@@ -250,3 +250,77 @@ This is the Forth move: the language parses itself.
 **Plan: Route A now (Sprint 0–4), Route B as Sprint 5 (Phase 2 bootstrap).**
 `SNOBOL4c.c` is the seed kernel — the "12 primitives in C" of our Forth analogy.
 The interpreter is done. What remains is the parser.
+
+---
+
+## Beautiful.sno: the parser is already written
+
+`Beautiful.sno` (SNOBOL4-dotnet repo, `Snobol4/Test Files/Beautiful/`) contains
+a complete SNOBOL4 expression and statement parser written as SNOBOL4 patterns.
+This resolves the "Route A vs Route B" question entirely.
+
+### The pattern hierarchy (from Beautiful.sno)
+
+```
+snoExpr        → snoExpr0 (assignment =)
+snoExpr0       → snoExpr1 (conditional ?)
+snoExpr1       → snoExpr2 (and &)
+snoExpr2       → snoExpr3 (alternation |)
+snoExpr3       → snoExpr4 (concatenation, space-separated)
+snoExpr4       → snoExpr5 (cursor @)
+snoExpr5       → snoExpr6 (arithmetic + -)
+snoExpr6       → snoExpr7 (string #)
+snoExpr7       → snoExpr8 (division /)
+snoExpr8       → snoExpr9 (multiplication *)
+snoExpr9       → snoExpr10 (remainder %)
+snoExpr10      → snoExpr11 (exponentiation ^ ! **)
+snoExpr11      → snoExpr12 (pattern ops $ .)
+snoExpr12      → snoExpr13 (complement ~)
+snoExpr13      → snoExpr14 (unary prefix ops)
+snoExpr14      → snoExpr15 (atoms, subscripts)
+snoExpr15      → snoExpr17 (function calls, parens, literals)
+```
+
+Plus: `snoStmt` (7-child: label/subject/pattern/=/replacement/goto1/goto2),
+`snoLabel`, `snoGoto`, `snoComment`, `snoControl`, `snoParse`, `snoCompiland`.
+
+### The stdin→stdout bridge (Expression.sno)
+
+The 5-line main pattern from `Expression.sno`:
+
+```snobol4
+START   LINE = INPUT                               :F(END)
+        LINE  POS(0) *snoExpr RPOS(0)             :F(NOTOK)
+        OUTPUT = "Valid SNOBOL4"                   :(START)
+NOTOK   OUTPUT = "Syntax ERROR"                   :(START)
+END
+```
+
+Translated to C (`main()` addition after registering patterns):
+
+```c
+const char * line;
+while ((line = read_line(stdin)) != NULL) {
+    assign_ptr("snoExpr", &snoExpr_0);
+    MATCH("snoExpr", line);
+}
+```
+
+### The serialization step (Sprint 5)
+
+Extract all `snoExpr*` patterns from `Beautiful.sno` and serialize them into
+`src/patterns/SNOBOL4_EXPRESSION_PATTERN.h` — the same static PATTERN struct
+format used by `BEAD_PATTERN.h`, `C_PATTERN.h`, etc. This is exactly what
+`_bootstrap.c` does from the Python side. We do it once by hand (or write a
+small serializer), then `#include` the result in `SNOBOL4c.c`.
+
+Result: `SNOBOL4c.c` reads stdin, matches against `*snoExpr`, and the full
+17-level SNOBOL4 expression grammar executes with zero new C code.
+
+### The λ bridge (Sprint 6)
+
+`Beautiful.sno` builds a pretty-print tree using `Shift`/`Reduce`/`Pop` and
+`nPush`/`nInc`/`nPop` actions. Replace those Reduce actions with `λ` nodes
+that emit IR instead of building a tree. The parse tree shape is known from
+`Beautiful.sno`: `snoStmt` has 7 children (label, subject, pattern, `=`,
+replacement, goto1, goto2). That IS the IR shape for Stage D.

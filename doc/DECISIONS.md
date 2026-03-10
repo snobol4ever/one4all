@@ -412,3 +412,98 @@ Moore's "12 primitives in C."
 
 **Status: UNDECIDED — but Route A (C + yacc front-end to SNOBOL4c.c) is
 the leading candidate. The interpreter is done. We need the parser.**
+
+---
+
+## Decision 1 (resolved): Beautiful.sno eliminates the parser problem
+
+### The discovery
+
+`Beautiful.sno` (in SNOBOL4-dotnet) contains a complete SNOBOL4 expression
+parser written as SNOBOL4 patterns: `snoExpr` through `snoExpr17`, plus
+`snoStmt`, `snoLabel`, `snoGoto`, `snoComment`, `snoParse`, `snoCompiland`.
+This is the full grammar — 17 precedence levels, all operators, function calls,
+subscripts, gotos.
+
+`Expression.sno` (the stripped-down version in the same folder) shows exactly
+how to use it:
+
+```snobol4
+START   LINE = INPUT                               :F(END)
+        LINE  POS(0) *snoExpr RPOS(0)             :F(NOTOK)
+        OUTPUT = "Valid SNOBOL4"                   :(START)
+NOTOK   OUTPUT = "Syntax ERROR"                   :(START)
+END
+```
+
+Read a line from stdin. Match it against `*snoExpr`. Print result to stdout.
+That is the entire stdin→stdout expression validator. Five lines.
+
+### What this means
+
+Route A (yacc/lex front-end) is **obsolete**. We do not need yacc. We do not
+need to write a grammar. The grammar is already written — in SNOBOL4 — and
+`SNOBOL4c.c` already knows how to execute SNOBOL4 patterns.
+
+The plan:
+
+1. **Extract `snoExpr` and all sub-patterns from `Beautiful.sno`** into a
+   new file: `src/patterns/SNOBOL4_EXPRESSION_PATTERN.h`. This is mechanical
+   work — the same transformation `_bootstrap.c` does: walk the pattern
+   structure, emit `static const PATTERN` declarations.
+
+2. **`#include "SNOBOL4_EXPRESSION_PATTERN.h"` in `SNOBOL4c.c`** alongside
+   the existing test patterns.
+
+3. **Add 5 lines to `main()`** mirroring `Expression.sno`: register
+   `snoExpr` in the globals table, read stdin line by line, call `MATCH()`.
+
+4. **`SNOBOL4c.c` now reads stdin and parses SNOBOL4 expressions.** No new
+   language infrastructure. No yacc. No lex. The interpreter is the parser.
+
+### The beauty
+
+Route A and Route B have **collapsed into the same route**:
+
+- Route A was: write a parser in a new language (yacc), have it emit `.h`
+  files for the interpreter to execute.
+- Route B was: write the parser as SNOBOL4 patterns inside `SNOBOL4c.c`.
+- **Actual route:** The parser is already written as SNOBOL4 patterns
+  (`Beautiful.sno`). Hard-code it as a `.h` file. Done.
+
+This is exactly the Forth bootstrap move: the seed kernel (`SNOBOL4c.c`)
+executes pattern data (`.h` files). The pattern data for the SNOBOL4 parser
+already exists. We just need to serialize it into the `.h` format and include
+it. The language parses itself from Sprint 1, not Sprint 8.
+
+### The `λ` bridge
+
+`Beautiful.sno` uses `nPush()`, `nInc()`, `nPop()` and string-quoted
+Reduce actions to build a parse tree (the `Shift`/`Reduce`/`Pop` nodes in
+`SNOBOL4c.c`). The full beautifier pipeline is:
+
+```
+stdin → snoExpr (pattern match, builds tree via Shift/Reduce)
+      → pp() (pretty-print the tree back to SNOBOL4)
+      → stdout
+```
+
+For SNOBOL4-tiny we don't need `pp()`. We need the match step to instead
+emit IR nodes (or C-with-gotos directly). That is the `λ` bridge: replace
+the `Reduce` actions that build a pretty-print tree with `λ` actions that
+emit IR. `Beautiful.sno` shows exactly what the parse tree looks like —
+`snoStmt` nodes with 7 children (label, subject, pattern, `=`, replacement,
+goto1, goto2). That *is* the IR shape for Stage D (full statements).
+
+### Revised sprint plan
+
+| Sprint | What | How |
+|--------|------|-----|
+| 0–4 | Pattern primitives, concat, alt, capture | existing `SNOBOL4c.c` |
+| 5 | **`SNOBOL4_EXPRESSION_PATTERN.h`** + stdin loop | serialize `snoExpr` from `Beautiful.sno` |
+| 6 | Replace Reduce actions with λ IR emitters | edit the `.h` file |
+| 7 | Full statement model (`snoStmt`, labels, gotos) | `snoStmt`/`snoParse` from `Beautiful.sno` |
+| 8 | Bootstrap closure: compiler compiles itself | oracle diff against CSNOBOL4/SPITBOL |
+
+**Status: DECIDED. No yacc. No new parser. Serialize `Beautiful.sno` patterns
+into a `.h` file and include it. The interpreter is the compiler.**

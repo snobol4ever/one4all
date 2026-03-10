@@ -84,8 +84,12 @@ The `.h` files (`C_PATTERN.h`, `CALC_PATTERN.h`, etc.) are pre-compiled
 pattern data that the interpreter executes. A compiler emits C-with-gotos
 (the `test_sno_*.c` format) instead — same semantics, zero dispatch cost.
 
-**What remains: the parser.** Route A adds a yacc/lex front-end. Route B
-writes the parser as SNOBOL4 patterns inside `SNOBOL4c.c` itself.
+**The parser is already written.** `Beautiful.sno` (SNOBOL4-dotnet repo)
+contains a complete 17-level SNOBOL4 expression and statement parser written
+as SNOBOL4 patterns (`snoExpr` through `snoExpr17`, `snoStmt`, `snoParse`).
+Sprint 5: serialize those patterns into `SNOBOL4_EXPRESSION_PATTERN.h`,
+`#include` it, add a 5-line stdin loop. No yacc. No new grammar.
+The seed kernel executes the parser as pattern data — the Forth move.
 
 ---
 
@@ -161,13 +165,13 @@ Test corpus: `SNOBOL4-corpus` (shared submodule), Gimpel library, Shafto AI corp
 Two foundational questions are currently on the table. See
 [`doc/DECISIONS.md`](doc/DECISIONS.md) for the full analysis.
 
-**Decision 1 — Compiler implementation language: leading candidate identified**
-`SNOBOL4c.c` is a complete 1,064-line SNOBOL4 pattern interpreter in C with
-heap allocator, GC, variable dictionary, and full match engine. It is the
-runtime. The `.h` files (BEAD, BEARDS, C, CALC, TESTS patterns) are compiled
-pattern data `#include`d into it — exactly the output a compiler would emit.
-Leading path: add a yacc/lex front-end that reads SNOBOL4 source and emits
-these `.h` files. Interpreter becomes compiler. See `doc/DECISIONS.md`.
+**Decision 1 — Compiler implementation language: RESOLVED**
+No yacc. No new grammar. `Beautiful.sno` (SNOBOL4-dotnet) contains a complete
+17-level SNOBOL4 expression and statement parser written as SNOBOL4 patterns
+(`snoExpr` through `snoExpr17`, `snoStmt`, `snoParse`). Sprint 5: serialize
+those patterns into `SNOBOL4_EXPRESSION_PATTERN.h`, `#include` it in
+`SNOBOL4c.c`, add a 5-line stdin loop. The seed kernel executes the parser as
+pattern data. The language parses itself. See `doc/DECISIONS.md`.
 
 **Decision 2 — What language does SNOBOL4-tiny implement first: DECIDED**
 Expressions first, statements second. Sequence B → C → D confirmed:

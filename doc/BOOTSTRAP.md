@@ -62,41 +62,45 @@ The core primitive set (subset of the 43 implemented):
 expressed in terms of existing ones. ARBNO is *derivable* from ARB + CAT + ALT
 once those work. Resist hardcoding it until the primitive set is proven complete.
 
-### Phase 2 — Parser (Sprint 5)
+### Phase 2 — SNOBOL4_EXPRESSION_PATTERN.h (Sprint 5)
 
-Two routes. Both start from `SNOBOL4c.c` as the runtime.
+**Route A (yacc) and Route B (write parser in SNOBOL4) are both obsolete.**
+The parser already exists.
 
-**Route A — yacc/lex front-end:**
-A yacc grammar reads SNOBOL4 source and emits `.h` files (static PATTERN
-struct declarations). `SNOBOL4c.c` interprets them unchanged. Fastest path.
-The grammar is already implicit in `transl8r_SNOBOL4.py` — porting to yacc
-is mechanical. Self-hosting is deferred.
+`Beautiful.sno` (SNOBOL4-dotnet repo) contains a complete SNOBOL4 expression
+and statement parser written as SNOBOL4 patterns — `snoExpr` through
+`snoExpr17`, plus `snoStmt`, `snoGoto`, `snoParse`, `snoCompiland`. It is the
+full grammar, 17 precedence levels, all operators, function calls, gotos.
 
-**Route B — Self-hosting parser:**
-Write the parser as SNOBOL4 patterns inside `SNOBOL4c.c`. The interpreter
-matches SNOBOL4 source text and emits C-with-gotos (the `test_sno_*.c`
-format) instead of executing. The interpreter IS the compiler's front-end.
-This is the Forth move: the language parses itself. Self-hosting from day one.
+Sprint 5 deliverable:
+1. Serialize `snoExpr*` patterns from `Beautiful.sno` into
+   `src/patterns/SNOBOL4_EXPRESSION_PATTERN.h` (static PATTERN struct format,
+   same as `BEAD_PATTERN.h`, `C_PATTERN.h`, etc.)
+2. `#include` it in `SNOBOL4c.c`
+3. Add a stdin read loop to `main()` (5 lines — see `Expression.sno`)
 
-**Plan: Route A for Sprint 5, Route B as the Phase 3 goal.**
+Result: `SNOBOL4c.c` reads SNOBOL4 expressions from stdin with zero new
+C infrastructure. The language parses itself from Sprint 5, not Sprint 8.
+This is the Forth move — the seed kernel executes the parser as pattern data.
 
 ### Phase 3 — Bootstrap Closure (Sprint 8+)
 
-The parser (written in SNOBOL4 via Route B) compiles itself and produces
-output identical to the CSNOBOL4/SPITBOL oracle. The full chain:
+Replace the `Shift`/`Reduce`/`Pop` tree-building actions in
+`SNOBOL4_EXPRESSION_PATTERN.h` with `λ` nodes that emit IR (or C-with-gotos
+directly). The parse tree shape is already defined by `Beautiful.sno`:
+`snoStmt` with 7 children (label/subject/pattern/`=`/replacement/goto1/goto2).
 
+The full chain:
 ```
 SNOBOL4 source
-    → SNOBOL4c.c (interpreter running the parser-as-patterns)
-    → C-with-gotos output
+    → SNOBOL4c.c (executing SNOBOL4_EXPRESSION_PATTERN.h via MATCH())
+    → λ actions emit C-with-gotos
     → compiled binary
-    → run on same SNOBOL4 source
-    → identical output to CSNOBOL4/SPITBOL
+    → oracle diff against CSNOBOL4/SPITBOL
 ```
 
-This closes the bootstrap loop. The `.h` file pipeline (Route A) becomes
-the permanent fast path for pre-compiled patterns; Route B is the
-self-hosting compiler path.
+Bootstrap is closed when the compiled binary produces output identical to
+running the same program on CSNOBOL4 or SPITBOL.
 
 ---
 
