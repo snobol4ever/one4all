@@ -294,6 +294,11 @@ void   sno_output_val(SnoVal v);        /* OUTPUT = v */
 SnoVal sno_input_read(void);            /* v = INPUT */
 void   sno_output_str(const char *s);   /* OUTPUT = 'string' */
 
+/* COMM — monitor telemetry */
+extern int sno_monitor_fd;
+void sno_comm_stno(int n);
+void sno_comm_var(const char *name, SnoVal val);
+
 /* ============================================================
  * SNOBOL4 keywords (&KEYWORD)
  * ============================================================ */
@@ -303,6 +308,7 @@ extern int64_t sno_kw_maxlngth;
 extern int64_t sno_kw_anchor;
 extern int64_t sno_kw_trim;
 extern int64_t sno_kw_stlimit;
+extern int64_t sno_kw_stcount;   /* &STCOUNT — incremented every statement */
 
 /* Global character sets */
 extern char sno_ucase[27];   /* &UCASE */

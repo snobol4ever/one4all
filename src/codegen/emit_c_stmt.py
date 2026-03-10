@@ -525,6 +525,7 @@ class StmtEmitter:
 
             # Emit the C label
             self._w(f'{lbl}: {{  /* L{stmt.lineno} */')
+            self._w(f'    sno_comm_stno({stmt.lineno});')
 
             # Determine success/failure labels from goto field
             succ_lbl = next_lbl

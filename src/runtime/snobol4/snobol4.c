@@ -14,6 +14,45 @@
 #include <stdarg.h>
 #include <ctype.h>
 #include <inttypes.h>
+#include <unistd.h>
+
+/* ============================================================
+ * COMM — monitor telemetry (Pick Monitor / double-trace)
+ *
+ * When sno_monitor_fd >= 0, every statement and every variable
+ * assignment emits an event to that file descriptor.
+ * Run with:  ./beautiful 2>/tmp/binary_trace.txt
+ * (sno_monitor_fd defaults to stderr = fd 2)
+ *
+ * Format mirrors CSNOBOL4 &TRACE output:
+ *   STNO <n>
+ *   VAR <name> <quoted-value>
+ * ============================================================ */
+int sno_monitor_fd = -1;   /* -1 = disabled; set to 2 for stderr */
+
+/* &STCOUNT — incremented every statement; checked against &STLIMIT */
+int64_t sno_kw_stcount = 0;
+
+void sno_comm_stno(int n) {
+    /* Enforce &STLIMIT (patch P001 — was declared but never checked) */
+    if (sno_kw_stlimit >= 0 && ++sno_kw_stcount > sno_kw_stlimit) {
+        fprintf(stderr, "\n** &STLIMIT exceeded at statement %d"
+                        " (&STCOUNT=%lld &STLIMIT=%lld)\n",
+                n, (long long)sno_kw_stcount, (long long)sno_kw_stlimit);
+        exit(1);
+    }
+    if (sno_monitor_fd < 0) return;
+    dprintf(sno_monitor_fd, "STNO %d\n", n);
+}
+
+void sno_comm_var(const char *name, SnoVal val) {
+    if (sno_monitor_fd < 0) return;
+    /* skip noisy internal variables */
+    if (!name) return;
+    if (name[0] == '_') return;          /* internal scratch vars */
+    const char *s = sno_to_str(val);
+    dprintf(sno_monitor_fd, "VAR %s \"%s\"\n", name, s ? s : "<null>");
+}
 
 /* ============================================================
  * Runtime initialization
@@ -24,7 +63,7 @@ int64_t sno_kw_fullscan = 0;
 int64_t sno_kw_maxlngth = 524288;
 int64_t sno_kw_anchor   = 0;
 int64_t sno_kw_trim     = 1;
-int64_t sno_kw_stlimit  = 50000;
+int64_t sno_kw_stlimit  = 2000000;
 
 char sno_ucase[27]    = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 char sno_lcase[27]    = "abcdefghijklmnopqrstuvwxyz";
@@ -36,6 +75,9 @@ void sno_runtime_init(void) {
     /* Build &ALPHABET: all 256 chars in order */
     for (int i = 0; i < 256; i++) sno_alphabet[i] = (char)i;
     sno_alphabet[256] = '\0';
+    /* Enable monitor if SNO_MONITOR=1 (writes to stderr) */
+    const char *mon = getenv("SNO_MONITOR");
+    if (mon && mon[0] == '1') sno_monitor_fd = 2;
 }
 
 /* ============================================================
@@ -444,6 +486,7 @@ SnoVal sno_var_get(const char *name) {
 void sno_var_set(const char *name, SnoVal val) {
     _var_init();
     if (!name) return;
+    sno_comm_var(name, val);
     unsigned h = _var_hash(name);
     for (VarEntry *e = _var_buckets[h]; e; e = e->next) {
         if (strcmp(e->name, name) == 0) { e->val = val; return; }
