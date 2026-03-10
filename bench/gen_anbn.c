@@ -38,39 +38,35 @@ static str_t S(S_t **zz, int entry) {
     if (!z) return SNO_EMPTY;  /* no frame = nothing to backtrack */
     goto S_beta;
 
-    S_alpha:
-        z->S_i = 1;  goto al1_alpha;
+    S_alpha:  z->S_i = 1;  goto al1_alpha;
     al1_alpha:  z->al1_entered = 0;  goto cl3_alpha;
     cl3_alpha:
         if (Delta + 1 > Omega) goto al1_beta;
         if (memcmp(Sigma + Delta, "a", 1) != 0) goto al1_beta;
         z->cl3_saved = Delta;  Delta += 1;  goto al1_li_ok;
     cl3_beta:  Delta = z->cl3_saved;  goto al1_beta;
-    al1_li_ok:
-        z->al1_entered = 1;  goto cr4_alpha;
+    al1_li_ok:  z->al1_entered = 1;  goto cr4_alpha;
     cr4_alpha:  z->cr4_entered = 0;  goto cl5_alpha;
-    cl5_alpha:  z->cl5_z = 0;
+    cl5_alpha:
+        z->cl5_z = 0;
         { str_t _r = S(&z->cl5_z, 0);
-          if (_r.ptr == 0) goto cr4_beta;
-          goto cr4_li_ok; }
+        if (_r.ptr == 0) goto cr4_beta;
+        goto cr4_li_ok; }
     cl5_beta:
         { str_t _r = S(&z->cl5_z, 1);
-          if (_r.ptr == 0) goto cr4_beta;
-          goto cr4_li_ok; }
-    cr4_li_ok:
-        z->cr4_entered = 1;  goto cr6_alpha;
+        if (_r.ptr == 0) goto cr4_beta;
+        goto cr4_li_ok; }
+    cr4_li_ok:  z->cr4_entered = 1;  goto cr6_alpha;
     cr6_alpha:
         if (Delta + 1 > Omega) goto cr4_ri_fail;
         if (memcmp(Sigma + Delta, "b", 1) != 0) goto cr4_ri_fail;
         z->cr6_saved = Delta;  Delta += 1;  goto S_lg;
     cr6_beta:  Delta = z->cr6_saved;  goto cr4_ri_fail;
-    cr4_ri_fail:
-        z->cr4_entered = 0;  goto cl5_beta;
+    cr4_ri_fail:  z->cr4_entered = 0;  goto cl5_beta;
     cr4_beta:
         if (z->cr4_entered) goto cr6_beta;
         goto al1_ri_fail;
-    al1_ri_fail:
-        z->al1_entered = 0;  goto cl3_beta;
+    al1_ri_fail:  z->al1_entered = 0;  goto cl3_beta;
     al1_beta:
         if (z->al1_entered) goto cr4_beta;
         goto S_lo;
@@ -82,15 +78,13 @@ static str_t S(S_t **zz, int entry) {
         if (memcmp(Sigma + Delta, "a", 1) != 0) goto ar2_beta;
         z->cl7_saved = Delta;  Delta += 1;  goto ar2_li_ok;
     cl7_beta:  Delta = z->cl7_saved;  goto ar2_beta;
-    ar2_li_ok:
-        z->ar2_entered = 1;  goto cr8_alpha;
+    ar2_li_ok:  z->ar2_entered = 1;  goto cr8_alpha;
     cr8_alpha:
         if (Delta + 1 > Omega) goto ar2_ri_fail;
         if (memcmp(Sigma + Delta, "b", 1) != 0) goto ar2_ri_fail;
         z->cr8_saved = Delta;  Delta += 1;  goto S_rg;
     cr8_beta:  Delta = z->cr8_saved;  goto ar2_ri_fail;
-    ar2_ri_fail:
-        z->ar2_entered = 0;  goto cl7_beta;
+    ar2_ri_fail:  z->ar2_entered = 0;  goto cl7_beta;
     ar2_beta:
         if (z->ar2_entered) goto cr8_beta;
         goto S_match_fail;
@@ -104,9 +98,8 @@ static str_t S(S_t **zz, int entry) {
 }
 
 
-/* Public driver — wraps the static-scoped generated engine */
 int engine_anbn(const char *s, int n) {
-    sno_arena_reset();   /* reset arena before each match */
+    sno_arena_reset();
     Sigma = s; Omega = n; Delta = 0;
     S_t *frame = 0;
     int first = 1;

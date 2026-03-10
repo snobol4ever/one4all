@@ -316,6 +316,126 @@ class FuncEmitter:
             L(f"/* TODO {type(node).__name__} */")
             L(f"{nid}_alpha: goto {omega};  {nid}_beta: goto {omega};")
 
+    # -----------------------------------------------------------------------
+    # Proebsting optimization pass
+    # "Simple Translation of Goal-Directed Evaluation" — Todd A. Proebsting
+    #
+    # The four-port template expansion produces correct but noisy code:
+    # many labels whose entire block is a bare "goto X;" — branches to
+    # branches.  Two passes clean this up entirely:
+    #
+    #   1. Copy propagation  — find every label L where the only statement
+    #      in L's block is "goto T;".  Replace every "goto L;" with "goto T;"
+    #      Repeat until stable (chains collapse; two passes handles cycles).
+    #
+    #   2. Dead-label elimination — after propagation, any label that has
+    #      zero incoming gotos AND is not a protected entry label is
+    #      unreachable; remove it and its block.
+    #
+    # Result closely resembles hand-written code (Proebsting Fig 1 → Fig 2).
+    # -----------------------------------------------------------------------
+
+    def _optimize_body(self, pat, entry_labels):
+        """Run copy-propagation + dead-label elimination on self.body[pat]."""
+        import re as _re
+
+        lines = self.body.get(pat, [])
+        if not lines:
+            return
+
+        # ── Step 0: parse lines into blocks ─────────────────────────────
+        label_re = _re.compile(r'^(\w+):(.*)$')
+        blocks = []   # list of [label_or_None, [stmts]]
+        for raw in lines:
+            line = raw.strip()
+            m = label_re.match(line)
+            if m:
+                lbl  = m.group(1)
+                rest = m.group(2).strip()
+                blocks.append([lbl, [rest] if rest else []])
+            else:
+                if not blocks:
+                    blocks.append([None, []])
+                blocks[-1][1].append(line)
+
+        # ── Step 1: label index ──────────────────────────────────────────
+        lbl_to_block = {b[0]: b for b in blocks if b[0]}
+
+        # ── Step 2: copy propagation ─────────────────────────────────────
+        goto_re = _re.compile(r'^goto\s+(\w+)\s*;$')
+
+        def resolve(lbl, seen=None):
+            if seen is None: seen = set()
+            if lbl in seen:  return lbl
+            seen.add(lbl)
+            b = lbl_to_block.get(lbl)
+            if b is None: return lbl
+            stmts = [s for s in b[1] if s]
+            if len(stmts) == 1:
+                gm = goto_re.match(stmts[0])
+                if gm:
+                    return resolve(gm.group(1), seen)
+            return lbl
+
+        redirect = {}
+        for lbl, b in lbl_to_block.items():
+            stmts = [s for s in b[1] if s]
+            if len(stmts) == 1 and goto_re.match(stmts[0]):
+                final = resolve(lbl)
+                if final != lbl:
+                    redirect[lbl] = final
+
+        def rewrite_stmt(stmt):
+            def sub(m2):
+                t = m2.group(1)
+                return f"goto {redirect[t]};" if t in redirect else m2.group(0)
+            return _re.sub(r'\bgoto\s+(\w+)\s*;', sub, stmt)
+
+        for b in blocks:
+            b[1] = [rewrite_stmt(s) for s in b[1]]
+
+        # ── Step 3: dead-label elimination ───────────────────────────────
+        incoming = {b[0]: 0 for b in blocks if b[0]}
+        for el in entry_labels:
+            if el in incoming:
+                incoming[el] = 999
+        for final in redirect.values():
+            if final in incoming:
+                incoming[final] = max(incoming[final], 1)
+        all_text = "\n".join(s for b in blocks for s in b[1])
+        for m in _re.finditer(r'\bgoto\s+(\w+)\s*;', all_text):
+            t = m.group(1)
+            if t in incoming:
+                incoming[t] += 1
+
+        live_blocks = []
+        for b in blocks:
+            lbl = b[0]
+            if lbl and incoming.get(lbl, 0) == 0 and lbl not in entry_labels:
+                stmts = [s for s in b[1] if s]
+                if len(stmts) <= 1:
+                    continue
+            live_blocks.append(b)
+
+        # ── Step 4: re-serialise ─────────────────────────────────────────
+        out = []
+        for lbl, stmts in live_blocks:
+            non_empty = [s for s in stmts if s]
+            if lbl:
+                if len(non_empty) == 1:
+                    out.append(f"{lbl}:  {non_empty[0]}")
+                elif non_empty:
+                    out.append(f"{lbl}:")
+                    for s in non_empty:
+                        out.append(f"    {s}")
+                else:
+                    out.append(f"{lbl}:")
+            else:
+                for s in non_empty:
+                    out.append(s)
+
+        self.body[pat] = out
+
     def generate_source(self, root_name, subject, include_main):
         names = self.graph.names()
 
@@ -327,6 +447,13 @@ class FuncEmitter:
                            nid=name,
                            gamma=f"{name}_match_ok",
                            omega=f"{name}_match_fail")
+
+        # Proebsting optimization: copy-propagation + dead-label elimination
+        for name in names:
+            self._optimize_body(name, entry_labels={
+                f"{name}_alpha", f"{name}_beta",
+                f"{name}_match_ok", f"{name}_match_fail"
+            })
 
         out = []
         out.append("/* Generated by SNOBOL4-tiny emit_c.py — DO NOT EDIT */")

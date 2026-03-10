@@ -34,8 +34,7 @@ static str_t AB(AB_t **zz, int entry) {
     if (!z) return SNO_EMPTY;  /* no frame = nothing to backtrack */
     goto AB_beta;
 
-    AB_alpha:
-        z->AB_i = 1;  goto al1_alpha;
+    AB_alpha:  z->AB_i = 1;  goto al1_alpha;
     al1_alpha:
         if (Delta + 1 > Omega) goto AB_lo;
         if (memcmp(Sigma + Delta, "a", 1) != 0) goto AB_lo;
@@ -85,53 +84,47 @@ static str_t ROOT(ROOT_t **zz, int entry) {
         if (z->cl3_depth >= 64) goto ROOT_beta;
         z->cl3_cursors[z->cl3_depth] = Delta;
         goto an5_alpha;
-    an5_alpha:  z->an5_z = 0;
+    an5_alpha:
+        z->an5_z = 0;
         { str_t _r = AB(&z->an5_z, 0);
-          if (_r.ptr == 0) goto cl3_cfail;
-          goto cl3_cok; }
+        if (_r.ptr == 0) goto cl3_cfail;
+        goto ROOT_li_ok; }
     an5_beta:
         { str_t _r = AB(&z->an5_z, 1);
-          if (_r.ptr == 0) goto cl3_cfail;
-          goto cl3_cok; }
-    cl3_cok:   goto ROOT_li_ok;
+        if (_r.ptr == 0) goto cl3_cfail;
+        goto ROOT_li_ok; }
     cl3_cfail:
         Delta = z->cl3_cursors[z->cl3_depth];  z->cl3_depth--;
         goto ROOT_beta;
-    ROOT_li_ok:
-        z->ROOT_entered = 1;  goto cr4_alpha;
+    ROOT_li_ok:  z->ROOT_entered = 1;  goto cr4_alpha;
     cr4_alpha:  z->cr4_entered = 0;  goto cl6_alpha;
     cl6_alpha:
         if (Delta + 1 > Omega) goto cr4_beta;
         if (memcmp(Sigma + Delta, "a", 1) != 0) goto cr4_beta;
         z->cl6_saved = Delta;  Delta += 1;  goto cr4_li_ok;
     cl6_beta:  Delta = z->cl6_saved;  goto cr4_beta;
-    cr4_li_ok:
-        z->cr4_entered = 1;  goto cr7_alpha;
+    cr4_li_ok:  z->cr4_entered = 1;  goto cr7_alpha;
     cr7_alpha:  z->cr7_entered = 0;  goto cl8_alpha;
     cl8_alpha:
         if (Delta + 1 > Omega) goto cr7_beta;
         if (memcmp(Sigma + Delta, "b", 1) != 0) goto cr7_beta;
         z->cl8_saved = Delta;  Delta += 1;  goto cr7_li_ok;
     cl8_beta:  Delta = z->cl8_saved;  goto cr7_beta;
-    cr7_li_ok:
-        z->cr7_entered = 1;  goto cr9_alpha;
+    cr7_li_ok:  z->cr7_entered = 1;  goto cr9_alpha;
     cr9_alpha:
         if (Delta + 1 > Omega) goto cr7_ri_fail;
         if (memcmp(Sigma + Delta, "b", 1) != 0) goto cr7_ri_fail;
         z->cr9_saved = Delta;  Delta += 1;  goto ROOT_match_ok;
     cr9_beta:  Delta = z->cr9_saved;  goto cr7_ri_fail;
-    cr7_ri_fail:
-        z->cr7_entered = 0;  goto cl8_beta;
+    cr7_ri_fail:  z->cr7_entered = 0;  goto cl8_beta;
     cr7_beta:
         if (z->cr7_entered) goto cr9_beta;
         goto cr4_ri_fail;
-    cr4_ri_fail:
-        z->cr4_entered = 0;  goto cl6_beta;
+    cr4_ri_fail:  z->cr4_entered = 0;  goto cl6_beta;
     cr4_beta:
         if (z->cr4_entered) goto cr7_beta;
         goto ROOT_ri_fail;
-    ROOT_ri_fail:
-        z->ROOT_entered = 0;  goto cl3_beta;
+    ROOT_ri_fail:  z->ROOT_entered = 0;  goto cl3_beta;
     ROOT_beta:
         if (z->ROOT_entered) goto cr4_beta;
         goto ROOT_match_fail;
@@ -140,9 +133,8 @@ static str_t ROOT(ROOT_t **zz, int entry) {
 }
 
 
-/* Public driver — wraps the static-scoped generated engine */
 int engine_aorb_star_abb(const char *s, int n) {
-    sno_arena_reset();   /* reset arena before each match */
+    sno_arena_reset();
     Sigma = s; Omega = n; Delta = 0;
     ROOT_t *frame = 0;
     int first = 1;
