@@ -409,3 +409,82 @@ same abstraction at different levels:
 The difference is that SNOBOL4tiny compiles generators to static gotos,
 while Icon uses a runtime generator stack. Same semantics, zero overhead.
 
+
+---
+
+## Polyglot Stdin: Alt as a Universal Parser Dispatcher
+
+### The Idea
+
+`SNOBOL4c.c`'s `MATCH()` engine doesn't care what grammar it's running — it just
+executes a `PATTERN *` tree against a subject string. The root pattern doesn't
+have to be a single grammar. It can be an **alternation** (`Π`) of multiple grammars:
+
+```c
+root = ALT(snoStmt, ALT(ednExpr, ALT(incStmt, ...)))
+```
+
+One `MATCH()` call against one stdin line. If `snoStmt` fails to match, the engine
+backtracks into `ednExpr`. If that fails, it tries `incStmt`. No dispatch logic.
+No format detection. No switch statement. The **backtracking engine is the dispatcher**.
+
+This is not a special feature — it falls directly out of the Π (alternation) node
+that's already implemented. Polyglot parsing is free.
+
+### Languages Feedable Through Stdin
+
+The initial target set:
+
+| Language | Grammar source | Notes |
+|----------|---------------|-------|
+| SNOBOL4 | `snoStmt` from `Beautiful.sno` | Primary target; Sprint 5 |
+| EDN | New `ednExpr` pattern | Clojure data literals; maps/vectors/keywords |
+| INC | `incStmt` | `.inc` include/macro files |
+| S-expressions | Subset of EDN | Trivial once EDN is done |
+| CSV (single line) | `csvRow` | `BREAK(',') $ field` × N |
+| Forth source | `forthWord` | Whitespace-delimited tokens |
+
+**Why EDN specifically:** EDN (Extensible Data Notation) is the format used by
+SNOBOL4-jvm (Clojure) for its internal IR serialization. A SNOBOL4-tiny that reads
+EDN can directly consume SNOBOL4-jvm IR output — closing a cross-implementation loop.
+
+### Implementation Path
+
+Sprint 5 establishes `snoStmt` as the root grammar (from `Beautiful.sno`). Adding a
+second grammar arm is a one-line change to the root `PATTERN`:
+
+```c
+// Before (Sprint 5):
+root = snoStmt;
+
+// After (EDN support):
+root = ALT(snoStmt, ednExpr);
+```
+
+The `ednExpr` pattern is itself a SNOBOL4 pattern — it would live in
+`src/patterns/EDN_PATTERN.h`, generated the same way as `SNOBOL4_EXPRESSION_PATTERN.h`.
+
+### The Bootstrap Angle
+
+Once SNOBOL4-tiny can read EDN, and SNOBOL4-jvm emits EDN IR, the pipeline becomes:
+
+```
+SNOBOL4 source
+    → SNOBOL4-jvm (parses, emits EDN IR)
+    → SNOBOL4-tiny stdin (reads EDN, emits C-with-gotos)
+    → compiled binary
+```
+
+SNOBOL4-tiny becomes a backend for SNOBOL4-jvm output. The two implementations
+validate each other through a shared IR format.
+
+### The Alt Pattern IS the Architecture
+
+The deeper point: the polyglot dispatcher is not a bolt-on feature. It reveals that
+the SNOBOL4 pattern match IS a universal parsing framework. Any context-free language
+with a SNOBOL4 grammar can be parsed by `MATCH()`. The "language" SNOBOL4-tiny
+implements is therefore not SNOBOL4 — it is **whatever grammar is loaded into
+`SNOBOL4_EXPRESSION_PATTERN.h`** at compile time.
+
+This means SNOBOL4-tiny is not a SNOBOL4 compiler. It is a **compiler compiler**
+whose input language is a SNOBOL4 pattern expression.

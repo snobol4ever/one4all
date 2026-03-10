@@ -507,3 +507,53 @@ goto1, goto2). That *is* the IR shape for Stage D (full statements).
 
 **Status: DECIDED. No yacc. No new parser. Serialize `Beautiful.sno` patterns
 into a `.h` file and include it. The interpreter is the compiler.**
+
+---
+
+## Decision 8: Polyglot stdin — EDN and alternate grammars via Alt root pattern
+
+### The Proposal
+
+The root pattern passed to `MATCH()` in `SNOBOL4c.c`'s stdin loop need not be a
+single grammar. It can be:
+
+```c
+root = ALT(snoStmt, ALT(ednExpr, ALT(incStmt, ...)));
+```
+
+The backtracking engine dispatches between grammars automatically. No format
+detection code. No switch. Polyglot parsing is a consequence of Π already existing.
+
+### EDN as First Alt Candidate
+
+EDN (Extensible Data Notation) is the natural first addition because:
+1. SNOBOL4-jvm uses Clojure/EDN for its internal data structures.
+2. A SNOBOL4-tiny that reads EDN can consume SNOBOL4-jvm IR directly.
+3. EDN grammar is small — maps, vectors, lists, keywords, strings, numbers.
+   The entire grammar fits in ~20 SNOBOL4 pattern definitions.
+
+### INC Files
+
+`.inc` files (include/macro definitions used in SNOBOL4 assembler dialects and
+some SPITBOL distributions) are another natural arm — they have a simple line-oriented
+grammar that's a proper subset of what the existing parsers already handle.
+
+### The Architecture Point
+
+This decision is not about adding features. It reveals that `SNOBOL4_EXPRESSION_PATTERN.h`
+is a **loadable grammar slot**, not a fixed parser. SNOBOL4-tiny is a compiler whose
+input language is determined at compile time by which `.h` files are included.
+
+Adding `EDN_PATTERN.h` to the `#include` chain and wrapping the root in `ALT()` makes
+SNOBOL4-tiny a polyglot compiler with zero new C infrastructure.
+
+**Status: DECIDED — 2026-03-10**
+
+**Decision: Implement EDN_PATTERN.h as the Sprint 7 deliverable (after REF/mutual recursion
+is validated in Sprint 6). INC support follows as Sprint 8. The root Alt chain is the
+architecture — each new language is one more arm, one more `.h` file.**
+
+Rationale: The insight that Alt IS the dispatcher is architecturally significant and
+should be locked in now. It changes how we think about what SNOBOL4-tiny *is*:
+not a SNOBOL4 compiler but a grammar-driven compiler compiler. Every decision
+downstream should be made with this in mind.

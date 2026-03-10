@@ -223,3 +223,30 @@ bench/          Benchmarks vs SPITBOL, CSNOBOL4
 | [SNOBOL4-dotnet](https://github.com/SNOBOL4-plus/SNOBOL4-dotnet) | Full SNOBOL4 → MSIL (C#) |
 | [SNOBOL4-python](https://github.com/SNOBOL4-plus/SNOBOL4-python) | Pattern library (PyPI) |
 | [SNOBOL4-corpus](https://github.com/SNOBOL4-plus/SNOBOL4-corpus) | Shared test corpus |
+
+---
+
+## Polyglot Parsing: Alt IS the Dispatcher
+
+SNOBOL4-tiny's stdin loop matches each input line against a root `PATTERN`.
+That root pattern is an **alternation** (`|`) of grammars:
+
+```c
+root = snoStmt | ednExpr | incStmt | ...
+```
+
+The backtracking engine dispatches between grammars automatically — no format
+detection, no switch statement. Each new language is one more arm, one more
+`*_PATTERN.h` file. This is not a feature; it falls out of `Alt` already existing.
+
+**Target grammar arms:**
+
+| Arm | Language | Source | Sprint |
+|-----|----------|--------|--------|
+| `snoStmt` | SNOBOL4 | `Beautiful.sno` serialized | 5 |
+| `ednExpr` | EDN (Clojure data literals) | New `EDN_PATTERN.h` | 7 |
+| `incStmt` | INC macro/include files | New `INC_PATTERN.h` | 8 |
+
+**The architectural consequence:** SNOBOL4-tiny is not a SNOBOL4 compiler.
+It is a **grammar-driven compiler compiler**. The input language is whatever
+grammar is loaded into the root Alt at compile time.
