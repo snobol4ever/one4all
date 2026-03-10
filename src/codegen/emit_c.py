@@ -137,6 +137,33 @@ class Emitter:
             self.emit(f"{nid}_beta:")
             self.emit(f"    goto {child_id}_beta;")
 
+        elif isinstance(node, Arbno):
+            # ARBNO(child): zero-or-more non-overlapping matches of child.
+            # α: succeed immediately (zero iterations).
+            # β: push cursor, try child_α fresh (one more iteration).
+            # child_γ: child matched — succeed again (cursor advanced).
+            # child_ω: child failed — restore cursor, propagate failure.
+            child_id = self.fresh_id("arbno_c")
+            self.static(f"static int64_t {nid}_cursors[64];")
+            self.static(f"static int     {nid}_depth;")
+            self.emit(f"{nid}_alpha:")
+            self.emit(f"    {nid}_depth = -1;")
+            self.emit(f"    goto {gamma};              /* ARBNO: zero matches → succeed */")
+            self.emit(f"{nid}_beta:")
+            self.emit(f"    {nid}_depth++;")
+            self.emit(f"    if ({nid}_depth >= 64) goto {omega};  /* stack overflow */")
+            self.emit(f"    {nid}_cursors[{nid}_depth] = cursor;")
+            self.emit(f"    goto {child_id}_alpha;")
+            self.emit_node(node.child, child_id,
+                           gamma=f"{nid}_child_ok",
+                           omega=f"{nid}_child_fail")
+            self.emit(f"{nid}_child_ok:")
+            self.emit(f"    goto {gamma};              /* child matched → ARBNO succeeds again */")
+            self.emit(f"{nid}_child_fail:")
+            self.emit(f"    cursor = {nid}_cursors[{nid}_depth];")
+            self.emit(f"    {nid}_depth--;")
+            self.emit(f"    goto {omega};              /* child failed → ARBNO fails */")
+
         elif isinstance(node, Ref):
             # Forward / backward reference to a named top-level pattern
             self.emit(f"{nid}_alpha:")
