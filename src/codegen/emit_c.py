@@ -517,7 +517,7 @@ class FuncEmitter:
             for line in bdy:
                 out.append("    " + line)
             out.append(f"    {name}_match_ok:   return (str_t){{ Sigma, Delta }};")
-            out.append(f"    {name}_match_fail: return SNO_EMPTY;")
+            out.append(f"    {name}_match_fail: sno_exit((void **)zz); return SNO_EMPTY;")
             out.append("}")
             out.append("")
 
