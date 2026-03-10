@@ -1,0 +1,14 @@
+# Build artifacts
+*.o
+*.out
+a.out
+__pycache__/
+*.pyc
+*.class
+
+# Test binaries (compiled sprint tests)
+test/sprint*/null
+test/sprint*/lit_hello
+test/sprint*/pos0
+test/sprint*/rpos0
+test/sprint*/got.txt
