@@ -161,9 +161,39 @@ def emit_expr(e):
     if k == 'sub':
         return f'sno_sub({emit_expr(e.left)}, {emit_expr(e.right)})'
     if k == 'mul':
-        # *var in pattern context = indirect pattern ref
+        # *var (left==null) = deferred pattern ref
         if e.left is not None and e.left.kind == 'null':
-            return f'sno_pat_ref("{e.right.val}")' if e.right and e.right.kind == 'var' else f'sno_pat_ref_val({emit_expr(e.right)})'
+            r = e.right
+            if r and r.kind == 'var':
+                return f'sno_pat_ref("{r.val}")'
+            # *name(cond_assign)(extra) = pat_cat(pat_assign_cond(ref, cond), extra)
+            if (r and r.kind == 'array' and r.obj and r.obj.kind == 'call'
+                    and r.subscripts and len(r.subscripts) == 1):
+                ref_part = f'sno_pat_assign_cond(sno_pat_ref("{r.obj.name}"), {emit_expr(r.obj.args[0]) if r.obj.args else "SNO_NULL_VAL"})'
+                extra = emit_as_pattern(r.subscripts[0])
+                return f'sno_pat_cat({ref_part}, {extra})'
+            # *call(args) = sno_pat_user_call
+            if r and r.kind == 'call':
+                ca = [emit_expr(a) for a in (r.args or [])]
+                n = len(ca)
+                if n:
+                    args_joined = ', '.join(ca)
+                    return f'sno_pat_user_call("{r.name}", (SnoVal[{n}]){{{args_joined}}}, {n})'
+                return f'sno_pat_user_call("{r.name}", NULL, 0)'
+            return f'sno_pat_ref_val({emit_expr(e.right)})'
+        # A * B where A is str/literal/pattern = pattern concat with deferred B
+        # In SNOBOL4, 'lit' * *var means concat(lit, deferred_ref(var))
+        if (e.left is not None and
+                (e.left.kind in ('str','lit','indirect') or _is_pattern_expr(e.left))):
+            lp = emit_as_pattern(e.left)
+            # Right side: treat as deferred ref if var/call
+            if e.right and e.right.kind == 'var':
+                rp = f'sno_pat_ref("{e.right.val}")'
+            elif e.right and e.right.kind == 'call':
+                rp = emit_as_pattern(e.right)
+            else:
+                rp = f'sno_var_as_pattern({emit_expr(e.right)})'
+            return f'sno_pat_cat({lp}, {rp})'
         return f'sno_mul({emit_expr(e.left)}, {emit_expr(e.right)})'
     if k == 'div':
         return f'sno_div({emit_expr(e.left)}, {emit_expr(e.right)})'

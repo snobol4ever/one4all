@@ -1752,7 +1752,7 @@ _stmt_177: {  /* L14 */
 _stmt_178: {  /* L20 */
     sno_comm_stno(20);
     {
-        SnoVal _rhs = sno_pat_ref_val(sno_apply("ioFileOptDash", (SnoVal[1]){sno_pat_alt(sno_var_as_pattern(sno_mul(sno_pat_span(sno_to_str(SNO_STR_VAL(" ,"))), sno_var_get("ioFileOptList"))), sno_var_as_pattern(sno_var_get("epsilon")))}, 1));
+        SnoVal _rhs = sno_pat_user_call("ioFileOptDash", (SnoVal[1]){sno_pat_alt(sno_var_as_pattern(sno_pat_cat(sno_pat_span(sno_to_str(SNO_STR_VAL(" ,"))), sno_pat_ref("ioFileOptList"))), sno_var_as_pattern(sno_var_get("epsilon")))}, 1);
         if (sno_is_fail(_rhs)) goto _stmt_179;
         sno_var_set("ioFileOptList", _rhs);
         goto _stmt_179;
@@ -1762,7 +1762,7 @@ _stmt_178: {  /* L20 */
 _stmt_179: {  /* L21 */
     sno_comm_stno(21);
     {
-        SnoVal _rhs = sno_concat_sv(sno_mul(SNO_STR_VAL("["), sno_var_get("ioFileOptList")), SNO_STR_VAL("]"));
+        SnoVal _rhs = sno_concat_sv(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("[")), sno_pat_ref("ioFileOptList")), SNO_STR_VAL("]"));
         if (sno_is_fail(_rhs)) goto _stmt_180;
         sno_var_set("ioFileOptPat", _rhs);
         goto _stmt_180;
@@ -3163,7 +3163,7 @@ _stmt_695: {  /* L61 */
 _stmt_696: {  /* L63 */
     sno_comm_stno(63);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_cat(sno_pat_span(sno_to_str(sno_concat_sv(sno_concat_sv(sno_concat_sv(sno_concat_sv(SNO_STR_VAL("."), sno_var_get("digits")), SNO_STR_VAL(sno_ucase)), SNO_STR_VAL("_")), SNO_STR_VAL(sno_lcase)))), sno_var_as_pattern(sno_var_get(sno_to_str(sno_var_get("tx"))))), sno_var_as_pattern(sno_mul(sno_var_get(sno_to_str(SNO_NULL_VAL)), sno_apply("match", (SnoVal[2]){sno_var_get("snoFunctions"), sno_var_get("snoTxInList")}, 2))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_cat(sno_pat_span(sno_to_str(sno_concat_sv(sno_concat_sv(sno_concat_sv(sno_concat_sv(SNO_STR_VAL("."), sno_var_get("digits")), SNO_STR_VAL(sno_ucase)), SNO_STR_VAL("_")), SNO_STR_VAL(sno_lcase)))), sno_var_as_pattern(sno_var_get(sno_to_str(sno_var_get("tx"))))), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(sno_var_get(sno_to_str(SNO_NULL_VAL))), sno_pat_user_call("match", (SnoVal[2]){sno_var_get("snoFunctions"), sno_var_get("snoTxInList")}, 2))));
         if (sno_is_fail(_rhs)) goto _stmt_697;
         sno_var_set("snoFunction", _rhs);
         goto _stmt_697;
@@ -3173,7 +3173,7 @@ _stmt_696: {  /* L63 */
 _stmt_697: {  /* L65 */
     sno_comm_stno(65);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_cat(sno_pat_span(sno_to_str(sno_concat_sv(sno_concat_sv(sno_concat_sv(sno_concat_sv(SNO_STR_VAL("."), sno_var_get("digits")), SNO_STR_VAL(sno_ucase)), SNO_STR_VAL("_")), SNO_STR_VAL(sno_lcase)))), sno_var_as_pattern(sno_var_get(sno_to_str(sno_var_get("tx"))))), sno_var_as_pattern(sno_mul(sno_var_get(sno_to_str(SNO_NULL_VAL)), sno_apply("match", (SnoVal[2]){sno_var_get("snoBuiltinVars"), sno_var_get("snoTxInList")}, 2))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_cat(sno_pat_span(sno_to_str(sno_concat_sv(sno_concat_sv(sno_concat_sv(sno_concat_sv(SNO_STR_VAL("."), sno_var_get("digits")), SNO_STR_VAL(sno_ucase)), SNO_STR_VAL("_")), SNO_STR_VAL(sno_lcase)))), sno_var_as_pattern(sno_var_get(sno_to_str(sno_var_get("tx"))))), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(sno_var_get(sno_to_str(SNO_NULL_VAL))), sno_pat_user_call("match", (SnoVal[2]){sno_var_get("snoBuiltinVars"), sno_var_get("snoTxInList")}, 2))));
         if (sno_is_fail(_rhs)) goto _stmt_698;
         sno_var_set("snoBuiltinVar", _rhs);
         goto _stmt_698;
@@ -3183,7 +3183,7 @@ _stmt_697: {  /* L65 */
 _stmt_698: {  /* L67 */
     sno_comm_stno(67);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_cat(sno_pat_span(sno_to_str(sno_concat_sv(sno_concat_sv(sno_concat_sv(sno_concat_sv(SNO_STR_VAL("."), sno_var_get("digits")), SNO_STR_VAL(sno_ucase)), SNO_STR_VAL("_")), SNO_STR_VAL(sno_lcase)))), sno_var_as_pattern(sno_var_get(sno_to_str(sno_var_get("tx"))))), sno_var_as_pattern(sno_mul(sno_var_get(sno_to_str(SNO_NULL_VAL)), sno_apply("match", (SnoVal[2]){sno_var_get("snoSpecialNms"), sno_var_get("snoTxInList")}, 2))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_cat(sno_pat_span(sno_to_str(sno_concat_sv(sno_concat_sv(sno_concat_sv(sno_concat_sv(SNO_STR_VAL("."), sno_var_get("digits")), SNO_STR_VAL(sno_ucase)), SNO_STR_VAL("_")), SNO_STR_VAL(sno_lcase)))), sno_var_as_pattern(sno_var_get(sno_to_str(sno_var_get("tx"))))), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(sno_var_get(sno_to_str(SNO_NULL_VAL))), sno_pat_user_call("match", (SnoVal[2]){sno_var_get("snoSpecialNms"), sno_var_get("snoTxInList")}, 2))));
         if (sno_is_fail(_rhs)) goto _stmt_699;
         sno_var_set("snoSpecialNm", _rhs);
         goto _stmt_699;
@@ -3193,7 +3193,7 @@ _stmt_698: {  /* L67 */
 _stmt_699: {  /* L69 */
     sno_comm_stno(69);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("&")), sno_pat_span(sno_to_str(sno_concat_sv(SNO_STR_VAL(sno_ucase), SNO_STR_VAL(sno_lcase))))), sno_var_as_pattern(sno_var_get(sno_to_str(sno_var_get("tx"))))), sno_var_as_pattern(sno_mul(sno_var_get(sno_to_str(SNO_NULL_VAL)), sno_apply("match", (SnoVal[2]){sno_var_get("snoProtKwds"), sno_var_get("snoTxInList")}, 2))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("&")), sno_pat_span(sno_to_str(sno_concat_sv(SNO_STR_VAL(sno_ucase), SNO_STR_VAL(sno_lcase))))), sno_var_as_pattern(sno_var_get(sno_to_str(sno_var_get("tx"))))), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(sno_var_get(sno_to_str(SNO_NULL_VAL))), sno_pat_user_call("match", (SnoVal[2]){sno_var_get("snoProtKwds"), sno_var_get("snoTxInList")}, 2))));
         if (sno_is_fail(_rhs)) goto _stmt_700;
         sno_var_set("snoProtKwd", _rhs);
         goto _stmt_700;
@@ -3203,7 +3203,7 @@ _stmt_699: {  /* L69 */
 _stmt_700: {  /* L70 */
     sno_comm_stno(70);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("&")), sno_pat_span(sno_to_str(sno_concat_sv(SNO_STR_VAL(sno_ucase), SNO_STR_VAL(sno_lcase))))), sno_var_as_pattern(sno_var_get(sno_to_str(sno_var_get("tx"))))), sno_var_as_pattern(sno_mul(sno_var_get(sno_to_str(SNO_NULL_VAL)), sno_apply("match", (SnoVal[2]){sno_var_get("snoUnprotKwds"), sno_var_get("snoTxInList")}, 2))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("&")), sno_pat_span(sno_to_str(sno_concat_sv(SNO_STR_VAL(sno_ucase), SNO_STR_VAL(sno_lcase))))), sno_var_as_pattern(sno_var_get(sno_to_str(sno_var_get("tx"))))), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(sno_var_get(sno_to_str(SNO_NULL_VAL))), sno_pat_user_call("match", (SnoVal[2]){sno_var_get("snoUnprotKwds"), sno_var_get("snoTxInList")}, 2))));
         if (sno_is_fail(_rhs)) goto _stmt_701;
         sno_var_set("snoUnprotKwd", _rhs);
         goto _stmt_701;
@@ -3233,7 +3233,7 @@ _stmt_702: {  /* L73 */
 _stmt_703: {  /* L78 */
     sno_comm_stno(78);
     {
-        SnoVal _rhs = sno_mul(sno_pat_alt(sno_pat_pos(sno_to_int(SNO_INT_VAL(0LL))), sno_var_as_pattern(SNO_STR_VAL(" "))), sno_subscript_get(sno_apply("upr", (SnoVal[1]){sno_var_get("tx")}, 1), sno_pat_alt(sno_var_as_pattern(SNO_STR_VAL(" ")), sno_pat_rpos(sno_to_int(SNO_INT_VAL(0LL))))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_alt(sno_pat_pos(sno_to_int(SNO_INT_VAL(0LL))), sno_var_as_pattern(SNO_STR_VAL(" "))), sno_var_as_pattern(sno_subscript_get(sno_apply("upr", (SnoVal[1]){sno_var_get("tx")}, 1), sno_pat_alt(sno_var_as_pattern(SNO_STR_VAL(" ")), sno_pat_rpos(sno_to_int(SNO_INT_VAL(0LL)))))));
         if (sno_is_fail(_rhs)) goto _stmt_704;
         sno_var_set("snoTxInList", _rhs);
         goto _stmt_704;
@@ -3293,7 +3293,7 @@ _stmt_708: {  /* L87 */
 _stmt_709: {  /* L97 */
     sno_comm_stno(97);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_mul(SNO_STR_VAL("="), sno_var_get("snoWhite"))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("=")), sno_pat_ref("snoWhite"))));
         if (sno_is_fail(_rhs)) goto _stmt_710;
         sno_var_set(sno_to_str(SNO_STR_VAL("=")), _rhs);
         goto _stmt_710;
@@ -3303,7 +3303,7 @@ _stmt_709: {  /* L97 */
 _stmt_710: {  /* L98 */
     sno_comm_stno(98);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_mul(SNO_STR_VAL("?"), sno_var_get("snoWhite"))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("?")), sno_pat_ref("snoWhite"))));
         if (sno_is_fail(_rhs)) goto _stmt_711;
         sno_var_set(sno_to_str(SNO_STR_VAL("?")), _rhs);
         goto _stmt_711;
@@ -3313,7 +3313,7 @@ _stmt_710: {  /* L98 */
 _stmt_711: {  /* L99 */
     sno_comm_stno(99);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_mul(SNO_STR_VAL("|"), sno_var_get("snoWhite"))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("|")), sno_pat_ref("snoWhite"))));
         if (sno_is_fail(_rhs)) goto _stmt_712;
         sno_var_set(sno_to_str(SNO_STR_VAL("|")), _rhs);
         goto _stmt_712;
@@ -3323,7 +3323,7 @@ _stmt_711: {  /* L99 */
 _stmt_712: {  /* L100 */
     sno_comm_stno(100);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_mul(SNO_STR_VAL("+"), sno_var_get("snoWhite"))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("+")), sno_pat_ref("snoWhite"))));
         if (sno_is_fail(_rhs)) goto _stmt_713;
         sno_var_set(sno_to_str(SNO_STR_VAL("+")), _rhs);
         goto _stmt_713;
@@ -3333,7 +3333,7 @@ _stmt_712: {  /* L100 */
 _stmt_713: {  /* L101 */
     sno_comm_stno(101);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_mul(SNO_STR_VAL("-"), sno_var_get("snoWhite"))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("-")), sno_pat_ref("snoWhite"))));
         if (sno_is_fail(_rhs)) goto _stmt_714;
         sno_var_set(sno_to_str(SNO_STR_VAL("-")), _rhs);
         goto _stmt_714;
@@ -3343,7 +3343,7 @@ _stmt_713: {  /* L101 */
 _stmt_714: {  /* L102 */
     sno_comm_stno(102);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_mul(SNO_STR_VAL("/"), sno_var_get("snoWhite"))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("/")), sno_pat_ref("snoWhite"))));
         if (sno_is_fail(_rhs)) goto _stmt_715;
         sno_var_set(sno_to_str(SNO_STR_VAL("/")), _rhs);
         goto _stmt_715;
@@ -3353,7 +3353,7 @@ _stmt_714: {  /* L102 */
 _stmt_715: {  /* L103 */
     sno_comm_stno(103);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_mul(SNO_STR_VAL("*"), sno_var_get("snoWhite"))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("*")), sno_pat_ref("snoWhite"))));
         if (sno_is_fail(_rhs)) goto _stmt_716;
         sno_var_set(sno_to_str(SNO_STR_VAL("*")), _rhs);
         goto _stmt_716;
@@ -3363,7 +3363,7 @@ _stmt_715: {  /* L103 */
 _stmt_716: {  /* L104 */
     sno_comm_stno(104);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_mul(SNO_STR_VAL("^"), sno_var_get("snoWhite"))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("^")), sno_pat_ref("snoWhite"))));
         if (sno_is_fail(_rhs)) goto _stmt_717;
         sno_var_set(sno_to_str(SNO_STR_VAL("^")), _rhs);
         goto _stmt_717;
@@ -3373,7 +3373,7 @@ _stmt_716: {  /* L104 */
 _stmt_717: {  /* L105 */
     sno_comm_stno(105);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_mul(SNO_STR_VAL("!"), sno_var_get("snoWhite"))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("!")), sno_pat_ref("snoWhite"))));
         if (sno_is_fail(_rhs)) goto _stmt_718;
         sno_var_set(sno_to_str(SNO_STR_VAL("!")), _rhs);
         goto _stmt_718;
@@ -3383,7 +3383,7 @@ _stmt_717: {  /* L105 */
 _stmt_718: {  /* L106 */
     sno_comm_stno(106);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_mul(SNO_STR_VAL("**"), sno_var_get("snoWhite"))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("**")), sno_pat_ref("snoWhite"))));
         if (sno_is_fail(_rhs)) goto _stmt_719;
         sno_var_set(sno_to_str(SNO_STR_VAL("**")), _rhs);
         goto _stmt_719;
@@ -3393,7 +3393,7 @@ _stmt_718: {  /* L106 */
 _stmt_719: {  /* L107 */
     sno_comm_stno(107);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_mul(SNO_STR_VAL("$"), sno_var_get("snoWhite"))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("$")), sno_pat_ref("snoWhite"))));
         if (sno_is_fail(_rhs)) goto _stmt_720;
         sno_var_set(sno_to_str(SNO_STR_VAL("$")), _rhs);
         goto _stmt_720;
@@ -3403,7 +3403,7 @@ _stmt_719: {  /* L107 */
 _stmt_720: {  /* L108 */
     sno_comm_stno(108);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_mul(SNO_STR_VAL("."), sno_var_get("snoWhite"))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL(".")), sno_pat_ref("snoWhite"))));
         if (sno_is_fail(_rhs)) goto _stmt_721;
         sno_var_set(sno_to_str(SNO_STR_VAL(".")), _rhs);
         goto _stmt_721;
@@ -3413,7 +3413,7 @@ _stmt_720: {  /* L108 */
 _stmt_721: {  /* L109 */
     sno_comm_stno(109);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_mul(SNO_STR_VAL("&"), sno_var_get("snoWhite"))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("&")), sno_pat_ref("snoWhite"))));
         if (sno_is_fail(_rhs)) goto _stmt_722;
         sno_var_set(sno_to_str(SNO_STR_VAL("&")), _rhs);
         goto _stmt_722;
@@ -3423,7 +3423,7 @@ _stmt_721: {  /* L109 */
 _stmt_722: {  /* L110 */
     sno_comm_stno(110);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_mul(SNO_STR_VAL("@"), sno_var_get("snoWhite"))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("@")), sno_pat_ref("snoWhite"))));
         if (sno_is_fail(_rhs)) goto _stmt_723;
         sno_var_set(sno_to_str(SNO_STR_VAL("@")), _rhs);
         goto _stmt_723;
@@ -3433,7 +3433,7 @@ _stmt_722: {  /* L110 */
 _stmt_723: {  /* L111 */
     sno_comm_stno(111);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_mul(SNO_STR_VAL("#"), sno_var_get("snoWhite"))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("#")), sno_pat_ref("snoWhite"))));
         if (sno_is_fail(_rhs)) goto _stmt_724;
         sno_var_set(sno_to_str(SNO_STR_VAL("#")), _rhs);
         goto _stmt_724;
@@ -3443,7 +3443,7 @@ _stmt_723: {  /* L111 */
 _stmt_724: {  /* L112 */
     sno_comm_stno(112);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_mul(SNO_STR_VAL("%"), sno_var_get("snoWhite"))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("%")), sno_pat_ref("snoWhite"))));
         if (sno_is_fail(_rhs)) goto _stmt_725;
         sno_var_set(sno_to_str(SNO_STR_VAL("%")), _rhs);
         goto _stmt_725;
@@ -3453,7 +3453,7 @@ _stmt_724: {  /* L112 */
 _stmt_725: {  /* L113 */
     sno_comm_stno(113);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_mul(SNO_STR_VAL("~"), sno_var_get("snoWhite"))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoWhite"), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("~")), sno_pat_ref("snoWhite"))));
         if (sno_is_fail(_rhs)) goto _stmt_726;
         sno_var_set(sno_to_str(SNO_STR_VAL("~")), _rhs);
         goto _stmt_726;
@@ -3463,7 +3463,7 @@ _stmt_725: {  /* L113 */
 _stmt_726: {  /* L114 */
     sno_comm_stno(114);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoGray"), sno_var_as_pattern(sno_mul(SNO_STR_VAL(","), sno_var_get("snoGray"))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoGray"), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL(",")), sno_pat_ref("snoGray"))));
         if (sno_is_fail(_rhs)) goto _stmt_727;
         sno_var_set(sno_to_str(SNO_STR_VAL(",")), _rhs);
         goto _stmt_727;
@@ -3473,7 +3473,7 @@ _stmt_726: {  /* L114 */
 _stmt_727: {  /* L115 */
     sno_comm_stno(115);
     {
-        SnoVal _rhs = sno_mul(SNO_STR_VAL("("), sno_var_get("snoGray"));
+        SnoVal _rhs = sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("(")), sno_pat_ref("snoGray"));
         if (sno_is_fail(_rhs)) goto _stmt_728;
         sno_var_set(sno_to_str(SNO_STR_VAL("(")), _rhs);
         goto _stmt_728;
@@ -3483,7 +3483,7 @@ _stmt_727: {  /* L115 */
 _stmt_728: {  /* L116 */
     sno_comm_stno(116);
     {
-        SnoVal _rhs = sno_mul(SNO_STR_VAL("["), sno_var_get("snoGray"));
+        SnoVal _rhs = sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("[")), sno_pat_ref("snoGray"));
         if (sno_is_fail(_rhs)) goto _stmt_729;
         sno_var_set(sno_to_str(SNO_STR_VAL("[")), _rhs);
         goto _stmt_729;
@@ -3493,7 +3493,7 @@ _stmt_728: {  /* L116 */
 _stmt_729: {  /* L117 */
     sno_comm_stno(117);
     {
-        SnoVal _rhs = sno_mul(SNO_STR_VAL("<"), sno_var_get("snoGray"));
+        SnoVal _rhs = sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("<")), sno_pat_ref("snoGray"));
         if (sno_is_fail(_rhs)) goto _stmt_730;
         sno_var_set(sno_to_str(SNO_STR_VAL("<")), _rhs);
         goto _stmt_730;
@@ -3543,7 +3543,7 @@ _stmt_733: {  /* L122 */
 _stmt_734: {  /* L126 */
     sno_comm_stno(126);
     {
-        SnoVal _rhs = sno_pat_cat(sno_var_as_pattern(sno_subscript_get(sno_apply("nInc", NULL, 0), sno_pat_alt(sno_pat_ref("snoExpr"), sno_pat_cat(sno_var_as_pattern(sno_var_get("epsilon")), sno_var_as_pattern(SNO_STR_VAL("")))))), sno_pat_fence_p(sno_pat_alt(sno_var_as_pattern(sno_mul(sno_var_get(sno_to_str(SNO_STR_VAL(","))), sno_var_get("snoXList"))), sno_var_as_pattern(sno_var_get("epsilon")))));
+        SnoVal _rhs = sno_pat_cat(sno_var_as_pattern(sno_subscript_get(sno_apply("nInc", NULL, 0), sno_pat_alt(sno_pat_ref("snoExpr"), sno_pat_cat(sno_var_as_pattern(sno_var_get("epsilon")), sno_var_as_pattern(SNO_STR_VAL("")))))), sno_pat_fence_p(sno_pat_alt(sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(sno_var_get(sno_to_str(SNO_STR_VAL(",")))), sno_pat_ref("snoXList"))), sno_var_as_pattern(sno_var_get("epsilon")))));
         if (sno_is_fail(_rhs)) goto _stmt_735;
         sno_var_set("snoXList", _rhs);
         goto _stmt_735;
@@ -3563,7 +3563,7 @@ _stmt_735: {  /* L127 */
 _stmt_736: {  /* L128 */
     sno_comm_stno(128);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoExpr1"), sno_pat_fence_p(sno_pat_alt(sno_var_as_pattern(sno_mul(sno_var_get(sno_to_str(SNO_STR_VAL("="))), sno_apply("snoExpr0", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'='"), SNO_INT_VAL(2LL))}, 1))), sno_var_as_pattern(sno_var_get("epsilon")))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoExpr1"), sno_pat_fence_p(sno_pat_alt(sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(sno_var_get(sno_to_str(SNO_STR_VAL("=")))), sno_pat_user_call("snoExpr0", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'='"), SNO_INT_VAL(2LL))}, 1))), sno_var_as_pattern(sno_var_get("epsilon")))));
         if (sno_is_fail(_rhs)) goto _stmt_737;
         sno_var_set("snoExpr0", _rhs);
         goto _stmt_737;
@@ -3573,7 +3573,7 @@ _stmt_736: {  /* L128 */
 _stmt_737: {  /* L129 */
     sno_comm_stno(129);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoExpr2"), sno_pat_fence_p(sno_pat_alt(sno_var_as_pattern(sno_mul(sno_var_get(sno_to_str(SNO_STR_VAL("?"))), sno_apply("snoExpr1", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'?'"), SNO_INT_VAL(2LL))}, 1))), sno_var_as_pattern(sno_var_get("epsilon")))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoExpr2"), sno_pat_fence_p(sno_pat_alt(sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(sno_var_get(sno_to_str(SNO_STR_VAL("?")))), sno_pat_user_call("snoExpr1", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'?'"), SNO_INT_VAL(2LL))}, 1))), sno_var_as_pattern(sno_var_get("epsilon")))));
         if (sno_is_fail(_rhs)) goto _stmt_738;
         sno_var_set("snoExpr1", _rhs);
         goto _stmt_738;
@@ -3583,7 +3583,7 @@ _stmt_737: {  /* L129 */
 _stmt_738: {  /* L130 */
     sno_comm_stno(130);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoExpr3"), sno_pat_fence_p(sno_pat_alt(sno_var_as_pattern(sno_mul(sno_var_get(sno_to_str(SNO_STR_VAL("&"))), sno_apply("snoExpr2", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'&'"), SNO_INT_VAL(2LL))}, 1))), sno_var_as_pattern(sno_var_get("epsilon")))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoExpr3"), sno_pat_fence_p(sno_pat_alt(sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(sno_var_get(sno_to_str(SNO_STR_VAL("&")))), sno_pat_user_call("snoExpr2", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'&'"), SNO_INT_VAL(2LL))}, 1))), sno_var_as_pattern(sno_var_get("epsilon")))));
         if (sno_is_fail(_rhs)) goto _stmt_739;
         sno_var_set("snoExpr2", _rhs);
         goto _stmt_739;
@@ -3603,7 +3603,7 @@ _stmt_739: {  /* L131 */
 _stmt_740: {  /* L132 */
     sno_comm_stno(132);
     {
-        SnoVal _rhs = sno_pat_cat(sno_var_as_pattern(sno_mul(sno_apply("nInc", NULL, 0), sno_var_get("snoExpr4"))), sno_pat_fence_p(sno_pat_alt(sno_var_as_pattern(sno_mul(sno_var_get(sno_to_str(SNO_STR_VAL("|"))), sno_var_get("snoX3"))), sno_var_as_pattern(sno_var_get("epsilon")))));
+        SnoVal _rhs = sno_pat_cat(sno_var_as_pattern(sno_mul(sno_apply("nInc", NULL, 0), sno_var_get("snoExpr4"))), sno_pat_fence_p(sno_pat_alt(sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(sno_var_get(sno_to_str(SNO_STR_VAL("|")))), sno_pat_ref("snoX3"))), sno_var_as_pattern(sno_var_get("epsilon")))));
         if (sno_is_fail(_rhs)) goto _stmt_741;
         sno_var_set("snoX3", _rhs);
         goto _stmt_741;
@@ -3623,7 +3623,7 @@ _stmt_741: {  /* L133 */
 _stmt_742: {  /* L134 */
     sno_comm_stno(134);
     {
-        SnoVal _rhs = sno_pat_cat(sno_var_as_pattern(sno_mul(sno_apply("nInc", NULL, 0), sno_var_get("snoExpr5"))), sno_pat_fence_p(sno_pat_alt(sno_var_as_pattern(sno_mul(sno_pat_ref("snoWhite"), sno_var_get("snoX4"))), sno_var_as_pattern(sno_var_get("epsilon")))));
+        SnoVal _rhs = sno_pat_cat(sno_var_as_pattern(sno_mul(sno_apply("nInc", NULL, 0), sno_var_get("snoExpr5"))), sno_pat_fence_p(sno_pat_alt(sno_var_as_pattern(sno_pat_cat(sno_pat_ref("snoWhite"), sno_pat_ref("snoX4"))), sno_var_as_pattern(sno_var_get("epsilon")))));
         if (sno_is_fail(_rhs)) goto _stmt_743;
         sno_var_set("snoX4", _rhs);
         goto _stmt_743;
@@ -3633,7 +3633,7 @@ _stmt_742: {  /* L134 */
 _stmt_743: {  /* L135 */
     sno_comm_stno(135);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoExpr6"), sno_pat_fence_p(sno_pat_alt(sno_var_as_pattern(sno_mul(sno_var_get(sno_to_str(SNO_STR_VAL("@"))), sno_apply("snoExpr5", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'@'"), SNO_INT_VAL(2LL))}, 1))), sno_var_as_pattern(sno_var_get("epsilon")))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoExpr6"), sno_pat_fence_p(sno_pat_alt(sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(sno_var_get(sno_to_str(SNO_STR_VAL("@")))), sno_pat_user_call("snoExpr5", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'@'"), SNO_INT_VAL(2LL))}, 1))), sno_var_as_pattern(sno_var_get("epsilon")))));
         if (sno_is_fail(_rhs)) goto _stmt_744;
         sno_var_set("snoExpr5", _rhs);
         goto _stmt_744;
@@ -3643,7 +3643,7 @@ _stmt_743: {  /* L135 */
 _stmt_744: {  /* L136 */
     sno_comm_stno(136);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoExpr7"), sno_pat_fence_p(sno_pat_alt(sno_pat_alt(sno_var_as_pattern(sno_mul(sno_var_get(sno_to_str(SNO_STR_VAL("+"))), sno_apply("snoExpr6", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'+'"), SNO_INT_VAL(2LL))}, 1))), sno_var_as_pattern(sno_mul(sno_var_get(sno_to_str(SNO_STR_VAL("-"))), sno_apply("snoExpr6", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'-'"), SNO_INT_VAL(2LL))}, 1)))), sno_var_as_pattern(sno_var_get("epsilon")))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoExpr7"), sno_pat_fence_p(sno_pat_alt(sno_pat_alt(sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(sno_var_get(sno_to_str(SNO_STR_VAL("+")))), sno_pat_user_call("snoExpr6", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'+'"), SNO_INT_VAL(2LL))}, 1))), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(sno_var_get(sno_to_str(SNO_STR_VAL("-")))), sno_pat_user_call("snoExpr6", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'-'"), SNO_INT_VAL(2LL))}, 1)))), sno_var_as_pattern(sno_var_get("epsilon")))));
         if (sno_is_fail(_rhs)) goto _stmt_745;
         sno_var_set("snoExpr6", _rhs);
         goto _stmt_745;
@@ -3653,7 +3653,7 @@ _stmt_744: {  /* L136 */
 _stmt_745: {  /* L140 */
     sno_comm_stno(140);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoExpr8"), sno_pat_fence_p(sno_pat_alt(sno_var_as_pattern(sno_mul(sno_var_get(sno_to_str(SNO_STR_VAL("#"))), sno_apply("snoExpr7", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'#'"), SNO_INT_VAL(2LL))}, 1))), sno_var_as_pattern(sno_var_get("epsilon")))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoExpr8"), sno_pat_fence_p(sno_pat_alt(sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(sno_var_get(sno_to_str(SNO_STR_VAL("#")))), sno_pat_user_call("snoExpr7", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'#'"), SNO_INT_VAL(2LL))}, 1))), sno_var_as_pattern(sno_var_get("epsilon")))));
         if (sno_is_fail(_rhs)) goto _stmt_746;
         sno_var_set("snoExpr7", _rhs);
         goto _stmt_746;
@@ -3663,7 +3663,7 @@ _stmt_745: {  /* L140 */
 _stmt_746: {  /* L141 */
     sno_comm_stno(141);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoExpr9"), sno_pat_fence_p(sno_pat_alt(sno_var_as_pattern(sno_mul(sno_var_get(sno_to_str(SNO_STR_VAL("/"))), sno_apply("snoExpr8", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'/'"), SNO_INT_VAL(2LL))}, 1))), sno_var_as_pattern(sno_var_get("epsilon")))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoExpr9"), sno_pat_fence_p(sno_pat_alt(sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(sno_var_get(sno_to_str(SNO_STR_VAL("/")))), sno_pat_user_call("snoExpr8", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'/'"), SNO_INT_VAL(2LL))}, 1))), sno_var_as_pattern(sno_var_get("epsilon")))));
         if (sno_is_fail(_rhs)) goto _stmt_747;
         sno_var_set("snoExpr8", _rhs);
         goto _stmt_747;
@@ -3673,7 +3673,7 @@ _stmt_746: {  /* L141 */
 _stmt_747: {  /* L142 */
     sno_comm_stno(142);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoExpr10"), sno_pat_fence_p(sno_pat_alt(sno_var_as_pattern(sno_mul(sno_var_get(sno_to_str(SNO_STR_VAL("*"))), sno_apply("snoExpr9", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'*'"), SNO_INT_VAL(2LL))}, 1))), sno_var_as_pattern(sno_var_get("epsilon")))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoExpr10"), sno_pat_fence_p(sno_pat_alt(sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(sno_var_get(sno_to_str(SNO_STR_VAL("*")))), sno_pat_user_call("snoExpr9", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'*'"), SNO_INT_VAL(2LL))}, 1))), sno_var_as_pattern(sno_var_get("epsilon")))));
         if (sno_is_fail(_rhs)) goto _stmt_748;
         sno_var_set("snoExpr9", _rhs);
         goto _stmt_748;
@@ -3683,7 +3683,7 @@ _stmt_747: {  /* L142 */
 _stmt_748: {  /* L143 */
     sno_comm_stno(143);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoExpr11"), sno_pat_fence_p(sno_pat_alt(sno_var_as_pattern(sno_mul(sno_var_get(sno_to_str(SNO_STR_VAL("%"))), sno_apply("snoExpr10", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'%'"), SNO_INT_VAL(2LL))}, 1))), sno_var_as_pattern(sno_var_get("epsilon")))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoExpr11"), sno_pat_fence_p(sno_pat_alt(sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(sno_var_get(sno_to_str(SNO_STR_VAL("%")))), sno_pat_user_call("snoExpr10", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'%'"), SNO_INT_VAL(2LL))}, 1))), sno_var_as_pattern(sno_var_get("epsilon")))));
         if (sno_is_fail(_rhs)) goto _stmt_749;
         sno_var_set("snoExpr10", _rhs);
         goto _stmt_749;
@@ -3703,7 +3703,7 @@ _stmt_749: {  /* L144 */
 _stmt_750: {  /* L146 */
     sno_comm_stno(146);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoExpr13"), sno_pat_fence_p(sno_pat_alt(sno_pat_alt(sno_var_as_pattern(sno_mul(sno_var_get(sno_to_str(SNO_STR_VAL("$"))), sno_apply("snoExpr12", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'$'"), SNO_INT_VAL(2LL))}, 1))), sno_var_as_pattern(sno_mul(sno_var_get(sno_to_str(SNO_STR_VAL("."))), sno_apply("snoExpr12", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'.'"), SNO_INT_VAL(2LL))}, 1)))), sno_var_as_pattern(sno_var_get("epsilon")))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoExpr13"), sno_pat_fence_p(sno_pat_alt(sno_pat_alt(sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(sno_var_get(sno_to_str(SNO_STR_VAL("$")))), sno_pat_user_call("snoExpr12", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'$'"), SNO_INT_VAL(2LL))}, 1))), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(sno_var_get(sno_to_str(SNO_STR_VAL(".")))), sno_pat_user_call("snoExpr12", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'.'"), SNO_INT_VAL(2LL))}, 1)))), sno_var_as_pattern(sno_var_get("epsilon")))));
         if (sno_is_fail(_rhs)) goto _stmt_751;
         sno_var_set("snoExpr12", _rhs);
         goto _stmt_751;
@@ -3713,7 +3713,7 @@ _stmt_750: {  /* L146 */
 _stmt_751: {  /* L152 */
     sno_comm_stno(152);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoExpr14"), sno_pat_fence_p(sno_pat_alt(sno_var_as_pattern(sno_mul(sno_var_get(sno_to_str(SNO_STR_VAL("~"))), sno_apply("snoExpr13", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'~'"), SNO_INT_VAL(2LL))}, 1))), sno_var_as_pattern(sno_var_get("epsilon")))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_ref("snoExpr14"), sno_pat_fence_p(sno_pat_alt(sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(sno_var_get(sno_to_str(SNO_STR_VAL("~")))), sno_pat_user_call("snoExpr13", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'~'"), SNO_INT_VAL(2LL))}, 1))), sno_var_as_pattern(sno_var_get("epsilon")))));
         if (sno_is_fail(_rhs)) goto _stmt_752;
         sno_var_set("snoExpr13", _rhs);
         goto _stmt_752;
@@ -3723,7 +3723,7 @@ _stmt_751: {  /* L152 */
 _stmt_752: {  /* L153 */
     sno_comm_stno(153);
     {
-        SnoVal _rhs = sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_var_as_pattern(sno_mul(SNO_STR_VAL("@"), sno_apply("snoExpr14", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'@'"), SNO_INT_VAL(1LL))}, 1))), sno_var_as_pattern(sno_mul(SNO_STR_VAL("~"), sno_apply("snoExpr14", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'~'"), SNO_INT_VAL(1LL))}, 1)))), sno_var_as_pattern(sno_mul(SNO_STR_VAL("?"), sno_apply("snoExpr14", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'?'"), SNO_INT_VAL(1LL))}, 1)))), sno_pat_cat(sno_pat_ref("snoProtKwd"), sno_var_as_pattern(SNO_STR_VAL("snoProtKwd")))), sno_pat_cat(sno_pat_ref("snoUnprotKwd"), sno_var_as_pattern(SNO_STR_VAL("snoUnprotKwd")))), sno_var_as_pattern(sno_mul(SNO_STR_VAL("&"), sno_apply("snoExpr14", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'&'"), SNO_INT_VAL(1LL))}, 1)))), sno_var_as_pattern(sno_mul(SNO_STR_VAL("+"), sno_apply("snoExpr14", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'+'"), SNO_INT_VAL(1LL))}, 1)))), sno_var_as_pattern(sno_mul(SNO_STR_VAL("-"), sno_apply("snoExpr14", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'-'"), SNO_INT_VAL(1LL))}, 1)))), sno_var_as_pattern(sno_mul(SNO_STR_VAL("*"), sno_apply("snoExpr14", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'*'"), SNO_INT_VAL(1LL))}, 1)))), sno_var_as_pattern(sno_mul(SNO_STR_VAL("$"), sno_apply("snoExpr14", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'$'"), SNO_INT_VAL(1LL))}, 1)))), sno_var_as_pattern(sno_mul(SNO_STR_VAL("."), sno_apply("snoExpr14", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'.'"), SNO_INT_VAL(1LL))}, 1)))), sno_var_as_pattern(sno_mul(SNO_STR_VAL("!"), sno_apply("snoExpr14", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'!'"), SNO_INT_VAL(1LL))}, 1)))), sno_var_as_pattern(sno_mul(SNO_STR_VAL("%"), sno_apply("snoExpr14", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'%'"), SNO_INT_VAL(1LL))}, 1)))), sno_var_as_pattern(sno_mul(SNO_STR_VAL("/"), sno_apply("snoExpr14", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'/'"), SNO_INT_VAL(1LL))}, 1)))), sno_var_as_pattern(sno_mul(SNO_STR_VAL("#"), sno_apply("snoExpr14", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'#'"), SNO_INT_VAL(1LL))}, 1)))), sno_var_as_pattern(sno_mul(SNO_STR_VAL("="), sno_apply("snoExpr14", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'='"), SNO_INT_VAL(1LL))}, 1)))), sno_var_as_pattern(sno_mul(SNO_STR_VAL("|"), sno_apply("snoExpr14", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'|'"), SNO_INT_VAL(1LL))}, 1)))), sno_pat_ref("snoExpr15"));
+        SnoVal _rhs = sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("@")), sno_pat_user_call("snoExpr14", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'@'"), SNO_INT_VAL(1LL))}, 1))), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("~")), sno_pat_user_call("snoExpr14", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'~'"), SNO_INT_VAL(1LL))}, 1)))), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("?")), sno_pat_user_call("snoExpr14", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'?'"), SNO_INT_VAL(1LL))}, 1)))), sno_pat_cat(sno_pat_ref("snoProtKwd"), sno_var_as_pattern(SNO_STR_VAL("snoProtKwd")))), sno_pat_cat(sno_pat_ref("snoUnprotKwd"), sno_var_as_pattern(SNO_STR_VAL("snoUnprotKwd")))), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("&")), sno_pat_user_call("snoExpr14", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'&'"), SNO_INT_VAL(1LL))}, 1)))), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("+")), sno_pat_user_call("snoExpr14", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'+'"), SNO_INT_VAL(1LL))}, 1)))), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("-")), sno_pat_user_call("snoExpr14", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'-'"), SNO_INT_VAL(1LL))}, 1)))), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("*")), sno_pat_user_call("snoExpr14", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'*'"), SNO_INT_VAL(1LL))}, 1)))), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("$")), sno_pat_user_call("snoExpr14", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'$'"), SNO_INT_VAL(1LL))}, 1)))), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL(".")), sno_pat_user_call("snoExpr14", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'.'"), SNO_INT_VAL(1LL))}, 1)))), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("!")), sno_pat_user_call("snoExpr14", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'!'"), SNO_INT_VAL(1LL))}, 1)))), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("%")), sno_pat_user_call("snoExpr14", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'%'"), SNO_INT_VAL(1LL))}, 1)))), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("/")), sno_pat_user_call("snoExpr14", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'/'"), SNO_INT_VAL(1LL))}, 1)))), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("#")), sno_pat_user_call("snoExpr14", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'#'"), SNO_INT_VAL(1LL))}, 1)))), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("=")), sno_pat_user_call("snoExpr14", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'='"), SNO_INT_VAL(1LL))}, 1)))), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("|")), sno_pat_user_call("snoExpr14", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'|'"), SNO_INT_VAL(1LL))}, 1)))), sno_pat_ref("snoExpr15"));
         if (sno_is_fail(_rhs)) goto _stmt_753;
         sno_var_set("snoExpr14", _rhs);
         goto _stmt_753;
@@ -3743,7 +3743,7 @@ _stmt_753: {  /* L171 */
 _stmt_754: {  /* L173 */
     sno_comm_stno(173);
     {
-        SnoVal _rhs = sno_pat_cat(sno_var_as_pattern(sno_subscript_get(sno_apply("nInc", NULL, 0), sno_pat_alt(sno_pat_cat(sno_var_as_pattern(sno_mul(sno_var_get(sno_to_str(SNO_STR_VAL("["))), sno_var_get("snoExprList"))), sno_var_as_pattern(sno_var_get(sno_to_str(SNO_STR_VAL("]"))))), sno_pat_cat(sno_var_as_pattern(sno_mul(sno_var_get(sno_to_str(SNO_STR_VAL("<"))), sno_var_get("snoExprList"))), sno_var_as_pattern(sno_var_get(sno_to_str(SNO_STR_VAL(">")))))))), sno_pat_fence_p(sno_pat_alt(sno_pat_ref("snoExpr16"), sno_var_as_pattern(sno_var_get("epsilon")))));
+        SnoVal _rhs = sno_pat_cat(sno_var_as_pattern(sno_subscript_get(sno_apply("nInc", NULL, 0), sno_pat_alt(sno_pat_cat(sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(sno_var_get(sno_to_str(SNO_STR_VAL("[")))), sno_pat_ref("snoExprList"))), sno_var_as_pattern(sno_var_get(sno_to_str(SNO_STR_VAL("]"))))), sno_pat_cat(sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(sno_var_get(sno_to_str(SNO_STR_VAL("<")))), sno_pat_ref("snoExprList"))), sno_var_as_pattern(sno_var_get(sno_to_str(SNO_STR_VAL(">")))))))), sno_pat_fence_p(sno_pat_alt(sno_pat_ref("snoExpr16"), sno_var_as_pattern(sno_var_get("epsilon")))));
         if (sno_is_fail(_rhs)) goto _stmt_755;
         sno_var_set("snoExpr16", _rhs);
         goto _stmt_755;
@@ -3753,7 +3753,7 @@ _stmt_754: {  /* L173 */
 _stmt_755: {  /* L176 */
     sno_comm_stno(176);
     {
-        SnoVal _rhs = sno_pat_fence_p(sno_var_as_pattern(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_pat_user_call("nPush", (SnoVal[1]){}, 0), sno_var_as_pattern(sno_mul(sno_var_get(sno_to_str(SNO_STR_VAL("("))), sno_apply("snoExpr", (SnoVal[1]){sno_pat_alt(sno_var_as_pattern(sno_mul(sno_var_get(sno_to_str(SNO_STR_VAL(","))), sno_apply("snoXList", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("','"), SNO_STR_VAL("nTop() + 1"))}, 1))), sno_pat_user_call("epsilon", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'()'"), SNO_INT_VAL(1LL))}, 1))}, 1)))), sno_var_as_pattern(sno_var_get(sno_to_str(SNO_STR_VAL(")"))))), sno_pat_user_call("nPop", (SnoVal[1]){}, 0)), sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_pat_ref("snoFunction"), sno_var_as_pattern(SNO_STR_VAL("snoFunction"))), sno_var_as_pattern(sno_mul(sno_var_get(sno_to_str(SNO_STR_VAL("("))), sno_var_get("snoExprList")))), sno_var_as_pattern(sno_var_get(sno_to_str(SNO_STR_VAL(")"))))), sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("'snoCall'")), sno_var_as_pattern(SNO_INT_VAL(2LL))))), sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_pat_ref("snoId"), sno_var_as_pattern(SNO_STR_VAL("snoId"))), sno_var_as_pattern(sno_mul(sno_var_get(sno_to_str(SNO_STR_VAL("("))), sno_var_get("snoExprList")))), sno_var_as_pattern(sno_var_get(sno_to_str(SNO_STR_VAL(")"))))), sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("'snoCall'")), sno_var_as_pattern(SNO_INT_VAL(2LL))))), sno_pat_cat(sno_pat_ref("snoBuiltinVar"), sno_var_as_pattern(SNO_STR_VAL("snoBuiltinVar")))), sno_pat_cat(sno_pat_ref("snoSpecialNm"), sno_var_as_pattern(SNO_STR_VAL("snoSpecialNm")))), sno_pat_cat(sno_pat_ref("snoId"), sno_var_as_pattern(SNO_STR_VAL("snoId")))), sno_pat_cat(sno_pat_ref("snoString"), sno_var_as_pattern(SNO_STR_VAL("snoString")))), sno_pat_cat(sno_pat_ref("snoReal"), sno_var_as_pattern(SNO_STR_VAL("snoReal")))), sno_pat_cat(sno_pat_ref("snoInteger"), sno_var_as_pattern(SNO_STR_VAL("snoInteger"))))));
+        SnoVal _rhs = sno_pat_fence_p(sno_var_as_pattern(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_alt(sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_pat_user_call("nPush", (SnoVal[1]){}, 0), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(sno_var_get(sno_to_str(SNO_STR_VAL("(")))), sno_pat_user_call("snoExpr", (SnoVal[1]){sno_pat_alt(sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(sno_var_get(sno_to_str(SNO_STR_VAL(",")))), sno_pat_user_call("snoXList", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("','"), SNO_STR_VAL("nTop() + 1"))}, 1))), sno_pat_user_call("epsilon", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("'()'"), SNO_INT_VAL(1LL))}, 1))}, 1)))), sno_var_as_pattern(sno_var_get(sno_to_str(SNO_STR_VAL(")"))))), sno_pat_user_call("nPop", (SnoVal[1]){}, 0)), sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_pat_ref("snoFunction"), sno_var_as_pattern(SNO_STR_VAL("snoFunction"))), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(sno_var_get(sno_to_str(SNO_STR_VAL("(")))), sno_pat_ref("snoExprList")))), sno_var_as_pattern(sno_var_get(sno_to_str(SNO_STR_VAL(")"))))), sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("'snoCall'")), sno_var_as_pattern(SNO_INT_VAL(2LL))))), sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_pat_ref("snoId"), sno_var_as_pattern(SNO_STR_VAL("snoId"))), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(sno_var_get(sno_to_str(SNO_STR_VAL("(")))), sno_pat_ref("snoExprList")))), sno_var_as_pattern(sno_var_get(sno_to_str(SNO_STR_VAL(")"))))), sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("'snoCall'")), sno_var_as_pattern(SNO_INT_VAL(2LL))))), sno_pat_cat(sno_pat_ref("snoBuiltinVar"), sno_var_as_pattern(SNO_STR_VAL("snoBuiltinVar")))), sno_pat_cat(sno_pat_ref("snoSpecialNm"), sno_var_as_pattern(SNO_STR_VAL("snoSpecialNm")))), sno_pat_cat(sno_pat_ref("snoId"), sno_var_as_pattern(SNO_STR_VAL("snoId")))), sno_pat_cat(sno_pat_ref("snoString"), sno_var_as_pattern(SNO_STR_VAL("snoString")))), sno_pat_cat(sno_pat_ref("snoReal"), sno_var_as_pattern(SNO_STR_VAL("snoReal")))), sno_pat_cat(sno_pat_ref("snoInteger"), sno_var_as_pattern(SNO_STR_VAL("snoInteger"))))));
         if (sno_is_fail(_rhs)) goto _stmt_756;
         sno_var_set("snoExpr17", _rhs);
         goto _stmt_756;
@@ -3803,7 +3803,7 @@ _stmt_759: {  /* L198 */
 _stmt_760: {  /* L200 */
     sno_comm_stno(200);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_cat(sno_pat_ref("snoGray"), sno_var_as_pattern(sno_mul(SNO_STR_VAL(":"), sno_var_get("snoGray")))), sno_pat_fence_p(sno_pat_alt(sno_pat_cat(sno_pat_cat(sno_pat_ref_val(sno_apply("snoTarget", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("*(':' snoBrackets)"), SNO_INT_VAL(1LL))}, 1)), sno_var_as_pattern(sno_var_get("epsilon"))), sno_var_as_pattern(SNO_STR_VAL(""))), sno_pat_cat(sno_var_as_pattern(sno_mul(sno_pat_ref("snoSorF"), sno_apply("snoTarget", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("*(':' SorF snoBrackets)"), SNO_INT_VAL(1LL))}, 1))), sno_pat_fence_p(sno_pat_alt(sno_var_as_pattern(sno_mul(sno_mul(sno_pat_ref("snoGray"), sno_var_get("snoSorF")), sno_apply("snoTarget", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("*(':' SorF snoBrackets)"), SNO_INT_VAL(1LL))}, 1))), sno_pat_cat(sno_var_as_pattern(sno_var_get("epsilon")), sno_var_as_pattern(SNO_STR_VAL("")))))))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_cat(sno_pat_ref("snoGray"), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL(":")), sno_pat_ref("snoGray")))), sno_pat_fence_p(sno_pat_alt(sno_pat_cat(sno_pat_cat(sno_pat_ref_val(sno_apply("snoTarget", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("*(':' snoBrackets)"), SNO_INT_VAL(1LL))}, 1)), sno_var_as_pattern(sno_var_get("epsilon"))), sno_var_as_pattern(SNO_STR_VAL(""))), sno_pat_cat(sno_var_as_pattern(sno_pat_cat(sno_pat_ref("snoSorF"), sno_pat_user_call("snoTarget", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("*(':' SorF snoBrackets)"), SNO_INT_VAL(1LL))}, 1))), sno_pat_fence_p(sno_pat_alt(sno_var_as_pattern(sno_mul(sno_pat_cat(sno_pat_ref("snoGray"), sno_pat_ref("snoSorF")), sno_apply("snoTarget", (SnoVal[1]){sno_concat_sv(SNO_STR_VAL("*(':' SorF snoBrackets)"), SNO_INT_VAL(1LL))}, 1))), sno_pat_cat(sno_var_as_pattern(sno_var_get("epsilon")), sno_var_as_pattern(SNO_STR_VAL("")))))))));
         if (sno_is_fail(_rhs)) goto _stmt_761;
         sno_var_set("snoGoto", _rhs);
         goto _stmt_761;
@@ -3843,7 +3843,7 @@ _stmt_763: {  /* L209 */
 _stmt_764: {  /* L210 */
     sno_comm_stno(210);
     {
-        SnoVal _rhs = sno_pat_cat(sno_pat_ref_val(sno_apply("snoLabel", (SnoVal[1]){sno_pat_alt(sno_pat_cat(sno_var_as_pattern(sno_mul(sno_pat_ref("snoWhite"), sno_var_get("snoExpr14"))), sno_pat_fence_p(sno_pat_alt(sno_pat_alt(sno_pat_cat(sno_var_as_pattern(sno_var_get("epsilon")), sno_var_as_pattern(sno_mul(SNO_STR_VAL(""), sno_apply("snoWhite", (SnoVal[1]){sno_pat_alt(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("=")), sno_var_as_pattern(sno_mul(sno_mul(SNO_STR_VAL("="), sno_var_get("snoWhite")), sno_var_get("snoExpr")))), sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("=")), sno_var_as_pattern(SNO_STR_VAL("="))), sno_var_as_pattern(sno_var_get("epsilon"))), sno_var_as_pattern(SNO_STR_VAL(""))))}, 1)))), sno_pat_cat(sno_var_as_pattern(sno_mul(sno_pat_alt(sno_var_as_pattern(sno_var_get(sno_to_str(SNO_STR_VAL("?")))), sno_pat_ref("snoWhite")), sno_var_get("snoExpr1"))), sno_pat_fence_p(sno_pat_alt(sno_pat_ref_val(sno_apply("snoWhite", (SnoVal[1]){sno_pat_alt(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("=")), sno_var_as_pattern(sno_mul(sno_mul(SNO_STR_VAL("="), sno_var_get("snoWhite")), sno_var_get("snoExpr")))), sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("=")), sno_var_as_pattern(SNO_STR_VAL("="))), sno_var_as_pattern(sno_var_get("epsilon"))), sno_var_as_pattern(SNO_STR_VAL(""))))}, 1)), sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_var_as_pattern(sno_var_get("epsilon")), sno_var_as_pattern(SNO_STR_VAL(""))), sno_var_as_pattern(sno_var_get("epsilon"))), sno_var_as_pattern(SNO_STR_VAL(""))))))), sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_var_as_pattern(sno_var_get("epsilon")), sno_var_as_pattern(SNO_STR_VAL(""))), sno_var_as_pattern(sno_var_get("epsilon"))), sno_var_as_pattern(SNO_STR_VAL(""))), sno_var_as_pattern(sno_var_get("epsilon"))), sno_var_as_pattern(SNO_STR_VAL("")))))), sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_var_as_pattern(sno_var_get("epsilon")), sno_var_as_pattern(SNO_STR_VAL(""))), sno_var_as_pattern(sno_var_get("epsilon"))), sno_var_as_pattern(SNO_STR_VAL(""))), sno_var_as_pattern(sno_var_get("epsilon"))), sno_var_as_pattern(SNO_STR_VAL(""))), sno_var_as_pattern(sno_var_get("epsilon"))), sno_var_as_pattern(SNO_STR_VAL(""))))}, 1)), sno_var_as_pattern(sno_mul(sno_pat_fence_p(sno_var_as_pattern(sno_pat_alt(sno_pat_ref("snoGoto"), sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_var_as_pattern(sno_var_get("epsilon")), sno_var_as_pattern(SNO_STR_VAL(""))), sno_var_as_pattern(sno_var_get("epsilon"))), sno_var_as_pattern(SNO_STR_VAL("")))))), sno_var_get("snoGray"))));
+        SnoVal _rhs = sno_pat_cat(sno_pat_ref_val(sno_apply("snoLabel", (SnoVal[1]){sno_pat_alt(sno_pat_cat(sno_var_as_pattern(sno_pat_cat(sno_pat_ref("snoWhite"), sno_pat_ref("snoExpr14"))), sno_pat_fence_p(sno_pat_alt(sno_pat_alt(sno_pat_cat(sno_var_as_pattern(sno_var_get("epsilon")), sno_var_as_pattern(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("")), sno_pat_user_call("snoWhite", (SnoVal[1]){sno_pat_alt(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("=")), sno_var_as_pattern(sno_mul(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("=")), sno_pat_ref("snoWhite")), sno_var_get("snoExpr")))), sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("=")), sno_var_as_pattern(SNO_STR_VAL("="))), sno_var_as_pattern(sno_var_get("epsilon"))), sno_var_as_pattern(SNO_STR_VAL(""))))}, 1)))), sno_pat_cat(sno_var_as_pattern(sno_pat_cat(sno_pat_alt(sno_var_as_pattern(sno_var_get(sno_to_str(SNO_STR_VAL("?")))), sno_pat_ref("snoWhite")), sno_pat_ref("snoExpr1"))), sno_pat_fence_p(sno_pat_alt(sno_pat_ref_val(sno_apply("snoWhite", (SnoVal[1]){sno_pat_alt(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("=")), sno_var_as_pattern(sno_mul(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("=")), sno_pat_ref("snoWhite")), sno_var_get("snoExpr")))), sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_var_as_pattern(SNO_STR_VAL("=")), sno_var_as_pattern(SNO_STR_VAL("="))), sno_var_as_pattern(sno_var_get("epsilon"))), sno_var_as_pattern(SNO_STR_VAL(""))))}, 1)), sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_var_as_pattern(sno_var_get("epsilon")), sno_var_as_pattern(SNO_STR_VAL(""))), sno_var_as_pattern(sno_var_get("epsilon"))), sno_var_as_pattern(SNO_STR_VAL(""))))))), sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_var_as_pattern(sno_var_get("epsilon")), sno_var_as_pattern(SNO_STR_VAL(""))), sno_var_as_pattern(sno_var_get("epsilon"))), sno_var_as_pattern(SNO_STR_VAL(""))), sno_var_as_pattern(sno_var_get("epsilon"))), sno_var_as_pattern(SNO_STR_VAL("")))))), sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_var_as_pattern(sno_var_get("epsilon")), sno_var_as_pattern(SNO_STR_VAL(""))), sno_var_as_pattern(sno_var_get("epsilon"))), sno_var_as_pattern(SNO_STR_VAL(""))), sno_var_as_pattern(sno_var_get("epsilon"))), sno_var_as_pattern(SNO_STR_VAL(""))), sno_var_as_pattern(sno_var_get("epsilon"))), sno_var_as_pattern(SNO_STR_VAL(""))))}, 1)), sno_var_as_pattern(sno_pat_cat(sno_pat_fence_p(sno_pat_alt(sno_pat_ref("snoGoto"), sno_pat_cat(sno_pat_cat(sno_pat_cat(sno_var_as_pattern(sno_var_get("epsilon")), sno_var_as_pattern(SNO_STR_VAL(""))), sno_var_as_pattern(sno_var_get("epsilon"))), sno_var_as_pattern(SNO_STR_VAL(""))))), sno_pat_ref("snoGray"))));
         if (sno_is_fail(_rhs)) goto _stmt_765;
         sno_var_set("snoStmt", _rhs);
         goto _stmt_765;
@@ -9441,7 +9441,7 @@ static SnoVal sno_uf_TY(SnoVal *_args, int _nargs) {
 SNO_TY: {  /* L24 */
     sno_comm_stno(24);
     {
-        SnoVal _rhs = sno_concat_sv(sno_concat_sv(sno_concat_sv((sno_le(sno_var_get("xTrace"),SNO_INT_VAL(0LL)) ? SNO_NULL_VAL : SNO_FAIL_VAL), sno_var_get("pat")), sno_var_get("txOfs")), sno_mul(sno_var_get(sno_to_str(SNO_NULL_VAL)), sno_apply("assign", (SnoVal[1]){SNO_NULL_VAL}, 1)));
+        SnoVal _rhs = sno_concat_sv(sno_concat_sv(sno_concat_sv((sno_le(sno_var_get("xTrace"),SNO_INT_VAL(0LL)) ? SNO_NULL_VAL : SNO_FAIL_VAL), sno_var_get("pat")), sno_var_get("txOfs")), sno_pat_cat(sno_var_as_pattern(sno_var_get(sno_to_str(SNO_NULL_VAL))), sno_pat_user_call("assign", (SnoVal[1]){SNO_NULL_VAL}, 1)));
         if (sno_is_fail(_rhs)) goto _stmt_646;
         sno_var_set("TY", _rhs);
         goto SNO_RETURN_LABEL_TY;
@@ -9519,7 +9519,7 @@ static SnoVal sno_uf_TZ(SnoVal *_args, int _nargs) {
 SNO_TZ: {  /* L35 */
     sno_comm_stno(35);
     {
-        SnoVal _rhs = sno_concat_sv(sno_concat_sv(sno_concat_sv((sno_le(sno_var_get("xTrace"),SNO_INT_VAL(0LL)) ? SNO_NULL_VAL : SNO_FAIL_VAL), sno_var_get("pat")), sno_var_get("txOfs")), sno_mul(sno_var_get(sno_to_str(SNO_NULL_VAL)), sno_apply("assign", (SnoVal[1]){SNO_NULL_VAL}, 1)));
+        SnoVal _rhs = sno_concat_sv(sno_concat_sv(sno_concat_sv((sno_le(sno_var_get("xTrace"),SNO_INT_VAL(0LL)) ? SNO_NULL_VAL : SNO_FAIL_VAL), sno_var_get("pat")), sno_var_get("txOfs")), sno_pat_cat(sno_var_as_pattern(sno_var_get(sno_to_str(SNO_NULL_VAL))), sno_pat_user_call("assign", (SnoVal[1]){SNO_NULL_VAL}, 1)));
         if (sno_is_fail(_rhs)) goto _stmt_651;
         sno_var_set("TZ", _rhs);
         goto SNO_RETURN_LABEL_TZ;
