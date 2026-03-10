@@ -489,45 +489,308 @@ def emit_pattern_expr(p):
 # Full program emitter
 # -----------------------------------------------------------------------
 
+import re as _re
+
+class FuncInfo:
+    """Metadata for a SNOBOL4-defined function."""
+    def __init__(self, name, params, locals_, entry_label):
+        self.name        = name
+        self.params      = params   # list of str
+        self.locals_     = locals_  # list of str
+        self.entry_label = entry_label
+        self.stmts       = []       # Stmt objects for this function's body
+        self.first_idx   = 0        # stmt index of entry label
+
+
 class StmtEmitter:
     def __init__(self, prog: Program):
         self.prog   = prog
         self.stmts  = prog.stmts
         self.lines  = []
+        # Set during per-function emit so _map_special_label knows the suffix
+        self._func_suffix = ''
+
+    # ------------------------------------------------------------------
+    # Top-level entry
+    # ------------------------------------------------------------------
 
     def emit(self):
         self.lines = []
-        self._emit_header()
-        self._emit_body()
-        self._emit_footer()
+        funcs, main_stmts, main_offset = self._collect_and_partition()
+        # Build the complete "main flow" as interleaved segments:
+        # [main_stmts] + [residuals from each function in order]
+        # Each residual is a (start_idx, stmts_list) pair
+        main_segments = [(0, main_stmts)]
+        for fi in funcs:
+            if fi.residual_start is not None:
+                seg = self.stmts[fi.residual_start:fi.residual_end]
+                if seg:
+                    main_segments.append((fi.residual_start, seg))
+        self._emit_header(funcs)
+        self._emit_main_body_segments(main_segments)
+        self._emit_main_footer()
+        for fi in funcs:
+            self._emit_function(fi)
+        self._emit_main_c(funcs)
         return '\n'.join(self.lines)
 
-    def _w(self, line=''):
-        self.lines.append(line)
+    # ------------------------------------------------------------------
+    # Function discovery and partitioning
+    # ------------------------------------------------------------------
 
-    def _emit_header(self):
+    def _collect_and_partition(self):
+        """
+        Scan all DEFINE statements, collect function metadata, then partition
+        self.stmts into (main_stmts, list_of_FuncInfo_with_stmts).
+
+        Returns: (funcs, main_stmts, main_offset)
+        """
+        # Step 1: build label→idx map (case-insensitive)
+        label_to_idx = {}
+        for i, s in enumerate(self.stmts):
+            if s.label:
+                label_to_idx[s.label.upper()] = i
+
+        # Step 2: collect DEFINE specs
+        func_map = {}  # entry_label_upper → FuncInfo
+        for s in self.stmts:
+            if not (s.subject and s.subject.kind == 'call' and
+                    s.subject.name and s.subject.name.upper() == 'DEFINE'):
+                continue
+            args = s.subject.args or []
+            if not args:
+                continue
+            spec_val = args[0].val if hasattr(args[0], 'val') else None
+            if not isinstance(spec_val, str):
+                continue
+            entry_val = (args[1].val if len(args) > 1 and
+                         hasattr(args[1], 'val') else None)
+            if not isinstance(entry_val, str):
+                entry_val = None
+
+            m = _re.match(r"(\w+)\(([^)]*)\)(.*)", spec_val)
+            if m:
+                fname   = m.group(1)
+                params  = [p.strip() for p in m.group(2).split(',') if p.strip()]
+                locals_ = [l.strip() for l in m.group(3).split(',') if l.strip()]
+            else:
+                fname   = spec_val
+                params  = []
+                locals_ = []
+
+            entry = entry_val if entry_val else fname
+            eu = entry.upper()
+            if eu not in func_map and eu in label_to_idx:
+                fi = FuncInfo(fname, params, locals_, entry)
+                fi.end_label = None
+                func_map[eu] = fi
+
+        # Step 3: sort function entries by stmt index
+        funcs_ordered = sorted(
+            func_map.values(),
+            key=lambda fi: label_to_idx[fi.entry_label.upper()]
+        )
+        for fi in funcs_ordered:
+            fi.first_idx = label_to_idx[fi.entry_label.upper()]
+
+        if not funcs_ordered:
+            for fi in funcs_ordered:
+                fi.stmts = []
+                fi.residual_start = None
+                fi.residual_end = None
+            return funcs_ordered, self.stmts, 0
+
+        # Step 4: collect ALL "skip" gotos
+        first_func_idx = funcs_ordered[0].first_idx
+        skip_targets = set()
+        func_entry_idxs = set(fi.first_idx for fi in funcs_ordered)
+        for s in self.stmts:
+            if s.goto and s.goto.unconditional:
+                tgt = s.goto.unconditional.upper()
+                if tgt in label_to_idx:
+                    tgt_idx = label_to_idx[tgt]
+                    # It's a skip target if it's after any function entry
+                    if any(tgt_idx > entry for entry in func_entry_idxs):
+                        skip_targets.add(tgt)
+
+        # Step 5: compute function body boundaries
+        # A function section = [fi.first_idx .. end)
+        # end = the skip target label's idx if it falls within this function's
+        #       natural range, otherwise the next function's first_idx
+        main_stmts = self.stmts[:first_func_idx]
+
+        for k, fi in enumerate(funcs_ordered):
+            start = fi.first_idx
+            default_end = (funcs_ordered[k+1].first_idx
+                           if k+1 < len(funcs_ordered) else len(self.stmts))
+
+            # Look for a skip target within [start..default_end)
+            best_end = default_end
+            for tgt_upper in skip_targets:
+                tgt_idx = label_to_idx.get(tgt_upper)
+                if tgt_idx is not None and start < tgt_idx <= default_end:
+                    if tgt_idx < best_end:
+                        best_end = tgt_idx
+
+            fi.stmts = self.stmts[start:best_end]
+            if best_end < default_end:
+                fi.residual_start = best_end
+                fi.residual_end   = default_end
+            else:
+                fi.residual_start = None
+                fi.residual_end   = None
+
+        return funcs_ordered, main_stmts, 0
+
+    # ------------------------------------------------------------------
+    # Header: includes + forward declarations
+    # ------------------------------------------------------------------
+
+    def _emit_header(self, funcs):
         self._w('/* Generated by emit_c_stmt.py — Sprint 20 */')
         self._w('#include "snobol4.h"')
         self._w('#include "snobol4_inc.h"')
+        self._w('#include <stdio.h>')
         self._w('')
+        # Forward-declare each user function
+        for fi in funcs:
+            safe = _safe_c_name(fi.name)
+            self._w(f'static SnoVal sno_uf_{safe}(SnoVal *_args, int _nargs);')
+        self._w('')
+
+    # ------------------------------------------------------------------
+    # Main program body
+    # ------------------------------------------------------------------
+
+    def _emit_main_body_segments(self, segments):
+        """Emit main program: interleaved segments (main stmts + residuals)."""
+        self._func_suffix = '_MAIN'
         self._w('int sno_program(void) {')
         self._w('    /* Jump to first statement */')
-        if self.stmts:
-            first_lbl = _stmt_label(0, self.stmts[0])
-            self._w(f'    goto {first_lbl};')
+        # Find first stmt across all segments
+        for offset, stmts in segments:
+            if stmts:
+                first_lbl = _stmt_label(offset, stmts[0])
+                self._w(f'    goto {first_lbl};')
+                break
+        self._w('')
+        for offset, stmts in segments:
+            self._emit_stmts(stmts, offset, is_main=True)
+
+    def _emit_main_footer(self):
+        self._w('/* --- program exit labels --- */')
+        self._w('_SNO_PROG_END:')
+        self._w('    return 0;')
+        self._w('SNO_RETURN_LABEL_MAIN:')
+        self._w('    return 0;')
+        self._w('SNO_FRETURN_LABEL_MAIN:')
+        self._w('    return 1;')
+        self._w('SNO_NRETURN_LABEL_MAIN:')
+        self._w('    return 0;')
+        self._w('SNO_CONTINUE_LABEL_MAIN:')
+        self._w('    return 0;')
+        self._w('SNO_error:')
+        self._w('    fprintf(stderr, "error label reached\\n");')
+        self._w('    return 2;')
+        self._w('SNO_err:')
+        self._w('    fprintf(stderr, "err label reached\\n");')
+        self._w('    return 2;')
+        self._w('}')
         self._w('')
 
-    def _emit_body(self):
-        n = len(self.stmts)
-        for i, stmt in enumerate(self.stmts):
-            lbl = _stmt_label(i, stmt)
-            next_lbl = _stmt_label(i+1, self.stmts[i+1]) if i+1 < n else '_SNO_PROG_END'
+    # ------------------------------------------------------------------
+    # Per-function C function
+    # ------------------------------------------------------------------
 
-            # Emit the C label
+    def _emit_function(self, fi):
+        safe = _safe_c_name(fi.name)
+        self._func_suffix = f'_{safe}'
+        all_vars = fi.params + fi.locals_
+        self._w(f'/* SNOBOL4 function: {fi.name}({", ".join(fi.params)}) locals={fi.locals_} */')
+        self._w(f'static SnoVal sno_uf_{safe}(SnoVal *_args, int _nargs) {{')
+        # Save existing values of params+locals, bind params from args
+        if all_vars:
+            self._w(f'    /* Save and bind params/locals */')
+            for v in all_vars:
+                sv = _safe_c_name(v)
+                self._w(f'    SnoVal _save_{sv} = sno_var_get("{v}");')
+            for i, p in enumerate(fi.params):
+                self._w(f'    sno_var_set("{p}", (_nargs > {i}) ? _args[{i}] : SNO_NULL_VAL);')
+            for l in fi.locals_:
+                self._w(f'    sno_var_set("{l}", SNO_NULL_VAL);')
+            self._w('')
+
+        # Jump to entry label
+        entry_c = _c_label(fi.entry_label)
+        self._w(f'    goto {entry_c};')
+        self._w('')
+
+        # Emit function body stmts
+        self._emit_stmts(fi.stmts, fi.first_idx, is_main=False)
+
+        # Return labels — per function
+        ret_lbl  = f'SNO_RETURN_LABEL_{safe}'
+        fret_lbl = f'SNO_FRETURN_LABEL_{safe}'
+        nret_lbl = f'SNO_NRETURN_LABEL_{safe}'
+        cont_lbl = f'SNO_CONTINUE_LABEL_{safe}'
+        self._w(f'{ret_lbl}:')
+        if all_vars:
+            for v in all_vars:
+                sv = _safe_c_name(v)
+                self._w(f'    sno_var_set("{v}", _save_{sv});')
+        self._w(f'    return SNO_NULL_VAL;')
+        self._w(f'{fret_lbl}:')
+        if all_vars:
+            for v in all_vars:
+                sv = _safe_c_name(v)
+                self._w(f'    sno_var_set("{v}", _save_{sv});')
+        self._w(f'    return SNO_FAIL_VAL;')
+        self._w(f'{nret_lbl}:')
+        if all_vars:
+            for v in all_vars:
+                sv = _safe_c_name(v)
+                self._w(f'    sno_var_set("{v}", _save_{sv});')
+        self._w(f'    return SNO_NULL_VAL;  /* NRETURN */')
+        self._w(f'{cont_lbl}:')
+        if all_vars:
+            for v in all_vars:
+                sv = _safe_c_name(v)
+                self._w(f'    sno_var_set("{v}", _save_{sv});')
+        self._w(f'    return SNO_NULL_VAL;  /* CONTINUE */')
+        self._w(f'}}')
+        self._w('')
+
+    # ------------------------------------------------------------------
+    # main() + function registration
+    # ------------------------------------------------------------------
+
+    def _emit_main_c(self, funcs):
+        self._w('int main(void) {')
+        self._w('    sno_runtime_init();')
+        self._w('    sno_inc_init();')
+        for fi in funcs:
+            safe = _safe_c_name(fi.name)
+            spec = f'{fi.name}({",".join(fi.params)}){",".join(fi.locals_)}'
+            self._w(f'    sno_define("{spec}", sno_uf_{safe});')
+        self._w('    return sno_program();')
+        self._w('}')
+
+    # ------------------------------------------------------------------
+    # Statement list emitter (shared by main and functions)
+    # ------------------------------------------------------------------
+
+    def _emit_stmts(self, stmts, offset, is_main):
+        n = len(stmts)
+        for i, stmt in enumerate(stmts):
+            abs_i = offset + i
+            lbl = _stmt_label(abs_i, stmt)
+            next_lbl = (_stmt_label(offset + i + 1, stmts[i+1])
+                        if i+1 < n else ('_SNO_PROG_END' if is_main else
+                                         f'SNO_RETURN_LABEL{self._func_suffix}'))
+
             self._w(f'{lbl}: {{  /* L{stmt.lineno} */')
             self._w(f'    sno_comm_stno({stmt.lineno});')
 
-            # Determine success/failure labels from goto field
             succ_lbl = next_lbl
             fail_lbl = next_lbl
 
@@ -535,7 +798,6 @@ class StmtEmitter:
                 g = stmt.goto
                 if g.unconditional:
                     cl = _c_label(g.unconditional)
-                    # Map SNOBOL4 special labels
                     cl = self._map_special_label(cl, g.unconditional)
                     succ_lbl = cl
                     fail_lbl = cl
@@ -549,134 +811,126 @@ class StmtEmitter:
                         cl = self._map_special_label(cl, g.on_failure)
                         fail_lbl = cl
 
-            # ---- Emit statement body ----
-
-            subj   = stmt.subject
-            pat    = stmt.pattern
-            repl   = stmt.replacement
-
-            # Case 1: pure function call (no subject, no pattern)
-            # e.g.  DEFINE('foo(a,b)')  or  DATA('tree(t,v,n,c)')
-            if subj is not None and subj.kind == 'call' and pat is None and repl is None:
-                name = subj.name.upper() if subj.name else ''
-                # DEFINE / DATA — executed for side effects
-                ca = [emit_expr(a) for a in (subj.args or [])]
-                if name == 'DEFINE':
-                    self._w(f'    sno_define_spec({ca[0] if ca else "SNO_NULL_VAL"});')
-                elif name == 'DATA':
-                    self._w(f'    sno_data_define(sno_to_str({ca[0] if ca else "SNO_NULL_VAL"}));')
-                elif name == 'OPSYN':
-                    if len(ca) >= 3:
-                        self._w(f'    sno_opsyn({", ".join(ca)});')
-                    else:
-                        self._w(f'    sno_opsyn2({", ".join(ca)});')
-                else:
-                    args_c = ', '.join(ca)
-                    n_args = len(ca)
-                    if n_args:
-                        self._w(f'    sno_apply("{subj.name}", (SnoVal[{n_args}]){{{args_c}}}, {n_args});')
-                    else:
-                        self._w(f'    sno_apply("{subj.name}", NULL, 0);')
-                # Goto handling: if S/F specified, they apply to the call result
-                self._w(f'    goto {succ_lbl};')
-
-            # Case 2: subject = replacement (assignment, no pattern)
-            elif subj is not None and repl is not None and pat is None:
-                rhs_c = emit_expr(repl)
-                # P003: if RHS contains a conditional (LT/GT/EQ/etc) that failed,
-                # it produces SNO_FAIL_VAL — detect and branch to fail label.
-                self._w(f'    {{')
-                self._w(f'        SnoVal _rhs = {rhs_c};')
-                self._w(f'        if (sno_is_fail(_rhs)) goto {fail_lbl};')
-                self._w(f'        {emit_assign_target(subj, "_rhs")[4:]}')
-                self._w(f'        goto {succ_lbl};')
-                self._w(f'    }}')
-
-            # Case 3: subject pattern = replacement (pattern match + optional replacement)
-            elif subj is not None and pat is not None:
-                subj_c  = emit_expr(subj)
-                pat_c   = emit_pattern_expr(pat)
-                repl_c  = emit_expr(repl) if repl else None
-
-                if repl_c:
-                    # Pattern match with replacement
-                    self._w(f'    {{')
-                    self._w(f'        SnoVal _subj = {subj_c};')
-                    self._w(f'        int _ok = sno_match_and_replace(&_subj, {pat_c}, {repl_c});')
-                    self._w(f'        {emit_assign_target(subj, "_subj")[4:]}')  # strip leading 4 spaces
-                    self._w(f'        if (_ok) goto {succ_lbl};')
-                    self._w(f'        else goto {fail_lbl};')
-                    self._w(f'    }}')
-                else:
-                    # Pattern match only (no replacement)
-                    self._w(f'    {{')
-                    self._w(f'        SnoVal _subj = {subj_c};')
-                    self._w(f'        int _ok = sno_match_pattern({pat_c}, sno_to_str(_subj));')
-                    self._w(f'        if (_ok) goto {succ_lbl};')
-                    self._w(f'        else goto {fail_lbl};')
-                    self._w(f'    }}')
-
-            # Case 4: bare goto only (no subject, no pattern, no replacement)
-            elif subj is None and pat is None and repl is None:
-                self._w(f'    goto {succ_lbl};')
-
-            # Case 5: only replacement (OUTPUT = ... without subject)
-            elif subj is None and repl is not None:
-                rhs_c = emit_expr(repl)
-                self._w(f'    {{')
-                self._w(f'        SnoVal _rhs = {rhs_c};')
-                self._w(f'        if (sno_is_fail(_rhs)) goto {fail_lbl};')
-                self._w(f'        sno_output_val(_rhs);')
-                self._w(f'        goto {succ_lbl};')
-                self._w(f'    }}')
-
-            else:
-                self._w(f'    /* unhandled stmt shape */')
-                self._w(f'    goto {next_lbl};')
-
+            self._emit_stmt_body(stmt, succ_lbl, fail_lbl, next_lbl)
             self._w(f'}}')
             self._w()
 
+    def _emit_stmt_body(self, stmt, succ_lbl, fail_lbl, next_lbl):
+        subj  = stmt.subject
+        pat   = stmt.pattern
+        repl  = stmt.replacement
+
+        # Case 1: pure function call (no subject, no pattern)
+        if subj is not None and subj.kind == 'call' and pat is None and repl is None:
+            name = subj.name.upper() if subj.name else ''
+            ca = [emit_expr(a) for a in (subj.args or [])]
+            if name == 'DEFINE':
+                self._w(f'    sno_define_spec({ca[0] if ca else "SNO_NULL_VAL"});')
+            elif name == 'DATA':
+                self._w(f'    sno_data_define(sno_to_str({ca[0] if ca else "SNO_NULL_VAL"}));')
+            elif name == 'OPSYN':
+                if len(ca) >= 3:
+                    self._w(f'    sno_opsyn({", ".join(ca)});')
+                else:
+                    self._w(f'    sno_opsyn2({", ".join(ca)});')
+            else:
+                args_c = ', '.join(ca)
+                n_args = len(ca)
+                if n_args:
+                    self._w(f'    {{')
+                    self._w(f'        SnoVal _ret = sno_apply("{subj.name}", (SnoVal[{n_args}]){{{args_c}}}, {n_args});')
+                    self._w(f'        if (sno_is_fail(_ret)) goto {fail_lbl};')
+                    self._w(f'        goto {succ_lbl};')
+                    self._w(f'    }}')
+                    return
+                else:
+                    self._w(f'    {{')
+                    self._w(f'        SnoVal _ret = sno_apply("{subj.name}", NULL, 0);')
+                    self._w(f'        if (sno_is_fail(_ret)) goto {fail_lbl};')
+                    self._w(f'        goto {succ_lbl};')
+                    self._w(f'    }}')
+                    return
+            self._w(f'    goto {succ_lbl};')
+
+        # Case 2: subject = replacement (assignment, no pattern)
+        elif subj is not None and repl is not None and pat is None:
+            rhs_c = emit_expr(repl)
+            self._w(f'    {{')
+            self._w(f'        SnoVal _rhs = {rhs_c};')
+            self._w(f'        if (sno_is_fail(_rhs)) goto {fail_lbl};')
+            self._w(f'        {emit_assign_target(subj, "_rhs")[4:]}')
+            self._w(f'        goto {succ_lbl};')
+            self._w(f'    }}')
+
+        # Case 3: subject pattern = replacement (pattern match + optional replacement)
+        elif subj is not None and pat is not None:
+            subj_c  = emit_expr(subj)
+            pat_c   = emit_pattern_expr(pat)
+            repl_c  = emit_expr(repl) if repl else None
+
+            if repl_c:
+                self._w(f'    {{')
+                self._w(f'        SnoVal _subj = {subj_c};')
+                self._w(f'        int _ok = sno_match_and_replace(&_subj, {pat_c}, {repl_c});')
+                self._w(f'        {emit_assign_target(subj, "_subj")[4:]}')
+                self._w(f'        if (_ok) goto {succ_lbl};')
+                self._w(f'        else goto {fail_lbl};')
+                self._w(f'    }}')
+            else:
+                self._w(f'    {{')
+                self._w(f'        SnoVal _subj = {subj_c};')
+                self._w(f'        int _ok = sno_match_pattern({pat_c}, sno_to_str(_subj));')
+                self._w(f'        if (_ok) goto {succ_lbl};')
+                self._w(f'        else goto {fail_lbl};')
+                self._w(f'    }}')
+
+        # Case 4: bare goto only
+        elif subj is None and pat is None and repl is None:
+            self._w(f'    goto {succ_lbl};')
+
+        # Case 5: OUTPUT = expr (no subject, has replacement)
+        elif subj is None and repl is not None:
+            rhs_c = emit_expr(repl)
+            self._w(f'    {{')
+            self._w(f'        SnoVal _rhs = {rhs_c};')
+            self._w(f'        if (sno_is_fail(_rhs)) goto {fail_lbl};')
+            self._w(f'        sno_output_val(_rhs);')
+            self._w(f'        goto {succ_lbl};')
+            self._w(f'    }}')
+
+        else:
+            self._w(f'    /* unhandled stmt shape */')
+            self._w(f'    goto {next_lbl};')
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
     def _map_special_label(self, cl, orig):
-        """Map SNOBOL4 special labels to C equivalents."""
         upper = orig.upper()
+        sfx = self._func_suffix  # e.g. '_findRefs' or '_MAIN'
         if upper == 'END':
             return '_SNO_PROG_END'
         if upper == 'RETURN':
-            return 'SNO_RETURN_LABEL'
+            return f'SNO_RETURN_LABEL{sfx}'
         if upper == 'FRETURN':
-            return 'SNO_FRETURN_LABEL'
+            return f'SNO_FRETURN_LABEL{sfx}'
         if upper == 'NRETURN':
-            return 'SNO_NRETURN_LABEL'
+            return f'SNO_NRETURN_LABEL{sfx}'
         if upper == 'CONTINUE':
-            return 'SNO_CONTINUE_LABEL'
+            return f'SNO_CONTINUE_LABEL{sfx}'
         return cl
 
-    def _emit_footer(self):
-        self._w('/* --- program exit labels --- */')
-        self._w('_SNO_PROG_END:')
-        self._w('    return 0;')
-        self._w('SNO_RETURN_LABEL:')
-        self._w('    return 0;')
-        self._w('SNO_FRETURN_LABEL:')
-        self._w('    return 1;')
-        self._w('SNO_NRETURN_LABEL:')
-        self._w('    return 0;')
-        self._w('SNO_CONTINUE_LABEL:')
-        self._w('    return 0;')
-        self._w('SNO_error:')
-        self._w('    fprintf(stderr, "error label reached\\n");')
-        self._w('    return 2;')
-        self._w('SNO_err:')
-        self._w('    fprintf(stderr, "err label reached\\n");')
-        self._w('    return 2;')
-        self._w('}')
-        self._w('')
-        self._w('int main(void) {')
-        self._w('    sno_runtime_init();')
-        self._w('    sno_inc_init();   /* initialize all hardcoded inc functions */')
-        self._w('    return sno_program();')
-        self._w('}')
+    def _w(self, line=''):
+        self.lines.append(line)
+
+
+def _safe_c_name(s):
+    """Convert a SNOBOL4 identifier to a safe C identifier."""
+    r = _re.sub(r'[^a-zA-Z0-9]', '_', s)
+    if r and r[0].isdigit():
+        r = 'f_' + r
+    return r or 'anon'
 
 
 def emit_program(prog: Program) -> str:
