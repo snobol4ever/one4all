@@ -100,6 +100,15 @@ char *sno_concat(const char *a, const char *b) {
     return r;
 }
 
+/* P003: SnoVal concat — propagates SNO_FAIL_VAL if either operand is FAIL */
+SnoVal sno_concat_sv(SnoVal a, SnoVal b) {
+    if (a.type == SNO_FAIL) return SNO_FAIL_VAL;
+    if (b.type == SNO_FAIL) return SNO_FAIL_VAL;
+    const char *sa = sno_to_str(a);
+    const char *sb = sno_to_str(b);
+    return SNO_STR_VAL(sno_concat(sa, sb));
+}
+
 int64_t sno_size(const char *s) {
     return s ? (int64_t)strlen(s) : 0;
 }

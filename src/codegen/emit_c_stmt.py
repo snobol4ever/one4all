@@ -149,7 +149,7 @@ def emit_expr(e):
     if k == 'concat':
         l = emit_expr(e.left)
         r = emit_expr(e.right)
-        return f'SNO_STR_VAL(sno_concat(sno_to_str({l}), sno_to_str({r})))'
+        return f'sno_concat_sv({l}, {r})'  # P003: propagates SNO_FAIL_VAL
 
     if k == 'add':
         return f'sno_add({emit_expr(e.left)}, {emit_expr(e.right)})'
@@ -183,14 +183,14 @@ def emit_expr(e):
             'REAL':     lambda a: f'sno_real_fn({a[0]})',
             'STRING':   lambda a: f'sno_string_fn({a[0]})',
             'DATATYPE': lambda a: f'SNO_STR_VAL(sno_datatype({a[0]}))',
-            'IDENT':    lambda a: f'(sno_ident({a[0]},{a[1]}) ? {a[0]} : SNO_NULL_VAL)',
-            'DIFFER':   lambda a: f'(sno_differ({a[0]},{a[1]}) ? {a[0]} : SNO_NULL_VAL)',
-            'EQ':       lambda a: f'(sno_eq({a[0]},{a[1]}) ? {a[0]} : SNO_NULL_VAL)',
-            'NE':       lambda a: f'(sno_ne({a[0]},{a[1]}) ? {a[0]} : SNO_NULL_VAL)',
-            'LT':       lambda a: f'(sno_lt({a[0]},{a[1]}) ? {a[0]} : SNO_NULL_VAL)',
-            'LE':       lambda a: f'(sno_le({a[0]},{a[1]}) ? {a[0]} : SNO_NULL_VAL)',
-            'GT':       lambda a: f'(sno_gt({a[0]},{a[1]}) ? {a[0]} : SNO_NULL_VAL)',
-            'GE':       lambda a: f'(sno_ge({a[0]},{a[1]}) ? {a[0]} : SNO_NULL_VAL)',
+            'IDENT':    lambda a: f'(sno_ident({a[0]},{a[1]}) ? SNO_NULL_VAL : SNO_FAIL_VAL)',
+            'DIFFER':   lambda a: f'(sno_differ({a[0]},{a[1]}) ? SNO_NULL_VAL : SNO_FAIL_VAL)',
+            'EQ':       lambda a: f'(sno_eq({a[0]},{a[1]}) ? SNO_NULL_VAL : SNO_FAIL_VAL)',
+            'NE':       lambda a: f'(sno_ne({a[0]},{a[1]}) ? SNO_NULL_VAL : SNO_FAIL_VAL)',
+            'LT':       lambda a: f'(sno_lt({a[0]},{a[1]}) ? SNO_NULL_VAL : SNO_FAIL_VAL)',
+            'LE':       lambda a: f'(sno_le({a[0]},{a[1]}) ? SNO_NULL_VAL : SNO_FAIL_VAL)',
+            'GT':       lambda a: f'(sno_gt({a[0]},{a[1]}) ? SNO_NULL_VAL : SNO_FAIL_VAL)',
+            'GE':       lambda a: f'(sno_ge({a[0]},{a[1]}) ? SNO_NULL_VAL : SNO_FAIL_VAL)',
             'ARRAY':    lambda a: f'sno_array_create({a[0]})',
             'TABLE':    lambda a: f'SNO_TABLE_VAL(sno_table_new())',
             'SORT':     lambda a: f'sno_sort_fn({a[0]})',
@@ -583,8 +583,14 @@ class StmtEmitter:
             # Case 2: subject = replacement (assignment, no pattern)
             elif subj is not None and repl is not None and pat is None:
                 rhs_c = emit_expr(repl)
-                self._w(emit_assign_target(subj, rhs_c))
-                self._w(f'    goto {succ_lbl};')
+                # P003: if RHS contains a conditional (LT/GT/EQ/etc) that failed,
+                # it produces SNO_FAIL_VAL — detect and branch to fail label.
+                self._w(f'    {{')
+                self._w(f'        SnoVal _rhs = {rhs_c};')
+                self._w(f'        if (sno_is_fail(_rhs)) goto {fail_lbl};')
+                self._w(f'        {emit_assign_target(subj, "_rhs")[4:]}')
+                self._w(f'        goto {succ_lbl};')
+                self._w(f'    }}')
 
             # Case 3: subject pattern = replacement (pattern match + optional replacement)
             elif subj is not None and pat is not None:
@@ -617,8 +623,12 @@ class StmtEmitter:
             # Case 5: only replacement (OUTPUT = ... without subject)
             elif subj is None and repl is not None:
                 rhs_c = emit_expr(repl)
-                self._w(f'    sno_output_val({rhs_c});')
-                self._w(f'    goto {succ_lbl};')
+                self._w(f'    {{')
+                self._w(f'        SnoVal _rhs = {rhs_c};')
+                self._w(f'        if (sno_is_fail(_rhs)) goto {fail_lbl};')
+                self._w(f'        sno_output_val(_rhs);')
+                self._w(f'        goto {succ_lbl};')
+                self._w(f'    }}')
 
             else:
                 self._w(f'    /* unhandled stmt shape */')
