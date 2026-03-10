@@ -109,6 +109,40 @@ Each completed sprint is tagged as a named snapshot (not a version number).
 
 ---
 
+## Bootstrap Strategy
+
+SNOBOL4-tiny follows the **Forth kernel discipline**: keep the seed as small
+as possible, then build everything else in the language itself.
+
+The analogy is direct:
+
+| Forth | SNOBOL4-tiny |
+|-------|-------------|
+| ~12 native primitives | 8 primitive pattern nodes (LIT, ANY, POS, RPOS, LEN, SPAN, BREAK, ARB) |
+| NEXT (3-instruction dispatch) | α/β/γ/ω wiring baked into compiled gotos — **zero** dispatch cost |
+| `: word ... ;` defines new words | `NAME = pattern` defines new patterns |
+| Dictionary (self-extending) | Named IR graph (already built) |
+| Write Forth in Forth | Write the emitter in SNOBOL4 |
+
+**Three phases:**
+
+1. **Seed kernel (Sprints 0–4):** 8 primitive C templates in `emit_c.py`.
+   Never add a primitive that can be expressed from existing ones — ARBNO
+   is derivable from ARB + CAT + ALT and should be written in SNOBOL4, not
+   hardcoded.
+
+2. **Self-hosting emitter (Sprint 5+):** Rewrite `emit_c.py` as
+   `src/codegen/emit.sno` — a SNOBOL4 program that reads IR descriptions
+   and emits C. Runs on SNOBOL4-jvm for validation, SNOBOL4-python for speed.
+
+3. **Bootstrap closure (Sprint 8+):** The emitter compiles itself and
+   produces output identical to the CSNOBOL4/SPITBOL oracle. Same test
+   as Snocone Step 9 in the sibling repos.
+
+See [`doc/BOOTSTRAP.md`](doc/BOOTSTRAP.md) for the full design.
+
+---
+
 ## Validation
 
 Correctness is validated against three oracles:

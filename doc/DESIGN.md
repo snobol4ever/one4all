@@ -125,3 +125,50 @@ No interpreter fallback. No mode switch.
 For x86-64: compiled code lands in mmap(PROT_EXEC).
 For JVM: ClassLoader.defineClass().
 For MSIL: DynamicMethod.
+
+---
+
+## The Forth Analogy — Why This Architecture
+
+SNOBOL4-tiny's architecture is deliberately modeled on the Forth kernel/dictionary
+split. Forth's power comes from having an irreducibly small native kernel (~12
+primitives) and then building everything else in the language itself. The same
+discipline applies here.
+
+### The NEXT Equivalent
+
+In Forth, NEXT is the 3-instruction heartbeat of the entire system:
+
+```asm
+NEXT: lw  W, (IP)    ; fetch next word pointer
+      add IP, 4      ; advance instruction pointer  
+      jmp (W)        ; jump to code
+```
+
+SPITBOL uses an equivalent: `succp` (3 instructions: load pthen, load pcode,
+jmp). Every pattern node pays this cost at runtime.
+
+SNOBOL4-tiny pays **zero**. The α/β/γ/ω wiring is baked into the compiled
+output as static gotos. There is no dispatch loop — the wiring IS the execution.
+This is the fundamental speed advantage over SPITBOL's threaded model.
+
+The price: the graph must be fully known at compile time. CODE/EVAL is the
+escape hatch — it re-enters the compiler and extends the graph at runtime,
+exactly as Forth's `:` extends the dictionary.
+
+### Primitive Minimality
+
+Before adding any new primitive node, ask: can it be expressed as CAT, ALT,
+or ARBNO of existing primitives? If yes — don't add it. Write the derivation.
+
+ARBNO is *derivable* from ARB + CAT + ALT once those work. TAB(n) is
+derivable from POS(n). These are not primitives — they are library words,
+written in SNOBOL4 the same way Forth's higher words are written in Forth.
+
+Irreducible primitives (nothing smaller can express them):
+LIT, ANY, POS, RPOS, LEN, SPAN, BREAK, ARB.
+
+Derivable (write in SNOBOL4, not as C templates):
+ARBNO, TAB, RTAB, and most compound patterns.
+
+See `doc/BOOTSTRAP.md` for the full three-phase bootstrap strategy.
