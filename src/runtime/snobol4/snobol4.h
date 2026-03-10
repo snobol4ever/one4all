@@ -239,13 +239,13 @@ int     sno_func_exists(const char *name);
  * ============================================================ */
 
 /* Return codes for statement execution */
-#define SNO_SUCCESS  0   /* fall through to next statement */
-#define SNO_FAILURE  1   /* branch to :F label */
+#define SNO_RETCODE_SUCCESS  0
+#define SNO_RETCODE_FAILURE  1
 #define SNO_GOTO     2   /* branch to specific label */
 #define SNO_RETURN   3   /* return from function */
 #define SNO_FRETURN  4   /* failure return from function */
 #define SNO_NRETURN  5   /* no-value return */
-#define SNO_END      6   /* END of program */
+#define SNO_RETCODE_END  6   /* END of program */
 
 /* ============================================================
  * Builtin functions (string operations)
@@ -373,6 +373,8 @@ void   sno_define_spec(SnoVal spec);
 SnoVal sno_apply_val(SnoVal fnval, SnoVal *args, int nargs);
 SnoVal sno_eval(SnoVal expr);
 SnoVal sno_opsyn(SnoVal newname, SnoVal oldname, SnoVal type);
+/* 2-arg convenience — type defaults to SNO_NULL_VAL */
+static inline SnoVal sno_opsyn2(SnoVal a, SnoVal b) { return sno_opsyn(a, b, SNO_NULL_VAL); }
 SnoVal sno_sort_fn(SnoVal arr);
 
 /* SNO_TABLE_VAL macro */

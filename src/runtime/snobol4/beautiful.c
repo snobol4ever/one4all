@@ -1001,12 +1001,12 @@ _stmt_182: {  /* L24 */
     goto SNO_io_end;
 }
 
-SNO_input_: {  /* L25 */
+SNO_input: {  /* L25 */
     sno_var_set("io", SNO_NULL_VAL);
     goto SNO_io;
 }
 
-SNO_output_: {  /* L26 */
+SNO_output: {  /* L26 */
     sno_var_set("io", SNO_NULL_VAL);
     goto SNO_io;
 }
@@ -3288,42 +3288,42 @@ _stmt_616: {  /* L15 */
     goto SNO_semanticEnd;
 }
 
-SNO_shift_: {  /* L17 */
+SNO_shift: {  /* L17 */
     sno_var_set("shift", sno_eval(SNO_STR_VAL(sno_concat(sno_to_str(SNO_STR_VAL(sno_concat(sno_to_str(SNO_STR_VAL("p . thx . *Shift('")), sno_to_str(sno_var_get("t"))))), sno_to_str(SNO_STR_VAL("', thx)"))))));
     goto SNO_RETURN_LABEL;
 }
 
-SNO_reduce_: {  /* L18 */
+SNO_reduce: {  /* L18 */
     sno_var_set("reduce", sno_eval(SNO_STR_VAL(sno_concat(sno_to_str(SNO_STR_VAL(sno_concat(sno_to_str(SNO_STR_VAL(sno_concat(sno_to_str(SNO_STR_VAL(sno_concat(sno_to_str(SNO_STR_VAL("epsilon . *Reduce(")), sno_to_str(sno_var_get("t"))))), sno_to_str(SNO_STR_VAL(", "))))), sno_to_str(sno_var_get("n"))))), sno_to_str(SNO_STR_VAL(")"))))));
     goto SNO_RETURN_LABEL;
 }
 
-SNO_pop_: {  /* L19 */
+SNO_pop: {  /* L19 */
     sno_var_set("pop", sno_var_get("epsilon"));
     goto SNO_RETURN_LABEL;
 }
 
-SNO_nPush_: {  /* L21 */
+SNO_nPush: {  /* L21 */
     sno_var_set("nPush", sno_var_get("epsilon"));
     goto SNO_RETURN_LABEL;
 }
 
-SNO_nInc_: {  /* L22 */
+SNO_nInc: {  /* L22 */
     sno_var_set("nInc", sno_var_get("epsilon"));
     goto SNO_RETURN_LABEL;
 }
 
-SNO_nDec_: {  /* L23 */
+SNO_nDec: {  /* L23 */
     sno_var_set("nDec", sno_var_get("epsilon"));
     goto SNO_RETURN_LABEL;
 }
 
-SNO_nTop_: {  /* L24 */
+SNO_nTop: {  /* L24 */
     sno_var_set("nTop", sno_apply("TopCounter", NULL, 0));
     goto SNO_RETURN_LABEL;
 }
 
-SNO_nPop_: {  /* L25 */
+SNO_nPop: {  /* L25 */
     sno_var_set("nPop", sno_var_get("epsilon"));
     goto SNO_RETURN_LABEL;
 }
@@ -4249,12 +4249,12 @@ _stmt_807: {  /* L297 */
     goto SNO_RETURN_LABEL;
 }
 
-SNO_pp_: {  /* L299 */
+SNO_pp_bang: {  /* L299 */
     sno_apply("EQ", (SnoVal[2]){sno_var_get("n"), SNO_INT_VAL(1LL)}, 2);
     goto SNO_ppUnOp;
 }
 
-SNO_pp_: {  /* L300 */
+SNO_pp_H: {  /* L300 */
     sno_apply("EQ", (SnoVal[2]){sno_var_get("n"), SNO_INT_VAL(1LL)}, 2);
     goto SNO_ppUnOp;
 }
@@ -4264,7 +4264,7 @@ _stmt_810: {  /* L301 */
     goto SNO_ppBinOp;
 }
 
-SNO_pp_: {  /* L302 */
+SNO_pp_dol: {  /* L302 */
     {
         SnoVal _subj = sno_var_get(sno_to_str(sno_var_get("EQ")));
         int _ok = sno_match_pattern(sno_var_as_pattern(sno_var_get("n")), sno_to_str(_subj));
@@ -4278,7 +4278,7 @@ _stmt_812: {  /* L303 */
     goto SNO_ppBinOp;
 }
 
-SNO_pp_: {  /* L304 */
+SNO_pp_pct: {  /* L304 */
     sno_apply("EQ", (SnoVal[2]){sno_var_get("n"), SNO_INT_VAL(1LL)}, 2);
     goto SNO_ppUnOp;
 }
@@ -4288,7 +4288,7 @@ _stmt_814: {  /* L305 */
     goto SNO_ppBinOp;
 }
 
-SNO_pp_: {  /* L306 */
+SNO_pp_amp: {  /* L306 */
     {
         SnoVal _subj = sno_var_get("&EQ");
         int _ok = sno_match_pattern(sno_var_as_pattern(sno_var_get("n")), sno_to_str(_subj));
@@ -4302,7 +4302,7 @@ _stmt_816: {  /* L307 */
     goto SNO_ppBinOp;
 }
 
-SNO_pp_: {  /* L308 */
+SNO_pp_star: {  /* L308 */
     /* unhandled stmt shape */
     goto _stmt_818;
 }
@@ -4326,7 +4326,7 @@ _stmt_820: {  /* L311 */
     goto SNO_ppBinOp;
 }
 
-SNO_pp_: {  /* L312 */
+SNO_pp: {  /* L312 */
     /* unhandled stmt shape */
     goto _stmt_822;
 }
@@ -4374,7 +4374,7 @@ _stmt_828: {  /* L319 */
     goto SNO_ppBinOp;
 }
 
-SNO_pp_: {  /* L320 */
+SNO_pp_q2: {  /* L320 */
     sno_apply("EQ", (SnoVal[2]){sno_var_get("n"), SNO_INT_VAL(1LL)}, 2);
     goto SNO_ppUnOp;
 }
@@ -4384,7 +4384,7 @@ _stmt_830: {  /* L321 */
     goto SNO_ppBinOp;
 }
 
-SNO_pp_: {  /* L322 */
+SNO_pp_A: {  /* L322 */
     sno_apply("EQ", (SnoVal[2]){sno_var_get("n"), SNO_INT_VAL(1LL)}, 2);
     goto SNO_ppUnOp;
 }
@@ -4394,12 +4394,12 @@ _stmt_832: {  /* L323 */
     goto SNO_ppBinOp;
 }
 
-SNO_pp_: {  /* L324 */
+SNO_pp_hat: {  /* L324 */
     sno_apply("EQ", (SnoVal[2]){sno_var_get("n"), SNO_INT_VAL(2LL)}, 2);
     goto SNO_ppBinOp;
 }
 
-SNO_pp_: {  /* L325 */
+SNO_pp_til: {  /* L325 */
     sno_apply("EQ", (SnoVal[2]){sno_var_get("n"), SNO_INT_VAL(1LL)}, 2);
     goto SNO_ppUnOp;
 }
@@ -5251,12 +5251,12 @@ _stmt_994: {  /* L503 */
     goto SNO_RETURN_LABEL;
 }
 
-SNO_ss_: {  /* L505 */
+SNO_ss_bang: {  /* L505 */
     sno_apply("EQ", (SnoVal[2]){sno_var_get("n"), SNO_INT_VAL(1LL)}, 2);
     goto SNO_ssUnOp;
 }
 
-SNO_ss_: {  /* L506 */
+SNO_ss_H: {  /* L506 */
     sno_apply("EQ", (SnoVal[2]){sno_var_get("n"), SNO_INT_VAL(1LL)}, 2);
     goto SNO_ssUnOp;
 }
@@ -5266,7 +5266,7 @@ _stmt_997: {  /* L507 */
     goto SNO_ssBinOp;
 }
 
-SNO_ss_: {  /* L508 */
+SNO_ss_dol: {  /* L508 */
     {
         SnoVal _subj = sno_var_get(sno_to_str(sno_var_get("EQ")));
         int _ok = sno_match_pattern(sno_var_as_pattern(sno_var_get("n")), sno_to_str(_subj));
@@ -5280,7 +5280,7 @@ _stmt_999: {  /* L509 */
     goto SNO_ssBinOp;
 }
 
-SNO_ss_: {  /* L510 */
+SNO_ss_pct: {  /* L510 */
     sno_apply("EQ", (SnoVal[2]){sno_var_get("n"), SNO_INT_VAL(1LL)}, 2);
     goto SNO_ssUnOp;
 }
@@ -5290,7 +5290,7 @@ _stmt_1001: {  /* L511 */
     goto SNO_ssBinOp;
 }
 
-SNO_ss_: {  /* L512 */
+SNO_ss_amp: {  /* L512 */
     {
         SnoVal _subj = sno_var_get("&EQ");
         int _ok = sno_match_pattern(sno_var_as_pattern(sno_var_get("n")), sno_to_str(_subj));
@@ -5304,7 +5304,7 @@ _stmt_1003: {  /* L513 */
     goto SNO_ssBinOp;
 }
 
-SNO_ss_: {  /* L514 */
+SNO_ss_star: {  /* L514 */
     /* unhandled stmt shape */
     goto _stmt_1005;
 }
@@ -5328,7 +5328,7 @@ _stmt_1007: {  /* L517 */
     goto SNO_ssBinOp;
 }
 
-SNO_ss_: {  /* L518 */
+SNO_ss: {  /* L518 */
     /* unhandled stmt shape */
     goto _stmt_1009;
 }
@@ -5376,7 +5376,7 @@ _stmt_1015: {  /* L525 */
     goto SNO_ssBinOp;
 }
 
-SNO_ss_: {  /* L526 */
+SNO_ss_q2: {  /* L526 */
     sno_apply("EQ", (SnoVal[2]){sno_var_get("n"), SNO_INT_VAL(1LL)}, 2);
     goto SNO_ssUnOp;
 }
@@ -5386,7 +5386,7 @@ _stmt_1017: {  /* L527 */
     goto SNO_ssBinOp;
 }
 
-SNO_ss_: {  /* L528 */
+SNO_ss_A: {  /* L528 */
     sno_apply("EQ", (SnoVal[2]){sno_var_get("n"), SNO_INT_VAL(1LL)}, 2);
     goto SNO_ssUnOp;
 }
@@ -5396,12 +5396,12 @@ _stmt_1019: {  /* L529 */
     goto SNO_ssBinOp;
 }
 
-SNO_ss_: {  /* L530 */
+SNO_ss_hat: {  /* L530 */
     sno_apply("EQ", (SnoVal[2]){sno_var_get("n"), SNO_INT_VAL(2LL)}, 2);
     goto SNO_ssBinOp;
 }
 
-SNO_ss_: {  /* L531 */
+SNO_ss_til: {  /* L531 */
     sno_apply("EQ", (SnoVal[2]){sno_var_get("n"), SNO_INT_VAL(1LL)}, 2);
     goto SNO_ssUnOp;
 }
@@ -5589,7 +5589,7 @@ _stmt_1048: {  /* L566 */
     goto SNO_bVisitEnd;
 }
 
-SNO_bVisit_: {  /* L567 */
+SNO_bVisit: {  /* L567 */
     sno_apply("APPLY", (SnoVal[2]){sno_var_get("fnc"), sno_var_get("x")}, 2);
     goto _stmt_1050;
 }
@@ -5853,7 +5853,7 @@ _stmt_1097: {  /* L623 */
 
 _stmt_1098: {  /* L624 */
     sno_apply("pp", (SnoVal[1]){sno_var_get("sno")}, 1);
-    goto SNO_END;
+    goto _SNO_PROG_END;
 }
 
 SNO_mainErr1: {  /* L625 */
@@ -5863,7 +5863,7 @@ SNO_mainErr1: {  /* L625 */
 
 _stmt_1100: {  /* L626 */
     sno_output_val(sno_var_get("snoSrc"));
-    goto SNO_END;
+    goto _SNO_PROG_END;
 }
 
 SNO_mainErr2: {  /* L627 */
@@ -5873,23 +5873,30 @@ SNO_mainErr2: {  /* L627 */
 
 _stmt_1102: {  /* L628 */
     sno_output_val(sno_var_get("snoSrc"));
-    goto SNO_END;
+    goto _SNO_PROG_END;
 }
 
 SNO_END: {  /* L630 */
-    goto SNO_END;
+    goto _SNO_PROG_END;
 }
 
-SNO_END:
-    return SNO_SUCCESS;
+/* --- program exit labels --- */
+_SNO_PROG_END:
+    return 0;
 SNO_RETURN_LABEL:
-    return SNO_SUCCESS;
+    return 0;
 SNO_FRETURN_LABEL:
-    return SNO_FAILURE;
+    return 1;
 SNO_NRETURN_LABEL:
-    return SNO_SUCCESS;
+    return 0;
 SNO_CONTINUE_LABEL:
-    return SNO_SUCCESS;
+    return 0;
+SNO_error:
+    fprintf(stderr, "error label reached\n");
+    return 2;
+SNO_err:
+    fprintf(stderr, "err label reached\n");
+    return 2;
 }
 
 int main(void) {

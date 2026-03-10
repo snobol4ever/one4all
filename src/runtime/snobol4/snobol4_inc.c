@@ -26,11 +26,6 @@ static const char *sno_bs_str      = "\b";
 static const char *sno_bSlash_str  = "\\";
 
 /* Keywords */
-int sno_kw_fullscan = 1;
-int sno_kw_anchor   = 0;
-int sno_kw_trim     = 0;
-int sno_kw_maxlngth = 524288;
-int sno_kw_stlimit  = 50000;
 
 /* doDebug, xTrace, doParseTree */
 static long long g_doDebug     = 0;
@@ -104,7 +99,7 @@ SnoVal sno_assign_fn(SnoVal name, SnoVal expression) {
     const char *nm = sno_to_str(name);
     /* If expression is an unevaluated expression, eval it */
     SnoVal val = expression;
-    if (SNO_TYPE(expression) == SNO_TYPE_STR) {
+    if (SNO_TYPE(expression) == SNO_STR) {
         /* Try to evaluate as SNOBOL4 — for now just use it as-is */
         val = expression;
     }
@@ -153,13 +148,13 @@ SnoVal sno_io_fn(SnoVal name, SnoVal mode) {
  * ===================================================================== */
 
 SnoVal sno_IncLevel(SnoVal delta) {
-    long long d = (SNO_TYPE(delta) == SNO_TYPE_NULL) ? 2 : sno_to_int(delta);
+    long long d = (SNO_TYPE(delta) == SNO_NULL) ? 2 : sno_to_int(delta);
     g_level += d;
     return SNO_NULL_VAL;
 }
 
 SnoVal sno_DecLevel(SnoVal delta) {
-    long long d = (SNO_TYPE(delta) == SNO_TYPE_NULL) ? 2 : sno_to_int(delta);
+    long long d = (SNO_TYPE(delta) == SNO_NULL) ? 2 : sno_to_int(delta);
     g_level -= d;
     if (g_level < 0) g_level = 0;
     return SNO_NULL_VAL;
@@ -227,7 +222,7 @@ SnoVal sno_Gen(SnoVal str, SnoVal outNm) {
 }
 
 SnoVal sno_GenTab(SnoVal pos) {
-    long long target = (SNO_TYPE(pos) == SNO_TYPE_NULL) ? g_level : sno_to_int(pos);
+    long long target = (SNO_TYPE(pos) == SNO_NULL) ? g_level : sno_to_int(pos);
     if (!g_buf) g_buf = sno_strdup_gc("");
 
     long long cur = (long long)strlen(g_buf);
@@ -302,15 +297,7 @@ SnoVal sno_Qize(SnoVal s) {
  * ===================================================================== */
 
 /* Forward declarations from snobol4.c */
-extern SnoVal sno_push_val(SnoVal x);
-extern SnoVal sno_pop_val(void);
-extern SnoVal sno_top_val(void);
-extern SnoVal sno_tree_new(SnoVal t, SnoVal v, SnoVal n, SnoVal c);
 extern SnoVal sno_field_get(SnoVal obj, const char *field);
-extern SnoVal sno_field_set(SnoVal obj, const char *field, SnoVal val);
-extern SnoVal sno_array_create(SnoVal spec);
-extern SnoVal sno_subscript_get(SnoVal arr, SnoVal idx);
-extern SnoVal sno_subscript_set(SnoVal arr, SnoVal idx, SnoVal val);
 
 SnoVal sno_Shift(SnoVal t_arg) {
     /* Shift(t, v) — but in beauty_run.sno it's called as Shift('tag', value) */
@@ -536,4 +523,250 @@ void sno_inc_init(void) {
     sno_register_fn("LLT",        _w_LLT,       2, 2);
     sno_register_fn("LLE",        _w_LLE,       2, 2);
     sno_register_fn("LNE",        _w_LNE,       2, 2);
+    sno_inc_init_extra();
+}
+
+/* =========================================================================
+ * Additional missing registrations (identified by compiland reachability)
+ * ===================================================================== */
+
+/* icase(str) — case.inc: build case-insensitive pattern from string
+ * Returns a pattern that matches str case-insensitively.
+ * Each alpha char → (upper | lower) alternation; non-alpha → literal. */
+static SnoVal _w_icase(SnoVal *a, int n) {
+    const char *s = sno_to_str(n > 0 ? a[0] : SNO_NULL_VAL);
+    if (!s || !*s) return sno_pat_epsilon();
+    /* Build cat of per-char patterns */
+    SnoVal pat = sno_pat_epsilon();
+    int len = (int)strlen(s);
+    for (int i = len - 1; i >= 0; i--) {
+        char c = s[i];
+        SnoVal cp;
+        if (isalpha((unsigned char)c)) {
+            char lo[2] = { (char)tolower((unsigned char)c), 0 };
+            char hi[2] = { (char)toupper((unsigned char)c), 0 };
+            cp = sno_pat_alt(sno_pat_lit(GC_strdup(lo)), sno_pat_lit(GC_strdup(hi)));
+        } else {
+            char buf[2] = { c, 0 };
+            cp = sno_pat_lit(GC_strdup(buf));
+        }
+        pat = (i == len - 1) ? cp : sno_pat_cat(cp, pat);
+    }
+    return pat;
+}
+
+/* IsSnobol4() — is.inc: we ARE SNOBOL4-tiny, so always RETURN (succeed) */
+static SnoVal _w_IsSnobol4(SnoVal *a, int n) {
+    (void)a; (void)n;
+    return SNO_STR_VAL("");   /* non-null = success */
+}
+
+/* Push(x) — stack.inc: push x onto value stack */
+static SnoVal _w_Push(SnoVal *a, int n) {
+    SnoVal x = n > 0 ? a[0] : SNO_NULL_VAL;
+    sno_push(x);
+    /* Push returns .dummy (NRETURN) — return null marker */
+    return SNO_NULL_VAL;
+}
+
+/* Pop() / Pop(var) — stack.inc: pop from value stack */
+static SnoVal _w_Pop(SnoVal *a, int n) {
+    if (sno_stack_depth() == 0) return SNO_NULL_VAL;
+    SnoVal v = sno_pop();
+    if (n > 0 && a[0].type == SNO_STR) {
+        /* Pop(var) — store into named variable */
+        sno_var_set(a[0].s, v);
+        return SNO_NULL_VAL;
+    }
+    return v;
+}
+
+/* TopCounter() — counter.inc: return current counter value */
+static SnoVal _w_TopCounter(SnoVal *a, int n) {
+    (void)a; (void)n;
+    int64_t v = sno_ntop();
+    if (v < 0) return SNO_NULL_VAL;   /* FRETURN if stack empty */
+    return SNO_INT_VAL(v);
+}
+
+/* SqlSQize(str) — Qize.inc: SQL single-quote escape ('' for each ') */
+static SnoVal _w_SqlSQize(SnoVal *a, int n) {
+    const char *s = sno_to_str(n > 0 ? a[0] : SNO_NULL_VAL);
+    if (!s || !*s) return SNO_STR_VAL("");
+    size_t len = strlen(s);
+    /* Count single quotes */
+    int sq = 0;
+    for (size_t i = 0; i < len; i++) if (s[i] == '\'') sq++;
+    char *out = (char *)GC_MALLOC(len + sq + 1);
+    char *p = out;
+    for (size_t i = 0; i < len; i++) {
+        if (s[i] == '\'') { *p++ = '\''; *p++ = '\''; }
+        else               *p++ = s[i];
+    }
+    *p = '\0';
+    return SNO_STR_VAL(out);
+}
+
+/* TLump(x, len) — TDump.inc: tree-to-string up to len chars (stub) */
+static SnoVal _w_TLump(SnoVal *a, int n) {
+    /* Stub: return tree tag as string */
+    if (n < 1 || a[0].type == SNO_NULL) return SNO_STR_VAL("()");
+    if (a[0].type == SNO_UDEF) {
+        SnoVal t = sno_field_get(a[0], "t");
+        SnoVal v = sno_field_get(a[0], "v");
+        const char *ts = sno_to_str(t);
+        const char *vs = sno_to_str(v);
+        size_t tl = strlen(ts), vl = strlen(vs);
+        char *out = (char *)GC_MALLOC(tl + vl + 4);
+        if (vl > 0) sprintf(out, "(%s %s)", ts, vs);
+        else        sprintf(out, "(%s)", ts);
+        return SNO_STR_VAL(out);
+    }
+    return SNO_STR_VAL(sno_to_str(a[0]));
+}
+
+/* TValue(x) — TDump.inc: extract printable value from tree node */
+static SnoVal _w_TValue(SnoVal *a, int n) {
+    if (n < 1) return SNO_STR_VAL(".");
+    SnoVal x = a[0];
+    if (x.type == SNO_NULL) return SNO_STR_VAL(".");
+    if (x.type == SNO_UDEF) {
+        SnoVal v = sno_field_get(x, "v");
+        if (sno_is_null(v)) return SNO_STR_VAL(".");
+        return SNO_STR_VAL(sno_to_str(v));
+    }
+    return SNO_STR_VAL(sno_to_str(x));
+}
+
+/* Visit(x, fnc) — tree.inc: pre-order traversal, apply fnc at each node */
+static SnoVal _w_Visit(SnoVal *a, int n) {
+    if (n < 2) return SNO_NULL_VAL;
+    SnoVal x   = a[0];
+    SnoVal fnc = a[1];
+    const char *fname = sno_to_str(fnc);
+    /* Apply fnc to x */
+    sno_apply(fname, &x, 1);
+    /* Recurse into children */
+    if (x.type == SNO_UDEF) {
+        SnoVal nc  = sno_field_get(x, "n");
+        SnoVal ca  = sno_field_get(x, "c");
+        int    cnt = (int)sno_to_int(nc);
+        for (int i = 1; i <= cnt; i++) {
+            SnoVal child = sno_subscript_get(ca, SNO_INT_VAL(i));
+            SnoVal visit_args[2] = { child, fnc };
+            _w_Visit(visit_args, 2);
+        }
+    }
+    return SNO_NULL_VAL;
+}
+
+/* bVisit — same as Visit for beautiful.sno purposes */
+static SnoVal _w_bVisit(SnoVal *a, int n) {
+    return _w_Visit(a, n);
+}
+
+/* Equal(x, y) — tree.inc: structural equality */
+static SnoVal _w_Equal(SnoVal *a, int n) {
+    if (n < 2) return SNO_NULL_VAL;
+    SnoVal x = a[0], y = a[1];
+    /* Both null → equal */
+    if (x.type == SNO_NULL && y.type == SNO_NULL) return SNO_STR_VAL("");
+    if (x.type == SNO_NULL || y.type == SNO_NULL) return SNO_NULL_VAL;
+    if (x.type != SNO_UDEF || y.type != SNO_UDEF) {
+        return strcmp(sno_to_str(x), sno_to_str(y)) == 0 ? SNO_STR_VAL("") : SNO_NULL_VAL;
+    }
+    /* Compare t, v, n */
+    if (!sno_ident(sno_field_get(x,"t"), sno_field_get(y,"t"))) return SNO_NULL_VAL;
+    if (!sno_ident(sno_field_get(x,"v"), sno_field_get(y,"v"))) return SNO_NULL_VAL;
+    SnoVal nx = sno_field_get(x,"n"), ny = sno_field_get(y,"n");
+    if (!sno_ident(nx, ny)) return SNO_NULL_VAL;
+    int cnt = (int)sno_to_int(nx);
+    SnoVal cx = sno_field_get(x,"c"), cy = sno_field_get(y,"c");
+    for (int i = 1; i <= cnt; i++) {
+        SnoVal ci_x = sno_subscript_get(cx, SNO_INT_VAL(i));
+        SnoVal ci_y = sno_subscript_get(cy, SNO_INT_VAL(i));
+        SnoVal eq_args[2] = { ci_x, ci_y };
+        if (sno_is_null(_w_Equal(eq_args, 2))) return SNO_NULL_VAL;
+    }
+    return SNO_STR_VAL("");
+}
+
+/* Equiv(x, y) — tree.inc: structural equivalence (like Equal but looser) */
+static SnoVal _w_Equiv(SnoVal *a, int n) {
+    return _w_Equal(a, n);   /* same semantics for our purposes */
+}
+
+/* Find(xn, y, f) — tree.inc: search tree *xn for node equiv to y, apply f */
+static SnoVal _w_Find(SnoVal *a, int n) {
+    if (n < 3) return SNO_NULL_VAL;
+    /* xn is a variable name (indirect ref), y is search target, f is function */
+    SnoVal xn  = a[0];
+    SnoVal y   = a[1];
+    SnoVal f   = a[2];
+    const char *xname  = sno_to_str(xn);
+    const char *fname  = sno_to_str(f);
+    SnoVal root = sno_var_get(xname);
+    if (sno_is_null(root)) return SNO_NULL_VAL;
+    /* Check if root equiv to y */
+    SnoVal eq_args[2] = { root, y };
+    if (!sno_is_null(_w_Equiv(eq_args, 2))) {
+        sno_apply(fname, &xn, 1);
+        return SNO_STR_VAL("");
+    }
+    /* Recurse into children */
+    if (root.type == SNO_UDEF) {
+        SnoVal nc = sno_field_get(root, "n");
+        SnoVal ca = sno_field_get(root, "c");
+        int cnt = (int)sno_to_int(nc);
+        for (int i = 1; i <= cnt; i++) {
+            SnoVal child = sno_subscript_get(ca, SNO_INT_VAL(i));
+            /* For child, we'd need a temp var — skip deep recursion for now */
+            (void)child;
+        }
+    }
+    return SNO_NULL_VAL;
+}
+
+/* Insert(x, y, place) — tree.inc: insert y into tree x at position place */
+static SnoVal _w_Insert(SnoVal *a, int n) {
+    if (n < 3) return n > 0 ? a[0] : SNO_NULL_VAL;
+    SnoVal x     = a[0];
+    SnoVal y     = a[1];
+    int    place = (int)sno_to_int(a[2]);
+    if (x.type != SNO_UDEF) return x;
+
+    SnoVal nc  = sno_field_get(x, "n");
+    SnoVal ca  = sno_field_get(x, "c");
+    int    cnt = (int)sno_to_int(nc);
+
+    /* Build new children array with y inserted at place */
+    int new_cnt = cnt + 1;
+    SnoVal new_c = sno_array_create(SNO_STR_VAL("1:256"));
+    for (int i = 1; i < place && i <= cnt; i++)
+        sno_subscript_set(new_c, SNO_INT_VAL(i), sno_subscript_get(ca, SNO_INT_VAL(i)));
+    sno_subscript_set(new_c, SNO_INT_VAL(place), y);
+    for (int i = place; i <= cnt; i++)
+        sno_subscript_set(new_c, SNO_INT_VAL(i+1), sno_subscript_get(ca, SNO_INT_VAL(i)));
+
+    sno_field_set(x, "n", SNO_INT_VAL(new_cnt));
+    sno_field_set(x, "c", new_c);
+    return x;
+}
+
+/* Register all the missing functions */
+void sno_inc_init_extra(void) {
+    sno_register_fn("icase",      _w_icase,      1, 1);
+    sno_register_fn("IsSnobol4",  _w_IsSnobol4,  0, 0);
+    sno_register_fn("Push",       _w_Push,        1, 1);
+    sno_register_fn("Pop",        _w_Pop,         0, 1);
+    sno_register_fn("TopCounter", _w_TopCounter,  0, 0);
+    sno_register_fn("SqlSQize",   _w_SqlSQize,    1, 1);
+    sno_register_fn("TLump",      _w_TLump,       1, 2);
+    sno_register_fn("TValue",     _w_TValue,      1, 1);
+    sno_register_fn("Visit",      _w_Visit,       2, 2);
+    sno_register_fn("bVisit",     _w_bVisit,      2, 2);
+    sno_register_fn("Equal",      _w_Equal,       2, 2);
+    sno_register_fn("Equiv",      _w_Equiv,       2, 2);
+    sno_register_fn("Find",       _w_Find,        3, 3);
+    sno_register_fn("Insert",     _w_Insert,      3, 3);
 }

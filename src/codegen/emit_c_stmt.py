@@ -29,13 +29,30 @@ from ir import Expr, PatExpr, Goto, Stmt, Program
 # -----------------------------------------------------------------------
 
 def _c_label(label_name):
-    """Convert a SNOBOL4 label to a valid C label."""
-    # Replace chars that aren't valid in C identifiers
-    s = label_name.replace("'", "_q_").replace("#", "_H_").replace("@", "_A_")
-    s = s.replace("-", "_").replace(".", "_dot_")
+    """Convert a SNOBOL4 label to a valid C label — every special char gets a unique name."""
+    char_map = {
+        "'": "_q_",   "#": "_H_",   "@": "_A_",   "-": "_",
+        ".": "_dot_", ":": "_col_", "(": "_lp_",  ")": "_rp_",
+        "<": "_lt_",  ">": "_gt_",  "!": "_bang_","$": "_dol_",
+        "?": "_q2_",  "&": "_amp_", "*": "_star_","^": "_hat_",
+        "~": "_til_", "%": "_pct_", "/": "_sl_",  "|": "_bar_",
+        "+": "_plus_","=": "_eq_",  ",": "_com_", " ": "_",
+        "[": "_lb_",  "]": "_rb_",  "{": "_lc_",  "}": "_rc_",
+        ";": "_sc_",  "\\": "_bs_",
+    }
+    s = label_name
+    for ch, rep in char_map.items():
+        s = s.replace(ch, rep)
+    # Remove any remaining non-identifier chars
+    import re as _re
+    s = _re.sub(r'[^a-zA-Z0-9_]', '_', s)
+    # Collapse multiple underscores
+    s = _re.sub(r'_+', '_', s).strip('_')
     # Prefix if starts with digit
     if s and s[0].isdigit():
         s = 'L_' + s
+    if not s:
+        s = 'empty'
     return 'SNO_' + s
 
 
@@ -426,7 +443,7 @@ class StmtEmitter:
         n = len(self.stmts)
         for i, stmt in enumerate(self.stmts):
             lbl = _stmt_label(i, stmt)
-            next_lbl = _stmt_label(i+1, self.stmts[i+1]) if i+1 < n else 'SNO_END'
+            next_lbl = _stmt_label(i+1, self.stmts[i+1]) if i+1 < n else '_SNO_PROG_END'
 
             # Emit the C label
             self._w(f'{lbl}: {{  /* L{stmt.lineno} */')
@@ -532,7 +549,7 @@ class StmtEmitter:
         """Map SNOBOL4 special labels to C equivalents."""
         upper = orig.upper()
         if upper == 'END':
-            return 'SNO_END'
+            return '_SNO_PROG_END'
         if upper == 'RETURN':
             return 'SNO_RETURN_LABEL'
         if upper == 'FRETURN':
@@ -544,16 +561,23 @@ class StmtEmitter:
         return cl
 
     def _emit_footer(self):
-        self._w('SNO_END:')
-        self._w('    return SNO_SUCCESS;')
+        self._w('/* --- program exit labels --- */')
+        self._w('_SNO_PROG_END:')
+        self._w('    return 0;')
         self._w('SNO_RETURN_LABEL:')
-        self._w('    return SNO_SUCCESS;')
+        self._w('    return 0;')
         self._w('SNO_FRETURN_LABEL:')
-        self._w('    return SNO_FAILURE;')
+        self._w('    return 1;')
         self._w('SNO_NRETURN_LABEL:')
-        self._w('    return SNO_SUCCESS;')
+        self._w('    return 0;')
         self._w('SNO_CONTINUE_LABEL:')
-        self._w('    return SNO_SUCCESS;')
+        self._w('    return 0;')
+        self._w('SNO_error:')
+        self._w('    fprintf(stderr, "error label reached\\n");')
+        self._w('    return 2;')
+        self._w('SNO_err:')
+        self._w('    fprintf(stderr, "err label reached\\n");')
+        self._w('    return 2;')
         self._w('}')
         self._w('')
         self._w('int main(void) {')

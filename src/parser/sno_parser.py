@@ -251,6 +251,18 @@ def tokenise(source, base_dir='.'):
             # so the statement parser knows the line was indented (no label possible).
             if text and text[0] in (' ', '\t'):
                 line_toks.insert(0, Token('SPACE', ' ', lineno))
+            else:
+                # Extract raw label from source (first whitespace-delimited token).
+                # This preserves special chars like pp_! pp_:() that the lexer strips.
+                import re as _re
+                m = _re.match(r'^(\S+)', text)
+                raw_label = m.group(1) if m else ''
+                # Only inject a RAW_LABEL pseudo-token if it actually looks like a label
+                # (not a keyword, not starting with quote/paren/digit/operator)
+                if (raw_label and
+                    raw_label[0] not in ('"', "'", '(', ')', '$', '&', '*', '-', '+', '=', ':', '0','1','2','3','4','5','6','7','8','9') and
+                    raw_label not in ('DEFINE','DATA','ARRAY','TABLE','INPUT','OUTPUT','OPSYN','LOAD','UNLOAD','EVAL','CODE')):
+                    line_toks.insert(0, Token('RAW_LABEL', raw_label, lineno))
             # Trim trailing SPACE only
             while line_toks and line_toks[-1].kind == 'SPACE':
                 line_toks.pop()
@@ -356,6 +368,11 @@ def _parse_stmt_tokens(toks, lineno):
     # Track whether the statement was indented (first token was SPACE).
     # If indented → no label is possible (label must be in column 1).
     was_indented = toks and toks[0].kind == 'SPACE'
+    # Extract raw label if present (preserves special chars like pp_!)
+    raw_label_override = None
+    if toks and toks[0].kind == 'RAW_LABEL':
+        raw_label_override = toks[0].val
+        toks = toks[1:]
     # Remove SPACE tokens — we will handle spacing contextually
     toks = [t for t in toks if t.kind != 'SPACE']
     if not toks:
@@ -430,12 +447,15 @@ def _parse_stmt_tokens(toks, lineno):
         # Looks like a label if the next significant token is also an IDENT,
         # a string/int, '$', '&', or '*', OR if this is the only token (bare label).
         if n == 1:
-            label = toks[0].val
+            label = raw_label_override or toks[0].val
             return Stmt(label=label, lineno=lineno)
         next_kind = toks[1].kind
         if next_kind in ('IDENT', 'STR', 'INT', 'REAL', 'DOLLAR', 'AMP', 'STAR',
                          'LPAREN', 'MINUS'):
             label = consume().val
+            # Override with raw label if available (preserves pp_! pp_:() etc)
+            if raw_label_override and raw_label_override.startswith(label):
+                label = raw_label_override
 
     # ----------------------------------------------------------------
     # Now parse: [subject [pattern] [= replacement]] [: goto]
