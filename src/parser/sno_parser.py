@@ -750,11 +750,15 @@ class _ExprParser:
             child = self.parse_primary()
             return Expr(kind='indirect', child=child)
 
-        # &KEYWORD
+        # &IDENT = keyword; & non-IDENT = concatenation operator
         if t.kind == 'AMP':
             self.consume()
-            name = self.consume('IDENT').val
-            return Expr(kind='keyword', val=name)
+            if not self.eof() and self.peek().kind == 'IDENT':
+                name = self.consume().val
+                return Expr(kind='keyword', val=name)
+            # & as infix concat — right operand follows
+            right = self.parse_primary()
+            return right
 
         # Parenthesised expression
         if t.kind == 'LPAREN':

@@ -269,6 +269,19 @@ def emit_pattern_match(subject_c, pat, success_label, fail_label):
     return lines
 
 
+def emit_pat_or_expr(p):
+    """Emit either a pattern or an expression as a pattern."""
+    from ir import Expr, PatExpr
+    if isinstance(p, PatExpr):
+        return emit_pattern_expr(p)
+    elif isinstance(p, Expr):
+        return f'sno_var_as_pattern({emit_expr(p)})'
+    elif isinstance(p, str):
+        s = p.replace('"', '\\"')
+        return f'sno_pat_lit("{s}")'
+    return 'sno_pat_epsilon()'
+
+
 def emit_pattern_expr(p):
     """Emit a C expression that constructs a runtime pattern for p."""
     if p is None:
@@ -350,8 +363,8 @@ def emit_pattern_expr(p):
             'RTAB':    lambda a: f'sno_pat_rtab(sno_to_int({a[0]}))',
             'ARB':     lambda a: 'sno_pat_arb()',
             'REM':     lambda a: 'sno_pat_rem()',
-            'FENCE':   lambda a: f'sno_pat_fence_p({len(a)>0 and emit_pattern_expr(a[0]) or "sno_pat_epsilon()"})',
-            'ARBNO':   lambda a: f'sno_pat_arbno({emit_pattern_expr(a[0])})',
+            'FENCE':   lambda a: f'sno_pat_fence_p({emit_pat_or_expr(a[0]) if a else "sno_pat_epsilon()"})',
+            'ARBNO':   lambda a: f'sno_pat_arbno({emit_pat_or_expr(a[0])})',
             'BAL':     lambda a: 'sno_pat_bal()',
             'FAIL':    lambda a: 'sno_pat_fail()',
             'ABORT':   lambda a: 'sno_pat_abort()',
