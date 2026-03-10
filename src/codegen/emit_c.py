@@ -118,6 +118,16 @@ class FlatEmitter:
             self.L(f"    goto {gamma};")
             self.L(f"{nid}_beta:  goto {ci}_beta;")
 
+        elif isinstance(node, Arb):
+            self.S(f"static int64_t {nid}_start;")
+            self.S(f"static int64_t {nid}_depth;")
+            self.L(f"{nid}_alpha:")
+            self.L(f"    {nid}_start = cursor;  {nid}_depth = 0;  goto {gamma};")
+            self.L(f"{nid}_beta:")
+            self.L(f"    {nid}_depth++;")
+            self.L(f"    if ({nid}_start + {nid}_depth > subject_len) goto {omega};")
+            self.L(f"    cursor = {nid}_start + {nid}_depth;  goto {gamma};")
+
         elif isinstance(node, Arbno):
             ci = self.fresh("arbno_c")
             self.S(f"static int64_t {nid}_cursors[64];")
@@ -257,6 +267,16 @@ class FuncEmitter:
                 L(f"    var_{var_up} = _v;")
             L(f"    }} goto {gamma};")
             L(f"{nid}_beta:  goto {ci}_beta;")
+
+        elif isinstance(node, Arb):
+            self.F(pat, f"    int64_t {nid}_start;")
+            self.F(pat, f"    int64_t {nid}_depth;")
+            L(f"{nid}_alpha:")
+            L(f"    z->{nid}_start = Delta;  z->{nid}_depth = 0;  goto {gamma};")
+            L(f"{nid}_beta:")
+            L(f"    z->{nid}_depth++;")
+            L(f"    if (z->{nid}_start + z->{nid}_depth > Omega) goto {omega};")
+            L(f"    Delta = z->{nid}_start + z->{nid}_depth;  goto {gamma};")
 
         elif isinstance(node, Arbno):
             ci = self.fresh("an")
