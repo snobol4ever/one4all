@@ -177,7 +177,25 @@ See `doc/BOOTSTRAP.md` for the full three-phase bootstrap strategy.
 
 ## Open Decisions
 
-See `doc/DECISIONS.md` for the two foundational questions currently on the
-table: (1) what language to write the compiler in, and (2) what language
-SNOBOL4-tiny implements first (full SNOBOL4 vs. a minimal sublanguage staged
-as B → C → D). Conclusions will be copied here once decided.
+See `doc/DECISIONS.md` for the two foundational questions. Decision 2
+(scope/sequencing) is now settled — see below.
+
+## Key Design Decisions (Settled)
+
+### Expressions first, statements second (decided 2026-03-10)
+
+SNOBOL4-tiny implements pattern expressions before the SNOBOL4 statement
+model. Stages:
+
+- **Stage B** (Sprints 0–4): single pattern, stdin/stdout, no naming
+- **Stage C** (Sprints 5–6): named patterns, mutual recursion, REF node —
+  the minimum for a real language
+- **Stage D** (Sprint 7+): SNOBOL4 statement model (variables, goto,
+  INPUT/OUTPUT, END)
+
+Rationale: expressions are the hard part. The statement model is a wrapper.
+Getting the expression semantics — including mutual recursion — proven first
+means every subsequent layer builds on a validated foundation.
+
+Decision 1 (compiler implementation language) remains open — see
+`doc/DECISIONS.md`.

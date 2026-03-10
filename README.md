@@ -166,8 +166,8 @@ compiler as a permanent bootstrap oracle. This mirrors the lbForth strategy:
 Lisp metacompiler → working kernel → Forth metacompiler replaces the Lisp.
 Needs explicit sign-off before Sprint 5.
 
-**Decision 2 — What language does SNOBOL4-tiny implement first:**
-The right sequence appears to be B → C → D:
+**Decision 2 — What language does SNOBOL4-tiny implement first: DECIDED**
+Expressions first, statements second. Sequence B → C → D confirmed:
 - **B** (Sprints 0–4): single pattern, stdin/stdout, no naming — already underway
 - **C** (Sprints 5–6): two named patterns with mutual recursion — the minimum
   for a real language, validates the graph IR, first thing no other pattern

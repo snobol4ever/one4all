@@ -208,9 +208,18 @@ legitimately be called **SNOBOL4-tiny** — a real language with named
 patterns and mutual recursion, just without the statement model. Stage D
 graduates it to a SNOBOL4 subset.
 
-**Status: UNDECIDED — the B→C→D sequence seems right but needs sign-off.
-In particular: does Option C deserve its own name? And does Stage C
-constitute a language worth releasing as a standalone tool?**
+**Status: DECIDED — 2026-03-10**
+
+**Decision: Expressions first, statements second. The B→C→D sequence is confirmed.**
+
+Rationale: Pattern expressions are the heart of SNOBOL4. The statement model
+(subject, replacement, goto) is a wrapper around expression evaluation. Getting
+expressions right first — including mutual recursion — means the hard part is
+proven before the statement model is layered on top. Every sprint through Stage C
+is directly validatable against CSNOBOL4/SPITBOL pattern semantics without the
+additional complexity of the statement interpreter.
+
+The naming question (does Stage C deserve its own name?) remains open.
 
 ---
 
