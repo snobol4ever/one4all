@@ -324,3 +324,88 @@ Result: `SNOBOL4c.c` reads stdin, matches against `*snoExpr`, and the full
 that emit IR instead of building a tree. The parse tree shape is known from
 `Beautiful.sno`: `snoStmt` has 7 children (label, subject, pattern, `=`,
 replacement, goto1, goto2). That IS the IR shape for Stage D.
+
+---
+
+## The SNOBOL4tiny Language — Formal Definition (Stage B)
+
+This section defines the language that SNOBOL4-tiny compiles at Stage B
+(Sprints 8–13). It is distinct from full SNOBOL4 (Stage C) and from the
+primitive pattern engine (Stage A).
+
+### What a SNOBOL4tiny Program Is
+
+A SNOBOL4tiny program consists of exactly three things:
+
+1. **A set of named pattern definitions** — each binding a name to a
+   pattern expression (which may reference other named patterns via
+   deferred `*NAME` refs).
+
+2. **A set of action nodes** embedded within those patterns — immediate
+   (`$ VAR`) and conditional (`. VAR`) — that fire side effects on match.
+
+3. **One entry point** — `MAIN`, or the last-defined pattern if `MAIN` is
+   absent.
+
+The program reads from **stdin only**. It writes to **stdout only**. There are
+no files, no environment variables, no arguments. The compiled binary is a
+pipeline stage: `something | snobol4tiny_program | something_else`.
+
+```
+DIGITS  = SPAN('0123456789')
+WORD    = SPAN('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ')
+TOKEN   = DIGITS | WORD
+MAIN    = POS(0) ARBNO(TOKEN $ OUTPUT) RPOS(0)
+```
+
+### Goal-Directed Evaluation
+
+Every pattern node is a **generator** in the Icon sense:
+
+- On first entry (α), it tries its first solution.
+- If downstream fails and backtracks (β), it tries its next solution.
+- When no more solutions exist, it propagates failure (ω) upward.
+- When it finds a solution, it passes control (γ) downstream.
+
+This means SNOBOL4tiny has full goal-directed evaluation — not just
+greedy matching. `ARBNO(TOKEN $ OUTPUT)` will backtrack if downstream
+fails, undoing captures if necessary.
+
+### The Immediate vs Conditional Distinction
+
+`$ VAR` (immediate assign) fires every time its left sub-pattern succeeds
+during the course of matching — it may fire multiple times if downstream
+backtracks and re-enters. It is part of the pattern execution, not deferred.
+
+`. VAR` (conditional assign) fires at most once, after the entire top-level
+match has committed. If the match fails after a conditional assign was "seen",
+the assign does not fire.
+
+When `VAR == OUTPUT`, the captured span is written to stdout immediately
+(for `$`) or after commit (for `.`).
+
+### Turing Completeness
+
+SNOBOL4tiny at Stage B is Turing-complete for string recognition: it can
+express any context-free grammar via mutually recursive named pattern
+definitions. The REF node enables cycles in the IR graph.
+
+It is not Turing-complete for general computation (no arithmetic, no
+variables beyond captures) — that is Stage C.
+
+### Relationship to Icon
+
+Icon's goal-directed evaluation and SNOBOL4tiny's α/β/γ/ω model are the
+same abstraction at different levels:
+
+| Icon | SNOBOL4tiny |
+|------|-------------|
+| Generator expression | Pattern node |
+| `suspend` | γ (succeed, remain resumable) |
+| `fail` | ω (no more solutions) |
+| Co-expression backtrack | β (downstream consumer failed, retry) |
+| `every` loop | ARBNO(P) |
+
+The difference is that SNOBOL4tiny compiles generators to static gotos,
+while Icon uses a runtime generator stack. Same semantics, zero overhead.
+
