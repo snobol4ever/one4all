@@ -85,6 +85,65 @@ Node = Union[Lit, Any, Span, Break, Len, Pos, Rpos, Arb, Arbno,
              Alt, Cat, Assign, Print, Ref]
 
 
+# ---- Sprint 16+ nodes: full SNOBOL4 statement model ----------------
+
+@dataclass
+class Expr:
+    """A SNOBOL4 value expression (Sprint 16+).
+    kind: 'str'|'int'|'real'|'null'|'var'|'keyword'|'indirect'|
+          'concat'|'add'|'sub'|'mul'|'div'|'pow'|'neg'|
+          'call'|'field'|'array'
+    """
+    kind: str
+    val:  object = None        # str/int/float for literals; str for var/keyword name
+    left: object = None        # Expr (binary ops, concat)
+    right: object = None       # Expr (binary ops, concat)
+    child: object = None       # Expr (unary neg, indirect)
+    name: str    = None        # function/field name
+    args: object = None        # list[Expr] for call
+    obj:  object = None        # Expr (array base)
+    subscripts: object = None  # list[Expr] (array indices)
+
+@dataclass
+class PatExpr:
+    """A SNOBOL4 pattern expression (Sprint 16+).
+    kind: 'lit'|'var'|'ref'|'call'|'cat'|'alt'|
+          'assign_imm'|'assign_cond'|'cursor'|'epsilon'|
+          'arb'|'rem'|'fail'|'abort'|'fence'|'succeed'|'bal'
+    """
+    kind: str
+    val:  object = None        # str for lit/var/ref
+    left: object = None        # PatExpr (cat, alt)
+    right: object = None       # PatExpr (cat, alt)
+    child: object = None       # PatExpr (for assign_imm/cond child)
+    var:  object = None        # Expr (capture target for assign nodes)
+    name: str    = None        # builtin name (call), or deferred ref name (ref)
+    args: object = None        # list[Expr|PatExpr] for call
+
+@dataclass
+class Goto:
+    """SNOBOL4 goto field."""
+    on_success: str    = None  # :S(label)
+    on_failure: str    = None  # :F(label)
+    unconditional: str = None  # :(label)
+
+@dataclass
+class Stmt:
+    """A full SNOBOL4 statement (Sprint 16+)."""
+    label:       str    = None   # optional label
+    subject:     object = None   # Expr | None
+    pattern:     object = None   # PatExpr | None
+    replacement: object = None   # Expr | None
+    goto:        object = None   # Goto | None
+    lineno:      int    = 0
+
+@dataclass
+class Program:
+    """A compiled SNOBOL4 program — ordered list of Stmts (Sprint 16+)."""
+    stmts: object = None         # list[Stmt]
+
+
+
 # ---------- graph ----------------------------------------------------
 
 class Graph:
