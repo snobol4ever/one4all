@@ -509,6 +509,9 @@ class StmtEmitter:
         self.lines  = []
         # Set during per-function emit so _map_special_label knows the suffix
         self._func_suffix = ''
+        self._goto_targets = set()
+        self._func_entry_lbls = set()
+        self._indirect_goto_stubs = set()  # (stub_label, var_name)
 
     # ------------------------------------------------------------------
     # Top-level entry
@@ -517,6 +520,28 @@ class StmtEmitter:
     def emit(self):
         self.lines = []
         funcs, main_stmts, main_offset = self._collect_and_partition()
+        # Build lookup sets used by _stmt_label heuristic
+        self._goto_targets = set()
+        for s in self.stmts:
+            if s.goto:
+                for gf in [s.goto.unconditional, s.goto.on_success, s.goto.on_failure]:
+                    if gf:
+                        self._goto_targets.add(gf.upper())
+        self._func_entry_lbls = {fi.entry_label.upper() for fi in funcs}
+        # Build set of all defined labels (for indirect goto detection)
+        _special = {'RETURN','FRETURN','NRETURN','CONTINUE','ABORT',
+                    'END','SCONTINUE','START','ERROR','ERR'}
+        self._defined_labels = {s.label.upper() for s in self.stmts if s.label} | _special
+        self._defined_labels |= self._func_entry_lbls
+        # Also add synthesized labels (parser mis-labeled call stmts)
+        for s in self.stmts:
+            if (s.label is None and s.subject and s.subject.kind == 'call' and
+                    s.subject.name and
+                    s.subject.name.upper() not in self._KNOWN_BUILTINS and
+                    s.pattern is None and s.replacement is None and
+                    s.subject.name.upper() in self._goto_targets and
+                    s.subject.name.upper() not in self._func_entry_lbls):
+                self._defined_labels.add(s.subject.name.upper())
         # Build the complete "main flow" as interleaved segments:
         # [main_stmts] + [residuals from each function in order]
         # Each residual is a (start_idx, stmts_list) pair
@@ -600,17 +625,28 @@ class StmtEmitter:
                 fi.residual_end = None
             return funcs_ordered, self.stmts, 0
 
-        # Step 4: collect ALL "skip" gotos
+        # Step 4: collect "group-end skip" gotos — unconditional gotos that jump
+        # to BARE LABEL stmts (no code: no subject, no pattern, no replacement)
+        # that are in the function zone and are NOT function entries.
+        # These are the ":(CounterEnd)" / ":(io_end)" patterns.
         first_func_idx = funcs_ordered[0].first_idx
         skip_targets = set()
         func_entry_idxs = set(fi.first_idx for fi in funcs_ordered)
+
+        def _is_bare_label(s):
+            """A bare label stmt has no subject, pattern, or replacement (just a label + optional goto)."""
+            return (s.subject is None and s.pattern is None and s.replacement is None)
+
         for s in self.stmts:
             if s.goto and s.goto.unconditional:
                 tgt = s.goto.unconditional.upper()
                 if tgt in label_to_idx:
                     tgt_idx = label_to_idx[tgt]
-                    # It's a skip target if it's after any function entry
-                    if any(tgt_idx > entry for entry in func_entry_idxs):
+                    tgt_stmt = self.stmts[tgt_idx]
+                    # Skip target: in function zone, NOT a function entry, and is a bare label
+                    if (tgt_idx > first_func_idx and
+                            tgt_idx not in func_entry_idxs and
+                            _is_bare_label(tgt_stmt)):
                         skip_targets.add(tgt)
 
         # Step 5: compute function body boundaries
@@ -639,6 +675,68 @@ class StmtEmitter:
             else:
                 fi.residual_start = None
                 fi.residual_end   = None
+
+        # Step 6: Merge function sections that share cross-section label references.
+        # Only merge BODY stmts — never absorb residuals (those always go to main).
+        def get_all_goto_targets(stmts):
+            targets = set()
+            for s in stmts:
+                if s.goto:
+                    for gf in [s.goto.unconditional, s.goto.on_success, s.goto.on_failure]:
+                        if gf:
+                            targets.add(gf.upper())
+            return targets
+
+        def labels_in_stmts(stmts):
+            lbls = set()
+            for s in stmts:
+                if s.label:
+                    lbls.add(s.label.upper())
+                elif (s.subject and s.subject.kind == 'call' and s.subject.name and
+                      s.pattern is None and s.replacement is None):
+                    lbls.add(s.subject.name.upper())
+            return lbls
+
+        sti = {id(s): k for k, s in enumerate(self.stmts)}
+
+        def merge_stmts(a, b):
+            seen = set()
+            result = []
+            for s in a + b:
+                if id(s) not in seen:
+                    seen.add(id(s))
+                    result.append(s)
+            return sorted(result, key=lambda s: sti.get(id(s), 99999))
+
+        changed = True
+        while changed:
+            changed = False
+            for i, fi in enumerate(funcs_ordered):
+                if not fi.stmts:
+                    continue
+                my_targets = get_all_goto_targets(fi.stmts)
+                for j, fj in enumerate(funcs_ordered):
+                    if i == j or not fj.stmts:
+                        continue
+                    fj_labels = labels_in_stmts(fj.stmts)
+                    shared = my_targets & (fj_labels - {fj.entry_label.upper()})
+                    if shared:
+                        fi.stmts = merge_stmts(fi.stmts, fj.stmts)
+                        # Transfer fj's residual to fi if fi has none
+                        # (so the residual stmts still make it to main flow)
+                        if fj.residual_start is not None and fi.residual_start is None:
+                            fi.residual_start = fj.residual_start
+                            fi.residual_end   = fj.residual_end
+                        fj.stmts = []
+                        fj.residual_start = None
+                        fj.residual_end   = None
+                        changed = True
+                        break
+                if changed:
+                    break
+
+        # Remove empty function entries
+        funcs_ordered = [fi for fi in funcs_ordered if fi.stmts]
 
         return funcs_ordered, main_stmts, 0
 
@@ -670,7 +768,7 @@ class StmtEmitter:
         # Find first stmt across all segments
         for offset, stmts in segments:
             if stmts:
-                first_lbl = _stmt_label(offset, stmts[0])
+                first_lbl = self._stmt_label(offset, stmts[0])
                 self._w(f'    goto {first_lbl};')
                 break
         self._w('')
@@ -678,6 +776,7 @@ class StmtEmitter:
             self._emit_stmts(stmts, offset, is_main=True)
 
     def _emit_main_footer(self):
+        self._emit_indirect_goto_stubs()
         self._w('/* --- program exit labels --- */')
         self._w('_SNO_PROG_END:')
         self._w('    return 0;')
@@ -690,6 +789,7 @@ class StmtEmitter:
         self._w('SNO_CONTINUE_LABEL_MAIN:')
         self._w('    return 0;')
         self._w('SNO_error:')
+        self._w('SNO_ERROR_LABEL_MAIN:')
         self._w('    fprintf(stderr, "error label reached\\n");')
         self._w('    return 2;')
         self._w('SNO_err:')
@@ -724,6 +824,7 @@ class StmtEmitter:
         entry_c = _c_label(fi.entry_label)
         self._w(f'    goto {entry_c};')
         self._w('')
+        self._w('')
 
         # Emit function body stmts
         self._emit_stmts(fi.stmts, fi.first_idx, is_main=False)
@@ -757,6 +858,14 @@ class StmtEmitter:
                 sv = _safe_c_name(v)
                 self._w(f'    sno_var_set("{v}", _save_{sv});')
         self._w(f'    return SNO_NULL_VAL;  /* CONTINUE */')
+        self._w(f'SNO_ERROR_LABEL_{safe}:')
+        self._w(f'    fprintf(stderr, "** error in {fi.name}\\n");')
+        if all_vars:
+            for v in all_vars:
+                sv = _safe_c_name(v)
+                self._w(f'    sno_var_set("{v}", _save_{sv});')
+        self._w(f'    return SNO_FAIL_VAL;')
+        self._emit_indirect_goto_stubs()
         self._w(f'}}')
         self._w('')
 
@@ -783,8 +892,8 @@ class StmtEmitter:
         n = len(stmts)
         for i, stmt in enumerate(stmts):
             abs_i = offset + i
-            lbl = _stmt_label(abs_i, stmt)
-            next_lbl = (_stmt_label(offset + i + 1, stmts[i+1])
+            lbl = self._stmt_label(abs_i, stmt)
+            next_lbl = (self._stmt_label(offset + i + 1, stmts[i+1])
                         if i+1 < n else ('_SNO_PROG_END' if is_main else
                                          f'SNO_RETURN_LABEL{self._func_suffix}'))
 
@@ -797,23 +906,52 @@ class StmtEmitter:
             if stmt.goto:
                 g = stmt.goto
                 if g.unconditional:
-                    cl = _c_label(g.unconditional)
-                    cl = self._map_special_label(cl, g.unconditional)
+                    cl = self._resolve_goto(g.unconditional)
                     succ_lbl = cl
                     fail_lbl = cl
                 else:
                     if g.on_success:
-                        cl = _c_label(g.on_success)
-                        cl = self._map_special_label(cl, g.on_success)
-                        succ_lbl = cl
+                        succ_lbl = self._resolve_goto(g.on_success)
                     if g.on_failure:
-                        cl = _c_label(g.on_failure)
-                        cl = self._map_special_label(cl, g.on_failure)
-                        fail_lbl = cl
+                        fail_lbl = self._resolve_goto(g.on_failure)
 
             self._emit_stmt_body(stmt, succ_lbl, fail_lbl, next_lbl)
             self._w(f'}}')
             self._w()
+
+    def _resolve_goto(self, target):
+        """Resolve a SNOBOL4 goto target to a C label or indirect-goto stub label."""
+        cl = _c_label(target)
+        cl = self._map_special_label(cl, target)
+        # If the target is not a defined label, it's an indirect (variable) goto.
+        # Emit a stub C label that calls sno_indirect_goto at runtime.
+        if target.upper() not in self._defined_labels:
+            stub = f'_sno_ind_{_safe_c_name(target)}'
+            self._indirect_goto_stubs.add((stub, target))
+            return stub
+        return cl
+
+    def _emit_indirect_goto_stubs(self):
+        """Emit C label stubs for indirect (variable) gotos collected during emit."""
+        if not self._indirect_goto_stubs:
+            return
+        is_main = (self._func_suffix == '_MAIN')
+        ret_stmt = 'return 0;' if is_main else 'return SNO_NULL_VAL;'
+        self._w('/* --- indirect goto stubs --- */')
+        for stub, varname in sorted(self._indirect_goto_stubs):
+            self._w(f'{stub}:')
+            self._w(f'    sno_indirect_goto("{varname}");')
+            self._w(f'    {ret_stmt}')
+        self._indirect_goto_stubs.clear()
+
+    def _emit_goto_stmt(self, label):
+        """Emit a C goto, handling indirect (variable) gotos."""
+        if label.startswith('_INDIRECT_GOTO_'):
+            varname = label[len('_INDIRECT_GOTO_'):]
+            self._w(f'        sno_indirect_goto("{varname}"); /* indirect goto :(varname) */')
+            self._w(f'        return SNO_NULL_VAL; /* not reached */')
+        else:
+            self._w(f'        goto {label};')
 
     def _emit_stmt_body(self, stmt, succ_lbl, fail_lbl, next_lbl):
         subj  = stmt.subject
@@ -884,6 +1022,16 @@ class StmtEmitter:
                 self._w(f'        else goto {fail_lbl};')
                 self._w(f'    }}')
 
+        # Case 3b: subject only, no pattern, no replacement (not a call)
+        # Evaluate for side effects; always succeeds
+        elif subj is not None and pat is None and repl is None:
+            subj_c = emit_expr(subj)
+            self._w(f'    {{')
+            self._w(f'        SnoVal _sv = {subj_c};')
+            self._w(f'        if (sno_is_fail(_sv)) goto {fail_lbl};')
+            self._w(f'        goto {succ_lbl};')
+            self._w(f'    }}')
+
         # Case 4: bare goto only
         elif subj is None and pat is None and repl is None:
             self._w(f'    goto {succ_lbl};')
@@ -919,7 +1067,55 @@ class StmtEmitter:
             return f'SNO_NRETURN_LABEL{sfx}'
         if upper == 'CONTINUE':
             return f'SNO_CONTINUE_LABEL{sfx}'
+        # error/err — global error handler (goes to main program error label)
+        if upper in ('ERROR', 'ERR'):
+            return f'SNO_ERROR_LABEL{sfx}'
         return cl
+
+    def _emit_error_label(self, sfx):
+        """Emit a per-function error label that prints and fails."""
+        self._w(f'SNO_ERROR_LABEL{sfx}:')
+        self._w(f'    fprintf(stderr, "** program error\\n");')
+
+    # Known builtin function names — these are real calls, not mislabeled stmts
+    _KNOWN_BUILTINS = {
+        'DEFINE','DATA','OPSYN','OUTPUT','INPUT','TERMINAL',
+        'DIFFER','IDENT','EQ','NE','LT','LE','GT','GE',
+        'LGT','LGE','LLT','LLE','LEQ','LNE',
+        'APPLY','ARRAY','TABLE','SIZE','DUPL','REPLACE','SUBSTR',
+        'REVERSE','LPAD','RPAD','TRIM','CHOP',
+        'INTEGER','REAL','STRING','CONVERT','DATATYPE','PROTOTYPE',
+        'EVAL','CODE','SORT','RSORT','COPY','COLLECT',
+        'DATE','TIME','HOST','EXIT','ABORT',
+        'TRACE','STOPTR','LOAD','UNLOAD',
+        'SPAN','BREAK','BREAKX','ANY','NOTANY','ARBNO',
+        'LEN','POS','RPOS','TAB','RTAB','REM',
+        'ARB','BAL','FENCE','FAIL','SUCCEED',
+        'SIN','COS','TAN','ATAN','EXP','LN','SQRT',
+        'CHAR','NOTANY','FIELD','ARG','LOCAL',
+        'ENDFILE','REWIND','BACKSPACE','EJECT',
+        'SET','ITEM','REMDR',
+        'PUSH','POP','TOP',           # inc functions
+        'N','T','V','C',              # tree field accessors
+        'BVISIT',                     # known user-defined
+    }
+
+    def _stmt_label(self, abs_i, stmt):
+        """Return C label for this statement, handling parser mis-labeling."""
+        if stmt.label:
+            return _c_label(stmt.label)
+        # Parser sometimes puts the SNOBOL4 label into subj.name
+        # for:  label    (cond_expr)   :goto
+        # Only synthesize if the name is an actual goto target AND not a
+        # known function entry (those are real calls, not mislabeled stmts).
+        subj = stmt.subject
+        if (subj is not None and subj.kind == 'call' and subj.name and
+                subj.name.upper() not in self._KNOWN_BUILTINS and
+                stmt.pattern is None and stmt.replacement is None and
+                subj.name.upper() in self._goto_targets and
+                subj.name.upper() not in self._func_entry_lbls):
+            return _c_label(subj.name)
+        return f'_stmt_{abs_i}'
 
     def _w(self, line=''):
         self.lines.append(line)

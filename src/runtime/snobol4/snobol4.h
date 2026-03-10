@@ -400,3 +400,4 @@ SnoVal sno_sort_fn(SnoVal arr);
 #include "../runtime.h"
 
 #endif /* SNOBOL4_H */
+void sno_indirect_goto(const char *varname);

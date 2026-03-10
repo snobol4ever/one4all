@@ -1005,3 +1005,13 @@ SnoVal sno_input_read(void) {
     if (nread > 0 && linebuf[nread-1] == '\n') linebuf[nread-1] = '\0';
     return SNO_STR_VAL(GC_strdup(linebuf));
 }
+
+/* Indirect goto — called when :(var) computed goto is taken.
+   Currently a stub: prints a warning and continues.
+   Full implementation requires a label dispatch table. */
+void sno_indirect_goto(const char *varname) {
+    SnoVal v = sno_var_get(varname);
+    const char *lbl = (v.type == SNO_STR) ? v.s : "(nil)";
+    fprintf(stderr, "sno_indirect_goto: var=%s label=%s (not implemented)\n",
+            varname, lbl);
+}
