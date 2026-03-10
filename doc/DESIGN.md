@@ -199,3 +199,54 @@ means every subsequent layer builds on a validated foundation.
 
 Decision 1 (compiler implementation language) remains open — see
 `doc/DECISIONS.md`.
+
+---
+
+## The Interpreter/Compiler Duality (key discovery)
+
+`SNOBOL4c.c` is a complete SNOBOL4 pattern interpreter in C. Its match engine
+uses four actions:
+
+```c
+#define PROCEED 0   // ↓  enter a node fresh
+#define SUCCESS 1   // ↑  node succeeded, return up
+#define FAILURE 2   // ↗  node failed, backtrack
+#define RECEDE  3   // ↖  downstream failed, retry
+```
+
+These are **the same four states as α/β/γ/ω** — not by coincidence. Both
+are implementations of the Byrd Box model. The difference is execution strategy:
+
+| | SNOBOL4c.c interpreter | SNOBOL4-tiny compiler |
+|---|---|---|
+| Dispatch | `switch(type<<2\|action)` at runtime | Static `goto` labels baked into C output |
+| State | `state_t Z` on heap | Named static variables per node |
+| Backtrack stack | `Ω_push/Ω_pop` (heap-allocated tracks array) | Implicit in goto graph structure |
+| Pattern data | `static const PATTERN` structs (`.h` files) | Inlined C-with-gotos (`.c` files) |
+| Recursion | `psi` stack of saved states on heap | Static arrays with depth index |
+| Speed | One `switch` dispatch per node per action | Zero dispatch — goto IS execution |
+
+The `.h` files (`BEAD_PATTERN.h`, `C_PATTERN.h`, `CALC_PATTERN.h`, etc.) are
+**compiled pattern data** — the output of `_bootstrap.c` (a Python C extension
+that walks SNOBOL4python pattern objects and dumps them as C struct declarations).
+They are `#include`d directly into `SNOBOL4c.c`.
+
+The `test_sno_*.c` files are what a SNOBOL4-tiny **compiler** emits instead —
+the same patterns, but as inlined C-with-gotos rather than interpreted structs.
+
+### The two routes from here
+
+**Route A — Interpreter + yacc front-end:**
+Add a yacc/lex parser to `SNOBOL4c.c` that reads SNOBOL4 source and emits
+`.h` files (static PATTERN struct declarations). The interpreter executes them.
+Fastest path to a working system. Self-hosting deferred.
+
+**Route B — Interpreter parses itself, emits compiled output:**
+Write the parser as SNOBOL4 patterns inside `SNOBOL4c.c`. The parser matches
+SNOBOL4 source text and emits C-with-gotos (the `test_sno_*.c` format).
+The interpreter is the compiler's front-end. Self-hosting from day one.
+This is the Forth move: the language parses itself.
+
+**Plan: Route A now (Sprint 0–4), Route B as Sprint 5 (Phase 2 bootstrap).**
+`SNOBOL4c.c` is the seed kernel — the "12 primitives in C" of our Forth analogy.
+The interpreter is done. What remains is the parser.

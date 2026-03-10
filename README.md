@@ -76,15 +76,16 @@ SNOBOL4 source
     → Code generator  → x86-64 ASM  /  JVM bytecode  /  MSIL
 ```
 
-**The IR is a graph, not a tree.** Recursive patterns like `X = 'a' | '(' *X ')'`
-require cycles. Forward references emit a `REF` node; at codegen time `REF`
-becomes a `jmp` to the already-emitted `_α` label.
+**The runtime already exists.** `SNOBOL4c.c` (1,064 lines of C) is a complete
+SNOBOL4 pattern interpreter covering all 43 node types. Its match engine uses
+four actions — PROCEED / SUCCESS / FAILURE / RECEDE — which are exactly the
+α/β/γ/ω protocol implemented as an interpreter rather than compiled gotos.
+The `.h` files (`C_PATTERN.h`, `CALC_PATTERN.h`, etc.) are pre-compiled
+pattern data that the interpreter executes. A compiler emits C-with-gotos
+(the `test_sno_*.c` format) instead — same semantics, zero dispatch cost.
 
-**All temporaries are statically allocated.** Each node owns named, typed,
-node-specific temporaries laid out in `.bss` at compile time — zero allocation
-during matching. Recursive patterns use static arrays with a bounded depth index
-(e.g., `_1_t _1[64]`). `CODE`/`EVAL` dynamic patterns use heap allocation
-(two-tier: static fast path + heap dynamic path).
+**What remains: the parser.** Route A adds a yacc/lex front-end. Route B
+writes the parser as SNOBOL4 patterns inside `SNOBOL4c.c` itself.
 
 ---
 
