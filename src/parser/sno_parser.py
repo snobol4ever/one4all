@@ -247,9 +247,11 @@ def tokenise(source, base_dir='.'):
             text, lineno = entry
             line_toks = []
             _tokenise_line(text, lineno, line_toks)
-            # Trim leading/trailing SPACE
-            while line_toks and line_toks[0].kind == 'SPACE':
-                line_toks.pop(0)
+            # If the original line starts with whitespace, prepend a SPACE sentinel
+            # so the statement parser knows the line was indented (no label possible).
+            if text and text[0] in (' ', '\t'):
+                line_toks.insert(0, Token('SPACE', ' ', lineno))
+            # Trim trailing SPACE only
             while line_toks and line_toks[-1].kind == 'SPACE':
                 line_toks.pop()
             if line_toks:
@@ -306,7 +308,8 @@ class Parser:
             self.pos += 1
 
     def skip_newlines(self):
-        while self.peek().kind in ('NEWLINE', 'SPACE'):
+        # Skip only NEWLINEs — SPACE tokens at line start encode indentation info
+        while self.peek().kind == 'NEWLINE':
             self.pos += 1
 
     def lineno(self):
@@ -350,7 +353,10 @@ class Parser:
 
 def _parse_stmt_tokens(toks, lineno):
     """Parse a single logical statement from its token list."""
-    # Remove SPACE tokens — we'll handle spacing contextually
+    # Track whether the statement was indented (first token was SPACE).
+    # If indented → no label is possible (label must be in column 1).
+    was_indented = toks and toks[0].kind == 'SPACE'
+    # Remove SPACE tokens — we will handle spacing contextually
     toks = [t for t in toks if t.kind != 'SPACE']
     if not toks:
         return None
@@ -414,7 +420,8 @@ def _parse_stmt_tokens(toks, lineno):
     # AND toks[1] is not '=', ':', NEWLINE, EOF → it's a label.
     # Edge case: "LABEL" alone on a line with no subject → label only.
 
-    if (toks[0].kind == 'IDENT'
+    if (not was_indented                               # must be column 1
+            and toks[0].kind == 'IDENT'
             and toks[0].val not in KEYWORDS_NOT_LABELS
             and not (n > 1 and toks[1].kind == 'EQ')      # subject = repl, no label
             and not (n > 1 and toks[1].kind == 'COLON')   # subject: goto? rare
@@ -587,6 +594,24 @@ def _subject_length(toks):
     if toks[0].kind == 'STAR':
         return 0
 
+    #  — indirect variable subject (e.g. $'#N')
+    if toks[0].kind == 'DOLLAR':
+        # Consume $ + one primary (STR or IDENT or '(' expr ')')
+        k = 1
+        if k < len(toks) and toks[k].kind in ('STR', 'IDENT'):
+            k += 1
+        elif k < len(toks) and toks[k].kind == 'LPAREN':
+            depth = 1; k += 1
+            while k < len(toks) and depth > 0:
+                if toks[k].kind in ('LPAREN',): depth += 1
+                elif toks[k].kind in ('RPAREN',): depth -= 1
+                k += 1
+        return k
+
+    # &KEYWORD subject
+    if toks[0].kind == 'AMP':
+        return 2 if len(toks) > 1 and toks[1].kind == 'IDENT' else 1
+
     # IDENT possibly followed by '(' args ')' or '[' subscript ']'
     if toks[0].kind != 'IDENT':
         return 0
@@ -673,7 +698,7 @@ class _ExprParser:
 
     def parse_multiplicative(self):
         left = self.parse_power()
-        while self.at('STAR', 'SLASH') and not self.at('STAR', off=0):
+        while self.at('STAR', 'SLASH'):
             # Careful: STAR is also deferred ref in pattern context
             # In value expr context, * is multiply
             op = self.consume().kind
