@@ -53,6 +53,7 @@ enum {
     T_pi      = 38,     /* π  optional              */
     T_EPSILON = 34,     /* ε  null match            */
     T_LITERAL = 40,     /* σ  literal string        */
+    T_VARREF  = 41,     /* deferred variable pattern ref */
     T_ALPHA   = 32,     /* α  beginning of line     */
     T_OMEGA   = 42,     /* ω  end of line           */
 };

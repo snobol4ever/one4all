@@ -59,6 +59,7 @@ typedef struct _SnoPattern SnoPattern;
 
 struct _SnoPattern {
     SnoPatKind  kind;
+    int         materialising; /* cycle detection flag */
     const char *str;       /* SPAT_LIT / SPAT_SPAN / SPAT_BREAK / SPAT_ANY / SPAT_NOTANY / SPAT_REF / SPAT_USER_CALL */
     int64_t     num;       /* SPAT_LEN / SPAT_POS / SPAT_RPOS / SPAT_TAB / SPAT_RTAB */
     SnoPattern *left;      /* SPAT_CAT / SPAT_ALT / SPAT_ARBNO / SPAT_FENCE / SPAT_ASSIGN_IMM / SPAT_ASSIGN_COND */
@@ -455,10 +456,28 @@ static Pattern *materialise(SnoPattern *sp, MatchCtx *ctx) {
     }
 
     case SPAT_REF: {
+        if (getenv("SNO_PAT_DEBUG") && sp->str)
+            fprintf(stderr, "  SPAT_REF '%s' -> type=%d\n", sp->str,
+                sno_var_get(sp->str).type);
         /* Resolve *name from variable table NOW */
         SnoVal v = sno_var_get(sp->str);
         if (v.type == SNO_PATTERN) {
-            return materialise(spat_of(v), ctx);
+            /* Cycle detection: track variable names being materialised.
+             * Recursive patterns (e.g. snoExpr14 = '|' *snoExpr14 rest)
+             * must not expand infinitely. Return epsilon on a cycle. */
+            #define MAT_MAX_DEPTH 64
+            static __thread const char *_mat_stack[MAT_MAX_DEPTH];
+            static __thread int _mat_top = 0;
+            for (int _i = 0; _i < _mat_top; _i++) {
+                if (_mat_stack[_i] == sp->str || strcmp(_mat_stack[_i], sp->str) == 0) {
+                    return make_epsilon(&ctx->pl); /* cycle: return epsilon */
+                }
+            }
+            if (_mat_top < MAT_MAX_DEPTH) _mat_stack[_mat_top++] = sp->str;
+            SnoPattern *sp2 = spat_of(v);
+            Pattern *result = materialise(sp2, ctx);
+            if (_mat_top > 0) _mat_top--;
+            return result;
         }
         /* Variable holds a string — treat as literal */
         if (v.type == SNO_STR || v.type == SNO_NULL) {
@@ -530,6 +549,8 @@ static Pattern *materialise(SnoPattern *sp, MatchCtx *ctx) {
     }
 
     case SPAT_USER_CALL: {
+        if (getenv("SNO_PAT_DEBUG"))
+            fprintf(stderr, "SPAT_USER_CALL %s\n", sp->str);
         /* Call a user function that returns a pattern, then materialise */
         SnoVal result = sno_apply(sp->str, sp->args, sp->nargs);
         if (result.type == SNO_PATTERN) {
@@ -563,6 +584,9 @@ static int try_match_at(SnoPattern *sp, const char *subject, int slen, int start
 }
 
 int sno_match_pattern(SnoVal pat, const char *subject) {
+    int _dbg = getenv("SNO_PAT_DEBUG") && subject && strlen(subject) < 20;
+    if (_dbg) fprintf(stderr, "sno_match_pattern: subj=%s(%zu) pat.type=%d\n",
+        subject, strlen(subject), pat.type);
     if (!subject) subject = "";
 
     SnoPattern *sp = spat_of(pat);

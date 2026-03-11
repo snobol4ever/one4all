@@ -145,6 +145,7 @@ def _tokenise_line(line, lineno, tokens):
             '|': TK['PIPE'],
             '$': TK['DOLLAR'],
             '.': TK['DOT'],
+            '~': TK['DOT'],   # ~ is alias for . (conditional assignment)
             '&': TK['AMP'],
             ',': TK['COMMA'],
         }

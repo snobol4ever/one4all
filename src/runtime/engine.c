@@ -376,6 +376,7 @@ MatchResult engine_match(Pattern *pattern, const char *subject, int subject_len)
 /*--- Leaf scanners -----------------------------------------------------------------*/
         case T_LITERAL<<2|PROCEED:
             if (scan_LITERAL(&Z))  { a = SUCCESS; z_up(&Z, &psi); } else { a = FAILURE; z_up_fail(&Z, &psi); } break;
+
         case T_ANY<<2|PROCEED:
             if (scan_ANY(&Z))      { a = SUCCESS; z_up(&Z, &psi); } else { a = FAILURE; z_up_fail(&Z, &psi); } break;
         case T_NOTANY<<2|PROCEED:

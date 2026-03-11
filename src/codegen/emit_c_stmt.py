@@ -394,12 +394,40 @@ def emit_as_pattern(p):
     if isinstance(p, PatExpr):
         return emit_pattern_expr(p)
     if isinstance(p, Expr):
-        # *var = indirect pattern ref
+        # *var = indirect pattern ref (and variants)
         if p.kind == 'mul' and p.left and p.left.kind == 'null':
-            varname = p.right.val if p.right and p.right.kind == 'var' else None
-            if varname:
-                return f'sno_pat_ref("{varname}")'
-            return f'sno_pat_ref_val({emit_expr(p.right)})'
+            r = p.right
+            if r and r.kind == 'var':
+                return f'sno_pat_ref("{r.val}")'
+            # *name(cond)(extra) = pat_cat(pat_assign_cond(ref(name), cond), extra)
+            if (r and r.kind == 'array' and r.obj and r.obj.kind == 'call'
+                    and r.subscripts and len(r.subscripts) == 1):
+                ref_part = (f'sno_pat_assign_cond(sno_pat_ref("{r.obj.name}"), '
+                            f'{emit_expr(r.obj.args[0]) if r.obj.args else "SNO_NULL_VAL"})')
+                extra = emit_as_pattern(r.subscripts[0])
+                return f'sno_pat_cat({ref_part}, {extra})'
+            # *name(args): distinguish pat-variable capture vs pattern func call
+            _PAT_FUNCS = {'nInc','nPush','nPop','nTop','IncCounter','DecCounter',
+                          'Push','Pop','Top',
+                          'DIFFER','IDENT','LT','LE','GT','GE','EQ','NE'}
+            if r and r.kind == 'call':
+                nm = (r.name or '').upper()
+                _KB = {'SPAN','BREAK','BREAKX','ANY','NOTANY','ARBNO','LEN','POS','RPOS',
+                        'TAB','RTAB','REM','ARB','BAL','FENCE','FAIL','SUCCEED',
+                        'DIFFER','IDENT','EQ','NE','LT','LE','GT','GE','APPLY','SIZE',
+                        'DUPL','REPLACE','SUBSTR','REVERSE','TRIM','INTEGER','REAL','STRING'}
+                if nm not in {x.upper() for x in _PAT_FUNCS} and nm not in _KB:
+                    # Pattern variable juxtaposed with next piece
+                    if r.args:
+                        return f'sno_pat_cat(sno_pat_ref("{r.name}"), {emit_as_pattern(r.args[0])})'
+                    return f'sno_pat_ref("{r.name}")'
+                ca = [emit_expr(a) for a in (r.args or [])]
+                n = len(ca)
+                if n:
+                    args_joined = ', '.join(ca)
+                    return f'sno_pat_user_call("{r.name}", (SnoVal[{n}]){{{args_joined}}}, {n})'
+                return f'sno_pat_user_call("{r.name}", NULL, 0)'
+            return f'sno_pat_ref_val({emit_expr(r)})'
         # Recursive pattern types
         if p.kind == 'concat':
             return f'sno_pat_cat({emit_as_pattern(p.left)}, {emit_as_pattern(p.right)})'
@@ -408,6 +436,19 @@ def emit_as_pattern(p):
         if p.kind == 'call':
             # Let emit_pattern_expr handle known pattern builtins
             from ir import PatExpr
+            _PAT_FUNCS2 = {'nInc','nPush','nPop','nTop','IncCounter','DecCounter',
+                           'Push','Pop','Top'}
+            _KB2 = {'SPAN','BREAK','BREAKX','ANY','NOTANY','ARBNO','LEN','POS','RPOS',
+                    'TAB','RTAB','REM','ARB','BAL','FENCE','FAIL','SUCCEED',
+                    'DIFFER','IDENT','EQ','NE','LT','LE','GT','GE','APPLY','SIZE',
+                    'DUPL','REPLACE','SUBSTR','REVERSE','TRIM','INTEGER','REAL',
+                    'STRING','CONVERT','INPUT','OUTPUT','DATATYPE'}
+            nm2 = (p.name or '').upper()
+            if nm2 not in {x.upper() for x in _PAT_FUNCS2} and nm2 not in _KB2:
+                # Pattern variable juxtaposed with next piece: ref(name) cat next
+                if p.args:
+                    return f'sno_pat_cat(sno_pat_ref("{p.name}"), {emit_as_pattern(p.args[0])})'
+                return f'sno_pat_ref("{p.name}")'
             try:
                 return emit_pattern_expr(p)
             except Exception:
