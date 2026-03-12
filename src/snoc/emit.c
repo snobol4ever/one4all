@@ -137,7 +137,7 @@ static void emit_expr(Expr *e) {
              * SNOBOL4 continuation lines cause the parser to greedily consume the
              * next '(' as a function-call argument to varname.  The correct
              * semantics are: deferred-ref(*varname) cat arg. */
-            E("sno_concat(sno_var_as_pattern(sno_pat_ref(\"%s\")),", e->left->sval);
+            E("sno_concat_sv(sno_var_as_pattern(sno_pat_ref(\"%s\")),", e->left->sval);
             emit_expr(e->left->args[0]);
             E(")");
         } else {
@@ -148,7 +148,7 @@ static void emit_expr(Expr *e) {
 
     case E_NEG: E("sno_neg("); emit_expr(e->right); E(")"); break;
 
-    case E_CONCAT: E("sno_concat("); emit_expr(e->left); E(","); emit_expr(e->right); E(")"); break;
+    case E_CONCAT: E("sno_concat_sv("); emit_expr(e->left); E(","); emit_expr(e->right); E(")"); break;
     case E_REDUCE: E("sno_apply(\"reduce\",(SnoVal[]){"); emit_expr(e->left); E(","); emit_expr(e->right); E("},2)"); break;
     case E_ADD:    E("sno_add(");    emit_expr(e->left); E(","); emit_expr(e->right); E(")"); break;
     case E_SUB:    E("sno_sub(");    emit_expr(e->left); E(","); emit_expr(e->right); E(")"); break;

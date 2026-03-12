@@ -78,32 +78,32 @@ char sno_alphabet[257];  /* all 256 ASCII chars */
 
 static SnoVal _b_GT(SnoVal *a, int n) {
     if (n < 2) return SNO_FAIL_VAL;
-    return sno_gt(a[0], a[1]) ? a[0] : SNO_FAIL_VAL;
+    return sno_gt(a[0], a[1]) ? SNO_NULL_VAL : SNO_FAIL_VAL;
 }
 static SnoVal _b_LT(SnoVal *a, int n) {
     if (n < 2) return SNO_FAIL_VAL;
-    return sno_lt(a[0], a[1]) ? a[0] : SNO_FAIL_VAL;
+    return sno_lt(a[0], a[1]) ? SNO_NULL_VAL : SNO_FAIL_VAL;
 }
 static SnoVal _b_GE(SnoVal *a, int n) {
     if (n < 2) return SNO_FAIL_VAL;
-    return sno_ge(a[0], a[1]) ? a[0] : SNO_FAIL_VAL;
+    return sno_ge(a[0], a[1]) ? SNO_NULL_VAL : SNO_FAIL_VAL;
 }
 static SnoVal _b_LE(SnoVal *a, int n) {
     if (n < 2) return SNO_FAIL_VAL;
-    return sno_le(a[0], a[1]) ? a[0] : SNO_FAIL_VAL;
+    return sno_le(a[0], a[1]) ? SNO_NULL_VAL : SNO_FAIL_VAL;
 }
 static SnoVal _b_EQ(SnoVal *a, int n) {
     if (n < 2) return SNO_FAIL_VAL;
     /* Numeric equality: equal returns first arg, else fail */
     if (a[0].type == SNO_INT && a[1].type == SNO_INT)
-        return (a[0].i == a[1].i) ? a[0] : SNO_FAIL_VAL;
-    return (sno_to_real(a[0]) == sno_to_real(a[1])) ? a[0] : SNO_FAIL_VAL;
+        return (a[0].i == a[1].i) ? SNO_NULL_VAL : SNO_FAIL_VAL;
+    return (sno_to_real(a[0]) == sno_to_real(a[1])) ? SNO_NULL_VAL : SNO_FAIL_VAL;
 }
 static SnoVal _b_NE(SnoVal *a, int n) {
     if (n < 2) return SNO_FAIL_VAL;
     if (a[0].type == SNO_INT && a[1].type == SNO_INT)
-        return (a[0].i != a[1].i) ? a[0] : SNO_FAIL_VAL;
-    return (sno_to_real(a[0]) != sno_to_real(a[1])) ? a[0] : SNO_FAIL_VAL;
+        return (a[0].i != a[1].i) ? SNO_NULL_VAL : SNO_FAIL_VAL;
+    return (sno_to_real(a[0]) != sno_to_real(a[1])) ? SNO_NULL_VAL : SNO_FAIL_VAL;
 }
 static SnoVal _b_INTEGER(SnoVal *a, int n) {
     if (n < 1) return SNO_FAIL_VAL;
@@ -1272,24 +1272,28 @@ SnoVal sno_string_fn(SnoVal v) {
 
 /* Arithmetic — promote int+int=int, otherwise real */
 SnoVal sno_add(SnoVal a, SnoVal b) {
+    if (a.type == SNO_FAIL || b.type == SNO_FAIL) return SNO_FAIL_VAL;
     if (a.type == SNO_INT && b.type == SNO_INT)
         return SNO_INT_VAL(a.i + b.i);
     return SNO_REAL_VAL(sno_to_real(a) + sno_to_real(b));
 }
 
 SnoVal sno_sub(SnoVal a, SnoVal b) {
+    if (a.type == SNO_FAIL || b.type == SNO_FAIL) return SNO_FAIL_VAL;
     if (a.type == SNO_INT && b.type == SNO_INT)
         return SNO_INT_VAL(a.i - b.i);
     return SNO_REAL_VAL(sno_to_real(a) - sno_to_real(b));
 }
 
 SnoVal sno_mul(SnoVal a, SnoVal b) {
+    if (a.type == SNO_FAIL || b.type == SNO_FAIL) return SNO_FAIL_VAL;
     if (a.type == SNO_INT && b.type == SNO_INT)
         return SNO_INT_VAL(a.i * b.i);
     return SNO_REAL_VAL(sno_to_real(a) * sno_to_real(b));
 }
 
 SnoVal sno_div(SnoVal a, SnoVal b) {
+    if (a.type == SNO_FAIL || b.type == SNO_FAIL) return SNO_FAIL_VAL;
     /* SNOBOL4 / is real division; integer / integer = integer in SNOBOL4 */
     if (a.type == SNO_INT && b.type == SNO_INT) {
         if (b.i == 0) return SNO_NULL_VAL;  /* division error */
@@ -1301,10 +1305,12 @@ SnoVal sno_div(SnoVal a, SnoVal b) {
 }
 
 SnoVal sno_pow(SnoVal a, SnoVal b) {
+    if (a.type == SNO_FAIL || b.type == SNO_FAIL) return SNO_FAIL_VAL;
     return SNO_REAL_VAL(pow(sno_to_real(a), sno_to_real(b)));
 }
 
 SnoVal sno_neg(SnoVal a) {
+    if (a.type == SNO_FAIL) return SNO_FAIL_VAL;
     if (a.type == SNO_INT)  return SNO_INT_VAL(-a.i);
     if (a.type == SNO_REAL) return SNO_REAL_VAL(-a.r);
     return SNO_INT_VAL(-sno_to_int(a));

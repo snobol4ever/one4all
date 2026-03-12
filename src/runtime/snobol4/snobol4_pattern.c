@@ -620,10 +620,10 @@ static int try_match_at(SnoPattern *sp, const char *subject, int slen, int start
 }
 
 int sno_match_pattern(SnoVal pat, const char *subject) {
-    int _dbg = getenv("SNO_PAT_DEBUG") && subject && strlen(subject) < 20;
-    if (_dbg) fprintf(stderr, "sno_match_pattern: subj=%s(%zu) pat.type=%d\n",
-        subject, strlen(subject), pat.type);
     if (!subject) subject = "";
+    int _dbg = getenv("SNO_PAT_DEBUG") && strlen(subject) < 20;
+    if (_dbg) fprintf(stderr, "sno_match_pattern: subj=(%zu) pat.type=%d\n",
+        strlen(subject), pat.type);
 
     SnoPattern *sp = spat_of(pat);
     if (!sp) {
