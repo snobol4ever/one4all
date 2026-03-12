@@ -31,7 +31,7 @@ causing an early exit before `main00` was ever reached. Fix: added
 `entry_label` when present; `is_body_boundary` and `fn_by_label`
 both check `entry_label`. See `src/snoc/emit.c`.
 
-**Build command that produced it**:
+**Build command that produced it** (beauty_full_first_clean.c):
 ```bash
 snoc beauty.sno -I $INC > beauty_full_first_clean.c
 gcc -O0 -g beauty_full_first_clean.c \
@@ -42,4 +42,36 @@ gcc -O0 -g beauty_full_first_clean.c \
     -Isrc/runtime/snobol4 -Isrc/runtime \
     -lgc -lm -w -o beauty_full_bin
 # → 0 errors, binary links
+```
+
+---
+
+## `beauty_full_session50.c`
+
+**What**: Generated C from `snoc beauty.sno -I $INC` at Session 50.
+The active debugging target — contains the grammar init bug under investigation.
+
+**When**: Session 50, 2026-03-12.
+
+**Stats**: 12,847 lines of C. md5: `7fcbb3951a95f3f77de5dfe4afc49e49`
+
+**Compiles with 0 gcc errors.** Binary runs but outputs "Parse Error" on all input.
+
+**Active bug (see PLAN.md §15):** `snoCommand` pattern fails to match any
+SNOBOL4 statement. Root cause candidate: `sno.y` parser misreads
+`*var (expr)` as `var(expr)` (function call instead of deref + concat).
+Evidence: `sno_apply("snoWhite", ..., 1)` in generated snoStmt construction.
+
+**Build command**:
+```bash
+SNOC=src/snoc/snoc
+INC=../SNOBOL4-corpus/programs/inc
+BEAUTY=../SNOBOL4-corpus/programs/beauty/beauty.sno
+R=src/runtime/snobol4
+
+$SNOC $BEAUTY -I $INC > artifacts/beauty_full_session50.c
+gcc -O0 -g artifacts/beauty_full_session50.c \
+    $R/snobol4.c $R/snobol4_inc.c \
+    $R/snobol4_pattern.c src/runtime/engine.c \
+    -I$R -Isrc/runtime -lgc -lm -w -o /tmp/beauty_full_bin
 ```
