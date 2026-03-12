@@ -402,3 +402,4 @@ SnoVal sno_sort_fn(SnoVal arr);
 
 #endif /* SNOBOL4_H */
 void sno_indirect_goto(const char *varname);
+SnoVal sno_pat_call(const char *name, SnoVal arg);

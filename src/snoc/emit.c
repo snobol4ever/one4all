@@ -248,19 +248,25 @@ static void emit_pat(Expr *e) {
     case E_CALL: {
         /* Route known builtins to sno_pat_* */
         const char *n = e->sval;
-        #define B0(nm,fn) if(strcasecmp(n,nm)==0){E(fn"()");break;}
-        #define B1(nm,fn) if(strcasecmp(n,nm)==0&&e->nargs>=1){E(fn"(");emit_expr(e->args[0]);E(")");break;}
+        /* B0: zero-arg pattern; B1i: one int64_t arg; B1s: one string arg; B1v: one SnoVal arg */
+        #define B0(nm,fn)  if(strcasecmp(n,nm)==0){E(fn"()");break;}
+        #define B1i(nm,fn) if(strcasecmp(n,nm)==0&&e->nargs>=1){E(fn"(sno_to_int(");emit_expr(e->args[0]);E("))");break;}
+        #define B1s(nm,fn) if(strcasecmp(n,nm)==0&&e->nargs>=1){E(fn"(sno_to_str(");emit_expr(e->args[0]);E("))");break;}
+        #define B1v(nm,fn) if(strcasecmp(n,nm)==0&&e->nargs>=1){E(fn"(");emit_expr(e->args[0]);E(")");break;}
         B0("ARB","sno_pat_arb")  B0("REM","sno_pat_rem")
         B0("FAIL","sno_pat_fail") B0("ABORT","sno_pat_abort")
         B0("FENCE","sno_pat_fence") B0("SUCCEED","sno_pat_succeed")
         B0("BAL","sno_pat_bal")
-        B1("LEN","sno_pat_len")   B1("POS","sno_pat_pos")
-        B1("RPOS","sno_pat_rpos") B1("TAB","sno_pat_tab")
-        B1("RTAB","sno_pat_rtab") B1("SPAN","sno_pat_span")
-        B1("BREAK","sno_pat_break") B1("NOTANY","sno_pat_notany")
-        B1("ANY","sno_pat_any")   B1("ARBNO","sno_pat_arbno")
+        B1i("LEN","sno_pat_len")   B1i("POS","sno_pat_pos")
+        B1i("RPOS","sno_pat_rpos") B1i("TAB","sno_pat_tab")
+        B1i("RTAB","sno_pat_rtab")
+        B1s("SPAN","sno_pat_span") B1s("BREAK","sno_pat_break")
+        B1s("NOTANY","sno_pat_notany") B1s("ANY","sno_pat_any")
+        B1v("ARBNO","sno_pat_arbno")
         #undef B0
-        #undef B1
+        #undef B1i
+        #undef B1s
+        #undef B1v
         /* user-defined pattern function */
         E("sno_pat_call(\"%s\"", n);
         for (int i=0; i<e->nargs; i++) { E(","); emit_expr(e->args[i]); }
@@ -372,9 +378,145 @@ static void emit_goto(SnoGoto *g, const char *fn, int result_ok) {
 }
 
 /* ============================================================
+ * Post-parse pattern-statement repair
+ *
+ * The grammar is LALR(1) and cannot always distinguish:
+ *   subject pattern = replacement    (pattern match)
+ *   subject_expr = replacement       (pure assignment)
+ * when pattern primitives (LEN, POS, etc.) appear inside the subject_expr.
+ * The lexer returns PAT_BUILTIN only at bstack_top==0, but PAT_BUILTIN IS
+ * also in the `primary` grammar rule for value exprs, causing the parser to
+ * absorb the pattern into the subject.
+ *
+ * This function detects the case and repairs the Stmt in place.
+ * It looks for: s->pattern==NULL, s->replacement==E_NULL, and the subject
+ * tree contains a PAT_BUILTIN call in a position that looks like a pattern start.
+ * ============================================================ */
+
+static int is_pat_builtin_call(Expr *e) {
+    if (!e || e->kind != E_CALL) return 0;
+    static const char *pb[] = {
+        "LEN","POS","RPOS","TAB","RTAB","SPAN","BREAK",
+        "NOTANY","ANY","ARB","REM","FAIL","ABORT",
+        "FENCE","SUCCEED","BAL","ARBNO", NULL
+    };
+    for (int i = 0; pb[i]; i++)
+        if (strcasecmp(e->sval, pb[i]) == 0) return 1;
+    return 0;
+}
+
+/* Returns 1 if expr e is a pattern node (E_CALL to pat_builtin, E_COND capture,
+ * E_ALT, or E_CONCAT whose left child is a pattern). */
+static int is_pat_node(Expr *e) {
+    if (!e) return 0;
+    if (is_pat_builtin_call(e)) return 1;
+    if (e->kind == E_COND) return 1;  /* .var capture */
+    if (e->kind == E_ALT)  return 1;  /* | alternation */
+    return 0;
+}
+
+/* Walk the E_CONCAT left spine. When we find a right child that is_pat_node,
+ * detach it and everything after it into the pattern.
+ * Returns the extracted pattern root, or NULL if nothing found.
+ * *subj_out is set to the remaining subject (may be the original expr if
+ * no split needed).
+ *
+ * The tree is LEFT-ASSOCIATIVE concat:
+ *   (((str, POS(0)), ANY('abc')), E_COND(letter))
+ * We walk the left spine, looking for the first right child that is a pat node.
+ * When found at depth D, the pattern is: right_at_D concat right_at_D-1 concat ... concat right_at_0
+ * assembled left-to-right.
+ */
+typedef struct { Expr *subj; Expr *pat; } SplitResult;
+
+static Expr *make_concat(Expr *left, Expr *right) {
+    if (!left)  return right;
+    if (!right) return left;
+    Expr *e = expr_new(E_CONCAT);
+    e->left = left; e->right = right;
+    return e;
+}
+
+static SplitResult split_spine(Expr *e) {
+    /* Null or non-concat node that's a pure value: subject only */
+    if (!e) { SplitResult r = {NULL, NULL}; return r; }
+
+    if (e->kind != E_CONCAT) {
+        if (is_pat_node(e)) {
+            SplitResult r = {NULL, e}; return r;   /* entire node is pattern */
+        } else {
+            SplitResult r = {e, NULL}; return r;   /* entire node is subject */
+        }
+    }
+
+    /* e = E_CONCAT(left, right) */
+    /* First check if RIGHT is a pattern node (first pat on the right spine) */
+    if (is_pat_node(e->right)) {
+        /* Split here: left is subject, right and above become pattern */
+        SplitResult inner = split_spine(e->left);
+        /* inner.pat (if any) should be prepended, but since left was already
+         * recursed and left's right IS the current pat... */
+        /* Actually: the split is between left and right.
+         * Subject = inner.subj (what was pure subject in e->left)
+         * Pattern = inner.pat (any pattern found in e->left's right chain) concat e->right */
+        SplitResult r;
+        r.subj = inner.subj;
+        r.pat  = make_concat(inner.pat, e->right);
+        return r;
+    }
+
+    /* Right is not a pattern node. Recurse left. */
+    SplitResult inner = split_spine(e->left);
+    if (!inner.pat) {
+        /* No split found in left, and right is not a pattern. No split. */
+        SplitResult r = {e, NULL}; return r;
+    }
+    /* Split found in left spine: reassemble */
+    /* inner.subj is the new left, e->right gets appended to the pattern */
+    SplitResult r;
+    r.subj = inner.subj;
+    r.pat  = make_concat(inner.pat, e->right);
+    return r;
+}
+
+static Expr *split_subject_pattern(Expr *e, Expr **subj_out) {
+    if (!e) { *subj_out = NULL; return NULL; }
+    SplitResult r = split_spine(e);
+    *subj_out = r.subj;
+    return r.pat;
+}
+
+/* Repair a misparsed pattern-match stmt.
+ * Called when s->pattern==NULL and s->replacement is E_NULL (bare '=').
+ * Also repairs pattern-match stmts with no replacement (s->replacement==NULL)
+ * where the subject absorbed the pattern (no '=' present).
+ * Returns 1 if the stmt was repaired. */
+static int maybe_fix_pattern_stmt(Stmt *s) {
+    /* Only attempt when: no pattern was parsed AND (replacement is E_NULL or NULL)
+     * AND there is a goto — the common pattern-match form. */
+    if (s->pattern) return 0;   /* already has a pattern */
+    if (!s->subject) return 0;  /* no subject */
+    /* Heuristic: if replacement is NULL (no =) or E_NULL (bare =), try to split */
+    if (s->replacement && s->replacement->kind != E_NULL) return 0;
+
+    Expr *new_subj = NULL;
+    Expr *new_pat  = split_subject_pattern(s->subject, &new_subj);
+    if (!new_pat) return 0;  /* no pattern found in subject */
+
+    s->subject     = new_subj;
+    s->pattern     = new_pat;
+    /* If replacement was E_NULL (bare =), keep it as empty replacement (delete matched).
+     * If it was NULL (no =), leave it NULL (just match, no replace). */
+    return 1;
+}
+
+/* ============================================================
  * Emit one statement
  * ============================================================ */
 static void emit_stmt(Stmt *s, const char *fn) {
+    /* Repair misparsed pattern-match stmts (grammar absorbs pattern into subject) */
+    maybe_fix_pattern_stmt(s);
+
     E("/* line %d */\n", s->lineno);
     if (s->label) E("_L%s:;\n", cs_label(s->label));
 
@@ -1017,14 +1159,6 @@ void snoc_emit(Program *prog, FILE *f) {
                     fn_table[i].body_starts[fn_table[i].nbody_starts++] = s;
             }
         }
-    }
-
-    /* DEBUG: dump phantom body_starts counts to stderr */
-    for (int i = 0; i < fn_count; i++) {
-        if (!fn_table[i].define_stmt)
-            fprintf(stderr, "PHANTOM %-20s nbody_starts=%d end=%s\n",
-                    fn_table[i].name, fn_table[i].nbody_starts,
-                    fn_table[i].end_label ? fn_table[i].end_label : "(null)");
     }
 
     /* Phase 2: emit */

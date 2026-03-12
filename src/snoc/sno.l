@@ -211,15 +211,21 @@ WS      [ \t]+
 "&"             { yylval.sval = intern("&"); return AMP; }
 
     /* ---- identifiers ---- */
-    /* PAT_BUILTIN only when directly followed by '(' — this prevents
-       variable names that happen to match builtin names (tab, rem, nul…)
-       from being mis-tokenised in capture targets or other non-call positions.
+    /* PAT_BUILTIN only when directly followed by '(' AND at statement level
+       (bstack_top == 0, i.e. not inside a function-call arglist).
+       Inside parens (e.g. foo(POS(0) ANY(...))), these are IDENT so they parse
+       as value-expr function calls, not as pattern-expr starters.
+       This disambiguates: `str POS(0) ANY(..) . x =` is parsed as
+       subject=str, pattern=POS(0) ANY(..) . x, replacement=empty.
        Zero-arg builtins (ARB, REM, FAIL…) used bare are returned as IDENT
        and routed through emit_pat's E_CALL path which handles them. */
 {IDENT}/"("     {
                     yylval.sval = intern(yytext);
                     last_was_callable = 1;
-                    return is_pat_builtin(yytext) ? PAT_BUILTIN : IDENT;
+                    /* PAT_BUILTIN only at top-level (not inside arglist parens) */
+                    if (is_pat_builtin(yytext) && bstack_top == 0)
+                        return PAT_BUILTIN;
+                    return IDENT;
                 }
 {IDENT}         { yylval.sval = intern(yytext); last_was_callable = 0; return IDENT; }
 

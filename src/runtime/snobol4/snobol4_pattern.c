@@ -993,3 +993,14 @@ SnoVal sno_sort_fn(SnoVal arr) {
     /* Stub — return input unchanged */
     return arr;
 }
+
+/* sno_pat_call — call a user-defined function with one arg and use result as pattern value.
+ * Used when a pattern expression contains a user-defined function call, e.g. *t(y) in pattern. */
+SnoVal sno_pat_call(const char *name, SnoVal arg) {
+    SnoVal args[1] = { arg };
+    SnoVal result = sno_apply(name, args, 1);
+    if (sno_is_fail(result)) return sno_pat_fail();
+    /* Wrap result as a pattern: if it's already a pattern, return it;
+     * otherwise treat it as a literal string pattern. */
+    return sno_var_as_pattern(result);
+}
