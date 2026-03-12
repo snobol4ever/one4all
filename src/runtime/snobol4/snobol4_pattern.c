@@ -219,8 +219,12 @@ SnoVal sno_pat_alt(SnoVal left, SnoVal right) {
     SnoPattern *p = spat_new(SPAT_ALT);
     p->left  = spat_of(left);
     p->right = spat_of(right);
-    if (!p->left  && left.type  == SNO_STR) p->left  = spat_of(sno_pat_lit(left.s));
-    if (!p->right && right.type == SNO_STR) p->right = spat_of(sno_pat_lit(right.s));
+    if (!p->left  && left.type  == SNO_STR)  p->left  = spat_of(sno_pat_lit(left.s));
+    if (!p->right && right.type == SNO_STR)  p->right = spat_of(sno_pat_lit(right.s));
+    /* SNO_NULL (uninitialized var) in ALT = epsilon: always succeeds.
+     * e.g. (nl | ';') where nl is uninitialized => ("" | ';') => epsilon. */
+    if (!p->left  && left.type  == SNO_NULL) p->left  = spat_of(sno_pat_epsilon());
+    if (!p->right && right.type == SNO_NULL) p->right = spat_of(sno_pat_epsilon());
     if (!p->left)  return right;
     if (!p->right) return left;
     return spat_val(p);
