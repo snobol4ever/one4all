@@ -293,6 +293,9 @@ class ParseError(Exception):
         self.lineno = lineno
 
 
+# OPSYN state: set True after OPSYN('&','reduce',2) is encountered in source stream
+_amp_is_reduce = False
+
 class Parser:
     def __init__(self, tokens):
         self.tokens = tokens
@@ -339,13 +342,23 @@ class Parser:
     # --- program ---
 
     def parse_program(self):
+        global _amp_is_reduce
+        _amp_is_reduce = False  # reset at start of each parse
         stmts = []
         self.skip_newlines()
         while not self.at('EOF'):
             stmt = self.parse_statement()
             if stmt is not None:
                 stmts.append(stmt)
+                # Detect OPSYN('&','reduce',2) — after this point & = reduce call
+                if (stmt.subject and getattr(stmt.subject, 'name', None) == 'OPSYN'
+                        and stmt.subject.args and len(stmt.subject.args) >= 2):
+                    a0 = getattr(stmt.subject.args[0], 'val', '')
+                    a1 = getattr(stmt.subject.args[1], 'val', '')
+                    if str(a0) == '&' and str(a1).lower() == 'reduce':
+                        _amp_is_reduce = True
             self.skip_newlines()
+        _amp_is_reduce = False  # reset for next parse
         return Program(stmts=stmts)
 
     # --- statement ---
@@ -752,8 +765,8 @@ class _ExprParser:
             from ir import PatExpr
             kind = 'assign_cond' if op == 'DOT' else 'assign_imm'
             left = PatExpr(kind=kind, child=left, var=var)
-        # Concatenation loop: juxtaposed terms OR explicit '&'
-        while not self.eof() and (self._starts_primary() or self.at('AMP')):
+        # Concatenation loop: juxtaposed terms, explicit '&', or prefix *deref
+        while not self.eof() and (self._starts_primary() or self.at('AMP') or self.at('STAR')):
             if self.at('AMP'):
                 self.consume()   # consume &
                 if self.eof() or not self._starts_primary():
@@ -762,7 +775,11 @@ class _ExprParser:
                 # & = reduce(left, right) per OPSYN('&','reduce',2) in beauty.sno
                 left = Expr(kind='call', name='reduce', args=[left, right])
             else:
-                right = self.parse_additive()
+                # STAR at start of juxtaposed item = deref prefix (*var), never infix multiply
+                if self.at('STAR'):
+                    right = self.parse_unary()
+                else:
+                    right = self.parse_additive()
                 left = Expr(kind='concat', left=left, right=right)
             # Check for capture after each piece
             while self.at('DOT', 'DOLLAR'):
@@ -784,13 +801,14 @@ class _ExprParser:
 
     def parse_multiplicative(self):
         left = self.parse_power()
-        while self.at('STAR', 'SLASH'):
-            # Careful: STAR is also deferred ref in pattern context
-            # In value expr context, * is multiply
-            op = self.consume().kind
+        # In SNOBOL4, binary * is ambiguous with unary * (deref prefix).
+        # "A *B" in replacement context is concat(A, deref(B)) not multiply(A,B).
+        # We only consume SLASH as binary division; STAR is handled as
+        # a deref prefix in the concat loop and parse_unary.
+        while self.at('SLASH'):
+            self.consume()
             right = self.parse_power()
-            kind = 'mul' if op == 'STAR' else 'div'
-            left = Expr(kind=kind, left=left, right=right)
+            left = Expr(kind='div', left=left, right=right)
         return left
 
     def parse_power(self):
