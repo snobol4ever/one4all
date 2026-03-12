@@ -70,6 +70,69 @@ char sno_lcase[27]    = "abcdefghijklmnopqrstuvwxyz";
 char sno_digits[11]   = "0123456789";
 char sno_alphabet[257];  /* all 256 ASCII chars */
 
+/* ============================================================
+ * Numeric comparison builtins: GT LT GE LE EQ NE
+ * SNOBOL4 semantics: succeed (return first arg) or fail (SNO_FAIL_VAL).
+ * Also INTEGER, SIZE, REAL type/conversion builtins.
+ * ============================================================ */
+
+static SnoVal _b_GT(SnoVal *a, int n) {
+    if (n < 2) return SNO_FAIL_VAL;
+    return sno_gt(a[0], a[1]) ? a[0] : SNO_FAIL_VAL;
+}
+static SnoVal _b_LT(SnoVal *a, int n) {
+    if (n < 2) return SNO_FAIL_VAL;
+    return sno_lt(a[0], a[1]) ? a[0] : SNO_FAIL_VAL;
+}
+static SnoVal _b_GE(SnoVal *a, int n) {
+    if (n < 2) return SNO_FAIL_VAL;
+    return sno_ge(a[0], a[1]) ? a[0] : SNO_FAIL_VAL;
+}
+static SnoVal _b_LE(SnoVal *a, int n) {
+    if (n < 2) return SNO_FAIL_VAL;
+    return sno_le(a[0], a[1]) ? a[0] : SNO_FAIL_VAL;
+}
+static SnoVal _b_EQ(SnoVal *a, int n) {
+    if (n < 2) return SNO_FAIL_VAL;
+    /* Numeric equality: equal returns first arg, else fail */
+    if (a[0].type == SNO_INT && a[1].type == SNO_INT)
+        return (a[0].i == a[1].i) ? a[0] : SNO_FAIL_VAL;
+    return (sno_to_real(a[0]) == sno_to_real(a[1])) ? a[0] : SNO_FAIL_VAL;
+}
+static SnoVal _b_NE(SnoVal *a, int n) {
+    if (n < 2) return SNO_FAIL_VAL;
+    if (a[0].type == SNO_INT && a[1].type == SNO_INT)
+        return (a[0].i != a[1].i) ? a[0] : SNO_FAIL_VAL;
+    return (sno_to_real(a[0]) != sno_to_real(a[1])) ? a[0] : SNO_FAIL_VAL;
+}
+static SnoVal _b_INTEGER(SnoVal *a, int n) {
+    if (n < 1) return SNO_FAIL_VAL;
+    /* Succeed (returning int value) if arg is or converts to integer */
+    if (a[0].type == SNO_INT) return a[0];
+    if (a[0].type == SNO_STR && a[0].s) {
+        char *end;
+        long long v = strtoll(a[0].s, &end, 10);
+        if (end != a[0].s && *end == '\0') return SNO_INT_VAL(v);
+    }
+    return SNO_FAIL_VAL;
+}
+static SnoVal _b_REAL(SnoVal *a, int n) {
+    if (n < 1) return SNO_FAIL_VAL;
+    if (a[0].type == SNO_REAL) return a[0];
+    if (a[0].type == SNO_INT)  return (SnoVal){ .type = SNO_REAL, .r = (double)a[0].i };
+    if (a[0].type == SNO_STR && a[0].s) {
+        char *end;
+        double v = strtod(a[0].s, &end);
+        if (end != a[0].s && *end == '\0') return (SnoVal){ .type = SNO_REAL, .r = v };
+    }
+    return SNO_FAIL_VAL;
+}
+static SnoVal _b_SIZE(SnoVal *a, int n) {
+    if (n < 1) return SNO_INT_VAL(0);
+    const char *s = sno_to_str(a[0]);
+    return SNO_INT_VAL((int64_t)(s ? strlen(s) : 0));
+}
+
 void sno_runtime_init(void) {
     GC_INIT();
     /* Build &ALPHABET: all 256 chars in order */
@@ -78,6 +141,18 @@ void sno_runtime_init(void) {
     /* Enable monitor if SNO_MONITOR=1 (writes to stderr) */
     const char *mon = getenv("SNO_MONITOR");
     if (mon && mon[0] == '1') sno_monitor_fd = 2;
+
+    /* Register numeric comparison builtins */
+    extern void sno_register_fn(const char *, SnoVal (*)(SnoVal*, int), int, int);
+    sno_register_fn("GT",      _b_GT,      2, 2);
+    sno_register_fn("LT",      _b_LT,      2, 2);
+    sno_register_fn("GE",      _b_GE,      2, 2);
+    sno_register_fn("LE",      _b_LE,      2, 2);
+    sno_register_fn("EQ",      _b_EQ,      2, 2);
+    sno_register_fn("NE",      _b_NE,      2, 2);
+    sno_register_fn("INTEGER", _b_INTEGER, 1, 1);
+    sno_register_fn("REAL",    _b_REAL,    1, 1);
+    sno_register_fn("SIZE",    _b_SIZE,    1, 1);
 }
 
 /* ============================================================
