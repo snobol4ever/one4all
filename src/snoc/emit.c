@@ -157,10 +157,6 @@ static void emit_expr(Expr *e) {
         E("sno_concat_sv("); emit_expr(e->left); E(","); emit_expr(e->right); E(")");
         break;
 
-    case E_PAT_CAT:
-        /* Pattern concat in value context — emit as pattern value */
-        E("sno_pat_cat("); emit_pat(e->left); E(","); emit_pat(e->right); E(")");
-        break;
     case E_REDUCE: E("sno_apply(\"reduce\",(SnoVal[]){"); emit_expr(e->left); E(","); emit_expr(e->right); E("},2)"); break;
     case E_ADD:    E("sno_add(");    emit_expr(e->left); E(","); emit_expr(e->right); E(")"); break;
     case E_SUB:    E("sno_sub(");    emit_expr(e->left); E(","); emit_expr(e->right); E(")"); break;
@@ -265,7 +261,6 @@ static void emit_pat(Expr *e) {
         break;
 
     case E_CONCAT:
-    case E_PAT_CAT:
         E("sno_pat_cat("); emit_pat(e->left); E(","); emit_pat(e->right); E(")"); break;
 
     case E_MUL:
@@ -557,7 +552,6 @@ static int is_pat_node(Expr *e) {
  */
 static int expr_contains_pattern(Expr *e) {
     if (!e) return 0;
-    if (e->kind == E_PAT_CAT) return 1;  /* always pattern context */
     if (is_pat_node(e)) return 1;
     /* *varname — deferred pattern ref */
     if (e->kind == E_DEREF && e->left && e->left->kind == E_VAR) return 1;
