@@ -304,6 +304,7 @@ static void emit_assign_target(Expr *lhs, const char *rhs_str) {
     if (!lhs) return;
     if (lhs->kind == E_VAR) {
         E("sno_set(%s, %s);\n", cs(lhs->sval), rhs_str);
+        E("sno_var_set(\"%s\", %s);\n", lhs->sval, cs(lhs->sval));
     } else if (lhs->kind == E_ARRAY) {
         E("sno_aset(%s,(SnoVal[]){", cs(lhs->sval));
         for (int i=0; i<lhs->nargs; i++) {
@@ -586,8 +587,10 @@ static void emit_stmt(Stmt *s, const char *fn) {
             if (s->subject->kind == E_VAR) {
                 if (is_io_name(s->subject->sval))
                     E("    sno_var_set(\"%s\", _s%d);\n", s->subject->sval, u);
-                else
+                else {
                     E("    sno_set(%s, _s%d);\n", cs(s->subject->sval), u);
+                    E("    sno_var_set(\"%s\", %s);\n", s->subject->sval, cs(s->subject->sval));
+                }
             }
             E("}\n");
         }
