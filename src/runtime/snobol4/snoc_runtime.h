@@ -164,7 +164,7 @@ static inline void _snoc_replace(SnoVal *subj, SnoMatch *m, SnoVal repl) {
 #define sno_replace(subj, m, repl)     _snoc_replace(subj, m, repl)
 
 /* ---- Runtime init / finish ---- */
-static inline void sno_init(void)    { sno_runtime_init(); }
+static inline void sno_init(void)    { sno_runtime_init(); extern void sno_inc_init(void); sno_inc_init(); }
 static inline void sno_finish(void)  { }
 
 /* ---- ABORT / exception handler stack ----
