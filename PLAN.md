@@ -1,5 +1,32 @@
 # SNOBOL4-tiny — Sprint Plan
 
+---
+
+## §0 — PROJECT VISION (Session 43, 2026-03-12)
+
+> **SNOBOL4 everywhere. SNOBOL4 for all. SNOBOL4 for now. SNOBOL4 forever.**
+> `SNOBOL4everywhere` · `SNOBOL4all` · `SNOBOL4now` · `SNOBOL4ever`
+
+The SNOBOL4-plus org is a **two-dimensional compiler matrix**:
+
+|                | **SNOBOL4** | **SPITBOL** | **SNOCONE** | **REBUS** | *(more)* |
+|----------------|-------------|-------------|-------------|-----------|----------|
+| **C / native** | SNOBOL4-tiny (snoc) ← *here* | — | — | — | |
+| **JVM**        | SNOBOL4-jvm | — | snocone.clj | — | |
+| **.NET**       | SNOBOL4-dotnet | — | snocone.cs | — | |
+| **ASM**        | — | — | — | — | |
+| *(more)*       | | | | | |
+
+- **Rows = backends / targets** (C/native, JVM, .NET, ASM, WASM, ...)
+- **Columns = front-ends / source languages** (SNOBOL4, SPITBOL, SNOCONE, REBUS, ...)
+- Each cell = a working compiler+runtime for that *(language × platform)* pair
+- The mission: fill the matrix. Make string-processing power available everywhere.
+
+SNOBOL4-tiny (snoc) is the **C/native × SNOBOL4** cell. Beauty.sno self-hosting
+is the proof-of-correctness for that cell. Every other cell follows the same pattern.
+
+---
+
 ## Status at Sprint 23 end
 
 | Repo            | Commit    | Status                                      |
