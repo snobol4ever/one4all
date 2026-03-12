@@ -804,6 +804,8 @@ static void emit_global_var_decls(void) {
  * Emit one DEFINE'd function
  * ============================================================ */
 static void emit_fn(FnDef *fn, Program *prog) {
+    /* Phantoms exist only as boundary markers — no C function to emit */
+    if (!fn->define_stmt) return;
     (void)prog;
     lreg_reset();
     cur_fn_name = fn->name;
@@ -861,11 +863,19 @@ static void emit_fn_forwards(void) {
     E("\n");
 }
 
-/* ============================================================
- * Main entry point emitter
- * ============================================================ */
+/* Return 1 if stmt s lies within any real (non-phantom) function body */
 static int stmt_is_in_any_fn_body(Stmt *s) {
     return stmt_in_fn_body(s, NULL);
+}
+
+/* Return 1 if stmt s lies within a phantom function's body region.
+ * Phantoms have body_starts populated after injection — reuse stmt_in_fn_body. */
+static int stmt_in_phantom_body(Stmt *s) {
+    for (int i = 0; i < fn_count; i++) {
+        if (fn_table[i].define_stmt) continue;  /* not a phantom */
+        if (stmt_in_fn_body(s, fn_table[i].name)) return 1;
+    }
+    return 0;
 }
 
 static void emit_main(Program *prog) {
@@ -874,8 +884,9 @@ static void emit_main(Program *prog) {
     E("int main(void) {\n");
     E("    sno_init();\n\n");
 
-    /* Register all DEFINE'd functions */
+    /* Register all DEFINE'd functions (skip phantoms — runtime-owned) */
     for (int i=0; i<fn_count; i++) {
+        if (!fn_table[i].define_stmt) continue;  /* phantom — skip */
         /* Reconstruct the proto spec string: "name(a,b)loc1,loc2" */
         E("    sno_define(\"");
         E("%s(", fn_table[i].name);
@@ -904,6 +915,8 @@ static void emit_main(Program *prog) {
         }
         /* Skip statements that live inside a function body */
         if (stmt_is_in_any_fn_body(s)) continue;
+        /* Skip statements inside phantom (runtime-owned) function bodies */
+        if (stmt_in_phantom_body(s)) continue;
         /* Skip the DEFINE(...) call statements themselves */
         if (stmt_define_proto(s)) continue;
 
@@ -925,7 +938,97 @@ void snoc_emit(Program *prog, FILE *f) {
     collect_symbols(prog);
     collect_functions(prog);
 
-    /* Phase 2: emit */    emit_header();
+    /* Phase 1b: inject phantom FnDef entries for every runtime-owned function
+     * whose source body appears in the expanded -INCLUDE stream but whose DEFINE
+     * is handled by snobol4_inc.c at runtime (so collect_functions never sees it).
+     *
+     * Phantoms have name + end_label only. define_stmt = NULL, nbody_starts = 0.
+     * They exist SOLELY so is_body_boundary() recognises their entry/end labels
+     * as boundaries and stops body-absorption into the wrong C function.
+     * emit_fn() skips phantoms (define_stmt == NULL → no C function emitted).
+     * emit_main() skips phantoms (define_stmt == NULL → no sno_define() call).
+     *
+     * Source: snobol4_inc.c sno_inc_init() + sno_inc_init_extra() registrations
+     * whose bodies appear in: ShiftReduce.sno, stack.sno, counter.sno, semantic.sno
+     */
+    static const struct { const char *name; const char *end_label; } phantoms[] = {
+        /* ShiftReduce.sno */
+        { "Shift",        "ShiftEnd"    },
+        { "Reduce",       "ReduceEnd"   },
+        /* stack.sno */
+        { "InitStack",    "StackEnd"    },
+        { "Push",         "StackEnd"    },
+        { "Pop",          "StackEnd"    },
+        { "Top",          "StackEnd"    },
+        /* counter.sno */
+        { "InitCounter",  "CounterEnd"  },
+        { "PushCounter",  "CounterEnd"  },
+        { "IncCounter",   "CounterEnd"  },
+        { "DecCounter",   "CounterEnd"  },
+        { "PopCounter",   "CounterEnd"  },
+        { "TopCounter",   "CounterEnd"  },
+        { "InitBegTag",   "BegTagEnd"   },
+        { "PushBegTag",   "BegTagEnd"   },
+        { "PopBegTag",    "BegTagEnd"   },
+        { "TopBegTag",    "BegTagEnd"   },
+        { "DumpBegTag",   "BegTagEnd"   },
+        { "InitEndTag",   "EndTagEnd"   },
+        { "PushEndTag",   "EndTagEnd"   },
+        { "PopEndTag",    "EndTagEnd"   },
+        { "TopEndTag",    "EndTagEnd"   },
+        { "DumpEndTag",   "EndTagEnd"   },
+        /* semantic.sno — entry labels are name_, end is semanticEnd */
+        { "shift_",       "semanticEnd" },
+        { "reduce_",      "semanticEnd" },
+        { "pop_",         "semanticEnd" },
+        { "nPush_",       "semanticEnd" },
+        { "nInc_",        "semanticEnd" },
+        { "nDec_",        "semanticEnd" },
+        { "nTop_",        "semanticEnd" },
+        { "nPop_",        "semanticEnd" },
+        { NULL, NULL }
+    };
+    for (int pi = 0; phantoms[pi].name && fn_count < FN_MAX; pi++) {
+        /* Skip if already in fn_table (defined by SNOBOL4 DEFINE in-stream) */
+        int already = 0;
+        for (int fi = 0; fi < fn_count; fi++)
+            if (strcasecmp(fn_table[fi].name, phantoms[pi].name) == 0) { already=1; break; }
+        if (already) continue;
+        FnDef *ph = &fn_table[fn_count++];
+        memset(ph, 0, sizeof *ph);
+        ph->name        = strdup(phantoms[pi].name);
+        ph->end_label   = strdup(phantoms[pi].end_label);
+        ph->define_stmt = NULL;   /* phantom: no SNOBOL4 DEFINE, no C emission */
+        ph->entry_label = NULL;
+        ph->nbody_starts = 0;
+    }
+
+    /* Populate body_starts for phantoms by scanning the program for their entry label.
+     * This lets stmt_in_fn_body() work for phantoms exactly like real functions. */
+    for (int i = 0; i < fn_count; i++) {
+        if (fn_table[i].define_stmt) continue;  /* not a phantom */
+        const char *entry = fn_table[i].entry_label
+                          ? fn_table[i].entry_label
+                          : fn_table[i].name;
+        fn_table[i].nbody_starts = 0;
+        for (Stmt *s = prog->head; s; s = s->next) {
+            if (s->label && strcasecmp(s->label, entry) == 0) {
+                if (fn_table[i].nbody_starts < BODY_MAX)
+                    fn_table[i].body_starts[fn_table[i].nbody_starts++] = s;
+            }
+        }
+    }
+
+    /* DEBUG: dump phantom body_starts counts to stderr */
+    for (int i = 0; i < fn_count; i++) {
+        if (!fn_table[i].define_stmt)
+            fprintf(stderr, "PHANTOM %-20s nbody_starts=%d end=%s\n",
+                    fn_table[i].name, fn_table[i].nbody_starts,
+                    fn_table[i].end_label ? fn_table[i].end_label : "(null)");
+    }
+
+    /* Phase 2: emit */
+    emit_header();
     emit_global_var_decls();
     emit_fn_forwards();
 
