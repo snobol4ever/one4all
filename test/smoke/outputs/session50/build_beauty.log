@@ -1,0 +1,11 @@
+=== build_beauty smoke test ===
+PASS: snoc exists
+Compiling beauty.sno → C ... OK (12847 lines)
+PASS: snoc produced C
+Compiling C → binary (gcc) ... OK
+PASS: gcc compiled with 0 errors
+
+============================================
+ALL PASS — beauty_full_bin at /tmp/beauty_full_bin
+Run test_snoCommand_match.sh for grammar smoke test.
+Run test_self_beautify.sh for Milestone 0 validation.

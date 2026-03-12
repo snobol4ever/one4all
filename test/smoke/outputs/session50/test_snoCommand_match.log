@@ -1,0 +1,93 @@
+=== snoCommand smoke test ===
+Binary: /tmp/beauty_full_bin
+
+FAIL: simple assignment
+      stmt:     X = 'hello'
+      out:  Parse Error
+    X = 'hello'
+FAIL: null assignment
+      stmt:     X = 
+      out:  Parse Error
+    X = 
+FAIL: concat assignment
+      stmt:     X = 'hello' 'world'
+      out:  Parse Error
+    X = 'hello' 'world'
+FAIL: numeric assignment
+      stmt:     N = 42
+      out:  Parse Error
+    N = 42
+FAIL: indirect assign
+      stmt:     $'var' = 'value'
+      out:  Parse Error
+    $'var' = 'value'
+FAIL: bare pattern match
+      stmt:     X 'hello'
+      out:  Parse Error
+    X 'hello'
+FAIL: pattern with S goto
+      stmt:     X 'hello'                        :S(END)
+      out:  Parse Error
+    X 'hello'                        :S(END)
+FAIL: pattern with F goto
+      stmt:     X 'hello'                        :F(END)
+      out:  Parse Error
+    X 'hello'                        :F(END)
+FAIL: pattern with capture
+      stmt:     X ('hello') . Y
+      out:  Parse Error
+    X ('hello') . Y
+FAIL: labeled pattern match
+      stmt: LOOP    X 'tick'                     :S(LOOP)
+      out:  Parse Error
+LOOP    X 'tick'                     :S(LOOP)
+FAIL: OUTPUT assignment
+      stmt:     OUTPUT = 'hello'
+      out:  Parse Error
+    OUTPUT = 'hello'
+FAIL: DEFINE call
+      stmt:     DEFINE('fn(a,b)loc')
+      out:  Parse Error
+    DEFINE('fn(a,b)loc')
+FAIL: DIFFER call
+      stmt:     DIFFER(X,Y)
+      out:  Parse Error
+    DIFFER(X,Y)
+FAIL: GT call with goto
+      stmt:     GT(N,0)                          :S(END)
+      out:  Parse Error
+    GT(N,0)                          :S(END)
+FAIL: comment line
+      stmt: *   this is a comment
+      out:  *   this is a comment
+Parse Error
+END
+FAIL: control line
+      stmt: -INCLUDE 'foo.sno'
+      out:  -INCLUDE 'foo.sno'
+Parse Error
+END
+FAIL: unconditional goto
+      stmt:     X = 1                            :(END)
+      out:  Parse Error
+    X = 1                            :(END)
+FAIL: labeled stmt
+      stmt: TOP X = X 1                          :(TOP)
+      out:  Parse Error
+TOP X = X 1                          :(TOP)
+FAIL: snoLabel definition
+      stmt:                   snoLabel = BREAK(' ' tab nl ';') ~ 'snoLabel'
+      out:  Parse Error
+                  snoLabel = BREAK(' ' tab nl ';') ~ 'snoLabel'
+FAIL: ARBNO pattern
+      stmt:     snoParse = ARBNO(*snoCommand)
+      out:  Parse Error
+    snoParse = ARBNO(*snoCommand)
+FAIL: DATA call
+      stmt:     DATA('t(type,value,nargs,left,right)')
+      out:  Parse Error
+    DATA('t(type,value,nargs,left,right)')
+
+============================================
+Results: 0 passed, 21 failed, 0 skipped
+FAILURES DETECTED — grammar pattern is broken at structural level.

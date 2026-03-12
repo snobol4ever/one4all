@@ -1,0 +1,49 @@
+=== Milestone 0: self-beautify smoke test ===
+Binary: /tmp/beauty_full_bin
+Running CSNOBOL4 oracle ... OK (790 lines)
+Running compiled binary ... OK (10 lines)
+Diffing oracle vs compiled ... DIFF (785 lines)
+
+7a8
+> Parse Error
+9,27d9
+< -INCLUDE 'global.sno'
+< -INCLUDE 'is.sno'
+< -INCLUDE 'FENCE.sno'
+< -INCLUDE 'io.sno'
+< -INCLUDE 'case.sno'
+< -INCLUDE 'assign.sno'
+< -INCLUDE 'match.sno'
+< -INCLUDE 'counter.sno'
+< -INCLUDE 'stack.sno'
+< -INCLUDE 'tree.sno'
+< -INCLUDE 'ShiftReduce.sno'
+< -INCLUDE 'TDump.sno'
+< -INCLUDE 'Gen.sno'
+< -INCLUDE 'Qize.sno'
+< -INCLUDE 'ReadWrite.sno'
+< -INCLUDE 'XDump.sno'
+< -INCLUDE 'semantic.sno'
+< -INCLUDE 'omega.sno'
+< -INCLUDE 'trace.sno'
+29,790d10
+<                &FULLSCAN      =  1
+<                &MAXLNGTH      =  524288
+< *
+< *                 Four tab-stops defined for the pretty-print routine.
+< *                 ppStop[1] - subject field start column
+< *                 ppStop[2] - pattern or = field start column
+< *                 ppStop[3] - replacement object start column
+< *                 ppStop[4] - goto field start column
+< *                 ppSmBump  - extra indent when inside multi-line nesting
+< *                 ppLgBump  - extra width budget when no goto field present
+< *
+< *                 Five profiles derived from corpus analysis (401 programs, quintiles):
+< *
+< *                 Profile     s1   s2   s3   s4  SmBump LgBump  Typical use
+< *                 --micro     11   26   29   55     3     21    Gimpel snippets, tiny utilities
+< *                 --small     13   28   31   60     4     24    Small programs <100 lines
+< *                 --medium    15   30   33   80     5     42    Moderate programs, mixed style
+
+============================================
+MILESTONE 0 NOT YET ACHIEVED.
