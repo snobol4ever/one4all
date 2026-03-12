@@ -404,6 +404,206 @@ we never need to execute a CODE object for Milestone 0.
 
 ---
 
+## §14 — Active Bugs and Design Gaps (Session 47, 2026-03-12)
+
+These are the discovered, confirmed, root-cause-identified bugs blocking
+Milestone 0. Each has a diagnosis, a fix, and a status.
+
+---
+
+### §14.1 — NRETURN must SUCCEED, not FAIL ✅ FIXED (`emit.c`)
+
+**Bug:** In `emit.c`, `emit_branch_target()` routed both `FRETURN` and
+`NRETURN` to `goto _SNO_FRETURN_fn`. This means every function that
+returned via `:(NRETURN)` **failed** instead of returning its value.
+
+**Scope of damage:** Massive. Every single one of these functions NRETURNs:
+- `Push()`, `Pop()`, `Top()` — the entire stack in `stack.sno`
+- `Shift()`, `Reduce()` — the shift-reduce machine in `ShiftReduce.sno`
+- `PushCounter`, `IncCounter`, `DecCounter`, `PopCounter` — counter stack
+- `TZ()`, `T8Pos()` — formatting/tracing
+- `Gen()` (multiple paths) — output generation
+- `assign()` — indirect assignment helper
+- `match()`, `notmatch()` — pattern match helpers
+- Essentially **all side-effect functions** in all `-INCLUDE` files
+
+**SNOBOL4 semantics of NRETURN:**
+NRETURN = the function successfully completed, has assigned its return
+variable (the variable named the same as the function), and returns
+that value. The NAME distinction (returning a first-class l-value
+reference) means the caller may assign through the returned NAME — but
+the function itself SUCCEEDS. It is not a failure of any kind.
+
+**The fix:** Separate FRETURN and NRETURN in `emit_branch_target()`:
+```c
+// BEFORE (wrong):
+else if (strcasecmp(label,"FRETURN")==0 || strcasecmp(label,"NRETURN")==0)
+    E("goto _SNO_FRETURN_%s", fn);
+
+// AFTER (correct):
+else if (strcasecmp(label,"FRETURN")==0)
+    E("goto _SNO_FRETURN_%s", fn);
+else if (strcasecmp(label,"NRETURN")==0)
+    E("goto _SNO_RETURN_%s", fn);   // NRETURN = success
+```
+
+**Committed:** yes (session 47).
+
+**What we DON'T implement:** The actual NAME return value — we don't create
+a first-class NAME object and return it. For beauty.sno this is fine:
+no caller examines the NAME-ness of the return; they only care that the
+function succeeded and its side effects (Push/Pop/shift/reduce) occurred.
+
+---
+
+### §14.2 — `DATA()` is a no-op: constructor and field functions never registered 🔴 NOT FIXED
+
+**Bug:** `DATA('link(next,value)')` is emitted as `sno_apply("DATA", ...)`.
+But `DATA` is **not registered** as a callable function in `snobol4.c`.
+So the call silently returns `SNO_NULL_VAL`. The constructor function
+`link()` and field accessor functions `next()`, `value()` are **never
+created** in the function hash.
+
+**Scope of damage:** Total stack failure.
+- `stack.sno` uses `DATA('link(next,value)')` for its linked-list stack
+- Every `Push(x)` call creates `link($'@S', x)` — but `link()` is unknown,
+  returns NULL, stack pointer `$'@S'` is set to NULL every push
+- Every `Pop()` call does `value($'@S')` — `value()` is unknown, returns NULL
+- `Top()` same — `value($'@S')` returns NULL
+- The entire shift-reduce parse stack is broken even after §14.1 NRETURN fix
+- `ShiftReduce.sno` also uses `DATA('tree(t,v,n,c)')` — same problem
+- `counter.sno` uses `DATA('link_counter(next,value)')` — same problem
+
+**The infrastructure exists:**
+- `sno_data_define(spec)` in `snobol4.c` — parses the spec, creates `UDefType`
+- `sno_udef_new(typename, ...)` — creates a `SNO_UDEF` instance
+- `sno_field_get(obj, field)` / `sno_field_set(obj, field, val)` — field access
+- `SNO_UDEF` (type 9) in `SnoVal` — struct exists
+
+**What's missing:** `DATA()` must be registered as a callable that:
+1. Calls `sno_data_define(spec)` to register the type
+2. Registers the **constructor function** (e.g. `link`) in the function hash:
+   `link(next_val, value_val)` → `sno_udef_new("link", next_val, value_val)`
+3. Registers each **field accessor function** (e.g. `next`, `value`) in the hash:
+   `value(obj)` → `sno_field_get(obj, "value")`
+   `value(obj) = x` → `sno_field_set(obj, "value", x)` — but this is the
+   **field setter** idiom which requires l-value support — see §14.3
+
+**The fix:** In `snobol4.c`, implement `_b_DATA(SnoVal *a, int n)`:
+
+```c
+static SnoVal _b_DATA(SnoVal *a, int n) {
+    if (n < 1) return SNO_NULL_VAL;
+    const char *spec = sno_to_str(a[0]);
+    sno_data_define(spec);
+    // Then register constructor + accessors dynamically
+    // (see implementation notes below)
+    return SNO_NULL_VAL;
+}
+```
+
+And register: `sno_register_fn("DATA", _b_DATA, 1, 1);`
+
+**Field setter l-value problem:**
+`value($'@S') = x` in SNOBOL4 means "set the `value` field of the object
+held in `$'@S'` to `x`". In generated C this would be:
+```c
+sno_field_set(sno_indirect_get("@S"), "value", x);
+```
+But our `emit_assign_target` only handles `E_VAR`, `E_ARRAY`, `E_KEYWORD`,
+`E_DEREF`. A field-accessor call on the left side of `=` is none of these.
+**The parser likely parses `value($'@S') = x` as a function call on the
+left side of assignment** — which snoc currently does not handle as an
+l-value. This is a **separate sub-bug** requiring parser/emitter changes.
+
+**Priority:** CRITICAL — without working `DATA()`, `Push`/`Pop`/`Top` all
+return null, the parse stack never accumulates anything, `Reduce` always
+pops null children, and the AST built by beauty.sno is all-null.
+
+---
+
+### §14.3 — Field accessor as l-value (setter idiom) 🔴 NOT FIXED
+
+Follows from §14.2. SNOBOL4 `DATA()` field accessors are functions that
+act as both getter and setter:
+
+```snobol4
+value($'@S')           * getter: returns field value
+value($'@S') = x       * setter: assigns into field
+```
+
+The setter form is syntactic sugar. In CSNOBOL4 this works because
+`value(obj)` returns a NAME — an l-value reference to the field slot.
+Assigning to the result of `value(obj)` assigns through that NAME into
+the field.
+
+**Our situation:** We have no NAME type (§13.1). We cannot make
+`value(obj)` return an l-value. The setter form requires either:
+
+**Option A — Compiler recognition:**
+snoc recognizes `fieldFn(obj) = rhs` as a special assignment form
+during emit, emits `sno_field_set(obj_expr, "fieldname", rhs)` directly.
+This requires the parser/emitter to identify field accessor calls on the
+lhs of assignment. **This is the right approach for Milestone 0.**
+
+**Option B — Runtime NAME type:**
+Implement NAME as a first-class `SnoVal` type carrying a setter callback.
+Field accessors return NAME objects. Assignment through a NAME calls the
+setter. Full generality, high implementation cost. **Deferred.**
+
+**Specific occurrences in stack.sno:**
+```snobol4
+$'@S' = link($'@S', x)     * constructor call, not setter — OK via §14.2
+Pop1: $var = value($'@S')  * getter form — OK via §14.2
+      $'@S' = next($'@S')  * getter form — OK via §14.2
+```
+
+Searching stack.sno, ShiftReduce.sno, counter.sno — the **setter form
+`fieldFn(obj) = x` does NOT appear** in the files used by beauty.sno.
+The fields are always READ via getter, WRITTEN via constructor `link(a, b)`.
+**§14.3 may be a non-issue for Milestone 0.** Verify before implementing.
+
+---
+
+### §14.4 — `snoSrc` is empty when match runs 🔴 NOT FIXED (root cause unknown)
+
+**Symptom:** `SNO_PAT_DEBUG=1` shows `subj=(0)` — every pattern match
+runs against a zero-length string. `snoSrc` is never populated.
+
+**The accumulation line** in generated C (from `main02`):
+```c
+SnoVal _v2202 = sno_concat_sv(
+    sno_concat_sv(sno_get(_snoSrc), sno_get(_snoLine)),
+    sno_get(_nl));
+```
+
+**Hypothesis:** `sno_get(_nl)` returns `SNO_FAIL_VAL` or `SNO_NULL_VAL`
+with zero length because `_nl` (the newline variable) is not initialized
+at the point this runs. `sno_concat_sv` is FAIL-propagating — if `_nl`
+is FAIL, the entire concat fails, `_ok2202` is false, and `_snoSrc` is
+never updated. It stays empty forever.
+
+**Why `_nl` might be uninitialized:**
+`nl` is set in one of the `-INCLUDE` files as a single newline character.
+If the include file that defines `nl` is processed AFTER the main loop
+starts, or if the initialization order is wrong in the flat emitted C,
+`_nl` may still be `{0}` (SNO_NULL with empty string) when `main02` runs.
+A zero-length newline makes the concat "succeed" but produce a string
+without line terminators — which could cause RPOS(0) matching issues.
+OR `_nl` is SNO_FAIL which kills the concat entirely.
+
+**Investigation needed:**
+```bash
+grep -n "_nl\b" /tmp/beauty_full.c | grep "sno_set\|sno_var_set" | head -5
+# Find where _nl is first assigned — is it before or after _L_main00?
+```
+
+**Priority:** CRITICAL — this is what produces "Parse Error" on every line.
+Even if §14.2 DATA() is fixed, the match subject is empty, so snoParse
+can never match any real input.
+
+---
+
 ## §11 — SNOBOL4 semantics quick reference
 
 - `DEFINE('fn(a,b)loc1')` — registers fn; body starts at SNOBOL4 label `fn`
