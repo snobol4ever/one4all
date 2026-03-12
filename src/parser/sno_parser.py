@@ -740,10 +740,10 @@ class _ExprParser:
         return left
 
     def parse_concat(self):
-        """Concatenation: sequence of terms juxtaposed (no operator needed).
-        In SNOBOL4, value concatenation is blank-separated — we handle this by
-        treating two adjacent primary expressions as concatenation.
-        We use SPACE tokens (were stripped) so just parse multiple terms."""
+        """Concatenation: juxtaposition or explicit '&' (SNOBOL4 binary concat).
+        In CSNOBOL4, X & Y in a replacement is identical to juxtaposition —
+        both produce CONPP/CONVP/CONVV depending on operand types.  We handle
+        both forms here so the parse tree is uniform Expr(concat,...) nodes."""
         left = self.parse_additive()
         # Pattern capture operators: . (conditional) and $ (immediate)
         while self.at('DOT', 'DOLLAR'):
@@ -752,8 +752,12 @@ class _ExprParser:
             from ir import PatExpr
             kind = 'assign_cond' if op == 'DOT' else 'assign_imm'
             left = PatExpr(kind=kind, child=left, var=var)
-        # Concatenation: if more tokens remain and they form a value expr, concat
-        while not self.eof() and self._starts_primary():
+        # Concatenation loop: juxtaposed terms OR explicit '&'
+        while not self.eof() and (self._starts_primary() or self.at('AMP')):
+            if self.at('AMP'):
+                self.consume()   # consume & — semantically identical to blank concat
+                if self.eof() or not self._starts_primary():
+                    break        # trailing & — ignore
             right = self.parse_additive()
             left = Expr(kind='concat', left=left, right=right)
             # Check for capture after each piece
@@ -828,15 +832,15 @@ class _ExprParser:
             child = self.parse_primary()
             return Expr(kind='indirect', child=child)
 
-        # &IDENT = keyword; & non-IDENT = concatenation operator
+        # &IDENT = keyword reference  (e.g. &ANCHOR, &ALPHABET)
+        # Note: bare '&' as infix concat is consumed by parse_concat, not here.
         if t.kind == 'AMP':
             self.consume()
             if not self.eof() and self.peek().kind == 'IDENT':
                 name = self.consume().val
                 return Expr(kind='keyword', val=name)
-            # & as infix concat — right operand follows
-            right = self.parse_primary()
-            return right
+            # & with no following IDENT — parse as keyword of empty name (error fallback)
+            return Expr(kind='null')
 
         # Parenthesised expression
         if t.kind == 'LPAREN':
@@ -850,18 +854,13 @@ class _ExprParser:
             name = self.consume().val
 
             # IDENT '(' args ')'  — function call OR subscript IDENT(i)
+            # In SNOBOL4, a second '(' after func(args) is always a new juxtaposed
+            # term in concatenation — NOT a 2D subscript.  Array subscripts use
+            # IDENT<i,j> / IDENT[i,j] syntax only.
             if self.at('LPAREN'):
                 self.consume()   # (
                 args = self._parse_arglist()
                 self.try_consume('RPAREN')
-                # Could be followed by another '(' for 2D: ARRAY(i)(j) or func(x)(y)
-                if self.at('LPAREN'):
-                    self.consume()
-                    args2 = self._parse_arglist()
-                    self.try_consume('RPAREN')
-                    # Treat as 2D subscript call
-                    base = Expr(kind='call', name=name, args=args)
-                    return Expr(kind='array', obj=base, subscripts=args2)
                 return Expr(kind='call', name=name, args=args)
 
             # IDENT '[' subscripts ']'  — array subscript

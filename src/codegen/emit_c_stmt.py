@@ -1014,11 +1014,17 @@ class StmtEmitter:
         nret_lbl = f'SNO_NRETURN_LABEL_{safe}'
         cont_lbl = f'SNO_CONTINUE_LABEL_{safe}'
         self._w(f'{ret_lbl}:')
+        # RETURN: capture the function-name variable (the return value) BEFORE
+        # restoring params/locals, then restore, then return it.
+        # In SNOBOL4, :(RETURN) returns the current value of the function-name var.
+        self._w(f'    {{')
+        self._w(f'        SnoVal _retval = sno_var_get("{fi.name}");')
         if all_vars:
             for v in all_vars:
                 sv = _safe_c_name(v)
-                self._w(f'    sno_var_set("{v}", _save_{sv});')
-        self._w(f'    return SNO_NULL_VAL;')
+                self._w(f'        sno_var_set("{v}", _save_{sv});')
+        self._w(f'        return _retval;')
+        self._w(f'    }}')
         self._w(f'{fret_lbl}:')
         if all_vars:
             for v in all_vars:
