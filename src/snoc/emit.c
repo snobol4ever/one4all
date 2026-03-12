@@ -992,7 +992,7 @@ void snoc_emit(Program *prog, FILE *f) {
         /* Skip if already in fn_table (defined by SNOBOL4 DEFINE in-stream) */
         int already = 0;
         for (int fi = 0; fi < fn_count; fi++)
-            if (strcasecmp(fn_table[fi].name, phantoms[pi].name) == 0) { already=1; break; }
+            if (strcmp(fn_table[fi].name, phantoms[pi].name) == 0) { already=1; break; }
         if (already) continue;
         FnDef *ph = &fn_table[fn_count++];
         memset(ph, 0, sizeof *ph);
@@ -1012,7 +1012,7 @@ void snoc_emit(Program *prog, FILE *f) {
                           : fn_table[i].name;
         fn_table[i].nbody_starts = 0;
         for (Stmt *s = prog->head; s; s = s->next) {
-            if (s->label && strcasecmp(s->label, entry) == 0) {
+            if (s->label && strcmp(s->label, entry) == 0) {
                 if (fn_table[i].nbody_starts < BODY_MAX)
                     fn_table[i].body_starts[fn_table[i].nbody_starts++] = s;
             }
