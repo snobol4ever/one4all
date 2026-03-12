@@ -321,8 +321,7 @@ static void emit_assign_target(Expr *lhs, const char *rhs_str) {
     if (!lhs) return;
     if (lhs->kind == E_VAR) {
         E("sno_set(%s, %s);\n", cs(lhs->sval), rhs_str);
-        if (!is_fn_local(lhs->sval))  /* sync globals; skip declared fn locals */
-            E("sno_var_set(\"%s\", %s);\n", lhs->sval, cs(lhs->sval));
+        E("sno_var_set(\"%s\", %s);\n", lhs->sval, cs(lhs->sval)); /* all vars are natural/hashed */
     } else if (lhs->kind == E_ARRAY) {
         E("sno_aset(%s,(SnoVal[]){", cs(lhs->sval));
         for (int i=0; i<lhs->nargs; i++) {
@@ -607,8 +606,7 @@ static void emit_stmt(Stmt *s, const char *fn) {
                     E("    sno_var_set(\"%s\", _s%d);\n", s->subject->sval, u);
                 else {
                     E("    sno_set(%s, _s%d);\n", cs(s->subject->sval), u);
-                    if (!is_fn_local(s->subject->sval))  /* skip fn locals */
-                        E("    sno_var_set(\"%s\", %s);\n", s->subject->sval, cs(s->subject->sval));
+                    E("    sno_var_set(\"%s\", %s);\n", s->subject->sval, cs(s->subject->sval)); /* natural var */
                 }
             }
             E("}\n");
@@ -1089,7 +1087,15 @@ static void emit_main(Program *prog) {
     cur_fn_name = "main";
     cur_fn_def  = NULL;   /* NULL = global scope; is_fn_local returns 0 for all vars */
     E("int main(void) {\n");
-    E("    sno_init();\n\n");
+    E("    sno_init();\n");
+    /* Register all global C statics so sno_var_set() can sync them back.
+     * This bridges the two-store gap: vars set via pattern conditional
+     * assignment (. varname) or pre-init write to the hash table only;
+     * registration lets those writes also update the C statics. */
+    for (int i = 0; i < sym_count; i++)
+        E("    sno_var_register(\"%s\", &%s);\n", sym_table[i], cs(sym_table[i]));
+    E("    sno_var_sync_registered(); /* pull pre-inited vars (nl,tab,etc) into C statics */\n");
+    E("\n");
 
     /* Register all DEFINE'd functions (skip phantoms — runtime-owned) */
     for (int i=0; i<fn_count; i++) {

@@ -208,6 +208,8 @@ void   sno_field_set(SnoVal obj, const char *field, SnoVal val);
 
 SnoVal  sno_var_get(const char *name);
 void    sno_var_set(const char *name, SnoVal val);
+void    sno_var_register(const char *name, SnoVal *ptr);
+void    sno_var_sync_registered(void);
 SnoVal  sno_indirect_get(const char *name);  /* $name */
 void    sno_indirect_set(const char *name, SnoVal val);
 

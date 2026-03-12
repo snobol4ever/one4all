@@ -808,6 +808,24 @@ typedef struct _VarEntry {
 static VarEntry *_var_buckets[VAR_BUCKETS];
 static int _var_init_done = 0;
 
+/* Static-pointer registration: when sno_var_set(name,val) fires,
+ * also update the C-static pointer if registered. This bridges the
+ * two-store gap for vars set via pattern conditional assignment (. var)
+ * or pre-init in sno_runtime_init, whose C statics are never touched
+ * by sno_set() because the assignment comes from the pattern engine. */
+#define VAR_REG_MAX 1024
+typedef struct { const char *name; SnoVal *ptr; } VarReg;
+static VarReg _var_reg[VAR_REG_MAX];
+static int    _var_reg_n = 0;
+
+void sno_var_register(const char *name, SnoVal *ptr) {
+    if (_var_reg_n < VAR_REG_MAX) {
+        _var_reg[_var_reg_n].name = name;
+        _var_reg[_var_reg_n].ptr  = ptr;
+        _var_reg_n++;
+    }
+}
+
 static void _var_init(void) {
     if (_var_init_done) return;
     memset(_var_buckets, 0, sizeof(_var_buckets));
@@ -839,13 +857,32 @@ void sno_var_set(const char *name, SnoVal val) {
     if (strcmp(name, "OUTPUT") == 0) { sno_output_val(val); return; }
     unsigned h = _var_hash(name);
     for (VarEntry *e = _var_buckets[h]; e; e = e->next) {
-        if (strcmp(e->name, name) == 0) { e->val = val; return; }
+        if (strcmp(e->name, name) == 0) {
+            e->val = val;
+            for (int _ri = 0; _ri < _var_reg_n; _ri++)
+                if (strcmp(_var_reg[_ri].name, name) == 0) { *_var_reg[_ri].ptr = val; break; }
+            return;
+        }
     }
     VarEntry *e = GC_malloc(sizeof(VarEntry));
     e->name = GC_strdup(name);
     e->val  = val;
     e->next = _var_buckets[h];
     _var_buckets[h] = e;
+    /* Also update registered C static if present */
+    for (int _ri = 0; _ri < _var_reg_n; _ri++)
+        if (strcmp(_var_reg[_ri].name, name) == 0) { *_var_reg[_ri].ptr = val; break; }
+}
+
+/* Sync all registered C statics FROM the hash table.
+ * Call this after all sno_var_register() calls (in main) so that
+ * vars pre-initialized by sno_runtime_init() propagate to their statics. */
+void sno_var_sync_registered(void) {
+    for (int _ri = 0; _ri < _var_reg_n; _ri++) {
+        SnoVal v = sno_var_get(_var_reg[_ri].name);
+        if (v.type != SNO_NULL && v.type != 0)
+            *_var_reg[_ri].ptr = v;
+    }
 }
 
 /* $name — indirect variable: the variable whose name is the value of 'name' */
