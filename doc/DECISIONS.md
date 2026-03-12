@@ -618,3 +618,54 @@ The kludge is correct by construction.
 
 beauty.sno and all 19 `-INCLUDE` files it uses make **zero calls** to `CODE()`.
 `SNO_CODE` stays as a type tag stub. Implementation deferred indefinitely.
+
+---
+
+## Decision 12: Smoke test — per-statement snoCommand match (Session 50, 2026-03-12)
+
+### The question
+
+How do we verify the grammar (snoCommand pattern) is working correctly?
+
+### Analysis (Session 50)
+
+Key architectural invariant confirmed: **if you strip all `.` and `$` captures
+from the grammar patterns, the structural pattern WILL match all beauty.sno
+statements.** This was established during the bootstrap phase.
+
+Therefore: the cheapest, most diagnostic smoke test is to match individual
+SNOBOL4 statements against `snoCommand` in isolation. If any statement fails,
+the grammar is broken (not the captures, not the shift-reduce stack).
+
+### Decision: DECIDED — mandatory smoke test before Milestone 0
+
+Before claiming Milestone 0 complete, the following must pass:
+
+1. `beauty_full_bin` built with 0 gcc errors
+2. For a representative set of beauty.sno statement types (assignment, pattern
+   match, DEFINE, function call, labeled goto), each matches `snoCommand`
+3. The full self-beautification produces empty diff vs oracle
+
+File: `test/smoke/test_snoCommand_match.sh`
+
+This replaces the obsolete Python-based sprint22 oracle as the primary
+end-to-end smoke test for the C compiler pipeline.
+
+---
+
+## Decision 13: Test suite is obsolete — replace with shell smoke tests (Session 50, 2026-03-12)
+
+### The situation
+
+`test/sprint*/` contain Python-based tests using `sno_parser` / `emit_c_stmt`
+— the old Python snoc pipeline. The current compiler is pure C (`snoc`).
+These tests do not run against the current compiler at all.
+
+### Decision: DECIDED — new smoke tests in `test/smoke/`
+
+Shell scripts that exercise the C snoc pipeline directly:
+- `build_beauty.sh` — compile beauty.sno → C → binary, 0 gcc errors
+- `test_snoCommand_match.sh` — match sample statements against snoCommand
+- `test_self_beautify.sh` — self-beautification diff vs oracle (Milestone 0)
+
+Old `test/sprint*/` retained for historical reference but not run in CI.

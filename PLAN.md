@@ -617,3 +617,91 @@ can never match any real input.
 - `pat $ var` — immediate assignment (at match time)
 - `&ANCHOR`, `&STLIMIT`, `&STCOUNT` — keywords via `sno_var_get/set`
 - Space before `-` required: `a[i - 1]` not `a[i-1]`
+
+---
+
+## §15 — Session 50 Findings (2026-03-12)
+
+### §15.1 — snoSrc IS populated (bug re-diagnosed)
+
+The earlier hypothesis (§14.4) that `snoSrc` is empty was WRONG about the cause.
+Debug in Session 50 confirmed:
+
+- `_nl` is correctly initialized (type=1, value=`\n`)
+- `sno_var_sync_registered()` is called after all `sno_var_register()` calls ✅
+- `snoSrc = snoSrc snoLine nl` emits `sno_concat_sv(...)` correctly ✅
+- By the time the snoParse match fires, `snoSrc = "    x = 'hello'\n"` (16 chars) ✅
+- The `slen=0` traces seen previously were from OTHER matches (pattern construction during init), not the main snoParse match
+
+**The real symptom:** `sno_match_pattern` tries all 17 positions (start=0..16) against snoSrc — ALL FAIL. The pattern is structurally present (type=5) but semantically broken.
+
+### §15.2 — KEY ARCHITECTURAL INVARIANT (confirmed Session 50)
+
+**If you strip all `.` and `$` captures/actions from the grammar patterns, the structural pattern WILL match beauty.sno text — this was validated during bootstrap.**
+
+Corollary: the match failure is NOT in the pattern structure. It must be in something that corrupts the pattern VARIABLES at runtime — between grammar init and the main match loop.
+
+### §15.3 — E_COND bug: impact is HARMLESS to match
+
+`emit.c` `case E_COND` / `case E_IMM`: when `e->right` is not `E_VAR` (e.g. `E_DEREF(E_CALL(...))`), varname falls back to `"?"`. This emits `sno_pat_cond(pat, "?")`. At runtime, `SPAT_ASSIGN_COND` with varname `"?"` wraps the child pattern correctly — the match is NOT affected, only the capture target is wrong. **This bug does not cause match failure.**
+
+### §15.4 — ACTUAL ROOT CAUSE CANDIDATE: parser misreads `*var (expr)`
+
+In `pat_atom` grammar (`sno.y`):
+```
+| STAR IDENT         → E_DEREF(E_VAR("ident"))     # correct: *snoWhite
+| IDENT LPAREN ...   → E_CALL("ident", args)        # correct: func(args)
+```
+
+But `*snoWhite` followed immediately by `(expr)` — after `STAR IDENT` reduces to `pat_atom`, does the next `(` get parsed as starting a new `pat_atom` (grouped subpattern), or does the parser backtrack and see `IDENT LPAREN` as a function call?
+
+**Evidence:** Generated C contains `sno_apply("snoWhite", (...), 1)` — calling snoWhite AS A FUNCTION with a pattern argument. This should be `sno_pat_cat(sno_pat_ref("snoWhite"), pat)`. The parser is misreading `*snoWhite (subpat)` as `snoWhite(subpat)` = function call.
+
+**Also:** `sno_pat_deref(sno_str("?"))` appears in snoStmt — dereferencing a variable literally named `"?"`. Variable `"?"` gets set by the bogus `sno_pat_cond(..., "?")` captures — so this is a compounding corruption: the E_COND bug pollutes var `"?"`, and then `sno_pat_deref(sno_str("?"))` uses that polluted value.
+
+### §15.5 — SMOKE TEST DESIGN: per-statement pattern match
+
+**The correct smoke test for the grammar is:**
+
+1. Build `beauty_full_bin`
+2. For each SNOBOL4 statement in beauty.sno, test that `snoCommand` matches it
+3. This is a pure structural match — no captures, no side effects needed
+
+This test would have caught the current failure immediately. **Add this as a mandatory smoke test before any Milestone 0 claim.**
+
+Proposed test file: `test/smoke/test_snoCommand_match.sh`
+
+```bash
+# For each non-comment, non-blank line in beauty.sno:
+# printf "line\nEND\n" | beauty_full_bin
+# should NOT output "Parse Error"
+```
+
+### §15.6 — Session 50 Next Steps (NOT YET DONE)
+
+1. **Fix `*var (expr)` parsing** — `sno.y`: after `STAR IDENT` reduces, `(expr)` must be a new pat_atom (concat), NOT a function call on the bare IDENT. The `STAR` prefix means the IDENT is already consumed as a deref — the `(` cannot retroactively make it a function call.
+
+2. **Fix `sno_pat_deref(sno_str("?"))` emissions** — trace where `$'?'` in the source becomes a pattern deref of `"?"` rather than an immediate capture.
+
+3. **Write smoke test** `test/smoke/test_snoCommand_match.sh` as described in §15.5.
+
+4. **After parser fix:** rebuild, rerun, confirm `try_match_at` succeeds for at least one position.
+
+
+---
+
+## §16 — Session Log
+
+### Session 50 (2026-03-12)
+- Confirmed `snoSrc` IS populated correctly — earlier `slen=0` traces were from pattern construction during init, not the main match
+- Confirmed `_nl` is correctly initialized (type=1, `\n`)
+- Confirmed `snoCommand`, `snoParse`, `snoStmt`, `snoWhite` all type=5 (PATTERN) ✅
+- `sno_match_pattern` tries all positions against correct subject — ALL FAIL
+- E_COND bug (`"?"` varname) confirmed HARMLESS to match — child pattern still wraps correctly
+- ROOT CAUSE CANDIDATE: parser misreads `*snoWhite (expr)` as `snoWhite(expr)` function call
+  - Evidence: `sno_apply("snoWhite", ..., 1)` in generated C for snoStmt construction
+  - Also: `sno_pat_deref(sno_str("?"))` — deref of var named `"?"` polluted by bogus captures
+- KEY INVARIANT documented: structural pattern match works (bootstrap proof)
+- Created `test/smoke/` with three shell scripts replacing obsolete Python sprint tests
+- Decisions 12+13 written to DECISIONS.md
+- Session interrupted before fixing `sno.y` parser rule for `STAR IDENT (expr)`
