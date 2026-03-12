@@ -568,12 +568,16 @@ def emit_pattern_expr(p):
         return f'sno_pat_alt({l}, {r})'
 
     if k == 'assign_imm':
-        child = emit_pattern_expr(p.child)
+        from ir import Expr as _Expr
+        child = (emit_as_pattern(p.child) if isinstance(p.child, _Expr)
+                 else emit_pattern_expr(p.child))
         var   = emit_expr(p.var) if p.var else 'SNO_NULL_VAL'
         return f'sno_pat_assign_imm({child}, {var})'
 
     if k == 'assign_cond':
-        child = emit_pattern_expr(p.child)
+        from ir import Expr as _Expr
+        child = (emit_as_pattern(p.child) if isinstance(p.child, _Expr)
+                 else emit_pattern_expr(p.child))
         var   = emit_expr(p.var) if p.var else 'SNO_NULL_VAL'
         return f'sno_pat_assign_cond({child}, {var})'
 
@@ -1186,6 +1190,17 @@ class StmtEmitter:
                 self._w(f'        if (_ok) goto {succ_lbl};')
                 self._w(f'        else goto {fail_lbl};')
                 self._w(f'    }}')
+
+        # Case 3c: no subject but has pattern (predicate call sequence)
+        # In SNOBOL4, "LT(i,n) Gen(nl)" with empty subject = match "" against the pattern
+        # Predicate patterns (LT, GT, EQ etc.) succeed/fail purely on their predicate logic.
+        elif subj is None and pat is not None and repl is None:
+            pat_c = emit_pattern_expr(pat)
+            self._w(f'    {{')
+            self._w(f'        int _ok = sno_match_pattern({pat_c}, "");')
+            self._w(f'        if (_ok) goto {succ_lbl};')
+            self._w(f'        else goto {fail_lbl};')
+            self._w(f'    }}')
 
         # Case 3b: subject only, no pattern, no replacement (not a call)
         # Evaluate for side effects; always succeeds

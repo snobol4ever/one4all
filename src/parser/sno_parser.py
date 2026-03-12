@@ -446,7 +446,33 @@ def _parse_stmt_tokens(toks, lineno):
     # AND toks[1] is not '=', ':', NEWLINE, EOF → it's a label.
     # Edge case: "LABEL" alone on a line with no subject → label only.
 
-    if (not was_indented                               # must be column 1
+    # RAW_LABEL with special chars (contains ':', '(', '[' etc) — force as label
+    # Example: "pp_:()" → raw_label_override="pp_:()", but lexer splits at ':'
+    # giving toks[0]='pp_', toks[1]=COLON. The normal logic would skip the label.
+    # Fix: if raw_label_override is longer than toks[0].val (has extra chars),
+    # trust the raw label and skip tokens until we've consumed what the raw label covers.
+    if (not was_indented and raw_label_override and toks
+            and toks[0].kind == 'IDENT'
+            and len(raw_label_override) > len(toks[0].val)
+            and raw_label_override.startswith(toks[0].val)):
+        label = raw_label_override
+        # Skip all lexed tokens that the raw label string covers
+        raw_rest = raw_label_override[len(toks[0].val):]  # e.g. ':()'
+        toks = toks[1:]  # consumed the IDENT
+        # consume tokens that are part of the raw label suffix
+        pos = 0
+        while toks and pos < len(raw_rest):
+            tok_val = toks[0].val if toks[0].val and isinstance(toks[0].val, str) else toks[0].kind
+            if raw_rest[pos:pos+len(tok_val)] == tok_val:
+                pos += len(tok_val)
+                toks = toks[1:]
+            else:
+                break
+        n = len(toks)
+        i[0] = 0
+        if not toks:
+            return Stmt(label=label, lineno=lineno)
+    elif (not was_indented                               # must be column 1
             and toks[0].kind == 'IDENT'
             and toks[0].val not in KEYWORDS_NOT_LABELS
             and not (n > 1 and toks[1].kind == 'EQ')      # subject = repl, no label

@@ -133,6 +133,119 @@ static SnoVal _b_SIZE(SnoVal *a, int n) {
     return SNO_INT_VAL((int64_t)(s ? strlen(s) : 0));
 }
 
+/* Sprint 23: IDENT, DIFFER, HOST, ENDFILE, APPLY + string builtins as callable */
+static SnoVal _b_IDENT(SnoVal *a, int n) {
+    SnoVal x = (n > 0) ? a[0] : SNO_NULL_VAL;
+    SnoVal y = (n > 1) ? a[1] : SNO_NULL_VAL;
+    return sno_ident(x, y) ? SNO_NULL_VAL : SNO_FAIL_VAL;
+}
+static SnoVal _b_DIFFER(SnoVal *a, int n) {
+    SnoVal x = (n > 0) ? a[0] : SNO_NULL_VAL;
+    SnoVal y = (n > 1) ? a[1] : SNO_NULL_VAL;
+    return sno_differ(x, y) ? x : SNO_FAIL_VAL;
+}
+static SnoVal _b_HOST(SnoVal *a, int n) {
+    /* HOST(0) = command args string, HOST(1) = PID, HOST(3) = argc */
+    if (n < 1) return SNO_NULL_VAL;
+    int64_t selector = sno_to_int(a[0]);
+    if (selector == 0) return SNO_STR_VAL(GC_strdup(""));
+    if (selector == 1) {
+        char buf[32]; snprintf(buf, sizeof(buf), "%d", (int)getpid());
+        return SNO_STR_VAL(GC_strdup(buf));
+    }
+    if (selector == 3) return SNO_INT_VAL(0);
+    return SNO_NULL_VAL;
+}
+static SnoVal _b_ENDFILE(SnoVal *a, int n) {
+    (void)a; (void)n;
+    return SNO_FAIL_VAL;  /* not at EOF on any channel */
+}
+static SnoVal _b_APPLY(SnoVal *a, int n) {
+    if (n < 1) return SNO_NULL_VAL;
+    const char *fname = sno_to_str(a[0]);
+    return sno_apply(fname, a + 1, n - 1);
+}
+static SnoVal _b_LPAD(SnoVal *a, int n) {
+    if (n < 2) return n > 0 ? a[0] : SNO_NULL_VAL;
+    return sno_lpad_fn(a[0], a[1], n > 2 ? a[2] : SNO_STR_VAL(" "));
+}
+static SnoVal _b_RPAD(SnoVal *a, int n) {
+    if (n < 2) return n > 0 ? a[0] : SNO_NULL_VAL;
+    return sno_rpad_fn(a[0], a[1], n > 2 ? a[2] : SNO_STR_VAL(" "));
+}
+static SnoVal _b_CHAR(SnoVal *a, int n) {
+    if (n < 1) return SNO_NULL_VAL;
+    return sno_char_fn(a[0]);
+}
+static SnoVal _b_DUPL(SnoVal *a, int n) {
+    if (n < 2) return SNO_NULL_VAL;
+    return sno_dupl_fn(a[0], a[1]);
+}
+static SnoVal _b_REPLACE(SnoVal *a, int n) {
+    if (n < 3) return SNO_NULL_VAL;
+    return sno_replace_fn(a[0], a[1], a[2]);
+}
+static SnoVal _b_TRIM(SnoVal *a, int n) {
+    if (n < 1) return SNO_NULL_VAL;
+    return sno_trim_fn(a[0]);
+}
+static SnoVal _b_SUBSTR(SnoVal *a, int n) {
+    if (n < 3) return SNO_NULL_VAL;
+    return sno_substr_fn(a[0], a[1], a[2]);
+}
+static SnoVal _b_REVERSE(SnoVal *a, int n) {
+    if (n < 1) return SNO_NULL_VAL;
+    return sno_reverse_fn(a[0]);
+}
+static SnoVal _b_DATATYPE(SnoVal *a, int n) {
+    if (n < 1) return SNO_STR_VAL("STRING");
+    return SNO_STR_VAL((char*)sno_datatype(a[0]));
+}
+
+/* Sprint 23: counter stack and tree field accessors as callable SnoVal functions */
+static SnoVal _b_nPush(SnoVal *a, int n) {
+    (void)a; (void)n;
+    sno_npush();
+    return SNO_NULL_VAL;
+}
+static SnoVal _b_nInc(SnoVal *a, int n) {
+    (void)a; (void)n;
+    sno_ninc();
+    return SNO_INT_VAL(sno_ntop());
+}
+static SnoVal _b_nDec(SnoVal *a, int n) {
+    (void)a; (void)n;
+    sno_ndec();
+    return SNO_INT_VAL(sno_ntop());
+}
+static SnoVal _b_nTop(SnoVal *a, int n) {
+    (void)a; (void)n;
+    return SNO_INT_VAL(sno_ntop());
+}
+static SnoVal _b_nPop(SnoVal *a, int n) {
+    (void)a; (void)n;
+    int64_t val = sno_ntop();
+    sno_npop();
+    return SNO_INT_VAL(val);
+}
+/* Tree field accessors: n(x), t(x), v(x), c(x) */
+static SnoVal _b_tree_n(SnoVal *a, int n) {
+    if (n < 1) return SNO_INT_VAL(0);
+    return sno_field_get(a[0], "n");
+}
+static SnoVal _b_tree_t(SnoVal *a, int n) {
+    if (n < 1) return SNO_NULL_VAL;
+    return sno_field_get(a[0], "t");
+}
+static SnoVal _b_tree_v(SnoVal *a, int n) {
+    if (n < 1) return SNO_NULL_VAL;
+    return sno_field_get(a[0], "v");
+}
+static SnoVal _b_tree_c(SnoVal *a, int n) {
+    if (n < 1) return SNO_NULL_VAL;
+    return sno_field_get(a[0], "c");
+}
+
 void sno_runtime_init(void) {
     GC_INIT();
     /* Build &ALPHABET: all 256 chars in order */
@@ -144,15 +257,40 @@ void sno_runtime_init(void) {
 
     /* Register numeric comparison builtins */
     extern void sno_register_fn(const char *, SnoVal (*)(SnoVal*, int), int, int);
-    sno_register_fn("GT",      _b_GT,      2, 2);
-    sno_register_fn("LT",      _b_LT,      2, 2);
-    sno_register_fn("GE",      _b_GE,      2, 2);
-    sno_register_fn("LE",      _b_LE,      2, 2);
-    sno_register_fn("EQ",      _b_EQ,      2, 2);
-    sno_register_fn("NE",      _b_NE,      2, 2);
-    sno_register_fn("INTEGER", _b_INTEGER, 1, 1);
-    sno_register_fn("REAL",    _b_REAL,    1, 1);
-    sno_register_fn("SIZE",    _b_SIZE,    1, 1);
+    sno_register_fn("GT",       _b_GT,       2, 2);
+    sno_register_fn("LT",       _b_LT,       2, 2);
+    sno_register_fn("GE",       _b_GE,       2, 2);
+    sno_register_fn("LE",       _b_LE,       2, 2);
+    sno_register_fn("EQ",       _b_EQ,       2, 2);
+    sno_register_fn("NE",       _b_NE,       2, 2);
+    sno_register_fn("INTEGER",  _b_INTEGER,  1, 1);
+    sno_register_fn("REAL",     _b_REAL,     1, 1);
+    sno_register_fn("SIZE",     _b_SIZE,     1, 1);
+    /* Sprint 23: string predicates and host interface */
+    sno_register_fn("IDENT",    _b_IDENT,    0, 2);
+    sno_register_fn("DIFFER",   _b_DIFFER,   0, 2);
+    sno_register_fn("HOST",     _b_HOST,     1, 4);
+    sno_register_fn("ENDFILE",  _b_ENDFILE,  1, 1);
+    sno_register_fn("APPLY",    _b_APPLY,    1, 9);
+    sno_register_fn("LPAD",     _b_LPAD,     2, 3);
+    sno_register_fn("RPAD",     _b_RPAD,     2, 3);
+    sno_register_fn("CHAR",     _b_CHAR,     1, 1);
+    sno_register_fn("DUPL",     _b_DUPL,     2, 2);
+    sno_register_fn("REPLACE",  _b_REPLACE,  3, 3);
+    sno_register_fn("TRIM",     _b_TRIM,     1, 1);
+    sno_register_fn("SUBSTR",   _b_SUBSTR,   3, 3);
+    sno_register_fn("REVERSE",  _b_REVERSE,  1, 1);
+    sno_register_fn("DATATYPE", _b_DATATYPE, 1, 1);
+    /* Sprint 23: counter stack and tree field accessors */
+    sno_register_fn("nPush",    _b_nPush,    0, 0);
+    sno_register_fn("nInc",     _b_nInc,     0, 0);
+    sno_register_fn("nDec",     _b_nDec,     0, 0);
+    sno_register_fn("nTop",     _b_nTop,     0, 0);
+    sno_register_fn("nPop",     _b_nPop,     0, 0);
+    sno_register_fn("n",        _b_tree_n,   1, 1);
+    sno_register_fn("t",        _b_tree_t,   1, 1);
+    sno_register_fn("v",        _b_tree_v,   1, 1);
+    sno_register_fn("c",        _b_tree_c,   1, 1);
 }
 
 /* ============================================================
