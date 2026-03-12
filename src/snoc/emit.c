@@ -111,6 +111,8 @@ static void emit_cstr(const char *s) {
  * Value expression emission → SnoVal
  * ============================================================ */
 static void emit_expr(Expr *e);
+static void emit_pat(Expr *e);
+static int  expr_contains_pattern(Expr *e);
 
 static void emit_expr(Expr *e) {
     if (!e) { E("SNO_NULL_VAL"); return; }
@@ -148,14 +150,31 @@ static void emit_expr(Expr *e) {
 
     case E_NEG: E("sno_neg("); emit_expr(e->right); E(")"); break;
 
-    case E_CONCAT: E("sno_concat_sv("); emit_expr(e->left); E(","); emit_expr(e->right); E(")"); break;
+    case E_CONCAT:
+        /* If the concat tree contains any pattern-valued node, route the whole
+         * thing through emit_pat so we get sno_pat_cat instead of sno_concat_sv.
+         * This handles: snoParse = nPush() ARBNO(...) reduce(...) nPop()
+         * where the RHS is a pure assignment but the value is a pattern. */
+        if (expr_contains_pattern(e->left) || expr_contains_pattern(e->right)) {
+            emit_pat(e);
+        } else {
+            E("sno_concat_sv("); emit_expr(e->left); E(","); emit_expr(e->right); E(")");
+        }
+        break;
     case E_REDUCE: E("sno_apply(\"reduce\",(SnoVal[]){"); emit_expr(e->left); E(","); emit_expr(e->right); E("},2)"); break;
     case E_ADD:    E("sno_add(");    emit_expr(e->left); E(","); emit_expr(e->right); E(")"); break;
     case E_SUB:    E("sno_sub(");    emit_expr(e->left); E(","); emit_expr(e->right); E(")"); break;
     case E_MUL:    E("sno_mul(");    emit_expr(e->left); E(","); emit_expr(e->right); E(")"); break;
     case E_DIV:    E("sno_div(");    emit_expr(e->left); E(","); emit_expr(e->right); E(")"); break;
     case E_POW:    E("sno_pow(");    emit_expr(e->left); E(","); emit_expr(e->right); E(")"); break;
-    case E_ALT:    E("sno_alt(");    emit_expr(e->left); E(","); emit_expr(e->right); E(")"); break;
+    case E_ALT:
+        /* Same: if either side is pattern-valued, use sno_pat_alt */
+        if (expr_contains_pattern(e->left) || expr_contains_pattern(e->right)) {
+            E("sno_pat_alt("); emit_pat(e->left); E(","); emit_pat(e->right); E(")");
+        } else {
+            E("sno_alt("); emit_expr(e->left); E(","); emit_expr(e->right); E(")");
+        }
+        break;
 
     /* capture nodes — in value context, evaluate the child */
     case E_COND: emit_expr(e->left); break;
@@ -282,7 +301,13 @@ static void emit_pat(Expr *e) {
         #define B1v(nm,fn) if(strcasecmp(n,nm)==0&&e->nargs>=1){E(fn"(");emit_expr(e->args[0]);E(")");break;}
         B0("ARB","sno_pat_arb")  B0("REM","sno_pat_rem")
         B0("FAIL","sno_pat_fail") B0("ABORT","sno_pat_abort")
-        B0("FENCE","sno_pat_fence") B0("SUCCEED","sno_pat_succeed")
+        /* FENCE() = bare fence; FENCE(p) = fence with sub-pattern */
+        if(strcasecmp(n,"FENCE")==0){
+            if(e->nargs>=1){E("sno_pat_fence_p(");emit_pat(e->args[0]);E(")");}
+            else{E("sno_pat_fence()");}
+            break;
+        }
+        B0("SUCCEED","sno_pat_succeed")
         B0("BAL","sno_pat_bal")
         B1i("LEN","sno_pat_len")   B1i("POS","sno_pat_pos")
         B1i("RPOS","sno_pat_rpos") B1i("TAB","sno_pat_tab")
@@ -294,10 +319,17 @@ static void emit_pat(Expr *e) {
         #undef B1i
         #undef B1s
         #undef B1v
-        /* user-defined pattern function */
-        E("sno_pat_call(\"%s\"", n);
-        for (int i=0; i<e->nargs; i++) { E(","); emit_expr(e->args[i]); }
-        E(")");
+        /* user-defined pattern function — use sno_pat_user_call so the function
+         * fires at MATCH TIME (SPAT_USER_CALL materialisation), not at build time.
+         * This correctly handles nPush()/nPop() side effects per match attempt,
+         * and reduce()/shift() which return pattern objects at materialisation time. */
+        if (e->nargs == 0) {
+            E("sno_pat_user_call(\"%s\",NULL,0)", n);
+        } else {
+            E("sno_pat_user_call(\"%s\",(SnoVal[]){", n);
+            for (int i=0; i<e->nargs; i++) { if(i) E(","); emit_expr(e->args[i]); }
+            E("},%d)", e->nargs);
+        }
         break;
     }
 
@@ -451,6 +483,41 @@ static int is_pat_node(Expr *e) {
     return 0;
 }
 
+/* Recursively checks if any node in e's subtree indicates pattern context.
+ * Used to decide whether a pure assignment RHS should use emit_pat.
+ * Indicators: E_DEREF (*var — always a pattern ref), E_REDUCE (& — reduce()),
+ * E_COND (. capture), E_ALT (| alternation in pattern context), E_CALL to
+ * any pattern builtin including ARBNO/FENCE/etc. */
+/* Returns 1 if the expression subtree rooted at e contains ANY pattern-valued
+ * node.  Used by emit_expr to decide whether E_CONCAT / E_ALT should be routed
+ * through emit_pat (sno_pat_cat / sno_pat_alt) instead of the string path
+ * (sno_concat_sv / sno_alt).
+ *
+ * Key cases that are pattern-valued but NOT caught by is_pat_node:
+ *   - E_DEREF whose left child is E_VAR — "*varname" deferred pattern ref
+ *   - E_CONCAT or E_ALT whose subtree contains any of the above
+ */
+static int expr_contains_pattern(Expr *e) {
+    if (!e) return 0;
+    if (is_pat_node(e)) return 1;
+    /* *varname — deferred pattern ref */
+    if (e->kind == E_DEREF && e->left && e->left->kind == E_VAR) return 1;
+    /* *varname(arg) — parser misparse deref+concat */
+    if (e->kind == E_DEREF && e->left && e->left->kind == E_CALL) return 1;
+    /* recurse into children */
+    if (e->kind == E_CONCAT || e->kind == E_ALT || e->kind == E_MUL)
+        return expr_contains_pattern(e->left) || expr_contains_pattern(e->right);
+    if (e->kind == E_CALL) {
+        /* ARBNO, FENCE, etc. already caught by is_pat_builtin_call above.
+         * Also treat reduce/eval calls as pattern-valued when inside concat. */
+        if (e->sval && (strcasecmp(e->sval,"reduce")==0 || strcasecmp(e->sval,"eval")==0))
+            return 1;
+        for (int i = 0; i < e->nargs; i++)
+            if (expr_contains_pattern(e->args[i])) return 1;
+    }
+    return 0;
+}
+
 /* Walk the E_CONCAT left spine. When we find a right child that is_pat_node,
  * detach it and everything after it into the pattern.
  * Returns the extracted pattern root, or NULL if nothing found.
@@ -571,7 +638,15 @@ static void emit_stmt(Stmt *s, const char *fn) {
     /* ---- pure assignment: subject = replacement, no pattern ---- */
     if (!s->pattern && s->replacement) {
         int u=uid();
-        E("SnoVal _v%d = ", u); emit_expr(s->replacement); E(";\n");
+        /* If the RHS contains deferred refs (*var), reduce() calls (&), or
+         * pattern builtins (ARBNO/FENCE/etc.), emit in pattern context so
+         * E_CONCAT becomes sno_pat_cat and *var becomes sno_pat_ref.
+         * This handles: snoParse = nPush() ARBNO(*snoCommand) ... nPop() */
+        if (expr_contains_pattern(s->replacement)) {
+            E("SnoVal _v%d = ", u); emit_pat(s->replacement); E(";\n");
+        } else {
+            E("SnoVal _v%d = ", u); emit_expr(s->replacement); E(";\n");
+        }
         E("int _ok%d = !SNO_IS_FAIL(_v%d);\n", u, u);
         E("if(_ok%d) {\n", u);
         char rhs[32]; snprintf(rhs,sizeof rhs,"_v%d",u);
