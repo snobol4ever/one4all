@@ -6,8 +6,8 @@ This is the irgen.icn equivalent for SNOBOL4 patterns.
 Each pattern node gets four ports:
     α (alpha)  — entry / start
     β (beta)   — resume (backtrack re-entry)
-    γ (gamma)  — success continuation (inherited from parent)
-    ω (omega)  — failure continuation (inherited from parent)
+    γ (gamma)  — succeed continuation (inherited from parent)
+    ω (omega)  — concede continuation (inherited from parent)
 
 Usage:
     from lower import lower_pattern
@@ -57,8 +57,8 @@ def lower_pattern(node, alpha: Label, gamma: Label, omega: Label) -> List[Chunk]
     """Lower a pattern AST node to a list of Chunks.
 
     alpha — where to jump to start this node
-    gamma — where to jump on success
-    omega — where to jump on failure
+    gamma — where to jump on succeed
+    omega — where to jump on concede
     Returns a flat list of Chunk objects (basic blocks).
     """
     chunks: List[Chunk] = []
@@ -151,14 +151,14 @@ def _lower(node, alpha: Label, gamma: Label, omega: Label, out: List[Chunk]):
         # Wiring chunk: α → left_α
         out.append(Chunk(alpha, [Goto(left_α)]))
 
-        # Lower left: success → right_α, failure → omega
+        # Lower left: succeed → right_α, concede → omega
         _lower(node.left,  left_α,  right_α, omega,   out)
 
-        # Lower right: success → γ, failure → left_β
+        # Lower right: succeed → γ, concede → left_β
         # left_β is the beta label for the left child.
         # We need to recover it. Convention: the first Chunk in a lowered
         # subtree has its label as alpha. The beta label is alpha.name + "_β_N".
-        # Simpler: pass a "beta callback" or just have the right failure
+        # Simpler: pass a "beta callback" or just have the right concede
         # go to the left's alpha with a "resume" flag.
         # CLEANEST: introduce a dedicated left_β label and pass it explicitly.
         left_β = _fresh(f"{alpha.name}_Lβ_")
@@ -196,7 +196,7 @@ def lower_node(node) -> tuple:
 
 
 def emit_pattern_chunks(node, name: str, parent_γ: Label, parent_ω: Label) -> List[Chunk]:
-    """Full lowering: node with given success/failure continuations.
+    """Full lowering: node with given succeed/concede continuations.
     Returns flat Chunk list with all gotos resolved to parent_γ / parent_ω.
     """
     chunks: List[Chunk] = []
@@ -215,8 +215,8 @@ def _emit(node, α: Label, β: Label, γ: Label, ω: Label, out: List[Chunk]):
 
     α — this node's alpha (entry) label
     β — this node's beta  (resume/backtrack) label
-    γ — success continuation (parent's label to jump to on match)
-    ω — failure continuation (parent's label to jump to on fail)
+    γ — succeed continuation (parent's label to jump to on match)
+    ω — concede continuation (parent's label to jump to on fail)
     """
 
     # ------------------------------------------------------------------ Lit
@@ -278,9 +278,9 @@ def _emit(node, α: Label, β: Label, γ: Label, ω: Label, out: List[Chunk]):
         # β → right_β (first try resuming right; if right exhausted → left_β)
         out.append(Chunk(β, [Goto(right_β)]))
 
-        # Lower left: success → right_α, failure → ω
+        # Lower left: succeed → right_α, concede → ω
         _emit(node.left,  left_α,  left_β,  right_α, ω,      out)
-        # Lower right: success → γ, failure → left_β
+        # Lower right: succeed → γ, concede → left_β
         _emit(node.right, right_α, right_β, γ,       left_β, out)
         return
 
@@ -300,20 +300,20 @@ def _emit(node, α: Label, β: Label, γ: Label, ω: Label, out: List[Chunk]):
         left_β  = _fresh(f"{α.name}_Lβ")
         right_α = _fresh(f"{α.name}_Rα")
         right_β = _fresh(f"{α.name}_Rβ")
-        lg      = _fresh(f"{α.name}_Lγ")   # left success handler
-        rg      = _fresh(f"{α.name}_Rγ")   # right success handler
+        lg      = _fresh(f"{α.name}_Lγ")   # left succeed handler
+        rg      = _fresh(f"{α.name}_Rγ")   # right succeed handler
 
         out.append(Chunk(α,  [Goto(left_α)]))
         out.append(Chunk(β,  [IndirectGoto(t)]))
 
-        # left success: save left_β into t, goto γ
+        # left succeed: save left_β into t, goto γ
         out.append(Chunk(lg, [MoveLabel(t, left_β), Goto(γ)]))
-        # right success: save right_β into t, goto γ
+        # right succeed: save right_β into t, goto γ
         out.append(Chunk(rg, [MoveLabel(t, right_β), Goto(γ)]))
 
-        # Lower left: success → lg (which saves β and goes to γ), failure → right_α
+        # Lower left: succeed → lg (which saves β and goes to γ), concede → right_α
         _emit(node.left,  left_α,  left_β,  lg, right_α, out)
-        # Lower right: success → rg, failure → ω
+        # Lower right: succeed → rg, concede → ω
         _emit(node.right, right_α, right_β, rg, ω,       out)
         return
 
@@ -345,8 +345,8 @@ def _emit(node, α: Label, β: Label, γ: Label, ω: Label, out: List[Chunk]):
     # ------------------------------------------------------------------ Call
     if isinstance(node, Call):
         # Call a named pattern (compiled as a method elsewhere).
-        # α: call with entry=ALPHA; on success → γ; on failure → ω
-        # β: call with entry=BETA;  on success → γ; on failure → ω
+        # α: call with entry=ALPHA; on succeed → γ; on concede → ω
+        # β: call with entry=BETA;  on succeed → γ; on concede → ω
         out.append(Chunk(α, [("CALL_ALPHA", node.name, γ, ω)]))
         out.append(Chunk(β, [("CALL_BETA",  node.name, γ, ω)]))
         return
@@ -404,8 +404,8 @@ if __name__ == "__main__":
     # Test: POS(0) ARBNO('Bird' | 'Blue' | LEN(1)) RPOS(0)
     # This is the pattern from test_sno_1.c — gold standard.
 
-    success = Label("SUCCESS")
-    failure = Label("FAILURE")
+    succeed = Label("SUCCEED")
+    concede = Label("CONCEDE")
 
     # The full pattern as nested AST nodes
     pattern = Seq(
@@ -419,7 +419,7 @@ if __name__ == "__main__":
     α = Label("root_α")
     β = Label("root_β")
     chunks: List[Chunk] = []
-    _emit(pattern, α, β, success, failure, chunks)
+    _emit(pattern, α, β, succeed, concede, chunks)
 
     print(f"lower.py smoke test: {len(chunks)} chunks generated")
     for c in chunks:

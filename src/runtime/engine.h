@@ -4,7 +4,7 @@
  * Pure C.  No Python.  No external dependencies beyond the C standard library.
  *
  * This engine implements the Psi/Omega Byrd Box protocol:
- *   - PROCEED / SUCCESS / FAILURE / RECEDE — the four signals
+ *   - PROCEED / SUCCEED / CONCEDE / RECEDE — the four signals
  *   - Psi  — continuation stack (where to return on success)
  *   - Omega — backtrack stack (each entry owns a deep-copied Psi snapshot)
  *   - Dispatch: (node_type << 2 | signal) — one switch, no indirect calls
@@ -61,8 +61,8 @@ enum {
 
 /* The four Byrd Box signals */
 #define PROCEED 0
-#define SUCCESS 1
-#define FAILURE 2
+#define SUCCEED 1
+#define CONCEDE 2
 #define RECEDE  3
 
 /*======================================================================================

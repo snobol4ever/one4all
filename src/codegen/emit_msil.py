@@ -181,9 +181,9 @@ class MsilEmitter:
             return [f"/* unknown: {tag} */"]
 
     def generate(self, class_name: str, root_alpha: Label,
-                 success: Label, failure: Label, subject: str) -> str:
-        success_id = self.L(success)
-        failure_id = self.L(failure)
+                 succeed: Label, concede: Label, subject: str) -> str:
+        success_id = self.L(succeed)
+        failure_id = self.L(concede)
         root_id    = self.L(root_alpha)
 
         seen = set(); uniq_locals = []
@@ -241,15 +241,15 @@ def _cs_string(s: str) -> str:
 
 def compile_to_csharp(node, class_name: str = "SnoMatch",
                       subject: str = "BlueGoldBirdFish") -> str:
-    success = Label("SUCCESS")
-    failure = Label("FAILURE")
+    succeed = Label("SUCCEED")
+    concede = Label("CONCEDE")
     alpha   = Label("root_alpha")
     beta    = Label("root_beta")
     chunks  = []
-    lower_emit(node, alpha, beta, success, failure, chunks)
+    lower_emit(node, alpha, beta, succeed, concede, chunks)
     em = MsilEmitter()
     em.emit_chunks(chunks)
-    return em.generate(class_name, alpha, success, failure, subject)
+    return em.generate(class_name, alpha, succeed, concede, subject)
 
 
 # ---------------------------------------------------------------------------

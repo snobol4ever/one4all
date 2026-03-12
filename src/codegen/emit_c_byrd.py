@@ -163,7 +163,7 @@ class CByrdEmitter:
             self.L(f"{'':30s} }}                                 goto {gamma.name};")
 
         elif tag == "ARBNO_INIT":
-            # α: depth=0, go try child immediately (no zero-match success)
+            # α: depth=0, go try child immediately (no zero-match succeed)
             _, child_alpha = insn
             self.D(f"    int _arbno_depth = 0;")
             self.D(f"    int _arbno_stack[64];")
@@ -196,7 +196,7 @@ class CByrdEmitter:
         else:
             self.L(f"{prefix:30s} /* unknown prim: {tag} */")
 
-    def generate(self, root_alpha: Label, success: Label, failure: Label,
+    def generate(self, root_alpha: Label, succeed: Label, concede: Label,
                  subject: str = "BlueGoldBirdFish") -> str:
         safe_subj = subject.replace('\\', '\\\\').replace('"', '\\"')
         lines = []
@@ -223,9 +223,9 @@ class CByrdEmitter:
         lines.append('    /*----- code -----*/')
         for l in self.lines:
             lines.append('    ' + l)
-        lines.append(f'    {success.name}:')
+        lines.append(f'    {succeed.name}:')
         lines.append('        printf("Success!\\n"); return;')
-        lines.append(f'    {failure.name}:')
+        lines.append(f'    {concede.name}:')
         lines.append('        printf("Failure.\\n"); return;')
         lines.append('}')
         lines.append('#ifdef __GNUC__')
@@ -247,17 +247,17 @@ def compile_to_c(node, subject: str = "BlueGoldBirdFish",
     """Compile a pattern AST node to a complete C file."""
     import sys; sys.path.insert(0, os.path.dirname(__file__))
 
-    success = Label("SUCCESS")
-    failure = Label("FAILURE")
+    succeed = Label("SUCCEED")
+    concede = Label("CONCEDE")
     α = Label(f"{pattern_name}_α")
     β = Label(f"{pattern_name}_β")
 
     chunks: List[Chunk] = []
-    lower_emit(node, α, β, success, failure, chunks)
+    lower_emit(node, α, β, succeed, concede, chunks)
 
     em = CByrdEmitter()
     em.emit_chunks(chunks)
-    return em.generate(α, success, failure, subject=subject)
+    return em.generate(α, succeed, concede, subject=subject)
 
 
 # ---------------------------------------------------------------------------

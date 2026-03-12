@@ -245,8 +245,8 @@ int     sno_func_exists(const char *name);
  * ============================================================ */
 
 /* Return codes for statement execution */
-#define SNO_RETCODE_SUCCESS  0
-#define SNO_RETCODE_FAILURE  1
+#define SNO_RETCODE_SUCCEED  0
+#define SNO_RETCODE_CONCEDE  1
 #define SNO_GOTO     2   /* branch to specific label */
 #define SNO_RETURN   3   /* return from function */
 #define SNO_FRETURN  4   /* failure return from function */

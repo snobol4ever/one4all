@@ -323,147 +323,147 @@ MatchResult engine_match_ex(Pattern *root, const char *subject, int subject_len,
         case T_PI<<2|PROCEED:
             if (Z.ctx < Z.PI->n) { a = PROCEED; omega_push(&omega, &Z, &psi); z_down(&Z, &psi);              break; }
             else                 { a = RECEDE;   omega_pop(&omega, &Z, &psi);                                  break; }
-        case T_PI<<2|SUCCESS:    { a = SUCCESS;                                 z_up(&Z, &psi);                break; }
-        case T_PI<<2|FAILURE:    { a = PROCEED;                                 z_stay_next(&Z);               break; }
+        case T_PI<<2|SUCCEED:    { a = SUCCEED;                                 z_up(&Z, &psi);                break; }
+        case T_PI<<2|CONCEDE:    { a = PROCEED;                                 z_stay_next(&Z);               break; }
         case T_PI<<2|RECEDE:
             if (!Z.fenced)       { a = PROCEED;                                 z_stay_next(&Z);               break; }
-            else                 { a = FAILURE;                                 z_up_fail(&Z, &psi);           break; }
+            else                 { a = CONCEDE;                                 z_up_fail(&Z, &psi);           break; }
 /*--- Σ (sequence) ------------------------------------------------------------------*/
         case T_SIGMA<<2|PROCEED:
             if (Z.ctx < Z.PI->n) { a = PROCEED;                                z_down(&Z, &psi);              break; }
             else                 {
                 if (getenv("SNO_PAT_DEBUG") && Z.OMEGA <= 6)
-                    fprintf(stderr, "  SIGMA SUCCESS ctx=%d/%d delta=%d\n", Z.ctx, Z.PI->n, Z.delta);
-                a = SUCCESS;                                 z_up(&Z, &psi);                break; }
-        case T_SIGMA<<2|SUCCESS:
+                    fprintf(stderr, "  SIGMA SUCCEED ctx=%d/%d delta=%d\n", Z.ctx, Z.PI->n, Z.delta);
+                a = SUCCEED;                                 z_up(&Z, &psi);                break; }
+        case T_SIGMA<<2|SUCCEED:
             if (getenv("SNO_PAT_DEBUG") && Z.OMEGA <= 6)
-                fprintf(stderr, "  SIGMA<<SUCCESS ctx=%d/%d delta=%d\n", Z.ctx, Z.PI->n, Z.delta);
+                fprintf(stderr, "  SIGMA<<SUCCEED ctx=%d/%d delta=%d\n", Z.ctx, Z.PI->n, Z.delta);
             { a = PROCEED;                                 z_move_next(&Z);               break; }
-        case T_SIGMA<<2|FAILURE:
+        case T_SIGMA<<2|CONCEDE:
             if (getenv("SNO_PAT_DEBUG") && Z.OMEGA <= 6)
-                fprintf(stderr, "  SIGMA FAILURE ctx=%d/%d delta=%d\n", Z.ctx, Z.PI->n, Z.delta);
+                fprintf(stderr, "  SIGMA CONCEDE ctx=%d/%d delta=%d\n", Z.ctx, Z.PI->n, Z.delta);
             { a = RECEDE;   omega_pop(&omega, &Z, &psi);                                  break; }
 /*--- ρ (conjunction) ---------------------------------------------------------------*/
         case T_RHO<<2|PROCEED:
             if (Z.ctx < Z.PI->n) { a = PROCEED;                                z_down(&Z, &psi);              break; }
-            else                 { a = SUCCESS;                                 z_up(&Z, &psi);                break; }
-        case T_RHO<<2|SUCCESS:   { a = PROCEED;                                 z_stay_next(&Z);               break; }
-        case T_RHO<<2|FAILURE:   { a = RECEDE;   omega_pop(&omega, &Z, &psi);                                  break; }
+            else                 { a = SUCCEED;                                 z_up(&Z, &psi);                break; }
+        case T_RHO<<2|SUCCEED:   { a = PROCEED;                                 z_stay_next(&Z);               break; }
+        case T_RHO<<2|CONCEDE:   { a = RECEDE;   omega_pop(&omega, &Z, &psi);                                  break; }
 /*--- π (optional) ------------------------------------------------------------------*/
         case T_pi<<2|PROCEED:
-            if (Z.ctx == 0)      { a = SUCCESS;  omega_push(&omega, &Z, &psi); z_up(&Z, &psi);                break; }
+            if (Z.ctx == 0)      { a = SUCCEED;  omega_push(&omega, &Z, &psi); z_up(&Z, &psi);                break; }
             else if (Z.ctx == 1) { a = PROCEED;  omega_push(&omega, &Z, &psi); z_down_single(&Z, &psi);       break; }
             else                 { a = RECEDE;   omega_pop(&omega, &Z, &psi);                                  break; }
-        case T_pi<<2|SUCCESS:    { a = SUCCESS;                                 z_up(&Z, &psi);                break; }
-        case T_pi<<2|FAILURE:    { a = FAILURE;                                 z_up_fail(&Z, &psi);           break; }
+        case T_pi<<2|SUCCEED:    { a = SUCCEED;                                 z_up(&Z, &psi);                break; }
+        case T_pi<<2|CONCEDE:    { a = CONCEDE;                                 z_up_fail(&Z, &psi);           break; }
         case T_pi<<2|RECEDE:
             if (!Z.fenced)       { a = PROCEED;                                 z_stay_next(&Z);               break; }
-            else                 { a = FAILURE;                                 z_up_fail(&Z, &psi);           break; }
+            else                 { a = CONCEDE;                                 z_up_fail(&Z, &psi);           break; }
 /*--- ARBNO -------------------------------------------------------------------------*/
         case T_ARBNO<<2|PROCEED:
             if (getenv("SNO_PAT_DEBUG") && Z.OMEGA <= 6)
                 fprintf(stderr, "  ARBNO PROCEED ctx=%d DELTA=%d OMEGA=%d\n", Z.ctx, Z.DELTA, Z.OMEGA);
-            if (Z.ctx == 0)      { a = SUCCESS;  omega_push(&omega, &Z, &psi); z_up_track(&Z, &psi, &omega);  break; }
+            if (Z.ctx == 0)      { a = SUCCEED;  omega_push(&omega, &Z, &psi); z_up_track(&Z, &psi, &omega);  break; }
             else                 { a = PROCEED;  omega_push(&omega, &Z, &psi); z_down_single(&Z, &psi);       break; }
-        case T_ARBNO<<2|SUCCESS:
+        case T_ARBNO<<2|SUCCEED:
             if (getenv("SNO_PAT_DEBUG") && Z.OMEGA <= 6)
-                fprintf(stderr, "  ARBNO SUCCESS delta=%d OMEGA=%d\n", Z.delta, Z.OMEGA);
-            { a = SUCCESS;                                 z_up_track(&Z, &psi, &omega);  break; }
-        case T_ARBNO<<2|FAILURE: { a = RECEDE;   omega_pop(&omega, &Z, &psi);                                  break; }
+                fprintf(stderr, "  ARBNO SUCCEED delta=%d OMEGA=%d\n", Z.delta, Z.OMEGA);
+            { a = SUCCEED;                                 z_up_track(&Z, &psi, &omega);  break; }
+        case T_ARBNO<<2|CONCEDE: { a = RECEDE;   omega_pop(&omega, &Z, &psi);                                  break; }
         case T_ARBNO<<2|RECEDE:
             if (getenv("SNO_PAT_DEBUG") && Z.OMEGA <= 6)
                 fprintf(stderr, "  ARBNO RECEDE ctx=%d yielded=%d fenced=%d DELTA=%d\n", Z.ctx, Z.yielded, Z.fenced, Z.DELTA);
-            if (Z.fenced)        { a = FAILURE;                                 z_up_fail(&Z, &psi);           break; }
+            if (Z.fenced)        { a = CONCEDE;                                 z_up_fail(&Z, &psi);           break; }
             else if (Z.yielded)  { a = PROCEED;                                 z_move_next(&Z);               break; }
-            else                 { a = FAILURE;                                 z_up_fail(&Z, &psi);           break; }
+            else                 { a = CONCEDE;                                 z_up_fail(&Z, &psi);           break; }
 /*--- ARB ---------------------------------------------------------------------------*/
         case T_ARB<<2|PROCEED:
-            if (scan_ARB(&Z))    { a = SUCCESS;  omega_push(&omega, &Z, &psi); z_up(&Z, &psi);                break; }
+            if (scan_ARB(&Z))    { a = SUCCEED;  omega_push(&omega, &Z, &psi); z_up(&Z, &psi);                break; }
             else                 { a = RECEDE;   omega_pop(&omega, &Z, &psi);                                  break; }
         case T_ARB<<2|RECEDE:
             if (!Z.fenced)       { a = PROCEED;                                 z_stay_next(&Z);               break; }
-            else                 { a = FAILURE;                                 z_up_fail(&Z, &psi);           break; }
+            else                 { a = CONCEDE;                                 z_up_fail(&Z, &psi);           break; }
 /*--- BAL ---------------------------------------------------------------------------*/
         case T_BAL<<2|PROCEED:
-            if (scan_BAL(&Z))    { a = SUCCESS;  omega_push(&omega, &Z, &psi); z_up(&Z, &psi);                break; }
+            if (scan_BAL(&Z))    { a = SUCCEED;  omega_push(&omega, &Z, &psi); z_up(&Z, &psi);                break; }
             else                 { a = RECEDE;   omega_pop(&omega, &Z, &psi);                                  break; }
         case T_BAL<<2|RECEDE:
             if (!Z.fenced)       { a = PROCEED;                                 z_next(&Z);                    break; }
-            else                 { a = FAILURE;                                 z_up_fail(&Z, &psi);           break; }
+            else                 { a = CONCEDE;                                 z_up_fail(&Z, &psi);           break; }
 /*--- FENCE -------------------------------------------------------------------------*/
         case T_FENCE<<2|PROCEED:
-            if (Z.PI->n == 0)    { a = SUCCESS;  omega_push(&omega, &Z, &psi); z_up(&Z, &psi);                break; }
+            if (Z.PI->n == 0)    { a = SUCCEED;  omega_push(&omega, &Z, &psi); z_up(&Z, &psi);                break; }
             else                 { a = PROCEED;  Z.fenced = 1;                  z_down_single(&Z, &psi);       break; }
         case T_FENCE<<2|RECEDE:
             if (Z.PI->n == 0)    { a = RECEDE;   Z.PI = NULL;                                                  break; }
-            else                 { a = FAILURE;   Z.PI = NULL;                                                  break; }
-        case T_FENCE<<2|SUCCESS:
-            if (Z.PI->n == 1)    { a = SUCCESS;  Z.fenced = 0;                  z_up(&Z, &psi);               break; }
-            else                 { a = FAILURE;   Z.PI = NULL;                                                  break; }
-        case T_FENCE<<2|FAILURE:
-            if (Z.PI->n == 1)    { a = FAILURE;  Z.fenced = 0;                  z_up_fail(&Z, &psi);          break; }
-            else                 { a = FAILURE;   Z.PI = NULL;                                                  break; }
+            else                 { a = CONCEDE;   Z.PI = NULL;                                                  break; }
+        case T_FENCE<<2|SUCCEED:
+            if (Z.PI->n == 1)    { a = SUCCEED;  Z.fenced = 0;                  z_up(&Z, &psi);               break; }
+            else                 { a = CONCEDE;   Z.PI = NULL;                                                  break; }
+        case T_FENCE<<2|CONCEDE:
+            if (Z.PI->n == 1)    { a = CONCEDE;  Z.fenced = 0;                  z_up_fail(&Z, &psi);          break; }
+            else                 { a = CONCEDE;   Z.PI = NULL;                                                  break; }
 /*--- Control -----------------------------------------------------------------------*/
-        case T_ABORT<<2|PROCEED:   { a = FAILURE;  Z.PI = NULL;                                                break; }
-        case T_SUCCEED<<2|PROCEED: { a = SUCCESS;  omega_push(&omega, &Z, &psi); z_up(&Z, &psi);              break; }
+        case T_ABORT<<2|PROCEED:   { a = CONCEDE;  Z.PI = NULL;                                                break; }
+        case T_SUCCEED<<2|PROCEED: { a = SUCCEED;  omega_push(&omega, &Z, &psi); z_up(&Z, &psi);              break; }
         case T_SUCCEED<<2|RECEDE:
             if (!Z.fenced)         { a = PROCEED;                                z_stay_next(&Z);              break; }
-            else                   { a = FAILURE;                                z_up_fail(&Z, &psi);          break; }
-        case T_FAIL<<2|PROCEED:    { a = FAILURE;                                z_up_fail(&Z, &psi);          break; }
-        case T_EPSILON<<2|PROCEED: { a = SUCCESS;                                z_up(&Z, &psi);               break; }
+            else                   { a = CONCEDE;                                z_up_fail(&Z, &psi);          break; }
+        case T_FAIL<<2|PROCEED:    { a = CONCEDE;                                z_up_fail(&Z, &psi);          break; }
+        case T_EPSILON<<2|PROCEED: { a = SUCCEED;                                z_up(&Z, &psi);               break; }
 /*--- Leaf scanners -----------------------------------------------------------------*/
         case T_LITERAL<<2|PROCEED:
             if (scan_LITERAL(&Z)) {
                 if (getenv("SNO_PAT_DEBUG") && Z.OMEGA <= 6)
                     fprintf(stderr, "  LIT '%.*s' MATCH delta=%d\n", Z.PI->s_len, Z.PI->s, Z.delta);
-                a = SUCCESS; z_up(&Z, &psi);
+                a = SUCCEED; z_up(&Z, &psi);
             } else {
                 if (getenv("SNO_PAT_DEBUG") && Z.OMEGA <= 6 && Z.PI->s_len <= 4)
                     fprintf(stderr, "  LIT '%.*s' FAIL at delta=%d\n", Z.PI->s_len, Z.PI->s, Z.delta);
-                a = FAILURE; z_up_fail(&Z, &psi);
+                a = CONCEDE; z_up_fail(&Z, &psi);
             }
             break;
 
         case T_ANY<<2|PROCEED:
-            if (scan_ANY(&Z))      { a = SUCCESS; z_up(&Z, &psi); } else { a = FAILURE; z_up_fail(&Z, &psi); } break;
+            if (scan_ANY(&Z))      { a = SUCCEED; z_up(&Z, &psi); } else { a = CONCEDE; z_up_fail(&Z, &psi); } break;
         case T_NOTANY<<2|PROCEED:
-            if (scan_NOTANY(&Z))   { a = SUCCESS; z_up(&Z, &psi); } else { a = FAILURE; z_up_fail(&Z, &psi); } break;
+            if (scan_NOTANY(&Z))   { a = SUCCEED; z_up(&Z, &psi); } else { a = CONCEDE; z_up_fail(&Z, &psi); } break;
         case T_SPAN<<2|PROCEED:
-            if (scan_SPAN(&Z))     { a = SUCCESS; z_up(&Z, &psi); } else { a = FAILURE; z_up_fail(&Z, &psi); } break;
+            if (scan_SPAN(&Z))     { a = SUCCEED; z_up(&Z, &psi); } else { a = CONCEDE; z_up_fail(&Z, &psi); } break;
         case T_BREAK<<2|PROCEED:
             if (scan_BREAK(&Z)) {
                 if (getenv("SNO_PAT_DEBUG") && Z.OMEGA <= 6)
                     fprintf(stderr, "  BREAK MATCH delta=%d chars='%.8s'\n", Z.delta, Z.PI->chars);
-                a = SUCCESS; z_up(&Z, &psi);
+                a = SUCCEED; z_up(&Z, &psi);
             } else {
                 if (getenv("SNO_PAT_DEBUG") && Z.OMEGA <= 6)
                     fprintf(stderr, "  BREAK FAIL at delta=%d chars='%.8s'\n", Z.delta, Z.PI->chars);
-                a = FAILURE; z_up_fail(&Z, &psi);
+                a = CONCEDE; z_up_fail(&Z, &psi);
             }
             break;
         case T_POS<<2|PROCEED:
-            if (scan_POS(&Z))      { a = SUCCESS; z_up(&Z, &psi); } else { a = FAILURE; z_up_fail(&Z, &psi); } break;
+            if (scan_POS(&Z))      { a = SUCCEED; z_up(&Z, &psi); } else { a = CONCEDE; z_up_fail(&Z, &psi); } break;
         case T_RPOS<<2|PROCEED:
-            if (scan_RPOS(&Z))     { a = SUCCESS; z_up(&Z, &psi); } else { a = FAILURE; z_up_fail(&Z, &psi); } break;
+            if (scan_RPOS(&Z))     { a = SUCCEED; z_up(&Z, &psi); } else { a = CONCEDE; z_up_fail(&Z, &psi); } break;
         case T_LEN<<2|PROCEED:
-            if (scan_LEN(&Z))      { a = SUCCESS; z_up(&Z, &psi); } else { a = FAILURE; z_up_fail(&Z, &psi); } break;
+            if (scan_LEN(&Z))      { a = SUCCEED; z_up(&Z, &psi); } else { a = CONCEDE; z_up_fail(&Z, &psi); } break;
         case T_TAB<<2|PROCEED:
-            if (scan_TAB(&Z))      { a = SUCCESS; z_up(&Z, &psi); } else { a = FAILURE; z_up_fail(&Z, &psi); } break;
+            if (scan_TAB(&Z))      { a = SUCCEED; z_up(&Z, &psi); } else { a = CONCEDE; z_up_fail(&Z, &psi); } break;
         case T_RTAB<<2|PROCEED:
-            if (scan_RTAB(&Z))     { a = SUCCESS; z_up(&Z, &psi); } else { a = FAILURE; z_up_fail(&Z, &psi); } break;
+            if (scan_RTAB(&Z))     { a = SUCCEED; z_up(&Z, &psi); } else { a = CONCEDE; z_up_fail(&Z, &psi); } break;
         case T_REM<<2|PROCEED:
-            if (scan_REM(&Z))      { a = SUCCESS; z_up(&Z, &psi); } else { a = FAILURE; z_up_fail(&Z, &psi); } break;
+            if (scan_REM(&Z))      { a = SUCCEED; z_up(&Z, &psi); } else { a = CONCEDE; z_up_fail(&Z, &psi); } break;
         case T_ALPHA<<2|PROCEED:
-            if (scan_ALPHA(&Z))    { a = SUCCESS; z_up(&Z, &psi); } else { a = FAILURE; z_up_fail(&Z, &psi); } break;
+            if (scan_ALPHA(&Z))    { a = SUCCEED; z_up(&Z, &psi); } else { a = CONCEDE; z_up_fail(&Z, &psi); } break;
         case T_OMEGA<<2|PROCEED:
-            if (scan_OMEGA(&Z))    { a = SUCCESS; z_up(&Z, &psi); } else { a = FAILURE; z_up_fail(&Z, &psi); } break;
+            if (scan_OMEGA(&Z))    { a = SUCCEED; z_up(&Z, &psi); } else { a = CONCEDE; z_up_fail(&Z, &psi); } break;
 /*--- MARB --------------------------------------------------------------------------*/
         case T_MARB<<2|PROCEED:
-            if (scan_ARB(&Z))      { a = SUCCESS; omega_push(&omega, &Z, &psi); z_up(&Z, &psi); break; }
+            if (scan_ARB(&Z))      { a = SUCCEED; omega_push(&omega, &Z, &psi); z_up(&Z, &psi); break; }
             else                   { a = RECEDE;  omega_pop(&omega, &Z, &psi);                   break; }
         case T_MARB<<2|RECEDE:
             if (!Z.fenced)         { a = PROCEED;                                z_stay_next(&Z); break; }
-            else                   { a = FAILURE;                                z_up_fail(&Z, &psi); break; }
+            else                   { a = CONCEDE;                                z_up_fail(&Z, &psi); break; }
 /*--- T_CAPTURE (capture the span matched by child) ---------------------------------*/
         case T_CAPTURE<<2|PROCEED: {
             /* Record start, push omega for potential backtrack, descend into child */
@@ -476,40 +476,40 @@ MatchResult engine_match_ex(Pattern *root, const char *subject, int subject_len,
             a = PROCEED;
             break;
         }
-        case T_CAPTURE<<2|SUCCESS:
+        case T_CAPTURE<<2|SUCCEED:
             /* Child matched: fire callback with (cap_slot, start, delta_end).
              * Z.delta = uncommitted cursor after child's match. */
             if (getenv("SNO_PAT_DEBUG"))
-                fprintf(stderr, "  T_CAPTURE SUCCESS slot=%d delta=%d (cap_start=%d) psi_depth=%d\n",
+                fprintf(stderr, "  T_CAPTURE SUCCEED slot=%d delta=%d (cap_start=%d) psi_depth=%d\n",
                     Z.PI->n, Z.delta, Z.cap_start, psi.count);
             if (Z.cap_fn)
                 Z.cap_fn(Z.PI->n, Z.cap_start, Z.delta, Z.cap_data);
-            a = SUCCESS;
+            a = SUCCEED;
             z_up(&Z, &psi);
             if (getenv("SNO_PAT_DEBUG") && Z.PI)
-                fprintf(stderr, "  T_CAPTURE SUCCESS: after z_up, Z.PI->type=%d Z.ctx=%d\n", Z.PI->type, Z.ctx);
+                fprintf(stderr, "  T_CAPTURE SUCCEED: after z_up, Z.PI->type=%d Z.ctx=%d\n", Z.PI->type, Z.ctx);
             break;
-        case T_CAPTURE<<2|FAILURE:
+        case T_CAPTURE<<2|CONCEDE:
             if (getenv("SNO_PAT_DEBUG"))
-                fprintf(stderr, "  T_CAPTURE FAILURE slot=%d\n", Z.PI->n);
+                fprintf(stderr, "  T_CAPTURE CONCEDE slot=%d\n", Z.PI->n);
             a = RECEDE;
             omega_pop(&omega, &Z, &psi);
             break;
         case T_CAPTURE<<2|RECEDE:
             if (getenv("SNO_PAT_DEBUG"))
                 fprintf(stderr, "  T_CAPTURE RECEDE slot=%d\n", Z.PI->n);
-            a = FAILURE;
+            a = CONCEDE;
             z_up_fail(&Z, &psi);
             break;
 /*-----------------------------------------------------------------------------------*/
         default:
-            a = FAILURE;
+            a = CONCEDE;
             Z.PI = NULL;
             break;
         }
     }
 
-    if (a == SUCCESS) {
+    if (a == SUCCEED) {
         result.matched = 1;
         result.start   = 0;
         result.end     = Z.delta;
