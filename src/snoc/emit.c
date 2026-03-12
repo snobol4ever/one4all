@@ -141,6 +141,7 @@ static void emit_expr(Expr *e) {
     case E_NEG: E("sno_neg("); emit_expr(e->right); E(")"); break;
 
     case E_CONCAT: E("sno_concat("); emit_expr(e->left); E(","); emit_expr(e->right); E(")"); break;
+    case E_REDUCE: E("sno_apply(\"reduce\",(SnoVal[]){"); emit_expr(e->left); E(","); emit_expr(e->right); E("},2)"); break;
     case E_ADD:    E("sno_add(");    emit_expr(e->left); E(","); emit_expr(e->right); E(")"); break;
     case E_SUB:    E("sno_sub(");    emit_expr(e->left); E(","); emit_expr(e->right); E(")"); break;
     case E_MUL:    E("sno_mul(");    emit_expr(e->left); E(","); emit_expr(e->right); E(")"); break;
@@ -228,6 +229,10 @@ static void emit_pat(Expr *e) {
 
     case E_CONCAT:
         E("sno_pat_cat("); emit_pat(e->left); E(","); emit_pat(e->right); E(")"); break;
+
+    case E_REDUCE:
+        /* & in pattern context: reduce(left, right) — returns a pattern */
+        E("sno_var_as_pattern(sno_apply(\"reduce\",(SnoVal[]){"); emit_expr(e->left); E(","); emit_expr(e->right); E("},2))"); break;
 
     case E_ALT:
         E("sno_pat_alt("); emit_pat(e->left); E(","); emit_pat(e->right); E(")"); break;
@@ -410,8 +415,9 @@ static int is_pat_builtin_call(Expr *e) {
 static int is_pat_node(Expr *e) {
     if (!e) return 0;
     if (is_pat_builtin_call(e)) return 1;
-    if (e->kind == E_COND) return 1;  /* .var capture */
-    if (e->kind == E_ALT)  return 1;  /* | alternation */
+    if (e->kind == E_COND)   return 1;  /* .var capture */
+    if (e->kind == E_ALT)    return 1;  /* | alternation */
+    if (e->kind == E_REDUCE) return 1;  /* & reduce() call — always pattern context */
     return 0;
 }
 
@@ -492,22 +498,28 @@ static Expr *split_subject_pattern(Expr *e, Expr **subj_out) {
  * where the subject absorbed the pattern (no '=' present).
  * Returns 1 if the stmt was repaired. */
 static int maybe_fix_pattern_stmt(Stmt *s) {
-    /* Only attempt when: no pattern was parsed AND (replacement is E_NULL or NULL)
-     * AND there is a goto — the common pattern-match form. */
-    if (s->pattern) return 0;   /* already has a pattern */
     if (!s->subject) return 0;  /* no subject */
-    /* Heuristic: if replacement is NULL (no =) or E_NULL (bare =), try to split */
+    /* Heuristic: if replacement is non-null non-E_NULL, this is a plain assignment,
+     * not a pattern match. Skip. */
     if (s->replacement && s->replacement->kind != E_NULL) return 0;
 
     Expr *new_subj = NULL;
     Expr *new_pat  = split_subject_pattern(s->subject, &new_subj);
-    if (!new_pat) return 0;  /* no pattern found in subject */
 
-    s->subject     = new_subj;
-    s->pattern     = new_pat;
-    /* If replacement was E_NULL (bare =), keep it as empty replacement (delete matched).
-     * If it was NULL (no =), leave it NULL (just match, no replace). */
-    return 1;
+    if (!new_pat && !s->pattern) return 0;  /* nothing to fix */
+
+    if (new_pat) {
+        s->subject = new_subj;
+        if (s->pattern) {
+            /* Pattern already parsed (e.g. RPOS(0) at end). Prepend extracted
+             * pattern from subject in front of the existing s->pattern. */
+            s->pattern = make_concat(new_pat, s->pattern);
+        } else {
+            s->pattern = new_pat;
+        }
+        return 1;
+    }
+    return 0;
 }
 
 /* ============================================================

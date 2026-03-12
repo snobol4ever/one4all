@@ -146,7 +146,7 @@ opt_goto  : /* empty */ { $$=NULL; } | COLON goto_clauses { $$=$2; } ;
 expr
     : term                  { $$=$1; }
     | expr term             { $$=binop(E_CONCAT,$1,$2); }   /* juxtaposition */
-    | expr AMP term         { $$=binop(E_CONCAT,$1,$3); }   /* & = concat */
+    | expr AMP term         { $$=binop(E_REDUCE,$1,$3); }   /* & = reduce() call */
     | expr PLUS  term       { $$=binop(E_ADD,$1,$3); }
     | expr MINUS term       { $$=binop(E_SUB,$1,$3); }
     | expr PIPE  term       { $$=binop(E_ALT,$1,$3); }      /* | pattern alt in value ctx */
