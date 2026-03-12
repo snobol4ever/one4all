@@ -18,6 +18,7 @@
 
 /* Forward declarations */
 static int is_io_name(const char *name);
+static int is_defined_function(const char *name);
 static void emit_assign_target(Expr *lhs, const char *rhs_str);
 static void emit_assign_target_io(Expr *lhs, const char *rhs_str);
 
@@ -134,8 +135,10 @@ static void emit_expr(Expr *e) {
         } else if (e->left->kind == E_VAR) {
             /* *varname — deferred pattern reference (resolved at match time) */
             E("sno_var_as_pattern(sno_pat_ref(\"%s\"))", e->left->sval);
-        } else if (e->left->kind == E_CALL && e->left->nargs == 1) {
-            /* *varname(arg) — parser misparse: *varname concatenated with (arg).
+        } else if (e->left->kind == E_CALL && e->left->nargs >= 1
+                   && !is_defined_function(e->left->sval)) {
+            fprintf(stderr, "EMIT_EXPR_DEREF_FIXUP: sval=%s nargs=%d\n", e->left->sval?e->left->sval:"NULL", e->left->nargs);
+            /* *varname(arg...) — parser misparse: *varname concatenated with (arg).
              * SNOBOL4 continuation lines cause the parser to greedily consume the
              * next '(' as a function-call argument to varname.  The correct
              * semantics are: deferred-ref(*varname) cat arg. */
@@ -151,15 +154,12 @@ static void emit_expr(Expr *e) {
     case E_NEG: E("sno_neg("); emit_expr(e->right); E(")"); break;
 
     case E_CONCAT:
-        /* If the concat tree contains any pattern-valued node, route the whole
-         * thing through emit_pat so we get sno_pat_cat instead of sno_concat_sv.
-         * This handles: snoParse = nPush() ARBNO(...) reduce(...) nPop()
-         * where the RHS is a pure assignment but the value is a pattern. */
-        if (expr_contains_pattern(e->left) || expr_contains_pattern(e->right)) {
-            emit_pat(e);
-        } else {
-            E("sno_concat_sv("); emit_expr(e->left); E(","); emit_expr(e->right); E(")");
-        }
+        E("sno_concat_sv("); emit_expr(e->left); E(","); emit_expr(e->right); E(")");
+        break;
+
+    case E_PAT_CAT:
+        /* Pattern concat in value context — emit as pattern value */
+        E("sno_pat_cat("); emit_pat(e->left); E(","); emit_pat(e->right); E(")");
         break;
     case E_REDUCE: E("sno_apply(\"reduce\",(SnoVal[]){"); emit_expr(e->left); E(","); emit_expr(e->right); E("},2)"); break;
     case E_ADD:    E("sno_add(");    emit_expr(e->left); E(","); emit_expr(e->right); E(")"); break;
@@ -247,10 +247,15 @@ static void emit_pat(Expr *e) {
 
     case E_DEREF:
         /* *X — deferred pattern reference */
+        fprintf(stderr, "EMIT_PAT_DEREF: left=%p left.kind=%d left.sval=%s left.nargs=%d right=%p\n", (void*)e->left, e->left?e->left->kind:-1, (e->left&&e->left->sval)?e->left->sval:"NULL", e->left?e->left->nargs:-1, (void*)e->right);
+        if (e->left && e->left->sval && (strcasecmp(e->left->sval,"snoXList")==0 || strcasecmp(e->left->sval,"reduce")==0))
+            fprintf(stderr, "EMIT_PAT E_DEREF: left.kind=%d left.sval=%s left.nargs=%d\n", e->left->kind, e->left->sval?e->left->sval:"NULL", e->left->nargs);
         if (e->left && e->left->kind == E_VAR)
             E("sno_pat_ref(\"%s\")", e->left->sval);
-        else if (e->left && e->left->kind == E_CALL && e->left->nargs == 1) {
-            /* *varname(arg) — continuation-line misparse: deref-ref cat arg */
+        else if (e->left && e->left->kind == E_CALL && e->left->nargs >= 1
+                 && !is_defined_function(e->left->sval)) {
+            /* *varname(arg...) — continuation-line misparse: deref-ref cat arg
+             * Only applies when varname is NOT a known function (it's a pat var). */
             E("sno_pat_cat(sno_pat_ref(\"%s\"),", e->left->sval);
             emit_pat(e->left->args[0]);
             E(")");
@@ -260,6 +265,7 @@ static void emit_pat(Expr *e) {
         break;
 
     case E_CONCAT:
+    case E_PAT_CAT:
         E("sno_pat_cat("); emit_pat(e->left); E(","); emit_pat(e->right); E(")"); break;
 
     case E_MUL:
@@ -272,8 +278,12 @@ static void emit_pat(Expr *e) {
         E(")"); break;
 
     case E_REDUCE:
-        /* & in pattern context: reduce(left, right) — returns a pattern */
-        E("sno_var_as_pattern(sno_apply(\"reduce\",(SnoVal[]){"); emit_expr(e->left); E(","); emit_expr(e->right); E("},2))"); break;
+        /* & in pattern context: reduce(left, right) — must fire at MATCH TIME.
+         * reduce() calls EVAL("epsilon . *Reduce(t, n)") where n may contain
+         * nTop() — which must be evaluated at match time, not build time.
+         * Use sno_pat_user_call to defer the call until the engine executes
+         * this node during pattern matching. */
+        E("sno_pat_user_call(\"reduce\",(SnoVal[]){"); emit_expr(e->left); E(","); emit_expr(e->right); E("},2)"); break;
 
     case E_ALT:
         E("sno_pat_alt("); emit_pat(e->left); E(","); emit_pat(e->right); E(")"); break;
@@ -322,13 +332,52 @@ static void emit_pat(Expr *e) {
         /* user-defined pattern function — use sno_pat_user_call so the function
          * fires at MATCH TIME (SPAT_USER_CALL materialisation), not at build time.
          * This correctly handles nPush()/nPop() side effects per match attempt,
-         * and reduce()/shift() which return pattern objects at materialisation time. */
+         * and reduce()/shift() which return pattern objects at materialisation time.
+         *
+         * EXCEPTION: if name is NOT a known/defined function AND has args, the
+         * parser has misinterpreted  var(pat)  as a function call.  In SNOBOL4,
+         * a variable followed by a parenthesised expression is CONCATENATION, not
+         * a call.  Emit: sno_pat_cat(sno_pat_var(n), emit_pat(args[0])) instead. */
+        if (e->nargs > 0 && !is_defined_function(n)) {
+            /* variable(args) → CONCAT(var, grouped_pat) */
+            E("sno_pat_cat(sno_pat_var(\"%s\"),", n);
+            if (e->nargs == 1) {
+                emit_pat(e->args[0]);
+            } else {
+                /* Multiple args: emit as successive concatenations */
+                for (int i = 0; i < e->nargs; i++) {
+                    if (i < e->nargs - 1) E("sno_pat_cat(");
+                }
+                emit_pat(e->args[0]);
+                for (int i = 1; i < e->nargs; i++) { E(","); emit_pat(e->args[i]); E(")"); }
+            }
+            E(")");
+            break;
+        }
         if (e->nargs == 0) {
             E("sno_pat_user_call(\"%s\",NULL,0)", n);
         } else {
-            E("sno_pat_user_call(\"%s\",(SnoVal[]){", n);
-            for (int i=0; i<e->nargs; i++) { if(i) E(","); emit_expr(e->args[i]); }
-            E("},%d)", e->nargs);
+            /* Pattern-constructor functions are called eagerly at BUILD TIME.
+             * They return a SnoVal of type PATTERN — wrap with sno_var_as_pattern.
+             * reduce(t,n), shift(p,t), EVAL(s) → build-time call → sno_apply.
+             * Side-effect functions (nPush, nPop, nInc, Reduce, Shift, TZ, etc.)
+             * must fire at MATCH TIME → stay as sno_pat_user_call. */
+            static const char *_build_time_fns[] = {
+                "reduce", "shift", "EVAL", NULL
+            };
+            int _is_build = 0;
+            for (int _ci = 0; _build_time_fns[_ci]; _ci++) {
+                if (strcasecmp(n, _build_time_fns[_ci]) == 0) { _is_build = 1; break; }
+            }
+            if (_is_build) {
+                E("sno_var_as_pattern(sno_apply(\"%s\",(SnoVal[]){", n);
+                for (int i=0; i<e->nargs; i++) { if(i) E(","); emit_expr(e->args[i]); }
+                E("},%d))", e->nargs);
+            } else {
+                E("sno_pat_user_call(\"%s\",(SnoVal[]){", n);
+                for (int i=0; i<e->nargs; i++) { if(i) E(","); emit_expr(e->args[i]); }
+                E("},%d)", e->nargs);
+            }
         }
         break;
     }
@@ -397,9 +446,18 @@ static void emit_goto_target(const char *label, const char *fn) {
         if (in_main) { E("goto _SNO_END"); return; }
         E("goto _SNO_RETURN_%s", fn); return;
     }
-    else if (strcasecmp(label,"FRETURN")==0 || strcasecmp(label,"NRETURN")==0) {
+    else if (strcasecmp(label,"FRETURN")==0) {
         if (in_main) { E("goto _SNO_END"); return; }
         E("goto _SNO_FRETURN_%s", fn); return;
+    }
+    else if (strcasecmp(label,"NRETURN")==0) {
+        /* NRETURN = successful return. The function has already assigned its
+         * return variable and done its side effects. The NAME distinction
+         * (returning an l-value reference) is not implemented, but the function
+         * must SUCCEED — not fail. Routing to FRETURN was causing Shift/Reduce
+         * and all side-effect functions to fail every call. */
+        if (in_main) { E("goto _SNO_END"); return; }
+        E("goto _SNO_RETURN_%s", fn); return;
     }
     else if (strcasecmp(label,"END")    ==0) {
         if (!in_main) { E("goto _SNO_FRETURN_%s", fn); return; }
@@ -499,6 +557,7 @@ static int is_pat_node(Expr *e) {
  */
 static int expr_contains_pattern(Expr *e) {
     if (!e) return 0;
+    if (e->kind == E_PAT_CAT) return 1;  /* always pattern context */
     if (is_pat_node(e)) return 1;
     /* *varname — deferred pattern ref */
     if (e->kind == E_DEREF && e->left && e->left->kind == E_VAR) return 1;
@@ -805,6 +864,34 @@ typedef struct {
 
 static FnDef fn_table[FN_MAX];
 static int   fn_count = 0;
+
+/* Returns 1 if 'name' is a user-defined function (present in fn_table) or a
+ * known SNOBOL4 standard library function.  Used to distinguish CALL from
+ * variable-concatenation-with-grouping: in SNOBOL4, nl('+') where nl is a
+ * variable (not a function) means CONCAT(nl, '+'), not a function call. */
+static int is_defined_function(const char *name) {
+    if (name && (strcasecmp(name,"snoXList")==0 || strcasecmp(name,"snoX3")==0)) fprintf(stderr, "DEBUG is_defined_function(%s)\n", name);
+    static const char *std[] = {
+        "APPLY","ARG","ARRAY","ATAN","BACKSPACE","BREAK","BREAKX",
+        "CHAR","CHOP","CLEAR","CODE","COLLECT","CONVERT","COPY","COS",
+        "DATA","DATATYPE","DATE","DEFINE","DETACH","DIFFER","DUMP","DUPL",
+        "EJECT","ENDFILE","EQ","EVAL","EXIT","EXP","FENCE","FIELD",
+        "GE","GT","HOST","IDENT","INPUT","INTEGER","ITEM",
+        "LE","LEN","LEQ","LGE","LGT","LLE","LLT","LN","LNE","LOAD",
+        "LOCAL","LPAD","LT","NE","NOTANY","OPSYN","OUTPUT",
+        "POS","PROTOTYPE","REMDR","REPLACE","REVERSE","REWIND","RPAD",
+        "RPOS","RSORT","RTAB","SET","SETEXIT","SIN","SIZE","SORT","SPAN",
+        "SQRT","STOPTR","SUBSTR","TAB","TRACE","TRIM","UNLOAD","UCASE","LCASE",
+        "ANY","ARB","ARBNO","BAL","FAIL","ABORT","REM","SUCCEED",
+        "ICASE","UCASE","LCASE","REVERSE","REPLACE","DUPL","LPAD","RPAD",
+        NULL
+    };
+    for (int i = 0; std[i]; i++)
+        if (strcasecmp(name, std[i]) == 0) return 1;
+    for (int i = 0; i < fn_count; i++)
+        if (strcasecmp(fn_table[i].name, name) == 0) return 1;
+    return 0;
+}
 
 /* cur_fn_def: set to the current FnDef* during emit_fn, NULL during emit_main */
 static FnDef *cur_fn_def = NULL;
