@@ -605,6 +605,26 @@ static void apply_captures(MatchCtx *ctx) {
  * sno_match_pattern — top-level match entry point
  * ===================================================================== */
 
+/* Callback for T_VARREF resolution: look up variable by name and materialise.
+ * userdata is MatchCtx*. Returns epsilon if variable not set or not a pattern. */
+static Pattern *var_resolve_callback(const char *name, void *userdata) {
+    MatchCtx *ctx = (MatchCtx *)userdata;
+    SnoVal v = sno_var_get(name);
+    if (v.type != SNO_PATTERN) {
+        /* not a pattern — return epsilon */
+        Pattern *ep = pattern_alloc(&ctx->pl);
+        ep->type = T_EPSILON;
+        return ep;
+    }
+    SnoPattern *sp = spat_of(v);
+    if (!sp) {
+        Pattern *ep = pattern_alloc(&ctx->pl);
+        ep->type = T_EPSILON;
+        return ep;
+    }
+    return materialise(sp, ctx);
+}
+
 /* Internal: try match at a single starting offset. Returns match end (>=start) or -1. */
 static int try_match_at(SnoPattern *sp, const char *subject, int slen, int start, MatchCtx *ctx) {
     ctx->scan_start = start;
@@ -612,6 +632,8 @@ static int try_match_at(SnoPattern *sp, const char *subject, int slen, int start
     EngineOpts opts;
     opts.cap_fn   = (ctx->ncaptures > 0) ? capture_callback : NULL;
     opts.cap_data = ctx;
+    opts.var_fn   = var_resolve_callback;
+    opts.var_data = ctx;
     MatchResult mr = engine_match_ex(root, subject + start, slen - start, &opts);
     if (getenv("SNO_PAT_DEBUG") && slen < 20)
         fprintf(stderr, "  try_match_at: start=%d slen=%d -> matched=%d end=%d\n",

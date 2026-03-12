@@ -81,6 +81,9 @@ typedef struct {
     CaptureFn       cap_fn;
     void           *cap_data;
     int             cap_start;  /* DELTA at the point T_CAPTURE entered its child */
+    /* Variable-resolve support for T_VARREF (deferred pattern refs inside ARBNO) */
+    VarResolveFn    var_fn;
+    void           *var_data;
 } State;
 
 /*======================================================================================
@@ -309,6 +312,8 @@ MatchResult engine_match_ex(Pattern *root, const char *subject, int subject_len,
     Z.PI       = root;
     Z.cap_fn   = opts ? opts->cap_fn   : NULL;
     Z.cap_data = opts ? opts->cap_data : NULL;
+    Z.var_fn   = opts ? opts->var_fn   : NULL;
+    Z.var_data = opts ? opts->var_data : NULL;
 
     int _iter = 0;
     while (Z.PI) {
@@ -412,6 +417,26 @@ MatchResult engine_match_ex(Pattern *root, const char *subject, int subject_len,
             else                   { a = CONCEDE;                                z_up_fail(&Z, &psi);          break; }
         case T_FAIL<<2|PROCEED:    { a = CONCEDE;                                z_up_fail(&Z, &psi);          break; }
         case T_EPSILON<<2|PROCEED: { a = SUCCEED;                                z_up(&Z, &psi);               break; }
+/*--- T_VARREF: deferred variable pattern ref (used inside ARBNO for recursive grammars) ---*/
+        case T_VARREF<<2|PROCEED: {
+            /* Resolve the variable name to a Pattern* at match time */
+            Pattern *resolved = Z.var_fn ? Z.var_fn(Z.PI->s, Z.var_data) : NULL;
+            if (!resolved || resolved->type == T_EPSILON) {
+                /* var not set or empty — treat as epsilon (succeed without consuming) */
+                a = SUCCEED; z_up(&Z, &psi);
+            } else {
+                /* Push this T_VARREF node as the continuation (ctx=1 = succeed side),
+                 * then descend into the resolved pattern. */
+                psi_push(&psi, Z.PI, 1);
+                Z.PI  = resolved;
+                Z.ctx = 0;
+                a     = PROCEED;
+            }
+            break;
+        }
+        case T_VARREF<<2|SUCCEED:  { a = SUCCEED;  z_up(&Z, &psi); break; }
+        case T_VARREF<<2|CONCEDE:  { a = CONCEDE;  z_up_fail(&Z, &psi); break; }
+        case T_VARREF<<2|RECEDE:   { a = CONCEDE;  z_up_fail(&Z, &psi); break; }
 /*--- Leaf scanners -----------------------------------------------------------------*/
         case T_LITERAL<<2|PROCEED:
             if (scan_LITERAL(&Z)) {

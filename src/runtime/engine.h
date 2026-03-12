@@ -114,9 +114,16 @@ typedef struct {
  * start, end: byte offsets within the subject passed to engine_match_ex. */
 typedef void (*CaptureFn)(int cap_slot, int start, int end, void *userdata);
 
+/* Variable-resolve callback: fired when a T_VARREF node is entered.
+ * name: the variable name to look up.
+ * Returns a materialised Pattern* (never NULL — return epsilon on failure). */
+typedef Pattern *(*VarResolveFn)(const char *name, void *userdata);
+
 typedef struct {
-    CaptureFn   cap_fn;    /* NULL = no captures */
-    void       *cap_data;  /* passed through to cap_fn unmodified */
+    CaptureFn     cap_fn;    /* NULL = no captures */
+    void         *cap_data;  /* passed through to cap_fn unmodified */
+    VarResolveFn  var_fn;    /* NULL = T_VARREF hits default (CONCEDE) */
+    void         *var_data;  /* passed through to var_fn unmodified */
 } EngineOpts;
 
 /*--- engine_match: run root against subject[0..subject_len) ---*/
