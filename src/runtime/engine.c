@@ -331,7 +331,7 @@ MatchResult engine_match_ex(Pattern *root, const char *subject, int subject_len,
         case T_PI<<2|SUCCEED:    { a = SUCCEED;                                 z_up(&Z, &psi);                break; }
         case T_PI<<2|CONCEDE:    { a = PROCEED;                                 z_stay_next(&Z);               break; }
         case T_PI<<2|RECEDE:
-            if (!Z.fenced)       { a = PROCEED;                                 z_stay_next(&Z);               break; }
+            if (Z.ctx < Z.PI->n) { a = PROCEED;                                z_stay_next(&Z);               break; }
             else                 { a = CONCEDE;                                 z_up_fail(&Z, &psi);           break; }
 /*--- Σ (sequence) ------------------------------------------------------------------*/
         case T_SIGMA<<2|PROCEED:
@@ -428,9 +428,12 @@ MatchResult engine_match_ex(Pattern *root, const char *subject, int subject_len,
                 /* Push this T_VARREF node as the continuation (ctx=1 = succeed side),
                  * then descend into the resolved pattern. */
                 psi_push(&psi, Z.PI, 1);
-                Z.PI  = resolved;
-                Z.ctx = 0;
-                a     = PROCEED;
+                Z.PI    = resolved;
+                Z.ctx   = 0;
+                /* Reset cursor to current start position so child pattern starts fresh */
+                Z.sigma = Z.SIGMA;
+                Z.delta = Z.DELTA;
+                a       = PROCEED;
             }
             break;
         }

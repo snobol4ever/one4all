@@ -260,8 +260,8 @@ pat_atom
           e->sval=$1; e->args=al->a; e->nargs=al->n; free(al); $$=e; }
     | PAT_BUILTIN
         { Expr *e=expr_new(E_CALL); e->sval=$1; e->nargs=0; $$=e; }
-    | STAR IDENT
-        /* deferred pattern reference *X */
+    | STAR IDENT %prec UDEREF
+        /* deferred pattern reference *X — force reduce before LPAREN is shifted */
         { Expr *e=expr_new(E_DEREF); e->left=expr_new(E_VAR); e->left->sval=$2; $$=e; }
     | STR
         { Expr *e=expr_new(E_STR); e->sval=$1; $$=e; }

@@ -1652,7 +1652,7 @@ SnoVal sno_input_read(void) {
     static char *linebuf = NULL;
     static size_t linecap = 0;
     ssize_t nread = getline(&linebuf, &linecap, stdin);
-    if (nread < 0) return SNO_NULL_VAL;  /* EOF = INPUT fails */
+    if (nread < 0) return SNO_FAIL_VAL;  /* EOF = INPUT fails */
     /* Strip trailing newline */
     if (nread > 0 && linebuf[nread-1] == '\n') linebuf[nread-1] = '\0';
     return SNO_STR_VAL(GC_strdup(linebuf));
