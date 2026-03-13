@@ -243,9 +243,6 @@ static void emit_pat(Expr *e) {
 
     case E_DEREF:
         /* *X — deferred pattern reference */
-
-        if (e->left && e->left->sval && (strcasecmp(e->left->sval,"snoXList")==0 || strcasecmp(e->left->sval,"reduce")==0))
-
         if (e->left && e->left->kind == E_VAR)
             E("sno_pat_ref(\"%s\")", e->left->sval);
         else if (e->left && e->left->kind == E_CALL && e->left->nargs >= 1

@@ -730,7 +730,6 @@ static Stmt *parse_body_field(const char *body, int lineno) {
         } else if (!lex_at_end(lx)) {
             /* subject WS pattern [= replacement] */
             s->pattern = parse_expr0(lx);
-            if(getenv("SNOC_DEBUG2")) { fprintf(stderr,"PATTERN: "); debug_expr(s->pattern, 0); }
 
             if (lex_peek(lx).kind == T_WS) {
                 lex_next(lx); skip_ws(lx);
@@ -780,13 +779,4 @@ Program *parse_program(LineArray *lines) {
     }
 
     return prog;
-}
-
-/* temp debug */
-void debug_expr(Expr *e, int depth) {
-    for(int i=0;i<depth;i++) fprintf(stderr,"  ");
-    if(!e){fprintf(stderr,"(null)\n");return;}
-    fprintf(stderr,"kind=%d sval=%s\n",e->kind,e->sval?e->sval:"");
-    debug_expr(e->left,depth+1);
-    debug_expr(e->right,depth+1);
 }
