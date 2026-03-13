@@ -7,7 +7,7 @@ FLEX   = flex
 SRCS   = rebus.tab.c lex.rebus.c rebus_print.c rebus_emit.c rebus_main.c
 OBJS   = $(SRCS:.c=.o)
 
-.PHONY: all clean test
+.PHONY: all clean test roundtrip
 
 all: rebus
 
@@ -54,3 +54,7 @@ test: rebus
 	@if [ -f ../../test/rebus/word_count.reb ]; then \
 	  ./rebus -p ../../test/rebus/word_count.reb && echo "PASS" || echo "FAIL"; \
 	fi
+
+# ---- round-trip tests (M-REBUS) ----
+roundtrip: rebus
+	@bash ../../test/rebus/run_roundtrip.sh
