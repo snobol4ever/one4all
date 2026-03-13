@@ -455,23 +455,17 @@ static Expr *parse_expr4(Lex *lx) {
     items[0] = first;
 
     for (;;) {
-        TokKind pk = lex_peek(lx).kind;
-        if (pk != T_WS) break;
-        /* look ahead: consume WS, check if what follows is a concat start */
-        lex_next(lx);
-        skip_ws(lx);
+        LexMark mc = lex_mark(lx);
+        if (lex_peek(lx).kind != T_WS) break;
+        lex_next(lx); /* consume WS tentatively */
         TokKind pk2 = lex_peek(lx).kind;
         if (!is_concat_start(pk2)) {
-            /* put WS back — it belongs to a higher level */
-            lx->peek = (Token){T_WS, NULL, 0, 0, lx->lineno};
-            lx->peeked = 1;
+            lex_restore(lx, mc); /* restore before WS — belongs to higher level */
             break;
         }
         Expr *next = parse_expr5(lx);
         if (!next) {
-            /* put WS back */
-            lx->peek = (Token){T_WS, NULL, 0, 0, lx->lineno};
-            lx->peeked = 1;
+            lex_restore(lx, mc);
             break;
         }
         if (n >= cap) { cap*=2; items=realloc(items,cap*sizeof*items); }
