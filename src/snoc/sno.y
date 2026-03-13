@@ -1,22 +1,27 @@
 %{
 /*
- * sno.y — SNOBOL4 bison grammar for snoc  (revised: unified expression grammar)
+ * sno.y — SNOBOL4 bison grammar for snoc
  *
- * The original grammar had 16 SR + 140 RR conflicts because it tried to split
- * value-expr and pattern-expr at the TOKEN level using a PAT_BUILTIN token class.
- * LALR(1) state merging made that approach structurally unfixable.
+ * Whitespace design (from beauty.sno S4_expression.sno):
  *
- * Fix (from the JVM instaparse grammar):
- *   - ONE expression grammar for everything.  No pat_expr / pat_alt / pat_cat /
- *     pat_cap / pat_atom productions.
- *   - No PAT_BUILTIN token.  Pattern primitives (LEN, POS, ...) are plain IDENT.
- *   - Subject/pattern/replacement split resolved at the STATEMENT level by
- *     position, exactly as the emitter already expects.
- *   - STAR IDENT always E_DEREF(E_VAR): consuming only IDENT (not factor) in the
- *     STAR rule prevents *IDENT LPAREN from being absorbed as a function call.
- *   - arglist RR conflict fixed: only one empty production.
- *   - DOLLAR STR special case removed: falls through normal DOLLAR factor path.
- *   - (expr, expr, ...) grouping parens produce E_ALT chain (cnd in JVM grammar).
+ *   __  — raw token: any run of spaces/tabs (lexer always emits this)
+ *   __  — mandatory whitespace: one or more __ tokens
+ *   _   — optional whitespace (gray): __ or empty
+ *
+ * Binary operators require __ on both sides:  expr __ OP __ term
+ * Concat requires __:                          expr __ term
+ * Unary operators need no leading space:       OP term
+ * Inside parens/brackets _ (gray) is used:     LPAREN _ expr _ RPAREN
+ *
+ * Statement structure mirrors beauty.sno snoStmt:
+ *   label __ subject __ pattern = replacement : goto
+ *   The first __ separates label from subject,
+ *   the second __ separates subject from pattern.
+ *   Subject is a full expr (snoExpr14 level — unary prefix).
+ *   Pattern is expr (snoExpr1 level — everything).
+ *
+ * This eliminates all lexer lookahead, bstack, PAT_BUILTIN, SUBJ tricks.
+ * The grammar expresses what was previously smuggled into the lexer.
  */
 
 #include "snoc.h"
@@ -60,23 +65,19 @@ extern int  lineno_stmt;
 %token  EQ COLON LPAREN RPAREN LBRACKET RBRACKET
 %token  STARSTAR CARET PLUS MINUS STAR SLASH
 %token  PIPE DOT DOLLAR AMP COMMA AT
-%token  SGOTO FGOTO NEWLINE _
+%token  SGOTO FGOTO NEWLINE __
 
 %type <stmt>  stmt
-%type <expr>  expr term factor atom primary opt_repl opt_expr
+%type <expr>  expr concat_expr unary_expr postfix_expr primary
+%type <expr>  opt_repl
 %type <go>    opt_goto goto_clauses
 %type <sval>  opt_label glabel
 %type <sval>  gclause_s gclause_f gclause_u
 %type <al>    arglist arglist_ne
 
-%left  PIPE AMP
-%left  PLUS MINUS
-%left  STAR SLASH
-%right STARSTAR CARET
-%right UMINUS UDEREF
-%left  LBRACKET
-%left  _
-%nonassoc SUBJ
+/* No precedence declarations needed — the grammar structure itself
+ * encodes precedence via the beauty.sno snoExpr level hierarchy.
+ * __/__ distinction handles binary vs unary without tricks. */
 
 %%
 
@@ -88,7 +89,7 @@ stmtlist
     ;
 
 line
-    : stmt NEWLINE      {
+    : stmt NEWLINE {
             if ($1) {
                 $1->next = NULL;
                 if (!prog->head) prog->head = prog->tail = $1;
@@ -109,26 +110,48 @@ line
     | error NEWLINE     { yyerrok; }
     ;
 
+
+/* _ = optional whitespace / gray */
+_  : /* empty */ | __ ;
+
+/* ---------------------------------------------------------------
+ * Statement
+ *
+ * Mirrors beauty.sno snoStmt:
+ *   label __ subject FENCE(
+ *     ε                             -- label/subject only
+ *     __ pattern                    -- subject __ pattern
+ *     __ pattern = replacement      -- with replacement
+ *   ) opt_goto
+ *
+ * Subject is unary_expr (snoExpr14 — all unary prefix operators).
+ * Pattern is expr (snoExpr1 level — everything including =).
+ * The __ between subject and pattern is the SAME token class as
+ * concat — but the grammar position disambiguates unambiguously:
+ * after a unary_expr at statement level, __ either starts a pattern
+ * (if followed by expr) or precedes = (replacement) or goto.
+ * --------------------------------------------------------------- */
+
 stmt
-    : LABEL
+    : opt_label
         { Stmt *s=stmt_new(); s->label=$1; s->lineno=lineno_stmt; $$=s; }
     | opt_label COLON goto_clauses
         { Stmt *s=stmt_new(); s->label=$1; s->go=(SnoGoto*)$3;
           s->lineno=lineno_stmt; $$=s; }
-    | opt_label term opt_goto %prec SUBJ
-        { Stmt *s=stmt_new(); s->label=$1; s->subject=$2;
-          s->go=(SnoGoto*)$3; s->lineno=lineno_stmt; $$=s; }
-    | opt_label term EQ opt_repl opt_goto %prec SUBJ
-        { Stmt *s=stmt_new(); s->label=$1; s->subject=$2;
-          s->replacement=$4; s->go=(SnoGoto*)$5;
+    | opt_label __ unary_expr opt_goto
+        { Stmt *s=stmt_new(); s->label=$1; s->subject=$3;
+          s->go=(SnoGoto*)$4; s->lineno=lineno_stmt; $$=s; }
+    | opt_label __ unary_expr EQ opt_repl opt_goto
+        { Stmt *s=stmt_new(); s->label=$1; s->subject=$3;
+          s->replacement=$5; s->go=(SnoGoto*)$6;
           s->lineno=lineno_stmt; $$=s; }
-    | opt_label term _ expr opt_goto %prec SUBJ
-        { Stmt *s=stmt_new(); s->label=$1; s->subject=$2;
-          s->pattern=$4; s->go=(SnoGoto*)$5;
+    | opt_label __ unary_expr __ expr opt_goto
+        { Stmt *s=stmt_new(); s->label=$1; s->subject=$3;
+          s->pattern=$5; s->go=(SnoGoto*)$6;
           s->lineno=lineno_stmt; $$=s; }
-    | opt_label term _ expr EQ opt_repl opt_goto %prec SUBJ
-        { Stmt *s=stmt_new(); s->label=$1; s->subject=$2;
-          s->pattern=$4; s->replacement=$6; s->go=(SnoGoto*)$7;
+    | opt_label __ unary_expr __ expr EQ opt_repl opt_goto
+        { Stmt *s=stmt_new(); s->label=$1; s->subject=$3;
+          s->pattern=$5; s->replacement=$7; s->go=(SnoGoto*)$8;
           s->lineno=lineno_stmt; $$=s; }
     ;
 
@@ -136,64 +159,85 @@ opt_label : /* empty */ { $$=NULL; } | LABEL { $$=$1; } ;
 
 opt_repl
     : /* empty */  { Expr *e=expr_new(E_NULL); $$=e; }
-    | expr         { $$=$1; }
+    | __ expr      { $$=$2; }
     ;
 
-opt_goto : /* empty */ { $$=NULL; } | COLON goto_clauses { $$=$2; } ;
+opt_goto : /* empty */ { $$=NULL; } | _ COLON _ goto_clauses { $$=$4; } ;
 
+/* ---------------------------------------------------------------
+ * Expression hierarchy — mirrors beauty.sno snoExpr levels
+ *
+ * expr         = snoExpr1  (assignment =, pattern match ?)
+ * concat_expr  = snoExpr4  (concat via __)
+ * unary_expr   = snoExpr14 (all unary prefix operators)
+ * postfix_expr = snoExpr15/16 (subscript [])
+ * primary      = snoExpr17 (atoms, calls, parens)
+ *
+ * Binary operators all require __ on both sides (beauty.sno $'op' =
+ * snoWhite op snoWhite).  This means PLUS/MINUS/etc. without
+ * surrounding spaces can only be unary — no %prec needed.
+ * --------------------------------------------------------------- */
+
+/* snoExpr1: assignment and pattern-match (right-associative by recursion) */
 expr
-    : term                          { $$=$1; }
-    | expr _ term               { $$=binop(E_CONCAT,$1,$3); }
-    | expr AMP term                 { $$=binop(E_REDUCE,$1,$3); }
-    | expr PLUS  term               { $$=binop(E_ADD,$1,$3); }
-    | expr MINUS term               { $$=binop(E_SUB,$1,$3); }
-    | expr PIPE  term               { $$=binop(E_ALT,$1,$3); }
-    | expr DOT   primary            { $$=binop(E_COND,$1,$3); }
-    | expr DOLLAR primary           { $$=binop(E_IMM,$1,$3); }
+    : concat_expr                               { $$=$1; }
+    | concat_expr __ EQ __ expr                 { $$=binop(E_ASSIGN,$1,$5); }
+    | concat_expr __ PIPE __ expr               { $$=binop(E_ALT,$1,$5); }
+    | concat_expr __ AMP __ expr                { $$=binop(E_REDUCE,$1,$5); }
+    | concat_expr __ PLUS __ expr               { $$=binop(E_ADD,$1,$5); }
+    | concat_expr __ MINUS __ expr              { $$=binop(E_SUB,$1,$5); }
+    | concat_expr __ STAR __ expr               { $$=binop(E_MUL,$1,$5); }
+    | concat_expr __ SLASH __ expr              { $$=binop(E_DIV,$1,$5); }
+    | concat_expr __ CARET __ expr              { $$=binop(E_POW,$1,$5); }
+    | concat_expr __ STARSTAR __ expr           { $$=binop(E_POW,$1,$5); }
+    | concat_expr __ DOT __ expr                { $$=binop(E_COND,$1,$5); }
+    | concat_expr __ DOLLAR __ expr             { $$=binop(E_IMM,$1,$5); }
+    | concat_expr __ AT __ expr                 { $$=binop(E_AT,$1,$5); }
     ;
 
-term
-    : factor                        { $$=$1; }
-    | term STAR   factor            { $$=binop(E_MUL,$1,$3); }
-    | term SLASH  factor            { $$=binop(E_DIV,$1,$3); }
-    | term STARSTAR factor          { $$=binop(E_POW,$1,$3); }
-    | term CARET  factor            { $$=binop(E_POW,$1,$3); }
+/* snoExpr4: concatenation — requires __ between terms */
+concat_expr
+    : unary_expr                                { $$=$1; }
+    | concat_expr __ unary_expr                 { $$=binop(E_CONCAT,$1,$3); }
     ;
 
-factor
-    : atom                          { $$=$1; }
-    | MINUS  factor %prec UMINUS    { $$=binop(E_NEG,NULL,$2); }
-    | PLUS   factor %prec UMINUS    { $$=$2; }
-    | DOLLAR factor %prec UDEREF    { $$=binop(E_DEREF,NULL,$2); }
-    | DOT    factor %prec UDEREF    { $$=binop(E_COND,NULL,$2); }
-    | STAR IDENT    %prec UDEREF    {
-        /* *X — deferred pattern ref.  Consuming IDENT (not factor) is the key:
-         * *foo(bar) = concat(deref(foo), call(bar)), NOT call(*foo, bar). */
-        Expr *v=expr_new(E_VAR); v->sval=$2;
-        $$=binop(E_DEREF,v,NULL); }
-    | AT IDENT                      { Expr *e=expr_new(E_AT); e->sval=$2; $$=e; }
+/* snoExpr14: unary prefix operators — no leading space required */
+unary_expr
+    : postfix_expr                              { $$=$1; }
+    | PLUS   unary_expr                         { $$=$2; }
+    | MINUS  unary_expr                         { $$=binop(E_NEG,NULL,$2); }
+    | STAR   unary_expr                         { $$=binop(E_DEREF,NULL,$2); }
+    | DOLLAR unary_expr                         { $$=binop(E_DEREF,NULL,$2); }
+    | DOT    unary_expr                         { $$=binop(E_COND,NULL,$2); }
+    | AT     unary_expr                         { Expr *e=expr_new(E_AT); e->right=$2; $$=e; }
+    | PIPE   unary_expr                         { $$=binop(E_ALT,NULL,$2); }
+    | CARET  unary_expr                         { $$=binop(E_POW,NULL,$2); }
+    | AMP    unary_expr                         { $$=binop(E_REDUCE,NULL,$2); }
+    | SLASH  unary_expr                         { $$=binop(E_DIV,NULL,$2); }
     ;
 
-atom
+/* snoExpr15/16: postfix subscript */
+postfix_expr
     : primary                                   { $$=$1; }
-    | atom LBRACKET arglist RBRACKET            {
-        AL *al=$3; Expr *e=expr_new(E_INDEX);
+    | postfix_expr LBRACKET _ arglist _ RBRACKET {
+        AL *al=$4; Expr *e=expr_new(E_INDEX);
         e->left=$1; e->args=al->a; e->nargs=al->n; free(al); $$=e; }
     ;
 
+/* snoExpr17: atoms */
 primary
     : STR       { Expr *e=expr_new(E_STR);  e->sval=$1; $$=e; }
     | INT       { Expr *e=expr_new(E_INT);  e->ival=$1; $$=e; }
     | REAL      { Expr *e=expr_new(E_REAL); e->dval=$1; $$=e; }
     | KEYWORD   { Expr *e=expr_new(E_KEYWORD); e->sval=$1; $$=e; }
-    | IDENT LPAREN arglist RPAREN
-        { AL *al=$3; Expr *e=expr_new(E_CALL);
+    | IDENT LPAREN _ arglist _ RPAREN
+        { AL *al=$4; Expr *e=expr_new(E_CALL);
           e->sval=$1; e->args=al->a; e->nargs=al->n; free(al); $$=e; }
     | IDENT     { Expr *e=expr_new(E_VAR); e->sval=$1; $$=e; }
-    | LPAREN expr RPAREN            { $$=$2; }
-    | LPAREN expr COMMA arglist_ne RPAREN
-        { /* (a, b, c) — alternation grouping, becomes E_ALT chain */
-          AL *al=$4; Expr *e=$2;
+    | LPAREN _ expr _ RPAREN               { $$=$3; }
+    | LPAREN _ expr COMMA _ arglist_ne _ RPAREN
+        { /* (a, b, c) — alternation grouping */
+          AL *al=$6; Expr *e=$3;
           for (int i=0;i<al->n;i++) e=binop(E_ALT,e,al->a[i]);
           free(al->a); free(al); $$=e; }
     ;
@@ -204,15 +248,8 @@ arglist
     ;
 
 arglist_ne
-    : opt_expr                      { AL *al=al_new(); al_push(al,$1); $$=al; }
-    | arglist_ne COMMA opt_expr     { al_push($1,$3); $$=$1; }
-    ;
-
-opt_expr
-    : expr          { $$=$1; }
-    | IDENT EQ expr
-        { Expr *e=expr_new(E_ASSIGN);
-          e->left=expr_new(E_VAR); e->left->sval=$1; e->right=$3; $$=e; }
+    : expr                          { AL *al=al_new(); al_push(al,$1); $$=al; }
+    | arglist_ne _ COMMA _ expr     { al_push($1,$5); $$=$1; }
     ;
 
 goto_clauses
@@ -224,9 +261,9 @@ goto_clauses
     | goto_clauses gclause_u { ((SnoGoto*)$1)->uncond=$2; $$=$1; }
     ;
 
-gclause_s : SGOTO  LPAREN glabel RPAREN { $$=$3; } ;
-gclause_f : FGOTO  LPAREN glabel RPAREN { $$=$3; } ;
-gclause_u : LPAREN glabel RPAREN        { $$=$2; } ;
+gclause_s : SGOTO  _ LPAREN _ glabel _ RPAREN { $$=$5; } ;
+gclause_f : FGOTO  _ LPAREN _ glabel _ RPAREN { $$=$5; } ;
+gclause_u :        _ LPAREN _ glabel _ RPAREN { $$=$4; } ;
 
 glabel
     : IDENT         { $$=$1; }
