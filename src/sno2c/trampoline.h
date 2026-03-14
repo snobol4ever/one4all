@@ -24,28 +24,29 @@
  */
 
 #include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <setjmp.h>
 
 /* -----------------------------------------------------------------------
  * Core type: a block function returns the next block to execute.
  * NULL = program end (normal termination).
- *
- * C doesn't allow recursive typedefs directly.  We use the void* trick:
- *   block_fn_t = pointer to function(void) returning void*
- * At call sites: pc = (block_fn_t)pc();
- * This is the standard trampoline pattern in C89/C99/C11.
  * ----------------------------------------------------------------------- */
 typedef void *(*block_fn_t)(void);
 
 /* -----------------------------------------------------------------------
- * Trampoline: runs until pc returns NULL.
+ * &STCOUNT / &STLIMIT — declared in snobol4.h; referenced here.
+ * trampoline_stno(lineno) called at top of every emitted stmt.
+ * kw_stlimit < 0 = unlimited (default).
  * ----------------------------------------------------------------------- */
-/* &STCOUNT / &STLIMIT — statement counter visible to SNOBOL4 programs.
- * kw_stlimit < 0 means unlimited (default).
- * Each stmt_N function calls trampoline_stno(n) once on entry.       */
+#ifndef SNOBOL4_H   /* avoid redeclaration if snobol4.h already included */
 extern int64_t kw_stlimit;
 extern int64_t kw_stcount;
+#endif
 static inline void trampoline_stno(int n) {
+    extern int64_t kw_stlimit;
+    extern int64_t kw_stcount;
     if (kw_stlimit >= 0 && ++kw_stcount > kw_stlimit) {
         fprintf(stderr,
             "\n** &STLIMIT exceeded at statement %d"

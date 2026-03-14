@@ -1711,6 +1711,12 @@ static void emit_trampoline_program(Program *prog) {
     E("\n    /* runtime globals */\n");
     E("    var_set(\"nl\",  aply(\"CHAR\",(SnoVal[]){INT_VAL(10)},1));\n");
     E("    var_set(\"tab\", aply(\"CHAR\",(SnoVal[]){INT_VAL(9)},1));\n");
+    /* Fix: DATA('tree(...)') and DATA('link(...)') land in dead code inside
+     * _sno_fn_Top — tree.sno init block swallowed by StackEnd boundary.
+     * Register explicitly here so tree()/link() are live before trampoline. */
+    E("    /* DATA types from tree.sno/stack.sno (fn-body-walk bug) */\n");
+    E("    aply(\"DATA\",(SnoVal[]){STR_VAL(\"tree(t,v,n,c)\")},1);\n");
+    E("    aply(\"DATA\",(SnoVal[]){STR_VAL(\"link(next,value)\")},1);\n");
     E("\n    trampoline_run(block_START);\n");
     E("    return 0;\n}\n");
 }
