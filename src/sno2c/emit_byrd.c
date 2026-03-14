@@ -112,21 +112,40 @@ static void byrd_emit(Expr *pat,
 static char decl_buf[DECL_BUF_MAX][DECL_LINE_MAX];
 static int  decl_count;
 
+/* Cross-call dedup: tracks statics already emitted in the current C function.
+ * Reset by byrd_fn_scope_reset() when emit.c opens a new C function. */
+static char fn_seen[DECL_BUF_MAX][DECL_LINE_MAX];
+static int  fn_seen_count;
+
+void byrd_fn_scope_reset(void) { fn_seen_count = 0; }
+
 static void decl_reset(void) { decl_count = 0; }
 
 static void decl_add(const char *fmt, ...) {
     if (decl_count >= DECL_BUF_MAX) return;
+    char tmp[DECL_LINE_MAX];
     va_list ap;
     va_start(ap, fmt);
-    vsnprintf(decl_buf[decl_count++], DECL_LINE_MAX, fmt, ap);
+    vsnprintf(tmp, DECL_LINE_MAX, fmt, ap);
     va_end(ap);
+    /* Dedup within this pattern's decl buffer */
+    for (int i = 0; i < decl_count; i++)
+        if (strcmp(decl_buf[i], tmp) == 0) return;
+    /* Dedup across patterns in same C function */
+    for (int i = 0; i < fn_seen_count; i++)
+        if (strcmp(fn_seen[i], tmp) == 0) return;
+    memcpy(decl_buf[decl_count++], tmp, DECL_LINE_MAX);
 }
 
 static void decl_flush(void) {
     if (decl_count == 0) return;
     B("    /* === static storage === */\n");
-    for (int i = 0; i < decl_count; i++)
+    for (int i = 0; i < decl_count; i++) {
         B("static %s;\n", decl_buf[i]);
+        /* Record in fn_seen so subsequent patterns skip this decl */
+        if (fn_seen_count < DECL_BUF_MAX)
+            memcpy(fn_seen[fn_seen_count++], decl_buf[i], DECL_LINE_MAX);
+    }
     B("\n");
 }
 
@@ -1106,13 +1125,40 @@ static void byrd_emit(Expr *pat,
         return;
 
     /* ---------------------------------------------------------------- E_DEREF (deferred ref) */
-    case E_DEREF:
-        /* *varname — deferred pattern ref: epsilon in static path */
-        B("%s: /* deferred pat ref — epsilon */\n", alpha);
+    case E_DEREF: {
+        /* *varname — indirect pattern reference.
+         * At runtime: get the value of 'varname', treat it as a pattern,
+         * match it anchored at the current cursor position.
+         * On success: advance cursor to the end of match → gamma.
+         * On failure: restore cursor → omega.
+         *
+         * Byrd ports:
+         *   alpha: attempt the match
+         *   beta:  resume → restore cursor and fail (no backtracking into the sub-pattern)
+         *   gamma: inherited success continuation
+         *   omega: inherited failure continuation
+         */
+        char saved[LBUF];
+        snprintf(saved, LBUF, "deref_%d_saved_cursor", byrd_uid());
+        decl_add("int64_t %s", saved);
+
+        const char *varname = pat->sval;   /* the variable name, e.g. "snoParse" */
+
+        B("%s: {\n", alpha);
+        B("    SnoVal _deref_pat = sno_var_get(%s%s%s);\n", "\"", varname, "\"");
+        B("    int _deref_new_cur = sno_match_pattern_at(_deref_pat, %s, (int)%s, (int)%s);\n",
+          subj, subj_len, cursor);
+        B("    if (_deref_new_cur < 0) goto %s;\n", omega);
+        B("    %s = %s;\n", saved, cursor);
+        B("    %s = (int64_t)_deref_new_cur;\n", cursor);
         B("    goto %s;\n", gamma);
+        B("}\n");
+
         B("%s:\n", beta);
+        B("    %s = %s;\n", cursor, saved);
         B("    goto %s;\n", omega);
         return;
+    }
 
     /* ---------------------------------------------------------------- default */
     default:

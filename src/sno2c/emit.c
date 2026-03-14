@@ -1232,6 +1232,7 @@ static void emit_fn(FnDef *fn, Program *prog) {
     if (!fn->define_stmt) return;
     (void)prog;
     lreg_reset();
+    byrd_fn_scope_reset();   /* clear cross-pattern static-decl dedup for this fn */
     cur_fn_name = fn->name;
     cur_fn_def  = fn;
     E("static SnoVal _sno_fn_%s(SnoVal *_args, int _nargs) {\n", fn->name);
@@ -1352,6 +1353,7 @@ static int stmt_in_phantom_body(Stmt *s) {
 
 static void emit_main(Program *prog) {
     lreg_reset();
+    byrd_fn_scope_reset();
     cur_fn_name = "main";
     cur_fn_def  = NULL;   /* NULL = global scope; is_fn_local returns 0 for all vars */
     E("int main(void) {\n");

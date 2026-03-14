@@ -102,6 +102,7 @@ Program *snoc_parse(FILE *f, const char *filename);
 void     snoc_emit(Program *prog, FILE *out);
 
 /* ---- Byrd box emitter (emit_byrd.c) ---- */
+void byrd_fn_scope_reset(void);   /* call at start of each emitted C function */
 void byrd_emit_pattern(Expr *pat, FILE *out_file,
                        const char *root_name,
                        const char *subject_var,

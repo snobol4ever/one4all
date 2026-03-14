@@ -842,6 +842,38 @@ int sno_match_pattern(SnoVal pat, const char *subject) {
  * with replacement and updates *subject. Returns 1 on success, 0 on fail.
  * ===================================================================== */
 
+/* =========================================================================
+ * sno_match_pattern_at — cursor-aware anchored match for E_DEREF / *varname
+ *
+ * Matches pat against subject starting at position cursor (anchored — no
+ * scan loop).  Returns the new cursor position (>= cursor) on success, or
+ * -1 on failure.  Used by compiled Byrd boxes for indirect pattern refs.
+ * ========================================================================= */
+
+int sno_match_pattern_at(SnoVal pat, const char *subject, int subj_len, int cursor) {
+    if (!subject) subject = "";
+    if (cursor < 0 || cursor > subj_len) return -1;
+
+    SnoPattern *sp = spat_of(pat);
+    if (!sp) {
+        /* Plain string literal pattern: anchored memcmp */
+        if (pat.type == SNO_STR) {
+            const char *lit = pat.s ? pat.s : "";
+            int n = (int)strlen(lit);
+            if (cursor + n > subj_len) return -1;
+            if (memcmp(subject + cursor, lit, (size_t)n) != 0) return -1;
+            return cursor + n;
+        }
+        /* NULL/integer/other — treat as empty string: anchored match of "" always succeeds */
+        return cursor;
+    }
+
+    MatchCtx ctx; memset(&ctx, 0, sizeof(ctx)); ctx.subject = subject;
+    int r = try_match_at(sp, subject, subj_len, cursor, &ctx);
+    /* try_match_at returns end-position on success, -1 on failure */
+    return r;
+}
+
 int sno_match_and_replace(SnoVal *subject, SnoVal pat, SnoVal replacement) {
     if (!subject) return 0;
     /* P002: if replacement value signals failure, propagate it as F-branch */

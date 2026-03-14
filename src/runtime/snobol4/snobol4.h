@@ -364,6 +364,7 @@ SnoVal sno_pat_user_call(const char *name, SnoVal *args, int nargs);
 
 /* Pattern matching */
 int  sno_match_pattern(SnoVal pat, const char *subject);
+int  sno_match_pattern_at(SnoVal pat, const char *subject, int subj_len, int cursor);
 int  sno_match_and_replace(SnoVal *subject, SnoVal pat, SnoVal replacement);
 
 /* ============================================================
