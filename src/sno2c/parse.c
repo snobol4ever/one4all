@@ -606,12 +606,16 @@ static char *parse_goto_label(Lex *lx) {
             lex_next(lx); /* consume '(' */
             /* scan raw source to grab the expression text */
             int start = lx->pos;
+            int end = lx->pos; /* will be updated to just before closing ) */
             while (!lex_at_end(lx) && depth > 0) {
+                int before = lx->pos;
                 Token tok = lex_next(lx);
                 if (tok.kind==T_LPAREN) depth++;
-                else if (tok.kind==T_RPAREN) depth--;
+                else if (tok.kind==T_RPAREN) {
+                    depth--;
+                    if (depth == 0) { end = before; break; } /* end = pos before ')' */
+                }
             }
-            int end = lx->pos - 1; /* back up past closing ) */
             /* Store as "$COMPUTED:expr_text" so emitter can emit dispatch */
             int elen = end - start;
             char *buf = malloc(12 + elen + 1);
@@ -786,6 +790,7 @@ Expr *parse_expr_from_str(const char *src) {
     if (!src || !*src) return NULL;
     Lex lx = {0};
     lex_open_str(&lx, src, (int)strlen(src), 0);
-    lex_next(&lx); /* prime */
+    /* Do NOT call lex_next() to prime — lex_peek() is self-priming.
+     * Calling lex_next() here discards the first token. */
     return parse_expr0(&lx);
 }

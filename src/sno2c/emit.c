@@ -428,6 +428,8 @@ static const char *cur_fn_name = NULL;
 /* Return 1 if label is defined within the body region of fn_name.
  * This is used to detect cross-function goto references. */
 static int label_is_in_fn_body(const char *label, const char *fn_name);
+static void emit_computed_goto_inline(const char *label, const char *fn);
+static int is_body_boundary(const char *label, const char *cur_fn);
 
 /* Forward: current stmt next uid for fallthrough */
 /* (cur_stmt_next_uid already declared above) */
@@ -512,12 +514,9 @@ static void emit_goto_target(const char *label, const char *fn) {
         E("goto _SNO_FRETURN_%s", fn); return;
     }
     else if (strncasecmp(label,"$COMPUTED",9)==0 || strcasecmp(label,"_COMPUTED")==0) {
-        /* Computed goto: $COMPUTED:expr — NOT YET IMPLEMENTED in fn-body mode.
-         * The expression text is preserved in label[10..] but we cannot emit
-         * a proper dispatch here because tramp_labels/fn_table are not in scope.
-         * Session 71 ONE NEXT ACTION: emit a sno_computed_goto() dispatch table
-         * function after all block/fn forward declarations in emit_trampoline_main(). */
-        E("goto _SNO_NEXT_%d", cur_stmt_next_uid); return;
+        /* Computed goto: delegate to helper defined after fn_table. */
+        emit_computed_goto_inline(label, fn);
+        return;
     }
     if (label_is_in_fn_body(label, NULL) && !label_is_in_fn_body(label, fn)) {
         E("goto _SNO_NEXT_%d", cur_stmt_next_uid); return;
@@ -1010,6 +1009,47 @@ typedef struct {
 
 static FnDef fn_table[FN_MAX];
 static int   fn_count = 0;
+
+/* emit_computed_goto_inline: emit a strcmp chain for $COMPUTED:expr in fn-body mode.
+ * Called from emit_goto_target when trampoline_mode==0 and label starts with $COMPUTED. */
+static void emit_computed_goto_inline(const char *label, const char *fn) {
+    const char *expr_src = (strncasecmp(label,"$COMPUTED",9)==0 && label[9]==':')
+                           ? label+10 : NULL;
+    if (!expr_src || !*expr_src || !fn) {
+        E("goto _SNO_NEXT_%d", cur_stmt_next_uid);
+        return;
+    }
+    /* Strip trailing ) and whitespace left by the off-by-one in parse.c capture */
+    char expr_buf[4096];
+    strncpy(expr_buf, expr_src, sizeof(expr_buf)-1);
+    expr_buf[sizeof(expr_buf)-1] = '\0';
+    int elen = (int)strlen(expr_buf);
+    while (elen > 0 && (expr_buf[elen-1] == ')' || expr_buf[elen-1] == ' ' || expr_buf[elen-1] == '\t'))
+        expr_buf[--elen] = '\0';
+    Expr *ce = parse_expr_from_str(expr_buf);
+    if (!ce) {
+        E("goto _SNO_NEXT_%d", cur_stmt_next_uid);
+        return;
+    }
+    E("{ const char *_cg = to_str(");
+    emit_expr(ce);
+    E("); if(0){}");
+    for (int i = 0; i < fn_count; i++) {
+        if (strcasecmp(fn_table[i].name, fn) != 0) continue;
+        for (int b = 0; b < fn_table[i].nbody_starts; b++) {
+            Stmt *bs = fn_table[i].body_starts[b];
+            for (Stmt *t = bs; t; t = t->next) {
+                if (t->is_end) break;
+                if (t != bs && is_body_boundary(t->label, fn_table[i].name)) break;
+                if (t->label)
+                    E(" else if(strcasecmp(_cg,\"%s\")==0) goto _L%s;",
+                      t->label, cs_label(t->label));
+            }
+        }
+        break;
+    }
+    E(" (void)_cg; }");
+}
 
 /* Returns 1 if 'name' is a user-defined function (present in fn_table) or a
  * known SNOBOL4 standard library function.  Used to distinguish CALL from
