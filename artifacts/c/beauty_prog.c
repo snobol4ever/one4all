@@ -6284,6 +6284,7 @@ static int64_t assign_c_94_α_saved_cursor;
     cat_r_92_β:   _cur512 = cat_r_92_α_saved_cursor;        goto cat_l_92_β;
     cat_r_91_α:   cat_r_91_α_depth = -1;                    goto cat_r_89_α_do_assign;
     cat_r_91_β:
+                  if (!nhas_frame()) npush();
                   if (++cat_r_91_α_depth >= 64)             goto cat_l_91_β;
                   cat_r_91_α_cursors[cat_r_91_α_depth] = _cur512;
                                                             goto arbno_c_93_α;
@@ -6381,6 +6382,7 @@ static int64_t assign_c_101_α_saved_cursor;
     cat_r_99_β:   _cur514 = cat_r_99_α_saved_cursor;        goto cat_l_99_β;
     cat_r_98_α:   cat_r_98_α_depth = -1;                    goto cat_r_96_α_do_assign;
     cat_r_98_β:
+                  if (!nhas_frame()) npush();
                   if (++cat_r_98_α_depth >= 64)             goto cat_l_98_β;
                   cat_r_98_α_cursors[cat_r_98_α_depth] = _cur514;
                                                             goto arbno_c_100_α;
@@ -7232,6 +7234,7 @@ static int64_t deref_158_saved_cursor;
     cat_r_128_β:                                            goto assign_c_129_β;
     cat_r_127_α:  cat_r_127_α_depth = -1;                   goto cat_r_126_α;
     cat_r_127_β:
+                  if (!nhas_frame()) npush();
                   if (++cat_r_127_α_depth >= 64)            goto cat_l_127_β;
                   cat_r_127_α_cursors[cat_r_127_α_depth] = _cur563;
                                                             goto arbno_c_131_α;
@@ -16254,7 +16257,7 @@ static SnoVal pat_ExprList(const char *_subj_np, int64_t _slen_np,
     cat_l_387_α:                                            goto cat_l_388_α;
     cat_l_387_β:                                            goto cat_r_388_β;
     cat_l_388_α:  npush();                                  goto cat_r_388_α;
-    cat_l_388_β:  npush();                                  goto cat_r_388_α;
+    cat_l_388_β:                                            goto _ExprList_ω;
 cat_r_388_α: {
     deref_389_saved_cur = _cur_np;
     SnoVal _r_389 = pat_XList(_subj_np, _slen_np, &_cur_np, &deref_389_z, 0);
@@ -16799,7 +16802,7 @@ static SnoVal pat_Expr3(const char *_subj_np, int64_t _slen_np,
     cat_l_431_α:                                            goto cat_l_432_α;
     cat_l_431_β:                                            goto cat_r_432_β;
     cat_l_432_α:  npush();                                  goto cat_r_432_α;
-    cat_l_432_β:  npush();                                  goto cat_r_432_α;
+    cat_l_432_β:                                            goto _Expr3_ω;
 cat_r_432_α: {
     deref_433_saved_cur = _cur_np;
     SnoVal _r_433 = pat_X3(_subj_np, _slen_np, &_cur_np, &deref_433_z, 0);
@@ -16956,7 +16959,7 @@ static SnoVal pat_Expr4(const char *_subj_np, int64_t _slen_np,
     cat_l_444_α:                                            goto cat_l_445_α;
     cat_l_444_β:                                            goto cat_r_445_β;
     cat_l_445_α:  npush();                                  goto cat_r_445_α;
-    cat_l_445_β:  npush();                                  goto cat_r_445_α;
+    cat_l_445_β:                                            goto _Expr4_ω;
 cat_r_445_α: {
     deref_446_saved_cur = _cur_np;
     SnoVal _r_446 = pat_X4(_subj_np, _slen_np, &_cur_np, &deref_446_z, 0);
@@ -18917,7 +18920,7 @@ cat_l_618_β: {
     cat_l_623_α:                                            goto cat_l_624_α;
     cat_l_623_β:                                            goto cat_r_624_β;
     cat_l_624_α:  npush();                                  goto cat_r_624_α;
-    cat_l_624_β:  npush();                                  goto cat_r_624_α;
+    cat_l_624_β:                                            goto alt_r_621_α;
 cat_r_624_α: {
     deref_625_saved_cur = _cur_np;
     SnoVal _r_625 = pat_Expr16(_subj_np, _slen_np, &_cur_np, &deref_625_z, 0);
@@ -21465,9 +21468,10 @@ static SnoVal pat_Parse(const char *_subj_np, int64_t _slen_np,
     cat_l_846_α:                                            goto cat_l_847_α;
     cat_l_846_β:                                            goto cat_r_847_β;
     cat_l_847_α:  npush();                                  goto cat_r_847_α;
-    cat_l_847_β:  npush();                                  goto cat_r_847_α;
+    cat_l_847_β:                                            goto _Parse_ω;
     cat_r_847_α:  cat_r_847_α_depth = -1;                   goto cat_r_846_α;
     cat_r_847_β:
+                  if (!nhas_frame()) npush();
                   if (++cat_r_847_α_depth >= 64)            goto cat_l_847_β;
                   cat_r_847_α_cursors[cat_r_847_α_depth] = _cur_np;
                                                             goto arbno_c_848_α;
@@ -21553,9 +21557,10 @@ static SnoVal pat_Compiland(const char *_subj_np, int64_t _slen_np,
     cat_l_852_α:                                            goto cat_l_853_α;
     cat_l_852_β:                                            goto cat_r_853_β;
     cat_l_853_α:  npush();                                  goto cat_r_853_α;
-    cat_l_853_β:  npush();                                  goto cat_r_853_α;
+    cat_l_853_β:                                            goto _Compiland_ω;
     cat_r_853_α:  cat_r_853_α_depth = -1;                   goto cat_r_852_α;
     cat_r_853_β:
+                  if (!nhas_frame()) npush();
                   if (++cat_r_853_α_depth >= 64)            goto cat_l_853_β;
                   cat_r_853_α_cursors[cat_r_853_α_depth] = _cur_np;
                                                             goto arbno_c_854_α;
@@ -21630,6 +21635,7 @@ alt_r_859_β:
     goto cat_l_858_β;
     cat_r_857_α:  cat_r_857_α_depth = -1;                   goto cat_r_850_α;
     cat_r_857_β:
+                  if (!nhas_frame()) npush();
                   if (++cat_r_857_α_depth >= 64)            goto cat_l_857_β;
                   cat_r_857_α_cursors[cat_r_857_α_depth] = _cur_np;
                                                             goto arbno_c_864_α;
