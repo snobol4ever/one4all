@@ -606,6 +606,9 @@ static int expr_contains_pattern(Expr *e) {
     /* recurse into children */
     if (e->kind == E_CONCAT || e->kind == E_ALT || e->kind == E_MUL)
         return expr_contains_pattern(e->left) || expr_contains_pattern(e->right);
+    /* $ and . operators — pattern may be on the left side */
+    if (e->kind == E_IMM || e->kind == E_COND)
+        return expr_contains_pattern(e->left);
     if (e->kind == E_CALL) {
         /* ARBNO, FENCE, etc. already caught by is_pat_builtin_call above.
          * Also treat reduce/evl calls as pattern-valued when inside ccat. */
@@ -1530,6 +1533,27 @@ static void emit_trampoline_program(Program *prog) {
     }
     E("\n");
 
+    /* --- Pass 0a: pre-register ALL named pattern names FIRST ---
+     * Must run before emit_fn so that *PatName inside DEFINE bodies
+     * (e.g. *SpecialNm in ss()) resolve to compiled functions, not
+     * interpreter fallback.  Registration is just name→fnname mapping;
+     * no C is emitted yet. */
+    byrd_named_pat_reset();
+    for (Stmt *s = prog->head; s; s = s->next) {
+        if (s->is_end) break;
+        if (stmt_in_phantom_body(s)) continue;
+        if (stmt_define_proto(s)) continue;
+        if (!s->pattern && s->replacement &&
+            s->subject && s->subject->kind == E_VAR &&
+            expr_contains_pattern(s->replacement)) {
+            byrd_preregister_named_pattern(s->subject->sval);
+        }
+    }
+    /* Emit struct typedecls and function fwdecls now — before emit_fn —
+     * so DEFINE function bodies can use pat_X_t types and call pat_X(). */
+    byrd_emit_named_typedecls(out);
+    byrd_emit_named_fwdecls(out);
+
     /* --- Emit DEFINE'd functions using the existing emit_fn path ---
      * Function bodies use classic goto emission (trampoline_mode=0 inside).
      * Only main-level code uses the trampoline model. */
@@ -1550,34 +1574,16 @@ static void emit_trampoline_program(Program *prog) {
     /* (Generated inline per-stmt as needed — no pre-declaration required
      *  because block_L compares by value, not by name.) */
 
-    /* --- Pass 0: emit compiled named pattern functions ---
-     * Sub-pass 0a: pre-register ALL names so forward/mutual refs resolve.
-     * Sub-pass 0b: emit function bodies (all names already in registry).
+    /* --- Pass 0b/c/d: emit compiled named pattern functions ---
+     * Names already pre-registered and typedecls/fwdecls already emitted
+     * in pass 0a above (before emit_fn).
+     * DO NOT call byrd_named_pat_reset() or re-emit typedecls here.
      */
-    E("/* --- compiled named pattern functions --- */\n");
-    byrd_named_pat_reset();
+    E("/* --- compiled named pattern function bodies --- */\n");
 
-    /* 0a: register all names first */
+    /* 0d: emit function bodies (emitted flag prevents duplicates) */
     for (Stmt *s = prog->head; s; s = s->next) {
         if (s->is_end) break;
-        if (stmt_is_in_any_fn_body(s)) continue;
-        if (stmt_in_phantom_body(s)) continue;
-        if (stmt_define_proto(s)) continue;
-        if (!s->pattern && s->replacement &&
-            s->subject && s->subject->kind == E_VAR &&
-            expr_contains_pattern(s->replacement)) {
-            byrd_preregister_named_pattern(s->subject->sval);
-        }
-    }
-
-    /* 0a.5: emit ALL struct typedef fwd-decls, then function fwd-decls */
-    byrd_emit_named_typedecls(out);
-    byrd_emit_named_fwdecls(out);
-
-    /* 0b: emit function bodies */
-    for (Stmt *s = prog->head; s; s = s->next) {
-        if (s->is_end) break;
-        if (stmt_is_in_any_fn_body(s)) continue;
         if (stmt_in_phantom_body(s)) continue;
         if (stmt_define_proto(s)) continue;
         if (!s->pattern && s->replacement &&

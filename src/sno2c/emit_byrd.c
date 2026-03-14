@@ -221,6 +221,7 @@ typedef struct {
     char varname[NAMED_PAT_NAMELEN];
     char typename[NAMED_PAT_NAMELEN];
     char fnname[NAMED_PAT_NAMELEN];
+    int  emitted;   /* 1 after byrd_emit_named_pattern has run for this name */
 } NamedPat;
 
 static NamedPat named_pat_registry[NAMED_PAT_MAX];
@@ -1667,6 +1668,19 @@ void byrd_emit_named_pattern(const char *varname, Expr *pat, FILE *out_file) {
     snprintf(tyname, sizeof tyname, "pat_%s_t", safe);
 
     named_pat_register(varname, tyname, fnname);
+
+    /* Deduplicate: only emit each named pattern once (first definition wins).
+     * beauty.sno assigns the same variable in multiple function bodies;
+     * we compile the first occurrence and ignore subsequent ones. */
+    NamedPat *np_entry = NULL;
+    for (int i = 0; i < named_pat_count; i++) {
+        if (strcmp(named_pat_registry[i].varname, varname) == 0) {
+            np_entry = &named_pat_registry[i];
+            break;
+        }
+    }
+    if (np_entry && np_entry->emitted) return;
+    if (np_entry) np_entry->emitted = 1;
 
     /* Reset fn_seen so statics aren't skipped due to a previous pattern's decls */
     byrd_fn_scope_reset();
