@@ -413,6 +413,57 @@ static Pattern *make_epsilon(PatternList *pl) {
     return p;
 }
 
+/* Deferred USER_CALL: data passed to T_FUNC callback at match time */
+typedef struct {
+    const char *name;
+    SnoVal     *args;
+    int         nargs;
+} DeferredCall;
+
+/* T_FUNC callback: called by engine at match time (zero-width, side-effect) */
+static void *deferred_call_fn(void *userdata) {
+    DeferredCall *d = (DeferredCall *)userdata;
+    /* Special handling for reduce/Reduce: evaluate string args at match time */
+    if (d->nargs >= 2 && strcasecmp(d->name, "reduce") == 0) {
+        SnoVal t_arg = d->args[0];
+        SnoVal n_arg = d->args[1];
+        /* Strip outer quotes from type string */
+        if (t_arg.type == SNO_STR && t_arg.s) {
+            const char *ts = t_arg.s;
+            int tlen = (int)strlen(ts);
+            if (tlen >= 2 &&
+                ((ts[0]=='\'' && ts[tlen-1]=='\'') ||
+                 (ts[0]=='"'  && ts[tlen-1]=='"'))) {
+                char *stripped = GC_malloc(tlen - 1);
+                memcpy(stripped, ts + 1, tlen - 2);
+                stripped[tlen-2] = '\0';
+                t_arg = SNO_STR_VAL(stripped);
+            }
+        }
+        /* Evaluate count expression at match time */
+        if (n_arg.type == SNO_STR)
+            n_arg = sno_eval(n_arg);
+        SnoVal reduce_args[2] = { t_arg, n_arg };
+        sno_apply("Reduce", reduce_args, 2);
+        return (void *)1; /* succeed */
+    }
+    /* All other calls: fire and succeed (side-effect only) */
+    sno_apply(d->name, d->args, d->nargs);
+    return (void *)1;
+}
+
+static Pattern *make_func(PatternList *pl, const char *name, SnoVal *args, int nargs) {
+    Pattern *p = pattern_alloc(pl);
+    p->type = T_FUNC;
+    DeferredCall *d = GC_malloc(sizeof(DeferredCall));
+    d->name  = name;
+    d->args  = args;
+    d->nargs = nargs;
+    p->func      = deferred_call_fn;
+    p->func_data = d;
+    return p;
+}
+
 static Pattern *materialise(SnoPattern *sp, MatchCtx *ctx) {
     if (!sp) return make_epsilon(&ctx->pl);
 
@@ -644,23 +695,11 @@ static Pattern *materialise(SnoPattern *sp, MatchCtx *ctx) {
 
     case SPAT_USER_CALL: {
         if (getenv("SNO_PAT_DEBUG"))
-            fprintf(stderr, "SPAT_USER_CALL %s\n", sp->str);
-        /* With VarCache in MatchCtx, var_resolve_callback materialises each
-         * SnoPattern* exactly ONCE per match (cached on ARBNO re-entries).
-         * Side-effect functions (nInc, nPush, nPop, Reduce) therefore fire
-         * ONCE at materialise time — correct.  No T_FUNC deferral needed. */
-        SnoVal result = sno_apply(sp->str, sp->args, sp->nargs);
-        if (result.type == SNO_PATTERN) {
-            return materialise(spat_of(result), ctx);
-        }
-        if (result.type == SNO_STR) {
-            p->type  = T_LITERAL;
-            p->s     = sno_to_str(result);
-            p->s_len = (int)strlen(p->s);
-            return p;
-        }
-        /* SNO_NULL / SNO_FAIL — epsilon */
-        return make_epsilon(&ctx->pl);
+            fprintf(stderr, "SPAT_USER_CALL %s (deferred→T_FUNC)\n", sp->str);
+        /* Defer the call to match time via T_FUNC — side-effect calls like
+         * nPush, nInc, nPop, Reduce must fire when the engine reaches this
+         * node during matching, NOT during materialise(). */
+        return make_func(&ctx->pl, sp->str, sp->args, sp->nargs);
     }
 
     default:

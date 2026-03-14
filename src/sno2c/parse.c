@@ -334,6 +334,18 @@ static Expr *parse_lbin(Lex *lx, ParseFn next_fn,
             lex_restore(lx, m); /* restore to before WS */
             break;
         }
+        /* T_STAR is binary only when followed by WS on both sides (a * b).
+         * If the token after * is not WS, it's unary *foo — not ours. */
+        if (k == T_STAR) {
+            LexMark m2 = lex_mark(lx);
+            lex_next(lx); /* consume * tentatively */
+            TokKind k2 = lex_peek(lx).kind;
+            lex_restore(lx, m2);
+            if (k2 != T_WS) {
+                lex_restore(lx, m); /* restore before WS — let concat handle it */
+                break;
+            }
+        }
         lex_next(lx); /* consume operator */
         skip_ws(lx);  /* consume trailing WS of binary op */
         Expr *r = next_fn(lx);
@@ -432,8 +444,10 @@ static Expr *parse_expr5(Lex *lx) {
 static int is_concat_start(TokKind k) {
     switch (k) {
         /* binary operators that must be surrounded by WS */
+        /* NOTE: T_STAR excluded — after whitespace, * is always unary
+         * (deferred pattern ref *foo). Binary * needs spaces: a * b. */
         case T_AT: case T_PLUS: case T_MINUS: case T_HASH:
-        case T_SLASH: case T_STAR: case T_PCT: case T_CARET:
+        case T_SLASH: case T_PCT: case T_CARET:
         case T_BANG: case T_STARSTAR: case T_DOT:
         case T_TILDE: case T_EQ: case T_QMARK: case T_AMP: case T_PIPE:
         /* terminators */

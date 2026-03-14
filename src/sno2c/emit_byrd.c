@@ -918,6 +918,42 @@ static void emit_abort_node(const char *alpha, const char *beta,
 }
 
 /* -----------------------------------------------------------------------
+ * emit_simple_val — emit a SnoVal C expression for a simple Expr node.
+ * Used by E_REDUCE to pass left/right as runtime values.
+ * Handles: E_STR, E_INT, E_VAR, E_CALL(nTop), E_NULL/NULL.
+ * Falls back to SNO_NULL_VAL for anything complex.
+ * ----------------------------------------------------------------------- */
+
+static void emit_simple_val(Expr *e) {
+    if (!e) { B("SNO_NULL_VAL"); return; }
+    switch (e->kind) {
+    case E_STR:
+        /* strip surrounding quotes if present — sval is already unquoted */
+        B("SNO_STR_VAL(\"%s\")", e->sval ? e->sval : "");
+        return;
+    case E_INT:
+        B("SNO_INT_VAL(%ld)", e->ival);
+        return;
+    case E_VAR:
+        B("sno_var_get(\"%s\")", e->sval ? e->sval : "");
+        return;
+    case E_CALL:
+        if (e->sval && strcasecmp(e->sval, "nTop") == 0)
+            { B("SNO_INT_VAL(sno_ntop())"); return; }
+        if (e->sval && strcasecmp(e->sval, "nInc") == 0)
+            { B("SNO_INT_VAL((sno_ninc(), sno_ntop()))"); return; }
+        if (e->sval && strcasecmp(e->sval, "nPop") == 0)
+            { B("SNO_INT_VAL((sno_npop(), 0))"); return; }
+        /* generic: fall through to sno_apply */
+        B("sno_apply(\"%s\", NULL, 0)", e->sval ? e->sval : "");
+        return;
+    default:
+        B("SNO_NULL_VAL /* unhandled emit_simple_val kind %d */", (int)e->kind);
+        return;
+    }
+}
+
+/* -----------------------------------------------------------------------
  * Main dispatch — byrd_emit
  *
  * Recursively lowers `pat` with the given four-port labels and emits C.
@@ -1074,6 +1110,37 @@ static void byrd_emit(Expr *pat,
             return;
         }
 
+        /* nPush() — push counter stack, always succeed (side-effect only) */
+        if (strcasecmp(n, "nPush") == 0) {
+            B("%s: sno_npush(); goto %s;\n", alpha, gamma);
+            B("%s: goto %s;\n", beta, omega);
+            return;
+        }
+        /* nInc() — increment top counter, always succeed */
+        if (strcasecmp(n, "nInc") == 0) {
+            B("%s: sno_ninc(); goto %s;\n", alpha, gamma);
+            B("%s: goto %s;\n", beta, omega);
+            return;
+        }
+        /* nDec() — decrement top counter, always succeed */
+        if (strcasecmp(n, "nDec") == 0) {
+            B("%s: sno_ndec(); goto %s;\n", alpha, gamma);
+            B("%s: goto %s;\n", beta, omega);
+            return;
+        }
+        /* nPop() — pop counter stack, always succeed */
+        if (strcasecmp(n, "nPop") == 0) {
+            B("%s: sno_npop(); goto %s;\n", alpha, gamma);
+            B("%s: goto %s;\n", beta, omega);
+            return;
+        }
+        /* nTop() — read top counter, always succeed (value available via sno_ntop()) */
+        if (strcasecmp(n, "nTop") == 0) {
+            B("%s: (void)sno_ntop(); goto %s;\n", alpha, gamma);
+            B("%s: goto %s;\n", beta, omega);
+            return;
+        }
+
         /* Fallback: unknown call — epsilon */
         B("%s: /* unknown call: %s — epsilon */\n", alpha, n);
         B("    goto %s;\n", gamma);
@@ -1143,7 +1210,13 @@ static void byrd_emit(Expr *pat,
         snprintf(saved, LBUF, "deref_%d_saved_cursor", byrd_uid());
         decl_add("int64_t %s", saved);
 
-        const char *varname = pat->sval;   /* the variable name, e.g. "snoParse" */
+        /* E_DEREF node: operand is in pat->left (created by unop()).
+         * For *varname, pat->left->kind == E_VAR, pat->left->sval is the name.
+         * For *$expr or other complex deref, fall back to empty. */
+        const char *varname = NULL;
+        if (pat->left && pat->left->kind == E_VAR)
+            varname = pat->left->sval;
+        if (!varname) varname = "";
 
         B("%s: {\n", alpha);
         B("    SnoVal _deref_pat = sno_var_get(%s%s%s);\n", "\"", varname, "\"");
@@ -1158,6 +1231,26 @@ static void byrd_emit(Expr *pat,
         B("%s:\n", beta);
         B("    %s = %s;\n", cursor, saved);
         B("    goto %s;\n", omega);
+        return;
+    }
+
+    /* --------------------------------------------------------------- E_REDUCE (& operator) */
+    case E_REDUCE: {
+        /* "type & count" — calls Reduce(type, count) at match time.
+         * Reduce() pops `count` trees from the linked-list stack ($'@S')
+         * and pushes one combined tree of `type`.  Always succeeds as a
+         * side-effect node (like nPush/nPop).
+         * left  = type  (E_STR like 'snoParse', or NULL)
+         * right = count (E_CALL(nTop), E_INT, etc.)              */
+        B("%s: /* E_REDUCE & */\n", alpha);
+        B("    { SnoVal _reduce_args[2] = {");
+        emit_simple_val(pat->left);
+        B(", ");
+        emit_simple_val(pat->right);
+        B("};\n");
+        B("      sno_apply(\"Reduce\", _reduce_args, 2); }\n");
+        B("    goto %s;\n", gamma);
+        B("%s: goto %s;\n", beta, omega);
         return;
     }
 
