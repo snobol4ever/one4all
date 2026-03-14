@@ -36,3 +36,20 @@ See SESSION.md for full trace.
 
 ### Active bug
 Same `c` field / START bug.
+
+---
+
+## Session 75 — 2026-03-14
+
+**File:** beauty_tramp_session75.c  
+**Lines:** 30628  
+**md5:** d89f93d4e1c9c60f1dbf2481d3f503d9  
+**Status:** CHANGED from session74
+
+### What changed
+- `emit_expr` E_CONCAT: chains ≥ 3 deep now emit multi-line indented `concat_sv`
+- Long lines reduced from 68 → 17 (chains of 2 with large args stay inline)
+- Remaining 17 long lines are `aply`/`strchr` embedded contexts, not solvable at E_CONCAT level
+
+### Active bug
+`c` field SSTR / START empty output — pre-existing.

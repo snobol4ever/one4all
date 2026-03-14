@@ -165,9 +165,50 @@ static void emit_expr(Expr *e) {
 
     case E_NEG: E("neg("); emit_expr(e->right); E(")"); break;
 
-    case E_CONCAT:
-        E("concat_sv("); emit_expr(e->left); E(","); emit_expr(e->right); E(")");
+    case E_CONCAT: {
+        /* Count chain depth to decide whether to pretty-print */
+        int depth = 0;
+        for (Expr *n = e; n->kind == E_CONCAT; n = n->left) depth++;
+        if (depth < 3) {
+            /* Short chain — keep inline */
+            E("concat_sv("); emit_expr(e->left); E(","); emit_expr(e->right); E(")");
+        } else {
+            /* Long chain — collect leaves and emit indented */
+            /* Max concat depth in beauty.sno is ~20 */
+            #define MAX_CONCAT_LEAVES 64
+            Expr *leaves[MAX_CONCAT_LEAVES];
+            int n = 0;
+            /* Walk left spine to collect leaves in order */
+            Expr *cur = e;
+            while (cur->kind == E_CONCAT && n < MAX_CONCAT_LEAVES - 1) {
+                leaves[n++] = cur->right;   /* push right children (will reverse) */
+                cur = cur->left;
+            }
+            leaves[n++] = cur;  /* leftmost leaf */
+            /* leaves[] is now right-to-left; reverse for left-to-right order */
+            for (int i = 0, j = n-1; i < j; i++, j--) {
+                Expr *tmp = leaves[i]; leaves[i] = leaves[j]; leaves[j] = tmp;
+            }
+            /* Emit as nested concat_sv with 4-space indent per level.
+             * Build from right: concat_sv(concat_sv(..., leaf[n-2]), leaf[n-1]) */
+            /* Emit opening parens — one concat_sv( per pair except the innermost */
+            for (int i = 0; i < n - 2; i++) E("concat_sv(\n    ");
+            /* Innermost pair */
+            E("concat_sv(");
+            emit_expr(leaves[0]);
+            E(",\n    ");
+            emit_expr(leaves[1]);
+            E(")");
+            /* Close each level, emitting next right-arg */
+            for (int i = 2; i < n; i++) {
+                E(",\n    ");
+                emit_expr(leaves[i]);
+                E(")");
+            }
+            #undef MAX_CONCAT_LEAVES
+        }
         break;
+    }
 
     case E_REDUCE: E("aply(\"reduce\",(SnoVal[]){"); emit_expr(e->left); E(","); emit_expr(e->right); E("},2)"); break;
     case E_ADD:    E("add(");    emit_expr(e->left); E(","); emit_expr(e->right); E(")"); break;
