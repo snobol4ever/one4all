@@ -71,6 +71,28 @@ static void emit_expr_validated(Expr *e) {
 }
 #define emit_expr(e) emit_expr_validated(e)
 #endif /* CNODE_VALIDATE */
+
+/* -----------------------------------------------------------------------
+ * Sprint 4 wiring: PP_EXPR / PP_PAT
+ *
+ * Replace  E("SnoVal _v%d = ", u); emit_expr(e); E(";\n");
+ * with     E("SnoVal _v%d = ", u); PP_EXPR(e, 16); E(";\n");
+ *
+ * PP_EXPR(e, col): build CNode tree, pp_cnode at column col, free arena.
+ * PP_PAT(e, col):  same but via build_pat.
+ * col = number of chars already on the line before the expression starts.
+ * ----------------------------------------------------------------------- */
+#define PP_EXPR(e, col) do { \
+    CArena *_a = cn_arena_new(65536); \
+    pp_cnode(build_expr(_a, (e)), out, (col), 4, 120); \
+    cn_arena_free(_a); \
+} while(0)
+
+#define PP_PAT(e, col) do { \
+    CArena *_a = cn_arena_new(65536); \
+    pp_cnode(build_pat(_a, (e)), out, (col), 4, 120); \
+    cn_arena_free(_a); \
+} while(0)
 #define PRETTY_OUT out
 #include "emit_pretty.h"
 
@@ -976,9 +998,11 @@ static void emit_stmt(Stmt *s, const char *fn) {
          * E_CONCAT becomes pat_cat and *var becomes pat_ref.
          * This handles: snoParse = nPush() ARBNO(*snoCommand) ... nPop() */
         if (expr_contains_pattern(s->replacement)) {
-            E("SnoVal _v%d = ", u); emit_pat(s->replacement); E(";\n");
+            int _col = fprintf(out, "SnoVal _v%d = ", u);
+            PP_PAT(s->replacement, _col); E(";\n");
         } else {
-            E("SnoVal _v%d = ", u); emit_expr(s->replacement); E(";\n");
+            int _col = fprintf(out, "SnoVal _v%d = ", u);
+            PP_EXPR(s->replacement, _col); E(";\n");
         }
         E("int _ok%d = !IS_FAIL(_v%d);\n", u, u);
         E("if(_ok%d) {\n", u);
@@ -995,7 +1019,7 @@ static void emit_stmt(Stmt *s, const char *fn) {
     if (s->pattern) {
         int u = uid();
         E("/* byrd mtch u%d */\n", u);
-        E("SnoVal _s%d = ", u); emit_expr(s->subject); E(";\n");
+        { int _col = fprintf(out, "SnoVal _s%d = ", u); PP_EXPR(s->subject, _col); E(";\n"); }
         E("const char *_subj%d = to_str(_s%d);\n", u, u);
         E("int64_t _slen%d = _subj%d ? (int64_t)strlen(_subj%d) : 0;\n", u, u, u);
         E("int64_t _cur%d  = 0;\n", u);
@@ -1040,7 +1064,7 @@ static void emit_stmt(Stmt *s, const char *fn) {
         if (s->replacement) {
             /* Replace matched region [_mstart%d .. _cur%d) with replacement */
             E("{\n");
-            E("    SnoVal _r%d = ", u); emit_expr(s->replacement); E(";\n");
+            E("    SnoVal _r%d = ", u); PP_EXPR(s->replacement, 4 + 10 + 3); E(";\n");
             E("    const char *_rs%d = to_str(_r%d);\n", u, u);
             E("    int64_t _rlen%d = _rs%d ? (int64_t)strlen(_rs%d) : 0;\n", u, u, u);
             E("    int64_t _tail%d = _slen%d - _cur%d;\n", u, u, u);
@@ -1079,7 +1103,7 @@ static void emit_stmt(Stmt *s, const char *fn) {
     /* ---- expression evaluation only ---- */
     {
         int u=uid();
-        E("SnoVal _v%d = ", u); emit_expr(s->subject); E(";\n");
+        { int _col = fprintf(out, "SnoVal _v%d = ", u); PP_EXPR(s->subject, _col); E(";\n"); }
         E("int _ok%d = !IS_FAIL(_v%d);\n", u, u);
         /* emit goto using _ok%d */
         emit_ok_goto(s->go, fn, u);

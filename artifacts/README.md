@@ -53,3 +53,24 @@ Same `c` field / START bug.
 
 ### Active bug
 `c` field SSTR / START empty output — pre-existing.
+
+---
+
+## Session 76 — 2026-03-15
+
+**File:** beauty_tramp_session76.c  
+**Lines:** 31782  
+**md5:** 2028344da06f3f862deae3efedf4bc9b  
+**Status:** CHANGED from session75
+
+### What changed
+- Sprint `cnode-build`: `emit_cnode.h` + `emit_cnode.c` — CNode IR, arena allocator,
+  `build_expr`/`build_pat`, `cn_flat_print`, `cn_flat_width`, `pp_cnode`. 0 mismatches
+  vs `emit_expr` on full beauty.sno. Committed `160f69b`.
+- Sprint `cnode-wire` (partial): `PP_EXPR`/`PP_PAT` macros added to emit.c.
+  5 `SnoVal _v = emit_expr(...)` call sites wired to `pp_cnode`. Compiles, smoke tests pass.
+  Long lines >200: 10 (down from 36). Max line still 3440 (emit_byrd SPAN/strchr, not expr).
+  **NOT YET COMMITTED** — pending this handoff.
+
+### Active bug
+`c` field SSTR / START empty output — deferred, M-CNODE first.
