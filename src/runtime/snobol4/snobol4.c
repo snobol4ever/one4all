@@ -647,6 +647,11 @@ void runtime_init(void) {
         _ch[0] = (char)92; _ch[1] = '\0'; var_set("bSlash", STR_VAL(_ch));
         _ch = GC_malloc_atomic(2);
         _ch[0] = (char)59; _ch[1] = '\0'; var_set("semicolon", STR_VAL(_ch));
+        /* Physical constants — ASCII-defined, never change, pre-init for
+         * pattern charset expressions that fire before global.sno line 25 */
+        var_set("UCASE",  STR_VAL(ucase));
+        var_set("LCASE",  STR_VAL(lcase));
+        var_set("digits", STR_VAL("0123456789"));
     }
 }
 

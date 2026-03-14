@@ -695,10 +695,58 @@ static Pattern *materialise(SnoPattern *sp, MatchCtx *ctx) {
 
     case SPAT_USER_CALL: {
         if (getenv("PAT_DEBUG"))
-            fprintf(stderr, "SPAT_USER_CALL %s (deferred→T_FUNC)\n", sp->strv);
-        /* Defer the call to mtch time via T_FUNC — side-effect calls like
-         * nPush, nInc, nPop, Reduce must fire when the engine reaches this
-         * node during matching, NOT during materialise(). */
+            fprintf(stderr, "SPAT_USER_CALL %s\n", sp->strv);
+
+        /* Primitive pattern builtins: evaluate args now and build proper T_* node.
+         * These are NOT side-effect functions — they return a pattern value.
+         * ANY(chars), SPAN(chars), BREAK(chars), NOTANY(chars): arg[0] = charset string.
+         * LEN(n): arg[0] = integer.
+         * POS(n), RPOS(n), TAB(n), RTAB(n): arg[0] = integer. */
+        const char *nm = sp->strv ? sp->strv : "";
+
+        if ((strcasecmp(nm, "ANY")    == 0 ||
+             strcasecmp(nm, "SPAN")   == 0 ||
+             strcasecmp(nm, "BREAK")  == 0 ||
+             strcasecmp(nm, "NOTANY") == 0) && sp->nargs >= 1) {
+            /* Evaluate charset arg at materialise time */
+            SnoVal cv = sp->args[0];
+            const char *chars = (cv.type == SSTR && cv.s) ? cv.s : "";
+            p->chars = GC_strdup(chars);
+            if      (strcasecmp(nm, "ANY")    == 0) p->type = T_ANY;
+            else if (strcasecmp(nm, "SPAN")   == 0) p->type = T_SPAN;
+            else if (strcasecmp(nm, "BREAK")  == 0) p->type = T_BREAK;
+            else                                     p->type = T_NOTANY;
+            if (getenv("PAT_DEBUG"))
+                fprintf(stderr, "  → %s chars='%.20s'\n", nm, p->chars);
+            return p;
+        }
+
+        if ((strcasecmp(nm, "LEN")   == 0 ||
+             strcasecmp(nm, "POS")   == 0 ||
+             strcasecmp(nm, "RPOS")  == 0 ||
+             strcasecmp(nm, "TAB")   == 0 ||
+             strcasecmp(nm, "RTAB")  == 0) && sp->nargs >= 1) {
+            SnoVal nv = sp->args[0];
+            int n = (nv.type == SINT) ? (int)nv.i : (int)to_int(nv);
+            p->n = n;
+            if      (strcasecmp(nm, "LEN")  == 0) { p->type = T_LEN;  }
+            else if (strcasecmp(nm, "POS")  == 0) {
+                /* Adjust for scan offset */
+                p->n = n - ctx->scan_start;
+                if (p->n < 0) { p->type = T_FAIL; p->n = 0; }
+                else p->type = T_POS;
+            }
+            else if (strcasecmp(nm, "RPOS") == 0) { p->type = T_RPOS; }
+            else if (strcasecmp(nm, "TAB")  == 0) { p->type = T_TAB;  }
+            else                                   { p->type = T_RTAB; }
+            if (getenv("PAT_DEBUG"))
+                fprintf(stderr, "  → %s n=%d\n", nm, p->n);
+            return p;
+        }
+
+        /* All other calls (nInc, nPush, nPop, Reduce, match, etc.):
+         * Defer to match time via T_FUNC — side-effect calls must fire
+         * when the engine reaches this node, NOT during materialise(). */
         return make_func(&ctx->pl, sp->strv, sp->args, sp->nargs);
     }
 
