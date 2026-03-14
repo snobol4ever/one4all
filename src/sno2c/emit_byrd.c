@@ -1317,7 +1317,10 @@ static void emit_simple_val(Expr *e) {
     if (!e) { B("NULL_VAL"); return; }
     switch (e->kind) {
     case E_STR:
-        /* strip surrounding quotes if present — sval is already unquoted */
+        /* 'nTop()' as a quoted string in & context: wire directly to C-level ntop()
+         * so compiled byrd box counter (npush/ninc/npop) and Reduce agree. */
+        if (e->sval && strcasecmp(e->sval, "nTop()") == 0)
+            { B("INT_VAL(ntop())"); return; }
         B("STR_VAL(\"%s\")", e->sval ? e->sval : "");
         return;
     case E_INT:
@@ -1493,7 +1496,8 @@ static void byrd_emit(Expr *pat,
         /* nPush() */
         if (strcasecmp(n, "nPush") == 0) {
             PL(alpha, gamma, "npush();");
-            PLG(beta, omega);
+            /* beta: re-push so counter is live when ARBNO extends on backtrack */
+            PL(beta,  gamma, "npush();");
             return;
         }
         /* nInc() */

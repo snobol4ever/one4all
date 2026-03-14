@@ -1704,6 +1704,12 @@ static void emit_trampoline_program(Program *prog) {
         }
         E("\", _sno_fn_%s);\n", fn_table[i].name);
     }
+    /* Initialize well-known globals that SNOBOL4 programs assume are set
+     * by the runtime but are not defined in beauty.sno's inc files.
+     * nl = CHAR(10), tab = CHAR(9) */
+    E("\n    /* runtime globals */\n");
+    E("    var_set(\"nl\",  aply(\"CHAR\",(SnoVal[]){INT_VAL(10)},1));\n");
+    E("    var_set(\"tab\", aply(\"CHAR\",(SnoVal[]){INT_VAL(9)},1));\n");
     E("\n    trampoline_run(block_START);\n");
     E("    return 0;\n}\n");
 }
