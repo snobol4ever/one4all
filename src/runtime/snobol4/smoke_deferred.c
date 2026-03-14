@@ -3,12 +3,12 @@
  *
  * In beautiful.sno: *snoParse, *snoExpr, *snoCommand etc.
  * These are stored in the variable table as patterns, then
- * referenced via pat_ref("snoParse") at mtch time.
+ * referenced via pat_ref("snoParse") at MATCH_fn time.
  *
  * This test:
  *   1. Stores a pattern in a variable
  *   2. Matches using a deferred ref to that variable
- *   3. Verifies the mtch succeeds
+ *   3. Verifies the MATCH_fn succeeds
  */
 #include <stdio.h>
 #include "snobol4.h"

@@ -97,7 +97,7 @@ static void test_pattern_engine(void) {
     DESCR_t cap_var = NULVCL;
     NV_SET_fn("captured", NULVCL);
     DESCR_t cap = pat_assign_cond(pat_span("0123456789"), NV_GET_fn("captured"));
-    /* Note: assign_cond stores into the variable on mtch */
+    /* Note: assign_cond stores into the variable on MATCH_fn */
     int ok = match_pattern(
         pat_cat(pat_pos(0), pat_cat(cap, pat_rpos(0))),
         "12345"
@@ -111,7 +111,7 @@ static void test_pattern_engine(void) {
     CHECK("match_and_replace result is 'hello there'",
           strcmp(VARVAL_fn(subject), "hello there") == 0);
 
-    /* pat_user_call — unknown pattern function dispatched via APLY_fn */
+    /* pat_user_call — unknown pattern function dispatched via APPLY_fn */
     /* (requires register_fn to be working) */
 }
 
@@ -168,7 +168,7 @@ static void test_registration(void) {
 
     /* register_fn */
     register_fn("addOne", _test_fn, 1, 1);
-    DESCR_t result = APLY_fn("addOne", (DESCR_t[]){INTVAL(41)}, 1);
+    DESCR_t result = APPLY_fn("addOne", (DESCR_t[]){INTVAL(41)}, 1);
     CHECK("registered fn 'addOne(41)' returns 42", to_int(result) == 42);
 
     /* push_val / pop_val / top_val */

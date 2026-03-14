@@ -8,9 +8,9 @@
  *     if/else, while, until, repeat, for, case, exit, next,
  *     fail, return, function declarations, record declarations.
  *   - The P-component (pattern matching) is SNOBOL4's:
- *     subject ? pattern  (mtch)
- *     subject ? pattern <- replacement  (replc)
- *     subject ?- pattern  (shorthand replc-with-empty)
+ *     subject ? pattern  (MATCH_fn)
+ *     subject ? pattern <- replacement  (REPLACE_fn)
+ *     subject ?- pattern  (shorthand REPLACE_fn-with-empty)
  *
  * Programs consist of a sequence of declarations (record and function).
  * Execution begins with a call to main().
@@ -141,9 +141,9 @@ typedef enum {
     RS_RETURN,      /* return [expr] */
     RS_STOP,        /* stop */
 
-    RS_MATCH,       /* expr ? expr  (pattern mtch, no replacement) */
-    RS_REPLACE,     /* expr ? expr <- expr  (pattern replc) */
-    RS_REPLN,       /* expr ?- expr  (replc with empty, shorthand) */
+    RS_MATCH,       /* expr ? expr  (pattern MATCH_fn, no replacement) */
+    RS_REPLACE,     /* expr ? expr <- expr  (pattern REPLACE_fn) */
+    RS_REPLN,       /* expr ?- expr  (REPLACE_fn with empty, shorthand) */
 
     RS_COMPOUND,    /* { stmt ; stmt ; … } */
 } RSKind;

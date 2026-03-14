@@ -1,6 +1,6 @@
 /* runtime.h — SNOBOL4-tiny static runtime
  *
- * All mtch state is statically allocated. Zero allocation during matching.
+ * All MATCH_fn state is statically allocated. Zero allocation during matching.
  * CODE/EVAL dynamic patterns use heap (two-tier: static fast path + heap).
  */
 
@@ -21,7 +21,7 @@ typedef struct {
 #define STR_EMPTY  ((str_t){ "", 0 })
 #define STR_LIT(s) ((str_t){ (s), (int64_t)(sizeof(s)-1) })
 
-/* ---------- mtch state ------------------------------------------- */
+/* ---------- MATCH_fn state ------------------------------------------- */
 
 typedef struct {
     const char *subject;
@@ -37,8 +37,8 @@ void output_cstr(const char *s);
 /* ---------- entry / exit frame ------------------------------------ */
 /* Used by recursive patterns (test_s4_2.c calling convention)     */
 
-void *entr(void **frame_ptr, size_t frame_size);
-void  xit(void **frame_ptr);
+void *ENTER_fn(void **frame_ptr, size_t frame_size);
+void  EXIT_fn(void **frame_ptr);
 void  arena_reset(void);   /* call between matches — resets arena to empty */
 
 /* ---------- value stack ------------------------------------------- */

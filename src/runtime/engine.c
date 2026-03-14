@@ -1,5 +1,5 @@
 /*======================================================================================
- * engine.c — SNOBOL4-tiny Byrd Box mtch engine (pure C, no Python)
+ * engine.c — SNOBOL4-tiny Byrd Box MATCH_fn engine (pure C, no Python)
  *
  * Derived from SNOBOL4cython/snobol4c_module.c (Lon Cherryholmes, 2026).
  * Extracted: Python→C converter and CPython module removed entirely.
@@ -425,7 +425,7 @@ MatchResult engine_match_ex(Pattern *root, const char *subject, int subject_len,
         case T_EPSILON<<2|PROCEED: { a = SUCCEED;                                z_up(&Z, &psi);               break; }
 /*--- T_VARREF: deferred variable pattern ref (used inside ARBNO for recursive grammars) ---*/
         case T_VARREF<<2|PROCEED: {
-            /* Resolve the variable name to a Pattern* at mtch time */
+            /* Resolve the variable name to a Pattern* at MATCH_fn time */
             Pattern *resolved = Z.var_fn ? Z.var_fn(Z.PI->s, Z.var_data) : NULL;
             if (!resolved || resolved->type == T_EPSILON) {
                 /* var not set or empty — treat as epsilon (succeed without consuming) */
@@ -513,7 +513,7 @@ MatchResult engine_match_ex(Pattern *root, const char *subject, int subject_len,
         }
         case T_CAPTURE<<2|SUCCEED:
             /* Child matched: fire callback with (cap_slot, start, delta_end).
-             * Z.delta = uncommitted cursor after child's mtch. */
+             * Z.delta = uncommitted cursor after child's MATCH_fn. */
             if (getenv("PAT_DEBUG"))
                 fprintf(stderr, "  T_CAPTURE SUCCEED slot=%d delta=%d (cap_start=%d) psi_depth=%d\n",
                     Z.PI->n, Z.delta, Z.cap_start, psi.count);
@@ -536,7 +536,7 @@ MatchResult engine_match_ex(Pattern *root, const char *subject, int subject_len,
             a = CONCEDE;
             z_up_fail(&Z, &psi);
             break;
-/*--- T_FUNC (zero-width side-effect call at mtch time) ----------------------------*/
+/*--- T_FUNC (zero-width side-effect call at MATCH_fn time) ----------------------------*/
         case T_FUNC<<2|PROCEED:
             if (Z.PI->func) {
                 void *r = Z.PI->func(Z.PI->func_data);

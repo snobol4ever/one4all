@@ -7,10 +7,10 @@
  * Architecture:
  *   - DESCR_t with type P holds a PATND_t* (GC-managed)
  *   - PATND_t wraps a lazy tree of pattern constructors
- *   - At mtch time, match_pattern() materialises the pattern into
+ *   - At MATCH_fn time, match_pattern() materialises the pattern into
  *     engine Pattern* nodes and calls engine_match()
- *   - Deferred refs (*name) are resolved from the variable table at mtch time
- *   - Capture assignments ($ and .) write into the variable table on mtch
+ *   - Deferred refs (*name) are resolved from the variable table at MATCH_fn time
+ *   - Capture assignments ($ and .) write into the variable table on MATCH_fn
  */
 
 #include <stdio.h>
@@ -60,7 +60,7 @@ typedef struct _PATND_t PATND_t;
 struct _PATND_t {
     XKIND_t  kind;
     int         materialising; /* cycle detection flag */
-    const char *strv;       /* XCHR / XSPNC / XBRKC / XANYC / XNNYC / XDSAR / XATP */
+    const char *STRVAL_fn;       /* XCHR / XSPNC / XBRKC / XANYC / XNNYC / XDSAR / XATP */
     int64_t     num;       /* XLNTH / XPOSI / XRPSI / XTB / XRTB */
     PATND_t *left;      /* XCAT / XOR / XARBN / XFNCE / XFNME / XNME */
     PATND_t *right;     /* XCAT / XOR */
@@ -97,31 +97,31 @@ static inline PATND_t *spat_of(DESCR_t v) {
 
 DESCR_t pat_lit(const char *s) {
     PATND_t *p = spat_new(XCHR);
-    p->strv = s ? GC_strdup(s) : "";
+    p->STRVAL_fn = s ? GC_strdup(s) : "";
     return spat_val(p);
 }
 
 DESCR_t pat_span(const char *chars) {
     PATND_t *p = spat_new(XSPNC);
-    p->strv = chars ? GC_strdup(chars) : "";
+    p->STRVAL_fn = chars ? GC_strdup(chars) : "";
     return spat_val(p);
 }
 
 DESCR_t pat_break_(const char *chars) {
     PATND_t *p = spat_new(XBRKC);
-    p->strv = chars ? GC_strdup(chars) : "";
+    p->STRVAL_fn = chars ? GC_strdup(chars) : "";
     return spat_val(p);
 }
 
 DESCR_t pat_any_cs(const char *chars) {
     PATND_t *p = spat_new(XANYC);
-    p->strv = chars ? GC_strdup(chars) : "";
+    p->STRVAL_fn = chars ? GC_strdup(chars) : "";
     return spat_val(p);
 }
 
 DESCR_t pat_notany(const char *chars) {
     PATND_t *p = spat_new(XNNYC);
-    p->strv = chars ? GC_strdup(chars) : "";
+    p->STRVAL_fn = chars ? GC_strdup(chars) : "";
     return spat_val(p);
 }
 
@@ -232,7 +232,7 @@ DESCR_t pat_alt(DESCR_t left, DESCR_t right) {
 
 DESCR_t pat_ref(const char *name) {
     PATND_t *p = spat_new(XDSAR);
-    p->strv = name ? GC_strdup(name) : "";
+    p->STRVAL_fn = name ? GC_strdup(name) : "";
     return spat_val(p);
 }
 
@@ -271,7 +271,7 @@ DESCR_t var_as_pattern(DESCR_t v) {
 
 DESCR_t pat_user_call(const char *name, DESCR_t *args, int nargs) {
     PATND_t *p = spat_new(XATP);
-    p->strv   = name ? GC_strdup(name) : "";
+    p->STRVAL_fn   = name ? GC_strdup(name) : "";
     p->nargs = nargs;
     if (nargs > 0) {
         p->args = (DESCR_t *)GC_MALLOC(nargs * sizeof(DESCR_t));
@@ -283,18 +283,18 @@ DESCR_t pat_user_call(const char *name, DESCR_t *args, int nargs) {
 /* =========================================================================
  * Pattern materialisation — convert PATND_t tree to engine Pattern* tree
  *
- * The engine uses malloc'd Pattern nodes that are freed after each mtch.
+ * The engine uses malloc'd Pattern nodes that are freed after each MATCH_fn.
  * We materialise lazily: deferred refs are resolved from the var table NOW.
- * Capture variables are recorded in a capture list, applied after mtch.
+ * Capture variables are recorded in a capture list, applied after MATCH_fn.
  * ===================================================================== */
 
 typedef struct {
     char   *var_name;   /* variable name to assign to (static, or NULL if deferred) */
-    /* Deferred var name: when var is *FuncCall(), evaluate at APLY_fn time */
-    char *(*var_fn)(void *data); /* if set, call this at APLY_fn time to get var name */
+    /* Deferred var name: when var is *FuncCall(), evaluate at APPLY_fn time */
+    char *(*var_fn)(void *data); /* if set, call this at APPLY_fn time to get var name */
     void   *var_data;   /* userdata for var_fn */
-    int     start;      /* mtch start cursor */
-    int     end;        /* mtch end cursor */
+    int     start;      /* MATCH_fn start cursor */
+    int     end;        /* MATCH_fn end cursor */
     int     is_imm;     /* 1 = immediate ($), 0 = conditional (.) */
 } Capture;
 
@@ -329,7 +329,7 @@ typedef struct {
  *                        stack side-effects (increment counter, PUSH_fn/POP_fn frame).
  *   Reduce            — returns DT_SNUL; pops parse stack and builds tree node.
  *
- * If the function returns P, we run it as a zero-width sub-mtch
+ * If the function returns P, we run it as a zero-width sub-MATCH_fn
  * against the current subject string so its captures fire correctly.
  * DT_FAIL (FRETURN) => -1 => engine CONCEDE.
  * All other returns => succeed zero-width. */
@@ -337,18 +337,18 @@ typedef struct {
     const char  *name;
     DESCR_t      *args;
     int          nargs;
-    /* Set at mtch time by the engine dispatcher in match_pattern.
-     * Points to the current subject being matched — used for P sub-mtch. */
+    /* Set at MATCH_fn time by the engine dispatcher in match_pattern.
+     * Points to the current subject being matched — used for P sub-MATCH_fn. */
     const char  *subject;
 } UCData;
 
 static void *user_call_fn(void *userdata) {
     UCData *d = (UCData *)userdata;
     if (getenv("PAT_DEBUG")) fprintf(stderr, "  user_call_fn: %s\n", d->name);
-    DESCR_t r = APLY_fn(d->name, d->args, d->nargs);
+    DESCR_t r = APPLY_fn(d->name, d->args, d->nargs);
     if (r.v == DT_FAIL) return (void *)(intptr_t)-1;
     if (r.v == DT_P && r.p) {
-        /* Run the returned pattern as a zero-width sub-mtch.
+        /* Run the returned pattern as a zero-width sub-MATCH_fn.
          * nInc/nPush/nPop return epsilon . *Fn() wrappers — matching against ""
          * fires the capture which records the counter/frame. */
         const char *subj = d->subject ? d->subject : "";
@@ -357,7 +357,7 @@ static void *user_call_fn(void *userdata) {
     return (void *)1;
 }
 
-/* Return 1 if this function must be deferred to mtch time.
+/* Return 1 if this function must be deferred to MATCH_fn time.
  * All others are safe to call eagerly at materialise time. */
 static int is_sideeffect_fn(const char *name) {
     if (!name) return 0;
@@ -374,7 +374,7 @@ static int is_sideeffect_fn(const char *name) {
  * the function's return value names the target variable. */
 static char *deferred_var_fn(void *data) {
     UCData *d = (UCData *)data;
-    DESCR_t r = APLY_fn(d->name, d->args, d->nargs);
+    DESCR_t r = APPLY_fn(d->name, d->args, d->nargs);
     if (r.v == DT_S && r.s && r.s[0]) return (char *)r.s;
     if (r.v == DT_SNUL) return NULL; /* NRETURN — no assignment */
     return NULL;
@@ -413,17 +413,17 @@ static Pattern *make_epsilon(PatternList *pl) {
     return p;
 }
 
-/* Deferred USER_CALL: data passed to T_FUNC callback at mtch time */
+/* Deferred USER_CALL: data passed to T_FUNC callback at MATCH_fn time */
 typedef struct {
     const char *name;
     DESCR_t     *args;
     int         nargs;
 } DeferredCall;
 
-/* T_FUNC callback: called by engine at mtch time (zero-width, side-effect) */
+/* T_FUNC callback: called by engine at MATCH_fn time (zero-width, side-effect) */
 static void *deferred_call_fn(void *userdata) {
     DeferredCall *d = (DeferredCall *)userdata;
-    /* Special handling for reduce/Reduce: evaluate string args at mtch time */
+    /* Special handling for reduce/Reduce: evaluate string args at MATCH_fn time */
     if (d->nargs >= 2 && strcasecmp(d->name, "reduce") == 0) {
         DESCR_t t_arg = d->args[0];
         DESCR_t n_arg = d->args[1];
@@ -440,15 +440,15 @@ static void *deferred_call_fn(void *userdata) {
                 t_arg = STRVAL(stripped);
             }
         }
-        /* Evaluate count expression at mtch time */
+        /* Evaluate count expression at MATCH_fn time */
         if (n_arg.v == DT_S)
-            n_arg = evl(n_arg);
+            n_arg = EVAL_fn(n_arg);
         DESCR_t reduce_args[2] = { t_arg, n_arg };
-        APLY_fn("Reduce", reduce_args, 2);
+        APPLY_fn("Reduce", reduce_args, 2);
         return (void *)1; /* succeed */
     }
     /* All other calls: fire and succeed (side-effect only) */
-    APLY_fn(d->name, d->args, d->nargs);
+    APPLY_fn(d->name, d->args, d->nargs);
     return (void *)1;
 }
 
@@ -473,28 +473,28 @@ static Pattern *materialise(PATND_t *sp, MatchCtx *ctx) {
 
     case XCHR:
         p->type  = T_LITERAL;
-        p->s     = sp->strv ? sp->strv : "";
+        p->s     = sp->STRVAL_fn ? sp->STRVAL_fn : "";
         p->s_len = (int)strlen(p->s);
         return p;
 
     case XSPNC:
         p->type  = T_SPAN;
-        p->chars = sp->strv ? sp->strv : "";
+        p->chars = sp->STRVAL_fn ? sp->STRVAL_fn : "";
         return p;
 
     case XBRKC:
         p->type  = T_BREAK;
-        p->chars = sp->strv ? sp->strv : "";
+        p->chars = sp->STRVAL_fn ? sp->STRVAL_fn : "";
         return p;
 
     case XANYC:
         p->type  = T_ANY;
-        p->chars = sp->strv ? sp->strv : "";
+        p->chars = sp->STRVAL_fn ? sp->STRVAL_fn : "";
         return p;
 
     case XNNYC:
         p->type  = T_NOTANY;
-        p->chars = sp->strv ? sp->strv : "";
+        p->chars = sp->STRVAL_fn ? sp->STRVAL_fn : "";
         return p;
 
     case XLNTH:
@@ -505,7 +505,7 @@ static Pattern *materialise(PATND_t *sp, MatchCtx *ctx) {
     case XPOSI:
         p->type = T_POS;
         /* Adjust for scan offset: POS(n) in original = POS(n - scan_start) in sub-string.
-         * If n < scan_start, this can never mtch from this offset. */
+         * If n < scan_start, this can never MATCH_fn from this offset. */
         p->n = (int)(sp->num - ctx->scan_start);
         if (p->n < 0) { p->type = T_FAIL; p->n = 0; }
         return p;
@@ -585,11 +585,11 @@ static Pattern *materialise(PATND_t *sp, MatchCtx *ctx) {
     }
 
     case XDSAR: {
-        if (getenv("PAT_DEBUG") && sp->strv)
-            fprintf(stderr, "  XDSAR '%s' -> type=%d\n", sp->strv,
-                NV_GET_fn(sp->strv).v);
+        if (getenv("PAT_DEBUG") && sp->STRVAL_fn)
+            fprintf(stderr, "  XDSAR '%s' -> type=%d\n", sp->STRVAL_fn,
+                NV_GET_fn(sp->STRVAL_fn).v);
         /* Resolve *name from variable table NOW */
-        DESCR_t v = NV_GET_fn(sp->strv);
+        DESCR_t v = NV_GET_fn(sp->STRVAL_fn);
         if (v.v == DT_P) {
             /* Cycle detection: track variable names being materialised.
              * Recursive patterns (e.g. snoExpr14 = '|' *snoExpr14 rest)
@@ -598,11 +598,11 @@ static Pattern *materialise(PATND_t *sp, MatchCtx *ctx) {
             static __thread const char *_mat_stack[MAT_MAX_DEPTH];
             static __thread int _mat_top = 0;
             for (int _i = 0; _i < _mat_top; _i++) {
-                if (_mat_stack[_i] == sp->strv || strcmp(_mat_stack[_i], sp->strv) == 0) {
+                if (_mat_stack[_i] == sp->STRVAL_fn || strcmp(_mat_stack[_i], sp->STRVAL_fn) == 0) {
                     return make_epsilon(&ctx->pl); /* cycle: return epsilon */
                 }
             }
-            if (_mat_top < MAT_MAX_DEPTH) _mat_stack[_mat_top++] = sp->strv;
+            if (_mat_top < MAT_MAX_DEPTH) _mat_stack[_mat_top++] = sp->STRVAL_fn;
             PATND_t *sp2 = spat_of(v);
             Pattern *result = materialise(sp2, ctx);
             if (_mat_top > 0) _mat_top--;
@@ -641,7 +641,7 @@ static Pattern *materialise(PATND_t *sp, MatchCtx *ctx) {
          *
          * We materialise this as a T_CAPTURE node wrapping the child. T_CAPTURE fires
          * a callback with (cap_slot, start, end) when the child succeeds. The cap_slot
-         * is the indx into ctx->captures[] where we stored the variable name.
+         * is the INDEX_fn into ctx->captures[] where we stored the variable name.
          *
          * The callback (capture_callback below) is called by engine_match_ex, reads
          * ctx->captures[cap_slot].var_name, and calls NV_SET_fn with the matched span.
@@ -666,7 +666,7 @@ static Pattern *materialise(PATND_t *sp, MatchCtx *ctx) {
             PATND_t *vsp = spat_of(vv);
             if (vsp && vsp->kind == XATP) {
                 UCData *d = (UCData *)GC_MALLOC(sizeof(UCData));
-                d->name  = vsp->strv;
+                d->name  = vsp->STRVAL_fn;
                 d->nargs = vsp->nargs;
                 d->args  = NULL;
                 if (vsp->nargs > 0) {
@@ -695,14 +695,14 @@ static Pattern *materialise(PATND_t *sp, MatchCtx *ctx) {
 
     case XATP: {
         if (getenv("PAT_DEBUG"))
-            fprintf(stderr, "XATP %s\n", sp->strv);
+            fprintf(stderr, "XATP %s\n", sp->STRVAL_fn);
 
         /* Primitive pattern builtins: evaluate args now and build proper T_* node.
          * These are NOT side-effect functions — they return a pattern value.
          * ANY(chars), SPAN(chars), BREAK(chars), NOTANY(chars): arg[0] = charset string.
          * LEN(n): arg[0] = integer.
          * POS(n), RPOS(n), TAB(n), RTAB(n): arg[0] = integer. */
-        const char *nm = sp->strv ? sp->strv : "";
+        const char *nm = sp->STRVAL_fn ? sp->STRVAL_fn : "";
 
         if ((strcasecmp(nm, "ANY")    == 0 ||
              strcasecmp(nm, "SPAN")   == 0 ||
@@ -747,7 +747,7 @@ static Pattern *materialise(PATND_t *sp, MatchCtx *ctx) {
         /* All other calls (nInc, nPush, nPop, Reduce, match, etc.):
          * Defer to match time via T_FUNC — side-effect calls must fire
          * when the engine reaches this node, NOT during materialise(). */
-        return make_func(&ctx->pl, sp->strv, sp->args, sp->nargs);
+        return make_func(&ctx->pl, sp->STRVAL_fn, sp->args, sp->nargs);
     }
 
     default:
@@ -795,7 +795,7 @@ static void apply_captures(MatchCtx *ctx) {
 }
 
 /* =========================================================================
- * match_pattern — TOP_fn-level mtch entry point
+ * match_pattern — TOP_fn-level MATCH_fn entry point
  * ===================================================================== */
 
 /* Callback for T_VARREF resolution: look up variable by name and materialise.
@@ -816,7 +816,7 @@ static Pattern *var_resolve_callback(const char *name, void *userdata) {
         return ep;
     }
     /* Cache lookup: if we've already materialised this PATND_t* during this
-     * mtch, return the cached Pattern* tree.  This prevents nInc/nPush/nPop
+     * MATCH_fn, return the cached Pattern* tree.  This prevents nInc/nPush/nPop
      * (and any other XATP nodes) from firing on every ARBNO iteration
      * that re-resolves the same variable (e.g. snoCommand).
      * The tree is identical every time — only the first materialise call is needed. */
@@ -832,7 +832,7 @@ static Pattern *var_resolve_callback(const char *name, void *userdata) {
     return root;
 }
 
-/* Internal: try mtch using a pre-materialised root at a single starting offset.
+/* Internal: try MATCH_fn using a pre-materialised root at a single starting offset.
  * Does NOT call materialise — caller must do that once. */
 static int try_match_at_root(Pattern *root, const char *subject, int slen, int start, MatchCtx *ctx) {
     ctx->scan_start = start;
@@ -853,7 +853,7 @@ static int try_match_at_root(Pattern *root, const char *subject, int slen, int s
     return -1;
 }
 
-/* Internal: materialise then try mtch at a single starting offset.
+/* Internal: materialise then try MATCH_fn at a single starting offset.
  * Used for match_and_replace and other single-shot callers. */
 static int try_match_at(PATND_t *sp, const char *subject, int slen, int start, MatchCtx *ctx) {
     ctx->scan_start = start;
@@ -899,7 +899,7 @@ int match_pattern(DESCR_t pat, const char *subject) {
     MatchCtx mat_ctx; memset(&mat_ctx, 0, sizeof(mat_ctx)); mat_ctx.subject = subject;
     Pattern *root = materialise(sp, &mat_ctx);
 
-    /* SNOBOL4 unanchored mtch: try each starting position */
+    /* SNOBOL4 unanchored MATCH_fn: try each starting position */
     if (kw_anchor) {
         /* &ANCHOR=1: anchored at position 0 only */
         MatchCtx ctx; memset(&ctx, 0, sizeof(ctx)); ctx.subject = subject;
@@ -923,14 +923,14 @@ int match_pattern(DESCR_t pat, const char *subject) {
 }
 
 /* =========================================================================
- * match_and_replace — pattern mtch with replacement
+ * match_and_replace — pattern MATCH_fn with replacement
  *
  * Matches pat against *subject. On success, replaces the matched portion
  * with replacement and updates *subject. Returns 1 on success, 0 on fail.
  * ===================================================================== */
 
 /* =========================================================================
- * match_pattern_at — cursor-aware anchored mtch for E_INDR / *varname
+ * match_pattern_at — cursor-aware anchored MATCH_fn for E_INDR / *varname
  *
  * Matches pat against subject starting at position cursor (anchored — no
  * scan loop).  Returns the new cursor position (>= cursor) on success, or
@@ -951,7 +951,7 @@ int match_pattern_at(DESCR_t pat, const char *subject, int subj_len, int cursor)
             if (memcmp(subject + cursor, lit, (size_t)n) != 0) return -1;
             return cursor + n;
         }
-        /* NULL/integer/other — treat as empty string: anchored mtch of "" always succeeds */
+        /* NULL/integer/other — treat as empty string: anchored MATCH_fn of "" always succeeds */
         return cursor;
     }
 
@@ -1119,11 +1119,11 @@ void define_spec(DESCR_t spec) {
 /* apply_val — APPLY(fnval, args...) */
 DESCR_t apply_val(DESCR_t fnval, DESCR_t *args, int nargs) {
     const char *name = VARVAL_fn(fnval);
-    return APLY_fn(name, args, nargs);
+    return APPLY_fn(name, args, nargs);
 }
 
 /* =========================================================================
- * evl — EVAL(expr)
+ * EVAL_fn — EVAL(expr)
  *
  * Hand-rolled recursive descent over the subset of SNOBOL4 pattern
  * expressions that beauty.sno produces:
@@ -1131,18 +1131,18 @@ DESCR_t apply_val(DESCR_t fnval, DESCR_t *args, int nargs) {
  *   expr : term ('.' term)*
  *   term : '*' ident ['(' args ')']   deferred ref / user_call node
  *        | ident '(' args ')'          function call — evaluate now
- *        | '\'' strv '\''               string literal → pat_lit
+ *        | '\'' STRVAL_fn '\''               string literal → pat_lit
  *        | ident                       plain name → S sentinel
  *   args : val (',' val)*
  *   val  : ident '(' args ')'          function call → value
- *        | '\'' strv '\''               string value
+ *        | '\'' STRVAL_fn '\''               string value
  *        | ident                       var lookup
  *        | integer
  *
  * Key semantic: plain IDENT in term position returns STRVAL(name).
  * Dot handler checks right operand type:
  *   S     → assign_cond(left, right)   capture into named var
- *   P → pat_cat(left, right)        pattern ccat
+ *   P → pat_cat(left, right)        pattern CONCAT_fn
  * ========================================================================= */
 
 typedef struct { const char *s; int pos; } SnoEvalCtx;
@@ -1203,7 +1203,7 @@ static DESCR_t _ev_val(SnoEvalCtx *e) {
         if (e->s[e->pos] == '(') {
             e->pos++;
             DESCR_t args[8]; int na = _ev_args(e, args, 8);
-            return APLY_fn(nm, args, na);
+            return APPLY_fn(nm, args, na);
         }
         return NV_GET_fn(nm);
     }
@@ -1241,7 +1241,7 @@ static DESCR_t _ev_term(SnoEvalCtx *e) {
         if (e->s[e->pos] == '(') {
             e->pos++;
             DESCR_t args[8]; int na = _ev_args(e, args, 8);
-            return APLY_fn(nm, args, na);
+            return APPLY_fn(nm, args, na);
         }
         return STRVAL(GC_strdup(nm));
     }
@@ -1274,7 +1274,7 @@ static DESCR_t _ev_expr(SnoEvalCtx *e) {
     return left;
 }
 
-DESCR_t evl(DESCR_t expr) {
+DESCR_t EVAL_fn(DESCR_t expr) {
     if (expr.v != DT_S && expr.v != DT_SNUL) return expr;
     const char *s = VARVAL_fn(expr);
     if (!s || !*s) return pat_epsilon();
@@ -1332,8 +1332,8 @@ DESCR_t sort_fn(DESCR_t arr) {
             idx++;
         }
 
-    /* Sort keys (indirect sort via indx array) */
-    /* Build indx array and sort */
+    /* Sort keys (indirect sort via INDEX_fn array) */
+    /* Build INDEX_fn array and sort */
     int *order = GC_malloc(n * sizeof(int));
     for (int i = 0; i < n; i++) order[i] = i;
     /* Simple insertion sort to avoid qsort complexity with indirect */
@@ -1366,7 +1366,7 @@ DESCR_t sort_fn(DESCR_t arr) {
  * Used when a pattern expression contains a user-defined function call, e.g. *t(y) in pattern. */
 DESCR_t pat_call(const char *name, DESCR_t arg) {
     DESCR_t args[1] = { arg };
-    DESCR_t result = APLY_fn(name, args, 1);
+    DESCR_t result = APPLY_fn(name, args, 1);
     if (IS_FAIL_fn(result)) return pat_fail();
     /* Wrap result as a pattern: if it's already a pattern, return it;
      * otherwise treat it as a literal string pattern. */

@@ -1,10 +1,10 @@
 /*
  * runtime_shim.h — shim between sno2c-generated C and snobol4.h runtime
  *
- * sno2c emits: strv(), vint(), kw(), ccat(), alt(),
+ * sno2c emits: STRVAL_fn(), INTVAL_fn(), kw(), CONCAT_fn(), alt(),
  * aref(), aset(), iset(), deref(), cursor_get(),
  * assign_expr(), get(v), set(v,x), IS_FAIL_fn(v), DT_SNUL.
- * Also: mtch(&s,pat) → SnoMatch; replc(&s,&m,repl).
+ * Also: MATCH_fn(&s,pat) → SnoMatch; REPLACE_fn(&s,&m,repl).
  */
 
 #ifndef RUNTIME_SHIM_H
@@ -38,9 +38,9 @@ static inline DESCR_t _str_impl(const char *s) {
     char *p = GC_STRDUP(s);
     return STRVAL(p);
 }
-#define vint(i)   _vint_impl((int64_t)(i))
+#define INTVAL_fn(i)   _vint_impl((int64_t)(i))
 #define real(d)  _real_impl((double)(d))
-#define strv(s)   _str_impl(s)
+#define STRVAL_fn(s)   _str_impl(s)
 
 /* ---- Keyword access ---- */
 static inline DESCR_t _kw_impl(const char *name) { return NV_GET_fn(name); }
@@ -49,11 +49,11 @@ static inline void   _kw_set_impl(const char *name, DESCR_t v) { NV_SET_fn(name,
 #define kw_set(name, v)  _kw_set_impl(name, v)
 
 /* ---- Concatenation: override char* version with DESCR_t version ---- */
-/* ccat in snobol4.h is char*,char*→char*; we need DESCR_t,DESCR_t→DESCR_t */
-#ifdef ccat
-#undef ccat
+/* CONCAT_fn in snobol4.h is char*,char*→char*; we need DESCR_t,DESCR_t→DESCR_t */
+#ifdef CONCAT_fn
+#undef CONCAT_fn
 #endif
-#define ccat(a, b)    CONC_fn((a), (b))
+#define CONCAT_fn(a, b)    CONCAT_fn((a), (b))
 
 /* ---- Pattern alternation ---- */
 static inline DESCR_t _alt_impl(DESCR_t a, DESCR_t b) { return pat_alt(a, b); }
@@ -108,11 +108,11 @@ static inline DESCR_t _index_impl(DESCR_t base, DESCR_t *keys, int n) {
 /* Use functions directly (not macros) to avoid preprocessor compound-literal arg-count issues */
 #undef aref
 #undef aset
-#undef indx
+#undef INDEX_fn
 /* These are now just the underlying functions */
 #define aref   _aref_impl
 #define aset   _aset_impl
-#define indx  _index_impl
+#define INDEX_fn  _index_impl
 
 /* ---- Cursor capture stub ---- */
 static inline DESCR_t _snoc_cursor_get(const char *varname) {
@@ -139,10 +139,10 @@ static inline DESCR_t _snoc_pat_imm(DESCR_t child, const char *var) {
 #define pat_cond(child, var)    _snoc_pat_cond(child, var)
 #define pat_imm(child, var)     _snoc_pat_imm(child, var)
 
-/* ---- Match / replc ---- */
+/* ---- Match / REPLACE_fn ---- */
 typedef struct {
     int    failed;
-    DESCR_t subject_saved;  /* saved subject before mtch, for replacement */
+    DESCR_t subject_saved;  /* saved subject before MATCH_fn, for replacement */
     DESCR_t pattern;
 } SnoMatch;
 
@@ -157,14 +157,14 @@ static inline SnoMatch _snoc_match(DESCR_t *subj, DESCR_t pat) {
 }
 static inline void _snoc_replace(DESCR_t *subj, SnoMatch *m, DESCR_t repl) {
     if (!subj || !m || m->failed) return;
-    *subj = m->subject_saved;  /* restore to pre-mtch state */
+    *subj = m->subject_saved;  /* restore to pre-MATCH_fn state */
     match_and_replace(subj, m->pattern, repl);
 }
-#define mtch(subj, pat)           _snoc_match(subj, pat)
-#define replc(subj, m, repl)     _snoc_replace(subj, m, repl)
+#define MATCH_fn(subj, pat)           _snoc_match(subj, pat)
+#define REPLACE_fn(subj, m, repl)     _snoc_replace(subj, m, repl)
 
-/* ---- Runtime ini / finish ---- */
-static inline void ini(void)    { SNO_INIT_fn(); extern void inc_init(void); inc_init(); }
+/* ---- Runtime INIT_fn / finish ---- */
+static inline void INIT_fn(void)    { SNO_INIT_fn(); extern void inc_init(void); inc_init(); }
 static inline void finish(void)  { }
 
 /* ---- ABORT / exception handler stack ----
@@ -190,7 +190,7 @@ static inline void push_abort_handler(jmp_buf *jb) {
 static inline void pop_abort_handler(void) {
     if (_sno_abort_depth > 0) _sno_abort_depth--;
 }
-static inline void abrt(int lineno) {
+static inline void ABORT_fn(int lineno) {
     _sno_abort_lineno = lineno;
     if (_sno_abort_depth > 0)
         longjmp(*_sno_abort_stack[_sno_abort_depth-1], 1);

@@ -8,7 +8,7 @@
  *   io.inc      — io(), fileName(), input_/output_ channels
  *   case.inc    — lwr(), upr()
  *   assign.inc  — assign() — assignment during pattern matching
- *   mtch.inc   — mtch(), notmatch()
+ *   MATCH_fn.inc   — MATCH_fn(), notmatch()
  *   counter.inc — nPush/nPop/nInc/nDec/nTop  (already in snobol4.c)
  *   stack.inc   — Push/Pop/Top/InitStack  (already in snobol4.c)
  *   tree.inc    — DT_DATA(tree), t/v/n/c accessors  (already in snobol4.c)
@@ -48,8 +48,8 @@ DESCR_t upr(DESCR_t s);
 DESCR_t assign_fn(DESCR_t name, DESCR_t expression);
 
 /* -------------------------------------------------------------------------
- * mtch.inc: mtch(subject, pattern) — succeeds if subject matches pattern
- * notmatch(subject, pattern)         — succeeds if subject does NOT mtch
+ * MATCH_fn.inc: MATCH_fn(subject, pattern) — succeeds if subject matches pattern
+ * notmatch(subject, pattern)         — succeeds if subject does NOT MATCH_fn
  * ---------------------------------------------------------------------- */
 DESCR_t match_fn(DESCR_t subject, DESCR_t pattern);
 DESCR_t notmatch_fn(DESCR_t subject, DESCR_t pattern);
@@ -62,7 +62,7 @@ DESCR_t io_fn(DESCR_t name, DESCR_t mode);
 /* -------------------------------------------------------------------------
  * Gen.inc: output generation with indentation
  * ---------------------------------------------------------------------- */
-DESCR_t Gen(DESCR_t strv, DESCR_t outNm);
+DESCR_t Gen(DESCR_t STRVAL_fn, DESCR_t outNm);
 DESCR_t GenTab(DESCR_t pos);
 DESCR_t GenSetCont(DESCR_t cont);
 DESCR_t IncLevel(DESCR_t delta);
@@ -96,7 +96,7 @@ DESCR_t TW(DESCR_t lvl, DESCR_t pat, DESCR_t name);
 DESCR_t TX(DESCR_t lvl, DESCR_t pat, DESCR_t name);
 DESCR_t TY(DESCR_t lvl, DESCR_t name, DESCR_t pat);
 DESCR_t TZ(DESCR_t lvl, DESCR_t name, DESCR_t pat);
-DESCR_t T8Trace(DESCR_t lvl, DESCR_t strv, DESCR_t ofs);
+DESCR_t T8Trace(DESCR_t lvl, DESCR_t STRVAL_fn, DESCR_t ofs);
 DESCR_t T8Pos(DESCR_t ofs, DESCR_t map);
 
 /* -------------------------------------------------------------------------

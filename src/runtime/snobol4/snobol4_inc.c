@@ -2,7 +2,7 @@
  * snobol4_inc.c — C implementations of SNOBOL4 .inc library functions
  *
  * Implements the library used by beauty.sno:
- *   global, is, io, case, assign, mtch, Gen, Qize, ShiftReduce, TREEBLK_t, Stack
+ *   global, is, io, case, assign, MATCH_fn, Gen, Qize, ShiftReduce, TREEBLK_t, Stack
  */
 
 #include <stdio.h>
@@ -97,7 +97,7 @@ DESCR_t upr(DESCR_t s) {
 
 DESCR_t assign_fn(DESCR_t name, DESCR_t expression) {
     const char *nm = VARVAL_fn(name);
-    /* If expression is an unevaluated expression, evl it */
+    /* If expression is an unevaluated expression, EVAL_fn it */
     DESCR_t val = expression;
     if (STYPE(expression) == DT_S) {
         /* Try to evaluate as SNOBOL4 — for now just use it as-is */
@@ -108,8 +108,8 @@ DESCR_t assign_fn(DESCR_t name, DESCR_t expression) {
 }
 
 /* =========================================================================
- * mtch.inc: mtch(subject, pattern) → NRETURN on mtch, FRETURN on fail
- * In C: return non-null on mtch, FAILDESCR on fail
+ * MATCH_fn.inc: MATCH_fn(subject, pattern) → NRETURN on MATCH_fn, FRETURN on fail
+ * In C: return non-null on MATCH_fn, FAILDESCR on fail
  * ===================================================================== */
 
 /* Forward declaration — pattern matching from snobol4.c */
@@ -175,18 +175,18 @@ static void gen_flush_line(const char *line) {
     printf("%s\n", line);
 }
 
-DESCR_t Gen(DESCR_t strv, DESCR_t outNm) {
-    const char *s = VARVAL_fn(strv);
+DESCR_t Gen(DESCR_t STRVAL_fn, DESCR_t outNm) {
+    const char *s = VARVAL_fn(STRVAL_fn);
     if (!s) s = "";
 
     if (!g_buf) g_buf = strdup_gc("");
     if (!g_mark) g_mark = strdup_gc("");
 
-    /* Append strv to buffer */
+    /* Append STRVAL_fn to buffer */
     /* If buffer is empty, prepend the mark+indent */
     const char *new_buf;
     if (!g_buf || !*g_buf) {
-        /* Start a new line: mark = cont position, then indent, then strv */
+        /* Start a new line: mark = cont position, then indent, then STRVAL_fn */
         char indent[256] = {0};
         long long mark_len = g_mark ? (long long)strlen(g_mark) : 0;
         long long ind_len  = g_level > mark_len ? g_level - mark_len : 0;
@@ -344,7 +344,7 @@ DESCR_t TW(DESCR_t lvl, DESCR_t pat, DESCR_t name) { return pat; }
 DESCR_t TX(DESCR_t lvl, DESCR_t pat, DESCR_t name) { return pat; }
 DESCR_t TY(DESCR_t lvl, DESCR_t name, DESCR_t pat) { return pat; }
 DESCR_t TZ(DESCR_t lvl, DESCR_t name, DESCR_t pat) { return pat; }
-DESCR_t T8Trace(DESCR_t lvl, DESCR_t strv, DESCR_t ofs) { return NULVCL; }
+DESCR_t T8Trace(DESCR_t lvl, DESCR_t STRVAL_fn, DESCR_t ofs) { return NULVCL; }
 DESCR_t T8Pos(DESCR_t ofs, DESCR_t map) { return STRVAL(""); }
 
 /* =========================================================================
@@ -496,7 +496,7 @@ void inc_init(void) {
     register_fn("lwr",        _w_lwr,       1, 1);
     register_fn("upr",        _w_upr,       1, 1);
     register_fn("assign",     _w_assign,    2, 2);
-    register_fn("mtch",      _w_match,     2, 2);
+    register_fn("MATCH_fn",      _w_match,     2, 2);
     register_fn("notmatch",   _w_notmatch,  2, 2);
     register_fn("Gen",        _w_Gen,       1, 2);
     register_fn("GenTab",     _w_GenTab,    0, 1);
@@ -531,8 +531,8 @@ void inc_init(void) {
  * Additional missing registrations (identified by compiland reachability)
  * ===================================================================== */
 
-/* icase(strv) — case.inc: build case-insensitive pattern from string
- * Returns a pattern that matches strv case-insensitively.
+/* icase(STRVAL_fn) — case.inc: build case-insensitive pattern from string
+ * Returns a pattern that matches STRVAL_fn case-insensitively.
  * Each alpha char → (upper | lower) alternation; non-alpha → literal. */
 static DESCR_t _w_icase(DESCR_t *a, int n) {
     const char *s = VARVAL_fn(n > 0 ? a[0] : NULVCL);
@@ -590,7 +590,7 @@ static DESCR_t _w_TopCounter(DESCR_t *a, int n) {
     return INTVAL(v);
 }
 
-/* SqlSQize(strv) — Qize.inc: SQL single-quote escape ('' for each ') */
+/* SqlSQize(STRVAL_fn) — Qize.inc: SQL single-quote escape ('' for each ') */
 static DESCR_t _w_SqlSQize(DESCR_t *a, int n) {
     const char *s = VARVAL_fn(n > 0 ? a[0] : NULVCL);
     if (!s || !*s) return STRVAL("");
@@ -639,14 +639,14 @@ static DESCR_t _w_TValue(DESCR_t *a, int n) {
     return STRVAL(VARVAL_fn(x));
 }
 
-/* Visit(x, fnc) — tree.inc: pre-order traversal, APLY_fn fnc at each node */
+/* Visit(x, fnc) — tree.inc: pre-order traversal, APPLY_fn fnc at each node */
 static DESCR_t _w_Visit(DESCR_t *a, int n) {
     if (n < 2) return NULVCL;
     DESCR_t x   = a[0];
     DESCR_t fnc = a[1];
     const char *fname = VARVAL_fn(fnc);
     /* Apply fnc to x */
-    APLY_fn(fname, &x, 1);
+    APPLY_fn(fname, &x, 1);
     /* Recurse into children */
     if (x.v == DT_DATA) {
         DESCR_t nc  = FIELD_GET_fn(x, "n");
@@ -697,7 +697,7 @@ static DESCR_t _w_Equiv(DESCR_t *a, int n) {
     return _w_Equal(a, n);   /* same semantics for our purposes */
 }
 
-/* Find(xn, y, f) — tree.inc: search tree *xn for node equiv to y, APLY_fn f */
+/* Find(xn, y, f) — tree.inc: search tree *xn for node equiv to y, APPLY_fn f */
 static DESCR_t _w_Find(DESCR_t *a, int n) {
     if (n < 3) return NULVCL;
     /* xn is a variable name (indirect ref), y is search target, f is function */
@@ -711,7 +711,7 @@ static DESCR_t _w_Find(DESCR_t *a, int n) {
     /* Check if root equiv to y */
     DESCR_t eq_args[2] = { root, y };
     if (!IS_NULL_fn(_w_Equiv(eq_args, 2))) {
-        APLY_fn(fname, &xn, 1);
+        APPLY_fn(fname, &xn, 1);
         return STRVAL("");
     }
     /* Recurse into children */

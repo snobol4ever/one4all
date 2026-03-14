@@ -164,9 +164,9 @@ CNODE_t *build_expr(CArena *a, EXPR_t *e) {
     switch (e->kind) {
     case E_NULV:  return cn_raw(a, "NULVCL");
 
-    case E_QLIT:   return cn_call1(a, "strv", cn_cstr(a, e->sval));
+    case E_QLIT:   return cn_call1(a, "STRVAL_fn", cn_cstr(a, e->sval));
 
-    case E_ILIT:   return cn_rawf(a, "vint(%ld)", e->ival);
+    case E_ILIT:   return cn_rawf(a, "INTVAL_fn(%ld)", e->ival);
 
     case E_FLIT:  return cn_rawf(a, "real(%g)", e->dval);
 
@@ -189,7 +189,7 @@ CNODE_t *build_expr(CArena *a, EXPR_t *e) {
                    && !is_defined_function_cn(e->left->sval)) {
             /* *varname(arg...) — continuation-line misparse: deref-ref cat arg */
             char buf[256];
-            snprintf(buf, sizeof buf, "CONC_fn(var_as_pattern(pat_ref(\"%s\")),", e->left->sval);
+            snprintf(buf, sizeof buf, "CONCAT_fn(var_as_pattern(pat_ref(\"%s\")),", e->left->sval);
             return cn_seq(a,
                 cn_raw(a, buf),
                 cn_seq(a, build_expr(a, e->left->args[0]), cn_raw(a, ")")));
@@ -201,7 +201,7 @@ CNODE_t *build_expr(CArena *a, EXPR_t *e) {
         return cn_call1(a, "neg", build_expr(a, e->right));
 
     case E_CONC:
-        return cn_call2(a, "CONC_fn", build_expr(a, e->left), build_expr(a, e->right));
+        return cn_call2(a, "CONCAT_fn", build_expr(a, e->left), build_expr(a, e->right));
 
     case E_OR: {
         /* If either side is pattern-valued, route to pat_alt */
@@ -212,7 +212,7 @@ CNODE_t *build_expr(CArena *a, EXPR_t *e) {
 
     case E_OPSYN:
         return cn_seq(a,
-            cn_raw(a, "APLY_fn(\"reduce\",(DESCR_t[]){"),
+            cn_raw(a, "APPLY_fn(\"reduce\",(DESCR_t[]){"),
             cn_seq(a, build_expr(a, e->left),
             cn_seq(a, cn_raw(a, ","),
             cn_seq(a, build_expr(a, e->right),
@@ -221,14 +221,14 @@ CNODE_t *build_expr(CArena *a, EXPR_t *e) {
     case E_ADD: return cn_call2(a, "add",    build_expr(a,e->left), build_expr(a,e->right));
     case E_SUB: return cn_call2(a, "sub",    build_expr(a,e->left), build_expr(a,e->right));
     case E_MPY: return cn_call2(a, "mul",    build_expr(a,e->left), build_expr(a,e->right));
-    case E_DIV: return cn_call2(a, "divyde", build_expr(a,e->left), build_expr(a,e->right));
-    case E_EXPOP: return cn_call2(a, "powr",   build_expr(a,e->left), build_expr(a,e->right));
+    case E_DIV: return cn_call2(a, "DIVIDE_fn", build_expr(a,e->left), build_expr(a,e->right));
+    case E_EXPOP: return cn_call2(a, "POWER_fn",   build_expr(a,e->left), build_expr(a,e->right));
 
     case E_FNC: {
         if (e->nargs == 0)
-            return cn_rawf(a, "APLY_fn(\"%s\",NULL,0)", e->sval);
+            return cn_rawf(a, "APPLY_fn(\"%s\",NULL,0)", e->sval);
         /* Build args array: (DESCR_t[]){arg0, arg1, ...} */
-        CNODE_t *arr_open = cn_rawf(a, "APLY_fn(\"%s\",(DESCR_t[]){", e->sval);
+        CNODE_t *arr_open = cn_rawf(a, "APPLY_fn(\"%s\",(DESCR_t[]){", e->sval);
         CNODE_t *inner = build_expr(a, e->args[0]);
         for (int i = 1; i < e->nargs; i++)
             inner = cn_seq(a, inner, cn_seq(a, cn_raw(a,","), build_expr(a, e->args[i])));
@@ -251,7 +251,7 @@ CNODE_t *build_expr(CArena *a, EXPR_t *e) {
         return build_expr(a, e->left);
 
     case E_IDX: {
-        CNODE_t *head = cn_raw(a, "indx(");
+        CNODE_t *head = cn_raw(a, "INDEX_fn(");
         CNODE_t *obj  = build_expr(a, e->left);
         CNODE_t *idx  = build_expr(a, e->args[0]);
         for (int i = 1; i < e->nargs; i++)

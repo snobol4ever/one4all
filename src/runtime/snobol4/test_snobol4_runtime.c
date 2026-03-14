@@ -25,10 +25,10 @@ int main(void) {
 
     /* --- DESCR_t conversions --- */
     printf("\n[DESCR_t conversions]\n");
-    CHECK("int to strv",       STREQ(VARVAL_fn(INTVAL(42)), "42"));
+    CHECK("int to STRVAL_fn",       STREQ(VARVAL_fn(INTVAL(42)), "42"));
     CHECK("int negative",     STREQ(VARVAL_fn(INTVAL(-7)), "-7"));
-    CHECK("strv to int",       to_int(STRVAL("123")) == 123);
-    CHECK("null to strv empty",STREQ(VARVAL_fn(NULVCL), ""));
+    CHECK("STRVAL_fn to int",       to_int(STRVAL("123")) == 123);
+    CHECK("null to STRVAL_fn empty",STREQ(VARVAL_fn(NULVCL), ""));
     CHECK("null to int 0",    to_int(NULVCL) == 0);
     CHECK("datatype INT",     STREQ(datatype(INTVAL(1)), "INTEGER"));
     CHECK("datatype STR",     STREQ(datatype(STRVAL("x")), "STRING"));
@@ -36,8 +36,8 @@ int main(void) {
 
     /* --- String ops --- */
     printf("\n[String operations]\n");
-    CHECK("ccat",    STREQ(ccat("hello", " world"), "hello world"));
-    CHECK("ccat empty", STREQ(ccat("", "x"), "x"));
+    CHECK("CONCAT_fn",    STREQ(CONCAT_fn("hello", " world"), "hello world"));
+    CHECK("CONCAT_fn empty", STREQ(CONCAT_fn("", "x"), "x"));
     CHECK("size",      size("hello") == 5);
     CHECK("size empty",size("") == 0);
     CHECK("size null", size(NULL) == 0);
@@ -47,8 +47,8 @@ int main(void) {
     DESCR_t sz = SIZE_fn(STRVAL("hello"));
     CHECK("SIZE_fn('hello')=5", sz.v==DT_I && sz.i==5);
 
-    DESCR_t dupl = DUPL_fn(STRVAL("ab"), INTVAL(3));
-    CHECK("DUPL_fn('ab',3)='ababab'", STREQ(VARVAL_fn(dupl), "ababab"));
+    DESCR_t dupl_result = DUPL_fn(STRVAL("ab"), INTVAL(3));
+    CHECK("DUPL_fn('ab',3)='ababab'", STREQ(VARVAL_fn(dupl_result), "ababab"));
 
     DESCR_t trim = TRIM_fn(STRVAL("hello   "));
     CHECK("TRIM_fn('hello   ')='hello'", STREQ(VARVAL_fn(trim), "hello"));
@@ -72,7 +72,7 @@ int main(void) {
     CHECK("REAL(3)=3.0", rv.v==DT_R && rv.r==3.0);
 
     /* REPLACE: tr-style */
-    DESCR_t rep = RPLACE_fn(STRVAL("hello"),
+    DESCR_t rep = REPLACE_fn(STRVAL("hello"),
                                 STRVAL("aeiou"),
                                 STRVAL("AEIOU"));
     CHECK("REPLACE('hello',vowels,VOWELS)='hEllO'", STREQ(VARVAL_fn(rep), "hEllO"));
@@ -83,7 +83,7 @@ int main(void) {
     CHECK("10+3=13",  add(a,b).i == 13);
     CHECK("10-3=7",   sub(a,b).i == 7);
     CHECK("10*3=30",  mul(a,b).i == 30);
-    CHECK("10/3=3",   divyde(a,b).i == 3);   /* integer division */
+    CHECK("10/3=3",   DIVIDE_fn(a,b).i == 3);   /* integer division */
     CHECK("10 EQ 10", eq(a, INTVAL(10)));
     CHECK("10 NE 3",  ne(a, b));
     CHECK("3 LT 10",  lt(b, a));
@@ -105,7 +105,7 @@ int main(void) {
     NV_SET_fn("FOO", INTVAL(99));
     CHECK("var set/get", NV_GET_fn("FOO").i == 99);
     NV_SET_fn("BAR", STRVAL("hello"));
-    CHECK("var strv", STREQ(VARVAL_fn(NV_GET_fn("BAR")), "hello"));
+    CHECK("var STRVAL_fn", STREQ(VARVAL_fn(NV_GET_fn("BAR")), "hello"));
     DESCR_t miss = NV_GET_fn("MISSING");
     CHECK("missing var = null", miss.v == DT_SNUL);
 

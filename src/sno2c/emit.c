@@ -5,8 +5,8 @@
  * but emit_pat() routes E_FNC to pat_* and E_CONC to pat_cat().
  *
  * Generated C uses the snobol4.c runtime API:
- *   DESCR_t, NV_GET_fn/set, APLY_fn, ccat, add, …
- *   PATND_t*, pat_lit, pat_len, pat_cat, mtch, …
+ *   DESCR_t, NV_GET_fn/set, APPLY_fn, CONCAT_fn, add, …
+ *   PATND_t*, pat_lit, pat_len, pat_cat, MATCH_fn, …
  */
 
 #include "sno2c.h"
@@ -185,14 +185,14 @@ int expr_contains_pattern(EXPR_t *e);
  * Walks a left-associative binary chain (E_CONC/E_OR) collecting all
  * leaves, then emits as indented multi-line nested calls.
  *
- * fn_name:  "CONC_fn", "pat_cat", "pat_alt"
+ * fn_name:  "CONCAT_fn", "pat_cat", "pat_alt"
  * emit_leaf: emit_expr or emit_pat — called for each leaf node
  * min_depth: minimum chain depth before pretty-printing kicks in (3)
  *
- * Output form (depth 4, fn="CONC_fn"):
- *   CONC_fn(
- *       CONC_fn(
- *           CONC_fn(leaf0, leaf1),
+ * Output form (depth 4, fn="CONCAT_fn"):
+ *   CONCAT_fn(
+ *       CONCAT_fn(
+ *           CONCAT_fn(leaf0, leaf1),
  *           leaf2),
  *       leaf3)
  * ----------------------------------------------------------------------- */
@@ -261,8 +261,8 @@ static void emit_expr(EXPR_t *e) {
     if (!e) { E("NULVCL"); return; }
     switch (e->kind) {
     case E_NULV:    E("NULVCL"); break;
-    case E_QLIT:     E("strv("); emit_cstr(e->sval); E(")"); break;
-    case E_ILIT:     E("vint(%ld)", e->ival); break;
+    case E_QLIT:     E("STRVAL_fn("); emit_cstr(e->sval); E(")"); break;
+    case E_ILIT:     E("INTVAL_fn(%ld)", e->ival); break;
     case E_FLIT:    E("real(%g)", e->dval); break;
     case E_VART:
         if (is_io_name(e->sval)) E("NV_GET_fn(\"%s\")", e->sval);
@@ -275,7 +275,7 @@ static void emit_expr(EXPR_t *e) {
             /* $expr — indirect lookup */
             E("deref("); emit_expr(e->right); E(")");
         } else if (e->left->kind == E_VART) {
-            /* *varname — deferred pattern reference (resolved at mtch time) */
+            /* *varname — deferred pattern reference (resolved at MATCH_fn time) */
             E("var_as_pattern(pat_ref(\"%s\"))", e->left->sval);
         } else if (e->left->kind == E_FNC && e->left->nargs >= 1
                    && !is_defined_function(e->left->sval)) {
@@ -284,7 +284,7 @@ static void emit_expr(EXPR_t *e) {
              * SNOBOL4 continuation lines cause the parser to greedily consume the
              * next '(' as a function-call argument to varname.  The correct
              * semantics are: deferred-ref(*varname) cat arg. */
-            E("CONC_fn(var_as_pattern(pat_ref(\"%s\")),", e->left->sval);
+            E("CONCAT_fn(var_as_pattern(pat_ref(\"%s\")),", e->left->sval);
             emit_expr(e->left->args[0]);
             E(")");
         } else {
@@ -296,15 +296,15 @@ static void emit_expr(EXPR_t *e) {
     case E_MNS: E("neg("); emit_expr(e->right); E(")"); break;
 
     case E_CONC:
-        emit_chain_pretty(e, E_CONC, "CONC_fn", emit_expr, 2);
+        emit_chain_pretty(e, E_CONC, "CONCAT_fn", emit_expr, 2);
         break;
 
-    case E_OPSYN: E("APLY_fn(\"reduce\",(DESCR_t[]){"); emit_expr(e->left); E(","); emit_expr(e->right); E("},2)"); break;
+    case E_OPSYN: E("APPLY_fn(\"reduce\",(DESCR_t[]){"); emit_expr(e->left); E(","); emit_expr(e->right); E("},2)"); break;
     case E_ADD:    E("add(");    emit_expr(e->left); E(","); emit_expr(e->right); E(")"); break;
     case E_SUB:    E("sub(");    emit_expr(e->left); E(","); emit_expr(e->right); E(")"); break;
     case E_MPY:    E("mul(");    emit_expr(e->left); E(","); emit_expr(e->right); E(")"); break;
-    case E_DIV:    E("divyde(");    emit_expr(e->left); E(","); emit_expr(e->right); E(")"); break;
-    case E_EXPOP:    E("powr(");    emit_expr(e->left); E(","); emit_expr(e->right); E(")"); break;
+    case E_DIV:    E("DIVIDE_fn(");    emit_expr(e->left); E(","); emit_expr(e->right); E(")"); break;
+    case E_EXPOP:    E("POWER_fn(");    emit_expr(e->left); E(","); emit_expr(e->right); E(")"); break;
     case E_OR:
         /* Same: if either side is pattern-valued, use pat_alt */
         if (expr_contains_pattern(e->left) || expr_contains_pattern(e->right)) {
@@ -320,9 +320,9 @@ static void emit_expr(EXPR_t *e) {
 
     case E_FNC:
         if (e->nargs == 0) {
-            E("APLY_fn(\"%s\",NULL,0)", e->sval);
+            E("APPLY_fn(\"%s\",NULL,0)", e->sval);
         } else {
-            E("APLY_fn(\"%s\",(DESCR_t[]){", e->sval);
+            E("APPLY_fn(\"%s\",(DESCR_t[]){", e->sval);
             for (int i=0; i<e->nargs; i++) {
                 if (i) E(","); emit_expr(e->args[i]);
             }
@@ -340,7 +340,7 @@ static void emit_expr(EXPR_t *e) {
 
     case E_IDX:
         /* postfix subscript: expr[i] — e.g. c(x)[i] */
-        E("indx("); emit_expr(e->left); E(",(DESCR_t[]){");
+        E("INDEX_fn("); emit_expr(e->left); E(",(DESCR_t[]){");
         for (int i=0; i<e->nargs; i++) {
             if (i) E(","); emit_expr(e->args[i]);
         }
@@ -369,7 +369,7 @@ static void emit_expr(EXPR_t *e) {
  *   E_NAM  → pat_cond(child_pat, varname)
  *   E_DOL   → pat_imm(child_pat, varname)
  *   E_INDR → pat_ref(varname)   (deferred pattern reference *X)
- *   E_QLIT   → pat_lit(strv)
+ *   E_QLIT   → pat_lit(STRVAL_fn)
  *   E_VART   → pat_var(varname)   (pattern variable)
  * ============================================================ */
 static void emit_pat(EXPR_t *e);
@@ -405,7 +405,7 @@ static void emit_pat(EXPR_t *e) {
 
     case E_MPY:
         /* pat * x — parsed as arithmetic multiply, but in pattern context
-         * this is: left_pattern ccat *right (deferred ref to right) */
+         * this is: left_pattern CONCAT_fn *right (deferred ref to right) */
         E("pat_cat("); emit_pat(e->left); E(",");
         if (e->right && e->right->kind == E_VART)
             E("pat_ref(\"%s\")", e->right->sval);
@@ -415,7 +415,7 @@ static void emit_pat(EXPR_t *e) {
     case E_OPSYN:
         /* & in pattern context: reduce(left, right) — must fire at MATCH TIME.
          * reduce() calls EVAL("epsilon . *Reduce(t, n)") where n may contain
-         * nTop() — which must be evaluated at mtch time, not build time.
+         * nTop() — which must be evaluated at MATCH_fn time, not build time.
          * Use pat_user_call to defer the call until the engine executes
          * this node during pattern matching. */
         E("pat_user_call(\"reduce\",(DESCR_t[]){"); emit_expr(e->left); E(","); emit_expr(e->right); E("},2)"); break;
@@ -467,7 +467,7 @@ static void emit_pat(EXPR_t *e) {
         #undef B1v
         /* user-defined pattern function — use pat_user_call so the function
          * fires at MATCH TIME (XATP materialisation), not at build time.
-         * This correctly handles nPush()/nPop() side effects per mtch attempt,
+         * This correctly handles nPush()/nPop() side effects per MATCH_fn attempt,
          * and reduce()/shift() which return pattern objects at materialisation time.
          *
          * EXCEPTION: if name is NOT a known/defined function AND has args, the
@@ -495,7 +495,7 @@ static void emit_pat(EXPR_t *e) {
         } else {
             /* Pattern-constructor functions are called eagerly at BUILD TIME.
              * They return a DESCR_t of type PATTERN — wrap with var_as_pattern.
-             * reduce(t,n), shift(p,t), EVAL(s) → build-time call → APLY_fn.
+             * reduce(t,n), shift(p,t), EVAL(s) → build-time call → APPLY_fn.
              * Side-effect functions (nPush, nPop, nInc, Reduce, Shift, TZ, etc.)
              * must fire at MATCH TIME → stay as pat_user_call. */
             static const char *_build_time_fns[] = {
@@ -506,7 +506,7 @@ static void emit_pat(EXPR_t *e) {
                 if (strcasecmp(n, _build_time_fns[_ci]) == 0) { _is_build = 1; break; }
             }
             if (_is_build) {
-                E("var_as_pattern(APLY_fn(\"%s\",(DESCR_t[]){", n);
+                E("var_as_pattern(APPLY_fn(\"%s\",(DESCR_t[]){", n);
                 for (int i=0; i<e->nargs; i++) { if(i) E(","); emit_expr(e->args[i]); }
                 E("},%d))", e->nargs);
             } else {
@@ -742,7 +742,7 @@ static void emit_goto(SnoGoto *g, const char *fn, int result_ok) {
  * Post-parse pattern-statement repair
  *
  * The grammar is LALR(1) and cannot always distinguish:
- *   subject pattern = replacement    (pattern mtch)
+ *   subject pattern = replacement    (pattern MATCH_fn)
  *   subject_expr = replacement       (pure assignment)
  * when pattern primitives (LEN, POS, etc.) appear inside the subject_expr.
  * The lexer returns PAT_BUILTIN only at bstack_top==0, but PAT_BUILTIN IS
@@ -775,7 +775,7 @@ static int is_pat_node(EXPR_t *e) {
     if (e->kind == E_OR)    return 1;  /* | alternation */
     if (e->kind == E_OPSYN) return 1;  /* & reduce() call — always pattern context */
     /* E_MPY(pat_node, x) — parsed from "pat *x" where * is multiplication token
-     * but semantically is pattern-ccat with deferred ref *x */
+     * but semantically is pattern-CONCAT_fn with deferred ref *x */
     if (e->kind == E_MPY && is_pat_node(e->left)) return 1;
     return 0;
 }
@@ -788,7 +788,7 @@ static int is_pat_node(EXPR_t *e) {
 /* Returns 1 if the expression subtree rooted at e contains ANY pattern-valued
  * node.  Used by emit_expr to decide whether E_CONC / E_OR should be routed
  * through emit_pat (pat_cat / pat_alt) instead of the string path
- * (CONC_fn / alt).
+ * (CONCAT_fn / alt).
  *
  * Key cases that are pattern-valued but NOT caught by is_pat_node:
  *   - E_INDR whose left child is E_VART — "*varname" deferred pattern ref
@@ -800,7 +800,7 @@ int expr_contains_pattern(EXPR_t *e) {
     /* *varname — deferred pattern ref (grammar: left=NULL, right=E_VART) */
     if (e->kind == E_INDR && e->right && e->right->kind == E_VART) return 1;
     if (e->kind == E_INDR && e->left  && e->left->kind  == E_VART) return 1;
-    /* *varname(arg) — parser misparse deref+ccat */
+    /* *varname(arg) — parser misparse deref+CONCAT_fn */
     if (e->kind == E_INDR && e->left && e->left->kind == E_FNC) return 1;
     /* recurse into children */
     if (e->kind == E_CONC || e->kind == E_OR || e->kind == E_MPY)
@@ -810,8 +810,8 @@ int expr_contains_pattern(EXPR_t *e) {
         return expr_contains_pattern(e->left);
     if (e->kind == E_FNC) {
         /* ARBNO, FENCE, etc. already caught by is_pat_builtin_call above.
-         * Also treat reduce/evl calls as pattern-valued when inside ccat. */
-        if (e->sval && (strcasecmp(e->sval,"reduce")==0 || strcasecmp(e->sval,"evl")==0))
+         * Also treat reduce/EVAL_fn calls as pattern-valued when inside CONCAT_fn. */
+        if (e->sval && (strcasecmp(e->sval,"reduce")==0 || strcasecmp(e->sval,"EVAL_fn")==0))
             return 1;
         for (int i = 0; i < e->nargs; i++)
             if (expr_contains_pattern(e->args[i])) return 1;
@@ -825,10 +825,10 @@ int expr_contains_pattern(EXPR_t *e) {
  * *subj_out is set to the remaining subject (may be the original expr if
  * no split needed).
  *
- * The tree is LEFT-ASSOCIATIVE ccat:
- *   (((strv, POS(0)), ANY('abc')), E_NAM(letter))
+ * The tree is LEFT-ASSOCIATIVE CONCAT_fn:
+ *   (((STRVAL_fn, POS(0)), ANY('abc')), E_NAM(letter))
  * We walk the left spine, looking for the first right child that is a pat node.
- * When found at depth D, the pattern is: right_at_D ccat right_at_D-1 ccat ... ccat right_at_0
+ * When found at depth D, the pattern is: right_at_D CONCAT_fn right_at_D-1 CONCAT_fn ... CONCAT_fn right_at_0
  * assembled left-to-right.
  */
 typedef struct { EXPR_t *subj; EXPR_t *pat; } SplitResult;
@@ -842,7 +842,7 @@ static EXPR_t *make_concat(EXPR_t *left, EXPR_t *right) {
 }
 
 static SplitResult split_spine(EXPR_t *e) {
-    /* Null or non-ccat node that's a pure value: subject only */
+    /* Null or non-CONCAT_fn node that's a pure value: subject only */
     if (!e) { SplitResult r = {NULL, NULL}; return r; }
 
     if (e->kind != E_CONC) {
@@ -862,7 +862,7 @@ static SplitResult split_spine(EXPR_t *e) {
          * recursed and left's right IS the current pat... */
         /* Actually: the split is between left and right.
          * Subject = inner.subj (what was pure subject in e->left)
-         * Pattern = inner.pat (any pattern found in e->left's right chain) ccat e->right */
+         * Pattern = inner.pat (any pattern found in e->left's right chain) CONCAT_fn e->right */
         SplitResult r;
         r.subj = inner.subj;
         r.pat  = make_concat(inner.pat, e->right);
@@ -890,15 +890,15 @@ static EXPR_t *split_subject_pattern(EXPR_t *e, EXPR_t **subj_out) {
     return r.pat;
 }
 
-/* Repair a misparsed pattern-mtch stmt.
+/* Repair a misparsed pattern-MATCH_fn stmt.
  * Called when s->pattern==NULL and s->replacement is E_NULV (bare '=').
- * Also repairs pattern-mtch stmts with no replacement (s->replacement==NULL)
+ * Also repairs pattern-MATCH_fn stmts with no replacement (s->replacement==NULL)
  * where the subject absorbed the pattern (no '=' present).
  * Returns 1 if the stmt was repaired. */
 static int maybe_fix_pattern_stmt(STMT_t *s) {
     if (!s->subject) return 0;  /* no subject */
     /* Heuristic: if replacement is non-null non-E_NULV, this is a plain assignment,
-     * not a pattern mtch. Skip. */
+     * not a pattern MATCH_fn. Skip. */
     if (s->replacement && s->replacement->kind != E_NULV) return 0;
 
     EXPR_t *new_subj = NULL;
@@ -977,7 +977,7 @@ static void emit_ok_goto(SnoGoto *g, const char *fn, int u) {
  * Emit one statement
  * ============================================================ */
 static void emit_stmt(STMT_t *s, const char *fn) {
-    /* Repair misparsed pattern-mtch stmts (grammar absorbs pattern into subject) */
+    /* Repair misparsed pattern-MATCH_fn stmts (grammar absorbs pattern into subject) */
     maybe_fix_pattern_stmt(s);
 
     E("/* line %d */\n", s->lineno);
@@ -1014,16 +1014,16 @@ static void emit_stmt(STMT_t *s, const char *fn) {
         return;
     }
 
-    /* ---- pattern mtch: subject pattern [= replacement] ---- */
+    /* ---- pattern MATCH_fn: subject pattern [= replacement] ---- */
     /* Compiled Byrd box path — replaces pat_* / engine.c stopgap. */
     if (s->pattern) {
         int u = uid();
-        E("/* byrd mtch u%d */\n", u);
+        E("/* byrd MATCH_fn u%d */\n", u);
         { int _col = fprintf(out, "DESCR_t _s%d = ", u); PP_EXPR(s->subject, _col); E(";\n"); }
         E("const char *_subj%d = VARVAL_fn(_s%d);\n", u, u);
         E("int64_t _slen%d = _subj%d ? (int64_t)strlen(_subj%d) : 0;\n", u, u, u);
         E("int64_t _cur%d  = 0;\n", u);
-        E("int64_t _mstart%d = 0;\n", u);  /* cursor before mtch — for replacement */
+        E("int64_t _mstart%d = 0;\n", u);  /* cursor before MATCH_fn — for replacement */
 
         char root_lbl[64], ok_lbl[64], fail_lbl[64], done_lbl[64];
         snprintf(root_lbl, sizeof root_lbl, "_byrd_%d",      u);
@@ -1058,7 +1058,7 @@ static void emit_stmt(STMT_t *s, const char *fn) {
         }
         byrd_emit_pattern(scan_pat, out, root_lbl, sv, sl, cv, ok_lbl, fail_lbl);
 
-        /* gamma: mtch succeeded */
+        /* gamma: MATCH_fn succeeded */
         PLG(ok_lbl, "");
         PS("", "_ok%d = 1;", u);
         if (s->replacement) {
@@ -1088,7 +1088,7 @@ static void emit_stmt(STMT_t *s, const char *fn) {
         }
         PG(done_lbl);
 
-        /* omega: mtch failed — restore @S to pre-match state */
+        /* omega: MATCH_fn failed — restore @S to pre-match state */
         PLG(fail_lbl, "");
         PS("", "NV_SET_fn(\"@S\", _stk_save_%d);", u);
         PS("", "_ok%d = 0;", u);
@@ -1258,16 +1258,16 @@ int is_defined_function(const char *name) {
     static const char *std[] = {
         "APPLY","ARG","ARRAY","ATAN","BACKSPACE","BREAK","BREAKX",
         "CHAR","CHOP","CLEAR","CODE","COLLECT","CONVERT","COPY","COS",
-        "DATA","DATATYPE","DATE","DEFINE_fn","DETACH","DIFFER","DUMP","DUPL_fn",
+        "DATA","DATATYPE","DATE","DEFINE","DETACH","DIFFER","DUMP","DUPL",
         "EJECT","ENDFILE","EQ","EVAL","EXIT","EXP","FENCE","FIELD",
         "GE","GT","HOST","IDENT","INPUT","INTEGER","ITEM",
         "LE","LEN","LEQ","LGE","LGT","LLE","LLT","LN","LNE","LOAD",
         "LOCAL","LPAD","LT","NE","NOTANY","OPSYN","OUTPUT",
         "POS","PROTOTYPE","REMDR","REPLACE","REVERSE","REWIND","RPAD",
-        "RPOS","RSORT","RTAB","SET","SETEXIT","SIN","SIZE_fn","SORT","SPAN",
-        "SQRT","STOPTR","SUBSTR_fn","TAB","TRACE","TRIM_fn","UNLOAD","UCASE","LCASE",
+        "RPOS","RSORT","RTAB","SET","SETEXIT","SIN","SIZE","SORT","SPAN",
+        "SQRT","STOPTR","SUBSTR","TAB","TRACE","TRIM","UNLOAD","UCASE","LCASE",
         "ANY","ARB","ARBNO","BAL","DT_FAIL","ABORT","REM","SUCCEED",
-        "ICASE","UCASE","LCASE","REVERSE","REPLACE","DUPL_fn","LPAD","RPAD",
+        "ICASE","UCASE","LCASE","REVERSE","REPLACE","DUPL","LPAD","RPAD",
         NULL
     };
     for (int i = 0; std[i]; i++)
@@ -1292,7 +1292,7 @@ static int is_fn_local(const char *varname) {
     return 0;
 }
 
-/* Return fn indx if label matches a known function entry, else -1 */
+/* Return fn INDEX_fn if label matches a known function entry, else -1 */
 static int fn_by_label(const char *label) {
     if (!label) return -1;
     for (int i=0; i<fn_count; i++) {
@@ -1332,7 +1332,7 @@ static void build_boundary_labels(void) {
     }
 }
 
-/* Return fn indx if stmt is the DEFINE_fn(...) call for it, else -1 */
+/* Return fn INDEX_fn if stmt is the DEFINE_fn(...) call for it, else -1 */
 static int fn_by_define_stmt(STMT_t *s) {
     for (int i=0; i<fn_count; i++)
         if (fn_table[i].define_stmt == s) return i;
@@ -1405,7 +1405,7 @@ static const char *stmt_define_proto(STMT_t *s) {
     if (!s->subject) return NULL;
     EXPR_t *e = s->subject;
     if (e->kind != E_FNC) return NULL;
-    if (strcasecmp(e->sval,"DEFINE_fn")!=0) return NULL;
+    if (strcasecmp(e->sval,"DEFINE")!=0) return NULL;
     if (e->nargs < 1) return NULL;
     return flatten_str_expr(e->args[0]);
 }
@@ -1453,7 +1453,7 @@ static void collect_functions(Program *prog) {
         for (int i=0; i<fn_count; i++)
             if (strcmp(fn_table[i].name, fn->name)==0) { found=i; break; }
         if (found >= 0) {
-            /* Free old name/args/locals, replc with new definition */
+            /* Free old name/args/locals, REPLACE_fn with new definition */
             fn_table[found] = *fn;
         } else {
             fn_count++;
@@ -1686,10 +1686,10 @@ static void emit_main(Program *prog) {
     cur_fn_name = "main";
     cur_fn_def  = NULL;   /* NULL = global scope; is_fn_local returns 0 for all vars */
     E("int main(void) {\n");
-    E("    ini();\n");
+    E("    INIT_fn();\n");
     /* Register all global C statics so NV_SET_fn() can sync them back.
      * This bridges the two-store gap: vars set via pattern conditional
-     * assignment (. varname) or pre-ini write to the hash table only;
+     * assignment (. varname) or pre-INIT_fn write to the hash table only;
      * registration lets those writes also update the C statics. */
     for (int i = 0; i < sym_count; i++)
         E("    NV_REG_fn(\"%s\", &%s);\n", sym_table[i], cs(sym_table[i]));
@@ -2016,7 +2016,7 @@ static void emit_trampoline_program(Program *prog) {
 
     /* --- main --- */
     E("int main(void) {\n");
-    E("    ini();\n");
+    E("    INIT_fn();\n");
     for (int i = 0; i < sym_count; i++)
         E("    NV_REG_fn(\"%s\", &%s);\n", sym_table[i], cs(sym_table[i]));
     E("    NV_SYNC_fn();\n\n");
@@ -2038,14 +2038,14 @@ static void emit_trampoline_program(Program *prog) {
      * by the runtime but are not defined in beauty.sno's inc files.
      * nl = CHAR(10), tab = CHAR(9) */
     E("\n    /* runtime globals */\n");
-    E("    NV_SET_fn(\"nl\",  APLY_fn(\"CHAR\",(DESCR_t[]){INTVAL(10)},1));\n");
-    E("    NV_SET_fn(\"tab\", APLY_fn(\"CHAR\",(DESCR_t[]){INTVAL(9)},1));\n");
+    E("    NV_SET_fn(\"nl\",  APPLY_fn(\"CHAR\",(DESCR_t[]){INTVAL(10)},1));\n");
+    E("    NV_SET_fn(\"tab\", APPLY_fn(\"CHAR\",(DESCR_t[]){INTVAL(9)},1));\n");
     /* Fix: DATA('tree(...)') and DATA('link(...)') land in dead code inside
      * _sno_fn_Top — tree.sno init block swallowed by StackEnd boundary.
      * Register explicitly here so tree()/link() are live before trampoline. */
     E("    /* DATA types from tree.sno/stack.sno (fn-body-walk bug) */\n");
-    E("    APLY_fn(\"DATA\",(DESCR_t[]){STRVAL(\"tree(t,v,n,c)\")},1);\n");
-    E("    APLY_fn(\"DATA\",(DESCR_t[]){STRVAL(\"link(next,value)\")},1);\n");
+    E("    APPLY_fn(\"DATA\",(DESCR_t[]){STRVAL(\"tree(t,v,n,c)\")},1);\n");
+    E("    APPLY_fn(\"DATA\",(DESCR_t[]){STRVAL(\"link(next,value)\")},1);\n");
     E("\n    trampoline_run(block_START);\n");
     E("    return 0;\n}\n");
 }

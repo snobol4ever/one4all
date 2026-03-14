@@ -163,7 +163,7 @@ static DESCR_t _b_ENDFILE(DESCR_t *a, int n) {
 static DESCR_t _b_APPLY(DESCR_t *a, int n) {
     if (n < 1) return NULVCL;
     const char *fname = VARVAL_fn(a[0]);
-    return APLY_fn(fname, a + 1, n - 1);
+    return APPLY_fn(fname, a + 1, n - 1);
 }
 static DESCR_t _b_LPAD(DESCR_t *a, int n) {
     if (n < 2) return n > 0 ? a[0] : NULVCL;
@@ -183,7 +183,7 @@ static DESCR_t _b_DUPL(DESCR_t *a, int n) {
 }
 static DESCR_t _b_REPLACE(DESCR_t *a, int n) {
     if (n < 3) return NULVCL;
-    return RPLACE_fn(a[0], a[1], a[2]);
+    return REPLACE_fn(a[0], a[1], a[2]);
 }
 static DESCR_t _b_TRIM(DESCR_t *a, int n) {
     if (n < 1) return NULVCL;
@@ -203,10 +203,10 @@ static DESCR_t _b_DATATYPE(DESCR_t *a, int n) {
 }
 
 /* EVAL / OPSYN / SORT wrappers — file scope required */
-extern DESCR_t evl(DESCR_t);
+extern DESCR_t EVAL_fn(DESCR_t);
 extern DESCR_t opsyn(DESCR_t, DESCR_t, DESCR_t);
 extern DESCR_t sort_fn(DESCR_t);
-static DESCR_t _b_EVAL(DESCR_t *a, int n)  { return evl(n>0?a[0]:NULVCL); }
+static DESCR_t _b_EVAL(DESCR_t *a, int n)  { return EVAL_fn(n>0?a[0]:NULVCL); }
 static DESCR_t _b_OPSYN(DESCR_t *a, int n) {
     return opsyn(n>0?a[0]:NULVCL,n>1?a[1]:NULVCL,n>2?a[2]:NULVCL); }
 static DESCR_t _b_SORT(DESCR_t *a, int n)  { return sort_fn(n>0?a[0]:NULVCL); }
@@ -504,7 +504,7 @@ static DESCR_t _b_DATA(DESCR_t *a, int n) {
     return NULVCL;
 }
 
-/* Pattern builtins callable via APLY_fn() — used when SPAN/BREAK/etc appear
+/* Pattern builtins callable via APPLY_fn() — used when SPAN/BREAK/etc appear
  * inside argument lists and are tokenised as IDENT rather than PAT_BUILTIN. */
 extern DESCR_t pat_span(const char *);
 extern DESCR_t pat_break_(const char *);
@@ -562,7 +562,7 @@ void SNO_INIT_fn(void) {
     register_fn("NE",       _b_NE,       2, 2);
     register_fn("INTEGER",  _b_INTEGER,  1, 1);
     register_fn("REAL",     _b_REAL,     1, 1);
-    register_fn("SIZE_fn",     _b_SIZE,     1, 1);
+    register_fn("SIZE",        _b_SIZE,     1, 1);
     /* Sprint 23: string predicates and host interface */
     register_fn("IDENT",    _b_IDENT,    0, 2);
     register_fn("DIFFER",   _b_DIFFER,   0, 2);
@@ -572,13 +572,13 @@ void SNO_INIT_fn(void) {
     register_fn("LPAD",     _b_LPAD,     2, 3);
     register_fn("RPAD",     _b_RPAD,     2, 3);
     register_fn("CHAR",     _b_CHAR,     1, 1);
-    register_fn("DUPL_fn",     _b_DUPL,     2, 2);
+    register_fn("DUPL",        _b_DUPL,     2, 2);
     register_fn("REPLACE",  _b_REPLACE,  3, 3);
-    register_fn("TRIM_fn",     _b_TRIM,     1, 1);
-    register_fn("SUBSTR_fn",   _b_SUBSTR,   3, 3);
+    register_fn("TRIM",        _b_TRIM,     1, 1);
+    register_fn("SUBSTR",      _b_SUBSTR,   3, 3);
     register_fn("REVERSE",  _b_REVERSE,  1, 1);
     register_fn("DATATYPE", _b_DATATYPE, 1, 1);
-    register_fn("DT_DATA",     _b_DATA,     1, 1);
+    register_fn("DATA",        _b_DATA,     1, 1);
     register_fn("EVAL",  _b_EVAL,  1, 1);
     register_fn("OPSYN", _b_OPSYN, 2, 3);
     register_fn("SORT",  _b_SORT,  1, 1);
@@ -595,7 +595,7 @@ void SNO_INIT_fn(void) {
     register_fn("value",    _b_field_value, 1, 1);
     register_fn("next",     _b_field_next,  1, 1);
     register_fn("DUMP",     _b_DUMP,        0, 1);
-    /* Pattern builtins callable via APLY_fn (when inside arglist parens) */
+    /* Pattern builtins callable via APPLY_fn (when inside arglist parens) */
     register_fn("SPAN",    _b_PAT_SPAN,    1, 1);
     register_fn("BREAK",   _b_PAT_BREAK,   1, 1);
     register_fn("ANY",     _b_PAT_ANY,     1, 1);
@@ -613,7 +613,7 @@ void SNO_INIT_fn(void) {
     register_fn("BAL",     _b_PAT_BAL,     0, 0);
     register_fn("ARBNO",   _b_PAT_ARBNO,   1, 1);
     register_fn("FENCE",   _b_PAT_FENCE,   0, 1);
-    /* Sprint 23: pre-ini &ALPHABET-derived constants from global.sno
+    /* Sprint 23: pre-INIT_fn &ALPHABET-derived constants from global.sno
      * &ALPHABET is a 256-char binary string; POS(n) LEN(1) . var extracts char(n).
      * Since STRVAL uses strlen, &ALPHABET[0]=NUL causes all matches to fail.
      * We pre-initialize the key character constants directly. */
@@ -635,7 +635,7 @@ void SNO_INIT_fn(void) {
         _ch = GC_malloc_atomic(2);
         _ch[0] = (char)8;  _ch[1] = '\0'; NV_SET_fn("bs", STRVAL(_ch));
         NV_SET_fn("nul", STRVAL(""));  /* char(0) = empty in string context */
-        /* epsilon = the always-succeeds zero-mtch pattern.
+        /* epsilon = the always-succeeds zero-MATCH_fn pattern.
          * USER CONTRACT (Lon, Session 47): epsilon is NEVER assigned by user code.
          * It is the pattern equivalent of NULL (empty string).
          * NULL = empty string sentinel; epsilon = always-succeed pattern sentinel.
@@ -669,12 +669,12 @@ void SNO_INIT_fn(void) {
  * String utilities
  * ============================================================ */
 
-char *dupl(const char *s) {
+char *STRDUP_fn(const char *s) {
     if (!s) return GC_strdup("");
     return GC_strdup(s);
 }
 
-char *ccat(const char *a, const char *b) {
+char *STRCONCAT_fn(const char *a, const char *b) {
     if (!a) a = "";
     if (!b) b = "";
     size_t la = strlen(a), lb = strlen(b);
@@ -685,17 +685,17 @@ char *ccat(const char *a, const char *b) {
     return r;
 }
 
-/* P003: DESCR_t ccat — propagates FAILDESCR if either operand is DT_FAIL.
+/* P003: DESCR_t CONCAT_fn — propagates FAILDESCR if either operand is DT_FAIL.
  * If either operand is a PATTERN, build a pattern concatenation instead of
  * string concatenation (blank-juxtaposition of patterns = pattern cat). */
-DESCR_t CONC_fn(DESCR_t a, DESCR_t b) {
+DESCR_t CONCAT_fn(DESCR_t a, DESCR_t b) {
     if (a.v == DT_FAIL) return FAILDESCR;
     if (b.v == DT_FAIL) return FAILDESCR;
     if (a.v == DT_P || b.v == DT_P)
         return pat_cat(a, b);
     const char *sa = VARVAL_fn(a);
     const char *sb = VARVAL_fn(b);
-    return STRVAL(ccat(sa, sb));
+    return STRVAL(STRCONCAT_fn(sa, sb));
 }
 
 int64_t size(const char *s) {
@@ -851,7 +851,7 @@ ARBLK_t *array_new(int lo, int hi) {
 }
 
 ARBLK_t *array_new2d(int lo1, int hi1, int lo2, int hi2) {
-    /* Stored as flat row-major: indx = (i-lo1)*(hi2-lo2+1) + (j-lo2) */
+    /* Stored as flat row-major: INDEX_fn = (i-lo1)*(hi2-lo2+1) + (j-lo2) */
     ARBLK_t *a = GC_malloc(sizeof(ARBLK_t));
     a->lo   = lo1;
     a->hi   = hi1;
@@ -865,7 +865,7 @@ ARBLK_t *array_new2d(int lo1, int hi1, int lo2, int hi2) {
     /* Store hi2/lo2 in spare fields — abuse: hi=hi2 in a second slot.
      * For simplicity, encode cols in a separate field. */
     /* Use tag trick: store cols count in a DESCR_t at position -1.
-     * Simpler: always allocate +1 and store cols at indx 0. */
+     * Simpler: always allocate +1 and store cols at INDEX_fn 0. */
     /* Actually: store lo2/hi2 by repurposing ndim as cols */
     a->ndim = cols;  /* repurpose: ndim = cols for 2D arrays */
     return a;
@@ -1029,13 +1029,16 @@ DESCR_t DATCON_fn(const char *typename, ...) {
 }
 
 DESCR_t FIELD_GET_fn(DESCR_t obj, const char *field) {
+    if (strcmp(field, "c") == 0)
+        fprintf(stderr, "TRACE FIELD_GET_fn(c): obj.v=%d obj.u=%p\n",
+                obj.v, (void*)obj.u);
     if (obj.v != DT_DATA || !obj.u) return NULVCL;
     DATBLK_t *t = obj.u->type;
     for (int i = 0; i < t->nfields; i++)
         if (strcasecmp(t->fields[i], field) == 0) {
             if (strcmp(field, "c") == 0)
-                fprintf(stderr, "TRACE FIELD_GET_fn(c): obj.v=%d fields[%d].v=%d\n",
-                        obj.v, i, obj.u->fields[i].v);
+                fprintf(stderr, "TRACE FIELD_GET_fn(c): found fields[%d].v=%d\n",
+                        i, obj.u->fields[i].v);
             return obj.u->fields[i];
         }
     return NULVCL;
@@ -1069,7 +1072,7 @@ static int _var_init_done = 0;
 /* Static-pointer registration: when NV_SET_fn(name,val) fires,
  * also update the C-static pointer if registered. This bridges the
  * two-store gap for vars set via pattern conditional assignment (. var)
- * or pre-ini in SNO_INIT_fn, whose C statics are never touched
+ * or pre-INIT_fn in SNO_INIT_fn, whose C statics are never touched
  * by set() because the assignment comes from the pattern engine. */
 #define VAR_REG_MAX 1024
 typedef struct { const char *name; DESCR_t *ptr; } VarReg;
@@ -1384,7 +1387,7 @@ void DEFINE_fn(const char *spec, FNCPTR_t fn) {
     _func_buckets[h] = fe;
 }
 
-DESCR_t APLY_fn(const char *name, DESCR_t *args, int nargs) {
+DESCR_t APPLY_fn(const char *name, DESCR_t *args, int nargs) {
     _func_init();
     if (!name) return NULVCL;
     unsigned h = _func_hash(name);
@@ -1412,29 +1415,29 @@ int FNCEX_fn(const char *name) {
  * ============================================================ */
 
 DESCR_t SIZE_fn(DESCR_t s) {
-    const char *strv = VARVAL_fn(s);
-    return INTVAL((int64_t)strlen(strv));
+    const char *STRVAL_fn = VARVAL_fn(s);
+    return INTVAL((int64_t)strlen(STRVAL_fn));
 }
 
 DESCR_t DUPL_fn(DESCR_t s, DESCR_t n) {
-    const char *strv = VARVAL_fn(s);
+    const char *STRVAL_fn = VARVAL_fn(s);
     int64_t times   = to_int(n);
-    if (times <= 0 || !strv || !*strv) return STRVAL(GC_strdup(""));
-    size_t slen = strlen(strv);
+    if (times <= 0 || !STRVAL_fn || !*STRVAL_fn) return STRVAL(GC_strdup(""));
+    size_t slen = strlen(STRVAL_fn);
     char *r = GC_malloc(slen * (size_t)times + 1);
     r[0] = '\0';
-    for (int64_t i = 0; i < times; i++) memcpy(r + i * slen, strv, slen);
+    for (int64_t i = 0; i < times; i++) memcpy(r + i * slen, STRVAL_fn, slen);
     r[slen * times] = '\0';
     return STRVAL(r);
 }
 
-DESCR_t RPLACE_fn(DESCR_t s, DESCR_t from, DESCR_t to) {
-    /* REPLACE(s, from, to): for each char in from, replc with corresponding
+DESCR_t REPLACE_fn(DESCR_t s, DESCR_t from, DESCR_t to) {
+    /* REPLACE(s, from, to): for each char in from, REPLACE_fn with corresponding
      * char in to. Like tr command. */
-    const char *strv  = VARVAL_fn(s);
+    const char *STRVAL_fn  = VARVAL_fn(s);
     const char *f    = VARVAL_fn(from);
     const char *t    = VARVAL_fn(to);
-    size_t slen = strlen(strv);
+    size_t slen = strlen(STRVAL_fn);
     char *r = GC_malloc(slen + 1);
     /* Build translation table */
     unsigned char xlat[256];
@@ -1447,7 +1450,7 @@ DESCR_t RPLACE_fn(DESCR_t s, DESCR_t from, DESCR_t to) {
     }
     size_t rlen = 0;
     for (size_t i = 0; i < slen; i++) {
-        unsigned char c = xlat[(unsigned char)strv[i]];
+        unsigned char c = xlat[(unsigned char)STRVAL_fn[i]];
         if (c) r[rlen++] = (char)c;
     }
     r[rlen] = '\0';
@@ -1455,65 +1458,65 @@ DESCR_t RPLACE_fn(DESCR_t s, DESCR_t from, DESCR_t to) {
 }
 
 DESCR_t SUBSTR_fn(DESCR_t s, DESCR_t i, DESCR_t n) {
-    const char *strv = VARVAL_fn(s);
+    const char *STRVAL_fn = VARVAL_fn(s);
     int64_t start   = to_int(i);  /* 1-based */
     int64_t len_    = to_int(n);
-    int64_t slen    = (int64_t)strlen(strv);
+    int64_t slen    = (int64_t)strlen(STRVAL_fn);
     if (start < 1) start = 1;
     if (start > slen + 1) return STRVAL(GC_strdup(""));
     if (len_ < 0) len_ = 0;
     if (start - 1 + len_ > slen) len_ = slen - start + 1;
     char *r = GC_malloc((size_t)len_ + 1);
-    memcpy(r, strv + start - 1, (size_t)len_);
+    memcpy(r, STRVAL_fn + start - 1, (size_t)len_);
     r[len_] = '\0';
     return STRVAL(r);
 }
 
 DESCR_t TRIM_fn(DESCR_t s) {
-    const char *strv = VARVAL_fn(s);
+    const char *STRVAL_fn = VARVAL_fn(s);
     /* TRIM_fn: remove trailing blanks */
-    int len = (int)strlen(strv);
-    while (len > 0 && strv[len-1] == ' ') len--;
+    int len = (int)strlen(STRVAL_fn);
+    while (len > 0 && STRVAL_fn[len-1] == ' ') len--;
     char *r = GC_malloc((size_t)len + 1);
-    memcpy(r, strv, (size_t)len);
+    memcpy(r, STRVAL_fn, (size_t)len);
     r[len] = '\0';
     return STRVAL(r);
 }
 
 DESCR_t lpad_fn(DESCR_t s, DESCR_t n, DESCR_t pad) {
-    const char *strv = VARVAL_fn(s);
+    const char *STRVAL_fn = VARVAL_fn(s);
     int64_t width   = to_int(n);
     const char *p   = VARVAL_fn(pad);
     char padch      = (p && *p) ? p[0] : ' ';
-    int64_t slen    = (int64_t)strlen(strv);
-    if (width <= slen) return STRVAL(GC_strdup(strv));
+    int64_t slen    = (int64_t)strlen(STRVAL_fn);
+    if (width <= slen) return STRVAL(GC_strdup(STRVAL_fn));
     int64_t npad = width - slen;
     char *r = GC_malloc((size_t)width + 1);
     memset(r, padch, (size_t)npad);
-    memcpy(r + npad, strv, (size_t)slen);
+    memcpy(r + npad, STRVAL_fn, (size_t)slen);
     r[width] = '\0';
     return STRVAL(r);
 }
 
 DESCR_t rpad_fn(DESCR_t s, DESCR_t n, DESCR_t pad) {
-    const char *strv = VARVAL_fn(s);
+    const char *STRVAL_fn = VARVAL_fn(s);
     int64_t width   = to_int(n);
     const char *p   = VARVAL_fn(pad);
     char padch      = (p && *p) ? p[0] : ' ';
-    int64_t slen    = (int64_t)strlen(strv);
-    if (width <= slen) return STRVAL(GC_strdup(strv));
+    int64_t slen    = (int64_t)strlen(STRVAL_fn);
+    if (width <= slen) return STRVAL(GC_strdup(STRVAL_fn));
     char *r = GC_malloc((size_t)width + 1);
-    memcpy(r, strv, (size_t)slen);
+    memcpy(r, STRVAL_fn, (size_t)slen);
     memset(r + slen, padch, (size_t)(width - slen));
     r[width] = '\0';
     return STRVAL(r);
 }
 
 DESCR_t REVERS_fn(DESCR_t s) {
-    const char *strv = VARVAL_fn(s);
-    int len = (int)strlen(strv);
+    const char *STRVAL_fn = VARVAL_fn(s);
+    int len = (int)strlen(STRVAL_fn);
     char *r = GC_malloc((size_t)len + 1);
-    for (int i = 0; i < len; i++) r[i] = strv[len - 1 - i];
+    for (int i = 0; i < len; i++) r[i] = STRVAL_fn[len - 1 - i];
     r[len] = '\0';
     return STRVAL(r);
 }
@@ -1589,7 +1592,7 @@ DESCR_t mul(DESCR_t a, DESCR_t b) {
     return REALVAL(to_real(a) * to_real(b));
 }
 
-DESCR_t divyde(DESCR_t a, DESCR_t b) {
+DESCR_t DIVIDE_fn(DESCR_t a, DESCR_t b) {
     if (a.v == DT_FAIL || b.v == DT_FAIL) return FAILDESCR;
     /* SNOBOL4 / is real division; integer / integer = integer in SNOBOL4 */
     if (a.v == DT_I && b.v == DT_I) {
@@ -1601,7 +1604,7 @@ DESCR_t divyde(DESCR_t a, DESCR_t b) {
     return REALVAL(to_real(a) / denom);
 }
 
-DESCR_t powr(DESCR_t a, DESCR_t b) {
+DESCR_t POWER_fn(DESCR_t a, DESCR_t b) {
     if (a.v == DT_FAIL || b.v == DT_FAIL) return FAILDESCR;
     return REALVAL(pow(to_real(a), to_real(b)));
 }

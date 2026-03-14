@@ -34,7 +34,7 @@ void    cn_arena_free(CArena *a);
  * CNODE_t — IR node for a C expression fragment
  * ----------------------------------------------------------------------- */
 typedef enum {
-    CN_RAW,   /* literal text atom: "NULVCL", "strv(", ")", "," … */
+    CN_RAW,   /* literal text atom: "NULVCL", "STRVAL_fn(", ")", "," … */
     CN_CALL,  /* fn(arg0, arg1, …) — function call with N arg subtrees */
     CN_SEQ,   /* left immediately followed by right (no separator) */
 } CNKIND_t;

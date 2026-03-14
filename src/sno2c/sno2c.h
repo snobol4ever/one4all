@@ -30,7 +30,7 @@ typedef enum {
     E_MNS,
     E_ADD, E_SUB, E_MPY, E_DIV, E_EXPOP,
     /* string / pattern composition */
-    E_CONC,       /* juxtaposition: value/pattern ccat */
+    E_CONC,       /* juxtaposition: value/pattern CONCAT_fn */
     E_OPSYN,       /* & operator: reduce(left, right) — OPSYN('&','reduce',2) */
     E_OR,          /* | : pattern alternation */
     /* captures (pattern context only) */

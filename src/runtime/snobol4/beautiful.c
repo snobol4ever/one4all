@@ -328,7 +328,7 @@ _stmt_24: {  /* L29 */
     {
         DESCR_t _rhs = STRVAL("NO_BREAK_SPACE");
         if (IS_FAIL_fn(_rhs)) goto _stmt_25;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(BCHAR_fn(INTVAL(194LL)), BCHAR_fn(INTVAL(160LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(BCHAR_fn(INTVAL(194LL)), BCHAR_fn(INTVAL(160LL))), _rhs);
         goto _stmt_25;
     }
 }
@@ -338,7 +338,7 @@ _stmt_25: {  /* L30 */
     {
         DESCR_t _rhs = STRVAL("CENT_SIGN");
         if (IS_FAIL_fn(_rhs)) goto _stmt_26;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(BCHAR_fn(INTVAL(194LL)), BCHAR_fn(INTVAL(162LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(BCHAR_fn(INTVAL(194LL)), BCHAR_fn(INTVAL(162LL))), _rhs);
         goto _stmt_26;
     }
 }
@@ -348,7 +348,7 @@ _stmt_26: {  /* L31 */
     {
         DESCR_t _rhs = STRVAL("SECTION_SIGN");
         if (IS_FAIL_fn(_rhs)) goto _stmt_27;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(BCHAR_fn(INTVAL(194LL)), BCHAR_fn(INTVAL(167LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(BCHAR_fn(INTVAL(194LL)), BCHAR_fn(INTVAL(167LL))), _rhs);
         goto _stmt_27;
     }
 }
@@ -358,7 +358,7 @@ _stmt_27: {  /* L32 */
     {
         DESCR_t _rhs = STRVAL("COPYRIGHT_SIGN");
         if (IS_FAIL_fn(_rhs)) goto _stmt_28;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(BCHAR_fn(INTVAL(194LL)), BCHAR_fn(INTVAL(169LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(BCHAR_fn(INTVAL(194LL)), BCHAR_fn(INTVAL(169LL))), _rhs);
         goto _stmt_28;
     }
 }
@@ -368,7 +368,7 @@ _stmt_28: {  /* L33 */
     {
         DESCR_t _rhs = STRVAL("FEMININE_ORDINAL_INDICATOR");
         if (IS_FAIL_fn(_rhs)) goto _stmt_29;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(BCHAR_fn(INTVAL(194LL)), BCHAR_fn(INTVAL(170LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(BCHAR_fn(INTVAL(194LL)), BCHAR_fn(INTVAL(170LL))), _rhs);
         goto _stmt_29;
     }
 }
@@ -378,7 +378,7 @@ _stmt_29: {  /* L34 */
     {
         DESCR_t _rhs = STRVAL("SOFT_HYPHEN");
         if (IS_FAIL_fn(_rhs)) goto _stmt_30;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(BCHAR_fn(INTVAL(194LL)), BCHAR_fn(INTVAL(173LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(BCHAR_fn(INTVAL(194LL)), BCHAR_fn(INTVAL(173LL))), _rhs);
         goto _stmt_30;
     }
 }
@@ -388,7 +388,7 @@ _stmt_30: {  /* L35 */
     {
         DESCR_t _rhs = STRVAL("REGISTERED_SIGN");
         if (IS_FAIL_fn(_rhs)) goto _stmt_31;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(BCHAR_fn(INTVAL(194LL)), BCHAR_fn(INTVAL(174LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(BCHAR_fn(INTVAL(194LL)), BCHAR_fn(INTVAL(174LL))), _rhs);
         goto _stmt_31;
     }
 }
@@ -398,7 +398,7 @@ _stmt_31: {  /* L36 */
     {
         DESCR_t _rhs = STRVAL("DEGREE_SIGN");
         if (IS_FAIL_fn(_rhs)) goto _stmt_32;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(BCHAR_fn(INTVAL(194LL)), BCHAR_fn(INTVAL(176LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(BCHAR_fn(INTVAL(194LL)), BCHAR_fn(INTVAL(176LL))), _rhs);
         goto _stmt_32;
     }
 }
@@ -408,7 +408,7 @@ _stmt_32: {  /* L37 */
     {
         DESCR_t _rhs = STRVAL("PLUS_MINUS_SIGN");
         if (IS_FAIL_fn(_rhs)) goto _stmt_33;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(BCHAR_fn(INTVAL(194LL)), BCHAR_fn(INTVAL(177LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(BCHAR_fn(INTVAL(194LL)), BCHAR_fn(INTVAL(177LL))), _rhs);
         goto _stmt_33;
     }
 }
@@ -418,7 +418,7 @@ _stmt_33: {  /* L38 */
     {
         DESCR_t _rhs = STRVAL("PILCROW_SIGN");
         if (IS_FAIL_fn(_rhs)) goto _stmt_34;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(BCHAR_fn(INTVAL(194LL)), BCHAR_fn(INTVAL(182LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(BCHAR_fn(INTVAL(194LL)), BCHAR_fn(INTVAL(182LL))), _rhs);
         goto _stmt_34;
     }
 }
@@ -428,7 +428,7 @@ _stmt_34: {  /* L39 */
     {
         DESCR_t _rhs = STRVAL("VULGAR_FRACTION_ONE_QUARTER");
         if (IS_FAIL_fn(_rhs)) goto _stmt_35;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(BCHAR_fn(INTVAL(194LL)), BCHAR_fn(INTVAL(188LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(BCHAR_fn(INTVAL(194LL)), BCHAR_fn(INTVAL(188LL))), _rhs);
         goto _stmt_35;
     }
 }
@@ -438,7 +438,7 @@ _stmt_35: {  /* L40 */
     {
         DESCR_t _rhs = STRVAL("VULGAR_FRACTION_ONE_HALF");
         if (IS_FAIL_fn(_rhs)) goto _stmt_36;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(BCHAR_fn(INTVAL(194LL)), BCHAR_fn(INTVAL(189LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(BCHAR_fn(INTVAL(194LL)), BCHAR_fn(INTVAL(189LL))), _rhs);
         goto _stmt_36;
     }
 }
@@ -448,7 +448,7 @@ _stmt_36: {  /* L41 */
     {
         DESCR_t _rhs = STRVAL("VULGAR_FRACTION_THREE_QUARTERS");
         if (IS_FAIL_fn(_rhs)) goto _stmt_37;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(BCHAR_fn(INTVAL(194LL)), BCHAR_fn(INTVAL(190LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(BCHAR_fn(INTVAL(194LL)), BCHAR_fn(INTVAL(190LL))), _rhs);
         goto _stmt_37;
     }
 }
@@ -458,7 +458,7 @@ _stmt_37: {  /* L42 */
     {
         DESCR_t _rhs = STRVAL("LATIN_CAPITAL_LETTER_ETH");
         if (IS_FAIL_fn(_rhs)) goto _stmt_38;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(BCHAR_fn(INTVAL(195LL)), BCHAR_fn(INTVAL(144LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(BCHAR_fn(INTVAL(195LL)), BCHAR_fn(INTVAL(144LL))), _rhs);
         goto _stmt_38;
     }
 }
@@ -468,7 +468,7 @@ _stmt_38: {  /* L43 */
     {
         DESCR_t _rhs = STRVAL("MULTIPLICATION_SIGN");
         if (IS_FAIL_fn(_rhs)) goto _stmt_39;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(BCHAR_fn(INTVAL(195LL)), BCHAR_fn(INTVAL(151LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(BCHAR_fn(INTVAL(195LL)), BCHAR_fn(INTVAL(151LL))), _rhs);
         goto _stmt_39;
     }
 }
@@ -478,7 +478,7 @@ _stmt_39: {  /* L44 */
     {
         DESCR_t _rhs = STRVAL("DIVISION_SIGN");
         if (IS_FAIL_fn(_rhs)) goto _stmt_40;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(BCHAR_fn(INTVAL(195LL)), BCHAR_fn(INTVAL(183LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(BCHAR_fn(INTVAL(195LL)), BCHAR_fn(INTVAL(183LL))), _rhs);
         goto _stmt_40;
     }
 }
@@ -488,7 +488,7 @@ _stmt_40: {  /* L45 */
     {
         DESCR_t _rhs = STRVAL("LATIN_SMALL_LETTER_O_WITH_MACRON");
         if (IS_FAIL_fn(_rhs)) goto _stmt_41;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(BCHAR_fn(INTVAL(197LL)), BCHAR_fn(INTVAL(141LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(BCHAR_fn(INTVAL(197LL)), BCHAR_fn(INTVAL(141LL))), _rhs);
         goto _stmt_41;
     }
 }
@@ -498,7 +498,7 @@ _stmt_41: {  /* L46 */
     {
         DESCR_t _rhs = STRVAL("MODIFIER_LETTER_TURNED_COMMA");
         if (IS_FAIL_fn(_rhs)) goto _stmt_42;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(BCHAR_fn(INTVAL(202LL)), BCHAR_fn(INTVAL(187LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(BCHAR_fn(INTVAL(202LL)), BCHAR_fn(INTVAL(187LL))), _rhs);
         goto _stmt_42;
     }
 }
@@ -508,7 +508,7 @@ _stmt_42: {  /* L47 */
     {
         DESCR_t _rhs = STRVAL("COMBINING_GRAVE_ACCENT");
         if (IS_FAIL_fn(_rhs)) goto _stmt_43;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(BCHAR_fn(INTVAL(204LL)), BCHAR_fn(INTVAL(128LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(BCHAR_fn(INTVAL(204LL)), BCHAR_fn(INTVAL(128LL))), _rhs);
         goto _stmt_43;
     }
 }
@@ -518,7 +518,7 @@ _stmt_43: {  /* L48 */
     {
         DESCR_t _rhs = STRVAL("COMBINING_ACUTE_ACCENT");
         if (IS_FAIL_fn(_rhs)) goto _stmt_44;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(BCHAR_fn(INTVAL(204LL)), BCHAR_fn(INTVAL(129LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(BCHAR_fn(INTVAL(204LL)), BCHAR_fn(INTVAL(129LL))), _rhs);
         goto _stmt_44;
     }
 }
@@ -528,7 +528,7 @@ _stmt_44: {  /* L49 */
     {
         DESCR_t _rhs = STRVAL("COMBINING_CIRCUMFLEX_ACCENT");
         if (IS_FAIL_fn(_rhs)) goto _stmt_45;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(BCHAR_fn(INTVAL(204LL)), BCHAR_fn(INTVAL(130LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(BCHAR_fn(INTVAL(204LL)), BCHAR_fn(INTVAL(130LL))), _rhs);
         goto _stmt_45;
     }
 }
@@ -538,7 +538,7 @@ _stmt_45: {  /* L50 */
     {
         DESCR_t _rhs = STRVAL("COMBINING_TILDE");
         if (IS_FAIL_fn(_rhs)) goto _stmt_46;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(BCHAR_fn(INTVAL(204LL)), BCHAR_fn(INTVAL(131LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(BCHAR_fn(INTVAL(204LL)), BCHAR_fn(INTVAL(131LL))), _rhs);
         goto _stmt_46;
     }
 }
@@ -548,7 +548,7 @@ _stmt_46: {  /* L51 */
     {
         DESCR_t _rhs = STRVAL("COMBINING_OVERLINE");
         if (IS_FAIL_fn(_rhs)) goto _stmt_47;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(BCHAR_fn(INTVAL(204LL)), BCHAR_fn(INTVAL(133LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(BCHAR_fn(INTVAL(204LL)), BCHAR_fn(INTVAL(133LL))), _rhs);
         goto _stmt_47;
     }
 }
@@ -558,7 +558,7 @@ _stmt_47: {  /* L52 */
     {
         DESCR_t _rhs = STRVAL("COMBINING_DIAERESIS");
         if (IS_FAIL_fn(_rhs)) goto _stmt_48;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(BCHAR_fn(INTVAL(204LL)), BCHAR_fn(INTVAL(136LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(BCHAR_fn(INTVAL(204LL)), BCHAR_fn(INTVAL(136LL))), _rhs);
         goto _stmt_48;
     }
 }
@@ -568,7 +568,7 @@ _stmt_48: {  /* L53 */
     {
         DESCR_t _rhs = STRVAL("GREEK_CAPITAL_LETTER_PHI");
         if (IS_FAIL_fn(_rhs)) goto _stmt_49;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(BCHAR_fn(INTVAL(206LL)), BCHAR_fn(INTVAL(166LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(BCHAR_fn(INTVAL(206LL)), BCHAR_fn(INTVAL(166LL))), _rhs);
         goto _stmt_49;
     }
 }
@@ -578,7 +578,7 @@ _stmt_49: {  /* L54 */
     {
         DESCR_t _rhs = STRVAL("GREEK_SMALL_LETTER_ALPHA");
         if (IS_FAIL_fn(_rhs)) goto _stmt_50;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(BCHAR_fn(INTVAL(206LL)), BCHAR_fn(INTVAL(177LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(BCHAR_fn(INTVAL(206LL)), BCHAR_fn(INTVAL(177LL))), _rhs);
         goto _stmt_50;
     }
 }
@@ -588,7 +588,7 @@ _stmt_50: {  /* L55 */
     {
         DESCR_t _rhs = STRVAL("GREEK_SMALL_LETTER_BETA");
         if (IS_FAIL_fn(_rhs)) goto _stmt_51;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(BCHAR_fn(INTVAL(206LL)), BCHAR_fn(INTVAL(178LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(BCHAR_fn(INTVAL(206LL)), BCHAR_fn(INTVAL(178LL))), _rhs);
         goto _stmt_51;
     }
 }
@@ -598,7 +598,7 @@ _stmt_51: {  /* L56 */
     {
         DESCR_t _rhs = STRVAL("GREEK_SMALL_LETTER_MU");
         if (IS_FAIL_fn(_rhs)) goto _stmt_52;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(BCHAR_fn(INTVAL(206LL)), BCHAR_fn(INTVAL(188LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(BCHAR_fn(INTVAL(206LL)), BCHAR_fn(INTVAL(188LL))), _rhs);
         goto _stmt_52;
     }
 }
@@ -608,7 +608,7 @@ _stmt_52: {  /* L57 */
     {
         DESCR_t _rhs = STRVAL("GREEK_PHI_SYMBOL");
         if (IS_FAIL_fn(_rhs)) goto _stmt_53;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(BCHAR_fn(INTVAL(207LL)), BCHAR_fn(INTVAL(149LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(BCHAR_fn(INTVAL(207LL)), BCHAR_fn(INTVAL(149LL))), _rhs);
         goto _stmt_53;
     }
 }
@@ -618,7 +618,7 @@ _stmt_53: {  /* L59 */
     {
         DESCR_t _rhs = STRVAL("EN_QUAD");
         if (IS_FAIL_fn(_rhs)) goto _stmt_54;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(128LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(128LL))), _rhs);
         goto _stmt_54;
     }
 }
@@ -628,7 +628,7 @@ _stmt_54: {  /* L60 */
     {
         DESCR_t _rhs = STRVAL("EM_QUAD");
         if (IS_FAIL_fn(_rhs)) goto _stmt_55;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(129LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(129LL))), _rhs);
         goto _stmt_55;
     }
 }
@@ -638,7 +638,7 @@ _stmt_55: {  /* L61 */
     {
         DESCR_t _rhs = STRVAL("EN_DASH");
         if (IS_FAIL_fn(_rhs)) goto _stmt_56;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(147LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(147LL))), _rhs);
         goto _stmt_56;
     }
 }
@@ -648,7 +648,7 @@ _stmt_56: {  /* L62 */
     {
         DESCR_t _rhs = STRVAL("EM_DASH");
         if (IS_FAIL_fn(_rhs)) goto _stmt_57;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(148LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(148LL))), _rhs);
         goto _stmt_57;
     }
 }
@@ -658,7 +658,7 @@ _stmt_57: {  /* L63 */
     {
         DESCR_t _rhs = STRVAL("LEFT_SINGLE_QUOTATION_MARK");
         if (IS_FAIL_fn(_rhs)) goto _stmt_58;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(152LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(152LL))), _rhs);
         goto _stmt_58;
     }
 }
@@ -668,7 +668,7 @@ _stmt_58: {  /* L64 */
     {
         DESCR_t _rhs = STRVAL("RIGHT_SINGLE_QUOTATION_MARK");
         if (IS_FAIL_fn(_rhs)) goto _stmt_59;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(153LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(153LL))), _rhs);
         goto _stmt_59;
     }
 }
@@ -678,7 +678,7 @@ _stmt_59: {  /* L65 */
     {
         DESCR_t _rhs = STRVAL("LEFT_DOUBLE_QUOTATION_MARK");
         if (IS_FAIL_fn(_rhs)) goto _stmt_60;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(156LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(156LL))), _rhs);
         goto _stmt_60;
     }
 }
@@ -688,7 +688,7 @@ _stmt_60: {  /* L66 */
     {
         DESCR_t _rhs = STRVAL("RIGHT_DOUBLE_QUOTATION_MARK");
         if (IS_FAIL_fn(_rhs)) goto _stmt_61;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(157LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(157LL))), _rhs);
         goto _stmt_61;
     }
 }
@@ -698,7 +698,7 @@ _stmt_61: {  /* L67 */
     {
         DESCR_t _rhs = STRVAL("BULLET");
         if (IS_FAIL_fn(_rhs)) goto _stmt_62;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(162LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(162LL))), _rhs);
         goto _stmt_62;
     }
 }
@@ -708,7 +708,7 @@ _stmt_62: {  /* L68 */
     {
         DESCR_t _rhs = STRVAL("HORIZONTAL_ELLIPSIS");
         if (IS_FAIL_fn(_rhs)) goto _stmt_63;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(166LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(166LL))), _rhs);
         goto _stmt_63;
     }
 }
@@ -718,7 +718,7 @@ _stmt_63: {  /* L69 */
     {
         DESCR_t _rhs = STRVAL("NARROW_NO_BREAK_SPACE");
         if (IS_FAIL_fn(_rhs)) goto _stmt_64;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(175LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(175LL))), _rhs);
         goto _stmt_64;
     }
 }
@@ -728,7 +728,7 @@ _stmt_64: {  /* L70 */
     {
         DESCR_t _rhs = STRVAL("PRIME");
         if (IS_FAIL_fn(_rhs)) goto _stmt_65;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(178LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(178LL))), _rhs);
         goto _stmt_65;
     }
 }
@@ -738,7 +738,7 @@ _stmt_65: {  /* L71 */
     {
         DESCR_t _rhs = STRVAL("FRACTION_SLASH");
         if (IS_FAIL_fn(_rhs)) goto _stmt_66;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(129LL))), BCHAR_fn(INTVAL(132LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(129LL))), BCHAR_fn(INTVAL(132LL))), _rhs);
         goto _stmt_66;
     }
 }
@@ -748,7 +748,7 @@ _stmt_66: {  /* L72 */
     {
         DESCR_t _rhs = STRVAL("SOUND_RECORDING_COPYRIGHT");
         if (IS_FAIL_fn(_rhs)) goto _stmt_67;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(132LL))), BCHAR_fn(INTVAL(151LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(132LL))), BCHAR_fn(INTVAL(151LL))), _rhs);
         goto _stmt_67;
     }
 }
@@ -758,7 +758,7 @@ _stmt_67: {  /* L73 */
     {
         DESCR_t _rhs = STRVAL("VULGAR_FRACTION_ONE_SEVENTH");
         if (IS_FAIL_fn(_rhs)) goto _stmt_68;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(133LL))), BCHAR_fn(INTVAL(144LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(133LL))), BCHAR_fn(INTVAL(144LL))), _rhs);
         goto _stmt_68;
     }
 }
@@ -768,7 +768,7 @@ _stmt_68: {  /* L74 */
     {
         DESCR_t _rhs = STRVAL("VULGAR_FRACTION_ONE_NINTH");
         if (IS_FAIL_fn(_rhs)) goto _stmt_69;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(133LL))), BCHAR_fn(INTVAL(145LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(133LL))), BCHAR_fn(INTVAL(145LL))), _rhs);
         goto _stmt_69;
     }
 }
@@ -778,7 +778,7 @@ _stmt_69: {  /* L75 */
     {
         DESCR_t _rhs = STRVAL("VULGAR_FRACTION_ONE_TENTH");
         if (IS_FAIL_fn(_rhs)) goto _stmt_70;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(133LL))), BCHAR_fn(INTVAL(146LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(133LL))), BCHAR_fn(INTVAL(146LL))), _rhs);
         goto _stmt_70;
     }
 }
@@ -788,7 +788,7 @@ _stmt_70: {  /* L76 */
     {
         DESCR_t _rhs = STRVAL("VULGAR_FRACTION_ONE_THIRD");
         if (IS_FAIL_fn(_rhs)) goto _stmt_71;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(133LL))), BCHAR_fn(INTVAL(147LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(133LL))), BCHAR_fn(INTVAL(147LL))), _rhs);
         goto _stmt_71;
     }
 }
@@ -798,7 +798,7 @@ _stmt_71: {  /* L77 */
     {
         DESCR_t _rhs = STRVAL("VULGAR_FRACTION_TWO_THIRDS");
         if (IS_FAIL_fn(_rhs)) goto _stmt_72;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(133LL))), BCHAR_fn(INTVAL(148LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(133LL))), BCHAR_fn(INTVAL(148LL))), _rhs);
         goto _stmt_72;
     }
 }
@@ -808,7 +808,7 @@ _stmt_72: {  /* L78 */
     {
         DESCR_t _rhs = STRVAL("VULGAR_FRACTION_ONE_FIFTH");
         if (IS_FAIL_fn(_rhs)) goto _stmt_73;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(133LL))), BCHAR_fn(INTVAL(149LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(133LL))), BCHAR_fn(INTVAL(149LL))), _rhs);
         goto _stmt_73;
     }
 }
@@ -818,7 +818,7 @@ _stmt_73: {  /* L79 */
     {
         DESCR_t _rhs = STRVAL("VULGAR_FRACTION_TWO_FIFTHS");
         if (IS_FAIL_fn(_rhs)) goto _stmt_74;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(133LL))), BCHAR_fn(INTVAL(150LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(133LL))), BCHAR_fn(INTVAL(150LL))), _rhs);
         goto _stmt_74;
     }
 }
@@ -828,7 +828,7 @@ _stmt_74: {  /* L80 */
     {
         DESCR_t _rhs = STRVAL("VULGAR_FRACTION_THREE_FIFTHS");
         if (IS_FAIL_fn(_rhs)) goto _stmt_75;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(133LL))), BCHAR_fn(INTVAL(151LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(133LL))), BCHAR_fn(INTVAL(151LL))), _rhs);
         goto _stmt_75;
     }
 }
@@ -838,7 +838,7 @@ _stmt_75: {  /* L81 */
     {
         DESCR_t _rhs = STRVAL("VULGAR_FRACTION_FOUR_FIFTHS");
         if (IS_FAIL_fn(_rhs)) goto _stmt_76;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(133LL))), BCHAR_fn(INTVAL(152LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(133LL))), BCHAR_fn(INTVAL(152LL))), _rhs);
         goto _stmt_76;
     }
 }
@@ -848,7 +848,7 @@ _stmt_76: {  /* L82 */
     {
         DESCR_t _rhs = STRVAL("VULGAR_FRACTION_ONE_SIXTH");
         if (IS_FAIL_fn(_rhs)) goto _stmt_77;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(133LL))), BCHAR_fn(INTVAL(153LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(133LL))), BCHAR_fn(INTVAL(153LL))), _rhs);
         goto _stmt_77;
     }
 }
@@ -858,7 +858,7 @@ _stmt_77: {  /* L83 */
     {
         DESCR_t _rhs = STRVAL("VULGAR_FRACTION_FIVE_SIXTHS");
         if (IS_FAIL_fn(_rhs)) goto _stmt_78;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(133LL))), BCHAR_fn(INTVAL(154LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(133LL))), BCHAR_fn(INTVAL(154LL))), _rhs);
         goto _stmt_78;
     }
 }
@@ -868,7 +868,7 @@ _stmt_78: {  /* L84 */
     {
         DESCR_t _rhs = STRVAL("VULGAR_FRACTION_ONE_EIGHTH");
         if (IS_FAIL_fn(_rhs)) goto _stmt_79;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(133LL))), BCHAR_fn(INTVAL(155LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(133LL))), BCHAR_fn(INTVAL(155LL))), _rhs);
         goto _stmt_79;
     }
 }
@@ -878,7 +878,7 @@ _stmt_79: {  /* L85 */
     {
         DESCR_t _rhs = STRVAL("VULGAR_FRACTION_THREE_EIGHTHS");
         if (IS_FAIL_fn(_rhs)) goto _stmt_80;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(133LL))), BCHAR_fn(INTVAL(156LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(133LL))), BCHAR_fn(INTVAL(156LL))), _rhs);
         goto _stmt_80;
     }
 }
@@ -888,7 +888,7 @@ _stmt_80: {  /* L86 */
     {
         DESCR_t _rhs = STRVAL("VULGAR_FRACTION_FIVE_EIGHTHS");
         if (IS_FAIL_fn(_rhs)) goto _stmt_81;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(133LL))), BCHAR_fn(INTVAL(157LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(133LL))), BCHAR_fn(INTVAL(157LL))), _rhs);
         goto _stmt_81;
     }
 }
@@ -898,7 +898,7 @@ _stmt_81: {  /* L87 */
     {
         DESCR_t _rhs = STRVAL("VULGAR_FRACTION_SEVEN_EIGHTHS");
         if (IS_FAIL_fn(_rhs)) goto _stmt_82;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(133LL))), BCHAR_fn(INTVAL(158LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(133LL))), BCHAR_fn(INTVAL(158LL))), _rhs);
         goto _stmt_82;
     }
 }
@@ -908,7 +908,7 @@ _stmt_82: {  /* L88 */
     {
         DESCR_t _rhs = STRVAL("MINUS_SIGN");
         if (IS_FAIL_fn(_rhs)) goto _stmt_83;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(136LL))), BCHAR_fn(INTVAL(146LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(136LL))), BCHAR_fn(INTVAL(146LL))), _rhs);
         goto _stmt_83;
     }
 }
@@ -918,7 +918,7 @@ _stmt_83: {  /* L89 */
     {
         DESCR_t _rhs = STRVAL("LESS_THAN_OR_EQUAL_TO");
         if (IS_FAIL_fn(_rhs)) goto _stmt_84;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(137LL))), BCHAR_fn(INTVAL(164LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(137LL))), BCHAR_fn(INTVAL(164LL))), _rhs);
         goto _stmt_84;
     }
 }
@@ -928,7 +928,7 @@ _stmt_84: {  /* L90 */
     {
         DESCR_t _rhs = STRVAL("CIRCLED_LATIN_CAPITAL_LETTER_M");
         if (IS_FAIL_fn(_rhs)) goto _stmt_85;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(147LL))), BCHAR_fn(INTVAL(130LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(147LL))), BCHAR_fn(INTVAL(130LL))), _rhs);
         goto _stmt_85;
     }
 }
@@ -938,7 +938,7 @@ _stmt_85: {  /* L91 */
     {
         DESCR_t _rhs = STRVAL("WHITE_BULLET");
         if (IS_FAIL_fn(_rhs)) goto _stmt_86;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(151LL))), BCHAR_fn(INTVAL(166LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(151LL))), BCHAR_fn(INTVAL(166LL))), _rhs);
         goto _stmt_86;
     }
 }
@@ -948,7 +948,7 @@ _stmt_86: {  /* L92 */
     {
         DESCR_t _rhs = STRVAL("BALLOT_BOX");
         if (IS_FAIL_fn(_rhs)) goto _stmt_87;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(152LL))), BCHAR_fn(INTVAL(144LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(152LL))), BCHAR_fn(INTVAL(144LL))), _rhs);
         goto _stmt_87;
     }
 }
@@ -958,7 +958,7 @@ _stmt_87: {  /* L93 */
     {
         DESCR_t _rhs = STRVAL("PRIVATE_UNKNOWN_1");
         if (IS_FAIL_fn(_rhs)) goto _stmt_88;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(238LL)), BCHAR_fn(INTVAL(131LL))), BCHAR_fn(INTVAL(169LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(238LL)), BCHAR_fn(INTVAL(131LL))), BCHAR_fn(INTVAL(169LL))), _rhs);
         goto _stmt_88;
     }
 }
@@ -968,7 +968,7 @@ _stmt_88: {  /* L94 */
     {
         DESCR_t _rhs = STRVAL("PRIVATE_UNKNOWN_2");
         if (IS_FAIL_fn(_rhs)) goto _stmt_89;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(238LL)), BCHAR_fn(INTVAL(134LL))), BCHAR_fn(INTVAL(171LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(238LL)), BCHAR_fn(INTVAL(134LL))), BCHAR_fn(INTVAL(171LL))), _rhs);
         goto _stmt_89;
     }
 }
@@ -978,7 +978,7 @@ _stmt_89: {  /* L96 */
     {
         DESCR_t _rhs = STRVAL("OGHAM_SPACE_MARK");
         if (IS_FAIL_fn(_rhs)) goto _stmt_90;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(225LL)), BCHAR_fn(INTVAL(154LL))), BCHAR_fn(INTVAL(128LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(225LL)), BCHAR_fn(INTVAL(154LL))), BCHAR_fn(INTVAL(128LL))), _rhs);
         goto _stmt_90;
     }
 }
@@ -988,7 +988,7 @@ _stmt_90: {  /* L97 */
     {
         DESCR_t _rhs = STRVAL("MONGOLIAN_VOWEL_SEPARATOR");
         if (IS_FAIL_fn(_rhs)) goto _stmt_91;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(225LL)), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(142LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(225LL)), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(142LL))), _rhs);
         goto _stmt_91;
     }
 }
@@ -998,7 +998,7 @@ _stmt_91: {  /* L98 */
     {
         DESCR_t _rhs = STRVAL("EN_SPACE");
         if (IS_FAIL_fn(_rhs)) goto _stmt_92;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(130LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(130LL))), _rhs);
         goto _stmt_92;
     }
 }
@@ -1008,7 +1008,7 @@ _stmt_92: {  /* L99 */
     {
         DESCR_t _rhs = STRVAL("EM_SPACE");
         if (IS_FAIL_fn(_rhs)) goto _stmt_93;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(131LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(131LL))), _rhs);
         goto _stmt_93;
     }
 }
@@ -1018,7 +1018,7 @@ _stmt_93: {  /* L100 */
     {
         DESCR_t _rhs = STRVAL("THREE_PER_EM_SPACE");
         if (IS_FAIL_fn(_rhs)) goto _stmt_94;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(132LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(132LL))), _rhs);
         goto _stmt_94;
     }
 }
@@ -1028,7 +1028,7 @@ _stmt_94: {  /* L101 */
     {
         DESCR_t _rhs = STRVAL("FOUR_PER_EM_SPACE");
         if (IS_FAIL_fn(_rhs)) goto _stmt_95;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(133LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(133LL))), _rhs);
         goto _stmt_95;
     }
 }
@@ -1038,7 +1038,7 @@ _stmt_95: {  /* L102 */
     {
         DESCR_t _rhs = STRVAL("SIX_PER_EM_SPACE");
         if (IS_FAIL_fn(_rhs)) goto _stmt_96;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(134LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(134LL))), _rhs);
         goto _stmt_96;
     }
 }
@@ -1048,7 +1048,7 @@ _stmt_96: {  /* L103 */
     {
         DESCR_t _rhs = STRVAL("FIGURE_SPACE");
         if (IS_FAIL_fn(_rhs)) goto _stmt_97;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(135LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(135LL))), _rhs);
         goto _stmt_97;
     }
 }
@@ -1058,7 +1058,7 @@ _stmt_97: {  /* L104 */
     {
         DESCR_t _rhs = STRVAL("PUNCTUATION_SPACE");
         if (IS_FAIL_fn(_rhs)) goto _stmt_98;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(136LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(136LL))), _rhs);
         goto _stmt_98;
     }
 }
@@ -1068,7 +1068,7 @@ _stmt_98: {  /* L105 */
     {
         DESCR_t _rhs = STRVAL("THIN_SPACE");
         if (IS_FAIL_fn(_rhs)) goto _stmt_99;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(137LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(137LL))), _rhs);
         goto _stmt_99;
     }
 }
@@ -1078,7 +1078,7 @@ _stmt_99: {  /* L106 */
     {
         DESCR_t _rhs = STRVAL("HAIR_SPACE");
         if (IS_FAIL_fn(_rhs)) goto _stmt_100;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(138LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(138LL))), _rhs);
         goto _stmt_100;
     }
 }
@@ -1088,7 +1088,7 @@ _stmt_100: {  /* L107 */
     {
         DESCR_t _rhs = STRVAL("LINE_SEPERATOR");
         if (IS_FAIL_fn(_rhs)) goto _stmt_101;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(168LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(168LL))), _rhs);
         goto _stmt_101;
     }
 }
@@ -1098,7 +1098,7 @@ _stmt_101: {  /* L108 */
     {
         DESCR_t _rhs = STRVAL("PARAGRAPH_SEPERATOR");
         if (IS_FAIL_fn(_rhs)) goto _stmt_102;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(169LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(169LL))), _rhs);
         goto _stmt_102;
     }
 }
@@ -1108,7 +1108,7 @@ _stmt_102: {  /* L109 */
     {
         DESCR_t _rhs = STRVAL("MEDIUM_MATHEMATICAL_SPACE");
         if (IS_FAIL_fn(_rhs)) goto _stmt_103;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(129LL))), BCHAR_fn(INTVAL(159LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(129LL))), BCHAR_fn(INTVAL(159LL))), _rhs);
         goto _stmt_103;
     }
 }
@@ -1118,7 +1118,7 @@ _stmt_103: {  /* L110 */
     {
         DESCR_t _rhs = STRVAL("IDEOGRAPHIC_SPACE");
         if (IS_FAIL_fn(_rhs)) goto _stmt_104;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(227LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(128LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(227LL)), BCHAR_fn(INTVAL(128LL))), BCHAR_fn(INTVAL(128LL))), _rhs);
         goto _stmt_104;
     }
 }
@@ -1128,7 +1128,7 @@ _stmt_104: {  /* L112 */
     {
         DESCR_t _rhs = STRVAL("VERTICAL_ELLIPSIS");
         if (IS_FAIL_fn(_rhs)) goto _stmt_105;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(139LL))), BCHAR_fn(INTVAL(174LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(139LL))), BCHAR_fn(INTVAL(174LL))), _rhs);
         goto _stmt_105;
     }
 }
@@ -1138,7 +1138,7 @@ _stmt_105: {  /* L113 */
     {
         DESCR_t _rhs = STRVAL("LEFTWARDS_ARROW");
         if (IS_FAIL_fn(_rhs)) goto _stmt_106;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(134LL))), BCHAR_fn(INTVAL(144LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(134LL))), BCHAR_fn(INTVAL(144LL))), _rhs);
         goto _stmt_106;
     }
 }
@@ -1148,7 +1148,7 @@ _stmt_106: {  /* L114 */
     {
         DESCR_t _rhs = STRVAL("RIGHTWARDS_ARROW");
         if (IS_FAIL_fn(_rhs)) goto _stmt_107;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(134LL))), BCHAR_fn(INTVAL(146LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(134LL))), BCHAR_fn(INTVAL(146LL))), _rhs);
         goto _stmt_107;
     }
 }
@@ -1158,7 +1158,7 @@ _stmt_107: {  /* L115 */
     {
         DESCR_t _rhs = STRVAL("LEFTWARDS_DOUBLE_ARROW");
         if (IS_FAIL_fn(_rhs)) goto _stmt_108;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(135LL))), BCHAR_fn(INTVAL(144LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(135LL))), BCHAR_fn(INTVAL(144LL))), _rhs);
         goto _stmt_108;
     }
 }
@@ -1168,7 +1168,7 @@ _stmt_108: {  /* L116 */
     {
         DESCR_t _rhs = STRVAL("RIGHTWARDS_DOUBLE_ARROW");
         if (IS_FAIL_fn(_rhs)) goto _stmt_109;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(135LL))), BCHAR_fn(INTVAL(146LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(135LL))), BCHAR_fn(INTVAL(146LL))), _rhs);
         goto _stmt_109;
     }
 }
@@ -1178,7 +1178,7 @@ _stmt_109: {  /* L117 */
     {
         DESCR_t _rhs = STRVAL("LONG_LEFTWARDS_ARROW");
         if (IS_FAIL_fn(_rhs)) goto _stmt_110;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(181LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(181LL))), _rhs);
         goto _stmt_110;
     }
 }
@@ -1188,7 +1188,7 @@ _stmt_110: {  /* L118 */
     {
         DESCR_t _rhs = STRVAL("LONG_RIGHTWARDS_ARROW");
         if (IS_FAIL_fn(_rhs)) goto _stmt_111;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(182LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(182LL))), _rhs);
         goto _stmt_111;
     }
 }
@@ -1198,7 +1198,7 @@ _stmt_111: {  /* L119 */
     {
         DESCR_t _rhs = STRVAL("LONG_LEFTWARDS_DOUBLE_ARROW");
         if (IS_FAIL_fn(_rhs)) goto _stmt_112;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(184LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(184LL))), _rhs);
         goto _stmt_112;
     }
 }
@@ -1208,7 +1208,7 @@ _stmt_112: {  /* L120 */
     {
         DESCR_t _rhs = STRVAL("LONG_RIGHTWARDS_DOUBLE_ARROW");
         if (IS_FAIL_fn(_rhs)) goto _stmt_113;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(185LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(226LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(185LL))), _rhs);
         goto _stmt_113;
     }
 }
@@ -1218,7 +1218,7 @@ _stmt_113: {  /* L121 */
     {
         DESCR_t _rhs = STRVAL("LEFTWARDS_ARROW_WITH_SMALL_TRIANGLE_ARROWHEAD");
         if (IS_FAIL_fn(_rhs)) goto _stmt_114;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(128LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(128LL))), _rhs);
         goto _stmt_114;
     }
 }
@@ -1228,7 +1228,7 @@ _stmt_114: {  /* L122 */
     {
         DESCR_t _rhs = STRVAL("RIGHTWARDS_ARROW_WITH_SMALL_TRIANGLE_ARROWHEAD");
         if (IS_FAIL_fn(_rhs)) goto _stmt_115;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(130LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(130LL))), _rhs);
         goto _stmt_115;
     }
 }
@@ -1238,7 +1238,7 @@ _stmt_115: {  /* L123 */
     {
         DESCR_t _rhs = STRVAL("LEFTWARDS_ARROW_WITH_MEDIUM_TRIANGLE_ARROWHEAD");
         if (IS_FAIL_fn(_rhs)) goto _stmt_116;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(132LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(132LL))), _rhs);
         goto _stmt_116;
     }
 }
@@ -1248,7 +1248,7 @@ _stmt_116: {  /* L124 */
     {
         DESCR_t _rhs = STRVAL("RIGHTWARDS_ARROW_WITH_MEDIUM_TRIANGLE_ARROWHEAD");
         if (IS_FAIL_fn(_rhs)) goto _stmt_117;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(134LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(134LL))), _rhs);
         goto _stmt_117;
     }
 }
@@ -1258,7 +1258,7 @@ _stmt_117: {  /* L125 */
     {
         DESCR_t _rhs = STRVAL("LEFTWARDS_ARROW_WITH_LARGE_TRIANGLE_ARROWHEAD");
         if (IS_FAIL_fn(_rhs)) goto _stmt_118;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(136LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(136LL))), _rhs);
         goto _stmt_118;
     }
 }
@@ -1268,7 +1268,7 @@ _stmt_118: {  /* L126 */
     {
         DESCR_t _rhs = STRVAL("RIGHTWARDS_ARROW_WITH_LARGE_TRIANGLE_ARROWHEAD");
         if (IS_FAIL_fn(_rhs)) goto _stmt_119;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(138LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(138LL))), _rhs);
         goto _stmt_119;
     }
 }
@@ -1278,7 +1278,7 @@ _stmt_119: {  /* L127 */
     {
         DESCR_t _rhs = STRVAL("LEFTWARDS_ARROW_WITH_SMALL_EQUILATERAL_ARROWHEAD");
         if (IS_FAIL_fn(_rhs)) goto _stmt_120;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(144LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(144LL))), _rhs);
         goto _stmt_120;
     }
 }
@@ -1288,7 +1288,7 @@ _stmt_120: {  /* L128 */
     {
         DESCR_t _rhs = STRVAL("RIGHTWARDS_ARROW_WITH_SMALL_EQUILATERAL_ARROWHEAD");
         if (IS_FAIL_fn(_rhs)) goto _stmt_121;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(146LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(146LL))), _rhs);
         goto _stmt_121;
     }
 }
@@ -1298,7 +1298,7 @@ _stmt_121: {  /* L129 */
     {
         DESCR_t _rhs = STRVAL("LEFTWARDS_ARROW_WITH_EQUILATERAL_ARROWHEAD");
         if (IS_FAIL_fn(_rhs)) goto _stmt_122;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(148LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(148LL))), _rhs);
         goto _stmt_122;
     }
 }
@@ -1308,7 +1308,7 @@ _stmt_122: {  /* L130 */
     {
         DESCR_t _rhs = STRVAL("RIGHTWARDS_ARROW_WITH_EQUILATERAL_ARROWHEAD");
         if (IS_FAIL_fn(_rhs)) goto _stmt_123;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(148LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(148LL))), _rhs);
         goto _stmt_123;
     }
 }
@@ -1318,7 +1318,7 @@ _stmt_123: {  /* L131 */
     {
         DESCR_t _rhs = STRVAL("HEAVY_LEFTWARDS_ARROW_WITH_EQUILATERAL_ARROWHEAD");
         if (IS_FAIL_fn(_rhs)) goto _stmt_124;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(152LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(152LL))), _rhs);
         goto _stmt_124;
     }
 }
@@ -1328,7 +1328,7 @@ _stmt_124: {  /* L132 */
     {
         DESCR_t _rhs = STRVAL("HEAVY_RIGHTWARDS_ARROW_WITH_EQUILATERAL_ARROWHEAD");
         if (IS_FAIL_fn(_rhs)) goto _stmt_125;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(154LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(154LL))), _rhs);
         goto _stmt_125;
     }
 }
@@ -1338,7 +1338,7 @@ _stmt_125: {  /* L133 */
     {
         DESCR_t _rhs = STRVAL("HEAVY_LEFTWARDS_ARROW_WITH_LARGE_EQUILATERAL_ARROWHEAD");
         if (IS_FAIL_fn(_rhs)) goto _stmt_126;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(156LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(156LL))), _rhs);
         goto _stmt_126;
     }
 }
@@ -1348,7 +1348,7 @@ _stmt_126: {  /* L134 */
     {
         DESCR_t _rhs = STRVAL("HEAVY_RIGHTWARDS_ARROW_WITH_LARGE_EQUILATERAL_ARROWHEAD");
         if (IS_FAIL_fn(_rhs)) goto _stmt_127;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(158LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(158LL))), _rhs);
         goto _stmt_127;
     }
 }
@@ -1358,7 +1358,7 @@ _stmt_127: {  /* L135 */
     {
         DESCR_t _rhs = STRVAL("LEFTWARDS_TRIANGLE_HEADED_ARROW_WITH_NARROW_SHAFT");
         if (IS_FAIL_fn(_rhs)) goto _stmt_128;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(160LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(160LL))), _rhs);
         goto _stmt_128;
     }
 }
@@ -1368,7 +1368,7 @@ _stmt_128: {  /* L136 */
     {
         DESCR_t _rhs = STRVAL("RIGHTWARDS_TRIANGLE_HEADED_ARROW_WITH_NARROW_SHAFT");
         if (IS_FAIL_fn(_rhs)) goto _stmt_129;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(162LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(162LL))), _rhs);
         goto _stmt_129;
     }
 }
@@ -1378,7 +1378,7 @@ _stmt_129: {  /* L137 */
     {
         DESCR_t _rhs = STRVAL("LEFTWARDS_TRIANGLE_HEADED_ARROW_WITH_MEDIUM_SHAFT");
         if (IS_FAIL_fn(_rhs)) goto _stmt_130;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(164LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(164LL))), _rhs);
         goto _stmt_130;
     }
 }
@@ -1388,7 +1388,7 @@ _stmt_130: {  /* L138 */
     {
         DESCR_t _rhs = STRVAL("RIGHTWARDS_TRIANGLE_HEADED_ARROW_WITH_MEDIUM_SHAFT");
         if (IS_FAIL_fn(_rhs)) goto _stmt_131;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(166LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(166LL))), _rhs);
         goto _stmt_131;
     }
 }
@@ -1398,7 +1398,7 @@ _stmt_131: {  /* L139 */
     {
         DESCR_t _rhs = STRVAL("LEFTWARDS_TRIANGLE_HEADED_ARROW_WITH_BOLD_SHAFT");
         if (IS_FAIL_fn(_rhs)) goto _stmt_132;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(168LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(168LL))), _rhs);
         goto _stmt_132;
     }
 }
@@ -1408,7 +1408,7 @@ _stmt_132: {  /* L140 */
     {
         DESCR_t _rhs = STRVAL("RIGHTWARDS_TRIANGLE_HEADED_ARROW_WITH_BOLD_SHAFT");
         if (IS_FAIL_fn(_rhs)) goto _stmt_133;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(170LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(170LL))), _rhs);
         goto _stmt_133;
     }
 }
@@ -1418,7 +1418,7 @@ _stmt_133: {  /* L141 */
     {
         DESCR_t _rhs = STRVAL("LEFTWARDS_TRIANGLE_HEADED_ARROW_WITH_HEAVY_SHAFT");
         if (IS_FAIL_fn(_rhs)) goto _stmt_134;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(172LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(172LL))), _rhs);
         goto _stmt_134;
     }
 }
@@ -1428,7 +1428,7 @@ _stmt_134: {  /* L142 */
     {
         DESCR_t _rhs = STRVAL("RIGHTWARDS_TRIANGLE_HEADED_ARROW_WITH_HEAVY_SHAFT");
         if (IS_FAIL_fn(_rhs)) goto _stmt_135;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(174LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(174LL))), _rhs);
         goto _stmt_135;
     }
 }
@@ -1438,7 +1438,7 @@ _stmt_135: {  /* L143 */
     {
         DESCR_t _rhs = STRVAL("LEFTWARDS_TRIANGLE_HEADED_ARROW_WITH_VERY_HEAVY_SHAFT");
         if (IS_FAIL_fn(_rhs)) goto _stmt_136;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(176LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(176LL))), _rhs);
         goto _stmt_136;
     }
 }
@@ -1448,7 +1448,7 @@ _stmt_136: {  /* L144 */
     {
         DESCR_t _rhs = STRVAL("RIGHTWARDS_TRIANGLE_HEADED_ARROW_WITH_VERY_HEAVY_SHAFT");
         if (IS_FAIL_fn(_rhs)) goto _stmt_137;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(178LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(178LL))), _rhs);
         goto _stmt_137;
     }
 }
@@ -1458,7 +1458,7 @@ _stmt_137: {  /* L145 */
     {
         DESCR_t _rhs = STRVAL("LEFTWARDS_SQUARED_ARROW");
         if (IS_FAIL_fn(_rhs)) goto _stmt_138;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(184LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(184LL))), _rhs);
         goto _stmt_138;
     }
 }
@@ -1468,7 +1468,7 @@ _stmt_138: {  /* L146 */
     {
         DESCR_t _rhs = STRVAL("RIGHTWARDS_SQUARED_ARROW");
         if (IS_FAIL_fn(_rhs)) goto _stmt_139;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(186LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(160LL))), BCHAR_fn(INTVAL(186LL))), _rhs);
         goto _stmt_139;
     }
 }
@@ -1478,7 +1478,7 @@ _stmt_139: {  /* L147 */
     {
         DESCR_t _rhs = STRVAL("LEFTWARDS_HEAVY_ARROW");
         if (IS_FAIL_fn(_rhs)) goto _stmt_140;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(161LL))), BCHAR_fn(INTVAL(132LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(161LL))), BCHAR_fn(INTVAL(132LL))), _rhs);
         goto _stmt_140;
     }
 }
@@ -1488,7 +1488,7 @@ _stmt_140: {  /* L148 */
     {
         DESCR_t _rhs = STRVAL("RIGHTWARDS_HEAVY_ARROW");
         if (IS_FAIL_fn(_rhs)) goto _stmt_141;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(161LL))), BCHAR_fn(INTVAL(134LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(161LL))), BCHAR_fn(INTVAL(134LL))), _rhs);
         goto _stmt_141;
     }
 }
@@ -1498,7 +1498,7 @@ _stmt_141: {  /* L149 */
     {
         DESCR_t _rhs = STRVAL("LEFTWARDS_SANS_SERIF_ARROW");
         if (IS_FAIL_fn(_rhs)) goto _stmt_142;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(161LL))), BCHAR_fn(INTVAL(144LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(161LL))), BCHAR_fn(INTVAL(144LL))), _rhs);
         goto _stmt_142;
     }
 }
@@ -1508,7 +1508,7 @@ _stmt_142: {  /* L150 */
     {
         DESCR_t _rhs = STRVAL("RIGHTWARDS_SANS_SERIF_ARROW");
         if (IS_FAIL_fn(_rhs)) goto _stmt_143;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(161LL))), BCHAR_fn(INTVAL(146LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(161LL))), BCHAR_fn(INTVAL(146LL))), _rhs);
         goto _stmt_143;
     }
 }
@@ -1518,7 +1518,7 @@ _stmt_143: {  /* L151 */
     {
         DESCR_t _rhs = STRVAL("WIDE_HEADED_LEFTWARDS_LIGHT_BARB_ARROW");
         if (IS_FAIL_fn(_rhs)) goto _stmt_144;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(161LL))), BCHAR_fn(INTVAL(160LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(161LL))), BCHAR_fn(INTVAL(160LL))), _rhs);
         goto _stmt_144;
     }
 }
@@ -1528,7 +1528,7 @@ _stmt_144: {  /* L152 */
     {
         DESCR_t _rhs = STRVAL("WIDE_HEADED_RIGHTWARDS_LIGHT_BARB_ARROW");
         if (IS_FAIL_fn(_rhs)) goto _stmt_145;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(161LL))), BCHAR_fn(INTVAL(162LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(161LL))), BCHAR_fn(INTVAL(162LL))), _rhs);
         goto _stmt_145;
     }
 }
@@ -1538,7 +1538,7 @@ _stmt_145: {  /* L153 */
     {
         DESCR_t _rhs = STRVAL("WIDE_HEADED_LEFTWARDS_BARB_ARROW");
         if (IS_FAIL_fn(_rhs)) goto _stmt_146;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(161LL))), BCHAR_fn(INTVAL(168LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(161LL))), BCHAR_fn(INTVAL(168LL))), _rhs);
         goto _stmt_146;
     }
 }
@@ -1548,7 +1548,7 @@ _stmt_146: {  /* L154 */
     {
         DESCR_t _rhs = STRVAL("WIDE_HEADED_RIGHTWARDS_BARB_ARROW");
         if (IS_FAIL_fn(_rhs)) goto _stmt_147;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(161LL))), BCHAR_fn(INTVAL(170LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(161LL))), BCHAR_fn(INTVAL(170LL))), _rhs);
         goto _stmt_147;
     }
 }
@@ -1558,7 +1558,7 @@ _stmt_147: {  /* L155 */
     {
         DESCR_t _rhs = STRVAL("WIDE_HEADED_LEFTWARDS_MEDIUM_BARB_ARROW");
         if (IS_FAIL_fn(_rhs)) goto _stmt_148;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(161LL))), BCHAR_fn(INTVAL(176LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(161LL))), BCHAR_fn(INTVAL(176LL))), _rhs);
         goto _stmt_148;
     }
 }
@@ -1568,7 +1568,7 @@ _stmt_148: {  /* L156 */
     {
         DESCR_t _rhs = STRVAL("WIDE_HEADED_RIGHTWARDS_MEDIUM_BARB_ARROW");
         if (IS_FAIL_fn(_rhs)) goto _stmt_149;
-        subscript_set(NV_GET_fn("UTF"), CONC_fn(CONC_fn(CONC_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(161LL))), BCHAR_fn(INTVAL(178LL))), _rhs);
+        subscript_set(NV_GET_fn("UTF"), CONCAT_fn(CONCAT_fn(CONCAT_fn(BCHAR_fn(INTVAL(240LL)), BCHAR_fn(INTVAL(159LL))), BCHAR_fn(INTVAL(161LL))), BCHAR_fn(INTVAL(178LL))), _rhs);
         goto _stmt_149;
     }
 }
@@ -1668,7 +1668,7 @@ IsTypeEnd: {  /* L17 */
 _stmt_166: {  /* L4 */
     comm_stno(4);
     {
-        DESCR_t _ret = APLY_fn("IsSnobol4", NULL, 0);
+        DESCR_t _ret = APPLY_fn("IsSnobol4", NULL, 0);
         if (IS_FAIL_fn(_ret)) goto FENCEEnd;
         goto _stmt_167;
     }
@@ -1697,7 +1697,7 @@ FENCEEnd: {  /* L7 */
 _stmt_170: {  /* L7 */
     comm_stno(7);
     {
-        DESCR_t _ret = APLY_fn("IsSnobol4", NULL, 0);
+        DESCR_t _ret = APPLY_fn("IsSnobol4", NULL, 0);
         if (IS_FAIL_fn(_ret)) goto io_end;
         goto _stmt_171;
     }
@@ -1762,7 +1762,7 @@ _stmt_178: {  /* L20 */
 _stmt_179: {  /* L21 */
     comm_stno(21);
     {
-        DESCR_t _rhs = CONC_fn(pat_cat(var_as_pattern(STRVAL("[")), pat_ref("ioFileOptList")), STRVAL("]"));
+        DESCR_t _rhs = CONCAT_fn(pat_cat(var_as_pattern(STRVAL("[")), pat_ref("ioFileOptList")), STRVAL("]"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_180;
         NV_SET_fn("ioFileOptPat", _rhs);
         goto _stmt_180;
@@ -1839,7 +1839,7 @@ cap_end: {  /* L16 */
 
 _stmt_200: {  /* L20 */
     comm_stno(20);
-    define_spec(STRVAL("icase(strv)letter,character"));
+    define_spec(STRVAL("icase(STRVAL_fn)letter,character"));
     goto icase_end;
 }
 
@@ -1861,7 +1861,7 @@ assign_end: {  /* L13 */
 
 _stmt_213: {  /* L6 */
     comm_stno(6);
-    define_spec(STRVAL("mtch(subject,pattern)"));
+    define_spec(STRVAL("MATCH_fn(subject,pattern)"));
     goto match_end;
 }
 
@@ -2215,7 +2215,7 @@ LevelEnd: {  /* L34 */
 
 _stmt_467: {  /* L36 */
     comm_stno(36);
-    define_spec(STRVAL("Gen(strv,outNm)ind,outline"));
+    define_spec(STRVAL("Gen(STRVAL_fn,outNm)ind,outline"));
     goto _stmt_468;
 }
 
@@ -2248,14 +2248,14 @@ GenEnd: {  /* L59 */
 
 _stmt_491: {  /* L4 */
     comm_stno(4);
-    define_spec(STRVAL("Qize(strv)part"));
+    define_spec(STRVAL("Qize(STRVAL_fn)part"));
     goto _stmt_492;
 }
 
 _stmt_492: {  /* L5 */
     comm_stno(5);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(NV_GET_fn("bSlash"), NV_GET_fn("bs")), NV_GET_fn("ff")), NV_GET_fn("nl")), NV_GET_fn("cr")), NV_GET_fn("tab"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(NV_GET_fn("bSlash"), NV_GET_fn("bs")), NV_GET_fn("ff")), NV_GET_fn("nl")), NV_GET_fn("cr")), NV_GET_fn("tab"));
         if (IS_FAIL_fn(_rhs)) goto QizeEnd;
         NV_SET_fn("QizeWierd", _rhs);
         goto QizeEnd;
@@ -2269,7 +2269,7 @@ QizeEnd: {  /* L28 */
 
 _stmt_505: {  /* L30 */
     comm_stno(30);
-    define_spec(STRVAL("SQize(strv)part"));
+    define_spec(STRVAL("SQize(STRVAL_fn)part"));
     goto SQizeEnd;
 }
 
@@ -2280,7 +2280,7 @@ SQizeEnd: {  /* L37 */
 
 _stmt_513: {  /* L39 */
     comm_stno(39);
-    define_spec(STRVAL("DQize(strv)part"));
+    define_spec(STRVAL("DQize(STRVAL_fn)part"));
     goto DQizeEnd;
 }
 
@@ -2291,7 +2291,7 @@ DQizeEnd: {  /* L46 */
 
 _stmt_521: {  /* L48 */
     comm_stno(48);
-    define_spec(STRVAL("SqlSQize(strv)part"));
+    define_spec(STRVAL("SqlSQize(STRVAL_fn)part"));
     goto SqlSQizeEnd;
 }
 
@@ -2313,7 +2313,7 @@ IntizeEnd: {  /* L76 */
 
 _stmt_531: {  /* L78 */
     comm_stno(78);
-    define_spec(STRVAL("Extize(strv)"));
+    define_spec(STRVAL("Extize(STRVAL_fn)"));
     goto ExtizeEnd;
 }
 
@@ -2324,14 +2324,14 @@ ExtizeEnd: {  /* L80 */
 
 _stmt_534: {  /* L6 */
     comm_stno(6);
-    define_spec(CONC_fn(STRVAL("Read(fileName,rdMapName)"), STRVAL("rdInput,rdIn,rdLine,rdLineNo,rdMap,rdOfs")));
+    define_spec(CONCAT_fn(STRVAL("Read(fileName,rdMapName)"), STRVAL("rdInput,rdIn,rdLine,rdLineNo,rdMap,rdOfs")));
     goto ReadEnd;
 }
 
 Read: {  /* L9 */
     comm_stno(9);
     {
-        DESCR_t _ret = APLY_fn("INPUT", (DESCR_t[1]){NULVCL}, 1);
+        DESCR_t _ret = APPLY_fn("INPUT", (DESCR_t[1]){NULVCL}, 1);
         if (IS_FAIL_fn(_ret)) goto FRETURN_LABEL_MAIN;
         goto _stmt_536;
     }
@@ -2408,7 +2408,7 @@ Read5: {  /* L16 */
 _stmt_543: {  /* L17 */
     comm_stno(17);
     {
-        DESCR_t _rhs = CONC_fn(NV_GET_fn("rdLine"), NV_GET_fn("rdIn"));
+        DESCR_t _rhs = CONCAT_fn(NV_GET_fn("rdLine"), NV_GET_fn("rdIn"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_544;
         NV_SET_fn("rdLine", _rhs);
         goto _stmt_544;
@@ -2418,7 +2418,7 @@ _stmt_543: {  /* L17 */
 _stmt_544: {  /* L18 */
     comm_stno(18);
     {
-        DESCR_t _ret = APLY_fn("LT", (DESCR_t[2]){SIZE_fn(NV_GET_fn("rdIn")), INTVAL(131072LL)}, 2);
+        DESCR_t _ret = APPLY_fn("LT", (DESCR_t[2]){SIZE_fn(NV_GET_fn("rdIn")), INTVAL(131072LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto Read5;
         goto _stmt_545;
     }
@@ -2457,7 +2457,7 @@ _stmt_547: {  /* L21 */
 _stmt_548: {  /* L22 */
     comm_stno(22);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(NV_GET_fn("Read"), NV_GET_fn("rdLine")), NV_GET_fn("nl"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(NV_GET_fn("Read"), NV_GET_fn("rdLine")), NV_GET_fn("nl"));
         if (IS_FAIL_fn(_rhs)) goto Read3;
         NV_SET_fn("Read", _rhs);
         goto Read3;
@@ -2467,7 +2467,7 @@ _stmt_548: {  /* L22 */
 Read9: {  /* L23 */
     comm_stno(23);
     {
-        DESCR_t _ret = APLY_fn("ENDFILE", (DESCR_t[1]){INTVAL(8LL)}, 1);
+        DESCR_t _ret = APPLY_fn("ENDFILE", (DESCR_t[1]){INTVAL(8LL)}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_550;
         goto _stmt_550;
     }
@@ -2476,7 +2476,7 @@ Read9: {  /* L23 */
 _stmt_550: {  /* L24 */
     comm_stno(24);
     {
-        DESCR_t _ret = APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("rdMapName")}, 1);
+        DESCR_t _ret = APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("rdMapName")}, 1);
         if (IS_FAIL_fn(_ret)) goto RETURN_LABEL_MAIN;
         goto _stmt_551;
     }
@@ -2510,7 +2510,7 @@ WriteEnd: {  /* L35 */
 
 _stmt_561: {  /* L37 */
     comm_stno(37);
-    define_spec(STRVAL("LineMap(strv,lmMapName)lmLineNo,lmMap,lmOfs,xOfs"));
+    define_spec(STRVAL("LineMap(STRVAL_fn,lmMapName)lmLineNo,lmMap,lmOfs,xOfs"));
     goto LineMapEnd;
 }
 
@@ -2521,7 +2521,7 @@ LineMapEnd: {  /* L46 */
 
 _stmt_571: {  /* L6 */
     comm_stno(6);
-    define_spec(CONC_fn(STRVAL("XDump(object,nm)"), STRVAL("i,iMax,iMin,objArr,objField,objKey,objKeyNm,objType,objVal")));
+    define_spec(CONCAT_fn(STRVAL("XDump(object,nm)"), STRVAL("i,iMax,iMin,objArr,objField,objKey,objKeyNm,objType,objVal")));
     goto XDumpEnd;
 }
 
@@ -2538,7 +2538,7 @@ XDump: {  /* L9 */
 _stmt_573: {  /* L10 */
     comm_stno(10);
     {
-        DESCR_t _ret = APLY_fn("IDENT", (DESCR_t[2]){NV_GET_fn("objType"), STRVAL("CODE")}, 2);
+        DESCR_t _ret = APPLY_fn("IDENT", (DESCR_t[2]){NV_GET_fn("objType"), STRVAL("CODE")}, 2);
         if (IS_FAIL_fn(_ret)) goto _stmt_574;
         goto XDump00;
     }
@@ -2547,7 +2547,7 @@ _stmt_573: {  /* L10 */
 _stmt_574: {  /* L11 */
     comm_stno(11);
     {
-        DESCR_t _ret = APLY_fn("IDENT", (DESCR_t[2]){NV_GET_fn("objType"), STRVAL("EXPRESSION")}, 2);
+        DESCR_t _ret = APPLY_fn("IDENT", (DESCR_t[2]){NV_GET_fn("objType"), STRVAL("EXPRESSION")}, 2);
         if (IS_FAIL_fn(_ret)) goto _stmt_575;
         goto XDump00;
     }
@@ -2556,7 +2556,7 @@ _stmt_574: {  /* L11 */
 _stmt_575: {  /* L12 */
     comm_stno(12);
     {
-        DESCR_t _ret = APLY_fn("IDENT", (DESCR_t[2]){NV_GET_fn("objType"), STRVAL("INTEGER")}, 2);
+        DESCR_t _ret = APPLY_fn("IDENT", (DESCR_t[2]){NV_GET_fn("objType"), STRVAL("INTEGER")}, 2);
         if (IS_FAIL_fn(_ret)) goto _stmt_576;
         goto XDump05;
     }
@@ -2565,7 +2565,7 @@ _stmt_575: {  /* L12 */
 _stmt_576: {  /* L13 */
     comm_stno(13);
     {
-        DESCR_t _ret = APLY_fn("IDENT", (DESCR_t[2]){NV_GET_fn("objType"), STRVAL("NAME")}, 2);
+        DESCR_t _ret = APPLY_fn("IDENT", (DESCR_t[2]){NV_GET_fn("objType"), STRVAL("NAME")}, 2);
         if (IS_FAIL_fn(_ret)) goto _stmt_577;
         goto XDump00;
     }
@@ -2574,7 +2574,7 @@ _stmt_576: {  /* L13 */
 _stmt_577: {  /* L14 */
     comm_stno(14);
     {
-        DESCR_t _ret = APLY_fn("IDENT", (DESCR_t[2]){NV_GET_fn("objType"), STRVAL("PATTERN")}, 2);
+        DESCR_t _ret = APPLY_fn("IDENT", (DESCR_t[2]){NV_GET_fn("objType"), STRVAL("PATTERN")}, 2);
         if (IS_FAIL_fn(_ret)) goto _stmt_578;
         goto XDump00;
     }
@@ -2583,7 +2583,7 @@ _stmt_577: {  /* L14 */
 _stmt_578: {  /* L15 */
     comm_stno(15);
     {
-        DESCR_t _ret = APLY_fn("IDENT", (DESCR_t[2]){NV_GET_fn("objType"), STRVAL("REAL")}, 2);
+        DESCR_t _ret = APPLY_fn("IDENT", (DESCR_t[2]){NV_GET_fn("objType"), STRVAL("REAL")}, 2);
         if (IS_FAIL_fn(_ret)) goto _stmt_579;
         goto XDump05;
     }
@@ -2592,7 +2592,7 @@ _stmt_578: {  /* L15 */
 _stmt_579: {  /* L16 */
     comm_stno(16);
     {
-        DESCR_t _ret = APLY_fn("IDENT", (DESCR_t[2]){NV_GET_fn("objType"), STRVAL("STRING")}, 2);
+        DESCR_t _ret = APPLY_fn("IDENT", (DESCR_t[2]){NV_GET_fn("objType"), STRVAL("STRING")}, 2);
         if (IS_FAIL_fn(_ret)) goto _stmt_580;
         goto XDump10;
     }
@@ -2601,7 +2601,7 @@ _stmt_579: {  /* L16 */
 _stmt_580: {  /* L17 */
     comm_stno(17);
     {
-        DESCR_t _ret = APLY_fn("IDENT", (DESCR_t[2]){NV_GET_fn("objType"), STRVAL("DT_A")}, 2);
+        DESCR_t _ret = APPLY_fn("IDENT", (DESCR_t[2]){NV_GET_fn("objType"), STRVAL("DT_A")}, 2);
         if (IS_FAIL_fn(_ret)) goto _stmt_581;
         goto XDump20;
     }
@@ -2610,7 +2610,7 @@ _stmt_580: {  /* L17 */
 _stmt_581: {  /* L18 */
     comm_stno(18);
     {
-        DESCR_t _ret = APLY_fn("IDENT", (DESCR_t[2]){NV_GET_fn("objType"), STRVAL("TABLE")}, 2);
+        DESCR_t _ret = APPLY_fn("IDENT", (DESCR_t[2]){NV_GET_fn("objType"), STRVAL("TABLE")}, 2);
         if (IS_FAIL_fn(_ret)) goto XDump40;
         goto XDump30;
     }
@@ -2619,7 +2619,7 @@ _stmt_581: {  /* L18 */
 XDump00: {  /* L19 */
     comm_stno(19);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(NV_GET_fn("nm"), STRVAL(" = ")), NV_GET_fn("objType"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(NV_GET_fn("nm"), STRVAL(" = ")), NV_GET_fn("objType"));
         if (IS_FAIL_fn(_rhs)) goto RETURN_LABEL_MAIN;
         output_val(_rhs);
         goto RETURN_LABEL_MAIN;
@@ -2629,7 +2629,7 @@ XDump00: {  /* L19 */
 XDump05: {  /* L20 */
     comm_stno(20);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(NV_GET_fn("nm"), STRVAL(" = ")), NV_GET_fn("object"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(NV_GET_fn("nm"), STRVAL(" = ")), NV_GET_fn("object"));
         if (IS_FAIL_fn(_rhs)) goto RETURN_LABEL_MAIN;
         output_val(_rhs);
         goto RETURN_LABEL_MAIN;
@@ -2639,7 +2639,7 @@ XDump05: {  /* L20 */
 XDump10: {  /* L21 */
     comm_stno(21);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(NV_GET_fn("nm"), STRVAL(" = ")), APLY_fn("Qize", (DESCR_t[1]){NV_GET_fn("object")}, 1));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(NV_GET_fn("nm"), STRVAL(" = ")), APPLY_fn("Qize", (DESCR_t[1]){NV_GET_fn("object")}, 1));
         if (IS_FAIL_fn(_rhs)) goto RETURN_LABEL_MAIN;
         output_val(_rhs);
         goto RETURN_LABEL_MAIN;
@@ -2649,7 +2649,7 @@ XDump10: {  /* L21 */
 XDump20: {  /* L22 */
     comm_stno(22);
     {
-        DESCR_t _rhs = APLY_fn("PROTOTYPE", (DESCR_t[1]){NV_GET_fn("object")}, 1);
+        DESCR_t _rhs = APPLY_fn("PROTOTYPE", (DESCR_t[1]){NV_GET_fn("object")}, 1);
         if (IS_FAIL_fn(_rhs)) goto _stmt_586;
         NV_SET_fn("objProto", _rhs);
         goto _stmt_586;
@@ -2669,7 +2669,7 @@ _stmt_586: {  /* L23 */
 _stmt_587: {  /* L27 */
     comm_stno(27);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn(CONC_fn(NV_GET_fn("nm"), STRVAL(" = ")), STRVAL("DT_A['")), NV_GET_fn("objProto")), STRVAL("']"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(NV_GET_fn("nm"), STRVAL(" = ")), STRVAL("DT_A['")), NV_GET_fn("objProto")), STRVAL("']"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_588;
         output_val(_rhs);
         goto _stmt_588;
@@ -2689,7 +2689,7 @@ _stmt_588: {  /* L28 */
 XDump25: {  /* L29 */
     comm_stno(29);
     {
-        DESCR_t _rhs = CONC_fn((lt(NV_GET_fn("i"),NV_GET_fn("iMax")) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL)));
+        DESCR_t _rhs = CONCAT_fn((lt(NV_GET_fn("i"),NV_GET_fn("iMax")) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL)));
         if (IS_FAIL_fn(_rhs)) goto RETURN_LABEL_MAIN;
         NV_SET_fn("i", _rhs);
         goto _stmt_590;
@@ -2699,7 +2699,7 @@ XDump25: {  /* L29 */
 _stmt_590: {  /* L30 */
     comm_stno(30);
     {
-        DESCR_t _ret = APLY_fn("XDump", (DESCR_t[2]){subscript_get(NV_GET_fn("object"), NV_GET_fn("i")), CONC_fn(CONC_fn(CONC_fn(NV_GET_fn("nm"), STRVAL("[")), NV_GET_fn("i")), STRVAL("]"))}, 2);
+        DESCR_t _ret = APPLY_fn("XDump", (DESCR_t[2]){subscript_get(NV_GET_fn("object"), NV_GET_fn("i")), CONCAT_fn(CONCAT_fn(CONCAT_fn(NV_GET_fn("nm"), STRVAL("[")), NV_GET_fn("i")), STRVAL("]"))}, 2);
         if (IS_FAIL_fn(_ret)) goto XDump25;
         goto XDump25;
     }
@@ -2708,7 +2708,7 @@ _stmt_590: {  /* L30 */
 XDump30: {  /* L31 */
     comm_stno(31);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(NV_GET_fn("nm"), STRVAL(" = ")), STRVAL("TABLE"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(NV_GET_fn("nm"), STRVAL(" = ")), STRVAL("TABLE"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_592;
         output_val(_rhs);
         goto _stmt_592;
@@ -2768,7 +2768,7 @@ _stmt_596: {  /* L37 */
 _stmt_597: {  /* L38 */
     comm_stno(38);
     {
-        DESCR_t _rhs = CONC_fn((ident(STRVAL(datatype(NV_GET_fn("objKey"))),STRVAL("INTEGER")) ? NULVCL : FAILDESCR), NV_GET_fn("objKey"));
+        DESCR_t _rhs = CONCAT_fn((ident(STRVAL(datatype(NV_GET_fn("objKey"))),STRVAL("INTEGER")) ? NULVCL : FAILDESCR), NV_GET_fn("objKey"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_598;
         NV_SET_fn("objKeyNm", _rhs);
         goto XDump37;
@@ -2778,7 +2778,7 @@ _stmt_597: {  /* L38 */
 _stmt_598: {  /* L39 */
     comm_stno(39);
     {
-        DESCR_t _rhs = CONC_fn((ident(STRVAL(datatype(NV_GET_fn("objKey"))),STRVAL("STRING")) ? NULVCL : FAILDESCR), APLY_fn("Qize", (DESCR_t[1]){NV_GET_fn("objKey")}, 1));
+        DESCR_t _rhs = CONCAT_fn((ident(STRVAL(datatype(NV_GET_fn("objKey"))),STRVAL("STRING")) ? NULVCL : FAILDESCR), APPLY_fn("Qize", (DESCR_t[1]){NV_GET_fn("objKey")}, 1));
         if (IS_FAIL_fn(_rhs)) goto _stmt_599;
         NV_SET_fn("objKeyNm", _rhs);
         goto XDump37;
@@ -2798,7 +2798,7 @@ _stmt_599: {  /* L40 */
 XDump37: {  /* L41 */
     comm_stno(41);
     {
-        DESCR_t _ret = APLY_fn("XDump", (DESCR_t[2]){NV_GET_fn("objVal"), CONC_fn(CONC_fn(CONC_fn(NV_GET_fn("nm"), STRVAL("[")), NV_GET_fn("objKeyNm")), STRVAL("]"))}, 2);
+        DESCR_t _ret = APPLY_fn("XDump", (DESCR_t[2]){NV_GET_fn("objVal"), CONCAT_fn(CONCAT_fn(CONCAT_fn(NV_GET_fn("nm"), STRVAL("[")), NV_GET_fn("objKeyNm")), STRVAL("]"))}, 2);
         if (IS_FAIL_fn(_ret)) goto XDump35;
         goto XDump35;
     }
@@ -2807,7 +2807,7 @@ XDump37: {  /* L41 */
 XDump40: {  /* L42 */
     comm_stno(42);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn(NV_GET_fn("nm"), STRVAL(" = ")), NV_GET_fn("objType")), STRVAL("()"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn(NV_GET_fn("nm"), STRVAL(" = ")), NV_GET_fn("objType")), STRVAL("()"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_602;
         output_val(_rhs);
         goto _stmt_602;
@@ -2837,7 +2837,7 @@ XDump45: {  /* L44 */
 _stmt_604: {  /* L45 */
     comm_stno(45);
     {
-        DESCR_t _rhs = APLY_fn("FIELD", (DESCR_t[2]){NV_GET_fn("objType"), NV_GET_fn("i")}, 2);
+        DESCR_t _rhs = APPLY_fn("FIELD", (DESCR_t[2]){NV_GET_fn("objType"), NV_GET_fn("i")}, 2);
         if (IS_FAIL_fn(_rhs)) goto RETURN_LABEL_MAIN;
         NV_SET_fn("objField", _rhs);
         goto _stmt_605;
@@ -2847,7 +2847,7 @@ _stmt_604: {  /* L45 */
 _stmt_605: {  /* L46 */
     comm_stno(46);
     {
-        DESCR_t _ret = APLY_fn("XDump", (DESCR_t[2]){apply_val(NV_GET_fn("objField"), (DESCR_t[]){ NV_GET_fn("object") }, 1), CONC_fn(CONC_fn(CONC_fn(NV_GET_fn("objField"), STRVAL("(")), NV_GET_fn("nm")), STRVAL(")"))}, 2);
+        DESCR_t _ret = APPLY_fn("XDump", (DESCR_t[2]){apply_val(NV_GET_fn("objField"), (DESCR_t[]){ NV_GET_fn("object") }, 1), CONCAT_fn(CONCAT_fn(CONCAT_fn(NV_GET_fn("objField"), STRVAL("(")), NV_GET_fn("nm")), STRVAL(")"))}, 2);
         if (IS_FAIL_fn(_ret)) goto XDump45;
         goto XDump45;
     }
@@ -2980,7 +2980,7 @@ TZEnd: {  /* L42 */
 
 _stmt_654: {  /* L4 */
     comm_stno(4);
-    define_spec(STRVAL("T8Trace(lvl,strv,ofs)t8p"));
+    define_spec(STRVAL("T8Trace(lvl,STRVAL_fn,ofs)t8p"));
     goto _stmt_655;
 }
 
@@ -3113,7 +3113,7 @@ _stmt_690: {  /* L50 */
 _stmt_691: {  /* L51 */
     comm_stno(51);
     {
-        DESCR_t _rhs = pat_cat(pat_cat(var_as_pattern(STRVAL("\"")), pat_break_(VARVAL_fn(CONC_fn(STRVAL("\""), NV_GET_fn("nl"))))), var_as_pattern(STRVAL("\"")));
+        DESCR_t _rhs = pat_cat(pat_cat(var_as_pattern(STRVAL("\"")), pat_break_(VARVAL_fn(CONCAT_fn(STRVAL("\""), NV_GET_fn("nl"))))), var_as_pattern(STRVAL("\"")));
         if (IS_FAIL_fn(_rhs)) goto _stmt_692;
         NV_SET_fn("snoDQ", _rhs);
         goto _stmt_692;
@@ -3123,7 +3123,7 @@ _stmt_691: {  /* L51 */
 _stmt_692: {  /* L52 */
     comm_stno(52);
     {
-        DESCR_t _rhs = pat_cat(pat_cat(var_as_pattern(STRVAL("'")), pat_break_(VARVAL_fn(CONC_fn(STRVAL("'"), NV_GET_fn("nl"))))), var_as_pattern(STRVAL("'")));
+        DESCR_t _rhs = pat_cat(pat_cat(var_as_pattern(STRVAL("'")), pat_break_(VARVAL_fn(CONCAT_fn(STRVAL("'"), NV_GET_fn("nl"))))), var_as_pattern(STRVAL("'")));
         if (IS_FAIL_fn(_rhs)) goto _stmt_693;
         NV_SET_fn("snoSQ", _rhs);
         goto _stmt_693;
@@ -3153,7 +3153,7 @@ _stmt_694: {  /* L54 */
 _stmt_695: {  /* L61 */
     comm_stno(61);
     {
-        DESCR_t _rhs = pat_cat(pat_any_cs(VARVAL_fn(CONC_fn(STRVAL(ucase), STRVAL(lcase)))), pat_fence_p(pat_alt(pat_span(VARVAL_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(STRVAL("."), NV_GET_fn("digits")), STRVAL(ucase)), STRVAL("_")), STRVAL(lcase)))), var_as_pattern(NV_GET_fn("epsilon")))));
+        DESCR_t _rhs = pat_cat(pat_any_cs(VARVAL_fn(CONCAT_fn(STRVAL(ucase), STRVAL(lcase)))), pat_fence_p(pat_alt(pat_span(VARVAL_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(STRVAL("."), NV_GET_fn("digits")), STRVAL(ucase)), STRVAL("_")), STRVAL(lcase)))), var_as_pattern(NV_GET_fn("epsilon")))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_696;
         NV_SET_fn("snoId", _rhs);
         goto _stmt_696;
@@ -3163,7 +3163,7 @@ _stmt_695: {  /* L61 */
 _stmt_696: {  /* L63 */
     comm_stno(63);
     {
-        DESCR_t _rhs = pat_cat(pat_cat(pat_span(VARVAL_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(STRVAL("."), NV_GET_fn("digits")), STRVAL(ucase)), STRVAL("_")), STRVAL(lcase)))), var_as_pattern(NV_GET_fn(VARVAL_fn(NV_GET_fn("tx"))))), var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(NULVCL))), pat_user_call("mtch", (DESCR_t[2]){NV_GET_fn("snoFunctions"), NV_GET_fn("snoTxInList")}, 2))));
+        DESCR_t _rhs = pat_cat(pat_cat(pat_span(VARVAL_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(STRVAL("."), NV_GET_fn("digits")), STRVAL(ucase)), STRVAL("_")), STRVAL(lcase)))), var_as_pattern(NV_GET_fn(VARVAL_fn(NV_GET_fn("tx"))))), var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(NULVCL))), pat_user_call("MATCH_fn", (DESCR_t[2]){NV_GET_fn("snoFunctions"), NV_GET_fn("snoTxInList")}, 2))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_697;
         NV_SET_fn("snoFunction", _rhs);
         goto _stmt_697;
@@ -3173,7 +3173,7 @@ _stmt_696: {  /* L63 */
 _stmt_697: {  /* L65 */
     comm_stno(65);
     {
-        DESCR_t _rhs = pat_cat(pat_cat(pat_span(VARVAL_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(STRVAL("."), NV_GET_fn("digits")), STRVAL(ucase)), STRVAL("_")), STRVAL(lcase)))), var_as_pattern(NV_GET_fn(VARVAL_fn(NV_GET_fn("tx"))))), var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(NULVCL))), pat_user_call("mtch", (DESCR_t[2]){NV_GET_fn("snoBuiltinVars"), NV_GET_fn("snoTxInList")}, 2))));
+        DESCR_t _rhs = pat_cat(pat_cat(pat_span(VARVAL_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(STRVAL("."), NV_GET_fn("digits")), STRVAL(ucase)), STRVAL("_")), STRVAL(lcase)))), var_as_pattern(NV_GET_fn(VARVAL_fn(NV_GET_fn("tx"))))), var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(NULVCL))), pat_user_call("MATCH_fn", (DESCR_t[2]){NV_GET_fn("snoBuiltinVars"), NV_GET_fn("snoTxInList")}, 2))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_698;
         NV_SET_fn("snoBuiltinVar", _rhs);
         goto _stmt_698;
@@ -3183,7 +3183,7 @@ _stmt_697: {  /* L65 */
 _stmt_698: {  /* L67 */
     comm_stno(67);
     {
-        DESCR_t _rhs = pat_cat(pat_cat(pat_span(VARVAL_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(STRVAL("."), NV_GET_fn("digits")), STRVAL(ucase)), STRVAL("_")), STRVAL(lcase)))), var_as_pattern(NV_GET_fn(VARVAL_fn(NV_GET_fn("tx"))))), var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(NULVCL))), pat_user_call("mtch", (DESCR_t[2]){NV_GET_fn("snoSpecialNms"), NV_GET_fn("snoTxInList")}, 2))));
+        DESCR_t _rhs = pat_cat(pat_cat(pat_span(VARVAL_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(STRVAL("."), NV_GET_fn("digits")), STRVAL(ucase)), STRVAL("_")), STRVAL(lcase)))), var_as_pattern(NV_GET_fn(VARVAL_fn(NV_GET_fn("tx"))))), var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(NULVCL))), pat_user_call("MATCH_fn", (DESCR_t[2]){NV_GET_fn("snoSpecialNms"), NV_GET_fn("snoTxInList")}, 2))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_699;
         NV_SET_fn("snoSpecialNm", _rhs);
         goto _stmt_699;
@@ -3193,7 +3193,7 @@ _stmt_698: {  /* L67 */
 _stmt_699: {  /* L69 */
     comm_stno(69);
     {
-        DESCR_t _rhs = pat_cat(pat_cat(pat_cat(var_as_pattern(STRVAL("&")), pat_span(VARVAL_fn(CONC_fn(STRVAL(ucase), STRVAL(lcase))))), var_as_pattern(NV_GET_fn(VARVAL_fn(NV_GET_fn("tx"))))), var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(NULVCL))), pat_user_call("mtch", (DESCR_t[2]){NV_GET_fn("snoProtKwds"), NV_GET_fn("snoTxInList")}, 2))));
+        DESCR_t _rhs = pat_cat(pat_cat(pat_cat(var_as_pattern(STRVAL("&")), pat_span(VARVAL_fn(CONCAT_fn(STRVAL(ucase), STRVAL(lcase))))), var_as_pattern(NV_GET_fn(VARVAL_fn(NV_GET_fn("tx"))))), var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(NULVCL))), pat_user_call("MATCH_fn", (DESCR_t[2]){NV_GET_fn("snoProtKwds"), NV_GET_fn("snoTxInList")}, 2))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_700;
         NV_SET_fn("snoProtKwd", _rhs);
         goto _stmt_700;
@@ -3203,7 +3203,7 @@ _stmt_699: {  /* L69 */
 _stmt_700: {  /* L70 */
     comm_stno(70);
     {
-        DESCR_t _rhs = pat_cat(pat_cat(pat_cat(var_as_pattern(STRVAL("&")), pat_span(VARVAL_fn(CONC_fn(STRVAL(ucase), STRVAL(lcase))))), var_as_pattern(NV_GET_fn(VARVAL_fn(NV_GET_fn("tx"))))), var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(NULVCL))), pat_user_call("mtch", (DESCR_t[2]){NV_GET_fn("snoUnprotKwds"), NV_GET_fn("snoTxInList")}, 2))));
+        DESCR_t _rhs = pat_cat(pat_cat(pat_cat(var_as_pattern(STRVAL("&")), pat_span(VARVAL_fn(CONCAT_fn(STRVAL(ucase), STRVAL(lcase))))), var_as_pattern(NV_GET_fn(VARVAL_fn(NV_GET_fn("tx"))))), var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(NULVCL))), pat_user_call("MATCH_fn", (DESCR_t[2]){NV_GET_fn("snoUnprotKwds"), NV_GET_fn("snoTxInList")}, 2))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_701;
         NV_SET_fn("snoUnprotKwd", _rhs);
         goto _stmt_701;
@@ -3223,7 +3223,7 @@ _stmt_701: {  /* L72 */
 _stmt_702: {  /* L73 */
     comm_stno(73);
     {
-        DESCR_t _rhs = pat_alt(pat_cat(pat_span(VARVAL_fn(CONC_fn(STRVAL(" "), NV_GET_fn("tab")))), pat_fence_p(pat_alt(pat_cat(pat_user_call("nl", (DESCR_t[1]){pat_alt(var_as_pattern(STRVAL("+")), var_as_pattern(STRVAL(".")))}, 1), pat_fence_p(pat_alt(pat_span(VARVAL_fn(CONC_fn(STRVAL(" "), NV_GET_fn("tab")))), var_as_pattern(NV_GET_fn("epsilon"))))), var_as_pattern(NV_GET_fn("epsilon"))))), pat_cat(pat_user_call("nl", (DESCR_t[1]){pat_alt(var_as_pattern(STRVAL("+")), var_as_pattern(STRVAL(".")))}, 1), pat_fence_p(pat_alt(pat_span(VARVAL_fn(CONC_fn(STRVAL(" "), NV_GET_fn("tab")))), var_as_pattern(NV_GET_fn("epsilon"))))));
+        DESCR_t _rhs = pat_alt(pat_cat(pat_span(VARVAL_fn(CONCAT_fn(STRVAL(" "), NV_GET_fn("tab")))), pat_fence_p(pat_alt(pat_cat(pat_user_call("nl", (DESCR_t[1]){pat_alt(var_as_pattern(STRVAL("+")), var_as_pattern(STRVAL(".")))}, 1), pat_fence_p(pat_alt(pat_span(VARVAL_fn(CONCAT_fn(STRVAL(" "), NV_GET_fn("tab")))), var_as_pattern(NV_GET_fn("epsilon"))))), var_as_pattern(NV_GET_fn("epsilon"))))), pat_cat(pat_user_call("nl", (DESCR_t[1]){pat_alt(var_as_pattern(STRVAL("+")), var_as_pattern(STRVAL(".")))}, 1), pat_fence_p(pat_alt(pat_span(VARVAL_fn(CONCAT_fn(STRVAL(" "), NV_GET_fn("tab")))), var_as_pattern(NV_GET_fn("epsilon"))))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_703;
         NV_SET_fn("snoWhite", _rhs);
         goto _stmt_703;
@@ -3233,7 +3233,7 @@ _stmt_702: {  /* L73 */
 _stmt_703: {  /* L78 */
     comm_stno(78);
     {
-        DESCR_t _rhs = pat_cat(pat_alt(pat_pos(to_int(INTVAL(0LL))), var_as_pattern(STRVAL(" "))), var_as_pattern(subscript_get(APLY_fn("upr", (DESCR_t[1]){NV_GET_fn("tx")}, 1), pat_alt(var_as_pattern(STRVAL(" ")), pat_rpos(to_int(INTVAL(0LL)))))));
+        DESCR_t _rhs = pat_cat(pat_alt(pat_pos(to_int(INTVAL(0LL))), var_as_pattern(STRVAL(" "))), var_as_pattern(subscript_get(APPLY_fn("upr", (DESCR_t[1]){NV_GET_fn("tx")}, 1), pat_alt(var_as_pattern(STRVAL(" ")), pat_rpos(to_int(INTVAL(0LL)))))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_704;
         NV_SET_fn("snoTxInList", _rhs);
         goto _stmt_704;
@@ -3263,7 +3263,7 @@ _stmt_705: {  /* L80 */
 _stmt_706: {  /* L81 */
     comm_stno(81);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(STRVAL("ABORT ALPHABET ARB BAL DT_FAIL FENCE FILE FNCLEVEL "), STRVAL("LASTFILE LASTLINE LASTNO LCASE LINE REM RTNTYPE ")), STRVAL("STCOUNT STNO SUCCEED UCASE"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(STRVAL("ABORT ALPHABET ARB BAL DT_FAIL FENCE FILE FNCLEVEL "), STRVAL("LASTFILE LASTLINE LASTNO LCASE LINE REM RTNTYPE ")), STRVAL("STCOUNT STNO SUCCEED UCASE"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_707;
         NV_SET_fn("snoProtKwds", _rhs);
         goto _stmt_707;
@@ -3273,7 +3273,7 @@ _stmt_706: {  /* L81 */
 _stmt_707: {  /* L84 */
     comm_stno(84);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(STRVAL("ABEND ANCHOR CASE CODE COMPARE DUMP ERRLIMIT "), STRVAL("ERRTEXT ERRTYPE FTRACE INPUT MAXLNGTH OUTPUT ")), STRVAL("PROFILE STLIMIT TRACE TRIM_fn FULLSCAN"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(STRVAL("ABEND ANCHOR CASE CODE COMPARE DUMP ERRLIMIT "), STRVAL("ERRTEXT ERRTYPE FTRACE INPUT MAXLNGTH OUTPUT ")), STRVAL("PROFILE STLIMIT TRACE TRIM_fn FULLSCAN"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_708;
         NV_SET_fn("snoUnprotKwds", _rhs);
         goto _stmt_708;
@@ -3283,7 +3283,7 @@ _stmt_707: {  /* L84 */
 _stmt_708: {  /* L87 */
     comm_stno(87);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(STRVAL("ANY APPLY ARBNO ARG DT_A ATAN BACKSPACE BREAK BREAKX "), STRVAL("CHAR CHOP CLEAR CODE COLLECT CONVERT COPY COS DT_DATA ")), STRVAL("DATATYPE DATE DEFINE_fn DETACH DIFFER DUMP DUPL_fn EJECT ")), STRVAL("ENDFILE EQ EVAL EXIT EXP FENCE FIELD GE GT HOST ")), STRVAL("IDENT INPUT INTEGER ITEM LE LEN LEQ LGE LGT LLE ")), STRVAL("LLT LN LNE LOAD LOCAL LPAD LT NE NOTANY OPSYN OUTPUT ")), STRVAL("POS PROTOTYPE REMDR REPLACE REVERSE REWIND RPAD RPOS ")), STRVAL("RSORT RTAB SET SETEXIT SIN SIZE_fn SORT SPAN SQRT STOPTR ")), STRVAL("SUBSTR_fn TAB TABLE TAN TIME TRACE TRIM_fn UNLOAD"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(STRVAL("ANY APPLY ARBNO ARG DT_A ATAN BACKSPACE BREAK BREAKX "), STRVAL("CHAR CHOP CLEAR CODE COLLECT CONVERT COPY COS DT_DATA ")), STRVAL("DATATYPE DATE DEFINE_fn DETACH DIFFER DUMP DUPL_fn EJECT ")), STRVAL("ENDFILE EQ EVAL EXIT EXP FENCE FIELD GE GT HOST ")), STRVAL("IDENT INPUT INTEGER ITEM LE LEN LEQ LGE LGT LLE ")), STRVAL("LLT LN LNE LOAD LOCAL LPAD LT NE NOTANY OPSYN OUTPUT ")), STRVAL("POS PROTOTYPE REMDR REPLACE REVERSE REWIND RPAD RPOS ")), STRVAL("RSORT RTAB SET SETEXIT SIN SIZE_fn SORT SPAN SQRT STOPTR ")), STRVAL("SUBSTR_fn TAB TABLE TAN TIME TRACE TRIM_fn UNLOAD"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_709;
         NV_SET_fn("snoFunctions", _rhs);
         goto _stmt_709;
@@ -3533,7 +3533,7 @@ _stmt_732: {  /* L120 */
 _stmt_733: {  /* L122 */
     comm_stno(122);
     {
-        DESCR_t _rhs = CONC_fn(mul(APLY_fn("nPush", NULL, 0), APLY_fn("snoXList", (DESCR_t[1]){CONC_fn(STRVAL("'snoExprList'"), STRVAL("*(GT(nTop(), 1) nTop())"))}, 1)), APLY_fn("nPop", NULL, 0));
+        DESCR_t _rhs = CONCAT_fn(mul(APPLY_fn("nPush", NULL, 0), APPLY_fn("snoXList", (DESCR_t[1]){CONCAT_fn(STRVAL("'snoExprList'"), STRVAL("*(GT(nTop(), 1) nTop())"))}, 1)), APPLY_fn("nPop", NULL, 0));
         if (IS_FAIL_fn(_rhs)) goto _stmt_734;
         NV_SET_fn("snoExprList", _rhs);
         goto _stmt_734;
@@ -3543,7 +3543,7 @@ _stmt_733: {  /* L122 */
 _stmt_734: {  /* L126 */
     comm_stno(126);
     {
-        DESCR_t _rhs = pat_cat(var_as_pattern(subscript_get(APLY_fn("nInc", NULL, 0), pat_alt(pat_ref("snoExpr"), pat_cat(var_as_pattern(NV_GET_fn("epsilon")), var_as_pattern(STRVAL("")))))), pat_fence_p(pat_alt(var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL(",")))), pat_ref("snoXList"))), var_as_pattern(NV_GET_fn("epsilon")))));
+        DESCR_t _rhs = pat_cat(var_as_pattern(subscript_get(APPLY_fn("nInc", NULL, 0), pat_alt(pat_ref("snoExpr"), pat_cat(var_as_pattern(NV_GET_fn("epsilon")), var_as_pattern(STRVAL("")))))), pat_fence_p(pat_alt(var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL(",")))), pat_ref("snoXList"))), var_as_pattern(NV_GET_fn("epsilon")))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_735;
         NV_SET_fn("snoXList", _rhs);
         goto _stmt_735;
@@ -3563,7 +3563,7 @@ _stmt_735: {  /* L127 */
 _stmt_736: {  /* L128 */
     comm_stno(128);
     {
-        DESCR_t _rhs = pat_cat(pat_ref("snoExpr1"), pat_fence_p(pat_alt(var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("=")))), pat_user_call("snoExpr0", (DESCR_t[1]){CONC_fn(STRVAL("'='"), INTVAL(2LL))}, 1))), var_as_pattern(NV_GET_fn("epsilon")))));
+        DESCR_t _rhs = pat_cat(pat_ref("snoExpr1"), pat_fence_p(pat_alt(var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("=")))), pat_user_call("snoExpr0", (DESCR_t[1]){CONCAT_fn(STRVAL("'='"), INTVAL(2LL))}, 1))), var_as_pattern(NV_GET_fn("epsilon")))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_737;
         NV_SET_fn("snoExpr0", _rhs);
         goto _stmt_737;
@@ -3573,7 +3573,7 @@ _stmt_736: {  /* L128 */
 _stmt_737: {  /* L129 */
     comm_stno(129);
     {
-        DESCR_t _rhs = pat_cat(pat_ref("snoExpr2"), pat_fence_p(pat_alt(var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("?")))), pat_user_call("snoExpr1", (DESCR_t[1]){CONC_fn(STRVAL("'?'"), INTVAL(2LL))}, 1))), var_as_pattern(NV_GET_fn("epsilon")))));
+        DESCR_t _rhs = pat_cat(pat_ref("snoExpr2"), pat_fence_p(pat_alt(var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("?")))), pat_user_call("snoExpr1", (DESCR_t[1]){CONCAT_fn(STRVAL("'?'"), INTVAL(2LL))}, 1))), var_as_pattern(NV_GET_fn("epsilon")))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_738;
         NV_SET_fn("snoExpr1", _rhs);
         goto _stmt_738;
@@ -3583,7 +3583,7 @@ _stmt_737: {  /* L129 */
 _stmt_738: {  /* L130 */
     comm_stno(130);
     {
-        DESCR_t _rhs = pat_cat(pat_ref("snoExpr3"), pat_fence_p(pat_alt(var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("&")))), pat_user_call("snoExpr2", (DESCR_t[1]){CONC_fn(STRVAL("'&'"), INTVAL(2LL))}, 1))), var_as_pattern(NV_GET_fn("epsilon")))));
+        DESCR_t _rhs = pat_cat(pat_ref("snoExpr3"), pat_fence_p(pat_alt(var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("&")))), pat_user_call("snoExpr2", (DESCR_t[1]){CONCAT_fn(STRVAL("'&'"), INTVAL(2LL))}, 1))), var_as_pattern(NV_GET_fn("epsilon")))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_739;
         NV_SET_fn("snoExpr2", _rhs);
         goto _stmt_739;
@@ -3593,7 +3593,7 @@ _stmt_738: {  /* L130 */
 _stmt_739: {  /* L131 */
     comm_stno(131);
     {
-        DESCR_t _rhs = CONC_fn(mul(APLY_fn("nPush", NULL, 0), APLY_fn("snoX3", (DESCR_t[1]){CONC_fn(STRVAL("'|'"), STRVAL("*(GT(nTop(), 1) nTop())"))}, 1)), APLY_fn("nPop", NULL, 0));
+        DESCR_t _rhs = CONCAT_fn(mul(APPLY_fn("nPush", NULL, 0), APPLY_fn("snoX3", (DESCR_t[1]){CONCAT_fn(STRVAL("'|'"), STRVAL("*(GT(nTop(), 1) nTop())"))}, 1)), APPLY_fn("nPop", NULL, 0));
         if (IS_FAIL_fn(_rhs)) goto _stmt_740;
         NV_SET_fn("snoExpr3", _rhs);
         goto _stmt_740;
@@ -3603,7 +3603,7 @@ _stmt_739: {  /* L131 */
 _stmt_740: {  /* L132 */
     comm_stno(132);
     {
-        DESCR_t _rhs = pat_cat(var_as_pattern(mul(APLY_fn("nInc", NULL, 0), NV_GET_fn("snoExpr4"))), pat_fence_p(pat_alt(var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("|")))), pat_ref("snoX3"))), var_as_pattern(NV_GET_fn("epsilon")))));
+        DESCR_t _rhs = pat_cat(var_as_pattern(mul(APPLY_fn("nInc", NULL, 0), NV_GET_fn("snoExpr4"))), pat_fence_p(pat_alt(var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("|")))), pat_ref("snoX3"))), var_as_pattern(NV_GET_fn("epsilon")))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_741;
         NV_SET_fn("snoX3", _rhs);
         goto _stmt_741;
@@ -3613,7 +3613,7 @@ _stmt_740: {  /* L132 */
 _stmt_741: {  /* L133 */
     comm_stno(133);
     {
-        DESCR_t _rhs = CONC_fn(mul(APLY_fn("nPush", NULL, 0), APLY_fn("snoX4", (DESCR_t[1]){CONC_fn(STRVAL("'..'"), STRVAL("*(GT(nTop(), 1) nTop())"))}, 1)), APLY_fn("nPop", NULL, 0));
+        DESCR_t _rhs = CONCAT_fn(mul(APPLY_fn("nPush", NULL, 0), APPLY_fn("snoX4", (DESCR_t[1]){CONCAT_fn(STRVAL("'..'"), STRVAL("*(GT(nTop(), 1) nTop())"))}, 1)), APPLY_fn("nPop", NULL, 0));
         if (IS_FAIL_fn(_rhs)) goto _stmt_742;
         NV_SET_fn("snoExpr4", _rhs);
         goto _stmt_742;
@@ -3623,7 +3623,7 @@ _stmt_741: {  /* L133 */
 _stmt_742: {  /* L134 */
     comm_stno(134);
     {
-        DESCR_t _rhs = pat_cat(var_as_pattern(mul(APLY_fn("nInc", NULL, 0), NV_GET_fn("snoExpr5"))), pat_fence_p(pat_alt(var_as_pattern(pat_cat(pat_ref("snoWhite"), pat_ref("snoX4"))), var_as_pattern(NV_GET_fn("epsilon")))));
+        DESCR_t _rhs = pat_cat(var_as_pattern(mul(APPLY_fn("nInc", NULL, 0), NV_GET_fn("snoExpr5"))), pat_fence_p(pat_alt(var_as_pattern(pat_cat(pat_ref("snoWhite"), pat_ref("snoX4"))), var_as_pattern(NV_GET_fn("epsilon")))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_743;
         NV_SET_fn("snoX4", _rhs);
         goto _stmt_743;
@@ -3633,7 +3633,7 @@ _stmt_742: {  /* L134 */
 _stmt_743: {  /* L135 */
     comm_stno(135);
     {
-        DESCR_t _rhs = pat_cat(pat_ref("snoExpr6"), pat_fence_p(pat_alt(var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("@")))), pat_user_call("snoExpr5", (DESCR_t[1]){CONC_fn(STRVAL("'@'"), INTVAL(2LL))}, 1))), var_as_pattern(NV_GET_fn("epsilon")))));
+        DESCR_t _rhs = pat_cat(pat_ref("snoExpr6"), pat_fence_p(pat_alt(var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("@")))), pat_user_call("snoExpr5", (DESCR_t[1]){CONCAT_fn(STRVAL("'@'"), INTVAL(2LL))}, 1))), var_as_pattern(NV_GET_fn("epsilon")))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_744;
         NV_SET_fn("snoExpr5", _rhs);
         goto _stmt_744;
@@ -3643,7 +3643,7 @@ _stmt_743: {  /* L135 */
 _stmt_744: {  /* L136 */
     comm_stno(136);
     {
-        DESCR_t _rhs = pat_cat(pat_ref("snoExpr7"), pat_fence_p(pat_alt(pat_alt(var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("+")))), pat_user_call("snoExpr6", (DESCR_t[1]){CONC_fn(STRVAL("'+'"), INTVAL(2LL))}, 1))), var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("-")))), pat_user_call("snoExpr6", (DESCR_t[1]){CONC_fn(STRVAL("'-'"), INTVAL(2LL))}, 1)))), var_as_pattern(NV_GET_fn("epsilon")))));
+        DESCR_t _rhs = pat_cat(pat_ref("snoExpr7"), pat_fence_p(pat_alt(pat_alt(var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("+")))), pat_user_call("snoExpr6", (DESCR_t[1]){CONCAT_fn(STRVAL("'+'"), INTVAL(2LL))}, 1))), var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("-")))), pat_user_call("snoExpr6", (DESCR_t[1]){CONCAT_fn(STRVAL("'-'"), INTVAL(2LL))}, 1)))), var_as_pattern(NV_GET_fn("epsilon")))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_745;
         NV_SET_fn("snoExpr6", _rhs);
         goto _stmt_745;
@@ -3653,7 +3653,7 @@ _stmt_744: {  /* L136 */
 _stmt_745: {  /* L140 */
     comm_stno(140);
     {
-        DESCR_t _rhs = pat_cat(pat_ref("snoExpr8"), pat_fence_p(pat_alt(var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("#")))), pat_user_call("snoExpr7", (DESCR_t[1]){CONC_fn(STRVAL("'#'"), INTVAL(2LL))}, 1))), var_as_pattern(NV_GET_fn("epsilon")))));
+        DESCR_t _rhs = pat_cat(pat_ref("snoExpr8"), pat_fence_p(pat_alt(var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("#")))), pat_user_call("snoExpr7", (DESCR_t[1]){CONCAT_fn(STRVAL("'#'"), INTVAL(2LL))}, 1))), var_as_pattern(NV_GET_fn("epsilon")))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_746;
         NV_SET_fn("snoExpr7", _rhs);
         goto _stmt_746;
@@ -3663,7 +3663,7 @@ _stmt_745: {  /* L140 */
 _stmt_746: {  /* L141 */
     comm_stno(141);
     {
-        DESCR_t _rhs = pat_cat(pat_ref("snoExpr9"), pat_fence_p(pat_alt(var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("/")))), pat_user_call("snoExpr8", (DESCR_t[1]){CONC_fn(STRVAL("'/'"), INTVAL(2LL))}, 1))), var_as_pattern(NV_GET_fn("epsilon")))));
+        DESCR_t _rhs = pat_cat(pat_ref("snoExpr9"), pat_fence_p(pat_alt(var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("/")))), pat_user_call("snoExpr8", (DESCR_t[1]){CONCAT_fn(STRVAL("'/'"), INTVAL(2LL))}, 1))), var_as_pattern(NV_GET_fn("epsilon")))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_747;
         NV_SET_fn("snoExpr8", _rhs);
         goto _stmt_747;
@@ -3673,7 +3673,7 @@ _stmt_746: {  /* L141 */
 _stmt_747: {  /* L142 */
     comm_stno(142);
     {
-        DESCR_t _rhs = pat_cat(pat_ref("snoExpr10"), pat_fence_p(pat_alt(var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("*")))), pat_user_call("snoExpr9", (DESCR_t[1]){CONC_fn(STRVAL("'*'"), INTVAL(2LL))}, 1))), var_as_pattern(NV_GET_fn("epsilon")))));
+        DESCR_t _rhs = pat_cat(pat_ref("snoExpr10"), pat_fence_p(pat_alt(var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("*")))), pat_user_call("snoExpr9", (DESCR_t[1]){CONCAT_fn(STRVAL("'*'"), INTVAL(2LL))}, 1))), var_as_pattern(NV_GET_fn("epsilon")))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_748;
         NV_SET_fn("snoExpr9", _rhs);
         goto _stmt_748;
@@ -3683,7 +3683,7 @@ _stmt_747: {  /* L142 */
 _stmt_748: {  /* L143 */
     comm_stno(143);
     {
-        DESCR_t _rhs = pat_cat(pat_ref("snoExpr11"), pat_fence_p(pat_alt(var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("%")))), pat_user_call("snoExpr10", (DESCR_t[1]){CONC_fn(STRVAL("'%'"), INTVAL(2LL))}, 1))), var_as_pattern(NV_GET_fn("epsilon")))));
+        DESCR_t _rhs = pat_cat(pat_ref("snoExpr11"), pat_fence_p(pat_alt(var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("%")))), pat_user_call("snoExpr10", (DESCR_t[1]){CONCAT_fn(STRVAL("'%'"), INTVAL(2LL))}, 1))), var_as_pattern(NV_GET_fn("epsilon")))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_749;
         NV_SET_fn("snoExpr10", _rhs);
         goto _stmt_749;
@@ -3693,7 +3693,7 @@ _stmt_748: {  /* L143 */
 _stmt_749: {  /* L144 */
     comm_stno(144);
     {
-        DESCR_t _rhs = pat_cat(pat_ref("snoExpr12"), pat_fence_p(pat_alt(var_as_pattern(mul(pat_alt(pat_alt(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("^")))), var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("!"))))), var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("**"))))), APLY_fn("snoExpr11", (DESCR_t[1]){CONC_fn(STRVAL("'^'"), INTVAL(2LL))}, 1))), var_as_pattern(NV_GET_fn("epsilon")))));
+        DESCR_t _rhs = pat_cat(pat_ref("snoExpr12"), pat_fence_p(pat_alt(var_as_pattern(mul(pat_alt(pat_alt(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("^")))), var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("!"))))), var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("**"))))), APPLY_fn("snoExpr11", (DESCR_t[1]){CONCAT_fn(STRVAL("'^'"), INTVAL(2LL))}, 1))), var_as_pattern(NV_GET_fn("epsilon")))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_750;
         NV_SET_fn("snoExpr11", _rhs);
         goto _stmt_750;
@@ -3703,7 +3703,7 @@ _stmt_749: {  /* L144 */
 _stmt_750: {  /* L146 */
     comm_stno(146);
     {
-        DESCR_t _rhs = pat_cat(pat_ref("snoExpr13"), pat_fence_p(pat_alt(pat_alt(var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("$")))), pat_user_call("snoExpr12", (DESCR_t[1]){CONC_fn(STRVAL("'$'"), INTVAL(2LL))}, 1))), var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL(".")))), pat_user_call("snoExpr12", (DESCR_t[1]){CONC_fn(STRVAL("'.'"), INTVAL(2LL))}, 1)))), var_as_pattern(NV_GET_fn("epsilon")))));
+        DESCR_t _rhs = pat_cat(pat_ref("snoExpr13"), pat_fence_p(pat_alt(pat_alt(var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("$")))), pat_user_call("snoExpr12", (DESCR_t[1]){CONCAT_fn(STRVAL("'$'"), INTVAL(2LL))}, 1))), var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL(".")))), pat_user_call("snoExpr12", (DESCR_t[1]){CONCAT_fn(STRVAL("'.'"), INTVAL(2LL))}, 1)))), var_as_pattern(NV_GET_fn("epsilon")))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_751;
         NV_SET_fn("snoExpr12", _rhs);
         goto _stmt_751;
@@ -3713,7 +3713,7 @@ _stmt_750: {  /* L146 */
 _stmt_751: {  /* L152 */
     comm_stno(152);
     {
-        DESCR_t _rhs = pat_cat(pat_ref("snoExpr14"), pat_fence_p(pat_alt(var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("~")))), pat_user_call("snoExpr13", (DESCR_t[1]){CONC_fn(STRVAL("'~'"), INTVAL(2LL))}, 1))), var_as_pattern(NV_GET_fn("epsilon")))));
+        DESCR_t _rhs = pat_cat(pat_ref("snoExpr14"), pat_fence_p(pat_alt(var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("~")))), pat_user_call("snoExpr13", (DESCR_t[1]){CONCAT_fn(STRVAL("'~'"), INTVAL(2LL))}, 1))), var_as_pattern(NV_GET_fn("epsilon")))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_752;
         NV_SET_fn("snoExpr13", _rhs);
         goto _stmt_752;
@@ -3723,7 +3723,7 @@ _stmt_751: {  /* L152 */
 _stmt_752: {  /* L153 */
     comm_stno(153);
     {
-        DESCR_t _rhs = pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(var_as_pattern(pat_cat(var_as_pattern(STRVAL("@")), pat_user_call("snoExpr14", (DESCR_t[1]){CONC_fn(STRVAL("'@'"), INTVAL(1LL))}, 1))), var_as_pattern(pat_cat(var_as_pattern(STRVAL("~")), pat_user_call("snoExpr14", (DESCR_t[1]){CONC_fn(STRVAL("'~'"), INTVAL(1LL))}, 1)))), var_as_pattern(pat_cat(var_as_pattern(STRVAL("?")), pat_user_call("snoExpr14", (DESCR_t[1]){CONC_fn(STRVAL("'?'"), INTVAL(1LL))}, 1)))), pat_cat(pat_ref("snoProtKwd"), var_as_pattern(STRVAL("snoProtKwd")))), pat_cat(pat_ref("snoUnprotKwd"), var_as_pattern(STRVAL("snoUnprotKwd")))), var_as_pattern(pat_cat(var_as_pattern(STRVAL("&")), pat_user_call("snoExpr14", (DESCR_t[1]){CONC_fn(STRVAL("'&'"), INTVAL(1LL))}, 1)))), var_as_pattern(pat_cat(var_as_pattern(STRVAL("+")), pat_user_call("snoExpr14", (DESCR_t[1]){CONC_fn(STRVAL("'+'"), INTVAL(1LL))}, 1)))), var_as_pattern(pat_cat(var_as_pattern(STRVAL("-")), pat_user_call("snoExpr14", (DESCR_t[1]){CONC_fn(STRVAL("'-'"), INTVAL(1LL))}, 1)))), var_as_pattern(pat_cat(var_as_pattern(STRVAL("*")), pat_user_call("snoExpr14", (DESCR_t[1]){CONC_fn(STRVAL("'*'"), INTVAL(1LL))}, 1)))), var_as_pattern(pat_cat(var_as_pattern(STRVAL("$")), pat_user_call("snoExpr14", (DESCR_t[1]){CONC_fn(STRVAL("'$'"), INTVAL(1LL))}, 1)))), var_as_pattern(pat_cat(var_as_pattern(STRVAL(".")), pat_user_call("snoExpr14", (DESCR_t[1]){CONC_fn(STRVAL("'.'"), INTVAL(1LL))}, 1)))), var_as_pattern(pat_cat(var_as_pattern(STRVAL("!")), pat_user_call("snoExpr14", (DESCR_t[1]){CONC_fn(STRVAL("'!'"), INTVAL(1LL))}, 1)))), var_as_pattern(pat_cat(var_as_pattern(STRVAL("%")), pat_user_call("snoExpr14", (DESCR_t[1]){CONC_fn(STRVAL("'%'"), INTVAL(1LL))}, 1)))), var_as_pattern(pat_cat(var_as_pattern(STRVAL("/")), pat_user_call("snoExpr14", (DESCR_t[1]){CONC_fn(STRVAL("'/'"), INTVAL(1LL))}, 1)))), var_as_pattern(pat_cat(var_as_pattern(STRVAL("#")), pat_user_call("snoExpr14", (DESCR_t[1]){CONC_fn(STRVAL("'#'"), INTVAL(1LL))}, 1)))), var_as_pattern(pat_cat(var_as_pattern(STRVAL("=")), pat_user_call("snoExpr14", (DESCR_t[1]){CONC_fn(STRVAL("'='"), INTVAL(1LL))}, 1)))), var_as_pattern(pat_cat(var_as_pattern(STRVAL("|")), pat_user_call("snoExpr14", (DESCR_t[1]){CONC_fn(STRVAL("'|'"), INTVAL(1LL))}, 1)))), pat_ref("snoExpr15"));
+        DESCR_t _rhs = pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(var_as_pattern(pat_cat(var_as_pattern(STRVAL("@")), pat_user_call("snoExpr14", (DESCR_t[1]){CONCAT_fn(STRVAL("'@'"), INTVAL(1LL))}, 1))), var_as_pattern(pat_cat(var_as_pattern(STRVAL("~")), pat_user_call("snoExpr14", (DESCR_t[1]){CONCAT_fn(STRVAL("'~'"), INTVAL(1LL))}, 1)))), var_as_pattern(pat_cat(var_as_pattern(STRVAL("?")), pat_user_call("snoExpr14", (DESCR_t[1]){CONCAT_fn(STRVAL("'?'"), INTVAL(1LL))}, 1)))), pat_cat(pat_ref("snoProtKwd"), var_as_pattern(STRVAL("snoProtKwd")))), pat_cat(pat_ref("snoUnprotKwd"), var_as_pattern(STRVAL("snoUnprotKwd")))), var_as_pattern(pat_cat(var_as_pattern(STRVAL("&")), pat_user_call("snoExpr14", (DESCR_t[1]){CONCAT_fn(STRVAL("'&'"), INTVAL(1LL))}, 1)))), var_as_pattern(pat_cat(var_as_pattern(STRVAL("+")), pat_user_call("snoExpr14", (DESCR_t[1]){CONCAT_fn(STRVAL("'+'"), INTVAL(1LL))}, 1)))), var_as_pattern(pat_cat(var_as_pattern(STRVAL("-")), pat_user_call("snoExpr14", (DESCR_t[1]){CONCAT_fn(STRVAL("'-'"), INTVAL(1LL))}, 1)))), var_as_pattern(pat_cat(var_as_pattern(STRVAL("*")), pat_user_call("snoExpr14", (DESCR_t[1]){CONCAT_fn(STRVAL("'*'"), INTVAL(1LL))}, 1)))), var_as_pattern(pat_cat(var_as_pattern(STRVAL("$")), pat_user_call("snoExpr14", (DESCR_t[1]){CONCAT_fn(STRVAL("'$'"), INTVAL(1LL))}, 1)))), var_as_pattern(pat_cat(var_as_pattern(STRVAL(".")), pat_user_call("snoExpr14", (DESCR_t[1]){CONCAT_fn(STRVAL("'.'"), INTVAL(1LL))}, 1)))), var_as_pattern(pat_cat(var_as_pattern(STRVAL("!")), pat_user_call("snoExpr14", (DESCR_t[1]){CONCAT_fn(STRVAL("'!'"), INTVAL(1LL))}, 1)))), var_as_pattern(pat_cat(var_as_pattern(STRVAL("%")), pat_user_call("snoExpr14", (DESCR_t[1]){CONCAT_fn(STRVAL("'%'"), INTVAL(1LL))}, 1)))), var_as_pattern(pat_cat(var_as_pattern(STRVAL("/")), pat_user_call("snoExpr14", (DESCR_t[1]){CONCAT_fn(STRVAL("'/'"), INTVAL(1LL))}, 1)))), var_as_pattern(pat_cat(var_as_pattern(STRVAL("#")), pat_user_call("snoExpr14", (DESCR_t[1]){CONCAT_fn(STRVAL("'#'"), INTVAL(1LL))}, 1)))), var_as_pattern(pat_cat(var_as_pattern(STRVAL("=")), pat_user_call("snoExpr14", (DESCR_t[1]){CONCAT_fn(STRVAL("'='"), INTVAL(1LL))}, 1)))), var_as_pattern(pat_cat(var_as_pattern(STRVAL("|")), pat_user_call("snoExpr14", (DESCR_t[1]){CONCAT_fn(STRVAL("'|'"), INTVAL(1LL))}, 1)))), pat_ref("snoExpr15"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_753;
         NV_SET_fn("snoExpr14", _rhs);
         goto _stmt_753;
@@ -3733,7 +3733,7 @@ _stmt_752: {  /* L153 */
 _stmt_753: {  /* L171 */
     comm_stno(171);
     {
-        DESCR_t _rhs = pat_cat(pat_ref("snoExpr17"), pat_fence_p(pat_alt(pat_cat(var_as_pattern(mul(APLY_fn("nPush", NULL, 0), APLY_fn("snoExpr16", (DESCR_t[1]){CONC_fn(STRVAL("'[]'"), STRVAL("nTop() + 1"))}, 1))), pat_user_call("nPop", (DESCR_t[1]){}, 0)), var_as_pattern(NV_GET_fn("epsilon")))));
+        DESCR_t _rhs = pat_cat(pat_ref("snoExpr17"), pat_fence_p(pat_alt(pat_cat(var_as_pattern(mul(APPLY_fn("nPush", NULL, 0), APPLY_fn("snoExpr16", (DESCR_t[1]){CONCAT_fn(STRVAL("'[]'"), STRVAL("nTop() + 1"))}, 1))), pat_user_call("nPop", (DESCR_t[1]){}, 0)), var_as_pattern(NV_GET_fn("epsilon")))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_754;
         NV_SET_fn("snoExpr15", _rhs);
         goto _stmt_754;
@@ -3743,7 +3743,7 @@ _stmt_753: {  /* L171 */
 _stmt_754: {  /* L173 */
     comm_stno(173);
     {
-        DESCR_t _rhs = pat_cat(var_as_pattern(subscript_get(APLY_fn("nInc", NULL, 0), pat_alt(pat_cat(var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("[")))), pat_ref("snoExprList"))), var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("]"))))), pat_cat(var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("<")))), pat_ref("snoExprList"))), var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL(">")))))))), pat_fence_p(pat_alt(pat_ref("snoExpr16"), var_as_pattern(NV_GET_fn("epsilon")))));
+        DESCR_t _rhs = pat_cat(var_as_pattern(subscript_get(APPLY_fn("nInc", NULL, 0), pat_alt(pat_cat(var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("[")))), pat_ref("snoExprList"))), var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("]"))))), pat_cat(var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("<")))), pat_ref("snoExprList"))), var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL(">")))))))), pat_fence_p(pat_alt(pat_ref("snoExpr16"), var_as_pattern(NV_GET_fn("epsilon")))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_755;
         NV_SET_fn("snoExpr16", _rhs);
         goto _stmt_755;
@@ -3753,7 +3753,7 @@ _stmt_754: {  /* L173 */
 _stmt_755: {  /* L176 */
     comm_stno(176);
     {
-        DESCR_t _rhs = pat_fence_p(var_as_pattern(pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(pat_cat(pat_cat(pat_cat(pat_user_call("nPush", (DESCR_t[1]){}, 0), var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("(")))), pat_user_call("snoExpr", (DESCR_t[1]){pat_alt(var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL(",")))), pat_user_call("snoXList", (DESCR_t[1]){CONC_fn(STRVAL("','"), STRVAL("nTop() + 1"))}, 1))), pat_user_call("epsilon", (DESCR_t[1]){CONC_fn(STRVAL("'()'"), INTVAL(1LL))}, 1))}, 1)))), var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL(")"))))), pat_user_call("nPop", (DESCR_t[1]){}, 0)), pat_cat(pat_cat(pat_cat(pat_cat(pat_ref("snoFunction"), var_as_pattern(STRVAL("snoFunction"))), var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("(")))), pat_ref("snoExprList")))), var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL(")"))))), pat_cat(var_as_pattern(STRVAL("'snoCall'")), var_as_pattern(INTVAL(2LL))))), pat_cat(pat_cat(pat_cat(pat_cat(pat_ref("snoId"), var_as_pattern(STRVAL("snoId"))), var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("(")))), pat_ref("snoExprList")))), var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL(")"))))), pat_cat(var_as_pattern(STRVAL("'snoCall'")), var_as_pattern(INTVAL(2LL))))), pat_cat(pat_ref("snoBuiltinVar"), var_as_pattern(STRVAL("snoBuiltinVar")))), pat_cat(pat_ref("snoSpecialNm"), var_as_pattern(STRVAL("snoSpecialNm")))), pat_cat(pat_ref("snoId"), var_as_pattern(STRVAL("snoId")))), pat_cat(pat_ref("snoString"), var_as_pattern(STRVAL("snoString")))), pat_cat(pat_ref("snoReal"), var_as_pattern(STRVAL("snoReal")))), pat_cat(pat_ref("snoInteger"), var_as_pattern(STRVAL("snoInteger"))))));
+        DESCR_t _rhs = pat_fence_p(var_as_pattern(pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(pat_alt(pat_cat(pat_cat(pat_cat(pat_user_call("nPush", (DESCR_t[1]){}, 0), var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("(")))), pat_user_call("snoExpr", (DESCR_t[1]){pat_alt(var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL(",")))), pat_user_call("snoXList", (DESCR_t[1]){CONCAT_fn(STRVAL("','"), STRVAL("nTop() + 1"))}, 1))), pat_user_call("epsilon", (DESCR_t[1]){CONCAT_fn(STRVAL("'()'"), INTVAL(1LL))}, 1))}, 1)))), var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL(")"))))), pat_user_call("nPop", (DESCR_t[1]){}, 0)), pat_cat(pat_cat(pat_cat(pat_cat(pat_ref("snoFunction"), var_as_pattern(STRVAL("snoFunction"))), var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("(")))), pat_ref("snoExprList")))), var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL(")"))))), pat_cat(var_as_pattern(STRVAL("'snoCall'")), var_as_pattern(INTVAL(2LL))))), pat_cat(pat_cat(pat_cat(pat_cat(pat_ref("snoId"), var_as_pattern(STRVAL("snoId"))), var_as_pattern(pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("(")))), pat_ref("snoExprList")))), var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL(")"))))), pat_cat(var_as_pattern(STRVAL("'snoCall'")), var_as_pattern(INTVAL(2LL))))), pat_cat(pat_ref("snoBuiltinVar"), var_as_pattern(STRVAL("snoBuiltinVar")))), pat_cat(pat_ref("snoSpecialNm"), var_as_pattern(STRVAL("snoSpecialNm")))), pat_cat(pat_ref("snoId"), var_as_pattern(STRVAL("snoId")))), pat_cat(pat_ref("snoString"), var_as_pattern(STRVAL("snoString")))), pat_cat(pat_ref("snoReal"), var_as_pattern(STRVAL("snoReal")))), pat_cat(pat_ref("snoInteger"), var_as_pattern(STRVAL("snoInteger"))))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_756;
         NV_SET_fn("snoExpr17", _rhs);
         goto _stmt_756;
@@ -3803,7 +3803,7 @@ _stmt_759: {  /* L198 */
 _stmt_760: {  /* L200 */
     comm_stno(200);
     {
-        DESCR_t _rhs = pat_cat(pat_cat(pat_ref("snoGray"), var_as_pattern(pat_cat(var_as_pattern(STRVAL(":")), pat_ref("snoGray")))), pat_fence_p(pat_alt(pat_cat(pat_cat(pat_ref_val(APLY_fn("snoTarget", (DESCR_t[1]){CONC_fn(STRVAL("*(':' snoBrackets)"), INTVAL(1LL))}, 1)), var_as_pattern(NV_GET_fn("epsilon"))), var_as_pattern(STRVAL(""))), pat_cat(var_as_pattern(pat_cat(pat_ref("snoSorF"), pat_user_call("snoTarget", (DESCR_t[1]){CONC_fn(STRVAL("*(':' SorF snoBrackets)"), INTVAL(1LL))}, 1))), pat_fence_p(pat_alt(var_as_pattern(mul(pat_cat(pat_ref("snoGray"), pat_ref("snoSorF")), APLY_fn("snoTarget", (DESCR_t[1]){CONC_fn(STRVAL("*(':' SorF snoBrackets)"), INTVAL(1LL))}, 1))), pat_cat(var_as_pattern(NV_GET_fn("epsilon")), var_as_pattern(STRVAL("")))))))));
+        DESCR_t _rhs = pat_cat(pat_cat(pat_ref("snoGray"), var_as_pattern(pat_cat(var_as_pattern(STRVAL(":")), pat_ref("snoGray")))), pat_fence_p(pat_alt(pat_cat(pat_cat(pat_ref_val(APPLY_fn("snoTarget", (DESCR_t[1]){CONCAT_fn(STRVAL("*(':' snoBrackets)"), INTVAL(1LL))}, 1)), var_as_pattern(NV_GET_fn("epsilon"))), var_as_pattern(STRVAL(""))), pat_cat(var_as_pattern(pat_cat(pat_ref("snoSorF"), pat_user_call("snoTarget", (DESCR_t[1]){CONCAT_fn(STRVAL("*(':' SorF snoBrackets)"), INTVAL(1LL))}, 1))), pat_fence_p(pat_alt(var_as_pattern(mul(pat_cat(pat_ref("snoGray"), pat_ref("snoSorF")), APPLY_fn("snoTarget", (DESCR_t[1]){CONCAT_fn(STRVAL("*(':' SorF snoBrackets)"), INTVAL(1LL))}, 1))), pat_cat(var_as_pattern(NV_GET_fn("epsilon")), var_as_pattern(STRVAL("")))))))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_761;
         NV_SET_fn("snoGoto", _rhs);
         goto _stmt_761;
@@ -3813,7 +3813,7 @@ _stmt_760: {  /* L200 */
 _stmt_761: {  /* L207 */
     comm_stno(207);
     {
-        DESCR_t _rhs = pat_cat(var_as_pattern(STRVAL("-")), pat_break_(VARVAL_fn(CONC_fn(NV_GET_fn("nl"), STRVAL(";")))));
+        DESCR_t _rhs = pat_cat(var_as_pattern(STRVAL("-")), pat_break_(VARVAL_fn(CONCAT_fn(NV_GET_fn("nl"), STRVAL(";")))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_762;
         NV_SET_fn("snoControl", _rhs);
         goto _stmt_762;
@@ -3833,7 +3833,7 @@ _stmt_762: {  /* L208 */
 _stmt_763: {  /* L209 */
     comm_stno(209);
     {
-        DESCR_t _rhs = pat_cat(pat_break_(VARVAL_fn(CONC_fn(CONC_fn(CONC_fn(STRVAL(" "), NV_GET_fn("tab")), NV_GET_fn("nl")), STRVAL(";")))), var_as_pattern(STRVAL("snoLabel")));
+        DESCR_t _rhs = pat_cat(pat_break_(VARVAL_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(STRVAL(" "), NV_GET_fn("tab")), NV_GET_fn("nl")), STRVAL(";")))), var_as_pattern(STRVAL("snoLabel")));
         if (IS_FAIL_fn(_rhs)) goto _stmt_764;
         NV_SET_fn("snoLabel", _rhs);
         goto _stmt_764;
@@ -3843,7 +3843,7 @@ _stmt_763: {  /* L209 */
 _stmt_764: {  /* L210 */
     comm_stno(210);
     {
-        DESCR_t _rhs = pat_cat(pat_ref_val(APLY_fn("snoLabel", (DESCR_t[1]){pat_alt(pat_cat(var_as_pattern(pat_cat(pat_ref("snoWhite"), pat_ref("snoExpr14"))), pat_fence_p(pat_alt(pat_alt(pat_cat(var_as_pattern(NV_GET_fn("epsilon")), var_as_pattern(pat_cat(var_as_pattern(STRVAL("")), pat_user_call("snoWhite", (DESCR_t[1]){pat_alt(pat_cat(var_as_pattern(STRVAL("=")), var_as_pattern(mul(pat_cat(var_as_pattern(STRVAL("=")), pat_ref("snoWhite")), NV_GET_fn("snoExpr")))), pat_cat(pat_cat(pat_cat(var_as_pattern(STRVAL("=")), var_as_pattern(STRVAL("="))), var_as_pattern(NV_GET_fn("epsilon"))), var_as_pattern(STRVAL(""))))}, 1)))), pat_cat(var_as_pattern(pat_cat(pat_alt(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("?")))), pat_ref("snoWhite")), pat_ref("snoExpr1"))), pat_fence_p(pat_alt(pat_ref_val(APLY_fn("snoWhite", (DESCR_t[1]){pat_alt(pat_cat(var_as_pattern(STRVAL("=")), var_as_pattern(mul(pat_cat(var_as_pattern(STRVAL("=")), pat_ref("snoWhite")), NV_GET_fn("snoExpr")))), pat_cat(pat_cat(pat_cat(var_as_pattern(STRVAL("=")), var_as_pattern(STRVAL("="))), var_as_pattern(NV_GET_fn("epsilon"))), var_as_pattern(STRVAL(""))))}, 1)), pat_cat(pat_cat(pat_cat(var_as_pattern(NV_GET_fn("epsilon")), var_as_pattern(STRVAL(""))), var_as_pattern(NV_GET_fn("epsilon"))), var_as_pattern(STRVAL(""))))))), pat_cat(pat_cat(pat_cat(pat_cat(pat_cat(var_as_pattern(NV_GET_fn("epsilon")), var_as_pattern(STRVAL(""))), var_as_pattern(NV_GET_fn("epsilon"))), var_as_pattern(STRVAL(""))), var_as_pattern(NV_GET_fn("epsilon"))), var_as_pattern(STRVAL("")))))), pat_cat(pat_cat(pat_cat(pat_cat(pat_cat(pat_cat(pat_cat(var_as_pattern(NV_GET_fn("epsilon")), var_as_pattern(STRVAL(""))), var_as_pattern(NV_GET_fn("epsilon"))), var_as_pattern(STRVAL(""))), var_as_pattern(NV_GET_fn("epsilon"))), var_as_pattern(STRVAL(""))), var_as_pattern(NV_GET_fn("epsilon"))), var_as_pattern(STRVAL(""))))}, 1)), var_as_pattern(pat_cat(pat_fence_p(pat_alt(pat_ref("snoGoto"), pat_cat(pat_cat(pat_cat(var_as_pattern(NV_GET_fn("epsilon")), var_as_pattern(STRVAL(""))), var_as_pattern(NV_GET_fn("epsilon"))), var_as_pattern(STRVAL(""))))), pat_ref("snoGray"))));
+        DESCR_t _rhs = pat_cat(pat_ref_val(APPLY_fn("snoLabel", (DESCR_t[1]){pat_alt(pat_cat(var_as_pattern(pat_cat(pat_ref("snoWhite"), pat_ref("snoExpr14"))), pat_fence_p(pat_alt(pat_alt(pat_cat(var_as_pattern(NV_GET_fn("epsilon")), var_as_pattern(pat_cat(var_as_pattern(STRVAL("")), pat_user_call("snoWhite", (DESCR_t[1]){pat_alt(pat_cat(var_as_pattern(STRVAL("=")), var_as_pattern(mul(pat_cat(var_as_pattern(STRVAL("=")), pat_ref("snoWhite")), NV_GET_fn("snoExpr")))), pat_cat(pat_cat(pat_cat(var_as_pattern(STRVAL("=")), var_as_pattern(STRVAL("="))), var_as_pattern(NV_GET_fn("epsilon"))), var_as_pattern(STRVAL(""))))}, 1)))), pat_cat(var_as_pattern(pat_cat(pat_alt(var_as_pattern(NV_GET_fn(VARVAL_fn(STRVAL("?")))), pat_ref("snoWhite")), pat_ref("snoExpr1"))), pat_fence_p(pat_alt(pat_ref_val(APPLY_fn("snoWhite", (DESCR_t[1]){pat_alt(pat_cat(var_as_pattern(STRVAL("=")), var_as_pattern(mul(pat_cat(var_as_pattern(STRVAL("=")), pat_ref("snoWhite")), NV_GET_fn("snoExpr")))), pat_cat(pat_cat(pat_cat(var_as_pattern(STRVAL("=")), var_as_pattern(STRVAL("="))), var_as_pattern(NV_GET_fn("epsilon"))), var_as_pattern(STRVAL(""))))}, 1)), pat_cat(pat_cat(pat_cat(var_as_pattern(NV_GET_fn("epsilon")), var_as_pattern(STRVAL(""))), var_as_pattern(NV_GET_fn("epsilon"))), var_as_pattern(STRVAL(""))))))), pat_cat(pat_cat(pat_cat(pat_cat(pat_cat(var_as_pattern(NV_GET_fn("epsilon")), var_as_pattern(STRVAL(""))), var_as_pattern(NV_GET_fn("epsilon"))), var_as_pattern(STRVAL(""))), var_as_pattern(NV_GET_fn("epsilon"))), var_as_pattern(STRVAL("")))))), pat_cat(pat_cat(pat_cat(pat_cat(pat_cat(pat_cat(pat_cat(var_as_pattern(NV_GET_fn("epsilon")), var_as_pattern(STRVAL(""))), var_as_pattern(NV_GET_fn("epsilon"))), var_as_pattern(STRVAL(""))), var_as_pattern(NV_GET_fn("epsilon"))), var_as_pattern(STRVAL(""))), var_as_pattern(NV_GET_fn("epsilon"))), var_as_pattern(STRVAL(""))))}, 1)), var_as_pattern(pat_cat(pat_fence_p(pat_alt(pat_ref("snoGoto"), pat_cat(pat_cat(pat_cat(var_as_pattern(NV_GET_fn("epsilon")), var_as_pattern(STRVAL(""))), var_as_pattern(NV_GET_fn("epsilon"))), var_as_pattern(STRVAL(""))))), pat_ref("snoGray"))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_765;
         NV_SET_fn("snoStmt", _rhs);
         goto _stmt_765;
@@ -3863,7 +3863,7 @@ _stmt_765: {  /* L231 */
 _stmt_766: {  /* L232 */
     comm_stno(232);
     {
-        DESCR_t _rhs = pat_cat(pat_user_call("nInc", (DESCR_t[1]){}, 0), pat_fence_p(pat_alt(pat_alt(pat_cat(pat_cat(pat_cat(pat_ref("snoComment"), var_as_pattern(STRVAL("comment"))), pat_cat(var_as_pattern(STRVAL("'snoComment'")), var_as_pattern(INTVAL(1LL)))), var_as_pattern(NV_GET_fn("nl"))), pat_cat(pat_cat(pat_cat(pat_ref("snoControl"), var_as_pattern(STRVAL("control"))), pat_cat(var_as_pattern(STRVAL("'snoControl'")), var_as_pattern(INTVAL(1LL)))), pat_alt(var_as_pattern(NV_GET_fn("nl")), var_as_pattern(STRVAL(";"))))), pat_ref_val(subscript_get(APLY_fn("snoStmt", (DESCR_t[1]){CONC_fn(STRVAL("'snoStmt'"), INTVAL(7LL))}, 1), pat_alt(var_as_pattern(NV_GET_fn("nl")), var_as_pattern(STRVAL(";"))))))));
+        DESCR_t _rhs = pat_cat(pat_user_call("nInc", (DESCR_t[1]){}, 0), pat_fence_p(pat_alt(pat_alt(pat_cat(pat_cat(pat_cat(pat_ref("snoComment"), var_as_pattern(STRVAL("comment"))), pat_cat(var_as_pattern(STRVAL("'snoComment'")), var_as_pattern(INTVAL(1LL)))), var_as_pattern(NV_GET_fn("nl"))), pat_cat(pat_cat(pat_cat(pat_ref("snoControl"), var_as_pattern(STRVAL("control"))), pat_cat(var_as_pattern(STRVAL("'snoControl'")), var_as_pattern(INTVAL(1LL)))), pat_alt(var_as_pattern(NV_GET_fn("nl")), var_as_pattern(STRVAL(";"))))), pat_ref_val(subscript_get(APPLY_fn("snoStmt", (DESCR_t[1]){CONCAT_fn(STRVAL("'snoStmt'"), INTVAL(7LL))}, 1), pat_alt(var_as_pattern(NV_GET_fn("nl")), var_as_pattern(STRVAL(";"))))))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_767;
         NV_SET_fn("snoCommand", _rhs);
         goto _stmt_767;
@@ -3873,7 +3873,7 @@ _stmt_766: {  /* L232 */
 _stmt_767: {  /* L239 */
     comm_stno(239);
     {
-        DESCR_t _rhs = pat_cat(pat_cat(pat_user_call("nPush", (DESCR_t[1]){}, 0), var_as_pattern(pat_assign_cond(pat_arbno(pat_ref("snoCommand")), CONC_fn(STRVAL("'snoParse'"), STRVAL("nTop()"))))), pat_user_call("nPop", (DESCR_t[1]){}, 0));
+        DESCR_t _rhs = pat_cat(pat_cat(pat_user_call("nPush", (DESCR_t[1]){}, 0), var_as_pattern(pat_assign_cond(pat_arbno(pat_ref("snoCommand")), CONCAT_fn(STRVAL("'snoParse'"), STRVAL("nTop()"))))), pat_user_call("nPop", (DESCR_t[1]){}, 0));
         if (IS_FAIL_fn(_rhs)) goto _stmt_768;
         NV_SET_fn("snoParse", _rhs);
         goto _stmt_768;
@@ -3883,7 +3883,7 @@ _stmt_767: {  /* L239 */
 _stmt_768: {  /* L244 */
     comm_stno(244);
     {
-        DESCR_t _rhs = pat_cat(pat_cat(pat_cat(pat_user_call("nPush", (DESCR_t[1]){}, 0), var_as_pattern(pat_assign_cond(pat_arbno(pat_ref("snoCommand")), CONC_fn(STRVAL("'snoParse'"), STRVAL("nTop()"))))), pat_alt(pat_cat(var_as_pattern(subscript_get(APLY_fn("icase", (DESCR_t[1]){STRVAL("END")}, 1), pat_alt(pat_cat(pat_cat(var_as_pattern(STRVAL(" ")), pat_break_(VARVAL_fn(NV_GET_fn("nl")))), var_as_pattern(NV_GET_fn("nl"))), var_as_pattern(NV_GET_fn("nl"))))), pat_arbno(pat_cat(pat_break_(VARVAL_fn(NV_GET_fn("nl"))), var_as_pattern(NV_GET_fn("nl"))))), var_as_pattern(NV_GET_fn("epsilon")))), pat_user_call("nPop", (DESCR_t[1]){}, 0));
+        DESCR_t _rhs = pat_cat(pat_cat(pat_cat(pat_user_call("nPush", (DESCR_t[1]){}, 0), var_as_pattern(pat_assign_cond(pat_arbno(pat_ref("snoCommand")), CONCAT_fn(STRVAL("'snoParse'"), STRVAL("nTop()"))))), pat_alt(pat_cat(var_as_pattern(subscript_get(APPLY_fn("icase", (DESCR_t[1]){STRVAL("END")}, 1), pat_alt(pat_cat(pat_cat(var_as_pattern(STRVAL(" ")), pat_break_(VARVAL_fn(NV_GET_fn("nl")))), var_as_pattern(NV_GET_fn("nl"))), var_as_pattern(NV_GET_fn("nl"))))), pat_arbno(pat_cat(pat_break_(VARVAL_fn(NV_GET_fn("nl"))), var_as_pattern(NV_GET_fn("nl"))))), var_as_pattern(NV_GET_fn("epsilon")))), pat_user_call("nPop", (DESCR_t[1]){}, 0));
         if (IS_FAIL_fn(_rhs)) goto _stmt_769;
         NV_SET_fn("snoCompiland", _rhs);
         goto _stmt_769;
@@ -3967,7 +3967,7 @@ _stmt_1084: {  /* L610 */
 _stmt_1085: {  /* L611 */
     comm_stno(611);
     {
-        DESCR_t _rhs = pat_alt(pat_span(VARVAL_fn(CONC_fn(STRVAL(" "), NV_GET_fn("tab")))), var_as_pattern(NV_GET_fn("epsilon")));
+        DESCR_t _rhs = pat_alt(pat_span(VARVAL_fn(CONCAT_fn(STRVAL(" "), NV_GET_fn("tab")))), var_as_pattern(NV_GET_fn("epsilon")));
         if (IS_FAIL_fn(_rhs)) goto main00;
         NV_SET_fn("snoSpace", _rhs);
         goto main00;
@@ -4016,7 +4016,7 @@ _stmt_1089: {  /* L615 */
 main02: {  /* L616 */
     comm_stno(616);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(NV_GET_fn("snoSrc"), NV_GET_fn("snoLine")), NV_GET_fn("nl"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(NV_GET_fn("snoSrc"), NV_GET_fn("snoLine")), NV_GET_fn("nl"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_1091;
         NV_SET_fn("snoSrc", _rhs);
         goto _stmt_1091;
@@ -4056,7 +4056,7 @@ _stmt_1093: {  /* L619 */
 _stmt_1094: {  /* L620 */
     comm_stno(620);
     {
-        DESCR_t _ret = APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("sno")}, 1);
+        DESCR_t _ret = APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("sno")}, 1);
         if (IS_FAIL_fn(_ret)) goto mainErr2;
         goto _stmt_1095;
     }
@@ -4065,7 +4065,7 @@ _stmt_1094: {  /* L620 */
 _stmt_1095: {  /* L621 */
     comm_stno(621);
     {
-        DESCR_t _ret = APLY_fn("pp", (DESCR_t[1]){NV_GET_fn("sno")}, 1);
+        DESCR_t _ret = APPLY_fn("pp", (DESCR_t[1]){NV_GET_fn("sno")}, 1);
         if (IS_FAIL_fn(_ret)) goto main01;
         goto main01;
     }
@@ -4084,7 +4084,7 @@ main05: {  /* L622 */
 _stmt_1097: {  /* L623 */
     comm_stno(623);
     {
-        DESCR_t _ret = APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("sno")}, 1);
+        DESCR_t _ret = APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("sno")}, 1);
         if (IS_FAIL_fn(_ret)) goto mainErr2;
         goto _stmt_1098;
     }
@@ -4093,7 +4093,7 @@ _stmt_1097: {  /* L623 */
 _stmt_1098: {  /* L624 */
     comm_stno(624);
     {
-        DESCR_t _ret = APLY_fn("pp", (DESCR_t[1]){NV_GET_fn("sno")}, 1);
+        DESCR_t _ret = APPLY_fn("pp", (DESCR_t[1]){NV_GET_fn("sno")}, 1);
         if (IS_FAIL_fn(_ret)) goto _PROG_END;
         goto _PROG_END;
     }
@@ -4172,7 +4172,7 @@ static DESCR_t uf_IsSpitbol(DESCR_t *_args, int _nargs) {
 IsSpitbol: {  /* L6 */
     comm_stno(6);
     {
-        DESCR_t _ret = APLY_fn("DIFFER", (DESCR_t[1]){NULVCL}, 1);
+        DESCR_t _ret = APPLY_fn("DIFFER", (DESCR_t[1]){NULVCL}, 1);
         if (IS_FAIL_fn(_ret)) goto FRETURN_LABEL_IsSpitbol;
         goto RETURN_LABEL_IsSpitbol;
     }
@@ -4199,7 +4199,7 @@ static DESCR_t uf_IsSnobol4(DESCR_t *_args, int _nargs) {
 IsSnobol4: {  /* L10 */
     comm_stno(10);
     {
-        DESCR_t _ret = APLY_fn("IDENT", (DESCR_t[1]){NULVCL}, 1);
+        DESCR_t _ret = APPLY_fn("IDENT", (DESCR_t[1]){NULVCL}, 1);
         if (IS_FAIL_fn(_ret)) goto FRETURN_LABEL_IsSnobol4;
         goto RETURN_LABEL_IsSnobol4;
     }
@@ -4235,7 +4235,7 @@ IsType: {  /* L14 */
     comm_stno(14);
     {
         DESCR_t _subj = NV_GET_fn("types");
-        int _ok = match_pattern(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_assign_cond(pat_span(VARVAL_fn(CONC_fn(STRVAL(ucase), STRVAL(lcase)))), APLY_fn("type", (DESCR_t[1]){pat_alt(var_as_pattern(STRVAL(",")), pat_rpos(to_int(INTVAL(0LL))))}, 1))), VARVAL_fn(_subj));
+        int _ok = match_pattern(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_assign_cond(pat_span(VARVAL_fn(CONCAT_fn(STRVAL(ucase), STRVAL(lcase)))), APPLY_fn("type", (DESCR_t[1]){pat_alt(var_as_pattern(STRVAL(",")), pat_rpos(to_int(INTVAL(0LL))))}, 1))), VARVAL_fn(_subj));
         if (_ok) goto _stmt_163;
         else goto FRETURN_LABEL_IsType;
     }
@@ -4250,7 +4250,7 @@ _stmt_163: {  /* L15 */
 _stmt_164: {  /* L16 */
     comm_stno(16);
     {
-        DESCR_t _ret = APLY_fn("IDENT", (DESCR_t[2]){STRVAL(datatype(NV_GET_fn("it"))), APLY_fn("upr", (DESCR_t[1]){NV_GET_fn("type")}, 1)}, 2);
+        DESCR_t _ret = APPLY_fn("IDENT", (DESCR_t[2]){STRVAL(datatype(NV_GET_fn("it"))), APPLY_fn("upr", (DESCR_t[1]){NV_GET_fn("type")}, 1)}, 2);
         if (IS_FAIL_fn(_ret)) goto IsType;
         goto RETURN_LABEL_IsType;
     }
@@ -4331,7 +4331,7 @@ io: {  /* L27 */
     comm_stno(27);
     {
         DESCR_t _subj = NV_GET_fn("fileName");
-        int _ok = match_and_replace(&_subj, pat_cat(pat_cat(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_lit("!")), var_as_pattern(NV_GET_fn("ioCmdDlmtPat1"))), var_as_pattern(NV_GET_fn("ioFileOptPat0"))), CONC_fn(STRVAL("|"), NV_GET_fn("cmd")));
+        int _ok = match_and_replace(&_subj, pat_cat(pat_cat(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_lit("!")), var_as_pattern(NV_GET_fn("ioCmdDlmtPat1"))), var_as_pattern(NV_GET_fn("ioFileOptPat0"))), CONCAT_fn(STRVAL("|"), NV_GET_fn("cmd")));
         NV_SET_fn("fileName", _subj);
         if (_ok) goto io1;
         else goto _stmt_186;
@@ -4342,7 +4342,7 @@ _stmt_186: {  /* L28 */
     comm_stno(28);
     {
         DESCR_t _subj = NV_GET_fn("fileName");
-        int _ok = match_and_replace(&_subj, pat_cat(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_lit("!")), var_as_pattern(NV_GET_fn("ioCmdDlmtPat2"))), CONC_fn(STRVAL("|"), NV_GET_fn("cmd")));
+        int _ok = match_and_replace(&_subj, pat_cat(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_lit("!")), var_as_pattern(NV_GET_fn("ioCmdDlmtPat2"))), CONCAT_fn(STRVAL("|"), NV_GET_fn("cmd")));
         NV_SET_fn("fileName", _subj);
         if (_ok) goto io1;
         else goto _stmt_187;
@@ -4362,7 +4362,7 @@ _stmt_187: {  /* L29 */
 io1: {  /* L30 */
     comm_stno(30);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(APLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("maxreclen")}, 1), NV_GET_fn("options")), INTVAL(1024LL));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(APPLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("maxreclen")}, 1), NV_GET_fn("options")), INTVAL(1024LL));
         if (IS_FAIL_fn(_rhs)) goto _stmt_189;
         NV_SET_fn("options", _rhs);
         goto _stmt_189;
@@ -4372,7 +4372,7 @@ io1: {  /* L30 */
 _stmt_189: {  /* L31 */
     comm_stno(31);
     {
-        DESCR_t _ret = APLY_fn("APPLY", (DESCR_t[5]){NV_GET_fn("io"), NV_GET_fn("name"), NV_GET_fn("channel"), NV_GET_fn("options"), NV_GET_fn("fileName")}, 5);
+        DESCR_t _ret = APPLY_fn("APPLY", (DESCR_t[5]){NV_GET_fn("io"), NV_GET_fn("name"), NV_GET_fn("channel"), NV_GET_fn("options"), NV_GET_fn("fileName")}, 5);
         if (IS_FAIL_fn(_ret)) goto FRETURN_LABEL_input_;
         goto RETURN_LABEL_input_;
     }
@@ -4443,7 +4443,7 @@ static DESCR_t uf_lwr(DESCR_t *_args, int _nargs) {
 lwr: {  /* L4 */
     comm_stno(4);
     {
-        DESCR_t _rhs = RPLACE_fn(NV_GET_fn("lwr"), STRVAL(ucase), STRVAL(lcase));
+        DESCR_t _rhs = REPLACE_fn(NV_GET_fn("lwr"), STRVAL(ucase), STRVAL(lcase));
         if (IS_FAIL_fn(_rhs)) goto RETURN_LABEL_lwr;
         NV_SET_fn("lwr", _rhs);
         goto RETURN_LABEL_lwr;
@@ -4480,7 +4480,7 @@ static DESCR_t uf_upr(DESCR_t *_args, int _nargs) {
 upr: {  /* L9 */
     comm_stno(9);
     {
-        DESCR_t _rhs = RPLACE_fn(NV_GET_fn("upr"), STRVAL(lcase), STRVAL(ucase));
+        DESCR_t _rhs = REPLACE_fn(NV_GET_fn("upr"), STRVAL(lcase), STRVAL(ucase));
         if (IS_FAIL_fn(_rhs)) goto RETURN_LABEL_upr;
         NV_SET_fn("upr", _rhs);
         goto RETURN_LABEL_upr;
@@ -4517,7 +4517,7 @@ static DESCR_t uf_cap(DESCR_t *_args, int _nargs) {
 cap: {  /* L14 */
     comm_stno(14);
     {
-        DESCR_t _rhs = CONC_fn(RPLACE_fn(SUBSTR_fn(NV_GET_fn("cap"), INTVAL(1LL), INTVAL(1LL)), STRVAL(lcase), STRVAL(ucase)), RPLACE_fn(APLY_fn("SUBSTR_fn", (DESCR_t[2]){NV_GET_fn("cap"), INTVAL(2LL)}, 2), STRVAL(ucase), STRVAL(lcase)));
+        DESCR_t _rhs = CONCAT_fn(REPLACE_fn(SUBSTR_fn(NV_GET_fn("cap"), INTVAL(1LL), INTVAL(1LL)), STRVAL(lcase), STRVAL(ucase)), REPLACE_fn(APPLY_fn("SUBSTR_fn", (DESCR_t[2]){NV_GET_fn("cap"), INTVAL(2LL)}, 2), STRVAL(ucase), STRVAL(lcase)));
         if (IS_FAIL_fn(_rhs)) goto ERROR_LABEL_cap;
         NV_SET_fn("cap", _rhs);
         goto RETURN_LABEL_cap;
@@ -4542,13 +4542,13 @@ ERROR_LABEL_cap:
     return FAILDESCR;
 }
 
-/* SNOBOL4 function: icase(strv) locals=['letter', 'character'] */
+/* SNOBOL4 function: icase(STRVAL_fn) locals=['letter', 'character'] */
 static DESCR_t uf_icase(DESCR_t *_args, int _nargs) {
     /* Save and bind params/locals */
-    DESCR_t _save_str = NV_GET_fn("strv");
+    DESCR_t _save_str = NV_GET_fn("STRVAL_fn");
     DESCR_t _save_letter = NV_GET_fn("letter");
     DESCR_t _save_character = NV_GET_fn("character");
-    NV_SET_fn("strv", (_nargs > 0) ? _args[0] : NULVCL);
+    NV_SET_fn("STRVAL_fn", (_nargs > 0) ? _args[0] : NULVCL);
     NV_SET_fn("letter", NULVCL);
     NV_SET_fn("character", NULVCL);
 
@@ -4558,7 +4558,7 @@ static DESCR_t uf_icase(DESCR_t *_args, int _nargs) {
 icase: {  /* L21 */
     comm_stno(21);
     {
-        DESCR_t _ret = APLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("strv")}, 1);
+        DESCR_t _ret = APPLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("STRVAL_fn")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_202;
         goto RETURN_LABEL_icase;
     }
@@ -4567,8 +4567,8 @@ icase: {  /* L21 */
 _stmt_202: {  /* L22 */
     comm_stno(22);
     {
-        DESCR_t _subj = NV_GET_fn("strv");
-        int _ok = match_pattern(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_assign_cond(pat_any_cs(VARVAL_fn(CONC_fn(STRVAL(ucase), STRVAL(lcase)))), NV_GET_fn("letter"))), VARVAL_fn(_subj));
+        DESCR_t _subj = NV_GET_fn("STRVAL_fn");
+        int _ok = match_pattern(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_assign_cond(pat_any_cs(VARVAL_fn(CONCAT_fn(STRVAL(ucase), STRVAL(lcase)))), NV_GET_fn("letter"))), VARVAL_fn(_subj));
         if (_ok) goto _stmt_203;
         else goto icase1;
     }
@@ -4577,7 +4577,7 @@ _stmt_202: {  /* L22 */
 _stmt_203: {  /* L23 */
     comm_stno(23);
     {
-        DESCR_t _rhs = APLY_fn("icase", (DESCR_t[1]){pat_alt(pat_user_call("upr", (DESCR_t[1]){NV_GET_fn("letter")}, 1), pat_user_call("lwr", (DESCR_t[1]){NV_GET_fn("letter")}, 1))}, 1);
+        DESCR_t _rhs = APPLY_fn("icase", (DESCR_t[1]){pat_alt(pat_user_call("upr", (DESCR_t[1]){NV_GET_fn("letter")}, 1), pat_user_call("lwr", (DESCR_t[1]){NV_GET_fn("letter")}, 1))}, 1);
         if (IS_FAIL_fn(_rhs)) goto icase;
         NV_SET_fn("icase", _rhs);
         goto icase;
@@ -4587,7 +4587,7 @@ _stmt_203: {  /* L23 */
 icase1: {  /* L24 */
     comm_stno(24);
     {
-        DESCR_t _subj = NV_GET_fn("strv");
+        DESCR_t _subj = NV_GET_fn("STRVAL_fn");
         int _ok = match_pattern(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_assign_cond(pat_len(to_int(INTVAL(1LL))), NV_GET_fn("character"))), VARVAL_fn(_subj));
         if (_ok) goto _stmt_205;
         else goto _stmt_205;
@@ -4597,7 +4597,7 @@ icase1: {  /* L24 */
 _stmt_205: {  /* L25 */
     comm_stno(25);
     {
-        DESCR_t _rhs = CONC_fn(NV_GET_fn("icase"), NV_GET_fn("character"));
+        DESCR_t _rhs = CONCAT_fn(NV_GET_fn("icase"), NV_GET_fn("character"));
         if (IS_FAIL_fn(_rhs)) goto icase;
         NV_SET_fn("icase", _rhs);
         goto icase;
@@ -4605,28 +4605,28 @@ _stmt_205: {  /* L25 */
 }
 
 RETURN_LABEL_icase:
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("letter", _save_letter);
     NV_SET_fn("character", _save_character);
     return NULVCL;
 FRETURN_LABEL_icase:
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("letter", _save_letter);
     NV_SET_fn("character", _save_character);
     return FAILDESCR;
 NRETURN_LABEL_icase:
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("letter", _save_letter);
     NV_SET_fn("character", _save_character);
     return NULVCL;  /* NRETURN */
 CONTINUE_LABEL_icase:
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("letter", _save_letter);
     NV_SET_fn("character", _save_character);
     return NULVCL;  /* CONTINUE */
 ERROR_LABEL_icase:
     fprintf(stderr, "** error in icase\n");
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("letter", _save_letter);
     NV_SET_fn("character", _save_character);
     return FAILDESCR;
@@ -4656,7 +4656,7 @@ assign: {  /* L9 */
 _stmt_209: {  /* L10 */
     comm_stno(10);
     {
-        DESCR_t _ret = APLY_fn("IDENT", (DESCR_t[2]){STRVAL(datatype(NV_GET_fn("expression"))), STRVAL("EXPRESSION")}, 2);
+        DESCR_t _ret = APPLY_fn("IDENT", (DESCR_t[2]){STRVAL(datatype(NV_GET_fn("expression"))), STRVAL("EXPRESSION")}, 2);
         if (IS_FAIL_fn(_ret)) goto assign1;
         goto _stmt_210;
     }
@@ -4665,7 +4665,7 @@ _stmt_209: {  /* L10 */
 _stmt_210: {  /* L11 */
     comm_stno(11);
     {
-        DESCR_t _rhs = evl(NV_GET_fn("expression"));
+        DESCR_t _rhs = EVAL_fn(NV_GET_fn("expression"));
         if (IS_FAIL_fn(_rhs)) goto NRETURN_LABEL_assign;
         NV_SET_fn(VARVAL_fn(NV_GET_fn("name")), _rhs);
         goto NRETURN_LABEL_assign;
@@ -4705,7 +4705,7 @@ ERROR_LABEL_assign:
     return FAILDESCR;
 }
 
-/* SNOBOL4 function: mtch(subject, pattern) locals=[] */
+/* SNOBOL4 function: MATCH_fn(subject, pattern) locals=[] */
 static DESCR_t uf_match(DESCR_t *_args, int _nargs) {
     /* Save and bind params/locals */
     DESCR_t _save_subject = NV_GET_fn("subject");
@@ -4713,15 +4713,15 @@ static DESCR_t uf_match(DESCR_t *_args, int _nargs) {
     NV_SET_fn("subject", (_nargs > 0) ? _args[0] : NULVCL);
     NV_SET_fn("pattern", (_nargs > 1) ? _args[1] : NULVCL);
 
-    goto mtch;
+    goto MATCH_fn;
 
 
-mtch: {  /* L7 */
+MATCH_fn: {  /* L7 */
     comm_stno(7);
     {
         DESCR_t _rhs = NULVCL;
         if (IS_FAIL_fn(_rhs)) goto _stmt_215;
-        NV_SET_fn("mtch", _rhs);
+        NV_SET_fn("MATCH_fn", _rhs);
         goto _stmt_215;
     }
 }
@@ -4753,7 +4753,7 @@ CONTINUE_LABEL_match:
     NV_SET_fn("pattern", _save_pattern);
     return NULVCL;  /* CONTINUE */
 ERROR_LABEL_match:
-    fprintf(stderr, "** error in mtch\n");
+    fprintf(stderr, "** error in MATCH_fn\n");
     NV_SET_fn("subject", _save_subject);
     NV_SET_fn("pattern", _save_pattern);
     return FAILDESCR;
@@ -4848,7 +4848,7 @@ static DESCR_t uf_PushCounter(DESCR_t *_args, int _nargs) {
 PushCounter: {  /* L15 */
     comm_stno(15);
     {
-        DESCR_t _rhs = CONC_fn((gt(NV_GET_fn("xTrace"),INTVAL(4LL)) ? NULVCL : FAILDESCR), STRVAL("PushCounter()"));
+        DESCR_t _rhs = CONCAT_fn((gt(NV_GET_fn("xTrace"),INTVAL(4LL)) ? NULVCL : FAILDESCR), STRVAL("PushCounter()"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_230;
         output_val(_rhs);
         goto _stmt_230;
@@ -4858,7 +4858,7 @@ PushCounter: {  /* L15 */
 _stmt_230: {  /* L16 */
     comm_stno(16);
     {
-        DESCR_t _rhs = APLY_fn("link_counter", (DESCR_t[2]){NV_GET_fn(VARVAL_fn(STRVAL("#N"))), INTVAL(0LL)}, 2);
+        DESCR_t _rhs = APPLY_fn("link_counter", (DESCR_t[2]){NV_GET_fn(VARVAL_fn(STRVAL("#N"))), INTVAL(0LL)}, 2);
         if (IS_FAIL_fn(_rhs)) goto _stmt_231;
         NV_SET_fn(VARVAL_fn(STRVAL("#N")), _rhs);
         goto _stmt_231;
@@ -4896,7 +4896,7 @@ static DESCR_t uf_IncCounter(DESCR_t *_args, int _nargs) {
 IncCounter: {  /* L18 */
     comm_stno(18);
     {
-        DESCR_t _rhs = add(APLY_fn("value", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("#N")))}, 1), INTVAL(1LL));
+        DESCR_t _rhs = add(APPLY_fn("value", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("#N")))}, 1), INTVAL(1LL));
         if (IS_FAIL_fn(_rhs)) goto _stmt_233;
         FIELD_SET_fn(NV_GET_fn(VARVAL_fn(STRVAL("#N"))), "value", _rhs);
         goto _stmt_233;
@@ -4906,7 +4906,7 @@ IncCounter: {  /* L18 */
 _stmt_233: {  /* L19 */
     comm_stno(19);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn((gt(NV_GET_fn("xTrace"),INTVAL(4LL)) ? NULVCL : FAILDESCR), APLY_fn("value", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("#N")))}, 1)), STRVAL(" = IncCounter()"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn((gt(NV_GET_fn("xTrace"),INTVAL(4LL)) ? NULVCL : FAILDESCR), APPLY_fn("value", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("#N")))}, 1)), STRVAL(" = IncCounter()"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_234;
         output_val(_rhs);
         goto _stmt_234;
@@ -4944,7 +4944,7 @@ static DESCR_t uf_DecCounter(DESCR_t *_args, int _nargs) {
 DecCounter: {  /* L21 */
     comm_stno(21);
     {
-        DESCR_t _rhs = sub(APLY_fn("value", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("#N")))}, 1), INTVAL(1LL));
+        DESCR_t _rhs = sub(APPLY_fn("value", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("#N")))}, 1), INTVAL(1LL));
         if (IS_FAIL_fn(_rhs)) goto _stmt_236;
         FIELD_SET_fn(NV_GET_fn(VARVAL_fn(STRVAL("#N"))), "value", _rhs);
         goto _stmt_236;
@@ -4954,7 +4954,7 @@ DecCounter: {  /* L21 */
 _stmt_236: {  /* L22 */
     comm_stno(22);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn((gt(NV_GET_fn("xTrace"),INTVAL(4LL)) ? NULVCL : FAILDESCR), APLY_fn("value", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("#N")))}, 1)), STRVAL(" = DecCounter()"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn((gt(NV_GET_fn("xTrace"),INTVAL(4LL)) ? NULVCL : FAILDESCR), APPLY_fn("value", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("#N")))}, 1)), STRVAL(" = DecCounter()"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_237;
         output_val(_rhs);
         goto _stmt_237;
@@ -4992,7 +4992,7 @@ static DESCR_t uf_PopCounter(DESCR_t *_args, int _nargs) {
 PopCounter: {  /* L24 */
     comm_stno(24);
     {
-        DESCR_t _rhs = CONC_fn((gt(NV_GET_fn("xTrace"),INTVAL(4LL)) ? NULVCL : FAILDESCR), STRVAL("PopCounter()"));
+        DESCR_t _rhs = CONCAT_fn((gt(NV_GET_fn("xTrace"),INTVAL(4LL)) ? NULVCL : FAILDESCR), STRVAL("PopCounter()"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_239;
         output_val(_rhs);
         goto _stmt_239;
@@ -5002,7 +5002,7 @@ PopCounter: {  /* L24 */
 _stmt_239: {  /* L25 */
     comm_stno(25);
     {
-        DESCR_t _rhs = CONC_fn(APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("#N")))}, 1), APLY_fn("next", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("#N")))}, 1));
+        DESCR_t _rhs = CONCAT_fn(APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("#N")))}, 1), APPLY_fn("next", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("#N")))}, 1));
         if (IS_FAIL_fn(_rhs)) goto FRETURN_LABEL_PopCounter;
         NV_SET_fn(VARVAL_fn(STRVAL("#N")), _rhs);
         goto _stmt_240;
@@ -5040,7 +5040,7 @@ static DESCR_t uf_TopCounter(DESCR_t *_args, int _nargs) {
 TopCounter: {  /* L27 */
     comm_stno(27);
     {
-        DESCR_t _rhs = CONC_fn(APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("#N")))}, 1), APLY_fn("value", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("#N")))}, 1));
+        DESCR_t _rhs = CONCAT_fn(APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("#N")))}, 1), APPLY_fn("value", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("#N")))}, 1));
         if (IS_FAIL_fn(_rhs)) goto FRETURN_LABEL_TopCounter;
         NV_SET_fn("TopCounter", _rhs);
         goto _stmt_242;
@@ -5050,7 +5050,7 @@ TopCounter: {  /* L27 */
 _stmt_242: {  /* L28 */
     comm_stno(28);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn((gt(NV_GET_fn("xTrace"),INTVAL(4LL)) ? NULVCL : FAILDESCR), NV_GET_fn("TopCounter")), STRVAL(" = TopCounter()"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn((gt(NV_GET_fn("xTrace"),INTVAL(4LL)) ? NULVCL : FAILDESCR), NV_GET_fn("TopCounter")), STRVAL(" = TopCounter()"));
         if (IS_FAIL_fn(_rhs)) goto RETURN_LABEL_TopCounter;
         output_val(_rhs);
         goto RETURN_LABEL_TopCounter;
@@ -5109,7 +5109,7 @@ static DESCR_t uf_PushBegTag(DESCR_t *_args, int _nargs) {
 PushBegTag: {  /* L44 */
     comm_stno(44);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn((gt(NV_GET_fn("xTrace"),INTVAL(4LL)) ? NULVCL : FAILDESCR), STRVAL("PushBegTag(")), APLY_fn("upr", (DESCR_t[1]){NV_GET_fn("t")}, 1)), STRVAL(")"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn((gt(NV_GET_fn("xTrace"),INTVAL(4LL)) ? NULVCL : FAILDESCR), STRVAL("PushBegTag(")), APPLY_fn("upr", (DESCR_t[1]){NV_GET_fn("t")}, 1)), STRVAL(")"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_252;
         output_val(_rhs);
         goto _stmt_252;
@@ -5119,7 +5119,7 @@ PushBegTag: {  /* L44 */
 _stmt_252: {  /* L45 */
     comm_stno(45);
     {
-        DESCR_t _rhs = APLY_fn("link_tag", (DESCR_t[2]){NV_GET_fn(VARVAL_fn(STRVAL("@B"))), APLY_fn("upr", (DESCR_t[1]){NV_GET_fn("t")}, 1)}, 2);
+        DESCR_t _rhs = APPLY_fn("link_tag", (DESCR_t[2]){NV_GET_fn(VARVAL_fn(STRVAL("@B"))), APPLY_fn("upr", (DESCR_t[1]){NV_GET_fn("t")}, 1)}, 2);
         if (IS_FAIL_fn(_rhs)) goto _stmt_253;
         NV_SET_fn(VARVAL_fn(STRVAL("@B")), _rhs);
         goto _stmt_253;
@@ -5129,7 +5129,7 @@ _stmt_252: {  /* L45 */
 _stmt_253: {  /* L46 */
     comm_stno(46);
     {
-        DESCR_t _rhs = APLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("t")}, 1);
+        DESCR_t _rhs = APPLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("t")}, 1);
         if (IS_FAIL_fn(_rhs)) goto _stmt_254;
         NV_SET_fn("PushBegTag", _rhs);
         goto NRETURN_LABEL_PushBegTag;
@@ -5139,7 +5139,7 @@ _stmt_253: {  /* L46 */
 _stmt_254: {  /* L47 */
     comm_stno(47);
     {
-        DESCR_t _rhs = APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("t")}, 1);
+        DESCR_t _rhs = APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("t")}, 1);
         if (IS_FAIL_fn(_rhs)) goto NRETURN_LABEL_PushBegTag;
         NV_SET_fn("PushBegTag", _rhs);
         goto NRETURN_LABEL_PushBegTag;
@@ -5172,7 +5172,7 @@ static DESCR_t uf_PopBegTag(DESCR_t *_args, int _nargs) {
 PopBegTag: {  /* L48 */
     comm_stno(48);
     {
-        DESCR_t _rhs = CONC_fn(subscript_get2((gt(NV_GET_fn("xTrace"),INTVAL(4LL)) ? NULVCL : FAILDESCR), CONC_fn(APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@B")))}, 1), APLY_fn("value", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@B")))}, 1)), STRVAL("DT_FAIL")), STRVAL(" = PopBegTag()"));
+        DESCR_t _rhs = CONCAT_fn(subscript_get2((gt(NV_GET_fn("xTrace"),INTVAL(4LL)) ? NULVCL : FAILDESCR), CONCAT_fn(APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@B")))}, 1), APPLY_fn("value", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@B")))}, 1)), STRVAL("DT_FAIL")), STRVAL(" = PopBegTag()"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_256;
         output_val(_rhs);
         goto _stmt_256;
@@ -5182,7 +5182,7 @@ PopBegTag: {  /* L48 */
 _stmt_256: {  /* L49 */
     comm_stno(49);
     {
-        DESCR_t _rhs = CONC_fn(APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@B")))}, 1), APLY_fn("next", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@B")))}, 1));
+        DESCR_t _rhs = CONCAT_fn(APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@B")))}, 1), APPLY_fn("next", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@B")))}, 1));
         if (IS_FAIL_fn(_rhs)) goto FRETURN_LABEL_PopBegTag;
         NV_SET_fn(VARVAL_fn(STRVAL("@B")), _rhs);
         goto _stmt_257;
@@ -5220,7 +5220,7 @@ static DESCR_t uf_TopBegTag(DESCR_t *_args, int _nargs) {
 TopBegTag: {  /* L51 */
     comm_stno(51);
     {
-        DESCR_t _rhs = CONC_fn(APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@B")))}, 1), APLY_fn("value", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@B")))}, 1));
+        DESCR_t _rhs = CONCAT_fn(APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@B")))}, 1), APPLY_fn("value", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@B")))}, 1));
         if (IS_FAIL_fn(_rhs)) goto FRETURN_LABEL_TopBegTag;
         NV_SET_fn("TopBegTag", _rhs);
         goto _stmt_259;
@@ -5230,7 +5230,7 @@ TopBegTag: {  /* L51 */
 _stmt_259: {  /* L52 */
     comm_stno(52);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn((gt(NV_GET_fn("xTrace"),INTVAL(4LL)) ? NULVCL : FAILDESCR), NV_GET_fn("TopBegTag")), STRVAL(" = TopBegTag()"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn((gt(NV_GET_fn("xTrace"),INTVAL(4LL)) ? NULVCL : FAILDESCR), NV_GET_fn("TopBegTag")), STRVAL(" = TopBegTag()"));
         if (IS_FAIL_fn(_rhs)) goto RETURN_LABEL_TopBegTag;
         output_val(_rhs);
         goto RETURN_LABEL_TopBegTag;
@@ -5276,7 +5276,7 @@ DumpBegTag: {  /* L53 */
 _stmt_261: {  /* L54 */
     comm_stno(54);
     {
-        DESCR_t _ret = APLY_fn("GT", (DESCR_t[2]){NV_GET_fn("xTrace"), INTVAL(5LL)}, 2);
+        DESCR_t _ret = APPLY_fn("GT", (DESCR_t[2]){NV_GET_fn("xTrace"), INTVAL(5LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto NRETURN_LABEL_DumpBegTag;
         goto _stmt_262;
     }
@@ -5295,7 +5295,7 @@ _stmt_262: {  /* L55 */
 DumpBegTag3: {  /* L56 */
     comm_stno(56);
     {
-        DESCR_t _rhs = CONC_fn(APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("b")}, 1), APLY_fn("value", (DESCR_t[1]){NV_GET_fn("b")}, 1));
+        DESCR_t _rhs = CONCAT_fn(APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("b")}, 1), APPLY_fn("value", (DESCR_t[1]){NV_GET_fn("b")}, 1));
         if (IS_FAIL_fn(_rhs)) goto DumpBegTag9;
         NV_SET_fn("v", _rhs);
         goto _stmt_264;
@@ -5305,7 +5305,7 @@ DumpBegTag3: {  /* L56 */
 _stmt_264: {  /* L57 */
     comm_stno(57);
     {
-        DESCR_t _rhs = CONC_fn(APLY_fn("list", (DESCR_t[2]){CONC_fn(APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("list")}, 1), STRVAL(", ")), STRVAL("")}, 2), NV_GET_fn("v"));
+        DESCR_t _rhs = CONCAT_fn(APPLY_fn("list", (DESCR_t[2]){CONCAT_fn(APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("list")}, 1), STRVAL(", ")), STRVAL("")}, 2), NV_GET_fn("v"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_265;
         NV_SET_fn("list", _rhs);
         goto _stmt_265;
@@ -5315,7 +5315,7 @@ _stmt_264: {  /* L57 */
 _stmt_265: {  /* L58 */
     comm_stno(58);
     {
-        DESCR_t _rhs = APLY_fn("next", (DESCR_t[1]){NV_GET_fn("b")}, 1);
+        DESCR_t _rhs = APPLY_fn("next", (DESCR_t[1]){NV_GET_fn("b")}, 1);
         if (IS_FAIL_fn(_rhs)) goto DumpBegTag3;
         NV_SET_fn("b", _rhs);
         goto DumpBegTag3;
@@ -5325,7 +5325,7 @@ _stmt_265: {  /* L58 */
 DumpBegTag9: {  /* L59 */
     comm_stno(59);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(STRVAL("@B = ("), NV_GET_fn("list")), STRVAL(")"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(STRVAL("@B = ("), NV_GET_fn("list")), STRVAL(")"));
         if (IS_FAIL_fn(_rhs)) goto NRETURN_LABEL_DumpBegTag;
         output_val(_rhs);
         goto NRETURN_LABEL_DumpBegTag;
@@ -5399,7 +5399,7 @@ static DESCR_t uf_PushEndTag(DESCR_t *_args, int _nargs) {
 PushEndTag: {  /* L68 */
     comm_stno(68);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn((gt(NV_GET_fn("xTrace"),INTVAL(4LL)) ? NULVCL : FAILDESCR), STRVAL("PushEndTag(")), APLY_fn("upr", (DESCR_t[1]){NV_GET_fn("t")}, 1)), STRVAL(")"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn((gt(NV_GET_fn("xTrace"),INTVAL(4LL)) ? NULVCL : FAILDESCR), STRVAL("PushEndTag(")), APPLY_fn("upr", (DESCR_t[1]){NV_GET_fn("t")}, 1)), STRVAL(")"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_275;
         output_val(_rhs);
         goto _stmt_275;
@@ -5409,7 +5409,7 @@ PushEndTag: {  /* L68 */
 _stmt_275: {  /* L69 */
     comm_stno(69);
     {
-        DESCR_t _rhs = APLY_fn("link_tag", (DESCR_t[2]){NV_GET_fn(VARVAL_fn(STRVAL("@E"))), APLY_fn("upr", (DESCR_t[1]){NV_GET_fn("t")}, 1)}, 2);
+        DESCR_t _rhs = APPLY_fn("link_tag", (DESCR_t[2]){NV_GET_fn(VARVAL_fn(STRVAL("@E"))), APPLY_fn("upr", (DESCR_t[1]){NV_GET_fn("t")}, 1)}, 2);
         if (IS_FAIL_fn(_rhs)) goto _stmt_276;
         NV_SET_fn(VARVAL_fn(STRVAL("@E")), _rhs);
         goto _stmt_276;
@@ -5419,7 +5419,7 @@ _stmt_275: {  /* L69 */
 _stmt_276: {  /* L70 */
     comm_stno(70);
     {
-        DESCR_t _rhs = APLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("t")}, 1);
+        DESCR_t _rhs = APPLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("t")}, 1);
         if (IS_FAIL_fn(_rhs)) goto _stmt_277;
         NV_SET_fn("PushEndTag", _rhs);
         goto NRETURN_LABEL_PushEndTag;
@@ -5429,7 +5429,7 @@ _stmt_276: {  /* L70 */
 _stmt_277: {  /* L71 */
     comm_stno(71);
     {
-        DESCR_t _rhs = APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("t")}, 1);
+        DESCR_t _rhs = APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("t")}, 1);
         if (IS_FAIL_fn(_rhs)) goto NRETURN_LABEL_PushEndTag;
         NV_SET_fn("PushEndTag", _rhs);
         goto NRETURN_LABEL_PushEndTag;
@@ -5462,7 +5462,7 @@ static DESCR_t uf_PopEndTag(DESCR_t *_args, int _nargs) {
 PopEndTag: {  /* L72 */
     comm_stno(72);
     {
-        DESCR_t _rhs = CONC_fn(subscript_get2((gt(NV_GET_fn("xTrace"),INTVAL(4LL)) ? NULVCL : FAILDESCR), CONC_fn(APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@E")))}, 1), APLY_fn("value", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@E")))}, 1)), STRVAL("DT_FAIL")), STRVAL(" = PopEndTag()"));
+        DESCR_t _rhs = CONCAT_fn(subscript_get2((gt(NV_GET_fn("xTrace"),INTVAL(4LL)) ? NULVCL : FAILDESCR), CONCAT_fn(APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@E")))}, 1), APPLY_fn("value", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@E")))}, 1)), STRVAL("DT_FAIL")), STRVAL(" = PopEndTag()"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_279;
         output_val(_rhs);
         goto _stmt_279;
@@ -5472,7 +5472,7 @@ PopEndTag: {  /* L72 */
 _stmt_279: {  /* L73 */
     comm_stno(73);
     {
-        DESCR_t _rhs = CONC_fn(APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@E")))}, 1), APLY_fn("next", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@E")))}, 1));
+        DESCR_t _rhs = CONCAT_fn(APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@E")))}, 1), APPLY_fn("next", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@E")))}, 1));
         if (IS_FAIL_fn(_rhs)) goto FRETURN_LABEL_PopEndTag;
         NV_SET_fn(VARVAL_fn(STRVAL("@E")), _rhs);
         goto _stmt_280;
@@ -5510,7 +5510,7 @@ static DESCR_t uf_TopEndTag(DESCR_t *_args, int _nargs) {
 TopEndTag: {  /* L75 */
     comm_stno(75);
     {
-        DESCR_t _rhs = CONC_fn(APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@E")))}, 1), APLY_fn("value", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@E")))}, 1));
+        DESCR_t _rhs = CONCAT_fn(APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@E")))}, 1), APPLY_fn("value", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@E")))}, 1));
         if (IS_FAIL_fn(_rhs)) goto FRETURN_LABEL_TopEndTag;
         NV_SET_fn("TopEndTag", _rhs);
         goto _stmt_282;
@@ -5520,7 +5520,7 @@ TopEndTag: {  /* L75 */
 _stmt_282: {  /* L76 */
     comm_stno(76);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn((gt(NV_GET_fn("xTrace"),INTVAL(4LL)) ? NULVCL : FAILDESCR), NV_GET_fn("TopEndTag")), STRVAL(" = TopEndTag()"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn((gt(NV_GET_fn("xTrace"),INTVAL(4LL)) ? NULVCL : FAILDESCR), NV_GET_fn("TopEndTag")), STRVAL(" = TopEndTag()"));
         if (IS_FAIL_fn(_rhs)) goto RETURN_LABEL_TopEndTag;
         output_val(_rhs);
         goto RETURN_LABEL_TopEndTag;
@@ -5566,7 +5566,7 @@ DumpEndTag: {  /* L77 */
 _stmt_284: {  /* L78 */
     comm_stno(78);
     {
-        DESCR_t _ret = APLY_fn("GT", (DESCR_t[2]){NV_GET_fn("xTrace"), INTVAL(5LL)}, 2);
+        DESCR_t _ret = APPLY_fn("GT", (DESCR_t[2]){NV_GET_fn("xTrace"), INTVAL(5LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto NRETURN_LABEL_DumpEndTag;
         goto _stmt_285;
     }
@@ -5585,7 +5585,7 @@ _stmt_285: {  /* L79 */
 DumpEndTag3: {  /* L80 */
     comm_stno(80);
     {
-        DESCR_t _rhs = CONC_fn(APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("e")}, 1), APLY_fn("value", (DESCR_t[1]){NV_GET_fn("e")}, 1));
+        DESCR_t _rhs = CONCAT_fn(APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("e")}, 1), APPLY_fn("value", (DESCR_t[1]){NV_GET_fn("e")}, 1));
         if (IS_FAIL_fn(_rhs)) goto DumpEndTag9;
         NV_SET_fn("v", _rhs);
         goto _stmt_287;
@@ -5595,7 +5595,7 @@ DumpEndTag3: {  /* L80 */
 _stmt_287: {  /* L81 */
     comm_stno(81);
     {
-        DESCR_t _rhs = CONC_fn(APLY_fn("list", (DESCR_t[2]){CONC_fn(APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("list")}, 1), STRVAL(", ")), STRVAL("")}, 2), NV_GET_fn("v"));
+        DESCR_t _rhs = CONCAT_fn(APPLY_fn("list", (DESCR_t[2]){CONCAT_fn(APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("list")}, 1), STRVAL(", ")), STRVAL("")}, 2), NV_GET_fn("v"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_288;
         NV_SET_fn("list", _rhs);
         goto _stmt_288;
@@ -5605,7 +5605,7 @@ _stmt_287: {  /* L81 */
 _stmt_288: {  /* L82 */
     comm_stno(82);
     {
-        DESCR_t _rhs = APLY_fn("next", (DESCR_t[1]){NV_GET_fn("e")}, 1);
+        DESCR_t _rhs = APPLY_fn("next", (DESCR_t[1]){NV_GET_fn("e")}, 1);
         if (IS_FAIL_fn(_rhs)) goto DumpEndTag3;
         NV_SET_fn("e", _rhs);
         goto DumpEndTag3;
@@ -5615,7 +5615,7 @@ _stmt_288: {  /* L82 */
 DumpEndTag9: {  /* L83 */
     comm_stno(83);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(STRVAL("@E = ("), NV_GET_fn("list")), STRVAL(")"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(STRVAL("@E = ("), NV_GET_fn("list")), STRVAL(")"));
         if (IS_FAIL_fn(_rhs)) goto NRETURN_LABEL_DumpEndTag;
         output_val(_rhs);
         goto NRETURN_LABEL_DumpEndTag;
@@ -5689,7 +5689,7 @@ static DESCR_t uf_Push(DESCR_t *_args, int _nargs) {
 Push: {  /* L13 */
     comm_stno(13);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn((gt(NV_GET_fn("xTrace"),INTVAL(4LL)) ? NULVCL : FAILDESCR), STRVAL("Push(")), APLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1)), STRVAL(")"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn((gt(NV_GET_fn("xTrace"),INTVAL(4LL)) ? NULVCL : FAILDESCR), STRVAL("Push(")), APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1)), STRVAL(")"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_298;
         output_val(_rhs);
         goto _stmt_298;
@@ -5699,7 +5699,7 @@ Push: {  /* L13 */
 _stmt_298: {  /* L14 */
     comm_stno(14);
     {
-        DESCR_t _rhs = APLY_fn("link", (DESCR_t[2]){NV_GET_fn(VARVAL_fn(STRVAL("@S"))), NV_GET_fn("x")}, 2);
+        DESCR_t _rhs = APPLY_fn("link", (DESCR_t[2]){NV_GET_fn(VARVAL_fn(STRVAL("@S"))), NV_GET_fn("x")}, 2);
         if (IS_FAIL_fn(_rhs)) goto _stmt_299;
         NV_SET_fn(VARVAL_fn(STRVAL("@S")), _rhs);
         goto _stmt_299;
@@ -5709,7 +5709,7 @@ _stmt_298: {  /* L14 */
 _stmt_299: {  /* L15 */
     comm_stno(15);
     {
-        DESCR_t _rhs = APLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("x")}, 1);
+        DESCR_t _rhs = APPLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("x")}, 1);
         if (IS_FAIL_fn(_rhs)) goto _stmt_300;
         NV_SET_fn("Push", _rhs);
         goto NRETURN_LABEL_Push;
@@ -5719,7 +5719,7 @@ _stmt_299: {  /* L15 */
 _stmt_300: {  /* L16 */
     comm_stno(16);
     {
-        DESCR_t _rhs = APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("x")}, 1);
+        DESCR_t _rhs = APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("x")}, 1);
         if (IS_FAIL_fn(_rhs)) goto NRETURN_LABEL_Push;
         NV_SET_fn("Push", _rhs);
         goto NRETURN_LABEL_Push;
@@ -5756,7 +5756,7 @@ static DESCR_t uf_Pop(DESCR_t *_args, int _nargs) {
 Pop: {  /* L17 */
     comm_stno(17);
     {
-        DESCR_t _ret = APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@S")))}, 1);
+        DESCR_t _ret = APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@S")))}, 1);
         if (IS_FAIL_fn(_ret)) goto FRETURN_LABEL_Pop;
         goto _stmt_302;
     }
@@ -5765,7 +5765,7 @@ Pop: {  /* L17 */
 _stmt_302: {  /* L18 */
     comm_stno(18);
     {
-        DESCR_t _ret = APLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("var")}, 1);
+        DESCR_t _ret = APPLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("var")}, 1);
         if (IS_FAIL_fn(_ret)) goto Pop1;
         goto _stmt_303;
     }
@@ -5774,7 +5774,7 @@ _stmt_302: {  /* L18 */
 _stmt_303: {  /* L19 */
     comm_stno(19);
     {
-        DESCR_t _rhs = APLY_fn("value", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@S")))}, 1);
+        DESCR_t _rhs = APPLY_fn("value", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@S")))}, 1);
         if (IS_FAIL_fn(_rhs)) goto _stmt_304;
         NV_SET_fn("Pop", _rhs);
         goto _stmt_304;
@@ -5784,7 +5784,7 @@ _stmt_303: {  /* L19 */
 _stmt_304: {  /* L20 */
     comm_stno(20);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn((gt(NV_GET_fn("xTrace"),INTVAL(4LL)) ? NULVCL : FAILDESCR), STRVAL("Pop() = ")), APLY_fn("t", (DESCR_t[1]){NV_GET_fn("Pop")}, 1));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn((gt(NV_GET_fn("xTrace"),INTVAL(4LL)) ? NULVCL : FAILDESCR), STRVAL("Pop() = ")), APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("Pop")}, 1));
         if (IS_FAIL_fn(_rhs)) goto _stmt_305;
         output_val(_rhs);
         goto _stmt_305;
@@ -5794,7 +5794,7 @@ _stmt_304: {  /* L20 */
 _stmt_305: {  /* L21 */
     comm_stno(21);
     {
-        DESCR_t _rhs = APLY_fn("next", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@S")))}, 1);
+        DESCR_t _rhs = APPLY_fn("next", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@S")))}, 1);
         if (IS_FAIL_fn(_rhs)) goto RETURN_LABEL_Pop;
         NV_SET_fn(VARVAL_fn(STRVAL("@S")), _rhs);
         goto RETURN_LABEL_Pop;
@@ -5814,7 +5814,7 @@ Pop1: {  /* L22 */
 _stmt_307: {  /* L23 */
     comm_stno(23);
     {
-        DESCR_t _rhs = APLY_fn("value", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@S")))}, 1);
+        DESCR_t _rhs = APPLY_fn("value", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@S")))}, 1);
         if (IS_FAIL_fn(_rhs)) goto _stmt_308;
         NV_SET_fn(VARVAL_fn(NV_GET_fn("var")), _rhs);
         goto _stmt_308;
@@ -5824,7 +5824,7 @@ _stmt_307: {  /* L23 */
 _stmt_308: {  /* L24 */
     comm_stno(24);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn((gt(NV_GET_fn("xTrace"),INTVAL(4LL)) ? NULVCL : FAILDESCR), STRVAL("Pop() = ")), APLY_fn("t", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(NV_GET_fn("var")))}, 1));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn((gt(NV_GET_fn("xTrace"),INTVAL(4LL)) ? NULVCL : FAILDESCR), STRVAL("Pop() = ")), APPLY_fn("t", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(NV_GET_fn("var")))}, 1));
         if (IS_FAIL_fn(_rhs)) goto _stmt_309;
         output_val(_rhs);
         goto _stmt_309;
@@ -5834,7 +5834,7 @@ _stmt_308: {  /* L24 */
 _stmt_309: {  /* L25 */
     comm_stno(25);
     {
-        DESCR_t _rhs = APLY_fn("next", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@S")))}, 1);
+        DESCR_t _rhs = APPLY_fn("next", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@S")))}, 1);
         if (IS_FAIL_fn(_rhs)) goto NRETURN_LABEL_Pop;
         NV_SET_fn(VARVAL_fn(STRVAL("@S")), _rhs);
         goto NRETURN_LABEL_Pop;
@@ -5867,7 +5867,7 @@ static DESCR_t uf_Top(DESCR_t *_args, int _nargs) {
 Top: {  /* L26 */
     comm_stno(26);
     {
-        DESCR_t _ret = APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@S")))}, 1);
+        DESCR_t _ret = APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("@S")))}, 1);
         if (IS_FAIL_fn(_ret)) goto FRETURN_LABEL_Top;
         goto _stmt_311;
     }
@@ -5886,7 +5886,7 @@ _stmt_311: {  /* L27 */
 _stmt_312: {  /* L28 */
     comm_stno(28);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn((gt(NV_GET_fn("xTrace"),INTVAL(4LL)) ? NULVCL : FAILDESCR), STRVAL("Top() = ")), APLY_fn("t", (DESCR_t[1]){NV_GET_fn("Top")}, 1));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn((gt(NV_GET_fn("xTrace"),INTVAL(4LL)) ? NULVCL : FAILDESCR), STRVAL("Top() = ")), APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("Top")}, 1));
         if (IS_FAIL_fn(_rhs)) goto NRETURN_LABEL_Top;
         output_val(_rhs);
         goto NRETURN_LABEL_Top;
@@ -5920,7 +5920,7 @@ static DESCR_t uf_Append(DESCR_t *_args, int _nargs) {
 Append: {  /* L17 */
     comm_stno(17);
     {
-        DESCR_t _rhs = APLY_fn("Insert", (DESCR_t[3]){NV_GET_fn("x"), NV_GET_fn("y"), add(APLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1), INTVAL(1LL))}, 3);
+        DESCR_t _rhs = APPLY_fn("Insert", (DESCR_t[3]){NV_GET_fn("x"), NV_GET_fn("y"), add(APPLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1), INTVAL(1LL))}, 3);
         if (IS_FAIL_fn(_rhs)) goto RETURN_LABEL_Append;
         NV_SET_fn("Append", _rhs);
         goto RETURN_LABEL_Append;
@@ -5964,7 +5964,7 @@ static DESCR_t uf_Prepend(DESCR_t *_args, int _nargs) {
 Prepend: {  /* L18 */
     comm_stno(18);
     {
-        DESCR_t _rhs = APLY_fn("Insert", (DESCR_t[3]){NV_GET_fn("x"), NV_GET_fn("y"), INTVAL(1LL)}, 3);
+        DESCR_t _rhs = APPLY_fn("Insert", (DESCR_t[3]){NV_GET_fn("x"), NV_GET_fn("y"), INTVAL(1LL)}, 3);
         if (IS_FAIL_fn(_rhs)) goto RETURN_LABEL_Prepend;
         NV_SET_fn("Prepend", _rhs);
         goto RETURN_LABEL_Prepend;
@@ -6024,7 +6024,7 @@ Insert: {  /* L19 */
 _stmt_322: {  /* L20 */
     comm_stno(20);
     {
-        DESCR_t _rhs = array_create(CONC_fn(STRVAL("1:"), add(APLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1), INTVAL(1LL))));
+        DESCR_t _rhs = array_create(CONCAT_fn(STRVAL("1:"), add(APPLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1), INTVAL(1LL))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_323;
         NV_SET_fn("c", _rhs);
         goto _stmt_323;
@@ -6044,7 +6044,7 @@ _stmt_323: {  /* L21 */
 Insert1: {  /* L22 */
     comm_stno(22);
     {
-        DESCR_t _rhs = CONC_fn((lt(NV_GET_fn("i"),sub(NV_GET_fn("place"), INTVAL(1LL))) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL)));
+        DESCR_t _rhs = CONCAT_fn((lt(NV_GET_fn("i"),sub(NV_GET_fn("place"), INTVAL(1LL))) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL)));
         if (IS_FAIL_fn(_rhs)) goto Insert2;
         NV_SET_fn("i", _rhs);
         goto _stmt_325;
@@ -6054,7 +6054,7 @@ Insert1: {  /* L22 */
 _stmt_325: {  /* L23 */
     comm_stno(23);
     {
-        DESCR_t _rhs = APLY_fn("c", (DESCR_t[1]){NV_GET_fn("x")}, 1);
+        DESCR_t _rhs = APPLY_fn("c", (DESCR_t[1]){NV_GET_fn("x")}, 1);
         if (IS_FAIL_fn(_rhs)) goto Insert1;
         subscript_set(NV_GET_fn("c"), NV_GET_fn("i"), _rhs);
         goto Insert1;
@@ -6074,7 +6074,7 @@ Insert2: {  /* L24 */
 Insert3: {  /* L25 */
     comm_stno(25);
     {
-        DESCR_t _rhs = CONC_fn((lt(NV_GET_fn("i"),APLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1)) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL)));
+        DESCR_t _rhs = CONCAT_fn((lt(NV_GET_fn("i"),APPLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1)) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL)));
         if (IS_FAIL_fn(_rhs)) goto Insert4;
         NV_SET_fn("i", _rhs);
         goto _stmt_328;
@@ -6084,7 +6084,7 @@ Insert3: {  /* L25 */
 _stmt_328: {  /* L26 */
     comm_stno(26);
     {
-        DESCR_t _rhs = APLY_fn("c", (DESCR_t[1]){NV_GET_fn("x")}, 1);
+        DESCR_t _rhs = APPLY_fn("c", (DESCR_t[1]){NV_GET_fn("x")}, 1);
         if (IS_FAIL_fn(_rhs)) goto Insert3;
         subscript_set(NV_GET_fn("c"), add(NV_GET_fn("i"), INTVAL(1LL)), _rhs);
         goto Insert3;
@@ -6094,7 +6094,7 @@ _stmt_328: {  /* L26 */
 Insert4: {  /* L27 */
     comm_stno(27);
     {
-        DESCR_t _rhs = add(APLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1), INTVAL(1LL));
+        DESCR_t _rhs = add(APPLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1), INTVAL(1LL));
         if (IS_FAIL_fn(_rhs)) goto _stmt_330;
         FIELD_SET_fn(NV_GET_fn("x"), "n", _rhs);
         goto _stmt_330;
@@ -6177,7 +6177,7 @@ Remove: {  /* L29 */
 _stmt_332: {  /* L30 */
     comm_stno(30);
     {
-        DESCR_t _rhs = CONC_fn((gt(sub(APLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1), INTVAL(1LL)),INTVAL(0LL)) ? NULVCL : FAILDESCR), array_create(CONC_fn(STRVAL("1:"), sub(APLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1), INTVAL(1LL)))));
+        DESCR_t _rhs = CONCAT_fn((gt(sub(APPLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1), INTVAL(1LL)),INTVAL(0LL)) ? NULVCL : FAILDESCR), array_create(CONCAT_fn(STRVAL("1:"), sub(APPLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1), INTVAL(1LL)))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_333;
         NV_SET_fn("c", _rhs);
         goto _stmt_333;
@@ -6197,7 +6197,7 @@ _stmt_333: {  /* L31 */
 Remove1: {  /* L32 */
     comm_stno(32);
     {
-        DESCR_t _rhs = CONC_fn((lt(NV_GET_fn("i"),sub(NV_GET_fn("place"), INTVAL(1LL))) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL)));
+        DESCR_t _rhs = CONCAT_fn((lt(NV_GET_fn("i"),sub(NV_GET_fn("place"), INTVAL(1LL))) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL)));
         if (IS_FAIL_fn(_rhs)) goto Remove2;
         NV_SET_fn("i", _rhs);
         goto _stmt_335;
@@ -6207,7 +6207,7 @@ Remove1: {  /* L32 */
 _stmt_335: {  /* L33 */
     comm_stno(33);
     {
-        DESCR_t _rhs = APLY_fn("c", (DESCR_t[1]){NV_GET_fn("x")}, 1);
+        DESCR_t _rhs = APPLY_fn("c", (DESCR_t[1]){NV_GET_fn("x")}, 1);
         if (IS_FAIL_fn(_rhs)) goto Remove1;
         subscript_set(NV_GET_fn("c"), NV_GET_fn("i"), _rhs);
         goto Remove1;
@@ -6227,7 +6227,7 @@ Remove2: {  /* L34 */
 Remove3: {  /* L35 */
     comm_stno(35);
     {
-        DESCR_t _rhs = CONC_fn((lt(NV_GET_fn("i"),APLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1)) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL)));
+        DESCR_t _rhs = CONCAT_fn((lt(NV_GET_fn("i"),APPLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1)) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL)));
         if (IS_FAIL_fn(_rhs)) goto Remove4;
         NV_SET_fn("i", _rhs);
         goto _stmt_338;
@@ -6237,7 +6237,7 @@ Remove3: {  /* L35 */
 _stmt_338: {  /* L36 */
     comm_stno(36);
     {
-        DESCR_t _rhs = APLY_fn("c", (DESCR_t[1]){NV_GET_fn("x")}, 1);
+        DESCR_t _rhs = APPLY_fn("c", (DESCR_t[1]){NV_GET_fn("x")}, 1);
         if (IS_FAIL_fn(_rhs)) goto Remove3;
         subscript_set(NV_GET_fn("c"), sub(NV_GET_fn("i"), INTVAL(1LL)), _rhs);
         goto Remove3;
@@ -6247,7 +6247,7 @@ _stmt_338: {  /* L36 */
 Remove4: {  /* L37 */
     comm_stno(37);
     {
-        DESCR_t _rhs = sub(APLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1), INTVAL(1LL));
+        DESCR_t _rhs = sub(APPLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1), INTVAL(1LL));
         if (IS_FAIL_fn(_rhs)) goto _stmt_340;
         FIELD_SET_fn(NV_GET_fn("x"), "n", _rhs);
         goto _stmt_340;
@@ -6343,7 +6343,7 @@ TREEBLK_t: {  /* L42 */
 Tree1: {  /* L43 */
     comm_stno(43);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn((gt(NV_GET_fn("nc"),INTVAL(0LL)) ? NULVCL : FAILDESCR), APLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(CONC_fn(STRVAL("c"), NV_GET_fn("nc"))))}, 1)), sub(NV_GET_fn("nc"), INTVAL(1LL)));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn((gt(NV_GET_fn("nc"),INTVAL(0LL)) ? NULVCL : FAILDESCR), APPLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(CONCAT_fn(STRVAL("c"), NV_GET_fn("nc"))))}, 1)), sub(NV_GET_fn("nc"), INTVAL(1LL)));
         if (IS_FAIL_fn(_rhs)) goto _stmt_345;
         NV_SET_fn("nc", _rhs);
         goto Tree1;
@@ -6353,7 +6353,7 @@ Tree1: {  /* L43 */
 _stmt_345: {  /* L44 */
     comm_stno(44);
     {
-        DESCR_t _rhs = APLY_fn("tree", (DESCR_t[4]){NV_GET_fn("t"), NV_GET_fn("v"), CONC_fn((gt(NV_GET_fn("nc"),INTVAL(0LL)) ? NULVCL : FAILDESCR), NV_GET_fn("nc")), NV_GET_fn("NULL")}, 4);
+        DESCR_t _rhs = APPLY_fn("tree", (DESCR_t[4]){NV_GET_fn("t"), NV_GET_fn("v"), CONCAT_fn((gt(NV_GET_fn("nc"),INTVAL(0LL)) ? NULVCL : FAILDESCR), NV_GET_fn("nc")), NV_GET_fn("NULL")}, 4);
         if (IS_FAIL_fn(_rhs)) goto _stmt_346;
         NV_SET_fn("TREEBLK_t", _rhs);
         goto _stmt_346;
@@ -6373,7 +6373,7 @@ _stmt_346: {  /* L48 */
 Tree3: {  /* L49 */
     comm_stno(49);
     {
-        DESCR_t _rhs = CONC_fn((lt(NV_GET_fn("i"),NV_GET_fn("nc")) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL)));
+        DESCR_t _rhs = CONCAT_fn((lt(NV_GET_fn("i"),NV_GET_fn("nc")) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL)));
         if (IS_FAIL_fn(_rhs)) goto RETURN_LABEL_Tree;
         NV_SET_fn("i", _rhs);
         goto _stmt_348;
@@ -6383,7 +6383,7 @@ Tree3: {  /* L49 */
 _stmt_348: {  /* L50 */
     comm_stno(50);
     {
-        DESCR_t _rhs = NV_GET_fn(VARVAL_fn(CONC_fn(STRVAL("c"), NV_GET_fn("i"))));
+        DESCR_t _rhs = NV_GET_fn(VARVAL_fn(CONCAT_fn(STRVAL("c"), NV_GET_fn("i"))));
         if (IS_FAIL_fn(_rhs)) goto Tree3;
         FIELD_SET_fn(NV_GET_fn("TREEBLK_t"), "c", _rhs);
         goto Tree3;
@@ -6504,7 +6504,7 @@ _stmt_352: {  /* L55 */
 _stmt_353: {  /* L56 */
     comm_stno(56);
     {
-        DESCR_t _ret = APLY_fn("IDENT", (DESCR_t[2]){APLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1), APLY_fn("t", (DESCR_t[1]){NV_GET_fn("y")}, 1)}, 2);
+        DESCR_t _ret = APPLY_fn("IDENT", (DESCR_t[2]){APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1), APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("y")}, 1)}, 2);
         if (IS_FAIL_fn(_ret)) goto FRETURN_LABEL_Equal;
         goto _stmt_354;
     }
@@ -6513,7 +6513,7 @@ _stmt_353: {  /* L56 */
 _stmt_354: {  /* L57 */
     comm_stno(57);
     {
-        DESCR_t _ret = APLY_fn("IDENT", (DESCR_t[2]){APLY_fn("v", (DESCR_t[1]){NV_GET_fn("x")}, 1), APLY_fn("v", (DESCR_t[1]){NV_GET_fn("y")}, 1)}, 2);
+        DESCR_t _ret = APPLY_fn("IDENT", (DESCR_t[2]){APPLY_fn("v", (DESCR_t[1]){NV_GET_fn("x")}, 1), APPLY_fn("v", (DESCR_t[1]){NV_GET_fn("y")}, 1)}, 2);
         if (IS_FAIL_fn(_ret)) goto FRETURN_LABEL_Equal;
         goto _stmt_355;
     }
@@ -6522,7 +6522,7 @@ _stmt_354: {  /* L57 */
 _stmt_355: {  /* L58 */
     comm_stno(58);
     {
-        DESCR_t _ret = APLY_fn("IDENT", (DESCR_t[2]){APLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1), APLY_fn("n", (DESCR_t[1]){NV_GET_fn("y")}, 1)}, 2);
+        DESCR_t _ret = APPLY_fn("IDENT", (DESCR_t[2]){APPLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1), APPLY_fn("n", (DESCR_t[1]){NV_GET_fn("y")}, 1)}, 2);
         if (IS_FAIL_fn(_ret)) goto FRETURN_LABEL_Equal;
         goto _stmt_356;
     }
@@ -6541,7 +6541,7 @@ _stmt_356: {  /* L59 */
 Equal5: {  /* L60 */
     comm_stno(60);
     {
-        DESCR_t _rhs = CONC_fn((lt(NV_GET_fn("i"),APLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1)) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL)));
+        DESCR_t _rhs = CONCAT_fn((lt(NV_GET_fn("i"),APPLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1)) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL)));
         if (IS_FAIL_fn(_rhs)) goto RETURN_LABEL_Equal;
         NV_SET_fn("i", _rhs);
         goto _stmt_358;
@@ -6551,7 +6551,7 @@ Equal5: {  /* L60 */
 _stmt_358: {  /* L61 */
     comm_stno(61);
     {
-        DESCR_t _ret = APLY_fn("Equal", (DESCR_t[1]){APLY_fn("c", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1);
+        DESCR_t _ret = APPLY_fn("Equal", (DESCR_t[1]){APPLY_fn("c", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1);
         if (IS_FAIL_fn(_ret)) goto FRETURN_LABEL_Equal;
         goto Equal5;
     }
@@ -6601,7 +6601,7 @@ static DESCR_t uf_Equiv(DESCR_t *_args, int _nargs) {
 Equiv: {  /* L65 */
     comm_stno(65);
     {
-        DESCR_t _subj = APLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1);
+        DESCR_t _subj = APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1);
         int _ok = match_pattern(pat_cat(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_user_call("t", (DESCR_t[1]){NV_GET_fn("y")}, 1)), pat_rpos(to_int(INTVAL(0LL)))), VARVAL_fn(_subj));
         if (_ok) goto _stmt_362;
         else goto FRETURN_LABEL_Equiv;
@@ -6611,7 +6611,7 @@ Equiv: {  /* L65 */
 _stmt_362: {  /* L66 */
     comm_stno(66);
     {
-        DESCR_t _subj = APLY_fn("v", (DESCR_t[1]){NV_GET_fn("x")}, 1);
+        DESCR_t _subj = APPLY_fn("v", (DESCR_t[1]){NV_GET_fn("x")}, 1);
         int _ok = match_pattern(pat_cat(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_user_call("v", (DESCR_t[1]){NV_GET_fn("y")}, 1)), pat_rpos(to_int(INTVAL(0LL)))), VARVAL_fn(_subj));
         if (_ok) goto _stmt_363;
         else goto FRETURN_LABEL_Equiv;
@@ -6621,7 +6621,7 @@ _stmt_362: {  /* L66 */
 _stmt_363: {  /* L67 */
     comm_stno(67);
     {
-        DESCR_t _subj = APLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1);
+        DESCR_t _subj = APPLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1);
         int _ok = match_pattern(pat_cat(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_user_call("n", (DESCR_t[1]){NV_GET_fn("y")}, 1)), pat_rpos(to_int(INTVAL(0LL)))), VARVAL_fn(_subj));
         if (_ok) goto _stmt_364;
         else goto FRETURN_LABEL_Equiv;
@@ -6657,7 +6657,7 @@ _stmt_366: {  /* L70 */
 _stmt_367: {  /* L71 */
     comm_stno(71);
     {
-        DESCR_t _ret = APLY_fn("Equiv", (DESCR_t[1]){APLY_fn("c", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1);
+        DESCR_t _ret = APPLY_fn("Equiv", (DESCR_t[1]){APPLY_fn("c", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1);
         if (IS_FAIL_fn(_ret)) goto FRETURN_LABEL_Equiv;
         goto Equiv5;
     }
@@ -6709,7 +6709,7 @@ static DESCR_t uf_Find(DESCR_t *_args, int _nargs) {
 Find: {  /* L75 */
     comm_stno(75);
     {
-        DESCR_t _ret = APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(NV_GET_fn("xn")))}, 1);
+        DESCR_t _ret = APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(NV_GET_fn("xn")))}, 1);
         if (IS_FAIL_fn(_ret)) goto RETURN_LABEL_Find;
         goto _stmt_371;
     }
@@ -6734,7 +6734,7 @@ _stmt_372: {  /* L77 */
 Find5: {  /* L78 */
     comm_stno(78);
     {
-        DESCR_t _rhs = CONC_fn((lt(NV_GET_fn("i"),APLY_fn("n", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(NV_GET_fn("xn")))}, 1)) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL)));
+        DESCR_t _rhs = CONCAT_fn((lt(NV_GET_fn("i"),APPLY_fn("n", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(NV_GET_fn("xn")))}, 1)) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL)));
         if (IS_FAIL_fn(_rhs)) goto RETURN_LABEL_Find;
         NV_SET_fn("i", _rhs);
         goto _stmt_374;
@@ -6744,7 +6744,7 @@ Find5: {  /* L78 */
 _stmt_374: {  /* L79 */
     comm_stno(79);
     {
-        DESCR_t _ret = APLY_fn("Find", (DESCR_t[1]){NULVCL}, 1);
+        DESCR_t _ret = APPLY_fn("Find", (DESCR_t[1]){NULVCL}, 1);
         if (IS_FAIL_fn(_ret)) goto Find5;
         goto Find5;
     }
@@ -6799,7 +6799,7 @@ static DESCR_t uf_Visit(DESCR_t *_args, int _nargs) {
 Visit: {  /* L84 */
     comm_stno(84);
     {
-        DESCR_t _ret = APLY_fn("APPLY", (DESCR_t[2]){NV_GET_fn("fnc"), NV_GET_fn("x")}, 2);
+        DESCR_t _ret = APPLY_fn("APPLY", (DESCR_t[2]){NV_GET_fn("fnc"), NV_GET_fn("x")}, 2);
         if (IS_FAIL_fn(_ret)) goto RETURN_LABEL_Visit;
         goto _stmt_378;
     }
@@ -6818,7 +6818,7 @@ _stmt_378: {  /* L85 */
 Visit_1: {  /* L86 */
     comm_stno(86);
     {
-        DESCR_t _rhs = CONC_fn((lt(NV_GET_fn("i"),APLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1)) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL)));
+        DESCR_t _rhs = CONCAT_fn((lt(NV_GET_fn("i"),APPLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1)) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL)));
         if (IS_FAIL_fn(_rhs)) goto RETURN_LABEL_Visit;
         NV_SET_fn("i", _rhs);
         goto _stmt_380;
@@ -6828,7 +6828,7 @@ Visit_1: {  /* L86 */
 _stmt_380: {  /* L87 */
     comm_stno(87);
     {
-        DESCR_t _ret = APLY_fn("Visit", (DESCR_t[1]){APLY_fn("c", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1);
+        DESCR_t _ret = APPLY_fn("Visit", (DESCR_t[1]){APPLY_fn("c", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1);
         if (IS_FAIL_fn(_ret)) goto Visit_1;
         goto Visit_1;
     }
@@ -6888,7 +6888,7 @@ Shift: {  /* L10 */
 _stmt_384: {  /* L11 */
     comm_stno(11);
     {
-        DESCR_t _rhs = APLY_fn("tree", (DESCR_t[2]){NV_GET_fn("t"), NV_GET_fn("v")}, 2);
+        DESCR_t _rhs = APPLY_fn("tree", (DESCR_t[2]){NV_GET_fn("t"), NV_GET_fn("v")}, 2);
         if (IS_FAIL_fn(_rhs)) goto _stmt_385;
         NV_SET_fn("s", _rhs);
         goto _stmt_385;
@@ -6898,7 +6898,7 @@ _stmt_384: {  /* L11 */
 _stmt_385: {  /* L12 */
     comm_stno(12);
     {
-        DESCR_t _ret = APLY_fn("Push", (DESCR_t[1]){NV_GET_fn("s")}, 1);
+        DESCR_t _ret = APPLY_fn("Push", (DESCR_t[1]){NV_GET_fn("s")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_386;
         goto _stmt_386;
     }
@@ -6907,7 +6907,7 @@ _stmt_385: {  /* L12 */
 _stmt_386: {  /* L13 */
     comm_stno(13);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn((gt(NV_GET_fn("xTrace"),INTVAL(3LL)) ? NULVCL : FAILDESCR), STRVAL("Shift(")), NV_GET_fn("t")), STRVAL(", ")), NV_GET_fn("v")), STRVAL(")"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn((gt(NV_GET_fn("xTrace"),INTVAL(3LL)) ? NULVCL : FAILDESCR), STRVAL("Shift(")), NV_GET_fn("t")), STRVAL(", ")), NV_GET_fn("v")), STRVAL(")"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_387;
         output_val(_rhs);
         goto _stmt_387;
@@ -6917,7 +6917,7 @@ _stmt_386: {  /* L13 */
 _stmt_387: {  /* L15 */
     comm_stno(15);
     {
-        DESCR_t _rhs = APLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("v")}, 1);
+        DESCR_t _rhs = APPLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("v")}, 1);
         if (IS_FAIL_fn(_rhs)) goto _stmt_388;
         NV_SET_fn("Shift", _rhs);
         goto NRETURN_LABEL_Shift;
@@ -6927,7 +6927,7 @@ _stmt_387: {  /* L15 */
 _stmt_388: {  /* L16 */
     comm_stno(16);
     {
-        DESCR_t _rhs = APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("v")}, 1);
+        DESCR_t _rhs = APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("v")}, 1);
         if (IS_FAIL_fn(_rhs)) goto NRETURN_LABEL_Shift;
         NV_SET_fn("Shift", _rhs);
         goto NRETURN_LABEL_Shift;
@@ -6992,7 +6992,7 @@ Reduce: {  /* L20 */
 _stmt_392: {  /* L21 */
     comm_stno(21);
     {
-        DESCR_t _ret = APLY_fn("IDENT", (DESCR_t[2]){STRVAL(datatype(NV_GET_fn("t"))), STRVAL("EXPRESSION")}, 2);
+        DESCR_t _ret = APPLY_fn("IDENT", (DESCR_t[2]){STRVAL(datatype(NV_GET_fn("t"))), STRVAL("EXPRESSION")}, 2);
         if (IS_FAIL_fn(_ret)) goto Reduce0;
         goto _stmt_393;
     }
@@ -7001,7 +7001,7 @@ _stmt_392: {  /* L21 */
 _stmt_393: {  /* L22 */
     comm_stno(22);
     {
-        DESCR_t _rhs = evl(NV_GET_fn("t"));
+        DESCR_t _rhs = EVAL_fn(NV_GET_fn("t"));
         if (IS_FAIL_fn(_rhs)) goto NRETURN_LABEL_Reduce;
         NV_SET_fn("t", _rhs);
         goto Reduce0;
@@ -7011,7 +7011,7 @@ _stmt_393: {  /* L22 */
 Reduce0: {  /* L23 */
     comm_stno(23);
     {
-        DESCR_t _ret = APLY_fn("IDENT", (DESCR_t[2]){STRVAL(datatype(NV_GET_fn("n"))), STRVAL("EXPRESSION")}, 2);
+        DESCR_t _ret = APPLY_fn("IDENT", (DESCR_t[2]){STRVAL(datatype(NV_GET_fn("n"))), STRVAL("EXPRESSION")}, 2);
         if (IS_FAIL_fn(_ret)) goto Reduce1;
         goto _stmt_395;
     }
@@ -7020,7 +7020,7 @@ Reduce0: {  /* L23 */
 _stmt_395: {  /* L24 */
     comm_stno(24);
     {
-        DESCR_t _rhs = evl(NV_GET_fn("n"));
+        DESCR_t _rhs = EVAL_fn(NV_GET_fn("n"));
         if (IS_FAIL_fn(_rhs)) goto NRETURN_LABEL_Reduce;
         NV_SET_fn("n", _rhs);
         goto Reduce1;
@@ -7030,7 +7030,7 @@ _stmt_395: {  /* L24 */
 Reduce1: {  /* L25 */
     comm_stno(25);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn((gt(NV_GET_fn("xTrace"),INTVAL(3LL)) ? NULVCL : FAILDESCR), STRVAL("Reduce(")), NV_GET_fn("t")), STRVAL(", ")), NV_GET_fn("n")), STRVAL(")"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn((gt(NV_GET_fn("xTrace"),INTVAL(3LL)) ? NULVCL : FAILDESCR), STRVAL("Reduce(")), NV_GET_fn("t")), STRVAL(", ")), NV_GET_fn("n")), STRVAL(")"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_397;
         output_val(_rhs);
         goto _stmt_397;
@@ -7040,7 +7040,7 @@ Reduce1: {  /* L25 */
 _stmt_397: {  /* L26 */
     comm_stno(26);
     {
-        DESCR_t _rhs = CONC_fn((ge(NV_GET_fn("n"),INTVAL(1LL)) ? NULVCL : FAILDESCR), array_create(CONC_fn(STRVAL("1:"), NV_GET_fn("n"))));
+        DESCR_t _rhs = CONCAT_fn((ge(NV_GET_fn("n"),INTVAL(1LL)) ? NULVCL : FAILDESCR), array_create(CONCAT_fn(STRVAL("1:"), NV_GET_fn("n"))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_398;
         NV_SET_fn("c", _rhs);
         goto _stmt_398;
@@ -7060,7 +7060,7 @@ _stmt_398: {  /* L27 */
 Reduce2: {  /* L28 */
     comm_stno(28);
     {
-        DESCR_t _rhs = CONC_fn((gt(NV_GET_fn("i"),INTVAL(1LL)) ? NULVCL : FAILDESCR), sub(NV_GET_fn("i"), INTVAL(1LL)));
+        DESCR_t _rhs = CONCAT_fn((gt(NV_GET_fn("i"),INTVAL(1LL)) ? NULVCL : FAILDESCR), sub(NV_GET_fn("i"), INTVAL(1LL)));
         if (IS_FAIL_fn(_rhs)) goto Reduce3;
         NV_SET_fn("i", _rhs);
         goto _stmt_400;
@@ -7070,7 +7070,7 @@ Reduce2: {  /* L28 */
 _stmt_400: {  /* L29 */
     comm_stno(29);
     {
-        DESCR_t _rhs = APLY_fn("Pop", NULL, 0);
+        DESCR_t _rhs = APPLY_fn("Pop", NULL, 0);
         if (IS_FAIL_fn(_rhs)) goto Reduce2;
         subscript_set(NV_GET_fn("c"), NV_GET_fn("i"), _rhs);
         goto Reduce2;
@@ -7080,7 +7080,7 @@ _stmt_400: {  /* L29 */
 Reduce3: {  /* L30 */
     comm_stno(30);
     {
-        DESCR_t _rhs = APLY_fn("tree", (DESCR_t[4]){NV_GET_fn("t"), NULVCL, NV_GET_fn("n"), NV_GET_fn("c")}, 4);
+        DESCR_t _rhs = APPLY_fn("tree", (DESCR_t[4]){NV_GET_fn("t"), NULVCL, NV_GET_fn("n"), NV_GET_fn("c")}, 4);
         if (IS_FAIL_fn(_rhs)) goto _stmt_402;
         NV_SET_fn("r", _rhs);
         goto _stmt_402;
@@ -7090,7 +7090,7 @@ Reduce3: {  /* L30 */
 _stmt_402: {  /* L32 */
     comm_stno(32);
     {
-        DESCR_t _ret = APLY_fn("Push", (DESCR_t[1]){NV_GET_fn("r")}, 1);
+        DESCR_t _ret = APPLY_fn("Push", (DESCR_t[1]){NV_GET_fn("r")}, 1);
         if (IS_FAIL_fn(_ret)) goto NRETURN_LABEL_Reduce;
         goto NRETURN_LABEL_Reduce;
     }
@@ -7153,7 +7153,7 @@ TValue: {  /* L10 */
 _stmt_406: {  /* L12 */
     comm_stno(12);
     {
-        DESCR_t _rhs = CONC_fn(APLY_fn("IDENT", (DESCR_t[1]){APLY_fn("v", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1), STRVAL("."));
+        DESCR_t _rhs = CONCAT_fn(APPLY_fn("IDENT", (DESCR_t[1]){APPLY_fn("v", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1), STRVAL("."));
         if (IS_FAIL_fn(_rhs)) goto _stmt_407;
         NV_SET_fn("TValue", _rhs);
         goto TValue3;
@@ -7163,7 +7163,7 @@ _stmt_406: {  /* L12 */
 _stmt_407: {  /* L13 */
     comm_stno(13);
     {
-        DESCR_t _rhs = CONC_fn((ident(APLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1),STRVAL("Name")) ? NULVCL : FAILDESCR), APLY_fn("v", (DESCR_t[1]){NV_GET_fn("x")}, 1));
+        DESCR_t _rhs = CONCAT_fn((ident(APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1),STRVAL("Name")) ? NULVCL : FAILDESCR), APPLY_fn("v", (DESCR_t[1]){NV_GET_fn("x")}, 1));
         if (IS_FAIL_fn(_rhs)) goto _stmt_408;
         NV_SET_fn("TValue", _rhs);
         goto RETURN_LABEL_TValue;
@@ -7173,7 +7173,7 @@ _stmt_407: {  /* L13 */
 _stmt_408: {  /* L14 */
     comm_stno(14);
     {
-        DESCR_t _rhs = CONC_fn((ident(APLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1),STRVAL("float")) ? NULVCL : FAILDESCR), APLY_fn("v", (DESCR_t[1]){NV_GET_fn("x")}, 1));
+        DESCR_t _rhs = CONCAT_fn((ident(APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1),STRVAL("float")) ? NULVCL : FAILDESCR), APPLY_fn("v", (DESCR_t[1]){NV_GET_fn("x")}, 1));
         if (IS_FAIL_fn(_rhs)) goto _stmt_409;
         NV_SET_fn("TValue", _rhs);
         goto RETURN_LABEL_TValue;
@@ -7183,7 +7183,7 @@ _stmt_408: {  /* L14 */
 _stmt_409: {  /* L15 */
     comm_stno(15);
     {
-        DESCR_t _rhs = CONC_fn((ident(APLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1),STRVAL("integer")) ? NULVCL : FAILDESCR), APLY_fn("v", (DESCR_t[1]){NV_GET_fn("x")}, 1));
+        DESCR_t _rhs = CONCAT_fn((ident(APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1),STRVAL("integer")) ? NULVCL : FAILDESCR), APPLY_fn("v", (DESCR_t[1]){NV_GET_fn("x")}, 1));
         if (IS_FAIL_fn(_rhs)) goto _stmt_410;
         NV_SET_fn("TValue", _rhs);
         goto RETURN_LABEL_TValue;
@@ -7193,7 +7193,7 @@ _stmt_409: {  /* L15 */
 _stmt_410: {  /* L16 */
     comm_stno(16);
     {
-        DESCR_t _rhs = CONC_fn((ident(APLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1),STRVAL("bool")) ? NULVCL : FAILDESCR), APLY_fn("v", (DESCR_t[1]){NV_GET_fn("x")}, 1));
+        DESCR_t _rhs = CONCAT_fn((ident(APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1),STRVAL("bool")) ? NULVCL : FAILDESCR), APPLY_fn("v", (DESCR_t[1]){NV_GET_fn("x")}, 1));
         if (IS_FAIL_fn(_rhs)) goto _stmt_411;
         NV_SET_fn("TValue", _rhs);
         goto RETURN_LABEL_TValue;
@@ -7203,7 +7203,7 @@ _stmt_410: {  /* L16 */
 _stmt_411: {  /* L17 */
     comm_stno(17);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn((ident(APLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1),STRVAL("datetime")) ? NULVCL : FAILDESCR), STRVAL("'")), APLY_fn("SqlSQize", (DESCR_t[1]){APLY_fn("v", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1)), STRVAL("'"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn((ident(APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1),STRVAL("datetime")) ? NULVCL : FAILDESCR), STRVAL("'")), APPLY_fn("SqlSQize", (DESCR_t[1]){APPLY_fn("v", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1)), STRVAL("'"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_412;
         NV_SET_fn("TValue", _rhs);
         goto RETURN_LABEL_TValue;
@@ -7213,7 +7213,7 @@ _stmt_411: {  /* L17 */
 _stmt_412: {  /* L18 */
     comm_stno(18);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn((ident(APLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1),STRVAL("character")) ? NULVCL : FAILDESCR), STRVAL("'")), APLY_fn("SqlSQize", (DESCR_t[1]){APLY_fn("v", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1)), STRVAL("'"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn((ident(APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1),STRVAL("character")) ? NULVCL : FAILDESCR), STRVAL("'")), APPLY_fn("SqlSQize", (DESCR_t[1]){APPLY_fn("v", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1)), STRVAL("'"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_413;
         NV_SET_fn("TValue", _rhs);
         goto RETURN_LABEL_TValue;
@@ -7223,7 +7223,7 @@ _stmt_412: {  /* L18 */
 _stmt_413: {  /* L19 */
     comm_stno(19);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn((ident(APLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1),STRVAL("string")) ? NULVCL : FAILDESCR), STRVAL("'")), APLY_fn("SqlSQize", (DESCR_t[1]){APLY_fn("v", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1)), STRVAL("'"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn((ident(APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1),STRVAL("string")) ? NULVCL : FAILDESCR), STRVAL("'")), APPLY_fn("SqlSQize", (DESCR_t[1]){APPLY_fn("v", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1)), STRVAL("'"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_414;
         NV_SET_fn("TValue", _rhs);
         goto RETURN_LABEL_TValue;
@@ -7233,7 +7233,7 @@ _stmt_413: {  /* L19 */
 _stmt_414: {  /* L20 */
     comm_stno(20);
     {
-        DESCR_t _rhs = CONC_fn((ident(APLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1),STRVAL("identifier")) ? NULVCL : FAILDESCR), APLY_fn("v", (DESCR_t[1]){NV_GET_fn("x")}, 1));
+        DESCR_t _rhs = CONCAT_fn((ident(APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1),STRVAL("identifier")) ? NULVCL : FAILDESCR), APPLY_fn("v", (DESCR_t[1]){NV_GET_fn("x")}, 1));
         if (IS_FAIL_fn(_rhs)) goto _stmt_415;
         NV_SET_fn("TValue", _rhs);
         goto RETURN_LABEL_TValue;
@@ -7243,7 +7243,7 @@ _stmt_414: {  /* L20 */
 _stmt_415: {  /* L21 */
     comm_stno(21);
     {
-        DESCR_t _rhs = APLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1);
+        DESCR_t _rhs = APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1);
         if (IS_FAIL_fn(_rhs)) goto TValue3;
         NV_SET_fn("TValue", _rhs);
         goto RETURN_LABEL_TValue;
@@ -7263,7 +7263,7 @@ TValue3: {  /* L22 */
 TValue5: {  /* L23 */
     comm_stno(23);
     {
-        DESCR_t _rhs = CONC_fn((lt(NV_GET_fn("i"),APLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1)) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL)));
+        DESCR_t _rhs = CONCAT_fn((lt(NV_GET_fn("i"),APPLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1)) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL)));
         if (IS_FAIL_fn(_rhs)) goto RETURN_LABEL_TValue;
         NV_SET_fn("i", _rhs);
         goto _stmt_418;
@@ -7273,7 +7273,7 @@ TValue5: {  /* L23 */
 _stmt_418: {  /* L24 */
     comm_stno(24);
     {
-        DESCR_t _rhs = CONC_fn(APLY_fn("TValue", (DESCR_t[2]){CONC_fn(APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("TValue")}, 1), STRVAL(".")), STRVAL("")}, 2), APLY_fn("v", (DESCR_t[1]){APLY_fn("c", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1));
+        DESCR_t _rhs = CONCAT_fn(APPLY_fn("TValue", (DESCR_t[2]){CONCAT_fn(APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("TValue")}, 1), STRVAL(".")), STRVAL("")}, 2), APPLY_fn("v", (DESCR_t[1]){APPLY_fn("c", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1));
         if (IS_FAIL_fn(_rhs)) goto TValue5;
         NV_SET_fn("TValue", _rhs);
         goto TValue5;
@@ -7321,7 +7321,7 @@ static DESCR_t uf_TDump(DESCR_t *_args, int _nargs) {
 TDump: {  /* L28 */
     comm_stno(28);
     {
-        DESCR_t _rhs = APLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("outNm")}, 1);
+        DESCR_t _rhs = APPLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("outNm")}, 1);
         if (IS_FAIL_fn(_rhs)) goto _stmt_422;
         NV_SET_fn("outNm", _rhs);
         goto _stmt_422;
@@ -7331,7 +7331,7 @@ TDump: {  /* L28 */
 _stmt_422: {  /* L29 */
     comm_stno(29);
     {
-        DESCR_t _rhs = CONC_fn((ident(STRVAL(datatype(NV_GET_fn("x"))),STRVAL("NAME")) ? NULVCL : FAILDESCR), NV_GET_fn(VARVAL_fn(NV_GET_fn("x"))));
+        DESCR_t _rhs = CONCAT_fn((ident(STRVAL(datatype(NV_GET_fn("x"))),STRVAL("NAME")) ? NULVCL : FAILDESCR), NV_GET_fn(VARVAL_fn(NV_GET_fn("x"))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_423;
         NV_SET_fn("x", _rhs);
         goto _stmt_423;
@@ -7341,7 +7341,7 @@ _stmt_422: {  /* L29 */
 _stmt_423: {  /* L30 */
     comm_stno(30);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[2]){CONC_fn(APLY_fn("TLump", (DESCR_t[2]){NV_GET_fn("x"), sub(INTVAL(140LL), APLY_fn("GetLevel", NULL, 0))}, 2), NV_GET_fn("nl")), NV_GET_fn("outNm")}, 2);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[2]){CONCAT_fn(APPLY_fn("TLump", (DESCR_t[2]){NV_GET_fn("x"), sub(INTVAL(140LL), APPLY_fn("GetLevel", NULL, 0))}, 2), NV_GET_fn("nl")), NV_GET_fn("outNm")}, 2);
         if (IS_FAIL_fn(_ret)) goto _stmt_424;
         goto RETURN_LABEL_TDump;
     }
@@ -7360,7 +7360,7 @@ _stmt_424: {  /* L31 */
 _stmt_425: {  /* L32 */
     comm_stno(32);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[2]){CONC_fn(APLY_fn("TValue", (DESCR_t[1]){NV_GET_fn("x")}, 1), NV_GET_fn("nl")), NV_GET_fn("outNm")}, 2);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[2]){CONCAT_fn(APPLY_fn("TValue", (DESCR_t[1]){NV_GET_fn("x")}, 1), NV_GET_fn("nl")), NV_GET_fn("outNm")}, 2);
         if (IS_FAIL_fn(_ret)) goto RETURN_LABEL_TDump;
         goto RETURN_LABEL_TDump;
     }
@@ -7369,8 +7369,8 @@ _stmt_425: {  /* L32 */
 TDump0: {  /* L33 */
     comm_stno(33);
     {
-        DESCR_t _subj = APLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1);
-        int _ok = match_pattern(pat_cat(pat_cat(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_any_cs(VARVAL_fn(CONC_fn(STRVAL(ucase), STRVAL(lcase))))), pat_alt(pat_span(VARVAL_fn(CONC_fn(CONC_fn(CONC_fn(NV_GET_fn("digits"), STRVAL(ucase)), STRVAL("_")), STRVAL(lcase)))), var_as_pattern(NV_GET_fn("epsilon")))), pat_rpos(to_int(INTVAL(0LL)))), VARVAL_fn(_subj));
+        DESCR_t _subj = APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1);
+        int _ok = match_pattern(pat_cat(pat_cat(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_any_cs(VARVAL_fn(CONCAT_fn(STRVAL(ucase), STRVAL(lcase))))), pat_alt(pat_span(VARVAL_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(NV_GET_fn("digits"), STRVAL(ucase)), STRVAL("_")), STRVAL(lcase)))), var_as_pattern(NV_GET_fn("epsilon")))), pat_rpos(to_int(INTVAL(0LL)))), VARVAL_fn(_subj));
         if (_ok) goto _stmt_427;
         else goto TDump1;
     }
@@ -7379,7 +7379,7 @@ TDump0: {  /* L33 */
 _stmt_427: {  /* L35 */
     comm_stno(35);
     {
-        DESCR_t _rhs = APLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1);
+        DESCR_t _rhs = APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1);
         if (IS_FAIL_fn(_rhs)) goto TDump2;
         NV_SET_fn("t", _rhs);
         goto TDump2;
@@ -7389,7 +7389,7 @@ _stmt_427: {  /* L35 */
 TDump1: {  /* L36 */
     comm_stno(36);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(STRVAL("\""), APLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1)), STRVAL("\""));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(STRVAL("\""), APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1)), STRVAL("\""));
         if (IS_FAIL_fn(_rhs)) goto TDump2;
         NV_SET_fn("t", _rhs);
         goto TDump2;
@@ -7399,7 +7399,7 @@ TDump1: {  /* L36 */
 TDump2: {  /* L37 */
     comm_stno(37);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[2]){CONC_fn(CONC_fn(STRVAL("("), NV_GET_fn("t")), NV_GET_fn("nl")), NV_GET_fn("outNm")}, 2);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[2]){CONCAT_fn(CONCAT_fn(STRVAL("("), NV_GET_fn("t")), NV_GET_fn("nl")), NV_GET_fn("outNm")}, 2);
         if (IS_FAIL_fn(_ret)) goto _stmt_430;
         goto _stmt_430;
     }
@@ -7408,7 +7408,7 @@ TDump2: {  /* L37 */
 _stmt_430: {  /* L38 */
     comm_stno(38);
     {
-        DESCR_t _ret = APLY_fn("IncLevel", NULL, 0);
+        DESCR_t _ret = APPLY_fn("IncLevel", NULL, 0);
         if (IS_FAIL_fn(_ret)) goto _stmt_431;
         goto _stmt_431;
     }
@@ -7427,7 +7427,7 @@ _stmt_431: {  /* L39 */
 TDump3: {  /* L40 */
     comm_stno(40);
     {
-        DESCR_t _rhs = CONC_fn((lt(NV_GET_fn("i"),APLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1)) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL)));
+        DESCR_t _rhs = CONCAT_fn((lt(NV_GET_fn("i"),APPLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1)) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL)));
         if (IS_FAIL_fn(_rhs)) goto TDump4;
         NV_SET_fn("i", _rhs);
         goto _stmt_433;
@@ -7437,7 +7437,7 @@ TDump3: {  /* L40 */
 _stmt_433: {  /* L41 */
     comm_stno(41);
     {
-        DESCR_t _ret = APLY_fn("TDump", (DESCR_t[1]){APLY_fn("c", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1);
+        DESCR_t _ret = APPLY_fn("TDump", (DESCR_t[1]){APPLY_fn("c", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1);
         if (IS_FAIL_fn(_ret)) goto TDump3;
         goto TDump3;
     }
@@ -7446,7 +7446,7 @@ _stmt_433: {  /* L41 */
 TDump4: {  /* L42 */
     comm_stno(42);
     {
-        DESCR_t _ret = APLY_fn("DecLevel", NULL, 0);
+        DESCR_t _ret = APPLY_fn("DecLevel", NULL, 0);
         if (IS_FAIL_fn(_ret)) goto _stmt_435;
         goto _stmt_435;
     }
@@ -7455,7 +7455,7 @@ TDump4: {  /* L42 */
 _stmt_435: {  /* L43 */
     comm_stno(43);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[2]){CONC_fn(STRVAL(")"), NV_GET_fn("nl")), NV_GET_fn("outNm")}, 2);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[2]){CONCAT_fn(STRVAL(")"), NV_GET_fn("nl")), NV_GET_fn("outNm")}, 2);
         if (IS_FAIL_fn(_ret)) goto RETURN_LABEL_TDump;
         goto RETURN_LABEL_TDump;
     }
@@ -7512,7 +7512,7 @@ static DESCR_t uf_TLump(DESCR_t *_args, int _nargs) {
 TLump: {  /* L47 */
     comm_stno(47);
     {
-        DESCR_t _ret = APLY_fn("GT", (DESCR_t[2]){NV_GET_fn("len"), INTVAL(0LL)}, 2);
+        DESCR_t _ret = APPLY_fn("GT", (DESCR_t[2]){NV_GET_fn("len"), INTVAL(0LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto FRETURN_LABEL_TLump;
         goto _stmt_439;
     }
@@ -7521,7 +7521,7 @@ TLump: {  /* L47 */
 _stmt_439: {  /* L48 */
     comm_stno(48);
     {
-        DESCR_t _rhs = CONC_fn(APLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("x")}, 1), STRVAL("()"));
+        DESCR_t _rhs = CONCAT_fn(APPLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("x")}, 1), STRVAL("()"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_440;
         NV_SET_fn("TLump", _rhs);
         goto RETURN_LABEL_TLump;
@@ -7541,7 +7541,7 @@ _stmt_440: {  /* L49 */
 _stmt_441: {  /* L50 */
     comm_stno(50);
     {
-        DESCR_t _rhs = APLY_fn("TValue", (DESCR_t[1]){NV_GET_fn("x")}, 1);
+        DESCR_t _rhs = APPLY_fn("TValue", (DESCR_t[1]){NV_GET_fn("x")}, 1);
         if (IS_FAIL_fn(_rhs)) goto _stmt_442;
         NV_SET_fn("TLump", _rhs);
         goto _stmt_442;
@@ -7551,7 +7551,7 @@ _stmt_441: {  /* L50 */
 _stmt_442: {  /* L51 */
     comm_stno(51);
     {
-        DESCR_t _ret = APLY_fn("LE", (DESCR_t[2]){SIZE_fn(NV_GET_fn("TLump")), NV_GET_fn("len")}, 2);
+        DESCR_t _ret = APPLY_fn("LE", (DESCR_t[2]){SIZE_fn(NV_GET_fn("TLump")), NV_GET_fn("len")}, 2);
         if (IS_FAIL_fn(_ret)) goto FRETURN_LABEL_TLump;
         goto RETURN_LABEL_TLump;
     }
@@ -7570,8 +7570,8 @@ TLump0: {  /* L52 */
 _stmt_444: {  /* L53 */
     comm_stno(53);
     {
-        DESCR_t _subj = APLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1);
-        int _ok = match_pattern(pat_cat(pat_cat(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_any_cs(VARVAL_fn(CONC_fn(STRVAL(ucase), STRVAL(lcase))))), pat_alt(pat_span(VARVAL_fn(CONC_fn(CONC_fn(CONC_fn(NV_GET_fn("digits"), STRVAL(ucase)), STRVAL("_")), STRVAL(lcase)))), var_as_pattern(NV_GET_fn("epsilon")))), pat_rpos(to_int(INTVAL(0LL)))), VARVAL_fn(_subj));
+        DESCR_t _subj = APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1);
+        int _ok = match_pattern(pat_cat(pat_cat(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_any_cs(VARVAL_fn(CONCAT_fn(STRVAL(ucase), STRVAL(lcase))))), pat_alt(pat_span(VARVAL_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(NV_GET_fn("digits"), STRVAL(ucase)), STRVAL("_")), STRVAL(lcase)))), var_as_pattern(NV_GET_fn("epsilon")))), pat_rpos(to_int(INTVAL(0LL)))), VARVAL_fn(_subj));
         if (_ok) goto _stmt_445;
         else goto TLump1;
     }
@@ -7580,7 +7580,7 @@ _stmt_444: {  /* L53 */
 _stmt_445: {  /* L55 */
     comm_stno(55);
     {
-        DESCR_t _rhs = APLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1);
+        DESCR_t _rhs = APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1);
         if (IS_FAIL_fn(_rhs)) goto TLump2;
         NV_SET_fn("t", _rhs);
         goto TLump2;
@@ -7590,7 +7590,7 @@ _stmt_445: {  /* L55 */
 TLump1: {  /* L56 */
     comm_stno(56);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(STRVAL("\""), APLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1)), STRVAL("\""));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(STRVAL("\""), APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1)), STRVAL("\""));
         if (IS_FAIL_fn(_rhs)) goto TLump2;
         NV_SET_fn("t", _rhs);
         goto TLump2;
@@ -7600,7 +7600,7 @@ TLump1: {  /* L56 */
 TLump2: {  /* L57 */
     comm_stno(57);
     {
-        DESCR_t _rhs = CONC_fn(NV_GET_fn("TLump"), NV_GET_fn("t"));
+        DESCR_t _rhs = CONCAT_fn(NV_GET_fn("TLump"), NV_GET_fn("t"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_448;
         NV_SET_fn("TLump", _rhs);
         goto _stmt_448;
@@ -7620,7 +7620,7 @@ _stmt_448: {  /* L58 */
 TLump3: {  /* L59 */
     comm_stno(59);
     {
-        DESCR_t _rhs = CONC_fn((lt(NV_GET_fn("i"),APLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1)) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL)));
+        DESCR_t _rhs = CONCAT_fn((lt(NV_GET_fn("i"),APPLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1)) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL)));
         if (IS_FAIL_fn(_rhs)) goto TLump4;
         NV_SET_fn("i", _rhs);
         goto _stmt_450;
@@ -7630,7 +7630,7 @@ TLump3: {  /* L59 */
 _stmt_450: {  /* L60 */
     comm_stno(60);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(NV_GET_fn("TLump"), STRVAL(" ")), APLY_fn("TLump", (DESCR_t[1]){APLY_fn("c", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(NV_GET_fn("TLump"), STRVAL(" ")), APPLY_fn("TLump", (DESCR_t[1]){APPLY_fn("c", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1));
         if (IS_FAIL_fn(_rhs)) goto FRETURN_LABEL_TLump;
         NV_SET_fn("TLump", _rhs);
         goto TLump3;
@@ -7640,7 +7640,7 @@ _stmt_450: {  /* L60 */
 TLump4: {  /* L61 */
     comm_stno(61);
     {
-        DESCR_t _rhs = CONC_fn(NV_GET_fn("TLump"), STRVAL(")"));
+        DESCR_t _rhs = CONCAT_fn(NV_GET_fn("TLump"), STRVAL(")"));
         if (IS_FAIL_fn(_rhs)) goto RETURN_LABEL_TLump;
         NV_SET_fn("TLump", _rhs);
         goto RETURN_LABEL_TLump;
@@ -7702,7 +7702,7 @@ IncLevel: {  /* L25 */
 _stmt_458: {  /* L26 */
     comm_stno(26);
     {
-        DESCR_t _rhs = CONC_fn(APLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("delta")}, 1), INTVAL(2LL));
+        DESCR_t _rhs = CONCAT_fn(APPLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("delta")}, 1), INTVAL(2LL));
         if (IS_FAIL_fn(_rhs)) goto _stmt_459;
         NV_SET_fn("delta", _rhs);
         goto _stmt_459;
@@ -7759,7 +7759,7 @@ DecLevel: {  /* L28 */
 _stmt_461: {  /* L29 */
     comm_stno(29);
     {
-        DESCR_t _rhs = CONC_fn(APLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("delta")}, 1), INTVAL(2LL));
+        DESCR_t _rhs = CONCAT_fn(APPLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("delta")}, 1), INTVAL(2LL));
         if (IS_FAIL_fn(_rhs)) goto _stmt_462;
         NV_SET_fn("delta", _rhs);
         goto _stmt_462;
@@ -7869,14 +7869,14 @@ ERROR_LABEL_GetLevel:
     return FAILDESCR;
 }
 
-/* SNOBOL4 function: Gen(strv, outNm) locals=['ind', 'outline'] */
+/* SNOBOL4 function: Gen(STRVAL_fn, outNm) locals=['ind', 'outline'] */
 static DESCR_t uf_Gen(DESCR_t *_args, int _nargs) {
     /* Save and bind params/locals */
-    DESCR_t _save_str = NV_GET_fn("strv");
+    DESCR_t _save_str = NV_GET_fn("STRVAL_fn");
     DESCR_t _save_outNm = NV_GET_fn("outNm");
     DESCR_t _save_ind = NV_GET_fn("ind");
     DESCR_t _save_outline = NV_GET_fn("outline");
-    NV_SET_fn("strv", (_nargs > 0) ? _args[0] : NULVCL);
+    NV_SET_fn("STRVAL_fn", (_nargs > 0) ? _args[0] : NULVCL);
     NV_SET_fn("outNm", (_nargs > 1) ? _args[1] : NULVCL);
     NV_SET_fn("ind", NULVCL);
     NV_SET_fn("outline", NULVCL);
@@ -7897,7 +7897,7 @@ Gen: {  /* L40 */
 _stmt_472: {  /* L41 */
     comm_stno(41);
     {
-        DESCR_t _rhs = APLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("outNm")}, 1);
+        DESCR_t _rhs = APPLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("outNm")}, 1);
         if (IS_FAIL_fn(_rhs)) goto _stmt_473;
         NV_SET_fn("outNm", _rhs);
         goto _stmt_473;
@@ -7917,7 +7917,7 @@ _stmt_473: {  /* L42 */
 _stmt_474: {  /* L43 */
     comm_stno(43);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("$B")))}, 1), NV_GET_fn(VARVAL_fn(STRVAL("$B")))), NV_GET_fn("strv"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("$B")))}, 1), NV_GET_fn(VARVAL_fn(STRVAL("$B")))), NV_GET_fn("STRVAL_fn"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_475;
         NV_SET_fn(VARVAL_fn(STRVAL("$B")), _rhs);
         goto _stmt_475;
@@ -7927,7 +7927,7 @@ _stmt_474: {  /* L43 */
 _stmt_475: {  /* L44 */
     comm_stno(44);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn(APLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("$B")))}, 1), NV_GET_fn(VARVAL_fn(STRVAL("$X")))), NV_GET_fn("ind")), NV_GET_fn("strv"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn(APPLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("$B")))}, 1), NV_GET_fn(VARVAL_fn(STRVAL("$X")))), NV_GET_fn("ind")), NV_GET_fn("STRVAL_fn"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_476;
         NV_SET_fn(VARVAL_fn(STRVAL("$B")), _rhs);
         goto _stmt_476;
@@ -7977,7 +7977,7 @@ Gen10: {  /* L48 */
 _stmt_480: {  /* L49 */
     comm_stno(49);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(NV_GET_fn(VARVAL_fn(STRVAL("$C"))), NV_GET_fn("ind")), NV_GET_fn("outline"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(NV_GET_fn(VARVAL_fn(STRVAL("$C"))), NV_GET_fn("ind")), NV_GET_fn("outline"));
         if (IS_FAIL_fn(_rhs)) goto Gen10;
         NV_SET_fn(VARVAL_fn(NV_GET_fn("outNm")), _rhs);
         goto Gen10;
@@ -7985,32 +7985,32 @@ _stmt_480: {  /* L49 */
 }
 
 RETURN_LABEL_Gen:
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("outNm", _save_outNm);
     NV_SET_fn("ind", _save_ind);
     NV_SET_fn("outline", _save_outline);
     return NULVCL;
 FRETURN_LABEL_Gen:
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("outNm", _save_outNm);
     NV_SET_fn("ind", _save_ind);
     NV_SET_fn("outline", _save_outline);
     return FAILDESCR;
 NRETURN_LABEL_Gen:
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("outNm", _save_outNm);
     NV_SET_fn("ind", _save_ind);
     NV_SET_fn("outline", _save_outline);
     return NULVCL;  /* NRETURN */
 CONTINUE_LABEL_Gen:
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("outNm", _save_outNm);
     NV_SET_fn("ind", _save_ind);
     NV_SET_fn("outline", _save_outline);
     return NULVCL;  /* CONTINUE */
 ERROR_LABEL_Gen:
     fprintf(stderr, "** error in Gen\n");
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("outNm", _save_outNm);
     NV_SET_fn("ind", _save_ind);
     NV_SET_fn("outline", _save_outline);
@@ -8039,7 +8039,7 @@ GenTab: {  /* L50 */
 _stmt_482: {  /* L51 */
     comm_stno(51);
     {
-        DESCR_t _rhs = CONC_fn(APLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("pos")}, 1), NV_GET_fn(VARVAL_fn(STRVAL("#L"))));
+        DESCR_t _rhs = CONCAT_fn(APPLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("pos")}, 1), NV_GET_fn(VARVAL_fn(STRVAL("#L"))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_483;
         NV_SET_fn("pos", _rhs);
         goto _stmt_483;
@@ -8049,7 +8049,7 @@ _stmt_482: {  /* L51 */
 _stmt_483: {  /* L52 */
     comm_stno(52);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn(APLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("$B")))}, 1), NV_GET_fn(VARVAL_fn(STRVAL("$X")))), STRVAL(" ")), DUPL_fn(STRVAL(" "), sub(sub(NV_GET_fn("pos"), SIZE_fn(NV_GET_fn(VARVAL_fn(STRVAL("$X"))))), INTVAL(1LL))));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn(APPLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("$B")))}, 1), NV_GET_fn(VARVAL_fn(STRVAL("$X")))), STRVAL(" ")), DUPL_fn(STRVAL(" "), sub(sub(NV_GET_fn("pos"), SIZE_fn(NV_GET_fn(VARVAL_fn(STRVAL("$X"))))), INTVAL(1LL))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_484;
         NV_SET_fn(VARVAL_fn(STRVAL("$B")), _rhs);
         goto NRETURN_LABEL_GenTab;
@@ -8059,7 +8059,7 @@ _stmt_483: {  /* L52 */
 _stmt_484: {  /* L53 */
     comm_stno(53);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(NV_GET_fn(VARVAL_fn(STRVAL("$B"))), STRVAL(" ")), DUPL_fn(STRVAL(" "), sub(sub(NV_GET_fn("pos"), SIZE_fn(NV_GET_fn(VARVAL_fn(STRVAL("$B"))))), INTVAL(1LL))));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(NV_GET_fn(VARVAL_fn(STRVAL("$B"))), STRVAL(" ")), DUPL_fn(STRVAL(" "), sub(sub(NV_GET_fn("pos"), SIZE_fn(NV_GET_fn(VARVAL_fn(STRVAL("$B"))))), INTVAL(1LL))));
         if (IS_FAIL_fn(_rhs)) goto _stmt_485;
         NV_SET_fn(VARVAL_fn(STRVAL("$B")), _rhs);
         goto NRETURN_LABEL_GenTab;
@@ -8069,7 +8069,7 @@ _stmt_484: {  /* L53 */
 _stmt_485: {  /* L54 */
     comm_stno(54);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(APLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("$B")))}, 1), NV_GET_fn(VARVAL_fn(STRVAL("$X")))), STRVAL(" "));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(APPLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn(VARVAL_fn(STRVAL("$B")))}, 1), NV_GET_fn(VARVAL_fn(STRVAL("$X")))), STRVAL(" "));
         if (IS_FAIL_fn(_rhs)) goto _stmt_486;
         NV_SET_fn(VARVAL_fn(STRVAL("$B")), _rhs);
         goto NRETURN_LABEL_GenTab;
@@ -8079,7 +8079,7 @@ _stmt_485: {  /* L54 */
 _stmt_486: {  /* L55 */
     comm_stno(55);
     {
-        DESCR_t _rhs = CONC_fn(NV_GET_fn(VARVAL_fn(STRVAL("$B"))), STRVAL(" "));
+        DESCR_t _rhs = CONCAT_fn(NV_GET_fn(VARVAL_fn(STRVAL("$B"))), STRVAL(" "));
         if (IS_FAIL_fn(_rhs)) goto NRETURN_LABEL_GenTab;
         NV_SET_fn(VARVAL_fn(STRVAL("$B")), _rhs);
         goto NRETURN_LABEL_GenTab;
@@ -8160,12 +8160,12 @@ ERROR_LABEL_GenSetCont:
     return FAILDESCR;
 }
 
-/* SNOBOL4 function: Qize(strv) locals=['part'] */
+/* SNOBOL4 function: Qize(STRVAL_fn) locals=['part'] */
 static DESCR_t uf_Qize(DESCR_t *_args, int _nargs) {
     /* Save and bind params/locals */
-    DESCR_t _save_str = NV_GET_fn("strv");
+    DESCR_t _save_str = NV_GET_fn("STRVAL_fn");
     DESCR_t _save_part = NV_GET_fn("part");
-    NV_SET_fn("strv", (_nargs > 0) ? _args[0] : NULVCL);
+    NV_SET_fn("STRVAL_fn", (_nargs > 0) ? _args[0] : NULVCL);
     NV_SET_fn("part", NULVCL);
 
     goto Qize;
@@ -8174,7 +8174,7 @@ static DESCR_t uf_Qize(DESCR_t *_args, int _nargs) {
 Qize: {  /* L6 */
     comm_stno(6);
     {
-        DESCR_t _rhs = CONC_fn(APLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("strv")}, 1), STRVAL("''"));
+        DESCR_t _rhs = CONCAT_fn(APPLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("STRVAL_fn")}, 1), STRVAL("''"));
         if (IS_FAIL_fn(_rhs)) goto Qize0;
         NV_SET_fn("Qize", _rhs);
         goto RETURN_LABEL_Qize;
@@ -8184,7 +8184,7 @@ Qize: {  /* L6 */
 Qize0: {  /* L7 */
     comm_stno(7);
     {
-        DESCR_t _ret = APLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("strv")}, 1);
+        DESCR_t _ret = APPLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("STRVAL_fn")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_495;
         goto RETURN_LABEL_Qize;
     }
@@ -8193,7 +8193,7 @@ Qize0: {  /* L7 */
 _stmt_495: {  /* L8 */
     comm_stno(8);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("Qize")}, 1), NV_GET_fn("Qize")), STRVAL(" "));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("Qize")}, 1), NV_GET_fn("Qize")), STRVAL(" "));
         if (IS_FAIL_fn(_rhs)) goto _stmt_496;
         NV_SET_fn("Qize", _rhs);
         goto _stmt_496;
@@ -8203,7 +8203,7 @@ _stmt_495: {  /* L8 */
 _stmt_496: {  /* L9 */
     comm_stno(9);
     {
-        DESCR_t _subj = NV_GET_fn("strv");
+        DESCR_t _subj = NV_GET_fn("STRVAL_fn");
         int _ok = match_pattern(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_cat(pat_cat(pat_assign_cond(var_as_pattern(NV_GET_fn("bSlash")), NULVCL), pat_ref("assign")), pat_assign_cond(pat_epsilon(), NV_GET_fn("part")))), VARVAL_fn(_subj));
         if (_ok) goto Qize3;
         else goto _stmt_497;
@@ -8213,8 +8213,8 @@ _stmt_496: {  /* L9 */
 _stmt_497: {  /* L17 */
     comm_stno(17);
     {
-        DESCR_t _subj = NV_GET_fn("strv");
-        int _ok = match_pattern(pat_cat(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_assign_cond(pat_cat(pat_cat(pat_break_(ccat(ccat("\"", "'"), VARVAL_fn(NV_GET_fn("QizeWierd")))), pat_lit("\"")), pat_arbno(pat_notany(VARVAL_fn(CONC_fn(STRVAL("'"), NV_GET_fn("QizeWierd")))))), NV_GET_fn("part"))), pat_assign_cond(pat_rtab(to_int(INTVAL(0LL))), NV_GET_fn("strv"))), VARVAL_fn(_subj));
+        DESCR_t _subj = NV_GET_fn("STRVAL_fn");
+        int _ok = match_pattern(pat_cat(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_assign_cond(pat_cat(pat_cat(pat_break_(CONCAT_fn(CONCAT_fn("\"", "'"), VARVAL_fn(NV_GET_fn("QizeWierd")))), pat_lit("\"")), pat_arbno(pat_notany(VARVAL_fn(CONCAT_fn(STRVAL("'"), NV_GET_fn("QizeWierd")))))), NV_GET_fn("part"))), pat_assign_cond(pat_rtab(to_int(INTVAL(0LL))), NV_GET_fn("STRVAL_fn"))), VARVAL_fn(_subj));
         if (_ok) goto Qize1;
         else goto _stmt_498;
     }
@@ -8223,8 +8223,8 @@ _stmt_497: {  /* L17 */
 _stmt_498: {  /* L20 */
     comm_stno(20);
     {
-        DESCR_t _subj = NV_GET_fn("strv");
-        int _ok = match_pattern(pat_cat(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_assign_cond(pat_cat(pat_cat(pat_break_(ccat(ccat("'", "\""), VARVAL_fn(NV_GET_fn("QizeWierd")))), pat_lit("'")), pat_arbno(pat_notany(VARVAL_fn(CONC_fn(STRVAL("\""), NV_GET_fn("QizeWierd")))))), NV_GET_fn("part"))), pat_assign_cond(pat_rtab(to_int(INTVAL(0LL))), NV_GET_fn("strv"))), VARVAL_fn(_subj));
+        DESCR_t _subj = NV_GET_fn("STRVAL_fn");
+        int _ok = match_pattern(pat_cat(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_assign_cond(pat_cat(pat_cat(pat_break_(CONCAT_fn(CONCAT_fn("'", "\""), VARVAL_fn(NV_GET_fn("QizeWierd")))), pat_lit("'")), pat_arbno(pat_notany(VARVAL_fn(CONCAT_fn(STRVAL("\""), NV_GET_fn("QizeWierd")))))), NV_GET_fn("part"))), pat_assign_cond(pat_rtab(to_int(INTVAL(0LL))), NV_GET_fn("STRVAL_fn"))), VARVAL_fn(_subj));
         if (_ok) goto Qize2;
         else goto _stmt_499;
     }
@@ -8233,7 +8233,7 @@ _stmt_498: {  /* L20 */
 _stmt_499: {  /* L23 */
     comm_stno(23);
     {
-        DESCR_t _subj = NV_GET_fn("strv");
+        DESCR_t _subj = NV_GET_fn("STRVAL_fn");
         int _ok = match_pattern(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_assign_cond(pat_break_(VARVAL_fn(NV_GET_fn("QizeWierd"))), NV_GET_fn("part"))), VARVAL_fn(_subj));
         if (_ok) goto Qize1;
         else goto _stmt_500;
@@ -8243,7 +8243,7 @@ _stmt_499: {  /* L23 */
 _stmt_500: {  /* L24 */
     comm_stno(24);
     {
-        DESCR_t _subj = NV_GET_fn("strv");
+        DESCR_t _subj = NV_GET_fn("STRVAL_fn");
         int _ok = match_pattern(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_assign_cond(var_as_pattern(NV_GET_fn("REM")), NV_GET_fn("part"))), VARVAL_fn(_subj));
         if (_ok) goto Qize1;
         else goto ERROR_LABEL_Qize;
@@ -8253,7 +8253,7 @@ _stmt_500: {  /* L24 */
 Qize1: {  /* L25 */
     comm_stno(25);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn(NV_GET_fn("Qize"), STRVAL("'")), NV_GET_fn("part")), STRVAL("'"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn(NV_GET_fn("Qize"), STRVAL("'")), NV_GET_fn("part")), STRVAL("'"));
         if (IS_FAIL_fn(_rhs)) goto Qize0;
         NV_SET_fn("Qize", _rhs);
         goto Qize0;
@@ -8263,7 +8263,7 @@ Qize1: {  /* L25 */
 Qize2: {  /* L26 */
     comm_stno(26);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn(NV_GET_fn("Qize"), STRVAL("\"")), NV_GET_fn("part")), STRVAL("\""));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn(NV_GET_fn("Qize"), STRVAL("\"")), NV_GET_fn("part")), STRVAL("\""));
         if (IS_FAIL_fn(_rhs)) goto Qize0;
         NV_SET_fn("Qize", _rhs);
         goto Qize0;
@@ -8273,7 +8273,7 @@ Qize2: {  /* L26 */
 Qize3: {  /* L27 */
     comm_stno(27);
     {
-        DESCR_t _rhs = CONC_fn(NV_GET_fn("Qize"), NV_GET_fn("part"));
+        DESCR_t _rhs = CONCAT_fn(NV_GET_fn("Qize"), NV_GET_fn("part"));
         if (IS_FAIL_fn(_rhs)) goto Qize0;
         NV_SET_fn("Qize", _rhs);
         goto Qize0;
@@ -8281,34 +8281,34 @@ Qize3: {  /* L27 */
 }
 
 RETURN_LABEL_Qize:
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("part", _save_part);
     return NULVCL;
 FRETURN_LABEL_Qize:
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("part", _save_part);
     return FAILDESCR;
 NRETURN_LABEL_Qize:
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("part", _save_part);
     return NULVCL;  /* NRETURN */
 CONTINUE_LABEL_Qize:
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("part", _save_part);
     return NULVCL;  /* CONTINUE */
 ERROR_LABEL_Qize:
     fprintf(stderr, "** error in Qize\n");
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("part", _save_part);
     return FAILDESCR;
 }
 
-/* SNOBOL4 function: SQize(strv) locals=['part'] */
+/* SNOBOL4 function: SQize(STRVAL_fn) locals=['part'] */
 static DESCR_t uf_SQize(DESCR_t *_args, int _nargs) {
     /* Save and bind params/locals */
-    DESCR_t _save_str = NV_GET_fn("strv");
+    DESCR_t _save_str = NV_GET_fn("STRVAL_fn");
     DESCR_t _save_part = NV_GET_fn("part");
-    NV_SET_fn("strv", (_nargs > 0) ? _args[0] : NULVCL);
+    NV_SET_fn("STRVAL_fn", (_nargs > 0) ? _args[0] : NULVCL);
     NV_SET_fn("part", NULVCL);
 
     goto SQize;
@@ -8317,7 +8317,7 @@ static DESCR_t uf_SQize(DESCR_t *_args, int _nargs) {
 SQize: {  /* L31 */
     comm_stno(31);
     {
-        DESCR_t _ret = APLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("strv")}, 1);
+        DESCR_t _ret = APPLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("STRVAL_fn")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_507;
         goto RETURN_LABEL_SQize;
     }
@@ -8326,7 +8326,7 @@ SQize: {  /* L31 */
 _stmt_507: {  /* L32 */
     comm_stno(32);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("SQize")}, 1), NV_GET_fn("SQize")), STRVAL(" "));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("SQize")}, 1), NV_GET_fn("SQize")), STRVAL(" "));
         if (IS_FAIL_fn(_rhs)) goto _stmt_508;
         NV_SET_fn("SQize", _rhs);
         goto _stmt_508;
@@ -8336,7 +8336,7 @@ _stmt_507: {  /* L32 */
 _stmt_508: {  /* L33 */
     comm_stno(33);
     {
-        DESCR_t _subj = NV_GET_fn("strv");
+        DESCR_t _subj = NV_GET_fn("STRVAL_fn");
         int _ok = match_pattern(pat_cat(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_assign_cond(pat_break_("'"), NV_GET_fn("part"))), pat_lit("'")), VARVAL_fn(_subj));
         if (_ok) goto SQize1;
         else goto _stmt_509;
@@ -8346,7 +8346,7 @@ _stmt_508: {  /* L33 */
 _stmt_509: {  /* L34 */
     comm_stno(34);
     {
-        DESCR_t _subj = NV_GET_fn("strv");
+        DESCR_t _subj = NV_GET_fn("STRVAL_fn");
         int _ok = match_pattern(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_assign_cond(var_as_pattern(NV_GET_fn("REM")), NV_GET_fn("part"))), VARVAL_fn(_subj));
         if (_ok) goto SQize2;
         else goto ERROR_LABEL_SQize;
@@ -8356,7 +8356,7 @@ _stmt_509: {  /* L34 */
 SQize1: {  /* L35 */
     comm_stno(35);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(NV_GET_fn("SQize"), STRVAL("'")), NV_GET_fn("part")), STRVAL("'")), STRVAL(" \"")), STRVAL("'")), STRVAL("\""));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(NV_GET_fn("SQize"), STRVAL("'")), NV_GET_fn("part")), STRVAL("'")), STRVAL(" \"")), STRVAL("'")), STRVAL("\""));
         if (IS_FAIL_fn(_rhs)) goto SQize;
         NV_SET_fn("SQize", _rhs);
         goto SQize;
@@ -8366,7 +8366,7 @@ SQize1: {  /* L35 */
 SQize2: {  /* L36 */
     comm_stno(36);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn(NV_GET_fn("SQize"), STRVAL("'")), NV_GET_fn("part")), STRVAL("'"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn(NV_GET_fn("SQize"), STRVAL("'")), NV_GET_fn("part")), STRVAL("'"));
         if (IS_FAIL_fn(_rhs)) goto SQize;
         NV_SET_fn("SQize", _rhs);
         goto SQize;
@@ -8374,34 +8374,34 @@ SQize2: {  /* L36 */
 }
 
 RETURN_LABEL_SQize:
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("part", _save_part);
     return NULVCL;
 FRETURN_LABEL_SQize:
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("part", _save_part);
     return FAILDESCR;
 NRETURN_LABEL_SQize:
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("part", _save_part);
     return NULVCL;  /* NRETURN */
 CONTINUE_LABEL_SQize:
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("part", _save_part);
     return NULVCL;  /* CONTINUE */
 ERROR_LABEL_SQize:
     fprintf(stderr, "** error in SQize\n");
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("part", _save_part);
     return FAILDESCR;
 }
 
-/* SNOBOL4 function: DQize(strv) locals=['part'] */
+/* SNOBOL4 function: DQize(STRVAL_fn) locals=['part'] */
 static DESCR_t uf_DQize(DESCR_t *_args, int _nargs) {
     /* Save and bind params/locals */
-    DESCR_t _save_str = NV_GET_fn("strv");
+    DESCR_t _save_str = NV_GET_fn("STRVAL_fn");
     DESCR_t _save_part = NV_GET_fn("part");
-    NV_SET_fn("strv", (_nargs > 0) ? _args[0] : NULVCL);
+    NV_SET_fn("STRVAL_fn", (_nargs > 0) ? _args[0] : NULVCL);
     NV_SET_fn("part", NULVCL);
 
     goto DQize;
@@ -8410,7 +8410,7 @@ static DESCR_t uf_DQize(DESCR_t *_args, int _nargs) {
 DQize: {  /* L40 */
     comm_stno(40);
     {
-        DESCR_t _ret = APLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("strv")}, 1);
+        DESCR_t _ret = APPLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("STRVAL_fn")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_515;
         goto RETURN_LABEL_DQize;
     }
@@ -8419,7 +8419,7 @@ DQize: {  /* L40 */
 _stmt_515: {  /* L41 */
     comm_stno(41);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("DQize")}, 1), NV_GET_fn("DQize")), STRVAL(" "));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("DQize")}, 1), NV_GET_fn("DQize")), STRVAL(" "));
         if (IS_FAIL_fn(_rhs)) goto _stmt_516;
         NV_SET_fn("DQize", _rhs);
         goto _stmt_516;
@@ -8429,7 +8429,7 @@ _stmt_515: {  /* L41 */
 _stmt_516: {  /* L42 */
     comm_stno(42);
     {
-        DESCR_t _subj = NV_GET_fn("strv");
+        DESCR_t _subj = NV_GET_fn("STRVAL_fn");
         int _ok = match_pattern(pat_cat(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_assign_cond(pat_break_("\""), NV_GET_fn("part"))), pat_lit("\"")), VARVAL_fn(_subj));
         if (_ok) goto DQize1;
         else goto _stmt_517;
@@ -8439,7 +8439,7 @@ _stmt_516: {  /* L42 */
 _stmt_517: {  /* L43 */
     comm_stno(43);
     {
-        DESCR_t _subj = NV_GET_fn("strv");
+        DESCR_t _subj = NV_GET_fn("STRVAL_fn");
         int _ok = match_pattern(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_assign_cond(var_as_pattern(NV_GET_fn("REM")), NV_GET_fn("part"))), VARVAL_fn(_subj));
         if (_ok) goto DQize2;
         else goto ERROR_LABEL_DQize;
@@ -8449,7 +8449,7 @@ _stmt_517: {  /* L43 */
 DQize1: {  /* L44 */
     comm_stno(44);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(NV_GET_fn("DQize"), STRVAL("\"")), NV_GET_fn("part")), STRVAL("\"")), STRVAL(" '")), STRVAL("\"")), STRVAL("'"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(NV_GET_fn("DQize"), STRVAL("\"")), NV_GET_fn("part")), STRVAL("\"")), STRVAL(" '")), STRVAL("\"")), STRVAL("'"));
         if (IS_FAIL_fn(_rhs)) goto DQize;
         NV_SET_fn("DQize", _rhs);
         goto DQize;
@@ -8459,7 +8459,7 @@ DQize1: {  /* L44 */
 DQize2: {  /* L45 */
     comm_stno(45);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn(NV_GET_fn("DQize"), STRVAL("\"")), NV_GET_fn("part")), STRVAL("\""));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn(NV_GET_fn("DQize"), STRVAL("\"")), NV_GET_fn("part")), STRVAL("\""));
         if (IS_FAIL_fn(_rhs)) goto DQize;
         NV_SET_fn("DQize", _rhs);
         goto DQize;
@@ -8467,34 +8467,34 @@ DQize2: {  /* L45 */
 }
 
 RETURN_LABEL_DQize:
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("part", _save_part);
     return NULVCL;
 FRETURN_LABEL_DQize:
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("part", _save_part);
     return FAILDESCR;
 NRETURN_LABEL_DQize:
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("part", _save_part);
     return NULVCL;  /* NRETURN */
 CONTINUE_LABEL_DQize:
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("part", _save_part);
     return NULVCL;  /* CONTINUE */
 ERROR_LABEL_DQize:
     fprintf(stderr, "** error in DQize\n");
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("part", _save_part);
     return FAILDESCR;
 }
 
-/* SNOBOL4 function: SqlSQize(strv) locals=['part'] */
+/* SNOBOL4 function: SqlSQize(STRVAL_fn) locals=['part'] */
 static DESCR_t uf_SqlSQize(DESCR_t *_args, int _nargs) {
     /* Save and bind params/locals */
-    DESCR_t _save_str = NV_GET_fn("strv");
+    DESCR_t _save_str = NV_GET_fn("STRVAL_fn");
     DESCR_t _save_part = NV_GET_fn("part");
-    NV_SET_fn("strv", (_nargs > 0) ? _args[0] : NULVCL);
+    NV_SET_fn("STRVAL_fn", (_nargs > 0) ? _args[0] : NULVCL);
     NV_SET_fn("part", NULVCL);
 
     goto SqlSQize;
@@ -8503,7 +8503,7 @@ static DESCR_t uf_SqlSQize(DESCR_t *_args, int _nargs) {
 SqlSQize: {  /* L49 */
     comm_stno(49);
     {
-        DESCR_t _ret = APLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("strv")}, 1);
+        DESCR_t _ret = APPLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("STRVAL_fn")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_523;
         goto RETURN_LABEL_SqlSQize;
     }
@@ -8512,7 +8512,7 @@ SqlSQize: {  /* L49 */
 _stmt_523: {  /* L50 */
     comm_stno(50);
     {
-        DESCR_t _subj = NV_GET_fn("strv");
+        DESCR_t _subj = NV_GET_fn("STRVAL_fn");
         int _ok = match_pattern(pat_cat(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_assign_cond(pat_break_("'"), NV_GET_fn("part"))), pat_lit("'")), VARVAL_fn(_subj));
         if (_ok) goto SqlSQize1;
         else goto _stmt_524;
@@ -8522,7 +8522,7 @@ _stmt_523: {  /* L50 */
 _stmt_524: {  /* L51 */
     comm_stno(51);
     {
-        DESCR_t _subj = NV_GET_fn("strv");
+        DESCR_t _subj = NV_GET_fn("STRVAL_fn");
         int _ok = match_pattern(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_assign_cond(var_as_pattern(NV_GET_fn("REM")), NV_GET_fn("part"))), VARVAL_fn(_subj));
         if (_ok) goto SqlSQize2;
         else goto ERROR_LABEL_SqlSQize;
@@ -8532,7 +8532,7 @@ _stmt_524: {  /* L51 */
 SqlSQize1: {  /* L52 */
     comm_stno(52);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(NV_GET_fn("SqlSQize"), NV_GET_fn("part")), STRVAL("''"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(NV_GET_fn("SqlSQize"), NV_GET_fn("part")), STRVAL("''"));
         if (IS_FAIL_fn(_rhs)) goto SqlSQize;
         NV_SET_fn("SqlSQize", _rhs);
         goto SqlSQize;
@@ -8542,7 +8542,7 @@ SqlSQize1: {  /* L52 */
 SqlSQize2: {  /* L53 */
     comm_stno(53);
     {
-        DESCR_t _rhs = CONC_fn(NV_GET_fn("SqlSQize"), NV_GET_fn("part"));
+        DESCR_t _rhs = CONCAT_fn(NV_GET_fn("SqlSQize"), NV_GET_fn("part"));
         if (IS_FAIL_fn(_rhs)) goto SqlSQize;
         NV_SET_fn("SqlSQize", _rhs);
         goto SqlSQize;
@@ -8550,24 +8550,24 @@ SqlSQize2: {  /* L53 */
 }
 
 RETURN_LABEL_SqlSQize:
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("part", _save_part);
     return NULVCL;
 FRETURN_LABEL_SqlSQize:
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("part", _save_part);
     return FAILDESCR;
 NRETURN_LABEL_SqlSQize:
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("part", _save_part);
     return NULVCL;  /* NRETURN */
 CONTINUE_LABEL_SqlSQize:
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("part", _save_part);
     return NULVCL;  /* CONTINUE */
 ERROR_LABEL_SqlSQize:
     fprintf(stderr, "** error in SqlSQize\n");
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("part", _save_part);
     return FAILDESCR;
 }
@@ -8589,7 +8589,7 @@ Intize: {  /* L57 */
     comm_stno(57);
     {
         DESCR_t _subj = NV_GET_fn("qqstr");
-        int _ok = match_pattern(pat_cat(pat_cat(pat_cat(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_assign_imm(pat_alt(pat_lit("'"), pat_lit("\"")), NV_GET_fn("qqdlm"))), pat_assign_cond(pat_arbno(APLY_fn("bSlash", (DESCR_t[1]){NV_GET_fn("bSlash")}, 1)), NULVCL)), pat_ref("assign")), pat_assign_cond(pat_epsilon(), NV_GET_fn("Intize"))), VARVAL_fn(_subj));
+        int _ok = match_pattern(pat_cat(pat_cat(pat_cat(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_assign_imm(pat_alt(pat_lit("'"), pat_lit("\"")), NV_GET_fn("qqdlm"))), pat_assign_cond(pat_arbno(APPLY_fn("bSlash", (DESCR_t[1]){NV_GET_fn("bSlash")}, 1)), NULVCL)), pat_ref("assign")), pat_assign_cond(pat_epsilon(), NV_GET_fn("Intize"))), VARVAL_fn(_subj));
         if (_ok) goto RETURN_LABEL_Intize;
         else goto FRETURN_LABEL_Intize;
     }
@@ -8623,11 +8623,11 @@ ERROR_LABEL_Intize:
     return FAILDESCR;
 }
 
-/* SNOBOL4 function: Extize(strv) locals=[] */
+/* SNOBOL4 function: Extize(STRVAL_fn) locals=[] */
 static DESCR_t uf_Extize(DESCR_t *_args, int _nargs) {
     /* Save and bind params/locals */
-    DESCR_t _save_str = NV_GET_fn("strv");
-    NV_SET_fn("strv", (_nargs > 0) ? _args[0] : NULVCL);
+    DESCR_t _save_str = NV_GET_fn("STRVAL_fn");
+    NV_SET_fn("STRVAL_fn", (_nargs > 0) ? _args[0] : NULVCL);
 
     goto Extize;
 
@@ -8638,20 +8638,20 @@ Extize: {  /* L79 */
 }
 
 RETURN_LABEL_Extize:
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     return NULVCL;
 FRETURN_LABEL_Extize:
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     return FAILDESCR;
 NRETURN_LABEL_Extize:
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     return NULVCL;  /* NRETURN */
 CONTINUE_LABEL_Extize:
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     return NULVCL;  /* CONTINUE */
 ERROR_LABEL_Extize:
     fprintf(stderr, "** error in Extize\n");
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     return FAILDESCR;
 }
 
@@ -8673,7 +8673,7 @@ static DESCR_t uf_Write(DESCR_t *_args, int _nargs) {
 Write: {  /* L29 */
     comm_stno(29);
     {
-        DESCR_t _ret = APLY_fn("OUTPUT", (DESCR_t[1]){NULVCL}, 1);
+        DESCR_t _ret = APPLY_fn("OUTPUT", (DESCR_t[1]){NULVCL}, 1);
         if (IS_FAIL_fn(_ret)) goto FRETURN_LABEL_Write;
         goto Write1;
     }
@@ -8722,7 +8722,7 @@ Write3: {  /* L33 */
 Write9: {  /* L34 */
     comm_stno(34);
     {
-        DESCR_t _ret = APLY_fn("ENDFILE", (DESCR_t[1]){INTVAL(8LL)}, 1);
+        DESCR_t _ret = APPLY_fn("ENDFILE", (DESCR_t[1]){INTVAL(8LL)}, 1);
         if (IS_FAIL_fn(_ret)) goto RETURN_LABEL_Write;
         goto RETURN_LABEL_Write;
     }
@@ -8761,16 +8761,16 @@ ERROR_LABEL_Write:
     return FAILDESCR;
 }
 
-/* SNOBOL4 function: LineMap(strv, lmMapName) locals=['lmLineNo', 'lmMap', 'lmOfs', 'xOfs'] */
+/* SNOBOL4 function: LineMap(STRVAL_fn, lmMapName) locals=['lmLineNo', 'lmMap', 'lmOfs', 'xOfs'] */
 static DESCR_t uf_LineMap(DESCR_t *_args, int _nargs) {
     /* Save and bind params/locals */
-    DESCR_t _save_str = NV_GET_fn("strv");
+    DESCR_t _save_str = NV_GET_fn("STRVAL_fn");
     DESCR_t _save_lmMapName = NV_GET_fn("lmMapName");
     DESCR_t _save_lmLineNo = NV_GET_fn("lmLineNo");
     DESCR_t _save_lmMap = NV_GET_fn("lmMap");
     DESCR_t _save_lmOfs = NV_GET_fn("lmOfs");
     DESCR_t _save_xOfs = NV_GET_fn("xOfs");
-    NV_SET_fn("strv", (_nargs > 0) ? _args[0] : NULVCL);
+    NV_SET_fn("STRVAL_fn", (_nargs > 0) ? _args[0] : NULVCL);
     NV_SET_fn("lmMapName", (_nargs > 1) ? _args[1] : NULVCL);
     NV_SET_fn("lmLineNo", NULVCL);
     NV_SET_fn("lmMap", NULVCL);
@@ -8823,7 +8823,7 @@ LineMap3: {  /* L41 */
 _stmt_566: {  /* L42 */
     comm_stno(42);
     {
-        DESCR_t _subj = NV_GET_fn("strv");
+        DESCR_t _subj = NV_GET_fn("STRVAL_fn");
         int _ok = match_pattern(pat_cat(pat_cat(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_break_(VARVAL_fn(NV_GET_fn("nl")))), var_as_pattern(NV_GET_fn("nl"))), var_as_pattern(NV_GET_fn("xOfs"))), VARVAL_fn(_subj));
         if (_ok) goto _stmt_567;
         else goto LineMap9;
@@ -8861,7 +8861,7 @@ LineMap9: {  /* L45 */
 }
 
 RETURN_LABEL_LineMap:
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("lmMapName", _save_lmMapName);
     NV_SET_fn("lmLineNo", _save_lmLineNo);
     NV_SET_fn("lmMap", _save_lmMap);
@@ -8869,7 +8869,7 @@ RETURN_LABEL_LineMap:
     NV_SET_fn("xOfs", _save_xOfs);
     return NULVCL;
 FRETURN_LABEL_LineMap:
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("lmMapName", _save_lmMapName);
     NV_SET_fn("lmLineNo", _save_lmLineNo);
     NV_SET_fn("lmMap", _save_lmMap);
@@ -8877,7 +8877,7 @@ FRETURN_LABEL_LineMap:
     NV_SET_fn("xOfs", _save_xOfs);
     return FAILDESCR;
 NRETURN_LABEL_LineMap:
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("lmMapName", _save_lmMapName);
     NV_SET_fn("lmLineNo", _save_lmLineNo);
     NV_SET_fn("lmMap", _save_lmMap);
@@ -8885,7 +8885,7 @@ NRETURN_LABEL_LineMap:
     NV_SET_fn("xOfs", _save_xOfs);
     return NULVCL;  /* NRETURN */
 CONTINUE_LABEL_LineMap:
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("lmMapName", _save_lmMapName);
     NV_SET_fn("lmLineNo", _save_lmLineNo);
     NV_SET_fn("lmMap", _save_lmMap);
@@ -8894,7 +8894,7 @@ CONTINUE_LABEL_LineMap:
     return NULVCL;  /* CONTINUE */
 ERROR_LABEL_LineMap:
     fprintf(stderr, "** error in LineMap\n");
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("lmMapName", _save_lmMapName);
     NV_SET_fn("lmLineNo", _save_lmLineNo);
     NV_SET_fn("lmMap", _save_lmMap);
@@ -8917,7 +8917,7 @@ static DESCR_t uf_shift(DESCR_t *_args, int _nargs) {
 shift: {  /* L17 */
     comm_stno(17);
     {
-        DESCR_t _rhs = evl(CONC_fn(CONC_fn(STRVAL("p . thx . *Shift('"), NV_GET_fn("t")), STRVAL("', thx)")));
+        DESCR_t _rhs = EVAL_fn(CONCAT_fn(CONCAT_fn(STRVAL("p . thx . *Shift('"), NV_GET_fn("t")), STRVAL("', thx)")));
         if (IS_FAIL_fn(_rhs)) goto RETURN_LABEL_shift;
         NV_SET_fn("shift", _rhs);
         goto RETURN_LABEL_shift;
@@ -8961,7 +8961,7 @@ static DESCR_t uf_reduce(DESCR_t *_args, int _nargs) {
 reduce: {  /* L18 */
     comm_stno(18);
     {
-        DESCR_t _rhs = evl(CONC_fn(CONC_fn(CONC_fn(CONC_fn(STRVAL("epsilon . *Reduce("), NV_GET_fn("t")), STRVAL(", ")), NV_GET_fn("n")), STRVAL(")")));
+        DESCR_t _rhs = EVAL_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(STRVAL("epsilon . *Reduce("), NV_GET_fn("t")), STRVAL(", ")), NV_GET_fn("n")), STRVAL(")")));
         if (IS_FAIL_fn(_rhs)) goto RETURN_LABEL_reduce;
         NV_SET_fn("reduce", _rhs);
         goto RETURN_LABEL_reduce;
@@ -9111,7 +9111,7 @@ static DESCR_t uf_nTop(DESCR_t *_args, int _nargs) {
 nTop: {  /* L24 */
     comm_stno(24);
     {
-        DESCR_t _rhs = APLY_fn("TopCounter", NULL, 0);
+        DESCR_t _rhs = APPLY_fn("TopCounter", NULL, 0);
         if (IS_FAIL_fn(_rhs)) goto RETURN_LABEL_nTop;
         NV_SET_fn("nTop", _rhs);
         goto RETURN_LABEL_nTop;
@@ -9177,7 +9177,7 @@ static DESCR_t uf_TV(DESCR_t *_args, int _nargs) {
 TV: {  /* L3 */
     comm_stno(3);
     {
-        DESCR_t _rhs = CONC_fn((eq(NV_GET_fn("doParseTree"),NV_GET_fn("FALSE")) ? NULVCL : FAILDESCR), STRVAL("pat"));
+        DESCR_t _rhs = CONCAT_fn((eq(NV_GET_fn("doParseTree"),NV_GET_fn("FALSE")) ? NULVCL : FAILDESCR), STRVAL("pat"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_628;
         NV_SET_fn("omega", _rhs);
         goto _stmt_628;
@@ -9187,7 +9187,7 @@ TV: {  /* L3 */
 _stmt_628: {  /* L4 */
     comm_stno(4);
     {
-        DESCR_t _rhs = CONC_fn((eq(NV_GET_fn("doParseTree"),NV_GET_fn("TRUE")) ? NULVCL : FAILDESCR), STRVAL("(pat ~ 'identifier')"));
+        DESCR_t _rhs = CONCAT_fn((eq(NV_GET_fn("doParseTree"),NV_GET_fn("TRUE")) ? NULVCL : FAILDESCR), STRVAL("(pat ~ 'identifier')"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_629;
         NV_SET_fn("omega", _rhs);
         goto _stmt_629;
@@ -9197,7 +9197,7 @@ _stmt_628: {  /* L4 */
 _stmt_629: {  /* L5 */
     comm_stno(5);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn(NV_GET_fn("omega"), STRVAL(" $ tx *LEQ(lwr(tx), \"")), APLY_fn("lwr", (DESCR_t[1]){NV_GET_fn("name")}, 1)), STRVAL("\")"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn(NV_GET_fn("omega"), STRVAL(" $ tx *LEQ(lwr(tx), \"")), APPLY_fn("lwr", (DESCR_t[1]){NV_GET_fn("name")}, 1)), STRVAL("\")"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_630;
         NV_SET_fn("omega", _rhs);
         goto _stmt_630;
@@ -9207,7 +9207,7 @@ _stmt_629: {  /* L5 */
 _stmt_630: {  /* L6 */
     comm_stno(6);
     {
-        DESCR_t _rhs = APLY_fn("TZ", (DESCR_t[3]){NV_GET_fn("lvl"), NV_GET_fn("name"), evl(NV_GET_fn("omega"))}, 3);
+        DESCR_t _rhs = APPLY_fn("TZ", (DESCR_t[3]){NV_GET_fn("lvl"), NV_GET_fn("name"), EVAL_fn(NV_GET_fn("omega"))}, 3);
         if (IS_FAIL_fn(_rhs)) goto ERROR_LABEL_TV;
         NV_SET_fn("TV", _rhs);
         goto RETURN_LABEL_TV;
@@ -9265,7 +9265,7 @@ static DESCR_t uf_TW(DESCR_t *_args, int _nargs) {
 TW: {  /* L10 */
     comm_stno(10);
     {
-        DESCR_t _rhs = CONC_fn((eq(NV_GET_fn("doParseTree"),NV_GET_fn("FALSE")) ? NULVCL : FAILDESCR), STRVAL("pat"));
+        DESCR_t _rhs = CONCAT_fn((eq(NV_GET_fn("doParseTree"),NV_GET_fn("FALSE")) ? NULVCL : FAILDESCR), STRVAL("pat"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_634;
         NV_SET_fn("omega", _rhs);
         goto _stmt_634;
@@ -9275,7 +9275,7 @@ TW: {  /* L10 */
 _stmt_634: {  /* L11 */
     comm_stno(11);
     {
-        DESCR_t _rhs = CONC_fn((eq(NV_GET_fn("doParseTree"),NV_GET_fn("TRUE")) ? NULVCL : FAILDESCR), STRVAL("(pat ~ 'identifier')"));
+        DESCR_t _rhs = CONCAT_fn((eq(NV_GET_fn("doParseTree"),NV_GET_fn("TRUE")) ? NULVCL : FAILDESCR), STRVAL("(pat ~ 'identifier')"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_635;
         NV_SET_fn("omega", _rhs);
         goto _stmt_635;
@@ -9285,7 +9285,7 @@ _stmt_634: {  /* L11 */
 _stmt_635: {  /* L12 */
     comm_stno(12);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn(NV_GET_fn("omega"), STRVAL(" $ tx *LEQ(upr(tx), '")), APLY_fn("upr", (DESCR_t[1]){NV_GET_fn("name")}, 1)), STRVAL("')"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn(NV_GET_fn("omega"), STRVAL(" $ tx *LEQ(upr(tx), '")), APPLY_fn("upr", (DESCR_t[1]){NV_GET_fn("name")}, 1)), STRVAL("')"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_636;
         NV_SET_fn("omega", _rhs);
         goto _stmt_636;
@@ -9295,7 +9295,7 @@ _stmt_635: {  /* L12 */
 _stmt_636: {  /* L13 */
     comm_stno(13);
     {
-        DESCR_t _rhs = APLY_fn("TZ", (DESCR_t[3]){NV_GET_fn("lvl"), NV_GET_fn("name"), evl(NV_GET_fn("omega"))}, 3);
+        DESCR_t _rhs = APPLY_fn("TZ", (DESCR_t[3]){NV_GET_fn("lvl"), NV_GET_fn("name"), EVAL_fn(NV_GET_fn("omega"))}, 3);
         if (IS_FAIL_fn(_rhs)) goto ERROR_LABEL_TW;
         NV_SET_fn("TW", _rhs);
         goto RETURN_LABEL_TW;
@@ -9353,7 +9353,7 @@ static DESCR_t uf_TX(DESCR_t *_args, int _nargs) {
 TX: {  /* L17 */
     comm_stno(17);
     {
-        DESCR_t _rhs = CONC_fn((eq(NV_GET_fn("doParseTree"),NV_GET_fn("FALSE")) ? NULVCL : FAILDESCR), STRVAL("pat"));
+        DESCR_t _rhs = CONCAT_fn((eq(NV_GET_fn("doParseTree"),NV_GET_fn("FALSE")) ? NULVCL : FAILDESCR), STRVAL("pat"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_640;
         NV_SET_fn("omega", _rhs);
         goto _stmt_640;
@@ -9363,7 +9363,7 @@ TX: {  /* L17 */
 _stmt_640: {  /* L18 */
     comm_stno(18);
     {
-        DESCR_t _rhs = CONC_fn((eq(NV_GET_fn("doParseTree"),NV_GET_fn("TRUE")) ? NULVCL : FAILDESCR), STRVAL("(pat ~ 'identifier')"));
+        DESCR_t _rhs = CONCAT_fn((eq(NV_GET_fn("doParseTree"),NV_GET_fn("TRUE")) ? NULVCL : FAILDESCR), STRVAL("(pat ~ 'identifier')"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_641;
         NV_SET_fn("omega", _rhs);
         goto _stmt_641;
@@ -9373,7 +9373,7 @@ _stmt_640: {  /* L18 */
 _stmt_641: {  /* L19 */
     comm_stno(19);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn(NV_GET_fn("omega"), STRVAL(" $ tx *LEQ(tx, '")), NV_GET_fn("name")), STRVAL("')"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn(NV_GET_fn("omega"), STRVAL(" $ tx *LEQ(tx, '")), NV_GET_fn("name")), STRVAL("')"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_642;
         NV_SET_fn("omega", _rhs);
         goto _stmt_642;
@@ -9383,7 +9383,7 @@ _stmt_641: {  /* L19 */
 _stmt_642: {  /* L20 */
     comm_stno(20);
     {
-        DESCR_t _rhs = APLY_fn("TZ", (DESCR_t[3]){NV_GET_fn("lvl"), NV_GET_fn("name"), evl(NV_GET_fn("omega"))}, 3);
+        DESCR_t _rhs = APPLY_fn("TZ", (DESCR_t[3]){NV_GET_fn("lvl"), NV_GET_fn("name"), EVAL_fn(NV_GET_fn("omega"))}, 3);
         if (IS_FAIL_fn(_rhs)) goto ERROR_LABEL_TX;
         NV_SET_fn("TX", _rhs);
         goto RETURN_LABEL_TX;
@@ -9441,7 +9441,7 @@ static DESCR_t uf_TY(DESCR_t *_args, int _nargs) {
 TY: {  /* L24 */
     comm_stno(24);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn((le(NV_GET_fn("xTrace"),INTVAL(0LL)) ? NULVCL : FAILDESCR), NV_GET_fn("pat")), NV_GET_fn("txOfs")), pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(NULVCL))), pat_user_call("assign", (DESCR_t[1]){NULVCL}, 1)));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn((le(NV_GET_fn("xTrace"),INTVAL(0LL)) ? NULVCL : FAILDESCR), NV_GET_fn("pat")), NV_GET_fn("txOfs")), pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(NULVCL))), pat_user_call("assign", (DESCR_t[1]){NULVCL}, 1)));
         if (IS_FAIL_fn(_rhs)) goto _stmt_646;
         NV_SET_fn("TY", _rhs);
         goto RETURN_LABEL_TY;
@@ -9451,7 +9451,7 @@ TY: {  /* L24 */
 _stmt_646: {  /* L26 */
     comm_stno(26);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(STRVAL("pat $ tz"), STRVAL(" @txOfs")), STRVAL(" $ *T8Trace(")), NV_GET_fn("lvl")), STRVAL(", ")), APLY_fn("Qize", (DESCR_t[1]){CONC_fn(NV_GET_fn("name"), STRVAL(": "))}, 1)), STRVAL(" tz, txOfs)"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(STRVAL("pat $ tz"), STRVAL(" @txOfs")), STRVAL(" $ *T8Trace(")), NV_GET_fn("lvl")), STRVAL(", ")), APPLY_fn("Qize", (DESCR_t[1]){CONCAT_fn(NV_GET_fn("name"), STRVAL(": "))}, 1)), STRVAL(" tz, txOfs)"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_647;
         NV_SET_fn("omega", _rhs);
         goto _stmt_647;
@@ -9461,7 +9461,7 @@ _stmt_646: {  /* L26 */
 _stmt_647: {  /* L29 */
     comm_stno(29);
     {
-        DESCR_t _rhs = evl(NV_GET_fn("omega"));
+        DESCR_t _rhs = EVAL_fn(NV_GET_fn("omega"));
         if (IS_FAIL_fn(_rhs)) goto ERROR_LABEL_TY;
         NV_SET_fn("TY", _rhs);
         goto RETURN_LABEL_TY;
@@ -9519,7 +9519,7 @@ static DESCR_t uf_TZ(DESCR_t *_args, int _nargs) {
 TZ: {  /* L35 */
     comm_stno(35);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn((le(NV_GET_fn("xTrace"),INTVAL(0LL)) ? NULVCL : FAILDESCR), NV_GET_fn("pat")), NV_GET_fn("txOfs")), pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(NULVCL))), pat_user_call("assign", (DESCR_t[1]){NULVCL}, 1)));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn((le(NV_GET_fn("xTrace"),INTVAL(0LL)) ? NULVCL : FAILDESCR), NV_GET_fn("pat")), NV_GET_fn("txOfs")), pat_cat(var_as_pattern(NV_GET_fn(VARVAL_fn(NULVCL))), pat_user_call("assign", (DESCR_t[1]){NULVCL}, 1)));
         if (IS_FAIL_fn(_rhs)) goto _stmt_651;
         NV_SET_fn("TZ", _rhs);
         goto RETURN_LABEL_TZ;
@@ -9529,7 +9529,7 @@ TZ: {  /* L35 */
 _stmt_651: {  /* L37 */
     comm_stno(37);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(STRVAL("@txOfs $ *T8Trace("), NV_GET_fn("lvl")), STRVAL(", '?' ")), APLY_fn("Qize", (DESCR_t[1]){NV_GET_fn("name")}, 1)), STRVAL(", txOfs)")), STRVAL(" pat $ tz")), STRVAL(" @txOfs")), STRVAL(" $ *T8Trace(")), NV_GET_fn("lvl")), STRVAL(", ")), APLY_fn("Qize", (DESCR_t[1]){CONC_fn(NV_GET_fn("name"), STRVAL(": "))}, 1)), STRVAL(" tz, txOfs)"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(STRVAL("@txOfs $ *T8Trace("), NV_GET_fn("lvl")), STRVAL(", '?' ")), APPLY_fn("Qize", (DESCR_t[1]){NV_GET_fn("name")}, 1)), STRVAL(", txOfs)")), STRVAL(" pat $ tz")), STRVAL(" @txOfs")), STRVAL(" $ *T8Trace(")), NV_GET_fn("lvl")), STRVAL(", ")), APPLY_fn("Qize", (DESCR_t[1]){CONCAT_fn(NV_GET_fn("name"), STRVAL(": "))}, 1)), STRVAL(" tz, txOfs)"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_652;
         NV_SET_fn("omega", _rhs);
         goto _stmt_652;
@@ -9539,7 +9539,7 @@ _stmt_651: {  /* L37 */
 _stmt_652: {  /* L41 */
     comm_stno(41);
     {
-        DESCR_t _rhs = evl(NV_GET_fn("omega"));
+        DESCR_t _rhs = EVAL_fn(NV_GET_fn("omega"));
         if (IS_FAIL_fn(_rhs)) goto ERROR_LABEL_TZ;
         NV_SET_fn("TZ", _rhs);
         goto RETURN_LABEL_TZ;
@@ -9579,15 +9579,15 @@ ERROR_LABEL_TZ:
     return FAILDESCR;
 }
 
-/* SNOBOL4 function: T8Trace(lvl, strv, ofs) locals=['t8p'] */
+/* SNOBOL4 function: T8Trace(lvl, STRVAL_fn, ofs) locals=['t8p'] */
 static DESCR_t uf_T8Trace(DESCR_t *_args, int _nargs) {
     /* Save and bind params/locals */
     DESCR_t _save_lvl = NV_GET_fn("lvl");
-    DESCR_t _save_str = NV_GET_fn("strv");
+    DESCR_t _save_str = NV_GET_fn("STRVAL_fn");
     DESCR_t _save_ofs = NV_GET_fn("ofs");
     DESCR_t _save_t8p = NV_GET_fn("t8p");
     NV_SET_fn("lvl", (_nargs > 0) ? _args[0] : NULVCL);
-    NV_SET_fn("strv", (_nargs > 1) ? _args[1] : NULVCL);
+    NV_SET_fn("STRVAL_fn", (_nargs > 1) ? _args[1] : NULVCL);
     NV_SET_fn("ofs", (_nargs > 2) ? _args[2] : NULVCL);
     NV_SET_fn("t8p", NULVCL);
 
@@ -9607,7 +9607,7 @@ T8Trace: {  /* L6 */
 _stmt_657: {  /* L7 */
     comm_stno(7);
     {
-        DESCR_t _ret = APLY_fn("GT", (DESCR_t[2]){NV_GET_fn("doDebug"), INTVAL(0LL)}, 2);
+        DESCR_t _ret = APPLY_fn("GT", (DESCR_t[2]){NV_GET_fn("doDebug"), INTVAL(0LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto NRETURN_LABEL_T8Trace;
         goto _stmt_658;
     }
@@ -9616,7 +9616,7 @@ _stmt_657: {  /* L7 */
 _stmt_658: {  /* L8 */
     comm_stno(8);
     {
-        DESCR_t _ret = APLY_fn("LE", (DESCR_t[2]){NV_GET_fn("lvl"), NV_GET_fn("doDebug")}, 2);
+        DESCR_t _ret = APPLY_fn("LE", (DESCR_t[2]){NV_GET_fn("lvl"), NV_GET_fn("doDebug")}, 2);
         if (IS_FAIL_fn(_ret)) goto NRETURN_LABEL_T8Trace;
         goto _stmt_659;
     }
@@ -9625,7 +9625,7 @@ _stmt_658: {  /* L8 */
 _stmt_659: {  /* L9 */
     comm_stno(9);
     {
-        DESCR_t _ret = APLY_fn("GT", (DESCR_t[2]){NV_GET_fn("doDebug"), INTVAL(1LL)}, 2);
+        DESCR_t _ret = APPLY_fn("GT", (DESCR_t[2]){NV_GET_fn("doDebug"), INTVAL(1LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto _stmt_660;
         goto T8Trace1;
     }
@@ -9634,7 +9634,7 @@ _stmt_659: {  /* L9 */
 _stmt_660: {  /* L10 */
     comm_stno(10);
     {
-        DESCR_t _subj = NV_GET_fn("strv");
+        DESCR_t _subj = NV_GET_fn("STRVAL_fn");
         int _ok = match_pattern(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_lit("?")), VARVAL_fn(_subj));
         if (_ok) goto NRETURN_LABEL_T8Trace;
         else goto T8Trace1;
@@ -9644,9 +9644,9 @@ _stmt_660: {  /* L10 */
 T8Trace1: {  /* L11 */
     comm_stno(11);
     {
-        DESCR_t _subj = NV_GET_fn("strv");
+        DESCR_t _subj = NV_GET_fn("STRVAL_fn");
         int _ok = match_and_replace(&_subj, pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_lit("?")), STRVAL("? "));
-        NV_SET_fn("strv", _subj);
+        NV_SET_fn("STRVAL_fn", _subj);
         if (_ok) goto T8Trace2;
         else goto _stmt_662;
     }
@@ -9655,9 +9655,9 @@ T8Trace1: {  /* L11 */
 _stmt_662: {  /* L12 */
     comm_stno(12);
     {
-        DESCR_t _subj = NV_GET_fn("strv");
+        DESCR_t _subj = NV_GET_fn("STRVAL_fn");
         int _ok = match_and_replace(&_subj, pat_pos(to_int(INTVAL(0LL))), STRVAL("  "));
-        NV_SET_fn("strv", _subj);
+        NV_SET_fn("STRVAL_fn", _subj);
         if (_ok) goto T8Trace2;
         else goto T8Trace2;
     }
@@ -9666,7 +9666,7 @@ _stmt_662: {  /* L12 */
 T8Trace2: {  /* L13 */
     comm_stno(13);
     {
-        DESCR_t _rhs = APLY_fn("T8Pos", (DESCR_t[2]){add(NV_GET_fn("strOfs"), NV_GET_fn("ofs")), NV_GET_fn("t8Map")}, 2);
+        DESCR_t _rhs = APPLY_fn("T8Pos", (DESCR_t[2]){add(NV_GET_fn("strOfs"), NV_GET_fn("ofs")), NV_GET_fn("t8Map")}, 2);
         if (IS_FAIL_fn(_rhs)) goto _stmt_664;
         NV_SET_fn("t8p", _rhs);
         goto _stmt_664;
@@ -9676,7 +9676,7 @@ T8Trace2: {  /* L13 */
 _stmt_664: {  /* L14 */
     comm_stno(14);
     {
-        DESCR_t _ret = APLY_fn("GE", (DESCR_t[2]){NV_GET_fn("t8MaxLine"), INTVAL(621LL)}, 2);
+        DESCR_t _ret = APPLY_fn("GE", (DESCR_t[2]){NV_GET_fn("t8MaxLine"), INTVAL(621LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto NRETURN_LABEL_T8Trace;
         goto _stmt_665;
     }
@@ -9685,7 +9685,7 @@ _stmt_664: {  /* L14 */
 _stmt_665: {  /* L15 */
     comm_stno(15);
     {
-        DESCR_t _rhs = CONC_fn((ge(NV_GET_fn("t8Max"),NV_GET_fn("t8MaxLast")) ? NULVCL : FAILDESCR), NV_GET_fn("t8Max"));
+        DESCR_t _rhs = CONCAT_fn((ge(NV_GET_fn("t8Max"),NV_GET_fn("t8MaxLast")) ? NULVCL : FAILDESCR), NV_GET_fn("t8Max"));
         if (IS_FAIL_fn(_rhs)) goto NRETURN_LABEL_T8Trace;
         NV_SET_fn("t8MaxLast", _rhs);
         goto _stmt_666;
@@ -9695,7 +9695,7 @@ _stmt_665: {  /* L15 */
 _stmt_666: {  /* L16 */
     comm_stno(16);
     {
-        DESCR_t _rhs = CONC_fn(NV_GET_fn("t8p"), NV_GET_fn("strv"));
+        DESCR_t _rhs = CONCAT_fn(NV_GET_fn("t8p"), NV_GET_fn("STRVAL_fn"));
         if (IS_FAIL_fn(_rhs)) goto NRETURN_LABEL_T8Trace;
         output_val(_rhs);
         goto NRETURN_LABEL_T8Trace;
@@ -9704,32 +9704,32 @@ _stmt_666: {  /* L16 */
 
 RETURN_LABEL_T8Trace:
     NV_SET_fn("lvl", _save_lvl);
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("ofs", _save_ofs);
     NV_SET_fn("t8p", _save_t8p);
     return NULVCL;
 FRETURN_LABEL_T8Trace:
     NV_SET_fn("lvl", _save_lvl);
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("ofs", _save_ofs);
     NV_SET_fn("t8p", _save_t8p);
     return FAILDESCR;
 NRETURN_LABEL_T8Trace:
     NV_SET_fn("lvl", _save_lvl);
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("ofs", _save_ofs);
     NV_SET_fn("t8p", _save_t8p);
     return NULVCL;  /* NRETURN */
 CONTINUE_LABEL_T8Trace:
     NV_SET_fn("lvl", _save_lvl);
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("ofs", _save_ofs);
     NV_SET_fn("t8p", _save_t8p);
     return NULVCL;  /* CONTINUE */
 ERROR_LABEL_T8Trace:
     fprintf(stderr, "** error in T8Trace\n");
     NV_SET_fn("lvl", _save_lvl);
-    NV_SET_fn("strv", _save_str);
+    NV_SET_fn("STRVAL_fn", _save_str);
     NV_SET_fn("ofs", _save_ofs);
     NV_SET_fn("t8p", _save_t8p);
     return FAILDESCR;
@@ -9751,7 +9751,7 @@ static DESCR_t uf_T8Pos(DESCR_t *_args, int _nargs) {
 T8Pos: {  /* L20 */
     comm_stno(20);
     {
-        DESCR_t _rhs = CONC_fn(APLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("t8Map")}, 1), lpad_fn(NV_GET_fn("t8Ofs"), INTVAL(8LL), STRVAL(" ")));
+        DESCR_t _rhs = CONCAT_fn(APPLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("t8Map")}, 1), lpad_fn(NV_GET_fn("t8Ofs"), INTVAL(8LL), STRVAL(" ")));
         if (IS_FAIL_fn(_rhs)) goto _stmt_670;
         NV_SET_fn("T8Pos", _rhs);
         goto RETURN_LABEL_T8Pos;
@@ -9781,7 +9781,7 @@ _stmt_671: {  /* L22 */
 T8Pos1: {  /* L23 */
     comm_stno(23);
     {
-        DESCR_t _rhs = CONC_fn(APLY_fn("IDENT", (DESCR_t[1]){subscript_get(NV_GET_fn("t8Map"), NV_GET_fn("i"))}, 1), sub(NV_GET_fn("i"), INTVAL(1LL)));
+        DESCR_t _rhs = CONCAT_fn(APPLY_fn("IDENT", (DESCR_t[1]){subscript_get(NV_GET_fn("t8Map"), NV_GET_fn("i"))}, 1), sub(NV_GET_fn("i"), INTVAL(1LL)));
         if (IS_FAIL_fn(_rhs)) goto _stmt_673;
         NV_SET_fn("i", _rhs);
         goto T8Pos1;
@@ -9821,7 +9821,7 @@ _stmt_675: {  /* L26 */
 T8Pos2: {  /* L27 */
     comm_stno(27);
     {
-        DESCR_t _rhs = CONC_fn(APLY_fn("IDENT", (DESCR_t[1]){subscript_get(NV_GET_fn("t8Map"), NV_GET_fn("i"))}, 1), sub(NV_GET_fn("i"), INTVAL(1LL)));
+        DESCR_t _rhs = CONCAT_fn(APPLY_fn("IDENT", (DESCR_t[1]){subscript_get(NV_GET_fn("t8Map"), NV_GET_fn("i"))}, 1), sub(NV_GET_fn("i"), INTVAL(1LL)));
         if (IS_FAIL_fn(_rhs)) goto _stmt_677;
         NV_SET_fn("i", _rhs);
         goto T8Pos2;
@@ -9851,7 +9851,7 @@ _stmt_678: {  /* L29 */
 _stmt_679: {  /* L30 */
     comm_stno(30);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(STRVAL("("), lpad_fn(NV_GET_fn("t8MaxLine"), INTVAL(5LL), STRVAL(" "))), STRVAL(", ")), lpad_fn(NV_GET_fn("t8MaxPos"), INTVAL(3LL), STRVAL(" "))), STRVAL(", ")), lpad_fn(NV_GET_fn("t8Line"), INTVAL(5LL), STRVAL(" "))), STRVAL(", ")), lpad_fn(NV_GET_fn("t8Pos"), INTVAL(3LL), STRVAL(" "))), STRVAL(")"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(STRVAL("("), lpad_fn(NV_GET_fn("t8MaxLine"), INTVAL(5LL), STRVAL(" "))), STRVAL(", ")), lpad_fn(NV_GET_fn("t8MaxPos"), INTVAL(3LL), STRVAL(" "))), STRVAL(", ")), lpad_fn(NV_GET_fn("t8Line"), INTVAL(5LL), STRVAL(" "))), STRVAL(", ")), lpad_fn(NV_GET_fn("t8Pos"), INTVAL(3LL), STRVAL(" "))), STRVAL(")"));
         if (IS_FAIL_fn(_rhs)) goto RETURN_LABEL_T8Pos;
         NV_SET_fn("T8Pos", _rhs);
         goto RETURN_LABEL_T8Pos;
@@ -9910,7 +9910,7 @@ static DESCR_t uf_pp(DESCR_t *_args, int _nargs) {
 pp: {  /* L256 */
     comm_stno(256);
     {
-        DESCR_t _ret = APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("x")}, 1);
+        DESCR_t _ret = APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("x")}, 1);
         if (IS_FAIL_fn(_ret)) goto RETURN_LABEL_pp;
         goto _stmt_771;
     }
@@ -9919,7 +9919,7 @@ pp: {  /* L256 */
 _stmt_771: {  /* L257 */
     comm_stno(257);
     {
-        DESCR_t _rhs = APLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1);
+        DESCR_t _rhs = APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1);
         if (IS_FAIL_fn(_rhs)) goto _stmt_772;
         NV_SET_fn("t", _rhs);
         goto _stmt_772;
@@ -9929,7 +9929,7 @@ _stmt_771: {  /* L257 */
 _stmt_772: {  /* L258 */
     comm_stno(258);
     {
-        DESCR_t _rhs = APLY_fn("v", (DESCR_t[1]){NV_GET_fn("x")}, 1);
+        DESCR_t _rhs = APPLY_fn("v", (DESCR_t[1]){NV_GET_fn("x")}, 1);
         if (IS_FAIL_fn(_rhs)) goto _stmt_773;
         NV_SET_fn("v", _rhs);
         goto _stmt_773;
@@ -9939,7 +9939,7 @@ _stmt_772: {  /* L258 */
 _stmt_773: {  /* L259 */
     comm_stno(259);
     {
-        DESCR_t _rhs = APLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1);
+        DESCR_t _rhs = APPLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1);
         if (IS_FAIL_fn(_rhs)) goto _stmt_774;
         NV_SET_fn("n", _rhs);
         goto _stmt_774;
@@ -9949,7 +9949,7 @@ _stmt_773: {  /* L259 */
 _stmt_774: {  /* L260 */
     comm_stno(260);
     {
-        DESCR_t _rhs = APLY_fn("c", (DESCR_t[1]){NV_GET_fn("x")}, 1);
+        DESCR_t _rhs = APPLY_fn("c", (DESCR_t[1]){NV_GET_fn("x")}, 1);
         if (IS_FAIL_fn(_rhs)) goto _stmt_775;
         NV_SET_fn("c", _rhs);
         goto _stmt_775;
@@ -9959,7 +9959,7 @@ _stmt_774: {  /* L260 */
 _stmt_775: {  /* L261 */
     comm_stno(261);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn((gt(NV_GET_fn("doDebug"),INTVAL(0LL)) ? NULVCL : FAILDESCR), STRVAL("pp(")), NV_GET_fn("t")), STRVAL(")")), STRVAL(", sz = ")), NV_GET_fn("level")), STRVAL("+")), SIZE_fn(NV_GET_fn("v"))), STRVAL(", v = ")), NV_GET_fn("v"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn((gt(NV_GET_fn("doDebug"),INTVAL(0LL)) ? NULVCL : FAILDESCR), STRVAL("pp(")), NV_GET_fn("t")), STRVAL(")")), STRVAL(", sz = ")), NV_GET_fn("level")), STRVAL("+")), SIZE_fn(NV_GET_fn("v"))), STRVAL(", v = ")), NV_GET_fn("v"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_776;
         output_val(_rhs);
         goto _stmt_776;
@@ -9969,7 +9969,7 @@ _stmt_775: {  /* L261 */
 _stmt_776: {  /* L262 */
     comm_stno(262);
     {
-        DESCR_t _ret = APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("t")}, 1);
+        DESCR_t _ret = APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("t")}, 1);
         if (IS_FAIL_fn(_ret)) goto RETURN_LABEL_pp;
         goto pp_snoParse;
     }
@@ -9998,7 +9998,7 @@ pp_0: {  /* L265 */
 pp_1: {  /* L266 */
     comm_stno(266);
     {
-        DESCR_t _rhs = CONC_fn((lt(NV_GET_fn("i"),NV_GET_fn("n")) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL)));
+        DESCR_t _rhs = CONCAT_fn((lt(NV_GET_fn("i"),NV_GET_fn("n")) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL)));
         if (IS_FAIL_fn(_rhs)) goto RETURN_LABEL_pp;
         NV_SET_fn("i", _rhs);
         goto _stmt_780;
@@ -10008,7 +10008,7 @@ pp_1: {  /* L266 */
 _stmt_780: {  /* L267 */
     comm_stno(267);
     {
-        DESCR_t _ret = APLY_fn("pp", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), NV_GET_fn("i"))}, 1);
+        DESCR_t _ret = APPLY_fn("pp", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), NV_GET_fn("i"))}, 1);
         if (IS_FAIL_fn(_ret)) goto pp_1;
         goto pp_1;
     }
@@ -10017,7 +10017,7 @@ _stmt_780: {  /* L267 */
 pp_snoBuiltinVar: {  /* L269 */
     comm_stno(269);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){APLY_fn("ss", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){APPLY_fn("ss", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_pp;
         goto RETURN_LABEL_pp;
     }
@@ -10026,7 +10026,7 @@ pp_snoBuiltinVar: {  /* L269 */
 pp_snoFunction: {  /* L270 */
     comm_stno(270);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){APLY_fn("ss", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){APPLY_fn("ss", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_pp;
         goto RETURN_LABEL_pp;
     }
@@ -10035,7 +10035,7 @@ pp_snoFunction: {  /* L270 */
 pp_snoId: {  /* L271 */
     comm_stno(271);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){APLY_fn("ss", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){APPLY_fn("ss", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_pp;
         goto RETURN_LABEL_pp;
     }
@@ -10044,7 +10044,7 @@ pp_snoId: {  /* L271 */
 pp_snoInteger: {  /* L272 */
     comm_stno(272);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){APLY_fn("ss", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){APPLY_fn("ss", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_pp;
         goto RETURN_LABEL_pp;
     }
@@ -10053,7 +10053,7 @@ pp_snoInteger: {  /* L272 */
 pp_snoLabel: {  /* L273 */
     comm_stno(273);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){APLY_fn("ss", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){APPLY_fn("ss", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_pp;
         goto RETURN_LABEL_pp;
     }
@@ -10062,7 +10062,7 @@ pp_snoLabel: {  /* L273 */
 pp_snoProtKwd: {  /* L274 */
     comm_stno(274);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){APLY_fn("ss", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){APPLY_fn("ss", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_pp;
         goto RETURN_LABEL_pp;
     }
@@ -10071,7 +10071,7 @@ pp_snoProtKwd: {  /* L274 */
 pp_snoReal: {  /* L275 */
     comm_stno(275);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){APLY_fn("ss", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){APPLY_fn("ss", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_pp;
         goto RETURN_LABEL_pp;
     }
@@ -10080,7 +10080,7 @@ pp_snoReal: {  /* L275 */
 pp_snoSpecialNm: {  /* L276 */
     comm_stno(276);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){APLY_fn("ss", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){APPLY_fn("ss", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_pp;
         goto RETURN_LABEL_pp;
     }
@@ -10089,7 +10089,7 @@ pp_snoSpecialNm: {  /* L276 */
 pp_snoString: {  /* L277 */
     comm_stno(277);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){APLY_fn("ss", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){APPLY_fn("ss", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_pp;
         goto RETURN_LABEL_pp;
     }
@@ -10098,7 +10098,7 @@ pp_snoString: {  /* L277 */
 pp_snoUnprotKwd: {  /* L278 */
     comm_stno(278);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){APLY_fn("ss", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){APPLY_fn("ss", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_pp;
         goto RETURN_LABEL_pp;
     }
@@ -10161,7 +10161,7 @@ _stmt_796: {  /* L285 */
 ppUnOp: {  /* L287 */
     comm_stno(287);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){APLY_fn("ss", (DESCR_t[2]){NV_GET_fn("x"), sub(NV_GET_fn("ppWidth"), APLY_fn("GetLevel", NULL, 0))}, 2)}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){APPLY_fn("ss", (DESCR_t[2]){NV_GET_fn("x"), sub(NV_GET_fn("ppWidth"), APPLY_fn("GetLevel", NULL, 0))}, 2)}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_798;
         goto RETURN_LABEL_pp;
     }
@@ -10170,7 +10170,7 @@ ppUnOp: {  /* L287 */
 _stmt_798: {  /* L288 */
     comm_stno(288);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){NV_GET_fn("t")}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){NV_GET_fn("t")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_799;
         goto _stmt_799;
     }
@@ -10179,7 +10179,7 @@ _stmt_798: {  /* L288 */
 _stmt_799: {  /* L289 */
     comm_stno(289);
     {
-        DESCR_t _ret = APLY_fn("pp", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), INTVAL(1LL))}, 1);
+        DESCR_t _ret = APPLY_fn("pp", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), INTVAL(1LL))}, 1);
         if (IS_FAIL_fn(_ret)) goto RETURN_LABEL_pp;
         goto RETURN_LABEL_pp;
     }
@@ -10188,7 +10188,7 @@ _stmt_799: {  /* L289 */
 ppBinOp: {  /* L290 */
     comm_stno(290);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){APLY_fn("ss", (DESCR_t[2]){NV_GET_fn("x"), sub(NV_GET_fn("ppWidth"), APLY_fn("GetLevel", NULL, 0))}, 2)}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){APPLY_fn("ss", (DESCR_t[2]){NV_GET_fn("x"), sub(NV_GET_fn("ppWidth"), APPLY_fn("GetLevel", NULL, 0))}, 2)}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_801;
         goto RETURN_LABEL_pp;
     }
@@ -10197,7 +10197,7 @@ ppBinOp: {  /* L290 */
 _stmt_801: {  /* L291 */
     comm_stno(291);
     {
-        DESCR_t _ret = APLY_fn("pp", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), INTVAL(1LL))}, 1);
+        DESCR_t _ret = APPLY_fn("pp", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), INTVAL(1LL))}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_802;
         goto _stmt_802;
     }
@@ -10206,7 +10206,7 @@ _stmt_801: {  /* L291 */
 _stmt_802: {  /* L292 */
     comm_stno(292);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){NV_GET_fn("nl")}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){NV_GET_fn("nl")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_803;
         goto _stmt_803;
     }
@@ -10215,7 +10215,7 @@ _stmt_802: {  /* L292 */
 _stmt_803: {  /* L293 */
     comm_stno(293);
     {
-        DESCR_t _ret = APLY_fn("DecLevel", NULL, 0);
+        DESCR_t _ret = APPLY_fn("DecLevel", NULL, 0);
         if (IS_FAIL_fn(_ret)) goto _stmt_804;
         goto _stmt_804;
     }
@@ -10224,7 +10224,7 @@ _stmt_803: {  /* L293 */
 _stmt_804: {  /* L294 */
     comm_stno(294);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){NV_GET_fn("t")}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){NV_GET_fn("t")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_805;
         goto _stmt_805;
     }
@@ -10233,7 +10233,7 @@ _stmt_804: {  /* L294 */
 _stmt_805: {  /* L295 */
     comm_stno(295);
     {
-        DESCR_t _ret = APLY_fn("IncLevel", NULL, 0);
+        DESCR_t _ret = APPLY_fn("IncLevel", NULL, 0);
         if (IS_FAIL_fn(_ret)) goto _stmt_806;
         goto _stmt_806;
     }
@@ -10242,7 +10242,7 @@ _stmt_805: {  /* L295 */
 _stmt_806: {  /* L296 */
     comm_stno(296);
     {
-        DESCR_t _ret = APLY_fn("GenTab", NULL, 0);
+        DESCR_t _ret = APPLY_fn("GenTab", NULL, 0);
         if (IS_FAIL_fn(_ret)) goto _stmt_807;
         goto _stmt_807;
     }
@@ -10251,7 +10251,7 @@ _stmt_806: {  /* L296 */
 _stmt_807: {  /* L297 */
     comm_stno(297);
     {
-        DESCR_t _ret = APLY_fn("pp", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), INTVAL(2LL))}, 1);
+        DESCR_t _ret = APPLY_fn("pp", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), INTVAL(2LL))}, 1);
         if (IS_FAIL_fn(_ret)) goto RETURN_LABEL_pp;
         goto RETURN_LABEL_pp;
     }
@@ -10260,7 +10260,7 @@ _stmt_807: {  /* L297 */
 pp_bang: {  /* L299 */
     comm_stno(299);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(1LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(1LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto pp_H;
         goto ppUnOp;
     }
@@ -10269,7 +10269,7 @@ pp_bang: {  /* L299 */
 pp_H: {  /* L300 */
     comm_stno(300);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(1LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(1LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto _stmt_810;
         goto ppUnOp;
     }
@@ -10278,7 +10278,7 @@ pp_H: {  /* L300 */
 _stmt_810: {  /* L301 */
     comm_stno(301);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_pp;
         goto ppBinOp;
     }
@@ -10297,7 +10297,7 @@ pp_dol: {  /* L302 */
 _stmt_812: {  /* L303 */
     comm_stno(303);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_pp;
         goto ppBinOp;
     }
@@ -10306,7 +10306,7 @@ _stmt_812: {  /* L303 */
 pp_pct: {  /* L304 */
     comm_stno(304);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(1LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(1LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto _stmt_814;
         goto ppUnOp;
     }
@@ -10315,7 +10315,7 @@ pp_pct: {  /* L304 */
 _stmt_814: {  /* L305 */
     comm_stno(305);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_pp;
         goto ppBinOp;
     }
@@ -10334,7 +10334,7 @@ pp_amp: {  /* L306 */
 _stmt_816: {  /* L307 */
     comm_stno(307);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_pp;
         goto ppBinOp;
     }
@@ -10349,7 +10349,7 @@ pp_star: {  /* L308 */
 _stmt_818: {  /* L309 */
     comm_stno(309);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_pp;
         goto ppBinOp;
     }
@@ -10368,7 +10368,7 @@ _stmt_819: {  /* L310 */
 _stmt_820: {  /* L311 */
     comm_stno(311);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_pp;
         goto ppBinOp;
     }
@@ -10383,7 +10383,7 @@ pp_minus: {  /* L312 */
 _stmt_822: {  /* L313 */
     comm_stno(313);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_pp;
         goto ppBinOp;
     }
@@ -10402,7 +10402,7 @@ _stmt_823: {  /* L314 */
 _stmt_824: {  /* L315 */
     comm_stno(315);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_pp;
         goto ppBinOp;
     }
@@ -10421,7 +10421,7 @@ _stmt_825: {  /* L316 */
 _stmt_826: {  /* L317 */
     comm_stno(317);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_pp;
         goto ppBinOp;
     }
@@ -10440,7 +10440,7 @@ _stmt_827: {  /* L318 */
 _stmt_828: {  /* L319 */
     comm_stno(319);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_pp;
         goto ppBinOp;
     }
@@ -10449,7 +10449,7 @@ _stmt_828: {  /* L319 */
 pp_q2: {  /* L320 */
     comm_stno(320);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(1LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(1LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto _stmt_830;
         goto ppUnOp;
     }
@@ -10458,7 +10458,7 @@ pp_q2: {  /* L320 */
 _stmt_830: {  /* L321 */
     comm_stno(321);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_pp;
         goto ppBinOp;
     }
@@ -10467,7 +10467,7 @@ _stmt_830: {  /* L321 */
 pp_A: {  /* L322 */
     comm_stno(322);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(1LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(1LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto _stmt_832;
         goto ppUnOp;
     }
@@ -10476,7 +10476,7 @@ pp_A: {  /* L322 */
 _stmt_832: {  /* L323 */
     comm_stno(323);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_pp;
         goto ppBinOp;
     }
@@ -10485,7 +10485,7 @@ _stmt_832: {  /* L323 */
 pp_hat: {  /* L324 */
     comm_stno(324);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_pp;
         goto ppBinOp;
     }
@@ -10494,7 +10494,7 @@ pp_hat: {  /* L324 */
 pp_til: {  /* L325 */
     comm_stno(325);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(1LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(1LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto _stmt_835;
         goto ppUnOp;
     }
@@ -10503,7 +10503,7 @@ pp_til: {  /* L325 */
 _stmt_835: {  /* L326 */
     comm_stno(326);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_pp;
         goto ppBinOp;
     }
@@ -10512,7 +10512,7 @@ _stmt_835: {  /* L326 */
 pp_snoComment: {  /* L328 */
     comm_stno(328);
     {
-        DESCR_t _ret = APLY_fn("SetLevel", (DESCR_t[1]){INTVAL(0LL)}, 1);
+        DESCR_t _ret = APPLY_fn("SetLevel", (DESCR_t[1]){INTVAL(0LL)}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_837;
         goto _stmt_837;
     }
@@ -10521,7 +10521,7 @@ pp_snoComment: {  /* L328 */
 _stmt_837: {  /* L329 */
     comm_stno(329);
     {
-        DESCR_t _ret = APLY_fn("GenSetCont", NULL, 0);
+        DESCR_t _ret = APPLY_fn("GenSetCont", NULL, 0);
         if (IS_FAIL_fn(_ret)) goto _stmt_838;
         goto _stmt_838;
     }
@@ -10530,7 +10530,7 @@ _stmt_837: {  /* L329 */
 _stmt_838: {  /* L330 */
     comm_stno(330);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){CONC_fn(APLY_fn("v", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), INTVAL(1LL))}, 1), NV_GET_fn("nl"))}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){CONCAT_fn(APPLY_fn("v", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), INTVAL(1LL))}, 1), NV_GET_fn("nl"))}, 1);
         if (IS_FAIL_fn(_ret)) goto RETURN_LABEL_pp;
         goto RETURN_LABEL_pp;
     }
@@ -10539,7 +10539,7 @@ _stmt_838: {  /* L330 */
 pp_snoControl: {  /* L332 */
     comm_stno(332);
     {
-        DESCR_t _ret = APLY_fn("SetLevel", (DESCR_t[1]){INTVAL(0LL)}, 1);
+        DESCR_t _ret = APPLY_fn("SetLevel", (DESCR_t[1]){INTVAL(0LL)}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_840;
         goto _stmt_840;
     }
@@ -10548,7 +10548,7 @@ pp_snoControl: {  /* L332 */
 _stmt_840: {  /* L333 */
     comm_stno(333);
     {
-        DESCR_t _ret = APLY_fn("GenSetCont", NULL, 0);
+        DESCR_t _ret = APPLY_fn("GenSetCont", NULL, 0);
         if (IS_FAIL_fn(_ret)) goto _stmt_841;
         goto _stmt_841;
     }
@@ -10557,7 +10557,7 @@ _stmt_840: {  /* L333 */
 _stmt_841: {  /* L334 */
     comm_stno(334);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){CONC_fn(APLY_fn("v", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), INTVAL(1LL))}, 1), NV_GET_fn("nl"))}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){CONCAT_fn(APPLY_fn("v", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), INTVAL(1LL))}, 1), NV_GET_fn("nl"))}, 1);
         if (IS_FAIL_fn(_ret)) goto RETURN_LABEL_pp;
         goto RETURN_LABEL_pp;
     }
@@ -10566,7 +10566,7 @@ _stmt_841: {  /* L334 */
 pp_snoStmt: {  /* L336 */
     comm_stno(336);
     {
-        DESCR_t _ret = APLY_fn("SetLevel", (DESCR_t[1]){INTVAL(0LL)}, 1);
+        DESCR_t _ret = APPLY_fn("SetLevel", (DESCR_t[1]){INTVAL(0LL)}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_843;
         goto _stmt_843;
     }
@@ -10575,7 +10575,7 @@ pp_snoStmt: {  /* L336 */
 _stmt_843: {  /* L337 */
     comm_stno(337);
     {
-        DESCR_t _ret = APLY_fn("GenSetCont", (DESCR_t[1]){STRVAL("+")}, 1);
+        DESCR_t _ret = APPLY_fn("GenSetCont", (DESCR_t[1]){STRVAL("+")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_844;
         goto _stmt_844;
     }
@@ -10594,7 +10594,7 @@ _stmt_844: {  /* L338 */
 _stmt_845: {  /* L339 */
     comm_stno(339);
     {
-        DESCR_t _rhs = APLY_fn("ss", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), INTVAL(1LL))}, 1);
+        DESCR_t _rhs = APPLY_fn("ss", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), INTVAL(1LL))}, 1);
         if (IS_FAIL_fn(_rhs)) goto _stmt_846;
         NV_SET_fn("ppLbl", _rhs);
         goto _stmt_846;
@@ -10624,7 +10624,7 @@ _stmt_847: {  /* L341 */
 _stmt_848: {  /* L342 */
     comm_stno(342);
     {
-        DESCR_t _rhs = APLY_fn("v", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), INTVAL(4LL))}, 1);
+        DESCR_t _rhs = APPLY_fn("v", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), INTVAL(4LL))}, 1);
         if (IS_FAIL_fn(_rhs)) goto _stmt_849;
         NV_SET_fn("ppAsgn", _rhs);
         goto _stmt_849;
@@ -10664,7 +10664,7 @@ _stmt_851: {  /* L345 */
 _stmt_852: {  /* L346 */
     comm_stno(346);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){NV_GET_fn("ppLbl")}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){NV_GET_fn("ppLbl")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_853;
         goto _stmt_853;
     }
@@ -10673,7 +10673,7 @@ _stmt_852: {  /* L346 */
 _stmt_853: {  /* L347 */
     comm_stno(347);
     {
-        DESCR_t _ret = APLY_fn("DIFFER", (DESCR_t[1]){APLY_fn("t", (DESCR_t[1]){NV_GET_fn("ppSubj")}, 1)}, 1);
+        DESCR_t _ret = APPLY_fn("DIFFER", (DESCR_t[1]){APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("ppSubj")}, 1)}, 1);
         if (IS_FAIL_fn(_ret)) goto pp_snoStmt7;
         goto _stmt_854;
     }
@@ -10682,7 +10682,7 @@ _stmt_853: {  /* L347 */
 _stmt_854: {  /* L348 */
     comm_stno(348);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){STRVAL(" ")}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){STRVAL(" ")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_855;
         goto _stmt_855;
     }
@@ -10691,7 +10691,7 @@ _stmt_854: {  /* L348 */
 _stmt_855: {  /* L349 */
     comm_stno(349);
     {
-        DESCR_t _ret = APLY_fn("GenTab", (DESCR_t[1]){subscript_get(NV_GET_fn("ppStop"), INTVAL(1LL))}, 1);
+        DESCR_t _ret = APPLY_fn("GenTab", (DESCR_t[1]){subscript_get(NV_GET_fn("ppStop"), INTVAL(1LL))}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_856;
         goto _stmt_856;
     }
@@ -10700,7 +10700,7 @@ _stmt_855: {  /* L349 */
 _stmt_856: {  /* L350 */
     comm_stno(350);
     {
-        DESCR_t _ret = APLY_fn("SetLevel", (DESCR_t[1]){subscript_get(NV_GET_fn("ppStop"), INTVAL(1LL))}, 1);
+        DESCR_t _ret = APPLY_fn("SetLevel", (DESCR_t[1]){subscript_get(NV_GET_fn("ppStop"), INTVAL(1LL))}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_857;
         goto _stmt_857;
     }
@@ -10709,7 +10709,7 @@ _stmt_856: {  /* L350 */
 _stmt_857: {  /* L351 */
     comm_stno(351);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn(APLY_fn("IDENT", (DESCR_t[1]){APLY_fn("t", (DESCR_t[1]){NV_GET_fn("ppPatrn")}, 1)}, 1), APLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("ppAsgn")}, 1)), APLY_fn("IDENT", (DESCR_t[1]){APLY_fn("t", (DESCR_t[1]){NV_GET_fn("ppGo1")}, 1)}, 1)), add(subscript_get(NV_GET_fn("ppStop"), INTVAL(4LL)), NV_GET_fn("ppLgBump")));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn(APPLY_fn("IDENT", (DESCR_t[1]){APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("ppPatrn")}, 1)}, 1), APPLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("ppAsgn")}, 1)), APPLY_fn("IDENT", (DESCR_t[1]){APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("ppGo1")}, 1)}, 1)), add(subscript_get(NV_GET_fn("ppStop"), INTVAL(4LL)), NV_GET_fn("ppLgBump")));
         if (IS_FAIL_fn(_rhs)) goto _stmt_858;
         NV_SET_fn("ppWidth", _rhs);
         goto _stmt_858;
@@ -10719,7 +10719,7 @@ _stmt_857: {  /* L351 */
 _stmt_858: {  /* L352 */
     comm_stno(352);
     {
-        DESCR_t _ret = APLY_fn("pp", (DESCR_t[1]){NV_GET_fn("ppSubj")}, 1);
+        DESCR_t _ret = APPLY_fn("pp", (DESCR_t[1]){NV_GET_fn("ppSubj")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_859;
         goto _stmt_859;
     }
@@ -10728,7 +10728,7 @@ _stmt_858: {  /* L352 */
 _stmt_859: {  /* L353 */
     comm_stno(353);
     {
-        DESCR_t _ret = APLY_fn("DIFFER", (DESCR_t[1]){APLY_fn("t", (DESCR_t[1]){NV_GET_fn("ppPatrn")}, 1)}, 1);
+        DESCR_t _ret = APPLY_fn("DIFFER", (DESCR_t[1]){APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("ppPatrn")}, 1)}, 1);
         if (IS_FAIL_fn(_ret)) goto pp_snoStmt5;
         goto _stmt_860;
     }
@@ -10737,7 +10737,7 @@ _stmt_859: {  /* L353 */
 _stmt_860: {  /* L354 */
     comm_stno(354);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){STRVAL(" ")}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){STRVAL(" ")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_861;
         goto _stmt_861;
     }
@@ -10746,7 +10746,7 @@ _stmt_860: {  /* L354 */
 _stmt_861: {  /* L355 */
     comm_stno(355);
     {
-        DESCR_t _ret = APLY_fn("GenTab", (DESCR_t[1]){subscript_get(NV_GET_fn("ppStop"), INTVAL(2LL))}, 1);
+        DESCR_t _ret = APPLY_fn("GenTab", (DESCR_t[1]){subscript_get(NV_GET_fn("ppStop"), INTVAL(2LL))}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_862;
         goto _stmt_862;
     }
@@ -10755,7 +10755,7 @@ _stmt_861: {  /* L355 */
 _stmt_862: {  /* L356 */
     comm_stno(356);
     {
-        DESCR_t _ret = APLY_fn("SetLevel", (DESCR_t[1]){subscript_get(NV_GET_fn("ppStop"), INTVAL(2LL))}, 1);
+        DESCR_t _ret = APPLY_fn("SetLevel", (DESCR_t[1]){subscript_get(NV_GET_fn("ppStop"), INTVAL(2LL))}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_863;
         goto _stmt_863;
     }
@@ -10764,7 +10764,7 @@ _stmt_862: {  /* L356 */
 _stmt_863: {  /* L357 */
     comm_stno(357);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(APLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("ppAsgn")}, 1), APLY_fn("IDENT", (DESCR_t[1]){APLY_fn("t", (DESCR_t[1]){NV_GET_fn("ppGo1")}, 1)}, 1)), add(subscript_get(NV_GET_fn("ppStop"), INTVAL(4LL)), NV_GET_fn("ppLgBump")));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(APPLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("ppAsgn")}, 1), APPLY_fn("IDENT", (DESCR_t[1]){APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("ppGo1")}, 1)}, 1)), add(subscript_get(NV_GET_fn("ppStop"), INTVAL(4LL)), NV_GET_fn("ppLgBump")));
         if (IS_FAIL_fn(_rhs)) goto _stmt_864;
         NV_SET_fn("ppWidth", _rhs);
         goto _stmt_864;
@@ -10774,7 +10774,7 @@ _stmt_863: {  /* L357 */
 _stmt_864: {  /* L358 */
     comm_stno(358);
     {
-        DESCR_t _ret = APLY_fn("pp", (DESCR_t[1]){NV_GET_fn("ppPatrn")}, 1);
+        DESCR_t _ret = APPLY_fn("pp", (DESCR_t[1]){NV_GET_fn("ppPatrn")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_865;
         goto _stmt_865;
     }
@@ -10783,7 +10783,7 @@ _stmt_864: {  /* L358 */
 _stmt_865: {  /* L359 */
     comm_stno(359);
     {
-        DESCR_t _ret = APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("ppAsgn")}, 1);
+        DESCR_t _ret = APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("ppAsgn")}, 1);
         if (IS_FAIL_fn(_ret)) goto pp_snoStmt7;
         goto _stmt_866;
     }
@@ -10792,7 +10792,7 @@ _stmt_865: {  /* L359 */
 _stmt_866: {  /* L360 */
     comm_stno(360);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){STRVAL(" =")}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){STRVAL(" =")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_867;
         goto _stmt_867;
     }
@@ -10801,7 +10801,7 @@ _stmt_866: {  /* L360 */
 _stmt_867: {  /* L361 */
     comm_stno(361);
     {
-        DESCR_t _ret = APLY_fn("DIFFER", (DESCR_t[1]){APLY_fn("t", (DESCR_t[1]){NV_GET_fn("ppRepl")}, 1)}, 1);
+        DESCR_t _ret = APPLY_fn("DIFFER", (DESCR_t[1]){APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("ppRepl")}, 1)}, 1);
         if (IS_FAIL_fn(_ret)) goto pp_snoStmt7;
         goto _stmt_868;
     }
@@ -10810,7 +10810,7 @@ _stmt_867: {  /* L361 */
 _stmt_868: {  /* L362 */
     comm_stno(362);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){STRVAL(" ")}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){STRVAL(" ")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_869;
         goto _stmt_869;
     }
@@ -10819,7 +10819,7 @@ _stmt_868: {  /* L362 */
 _stmt_869: {  /* L363 */
     comm_stno(363);
     {
-        DESCR_t _ret = APLY_fn("pp", (DESCR_t[1]){NV_GET_fn("ppRepl")}, 1);
+        DESCR_t _ret = APPLY_fn("pp", (DESCR_t[1]){NV_GET_fn("ppRepl")}, 1);
         if (IS_FAIL_fn(_ret)) goto pp_snoStmt7;
         goto pp_snoStmt7;
     }
@@ -10828,7 +10828,7 @@ _stmt_869: {  /* L363 */
 pp_snoStmt5: {  /* L364 */
     comm_stno(364);
     {
-        DESCR_t _ret = APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("ppAsgn")}, 1);
+        DESCR_t _ret = APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("ppAsgn")}, 1);
         if (IS_FAIL_fn(_ret)) goto pp_snoStmt7;
         goto _stmt_871;
     }
@@ -10837,7 +10837,7 @@ pp_snoStmt5: {  /* L364 */
 _stmt_871: {  /* L365 */
     comm_stno(365);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){STRVAL(" ")}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){STRVAL(" ")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_872;
         goto _stmt_872;
     }
@@ -10846,7 +10846,7 @@ _stmt_871: {  /* L365 */
 _stmt_872: {  /* L366 */
     comm_stno(366);
     {
-        DESCR_t _ret = APLY_fn("GenTab", (DESCR_t[1]){subscript_get(NV_GET_fn("ppStop"), INTVAL(2LL))}, 1);
+        DESCR_t _ret = APPLY_fn("GenTab", (DESCR_t[1]){subscript_get(NV_GET_fn("ppStop"), INTVAL(2LL))}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_873;
         goto _stmt_873;
     }
@@ -10855,7 +10855,7 @@ _stmt_872: {  /* L366 */
 _stmt_873: {  /* L367 */
     comm_stno(367);
     {
-        DESCR_t _ret = APLY_fn("SetLevel", (DESCR_t[1]){subscript_get(NV_GET_fn("ppStop"), INTVAL(2LL))}, 1);
+        DESCR_t _ret = APPLY_fn("SetLevel", (DESCR_t[1]){subscript_get(NV_GET_fn("ppStop"), INTVAL(2LL))}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_874;
         goto _stmt_874;
     }
@@ -10864,7 +10864,7 @@ _stmt_873: {  /* L367 */
 _stmt_874: {  /* L368 */
     comm_stno(368);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){STRVAL("=")}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){STRVAL("=")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_875;
         goto _stmt_875;
     }
@@ -10873,7 +10873,7 @@ _stmt_874: {  /* L368 */
 _stmt_875: {  /* L369 */
     comm_stno(369);
     {
-        DESCR_t _ret = APLY_fn("DIFFER", (DESCR_t[1]){APLY_fn("t", (DESCR_t[1]){NV_GET_fn("ppRepl")}, 1)}, 1);
+        DESCR_t _ret = APPLY_fn("DIFFER", (DESCR_t[1]){APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("ppRepl")}, 1)}, 1);
         if (IS_FAIL_fn(_ret)) goto pp_snoStmt7;
         goto _stmt_876;
     }
@@ -10882,7 +10882,7 @@ _stmt_875: {  /* L369 */
 _stmt_876: {  /* L370 */
     comm_stno(370);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){STRVAL(" ")}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){STRVAL(" ")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_877;
         goto _stmt_877;
     }
@@ -10891,7 +10891,7 @@ _stmt_876: {  /* L370 */
 _stmt_877: {  /* L371 */
     comm_stno(371);
     {
-        DESCR_t _ret = APLY_fn("GenTab", (DESCR_t[1]){subscript_get(NV_GET_fn("ppStop"), INTVAL(3LL))}, 1);
+        DESCR_t _ret = APPLY_fn("GenTab", (DESCR_t[1]){subscript_get(NV_GET_fn("ppStop"), INTVAL(3LL))}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_878;
         goto _stmt_878;
     }
@@ -10900,7 +10900,7 @@ _stmt_877: {  /* L371 */
 _stmt_878: {  /* L372 */
     comm_stno(372);
     {
-        DESCR_t _ret = APLY_fn("SetLevel", (DESCR_t[1]){subscript_get(NV_GET_fn("ppStop"), INTVAL(3LL))}, 1);
+        DESCR_t _ret = APPLY_fn("SetLevel", (DESCR_t[1]){subscript_get(NV_GET_fn("ppStop"), INTVAL(3LL))}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_879;
         goto _stmt_879;
     }
@@ -10909,7 +10909,7 @@ _stmt_878: {  /* L372 */
 _stmt_879: {  /* L373 */
     comm_stno(373);
     {
-        DESCR_t _rhs = CONC_fn(APLY_fn("IDENT", (DESCR_t[1]){APLY_fn("t", (DESCR_t[1]){NV_GET_fn("ppGo1")}, 1)}, 1), add(subscript_get(NV_GET_fn("ppStop"), INTVAL(4LL)), NV_GET_fn("ppLgBump")));
+        DESCR_t _rhs = CONCAT_fn(APPLY_fn("IDENT", (DESCR_t[1]){APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("ppGo1")}, 1)}, 1), add(subscript_get(NV_GET_fn("ppStop"), INTVAL(4LL)), NV_GET_fn("ppLgBump")));
         if (IS_FAIL_fn(_rhs)) goto _stmt_880;
         NV_SET_fn("ppWidth", _rhs);
         goto _stmt_880;
@@ -10919,7 +10919,7 @@ _stmt_879: {  /* L373 */
 _stmt_880: {  /* L374 */
     comm_stno(374);
     {
-        DESCR_t _ret = APLY_fn("pp", (DESCR_t[1]){NV_GET_fn("ppRepl")}, 1);
+        DESCR_t _ret = APPLY_fn("pp", (DESCR_t[1]){NV_GET_fn("ppRepl")}, 1);
         if (IS_FAIL_fn(_ret)) goto pp_snoStmt7;
         goto pp_snoStmt7;
     }
@@ -10928,7 +10928,7 @@ _stmt_880: {  /* L374 */
 pp_snoStmt7: {  /* L375 */
     comm_stno(375);
     {
-        DESCR_t _ret = APLY_fn("DIFFER", (DESCR_t[1]){APLY_fn("t", (DESCR_t[1]){NV_GET_fn("ppGo1")}, 1)}, 1);
+        DESCR_t _ret = APPLY_fn("DIFFER", (DESCR_t[1]){APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("ppGo1")}, 1)}, 1);
         if (IS_FAIL_fn(_ret)) goto pp_snoStmt9;
         goto _stmt_882;
     }
@@ -10947,7 +10947,7 @@ _stmt_882: {  /* L376 */
 _stmt_883: {  /* L377 */
     comm_stno(377);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){STRVAL(" ")}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){STRVAL(" ")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_884;
         goto _stmt_884;
     }
@@ -10956,7 +10956,7 @@ _stmt_883: {  /* L377 */
 _stmt_884: {  /* L378 */
     comm_stno(378);
     {
-        DESCR_t _ret = APLY_fn("GenTab", (DESCR_t[1]){subscript_get(NV_GET_fn("ppStop"), INTVAL(4LL))}, 1);
+        DESCR_t _ret = APPLY_fn("GenTab", (DESCR_t[1]){subscript_get(NV_GET_fn("ppStop"), INTVAL(4LL))}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_885;
         goto _stmt_885;
     }
@@ -10965,7 +10965,7 @@ _stmt_884: {  /* L378 */
 _stmt_885: {  /* L379 */
     comm_stno(379);
     {
-        DESCR_t _ret = APLY_fn("SetLevel", (DESCR_t[1]){subscript_get(NV_GET_fn("ppStop"), INTVAL(4LL))}, 1);
+        DESCR_t _ret = APPLY_fn("SetLevel", (DESCR_t[1]){subscript_get(NV_GET_fn("ppStop"), INTVAL(4LL))}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_886;
         goto _stmt_886;
     }
@@ -10974,7 +10974,7 @@ _stmt_885: {  /* L379 */
 _stmt_886: {  /* L380 */
     comm_stno(380);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){STRVAL(":")}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){STRVAL(":")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_887;
         goto _stmt_887;
     }
@@ -10983,7 +10983,7 @@ _stmt_886: {  /* L380 */
 _stmt_887: {  /* L381 */
     comm_stno(381);
     {
-        DESCR_t _ret = APLY_fn("pp", (DESCR_t[1]){NV_GET_fn("ppGo1")}, 1);
+        DESCR_t _ret = APPLY_fn("pp", (DESCR_t[1]){NV_GET_fn("ppGo1")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_888;
         goto _stmt_888;
     }
@@ -10992,7 +10992,7 @@ _stmt_887: {  /* L381 */
 _stmt_888: {  /* L382 */
     comm_stno(382);
     {
-        DESCR_t _ret = APLY_fn("DIFFER", (DESCR_t[1]){APLY_fn("t", (DESCR_t[1]){NV_GET_fn("ppGo2")}, 1)}, 1);
+        DESCR_t _ret = APPLY_fn("DIFFER", (DESCR_t[1]){APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("ppGo2")}, 1)}, 1);
         if (IS_FAIL_fn(_ret)) goto pp_snoStmt9;
         goto _stmt_889;
     }
@@ -11001,7 +11001,7 @@ _stmt_888: {  /* L382 */
 _stmt_889: {  /* L383 */
     comm_stno(383);
     {
-        DESCR_t _ret = APLY_fn("pp", (DESCR_t[1]){NV_GET_fn("ppGo2")}, 1);
+        DESCR_t _ret = APPLY_fn("pp", (DESCR_t[1]){NV_GET_fn("ppGo2")}, 1);
         if (IS_FAIL_fn(_ret)) goto pp_snoStmt9;
         goto pp_snoStmt9;
     }
@@ -11010,7 +11010,7 @@ _stmt_889: {  /* L383 */
 pp_snoStmt9: {  /* L384 */
     comm_stno(384);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){NV_GET_fn("nl")}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){NV_GET_fn("nl")}, 1);
         if (IS_FAIL_fn(_ret)) goto RETURN_LABEL_pp;
         goto RETURN_LABEL_pp;
     }
@@ -11019,7 +11019,7 @@ pp_snoStmt9: {  /* L384 */
 pp_snoExprList: {  /* L386 */
     comm_stno(386);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){APLY_fn("ss", (DESCR_t[2]){NV_GET_fn("x"), sub(NV_GET_fn("ppWidth"), APLY_fn("GetLevel", NULL, 0))}, 2)}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){APPLY_fn("ss", (DESCR_t[2]){NV_GET_fn("x"), sub(NV_GET_fn("ppWidth"), APPLY_fn("GetLevel", NULL, 0))}, 2)}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_892;
         goto RETURN_LABEL_pp;
     }
@@ -11028,7 +11028,7 @@ pp_snoExprList: {  /* L386 */
 _stmt_892: {  /* L387 */
     comm_stno(387);
     {
-        DESCR_t _ret = APLY_fn("pp", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), INTVAL(1LL))}, 1);
+        DESCR_t _ret = APPLY_fn("pp", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), INTVAL(1LL))}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_893;
         goto _stmt_893;
     }
@@ -11047,7 +11047,7 @@ _stmt_893: {  /* L388 */
 pp_snoExprList0: {  /* L389 */
     comm_stno(389);
     {
-        DESCR_t _rhs = CONC_fn((lt(NV_GET_fn("i"),NV_GET_fn("n")) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL)));
+        DESCR_t _rhs = CONCAT_fn((lt(NV_GET_fn("i"),NV_GET_fn("n")) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL)));
         if (IS_FAIL_fn(_rhs)) goto RETURN_LABEL_pp;
         NV_SET_fn("i", _rhs);
         goto _stmt_895;
@@ -11057,7 +11057,7 @@ pp_snoExprList0: {  /* L389 */
 _stmt_895: {  /* L390 */
     comm_stno(390);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){NV_GET_fn("nl")}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){NV_GET_fn("nl")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_896;
         goto _stmt_896;
     }
@@ -11066,7 +11066,7 @@ _stmt_895: {  /* L390 */
 _stmt_896: {  /* L391 */
     comm_stno(391);
     {
-        DESCR_t _ret = APLY_fn("DecLevel", NULL, 0);
+        DESCR_t _ret = APPLY_fn("DecLevel", NULL, 0);
         if (IS_FAIL_fn(_ret)) goto _stmt_897;
         goto _stmt_897;
     }
@@ -11075,7 +11075,7 @@ _stmt_896: {  /* L391 */
 _stmt_897: {  /* L392 */
     comm_stno(392);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){STRVAL(",")}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){STRVAL(",")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_898;
         goto _stmt_898;
     }
@@ -11084,7 +11084,7 @@ _stmt_897: {  /* L392 */
 _stmt_898: {  /* L393 */
     comm_stno(393);
     {
-        DESCR_t _ret = APLY_fn("IncLevel", NULL, 0);
+        DESCR_t _ret = APPLY_fn("IncLevel", NULL, 0);
         if (IS_FAIL_fn(_ret)) goto _stmt_899;
         goto _stmt_899;
     }
@@ -11093,7 +11093,7 @@ _stmt_898: {  /* L393 */
 _stmt_899: {  /* L394 */
     comm_stno(394);
     {
-        DESCR_t _ret = APLY_fn("GenTab", NULL, 0);
+        DESCR_t _ret = APPLY_fn("GenTab", NULL, 0);
         if (IS_FAIL_fn(_ret)) goto _stmt_900;
         goto _stmt_900;
     }
@@ -11102,7 +11102,7 @@ _stmt_899: {  /* L394 */
 _stmt_900: {  /* L395 */
     comm_stno(395);
     {
-        DESCR_t _ret = APLY_fn("pp", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), NV_GET_fn("i"))}, 1);
+        DESCR_t _ret = APPLY_fn("pp", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), NV_GET_fn("i"))}, 1);
         if (IS_FAIL_fn(_ret)) goto pp_snoExprList0;
         goto pp_snoExprList0;
     }
@@ -11121,7 +11121,7 @@ _stmt_901: {  /* L397 */
 _stmt_902: {  /* L398 */
     comm_stno(398);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){STRVAL("(")}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){STRVAL("(")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_903;
         goto _stmt_903;
     }
@@ -11130,7 +11130,7 @@ _stmt_902: {  /* L398 */
 _stmt_903: {  /* L399 */
     comm_stno(399);
     {
-        DESCR_t _ret = APLY_fn("IncLevel", NULL, 0);
+        DESCR_t _ret = APPLY_fn("IncLevel", NULL, 0);
         if (IS_FAIL_fn(_ret)) goto _stmt_904;
         goto _stmt_904;
     }
@@ -11139,7 +11139,7 @@ _stmt_903: {  /* L399 */
 _stmt_904: {  /* L400 */
     comm_stno(400);
     {
-        DESCR_t _ret = APLY_fn("GenTab", NULL, 0);
+        DESCR_t _ret = APPLY_fn("GenTab", NULL, 0);
         if (IS_FAIL_fn(_ret)) goto _stmt_905;
         goto _stmt_905;
     }
@@ -11148,7 +11148,7 @@ _stmt_904: {  /* L400 */
 _stmt_905: {  /* L401 */
     comm_stno(401);
     {
-        DESCR_t _ret = APLY_fn("pp", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), INTVAL(1LL))}, 1);
+        DESCR_t _ret = APPLY_fn("pp", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), INTVAL(1LL))}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_906;
         goto _stmt_906;
     }
@@ -11168,7 +11168,7 @@ _stmt_907: {  /* L403 */
     comm_stno(403);
     {
         DESCR_t _subj = NV_GET_fn("pp_");
-        int _ok = match_and_replace(&_subj, pat_epsilon(), CONC_fn((lt(NV_GET_fn("i"),NV_GET_fn("n")) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL))));
+        int _ok = match_and_replace(&_subj, pat_epsilon(), CONCAT_fn((lt(NV_GET_fn("i"),NV_GET_fn("n")) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL))));
         NV_SET_fn("pp_", _subj);
         if (_ok) goto _stmt_908;
         else goto _stmt_908;
@@ -11178,7 +11178,7 @@ _stmt_907: {  /* L403 */
 _stmt_908: {  /* L404 */
     comm_stno(404);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){NV_GET_fn("nl")}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){NV_GET_fn("nl")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_909;
         goto _stmt_909;
     }
@@ -11187,7 +11187,7 @@ _stmt_908: {  /* L404 */
 _stmt_909: {  /* L405 */
     comm_stno(405);
     {
-        DESCR_t _ret = APLY_fn("DecLevel", NULL, 0);
+        DESCR_t _ret = APPLY_fn("DecLevel", NULL, 0);
         if (IS_FAIL_fn(_ret)) goto _stmt_910;
         goto _stmt_910;
     }
@@ -11196,7 +11196,7 @@ _stmt_909: {  /* L405 */
 _stmt_910: {  /* L406 */
     comm_stno(406);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){STRVAL(",")}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){STRVAL(",")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_911;
         goto _stmt_911;
     }
@@ -11205,7 +11205,7 @@ _stmt_910: {  /* L406 */
 _stmt_911: {  /* L407 */
     comm_stno(407);
     {
-        DESCR_t _ret = APLY_fn("IncLevel", NULL, 0);
+        DESCR_t _ret = APPLY_fn("IncLevel", NULL, 0);
         if (IS_FAIL_fn(_ret)) goto _stmt_912;
         goto _stmt_912;
     }
@@ -11214,7 +11214,7 @@ _stmt_911: {  /* L407 */
 _stmt_912: {  /* L408 */
     comm_stno(408);
     {
-        DESCR_t _ret = APLY_fn("GenTab", NULL, 0);
+        DESCR_t _ret = APPLY_fn("GenTab", NULL, 0);
         if (IS_FAIL_fn(_ret)) goto _stmt_913;
         goto _stmt_913;
     }
@@ -11223,7 +11223,7 @@ _stmt_912: {  /* L408 */
 _stmt_913: {  /* L409 */
     comm_stno(409);
     {
-        DESCR_t _ret = APLY_fn("pp", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), NV_GET_fn("i"))}, 1);
+        DESCR_t _ret = APPLY_fn("pp", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), NV_GET_fn("i"))}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_914;
         goto _stmt_914;
     }
@@ -11242,7 +11242,7 @@ _stmt_914: {  /* L410 */
 _stmt_915: {  /* L411 */
     comm_stno(411);
     {
-        DESCR_t _ret = APLY_fn("DecLevel", NULL, 0);
+        DESCR_t _ret = APPLY_fn("DecLevel", NULL, 0);
         if (IS_FAIL_fn(_ret)) goto _stmt_916;
         goto _stmt_916;
     }
@@ -11251,7 +11251,7 @@ _stmt_915: {  /* L411 */
 _stmt_916: {  /* L412 */
     comm_stno(412);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){STRVAL(")")}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){STRVAL(")")}, 1);
         if (IS_FAIL_fn(_ret)) goto RETURN_LABEL_pp;
         goto RETURN_LABEL_pp;
     }
@@ -11270,7 +11270,7 @@ _stmt_917: {  /* L414 */
 _stmt_918: {  /* L415 */
     comm_stno(415);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){APLY_fn("ss", (DESCR_t[2]){NV_GET_fn("x"), sub(NV_GET_fn("ppWidth"), APLY_fn("GetLevel", NULL, 0))}, 2)}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){APPLY_fn("ss", (DESCR_t[2]){NV_GET_fn("x"), sub(NV_GET_fn("ppWidth"), APPLY_fn("GetLevel", NULL, 0))}, 2)}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_919;
         goto RETURN_LABEL_pp;
     }
@@ -11279,7 +11279,7 @@ _stmt_918: {  /* L415 */
 _stmt_919: {  /* L416 */
     comm_stno(416);
     {
-        DESCR_t _ret = APLY_fn("pp", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), INTVAL(1LL))}, 1);
+        DESCR_t _ret = APPLY_fn("pp", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), INTVAL(1LL))}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_920;
         goto _stmt_920;
     }
@@ -11299,7 +11299,7 @@ _stmt_921: {  /* L418 */
     comm_stno(418);
     {
         DESCR_t _subj = NV_GET_fn("pp_");
-        int _ok = match_and_replace(&_subj, pat_alt(pat_epsilon(), pat_cat(pat_lit("0"), var_as_pattern(NV_GET_fn("i")))), CONC_fn((lt(NV_GET_fn("i"),NV_GET_fn("n")) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL))));
+        int _ok = match_and_replace(&_subj, pat_alt(pat_epsilon(), pat_cat(pat_lit("0"), var_as_pattern(NV_GET_fn("i")))), CONCAT_fn((lt(NV_GET_fn("i"),NV_GET_fn("n")) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL))));
         NV_SET_fn("pp_", _subj);
         if (_ok) goto _stmt_922;
         else goto RETURN_LABEL_pp;
@@ -11309,7 +11309,7 @@ _stmt_921: {  /* L418 */
 _stmt_922: {  /* L419 */
     comm_stno(419);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){NV_GET_fn("nl")}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){NV_GET_fn("nl")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_923;
         goto _stmt_923;
     }
@@ -11318,7 +11318,7 @@ _stmt_922: {  /* L419 */
 _stmt_923: {  /* L420 */
     comm_stno(420);
     {
-        DESCR_t _ret = APLY_fn("DecLevel", NULL, 0);
+        DESCR_t _ret = APPLY_fn("DecLevel", NULL, 0);
         if (IS_FAIL_fn(_ret)) goto _stmt_924;
         goto _stmt_924;
     }
@@ -11327,7 +11327,7 @@ _stmt_923: {  /* L420 */
 _stmt_924: {  /* L421 */
     comm_stno(421);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){STRVAL("|")}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){STRVAL("|")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_925;
         goto _stmt_925;
     }
@@ -11336,7 +11336,7 @@ _stmt_924: {  /* L421 */
 _stmt_925: {  /* L422 */
     comm_stno(422);
     {
-        DESCR_t _ret = APLY_fn("IncLevel", NULL, 0);
+        DESCR_t _ret = APPLY_fn("IncLevel", NULL, 0);
         if (IS_FAIL_fn(_ret)) goto _stmt_926;
         goto _stmt_926;
     }
@@ -11345,7 +11345,7 @@ _stmt_925: {  /* L422 */
 _stmt_926: {  /* L423 */
     comm_stno(423);
     {
-        DESCR_t _ret = APLY_fn("GenTab", NULL, 0);
+        DESCR_t _ret = APPLY_fn("GenTab", NULL, 0);
         if (IS_FAIL_fn(_ret)) goto _stmt_927;
         goto _stmt_927;
     }
@@ -11354,7 +11354,7 @@ _stmt_926: {  /* L423 */
 _stmt_927: {  /* L424 */
     comm_stno(424);
     {
-        DESCR_t _ret = APLY_fn("pp", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), NV_GET_fn("i"))}, 1);
+        DESCR_t _ret = APPLY_fn("pp", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), NV_GET_fn("i"))}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_928;
         goto _stmt_928;
     }
@@ -11384,7 +11384,7 @@ _stmt_930: {  /* L428 */
     comm_stno(428);
     {
         DESCR_t _subj = NV_GET_fn("pp_");
-        int _ok = match_and_replace(&_subj, pat_assign_cond(pat_epsilon(), NULVCL), CONC_fn((lt(NV_GET_fn("i"),NV_GET_fn("n")) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL))));
+        int _ok = match_and_replace(&_subj, pat_assign_cond(pat_epsilon(), NULVCL), CONCAT_fn((lt(NV_GET_fn("i"),NV_GET_fn("n")) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL))));
         NV_SET_fn("pp_", _subj);
         if (_ok) goto _stmt_931;
         else goto RETURN_LABEL_pp;
@@ -11394,7 +11394,7 @@ _stmt_930: {  /* L428 */
 _stmt_931: {  /* L429 */
     comm_stno(429);
     {
-        DESCR_t _ret = APLY_fn("pp", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), NV_GET_fn("i"))}, 1);
+        DESCR_t _ret = APPLY_fn("pp", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), NV_GET_fn("i"))}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_932;
         goto _stmt_932;
     }
@@ -11410,7 +11410,7 @@ _stmt_933: {  /* L432 */
     comm_stno(432);
     {
         DESCR_t _subj = NULVCL /* array subscript */;
-        int _ok = match_pattern(pat_user_call("Gen", (DESCR_t[1]){APLY_fn("ss", (DESCR_t[2]){NV_GET_fn("x"), sub(NV_GET_fn("ppWidth"), APLY_fn("GetLevel", NULL, 0))}, 2)}, 1), VARVAL_fn(_subj));
+        int _ok = match_pattern(pat_user_call("Gen", (DESCR_t[1]){APPLY_fn("ss", (DESCR_t[2]){NV_GET_fn("x"), sub(NV_GET_fn("ppWidth"), APPLY_fn("GetLevel", NULL, 0))}, 2)}, 1), VARVAL_fn(_subj));
         if (_ok) goto RETURN_LABEL_pp;
         else goto _stmt_934;
     }
@@ -11419,7 +11419,7 @@ _stmt_933: {  /* L432 */
 _stmt_934: {  /* L433 */
     comm_stno(433);
     {
-        DESCR_t _ret = APLY_fn("pp", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), INTVAL(1LL))}, 1);
+        DESCR_t _ret = APPLY_fn("pp", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), INTVAL(1LL))}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_935;
         goto _stmt_935;
     }
@@ -11439,7 +11439,7 @@ _stmt_936: {  /* L435 */
     comm_stno(435);
     {
         DESCR_t _subj = NULVCL /* array subscript */;
-        int _ok = match_and_replace(&_subj, pat_cat(pat_lit("0"), var_as_pattern(NV_GET_fn("i"))), CONC_fn((lt(NV_GET_fn("i"),NV_GET_fn("n")) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL))));
+        int _ok = match_and_replace(&_subj, pat_cat(pat_lit("0"), var_as_pattern(NV_GET_fn("i"))), CONCAT_fn((lt(NV_GET_fn("i"),NV_GET_fn("n")) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL))));
         /* unhandled assignment target kind=array */;
         if (_ok) goto _stmt_937;
         else goto RETURN_LABEL_pp;
@@ -11449,7 +11449,7 @@ _stmt_936: {  /* L435 */
 _stmt_937: {  /* L436 */
     comm_stno(436);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){STRVAL("[")}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){STRVAL("[")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_938;
         goto _stmt_938;
     }
@@ -11458,7 +11458,7 @@ _stmt_937: {  /* L436 */
 _stmt_938: {  /* L437 */
     comm_stno(437);
     {
-        DESCR_t _ret = APLY_fn("IncLevel", NULL, 0);
+        DESCR_t _ret = APPLY_fn("IncLevel", NULL, 0);
         if (IS_FAIL_fn(_ret)) goto _stmt_939;
         goto _stmt_939;
     }
@@ -11467,7 +11467,7 @@ _stmt_938: {  /* L437 */
 _stmt_939: {  /* L438 */
     comm_stno(438);
     {
-        DESCR_t _ret = APLY_fn("GenTab", NULL, 0);
+        DESCR_t _ret = APPLY_fn("GenTab", NULL, 0);
         if (IS_FAIL_fn(_ret)) goto _stmt_940;
         goto _stmt_940;
     }
@@ -11476,7 +11476,7 @@ _stmt_939: {  /* L438 */
 _stmt_940: {  /* L439 */
     comm_stno(439);
     {
-        DESCR_t _ret = APLY_fn("pp", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), NV_GET_fn("i"))}, 1);
+        DESCR_t _ret = APPLY_fn("pp", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), NV_GET_fn("i"))}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_941;
         goto _stmt_941;
     }
@@ -11485,7 +11485,7 @@ _stmt_940: {  /* L439 */
 _stmt_941: {  /* L440 */
     comm_stno(440);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){NV_GET_fn("nl")}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){NV_GET_fn("nl")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_942;
         goto _stmt_942;
     }
@@ -11494,7 +11494,7 @@ _stmt_941: {  /* L440 */
 _stmt_942: {  /* L441 */
     comm_stno(441);
     {
-        DESCR_t _ret = APLY_fn("DecLevel", NULL, 0);
+        DESCR_t _ret = APPLY_fn("DecLevel", NULL, 0);
         if (IS_FAIL_fn(_ret)) goto _stmt_943;
         goto _stmt_943;
     }
@@ -11503,7 +11503,7 @@ _stmt_942: {  /* L441 */
 _stmt_943: {  /* L442 */
     comm_stno(442);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){STRVAL("]")}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){STRVAL("]")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_944;
         goto _stmt_944;
     }
@@ -11518,8 +11518,8 @@ _stmt_944: {  /* L443 */
 _stmt_945: {  /* L445 */
     comm_stno(445);
     {
-        DESCR_t _subj = APLY_fn("pp_", NULL, 0);
-        int _ok = match_pattern(pat_user_call("Gen", (DESCR_t[1]){APLY_fn("ss", (DESCR_t[2]){NV_GET_fn("x"), sub(NV_GET_fn("ppWidth"), APLY_fn("GetLevel", NULL, 0))}, 2)}, 1), VARVAL_fn(_subj));
+        DESCR_t _subj = APPLY_fn("pp_", NULL, 0);
+        int _ok = match_pattern(pat_user_call("Gen", (DESCR_t[1]){APPLY_fn("ss", (DESCR_t[2]){NV_GET_fn("x"), sub(NV_GET_fn("ppWidth"), APPLY_fn("GetLevel", NULL, 0))}, 2)}, 1), VARVAL_fn(_subj));
         if (_ok) goto RETURN_LABEL_pp;
         else goto _stmt_946;
     }
@@ -11528,7 +11528,7 @@ _stmt_945: {  /* L445 */
 _stmt_946: {  /* L446 */
     comm_stno(446);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){STRVAL("(")}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){STRVAL("(")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_947;
         goto _stmt_947;
     }
@@ -11537,7 +11537,7 @@ _stmt_946: {  /* L446 */
 _stmt_947: {  /* L447 */
     comm_stno(447);
     {
-        DESCR_t _ret = APLY_fn("IncLevel", NULL, 0);
+        DESCR_t _ret = APPLY_fn("IncLevel", NULL, 0);
         if (IS_FAIL_fn(_ret)) goto _stmt_948;
         goto _stmt_948;
     }
@@ -11546,7 +11546,7 @@ _stmt_947: {  /* L447 */
 _stmt_948: {  /* L448 */
     comm_stno(448);
     {
-        DESCR_t _ret = APLY_fn("GenTab", NULL, 0);
+        DESCR_t _ret = APPLY_fn("GenTab", NULL, 0);
         if (IS_FAIL_fn(_ret)) goto _stmt_949;
         goto _stmt_949;
     }
@@ -11555,7 +11555,7 @@ _stmt_948: {  /* L448 */
 _stmt_949: {  /* L449 */
     comm_stno(449);
     {
-        DESCR_t _ret = APLY_fn("pp", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), INTVAL(1LL))}, 1);
+        DESCR_t _ret = APPLY_fn("pp", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), INTVAL(1LL))}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_950;
         goto _stmt_950;
     }
@@ -11564,7 +11564,7 @@ _stmt_949: {  /* L449 */
 _stmt_950: {  /* L450 */
     comm_stno(450);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){NV_GET_fn("nl")}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){NV_GET_fn("nl")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_951;
         goto _stmt_951;
     }
@@ -11573,7 +11573,7 @@ _stmt_950: {  /* L450 */
 _stmt_951: {  /* L451 */
     comm_stno(451);
     {
-        DESCR_t _ret = APLY_fn("DecLevel", NULL, 0);
+        DESCR_t _ret = APPLY_fn("DecLevel", NULL, 0);
         if (IS_FAIL_fn(_ret)) goto _stmt_952;
         goto _stmt_952;
     }
@@ -11582,7 +11582,7 @@ _stmt_951: {  /* L451 */
 _stmt_952: {  /* L452 */
     comm_stno(452);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){STRVAL(")")}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){STRVAL(")")}, 1);
         if (IS_FAIL_fn(_ret)) goto RETURN_LABEL_pp;
         goto RETURN_LABEL_pp;
     }
@@ -11591,7 +11591,7 @@ _stmt_952: {  /* L452 */
 pp_snoCall: {  /* L454 */
     comm_stno(454);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){APLY_fn("ss", (DESCR_t[2]){NV_GET_fn("x"), sub(NV_GET_fn("ppWidth"), APLY_fn("GetLevel", NULL, 0))}, 2)}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){APPLY_fn("ss", (DESCR_t[2]){NV_GET_fn("x"), sub(NV_GET_fn("ppWidth"), APPLY_fn("GetLevel", NULL, 0))}, 2)}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_954;
         goto RETURN_LABEL_pp;
     }
@@ -11600,7 +11600,7 @@ pp_snoCall: {  /* L454 */
 _stmt_954: {  /* L455 */
     comm_stno(455);
     {
-        DESCR_t _ret = APLY_fn("pp", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), INTVAL(1LL))}, 1);
+        DESCR_t _ret = APPLY_fn("pp", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), INTVAL(1LL))}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_955;
         goto _stmt_955;
     }
@@ -11609,7 +11609,7 @@ _stmt_954: {  /* L455 */
 _stmt_955: {  /* L456 */
     comm_stno(456);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){CONC_fn(STRVAL("("), NV_GET_fn("nl"))}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){CONCAT_fn(STRVAL("("), NV_GET_fn("nl"))}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_956;
         goto _stmt_956;
     }
@@ -11618,7 +11618,7 @@ _stmt_955: {  /* L456 */
 _stmt_956: {  /* L457 */
     comm_stno(457);
     {
-        DESCR_t _ret = APLY_fn("IncLevel", NULL, 0);
+        DESCR_t _ret = APPLY_fn("IncLevel", NULL, 0);
         if (IS_FAIL_fn(_ret)) goto _stmt_957;
         goto _stmt_957;
     }
@@ -11627,7 +11627,7 @@ _stmt_956: {  /* L457 */
 _stmt_957: {  /* L458 */
     comm_stno(458);
     {
-        DESCR_t _ret = APLY_fn("GenTab", NULL, 0);
+        DESCR_t _ret = APPLY_fn("GenTab", NULL, 0);
         if (IS_FAIL_fn(_ret)) goto _stmt_958;
         goto _stmt_958;
     }
@@ -11636,7 +11636,7 @@ _stmt_957: {  /* L458 */
 _stmt_958: {  /* L459 */
     comm_stno(459);
     {
-        DESCR_t _ret = APLY_fn("pp", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), INTVAL(2LL))}, 1);
+        DESCR_t _ret = APPLY_fn("pp", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), INTVAL(2LL))}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_959;
         goto _stmt_959;
     }
@@ -11645,7 +11645,7 @@ _stmt_958: {  /* L459 */
 _stmt_959: {  /* L460 */
     comm_stno(460);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){NV_GET_fn("nl")}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){NV_GET_fn("nl")}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_960;
         goto _stmt_960;
     }
@@ -11654,7 +11654,7 @@ _stmt_959: {  /* L460 */
 _stmt_960: {  /* L461 */
     comm_stno(461);
     {
-        DESCR_t _ret = APLY_fn("DecLevel", NULL, 0);
+        DESCR_t _ret = APPLY_fn("DecLevel", NULL, 0);
         if (IS_FAIL_fn(_ret)) goto _stmt_961;
         goto _stmt_961;
     }
@@ -11663,7 +11663,7 @@ _stmt_960: {  /* L461 */
 _stmt_961: {  /* L462 */
     comm_stno(462);
     {
-        DESCR_t _ret = APLY_fn("Gen", (DESCR_t[1]){STRVAL(")")}, 1);
+        DESCR_t _ret = APPLY_fn("Gen", (DESCR_t[1]){STRVAL(")")}, 1);
         if (IS_FAIL_fn(_ret)) goto RETURN_LABEL_pp;
         goto RETURN_LABEL_pp;
     }
@@ -11751,7 +11751,7 @@ static DESCR_t uf_ss(DESCR_t *_args, int _nargs) {
 ss: {  /* L470 */
     comm_stno(470);
     {
-        DESCR_t _ret = APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("x")}, 1);
+        DESCR_t _ret = APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("x")}, 1);
         if (IS_FAIL_fn(_ret)) goto RETURN_LABEL_ss;
         goto _stmt_965;
     }
@@ -11760,7 +11760,7 @@ ss: {  /* L470 */
 _stmt_965: {  /* L471 */
     comm_stno(471);
     {
-        DESCR_t _rhs = CONC_fn(APLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("len")}, 1), INTVAL(1024LL));
+        DESCR_t _rhs = CONCAT_fn(APPLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("len")}, 1), INTVAL(1024LL));
         if (IS_FAIL_fn(_rhs)) goto _stmt_966;
         NV_SET_fn("len", _rhs);
         goto _stmt_966;
@@ -11770,7 +11770,7 @@ _stmt_965: {  /* L471 */
 _stmt_966: {  /* L472 */
     comm_stno(472);
     {
-        DESCR_t _ret = APLY_fn("GT", (DESCR_t[2]){NV_GET_fn("len"), INTVAL(0LL)}, 2);
+        DESCR_t _ret = APPLY_fn("GT", (DESCR_t[2]){NV_GET_fn("len"), INTVAL(0LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto FRETURN_LABEL_ss;
         goto _stmt_967;
     }
@@ -11779,7 +11779,7 @@ _stmt_966: {  /* L472 */
 _stmt_967: {  /* L473 */
     comm_stno(473);
     {
-        DESCR_t _rhs = APLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1);
+        DESCR_t _rhs = APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1);
         if (IS_FAIL_fn(_rhs)) goto _stmt_968;
         NV_SET_fn("t", _rhs);
         goto _stmt_968;
@@ -11789,7 +11789,7 @@ _stmt_967: {  /* L473 */
 _stmt_968: {  /* L474 */
     comm_stno(474);
     {
-        DESCR_t _rhs = APLY_fn("v", (DESCR_t[1]){NV_GET_fn("x")}, 1);
+        DESCR_t _rhs = APPLY_fn("v", (DESCR_t[1]){NV_GET_fn("x")}, 1);
         if (IS_FAIL_fn(_rhs)) goto _stmt_969;
         NV_SET_fn("v", _rhs);
         goto _stmt_969;
@@ -11799,7 +11799,7 @@ _stmt_968: {  /* L474 */
 _stmt_969: {  /* L475 */
     comm_stno(475);
     {
-        DESCR_t _rhs = APLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1);
+        DESCR_t _rhs = APPLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1);
         if (IS_FAIL_fn(_rhs)) goto _stmt_970;
         NV_SET_fn("n", _rhs);
         goto _stmt_970;
@@ -11809,7 +11809,7 @@ _stmt_969: {  /* L475 */
 _stmt_970: {  /* L476 */
     comm_stno(476);
     {
-        DESCR_t _rhs = APLY_fn("c", (DESCR_t[1]){NV_GET_fn("x")}, 1);
+        DESCR_t _rhs = APPLY_fn("c", (DESCR_t[1]){NV_GET_fn("x")}, 1);
         if (IS_FAIL_fn(_rhs)) goto _stmt_971;
         NV_SET_fn("c", _rhs);
         goto _stmt_971;
@@ -11819,7 +11819,7 @@ _stmt_970: {  /* L476 */
 _stmt_971: {  /* L477 */
     comm_stno(477);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn(CONC_fn((gt(NV_GET_fn("doDebug"),INTVAL(0LL)) ? NULVCL : FAILDESCR), STRVAL("ss(")), NV_GET_fn("t")), STRVAL(")")), STRVAL(", sz = ")), NV_GET_fn("level")), STRVAL("+")), SIZE_fn(NV_GET_fn("v"))), STRVAL(", v = ")), NV_GET_fn("v"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn((gt(NV_GET_fn("doDebug"),INTVAL(0LL)) ? NULVCL : FAILDESCR), STRVAL("ss(")), NV_GET_fn("t")), STRVAL(")")), STRVAL(", sz = ")), NV_GET_fn("level")), STRVAL("+")), SIZE_fn(NV_GET_fn("v"))), STRVAL(", v = ")), NV_GET_fn("v"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_972;
         output_val(_rhs);
         goto _stmt_972;
@@ -11829,7 +11829,7 @@ _stmt_971: {  /* L477 */
 _stmt_972: {  /* L478 */
     comm_stno(478);
     {
-        DESCR_t _ret = APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("t")}, 1);
+        DESCR_t _ret = APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("t")}, 1);
         if (IS_FAIL_fn(_ret)) goto RETURN_LABEL_ss;
         goto ss_snoBuiltinVar;
     }
@@ -11838,7 +11838,7 @@ _stmt_972: {  /* L478 */
 ss_snoBuiltinVar: {  /* L480 */
     comm_stno(480);
     {
-        DESCR_t _rhs = APLY_fn("upr", (DESCR_t[1]){NV_GET_fn("v")}, 1);
+        DESCR_t _rhs = APPLY_fn("upr", (DESCR_t[1]){NV_GET_fn("v")}, 1);
         if (IS_FAIL_fn(_rhs)) goto ss_atomic;
         NV_SET_fn("ss", _rhs);
         goto ss_atomic;
@@ -11848,7 +11848,7 @@ ss_snoBuiltinVar: {  /* L480 */
 ss_snoFunction: {  /* L481 */
     comm_stno(481);
     {
-        DESCR_t _rhs = APLY_fn("upr", (DESCR_t[1]){NV_GET_fn("v")}, 1);
+        DESCR_t _rhs = APPLY_fn("upr", (DESCR_t[1]){NV_GET_fn("v")}, 1);
         if (IS_FAIL_fn(_rhs)) goto ss_atomic;
         NV_SET_fn("ss", _rhs);
         goto ss_atomic;
@@ -11888,7 +11888,7 @@ ss_snoLabel: {  /* L484 */
 ss_snoLabel0: {  /* L485 */
     comm_stno(485);
     {
-        DESCR_t _rhs = APLY_fn("upr", (DESCR_t[1]){NV_GET_fn("v")}, 1);
+        DESCR_t _rhs = APPLY_fn("upr", (DESCR_t[1]){NV_GET_fn("v")}, 1);
         if (IS_FAIL_fn(_rhs)) goto ss_atomic;
         NV_SET_fn("ss", _rhs);
         goto ss_atomic;
@@ -11908,7 +11908,7 @@ ss_snoLabel1: {  /* L486 */
 ss_snoProtKwd: {  /* L487 */
     comm_stno(487);
     {
-        DESCR_t _rhs = APLY_fn("upr", (DESCR_t[1]){NV_GET_fn("v")}, 1);
+        DESCR_t _rhs = APPLY_fn("upr", (DESCR_t[1]){NV_GET_fn("v")}, 1);
         if (IS_FAIL_fn(_rhs)) goto ss_atomic;
         NV_SET_fn("ss", _rhs);
         goto ss_atomic;
@@ -11928,7 +11928,7 @@ ss_snoReal: {  /* L488 */
 ss_snoSpecialNm: {  /* L489 */
     comm_stno(489);
     {
-        DESCR_t _rhs = APLY_fn("upr", (DESCR_t[1]){NV_GET_fn("v")}, 1);
+        DESCR_t _rhs = APPLY_fn("upr", (DESCR_t[1]){NV_GET_fn("v")}, 1);
         if (IS_FAIL_fn(_rhs)) goto ss_atomic;
         NV_SET_fn("ss", _rhs);
         goto ss_atomic;
@@ -11948,7 +11948,7 @@ ss_snoString: {  /* L490 */
 ss_snoUnprotKwd: {  /* L491 */
     comm_stno(491);
     {
-        DESCR_t _rhs = APLY_fn("upr", (DESCR_t[1]){NV_GET_fn("v")}, 1);
+        DESCR_t _rhs = APPLY_fn("upr", (DESCR_t[1]){NV_GET_fn("v")}, 1);
         if (IS_FAIL_fn(_rhs)) goto ss_atomic;
         NV_SET_fn("ss", _rhs);
         goto ss_atomic;
@@ -11958,7 +11958,7 @@ ss_snoUnprotKwd: {  /* L491 */
 ss_atomic: {  /* L492 */
     comm_stno(492);
     {
-        DESCR_t _ret = APLY_fn("LE", (DESCR_t[2]){SIZE_fn(NV_GET_fn("ss")), NV_GET_fn("len")}, 2);
+        DESCR_t _ret = APPLY_fn("LE", (DESCR_t[2]){SIZE_fn(NV_GET_fn("ss")), NV_GET_fn("len")}, 2);
         if (IS_FAIL_fn(_ret)) goto FRETURN_LABEL_ss;
         goto RETURN_LABEL_ss;
     }
@@ -12021,7 +12021,7 @@ _stmt_991: {  /* L499 */
 ssUnOp: {  /* L501 */
     comm_stno(501);
     {
-        DESCR_t _rhs = CONC_fn(NV_GET_fn("t"), APLY_fn("ss", (DESCR_t[2]){subscript_get(NV_GET_fn("c"), INTVAL(1LL)), sub(NV_GET_fn("len"), SIZE_fn(NV_GET_fn("t")))}, 2));
+        DESCR_t _rhs = CONCAT_fn(NV_GET_fn("t"), APPLY_fn("ss", (DESCR_t[2]){subscript_get(NV_GET_fn("c"), INTVAL(1LL)), sub(NV_GET_fn("len"), SIZE_fn(NV_GET_fn("t")))}, 2));
         if (IS_FAIL_fn(_rhs)) goto FRETURN_LABEL_ss;
         NV_SET_fn("ss", _rhs);
         goto RETURN_LABEL_ss;
@@ -12031,7 +12031,7 @@ ssUnOp: {  /* L501 */
 ssBinOp: {  /* L502 */
     comm_stno(502);
     {
-        DESCR_t _rhs = APLY_fn("ss", (DESCR_t[2]){subscript_get(NV_GET_fn("c"), INTVAL(1LL)), NV_GET_fn("len")}, 2);
+        DESCR_t _rhs = APPLY_fn("ss", (DESCR_t[2]){subscript_get(NV_GET_fn("c"), INTVAL(1LL)), NV_GET_fn("len")}, 2);
         if (IS_FAIL_fn(_rhs)) goto FRETURN_LABEL_ss;
         NV_SET_fn("ss", _rhs);
         goto _stmt_994;
@@ -12041,7 +12041,7 @@ ssBinOp: {  /* L502 */
 _stmt_994: {  /* L503 */
     comm_stno(503);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn(CONC_fn(NV_GET_fn("ss"), STRVAL(" ")), NV_GET_fn("t")), STRVAL(" ")), APLY_fn("ss", (DESCR_t[2]){subscript_get(NV_GET_fn("c"), INTVAL(2LL)), sub(sub(sub(NV_GET_fn("len"), SIZE_fn(NV_GET_fn("ss"))), SIZE_fn(NV_GET_fn("t"))), INTVAL(2LL))}, 2));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(NV_GET_fn("ss"), STRVAL(" ")), NV_GET_fn("t")), STRVAL(" ")), APPLY_fn("ss", (DESCR_t[2]){subscript_get(NV_GET_fn("c"), INTVAL(2LL)), sub(sub(sub(NV_GET_fn("len"), SIZE_fn(NV_GET_fn("ss"))), SIZE_fn(NV_GET_fn("t"))), INTVAL(2LL))}, 2));
         if (IS_FAIL_fn(_rhs)) goto FRETURN_LABEL_ss;
         NV_SET_fn("ss", _rhs);
         goto RETURN_LABEL_ss;
@@ -12051,7 +12051,7 @@ _stmt_994: {  /* L503 */
 ss_bang: {  /* L505 */
     comm_stno(505);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(1LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(1LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto ss_H;
         goto ssUnOp;
     }
@@ -12060,7 +12060,7 @@ ss_bang: {  /* L505 */
 ss_H: {  /* L506 */
     comm_stno(506);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(1LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(1LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto _stmt_997;
         goto ssUnOp;
     }
@@ -12069,7 +12069,7 @@ ss_H: {  /* L506 */
 _stmt_997: {  /* L507 */
     comm_stno(507);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_ss;
         goto ssBinOp;
     }
@@ -12088,7 +12088,7 @@ ss_dol: {  /* L508 */
 _stmt_999: {  /* L509 */
     comm_stno(509);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_ss;
         goto ssBinOp;
     }
@@ -12097,7 +12097,7 @@ _stmt_999: {  /* L509 */
 ss_pct: {  /* L510 */
     comm_stno(510);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(1LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(1LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto _stmt_1001;
         goto ssUnOp;
     }
@@ -12106,7 +12106,7 @@ ss_pct: {  /* L510 */
 _stmt_1001: {  /* L511 */
     comm_stno(511);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_ss;
         goto ssBinOp;
     }
@@ -12125,7 +12125,7 @@ ss_amp: {  /* L512 */
 _stmt_1003: {  /* L513 */
     comm_stno(513);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_ss;
         goto ssBinOp;
     }
@@ -12140,7 +12140,7 @@ ss_star: {  /* L514 */
 _stmt_1005: {  /* L515 */
     comm_stno(515);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_ss;
         goto ssBinOp;
     }
@@ -12159,7 +12159,7 @@ _stmt_1006: {  /* L516 */
 _stmt_1007: {  /* L517 */
     comm_stno(517);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_ss;
         goto ssBinOp;
     }
@@ -12174,7 +12174,7 @@ ss_minus: {  /* L518 */
 _stmt_1009: {  /* L519 */
     comm_stno(519);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_ss;
         goto ssBinOp;
     }
@@ -12193,7 +12193,7 @@ _stmt_1010: {  /* L520 */
 _stmt_1011: {  /* L521 */
     comm_stno(521);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_ss;
         goto ssBinOp;
     }
@@ -12212,7 +12212,7 @@ _stmt_1012: {  /* L522 */
 _stmt_1013: {  /* L523 */
     comm_stno(523);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_ss;
         goto ssBinOp;
     }
@@ -12231,7 +12231,7 @@ _stmt_1014: {  /* L524 */
 _stmt_1015: {  /* L525 */
     comm_stno(525);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_ss;
         goto ssBinOp;
     }
@@ -12240,7 +12240,7 @@ _stmt_1015: {  /* L525 */
 ss_q2: {  /* L526 */
     comm_stno(526);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(1LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(1LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto _stmt_1017;
         goto ssUnOp;
     }
@@ -12249,7 +12249,7 @@ ss_q2: {  /* L526 */
 _stmt_1017: {  /* L527 */
     comm_stno(527);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_ss;
         goto ssBinOp;
     }
@@ -12258,7 +12258,7 @@ _stmt_1017: {  /* L527 */
 ss_A: {  /* L528 */
     comm_stno(528);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(1LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(1LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto _stmt_1019;
         goto ssUnOp;
     }
@@ -12267,7 +12267,7 @@ ss_A: {  /* L528 */
 _stmt_1019: {  /* L529 */
     comm_stno(529);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_ss;
         goto ssBinOp;
     }
@@ -12276,7 +12276,7 @@ _stmt_1019: {  /* L529 */
 ss_hat: {  /* L530 */
     comm_stno(530);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_ss;
         goto ssBinOp;
     }
@@ -12285,7 +12285,7 @@ ss_hat: {  /* L530 */
 ss_til: {  /* L531 */
     comm_stno(531);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(1LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(1LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto _stmt_1022;
         goto ssUnOp;
     }
@@ -12294,7 +12294,7 @@ ss_til: {  /* L531 */
 _stmt_1022: {  /* L532 */
     comm_stno(532);
     {
-        DESCR_t _ret = APLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
+        DESCR_t _ret = APPLY_fn("EQ", (DESCR_t[2]){NV_GET_fn("n"), INTVAL(2LL)}, 2);
         if (IS_FAIL_fn(_ret)) goto ERROR_LABEL_ss;
         goto ssBinOp;
     }
@@ -12303,7 +12303,7 @@ _stmt_1022: {  /* L532 */
 ss_snoExprList: {  /* L534 */
     comm_stno(534);
     {
-        DESCR_t _rhs = APLY_fn("ss", (DESCR_t[2]){subscript_get(NV_GET_fn("c"), INTVAL(1LL)), NV_GET_fn("len")}, 2);
+        DESCR_t _rhs = APPLY_fn("ss", (DESCR_t[2]){subscript_get(NV_GET_fn("c"), INTVAL(1LL)), NV_GET_fn("len")}, 2);
         if (IS_FAIL_fn(_rhs)) goto FRETURN_LABEL_ss;
         NV_SET_fn("ss", _rhs);
         goto _stmt_1024;
@@ -12323,7 +12323,7 @@ _stmt_1024: {  /* L535 */
 ss_snoExprList0: {  /* L536 */
     comm_stno(536);
     {
-        DESCR_t _rhs = CONC_fn((lt(NV_GET_fn("i"),NV_GET_fn("n")) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL)));
+        DESCR_t _rhs = CONCAT_fn((lt(NV_GET_fn("i"),NV_GET_fn("n")) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL)));
         if (IS_FAIL_fn(_rhs)) goto RETURN_LABEL_ss;
         NV_SET_fn("i", _rhs);
         goto _stmt_1026;
@@ -12333,7 +12333,7 @@ ss_snoExprList0: {  /* L536 */
 _stmt_1026: {  /* L537 */
     comm_stno(537);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(NV_GET_fn("ss"), STRVAL(", ")), APLY_fn("ss", (DESCR_t[2]){subscript_get(NV_GET_fn("c"), NV_GET_fn("i")), sub(sub(NV_GET_fn("len"), SIZE_fn(NV_GET_fn("ss"))), INTVAL(2LL))}, 2));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(NV_GET_fn("ss"), STRVAL(", ")), APPLY_fn("ss", (DESCR_t[2]){subscript_get(NV_GET_fn("c"), NV_GET_fn("i")), sub(sub(NV_GET_fn("len"), SIZE_fn(NV_GET_fn("ss"))), INTVAL(2LL))}, 2));
         if (IS_FAIL_fn(_rhs)) goto FRETURN_LABEL_ss;
         NV_SET_fn("ss", _rhs);
         goto ss_snoExprList0;
@@ -12344,7 +12344,7 @@ _stmt_1027: {  /* L539 */
     comm_stno(539);
     {
         DESCR_t _subj = NV_GET_fn("ss_");
-        int _ok = match_and_replace(&_subj, pat_epsilon(), CONC_fn(STRVAL("("), APLY_fn("ss", (DESCR_t[2]){subscript_get(NV_GET_fn("c"), INTVAL(1LL)), sub(NV_GET_fn("len"), INTVAL(4LL))}, 2)));
+        int _ok = match_and_replace(&_subj, pat_epsilon(), CONCAT_fn(STRVAL("("), APPLY_fn("ss", (DESCR_t[2]){subscript_get(NV_GET_fn("c"), INTVAL(1LL)), sub(NV_GET_fn("len"), INTVAL(4LL))}, 2)));
         NV_SET_fn("ss_", _subj);
         if (_ok) goto _stmt_1028;
         else goto FRETURN_LABEL_ss;
@@ -12365,7 +12365,7 @@ _stmt_1029: {  /* L541 */
     comm_stno(541);
     {
         DESCR_t _subj = NV_GET_fn("ss_");
-        int _ok = match_and_replace(&_subj, pat_epsilon(), CONC_fn((lt(NV_GET_fn("i"),NV_GET_fn("n")) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL))));
+        int _ok = match_and_replace(&_subj, pat_epsilon(), CONCAT_fn((lt(NV_GET_fn("i"),NV_GET_fn("n")) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL))));
         NV_SET_fn("ss_", _subj);
         if (_ok) goto _stmt_1030;
         else goto _stmt_1030;
@@ -12375,7 +12375,7 @@ _stmt_1029: {  /* L541 */
 _stmt_1030: {  /* L542 */
     comm_stno(542);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(NV_GET_fn("ss"), STRVAL(", ")), APLY_fn("ss", (DESCR_t[2]){subscript_get(NV_GET_fn("c"), NV_GET_fn("i")), sub(sub(NV_GET_fn("len"), SIZE_fn(NV_GET_fn("ss"))), INTVAL(3LL))}, 2));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(NV_GET_fn("ss"), STRVAL(", ")), APPLY_fn("ss", (DESCR_t[2]){subscript_get(NV_GET_fn("c"), NV_GET_fn("i")), sub(sub(NV_GET_fn("len"), SIZE_fn(NV_GET_fn("ss"))), INTVAL(3LL))}, 2));
         if (IS_FAIL_fn(_rhs)) goto FRETURN_LABEL_ss;
         NV_SET_fn("ss", _rhs);
         goto _stmt_1031;
@@ -12386,7 +12386,7 @@ _stmt_1031: {  /* L543 */
     comm_stno(543);
     {
         DESCR_t _subj = NV_GET_fn("ss_");
-        int _ok = match_and_replace(&_subj, pat_epsilon(), CONC_fn(NV_GET_fn("ss"), STRVAL(")")));
+        int _ok = match_and_replace(&_subj, pat_epsilon(), CONCAT_fn(NV_GET_fn("ss"), STRVAL(")")));
         NV_SET_fn("ss_", _subj);
         if (_ok) goto RETURN_LABEL_ss;
         else goto RETURN_LABEL_ss;
@@ -12406,7 +12406,7 @@ _stmt_1032: {  /* L545 */
 _stmt_1033: {  /* L546 */
     comm_stno(546);
     {
-        DESCR_t _rhs = APLY_fn("ss", (DESCR_t[2]){subscript_get(NV_GET_fn("c"), INTVAL(1LL)), NV_GET_fn("len")}, 2);
+        DESCR_t _rhs = APPLY_fn("ss", (DESCR_t[2]){subscript_get(NV_GET_fn("c"), INTVAL(1LL)), NV_GET_fn("len")}, 2);
         if (IS_FAIL_fn(_rhs)) goto FRETURN_LABEL_ss;
         NV_SET_fn("ss", _rhs);
         goto _stmt_1034;
@@ -12427,7 +12427,7 @@ _stmt_1035: {  /* L548 */
     comm_stno(548);
     {
         DESCR_t _subj = NV_GET_fn("ss_");
-        int _ok = match_and_replace(&_subj, pat_alt(pat_epsilon(), pat_cat(pat_lit("0"), var_as_pattern(NV_GET_fn("i")))), CONC_fn((lt(NV_GET_fn("i"),NV_GET_fn("n")) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL))));
+        int _ok = match_and_replace(&_subj, pat_alt(pat_epsilon(), pat_cat(pat_lit("0"), var_as_pattern(NV_GET_fn("i")))), CONCAT_fn((lt(NV_GET_fn("i"),NV_GET_fn("n")) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL))));
         NV_SET_fn("ss_", _subj);
         if (_ok) goto _stmt_1036;
         else goto RETURN_LABEL_ss;
@@ -12437,7 +12437,7 @@ _stmt_1035: {  /* L548 */
 _stmt_1036: {  /* L549 */
     comm_stno(549);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(NV_GET_fn("ss"), STRVAL(" | ")), APLY_fn("ss", (DESCR_t[2]){subscript_get(NV_GET_fn("c"), NV_GET_fn("i")), sub(sub(NV_GET_fn("len"), SIZE_fn(NV_GET_fn("ss"))), INTVAL(3LL))}, 2));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(NV_GET_fn("ss"), STRVAL(" | ")), APPLY_fn("ss", (DESCR_t[2]){subscript_get(NV_GET_fn("c"), NV_GET_fn("i")), sub(sub(NV_GET_fn("len"), SIZE_fn(NV_GET_fn("ss"))), INTVAL(3LL))}, 2));
         if (IS_FAIL_fn(_rhs)) goto FRETURN_LABEL_ss;
         NV_SET_fn("ss", _rhs);
         goto _stmt_1037;
@@ -12448,7 +12448,7 @@ _stmt_1037: {  /* L551 */
     comm_stno(551);
     {
         DESCR_t _subj = NV_GET_fn("ss_");
-        int _ok = match_and_replace(&_subj, pat_assign_cond(pat_epsilon(), NULVCL), APLY_fn("ss", (DESCR_t[2]){subscript_get(NV_GET_fn("c"), INTVAL(1LL)), NV_GET_fn("len")}, 2));
+        int _ok = match_and_replace(&_subj, pat_assign_cond(pat_epsilon(), NULVCL), APPLY_fn("ss", (DESCR_t[2]){subscript_get(NV_GET_fn("c"), INTVAL(1LL)), NV_GET_fn("len")}, 2));
         NV_SET_fn("ss_", _subj);
         if (_ok) goto _stmt_1038;
         else goto FRETURN_LABEL_ss;
@@ -12469,7 +12469,7 @@ _stmt_1039: {  /* L553 */
     comm_stno(553);
     {
         DESCR_t _subj = NV_GET_fn("ss_");
-        int _ok = match_and_replace(&_subj, pat_assign_cond(pat_epsilon(), NULVCL), CONC_fn((lt(NV_GET_fn("i"),NV_GET_fn("n")) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL))));
+        int _ok = match_and_replace(&_subj, pat_assign_cond(pat_epsilon(), NULVCL), CONCAT_fn((lt(NV_GET_fn("i"),NV_GET_fn("n")) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL))));
         NV_SET_fn("ss_", _subj);
         if (_ok) goto _stmt_1040;
         else goto RETURN_LABEL_ss;
@@ -12479,7 +12479,7 @@ _stmt_1039: {  /* L553 */
 _stmt_1040: {  /* L554 */
     comm_stno(554);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(NV_GET_fn("ss"), STRVAL(" ")), APLY_fn("ss", (DESCR_t[2]){subscript_get(NV_GET_fn("c"), NV_GET_fn("i")), sub(sub(NV_GET_fn("len"), SIZE_fn(NV_GET_fn("ss"))), INTVAL(1LL))}, 2));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(NV_GET_fn("ss"), STRVAL(" ")), APPLY_fn("ss", (DESCR_t[2]){subscript_get(NV_GET_fn("c"), NV_GET_fn("i")), sub(sub(NV_GET_fn("len"), SIZE_fn(NV_GET_fn("ss"))), INTVAL(1LL))}, 2));
         if (IS_FAIL_fn(_rhs)) goto FRETURN_LABEL_ss;
         NV_SET_fn("ss", _rhs);
         goto _stmt_1041;
@@ -12490,7 +12490,7 @@ _stmt_1041: {  /* L556 */
     comm_stno(556);
     {
         DESCR_t _subj = NULVCL /* array subscript */;
-        int _ok = match_and_replace(&_subj, var_as_pattern(NV_GET_fn("ss")), APLY_fn("ss", (DESCR_t[2]){subscript_get(NV_GET_fn("c"), INTVAL(1LL)), NV_GET_fn("len")}, 2));
+        int _ok = match_and_replace(&_subj, var_as_pattern(NV_GET_fn("ss")), APPLY_fn("ss", (DESCR_t[2]){subscript_get(NV_GET_fn("c"), INTVAL(1LL)), NV_GET_fn("len")}, 2));
         /* unhandled assignment target kind=array */;
         if (_ok) goto _stmt_1042;
         else goto FRETURN_LABEL_ss;
@@ -12511,7 +12511,7 @@ _stmt_1043: {  /* L558 */
     comm_stno(558);
     {
         DESCR_t _subj = NULVCL /* array subscript */;
-        int _ok = match_and_replace(&_subj, pat_cat(pat_lit("0"), var_as_pattern(NV_GET_fn("i"))), CONC_fn((lt(NV_GET_fn("i"),NV_GET_fn("n")) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL))));
+        int _ok = match_and_replace(&_subj, pat_cat(pat_lit("0"), var_as_pattern(NV_GET_fn("i"))), CONCAT_fn((lt(NV_GET_fn("i"),NV_GET_fn("n")) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL))));
         /* unhandled assignment target kind=array */;
         if (_ok) goto _stmt_1044;
         else goto RETURN_LABEL_ss;
@@ -12521,7 +12521,7 @@ _stmt_1043: {  /* L558 */
 _stmt_1044: {  /* L559 */
     comm_stno(559);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn(NV_GET_fn("ss"), STRVAL("[")), APLY_fn("ss", (DESCR_t[2]){subscript_get(NV_GET_fn("c"), NV_GET_fn("i")), sub(sub(NV_GET_fn("len"), SIZE_fn(NV_GET_fn("ss"))), INTVAL(2LL))}, 2)), STRVAL("]"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn(NV_GET_fn("ss"), STRVAL("[")), APPLY_fn("ss", (DESCR_t[2]){subscript_get(NV_GET_fn("c"), NV_GET_fn("i")), sub(sub(NV_GET_fn("len"), SIZE_fn(NV_GET_fn("ss"))), INTVAL(2LL))}, 2)), STRVAL("]"));
         if (IS_FAIL_fn(_rhs)) goto FRETURN_LABEL_ss;
         NV_SET_fn("ss", _rhs);
         goto _stmt_1045;
@@ -12531,8 +12531,8 @@ _stmt_1044: {  /* L559 */
 _stmt_1045: {  /* L561 */
     comm_stno(561);
     {
-        DESCR_t _subj = APLY_fn("ss_", NULL, 0);
-        int _ok = match_and_replace(&_subj, var_as_pattern(NV_GET_fn("ss")), CONC_fn(CONC_fn(STRVAL("("), APLY_fn("ss", (DESCR_t[2]){subscript_get(NV_GET_fn("c"), INTVAL(1LL)), sub(NV_GET_fn("len"), INTVAL(2LL))}, 2)), STRVAL(")")));
+        DESCR_t _subj = APPLY_fn("ss_", NULL, 0);
+        int _ok = match_and_replace(&_subj, var_as_pattern(NV_GET_fn("ss")), CONCAT_fn(CONCAT_fn(STRVAL("("), APPLY_fn("ss", (DESCR_t[2]){subscript_get(NV_GET_fn("c"), INTVAL(1LL)), sub(NV_GET_fn("len"), INTVAL(2LL))}, 2)), STRVAL(")")));
         /* unhandled assignment target kind=call */;
         if (_ok) goto RETURN_LABEL_ss;
         else goto FRETURN_LABEL_ss;
@@ -12542,7 +12542,7 @@ _stmt_1045: {  /* L561 */
 ss_snoCall: {  /* L563 */
     comm_stno(563);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn(APLY_fn("ss", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), INTVAL(1LL))}, 1), STRVAL("(")), APLY_fn("ss", (DESCR_t[2]){subscript_get(NV_GET_fn("c"), INTVAL(2LL)), sub(sub(NV_GET_fn("len"), SIZE_fn(NV_GET_fn("v"))), INTVAL(2LL))}, 2)), STRVAL(")"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn(APPLY_fn("ss", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), INTVAL(1LL))}, 1), STRVAL("(")), APPLY_fn("ss", (DESCR_t[2]){subscript_get(NV_GET_fn("c"), INTVAL(2LL)), sub(sub(NV_GET_fn("len"), SIZE_fn(NV_GET_fn("v"))), INTVAL(2LL))}, 2)), STRVAL(")"));
         if (IS_FAIL_fn(_rhs)) goto FRETURN_LABEL_ss;
         NV_SET_fn("ss", _rhs);
         goto RETURN_LABEL_ss;
@@ -12632,7 +12632,7 @@ static DESCR_t uf_bVisit(DESCR_t *_args, int _nargs) {
 bVisit: {  /* L567 */
     comm_stno(567);
     {
-        DESCR_t _ret = APLY_fn("APPLY", (DESCR_t[2]){NV_GET_fn("fnc"), NV_GET_fn("x")}, 2);
+        DESCR_t _ret = APPLY_fn("APPLY", (DESCR_t[2]){NV_GET_fn("fnc"), NV_GET_fn("x")}, 2);
         if (IS_FAIL_fn(_ret)) goto RETURN_LABEL_bVisit;
         goto _stmt_1050;
     }
@@ -12651,7 +12651,7 @@ _stmt_1050: {  /* L568 */
 bVisit_1: {  /* L569 */
     comm_stno(569);
     {
-        DESCR_t _rhs = CONC_fn((lt(NV_GET_fn("i"),APLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1)) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL)));
+        DESCR_t _rhs = CONCAT_fn((lt(NV_GET_fn("i"),APPLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1)) ? NULVCL : FAILDESCR), add(NV_GET_fn("i"), INTVAL(1LL)));
         if (IS_FAIL_fn(_rhs)) goto RETURN_LABEL_bVisit;
         NV_SET_fn("i", _rhs);
         goto _stmt_1052;
@@ -12661,7 +12661,7 @@ bVisit_1: {  /* L569 */
 _stmt_1052: {  /* L570 */
     comm_stno(570);
     {
-        DESCR_t _ret = APLY_fn("bVisit", (DESCR_t[1]){APLY_fn("c", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1);
+        DESCR_t _ret = APPLY_fn("bVisit", (DESCR_t[1]){APPLY_fn("c", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1);
         if (IS_FAIL_fn(_ret)) goto bVisit_1;
         goto bVisit_1;
     }
@@ -12711,7 +12711,7 @@ static DESCR_t uf_findRefs(DESCR_t *_args, int _nargs) {
 findRefs: {  /* L575 */
     comm_stno(575);
     {
-        DESCR_t _ret = APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("x")}, 1);
+        DESCR_t _ret = APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("x")}, 1);
         if (IS_FAIL_fn(_ret)) goto RETURN_LABEL_findRefs;
         goto _stmt_1057;
     }
@@ -12720,7 +12720,7 @@ findRefs: {  /* L575 */
 _stmt_1057: {  /* L576 */
     comm_stno(576);
     {
-        DESCR_t _ret = APLY_fn("IDENT", (DESCR_t[2]){APLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1), STRVAL("snoCall")}, 2);
+        DESCR_t _ret = APPLY_fn("IDENT", (DESCR_t[2]){APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1), STRVAL("snoCall")}, 2);
         if (IS_FAIL_fn(_ret)) goto findRefs_1;
         goto _stmt_1058;
     }
@@ -12739,7 +12739,7 @@ _stmt_1058: {  /* L577 */
 findRefs_0: {  /* L578 */
     comm_stno(578);
     {
-        DESCR_t _rhs = CONC_fn((lt(NV_GET_fn("n"),APLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1)) ? NULVCL : FAILDESCR), add(NV_GET_fn("n"), INTVAL(1LL)));
+        DESCR_t _rhs = CONCAT_fn((lt(NV_GET_fn("n"),APPLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1)) ? NULVCL : FAILDESCR), add(NV_GET_fn("n"), INTVAL(1LL)));
         if (IS_FAIL_fn(_rhs)) goto FRETURN_LABEL_findRefs;
         NV_SET_fn("n", _rhs);
         goto _stmt_1060;
@@ -12749,7 +12749,7 @@ findRefs_0: {  /* L578 */
 _stmt_1060: {  /* L579 */
     comm_stno(579);
     {
-        DESCR_t _ret = APLY_fn("bVisit", (DESCR_t[1]){APLY_fn("c", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1);
+        DESCR_t _ret = APPLY_fn("bVisit", (DESCR_t[1]){APPLY_fn("c", (DESCR_t[1]){NV_GET_fn("x")}, 1)}, 1);
         if (IS_FAIL_fn(_ret)) goto findRefs_0;
         goto findRefs_0;
     }
@@ -12758,7 +12758,7 @@ _stmt_1060: {  /* L579 */
 findRefs_1: {  /* L580 */
     comm_stno(580);
     {
-        DESCR_t _ret = APLY_fn("findRefs_1", (DESCR_t[1]){CONC_fn((ident(APLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1),STRVAL("&")) ? NULVCL : FAILDESCR), (eq(APLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1),INTVAL(1LL)) ? NULVCL : FAILDESCR))}, 1);
+        DESCR_t _ret = APPLY_fn("findRefs_1", (DESCR_t[1]){CONCAT_fn((ident(APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1),STRVAL("&")) ? NULVCL : FAILDESCR), (eq(APPLY_fn("n", (DESCR_t[1]){NV_GET_fn("x")}, 1),INTVAL(1LL)) ? NULVCL : FAILDESCR))}, 1);
         if (IS_FAIL_fn(_ret)) goto findRefs_2;
         goto _stmt_1062;
     }
@@ -12767,7 +12767,7 @@ findRefs_1: {  /* L580 */
 _stmt_1062: {  /* L581 */
     comm_stno(581);
     {
-        DESCR_t _rhs = APLY_fn("ss", (DESCR_t[1]){NV_GET_fn("x")}, 1);
+        DESCR_t _rhs = APPLY_fn("ss", (DESCR_t[1]){NV_GET_fn("x")}, 1);
         if (IS_FAIL_fn(_rhs)) goto findRefs_9;
         NV_SET_fn("v", _rhs);
         goto findRefs_9;
@@ -12777,7 +12777,7 @@ _stmt_1062: {  /* L581 */
 findRefs_2: {  /* L582 */
     comm_stno(582);
     {
-        DESCR_t _ret = APLY_fn("IDENT", (DESCR_t[2]){APLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1), STRVAL("snoId")}, 2);
+        DESCR_t _ret = APPLY_fn("IDENT", (DESCR_t[2]){APPLY_fn("t", (DESCR_t[1]){NV_GET_fn("x")}, 1), STRVAL("snoId")}, 2);
         if (IS_FAIL_fn(_ret)) goto RETURN_LABEL_findRefs;
         goto _stmt_1064;
     }
@@ -12786,7 +12786,7 @@ findRefs_2: {  /* L582 */
 _stmt_1064: {  /* L583 */
     comm_stno(583);
     {
-        DESCR_t _rhs = APLY_fn("v", (DESCR_t[1]){NV_GET_fn("x")}, 1);
+        DESCR_t _rhs = APPLY_fn("v", (DESCR_t[1]){NV_GET_fn("x")}, 1);
         if (IS_FAIL_fn(_rhs)) goto findRefs_9;
         NV_SET_fn("v", _rhs);
         goto findRefs_9;
@@ -12797,7 +12797,7 @@ findRefs_9: {  /* L584 */
     comm_stno(584);
     {
         DESCR_t _subj = NV_GET_fn("v");
-        int _ok = match_pattern(pat_cat(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_span(ccat(ccat("0123456789", VARVAL_fn(NV_GET_fn("EXPR_t(kind='keyword', val='UCASE', left=None, right=None, child=None, name=None, args=None, obj=None, subscripts=None)"))), "_"))), pat_rpos(to_int(INTVAL(0LL)))), VARVAL_fn(_subj));
+        int _ok = match_pattern(pat_cat(pat_cat(pat_pos(to_int(INTVAL(0LL))), pat_span(CONCAT_fn(CONCAT_fn("0123456789", VARVAL_fn(NV_GET_fn("EXPR_t(kind='keyword', val='UCASE', left=None, right=None, child=None, name=None, args=None, obj=None, subscripts=None)"))), "_"))), pat_rpos(to_int(INTVAL(0LL)))), VARVAL_fn(_subj));
         if (_ok) goto _stmt_1066;
         else goto FRETURN_LABEL_findRefs;
     }
@@ -12806,7 +12806,7 @@ findRefs_9: {  /* L584 */
 _stmt_1066: {  /* L585 */
     comm_stno(585);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn(APLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("snoRefs")}, 1), NV_GET_fn("snoRefs")), STRVAL(" ")), NV_GET_fn("v"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn(APPLY_fn("DIFFER", (DESCR_t[1]){NV_GET_fn("snoRefs")}, 1), NV_GET_fn("snoRefs")), STRVAL(" ")), NV_GET_fn("v"));
         if (IS_FAIL_fn(_rhs)) goto _stmt_1067;
         NV_SET_fn("snoRefs", _rhs);
         goto FRETURN_LABEL_findRefs;
@@ -12816,7 +12816,7 @@ _stmt_1066: {  /* L585 */
 _stmt_1067: {  /* L586 */
     comm_stno(586);
     {
-        DESCR_t _rhs = CONC_fn(APLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("snoRefs")}, 1), NV_GET_fn("v"));
+        DESCR_t _rhs = CONCAT_fn(APPLY_fn("IDENT", (DESCR_t[1]){NV_GET_fn("snoRefs")}, 1), NV_GET_fn("v"));
         if (IS_FAIL_fn(_rhs)) goto FRETURN_LABEL_findRefs;
         NV_SET_fn("snoRefs", _rhs);
         goto FRETURN_LABEL_findRefs;
@@ -12871,7 +12871,7 @@ static DESCR_t uf_refs(DESCR_t *_args, int _nargs) {
 refs: {  /* L590 */
     comm_stno(590);
     {
-        DESCR_t _rhs = APLY_fn("c", (DESCR_t[1]){NV_GET_fn("p")}, 1);
+        DESCR_t _rhs = APPLY_fn("c", (DESCR_t[1]){NV_GET_fn("p")}, 1);
         if (IS_FAIL_fn(_rhs)) goto _stmt_1071;
         NV_SET_fn("c", _rhs);
         goto _stmt_1071;
@@ -12891,7 +12891,7 @@ _stmt_1071: {  /* L591 */
 refs_0: {  /* L592 */
     comm_stno(592);
     {
-        DESCR_t _rhs = CONC_fn((lt(NV_GET_fn("n"),APLY_fn("n", (DESCR_t[1]){NV_GET_fn("p")}, 1)) ? NULVCL : FAILDESCR), add(NV_GET_fn("n"), INTVAL(1LL)));
+        DESCR_t _rhs = CONCAT_fn((lt(NV_GET_fn("n"),APPLY_fn("n", (DESCR_t[1]){NV_GET_fn("p")}, 1)) ? NULVCL : FAILDESCR), add(NV_GET_fn("n"), INTVAL(1LL)));
         if (IS_FAIL_fn(_rhs)) goto RETURN_LABEL_refs;
         NV_SET_fn("n", _rhs);
         goto _stmt_1073;
@@ -12901,7 +12901,7 @@ refs_0: {  /* L592 */
 _stmt_1073: {  /* L593 */
     comm_stno(593);
     {
-        DESCR_t _ret = APLY_fn("IDENT", (DESCR_t[2]){APLY_fn("t", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), NV_GET_fn("n"))}, 1), STRVAL("snoStmt")}, 2);
+        DESCR_t _ret = APPLY_fn("IDENT", (DESCR_t[2]){APPLY_fn("t", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), NV_GET_fn("n"))}, 1), STRVAL("snoStmt")}, 2);
         if (IS_FAIL_fn(_ret)) goto refs_0;
         goto _stmt_1074;
     }
@@ -12920,7 +12920,7 @@ _stmt_1074: {  /* L594 */
 _stmt_1075: {  /* L595 */
     comm_stno(595);
     {
-        DESCR_t _ret = APLY_fn("IDENT", (DESCR_t[1]){APLY_fn("t", (DESCR_t[1]){APLY_fn("c", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), NV_GET_fn("n"))}, 1)}, 1)}, 1);
+        DESCR_t _ret = APPLY_fn("IDENT", (DESCR_t[1]){APPLY_fn("t", (DESCR_t[1]){APPLY_fn("c", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), NV_GET_fn("n"))}, 1)}, 1)}, 1);
         if (IS_FAIL_fn(_ret)) goto refs_0;
         goto _stmt_1076;
     }
@@ -12929,7 +12929,7 @@ _stmt_1075: {  /* L595 */
 _stmt_1076: {  /* L596 */
     comm_stno(596);
     {
-        DESCR_t _ret = APLY_fn("IDENT", (DESCR_t[1]){APLY_fn("t", (DESCR_t[1]){APLY_fn("c", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), NV_GET_fn("n"))}, 1)}, 1)}, 1);
+        DESCR_t _ret = APPLY_fn("IDENT", (DESCR_t[1]){APPLY_fn("t", (DESCR_t[1]){APPLY_fn("c", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), NV_GET_fn("n"))}, 1)}, 1)}, 1);
         if (IS_FAIL_fn(_ret)) goto refs_0;
         goto _stmt_1077;
     }
@@ -12938,7 +12938,7 @@ _stmt_1076: {  /* L596 */
 _stmt_1077: {  /* L597 */
     comm_stno(597);
     {
-        DESCR_t _ret = APLY_fn("IDENT", (DESCR_t[1]){APLY_fn("t", (DESCR_t[1]){APLY_fn("c", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), NV_GET_fn("n"))}, 1)}, 1)}, 1);
+        DESCR_t _ret = APPLY_fn("IDENT", (DESCR_t[1]){APPLY_fn("t", (DESCR_t[1]){APPLY_fn("c", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), NV_GET_fn("n"))}, 1)}, 1)}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_1078;
         goto refs_1;
     }
@@ -12947,7 +12947,7 @@ _stmt_1077: {  /* L597 */
 _stmt_1078: {  /* L598 */
     comm_stno(598);
     {
-        DESCR_t _ret = APLY_fn("IDENT", (DESCR_t[1]){APLY_fn("t", (DESCR_t[1]){APLY_fn("c", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), NV_GET_fn("n"))}, 1)}, 1)}, 1);
+        DESCR_t _ret = APPLY_fn("IDENT", (DESCR_t[1]){APPLY_fn("t", (DESCR_t[1]){APPLY_fn("c", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), NV_GET_fn("n"))}, 1)}, 1)}, 1);
         if (IS_FAIL_fn(_ret)) goto refs_0;
         goto refs_1;
     }
@@ -12956,7 +12956,7 @@ _stmt_1078: {  /* L598 */
 refs_1: {  /* L599 */
     comm_stno(599);
     {
-        DESCR_t _rhs = APLY_fn("ss", (DESCR_t[1]){APLY_fn("c", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), NV_GET_fn("n"))}, 1)}, 1);
+        DESCR_t _rhs = APPLY_fn("ss", (DESCR_t[1]){APPLY_fn("c", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), NV_GET_fn("n"))}, 1)}, 1);
         if (IS_FAIL_fn(_rhs)) goto _stmt_1080;
         NV_SET_fn("subj", _rhs);
         goto _stmt_1080;
@@ -12975,7 +12975,7 @@ _stmt_1080: {  /* L600 */
 _stmt_1081: {  /* L601 */
     comm_stno(601);
     {
-        DESCR_t _ret = APLY_fn("bVisit", (DESCR_t[1]){APLY_fn("c", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), NV_GET_fn("n"))}, 1)}, 1);
+        DESCR_t _ret = APPLY_fn("bVisit", (DESCR_t[1]){APPLY_fn("c", (DESCR_t[1]){subscript_get(NV_GET_fn("c"), NV_GET_fn("n"))}, 1)}, 1);
         if (IS_FAIL_fn(_ret)) goto _stmt_1082;
         goto _stmt_1082;
     }
@@ -12984,7 +12984,7 @@ _stmt_1081: {  /* L601 */
 _stmt_1082: {  /* L602 */
     comm_stno(602);
     {
-        DESCR_t _rhs = CONC_fn(CONC_fn(CONC_fn(CONC_fn(lpad_fn(NV_GET_fn("s"), INTVAL(3LL), INTVAL(0LL)), STRVAL(": ")), rpad_fn(NV_GET_fn("subj"), INTVAL(38LL), STRVAL(" "))), STRVAL(" ")), NV_GET_fn("snoRefs"));
+        DESCR_t _rhs = CONCAT_fn(CONCAT_fn(CONCAT_fn(CONCAT_fn(lpad_fn(NV_GET_fn("s"), INTVAL(3LL), INTVAL(0LL)), STRVAL(": ")), rpad_fn(NV_GET_fn("subj"), INTVAL(38LL), STRVAL(" "))), STRVAL(" ")), NV_GET_fn("snoRefs"));
         if (IS_FAIL_fn(_rhs)) goto refs_0;
         output_val(_rhs);
         goto refs_0;
@@ -13039,9 +13039,9 @@ int main(void) {
     DEFINE_fn("lwr(lwr)", uf_lwr);
     DEFINE_fn("upr(upr)", uf_upr);
     DEFINE_fn("cap(cap)", uf_cap);
-    DEFINE_fn("icase(strv)letter,character", uf_icase);
+    DEFINE_fn("icase(STRVAL_fn)letter,character", uf_icase);
     DEFINE_fn("assign(name,expression)", uf_assign);
-    DEFINE_fn("mtch(subject,pattern)", uf_match);
+    DEFINE_fn("MATCH_fn(subject,pattern)", uf_match);
     DEFINE_fn("notmatch(subject,pattern)", uf_notmatch);
     DEFINE_fn("InitCounter()", uf_InitCounter);
     DEFINE_fn("PushCounter()", uf_PushCounter);
@@ -13081,17 +13081,17 @@ int main(void) {
     DEFINE_fn("DecLevel(delta)", uf_DecLevel);
     DEFINE_fn("SetLevel(level)", uf_SetLevel);
     DEFINE_fn("GetLevel()", uf_GetLevel);
-    DEFINE_fn("Gen(strv,outNm)ind,outline", uf_Gen);
+    DEFINE_fn("Gen(STRVAL_fn,outNm)ind,outline", uf_Gen);
     DEFINE_fn("GenTab(pos)", uf_GenTab);
     DEFINE_fn("GenSetCont(cont)", uf_GenSetCont);
-    DEFINE_fn("Qize(strv)part", uf_Qize);
-    DEFINE_fn("SQize(strv)part", uf_SQize);
-    DEFINE_fn("DQize(strv)part", uf_DQize);
-    DEFINE_fn("SqlSQize(strv)part", uf_SqlSQize);
+    DEFINE_fn("Qize(STRVAL_fn)part", uf_Qize);
+    DEFINE_fn("SQize(STRVAL_fn)part", uf_SQize);
+    DEFINE_fn("DQize(STRVAL_fn)part", uf_DQize);
+    DEFINE_fn("SqlSQize(STRVAL_fn)part", uf_SqlSQize);
     DEFINE_fn("Intize(qqstr)iq,qqdlm", uf_Intize);
-    DEFINE_fn("Extize(strv)", uf_Extize);
+    DEFINE_fn("Extize(STRVAL_fn)", uf_Extize);
     DEFINE_fn("Write(fileName,fileStr)wrLine,wrOutput", uf_Write);
-    DEFINE_fn("LineMap(strv,lmMapName)lmLineNo,lmMap,lmOfs,xOfs", uf_LineMap);
+    DEFINE_fn("LineMap(STRVAL_fn,lmMapName)lmLineNo,lmMap,lmOfs,xOfs", uf_LineMap);
     DEFINE_fn("shift(p,t)", uf_shift);
     DEFINE_fn("reduce(t,n)", uf_reduce);
     DEFINE_fn("POP_fn()", uf_pop);
@@ -13105,7 +13105,7 @@ int main(void) {
     DEFINE_fn("TX(lvl,pat,name)omega", uf_TX);
     DEFINE_fn("TY(lvl,name,pat)omega", uf_TY);
     DEFINE_fn("TZ(lvl,name,pat)omega", uf_TZ);
-    DEFINE_fn("T8Trace(lvl,strv,ofs)t8p", uf_T8Trace);
+    DEFINE_fn("T8Trace(lvl,STRVAL_fn,ofs)t8p", uf_T8Trace);
     DEFINE_fn("T8Pos(t8Ofs,t8Map)i", uf_T8Pos);
     DEFINE_fn("pp(x)c,i,n,s,t,v", uf_pp);
     DEFINE_fn("ss(x,len)c,c1,c2,i,n,s,t,v", uf_ss);

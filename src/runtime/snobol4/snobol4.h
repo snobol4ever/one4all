@@ -92,11 +92,11 @@ int64_t to_int(DESCR_t v);
 double to_real(DESCR_t v);
 
 /* String concatenation — GC-managed result */
-char *ccat(const char *a, const char *b);
-DESCR_t CONC_fn(DESCR_t a, DESCR_t b);  /* P003: DT_FAIL-propagating ccat */
+char *STRCONCAT_fn(const char *a, const char *b);
+DESCR_t CONCAT_fn(DESCR_t a, DESCR_t b);  /* P003: DT_FAIL-propagating CONCAT_fn */
 
 /* String duplication */
-char *dupl(const char *s);
+char *STRDUP_fn(const char *s);
 
 /* String size in characters */
 int64_t size(const char *s);
@@ -239,7 +239,7 @@ int    STACK_DEPTH_fn(void);
 typedef DESCR_t (*FNCPTR_t)(DESCR_t *args, int nargs);
 
 void    DEFINE_fn(const char *spec, FNCPTR_t fn);  /* DEFINE_fn('name(a,b)local1,local2') */
-DESCR_t  APLY_fn(const char *name, DESCR_t *args, int nargs);  /* APPLY(name,...) */
+DESCR_t  APPLY_fn(const char *name, DESCR_t *args, int nargs);  /* APPLY(name,...) */
 int     FNCEX_fn(const char *name);
 
 /* ============================================================
@@ -261,7 +261,7 @@ int     FNCEX_fn(const char *name);
 
 DESCR_t SIZE_fn(DESCR_t s);                        /* SIZE_fn(s) */
 DESCR_t DUPL_fn(DESCR_t s, DESCR_t n);              /* DUPL_fn(s,n) */
-DESCR_t RPLACE_fn(DESCR_t s, DESCR_t from, DESCR_t to); /* REPLACE(s,f,t) */
+DESCR_t REPLACE_fn(DESCR_t s, DESCR_t from, DESCR_t to); /* REPLACE(s,f,t) */
 DESCR_t SUBSTR_fn(DESCR_t s, DESCR_t i, DESCR_t n);  /* SUBSTR_fn(s,i,n) */
 DESCR_t TRIM_fn(DESCR_t s);                        /* TRIM_fn(s) */
 DESCR_t lpad_fn(DESCR_t s, DESCR_t n, DESCR_t pad);  /* LPAD(s,n,pad) */
@@ -289,8 +289,8 @@ int differ(DESCR_t a, DESCR_t b);/* DIFFER: string/value different */
 DESCR_t add(DESCR_t a, DESCR_t b);
 DESCR_t sub(DESCR_t a, DESCR_t b);
 DESCR_t mul(DESCR_t a, DESCR_t b);
-DESCR_t divyde(DESCR_t a, DESCR_t b);
-DESCR_t powr(DESCR_t a, DESCR_t b);
+DESCR_t DIVIDE_fn(DESCR_t a, DESCR_t b);
+DESCR_t POWER_fn(DESCR_t a, DESCR_t b);
 DESCR_t neg(DESCR_t a);
 
 /* ============================================================
@@ -388,7 +388,7 @@ int    val_stack_depth(void);
 void   register_fn(const char *name, DESCR_t (*fn)(DESCR_t*, int), int min_args, int max_args);
 void   define_spec(DESCR_t spec);
 DESCR_t apply_val(DESCR_t fnval, DESCR_t *args, int nargs);
-DESCR_t evl(DESCR_t expr);
+DESCR_t EVAL_fn(DESCR_t expr);
 DESCR_t opsyn(DESCR_t newname, DESCR_t oldname, DESCR_t type);
 /* 2-arg convenience — type defaults to NULVCL */
 static inline DESCR_t opsyn2(DESCR_t a, DESCR_t b) { return opsyn(a, b, NULVCL); }

@@ -17,7 +17,7 @@
  *   snoExpr1  → (folded into parse_expr0 as snoExpr1 is just '?')
  *   snoExpr2  → parse_expr2   &
  *   snoExpr3  → parse_expr3   | (n-ary)
- *   snoExpr4  → parse_expr4   ccat (whitespace-separated, n-ary)
+ *   snoExpr4  → parse_expr4   CONCAT_fn (whitespace-separated, n-ary)
  *   snoExpr5  → parse_expr5   @
  *   snoExpr6  → parse_expr6   + -
  *   snoExpr7  → parse_expr7   #
@@ -343,7 +343,7 @@ static EXPR_t *parse_lbin(Lex *lx, ParseFn next_fn,
             TokKind k2 = lex_peek(lx).kind;
             lex_restore(lx, m2);
             if (k2 != T_WS) {
-                lex_restore(lx, m); /* restore before WS — let ccat handle it */
+                lex_restore(lx, m); /* restore before WS — let CONCAT_fn handle it */
                 break;
             }
         }
@@ -430,18 +430,18 @@ static EXPR_t *parse_expr5(Lex *lx) {
  * snoX4 = nInc() snoExpr5 FENCE(snoWhite snoX4 | ε)
  *
  * After parse_expr5 returns, if the next token is T_WS and the token after
- * that is an atom (not a binary operator), it's a ccat.
+ * that is an atom (not a binary operator), it's a CONCAT_fn.
  *
  * "Not a binary operator" = not one of the operators that parse_expr5..12
  * consume after WS.  Those are: @ + - # / * % ^ ! ** $ . ~ (and = ? & | for
  * higher levels).  Everything else (identifier, literal, unary-prefix, '(')
- * is a ccat continuation.
+ * is a CONCAT_fn continuation.
  *
  * We implement this by trying parse_expr5 after WS; if the first token is a
  * binary operator, we put the WS back and stop.
  */
 
-/* Returns 1 if tok can start a new ccat item (i.e., is not a binary op). */
+/* Returns 1 if tok can start a new CONCAT_fn item (i.e., is not a binary op). */
 static int is_concat_start(TokKind k) {
     switch (k) {
         /* binary operators that must be surrounded by WS */
@@ -464,7 +464,7 @@ static EXPR_t *parse_expr4(Lex *lx) {
     EXPR_t *first = parse_expr5(lx);
     if (!first) return NULL;
 
-    /* Collect ccat items */
+    /* Collect CONCAT_fn items */
     int cap=4, n=1;
     EXPR_t **items = malloc(cap * sizeof *items);
     items[0] = first;

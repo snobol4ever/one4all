@@ -17,10 +17,10 @@
  *                          const char *gamma_label,   // on success
  *                          const char *omega_label);  // on failure
  *
- * The caller (emit.c, emit_stmt pattern-mtch case) is responsible for:
+ * The caller (emit.c, emit_stmt pattern-MATCH_fn case) is responsible for:
  *   - emitting subject/cursor/subject_len setup
  *   - jumping to root_α
- *   - handling gamma_label (mtch succeeded) and omega_label (mtch failed)
+ *   - handling gamma_label (MATCH_fn succeeded) and omega_label (MATCH_fn failed)
  *
  * Byrd four-port model per node:
  *   α (alpha) — entry / start
@@ -381,7 +381,7 @@ static void emit_cstr(const char *s) {
  *
  * E_QLIT  → "literal"          (compile-time constant)
  * E_VART  → VARVAL_fn(NV_GET_fn("name"))
- * E_CONC → ccat(lhs, rhs)   (both sides recursed)
+ * E_CONC → CONCAT_fn(lhs, rhs)   (both sides recursed)
  * fallback → ""
  * ----------------------------------------------------------------------- */
 static void emit_charset_cexpr(EXPR_t *arg, char *buf, int bufsz);
@@ -412,10 +412,10 @@ static void emit_charset_cexpr(EXPR_t *arg, char *buf, int bufsz) {
         char lbuf[512], rbuf[512];
         emit_charset_cexpr(arg->left,  lbuf, (int)sizeof lbuf);
         emit_charset_cexpr(arg->right, rbuf, (int)sizeof rbuf);
-        /* ccat is #define'd as CONC_fn(DESCR_t,DESCR_t) in snoc_runtime.h,
+        /* CONCAT_fn is #define'd as CONCAT_fn(DESCR_t,DESCR_t) in snoc_runtime.h,
          * so we must wrap char* sides in STRVAL and extract result with VARVAL_fn. */
         snprintf(buf, bufsz,
-                 "VARVAL_fn(CONC_fn(STRVAL(%s), STRVAL(%s)))",
+                 "VARVAL_fn(CONCAT_fn(STRVAL(%s), STRVAL(%s)))",
                  lbuf, rbuf);
         return;
     }
@@ -716,7 +716,7 @@ static void emit_notany(const char *cs,
 }
 
 /* -----------------------------------------------------------------------
- * SPAN node — mtch one or more chars in charset
+ * SPAN node — MATCH_fn one or more chars in charset
  *
  * On beta: retreat one char at a time (backtrackable).
  * ----------------------------------------------------------------------- */
@@ -838,7 +838,7 @@ static void emit_seq(EXPR_t *left, EXPR_t *right,
     label_fmt(right_α, "cat_r", uid, "α");
     label_fmt(right_β, "cat_r", uid, "β");
 
-    PLG(alpha, left_α);   /* α  → left_α  (CAT — entr left) */
+    PLG(alpha, left_α);   /* α  → left_α  (CAT — ENTER_fn left) */
     PLG(beta,  right_β);  /* β  → right_β (resume right first) */
 
     byrd_emit(left,
@@ -926,7 +926,7 @@ static void emit_alt(EXPR_t *left, EXPR_t *right,
  * The key insight from the oracle:
  *   - ARBNO starts by succeeding with ZERO matches (depth=-1, goto gamma)
  *   - beta extends: save cursor, try child
- *   - child_ok → gamma (ARBNO succeeds again with one more mtch)
+ *   - child_ok → gamma (ARBNO succeeds again with one more MATCH_fn)
  *   - child_fail → restore cursor, depth--, omega (ARBNO gives up)
  * ----------------------------------------------------------------------- */
 
@@ -1147,7 +1147,7 @@ static void emit_imm(EXPR_t *child, const char *varname,
         if (do_shift) {
             /* ~ operator: PUSH_fn tree node onto shift-reduce stack via Shift(type, value) */
             PS(NULL, "  { DESCR_t _shift_args[2] = {STRVAL(\"%s\"), STRVAL(_os)};", varname);
-            PS(NULL, "    APLY_fn(\"Shift\", _shift_args, 2); }");
+            PS(NULL, "    APPLY_fn(\"Shift\", _shift_args, 2); }");
         }
         PS(gamma, "}");
     }
@@ -1160,7 +1160,7 @@ static void emit_imm(EXPR_t *child, const char *varname,
  * E_NAM (. capture) node
  *
  * Like E_DOL but the assignment is CONDITIONAL — it fires when we reach
- * the gamma of the enclosing mtch.  For the static compiled path we treat
+ * the gamma of the enclosing MATCH_fn.  For the static compiled path we treat
  * it identically to E_DOL (assign on child success, readable by outer code).
  * ----------------------------------------------------------------------- */
 
@@ -1257,8 +1257,8 @@ static void emit_simple_val(EXPR_t *e) {
             { B("INTVAL((NINC_fn(), ntop()))"); return; }
         if (e->sval && strcasecmp(e->sval, "nPop") == 0)
             { B("INTVAL((NPOP_fn(), 0))"); return; }
-        /* generic: fall through to APLY_fn */
-        B("APLY_fn(\"%s\", NULL, 0)", e->sval ? e->sval : "");
+        /* generic: fall through to APPLY_fn */
+        B("APPLY_fn(\"%s\", NULL, 0)", e->sval ? e->sval : "");
         return;
     default:
         B("NULVCL /* unhandled emit_simple_val kind %d */", (int)e->kind);
@@ -1670,7 +1670,7 @@ static void byrd_emit(EXPR_t *pat,
         B(", ");
         emit_simple_val(pat->right);
         B("};\n");
-        B("      APLY_fn(\"Reduce\", _reduce_args, 2); }\n");
+        B("      APPLY_fn(\"Reduce\", _reduce_args, 2); }\n");
         B("    goto %s;\n", gamma);
         B("%s: goto %s;\n", beta, omega);
         return;
@@ -1687,15 +1687,15 @@ static void byrd_emit(EXPR_t *pat,
 /* =======================================================================
  * Public API
  *
- * byrd_emit_pattern — emit a complete standalone mtch block:
+ * byrd_emit_pattern — emit a complete standalone MATCH_fn block:
  *
  *   goto <root>_alpha;
  *   [declarations]
  *   [Byrd box labeled-goto C]
- *   <gamma_label>:   (mtch succeeded)
- *   <omega_label>:   (mtch failed)
+ *   <gamma_label>:   (MATCH_fn succeeded)
+ *   <omega_label>:   (MATCH_fn failed)
  *
- * Called from emit.c in the pattern-mtch statement case.
+ * Called from emit.c in the pattern-MATCH_fn statement case.
  *
  * Parameters:
  *   pat          — the pattern EXPR_t* (subject pattern field)
@@ -1704,8 +1704,8 @@ static void byrd_emit(EXPR_t *pat,
  *   subject_var  — C expression for the subject string pointer
  *   subj_len_var — C expression for subject length (int64_t)
  *   cursor_var   — C lvalue for the cursor (int64_t, modified in place)
- *   gamma_label  — C label to jump to on mtch success
- *   omega_label  — C label to jump to on mtch failure
+ *   gamma_label  — C label to jump to on MATCH_fn success
+ *   omega_label  — C label to jump to on MATCH_fn failure
  * ======================================================================= */
 
 void byrd_emit_pattern(EXPR_t *pat, FILE *out_file,
