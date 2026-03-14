@@ -140,3 +140,24 @@ gcc -O0 -g artifacts/beauty_full_session50.c \
     $R/snobol4_pattern.c src/runtime/engine.c \
     -I$R -Isrc/runtime -lgc -lm -w -o /tmp/beauty_full_bin
 ```
+
+---
+
+## `beauty_full_session54.c`
+
+**What**: Generated C from `sno2c beauty.sno -I $INC` at Session 54.
+No code changes this session — architecture documentation session only.
+md5 matches session53 exactly (confirmed: same compiler output).
+
+Major architecture decisions recorded in HQ this session:
+- TWO TECHNIQUES for *X: Technique 1 (C target: struct+calloc) vs Technique 2 (ASM: mmap+memcpy+relocate)
+- Statement execution model: per-stmt setjmp, glob-sequence optimization, non-Gimpel DEFINE
+- ALL BYRD BOXES rule: engine.c never in beauty_full_bin
+- Sprint pivot: beauty-runtime → compiled-byrd-boxes-full
+
+**When**: Session 54, 2026-03-14.
+
+**Stats**: 16,610 lines of C. md5: `fc34ebc925c234e2ab5148840ed3cf41`
+
+**Compiles with 0 gcc errors.** Active bug: *snoParse through engine.c — NOT being chased.
+Next action: implement `byrd_emit_named_pattern` in emit_byrd.c (Technique 1).
