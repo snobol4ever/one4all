@@ -1496,8 +1496,11 @@ static void byrd_emit(Expr *pat,
         /* nPush() */
         if (strcasecmp(n, "nPush") == 0) {
             PL(alpha, gamma, "npush();");
-            /* beta: re-push so counter is live when ARBNO extends on backtrack */
-            PL(beta,  gamma, "npush();");
+            /* beta: nPush has no alternatives — fail so the containing CAT
+             * routes backtrack to ARBNO's own beta (cat_l_847_β → cat_r_847_β).
+             * Re-pushing here was wrong: it reset ARBNO depth=-1 each time,
+             * causing infinite zero-iteration ARBNO loop. */
+            PLG(beta, omega);
             return;
         }
         /* nInc() */

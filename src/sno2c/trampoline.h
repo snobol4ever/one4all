@@ -47,7 +47,9 @@ extern int64_t kw_stcount;
 static inline void trampoline_stno(int n) {
     extern int64_t kw_stlimit;
     extern int64_t kw_stcount;
-    if (kw_stlimit >= 0 && ++kw_stcount > kw_stlimit) {
+    ++kw_stcount;
+    if (getenv("SNO_TRACE")) fprintf(stderr, "STNO %lld line=%d\n", (long long)kw_stcount, n);
+    if (kw_stlimit >= 0 && kw_stcount > kw_stlimit) {
         fprintf(stderr,
             "\n** &STLIMIT exceeded at statement %d"
             " (&STCOUNT=%lld &STLIMIT=%lld)\n",
