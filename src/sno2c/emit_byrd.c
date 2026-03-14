@@ -63,6 +63,20 @@ static void B(const char *fmt, ...) {
     va_end(ap);
 }
 
+/* byrd_cs — C static name for a SNOBOL4 variable (mirrors cs() in emit.c).
+ * Prepends '_', replaces non-alnum/_ with '_'. Static buffer — use before next call. */
+static const char *byrd_cs(const char *s) {
+    static char buf[520];
+    int i = 0, j = 0;
+    buf[j++] = '_';
+    for (; s[i] && j < 510; i++) {
+        unsigned char c = (unsigned char)s[i];
+        buf[j++] = (isalnum(c) || c == '_') ? (char)c : '_';
+    }
+    buf[j] = '\0';
+    return buf;
+}
+
 /* -----------------------------------------------------------------------
  * Three-column pretty printer for emitted Byrd box code
  *
@@ -1205,10 +1219,19 @@ static void emit_imm(Expr *child, const char *varname,
         PS(NULL,  "  memcpy(_os, %s + %s, _len); _os[_len] = 0;", subj, start_var);
         PS(gamma, "  output_str(_os); free(_os); }");
     } else {
+        /* Sync both hash table and C static (if one exists).
+         * Skip C static sync for '_' (discard var → '__' invalid) and
+         * any name that maps to a reserved/invalid C identifier. */
+        int skip_cstatic = (strcmp(varname, "_") == 0);
         PS(NULL,  "{ int64_t _len = %s - %s;", cursor, start_var);
         PS(NULL,  "  char *_os = (char*)GC_malloc(_len + 1);");
         PS(NULL,  "  memcpy(_os, %s + %s, _len); _os[_len] = 0;", subj, start_var);
-        PS(gamma, "  var_set(\"%s\", STR_VAL(_os)); }", varname);
+        if (skip_cstatic) {
+            PS(gamma, "  var_set(\"%s\", STR_VAL(_os)); }", varname);
+        } else {
+            PS(NULL,  "  var_set(\"%s\", STR_VAL(_os));", varname);
+            PS(gamma, "  %s = STR_VAL(_os); }", byrd_cs(varname));
+        }
     }
 
     /* β: backtrack into child */
