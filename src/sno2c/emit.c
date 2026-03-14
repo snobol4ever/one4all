@@ -24,6 +24,14 @@ static void emit_assign_target_io(Expr *lhs, const char *rhs_str);
 
 static int cur_stmt_next_uid = 0;  /* set by snoc_emit before each emit_stmt */
 
+/* ---- Trampoline mode (sprint stmt-fn) ----
+ * When trampoline_mode=1, emit_goto_target emits "return block_X" instead of
+ * "goto _L_X", and each stmt is wrapped in its own static void* stmt_N(void).
+ * Controlled by -trampoline flag on the sno2c command line.
+ */
+int trampoline_mode = 0;         /* set by main.c when -trampoline passed */
+static int tramp_stmt_id = 0;    /* sequential stmt ID within current scope */
+
 static FILE *out;
 static int   uid_ctr = 0;
 static int   uid(void) { return ++uid_ctr; }
@@ -437,6 +445,38 @@ static int label_is_in_fn_body(const char *label, const char *fn_name);
  */
 static void emit_goto_target(const char *label, const char *fn) {
     int in_main = !fn || strcasecmp(fn, "main") == 0;
+
+    /* ---- Trampoline mode: every exit is a return, not a goto ---- */
+    if (trampoline_mode) {
+        if      (strcasecmp(label,"RETURN") ==0 ||
+                 strcasecmp(label,"NRETURN")==0) {
+            if (in_main) { E("return NULL"); return; }
+            E("return _tramp_return_%s", fn); return;
+        }
+        else if (strcasecmp(label,"FRETURN")==0 ||
+                 strcasecmp(label,"error")  ==0) {
+            if (in_main) { E("return NULL"); return; }
+            E("return _tramp_freturn_%s", fn); return;
+        }
+        else if (strcasecmp(label,"END")==0) {
+            E("return NULL"); return;
+        }
+        else if (strcasecmp(label,"$COMPUTED")==0 ||
+                 strcasecmp(label,"_COMPUTED")==0) {
+            E("return (void*)_tramp_next_%d", cur_stmt_next_uid); return;
+        }
+        /* Cross-scope: fall through */
+        if (label_is_in_fn_body(label, NULL) && !label_is_in_fn_body(label, fn)) {
+            E("return (void*)_tramp_next_%d", cur_stmt_next_uid); return;
+        }
+        if (!in_main && !label_is_in_fn_body(label, fn)) {
+            E("return (void*)_tramp_next_%d", cur_stmt_next_uid); return;
+        }
+        E("return (void*)block_%s", cs_label(label));
+        return;
+    }
+
+    /* ---- Classic goto mode (unchanged) ---- */
     if      (strcasecmp(label,"RETURN") ==0) {
         if (in_main) { E("goto _SNO_END"); return; }
         E("goto _SNO_RETURN_%s", fn); return;
@@ -446,11 +486,6 @@ static void emit_goto_target(const char *label, const char *fn) {
         E("goto _SNO_FRETURN_%s", fn); return;
     }
     else if (strcasecmp(label,"NRETURN")==0) {
-        /* NRETURN = successful return. The function has already assigned its
-         * return variable and done its side effects. The NAME distinction
-         * (returning an l-value reference) is not implemented, but the function
-         * must SUCCEED — not fail. Routing to FRETURN was causing Shift/Reduce
-         * and all side-effect functions to fail every call. */
         if (in_main) { E("goto _SNO_END"); return; }
         E("goto _SNO_RETURN_%s", fn); return;
     }
@@ -465,10 +500,6 @@ static void emit_goto_target(const char *label, const char *fn) {
     else if (strcasecmp(label,"$COMPUTED")==0 || strcasecmp(label,"_COMPUTED")==0) {
         E("goto _SNO_NEXT_%d", cur_stmt_next_uid); return;
     }
-    /* Cross-scope goto detection:
-     * 1. Label is in a different function's body → fallthrough.
-     * 2. Label is in main scope (not in any fn body) but we're inside a fn → fallthrough.
-     *    (main-scope labels are C labels in main(); unreachable from a C function.) */
     if (label_is_in_fn_body(label, NULL) && !label_is_in_fn_body(label, fn)) {
         E("goto _SNO_NEXT_%d", cur_stmt_next_uid); return;
     }
@@ -479,6 +510,21 @@ static void emit_goto_target(const char *label, const char *fn) {
 }
 
 static void emit_goto(SnoGoto *g, const char *fn, int result_ok) {
+    if (trampoline_mode) {
+        if (!g) { E("    return (void*)_tramp_next_%d;\n", cur_stmt_next_uid); return; }
+        if (g->uncond) {
+            E("    "); emit_goto_target(g->uncond, fn); E(";\n");
+        } else {
+            if (result_ok) {
+                if (g->onsuccess) { E("    if(_ok) { "); emit_goto_target(g->onsuccess, fn); E("; }\n"); }
+                if (g->onfailure) { E("    if(!_ok) { "); emit_goto_target(g->onfailure, fn); E("; }\n"); }
+            } else {
+                if (g->onsuccess) { E("    "); emit_goto_target(g->onsuccess, fn); E(";\n"); }
+            }
+            E("    return (void*)_tramp_next_%d;\n", cur_stmt_next_uid);
+        }
+        return;
+    }
     if (!g) { E("    goto _SNO_NEXT_%d;\n", cur_stmt_next_uid); return; }
     if (g->uncond) {
         E("    "); emit_goto_target(g->uncond, fn); E(";\n");
@@ -718,12 +764,16 @@ static void emit_stmt(Stmt *s, const char *fn) {
         emit_assign_target_io(s->subject, rhs);
         E("}\n");
         /* emit goto using _ok%d for conditional :S/:F branches */
-        if (!s->go) { E("    goto _SNO_NEXT_%d;\n", cur_stmt_next_uid); }
+        if (!s->go) {
+            if (trampoline_mode) E("    return (void*)_tramp_next_%d;\n", cur_stmt_next_uid);
+            else                 E("    goto _SNO_NEXT_%d;\n", cur_stmt_next_uid);
+        }
         else if (s->go->uncond) { emit_goto(s->go, fn, 0); }
         else {
             if (s->go->onsuccess) { E("    if(_ok%d) ", u); emit_goto_target(s->go->onsuccess, fn); E(";\n"); }
             if (s->go->onfailure) { E("    if(!_ok%d) ", u); emit_goto_target(s->go->onfailure, fn); E(";\n"); }
-            E("    goto _SNO_NEXT_%d;\n", cur_stmt_next_uid);
+            if (trampoline_mode) E("    return (void*)_tramp_next_%d;\n", cur_stmt_next_uid);
+            else                 E("    goto _SNO_NEXT_%d;\n", cur_stmt_next_uid);
         }
         return;
     }
@@ -805,12 +855,16 @@ static void emit_stmt(Stmt *s, const char *fn) {
         E("%s:;\n", done_lbl);
 
         /* emit goto using _ok%d */
-        if (!s->go) { E("    goto _SNO_NEXT_%d;\n", cur_stmt_next_uid); }
+        if (!s->go) {
+            if (trampoline_mode) E("    return (void*)_tramp_next_%d;\n", cur_stmt_next_uid);
+            else                 E("    goto _SNO_NEXT_%d;\n", cur_stmt_next_uid);
+        }
         else if (s->go->uncond) { emit_goto(s->go, fn, 0); }
         else {
             if (s->go->onsuccess) { E("    if(_ok%d) ", u); emit_goto_target(s->go->onsuccess, fn); E(";\n"); }
             if (s->go->onfailure) { E("    if(!_ok%d) ", u); emit_goto_target(s->go->onfailure, fn); E(";\n"); }
-            E("    goto _SNO_NEXT_%d;\n", cur_stmt_next_uid);
+            if (trampoline_mode) E("    return (void*)_tramp_next_%d;\n", cur_stmt_next_uid);
+            else                 E("    goto _SNO_NEXT_%d;\n", cur_stmt_next_uid);
         }
         return;
     }
@@ -821,12 +875,16 @@ static void emit_stmt(Stmt *s, const char *fn) {
         E("SnoVal _v%d = ", u); emit_expr(s->subject); E(";\n");
         E("int _ok%d = !IS_FAIL(_v%d);\n", u, u);
         /* emit goto using _ok%d */
-        if (!s->go) { E("    goto _SNO_NEXT_%d;\n", cur_stmt_next_uid); }
+        if (!s->go) {
+            if (trampoline_mode) E("    return (void*)_tramp_next_%d;\n", cur_stmt_next_uid);
+            else                 E("    goto _SNO_NEXT_%d;\n", cur_stmt_next_uid);
+        }
         else if (s->go->uncond) { emit_goto(s->go, fn, 0); }
         else {
             if (s->go->onsuccess) { E("    if(_ok%d) ", u); emit_goto_target(s->go->onsuccess, fn); E(";\n"); }
             if (s->go->onfailure) { E("    if(!_ok%d) ", u); emit_goto_target(s->go->onfailure, fn); E(";\n"); }
-            E("    goto _SNO_NEXT_%d;\n", cur_stmt_next_uid);
+            if (trampoline_mode) E("    return (void*)_tramp_next_%d;\n", cur_stmt_next_uid);
+            else                 E("    goto _SNO_NEXT_%d;\n", cur_stmt_next_uid);
         }
     }
 }
@@ -1412,6 +1470,202 @@ static void emit_main(Program *prog) {
 }
 
 /* ============================================================
+ * Trampoline emission (sprint stmt-fn)
+ *
+ * emit_trampoline_program() is called instead of the classic
+ * emit_fn/emit_main path when trampoline_mode=1.
+ *
+ * Output structure:
+ *   #include "trampoline.h"
+ *   #include runtime headers
+ *   static SnoVal globals...
+ *   forward decls: block_X for every labeled stmt
+ *   static void* stmt_N(void) { ...emit_stmt body... }  per stmt
+ *   static void* block_L(void) { stmt sequence }        per labeled group
+ *   int main(void) { runtime_init(); trampoline_run(block_START); }
+ * ============================================================ */
+
+/* Collect all labels that appear on statements (block entry points) */
+#define TRAMP_LABEL_MAX 4096
+static char *tramp_labels[TRAMP_LABEL_MAX];
+static int   tramp_nlabels = 0;
+
+static void tramp_collect_labels(Program *prog) {
+    tramp_nlabels = 0;
+    for (Stmt *s = prog->head; s; s = s->next) {
+        if (s->label && tramp_nlabels < TRAMP_LABEL_MAX)
+            tramp_labels[tramp_nlabels++] = s->label;
+    }
+}
+
+static int tramp_has_label(const char *lbl) {
+    for (int i = 0; i < tramp_nlabels; i++)
+        if (strcasecmp(tramp_labels[i], lbl) == 0) return 1;
+    return 0;
+}
+
+static void emit_trampoline_program(Program *prog) {
+    /* --- Header --- */
+    E("/* generated by sno2c -trampoline */\n");
+    E("#include \"trampoline.h\"\n");
+    E("#include \"runtime_shim.h\"\n\n");
+
+    /* --- Global variable declarations --- */
+    E("/* --- global SNOBOL4 variables --- */\n");
+    for (int i = 0; i < sym_count; i++)
+        E("static SnoVal %s = {0};\n", cs(sym_table[i]));
+    E("\n");
+
+    /* --- Collect labels for forward declarations --- */
+    tramp_collect_labels(prog);
+
+    /* --- Forward declarations for all block functions --- */
+    E("/* --- block forward declarations --- */\n");
+    E("static void *block_START(void);\n");
+    E("static void *block_END(void);\n");
+    for (int i = 0; i < tramp_nlabels; i++) {
+        const char *lbl = tramp_labels[i];
+        if (strcasecmp(lbl,"END")==0) continue;
+        E("static void *block_%s(void);\n", cs_label(lbl));
+    }
+    E("\n");
+
+    /* --- Emit DEFINE'd functions using the existing emit_fn path ---
+     * Function bodies use classic goto emission (trampoline_mode=0 inside).
+     * Only main-level code uses the trampoline model. */
+    {
+        int saved = trampoline_mode;
+        trampoline_mode = 0;
+        emit_fn_forwards();
+        for (int i = 0; i < fn_count; i++)
+            emit_fn(&fn_table[i], prog);
+        trampoline_mode = saved;
+    }
+    E("\n");
+
+    /* --- Sentinel block pointers used by stmt_N as "continue" signals ---
+     * _tramp_next_N is just a unique non-NULL address the block fn
+     * recognises as "this stmt fell through; run next stmt". We use the
+     * address of a unique static char as the sentinel. */
+    /* (Generated inline per-stmt as needed — no pre-declaration required
+     *  because block_L compares by value, not by name.) */
+
+    /* --- Emit each main-level stmt as its own function --- */
+    lreg_reset();
+    byrd_fn_scope_reset();
+    cur_fn_name = "main";
+    cur_fn_def  = NULL;
+
+    /* sid_uid[sid] = the cur_stmt_next_uid assigned to stmt sid (1-based) */
+#define TRAMP_STMT_MAX 8192
+    static int sid_uid[TRAMP_STMT_MAX];
+    static Stmt *sid_stmt[TRAMP_STMT_MAX];
+    int stmt_count = 0;
+
+    /* Pass 1: emit stmt_N() functions, record sid→uid mapping */
+    for (Stmt *s = prog->head; s; s = s->next) {
+        if (s->is_end) break;
+        if (stmt_is_in_any_fn_body(s)) continue;
+        if (stmt_in_phantom_body(s)) continue;
+        if (stmt_define_proto(s)) continue;
+        if (stmt_count >= TRAMP_STMT_MAX) break;
+
+        int sid = ++stmt_count;
+        cur_stmt_next_uid = uid();
+        sid_uid[sid]  = cur_stmt_next_uid;
+        sid_stmt[sid] = s;
+
+        /* sentinel: unique static char address == "this stmt fell through" */
+        E("static char _tramp_sentinel_%d;\n", cur_stmt_next_uid);
+        E("#define _tramp_next_%d ((void*)&_tramp_sentinel_%d)\n",
+          cur_stmt_next_uid, cur_stmt_next_uid);
+
+        E("static void *stmt_%d(void) { /* line %d%s%s */\n",
+          sid, s->lineno,
+          s->label ? " label:" : "",
+          s->label ? s->label  : "");
+        emit_stmt(s, "main");
+        E("}\n\n");
+    }
+
+    /* Pass 2: emit block grouping functions.
+     * Rule: a labeled stmt starts a new block.
+     * Unlabeled stmts after it belong to the same block.
+     * Each block calls its member stmts; if stmt returns _tramp_next_N
+     * (fall-through sentinel), continue; otherwise return immediately.
+     */
+    E("/* --- block functions --- */\n");
+
+    const char *cur_block_label = NULL;   /* NULL = block_START */
+    int block_open = 0;
+
+    for (int sid = 1; sid <= stmt_count; sid++) {
+        Stmt *s = sid_stmt[sid];
+
+        /* A labeled stmt (not the very first) closes the current block
+         * and opens a new one named after the label */
+        if (s->label && block_open) {
+            E("    return block_%s; /* fall into next block */\n}\n\n",
+              cs_label(s->label));
+            block_open = 0;
+        }
+
+        /* Open a new block if needed */
+        if (!block_open) {
+            if (!s->label || sid == 1) {
+                /* block_START: first unlabeled run OR very first stmt */
+                if (!cur_block_label) {
+                    E("static void *block_START(void) {\n");
+                } else {
+                    E("static void *block_%s(void) {\n", cs_label(cur_block_label));
+                }
+            } else {
+                cur_block_label = s->label;
+                E("static void *block_%s(void) {\n", cs_label(s->label));
+            }
+            block_open = 1;
+        }
+
+        /* Call stmt, propagate any non-fallthrough return */
+        E("    { void *_r = stmt_%d();\n", sid);
+        E("      if (_r != _tramp_next_%d) return _r; }\n", sid_uid[sid]);
+    }
+
+    /* Close the last open block */
+    if (block_open) {
+        E("    return block_END;\n}\n\n");
+    } else if (stmt_count == 0) {
+        /* Empty program */
+        E("static void *block_START(void) { return block_END; }\n\n");
+    }
+
+    E("static void *block_END(void) { return NULL; }\n\n");
+
+    /* --- main --- */
+    E("int main(void) {\n");
+    E("    ini();\n");
+    for (int i = 0; i < sym_count; i++)
+        E("    var_register(\"%s\", &%s);\n", sym_table[i], cs(sym_table[i]));
+    E("    var_sync_registered();\n\n");
+    for (int i = 0; i < fn_count; i++) {
+        if (!fn_table[i].define_stmt) continue;
+        E("    define(\"%s(", fn_table[i].name);
+        for (int j = 0; j < fn_table[i].nargs; j++) {
+            if (j) E(",");
+            E("%s", fn_table[i].args[j]);
+        }
+        E(")");
+        for (int j = 0; j < fn_table[i].nlocals; j++) {
+            if (j) E(","); else E("");
+            E("%s", fn_table[i].locals[j]);
+        }
+        E("\", _sno_fn_%s);\n", fn_table[i].name);
+    }
+    E("\n    trampoline_run(block_START);\n");
+    E("    return 0;\n}\n");
+}
+
+/* ============================================================
  * Public entry point
  * ============================================================ */
 void snoc_emit(Program *prog, FILE *f) {
@@ -1518,6 +1772,10 @@ void snoc_emit(Program *prog, FILE *f) {
     }
 
     /* Phase 2: emit */
+    if (trampoline_mode) {
+        emit_trampoline_program(prog);
+        return;
+    }
     emit_header();
     emit_global_var_decls();
     emit_fn_forwards();

@@ -1,11 +1,13 @@
 /*
  * main.c — sno2c driver
- * Usage: sno2c [-I dir] [-o out.c] input.sno
+ * Usage: sno2c [-I dir] [-o out.c] [-trampoline] input.sno
  */
 #include "sno2c.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+extern int trampoline_mode;  /* defined in emit.c */
 
 int main(int argc, char *argv[]) {
     const char *outfile = NULL, *infile = NULL;
@@ -16,6 +18,8 @@ int main(int argc, char *argv[]) {
             snoc_add_include_dir(argv[i]+2);
         } else if (!strcmp(argv[i],"-o") && i+1<argc) {
             outfile = argv[++i];
+        } else if (!strcmp(argv[i],"-trampoline")) {
+            trampoline_mode = 1;
         } else if (argv[i][0]!='-') {
             infile = argv[i];
         } else {
