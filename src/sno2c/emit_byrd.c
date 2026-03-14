@@ -135,6 +135,33 @@ static void named_pat_register(const char *varname,
     snprintf(e->fnname,   NAMED_PAT_NAMELEN, "%s", fnname);
 }
 
+/* Pre-register a name without emitting anything — so all names are known
+ * before any function body is emitted (handles forward/mutual references). */
+void byrd_preregister_named_pattern(const char *varname) {
+    char safe[NAMED_PAT_NAMELEN];
+    const char *s = varname;
+    int i = 0;
+    for (; *s && i < (int)(sizeof safe)-1; s++, i++)
+        safe[i] = (isalnum((unsigned char)*s) || *s=='_') ? *s : '_';
+    safe[i] = '\0';
+    char fnname[NAMED_PAT_NAMELEN], tyname[NAMED_PAT_NAMELEN];
+    snprintf(fnname, sizeof fnname, "pat_%s", safe);
+    snprintf(tyname, sizeof tyname, "pat_%s_t", safe);
+    named_pat_register(varname, tyname, fnname);
+}
+
+/* Emit forward declarations for ALL registered named patterns.
+ * Must be called once, after all byrd_preregister_named_pattern calls,
+ * and BEFORE any byrd_emit_named_pattern calls. */
+void byrd_emit_named_fwdecls(FILE *out_file) {
+    for (int i = 0; i < named_pat_count; i++) {
+        fprintf(out_file,
+            "static SnoVal %s(const char *, int64_t, int64_t *, int);\n",
+            named_pat_registry[i].fnname);
+    }
+    if (named_pat_count > 0) fprintf(out_file, "\n");
+}
+
 static const NamedPat *named_pat_lookup(const char *varname) {
     for (int i = 0; i < named_pat_count; i++)
         if (strcmp(named_pat_registry[i].varname, varname) == 0)
@@ -1317,24 +1344,30 @@ static void byrd_emit(Expr *pat,
         const NamedPat *np = named_pat_lookup(varname);
 
         if (np) {
-            /* Compiled path: direct function call — no engine.c */
-            /* Child frame pointer field: _z_<varname>  (type: pat_<varname>_t *) */
-            char zfield[LBUF];
-            snprintf(zfield, LBUF, "_z_%s", varname);
-            /* Declare as static pointer (NULL = unallocated) */
-            decl_add("%s *%s", np->typename, zfield);
+            /* Compiled path: direct function call — no engine.c.
+             * New signature: pat_X(subj, slen, &cursor, entry)
+             * Returns FAIL_VAL on fail, non-fail on success (cursor updated). */
+            char saved_cur[LBUF];
+            snprintf(saved_cur, LBUF, "deref_%d_saved_cur", byrd_uid());
+            decl_add("int64_t %s", saved_cur);
 
             /* alpha: first call — entry 0 */
             B("%s: {\n", alpha);
-            B("    SnoVal _r_%s = %s(&%s, 0);\n", varname, np->fnname, zfield);
-            B("    if (IS_FAIL(_r_%s)) goto %s;\n", varname, omega);
+            B("    %s = %s;\n", saved_cur, cursor);  /* save cursor before call */
+            B("    SnoVal _r_%s = %s(%s, %s, &%s, 0);\n",
+              varname, np->fnname, subj, subj_len, cursor);
+            B("    if (is_fail(_r_%s)) { %s = %s; goto %s; }\n",
+              varname, cursor, saved_cur, omega);
             B("    goto %s;\n", gamma);
             B("}\n");
 
-            /* beta: backtrack — entry 1 */
+            /* beta: backtrack — entry 1, restore cursor first */
             B("%s: {\n", beta);
-            B("    SnoVal _r_%s = %s(&%s, 1);\n", varname, np->fnname, zfield);
-            B("    if (IS_FAIL(_r_%s)) goto %s;\n", varname, omega);
+            B("    %s = %s;\n", cursor, saved_cur);  /* restore for backtrack */
+            B("    SnoVal _r_%s = %s(%s, %s, &%s, 1);\n",
+              varname, np->fnname, subj, subj_len, cursor);
+            B("    if (is_fail(_r_%s)) { %s = %s; goto %s; }\n",
+              varname, cursor, saved_cur, omega);
             B("    goto %s;\n", gamma);
             B("}\n");
             return;
@@ -1484,6 +1517,105 @@ void byrd_emit_pattern(Expr *pat, FILE *out_file,
         fwrite(code_buf, 1, code_size, out_file);
 
     free(code_buf);
+}
+
+/* =======================================================================
+ * byrd_emit_named_pattern — emit a named pattern as a compiled C function.
+ *
+ * Emits a forward decl + C function:
+ *   static SnoVal pat_X(const char *_subj_np, int64_t _slen_np,
+ *                       int64_t *_cur_ptr_np, int _entry_np);
+ * entry 0 = alpha (fresh), entry 1 = beta (resume).
+ * On success updates *_cur_ptr_np and returns SNO_EMPTY.
+ * On failure returns FAIL_VAL.
+ *
+ * Registers the name so E_DEREF (*varname) emits a direct call.
+ * ======================================================================= */
+
+void byrd_emit_named_pattern(const char *varname, Expr *pat, FILE *out_file) {
+    /* C-safe name */
+    char safe[NAMED_PAT_NAMELEN];
+    {
+        const char *s = varname;
+        int i = 0;
+        for (; *s && i < (int)(sizeof safe)-1; s++, i++)
+            safe[i] = (isalnum((unsigned char)*s) || *s=='_') ? *s : '_';
+        safe[i] = '\0';
+    }
+
+    char fnname[NAMED_PAT_NAMELEN];
+    char tyname[NAMED_PAT_NAMELEN];
+    snprintf(fnname, sizeof fnname, "pat_%s", safe);
+    snprintf(tyname, sizeof tyname, "pat_%s_t", safe);
+
+    named_pat_register(varname, tyname, fnname);
+
+    /* Reset fn_seen so statics aren't skipped due to a previous pattern's decls */
+    byrd_fn_scope_reset();
+
+    /* NOTE: forward declaration is NOT emitted here.
+     * Caller must emit all forward decls (via byrd_emit_named_fwdecls) BEFORE
+     * calling this function, so mutual/forward refs compile clean. */
+
+    char   *code_buf  = NULL;
+    size_t  code_size = 0;
+    FILE   *code_file = open_memstream(&code_buf, &code_size);
+    if (!code_file) {
+        fprintf(out_file, "/* emit_byrd: open_memstream failed for %s */\n", varname);
+        return;
+    }
+
+    int uid_saved = byrd_uid_ctr;
+    decl_reset();
+
+    char gamma_lbl[LBUF], omega_lbl[LBUF];
+    char root_alpha[LBUF], root_beta[LBUF];
+    snprintf(gamma_lbl,  LBUF, "_%s_ok",    safe);
+    snprintf(omega_lbl,  LBUF, "_%s_fail",  safe);
+    snprintf(root_alpha, LBUF, "_%s_alpha", safe);
+    snprintf(root_beta,  LBUF, "_%s_beta",  safe);
+
+    byrd_out = code_file;
+    byrd_uid_ctr = uid_saved;
+    decl_reset();
+
+    byrd_emit(pat,
+              root_alpha, root_beta,
+              gamma_lbl, omega_lbl,
+              "_subj_np", "_slen_np", "_cur_np",
+              0);
+
+    fflush(code_file);
+    fclose(code_file);
+
+    byrd_out = out_file;
+
+    fprintf(out_file,
+        "static SnoVal %s(const char *_subj_np, int64_t _slen_np,\n"
+        "                  int64_t *_cur_ptr_np, int _entry_np) {\n"
+        "    int64_t _cur_np = *_cur_ptr_np;\n",
+        fnname);
+
+    decl_flush();
+
+    fprintf(out_file,
+        "    if (_entry_np == 0) goto %s;\n"
+        "    if (_entry_np == 1) goto %s;\n"
+        "    goto %s;\n",
+        root_alpha, root_beta, omega_lbl);
+
+    if (code_buf && code_size > 0)
+        fwrite(code_buf, 1, code_size, out_file);
+    free(code_buf);
+
+    fprintf(out_file,
+        "    %s:;\n"
+        "        *_cur_ptr_np = _cur_np;\n"
+        "        return STR_VAL(\"\");\n"   /* success: cursor updated, return non-fail */
+        "    %s:;\n"
+        "        return FAIL_VAL;\n"
+        "}\n\n",
+        gamma_lbl, omega_lbl);
 }
 
 /* =======================================================================

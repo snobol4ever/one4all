@@ -103,6 +103,9 @@ void     snoc_emit(Program *prog, FILE *out);
 
 /* ---- Byrd box emitter (emit_byrd.c) ---- */
 void byrd_fn_scope_reset(void);   /* call at start of each emitted C function */
+void byrd_named_pat_reset(void);  /* clear registry between programs */
+void byrd_preregister_named_pattern(const char *varname); /* forward-register name */
+void byrd_emit_named_fwdecls(FILE *out_file); /* emit all forward decls at once */
 void byrd_emit_pattern(Expr *pat, FILE *out_file,
                        const char *root_name,
                        const char *subject_var,
@@ -114,6 +117,8 @@ void byrd_emit_pattern(Expr *pat, FILE *out_file,
 void byrd_emit_standalone(Expr *pat, FILE *out_file,
                           const char *subject,
                           const char *root_name);
+
+void byrd_emit_named_pattern(const char *varname, Expr *pat, FILE *out_file);
 
 /* ---- error ---- */
 void snoc_error(int lineno, const char *fmt, ...);

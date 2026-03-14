@@ -1550,6 +1550,43 @@ static void emit_trampoline_program(Program *prog) {
     /* (Generated inline per-stmt as needed — no pre-declaration required
      *  because block_L compares by value, not by name.) */
 
+    /* --- Pass 0: emit compiled named pattern functions ---
+     * Sub-pass 0a: pre-register ALL names so forward/mutual refs resolve.
+     * Sub-pass 0b: emit function bodies (all names already in registry).
+     */
+    E("/* --- compiled named pattern functions --- */\n");
+    byrd_named_pat_reset();
+
+    /* 0a: register all names first */
+    for (Stmt *s = prog->head; s; s = s->next) {
+        if (s->is_end) break;
+        if (stmt_is_in_any_fn_body(s)) continue;
+        if (stmt_in_phantom_body(s)) continue;
+        if (stmt_define_proto(s)) continue;
+        if (!s->pattern && s->replacement &&
+            s->subject && s->subject->kind == E_VAR &&
+            expr_contains_pattern(s->replacement)) {
+            byrd_preregister_named_pattern(s->subject->sval);
+        }
+    }
+
+    /* 0a.5: emit ALL forward decls in one block before any function body */
+    byrd_emit_named_fwdecls(out);
+
+    /* 0b: emit function bodies */
+    for (Stmt *s = prog->head; s; s = s->next) {
+        if (s->is_end) break;
+        if (stmt_is_in_any_fn_body(s)) continue;
+        if (stmt_in_phantom_body(s)) continue;
+        if (stmt_define_proto(s)) continue;
+        if (!s->pattern && s->replacement &&
+            s->subject && s->subject->kind == E_VAR &&
+            expr_contains_pattern(s->replacement)) {
+            byrd_emit_named_pattern(s->subject->sval, s->replacement, out);
+        }
+    }
+    E("\n");
+
     /* --- Emit each main-level stmt as its own function --- */
     lreg_reset();
     byrd_fn_scope_reset();
