@@ -101,6 +101,19 @@ void     snoc_add_include_dir(const char *d);
 Program *snoc_parse(FILE *f, const char *filename);
 void     snoc_emit(Program *prog, FILE *out);
 
+/* ---- Byrd box emitter (emit_byrd.c) ---- */
+void byrd_emit_pattern(Expr *pat, FILE *out_file,
+                       const char *root_name,
+                       const char *subject_var,
+                       const char *subj_len_var,
+                       const char *cursor_var,
+                       const char *gamma_label,
+                       const char *omega_label);
+
+void byrd_emit_standalone(Expr *pat, FILE *out_file,
+                          const char *subject,
+                          const char *root_name);
+
 /* ---- error ---- */
 void snoc_error(int lineno, const char *fmt, ...);
 extern int   snoc_nerrors;
