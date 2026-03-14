@@ -13,3 +13,13 @@
 - START → START now works ✅
 - Active bug: $expr indirect read uses e->left (NULL) instead of e->right — see SESSION.md
 - `$'@S' = link(...)` stores STRING not link UDEF — broken until E_DEREF fix applied
+
+## Session 78 notes
+- Commit: `b20329f fix(emit_cnode): build_expr E_DEREF — check !e->left first, use e->right for $expr`
+- emit_cnode.c build_expr E_DEREF fixed: grammar puts $expr operand in e->right (e->left is NULL)
+- Old code fell through to build_expr(a, e->left) → NULL → deref(NULL_VAL)
+- New code mirrors emit_expr: !e->left → deref(e->right), e->left->E_VAR → var_as_pattern(pat_ref(...))
+- Binary compiles 0 errors with engine_stub.c
+- Parse Error still active — emit.c emit_expr E_DEREF NOT YET FIXED (session 79 first action)
+- Lines: 31776 | MD5: 5046a4b6f8a751ea92a67d271c1c05a2 | CHANGED from session 77
+- Session also: TINY.md/SESSION.md rewritten (19-session staleness fixed), bootstrap plan written
