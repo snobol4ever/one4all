@@ -300,12 +300,24 @@ typedef struct {
 
 #define MAX_CAPTURES 64
 
+/* Cache of already-materialised patterns keyed by SnoPattern* identity.
+ * Prevents var_resolve_callback from re-materialising the same variable
+ * (e.g. snoCommand) on every ARBNO iteration.  nInc/nPush/nPop fire ONCE
+ * at materialise time (correct — they set up capture wrappers), not N times. */
+#define VAR_CACHE_MAX 32
 typedef struct {
-    PatternList pl;
-    Capture     captures[MAX_CAPTURES];
-    int         ncaptures;
-    const char *subject;     /* the subject string being matched */
-    int         scan_start;  /* current scan start offset for POS/RPOS adjustment */
+    SnoPattern *sp;    /* original SnoPattern* (identity key) */
+    Pattern    *root;  /* materialised Pattern* tree (owned by pl) */
+} VarCacheEntry;
+
+typedef struct {
+    PatternList    pl;
+    Capture        captures[MAX_CAPTURES];
+    int            ncaptures;
+    const char    *subject;       /* the subject string being matched */
+    int            scan_start;    /* current scan start offset for POS/RPOS adjustment */
+    VarCacheEntry  var_cache[VAR_CACHE_MAX];
+    int            var_cache_n;
 } MatchCtx;
 
 /* Forward decl */
@@ -633,30 +645,10 @@ static Pattern *materialise(SnoPattern *sp, MatchCtx *ctx) {
     case SPAT_USER_CALL: {
         if (getenv("SNO_PAT_DEBUG"))
             fprintf(stderr, "SPAT_USER_CALL %s\n", sp->str);
-        /* Side-effect functions (nInc, nPop, nPush, Reduce) must NEVER be called
-         * at materialise time — materialise() fires once per match AND once per
-         * ARBNO iteration via var_resolve_callback, so they would corrupt state.
-         * Wrap them in T_FUNC so user_call_fn() fires at match time only.
-         *
-         * All other functions (reduce, TZ, lwr, IDENT, etc.) are safe to call
-         * eagerly — they return SNO_PATTERN or SNO_STR which we inline into the
-         * pattern tree, exactly as before. */
-        if (is_sideeffect_fn(sp->str)) {
-            UCData *d = (UCData *)GC_MALLOC(sizeof(UCData));
-            d->name    = sp->str;
-            d->nargs   = sp->nargs;
-            d->args    = NULL;
-            d->subject = ctx->subject;   /* thread subject for SNO_PATTERN sub-match */
-            if (sp->nargs > 0) {
-                d->args = (SnoVal *)GC_MALLOC(sp->nargs * sizeof(SnoVal));
-                memcpy(d->args, sp->args, sp->nargs * sizeof(SnoVal));
-            }
-            p->type      = T_FUNC;
-            p->func      = user_call_fn;
-            p->func_data = d;
-            return p;
-        }
-        /* Eager path: call now, inline result into pattern tree */
+        /* With VarCache in MatchCtx, var_resolve_callback materialises each
+         * SnoPattern* exactly ONCE per match (cached on ARBNO re-entries).
+         * Side-effect functions (nInc, nPush, nPop, Reduce) therefore fire
+         * ONCE at materialise time — correct.  No T_FUNC deferral needed. */
         SnoVal result = sno_apply(sp->str, sp->args, sp->nargs);
         if (result.type == SNO_PATTERN) {
             return materialise(spat_of(result), ctx);
@@ -736,7 +728,21 @@ static Pattern *var_resolve_callback(const char *name, void *userdata) {
         ep->type = T_EPSILON;
         return ep;
     }
-    return materialise(sp, ctx);
+    /* Cache lookup: if we've already materialised this SnoPattern* during this
+     * match, return the cached Pattern* tree.  This prevents nInc/nPush/nPop
+     * (and any other SPAT_USER_CALL nodes) from firing on every ARBNO iteration
+     * that re-resolves the same variable (e.g. snoCommand).
+     * The tree is identical every time — only the first materialise call is needed. */
+    for (int i = 0; i < ctx->var_cache_n; i++)
+        if (ctx->var_cache[i].sp == sp)
+            return ctx->var_cache[i].root;
+    Pattern *root = materialise(sp, ctx);
+    if (ctx->var_cache_n < VAR_CACHE_MAX) {
+        ctx->var_cache[ctx->var_cache_n].sp   = sp;
+        ctx->var_cache[ctx->var_cache_n].root = root;
+        ctx->var_cache_n++;
+    }
+    return root;
 }
 
 /* Internal: try match using a pre-materialised root at a single starting offset.

@@ -210,6 +210,7 @@ static SnoVal _b_EVAL(SnoVal *a, int n)  { return sno_eval(n>0?a[0]:SNO_NULL_VAL
 static SnoVal _b_OPSYN(SnoVal *a, int n) {
     return sno_opsyn(n>0?a[0]:SNO_NULL_VAL,n>1?a[1]:SNO_NULL_VAL,n>2?a[2]:SNO_NULL_VAL); }
 static SnoVal _b_SORT(SnoVal *a, int n)  { return sno_sort_fn(n>0?a[0]:SNO_NULL_VAL); }
+static SnoVal _b_INPUT(SnoVal *a, int n);  /* defined near sno_input_read below */
 
 /* Sprint 23: counter stack and tree field accessors as callable SnoVal functions */
 static SnoVal _b_nPush(SnoVal *a, int n) {
@@ -581,6 +582,7 @@ void sno_runtime_init(void) {
     sno_register_fn("EVAL",  _b_EVAL,  1, 1);
     sno_register_fn("OPSYN", _b_OPSYN, 2, 3);
     sno_register_fn("SORT",  _b_SORT,  1, 1);
+    sno_register_fn("INPUT", _b_INPUT, 1, 4);
     sno_register_fn("nPush",    _b_nPush,    0, 0);
     sno_register_fn("nInc",     _b_nInc,     0, 0);
     sno_register_fn("nDec",     _b_nDec,     0, 0);
@@ -1648,14 +1650,34 @@ void sno_output_str(const char *s) {
     printf("%s\n", s ? s : "");
 }
 
+/* Current INPUT source — defaults to stdin, redirected by INPUT(name,channel,'',fileName) */
+static FILE *_input_fp = NULL;
+static char *_input_buf = NULL;
+static size_t _input_cap = 0;
+
 SnoVal sno_input_read(void) {
-    static char *linebuf = NULL;
-    static size_t linecap = 0;
-    ssize_t nread = getline(&linebuf, &linecap, stdin);
+    if (!_input_fp) _input_fp = stdin;
+    ssize_t nread = getline(&_input_buf, &_input_cap, _input_fp);
     if (nread < 0) return SNO_FAIL_VAL;  /* EOF = INPUT fails */
-    /* Strip trailing newline */
-    if (nread > 0 && linebuf[nread-1] == '\n') linebuf[nread-1] = '\0';
-    return SNO_STR_VAL(GC_strdup(linebuf));
+    if (nread > 0 && _input_buf[nread-1] == '\n') _input_buf[nread-1] = '\0';
+    return SNO_STR_VAL(GC_strdup(_input_buf));
+}
+
+/* INPUT(name, channel, options, fileName) — I/O association (SPITBOL-style).
+ * io.sno OPSYNs the original INPUT builtin to input__ then calls it with 4 args.
+ * We support the essential case: reassign INPUT source to a named file. */
+static SnoVal _b_INPUT(SnoVal *a, int n) {
+    const char *fname = (n >= 4) ? sno_to_str(a[3]) : NULL;
+    if (!fname || !fname[0]) {
+        if (_input_fp && _input_fp != stdin) fclose(_input_fp);
+        _input_fp = stdin;
+        return SNO_NULL_VAL;
+    }
+    FILE *f = fopen(fname, "r");
+    if (!f) return SNO_FAIL_VAL;
+    if (_input_fp && _input_fp != stdin) fclose(_input_fp);
+    _input_fp = f;
+    return SNO_NULL_VAL;
 }
 
 /* Indirect goto — called when :(var) computed goto is taken.
