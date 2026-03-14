@@ -1596,32 +1596,30 @@ static void emit_trampoline_program(Program *prog) {
      */
     E("/* --- block functions --- */\n");
 
-    const char *cur_block_label = NULL;   /* NULL = block_START */
     int block_open = 0;
+    int first_block = 1;  /* first block is always block_START */
 
     for (int sid = 1; sid <= stmt_count; sid++) {
         Stmt *s = sid_stmt[sid];
 
-        /* A labeled stmt (not the very first) closes the current block
-         * and opens a new one named after the label */
+        /* A labeled stmt closes the current block (falls through to new label) */
         if (s->label && block_open) {
             E("    return block_%s; /* fall into next block */\n}\n\n",
               cs_label(s->label));
             block_open = 0;
         }
 
-        /* Open a new block if needed */
+        /* Open a new block if none is open */
         if (!block_open) {
-            if (!s->label || sid == 1) {
-                /* block_START: first unlabeled run OR very first stmt */
-                if (!cur_block_label) {
-                    E("static void *block_START(void) {\n");
-                } else {
-                    E("static void *block_%s(void) {\n", cs_label(cur_block_label));
-                }
-            } else {
-                cur_block_label = s->label;
+            if (first_block) {
+                E("static void *block_START(void) {\n");
+                first_block = 0;
+            } else if (s->label) {
                 E("static void *block_%s(void) {\n", cs_label(s->label));
+            } else {
+                /* Unlabeled stmt after a fall-through gap — shouldn't normally
+                 * happen in well-formed SNOBOL4, but handle gracefully */
+                E("static void *block_START(void) {\n");
             }
             block_open = 1;
         }
