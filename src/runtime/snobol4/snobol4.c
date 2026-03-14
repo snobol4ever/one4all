@@ -1179,6 +1179,7 @@ static int      _ntop = -1;
 void npush(void) {
     if (_ntop < NSTACK_MAX - 1) _nstack[++_ntop] = 0;
 }
+int nhas_frame(void) { return _ntop >= 0; }
 
 void ninc(void) {
     if (_ntop >= 0) _nstack[_ntop]++;

@@ -1056,6 +1056,11 @@ static void emit_arbno(Expr *child,
 
     /* β: extend by one — save cursor, try child */
     PLG(beta, NULL);
+    /* Re-establish counter frame if nPop fired on the alpha-path success.
+     * When nPush()→ARBNO(0)→Reduce→nPop() completes and Parse is re-entered
+     * via beta, _ntop=-1.  A single conditional npush() here restores it so
+     * nInc() inside Command counts correctly. */
+    PS(NULL, "if (!nhas_frame()) npush();");
     PS(omega,    "if (++%s >= 64)", depth_var);
     PS(child_α,  "%s[%s] = %s;", stack_var, depth_var, cursor);
 

@@ -218,6 +218,7 @@ void    indirect_set(const char *name, SnoVal val);
  * ============================================================ */
 
 void    npush(void);
+int     nhas_frame(void);  /* 1 if counter stack is non-empty */
 void    ninc(void);
 void    ndec(void);
 int64_t ntop(void);
