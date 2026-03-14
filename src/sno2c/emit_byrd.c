@@ -1555,11 +1555,65 @@ static void byrd_emit(Expr *pat,
         return;
     }
 
-    /* ---------------------------------------------------------------- E_VAR (pattern var) */
-    case E_VAR:
-        PLG(alpha, gamma);   /* pat var — epsilon in static path */
-        PLG(beta,  omega);
+    /* ---------------------------------------------------------------- E_VAR (pattern var)
+     * A bare variable name in pattern context means implicit deref — same as *X.
+     * Fall through to E_DEREF with varname = pat->sval.
+     * (Previously emitted epsilon — wrong: `nl` in Command would silently match nothing.) */
+    case E_VAR: {
+        const char *varname = pat->sval ? pat->sval : "";
+        const NamedPat *np_v = named_pat_lookup(varname);
+        if (np_v) {
+            /* Compiled named pattern — direct call */
+            int uid = byrd_uid();
+            char saved_cur[LBUF];
+            snprintf(saved_cur, LBUF, "deref_%d_saved_cur", uid);
+            decl_add("int64_t %s", saved_cur);
+            char child_field[LBUF];
+            snprintf(child_field, LBUF, "deref_%d_z", uid);
+            {
+                char child_decl[DECL_LINE_MAX];
+                snprintf(child_decl, DECL_LINE_MAX, "%s *%s", np_v->typename, child_field);
+                if (in_named_pat)
+                    child_decl_add(child_decl);
+                else
+                    decl_add("%s *%s", np_v->typename, child_field);
+            }
+            B("%s: {\n", alpha);
+            B("    %s = %s;\n", saved_cur, cursor);
+            B("    SnoVal _r_%d = %s(%s, %s, &%s, &%s, 0);\n",
+              uid, np_v->fnname, subj, subj_len, cursor, child_field);
+            B("    if (is_fail(_r_%d)) { %s = %s; goto %s; }\n",
+              uid, cursor, saved_cur, omega);
+            B("    goto %s;\n", gamma);
+            B("}\n");
+            B("%s: {\n", beta);
+            B("    %s = %s;\n", cursor, saved_cur);
+            B("    SnoVal _r_%d_b = %s(%s, %s, &%s, &%s, 1);\n",
+              uid, np_v->fnname, subj, subj_len, cursor, child_field);
+            B("    if (is_fail(_r_%d_b)) { %s = %s; goto %s; }\n",
+              uid, cursor, saved_cur, omega);
+            B("    goto %s;\n", gamma);
+            B("}\n");
+        } else {
+            /* String/dynamic pattern — match_pattern_at fallback */
+            char saved[LBUF];
+            snprintf(saved, LBUF, "deref_%d_saved_cursor", byrd_uid());
+            decl_add("int64_t %s", saved);
+            B("%s: {\n", alpha);
+            B("    SnoVal _deref_pat = var_get(\"%s\");\n", varname);
+            B("    int _deref_new_cur = match_pattern_at(_deref_pat, %s, (int)%s, (int)%s);\n",
+              subj, subj_len, cursor);
+            B("    if (_deref_new_cur < 0) goto %s;\n", omega);
+            B("    %s = %s;\n", saved, cursor);
+            B("    %s = (int64_t)_deref_new_cur;\n", cursor);
+            B("    goto %s;\n", gamma);
+            B("}\n");
+            B("%s:\n", beta);
+            B("    %s = %s;\n", cursor, saved);
+            B("    goto %s;\n", omega);
+        }
         return;
+    }
 
     /* ---------------------------------------------------------------- E_DEREF (deferred ref) */
     case E_DEREF: {
