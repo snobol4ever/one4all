@@ -161,3 +161,15 @@ Major architecture decisions recorded in HQ this session:
 
 **Compiles with 0 gcc errors.** Active bug: *snoParse through engine.c — NOT being chased.
 Next action: implement `byrd_emit_named_pattern` in emit_byrd.c (Technique 1).
+
+## Session 67 — beauty_tramp_session67.c
+**Changes since S66:**
+- fix(parse): parse_expr13 now builds E_COND(l,r) for `~` instead of discarding tag with (void)r
+- fix(emit_byrd): skip_cstatic |= do_shift so tag strings ('Label','comment','' etc) never emit invalid C statics
+
+**Result:** * comment passes cleanly. START still Internal Error (Shift fires 7×, Reduce fires — investigating why Pop() still returns empty after correct Shifts).
+
+- Lines: 28776
+- md5: d53a75d1f42342071c807e4035a85878
+- gcc errors: 0
+- Active bug: Internal Error on START — Shift(7) fires correctly, Reduce('Stmt',7) fires, but sno still FAIL after Pop()

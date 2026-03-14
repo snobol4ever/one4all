@@ -1221,8 +1221,10 @@ static void emit_imm(Expr *child, const char *varname,
     } else {
         /* Sync both hash table and C static (if one exists).
          * Skip C static sync for '_' (discard var → '__' invalid) and
-         * any name that maps to a reserved/invalid C identifier. */
-        int skip_cstatic = (strcmp(varname, "_") == 0);
+         * any name that maps to a reserved/invalid C identifier.
+         * When do_shift=1 (~ operator), varname is a tree tag not a SNOBOL4
+         * variable — never emit C static assignment for tags. */
+        int skip_cstatic = (strcmp(varname, "_") == 0) || do_shift || (varname[0] == '\0');
         PS(NULL,  "{ int64_t _len = %s - %s;", cursor, start_var);
         PS(NULL,  "  char *_os = (char*)GC_malloc(_len + 1);");
         PS(NULL,  "  memcpy(_os, %s + %s, _len); _os[_len] = 0;", subj, start_var);

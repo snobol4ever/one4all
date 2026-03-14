@@ -382,6 +382,7 @@ SnoVal make_tree(SnoVal tag, SnoVal val, SnoVal n, SnoVal children);
 SnoVal push_val(SnoVal x);
 SnoVal pop_val(void);
 SnoVal top_val(void);
+int    val_stack_depth(void);
 
 /* Function registration */
 void   register_fn(const char *name, SnoVal (*fn)(SnoVal*, int), int min_args, int max_args);

@@ -285,9 +285,8 @@ static Expr *parse_expr13(Lex *lx) {
         lex_next(lx); /* consume ~ */
         skip_ws(lx);  /* consume trailing WS of binary ~ */
         Expr *r = parse_expr13(lx);
-        (void)r;      /* tag is tree metadata — not matched against subject.
-                       * In the compiled path ~ X ~ 'tag' → just X (epsilon for tag). */
-        /* l = binop(E_CONCAT, l, r);  ← old: wrongly matched 'tag' as literal */
+        /* ~ 'tag': emit E_COND(child=l, tag=r) so emit_byrd generates Shift(tag, matched) */
+        l = binop(E_COND, l, r);
     }
     return l;
 }
