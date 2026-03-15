@@ -452,18 +452,30 @@ static void emit_lit(const char *s,
 static void emit_pos(long n, const char *alpha, const char *beta,
                      const char *gamma, const char *omega,
                      const char *cursor);
+static void emit_pos_expr(const char *expr, const char *alpha, const char *beta,
+                          const char *gamma, const char *omega,
+                          const char *cursor);
 static void emit_rpos(long n, const char *alpha, const char *beta,
                       const char *gamma, const char *omega,
                       const char *subj_len, const char *cursor);
+static void emit_rpos_expr(const char *expr, const char *alpha, const char *beta,
+                           const char *gamma, const char *omega,
+                           const char *subj_len, const char *cursor);
 static void emit_len(long n, const char *alpha, const char *beta,
                      const char *gamma, const char *omega,
                      const char *subj_len, const char *cursor);
 static void emit_tab(long n, const char *alpha, const char *beta,
                      const char *gamma, const char *omega,
                      const char *cursor);
+static void emit_tab_expr(const char *expr, const char *alpha, const char *beta,
+                          const char *gamma, const char *omega,
+                          const char *cursor);
 static void emit_rtab(long n, const char *alpha, const char *beta,
                       const char *gamma, const char *omega,
                       const char *subj_len, const char *cursor);
+static void emit_rtab_expr(const char *expr, const char *alpha, const char *beta,
+                           const char *gamma, const char *omega,
+                           const char *subj_len, const char *cursor);
 static void emit_any(const char *cs,
                      const char *alpha, const char *beta,
                      const char *gamma, const char *omega,
@@ -602,6 +614,17 @@ static void emit_pos(long n,
     PLG(beta, omega);
 }
 
+/* POS with runtime expression (variable arg) */
+static void emit_pos_expr(const char *expr,
+                          const char *alpha, const char *beta,
+                          const char *gamma, const char *omega,
+                          const char *cursor) {
+    PLG(alpha, NULL);
+    PS(omega,  "if (%s != (int64_t)(%s))", cursor, expr);
+    PG(gamma);
+    PLG(beta, omega);
+}
+
 /* -----------------------------------------------------------------------
  * RPOS node
  *
@@ -619,6 +642,17 @@ static void emit_rpos(long n,
                       const char *subj_len, const char *cursor) {
     PLG(alpha, NULL);
     PS(omega,  "if (%s != %s - %ld)", cursor, subj_len, n);
+    PG(gamma);
+    PLG(beta, omega);
+}
+
+/* RPOS with runtime expression */
+static void emit_rpos_expr(const char *expr,
+                           const char *alpha, const char *beta,
+                           const char *gamma, const char *omega,
+                           const char *subj_len, const char *cursor) {
+    PLG(alpha, NULL);
+    PS(omega,  "if (%s != %s - (int64_t)(%s))", cursor, subj_len, expr);
     PG(gamma);
     PLG(beta, omega);
 }
@@ -661,6 +695,21 @@ static void emit_tab(long n,
     PL(beta, omega, "%s = %s;", cursor, saved);
 }
 
+/* TAB with runtime expression */
+static void emit_tab_expr(const char *expr,
+                          const char *alpha, const char *beta,
+                          const char *gamma, const char *omega,
+                          const char *cursor) {
+    char saved[LBUF];
+    snprintf(saved, LBUF, "%s_saved_cursor", alpha);
+    decl_add("int64_t %s", saved);
+
+    PLG(alpha, NULL);
+    PS(omega,  "if (%s > (int64_t)(%s))", cursor, expr);
+    PS(gamma,  "%s = %s; %s = (int64_t)(%s);", saved, cursor, cursor, expr);
+    PL(beta, omega, "%s = %s;", cursor, saved);
+}
+
 /* -----------------------------------------------------------------------
  * RTAB node — advance cursor to len - n
  * ----------------------------------------------------------------------- */
@@ -676,6 +725,21 @@ static void emit_rtab(long n,
     PLG(alpha, NULL);
     PS(omega,  "if (%s > %s - %ld)", cursor, subj_len, n);
     PS(gamma,  "%s = %s; %s = %s - %ld;", saved, cursor, cursor, subj_len, n);
+    PL(beta, omega, "%s = %s;", cursor, saved);
+}
+
+/* RTAB with runtime expression */
+static void emit_rtab_expr(const char *expr,
+                           const char *alpha, const char *beta,
+                           const char *gamma, const char *omega,
+                           const char *subj_len, const char *cursor) {
+    char saved[LBUF];
+    snprintf(saved, LBUF, "%s_saved_cursor", alpha);
+    decl_add("int64_t %s", saved);
+
+    PLG(alpha, NULL);
+    PS(omega,  "if (%s > %s - (int64_t)(%s))", cursor, subj_len, expr);
+    PS(gamma,  "%s = %s; %s = %s - (int64_t)(%s);", saved, cursor, cursor, subj_len, expr);
     PL(beta, omega, "%s = %s;", cursor, saved);
 }
 
@@ -1317,26 +1381,50 @@ static void byrd_emit(EXPR_t *pat,
         }
         /* POS(n) */
         if (strcasecmp(n, "POS") == 0 && pat->nargs >= 1) {
-            long v = (pat->args[0]->kind == E_ILIT) ? pat->args[0]->ival : 0;
-            emit_pos(v, alpha, beta, gamma, omega, cursor);
+            if (pat->args[0]->kind == E_ILIT) {
+                emit_pos(pat->args[0]->ival, alpha, beta, gamma, omega, cursor);
+            } else {
+                char expr[256];
+                snprintf(expr, sizeof expr, "to_int(NV_GET_fn(\"%s\"))",
+                         (pat->args[0]->sval ? pat->args[0]->sval : ""));
+                emit_pos_expr(expr, alpha, beta, gamma, omega, cursor);
+            }
             return;
         }
         /* RPOS(n) */
         if (strcasecmp(n, "RPOS") == 0 && pat->nargs >= 1) {
-            long v = (pat->args[0]->kind == E_ILIT) ? pat->args[0]->ival : 0;
-            emit_rpos(v, alpha, beta, gamma, omega, subj_len, cursor);
+            if (pat->args[0]->kind == E_ILIT) {
+                emit_rpos(pat->args[0]->ival, alpha, beta, gamma, omega, subj_len, cursor);
+            } else {
+                char expr[256];
+                snprintf(expr, sizeof expr, "to_int(NV_GET_fn(\"%s\"))",
+                         (pat->args[0]->sval ? pat->args[0]->sval : ""));
+                emit_rpos_expr(expr, alpha, beta, gamma, omega, subj_len, cursor);
+            }
             return;
         }
         /* TAB(n) */
         if (strcasecmp(n, "TAB") == 0 && pat->nargs >= 1) {
-            long v = (pat->args[0]->kind == E_ILIT) ? pat->args[0]->ival : 0;
-            emit_tab(v, alpha, beta, gamma, omega, cursor);
+            if (pat->args[0]->kind == E_ILIT) {
+                emit_tab(pat->args[0]->ival, alpha, beta, gamma, omega, cursor);
+            } else {
+                char expr[256];
+                snprintf(expr, sizeof expr, "to_int(NV_GET_fn(\"%s\"))",
+                         (pat->args[0]->sval ? pat->args[0]->sval : ""));
+                emit_tab_expr(expr, alpha, beta, gamma, omega, cursor);
+            }
             return;
         }
         /* RTAB(n) */
         if (strcasecmp(n, "RTAB") == 0 && pat->nargs >= 1) {
-            long v = (pat->args[0]->kind == E_ILIT) ? pat->args[0]->ival : 0;
-            emit_rtab(v, alpha, beta, gamma, omega, subj_len, cursor);
+            if (pat->args[0]->kind == E_ILIT) {
+                emit_rtab(pat->args[0]->ival, alpha, beta, gamma, omega, subj_len, cursor);
+            } else {
+                char expr[256];
+                snprintf(expr, sizeof expr, "to_int(NV_GET_fn(\"%s\"))",
+                         (pat->args[0]->sval ? pat->args[0]->sval : ""));
+                emit_rtab_expr(expr, alpha, beta, gamma, omega, subj_len, cursor);
+            }
             return;
         }
         /* ANY(cs) */
@@ -1501,6 +1589,37 @@ static void byrd_emit(EXPR_t *pat,
      * (Previously emitted epsilon — wrong: `nl` in Command would silently match nothing.) */
     case E_VART: {
         const char *varname = pat->sval ? pat->sval : "";
+
+        /* Zero-arg builtin patterns used as bare names (no parens).
+         * REM, ARB, FAIL, SUCCEED, FENCE, ABORT are valid pattern literals
+         * in SNOBOL4 — they appear without () and must not be treated as
+         * variable dereferences.  Route them through the same emitters as
+         * the E_FNC path so behaviour is identical. */
+        if (strcasecmp(varname, "REM") == 0) {
+            emit_rem(alpha, beta, gamma, omega, subj_len, cursor);
+            return;
+        }
+        if (strcasecmp(varname, "ARB") == 0) {
+            emit_arb(alpha, beta, gamma, omega, subj_len, cursor);
+            return;
+        }
+        if (strcasecmp(varname, "FAIL") == 0 || strcasecmp(varname, "DT_FAIL") == 0) {
+            emit_fail_node(alpha, beta, omega);
+            return;
+        }
+        if (strcasecmp(varname, "SUCCEED") == 0) {
+            emit_succeed(alpha, beta, gamma);
+            return;
+        }
+        if (strcasecmp(varname, "FENCE") == 0) {
+            emit_fence(alpha, beta, gamma, omega);
+            return;
+        }
+        if (strcasecmp(varname, "ABORT") == 0) {
+            emit_abort_node(alpha, beta, omega);
+            return;
+        }
+
         const NamedPat *np_v = named_pat_lookup(varname);
         if (np_v) {
             /* Compiled named pattern — direct call */
