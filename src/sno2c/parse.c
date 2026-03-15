@@ -729,23 +729,44 @@ static STMT_t *parse_body_field(const char *body, int lineno) {
          expr → pattern (requires WS between subject and pattern)
          nothing → invocation
     */
-    if (lex_peek(lx).kind == T_WS) {
-        lex_next(lx); skip_ws(lx); /* consume WS */
+    /* After subject: WS or '?' introduce the pattern field.
+     * '?' is the interrogation verb: S ? P means match P against S,
+     * same semantics as S P but explicit — no replacement allowed.
+     * Forms: "S ? P"  (no WS before ?)
+     *        "S  ? P" (WS before ?, WS after ?)  ← beauty.sno style
+     */
+    int have_ws   = (lex_peek(lx).kind == T_WS);
+    int have_qmark = 0;
 
-        if (lex_peek(lx).kind == T_EQ) {
-            /* subject = [replacement] */
+    if (have_ws) {
+        lex_next(lx); skip_ws(lx); /* consume WS */
+        /* After WS: check if ? is the verb (e.g. "LINE  ?  PAT") */
+        if (lex_peek(lx).kind == T_QMARK) {
+            have_qmark = 1;
+            lex_next(lx); skip_ws(lx); /* consume '?' and trailing WS */
+        }
+    } else if (lex_peek(lx).kind == T_QMARK) {
+        /* Direct ? with no leading WS */
+        have_qmark = 1;
+        lex_next(lx); skip_ws(lx);
+    }
+
+    if (have_ws || have_qmark) {
+        if (have_ws && !have_qmark && lex_peek(lx).kind == T_EQ) {
+            /* subject = [replacement] — only valid after plain WS, not '?' */
             lex_next(lx); /* consume '=' */
             s->has_eq = 1;
             skip_ws(lx);
             if (!lex_at_end(lx))
                 s->replacement = parse_expr(lx);
         } else if (!lex_at_end(lx)) {
-            /* subject WS pattern [= replacement]
+            /* subject WS pattern [= replacement]  — or —  subject ? pattern
              * Use parse_expr3 (not parse_expr0) so trailing '=' is NOT
              * consumed as an assignment operator inside the pattern. */
             s->pattern = parse_expr3(lx);  /* includes |, excludes = and ? */
 
             if (lex_peek(lx).kind == T_WS) {
+                /* Allow = replacement after both WS and ? separators */
                 lex_next(lx); skip_ws(lx);
                 if (lex_peek(lx).kind == T_EQ) {
                     lex_next(lx); skip_ws(lx);

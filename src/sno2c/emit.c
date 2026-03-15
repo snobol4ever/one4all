@@ -1083,11 +1083,13 @@ static void emit_stmt(STMT_t *s, const char *fn) {
             seq->right = s->pattern;
             scan_pat = seq;
         }
+        byrd_cond_reset();
         byrd_emit_pattern(scan_pat, out, root_lbl, sv, sl, cv, ok_lbl, fail_lbl);
 
         /* gamma: MATCH_fn succeeded */
         PLG(ok_lbl, "");
         PS("", "_ok%d = 1;", u);
+        byrd_cond_emit_assigns(out, u);   /* flush pending . captures */
         if (s->replacement || s->has_eq) {
             /* Replace matched region [_mstart%d .. _cur%d) with replacement.
              * If has_eq but replacement==NULL, that is a null replacement — delete match. */

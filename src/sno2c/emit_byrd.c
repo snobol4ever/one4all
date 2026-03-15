@@ -141,6 +141,55 @@ static int      named_pat_count = 0;
 
 void byrd_named_pat_reset(void) { named_pat_count = 0; }
 
+/* -----------------------------------------------------------------------
+ * Pending conditional assignments (E_NAM / dot-capture)
+ *
+ * emit_cond() registers (varname, c_tmpvar) pairs here.
+ * emit.c calls byrd_cond_emit_assigns() at _byrd_ok to flush them.
+ * byrd_cond_reset() is called before each MATCH_fn block.
+ * ----------------------------------------------------------------------- */
+#define COND_ASSIGN_MAX 32
+typedef struct {
+    char varname[NAMED_PAT_NAMELEN];  /* SNOBOL4 var, e.g. "OUTPUT" */
+    char tmpvar[NAMED_PAT_NAMELEN];   /* C temp var holding captured string */
+    int  has_cstatic;                 /* 1 if a C static exists for varname */
+} CondAssign;
+static CondAssign cond_assigns[COND_ASSIGN_MAX];
+static int        cond_assign_count = 0;
+
+void byrd_cond_reset(void) { cond_assign_count = 0; }
+
+/* Called by emit_cond to register a pending conditional */
+static void cond_register(const char *varname, const char *tmpvar, int has_cs) {
+    if (cond_assign_count >= COND_ASSIGN_MAX) return;
+    CondAssign *ca = &cond_assigns[cond_assign_count++];
+    snprintf(ca->varname, NAMED_PAT_NAMELEN, "%s", varname);
+    snprintf(ca->tmpvar,  NAMED_PAT_NAMELEN, "%s", tmpvar);
+    ca->has_cstatic = has_cs;
+}
+
+/* Called by emit.c at _byrd_ok to flush pending conditional assigns */
+void byrd_cond_emit_assigns(FILE *fp, int stmt_u) {
+    (void)stmt_u;
+    for (int i = 0; i < cond_assign_count; i++) {
+        CondAssign *ca = &cond_assigns[i];
+        if (strcasecmp(ca->varname, "OUTPUT") == 0) {
+            fprintf(fp, "if (%s) NV_SET_fn(\"OUTPUT\", STRVAL(%s));\n",
+                    ca->tmpvar, ca->tmpvar);
+        } else {
+            fprintf(fp, "if (%s) { NV_SET_fn(\"%s\", STRVAL(%s));",
+                    ca->tmpvar, ca->varname, ca->tmpvar);
+            if (ca->has_cstatic) {
+                /* sync C static too — use byrd_cs logic inline */
+                char cs[NAMED_PAT_NAMELEN];
+                snprintf(cs, sizeof cs, "_%s", ca->varname);
+                fprintf(fp, " %s = STRVAL(%s);", cs, ca->tmpvar);
+            }
+            fprintf(fp, " }\n");
+        }
+    }
+}
+
 static void named_pat_register(const char *varname,
                                 const char *typename,
                                 const char *fnname) {
@@ -532,11 +581,6 @@ static void emit_imm(EXPR_t *child, const char *varname,
                      const char *gamma, const char *omega,
                      const char *subj, const char *subj_len,
                      const char *cursor, int depth, int do_shift);
-static void emit_cond(EXPR_t *child, const char *varname,
-                      const char *alpha, const char *beta,
-                      const char *gamma, const char *omega,
-                      const char *subj, const char *subj_len,
-                      const char *cursor, int depth);
 
 
 /* -----------------------------------------------------------------------
@@ -1225,21 +1269,65 @@ static void emit_imm(EXPR_t *child, const char *varname,
 }
 
 /* -----------------------------------------------------------------------
- * E_NAM (. capture) node
+ * E_NAM (. capture) node — conditional assignment
  *
- * Like E_DOL but the assignment is CONDITIONAL — it fires when we reach
- * the gamma of the enclosing MATCH_fn.  For the static compiled path we treat
- * it identically to E_DOL (assign on child success, readable by outer code).
+ * Captures span into a C temp var on child success (overwriting on each
+ * backtrack attempt).  Registers with cond_register() so emit.c can
+ * flush the actual NV_SET at _byrd_ok — the single point where the whole
+ * match has definitively succeeded.
  * ----------------------------------------------------------------------- */
-
 static void emit_cond(EXPR_t *child, const char *varname,
                       const char *alpha, const char *beta,
                       const char *gamma, const char *omega,
                       const char *subj, const char *subj_len,
                       const char *cursor, int depth) {
-    /* ~ operator: same as IMM but calls Shift() to PUSH_fn tree node */
-    emit_imm(child, varname, alpha, beta, gamma, omega,
-             subj, subj_len, cursor, depth, 1);
+    int uid = byrd_uid();
+
+    /* Sanitize varname for C identifier */
+    char safe_varname[NAMED_PAT_NAMELEN];
+    { int i = 0; const char *s = varname;
+      for (; *s && i < (int)(sizeof safe_varname)-1; s++, i++)
+          safe_varname[i] = (isalnum((unsigned char)*s) || *s=='_') ? *s : '_';
+      safe_varname[i] = '\0'; }
+    const char *vn = safe_varname;
+
+    Label child_α, child_β;
+    label_fmt(child_α, "cond_c", uid, "α");
+    label_fmt(child_β, "cond_c", uid, "β");
+
+    char start_var[LBUF], tmp_var[LBUF], do_capture[LBUF];
+    snprintf(start_var,  LBUF, "%s_cstart",  alpha);
+    snprintf(tmp_var,    LBUF, "cond_%s_%d", vn, uid);
+    snprintf(do_capture, LBUF, "%s_do_cap",  alpha);
+    decl_add("int64_t %s", start_var);
+    decl_add("char *%s",   tmp_var);
+
+    /* Register pending conditional — flushed by emit.c at _byrd_ok */
+    int has_cs = !(strcmp(vn, "_") == 0 || vn[0] == '\0' ||
+                   strcasecmp(varname, "OUTPUT") == 0);
+    cond_register(varname, tmp_var, has_cs);
+
+    /* α: init tmp to NULL, record start, enter child */
+    PLG(alpha, NULL);
+    PS(NULL,     "%s = NULL;",      tmp_var);
+    PS(child_α,  "%s = %s;",        start_var, cursor);
+
+    byrd_emit(child,
+              child_α, child_β,
+              do_capture, omega,
+              subj, subj_len, cursor, depth + 1);
+
+    /* do_capture: copy current span into tmp_var, then → γ.
+     * On backtrack, ARB re-enters child_α, extends span, calls do_capture
+     * again — tmp_var is overwritten with the longer span.  Only the value
+     * present at _byrd_ok (flushed by byrd_cond_emit_assigns) matters. */
+    PLG(do_capture, NULL);
+    PS(NULL,  "{ int64_t _len = %s - %s;", cursor, start_var);
+    PS(NULL,  "  %s = (char*)GC_malloc(_len + 1);", tmp_var);
+    PS(gamma, "  memcpy(%s, %s + %s, _len); %s[_len] = '\\0'; }", tmp_var, subj, start_var, tmp_var);
+
+    /* β: backtrack into child */
+    PLG(beta, child_β);
 }
 
 /* -----------------------------------------------------------------------
@@ -1590,6 +1678,29 @@ static void byrd_emit(EXPR_t *pat,
         emit_cond(pat->left, varname,
                   alpha, beta, gamma, omega,
                   subj, subj_len, cursor, depth);
+        return;
+    }
+
+    /* --------------------------------------------------------------- E_ATP (@ position) */
+    case E_ATP: {
+        /* @VAR — zero-width: capture current cursor position as integer into VAR.
+         * Always succeeds, never consumes input.  No backtrack effect. */
+        const char *varname = (pat->right && pat->right->sval) ? pat->right->sval : "_";
+        int uid = byrd_uid();
+        char safe[NAMED_PAT_NAMELEN];
+        { int i=0; const char *s=varname;
+          for(;*s&&i<(int)sizeof(safe)-1;s++,i++)
+              safe[i]=(isalnum((unsigned char)*s)||*s=='_')?*s:'_';
+          safe[i]='\0'; }
+        /* α: assign cursor position to var, → γ */
+        PLG(alpha, NULL);
+        PS(NULL, "{ NV_SET_fn(\"%s\", INTVAL_fn((int64_t)%s));", varname, cursor);
+        int skip_cs = (strcmp(safe,"_")==0||safe[0]=='\0');
+        if (!skip_cs)
+            PS(NULL, "  %s = INTVAL_fn((int64_t)%s);", byrd_cs(varname), cursor);
+        PS(gamma, "}");
+        /* β → γ: position capture has no backtrack (zero-width, no state to undo) */
+        PLG(beta, gamma);
         return;
     }
 
@@ -1988,6 +2099,7 @@ void byrd_emit_named_pattern(const char *varname, EXPR_t *pat, FILE *out_file) {
     byrd_out = code_file;
     byrd_uid_ctr = uid_saved;
     decl_reset();
+    byrd_cond_reset();   /* clear any pending conditionals from prior pattern */
 
     byrd_emit(pat,
               root_α, root_β,
@@ -2031,11 +2143,14 @@ void byrd_emit_named_pattern(const char *varname, EXPR_t *pat, FILE *out_file) {
     /* 6. Success/fail exits */
     fprintf(out_file,
         "    %s:;\n"
-        "        *_cur_ptr_np = _cur_np;\n"
+        "        *_cur_ptr_np = _cur_np;\n",
+        γ_lbl);
+    byrd_cond_emit_assigns(out_file, 0);   /* flush . captures at pattern gamma */
+    fprintf(out_file,
         "        return STRVAL(\"\");\n"
         "    %s:;\n"
         "        return FAILDESCR;\n",
-        γ_lbl, ω_lbl);
+        ω_lbl);
 
     /* 7. Emit #undefs and close function */
     decl_emit_undefs(out_file);

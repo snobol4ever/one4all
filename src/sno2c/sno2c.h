@@ -127,6 +127,9 @@ void byrd_emit_standalone(EXPR_t *pat, FILE *out_file,
 
 void byrd_emit_named_pattern(const char *varname, EXPR_t *pat, FILE *out_file);
 
+void byrd_cond_reset(void);
+void byrd_cond_emit_assigns(FILE *out_file, int stmt_u);
+
 /* ---- error ---- */
 void snoc_error(int lineno, const char *fmt, ...);
 extern int   snoc_nerrors;

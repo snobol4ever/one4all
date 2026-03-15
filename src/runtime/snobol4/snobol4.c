@@ -1583,8 +1583,30 @@ DESCR_t string_fn(DESCR_t v) {
  * ============================================================ */
 
 /* Arithmetic — promote int+int=int, otherwise real */
+/* Coerce a value to integer if it is a string that contains only digits
+ * (possibly with leading/trailing spaces and optional sign).
+ * Returns the value unchanged if it does not look like a pure integer. */
+static DESCR_t coerce_numeric(DESCR_t v) {
+    if (v.v == DT_S) {
+        const char *s = v.s ? v.s : "";
+        while (*s == ' ') s++;
+        if (*s == '+' || *s == '-') s++;
+        if (!*s) return v;  /* empty */
+        const char *p = s;
+        while (*p >= '0' && *p <= '9') p++;
+        /* skip trailing spaces */
+        while (*p == ' ') p++;
+        if (*p == '\0' && p > s)  /* pure integer string */
+            return INTVAL((int64_t)strtoll(v.s ? v.s : "", NULL, 10));
+    }
+    return v;
+}
+
 DESCR_t add(DESCR_t a, DESCR_t b) {
     if (a.v == DT_FAIL || b.v == DT_FAIL) return FAILDESCR;
+    if (a.v == DT_SNUL) a = INTVAL(0);
+    if (b.v == DT_SNUL) b = INTVAL(0);
+    a = coerce_numeric(a); b = coerce_numeric(b);
     if (a.v == DT_I && b.v == DT_I)
         return INTVAL(a.i + b.i);
     return REALVAL(to_real(a) + to_real(b));
@@ -1592,6 +1614,9 @@ DESCR_t add(DESCR_t a, DESCR_t b) {
 
 DESCR_t sub(DESCR_t a, DESCR_t b) {
     if (a.v == DT_FAIL || b.v == DT_FAIL) return FAILDESCR;
+    if (a.v == DT_SNUL) a = INTVAL(0);
+    if (b.v == DT_SNUL) b = INTVAL(0);
+    a = coerce_numeric(a); b = coerce_numeric(b);
     if (a.v == DT_I && b.v == DT_I)
         return INTVAL(a.i - b.i);
     return REALVAL(to_real(a) - to_real(b));
@@ -1599,6 +1624,7 @@ DESCR_t sub(DESCR_t a, DESCR_t b) {
 
 DESCR_t mul(DESCR_t a, DESCR_t b) {
     if (a.v == DT_FAIL || b.v == DT_FAIL) return FAILDESCR;
+    a = coerce_numeric(a); b = coerce_numeric(b);
     if (a.v == DT_I && b.v == DT_I)
         return INTVAL(a.i * b.i);
     return REALVAL(to_real(a) * to_real(b));
