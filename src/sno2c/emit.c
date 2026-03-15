@@ -547,6 +547,15 @@ static void emit_assign_target(EXPR_t *lhs, const char *rhs_str) {
         E("},%d,%s);\n", lhs->nargs, rhs_str);
     } else if (lhs->kind == E_KW) {
         E("kw_set(\"%s\",%s);\n", lhs->sval, rhs_str);
+    } else if (lhs->kind == E_IDX) {
+        /* v<i> = x  or  v[i] = x  →  aset(get(_v), {i}, nargs, x) */
+        E("aset(");
+        emit_expr(lhs->left);
+        E(",(DESCR_t[]){");
+        for (int i=0; i<lhs->nargs; i++) {
+            if (i) E(","); emit_expr(lhs->args[i]);
+        }
+        E("},%d,%s);\n", lhs->nargs, rhs_str);
     } else if (lhs->kind == E_INDR) {
         E("iset("); emit_expr(lhs->right); E(",%s);\n", rhs_str);
     } else if (lhs->kind == E_FNC && lhs->nargs == 1) {
@@ -1860,6 +1869,7 @@ static void emit_trampoline_program(Program *prog) {
     for (int i = 0; i < tramp_nlabels; i++) {
         const char *lbl = tramp_labels[i];
         if (strcasecmp(lbl,"END")==0) continue;
+        if (strcasecmp(lbl,"START")==0) continue;  /* hardcoded above */
         E("static void *block%s(void);\n", cs_label(lbl));
     }
     /* Forward decls for undefined-label stubs */
@@ -1979,6 +1989,7 @@ static void emit_trampoline_program(Program *prog) {
 
     int block_open = 0;
     int first_block = 1;  /* first block is always block_START */
+    const char *first_block_label = NULL; /* label on first stmt, needs alias */
 
     for (int sid = 1; sid <= stmt_count; sid++) {
         STMT_t *s = sid_stmt[sid];
@@ -1995,6 +2006,9 @@ static void emit_trampoline_program(Program *prog) {
             if (first_block) {
                 E("static void *block_START(void) {\n");
                 first_block = 0;
+                /* If first stmt carries a label, record it for alias emission */
+                if (s->label) first_block_label = s->label;
+                /* (alias emitted at block close — see first_block_label below) */
             } else if (s->label) {
                 E("static void *block%s(void) {\n", cs_label(s->label));
             } else {
@@ -2018,6 +2032,13 @@ static void emit_trampoline_program(Program *prog) {
         E("static void *block_START(void) { return block_END; }\n\n");
     }
 
+    /* If first stmt had a label other than START, block_START absorbed it
+     * but block_<label> was forward-declared. Emit a forwarding alias. */
+    if (first_block_label && strcasecmp(first_block_label, "START") != 0) {
+        E("static void *block%s(void) { return block_START(); }\n\n",
+          cs_label(first_block_label));
+    }
+
     E("static void *block_END(void) { return NULL; }\n\n");
 
     /* --- Stubs for undefined labels (e.g. 'err' from library code) --- */
@@ -2037,6 +2058,7 @@ static void emit_trampoline_program(Program *prog) {
     for (int i = 0; i < tramp_nlabels; i++) {
         const char *lbl = tramp_labels[i];
         if (strcasecmp(lbl,"END")==0) continue;
+        if (strcasecmp(lbl,"START")==0) continue;  /* hardcoded above */
         E("    {\"%s\", block%s},\n", lbl, cs_label(lbl));
     }
     /* Add undefined-label stubs to the table too */

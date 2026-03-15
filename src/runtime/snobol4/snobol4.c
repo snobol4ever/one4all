@@ -221,6 +221,63 @@ static DESCR_t _b_OPSYN(DESCR_t *a, int n) {
 static DESCR_t _b_SORT(DESCR_t *a, int n)  { return sort_fn(n>0?a[0]:NULVCL); }
 static DESCR_t _b_INPUT(DESCR_t *a, int n);  /* defined near input_read below */
 
+/* ARRAY(n) or ARRAY('lo:hi') or ARRAY('lo:hi,lo2:hi2') */
+static DESCR_t _b_ARRAY(DESCR_t *a, int n) {
+    if (n < 1) return FAILDESCR;
+    const char *proto = VARVAL_fn(a[0]);
+    if (proto && strchr(proto, ':')) {
+        /* Parse "lo:hi" or "lo:hi,lo2:hi2" */
+        int lo = 1, hi = 1, lo2 = 1, hi2 = 1;
+        const char *comma = strchr(proto, ',');
+        if (comma) {
+            sscanf(proto,  "%d:%d", &lo, &hi);
+            sscanf(comma+1, "%d:%d", &lo2, &hi2);
+            return ARRAY_VAL(array_new2d(lo, hi, lo2, hi2));
+        }
+        sscanf(proto, "%d:%d", &lo, &hi);
+        return ARRAY_VAL(array_new(lo, hi));
+    }
+    int sz = (int)to_int(a[0]);
+    if (sz < 1) return FAILDESCR;
+    /* Optional second arg: initial value (ignored for now) */
+    return ARRAY_VAL(array_new(1, sz));
+}
+
+/* TABLE(initial_size, increment) — both args optional */
+static DESCR_t _b_TABLE(DESCR_t *a, int n) {
+    (void)a; (void)n;
+    return TABLE_VAL(table_new());
+}
+
+/* CONVERT(val, type) */
+static DESCR_t _b_CONVERT(DESCR_t *a, int n) {
+    if (n < 2) return FAILDESCR;
+    DESCR_t val  = a[0];
+    const char *type = VARVAL_fn(a[1]);
+    if (!type) return FAILDESCR;
+    if (strcasecmp(type, "STRING")  == 0) { const char *s = VARVAL_fn(val); return s ? STRVAL(s) : NULVCL; }
+    if (strcasecmp(type, "INTEGER") == 0) return INTVAL((int64_t)to_int(val));
+    if (strcasecmp(type, "REAL")    == 0) return (DESCR_t){ .v = DT_R, .r = to_real(val) };
+    if (strcasecmp(type, "ARRAY")   == 0) {
+        if (val.v == DT_A) return val;
+        return FAILDESCR;
+    }
+    return FAILDESCR;
+}
+
+/* COPY(array_or_table) — shallow copy */
+static DESCR_t _b_COPY(DESCR_t *a, int n) {
+    if (n < 1) return FAILDESCR;
+    DESCR_t v = a[0];
+    if (v.v == DT_A) {
+        int sz = v.arr->hi - v.arr->lo + 1;
+        ARBLK_t *copy = array_new(v.arr->lo, v.arr->hi);
+        for (int i = 0; i < sz; i++) copy->data[i] = v.arr->data[i];
+        return ARRAY_VAL(copy);
+    }
+    return FAILDESCR;
+}
+
 /* Sprint 23: counter stack and tree field accessors as callable DESCR_t functions */
 static DESCR_t _b_nPush(DESCR_t *a, int n) {
     (void)a; (void)n;
@@ -591,6 +648,10 @@ void SNO_INIT_fn(void) {
     register_fn("REVERSE",  _b_REVERSE,  1, 1);
     register_fn("DATATYPE", _b_DATATYPE, 1, 1);
     register_fn("DATA",        _b_DATA,     1, 1);
+    register_fn("ARRAY",   _b_ARRAY,   1, 2);
+    register_fn("TABLE",   _b_TABLE,   0, 2);
+    register_fn("CONVERT", _b_CONVERT, 2, 2);
+    register_fn("COPY",    _b_COPY,    1, 1);
     register_fn("EVAL",  _b_EVAL,  1, 1);
     register_fn("OPSYN", _b_OPSYN, 2, 3);
     register_fn("SORT",  _b_SORT,  1, 1);
