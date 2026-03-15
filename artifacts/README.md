@@ -84,3 +84,21 @@
 - Sprint A (`beauty-crosscheck`) begins next session (101).
 - First: build beauty_full_bin → write 101_comment test → run run_beauty.sh.
 - See TINY.md §NOW and FRONTEND-SNOBOL4.md §Rung 12 Test Format.
+
+## Session 101 — 2026-03-15
+
+### beauty_tramp_session95.c (no new artifact)
+- **md5:** cc34e62fee07676e12d0824c14fe6e85 — UNCHANGED from session95
+- **compile status:** not recompiled (no sno2c changes)
+- **crosscheck:** 106/106 maintained
+
+### Session 101 work
+- No compiler or sno2c changes.
+- README.md: authorship corrections — Jeffrey built Roslyn runtime, Lon did MSIL
+  speedup; TINY is co-authored by Lon + Claude Sonnet 4.6 (third developer).
+- Taglines fixed: snobol4all. snobol4now. snobol4ever. / SNOBOL for all. SNOBOL for now. SNOBOL forever.
+
+### Active bug / next action
+- Sprint A (`beauty-crosscheck`) begins next session (102).
+- First: build beauty_full_bin → write 101_comment test → run run_beauty.sh.
+- See TINY.md §NOW and FRONTEND-SNOBOL4.md §Rung 12 Test Format.
