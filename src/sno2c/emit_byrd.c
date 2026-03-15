@@ -298,12 +298,16 @@ static int decl_field_name_len(const char *decl) {
     return (int)(end - start);
 }
 
-/* Emit normal static storage (non-struct mode). */
+/* Emit normal local storage (non-struct mode).
+ * These are plain (non-static) locals — declared before the first goto
+ * (two-pass approach guarantees this) so C99 jump-over-declaration is not
+ * an issue.  Must NOT be static: static locals persist across trampoline
+ * calls and corrupt pattern frame state on the second+ statement. */
 static void decl_flush(void) {
     if (decl_count == 0) return;
-    B("    /* === static storage === */\n");
+    B("    /* === local storage === */\n");
     for (int i = 0; i < decl_count; i++) {
-        B("static %s;\n", decl_buf[i]);
+        B("%s;\n", decl_buf[i]);
         /* Record in fn_seen so subsequent patterns skip this decl */
         if (fn_seen_count < DECL_BUF_MAX)
             memcpy(fn_seen[fn_seen_count++], decl_buf[i], DECL_LINE_MAX);
