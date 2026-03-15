@@ -174,8 +174,8 @@ void byrd_cond_emit_assigns(FILE *fp, int stmt_u) {
     for (int i = 0; i < cond_assign_count; i++) {
         CondAssign *ca = &cond_assigns[i];
         if (strcasecmp(ca->varname, "OUTPUT") == 0) {
-            fprintf(fp, "if (%s) NV_SET_fn(\"OUTPUT\", STRVAL(%s));\n",
-                    ca->tmpvar, ca->tmpvar);
+            fprintf(fp, "if (%s) { NV_SET_fn(\"OUTPUT\", STRVAL(%s)); push_val(STRVAL(%s)); }\n",
+                    ca->tmpvar, ca->tmpvar, ca->tmpvar);
         } else {
             fprintf(fp, "if (%s) { NV_SET_fn(\"%s\", STRVAL(%s));",
                     ca->tmpvar, ca->varname, ca->tmpvar);
@@ -185,7 +185,8 @@ void byrd_cond_emit_assigns(FILE *fp, int stmt_u) {
                 snprintf(cs, sizeof cs, "_%s", ca->varname);
                 fprintf(fp, " %s = STRVAL(%s);", cs, ca->tmpvar);
             }
-            fprintf(fp, " }\n");
+            /* push_val: ~ capture feeds the nInc stack for Reduce("Tag",N) */
+            fprintf(fp, " push_val(STRVAL(%s)); }\n", ca->tmpvar);
         }
     }
 }
