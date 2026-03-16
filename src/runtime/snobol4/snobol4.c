@@ -1282,6 +1282,9 @@ static int      _ntop = -1;
 static int _nhome[NHOME_MAX];
 static int _nhome_top = -1;
 
+/* Global sequence counter across all nPush/nInc/nPop/Shift/Reduce events */
+int _nseq = 0;
+
 void NPUSH_fn(void) {
     if (_ntop < NSTACK_MAX - 1) {
         ++_ntop;
@@ -1291,10 +1294,16 @@ void NPUSH_fn(void) {
             _nhome[++_nhome_top] = _ntop;
         }
     }
+    fprintf(stderr, "SEQ%04d NPUSH depth=%d top=%lld\n",
+            ++_nseq, _ntop, (long long)(_ntop >= 0 ? _nstack[_ntop] : 0));
 }
 int NHAS_FRAME_fn(void) { return _ntop >= 0; }
 
-void NINC_fn(void) { if (_ntop >= 0) _nstack[_ntop]++; }
+void NINC_fn(void) {
+    if (_ntop >= 0) _nstack[_ntop]++;
+    fprintf(stderr, "SEQ%04d NINC  depth=%d top=%lld\n",
+            ++_nseq, _ntop, (long long)(_ntop >= 0 ? _nstack[_ntop] : 0));
+}
 void NINC_AT_fn(int frame) {
     if (frame >= 0 && frame <= _ntop) _nstack[frame]++;
 }
@@ -1303,7 +1312,11 @@ void NDEC_fn(void) { if (_ntop >= 0) _nstack[_ntop]--; }
 
 int64_t ntop(void) { return (_ntop >= 0) ? _nstack[_ntop] : 0; }
 
-void NPOP_fn(void) { if (_ntop >= 0) _ntop--; }
+void NPOP_fn(void) {
+    fprintf(stderr, "SEQ%04d NPOP  depth=%d top=%lld\n",
+            ++_nseq, _ntop, (long long)(_ntop >= 0 ? _nstack[_ntop] : 0));
+    if (_ntop >= 0) _ntop--;
+}
 
 /* ============================================================
  * Value stack (Push/Pop/Top for Shift/Reduce)

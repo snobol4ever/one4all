@@ -12,6 +12,9 @@
 #include "snobol4.h"
 #include "mock_includes.h"
 
+/* Shared sequence counter — defined in snobol4.c, used here for Shift/Reduce */
+extern int _nseq;
+
 /* =========================================================================
  * Global variables (global.inc)
  * ===================================================================== */
@@ -303,7 +306,7 @@ DESCR_t Shift(DESCR_t t_arg, DESCR_t v_arg) {
     /* Shift(t, v) — create tree node with type t and value v, push onto stack */
     const char *ts = IS_STR_fn(t_arg) ? t_arg.s : "?";
     const char *vs = IS_STR_fn(v_arg) ? v_arg.s : (IS_INT_fn(v_arg) ? "(int)" : "(null)");
-    fprintf(stderr, "[PROBE] Shift(%s, '%s')\n", ts, vs);
+    fprintf(stderr, "SEQ%04d SHIFT type=%s val='%s'\n", ++_nseq, ts, vs);
     DESCR_t s = MAKE_TREE_fn(t_arg, v_arg, INTVAL(0), NULVCL);
     push_val(s);
     return NULVCL;
@@ -315,7 +318,7 @@ DESCR_t Reduce(DESCR_t t_arg, DESCR_t n_arg) {
     DESCR_t n = n_arg;
     long long count = to_int(n);
     const char *ts = IS_STR_fn(t_arg) ? t_arg.s : "?";
-    fprintf(stderr, "[PROBE] Reduce(%s, %lld)\n", ts, count);
+    fprintf(stderr, "SEQ%04d REDUCE type=%s n=%lld\n", ++_nseq, ts, count);
 
     /* Build array of n children from stack */
     if (count < 1) count = 0;
