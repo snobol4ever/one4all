@@ -137,3 +137,12 @@
 - **Lines:** 15542
 - **Compile status:** OK (beauty_full_bin builds)
 - **Active bug:** Named pattern RHS truncation. `Function = SPAN(...) $ tx $ *match(Functions, TxInList)` — compiled pat_Function only contains the SPAN, dropping `$ tx` and `$ *match(...)`. Root: byrd_emit_named_pattern() receives only partial AST. Investigate emit.c:1939 — how replacement expression is extracted and passed. Fix: ensure full concatenation AST reaches Byrd emitter.
+
+## session105
+- Date: 2026-03-15
+- md5: 7f4e252a32d5c23f05e296b728c4618b
+- Lines: 15632
+- Compile status: gcc ERROR (duplicate labels — fix in progress)
+- Active bug: E_DOL computed-right label duplication in byrd_emit
+  - dolc_N_resume / dolc_N_rb defined twice
+  - l_lb vs l_rb separation fix drafted but not yet applied cleanly

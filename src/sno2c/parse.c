@@ -292,21 +292,25 @@ static EXPR_t *parse_expr13(Lex *lx) {
 }
 
 /* ── expr12 — $ . binary ─────────────────────────────────────────────────── */
-/* snoExpr12 = snoExpr13 FENCE(($'$' | $'.') snoExpr12 | ε) — right-assoc */
+/* snoExpr12 = snoExpr13 (($'$' | $'.') snoExpr13)* — left-assoc (Gimpel §5.2) */
 static EXPR_t *parse_expr12(Lex *lx) {
     EXPR_t *l = parse_expr13(lx);
     if (!l) return NULL;
-    LexMark m12 = lex_mark(lx);
-    if (lex_peek(lx).kind != T_WS) return l;
-    lex_next(lx); /* consume WS */
-    TokKind op = lex_peek(lx).kind;
-    if (op == T_DOLLAR || op == T_DOT) {
-        lex_next(lx); skip_ws(lx);
-        EXPR_t *r = parse_expr12(lx); /* right-associative */
-        EKind k = (op==T_DOLLAR) ? E_DOL : E_NAM;
-        return binop(k, l, r);
+    for (;;) {
+        LexMark m12 = lex_mark(lx);
+        if (lex_peek(lx).kind != T_WS) break;
+        lex_next(lx); /* consume WS */
+        TokKind op = lex_peek(lx).kind;
+        if (op == T_DOLLAR || op == T_DOT) {
+            lex_next(lx); skip_ws(lx);
+            EXPR_t *r = parse_expr13(lx); /* left-associative: only one level */
+            EKind k = (op==T_DOLLAR) ? E_DOL : E_NAM;
+            l = binop(k, l, r);
+        } else {
+            lex_restore(lx, m12);
+            break;
+        }
     }
-    lex_restore(lx, m12);
     return l;
 }
 
