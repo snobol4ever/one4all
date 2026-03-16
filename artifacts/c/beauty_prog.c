@@ -241,6 +241,7 @@ typedef struct pat_Command_t pat_Command_t;
 typedef struct pat_Parse_t pat_Parse_t;
 typedef struct pat_Compiland_t pat_Compiland_t;
 typedef struct pat_Space_t pat_Space_t;
+static int _pending_parent_frame = -1;
 
 static DESCR_t pat_ppTokPat(const char *, int64_t, int64_t *, pat_ppTokPat_t **, int);
 static DESCR_t pat_ppGSfx(const char *, int64_t, int64_t *, pat_ppGSfx_t **, int);
@@ -3505,6 +3506,7 @@ NV_SET_fn("OUTPUT", _v611);
 
 /* --- compiled named pattern function bodies --- */
 typedef struct pat_ppTokPat_t {
+    int _parent_frame;
     int64_t cat_l_7_α_saved_cursor;
     int64_t cat_r_7_α_cstart;
     char *cond_ppTokName_8;
@@ -3522,9 +3524,15 @@ typedef struct pat_ppTokPat_t {
 
 static DESCR_t pat_ppTokPat(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_ppTokPat_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_ppTokPat_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_ppTokPat_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_ppTokPat_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define cat_l_7_α_saved_cursor z->cat_l_7_α_saved_cursor
 #define cat_r_7_α_cstart z->cat_r_7_α_cstart
 #define cond_ppTokName_8 z->cond_ppTokName_8
@@ -3627,6 +3635,7 @@ if (cond_ppTokVal_14) { NV_SET_fn("ppTokVal", STRVAL(cond_ppTokVal_14)); _ppTokV
         return STRVAL("");
     _ppTokPat_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef cat_l_7_α_saved_cursor
 #undef cat_r_7_α_cstart
 #undef cond_ppTokName_8
@@ -3644,6 +3653,7 @@ if (cond_ppTokVal_14) { NV_SET_fn("ppTokVal", STRVAL(cond_ppTokVal_14)); _ppTokV
 }
 
 typedef struct pat_ppGSfx_t {
+    int _parent_frame;
     int64_t alt_l_19_α_delta;
     int64_t alt_l_19_α_start;
     int64_t alt_r_19_α_saved_cursor;
@@ -3657,9 +3667,15 @@ typedef struct pat_ppGSfx_t {
 
 static DESCR_t pat_ppGSfx(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_ppGSfx_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_ppGSfx_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_ppGSfx_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_ppGSfx_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define alt_l_19_α_delta z->alt_l_19_α_delta
 #define alt_l_19_α_start z->alt_l_19_α_start
 #define alt_r_19_α_saved_cursor z->alt_r_19_α_saved_cursor
@@ -3743,6 +3759,7 @@ static DESCR_t pat_ppGSfx(const char *_subj_np, int64_t _slen_np,
         return STRVAL("");
     _ppGSfx_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef alt_l_19_α_delta
 #undef alt_l_19_α_start
 #undef alt_r_19_α_saved_cursor
@@ -3756,6 +3773,7 @@ static DESCR_t pat_ppGSfx(const char *_subj_np, int64_t _slen_np,
 }
 
 typedef struct pat_ppGPat_t {
+    int _parent_frame;
     int64_t cat_l_22_α_cstart;
     char *cond_ppGCon_23;
     int64_t cond_c_23_α_saved_cursor;
@@ -3765,9 +3783,15 @@ typedef struct pat_ppGPat_t {
 
 static DESCR_t pat_ppGPat(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_ppGPat_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_ppGPat_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_ppGPat_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_ppGPat_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define cat_l_22_α_cstart z->cat_l_22_α_cstart
 #define cond_ppGCon_23 z->cond_ppGCon_23
 #define cond_c_23_α_saved_cursor z->cond_c_23_α_saved_cursor
@@ -3812,6 +3836,7 @@ if (cond_ppGCon_23) { NV_SET_fn("ppGCon", STRVAL(cond_ppGCon_23)); _ppGCon = STR
         return STRVAL("");
     _ppGPat_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef cat_l_22_α_cstart
 #undef cond_ppGCon_23
 #undef cond_c_23_α_saved_cursor
@@ -3821,6 +3846,7 @@ if (cond_ppGCon_23) { NV_SET_fn("ppGCon", STRVAL(cond_ppGCon_23)); _ppGCon = STR
 }
 
 typedef struct pat_ppTrimPat_t {
+    int _parent_frame;
     int64_t _ppTrimPat_α_cstart;
     char *cond_ppDrop_25;
     int64_t cat_l_26_α_delta;
@@ -3829,9 +3855,15 @@ typedef struct pat_ppTrimPat_t {
 
 static DESCR_t pat_ppTrimPat(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_ppTrimPat_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_ppTrimPat_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_ppTrimPat_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_ppTrimPat_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define _ppTrimPat_α_cstart z->_ppTrimPat_α_cstart
 #define cond_ppDrop_25 z->cond_ppDrop_25
 #define cat_l_26_α_delta z->cat_l_26_α_delta
@@ -3870,6 +3902,7 @@ if (cond_ppDrop_25) { NV_SET_fn("ppDrop", STRVAL(cond_ppDrop_25)); _ppDrop = STR
         return STRVAL("");
     _ppTrimPat_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef _ppTrimPat_α_cstart
 #undef cond_ppDrop_25
 #undef cat_l_26_α_delta
@@ -3878,15 +3911,22 @@ if (cond_ppDrop_25) { NV_SET_fn("ppDrop", STRVAL(cond_ppDrop_25)); _ppDrop = STR
 }
 
 typedef struct pat_Integer_t {
+    int _parent_frame;
     int64_t _Integer_α_delta;
     int64_t _Integer_α_start;
 } pat_Integer_t;
 
 static DESCR_t pat_Integer(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Integer_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Integer_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Integer_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Integer_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define _Integer_α_delta z->_Integer_α_delta
 #define _Integer_α_start z->_Integer_α_start
 
@@ -3907,12 +3947,14 @@ static DESCR_t pat_Integer(const char *_subj_np, int64_t _slen_np,
         return STRVAL("");
     _Integer_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef _Integer_α_delta
 #undef _Integer_α_start
 
 }
 
 typedef struct pat_DQ_t {
+    int _parent_frame;
     int64_t cat_l_28_α_saved_cursor;
     int64_t cat_r_28_α_saved_cursor;
     int64_t cat_r_27_α_saved_cursor;
@@ -3920,9 +3962,15 @@ typedef struct pat_DQ_t {
 
 static DESCR_t pat_DQ(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_DQ_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_DQ_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_DQ_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_DQ_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define cat_l_28_α_saved_cursor z->cat_l_28_α_saved_cursor
 #define cat_r_28_α_saved_cursor z->cat_r_28_α_saved_cursor
 #define cat_r_27_α_saved_cursor z->cat_r_27_α_saved_cursor
@@ -3957,6 +4005,7 @@ static DESCR_t pat_DQ(const char *_subj_np, int64_t _slen_np,
         return STRVAL("");
     _DQ_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef cat_l_28_α_saved_cursor
 #undef cat_r_28_α_saved_cursor
 #undef cat_r_27_α_saved_cursor
@@ -3964,6 +4013,7 @@ static DESCR_t pat_DQ(const char *_subj_np, int64_t _slen_np,
 }
 
 typedef struct pat_SQ_t {
+    int _parent_frame;
     int64_t cat_l_30_α_saved_cursor;
     int64_t cat_r_30_α_saved_cursor;
     int64_t cat_r_29_α_saved_cursor;
@@ -3971,9 +4021,15 @@ typedef struct pat_SQ_t {
 
 static DESCR_t pat_SQ(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_SQ_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_SQ_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_SQ_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_SQ_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define cat_l_30_α_saved_cursor z->cat_l_30_α_saved_cursor
 #define cat_r_30_α_saved_cursor z->cat_r_30_α_saved_cursor
 #define cat_r_29_α_saved_cursor z->cat_r_29_α_saved_cursor
@@ -4008,6 +4064,7 @@ static DESCR_t pat_SQ(const char *_subj_np, int64_t _slen_np,
         return STRVAL("");
     _SQ_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef cat_l_30_α_saved_cursor
 #undef cat_r_30_α_saved_cursor
 #undef cat_r_29_α_saved_cursor
@@ -4015,6 +4072,7 @@ static DESCR_t pat_SQ(const char *_subj_np, int64_t _slen_np,
 }
 
 typedef struct pat_String_t {
+    int _parent_frame;
     int64_t deref_32_saved_cur;
     int64_t deref_33_saved_cur;
     pat_SQ_t *deref_32_z;
@@ -4023,9 +4081,15 @@ typedef struct pat_String_t {
 
 static DESCR_t pat_String(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_String_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_String_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_String_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_String_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define deref_32_saved_cur z->deref_32_saved_cur
 #define deref_33_saved_cur z->deref_33_saved_cur
 #define deref_32_z z->deref_32_z
@@ -4065,6 +4129,7 @@ alt_r_31_β: {
         return STRVAL("");
     _String_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef deref_32_saved_cur
 #undef deref_33_saved_cur
 #undef deref_32_z
@@ -4073,6 +4138,7 @@ alt_r_31_β: {
 }
 
 typedef struct pat_Real_t {
+    int _parent_frame;
     int64_t cat_l_38_α_delta;
     int64_t cat_l_38_α_start;
     int64_t cat_l_40_α_saved_cursor;
@@ -4097,9 +4163,15 @@ typedef struct pat_Real_t {
 
 static DESCR_t pat_Real(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Real_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Real_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Real_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Real_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define cat_l_38_α_delta z->cat_l_38_α_delta
 #define cat_l_38_α_start z->cat_l_38_α_start
 #define cat_l_40_α_saved_cursor z->cat_l_40_α_saved_cursor
@@ -4288,6 +4360,7 @@ alt_r_52_β:
         return STRVAL("");
     _Real_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef cat_l_38_α_delta
 #undef cat_l_38_α_start
 #undef cat_l_40_α_saved_cursor
@@ -4312,6 +4385,7 @@ alt_r_52_β:
 }
 
 typedef struct pat_Id_t {
+    int _parent_frame;
     int64_t cat_l_54_α_saved_cursor;
     int64_t alt_l_56_α_delta;
     int64_t alt_l_56_α_start;
@@ -4320,9 +4394,15 @@ typedef struct pat_Id_t {
 
 static DESCR_t pat_Id(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Id_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Id_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Id_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Id_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define cat_l_54_α_saved_cursor z->cat_l_54_α_saved_cursor
 #define alt_l_56_α_delta z->alt_l_56_α_delta
 #define alt_l_56_α_start z->alt_l_56_α_start
@@ -4370,6 +4450,7 @@ alt_r_56_β:
         return STRVAL("");
     _Id_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef cat_l_54_α_saved_cursor
 #undef alt_l_56_α_delta
 #undef alt_l_56_α_start
@@ -4378,6 +4459,7 @@ alt_r_56_β:
 }
 
 typedef struct pat_Function_t {
+    int _parent_frame;
     int64_t dolc_58_la_start;
     int64_t assign_c_59_α_delta;
     int64_t assign_c_59_α_start;
@@ -4386,9 +4468,15 @@ typedef struct pat_Function_t {
 
 static DESCR_t pat_Function(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Function_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Function_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Function_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Function_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define dolc_58_la_start z->dolc_58_la_start
 #define assign_c_59_α_delta z->assign_c_59_α_delta
 #define assign_c_59_α_start z->assign_c_59_α_start
@@ -4437,6 +4525,7 @@ dolc_58_rb:
         return STRVAL("");
     _Function_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef dolc_58_la_start
 #undef assign_c_59_α_delta
 #undef assign_c_59_α_start
@@ -4445,6 +4534,7 @@ dolc_58_rb:
 }
 
 typedef struct pat_BuiltinVar_t {
+    int _parent_frame;
     int64_t dolc_61_la_start;
     int64_t assign_c_62_α_delta;
     int64_t assign_c_62_α_start;
@@ -4453,9 +4543,15 @@ typedef struct pat_BuiltinVar_t {
 
 static DESCR_t pat_BuiltinVar(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_BuiltinVar_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_BuiltinVar_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_BuiltinVar_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_BuiltinVar_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define dolc_61_la_start z->dolc_61_la_start
 #define assign_c_62_α_delta z->assign_c_62_α_delta
 #define assign_c_62_α_start z->assign_c_62_α_start
@@ -4504,6 +4600,7 @@ dolc_61_rb:
         return STRVAL("");
     _BuiltinVar_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef dolc_61_la_start
 #undef assign_c_62_α_delta
 #undef assign_c_62_α_start
@@ -4512,6 +4609,7 @@ dolc_61_rb:
 }
 
 typedef struct pat_SpecialNm_t {
+    int _parent_frame;
     int64_t dolc_64_la_start;
     int64_t assign_c_65_α_delta;
     int64_t assign_c_65_α_start;
@@ -4520,9 +4618,15 @@ typedef struct pat_SpecialNm_t {
 
 static DESCR_t pat_SpecialNm(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_SpecialNm_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_SpecialNm_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_SpecialNm_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_SpecialNm_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define dolc_64_la_start z->dolc_64_la_start
 #define assign_c_65_α_delta z->assign_c_65_α_delta
 #define assign_c_65_α_start z->assign_c_65_α_start
@@ -4571,6 +4675,7 @@ dolc_64_rb:
         return STRVAL("");
     _SpecialNm_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef dolc_64_la_start
 #undef assign_c_65_α_delta
 #undef assign_c_65_α_start
@@ -4579,6 +4684,7 @@ dolc_64_rb:
 }
 
 typedef struct pat_ProtKwd_t {
+    int _parent_frame;
     int64_t cat_l_67_α_saved_cursor;
     int64_t dolc_68_la_start;
     int64_t assign_c_69_α_delta;
@@ -4588,9 +4694,15 @@ typedef struct pat_ProtKwd_t {
 
 static DESCR_t pat_ProtKwd(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_ProtKwd_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_ProtKwd_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_ProtKwd_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_ProtKwd_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define cat_l_67_α_saved_cursor z->cat_l_67_α_saved_cursor
 #define dolc_68_la_start z->dolc_68_la_start
 #define assign_c_69_α_delta z->assign_c_69_α_delta
@@ -4648,6 +4760,7 @@ dolc_68_rb:
         return STRVAL("");
     _ProtKwd_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef cat_l_67_α_saved_cursor
 #undef dolc_68_la_start
 #undef assign_c_69_α_delta
@@ -4657,6 +4770,7 @@ dolc_68_rb:
 }
 
 typedef struct pat_UnprotKwd_t {
+    int _parent_frame;
     int64_t cat_l_71_α_saved_cursor;
     int64_t dolc_72_la_start;
     int64_t assign_c_73_α_delta;
@@ -4666,9 +4780,15 @@ typedef struct pat_UnprotKwd_t {
 
 static DESCR_t pat_UnprotKwd(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_UnprotKwd_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_UnprotKwd_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_UnprotKwd_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_UnprotKwd_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define cat_l_71_α_saved_cursor z->cat_l_71_α_saved_cursor
 #define dolc_72_la_start z->dolc_72_la_start
 #define assign_c_73_α_delta z->assign_c_73_α_delta
@@ -4726,6 +4846,7 @@ dolc_72_rb:
         return STRVAL("");
     _UnprotKwd_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef cat_l_71_α_saved_cursor
 #undef dolc_72_la_start
 #undef assign_c_73_α_delta
@@ -4735,6 +4856,7 @@ dolc_72_rb:
 }
 
 typedef struct pat_Gray_t {
+    int _parent_frame;
     int64_t deref_76_saved_cur;
     int64_t deref_77_saved_cursor;
     pat_White_t *deref_76_z;
@@ -4742,9 +4864,15 @@ typedef struct pat_Gray_t {
 
 static DESCR_t pat_Gray(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Gray_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Gray_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Gray_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Gray_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define deref_76_saved_cur z->deref_76_saved_cur
 #define deref_77_saved_cursor z->deref_77_saved_cursor
 #define deref_76_z z->deref_76_z
@@ -4782,6 +4910,7 @@ alt_r_75_β:
         return STRVAL("");
     _Gray_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef deref_76_saved_cur
 #undef deref_77_saved_cursor
 #undef deref_76_z
@@ -4789,6 +4918,7 @@ alt_r_75_β:
 }
 
 typedef struct pat_White_t {
+    int _parent_frame;
     int64_t cat_l_79_α_delta;
     int64_t cat_l_79_α_start;
     int64_t deref_84_saved_cursor;
@@ -4808,9 +4938,15 @@ typedef struct pat_White_t {
 
 static DESCR_t pat_White(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_White_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_White_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_White_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_White_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define cat_l_79_α_delta z->cat_l_79_α_delta
 #define cat_l_79_α_start z->cat_l_79_α_start
 #define deref_84_saved_cursor z->deref_84_saved_cursor
@@ -4972,6 +5108,7 @@ alt_r_95_β:
         return STRVAL("");
     _White_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef cat_l_79_α_delta
 #undef cat_l_79_α_start
 #undef deref_84_saved_cursor
@@ -4991,6 +5128,7 @@ alt_r_95_β:
 }
 
 typedef struct pat_TxInList_t {
+    int _parent_frame;
     int64_t alt_r_99_α_saved_cursor;
     int64_t deref_fnc_100_saved_cursor;
     int64_t alt_l_101_α_saved_cursor;
@@ -4998,9 +5136,15 @@ typedef struct pat_TxInList_t {
 
 static DESCR_t pat_TxInList(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_TxInList_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_TxInList_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_TxInList_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_TxInList_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define alt_r_99_α_saved_cursor z->alt_r_99_α_saved_cursor
 #define deref_fnc_100_saved_cursor z->deref_fnc_100_saved_cursor
 #define alt_l_101_α_saved_cursor z->alt_l_101_α_saved_cursor
@@ -5055,6 +5199,7 @@ cat_r_98_β:
         return STRVAL("");
     _TxInList_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef alt_r_99_α_saved_cursor
 #undef deref_fnc_100_saved_cursor
 #undef alt_l_101_α_saved_cursor
@@ -5062,15 +5207,24 @@ cat_r_98_β:
 }
 
 typedef struct pat_ExprList_t {
+    int _parent_frame;
+    int _saved_frame_104;
     int64_t deref_105_saved_cur;
     pat_XList_t *deref_105_z;
 } pat_ExprList_t;
 
 static DESCR_t pat_ExprList(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_ExprList_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_ExprList_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_ExprList_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_ExprList_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
+#define _saved_frame_104 z->_saved_frame_104
 #define deref_105_saved_cur z->deref_105_saved_cur
 #define deref_105_z z->deref_105_z
 
@@ -5082,8 +5236,9 @@ static DESCR_t pat_ExprList(const char *_subj_np, int64_t _slen_np,
     cat_l_102_α:                                            goto cat_l_103_α;
     cat_l_102_β:                                            goto cat_r_103_β;
     cat_l_103_α:                                            goto cat_l_104_α;
-    cat_l_103_β:  NPUSH_fn();                               goto cat_r_104_β;
-    cat_l_104_α:  NPUSH_fn();                               goto cat_r_104_α;
+    cat_l_103_β:                                            goto cat_r_104_β;
+    cat_l_104_α:  NPUSH_fn(); _saved_frame_104 = NTOP_INDEX_fn();
+                                                            goto cat_r_104_α;
     cat_l_104_β:                                            goto _ExprList_ω;
 cat_r_104_α: {
     deref_105_saved_cur = _cur_np;
@@ -5111,12 +5266,15 @@ cat_r_103_β: goto cat_l_103_β;
         return STRVAL("");
     _ExprList_ω:;
         return FAILDESCR;
+#undef _parent_frame
+#undef _saved_frame_104
 #undef deref_105_saved_cur
 #undef deref_105_z
 
 }
 
 typedef struct pat_XList_t {
+    int _parent_frame;
     int64_t deref_109_saved_cur;
     int64_t alt_r_108_α_start;
     int64_t deref_111_saved_cursor;
@@ -5130,9 +5288,15 @@ typedef struct pat_XList_t {
 
 static DESCR_t pat_XList(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_XList_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_XList_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_XList_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_XList_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define deref_109_saved_cur z->deref_109_saved_cur
 #define alt_r_108_α_start z->alt_r_108_α_start
 #define deref_111_saved_cursor z->deref_111_saved_cursor
@@ -5151,7 +5315,7 @@ static DESCR_t pat_XList(const char *_subj_np, int64_t _slen_np,
     cat_l_106_α:                                            goto cat_l_107_α;
     cat_l_106_β:                                            goto cat_r_107_β;
     cat_l_107_α:  NINC_fn();                                goto cat_r_107_α;
-    cat_l_107_β:  NDEC_fn();                                goto _XList_ω;  /* line 5154 */
+    cat_l_107_β:  NDEC_fn();                                goto _XList_ω;
     cat_r_107_α:                                            goto alt_l_108_α;
     cat_r_107_β:                                            goto alt_r_108_β;
 alt_l_108_α: {
@@ -5203,9 +5367,10 @@ assign_c_110_β:
     dlit_115_β:   _cur_np = dlit_115_α_saved_cursor;        goto alt_r_113_α;
     dlit_115_do_assign:
                   { int64_t _len = _cur_np - dlit_115_start;
-                    char *_os = malloc(_len + 1);
+                    char *_os = (char*)GC_malloc(_len + 1);
                     memcpy(_os, _subj_np + dlit_115_start, _len); _os[_len] = 0;
-                    (void)_os; free(_os); /* output_str suppressed: $-capture output via Gen only */ }           goto cat_r_114_α;
+                    (void)_os; /* output_str suppressed in named pat */
+                    free(_os); }                            goto cat_r_114_α;
     cat_l_114_β:                                            goto dlit_115_β;
 cat_r_114_α: {
     deref_116_saved_cur = _cur_np;
@@ -5237,6 +5402,7 @@ alt_r_113_β:
         return STRVAL("");
     _XList_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef deref_109_saved_cur
 #undef alt_r_108_α_start
 #undef deref_111_saved_cursor
@@ -5250,15 +5416,22 @@ alt_r_113_β:
 }
 
 typedef struct pat_Expr_t {
+    int _parent_frame;
     int64_t deref_118_saved_cur;
     pat_Expr0_t *deref_118_z;
 } pat_Expr_t;
 
 static DESCR_t pat_Expr(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Expr_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Expr_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Expr_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Expr_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define deref_118_saved_cur z->deref_118_saved_cur
 #define deref_118_z z->deref_118_z
 
@@ -5282,12 +5455,14 @@ _Expr_β: {
         return STRVAL("");
     _Expr_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef deref_118_saved_cur
 #undef deref_118_z
 
 }
 
 typedef struct pat_Expr0_t {
+    int _parent_frame;
     int64_t deref_120_saved_cur;
     int64_t dlit_125_start;
     int64_t dlit_125_α_saved_cursor;
@@ -5299,9 +5474,15 @@ typedef struct pat_Expr0_t {
 
 static DESCR_t pat_Expr0(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Expr0_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Expr0_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Expr0_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Expr0_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define deref_120_saved_cur z->deref_120_saved_cur
 #define dlit_125_start z->dlit_125_start
 #define dlit_125_α_saved_cursor z->dlit_125_α_saved_cursor
@@ -5345,9 +5526,10 @@ cat_l_119_β: {
     dlit_125_β:   _cur_np = dlit_125_α_saved_cursor;        goto alt_r_122_α;
     dlit_125_do_assign:
                   { int64_t _len = _cur_np - dlit_125_start;
-                    char *_os = malloc(_len + 1);
+                    char *_os = (char*)GC_malloc(_len + 1);
                     memcpy(_os, _subj_np + dlit_125_start, _len); _os[_len] = 0;
-                    (void)_os; free(_os); /* output_str suppressed: $-capture output via Gen only */ }           goto cat_r_124_α;
+                    (void)_os; /* output_str suppressed in named pat */
+                    free(_os); }                            goto cat_r_124_α;
     cat_l_124_β:                                            goto dlit_125_β;
 cat_r_124_α: {
     deref_126_saved_cur = _cur_np;
@@ -5384,6 +5566,7 @@ alt_r_122_β:
         return STRVAL("");
     _Expr0_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef deref_120_saved_cur
 #undef dlit_125_start
 #undef dlit_125_α_saved_cursor
@@ -5395,6 +5578,7 @@ alt_r_122_β:
 }
 
 typedef struct pat_Expr1_t {
+    int _parent_frame;
     int64_t deref_129_saved_cur;
     int64_t dlit_134_start;
     int64_t dlit_134_α_saved_cursor;
@@ -5406,9 +5590,15 @@ typedef struct pat_Expr1_t {
 
 static DESCR_t pat_Expr1(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Expr1_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Expr1_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Expr1_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Expr1_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define deref_129_saved_cur z->deref_129_saved_cur
 #define dlit_134_start z->dlit_134_start
 #define dlit_134_α_saved_cursor z->dlit_134_α_saved_cursor
@@ -5452,9 +5642,10 @@ cat_l_128_β: {
     dlit_134_β:   _cur_np = dlit_134_α_saved_cursor;        goto alt_r_131_α;
     dlit_134_do_assign:
                   { int64_t _len = _cur_np - dlit_134_start;
-                    char *_os = malloc(_len + 1);
+                    char *_os = (char*)GC_malloc(_len + 1);
                     memcpy(_os, _subj_np + dlit_134_start, _len); _os[_len] = 0;
-                    (void)_os; free(_os); /* output_str suppressed: $-capture output via Gen only */ }           goto cat_r_133_α;
+                    (void)_os; /* output_str suppressed in named pat */
+                    free(_os); }                            goto cat_r_133_α;
     cat_l_133_β:                                            goto dlit_134_β;
 cat_r_133_α: {
     deref_135_saved_cur = _cur_np;
@@ -5491,6 +5682,7 @@ alt_r_131_β:
         return STRVAL("");
     _Expr1_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef deref_129_saved_cur
 #undef dlit_134_start
 #undef dlit_134_α_saved_cursor
@@ -5502,6 +5694,7 @@ alt_r_131_β:
 }
 
 typedef struct pat_Expr2_t {
+    int _parent_frame;
     int64_t deref_138_saved_cur;
     int64_t dlit_143_start;
     int64_t dlit_143_α_saved_cursor;
@@ -5513,9 +5706,15 @@ typedef struct pat_Expr2_t {
 
 static DESCR_t pat_Expr2(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Expr2_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Expr2_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Expr2_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Expr2_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define deref_138_saved_cur z->deref_138_saved_cur
 #define dlit_143_start z->dlit_143_start
 #define dlit_143_α_saved_cursor z->dlit_143_α_saved_cursor
@@ -5559,9 +5758,10 @@ cat_l_137_β: {
     dlit_143_β:   _cur_np = dlit_143_α_saved_cursor;        goto alt_r_140_α;
     dlit_143_do_assign:
                   { int64_t _len = _cur_np - dlit_143_start;
-                    char *_os = malloc(_len + 1);
+                    char *_os = (char*)GC_malloc(_len + 1);
                     memcpy(_os, _subj_np + dlit_143_start, _len); _os[_len] = 0;
-                    (void)_os; free(_os); /* output_str suppressed: $-capture output via Gen only */ }           goto cat_r_142_α;
+                    (void)_os; /* output_str suppressed in named pat */
+                    free(_os); }                            goto cat_r_142_α;
     cat_l_142_β:                                            goto dlit_143_β;
 cat_r_142_α: {
     deref_144_saved_cur = _cur_np;
@@ -5598,6 +5798,7 @@ alt_r_140_β:
         return STRVAL("");
     _Expr2_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef deref_138_saved_cur
 #undef dlit_143_start
 #undef dlit_143_α_saved_cursor
@@ -5609,19 +5810,26 @@ alt_r_140_β:
 }
 
 typedef struct pat_Expr3_t {
+    int _parent_frame;
+    int _saved_frame_148;
     int64_t deref_149_saved_cur;
     pat_X3_t *deref_149_z;
-    int _saved_frame;
 } pat_Expr3_t;
 
 static DESCR_t pat_Expr3(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Expr3_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Expr3_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Expr3_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Expr3_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
+#define _saved_frame_148 z->_saved_frame_148
 #define deref_149_saved_cur z->deref_149_saved_cur
 #define deref_149_z z->deref_149_z
-#define _expr3_frame z->_saved_frame
 
     if (_entry_np == 0) goto _Expr3_α;
     if (_entry_np == 1) goto _Expr3_β;
@@ -5631,9 +5839,10 @@ static DESCR_t pat_Expr3(const char *_subj_np, int64_t _slen_np,
     cat_l_146_α:                                            goto cat_l_147_α;
     cat_l_146_β:                                            goto cat_r_147_β;
     cat_l_147_α:                                            goto cat_l_148_α;
-    cat_l_147_β:  NPUSH_fn(); _expr3_frame=NTOP_INDEX_fn(); goto cat_r_148_β;
-    cat_l_148_α:  NPUSH_fn(); _expr3_frame=NTOP_INDEX_fn(); goto cat_r_148_α;
-    cat_l_148_β:  _expr3_frame=-1;                         goto _Expr3_ω;
+    cat_l_147_β:                                            goto cat_r_148_β;
+    cat_l_148_α:  NPUSH_fn(); _saved_frame_148 = NTOP_INDEX_fn();
+                                                            goto cat_r_148_α;
+    cat_l_148_β:                                            goto _Expr3_ω;
 cat_r_148_α: {
     deref_149_saved_cur = _cur_np;
     DESCR_t _r_149 = pat_X3(_subj_np, _slen_np, &_cur_np, &deref_149_z, 0);
@@ -5647,11 +5856,10 @@ cat_r_148_β: {
     goto cat_r_147_α;
 }
 cat_r_147_α: /* E_OPSYN & */
-    { int _cnt3 = (_expr3_frame>=0) ? (int)NSTACK_AT_fn(_expr3_frame) : 0;
-    if (_cnt3 > 1) {
-    { DESCR_t _reduce_args[2] = {STRVAL("|"), INTVAL(_cnt3)};
+    if (ntop() > 1) {
+    { DESCR_t _reduce_args[2] = {STRVAL("|"), INTVAL(ntop())};
       APPLY_fn("Reduce", _reduce_args, 2); }
-    } }
+    }
     goto cat_r_146_α;
 cat_r_147_β: goto cat_l_147_β;
     cat_r_146_α:  NPOP_fn();                                goto _Expr3_γ;
@@ -5661,13 +5869,15 @@ cat_r_147_β: goto cat_l_147_β;
         return STRVAL("");
     _Expr3_ω:;
         return FAILDESCR;
+#undef _parent_frame
+#undef _saved_frame_148
 #undef deref_149_saved_cur
 #undef deref_149_z
-#undef _expr3_frame
 
 }
 
 typedef struct pat_X3_t {
+    int _parent_frame;
     int64_t deref_152_saved_cur;
     int64_t dlit_156_start;
     int64_t dlit_156_α_saved_cursor;
@@ -5679,9 +5889,15 @@ typedef struct pat_X3_t {
 
 static DESCR_t pat_X3(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_X3_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_X3_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_X3_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_X3_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define deref_152_saved_cur z->deref_152_saved_cur
 #define dlit_156_start z->dlit_156_start
 #define dlit_156_α_saved_cursor z->dlit_156_α_saved_cursor
@@ -5698,7 +5914,7 @@ static DESCR_t pat_X3(const char *_subj_np, int64_t _slen_np,
     cat_l_150_α:                                            goto cat_l_151_α;
     cat_l_150_β:                                            goto cat_r_151_β;
     cat_l_151_α:  NINC_fn();                                goto cat_r_151_α;
-    cat_l_151_β:  NDEC_fn();                                goto _X3_ω;  /* line 5697 */
+    cat_l_151_β:  NDEC_fn();                                goto _X3_ω;
 cat_r_151_α: {
     deref_152_saved_cur = _cur_np;
     DESCR_t _r_152 = pat_Expr4(_subj_np, _slen_np, &_cur_np, &deref_152_z, 0);
@@ -5727,9 +5943,10 @@ cat_r_151_β: {
     dlit_156_β:   _cur_np = dlit_156_α_saved_cursor;        goto alt_r_154_α;
     dlit_156_do_assign:
                   { int64_t _len = _cur_np - dlit_156_start;
-                    char *_os = malloc(_len + 1);
+                    char *_os = (char*)GC_malloc(_len + 1);
                     memcpy(_os, _subj_np + dlit_156_start, _len); _os[_len] = 0;
-                    (void)_os; free(_os); /* output_str suppressed: $-capture output via Gen only */ }           goto cat_r_155_α;
+                    (void)_os; /* output_str suppressed in named pat */
+                    free(_os); }                            goto cat_r_155_α;
     cat_l_155_β:                                            goto dlit_156_β;
 cat_r_155_α: {
     deref_157_saved_cur = _cur_np;
@@ -5761,6 +5978,7 @@ alt_r_154_β:
         return STRVAL("");
     _X3_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef deref_152_saved_cur
 #undef dlit_156_start
 #undef dlit_156_α_saved_cursor
@@ -5772,21 +5990,28 @@ alt_r_154_β:
 }
 
 typedef struct pat_Expr4_t {
+    int _parent_frame;
+    int _saved_frame_161;
     int64_t deref_162_saved_cur;
     pat_X4_t *deref_162_z;
-    int _saved_frame;  /* frame index saved at NPUSH time */
 } pat_Expr4_t;
 
 static DESCR_t pat_Expr4(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Expr4_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Expr4_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Expr4_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Expr4_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
+#define _saved_frame_161 z->_saved_frame_161
 #define deref_162_saved_cur z->deref_162_saved_cur
 #define deref_162_z z->deref_162_z
-#define _expr4_frame z->_saved_frame
 
-    if (_entry_np == 0) { z->_saved_frame = -1; goto _Expr4_α; }
+    if (_entry_np == 0) goto _Expr4_α;
     if (_entry_np == 1) goto _Expr4_β;
     goto _Expr4_ω;
     _Expr4_α:                                               goto cat_l_159_α;
@@ -5794,29 +6019,27 @@ static DESCR_t pat_Expr4(const char *_subj_np, int64_t _slen_np,
     cat_l_159_α:                                            goto cat_l_160_α;
     cat_l_159_β:                                            goto cat_r_160_β;
     cat_l_160_α:                                            goto cat_l_161_α;
-    cat_l_160_β:  NPUSH_fn(); _expr4_frame=NTOP_INDEX_fn(); goto cat_r_161_β;
-    cat_l_161_α:  NPUSH_fn(); _expr4_frame=NTOP_INDEX_fn(); goto cat_r_161_α;
-    cat_l_161_β:  _expr4_frame=-1;                         goto _Expr4_ω;
+    cat_l_160_β:                                            goto cat_r_161_β;
+    cat_l_161_α:  NPUSH_fn(); _saved_frame_161 = NTOP_INDEX_fn();
+                                                            goto cat_r_161_α;
+    cat_l_161_β:                                            goto _Expr4_ω;
 cat_r_161_α: {
     deref_162_saved_cur = _cur_np;
-    _x4_pending_parent_frame = _expr4_frame;
     DESCR_t _r_162 = pat_X4(_subj_np, _slen_np, &_cur_np, &deref_162_z, 0);
     if (IS_FAIL_fn(_r_162)) { _cur_np = deref_162_saved_cur; goto cat_l_161_β; }
     goto cat_r_160_α;
 }
 cat_r_161_β: {
     _cur_np = deref_162_saved_cur;
-    _x4_pending_parent_frame = _expr4_frame;
     DESCR_t _r_162_b = pat_X4(_subj_np, _slen_np, &_cur_np, &deref_162_z, 1);
     if (IS_FAIL_fn(_r_162_b)) { _cur_np = deref_162_saved_cur; goto cat_l_161_β; }
     goto cat_r_160_α;
 }
 cat_r_160_α: /* E_OPSYN & */
-    { int _cnt = (_expr4_frame>=0) ? (int)NSTACK_AT_fn(_expr4_frame) : 0;
-    if (_cnt > 1) {
-    { DESCR_t _reduce_args[2] = {STRVAL(".."), INTVAL(_cnt)};
+    if (ntop() > 1) {
+    { DESCR_t _reduce_args[2] = {STRVAL(".."), INTVAL(ntop())};
       APPLY_fn("Reduce", _reduce_args, 2); }
-    } }
+    }
     goto cat_r_159_α;
 cat_r_160_β: goto cat_l_160_β;
     cat_r_159_α:  NPOP_fn();                                goto _Expr4_γ;
@@ -5826,13 +6049,15 @@ cat_r_160_β: goto cat_l_160_β;
         return STRVAL("");
     _Expr4_ω:;
         return FAILDESCR;
+#undef _parent_frame
+#undef _saved_frame_161
 #undef deref_162_saved_cur
 #undef deref_162_z
-#undef _expr4_frame
 
 }
 
 typedef struct pat_X4_t {
+    int _parent_frame;
     int64_t deref_165_saved_cur;
     int64_t deref_169_saved_cur;
     int64_t deref_170_saved_cur;
@@ -5840,14 +6065,19 @@ typedef struct pat_X4_t {
     pat_Expr5_t *deref_165_z;
     pat_White_t *deref_169_z;
     pat_X4_t *deref_170_z;
-    int _parent_frame;  /* Expr4 frame to increment for concat counting */
 } pat_X4_t;
 
 static DESCR_t pat_X4(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_X4_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_X4_t)); (*_zz_np)->_parent_frame = _x4_pending_parent_frame; }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_X4_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_X4_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define deref_165_saved_cur z->deref_165_saved_cur
 #define deref_169_saved_cur z->deref_169_saved_cur
 #define deref_170_saved_cur z->deref_170_saved_cur
@@ -5855,7 +6085,6 @@ static DESCR_t pat_X4(const char *_subj_np, int64_t _slen_np,
 #define deref_165_z z->deref_165_z
 #define deref_169_z z->deref_169_z
 #define deref_170_z z->deref_170_z
-#define _x4_parent_frame z->_parent_frame
 
     if (_entry_np == 0) goto _X4_α;
     if (_entry_np == 1) goto _X4_β;
@@ -5864,8 +6093,8 @@ static DESCR_t pat_X4(const char *_subj_np, int64_t _slen_np,
     _X4_β:                                                  goto cat_r_163_β;
     cat_l_163_α:                                            goto cat_l_164_α;
     cat_l_163_β:                                            goto cat_r_164_β;
-    cat_l_164_α:  NINC_AT_fn(_x4_parent_frame);                                goto cat_r_164_α;
-    cat_l_164_β:                                            goto _X4_ω;  /* no NDEC: parent Expr4 owns count */
+    cat_l_164_α:  NINC_fn();                                goto cat_r_164_α;
+    cat_l_164_β:  NDEC_fn();                                goto _X4_ω;
 cat_r_164_α: {
     deref_165_saved_cur = _cur_np;
     DESCR_t _r_165 = pat_Expr5(_subj_np, _slen_np, &_cur_np, &deref_165_z, 0);
@@ -5896,19 +6125,13 @@ cat_l_168_β: {
     goto cat_r_168_α;
 }
 cat_r_168_α: {
-    /* Bug6a: ':' after whitespace belongs to pat_Goto, not a concat atom */
-    if (_cur_np < _slen_np && _subj_np[_cur_np] == ':') { goto alt_r_167_α; }
     deref_170_saved_cur = _cur_np;
-    _x4_pending_parent_frame = _x4_parent_frame;
     DESCR_t _r_170 = pat_X4(_subj_np, _slen_np, &_cur_np, &deref_170_z, 0);
     if (IS_FAIL_fn(_r_170)) { _cur_np = deref_170_saved_cur; goto cat_l_168_β; }
     goto fence_after_166;
 }
 cat_r_168_β: {
-    /* Bug6a: same guard on backtrack path */
-    if (_cur_np < _slen_np && _subj_np[_cur_np] == ':') { goto alt_r_167_α; }
     _cur_np = deref_170_saved_cur;
-    _x4_pending_parent_frame = _x4_parent_frame;
     DESCR_t _r_170_b = pat_X4(_subj_np, _slen_np, &_cur_np, &deref_170_z, 1);
     if (IS_FAIL_fn(_r_170_b)) { _cur_np = deref_170_saved_cur; goto cat_l_168_β; }
     goto fence_after_166;
@@ -5931,6 +6154,7 @@ alt_r_167_β:
         return STRVAL("");
     _X4_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef deref_165_saved_cur
 #undef deref_169_saved_cur
 #undef deref_170_saved_cur
@@ -5938,11 +6162,11 @@ alt_r_167_β:
 #undef deref_165_z
 #undef deref_169_z
 #undef deref_170_z
-#undef _x4_parent_frame
 
 }
 
 typedef struct pat_Expr5_t {
+    int _parent_frame;
     int64_t deref_173_saved_cur;
     int64_t dlit_178_start;
     int64_t dlit_178_α_saved_cursor;
@@ -5954,9 +6178,15 @@ typedef struct pat_Expr5_t {
 
 static DESCR_t pat_Expr5(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Expr5_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Expr5_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Expr5_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Expr5_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define deref_173_saved_cur z->deref_173_saved_cur
 #define dlit_178_start z->dlit_178_start
 #define dlit_178_α_saved_cursor z->dlit_178_α_saved_cursor
@@ -6000,9 +6230,10 @@ cat_l_172_β: {
     dlit_178_β:   _cur_np = dlit_178_α_saved_cursor;        goto alt_r_175_α;
     dlit_178_do_assign:
                   { int64_t _len = _cur_np - dlit_178_start;
-                    char *_os = malloc(_len + 1);
+                    char *_os = (char*)GC_malloc(_len + 1);
                     memcpy(_os, _subj_np + dlit_178_start, _len); _os[_len] = 0;
-                    (void)_os; free(_os); /* output_str suppressed: $-capture output via Gen only */ }           goto cat_r_177_α;
+                    (void)_os; /* output_str suppressed in named pat */
+                    free(_os); }                            goto cat_r_177_α;
     cat_l_177_β:                                            goto dlit_178_β;
 cat_r_177_α: {
     deref_179_saved_cur = _cur_np;
@@ -6039,6 +6270,7 @@ alt_r_175_β:
         return STRVAL("");
     _Expr5_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef deref_173_saved_cur
 #undef dlit_178_start
 #undef dlit_178_α_saved_cursor
@@ -6050,6 +6282,7 @@ alt_r_175_β:
 }
 
 typedef struct pat_Expr6_t {
+    int _parent_frame;
     int64_t deref_182_saved_cur;
     int64_t dlit_188_start;
     int64_t dlit_188_α_saved_cursor;
@@ -6065,9 +6298,15 @@ typedef struct pat_Expr6_t {
 
 static DESCR_t pat_Expr6(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Expr6_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Expr6_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Expr6_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Expr6_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define deref_182_saved_cur z->deref_182_saved_cur
 #define dlit_188_start z->dlit_188_start
 #define dlit_188_α_saved_cursor z->dlit_188_α_saved_cursor
@@ -6117,9 +6356,10 @@ cat_l_181_β: {
     dlit_188_β:   _cur_np = dlit_188_α_saved_cursor;        goto alt_r_185_α;
     dlit_188_do_assign:
                   { int64_t _len = _cur_np - dlit_188_start;
-                    char *_os = malloc(_len + 1);
+                    char *_os = (char*)GC_malloc(_len + 1);
                     memcpy(_os, _subj_np + dlit_188_start, _len); _os[_len] = 0;
-                    (void)_os; free(_os); /* output_str suppressed: $-capture output via Gen only */ }           goto cat_r_187_α;
+                    (void)_os; /* output_str suppressed in named pat */
+                    free(_os); }                            goto cat_r_187_α;
     cat_l_187_β:                                            goto dlit_188_β;
 cat_r_187_α: {
     deref_189_saved_cur = _cur_np;
@@ -6153,9 +6393,10 @@ cat_r_186_β: goto cat_l_186_β;
     dlit_192_β:   _cur_np = dlit_192_α_saved_cursor;        goto alt_r_184_α;
     dlit_192_do_assign:
                   { int64_t _len = _cur_np - dlit_192_start;
-                    char *_os = malloc(_len + 1);
+                    char *_os = (char*)GC_malloc(_len + 1);
                     memcpy(_os, _subj_np + dlit_192_start, _len); _os[_len] = 0;
-                    (void)_os; free(_os); /* output_str suppressed: $-capture output via Gen only */ }           goto cat_r_191_α;
+                    (void)_os; /* output_str suppressed in named pat */
+                    free(_os); }                            goto cat_r_191_α;
     cat_l_191_β:                                            goto dlit_192_β;
 cat_r_191_α: {
     deref_193_saved_cur = _cur_np;
@@ -6192,6 +6433,7 @@ alt_r_184_β:
         return STRVAL("");
     _Expr6_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef deref_182_saved_cur
 #undef dlit_188_start
 #undef dlit_188_α_saved_cursor
@@ -6207,6 +6449,7 @@ alt_r_184_β:
 }
 
 typedef struct pat_Expr7_t {
+    int _parent_frame;
     int64_t deref_196_saved_cur;
     int64_t dlit_201_start;
     int64_t dlit_201_α_saved_cursor;
@@ -6218,9 +6461,15 @@ typedef struct pat_Expr7_t {
 
 static DESCR_t pat_Expr7(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Expr7_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Expr7_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Expr7_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Expr7_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define deref_196_saved_cur z->deref_196_saved_cur
 #define dlit_201_start z->dlit_201_start
 #define dlit_201_α_saved_cursor z->dlit_201_α_saved_cursor
@@ -6264,9 +6513,10 @@ cat_l_195_β: {
     dlit_201_β:   _cur_np = dlit_201_α_saved_cursor;        goto alt_r_198_α;
     dlit_201_do_assign:
                   { int64_t _len = _cur_np - dlit_201_start;
-                    char *_os = malloc(_len + 1);
+                    char *_os = (char*)GC_malloc(_len + 1);
                     memcpy(_os, _subj_np + dlit_201_start, _len); _os[_len] = 0;
-                    (void)_os; free(_os); /* output_str suppressed: $-capture output via Gen only */ }           goto cat_r_200_α;
+                    (void)_os; /* output_str suppressed in named pat */
+                    free(_os); }                            goto cat_r_200_α;
     cat_l_200_β:                                            goto dlit_201_β;
 cat_r_200_α: {
     deref_202_saved_cur = _cur_np;
@@ -6303,6 +6553,7 @@ alt_r_198_β:
         return STRVAL("");
     _Expr7_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef deref_196_saved_cur
 #undef dlit_201_start
 #undef dlit_201_α_saved_cursor
@@ -6314,6 +6565,7 @@ alt_r_198_β:
 }
 
 typedef struct pat_Expr8_t {
+    int _parent_frame;
     int64_t deref_205_saved_cur;
     int64_t dlit_210_start;
     int64_t dlit_210_α_saved_cursor;
@@ -6325,9 +6577,15 @@ typedef struct pat_Expr8_t {
 
 static DESCR_t pat_Expr8(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Expr8_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Expr8_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Expr8_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Expr8_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define deref_205_saved_cur z->deref_205_saved_cur
 #define dlit_210_start z->dlit_210_start
 #define dlit_210_α_saved_cursor z->dlit_210_α_saved_cursor
@@ -6371,9 +6629,10 @@ cat_l_204_β: {
     dlit_210_β:   _cur_np = dlit_210_α_saved_cursor;        goto alt_r_207_α;
     dlit_210_do_assign:
                   { int64_t _len = _cur_np - dlit_210_start;
-                    char *_os = malloc(_len + 1);
+                    char *_os = (char*)GC_malloc(_len + 1);
                     memcpy(_os, _subj_np + dlit_210_start, _len); _os[_len] = 0;
-                    (void)_os; free(_os); /* output_str suppressed: $-capture output via Gen only */ }           goto cat_r_209_α;
+                    (void)_os; /* output_str suppressed in named pat */
+                    free(_os); }                            goto cat_r_209_α;
     cat_l_209_β:                                            goto dlit_210_β;
 cat_r_209_α: {
     deref_211_saved_cur = _cur_np;
@@ -6410,6 +6669,7 @@ alt_r_207_β:
         return STRVAL("");
     _Expr8_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef deref_205_saved_cur
 #undef dlit_210_start
 #undef dlit_210_α_saved_cursor
@@ -6421,6 +6681,7 @@ alt_r_207_β:
 }
 
 typedef struct pat_Expr9_t {
+    int _parent_frame;
     int64_t deref_214_saved_cur;
     int64_t dlit_219_start;
     int64_t dlit_219_α_saved_cursor;
@@ -6432,9 +6693,15 @@ typedef struct pat_Expr9_t {
 
 static DESCR_t pat_Expr9(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Expr9_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Expr9_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Expr9_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Expr9_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define deref_214_saved_cur z->deref_214_saved_cur
 #define dlit_219_start z->dlit_219_start
 #define dlit_219_α_saved_cursor z->dlit_219_α_saved_cursor
@@ -6478,9 +6745,10 @@ cat_l_213_β: {
     dlit_219_β:   _cur_np = dlit_219_α_saved_cursor;        goto alt_r_216_α;
     dlit_219_do_assign:
                   { int64_t _len = _cur_np - dlit_219_start;
-                    char *_os = malloc(_len + 1);
+                    char *_os = (char*)GC_malloc(_len + 1);
                     memcpy(_os, _subj_np + dlit_219_start, _len); _os[_len] = 0;
-                    (void)_os; free(_os); /* output_str suppressed: $-capture output via Gen only */ }           goto cat_r_218_α;
+                    (void)_os; /* output_str suppressed in named pat */
+                    free(_os); }                            goto cat_r_218_α;
     cat_l_218_β:                                            goto dlit_219_β;
 cat_r_218_α: {
     deref_220_saved_cur = _cur_np;
@@ -6517,6 +6785,7 @@ alt_r_216_β:
         return STRVAL("");
     _Expr9_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef deref_214_saved_cur
 #undef dlit_219_start
 #undef dlit_219_α_saved_cursor
@@ -6528,6 +6797,7 @@ alt_r_216_β:
 }
 
 typedef struct pat_Expr10_t {
+    int _parent_frame;
     int64_t deref_223_saved_cur;
     int64_t dlit_228_start;
     int64_t dlit_228_α_saved_cursor;
@@ -6539,9 +6809,15 @@ typedef struct pat_Expr10_t {
 
 static DESCR_t pat_Expr10(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Expr10_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Expr10_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Expr10_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Expr10_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define deref_223_saved_cur z->deref_223_saved_cur
 #define dlit_228_start z->dlit_228_start
 #define dlit_228_α_saved_cursor z->dlit_228_α_saved_cursor
@@ -6585,9 +6861,10 @@ cat_l_222_β: {
     dlit_228_β:   _cur_np = dlit_228_α_saved_cursor;        goto alt_r_225_α;
     dlit_228_do_assign:
                   { int64_t _len = _cur_np - dlit_228_start;
-                    char *_os = malloc(_len + 1);
+                    char *_os = (char*)GC_malloc(_len + 1);
                     memcpy(_os, _subj_np + dlit_228_start, _len); _os[_len] = 0;
-                    (void)_os; free(_os); /* output_str suppressed: $-capture output via Gen only */ }           goto cat_r_227_α;
+                    (void)_os; /* output_str suppressed in named pat */
+                    free(_os); }                            goto cat_r_227_α;
     cat_l_227_β:                                            goto dlit_228_β;
 cat_r_227_α: {
     deref_229_saved_cur = _cur_np;
@@ -6624,6 +6901,7 @@ alt_r_225_β:
         return STRVAL("");
     _Expr10_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef deref_223_saved_cur
 #undef dlit_228_start
 #undef dlit_228_α_saved_cursor
@@ -6635,6 +6913,7 @@ alt_r_225_β:
 }
 
 typedef struct pat_Expr11_t {
+    int _parent_frame;
     int64_t deref_232_saved_cur;
     int64_t dlit_239_start;
     int64_t dlit_239_α_saved_cursor;
@@ -6650,9 +6929,15 @@ typedef struct pat_Expr11_t {
 
 static DESCR_t pat_Expr11(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Expr11_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Expr11_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Expr11_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Expr11_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define deref_232_saved_cur z->deref_232_saved_cur
 #define dlit_239_start z->dlit_239_start
 #define dlit_239_α_saved_cursor z->dlit_239_α_saved_cursor
@@ -6704,9 +6989,10 @@ cat_l_231_β: {
     dlit_239_β:   _cur_np = dlit_239_α_saved_cursor;        goto alt_r_238_α;
     dlit_239_do_assign:
                   { int64_t _len = _cur_np - dlit_239_start;
-                    char *_os = malloc(_len + 1);
+                    char *_os = (char*)GC_malloc(_len + 1);
                     memcpy(_os, _subj_np + dlit_239_start, _len); _os[_len] = 0;
-                    (void)_os; free(_os); /* output_str suppressed: $-capture output via Gen only */ }           goto cat_r_236_α;
+                    (void)_os; /* output_str suppressed in named pat */
+                    free(_os); }                            goto cat_r_236_α;
     alt_l_238_β:                                            goto dlit_239_β;
     alt_r_238_α:
                   dlit_240_start = _cur_np;
@@ -6719,9 +7005,10 @@ cat_l_231_β: {
     dlit_240_β:   _cur_np = dlit_240_α_saved_cursor;        goto alt_r_237_α;
     dlit_240_do_assign:
                   { int64_t _len = _cur_np - dlit_240_start;
-                    char *_os = malloc(_len + 1);
+                    char *_os = (char*)GC_malloc(_len + 1);
                     memcpy(_os, _subj_np + dlit_240_start, _len); _os[_len] = 0;
-                    (void)_os; free(_os); /* output_str suppressed: $-capture output via Gen only */ }           goto cat_r_236_α;
+                    (void)_os; /* output_str suppressed in named pat */
+                    free(_os); }                            goto cat_r_236_α;
     alt_r_238_β:                                            goto dlit_240_β;
     alt_r_237_α:
                   dlit_241_start = _cur_np;
@@ -6735,9 +7022,10 @@ cat_l_231_β: {
     dlit_241_β:   _cur_np = dlit_241_α_saved_cursor;        goto alt_r_234_α;
     dlit_241_do_assign:
                   { int64_t _len = _cur_np - dlit_241_start;
-                    char *_os = malloc(_len + 1);
+                    char *_os = (char*)GC_malloc(_len + 1);
                     memcpy(_os, _subj_np + dlit_241_start, _len); _os[_len] = 0;
-                    (void)_os; free(_os); /* output_str suppressed: $-capture output via Gen only */ }           goto cat_r_236_α;
+                    (void)_os; /* output_str suppressed in named pat */
+                    free(_os); }                            goto cat_r_236_α;
     alt_r_237_β:                                            goto dlit_241_β;
 cat_r_236_α: {
     deref_242_saved_cur = _cur_np;
@@ -6774,6 +7062,7 @@ alt_r_234_β:
         return STRVAL("");
     _Expr11_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef deref_232_saved_cur
 #undef dlit_239_start
 #undef dlit_239_α_saved_cursor
@@ -6789,6 +7078,7 @@ alt_r_234_β:
 }
 
 typedef struct pat_Expr12_t {
+    int _parent_frame;
     int64_t deref_245_saved_cur;
     int64_t dlit_251_start;
     int64_t dlit_251_α_saved_cursor;
@@ -6804,9 +7094,15 @@ typedef struct pat_Expr12_t {
 
 static DESCR_t pat_Expr12(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Expr12_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Expr12_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Expr12_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Expr12_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define deref_245_saved_cur z->deref_245_saved_cur
 #define dlit_251_start z->dlit_251_start
 #define dlit_251_α_saved_cursor z->dlit_251_α_saved_cursor
@@ -6856,9 +7152,10 @@ cat_l_244_β: {
     dlit_251_β:   _cur_np = dlit_251_α_saved_cursor;        goto alt_r_248_α;
     dlit_251_do_assign:
                   { int64_t _len = _cur_np - dlit_251_start;
-                    char *_os = malloc(_len + 1);
+                    char *_os = (char*)GC_malloc(_len + 1);
                     memcpy(_os, _subj_np + dlit_251_start, _len); _os[_len] = 0;
-                    (void)_os; free(_os); /* output_str suppressed: $-capture output via Gen only */ }           goto cat_r_250_α;
+                    (void)_os; /* output_str suppressed in named pat */
+                    free(_os); }                            goto cat_r_250_α;
     cat_l_250_β:                                            goto dlit_251_β;
 cat_r_250_α: {
     deref_252_saved_cur = _cur_np;
@@ -6892,9 +7189,10 @@ cat_r_249_β: goto cat_l_249_β;
     dlit_255_β:   _cur_np = dlit_255_α_saved_cursor;        goto alt_r_247_α;
     dlit_255_do_assign:
                   { int64_t _len = _cur_np - dlit_255_start;
-                    char *_os = malloc(_len + 1);
+                    char *_os = (char*)GC_malloc(_len + 1);
                     memcpy(_os, _subj_np + dlit_255_start, _len); _os[_len] = 0;
-                    (void)_os; free(_os); /* output_str suppressed: $-capture output via Gen only */ }           goto cat_r_254_α;
+                    (void)_os; /* output_str suppressed in named pat */
+                    free(_os); }                            goto cat_r_254_α;
     cat_l_254_β:                                            goto dlit_255_β;
 cat_r_254_α: {
     deref_256_saved_cur = _cur_np;
@@ -6931,6 +7229,7 @@ alt_r_247_β:
         return STRVAL("");
     _Expr12_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef deref_245_saved_cur
 #undef dlit_251_start
 #undef dlit_251_α_saved_cursor
@@ -6946,6 +7245,7 @@ alt_r_247_β:
 }
 
 typedef struct pat_Expr13_t {
+    int _parent_frame;
     int64_t deref_259_saved_cur;
     int64_t dlit_264_start;
     int64_t dlit_264_α_saved_cursor;
@@ -6957,9 +7257,15 @@ typedef struct pat_Expr13_t {
 
 static DESCR_t pat_Expr13(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Expr13_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Expr13_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Expr13_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Expr13_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define deref_259_saved_cur z->deref_259_saved_cur
 #define dlit_264_start z->dlit_264_start
 #define dlit_264_α_saved_cursor z->dlit_264_α_saved_cursor
@@ -7003,9 +7309,10 @@ cat_l_258_β: {
     dlit_264_β:   _cur_np = dlit_264_α_saved_cursor;        goto alt_r_261_α;
     dlit_264_do_assign:
                   { int64_t _len = _cur_np - dlit_264_start;
-                    char *_os = malloc(_len + 1);
+                    char *_os = (char*)GC_malloc(_len + 1);
                     memcpy(_os, _subj_np + dlit_264_start, _len); _os[_len] = 0;
-                    (void)_os; free(_os); /* output_str suppressed: $-capture output via Gen only */ }           goto cat_r_263_α;
+                    (void)_os; /* output_str suppressed in named pat */
+                    free(_os); }                            goto cat_r_263_α;
     cat_l_263_β:                                            goto dlit_264_β;
 cat_r_263_α: {
     deref_265_saved_cur = _cur_np;
@@ -7042,6 +7349,7 @@ alt_r_261_β:
         return STRVAL("");
     _Expr13_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef deref_259_saved_cur
 #undef dlit_264_start
 #undef dlit_264_α_saved_cursor
@@ -7053,6 +7361,7 @@ alt_r_261_β:
 }
 
 typedef struct pat_Expr14_t {
+    int _parent_frame;
     int64_t cat_l_285_α_saved_cursor;
     int64_t deref_286_saved_cur;
     int64_t cat_l_288_α_saved_cursor;
@@ -7110,9 +7419,15 @@ typedef struct pat_Expr14_t {
 
 static DESCR_t pat_Expr14(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Expr14_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Expr14_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Expr14_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Expr14_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define cat_l_285_α_saved_cursor z->cat_l_285_α_saved_cursor
 #define deref_286_saved_cur z->deref_286_saved_cur
 #define cat_l_288_α_saved_cursor z->cat_l_288_α_saved_cursor
@@ -7670,6 +7985,7 @@ alt_r_267_β: {
         return STRVAL("");
     _Expr14_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef cat_l_285_α_saved_cursor
 #undef deref_286_saved_cur
 #undef cat_l_288_α_saved_cursor
@@ -7727,7 +8043,9 @@ alt_r_267_β: {
 }
 
 typedef struct pat_Expr15_t {
+    int _parent_frame;
     int64_t deref_335_saved_cur;
+    int _saved_frame_340;
     int64_t deref_341_saved_cur;
     int64_t deref_342_saved_cursor;
     pat_Expr17_t *deref_335_z;
@@ -7736,10 +8054,17 @@ typedef struct pat_Expr15_t {
 
 static DESCR_t pat_Expr15(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Expr15_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Expr15_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Expr15_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Expr15_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define deref_335_saved_cur z->deref_335_saved_cur
+#define _saved_frame_340 z->_saved_frame_340
 #define deref_341_saved_cur z->deref_341_saved_cur
 #define deref_342_saved_cursor z->deref_342_saved_cursor
 #define deref_335_z z->deref_335_z
@@ -7770,8 +8095,9 @@ cat_l_334_β: {
     cat_l_338_α:                                            goto cat_l_339_α;
     cat_l_338_β:                                            goto cat_r_339_β;
     cat_l_339_α:                                            goto cat_l_340_α;
-    cat_l_339_β:  NPUSH_fn();                               goto cat_r_340_β;
-    cat_l_340_α:  NPUSH_fn();                               goto cat_r_340_α;
+    cat_l_339_β:                                            goto cat_r_340_β;
+    cat_l_340_α:  NPUSH_fn(); _saved_frame_340 = NTOP_INDEX_fn();
+                                                            goto cat_r_340_α;
     cat_l_340_β:                                            goto alt_r_337_α;
 cat_r_340_α: {
     deref_341_saved_cur = _cur_np;
@@ -7810,7 +8136,9 @@ alt_r_337_β:
         return STRVAL("");
     _Expr15_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef deref_335_saved_cur
+#undef _saved_frame_340
 #undef deref_341_saved_cur
 #undef deref_342_saved_cursor
 #undef deref_335_z
@@ -7819,6 +8147,7 @@ alt_r_337_β:
 }
 
 typedef struct pat_Expr16_t {
+    int _parent_frame;
     int64_t dlit_347_start;
     int64_t dlit_347_α_saved_cursor;
     int64_t cat_r_346_α_start;
@@ -7840,9 +8169,15 @@ typedef struct pat_Expr16_t {
 
 static DESCR_t pat_Expr16(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Expr16_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Expr16_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Expr16_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Expr16_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define dlit_347_start z->dlit_347_start
 #define dlit_347_α_saved_cursor z->dlit_347_α_saved_cursor
 #define cat_r_346_α_start z->cat_r_346_α_start
@@ -7868,8 +8203,8 @@ static DESCR_t pat_Expr16(const char *_subj_np, int64_t _slen_np,
     _Expr16_β:                                              goto cat_r_343_β;
     cat_l_343_α:                                            goto cat_l_344_α;
     cat_l_343_β:                                            goto cat_r_344_β;
-    cat_l_344_α:  NPUSH_fn(); NINC_fn();                    goto cat_r_344_α;
-    cat_l_344_β:  NDEC_fn(); NPOP_fn();                     goto _Expr16_ω;  /* Expr16: isolated frame */
+    cat_l_344_α:  NINC_fn();                                goto cat_r_344_α;
+    cat_l_344_β:  NDEC_fn();                                goto _Expr16_ω;
     cat_r_344_α:                                            goto alt_l_345_α;
     cat_r_344_β:                                            goto alt_r_345_β;
     alt_l_345_α:                                            goto cat_l_346_α;
@@ -7885,9 +8220,10 @@ static DESCR_t pat_Expr16(const char *_subj_np, int64_t _slen_np,
     dlit_347_β:   _cur_np = dlit_347_α_saved_cursor;        goto alt_r_345_α;
     dlit_347_do_assign:
                   { int64_t _len = _cur_np - dlit_347_start;
-                    char *_os = malloc(_len + 1);
+                    char *_os = (char*)GC_malloc(_len + 1);
                     memcpy(_os, _subj_np + dlit_347_start, _len); _os[_len] = 0;
-                    (void)_os; free(_os); /* output_str suppressed: $-capture output via Gen only */ }           goto cat_r_346_α;
+                    (void)_os; /* output_str suppressed in named pat */
+                    free(_os); }                            goto cat_r_346_α;
     cat_l_346_β:                                            goto dlit_347_β;
     cat_r_346_α:
                   dlit_348_stk_depth = STACK_DEPTH_fn();
@@ -7933,9 +8269,10 @@ assign_c_348_β: {
     dlit_352_β:   _cur_np = dlit_352_α_saved_cursor;        goto cat_l_344_β;
     dlit_352_do_assign:
                   { int64_t _len = _cur_np - dlit_352_start;
-                    char *_os = malloc(_len + 1);
+                    char *_os = (char*)GC_malloc(_len + 1);
                     memcpy(_os, _subj_np + dlit_352_start, _len); _os[_len] = 0;
-                    (void)_os; free(_os); /* output_str suppressed: $-capture output via Gen only */ }           goto cat_r_351_α;
+                    (void)_os; /* output_str suppressed in named pat */
+                    free(_os); }                            goto cat_r_351_α;
     cat_l_351_β:                                            goto dlit_352_β;
     cat_r_351_α:
                   dlit_353_stk_depth = STACK_DEPTH_fn();
@@ -7997,11 +8334,11 @@ alt_r_357_β:
     fence_after_356:                                        goto _Expr16_γ;
     cat_r_343_β:                                            goto cat_l_343_β;
     _Expr16_γ:;
-        NPOP_fn();  /* pop isolated Expr16 frame */
         *_cur_ptr_np = _cur_np;
         return STRVAL("");
     _Expr16_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef dlit_347_start
 #undef dlit_347_α_saved_cursor
 #undef cat_r_346_α_start
@@ -8023,6 +8360,7 @@ alt_r_357_β:
 }
 
 typedef struct pat_Expr17_t {
+    int _parent_frame;
     int64_t cat_l_371_α_start;
     int64_t imm_se_lit_373_α_saved_cursor;
     int64_t deref_374_saved_cur;
@@ -8079,9 +8417,15 @@ typedef struct pat_Expr17_t {
 
 static DESCR_t pat_Expr17(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Expr17_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Expr17_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Expr17_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Expr17_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define cat_l_371_α_start z->cat_l_371_α_start
 #define imm_se_lit_373_α_saved_cursor z->imm_se_lit_373_α_saved_cursor
 #define deref_374_saved_cur z->deref_374_saved_cur
@@ -8173,9 +8517,10 @@ NPUSH_fn();
     imm_se_lit_373_β: _cur_np = imm_se_lit_373_α_saved_cursor;  goto alt_r_368_α;
     cat_l_371_α_do_assign:
                   { int64_t _len = _cur_np - cat_l_371_α_start;
-                    char *_os = malloc(_len + 1);
+                    char *_os = (char*)GC_malloc(_len + 1);
                     memcpy(_os, _subj_np + cat_l_371_α_start, _len); _os[_len] = 0;
-                    (void)_os; free(_os); /* output_str suppressed: $-capture output via Gen only */ }           goto cat_r_371_α;
+                    (void)_os; /* output_str suppressed in named pat */
+                    free(_os); }                            goto cat_r_371_α;
     cat_l_371_β:                                            goto alt_r_368_α;
 cat_r_371_α: {
     deref_374_saved_cur = _cur_np;
@@ -8210,9 +8555,10 @@ cat_r_371_β: {
     dlit_380_β:   _cur_np = dlit_380_α_saved_cursor;        goto alt_r_377_α;
     dlit_380_do_assign:
                   { int64_t _len = _cur_np - dlit_380_start;
-                    char *_os = malloc(_len + 1);
+                    char *_os = (char*)GC_malloc(_len + 1);
                     memcpy(_os, _subj_np + dlit_380_start, _len); _os[_len] = 0;
-                    (void)_os; free(_os); /* output_str suppressed: $-capture output via Gen only */ }           goto cat_r_379_α;
+                    (void)_os; /* output_str suppressed in named pat */
+                    free(_os); }                            goto cat_r_379_α;
     cat_l_379_β:                                            goto dlit_380_β;
 cat_r_379_α: {
     deref_381_saved_cur = _cur_np;
@@ -8567,6 +8913,7 @@ assign_c_412_β: {
         return STRVAL("");
     _Expr17_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef cat_l_371_α_start
 #undef imm_se_lit_373_α_saved_cursor
 #undef deref_374_saved_cur
@@ -8623,6 +8970,7 @@ assign_c_412_β: {
 }
 
 typedef struct pat_SGoto_t {
+    int _parent_frame;
     int64_t _SGoto_α_cstart;
     char *cond_OUTPUT_414;
     int64_t alt_l_415_α_saved_cursor;
@@ -8631,9 +8979,15 @@ typedef struct pat_SGoto_t {
 
 static DESCR_t pat_SGoto(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_SGoto_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_SGoto_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_SGoto_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_SGoto_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define _SGoto_α_cstart z->_SGoto_α_cstart
 #define cond_OUTPUT_414 z->cond_OUTPUT_414
 #define alt_l_415_α_saved_cursor z->alt_l_415_α_saved_cursor
@@ -8667,12 +9021,11 @@ static DESCR_t pat_SGoto(const char *_subj_np, int64_t _slen_np,
     _SGoto_β:                                               goto cond_c_414_β;
     _SGoto_γ:;
         *_cur_ptr_np = _cur_np;
-/* cond_OUTPUT_414 suppressed: $-capture in pat_SGoto fires during parse; Gen handles pp output */
-        /* assign(.SorF, *'S') — Bug6b: set SorF for Reduce type */
-        NV_SET_fn("SorF", STRVAL("S"));
+if (cond_OUTPUT_414) NV_SET_fn("OUTPUT", STRVAL(cond_OUTPUT_414));
         return STRVAL("");
     _SGoto_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef _SGoto_α_cstart
 #undef cond_OUTPUT_414
 #undef alt_l_415_α_saved_cursor
@@ -8681,6 +9034,7 @@ static DESCR_t pat_SGoto(const char *_subj_np, int64_t _slen_np,
 }
 
 typedef struct pat_FGoto_t {
+    int _parent_frame;
     int64_t _FGoto_α_cstart;
     char *cond_OUTPUT_416;
     int64_t alt_l_417_α_saved_cursor;
@@ -8689,9 +9043,15 @@ typedef struct pat_FGoto_t {
 
 static DESCR_t pat_FGoto(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_FGoto_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_FGoto_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_FGoto_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_FGoto_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define _FGoto_α_cstart z->_FGoto_α_cstart
 #define cond_OUTPUT_416 z->cond_OUTPUT_416
 #define alt_l_417_α_saved_cursor z->alt_l_417_α_saved_cursor
@@ -8725,12 +9085,11 @@ static DESCR_t pat_FGoto(const char *_subj_np, int64_t _slen_np,
     _FGoto_β:                                               goto cond_c_416_β;
     _FGoto_γ:;
         *_cur_ptr_np = _cur_np;
-/* cond_OUTPUT_416 suppressed: $-capture in pat_FGoto fires during parse; Gen handles pp output */
-        /* assign(.SorF, *'F') — Bug6b: set SorF for Reduce type */
-        NV_SET_fn("SorF", STRVAL("F"));
+if (cond_OUTPUT_416) NV_SET_fn("OUTPUT", STRVAL(cond_OUTPUT_416));
         return STRVAL("");
     _FGoto_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef _FGoto_α_cstart
 #undef cond_OUTPUT_416
 #undef alt_l_417_α_saved_cursor
@@ -8739,6 +9098,7 @@ static DESCR_t pat_FGoto(const char *_subj_np, int64_t _slen_np,
 }
 
 typedef struct pat_SorF_t {
+    int _parent_frame;
     int64_t deref_419_saved_cur;
     int64_t deref_420_saved_cur;
     pat_SGoto_t *deref_419_z;
@@ -8747,9 +9107,15 @@ typedef struct pat_SorF_t {
 
 static DESCR_t pat_SorF(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_SorF_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_SorF_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_SorF_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_SorF_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define deref_419_saved_cur z->deref_419_saved_cur
 #define deref_420_saved_cur z->deref_420_saved_cur
 #define deref_419_z z->deref_419_z
@@ -8789,6 +9155,7 @@ alt_r_418_β: {
         return STRVAL("");
     _SorF_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef deref_419_saved_cur
 #undef deref_420_saved_cur
 #undef deref_419_z
@@ -8797,6 +9164,7 @@ alt_r_418_β: {
 }
 
 typedef struct pat_Target_t {
+    int _parent_frame;
     int64_t cat_l_422_α_cstart;
     char *cond_OUTPUT_423;
     int64_t dlit_424_start;
@@ -8819,9 +9187,15 @@ typedef struct pat_Target_t {
 
 static DESCR_t pat_Target(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Target_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Target_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Target_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Target_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define cat_l_422_α_cstart z->cat_l_422_α_cstart
 #define cond_OUTPUT_423 z->cond_OUTPUT_423
 #define dlit_424_start z->dlit_424_start
@@ -8862,13 +9236,10 @@ static DESCR_t pat_Target(const char *_subj_np, int64_t _slen_np,
     dlit_424_β:   _cur_np = dlit_424_α_saved_cursor;        goto alt_r_421_α;
     dlit_424_do_assign:
                   { int64_t _len = _cur_np - dlit_424_start;
-                    char *_os = malloc(_len + 1);
+                    char *_os = (char*)GC_malloc(_len + 1);
                     memcpy(_os, _subj_np + dlit_424_start, _len); _os[_len] = 0;
-                    /* output_str suppressed: $'(' output belongs to pp(), not parser */
-                    free(_os); }
-                  /* assign(.Brackets, *'()') — Bug6b: set Brackets for Reduce type */
-                  NV_SET_fn("Brackets", STRVAL("()"));
-                                                            goto cat_l_422_α_do_cap;
+                    (void)_os; /* output_str suppressed in named pat */
+                    free(_os); }                            goto cat_l_422_α_do_cap;
     cond_c_423_β:                                           goto dlit_424_β;
     cat_l_422_α_do_cap:
                   { int64_t _len = _cur_np - cat_l_422_α_cstart;
@@ -8923,13 +9294,10 @@ assign_c_425_β: {
     dlit_430_β:   _cur_np = dlit_430_α_saved_cursor;        goto _Target_ω;
     dlit_430_do_assign:
                   { int64_t _len = _cur_np - dlit_430_start;
-                    char *_os = malloc(_len + 1);
+                    char *_os = (char*)GC_malloc(_len + 1);
                     memcpy(_os, _subj_np + dlit_430_start, _len); _os[_len] = 0;
-                    /* output_str suppressed: $'<' output belongs to pp(), not parser */
-                    free(_os); }
-                  /* assign(.Brackets, *'<>') — Bug6b: set Brackets for Reduce type */
-                  NV_SET_fn("Brackets", STRVAL("<>"));
-                                                            goto cat_l_428_α_do_cap;
+                    (void)_os; /* output_str suppressed in named pat */
+                    free(_os); }                            goto cat_l_428_α_do_cap;
     cond_c_429_β:                                           goto dlit_430_β;
     cat_l_428_α_do_cap:
                   { int64_t _len = _cur_np - cat_l_428_α_cstart;
@@ -8970,11 +9338,12 @@ assign_c_431_β: {
                   }                                         goto _Target_γ;
     _Target_γ:;
         *_cur_ptr_np = _cur_np;
-/* cond_OUTPUT_423/429 suppressed: $-capture OUTPUT in pat_Target fires during parse;
-   pp() Gen handles all output for goto brackets */
+if (cond_OUTPUT_423) NV_SET_fn("OUTPUT", STRVAL(cond_OUTPUT_423));
+if (cond_OUTPUT_429) NV_SET_fn("OUTPUT", STRVAL(cond_OUTPUT_429));
         return STRVAL("");
     _Target_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef cat_l_422_α_cstart
 #undef cond_OUTPUT_423
 #undef dlit_424_start
@@ -8997,6 +9366,7 @@ assign_c_431_β: {
 }
 
 typedef struct pat_Goto_t {
+    int _parent_frame;
     int64_t deref_437_saved_cur;
     int64_t cat_r_436_α_saved_cursor;
     int64_t deref_438_saved_cur;
@@ -9022,9 +9392,15 @@ typedef struct pat_Goto_t {
 
 static DESCR_t pat_Goto(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Goto_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Goto_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Goto_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Goto_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define deref_437_saved_cur z->deref_437_saved_cur
 #define cat_r_436_α_saved_cursor z->cat_r_436_α_saved_cursor
 #define deref_438_saved_cur z->deref_438_saved_cur
@@ -9105,9 +9481,10 @@ cat_l_442_β: {
     if (IS_FAIL_fn(_r_443_b)) { _cur_np = deref_443_saved_cur; goto alt_r_440_α; }
     goto cat_r_442_α;
 }
-cat_r_442_α: /* E_OPSYN & -- Bug6b fix: build ':' Brackets dynamically */
-    { DESCR_t _reduce_args[2] = {CONCAT_fn(STRVAL_fn(":"), NV_GET_fn("Brackets")), INTVAL(1)};
-      APPLY_fn("Reduce", _reduce_args, 2); }
+cat_r_442_α: /* E_OPSYN & */
+    { DESCR_t _type_b = CONCAT_fn(STRVAL_fn(":"), NV_GET_fn("Brackets"));
+    { DESCR_t _reduce_args[2] = {_type_b, INTVAL(1)};
+      APPLY_fn("Reduce", _reduce_args, 2); } }
     goto cat_r_441_α;
 cat_r_442_β: goto cat_l_442_β;
     cat_r_441_α:  cat_r_441_α_start = _cur_np;              goto assign_c_444_α;
@@ -9162,10 +9539,9 @@ cat_r_448_β: {
     goto cat_r_447_α;
 }
 cat_r_447_α: /* E_OPSYN & */
-    { /* Bug6b fix: build ':' SorF Brackets dynamically */
-      DESCR_t _sorf_b = CONCAT_fn(STRVAL_fn(":"), CONCAT_fn(NV_GET_fn("SorF"), NV_GET_fn("Brackets")));
-      DESCR_t _reduce_args[2] = {_sorf_b, INTVAL(1)};
-      APPLY_fn("Reduce", _reduce_args, 2); }
+    { DESCR_t _type_b = CONCAT_fn(STRVAL_fn(":"), CONCAT_fn(NV_GET_fn("SorF"), NV_GET_fn("Brackets")));
+    { DESCR_t _reduce_args[2] = {_type_b, INTVAL(1)};
+      APPLY_fn("Reduce", _reduce_args, 2); } }
     goto cat_r_446_α;
 cat_r_447_β: goto cat_l_447_β;
     cat_r_446_α:                                            goto fence_p_451_α;
@@ -9214,10 +9590,9 @@ cat_r_454_β: {
     goto cat_r_453_α;
 }
 cat_r_453_α: /* E_OPSYN & */
-    { /* Bug6b fix: build ':' SorF Brackets dynamically */
-      DESCR_t _sorf_b = CONCAT_fn(STRVAL_fn(":"), CONCAT_fn(NV_GET_fn("SorF"), NV_GET_fn("Brackets")));
-      DESCR_t _reduce_args[2] = {_sorf_b, INTVAL(1)};
-      APPLY_fn("Reduce", _reduce_args, 2); }
+    { DESCR_t _type_b = CONCAT_fn(STRVAL_fn(":"), CONCAT_fn(NV_GET_fn("SorF"), NV_GET_fn("Brackets")));
+    { DESCR_t _reduce_args[2] = {_type_b, INTVAL(1)};
+      APPLY_fn("Reduce", _reduce_args, 2); } }
     goto fence_after_451;
 cat_r_453_β: goto cat_l_453_β;
     alt_r_452_α:  alt_r_452_α_start = _cur_np;              goto assign_c_459_α;
@@ -9250,6 +9625,7 @@ assign_c_459_β:
         return STRVAL("");
     _Goto_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef deref_437_saved_cur
 #undef cat_r_436_α_saved_cursor
 #undef deref_438_saved_cur
@@ -9275,15 +9651,22 @@ assign_c_459_β:
 }
 
 typedef struct pat_Control_t {
+    int _parent_frame;
     int64_t cat_l_461_α_saved_cursor;
     int64_t cat_r_461_α_saved_cursor;
 } pat_Control_t;
 
 static DESCR_t pat_Control(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Control_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Control_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Control_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Control_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define cat_l_461_α_saved_cursor z->cat_l_461_α_saved_cursor
 #define cat_r_461_α_saved_cursor z->cat_r_461_α_saved_cursor
 
@@ -9309,21 +9692,29 @@ static DESCR_t pat_Control(const char *_subj_np, int64_t _slen_np,
         return STRVAL("");
     _Control_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef cat_l_461_α_saved_cursor
 #undef cat_r_461_α_saved_cursor
 
 }
 
 typedef struct pat_Comment_t {
+    int _parent_frame;
     int64_t cat_l_462_α_saved_cursor;
     int64_t cat_r_462_α_saved_cursor;
 } pat_Comment_t;
 
 static DESCR_t pat_Comment(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Comment_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Comment_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Comment_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Comment_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define cat_l_462_α_saved_cursor z->cat_l_462_α_saved_cursor
 #define cat_r_462_α_saved_cursor z->cat_r_462_α_saved_cursor
 
@@ -9349,21 +9740,29 @@ static DESCR_t pat_Comment(const char *_subj_np, int64_t _slen_np,
         return STRVAL("");
     _Comment_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef cat_l_462_α_saved_cursor
 #undef cat_r_462_α_saved_cursor
 
 }
 
 typedef struct pat_Label_t {
+    int _parent_frame;
     int64_t _Label_α_start;
     int64_t assign_c_463_α_saved_cursor;
 } pat_Label_t;
 
 static DESCR_t pat_Label(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Label_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Label_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Label_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Label_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define _Label_α_start z->_Label_α_start
 #define assign_c_463_α_saved_cursor z->assign_c_463_α_saved_cursor
 
@@ -9391,12 +9790,14 @@ static DESCR_t pat_Label(const char *_subj_np, int64_t _slen_np,
         return STRVAL("");
     _Label_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef _Label_α_start
 #undef assign_c_463_α_saved_cursor
 
 }
 
 typedef struct pat_Stmt_t {
+    int _parent_frame;
     int64_t deref_467_saved_cur;
     int64_t deref_471_saved_cur;
     int64_t deref_472_saved_cur;
@@ -9465,9 +9866,15 @@ typedef struct pat_Stmt_t {
 
 static DESCR_t pat_Stmt(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Stmt_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Stmt_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Stmt_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Stmt_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define deref_467_saved_cur z->deref_467_saved_cur
 #define deref_471_saved_cur z->deref_471_saved_cur
 #define deref_472_saved_cur z->deref_472_saved_cur
@@ -9728,9 +10135,10 @@ assign_c_489_β:
     dlit_494_β:   _cur_np = dlit_494_α_saved_cursor;        goto alt_r_493_α;
     dlit_494_do_assign:
                   { int64_t _len = _cur_np - dlit_494_start;
-                    char *_os = malloc(_len + 1);
+                    char *_os = (char*)GC_malloc(_len + 1);
                     memcpy(_os, _subj_np + dlit_494_start, _len); _os[_len] = 0;
-                    (void)_os; free(_os); /* output_str suppressed: $-capture output via Gen only */ }           goto cat_r_492_α;
+                    (void)_os; /* output_str suppressed in named pat */
+                    free(_os); }                            goto cat_r_492_α;
     alt_l_493_β:                                            goto dlit_494_β;
 alt_r_493_α: {
     deref_495_saved_cur = _cur_np;
@@ -10141,6 +10549,7 @@ cat_r_464_β: {
         return STRVAL("");
     _Stmt_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef deref_467_saved_cur
 #undef deref_471_saved_cur
 #undef deref_472_saved_cur
@@ -10209,6 +10618,7 @@ cat_r_464_β: {
 }
 
 typedef struct pat_Commands_t {
+    int _parent_frame;
     int64_t deref_545_saved_cur;
     int64_t deref_548_saved_cur;
     int64_t deref_549_saved_cursor;
@@ -10218,9 +10628,15 @@ typedef struct pat_Commands_t {
 
 static DESCR_t pat_Commands(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Commands_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Commands_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Commands_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Commands_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define deref_545_saved_cur z->deref_545_saved_cur
 #define deref_548_saved_cur z->deref_548_saved_cur
 #define deref_549_saved_cursor z->deref_549_saved_cursor
@@ -10277,6 +10693,7 @@ alt_r_547_β:
         return STRVAL("");
     _Commands_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef deref_545_saved_cur
 #undef deref_548_saved_cur
 #undef deref_549_saved_cursor
@@ -10286,7 +10703,7 @@ alt_r_547_β:
 }
 
 typedef struct pat_Command_t {
-    int _parent_frame;  /* Parse/Compiland nstack frame for NINC_AT */
+    int _parent_frame;
     int64_t cat_l_555_α_start;
     int64_t deref_557_saved_cur;
     int64_t deref_558_saved_cursor;
@@ -10304,10 +10721,15 @@ typedef struct pat_Command_t {
 
 static DESCR_t pat_Command(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Command_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Command_t)); (*_zz_np)->_parent_frame = _command_pending_parent_frame; }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Command_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Command_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
-#define _cmd_parent_frame z->_parent_frame
+#define _parent_frame z->_parent_frame
 #define cat_l_555_α_start z->cat_l_555_α_start
 #define deref_557_saved_cur z->deref_557_saved_cur
 #define deref_558_saved_cursor z->deref_558_saved_cursor
@@ -10327,8 +10749,8 @@ static DESCR_t pat_Command(const char *_subj_np, int64_t _slen_np,
     goto _Command_ω;
     _Command_α:                                             goto cat_l_550_α;
     _Command_β:                                             goto cat_r_550_β;
-    cat_l_550_α:  NINC_AT_fn(_cmd_parent_frame);            goto cat_r_550_α;
-    cat_l_550_β:  /* NDEC removed: parent frame owns counter */ goto _Command_ω;
+    cat_l_550_α:  NINC_fn();                                goto cat_r_550_α;
+    cat_l_550_β:  NDEC_fn();                                goto _Command_ω;
     cat_r_550_α:                                            goto fence_p_551_α;
     fence_p_551_α:                                          goto alt_l_552_α;
     fence_p_551_β:                                          goto alt_r_552_β;
@@ -10473,7 +10895,7 @@ alt_l_568_β:
         return STRVAL("");
     _Command_ω:;
         return FAILDESCR;
-#undef _cmd_parent_frame
+#undef _parent_frame
 #undef cat_l_555_α_start
 #undef deref_557_saved_cur
 #undef deref_558_saved_cursor
@@ -10491,7 +10913,8 @@ alt_l_568_β:
 }
 
 typedef struct pat_Parse_t {
-    int _saved_frame;  /* nstack frame index saved at NPUSH time */
+    int _parent_frame;
+    int _saved_frame_572;
     int cat_r_572_α_depth;
     int64_t cat_r_572_α_cursors[64];
     DESCR_t cat_r_572_α_saved_stk;
@@ -10501,10 +10924,16 @@ typedef struct pat_Parse_t {
 
 static DESCR_t pat_Parse(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Parse_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Parse_t)); (*_zz_np)->_saved_frame = -1; }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Parse_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Parse_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
-#define _parse_frame z->_saved_frame
+#define _parent_frame z->_parent_frame
+#define _saved_frame_572 z->_saved_frame_572
 #define cat_r_572_α_depth z->cat_r_572_α_depth
 #define cat_r_572_α_cursors z->cat_r_572_α_cursors
 #define cat_r_572_α_saved_stk z->cat_r_572_α_saved_stk
@@ -10519,8 +10948,9 @@ static DESCR_t pat_Parse(const char *_subj_np, int64_t _slen_np,
     cat_l_570_α:                                            goto cat_l_571_α;
     cat_l_570_β:                                            goto cat_r_571_β;
     cat_l_571_α:                                            goto cat_l_572_α;
-    cat_l_571_β:  NPUSH_fn(); _parse_frame = NTOP_INDEX_fn(); _command_pending_parent_frame = _parse_frame; goto cat_r_572_β;
-    cat_l_572_α:  NPUSH_fn(); _parse_frame = NTOP_INDEX_fn(); _command_pending_parent_frame = _parse_frame; goto cat_r_572_α;
+    cat_l_571_β:                                            goto cat_r_572_β;
+    cat_l_572_α:  NPUSH_fn(); _saved_frame_572 = NTOP_INDEX_fn();
+                                                            goto cat_r_572_α;
     cat_l_572_β:                                            goto _Parse_ω;
     cat_r_572_α:  cat_r_572_α_saved_stk = NV_GET_fn("@S"); cat_r_572_α_depth = -1;
                                                             goto cat_r_571_α;
@@ -10548,7 +10978,7 @@ arbno_c_573_β: {
     goto cat_r_572_α_child_ok;
 }
 cat_r_571_α: /* E_OPSYN & */
-    { DESCR_t _reduce_args[2] = {STRVAL("Parse"), INTVAL((_parse_frame>=0)?NSTACK_AT_fn(_parse_frame):0)};
+    { DESCR_t _reduce_args[2] = {STRVAL("Parse"), INTVAL(ntop())};
       APPLY_fn("Reduce", _reduce_args, 2); }
     goto cat_r_570_α;
 cat_r_571_β: goto cat_l_571_β;
@@ -10559,7 +10989,8 @@ cat_r_571_β: goto cat_l_571_β;
         return STRVAL("");
     _Parse_ω:;
         return FAILDESCR;
-#undef _parse_frame
+#undef _parent_frame
+#undef _saved_frame_572
 #undef cat_r_572_α_depth
 #undef cat_r_572_α_cursors
 #undef cat_r_572_α_saved_stk
@@ -10569,7 +11000,8 @@ cat_r_571_β: goto cat_l_571_β;
 }
 
 typedef struct pat_Compiland_t {
-    int _saved_frame;  /* nstack frame index saved at NPUSH time */
+    int _parent_frame;
+    int _saved_frame_578;
     int cat_r_578_α_depth;
     int64_t cat_r_578_α_cursors[64];
     DESCR_t cat_r_578_α_saved_stk;
@@ -10589,10 +11021,16 @@ typedef struct pat_Compiland_t {
 
 static DESCR_t pat_Compiland(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Compiland_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Compiland_t)); (*_zz_np)->_saved_frame = -1; }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Compiland_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Compiland_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
-#define _compiland_frame z->_saved_frame
+#define _parent_frame z->_parent_frame
+#define _saved_frame_578 z->_saved_frame_578
 #define cat_r_578_α_depth z->cat_r_578_α_depth
 #define cat_r_578_α_cursors z->cat_r_578_α_cursors
 #define cat_r_578_α_saved_stk z->cat_r_578_α_saved_stk
@@ -10619,8 +11057,9 @@ static DESCR_t pat_Compiland(const char *_subj_np, int64_t _slen_np,
     cat_l_576_α:                                            goto cat_l_577_α;
     cat_l_576_β:                                            goto cat_r_577_β;
     cat_l_577_α:                                            goto cat_l_578_α;
-    cat_l_577_β:  NPUSH_fn(); _compiland_frame = NTOP_INDEX_fn(); _command_pending_parent_frame = _compiland_frame; goto cat_r_578_β;
-    cat_l_578_α:  NPUSH_fn(); _compiland_frame = NTOP_INDEX_fn(); _command_pending_parent_frame = _compiland_frame; goto cat_r_578_α;
+    cat_l_577_β:                                            goto cat_r_578_β;
+    cat_l_578_α:  NPUSH_fn(); _saved_frame_578 = NTOP_INDEX_fn();
+                                                            goto cat_r_578_α;
     cat_l_578_β:                                            goto _Compiland_ω;
     cat_r_578_α:  cat_r_578_α_saved_stk = NV_GET_fn("@S"); cat_r_578_α_depth = -1;
                                                             goto cat_r_577_α;
@@ -10648,7 +11087,7 @@ arbno_c_579_β: {
     goto cat_r_578_α_child_ok;
 }
 cat_r_577_α: /* E_OPSYN & */
-    { DESCR_t _reduce_args[2] = {STRVAL("Parse"), INTVAL((_compiland_frame>=0)?NSTACK_AT_fn(_compiland_frame):0)};
+    { DESCR_t _reduce_args[2] = {STRVAL("Parse"), INTVAL(ntop())};
       APPLY_fn("Reduce", _reduce_args, 2); }
     goto cat_r_576_α;
 cat_r_577_β: goto cat_l_577_β;
@@ -10755,7 +11194,8 @@ alt_r_581_β:
         return STRVAL("");
     _Compiland_ω:;
         return FAILDESCR;
-#undef _compiland_frame
+#undef _parent_frame
+#undef _saved_frame_578
 #undef cat_r_578_α_depth
 #undef cat_r_578_α_cursors
 #undef cat_r_578_α_saved_stk
@@ -10775,6 +11215,7 @@ alt_r_581_β:
 }
 
 typedef struct pat_Space_t {
+    int _parent_frame;
     int64_t alt_l_594_α_delta;
     int64_t alt_l_594_α_start;
     int64_t deref_595_saved_cursor;
@@ -10782,9 +11223,15 @@ typedef struct pat_Space_t {
 
 static DESCR_t pat_Space(const char *_subj_np, int64_t _slen_np,
                   int64_t *_cur_ptr_np, pat_Space_t **_zz_np, int _entry_np) {
-    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(pat_Space_t)); }
+    if (_entry_np == 0) {
+        *_zz_np = calloc(1, sizeof(pat_Space_t));
+        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */
+        (*_zz_np)->_parent_frame = _pending_parent_frame;
+        _pending_parent_frame = -1;  /* consume */
+    }
     pat_Space_t *z = *_zz_np;
     int64_t _cur_np = *_cur_ptr_np;
+#define _parent_frame z->_parent_frame
 #define alt_l_594_α_delta z->alt_l_594_α_delta
 #define alt_l_594_α_start z->alt_l_594_α_start
 #define deref_595_saved_cursor z->deref_595_saved_cursor
@@ -10819,6 +11266,7 @@ alt_r_594_β:
         return STRVAL("");
     _Space_ω:;
         return FAILDESCR;
+#undef _parent_frame
 #undef alt_l_594_α_delta
 #undef alt_l_594_α_start
 #undef deref_595_saved_cursor
@@ -11781,7 +12229,7 @@ static void *stmt_65(void) { /* line 134 label:ppArgWarn */
 /* line 134 */
     _L_ppArgWarn:
                   trampoline_stno(134);
-DESCR_t _v740 = CONCAT_fn(EVAL_fn(STRVAL_fn("* Warning: unknown switch --")),get(_ppTokName));
+DESCR_t _v740 = CONCAT_fn(STRVAL_fn("* Warning: unknown switch --"),get(_ppTokName));
 int _ok740 = !IS_FAIL_fn(_v740);
 if(_ok740) {
 NV_SET_fn("OUTPUT", _v740);
@@ -12691,7 +13139,7 @@ DESCR_t _v844 = CONCAT_fn(
                                                             CONCAT_fn(
                                                                 CONCAT_fn(
                                                                     CONCAT_fn(
-                                                                        CONCAT_fn(EVAL_fn(STRVAL_fn("* --auto: n=")),get(_ppNg)),
+                                                                        CONCAT_fn(STRVAL_fn("* --auto: n="),get(_ppNg)),
                                                                         STRVAL_fn(" p90=")
                                                                     ),
                                                                     get(_ppP90)
@@ -13282,7 +13730,7 @@ static void *stmt_149(void) { /* line 277 */
 DESCR_t _v905 = pat_cat(pat_cat(pat_ref("White"),pat_lit("**")),pat_ref("White"));
 int _ok905 = !IS_FAIL_fn(_v905);
 if(_ok905) {
-iset(EVAL_fn(STRVAL_fn("**")),_v905);
+iset(STRVAL_fn("**"),_v905);
 }
     return (void*)_tramp_next_904;
 }
@@ -13478,7 +13926,7 @@ DESCR_t _v935 = pat_cat(
                     pat_cat(
                         pat_cat(pat_user_call("nPush",NULL,0),pat_ref("XList")),
                         pat_val(
-                            APPLY_fn("reduce",(DESCR_t[]){STRVAL_fn("'ExprList'"),EVAL_fn(STRVAL_fn("*(GT(nTop(), 1) nTop())"))},2)
+                            APPLY_fn("reduce",(DESCR_t[]){STRVAL_fn("'ExprList'"),STRVAL_fn("*(GT(nTop(), 1) nTop())")},2)
                         )
                     ),
                     pat_user_call("nPop",NULL,0)
@@ -13605,7 +14053,7 @@ static void *stmt_170(void) { /* line 302 */
 DESCR_t _v947 = pat_cat(
                     pat_cat(
                         pat_cat(pat_user_call("nPush",NULL,0),pat_ref("X3")),
-                        pat_val(APPLY_fn("reduce",(DESCR_t[]){STRVAL_fn("'|'"),EVAL_fn(STRVAL_fn("*(GT(nTop(), 1) nTop())"))},2))
+                        pat_val(APPLY_fn("reduce",(DESCR_t[]){STRVAL_fn("'|'"),STRVAL_fn("*(GT(nTop(), 1) nTop())")},2))
                     ),
                     pat_user_call("nPop",NULL,0)
                 );
@@ -13643,7 +14091,7 @@ DESCR_t _v951 = pat_cat(
                     pat_cat(
                         pat_cat(pat_user_call("nPush",NULL,0),pat_ref("X4")),
                         pat_val(
-                            APPLY_fn("reduce",(DESCR_t[]){STRVAL_fn("'..'"),EVAL_fn(STRVAL_fn("*(GT(nTop(), 1) nTop())"))},2)
+                            APPLY_fn("reduce",(DESCR_t[]){STRVAL_fn("'..'"),STRVAL_fn("*(GT(nTop(), 1) nTop())")},2)
                         )
                     ),
                     pat_user_call("nPop",NULL,0)
@@ -13842,7 +14290,7 @@ DESCR_t _v967 = pat_cat(
                                 pat_cat(
                                     pat_alt(
                                         pat_alt(pat_deref(STRVAL_fn("^")),pat_deref(STRVAL_fn("!"))),
-                                        pat_deref(EVAL_fn(STRVAL_fn("**")))
+                                        pat_deref(STRVAL_fn("**"))
                                     ),
                                     pat_ref("Expr11")
                                 ),
@@ -14269,7 +14717,7 @@ DESCR_t _v989 = pat_cat(
                             pat_cat(
                                 pat_cat(
                                     pat_ref("Target"),
-                                    pat_val(APPLY_fn("reduce",(DESCR_t[]){EVAL_fn(STRVAL_fn("*(':' Brackets)")),INTVAL_fn(1)},2))
+                                    pat_val(APPLY_fn("reduce",(DESCR_t[]){STRVAL_fn("*(':' Brackets)"),INTVAL_fn(1)},2))
                                 ),
                                 pat_val(get(_epsilon))
                             ),
@@ -14277,7 +14725,7 @@ DESCR_t _v989 = pat_cat(
                                 pat_cat(
                                     pat_cat(pat_ref("SorF"),pat_ref("Target")),
                                     pat_val(
-                                        APPLY_fn("reduce",(DESCR_t[]){EVAL_fn(STRVAL_fn("*(':' SorF Brackets)")),INTVAL_fn(1)},2)
+                                        APPLY_fn("reduce",(DESCR_t[]){STRVAL_fn("*(':' SorF Brackets)"),INTVAL_fn(1)},2)
                                     )
                                 ),
                                 pat_fence_p(
@@ -14285,7 +14733,7 @@ DESCR_t _v989 = pat_cat(
                                         pat_cat(
                                             pat_cat(pat_cat(pat_ref("Gray"),pat_ref("SorF")),pat_ref("Target")),
                                             pat_val(
-                                                APPLY_fn("reduce",(DESCR_t[]){EVAL_fn(STRVAL_fn("*(':' SorF Brackets)")),INTVAL_fn(1)},2)
+                                                APPLY_fn("reduce",(DESCR_t[]){STRVAL_fn("*(':' SorF Brackets)"),INTVAL_fn(1)},2)
                                             )
                                         ),
                                         pat_val(get(_epsilon))
