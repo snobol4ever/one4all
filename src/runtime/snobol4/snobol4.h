@@ -219,6 +219,7 @@ void    INDR_SET_fn(const char *name, DESCR_t val);
 void    NPUSH_fn(void);
 int     NHAS_FRAME_fn(void);  /* 1 if counter stack is non-empty */
 void    NINC_fn(void);
+void    NINC_AT_fn(int frame);
 void    NDEC_fn(void);
 int64_t ntop(void);
 void    NPOP_fn(void);
@@ -407,3 +408,5 @@ DESCR_t sort_fn(DESCR_t arr);
 #endif /* SNOBOL4_H */
 void indirect_goto(const char *varname);
 DESCR_t pat_call(const char *name, DESCR_t arg);
+
+extern int _x4_pending_parent_frame;

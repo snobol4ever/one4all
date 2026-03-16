@@ -1275,26 +1275,35 @@ static void var_dump(void) {
 static int64_t _nstack[NSTACK_MAX];
 static int      _ntop = -1;
 
+/* Home-frame stack: NPUSH records which _nstack level nInc should target.
+ * Nested patterns push additional _nstack frames, but nInc should always
+ * increment the frame created by the ENCLOSING nPush, not the current top. */
+#define NHOME_MAX 256
+static int _nhome[NHOME_MAX];
+static int _nhome_top = -1;
+
 void NPUSH_fn(void) {
-    if (_ntop < NSTACK_MAX - 1) _nstack[++_ntop] = 0;
+    if (_ntop < NSTACK_MAX - 1) {
+        ++_ntop;
+        _nstack[_ntop] = 0;
+        /* record this as the home frame for subsequent nInc calls */
+        if (_nhome_top < NHOME_MAX - 1) {
+            _nhome[++_nhome_top] = _ntop;
+        }
+    }
 }
 int NHAS_FRAME_fn(void) { return _ntop >= 0; }
 
-void NINC_fn(void) {
-    if (_ntop >= 0) _nstack[_ntop]++;
+void NINC_fn(void) { if (_ntop >= 0) _nstack[_ntop]++; }
+void NINC_AT_fn(int frame) {
+    if (frame >= 0 && frame <= _ntop) _nstack[frame]++;
 }
 
-void NDEC_fn(void) {
-    if (_ntop >= 0) _nstack[_ntop]--;
-}
+void NDEC_fn(void) { if (_ntop >= 0) _nstack[_ntop]--; }
 
-int64_t ntop(void) {
-    return (_ntop >= 0) ? _nstack[_ntop] : 0;
-}
+int64_t ntop(void) { return (_ntop >= 0) ? _nstack[_ntop] : 0; }
 
-void NPOP_fn(void) {
-    if (_ntop >= 0) _ntop--;
-}
+void NPOP_fn(void) { if (_ntop >= 0) _ntop--; }
 
 /* ============================================================
  * Value stack (Push/Pop/Top for Shift/Reduce)
@@ -1822,3 +1831,10 @@ void indirect_goto(const char *varname) {
     fprintf(stderr, "indirect_goto: var=%s label=%s (not implemented)\n",
             varname, lbl);
 }
+
+int nhome_info(void) { return (_nhome_top >= 0) ? _nhome[_nhome_top] : -1; }
+
+int NTOP_INDEX_fn(void) { return _ntop; }
+int64_t NSTACK_AT_fn(int frame) { return (frame>=0 && frame<NSTACK_MAX) ? _nstack[frame] : 0; }
+
+int _x4_pending_parent_frame = -1;

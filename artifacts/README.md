@@ -176,3 +176,9 @@
   pp() walk produces blank output — assignment tree node not being pretty-printed.
   Next: read inc/assign.sno, trace which Shift/Reduce tree node assignment produces,
   find the pp() case that handles it, diagnose why output is blank.
+
+## Session 113 — 2026-03-16
+- md5: 22c0a70210fea64cba68e916c0f2ca34
+- lines: 15814
+- compile: OK
+- active bug: Bug5 — concat counter (Expr4/X4 NINC_AT_fn fix partially applied in beauty_full.c; sno2c emit_byrd.c not yet updated; pp_.. crash on Reduce("..",2) unresolved)
