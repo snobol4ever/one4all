@@ -8191,7 +8191,18 @@ assign_c_384_β: {
                     NV_SET_fn("_", STRVAL(_os));
                   }                                         goto cat_r_382_α;
     cat_l_382_β:                                            goto assign_c_383_β;
-    cat_r_382_α:  cat_r_382_α_start = _cur_np;              goto assign_c_386_α;
+    cat_r_382_α:  cat_r_382_α_start = _cur_np;
+                  /* Bug2 fix (session109): function-call requires '(' before ExprList.
+                   * Without this guard, pat_ExprList matches epsilon and "OUTPUT" is
+                   * spuriously reduced as Call(Function,ExprList0) instead of a bare subject.
+                   * We must pop the Shift("Function",...) already on the value stack
+                   * before backtracking, otherwise the stack is left dirty. */
+                  if (_cur_np >= _slen_np || _subj_np[_cur_np] != '(') {
+                      pop_val();   /* undo Shift("Function", v) from assign_c_383_α_do_assign */
+                      _cur_np = deref_385_saved_cur;  /* restore cursor to before Function */
+                      goto alt_r_365_α;   /* skip entire function-call arm */
+                  }
+                  goto assign_c_386_α;
 assign_c_386_α: {
     deref_387_saved_cur = _cur_np;
     DESCR_t _r_387 = pat_ExprList(_subj_np, _slen_np, &_cur_np, &deref_387_z, 0);
@@ -8250,7 +8261,14 @@ assign_c_391_β: {
                     NV_SET_fn("_", STRVAL(_os));
                   }                                         goto cat_r_389_α;
     cat_l_389_β:                                            goto assign_c_390_β;
-    cat_r_389_α:  cat_r_389_α_start = _cur_np;              goto assign_c_393_α;
+    cat_r_389_α:  cat_r_389_α_start = _cur_np;
+                  /* Bug2 fix (session109): same guard for Id arm — pop Shift("Id",...) if no '(' */
+                  if (_cur_np >= _slen_np || _subj_np[_cur_np] != '(') {
+                      pop_val();   /* undo Shift("Id", v) from assign_c_390_α_do_assign */
+                      _cur_np = deref_392_saved_cur;  /* restore cursor to before Id */
+                      goto alt_r_364_α;   /* skip entire Id function-call arm */
+                  }
+                  goto assign_c_393_α;
 assign_c_393_α: {
     deref_394_saved_cur = _cur_np;
     DESCR_t _r_394 = pat_ExprList(_subj_np, _slen_np, &_cur_np, &deref_394_z, 0);
