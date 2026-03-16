@@ -1526,6 +1526,16 @@ static void emit_simple_val(EXPR_t *e) {
         /* Strip outer single-quote pair: sval "'tag'" -> emit STRVAL("tag"). */
         const char *sv = e->sval ? e->sval : "";
         size_t sl = strlen(sv);
+        /* Bug6b: sval starting with '*' is a SNOBOL4 pattern expression
+         * (e.g. "*(':' Brackets)") — must be EVAL'd at runtime to produce
+         * the actual pattern object. ShiftReduce.sno Reduce() only calls
+         * EVAL(t) when DATATYPE(t)=='EXPRESSION'; passing STRVAL gives
+         * type STRING and skips EVAL, leaving the raw string as the type.
+         * Wrapping with EVAL_fn() here pre-evaluates it to the pattern. */
+        if (sl > 0 && sv[0] == '*') {
+            B("EVAL_fn(STRVAL(\"%s\"))", sv);
+            return;
+        }
         if (sl >= 2 && sv[0] == '\'' && sv[sl-1] == '\'')
             B("STRVAL(\"%.*s\")", (int)(sl-2), sv+1);
         else
