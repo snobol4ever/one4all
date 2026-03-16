@@ -1838,3 +1838,4 @@ int NTOP_INDEX_fn(void) { return _ntop; }
 int64_t NSTACK_AT_fn(int frame) { return (frame>=0 && frame<NSTACK_MAX) ? _nstack[frame] : 0; }
 
 int _x4_pending_parent_frame = -1;
+int _command_pending_parent_frame = -1;

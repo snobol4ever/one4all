@@ -410,3 +410,4 @@ void indirect_goto(const char *varname);
 DESCR_t pat_call(const char *name, DESCR_t arg);
 
 extern int _x4_pending_parent_frame;
+extern int _command_pending_parent_frame;
