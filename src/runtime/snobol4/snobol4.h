@@ -218,6 +218,8 @@ void    INDR_SET_fn(const char *name, DESCR_t val);
 
 void    NPUSH_fn(void);
 int     NHAS_FRAME_fn(void);  /* 1 if counter stack is non-empty */
+int     NTOP_INDEX_fn(void);  /* return current _ntop index (-1 if empty) */
+int64_t NSTACK_AT_fn(int frame); /* read _nstack[frame] safely */
 void    NINC_fn(void);
 void    NINC_AT_fn(int frame);
 void    NDEC_fn(void);

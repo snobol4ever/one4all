@@ -230,6 +230,11 @@ void byrd_emit_named_typedecls(FILE *out_file) {
             named_pat_registry[i].typename,
             named_pat_registry[i].typename);
     }
+    /* Bug5: one file-scope static for cross-pattern nInc frame threading.
+     * pat_Expr4 (or any pattern with saved_frame) sets this before calling
+     * a child named pattern that contains nInc().  The child reads it at
+     * entry and stores it in its own _parent_frame field. */
+    fprintf(out_file, "static int _pending_parent_frame = -1;\n");
     if (named_pat_count > 0) fprintf(out_file, "\n");
 }
 
@@ -284,6 +289,30 @@ static int  fn_seen_count;
 
 /* Struct mode — set by byrd_emit_named_pattern */
 static int  in_named_pat = 0;
+/* Name of the pattern currently being emitted (valid when in_named_pat==1).
+ * Used to gate output_str suppression: parse patterns suppress it; pp/Gen/ss/qq don't. */
+static const char *current_named_pat_name = NULL;
+
+/* Returns 1 if current named pattern is a parse-phase pattern (not a pp/output pattern).
+ * Parse patterns build the Shift/Reduce tree — their $OUTPUT captures fire during parse
+ * and must not emit immediately; Gen/pp handles actual output.
+ * pp*, Gen, ss, qq, output* are pretty-print/output patterns that must NOT suppress. */
+static int suppress_output_in_named_pat(void) {
+    if (!in_named_pat || !current_named_pat_name) return 0;
+    const char *n = current_named_pat_name;
+    /* Never suppress in: pp*, Gen, ss, qq, output* */
+    if (strncasecmp(n, "pp",     2) == 0) return 0;
+    if (strncasecmp(n, "Gen",    3) == 0) return 0;
+    if (strcasecmp (n, "ss")       == 0) return 0;
+    if (strcasecmp (n, "qq")       == 0) return 0;
+    if (strncasecmp(n, "output", 6) == 0) return 0;
+    return 1;  /* parse pattern — suppress */
+}
+
+/* Bug5: when emit_seq sees left=nPush() and in_named_pat, it stores the uid
+ * here so the immediately following E_OPSYN & can reference z->_saved_frame_UID
+ * instead of ntop().  Reset to -1 after E_OPSYN consumes it. */
+static int  pending_npush_uid = -1;
 
 void byrd_fn_scope_reset(void) { fn_seen_count = 0; }
 
@@ -996,11 +1025,25 @@ static void emit_seq(EXPR_t *left, EXPR_t *right,
      * without ever having passed through left_α (where NPUSH_fn fires on
      * the forward path).  Emit NPUSH_fn() here so ntop() is valid when
      * the right child's Reduce/E_OPSYN fires on the backtrack path.
-     * Without this, ntop()==0 at Reduce time → Reduce pops 0 and inflates
-     * the parse-tree stack instead of collapsing it. */
+     *
+     * Bug5 fix: also save the frame index so E_OPSYN Reduce can read
+     * NSTACK_AT_fn(_saved_frame) instead of ntop() — which would be
+     * wrong when nested NPUSHes have displaced _ntop above this frame.
+     * In struct mode (in_named_pat), add a _saved_frame_%d field to the
+     * struct so the saved index survives across entry/re-entry. */
     if (left && left->kind == E_FNC && left->sval &&
         strcasecmp(left->sval, "nPush") == 0) {
-        PL(beta, right_β, "NPUSH_fn();");  /* β: re-push before retrying right */
+        if (suppress_output_in_named_pat()) {
+            char sf_field[64];
+            snprintf(sf_field, sizeof sf_field, "int _saved_frame_%d", uid);
+            decl_add("%s", sf_field);
+            pending_npush_uid = uid;  /* tell E_FNC nPush emitter to save frame */
+            /* Fall through to normal PLG/byrd_emit — E_FNC nPush will pick up
+             * pending_npush_uid and emit the NTOP_INDEX_fn() save inline. */
+            PLG(beta, right_β);
+        } else {
+            PL(beta, right_β, "NPUSH_fn();");  /* β: re-push before retrying right */
+        }
     } else {
         PLG(beta, right_β);
     }
@@ -1014,6 +1057,14 @@ static void emit_seq(EXPR_t *left, EXPR_t *right,
               right_α, right_β,
               gamma, left_β,
               subj, subj_len, cursor, depth + 1);
+
+    /* Bug5: if THIS emit_seq set pending_npush_uid (left was nPush()) and
+     * E_OPSYN never consumed it (right didn't contain E_OPSYN), reset it now.
+     * We only reset if we were the setter — tracked by whether uid matches. */
+    if (in_named_pat && left && left->kind == E_FNC && left->sval &&
+        strcasecmp(left->sval, "nPush") == 0) {
+        pending_npush_uid = -1;  /* nPush seq done — clear any unconsumed uid */
+    }
 }
 
 /* -----------------------------------------------------------------------
@@ -1247,9 +1298,14 @@ static void emit_imm(EXPR_t *child, const char *varname,
         /* do_assign: capture matched span → OUTPUT, then γ */
         PLG(do_assign, NULL);
         PS(NULL,  "{ int64_t _len = %s - %s;", cursor, start_var);
-        PS(NULL,  "  char *_os = malloc(_len + 1);");
+        PS(NULL,  "  char *_os = (char*)GC_malloc(_len + 1);");
         PS(NULL,  "  memcpy(_os, %s + %s, _len); _os[_len] = 0;", subj, start_var);
-        PS(gamma, "  output_str(_os); free(_os); }");
+        if (suppress_output_in_named_pat()) {
+            PS(NULL,  "  (void)_os; /* output_str suppressed in named pat */");
+            PS(gamma, "  free(_os); }");
+        } else {
+            PS(gamma, "  output_str(_os); free(_os); }");
+        }
 
         /* β → ω: side-effect already fired, cannot resume */
         PLG(beta, omega);
@@ -1370,9 +1426,16 @@ static void emit_imm(EXPR_t *child, const char *varname,
     PLG(do_assign, NULL);
     if (strcasecmp(varname, "OUTPUT") == 0) {
         PS(NULL,  "{ int64_t _len = %s - %s;", cursor, start_var);
-        PS(NULL,  "  char *_os = malloc(_len + 1);");
+        PS(NULL,  "  char *_os = (char*)GC_malloc(_len + 1);");
         PS(NULL,  "  memcpy(_os, %s + %s, _len); _os[_len] = 0;", subj, start_var);
-        PS(gamma, "  output_str(_os); free(_os); }");
+        if (suppress_output_in_named_pat()) {
+            /* $-capture inside a named pattern fires during parse traversal.
+             * Gen/pp handles all actual output — suppress output_str here. */
+            PS(NULL,  "  (void)_os; /* output_str suppressed in named pat: Gen handles pp output */");
+        } else {
+            PS(NULL,  "  output_str(_os);");
+        }
+        PS(gamma, "  free(_os); }");
     } else {
         /* Sync both hash table and C static (if one exists).
          * Skip C static sync for '_' (discard var → '__' invalid) and
@@ -1753,18 +1816,25 @@ static void byrd_emit(EXPR_t *pat,
 
         /* nPush() */
         if (strcasecmp(n, "nPush") == 0) {
-            PL(alpha, gamma, "NPUSH_fn();");
-            /* beta: nPush has no alternatives — fail so the containing CAT
-             * routes backtrack to ARBNO's own beta (cat_l_847_β → cat_r_847_β).
-             * Re-pushing here was wrong: it reset ARBNO depth=-1 each time,
-             * causing infinite zero-iteration ARBNO loop. */
+            int sf = pending_npush_uid;
+            /* Do NOT consume pending_npush_uid here — E_OPSYN & will consume it.
+             * We only read it to emit the NTOP_INDEX_fn() save alongside NPUSH_fn(). */
+            if (sf >= 0) {
+                /* Bug5: save frame index so Reduce can use NSTACK_AT_fn.
+                 * Emit bare field name — decl_emit_defines provides z-> prefix. */
+                PL(alpha, gamma, "NPUSH_fn(); _saved_frame_%d = NTOP_INDEX_fn();", sf);
+            } else {
+                PL(alpha, gamma, "NPUSH_fn();");
+            }
             PLG(beta, omega);
             return;
         }
         /* nInc() */
         if (strcasecmp(n, "nInc") == 0) {
+            /* Always use NINC_fn() — increments _ntop (current frame top).
+             * Bug5 fix (NSTACK_AT_fn) applies only at Reduce time, not here. */
             PL(alpha, gamma, "NINC_fn();");
-            PL(beta, omega, "NDEC_fn();");  /* compensate: nInc fired but Command failed */
+            PL(beta, omega,  "NDEC_fn();");
             return;
         }
         /* nDec() */
@@ -1996,7 +2066,29 @@ static void byrd_emit(EXPR_t *pat,
                 else
                     decl_add("%s *%s", np_v->typename, child_field);
             }
+            /* Bug6a: inside pat_X4, before attempting another recursive *X4 call,
+             * reject ':' as a valid atom start — it belongs to pat_Goto, not a
+             * concat expression atom.  Without this, FENCE(*White *X4) in pat_X4
+             * consumes the space before ':(END)' then tries X4 on ':(END)', producing
+             * a spurious Reduce(..,2) that misaligns the Stmt parse tree. */
+            int x4_colon_guard = (strcasecmp(varname, "X4") == 0 && in_named_pat);
+
+            /* Bug5: cross-pattern nInc frame threading.
+             * If pending_npush_uid is set, the enclosing emit_seq has a nPush()
+             * left child whose frame index is saved in _saved_frame_UID.
+             * Before calling a child named pattern that contains nInc(), set
+             * _pending_parent_frame so the child can use NINC_AT_fn. */
+            int pf_uid = pending_npush_uid;
+            /* Don't consume pending_npush_uid here — E_OPSYN will consume it.
+             * But do thread it to child. */
+
             B("%s: {\n", alpha);
+            if (x4_colon_guard)
+                B("    /* Bug6a: ':' after whitespace belongs to pat_Goto */\n"
+                  "    if (%s < %s && %s[%s] == ':') { goto %s; }\n",
+                  cursor, subj_len, subj, cursor, omega);
+            if (pf_uid >= 0)
+                B("    _pending_parent_frame = _saved_frame_%d;\n", pf_uid);
             B("    %s = %s;\n", saved_cur, cursor);
             B("    DESCR_t _r_%d = %s(%s, %s, &%s, &%s, 0);\n",
               uid, np_v->fnname, subj, subj_len, cursor, child_field);
@@ -2005,6 +2097,12 @@ static void byrd_emit(EXPR_t *pat,
             B("    goto %s;\n", gamma);
             B("}\n");
             B("%s: {\n", beta);
+            if (x4_colon_guard)
+                B("    /* Bug6a: same guard on backtrack path */\n"
+                  "    if (%s < %s && %s[%s] == ':') { goto %s; }\n",
+                  cursor, subj_len, subj, cursor, omega);
+            if (pf_uid >= 0)
+                B("    _pending_parent_frame = _saved_frame_%d;\n", pf_uid);
             B("    %s = %s;\n", cursor, saved_cur);
             B("    DESCR_t _r_%d_b = %s(%s, %s, &%s, &%s, 1);\n",
               uid, np_v->fnname, subj, subj_len, cursor, child_field);
@@ -2074,9 +2172,14 @@ static void byrd_emit(EXPR_t *pat,
             /* do_assign: capture span → OUTPUT, then γ */
             PLG(do_assign, NULL);
             PS(NULL,  "{ int64_t _len = %s - %s;", cursor, start_var);
-            PS(NULL,  "  char *_os = malloc(_len + 1);");
+            PS(NULL,  "  char *_os = (char*)GC_malloc(_len + 1);");
             PS(NULL,  "  memcpy(_os, %s + %s, _len); _os[_len] = 0;", subj, start_var);
-            PS(gamma, "  output_str(_os); free(_os); }");
+            if (suppress_output_in_named_pat()) {
+                PS(NULL,  "  (void)_os; /* output_str suppressed in named pat */");
+                PS(gamma, "  free(_os); }");
+            } else {
+                PS(gamma, "  output_str(_os); free(_os); }");
+            }
 
             PLG(beta, lit_β);
             return;
@@ -2203,23 +2306,77 @@ static void byrd_emit(EXPR_t *pat,
     /* --------------------------------------------------------------- E_OPSYN (& operator) */
     case E_OPSYN: {
         B("%s: /* E_OPSYN & */\n", alpha);
+
+        /* Bug5: if the enclosing emit_seq saved a frame index (nPush() left),
+         * use NSTACK_AT_fn(_saved_frame_UID) for the n-argument instead of ntop().
+         * ntop() would give the wrong count when nested NPUSHes displace _ntop. */
+        int sf_uid = pending_npush_uid;
+        pending_npush_uid = -1;  /* consume — one-shot */
+
         /* If the n-argument is a conditional nTop() expression like
-         * '*(GT(nTop(), 1) nTop())', only call Reduce when ntop() > 1.
-         * When ntop()==1 the single item is already on the stack — no wrapping needed.
+         * '*(GT(nTop(), 1) nTop())', only call Reduce when count > 1.
+         * When count==1 the single item is already on the stack — no wrapping needed.
          * For plain integer literals or 'nTop()' alone, always call Reduce. */
         int conditional_ntop = (pat->right && pat->right->kind == E_QLIT
                                 && pat->right->sval
                                 && strcasestr(pat->right->sval, "GT(nTop()"));
-        if (conditional_ntop)
-            B("    if (ntop() > 1) {\n");
-        B("    { DESCR_t _reduce_args[2] = {");
-        emit_simple_val(pat->left);
-        B(", ");
-        emit_simple_val(pat->right);
-        B("};\n");
-        B("      APPLY_fn(\"Reduce\", _reduce_args, 2); }\n");
-        if (conditional_ntop)
-            B("    }\n");
+        if (conditional_ntop) {
+            if (sf_uid >= 0)
+                B("    { int _cnt_%d = (_saved_frame_%d >= 0)"
+                  " ? (int)NSTACK_AT_fn(_saved_frame_%d) : 0;\n"
+                  "    if (_cnt_%d > 1) {\n", sf_uid, sf_uid, sf_uid, sf_uid);
+            else
+                B("    if (ntop() > 1) {\n");
+        }
+
+        /* Bug6b: if left is an E_QLIT starting with '*' (unevaluated SNOBOL4
+         * pattern expression like "*(':' Brackets)"), it must be built at
+         * runtime from the NV variables Brackets/SorF that pat_Target/SGoto/
+         * FGoto set.  Detect the two known forms:
+         *   "*(':' Brackets)"          → CONCAT_fn(STRVAL_fn(":"), NV_GET_fn("Brackets"))
+         *   "*(':' SorF Brackets)"     → CONCAT_fn(STRVAL_fn(":"), CONCAT_fn(NV_GET_fn("SorF"), NV_GET_fn("Brackets")))
+         * For any other '*'-prefixed literal, fall back to EVAL_fn (existing). */
+        int bug6b = 0;
+        if (pat->left && pat->left->kind == E_QLIT && pat->left->sval
+            && pat->left->sval[0] == '*') {
+            const char *sv = pat->left->sval;
+            if (strcasestr(sv, "SorF") && strcasestr(sv, "Brackets")) {
+                B("    { DESCR_t _type_b = CONCAT_fn(STRVAL_fn(\":\"),"
+                  " CONCAT_fn(NV_GET_fn(\"SorF\"), NV_GET_fn(\"Brackets\")));\n");
+                bug6b = 2;
+            } else if (strcasestr(sv, "Brackets")) {
+                B("    { DESCR_t _type_b = CONCAT_fn(STRVAL_fn(\":\"),"
+                  " NV_GET_fn(\"Brackets\"));\n");
+                bug6b = 1;
+            }
+        }
+
+        if (bug6b) {
+            B("    { DESCR_t _reduce_args[2] = {_type_b, ");
+            emit_simple_val(pat->right);
+            B("};\n");
+            B("      APPLY_fn(\"Reduce\", _reduce_args, 2); } }\n");
+        } else {
+            B("    { DESCR_t _reduce_args[2] = {");
+            emit_simple_val(pat->left);
+            B(", ");
+            if (sf_uid >= 0 && conditional_ntop)
+                B("INTVAL(_cnt_%d)", sf_uid);
+            else if (sf_uid >= 0)
+                B("INTVAL((_saved_frame_%d >= 0)"
+                  " ? (int)NSTACK_AT_fn(_saved_frame_%d) : 0)", sf_uid, sf_uid);
+            else
+                emit_simple_val(pat->right);
+            B("};\n");
+            B("      APPLY_fn(\"Reduce\", _reduce_args, 2); }\n");
+        }
+
+        if (conditional_ntop) {
+            if (sf_uid >= 0)
+                B("    } }\n");  /* close if + block for _cnt_ */
+            else
+                B("    }\n");
+        }
         B("    goto %s;\n", gamma);
         B("%s: goto %s;\n", beta, omega);
         return;
@@ -2400,11 +2557,17 @@ void byrd_emit_named_pattern(const char *varname, EXPR_t *pat, FILE *out_file) {
     /* Struct mode ON — decl_add will collect into struct fields,
      * child_decl_add will collect child frame pointers separately. */
     in_named_pat = 1;
+    current_named_pat_name = varname;
 
     byrd_out = code_file;
     byrd_uid_ctr = uid_saved;
     decl_reset();
     byrd_cond_reset();   /* clear any pending conditionals from prior pattern */
+
+    /* Bug5: every named pattern gets a _parent_frame field so nInc()
+     * can use NINC_AT_fn(_parent_frame) to increment the correct frame
+     * even when this pattern is called from inside a nested NPUSH context. */
+    decl_add("int _parent_frame");
 
     byrd_emit(pat,
               root_α, root_β,
@@ -2416,7 +2579,7 @@ void byrd_emit_named_pattern(const char *varname, EXPR_t *pat, FILE *out_file) {
     fclose(code_file);
 
     in_named_pat = 0;
-    byrd_out = out_file;
+    current_named_pat_name = NULL;
 
     /* 1. Emit the struct typedef (uses decl_buf + child_decl_buf collected above) */
     decl_flush_as_struct(out_file, tyname);
@@ -2425,7 +2588,12 @@ void byrd_emit_named_pattern(const char *varname, EXPR_t *pat, FILE *out_file) {
     fprintf(out_file,
         "static DESCR_t %s(const char *_subj_np, int64_t _slen_np,\n"
         "                  int64_t *_cur_ptr_np, %s **_zz_np, int _entry_np) {\n"
-        "    if (_entry_np == 0) { *_zz_np = calloc(1, sizeof(%s)); }\n"
+        "    if (_entry_np == 0) {\n"
+        "        *_zz_np = calloc(1, sizeof(%s));\n"
+        "        /* Bug5: grab parent frame from cross-pattern handoff (set by caller) */\n"
+        "        (*_zz_np)->_parent_frame = _pending_parent_frame;\n"
+        "        _pending_parent_frame = -1;  /* consume */\n"
+        "    }\n"
         "    %s *z = *_zz_np;\n"
         "    int64_t _cur_np = *_cur_ptr_np;\n",
         fnname, tyname, tyname, tyname);
