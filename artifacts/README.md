@@ -191,6 +191,24 @@ session115 | 2026-03-16 | 6d5919daa03d3c56646b5f0a165f86ee | 15859 lines | compi
 - **active bug:** Bug5 saved-frame NSTACK_AT port incomplete — pending_npush_uid not surviving nested CAT levels to reach E_OPSYN; 101-103 PASS, 104-105 FAIL from regenerated C
 - **note:** beauty_full_bin (in repo) still from WIP — passes 101-105; emit_byrd.c port WIP
 
+## session147 — 2026-03-17 — ASM backend Sprint A4: M-ASM-ALT ✅
+
+### artifacts/asm/alt_first.s  (Sprint A4 — M-ASM-ALT ✅)
+- **status:** PASS — subject "cat", pattern `LIT("cat") | LIT("dog")` → `cat\n` exit 0
+- **milestone:** M-ASM-ALT fires this session
+- **assemble:** `nasm -f elf64 alt_first.s -o alt_first.o && ld alt_first.o -o alt_first_bin && ./alt_first_bin`
+- **design:** ALT α saves cursor_at_alt; left_ω restores and jumps right_α; both γ wire to alt_γ; right_ω → alt_ω. Proebsting §4.5 ifstmt pattern, compile-time wiring (no indirect jmp needed for two-arm pattern ALT).
+
+### artifacts/asm/alt_second.s  (Sprint A4 — M-ASM-ALT ✅)
+- **status:** PASS — subject "dog" → first arm fails, second arm matches → `dog\n` exit 0
+- **assemble:** `nasm -f elf64 alt_second.s -o alt_second.o && ld alt_second.o -o alt_second_bin && ./alt_second_bin`
+- **design:** identical wiring to alt_first.s, only subject differs
+
+### artifacts/asm/alt_fail.s  (Sprint A4 — M-ASM-ALT ✅)
+- **status:** PASS — subject "fish" → both arms fail → no output, exit 1
+- **assemble:** `nasm -f elf64 alt_fail.s -o alt_fail.o && ld alt_fail.o -o alt_fail_bin && ./alt_fail_bin`
+- **design:** right_ω → alt_ω chain; alt_ω exits 1
+
 ## session146 — 2026-03-17 — ASM backend Sprint A0–A1
 
 ### artifacts/asm/null.s  (Sprint A0 — M-ASM-HELLO ✅)
