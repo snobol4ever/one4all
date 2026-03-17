@@ -5,7 +5,7 @@ oracle_sprint14.py — Sprint 14 oracle
 Verifies the snoc compiler end-to-end on the first SNOBOL4 programs.
 Each test: compile a .sno file, capture stdout, compare to expected.
 
-This is the first oracle that proves SNOBOL4-tiny is a compiler —
+This is the first oracle that proves snobol4x is a compiler —
 not just a pattern engine.
 """
 

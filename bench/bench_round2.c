@@ -1,7 +1,7 @@
 /*
  * bench_round2.c — Round 2: Honest Benchmark
  * ===========================================
- * SNOBOL4-tiny via emit_c.py IR pipeline vs PCRE2 JIT and Bison LALR(1).
+ * snobol4x via emit_c.py IR pipeline vs PCRE2 JIT and Bison LALR(1).
  * No hand-optimization. The real engine as it actually runs.
  */
 #include <stdio.h>
@@ -48,7 +48,7 @@ static int pcre2_full(pcre2_code * re, pcre2_match_data * md,
 int main(void) {
     printf("=================================================================\n");
     printf("  Round 2 — emit_c.py IR Pipeline vs PCRE2 JIT and Bison LALR(1)\n");
-    printf("  SNOBOL4-tiny: real FuncEmitter -> C, no hand-optimization\n");
+    printf("  snobol4x: real FuncEmitter -> C, no hand-optimization\n");
     printf("  %dM iterations each.\n", ITERS/1000000);
     printf("=================================================================\n\n");
 
@@ -86,10 +86,10 @@ int main(void) {
     t1=ns_now();
     double t_pcre2 = (double)(t1-t0)/ITERS;
 
-    printf("  SNOBOL4-tiny (emit_c.py) : %7.2f ns/match\n", t_tiny_re);
+    printf("  snobol4x (emit_c.py) : %7.2f ns/match\n", t_tiny_re);
     printf("  PCRE2 JIT                : %7.2f ns/match\n", t_pcre2);
     if (t_tiny_re < t_pcre2)
-        printf("  Result: SNOBOL4-tiny is %.2fx FASTER\n\n", t_pcre2/t_tiny_re);
+        printf("  Result: snobol4x is %.2fx FASTER\n\n", t_pcre2/t_tiny_re);
     else
         printf("  Result: PCRE2 JIT is %.2fx faster (tiny/pcre2 = %.2f)\n\n",
                t_tiny_re/t_pcre2, t_tiny_re/t_pcre2);
@@ -109,10 +109,10 @@ int main(void) {
     t1=ns_now();
     double t_bison = (double)(t1-t0)/ITERS;
 
-    printf("  SNOBOL4-tiny (emit_c.py) : %7.2f ns/parse\n", t_tiny_ab);
+    printf("  snobol4x (emit_c.py) : %7.2f ns/parse\n", t_tiny_ab);
     printf("  Bison LALR(1)            : %7.2f ns/parse\n", t_bison);
     if (t_tiny_ab < t_bison)
-        printf("  Result: SNOBOL4-tiny is %.2fx FASTER\n\n", t_bison/t_tiny_ab);
+        printf("  Result: snobol4x is %.2fx FASTER\n\n", t_bison/t_tiny_ab);
     else
         printf("  Result: Bison is %.2fx faster (tiny/bison = %.2f)\n\n",
                t_tiny_ab/t_bison, t_tiny_ab/t_bison);

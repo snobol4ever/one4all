@@ -1,4 +1,4 @@
-# SNOBOL4-tiny — Open Architecture Decisions
+# snobol4x — Open Architecture Decisions
 
 This file is where undecided questions are laid out, argued, and resolved.
 Once a decision is made, the conclusion moves to DESIGN.md and the entry
@@ -42,9 +42,9 @@ compiler itself.
   a rewrite anyway.
 - **Con:** Adds a Python dependency to the build chain.
 
-#### B. SNOBOL4 (on SNOBOL4-jvm or SNOBOL4-python)
+#### B. SNOBOL4 (on snobol4jvm or snobol4python)
 Write the compiler as a SNOBOL4 program from the start. The compiler runs
-on SNOBOL4-jvm (or CSNOBOL4 / SPITBOL as oracle). The target of compilation
+on snobol4jvm (or CSNOBOL4 / SPITBOL as oracle). The target of compilation
 is C-with-gotos.
 
 - **Pro:** True self-hosting from the start — the compiler is a SNOBOL4
@@ -91,7 +91,7 @@ development happens in SNOBOL4.
 
 ---
 
-## Decision 2: What language does SNOBOL4-tiny implement first?
+## Decision 2: What language does snobol4x implement first?
 
 ### The question
 
@@ -104,14 +104,14 @@ This breaks into a spectrum:
 Implement the complete SNOBOL4 language: statements, goto-driven control
 flow, all primitives, DATA(), DEFINE(), CODE/EVAL, arithmetic, I/O.
 
-- **Pro:** The test corpus (SNOBOL4-corpus, Gimpel library) applies
+- **Pro:** The test corpus (snobol4corpus, Gimpel library) applies
   immediately. Every sprint result is directly comparable to SPITBOL.
 - **Con:** The full language is large. Too many things to get right before
   the compiler produces a single working program.
 
 ### Option B: A minimal pattern-only sublanguage first
 
-The smallest useful SNOBOL4-tiny program is a single pattern match against
+The smallest useful snobol4x program is a single pattern match against
 a single input string, producing output. No statements. No control flow.
 No variables except OUTPUT.
 
@@ -160,7 +160,7 @@ context-free grammar). It is a clean, small, self-contained language.
 - **Pro:** Mutual recursion is the first test that the IR graph (not tree)
   design is correct. This is the right moment to validate it.
 - **Pro:** This is genuinely a different, smaller language than SNOBOL4.
-  It could have its own name. (SNOBOL4-tiny is the compiler; the language
+  It could have its own name. (snobol4x is the compiler; the language
   it implements at this stage could be called something else.)
 - **Con:** Still not SNOBOL4. Users cannot run existing SNOBOL4 programs.
 
@@ -200,11 +200,11 @@ The right sequence is **B → C → D**, not a choice between them.
 
 The key insight is that Option C is where the language becomes *interesting*:
 mutual recursion is the first thing that cannot be expressed in any other
-pattern language. It validates the graph IR. It is the moment SNOBOL4-tiny
+pattern language. It validates the graph IR. It is the moment snobol4x
 becomes more than a fancy regex engine.
 
 Option C also answers the naming question: the language at stage C could
-legitimately be called **SNOBOL4-tiny** — a real language with named
+legitimately be called **snobol4x** — a real language with named
 patterns and mutual recursion, just without the statement model. Stage D
 graduates it to a SNOBOL4 subset.
 
@@ -252,7 +252,7 @@ These structs would need a separate C runtime to execute.
 **`test_sno_1.c` through `test_sno_4.c`** — these ARE the compiled output.
 They are self-contained C-with-gotos programs using the α/β/γ/ω protocol
 directly. No struct interpreter needed — the pattern matching IS the C code.
-These are hand-written examples of exactly what SNOBOL4-tiny's emitter should
+These are hand-written examples of exactly what snobol4x's emitter should
 produce automatically.
 
 **`transl8r_SNOBOL4.py`** (1,103 lines) — a SNOBOL4→C compiler written in
@@ -272,7 +272,7 @@ language including mutual recursion.
 
 The `transl8r_SNOBOL4.py` + `test_sno_*.c` combination IS the compiler,
 already written. The question is not "what language do we write the compiler
-in" but rather "how do we take what already exists and make it the SNOBOL4-tiny
+in" but rather "how do we take what already exists and make it the snobol4x
 compiler."
 
 **Revised candidate: C + yacc/lex as the front-end**
@@ -297,10 +297,10 @@ This gives:
 
 **The concern:**
 - yacc grammars are not self-hosting. The bootstrap path (Phase 2) becomes:
-  C compiler → SNOBOL4-tiny output → eventually a SNOBOL4 program that
+  C compiler → snobol4x output → eventually a SNOBOL4 program that
   can describe its own grammar. This is further from self-hosting than the
   Python→SNOBOL4 path.
-- But: SNOBOL4-tiny is a *compiler*, not an interpreter. Self-hosting is
+- But: snobol4x is a *compiler*, not an interpreter. Self-hosting is
   a long-term goal, not Sprint 1. For getting to Stage C (mutual recursion,
   working patterns), C + yacc is the fastest path.
 
@@ -372,7 +372,7 @@ Commented-out test cases cover BEAD, BEARDS, C (expression grammar), CALC
 `.h` files ARE compiled pattern data. The interpreter IS the reference
 implementation of every node's semantics.
 
-The path to SNOBOL4-tiny as a compiler now has two routes:
+The path to snobol4x as a compiler now has two routes:
 
 **Route A: Add a front-end to SNOBOL4c.c (C + yacc)**
 
@@ -419,7 +419,7 @@ the leading candidate. The interpreter is done. We need the parser.**
 
 ### The discovery
 
-`Beautiful.sno` (in SNOBOL4-dotnet) contains a complete SNOBOL4 expression
+`Beautiful.sno` (in snobol4dotnet) contains a complete SNOBOL4 expression
 parser written as SNOBOL4 patterns: `snoExpr` through `snoExpr17`, plus
 `snoStmt`, `snoLabel`, `snoGoto`, `snoComment`, `snoParse`, `snoCompiland`.
 This is the full grammar — 17 precedence levels, all operators, function calls,
@@ -488,7 +488,7 @@ stdin → snoExpr (pattern match, builds tree via Shift/Reduce)
       → stdout
 ```
 
-For SNOBOL4-tiny we don't need `pp()`. We need the match step to instead
+For snobol4x we don't need `pp()`. We need the match step to instead
 emit IR nodes (or C-with-gotos directly). That is the `λ` bridge: replace
 the `Reduce` actions that build a pretty-print tree with `λ` actions that
 emit IR. `Beautiful.sno` shows exactly what the parse tree looks like —
@@ -527,8 +527,8 @@ detection code. No switch. Polyglot parsing is a consequence of Π already exist
 ### EDN as First Alt Candidate
 
 EDN (Extensible Data Notation) is the natural first addition because:
-1. SNOBOL4-jvm uses Clojure/EDN for its internal data structures.
-2. A SNOBOL4-tiny that reads EDN can consume SNOBOL4-jvm IR directly.
+1. snobol4jvm uses Clojure/EDN for its internal data structures.
+2. A snobol4x that reads EDN can consume snobol4jvm IR directly.
 3. EDN grammar is small — maps, vectors, lists, keywords, strings, numbers.
    The entire grammar fits in ~20 SNOBOL4 pattern definitions.
 
@@ -541,11 +541,11 @@ grammar that's a proper subset of what the existing parsers already handle.
 ### The Architecture Point
 
 This decision is not about adding features. It reveals that `SNOBOL4_EXPRESSION_PATTERN.h`
-is a **loadable grammar slot**, not a fixed parser. SNOBOL4-tiny is a compiler whose
+is a **loadable grammar slot**, not a fixed parser. snobol4x is a compiler whose
 input language is determined at compile time by which `.h` files are included.
 
 Adding `EDN_PATTERN.h` to the `#include` chain and wrapping the root in `ALT()` makes
-SNOBOL4-tiny a polyglot compiler with zero new C infrastructure.
+snobol4x a polyglot compiler with zero new C infrastructure.
 
 **Status: DECIDED — 2026-03-10**
 
@@ -554,7 +554,7 @@ is validated in Sprint 6). INC support follows as Sprint 8. The root Alt chain i
 architecture — each new language is one more arm, one more `.h` file.**
 
 Rationale: The insight that Alt IS the dispatcher is architecturally significant and
-should be locked in now. It changes how we think about what SNOBOL4-tiny *is*:
+should be locked in now. It changes how we think about what snobol4x *is*:
 not a SNOBOL4 compiler but a grammar-driven compiler compiler. Every decision
 downstream should be made with this in mind.
 

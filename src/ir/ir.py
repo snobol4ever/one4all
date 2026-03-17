@@ -1,5 +1,5 @@
 """
-ir.py — SNOBOL4-tiny IR node graph
+ir.py — snobol4x IR node graph
 
 The IR is a named flat table of nodes.  Edges are represented as node IDs
 (strings).  The graph supports cycles via REF nodes; cycle resolution happens

@@ -1,5 +1,5 @@
 """
-parser.py — SNOBOL4-tiny source parser (Sprint 14)
+parser.py — snobol4x source parser (Sprint 14)
 
 Parses a subset of SNOBOL4 into the IR node graph.
 
@@ -272,7 +272,7 @@ def parse_statement(toks, lineno):
 
 def parse_program(source):
     """
-    Parse a SNOBOL4-tiny program into an IR Graph.
+    Parse a snobol4x program into an IR Graph.
 
     Sprint 14 mapping:
       OUTPUT = 'expr'  →  Assign(expr, var='OUTPUT')

@@ -1,4 +1,4 @@
-/* runtime.h — SNOBOL4-tiny static runtime
+/* runtime.h — snobol4x static runtime
  *
  * All MATCH_fn state is statically allocated. Zero allocation during matching.
  * CODE/EVAL dynamic patterns use heap (two-tier: static fast path + heap).

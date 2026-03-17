@@ -4,7 +4,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TINY="$(cd "$SCRIPT_DIR/../.." && pwd)"
-CORPUS="$(cd "$TINY/../../SNOBOL4-corpus/crosscheck" && pwd)"
+CORPUS="$(cd "$TINY/../../snobol4corpus/crosscheck" && pwd)"
 SNO2C="$TINY/src/sno2c/sno2c"
 RT="$TINY/src/runtime"
 SNO2C_INC="$TINY/src/sno2c"
@@ -67,7 +67,7 @@ summary() {
     echo -e "Results: ${GREEN}$PASS passed${RESET}, ${RED}$FAIL failed${RESET}, ${YELLOW}$SKIP skipped${RESET}"
 }
 
-echo "=== SNOBOL4-tiny crosscheck ==="
+echo "=== snobol4x crosscheck ==="
 echo "sno2c: $SNO2C"; echo ""
 
 for dir in output assign concat arith_new control_new patterns capture strings keywords functions data; do

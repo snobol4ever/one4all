@@ -1,4 +1,4 @@
-# SNOBOL4-tiny — Bootstrap Strategy
+# snobol4x — Bootstrap Strategy
 
 ## The Forth Lesson
 
@@ -20,7 +20,7 @@ the system proves itself.
 
 ## The Direct Analogy
 
-| Forth concept | SNOBOL4-tiny equivalent |
+| Forth concept | snobol4x equivalent |
 |---|---|
 | ~12 native primitives | ~8 primitive pattern nodes: LIT, ANY, POS, RPOS, LEN, SPAN, BREAK, ARB |
 | NEXT (3-instruction inner loop) | The α/β/γ/ω wiring dispatcher |
@@ -67,7 +67,7 @@ once those work. Resist hardcoding it until the primitive set is proven complete
 **Route A (yacc) and Route B (write parser in SNOBOL4) are both obsolete.**
 The parser already exists.
 
-`Beautiful.sno` (SNOBOL4-dotnet repo) contains a complete SNOBOL4 expression
+`Beautiful.sno` (snobol4dotnet repo) contains a complete SNOBOL4 expression
 and statement parser written as SNOBOL4 patterns — `snoExpr` through
 `snoExpr17`, plus `snoStmt`, `snoGoto`, `snoParse`, `snoCompiland`. It is the
 full grammar, 17 precedence levels, all operators, function calls, gotos.
@@ -114,10 +114,10 @@ NEXT: lw  W, (IP)    ; fetch next word address
       jmp (W)        ; jump to it
 ```
 
-In SNOBOL4-tiny, the equivalent is the **wiring discipline** itself. The
+In snobol4x, the equivalent is the **wiring discipline** itself. The
 "inner interpreter" is not a loop — it is the static goto graph baked into
 the compiled output. There is no dispatch at runtime; the wiring IS the
-execution. This is why SNOBOL4-tiny is faster than SPITBOL's threaded model:
+execution. This is why snobol4x is faster than SPITBOL's threaded model:
 SPITBOL still has a NEXT-equivalent (`succp`: 3 instructions per node).
 We have zero.
 
@@ -148,9 +148,9 @@ Examples:
 At each phase, correctness is checked against the oracle chain:
 
 ```
-SNOBOL4-tiny output
-    == SNOBOL4-jvm output
-    == SNOBOL4-dotnet output
+snobol4x output
+    == snobol4jvm output
+    == snobol4dotnet output
     == CSNOBOL4 output
     == SPITBOL output
 ```

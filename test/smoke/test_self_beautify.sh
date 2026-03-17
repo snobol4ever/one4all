@@ -9,7 +9,7 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
-CORPUS="$(cd "$REPO/../SNOBOL4-corpus" && pwd)"
+CORPUS="$(cd "$REPO/../snobol4corpus" && pwd)"
 BEAUTY="$CORPUS/programs/beauty/beauty.sno"
 INC="$CORPUS/programs/inc"
 BIN="${1:-/tmp/beauty_full_bin}"

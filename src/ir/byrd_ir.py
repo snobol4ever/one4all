@@ -1,5 +1,5 @@
 """
-byrd_ir.py — Byrd Box four-port IR for SNOBOL4-plus JVM and MSIL backends.
+byrd_ir.py — Byrd Box four-port IR for snobol4ever JVM and MSIL backends.
 
 Ported from Jcon's ir.icn (Proebsting + Townsend, Arizona, 1999).
 Only the SNOBOL4 pattern subset — ~12 of Jcon's ~30 nodes.

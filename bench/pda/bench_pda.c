@@ -1,9 +1,9 @@
 /*
- * bench_pda.c — SNOBOL4-tiny vs Bison/YACC (PDA tier)
+ * bench_pda.c — snobol4x vs Bison/YACC (PDA tier)
  * =====================================================
  * Second benchmark contest: Type 2 (context-free) languages.
  * RE engines cannot play here. Bison is the industry champion.
- * SNOBOL4-tiny uses recursive REF — compiled static gotos.
+ * snobol4x uses recursive REF — compiled static gotos.
  * Bison uses LALR(1) — table-driven pushdown automaton.
  * Both compile to C. Both run native. No VM. No JIT.
  *
@@ -40,7 +40,7 @@ static inline long long ns_now(void) {
 }
 
 /*===========================================================================*/
-/* SNOBOL4-tiny — {a^n b^n}                                                  */
+/* snobol4x — {a^n b^n}                                                  */
 /* Recursive REF: S → a S b | a b                                            */
 /* Compiled to static gotos (inline here for benchmark purity)               */
 /*===========================================================================*/
@@ -62,7 +62,7 @@ static bool tiny_anbn(const char * s, int n) {
 }
 
 /*===========================================================================*/
-/* SNOBOL4-tiny — Dyck language                                              */
+/* snobol4x — Dyck language                                              */
 /* D → ε | ( D ) D                                                           */
 /*===========================================================================*/
 static bool tiny_dyck(const char * s, int n) {
@@ -174,7 +174,7 @@ static double bench_bison_dyck(char ** corpus, int * lens, int n) {
 /*===========================================================================*/
 int main(void) {
     printf("=================================================================\n");
-    printf("  SNOBOL4-tiny vs Bison/YACC (LALR1 PDA) — Type 2 Benchmark\n");
+    printf("  snobol4x vs Bison/YACC (LALR1 PDA) — Type 2 Benchmark\n");
     printf("  Both compile to C. Both run native. %dM iterations each.\n",
            ITERS/1000000);
     printf("=================================================================\n\n");
@@ -188,10 +188,10 @@ int main(void) {
     printf("--- TEST 1: {a^n b^n}  (n=1..15, mixed) ---\n");
     double t_tiny_ab  = bench_tiny_anbn(anbn_corpus, anbn_lens, 20);
     double t_bison_ab = bench_bison_anbn(anbn_corpus, anbn_lens, 20);
-    printf("  SNOBOL4-tiny (static gotos) : %7.2f ns/parse\n", t_tiny_ab);
+    printf("  snobol4x (static gotos) : %7.2f ns/parse\n", t_tiny_ab);
     printf("  Bison LALR(1) PDA           : %7.2f ns/parse\n", t_bison_ab);
     if (t_tiny_ab < t_bison_ab)
-        printf("  Result: SNOBOL4-tiny is %.2fx FASTER than Bison\n\n",
+        printf("  Result: snobol4x is %.2fx FASTER than Bison\n\n",
                t_bison_ab / t_tiny_ab);
     else
         printf("  Result: Bison is %.2fx faster (ratio %.2f)\n\n",
@@ -201,10 +201,10 @@ int main(void) {
     printf("--- TEST 2: Dyck language (balanced parentheses) ---\n");
     double t_tiny_dy  = bench_tiny_dyck(dyck_corpus, dyck_lens, 20);
     double t_bison_dy = bench_bison_dyck(dyck_corpus, dyck_lens, 20);
-    printf("  SNOBOL4-tiny (static gotos) : %7.2f ns/parse\n", t_tiny_dy);
+    printf("  snobol4x (static gotos) : %7.2f ns/parse\n", t_tiny_dy);
     printf("  Bison LALR(1) PDA           : %7.2f ns/parse\n", t_bison_dy);
     if (t_tiny_dy < t_bison_dy)
-        printf("  Result: SNOBOL4-tiny is %.2fx FASTER than Bison\n\n",
+        printf("  Result: snobol4x is %.2fx FASTER than Bison\n\n",
                t_bison_dy / t_tiny_dy);
     else
         printf("  Result: Bison is %.2fx faster (ratio %.2f)\n\n",
@@ -214,7 +214,7 @@ int main(void) {
     printf("  VERDICT\n");
     printf("=================================================================\n");
     printf("  Bison ceiling: Type 2 (context-free). Full stop.\n");
-    printf("  SNOBOL4-tiny : Type 2, Type 1, Type 0. No ceiling.\n");
+    printf("  snobol4x : Type 2, Type 1, Type 0. No ceiling.\n");
     printf("  Speed        : see results above.\n");
     printf("=================================================================\n");
 

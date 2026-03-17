@@ -37,7 +37,7 @@
  *   [initial stmts]
  *   F_RB_BODY_
  *
- * Author: Claude Sonnet 4.6  (third developer, SNOBOL4-tiny)
+ * Author: Claude Sonnet 4.6  (third developer, snobol4x)
  */
 
 #include "rebus.h"

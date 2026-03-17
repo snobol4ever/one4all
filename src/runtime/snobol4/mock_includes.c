@@ -563,7 +563,7 @@ static DESCR_t _w_icase(DESCR_t *a, int n) {
     return pat;
 }
 
-/* IsSnobol4() — is.inc: we ARE SNOBOL4-tiny, so always RETURN (succeed) */
+/* IsSnobol4() — is.inc: we ARE snobol4x, so always RETURN (succeed) */
 static DESCR_t _w_IsSnobol4(DESCR_t *a, int n) {
     (void)a; (void)n;
     return STRVAL("");   /* non-null = success */

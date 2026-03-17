@@ -1,9 +1,9 @@
-/* snobol4.h — SNOBOL4-tiny universal value type and runtime API
+/* snobol4.h — snobol4x universal value type and runtime API
  *
  * Architecture decisions (recorded PLAN.md 2026-03-10):
  *   D1: Memory model = Boehm GC  (no ref-counting, no free() anywhere)
  *   D2: TREEBLK_t children = realloc'd dynamic array (unbounded arity)
- *   D3: cstack = thread-local MatchState* (matches SNOBOL4-csharp [ThreadStatic])
+ *   D3: cstack = thread-local MatchState* (matches snobol4csharp [ThreadStatic])
  *
  * This header defines the full SNOBOL4 value universe:
  *   DT_SNUL, S, I, R, DT_DATA,

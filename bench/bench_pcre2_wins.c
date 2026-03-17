@@ -1,5 +1,5 @@
 /*
- * bench_pcre2_wins.c — Where does PCRE2 beat SNOBOL4-tiny?
+ * bench_pcre2_wins.c — Where does PCRE2 beat snobol4x?
  * Find the honest cases. Science requires both sides.
  */
 #include <stdio.h>
@@ -36,7 +36,7 @@ static bool pcre2_full(pcre2_code*re,pcre2_match_data*md,const char*s,int n){
 /* -------------------------------------------------------------------
  * TEST A: Simple literal match — "hello" in a long string
  * PCRE2 JIT has highly optimized Boyer-Moore-style literal search.
- * SNOBOL4-tiny naive scan has no such optimization yet.
+ * snobol4x naive scan has no such optimization yet.
  * ------------------------------------------------------------------- */
 static bool tiny_has_hello(const char*s, int n) {
     /* naive scan — no Boyer-Moore, no SIMD */
@@ -50,7 +50,7 @@ static bool tiny_has_hello(const char*s, int n) {
  * TEST B: Email-like pattern — complex alternation and quantifiers
  * [a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}
  * PCRE2 JIT compiles this to highly optimized machine code.
- * SNOBOL4-tiny would need full ARBNO+ALT chains — more overhead.
+ * snobol4x would need full ARBNO+ALT chains — more overhead.
  * ------------------------------------------------------------------- */
 static bool tiny_email(const char*s, int n) {
     /* hand-written email validator — simplified */
@@ -86,7 +86,7 @@ static bool tiny_email(const char*s, int n) {
  * TEST C: Long string, no match — PCRE2 JIT uses SIMD to scan fast
  * Pattern: "zzzz" in a string of 1000 'a's — not present
  * PCRE2: SIMD vectorized scan
- * SNOBOL4-tiny: character-by-character
+ * snobol4x: character-by-character
  * ------------------------------------------------------------------- */
 static bool tiny_find_zzzz(const char*s, int n) {
     for(int i=0;i<=n-4;i++)
@@ -99,7 +99,7 @@ static bool tiny_find_zzzz(const char*s, int n) {
  * TEST D: Anchored exact match on short string — pure overhead test
  * Pattern: "^abc$" on "abc" — 3 chars
  * PCRE2 JIT: near-zero overhead, highly tuned
- * SNOBOL4-tiny: function call overhead + loop
+ * snobol4x: function call overhead + loop
  * ------------------------------------------------------------------- */
 static bool tiny_abc(const char*s, int n) {
     return n==3&&s[0]=='a'&&s[1]=='b'&&s[2]=='c';
@@ -107,7 +107,7 @@ static bool tiny_abc(const char*s, int n) {
 
 int main(void) {
     printf("=================================================================\n");
-    printf("  WHERE DOES PCRE2 BEAT SNOBOL4-tiny? — Honest Benchmarks\n");
+    printf("  WHERE DOES PCRE2 BEAT snobol4x? — Honest Benchmarks\n");
     printf("=================================================================\n\n");
 
     volatile int sink=0;
@@ -139,12 +139,12 @@ int main(void) {
     double tA_pcre=(double)(t1-t0)/ITERS;
 
     printf("--- TEST A: literal 'hello' in 1001-char string (%dM iters) ---\n",ITERS/1000000);
-    printf("  SNOBOL4-tiny (naive scan) : %7.2f ns\n", tA_tiny);
+    printf("  snobol4x (naive scan) : %7.2f ns\n", tA_tiny);
     printf("  PCRE2 JIT (Boyer-Moore)   : %7.2f ns\n", tA_pcre);
     if(tA_pcre<tA_tiny)
         printf("  Result: PCRE2 wins by %.2fx\n\n", tA_tiny/tA_pcre);
     else
-        printf("  Result: SNOBOL4-tiny wins by %.2fx\n\n", tA_pcre/tA_tiny);
+        printf("  Result: snobol4x wins by %.2fx\n\n", tA_pcre/tA_tiny);
 
     /* TEST B: email pattern */
     const char* emails[]={"user@example.com","test.name+tag@sub.domain.org",
@@ -168,12 +168,12 @@ int main(void) {
     double tB_pcre=(double)(t1-t0)/ITERS;
 
     printf("--- TEST B: email pattern on real addresses (%dM iters) ---\n",ITERS/1000000);
-    printf("  SNOBOL4-tiny (hand-written): %7.2f ns\n", tB_tiny);
+    printf("  snobol4x (hand-written): %7.2f ns\n", tB_tiny);
     printf("  PCRE2 JIT                  : %7.2f ns\n", tB_pcre);
     if(tB_pcre<tB_tiny)
         printf("  Result: PCRE2 wins by %.2fx\n\n", tB_tiny/tB_pcre);
     else
-        printf("  Result: SNOBOL4-tiny wins by %.2fx\n\n", tB_pcre/tB_tiny);
+        printf("  Result: snobol4x wins by %.2fx\n\n", tB_pcre/tB_tiny);
 
     /* TEST C: no-match scan in long string */
     char all_a[1001]; memset(all_a,'a',1000); all_a[1000]='\0';
@@ -195,12 +195,12 @@ int main(void) {
     double tC_pcre=(double)(t1-t0)/ITERS;
 
     printf("--- TEST C: 'zzzz' not found in 1000-char all-'a' string (%dM iters) ---\n",ITERS/1000000);
-    printf("  SNOBOL4-tiny (naive scan)  : %7.2f ns\n", tC_tiny);
+    printf("  snobol4x (naive scan)  : %7.2f ns\n", tC_tiny);
     printf("  PCRE2 JIT (SIMD scan)      : %7.2f ns\n", tC_pcre);
     if(tC_pcre<tC_tiny)
         printf("  Result: PCRE2 wins by %.2fx\n\n", tC_tiny/tC_pcre);
     else
-        printf("  Result: SNOBOL4-tiny wins by %.2fx\n\n", tC_pcre/tC_tiny);
+        printf("  Result: snobol4x wins by %.2fx\n\n", tC_pcre/tC_tiny);
 
     /* TEST D: trivial anchored match */
     pcre2_code*reD=compile_re("^abc$");
@@ -221,29 +221,29 @@ int main(void) {
     double tD_pcre=(double)(t1-t0)/ITERS;
 
     printf("--- TEST D: anchored '^abc$' on 3-char string (%dM iters) ---\n",ITERS/1000000);
-    printf("  SNOBOL4-tiny (direct cmp)  : %7.2f ns\n", tD_tiny);
+    printf("  snobol4x (direct cmp)  : %7.2f ns\n", tD_tiny);
     printf("  PCRE2 JIT                  : %7.2f ns\n", tD_pcre);
     if(tD_pcre<tD_tiny)
         printf("  Result: PCRE2 wins by %.2fx\n\n", tD_tiny/tD_pcre);
     else
-        printf("  Result: SNOBOL4-tiny wins by %.2fx\n\n", tD_pcre/tD_tiny);
+        printf("  Result: snobol4x wins by %.2fx\n\n", tD_pcre/tD_tiny);
 
     printf("(void)sink=%d\n\n",sink&1);
     printf("=================================================================\n");
     printf("  SUMMARY — Where PCRE2 has the edge\n");
     printf("=================================================================\n");
     printf("  A. Long literal search   — PCRE2 Boyer-Moore / Horspool is faster\n");
-    printf("     when SNOBOL4-tiny has no string search optimization built in.\n");
+    printf("     when snobol4x has no string search optimization built in.\n");
     printf("  B. Complex character classes — PCRE2 JIT compiles [a-z0-9._%+-]\n");
-    printf("     to a 256-entry bitmask lookup. SNOBOL4-tiny uses branching.\n");
+    printf("     to a 256-entry bitmask lookup. snobol4x uses branching.\n");
     printf("  C. SIMD no-match scan    — PCRE2 JIT uses SSE/AVX to scan 16-32\n");
-    printf("     bytes at once. SNOBOL4-tiny scans one char at a time.\n");
+    printf("     bytes at once. snobol4x scans one char at a time.\n");
     printf("  D. API overhead          — PCRE2 match_data allocation + ovector\n");
     printf("     adds fixed cost. Tiny wins here (no API layer).\n");
     printf("\n");
     printf("  ROOT CAUSE: PCRE2 JIT has 20+ years of micro-optimizations —\n");
     printf("  SIMD literal search, bitmask char classes, tuned JIT prologue.\n");
-    printf("  SNOBOL4-tiny has none of these YET. They are all addable.\n");
+    printf("  snobol4x has none of these YET. They are all addable.\n");
     printf("  The structural advantage (zero dispatch, goal-directed eval)\n");
     printf("  is already present. The micro-opts are engineering work.\n");
     printf("=================================================================\n");

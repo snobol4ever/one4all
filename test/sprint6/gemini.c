@@ -3,7 +3,7 @@
  * ====================================================
  * Named "Gemini" for the twin mutual-recursive patterns EVEN and ODD —
  * the simplest possible test of cross-pattern recursion, and the first
- * oracle in the SNOBOL4-plus suite to require function-per-pattern
+ * oracle in the snobol4ever suite to require function-per-pattern
  * code generation.
  *
  * IR (what emit_c.py must generate from):

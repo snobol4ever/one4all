@@ -1,5 +1,5 @@
 /*
- * bench_re_vs_tiny.c — SNOBOL4-tiny vs PCRE2 Benchmark
+ * bench_re_vs_tiny.c — snobol4x vs PCRE2 Benchmark
  * Three contests: normal, pathological backtracking, verdict.
  */
 #include <stdio.h>
@@ -16,7 +16,7 @@ static inline long long ns_now(void) {
     return (long long)t.tv_sec * 1000000000LL + t.tv_nsec;
 }
 
-/* SNOBOL4-tiny: (a|b)*abb
+/* snobol4x: (a|b)*abb
  * Goal-directed: string must be all {a,b} and end in "abb".
  * O(n) — one pass. */
 static bool tiny_aorb_star_abb(const char * s, int n) {
@@ -26,7 +26,7 @@ static bool tiny_aorb_star_abb(const char * s, int n) {
     return s[n-3]=='a' && s[n-2]=='b' && s[n-1]=='b';
 }
 
-/* SNOBOL4-tiny: (a+)+b on adversarial all-'a' input.
+/* snobol4x: (a+)+b on adversarial all-'a' input.
  * Structural O(1) failure: last char must be 'b'. If not, reject immediately.
  * PCRE2 backtracks through 2^n configurations before reaching same conclusion. */
 static bool tiny_aplus_plus_b(const char * s, int n) {
@@ -59,7 +59,7 @@ static bool pcre2_full(pcre2_code * re, pcre2_match_data * md,
 
 int main(void) {
     printf("=================================================================\n");
-    printf("  SNOBOL4-tiny vs PCRE2 — Pattern Matching Benchmark\n");
+    printf("  snobol4x vs PCRE2 — Pattern Matching Benchmark\n");
     printf("=================================================================\n\n");
 
     /* TEST 1: NORMAL — (a|b)*abb, positive inputs */
@@ -87,10 +87,10 @@ int main(void) {
     double pcre2_ns=(double)(t1-t0)/ITERS;
     (void)sink;
 
-    printf("  SNOBOL4-tiny : %6.2f ns/match\n", tiny_ns);
+    printf("  snobol4x : %6.2f ns/match\n", tiny_ns);
     printf("  PCRE2 (JIT)  : %6.2f ns/match\n", pcre2_ns);
     if (tiny_ns < pcre2_ns)
-        printf("  Result       : SNOBOL4-tiny is %.2fx FASTER than PCRE2 JIT\n\n",
+        printf("  Result       : snobol4x is %.2fx FASTER than PCRE2 JIT\n\n",
                pcre2_ns/tiny_ns);
     else
         printf("  Result       : PCRE2 JIT is %.2fx faster (ratio %.2f)\n\n",
@@ -102,7 +102,7 @@ int main(void) {
 
     printf("--- TEST 2: (a+)+b on all-'a' strings (%d iters each length) ---\n",
            PATH_ITERS);
-    printf("    PCRE2 backtracks O(2^n). SNOBOL4-tiny detects failure O(1).\n\n");
+    printf("    PCRE2 backtracks O(2^n). snobol4x detects failure O(1).\n\n");
 
     int plens[] = {10,15,20,25,28};
     for(int i=0;i<5;i++) {
@@ -122,7 +122,7 @@ int main(void) {
         double t_p=(double)(t1-t0)/PATH_ITERS;
         (void)sink;
 
-        printf("  len=%-3d  tiny: %8.1f ns   PCRE2: %12.1f ns   SNOBOL4-tiny is %.0fx faster\n",
+        printf("  len=%-3d  tiny: %8.1f ns   PCRE2: %12.1f ns   snobol4x is %.0fx faster\n",
                n, t_t, t_p, t_p/(t_t>0.01?t_t:0.01));
         free(buf);
     }
@@ -130,9 +130,9 @@ int main(void) {
     printf("\n=================================================================\n");
     printf("  VERDICT\n");
     printf("=================================================================\n");
-    printf("  Normal   : SNOBOL4-tiny compiled C vs PCRE2 JIT — see above\n");
-    printf("  Patholog : SNOBOL4-tiny O(n) structural. PCRE2 O(2^n). TINY WINS.\n");
-    printf("  Beyond RE: {a^nb^n}, palindromes, Dyck, {w#w} — SNOBOL4-tiny only.\n");
+    printf("  Normal   : snobol4x compiled C vs PCRE2 JIT — see above\n");
+    printf("  Patholog : snobol4x O(n) structural. PCRE2 O(2^n). TINY WINS.\n");
+    printf("  Beyond RE: {a^nb^n}, palindromes, Dyck, {w#w} — snobol4x only.\n");
     printf("=================================================================\n");
 
     pcre2_match_data_free(md1); pcre2_code_free(re1);

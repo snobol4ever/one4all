@@ -1,16 +1,16 @@
-# SNOBOL4-tiny
+# snobol4x
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
 A native SNOBOL4 compiler targeting x86-64 ASM, JVM bytecode, and MSIL.
 Stackless. Goal-directed like Icon. Faster than SPITBOL.
 
-Part of the [SNOBOL4-plus](https://github.com/SNOBOL4-plus) organization.
+Part of the [snobol4ever](https://github.com/snobol4ever) organization.
 
 ---
 
 ## What This Is
 
-SNOBOL4-tiny compiles SNOBOL4 programs to native code using a
+snobol4x compiles SNOBOL4 programs to native code using a
 **Byrd Box** compilation model. Every expression — pattern or arithmetic —
 is a generator with four labeled entry points:
 
@@ -21,7 +21,7 @@ is a generator with four labeled entry points:
 | **γ** | Succeed (pass value up) |
 | **ω** | Fail (propagate failure up) |
 
-This gives SNOBOL4-tiny true **goal-directed evaluation** (like Icon), compiled
+This gives snobol4x true **goal-directed evaluation** (like Icon), compiled
 to straight-line native code with no interpreter loop and no indirect dispatch.
 
 ---
@@ -31,7 +31,7 @@ to straight-line native code with no interpreter loop and no indirect dispatch.
 SPITBOL is the fastest SNOBOL4 implementation in existence. It uses the hardware
 x86 stack (`rsp`) as the backtracking history stack — fast, but bounded:
 
-| Limitation | SPITBOL | SNOBOL4-tiny |
+| Limitation | SPITBOL | snobol4x |
 |------------|---------|--------------|
 | Backtrack stack | Hardware `rsp` (OS-bounded) | Heap `_t` structs (unbounded) |
 | Goal-directed eval | No | Yes — every expr is a generator |
@@ -85,7 +85,7 @@ The `.h` files (`C_PATTERN.h`, `CALC_PATTERN.h`, etc.) are pre-compiled
 pattern data that the interpreter executes. A compiler emits C-with-gotos
 (the `test_sno_*.c` format) instead — same semantics, zero dispatch cost.
 
-**The parser is already written.** `Beautiful.sno` (SNOBOL4-dotnet repo)
+**The parser is already written.** `Beautiful.sno` (snobol4dotnet repo)
 contains a complete 17-level SNOBOL4 expression and statement parser written
 as SNOBOL4 patterns (`snoExpr` through `snoExpr17`, `snoStmt`, `snoParse`).
 Sprint 5: serialize those patterns into `SNOBOL4_EXPRESSION_PATTERN.h`,
@@ -117,12 +117,12 @@ Each completed sprint is tagged as a named snapshot (not a version number).
 
 ## Bootstrap Strategy
 
-SNOBOL4-tiny follows the **Forth kernel discipline**: keep the seed as small
+snobol4x follows the **Forth kernel discipline**: keep the seed as small
 as possible, then build everything else in the language itself.
 
 The analogy is direct:
 
-| Forth | SNOBOL4-tiny |
+| Forth | snobol4x |
 |-------|-------------|
 | ~12 native primitives | 8 primitive pattern nodes (LIT, ANY, POS, RPOS, LEN, SPAN, BREAK, ARB) |
 | NEXT (3-instruction dispatch) | α/β/γ/ω wiring baked into compiled gotos — **zero** dispatch cost |
@@ -139,7 +139,7 @@ The analogy is direct:
 
 2. **Self-hosting emitter (Sprint 5+):** Rewrite `emit_c.py` as
    `src/codegen/emit.sno` — a SNOBOL4 program that reads IR descriptions
-   and emits C. Runs on SNOBOL4-jvm for validation, SNOBOL4-python for speed.
+   and emits C. Runs on snobol4jvm for validation, snobol4python for speed.
 
 3. **Bootstrap closure (Sprint 8+):** The emitter compiles itself and
    produces output identical to the CSNOBOL4/SPITBOL oracle. Same test
@@ -155,9 +155,9 @@ Correctness is validated against three oracles:
 
 - **SPITBOL x64** — speed reference
 - **CSNOBOL4 2.3.3** — conformance reference
-- **SNOBOL4-jvm / SNOBOL4-dotnet** — sibling implementations in this org
+- **snobol4jvm / snobol4dotnet** — sibling implementations in this org
 
-Test corpus: `SNOBOL4-corpus` (shared submodule), Gimpel library, Shafto AI corpus.
+Test corpus: `snobol4corpus` (shared submodule), Gimpel library, Shafto AI corpus.
 
 ---
 
@@ -167,14 +167,14 @@ Two foundational questions are currently on the table. See
 [`doc/DECISIONS.md`](doc/DECISIONS.md) for the full analysis.
 
 **Decision 1 — Compiler implementation language: RESOLVED**
-No yacc. No new grammar. `Beautiful.sno` (SNOBOL4-dotnet) contains a complete
+No yacc. No new grammar. `Beautiful.sno` (snobol4dotnet) contains a complete
 17-level SNOBOL4 expression and statement parser written as SNOBOL4 patterns
 (`snoExpr` through `snoExpr17`, `snoStmt`, `snoParse`). Sprint 5: serialize
 those patterns into `SNOBOL4_EXPRESSION_PATTERN.h`, `#include` it in
 `SNOBOL4c.c`, add a 5-line stdin loop. The seed kernel executes the parser as
 pattern data. The language parses itself. See `doc/DECISIONS.md`.
 
-**Decision 2 — What language does SNOBOL4-tiny implement first: DECIDED**
+**Decision 2 — What language does snobol4x implement first: DECIDED**
 Expressions first, statements second. Sequence B → C → D confirmed:
 - **B** (Sprints 0–4): single pattern, stdin/stdout, no naming — already underway
 - **C** (Sprints 5–6): two named patterns with mutual recursion — the minimum
@@ -210,9 +210,9 @@ bench/          Benchmarks vs SPITBOL, CSNOBOL4
 ## Collaborators
 
 - **Lon Jones Cherryholmes** ([@LCherryholmes](https://github.com/LCherryholmes)) —
-  compiler architecture, x86-64 codegen, SNOBOL4-jvm author
+  compiler architecture, x86-64 codegen, snobol4jvm author
 - **Jeffrey Cooper, M.D.** ([@jcooper0](https://github.com/jcooper0)) —
-  SNOBOL4-dotnet author, MSIL target
+  snobol4dotnet author, MSIL target
 
 ---
 
@@ -220,16 +220,16 @@ bench/          Benchmarks vs SPITBOL, CSNOBOL4
 
 | Repo | What |
 |------|------|
-| [SNOBOL4-jvm](https://github.com/SNOBOL4-plus/SNOBOL4-jvm) | Full SNOBOL4 → JVM bytecode (Clojure) |
-| [SNOBOL4-dotnet](https://github.com/SNOBOL4-plus/SNOBOL4-dotnet) | Full SNOBOL4 → MSIL (C#) |
-| [SNOBOL4-python](https://github.com/SNOBOL4-plus/SNOBOL4-python) | Pattern library (PyPI) |
-| [SNOBOL4-corpus](https://github.com/SNOBOL4-plus/SNOBOL4-corpus) | Shared test corpus |
+| [snobol4jvm](https://github.com/snobol4ever/snobol4jvm) | Full SNOBOL4 → JVM bytecode (Clojure) |
+| [snobol4dotnet](https://github.com/snobol4ever/snobol4dotnet) | Full SNOBOL4 → MSIL (C#) |
+| [snobol4python](https://github.com/snobol4ever/snobol4python) | Pattern library (PyPI) |
+| [snobol4corpus](https://github.com/snobol4ever/snobol4corpus) | Shared test corpus |
 
 ---
 
 ## Polyglot Parsing: Alt IS the Dispatcher
 
-SNOBOL4-tiny's stdin loop matches each input line against a root `PATTERN`.
+snobol4x's stdin loop matches each input line against a root `PATTERN`.
 That root pattern is an **alternation** (`|`) of grammars:
 
 ```c
@@ -248,6 +248,6 @@ detection, no switch statement. Each new language is one more arm, one more
 | `ednExpr` | EDN (Clojure data literals) | New `EDN_PATTERN.h` | 7 |
 | `incStmt` | INC macro/include files | New `INC_PATTERN.h` | 8 |
 
-**The architectural consequence:** SNOBOL4-tiny is not a SNOBOL4 compiler.
+**The architectural consequence:** snobol4x is not a SNOBOL4 compiler.
 It is a **grammar-driven compiler compiler**. The input language is whatever
 grammar is loaded into the root Alt at compile time.
