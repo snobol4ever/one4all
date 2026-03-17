@@ -40,70 +40,80 @@ trap "rm -rf $WORK" EXIT
 
 passed=0; failed=0; skipped=0
 
-# ── extract_subject: pull subject string from "X = '...'" or 'X = "..."' ────
+# ── extract_subject: find subject var from match line, then its value ────────
 extract_subject() {
     local sno="$1"
-    # Match: whitespace X = 'string' or "string" on the FIRST such line
-    perl -ne '
-        if (/^\s+\w+\s*=\s*'"'"'([^'"'"']*)'"'"'/ ||
-            /^\s+\w+\s*=\s*"([^"]*)"/) {
-            print $1; exit;
+    local subj_var
+    subj_var=$(perl -ne '
+        next if /^\s*\*/;
+        next if /^\s*$/;
+        next if /^\s+\w+\s*=/;
+        next if /^[A-Z]/;
+        next if /^END\s*$/;
+        if (/^\s+(\w+)\s+\S/) { print $1; exit; }
+    ' "$sno")
+    [[ -z "$subj_var" ]] && return
+    perl -e '
+        my $v = $ARGV[0]; my $f = $ARGV[1];
+        open my $fh, "<", $f or die;
+        while (<$fh>) {
+            if (/^\s+\Q$v\E\s*=\s'"'"'([^'"'"']*)'"'"'/ ||
+                /^\s+\Q$v\E\s*=\s"([^"]*)"/) { print $1; exit; }
         }
-    ' "$sno"
-}
-
-# ── extract_var: find the captured variable name (. V or $ V) ────────────────
-extract_capture_var() {
-    local sno="$1"
-    perl -ne 'if (/[.\$]\s*([A-Z][A-Z0-9]*)/) { print $1; exit; }' "$sno"
+    ' "$subj_var" "$sno"
 }
 
 # ── is_capture_test: does the .sno use . or $ capture? ──────────────────────
 is_capture_test() {
-    local sno="$1"
-    grep -qE '\.\s+[A-Z]|\$\s*[A-Z]' "$sno"
+    grep -qE '\.\s+[A-Z]|\$\s*[A-Z]' "$1"
 }
 
 # ── build_bare_sno: produce minimal .sno for sno2c -asm-body ─────────────────
-# Strips comments, assignment lines, labels, and gotos — keeps only the
-# pattern match statement(s).
 build_bare_sno() {
     local sno="$1" out="$2"
-    perl -ne '
-        next if /^\s*\*/;           # comment
-        next if /^\s*$/;            # blank
-        # Keep pattern assignments (RHS contains | or pattern functions)
-        # Strip plain value assignments (X = 'string' or X = number)
-        if (/^\s+\w+\s*=/) {
-            # Keep if RHS looks like a pattern: contains | ( or known pattern builtins
-            if (/[|]/ || /=\s*\(/ || /=\s*(ARB|ARBNO|ANY|NOTANY|SPAN|BREAK|LEN|POS|RPOS|TAB|RTAB|REM|FAIL)\b/i) {
-                # Strip goto suffixes
+    local star_vars
+    star_vars=$(perl -ne 'while (/\*([A-Z][A-Z0-9]*)/g){print "$1\n"}' "$sno" \
+                | sort -u | paste -sd'|' -)
+    perl -e '
+        my ($sv, $sno, $out) = @ARGV;
+        open my $in,  "<", $sno or die;
+        open my $fh,  ">", $out or die;
+        while (<$in>) {
+            next if /^\s*\*/;
+            next if /^\s*$/;
+            next if /^END\s*$/;
+            next if /^[A-Z][A-Z0-9]*\s+OUTPUT/;
+            next if /:\(END\)/;
+            if (/^\s+(\w+)\s*=\s*(.*)/) {
+                my ($var, $rhs) = ($1, $2);
+                if ($rhs =~ /[|(]/ ||
+                    $rhs =~ /\b(ARB|ARBNO|ANY|NOTANY|SPAN|BREAK|LEN|POS|RPOS|TAB|RTAB|REM|FAIL)\b/i) {
+                    s/\s*:S\([^)]*\)F\([^)]*\)//;
+                    s/\s*:S\([^)]*\)//;
+                    print $fh $_;
+                } elsif ($sv && $var =~ /^($sv)$/) {
+                    s/\s*:S\([^)]*\)F\([^)]*\)//;
+                    s/\s*:S\([^)]*\)//;
+                    print $fh $_;
+                }
+                next;
+            }
+            if (/^\s+\w+\s+\S/ || /^\s+\w+\s*$/) {
                 s/\s*:S\([^)]*\)F\([^)]*\)//;
                 s/\s*:S\([^)]*\)//;
-                print;
+                s/\s*:F\([^)]*\)//;
+                print $fh $_;
             }
-            next;
         }
-        next if /^END\s*$/;         # END marker
-        next if /^[A-Z][A-Z0-9]*\s+OUTPUT/;  # labelled OUTPUT
-        next if /:\(END\)/;         # goto END
-        # Keep pattern match lines (subject PATTERN :S... or subject PATTERN)
-        if (/^\s+\w+\s+\S/ || /^\s+\w+\s*$/) {
-            # Strip goto suffixes :S(x)F(y)
-            s/\s*:S\([^)]*\)F\([^)]*\)//;
-            s/\s*:S\([^)]*\)//;
-            s/\s*:F\([^)]*\)//;
-            print;
-        }
-    ' "$sno" > "$out"
-    # Add END
-    echo "END" >> "$out"
+        print $fh "END\n";
+    ' "$star_vars" "$sno" "$out"
 }
 
 # ── run_one: process a single .sno file ──────────────────────────────────────
 run_one() {
     local sno="$1"
-    local ref="${sno%.sno}.ref"
+    local ref="${sno%.sno}.asm.ref"
+    [[ -f "$ref" ]] || ref="${sno%.sno}.ref"
     local tag
     tag=$(basename "$sno" .sno)
 

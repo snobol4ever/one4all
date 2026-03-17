@@ -245,6 +245,16 @@ static void emit_asm_rpos(long n,
  * ----------------------------------------------------------------------- */
 
 typedef struct AsmNamedPat AsmNamedPat;
+
+/* Forward declarations for capture variable registry (defined after named-pat section) */
+#define MAX_CAP_VARS 64
+typedef struct {
+    char varname[64];
+    char safe[64];
+    char buf_sym[128];
+    char len_sym[128];
+} CaptureVar;
+static CaptureVar *cap_var_register(const char *varname);
 struct AsmNamedPat {
     char varname[128];
     char safe[128];
@@ -926,13 +936,22 @@ static void emit_asm_assign(EXPR_t *child, const char *varname,
     snprintf(dol_gamma, LBUF, "dol%d_gamma",        uid);
     snprintf(dol_omega, LBUF, "dol%d_omega",        uid);
     snprintf(entry_cur, LBUF, "dol%d_entry",        uid);
-    /* Write capture directly into harness globals cap_buf / cap_len */
-    snprintf(cap_buf,   LBUF, "cap_buf");
-    snprintf(cap_len,   LBUF, "cap_len");
 
-    /* register .bss slots — only entry_cur; cap_buf/cap_len are harness externs */
+    /* Per-variable capture buffers — register var and get its symbols */
+    CaptureVar *cv = cap_var_register(varname ? varname : "cap");
+    if (cv) {
+        snprintf(cap_buf, LBUF, "%s", cv->buf_sym);
+        snprintf(cap_len, LBUF, "%s", cv->len_sym);
+        /* Use per-var entry cursor (pre-registered in .bss by pre-scan) */
+        snprintf(entry_cur, LBUF, "dol_entry_%s", cv->safe);
+    } else {
+        snprintf(cap_buf,   LBUF, "cap_fallback_buf");
+        snprintf(cap_len,   LBUF, "cap_fallback_len");
+        snprintf(entry_cur, LBUF, "dol%d_entry", uid);
+    }
+
+    /* bss_add is a no-op if already registered; harmless in single-pass mode */
     bss_add(entry_cur);
-    /* cap_buf and cap_len are extern globals from the harness — no .bss needed */
 
     A("\n; DOL(%s $  %s)  α=%s\n", varname ? varname : "?", safe, alpha);
 
@@ -1048,16 +1067,34 @@ static void emit_asm_node(EXPR_t *pat,
     }
 
     case E_NAM: {
-        /* expr . var — conditional assignment.
-         * Semantics identical to $ in the pattern match phase
-         * (assignment deferred to after full match for ., but for
-         * our standalone crosscheck harness the distinction doesn't
-         * matter yet — emit same as E_DOL). */
+        /* expr . var — conditional assignment. */
         const char *varname = (pat->right && pat->right->sval)
                               ? pat->right->sval : "cap";
         emit_asm_assign(pat->left, varname,
                         alpha, beta, gamma, omega,
                         cursor, subj, subj_len_sym, depth);
+        break;
+    }
+
+    case E_INDR: {
+        /* *VAR — indirect pattern reference.
+         * pat->left is E_VART holding the variable name.
+         * Look it up in the named-pattern registry and call it. */
+        const char *varname = (pat->left && pat->left->sval)
+                              ? pat->left->sval
+                              : (pat->sval ? pat->sval : NULL);
+        if (varname) {
+            const AsmNamedPat *np = asm_named_lookup(varname);
+            if (np) {
+                emit_asm_named_ref(np, alpha, beta, gamma, omega);
+            } else {
+                A("\n; E_INDR unresolved: %s → ω\n", varname);
+                asmL(alpha); asmL(beta); asmJ(omega);
+            }
+        } else {
+            A("\n; E_INDR no varname → ω\n");
+            asmL(alpha); asmL(beta); asmJ(omega);
+        }
         break;
     }
 
@@ -1144,6 +1181,89 @@ int  asm_extra_bss_count = 0;
 static void extra_bss_emit(void) {
     for (int i = 0; i < asm_extra_bss_count; i++)
         A("%s\n", asm_extra_bss[i]);
+}
+
+/* -----------------------------------------------------------------------
+ * Per-variable capture registry
+ *
+ * Each . or $ capture against a distinct variable gets its own pair:
+ *   cap_VAR_buf  resb 256   — captured bytes
+ *   cap_VAR_len  resq 1     — captured length (UINT64_MAX = no capture)
+ *
+ * The harness walks cap_order[] at match_success to print non-empty caps.
+ * ----------------------------------------------------------------------- */
+
+static CaptureVar cap_vars[MAX_CAP_VARS];
+static int cap_var_count = 0;
+
+static void cap_vars_reset(void) { cap_var_count = 0; }
+
+/* Register (or look up) a capture variable; returns the entry. */
+static CaptureVar *cap_var_register(const char *varname) {
+    for (int i = 0; i < cap_var_count; i++)
+        if (strcmp(cap_vars[i].varname, varname) == 0)
+            return &cap_vars[i];
+    if (cap_var_count >= MAX_CAP_VARS) return NULL;
+    CaptureVar *cv = &cap_vars[cap_var_count++];
+    strncpy(cv->varname, varname, sizeof cv->varname - 1);
+    cv->varname[sizeof cv->varname - 1] = '\0';
+    /* build safe label fragment */
+    int si = 0;
+    for (const char *p = varname; *p && si < 60; p++)
+        cv->safe[si++] = (isalnum((unsigned char)*p) || *p == '_') ? *p : '_';
+    cv->safe[si] = '\0';
+    if (!si) { cv->safe[0] = 'v'; cv->safe[1] = '\0'; }
+    snprintf(cv->buf_sym, sizeof cv->buf_sym, "cap_%s_buf", cv->safe);
+    snprintf(cv->len_sym, sizeof cv->len_sym, "cap_%s_len", cv->safe);
+    return cv;
+}
+
+/* Emit .bss lines for all registered capture variables */
+static void cap_vars_emit_bss(void) {
+    for (int i = 0; i < cap_var_count; i++) {
+        A("%-24s resb 256\n", cap_vars[i].buf_sym);
+        A("%-24s resq 1\n",   cap_vars[i].len_sym);
+    }
+}
+
+/* Emit section .data cap_order table for the harness */
+static void cap_vars_emit_order(void) {
+    if (cap_var_count == 0) return;
+    A("\n; cap_order table — harness walks this at match_success\n");
+    /* Emit name strings */
+    for (int i = 0; i < cap_var_count; i++)
+        A("cap_name_%s  db  ", cap_vars[i].safe);
+    /* We can't easily put a for loop with string literals cleanly, so
+     * emit each cap_name_X as: db 'A', 0 */
+    /* Reset and do it properly */
+    /* (The A() calls above emitted "cap_name_X  db  " — we need to back out.
+     *  Better: just do it all in one pass.) */
+    /* NOTE: the above approach is broken — we need to emit complete lines.
+     * Start over with a clean approach using a separate pass. */
+    /* This function is called after header externs, in section .data context. */
+}
+
+/* Emit cap_order in .data section — each entry: {ptr-to-name, ptr-to-buf, ptr-to-len} */
+static void cap_vars_emit_data_section(void) {
+    if (cap_var_count == 0) return;
+    A("\n; per-variable capture name strings\n");
+    for (int i = 0; i < cap_var_count; i++) {
+        A("cap_name_%-16s db  ", cap_vars[i].safe);
+        for (int j = 0; cap_vars[i].varname[j]; j++) {
+            if (j) A(", ");
+            A("%d", (unsigned char)cap_vars[i].varname[j]);
+        }
+        A(", 0\n");
+    }
+    A("\n; cap_order[] = { name*, buf*, len* } ... null-terminated\n");
+    A("cap_order:\n");
+    for (int i = 0; i < cap_var_count; i++) {
+        A("    dq  cap_name_%-12s", cap_vars[i].safe);
+        A(", %s", cap_vars[i].buf_sym);
+        A(", %s\n", cap_vars[i].len_sym);
+    }
+    A("    dq  0, 0, 0\n");  /* sentinel */
+    A("cap_order_count  dq  %d\n", cap_var_count);
 }
 
 /* -----------------------------------------------------------------------
@@ -1458,57 +1578,100 @@ static void asm_emit_pattern(STMT_t *stmt) {
  * The harness C file provides all those externs.
  * ----------------------------------------------------------------------- */
 
+/* -----------------------------------------------------------------------
+ * asm_scan_capture_vars — pre-pass: walk pattern tree and register every
+ * DOL/NAM capture variable so cap_vars[] is fully populated before we
+ * emit any sections.  Eliminates the need for a two-pass memstream.
+ * ----------------------------------------------------------------------- */
+
+static void asm_scan_expr_for_caps(EXPR_t *e) {
+    if (!e) return;
+    if (e->kind == E_DOL || e->kind == E_NAM) {
+        const char *vn = (e->right && e->right->sval) ? e->right->sval : "cap";
+        cap_var_register(vn);
+    }
+    /* recurse into all children */
+    asm_scan_expr_for_caps(e->left);
+    asm_scan_expr_for_caps(e->right);
+    for (int i = 0; i < e->nargs; i++)
+        asm_scan_expr_for_caps(e->args[i]);
+}
+
+static void asm_scan_capture_vars(STMT_t *stmt) {
+    cap_vars_reset();
+    if (!stmt || !stmt->pattern) return;
+    asm_scan_expr_for_caps(stmt->pattern);
+    /* Also scan named pattern bodies */
+    for (int i = 0; i < asm_named_count; i++)
+        asm_scan_expr_for_caps(asm_named[i].pat);
+}
+
+/* -----------------------------------------------------------------------
+ * asm_emit_body — body-only mode (-asm-body flag)
+ *
+ * Single-pass: pre-scan registers all caps + named patterns first,
+ * then emit header → .data → .bss → .text in one forward pass.
+ * No open_memstream / two-pass needed.
+ * ----------------------------------------------------------------------- */
+
 static void asm_emit_body(STMT_t *stmt) {
     if (!stmt || !stmt->pattern) return;
 
     bss_reset();
     lit_reset();
+    cap_vars_reset();
     asm_extra_bss_count = 0;
 
     const char *cursor_sym   = "cursor";
     const char *subj_sym     = "subject_data";
     const char *subj_len_sym = "subject_len_val";
 
-    /* DO NOT add cursor to bss — it's extern from harness */
-
-    /* Register named-pattern ret_ pointers in .bss */
+    /* Named-pattern ret_ slots always known up front */
     for (int i = 0; i < asm_named_count; i++) {
         bss_add(asm_named[i].ret_gamma);
         bss_add(asm_named[i].ret_omega);
     }
 
-    /* Collect root pattern code into temp buffer */
-    char *code_buf = NULL; size_t code_size = 0;
-    FILE *code_f = open_memstream(&code_buf, &code_size);
-    if (!code_f) return;
-
+    /* ── Collection pass: redirect output to /dev/null, advance uid counter,
+     *    fire all bss_add / lit_intern / cap_var_register calls.
+     *    uid sequence is identical to the real pass that follows, so every
+     *    derived name (lit_str_N, dol_entry_X, root_alpha_saved, …) is
+     *    registered before we emit any section headers.            ── */
+    FILE *devnull = fopen("/dev/null", "w");
     FILE *real_out = asm_out;
-    asm_out = code_f;
+    asm_out = devnull;
+
+    int uid_before_dry = asm_uid_ctr;   /* save uid counter state */
 
     emit_asm_node(stmt->pattern,
                   "root_alpha", "root_beta",
                   "match_success", "match_fail",
-                  cursor_sym, subj_sym, subj_len_sym,
-                  0);
-
+                  cursor_sym, subj_sym, subj_len_sym, 0);
     for (int i = 0; i < asm_named_count; i++)
         emit_asm_named_def(&asm_named[i], cursor_sym, subj_sym, subj_len_sym);
 
-    fclose(code_f);
+    fclose(devnull);
     asm_out = real_out;
+    asm_uid_ctr = uid_before_dry;       /* reset so real pass generates same labels */
 
-    /* Write .s file header */
+    /* ── Emit pass: all symbols now registered; emit sections in order ── */
+
+    /* Header */
     A("; generated by sno2c -asm-body — link with snobol4_asm_harness.o\n");
     A("; assemble: nasm -f elf64 body.s -o body.o\n");
-    A("; link:     gcc -o prog body.o snobol4_asm_harness.o\n\n");
+    A("; link:     gcc -no-pie -o prog body.o snobol4_asm_harness.o\n\n");
 
     A("    global root_alpha, root_beta\n");
     A("    extern cursor, subject_data, subject_len_val\n");
     A("    extern match_success, match_fail\n");
-    A("    extern outer_cursor, cap_len, cap_buf\n\n");
+    A("    extern outer_cursor\n");
+    if (cap_var_count > 0)
+        A("    global cap_order, cap_order_count\n");
+    A("\n");
 
-    /* .data — string literals only (no subject — harness owns that) */
-    if (lit_count > 0) {
+    /* .data — string literals + cap_order table */
+    int has_data = lit_count > 0 || cap_var_count > 0;
+    if (has_data) {
         A("\nsection .data\n\n");
         for (int i = 0; i < lit_count; i++) {
             A("%-20s db ", lit_table[i].label);
@@ -1518,21 +1681,30 @@ static void asm_emit_body(STMT_t *stmt) {
             }
             A("\n");
         }
+        cap_vars_emit_data_section();
     }
 
-    /* .bss — named-pattern ret slots + any extra (no cursor/subject) */
-    int has_bss = bss_count > 0 || asm_extra_bss_count > 0;
+    /* .bss — all slots collected during dry run */
+    int has_bss = bss_count > 0 || asm_extra_bss_count > 0 || cap_var_count > 0;
     if (has_bss) {
         A("\nsection .bss\n\n");
         for (int i = 0; i < bss_count; i++)
             A("%-24s resq 1\n", bss_slots[i]);
         extra_bss_emit();
+        cap_vars_emit_bss();
     }
 
-    /* .text */
+    /* .text — real emit; uid counter continues from where dry run left off,
+     *         so all generated labels are identical to the collected names  */
     A("\nsection .text\n\n");
-    A("%.*s", (int)code_size, code_buf);
-    free(code_buf);
+
+    emit_asm_node(stmt->pattern,
+                  "root_alpha", "root_beta",
+                  "match_success", "match_fail",
+                  cursor_sym, subj_sym, subj_len_sym, 0);
+
+    for (int i = 0; i < asm_named_count; i++)
+        emit_asm_named_def(&asm_named[i], cursor_sym, subj_sym, subj_len_sym);
 }
 
 /* -----------------------------------------------------------------------
