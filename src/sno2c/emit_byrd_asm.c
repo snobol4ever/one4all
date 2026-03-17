@@ -466,6 +466,422 @@ static void emit_asm_arbno(EXPR_t *child,
 }
 
 /* -----------------------------------------------------------------------
+ * emit_asm_any — ANY(S): match one char IN charset S
+ *
+ * Byrd Box (v311.sil ANY/CHARZ):
+ *   α: bounds check (cursor < subj_len); scan S for subject[cursor]; advance; γ
+ *   β: restore cursor; ω
+ * ----------------------------------------------------------------------- */
+
+static void emit_asm_any(const char *charset, int cslen,
+                          const char *alpha, const char *beta,
+                          const char *gamma, const char *omega,
+                          const char *cursor,
+                          const char *subj, const char *subj_len_sym) {
+    char saved[LBUF], cs_lbl[LBUF], loop[LBUF], found[LBUF], notfound[LBUF];
+    int uid = asm_uid();
+    snprintf(saved,    LBUF, "any%d_saved",    uid);
+    snprintf(cs_lbl,   LBUF, "any%d_charset",  uid);
+    snprintf(loop,     LBUF, "any%d_loop",     uid);
+    snprintf(found,    LBUF, "any%d_found",    uid);
+    snprintf(notfound, LBUF, "any%d_notfound", uid);
+    bss_add(saved);
+
+    /* intern charset as data */
+    const char *clabel = lit_intern(charset, cslen);
+
+    A("\n; ANY(\"%.*s\")  α=%s\n", cslen, charset, alpha);
+    asmL(alpha);
+    /* bounds: cursor < subj_len */
+    A("    mov     rax, [%s]\n", cursor);
+    A("    cmp     rax, [%s]\n", subj_len_sym);
+    asmJge(omega);
+    /* save cursor */
+    A("    mov     [%s], rax\n", saved);
+    /* rbx = subject[cursor] */
+    A("    lea     rbx, [rel %s]\n", subj);
+    A("    movzx   ecx, byte [rbx + rax]\n");      /* ecx = subject char */
+    /* scan charset */
+    A("    lea     rsi, [rel %s]\n", clabel);
+    A("    mov     rdx, %d\n", cslen);
+    asmL(loop);
+    A("    test    rdx, rdx\n");
+    A("    jz      %s\n", notfound);
+    A("    movzx   eax, byte [rsi]\n");
+    A("    cmp     al, cl\n");
+    asmJe(found);
+    A("    inc     rsi\n");
+    A("    dec     rdx\n");
+    asmJ(loop);
+    asmL(notfound);
+    asmJ(omega);
+    asmL(found);
+    /* advance cursor by 1 */
+    A("    mov     rax, [%s]\n", saved);
+    A("    inc     rax\n");
+    A("    mov     [%s], rax\n", cursor);
+    asmJ(gamma);
+
+    A("\n; ANY β=%s\n", beta);
+    asmL(beta);
+    A("    mov     rax, [%s]\n", saved);
+    A("    mov     [%s], rax\n", cursor);
+    asmJ(omega);
+}
+
+/* -----------------------------------------------------------------------
+ * emit_asm_notany — NOTANY(S): match one char NOT IN charset S
+ * ----------------------------------------------------------------------- */
+
+static void emit_asm_notany(const char *charset, int cslen,
+                             const char *alpha, const char *beta,
+                             const char *gamma, const char *omega,
+                             const char *cursor,
+                             const char *subj, const char *subj_len_sym) {
+    char saved[LBUF], cs_lbl[LBUF], loop[LBUF], found[LBUF];
+    int uid = asm_uid();
+    snprintf(saved,  LBUF, "nany%d_saved",   uid);
+    snprintf(cs_lbl, LBUF, "nany%d_charset", uid);
+    snprintf(loop,   LBUF, "nany%d_loop",    uid);
+    snprintf(found,  LBUF, "nany%d_found",   uid);
+    bss_add(saved);
+
+    const char *clabel = lit_intern(charset, cslen);
+
+    A("\n; NOTANY(\"%.*s\")  α=%s\n", cslen, charset, alpha);
+    asmL(alpha);
+    A("    mov     rax, [%s]\n", cursor);
+    A("    cmp     rax, [%s]\n", subj_len_sym);
+    asmJge(omega);
+    A("    mov     [%s], rax\n", saved);
+    A("    lea     rbx, [rel %s]\n", subj);
+    A("    movzx   ecx, byte [rbx + rax]\n");
+    A("    lea     rsi, [rel %s]\n", clabel);
+    A("    mov     rdx, %d\n", cslen);
+    asmL(loop);
+    A("    test    rdx, rdx\n");
+    A("    jz      %s\n", found);           /* char not in set → succeed */
+    A("    movzx   eax, byte [rsi]\n");
+    A("    cmp     al, cl\n");
+    asmJe(omega);                           /* char IN set → fail */
+    A("    inc     rsi\n");
+    A("    dec     rdx\n");
+    asmJ(loop);
+    asmL(found);
+    A("    mov     rax, [%s]\n", saved);
+    A("    inc     rax\n");
+    A("    mov     [%s], rax\n", cursor);
+    asmJ(gamma);
+
+    A("\n; NOTANY β=%s\n", beta);
+    asmL(beta);
+    A("    mov     rax, [%s]\n", saved);
+    A("    mov     [%s], rax\n", cursor);
+    asmJ(omega);
+}
+
+/* -----------------------------------------------------------------------
+ * emit_asm_span — SPAN(S): match longest run of chars IN S (min 1)
+ * ----------------------------------------------------------------------- */
+
+static void emit_asm_span(const char *charset, int cslen,
+                           const char *alpha, const char *beta,
+                           const char *gamma, const char *omega,
+                           const char *cursor,
+                           const char *subj, const char *subj_len_sym) {
+    char saved[LBUF], outer_lp[LBUF], cs_scan[LBUF], in_set[LBUF], not_in[LBUF];
+    int uid = asm_uid();
+    snprintf(saved,   LBUF, "span%d_saved",  uid);
+    snprintf(outer_lp,LBUF, "span%d_outer",  uid);
+    snprintf(cs_scan, LBUF, "span%d_csscan", uid);
+    snprintf(in_set,  LBUF, "span%d_inset",  uid);
+    snprintf(not_in,  LBUF, "span%d_notin",  uid);
+    bss_add(saved);
+
+    const char *clabel = lit_intern(charset, cslen);
+
+    A("\n; SPAN(\"%.*s\") REAL  α=%s\n", cslen, charset, alpha);
+    asmL(alpha);
+    /* need at least 1 char */
+    A("    mov     rax, [%s]\n", cursor);
+    A("    cmp     rax, [%s]\n", subj_len_sym);
+    asmJge(omega);
+    A("    mov     [%s], rax\n", saved);  /* save start position */
+
+    /* r12 = current position (walk forward) */
+    A("    mov     r12, rax\n");
+    asmL(outer_lp);
+    /* bounds */
+    A("    cmp     r12, [%s]\n", subj_len_sym);
+    A("    jge     %s\n", not_in);
+    /* load subject[r12] into cl */
+    A("    lea     rbx, [rel %s]\n", subj);
+    A("    movzx   ecx, byte [rbx + r12]\n");
+    /* scan charset: al = each charset byte; check al == cl */
+    A("    lea     rsi, [rel %s]\n", clabel);
+    A("    mov     rdx, %d\n", cslen);
+    asmL(cs_scan);
+    A("    test    rdx, rdx\n");
+    A("    jz      %s\n", not_in);        /* char not in set → stop */
+    A("    movzx   eax, byte [rsi]\n");
+    A("    cmp     al, cl\n");
+    asmJe(in_set);
+    A("    inc     rsi\n");
+    A("    dec     rdx\n");
+    asmJ(cs_scan);
+    asmL(in_set);
+    A("    inc     r12\n");
+    asmJ(outer_lp);
+
+    asmL(not_in);
+    /* r12 = position after last matching char
+     * require r12 > saved (at least 1 char matched) */
+    A("    mov     rbx, [%s]\n", saved);
+    A("    cmp     r12, rbx\n");
+    asmJe(omega);                         /* zero chars → fail */
+    A("    mov     [%s], r12\n", cursor);
+    asmJ(gamma);
+
+    A("\n; SPAN β=%s\n", beta);
+    asmL(beta);
+    A("    mov     rax, [%s]\n", saved);
+    A("    mov     [%s], rax\n", cursor);
+    asmJ(omega);
+}
+
+static void emit_asm_break(const char *charset, int cslen,
+                                 const char *alpha, const char *beta,
+                                 const char *gamma, const char *omega,
+                                 const char *cursor,
+                                 const char *subj, const char *subj_len_sym) {
+    char saved[LBUF], outer_lp[LBUF], cs_scan[LBUF], in_set[LBUF], advance[LBUF];
+    int uid = asm_uid();
+    snprintf(saved,   LBUF, "brk%d_saved",   uid);
+    snprintf(outer_lp,LBUF, "brk%d_outer",   uid);
+    snprintf(cs_scan, LBUF, "brk%d_csscan",  uid);
+    snprintf(in_set,  LBUF, "brk%d_inset",   uid);
+    snprintf(advance, LBUF, "brk%d_advance", uid);
+    bss_add(saved);
+
+    const char *clabel = lit_intern(charset, cslen);
+
+    A("\n; BREAK(\"%.*s\") REAL  α=%s\n", cslen, charset, alpha);
+    asmL(alpha);
+    A("    mov     rax, [%s]\n", cursor);
+    A("    mov     [%s], rax\n", saved);
+    A("    mov     r12, rax\n");
+
+    asmL(outer_lp);
+    A("    cmp     r12, [%s]\n", subj_len_sym);
+    asmJge(omega);                          /* reached end without delimiter → fail */
+    A("    lea     rbx, [rel %s]\n", subj);
+    A("    movzx   ecx, byte [rbx + r12]\n");
+    /* check if subject[r12] IN charset → if yes, stop (success) */
+    A("    lea     rsi, [rel %s]\n", clabel);
+    A("    mov     rdx, %d\n", cslen);
+    asmL(cs_scan);
+    A("    test    rdx, rdx\n");
+    asmJe(advance);                         /* char not in delimiters → keep going */
+    A("    movzx   eax, byte [rsi]\n");
+    A("    cmp     al, cl\n");
+    asmJe(in_set);                          /* found delimiter */
+    A("    inc     rsi\n");
+    A("    dec     rdx\n");
+    asmJ(cs_scan);
+
+    asmL(advance);
+    A("    inc     r12\n");
+    asmJ(outer_lp);
+
+    asmL(in_set);
+    /* cursor = r12 (position OF delimiter — not past it) */
+    A("    mov     [%s], r12\n", cursor);
+    asmJ(gamma);
+
+    A("\n; BREAK β=%s\n", beta);
+    asmL(beta);
+    A("    mov     rax, [%s]\n", saved);
+    A("    mov     [%s], rax\n", cursor);
+    asmJ(omega);
+}
+
+/* -----------------------------------------------------------------------
+ * emit_asm_len — LEN(N): match exactly N characters
+ * ----------------------------------------------------------------------- */
+
+static void emit_asm_len(long n,
+                          const char *alpha, const char *beta,
+                          const char *gamma, const char *omega,
+                          const char *cursor,
+                          const char *subj_len_sym) {
+    char saved[LBUF];
+    int uid = asm_uid();
+    snprintf(saved, LBUF, "len%d_saved", uid);
+    bss_add(saved);
+    (void)subj_len_sym;
+
+    A("\n; LEN(%ld)  α=%s\n", n, alpha);
+    asmL(alpha);
+    A("    mov     rax, [%s]\n", cursor);
+    A("    mov     [%s], rax\n", saved);
+    A("    add     rax, %ld\n", n);
+    A("    cmp     rax, [%s]\n", subj_len_sym);
+    asmJg(omega);
+    A("    mov     [%s], rax\n", cursor);
+    asmJ(gamma);
+
+    A("\n; LEN β=%s\n", beta);
+    asmL(beta);
+    A("    mov     rax, [%s]\n", saved);
+    A("    mov     [%s], rax\n", cursor);
+    asmJ(omega);
+}
+
+/* -----------------------------------------------------------------------
+ * emit_asm_tab — TAB(N): advance cursor to column N (fail if past N)
+ * ----------------------------------------------------------------------- */
+
+static void emit_asm_tab(long n,
+                          const char *alpha, const char *beta,
+                          const char *gamma, const char *omega,
+                          const char *cursor) {
+    char saved[LBUF];
+    int uid = asm_uid();
+    snprintf(saved, LBUF, "tab%d_saved", uid);
+    bss_add(saved);
+
+    A("\n; TAB(%ld)  α=%s\n", n, alpha);
+    asmL(alpha);
+    A("    mov     rax, [%s]\n", cursor);
+    A("    mov     [%s], rax\n", saved);
+    /* fail if cursor > n (already past the tab position) */
+    A("    cmp     rax, %ld\n", n);
+    asmJg(omega);
+    A("    mov     qword [%s], %ld\n", cursor, n);
+    asmJ(gamma);
+
+    A("\n; TAB β=%s\n", beta);
+    asmL(beta);
+    A("    mov     rax, [%s]\n", saved);
+    A("    mov     [%s], rax\n", cursor);
+    asmJ(omega);
+}
+
+/* -----------------------------------------------------------------------
+ * emit_asm_rtab — RTAB(N): match up to N chars from right
+ *   cursor must end at subj_len - N
+ * ----------------------------------------------------------------------- */
+
+static void emit_asm_rtab(long n,
+                           const char *alpha, const char *beta,
+                           const char *gamma, const char *omega,
+                           const char *cursor,
+                           const char *subj_len_sym) {
+    char saved[LBUF];
+    int uid = asm_uid();
+    snprintf(saved, LBUF, "rtab%d_saved", uid);
+    bss_add(saved);
+
+    A("\n; RTAB(%ld)  α=%s\n", n, alpha);
+    asmL(alpha);
+    A("    mov     rax, [%s]\n", cursor);
+    A("    mov     [%s], rax\n", saved);
+    /* target = subj_len - n */
+    A("    mov     rbx, [%s]\n", subj_len_sym);
+    if (n != 0) A("    sub     rbx, %ld\n", n);
+    /* fail if cursor > target */
+    A("    cmp     rax, rbx\n");
+    asmJg(omega);
+    /* set cursor = target */
+    A("    mov     [%s], rbx\n", cursor);
+    asmJ(gamma);
+
+    A("\n; RTAB β=%s\n", beta);
+    asmL(beta);
+    A("    mov     rax, [%s]\n", saved);
+    A("    mov     [%s], rax\n", cursor);
+    asmJ(omega);
+}
+
+/* -----------------------------------------------------------------------
+ * emit_asm_rem — REM: match rest of string (always succeeds, no backtrack)
+ * ----------------------------------------------------------------------- */
+
+static void emit_asm_rem(const char *alpha, const char *beta,
+                          const char *gamma, const char *omega,
+                          const char *cursor,
+                          const char *subj_len_sym) {
+    char saved[LBUF];
+    int uid = asm_uid();
+    snprintf(saved, LBUF, "rem%d_saved", uid);
+    bss_add(saved);
+
+    A("\n; REM  α=%s\n", alpha);
+    asmL(alpha);
+    A("    mov     rax, [%s]\n", cursor);
+    A("    mov     [%s], rax\n", saved);
+    /* set cursor = subj_len */
+    A("    mov     rax, [%s]\n", subj_len_sym);
+    A("    mov     [%s], rax\n", cursor);
+    asmJ(gamma);
+
+    A("\n; REM β=%s\n", beta);
+    asmL(beta);
+    A("    mov     rax, [%s]\n", saved);
+    A("    mov     [%s], rax\n", cursor);
+    asmJ(omega);
+}
+
+/* -----------------------------------------------------------------------
+ * emit_asm_arb — ARB: match minimum (0 chars), then backtrack to extend
+ *
+ * ARB is like ARBNO(''): tries 0 chars first, then on backtrack extends
+ * by 1 char at a time up to subj_len - cursor.
+ *
+ * Design (flat .bss):
+ *   arb_N_start: cursor position when ARB entered (for β restore)
+ *   arb_N_step:  current step count (0, 1, 2, ...)
+ *
+ *   α: save cursor + step=0; set cursor=start+0; goto γ
+ *   β: step++; if start+step > subj_len: goto ω; set cursor=start+step; goto γ
+ * ----------------------------------------------------------------------- */
+
+static void emit_asm_arb(const char *alpha, const char *beta,
+                          const char *gamma, const char *omega,
+                          const char *cursor,
+                          const char *subj_len_sym) {
+    char arb_start[LBUF], arb_step[LBUF], chk[LBUF];
+    int uid = asm_uid();
+    snprintf(arb_start, LBUF, "arb%d_start", uid);
+    snprintf(arb_step,  LBUF, "arb%d_step",  uid);
+    snprintf(chk,       LBUF, "arb%d_chk",   uid);
+    bss_add(arb_start);
+    bss_add(arb_step);
+
+    A("\n; ARB  α=%s\n", alpha);
+    asmL(alpha);
+    A("    mov     rax, [%s]\n", cursor);
+    A("    mov     [%s], rax\n", arb_start);
+    A("    mov     qword [%s], 0\n", arb_step);
+    /* cursor stays at start (0-length match first) */
+    asmJ(gamma);
+
+    A("\n; ARB β=%s\n", beta);
+    asmL(beta);
+    A("    mov     rax, [%s]\n", arb_step);
+    A("    inc     rax\n");
+    A("    mov     [%s], rax\n", arb_step);
+    /* check start + step <= subj_len */
+    A("    mov     rbx, [%s]\n", arb_start);
+    A("    add     rbx, rax\n");
+    A("    cmp     rbx, [%s]\n", subj_len_sym);
+    asmJg(omega);
+    A("    mov     [%s], rbx\n", cursor);
+    asmJ(gamma);
+    (void)chk;
+}
+
+/* -----------------------------------------------------------------------
  * emit_asm_assign — E_DOL (expr $ var) — immediate assignment
  *
  * Byrd Box (v311.sil ENMI, Proebsting §4.3):
@@ -510,19 +926,13 @@ static void emit_asm_assign(EXPR_t *child, const char *varname,
     snprintf(dol_gamma, LBUF, "dol%d_gamma",        uid);
     snprintf(dol_omega, LBUF, "dol%d_omega",        uid);
     snprintf(entry_cur, LBUF, "dol%d_entry",        uid);
-    snprintf(cap_buf,   LBUF, "cap_%s_%d_buf",      safe, uid);
-    snprintf(cap_len,   LBUF, "cap_%s_%d_len",      safe, uid);
+    /* Write capture directly into harness globals cap_buf / cap_len */
+    snprintf(cap_buf,   LBUF, "cap_buf");
+    snprintf(cap_len,   LBUF, "cap_len");
 
-    /* register .bss slots */
+    /* register .bss slots — only entry_cur; cap_buf/cap_len are harness externs */
     bss_add(entry_cur);
-    bss_add(cap_len);
-    /* cap_buf needs resb 256, not resq 1 — use extra_bss */
-    extern char asm_extra_bss[][128];
-    extern int  asm_extra_bss_count;
-    if (asm_extra_bss_count < 64) {
-        snprintf(asm_extra_bss[asm_extra_bss_count++], 128,
-                 "%-24s resb 256", cap_buf);
-    }
+    /* cap_buf and cap_len are extern globals from the harness — no .bss needed */
 
     A("\n; DOL(%s $  %s)  α=%s\n", varname ? varname : "?", safe, alpha);
 
@@ -595,9 +1005,25 @@ static void emit_asm_node(EXPR_t *pat,
 
     case E_VART: {
         /* Variable reference in pattern context — named pattern call site.
-         * Look up in the registry; if found emit indirect-jmp call convention.
-         * If not found, emit a comment + omega (unresolved reference). */
+         * BUT: zero-arg builtins (REM, ARB, FAIL) appear as E_VART with no
+         * parens. Intercept them before the named-pattern lookup. */
         const char *varname = pat->sval ? pat->sval : "";
+        if (strcasecmp(varname, "REM") == 0) {
+            emit_asm_rem(alpha, beta, gamma, omega, cursor, subj_len_sym);
+            break;
+        }
+        if (strcasecmp(varname, "ARB") == 0) {
+            emit_asm_arb(alpha, beta, gamma, omega, cursor, subj_len_sym);
+            break;
+        }
+        if (strcasecmp(varname, "FAIL") == 0) {
+            A("\n; FAIL  α=%s\n", alpha);
+            asmL(alpha);
+            asmL(beta);
+            asmJ(omega);
+            break;
+        }
+        /* Look up in the named-pattern registry */
         const AsmNamedPat *np = asm_named_lookup(varname);
         if (np) {
             emit_asm_named_ref(np, alpha, beta, gamma, omega);
@@ -648,6 +1074,48 @@ static void emit_asm_node(EXPR_t *pat,
             emit_asm_arbno(pat->args[0],
                            alpha, beta, gamma, omega,
                            cursor, subj, subj_len_sym, depth);
+        } else if (pat->sval && strcasecmp(pat->sval, "ANY") == 0 && pat->nargs == 1) {
+            EXPR_t *arg = pat->args[0];
+            const char *cs = (arg->kind == E_QLIT && arg->sval) ? arg->sval : "";
+            int cslen = (arg->kind == E_QLIT && arg->sval) ? (int)strlen(arg->sval) : 0;
+            emit_asm_any(cs, cslen, alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
+        } else if (pat->sval && strcasecmp(pat->sval, "NOTANY") == 0 && pat->nargs == 1) {
+            EXPR_t *arg = pat->args[0];
+            const char *cs = (arg->kind == E_QLIT && arg->sval) ? arg->sval : "";
+            int cslen = (arg->kind == E_QLIT && arg->sval) ? (int)strlen(arg->sval) : 0;
+            emit_asm_notany(cs, cslen, alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
+        } else if (pat->sval && strcasecmp(pat->sval, "SPAN") == 0 && pat->nargs == 1) {
+            EXPR_t *arg = pat->args[0];
+            const char *cs = (arg->kind == E_QLIT && arg->sval) ? arg->sval : "";
+            int cslen = (arg->kind == E_QLIT && arg->sval) ? (int)strlen(arg->sval) : 0;
+            emit_asm_span(cs, cslen, alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
+        } else if (pat->sval && strcasecmp(pat->sval, "BREAK") == 0 && pat->nargs == 1) {
+            EXPR_t *arg = pat->args[0];
+            const char *cs = (arg->kind == E_QLIT && arg->sval) ? arg->sval : "";
+            int cslen = (arg->kind == E_QLIT && arg->sval) ? (int)strlen(arg->sval) : 0;
+            emit_asm_break(cs, cslen, alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
+        } else if (pat->sval && strcasecmp(pat->sval, "LEN") == 0 && pat->nargs == 1) {
+            EXPR_t *arg = pat->args[0];
+            long n = (arg->kind == E_ILIT) ? arg->ival : 0;
+            emit_asm_len(n, alpha, beta, gamma, omega, cursor, subj_len_sym);
+        } else if (pat->sval && strcasecmp(pat->sval, "TAB") == 0 && pat->nargs == 1) {
+            EXPR_t *arg = pat->args[0];
+            long n = (arg->kind == E_ILIT) ? arg->ival : 0;
+            emit_asm_tab(n, alpha, beta, gamma, omega, cursor);
+        } else if (pat->sval && strcasecmp(pat->sval, "RTAB") == 0 && pat->nargs == 1) {
+            EXPR_t *arg = pat->args[0];
+            long n = (arg->kind == E_ILIT) ? arg->ival : 0;
+            emit_asm_rtab(n, alpha, beta, gamma, omega, cursor, subj_len_sym);
+        } else if (pat->sval && strcasecmp(pat->sval, "REM") == 0 && pat->nargs == 0) {
+            emit_asm_rem(alpha, beta, gamma, omega, cursor, subj_len_sym);
+        } else if (pat->sval && strcasecmp(pat->sval, "ARB") == 0 && pat->nargs == 0) {
+            emit_asm_arb(alpha, beta, gamma, omega, cursor, subj_len_sym);
+        } else if (pat->sval && strcasecmp(pat->sval, "FAIL") == 0) {
+            /* FAIL always fails — alpha and beta both jump to omega */
+            A("\n; FAIL  α=%s\n", alpha);
+            asmL(alpha);
+            asmL(beta);
+            asmJ(omega);
         } else {
             /* Unimplemented function — emit a comment + omega jump */
             A("\n; UNIMPLEMENTED: %s() → ω\n", pat->sval ? pat->sval : "?");

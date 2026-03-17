@@ -72,7 +72,18 @@ build_bare_sno() {
     perl -ne '
         next if /^\s*\*/;           # comment
         next if /^\s*$/;            # blank
-        next if /^\s+\w+\s*=/;     # assignment (X = ...)
+        # Keep pattern assignments (RHS contains | or pattern functions)
+        # Strip plain value assignments (X = 'string' or X = number)
+        if (/^\s+\w+\s*=/) {
+            # Keep if RHS looks like a pattern: contains | ( or known pattern builtins
+            if (/[|]/ || /=\s*\(/ || /=\s*(ARB|ARBNO|ANY|NOTANY|SPAN|BREAK|LEN|POS|RPOS|TAB|RTAB|REM|FAIL)\b/i) {
+                # Strip goto suffixes
+                s/\s*:S\([^)]*\)F\([^)]*\)//;
+                s/\s*:S\([^)]*\)//;
+                print;
+            }
+            next;
+        }
         next if /^END\s*$/;         # END marker
         next if /^[A-Z][A-Z0-9]*\s+OUTPUT/;  # labelled OUTPUT
         next if /:\(END\)/;         # goto END
