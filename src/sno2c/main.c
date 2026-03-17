@@ -8,6 +8,9 @@
 #include <string.h>
 
 extern int trampoline_mode;  /* defined in emit.c */
+void asm_emit(Program *prog, FILE *f); /* defined in emit_byrd_asm.c */
+
+static int asm_mode = 0;    /* -asm flag: emit x64 NASM instead of C */
 
 int main(int argc, char *argv[]) {
     const char *outfile = NULL, *infile = NULL;
@@ -20,6 +23,8 @@ int main(int argc, char *argv[]) {
             outfile = argv[++i];
         } else if (!strcmp(argv[i],"-trampoline")) {
             trampoline_mode = 1;
+        } else if (!strcmp(argv[i],"-asm")) {
+            asm_mode = 1;
         } else if (argv[i][0]!='-') {
             infile = argv[i];
         } else {
@@ -50,7 +55,10 @@ int main(int argc, char *argv[]) {
         fprintf(stderr,"sno2c: %d error(s)\n", snoc_nerrors); return 1;
     }
 
-    snoc_emit(prog, out);
+    if (asm_mode)
+        asm_emit(prog, out);
+    else
+        snoc_emit(prog, out);
 
     if (infile)  fclose(in);
     if (outfile) fclose(out);
