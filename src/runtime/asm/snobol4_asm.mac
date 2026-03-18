@@ -1018,5 +1018,98 @@
 %define CALL2_SN CONC2_N      ; back-compat
 
 ; =============================================================================
-; END Session 167 high-level statement macros
+; Session 171 — variable-arg CONC2/ALT2 fast-path macros
+;
+;   CONC2_SV  fn, strlab, varlab   — fn(str_literal, variable)
+;   CONC2_VS  fn, varlab, strlab   — fn(variable, str_literal)
+;   CONC2_VN  fn, varlab           — fn(variable, NULVCL)
+;   CONC2_VV  fn, varlab1, varlab2 — fn(variable, variable)
+;
+;   ALT2_SV / ALT2_VS / ALT2_VN / ALT2_VV — identical expansion, different fn label
+; =============================================================================
+
+; CONC2_SV fn, strlab, varlab   — fn(str_literal, variable) → [rbp-32/24]
+%macro CONC2_SV 3
+    sub     rsp, 32
+    lea     rdi, [rel %2]
+    call    stmt_strval
+    mov     [rsp], rax
+    mov     [rsp+8], rdx
+    lea     rdi, [rel %3]
+    call    stmt_get
+    mov     [rsp+16], rax
+    mov     [rsp+24], rdx
+    lea     rdi, [rel %1]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+%endmacro
+%define ALT2_SV  CONC2_SV
+
+; CONC2_VS fn, varlab, strlab   — fn(variable, str_literal) → [rbp-32/24]
+%macro CONC2_VS 3
+    sub     rsp, 32
+    lea     rdi, [rel %2]
+    call    stmt_get
+    mov     [rsp], rax
+    mov     [rsp+8], rdx
+    lea     rdi, [rel %3]
+    call    stmt_strval
+    mov     [rsp+16], rax
+    mov     [rsp+24], rdx
+    lea     rdi, [rel %1]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+%endmacro
+%define ALT2_VS  CONC2_VS
+
+; CONC2_VN fn, varlab   — fn(variable, NULVCL) → [rbp-32/24]
+%macro CONC2_VN 2
+    sub     rsp, 32
+    lea     rdi, [rel %2]
+    call    stmt_get
+    mov     [rsp], rax
+    mov     [rsp+8], rdx
+    mov     qword [rsp+16], 1
+    mov     qword [rsp+24], 0
+    lea     rdi, [rel %1]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+%endmacro
+%define ALT2_VN  CONC2_VN
+
+; CONC2_VV fn, varlab1, varlab2 — fn(variable, variable) → [rbp-32/24]
+%macro CONC2_VV 3
+    sub     rsp, 32
+    lea     rdi, [rel %2]
+    call    stmt_get
+    mov     [rsp], rax
+    mov     [rsp+8], rdx
+    lea     rdi, [rel %3]
+    call    stmt_get
+    mov     [rsp+16], rax
+    mov     [rsp+24], rdx
+    lea     rdi, [rel %1]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+%endmacro
+%define ALT2_VV  CONC2_VV
+
+; =============================================================================
+; END Session 167/171 high-level statement macros
 ; =============================================================================
