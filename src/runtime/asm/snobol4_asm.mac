@@ -1,0 +1,297 @@
+; =============================================================================
+; snobol4_asm.mac — NASM macro library for sno2c ASM backend
+;
+; Design: every emitted line follows the three-column SNOBOL4 form:
+;
+;   LABEL          ACTION          GOTO
+;
+; Macros expand to whatever register shuffling is needed underneath.
+; The generated .s file reads like the theory — Byrd box ports visible,
+; statement structure clear, no raw register names in the body.
+;
+; Calling convention: SysV AMD64.
+; DESCR_t = 16 bytes: [0..7]=type+pad (rax), [8..15]=union ptr/int (rdx)
+; subject_data, subject_len_val, cursor: flat .bss globals.
+;
+; Registers reserved across macros:
+;   rbx = scratch (callee-saved, restored by macros that use it)
+;   rax, rdx = DESCR_t return value from C shims
+;   rdi, rsi, rdx, rcx = C call arguments
+;
+; Sprint A12 — M-ASM-MACROS
+; =============================================================================
+
+; -----------------------------------------------------------------------------
+; STMT_SEP — visual separator between statements (80 columns)
+; -----------------------------------------------------------------------------
+%macro STMT_SEP 0
+    ; ========================================================================
+%endmacro
+
+; -----------------------------------------------------------------------------
+; PORT_SEP — visual separator between Byrd box ports (60 columns)
+; -----------------------------------------------------------------------------
+%macro PORT_SEP 0
+    ; ----------------------------------------
+%endmacro
+
+; -----------------------------------------------------------------------------
+; STMT_COMMENT label, text — annotate a statement boundary
+; -----------------------------------------------------------------------------
+%macro STMT_COMMENT 2
+    ; STMT %1 : %2
+%endmacro
+
+; -----------------------------------------------------------------------------
+; PORT_COMMENT port, role — annotate a Byrd box port
+; -----------------------------------------------------------------------------
+%macro PORT_COMMENT 2
+    ; PORT %1 [%2]
+%endmacro
+
+; =============================================================================
+; STATEMENT-LEVEL MACROS
+; =============================================================================
+
+; -----------------------------------------------------------------------------
+; PROG_INIT — program startup: call stmt_init
+; -----------------------------------------------------------------------------
+%macro PROG_INIT 0
+    push    rbp
+    mov     rbp, rsp
+    sub     rsp, 64
+    call    stmt_init
+%endmacro
+
+; -----------------------------------------------------------------------------
+; PROG_END — program termination
+; -----------------------------------------------------------------------------
+%macro PROG_END 0
+    call    stmt_finish
+    xor     eax, eax
+    leave
+    ret
+%endmacro
+
+; -----------------------------------------------------------------------------
+; GET_VAR strlab — load named SNOBOL4 variable → DESCR_t at [rbp-16]
+; strlab is a S_N label pointing to the null-terminated variable name
+; -----------------------------------------------------------------------------
+%macro GET_VAR 1
+    lea     rdi, [rel %1]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8],  rdx
+%endmacro
+
+; -----------------------------------------------------------------------------
+; SET_VAR strlab — store DESCR_t from [rbp-32] into named variable
+; -----------------------------------------------------------------------------
+%macro SET_VAR 1
+    lea     rdi, [rel %1]
+    mov     rsi, [rbp-32]
+    mov     rdx, [rbp-24]
+    call    stmt_set
+%endmacro
+
+; -----------------------------------------------------------------------------
+; SET_OUTPUT — write DESCR_t at [rbp-32] to OUTPUT (stdout)
+; -----------------------------------------------------------------------------
+%macro SET_OUTPUT 0
+    mov     rdi, [rbp-32]
+    mov     rsi, [rbp-24]
+    call    stmt_output
+%endmacro
+
+; -----------------------------------------------------------------------------
+; LOAD_STR strlab — make string literal DESCR_t at [rbp-32]
+; -----------------------------------------------------------------------------
+%macro LOAD_STR 1
+    lea     rdi, [rel %1]
+    call    stmt_strval
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+%endmacro
+
+; -----------------------------------------------------------------------------
+; LOAD_INT n — make integer DESCR_t at [rbp-32]
+; -----------------------------------------------------------------------------
+%macro LOAD_INT 1
+    mov     rdi, %1
+    call    stmt_intval
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+%endmacro
+
+; -----------------------------------------------------------------------------
+; CHECK_FAIL succeed, fail — branch on IS_FAIL of [rbp-32]
+; -----------------------------------------------------------------------------
+%macro CHECK_FAIL 2
+    mov     rdi, [rbp-32]
+    mov     rsi, [rbp-24]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     %2
+    jmp     %1
+%endmacro
+
+; -----------------------------------------------------------------------------
+; SETUP_SUBJECT — copy DESCR_t at [rbp-16] into subject_data for pattern match
+; -----------------------------------------------------------------------------
+%macro SETUP_SUBJECT 0
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_setup_subject
+%endmacro
+
+; -----------------------------------------------------------------------------
+; APPLY_REPL strlab — write DESCR_t at [rbp-32] back to named variable
+; -----------------------------------------------------------------------------
+%macro APPLY_REPL 1
+    lea     rdi, [rel %1]
+    mov     rsi, [rbp-32]
+    mov     rdx, [rbp-24]
+    call    stmt_apply_replacement
+%endmacro
+
+; =============================================================================
+; PATTERN NODE MACROS
+; Each macro corresponds to one Byrd box primitive.
+; Parameters: charset/literal data label, then γ (succeed) and ω (fail) targets.
+; =============================================================================
+
+; -----------------------------------------------------------------------------
+; LIT_MATCH cs_label, len, γ, ω
+; Match exact byte sequence. Inline repe cmpsb.
+; -----------------------------------------------------------------------------
+%macro LIT_MATCH 4
+    ; LIT [%1] len=%2  →  γ=%3  ω=%4
+    mov     rax, [rel cursor]
+    mov     rbx, [rel subject_len_val]
+    mov     rcx, %2
+    add     rcx, rax
+    cmp     rcx, rbx
+    ja      %4
+    lea     rsi, [rel %1]
+    lea     rdi, [rel subject_data]
+    add     rdi, rax
+    push    rcx
+    mov     rcx, %2
+    repe    cmpsb
+    pop     rcx
+    jne     %4
+    mov     [rel cursor], rcx
+    jmp     %3
+%endmacro
+
+; -----------------------------------------------------------------------------
+; SPAN_MATCH cs_label, cs_len, γ, ω
+; Match longest run of chars in charset (min 1).
+; -----------------------------------------------------------------------------
+%macro SPAN_MATCH 4
+    ; SPAN [%1] len=%2  →  γ=%3  ω=%4
+    mov     rax, [rel cursor]
+    mov     rbx, [rel subject_len_val]
+    mov     r8,  rax          ; start position
+%%span_loop:
+    cmp     rax, rbx
+    jge     %%span_check
+    movzx   ecx, byte [rel subject_data + rax]
+    lea     rsi, [rel %1]
+    mov     rdx, %2
+    push    rax
+    push    rbx
+    push    r8
+%%span_scan:
+    test    rdx, rdx
+    jz      %%span_notfound
+    movzx   edi, byte [rsi]
+    cmp     cl, dil
+    je      %%span_found
+    inc     rsi
+    dec     rdx
+    jmp     %%span_scan
+%%span_found:
+    pop     r8
+    pop     rbx
+    pop     rax
+    inc     rax
+    jmp     %%span_loop
+%%span_notfound:
+    pop     r8
+    pop     rbx
+    pop     rax
+%%span_check:
+    cmp     rax, r8
+    je      %4
+    mov     [rel cursor], rax
+    jmp     %3
+%endmacro
+
+; -----------------------------------------------------------------------------
+; POS_MATCH n, γ, ω — match if cursor == n
+; -----------------------------------------------------------------------------
+%macro POS_MATCH 3
+    ; POS %1  →  γ=%2  ω=%3
+    cmp     qword [rel cursor], %1
+    je      %2
+    jmp     %3
+%endmacro
+
+; -----------------------------------------------------------------------------
+; RPOS_MATCH n, γ, ω — match if cursor == subject_len - n
+; -----------------------------------------------------------------------------
+%macro RPOS_MATCH 3
+    ; RPOS %1  →  γ=%2  ω=%3
+    mov     rax, [rel subject_len_val]
+    sub     rax, %1
+    cmp     [rel cursor], rax
+    je      %2
+    jmp     %3
+%endmacro
+
+; -----------------------------------------------------------------------------
+; CURSOR_SAVE reg — save cursor into register (for ALT/ARBNO backtrack)
+; -----------------------------------------------------------------------------
+%macro CURSOR_SAVE 1
+    mov     %1, [rel cursor]
+%endmacro
+
+; -----------------------------------------------------------------------------
+; CURSOR_RESTORE reg — restore cursor from register
+; -----------------------------------------------------------------------------
+%macro CURSOR_RESTORE 1
+    mov     [rel cursor], %1
+%endmacro
+
+; -----------------------------------------------------------------------------
+; GOTO_ALWAYS target — unconditional jump (readable alias)
+; -----------------------------------------------------------------------------
+%macro GOTO_ALWAYS 1
+    jmp     %1
+%endmacro
+
+; -----------------------------------------------------------------------------
+; GOTO_S target — jump on success (alias for clarity in statement context)
+; -----------------------------------------------------------------------------
+%macro GOTO_S 1
+    jmp     %1
+%endmacro
+
+; -----------------------------------------------------------------------------
+; GOTO_F target — jump on failure
+; -----------------------------------------------------------------------------
+%macro GOTO_F 1
+    jmp     %1
+%endmacro
+
+; -----------------------------------------------------------------------------
+; CALL_FN name — call a C shim function (readable alias)
+; -----------------------------------------------------------------------------
+%macro CALL_FN 1
+    call    %1
+%endmacro
+
+; =============================================================================
+; END snobol4_asm.mac
+; =============================================================================

@@ -333,3 +333,10 @@ session115 | 2026-03-16 | 6d5919daa03d3c56646b5f0a165f86ee | 15859 lines | compi
 - Named pattern bodies (P_name_alpha/beta) now emitted in program mode
 - Remaining: asm_named_count=0 at body emission (reset bug); pattern match
   stmt execution (Case 2) wired but not yet running
+
+### artifacts/asm/beauty_prog_session156.s  (Sprint A12 — M-ASM-MACROS begun)
+- status: macro-driven — %include snobol4_asm.mac; PROG_INIT/PROG_END/STMT_SEP
+- L_SNO_END replaces _SNO_END; L_/S_/P_ naming consistent
+- global cursor/subject_data/subject_len_val exported for stmt_rt.c linkage
+- hello-world test: assembles + links + runs correctly
+- remaining: all inline mov/call → macro calls; body macros (GET_VAR/SET_OUTPUT etc)
