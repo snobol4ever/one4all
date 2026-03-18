@@ -387,26 +387,28 @@
 %endmacro
 
 ; -----------------------------------------------------------------------------
-; IS_FAIL_BRANCH fail_lbl — branch to fail_lbl if DESCR_t at [rbp-32] is fail
+; FAIL_BR fail_lbl — branch to fail_lbl if DESCR_t at [rbp-32] is fail
 ; -----------------------------------------------------------------------------
-%macro IS_FAIL_BRANCH 1
+%macro FAIL_BR 1
     mov     rdi, [rbp-32]
     mov     rsi, [rbp-24]
     call    stmt_is_fail
     test    eax, eax
     jnz     %1
 %endmacro
+%define IS_FAIL_BRANCH FAIL_BR      ; back-compat alias
 
 ; -----------------------------------------------------------------------------
-; IS_FAIL_BRANCH16 fail_lbl — branch if DESCR_t at [rbp-16] is fail
+; FAIL_BR16 fail_lbl — branch if DESCR_t at [rbp-16] is fail
 ; -----------------------------------------------------------------------------
-%macro IS_FAIL_BRANCH16 1
+%macro FAIL_BR16 1
     mov     rdi, [rbp-16]
     mov     rsi, [rbp-8]
     call    stmt_is_fail
     test    eax, eax
     jnz     %1
 %endmacro
+%define IS_FAIL_BRANCH16 FAIL_BR16  ; back-compat alias
 
 ; -----------------------------------------------------------------------------
 ; LOAD_VAR strlab — load named variable → DESCR_t at [rbp-32] (rhs slot)
@@ -419,13 +421,14 @@
 %endmacro
 
 ; -----------------------------------------------------------------------------
-; SETUP_SUBJECT_FROM16 — set up subject from DESCR_t at [rbp-16]
+; SUBJ_FROM16 — set up subject from DESCR_t at [rbp-16]
 ; -----------------------------------------------------------------------------
-%macro SETUP_SUBJECT_FROM16 0
+%macro SUBJ_FROM16 0
     mov     rdi, [rbp-16]
     mov     rsi, [rbp-8]
     call    stmt_setup_subject
 %endmacro
+%define SETUP_SUBJECT_FROM16 SUBJ_FROM16  ; back-compat alias
 
 ; =============================================================================
 ; END snobol4_asm.mac
@@ -874,10 +877,13 @@
 ;   CALL1_INT   fn, n              — rax/rdx := fn(n)  [result at rbp-32/24]
 ;   CALL1_STR   fn, s              — rax/rdx := fn(s)  [result at rbp-32/24]
 ;   CALL1_VAR   fn, var            — rax/rdx := fn(var) [result at rbp-32/24]
-;   CALL2_SS    fn, s1, s2         — rax/rdx := fn(s1, s2)
-;   CALL2_SI    fn, s, n           — rax/rdx := fn(s, n)
-;   CALL2_II    fn, n1, n2         — rax/rdx := fn(n1, n2)
-;   CALL2_SN    fn, s              — fn(s, NULVCL)
+;   CONC2       fn, s1, s2         — rax/rdx := CONCAT(s1, s2)  [two str args]
+;   CONC2_N     fn, s              — rax/rdx := CONCAT(s, NULVCL)
+;   ALT2        fn, s1, s2         — rax/rdx := ALT(s1, s2)     [two str args]
+;   ALT2_N      fn, s              — rax/rdx := ALT(s, NULVCL)
+;
+;   CONC2/ALT2 differ only in fn label; share the same expansion shape.
+;   Back-compat aliases: CALL2_SS = CONC2, CALL2_SN = CONC2_N
 ;
 ; All ASSIGN_* macros jump to fail_lbl on fail, otherwise store and fall through.
 
@@ -964,10 +970,10 @@
 %endmacro
 
 ; -----------------------------------------------------------------------------
-; CALL2_SS fn, strlab1, strlab2
-;   [rbp-32/24] = fn(s1, s2)  — 2-arg call with two string literal args
+; CONC2 fn, strlab1, strlab2   — fn(s1, s2)  two string-literal args → [rbp-32/24]
+; ALT2  fn, strlab1, strlab2   — same shape, different fn
 ; -----------------------------------------------------------------------------
-%macro CALL2_SS 3             ; fn_strlab, str1_strlab, str2_strlab
+%macro CONC2 3                ; fn_strlab, str1_strlab, str2_strlab
     sub     rsp, 32
     lea     rdi, [rel %2]
     call    stmt_strval
@@ -985,11 +991,14 @@
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
 %endmacro
+%define ALT2     CONC2        ; same expansion, caller passes different fn label
+%define CALL2_SS CONC2        ; back-compat
 
 ; -----------------------------------------------------------------------------
-; CALL2_SN fn, strlab    — fn(s, NULVCL)
+; CONC2_N fn, strlab   — fn(s, NULVCL)  → [rbp-32/24]
+; ALT2_N  fn, strlab   — same shape
 ; -----------------------------------------------------------------------------
-%macro CALL2_SN 2             ; fn_strlab, str_strlab
+%macro CONC2_N 2              ; fn_strlab, str_strlab
     sub     rsp, 32
     lea     rdi, [rel %2]
     call    stmt_strval
@@ -1005,6 +1014,8 @@
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
 %endmacro
+%define ALT2_N   CONC2_N      ; same expansion
+%define CALL2_SN CONC2_N      ; back-compat
 
 ; =============================================================================
 ; END Session 167 high-level statement macros

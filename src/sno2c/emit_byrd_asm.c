@@ -42,8 +42,19 @@ static FILE *asm_out;
  * out_col tracks the current column (0 = start of line).
  * emit_to_col(n) pads with spaces until out_col == n.
  * If out_col >= n already (long label case), emit newline first.
+ *
+ * Three-column layout:
+ *   col1: label:        — starts at 0, ends at COL_W
+ *   col2: MACRO_NAME    — starts at COL_W, width = COL2_W (12)
+ *   col3: operands      — starts at COL_W + COL2_W + 1
+ *   comment:            — starts at COL_CMT
+ *
+ * COL2_W=12 accommodates all macro names (longest: SUBJ_FROM16=11,
+ * DOL_CAPTURE=11, STORE_ARG32=11, GOTO_ALWAYS=11, LOAD_NULVCL=11).
  */
-#define COL_W 28
+#define COL_W   28
+#define COL2_W  12
+#define COL_CMT (COL_W + COL2_W + 32)   /* 72 — comment column in ALFC lines */
 
 /* Comment separator width (configurable).
  * SEP_W = total width of ; === / ; --- lines, including the leading "; ".
@@ -312,7 +323,7 @@ static char _alfc_ibuf[768];
     while (*_alfc_p == ' ') _alfc_p++; \
     oc_str(_alfc_p); \
     /* pad to comment col if room, else just one space */ \
-    if (out_col < COL_W + 44) { emit_to_col(COL_W + 44); } else { oc_char(' '); } \
+    if (out_col < COL_CMT) { emit_to_col(COL_CMT); } else { oc_char(' '); } \
     oc_str("; "); oc_str(comment); oc_char('\n'); \
 } while(0)
 
@@ -1764,19 +1775,43 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
     case E_CONC: {
         /* Binary pattern operators: ALT (|) and CONCAT (juxtaposition).
          * Treat as 2-arg function call: ALT(left,right) or CONCAT(left,right).
-         * Allocate 2-slot args array on stack (32 bytes), evaluate each child,
-         * store into array, then call stmt_apply. */
+         *
+         * Fast paths use CONC2/ALT2 macros when both args are literals:
+         *   CONC2_N  fn, s        — fn(s, NULVCL)          left=QLIT, right=NULV/null
+         *   CONC2    fn, s1, s2   — fn(s1, s2)             left=QLIT, right=QLIT
+         *   ALT2_N / ALT2        — same shapes for E_OR
+         * Fallback: generic sub/LOAD/STORE_ARG32/APPLY_FN_N/add sequence. */
         const char *opname = (e->kind == E_OR) ? "ALT" : "CONCAT";
+        const char *mac_ss = (e->kind == E_OR) ? "ALT2    " : "CONC2   ";
+        const char *mac_sn = (e->kind == E_OR) ? "ALT2_N  " : "CONC2_N ";
         const char *fnlab  = prog_str_intern(opname);
-        /* Reserve 32 bytes (2 × 16-byte DESCR_t) for args array */
+
+        int left_is_str  = e->left  && e->left->kind  == E_QLIT;
+        int right_is_nul = !e->right ||
+                            e->right->kind == E_NULV ||
+                           (e->right->kind == E_ILIT && e->right->ival == 0);
+        int right_is_str = e->right && e->right->kind == E_QLIT;
+
+        if (left_is_str && right_is_nul && rbp_off == -32) {
+            /* Fast path: fn(str, NULVCL) */
+            const char *slab = prog_str_intern(e->left->sval);
+            A("    %s%s, %s\n", mac_sn, fnlab, slab);
+            return 1;
+        }
+        if (left_is_str && right_is_str && rbp_off == -32) {
+            /* Fast path: fn(str1, str2) */
+            const char *s1 = prog_str_intern(e->left->sval);
+            const char *s2 = prog_str_intern(e->right->sval);
+            A("    %s%s, %s, %s\n", mac_ss, fnlab, s1, s2);
+            return 1;
+        }
+
+        /* Generic path: allocate 2-slot args array, evaluate each child */
         A("    sub     rsp, 32\n");
-        /* Evaluate left child → [rsp+0] */
         prog_emit_expr(e->left,  rbp_off);
         A("    STORE_ARG32 0\n");
-        /* Evaluate right child → [rsp+16] */
         prog_emit_expr(e->right, rbp_off);
         A("    STORE_ARG32 16\n");
-        /* Call stmt_apply(name, args_ptr, 2) */
         A("    APPLY_FN_N  %s, 2\n", fnlab);
         A("    add     rsp, 32\n");
         A("    mov     [rbp%+d], rax\n", rbp_off);
@@ -2058,7 +2093,7 @@ static void asm_emit_program(Program *prog) {
                 int may_fail = prog_emit_expr(s->subject, -16);
                 /* If subject may fail AND there are S/F targets, dispatch */
                 if (may_fail && !s->has_eq && (id_s >= 0 || id_f >= 0)) {
-                    A("    IS_FAIL_BRANCH16  %s\n", id_f >= 0 ? sfail_lbl : next_lbl);
+                    A("    FAIL_BR16   %s\n", id_f >= 0 ? sfail_lbl : next_lbl);
                     /* success path */
                     emit_jmp(tgt_s ? tgt_s : tgt_u, next_lbl);
                     /* failure path */
@@ -2089,7 +2124,7 @@ static void asm_emit_program(Program *prog) {
                     /* General path */
                     prog_emit_expr(s->replacement, -32);
                     /* stmt_is_fail check on RHS */
-                    A("    IS_FAIL_BRANCH  %s\n", fail_target);
+                    A("    FAIL_BR     %s\n", fail_target);
                     /* Assign: if subject is OUTPUT, call stmt_output */
                     if (is_output) {
                         A("    SET_OUTPUT\n");
@@ -2140,7 +2175,7 @@ static void asm_emit_program(Program *prog) {
         /* -- subject eval -- */
         prog_emit_expr(s->subject, -16);
         /* stmt_setup_subject — copies into subject_data[], resets cursor */
-        A("    SETUP_SUBJECT_FROM16\n");
+        A("    SUBJ_FROM16\n");
 
         /* -- start the pattern -- */
         A("    jmp     %s\n", pat_alpha);

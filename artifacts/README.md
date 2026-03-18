@@ -466,3 +466,17 @@ session115 | 2026-03-16 | 6d5919daa03d3c56646b5f0a165f86ee | 15859 lines | compi
      - SNOBOL4 source labels embedded in `===` lines when present
      - Section headers: PROGRAM BODY / END / NAMED PATTERN BODIES / STUB LABELS / STRING TABLE
 - **Invariants:** 106/106 C crosscheck PASS, 26/26 ASM crosscheck PASS
+
+### artifacts/asm/beauty_prog_session168.s  (Sprint A14 — M-ASM-BEAUTIFUL, active)
+- status: 12689 lines — assembles clean (1 pre-existing db-empty warning)
+- session: session168
+- assemble: nasm -f elf64 beauty_prog_session168.s -I src/runtime/asm/ -o /dev/null
+- changes this session:
+  - Macro renames in snobol4_asm.mac: IS_FAIL_BRANCH→FAIL_BR, IS_FAIL_BRANCH16→FAIL_BR16,
+    SETUP_SUBJECT_FROM16→SUBJ_FROM16, CALL2_SS→CONC2, CALL2_SN→CONC2_N;
+    ALT2/ALT2_N aliases added; all back-compat %define aliases preserved
+  - COL2_W=12, COL_CMT=72 defined in emit_byrd_asm.c; ALFC comment column uses COL_CMT
+  - CONC2_N/CONC2 fast paths added in E_OR/E_CONC for QLIT+NULV and QLIT+QLIT children
+  - FAIL_BR/FAIL_BR16/SUBJ_FROM16 emit sites updated in emitter
+- next: CONC2_SV macro (QLIT left + VART right — dominant shape, ~300 sites remaining)
+- **Invariants:** 106/106 C crosscheck PASS, 26/26 ASM crosscheck PASS
