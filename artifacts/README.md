@@ -410,3 +410,12 @@ session115 | 2026-03-16 | 6d5919daa03d3c56646b5f0a165f86ee | 15859 lines | compi
   Comments folded from preceding lines onto the instruction line.
   ALT emitter now uses ALT_SAVE_CURSOR/ALT_RESTORE_CURSOR macros fully.
 - **Invariants:** 106/106 C crosscheck PASS, 26/26 ASM crosscheck PASS
+
+## beauty_prog_session163.s
+- **Sprint:** A14 — M-ASM-BEAUTIFUL
+- **Status:** assembles clean (nasm -f elf64 -I src/runtime/asm/)
+- **Lines:** 14448 (down 3772 from session159)
+- **What changed:** DOL_SAVE/DOL_CAPTURE/ALT_ALPHA/ALT_OMEGA macros collapse multi-line
+  blocks to single lines. All double-newlines removed. Every state is one line:
+  `label:  MACRO args ; comment` — four columns throughout.
+- **Invariants:** 106/106 C crosscheck PASS, 26/26 ASM crosscheck PASS

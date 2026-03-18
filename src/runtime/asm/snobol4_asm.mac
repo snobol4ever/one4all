@@ -809,3 +809,54 @@
 ; =============================================================================
 ; END of Sprint A14 pattern port macros
 ; =============================================================================
+
+; =============================================================================
+; DOL_SAVE entry_cur, cursor, child_alpha
+;   α port of $ capture: save entry cursor, jump to child
+; =============================================================================
+%macro DOL_SAVE 3             ; entry_cur, cursor, child_alpha
+    mov     rax, [%2]
+    mov     [%1], rax
+    jmp     %3
+%endmacro
+
+; =============================================================================
+; DOL_CAPTURE entry_cur, cursor, cap_buf, cap_len, subj, gamma
+;   γ port of $ capture: compute span length, copy bytes, jump gamma
+; =============================================================================
+%macro DOL_CAPTURE 6          ; entry_cur, cursor, cap_buf, cap_len, subj, gamma
+    mov     rax, [%2]         ; rax = cursor (end of match)
+    mov     rbx, [%1]         ; rbx = entry cursor (start of match)
+    sub     rax, rbx          ; rax = span length
+    mov     [%4], rax         ; cap_len = length
+    lea     rsi, [rel %5]     ; rsi = &subj[0]
+    add     rsi, rbx          ; rsi = &subj[entry_cursor]
+    lea     rdi, [rel %3]     ; rdi = cap_buf
+    mov     rcx, rax          ; rcx = length
+    rep     movsb             ; copy span → cap_buf
+    jmp     %6                ; → gamma
+%endmacro
+
+; =============================================================================
+; ALT_ALPHA cursor_save, cursor, left_alpha
+;   Combined: save cursor + jump to left arm (α of ALT node)
+; =============================================================================
+%macro ALT_ALPHA 3            ; cursor_save, cursor, left_alpha
+    mov     rax, [%2]
+    mov     [%1], rax
+    jmp     %3
+%endmacro
+
+; =============================================================================
+; ALT_OMEGA cursor_save, cursor, right_alpha
+;   Combined: restore cursor + jump to right arm (left_ω trampoline)
+; =============================================================================
+%macro ALT_OMEGA 3            ; cursor_save, cursor, right_alpha
+    mov     rax, [%1]
+    mov     [%2], rax
+    jmp     %3
+%endmacro
+
+; =============================================================================
+; END of Sprint A14 DOL/ALT combined macros
+; =============================================================================

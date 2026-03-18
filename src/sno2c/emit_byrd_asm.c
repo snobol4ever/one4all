@@ -72,7 +72,7 @@ static void bss_add(const char *name) {
 
 static void bss_emit(void) {
     if (bss_count == 0) return;
-    A("\nsection .bss\n\n");
+    A("\nsection .bss\n");
     for (int i = 0; i < bss_count; i++)
         A("%-24s resq 1\n", bss_slots[i]);
 }
@@ -102,7 +102,7 @@ static const char *lit_intern(const char *s, int n) {
 
 static void lit_emit_data(void) {
     if (lit_count == 0) return;
-    A("\nsection .data\n\n");
+    A("\nsection .data\n");
     A("subject_str:    db 0        ; placeholder — harness fills this\n");
     A("newline:        db 10\n");
     for (int i = 0; i < lit_count; i++) {
@@ -334,21 +334,18 @@ static void emit_asm_alt(EXPR_t *left, EXPR_t *right,
     snprintf(restore_lbl,  LBUF, "alt%d_restore",   uid);
     bss_add(cursor_save);
 
-    ALFC(alpha, "ALT α — save cursor, try left",
-         "ALT_SAVE_CURSOR     %s, %s\n", cursor_save, cursor);
-    A("    jmp     %s\n", lα);
-
-    ALFC(beta, "ALT β — resume right", "SEQ_BETA    %s\n", rβ);
-
     char left_omega_tramp[LBUF];
     snprintf(left_omega_tramp, LBUF, "alt%d_left_omega", uid);
+
+    ALFC(alpha, "ALT α — save cursor, enter left",
+         "ALT_ALPHA   %s, %s, %s\n", cursor_save, cursor, lα);
+    ALFC(beta,  "ALT β — resume right", "SEQ_BETA    %s\n", rβ);
 
     emit_asm_node(left, lα, lβ, gamma, left_omega_tramp,
                   cursor, subj, subj_len_sym, depth+1);
 
-    ALFC(left_omega_tramp, "ALT left_ω — restore cursor, try right",
-         "ALT_RESTORE_CURSOR  %s, %s\n", cursor_save, cursor);
-    A("    jmp     %s\n", rα);
+    ALFC(left_omega_tramp, "ALT left_ω — restore cursor, enter right",
+         "ALT_OMEGA   %s, %s, %s\n", cursor_save, cursor, rα);
 
     emit_asm_node(right, rα, rβ, gamma, omega,
                   cursor, subj, subj_len_sym, depth+1);
@@ -401,7 +398,7 @@ static void emit_asm_arbno(EXPR_t *child,
     A("\n; ARBNO α=%s\n", alpha);
 
     /* α: initialize depth=0, push cursor, goto γ */
-    ALF(alpha, "mov     qword [%s], 0\n\n", dep);
+    ALF(alpha, "mov     qword [%s], 0\n", dep);
     /* push cursor onto stack slot 0 */
     A("    lea     rbx, [rel %s]\n", stk);
     A("    mov     rax, [%s]\n", cursor);
@@ -410,7 +407,7 @@ static void emit_asm_arbno(EXPR_t *child,
     asmJ(gamma);
 
     /* β: pop, save cursor-before-rep, try child */
-    ALFC(beta, "ARBNO", "mov     rax, [%s]\n\n", dep);
+    ALFC(beta, "ARBNO", "mov     rax, [%s]\n", dep);
     A("    test    rax, rax\n");
     asmJe(omega);                  /* stack empty → ω */
     A("    dec     rax\n");
@@ -422,7 +419,7 @@ static void emit_asm_arbno(EXPR_t *child,
     asmJ(cα);
 
     /* child_ok: zero-advance guard, push new cursor, re-succeed */
-    ALFC(child_ok, "ARBNO child_ok", "mov     rax, [%s]\n\n", cursor);
+    ALFC(child_ok, "ARBNO child_ok", "mov     rax, [%s]\n", cursor);
     A("    mov     rbx, [%s]\n", cur_before);
     A("    cmp     rax, rbx\n");
     asmJe(omega);                  /* stalled → ω */
@@ -465,9 +462,9 @@ static void emit_asm_any(const char *charset, int cslen,
     bss_add(saved);
     const char *clabel = lit_intern(charset, cslen);
 
-    ALFC(alpha, "ANY α", "ANY_ALPHA   %s, %d, %s, %s, %s, %s, %s, %s\n\n",
+    ALFC(alpha, "ANY α", "ANY_ALPHA   %s, %d, %s, %s, %s, %s, %s, %s\n",
       clabel, cslen, saved, cursor, subj, subj_len_sym, gamma, omega);
-    ALFC(beta, "ANY β", "ANY_BETA    %s, %s, %s\n\n", saved, cursor, omega);
+    ALFC(beta, "ANY β", "ANY_BETA    %s, %s, %s\n", saved, cursor, omega);
 }
 
 /* -----------------------------------------------------------------------
@@ -485,9 +482,9 @@ static void emit_asm_notany(const char *charset, int cslen,
     bss_add(saved);
     const char *clabel = lit_intern(charset, cslen);
 
-    ALFC(alpha, "NOTANY α", "NOTANY_ALPHA %s, %d, %s, %s, %s, %s, %s, %s\n\n",
+    ALFC(alpha, "NOTANY α", "NOTANY_ALPHA %s, %d, %s, %s, %s, %s, %s, %s\n",
       clabel, cslen, saved, cursor, subj, subj_len_sym, gamma, omega);
-    ALFC(beta, "NOTANY β", "NOTANY_BETA  %s, %s, %s\n\n", saved, cursor, omega);
+    ALFC(beta, "NOTANY β", "NOTANY_BETA  %s, %s, %s\n", saved, cursor, omega);
 }
 
 /* -----------------------------------------------------------------------
@@ -505,9 +502,9 @@ static void emit_asm_span(const char *charset, int cslen,
     bss_add(saved);
     const char *clabel = lit_intern(charset, cslen);
 
-    ALFC(alpha, "SPAN α", "SPAN_ALPHA  %s, %d, %s, %s, %s, %s, %s, %s\n\n",
+    ALFC(alpha, "SPAN α", "SPAN_ALPHA  %s, %d, %s, %s, %s, %s, %s, %s\n",
       clabel, cslen, saved, cursor, subj, subj_len_sym, gamma, omega);
-    ALFC(beta, "SPAN β", "SPAN_BETA   %s, %s, %s\n\n", saved, cursor, omega);
+    ALFC(beta, "SPAN β", "SPAN_BETA   %s, %s, %s\n", saved, cursor, omega);
 }
 
 static void emit_asm_break(const char *charset, int cslen,
@@ -521,9 +518,9 @@ static void emit_asm_break(const char *charset, int cslen,
     bss_add(saved);
     const char *clabel = lit_intern(charset, cslen);
 
-    ALFC(alpha, "BREAK α", "BREAK_ALPHA %s, %d, %s, %s, %s, %s, %s, %s\n\n",
+    ALFC(alpha, "BREAK α", "BREAK_ALPHA %s, %d, %s, %s, %s, %s, %s, %s\n",
       clabel, cslen, saved, cursor, subj, subj_len_sym, gamma, omega);
-    ALFC(beta, "BREAK β", "BREAK_BETA  %s, %s, %s\n\n", saved, cursor, omega);
+    ALFC(beta, "BREAK β", "BREAK_BETA  %s, %s, %s\n", saved, cursor, omega);
 }
 
 /* -----------------------------------------------------------------------
@@ -540,8 +537,8 @@ static void emit_asm_len(long n,
     snprintf(saved, LBUF, "len%d_saved", uid);
     bss_add(saved);
 
-    ALFC(alpha, "LEN(%ld)", "LEN_ALPHA   %ld, %s, %s, %s, %s, %s\n\n", n, saved, cursor, subj_len_sym, gamma, omega);
-    ALFC(beta, "LEN β", "LEN_BETA    %s, %s, %s\n\n", saved, cursor, omega);
+    ALFC(alpha, "LEN(%ld)", "LEN_ALPHA   %ld, %s, %s, %s, %s, %s\n", n, saved, cursor, subj_len_sym, gamma, omega);
+    ALFC(beta, "LEN β", "LEN_BETA    %s, %s, %s\n", saved, cursor, omega);
 }
 
 /* -----------------------------------------------------------------------
@@ -557,8 +554,8 @@ static void emit_asm_tab(long n,
     snprintf(saved, LBUF, "tab%d_saved", uid);
     bss_add(saved);
 
-    ALFC(alpha, "TAB(%ld)", "TAB_ALPHA   %ld, %s, %s, %s, %s\n\n", n, saved, cursor, gamma, omega);
-    ALFC(beta, "TAB β", "TAB_BETA    %s, %s, %s\n\n", saved, cursor, omega);
+    ALFC(alpha, "TAB(%ld)", "TAB_ALPHA   %ld, %s, %s, %s, %s\n", n, saved, cursor, gamma, omega);
+    ALFC(beta, "TAB β", "TAB_BETA    %s, %s, %s\n", saved, cursor, omega);
 }
 
 /* -----------------------------------------------------------------------
@@ -575,8 +572,8 @@ static void emit_asm_rtab(long n,
     snprintf(saved, LBUF, "rtab%d_saved", uid);
     bss_add(saved);
 
-    ALFC(alpha, "RTAB(%ld)", "RTAB_ALPHA  %ld, %s, %s, %s, %s, %s\n\n", n, saved, cursor, subj_len_sym, gamma, omega);
-    ALFC(beta, "RTAB β", "RTAB_BETA   %s, %s, %s\n\n", saved, cursor, omega);
+    ALFC(alpha, "RTAB(%ld)", "RTAB_ALPHA  %ld, %s, %s, %s, %s, %s\n", n, saved, cursor, subj_len_sym, gamma, omega);
+    ALFC(beta, "RTAB β", "RTAB_BETA   %s, %s, %s\n", saved, cursor, omega);
 }
 
 /* -----------------------------------------------------------------------
@@ -592,8 +589,8 @@ static void emit_asm_rem(const char *alpha, const char *beta,
     snprintf(saved, LBUF, "rem%d_saved", uid);
     bss_add(saved);
 
-    ALFC(alpha, "REM", "REM_ALPHA   %s, %s, %s, %s\n\n", saved, cursor, subj_len_sym, gamma);
-    ALFC(beta, "REM β", "REM_BETA    %s, %s, %s\n\n", saved, cursor, omega);
+    ALFC(alpha, "REM", "REM_ALPHA   %s, %s, %s, %s\n", saved, cursor, subj_len_sym, gamma);
+    ALFC(beta, "REM β", "REM_BETA    %s, %s, %s\n", saved, cursor, omega);
 }
 
 /* -----------------------------------------------------------------------
@@ -622,13 +619,13 @@ static void emit_asm_arb(const char *alpha, const char *beta,
     bss_add(arb_start);
     bss_add(arb_step);
 
-    ALFC(alpha, "ARB", "mov     rax, [%s]\n\n", cursor);
+    ALFC(alpha, "ARB", "mov     rax, [%s]\n", cursor);
     A("    mov     [%s], rax\n", arb_start);
     A("    mov     qword [%s], 0\n", arb_step);
     /* cursor stays at start (0-length match first) */
     asmJ(gamma);
 
-    ALFC(beta, "ARB", "mov     rax, [%s]\n\n", arb_step);
+    ALFC(beta, "ARB", "mov     rax, [%s]\n", arb_step);
     A("    inc     rax\n");
     A("    mov     [%s], rax\n", arb_step);
     /* check start + step <= subj_len */
@@ -705,36 +702,24 @@ static void emit_asm_assign(EXPR_t *child, const char *varname,
 
     A("\n; DOL(%s $  %s)  α=%s\n", varname ? varname : "?", safe, alpha);
 
-    /* α: save entry cursor, enter child */
-    ALF(alpha, "mov     rax, [%s]\n\n", cursor);
-    A("    mov     [%s], rax\n", entry_cur);
-    asmJ(cα);
+    /* α: save entry cursor, enter child — one macro call */
+    ALFC(alpha, "DOL α — save entry cursor",
+         "DOL_SAVE    %s, %s, %s\n", entry_cur, cursor, cα);
 
     /* β: transparent — backtrack into child */
-    ALF(beta, "jmp     %s\n", cβ);
+    ALFC(beta, "DOL β", "jmp     %s\n", cβ);
 
     /* Emit child subtree — child's γ goes to dol_gamma, child's ω to dol_omega */
     emit_asm_node(child, cα, cβ, dol_gamma, dol_omega,
                   cursor, subj, subj_len_sym, depth + 1);
 
-    /* dol_γ: compute span, copy to cap_buf, proceed to outer γ */
-    A("\n; DOL γ — capture span into %s\n", cap_buf);
-    asmL(dol_gamma);
-    /* rax = cursor - entry_cursor = span length */
-    A("    mov     rax, [%s]\n", cursor);
-    A("    mov     rbx, [%s]\n", entry_cur);
-    A("    sub     rax, rbx\n");
-    A("    mov     [%s], rax\n", cap_len);
-    /* rep movsb: rsi = &subj[entry_cursor], rdi = cap_buf, rcx = len */
-    A("    lea     rsi, [rel %s]\n", subj);
-    A("    add     rsi, rbx\n");
-    A("    lea     rdi, [rel %s]\n", cap_buf);
-    A("    mov     rcx, rax\n");
-    A("    rep     movsb\n");
-    asmJ(gamma);
+    /* dol_γ: compute span, copy to cap_buf, proceed to outer γ — one macro call */
+    ALFC(dol_gamma, "DOL γ — capture span",
+         "DOL_CAPTURE %s, %s, %s, %s, %s, %s\n",
+         entry_cur, cursor, cap_buf, cap_len, subj, gamma);
 
     /* dol_ω: child failed — no assignment, propagate failure */
-    ALFC(dol_omega, "DOL ω — child failed, no capture", "jmp     %s\n", omega);
+    ALFC(dol_omega, "DOL ω — child failed", "jmp     %s\n", omega);
 }
 
 /* -----------------------------------------------------------------------
@@ -1085,14 +1070,14 @@ static void emit_asm_named_ref(const AsmNamedPat *np,
     A("\n; REF(%s) α=%s\n", np->varname, alpha);
 
     /* α: load continuations, jump to named pattern α */
-    ALF(alpha, "lea     rax, [rel %s]\n\n", glbl);
+    ALF(alpha, "lea     rax, [rel %s]\n", glbl);
     A("    mov     [%s], rax\n", np->ret_gamma);
     A("    lea     rax, [rel %s]\n", olbl);
     A("    mov     [%s], rax\n", np->ret_omega);
     A("    jmp     %s\n", np->alpha_lbl);
 
     /* β: reload continuations (caller may have changed them), jump to β */
-    ALFC(beta, "REF(%s)", "lea     rax, [rel %s]\n\n", glbl);
+    ALFC(beta, "REF(%s)", "lea     rax, [rel %s]\n", glbl);
     A("    mov     [%s], rax\n", np->ret_gamma);
     A("    lea     rax, [rel %s]\n", olbl);
     A("    mov     [%s], rax\n", np->ret_omega);
@@ -1123,7 +1108,7 @@ static void emit_asm_named_def(const AsmNamedPat *np,
         /* No pattern expression — emit stubs that always fail */
         A("\n; Named pattern %s — no expression, always fails\n", np->varname);
         asmL(np->alpha_lbl);
-        ALF(np->beta_lbl, "jmp     [%s]\n\n", np->ret_omega);
+        ALF(np->beta_lbl, "jmp     [%s]\n", np->ret_omega);
         return;
     }
 
@@ -1157,8 +1142,8 @@ static void emit_asm_named_def(const AsmNamedPat *np,
 
 static void asm_emit_null_program(void) {
     A("; generated by sno2c -asm\n");
-    A("    global _start\n\n");
-    A("section .text\n\n");
+    A("    global _start\n");
+    A("section .text\n");
     A("_start:\n");
     A("    mov     eax, 60\n");
     A("    xor     edi, edi\n");
@@ -1252,11 +1237,11 @@ static void asm_emit_pattern(STMT_t *stmt) {
     asm_out = real_out;
 
     A("; generated by sno2c -asm\n");
-    A("; assemble: nasm -f elf64 out.s -o out.o && ld out.o -o out\n\n");
+    A("; assemble: nasm -f elf64 out.s -o out.o && ld out.o -o out\n");
     A("    global _start\n");
 
     /* .data */
-    A("\nsection .data\n\n");
+    A("\nsection .data\n");
     A("%-20s db ", subj_sym);
     for (int i = 0; i < subj_len; i++) {
         if (i) A(", ");
@@ -1276,14 +1261,14 @@ static void asm_emit_pattern(STMT_t *stmt) {
     }
 
     /* .bss */
-    A("\nsection .bss\n\n");
+    A("\nsection .bss\n");
     A("%-24s resq 1\n", subj_len_sym);
     for (int i = 0; i < bss_count; i++)
         A("%-24s resq 1\n", bss_slots[i]);
     extra_bss_emit();
 
     /* .text */
-    A("\nsection .text\n\n");
+    A("\nsection .text\n");
     A("_start:\n");
     A("    ; init\n");
     A("    mov     qword [%s], %d\n", subj_len_sym, subj_len);
@@ -1396,9 +1381,9 @@ static void asm_emit_body(STMT_t *stmt) {
     /* Header */
     A("; generated by sno2c -asm-body — link with snobol4_asm_harness.o\n");
     A("; assemble: nasm -f elf64 -I<runtime/asm/> body.s -o body.o\n");
-    A("; link:     gcc -no-pie -o prog body.o snobol4_asm_harness.o\n\n");
+    A("; link:     gcc -no-pie -o prog body.o snobol4_asm_harness.o\n");
 
-    A("%%include \"snobol4_asm.mac\"\n\n");
+    A("%%include \"snobol4_asm.mac\"\n");
 
     A("    global root_alpha, root_beta\n");
     A("    extern cursor, subject_data, subject_len_val\n");
@@ -1411,7 +1396,7 @@ static void asm_emit_body(STMT_t *stmt) {
     /* .data — string literals + cap_order table */
     int has_data = lit_count > 0 || cap_var_count > 0;
     if (has_data) {
-        A("\nsection .data\n\n");
+        A("\nsection .data\n");
         for (int i = 0; i < lit_count; i++) {
             A("%-20s db ", lit_table[i].label);
             for (int j = 0; j < lit_table[i].len; j++) {
@@ -1426,7 +1411,7 @@ static void asm_emit_body(STMT_t *stmt) {
     /* .bss — all slots collected during dry run */
     int has_bss = bss_count > 0 || asm_extra_bss_count > 0 || cap_var_count > 0;
     if (has_bss) {
-        A("\nsection .bss\n\n");
+        A("\nsection .bss\n");
         for (int i = 0; i < bss_count; i++)
             A("%-24s resq 1\n", bss_slots[i]);
         extra_bss_emit();
@@ -1435,7 +1420,7 @@ static void asm_emit_body(STMT_t *stmt) {
 
     /* .text — real emit; uid counter continues from where dry run left off,
      *         so all generated labels are identical to the collected names  */
-    A("\nsection .text\n\n");
+    A("\nsection .text\n");
 
     emit_asm_node(stmt->pattern,
                   "root_alpha", "root_beta",
@@ -1812,8 +1797,8 @@ static void asm_emit_program(Program *prog) {
     /* ---- emit header ---- */
     A("; generated by sno2c -asm (program mode)\n");
     A("; link: gcc -no-pie out.s stmt_rt.o snobol4.o mock_includes.o\n");
-    A(";             snobol4_pattern.o mock_engine.o -lgc -lm -o prog\n\n");
-    A("%%include \"snobol4_asm.mac\"\n\n");
+    A(";             snobol4_pattern.o mock_engine.o -lgc -lm -o prog\n");
+    A("%%include \"snobol4_asm.mac\"\n");
     A("    global  main\n");
     A("    extern  stmt_init, stmt_strval, stmt_intval\n");
     A("    extern  stmt_get, stmt_set, stmt_output, stmt_input\n");
@@ -1830,11 +1815,11 @@ static void asm_emit_program(Program *prog) {
      * calls from emit time are captured. See prog_str_emit_data() below. */
 
     /* ---- .note.GNU-stack ---- */
-    A("section .note.GNU-stack noalloc noexec nowrite progbits\n\n");
+    A("section .note.GNU-stack noalloc noexec nowrite progbits\n");
 
     /* ---- .bss ---- */
     /* Always emit .bss — subject_data is always needed for pattern stmts */
-    A("section .bss\n\n");
+    A("section .bss\n");
     for (int i = 0; i < bss_count; i++)
         A("%-24s resq 1\n", bss_slots[i]);
     /* Byrd box scratch slots (saved_cursor, arbno stack, etc.) */
@@ -1846,9 +1831,9 @@ static void asm_emit_program(Program *prog) {
     A("\n");
 
     /* ---- .text ---- */
-    A("section .text\n\n");
+    A("section .text\n");
     A("main:\n");
-    A("    PROG_INIT\n\n");
+    A("    PROG_INIT\n");
 
     /* Walk statements */
     int stmt_uid = 0;
@@ -2001,7 +1986,7 @@ static void asm_emit_program(Program *prog) {
 
     /* ---- Emit lit_table strings used by Byrd box LIT nodes ---- */
     if (lit_count > 0) {
-        A("\nsection .data\n\n");
+        A("\nsection .data\n");
         for (int i = 0; i < lit_count; i++) {
             A("%-20s db ", lit_table[i].label);
             for (int j = 0; j < lit_table[i].len; j++) {
@@ -2039,7 +2024,7 @@ static void asm_emit_program(Program *prog) {
     }
 
     /* ---- .data emitted last so all prog_str_intern() calls are captured ---- */
-    A("\nsection .data\n\n");
+    A("\nsection .data\n");
     prog_str_emit_data();
 }
 
