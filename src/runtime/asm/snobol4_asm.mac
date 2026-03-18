@@ -860,3 +860,152 @@
 ; =============================================================================
 ; END of Sprint A14 DOL/ALT combined macros
 ; =============================================================================
+
+; =============================================================================
+; Session 167 — M-ASM-BEAUTIFUL high-level statement macros
+; =============================================================================
+;
+; These macros collapse the verbose 5-8 line sequences in the main body into
+; single readable lines, matching the readability of the C backend output.
+;
+; Naming convention:
+;   ASSIGN_INT  var, n, fail_lbl   — var := n  (integer literal)
+;   ASSIGN_STR  var, s, fail_lbl   — var := s  (string literal)
+;   CALL1_INT   fn, n              — rax/rdx := fn(n)  [result at rbp-32/24]
+;   CALL1_STR   fn, s              — rax/rdx := fn(s)  [result at rbp-32/24]
+;   CALL1_VAR   fn, var            — rax/rdx := fn(var) [result at rbp-32/24]
+;   CALL2_SS    fn, s1, s2         — rax/rdx := fn(s1, s2)
+;   CALL2_SI    fn, s, n           — rax/rdx := fn(s, n)
+;   CALL2_II    fn, n1, n2         — rax/rdx := fn(n1, n2)
+;   CALL2_SN    fn, s              — fn(s, NULVCL)
+;
+; All ASSIGN_* macros jump to fail_lbl on fail, otherwise store and fall through.
+
+; -----------------------------------------------------------------------------
+; ASSIGN_INT var, n, fail_lbl
+;   var = n   where n is an integer literal
+;   Expands to: LOAD_INT + IS_FAIL_BRANCH + SET_VAR  (was 6 lines)
+; -----------------------------------------------------------------------------
+%macro ASSIGN_INT 3           ; var_strlab, n, fail_lbl
+    mov     rdi, %2
+    call    stmt_intval
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    mov     rdi, [rbp-32]
+    mov     rsi, [rbp-24]
+    call    stmt_is_fail
+    test    rax, rax
+    jnz     %3
+    lea     rdi, [rel %1]
+    mov     rsi, [rbp-32]
+    mov     rdx, [rbp-24]
+    call    stmt_set
+%endmacro
+
+; -----------------------------------------------------------------------------
+; ASSIGN_STR var, strlab, fail_lbl
+;   var = "string"
+;   Expands to: LOAD_STR + IS_FAIL_BRANCH + SET_VAR  (was 6 lines)
+; -----------------------------------------------------------------------------
+%macro ASSIGN_STR 3           ; var_strlab, str_strlab, fail_lbl
+    lea     rdi, [rel %2]
+    call    stmt_strval
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    mov     rdi, [rbp-32]
+    mov     rsi, [rbp-24]
+    call    stmt_is_fail
+    test    rax, rax
+    jnz     %3
+    lea     rdi, [rel %1]
+    mov     rsi, [rbp-32]
+    mov     rdx, [rbp-24]
+    call    stmt_set
+%endmacro
+
+; -----------------------------------------------------------------------------
+; CALL1_INT fn, n
+;   [rbp-32/24] = fn(n)   — 1-arg call with integer literal arg
+;   Collapses: sub rsp,16 / LOAD_INT / mov-pair / STORE_ARG32 0 /
+;              APPLY_FN_N / add rsp,16 / mov-pair  (was 9 lines → 1)
+; -----------------------------------------------------------------------------
+%macro CALL1_INT 2            ; fn_strlab, n
+    sub     rsp, 16
+    mov     rdi, %2
+    call    stmt_intval
+    mov     [rsp], rax
+    mov     [rsp+8], rdx
+    lea     rdi, [rel %1]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+%endmacro
+
+; -----------------------------------------------------------------------------
+; CALL1_STR fn, strlab
+;   [rbp-32/24] = fn(s)   — 1-arg call with string literal arg
+; -----------------------------------------------------------------------------
+%macro CALL1_STR 2            ; fn_strlab, str_strlab
+    sub     rsp, 16
+    lea     rdi, [rel %2]
+    call    stmt_strval
+    mov     [rsp], rax
+    mov     [rsp+8], rdx
+    lea     rdi, [rel %1]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+%endmacro
+
+; -----------------------------------------------------------------------------
+; CALL2_SS fn, strlab1, strlab2
+;   [rbp-32/24] = fn(s1, s2)  — 2-arg call with two string literal args
+; -----------------------------------------------------------------------------
+%macro CALL2_SS 3             ; fn_strlab, str1_strlab, str2_strlab
+    sub     rsp, 32
+    lea     rdi, [rel %2]
+    call    stmt_strval
+    mov     [rsp], rax
+    mov     [rsp+8], rdx
+    lea     rdi, [rel %3]
+    call    stmt_strval
+    mov     [rsp+16], rax
+    mov     [rsp+24], rdx
+    lea     rdi, [rel %1]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+%endmacro
+
+; -----------------------------------------------------------------------------
+; CALL2_SN fn, strlab    — fn(s, NULVCL)
+; -----------------------------------------------------------------------------
+%macro CALL2_SN 2             ; fn_strlab, str_strlab
+    sub     rsp, 32
+    lea     rdi, [rel %2]
+    call    stmt_strval
+    mov     [rsp], rax
+    mov     [rsp+8], rdx
+    mov     qword [rsp+16], 1
+    mov     qword [rsp+24], 0
+    lea     rdi, [rel %1]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+%endmacro
+
+; =============================================================================
+; END Session 167 high-level statement macros
+; =============================================================================

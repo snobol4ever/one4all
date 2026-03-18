@@ -45,7 +45,39 @@ static FILE *asm_out;
  */
 #define COL_W 28
 
+/* Comment separator width (configurable).
+ * SEP_W = total width of ; === / ; --- lines, including the leading "; ".
+ * 80 is the classic terminal width; 120 suits wide monitors. */
+#define SEP_W 80
+
 static int out_col = 0;
+
+/* emit_sep_major — strong horizontal rule: ; ====...  (SEP_W chars total)
+ * Embeds optional tag: ";  tag ===..."
+ * Used for: SNOBOL4 statement boundaries, section headers, named pattern headers. */
+static void emit_sep_major(const char *tag) {
+    int used = 2;
+    fprintf(asm_out, "\n; ");
+    if (tag && tag[0]) {
+        used += fprintf(asm_out, " %s ", tag);
+    }
+    for (int i = used; i < SEP_W; i++) fputc('=', asm_out);
+    fputc('\n', asm_out);
+    out_col = 0;
+}
+
+/* emit_sep_minor — light horizontal rule: ; ----...  (SEP_W chars total)
+ * Used for: γ/ω trampoline boundary within named pattern defs. */
+static void emit_sep_minor(const char *tag) {
+    int used = 2;
+    fprintf(asm_out, "; ");
+    if (tag && tag[0]) {
+        used += fprintf(asm_out, " %s ", tag);
+    }
+    for (int i = used; i < SEP_W; i++) fputc('-', asm_out);
+    fputc('\n', asm_out);
+    out_col = 0;
+}
 
 static void oc_char(char c) {
     fputc(c, asm_out);
@@ -1239,7 +1271,8 @@ static void emit_asm_named_def(const AsmNamedPat *np,
     snprintf(inner_gamma, LBUF, "patdef_%s_gamma", np->safe);
     snprintf(inner_omega, LBUF, "patdef_%s_omega", np->safe);
 
-    A("\n; ============ Named pattern: %s ============\n", np->varname);
+    /* Major separator: named pattern header */
+    emit_sep_major(np->varname);
 
     /* α entry — initial match */
     A("; %s (α entry)\n", np->alpha_lbl);
@@ -1249,8 +1282,11 @@ static void emit_asm_named_def(const AsmNamedPat *np,
                   cursor, subj, subj_len_sym,
                   1);
 
+    /* Minor separator before γ/ω trampolines */
+    emit_sep_minor("γ/ω");
+
     /* γ trampoline: indirect jump to caller's continuation */
-    A("\n%s:\n", inner_gamma);
+    A("%s:\n", inner_gamma);
     A("    jmp     [%s]\n", np->ret_gamma);
 
     /* ω trampoline */
@@ -1637,10 +1673,11 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
     case E_QLIT: {
         const char *lab = prog_str_intern(e->sval);
         A("    LOAD_STR    %s\n", lab);
+        /* LOAD_STR already writes rax/rdx → [rbp-32/24]; skip redundant mov */
         if (rbp_off == -16) {
             A("    mov     [rbp-16], rax\n");
             A("    mov     [rbp-8],  rdx\n");
-        } else {
+        } else if (rbp_off != -32) {
             A("    mov     [rbp%+d], rax\n", rbp_off);
             A("    mov     [rbp%+d], rdx\n", rbp_off+8);
         }
@@ -1648,10 +1685,11 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
     }
     case E_ILIT:
         A("    LOAD_INT    %ld\n", (long)e->ival);
+        /* LOAD_INT already writes rax/rdx → [rbp-32/24]; skip redundant mov */
         if (rbp_off == -16) {
             A("    mov     [rbp-16], rax\n");
             A("    mov     [rbp-8],  rdx\n");
-        } else {
+        } else if (rbp_off != -32) {
             A("    mov     [rbp%+d], rax\n", rbp_off);
             A("    mov     [rbp%+d], rdx\n", rbp_off+8);
         }
@@ -1688,6 +1726,19 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
         int na = e->nargs;
         if (na > 8) na = 8;
         const char *fnlab = prog_str_intern(e->sval);
+        /* Fast path: 1-arg call with simple literal arg → CALL1_INT / CALL1_STR */
+        if (na == 1 && e->args[0] && rbp_off == -32) {
+            EXPR_t *arg0 = e->args[0];
+            if (arg0->kind == E_ILIT) {
+                A("    CALL1_INT   %s, %ld\n", fnlab, (long)arg0->ival);
+                return 1;
+            }
+            if (arg0->kind == E_QLIT) {
+                const char *alab = prog_str_intern(arg0->sval);
+                A("    CALL1_STR   %s, %s\n", fnlab, alab);
+                return 1;
+            }
+        }
         if (na == 0) {
             A("    APPLY_FN_0  %s\n", fnlab);
         } else {
@@ -1700,8 +1751,13 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
             A("    APPLY_FN_N  %s, %d\n", fnlab, na);
             A("    add     rsp, %d\n", arr_bytes);
         }
-        A("    mov     [rbp%+d], rax\n", rbp_off);
-        A("    mov     [rbp%+d], rdx\n", rbp_off+8);
+        /* Result in rax/rdx → store to target slot */
+        if (rbp_off == -32 || rbp_off == -16) {
+            A("    STORE_RESULT\n");
+        } else {
+            A("    mov     [rbp%+d], rax\n", rbp_off);
+            A("    mov     [rbp%+d], rdx\n", rbp_off+8);
+        }
         return 1;
     }
     case E_OR:
@@ -1957,6 +2013,7 @@ static void asm_emit_program(Program *prog) {
 
     /* ---- .text ---- */
     flush_pending_label();
+    emit_sep_major("PROGRAM BODY");
     A("section .text\n");
     A("main:\n");
     A("    PROG_INIT\n");
@@ -1974,9 +2031,11 @@ static void asm_emit_program(Program *prog) {
         char next_lbl[64]; snprintf(next_lbl, sizeof next_lbl, "L_sn_%d", uid);
         char sfail_lbl[64]; snprintf(sfail_lbl, sizeof sfail_lbl, "L_sf_%d", uid);
 
-        /* STMT_SEP first (visual separator). Then queue label — it will fold
-         * onto the first real instruction of this statement. */
-        A("\n%*sSTMT_SEP\n", COL_W, "");
+        /* Major separator: SNOBOL4 statement boundary.
+         * Emit "; === label ===..." with the SNOBOL4 source label embedded
+         * when present, or plain "; ======..." for unlabelled statements.
+         * Then queue the generated label to fold onto the first instruction. */
+        emit_sep_major(s->label ? s->label : NULL);
         if (s->label) {
             asmL(prog_label_nasm(s->label));
             { int _id = prog_label_id(s->label);
@@ -2015,17 +2074,29 @@ static void asm_emit_program(Program *prog) {
             /* If has_eq: assign replacement to subject variable */
             if (s->has_eq && s->replacement && s->subject &&
                 s->subject->kind == E_VART) {
-                /* RHS */
-                prog_emit_expr(s->replacement, -32);
-                /* stmt_is_fail check on RHS */
-                A("    IS_FAIL_BRANCH  %s\n", id_f >= 0 ? sfail_lbl : next_lbl);
-                /* Assign: if subject is OUTPUT, call stmt_output */
-                if (strcasecmp(s->subject->sval, "OUTPUT") == 0) {
-                    A("    SET_OUTPUT\n");
-                } else {
-                    /* generic variable set */
+                const char *fail_target = id_f >= 0 ? sfail_lbl : next_lbl;
+                int is_output = strcasecmp(s->subject->sval, "OUTPUT") == 0;
+                /* Fast path: simple literal RHS + non-OUTPUT target → ASSIGN_INT/ASSIGN_STR */
+                if (!is_output && s->replacement->kind == E_ILIT) {
                     const char *vlab = prog_str_intern(s->subject->sval);
-                    A("    SET_VAR     %s\n", vlab);
+                    A("    ASSIGN_INT  %s, %ld, %s\n", vlab,
+                      (long)s->replacement->ival, fail_target);
+                } else if (!is_output && s->replacement->kind == E_QLIT) {
+                    const char *vlab = prog_str_intern(s->subject->sval);
+                    const char *rlab = prog_str_intern(s->replacement->sval);
+                    A("    ASSIGN_STR  %s, %s, %s\n", vlab, rlab, fail_target);
+                } else {
+                    /* General path */
+                    prog_emit_expr(s->replacement, -32);
+                    /* stmt_is_fail check on RHS */
+                    A("    IS_FAIL_BRANCH  %s\n", fail_target);
+                    /* Assign: if subject is OUTPUT, call stmt_output */
+                    if (is_output) {
+                        A("    SET_OUTPUT\n");
+                    } else {
+                        const char *vlab = prog_str_intern(s->subject->sval);
+                        A("    SET_VAR     %s\n", vlab);
+                    }
                 }
                 /* success path */
                 emit_jmp(tgt_s ? tgt_s : tgt_u, next_lbl);
@@ -2108,7 +2179,8 @@ static void asm_emit_program(Program *prog) {
     }
 
     /* Safety net end — also serves as RETURN/FRETURN/END target */
-    A("\nL_SNO_END:\n");
+    emit_sep_major("END");
+    A("L_SNO_END:\n");
     flush_pending_label();
     A("    PROG_END\n");
 
@@ -2126,8 +2198,8 @@ static void asm_emit_program(Program *prog) {
     }
 
     /* ---- Named pattern bodies — must be in .text (executable) ---- */
-    A("\nsection .text\n");
-    A("\n; ======== named pattern bodies ========\n");
+    emit_sep_major("NAMED PATTERN BODIES");
+    A("section .text\n");
     for (int i = 0; i < asm_named_count; i++) {
         if (asm_named[i].pat) {
             EKind rk = asm_named[i].pat->kind;
@@ -2137,12 +2209,12 @@ static void asm_emit_program(Program *prog) {
                            "cursor","subject_data","subject_len_val");
     }
 
-    A("\nsection .text\n"); /* stubs must also be in .text */
+    emit_sep_major("STUB LABELS");
+    A("section .text\n"); /* stubs must also be in .text */
     /* ---- Stub definitions for referenced-but-undefined labels ----
      * These are dangling gotos (e.g. :F(error) with no "error" label defined,
      * or computed goto dispatch labels not yet implemented).
      * Map them to _SNO_END so the program assembles and terminates cleanly. */
-    A("\n; --- stub labels (dangling gotos / computed goto TBD) ---\n");
     for (int i = 0; i < prog_label_count; i++) {
         if (!prog_label_defined[i]) {
             A("%s:  ; STUB → _SNO_END (dangling or computed goto)\n",
@@ -2152,7 +2224,8 @@ static void asm_emit_program(Program *prog) {
     }
 
     /* ---- .data emitted last so all prog_str_intern() calls are captured ---- */
-    A("\nsection .data\n");
+    emit_sep_major("STRING TABLE");
+    A("section .data\n");
     prog_str_emit_data();
 }
 

@@ -446,3 +446,23 @@ session115 | 2026-03-16 | 6d5919daa03d3c56646b5f0a165f86ee | 15859 lines | compi
 - **Status:** assembles clean (nasm -f elf64 -I src/runtime/asm/)
 - **Change:** STMT_SEP shifted to column 28 (instruction column); was 4-space indent
 - **Invariants:** 106/106 C crosscheck PASS, 26/26 ASM crosscheck PASS
+
+## beauty_prog_session167.s
+- **Session:** 167
+- **Lines:** 12745 (down 919 from session166 — 6.7% reduction)
+- **Status:** assembles clean (nasm -f elf64 -I src/runtime/asm/); one pre-existing warning (empty db)
+- **Changes:**
+  1. **Macro collapses (M-ASM-BEAUTIFUL sprint A14):**
+     - `ASSIGN_INT var, n, fail_lbl` — collapses LOAD_INT + IS_FAIL_BRANCH + SET_VAR
+     - `ASSIGN_STR var, s, fail_lbl` — collapses LOAD_STR + IS_FAIL_BRANCH + SET_VAR
+     - `CALL1_INT fn, n` — collapses sub rsp + LOAD_INT + STORE_ARG32 + APPLY_FN_N + add rsp + mov-pair
+     - `CALL1_STR fn, s` — same with LOAD_STR
+     - Redundant `mov [rbp-32],rax` / `mov [rbp-24],rdx` after LOAD_INT/LOAD_STR eliminated (those macros already write there)
+     - Post-APPLY_FN_N raw mov pair → STORE_RESULT macro
+  2. **Comment separators (SEP_W=80, configurable):**
+     - `emit_sep_major(tag)` — `; === tag ====...` at every SNOBOL4 statement, section headers, named pattern headers
+     - `emit_sep_minor(tag)` — `; --- tag ----...` before γ/ω trampolines within named pattern defs
+     - STMT_SEP NASM macro replaced by raw comment text (visible without macro expansion)
+     - SNOBOL4 source labels embedded in `===` lines when present
+     - Section headers: PROGRAM BODY / END / NAMED PATTERN BODIES / STUB LABELS / STRING TABLE
+- **Invariants:** 106/106 C crosscheck PASS, 26/26 ASM crosscheck PASS
