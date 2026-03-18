@@ -8,27 +8,18 @@ extern  stmt_get, stmt_set, stmt_output, stmt_input
 extern  stmt_concat, stmt_is_fail, stmt_finish
 extern  stmt_apply, stmt_goto_dispatch
 extern  stmt_setup_subject, stmt_apply_replacement
-extern  stmt_set_capture
+extern  stmt_set_capture, stmt_match_var
 global  cursor, subject_data, subject_len_val
 
 section .note.GNU-stack noalloc noexec nowrite progbits
 section .bss
 cursor                   resq 1
 subject_len_val          resq 1
-P_WORD_ret_gamma         resq 1
-P_WORD_ret_omega         resq 1
-P_WPAT_ret_gamma         resq 1
-P_WPAT_ret_omega         resq 1
-P_LINE_ret_gamma         resq 1
-P_LINE_ret_omega         resq 1
-P_N_ret_gamma            resq 1
-P_N_ret_omega            resq 1
-P_OUTPUT_ret_gamma       resq 1
-P_OUTPUT_ret_omega       resq 1
-seq_l3_alpha_saved       resq 1
-brk6_saved               resq 1
-span7_saved              resq 1
-seq_r8_alpha_saved       resq 1
+P_WPAT_ret_γ            resq 1
+P_WPAT_ret_ω            resq 1
+scan_start_5             resq 1
+brk2_saved               resq 1
+span3_saved              resq 1
 conc_tmp0_rax            resq 1
 conc_tmp0_rdx            resq 1
 subject_data             resb 65536
@@ -46,225 +37,150 @@ main:
 ; ======================================================================================================================
 
 ; ======================================================================================================================
-L_sn_0:                     GET_VAR     S_NUMERALS
-                            ASSIGN_STR  S_NUMERALS, S_0123456789, L_sn_1
-                            jmp         L_sn_1
+Ln_0:                       GET_VAR     S_NUMERALS
+                            ASSIGN_STR  S_NUMERALS, S_0123456789, Ln_1
+                            jmp         Ln_1
 
 ; ======================================================================================================================
-L_sn_1:                     GET_VAR     S_WORD
-                            sub         rsp, 32
-                            sub         rsp, 32
-                            CONC2_SV    S_CONCAT, S_XX_MI, S_NUMERALS
-                            STORE_ARG32 0
+Ln_1:                       GET_VAR     S_WORD
+                            CAT2_SV     S_XX_MI, S_NUMERALS
+                            mov         [conc_tmp0_rax], rax
+                            mov         [conc_tmp0_rdx], rdx
                             lea         rdi, [rel S_AM_UCASE]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_CONCAT, 2
-                            add         rsp, 32
+                            mov         rcx, rdx
+                            mov         rdx, rax
+                            mov         rdi, [conc_tmp0_rax]
+                            mov         rsi, [conc_tmp0_rdx]
+                            call        stmt_concat
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
-                            STORE_ARG32 0
+                            mov         [conc_tmp0_rax], rax
+                            mov         [conc_tmp0_rdx], rdx
                             lea         rdi, [rel S_AM_LCASE]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_CONCAT, 2
-                            add         rsp, 32
+                            mov         rcx, rdx
+                            mov         rdx, rax
+                            mov         rdi, [conc_tmp0_rax]
+                            mov         rsi, [conc_tmp0_rdx]
+                            call        stmt_concat
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
-                            FAIL_BR     L_sn_2
+                            FAIL_BR     Ln_2
                             SET_VAR     S_WORD
-                            jmp         L_sn_2
+                            jmp         Ln_2
 
 ; ======================================================================================================================
-L_sn_2:                     GET_VAR     S_WPAT
-                            sub         rsp, 32
+Ln_2:                       GET_VAR     S_WPAT
                             CALL1_VAR   S_BREAK, S_WORD
-                            STORE_ARG32 0
+                            mov         [conc_tmp0_rax], rax
+                            mov         [conc_tmp0_rdx], rdx
                             CALL1_VAR   S_SPAN, S_WORD
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_CONCAT, 2
-                            add         rsp, 32
+                            mov         rcx, rdx
+                            mov         rdx, rax
+                            mov         rdi, [conc_tmp0_rax]
+                            mov         rsi, [conc_tmp0_rdx]
+                            call        stmt_concat
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
-                            FAIL_BR     L_sn_3
+                            FAIL_BR     Ln_3
                             SET_VAR     S_WPAT
-                            jmp         L_sn_3
+                            jmp         Ln_3
 
-L_sn_3:
+Ln_3:
 ;  NEXTL ===============================================================================================================
 L_NEXTL_0:                  GET_VAR     S_LINE
                             lea         rdi, [rel S_INPUT]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
-                            FAIL_BR     L_sf_4
+                            FAIL_BR     Lf_4
                             SET_VAR     S_LINE
-                            jmp         L_sn_4
-L_sf_4:                     jmp         L_DONE_1
+                            jmp         Ln_4
+Lf_4:                       jmp         L_DONE_1
 
-L_sn_4:
+Ln_4:
 ;  NEXTW ===============================================================================================================
 L_NEXTW_2:                  GET_VAR     S_LINE
                             SUBJ_FROM16
 
+                            mov         qword [scan_start_5], 0
+scan_retry_5:
+                            mov         rax, [scan_start_5]
+                            mov         [cursor], rax
                             jmp         P_5_α
 
 
 P_5_α: ; REF(WPAT)
                             lea         rax, [rel nref0_gamma]
-                            mov         [P_WPAT_ret_gamma], rax
+                            mov         [P_WPAT_ret_γ], rax
                             lea         rax, [rel nref0_omega]
-                            mov         [P_WPAT_ret_omega], rax
-                            jmp         P_WPAT_alpha
+                            mov         [P_WPAT_ret_ω], rax
+                            jmp         P_WPAT_α
 P_5_β:                      lea         rax, [rel nref0_gamma] ; REF(%s)
-                            mov         [P_WPAT_ret_gamma], rax
+                            mov         [P_WPAT_ret_γ], rax
                             lea         rax, [rel nref0_omega]
-                            mov         [P_WPAT_ret_omega], rax
-                            jmp         P_WPAT_beta
+                            mov         [P_WPAT_ret_ω], rax
+                            jmp         P_WPAT_β
 
 nref0_gamma:
                             jmp         P_5_γ
 nref0_omega:                jmp         P_5_ω
 
-P_5_γ:                      jmp         L_sn_5
-P_5_ω:                      jmp         L_NEXTL_0
+P_5_γ:                      jmp         Ln_5
+P_5_ω:                      mov         rax, [scan_start_5]
+                            inc         rax
+                            cmp         rax, [subject_len_val]
+                            jg          Ln_5
+                            mov         [scan_start_5], rax
+                            jmp         scan_retry_5
+                            jmp         L_NEXTL_0
 
 ; ======================================================================================================================
-L_sn_5:                     GET_VAR     S_N
-                            mov         qword [rbp-32], 1
-                            mov         qword [rbp-24], 0
-                            FAIL_BR     L_sn_6
+Ln_5:                       GET_VAR     S_N
+                            CONC2_VI    S_add, S_N, 1
+                            FAIL_BR     Ln_6
                             SET_VAR     S_N
                             jmp         L_NEXTW_2
 
-L_sn_6:
+Ln_6:
 ;  DONE ================================================================================================================
 L_DONE_1:                   GET_VAR     S_OUTPUT
-                            CONC2_VS    S_CONCAT, S_N, S_SP_words
-                            FAIL_BR     L_sn_7
+                            CAT2_VS     S_N, S_SP_words
+                            FAIL_BR     Ln_7
                             SET_OUTPUT
 
-                            jmp         L_sn_7
-L_sn_7:                     GOTO_ALWAYS L_SNO_END
+                            jmp         Ln_7
+Ln_7:                       GOTO_ALWAYS L_SNO_END
 
 L_SNO_END:
                             PROG_END
 
 
 section .data
-lit_str_1            db 39, 45
-lit_str_2            db 
-lit_str_3            db 32, 119, 111, 114, 100, 115
+lit_str_1            db 
 ;  END =================================================================================================================
 
 section .text
 
 ;  NAMED PATTERN BODIES ================================================================================================
 
-; P_WORD_alpha (α entry)
-P_WORD_alpha:               jmp         seq_l1_alpha ; SEQ
-P_WORD_beta:                jmp         seq_r1_beta
-seq_l1_alpha:               jmp         seq_l2_alpha ; SEQ
-seq_l1_beta:                jmp         seq_r2_beta
-seq_l2_alpha:               jmp         seq_l3_alpha ; SEQ
-seq_l2_beta:                jmp         seq_r3_beta
-seq_l3_alpha:               LIT_ALPHA   lit_str_1, 2, seq_l3_alpha_saved, cursor, subject_data, subject_len_val, seq_r3_alpha, patdef_WORD_omega ; LIT α
-seq_l3_beta:                LIT_BETA    seq_l3_alpha_saved, cursor, patdef_WORD_omega ; LIT β
-
-seq_r3_alpha: ; REF(NUMERALS)
-                            lea         rax, [rel nref4_gamma]
-                            mov         [P_NUMERALS_ret_gamma], rax
-                            lea         rax, [rel nref4_omega]
-                            mov         [P_NUMERALS_ret_omega], rax
-                            jmp         P_NUMERALS_alpha
-seq_r3_beta:                lea         rax, [rel nref4_gamma] ; REF(%s)
-                            mov         [P_NUMERALS_ret_gamma], rax
-                            lea         rax, [rel nref4_omega]
-                            mov         [P_NUMERALS_ret_omega], rax
-                            jmp         P_NUMERALS_beta
-
-nref4_gamma:
-                            jmp         seq_r2_alpha
-;  WORD ================================================================================================================
-nref4_omega:                jmp         seq_l3_beta
-
-; UNIMPLEMENTED node kind 5 → ω
-seq_r2_alpha:
-seq_r2_beta:                jmp         seq_l2_beta
-
-; UNIMPLEMENTED node kind 5 → ω
-seq_r1_alpha:
-seq_r1_beta:                jmp         seq_l1_beta
-;  γ/ω ---------------------------------------------------------------------------------------------------------------
-patdef_WORD_gamma:
-                            jmp         [P_WORD_ret_gamma]
-patdef_WORD_omega:          jmp         [P_WORD_ret_omega]
-
-; P_WPAT_alpha (α entry)
-P_WPAT_alpha:               jmp         seq_l5_alpha ; SEQ
-P_WPAT_beta:                jmp         seq_r5_beta
-seq_l5_alpha:               BREAK_ALPHA lit_str_2, 0, brk6_saved, cursor, subject_data, subject_len_val, seq_r5_alpha, patdef_WPAT_omega ; BREAK α
-seq_l5_beta:                BREAK_BETA  brk6_saved, cursor, patdef_WPAT_omega ; BREAK β
-seq_r5_alpha:               SPAN_ALPHA  lit_str_2, 0, span7_saved, cursor, subject_data, subject_len_val, patdef_WPAT_gamma, seq_l5_beta ; SPAN α
-seq_r5_beta:                SPAN_BETA   span7_saved, cursor, seq_l5_beta ; SPAN β
+; P_WPAT_α (α entry)
+P_WPAT_α:                   jmp         seq_l1_alpha ; SEQ
+P_WPAT_β:                   jmp         seq_r1_beta
+seq_l1_alpha:               BREAK_ALPHA lit_str_1, 0, brk2_saved, cursor, subject_data, subject_len_val, seq_r1_alpha, patdef_WPAT_omega ; BREAK α
+seq_l1_beta:                BREAK_BETA  brk2_saved, cursor, patdef_WPAT_omega ; BREAK β
+seq_r1_alpha:               SPAN_ALPHA  lit_str_1, 0, span3_saved, cursor, subject_data, subject_len_val, patdef_WPAT_gamma, seq_l1_beta ; SPAN α
+seq_r1_beta:                SPAN_BETA   span3_saved, cursor, seq_l1_beta ; SPAN β
 ;  γ/ω ---------------------------------------------------------------------------------------------------------------
 patdef_WPAT_gamma:
-                            jmp         [P_WPAT_ret_gamma]
+                            jmp         [P_WPAT_ret_γ]
 ;  WPAT ================================================================================================================
-patdef_WPAT_omega:          jmp         [P_WPAT_ret_omega]
-
-; P_LINE_alpha (α entry)
-
-; UNRESOLVED named pattern ref: INPUT → ω
-P_LINE_alpha:
-P_LINE_beta:                jmp         patdef_LINE_omega
-;  γ/ω ---------------------------------------------------------------------------------------------------------------
-patdef_LINE_gamma:
-                            jmp         [P_LINE_ret_gamma]
-;  LINE ================================================================================================================
-patdef_LINE_omega:          jmp         [P_LINE_ret_omega]
-
-; P_N_alpha (α entry)
-
-; UNIMPLEMENTED node kind 8 → ω
-P_N_alpha:
-P_N_beta:                   jmp         patdef_N_omega
-;  γ/ω ---------------------------------------------------------------------------------------------------------------
-patdef_N_gamma:
-                            jmp         [P_N_ret_gamma]
-;  N ===================================================================================================================
-patdef_N_omega:             jmp         [P_N_ret_omega]
-
-; P_OUTPUT_alpha (α entry)
-P_OUTPUT_alpha:             jmp         seq_l8_alpha ; SEQ
-P_OUTPUT_beta:              jmp         seq_r8_beta
-
-seq_l8_alpha: ; REF(N)
-                            lea         rax, [rel nref9_gamma]
-                            mov         [P_N_ret_gamma], rax
-                            lea         rax, [rel nref9_omega]
-                            mov         [P_N_ret_omega], rax
-                            jmp         P_N_alpha
-seq_l8_beta:                lea         rax, [rel nref9_gamma] ; REF(%s)
-                            mov         [P_N_ret_gamma], rax
-                            lea         rax, [rel nref9_omega]
-                            mov         [P_N_ret_omega], rax
-                            jmp         P_N_beta
-
-nref9_gamma:
-                            jmp         seq_r8_alpha
-;  OUTPUT ==============================================================================================================
-nref9_omega:                jmp         patdef_OUTPUT_omega
-seq_r8_alpha:               LIT_ALPHA   lit_str_3, 6, seq_r8_alpha_saved, cursor, subject_data, subject_len_val, patdef_OUTPUT_gamma, seq_l8_beta ; LIT α
-seq_r8_beta:                LIT_BETA    seq_r8_alpha_saved, cursor, seq_l8_beta ; LIT β
-;  γ/ω ---------------------------------------------------------------------------------------------------------------
-patdef_OUTPUT_gamma:
-                            jmp         [P_OUTPUT_ret_gamma]
-patdef_OUTPUT_omega:        jmp         [P_OUTPUT_ret_omega]
+patdef_WPAT_omega:          jmp         [P_WPAT_ret_ω]
 
 section .text
 L_END_3:  ; STUB → _SNO_END (dangling or computed goto)
@@ -292,6 +208,6 @@ S_OUTPUT             db 79, 85, 84, 80, 85, 84, 0  ; "OUTPUT"
 S_SP_words           db 32, 119, 111, 114, 100, 115, 0  ; " words"
 S_END                db 69, 78, 68, 0  ; "END"
 S_AM_TRIM            db 38, 84, 82, 73, 77, 0  ; "&TRIM"
-S_CONCAT             db 67, 79, 78, 67, 65, 84, 0  ; "CONCAT"
 S_AM_UCASE           db 38, 85, 67, 65, 83, 69, 0  ; "&UCASE"
 S_AM_LCASE           db 38, 76, 67, 65, 83, 69, 0  ; "&LCASE"
+S_add                db 97, 100, 100, 0  ; "add"

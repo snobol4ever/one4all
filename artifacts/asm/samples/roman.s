@@ -8,27 +8,30 @@ extern  stmt_get, stmt_set, stmt_output, stmt_input
 extern  stmt_concat, stmt_is_fail, stmt_finish
 extern  stmt_apply, stmt_goto_dispatch
 extern  stmt_setup_subject, stmt_apply_replacement
-extern  stmt_set_capture
+extern  stmt_set_capture, stmt_match_var
 global  cursor, subject_data, subject_len_val
 
 section .note.GNU-stack noalloc noexec nowrite progbits
 section .bss
 cursor                   resq 1
 subject_len_val          resq 1
-P_s_ret_gamma            resq 1
-P_s_ret_omega            resq 1
-P_v_ret_gamma            resq 1
-P_v_ret_omega            resq 1
-P_r_ret_gamma            resq 1
-P_r_ret_omega            resq 1
-P_i_ret_gamma            resq 1
-P_i_ret_omega            resq 1
-P_n_ret_gamma            resq 1
-P_n_ret_omega            resq 1
-P_roman_ret_gamma        resq 1
-P_roman_ret_omega        resq 1
-P_OUTPUT_ret_gamma       resq 1
-P_OUTPUT_ret_omega       resq 1
+P_ROMAN_ret_γ           resq 1
+P_ROMAN_ret_ω           resq 1
+P_T1_ret_γ              resq 1
+P_T1_ret_ω              resq 1
+P_R_ret_γ               resq 1
+P_R_ret_ω               resq 1
+P_N_ret_γ               resq 1
+P_N_ret_ω               resq 1
+P_T2_ret_γ              resq 1
+P_T2_ret_ω              resq 1
+scan_start_3             resq 1
+scan_start_4             resq 1
+dol_entry_T              resq 1
+len2_saved               resq 1
+brk5_saved               resq 1
+cap_T_buf                resb 256
+cap_T_len                resq 1
 conc_tmp0_rax            resq 1
 conc_tmp0_rdx            resq 1
 subject_data             resb 65536
@@ -41,8 +44,16 @@ main:
 
 ;  PROGRAM BODY ========================================================================================================
 
-                            sub         rsp, 16
-                            LOAD_STR    S_roman_LP_n_RP_s_CM_v_CM_r_CM_i
+                            GET_VAR     S_AM_TRIM
+
+; ======================================================================================================================
+
+; ======================================================================================================================
+Ln_0:                       GET_VAR     S_AM_STLIMIT
+
+; ======================================================================================================================
+Ln_1:                       sub         rsp, 16
+                            LOAD_STR    S_ROMAN_LP_N_RP_T
                             mov         [rbp-16], rax
                             mov         [rbp-8],  rdx
                             STORE_ARG32 0
@@ -50,415 +61,307 @@ main:
                             add         rsp, 16
                             STORE_RESULT
 
-                            jmp         L_roman_end_0
-
-; ======================================================================================================================
-
-L_sn_0:
-;  roman ===============================================================================================================
-L_roman_1:                  GET_VAR     S_s
-                            ASSIGN_STR  S_s, S_5, L_sn_1
-                            jmp         L_sn_1
-
-; ======================================================================================================================
-L_sn_1:                     GET_VAR     S_v
-                            CALL1_INT   S_ARRAY, 13
-                            FAIL_BR     L_sn_2
-                            SET_VAR     S_v
-                            jmp         L_sn_2
-
-; ======================================================================================================================
-L_sn_2:                     LOAD_NULVCL
-
-
-; ======================================================================================================================
-L_sn_3:                     LOAD_NULVCL
-
-
-; ======================================================================================================================
-L_sn_4:                     LOAD_NULVCL
-
-
-; ======================================================================================================================
-L_sn_5:                     LOAD_NULVCL
-
-
-; ======================================================================================================================
-L_sn_6:                     LOAD_NULVCL
-
-
-; ======================================================================================================================
-L_sn_7:                     LOAD_NULVCL
-
-
-; ======================================================================================================================
-L_sn_8:                     LOAD_NULVCL
-
-
-; ======================================================================================================================
-L_sn_9:                     LOAD_NULVCL
-
-
-; ======================================================================================================================
-L_sn_10:                    LOAD_NULVCL
-
-
-; ======================================================================================================================
-L_sn_11:                    LOAD_NULVCL
-
-
-; ======================================================================================================================
-L_sn_12:                    LOAD_NULVCL
-
-
-; ======================================================================================================================
-L_sn_13:                    LOAD_NULVCL
-
-
-; ======================================================================================================================
-L_sn_14:                    LOAD_NULVCL
-
-
-; ======================================================================================================================
-L_sn_15:                    GET_VAR     S_r
-                            CALL1_INT   S_ARRAY, 13
-                            FAIL_BR     L_sn_16
-                            SET_VAR     S_r
-                            jmp         L_sn_16
-
-; ======================================================================================================================
-L_sn_16:                    LOAD_NULVCL
-
-
-; ======================================================================================================================
-L_sn_17:                    LOAD_NULVCL
-
-
-; ======================================================================================================================
-L_sn_18:                    LOAD_NULVCL
-
-
-; ======================================================================================================================
-L_sn_19:                    LOAD_NULVCL
-
-
-; ======================================================================================================================
-L_sn_20:                    LOAD_NULVCL
-
-
-; ======================================================================================================================
-L_sn_21:                    LOAD_NULVCL
-
-
-; ======================================================================================================================
-L_sn_22:                    LOAD_NULVCL
-
-
-; ======================================================================================================================
-L_sn_23:                    LOAD_NULVCL
-
-
-; ======================================================================================================================
-L_sn_24:                    LOAD_NULVCL
-
-
-; ======================================================================================================================
-L_sn_25:                    LOAD_NULVCL
-
-
-; ======================================================================================================================
-L_sn_26:                    LOAD_NULVCL
-
-
-; ======================================================================================================================
-L_sn_27:                    LOAD_NULVCL
-
-
-; ======================================================================================================================
-L_sn_28:                    LOAD_NULVCL
-
-
-; ======================================================================================================================
-L_sn_29:                    GET_VAR     S_i
-                            ASSIGN_INT  S_i, 1, L_sn_30
-                            jmp         L_sn_30
-
-L_sn_30:
-;  RLOOP ===============================================================================================================
-L_RLOOP_2:                  CONC2_VN16  S_GT, S_n
-                            FAIL_BR16   L_sf_31
-                            jmp         L_sn_31
-L_sf_31:                    jmp         L_RDONE_3
-
-; ======================================================================================================================
-L_sn_31:                    sub         rsp, 32
-                            GET_VAR     S_n
-                            STORE_ARG32 0
-                            LOAD_NULVCL
-
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_GE, 2
-                            add         rsp, 32
-                            STORE_RESULT
-
-                            FAIL_BR16   L_sf_32
-                            jmp         L_sn_32
-L_sf_32:                    jmp         L_RNEXT_4
-
-; ======================================================================================================================
-L_sn_32:                    GET_VAR     S_s
-                            sub         rsp, 32
-                            lea         rdi, [rel S_s]
-                            call        stmt_get
-                            mov         [rbp-32], rax
-                            mov         [rbp-24], rdx
-                            STORE_ARG32 0
-                            mov         qword [rbp-32], 1
-                            mov         qword [rbp-24], 0
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_CONCAT, 2
-                            add         rsp, 32
-                            mov         [rbp-32], rax
-                            mov         [rbp-24], rdx
-                            FAIL_BR     L_sn_33
-                            SET_VAR     S_s
-                            jmp         L_sn_33
-
-; ======================================================================================================================
-L_sn_33:                    GET_VAR     S_n
-                            mov         qword [rbp-32], 1
-                            mov         qword [rbp-24], 0
-                            FAIL_BR     L_sn_34
-                            SET_VAR     S_n
-                            jmp         L_RLOOP_2
-
-L_sn_34:
-;  RNEXT ===============================================================================================================
-L_RNEXT_4:                  GET_VAR     S_i
-                            mov         qword [rbp-32], 1
-                            mov         qword [rbp-24], 0
-                            FAIL_BR     L_sn_35
-                            SET_VAR     S_i
-                            jmp         L_RLOOP_2
-
-L_sn_35:
-;  RDONE ===============================================================================================================
-L_RDONE_3:                  GET_VAR     S_roman
-                            lea         rdi, [rel S_s]
-                            call        stmt_get
-                            mov         [rbp-32], rax
-                            mov         [rbp-24], rdx
-                            FAIL_BR     L_sn_36
-                            SET_VAR     S_roman
+                            jmp         L_ROMAN_END_0
+
+Ln_2:
+;  ROMAN ===============================================================================================================
+L_ROMAN_1:                  GET_VAR     S_N
+                            SUBJ_FROM16
+
+                            mov         qword [scan_start_3], 0
+scan_retry_3:
+                            mov         rax, [scan_start_3]
+                            mov         [cursor], rax
+                            jmp         P_3_α
+
+P_3_α:                      jmp         seq_l0_alpha ; SEQ
+P_3_β:                      jmp         seq_r0_beta
+seq_l0_alpha:               RPOS_ALPHA  1, cursor, subject_len_val, seq_r0_alpha, P_3_ω ; RPOS(%ld)
+seq_l0_beta:                RPOS_BETA   cursor, P_3_ω
+
+seq_r0_alpha: ; DOL(T $  T)
+                            DOL_SAVE    dol_entry_T, cursor, dol1_child_alpha ; DOL α — save entry cursor
+seq_r0_beta:                jmp         dol1_child_beta ; DOL β
+dol1_child_alpha:           LEN_ALPHA   1, len2_saved, cursor, subject_len_val, dol1_gamma, dol1_omega ; LEN(%ld)
+dol1_child_beta:            LEN_BETA    len2_saved, cursor, dol1_omega ; LEN β
+dol1_gamma:                 DOL_CAPTURE dol_entry_T, cursor, cap_T_buf, cap_T_len, subject_data, P_3_γ ; DOL γ — capture span
+dol1_omega:                 jmp         seq_l0_beta ; DOL ω — child failed
+
+P_3_γ:                      SET_CAPTURE S_T, cap_T_buf, cap_T_len
+                            jmp         Ln_3
+P_3_ω:                      mov         rax, [scan_start_3]
+                            inc         rax
+                            cmp         rax, [subject_len_val]
+                            jg          Ln_3
+                            mov         [scan_start_3], rax
+                            jmp         scan_retry_3
                             GOTO_ALWAYS L_SNO_END     ; RETURN
 
-L_sn_36:
-L_roman_end_0:
+; ======================================================================================================================
+Ln_3:                       LOAD_STR    S_0_CM_1I_CM_2II_CM_3III_CM_4IV_CM_5V_CM_6VI_CM_7VII_CM_8VIII_C
+                            mov         [rbp-16], rax
+                            mov         [rbp-8],  rdx
+                            SUBJ_FROM16
 
-;  roman_end ===========================================================================================================
+                            mov         qword [scan_start_4], 0
+scan_retry_4:
+                            mov         rax, [scan_start_4]
+                            mov         [cursor], rax
+                            jmp         P_4_α
+
+P_4_α:                      jmp         seq_l3_alpha ; SEQ
+P_4_β:                      jmp         seq_r3_beta
+
+; UNRESOLVED named pattern ref: T → ω
+seq_l3_alpha:
+seq_l3_beta:                jmp         P_4_ω
+
+seq_r3_alpha: ; DOL(T $  T)
+                            DOL_SAVE    dol_entry_T, cursor, dol4_child_alpha ; DOL α — save entry cursor
+seq_r3_beta:                jmp         dol4_child_beta ; DOL β
+dol4_child_alpha:           BREAK_ALPHA lit_str_1, 1, brk5_saved, cursor, subject_data, subject_len_val, dol4_gamma, dol4_omega ; BREAK α
+dol4_child_beta:            BREAK_BETA  brk5_saved, cursor, dol4_omega ; BREAK β
+dol4_gamma:                 DOL_CAPTURE dol_entry_T, cursor, cap_T_buf, cap_T_len, subject_data, P_4_γ ; DOL γ — capture span
+dol4_omega:                 jmp         seq_l3_beta ; DOL ω — child failed
+
+P_4_γ:                      SET_CAPTURE S_T, cap_T_buf, cap_T_len
+                            jmp         Ln_4
+P_4_ω:                      mov         rax, [scan_start_4]
+                            inc         rax
+                            cmp         rax, [subject_len_val]
+                            jg          Ln_4
+                            mov         [scan_start_4], rax
+                            jmp         scan_retry_4
+                            GOTO_ALWAYS L_SNO_END     ; FRETURN
 
 ; ======================================================================================================================
-L_sn_37:                    GET_VAR     S_OUTPUT
-                            CALL1_INT   S_roman, 1
-                            FAIL_BR     L_sn_38
-                            SET_OUTPUT
+Ln_4:                       GET_VAR     S_ROMAN
+                            sub         rsp, 48
+                            CALL1_VAR   S_ROMAN, S_N
+                            STORE_ARG32 0
+                            LOAD_STR    S_IVXLCDM
+                            STORE_ARG32 16
+                            LOAD_STR    S_XLCDM_ST_ST
+                            STORE_ARG32 32
+                            APPLY_FN_N  S_REPLACE, 3
+                            add         rsp, 48
+                            STORE_RESULT
 
-                            jmp         L_sn_38
+                            mov         [conc_tmp0_rax], rax
+                            mov         [conc_tmp0_rdx], rdx
+                            lea         rdi, [rel S_T]
+                            call        stmt_get
+                            mov         [rbp-32], rax
+                            mov         [rbp-24], rdx
+                            mov         rcx, rdx
+                            mov         rdx, rax
+                            mov         rdi, [conc_tmp0_rax]
+                            mov         rsi, [conc_tmp0_rdx]
+                            call        stmt_concat
+                            mov         [rbp-32], rax
+                            mov         [rbp-24], rdx
+                            FAIL_BR     Lf_5
+                            SET_VAR     S_ROMAN
+                            GOTO_ALWAYS L_SNO_END     ; RETURN
+Lf_5:                       GOTO_ALWAYS L_SNO_END     ; FRETURN
 
-; ======================================================================================================================
-L_sn_38:                    GET_VAR     S_OUTPUT
-                            CALL1_INT   S_roman, 4
-                            FAIL_BR     L_sn_39
-                            SET_OUTPUT
+Ln_5:
+L_ROMAN_END_0:
 
-                            jmp         L_sn_39
-
-; ======================================================================================================================
-L_sn_39:                    GET_VAR     S_OUTPUT
-                            CALL1_INT   S_roman, 9
-                            FAIL_BR     L_sn_40
-                            SET_OUTPUT
-
-                            jmp         L_sn_40
-
-; ======================================================================================================================
-L_sn_40:                    GET_VAR     S_OUTPUT
-                            CALL1_INT   S_roman, 42
-                            FAIL_BR     L_sn_41
-                            SET_OUTPUT
-
-                            jmp         L_sn_41
-
-; ======================================================================================================================
-L_sn_41:                    GET_VAR     S_OUTPUT
-                            CALL1_INT   S_roman, 1999
-                            FAIL_BR     L_sn_42
-                            SET_OUTPUT
-
-                            jmp         L_sn_42
+;  ROMAN_END ===========================================================================================================
 
 ; ======================================================================================================================
-L_sn_42:                    GET_VAR     S_OUTPUT
-                            CALL1_INT   S_roman, 2024
-                            FAIL_BR     L_sn_43
+Ln_6:                       GET_VAR     S_T1
+                            APPLY_FN_0  S_TIME
+                            STORE_RESULT
+
+                            FAIL_BR     Ln_7
+                            SET_VAR     S_T1
+                            jmp         Ln_7
+
+; ======================================================================================================================
+Ln_7:                       GET_VAR     S_N
+                            ASSIGN_INT  S_N, 0, Ln_8
+                            jmp         Ln_8
+
+Ln_8:
+;  LOOP ================================================================================================================
+L_LOOP_2:                   GET_VAR     S_R
+                            CALL1_STR   S_ROMAN, S_1776
+                            FAIL_BR     Ln_9
+                            SET_VAR     S_R
+                            jmp         Ln_9
+
+; ======================================================================================================================
+Ln_9:                       GET_VAR     S_N
+                            CONC2_VI    S_LT, S_N, 100000
+                            mov         [conc_tmp0_rax], rax
+                            mov         [conc_tmp0_rdx], rdx
+                            CONC2_VI    S_add, S_N, 1
+                            mov         rcx, rdx
+                            mov         rdx, rax
+                            mov         rdi, [conc_tmp0_rax]
+                            mov         rsi, [conc_tmp0_rdx]
+                            call        stmt_concat
+                            mov         [rbp-32], rax
+                            mov         [rbp-24], rdx
+                            FAIL_BR     Ln_10
+                            SET_VAR     S_N
+                            jmp         L_LOOP_2
+
+; ======================================================================================================================
+Ln_10:                      GET_VAR     S_T2
+                            APPLY_FN_0  S_TIME
+                            STORE_RESULT
+
+                            FAIL_BR     Ln_11
+                            SET_VAR     S_T2
+                            jmp         Ln_11
+
+; ======================================================================================================================
+Ln_11:                      GET_VAR     S_OUTPUT
+                            CAT2_SV     S_result_CL_SP, S_R
+                            FAIL_BR     Ln_12
                             SET_OUTPUT
 
-                            jmp         L_sn_43
-L_sn_43:                    GOTO_ALWAYS L_SNO_END
+                            jmp         Ln_12
+
+; ======================================================================================================================
+Ln_12:                      GET_VAR     S_OUTPUT
+                            LOAD_STR    S_ms_CL_SP
+                            mov         [conc_tmp0_rax], rax
+                            mov         [conc_tmp0_rdx], rdx
+                            CONC2_VV    S_sub, S_T2, S_T1
+                            mov         rcx, rdx
+                            mov         rdx, rax
+                            mov         rdi, [conc_tmp0_rax]
+                            mov         rsi, [conc_tmp0_rdx]
+                            call        stmt_concat
+                            mov         [rbp-32], rax
+                            mov         [rbp-24], rdx
+                            FAIL_BR     Ln_13
+                            SET_OUTPUT
+
+                            jmp         Ln_13
+Ln_13:                      GOTO_ALWAYS L_SNO_END
 
 L_SNO_END:
                             PROG_END
 
+
+section .data
+lit_str_1            db 44
 ;  END =================================================================================================================
 
 section .text
 
 ;  NAMED PATTERN BODIES ================================================================================================
 
-; P_s_alpha (α entry)
-P_s_alpha:                  jmp         seq_l0_alpha ; SEQ
-P_s_beta:                   jmp         seq_r0_beta
+; P_ROMAN_α (α entry)
+P_ROMAN_α:                  jmp         seq_l6_alpha ; SEQ
+P_ROMAN_β:                  jmp         seq_r6_beta
 
-seq_l0_alpha: ; REF(s)
-                            lea         rax, [rel nref1_gamma]
-                            mov         [P_s_ret_gamma], rax
-                            lea         rax, [rel nref1_omega]
-                            mov         [P_s_ret_omega], rax
-                            jmp         P_s_alpha
-seq_l0_beta:                lea         rax, [rel nref1_gamma] ; REF(%s)
-                            mov         [P_s_ret_gamma], rax
-                            lea         rax, [rel nref1_omega]
-                            mov         [P_s_ret_omega], rax
-                            jmp         P_s_beta
+; UNIMPLEMENTED: REPLACE() → ω
+seq_l6_alpha:
+seq_l6_beta:                jmp         patdef_ROMAN_omega
 
-nref1_gamma:
-                            jmp         seq_r0_alpha
-;  s ===================================================================================================================
-nref1_omega:                jmp         patdef_s_omega
-
-; UNIMPLEMENTED node kind 20 → ω
-seq_r0_alpha:
-seq_r0_beta:                jmp         seq_l0_beta
+; UNRESOLVED named pattern ref: T → ω
+seq_r6_alpha:
+seq_r6_beta:                jmp         seq_l6_beta
 ;  γ/ω ---------------------------------------------------------------------------------------------------------------
-patdef_s_gamma:
-                            jmp         [P_s_ret_gamma]
-patdef_s_omega:             jmp         [P_s_ret_omega]
+patdef_ROMAN_gamma:
+                            jmp         [P_ROMAN_ret_γ]
+;  ROMAN ===============================================================================================================
+patdef_ROMAN_omega:         jmp         [P_ROMAN_ret_ω]
 
-; P_v_alpha (α entry)
+; P_T1_α (α entry)
 
-; UNIMPLEMENTED: ARRAY() → ω
-P_v_alpha:
-P_v_beta:                   jmp         patdef_v_omega
+; UNIMPLEMENTED: TIME() → ω
+P_T1_α:
+P_T1_β:                     jmp         patdef_T1_omega
 ;  γ/ω ---------------------------------------------------------------------------------------------------------------
-patdef_v_gamma:
-                            jmp         [P_v_ret_gamma]
-;  v ===================================================================================================================
-patdef_v_omega:             jmp         [P_v_ret_omega]
+patdef_T1_gamma:
+                            jmp         [P_T1_ret_γ]
+;  T1 ==================================================================================================================
+patdef_T1_omega:            jmp         [P_T1_ret_ω]
 
-; P_r_alpha (α entry)
+; P_R_α (α entry)
 
-; UNIMPLEMENTED: ARRAY() → ω
-P_r_alpha:
-P_r_beta:                   jmp         patdef_r_omega
+; UNIMPLEMENTED: ROMAN() → ω
+P_R_α:
+P_R_β:                      jmp         patdef_R_omega
 ;  γ/ω ---------------------------------------------------------------------------------------------------------------
-patdef_r_gamma:
-                            jmp         [P_r_ret_gamma]
-;  r ===================================================================================================================
-patdef_r_omega:             jmp         [P_r_ret_omega]
+patdef_R_gamma:
+                            jmp         [P_R_ret_γ]
+;  R ===================================================================================================================
+patdef_R_omega:             jmp         [P_R_ret_ω]
 
-; P_i_alpha (α entry)
+; P_N_α (α entry)
+P_N_α:                      jmp         seq_l7_alpha ; SEQ
+P_N_β:                      jmp         seq_r7_beta
+
+; UNIMPLEMENTED: LT() → ω
+seq_l7_alpha:
+seq_l7_beta:                jmp         patdef_N_omega
 
 ; UNIMPLEMENTED node kind 8 → ω
-P_i_alpha:
-P_i_beta:                   jmp         patdef_i_omega
+seq_r7_alpha:
+seq_r7_beta:                jmp         seq_l7_beta
 ;  γ/ω ---------------------------------------------------------------------------------------------------------------
-patdef_i_gamma:
-                            jmp         [P_i_ret_gamma]
-;  i ===================================================================================================================
-patdef_i_omega:             jmp         [P_i_ret_omega]
+patdef_N_gamma:
+                            jmp         [P_N_ret_γ]
+;  N ===================================================================================================================
+patdef_N_omega:             jmp         [P_N_ret_ω]
 
-; P_n_alpha (α entry)
+; P_T2_α (α entry)
 
-; UNIMPLEMENTED node kind 9 → ω
-P_n_alpha:
-P_n_beta:                   jmp         patdef_n_omega
+; UNIMPLEMENTED: TIME() → ω
+P_T2_α:
+P_T2_β:                     jmp         patdef_T2_omega
 ;  γ/ω ---------------------------------------------------------------------------------------------------------------
-patdef_n_gamma:
-                            jmp         [P_n_ret_gamma]
-;  n ===================================================================================================================
-patdef_n_omega:             jmp         [P_n_ret_omega]
-
-; P_roman_alpha (α entry)
-
-P_roman_alpha: ; REF(s)
-                            lea         rax, [rel nref2_gamma]
-                            mov         [P_s_ret_gamma], rax
-                            lea         rax, [rel nref2_omega]
-                            mov         [P_s_ret_omega], rax
-                            jmp         P_s_alpha
-P_roman_beta:               lea         rax, [rel nref2_gamma] ; REF(%s)
-                            mov         [P_s_ret_gamma], rax
-                            lea         rax, [rel nref2_omega]
-                            mov         [P_s_ret_omega], rax
-                            jmp         P_s_beta
-
-nref2_gamma:
-                            jmp         patdef_roman_gamma
-;  roman ===============================================================================================================
-nref2_omega:                jmp         patdef_roman_omega
-;  γ/ω ---------------------------------------------------------------------------------------------------------------
-patdef_roman_gamma:
-                            jmp         [P_roman_ret_gamma]
-patdef_roman_omega:         jmp         [P_roman_ret_omega]
-
-; P_OUTPUT_alpha (α entry)
-
-; UNIMPLEMENTED: roman() → ω
-P_OUTPUT_alpha:
-P_OUTPUT_beta:              jmp         patdef_OUTPUT_omega
-;  γ/ω ---------------------------------------------------------------------------------------------------------------
-patdef_OUTPUT_gamma:
-                            jmp         [P_OUTPUT_ret_gamma]
-;  OUTPUT ==============================================================================================================
-patdef_OUTPUT_omega:        jmp         [P_OUTPUT_ret_omega]
+patdef_T2_gamma:
+                            jmp         [P_T2_ret_γ]
+;  T2 ==================================================================================================================
+patdef_T2_omega:            jmp         [P_T2_ret_ω]
 
 section .text
-L_END_5:  ; STUB → _SNO_END (dangling or computed goto)
+L_END_3:  ; STUB → _SNO_END (dangling or computed goto)
                             GOTO_ALWAYS L_SNO_END
-L_RETURN_6:  ; STUB → _SNO_END (dangling or computed goto)
+L_RETURN_4:  ; STUB → _SNO_END (dangling or computed goto)
+                            GOTO_ALWAYS L_SNO_END
+L_FRETURN_5:  ; STUB → _SNO_END (dangling or computed goto)
                             GOTO_ALWAYS L_SNO_END
 ;  STUB LABELS =========================================================================================================
 
 section .data
+S_TRIM               db 84, 82, 73, 77, 0  ; "TRIM"
+S_STLIMIT            db 83, 84, 76, 73, 77, 73, 84, 0  ; "STLIMIT"
 S_DEFINE             db 68, 69, 70, 73, 78, 69, 0  ; "DEFINE"
-S_roman_LP_n_RP_s_CM_v_CM_r_CM_i db 114, 111, 109, 97, 110, 40, 110, 41, 115, 44, 118, 44, 114, 44, 105, 0  ; "roman(n)s,v,r,i"
-S_roman              db 114, 111, 109, 97, 110, 0  ; "roman"
-S_s                  db 115, 0  ; "s"
-S_5                  db 0  ; 
-S_v                  db 118, 0  ; "v"
-S_ARRAY              db 65, 82, 82, 65, 89, 0  ; "ARRAY"
-S_r                  db 114, 0  ; "r"
-S_M                  db 77, 0  ; "M"
-S_CM                 db 67, 77, 0  ; "CM"
-S_D                  db 68, 0  ; "D"
-S_CD                 db 67, 68, 0  ; "CD"
-S_C                  db 67, 0  ; "C"
-S_XC                 db 88, 67, 0  ; "XC"
-S_L                  db 76, 0  ; "L"
-S_XL                 db 88, 76, 0  ; "XL"
-S_X                  db 88, 0  ; "X"
-S_IX                 db 73, 88, 0  ; "IX"
-S_V                  db 86, 0  ; "V"
-S_IV                 db 73, 86, 0  ; "IV"
-S_I                  db 73, 0  ; "I"
-S_i                  db 105, 0  ; "i"
-S_RLOOP              db 82, 76, 79, 79, 80, 0  ; "RLOOP"
-S_GT                 db 71, 84, 0  ; "GT"
-S_n                  db 110, 0  ; "n"
-S_GE                 db 71, 69, 0  ; "GE"
-S_RNEXT              db 82, 78, 69, 88, 84, 0  ; "RNEXT"
-S_RDONE              db 82, 68, 79, 78, 69, 0  ; "RDONE"
-S_roman_end          db 114, 111, 109, 97, 110, 95, 101, 110, 100, 0  ; "roman_end"
+S_ROMAN_LP_N_RP_T    db 82, 79, 77, 65, 78, 40, 78, 41, 84, 0  ; "ROMAN(N)T"
+S_ROMAN              db 82, 79, 77, 65, 78, 0  ; "ROMAN"
+S_N                  db 78, 0  ; "N"
+S_T                  db 84, 0  ; "T"
+S_LEN                db 76, 69, 78, 0  ; "LEN"
+S_RPOS               db 82, 80, 79, 83, 0  ; "RPOS"
+S_0_CM_1I_CM_2II_CM_3III_CM_4IV_CM_5V_CM_6VI_CM_7VII_CM_8VIII_C db 48, 44, 49, 73, 44, 50, 73, 73, 44, 51, 73, 73, 73, 44, 52, 73, 86, 44, 53, 86, 44, 54, 86, 73, 44, 55, 86, 73, 73, 44, 56, 86, 73, 73, 73, 44, 57, 73, 88, 44, 0  ; "0,1I,2II,3III,4IV,5V,6VI,7VII,8VIII,9IX,"
+S_BREAK              db 66, 82, 69, 65, 75, 0  ; "BREAK"
+S_CM                 db 44, 0  ; ","
+S_REPLACE            db 82, 69, 80, 76, 65, 67, 69, 0  ; "REPLACE"
+S_XLCDM_ST_ST        db 88, 76, 67, 68, 77, 42, 42, 0  ; "XLCDM**"
+S_IVXLCDM            db 73, 86, 88, 76, 67, 68, 77, 0  ; "IVXLCDM"
+S_ROMAN_END          db 82, 79, 77, 65, 78, 95, 69, 78, 68, 0  ; "ROMAN_END"
+S_T1                 db 84, 49, 0  ; "T1"
+S_TIME               db 84, 73, 77, 69, 0  ; "TIME"
+S_LOOP               db 76, 79, 79, 80, 0  ; "LOOP"
+S_R                  db 82, 0  ; "R"
+S_1776               db 49, 55, 55, 54, 0  ; "1776"
+S_LT                 db 76, 84, 0  ; "LT"
+S_T2                 db 84, 50, 0  ; "T2"
 S_OUTPUT             db 79, 85, 84, 80, 85, 84, 0  ; "OUTPUT"
+S_result_CL_SP       db 114, 101, 115, 117, 108, 116, 58, 32, 0  ; "result: "
+S_ms_CL_SP           db 109, 115, 58, 32, 0  ; "ms: "
 S_END                db 69, 78, 68, 0  ; "END"
-S_CONCAT             db 67, 79, 78, 67, 65, 84, 0  ; "CONCAT"
+S_AM_TRIM            db 38, 84, 82, 73, 77, 0  ; "&TRIM"
+S_AM_STLIMIT         db 38, 83, 84, 76, 73, 77, 73, 84, 0  ; "&STLIMIT"
+S_add                db 97, 100, 100, 0  ; "add"
+S_sub                db 115, 117, 98, 0  ; "sub"
