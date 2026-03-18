@@ -325,3 +325,11 @@ session115 | 2026-03-16 | 6d5919daa03d3c56646b5f0a165f86ee | 15859 lines | compi
 - runs: hangs — pattern-match stmts fall through (Case 2 not yet wired to Byrd box)
 - next: stmt_setup_subject() shim + jmp root_alpha per pattern stmt
 - assemble: nasm -f elf64 beauty_prog_session154.s -o beauty_prog.o
+
+### artifacts/asm/beauty_prog_session155.s  (Sprint A10)
+- status: ASSEMBLES CLEAN — S_/L_/P_/P_N_αβγω naming convention
+- Convention: S_=string literal, L_=label, P_=pattern (named body + Byrd ports)
+- Greek α/β/γ/ω for internal Byrd ports (not linkable as extern symbols)
+- Named pattern bodies (P_name_alpha/beta) now emitted in program mode
+- Remaining: asm_named_count=0 at body emission (reset bug); pattern match
+  stmt execution (Case 2) wired but not yet running

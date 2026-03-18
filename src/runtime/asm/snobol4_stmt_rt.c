@@ -179,3 +179,34 @@ int stmt_gt(DESCR_t a, DESCR_t b) {
 DESCR_t stmt_apply(const char *name, DESCR_t *args, int nargs) {
     return APPLY_fn(name, args, nargs);
 }
+
+/* ---- Pattern match subject setup ---- */
+
+/* Byrd box globals — defined in the .s file, extern here so C can write them */
+extern uint64_t cursor;
+extern uint64_t subject_len_val;
+extern char     subject_data[65536];
+
+/* stmt_setup_subject: copy DESCR_t string value into subject_data flat buffer,
+ * set subject_len_val, reset cursor to 0.
+ * Called from ASM before jmp root_alpha for each pattern-match statement.
+ * Returns 0 on success, 1 if subject is FAIL/null (skip the match). */
+int stmt_setup_subject(DESCR_t subj) {
+    const char *s = VARVAL_fn(subj);
+    if (!s) s = "";
+    size_t len = strlen(s);
+    if (len >= 65536) len = 65535;
+    memcpy(subject_data, s, len);
+    subject_data[len] = '\0';
+    subject_len_val = (uint64_t)len;
+    cursor = 0;
+    return 0;
+}
+
+/* stmt_apply_replacement: after a successful match, write the replacement
+ * value back into the subject variable (name given as string).
+ * For now: stores the replacement DESCR_t into the named variable. */
+void stmt_apply_replacement(const char *varname, DESCR_t repl) {
+    if (varname && *varname)
+        NV_SET_fn(varname, repl);
+}

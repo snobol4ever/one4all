@@ -1308,10 +1308,10 @@ static AsmNamedPat *asm_named_register(const char *varname, EXPR_t *pat) {
     AsmNamedPat *e = &asm_named[asm_named_count++];
     snprintf(e->varname, ASM_NAMED_NAMELEN, "%s", varname);
     asm_safe_name(varname, e->safe, ASM_NAMED_NAMELEN);
-    snprintf(e->alpha_lbl, ASM_NAMED_NAMELEN, "pat_%s_alpha", e->safe);
-    snprintf(e->beta_lbl,  ASM_NAMED_NAMELEN, "pat_%s_beta",  e->safe);
-    snprintf(e->ret_gamma, ASM_NAMED_NAMELEN, "pat_%s_ret_gamma", e->safe);
-    snprintf(e->ret_omega, ASM_NAMED_NAMELEN, "pat_%s_ret_omega", e->safe);
+    snprintf(e->alpha_lbl, ASM_NAMED_NAMELEN, "P_%s_alpha", e->safe);
+    snprintf(e->beta_lbl,  ASM_NAMED_NAMELEN, "P_%s_beta",  e->safe);
+    snprintf(e->ret_gamma, ASM_NAMED_NAMELEN, "P_%s_ret_gamma", e->safe);
+    snprintf(e->ret_omega, ASM_NAMED_NAMELEN, "P_%s_ret_omega", e->safe);
     e->pat = pat;
     return e;
 }
@@ -1750,9 +1750,9 @@ static void prog_str_reset(void) { prog_str_count = 0; }
 static const char *prog_str_intern(const char *s) {
     for (int i = 0; i < prog_str_count; i++)
         if (strcmp(prog_strs[i].val, s) == 0) return prog_strs[i].label;
-    if (prog_str_count >= MAX_PROG_STRS) return "ps_overflow";
+    if (prog_str_count >= MAX_PROG_STRS) return "S_overflow";
     ProgStr *e = &prog_strs[prog_str_count++];
-    snprintf(e->label, sizeof e->label, "ps_%d", prog_str_count);
+    snprintf(e->label, sizeof e->label, "S_%d", prog_str_count);
     e->val = strdup(s);
     return e->label;
 }
@@ -1894,7 +1894,7 @@ static int prog_label_id(const char *lbl) {
 static const char *prog_label_nasm(const char *lbl) {
     static char buf[256];
     int id = prog_label_id(lbl);
-    if (id < 0) { snprintf(buf, sizeof buf, "_L_unk_%d", id); return buf; }
+    if (id < 0) { snprintf(buf, sizeof buf, "L_unk_%d", id); return buf; }
     /* Build clean base: alnum only, runs of others → single _ */
     char base[128]; int bi = 0; int in_sep = 0;
     for (const char *p = lbl; *p && bi < 120; p++) {
@@ -1908,7 +1908,7 @@ static const char *prog_label_nasm(const char *lbl) {
     while (bi > 0 && base[bi-1] == '_') bi--;
     base[bi] = '\0';
     if (bi == 0) snprintf(base, sizeof base, "L");
-    snprintf(buf, sizeof buf, "_L_%s_%d", base, id);
+    snprintf(buf, sizeof buf, "L_%s_%d", base, id);
     return buf;
 }
 
@@ -1962,7 +1962,10 @@ static void asm_emit_program(Program *prog) {
     /* Pass 2: collect .bss slots for pattern stmts (named-pat ret_ pointers).
      * In program mode, skip entries whose replacement is a plain value
      * (E_QLIT/E_ILIT/E_VART) — those are variable assignments, not patterns. */
-    bss_add("_cursor");
+    bss_add("cursor");
+    bss_add("subject_len_val");
+    /* subject_data is a byte array — emitted separately in .bss */
+
     for (int i = 0; i < asm_named_count; i++) {
         if (asm_named[i].pat) {
             EKind rk = asm_named[i].pat->kind;
@@ -1971,6 +1974,35 @@ static void asm_emit_program(Program *prog) {
         }
         bss_add(asm_named[i].ret_gamma);
         bss_add(asm_named[i].ret_omega);
+    }
+
+    /* ---- Pass 3: dry-run all pattern emissions to collect bss/lit slots ----
+     * Mirrors asm_emit_body dry-run. Redirects output to /dev/null,
+     * runs emit_asm_node for every pattern stmt, then restores.
+     * This ensures span_saved/lit_str slots are registered before .bss/.data. */
+    {
+        FILE *devnull = fopen("/dev/null", "w");
+        FILE *real_out_p3 = asm_out;
+        asm_out = devnull;
+        int uid_save = asm_uid_ctr;
+        for (STMT_t *sp = prog->head; sp; sp = sp->next) {
+            if (sp->is_end) break;
+            if (!sp->pattern) continue;
+            /* real pass uses stmt_uid++ (not asm_uid) — no uid to consume here */
+            /* throwaway port labels — only bss_add/lit_intern side-effects matter */
+            emit_asm_node(sp->pattern,
+                          "P_dry_a","P_dry_b","P_dry_g","P_dry_o",
+                          "cursor", "subject_data", "subject_len_val", 0);
+        }
+        /* also dry-run named pattern bodies */
+        for (int i = 0; i < asm_named_count; i++) {
+            EKind rk = asm_named[i].pat ? asm_named[i].pat->kind : E_NULV;
+            if (rk==E_QLIT||rk==E_ILIT||rk==E_FLIT||rk==E_NULV) continue;
+            emit_asm_named_def(&asm_named[i], "cursor","subject_data","subject_len_val");
+        }
+        fclose(devnull);
+        asm_out = real_out_p3;
+        asm_uid_ctr = uid_save; /* reset so real pass generates same labels */
     }
 
     /* ---- emit header ---- */
@@ -1982,7 +2014,11 @@ static void asm_emit_program(Program *prog) {
     A("    extern  stmt_get, stmt_set, stmt_output, stmt_input\n");
     A("    extern  stmt_concat, stmt_is_fail, stmt_finish\n");
     A("    extern  stmt_apply, stmt_goto_dispatch\n");
+    A("    extern  stmt_setup_subject, stmt_apply_replacement\n");
     A("\n");
+    /* subject_data/subject_len_val/cursor: defined here, shared with Byrd boxes */
+    A("; pattern match globals (subject buffer, len, cursor)\n");
+
 
     /* .data emitted at end of file (after .text) so late prog_str_intern()
      * calls from emit time are captured. See prog_str_emit_data() below. */
@@ -1991,12 +2027,16 @@ static void asm_emit_program(Program *prog) {
     A("section .note.GNU-stack noalloc noexec nowrite progbits\n\n");
 
     /* ---- .bss ---- */
-    if (bss_count > 0) {
-        A("section .bss\n\n");
-        for (int i = 0; i < bss_count; i++)
-            A("%-24s resq 1\n", bss_slots[i]);
-        A("\n");
-    }
+    /* Always emit .bss — subject_data is always needed for pattern stmts */
+    A("section .bss\n\n");
+    for (int i = 0; i < bss_count; i++)
+        A("%-24s resq 1\n", bss_slots[i]);
+    /* Byrd box scratch slots (saved_cursor, arbno stack, etc.) */
+    extra_bss_emit();
+    /* lit_table string literals used by pattern nodes */
+    /* subject buffer for pattern matching */
+    A("%-24s resb 65536\n", "subject_data");
+    A("\n");
 
     /* ---- .text ---- */
     A("section .text\n\n");
@@ -2027,8 +2067,8 @@ static void asm_emit_program(Program *prog) {
         }
 
         int uid = stmt_uid++;
-        char next_lbl[64]; snprintf(next_lbl, sizeof next_lbl, "_sn_%d", uid);
-        char sfail_lbl[64]; snprintf(sfail_lbl, sizeof sfail_lbl, "_sf_%d", uid);
+        char next_lbl[64]; snprintf(next_lbl, sizeof next_lbl, "L_sn_%d", uid);
+        char sfail_lbl[64]; snprintf(sfail_lbl, sizeof sfail_lbl, "L_sf_%d", uid);
 
         /* Determine S/F/uncond targets */
         const char *tgt_s = s->go ? s->go->onsuccess : NULL;
@@ -2088,32 +2128,64 @@ static void asm_emit_program(Program *prog) {
 
         /* Case 2: pattern-match statement
          * subject pattern [= replacement] :S(L)F(L)
-         * Emit subject eval, then Byrd box, then S/F dispatch. */
+         *
+         * Four-port Byrd box execution (Proebsting):
+         *   alpha = entry, beta = resume, gamma = succeed, omega = fail
+         *
+         *   1. Eval subject → DESCR_t, call stmt_setup_subject()
+         *      (copies string into subject_data[], sets subject_len_val, cursor=0)
+         *   2. jmp pat_N_alpha  — start the pattern
+         *   3. pat_N_gamma:     — match succeeded
+         *      apply replacement (if any), emit_jmp S-target
+         *   4. pat_N_omega:     — match failed
+         *      emit_jmp F-target
+         *
+         * The Byrd box code is emitted inline via emit_asm_node().
+         */
 
-        /* Pattern match success → _sm_UID, fail → _sf_UID */
-        char sm_lbl[64]; snprintf(sm_lbl, sizeof sm_lbl, "_sm_%d", uid);
+        /* Greek suffixes: internal Byrd box ports — not exportable as linker symbols.
+         * α=entry β=resume γ=succeed ω=fail  (Proebsting four-port model) */
+        char pat_alpha[64]; snprintf(pat_alpha, sizeof pat_alpha, "P_%d_α", uid);
+        char pat_beta[64];  snprintf(pat_beta,  sizeof pat_beta,  "P_%d_β", uid);
+        char pat_gamma[64]; snprintf(pat_gamma, sizeof pat_gamma, "P_%d_γ", uid);
+        char pat_omega[64]; snprintf(pat_omega, sizeof pat_omega, "P_%d_ω", uid);
 
-        /* Evaluate subject into _cursor bss slot */
-        if (s->subject && s->subject->kind == E_VART) {
+        /* -- subject eval -- */
+        prog_emit_expr(s->subject, -16);
+        /* stmt_setup_subject(subj_descr) — copies into subject_data[], resets cursor */
+        A("    mov     rdi, [rbp-16]\n");
+        A("    mov     rsi, [rbp-8]\n");
+        A("    call    stmt_setup_subject\n");
+
+        /* -- start the pattern -- */
+        A("    jmp     %s\n", pat_alpha);
+
+        /* -- Byrd box inline: alpha/beta → gamma/omega -- */
+        A("\n");
+        emit_asm_node(s->pattern,
+                      pat_alpha, pat_beta,
+                      pat_gamma, pat_omega,
+                      "cursor", "subject_data", "subject_len_val",
+                      0 /* depth */);
+        A("\n");
+
+        /* -- gamma: match succeeded -- */
+        A("%s:\n", pat_gamma);
+        if (s->has_eq && s->replacement && s->subject &&
+            s->subject->kind == E_VART) {
+            /* apply replacement → subject variable */
+            prog_emit_expr(s->replacement, -32);
             const char *vlab = prog_str_intern(s->subject->sval);
             A("    lea     rdi, [rel %s]\n", vlab);
-            A("    call    stmt_get\n");
-            A("    mov     [rbp-16], rax\n");
-            A("    mov     [rbp-8],  rdx\n");
-            /* Subject string into cursor=0 setup not fully implemented —
-             * pattern match against C runtime subject TBD */
+            A("    mov     rsi, [rbp-32]\n");
+            A("    mov     rdx, [rbp-24]\n");
+            A("    call    stmt_apply_replacement\n");
         }
-
-        /* For now: emit unconditional fallthrough (pattern match TBD) */
-        if (id_u >= 0) emit_jmp(tgt_u, next_lbl);
-        else           emit_jmp(NULL, next_lbl);
-
-        A("%s:\n", sm_lbl);
         emit_jmp(tgt_s, next_lbl);
 
-        A("%s:\n", sfail_lbl);
-        if (id_f >= 0) emit_jmp(tgt_f, next_lbl);
-        else           A("    jmp     %s\n", next_lbl);
+        /* -- omega: match failed -- */
+        A("%s:\n", pat_omega);
+        emit_jmp(tgt_f, next_lbl);
 
         A("%s:\n", next_lbl);
     }
@@ -2124,6 +2196,30 @@ static void asm_emit_program(Program *prog) {
     A("    xor     eax, eax\n");
     A("    leave\n");
     A("    ret\n");
+
+    /* ---- Emit lit_table strings used by Byrd box LIT nodes ---- */
+    if (lit_count > 0) {
+        A("\nsection .data\n\n");
+        for (int i = 0; i < lit_count; i++) {
+            A("%-20s db ", lit_table[i].label);
+            for (int j = 0; j < lit_table[i].len; j++) {
+                if (j) A(", ");
+                A("%d", (unsigned char)lit_table[i].val[j]);
+            }
+            A("\n");
+        }
+    }
+
+    /* ---- Named pattern bodies (emit_asm_named_def for each real pattern) ---- */
+    A("\n; ======== named pattern bodies ========\n");
+    for (int i = 0; i < asm_named_count; i++) {
+        if (asm_named[i].pat) {
+            EKind rk = asm_named[i].pat->kind;
+            if (rk==E_QLIT||rk==E_ILIT||rk==E_FLIT||rk==E_NULV) continue;
+        }
+        emit_asm_named_def(&asm_named[i],
+                           "cursor","subject_data","subject_len_val");
+    }
 
     /* ---- Stub definitions for referenced-but-undefined labels ----
      * These are dangling gotos (e.g. :F(error) with no "error" label defined,
