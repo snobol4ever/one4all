@@ -105,6 +105,32 @@ static DESCR_t _b_NE(DESCR_t *a, int n) {
         return (a[0].i != a[1].i) ? NULVCL : FAILDESCR;
     return (to_real(a[0]) != to_real(a[1])) ? NULVCL : FAILDESCR;
 }
+/* Arithmetic operator wrappers — registered so APPLY_fn("add",...) works */
+static DESCR_t _b_add(DESCR_t *a, int n) {
+    if (n < 2) return FAILDESCR;
+    return add(a[0], a[1]);
+}
+static DESCR_t _b_sub(DESCR_t *a, int n) {
+    if (n < 2) return FAILDESCR;
+    return sub(a[0], a[1]);
+}
+static DESCR_t _b_mul(DESCR_t *a, int n) {
+    if (n < 2) return FAILDESCR;
+    return mul(a[0], a[1]);
+}
+static DESCR_t _b_div(DESCR_t *a, int n) {
+    if (n < 2) return FAILDESCR;
+    return DIVIDE_fn(a[0], a[1]);
+}
+static DESCR_t _b_pow(DESCR_t *a, int n) {
+    if (n < 2) return FAILDESCR;
+    return POWER_fn(a[0], a[1]);
+}
+static DESCR_t _b_neg(DESCR_t *a, int n) {
+    if (n < 1) return FAILDESCR;
+    return neg(a[0]);
+}
+
 static DESCR_t _b_INTEGER(DESCR_t *a, int n) {
     if (n < 1) return FAILDESCR;
     /* Succeed (returning int value) if arg is or converts to integer */
@@ -630,6 +656,13 @@ void SNO_INIT_fn(void) {
     register_fn("LE",       _b_LE,       2, 2);
     register_fn("EQ",       _b_EQ,       2, 2);
     register_fn("NE",       _b_NE,       2, 2);
+    /* Arithmetic operators — registered so APPLY_fn("add",...) works */
+    register_fn("add",      _b_add,      2, 2);
+    register_fn("sub",      _b_sub,      2, 2);
+    register_fn("mul",      _b_mul,      2, 2);
+    register_fn("DIVIDE_fn",_b_div,      2, 2);
+    register_fn("POWER_fn", _b_pow,      2, 2);
+    register_fn("neg",      _b_neg,      1, 1);
     register_fn("INTEGER",  _b_INTEGER,  1, 1);
     register_fn("REAL",     _b_REAL,     1, 1);
     register_fn("SIZE",        _b_SIZE,     1, 1);

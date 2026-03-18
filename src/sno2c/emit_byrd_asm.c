@@ -1462,7 +1462,32 @@ static void asm_emit_null_program(void) {
 }
 
 /* -----------------------------------------------------------------------
- * asm_scan_named_patterns — walk the program and register all
+/* expr_is_pattern_expr — return 1 if expression tree is a genuine
+ * pattern-building expression (contains E_FNC, E_OR, or E_CONC with
+ * at least one non-literal/non-value child).
+ * Pure value assignments (E_VART, E_QLIT, E_ILIT alone, or
+ * E_CONC/E_OR where ALL leaves are literals or variable refs with no
+ * pattern-function calls) are NOT named patterns in program context. */
+static int expr_has_pattern_fn(EXPR_t *e) {
+    if (!e) return 0;
+    /* E_FNC nodes that are pattern builtins make this a pattern expr */
+    if (e->kind == E_FNC) return 1;
+    if (expr_has_pattern_fn(e->left))  return 1;
+    if (expr_has_pattern_fn(e->right)) return 1;
+    for (int i = 0; i < e->nargs; i++)
+        if (expr_has_pattern_fn(e->args[i])) return 1;
+    return 0;
+}
+static int expr_is_pattern_expr(EXPR_t *e) {
+    if (!e) return 0;
+    /* E_OR (alternation) and E_CONC (concatenation) with E_QLIT children
+     * are genuine pattern expressions (e.g. P = 'a' | 'b') */
+    if (e->kind == E_OR || e->kind == E_CONC) return 1;
+    /* Any function call is a pattern expression */
+    return expr_has_pattern_fn(e);
+}
+
+/* asm_scan_named_patterns — walk the program and register all
  * pattern assignments (VAR = <pattern-expr>) before emitting.
  * ----------------------------------------------------------------------- */
 
@@ -1473,9 +1498,13 @@ static void asm_scan_named_patterns(Program *prog) {
         /* A pattern assignment: subject is a variable, no pattern field,
          * has_eq is set, replacement holds the pattern expression.
          * E.g.   ASTAR = ARBNO(LIT("a"))
-         * In sno2c IR: subject=E_VART("ASTAR"), pattern=NULL, replacement=<expr> */
+         * In sno2c IR: subject=E_VART("ASTAR"), pattern=NULL, replacement=<expr>
+         * Only register if the replacement is genuinely a pattern-building
+         * expression (contains E_FNC).  Plain value assignments like
+         * X = 'hello' or OUTPUT = X 'world' are NOT named patterns. */
         if (s->subject && s->subject->kind == E_VART &&
-            s->has_eq && s->replacement && !s->pattern) {
+            s->has_eq && s->replacement && !s->pattern &&
+            expr_is_pattern_expr(s->replacement)) {
             asm_named_register(s->subject->sval, s->replacement);
         }
     }
@@ -2167,6 +2196,115 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
         A("    mov     [rbp%+d], rdx\n", rbp_off + 8);
         return 1; /* may fail */
     }
+    /* ---- arithmetic binary operators ---- */
+    case E_ADD:
+    case E_SUB:
+    case E_MPY:
+    case E_DIV:
+    case E_EXPOP: {
+        const char *fn = (e->kind == E_ADD)   ? "add"       :
+                         (e->kind == E_SUB)   ? "sub"       :
+                         (e->kind == E_MPY)   ? "mul"       :
+                         (e->kind == E_DIV)   ? "DIVIDE_fn" :
+                                                "POWER_fn";
+        const char *fnlab = prog_str_intern(fn);
+        EXPR_t *l = e->left, *r = e->right;
+        int ls = (l && l->kind == E_QLIT);
+        int lv = (l && l->kind == E_VART);
+        int li = (l && l->kind == E_ILIT);
+        int rs = (r && r->kind == E_QLIT);
+        int rv = (r && r->kind == E_VART);
+        int ri = (r && r->kind == E_ILIT);
+        int rn = (!r || r->kind == E_NULV);
+        /* Fast paths when both args are atoms (same macros used for CONC2/ALT2) */
+        if (rbp_off == -32) {
+            if (lv && rv) {
+                A("    CONC2_VV %s, %s, %s\n", fnlab,
+                  prog_str_intern(l->sval), prog_str_intern(r->sval));
+                return 1;
+            }
+            if (lv && ri) {
+                A("    CONC2_VI %s, %s, %ld\n", fnlab,
+                  prog_str_intern(l->sval), (long)r->ival);
+                return 1;
+            }
+            if (li && rv) {
+                A("    CONC2_IV %s, %ld, %s\n", fnlab,
+                  (long)l->ival, prog_str_intern(r->sval));
+                return 1;
+            }
+            if (li && ri) {
+                A("    CONC2_II %s, %ld, %ld\n", fnlab,
+                  (long)l->ival, (long)r->ival);
+                return 1;
+            }
+            if (lv && rs) {
+                A("    CONC2_VS %s, %s, %s\n", fnlab,
+                  prog_str_intern(l->sval), prog_str_intern(r->sval));
+                return 1;
+            }
+            if (ls && rv) {
+                A("    CONC2_SV %s, %s, %s\n", fnlab,
+                  prog_str_intern(l->sval), prog_str_intern(r->sval));
+                return 1;
+            }
+            if (lv && rn) {
+                A("    CONC2_VN %s, %s\n", fnlab, prog_str_intern(l->sval));
+                return 1;
+            }
+        }
+        /* Generic 2-arg path: evaluate each child, call via stmt_apply */
+        A("    sub     rsp, 32\n");
+        prog_emit_expr(l, -32);
+        A("    STORE_ARG32 0\n");
+        prog_emit_expr(r, -32);
+        A("    STORE_ARG32 16\n");
+        A("    APPLY_FN_N  %s, 2\n", fnlab);
+        A("    add     rsp, 32\n");
+        if (rbp_off == -32 || rbp_off == -16) {
+            A("    STORE_RESULT\n");
+        } else {
+            A("    mov     [rbp%+d], rax\n", rbp_off);
+            A("    mov     [rbp%+d], rdx\n", rbp_off+8);
+        }
+        return 1;
+    }
+    /* ---- unary minus ---- */
+    case E_MNS: {
+        const char *fnlab = prog_str_intern("neg");
+        EXPR_t *operand = e->left;   /* unop() puts operand in left */
+        if (!operand) goto fallback;
+        if (rbp_off == -32) {
+            if (operand->kind == E_ILIT) {
+                A("    CALL1_INT   %s, %ld\n", fnlab, (long)operand->ival);
+                return 1;
+            }
+            if (operand->kind == E_VART) {
+                A("    CALL1_VAR   %s, %s\n", fnlab,
+                  prog_str_intern(operand->sval));
+                return 1;
+            }
+            if (operand->kind == E_QLIT) {
+                A("    CALL1_STR   %s, %s\n", fnlab,
+                  prog_str_intern(operand->sval));
+                return 1;
+            }
+        }
+        /* Generic 1-arg path */
+        A("    sub     rsp, 16\n");
+        prog_emit_expr(operand, -32);
+        A("    STORE_ARG32 0\n");
+        A("    APPLY_FN_N  %s, 1\n", fnlab);
+        A("    add     rsp, 16\n");
+        if (rbp_off == -32 || rbp_off == -16) {
+            A("    STORE_RESULT\n");
+        } else {
+            A("    mov     [rbp%+d], rax\n", rbp_off);
+            A("    mov     [rbp%+d], rdx\n", rbp_off+8);
+        }
+        return 1;
+    }
+
     fallback:
     default:
         /* Fallback: emit NULVCL — complex exprs not yet supported */
@@ -2321,7 +2459,8 @@ static void asm_emit_program(Program *prog) {
     for (int i = 0; i < asm_named_count; i++) {
         if (asm_named[i].pat) {
             EKind rk = asm_named[i].pat->kind;
-            if (rk == E_QLIT || rk == E_ILIT || rk == E_FLIT || rk == E_NULV)
+            if (rk == E_QLIT || rk == E_ILIT || rk == E_FLIT || rk == E_NULV ||
+                rk == E_VART || rk == E_KW)
                 continue; /* plain value assignment — not a real named pattern */
         }
         bss_add(asm_named[i].ret_gamma);
@@ -2337,19 +2476,25 @@ static void asm_emit_program(Program *prog) {
         FILE *real_out_p3 = asm_out;
         asm_out = devnull;
         int uid_save = asm_uid_ctr;
+        /* Walk statements using the same uid sequence as the real pass */
+        int dry_stmt_uid = 0;
         for (STMT_t *sp = prog->head; sp; sp = sp->next) {
             if (sp->is_end) break;
+            int dry_uid = dry_stmt_uid++;
             if (!sp->pattern) continue;
-            /* real pass uses stmt_uid++ (not asm_uid) — no uid to consume here */
-            /* throwaway port labels — only bss_add/lit_intern side-effects matter */
+            /* Use real label names so bss_add registers the correct slot names */
+            char dry_alpha[64]; snprintf(dry_alpha, sizeof dry_alpha, "P_%d_α", dry_uid);
+            char dry_beta[64];  snprintf(dry_beta,  sizeof dry_beta,  "P_%d_β", dry_uid);
+            char dry_gamma[64]; snprintf(dry_gamma, sizeof dry_gamma, "P_%d_γ", dry_uid);
+            char dry_omega[64]; snprintf(dry_omega, sizeof dry_omega, "P_%d_ω", dry_uid);
             emit_asm_node(sp->pattern,
-                          "P_dry_a","P_dry_b","P_dry_g","P_dry_o",
+                          dry_alpha, dry_beta, dry_gamma, dry_omega,
                           "cursor", "subject_data", "subject_len_val", 0);
         }
         /* also dry-run named pattern bodies */
         for (int i = 0; i < asm_named_count; i++) {
             EKind rk = asm_named[i].pat ? asm_named[i].pat->kind : E_NULV;
-            if (rk==E_QLIT||rk==E_ILIT||rk==E_FLIT||rk==E_NULV) continue;
+            if (rk==E_QLIT||rk==E_ILIT||rk==E_FLIT||rk==E_NULV||rk==E_VART||rk==E_KW) continue;
             emit_asm_named_def(&asm_named[i], "cursor","subject_data","subject_len_val");
         }
         fclose(devnull);
@@ -2416,8 +2561,8 @@ static void asm_emit_program(Program *prog) {
         }
 
         int uid = stmt_uid++;
-        char next_lbl[64]; snprintf(next_lbl, sizeof next_lbl, "L_sn_%d", uid);
-        char sfail_lbl[64]; snprintf(sfail_lbl, sizeof sfail_lbl, "L_sf_%d", uid);
+        char next_lbl[64]; snprintf(next_lbl, sizeof next_lbl, "Ln_%d", uid);
+        char sfail_lbl[64]; snprintf(sfail_lbl, sizeof sfail_lbl, "Lf_%d", uid);
 
         /* Major separator: SNOBOL4 statement boundary.
          * Emit "; === label ===..." with the SNOBOL4 source label embedded
@@ -2591,7 +2736,7 @@ static void asm_emit_program(Program *prog) {
     for (int i = 0; i < asm_named_count; i++) {
         if (asm_named[i].pat) {
             EKind rk = asm_named[i].pat->kind;
-            if (rk==E_QLIT||rk==E_ILIT||rk==E_FLIT||rk==E_NULV) continue;
+            if (rk==E_QLIT||rk==E_ILIT||rk==E_FLIT||rk==E_NULV||rk==E_VART||rk==E_KW) continue;
         }
         emit_asm_named_def(&asm_named[i],
                            "cursor","subject_data","subject_len_val");

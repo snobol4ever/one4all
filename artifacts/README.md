@@ -5,22 +5,38 @@ Overwrite and commit when the artifact changes. `git log -p artifacts/asm/beauty
 
 ```
 artifacts/
-  asm/    — x64 NASM output (.s files)
-  c/      — C backend generated output (.c files)
-  jvm/    — JVM bytecode and Clojure output (future)
-  net/    — .NET MSIL output (future)
+  asm/
+    beauty_prog.s        ← PRIMARY: beauty.sno compiled via -asm
+    fixtures/            ← sprint oracle .s files (one per node type / milestone)
+    samples/             ← sample programs (roman, wordcount)
+  c/                     ← C backend generated output (.c files)
+  jvm/                   ← JVM bytecode (future)
+  net/                   ← .NET MSIL (future)
 ```
 
 ---
 
-## asm/ — x64 NASM
+## asm/beauty_prog.s — PRIMARY ARTIFACT
 
-### beauty_prog.s
-- **what:** beauty.sno compiled via `-asm` — primary sprint oracle
-- **update:** `src/sno2c/sno2c -asm -I$INC $BEAUTY > artifacts/asm/beauty_prog.s`
-- **verify:** `nasm -f elf64 -I src/runtime/asm/ artifacts/asm/beauty_prog.s -o /dev/null`
+The canonical output of `sno2c -asm` on `beauty.sno`. This is what M-ASM-BEAUTIFUL was declared on.
+Every session that changes the ASM backend must regenerate and commit this file.
 
-### Sprint oracle fixtures (one file per node type / milestone)
+**Update:**
+```bash
+INC=/home/claude/snobol4corpus/programs/inc
+BEAUTY=/home/claude/snobol4corpus/programs/beauty/beauty.sno
+src/sno2c/sno2c -asm -I$INC $BEAUTY > artifacts/asm/beauty_prog.s
+nasm -f elf64 -I src/runtime/asm/ artifacts/asm/beauty_prog.s -o /dev/null  # must be clean
+git add artifacts/asm/beauty_prog.s && git commit
+```
+
+---
+
+## asm/fixtures/ — Sprint oracle fixtures
+
+One file per node type or milestone. Hand-written or generated during sprint work.
+These are reference/regression files — not updated every session.
+
 | File | Node/feature | Milestone |
 |------|-------------|-----------|
 | null.s | empty program | M-ASM-HELLO ✅ |
@@ -32,46 +48,13 @@ artifacts/
 | assign_lit.s, assign_digits.s | $ capture | M-ASM-ASSIGN ✅ |
 | ref_astar_bstar.s, anbn.s | named patterns | M-ASM-NAMED ✅ |
 | multi_capture_abc.s, star_deref_capture.s | multi-capture, *VAR | M-ASM-CROSSCHECK ✅ |
-| stmt_output_lit.s, stmt_assign.s, stmt_goto.s | program-mode statements | M-ASM-BEAUTY work |
+| stmt_output_lit.s, stmt_goto.s | program-mode statements | M-ASM-BEAUTY work |
 
-### Sample programs (M-ASM-SAMPLES)
+---
+
+## asm/samples/ — Sample programs
+
 | File | What | Status |
 |------|------|--------|
-| roman.s | roman numeral converter — patterns, functions, arrays, arithmetic | assembles; output wrong (placeholder) |
-| wordcount.s | word frequency counter — string scanning, table, patterns | NASM_FAIL P_X_ret_gamma (placeholder) |
-
----
-
-## c/ — C backend
-
-### beauty_prog.c
-- **what:** beauty.sno compiled via `-trampoline` — C backend oracle
-- **update:** `src/sno2c/sno2c -trampoline -I$INC $BEAUTY > artifacts/c/beauty_prog.c`
-- **last known state:** session116, 16307 lines
-
-### Trampoline fixtures
-| File | What |
-|------|------|
-| trampoline_hello.c | hello world via trampoline backend |
-| trampoline_branch.c | branching via trampoline backend |
-| trampoline_fn.c | function calls via trampoline backend |
-
----
-
-## jvm/ — JVM bytecode *(future)*
-
-Clojure→bytecode output. Placeholder — populated when JVM backend produces artifacts.
-
----
-
-## net/ — .NET MSIL *(future)*
-
-C#→MSIL output. Placeholder — populated when DOTNET backend produces artifacts.
-
----
-
-## Protocol
-
-- **Never create** `foo_sessionN.ext` — overwrite `foo.ext` and commit
-- `git log -p artifacts/TYPE/foo.ext` — full history
-- Commit message: `sessionN: artifacts — foo.ext updated (reason)`
+| roman.s | roman numeral converter | assembles; output placeholder |
+| wordcount.s | word count program | assembles with warning |
