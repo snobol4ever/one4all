@@ -295,175 +295,132 @@ L_START_0:
 L_sn_0:
 
     STMT_SEP
-    lea     rdi, [rel S_457]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_457
 L_sn_1:
 
     STMT_SEP
-    lea     rdi, [rel S_458]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_458
 L_sn_2:
 
     STMT_SEP
-    lea     rdi, [rel S_4]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_4
     sub     rsp, 16
-    lea     rdi, [rel S_6]
-    call    stmt_strval
+    LOAD_STR    S_6
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rax, [rbp-32]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_5]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_5, 1
     add     rsp, 16
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_3
-    lea     rdi, [rel S_4]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_3
+    SET_VAR     S_4
     jmp     L_sn_3
 L_sn_3:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_4:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_5:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_6:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_7:
 
     STMT_SEP
-    lea     rdi, [rel S_7]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 5
-    call    stmt_intval
+    GET_VAR     S_7
+    LOAD_INT    5
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_8
-    lea     rdi, [rel S_7]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_8
+    SET_VAR     S_7
     jmp     L_sn_8
 L_sn_8:
 
     STMT_SEP
-    lea     rdi, [rel S_8]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 42
-    call    stmt_intval
+    GET_VAR     S_8
+    LOAD_INT    42
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_9
-    lea     rdi, [rel S_8]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_9
+    SET_VAR     S_8
     jmp     L_sn_9
 L_sn_9:
 
     STMT_SEP
-    lea     rdi, [rel S_9]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_9
     sub     rsp, 16
-    mov     rdi, 0
-    call    stmt_intval
+    LOAD_INT    0
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rax, [rbp-32]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_10]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_10, 1
     add     rsp, 16
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_10
-    lea     rdi, [rel S_9]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_10
+    SET_VAR     S_9
     jmp     L_sn_10
 L_sn_10:
 
     STMT_SEP
-    lea     rdi, [rel S_11]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_11
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_20
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_11
-    lea     rdi, [rel S_11]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_17
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_11
+    SET_VAR     S_11
     jmp     L_sn_11
 L_sn_11:
 
     STMT_SEP
 L_ppArgLoop_1:
-    lea     rdi, [rel S_9]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_setup_subject
+    GET_VAR     S_9
+    SETUP_SUBJECT_FROM16
     jmp     P_12_α
 
 
@@ -523,42 +480,15 @@ seq_r0_beta:
     jmp     seq_l0_beta
 
 P_12_γ:
-    lea     rdi, [rel S_18]
-    lea     rsi, [rel cap_ppTokName_buf]
-    mov     rdx, [cap_ppTokName_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_12]
-    lea     rsi, [rel cap_ppTokVal_buf]
-    mov     rdx, [cap_ppTokVal_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_62]
-    lea     rsi, [rel cap_ppGCon_buf]
-    mov     rdx, [cap_ppGCon_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_64]
-    lea     rsi, [rel cap_ppDrop_buf]
-    mov     rdx, [cap_ppDrop_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_459]
-    lea     rsi, [rel cap_cap_buf]
-    mov     rdx, [cap_cap_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_135]
-    lea     rsi, [rel cap_tx_buf]
-    mov     rdx, [cap_tx_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_13]
-    lea     rsi, [rel cap_v_buf]
-    mov     rdx, [cap_v_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_140]
-    lea     rsi, [rel cap_ProtKwd_buf]
-    mov     rdx, [cap_ProtKwd_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_143]
-    lea     rsi, [rel cap_UnprotKwd_buf]
-    mov     rdx, [cap_UnprotKwd_len]
-    call    stmt_set_capture
+    SET_CAPTURE S_18, cap_ppTokName_buf, cap_ppTokName_len
+    SET_CAPTURE S_12, cap_ppTokVal_buf, cap_ppTokVal_len
+    SET_CAPTURE S_62, cap_ppGCon_buf, cap_ppGCon_len
+    SET_CAPTURE S_64, cap_ppDrop_buf, cap_ppDrop_len
+    SET_CAPTURE S_461, cap_cap_buf, cap_cap_len
+    SET_CAPTURE S_135, cap_tx_buf, cap_tx_len
+    SET_CAPTURE S_13, cap_v_buf, cap_v_len
+    SET_CAPTURE S_140, cap_ProtKwd_buf, cap_ProtKwd_len
+    SET_CAPTURE S_143, cap_UnprotKwd_buf, cap_UnprotKwd_len
     jmp     L_sn_12
 P_12_ω:
     jmp     L_sn_12
@@ -566,39 +496,21 @@ L_sn_12:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_9]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_24]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_9
+    STORE_ARG32 0
+    APPLY_FN_N  S_24, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_13
+    IS_FAIL_BRANCH16  L_sf_13
     jmp     L_sn_13
 L_sf_13:
     jmp     L_ppArgDone_2
 L_sn_13:
 
     STMT_SEP
-    lea     rdi, [rel S_9]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_setup_subject
+    GET_VAR     S_9
+    SETUP_SUBJECT_FROM16
     jmp     P_14_α
 
 
@@ -624,42 +536,15 @@ nref2_omega:
     jmp     P_14_ω
 
 P_14_γ:
-    lea     rdi, [rel S_18]
-    lea     rsi, [rel cap_ppTokName_buf]
-    mov     rdx, [cap_ppTokName_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_12]
-    lea     rsi, [rel cap_ppTokVal_buf]
-    mov     rdx, [cap_ppTokVal_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_62]
-    lea     rsi, [rel cap_ppGCon_buf]
-    mov     rdx, [cap_ppGCon_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_64]
-    lea     rsi, [rel cap_ppDrop_buf]
-    mov     rdx, [cap_ppDrop_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_459]
-    lea     rsi, [rel cap_cap_buf]
-    mov     rdx, [cap_cap_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_135]
-    lea     rsi, [rel cap_tx_buf]
-    mov     rdx, [cap_tx_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_13]
-    lea     rsi, [rel cap_v_buf]
-    mov     rdx, [cap_v_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_140]
-    lea     rsi, [rel cap_ProtKwd_buf]
-    mov     rdx, [cap_ProtKwd_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_143]
-    lea     rsi, [rel cap_UnprotKwd_buf]
-    mov     rdx, [cap_UnprotKwd_len]
-    call    stmt_set_capture
+    SET_CAPTURE S_18, cap_ppTokName_buf, cap_ppTokName_len
+    SET_CAPTURE S_12, cap_ppTokVal_buf, cap_ppTokVal_len
+    SET_CAPTURE S_62, cap_ppGCon_buf, cap_ppGCon_len
+    SET_CAPTURE S_64, cap_ppDrop_buf, cap_ppDrop_len
+    SET_CAPTURE S_461, cap_cap_buf, cap_cap_len
+    SET_CAPTURE S_135, cap_tx_buf, cap_tx_len
+    SET_CAPTURE S_13, cap_v_buf, cap_v_len
+    SET_CAPTURE S_140, cap_ProtKwd_buf, cap_ProtKwd_len
+    SET_CAPTURE S_143, cap_UnprotKwd_buf, cap_UnprotKwd_len
     jmp     L_sn_14
 P_14_ω:
     jmp     L_ppArgDone_2
@@ -667,848 +552,482 @@ L_sn_14:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_18]
-    call    stmt_get
+    GET_VAR     S_18
+    STORE_ARG32 0
+    LOAD_STR    S_26
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_26]
-    call    stmt_strval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_25]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_25, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_15
+    IS_FAIL_BRANCH16  L_sf_15
     jmp     L_sn_15
 L_sf_15:
     jmp     L_ppArgP2_3
 L_sn_15:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_16:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_17:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_18:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_19:
 
     STMT_SEP
-    lea     rdi, [rel S_7]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 3
-    call    stmt_intval
+    GET_VAR     S_7
+    LOAD_INT    3
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_20
-    lea     rdi, [rel S_7]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_20
+    SET_VAR     S_7
     jmp     L_sn_20
 L_sn_20:
 
     STMT_SEP
-    lea     rdi, [rel S_8]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 21
-    call    stmt_intval
+    GET_VAR     S_8
+    LOAD_INT    21
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_21
-    lea     rdi, [rel S_8]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_21
+    SET_VAR     S_8
     jmp     L_ppArgLoop_1
 L_sn_21:
 
     STMT_SEP
 L_ppArgP2_3:
     sub     rsp, 32
-    lea     rdi, [rel S_18]
-    call    stmt_get
+    GET_VAR     S_18
+    STORE_ARG32 0
+    LOAD_STR    S_28
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_28]
-    call    stmt_strval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_25]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_25, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_22
+    IS_FAIL_BRANCH16  L_sf_22
     jmp     L_sn_22
 L_sf_22:
     jmp     L_ppArgP3_4
 L_sn_22:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_23:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_24:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_25:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_26:
 
     STMT_SEP
-    lea     rdi, [rel S_7]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 4
-    call    stmt_intval
+    GET_VAR     S_7
+    LOAD_INT    4
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_27
-    lea     rdi, [rel S_7]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_27
+    SET_VAR     S_7
     jmp     L_sn_27
 L_sn_27:
 
     STMT_SEP
-    lea     rdi, [rel S_8]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 24
-    call    stmt_intval
+    GET_VAR     S_8
+    LOAD_INT    24
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_28
-    lea     rdi, [rel S_8]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_28
+    SET_VAR     S_8
     jmp     L_ppArgLoop_1
 L_sn_28:
 
     STMT_SEP
 L_ppArgP3_4:
     sub     rsp, 32
-    lea     rdi, [rel S_18]
-    call    stmt_get
+    GET_VAR     S_18
+    STORE_ARG32 0
+    LOAD_STR    S_30
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_30]
-    call    stmt_strval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_25]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_25, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_29
+    IS_FAIL_BRANCH16  L_sf_29
     jmp     L_sn_29
 L_sf_29:
     jmp     L_ppArgP4_5
 L_sn_29:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_30:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_31:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_32:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_33:
 
     STMT_SEP
-    lea     rdi, [rel S_7]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 5
-    call    stmt_intval
+    GET_VAR     S_7
+    LOAD_INT    5
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_34
-    lea     rdi, [rel S_7]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_34
+    SET_VAR     S_7
     jmp     L_sn_34
 L_sn_34:
 
     STMT_SEP
-    lea     rdi, [rel S_8]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 42
-    call    stmt_intval
+    GET_VAR     S_8
+    LOAD_INT    42
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_35
-    lea     rdi, [rel S_8]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_35
+    SET_VAR     S_8
     jmp     L_ppArgLoop_1
 L_sn_35:
 
     STMT_SEP
 L_ppArgP4_5:
     sub     rsp, 32
-    lea     rdi, [rel S_18]
-    call    stmt_get
+    GET_VAR     S_18
+    STORE_ARG32 0
+    LOAD_STR    S_32
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_32]
-    call    stmt_strval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_25]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_25, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_36
+    IS_FAIL_BRANCH16  L_sf_36
     jmp     L_sn_36
 L_sf_36:
     jmp     L_ppArgP5_6
 L_sn_36:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_37:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_38:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_39:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_40:
 
     STMT_SEP
-    lea     rdi, [rel S_7]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 6
-    call    stmt_intval
+    GET_VAR     S_7
+    LOAD_INT    6
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_41
-    lea     rdi, [rel S_7]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_41
+    SET_VAR     S_7
     jmp     L_sn_41
 L_sn_41:
 
     STMT_SEP
-    lea     rdi, [rel S_8]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 54
-    call    stmt_intval
+    GET_VAR     S_8
+    LOAD_INT    54
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_42
-    lea     rdi, [rel S_8]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_42
+    SET_VAR     S_8
     jmp     L_ppArgLoop_1
 L_sn_42:
 
     STMT_SEP
 L_ppArgP5_6:
     sub     rsp, 32
-    lea     rdi, [rel S_18]
-    call    stmt_get
+    GET_VAR     S_18
+    STORE_ARG32 0
+    LOAD_STR    S_34
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_34]
-    call    stmt_strval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_25]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_25, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_43
+    IS_FAIL_BRANCH16  L_sf_43
     jmp     L_sn_43
 L_sf_43:
     jmp     L_ppArgChk1_7
 L_sn_43:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_44:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_45:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_46:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_47:
 
     STMT_SEP
-    lea     rdi, [rel S_7]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 7
-    call    stmt_intval
+    GET_VAR     S_7
+    LOAD_INT    7
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_48
-    lea     rdi, [rel S_7]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_48
+    SET_VAR     S_7
     jmp     L_sn_48
 L_sn_48:
 
     STMT_SEP
-    lea     rdi, [rel S_8]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 68
-    call    stmt_intval
+    GET_VAR     S_8
+    LOAD_INT    68
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_49
-    lea     rdi, [rel S_8]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_49
+    SET_VAR     S_8
     jmp     L_ppArgLoop_1
 L_sn_49:
 
     STMT_SEP
 L_ppArgChk1_7:
     sub     rsp, 32
-    lea     rdi, [rel S_18]
-    call    stmt_get
+    GET_VAR     S_18
+    STORE_ARG32 0
+    LOAD_STR    S_36
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_36]
-    call    stmt_strval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_25]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_25, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_50
+    IS_FAIL_BRANCH16  L_sf_50
     jmp     L_sn_50
 L_sf_50:
     jmp     L_ppArgChk2_8
 L_sn_50:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
     jmp     L_ppArgLoop_1
 L_sn_51:
 
     STMT_SEP
 L_ppArgChk2_8:
     sub     rsp, 32
-    lea     rdi, [rel S_18]
-    call    stmt_get
+    GET_VAR     S_18
+    STORE_ARG32 0
+    LOAD_STR    S_38
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_38]
-    call    stmt_strval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_25]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_25, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_52
+    IS_FAIL_BRANCH16  L_sf_52
     jmp     L_sn_52
 L_sf_52:
     jmp     L_ppArgChk3_9
 L_sn_52:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
     jmp     L_ppArgLoop_1
 L_sn_53:
 
     STMT_SEP
 L_ppArgChk3_9:
     sub     rsp, 32
-    lea     rdi, [rel S_18]
-    call    stmt_get
+    GET_VAR     S_18
+    STORE_ARG32 0
+    LOAD_STR    S_40
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_40]
-    call    stmt_strval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_25]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_25, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_54
+    IS_FAIL_BRANCH16  L_sf_54
     jmp     L_sn_54
 L_sf_54:
     jmp     L_ppArgChk4_10
 L_sn_54:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
     jmp     L_ppArgLoop_1
 L_sn_55:
 
     STMT_SEP
 L_ppArgChk4_10:
     sub     rsp, 32
-    lea     rdi, [rel S_18]
-    call    stmt_get
+    GET_VAR     S_18
+    STORE_ARG32 0
+    LOAD_STR    S_42
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_42]
-    call    stmt_strval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_25]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_25, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_56
+    IS_FAIL_BRANCH16  L_sf_56
     jmp     L_sn_56
 L_sf_56:
     jmp     L_ppArgChk5_11
 L_sn_56:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
     jmp     L_ppArgLoop_1
 L_sn_57:
 
     STMT_SEP
 L_ppArgChk5_11:
     sub     rsp, 32
-    lea     rdi, [rel S_18]
-    call    stmt_get
+    GET_VAR     S_18
+    STORE_ARG32 0
+    LOAD_STR    S_44
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_44]
-    call    stmt_strval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_25]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_25, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_58
+    IS_FAIL_BRANCH16  L_sf_58
     jmp     L_sn_58
 L_sf_58:
     jmp     L_ppArgChk6_12
 L_sn_58:
 
     STMT_SEP
-    lea     rdi, [rel S_7]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_7
     lea     rdi, [rel S_12]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_59
-    lea     rdi, [rel S_7]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_59
+    SET_VAR     S_7
     jmp     L_ppArgLoop_1
 L_sn_59:
 
     STMT_SEP
 L_ppArgChk6_12:
     sub     rsp, 32
-    lea     rdi, [rel S_18]
-    call    stmt_get
+    GET_VAR     S_18
+    STORE_ARG32 0
+    LOAD_STR    S_46
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_46]
-    call    stmt_strval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_25]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_25, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_60
+    IS_FAIL_BRANCH16  L_sf_60
     jmp     L_sn_60
 L_sf_60:
     jmp     L_ppArgUnk_13
 L_sn_60:
 
     STMT_SEP
-    lea     rdi, [rel S_8]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_8
     lea     rdi, [rel S_12]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_61
-    lea     rdi, [rel S_8]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_61
+    SET_VAR     S_8
     jmp     L_ppArgLoop_1
 L_sn_61:
 
     STMT_SEP
 L_ppArgUnk_13:
     sub     rsp, 32
-    lea     rdi, [rel S_18]
-    call    stmt_get
+    GET_VAR     S_18
+    STORE_ARG32 0
+    LOAD_STR    S_48
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_48]
-    call    stmt_strval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_25]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_25, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_62
+    IS_FAIL_BRANCH16  L_sf_62
     jmp     L_sn_62
 L_sf_62:
     jmp     L_ppArgWarn_14
 L_sn_62:
 
     STMT_SEP
-    lea     rdi, [rel S_49]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 1
-    call    stmt_intval
+    GET_VAR     S_49
+    LOAD_INT    1
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_63
-    lea     rdi, [rel S_49]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_63
+    SET_VAR     S_49
     jmp     L_ppArgLoop_1
 L_sn_63:
 
     STMT_SEP
 L_ppArgWarn_14:
-    lea     rdi, [rel S_51]
+    GET_VAR     S_51
+    sub     rsp, 32
+    LOAD_STR    S_52
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_18]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_64
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_output
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_64
+    SET_OUTPUT
     jmp     L_ppArgLoop_1
 L_sn_64:
 
@@ -1518,230 +1037,250 @@ L_sn_65:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_49]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_24]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_49
+    STORE_ARG32 0
+    APPLY_FN_N  S_24, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_66
+    IS_FAIL_BRANCH16  L_sf_66
     jmp     L_sn_66
 L_sf_66:
     jmp     L_ppAutoSkip_15
 L_sn_66:
 
     STMT_SEP
-    lea     rdi, [rel S_54]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_54
     sub     rsp, 16
-    mov     rdi, 9
-    call    stmt_intval
+    LOAD_INT    9
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rax, [rbp-32]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_55]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_55, 1
     add     rsp, 16
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_67
-    lea     rdi, [rel S_54]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_67
+    SET_VAR     S_54
     jmp     L_sn_67
 L_sn_67:
 
     STMT_SEP
-    lea     rdi, [rel S_56]
+    GET_VAR     S_56
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 16
+    sub     rsp, 32
+    LOAD_STR    S_16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_54]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_68
-    lea     rdi, [rel S_56]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_22, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_13
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_60
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 16
+    LOAD_STR    S_59
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_57, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_13
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 16
+    LOAD_STR    S_58
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_57, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_13
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_14]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_68
+    SET_VAR     S_56
     jmp     L_sn_68
 L_sn_68:
 
     STMT_SEP
-    lea     rdi, [rel S_61]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_61
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_69
-    lea     rdi, [rel S_61]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    lea     rdi, [rel S_56]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_69
+    SET_VAR     S_61
     jmp     L_sn_69
 L_sn_69:
 
     STMT_SEP
-    lea     rdi, [rel S_63]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_63
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_70
-    lea     rdi, [rel S_63]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_70
+    SET_VAR     S_63
     jmp     L_sn_70
 L_sn_70:
 
     STMT_SEP
-    lea     rdi, [rel S_66]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 0
-    call    stmt_intval
+    GET_VAR     S_66
+    LOAD_INT    0
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_71
-    lea     rdi, [rel S_66]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_71
+    SET_VAR     S_66
     jmp     L_sn_71
 L_sn_71:
 
     STMT_SEP
-    lea     rdi, [rel S_67]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_67
     sub     rsp, 16
-    mov     rdi, 2000
-    call    stmt_intval
+    LOAD_INT    2000
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rax, [rbp-32]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_5]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_5, 1
     add     rsp, 16
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_72
-    lea     rdi, [rel S_67]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_72
+    SET_VAR     S_67
     jmp     L_sn_72
 L_sn_72:
 
     STMT_SEP
-    lea     rdi, [rel S_68]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_73
-    lea     rdi, [rel S_68]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    GET_VAR     S_68
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_70
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    LOAD_INT    1
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_10, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_69
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_73
+    SET_VAR     S_68
     jmp     L_sn_73
 L_sn_73:
 
     STMT_SEP
     sub     rsp, 64
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 3
-    call    stmt_intval
+    LOAD_NULVCL
+    STORE_ARG32 0
+    LOAD_INT    3
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_13]
-    call    stmt_strval
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    LOAD_STR    S_13
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 32], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 40], rax
-    lea     rdi, [rel S_68]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 48], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 56], rax
-    lea     rdi, [rel S_71]
-    mov     rsi, rsp
-    mov     rdx, 4
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 32
+    GET_VAR     S_68
+    STORE_ARG32 48
+    APPLY_FN_N  S_71, 4
     add     rsp, 64
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -1749,57 +1288,32 @@ L_sn_74:
 
     STMT_SEP
 L_ppAutoR_16:
-    lea     rdi, [rel S_74]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_74
     lea     rdi, [rel S_75]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_75
-    lea     rdi, [rel S_74]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sf_75
+    SET_VAR     S_74
     jmp     L_sn_75
 L_sf_75:
     jmp     L_ppAutoSort_17
 L_sn_75:
 
     STMT_SEP
-    lea     rdi, [rel S_72]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_72
     lea     rdi, [rel S_74]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_76
-    lea     rdi, [rel S_72]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_76
+    SET_VAR     S_72
     jmp     L_sn_76
 L_sn_76:
 
     STMT_SEP
-    lea     rdi, [rel S_74]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_setup_subject
+    GET_VAR     S_74
+    SETUP_SUBJECT_FROM16
     jmp     P_77_α
 
 
@@ -1853,55 +1367,23 @@ seq_r3_beta:
     jmp     seq_l3_beta
 
 P_77_γ:
-    lea     rdi, [rel S_18]
-    lea     rsi, [rel cap_ppTokName_buf]
-    mov     rdx, [cap_ppTokName_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_12]
-    lea     rsi, [rel cap_ppTokVal_buf]
-    mov     rdx, [cap_ppTokVal_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_62]
-    lea     rsi, [rel cap_ppGCon_buf]
-    mov     rdx, [cap_ppGCon_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_64]
-    lea     rsi, [rel cap_ppDrop_buf]
-    mov     rdx, [cap_ppDrop_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_459]
-    lea     rsi, [rel cap_cap_buf]
-    mov     rdx, [cap_cap_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_135]
-    lea     rsi, [rel cap_tx_buf]
-    mov     rdx, [cap_tx_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_13]
-    lea     rsi, [rel cap_v_buf]
-    mov     rdx, [cap_v_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_140]
-    lea     rsi, [rel cap_ProtKwd_buf]
-    mov     rdx, [cap_ProtKwd_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_143]
-    lea     rsi, [rel cap_UnprotKwd_buf]
-    mov     rdx, [cap_UnprotKwd_len]
-    call    stmt_set_capture
+    SET_CAPTURE S_18, cap_ppTokName_buf, cap_ppTokName_len
+    SET_CAPTURE S_12, cap_ppTokVal_buf, cap_ppTokVal_len
+    SET_CAPTURE S_62, cap_ppGCon_buf, cap_ppGCon_len
+    SET_CAPTURE S_64, cap_ppDrop_buf, cap_ppDrop_len
+    SET_CAPTURE S_461, cap_cap_buf, cap_cap_len
+    SET_CAPTURE S_135, cap_tx_buf, cap_tx_len
+    SET_CAPTURE S_13, cap_v_buf, cap_v_len
+    SET_CAPTURE S_140, cap_ProtKwd_buf, cap_ProtKwd_len
+    SET_CAPTURE S_143, cap_UnprotKwd_buf, cap_UnprotKwd_len
     jmp     L_ppAutoR_16
 P_77_ω:
     jmp     L_sn_77
 L_sn_77:
 
     STMT_SEP
-    lea     rdi, [rel S_74]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_setup_subject
+    GET_VAR     S_74
+    SETUP_SUBJECT_FROM16
     jmp     P_78_α
 
 
@@ -1955,42 +1437,15 @@ seq_r5_beta:
     jmp     seq_l5_beta
 
 P_78_γ:
-    lea     rdi, [rel S_18]
-    lea     rsi, [rel cap_ppTokName_buf]
-    mov     rdx, [cap_ppTokName_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_12]
-    lea     rsi, [rel cap_ppTokVal_buf]
-    mov     rdx, [cap_ppTokVal_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_62]
-    lea     rsi, [rel cap_ppGCon_buf]
-    mov     rdx, [cap_ppGCon_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_64]
-    lea     rsi, [rel cap_ppDrop_buf]
-    mov     rdx, [cap_ppDrop_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_459]
-    lea     rsi, [rel cap_cap_buf]
-    mov     rdx, [cap_cap_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_135]
-    lea     rsi, [rel cap_tx_buf]
-    mov     rdx, [cap_tx_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_13]
-    lea     rsi, [rel cap_v_buf]
-    mov     rdx, [cap_v_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_140]
-    lea     rsi, [rel cap_ProtKwd_buf]
-    mov     rdx, [cap_ProtKwd_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_143]
-    lea     rsi, [rel cap_UnprotKwd_buf]
-    mov     rdx, [cap_UnprotKwd_len]
-    call    stmt_set_capture
+    SET_CAPTURE S_18, cap_ppTokName_buf, cap_ppTokName_len
+    SET_CAPTURE S_12, cap_ppTokVal_buf, cap_ppTokVal_len
+    SET_CAPTURE S_62, cap_ppGCon_buf, cap_ppGCon_len
+    SET_CAPTURE S_64, cap_ppDrop_buf, cap_ppDrop_len
+    SET_CAPTURE S_461, cap_cap_buf, cap_cap_len
+    SET_CAPTURE S_135, cap_tx_buf, cap_tx_len
+    SET_CAPTURE S_13, cap_v_buf, cap_v_len
+    SET_CAPTURE S_140, cap_ProtKwd_buf, cap_ProtKwd_len
+    SET_CAPTURE S_143, cap_UnprotKwd_buf, cap_UnprotKwd_len
     jmp     L_ppAutoCont_18
 P_78_ω:
     jmp     L_sn_78
@@ -1998,39 +1453,21 @@ L_sn_78:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_78]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_24]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_78
+    STORE_ARG32 0
+    APPLY_FN_N  S_24, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_79
+    IS_FAIL_BRANCH16  L_sf_79
     jmp     L_sn_79
 L_sf_79:
     jmp     L_ppAutoNew_19
 L_sn_79:
 
     STMT_SEP
-    lea     rdi, [rel S_78]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_setup_subject
+    GET_VAR     S_78
+    SETUP_SUBJECT_FROM16
     jmp     P_80_α
 
 
@@ -2056,76 +1493,34 @@ nref7_omega:
     jmp     P_80_ω
 
 P_80_γ:
-    lea     rdi, [rel S_18]
-    lea     rsi, [rel cap_ppTokName_buf]
-    mov     rdx, [cap_ppTokName_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_12]
-    lea     rsi, [rel cap_ppTokVal_buf]
-    mov     rdx, [cap_ppTokVal_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_62]
-    lea     rsi, [rel cap_ppGCon_buf]
-    mov     rdx, [cap_ppGCon_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_64]
-    lea     rsi, [rel cap_ppDrop_buf]
-    mov     rdx, [cap_ppDrop_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_459]
-    lea     rsi, [rel cap_cap_buf]
-    mov     rdx, [cap_cap_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_135]
-    lea     rsi, [rel cap_tx_buf]
-    mov     rdx, [cap_tx_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_13]
-    lea     rsi, [rel cap_v_buf]
-    mov     rdx, [cap_v_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_140]
-    lea     rsi, [rel cap_ProtKwd_buf]
-    mov     rdx, [cap_ProtKwd_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_143]
-    lea     rsi, [rel cap_UnprotKwd_buf]
-    mov     rdx, [cap_UnprotKwd_len]
-    call    stmt_set_capture
+    SET_CAPTURE S_18, cap_ppTokName_buf, cap_ppTokName_len
+    SET_CAPTURE S_12, cap_ppTokVal_buf, cap_ppTokVal_len
+    SET_CAPTURE S_62, cap_ppGCon_buf, cap_ppGCon_len
+    SET_CAPTURE S_64, cap_ppDrop_buf, cap_ppDrop_len
+    SET_CAPTURE S_461, cap_cap_buf, cap_cap_len
+    SET_CAPTURE S_135, cap_tx_buf, cap_tx_len
+    SET_CAPTURE S_13, cap_v_buf, cap_v_len
+    SET_CAPTURE S_140, cap_ProtKwd_buf, cap_ProtKwd_len
+    SET_CAPTURE S_143, cap_UnprotKwd_buf, cap_UnprotKwd_len
     jmp     L_sn_80
 P_80_ω:
     jmp     L_ppAutoNew_19
 L_sn_80:
 
     STMT_SEP
-    lea     rdi, [rel S_79]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_79
     lea     rdi, [rel S_62]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_81
-    lea     rdi, [rel S_79]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_81
+    SET_VAR     S_79
     jmp     L_sn_81
 L_sn_81:
 
     STMT_SEP
-    lea     rdi, [rel S_79]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_setup_subject
+    GET_VAR     S_79
+    SETUP_SUBJECT_FROM16
     jmp     P_82_α
 
 
@@ -2151,552 +1546,326 @@ nref8_omega:
     jmp     P_82_ω
 
 P_82_γ:
-    lea     rdi, [rel S_18]
-    lea     rsi, [rel cap_ppTokName_buf]
-    mov     rdx, [cap_ppTokName_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_12]
-    lea     rsi, [rel cap_ppTokVal_buf]
-    mov     rdx, [cap_ppTokVal_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_62]
-    lea     rsi, [rel cap_ppGCon_buf]
-    mov     rdx, [cap_ppGCon_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_64]
-    lea     rsi, [rel cap_ppDrop_buf]
-    mov     rdx, [cap_ppDrop_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_459]
-    lea     rsi, [rel cap_cap_buf]
-    mov     rdx, [cap_cap_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_135]
-    lea     rsi, [rel cap_tx_buf]
-    mov     rdx, [cap_tx_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_13]
-    lea     rsi, [rel cap_v_buf]
-    mov     rdx, [cap_v_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_140]
-    lea     rsi, [rel cap_ProtKwd_buf]
-    mov     rdx, [cap_ProtKwd_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_143]
-    lea     rsi, [rel cap_UnprotKwd_buf]
-    mov     rdx, [cap_UnprotKwd_len]
-    call    stmt_set_capture
+    SET_CAPTURE S_18, cap_ppTokName_buf, cap_ppTokName_len
+    SET_CAPTURE S_12, cap_ppTokVal_buf, cap_ppTokVal_len
+    SET_CAPTURE S_62, cap_ppGCon_buf, cap_ppGCon_len
+    SET_CAPTURE S_64, cap_ppDrop_buf, cap_ppDrop_len
+    SET_CAPTURE S_461, cap_cap_buf, cap_cap_len
+    SET_CAPTURE S_135, cap_tx_buf, cap_tx_len
+    SET_CAPTURE S_13, cap_v_buf, cap_v_len
+    SET_CAPTURE S_140, cap_ProtKwd_buf, cap_ProtKwd_len
+    SET_CAPTURE S_143, cap_UnprotKwd_buf, cap_UnprotKwd_len
     jmp     L_sn_82
 P_82_ω:
     jmp     L_sn_82
 L_sn_82:
 
     STMT_SEP
-    lea     rdi, [rel S_80]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_80
     sub     rsp, 16
     lea     rdi, [rel S_79]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rax, [rbp-32]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_81]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_81, 1
     add     rsp, 16
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_83
-    lea     rdi, [rel S_80]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_83
+    SET_VAR     S_80
     jmp     L_sn_83
 L_sn_83:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_80]
-    call    stmt_get
+    GET_VAR     S_80
+    STORE_ARG32 0
+    LOAD_INT    0
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 0
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_24]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_24, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_84
+    IS_FAIL_BRANCH16  L_sf_84
     jmp     L_sn_84
 L_sf_84:
     jmp     L_ppAutoNew_19
 L_sn_84:
 
     STMT_SEP
-    lea     rdi, [rel S_66]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_66
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_85
-    lea     rdi, [rel S_66]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_85
+    SET_VAR     S_66
     jmp     L_sn_85
 L_sn_85:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_86:
 
     STMT_SEP
 L_ppAutoNew_19:
-    lea     rdi, [rel S_78]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_78
     lea     rdi, [rel S_74]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_87
-    lea     rdi, [rel S_78]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_87
+    SET_VAR     S_78
     jmp     L_ppAutoR_16
 L_sn_87:
 
     STMT_SEP
 L_ppAutoCont_18:
+    GET_VAR     S_78
+    sub     rsp, 32
+    sub     rsp, 32
     lea     rdi, [rel S_78]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_88
-    lea     rdi, [rel S_78]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_74]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_88
+    SET_VAR     S_78
     jmp     L_ppAutoR_16
 L_sn_88:
 
     STMT_SEP
 L_ppAutoSort_17:
     sub     rsp, 16
-    mov     rdi, 3
-    call    stmt_intval
+    LOAD_INT    3
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_85]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_85, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_89:
 
     STMT_SEP
-    lea     rdi, [rel S_86]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 1
-    call    stmt_intval
+    GET_VAR     S_86
+    LOAD_INT    1
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_90
-    lea     rdi, [rel S_86]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_90
+    SET_VAR     S_86
     jmp     L_sn_90
 L_sn_90:
 
     STMT_SEP
 L_ppAS1_20:
+    GET_VAR     S_86
+    sub     rsp, 32
+    sub     rsp, 32
     lea     rdi, [rel S_86]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_66]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_88, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_91
-    lea     rdi, [rel S_86]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sf_91
+    SET_VAR     S_86
     jmp     L_sn_91
 L_sf_91:
     jmp     L_ppAutoCalc_21
 L_sn_91:
 
     STMT_SEP
-    lea     rdi, [rel S_89]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_89
     lea     rdi, [rel S_86]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_92
-    lea     rdi, [rel S_89]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_92
+    SET_VAR     S_89
     jmp     L_sn_92
 L_sn_92:
 
     STMT_SEP
-    lea     rdi, [rel S_90]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_90
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_93
-    lea     rdi, [rel S_90]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_93
+    SET_VAR     S_90
     jmp     L_sn_93
 L_sn_93:
 
     STMT_SEP
 L_ppAS2_22:
-    lea     rdi, [rel S_92]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_92
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_94
-    lea     rdi, [rel S_92]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_94
+    SET_VAR     S_92
     jmp     L_sn_94
 L_sn_94:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_92]
-    call    stmt_get
+    GET_VAR     S_92
+    STORE_ARG32 0
+    LOAD_INT    1
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 1
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_88]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_88, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_95
+    IS_FAIL_BRANCH16  L_sn_95
     jmp     L_ppASins_23
 L_sn_95:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_90]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_88]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    GET_VAR     S_90
+    STORE_ARG32 0
+    LOAD_NULVCL
+    STORE_ARG32 16
+    APPLY_FN_N  S_88, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_96
+    IS_FAIL_BRANCH16  L_sf_96
     jmp     L_sn_96
 L_sf_96:
     jmp     L_ppASins_23
 L_sn_96:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_97:
 
     STMT_SEP
-    lea     rdi, [rel S_89]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_89
     lea     rdi, [rel S_92]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_98
-    lea     rdi, [rel S_89]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_98
+    SET_VAR     S_89
     jmp     L_ppAS2_22
 L_sn_98:
 
     STMT_SEP
 L_ppASins_23:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
     jmp     L_ppAS1_20
 L_sn_99:
 
     STMT_SEP
 L_ppAutoCalc_21:
-    lea     rdi, [rel S_95]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_95
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_100
-    lea     rdi, [rel S_95]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_100
+    SET_VAR     S_95
     jmp     L_sn_100
 L_sn_100:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_95]
-    call    stmt_get
+    GET_VAR     S_95
+    STORE_ARG32 0
+    LOAD_INT    1
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 1
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_88]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_88, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_101
+    IS_FAIL_BRANCH16  L_sf_101
     jmp     L_sn_101
 L_sf_101:
     jmp     L_ppAP90ok_24
 L_sn_101:
 
     STMT_SEP
-    lea     rdi, [rel S_95]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 1
-    call    stmt_intval
+    GET_VAR     S_95
+    LOAD_INT    1
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_102
-    lea     rdi, [rel S_95]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_102
+    SET_VAR     S_95
     jmp     L_sn_102
 L_sn_102:
 
     STMT_SEP
 L_ppAP90ok_24:
-    lea     rdi, [rel S_97]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_97
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_103
-    lea     rdi, [rel S_97]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_103
+    SET_VAR     S_97
     jmp     L_sn_103
 L_sn_103:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_97]
-    call    stmt_get
+    GET_VAR     S_97
+    STORE_ARG32 0
+    LOAD_INT    20
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 20
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_88]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_88, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_104
+    IS_FAIL_BRANCH16  L_sf_104
     jmp     L_sn_104
 L_sf_104:
     jmp     L_ppAscale_25
 L_sn_104:
 
     STMT_SEP
-    lea     rdi, [rel S_97]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 20
-    call    stmt_intval
+    GET_VAR     S_97
+    LOAD_INT    20
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_105
-    lea     rdi, [rel S_97]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_105
+    SET_VAR     S_97
     jmp     L_sn_105
 L_sn_105:
 
@@ -2705,213 +1874,266 @@ L_ppAscale_25:
 L_sn_106:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_107:
 
     STMT_SEP
     sub     rsp, 32
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 40
-    call    stmt_intval
+    LOAD_NULVCL
+    STORE_ARG32 0
+    LOAD_INT    40
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_88]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_88, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_108
+    IS_FAIL_BRANCH16  L_sf_108
     jmp     L_sn_108
 L_sf_108:
     jmp     L_ppAs1_26
 L_sn_108:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_109:
 
     STMT_SEP
 L_ppAs1_26:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_110:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_111:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_112:
 
     STMT_SEP
-    lea     rdi, [rel S_7]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_7
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_113
-    lea     rdi, [rel S_7]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_113
+    SET_VAR     S_7
     jmp     L_sn_113
 L_sn_113:
 
     STMT_SEP
-    lea     rdi, [rel S_8]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_8
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_114
-    lea     rdi, [rel S_8]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_114
+    SET_VAR     S_8
     jmp     L_sn_114
 L_sn_114:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_8]
-    call    stmt_get
+    GET_VAR     S_8
+    STORE_ARG32 0
+    LOAD_INT    10
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 10
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_88]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_88, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_115
+    IS_FAIL_BRANCH16  L_sf_115
     jmp     L_sn_115
 L_sf_115:
     jmp     L_ppAutoMsg_27
 L_sn_115:
 
     STMT_SEP
-    lea     rdi, [rel S_8]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 10
-    call    stmt_intval
+    GET_VAR     S_8
+    LOAD_INT    10
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_116
-    lea     rdi, [rel S_8]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_116
+    SET_VAR     S_8
     jmp     L_sn_116
 L_sn_116:
 
     STMT_SEP
 L_ppAutoMsg_27:
-    lea     rdi, [rel S_51]
+    GET_VAR     S_51
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_108
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_66]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_107
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_97]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_106
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_117
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_output
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_105
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_104
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_103
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_102
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_7]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_101
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_8]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_117
+    SET_OUTPUT
     jmp     L_sn_117
 L_sn_117:
 
     STMT_SEP
     sub     rsp, 64
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 1
-    call    stmt_intval
+    LOAD_NULVCL
+    STORE_ARG32 0
+    LOAD_INT    1
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_13]
-    call    stmt_strval
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    LOAD_STR    S_13
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 32], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 40], rax
-    lea     rdi, [rel S_68]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 48], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 56], rax
-    lea     rdi, [rel S_109]
-    mov     rsi, rsp
-    mov     rdx, 4
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 32
+    GET_VAR     S_68
+    STORE_ARG32 48
+    APPLY_FN_N  S_109, 4
     add     rsp, 64
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -2922,1214 +2144,3734 @@ L_ppAutoSkip_15:
 L_sn_119:
 
     STMT_SEP
-    lea     rdi, [rel S_111]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_111
     sub     rsp, 16
     lea     rdi, [rel S_112]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rax, [rbp-32]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_22]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_22, 1
     add     rsp, 16
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_120
-    lea     rdi, [rel S_111]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_120
+    SET_VAR     S_111
     jmp     L_sn_120
 L_sn_120:
 
     STMT_SEP
-    lea     rdi, [rel S_113]
+    GET_VAR     S_113
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_114
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    LOAD_STR    S_114
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_115]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_121
-    lea     rdi, [rel S_113]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_15, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_114
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_121
+    SET_VAR     S_113
     jmp     L_sn_121
 L_sn_121:
 
     STMT_SEP
-    lea     rdi, [rel S_116]
+    GET_VAR     S_116
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_117
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    LOAD_STR    S_117
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_115]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_122
-    lea     rdi, [rel S_116]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_15, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_117
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_122
+    SET_VAR     S_116
     jmp     L_sn_122
 L_sn_122:
 
     STMT_SEP
-    lea     rdi, [rel S_118]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_118
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_123
-    lea     rdi, [rel S_118]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_123
+    SET_VAR     S_118
     jmp     L_sn_123
 L_sn_123:
 
     STMT_SEP
-    lea     rdi, [rel S_119]
+    GET_VAR     S_119
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 16
+    lea     rdi, [rel S_112]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_124
-    lea     rdi, [rel S_119]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_22, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_122
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    sub     rsp, 16
+    lea     rdi, [rel S_112]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_22, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_121]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_120, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_121]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    LOAD_STR    S_126
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_125
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_124
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_123
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_121]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    lea     rdi, [rel S_112]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_22, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 16
+    lea     rdi, [rel S_112]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_22, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_122
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    sub     rsp, 16
+    lea     rdi, [rel S_112]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_22, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_121]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_120, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_124
+    SET_VAR     S_119
     jmp     L_sn_124
 L_sn_124:
 
     STMT_SEP
-    lea     rdi, [rel S_127]
+    GET_VAR     S_127
+    sub     rsp, 32
+    sub     rsp, 16
+    sub     rsp, 32
+    lea     rdi, [rel S_462]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_125
-    lea     rdi, [rel S_127]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_463]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_57, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    sub     rsp, 16
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_122
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_112]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_462]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_129
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_463]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_22, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_121]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_120, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_125
+    SET_VAR     S_127
     jmp     L_sn_125
 L_sn_125:
 
     STMT_SEP
-    lea     rdi, [rel S_131]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_131
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_126
-    lea     rdi, [rel S_131]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_126
+    SET_VAR     S_131
     jmp     L_sn_126
 L_sn_126:
 
     STMT_SEP
-    lea     rdi, [rel S_136]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_136
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_127
-    lea     rdi, [rel S_136]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_127
+    SET_VAR     S_136
     jmp     L_sn_127
 L_sn_127:
 
     STMT_SEP
-    lea     rdi, [rel S_138]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_138
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_128
-    lea     rdi, [rel S_138]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_128
+    SET_VAR     S_138
     jmp     L_sn_128
 L_sn_128:
 
     STMT_SEP
-    lea     rdi, [rel S_140]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_140
+    sub     rsp, 32
+    LOAD_STR    S_142
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_129
-    lea     rdi, [rel S_140]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_129
+    SET_VAR     S_140
     jmp     L_sn_129
 L_sn_129:
 
     STMT_SEP
-    lea     rdi, [rel S_143]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_143
+    sub     rsp, 32
+    LOAD_STR    S_142
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_130
-    lea     rdi, [rel S_143]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_130
+    SET_VAR     S_143
     jmp     L_sn_130
 L_sn_130:
 
     STMT_SEP
-    lea     rdi, [rel S_145]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_145
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_131
-    lea     rdi, [rel S_145]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    lea     rdi, [rel S_121]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_131
+    SET_VAR     S_145
     jmp     L_sn_131
 L_sn_131:
 
     STMT_SEP
-    lea     rdi, [rel S_146]
+    GET_VAR     S_146
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 16
+    sub     rsp, 32
+    LOAD_STR    S_16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_147]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_132
-    lea     rdi, [rel S_146]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_22, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    lea     rdi, [rel S_115]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    LOAD_STR    S_124
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_122
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    sub     rsp, 16
+    sub     rsp, 32
+    LOAD_STR    S_16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_147]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_22, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_121]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_120, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_121]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_120, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    lea     rdi, [rel S_115]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    LOAD_STR    S_124
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_122
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    sub     rsp, 16
+    sub     rsp, 32
+    LOAD_STR    S_16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_147]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_22, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_121]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_120, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_132
+    SET_VAR     S_146
     jmp     L_sn_132
 L_sn_132:
 
     STMT_SEP
-    lea     rdi, [rel S_133]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_133
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 16
+    LOAD_INT    0
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_23, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_133
-    lea     rdi, [rel S_133]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    LOAD_STR    S_16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    LOAD_INT    0
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_65, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_133
+    SET_VAR     S_133
     jmp     L_sn_133
 L_sn_133:
 
     STMT_SEP
-    lea     rdi, [rel S_139]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    lea     rdi, [rel S_149]
-    call    stmt_strval
+    GET_VAR     S_139
+    LOAD_STR    S_149
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_134
-    lea     rdi, [rel S_139]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_134
+    SET_VAR     S_139
     jmp     L_sn_134
 L_sn_134:
 
     STMT_SEP
-    lea     rdi, [rel S_137]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    lea     rdi, [rel S_150]
-    call    stmt_strval
+    GET_VAR     S_137
+    LOAD_STR    S_150
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_135
-    lea     rdi, [rel S_137]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_135
+    SET_VAR     S_137
     jmp     L_sn_135
 L_sn_135:
 
     STMT_SEP
-    lea     rdi, [rel S_141]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_136
-    lea     rdi, [rel S_141]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    GET_VAR     S_141
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_153
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_152
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_151
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_136
+    SET_VAR     S_141
     jmp     L_sn_136
 L_sn_136:
 
     STMT_SEP
-    lea     rdi, [rel S_144]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_137
-    lea     rdi, [rel S_144]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    GET_VAR     S_144
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_156
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_155
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_154
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_137
+    SET_VAR     S_144
     jmp     L_sn_137
 L_sn_137:
 
     STMT_SEP
-    lea     rdi, [rel S_134]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_138
-    lea     rdi, [rel S_134]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    GET_VAR     S_134
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_165
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_164
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_163
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_162
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_161
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_160
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_159
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_158
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_157
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_138
+    SET_VAR     S_134
     jmp     L_sn_138
 L_sn_138:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_139:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_140:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_141:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_142:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_143:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_144:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_145:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_146:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_147:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_148:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_149:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_150:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_151:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_152:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_153:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_154:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_155:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_156:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_157:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_158:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_159:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_160:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_161:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    LOAD_NULVCL
 L_sn_162:
 
     STMT_SEP
-    lea     rdi, [rel S_185]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_185
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    APPLY_FN_0  S_190
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_163
-    lea     rdi, [rel S_185]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_0  S_186
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_163
+    SET_VAR     S_185
     jmp     L_sn_163
 L_sn_163:
 
     STMT_SEP
-    lea     rdi, [rel S_189]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_189
+    sub     rsp, 32
+    sub     rsp, 32
+    APPLY_FN_0  S_192
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_164
-    lea     rdi, [rel S_189]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_121]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_120, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_164
+    SET_VAR     S_189
     jmp     L_sn_164
 L_sn_164:
 
     STMT_SEP
-    lea     rdi, [rel S_191]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_191
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_165
-    lea     rdi, [rel S_191]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_165
+    SET_VAR     S_191
     jmp     L_sn_165
 L_sn_165:
 
     STMT_SEP
-    lea     rdi, [rel S_193]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_193
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_166
-    lea     rdi, [rel S_193]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_121]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_120, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_166
+    SET_VAR     S_193
     jmp     L_sn_166
 L_sn_166:
 
     STMT_SEP
-    lea     rdi, [rel S_195]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_195
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_167
-    lea     rdi, [rel S_195]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_121]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_120, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_167
+    SET_VAR     S_195
     jmp     L_sn_167
 L_sn_167:
 
     STMT_SEP
-    lea     rdi, [rel S_197]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_197
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_168
-    lea     rdi, [rel S_197]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_121]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_120, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_168
+    SET_VAR     S_197
     jmp     L_sn_168
 L_sn_168:
 
     STMT_SEP
-    lea     rdi, [rel S_199]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_199
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    APPLY_FN_0  S_190
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_169
-    lea     rdi, [rel S_199]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_0  S_186
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_169
+    SET_VAR     S_199
     jmp     L_sn_169
 L_sn_169:
 
     STMT_SEP
-    lea     rdi, [rel S_201]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_201
+    sub     rsp, 32
+    sub     rsp, 32
+    APPLY_FN_0  S_192
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_170
-    lea     rdi, [rel S_201]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_121]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_120, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_170
+    SET_VAR     S_201
     jmp     L_sn_170
 L_sn_170:
 
     STMT_SEP
-    lea     rdi, [rel S_202]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_202
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    APPLY_FN_0  S_190
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_171
-    lea     rdi, [rel S_202]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_0  S_186
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_171
+    SET_VAR     S_202
     jmp     L_sn_171
 L_sn_171:
 
     STMT_SEP
-    lea     rdi, [rel S_204]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_204
+    sub     rsp, 32
+    sub     rsp, 32
+    APPLY_FN_0  S_192
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_172
-    lea     rdi, [rel S_204]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_121]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_120, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_172
+    SET_VAR     S_204
     jmp     L_sn_172
 L_sn_172:
 
     STMT_SEP
-    lea     rdi, [rel S_205]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_205
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_173
-    lea     rdi, [rel S_205]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_121]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_120, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_173
+    SET_VAR     S_205
     jmp     L_sn_173
 L_sn_173:
 
     STMT_SEP
-    lea     rdi, [rel S_207]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_207
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_174
-    lea     rdi, [rel S_207]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_121]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_120, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_174
+    SET_VAR     S_207
     jmp     L_sn_174
 L_sn_174:
 
     STMT_SEP
-    lea     rdi, [rel S_210]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_210
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_175
-    lea     rdi, [rel S_210]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_121]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_120, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_175
+    SET_VAR     S_210
     jmp     L_sn_175
 L_sn_175:
 
     STMT_SEP
-    lea     rdi, [rel S_212]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_212
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_176
-    lea     rdi, [rel S_212]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_121]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_120, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_176
+    SET_VAR     S_212
     jmp     L_sn_176
 L_sn_176:
 
     STMT_SEP
-    lea     rdi, [rel S_214]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_214
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_177
-    lea     rdi, [rel S_214]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_121]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_120, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_177
+    SET_VAR     S_214
     jmp     L_sn_177
 L_sn_177:
 
     STMT_SEP
-    lea     rdi, [rel S_216]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_216
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_178
-    lea     rdi, [rel S_216]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_121]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_120, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_178
+    SET_VAR     S_216
     jmp     L_sn_178
 L_sn_178:
 
     STMT_SEP
-    lea     rdi, [rel S_218]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_218
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_179
-    lea     rdi, [rel S_218]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_121]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_120, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_179
+    SET_VAR     S_218
     jmp     L_sn_179
 L_sn_179:
 
     STMT_SEP
-    lea     rdi, [rel S_220]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_220
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_180
-    lea     rdi, [rel S_220]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_121]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_120, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_180
+    SET_VAR     S_220
     jmp     L_sn_180
 L_sn_180:
 
     STMT_SEP
-    lea     rdi, [rel S_223]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_223
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_181
-    lea     rdi, [rel S_223]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_121]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_120, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_181
+    SET_VAR     S_223
     jmp     L_sn_181
 L_sn_181:
 
     STMT_SEP
-    lea     rdi, [rel S_225]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_225
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_174
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_182
-    lea     rdi, [rel S_225]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_177
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_166
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_142
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_124
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_123
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_169
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_173
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_122
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_171
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_176
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_168
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_175
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_17
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_167
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_182
+    SET_VAR     S_225
     jmp     L_sn_182
 L_sn_182:
 
     STMT_SEP
-    lea     rdi, [rel S_226]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_226
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_183
-    lea     rdi, [rel S_226]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    APPLY_FN_0  S_190
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_0  S_186
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_121]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_120, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_183
+    SET_VAR     S_226
     jmp     L_sn_183
 L_sn_183:
 
     STMT_SEP
-    lea     rdi, [rel S_230]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_230
+    sub     rsp, 32
+    sub     rsp, 32
+    APPLY_FN_0  S_192
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_184
-    lea     rdi, [rel S_230]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    lea     rdi, [rel S_121]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_120, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_184
+    SET_VAR     S_230
     jmp     L_sn_184
 L_sn_184:
 
     STMT_SEP
-    lea     rdi, [rel S_231]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_231
     sub     rsp, 16
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rax, [rbp-32]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_120]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_0  S_186
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_120, 1
     add     rsp, 16
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_185
-    lea     rdi, [rel S_231]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_185
+    SET_VAR     S_231
     jmp     L_sn_185
 L_sn_185:
 
     STMT_SEP
-    lea     rdi, [rel S_235]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_235
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_186
-    lea     rdi, [rel S_235]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_186
+    SET_VAR     S_235
     jmp     L_sn_186
 L_sn_186:
 
     STMT_SEP
-    lea     rdi, [rel S_240]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_240
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_187
-    lea     rdi, [rel S_240]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_187
+    SET_VAR     S_240
     jmp     L_sn_187
 L_sn_187:
 
     STMT_SEP
-    lea     rdi, [rel S_238]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_238
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_188
-    lea     rdi, [rel S_238]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_188
+    SET_VAR     S_238
     jmp     L_sn_188
 L_sn_188:
 
     STMT_SEP
-    lea     rdi, [rel S_243]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_243
+    sub     rsp, 32
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_189
-    lea     rdi, [rel S_243]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_189
+    SET_VAR     S_243
     jmp     L_sn_189
 L_sn_189:
 
     STMT_SEP
-    lea     rdi, [rel S_247]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_247
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_190
-    lea     rdi, [rel S_247]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    LOAD_STR    S_60
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_120, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_120, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_190
+    SET_VAR     S_247
     jmp     L_sn_190
 L_sn_190:
 
     STMT_SEP
-    lea     rdi, [rel S_250]
+    GET_VAR     S_250
+    sub     rsp, 32
+    LOAD_STR    S_123
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    lea     rdi, [rel S_115]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_191
-    lea     rdi, [rel S_250]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_251
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_15, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_191
+    SET_VAR     S_250
     jmp     L_sn_191
 L_sn_191:
 
     STMT_SEP
-    lea     rdi, [rel S_252]
+    GET_VAR     S_252
+    sub     rsp, 32
+    LOAD_STR    S_169
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    lea     rdi, [rel S_115]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_192
-    lea     rdi, [rel S_252]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_15, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_192
+    SET_VAR     S_252
     jmp     L_sn_192
 L_sn_192:
 
     STMT_SEP
-    lea     rdi, [rel S_253]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_253
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_193
-    lea     rdi, [rel S_253]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_193
+    SET_VAR     S_253
     jmp     L_sn_193
 L_sn_193:
 
     STMT_SEP
-    lea     rdi, [rel S_254]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_254
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_194
-    lea     rdi, [rel S_254]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_120, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_120, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_120, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_194
+    SET_VAR     S_254
     jmp     L_sn_194
 L_sn_194:
 
     STMT_SEP
-    lea     rdi, [rel S_255]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_255
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_195
-    lea     rdi, [rel S_255]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    lea     rdi, [rel S_121]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_120, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_195
+    SET_VAR     S_255
     jmp     L_sn_195
 L_sn_195:
 
     STMT_SEP
-    lea     rdi, [rel S_256]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_256
+    sub     rsp, 32
+    APPLY_FN_0  S_192
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_196
-    lea     rdi, [rel S_256]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_115]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    lea     rdi, [rel S_115]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_251
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    lea     rdi, [rel S_115]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_251
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_120, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_196
+    SET_VAR     S_256
     jmp     L_sn_196
 L_sn_196:
 
     STMT_SEP
-    lea     rdi, [rel S_260]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_260
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    APPLY_FN_0  S_190
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_197
-    lea     rdi, [rel S_260]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    APPLY_FN_N  S_263, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_0  S_186
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_197
+    SET_VAR     S_260
     jmp     L_sn_197
 L_sn_197:
 
     STMT_SEP
-    lea     rdi, [rel S_264]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_264
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    APPLY_FN_0  S_190
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_198
-    lea     rdi, [rel S_264]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    APPLY_FN_N  S_263, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 16
+    LOAD_STR    S_266
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_265, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    lea     rdi, [rel S_115]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_15, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_115]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_115]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 32
+    sub     rsp, 16
+    lea     rdi, [rel S_115]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_15, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_115]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_263, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_121]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_0  S_186
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_198
+    SET_VAR     S_264
     jmp     L_sn_198
 L_sn_198:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_268]
-    call    stmt_strval
+    LOAD_STR    S_268
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_267]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_267, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -4139,203 +5881,216 @@ L_sn_199:
     STMT_SEP
 L_pp_29:
     sub     rsp, 16
-    lea     rdi, [rel S_270]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_24]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_270
+    STORE_ARG32 0
+    APPLY_FN_N  S_24, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_200
+    IS_FAIL_BRANCH16  L_sf_200
     jmp     L_sn_200
 L_sf_200:
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_200:
 
     STMT_SEP
-    lea     rdi, [rel S_271]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_271
     sub     rsp, 16
     lea     rdi, [rel S_270]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rax, [rbp-32]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_271]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_271, 1
     add     rsp, 16
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_201
-    lea     rdi, [rel S_271]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_201
+    SET_VAR     S_271
     jmp     L_sn_201
 L_sn_201:
 
     STMT_SEP
-    lea     rdi, [rel S_272]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_272
     sub     rsp, 16
     lea     rdi, [rel S_270]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rax, [rbp-32]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_272]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_272, 1
     add     rsp, 16
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_202
-    lea     rdi, [rel S_272]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_202
+    SET_VAR     S_272
     jmp     L_sn_202
 L_sn_202:
 
     STMT_SEP
-    lea     rdi, [rel S_273]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_273
     sub     rsp, 16
     lea     rdi, [rel S_270]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rax, [rbp-32]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_273]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_273, 1
     add     rsp, 16
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_203
-    lea     rdi, [rel S_273]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_203
+    SET_VAR     S_273
     jmp     L_sn_203
 L_sn_203:
 
     STMT_SEP
-    lea     rdi, [rel S_274]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_274
     sub     rsp, 16
     lea     rdi, [rel S_270]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rax, [rbp-32]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_274]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_274, 1
     add     rsp, 16
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_204
-    lea     rdi, [rel S_274]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_204
+    SET_VAR     S_274
     jmp     L_sn_204
 L_sn_204:
 
     STMT_SEP
-    lea     rdi, [rel S_51]
+    GET_VAR     S_51
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    lea     rdi, [rel S_280]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_205
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_output
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_INT    0
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_279, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_278
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_271]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_182
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_277
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_276]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_124
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    lea     rdi, [rel S_272]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_81, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_275
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_272]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_205
+    SET_OUTPUT
     jmp     L_sn_205
 L_sn_205:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_271]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_24]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_271
+    STORE_ARG32 0
+    APPLY_FN_N  S_24, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_206
+    IS_FAIL_BRANCH16  L_sf_206
     jmp     L_COMPUTED_pp_t_30
 L_sf_206:
     GOTO_ALWAYS  L_SNO_END     ; RETURN
@@ -4343,63 +6098,54 @@ L_sn_206:
 
     STMT_SEP
 L_pp_Parse_31:
-    lea     rdi, [rel S_282]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_282
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_207
-    lea     rdi, [rel S_282]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_207
+    SET_VAR     S_282
     jmp     L_pp_0_32
 L_sn_207:
 
     STMT_SEP
 L_pp_0_32:
-    lea     rdi, [rel S_284]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 0
-    call    stmt_intval
+    GET_VAR     S_284
+    LOAD_INT    0
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_208
-    lea     rdi, [rel S_284]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_208
+    SET_VAR     S_284
     jmp     L_sn_208
 L_sn_208:
 
     STMT_SEP
 L_pp_1_33:
+    GET_VAR     S_284
+    sub     rsp, 32
+    sub     rsp, 32
     lea     rdi, [rel S_284]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_88, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_209
-    lea     rdi, [rel S_284]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sf_209
+    SET_VAR     S_284
     jmp     L_sn_209
 L_sf_209:
     GOTO_ALWAYS  L_SNO_END     ; RETURN
@@ -4407,16 +6153,9 @@ L_sn_209:
 
     STMT_SEP
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_269]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_269, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -4427,37 +6166,18 @@ L_sn_210:
 L_pp_BuiltinVar_34:
     sub     rsp, 16
     sub     rsp, 16
-    lea     rdi, [rel S_270]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_288]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_270
+    STORE_ARG32 0
+    APPLY_FN_N  S_288, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_211
+    IS_FAIL_BRANCH16  L_sf_211
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sf_211:
     jmp     L_error_35
@@ -4467,37 +6187,18 @@ L_sn_211:
 L_pp_Function_36:
     sub     rsp, 16
     sub     rsp, 16
-    lea     rdi, [rel S_270]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_288]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_270
+    STORE_ARG32 0
+    APPLY_FN_N  S_288, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_212
+    IS_FAIL_BRANCH16  L_sf_212
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sf_212:
     jmp     L_error_35
@@ -4507,37 +6208,18 @@ L_sn_212:
 L_pp_Id_37:
     sub     rsp, 16
     sub     rsp, 16
-    lea     rdi, [rel S_270]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_288]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_270
+    STORE_ARG32 0
+    APPLY_FN_N  S_288, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_213
+    IS_FAIL_BRANCH16  L_sf_213
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sf_213:
     jmp     L_error_35
@@ -4547,37 +6229,18 @@ L_sn_213:
 L_pp_Integer_38:
     sub     rsp, 16
     sub     rsp, 16
-    lea     rdi, [rel S_270]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_288]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_270
+    STORE_ARG32 0
+    APPLY_FN_N  S_288, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_214
+    IS_FAIL_BRANCH16  L_sf_214
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sf_214:
     jmp     L_error_35
@@ -4587,37 +6250,18 @@ L_sn_214:
 L_pp_Label_39:
     sub     rsp, 16
     sub     rsp, 16
-    lea     rdi, [rel S_270]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_288]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_270
+    STORE_ARG32 0
+    APPLY_FN_N  S_288, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_215
+    IS_FAIL_BRANCH16  L_sf_215
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sf_215:
     jmp     L_error_35
@@ -4627,37 +6271,18 @@ L_sn_215:
 L_pp_ProtKwd_40:
     sub     rsp, 16
     sub     rsp, 16
-    lea     rdi, [rel S_270]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_288]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_270
+    STORE_ARG32 0
+    APPLY_FN_N  S_288, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_216
+    IS_FAIL_BRANCH16  L_sf_216
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sf_216:
     jmp     L_error_35
@@ -4667,37 +6292,18 @@ L_sn_216:
 L_pp_Real_41:
     sub     rsp, 16
     sub     rsp, 16
-    lea     rdi, [rel S_270]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_288]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_270
+    STORE_ARG32 0
+    APPLY_FN_N  S_288, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_217
+    IS_FAIL_BRANCH16  L_sf_217
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sf_217:
     jmp     L_error_35
@@ -4707,37 +6313,18 @@ L_sn_217:
 L_pp_SpecialNm_42:
     sub     rsp, 16
     sub     rsp, 16
-    lea     rdi, [rel S_270]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_288]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_270
+    STORE_ARG32 0
+    APPLY_FN_N  S_288, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_218
+    IS_FAIL_BRANCH16  L_sf_218
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sf_218:
     jmp     L_error_35
@@ -4747,37 +6334,18 @@ L_sn_218:
 L_pp_String_43:
     sub     rsp, 16
     sub     rsp, 16
-    lea     rdi, [rel S_270]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_288]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_270
+    STORE_ARG32 0
+    APPLY_FN_N  S_288, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_219
+    IS_FAIL_BRANCH16  L_sf_219
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sf_219:
     jmp     L_error_35
@@ -4787,37 +6355,18 @@ L_sn_219:
 L_pp_UnprotKwd_44:
     sub     rsp, 16
     sub     rsp, 16
-    lea     rdi, [rel S_270]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_288]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_270
+    STORE_ARG32 0
+    APPLY_FN_N  S_288, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_220
+    IS_FAIL_BRANCH16  L_sf_220
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sf_220:
     jmp     L_error_35
@@ -4827,37 +6376,18 @@ L_sn_220:
 L_pp_45:
     sub     rsp, 16
     sub     rsp, 16
-    lea     rdi, [rel S_270]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_288]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_270
+    STORE_ARG32 0
+    APPLY_FN_N  S_288, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_221
+    IS_FAIL_BRANCH16  L_sf_221
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sf_221:
     jmp     L_error_35
@@ -4867,37 +6397,18 @@ L_sn_221:
 L_pp_46:
     sub     rsp, 16
     sub     rsp, 16
-    lea     rdi, [rel S_270]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_288]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_270
+    STORE_ARG32 0
+    APPLY_FN_N  S_288, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_222
+    IS_FAIL_BRANCH16  L_sf_222
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sf_222:
     jmp     L_error_35
@@ -4907,37 +6418,18 @@ L_sn_222:
 L_pp_S_47:
     sub     rsp, 16
     sub     rsp, 16
-    lea     rdi, [rel S_270]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_288]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_270
+    STORE_ARG32 0
+    APPLY_FN_N  S_288, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_223
+    IS_FAIL_BRANCH16  L_sf_223
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sf_223:
     jmp     L_error_35
@@ -4947,37 +6439,18 @@ L_sn_223:
 L_pp_S_48:
     sub     rsp, 16
     sub     rsp, 16
-    lea     rdi, [rel S_270]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_288]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_270
+    STORE_ARG32 0
+    APPLY_FN_N  S_288, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_224
+    IS_FAIL_BRANCH16  L_sf_224
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sf_224:
     jmp     L_error_35
@@ -4987,37 +6460,18 @@ L_sn_224:
 L_pp_F_49:
     sub     rsp, 16
     sub     rsp, 16
-    lea     rdi, [rel S_270]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_288]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_270
+    STORE_ARG32 0
+    APPLY_FN_N  S_288, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_225
+    IS_FAIL_BRANCH16  L_sf_225
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sf_225:
     jmp     L_error_35
@@ -5027,37 +6481,18 @@ L_sn_225:
 L_pp_F_50:
     sub     rsp, 16
     sub     rsp, 16
-    lea     rdi, [rel S_270]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_288]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_270
+    STORE_ARG32 0
+    APPLY_FN_N  S_288, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_226
+    IS_FAIL_BRANCH16  L_sf_226
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sf_226:
     jmp     L_error_35
@@ -5067,60 +6502,28 @@ L_sn_226:
 L_ppUnOp_51:
     sub     rsp, 16
     sub     rsp, 32
-    lea     rdi, [rel S_270]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_288]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    GET_VAR     S_270
+    STORE_ARG32 0
+    LOAD_NULVCL
+    STORE_ARG32 16
+    APPLY_FN_N  S_288, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_227
+    IS_FAIL_BRANCH16  L_sn_227
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_227:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_271]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_271
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -5128,16 +6531,9 @@ L_sn_228:
 
     STMT_SEP
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_269]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_269, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -5148,58 +6544,28 @@ L_sn_229:
 L_ppBinOp_52:
     sub     rsp, 16
     sub     rsp, 32
-    lea     rdi, [rel S_270]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_288]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    GET_VAR     S_270
+    STORE_ARG32 0
+    LOAD_NULVCL
+    STORE_ARG32 16
+    APPLY_FN_N  S_288, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_230
+    IS_FAIL_BRANCH16  L_sn_230
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_230:
 
     STMT_SEP
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_269]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_269, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -5207,81 +6573,47 @@ L_sn_231:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_115]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_115
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_232:
 
     STMT_SEP
-    lea     rdi, [rel S_307]
-    xor     rsi, rsi
-    xor     rdx, rdx
-    call    stmt_apply
+    APPLY_FN_0  S_307
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_233:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_271]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_271
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_234:
 
     STMT_SEP
-    lea     rdi, [rel S_308]
-    xor     rsi, rsi
-    xor     rdx, rdx
-    call    stmt_apply
+    APPLY_FN_0  S_308
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_235:
 
     STMT_SEP
-    lea     rdi, [rel S_309]
-    xor     rsi, rsi
-    xor     rdx, rdx
-    call    stmt_apply
+    APPLY_FN_0  S_309
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_236:
 
     STMT_SEP
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_269]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_269, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -5291,101 +6623,50 @@ L_sn_237:
     STMT_SEP
 L_pp_53:
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    1
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 1
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_238
+    IS_FAIL_BRANCH16  L_sn_238
     jmp     L_ppUnOp_51
 L_sn_238:
 
     STMT_SEP
 L_pp_54:
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    1
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 1
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_239
+    IS_FAIL_BRANCH16  L_sn_239
     jmp     L_ppUnOp_51
 L_sn_239:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    2
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 2
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_240
+    IS_FAIL_BRANCH16  L_sf_240
     jmp     L_ppBinOp_52
 L_sf_240:
     jmp     L_error_35
@@ -5394,67 +6675,33 @@ L_sn_240:
     STMT_SEP
 L_pp_55:
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    1
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 1
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_241
+    IS_FAIL_BRANCH16  L_sn_241
     jmp     L_ppUnOp_51
 L_sn_241:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    2
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 2
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_242
+    IS_FAIL_BRANCH16  L_sf_242
     jmp     L_ppBinOp_52
 L_sf_242:
     jmp     L_error_35
@@ -5463,67 +6710,33 @@ L_sn_242:
     STMT_SEP
 L_pp_56:
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    1
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 1
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_243
+    IS_FAIL_BRANCH16  L_sn_243
     jmp     L_ppUnOp_51
 L_sn_243:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    2
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 2
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_244
+    IS_FAIL_BRANCH16  L_sf_244
     jmp     L_ppBinOp_52
 L_sf_244:
     jmp     L_error_35
@@ -5532,67 +6745,33 @@ L_sn_244:
     STMT_SEP
 L_pp_57:
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    1
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 1
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_245
+    IS_FAIL_BRANCH16  L_sn_245
     jmp     L_ppUnOp_51
 L_sn_245:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    2
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 2
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_246
+    IS_FAIL_BRANCH16  L_sf_246
     jmp     L_ppBinOp_52
 L_sf_246:
     jmp     L_error_35
@@ -5601,67 +6780,33 @@ L_sn_246:
     STMT_SEP
 L_pp_58:
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    1
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 1
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_247
+    IS_FAIL_BRANCH16  L_sn_247
     jmp     L_ppUnOp_51
 L_sn_247:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    2
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 2
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_248
+    IS_FAIL_BRANCH16  L_sf_248
     jmp     L_ppBinOp_52
 L_sf_248:
     jmp     L_error_35
@@ -5670,67 +6815,33 @@ L_sn_248:
     STMT_SEP
 L_pp_59:
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    1
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 1
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_249
+    IS_FAIL_BRANCH16  L_sn_249
     jmp     L_ppUnOp_51
 L_sn_249:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    2
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 2
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_250
+    IS_FAIL_BRANCH16  L_sf_250
     jmp     L_ppBinOp_52
 L_sf_250:
     jmp     L_error_35
@@ -5739,67 +6850,33 @@ L_sn_250:
     STMT_SEP
 L_pp_60:
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    1
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 1
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_251
+    IS_FAIL_BRANCH16  L_sn_251
     jmp     L_ppUnOp_51
 L_sn_251:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    2
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 2
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_252
+    IS_FAIL_BRANCH16  L_sf_252
     jmp     L_ppBinOp_52
 L_sf_252:
     jmp     L_error_35
@@ -5808,67 +6885,33 @@ L_sn_252:
     STMT_SEP
 L_pp_61:
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    1
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 1
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_253
+    IS_FAIL_BRANCH16  L_sn_253
     jmp     L_ppUnOp_51
 L_sn_253:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    2
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 2
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_254
+    IS_FAIL_BRANCH16  L_sf_254
     jmp     L_ppBinOp_52
 L_sf_254:
     jmp     L_error_35
@@ -5877,67 +6920,33 @@ L_sn_254:
     STMT_SEP
 L_pp_62:
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    1
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 1
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_255
+    IS_FAIL_BRANCH16  L_sn_255
     jmp     L_ppUnOp_51
 L_sn_255:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    2
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 2
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_256
+    IS_FAIL_BRANCH16  L_sf_256
     jmp     L_ppBinOp_52
 L_sf_256:
     jmp     L_error_35
@@ -5946,67 +6955,33 @@ L_sn_256:
     STMT_SEP
 L_pp_63:
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    1
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 1
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_257
+    IS_FAIL_BRANCH16  L_sn_257
     jmp     L_ppUnOp_51
 L_sn_257:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    2
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 2
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_258
+    IS_FAIL_BRANCH16  L_sf_258
     jmp     L_ppBinOp_52
 L_sf_258:
     jmp     L_error_35
@@ -6015,67 +6990,33 @@ L_sn_258:
     STMT_SEP
 L_pp_64:
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    1
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 1
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_259
+    IS_FAIL_BRANCH16  L_sn_259
     jmp     L_ppUnOp_51
 L_sn_259:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    2
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 2
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_260
+    IS_FAIL_BRANCH16  L_sf_260
     jmp     L_ppBinOp_52
 L_sf_260:
     jmp     L_error_35
@@ -6084,67 +7025,33 @@ L_sn_260:
     STMT_SEP
 L_pp_65:
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    1
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 1
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_261
+    IS_FAIL_BRANCH16  L_sn_261
     jmp     L_ppUnOp_51
 L_sn_261:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    2
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 2
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_262
+    IS_FAIL_BRANCH16  L_sf_262
     jmp     L_ppBinOp_52
 L_sf_262:
     jmp     L_error_35
@@ -6153,34 +7060,17 @@ L_sn_262:
     STMT_SEP
 L_pp_66:
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    2
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 2
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_263
+    IS_FAIL_BRANCH16  L_sf_263
     jmp     L_ppBinOp_52
 L_sf_263:
     jmp     L_error_35
@@ -6189,67 +7079,33 @@ L_sn_263:
     STMT_SEP
 L_pp_67:
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    1
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 1
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_264
+    IS_FAIL_BRANCH16  L_sn_264
     jmp     L_ppUnOp_51
 L_sn_264:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    2
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 2
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_265
+    IS_FAIL_BRANCH16  L_sf_265
     jmp     L_ppBinOp_52
 L_sf_265:
     jmp     L_error_35
@@ -6258,44 +7114,41 @@ L_sn_265:
     STMT_SEP
 L_pp_Comment_68:
     sub     rsp, 16
-    mov     rdi, 0
-    call    stmt_intval
+    LOAD_INT    0
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_327]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_327, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_266:
 
     STMT_SEP
-    lea     rdi, [rel S_328]
-    xor     rsi, rsi
-    xor     rdx, rdx
-    call    stmt_apply
+    APPLY_FN_0  S_328
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_267:
 
     STMT_SEP
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    sub     rsp, 32
+    sub     rsp, 16
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_272, 1
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    STORE_ARG32 0
+    GET_VAR     S_115
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -6305,44 +7158,41 @@ L_sn_268:
     STMT_SEP
 L_pp_Control_69:
     sub     rsp, 16
-    mov     rdi, 0
-    call    stmt_intval
+    LOAD_INT    0
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_327]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_327, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_269:
 
     STMT_SEP
-    lea     rdi, [rel S_328]
-    xor     rsi, rsi
-    xor     rdx, rdx
-    call    stmt_apply
+    APPLY_FN_0  S_328
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_270:
 
     STMT_SEP
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    sub     rsp, 32
+    sub     rsp, 16
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_272, 1
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    STORE_ARG32 0
+    GET_VAR     S_115
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -6352,18 +7202,11 @@ L_sn_271:
     STMT_SEP
 L_pp_Stmt_70:
     sub     rsp, 16
-    mov     rdi, 0
-    call    stmt_intval
+    LOAD_INT    0
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_327]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_327, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -6371,213 +7214,105 @@ L_sn_272:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_124]
-    call    stmt_strval
+    LOAD_STR    S_124
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_328]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_328, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_273:
 
     STMT_SEP
-    lea     rdi, [rel S_282]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_282
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_274
-    lea     rdi, [rel S_282]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_274
+    SET_VAR     S_282
     jmp     L_sn_274
 L_sn_274:
 
     STMT_SEP
-    lea     rdi, [rel S_331]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_331
     sub     rsp, 16
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rax, [rbp-32]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_288]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_288, 1
     add     rsp, 16
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_275
-    lea     rdi, [rel S_331]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_275
+    SET_VAR     S_331
     jmp     L_sn_275
 L_sn_275:
 
     STMT_SEP
-    lea     rdi, [rel S_332]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_332
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_276
-    lea     rdi, [rel S_332]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_276
+    SET_VAR     S_332
     jmp     L_sn_276
 L_sn_276:
 
     STMT_SEP
-    lea     rdi, [rel S_333]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_333
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_277
-    lea     rdi, [rel S_333]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_277
+    SET_VAR     S_333
     jmp     L_sn_277
 L_sn_277:
 
     STMT_SEP
-    lea     rdi, [rel S_334]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_334
     sub     rsp, 16
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rax, [rbp-32]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_272]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_272, 1
     add     rsp, 16
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_278
-    lea     rdi, [rel S_334]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_278
+    SET_VAR     S_334
     jmp     L_sn_278
 L_sn_278:
 
     STMT_SEP
-    lea     rdi, [rel S_335]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_335
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_279
-    lea     rdi, [rel S_335]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_279
+    SET_VAR     S_335
     jmp     L_sn_279
 L_sn_279:
 
     STMT_SEP
-    lea     rdi, [rel S_336]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_336
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_280
-    lea     rdi, [rel S_336]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_280
+    SET_VAR     S_336
     jmp     L_sn_280
 L_sn_280:
 
     STMT_SEP
-    lea     rdi, [rel S_337]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_337
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_281
-    lea     rdi, [rel S_337]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_281
+    SET_VAR     S_337
     jmp     L_sn_281
 L_sn_281:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_331]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_331
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -6586,37 +7321,18 @@ L_sn_282:
     STMT_SEP
     sub     rsp, 16
     sub     rsp, 16
-    lea     rdi, [rel S_332]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_271]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_332
+    STORE_ARG32 0
+    APPLY_FN_N  S_271, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_24]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_24, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_283
+    IS_FAIL_BRANCH16  L_sf_283
     jmp     L_sn_283
 L_sf_283:
     jmp     L_pp_Stmt7_71
@@ -6624,18 +7340,11 @@ L_sn_283:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_16]
-    call    stmt_strval
+    LOAD_STR    S_16
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -6643,16 +7352,9 @@ L_sn_284:
 
     STMT_SEP
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_309]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_309, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -6660,54 +7362,91 @@ L_sn_285:
 
     STMT_SEP
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_327]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_327, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_286:
 
     STMT_SEP
-    lea     rdi, [rel S_282]
+    GET_VAR     S_282
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 16
+    sub     rsp, 16
+    lea     rdi, [rel S_333]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_271, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_25, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    lea     rdi, [rel S_334]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_25, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 16
+    lea     rdi, [rel S_336]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_271, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_25, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_287
-    lea     rdi, [rel S_282]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_287
+    SET_VAR     S_282
     jmp     L_sn_287
 L_sn_287:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_332]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_269]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_332
+    STORE_ARG32 0
+    APPLY_FN_N  S_269, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -6716,37 +7455,18 @@ L_sn_288:
     STMT_SEP
     sub     rsp, 16
     sub     rsp, 16
-    lea     rdi, [rel S_333]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_271]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_333
+    STORE_ARG32 0
+    APPLY_FN_N  S_271, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_24]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_24, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_289
+    IS_FAIL_BRANCH16  L_sf_289
     jmp     L_sn_289
 L_sf_289:
     jmp     L_pp_Stmt5_72
@@ -6754,18 +7474,11 @@ L_sn_289:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_16]
-    call    stmt_strval
+    LOAD_STR    S_16
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -6773,16 +7486,9 @@ L_sn_290:
 
     STMT_SEP
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_309]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_309, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -6790,54 +7496,68 @@ L_sn_291:
 
     STMT_SEP
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_327]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_327, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_292:
 
     STMT_SEP
-    lea     rdi, [rel S_282]
+    GET_VAR     S_282
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 16
+    lea     rdi, [rel S_334]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_25, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    sub     rsp, 16
+    lea     rdi, [rel S_336]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_271, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_25, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_293
-    lea     rdi, [rel S_282]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_293
+    SET_VAR     S_282
     jmp     L_sn_293
 L_sn_293:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_333]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_269]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_333
+    STORE_ARG32 0
+    APPLY_FN_N  S_269, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -6845,26 +7565,13 @@ L_sn_294:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_334]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_24]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_334
+    STORE_ARG32 0
+    APPLY_FN_N  S_24, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_295
+    IS_FAIL_BRANCH16  L_sf_295
     jmp     L_sn_295
 L_sf_295:
     jmp     L_pp_Stmt7_71
@@ -6872,18 +7579,11 @@ L_sn_295:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_338]
-    call    stmt_strval
+    LOAD_STR    S_338
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -6892,37 +7592,18 @@ L_sn_296:
     STMT_SEP
     sub     rsp, 16
     sub     rsp, 16
-    lea     rdi, [rel S_335]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_271]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_335
+    STORE_ARG32 0
+    APPLY_FN_N  S_271, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_24]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_24, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_297
+    IS_FAIL_BRANCH16  L_sf_297
     jmp     L_sn_297
 L_sf_297:
     jmp     L_pp_Stmt7_71
@@ -6930,18 +7611,11 @@ L_sn_297:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_16]
-    call    stmt_strval
+    LOAD_STR    S_16
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -6949,18 +7623,9 @@ L_sn_298:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_335]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_269]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_335
+    STORE_ARG32 0
+    APPLY_FN_N  S_269, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -6970,26 +7635,13 @@ L_sn_299:
     STMT_SEP
 L_pp_Stmt5_72:
     sub     rsp, 16
-    lea     rdi, [rel S_334]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_24]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_334
+    STORE_ARG32 0
+    APPLY_FN_N  S_24, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_300
+    IS_FAIL_BRANCH16  L_sf_300
     jmp     L_sn_300
 L_sf_300:
     jmp     L_pp_Stmt7_71
@@ -6997,18 +7649,11 @@ L_sn_300:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_16]
-    call    stmt_strval
+    LOAD_STR    S_16
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -7016,16 +7661,9 @@ L_sn_301:
 
     STMT_SEP
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_309]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_309, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -7033,16 +7671,9 @@ L_sn_302:
 
     STMT_SEP
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_327]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_327, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -7050,18 +7681,11 @@ L_sn_303:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_17]
-    call    stmt_strval
+    LOAD_STR    S_17
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -7070,37 +7694,18 @@ L_sn_304:
     STMT_SEP
     sub     rsp, 16
     sub     rsp, 16
-    lea     rdi, [rel S_335]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_271]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_335
+    STORE_ARG32 0
+    APPLY_FN_N  S_271, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_24]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_24, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_305
+    IS_FAIL_BRANCH16  L_sf_305
     jmp     L_sn_305
 L_sf_305:
     jmp     L_pp_Stmt7_71
@@ -7108,18 +7713,11 @@ L_sn_305:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_16]
-    call    stmt_strval
+    LOAD_STR    S_16
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -7127,16 +7725,9 @@ L_sn_306:
 
     STMT_SEP
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_309]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_309, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -7144,54 +7735,51 @@ L_sn_307:
 
     STMT_SEP
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_327]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_327, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_308:
 
     STMT_SEP
-    lea     rdi, [rel S_282]
+    GET_VAR     S_282
+    sub     rsp, 32
+    sub     rsp, 16
+    sub     rsp, 16
+    lea     rdi, [rel S_336]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_271, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_25, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_309
-    lea     rdi, [rel S_282]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_309
+    SET_VAR     S_282
     jmp     L_sn_309
 L_sn_309:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_335]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_269]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_335
+    STORE_ARG32 0
+    APPLY_FN_N  S_269, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -7202,77 +7790,40 @@ L_sn_310:
 L_pp_Stmt7_71:
     sub     rsp, 16
     sub     rsp, 16
-    lea     rdi, [rel S_336]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_271]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_336
+    STORE_ARG32 0
+    APPLY_FN_N  S_271, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_24]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_24, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_311
+    IS_FAIL_BRANCH16  L_sf_311
     jmp     L_sn_311
 L_sf_311:
     jmp     L_pp_Stmt9_73
 L_sn_311:
 
     STMT_SEP
-    lea     rdi, [rel S_282]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 256
-    call    stmt_intval
+    GET_VAR     S_282
+    LOAD_INT    256
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_312
-    lea     rdi, [rel S_282]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_312
+    SET_VAR     S_282
     jmp     L_sn_312
 L_sn_312:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_16]
-    call    stmt_strval
+    LOAD_STR    S_16
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -7280,16 +7831,9 @@ L_sn_313:
 
     STMT_SEP
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_309]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_309, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -7297,16 +7841,9 @@ L_sn_314:
 
     STMT_SEP
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_327]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_327, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -7314,18 +7851,11 @@ L_sn_315:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_60]
-    call    stmt_strval
+    LOAD_STR    S_60
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -7333,18 +7863,9 @@ L_sn_316:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_336]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_269]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_336
+    STORE_ARG32 0
+    APPLY_FN_N  S_269, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -7353,37 +7874,18 @@ L_sn_317:
     STMT_SEP
     sub     rsp, 16
     sub     rsp, 16
-    lea     rdi, [rel S_337]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_271]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_337
+    STORE_ARG32 0
+    APPLY_FN_N  S_271, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_24]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_24, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_318
+    IS_FAIL_BRANCH16  L_sf_318
     jmp     L_sn_318
 L_sf_318:
     jmp     L_pp_Stmt9_73
@@ -7391,18 +7893,9 @@ L_sn_318:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_337]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_269]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_337
+    STORE_ARG32 0
+    APPLY_FN_N  S_269, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -7412,18 +7905,9 @@ L_sn_319:
     STMT_SEP
 L_pp_Stmt9_73:
     sub     rsp, 16
-    lea     rdi, [rel S_115]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_115
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -7434,101 +7918,72 @@ L_sn_320:
 L_pp_ExprList_74:
     sub     rsp, 16
     sub     rsp, 32
-    lea     rdi, [rel S_270]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_288]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    GET_VAR     S_270
+    STORE_ARG32 0
+    LOAD_NULVCL
+    STORE_ARG32 16
+    APPLY_FN_N  S_288, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_321
+    IS_FAIL_BRANCH16  L_sn_321
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_321:
 
     STMT_SEP
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_269]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_269, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_322:
 
     STMT_SEP
-    lea     rdi, [rel S_284]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 1
-    call    stmt_intval
+    GET_VAR     S_284
+    LOAD_INT    1
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_323
-    lea     rdi, [rel S_284]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_323
+    SET_VAR     S_284
     jmp     L_sn_323
 L_sn_323:
 
     STMT_SEP
 L_pp_ExprList0_75:
+    GET_VAR     S_284
+    sub     rsp, 32
+    sub     rsp, 32
     lea     rdi, [rel S_284]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_88, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_324
-    lea     rdi, [rel S_284]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sf_324
+    SET_VAR     S_284
     jmp     L_sn_324
 L_sf_324:
     GOTO_ALWAYS  L_SNO_END     ; RETURN
@@ -7536,81 +7991,49 @@ L_sn_324:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_115]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_115
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_325:
 
     STMT_SEP
-    lea     rdi, [rel S_307]
-    xor     rsi, rsi
-    xor     rdx, rdx
-    call    stmt_apply
+    APPLY_FN_0  S_307
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_326:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_178]
-    call    stmt_strval
+    LOAD_STR    S_178
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_327:
 
     STMT_SEP
-    lea     rdi, [rel S_308]
-    xor     rsi, rsi
-    xor     rdx, rdx
-    call    stmt_apply
+    APPLY_FN_0  S_308
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_328:
 
     STMT_SEP
-    lea     rdi, [rel S_309]
-    xor     rsi, rsi
-    xor     rdx, rdx
-    call    stmt_apply
+    APPLY_FN_0  S_309
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_329:
 
     STMT_SEP
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_269]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_269, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -7621,138 +8044,96 @@ L_sn_330:
 L_pp_76:
     sub     rsp, 16
     sub     rsp, 32
-    lea     rdi, [rel S_270]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_288]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    GET_VAR     S_270
+    STORE_ARG32 0
+    LOAD_NULVCL
+    STORE_ARG32 16
+    APPLY_FN_N  S_288, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_331
+    IS_FAIL_BRANCH16  L_sn_331
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_331:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_179]
-    call    stmt_strval
+    LOAD_STR    S_179
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_332:
 
     STMT_SEP
-    lea     rdi, [rel S_308]
-    xor     rsi, rsi
-    xor     rdx, rdx
-    call    stmt_apply
+    APPLY_FN_0  S_308
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_333:
 
     STMT_SEP
-    lea     rdi, [rel S_309]
-    xor     rsi, rsi
-    xor     rdx, rdx
-    call    stmt_apply
+    APPLY_FN_0  S_309
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_334:
 
     STMT_SEP
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_269]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_269, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_335:
 
     STMT_SEP
-    lea     rdi, [rel S_284]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 1
-    call    stmt_intval
+    GET_VAR     S_284
+    LOAD_INT    1
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_336
-    lea     rdi, [rel S_284]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_336
+    SET_VAR     S_284
     jmp     L_sn_336
 L_sn_336:
 
     STMT_SEP
 L_pp_0_77:
+    GET_VAR     S_284
+    sub     rsp, 32
+    sub     rsp, 32
     lea     rdi, [rel S_284]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_88, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_337
-    lea     rdi, [rel S_284]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sf_337
+    SET_VAR     S_284
     jmp     L_sn_337
 L_sf_337:
     jmp     L_COMPUTED_pp_1_78
@@ -7760,81 +8141,49 @@ L_sn_337:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_115]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_115
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_338:
 
     STMT_SEP
-    lea     rdi, [rel S_307]
-    xor     rsi, rsi
-    xor     rdx, rdx
-    call    stmt_apply
+    APPLY_FN_0  S_307
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_339:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_178]
-    call    stmt_strval
+    LOAD_STR    S_178
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_340:
 
     STMT_SEP
-    lea     rdi, [rel S_308]
-    xor     rsi, rsi
-    xor     rdx, rdx
-    call    stmt_apply
+    APPLY_FN_0  S_308
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_341:
 
     STMT_SEP
-    lea     rdi, [rel S_309]
-    xor     rsi, rsi
-    xor     rdx, rdx
-    call    stmt_apply
+    APPLY_FN_0  S_309
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_342:
 
     STMT_SEP
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_269]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_269, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -7844,46 +8193,27 @@ L_sn_343:
     STMT_SEP
 L_pp_1_80:
     sub     rsp, 16
-    lea     rdi, [rel S_115]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_115
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_344:
 
     STMT_SEP
-    lea     rdi, [rel S_307]
-    xor     rsi, rsi
-    xor     rdx, rdx
-    call    stmt_apply
+    APPLY_FN_0  S_307
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_345:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_182]
-    call    stmt_strval
+    LOAD_STR    S_182
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -7893,135 +8223,89 @@ L_sn_346:
     STMT_SEP
 L_pp_81:
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    1
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 1
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_347
+    IS_FAIL_BRANCH16  L_sn_347
     jmp     L_ppUnOp_51
 L_sn_347:
 
     STMT_SEP
     sub     rsp, 16
     sub     rsp, 32
-    lea     rdi, [rel S_270]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_288]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    GET_VAR     S_270
+    STORE_ARG32 0
+    LOAD_NULVCL
+    STORE_ARG32 16
+    APPLY_FN_N  S_288, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_348
+    IS_FAIL_BRANCH16  L_sn_348
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_348:
 
     STMT_SEP
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_269]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_269, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_349:
 
     STMT_SEP
-    lea     rdi, [rel S_284]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 1
-    call    stmt_intval
+    GET_VAR     S_284
+    LOAD_INT    1
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_350
-    lea     rdi, [rel S_284]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_350
+    SET_VAR     S_284
     jmp     L_sn_350
 L_sn_350:
 
     STMT_SEP
 L_pp_0_82:
+    GET_VAR     S_284
+    sub     rsp, 32
+    sub     rsp, 32
     lea     rdi, [rel S_284]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_88, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_351
-    lea     rdi, [rel S_284]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sf_351
+    SET_VAR     S_284
     jmp     L_sn_351
 L_sf_351:
     GOTO_ALWAYS  L_SNO_END     ; RETURN
@@ -8029,81 +8313,49 @@ L_sn_351:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_115]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_115
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_352:
 
     STMT_SEP
-    lea     rdi, [rel S_307]
-    xor     rsi, rsi
-    xor     rdx, rdx
-    call    stmt_apply
+    APPLY_FN_0  S_307
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_353:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_167]
-    call    stmt_strval
+    LOAD_STR    S_167
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_354:
 
     STMT_SEP
-    lea     rdi, [rel S_308]
-    xor     rsi, rsi
-    xor     rdx, rdx
-    call    stmt_apply
+    APPLY_FN_0  S_308
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_355:
 
     STMT_SEP
-    lea     rdi, [rel S_309]
-    xor     rsi, rsi
-    xor     rdx, rdx
-    call    stmt_apply
+    APPLY_FN_0  S_309
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_356:
 
     STMT_SEP
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_269]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_269, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -8114,84 +8366,62 @@ L_sn_357:
 L_pp_84:
     sub     rsp, 16
     sub     rsp, 32
-    lea     rdi, [rel S_270]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_288]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    GET_VAR     S_270
+    STORE_ARG32 0
+    LOAD_NULVCL
+    STORE_ARG32 16
+    APPLY_FN_N  S_288, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_358
+    IS_FAIL_BRANCH16  L_sn_358
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_358:
 
     STMT_SEP
-    lea     rdi, [rel S_284]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 0
-    call    stmt_intval
+    GET_VAR     S_284
+    LOAD_INT    0
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_359
-    lea     rdi, [rel S_284]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_359
+    SET_VAR     S_284
     jmp     L_sn_359
 L_sn_359:
 
     STMT_SEP
 L_pp_0_85:
+    GET_VAR     S_284
+    sub     rsp, 32
+    sub     rsp, 32
     lea     rdi, [rel S_284]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_88, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_360
-    lea     rdi, [rel S_284]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sf_360
+    SET_VAR     S_284
     jmp     L_sn_360
 L_sf_360:
     GOTO_ALWAYS  L_SNO_END     ; RETURN
@@ -8199,24 +8429,38 @@ L_sn_360:
 
     STMT_SEP
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_269]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_269, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_361:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    sub     rsp, 32
+    GET_VAR     S_284
+    STORE_ARG32 0
+    GET_VAR     S_273
+    STORE_ARG32 16
+    APPLY_FN_N  S_88, 2
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    GET_VAR     S_115
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
     jmp     L_COMPUTED_pp_0_86
 L_sn_362:
 
@@ -8224,101 +8468,72 @@ L_sn_362:
 L_pp_87:
     sub     rsp, 16
     sub     rsp, 32
-    lea     rdi, [rel S_270]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_288]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    GET_VAR     S_270
+    STORE_ARG32 0
+    LOAD_NULVCL
+    STORE_ARG32 16
+    APPLY_FN_N  S_288, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_363
+    IS_FAIL_BRANCH16  L_sn_363
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_363:
 
     STMT_SEP
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_269]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_269, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_364:
 
     STMT_SEP
-    lea     rdi, [rel S_284]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 1
-    call    stmt_intval
+    GET_VAR     S_284
+    LOAD_INT    1
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_365
-    lea     rdi, [rel S_284]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_365
+    SET_VAR     S_284
     jmp     L_sn_365
 L_sn_365:
 
     STMT_SEP
 L_pp_0_88:
+    GET_VAR     S_284
+    sub     rsp, 32
+    sub     rsp, 32
     lea     rdi, [rel S_284]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_88, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_366
-    lea     rdi, [rel S_284]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sf_366
+    SET_VAR     S_284
     jmp     L_sn_366
 L_sf_366:
     GOTO_ALWAYS  L_SNO_END     ; RETURN
@@ -8326,53 +8541,33 @@ L_sn_366:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_180]
-    call    stmt_strval
+    LOAD_STR    S_180
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_367:
 
     STMT_SEP
-    lea     rdi, [rel S_308]
-    xor     rsi, rsi
-    xor     rdx, rdx
-    call    stmt_apply
+    APPLY_FN_0  S_308
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_368:
 
     STMT_SEP
-    lea     rdi, [rel S_309]
-    xor     rsi, rsi
-    xor     rdx, rdx
-    call    stmt_apply
+    APPLY_FN_0  S_309
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_369:
 
     STMT_SEP
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_269]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_269, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -8380,54 +8575,56 @@ L_sn_370:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_115]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_115
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_371:
 
     STMT_SEP
-    lea     rdi, [rel S_307]
-    xor     rsi, rsi
-    xor     rdx, rdx
-    call    stmt_apply
+    APPLY_FN_0  S_307
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_372:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_183]
-    call    stmt_strval
+    LOAD_STR    S_183
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_373:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    sub     rsp, 32
+    GET_VAR     S_284
+    STORE_ARG32 0
+    GET_VAR     S_273
+    STORE_ARG32 16
+    APPLY_FN_N  S_88, 2
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    GET_VAR     S_115
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
     jmp     L_COMPUTED_pp_0_89
 L_sn_374:
 
@@ -8435,95 +8632,52 @@ L_sn_374:
 L_pp_90:
     sub     rsp, 16
     sub     rsp, 32
-    lea     rdi, [rel S_270]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_288]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    GET_VAR     S_270
+    STORE_ARG32 0
+    LOAD_NULVCL
+    STORE_ARG32 16
+    APPLY_FN_N  S_288, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_375
+    IS_FAIL_BRANCH16  L_sn_375
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_375:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_179]
-    call    stmt_strval
+    LOAD_STR    S_179
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_376:
 
     STMT_SEP
-    lea     rdi, [rel S_308]
-    xor     rsi, rsi
-    xor     rdx, rdx
-    call    stmt_apply
+    APPLY_FN_0  S_308
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_377:
 
     STMT_SEP
-    lea     rdi, [rel S_309]
-    xor     rsi, rsi
-    xor     rdx, rdx
-    call    stmt_apply
+    APPLY_FN_0  S_309
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_378:
 
     STMT_SEP
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_269]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_269, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -8531,46 +8685,27 @@ L_sn_379:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_115]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_115
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_380:
 
     STMT_SEP
-    lea     rdi, [rel S_307]
-    xor     rsi, rsi
-    xor     rdx, rdx
-    call    stmt_apply
+    APPLY_FN_0  S_307
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_381:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_182]
-    call    stmt_strval
+    LOAD_STR    S_182
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -8581,58 +8716,28 @@ L_sn_382:
 L_pp_Call_91:
     sub     rsp, 16
     sub     rsp, 32
-    lea     rdi, [rel S_270]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_288]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    GET_VAR     S_270
+    STORE_ARG32 0
+    LOAD_NULVCL
+    STORE_ARG32 16
+    APPLY_FN_N  S_288, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_383
+    IS_FAIL_BRANCH16  L_sn_383
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_383:
 
     STMT_SEP
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_269]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_269, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -8640,51 +8745,41 @@ L_sn_384:
 
     STMT_SEP
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    sub     rsp, 32
+    LOAD_STR    S_179
+    mov     [rbp-16], rax
+    mov     [rbp-8],  rdx
+    STORE_ARG32 0
+    GET_VAR     S_115
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_385:
 
     STMT_SEP
-    lea     rdi, [rel S_308]
-    xor     rsi, rsi
-    xor     rdx, rdx
-    call    stmt_apply
+    APPLY_FN_0  S_308
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_386:
 
     STMT_SEP
-    lea     rdi, [rel S_309]
-    xor     rsi, rsi
-    xor     rdx, rdx
-    call    stmt_apply
+    APPLY_FN_0  S_309
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_387:
 
     STMT_SEP
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_269]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_269, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -8692,46 +8787,27 @@ L_sn_388:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_115]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_115
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_389:
 
     STMT_SEP
-    lea     rdi, [rel S_307]
-    xor     rsi, rsi
-    xor     rdx, rdx
-    call    stmt_apply
+    APPLY_FN_0  S_307
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_390:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_182]
-    call    stmt_strval
+    LOAD_STR    S_182
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_287]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_287, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -8744,18 +8820,11 @@ L_sn_392:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_356]
-    call    stmt_strval
+    LOAD_STR    S_356
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_267]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_267, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -8765,257 +8834,261 @@ L_sn_393:
     STMT_SEP
 L_ss_93:
     sub     rsp, 16
-    lea     rdi, [rel S_270]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_24]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_270
+    STORE_ARG32 0
+    APPLY_FN_N  S_24, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_394
+    IS_FAIL_BRANCH16  L_sf_394
     jmp     L_sn_394
 L_sf_394:
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_394:
 
     STMT_SEP
+    GET_VAR     S_357
+    sub     rsp, 32
+    sub     rsp, 16
     lea     rdi, [rel S_357]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_395
-    lea     rdi, [rel S_357]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_25, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_INT    1024
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_395
+    SET_VAR     S_357
     jmp     L_sn_395
 L_sn_395:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_357]
-    call    stmt_get
+    GET_VAR     S_357
+    STORE_ARG32 0
+    LOAD_INT    0
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 0
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_279]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_279, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_396
+    IS_FAIL_BRANCH16  L_sf_396
     jmp     L_sn_396
 L_sf_396:
     GOTO_ALWAYS  L_SNO_END     ; FRETURN
 L_sn_396:
 
     STMT_SEP
-    lea     rdi, [rel S_271]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_271
     sub     rsp, 16
     lea     rdi, [rel S_270]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rax, [rbp-32]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_271]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_271, 1
     add     rsp, 16
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_397
-    lea     rdi, [rel S_271]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_397
+    SET_VAR     S_271
     jmp     L_sn_397
 L_sn_397:
 
     STMT_SEP
-    lea     rdi, [rel S_272]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_272
     sub     rsp, 16
     lea     rdi, [rel S_270]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rax, [rbp-32]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_272]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_272, 1
     add     rsp, 16
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_398
-    lea     rdi, [rel S_272]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_398
+    SET_VAR     S_272
     jmp     L_sn_398
 L_sn_398:
 
     STMT_SEP
-    lea     rdi, [rel S_273]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_273
     sub     rsp, 16
     lea     rdi, [rel S_270]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rax, [rbp-32]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_273]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_273, 1
     add     rsp, 16
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_399
-    lea     rdi, [rel S_273]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_399
+    SET_VAR     S_273
     jmp     L_sn_399
 L_sn_399:
 
     STMT_SEP
-    lea     rdi, [rel S_274]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_274
     sub     rsp, 16
     lea     rdi, [rel S_270]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rax, [rbp-32]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_274]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_274, 1
     add     rsp, 16
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_400
-    lea     rdi, [rel S_274]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_400
+    SET_VAR     S_274
     jmp     L_sn_400
 L_sn_400:
 
     STMT_SEP
-    lea     rdi, [rel S_51]
+    GET_VAR     S_51
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    lea     rdi, [rel S_280]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_401
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_output
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_INT    0
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_279, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_358
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_271]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_182
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_277
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_276]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_124
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    lea     rdi, [rel S_272]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_81, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_275
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_272]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_401
+    SET_OUTPUT
     jmp     L_sn_401
 L_sn_401:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_271]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_24]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_271
+    STORE_ARG32 0
+    APPLY_FN_N  S_24, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_402
+    IS_FAIL_BRANCH16  L_sf_402
     jmp     L_COMPUTED_ss_t_94
 L_sf_402:
     GOTO_ALWAYS  L_SNO_END     ; RETURN
@@ -9023,125 +9096,68 @@ L_sn_402:
 
     STMT_SEP
 L_ss_BuiltinVar_95:
-    lea     rdi, [rel S_288]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_288
     sub     rsp, 16
     lea     rdi, [rel S_272]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rax, [rbp-32]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_148]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_148, 1
     add     rsp, 16
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_403
-    lea     rdi, [rel S_288]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_403
+    SET_VAR     S_288
     jmp     L_ss_atomic_96
 L_sn_403:
 
     STMT_SEP
 L_ss_Function_97:
-    lea     rdi, [rel S_288]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_288
     sub     rsp, 16
     lea     rdi, [rel S_272]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rax, [rbp-32]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_148]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_148, 1
     add     rsp, 16
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_404
-    lea     rdi, [rel S_288]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_404
+    SET_VAR     S_288
     jmp     L_ss_atomic_96
 L_sn_404:
 
     STMT_SEP
 L_ss_Id_98:
-    lea     rdi, [rel S_288]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_288
     lea     rdi, [rel S_272]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_405
-    lea     rdi, [rel S_288]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_405
+    SET_VAR     S_288
     jmp     L_ss_atomic_96
 L_sn_405:
 
     STMT_SEP
 L_ss_Integer_99:
-    lea     rdi, [rel S_288]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_288
     lea     rdi, [rel S_272]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_406
-    lea     rdi, [rel S_288]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_406
+    SET_VAR     S_288
     jmp     L_ss_atomic_96
 L_sn_406:
 
     STMT_SEP
 L_ss_Label_100:
-    lea     rdi, [rel S_272]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_setup_subject
+    GET_VAR     S_272
+    SETUP_SUBJECT_FROM16
     jmp     P_407_α
 
 
@@ -9200,42 +9216,15 @@ seq_r9_beta:
     jmp     seq_l9_beta
 
 P_407_γ:
-    lea     rdi, [rel S_18]
-    lea     rsi, [rel cap_ppTokName_buf]
-    mov     rdx, [cap_ppTokName_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_12]
-    lea     rsi, [rel cap_ppTokVal_buf]
-    mov     rdx, [cap_ppTokVal_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_62]
-    lea     rsi, [rel cap_ppGCon_buf]
-    mov     rdx, [cap_ppGCon_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_64]
-    lea     rsi, [rel cap_ppDrop_buf]
-    mov     rdx, [cap_ppDrop_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_459]
-    lea     rsi, [rel cap_cap_buf]
-    mov     rdx, [cap_cap_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_135]
-    lea     rsi, [rel cap_tx_buf]
-    mov     rdx, [cap_tx_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_13]
-    lea     rsi, [rel cap_v_buf]
-    mov     rdx, [cap_v_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_140]
-    lea     rsi, [rel cap_ProtKwd_buf]
-    mov     rdx, [cap_ProtKwd_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_143]
-    lea     rsi, [rel cap_UnprotKwd_buf]
-    mov     rdx, [cap_UnprotKwd_len]
-    call    stmt_set_capture
+    SET_CAPTURE S_18, cap_ppTokName_buf, cap_ppTokName_len
+    SET_CAPTURE S_12, cap_ppTokVal_buf, cap_ppTokVal_len
+    SET_CAPTURE S_62, cap_ppGCon_buf, cap_ppGCon_len
+    SET_CAPTURE S_64, cap_ppDrop_buf, cap_ppDrop_len
+    SET_CAPTURE S_461, cap_cap_buf, cap_cap_len
+    SET_CAPTURE S_135, cap_tx_buf, cap_tx_len
+    SET_CAPTURE S_13, cap_v_buf, cap_v_len
+    SET_CAPTURE S_140, cap_ProtKwd_buf, cap_ProtKwd_len
+    SET_CAPTURE S_143, cap_UnprotKwd_buf, cap_UnprotKwd_len
     jmp     L_ss_Label0_101
 P_407_ω:
     jmp     L_ss_Label1_102
@@ -9243,203 +9232,109 @@ L_sn_407:
 
     STMT_SEP
 L_ss_Label0_101:
-    lea     rdi, [rel S_288]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_288
     sub     rsp, 16
     lea     rdi, [rel S_272]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rax, [rbp-32]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_148]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_148, 1
     add     rsp, 16
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_408
-    lea     rdi, [rel S_288]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_408
+    SET_VAR     S_288
     jmp     L_ss_atomic_96
 L_sn_408:
 
     STMT_SEP
 L_ss_Label1_102:
-    lea     rdi, [rel S_288]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_288
     lea     rdi, [rel S_272]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_409
-    lea     rdi, [rel S_288]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_409
+    SET_VAR     S_288
     jmp     L_ss_atomic_96
 L_sn_409:
 
     STMT_SEP
 L_ss_ProtKwd_103:
-    lea     rdi, [rel S_288]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_288
     sub     rsp, 16
     lea     rdi, [rel S_272]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rax, [rbp-32]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_148]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_148, 1
     add     rsp, 16
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_410
-    lea     rdi, [rel S_288]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_410
+    SET_VAR     S_288
     jmp     L_ss_atomic_96
 L_sn_410:
 
     STMT_SEP
 L_ss_Real_104:
-    lea     rdi, [rel S_288]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_288
     lea     rdi, [rel S_272]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_411
-    lea     rdi, [rel S_288]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_411
+    SET_VAR     S_288
     jmp     L_ss_atomic_96
 L_sn_411:
 
     STMT_SEP
 L_ss_SpecialNm_105:
-    lea     rdi, [rel S_288]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_288
     sub     rsp, 16
     lea     rdi, [rel S_272]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rax, [rbp-32]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_148]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_148, 1
     add     rsp, 16
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_412
-    lea     rdi, [rel S_288]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_412
+    SET_VAR     S_288
     jmp     L_ss_atomic_96
 L_sn_412:
 
     STMT_SEP
 L_ss_String_106:
-    lea     rdi, [rel S_288]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_288
     lea     rdi, [rel S_272]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_413
-    lea     rdi, [rel S_288]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_413
+    SET_VAR     S_288
     jmp     L_ss_atomic_96
 L_sn_413:
 
     STMT_SEP
 L_ss_UnprotKwd_107:
-    lea     rdi, [rel S_288]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_288
     sub     rsp, 16
     lea     rdi, [rel S_272]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rax, [rbp-32]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_148]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_148, 1
     add     rsp, 16
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_414
-    lea     rdi, [rel S_288]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_414
+    SET_VAR     S_288
     jmp     L_ss_atomic_96
 L_sn_414:
 
@@ -9447,45 +9342,20 @@ L_sn_414:
 L_ss_atomic_96:
     sub     rsp, 32
     sub     rsp, 16
-    lea     rdi, [rel S_288]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_81]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_288
+    STORE_ARG32 0
+    APPLY_FN_N  S_81, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_357]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_372]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    STORE_ARG32 0
+    GET_VAR     S_357
+    STORE_ARG32 16
+    APPLY_FN_N  S_372, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_415
+    IS_FAIL_BRANCH16  L_sf_415
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sf_415:
     GOTO_ALWAYS  L_SNO_END     ; FRETURN
@@ -9493,21 +9363,40 @@ L_sn_415:
 
     STMT_SEP
 L_ss_108:
-    lea     rdi, [rel S_288]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_288
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_179
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_416
-    lea     rdi, [rel S_288]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_288, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_182
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sf_416
+    SET_VAR     S_288
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sf_416:
     jmp     L_error_35
@@ -9515,21 +9404,40 @@ L_sn_416:
 
     STMT_SEP
 L_ss_109:
-    lea     rdi, [rel S_288]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_288
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_181
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_417
-    lea     rdi, [rel S_288]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_288, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_184
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sf_417
+    SET_VAR     S_288
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sf_417:
     jmp     L_error_35
@@ -9537,21 +9445,40 @@ L_sn_417:
 
     STMT_SEP
 L_ss_S_110:
-    lea     rdi, [rel S_288]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_288
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_376
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_418
-    lea     rdi, [rel S_288]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_288, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_182
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sf_418
+    SET_VAR     S_288
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sf_418:
     jmp     L_error_35
@@ -9559,21 +9486,40 @@ L_sn_418:
 
     STMT_SEP
 L_ss_S_111:
-    lea     rdi, [rel S_288]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_288
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_378
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_419
-    lea     rdi, [rel S_288]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_288, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_184
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sf_419
+    SET_VAR     S_288
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sf_419:
     jmp     L_error_35
@@ -9581,21 +9527,40 @@ L_sn_419:
 
     STMT_SEP
 L_ss_F_112:
-    lea     rdi, [rel S_288]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_288
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_380
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_420
-    lea     rdi, [rel S_288]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_288, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_182
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sf_420
+    SET_VAR     S_288
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sf_420:
     jmp     L_error_35
@@ -9603,21 +9568,40 @@ L_sn_420:
 
     STMT_SEP
 L_ss_F_113:
-    lea     rdi, [rel S_288]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_288
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_382
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_421
-    lea     rdi, [rel S_288]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_288, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_184
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sf_421
+    SET_VAR     S_288
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sf_421:
     jmp     L_error_35
@@ -9625,21 +9609,31 @@ L_sn_421:
 
     STMT_SEP
 L_ssUnOp_114:
-    lea     rdi, [rel S_288]
+    GET_VAR     S_288
+    sub     rsp, 32
+    lea     rdi, [rel S_271]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_422
-    lea     rdi, [rel S_288]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_288, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sf_422
+    SET_VAR     S_288
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sf_422:
     GOTO_ALWAYS  L_SNO_END     ; FRETURN
@@ -9647,62 +9641,84 @@ L_sn_422:
 
     STMT_SEP
 L_ssBinOp_115:
-    lea     rdi, [rel S_288]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_288
     sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rax, [rbp-32]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 8], rax
+    STORE_ARG32 0
     lea     rdi, [rel S_357]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rax, [rbp-32]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_288]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    STORE_ARG32 16
+    APPLY_FN_N  S_288, 2
     add     rsp, 32
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_423
-    lea     rdi, [rel S_288]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sf_423
+    SET_VAR     S_288
     jmp     L_sn_423
 L_sf_423:
     GOTO_ALWAYS  L_SNO_END     ; FRETURN
 L_sn_423:
 
     STMT_SEP
+    GET_VAR     S_288
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
     lea     rdi, [rel S_288]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_271]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_424
-    lea     rdi, [rel S_288]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_288, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sf_424
+    SET_VAR     S_288
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sf_424:
     GOTO_ALWAYS  L_SNO_END     ; FRETURN
@@ -9711,101 +9727,50 @@ L_sn_424:
     STMT_SEP
 L_ss_116:
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    1
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 1
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_425
+    IS_FAIL_BRANCH16  L_sn_425
     jmp     L_ssUnOp_114
 L_sn_425:
 
     STMT_SEP
 L_ss_117:
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    1
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 1
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_426
+    IS_FAIL_BRANCH16  L_sn_426
     jmp     L_ssUnOp_114
 L_sn_426:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    2
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 2
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_427
+    IS_FAIL_BRANCH16  L_sf_427
     jmp     L_ssBinOp_115
 L_sf_427:
     jmp     L_error_35
@@ -9814,67 +9779,33 @@ L_sn_427:
     STMT_SEP
 L_ss_118:
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    1
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 1
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_428
+    IS_FAIL_BRANCH16  L_sn_428
     jmp     L_ssUnOp_114
 L_sn_428:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    2
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 2
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_429
+    IS_FAIL_BRANCH16  L_sf_429
     jmp     L_ssBinOp_115
 L_sf_429:
     jmp     L_error_35
@@ -9883,67 +9814,33 @@ L_sn_429:
     STMT_SEP
 L_ss_119:
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    1
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 1
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_430
+    IS_FAIL_BRANCH16  L_sn_430
     jmp     L_ssUnOp_114
 L_sn_430:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    2
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 2
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_431
+    IS_FAIL_BRANCH16  L_sf_431
     jmp     L_ssBinOp_115
 L_sf_431:
     jmp     L_error_35
@@ -9952,67 +9849,33 @@ L_sn_431:
     STMT_SEP
 L_ss_120:
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    1
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 1
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_432
+    IS_FAIL_BRANCH16  L_sn_432
     jmp     L_ssUnOp_114
 L_sn_432:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    2
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 2
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_433
+    IS_FAIL_BRANCH16  L_sf_433
     jmp     L_ssBinOp_115
 L_sf_433:
     jmp     L_error_35
@@ -10021,67 +9884,33 @@ L_sn_433:
     STMT_SEP
 L_ss_121:
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    1
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 1
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_434
+    IS_FAIL_BRANCH16  L_sn_434
     jmp     L_ssUnOp_114
 L_sn_434:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    2
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 2
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_435
+    IS_FAIL_BRANCH16  L_sf_435
     jmp     L_ssBinOp_115
 L_sf_435:
     jmp     L_error_35
@@ -10090,67 +9919,33 @@ L_sn_435:
     STMT_SEP
 L_ss_122:
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    1
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 1
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_436
+    IS_FAIL_BRANCH16  L_sn_436
     jmp     L_ssUnOp_114
 L_sn_436:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    2
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 2
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_437
+    IS_FAIL_BRANCH16  L_sf_437
     jmp     L_ssBinOp_115
 L_sf_437:
     jmp     L_error_35
@@ -10159,67 +9954,33 @@ L_sn_437:
     STMT_SEP
 L_ss_123:
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    1
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 1
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_438
+    IS_FAIL_BRANCH16  L_sn_438
     jmp     L_ssUnOp_114
 L_sn_438:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    2
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 2
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_439
+    IS_FAIL_BRANCH16  L_sf_439
     jmp     L_ssBinOp_115
 L_sf_439:
     jmp     L_error_35
@@ -10228,67 +9989,33 @@ L_sn_439:
     STMT_SEP
 L_ss_124:
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    1
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 1
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_440
+    IS_FAIL_BRANCH16  L_sn_440
     jmp     L_ssUnOp_114
 L_sn_440:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    2
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 2
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_441
+    IS_FAIL_BRANCH16  L_sf_441
     jmp     L_ssBinOp_115
 L_sf_441:
     jmp     L_error_35
@@ -10297,67 +10024,33 @@ L_sn_441:
     STMT_SEP
 L_ss_125:
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    1
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 1
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_442
+    IS_FAIL_BRANCH16  L_sn_442
     jmp     L_ssUnOp_114
 L_sn_442:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    2
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 2
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_443
+    IS_FAIL_BRANCH16  L_sf_443
     jmp     L_ssBinOp_115
 L_sf_443:
     jmp     L_error_35
@@ -10366,67 +10059,33 @@ L_sn_443:
     STMT_SEP
 L_ss_126:
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    1
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 1
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_444
+    IS_FAIL_BRANCH16  L_sn_444
     jmp     L_ssUnOp_114
 L_sn_444:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    2
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 2
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_445
+    IS_FAIL_BRANCH16  L_sf_445
     jmp     L_ssBinOp_115
 L_sf_445:
     jmp     L_error_35
@@ -10435,67 +10094,33 @@ L_sn_445:
     STMT_SEP
 L_ss_127:
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    1
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 1
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_446
+    IS_FAIL_BRANCH16  L_sn_446
     jmp     L_ssUnOp_114
 L_sn_446:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    2
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 2
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_447
+    IS_FAIL_BRANCH16  L_sf_447
     jmp     L_ssBinOp_115
 L_sf_447:
     jmp     L_error_35
@@ -10504,67 +10129,33 @@ L_sn_447:
     STMT_SEP
 L_ss_128:
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    1
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 1
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_448
+    IS_FAIL_BRANCH16  L_sn_448
     jmp     L_ssUnOp_114
 L_sn_448:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    2
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 2
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_449
+    IS_FAIL_BRANCH16  L_sf_449
     jmp     L_ssBinOp_115
 L_sf_449:
     jmp     L_error_35
@@ -10573,34 +10164,17 @@ L_sn_449:
     STMT_SEP
 L_ss_129:
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    2
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 2
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_450
+    IS_FAIL_BRANCH16  L_sf_450
     jmp     L_ssBinOp_115
 L_sf_450:
     jmp     L_error_35
@@ -10609,67 +10183,33 @@ L_sn_450:
     STMT_SEP
 L_ss_130:
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    1
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 1
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_451
+    IS_FAIL_BRANCH16  L_sn_451
     jmp     L_ssUnOp_114
 L_sn_451:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    2
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 2
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_452
+    IS_FAIL_BRANCH16  L_sf_452
     jmp     L_ssBinOp_115
 L_sf_452:
     jmp     L_error_35
@@ -10677,105 +10217,107 @@ L_sn_452:
 
     STMT_SEP
 L_ss_ExprList_131:
-    lea     rdi, [rel S_288]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_288
     sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rax, [rbp-32]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 8], rax
+    STORE_ARG32 0
     lea     rdi, [rel S_357]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rax, [rbp-32]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_288]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    STORE_ARG32 16
+    APPLY_FN_N  S_288, 2
     add     rsp, 32
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_453
-    lea     rdi, [rel S_288]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sf_453
+    SET_VAR     S_288
     jmp     L_sn_453
 L_sf_453:
     GOTO_ALWAYS  L_SNO_END     ; FRETURN
 L_sn_453:
 
     STMT_SEP
-    lea     rdi, [rel S_284]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 1
-    call    stmt_intval
+    GET_VAR     S_284
+    LOAD_INT    1
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_454
-    lea     rdi, [rel S_284]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_454
+    SET_VAR     S_284
     jmp     L_sn_454
 L_sn_454:
 
     STMT_SEP
 L_ss_ExprList0_132:
+    GET_VAR     S_284
+    sub     rsp, 32
+    sub     rsp, 32
     lea     rdi, [rel S_284]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_88, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_455
-    lea     rdi, [rel S_284]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sf_455
+    SET_VAR     S_284
     jmp     L_sn_455
 L_sf_455:
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_455:
 
     STMT_SEP
+    GET_VAR     S_288
+    sub     rsp, 32
+    sub     rsp, 32
     lea     rdi, [rel S_288]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_402
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_456
-    lea     rdi, [rel S_288]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_288, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sf_456
+    SET_VAR     S_288
     jmp     L_ss_ExprList0_132
 L_sf_456:
     GOTO_ALWAYS  L_SNO_END     ; FRETURN
@@ -10783,85 +10325,115 @@ L_sn_456:
 
     STMT_SEP
 L_ss_133:
-    lea     rdi, [rel S_288]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_288
+    sub     rsp, 32
+    LOAD_STR    S_179
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_457
-    lea     rdi, [rel S_288]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_288, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sf_457
+    SET_VAR     S_288
     jmp     L_sn_457
 L_sf_457:
     GOTO_ALWAYS  L_SNO_END     ; FRETURN
 L_sn_457:
 
     STMT_SEP
-    lea     rdi, [rel S_284]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 1
-    call    stmt_intval
+    GET_VAR     S_284
+    LOAD_INT    1
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_458
-    lea     rdi, [rel S_284]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_458
+    SET_VAR     S_284
     jmp     L_sn_458
 L_sn_458:
 
     STMT_SEP
 L_ss_0_134:
+    GET_VAR     S_284
+    sub     rsp, 32
+    sub     rsp, 32
     lea     rdi, [rel S_284]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_88, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_459
-    lea     rdi, [rel S_284]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sf_459
+    SET_VAR     S_284
     jmp     L_sn_459
 L_sf_459:
     jmp     L_COMPUTED_ss_1_135
 L_sn_459:
 
     STMT_SEP
+    GET_VAR     S_288
+    sub     rsp, 32
+    sub     rsp, 32
     lea     rdi, [rel S_288]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_402
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_460
-    lea     rdi, [rel S_288]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_288, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sf_460
+    SET_VAR     S_288
     jmp     L_COMPUTED_ss_0_136
 L_sf_460:
     GOTO_ALWAYS  L_SNO_END     ; FRETURN
@@ -10869,158 +10441,145 @@ L_sn_460:
 
     STMT_SEP
 L_ss_1_137:
+    GET_VAR     S_288
+    sub     rsp, 32
     lea     rdi, [rel S_288]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_461
-    lea     rdi, [rel S_288]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_182
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_461
+    SET_VAR     S_288
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_461:
 
     STMT_SEP
 L_ss_138:
     sub     rsp, 32
-    lea     rdi, [rel S_273]
-    call    stmt_get
+    GET_VAR     S_273
+    STORE_ARG32 0
+    LOAD_INT    1
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     rdi, 1
-    call    stmt_intval
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_311]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_462
+    IS_FAIL_BRANCH16  L_sn_462
     jmp     L_ssUnOp_114
 L_sn_462:
 
     STMT_SEP
-    lea     rdi, [rel S_288]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_288
     sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rax, [rbp-32]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 8], rax
+    STORE_ARG32 0
     lea     rdi, [rel S_357]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rax, [rbp-32]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_288]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    STORE_ARG32 16
+    APPLY_FN_N  S_288, 2
     add     rsp, 32
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_463
-    lea     rdi, [rel S_288]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sf_463
+    SET_VAR     S_288
     jmp     L_sn_463
 L_sf_463:
     GOTO_ALWAYS  L_SNO_END     ; FRETURN
 L_sn_463:
 
     STMT_SEP
-    lea     rdi, [rel S_284]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 1
-    call    stmt_intval
+    GET_VAR     S_284
+    LOAD_INT    1
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_464
-    lea     rdi, [rel S_284]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_464
+    SET_VAR     S_284
     jmp     L_sn_464
 L_sn_464:
 
     STMT_SEP
 L_ss_0_139:
+    GET_VAR     S_284
+    sub     rsp, 32
+    sub     rsp, 32
     lea     rdi, [rel S_284]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_88, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_465
-    lea     rdi, [rel S_284]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sf_465
+    SET_VAR     S_284
     jmp     L_sn_465
 L_sf_465:
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_465:
 
     STMT_SEP
+    GET_VAR     S_288
+    sub     rsp, 32
+    sub     rsp, 32
     lea     rdi, [rel S_288]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_408
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_466
-    lea     rdi, [rel S_288]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_288, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sf_466
+    SET_VAR     S_288
     jmp     L_COMPUTED_ss_0_140
 L_sf_466:
     GOTO_ALWAYS  L_SNO_END     ; FRETURN
@@ -11028,105 +10587,107 @@ L_sn_466:
 
     STMT_SEP
 L_ss_141:
-    lea     rdi, [rel S_288]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_288
     sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rax, [rbp-32]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 8], rax
+    STORE_ARG32 0
     lea     rdi, [rel S_357]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rax, [rbp-32]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_288]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    STORE_ARG32 16
+    APPLY_FN_N  S_288, 2
     add     rsp, 32
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_467
-    lea     rdi, [rel S_288]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sf_467
+    SET_VAR     S_288
     jmp     L_sn_467
 L_sf_467:
     GOTO_ALWAYS  L_SNO_END     ; FRETURN
 L_sn_467:
 
     STMT_SEP
-    lea     rdi, [rel S_284]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 1
-    call    stmt_intval
+    GET_VAR     S_284
+    LOAD_INT    1
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_468
-    lea     rdi, [rel S_284]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_468
+    SET_VAR     S_284
     jmp     L_sn_468
 L_sn_468:
 
     STMT_SEP
 L_ss_0_142:
+    GET_VAR     S_284
+    sub     rsp, 32
+    sub     rsp, 32
     lea     rdi, [rel S_284]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_88, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_469
-    lea     rdi, [rel S_284]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sf_469
+    SET_VAR     S_284
     jmp     L_sn_469
 L_sf_469:
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_469:
 
     STMT_SEP
+    GET_VAR     S_288
+    sub     rsp, 32
+    sub     rsp, 32
     lea     rdi, [rel S_288]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_470
-    lea     rdi, [rel S_288]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_288, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sf_470
+    SET_VAR     S_288
     jmp     L_COMPUTED_ss_0_143
 L_sf_470:
     GOTO_ALWAYS  L_SNO_END     ; FRETURN
@@ -11134,105 +10695,117 @@ L_sn_470:
 
     STMT_SEP
 L_ss_144:
-    lea     rdi, [rel S_288]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_288
     sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rax, [rbp-32]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 8], rax
+    STORE_ARG32 0
     lea     rdi, [rel S_357]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rax, [rbp-32]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_288]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    STORE_ARG32 16
+    APPLY_FN_N  S_288, 2
     add     rsp, 32
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_471
-    lea     rdi, [rel S_288]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sf_471
+    SET_VAR     S_288
     jmp     L_sn_471
 L_sf_471:
     GOTO_ALWAYS  L_SNO_END     ; FRETURN
 L_sn_471:
 
     STMT_SEP
-    lea     rdi, [rel S_284]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 1
-    call    stmt_intval
+    GET_VAR     S_284
+    LOAD_INT    1
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_472
-    lea     rdi, [rel S_284]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_472
+    SET_VAR     S_284
     jmp     L_sn_472
 L_sn_472:
 
     STMT_SEP
 L_ss_0_145:
+    GET_VAR     S_284
+    sub     rsp, 32
+    sub     rsp, 32
     lea     rdi, [rel S_284]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_88, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_473
-    lea     rdi, [rel S_284]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sf_473
+    SET_VAR     S_284
     jmp     L_sn_473
 L_sf_473:
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_473:
 
     STMT_SEP
+    GET_VAR     S_288
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
     lea     rdi, [rel S_288]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_180
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_474
-    lea     rdi, [rel S_288]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_288, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_183
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sf_474
+    SET_VAR     S_288
     jmp     L_COMPUTED_ss_0_146
 L_sf_474:
     GOTO_ALWAYS  L_SNO_END     ; FRETURN
@@ -11240,21 +10813,40 @@ L_sn_474:
 
     STMT_SEP
 L_ss_147:
-    lea     rdi, [rel S_288]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_288
+    sub     rsp, 32
+    sub     rsp, 32
+    LOAD_STR    S_179
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_475
-    lea     rdi, [rel S_288]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_288, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_182
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sf_475
+    SET_VAR     S_288
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sf_475:
     GOTO_ALWAYS  L_SNO_END     ; FRETURN
@@ -11262,21 +10854,55 @@ L_sn_475:
 
     STMT_SEP
 L_ss_Call_148:
-    lea     rdi, [rel S_288]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_288
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 16
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_476
-    lea     rdi, [rel S_288]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 0
+    APPLY_FN_N  S_288, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_179
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 0
+    mov     qword [rbp-32], 1
+    mov     qword [rbp-24], 0
+    STORE_ARG32 16
+    APPLY_FN_N  S_288, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_182
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sf_476
+    SET_VAR     S_288
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sf_476:
     GOTO_ALWAYS  L_SNO_END     ; FRETURN
@@ -11288,26 +10914,15 @@ L_sn_477:
 
     STMT_SEP
     sub     rsp, 32
-    lea     rdi, [rel S_417]
-    call    stmt_strval
+    LOAD_STR    S_417
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_416]
-    call    stmt_strval
+    mov     [rbp-8],  rdx
+    STORE_ARG32 0
+    LOAD_STR    S_416
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_267]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_267, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -11317,77 +10932,65 @@ L_sn_478:
     STMT_SEP
 L_bVisit_150:
     sub     rsp, 32
-    lea     rdi, [rel S_419]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_270]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_418]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    GET_VAR     S_419
+    STORE_ARG32 0
+    GET_VAR     S_270
+    STORE_ARG32 16
+    APPLY_FN_N  S_418, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_479
+    IS_FAIL_BRANCH16  L_sf_479
     jmp     L_sn_479
 L_sf_479:
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_479:
 
     STMT_SEP
-    lea     rdi, [rel S_284]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 0
-    call    stmt_intval
+    GET_VAR     S_284
+    LOAD_INT    0
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_480
-    lea     rdi, [rel S_284]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_480
+    SET_VAR     S_284
     jmp     L_sn_480
 L_sn_480:
 
     STMT_SEP
 L_bVisit_1_151:
+    GET_VAR     S_284
+    sub     rsp, 32
+    sub     rsp, 32
     lea     rdi, [rel S_284]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_273, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_88, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_481
-    lea     rdi, [rel S_284]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sf_481
+    SET_VAR     S_284
     jmp     L_sn_481
 L_sf_481:
     GOTO_ALWAYS  L_SNO_END     ; RETURN
@@ -11395,24 +10998,11 @@ L_sn_481:
 
     STMT_SEP
     sub     rsp, 32
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_419]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_421]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    GET_VAR     S_419
+    STORE_ARG32 16
+    APPLY_FN_N  S_421, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -11425,54 +11015,31 @@ L_sn_483:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_423]
-    call    stmt_strval
+    LOAD_STR    S_423
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_267]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_267, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_484:
 
     STMT_SEP
-    lea     rdi, [rel S_424]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_424
     jmp     L_findRefsEnd_152
 L_sn_485:
 
     STMT_SEP
 L_findRefs_153:
     sub     rsp, 16
-    lea     rdi, [rel S_270]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_24]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_270
+    STORE_ARG32 0
+    APPLY_FN_N  S_24, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_486
+    IS_FAIL_BRANCH16  L_sf_486
     jmp     L_sn_486
 L_sf_486:
     GOTO_ALWAYS  L_SNO_END     ; RETURN
@@ -11481,88 +11048,72 @@ L_sn_486:
     STMT_SEP
     sub     rsp, 32
     sub     rsp, 16
-    lea     rdi, [rel S_270]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_271]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_270
+    STORE_ARG32 0
+    APPLY_FN_N  S_271, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_426]
-    call    stmt_strval
+    STORE_ARG32 0
+    LOAD_STR    S_426
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_25]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_25, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_487
+    IS_FAIL_BRANCH16  L_sf_487
     jmp     L_sn_487
 L_sf_487:
     jmp     L_findRefs_1_154
 L_sn_487:
 
     STMT_SEP
-    lea     rdi, [rel S_273]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 1
-    call    stmt_intval
+    GET_VAR     S_273
+    LOAD_INT    1
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_488
-    lea     rdi, [rel S_273]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_488
+    SET_VAR     S_273
     jmp     L_sn_488
 L_sn_488:
 
     STMT_SEP
 L_findRefs_0_155:
+    GET_VAR     S_273
+    sub     rsp, 32
+    sub     rsp, 32
     lea     rdi, [rel S_273]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_273, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_88, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_489
-    lea     rdi, [rel S_273]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sf_489
+    SET_VAR     S_273
     jmp     L_sn_489
 L_sf_489:
     GOTO_ALWAYS  L_SNO_END     ; FRETURN
@@ -11570,22 +11121,11 @@ L_sn_489:
 
     STMT_SEP
     sub     rsp, 32
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_421]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    LOAD_NULVCL
+    STORE_ARG32 16
+    APPLY_FN_N  S_421, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -11594,40 +11134,67 @@ L_sn_490:
 
     STMT_SEP
 L_findRefs_1_154:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 16
+    GET_VAR     S_270
+    STORE_ARG32 0
+    APPLY_FN_N  S_271, 1
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_142
+    mov     [rbp-16], rax
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_25, 2
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    sub     rsp, 16
+    GET_VAR     S_270
+    STORE_ARG32 0
+    APPLY_FN_N  S_273, 1
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    STORE_ARG32 0
+    LOAD_INT    1
+    mov     [rbp-16], rax
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_311, 2
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    IS_FAIL_BRANCH16  L_sf_491
+    jmp     L_sn_491
+L_sf_491:
+    jmp     L_findRefs_2_156
 L_sn_491:
 
     STMT_SEP
-    lea     rdi, [rel S_272]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_272
     sub     rsp, 16
     lea     rdi, [rel S_270]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rax, [rbp-32]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_288]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_288, 1
     add     rsp, 16
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_492
-    lea     rdi, [rel S_272]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_492
+    SET_VAR     S_272
     jmp     L_findRefs_9_157
 L_sn_492:
 
@@ -11635,92 +11202,48 @@ L_sn_492:
 L_findRefs_2_156:
     sub     rsp, 32
     sub     rsp, 16
-    lea     rdi, [rel S_270]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_271]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_270
+    STORE_ARG32 0
+    APPLY_FN_N  S_271, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_127]
-    call    stmt_strval
+    STORE_ARG32 0
+    LOAD_STR    S_127
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_25]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_25, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_493
+    IS_FAIL_BRANCH16  L_sf_493
     jmp     L_sn_493
 L_sf_493:
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_493:
 
     STMT_SEP
-    lea     rdi, [rel S_272]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_272
     sub     rsp, 16
     lea     rdi, [rel S_270]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rax, [rbp-32]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_272]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_272, 1
     add     rsp, 16
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_494
-    lea     rdi, [rel S_272]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_494
+    SET_VAR     S_272
     jmp     L_findRefs_9_157
 L_sn_494:
 
     STMT_SEP
 L_findRefs_9_157:
-    lea     rdi, [rel S_272]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_setup_subject
+    GET_VAR     S_272
+    SETUP_SUBJECT_FROM16
     jmp     P_495_α
 
 
@@ -11797,82 +11320,94 @@ seq_r12_beta:
     jmp     seq_l12_beta
 
 P_495_γ:
-    lea     rdi, [rel S_18]
-    lea     rsi, [rel cap_ppTokName_buf]
-    mov     rdx, [cap_ppTokName_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_12]
-    lea     rsi, [rel cap_ppTokVal_buf]
-    mov     rdx, [cap_ppTokVal_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_62]
-    lea     rsi, [rel cap_ppGCon_buf]
-    mov     rdx, [cap_ppGCon_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_64]
-    lea     rsi, [rel cap_ppDrop_buf]
-    mov     rdx, [cap_ppDrop_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_459]
-    lea     rsi, [rel cap_cap_buf]
-    mov     rdx, [cap_cap_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_135]
-    lea     rsi, [rel cap_tx_buf]
-    mov     rdx, [cap_tx_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_13]
-    lea     rsi, [rel cap_v_buf]
-    mov     rdx, [cap_v_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_140]
-    lea     rsi, [rel cap_ProtKwd_buf]
-    mov     rdx, [cap_ProtKwd_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_143]
-    lea     rsi, [rel cap_UnprotKwd_buf]
-    mov     rdx, [cap_UnprotKwd_len]
-    call    stmt_set_capture
+    SET_CAPTURE S_18, cap_ppTokName_buf, cap_ppTokName_len
+    SET_CAPTURE S_12, cap_ppTokVal_buf, cap_ppTokVal_len
+    SET_CAPTURE S_62, cap_ppGCon_buf, cap_ppGCon_len
+    SET_CAPTURE S_64, cap_ppDrop_buf, cap_ppDrop_len
+    SET_CAPTURE S_461, cap_cap_buf, cap_cap_len
+    SET_CAPTURE S_135, cap_tx_buf, cap_tx_len
+    SET_CAPTURE S_13, cap_v_buf, cap_v_len
+    SET_CAPTURE S_140, cap_ProtKwd_buf, cap_ProtKwd_len
+    SET_CAPTURE S_143, cap_UnprotKwd_buf, cap_UnprotKwd_len
     jmp     L_sn_495
 P_495_ω:
     GOTO_ALWAYS  L_SNO_END     ; FRETURN
 L_sn_495:
 
     STMT_SEP
+    GET_VAR     S_424
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 16
     lea     rdi, [rel S_424]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_496
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_24, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
     lea     rdi, [rel S_424]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_272]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_496
+    SET_VAR     S_424
     GOTO_ALWAYS  L_SNO_END     ; FRETURN
 L_sn_496:
 
     STMT_SEP
+    GET_VAR     S_424
+    sub     rsp, 32
+    sub     rsp, 16
     lea     rdi, [rel S_424]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_497
-    lea     rdi, [rel S_424]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_25, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_272]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_497
+    SET_VAR     S_424
     GOTO_ALWAYS  L_SNO_END     ; FRETURN
 L_sn_497:
 
@@ -11882,18 +11417,11 @@ L_sn_498:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_433]
-    call    stmt_strval
+    LOAD_STR    S_433
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_267]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_267, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -11902,76 +11430,67 @@ L_sn_499:
 
     STMT_SEP
 L_refs_159:
-    lea     rdi, [rel S_274]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_274
     sub     rsp, 16
     lea     rdi, [rel S_435]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rax, [rbp-32]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_274]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_274, 1
     add     rsp, 16
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_500
-    lea     rdi, [rel S_274]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_500
+    SET_VAR     S_274
     jmp     L_sn_500
 L_sn_500:
 
     STMT_SEP
-    lea     rdi, [rel S_273]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 0
-    call    stmt_intval
+    GET_VAR     S_273
+    LOAD_INT    0
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_501
-    lea     rdi, [rel S_273]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_501
+    SET_VAR     S_273
     jmp     L_sn_501
 L_sn_501:
 
     STMT_SEP
 L_refs_0_160:
+    GET_VAR     S_273
+    sub     rsp, 32
+    sub     rsp, 32
     lea     rdi, [rel S_273]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 16
+    lea     rdi, [rel S_435]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_273, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_88, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_502
-    lea     rdi, [rel S_273]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sf_502
+    SET_VAR     S_273
     jmp     L_sn_502
 L_sf_502:
     GOTO_ALWAYS  L_SNO_END     ; RETURN
@@ -11980,99 +11499,51 @@ L_sn_502:
     STMT_SEP
     sub     rsp, 32
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_271]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_271, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_254]
-    call    stmt_strval
+    STORE_ARG32 0
+    LOAD_STR    S_254
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_25]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_25, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_503
+    IS_FAIL_BRANCH16  L_sf_503
     jmp     L_sn_503
 L_sf_503:
     jmp     L_refs_0_160
 L_sn_503:
 
     STMT_SEP
-    lea     rdi, [rel S_239]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_239
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_504
-    lea     rdi, [rel S_239]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_504
+    SET_VAR     S_239
     jmp     L_sn_504
 L_sn_504:
 
     STMT_SEP
     sub     rsp, 16
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_271]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_271, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_25]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_25, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_505
+    IS_FAIL_BRANCH16  L_sf_505
     jmp     L_sn_505
 L_sf_505:
     jmp     L_refs_0_160
@@ -12081,43 +11552,22 @@ L_sn_505:
     STMT_SEP
     sub     rsp, 32
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_271]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_271, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_17]
-    call    stmt_strval
+    STORE_ARG32 0
+    LOAD_STR    S_17
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_25]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_25, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_506
+    IS_FAIL_BRANCH16  L_sf_506
     jmp     L_sn_506
 L_sf_506:
     jmp     L_refs_0_160
@@ -12126,86 +11576,44 @@ L_sn_506:
     STMT_SEP
     sub     rsp, 32
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_271]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_271, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_127]
-    call    stmt_strval
+    STORE_ARG32 0
+    LOAD_STR    S_127
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_25]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_25, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_507
+    IS_FAIL_BRANCH16  L_sn_507
     jmp     L_refs_1_161
 L_sn_507:
 
     STMT_SEP
     sub     rsp, 32
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_271]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_271, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_173]
-    call    stmt_strval
+    STORE_ARG32 0
+    LOAD_STR    S_173
     mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_25]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    mov     [rbp-8],  rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_25, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_508
+    IS_FAIL_BRANCH16  L_sf_508
     jmp     L_refs_1_161
 L_sf_508:
     jmp     L_refs_0_160
@@ -12213,81 +11621,110 @@ L_sn_508:
 
     STMT_SEP
 L_refs_1_161:
-    lea     rdi, [rel S_438]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_438
     sub     rsp, 16
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
-    mov     rax, [rbp-32]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-24]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_288]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    STORE_ARG32 0
+    APPLY_FN_N  S_288, 1
     add     rsp, 16
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_509
-    lea     rdi, [rel S_438]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_509
+    SET_VAR     S_438
     jmp     L_sn_509
 L_sn_509:
 
     STMT_SEP
-    lea     rdi, [rel S_424]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_424
 L_sn_510:
 
     STMT_SEP
     sub     rsp, 32
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 16], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 24], rax
-    lea     rdi, [rel S_421]
-    mov     rsi, rsp
-    mov     rdx, 2
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    LOAD_NULVCL
+    STORE_ARG32 16
+    APPLY_FN_N  S_421, 2
     add     rsp, 32
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
 L_sn_511:
 
     STMT_SEP
-    lea     rdi, [rel S_51]
+    GET_VAR     S_51
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 32
+    sub     rsp, 48
+    lea     rdi, [rel S_239]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_512
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_output
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_INT    3
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    LOAD_INT    0
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 32
+    APPLY_FN_N  S_441, 3
+    add     rsp, 48
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_440
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    sub     rsp, 32
+    lea     rdi, [rel S_438]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_INT    38
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_439, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    LOAD_STR    S_16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_424]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_512
+    SET_OUTPUT
     jmp     L_refs_0_160
 L_sn_512:
 
@@ -12296,64 +11733,62 @@ L_refsEnd_158:
 L_sn_513:
 
     STMT_SEP
-    lea     rdi, [rel S_280]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, 0
-    call    stmt_intval
+    GET_VAR     S_280
+    LOAD_INT    0
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_514
-    lea     rdi, [rel S_280]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sn_514
+    SET_VAR     S_280
     jmp     L_sn_514
 L_sn_514:
 
     STMT_SEP
-    lea     rdi, [rel S_443]
+    GET_VAR     S_443
+    sub     rsp, 32
+    sub     rsp, 16
+    sub     rsp, 32
+    LOAD_STR    S_16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_147]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_515
-    lea     rdi, [rel S_443]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    APPLY_FN_N  S_22, 1
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_121]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_460, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_515
+    SET_VAR     S_443
     jmp     L_sn_515
 L_sn_515:
 
     STMT_SEP
 L_main00_162:
-    lea     rdi, [rel S_445]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_445
     lea     rdi, [rel S_75]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_516
-    lea     rdi, [rel S_445]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sf_516
+    SET_VAR     S_445
     jmp     L_sn_516
 L_sf_516:
     GOTO_ALWAYS  L_SNO_END     ; END
@@ -12361,20 +11796,12 @@ L_sn_516:
 
     STMT_SEP
 L_main01_163:
-    lea     rdi, [rel S_447]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_447
 L_sn_517:
 
     STMT_SEP
-    lea     rdi, [rel S_445]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_setup_subject
+    GET_VAR     S_445
+    SETUP_SUBJECT_FROM16
     jmp     P_518_α
 
 
@@ -12428,118 +11855,81 @@ seq_r15_beta:
     jmp     seq_l15_beta
 
 P_518_γ:
-    lea     rdi, [rel S_18]
-    lea     rsi, [rel cap_ppTokName_buf]
-    mov     rdx, [cap_ppTokName_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_12]
-    lea     rsi, [rel cap_ppTokVal_buf]
-    mov     rdx, [cap_ppTokVal_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_62]
-    lea     rsi, [rel cap_ppGCon_buf]
-    mov     rdx, [cap_ppGCon_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_64]
-    lea     rsi, [rel cap_ppDrop_buf]
-    mov     rdx, [cap_ppDrop_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_459]
-    lea     rsi, [rel cap_cap_buf]
-    mov     rdx, [cap_cap_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_135]
-    lea     rsi, [rel cap_tx_buf]
-    mov     rdx, [cap_tx_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_13]
-    lea     rsi, [rel cap_v_buf]
-    mov     rdx, [cap_v_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_140]
-    lea     rsi, [rel cap_ProtKwd_buf]
-    mov     rdx, [cap_ProtKwd_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_143]
-    lea     rsi, [rel cap_UnprotKwd_buf]
-    mov     rdx, [cap_UnprotKwd_len]
-    call    stmt_set_capture
+    SET_CAPTURE S_18, cap_ppTokName_buf, cap_ppTokName_len
+    SET_CAPTURE S_12, cap_ppTokVal_buf, cap_ppTokVal_len
+    SET_CAPTURE S_62, cap_ppGCon_buf, cap_ppGCon_len
+    SET_CAPTURE S_64, cap_ppDrop_buf, cap_ppDrop_len
+    SET_CAPTURE S_461, cap_cap_buf, cap_cap_len
+    SET_CAPTURE S_135, cap_tx_buf, cap_tx_len
+    SET_CAPTURE S_13, cap_v_buf, cap_v_len
+    SET_CAPTURE S_140, cap_ProtKwd_buf, cap_ProtKwd_len
+    SET_CAPTURE S_143, cap_UnprotKwd_buf, cap_UnprotKwd_len
     jmp     L_sn_518
 P_518_ω:
     jmp     L_main02_164
 L_sn_518:
 
     STMT_SEP
-    lea     rdi, [rel S_51]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_51
     lea     rdi, [rel S_445]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_519
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_output
+    IS_FAIL_BRANCH  L_sn_519
+    SET_OUTPUT
     jmp     L_main00_162
 L_sn_519:
 
     STMT_SEP
 L_main02_164:
+    GET_VAR     S_447
+    sub     rsp, 32
+    sub     rsp, 32
     lea     rdi, [rel S_447]
     call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_520
-    lea     rdi, [rel S_447]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_445]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 0
+    lea     rdi, [rel S_115]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    STORE_ARG32 16
+    APPLY_FN_N  S_459, 2
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    IS_FAIL_BRANCH  L_sn_520
+    SET_VAR     S_447
     jmp     L_sn_520
 L_sn_520:
 
     STMT_SEP
-    lea     rdi, [rel S_445]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_445
     lea     rdi, [rel S_75]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_521
-    lea     rdi, [rel S_445]
-    mov     rsi, [rbp-32]
-    mov     rdx, [rbp-24]
-    call    stmt_set
+    IS_FAIL_BRANCH  L_sf_521
+    SET_VAR     S_445
     jmp     L_sn_521
 L_sf_521:
     jmp     L_main05_165
 L_sn_521:
 
     STMT_SEP
-    lea     rdi, [rel S_445]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_setup_subject
+    GET_VAR     S_445
+    SETUP_SUBJECT_FROM16
     jmp     P_522_α
 
 
@@ -12593,55 +11983,23 @@ seq_r17_beta:
     jmp     seq_l17_beta
 
 P_522_γ:
-    lea     rdi, [rel S_18]
-    lea     rsi, [rel cap_ppTokName_buf]
-    mov     rdx, [cap_ppTokName_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_12]
-    lea     rsi, [rel cap_ppTokVal_buf]
-    mov     rdx, [cap_ppTokVal_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_62]
-    lea     rsi, [rel cap_ppGCon_buf]
-    mov     rdx, [cap_ppGCon_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_64]
-    lea     rsi, [rel cap_ppDrop_buf]
-    mov     rdx, [cap_ppDrop_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_459]
-    lea     rsi, [rel cap_cap_buf]
-    mov     rdx, [cap_cap_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_135]
-    lea     rsi, [rel cap_tx_buf]
-    mov     rdx, [cap_tx_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_13]
-    lea     rsi, [rel cap_v_buf]
-    mov     rdx, [cap_v_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_140]
-    lea     rsi, [rel cap_ProtKwd_buf]
-    mov     rdx, [cap_ProtKwd_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_143]
-    lea     rsi, [rel cap_UnprotKwd_buf]
-    mov     rdx, [cap_UnprotKwd_len]
-    call    stmt_set_capture
+    SET_CAPTURE S_18, cap_ppTokName_buf, cap_ppTokName_len
+    SET_CAPTURE S_12, cap_ppTokVal_buf, cap_ppTokVal_len
+    SET_CAPTURE S_62, cap_ppGCon_buf, cap_ppGCon_len
+    SET_CAPTURE S_64, cap_ppDrop_buf, cap_ppDrop_len
+    SET_CAPTURE S_461, cap_cap_buf, cap_cap_len
+    SET_CAPTURE S_135, cap_tx_buf, cap_tx_len
+    SET_CAPTURE S_13, cap_v_buf, cap_v_len
+    SET_CAPTURE S_140, cap_ProtKwd_buf, cap_ProtKwd_len
+    SET_CAPTURE S_143, cap_UnprotKwd_buf, cap_UnprotKwd_len
     jmp     L_main02_164
 P_522_ω:
     jmp     L_sn_522
 L_sn_522:
 
     STMT_SEP
-    lea     rdi, [rel S_447]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_setup_subject
+    GET_VAR     S_447
+    SETUP_SUBJECT_FROM16
     jmp     P_523_α
 
 
@@ -12695,42 +12053,15 @@ seq_r19_beta:
     jmp     seq_l19_beta
 
 P_523_γ:
-    lea     rdi, [rel S_18]
-    lea     rsi, [rel cap_ppTokName_buf]
-    mov     rdx, [cap_ppTokName_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_12]
-    lea     rsi, [rel cap_ppTokVal_buf]
-    mov     rdx, [cap_ppTokVal_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_62]
-    lea     rsi, [rel cap_ppGCon_buf]
-    mov     rdx, [cap_ppGCon_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_64]
-    lea     rsi, [rel cap_ppDrop_buf]
-    mov     rdx, [cap_ppDrop_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_459]
-    lea     rsi, [rel cap_cap_buf]
-    mov     rdx, [cap_cap_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_135]
-    lea     rsi, [rel cap_tx_buf]
-    mov     rdx, [cap_tx_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_13]
-    lea     rsi, [rel cap_v_buf]
-    mov     rdx, [cap_v_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_140]
-    lea     rsi, [rel cap_ProtKwd_buf]
-    mov     rdx, [cap_ProtKwd_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_143]
-    lea     rsi, [rel cap_UnprotKwd_buf]
-    mov     rdx, [cap_UnprotKwd_len]
-    call    stmt_set_capture
+    SET_CAPTURE S_18, cap_ppTokName_buf, cap_ppTokName_len
+    SET_CAPTURE S_12, cap_ppTokVal_buf, cap_ppTokVal_len
+    SET_CAPTURE S_62, cap_ppGCon_buf, cap_ppGCon_len
+    SET_CAPTURE S_64, cap_ppDrop_buf, cap_ppDrop_len
+    SET_CAPTURE S_461, cap_cap_buf, cap_cap_len
+    SET_CAPTURE S_135, cap_tx_buf, cap_tx_len
+    SET_CAPTURE S_13, cap_v_buf, cap_v_len
+    SET_CAPTURE S_140, cap_ProtKwd_buf, cap_ProtKwd_len
+    SET_CAPTURE S_143, cap_UnprotKwd_buf, cap_UnprotKwd_len
     jmp     L_sn_523
 P_523_ω:
     jmp     L_mainErr1_166
@@ -12738,24 +12069,13 @@ L_sn_523:
 
     STMT_SEP
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_24]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_24, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_524
+    IS_FAIL_BRANCH16  L_sf_524
     jmp     L_sn_524
 L_sf_524:
     jmp     L_mainErr2_167
@@ -12763,18 +12083,9 @@ L_sn_524:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_451]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_269]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_451
+    STORE_ARG32 0
+    APPLY_FN_N  S_269, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -12783,13 +12094,8 @@ L_sn_525:
 
     STMT_SEP
 L_main05_165:
-    lea     rdi, [rel S_447]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_setup_subject
+    GET_VAR     S_447
+    SETUP_SUBJECT_FROM16
     jmp     P_526_α
 
 
@@ -12843,42 +12149,15 @@ seq_r22_beta:
     jmp     seq_l22_beta
 
 P_526_γ:
-    lea     rdi, [rel S_18]
-    lea     rsi, [rel cap_ppTokName_buf]
-    mov     rdx, [cap_ppTokName_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_12]
-    lea     rsi, [rel cap_ppTokVal_buf]
-    mov     rdx, [cap_ppTokVal_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_62]
-    lea     rsi, [rel cap_ppGCon_buf]
-    mov     rdx, [cap_ppGCon_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_64]
-    lea     rsi, [rel cap_ppDrop_buf]
-    mov     rdx, [cap_ppDrop_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_459]
-    lea     rsi, [rel cap_cap_buf]
-    mov     rdx, [cap_cap_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_135]
-    lea     rsi, [rel cap_tx_buf]
-    mov     rdx, [cap_tx_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_13]
-    lea     rsi, [rel cap_v_buf]
-    mov     rdx, [cap_v_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_140]
-    lea     rsi, [rel cap_ProtKwd_buf]
-    mov     rdx, [cap_ProtKwd_len]
-    call    stmt_set_capture
-    lea     rdi, [rel S_143]
-    lea     rsi, [rel cap_UnprotKwd_buf]
-    mov     rdx, [cap_UnprotKwd_len]
-    call    stmt_set_capture
+    SET_CAPTURE S_18, cap_ppTokName_buf, cap_ppTokName_len
+    SET_CAPTURE S_12, cap_ppTokVal_buf, cap_ppTokVal_len
+    SET_CAPTURE S_62, cap_ppGCon_buf, cap_ppGCon_len
+    SET_CAPTURE S_64, cap_ppDrop_buf, cap_ppDrop_len
+    SET_CAPTURE S_461, cap_cap_buf, cap_cap_len
+    SET_CAPTURE S_135, cap_tx_buf, cap_tx_len
+    SET_CAPTURE S_13, cap_v_buf, cap_v_len
+    SET_CAPTURE S_140, cap_ProtKwd_buf, cap_ProtKwd_len
+    SET_CAPTURE S_143, cap_UnprotKwd_buf, cap_UnprotKwd_len
     jmp     L_sn_526
 P_526_ω:
     jmp     L_mainErr1_166
@@ -12886,24 +12165,13 @@ L_sn_526:
 
     STMT_SEP
     sub     rsp, 16
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_24]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    LOAD_NULVCL
+    STORE_ARG32 0
+    APPLY_FN_N  S_24, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     rdi, [rbp-16]
-    mov     rsi, [rbp-8]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sf_527
+    IS_FAIL_BRANCH16  L_sf_527
     jmp     L_sn_527
 L_sf_527:
     jmp     L_mainErr2_167
@@ -12911,18 +12179,9 @@ L_sn_527:
 
     STMT_SEP
     sub     rsp, 16
-    lea     rdi, [rel S_451]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    mov     rax, [rbp-16]
-    mov     [rsp + 0], rax
-    mov     rax, [rbp-8]
-    mov     [rsp + 8], rax
-    lea     rdi, [rel S_269]
-    mov     rsi, rsp
-    mov     rdx, 1
-    call    stmt_apply
+    GET_VAR     S_451
+    STORE_ARG32 0
+    APPLY_FN_N  S_269, 1
     add     rsp, 16
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
@@ -12931,83 +12190,45 @@ L_sn_528:
 
     STMT_SEP
 L_mainErr1_166:
-    lea     rdi, [rel S_51]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    lea     rdi, [rel S_454]
-    call    stmt_strval
+    GET_VAR     S_51
+    LOAD_STR    S_454
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_529
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_output
+    IS_FAIL_BRANCH  L_sn_529
+    SET_OUTPUT
     jmp     L_sn_529
 L_sn_529:
 
     STMT_SEP
-    lea     rdi, [rel S_51]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_51
     lea     rdi, [rel S_447]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_530
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_output
+    IS_FAIL_BRANCH  L_sn_530
+    SET_OUTPUT
     GOTO_ALWAYS  L_SNO_END     ; END
 L_sn_530:
 
     STMT_SEP
 L_mainErr2_167:
-    lea     rdi, [rel S_51]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
-    lea     rdi, [rel S_456]
-    call    stmt_strval
+    GET_VAR     S_51
+    LOAD_STR    S_456
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_531
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_output
+    IS_FAIL_BRANCH  L_sn_531
+    SET_OUTPUT
     jmp     L_sn_531
 L_sn_531:
 
     STMT_SEP
-    lea     rdi, [rel S_51]
-    call    stmt_get
-    mov     [rbp-16], rax
-    mov     [rbp-8], rdx
+    GET_VAR     S_51
     lea     rdi, [rel S_447]
     call    stmt_get
     mov     [rbp-32], rax
     mov     [rbp-24], rdx
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_is_fail
-    test    eax, eax
-    jnz     L_sn_532
-    mov     rdi, [rbp-32]
-    mov     rsi, [rbp-24]
-    call    stmt_output
+    IS_FAIL_BRANCH  L_sn_532
+    SET_OUTPUT
     GOTO_ALWAYS  L_SNO_END     ; END
 L_sn_532:
     GOTO_ALWAYS  L_SNO_END
@@ -18992,4 +18213,8 @@ S_455                db 109, 97, 105, 110, 69, 114, 114, 50, 0  ; "mainErr2"
 S_456                db 73, 110, 116, 101, 114, 110, 97, 108, 32, 69, 114, 114, 111, 114, 0  ; "Internal Error"
 S_457                db 38, 70, 85, 76, 76, 83, 67, 65, 78, 0  ; "&FULLSCAN"
 S_458                db 38, 77, 65, 88, 76, 78, 71, 84, 72, 0  ; "&MAXLNGTH"
-S_459                db 99, 97, 112, 0  ; "cap"
+S_459                db 67, 79, 78, 67, 65, 84, 0  ; "CONCAT"
+S_460                db 65, 76, 84, 0  ; "ALT"
+S_461                db 99, 97, 112, 0  ; "cap"
+S_462                db 38, 85, 67, 65, 83, 69, 0  ; "&UCASE"
+S_463                db 38, 76, 67, 65, 83, 69, 0  ; "&LCASE"
