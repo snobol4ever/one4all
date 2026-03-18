@@ -203,7 +203,7 @@ convention adjusted. Decide: **treat `error` as FRETURN for now, revisit.**
 ### Build + test sequence
 
 ```bash
-cd /home/claude/snobol4x/src/snoc && make clean && make
+cd /home/socrates/snobol4x/src/snoc && make clean && make
 
 # Step 1: hello world still works
 ./snoc /tmp/hello.sno > /tmp/hello.c
@@ -223,13 +223,13 @@ gcc ... -o /tmp/fn_test_bin
 /tmp/fn_test_bin   # expect: hello world
 
 # Step 3: beauty.sno
-./snoc /home/claude/snobol4corpus/programs/beauty/beauty.sno \
-    -I /home/claude/snobol4corpus/programs/inc \
+./snoc /home/socrates/snobol4corpus/programs/beauty/beauty.sno \
+    -I /home/socrates/snobol4corpus/programs/inc \
     > /tmp/beauty_snoc.c
 gcc -O0 -g /tmp/beauty_snoc.c [runtime files] -lgc -lm -w -o /tmp/beauty_bin
-/tmp/beauty_bin < /home/claude/snobol4corpus/programs/beauty/beauty.sno \
+/tmp/beauty_bin < /home/socrates/snobol4corpus/programs/beauty/beauty.sno \
     > /tmp/beauty_out.sno
-diff /home/claude/snobol4corpus/programs/beauty/beauty.sno /tmp/beauty_out.sno
+diff /home/socrates/snobol4corpus/programs/beauty/beauty.sno /tmp/beauty_out.sno
 # expect: empty diff  ← THE COMMIT
 ```
 
@@ -245,7 +245,7 @@ Claude Sonnet 4.6 writes the commit message (recorded at `c5b3e99`).
 ## §9 — Runtime build command (reference)
 
 ```bash
-RUNTIME="/home/claude/snobol4x/src/runtime"
+RUNTIME="/home/socrates/snobol4x/src/runtime"
 gcc -O0 -g "$1" \
     $RUNTIME/snobol4/snobol4.c \
     $RUNTIME/snobol4/mock_includes.c \

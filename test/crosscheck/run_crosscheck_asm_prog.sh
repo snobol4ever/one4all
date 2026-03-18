@@ -5,11 +5,11 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TINY="$(cd "$SCRIPT_DIR/../.." && pwd)"
-CORPUS="${CORPUS:-/home/claude/snobol4corpus/crosscheck/beauty}"
+CORPUS="${CORPUS:-/home/socrates/snobol4corpus/crosscheck/beauty}"
 SNO2C="$TINY/src/sno2c/sno2c"
 RT="$TINY/src/runtime"
-INC="${INC:-/home/claude/snobol4corpus/programs/inc}"
-BEAUTY="${BEAUTY:-/home/claude/snobol4corpus/programs/beauty/beauty.sno}"
+INC="${INC:-/home/socrates/snobol4corpus/programs/inc}"
+BEAUTY="${BEAUTY:-/home/socrates/snobol4corpus/programs/beauty/beauty.sno}"
 
 GREEN='\033[0;32m'; RED='\033[0;31m'; YELLOW='\033[0;33m'; RESET='\033[0m'
 PASS=0; FAIL=0; SKIP=0

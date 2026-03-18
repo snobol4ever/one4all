@@ -18,11 +18,11 @@ jumps.
 
 Reference:
     Jcon paper:  https://www2.cs.arizona.edu/icon/jcon/impl.pdf
-    ir.icn:      /home/claude/jcon/tran/ir.icn
-    irgen.icn:   /home/claude/jcon/tran/irgen.icn
-    gen_bc.icn:  /home/claude/jcon/tran/gen_bc.icn
-    gold C:      /home/claude/ByrdBox/ByrdBox/test_sno_2.c
-                 /home/claude/ByrdBox/ByrdBox/test_sno_3.c
+    ir.icn:      /home/socrates/jcon/tran/ir.icn
+    irgen.icn:   /home/socrates/jcon/tran/irgen.icn
+    gen_bc.icn:  /home/socrates/jcon/tran/gen_bc.icn
+    gold C:      /home/socrates/ByrdBox/ByrdBox/test_sno_2.c
+                 /home/socrates/ByrdBox/ByrdBox/test_sno_3.c
 """
 
 from __future__ import annotations

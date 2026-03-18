@@ -7,7 +7,7 @@
 set -euo pipefail
 
 BINARY=./beauty_full_bin
-CORPUS=/home/claude/snobol4corpus/crosscheck/beauty
+CORPUS=/home/socrates/snobol4corpus/crosscheck/beauty
 
 if [[ ! -x "$BINARY" ]]; then
     echo "ERROR: $BINARY not found or not executable. Build it first." >&2
