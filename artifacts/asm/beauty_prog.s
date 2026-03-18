@@ -423,21 +423,14 @@ L_ppArgLoop_1:
     SETUP_SUBJECT_FROM16
     jmp     P_12_α
 
-
-; SEQ α=P_12_α
-P_12_α:                    jmp     seq_l0_alpha
+P_12_α:                    jmp     seq_l0_alpha                        ; SEQ
 P_12_β:                    jmp     seq_r0_beta
-
-; POS(0)  α=seq_l0_alpha
-seq_l0_alpha:               POS_ALPHA   0, cursor, seq_r0_alpha, P_12_ω
+seq_l0_alpha:               POS_ALPHA   0, cursor, seq_r0_alpha, P_12_ω; POS(%ld)
 seq_l0_beta:                POS_BETA    cursor, P_12_ω
-
-; SPAN(" ")  α=seq_r0_alpha
 seq_r0_alpha:               SPAN_ALPHA  lit_str_1, 1, span1_saved, cursor, subject_data, subject_len_val, P_12_γ, seq_l0_beta
-
-; SPAN β=seq_r0_beta
+; SPAN α
 seq_r0_beta:                SPAN_BETA   span1_saved, cursor, seq_l0_beta
-
+; SPAN β
 
 P_12_γ:
     SET_CAPTURE S_18, cap_ppTokName_buf, cap_ppTokName_len
@@ -481,10 +474,8 @@ P_14_α:                    lea     rax, [rel nref2_gamma]
     lea     rax, [rel nref2_omega]
     mov     [P_ppTokPat_ret_omega], rax
     jmp     P_ppTokPat_alpha
-
-; REF(ppTokPat) β=P_14_β
 P_14_β:                    lea     rax, [rel nref2_gamma]
-
+             ; REF(%s)
     mov     [P_ppTokPat_ret_gamma], rax
     lea     rax, [rel nref2_omega]
     mov     [P_ppTokPat_ret_omega], rax
@@ -1276,21 +1267,14 @@ L_sn_76:
     SETUP_SUBJECT_FROM16
     jmp     P_77_α
 
-
-; SEQ α=P_77_α
-P_77_α:                    jmp     seq_l3_alpha
+P_77_α:                    jmp     seq_l3_alpha                        ; SEQ
 P_77_β:                    jmp     seq_r3_beta
-
-; POS(0)  α=seq_l3_alpha
-seq_l3_alpha:               POS_ALPHA   0, cursor, seq_r3_alpha, P_77_ω
+seq_l3_alpha:               POS_ALPHA   0, cursor, seq_r3_alpha, P_77_ω; POS(%ld)
 seq_l3_beta:                POS_BETA    cursor, P_77_ω
-
-; ANY("*-")  α=seq_r3_alpha
 seq_r3_alpha:               ANY_ALPHA   lit_str_2, 2, any4_saved, cursor, subject_data, subject_len_val, P_77_γ, seq_l3_beta
-
-; ANY β=seq_r3_beta
+; ANY α
 seq_r3_beta:                ANY_BETA    any4_saved, cursor, seq_l3_beta
-
+; ANY β
 
 P_77_γ:
     SET_CAPTURE S_18, cap_ppTokName_buf, cap_ppTokName_len
@@ -1312,21 +1296,14 @@ L_sn_77:
     SETUP_SUBJECT_FROM16
     jmp     P_78_α
 
-
-; SEQ α=P_78_α
-P_78_α:                    jmp     seq_l5_alpha
+P_78_α:                    jmp     seq_l5_alpha                        ; SEQ
 P_78_β:                    jmp     seq_r5_beta
-
-; POS(0)  α=seq_l5_alpha
-seq_l5_alpha:               POS_ALPHA   0, cursor, seq_r5_alpha, P_78_ω
+seq_l5_alpha:               POS_ALPHA   0, cursor, seq_r5_alpha, P_78_ω; POS(%ld)
 seq_l5_beta:                POS_BETA    cursor, P_78_ω
-
-; ANY("+.")  α=seq_r5_alpha
 seq_r5_alpha:               ANY_ALPHA   lit_str_3, 2, any6_saved, cursor, subject_data, subject_len_val, P_78_γ, seq_l5_beta
-
-; ANY β=seq_r5_beta
+; ANY α
 seq_r5_beta:                ANY_BETA    any6_saved, cursor, seq_l5_beta
-
+; ANY β
 
 P_78_γ:
     SET_CAPTURE S_18, cap_ppTokName_buf, cap_ppTokName_len
@@ -1370,10 +1347,8 @@ P_80_α:                    lea     rax, [rel nref7_gamma]
     lea     rax, [rel nref7_omega]
     mov     [P_ppGPat_ret_omega], rax
     jmp     P_ppGPat_alpha
-
-; REF(ppGPat) β=P_80_β
 P_80_β:                    lea     rax, [rel nref7_gamma]
-
+             ; REF(%s)
     mov     [P_ppGPat_ret_gamma], rax
     lea     rax, [rel nref7_omega]
     mov     [P_ppGPat_ret_omega], rax
@@ -1423,10 +1398,8 @@ P_82_α:                    lea     rax, [rel nref8_gamma]
     lea     rax, [rel nref8_omega]
     mov     [P_ppTrimPat_ret_omega], rax
     jmp     P_ppTrimPat_alpha
-
-; REF(ppTrimPat) β=P_82_β
 P_82_β:                    lea     rax, [rel nref8_gamma]
-
+             ; REF(%s)
     mov     [P_ppTrimPat_ret_gamma], rax
     lea     rax, [rel nref8_omega]
     mov     [P_ppTrimPat_ret_omega], rax
@@ -9052,17 +9025,11 @@ L_ss_Label_100:
     SETUP_SUBJECT_FROM16
     jmp     P_407_α
 
-
-; SEQ α=P_407_α
-P_407_α:                   jmp     seq_l9_alpha
+P_407_α:                   jmp     seq_l9_alpha                        ; SEQ
 P_407_β:                   jmp     seq_r9_beta
-
-; SEQ α=seq_l9_alpha
-seq_l9_alpha:               jmp     seq_l10_alpha
+seq_l9_alpha:               jmp     seq_l10_alpha                       ; SEQ
 seq_l9_beta:                jmp     seq_r10_beta
-
-; POS(0)  α=seq_l10_alpha
-seq_l10_alpha:              POS_ALPHA   0, cursor, seq_r10_alpha, P_407_ω
+seq_l10_alpha:              POS_ALPHA   0, cursor, seq_r10_alpha, P_407_ω; POS(%ld)
 seq_l10_beta:               POS_BETA    cursor, P_407_ω
 
 ; REF(SpecialNm) α=seq_r10_alpha
@@ -9072,10 +9039,8 @@ seq_r10_alpha:              lea     rax, [rel nref11_gamma]
     lea     rax, [rel nref11_omega]
     mov     [P_SpecialNm_ret_omega], rax
     jmp     P_SpecialNm_alpha
-
-; REF(SpecialNm) β=seq_r10_beta
 seq_r10_beta:               lea     rax, [rel nref11_gamma]
-
+            ; REF(%s)
     mov     [P_SpecialNm_ret_gamma], rax
     lea     rax, [rel nref11_omega]
     mov     [P_SpecialNm_ret_omega], rax
@@ -9085,9 +9050,7 @@ nref11_gamma:
     jmp     seq_r9_alpha
 nref11_omega:
     jmp     seq_l10_beta
-
-; RPOS(0)  α=seq_r9_alpha
-seq_r9_alpha:               RPOS_ALPHA  0, cursor, subject_len_val, P_407_γ, seq_l9_beta
+seq_r9_alpha:               RPOS_ALPHA  0, cursor, subject_len_val, P_407_γ, seq_l9_beta; RPOS(%ld)
 seq_r9_beta:                RPOS_BETA   cursor, seq_l9_beta
 
 P_407_γ:
@@ -11121,28 +11084,17 @@ L_findRefs_9_157:
     SETUP_SUBJECT_FROM16
     jmp     P_495_α
 
-
-; SEQ α=P_495_α
-P_495_α:                   jmp     seq_l12_alpha
+P_495_α:                   jmp     seq_l12_alpha                       ; SEQ
 P_495_β:                   jmp     seq_r12_beta
-
-; SEQ α=seq_l12_alpha
-seq_l12_alpha:              jmp     seq_l13_alpha
+seq_l12_alpha:              jmp     seq_l13_alpha                       ; SEQ
 seq_l12_beta:               jmp     seq_r13_beta
-
-; POS(0)  α=seq_l13_alpha
-seq_l13_alpha:              POS_ALPHA   0, cursor, seq_r13_alpha, P_495_ω
+seq_l13_alpha:              POS_ALPHA   0, cursor, seq_r13_alpha, P_495_ω; POS(%ld)
 seq_l13_beta:               POS_BETA    cursor, P_495_ω
-
-; SPAN("")  α=seq_r13_alpha
 seq_r13_alpha:              SPAN_ALPHA  lit_str_4, 0, span14_saved, cursor, subject_data, subject_len_val, seq_r12_alpha, seq_l13_beta
-
-; SPAN β=seq_r13_beta
+; SPAN α
 seq_r13_beta:               SPAN_BETA   span14_saved, cursor, seq_l13_beta
-
-
-; RPOS(0)  α=seq_r12_alpha
-seq_r12_alpha:              RPOS_ALPHA  0, cursor, subject_len_val, P_495_γ, seq_l12_beta
+; SPAN β
+seq_r12_alpha:              RPOS_ALPHA  0, cursor, subject_len_val, P_495_γ, seq_l12_beta; RPOS(%ld)
 seq_r12_beta:               RPOS_BETA   cursor, seq_l12_beta
 
 P_495_γ:
@@ -11630,21 +11582,14 @@ L_sn_517:
     SETUP_SUBJECT_FROM16
     jmp     P_518_α
 
-
-; SEQ α=P_518_α
-P_518_α:                   jmp     seq_l15_alpha
+P_518_α:                   jmp     seq_l15_alpha                       ; SEQ
 P_518_β:                   jmp     seq_r15_beta
-
-; POS(0)  α=seq_l15_alpha
-seq_l15_alpha:              POS_ALPHA   0, cursor, seq_r15_alpha, P_518_ω
+seq_l15_alpha:              POS_ALPHA   0, cursor, seq_r15_alpha, P_518_ω; POS(%ld)
 seq_l15_beta:               POS_BETA    cursor, P_518_ω
-
-; ANY("*-")  α=seq_r15_alpha
 seq_r15_alpha:              ANY_ALPHA   lit_str_2, 2, any16_saved, cursor, subject_data, subject_len_val, P_518_γ, seq_l15_beta
-
-; ANY β=seq_r15_beta
+; ANY α
 seq_r15_beta:               ANY_BETA    any16_saved, cursor, seq_l15_beta
-
+; ANY β
 
 P_518_γ:
     SET_CAPTURE S_18, cap_ppTokName_buf, cap_ppTokName_len
@@ -11724,21 +11669,14 @@ L_sn_521:
     SETUP_SUBJECT_FROM16
     jmp     P_522_α
 
-
-; SEQ α=P_522_α
-P_522_α:                   jmp     seq_l17_alpha
+P_522_α:                   jmp     seq_l17_alpha                       ; SEQ
 P_522_β:                   jmp     seq_r17_beta
-
-; POS(0)  α=seq_l17_alpha
-seq_l17_alpha:              POS_ALPHA   0, cursor, seq_r17_alpha, P_522_ω
+seq_l17_alpha:              POS_ALPHA   0, cursor, seq_r17_alpha, P_522_ω; POS(%ld)
 seq_l17_beta:               POS_BETA    cursor, P_522_ω
-
-; ANY(".+")  α=seq_r17_alpha
 seq_r17_alpha:              ANY_ALPHA   lit_str_5, 2, any18_saved, cursor, subject_data, subject_len_val, P_522_γ, seq_l17_beta
-
-; ANY β=seq_r17_beta
+; ANY α
 seq_r17_beta:               ANY_BETA    any18_saved, cursor, seq_l17_beta
-
+; ANY β
 
 P_522_γ:
     SET_CAPTURE S_18, cap_ppTokName_buf, cap_ppTokName_len
@@ -11760,21 +11698,13 @@ L_sn_522:
     SETUP_SUBJECT_FROM16
     jmp     P_523_α
 
-
-; SEQ α=P_523_α
-P_523_α:                   jmp     seq_l19_alpha
+P_523_α:                   jmp     seq_l19_alpha                       ; SEQ
 P_523_β:                   jmp     seq_r19_beta
-
-; SEQ α=seq_l19_alpha
-seq_l19_alpha:              jmp     seq_l20_alpha
+seq_l19_alpha:              jmp     seq_l20_alpha                       ; SEQ
 seq_l19_beta:               jmp     seq_r20_beta
-
-; SEQ α=seq_l20_alpha
-seq_l20_alpha:              jmp     seq_l21_alpha
+seq_l20_alpha:              jmp     seq_l21_alpha                       ; SEQ
 seq_l20_beta:               jmp     seq_r21_beta
-
-; POS(0)  α=seq_l21_alpha
-seq_l21_alpha:              POS_ALPHA   0, cursor, seq_r21_alpha, P_523_ω
+seq_l21_alpha:              POS_ALPHA   0, cursor, seq_r21_alpha, P_523_ω; POS(%ld)
 seq_l21_beta:               POS_BETA    cursor, P_523_ω
 
 ; E_INDR unresolved: Parse → ω
@@ -11784,9 +11714,7 @@ seq_r21_beta:               jmp     seq_l21_beta
 ; E_INDR unresolved: Space → ω
 seq_r20_alpha:
 seq_r20_beta:               jmp     seq_l20_beta
-
-; RPOS(0)  α=seq_r19_alpha
-seq_r19_alpha:              RPOS_ALPHA  0, cursor, subject_len_val, P_523_γ, seq_l19_beta
+seq_r19_alpha:              RPOS_ALPHA  0, cursor, subject_len_val, P_523_γ, seq_l19_beta; RPOS(%ld)
 seq_r19_beta:               RPOS_BETA   cursor, seq_l19_beta
 
 P_523_γ:
@@ -11835,21 +11763,13 @@ L_main05_165:
     SETUP_SUBJECT_FROM16
     jmp     P_526_α
 
-
-; SEQ α=P_526_α
-P_526_α:                   jmp     seq_l22_alpha
+P_526_α:                   jmp     seq_l22_alpha                       ; SEQ
 P_526_β:                   jmp     seq_r22_beta
-
-; SEQ α=seq_l22_alpha
-seq_l22_alpha:              jmp     seq_l23_alpha
+seq_l22_alpha:              jmp     seq_l23_alpha                       ; SEQ
 seq_l22_beta:               jmp     seq_r23_beta
-
-; SEQ α=seq_l23_alpha
-seq_l23_alpha:              jmp     seq_l24_alpha
+seq_l23_alpha:              jmp     seq_l24_alpha                       ; SEQ
 seq_l23_beta:               jmp     seq_r24_beta
-
-; POS(0)  α=seq_l24_alpha
-seq_l24_alpha:              POS_ALPHA   0, cursor, seq_r24_alpha, P_526_ω
+seq_l24_alpha:              POS_ALPHA   0, cursor, seq_r24_alpha, P_526_ω; POS(%ld)
 seq_l24_beta:               POS_BETA    cursor, P_526_ω
 
 ; E_INDR unresolved: Parse → ω
@@ -11859,9 +11779,7 @@ seq_r24_beta:               jmp     seq_l24_beta
 ; E_INDR unresolved: Space → ω
 seq_r23_alpha:
 seq_r23_beta:               jmp     seq_l23_beta
-
-; RPOS(0)  α=seq_r22_alpha
-seq_r22_alpha:              RPOS_ALPHA  0, cursor, subject_len_val, P_526_γ, seq_l22_beta
+seq_r22_alpha:              RPOS_ALPHA  0, cursor, subject_len_val, P_526_γ, seq_l22_beta; RPOS(%ld)
 seq_r22_beta:               RPOS_BETA   cursor, seq_l22_beta
 
 P_526_γ:
@@ -12024,19 +11942,12 @@ patdef_ppArgs_omega:
 
 ; ============ Named pattern: ppTokPat ============
 ; P_ppTokPat_alpha (α entry)
-
-; SEQ α=P_ppTokPat_alpha
-P_ppTokPat_alpha:           jmp     seq_l25_alpha
+P_ppTokPat_alpha:           jmp     seq_l25_alpha                       ; SEQ
 P_ppTokPat_beta:            jmp     seq_r25_beta
-
-; SEQ α=seq_l25_alpha
-seq_l25_alpha:              jmp     seq_l26_alpha
+seq_l25_alpha:              jmp     seq_l26_alpha                       ; SEQ
 seq_l25_beta:               jmp     seq_r26_beta
-
-; LIT("--")  α=seq_l26_alpha
-seq_l26_alpha:              LIT_ALPHA   lit_str_6, 2, seq_l26_alpha_saved, cursor, subject_data, subject_len_val, seq_r26_alpha, patdef_ppTokPat_omega
-; LIT β
-seq_l26_beta:               LIT_BETA    seq_l26_alpha_saved, cursor, patdef_ppTokPat_omega
+seq_l26_alpha:              LIT_ALPHA   lit_str_6, 2, seq_l26_alpha_saved, cursor, subject_data, subject_len_val, seq_r26_alpha, patdef_ppTokPat_omega; LIT α
+seq_l26_beta:               LIT_BETA    seq_l26_alpha_saved, cursor, patdef_ppTokPat_omega; LIT β
 
 ; DOL(ppTokName $  ppTokName)  α=seq_r26_alpha
 seq_r26_alpha:              mov     rax, [cursor]
@@ -12044,33 +11955,19 @@ seq_r26_alpha:              mov     rax, [cursor]
     mov     [dol_entry_ppTokName], rax
     jmp     dol27_child_alpha
 seq_r26_beta:               jmp     dol27_child_beta
-
-; ALT α=dol27_child_alpha
-dol27_child_alpha:          mov     rax, [cursor]
-
-    mov     [alt28_cur_save], rax
+dol27_child_alpha:          ALT_SAVE_CURSOR     alt28_cur_save, cursor  ; ALT α — save cursor, try left
     jmp     alt_l28_alpha
-dol27_child_beta:           jmp     alt_r28_beta
-
-; BREAK("= ")  α=alt_l28_alpha
+dol27_child_beta:           SEQ_BETA    alt_r28_beta                    ; ALT β — resume right
 alt_l28_alpha:              BREAK_ALPHA lit_str_7, 2, brk29_saved, cursor, subject_data, subject_len_val, dol27_gamma, alt28_left_omega
-
-; BREAK β=alt_l28_beta
+; BREAK α
 alt_l28_beta:               BREAK_BETA  brk29_saved, cursor, alt28_left_omega
-
-
-; ALT left_ω trampoline
-alt28_left_omega:           mov     rax, [alt28_cur_save]
-
-    mov     [cursor], rax
+; BREAK β
+alt28_left_omega:           ALT_RESTORE_CURSOR  alt28_cur_save, cursor  ; ALT left_ω — restore cursor, try right
     jmp     alt_r28_alpha
-
-; REM  α=alt_r28_alpha
 alt_r28_alpha:              REM_ALPHA   rem30_saved, cursor, subject_len_val, dol27_gamma
-
-; REM β=alt_r28_beta
+; REM
 alt_r28_beta:               REM_BETA    rem30_saved, cursor, dol27_omega
-
+; REM β
 
 ; DOL γ — capture span into cap_ppTokName_buf
 dol27_gamma:
@@ -12084,25 +11981,14 @@ dol27_gamma:
     mov     rcx, rax
     rep     movsb
     jmp     seq_r25_alpha
-
-; DOL ω — child failed, no capture
-dol27_omega:                jmp     seq_l26_beta
-
-; ALT α=seq_r25_alpha
-seq_r25_alpha:              mov     rax, [cursor]
-
-    mov     [alt31_cur_save], rax
+dol27_omega:                jmp     seq_l26_beta                        ; DOL ω — child failed, no capture
+seq_r25_alpha:              ALT_SAVE_CURSOR     alt31_cur_save, cursor  ; ALT α — save cursor, try left
     jmp     alt_l31_alpha
-seq_r25_beta:               jmp     alt_r31_beta
-
-; SEQ α=alt_l31_alpha
-alt_l31_alpha:              jmp     seq_l32_alpha
+seq_r25_beta:               SEQ_BETA    alt_r31_beta                    ; ALT β — resume right
+alt_l31_alpha:              jmp     seq_l32_alpha                       ; SEQ
 alt_l31_beta:               jmp     seq_r32_beta
-
-; LIT("=")  α=seq_l32_alpha
-seq_l32_alpha:              LIT_ALPHA1  61, seq_l32_alpha_saved, cursor, subject_data, subject_len_val, seq_r32_alpha, alt31_left_omega
-; LIT β
-seq_l32_beta:               LIT_BETA    seq_l32_alpha_saved, cursor, alt31_left_omega
+seq_l32_alpha:              LIT_ALPHA1  61, seq_l32_alpha_saved, cursor, subject_data, subject_len_val, seq_r32_alpha, alt31_left_omega; LIT α
+seq_l32_beta:               LIT_BETA    seq_l32_alpha_saved, cursor, alt31_left_omega; LIT β
 
 ; DOL(ppTokVal $  ppTokVal)  α=seq_r32_alpha
 seq_r32_alpha:              mov     rax, [cursor]
@@ -12110,33 +11996,19 @@ seq_r32_alpha:              mov     rax, [cursor]
     mov     [dol_entry_ppTokVal], rax
     jmp     dol33_child_alpha
 seq_r32_beta:               jmp     dol33_child_beta
-
-; ALT α=dol33_child_alpha
-dol33_child_alpha:          mov     rax, [cursor]
-
-    mov     [alt34_cur_save], rax
+dol33_child_alpha:          ALT_SAVE_CURSOR     alt34_cur_save, cursor  ; ALT α — save cursor, try left
     jmp     alt_l34_alpha
-dol33_child_beta:           jmp     alt_r34_beta
-
-; BREAK(" ")  α=alt_l34_alpha
+dol33_child_beta:           SEQ_BETA    alt_r34_beta                    ; ALT β — resume right
 alt_l34_alpha:              BREAK_ALPHA lit_str_1, 1, brk35_saved, cursor, subject_data, subject_len_val, dol33_gamma, alt34_left_omega
-
-; BREAK β=alt_l34_beta
+; BREAK α
 alt_l34_beta:               BREAK_BETA  brk35_saved, cursor, alt34_left_omega
-
-
-; ALT left_ω trampoline
-alt34_left_omega:           mov     rax, [alt34_cur_save]
-
-    mov     [cursor], rax
+; BREAK β
+alt34_left_omega:           ALT_RESTORE_CURSOR  alt34_cur_save, cursor  ; ALT left_ω — restore cursor, try right
     jmp     alt_r34_alpha
-
-; REM  α=alt_r34_alpha
 alt_r34_alpha:              REM_ALPHA   rem36_saved, cursor, subject_len_val, dol33_gamma
-
-; REM β=alt_r34_beta
+; REM
 alt_r34_beta:               REM_BETA    rem36_saved, cursor, dol33_omega
-
+; REM β
 
 ; DOL γ — capture span into cap_ppTokVal_buf
 dol33_gamma:
@@ -12150,14 +12022,8 @@ dol33_gamma:
     mov     rcx, rax
     rep     movsb
     jmp     patdef_ppTokPat_gamma
-
-; DOL ω — child failed, no capture
-dol33_omega:                jmp     seq_l32_beta
-
-; ALT left_ω trampoline
-alt31_left_omega:           mov     rax, [alt31_cur_save]
-
-    mov     [cursor], rax
+dol33_omega:                jmp     seq_l32_beta                        ; DOL ω — child failed, no capture
+alt31_left_omega:           ALT_RESTORE_CURSOR  alt31_cur_save, cursor  ; ALT left_ω — restore cursor, try right
     jmp     alt_r31_alpha
 
 ; DOL(ppTokVal $  ppTokVal)  α=alt_r31_alpha
@@ -12166,11 +12032,8 @@ alt_r31_alpha:              mov     rax, [cursor]
     mov     [dol_entry_ppTokVal], rax
     jmp     dol37_child_alpha
 alt_r31_beta:               jmp     dol37_child_beta
-
-; LIT("")  α=dol37_child_alpha
-dol37_child_alpha:          LIT_ALPHA   lit_str_4, 0, dol37_child_alpha_saved, cursor, subject_data, subject_len_val, dol37_gamma, dol37_omega
-; LIT β
-dol37_child_beta:           LIT_BETA    dol37_child_alpha_saved, cursor, dol37_omega
+dol37_child_alpha:          LIT_ALPHA   lit_str_4, 0, dol37_child_alpha_saved, cursor, subject_data, subject_len_val, dol37_gamma, dol37_omega; LIT α
+dol37_child_beta:           LIT_BETA    dol37_child_alpha_saved, cursor, dol37_omega; LIT β
 
 ; DOL γ — capture span into cap_ppTokVal_buf
 dol37_gamma:
@@ -12184,9 +12047,7 @@ dol37_gamma:
     mov     rcx, rax
     rep     movsb
     jmp     patdef_ppTokPat_gamma
-
-; DOL ω — child failed, no capture
-dol37_omega:                jmp     seq_l25_beta
+dol37_omega:                jmp     seq_l25_beta                        ; DOL ω — child failed, no capture
 
 patdef_ppTokPat_gamma:
     jmp     [P_ppTokPat_ret_gamma]
@@ -12219,109 +12080,53 @@ patdef_ppTab_omega:
 
 ; ============ Named pattern: ppGSfx ============
 ; P_ppGSfx_alpha (α entry)
-
-; SEQ α=P_ppGSfx_alpha
-P_ppGSfx_alpha:             jmp     seq_l38_alpha
+P_ppGSfx_alpha:             jmp     seq_l38_alpha                       ; SEQ
 P_ppGSfx_beta:              jmp     seq_r38_beta
-
-; SEQ α=seq_l38_alpha
-seq_l38_alpha:              jmp     seq_l39_alpha
+seq_l38_alpha:              jmp     seq_l39_alpha                       ; SEQ
 seq_l38_beta:               jmp     seq_r39_beta
-
-; SEQ α=seq_l39_alpha
-seq_l39_alpha:              jmp     seq_l40_alpha
+seq_l39_alpha:              jmp     seq_l40_alpha                       ; SEQ
 seq_l39_beta:               jmp     seq_r40_beta
-
-; SEQ α=seq_l40_alpha
-seq_l40_alpha:              jmp     seq_l41_alpha
+seq_l40_alpha:              jmp     seq_l41_alpha                       ; SEQ
 seq_l40_beta:               jmp     seq_r41_beta
-
-; ALT α=seq_l41_alpha
-seq_l41_alpha:              mov     rax, [cursor]
-
-    mov     [alt42_cur_save], rax
+seq_l41_alpha:              ALT_SAVE_CURSOR     alt42_cur_save, cursor  ; ALT α — save cursor, try left
     jmp     alt_l42_alpha
-seq_l41_beta:               jmp     alt_r42_beta
-
-; SPAN("")  α=alt_l42_alpha
+seq_l41_beta:               SEQ_BETA    alt_r42_beta                    ; ALT β — resume right
 alt_l42_alpha:              SPAN_ALPHA  lit_str_4, 0, span43_saved, cursor, subject_data, subject_len_val, seq_r41_alpha, alt42_left_omega
-
-; SPAN β=alt_l42_beta
+; SPAN α
 alt_l42_beta:               SPAN_BETA   span43_saved, cursor, alt42_left_omega
-
-
-; ALT left_ω trampoline
-alt42_left_omega:           mov     rax, [alt42_cur_save]
-
-    mov     [cursor], rax
+; SPAN β
+alt42_left_omega:           ALT_RESTORE_CURSOR  alt42_cur_save, cursor  ; ALT left_ω — restore cursor, try right
     jmp     alt_r42_alpha
-
-; LIT("")  α=alt_r42_alpha
-alt_r42_alpha:              LIT_ALPHA   lit_str_4, 0, alt_r42_alpha_saved, cursor, subject_data, subject_len_val, seq_r41_alpha, patdef_ppGSfx_omega
-; LIT β
-alt_r42_beta:               LIT_BETA    alt_r42_alpha_saved, cursor, patdef_ppGSfx_omega
-
-; LIT(":")  α=seq_r41_alpha
-seq_r41_alpha:              LIT_ALPHA1  58, seq_r41_alpha_saved, cursor, subject_data, subject_len_val, seq_r40_alpha, seq_l41_beta
-; LIT β
-seq_r41_beta:               LIT_BETA    seq_r41_alpha_saved, cursor, seq_l41_beta
-
-; ALT α=seq_r40_alpha
-seq_r40_alpha:              mov     rax, [cursor]
-
-    mov     [alt44_cur_save], rax
+alt_r42_alpha:              LIT_ALPHA   lit_str_4, 0, alt_r42_alpha_saved, cursor, subject_data, subject_len_val, seq_r41_alpha, patdef_ppGSfx_omega; LIT α
+alt_r42_beta:               LIT_BETA    alt_r42_alpha_saved, cursor, patdef_ppGSfx_omega; LIT β
+seq_r41_alpha:              LIT_ALPHA1  58, seq_r41_alpha_saved, cursor, subject_data, subject_len_val, seq_r40_alpha, seq_l41_beta; LIT α
+seq_r41_beta:               LIT_BETA    seq_r41_alpha_saved, cursor, seq_l41_beta; LIT β
+seq_r40_alpha:              ALT_SAVE_CURSOR     alt44_cur_save, cursor  ; ALT α — save cursor, try left
     jmp     alt_l44_alpha
-seq_r40_beta:               jmp     alt_r44_beta
-
-; ANY("SF")  α=alt_l44_alpha
+seq_r40_beta:               SEQ_BETA    alt_r44_beta                    ; ALT β — resume right
 alt_l44_alpha:              ANY_ALPHA   lit_str_8, 2, any45_saved, cursor, subject_data, subject_len_val, seq_r39_alpha, alt44_left_omega
-
-; ANY β=alt_l44_beta
+; ANY α
 alt_l44_beta:               ANY_BETA    any45_saved, cursor, alt44_left_omega
-
-
-; ALT left_ω trampoline
-alt44_left_omega:           mov     rax, [alt44_cur_save]
-
-    mov     [cursor], rax
+; ANY β
+alt44_left_omega:           ALT_RESTORE_CURSOR  alt44_cur_save, cursor  ; ALT left_ω — restore cursor, try right
     jmp     alt_r44_alpha
-
-; LIT("")  α=alt_r44_alpha
-alt_r44_alpha:              LIT_ALPHA   lit_str_4, 0, alt_r44_alpha_saved, cursor, subject_data, subject_len_val, seq_r39_alpha, seq_l40_beta
-; LIT β
-alt_r44_beta:               LIT_BETA    alt_r44_alpha_saved, cursor, seq_l40_beta
-
-; ALT α=seq_r39_alpha
-seq_r39_alpha:              mov     rax, [cursor]
-
-    mov     [alt46_cur_save], rax
+alt_r44_alpha:              LIT_ALPHA   lit_str_4, 0, alt_r44_alpha_saved, cursor, subject_data, subject_len_val, seq_r39_alpha, seq_l40_beta; LIT α
+alt_r44_beta:               LIT_BETA    alt_r44_alpha_saved, cursor, seq_l40_beta; LIT β
+seq_r39_alpha:              ALT_SAVE_CURSOR     alt46_cur_save, cursor  ; ALT α — save cursor, try left
     jmp     alt_l46_alpha
-seq_r39_beta:               jmp     alt_r46_beta
-
-; ANY("(<")  α=alt_l46_alpha
+seq_r39_beta:               SEQ_BETA    alt_r46_beta                    ; ALT β — resume right
 alt_l46_alpha:              ANY_ALPHA   lit_str_9, 2, any47_saved, cursor, subject_data, subject_len_val, seq_r38_alpha, alt46_left_omega
-
-; ANY β=alt_l46_beta
+; ANY α
 alt_l46_beta:               ANY_BETA    any47_saved, cursor, alt46_left_omega
-
-
-; ALT left_ω trampoline
-alt46_left_omega:           mov     rax, [alt46_cur_save]
-
-    mov     [cursor], rax
+; ANY β
+alt46_left_omega:           ALT_RESTORE_CURSOR  alt46_cur_save, cursor  ; ALT left_ω — restore cursor, try right
     jmp     alt_r46_alpha
-
-; LIT("")  α=alt_r46_alpha
-alt_r46_alpha:              LIT_ALPHA   lit_str_4, 0, alt_r46_alpha_saved, cursor, subject_data, subject_len_val, seq_r38_alpha, seq_l39_beta
-; LIT β
-alt_r46_beta:               LIT_BETA    alt_r46_alpha_saved, cursor, seq_l39_beta
-
-; REM  α=seq_r38_alpha
+alt_r46_alpha:              LIT_ALPHA   lit_str_4, 0, alt_r46_alpha_saved, cursor, subject_data, subject_len_val, seq_r38_alpha, seq_l39_beta; LIT α
+alt_r46_beta:               LIT_BETA    alt_r46_alpha_saved, cursor, seq_l39_beta; LIT β
 seq_r38_alpha:              REM_ALPHA   rem48_saved, cursor, subject_len_val, patdef_ppGSfx_gamma
-
-; REM β=seq_r38_beta
+; REM
 seq_r38_beta:               REM_BETA    rem48_saved, cursor, seq_l38_beta
-
+; REM β
 
 patdef_ppGSfx_gamma:
     jmp     [P_ppGSfx_ret_gamma]
@@ -12330,9 +12135,7 @@ patdef_ppGSfx_omega:
 
 ; ============ Named pattern: ppGPat ============
 ; P_ppGPat_alpha (α entry)
-
-; SEQ α=P_ppGPat_alpha
-P_ppGPat_alpha:             jmp     seq_l49_alpha
+P_ppGPat_alpha:             jmp     seq_l49_alpha                       ; SEQ
 P_ppGPat_beta:              jmp     seq_r49_beta
 
 ; DOL(ppGCon $  ppGCon)  α=seq_l49_alpha
@@ -12341,13 +12144,10 @@ seq_l49_alpha:              mov     rax, [cursor]
     mov     [dol_entry_ppGCon], rax
     jmp     dol50_child_alpha
 seq_l49_beta:               jmp     dol50_child_beta
-
-; BREAK(":")  α=dol50_child_alpha
 dol50_child_alpha:          BREAK_ALPHA lit_str_10, 1, brk51_saved, cursor, subject_data, subject_len_val, dol50_gamma, dol50_omega
-
-; BREAK β=dol50_child_beta
+; BREAK α
 dol50_child_beta:           BREAK_BETA  brk51_saved, cursor, dol50_omega
-
+; BREAK β
 
 ; DOL γ — capture span into cap_ppGCon_buf
 dol50_gamma:
@@ -12361,9 +12161,7 @@ dol50_gamma:
     mov     rcx, rax
     rep     movsb
     jmp     seq_r49_alpha
-
-; DOL ω — child failed, no capture
-dol50_omega:                jmp     patdef_ppGPat_omega
+dol50_omega:                jmp     patdef_ppGPat_omega                 ; DOL ω — child failed, no capture
 
 ; REF(ppGSfx) α=seq_r49_alpha
 seq_r49_alpha:              lea     rax, [rel nref52_gamma]
@@ -12372,10 +12170,8 @@ seq_r49_alpha:              lea     rax, [rel nref52_gamma]
     lea     rax, [rel nref52_omega]
     mov     [P_ppGSfx_ret_omega], rax
     jmp     P_ppGSfx_alpha
-
-; REF(ppGSfx) β=seq_r49_beta
 seq_r49_beta:               lea     rax, [rel nref52_gamma]
-
+            ; REF(%s)
     mov     [P_ppGSfx_ret_gamma], rax
     lea     rax, [rel nref52_omega]
     mov     [P_ppGSfx_ret_omega], rax
@@ -12400,20 +12196,13 @@ P_ppTrimPat_alpha:          mov     rax, [cursor]
     mov     [dol_entry_ppDrop], rax
     jmp     dol53_child_alpha
 P_ppTrimPat_beta:           jmp     dol53_child_beta
-
-; SEQ α=dol53_child_alpha
-dol53_child_alpha:          jmp     seq_l54_alpha
+dol53_child_alpha:          jmp     seq_l54_alpha                       ; SEQ
 dol53_child_beta:           jmp     seq_r54_beta
-
-; SPAN("")  α=seq_l54_alpha
 seq_l54_alpha:              SPAN_ALPHA  lit_str_4, 0, span55_saved, cursor, subject_data, subject_len_val, seq_r54_alpha, dol53_omega
-
-; SPAN β=seq_l54_beta
+; SPAN α
 seq_l54_beta:               SPAN_BETA   span55_saved, cursor, dol53_omega
-
-
-; RPOS(0)  α=seq_r54_alpha
-seq_r54_alpha:              RPOS_ALPHA  0, cursor, subject_len_val, dol53_gamma, seq_l54_beta
+; SPAN β
+seq_r54_alpha:              RPOS_ALPHA  0, cursor, subject_len_val, dol53_gamma, seq_l54_beta; RPOS(%ld)
 seq_r54_beta:               RPOS_BETA   cursor, seq_l54_beta
 
 ; DOL γ — capture span into cap_ppDrop_buf
@@ -12428,9 +12217,7 @@ dol53_gamma:
     mov     rcx, rax
     rep     movsb
     jmp     patdef_ppTrimPat_gamma
-
-; DOL ω — child failed, no capture
-dol53_omega:                jmp     patdef_ppTrimPat_omega
+dol53_omega:                jmp     patdef_ppTrimPat_omega              ; DOL ω — child failed, no capture
 
 patdef_ppTrimPat_gamma:
     jmp     [P_ppTrimPat_ret_gamma]
@@ -12463,28 +12250,18 @@ patdef_ppWArr_omega:
 
 ; ============ Named pattern: ppTmpFile ============
 ; P_ppTmpFile_alpha (α entry)
-
-; SEQ α=P_ppTmpFile_alpha
-P_ppTmpFile_alpha:          jmp     seq_l56_alpha
+P_ppTmpFile_alpha:          jmp     seq_l56_alpha                       ; SEQ
 P_ppTmpFile_beta:           jmp     seq_r56_beta
-
-; SEQ α=seq_l56_alpha
-seq_l56_alpha:              jmp     seq_l57_alpha
+seq_l56_alpha:              jmp     seq_l57_alpha                       ; SEQ
 seq_l56_beta:               jmp     seq_r57_beta
-
-; LIT("/tmp/beauty_auto_")  α=seq_l57_alpha
-seq_l57_alpha:              LIT_ALPHA   lit_str_11, 17, seq_l57_alpha_saved, cursor, subject_data, subject_len_val, seq_r57_alpha, patdef_ppTmpFile_omega
-; LIT β
-seq_l57_beta:               LIT_BETA    seq_l57_alpha_saved, cursor, patdef_ppTmpFile_omega
+seq_l57_alpha:              LIT_ALPHA   lit_str_11, 17, seq_l57_alpha_saved, cursor, subject_data, subject_len_val, seq_r57_alpha, patdef_ppTmpFile_omega; LIT α
+seq_l57_beta:               LIT_BETA    seq_l57_alpha_saved, cursor, patdef_ppTmpFile_omega; LIT β
 
 ; UNIMPLEMENTED: HOST() → ω
 seq_r57_alpha:
 seq_r57_beta:               jmp     seq_l57_beta
-
-; LIT(".sno")  α=seq_r56_alpha
-seq_r56_alpha:              LIT_ALPHA   lit_str_12, 4, seq_r56_alpha_saved, cursor, subject_data, subject_len_val, patdef_ppTmpFile_gamma, seq_l56_beta
-; LIT β
-seq_r56_beta:               LIT_BETA    seq_r56_alpha_saved, cursor, seq_l56_beta
+seq_r56_alpha:              LIT_ALPHA   lit_str_12, 4, seq_r56_alpha_saved, cursor, subject_data, subject_len_val, patdef_ppTmpFile_gamma, seq_l56_beta; LIT α
+seq_r56_beta:               LIT_BETA    seq_r56_alpha_saved, cursor, seq_l56_beta; LIT β
 
 patdef_ppTmpFile_gamma:
     jmp     [P_ppTmpFile_ret_gamma]
@@ -12513,10 +12290,8 @@ P_ppTmp_alpha:              lea     rax, [rel nref58_gamma]
     lea     rax, [rel nref58_omega]
     mov     [P_ppLn_ret_omega], rax
     jmp     P_ppLn_alpha
-
-; REF(ppLn) β=P_ppTmp_beta
 P_ppTmp_beta:               lea     rax, [rel nref58_gamma]
-
+            ; REF(%s)
     mov     [P_ppLn_ret_gamma], rax
     lea     rax, [rel nref58_omega]
     mov     [P_ppLn_ret_omega], rax
@@ -12558,13 +12333,9 @@ patdef_ppW_omega:
 
 ; ============ Named pattern: ppStmt ============
 ; P_ppStmt_alpha (α entry)
-
-; SEQ α=P_ppStmt_alpha
-P_ppStmt_alpha:             jmp     seq_l59_alpha
+P_ppStmt_alpha:             jmp     seq_l59_alpha                       ; SEQ
 P_ppStmt_beta:              jmp     seq_r59_beta
-
-; SEQ α=seq_l59_alpha
-seq_l59_alpha:              jmp     seq_l60_alpha
+seq_l59_alpha:              jmp     seq_l60_alpha                       ; SEQ
 seq_l59_beta:               jmp     seq_r60_beta
 
 ; REF(ppStmt) α=seq_l60_alpha
@@ -12574,10 +12345,8 @@ seq_l60_alpha:              lea     rax, [rel nref61_gamma]
     lea     rax, [rel nref61_omega]
     mov     [P_ppStmt_ret_omega], rax
     jmp     P_ppStmt_alpha
-
-; REF(ppStmt) β=seq_l60_beta
 seq_l60_beta:               lea     rax, [rel nref61_gamma]
-
+            ; REF(%s)
     mov     [P_ppStmt_ret_gamma], rax
     lea     rax, [rel nref61_omega]
     mov     [P_ppStmt_ret_omega], rax
@@ -12587,11 +12356,8 @@ nref61_gamma:
     jmp     seq_r60_alpha
 nref61_omega:
     jmp     patdef_ppStmt_omega
-
-; LIT(" ")  α=seq_r60_alpha
-seq_r60_alpha:              LIT_ALPHA1  32, seq_r60_alpha_saved, cursor, subject_data, subject_len_val, seq_r59_alpha, seq_l60_beta
-; LIT β
-seq_r60_beta:               LIT_BETA    seq_r60_alpha_saved, cursor, seq_l60_beta
+seq_r60_alpha:              LIT_ALPHA1  32, seq_r60_alpha_saved, cursor, subject_data, subject_len_val, seq_r59_alpha, seq_l60_beta; LIT α
+seq_r60_beta:               LIT_BETA    seq_r60_alpha_saved, cursor, seq_l60_beta; LIT β
 
 ; REF(ppLn) α=seq_r59_alpha
 seq_r59_alpha:              lea     rax, [rel nref62_gamma]
@@ -12600,10 +12366,8 @@ seq_r59_alpha:              lea     rax, [rel nref62_gamma]
     lea     rax, [rel nref62_omega]
     mov     [P_ppLn_ret_omega], rax
     jmp     P_ppLn_alpha
-
-; REF(ppLn) β=seq_r59_beta
 seq_r59_beta:               lea     rax, [rel nref62_gamma]
-
+            ; REF(%s)
     mov     [P_ppLn_ret_gamma], rax
     lea     rax, [rel nref62_omega]
     mov     [P_ppLn_ret_omega], rax
@@ -12621,9 +12385,7 @@ patdef_ppStmt_omega:
 
 ; ============ Named pattern: ppI ============
 ; P_ppI_alpha (α entry)
-
-; SEQ α=P_ppI_alpha
-P_ppI_alpha:                jmp     seq_l63_alpha
+P_ppI_alpha:                jmp     seq_l63_alpha                       ; SEQ
 P_ppI_beta:                 jmp     seq_r63_beta
 
 ; UNIMPLEMENTED: LT() → ω
@@ -12649,10 +12411,8 @@ P_ppJ_alpha:                lea     rax, [rel nref64_gamma]
     lea     rax, [rel nref64_omega]
     mov     [P_ppJ1_ret_omega], rax
     jmp     P_ppJ1_alpha
-
-; REF(ppJ1) β=P_ppJ_beta
 P_ppJ_beta:                 lea     rax, [rel nref64_gamma]
-
+            ; REF(%s)
     mov     [P_ppJ1_ret_gamma], rax
     lea     rax, [rel nref64_omega]
     mov     [P_ppJ1_ret_omega], rax
@@ -12694,13 +12454,10 @@ patdef_ppJ1_omega:
 
 ; ============ Named pattern: Integer ============
 ; P_Integer_alpha (α entry)
-
-; SPAN("")  α=P_Integer_alpha
 P_Integer_alpha:            SPAN_ALPHA  lit_str_4, 0, span65_saved, cursor, subject_data, subject_len_val, patdef_Integer_gamma, patdef_Integer_omega
-
-; SPAN β=P_Integer_beta
+; SPAN α
 P_Integer_beta:             SPAN_BETA   span65_saved, cursor, patdef_Integer_omega
-
+; SPAN β
 
 patdef_Integer_gamma:
     jmp     [P_Integer_ret_gamma]
@@ -12709,31 +12466,18 @@ patdef_Integer_omega:
 
 ; ============ Named pattern: DQ ============
 ; P_DQ_alpha (α entry)
-
-; SEQ α=P_DQ_alpha
-P_DQ_alpha:                 jmp     seq_l66_alpha
+P_DQ_alpha:                 jmp     seq_l66_alpha                       ; SEQ
 P_DQ_beta:                  jmp     seq_r66_beta
-
-; SEQ α=seq_l66_alpha
-seq_l66_alpha:              jmp     seq_l67_alpha
+seq_l66_alpha:              jmp     seq_l67_alpha                       ; SEQ
 seq_l66_beta:               jmp     seq_r67_beta
-
-; LIT(""")  α=seq_l67_alpha
-seq_l67_alpha:              LIT_ALPHA1  34, seq_l67_alpha_saved, cursor, subject_data, subject_len_val, seq_r67_alpha, patdef_DQ_omega
-; LIT β
-seq_l67_beta:               LIT_BETA    seq_l67_alpha_saved, cursor, patdef_DQ_omega
-
-; BREAK("")  α=seq_r67_alpha
+seq_l67_alpha:              LIT_ALPHA1  34, seq_l67_alpha_saved, cursor, subject_data, subject_len_val, seq_r67_alpha, patdef_DQ_omega; LIT α
+seq_l67_beta:               LIT_BETA    seq_l67_alpha_saved, cursor, patdef_DQ_omega; LIT β
 seq_r67_alpha:              BREAK_ALPHA lit_str_4, 0, brk68_saved, cursor, subject_data, subject_len_val, seq_r66_alpha, seq_l67_beta
-
-; BREAK β=seq_r67_beta
+; BREAK α
 seq_r67_beta:               BREAK_BETA  brk68_saved, cursor, seq_l67_beta
-
-
-; LIT(""")  α=seq_r66_alpha
-seq_r66_alpha:              LIT_ALPHA1  34, seq_r66_alpha_saved, cursor, subject_data, subject_len_val, patdef_DQ_gamma, seq_l66_beta
-; LIT β
-seq_r66_beta:               LIT_BETA    seq_r66_alpha_saved, cursor, seq_l66_beta
+; BREAK β
+seq_r66_alpha:              LIT_ALPHA1  34, seq_r66_alpha_saved, cursor, subject_data, subject_len_val, patdef_DQ_gamma, seq_l66_beta; LIT α
+seq_r66_beta:               LIT_BETA    seq_r66_alpha_saved, cursor, seq_l66_beta; LIT β
 
 patdef_DQ_gamma:
     jmp     [P_DQ_ret_gamma]
@@ -12742,31 +12486,18 @@ patdef_DQ_omega:
 
 ; ============ Named pattern: SQ ============
 ; P_SQ_alpha (α entry)
-
-; SEQ α=P_SQ_alpha
-P_SQ_alpha:                 jmp     seq_l69_alpha
+P_SQ_alpha:                 jmp     seq_l69_alpha                       ; SEQ
 P_SQ_beta:                  jmp     seq_r69_beta
-
-; SEQ α=seq_l69_alpha
-seq_l69_alpha:              jmp     seq_l70_alpha
+seq_l69_alpha:              jmp     seq_l70_alpha                       ; SEQ
 seq_l69_beta:               jmp     seq_r70_beta
-
-; LIT("'")  α=seq_l70_alpha
-seq_l70_alpha:              LIT_ALPHA1  39, seq_l70_alpha_saved, cursor, subject_data, subject_len_val, seq_r70_alpha, patdef_SQ_omega
-; LIT β
-seq_l70_beta:               LIT_BETA    seq_l70_alpha_saved, cursor, patdef_SQ_omega
-
-; BREAK("")  α=seq_r70_alpha
+seq_l70_alpha:              LIT_ALPHA1  39, seq_l70_alpha_saved, cursor, subject_data, subject_len_val, seq_r70_alpha, patdef_SQ_omega; LIT α
+seq_l70_beta:               LIT_BETA    seq_l70_alpha_saved, cursor, patdef_SQ_omega; LIT β
 seq_r70_alpha:              BREAK_ALPHA lit_str_4, 0, brk71_saved, cursor, subject_data, subject_len_val, seq_r69_alpha, seq_l70_beta
-
-; BREAK β=seq_r70_beta
+; BREAK α
 seq_r70_beta:               BREAK_BETA  brk71_saved, cursor, seq_l70_beta
-
-
-; LIT("'")  α=seq_r69_alpha
-seq_r69_alpha:              LIT_ALPHA1  39, seq_r69_alpha_saved, cursor, subject_data, subject_len_val, patdef_SQ_gamma, seq_l69_beta
-; LIT β
-seq_r69_beta:               LIT_BETA    seq_r69_alpha_saved, cursor, seq_l69_beta
+; BREAK β
+seq_r69_alpha:              LIT_ALPHA1  39, seq_r69_alpha_saved, cursor, subject_data, subject_len_val, patdef_SQ_gamma, seq_l69_beta; LIT α
+seq_r69_beta:               LIT_BETA    seq_r69_alpha_saved, cursor, seq_l69_beta; LIT β
 
 patdef_SQ_gamma:
     jmp     [P_SQ_ret_gamma]
@@ -12775,13 +12506,9 @@ patdef_SQ_omega:
 
 ; ============ Named pattern: String ============
 ; P_String_alpha (α entry)
-
-; ALT α=P_String_alpha
-P_String_alpha:             mov     rax, [cursor]
-
-    mov     [alt72_cur_save], rax
+P_String_alpha:             ALT_SAVE_CURSOR     alt72_cur_save, cursor  ; ALT α — save cursor, try left
     jmp     alt_l72_alpha
-P_String_beta:              jmp     alt_r72_beta
+P_String_beta:              SEQ_BETA    alt_r72_beta                    ; ALT β — resume right
 
 ; REF(SQ) α=alt_l72_alpha
 alt_l72_alpha:              lea     rax, [rel nref73_gamma]
@@ -12790,10 +12517,8 @@ alt_l72_alpha:              lea     rax, [rel nref73_gamma]
     lea     rax, [rel nref73_omega]
     mov     [P_SQ_ret_omega], rax
     jmp     P_SQ_alpha
-
-; REF(SQ) β=alt_l72_beta
 alt_l72_beta:               lea     rax, [rel nref73_gamma]
-
+            ; REF(%s)
     mov     [P_SQ_ret_gamma], rax
     lea     rax, [rel nref73_omega]
     mov     [P_SQ_ret_omega], rax
@@ -12803,11 +12528,7 @@ nref73_gamma:
     jmp     patdef_String_gamma
 nref73_omega:
     jmp     alt72_left_omega
-
-; ALT left_ω trampoline
-alt72_left_omega:           mov     rax, [alt72_cur_save]
-
-    mov     [cursor], rax
+alt72_left_omega:           ALT_RESTORE_CURSOR  alt72_cur_save, cursor  ; ALT left_ω — restore cursor, try right
     jmp     alt_r72_alpha
 
 ; REF(DQ) α=alt_r72_alpha
@@ -12817,10 +12538,8 @@ alt_r72_alpha:              lea     rax, [rel nref74_gamma]
     lea     rax, [rel nref74_omega]
     mov     [P_DQ_ret_omega], rax
     jmp     P_DQ_alpha
-
-; REF(DQ) β=alt_r72_beta
 alt_r72_beta:               lea     rax, [rel nref74_gamma]
-
+            ; REF(%s)
     mov     [P_DQ_ret_gamma], rax
     lea     rax, [rel nref74_omega]
     mov     [P_DQ_ret_omega], rax
@@ -12838,162 +12557,81 @@ patdef_String_omega:
 
 ; ============ Named pattern: Real ============
 ; P_Real_alpha (α entry)
-
-; ALT α=P_Real_alpha
-P_Real_alpha:               mov     rax, [cursor]
-
-    mov     [alt75_cur_save], rax
+P_Real_alpha:               ALT_SAVE_CURSOR     alt75_cur_save, cursor  ; ALT α — save cursor, try left
     jmp     alt_l75_alpha
-P_Real_beta:                jmp     alt_r75_beta
-
-; SEQ α=alt_l75_alpha
-alt_l75_alpha:              jmp     seq_l76_alpha
+P_Real_beta:                SEQ_BETA    alt_r75_beta                    ; ALT β — resume right
+alt_l75_alpha:              jmp     seq_l76_alpha                       ; SEQ
 alt_l75_beta:               jmp     seq_r76_beta
-
-; SEQ α=seq_l76_alpha
-seq_l76_alpha:              jmp     seq_l77_alpha
+seq_l76_alpha:              jmp     seq_l77_alpha                       ; SEQ
 seq_l76_beta:               jmp     seq_r77_beta
-
-; SEQ α=seq_l77_alpha
-seq_l77_alpha:              jmp     seq_l78_alpha
+seq_l77_alpha:              jmp     seq_l78_alpha                       ; SEQ
 seq_l77_beta:               jmp     seq_r78_beta
-
-; SEQ α=seq_l78_alpha
-seq_l78_alpha:              jmp     seq_l79_alpha
+seq_l78_alpha:              jmp     seq_l79_alpha                       ; SEQ
 seq_l78_beta:               jmp     seq_r79_beta
-
-; SPAN("")  α=seq_l79_alpha
 seq_l79_alpha:              SPAN_ALPHA  lit_str_4, 0, span80_saved, cursor, subject_data, subject_len_val, seq_r79_alpha, alt75_left_omega
-
-; SPAN β=seq_l79_beta
+; SPAN α
 seq_l79_beta:               SPAN_BETA   span80_saved, cursor, alt75_left_omega
-
-
-; ALT α=seq_r79_alpha
-seq_r79_alpha:              mov     rax, [cursor]
-
-    mov     [alt81_cur_save], rax
+; SPAN β
+seq_r79_alpha:              ALT_SAVE_CURSOR     alt81_cur_save, cursor  ; ALT α — save cursor, try left
     jmp     alt_l81_alpha
-seq_r79_beta:               jmp     alt_r81_beta
-
-; SEQ α=alt_l81_alpha
-alt_l81_alpha:              jmp     seq_l82_alpha
+seq_r79_beta:               SEQ_BETA    alt_r81_beta                    ; ALT β — resume right
+alt_l81_alpha:              jmp     seq_l82_alpha                       ; SEQ
 alt_l81_beta:               jmp     seq_r82_beta
-
-; LIT(".")  α=seq_l82_alpha
-seq_l82_alpha:              LIT_ALPHA1  46, seq_l82_alpha_saved, cursor, subject_data, subject_len_val, seq_r82_alpha, alt81_left_omega
-; LIT β
-seq_l82_beta:               LIT_BETA    seq_l82_alpha_saved, cursor, alt81_left_omega
+seq_l82_alpha:              LIT_ALPHA1  46, seq_l82_alpha_saved, cursor, subject_data, subject_len_val, seq_r82_alpha, alt81_left_omega; LIT α
+seq_l82_beta:               LIT_BETA    seq_l82_alpha_saved, cursor, alt81_left_omega; LIT β
 
 ; UNIMPLEMENTED: FENCE() → ω
 seq_r82_alpha:
 seq_r82_beta:               jmp     seq_l82_beta
-
-; ALT left_ω trampoline
-alt81_left_omega:           mov     rax, [alt81_cur_save]
-
-    mov     [cursor], rax
+alt81_left_omega:           ALT_RESTORE_CURSOR  alt81_cur_save, cursor  ; ALT left_ω — restore cursor, try right
     jmp     alt_r81_alpha
 
 ; UNRESOLVED named pattern ref: epsilon → ω
 alt_r81_alpha:
 alt_r81_beta:               jmp     seq_l79_beta
-
-; ALT α=seq_r78_alpha
-seq_r78_alpha:              mov     rax, [cursor]
-
-    mov     [alt83_cur_save], rax
+seq_r78_alpha:              ALT_SAVE_CURSOR     alt83_cur_save, cursor  ; ALT α — save cursor, try left
     jmp     alt_l83_alpha
-seq_r78_beta:               jmp     alt_r83_beta
-
-; LIT("E")  α=alt_l83_alpha
-alt_l83_alpha:              LIT_ALPHA1  69, alt_l83_alpha_saved, cursor, subject_data, subject_len_val, seq_r77_alpha, alt83_left_omega
-; LIT β
-alt_l83_beta:               LIT_BETA    alt_l83_alpha_saved, cursor, alt83_left_omega
-
-; ALT left_ω trampoline
-alt83_left_omega:           mov     rax, [alt83_cur_save]
-
-    mov     [cursor], rax
+seq_r78_beta:               SEQ_BETA    alt_r83_beta                    ; ALT β — resume right
+alt_l83_alpha:              LIT_ALPHA1  69, alt_l83_alpha_saved, cursor, subject_data, subject_len_val, seq_r77_alpha, alt83_left_omega; LIT α
+alt_l83_beta:               LIT_BETA    alt_l83_alpha_saved, cursor, alt83_left_omega; LIT β
+alt83_left_omega:           ALT_RESTORE_CURSOR  alt83_cur_save, cursor  ; ALT left_ω — restore cursor, try right
     jmp     alt_r83_alpha
-
-; LIT("e")  α=alt_r83_alpha
-alt_r83_alpha:              LIT_ALPHA1  101, alt_r83_alpha_saved, cursor, subject_data, subject_len_val, seq_r77_alpha, seq_l78_beta
-; LIT β
-alt_r83_beta:               LIT_BETA    alt_r83_alpha_saved, cursor, seq_l78_beta
-
-; ALT α=seq_r77_alpha
-seq_r77_alpha:              mov     rax, [cursor]
-
-    mov     [alt84_cur_save], rax
+alt_r83_alpha:              LIT_ALPHA1  101, alt_r83_alpha_saved, cursor, subject_data, subject_len_val, seq_r77_alpha, seq_l78_beta; LIT α
+alt_r83_beta:               LIT_BETA    alt_r83_alpha_saved, cursor, seq_l78_beta; LIT β
+seq_r77_alpha:              ALT_SAVE_CURSOR     alt84_cur_save, cursor  ; ALT α — save cursor, try left
     jmp     alt_l84_alpha
-seq_r77_beta:               jmp     alt_r84_beta
-
-; ALT α=alt_l84_alpha
-alt_l84_alpha:              mov     rax, [cursor]
-
-    mov     [alt85_cur_save], rax
+seq_r77_beta:               SEQ_BETA    alt_r84_beta                    ; ALT β — resume right
+alt_l84_alpha:              ALT_SAVE_CURSOR     alt85_cur_save, cursor  ; ALT α — save cursor, try left
     jmp     alt_l85_alpha
-alt_l84_beta:               jmp     alt_r85_beta
-
-; LIT("+")  α=alt_l85_alpha
-alt_l85_alpha:              LIT_ALPHA1  43, alt_l85_alpha_saved, cursor, subject_data, subject_len_val, seq_r76_alpha, alt85_left_omega
-; LIT β
-alt_l85_beta:               LIT_BETA    alt_l85_alpha_saved, cursor, alt85_left_omega
-
-; ALT left_ω trampoline
-alt85_left_omega:           mov     rax, [alt85_cur_save]
-
-    mov     [cursor], rax
+alt_l84_beta:               SEQ_BETA    alt_r85_beta                    ; ALT β — resume right
+alt_l85_alpha:              LIT_ALPHA1  43, alt_l85_alpha_saved, cursor, subject_data, subject_len_val, seq_r76_alpha, alt85_left_omega; LIT α
+alt_l85_beta:               LIT_BETA    alt_l85_alpha_saved, cursor, alt85_left_omega; LIT β
+alt85_left_omega:           ALT_RESTORE_CURSOR  alt85_cur_save, cursor  ; ALT left_ω — restore cursor, try right
     jmp     alt_r85_alpha
-
-; LIT("-")  α=alt_r85_alpha
-alt_r85_alpha:              LIT_ALPHA1  45, alt_r85_alpha_saved, cursor, subject_data, subject_len_val, seq_r76_alpha, alt84_left_omega
-; LIT β
-alt_r85_beta:               LIT_BETA    alt_r85_alpha_saved, cursor, alt84_left_omega
-
-; ALT left_ω trampoline
-alt84_left_omega:           mov     rax, [alt84_cur_save]
-
-    mov     [cursor], rax
+alt_r85_alpha:              LIT_ALPHA1  45, alt_r85_alpha_saved, cursor, subject_data, subject_len_val, seq_r76_alpha, alt84_left_omega; LIT α
+alt_r85_beta:               LIT_BETA    alt_r85_alpha_saved, cursor, alt84_left_omega; LIT β
+alt84_left_omega:           ALT_RESTORE_CURSOR  alt84_cur_save, cursor  ; ALT left_ω — restore cursor, try right
     jmp     alt_r84_alpha
 
 ; UNRESOLVED named pattern ref: epsilon → ω
 alt_r84_alpha:
 alt_r84_beta:               jmp     seq_l77_beta
-
-; SPAN("")  α=seq_r76_alpha
 seq_r76_alpha:              SPAN_ALPHA  lit_str_4, 0, span86_saved, cursor, subject_data, subject_len_val, patdef_Real_gamma, seq_l76_beta
-
-; SPAN β=seq_r76_beta
+; SPAN α
 seq_r76_beta:               SPAN_BETA   span86_saved, cursor, seq_l76_beta
-
-
-; ALT left_ω trampoline
-alt75_left_omega:           mov     rax, [alt75_cur_save]
-
-    mov     [cursor], rax
+; SPAN β
+alt75_left_omega:           ALT_RESTORE_CURSOR  alt75_cur_save, cursor  ; ALT left_ω — restore cursor, try right
     jmp     alt_r75_alpha
-
-; SEQ α=alt_r75_alpha
-alt_r75_alpha:              jmp     seq_l87_alpha
+alt_r75_alpha:              jmp     seq_l87_alpha                       ; SEQ
 alt_r75_beta:               jmp     seq_r87_beta
-
-; SEQ α=seq_l87_alpha
-seq_l87_alpha:              jmp     seq_l88_alpha
+seq_l87_alpha:              jmp     seq_l88_alpha                       ; SEQ
 seq_l87_beta:               jmp     seq_r88_beta
-
-; SPAN("")  α=seq_l88_alpha
 seq_l88_alpha:              SPAN_ALPHA  lit_str_4, 0, span89_saved, cursor, subject_data, subject_len_val, seq_r88_alpha, patdef_Real_omega
-
-; SPAN β=seq_l88_beta
+; SPAN α
 seq_l88_beta:               SPAN_BETA   span89_saved, cursor, patdef_Real_omega
-
-
-; LIT(".")  α=seq_r88_alpha
-seq_r88_alpha:              LIT_ALPHA1  46, seq_r88_alpha_saved, cursor, subject_data, subject_len_val, seq_r87_alpha, seq_l88_beta
-; LIT β
-seq_r88_beta:               LIT_BETA    seq_r88_alpha_saved, cursor, seq_l88_beta
+; SPAN β
+seq_r88_alpha:              LIT_ALPHA1  46, seq_r88_alpha_saved, cursor, subject_data, subject_len_val, seq_r87_alpha, seq_l88_beta; LIT α
+seq_r88_beta:               LIT_BETA    seq_r88_alpha_saved, cursor, seq_l88_beta; LIT β
 
 ; UNIMPLEMENTED: FENCE() → ω
 seq_r87_alpha:
@@ -13006,17 +12644,12 @@ patdef_Real_omega:
 
 ; ============ Named pattern: Id ============
 ; P_Id_alpha (α entry)
-
-; SEQ α=P_Id_alpha
-P_Id_alpha:                 jmp     seq_l90_alpha
+P_Id_alpha:                 jmp     seq_l90_alpha                       ; SEQ
 P_Id_beta:                  jmp     seq_r90_beta
-
-; ANY("")  α=seq_l90_alpha
 seq_l90_alpha:              ANY_ALPHA   lit_str_4, 0, any91_saved, cursor, subject_data, subject_len_val, seq_r90_alpha, patdef_Id_omega
-
-; ANY β=seq_l90_beta
+; ANY α
 seq_l90_beta:               ANY_BETA    any91_saved, cursor, patdef_Id_omega
-
+; ANY β
 
 ; UNIMPLEMENTED: FENCE() → ω
 seq_r90_alpha:
@@ -13043,13 +12676,10 @@ dol92_child_alpha:          mov     rax, [cursor]
     mov     [dol_entry_tx], rax
     jmp     dol93_child_alpha
 dol92_child_beta:           jmp     dol93_child_beta
-
-; SPAN("")  α=dol93_child_alpha
 dol93_child_alpha:          SPAN_ALPHA  lit_str_4, 0, span94_saved, cursor, subject_data, subject_len_val, dol93_gamma, dol93_omega
-
-; SPAN β=dol93_child_beta
+; SPAN α
 dol93_child_beta:           SPAN_BETA   span94_saved, cursor, dol93_omega
-
+; SPAN β
 
 ; DOL γ — capture span into cap_tx_buf
 dol93_gamma:
@@ -13063,9 +12693,7 @@ dol93_gamma:
     mov     rcx, rax
     rep     movsb
     jmp     dol92_gamma
-
-; DOL ω — child failed, no capture
-dol93_omega:                jmp     dol92_omega
+dol93_omega:                jmp     dol92_omega                         ; DOL ω — child failed, no capture
 
 ; DOL γ — capture span into cap_cap_buf
 dol92_gamma:
@@ -13079,9 +12707,7 @@ dol92_gamma:
     mov     rcx, rax
     rep     movsb
     jmp     patdef_Function_gamma
-
-; DOL ω — child failed, no capture
-dol92_omega:                jmp     patdef_Function_omega
+dol92_omega:                jmp     patdef_Function_omega               ; DOL ω — child failed, no capture
 
 patdef_Function_gamma:
     jmp     [P_Function_ret_gamma]
@@ -13104,13 +12730,10 @@ dol95_child_alpha:          mov     rax, [cursor]
     mov     [dol_entry_tx], rax
     jmp     dol96_child_alpha
 dol95_child_beta:           jmp     dol96_child_beta
-
-; SPAN("")  α=dol96_child_alpha
 dol96_child_alpha:          SPAN_ALPHA  lit_str_4, 0, span97_saved, cursor, subject_data, subject_len_val, dol96_gamma, dol96_omega
-
-; SPAN β=dol96_child_beta
+; SPAN α
 dol96_child_beta:           SPAN_BETA   span97_saved, cursor, dol96_omega
-
+; SPAN β
 
 ; DOL γ — capture span into cap_tx_buf
 dol96_gamma:
@@ -13124,9 +12747,7 @@ dol96_gamma:
     mov     rcx, rax
     rep     movsb
     jmp     dol95_gamma
-
-; DOL ω — child failed, no capture
-dol96_omega:                jmp     dol95_omega
+dol96_omega:                jmp     dol95_omega                         ; DOL ω — child failed, no capture
 
 ; DOL γ — capture span into cap_cap_buf
 dol95_gamma:
@@ -13140,9 +12761,7 @@ dol95_gamma:
     mov     rcx, rax
     rep     movsb
     jmp     patdef_BuiltinVar_gamma
-
-; DOL ω — child failed, no capture
-dol95_omega:                jmp     patdef_BuiltinVar_omega
+dol95_omega:                jmp     patdef_BuiltinVar_omega             ; DOL ω — child failed, no capture
 
 patdef_BuiltinVar_gamma:
     jmp     [P_BuiltinVar_ret_gamma]
@@ -13165,13 +12784,10 @@ dol98_child_alpha:          mov     rax, [cursor]
     mov     [dol_entry_tx], rax
     jmp     dol99_child_alpha
 dol98_child_beta:           jmp     dol99_child_beta
-
-; SPAN("")  α=dol99_child_alpha
 dol99_child_alpha:          SPAN_ALPHA  lit_str_4, 0, span100_saved, cursor, subject_data, subject_len_val, dol99_gamma, dol99_omega
-
-; SPAN β=dol99_child_beta
+; SPAN α
 dol99_child_beta:           SPAN_BETA   span100_saved, cursor, dol99_omega
-
+; SPAN β
 
 ; DOL γ — capture span into cap_tx_buf
 dol99_gamma:
@@ -13185,9 +12801,7 @@ dol99_gamma:
     mov     rcx, rax
     rep     movsb
     jmp     dol98_gamma
-
-; DOL ω — child failed, no capture
-dol99_omega:                jmp     dol98_omega
+dol99_omega:                jmp     dol98_omega                         ; DOL ω — child failed, no capture
 
 ; DOL γ — capture span into cap_cap_buf
 dol98_gamma:
@@ -13201,9 +12815,7 @@ dol98_gamma:
     mov     rcx, rax
     rep     movsb
     jmp     patdef_SpecialNm_gamma
-
-; DOL ω — child failed, no capture
-dol98_omega:                jmp     patdef_SpecialNm_omega
+dol98_omega:                jmp     patdef_SpecialNm_omega              ; DOL ω — child failed, no capture
 
 patdef_SpecialNm_gamma:
     jmp     [P_SpecialNm_ret_gamma]
@@ -13212,15 +12824,10 @@ patdef_SpecialNm_omega:
 
 ; ============ Named pattern: ProtKwd ============
 ; P_ProtKwd_alpha (α entry)
-
-; SEQ α=P_ProtKwd_alpha
-P_ProtKwd_alpha:            jmp     seq_l101_alpha
+P_ProtKwd_alpha:            jmp     seq_l101_alpha                      ; SEQ
 P_ProtKwd_beta:             jmp     seq_r101_beta
-
-; LIT("&")  α=seq_l101_alpha
-seq_l101_alpha:             LIT_ALPHA1  38, seq_l101_alpha_saved, cursor, subject_data, subject_len_val, seq_r101_alpha, patdef_ProtKwd_omega
-; LIT β
-seq_l101_beta:              LIT_BETA    seq_l101_alpha_saved, cursor, patdef_ProtKwd_omega
+seq_l101_alpha:             LIT_ALPHA1  38, seq_l101_alpha_saved, cursor, subject_data, subject_len_val, seq_r101_alpha, patdef_ProtKwd_omega; LIT α
+seq_l101_beta:              LIT_BETA    seq_l101_alpha_saved, cursor, patdef_ProtKwd_omega; LIT β
 
 ; DOL(cap $  cap)  α=seq_r101_alpha
 seq_r101_alpha:             mov     rax, [cursor]
@@ -13235,13 +12842,10 @@ dol102_child_alpha:         mov     rax, [cursor]
     mov     [dol_entry_tx], rax
     jmp     dol103_child_alpha
 dol102_child_beta:          jmp     dol103_child_beta
-
-; SPAN("")  α=dol103_child_alpha
 dol103_child_alpha:         SPAN_ALPHA  lit_str_4, 0, span104_saved, cursor, subject_data, subject_len_val, dol103_gamma, dol103_omega
-
-; SPAN β=dol103_child_beta
+; SPAN α
 dol103_child_beta:          SPAN_BETA   span104_saved, cursor, dol103_omega
-
+; SPAN β
 
 ; DOL γ — capture span into cap_tx_buf
 dol103_gamma:
@@ -13255,9 +12859,7 @@ dol103_gamma:
     mov     rcx, rax
     rep     movsb
     jmp     dol102_gamma
-
-; DOL ω — child failed, no capture
-dol103_omega:               jmp     dol102_omega
+dol103_omega:               jmp     dol102_omega                        ; DOL ω — child failed, no capture
 
 ; DOL γ — capture span into cap_cap_buf
 dol102_gamma:
@@ -13271,9 +12873,7 @@ dol102_gamma:
     mov     rcx, rax
     rep     movsb
     jmp     patdef_ProtKwd_gamma
-
-; DOL ω — child failed, no capture
-dol102_omega:               jmp     seq_l101_beta
+dol102_omega:               jmp     seq_l101_beta                       ; DOL ω — child failed, no capture
 
 patdef_ProtKwd_gamma:
     jmp     [P_ProtKwd_ret_gamma]
@@ -13282,15 +12882,10 @@ patdef_ProtKwd_omega:
 
 ; ============ Named pattern: UnprotKwd ============
 ; P_UnprotKwd_alpha (α entry)
-
-; SEQ α=P_UnprotKwd_alpha
-P_UnprotKwd_alpha:          jmp     seq_l105_alpha
+P_UnprotKwd_alpha:          jmp     seq_l105_alpha                      ; SEQ
 P_UnprotKwd_beta:           jmp     seq_r105_beta
-
-; LIT("&")  α=seq_l105_alpha
-seq_l105_alpha:             LIT_ALPHA1  38, seq_l105_alpha_saved, cursor, subject_data, subject_len_val, seq_r105_alpha, patdef_UnprotKwd_omega
-; LIT β
-seq_l105_beta:              LIT_BETA    seq_l105_alpha_saved, cursor, patdef_UnprotKwd_omega
+seq_l105_alpha:             LIT_ALPHA1  38, seq_l105_alpha_saved, cursor, subject_data, subject_len_val, seq_r105_alpha, patdef_UnprotKwd_omega; LIT α
+seq_l105_beta:              LIT_BETA    seq_l105_alpha_saved, cursor, patdef_UnprotKwd_omega; LIT β
 
 ; DOL(cap $  cap)  α=seq_r105_alpha
 seq_r105_alpha:             mov     rax, [cursor]
@@ -13305,13 +12900,10 @@ dol106_child_alpha:         mov     rax, [cursor]
     mov     [dol_entry_tx], rax
     jmp     dol107_child_alpha
 dol106_child_beta:          jmp     dol107_child_beta
-
-; SPAN("")  α=dol107_child_alpha
 dol107_child_alpha:         SPAN_ALPHA  lit_str_4, 0, span108_saved, cursor, subject_data, subject_len_val, dol107_gamma, dol107_omega
-
-; SPAN β=dol107_child_beta
+; SPAN α
 dol107_child_beta:          SPAN_BETA   span108_saved, cursor, dol107_omega
-
+; SPAN β
 
 ; DOL γ — capture span into cap_tx_buf
 dol107_gamma:
@@ -13325,9 +12917,7 @@ dol107_gamma:
     mov     rcx, rax
     rep     movsb
     jmp     dol106_gamma
-
-; DOL ω — child failed, no capture
-dol107_omega:               jmp     dol106_omega
+dol107_omega:               jmp     dol106_omega                        ; DOL ω — child failed, no capture
 
 ; DOL γ — capture span into cap_cap_buf
 dol106_gamma:
@@ -13341,9 +12931,7 @@ dol106_gamma:
     mov     rcx, rax
     rep     movsb
     jmp     patdef_UnprotKwd_gamma
-
-; DOL ω — child failed, no capture
-dol106_omega:               jmp     seq_l105_beta
+dol106_omega:               jmp     seq_l105_beta                       ; DOL ω — child failed, no capture
 
 patdef_UnprotKwd_gamma:
     jmp     [P_UnprotKwd_ret_gamma]
@@ -13352,13 +12940,9 @@ patdef_UnprotKwd_omega:
 
 ; ============ Named pattern: Gray ============
 ; P_Gray_alpha (α entry)
-
-; ALT α=P_Gray_alpha
-P_Gray_alpha:               mov     rax, [cursor]
-
-    mov     [alt109_cur_save], rax
+P_Gray_alpha:               ALT_SAVE_CURSOR     alt109_cur_save, cursor ; ALT α — save cursor, try left
     jmp     alt_l109_alpha
-P_Gray_beta:                jmp     alt_r109_beta
+P_Gray_beta:                SEQ_BETA    alt_r109_beta                   ; ALT β — resume right
 
 ; REF(White) α=alt_l109_alpha
 alt_l109_alpha:             lea     rax, [rel nref110_gamma]
@@ -13367,10 +12951,8 @@ alt_l109_alpha:             lea     rax, [rel nref110_gamma]
     lea     rax, [rel nref110_omega]
     mov     [P_White_ret_omega], rax
     jmp     P_White_alpha
-
-; REF(White) β=alt_l109_beta
 alt_l109_beta:              lea     rax, [rel nref110_gamma]
-
+           ; REF(%s)
     mov     [P_White_ret_gamma], rax
     lea     rax, [rel nref110_omega]
     mov     [P_White_ret_omega], rax
@@ -13380,11 +12962,7 @@ nref110_gamma:
     jmp     patdef_Gray_gamma
 nref110_omega:
     jmp     alt109_left_omega
-
-; ALT left_ω trampoline
-alt109_left_omega:          mov     rax, [alt109_cur_save]
-
-    mov     [cursor], rax
+alt109_left_omega:          ALT_RESTORE_CURSOR  alt109_cur_save, cursor ; ALT left_ω — restore cursor, try right
     jmp     alt_r109_alpha
 
 ; UNRESOLVED named pattern ref: epsilon → ω
@@ -13398,69 +12976,38 @@ patdef_Gray_omega:
 
 ; ============ Named pattern: White ============
 ; P_White_alpha (α entry)
-
-; ALT α=P_White_alpha
-P_White_alpha:              mov     rax, [cursor]
-
-    mov     [alt111_cur_save], rax
+P_White_alpha:              ALT_SAVE_CURSOR     alt111_cur_save, cursor ; ALT α — save cursor, try left
     jmp     alt_l111_alpha
-P_White_beta:               jmp     alt_r111_beta
-
-; SEQ α=alt_l111_alpha
-alt_l111_alpha:             jmp     seq_l112_alpha
+P_White_beta:               SEQ_BETA    alt_r111_beta                   ; ALT β — resume right
+alt_l111_alpha:             jmp     seq_l112_alpha                      ; SEQ
 alt_l111_beta:              jmp     seq_r112_beta
-
-; SPAN("")  α=seq_l112_alpha
 seq_l112_alpha:             SPAN_ALPHA  lit_str_4, 0, span113_saved, cursor, subject_data, subject_len_val, seq_r112_alpha, alt111_left_omega
-
-; SPAN β=seq_l112_beta
+; SPAN α
 seq_l112_beta:              SPAN_BETA   span113_saved, cursor, alt111_left_omega
-
+; SPAN β
 
 ; UNIMPLEMENTED: FENCE() → ω
 seq_r112_alpha:
 seq_r112_beta:              jmp     seq_l112_beta
-
-; ALT left_ω trampoline
-alt111_left_omega:          mov     rax, [alt111_cur_save]
-
-    mov     [cursor], rax
+alt111_left_omega:          ALT_RESTORE_CURSOR  alt111_cur_save, cursor ; ALT left_ω — restore cursor, try right
     jmp     alt_r111_alpha
-
-; SEQ α=alt_r111_alpha
-alt_r111_alpha:             jmp     seq_l114_alpha
+alt_r111_alpha:             jmp     seq_l114_alpha                      ; SEQ
 alt_r111_beta:              jmp     seq_r114_beta
-
-; SEQ α=seq_l114_alpha
-seq_l114_alpha:             jmp     seq_l115_alpha
+seq_l114_alpha:             jmp     seq_l115_alpha                      ; SEQ
 seq_l114_beta:              jmp     seq_r115_beta
 
 ; UNRESOLVED named pattern ref: nl → ω
 seq_l115_alpha:
 seq_l115_beta:              jmp     patdef_White_omega
-
-; ALT α=seq_r115_alpha
-seq_r115_alpha:             mov     rax, [cursor]
-
-    mov     [alt116_cur_save], rax
+seq_r115_alpha:             ALT_SAVE_CURSOR     alt116_cur_save, cursor ; ALT α — save cursor, try left
     jmp     alt_l116_alpha
-seq_r115_beta:              jmp     alt_r116_beta
-
-; LIT("+")  α=alt_l116_alpha
-alt_l116_alpha:             LIT_ALPHA1  43, alt_l116_alpha_saved, cursor, subject_data, subject_len_val, seq_r114_alpha, alt116_left_omega
-; LIT β
-alt_l116_beta:              LIT_BETA    alt_l116_alpha_saved, cursor, alt116_left_omega
-
-; ALT left_ω trampoline
-alt116_left_omega:          mov     rax, [alt116_cur_save]
-
-    mov     [cursor], rax
+seq_r115_beta:              SEQ_BETA    alt_r116_beta                   ; ALT β — resume right
+alt_l116_alpha:             LIT_ALPHA1  43, alt_l116_alpha_saved, cursor, subject_data, subject_len_val, seq_r114_alpha, alt116_left_omega; LIT α
+alt_l116_beta:              LIT_BETA    alt_l116_alpha_saved, cursor, alt116_left_omega; LIT β
+alt116_left_omega:          ALT_RESTORE_CURSOR  alt116_cur_save, cursor ; ALT left_ω — restore cursor, try right
     jmp     alt_r116_alpha
-
-; LIT(".")  α=alt_r116_alpha
-alt_r116_alpha:             LIT_ALPHA1  46, alt_r116_alpha_saved, cursor, subject_data, subject_len_val, seq_r114_alpha, seq_l115_beta
-; LIT β
-alt_r116_beta:              LIT_BETA    alt_r116_alpha_saved, cursor, seq_l115_beta
+alt_r116_alpha:             LIT_ALPHA1  46, alt_r116_alpha_saved, cursor, subject_data, subject_len_val, seq_r114_alpha, seq_l115_beta; LIT α
+alt_r116_beta:              LIT_BETA    alt_r116_alpha_saved, cursor, seq_l115_beta; LIT β
 
 ; UNIMPLEMENTED: FENCE() → ω
 seq_r114_alpha:
@@ -13473,61 +13020,31 @@ patdef_White_omega:
 
 ; ============ Named pattern: TxInList ============
 ; P_TxInList_alpha (α entry)
-
-; SEQ α=P_TxInList_alpha
-P_TxInList_alpha:           jmp     seq_l117_alpha
+P_TxInList_alpha:           jmp     seq_l117_alpha                      ; SEQ
 P_TxInList_beta:            jmp     seq_r117_beta
-
-; SEQ α=seq_l117_alpha
-seq_l117_alpha:             jmp     seq_l118_alpha
+seq_l117_alpha:             jmp     seq_l118_alpha                      ; SEQ
 seq_l117_beta:              jmp     seq_r118_beta
-
-; ALT α=seq_l118_alpha
-seq_l118_alpha:             mov     rax, [cursor]
-
-    mov     [alt119_cur_save], rax
+seq_l118_alpha:             ALT_SAVE_CURSOR     alt119_cur_save, cursor ; ALT α — save cursor, try left
     jmp     alt_l119_alpha
-seq_l118_beta:              jmp     alt_r119_beta
-
-; POS(0)  α=alt_l119_alpha
-alt_l119_alpha:             POS_ALPHA   0, cursor, seq_r118_alpha, alt119_left_omega
+seq_l118_beta:              SEQ_BETA    alt_r119_beta                   ; ALT β — resume right
+alt_l119_alpha:             POS_ALPHA   0, cursor, seq_r118_alpha, alt119_left_omega; POS(%ld)
 alt_l119_beta:              POS_BETA    cursor, alt119_left_omega
-
-; ALT left_ω trampoline
-alt119_left_omega:          mov     rax, [alt119_cur_save]
-
-    mov     [cursor], rax
+alt119_left_omega:          ALT_RESTORE_CURSOR  alt119_cur_save, cursor ; ALT left_ω — restore cursor, try right
     jmp     alt_r119_alpha
-
-; LIT(" ")  α=alt_r119_alpha
-alt_r119_alpha:             LIT_ALPHA1  32, alt_r119_alpha_saved, cursor, subject_data, subject_len_val, seq_r118_alpha, patdef_TxInList_omega
-; LIT β
-alt_r119_beta:              LIT_BETA    alt_r119_alpha_saved, cursor, patdef_TxInList_omega
+alt_r119_alpha:             LIT_ALPHA1  32, alt_r119_alpha_saved, cursor, subject_data, subject_len_val, seq_r118_alpha, patdef_TxInList_omega; LIT α
+alt_r119_beta:              LIT_BETA    alt_r119_alpha_saved, cursor, patdef_TxInList_omega; LIT β
 
 ; E_INDR unresolved: upr → ω
 seq_r118_alpha:
 seq_r118_beta:              jmp     seq_l118_beta
-
-; ALT α=seq_r117_alpha
-seq_r117_alpha:             mov     rax, [cursor]
-
-    mov     [alt120_cur_save], rax
+seq_r117_alpha:             ALT_SAVE_CURSOR     alt120_cur_save, cursor ; ALT α — save cursor, try left
     jmp     alt_l120_alpha
-seq_r117_beta:              jmp     alt_r120_beta
-
-; LIT(" ")  α=alt_l120_alpha
-alt_l120_alpha:             LIT_ALPHA1  32, alt_l120_alpha_saved, cursor, subject_data, subject_len_val, patdef_TxInList_gamma, alt120_left_omega
-; LIT β
-alt_l120_beta:              LIT_BETA    alt_l120_alpha_saved, cursor, alt120_left_omega
-
-; ALT left_ω trampoline
-alt120_left_omega:          mov     rax, [alt120_cur_save]
-
-    mov     [cursor], rax
+seq_r117_beta:              SEQ_BETA    alt_r120_beta                   ; ALT β — resume right
+alt_l120_alpha:             LIT_ALPHA1  32, alt_l120_alpha_saved, cursor, subject_data, subject_len_val, patdef_TxInList_gamma, alt120_left_omega; LIT α
+alt_l120_beta:              LIT_BETA    alt_l120_alpha_saved, cursor, alt120_left_omega; LIT β
+alt120_left_omega:          ALT_RESTORE_CURSOR  alt120_cur_save, cursor ; ALT left_ω — restore cursor, try right
     jmp     alt_r120_alpha
-
-; RPOS(0)  α=alt_r120_alpha
-alt_r120_alpha:             RPOS_ALPHA  0, cursor, subject_len_val, patdef_TxInList_gamma, seq_l117_beta
+alt_r120_alpha:             RPOS_ALPHA  0, cursor, subject_len_val, patdef_TxInList_gamma, seq_l117_beta; RPOS(%ld)
 alt_r120_beta:              RPOS_BETA   cursor, seq_l117_beta
 
 patdef_TxInList_gamma:
@@ -13537,29 +13054,16 @@ patdef_TxInList_omega:
 
 ; ============ Named pattern: ProtKwds ============
 ; P_ProtKwds_alpha (α entry)
-
-; SEQ α=P_ProtKwds_alpha
-P_ProtKwds_alpha:           jmp     seq_l121_alpha
+P_ProtKwds_alpha:           jmp     seq_l121_alpha                      ; SEQ
 P_ProtKwds_beta:            jmp     seq_r121_beta
-
-; SEQ α=seq_l121_alpha
-seq_l121_alpha:             jmp     seq_l122_alpha
+seq_l121_alpha:             jmp     seq_l122_alpha                      ; SEQ
 seq_l121_beta:              jmp     seq_r122_beta
-
-; LIT("ABORT ALPHABET ARB BAL FAIL FENCE FILE FNCLEVEL ")  α=seq_l122_alpha
-seq_l122_alpha:             LIT_ALPHA   lit_str_13, 48, seq_l122_alpha_saved, cursor, subject_data, subject_len_val, seq_r122_alpha, patdef_ProtKwds_omega
-; LIT β
-seq_l122_beta:              LIT_BETA    seq_l122_alpha_saved, cursor, patdef_ProtKwds_omega
-
-; LIT("LASTFILE LASTLINE LASTNO LCASE LINE REM RTNTYPE ")  α=seq_r122_alpha
-seq_r122_alpha:             LIT_ALPHA   lit_str_14, 48, seq_r122_alpha_saved, cursor, subject_data, subject_len_val, seq_r121_alpha, seq_l122_beta
-; LIT β
-seq_r122_beta:              LIT_BETA    seq_r122_alpha_saved, cursor, seq_l122_beta
-
-; LIT("STCOUNT STNO SUCCEED UCASE")  α=seq_r121_alpha
-seq_r121_alpha:             LIT_ALPHA   lit_str_15, 26, seq_r121_alpha_saved, cursor, subject_data, subject_len_val, patdef_ProtKwds_gamma, seq_l121_beta
-; LIT β
-seq_r121_beta:              LIT_BETA    seq_r121_alpha_saved, cursor, seq_l121_beta
+seq_l122_alpha:             LIT_ALPHA   lit_str_13, 48, seq_l122_alpha_saved, cursor, subject_data, subject_len_val, seq_r122_alpha, patdef_ProtKwds_omega; LIT α
+seq_l122_beta:              LIT_BETA    seq_l122_alpha_saved, cursor, patdef_ProtKwds_omega; LIT β
+seq_r122_alpha:             LIT_ALPHA   lit_str_14, 48, seq_r122_alpha_saved, cursor, subject_data, subject_len_val, seq_r121_alpha, seq_l122_beta; LIT α
+seq_r122_beta:              LIT_BETA    seq_r122_alpha_saved, cursor, seq_l122_beta; LIT β
+seq_r121_alpha:             LIT_ALPHA   lit_str_15, 26, seq_r121_alpha_saved, cursor, subject_data, subject_len_val, patdef_ProtKwds_gamma, seq_l121_beta; LIT α
+seq_r121_beta:              LIT_BETA    seq_r121_alpha_saved, cursor, seq_l121_beta; LIT β
 
 patdef_ProtKwds_gamma:
     jmp     [P_ProtKwds_ret_gamma]
@@ -13568,29 +13072,16 @@ patdef_ProtKwds_omega:
 
 ; ============ Named pattern: UnprotKwds ============
 ; P_UnprotKwds_alpha (α entry)
-
-; SEQ α=P_UnprotKwds_alpha
-P_UnprotKwds_alpha:         jmp     seq_l123_alpha
+P_UnprotKwds_alpha:         jmp     seq_l123_alpha                      ; SEQ
 P_UnprotKwds_beta:          jmp     seq_r123_beta
-
-; SEQ α=seq_l123_alpha
-seq_l123_alpha:             jmp     seq_l124_alpha
+seq_l123_alpha:             jmp     seq_l124_alpha                      ; SEQ
 seq_l123_beta:              jmp     seq_r124_beta
-
-; LIT("ABEND ANCHOR CASE CODE COMPARE DUMP ERRLIMIT ")  α=seq_l124_alpha
-seq_l124_alpha:             LIT_ALPHA   lit_str_16, 45, seq_l124_alpha_saved, cursor, subject_data, subject_len_val, seq_r124_alpha, patdef_UnprotKwds_omega
-; LIT β
-seq_l124_beta:              LIT_BETA    seq_l124_alpha_saved, cursor, patdef_UnprotKwds_omega
-
-; LIT("ERRTEXT ERRTYPE FTRACE INPUT MAXLNGTH OUTPUT ")  α=seq_r124_alpha
-seq_r124_alpha:             LIT_ALPHA   lit_str_17, 45, seq_r124_alpha_saved, cursor, subject_data, subject_len_val, seq_r123_alpha, seq_l124_beta
-; LIT β
-seq_r124_beta:              LIT_BETA    seq_r124_alpha_saved, cursor, seq_l124_beta
-
-; LIT("PROFILE STLIMIT TRACE TRIM FULLSCAN")  α=seq_r123_alpha
-seq_r123_alpha:             LIT_ALPHA   lit_str_18, 35, seq_r123_alpha_saved, cursor, subject_data, subject_len_val, patdef_UnprotKwds_gamma, seq_l123_beta
-; LIT β
-seq_r123_beta:              LIT_BETA    seq_r123_alpha_saved, cursor, seq_l123_beta
+seq_l124_alpha:             LIT_ALPHA   lit_str_16, 45, seq_l124_alpha_saved, cursor, subject_data, subject_len_val, seq_r124_alpha, patdef_UnprotKwds_omega; LIT α
+seq_l124_beta:              LIT_BETA    seq_l124_alpha_saved, cursor, patdef_UnprotKwds_omega; LIT β
+seq_r124_alpha:             LIT_ALPHA   lit_str_17, 45, seq_r124_alpha_saved, cursor, subject_data, subject_len_val, seq_r123_alpha, seq_l124_beta; LIT α
+seq_r124_beta:              LIT_BETA    seq_r124_alpha_saved, cursor, seq_l124_beta; LIT β
+seq_r123_alpha:             LIT_ALPHA   lit_str_18, 35, seq_r123_alpha_saved, cursor, subject_data, subject_len_val, patdef_UnprotKwds_gamma, seq_l123_beta; LIT α
+seq_r123_beta:              LIT_BETA    seq_r123_alpha_saved, cursor, seq_l123_beta; LIT β
 
 patdef_UnprotKwds_gamma:
     jmp     [P_UnprotKwds_ret_gamma]
@@ -13599,83 +13090,40 @@ patdef_UnprotKwds_omega:
 
 ; ============ Named pattern: Functions ============
 ; P_Functions_alpha (α entry)
-
-; SEQ α=P_Functions_alpha
-P_Functions_alpha:          jmp     seq_l125_alpha
+P_Functions_alpha:          jmp     seq_l125_alpha                      ; SEQ
 P_Functions_beta:           jmp     seq_r125_beta
-
-; SEQ α=seq_l125_alpha
-seq_l125_alpha:             jmp     seq_l126_alpha
+seq_l125_alpha:             jmp     seq_l126_alpha                      ; SEQ
 seq_l125_beta:              jmp     seq_r126_beta
-
-; SEQ α=seq_l126_alpha
-seq_l126_alpha:             jmp     seq_l127_alpha
+seq_l126_alpha:             jmp     seq_l127_alpha                      ; SEQ
 seq_l126_beta:              jmp     seq_r127_beta
-
-; SEQ α=seq_l127_alpha
-seq_l127_alpha:             jmp     seq_l128_alpha
+seq_l127_alpha:             jmp     seq_l128_alpha                      ; SEQ
 seq_l127_beta:              jmp     seq_r128_beta
-
-; SEQ α=seq_l128_alpha
-seq_l128_alpha:             jmp     seq_l129_alpha
+seq_l128_alpha:             jmp     seq_l129_alpha                      ; SEQ
 seq_l128_beta:              jmp     seq_r129_beta
-
-; SEQ α=seq_l129_alpha
-seq_l129_alpha:             jmp     seq_l130_alpha
+seq_l129_alpha:             jmp     seq_l130_alpha                      ; SEQ
 seq_l129_beta:              jmp     seq_r130_beta
-
-; SEQ α=seq_l130_alpha
-seq_l130_alpha:             jmp     seq_l131_alpha
+seq_l130_alpha:             jmp     seq_l131_alpha                      ; SEQ
 seq_l130_beta:              jmp     seq_r131_beta
-
-; SEQ α=seq_l131_alpha
-seq_l131_alpha:             jmp     seq_l132_alpha
+seq_l131_alpha:             jmp     seq_l132_alpha                      ; SEQ
 seq_l131_beta:              jmp     seq_r132_beta
-
-; LIT("ANY APPLY ARBNO ARG ARRAY ATAN BACKSPACE BREAK BREAKX ")  α=seq_l132_alpha
-seq_l132_alpha:             LIT_ALPHA   lit_str_19, 54, seq_l132_alpha_saved, cursor, subject_data, subject_len_val, seq_r132_alpha, patdef_Functions_omega
-; LIT β
-seq_l132_beta:              LIT_BETA    seq_l132_alpha_saved, cursor, patdef_Functions_omega
-
-; LIT("CHAR CHOP CLEAR CODE COLLECT CONVERT COPY COS DATA ")  α=seq_r132_alpha
-seq_r132_alpha:             LIT_ALPHA   lit_str_20, 51, seq_r132_alpha_saved, cursor, subject_data, subject_len_val, seq_r131_alpha, seq_l132_beta
-; LIT β
-seq_r132_beta:              LIT_BETA    seq_r132_alpha_saved, cursor, seq_l132_beta
-
-; LIT("DATATYPE DATE DEFINE DETACH DIFFER DUMP DUPL EJECT ")  α=seq_r131_alpha
-seq_r131_alpha:             LIT_ALPHA   lit_str_21, 51, seq_r131_alpha_saved, cursor, subject_data, subject_len_val, seq_r130_alpha, seq_l131_beta
-; LIT β
-seq_r131_beta:              LIT_BETA    seq_r131_alpha_saved, cursor, seq_l131_beta
-
-; LIT("ENDFILE EQ EVAL EXIT EXP FENCE FIELD GE GT HOST ")  α=seq_r130_alpha
-seq_r130_alpha:             LIT_ALPHA   lit_str_22, 48, seq_r130_alpha_saved, cursor, subject_data, subject_len_val, seq_r129_alpha, seq_l130_beta
-; LIT β
-seq_r130_beta:              LIT_BETA    seq_r130_alpha_saved, cursor, seq_l130_beta
-
-; LIT("IDENT INPUT INTEGER ITEM LE LEN LEQ LGE LGT LLE ")  α=seq_r129_alpha
-seq_r129_alpha:             LIT_ALPHA   lit_str_23, 48, seq_r129_alpha_saved, cursor, subject_data, subject_len_val, seq_r128_alpha, seq_l129_beta
-; LIT β
-seq_r129_beta:              LIT_BETA    seq_r129_alpha_saved, cursor, seq_l129_beta
-
-; LIT("LLT LN LNE LOAD LOCAL LPAD LT NE NOTANY OPSYN OUTPUT ")  α=seq_r128_alpha
-seq_r128_alpha:             LIT_ALPHA   lit_str_24, 53, seq_r128_alpha_saved, cursor, subject_data, subject_len_val, seq_r127_alpha, seq_l128_beta
-; LIT β
-seq_r128_beta:              LIT_BETA    seq_r128_alpha_saved, cursor, seq_l128_beta
-
-; LIT("POS PROTOTYPE REMDR REPLACE REVERSE REWIND RPAD RPOS ")  α=seq_r127_alpha
-seq_r127_alpha:             LIT_ALPHA   lit_str_25, 53, seq_r127_alpha_saved, cursor, subject_data, subject_len_val, seq_r126_alpha, seq_l127_beta
-; LIT β
-seq_r127_beta:              LIT_BETA    seq_r127_alpha_saved, cursor, seq_l127_beta
-
-; LIT("RSORT RTAB SET SETEXIT SIN SIZE SORT SPAN SQRT STOPTR ")  α=seq_r126_alpha
-seq_r126_alpha:             LIT_ALPHA   lit_str_26, 54, seq_r126_alpha_saved, cursor, subject_data, subject_len_val, seq_r125_alpha, seq_l126_beta
-; LIT β
-seq_r126_beta:              LIT_BETA    seq_r126_alpha_saved, cursor, seq_l126_beta
-
-; LIT("SUBSTR TAB TABLE TAN TIME TRACE TRIM UNLOAD")  α=seq_r125_alpha
-seq_r125_alpha:             LIT_ALPHA   lit_str_27, 43, seq_r125_alpha_saved, cursor, subject_data, subject_len_val, patdef_Functions_gamma, seq_l125_beta
-; LIT β
-seq_r125_beta:              LIT_BETA    seq_r125_alpha_saved, cursor, seq_l125_beta
+seq_l132_alpha:             LIT_ALPHA   lit_str_19, 54, seq_l132_alpha_saved, cursor, subject_data, subject_len_val, seq_r132_alpha, patdef_Functions_omega; LIT α
+seq_l132_beta:              LIT_BETA    seq_l132_alpha_saved, cursor, patdef_Functions_omega; LIT β
+seq_r132_alpha:             LIT_ALPHA   lit_str_20, 51, seq_r132_alpha_saved, cursor, subject_data, subject_len_val, seq_r131_alpha, seq_l132_beta; LIT α
+seq_r132_beta:              LIT_BETA    seq_r132_alpha_saved, cursor, seq_l132_beta; LIT β
+seq_r131_alpha:             LIT_ALPHA   lit_str_21, 51, seq_r131_alpha_saved, cursor, subject_data, subject_len_val, seq_r130_alpha, seq_l131_beta; LIT α
+seq_r131_beta:              LIT_BETA    seq_r131_alpha_saved, cursor, seq_l131_beta; LIT β
+seq_r130_alpha:             LIT_ALPHA   lit_str_22, 48, seq_r130_alpha_saved, cursor, subject_data, subject_len_val, seq_r129_alpha, seq_l130_beta; LIT α
+seq_r130_beta:              LIT_BETA    seq_r130_alpha_saved, cursor, seq_l130_beta; LIT β
+seq_r129_alpha:             LIT_ALPHA   lit_str_23, 48, seq_r129_alpha_saved, cursor, subject_data, subject_len_val, seq_r128_alpha, seq_l129_beta; LIT α
+seq_r129_beta:              LIT_BETA    seq_r129_alpha_saved, cursor, seq_l129_beta; LIT β
+seq_r128_alpha:             LIT_ALPHA   lit_str_24, 53, seq_r128_alpha_saved, cursor, subject_data, subject_len_val, seq_r127_alpha, seq_l128_beta; LIT α
+seq_r128_beta:              LIT_BETA    seq_r128_alpha_saved, cursor, seq_l128_beta; LIT β
+seq_r127_alpha:             LIT_ALPHA   lit_str_25, 53, seq_r127_alpha_saved, cursor, subject_data, subject_len_val, seq_r126_alpha, seq_l127_beta; LIT α
+seq_r127_beta:              LIT_BETA    seq_r127_alpha_saved, cursor, seq_l127_beta; LIT β
+seq_r126_alpha:             LIT_ALPHA   lit_str_26, 54, seq_r126_alpha_saved, cursor, subject_data, subject_len_val, seq_r125_alpha, seq_l126_beta; LIT α
+seq_r126_beta:              LIT_BETA    seq_r126_alpha_saved, cursor, seq_l126_beta; LIT β
+seq_r125_alpha:             LIT_ALPHA   lit_str_27, 43, seq_r125_alpha_saved, cursor, subject_data, subject_len_val, patdef_Functions_gamma, seq_l125_beta; LIT α
+seq_r125_beta:              LIT_BETA    seq_r125_alpha_saved, cursor, seq_l125_beta; LIT β
 
 patdef_Functions_gamma:
     jmp     [P_Functions_ret_gamma]
@@ -13684,17 +13132,11 @@ patdef_Functions_omega:
 
 ; ============ Named pattern: ExprList ============
 ; P_ExprList_alpha (α entry)
-
-; SEQ α=P_ExprList_alpha
-P_ExprList_alpha:           jmp     seq_l133_alpha
+P_ExprList_alpha:           jmp     seq_l133_alpha                      ; SEQ
 P_ExprList_beta:            jmp     seq_r133_beta
-
-; SEQ α=seq_l133_alpha
-seq_l133_alpha:             jmp     seq_l134_alpha
+seq_l133_alpha:             jmp     seq_l134_alpha                      ; SEQ
 seq_l133_beta:              jmp     seq_r134_beta
-
-; SEQ α=seq_l134_alpha
-seq_l134_alpha:             jmp     seq_l135_alpha
+seq_l134_alpha:             jmp     seq_l135_alpha                      ; SEQ
 seq_l134_beta:              jmp     seq_r135_beta
 
 ; UNIMPLEMENTED: nPush() → ω
@@ -13708,10 +13150,8 @@ seq_r135_alpha:             lea     rax, [rel nref136_gamma]
     lea     rax, [rel nref136_omega]
     mov     [P_XList_ret_omega], rax
     jmp     P_XList_alpha
-
-; REF(XList) β=seq_r135_beta
 seq_r135_beta:              lea     rax, [rel nref136_gamma]
-
+           ; REF(%s)
     mov     [P_XList_ret_gamma], rax
     lea     rax, [rel nref136_omega]
     mov     [P_XList_ret_omega], rax
@@ -13737,25 +13177,17 @@ patdef_ExprList_omega:
 
 ; ============ Named pattern: XList ============
 ; P_XList_alpha (α entry)
-
-; SEQ α=P_XList_alpha
-P_XList_alpha:              jmp     seq_l137_alpha
+P_XList_alpha:              jmp     seq_l137_alpha                      ; SEQ
 P_XList_beta:               jmp     seq_r137_beta
-
-; SEQ α=seq_l137_alpha
-seq_l137_alpha:             jmp     seq_l138_alpha
+seq_l137_alpha:             jmp     seq_l138_alpha                      ; SEQ
 seq_l137_beta:              jmp     seq_r138_beta
 
 ; UNIMPLEMENTED: nInc() → ω
 seq_l138_alpha:
 seq_l138_beta:              jmp     patdef_XList_omega
-
-; ALT α=seq_r138_alpha
-seq_r138_alpha:             mov     rax, [cursor]
-
-    mov     [alt139_cur_save], rax
+seq_r138_alpha:             ALT_SAVE_CURSOR     alt139_cur_save, cursor ; ALT α — save cursor, try left
     jmp     alt_l139_alpha
-seq_r138_beta:              jmp     alt_r139_beta
+seq_r138_beta:              SEQ_BETA    alt_r139_beta                   ; ALT β — resume right
 
 ; REF(Expr) α=alt_l139_alpha
 alt_l139_alpha:             lea     rax, [rel nref140_gamma]
@@ -13764,10 +13196,8 @@ alt_l139_alpha:             lea     rax, [rel nref140_gamma]
     lea     rax, [rel nref140_omega]
     mov     [P_Expr_ret_omega], rax
     jmp     P_Expr_alpha
-
-; REF(Expr) β=alt_l139_beta
 alt_l139_beta:              lea     rax, [rel nref140_gamma]
-
+           ; REF(%s)
     mov     [P_Expr_ret_gamma], rax
     lea     rax, [rel nref140_omega]
     mov     [P_Expr_ret_omega], rax
@@ -13777,11 +13207,7 @@ nref140_gamma:
     jmp     seq_r137_alpha
 nref140_omega:
     jmp     alt139_left_omega
-
-; ALT left_ω trampoline
-alt139_left_omega:          mov     rax, [alt139_cur_save]
-
-    mov     [cursor], rax
+alt139_left_omega:          ALT_RESTORE_CURSOR  alt139_cur_save, cursor ; ALT left_ω — restore cursor, try right
     jmp     alt_r139_alpha
 
 ; DOL( $  v)  α=alt_r139_alpha
@@ -13807,9 +13233,7 @@ dol141_gamma:
     mov     rcx, rax
     rep     movsb
     jmp     seq_r137_alpha
-
-; DOL ω — child failed, no capture
-dol141_omega:               jmp     seq_l138_beta
+dol141_omega:               jmp     seq_l138_beta                       ; DOL ω — child failed, no capture
 
 ; UNIMPLEMENTED: FENCE() → ω
 seq_r137_alpha:
@@ -13830,10 +13254,8 @@ P_Expr_alpha:               lea     rax, [rel nref142_gamma]
     lea     rax, [rel nref142_omega]
     mov     [P_Expr0_ret_omega], rax
     jmp     P_Expr0_alpha
-
-; REF(Expr0) β=P_Expr_beta
 P_Expr_beta:                lea     rax, [rel nref142_gamma]
-
+           ; REF(%s)
     mov     [P_Expr0_ret_gamma], rax
     lea     rax, [rel nref142_omega]
     mov     [P_Expr0_ret_omega], rax
@@ -13851,9 +13273,7 @@ patdef_Expr_omega:
 
 ; ============ Named pattern: Expr0 ============
 ; P_Expr0_alpha (α entry)
-
-; SEQ α=P_Expr0_alpha
-P_Expr0_alpha:              jmp     seq_l143_alpha
+P_Expr0_alpha:              jmp     seq_l143_alpha                      ; SEQ
 P_Expr0_beta:               jmp     seq_r143_beta
 
 ; REF(Expr1) α=seq_l143_alpha
@@ -13863,10 +13283,8 @@ seq_l143_alpha:             lea     rax, [rel nref144_gamma]
     lea     rax, [rel nref144_omega]
     mov     [P_Expr1_ret_omega], rax
     jmp     P_Expr1_alpha
-
-; REF(Expr1) β=seq_l143_beta
 seq_l143_beta:              lea     rax, [rel nref144_gamma]
-
+           ; REF(%s)
     mov     [P_Expr1_ret_gamma], rax
     lea     rax, [rel nref144_omega]
     mov     [P_Expr1_ret_omega], rax
@@ -13888,9 +13306,7 @@ patdef_Expr0_omega:
 
 ; ============ Named pattern: Expr1 ============
 ; P_Expr1_alpha (α entry)
-
-; SEQ α=P_Expr1_alpha
-P_Expr1_alpha:              jmp     seq_l145_alpha
+P_Expr1_alpha:              jmp     seq_l145_alpha                      ; SEQ
 P_Expr1_beta:               jmp     seq_r145_beta
 
 ; REF(Expr2) α=seq_l145_alpha
@@ -13900,10 +13316,8 @@ seq_l145_alpha:             lea     rax, [rel nref146_gamma]
     lea     rax, [rel nref146_omega]
     mov     [P_Expr2_ret_omega], rax
     jmp     P_Expr2_alpha
-
-; REF(Expr2) β=seq_l145_beta
 seq_l145_beta:              lea     rax, [rel nref146_gamma]
-
+           ; REF(%s)
     mov     [P_Expr2_ret_gamma], rax
     lea     rax, [rel nref146_omega]
     mov     [P_Expr2_ret_omega], rax
@@ -13925,9 +13339,7 @@ patdef_Expr1_omega:
 
 ; ============ Named pattern: Expr2 ============
 ; P_Expr2_alpha (α entry)
-
-; SEQ α=P_Expr2_alpha
-P_Expr2_alpha:              jmp     seq_l147_alpha
+P_Expr2_alpha:              jmp     seq_l147_alpha                      ; SEQ
 P_Expr2_beta:               jmp     seq_r147_beta
 
 ; REF(Expr3) α=seq_l147_alpha
@@ -13937,10 +13349,8 @@ seq_l147_alpha:             lea     rax, [rel nref148_gamma]
     lea     rax, [rel nref148_omega]
     mov     [P_Expr3_ret_omega], rax
     jmp     P_Expr3_alpha
-
-; REF(Expr3) β=seq_l147_beta
 seq_l147_beta:              lea     rax, [rel nref148_gamma]
-
+           ; REF(%s)
     mov     [P_Expr3_ret_gamma], rax
     lea     rax, [rel nref148_omega]
     mov     [P_Expr3_ret_omega], rax
@@ -13962,17 +13372,11 @@ patdef_Expr2_omega:
 
 ; ============ Named pattern: Expr3 ============
 ; P_Expr3_alpha (α entry)
-
-; SEQ α=P_Expr3_alpha
-P_Expr3_alpha:              jmp     seq_l149_alpha
+P_Expr3_alpha:              jmp     seq_l149_alpha                      ; SEQ
 P_Expr3_beta:               jmp     seq_r149_beta
-
-; SEQ α=seq_l149_alpha
-seq_l149_alpha:             jmp     seq_l150_alpha
+seq_l149_alpha:             jmp     seq_l150_alpha                      ; SEQ
 seq_l149_beta:              jmp     seq_r150_beta
-
-; SEQ α=seq_l150_alpha
-seq_l150_alpha:             jmp     seq_l151_alpha
+seq_l150_alpha:             jmp     seq_l151_alpha                      ; SEQ
 seq_l150_beta:              jmp     seq_r151_beta
 
 ; UNIMPLEMENTED: nPush() → ω
@@ -13986,10 +13390,8 @@ seq_r151_alpha:             lea     rax, [rel nref152_gamma]
     lea     rax, [rel nref152_omega]
     mov     [P_X3_ret_omega], rax
     jmp     P_X3_alpha
-
-; REF(X3) β=seq_r151_beta
 seq_r151_beta:              lea     rax, [rel nref152_gamma]
-
+           ; REF(%s)
     mov     [P_X3_ret_gamma], rax
     lea     rax, [rel nref152_omega]
     mov     [P_X3_ret_omega], rax
@@ -14015,13 +13417,9 @@ patdef_Expr3_omega:
 
 ; ============ Named pattern: X3 ============
 ; P_X3_alpha (α entry)
-
-; SEQ α=P_X3_alpha
-P_X3_alpha:                 jmp     seq_l153_alpha
+P_X3_alpha:                 jmp     seq_l153_alpha                      ; SEQ
 P_X3_beta:                  jmp     seq_r153_beta
-
-; SEQ α=seq_l153_alpha
-seq_l153_alpha:             jmp     seq_l154_alpha
+seq_l153_alpha:             jmp     seq_l154_alpha                      ; SEQ
 seq_l153_beta:              jmp     seq_r154_beta
 
 ; UNIMPLEMENTED: nInc() → ω
@@ -14035,10 +13433,8 @@ seq_r154_alpha:             lea     rax, [rel nref155_gamma]
     lea     rax, [rel nref155_omega]
     mov     [P_Expr4_ret_omega], rax
     jmp     P_Expr4_alpha
-
-; REF(Expr4) β=seq_r154_beta
 seq_r154_beta:              lea     rax, [rel nref155_gamma]
-
+           ; REF(%s)
     mov     [P_Expr4_ret_gamma], rax
     lea     rax, [rel nref155_omega]
     mov     [P_Expr4_ret_omega], rax
@@ -14060,17 +13456,11 @@ patdef_X3_omega:
 
 ; ============ Named pattern: Expr4 ============
 ; P_Expr4_alpha (α entry)
-
-; SEQ α=P_Expr4_alpha
-P_Expr4_alpha:              jmp     seq_l156_alpha
+P_Expr4_alpha:              jmp     seq_l156_alpha                      ; SEQ
 P_Expr4_beta:               jmp     seq_r156_beta
-
-; SEQ α=seq_l156_alpha
-seq_l156_alpha:             jmp     seq_l157_alpha
+seq_l156_alpha:             jmp     seq_l157_alpha                      ; SEQ
 seq_l156_beta:              jmp     seq_r157_beta
-
-; SEQ α=seq_l157_alpha
-seq_l157_alpha:             jmp     seq_l158_alpha
+seq_l157_alpha:             jmp     seq_l158_alpha                      ; SEQ
 seq_l157_beta:              jmp     seq_r158_beta
 
 ; UNIMPLEMENTED: nPush() → ω
@@ -14084,10 +13474,8 @@ seq_r158_alpha:             lea     rax, [rel nref159_gamma]
     lea     rax, [rel nref159_omega]
     mov     [P_X4_ret_omega], rax
     jmp     P_X4_alpha
-
-; REF(X4) β=seq_r158_beta
 seq_r158_beta:              lea     rax, [rel nref159_gamma]
-
+           ; REF(%s)
     mov     [P_X4_ret_gamma], rax
     lea     rax, [rel nref159_omega]
     mov     [P_X4_ret_omega], rax
@@ -14113,13 +13501,9 @@ patdef_Expr4_omega:
 
 ; ============ Named pattern: X4 ============
 ; P_X4_alpha (α entry)
-
-; SEQ α=P_X4_alpha
-P_X4_alpha:                 jmp     seq_l160_alpha
+P_X4_alpha:                 jmp     seq_l160_alpha                      ; SEQ
 P_X4_beta:                  jmp     seq_r160_beta
-
-; SEQ α=seq_l160_alpha
-seq_l160_alpha:             jmp     seq_l161_alpha
+seq_l160_alpha:             jmp     seq_l161_alpha                      ; SEQ
 seq_l160_beta:              jmp     seq_r161_beta
 
 ; UNIMPLEMENTED: nInc() → ω
@@ -14133,10 +13517,8 @@ seq_r161_alpha:             lea     rax, [rel nref162_gamma]
     lea     rax, [rel nref162_omega]
     mov     [P_Expr5_ret_omega], rax
     jmp     P_Expr5_alpha
-
-; REF(Expr5) β=seq_r161_beta
 seq_r161_beta:              lea     rax, [rel nref162_gamma]
-
+           ; REF(%s)
     mov     [P_Expr5_ret_gamma], rax
     lea     rax, [rel nref162_omega]
     mov     [P_Expr5_ret_omega], rax
@@ -14158,9 +13540,7 @@ patdef_X4_omega:
 
 ; ============ Named pattern: Expr5 ============
 ; P_Expr5_alpha (α entry)
-
-; SEQ α=P_Expr5_alpha
-P_Expr5_alpha:              jmp     seq_l163_alpha
+P_Expr5_alpha:              jmp     seq_l163_alpha                      ; SEQ
 P_Expr5_beta:               jmp     seq_r163_beta
 
 ; REF(Expr6) α=seq_l163_alpha
@@ -14170,10 +13550,8 @@ seq_l163_alpha:             lea     rax, [rel nref164_gamma]
     lea     rax, [rel nref164_omega]
     mov     [P_Expr6_ret_omega], rax
     jmp     P_Expr6_alpha
-
-; REF(Expr6) β=seq_l163_beta
 seq_l163_beta:              lea     rax, [rel nref164_gamma]
-
+           ; REF(%s)
     mov     [P_Expr6_ret_gamma], rax
     lea     rax, [rel nref164_omega]
     mov     [P_Expr6_ret_omega], rax
@@ -14195,9 +13573,7 @@ patdef_Expr5_omega:
 
 ; ============ Named pattern: Expr6 ============
 ; P_Expr6_alpha (α entry)
-
-; SEQ α=P_Expr6_alpha
-P_Expr6_alpha:              jmp     seq_l165_alpha
+P_Expr6_alpha:              jmp     seq_l165_alpha                      ; SEQ
 P_Expr6_beta:               jmp     seq_r165_beta
 
 ; REF(Expr7) α=seq_l165_alpha
@@ -14207,10 +13583,8 @@ seq_l165_alpha:             lea     rax, [rel nref166_gamma]
     lea     rax, [rel nref166_omega]
     mov     [P_Expr7_ret_omega], rax
     jmp     P_Expr7_alpha
-
-; REF(Expr7) β=seq_l165_beta
 seq_l165_beta:              lea     rax, [rel nref166_gamma]
-
+           ; REF(%s)
     mov     [P_Expr7_ret_gamma], rax
     lea     rax, [rel nref166_omega]
     mov     [P_Expr7_ret_omega], rax
@@ -14232,9 +13606,7 @@ patdef_Expr6_omega:
 
 ; ============ Named pattern: Expr7 ============
 ; P_Expr7_alpha (α entry)
-
-; SEQ α=P_Expr7_alpha
-P_Expr7_alpha:              jmp     seq_l167_alpha
+P_Expr7_alpha:              jmp     seq_l167_alpha                      ; SEQ
 P_Expr7_beta:               jmp     seq_r167_beta
 
 ; REF(Expr8) α=seq_l167_alpha
@@ -14244,10 +13616,8 @@ seq_l167_alpha:             lea     rax, [rel nref168_gamma]
     lea     rax, [rel nref168_omega]
     mov     [P_Expr8_ret_omega], rax
     jmp     P_Expr8_alpha
-
-; REF(Expr8) β=seq_l167_beta
 seq_l167_beta:              lea     rax, [rel nref168_gamma]
-
+           ; REF(%s)
     mov     [P_Expr8_ret_gamma], rax
     lea     rax, [rel nref168_omega]
     mov     [P_Expr8_ret_omega], rax
@@ -14269,9 +13639,7 @@ patdef_Expr7_omega:
 
 ; ============ Named pattern: Expr8 ============
 ; P_Expr8_alpha (α entry)
-
-; SEQ α=P_Expr8_alpha
-P_Expr8_alpha:              jmp     seq_l169_alpha
+P_Expr8_alpha:              jmp     seq_l169_alpha                      ; SEQ
 P_Expr8_beta:               jmp     seq_r169_beta
 
 ; REF(Expr9) α=seq_l169_alpha
@@ -14281,10 +13649,8 @@ seq_l169_alpha:             lea     rax, [rel nref170_gamma]
     lea     rax, [rel nref170_omega]
     mov     [P_Expr9_ret_omega], rax
     jmp     P_Expr9_alpha
-
-; REF(Expr9) β=seq_l169_beta
 seq_l169_beta:              lea     rax, [rel nref170_gamma]
-
+           ; REF(%s)
     mov     [P_Expr9_ret_gamma], rax
     lea     rax, [rel nref170_omega]
     mov     [P_Expr9_ret_omega], rax
@@ -14306,9 +13672,7 @@ patdef_Expr8_omega:
 
 ; ============ Named pattern: Expr9 ============
 ; P_Expr9_alpha (α entry)
-
-; SEQ α=P_Expr9_alpha
-P_Expr9_alpha:              jmp     seq_l171_alpha
+P_Expr9_alpha:              jmp     seq_l171_alpha                      ; SEQ
 P_Expr9_beta:               jmp     seq_r171_beta
 
 ; REF(Expr10) α=seq_l171_alpha
@@ -14318,10 +13682,8 @@ seq_l171_alpha:             lea     rax, [rel nref172_gamma]
     lea     rax, [rel nref172_omega]
     mov     [P_Expr10_ret_omega], rax
     jmp     P_Expr10_alpha
-
-; REF(Expr10) β=seq_l171_beta
 seq_l171_beta:              lea     rax, [rel nref172_gamma]
-
+           ; REF(%s)
     mov     [P_Expr10_ret_gamma], rax
     lea     rax, [rel nref172_omega]
     mov     [P_Expr10_ret_omega], rax
@@ -14343,9 +13705,7 @@ patdef_Expr9_omega:
 
 ; ============ Named pattern: Expr10 ============
 ; P_Expr10_alpha (α entry)
-
-; SEQ α=P_Expr10_alpha
-P_Expr10_alpha:             jmp     seq_l173_alpha
+P_Expr10_alpha:             jmp     seq_l173_alpha                      ; SEQ
 P_Expr10_beta:              jmp     seq_r173_beta
 
 ; REF(Expr11) α=seq_l173_alpha
@@ -14355,10 +13715,8 @@ seq_l173_alpha:             lea     rax, [rel nref174_gamma]
     lea     rax, [rel nref174_omega]
     mov     [P_Expr11_ret_omega], rax
     jmp     P_Expr11_alpha
-
-; REF(Expr11) β=seq_l173_beta
 seq_l173_beta:              lea     rax, [rel nref174_gamma]
-
+           ; REF(%s)
     mov     [P_Expr11_ret_gamma], rax
     lea     rax, [rel nref174_omega]
     mov     [P_Expr11_ret_omega], rax
@@ -14380,9 +13738,7 @@ patdef_Expr10_omega:
 
 ; ============ Named pattern: Expr11 ============
 ; P_Expr11_alpha (α entry)
-
-; SEQ α=P_Expr11_alpha
-P_Expr11_alpha:             jmp     seq_l175_alpha
+P_Expr11_alpha:             jmp     seq_l175_alpha                      ; SEQ
 P_Expr11_beta:              jmp     seq_r175_beta
 
 ; REF(Expr12) α=seq_l175_alpha
@@ -14392,10 +13748,8 @@ seq_l175_alpha:             lea     rax, [rel nref176_gamma]
     lea     rax, [rel nref176_omega]
     mov     [P_Expr12_ret_omega], rax
     jmp     P_Expr12_alpha
-
-; REF(Expr12) β=seq_l175_beta
 seq_l175_beta:              lea     rax, [rel nref176_gamma]
-
+           ; REF(%s)
     mov     [P_Expr12_ret_gamma], rax
     lea     rax, [rel nref176_omega]
     mov     [P_Expr12_ret_omega], rax
@@ -14417,9 +13771,7 @@ patdef_Expr11_omega:
 
 ; ============ Named pattern: Expr12 ============
 ; P_Expr12_alpha (α entry)
-
-; SEQ α=P_Expr12_alpha
-P_Expr12_alpha:             jmp     seq_l177_alpha
+P_Expr12_alpha:             jmp     seq_l177_alpha                      ; SEQ
 P_Expr12_beta:              jmp     seq_r177_beta
 
 ; REF(Expr13) α=seq_l177_alpha
@@ -14429,10 +13781,8 @@ seq_l177_alpha:             lea     rax, [rel nref178_gamma]
     lea     rax, [rel nref178_omega]
     mov     [P_Expr13_ret_omega], rax
     jmp     P_Expr13_alpha
-
-; REF(Expr13) β=seq_l177_beta
 seq_l177_beta:              lea     rax, [rel nref178_gamma]
-
+           ; REF(%s)
     mov     [P_Expr13_ret_gamma], rax
     lea     rax, [rel nref178_omega]
     mov     [P_Expr13_ret_omega], rax
@@ -14454,9 +13804,7 @@ patdef_Expr12_omega:
 
 ; ============ Named pattern: Expr13 ============
 ; P_Expr13_alpha (α entry)
-
-; SEQ α=P_Expr13_alpha
-P_Expr13_alpha:             jmp     seq_l179_alpha
+P_Expr13_alpha:             jmp     seq_l179_alpha                      ; SEQ
 P_Expr13_beta:              jmp     seq_r179_beta
 
 ; REF(Expr14) α=seq_l179_alpha
@@ -14466,10 +13814,8 @@ seq_l179_alpha:             lea     rax, [rel nref180_gamma]
     lea     rax, [rel nref180_omega]
     mov     [P_Expr14_ret_omega], rax
     jmp     P_Expr14_alpha
-
-; REF(Expr14) β=seq_l179_beta
 seq_l179_beta:              lea     rax, [rel nref180_gamma]
-
+           ; REF(%s)
     mov     [P_Expr14_ret_gamma], rax
     lea     rax, [rel nref180_omega]
     mov     [P_Expr14_ret_omega], rax
@@ -14491,138 +13837,63 @@ patdef_Expr13_omega:
 
 ; ============ Named pattern: Expr14 ============
 ; P_Expr14_alpha (α entry)
-
-; ALT α=P_Expr14_alpha
-P_Expr14_alpha:             mov     rax, [cursor]
-
-    mov     [alt181_cur_save], rax
+P_Expr14_alpha:             ALT_SAVE_CURSOR     alt181_cur_save, cursor ; ALT α — save cursor, try left
     jmp     alt_l181_alpha
-P_Expr14_beta:              jmp     alt_r181_beta
-
-; ALT α=alt_l181_alpha
-alt_l181_alpha:             mov     rax, [cursor]
-
-    mov     [alt182_cur_save], rax
+P_Expr14_beta:              SEQ_BETA    alt_r181_beta                   ; ALT β — resume right
+alt_l181_alpha:             ALT_SAVE_CURSOR     alt182_cur_save, cursor ; ALT α — save cursor, try left
     jmp     alt_l182_alpha
-alt_l181_beta:              jmp     alt_r182_beta
-
-; ALT α=alt_l182_alpha
-alt_l182_alpha:             mov     rax, [cursor]
-
-    mov     [alt183_cur_save], rax
+alt_l181_beta:              SEQ_BETA    alt_r182_beta                   ; ALT β — resume right
+alt_l182_alpha:             ALT_SAVE_CURSOR     alt183_cur_save, cursor ; ALT α — save cursor, try left
     jmp     alt_l183_alpha
-alt_l182_beta:              jmp     alt_r183_beta
-
-; ALT α=alt_l183_alpha
-alt_l183_alpha:             mov     rax, [cursor]
-
-    mov     [alt184_cur_save], rax
+alt_l182_beta:              SEQ_BETA    alt_r183_beta                   ; ALT β — resume right
+alt_l183_alpha:             ALT_SAVE_CURSOR     alt184_cur_save, cursor ; ALT α — save cursor, try left
     jmp     alt_l184_alpha
-alt_l183_beta:              jmp     alt_r184_beta
-
-; ALT α=alt_l184_alpha
-alt_l184_alpha:             mov     rax, [cursor]
-
-    mov     [alt185_cur_save], rax
+alt_l183_beta:              SEQ_BETA    alt_r184_beta                   ; ALT β — resume right
+alt_l184_alpha:             ALT_SAVE_CURSOR     alt185_cur_save, cursor ; ALT α — save cursor, try left
     jmp     alt_l185_alpha
-alt_l184_beta:              jmp     alt_r185_beta
-
-; ALT α=alt_l185_alpha
-alt_l185_alpha:             mov     rax, [cursor]
-
-    mov     [alt186_cur_save], rax
+alt_l184_beta:              SEQ_BETA    alt_r185_beta                   ; ALT β — resume right
+alt_l185_alpha:             ALT_SAVE_CURSOR     alt186_cur_save, cursor ; ALT α — save cursor, try left
     jmp     alt_l186_alpha
-alt_l185_beta:              jmp     alt_r186_beta
-
-; ALT α=alt_l186_alpha
-alt_l186_alpha:             mov     rax, [cursor]
-
-    mov     [alt187_cur_save], rax
+alt_l185_beta:              SEQ_BETA    alt_r186_beta                   ; ALT β — resume right
+alt_l186_alpha:             ALT_SAVE_CURSOR     alt187_cur_save, cursor ; ALT α — save cursor, try left
     jmp     alt_l187_alpha
-alt_l186_beta:              jmp     alt_r187_beta
-
-; ALT α=alt_l187_alpha
-alt_l187_alpha:             mov     rax, [cursor]
-
-    mov     [alt188_cur_save], rax
+alt_l186_beta:              SEQ_BETA    alt_r187_beta                   ; ALT β — resume right
+alt_l187_alpha:             ALT_SAVE_CURSOR     alt188_cur_save, cursor ; ALT α — save cursor, try left
     jmp     alt_l188_alpha
-alt_l187_beta:              jmp     alt_r188_beta
-
-; ALT α=alt_l188_alpha
-alt_l188_alpha:             mov     rax, [cursor]
-
-    mov     [alt189_cur_save], rax
+alt_l187_beta:              SEQ_BETA    alt_r188_beta                   ; ALT β — resume right
+alt_l188_alpha:             ALT_SAVE_CURSOR     alt189_cur_save, cursor ; ALT α — save cursor, try left
     jmp     alt_l189_alpha
-alt_l188_beta:              jmp     alt_r189_beta
-
-; ALT α=alt_l189_alpha
-alt_l189_alpha:             mov     rax, [cursor]
-
-    mov     [alt190_cur_save], rax
+alt_l188_beta:              SEQ_BETA    alt_r189_beta                   ; ALT β — resume right
+alt_l189_alpha:             ALT_SAVE_CURSOR     alt190_cur_save, cursor ; ALT α — save cursor, try left
     jmp     alt_l190_alpha
-alt_l189_beta:              jmp     alt_r190_beta
-
-; ALT α=alt_l190_alpha
-alt_l190_alpha:             mov     rax, [cursor]
-
-    mov     [alt191_cur_save], rax
+alt_l189_beta:              SEQ_BETA    alt_r190_beta                   ; ALT β — resume right
+alt_l190_alpha:             ALT_SAVE_CURSOR     alt191_cur_save, cursor ; ALT α — save cursor, try left
     jmp     alt_l191_alpha
-alt_l190_beta:              jmp     alt_r191_beta
-
-; ALT α=alt_l191_alpha
-alt_l191_alpha:             mov     rax, [cursor]
-
-    mov     [alt192_cur_save], rax
+alt_l190_beta:              SEQ_BETA    alt_r191_beta                   ; ALT β — resume right
+alt_l191_alpha:             ALT_SAVE_CURSOR     alt192_cur_save, cursor ; ALT α — save cursor, try left
     jmp     alt_l192_alpha
-alt_l191_beta:              jmp     alt_r192_beta
-
-; ALT α=alt_l192_alpha
-alt_l192_alpha:             mov     rax, [cursor]
-
-    mov     [alt193_cur_save], rax
+alt_l191_beta:              SEQ_BETA    alt_r192_beta                   ; ALT β — resume right
+alt_l192_alpha:             ALT_SAVE_CURSOR     alt193_cur_save, cursor ; ALT α — save cursor, try left
     jmp     alt_l193_alpha
-alt_l192_beta:              jmp     alt_r193_beta
-
-; ALT α=alt_l193_alpha
-alt_l193_alpha:             mov     rax, [cursor]
-
-    mov     [alt194_cur_save], rax
+alt_l192_beta:              SEQ_BETA    alt_r193_beta                   ; ALT β — resume right
+alt_l193_alpha:             ALT_SAVE_CURSOR     alt194_cur_save, cursor ; ALT α — save cursor, try left
     jmp     alt_l194_alpha
-alt_l193_beta:              jmp     alt_r194_beta
-
-; ALT α=alt_l194_alpha
-alt_l194_alpha:             mov     rax, [cursor]
-
-    mov     [alt195_cur_save], rax
+alt_l193_beta:              SEQ_BETA    alt_r194_beta                   ; ALT β — resume right
+alt_l194_alpha:             ALT_SAVE_CURSOR     alt195_cur_save, cursor ; ALT α — save cursor, try left
     jmp     alt_l195_alpha
-alt_l194_beta:              jmp     alt_r195_beta
-
-; ALT α=alt_l195_alpha
-alt_l195_alpha:             mov     rax, [cursor]
-
-    mov     [alt196_cur_save], rax
+alt_l194_beta:              SEQ_BETA    alt_r195_beta                   ; ALT β — resume right
+alt_l195_alpha:             ALT_SAVE_CURSOR     alt196_cur_save, cursor ; ALT α — save cursor, try left
     jmp     alt_l196_alpha
-alt_l195_beta:              jmp     alt_r196_beta
-
-; ALT α=alt_l196_alpha
-alt_l196_alpha:             mov     rax, [cursor]
-
-    mov     [alt197_cur_save], rax
+alt_l195_beta:              SEQ_BETA    alt_r196_beta                   ; ALT β — resume right
+alt_l196_alpha:             ALT_SAVE_CURSOR     alt197_cur_save, cursor ; ALT α — save cursor, try left
     jmp     alt_l197_alpha
-alt_l196_beta:              jmp     alt_r197_beta
-
-; SEQ α=alt_l197_alpha
-alt_l197_alpha:             jmp     seq_l198_alpha
+alt_l196_beta:              SEQ_BETA    alt_r197_beta                   ; ALT β — resume right
+alt_l197_alpha:             jmp     seq_l198_alpha                      ; SEQ
 alt_l197_beta:              jmp     seq_r198_beta
-
-; SEQ α=seq_l198_alpha
-seq_l198_alpha:             jmp     seq_l199_alpha
+seq_l198_alpha:             jmp     seq_l199_alpha                      ; SEQ
 seq_l198_beta:              jmp     seq_r199_beta
-
-; LIT("@")  α=seq_l199_alpha
-seq_l199_alpha:             LIT_ALPHA1  64, seq_l199_alpha_saved, cursor, subject_data, subject_len_val, seq_r199_alpha, alt197_left_omega
-; LIT β
-seq_l199_beta:              LIT_BETA    seq_l199_alpha_saved, cursor, alt197_left_omega
+seq_l199_alpha:             LIT_ALPHA1  64, seq_l199_alpha_saved, cursor, subject_data, subject_len_val, seq_r199_alpha, alt197_left_omega; LIT α
+seq_l199_beta:              LIT_BETA    seq_l199_alpha_saved, cursor, alt197_left_omega; LIT β
 
 ; REF(Expr14) α=seq_r199_alpha
 seq_r199_alpha:             lea     rax, [rel nref200_gamma]
@@ -14631,10 +13902,8 @@ seq_r199_alpha:             lea     rax, [rel nref200_gamma]
     lea     rax, [rel nref200_omega]
     mov     [P_Expr14_ret_omega], rax
     jmp     P_Expr14_alpha
-
-; REF(Expr14) β=seq_r199_beta
 seq_r199_beta:              lea     rax, [rel nref200_gamma]
-
+           ; REF(%s)
     mov     [P_Expr14_ret_gamma], rax
     lea     rax, [rel nref200_omega]
     mov     [P_Expr14_ret_omega], rax
@@ -14648,25 +13917,14 @@ nref200_omega:
 ; UNIMPLEMENTED node kind 14 → ω
 seq_r198_alpha:
 seq_r198_beta:              jmp     seq_l198_beta
-
-; ALT left_ω trampoline
-alt197_left_omega:          mov     rax, [alt197_cur_save]
-
-    mov     [cursor], rax
+alt197_left_omega:          ALT_RESTORE_CURSOR  alt197_cur_save, cursor ; ALT left_ω — restore cursor, try right
     jmp     alt_r197_alpha
-
-; SEQ α=alt_r197_alpha
-alt_r197_alpha:             jmp     seq_l201_alpha
+alt_r197_alpha:             jmp     seq_l201_alpha                      ; SEQ
 alt_r197_beta:              jmp     seq_r201_beta
-
-; SEQ α=seq_l201_alpha
-seq_l201_alpha:             jmp     seq_l202_alpha
+seq_l201_alpha:             jmp     seq_l202_alpha                      ; SEQ
 seq_l201_beta:              jmp     seq_r202_beta
-
-; LIT("~")  α=seq_l202_alpha
-seq_l202_alpha:             LIT_ALPHA1  126, seq_l202_alpha_saved, cursor, subject_data, subject_len_val, seq_r202_alpha, alt196_left_omega
-; LIT β
-seq_l202_beta:              LIT_BETA    seq_l202_alpha_saved, cursor, alt196_left_omega
+seq_l202_alpha:             LIT_ALPHA1  126, seq_l202_alpha_saved, cursor, subject_data, subject_len_val, seq_r202_alpha, alt196_left_omega; LIT α
+seq_l202_beta:              LIT_BETA    seq_l202_alpha_saved, cursor, alt196_left_omega; LIT β
 
 ; REF(Expr14) α=seq_r202_alpha
 seq_r202_alpha:             lea     rax, [rel nref203_gamma]
@@ -14675,10 +13933,8 @@ seq_r202_alpha:             lea     rax, [rel nref203_gamma]
     lea     rax, [rel nref203_omega]
     mov     [P_Expr14_ret_omega], rax
     jmp     P_Expr14_alpha
-
-; REF(Expr14) β=seq_r202_beta
 seq_r202_beta:              lea     rax, [rel nref203_gamma]
-
+           ; REF(%s)
     mov     [P_Expr14_ret_gamma], rax
     lea     rax, [rel nref203_omega]
     mov     [P_Expr14_ret_omega], rax
@@ -14692,25 +13948,14 @@ nref203_omega:
 ; UNIMPLEMENTED node kind 14 → ω
 seq_r201_alpha:
 seq_r201_beta:              jmp     seq_l201_beta
-
-; ALT left_ω trampoline
-alt196_left_omega:          mov     rax, [alt196_cur_save]
-
-    mov     [cursor], rax
+alt196_left_omega:          ALT_RESTORE_CURSOR  alt196_cur_save, cursor ; ALT left_ω — restore cursor, try right
     jmp     alt_r196_alpha
-
-; SEQ α=alt_r196_alpha
-alt_r196_alpha:             jmp     seq_l204_alpha
+alt_r196_alpha:             jmp     seq_l204_alpha                      ; SEQ
 alt_r196_beta:              jmp     seq_r204_beta
-
-; SEQ α=seq_l204_alpha
-seq_l204_alpha:             jmp     seq_l205_alpha
+seq_l204_alpha:             jmp     seq_l205_alpha                      ; SEQ
 seq_l204_beta:              jmp     seq_r205_beta
-
-; LIT("?")  α=seq_l205_alpha
-seq_l205_alpha:             LIT_ALPHA1  63, seq_l205_alpha_saved, cursor, subject_data, subject_len_val, seq_r205_alpha, alt195_left_omega
-; LIT β
-seq_l205_beta:              LIT_BETA    seq_l205_alpha_saved, cursor, alt195_left_omega
+seq_l205_alpha:             LIT_ALPHA1  63, seq_l205_alpha_saved, cursor, subject_data, subject_len_val, seq_r205_alpha, alt195_left_omega; LIT α
+seq_l205_beta:              LIT_BETA    seq_l205_alpha_saved, cursor, alt195_left_omega; LIT β
 
 ; REF(Expr14) α=seq_r205_alpha
 seq_r205_alpha:             lea     rax, [rel nref206_gamma]
@@ -14719,10 +13964,8 @@ seq_r205_alpha:             lea     rax, [rel nref206_gamma]
     lea     rax, [rel nref206_omega]
     mov     [P_Expr14_ret_omega], rax
     jmp     P_Expr14_alpha
-
-; REF(Expr14) β=seq_r205_beta
 seq_r205_beta:              lea     rax, [rel nref206_gamma]
-
+           ; REF(%s)
     mov     [P_Expr14_ret_gamma], rax
     lea     rax, [rel nref206_omega]
     mov     [P_Expr14_ret_omega], rax
@@ -14736,11 +13979,7 @@ nref206_omega:
 ; UNIMPLEMENTED node kind 14 → ω
 seq_r204_alpha:
 seq_r204_beta:              jmp     seq_l204_beta
-
-; ALT left_ω trampoline
-alt195_left_omega:          mov     rax, [alt195_cur_save]
-
-    mov     [cursor], rax
+alt195_left_omega:          ALT_RESTORE_CURSOR  alt195_cur_save, cursor ; ALT left_ω — restore cursor, try right
     jmp     alt_r195_alpha
 
 ; DOL(ProtKwd $  ProtKwd)  α=alt_r195_alpha
@@ -14757,10 +13996,8 @@ dol207_child_alpha:         lea     rax, [rel nref208_gamma]
     lea     rax, [rel nref208_omega]
     mov     [P_ProtKwd_ret_omega], rax
     jmp     P_ProtKwd_alpha
-
-; REF(ProtKwd) β=dol207_child_beta
 dol207_child_beta:          lea     rax, [rel nref208_gamma]
-
+           ; REF(%s)
     mov     [P_ProtKwd_ret_gamma], rax
     lea     rax, [rel nref208_omega]
     mov     [P_ProtKwd_ret_omega], rax
@@ -14783,14 +14020,8 @@ dol207_gamma:
     mov     rcx, rax
     rep     movsb
     jmp     patdef_Expr14_gamma
-
-; DOL ω — child failed, no capture
-dol207_omega:               jmp     alt194_left_omega
-
-; ALT left_ω trampoline
-alt194_left_omega:          mov     rax, [alt194_cur_save]
-
-    mov     [cursor], rax
+dol207_omega:               jmp     alt194_left_omega                   ; DOL ω — child failed, no capture
+alt194_left_omega:          ALT_RESTORE_CURSOR  alt194_cur_save, cursor ; ALT left_ω — restore cursor, try right
     jmp     alt_r194_alpha
 
 ; DOL(UnprotKwd $  UnprotKwd)  α=alt_r194_alpha
@@ -14807,10 +14038,8 @@ dol209_child_alpha:         lea     rax, [rel nref210_gamma]
     lea     rax, [rel nref210_omega]
     mov     [P_UnprotKwd_ret_omega], rax
     jmp     P_UnprotKwd_alpha
-
-; REF(UnprotKwd) β=dol209_child_beta
 dol209_child_beta:          lea     rax, [rel nref210_gamma]
-
+           ; REF(%s)
     mov     [P_UnprotKwd_ret_gamma], rax
     lea     rax, [rel nref210_omega]
     mov     [P_UnprotKwd_ret_omega], rax
@@ -14833,28 +14062,15 @@ dol209_gamma:
     mov     rcx, rax
     rep     movsb
     jmp     patdef_Expr14_gamma
-
-; DOL ω — child failed, no capture
-dol209_omega:               jmp     alt193_left_omega
-
-; ALT left_ω trampoline
-alt193_left_omega:          mov     rax, [alt193_cur_save]
-
-    mov     [cursor], rax
+dol209_omega:               jmp     alt193_left_omega                   ; DOL ω — child failed, no capture
+alt193_left_omega:          ALT_RESTORE_CURSOR  alt193_cur_save, cursor ; ALT left_ω — restore cursor, try right
     jmp     alt_r193_alpha
-
-; SEQ α=alt_r193_alpha
-alt_r193_alpha:             jmp     seq_l211_alpha
+alt_r193_alpha:             jmp     seq_l211_alpha                      ; SEQ
 alt_r193_beta:              jmp     seq_r211_beta
-
-; SEQ α=seq_l211_alpha
-seq_l211_alpha:             jmp     seq_l212_alpha
+seq_l211_alpha:             jmp     seq_l212_alpha                      ; SEQ
 seq_l211_beta:              jmp     seq_r212_beta
-
-; LIT("&")  α=seq_l212_alpha
-seq_l212_alpha:             LIT_ALPHA1  38, seq_l212_alpha_saved, cursor, subject_data, subject_len_val, seq_r212_alpha, alt192_left_omega
-; LIT β
-seq_l212_beta:              LIT_BETA    seq_l212_alpha_saved, cursor, alt192_left_omega
+seq_l212_alpha:             LIT_ALPHA1  38, seq_l212_alpha_saved, cursor, subject_data, subject_len_val, seq_r212_alpha, alt192_left_omega; LIT α
+seq_l212_beta:              LIT_BETA    seq_l212_alpha_saved, cursor, alt192_left_omega; LIT β
 
 ; REF(Expr14) α=seq_r212_alpha
 seq_r212_alpha:             lea     rax, [rel nref213_gamma]
@@ -14863,10 +14079,8 @@ seq_r212_alpha:             lea     rax, [rel nref213_gamma]
     lea     rax, [rel nref213_omega]
     mov     [P_Expr14_ret_omega], rax
     jmp     P_Expr14_alpha
-
-; REF(Expr14) β=seq_r212_beta
 seq_r212_beta:              lea     rax, [rel nref213_gamma]
-
+           ; REF(%s)
     mov     [P_Expr14_ret_gamma], rax
     lea     rax, [rel nref213_omega]
     mov     [P_Expr14_ret_omega], rax
@@ -14880,25 +14094,14 @@ nref213_omega:
 ; UNIMPLEMENTED node kind 14 → ω
 seq_r211_alpha:
 seq_r211_beta:              jmp     seq_l211_beta
-
-; ALT left_ω trampoline
-alt192_left_omega:          mov     rax, [alt192_cur_save]
-
-    mov     [cursor], rax
+alt192_left_omega:          ALT_RESTORE_CURSOR  alt192_cur_save, cursor ; ALT left_ω — restore cursor, try right
     jmp     alt_r192_alpha
-
-; SEQ α=alt_r192_alpha
-alt_r192_alpha:             jmp     seq_l214_alpha
+alt_r192_alpha:             jmp     seq_l214_alpha                      ; SEQ
 alt_r192_beta:              jmp     seq_r214_beta
-
-; SEQ α=seq_l214_alpha
-seq_l214_alpha:             jmp     seq_l215_alpha
+seq_l214_alpha:             jmp     seq_l215_alpha                      ; SEQ
 seq_l214_beta:              jmp     seq_r215_beta
-
-; LIT("+")  α=seq_l215_alpha
-seq_l215_alpha:             LIT_ALPHA1  43, seq_l215_alpha_saved, cursor, subject_data, subject_len_val, seq_r215_alpha, alt191_left_omega
-; LIT β
-seq_l215_beta:              LIT_BETA    seq_l215_alpha_saved, cursor, alt191_left_omega
+seq_l215_alpha:             LIT_ALPHA1  43, seq_l215_alpha_saved, cursor, subject_data, subject_len_val, seq_r215_alpha, alt191_left_omega; LIT α
+seq_l215_beta:              LIT_BETA    seq_l215_alpha_saved, cursor, alt191_left_omega; LIT β
 
 ; REF(Expr14) α=seq_r215_alpha
 seq_r215_alpha:             lea     rax, [rel nref216_gamma]
@@ -14907,10 +14110,8 @@ seq_r215_alpha:             lea     rax, [rel nref216_gamma]
     lea     rax, [rel nref216_omega]
     mov     [P_Expr14_ret_omega], rax
     jmp     P_Expr14_alpha
-
-; REF(Expr14) β=seq_r215_beta
 seq_r215_beta:              lea     rax, [rel nref216_gamma]
-
+           ; REF(%s)
     mov     [P_Expr14_ret_gamma], rax
     lea     rax, [rel nref216_omega]
     mov     [P_Expr14_ret_omega], rax
@@ -14924,25 +14125,14 @@ nref216_omega:
 ; UNIMPLEMENTED node kind 14 → ω
 seq_r214_alpha:
 seq_r214_beta:              jmp     seq_l214_beta
-
-; ALT left_ω trampoline
-alt191_left_omega:          mov     rax, [alt191_cur_save]
-
-    mov     [cursor], rax
+alt191_left_omega:          ALT_RESTORE_CURSOR  alt191_cur_save, cursor ; ALT left_ω — restore cursor, try right
     jmp     alt_r191_alpha
-
-; SEQ α=alt_r191_alpha
-alt_r191_alpha:             jmp     seq_l217_alpha
+alt_r191_alpha:             jmp     seq_l217_alpha                      ; SEQ
 alt_r191_beta:              jmp     seq_r217_beta
-
-; SEQ α=seq_l217_alpha
-seq_l217_alpha:             jmp     seq_l218_alpha
+seq_l217_alpha:             jmp     seq_l218_alpha                      ; SEQ
 seq_l217_beta:              jmp     seq_r218_beta
-
-; LIT("-")  α=seq_l218_alpha
-seq_l218_alpha:             LIT_ALPHA1  45, seq_l218_alpha_saved, cursor, subject_data, subject_len_val, seq_r218_alpha, alt190_left_omega
-; LIT β
-seq_l218_beta:              LIT_BETA    seq_l218_alpha_saved, cursor, alt190_left_omega
+seq_l218_alpha:             LIT_ALPHA1  45, seq_l218_alpha_saved, cursor, subject_data, subject_len_val, seq_r218_alpha, alt190_left_omega; LIT α
+seq_l218_beta:              LIT_BETA    seq_l218_alpha_saved, cursor, alt190_left_omega; LIT β
 
 ; REF(Expr14) α=seq_r218_alpha
 seq_r218_alpha:             lea     rax, [rel nref219_gamma]
@@ -14951,10 +14141,8 @@ seq_r218_alpha:             lea     rax, [rel nref219_gamma]
     lea     rax, [rel nref219_omega]
     mov     [P_Expr14_ret_omega], rax
     jmp     P_Expr14_alpha
-
-; REF(Expr14) β=seq_r218_beta
 seq_r218_beta:              lea     rax, [rel nref219_gamma]
-
+           ; REF(%s)
     mov     [P_Expr14_ret_gamma], rax
     lea     rax, [rel nref219_omega]
     mov     [P_Expr14_ret_omega], rax
@@ -14968,25 +14156,14 @@ nref219_omega:
 ; UNIMPLEMENTED node kind 14 → ω
 seq_r217_alpha:
 seq_r217_beta:              jmp     seq_l217_beta
-
-; ALT left_ω trampoline
-alt190_left_omega:          mov     rax, [alt190_cur_save]
-
-    mov     [cursor], rax
+alt190_left_omega:          ALT_RESTORE_CURSOR  alt190_cur_save, cursor ; ALT left_ω — restore cursor, try right
     jmp     alt_r190_alpha
-
-; SEQ α=alt_r190_alpha
-alt_r190_alpha:             jmp     seq_l220_alpha
+alt_r190_alpha:             jmp     seq_l220_alpha                      ; SEQ
 alt_r190_beta:              jmp     seq_r220_beta
-
-; SEQ α=seq_l220_alpha
-seq_l220_alpha:             jmp     seq_l221_alpha
+seq_l220_alpha:             jmp     seq_l221_alpha                      ; SEQ
 seq_l220_beta:              jmp     seq_r221_beta
-
-; LIT("*")  α=seq_l221_alpha
-seq_l221_alpha:             LIT_ALPHA1  42, seq_l221_alpha_saved, cursor, subject_data, subject_len_val, seq_r221_alpha, alt189_left_omega
-; LIT β
-seq_l221_beta:              LIT_BETA    seq_l221_alpha_saved, cursor, alt189_left_omega
+seq_l221_alpha:             LIT_ALPHA1  42, seq_l221_alpha_saved, cursor, subject_data, subject_len_val, seq_r221_alpha, alt189_left_omega; LIT α
+seq_l221_beta:              LIT_BETA    seq_l221_alpha_saved, cursor, alt189_left_omega; LIT β
 
 ; REF(Expr14) α=seq_r221_alpha
 seq_r221_alpha:             lea     rax, [rel nref222_gamma]
@@ -14995,10 +14172,8 @@ seq_r221_alpha:             lea     rax, [rel nref222_gamma]
     lea     rax, [rel nref222_omega]
     mov     [P_Expr14_ret_omega], rax
     jmp     P_Expr14_alpha
-
-; REF(Expr14) β=seq_r221_beta
 seq_r221_beta:              lea     rax, [rel nref222_gamma]
-
+           ; REF(%s)
     mov     [P_Expr14_ret_gamma], rax
     lea     rax, [rel nref222_omega]
     mov     [P_Expr14_ret_omega], rax
@@ -15012,25 +14187,14 @@ nref222_omega:
 ; UNIMPLEMENTED node kind 14 → ω
 seq_r220_alpha:
 seq_r220_beta:              jmp     seq_l220_beta
-
-; ALT left_ω trampoline
-alt189_left_omega:          mov     rax, [alt189_cur_save]
-
-    mov     [cursor], rax
+alt189_left_omega:          ALT_RESTORE_CURSOR  alt189_cur_save, cursor ; ALT left_ω — restore cursor, try right
     jmp     alt_r189_alpha
-
-; SEQ α=alt_r189_alpha
-alt_r189_alpha:             jmp     seq_l223_alpha
+alt_r189_alpha:             jmp     seq_l223_alpha                      ; SEQ
 alt_r189_beta:              jmp     seq_r223_beta
-
-; SEQ α=seq_l223_alpha
-seq_l223_alpha:             jmp     seq_l224_alpha
+seq_l223_alpha:             jmp     seq_l224_alpha                      ; SEQ
 seq_l223_beta:              jmp     seq_r224_beta
-
-; LIT("$")  α=seq_l224_alpha
-seq_l224_alpha:             LIT_ALPHA1  36, seq_l224_alpha_saved, cursor, subject_data, subject_len_val, seq_r224_alpha, alt188_left_omega
-; LIT β
-seq_l224_beta:              LIT_BETA    seq_l224_alpha_saved, cursor, alt188_left_omega
+seq_l224_alpha:             LIT_ALPHA1  36, seq_l224_alpha_saved, cursor, subject_data, subject_len_val, seq_r224_alpha, alt188_left_omega; LIT α
+seq_l224_beta:              LIT_BETA    seq_l224_alpha_saved, cursor, alt188_left_omega; LIT β
 
 ; REF(Expr14) α=seq_r224_alpha
 seq_r224_alpha:             lea     rax, [rel nref225_gamma]
@@ -15039,10 +14203,8 @@ seq_r224_alpha:             lea     rax, [rel nref225_gamma]
     lea     rax, [rel nref225_omega]
     mov     [P_Expr14_ret_omega], rax
     jmp     P_Expr14_alpha
-
-; REF(Expr14) β=seq_r224_beta
 seq_r224_beta:              lea     rax, [rel nref225_gamma]
-
+           ; REF(%s)
     mov     [P_Expr14_ret_gamma], rax
     lea     rax, [rel nref225_omega]
     mov     [P_Expr14_ret_omega], rax
@@ -15056,25 +14218,14 @@ nref225_omega:
 ; UNIMPLEMENTED node kind 14 → ω
 seq_r223_alpha:
 seq_r223_beta:              jmp     seq_l223_beta
-
-; ALT left_ω trampoline
-alt188_left_omega:          mov     rax, [alt188_cur_save]
-
-    mov     [cursor], rax
+alt188_left_omega:          ALT_RESTORE_CURSOR  alt188_cur_save, cursor ; ALT left_ω — restore cursor, try right
     jmp     alt_r188_alpha
-
-; SEQ α=alt_r188_alpha
-alt_r188_alpha:             jmp     seq_l226_alpha
+alt_r188_alpha:             jmp     seq_l226_alpha                      ; SEQ
 alt_r188_beta:              jmp     seq_r226_beta
-
-; SEQ α=seq_l226_alpha
-seq_l226_alpha:             jmp     seq_l227_alpha
+seq_l226_alpha:             jmp     seq_l227_alpha                      ; SEQ
 seq_l226_beta:              jmp     seq_r227_beta
-
-; LIT(".")  α=seq_l227_alpha
-seq_l227_alpha:             LIT_ALPHA1  46, seq_l227_alpha_saved, cursor, subject_data, subject_len_val, seq_r227_alpha, alt187_left_omega
-; LIT β
-seq_l227_beta:              LIT_BETA    seq_l227_alpha_saved, cursor, alt187_left_omega
+seq_l227_alpha:             LIT_ALPHA1  46, seq_l227_alpha_saved, cursor, subject_data, subject_len_val, seq_r227_alpha, alt187_left_omega; LIT α
+seq_l227_beta:              LIT_BETA    seq_l227_alpha_saved, cursor, alt187_left_omega; LIT β
 
 ; REF(Expr14) α=seq_r227_alpha
 seq_r227_alpha:             lea     rax, [rel nref228_gamma]
@@ -15083,10 +14234,8 @@ seq_r227_alpha:             lea     rax, [rel nref228_gamma]
     lea     rax, [rel nref228_omega]
     mov     [P_Expr14_ret_omega], rax
     jmp     P_Expr14_alpha
-
-; REF(Expr14) β=seq_r227_beta
 seq_r227_beta:              lea     rax, [rel nref228_gamma]
-
+           ; REF(%s)
     mov     [P_Expr14_ret_gamma], rax
     lea     rax, [rel nref228_omega]
     mov     [P_Expr14_ret_omega], rax
@@ -15100,25 +14249,14 @@ nref228_omega:
 ; UNIMPLEMENTED node kind 14 → ω
 seq_r226_alpha:
 seq_r226_beta:              jmp     seq_l226_beta
-
-; ALT left_ω trampoline
-alt187_left_omega:          mov     rax, [alt187_cur_save]
-
-    mov     [cursor], rax
+alt187_left_omega:          ALT_RESTORE_CURSOR  alt187_cur_save, cursor ; ALT left_ω — restore cursor, try right
     jmp     alt_r187_alpha
-
-; SEQ α=alt_r187_alpha
-alt_r187_alpha:             jmp     seq_l229_alpha
+alt_r187_alpha:             jmp     seq_l229_alpha                      ; SEQ
 alt_r187_beta:              jmp     seq_r229_beta
-
-; SEQ α=seq_l229_alpha
-seq_l229_alpha:             jmp     seq_l230_alpha
+seq_l229_alpha:             jmp     seq_l230_alpha                      ; SEQ
 seq_l229_beta:              jmp     seq_r230_beta
-
-; LIT("!")  α=seq_l230_alpha
-seq_l230_alpha:             LIT_ALPHA1  33, seq_l230_alpha_saved, cursor, subject_data, subject_len_val, seq_r230_alpha, alt186_left_omega
-; LIT β
-seq_l230_beta:              LIT_BETA    seq_l230_alpha_saved, cursor, alt186_left_omega
+seq_l230_alpha:             LIT_ALPHA1  33, seq_l230_alpha_saved, cursor, subject_data, subject_len_val, seq_r230_alpha, alt186_left_omega; LIT α
+seq_l230_beta:              LIT_BETA    seq_l230_alpha_saved, cursor, alt186_left_omega; LIT β
 
 ; REF(Expr14) α=seq_r230_alpha
 seq_r230_alpha:             lea     rax, [rel nref231_gamma]
@@ -15127,10 +14265,8 @@ seq_r230_alpha:             lea     rax, [rel nref231_gamma]
     lea     rax, [rel nref231_omega]
     mov     [P_Expr14_ret_omega], rax
     jmp     P_Expr14_alpha
-
-; REF(Expr14) β=seq_r230_beta
 seq_r230_beta:              lea     rax, [rel nref231_gamma]
-
+           ; REF(%s)
     mov     [P_Expr14_ret_gamma], rax
     lea     rax, [rel nref231_omega]
     mov     [P_Expr14_ret_omega], rax
@@ -15144,25 +14280,14 @@ nref231_omega:
 ; UNIMPLEMENTED node kind 14 → ω
 seq_r229_alpha:
 seq_r229_beta:              jmp     seq_l229_beta
-
-; ALT left_ω trampoline
-alt186_left_omega:          mov     rax, [alt186_cur_save]
-
-    mov     [cursor], rax
+alt186_left_omega:          ALT_RESTORE_CURSOR  alt186_cur_save, cursor ; ALT left_ω — restore cursor, try right
     jmp     alt_r186_alpha
-
-; SEQ α=alt_r186_alpha
-alt_r186_alpha:             jmp     seq_l232_alpha
+alt_r186_alpha:             jmp     seq_l232_alpha                      ; SEQ
 alt_r186_beta:              jmp     seq_r232_beta
-
-; SEQ α=seq_l232_alpha
-seq_l232_alpha:             jmp     seq_l233_alpha
+seq_l232_alpha:             jmp     seq_l233_alpha                      ; SEQ
 seq_l232_beta:              jmp     seq_r233_beta
-
-; LIT("%")  α=seq_l233_alpha
-seq_l233_alpha:             LIT_ALPHA1  37, seq_l233_alpha_saved, cursor, subject_data, subject_len_val, seq_r233_alpha, alt185_left_omega
-; LIT β
-seq_l233_beta:              LIT_BETA    seq_l233_alpha_saved, cursor, alt185_left_omega
+seq_l233_alpha:             LIT_ALPHA1  37, seq_l233_alpha_saved, cursor, subject_data, subject_len_val, seq_r233_alpha, alt185_left_omega; LIT α
+seq_l233_beta:              LIT_BETA    seq_l233_alpha_saved, cursor, alt185_left_omega; LIT β
 
 ; REF(Expr14) α=seq_r233_alpha
 seq_r233_alpha:             lea     rax, [rel nref234_gamma]
@@ -15171,10 +14296,8 @@ seq_r233_alpha:             lea     rax, [rel nref234_gamma]
     lea     rax, [rel nref234_omega]
     mov     [P_Expr14_ret_omega], rax
     jmp     P_Expr14_alpha
-
-; REF(Expr14) β=seq_r233_beta
 seq_r233_beta:              lea     rax, [rel nref234_gamma]
-
+           ; REF(%s)
     mov     [P_Expr14_ret_gamma], rax
     lea     rax, [rel nref234_omega]
     mov     [P_Expr14_ret_omega], rax
@@ -15188,25 +14311,14 @@ nref234_omega:
 ; UNIMPLEMENTED node kind 14 → ω
 seq_r232_alpha:
 seq_r232_beta:              jmp     seq_l232_beta
-
-; ALT left_ω trampoline
-alt185_left_omega:          mov     rax, [alt185_cur_save]
-
-    mov     [cursor], rax
+alt185_left_omega:          ALT_RESTORE_CURSOR  alt185_cur_save, cursor ; ALT left_ω — restore cursor, try right
     jmp     alt_r185_alpha
-
-; SEQ α=alt_r185_alpha
-alt_r185_alpha:             jmp     seq_l235_alpha
+alt_r185_alpha:             jmp     seq_l235_alpha                      ; SEQ
 alt_r185_beta:              jmp     seq_r235_beta
-
-; SEQ α=seq_l235_alpha
-seq_l235_alpha:             jmp     seq_l236_alpha
+seq_l235_alpha:             jmp     seq_l236_alpha                      ; SEQ
 seq_l235_beta:              jmp     seq_r236_beta
-
-; LIT("/")  α=seq_l236_alpha
-seq_l236_alpha:             LIT_ALPHA1  47, seq_l236_alpha_saved, cursor, subject_data, subject_len_val, seq_r236_alpha, alt184_left_omega
-; LIT β
-seq_l236_beta:              LIT_BETA    seq_l236_alpha_saved, cursor, alt184_left_omega
+seq_l236_alpha:             LIT_ALPHA1  47, seq_l236_alpha_saved, cursor, subject_data, subject_len_val, seq_r236_alpha, alt184_left_omega; LIT α
+seq_l236_beta:              LIT_BETA    seq_l236_alpha_saved, cursor, alt184_left_omega; LIT β
 
 ; REF(Expr14) α=seq_r236_alpha
 seq_r236_alpha:             lea     rax, [rel nref237_gamma]
@@ -15215,10 +14327,8 @@ seq_r236_alpha:             lea     rax, [rel nref237_gamma]
     lea     rax, [rel nref237_omega]
     mov     [P_Expr14_ret_omega], rax
     jmp     P_Expr14_alpha
-
-; REF(Expr14) β=seq_r236_beta
 seq_r236_beta:              lea     rax, [rel nref237_gamma]
-
+           ; REF(%s)
     mov     [P_Expr14_ret_gamma], rax
     lea     rax, [rel nref237_omega]
     mov     [P_Expr14_ret_omega], rax
@@ -15232,25 +14342,14 @@ nref237_omega:
 ; UNIMPLEMENTED node kind 14 → ω
 seq_r235_alpha:
 seq_r235_beta:              jmp     seq_l235_beta
-
-; ALT left_ω trampoline
-alt184_left_omega:          mov     rax, [alt184_cur_save]
-
-    mov     [cursor], rax
+alt184_left_omega:          ALT_RESTORE_CURSOR  alt184_cur_save, cursor ; ALT left_ω — restore cursor, try right
     jmp     alt_r184_alpha
-
-; SEQ α=alt_r184_alpha
-alt_r184_alpha:             jmp     seq_l238_alpha
+alt_r184_alpha:             jmp     seq_l238_alpha                      ; SEQ
 alt_r184_beta:              jmp     seq_r238_beta
-
-; SEQ α=seq_l238_alpha
-seq_l238_alpha:             jmp     seq_l239_alpha
+seq_l238_alpha:             jmp     seq_l239_alpha                      ; SEQ
 seq_l238_beta:              jmp     seq_r239_beta
-
-; LIT("#")  α=seq_l239_alpha
-seq_l239_alpha:             LIT_ALPHA1  35, seq_l239_alpha_saved, cursor, subject_data, subject_len_val, seq_r239_alpha, alt183_left_omega
-; LIT β
-seq_l239_beta:              LIT_BETA    seq_l239_alpha_saved, cursor, alt183_left_omega
+seq_l239_alpha:             LIT_ALPHA1  35, seq_l239_alpha_saved, cursor, subject_data, subject_len_val, seq_r239_alpha, alt183_left_omega; LIT α
+seq_l239_beta:              LIT_BETA    seq_l239_alpha_saved, cursor, alt183_left_omega; LIT β
 
 ; REF(Expr14) α=seq_r239_alpha
 seq_r239_alpha:             lea     rax, [rel nref240_gamma]
@@ -15259,10 +14358,8 @@ seq_r239_alpha:             lea     rax, [rel nref240_gamma]
     lea     rax, [rel nref240_omega]
     mov     [P_Expr14_ret_omega], rax
     jmp     P_Expr14_alpha
-
-; REF(Expr14) β=seq_r239_beta
 seq_r239_beta:              lea     rax, [rel nref240_gamma]
-
+           ; REF(%s)
     mov     [P_Expr14_ret_gamma], rax
     lea     rax, [rel nref240_omega]
     mov     [P_Expr14_ret_omega], rax
@@ -15276,25 +14373,14 @@ nref240_omega:
 ; UNIMPLEMENTED node kind 14 → ω
 seq_r238_alpha:
 seq_r238_beta:              jmp     seq_l238_beta
-
-; ALT left_ω trampoline
-alt183_left_omega:          mov     rax, [alt183_cur_save]
-
-    mov     [cursor], rax
+alt183_left_omega:          ALT_RESTORE_CURSOR  alt183_cur_save, cursor ; ALT left_ω — restore cursor, try right
     jmp     alt_r183_alpha
-
-; SEQ α=alt_r183_alpha
-alt_r183_alpha:             jmp     seq_l241_alpha
+alt_r183_alpha:             jmp     seq_l241_alpha                      ; SEQ
 alt_r183_beta:              jmp     seq_r241_beta
-
-; SEQ α=seq_l241_alpha
-seq_l241_alpha:             jmp     seq_l242_alpha
+seq_l241_alpha:             jmp     seq_l242_alpha                      ; SEQ
 seq_l241_beta:              jmp     seq_r242_beta
-
-; LIT("=")  α=seq_l242_alpha
-seq_l242_alpha:             LIT_ALPHA1  61, seq_l242_alpha_saved, cursor, subject_data, subject_len_val, seq_r242_alpha, alt182_left_omega
-; LIT β
-seq_l242_beta:              LIT_BETA    seq_l242_alpha_saved, cursor, alt182_left_omega
+seq_l242_alpha:             LIT_ALPHA1  61, seq_l242_alpha_saved, cursor, subject_data, subject_len_val, seq_r242_alpha, alt182_left_omega; LIT α
+seq_l242_beta:              LIT_BETA    seq_l242_alpha_saved, cursor, alt182_left_omega; LIT β
 
 ; REF(Expr14) α=seq_r242_alpha
 seq_r242_alpha:             lea     rax, [rel nref243_gamma]
@@ -15303,10 +14389,8 @@ seq_r242_alpha:             lea     rax, [rel nref243_gamma]
     lea     rax, [rel nref243_omega]
     mov     [P_Expr14_ret_omega], rax
     jmp     P_Expr14_alpha
-
-; REF(Expr14) β=seq_r242_beta
 seq_r242_beta:              lea     rax, [rel nref243_gamma]
-
+           ; REF(%s)
     mov     [P_Expr14_ret_gamma], rax
     lea     rax, [rel nref243_omega]
     mov     [P_Expr14_ret_omega], rax
@@ -15320,25 +14404,14 @@ nref243_omega:
 ; UNIMPLEMENTED node kind 14 → ω
 seq_r241_alpha:
 seq_r241_beta:              jmp     seq_l241_beta
-
-; ALT left_ω trampoline
-alt182_left_omega:          mov     rax, [alt182_cur_save]
-
-    mov     [cursor], rax
+alt182_left_omega:          ALT_RESTORE_CURSOR  alt182_cur_save, cursor ; ALT left_ω — restore cursor, try right
     jmp     alt_r182_alpha
-
-; SEQ α=alt_r182_alpha
-alt_r182_alpha:             jmp     seq_l244_alpha
+alt_r182_alpha:             jmp     seq_l244_alpha                      ; SEQ
 alt_r182_beta:              jmp     seq_r244_beta
-
-; SEQ α=seq_l244_alpha
-seq_l244_alpha:             jmp     seq_l245_alpha
+seq_l244_alpha:             jmp     seq_l245_alpha                      ; SEQ
 seq_l244_beta:              jmp     seq_r245_beta
-
-; LIT("|")  α=seq_l245_alpha
-seq_l245_alpha:             LIT_ALPHA1  124, seq_l245_alpha_saved, cursor, subject_data, subject_len_val, seq_r245_alpha, alt181_left_omega
-; LIT β
-seq_l245_beta:              LIT_BETA    seq_l245_alpha_saved, cursor, alt181_left_omega
+seq_l245_alpha:             LIT_ALPHA1  124, seq_l245_alpha_saved, cursor, subject_data, subject_len_val, seq_r245_alpha, alt181_left_omega; LIT α
+seq_l245_beta:              LIT_BETA    seq_l245_alpha_saved, cursor, alt181_left_omega; LIT β
 
 ; REF(Expr14) α=seq_r245_alpha
 seq_r245_alpha:             lea     rax, [rel nref246_gamma]
@@ -15347,10 +14420,8 @@ seq_r245_alpha:             lea     rax, [rel nref246_gamma]
     lea     rax, [rel nref246_omega]
     mov     [P_Expr14_ret_omega], rax
     jmp     P_Expr14_alpha
-
-; REF(Expr14) β=seq_r245_beta
 seq_r245_beta:              lea     rax, [rel nref246_gamma]
-
+           ; REF(%s)
     mov     [P_Expr14_ret_gamma], rax
     lea     rax, [rel nref246_omega]
     mov     [P_Expr14_ret_omega], rax
@@ -15364,11 +14435,7 @@ nref246_omega:
 ; UNIMPLEMENTED node kind 14 → ω
 seq_r244_alpha:
 seq_r244_beta:              jmp     seq_l244_beta
-
-; ALT left_ω trampoline
-alt181_left_omega:          mov     rax, [alt181_cur_save]
-
-    mov     [cursor], rax
+alt181_left_omega:          ALT_RESTORE_CURSOR  alt181_cur_save, cursor ; ALT left_ω — restore cursor, try right
     jmp     alt_r181_alpha
 
 ; E_INDR unresolved: Expr15 → ω
