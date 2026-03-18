@@ -444,16 +444,7 @@ P_14_γ:                     SET_CAPTURE S_18, cap_ppTokName_buf, cap_ppTokName_
 P_14_ω:                     jmp     L_ppArgDone_2
 
 ; ======================================================================================================================
-L_sn_14:                    sub     rsp, 32
-                            GET_VAR     S_18
-                            STORE_ARG32 0
-                            LOAD_STR    S_26
-                            mov     [rbp-16], rax
-                            mov     [rbp-8],  rdx
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_25, 2
-                            add     rsp, 32
-                            STORE_RESULT
+L_sn_14:                    CONC2_VS16 S_25, S_18, S_26
                             FAIL_BR16   L_sf_15
                             jmp     L_sn_15
 L_sf_15:                    jmp     L_ppArgP2_3
@@ -482,16 +473,7 @@ L_sn_20:                    GET_VAR     S_8
 
 ;  ppArgP2 =============================================================================================================
 L_sn_21:
-L_ppArgP2_3:                sub     rsp, 32
-                            GET_VAR     S_18
-                            STORE_ARG32 0
-                            LOAD_STR    S_28
-                            mov     [rbp-16], rax
-                            mov     [rbp-8],  rdx
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_25, 2
-                            add     rsp, 32
-                            STORE_RESULT
+L_ppArgP2_3:                CONC2_VS16 S_25, S_18, S_28
                             FAIL_BR16   L_sf_22
                             jmp     L_sn_22
 L_sf_22:                    jmp     L_ppArgP3_4
@@ -520,16 +502,7 @@ L_sn_27:                    GET_VAR     S_8
 
 ;  ppArgP3 =============================================================================================================
 L_sn_28:
-L_ppArgP3_4:                sub     rsp, 32
-                            GET_VAR     S_18
-                            STORE_ARG32 0
-                            LOAD_STR    S_30
-                            mov     [rbp-16], rax
-                            mov     [rbp-8],  rdx
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_25, 2
-                            add     rsp, 32
-                            STORE_RESULT
+L_ppArgP3_4:                CONC2_VS16 S_25, S_18, S_30
                             FAIL_BR16   L_sf_29
                             jmp     L_sn_29
 L_sf_29:                    jmp     L_ppArgP4_5
@@ -558,16 +531,7 @@ L_sn_34:                    GET_VAR     S_8
 
 ;  ppArgP4 =============================================================================================================
 L_sn_35:
-L_ppArgP4_5:                sub     rsp, 32
-                            GET_VAR     S_18
-                            STORE_ARG32 0
-                            LOAD_STR    S_32
-                            mov     [rbp-16], rax
-                            mov     [rbp-8],  rdx
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_25, 2
-                            add     rsp, 32
-                            STORE_RESULT
+L_ppArgP4_5:                CONC2_VS16 S_25, S_18, S_32
                             FAIL_BR16   L_sf_36
                             jmp     L_sn_36
 L_sf_36:                    jmp     L_ppArgP5_6
@@ -596,16 +560,7 @@ L_sn_41:                    GET_VAR     S_8
 
 ;  ppArgP5 =============================================================================================================
 L_sn_42:
-L_ppArgP5_6:                sub     rsp, 32
-                            GET_VAR     S_18
-                            STORE_ARG32 0
-                            LOAD_STR    S_34
-                            mov     [rbp-16], rax
-                            mov     [rbp-8],  rdx
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_25, 2
-                            add     rsp, 32
-                            STORE_RESULT
+L_ppArgP5_6:                CONC2_VS16 S_25, S_18, S_34
                             FAIL_BR16   L_sf_43
                             jmp     L_sn_43
 L_sf_43:                    jmp     L_ppArgChk1_7
@@ -634,16 +589,7 @@ L_sn_48:                    GET_VAR     S_8
 
 ;  ppArgChk1 ===========================================================================================================
 L_sn_49:
-L_ppArgChk1_7:              sub     rsp, 32
-                            GET_VAR     S_18
-                            STORE_ARG32 0
-                            LOAD_STR    S_36
-                            mov     [rbp-16], rax
-                            mov     [rbp-8],  rdx
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_25, 2
-                            add     rsp, 32
-                            STORE_RESULT
+L_ppArgChk1_7:              CONC2_VS16 S_25, S_18, S_36
                             FAIL_BR16   L_sf_50
                             jmp     L_sn_50
 L_sf_50:                    jmp     L_ppArgChk2_8
@@ -654,16 +600,7 @@ L_sn_50:                    LOAD_NULVCL
 
 ;  ppArgChk2 ===========================================================================================================
 L_sn_51:
-L_ppArgChk2_8:              sub     rsp, 32
-                            GET_VAR     S_18
-                            STORE_ARG32 0
-                            LOAD_STR    S_38
-                            mov     [rbp-16], rax
-                            mov     [rbp-8],  rdx
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_25, 2
-                            add     rsp, 32
-                            STORE_RESULT
+L_ppArgChk2_8:              CONC2_VS16 S_25, S_18, S_38
                             FAIL_BR16   L_sf_52
                             jmp     L_sn_52
 L_sf_52:                    jmp     L_ppArgChk3_9
@@ -674,16 +611,7 @@ L_sn_52:                    LOAD_NULVCL
 
 ;  ppArgChk3 ===========================================================================================================
 L_sn_53:
-L_ppArgChk3_9:              sub     rsp, 32
-                            GET_VAR     S_18
-                            STORE_ARG32 0
-                            LOAD_STR    S_40
-                            mov     [rbp-16], rax
-                            mov     [rbp-8],  rdx
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_25, 2
-                            add     rsp, 32
-                            STORE_RESULT
+L_ppArgChk3_9:              CONC2_VS16 S_25, S_18, S_40
                             FAIL_BR16   L_sf_54
                             jmp     L_sn_54
 L_sf_54:                    jmp     L_ppArgChk4_10
@@ -694,16 +622,7 @@ L_sn_54:                    LOAD_NULVCL
 
 ;  ppArgChk4 ===========================================================================================================
 L_sn_55:
-L_ppArgChk4_10:             sub     rsp, 32
-                            GET_VAR     S_18
-                            STORE_ARG32 0
-                            LOAD_STR    S_42
-                            mov     [rbp-16], rax
-                            mov     [rbp-8],  rdx
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_25, 2
-                            add     rsp, 32
-                            STORE_RESULT
+L_ppArgChk4_10:             CONC2_VS16 S_25, S_18, S_42
                             FAIL_BR16   L_sf_56
                             jmp     L_sn_56
 L_sf_56:                    jmp     L_ppArgChk5_11
@@ -714,16 +633,7 @@ L_sn_56:                    LOAD_NULVCL
 
 ;  ppArgChk5 ===========================================================================================================
 L_sn_57:
-L_ppArgChk5_11:             sub     rsp, 32
-                            GET_VAR     S_18
-                            STORE_ARG32 0
-                            LOAD_STR    S_44
-                            mov     [rbp-16], rax
-                            mov     [rbp-8],  rdx
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_25, 2
-                            add     rsp, 32
-                            STORE_RESULT
+L_ppArgChk5_11:             CONC2_VS16 S_25, S_18, S_44
                             FAIL_BR16   L_sf_58
                             jmp     L_sn_58
 L_sf_58:                    jmp     L_ppArgChk6_12
@@ -740,16 +650,7 @@ L_sn_58:                    GET_VAR     S_7
 
 ;  ppArgChk6 ===========================================================================================================
 L_sn_59:
-L_ppArgChk6_12:             sub     rsp, 32
-                            GET_VAR     S_18
-                            STORE_ARG32 0
-                            LOAD_STR    S_46
-                            mov     [rbp-16], rax
-                            mov     [rbp-8],  rdx
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_25, 2
-                            add     rsp, 32
-                            STORE_RESULT
+L_ppArgChk6_12:             CONC2_VS16 S_25, S_18, S_46
                             FAIL_BR16   L_sf_60
                             jmp     L_sn_60
 L_sf_60:                    jmp     L_ppArgUnk_13
@@ -766,16 +667,7 @@ L_sn_60:                    GET_VAR     S_8
 
 ;  ppArgUnk ============================================================================================================
 L_sn_61:
-L_ppArgUnk_13:              sub     rsp, 32
-                            GET_VAR     S_18
-                            STORE_ARG32 0
-                            LOAD_STR    S_48
-                            mov     [rbp-16], rax
-                            mov     [rbp-8],  rdx
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_25, 2
-                            add     rsp, 32
-                            STORE_RESULT
+L_ppArgUnk_13:              CONC2_VS16 S_25, S_18, S_48
                             FAIL_BR16   L_sf_62
                             jmp     L_sn_62
 L_sf_62:                    jmp     L_ppArgWarn_14
@@ -1141,16 +1033,7 @@ L_sn_82:                    GET_VAR     S_80
                             jmp     L_sn_83
 
 ; ======================================================================================================================
-L_sn_83:                    sub     rsp, 32
-                            GET_VAR     S_80
-                            STORE_ARG32 0
-                            LOAD_INT    0
-                            mov     [rbp-16], rax
-                            mov     [rbp-8],  rdx
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_24, 2
-                            add     rsp, 32
-                            STORE_RESULT
+L_sn_83:                    CONC2_VN16 S_24, S_80
                             FAIL_BR16   L_sf_84
                             jmp     L_sn_84
 L_sf_84:                    jmp     L_ppAutoNew_19
@@ -1216,20 +1099,7 @@ L_sn_89:                    GET_VAR     S_86
 L_sn_90:
 L_ppAS1_20:                 GET_VAR     S_86
                             sub     rsp, 32
-                            sub     rsp, 32
-                            lea     rdi, [rel S_86]
-                            call    stmt_get
-                            mov     [rbp-32], rax
-                            mov     [rbp-24], rdx
-                            STORE_ARG32 0
-                            lea     rdi, [rel S_66]
-                            call    stmt_get
-                            mov     [rbp-32], rax
-                            mov     [rbp-24], rdx
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_88, 2
-                            add     rsp, 32
-                            STORE_RESULT
+                            CONC2_VV S_88, S_86, S_66
                             STORE_ARG32 0
                             mov     qword [rbp-32], 1
                             mov     qword [rbp-24], 0
@@ -4956,17 +4826,7 @@ L_sn_204:                   GET_VAR     S_51
                             sub     rsp, 32
                             sub     rsp, 32
                             sub     rsp, 32
-                            sub     rsp, 32
-                            lea     rdi, [rel S_280]
-                            call    stmt_get
-                            mov     [rbp-32], rax
-                            mov     [rbp-24], rdx
-                            STORE_ARG32 0
-                            LOAD_INT    0
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_279, 2
-                            add     rsp, 32
-                            STORE_RESULT
+                            CONC2_VN S_279, S_280
                             STORE_ARG32 0
                             LOAD_STR    S_278
                             STORE_ARG32 16
@@ -5081,20 +4941,7 @@ L_pp_0_32:                  GET_VAR     S_284
 L_sn_208:
 L_pp_1_33:                  GET_VAR     S_284
                             sub     rsp, 32
-                            sub     rsp, 32
-                            lea     rdi, [rel S_284]
-                            call    stmt_get
-                            mov     [rbp-32], rax
-                            mov     [rbp-24], rdx
-                            STORE_ARG32 0
-                            lea     rdi, [rel S_273]
-                            call    stmt_get
-                            mov     [rbp-32], rax
-                            mov     [rbp-24], rdx
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_88, 2
-                            add     rsp, 32
-                            STORE_RESULT
+                            CONC2_VV S_88, S_284, S_273
                             STORE_ARG32 0
                             mov     qword [rbp-32], 1
                             mov     qword [rbp-24], 0
@@ -6616,20 +6463,7 @@ L_sn_322:                   GET_VAR     S_284
 L_sn_323:
 L_pp_ExprList0_75:          GET_VAR     S_284
                             sub     rsp, 32
-                            sub     rsp, 32
-                            lea     rdi, [rel S_284]
-                            call    stmt_get
-                            mov     [rbp-32], rax
-                            mov     [rbp-24], rdx
-                            STORE_ARG32 0
-                            lea     rdi, [rel S_273]
-                            call    stmt_get
-                            mov     [rbp-32], rax
-                            mov     [rbp-24], rdx
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_88, 2
-                            add     rsp, 32
-                            STORE_RESULT
+                            CONC2_VV S_88, S_284, S_273
                             STORE_ARG32 0
                             mov     qword [rbp-32], 1
                             mov     qword [rbp-24], 0
@@ -6735,20 +6569,7 @@ L_sn_335:                   GET_VAR     S_284
 L_sn_336:
 L_pp_0_77:                  GET_VAR     S_284
                             sub     rsp, 32
-                            sub     rsp, 32
-                            lea     rdi, [rel S_284]
-                            call    stmt_get
-                            mov     [rbp-32], rax
-                            mov     [rbp-24], rdx
-                            STORE_ARG32 0
-                            lea     rdi, [rel S_273]
-                            call    stmt_get
-                            mov     [rbp-32], rax
-                            mov     [rbp-24], rdx
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_88, 2
-                            add     rsp, 32
-                            STORE_RESULT
+                            CONC2_VV S_88, S_284, S_273
                             STORE_ARG32 0
                             mov     qword [rbp-32], 1
                             mov     qword [rbp-24], 0
@@ -6874,20 +6695,7 @@ L_sn_349:                   GET_VAR     S_284
 L_sn_350:
 L_pp_0_82:                  GET_VAR     S_284
                             sub     rsp, 32
-                            sub     rsp, 32
-                            lea     rdi, [rel S_284]
-                            call    stmt_get
-                            mov     [rbp-32], rax
-                            mov     [rbp-24], rdx
-                            STORE_ARG32 0
-                            lea     rdi, [rel S_273]
-                            call    stmt_get
-                            mov     [rbp-32], rax
-                            mov     [rbp-24], rdx
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_88, 2
-                            add     rsp, 32
-                            STORE_RESULT
+                            CONC2_VV S_88, S_284, S_273
                             STORE_ARG32 0
                             mov     qword [rbp-32], 1
                             mov     qword [rbp-24], 0
@@ -6967,20 +6775,7 @@ L_sn_358:                   GET_VAR     S_284
 L_sn_359:
 L_pp_0_85:                  GET_VAR     S_284
                             sub     rsp, 32
-                            sub     rsp, 32
-                            lea     rdi, [rel S_284]
-                            call    stmt_get
-                            mov     [rbp-32], rax
-                            mov     [rbp-24], rdx
-                            STORE_ARG32 0
-                            lea     rdi, [rel S_273]
-                            call    stmt_get
-                            mov     [rbp-32], rax
-                            mov     [rbp-24], rdx
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_88, 2
-                            add     rsp, 32
-                            STORE_RESULT
+                            CONC2_VV S_88, S_284, S_273
                             STORE_ARG32 0
                             mov     qword [rbp-32], 1
                             mov     qword [rbp-24], 0
@@ -7004,14 +6799,7 @@ L_sn_360:                   sub     rsp, 16
 
 ; ======================================================================================================================
 L_sn_361:                   sub     rsp, 32
-                            sub     rsp, 32
-                            GET_VAR     S_284
-                            STORE_ARG32 0
-                            GET_VAR     S_273
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_88, 2
-                            add     rsp, 32
-                            STORE_RESULT
+                            CONC2_VV16 S_88, S_284, S_273
                             STORE_ARG32 0
                             sub     rsp, 16
                             GET_VAR     S_115
@@ -7061,20 +6849,7 @@ L_sn_364:                   GET_VAR     S_284
 L_sn_365:
 L_pp_0_88:                  GET_VAR     S_284
                             sub     rsp, 32
-                            sub     rsp, 32
-                            lea     rdi, [rel S_284]
-                            call    stmt_get
-                            mov     [rbp-32], rax
-                            mov     [rbp-24], rdx
-                            STORE_ARG32 0
-                            lea     rdi, [rel S_273]
-                            call    stmt_get
-                            mov     [rbp-32], rax
-                            mov     [rbp-24], rdx
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_88, 2
-                            add     rsp, 32
-                            STORE_RESULT
+                            CONC2_VV S_88, S_284, S_273
                             STORE_ARG32 0
                             mov     qword [rbp-32], 1
                             mov     qword [rbp-24], 0
@@ -7138,14 +6913,7 @@ L_sn_372:                   sub     rsp, 16
 
 ; ======================================================================================================================
 L_sn_373:                   sub     rsp, 32
-                            sub     rsp, 32
-                            GET_VAR     S_284
-                            STORE_ARG32 0
-                            GET_VAR     S_273
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_88, 2
-                            add     rsp, 32
-                            STORE_RESULT
+                            CONC2_VV16 S_88, S_284, S_273
                             STORE_ARG32 0
                             sub     rsp, 16
                             GET_VAR     S_115
@@ -7255,17 +7023,7 @@ L_sn_383:                   sub     rsp, 16
 
 ; ======================================================================================================================
 L_sn_384:                   sub     rsp, 16
-                            sub     rsp, 32
-                            LOAD_STR    S_179
-                            mov     [rbp-16], rax
-                            mov     [rbp-8],  rdx
-                            STORE_ARG32 0
-                            GET_VAR     S_115
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_459, 2
-                            add     rsp, 32
-                            mov     [rbp-16], rax
-                            mov     [rbp-8], rdx
+                            CONC2_SV16 S_459, S_179, S_115
                             STORE_ARG32 0
                             APPLY_FN_N  S_287, 1
                             add     rsp, 16
@@ -7361,16 +7119,7 @@ L_sn_394:                   GET_VAR     S_357
                             jmp     L_sn_395
 
 ; ======================================================================================================================
-L_sn_395:                   sub     rsp, 32
-                            GET_VAR     S_357
-                            STORE_ARG32 0
-                            LOAD_INT    0
-                            mov     [rbp-16], rax
-                            mov     [rbp-8],  rdx
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_279, 2
-                            add     rsp, 32
-                            STORE_RESULT
+L_sn_395:                   CONC2_VN16 S_279, S_357
                             FAIL_BR16   L_sf_396
                             jmp     L_sn_396
 L_sf_396:                   GOTO_ALWAYS  L_SNO_END     ; FRETURN
@@ -7446,17 +7195,7 @@ L_sn_400:                   GET_VAR     S_51
                             sub     rsp, 32
                             sub     rsp, 32
                             sub     rsp, 32
-                            sub     rsp, 32
-                            lea     rdi, [rel S_280]
-                            call    stmt_get
-                            mov     [rbp-32], rax
-                            mov     [rbp-24], rdx
-                            STORE_ARG32 0
-                            LOAD_INT    0
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_279, 2
-                            add     rsp, 32
-                            STORE_RESULT
+                            CONC2_VN S_279, S_280
                             STORE_ARG32 0
                             LOAD_STR    S_358
                             STORE_ARG32 16
@@ -8512,20 +8251,7 @@ L_sn_453:                   GET_VAR     S_284
 L_sn_454:
 L_ss_ExprList0_132:         GET_VAR     S_284
                             sub     rsp, 32
-                            sub     rsp, 32
-                            lea     rdi, [rel S_284]
-                            call    stmt_get
-                            mov     [rbp-32], rax
-                            mov     [rbp-24], rdx
-                            STORE_ARG32 0
-                            lea     rdi, [rel S_273]
-                            call    stmt_get
-                            mov     [rbp-32], rax
-                            mov     [rbp-24], rdx
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_88, 2
-                            add     rsp, 32
-                            STORE_RESULT
+                            CONC2_VV S_88, S_284, S_273
                             STORE_ARG32 0
                             mov     qword [rbp-32], 1
                             mov     qword [rbp-24], 0
@@ -8599,20 +8325,7 @@ L_sn_457:                   GET_VAR     S_284
 L_sn_458:
 L_ss_0_134:                 GET_VAR     S_284
                             sub     rsp, 32
-                            sub     rsp, 32
-                            lea     rdi, [rel S_284]
-                            call    stmt_get
-                            mov     [rbp-32], rax
-                            mov     [rbp-24], rdx
-                            STORE_ARG32 0
-                            lea     rdi, [rel S_273]
-                            call    stmt_get
-                            mov     [rbp-32], rax
-                            mov     [rbp-24], rdx
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_88, 2
-                            add     rsp, 32
-                            STORE_RESULT
+                            CONC2_VV S_88, S_284, S_273
                             STORE_ARG32 0
                             mov     qword [rbp-32], 1
                             mov     qword [rbp-24], 0
@@ -8702,20 +8415,7 @@ L_sn_463:                   GET_VAR     S_284
 L_sn_464:
 L_ss_0_139:                 GET_VAR     S_284
                             sub     rsp, 32
-                            sub     rsp, 32
-                            lea     rdi, [rel S_284]
-                            call    stmt_get
-                            mov     [rbp-32], rax
-                            mov     [rbp-24], rdx
-                            STORE_ARG32 0
-                            lea     rdi, [rel S_273]
-                            call    stmt_get
-                            mov     [rbp-32], rax
-                            mov     [rbp-24], rdx
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_88, 2
-                            add     rsp, 32
-                            STORE_RESULT
+                            CONC2_VV S_88, S_284, S_273
                             STORE_ARG32 0
                             mov     qword [rbp-32], 1
                             mov     qword [rbp-24], 0
@@ -8783,20 +8483,7 @@ L_sn_467:                   GET_VAR     S_284
 L_sn_468:
 L_ss_0_142:                 GET_VAR     S_284
                             sub     rsp, 32
-                            sub     rsp, 32
-                            lea     rdi, [rel S_284]
-                            call    stmt_get
-                            mov     [rbp-32], rax
-                            mov     [rbp-24], rdx
-                            STORE_ARG32 0
-                            lea     rdi, [rel S_273]
-                            call    stmt_get
-                            mov     [rbp-32], rax
-                            mov     [rbp-24], rdx
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_88, 2
-                            add     rsp, 32
-                            STORE_RESULT
+                            CONC2_VV S_88, S_284, S_273
                             STORE_ARG32 0
                             mov     qword [rbp-32], 1
                             mov     qword [rbp-24], 0
@@ -8864,20 +8551,7 @@ L_sn_471:                   GET_VAR     S_284
 L_sn_472:
 L_ss_0_145:                 GET_VAR     S_284
                             sub     rsp, 32
-                            sub     rsp, 32
-                            lea     rdi, [rel S_284]
-                            call    stmt_get
-                            mov     [rbp-32], rax
-                            mov     [rbp-24], rdx
-                            STORE_ARG32 0
-                            lea     rdi, [rel S_273]
-                            call    stmt_get
-                            mov     [rbp-32], rax
-                            mov     [rbp-24], rdx
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_88, 2
-                            add     rsp, 32
-                            STORE_RESULT
+                            CONC2_VV S_88, S_284, S_273
                             STORE_ARG32 0
                             mov     qword [rbp-32], 1
                             mov     qword [rbp-24], 0
@@ -9011,30 +8685,12 @@ L_sn_476:
 L_ssEnd_92:
 
 ; ======================================================================================================================
-L_sn_477:                   sub     rsp, 32
-                            LOAD_STR    S_417
-                            mov     [rbp-16], rax
-                            mov     [rbp-8],  rdx
-                            STORE_ARG32 0
-                            LOAD_STR    S_416
-                            mov     [rbp-16], rax
-                            mov     [rbp-8],  rdx
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_267, 2
-                            add     rsp, 32
-                            STORE_RESULT
+L_sn_477:                   CONC2_16   S_267, S_417, S_416
                             jmp     L_bVisitEnd_149
 
 ;  bVisit_ =============================================================================================================
 L_sn_478:
-L_bVisit_150:               sub     rsp, 32
-                            GET_VAR     S_419
-                            STORE_ARG32 0
-                            GET_VAR     S_270
-                            STORE_ARG32 16
-                            APPLY_FN_N  S_418, 2
-                            add     rsp, 32
-                            STORE_RESULT
+L_bVisit_150:               CONC2_VV16 S_418, S_419, S_270
                             FAIL_BR16   L_sf_479
                             jmp     L_sn_479
 L_sf_479:                   GOTO_ALWAYS  L_SNO_END     ; RETURN
