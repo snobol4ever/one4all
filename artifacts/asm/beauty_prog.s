@@ -10,6 +10,7 @@
     extern  stmt_concat, stmt_is_fail, stmt_finish
     extern  stmt_apply, stmt_goto_dispatch
     extern  stmt_setup_subject, stmt_apply_replacement
+    extern  stmt_set_capture
     global  cursor, subject_data, subject_len_val
 
 section .note.GNU-stack noalloc noexec nowrite progbits
@@ -312,8 +313,22 @@ L_sn_2:
     call    stmt_get
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_6]
+    call    stmt_strval
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    mov     rax, [rbp-32]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_5]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
     mov     rdi, [rbp-32]
     mov     rsi, [rbp-24]
     call    stmt_is_fail
@@ -393,8 +408,22 @@ L_sn_9:
     call    stmt_get
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
+    sub     rsp, 16
+    mov     rdi, 0
+    call    stmt_intval
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    mov     rax, [rbp-32]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_10]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
     mov     rdi, [rbp-32]
     mov     rsi, [rbp-24]
     call    stmt_is_fail
@@ -494,14 +523,72 @@ seq_r0_beta:
     jmp     seq_l0_beta
 
 P_12_γ:
+    lea     rdi, [rel S_18]
+    lea     rsi, [rel cap_ppTokName_buf]
+    mov     rdx, [cap_ppTokName_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_12]
+    lea     rsi, [rel cap_ppTokVal_buf]
+    mov     rdx, [cap_ppTokVal_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_62]
+    lea     rsi, [rel cap_ppGCon_buf]
+    mov     rdx, [cap_ppGCon_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_64]
+    lea     rsi, [rel cap_ppDrop_buf]
+    mov     rdx, [cap_ppDrop_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_459]
+    lea     rsi, [rel cap_cap_buf]
+    mov     rdx, [cap_cap_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_135]
+    lea     rsi, [rel cap_tx_buf]
+    mov     rdx, [cap_tx_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_13]
+    lea     rsi, [rel cap_v_buf]
+    mov     rdx, [cap_v_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_140]
+    lea     rsi, [rel cap_ProtKwd_buf]
+    mov     rdx, [cap_ProtKwd_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_143]
+    lea     rsi, [rel cap_UnprotKwd_buf]
+    mov     rdx, [cap_UnprotKwd_len]
+    call    stmt_set_capture
     jmp     L_sn_12
 P_12_ω:
     jmp     L_sn_12
 L_sn_12:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_9]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_24]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_13
+    jmp     L_sn_13
+L_sf_13:
+    jmp     L_ppArgDone_2
 L_sn_13:
 
     STMT_SEP
@@ -537,14 +624,80 @@ nref2_omega:
     jmp     P_14_ω
 
 P_14_γ:
+    lea     rdi, [rel S_18]
+    lea     rsi, [rel cap_ppTokName_buf]
+    mov     rdx, [cap_ppTokName_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_12]
+    lea     rsi, [rel cap_ppTokVal_buf]
+    mov     rdx, [cap_ppTokVal_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_62]
+    lea     rsi, [rel cap_ppGCon_buf]
+    mov     rdx, [cap_ppGCon_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_64]
+    lea     rsi, [rel cap_ppDrop_buf]
+    mov     rdx, [cap_ppDrop_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_459]
+    lea     rsi, [rel cap_cap_buf]
+    mov     rdx, [cap_cap_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_135]
+    lea     rsi, [rel cap_tx_buf]
+    mov     rdx, [cap_tx_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_13]
+    lea     rsi, [rel cap_v_buf]
+    mov     rdx, [cap_v_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_140]
+    lea     rsi, [rel cap_ProtKwd_buf]
+    mov     rdx, [cap_ProtKwd_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_143]
+    lea     rsi, [rel cap_UnprotKwd_buf]
+    mov     rdx, [cap_UnprotKwd_len]
+    call    stmt_set_capture
     jmp     L_sn_14
 P_14_ω:
     jmp     L_ppArgDone_2
 L_sn_14:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_18]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_26]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_25]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_15
+    jmp     L_sn_15
+L_sf_15:
+    jmp     L_ppArgP2_3
 L_sn_15:
 
     STMT_SEP
@@ -611,8 +764,38 @@ L_sn_21:
 
     STMT_SEP
 L_ppArgP2_3:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_18]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_28]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_25]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_22
+    jmp     L_sn_22
+L_sf_22:
+    jmp     L_ppArgP3_4
 L_sn_22:
 
     STMT_SEP
@@ -679,8 +862,38 @@ L_sn_28:
 
     STMT_SEP
 L_ppArgP3_4:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_18]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_30]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_25]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_29
+    jmp     L_sn_29
+L_sf_29:
+    jmp     L_ppArgP4_5
 L_sn_29:
 
     STMT_SEP
@@ -747,8 +960,38 @@ L_sn_35:
 
     STMT_SEP
 L_ppArgP4_5:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_18]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_32]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_25]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_36
+    jmp     L_sn_36
+L_sf_36:
+    jmp     L_ppArgP5_6
 L_sn_36:
 
     STMT_SEP
@@ -815,8 +1058,38 @@ L_sn_42:
 
     STMT_SEP
 L_ppArgP5_6:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_18]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_34]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_25]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_43
+    jmp     L_sn_43
+L_sf_43:
+    jmp     L_ppArgChk1_7
 L_sn_43:
 
     STMT_SEP
@@ -883,8 +1156,38 @@ L_sn_49:
 
     STMT_SEP
 L_ppArgChk1_7:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_18]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_36]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_25]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_50
+    jmp     L_sn_50
+L_sf_50:
+    jmp     L_ppArgChk2_8
 L_sn_50:
 
     STMT_SEP
@@ -895,8 +1198,38 @@ L_sn_51:
 
     STMT_SEP
 L_ppArgChk2_8:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_18]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_38]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_25]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_52
+    jmp     L_sn_52
+L_sf_52:
+    jmp     L_ppArgChk3_9
 L_sn_52:
 
     STMT_SEP
@@ -907,8 +1240,38 @@ L_sn_53:
 
     STMT_SEP
 L_ppArgChk3_9:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_18]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_40]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_25]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_54
+    jmp     L_sn_54
+L_sf_54:
+    jmp     L_ppArgChk4_10
 L_sn_54:
 
     STMT_SEP
@@ -919,8 +1282,38 @@ L_sn_55:
 
     STMT_SEP
 L_ppArgChk4_10:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_18]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_42]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_25]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_56
+    jmp     L_sn_56
+L_sf_56:
+    jmp     L_ppArgChk5_11
 L_sn_56:
 
     STMT_SEP
@@ -931,8 +1324,38 @@ L_sn_57:
 
     STMT_SEP
 L_ppArgChk5_11:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_18]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_44]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_25]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_58
+    jmp     L_sn_58
+L_sf_58:
+    jmp     L_ppArgChk6_12
 L_sn_58:
 
     STMT_SEP
@@ -958,8 +1381,38 @@ L_sn_59:
 
     STMT_SEP
 L_ppArgChk6_12:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_18]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_46]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_25]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_60
+    jmp     L_sn_60
+L_sf_60:
+    jmp     L_ppArgUnk_13
 L_sn_60:
 
     STMT_SEP
@@ -985,8 +1438,38 @@ L_sn_61:
 
     STMT_SEP
 L_ppArgUnk_13:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_18]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_48]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_25]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_62
+    jmp     L_sn_62
+L_sf_62:
+    jmp     L_ppArgWarn_14
 L_sn_62:
 
     STMT_SEP
@@ -1034,8 +1517,30 @@ L_ppArgDone_2:
 L_sn_65:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_49]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_24]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_66
+    jmp     L_sn_66
+L_sf_66:
+    jmp     L_ppAutoSkip_15
 L_sn_66:
 
     STMT_SEP
@@ -1043,8 +1548,22 @@ L_sn_66:
     call    stmt_get
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
+    sub     rsp, 16
+    mov     rdi, 9
+    call    stmt_intval
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    mov     rax, [rbp-32]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_55]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
     mov     rdi, [rbp-32]
     mov     rsi, [rbp-24]
     call    stmt_is_fail
@@ -1140,8 +1659,22 @@ L_sn_71:
     call    stmt_get
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
+    sub     rsp, 16
+    mov     rdi, 2000
+    call    stmt_intval
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    mov     rax, [rbp-32]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_5]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
     mov     rdi, [rbp-32]
     mov     rsi, [rbp-24]
     call    stmt_is_fail
@@ -1174,8 +1707,44 @@ L_sn_72:
 L_sn_73:
 
     STMT_SEP
+    sub     rsp, 64
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 3
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_13]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 32], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 40], rax
+    lea     rdi, [rel S_68]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 48], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 56], rax
+    lea     rdi, [rel S_71]
+    mov     rsi, rsp
+    mov     rdx, 4
+    call    stmt_apply
+    add     rsp, 64
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_74:
 
     STMT_SEP
@@ -1284,6 +1853,42 @@ seq_r3_beta:
     jmp     seq_l3_beta
 
 P_77_γ:
+    lea     rdi, [rel S_18]
+    lea     rsi, [rel cap_ppTokName_buf]
+    mov     rdx, [cap_ppTokName_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_12]
+    lea     rsi, [rel cap_ppTokVal_buf]
+    mov     rdx, [cap_ppTokVal_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_62]
+    lea     rsi, [rel cap_ppGCon_buf]
+    mov     rdx, [cap_ppGCon_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_64]
+    lea     rsi, [rel cap_ppDrop_buf]
+    mov     rdx, [cap_ppDrop_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_459]
+    lea     rsi, [rel cap_cap_buf]
+    mov     rdx, [cap_cap_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_135]
+    lea     rsi, [rel cap_tx_buf]
+    mov     rdx, [cap_tx_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_13]
+    lea     rsi, [rel cap_v_buf]
+    mov     rdx, [cap_v_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_140]
+    lea     rsi, [rel cap_ProtKwd_buf]
+    mov     rdx, [cap_ProtKwd_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_143]
+    lea     rsi, [rel cap_UnprotKwd_buf]
+    mov     rdx, [cap_UnprotKwd_len]
+    call    stmt_set_capture
     jmp     L_ppAutoR_16
 P_77_ω:
     jmp     L_sn_77
@@ -1350,14 +1955,72 @@ seq_r5_beta:
     jmp     seq_l5_beta
 
 P_78_γ:
+    lea     rdi, [rel S_18]
+    lea     rsi, [rel cap_ppTokName_buf]
+    mov     rdx, [cap_ppTokName_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_12]
+    lea     rsi, [rel cap_ppTokVal_buf]
+    mov     rdx, [cap_ppTokVal_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_62]
+    lea     rsi, [rel cap_ppGCon_buf]
+    mov     rdx, [cap_ppGCon_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_64]
+    lea     rsi, [rel cap_ppDrop_buf]
+    mov     rdx, [cap_ppDrop_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_459]
+    lea     rsi, [rel cap_cap_buf]
+    mov     rdx, [cap_cap_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_135]
+    lea     rsi, [rel cap_tx_buf]
+    mov     rdx, [cap_tx_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_13]
+    lea     rsi, [rel cap_v_buf]
+    mov     rdx, [cap_v_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_140]
+    lea     rsi, [rel cap_ProtKwd_buf]
+    mov     rdx, [cap_ProtKwd_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_143]
+    lea     rsi, [rel cap_UnprotKwd_buf]
+    mov     rdx, [cap_UnprotKwd_len]
+    call    stmt_set_capture
     jmp     L_ppAutoCont_18
 P_78_ω:
     jmp     L_sn_78
 L_sn_78:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_78]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_24]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_79
+    jmp     L_sn_79
+L_sf_79:
+    jmp     L_ppAutoNew_19
 L_sn_79:
 
     STMT_SEP
@@ -1393,6 +2056,42 @@ nref7_omega:
     jmp     P_80_ω
 
 P_80_γ:
+    lea     rdi, [rel S_18]
+    lea     rsi, [rel cap_ppTokName_buf]
+    mov     rdx, [cap_ppTokName_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_12]
+    lea     rsi, [rel cap_ppTokVal_buf]
+    mov     rdx, [cap_ppTokVal_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_62]
+    lea     rsi, [rel cap_ppGCon_buf]
+    mov     rdx, [cap_ppGCon_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_64]
+    lea     rsi, [rel cap_ppDrop_buf]
+    mov     rdx, [cap_ppDrop_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_459]
+    lea     rsi, [rel cap_cap_buf]
+    mov     rdx, [cap_cap_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_135]
+    lea     rsi, [rel cap_tx_buf]
+    mov     rdx, [cap_tx_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_13]
+    lea     rsi, [rel cap_v_buf]
+    mov     rdx, [cap_v_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_140]
+    lea     rsi, [rel cap_ProtKwd_buf]
+    mov     rdx, [cap_ProtKwd_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_143]
+    lea     rsi, [rel cap_UnprotKwd_buf]
+    mov     rdx, [cap_UnprotKwd_len]
+    call    stmt_set_capture
     jmp     L_sn_80
 P_80_ω:
     jmp     L_ppAutoNew_19
@@ -1452,6 +2151,42 @@ nref8_omega:
     jmp     P_82_ω
 
 P_82_γ:
+    lea     rdi, [rel S_18]
+    lea     rsi, [rel cap_ppTokName_buf]
+    mov     rdx, [cap_ppTokName_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_12]
+    lea     rsi, [rel cap_ppTokVal_buf]
+    mov     rdx, [cap_ppTokVal_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_62]
+    lea     rsi, [rel cap_ppGCon_buf]
+    mov     rdx, [cap_ppGCon_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_64]
+    lea     rsi, [rel cap_ppDrop_buf]
+    mov     rdx, [cap_ppDrop_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_459]
+    lea     rsi, [rel cap_cap_buf]
+    mov     rdx, [cap_cap_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_135]
+    lea     rsi, [rel cap_tx_buf]
+    mov     rdx, [cap_tx_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_13]
+    lea     rsi, [rel cap_v_buf]
+    mov     rdx, [cap_v_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_140]
+    lea     rsi, [rel cap_ProtKwd_buf]
+    mov     rdx, [cap_ProtKwd_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_143]
+    lea     rsi, [rel cap_UnprotKwd_buf]
+    mov     rdx, [cap_UnprotKwd_len]
+    call    stmt_set_capture
     jmp     L_sn_82
 P_82_ω:
     jmp     L_sn_82
@@ -1462,8 +2197,22 @@ L_sn_82:
     call    stmt_get
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_79]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    mov     rax, [rbp-32]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_81]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
     mov     rdi, [rbp-32]
     mov     rsi, [rbp-24]
     call    stmt_is_fail
@@ -1477,8 +2226,38 @@ L_sn_82:
 L_sn_83:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_80]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 0
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_24]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_84
+    jmp     L_sn_84
+L_sf_84:
+    jmp     L_ppAutoNew_19
 L_sn_84:
 
     STMT_SEP
@@ -1549,8 +2328,22 @@ L_sn_88:
 
     STMT_SEP
 L_ppAutoSort_17:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    mov     rdi, 3
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_85]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_89:
 
     STMT_SEP
@@ -1657,13 +2450,69 @@ L_ppAS2_22:
 L_sn_94:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_92]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 1
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_88]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_95
+    jmp     L_ppASins_23
 L_sn_95:
 
     STMT_SEP
+    sub     rsp, 32
+    lea     rdi, [rel S_90]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_88]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_96
+    jmp     L_sn_96
+L_sf_96:
+    jmp     L_ppASins_23
 L_sn_96:
 
     STMT_SEP
@@ -1720,8 +2569,38 @@ L_ppAutoCalc_21:
 L_sn_100:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_95]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 1
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_88]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_101
+    jmp     L_sn_101
+L_sf_101:
+    jmp     L_ppAP90ok_24
 L_sn_101:
 
     STMT_SEP
@@ -1766,8 +2645,38 @@ L_ppAP90ok_24:
 L_sn_103:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_97]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 20
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_88]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_104
+    jmp     L_sn_104
+L_sf_104:
+    jmp     L_ppAscale_25
 L_sn_104:
 
     STMT_SEP
@@ -1801,8 +2710,36 @@ L_sn_106:
 L_sn_107:
 
     STMT_SEP
+    sub     rsp, 32
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 40
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_88]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_108
+    jmp     L_sn_108
+L_sf_108:
+    jmp     L_ppAs1_26
 L_sn_108:
 
     STMT_SEP
@@ -1865,8 +2802,38 @@ L_sn_113:
 L_sn_114:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_8]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 10
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_88]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_115
+    jmp     L_sn_115
+L_sf_115:
+    jmp     L_ppAutoMsg_27
 L_sn_115:
 
     STMT_SEP
@@ -1910,8 +2877,44 @@ L_ppAutoMsg_27:
 L_sn_117:
 
     STMT_SEP
+    sub     rsp, 64
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 1
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_13]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 32], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 40], rax
+    lea     rdi, [rel S_68]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 48], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 56], rax
+    lea     rdi, [rel S_109]
+    mov     rsi, rsp
+    mov     rdx, 4
+    call    stmt_apply
+    add     rsp, 64
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_118:
 
     STMT_SEP
@@ -1923,8 +2926,22 @@ L_sn_119:
     call    stmt_get
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_112]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    mov     rax, [rbp-32]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_22]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
     mov     rdi, [rbp-32]
     mov     rsi, [rbp-24]
     call    stmt_is_fail
@@ -2826,8 +3843,20 @@ L_sn_184:
     call    stmt_get
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
+    sub     rsp, 16
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
+    mov     rax, [rbp-32]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_120]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
     mov     rdi, [rbp-32]
     mov     rsi, [rbp-24]
     call    stmt_is_fail
@@ -3088,15 +4117,51 @@ L_sn_197:
 L_sn_198:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_268]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_267]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
     jmp     L_ppEnd_28
 L_sn_199:
 
     STMT_SEP
 L_pp_29:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_24]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_200
+    jmp     L_sn_200
+L_sf_200:
+    GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_200:
 
     STMT_SEP
@@ -3104,8 +4169,22 @@ L_sn_200:
     call    stmt_get
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    mov     rax, [rbp-32]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_271]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
     mov     rdi, [rbp-32]
     mov     rsi, [rbp-24]
     call    stmt_is_fail
@@ -3123,8 +4202,22 @@ L_sn_201:
     call    stmt_get
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    mov     rax, [rbp-32]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_272]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
     mov     rdi, [rbp-32]
     mov     rsi, [rbp-24]
     call    stmt_is_fail
@@ -3142,8 +4235,22 @@ L_sn_202:
     call    stmt_get
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    mov     rax, [rbp-32]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_273]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
     mov     rdi, [rbp-32]
     mov     rsi, [rbp-24]
     call    stmt_is_fail
@@ -3161,8 +4268,22 @@ L_sn_203:
     call    stmt_get
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    mov     rax, [rbp-32]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_274]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
     mov     rdi, [rbp-32]
     mov     rsi, [rbp-24]
     call    stmt_is_fail
@@ -3194,8 +4315,30 @@ L_sn_204:
 L_sn_205:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_271]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_24]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_206
+    jmp     L_COMPUTED_pp_t_30
+L_sf_206:
+    GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_206:
 
     STMT_SEP
@@ -3263,364 +4406,1986 @@ L_sf_209:
 L_sn_209:
 
     STMT_SEP
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_269]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
     jmp     L_pp_1_33
 L_sn_210:
 
     STMT_SEP
 L_pp_BuiltinVar_34:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    sub     rsp, 16
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_288]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_211
+    GOTO_ALWAYS  L_SNO_END     ; RETURN
+L_sf_211:
+    jmp     L_error_35
 L_sn_211:
 
     STMT_SEP
 L_pp_Function_36:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    sub     rsp, 16
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_288]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_212
+    GOTO_ALWAYS  L_SNO_END     ; RETURN
+L_sf_212:
+    jmp     L_error_35
 L_sn_212:
 
     STMT_SEP
 L_pp_Id_37:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    sub     rsp, 16
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_288]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_213
+    GOTO_ALWAYS  L_SNO_END     ; RETURN
+L_sf_213:
+    jmp     L_error_35
 L_sn_213:
 
     STMT_SEP
 L_pp_Integer_38:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    sub     rsp, 16
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_288]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_214
+    GOTO_ALWAYS  L_SNO_END     ; RETURN
+L_sf_214:
+    jmp     L_error_35
 L_sn_214:
 
     STMT_SEP
 L_pp_Label_39:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    sub     rsp, 16
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_288]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_215
+    GOTO_ALWAYS  L_SNO_END     ; RETURN
+L_sf_215:
+    jmp     L_error_35
 L_sn_215:
 
     STMT_SEP
 L_pp_ProtKwd_40:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    sub     rsp, 16
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_288]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_216
+    GOTO_ALWAYS  L_SNO_END     ; RETURN
+L_sf_216:
+    jmp     L_error_35
 L_sn_216:
 
     STMT_SEP
 L_pp_Real_41:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    sub     rsp, 16
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_288]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_217
+    GOTO_ALWAYS  L_SNO_END     ; RETURN
+L_sf_217:
+    jmp     L_error_35
 L_sn_217:
 
     STMT_SEP
 L_pp_SpecialNm_42:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    sub     rsp, 16
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_288]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_218
+    GOTO_ALWAYS  L_SNO_END     ; RETURN
+L_sf_218:
+    jmp     L_error_35
 L_sn_218:
 
     STMT_SEP
 L_pp_String_43:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    sub     rsp, 16
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_288]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_219
+    GOTO_ALWAYS  L_SNO_END     ; RETURN
+L_sf_219:
+    jmp     L_error_35
 L_sn_219:
 
     STMT_SEP
 L_pp_UnprotKwd_44:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    sub     rsp, 16
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_288]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_220
+    GOTO_ALWAYS  L_SNO_END     ; RETURN
+L_sf_220:
+    jmp     L_error_35
 L_sn_220:
 
     STMT_SEP
 L_pp_45:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    sub     rsp, 16
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_288]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_221
+    GOTO_ALWAYS  L_SNO_END     ; RETURN
+L_sf_221:
+    jmp     L_error_35
 L_sn_221:
 
     STMT_SEP
 L_pp_46:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    sub     rsp, 16
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_288]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_222
+    GOTO_ALWAYS  L_SNO_END     ; RETURN
+L_sf_222:
+    jmp     L_error_35
 L_sn_222:
 
     STMT_SEP
 L_pp_S_47:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    sub     rsp, 16
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_288]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_223
+    GOTO_ALWAYS  L_SNO_END     ; RETURN
+L_sf_223:
+    jmp     L_error_35
 L_sn_223:
 
     STMT_SEP
 L_pp_S_48:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    sub     rsp, 16
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_288]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_224
+    GOTO_ALWAYS  L_SNO_END     ; RETURN
+L_sf_224:
+    jmp     L_error_35
 L_sn_224:
 
     STMT_SEP
 L_pp_F_49:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    sub     rsp, 16
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_288]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_225
+    GOTO_ALWAYS  L_SNO_END     ; RETURN
+L_sf_225:
+    jmp     L_error_35
 L_sn_225:
 
     STMT_SEP
 L_pp_F_50:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    sub     rsp, 16
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_288]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_226
+    GOTO_ALWAYS  L_SNO_END     ; RETURN
+L_sf_226:
+    jmp     L_error_35
 L_sn_226:
 
     STMT_SEP
 L_ppUnOp_51:
+    sub     rsp, 16
+    sub     rsp, 32
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_288]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_227
+    GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_227:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_271]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_228:
 
     STMT_SEP
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_269]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_229:
 
     STMT_SEP
 L_ppBinOp_52:
+    sub     rsp, 16
+    sub     rsp, 32
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_288]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_230
+    GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_230:
 
     STMT_SEP
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_269]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_231:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_115]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_232:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    lea     rdi, [rel S_307]
+    xor     rsi, rsi
+    xor     rdx, rdx
+    call    stmt_apply
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_233:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_271]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_234:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    lea     rdi, [rel S_308]
+    xor     rsi, rsi
+    xor     rdx, rdx
+    call    stmt_apply
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_235:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    lea     rdi, [rel S_309]
+    xor     rsi, rsi
+    xor     rdx, rdx
+    call    stmt_apply
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_236:
 
     STMT_SEP
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_269]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_237:
 
     STMT_SEP
 L_pp_53:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 1
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_238
+    jmp     L_ppUnOp_51
 L_sn_238:
 
     STMT_SEP
 L_pp_54:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 1
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_239
+    jmp     L_ppUnOp_51
 L_sn_239:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 2
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_240
+    jmp     L_ppBinOp_52
+L_sf_240:
+    jmp     L_error_35
 L_sn_240:
 
     STMT_SEP
 L_pp_55:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 1
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_241
+    jmp     L_ppUnOp_51
 L_sn_241:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 2
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_242
+    jmp     L_ppBinOp_52
+L_sf_242:
+    jmp     L_error_35
 L_sn_242:
 
     STMT_SEP
 L_pp_56:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 1
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_243
+    jmp     L_ppUnOp_51
 L_sn_243:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 2
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_244
+    jmp     L_ppBinOp_52
+L_sf_244:
+    jmp     L_error_35
 L_sn_244:
 
     STMT_SEP
 L_pp_57:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 1
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_245
+    jmp     L_ppUnOp_51
 L_sn_245:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 2
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_246
+    jmp     L_ppBinOp_52
+L_sf_246:
+    jmp     L_error_35
 L_sn_246:
 
     STMT_SEP
 L_pp_58:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 1
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_247
+    jmp     L_ppUnOp_51
 L_sn_247:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 2
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_248
+    jmp     L_ppBinOp_52
+L_sf_248:
+    jmp     L_error_35
 L_sn_248:
 
     STMT_SEP
 L_pp_59:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 1
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_249
+    jmp     L_ppUnOp_51
 L_sn_249:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 2
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_250
+    jmp     L_ppBinOp_52
+L_sf_250:
+    jmp     L_error_35
 L_sn_250:
 
     STMT_SEP
 L_pp_60:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 1
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_251
+    jmp     L_ppUnOp_51
 L_sn_251:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 2
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_252
+    jmp     L_ppBinOp_52
+L_sf_252:
+    jmp     L_error_35
 L_sn_252:
 
     STMT_SEP
 L_pp_61:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 1
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_253
+    jmp     L_ppUnOp_51
 L_sn_253:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 2
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_254
+    jmp     L_ppBinOp_52
+L_sf_254:
+    jmp     L_error_35
 L_sn_254:
 
     STMT_SEP
 L_pp_62:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 1
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_255
+    jmp     L_ppUnOp_51
 L_sn_255:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 2
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_256
+    jmp     L_ppBinOp_52
+L_sf_256:
+    jmp     L_error_35
 L_sn_256:
 
     STMT_SEP
 L_pp_63:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 1
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_257
+    jmp     L_ppUnOp_51
 L_sn_257:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 2
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_258
+    jmp     L_ppBinOp_52
+L_sf_258:
+    jmp     L_error_35
 L_sn_258:
 
     STMT_SEP
 L_pp_64:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 1
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_259
+    jmp     L_ppUnOp_51
 L_sn_259:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 2
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_260
+    jmp     L_ppBinOp_52
+L_sf_260:
+    jmp     L_error_35
 L_sn_260:
 
     STMT_SEP
 L_pp_65:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 1
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_261
+    jmp     L_ppUnOp_51
 L_sn_261:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 2
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_262
+    jmp     L_ppBinOp_52
+L_sf_262:
+    jmp     L_error_35
 L_sn_262:
 
     STMT_SEP
 L_pp_66:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 2
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_263
+    jmp     L_ppBinOp_52
+L_sf_263:
+    jmp     L_error_35
 L_sn_263:
 
     STMT_SEP
 L_pp_67:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 1
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_264
+    jmp     L_ppUnOp_51
 L_sn_264:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 2
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_265
+    jmp     L_ppBinOp_52
+L_sf_265:
+    jmp     L_error_35
 L_sn_265:
 
     STMT_SEP
 L_pp_Comment_68:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    mov     rdi, 0
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_327]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_266:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    lea     rdi, [rel S_328]
+    xor     rsi, rsi
+    xor     rdx, rdx
+    call    stmt_apply
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_267:
 
     STMT_SEP
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_268:
 
     STMT_SEP
 L_pp_Control_69:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    mov     rdi, 0
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_327]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_269:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    lea     rdi, [rel S_328]
+    xor     rsi, rsi
+    xor     rdx, rdx
+    call    stmt_apply
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_270:
 
     STMT_SEP
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_271:
 
     STMT_SEP
 L_pp_Stmt_70:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    mov     rdi, 0
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_327]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_272:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_124]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_328]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_273:
 
     STMT_SEP
@@ -3647,8 +6412,20 @@ L_sn_274:
     call    stmt_get
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
+    sub     rsp, 16
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
+    mov     rax, [rbp-32]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_288]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
     mov     rdi, [rbp-32]
     mov     rsi, [rbp-24]
     call    stmt_is_fail
@@ -3704,8 +6481,20 @@ L_sn_277:
     call    stmt_get
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
+    sub     rsp, 16
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
+    mov     rax, [rbp-32]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_272]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
     mov     rdi, [rbp-32]
     mov     rsi, [rbp-24]
     call    stmt_is_fail
@@ -3776,28 +6565,114 @@ L_sn_280:
 L_sn_281:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_331]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_282:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    sub     rsp, 16
+    lea     rdi, [rel S_332]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_271]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_24]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_283
+    jmp     L_sn_283
+L_sf_283:
+    jmp     L_pp_Stmt7_71
 L_sn_283:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_16]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_284:
 
     STMT_SEP
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_309]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_285:
 
     STMT_SEP
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_327]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_286:
 
     STMT_SEP
@@ -3820,28 +6695,114 @@ L_sn_286:
 L_sn_287:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_332]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_269]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_288:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    sub     rsp, 16
+    lea     rdi, [rel S_333]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_271]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_24]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_289
+    jmp     L_sn_289
+L_sf_289:
+    jmp     L_pp_Stmt5_72
 L_sn_289:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_16]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_290:
 
     STMT_SEP
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_309]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_291:
 
     STMT_SEP
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_327]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_292:
 
     STMT_SEP
@@ -3864,80 +6825,338 @@ L_sn_292:
 L_sn_293:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_333]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_269]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_294:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_334]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_24]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_295
+    jmp     L_sn_295
+L_sf_295:
+    jmp     L_pp_Stmt7_71
 L_sn_295:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_338]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_296:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    sub     rsp, 16
+    lea     rdi, [rel S_335]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_271]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_24]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_297
+    jmp     L_sn_297
+L_sf_297:
+    jmp     L_pp_Stmt7_71
 L_sn_297:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_16]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_298:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_335]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_269]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
     jmp     L_pp_Stmt7_71
 L_sn_299:
 
     STMT_SEP
 L_pp_Stmt5_72:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_334]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_24]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_300
+    jmp     L_sn_300
+L_sf_300:
+    jmp     L_pp_Stmt7_71
 L_sn_300:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_16]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_301:
 
     STMT_SEP
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_309]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_302:
 
     STMT_SEP
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_327]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_303:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_17]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_304:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    sub     rsp, 16
+    lea     rdi, [rel S_335]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_271]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_24]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_305
+    jmp     L_sn_305
+L_sf_305:
+    jmp     L_pp_Stmt7_71
 L_sn_305:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_16]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_306:
 
     STMT_SEP
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_309]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_307:
 
     STMT_SEP
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_327]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_308:
 
     STMT_SEP
@@ -3960,15 +7179,63 @@ L_sn_308:
 L_sn_309:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_335]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_269]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
     jmp     L_pp_Stmt7_71
 L_sn_310:
 
     STMT_SEP
 L_pp_Stmt7_71:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    sub     rsp, 16
+    lea     rdi, [rel S_336]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_271]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_24]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_311
+    jmp     L_sn_311
+L_sf_311:
+    jmp     L_pp_Stmt9_73
 L_sn_311:
 
     STMT_SEP
@@ -3993,57 +7260,235 @@ L_sn_311:
 L_sn_312:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_16]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_313:
 
     STMT_SEP
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_309]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_314:
 
     STMT_SEP
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_327]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_315:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_60]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_316:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_336]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_269]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_317:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    sub     rsp, 16
+    lea     rdi, [rel S_337]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_271]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_24]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_318
+    jmp     L_sn_318
+L_sf_318:
+    jmp     L_pp_Stmt9_73
 L_sn_318:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_337]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_269]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
     jmp     L_pp_Stmt9_73
 L_sn_319:
 
     STMT_SEP
 L_pp_Stmt9_73:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_115]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_320:
 
     STMT_SEP
 L_pp_ExprList_74:
+    sub     rsp, 16
+    sub     rsp, 32
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_288]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_321
+    GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_321:
 
     STMT_SEP
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_269]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_322:
 
     STMT_SEP
@@ -4090,60 +7535,184 @@ L_sf_324:
 L_sn_324:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_115]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_325:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    lea     rdi, [rel S_307]
+    xor     rsi, rsi
+    xor     rdx, rdx
+    call    stmt_apply
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_326:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_178]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_327:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    lea     rdi, [rel S_308]
+    xor     rsi, rsi
+    xor     rdx, rdx
+    call    stmt_apply
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_328:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    lea     rdi, [rel S_309]
+    xor     rsi, rsi
+    xor     rdx, rdx
+    call    stmt_apply
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_329:
 
     STMT_SEP
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_269]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
     jmp     L_pp_ExprList0_75
 L_sn_330:
 
     STMT_SEP
 L_pp_76:
+    sub     rsp, 16
+    sub     rsp, 32
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_288]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_331
+    GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_331:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_179]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_332:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    lea     rdi, [rel S_308]
+    xor     rsi, rsi
+    xor     rdx, rdx
+    call    stmt_apply
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_333:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    lea     rdi, [rel S_309]
+    xor     rsi, rsi
+    xor     rdx, rdx
+    call    stmt_apply
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_334:
 
     STMT_SEP
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_269]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_335:
 
     STMT_SEP
@@ -4190,67 +7759,229 @@ L_sf_337:
 L_sn_337:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_115]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_338:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    lea     rdi, [rel S_307]
+    xor     rsi, rsi
+    xor     rdx, rdx
+    call    stmt_apply
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_339:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_178]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_340:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    lea     rdi, [rel S_308]
+    xor     rsi, rsi
+    xor     rdx, rdx
+    call    stmt_apply
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_341:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    lea     rdi, [rel S_309]
+    xor     rsi, rsi
+    xor     rdx, rdx
+    call    stmt_apply
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_342:
 
     STMT_SEP
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_269]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
     jmp     L_COMPUTED_pp_0_79
 L_sn_343:
 
     STMT_SEP
 L_pp_1_80:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_115]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_344:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    lea     rdi, [rel S_307]
+    xor     rsi, rsi
+    xor     rdx, rdx
+    call    stmt_apply
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_345:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_182]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_346:
 
     STMT_SEP
 L_pp_81:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 1
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_347
+    jmp     L_ppUnOp_51
 L_sn_347:
 
     STMT_SEP
+    sub     rsp, 16
+    sub     rsp, 32
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_288]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_348
+    GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_348:
 
     STMT_SEP
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_269]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_349:
 
     STMT_SEP
@@ -4297,40 +8028,130 @@ L_sf_351:
 L_sn_351:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_115]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_352:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    lea     rdi, [rel S_307]
+    xor     rsi, rsi
+    xor     rdx, rdx
+    call    stmt_apply
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_353:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_167]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_354:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    lea     rdi, [rel S_308]
+    xor     rsi, rsi
+    xor     rdx, rdx
+    call    stmt_apply
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_355:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    lea     rdi, [rel S_309]
+    xor     rsi, rsi
+    xor     rdx, rdx
+    call    stmt_apply
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_356:
 
     STMT_SEP
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_269]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
     jmp     L_COMPUTED_pp_0_83
 L_sn_357:
 
     STMT_SEP
 L_pp_84:
+    sub     rsp, 16
+    sub     rsp, 32
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_288]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_358
+    GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_358:
 
     STMT_SEP
@@ -4377,8 +8198,20 @@ L_sf_360:
 L_sn_360:
 
     STMT_SEP
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_269]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_361:
 
     STMT_SEP
@@ -4389,13 +8222,63 @@ L_sn_362:
 
     STMT_SEP
 L_pp_87:
+    sub     rsp, 16
+    sub     rsp, 32
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_288]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_363
+    GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_363:
 
     STMT_SEP
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_269]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_364:
 
     STMT_SEP
@@ -4442,38 +8325,104 @@ L_sf_366:
 L_sn_366:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_180]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_367:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    lea     rdi, [rel S_308]
+    xor     rsi, rsi
+    xor     rdx, rdx
+    call    stmt_apply
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_368:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    lea     rdi, [rel S_309]
+    xor     rsi, rsi
+    xor     rdx, rdx
+    call    stmt_apply
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_369:
 
     STMT_SEP
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_269]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_370:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_115]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_371:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    lea     rdi, [rel S_307]
+    xor     rsi, rsi
+    xor     rdx, rdx
+    call    stmt_apply
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_372:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_183]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_373:
 
     STMT_SEP
@@ -4484,90 +8433,308 @@ L_sn_374:
 
     STMT_SEP
 L_pp_90:
+    sub     rsp, 16
+    sub     rsp, 32
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_288]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_375
+    GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_375:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_179]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_376:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    lea     rdi, [rel S_308]
+    xor     rsi, rsi
+    xor     rdx, rdx
+    call    stmt_apply
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_377:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    lea     rdi, [rel S_309]
+    xor     rsi, rsi
+    xor     rdx, rdx
+    call    stmt_apply
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_378:
 
     STMT_SEP
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_269]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_379:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_115]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_380:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    lea     rdi, [rel S_307]
+    xor     rsi, rsi
+    xor     rdx, rdx
+    call    stmt_apply
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_381:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_182]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_382:
 
     STMT_SEP
 L_pp_Call_91:
+    sub     rsp, 16
+    sub     rsp, 32
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_288]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_383
+    GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_383:
 
     STMT_SEP
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_269]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_384:
 
     STMT_SEP
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_385:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    lea     rdi, [rel S_308]
+    xor     rsi, rsi
+    xor     rdx, rdx
+    call    stmt_apply
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_386:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    lea     rdi, [rel S_309]
+    xor     rsi, rsi
+    xor     rdx, rdx
+    call    stmt_apply
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_387:
 
     STMT_SEP
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_269]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_388:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_115]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_389:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    lea     rdi, [rel S_307]
+    xor     rsi, rsi
+    xor     rdx, rdx
+    call    stmt_apply
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_390:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_182]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_287]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
     GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_391:
 
@@ -4576,15 +8743,51 @@ L_ppEnd_28:
 L_sn_392:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_356]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_267]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
     jmp     L_ssEnd_92
 L_sn_393:
 
     STMT_SEP
 L_ss_93:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_24]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_394
+    jmp     L_sn_394
+L_sf_394:
+    GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_394:
 
     STMT_SEP
@@ -4607,8 +8810,38 @@ L_sn_394:
 L_sn_395:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_357]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 0
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_279]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_396
+    jmp     L_sn_396
+L_sf_396:
+    GOTO_ALWAYS  L_SNO_END     ; FRETURN
 L_sn_396:
 
     STMT_SEP
@@ -4616,8 +8849,22 @@ L_sn_396:
     call    stmt_get
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    mov     rax, [rbp-32]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_271]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
     mov     rdi, [rbp-32]
     mov     rsi, [rbp-24]
     call    stmt_is_fail
@@ -4635,8 +8882,22 @@ L_sn_397:
     call    stmt_get
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    mov     rax, [rbp-32]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_272]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
     mov     rdi, [rbp-32]
     mov     rsi, [rbp-24]
     call    stmt_is_fail
@@ -4654,8 +8915,22 @@ L_sn_398:
     call    stmt_get
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    mov     rax, [rbp-32]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_273]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
     mov     rdi, [rbp-32]
     mov     rsi, [rbp-24]
     call    stmt_is_fail
@@ -4673,8 +8948,22 @@ L_sn_399:
     call    stmt_get
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    mov     rax, [rbp-32]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_274]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
     mov     rdi, [rbp-32]
     mov     rsi, [rbp-24]
     call    stmt_is_fail
@@ -4706,8 +8995,30 @@ L_sn_400:
 L_sn_401:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_271]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_24]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_402
+    jmp     L_COMPUTED_ss_t_94
+L_sf_402:
+    GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_402:
 
     STMT_SEP
@@ -4716,8 +9027,22 @@ L_ss_BuiltinVar_95:
     call    stmt_get
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_272]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    mov     rax, [rbp-32]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_148]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
     mov     rdi, [rbp-32]
     mov     rsi, [rbp-24]
     call    stmt_is_fail
@@ -4736,8 +9061,22 @@ L_ss_Function_97:
     call    stmt_get
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_272]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    mov     rax, [rbp-32]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_148]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
     mov     rdi, [rbp-32]
     mov     rsi, [rbp-24]
     call    stmt_is_fail
@@ -4861,6 +9200,42 @@ seq_r9_beta:
     jmp     seq_l9_beta
 
 P_407_γ:
+    lea     rdi, [rel S_18]
+    lea     rsi, [rel cap_ppTokName_buf]
+    mov     rdx, [cap_ppTokName_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_12]
+    lea     rsi, [rel cap_ppTokVal_buf]
+    mov     rdx, [cap_ppTokVal_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_62]
+    lea     rsi, [rel cap_ppGCon_buf]
+    mov     rdx, [cap_ppGCon_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_64]
+    lea     rsi, [rel cap_ppDrop_buf]
+    mov     rdx, [cap_ppDrop_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_459]
+    lea     rsi, [rel cap_cap_buf]
+    mov     rdx, [cap_cap_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_135]
+    lea     rsi, [rel cap_tx_buf]
+    mov     rdx, [cap_tx_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_13]
+    lea     rsi, [rel cap_v_buf]
+    mov     rdx, [cap_v_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_140]
+    lea     rsi, [rel cap_ProtKwd_buf]
+    mov     rdx, [cap_ProtKwd_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_143]
+    lea     rsi, [rel cap_UnprotKwd_buf]
+    mov     rdx, [cap_UnprotKwd_len]
+    call    stmt_set_capture
     jmp     L_ss_Label0_101
 P_407_ω:
     jmp     L_ss_Label1_102
@@ -4872,8 +9247,22 @@ L_ss_Label0_101:
     call    stmt_get
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_272]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    mov     rax, [rbp-32]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_148]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
     mov     rdi, [rbp-32]
     mov     rsi, [rbp-24]
     call    stmt_is_fail
@@ -4914,8 +9303,22 @@ L_ss_ProtKwd_103:
     call    stmt_get
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_272]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    mov     rax, [rbp-32]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_148]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
     mov     rdi, [rbp-32]
     mov     rsi, [rbp-24]
     call    stmt_is_fail
@@ -4956,8 +9359,22 @@ L_ss_SpecialNm_105:
     call    stmt_get
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_272]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    mov     rax, [rbp-32]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_148]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
     mov     rdi, [rbp-32]
     mov     rsi, [rbp-24]
     call    stmt_is_fail
@@ -4998,8 +9415,22 @@ L_ss_UnprotKwd_107:
     call    stmt_get
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_272]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    mov     rax, [rbp-32]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_148]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
     mov     rdi, [rbp-32]
     mov     rsi, [rbp-24]
     call    stmt_is_fail
@@ -5014,8 +9445,50 @@ L_sn_414:
 
     STMT_SEP
 L_ss_atomic_96:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    sub     rsp, 16
+    lea     rdi, [rel S_288]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_81]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_357]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_372]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_415
+    GOTO_ALWAYS  L_SNO_END     ; RETURN
+L_sf_415:
+    GOTO_ALWAYS  L_SNO_END     ; FRETURN
 L_sn_415:
 
     STMT_SEP
@@ -5178,8 +9651,28 @@ L_ssBinOp_115:
     call    stmt_get
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
+    mov     rax, [rbp-32]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_357]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    mov     rax, [rbp-32]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_288]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
     mov     rdi, [rbp-32]
     mov     rsi, [rbp-24]
     call    stmt_is_fail
@@ -5217,157 +9710,969 @@ L_sn_424:
 
     STMT_SEP
 L_ss_116:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 1
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_425
+    jmp     L_ssUnOp_114
 L_sn_425:
 
     STMT_SEP
 L_ss_117:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 1
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_426
+    jmp     L_ssUnOp_114
 L_sn_426:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 2
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_427
+    jmp     L_ssBinOp_115
+L_sf_427:
+    jmp     L_error_35
 L_sn_427:
 
     STMT_SEP
 L_ss_118:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 1
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_428
+    jmp     L_ssUnOp_114
 L_sn_428:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 2
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_429
+    jmp     L_ssBinOp_115
+L_sf_429:
+    jmp     L_error_35
 L_sn_429:
 
     STMT_SEP
 L_ss_119:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 1
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_430
+    jmp     L_ssUnOp_114
 L_sn_430:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 2
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_431
+    jmp     L_ssBinOp_115
+L_sf_431:
+    jmp     L_error_35
 L_sn_431:
 
     STMT_SEP
 L_ss_120:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 1
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_432
+    jmp     L_ssUnOp_114
 L_sn_432:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 2
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_433
+    jmp     L_ssBinOp_115
+L_sf_433:
+    jmp     L_error_35
 L_sn_433:
 
     STMT_SEP
 L_ss_121:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 1
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_434
+    jmp     L_ssUnOp_114
 L_sn_434:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 2
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_435
+    jmp     L_ssBinOp_115
+L_sf_435:
+    jmp     L_error_35
 L_sn_435:
 
     STMT_SEP
 L_ss_122:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 1
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_436
+    jmp     L_ssUnOp_114
 L_sn_436:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 2
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_437
+    jmp     L_ssBinOp_115
+L_sf_437:
+    jmp     L_error_35
 L_sn_437:
 
     STMT_SEP
 L_ss_123:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 1
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_438
+    jmp     L_ssUnOp_114
 L_sn_438:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 2
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_439
+    jmp     L_ssBinOp_115
+L_sf_439:
+    jmp     L_error_35
 L_sn_439:
 
     STMT_SEP
 L_ss_124:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 1
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_440
+    jmp     L_ssUnOp_114
 L_sn_440:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 2
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_441
+    jmp     L_ssBinOp_115
+L_sf_441:
+    jmp     L_error_35
 L_sn_441:
 
     STMT_SEP
 L_ss_125:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 1
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_442
+    jmp     L_ssUnOp_114
 L_sn_442:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 2
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_443
+    jmp     L_ssBinOp_115
+L_sf_443:
+    jmp     L_error_35
 L_sn_443:
 
     STMT_SEP
 L_ss_126:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 1
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_444
+    jmp     L_ssUnOp_114
 L_sn_444:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 2
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_445
+    jmp     L_ssBinOp_115
+L_sf_445:
+    jmp     L_error_35
 L_sn_445:
 
     STMT_SEP
 L_ss_127:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 1
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_446
+    jmp     L_ssUnOp_114
 L_sn_446:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 2
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_447
+    jmp     L_ssBinOp_115
+L_sf_447:
+    jmp     L_error_35
 L_sn_447:
 
     STMT_SEP
 L_ss_128:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 1
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_448
+    jmp     L_ssUnOp_114
 L_sn_448:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 2
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_449
+    jmp     L_ssBinOp_115
+L_sf_449:
+    jmp     L_error_35
 L_sn_449:
 
     STMT_SEP
 L_ss_129:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 2
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_450
+    jmp     L_ssBinOp_115
+L_sf_450:
+    jmp     L_error_35
 L_sn_450:
 
     STMT_SEP
 L_ss_130:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 1
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_451
+    jmp     L_ssUnOp_114
 L_sn_451:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 2
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_452
+    jmp     L_ssBinOp_115
+L_sf_452:
+    jmp     L_error_35
 L_sn_452:
 
     STMT_SEP
@@ -5376,8 +10681,28 @@ L_ss_ExprList_131:
     call    stmt_get
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
+    mov     rax, [rbp-32]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_357]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    mov     rax, [rbp-32]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_288]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
     mov     rdi, [rbp-32]
     mov     rsi, [rbp-24]
     call    stmt_is_fail
@@ -5564,8 +10889,36 @@ L_sn_461:
 
     STMT_SEP
 L_ss_138:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_273]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     rdi, 1
+    call    stmt_intval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_311]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_462
+    jmp     L_ssUnOp_114
 L_sn_462:
 
     STMT_SEP
@@ -5573,8 +10926,28 @@ L_sn_462:
     call    stmt_get
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
+    mov     rax, [rbp-32]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_357]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    mov     rax, [rbp-32]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_288]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
     mov     rdi, [rbp-32]
     mov     rsi, [rbp-24]
     call    stmt_is_fail
@@ -5659,8 +11032,28 @@ L_ss_141:
     call    stmt_get
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
+    mov     rax, [rbp-32]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_357]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    mov     rax, [rbp-32]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_288]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
     mov     rdi, [rbp-32]
     mov     rsi, [rbp-24]
     call    stmt_is_fail
@@ -5745,8 +11138,28 @@ L_ss_144:
     call    stmt_get
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
+    sub     rsp, 32
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
+    mov     rax, [rbp-32]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_357]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    mov     rax, [rbp-32]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_288]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
     mov     rdi, [rbp-32]
     mov     rsi, [rbp-24]
     call    stmt_is_fail
@@ -5874,15 +11287,67 @@ L_ssEnd_92:
 L_sn_477:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_417]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_416]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_267]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
     jmp     L_bVisitEnd_149
 L_sn_478:
 
     STMT_SEP
 L_bVisit_150:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    lea     rdi, [rel S_419]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_418]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_479
+    jmp     L_sn_479
+L_sf_479:
+    GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_479:
 
     STMT_SEP
@@ -5929,8 +11394,28 @@ L_sf_481:
 L_sn_481:
 
     STMT_SEP
+    sub     rsp, 32
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_419]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_421]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
     jmp     L_bVisit_1_151
 L_sn_482:
 
@@ -5939,8 +11424,22 @@ L_bVisitEnd_149:
 L_sn_483:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_423]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_267]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_484:
 
     STMT_SEP
@@ -5953,13 +11452,77 @@ L_sn_485:
 
     STMT_SEP
 L_findRefs_153:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_24]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_486
+    jmp     L_sn_486
+L_sf_486:
+    GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_486:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    sub     rsp, 16
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_271]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_426]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_25]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_487
+    jmp     L_sn_487
+L_sf_487:
+    jmp     L_findRefs_1_154
 L_sn_487:
 
     STMT_SEP
@@ -6006,8 +11569,26 @@ L_sf_489:
 L_sn_489:
 
     STMT_SEP
+    sub     rsp, 32
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     qword [rbp-16], 1
+    mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_421]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
     jmp     L_findRefs_0_155
 L_sn_490:
 
@@ -6022,8 +11603,22 @@ L_sn_491:
     call    stmt_get
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    mov     rax, [rbp-32]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_288]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
     mov     rdi, [rbp-32]
     mov     rsi, [rbp-24]
     call    stmt_is_fail
@@ -6038,8 +11633,50 @@ L_sn_492:
 
     STMT_SEP
 L_findRefs_2_156:
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 32
+    sub     rsp, 16
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_271]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_127]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_25]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_493
+    jmp     L_sn_493
+L_sf_493:
+    GOTO_ALWAYS  L_SNO_END     ; RETURN
 L_sn_493:
 
     STMT_SEP
@@ -6047,8 +11684,22 @@ L_sn_493:
     call    stmt_get
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_270]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    mov     rax, [rbp-32]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_272]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
     mov     rdi, [rbp-32]
     mov     rsi, [rbp-24]
     call    stmt_is_fail
@@ -6146,6 +11797,42 @@ seq_r12_beta:
     jmp     seq_l12_beta
 
 P_495_γ:
+    lea     rdi, [rel S_18]
+    lea     rsi, [rel cap_ppTokName_buf]
+    mov     rdx, [cap_ppTokName_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_12]
+    lea     rsi, [rel cap_ppTokVal_buf]
+    mov     rdx, [cap_ppTokVal_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_62]
+    lea     rsi, [rel cap_ppGCon_buf]
+    mov     rdx, [cap_ppGCon_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_64]
+    lea     rsi, [rel cap_ppDrop_buf]
+    mov     rdx, [cap_ppDrop_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_459]
+    lea     rsi, [rel cap_cap_buf]
+    mov     rdx, [cap_cap_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_135]
+    lea     rsi, [rel cap_tx_buf]
+    mov     rdx, [cap_tx_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_13]
+    lea     rsi, [rel cap_v_buf]
+    mov     rdx, [cap_v_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_140]
+    lea     rsi, [rel cap_ProtKwd_buf]
+    mov     rdx, [cap_ProtKwd_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_143]
+    lea     rsi, [rel cap_UnprotKwd_buf]
+    mov     rdx, [cap_UnprotKwd_len]
+    call    stmt_set_capture
     jmp     L_sn_495
 P_495_ω:
     GOTO_ALWAYS  L_SNO_END     ; FRETURN
@@ -6194,8 +11881,22 @@ L_findRefsEnd_152:
 L_sn_498:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_433]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_267]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
     jmp     L_refsEnd_158
 L_sn_499:
 
@@ -6205,8 +11906,22 @@ L_refs_159:
     call    stmt_get
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
-    mov     qword [rbp-32], 1
-    mov     qword [rbp-24], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_435]
+    call    stmt_get
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+    mov     rax, [rbp-32]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_274]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
     mov     rdi, [rbp-32]
     mov     rsi, [rbp-24]
     call    stmt_is_fail
@@ -6263,8 +11978,48 @@ L_sf_502:
 L_sn_502:
 
     STMT_SEP
+    sub     rsp, 32
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_271]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_254]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_25]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_503
+    jmp     L_sn_503
+L_sf_503:
+    jmp     L_refs_0_160
 L_sn_503:
 
     STMT_SEP
@@ -6287,23 +12042,173 @@ L_sn_503:
 L_sn_504:
 
     STMT_SEP
+    sub     rsp, 16
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_271]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_25]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_505
+    jmp     L_sn_505
+L_sf_505:
+    jmp     L_refs_0_160
 L_sn_505:
 
     STMT_SEP
+    sub     rsp, 32
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_271]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_17]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_25]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_506
+    jmp     L_sn_506
+L_sf_506:
+    jmp     L_refs_0_160
 L_sn_506:
 
     STMT_SEP
+    sub     rsp, 32
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_271]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_127]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_25]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sn_507
+    jmp     L_refs_1_161
 L_sn_507:
 
     STMT_SEP
+    sub     rsp, 32
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_271]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_173]
+    call    stmt_strval
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_25]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_508
+    jmp     L_refs_1_161
+L_sf_508:
+    jmp     L_refs_0_160
 L_sn_508:
 
     STMT_SEP
@@ -6312,8 +12217,20 @@ L_refs_1_161:
     call    stmt_get
     mov     [rbp-16], rax
     mov     [rbp-8], rdx
+    sub     rsp, 16
     mov     qword [rbp-32], 1
     mov     qword [rbp-24], 0
+    mov     rax, [rbp-32]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-24]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_288]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
     mov     rdi, [rbp-32]
     mov     rsi, [rbp-24]
     call    stmt_is_fail
@@ -6334,8 +12251,26 @@ L_sn_509:
 L_sn_510:
 
     STMT_SEP
+    sub     rsp, 32
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    mov     qword [rbp-16], 1
+    mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 16], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 24], rax
+    lea     rdi, [rel S_421]
+    mov     rsi, rsp
+    mov     rdx, 2
+    call    stmt_apply
+    add     rsp, 32
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
 L_sn_511:
 
     STMT_SEP
@@ -6493,6 +12428,42 @@ seq_r15_beta:
     jmp     seq_l15_beta
 
 P_518_γ:
+    lea     rdi, [rel S_18]
+    lea     rsi, [rel cap_ppTokName_buf]
+    mov     rdx, [cap_ppTokName_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_12]
+    lea     rsi, [rel cap_ppTokVal_buf]
+    mov     rdx, [cap_ppTokVal_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_62]
+    lea     rsi, [rel cap_ppGCon_buf]
+    mov     rdx, [cap_ppGCon_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_64]
+    lea     rsi, [rel cap_ppDrop_buf]
+    mov     rdx, [cap_ppDrop_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_459]
+    lea     rsi, [rel cap_cap_buf]
+    mov     rdx, [cap_cap_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_135]
+    lea     rsi, [rel cap_tx_buf]
+    mov     rdx, [cap_tx_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_13]
+    lea     rsi, [rel cap_v_buf]
+    mov     rdx, [cap_v_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_140]
+    lea     rsi, [rel cap_ProtKwd_buf]
+    mov     rdx, [cap_ProtKwd_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_143]
+    lea     rsi, [rel cap_UnprotKwd_buf]
+    mov     rdx, [cap_UnprotKwd_len]
+    call    stmt_set_capture
     jmp     L_sn_518
 P_518_ω:
     jmp     L_main02_164
@@ -6622,6 +12593,42 @@ seq_r17_beta:
     jmp     seq_l17_beta
 
 P_522_γ:
+    lea     rdi, [rel S_18]
+    lea     rsi, [rel cap_ppTokName_buf]
+    mov     rdx, [cap_ppTokName_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_12]
+    lea     rsi, [rel cap_ppTokVal_buf]
+    mov     rdx, [cap_ppTokVal_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_62]
+    lea     rsi, [rel cap_ppGCon_buf]
+    mov     rdx, [cap_ppGCon_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_64]
+    lea     rsi, [rel cap_ppDrop_buf]
+    mov     rdx, [cap_ppDrop_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_459]
+    lea     rsi, [rel cap_cap_buf]
+    mov     rdx, [cap_cap_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_135]
+    lea     rsi, [rel cap_tx_buf]
+    mov     rdx, [cap_tx_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_13]
+    lea     rsi, [rel cap_v_buf]
+    mov     rdx, [cap_v_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_140]
+    lea     rsi, [rel cap_ProtKwd_buf]
+    mov     rdx, [cap_ProtKwd_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_143]
+    lea     rsi, [rel cap_UnprotKwd_buf]
+    mov     rdx, [cap_UnprotKwd_len]
+    call    stmt_set_capture
     jmp     L_main02_164
 P_522_ω:
     jmp     L_sn_522
@@ -6688,19 +12695,89 @@ seq_r19_beta:
     jmp     seq_l19_beta
 
 P_523_γ:
+    lea     rdi, [rel S_18]
+    lea     rsi, [rel cap_ppTokName_buf]
+    mov     rdx, [cap_ppTokName_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_12]
+    lea     rsi, [rel cap_ppTokVal_buf]
+    mov     rdx, [cap_ppTokVal_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_62]
+    lea     rsi, [rel cap_ppGCon_buf]
+    mov     rdx, [cap_ppGCon_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_64]
+    lea     rsi, [rel cap_ppDrop_buf]
+    mov     rdx, [cap_ppDrop_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_459]
+    lea     rsi, [rel cap_cap_buf]
+    mov     rdx, [cap_cap_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_135]
+    lea     rsi, [rel cap_tx_buf]
+    mov     rdx, [cap_tx_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_13]
+    lea     rsi, [rel cap_v_buf]
+    mov     rdx, [cap_v_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_140]
+    lea     rsi, [rel cap_ProtKwd_buf]
+    mov     rdx, [cap_ProtKwd_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_143]
+    lea     rsi, [rel cap_UnprotKwd_buf]
+    mov     rdx, [cap_UnprotKwd_len]
+    call    stmt_set_capture
     jmp     L_sn_523
 P_523_ω:
     jmp     L_mainErr1_166
 L_sn_523:
 
     STMT_SEP
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_24]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_524
+    jmp     L_sn_524
+L_sf_524:
+    jmp     L_mainErr2_167
 L_sn_524:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_451]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_269]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
     jmp     L_main01_163
 L_sn_525:
 
@@ -6766,19 +12843,89 @@ seq_r22_beta:
     jmp     seq_l22_beta
 
 P_526_γ:
+    lea     rdi, [rel S_18]
+    lea     rsi, [rel cap_ppTokName_buf]
+    mov     rdx, [cap_ppTokName_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_12]
+    lea     rsi, [rel cap_ppTokVal_buf]
+    mov     rdx, [cap_ppTokVal_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_62]
+    lea     rsi, [rel cap_ppGCon_buf]
+    mov     rdx, [cap_ppGCon_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_64]
+    lea     rsi, [rel cap_ppDrop_buf]
+    mov     rdx, [cap_ppDrop_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_459]
+    lea     rsi, [rel cap_cap_buf]
+    mov     rdx, [cap_cap_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_135]
+    lea     rsi, [rel cap_tx_buf]
+    mov     rdx, [cap_tx_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_13]
+    lea     rsi, [rel cap_v_buf]
+    mov     rdx, [cap_v_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_140]
+    lea     rsi, [rel cap_ProtKwd_buf]
+    mov     rdx, [cap_ProtKwd_len]
+    call    stmt_set_capture
+    lea     rdi, [rel S_143]
+    lea     rsi, [rel cap_UnprotKwd_buf]
+    mov     rdx, [cap_UnprotKwd_len]
+    call    stmt_set_capture
     jmp     L_sn_526
 P_526_ω:
     jmp     L_mainErr1_166
 L_sn_526:
 
     STMT_SEP
+    sub     rsp, 16
     mov     qword [rbp-16], 1
     mov     qword [rbp-8], 0
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_24]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    call    stmt_is_fail
+    test    eax, eax
+    jnz     L_sf_527
+    jmp     L_sn_527
+L_sf_527:
+    jmp     L_mainErr2_167
 L_sn_527:
 
     STMT_SEP
-    mov     qword [rbp-16], 1
-    mov     qword [rbp-8], 0
+    sub     rsp, 16
+    lea     rdi, [rel S_451]
+    call    stmt_get
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
+    mov     rax, [rbp-16]
+    mov     [rsp + 0], rax
+    mov     rax, [rbp-8]
+    mov     [rsp + 8], rax
+    lea     rdi, [rel S_269]
+    mov     rsi, rsp
+    mov     rdx, 1
+    call    stmt_apply
+    add     rsp, 16
+    mov     [rbp-16], rax
+    mov     [rbp-8], rdx
     GOTO_ALWAYS  L_SNO_END     ; END
 L_sn_528:
 
@@ -6916,6 +13063,8 @@ lit_str_43           db 37
 lit_str_44           db 47
 lit_str_45           db 35
 lit_str_46           db 124
+
+section .text
 
 ; ======== named pattern bodies ========
 
@@ -12347,6 +18496,8 @@ patdef_Expr14_gamma:
 patdef_Expr14_omega:
     jmp     [P_Expr14_ret_omega]
 
+section .text
+
 ; --- stub labels (dangling gotos / computed goto TBD) ---
 L_COMPUTED_pp_t_30:  ; STUB → _SNO_END (dangling or computed goto)
     GOTO_ALWAYS  L_SNO_END
@@ -12841,3 +18992,4 @@ S_455                db 109, 97, 105, 110, 69, 114, 114, 50, 0  ; "mainErr2"
 S_456                db 73, 110, 116, 101, 114, 110, 97, 108, 32, 69, 114, 114, 111, 114, 0  ; "Internal Error"
 S_457                db 38, 70, 85, 76, 76, 83, 67, 65, 78, 0  ; "&FULLSCAN"
 S_458                db 38, 77, 65, 88, 76, 78, 71, 84, 72, 0  ; "&MAXLNGTH"
+S_459                db 99, 97, 112, 0  ; "cap"
