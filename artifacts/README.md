@@ -428,3 +428,14 @@ session115 | 2026-03-16 | 6d5919daa03d3c56646b5f0a165f86ee | 15859 lines | compi
   first instruction. Rule: label on own line only when two labels are consecutive.
   `L_sn_0:  GET_VAR S_457` — one line per state throughout program body.
 - **Invariants:** 106/106 C crosscheck PASS, 26/26 ASM crosscheck PASS
+
+## beauty_prog_session165.s
+- **Sprint:** A14 — M-ASM-BEAUTIFUL
+- **Status:** assembles clean (nasm -f elf64 -I src/runtime/asm/)
+- **Lines:** 13664 (same as session164)
+- **What changed:** Inline column alignment (COL_W=28). Added out_col tracker,
+  oc_char()/oc_str()/emit_to_col() — counts display columns, skips UTF-8
+  continuation bytes. Every instruction (labeled or unlabeled) starts at
+  display column 28. ALFC fixed to use emit_to_col instead of %-28s printf
+  padding. STMT_SEP/PORT_SEP/directives exempt from alignment.
+- **Invariants:** 106/106 C crosscheck PASS, 26/26 ASM crosscheck PASS

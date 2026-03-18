@@ -38,6 +38,31 @@
 
 static FILE *asm_out;
 
+/* Column alignment — every instruction starts at COL_W.
+ * out_col tracks the current column (0 = start of line).
+ * emit_to_col(n) pads with spaces until out_col == n.
+ * If out_col >= n already (long label case), emit newline first.
+ */
+#define COL_W 28
+
+static int out_col = 0;
+
+static void oc_char(char c) {
+    fputc(c, asm_out);
+    if (c == '\n') out_col = 0;
+    /* Count only non-continuation UTF-8 bytes as display columns */
+    else if ((c & 0xC0) != 0x80) out_col++;
+}
+
+static void oc_str(const char *s) {
+    for (; *s; s++) oc_char(*s);
+}
+
+static void emit_to_col(int n) {
+    if (out_col >= n) { oc_char('\n'); }
+    while (out_col < n) oc_char(' ');
+}
+
 /* -----------------------------------------------------------------------
  * Pending-label mechanism (Sprint A14 beauty):
  * Instead of emitting "label:\n" immediately, we hold it and prepend it
@@ -49,7 +74,9 @@ static char pending_label[256] = "";
 /* flush_pending_label — emit pending label standalone (consecutive-label case) */
 static void flush_pending_label(void) {
     if (pending_label[0]) {
-        fprintf(asm_out, "%s:\n", pending_label);
+        oc_str(pending_label);
+        oc_char(':');
+        oc_char('\n');
         pending_label[0] = '\0';
     }
 }
@@ -81,26 +108,57 @@ static void A(const char *fmt, ...) {
         }
         int is_blank = (*p == '\0');
         if (is_blank || is_passthrough) {
-            fputs(buf, asm_out);
+            oc_str(buf);
             return;  /* pending label survives blank lines and separators */
         }
         if (is_instr) {
-            /* It's an instruction (possibly preceded by blank lines).
-             * Emit any leading newlines first, then fold label+instruction. */
+            /* Emit any leading newlines first, then fold label+instruction. */
             const char *start = buf;
-            while (*start == '\n') { fputc('\n', asm_out); start++; }
-            /* strip leading spaces from instruction */
-            while (*start == ' ' || *start == '\t') start++;
-            char lc[258];
-            snprintf(lc, sizeof lc, "%s:", pending_label);
+            while (*start == '\n') { oc_char('\n'); start++; }
+            /* emit label: then pad to COL_W */
+            oc_str(pending_label);
+            oc_char(':');
             pending_label[0] = '\0';
-            fprintf(asm_out, "%-28s%s", lc, start);
+            emit_to_col(COL_W);
+            /* strip leading whitespace from instruction content */
+            while (*start == ' ' || *start == '\t') start++;
+            oc_str(start);
             return;
         } else {
             flush_pending_label();
         }
     }
-    fputs(buf, asm_out);
+    /* No pending label — emit instruction at COL_W if it's indented content */
+    {
+        const char *p = buf;
+        /* skip leading newlines — emit them, then handle the instruction part */
+        while (*p == '\n') { oc_char('\n'); p++; }
+        if (*p == ' ' || *p == '\t') {
+            /* indented instruction — align to COL_W */
+            while (*p == ' ' || *p == '\t') p++;
+            if (*p) {  /* non-empty after strip */
+                /* check it's not a .section / global / extern / resq directive */
+                int is_directive = (strncmp(p, "section", 7) == 0 ||
+                                    strncmp(p, "global",  6) == 0 ||
+                                    strncmp(p, "extern",  6) == 0 ||
+                                    strncmp(p, "resq",    4) == 0 ||
+                                    strncmp(p, "db ",     3) == 0 ||
+                                    strncmp(p, "dq ",     3) == 0 ||
+                                    strncmp(p, "dd ",     3) == 0 ||
+                                    strncmp(p, "%include",8) == 0 ||
+                                    strncmp(p, "STMT_SEP",8) == 0 ||
+                                    strncmp(p, "PORT_SEP",8) == 0 ||
+                                    p[0] == ';');
+                if (!is_directive) {
+                    emit_to_col(COL_W);
+                    oc_str(p);
+                    return;
+                }
+            }
+        }
+        /* fallback: emit as-is from current position */
+        oc_str(p);
+    }
 }
 
 /* -----------------------------------------------------------------------
@@ -192,10 +250,11 @@ static void asmL(const char *lbl) {
 
 /* asmLB(lbl, instr) — label and pre-built instruction string on one line */
 static void asmLB(const char *lbl, const char *instr) {
-    char lc[LBUF+2];
-    snprintf(lc, sizeof lc, "%s:", lbl);
+    flush_pending_label();
+    oc_str(lbl); oc_char(':');
+    emit_to_col(COL_W);
     while (*instr == ' ') instr++;
-    A("%-28s%s", lc, instr);
+    oc_str(instr);
 }
 
 /* ALF — emit "label:  instruction\n" where instruction is printf-formatted.
@@ -208,18 +267,21 @@ static char _alf_ibuf[1024];
 
 /* ALFC — emit "label:  instruction ; comment\n" — three columns, snug */
 static char _alfc_ibuf[768];
-static char _alfc_cbuf[256];
 #define ALFC(lbl, comment, fmt, ...) do { \
     snprintf(_alfc_ibuf, sizeof _alfc_ibuf, fmt, ##__VA_ARGS__); \
     /* strip trailing newline from instruction */ \
     int _alfc_len = strlen(_alfc_ibuf); \
     if (_alfc_len > 0 && _alfc_ibuf[_alfc_len-1] == '\n') _alfc_ibuf[--_alfc_len] = '\0'; \
-    /* strip leading spaces */ \
+    /* emit label: at col 0, instruction at COL_W, then comment (no wrap) */ \
+    flush_pending_label(); \
+    oc_str(lbl); oc_char(':'); \
+    emit_to_col(COL_W); \
     const char *_alfc_p = _alfc_ibuf; \
     while (*_alfc_p == ' ') _alfc_p++; \
-    char _alfc_lc[LBUF+2]; \
-    snprintf(_alfc_lc, sizeof _alfc_lc, "%s:", lbl); \
-    A("%-28s%-44s; %s\n", _alfc_lc, _alfc_p, comment); \
+    oc_str(_alfc_p); \
+    /* pad to comment col if room, else just one space */ \
+    if (out_col < COL_W + 44) { emit_to_col(COL_W + 44); } else { oc_char(' '); } \
+    oc_str("; "); oc_str(comment); oc_char('\n'); \
 } while(0)
 
 
