@@ -412,6 +412,36 @@ int stmt_match_var(const char *varname) {
 
 /* ---- capture variable materialisation ---- */
 
+/* ---- Array / Table / DATA field access shims ---- */
+
+/* stmt_aref: get element from ARRAY or TABLE descriptor.
+ *   arr  — DESCR_t of the array/table (passed as two ints: type in rdi, ptr in rsi)
+ *   key  — DESCR_t subscript (in rdx/rcx)
+ * Returns the element DESCR_t in rax:rdx. */
+DESCR_t stmt_aref(DESCR_t arr, DESCR_t key) {
+    DESCR_t keys[1] = { key };
+    return _aref_impl(arr, keys, 1);
+}
+
+/* stmt_aset: set element in ARRAY or TABLE descriptor.
+ *   arr  — DESCR_t of the array/table  (rdi:rsi)
+ *   key  — DESCR_t subscript            (rdx:rcx)
+ *   val  — DESCR_t value to store       (r8:r9)
+ * No return value. */
+void stmt_aset(DESCR_t arr, DESCR_t key, DESCR_t val) {
+    DESCR_t keys[1] = { key };
+    _aset_impl(arr, keys, 1, val);
+}
+
+/* stmt_field_set: set a DATA record field.
+ *   obj   — DESCR_t of the DATA object  (rdi:rsi)
+ *   field — C string field name          (rdx)
+ *   val   — DESCR_t value to store       (rcx:r8)
+ * No return value. */
+void stmt_field_set(DESCR_t obj, const char *field, DESCR_t val) {
+    FIELD_SET_fn(obj, field, val);
+}
+
 /* stmt_set_capture: after a DOL/NAM pattern match, copy the captured
  * byte span from cap_VAR_buf (length cap_VAR_len) into the SNOBOL4
  * variable named varname.

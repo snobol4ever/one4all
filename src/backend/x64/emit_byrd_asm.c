@@ -181,105 +181,158 @@ static void flush_pending_label(void) {
     }
 }
 
+/* -----------------------------------------------------------------------
+ * emit3 — structured three-column instruction emitter.
+ *
+ * This is the single choke-point for all NASM output.  Every instruction
+ * goes through here; directives and raw lines use emit_raw().
+ *
+ * Parameters:
+ *   label    — NASM label string WITHOUT trailing colon, or NULL
+ *   opcode   — opcode / macro name, e.g. "mov", "ASSIGN_INT"
+ *   operands — operand string, e.g. "rdi, [rbp-16]", or NULL
+ *
+ * Column layout (defined by COL_W / COL2_W):
+ *   col 0          : label: (if any)
+ *   col COL_W      : opcode
+ *   col COL_W+COL2_W : operands (if any)
+ *
+ * Label-fold rule: if pending_label is set, it is emitted on this same
+ * line rather than flushed standalone.  Pending sep is attached before
+ * the label when present.
+ * ----------------------------------------------------------------------- */
+static void emit3(const char *label, const char *opcode, const char *operands) {
+    /* Resolve which label appears on this line: explicit arg wins over pending */
+    const char *lbl = (label && *label) ? label : NULL;
+    if (!lbl && pending_label[0]) {
+        lbl = pending_label;
+    }
+
+    /* Attach pending sep immediately before the label line */
+    if (pending_sep[0]) {
+        oc_char(';'); oc_char(' '); oc_str(pending_sep); oc_char('\n');
+        pending_sep[0] = '\0';
+    }
+
+    /* Emit label + colon if present */
+    if (lbl) {
+        oc_str(lbl);
+        oc_char(':');
+        pending_label[0] = '\0';
+    }
+
+    /* Pad to COL_W, emit opcode */
+    emit_to_col(COL_W);
+    oc_str(opcode);
+
+    /* Pad to COL3, emit operands */
+    if (operands && *operands) {
+        int col3 = COL_W + COL2_W;
+        if (out_col < col3) emit_to_col(col3);
+        else oc_char(' ');
+        oc_str(operands);
+    }
+    oc_char('\n');
+}
+
+/* emit_raw — emit a line that must not be column-formatted:
+ * directives (section, global, extern, resq, db, dq, %include),
+ * comment lines, blank lines, sep macros.
+ * Flushes pending_label standalone first (a label before a directive
+ * gets its own line). */
+static void emit_raw(const char *text) {
+    flush_pending_label();
+    oc_str(text);
+}
+
+/* fmt_op — format operand string into a thread-local static buffer.
+ * Used by A() to split "    MACRO  op1, op2\n" into opcode + operands. */
+static char _fmt_op_buf[512];
+static const char *fmt_op(const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(_fmt_op_buf, sizeof _fmt_op_buf, fmt, ap);
+    va_end(ap);
+    return _fmt_op_buf;
+}
+
+/* -----------------------------------------------------------------------
+ * A — printf-style assembler output.
+ *
+ * Compatibility entry point: parses the formatted string to split it into
+ * (label, opcode, operands) and delegates to emit3 / emit_raw.
+ *
+ * String shapes handled:
+ *   "    OPCODE  operands\n"   → emit3(NULL, opcode, operands)
+ *   "    OPCODE\n"             → emit3(NULL, opcode, NULL)
+ *   "label:\n"                 → flush_pending_label; pending_label = label
+ *                               (handled by asmL, not A — kept for safety)
+ *   "\n"                       → emit_raw("\n")   blank line
+ *   "    ; comment\n"          → emit_raw(text)   passthrough
+ *   "    section ...\n" etc.   → emit_raw(text)   directive
+ * ----------------------------------------------------------------------- */
 static void A(const char *fmt, ...) {
-    /* Build the full output string first */
     char buf[2048];
     va_list ap;
     va_start(ap, fmt);
     vsnprintf(buf, sizeof buf, fmt, ap);
     va_end(ap);
 
-    if (pending_label[0]) {
-        /* Find first non-newline char to decide if this is an instruction */
-        const char *p = buf;
-        while (*p == '\n') p++;
-        /* Treat as instruction only if it starts with space/tab AND is not STMT_SEP/PORT_SEP */
-        int is_instr = (*p == ' ' || *p == '\t');
-        int is_passthrough = 0;  /* separators and blank lines pass through without flushing */
-        if (is_instr) {
-            const char *kw = p;
-            while (*kw == ' ' || *kw == '\t') kw++;
-            if (strncmp(kw, "STMT_SEP", 8) == 0 ||
-                strncmp(kw, "PORT_SEP", 8) == 0 ||
-                strncmp(kw, ";", 1) == 0) {
-                is_instr = 0;
-                is_passthrough = 1;  /* visual separator — label survives it */
-            }
-        }
-        int is_blank = (*p == '\0');
-        if (is_blank || is_passthrough) {
-            oc_str(buf);
-            return;  /* pending label survives blank lines and separators */
-        }
-        if (is_instr) {
-            /* Emit any leading newlines first, then sep (if any), then fold label+instruction. */
-            const char *start = buf;
-            while (*start == '\n') { oc_char('\n'); start++; }
-            /* Rule 3: sep immediately precedes label:  INSTR with no blank between */
-            if (pending_sep[0]) {
-                oc_char(';'); oc_char(' '); oc_str(pending_sep); oc_char('\n');
-                pending_sep[0] = '\0';
-            }
-            /* emit label: then pad to COL_W */
-            oc_str(pending_label);
-            oc_char(':');
-            pending_label[0] = '\0';
-            emit_to_col(COL_W);
-            /* strip leading whitespace from instruction content */
-            while (*start == ' ' || *start == '\t') start++;
-            emit_instr(start);
+    const char *p = buf;
+
+    /* Emit any leading newlines as raw blank lines */
+    while (*p == '\n') { emit_raw("\n"); p++; }
+    if (!*p) return;
+
+    /* Indented content: strip leading whitespace, classify */
+    if (*p == ' ' || *p == '\t') {
+        while (*p == ' ' || *p == '\t') p++;
+
+        /* Directives and passthrough lines — emit raw (label survives) */
+        int is_directive =
+            strncmp(p, "section", 7) == 0 ||
+            strncmp(p, "global",  6) == 0 ||
+            strncmp(p, "extern",  6) == 0 ||
+            strncmp(p, "resq",    4) == 0 ||
+            strncmp(p, "db ",     3) == 0 ||
+            strncmp(p, "dq ",     3) == 0 ||
+            strncmp(p, "dd ",     3) == 0 ||
+            strncmp(p, "%include",8) == 0 ||
+            strncmp(p, "STMT_SEP",8) == 0 ||
+            strncmp(p, "PORT_SEP",8) == 0 ||
+            p[0] == ';';
+        if (is_directive) {
+            /* Label survives directives — don't flush it */
+            oc_str(p);
             return;
-        } else {
-            flush_pending_label();
         }
-    }
-    /* No pending label — emit instruction at COL_W if it's indented content */
-    {
-        const char *p = buf;
-        /* skip leading newlines — emit them, then handle the instruction part */
-        while (*p == '\n') { oc_char('\n'); p++; }
-        if (*p == ' ' || *p == '\t') {
-            /* indented instruction — align to COL_W */
-            while (*p == ' ' || *p == '\t') p++;
-            if (*p) {  /* non-empty after strip */
-                /* check it's not a .section / global / extern / resq directive */
-                int is_directive = (strncmp(p, "section", 7) == 0 ||
-                                    strncmp(p, "global",  6) == 0 ||
-                                    strncmp(p, "extern",  6) == 0 ||
-                                    strncmp(p, "resq",    4) == 0 ||
-                                    strncmp(p, "db ",     3) == 0 ||
-                                    strncmp(p, "dq ",     3) == 0 ||
-                                    strncmp(p, "dd ",     3) == 0 ||
-                                    strncmp(p, "%include",8) == 0 ||
-                                    strncmp(p, "STMT_SEP",8) == 0 ||
-                                    strncmp(p, "PORT_SEP",8) == 0 ||
-                                    p[0] == ';');
-                if (!is_directive) {
-                    emit_to_col(COL_W);
-                    /* Col3 alignment: emit opcode word, then pad to COL3 before operands */
-                    const char *op = p;
-                    const char *sp = p;
-                    while (*sp && *sp != ' ' && *sp != '\t') sp++; /* end of opcode */
-                    /* emit the opcode word */
-                    while (op < sp) oc_char(*op++);
-                    /* skip whitespace in source */
-                    while (*sp == ' ' || *sp == '\t') sp++;
-                    if (*sp) {
-                        /* pad to COL3 for operands */
-                        int col3 = COL_W + COL2_W;
-                        if (out_col < col3) emit_to_col(col3);
-                        else oc_char(' ');
-                        oc_str(sp);
-                    } else {
-                        oc_char('\n');
-                    }
-                    return;
-                }
-            }
+
+        /* Instruction: split into opcode + operands, call emit3 */
+        const char *op_start = p;
+        while (*p && *p != ' ' && *p != '\t' && *p != '\n') p++;
+        /* Grab opcode into a small buffer */
+        char opcode[128];
+        int oplen = (int)(p - op_start);
+        if (oplen >= (int)sizeof opcode) oplen = (int)sizeof opcode - 1;
+        memcpy(opcode, op_start, oplen);
+        opcode[oplen] = '\0';
+        /* Skip whitespace between opcode and operands */
+        while (*p == ' ' || *p == '\t') p++;
+        /* Strip trailing newline from operands */
+        char operands[1024] = "";
+        if (*p && *p != '\n') {
+            int olen = (int)strlen(p);
+            if (olen > 0 && p[olen-1] == '\n') olen--;
+            if (olen >= (int)sizeof operands) olen = (int)sizeof operands - 1;
+            memcpy(operands, p, olen);
+            operands[olen] = '\0';
         }
-        /* fallback: emit as-is from current position */
-        oc_str(p);
+        emit3(NULL, opcode, operands[0] ? operands : NULL);
+        return;
     }
+
+    /* Non-indented: raw passthrough (labels are handled by asmL, not A) */
+    oc_str(p);
 }
 
 /* -----------------------------------------------------------------------
@@ -2723,6 +2776,31 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
         }
         return 1;
     }
+    case E_IDX: {
+        /* arr<i> or arr['key'] or tbl['key']  →  stmt_aref(arr, key)
+         * SysV AMD64: DESCR_t args passed in pairs of int regs.
+         *   arg0 (arr): rdi=type, rsi=ptr
+         *   arg1 (key): rdx=type, rcx=ptr
+         * Returns DESCR_t in rax:rdx. */
+        if (!e->left || e->nargs < 1 || !e->args[0]) goto fallback;
+        /* Evaluate arr → [rbp-16/8], key → [rbp-32/24] */
+        prog_emit_expr(e->left,    -16);
+        prog_emit_expr(e->args[0], -32);
+        A("    mov     rdi, [rbp-16]\n");
+        A("    mov     rsi, [rbp-8]\n");
+        A("    mov     rdx, [rbp-32]\n");
+        A("    mov     rcx, [rbp-24]\n");
+        A("    call    stmt_aref\n");
+        if (rbp_off == -16) {
+            A("    mov     [rbp-16], rax\n");
+            A("    mov     [rbp-8],  rdx\n");
+        } else {
+            A("    mov     [rbp-32], rax\n");
+            A("    mov     [rbp-24], rdx\n");
+        }
+        return 1;
+    }
+
     case E_OR:
     case E_CONC: {
         /* E_CONC = string CAT  (value context): call stmt_concat directly.
@@ -3283,6 +3361,7 @@ static void asm_emit_program(Program *prog) {
     A("    extern  stmt_any_var, stmt_notany_var\n");
     A("    extern  stmt_at_capture\n");
     A("    extern  kw_anchor\n");
+    A("    extern  stmt_aref, stmt_aset, stmt_field_set\n");
     A("    extern  comm_stno\n");
     A("    global  cursor, subject_data, subject_len_val\n");
     A("\n");
@@ -3390,7 +3469,9 @@ static void asm_emit_program(Program *prog) {
              * The indirect handler below evaluates the inner name expression itself. */
             if (s->subject &&
                 !(s->has_eq && (s->subject->kind == E_INDR || s->subject->kind == E_DOL)) &&
-                !(s->has_eq && (s->subject->kind == E_VART || s->subject->kind == E_KW))) {
+                !(s->has_eq && (s->subject->kind == E_VART || s->subject->kind == E_KW)) &&
+                !(s->has_eq && s->subject->kind == E_IDX) &&
+                !(s->has_eq && s->subject->kind == E_FNC && s->subject->nargs == 1)) {
                 int may_fail = prog_emit_expr(s->subject, -32);
                 /* If subject may fail AND there are S/F targets, dispatch */
                 if (may_fail && !s->has_eq && (id_s >= 0 || id_f >= 0)) {
@@ -3480,6 +3561,112 @@ static void asm_emit_program(Program *prog) {
                     A("    FAIL_BR     %s\n", fail_target);
                 }
                 A("    SET_VAR_INDIR\n");
+                emit_jmp(tgt_s ? tgt_s : tgt_u, next_lbl);
+                if (id_f >= 0) {
+                    asmL(sfail_lbl);
+                    emit_jmp(tgt_f, next_lbl);
+                }
+            } else if (s->has_eq && s->subject &&
+                       s->subject->kind == E_IDX &&
+                       s->subject->left && s->subject->nargs >= 1) {
+                /* A<i> = val  or  T['key'] = val  →  stmt_aset(arr, key, val)
+                 *
+                 * SysV AMD64 calling convention for stmt_aset(arr, key, val):
+                 *   arr: rdi=type, rsi=ptr
+                 *   key: rdx=type, rcx=ptr
+                 *   val: r8=type,  r9=ptr
+                 *
+                 * Evaluation order: arr first, then key, then RHS val.
+                 * We stash arr and key in .bss scratch slots to survive the
+                 * RHS evaluation (which may clobber [rbp-16/8] and [rbp-32/24]).
+                 */
+                const char *fail_target = id_f >= 0 ? sfail_lbl : next_lbl;
+
+                /* Use a unique scratch uid to avoid slot collisions */
+                static int idx_uid_counter = 0;
+                int idx_uid = idx_uid_counter++;
+
+                /* Declare two .bss scratch slots for arr and key */
+                char arr_t_lab[64], arr_p_lab[64];
+                char key_t_lab[64], key_p_lab[64];
+                snprintf(arr_t_lab, sizeof arr_t_lab, "idx_arr%d_t", idx_uid);
+                snprintf(arr_p_lab, sizeof arr_p_lab, "idx_arr%d_p", idx_uid);
+                snprintf(key_t_lab, sizeof key_t_lab, "idx_key%d_t", idx_uid);
+                snprintf(key_p_lab, sizeof key_p_lab, "idx_key%d_p", idx_uid);
+                /* Emit .bss declarations (we emit them inline; the assembler
+                 * allows forward .bss refs in NASM with resq) — we use a
+                 * deferred approach: emit the scratch code into a side buffer
+                 * and rely on the .bss prescan pass.  Simpler: just push/pop. */
+
+                /* Evaluate arr → [rbp-16/8] */
+                prog_emit_expr(s->subject->left,      -16);
+                /* Save arr onto C stack */
+                A("    push    qword [rbp-8]\n");   /* arr ptr  (high) */
+                A("    push    qword [rbp-16]\n");  /* arr type (low) */
+                /* Evaluate key → [rbp-32/24] */
+                prog_emit_expr(s->subject->args[0],  -32);
+                /* Save key onto C stack (now arr is at [rsp+16]..[rsp+23],
+                 * key at [rsp+0]..[rsp+7] and [rsp+8]..[rsp+15]) */
+                A("    push    qword [rbp-24]\n");  /* key ptr  (high) */
+                A("    push    qword [rbp-32]\n");  /* key type (low) */
+                /* Evaluate RHS → [rbp-32/24] */
+                if (!s->replacement || s->replacement->kind == E_NULV) {
+                    A("    mov     qword [rbp-32], 1\n");  /* DT_SNUL */
+                    A("    mov     qword [rbp-24], 0\n");
+                } else {
+                    prog_emit_expr(s->replacement, -32);
+                    A("    FAIL_BR     %s\n", fail_target);
+                }
+                /* Restore key (was at rsp+0..15) and arr (was at rsp+16..31) */
+                /* Stack layout (top→bottom): key_t, key_p, arr_t, arr_p
+                 * i.e. [rsp+0]=key_t, [rsp+8]=key_p, [rsp+16]=arr_t, [rsp+24]=arr_p */
+                A("    mov     r8,  [rbp-32]\n");   /* val type */
+                A("    mov     r9,  [rbp-24]\n");   /* val ptr  */
+                A("    mov     rdx, [rsp]\n");      /* key type */
+                A("    mov     rcx, [rsp+8]\n");    /* key ptr  */
+                A("    mov     rdi, [rsp+16]\n");   /* arr type */
+                A("    mov     rsi, [rsp+24]\n");   /* arr ptr  */
+                A("    add     rsp, 32\n");         /* pop 4 saved qwords */
+                A("    call    stmt_aset\n");
+                emit_jmp(tgt_s ? tgt_s : tgt_u, next_lbl);
+                if (id_f >= 0) {
+                    asmL(sfail_lbl);
+                    emit_jmp(tgt_f, next_lbl);
+                }
+            } else if (s->has_eq && s->subject &&
+                       s->subject->kind == E_FNC &&
+                       s->subject->nargs == 1 &&
+                       s->subject->sval) {
+                /* field(obj) = val  →  stmt_field_set(obj, "field", val)
+                 *
+                 * SysV AMD64 for stmt_field_set(obj, field, val):
+                 *   obj:   rdi=type, rsi=ptr
+                 *   field: rdx = pointer to C string label
+                 *   val:   rcx=type, r8=ptr
+                 */
+                const char *fail_target = id_f >= 0 ? sfail_lbl : next_lbl;
+                const char *flab = prog_str_intern(s->subject->sval);
+
+                /* Evaluate obj → push onto stack */
+                prog_emit_expr(s->subject->args[0], -16);
+                A("    push    qword [rbp-8]\n");   /* obj ptr  */
+                A("    push    qword [rbp-16]\n");  /* obj type */
+                /* Evaluate val → [rbp-32/24] */
+                if (!s->replacement || s->replacement->kind == E_NULV) {
+                    A("    mov     qword [rbp-32], 1\n");
+                    A("    mov     qword [rbp-24], 0\n");
+                } else {
+                    prog_emit_expr(s->replacement, -32);
+                    A("    FAIL_BR     %s\n", fail_target);
+                }
+                /* Set up args: obj in rdi:rsi, field name in rdx, val in rcx:r8 */
+                A("    mov     rcx, [rbp-32]\n");   /* val type */
+                A("    mov     r8,  [rbp-24]\n");   /* val ptr  */
+                A("    lea     rdx, [rel %s]\n", flab);  /* field name */
+                A("    mov     rdi, [rsp]\n");      /* obj type */
+                A("    mov     rsi, [rsp+8]\n");    /* obj ptr  */
+                A("    add     rsp, 16\n");         /* pop 2 saved qwords */
+                A("    call    stmt_field_set\n");
                 emit_jmp(tgt_s ? tgt_s : tgt_u, next_lbl);
                 if (id_f >= 0) {
                     asmL(sfail_lbl);

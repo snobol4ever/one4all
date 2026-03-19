@@ -199,6 +199,7 @@ DESCR_t DATCON_fn(const char *typename, ...);  /* varargs: field values */
 
 /* Get/set field by name */
 DESCR_t FIELD_GET_fn(DESCR_t obj, const char *field);
+void    FIELD_SET_fn(DESCR_t obj, const char *field, DESCR_t val);
 void   FIELD_SET_fn(DESCR_t obj, const char *field, DESCR_t val);
 
 /* ============================================================
