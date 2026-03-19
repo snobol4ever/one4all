@@ -25,18 +25,18 @@ echo "Compiling beauty.sno via sno2c -asm ..."
 }
 
 # Assemble
-nasm -f elf64 "$WORK/beauty.s" -o "$WORK/beauty.o" 2>&1 || {
+nasm -f elf64 -I"$RT/asm/" "$WORK/beauty.s" -o "$WORK/beauty.o" 2>&1 || {
     echo -e "${RED}FAIL${RESET} nasm failed"
     head -20 "$WORK/beauty.s"
     exit 1
 }
 
 # Compile runtime
-gcc -O0 -g -c "$RT/asm/snobol4_stmt_rt.c"    -I"$RT/snobol4" -I"$RT" -I"$TINY/src/sno2c" -w -o "$WORK/stmt_rt.o"
-gcc -O0 -g -c "$RT/snobol4/snobol4.c"         -I"$RT/snobol4" -I"$RT" -I"$TINY/src/sno2c" -w -o "$WORK/snobol4.o"
-gcc -O0 -g -c "$RT/snobol4/mock_includes.c"   -I"$RT/snobol4" -I"$RT" -I"$TINY/src/sno2c" -w -o "$WORK/mock_includes.o"
-gcc -O0 -g -c "$RT/snobol4/snobol4_pattern.c" -I"$RT/snobol4" -I"$RT" -I"$TINY/src/sno2c" -w -o "$WORK/snobol4_pattern.o"
-gcc -O0 -g -c "$RT/mock_engine.c"             -I"$RT/snobol4" -I"$RT" -I"$TINY/src/sno2c" -w -o "$WORK/mock_engine.o"
+gcc -O0 -g -c "$RT/asm/snobol4_stmt_rt.c"       -I"$RT/snobol4" -I"$RT" -I"$TINY/src/frontend/snobol4" -w -o "$WORK/stmt_rt.o"
+gcc -O0 -g -c "$RT/snobol4/snobol4.c"            -I"$RT/snobol4" -I"$RT" -I"$TINY/src/frontend/snobol4" -w -o "$WORK/snobol4.o"
+gcc -O0 -g -c "$RT/mock/mock_includes.c"          -I"$RT/snobol4" -I"$RT" -I"$TINY/src/frontend/snobol4" -w -o "$WORK/mock_includes.o"
+gcc -O0 -g -c "$RT/snobol4/snobol4_pattern.c"    -I"$RT/snobol4" -I"$RT" -I"$TINY/src/frontend/snobol4" -w -o "$WORK/snobol4_pattern.o"
+gcc -O0 -g -c "$RT/mock/mock_engine.c"            -I"$RT/snobol4" -I"$RT" -I"$TINY/src/frontend/snobol4" -w -o "$WORK/mock_engine.o"
 
 # Link beauty_asm_bin
 gcc -no-pie "$WORK/beauty.o" \
