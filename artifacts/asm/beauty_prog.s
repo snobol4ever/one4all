@@ -13,6 +13,10 @@ extern  stmt_setup_subject, stmt_apply_replacement
 extern  stmt_apply_replacement_splice
 extern  stmt_set_capture, stmt_match_var
 extern  stmt_pos_var, stmt_rpos_var
+extern  stmt_span_var, stmt_break_var
+extern  stmt_breakx_var, stmt_breakx_lit
+extern  stmt_any_var, stmt_notany_var
+extern  stmt_at_capture
 extern  kw_anchor
 global  cursor, subject_data, subject_len_val
 
@@ -502,7 +506,7 @@ Ln_12:                      sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_DIFFER, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_13
                             jmp         Ln_13
@@ -840,7 +844,7 @@ Ln_65:                      sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_DIFFER, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_66
                             jmp         Ln_66
@@ -1018,7 +1022,7 @@ Ln_73:                      sub         rsp, 64
                             STORE_ARG32 48
                             APPLY_FN_N  S_output, 4
                             add         rsp, 64
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 Ln_74:
@@ -1131,7 +1135,7 @@ Ln_78:                      sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_DIFFER, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_79
                             jmp         Ln_79
@@ -1317,7 +1321,7 @@ L_ppAutoSort_17:            sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_ENDFILE, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -1384,7 +1388,7 @@ Ln_95:                      sub         rsp, 32
                             STORE_ARG32 16
                             APPLY_FN_N  S_LT, 2
                             add         rsp, 32
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_96
                             jmp         Ln_96
@@ -1477,7 +1481,7 @@ Ln_107:                     sub         rsp, 32
                             STORE_ARG32 16
                             APPLY_FN_N  S_LT, 2
                             add         rsp, 32
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_108
                             jmp         Ln_108
@@ -1755,7 +1759,7 @@ Ln_117:                     sub         rsp, 64
                             STORE_ARG32 48
                             APPLY_FN_N  S_input, 4
                             add         rsp, 64
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 Ln_118:
@@ -6045,7 +6049,7 @@ L_pp_29:                    sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_DIFFER, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_200
                             jmp         Ln_200
@@ -6192,7 +6196,7 @@ Ln_205:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_DIFFER, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_206
                             jmp         L_COMPUTED_pp_t_30
@@ -6263,12 +6267,12 @@ L_pp_BuiltinVar_34:         sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_ss, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_211
                             jmp         [P_pp_ret_γ]     ; RETURN
@@ -6282,12 +6286,12 @@ L_pp_Function_36:           sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_ss, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_212
                             jmp         [P_pp_ret_γ]     ; RETURN
@@ -6301,12 +6305,12 @@ L_pp_Id_37:                 sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_ss, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_213
                             jmp         [P_pp_ret_γ]     ; RETURN
@@ -6320,12 +6324,12 @@ L_pp_Integer_38:            sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_ss, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_214
                             jmp         [P_pp_ret_γ]     ; RETURN
@@ -6339,12 +6343,12 @@ L_pp_Label_39:              sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_ss, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_215
                             jmp         [P_pp_ret_γ]     ; RETURN
@@ -6358,12 +6362,12 @@ L_pp_ProtKwd_40:            sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_ss, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_216
                             jmp         [P_pp_ret_γ]     ; RETURN
@@ -6377,12 +6381,12 @@ L_pp_Real_41:               sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_ss, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_217
                             jmp         [P_pp_ret_γ]     ; RETURN
@@ -6396,12 +6400,12 @@ L_pp_SpecialNm_42:          sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_ss, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_218
                             jmp         [P_pp_ret_γ]     ; RETURN
@@ -6415,12 +6419,12 @@ L_pp_String_43:             sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_ss, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_219
                             jmp         [P_pp_ret_γ]     ; RETURN
@@ -6434,12 +6438,12 @@ L_pp_UnprotKwd_44:          sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_ss, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_220
                             jmp         [P_pp_ret_γ]     ; RETURN
@@ -6453,12 +6457,12 @@ L_pp_45:                    sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_ss, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_221
                             jmp         [P_pp_ret_γ]     ; RETURN
@@ -6472,12 +6476,12 @@ L_pp_46:                    sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_ss, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_222
                             jmp         [P_pp_ret_γ]     ; RETURN
@@ -6491,12 +6495,12 @@ L_pp_S_47:                  sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_ss, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_223
                             jmp         [P_pp_ret_γ]     ; RETURN
@@ -6510,12 +6514,12 @@ L_pp_S_48:                  sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_ss, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_224
                             jmp         [P_pp_ret_γ]     ; RETURN
@@ -6529,12 +6533,12 @@ L_pp_F_49:                  sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_ss, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_225
                             jmp         [P_pp_ret_γ]     ; RETURN
@@ -6548,12 +6552,12 @@ L_pp_F_50:                  sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_ss, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_226
                             jmp         [P_pp_ret_γ]     ; RETURN
@@ -6582,12 +6586,12 @@ L_ppUnOp_51:                sub         rsp, 16
                             STORE_ARG32 16
                             APPLY_FN_N  S_ss, 2
                             add         rsp, 32
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Ln_227
                             jmp         [P_pp_ret_γ]     ; RETURN
@@ -6598,7 +6602,7 @@ Ln_227:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -6647,12 +6651,12 @@ L_ppBinOp_52:               sub         rsp, 16
                             STORE_ARG32 16
                             APPLY_FN_N  S_ss, 2
                             add         rsp, 32
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Ln_230
                             jmp         [P_pp_ret_γ]     ; RETURN
@@ -6685,12 +6689,12 @@ Ln_231:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
 Ln_232:                     APPLY_FN_0  S_DecLevel
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -6699,17 +6703,17 @@ Ln_233:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
 Ln_234:                     APPLY_FN_0  S_IncLevel
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
 Ln_235:                     APPLY_FN_0  S_GenTab
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -6913,12 +6917,12 @@ L_pp_Comment_68:            sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_SetLevel, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
 Ln_266:                     APPLY_FN_0  S_GenSetCont
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -6947,7 +6951,7 @@ Ln_267:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             jmp         [P_pp_ret_γ]     ; RETURN
 
@@ -6960,12 +6964,12 @@ L_pp_Control_69:            sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_SetLevel, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
 Ln_269:                     APPLY_FN_0  S_GenSetCont
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -6994,7 +6998,7 @@ Ln_270:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             jmp         [P_pp_ret_γ]     ; RETURN
 
@@ -7007,7 +7011,7 @@ L_pp_Stmt_70:               sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_SetLevel, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -7018,7 +7022,7 @@ Ln_272:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_GenSetCont, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -7103,7 +7107,7 @@ Ln_281:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -7113,12 +7117,12 @@ Ln_282:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_t, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             APPLY_FN_N  S_DIFFER, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_283
                             jmp         Ln_283
@@ -7132,7 +7136,7 @@ Ln_283:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -7142,7 +7146,7 @@ Ln_284:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_GenTab, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -7152,7 +7156,7 @@ Ln_285:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_SetLevel, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -7247,12 +7251,12 @@ Ln_288:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_t, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             APPLY_FN_N  S_DIFFER, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_289
                             jmp         Ln_289
@@ -7266,7 +7270,7 @@ Ln_289:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -7276,7 +7280,7 @@ Ln_290:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_GenTab, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -7286,7 +7290,7 @@ Ln_291:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_SetLevel, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -7364,7 +7368,7 @@ Ln_294:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_DIFFER, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_295
                             jmp         Ln_295
@@ -7378,7 +7382,7 @@ Ln_295:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -7388,12 +7392,12 @@ Ln_296:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_t, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             APPLY_FN_N  S_DIFFER, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_297
                             jmp         Ln_297
@@ -7407,7 +7411,7 @@ Ln_297:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -7442,7 +7446,7 @@ L_pp_Stmt5_72:              sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_DIFFER, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_300
                             jmp         Ln_300
@@ -7456,7 +7460,7 @@ Ln_300:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -7466,7 +7470,7 @@ Ln_301:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_GenTab, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -7476,7 +7480,7 @@ Ln_302:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_SetLevel, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -7487,7 +7491,7 @@ Ln_303:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -7497,12 +7501,12 @@ Ln_304:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_t, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             APPLY_FN_N  S_DIFFER, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_305
                             jmp         Ln_305
@@ -7516,7 +7520,7 @@ Ln_305:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -7526,7 +7530,7 @@ Ln_306:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_GenTab, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -7536,7 +7540,7 @@ Ln_307:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_SetLevel, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -7607,12 +7611,12 @@ L_pp_Stmt7_71:              sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_t, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             APPLY_FN_N  S_DIFFER, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_311
                             jmp         Ln_311
@@ -7631,7 +7635,7 @@ Ln_312:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -7641,7 +7645,7 @@ Ln_313:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_GenTab, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -7651,7 +7655,7 @@ Ln_314:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_SetLevel, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -7662,7 +7666,7 @@ Ln_315:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -7696,12 +7700,12 @@ Ln_317:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_t, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             APPLY_FN_N  S_DIFFER, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_318
                             jmp         Ln_318
@@ -7739,7 +7743,7 @@ L_pp_Stmt9_73:              sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             jmp         [P_pp_ret_γ]     ; RETURN
 
@@ -7766,12 +7770,12 @@ L_pp_ExprList_74:           sub         rsp, 16
                             STORE_ARG32 16
                             APPLY_FN_N  S_ss, 2
                             add         rsp, 32
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Ln_321
                             jmp         [P_pp_ret_γ]     ; RETURN
@@ -7828,12 +7832,12 @@ Ln_324:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
 Ln_325:                     APPLY_FN_0  S_DecLevel
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -7844,17 +7848,17 @@ Ln_326:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
 Ln_327:                     APPLY_FN_0  S_IncLevel
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
 Ln_328:                     APPLY_FN_0  S_GenTab
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -7903,12 +7907,12 @@ L_pp_76:                    sub         rsp, 16
                             STORE_ARG32 16
                             APPLY_FN_N  S_ss, 2
                             add         rsp, 32
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Ln_331
                             jmp         [P_pp_ret_γ]     ; RETURN
@@ -7921,17 +7925,17 @@ Ln_331:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
 Ln_332:                     APPLY_FN_0  S_IncLevel
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
 Ln_333:                     APPLY_FN_0  S_GenTab
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -7986,12 +7990,12 @@ Ln_337:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
 Ln_338:                     APPLY_FN_0  S_DecLevel
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -8002,17 +8006,17 @@ Ln_339:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
 Ln_340:                     APPLY_FN_0  S_IncLevel
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
 Ln_341:                     APPLY_FN_0  S_GenTab
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -8045,12 +8049,12 @@ L_pp_1_80:                  sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
 Ln_344:                     APPLY_FN_0  S_DecLevel
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -8061,7 +8065,7 @@ Ln_345:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             jmp         [P_pp_ret_γ]     ; RETURN
 
@@ -8093,12 +8097,12 @@ Ln_347:                     sub         rsp, 16
                             STORE_ARG32 16
                             APPLY_FN_N  S_ss, 2
                             add         rsp, 32
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Ln_348
                             jmp         [P_pp_ret_γ]     ; RETURN
@@ -8155,12 +8159,12 @@ Ln_351:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
 Ln_352:                     APPLY_FN_0  S_DecLevel
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -8171,17 +8175,17 @@ Ln_353:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
 Ln_354:                     APPLY_FN_0  S_IncLevel
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
 Ln_355:                     APPLY_FN_0  S_GenTab
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -8230,12 +8234,12 @@ L_pp_84:                    sub         rsp, 16
                             STORE_ARG32 16
                             APPLY_FN_N  S_ss, 2
                             add         rsp, 32
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Ln_358
                             jmp         [P_pp_ret_γ]     ; RETURN
@@ -8323,12 +8327,12 @@ L_pp_87:                    sub         rsp, 16
                             STORE_ARG32 16
                             APPLY_FN_N  S_ss, 2
                             add         rsp, 32
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Ln_363
                             jmp         [P_pp_ret_γ]     ; RETURN
@@ -8387,17 +8391,17 @@ Ln_366:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
 Ln_367:                     APPLY_FN_0  S_IncLevel
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
 Ln_368:                     APPLY_FN_0  S_GenTab
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -8428,12 +8432,12 @@ Ln_370:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
 Ln_371:                     APPLY_FN_0  S_DecLevel
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -8444,7 +8448,7 @@ Ln_372:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -8484,12 +8488,12 @@ L_pp_90:                    sub         rsp, 16
                             STORE_ARG32 16
                             APPLY_FN_N  S_ss, 2
                             add         rsp, 32
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Ln_375
                             jmp         [P_pp_ret_γ]     ; RETURN
@@ -8502,17 +8506,17 @@ Ln_375:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
 Ln_376:                     APPLY_FN_0  S_IncLevel
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
 Ln_377:                     APPLY_FN_0  S_GenTab
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -8543,12 +8547,12 @@ Ln_379:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
 Ln_380:                     APPLY_FN_0  S_DecLevel
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -8559,7 +8563,7 @@ Ln_381:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             jmp         [P_pp_ret_γ]     ; RETURN
 
@@ -8586,12 +8590,12 @@ L_pp_Call_91:               sub         rsp, 16
                             STORE_ARG32 16
                             APPLY_FN_N  S_ss, 2
                             add         rsp, 32
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Ln_383
                             jmp         [P_pp_ret_γ]     ; RETURN
@@ -8637,17 +8641,17 @@ Ln_384:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
 Ln_385:                     APPLY_FN_0  S_IncLevel
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
 Ln_386:                     APPLY_FN_0  S_GenTab
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -8678,12 +8682,12 @@ Ln_388:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
 Ln_389:                     APPLY_FN_0  S_DecLevel
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -8694,7 +8698,7 @@ Ln_390:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             jmp         [P_pp_ret_γ]     ; RETURN
 
@@ -8714,7 +8718,7 @@ L_ss_93:                    sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_DIFFER, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_394
                             jmp         Ln_394
@@ -8884,7 +8888,7 @@ Ln_401:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_DIFFER, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_402
                             jmp         L_COMPUTED_ss_t_94
@@ -9061,14 +9065,14 @@ L_ss_atomic_96:             sub         rsp, 32
                             STORE_ARG32 0
                             APPLY_FN_N  S_SIZE, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             GET_VAR     S_len
                             STORE_ARG32 16
                             APPLY_FN_N  S_LE, 2
                             add         rsp, 32
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_415
                             jmp         [P_pp_ret_γ]     ; RETURN
@@ -10268,7 +10272,7 @@ Ln_481:                     sub         rsp, 32
                             STORE_ARG32 16
                             APPLY_FN_N  S_bVisit_421, 2
                             add         rsp, 32
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             jmp         L_bVisit_1_151
 
@@ -10293,7 +10297,7 @@ L_findRefs_153:             sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_DIFFER, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_486
                             jmp         Ln_486
@@ -10306,7 +10310,7 @@ Ln_486:                     sub         rsp, 32
                             STORE_ARG32 0
                             APPLY_FN_N  S_t, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             LOAD_STR    S_Call
@@ -10315,7 +10319,7 @@ Ln_486:                     sub         rsp, 32
                             STORE_ARG32 16
                             APPLY_FN_N  S_IDENT, 2
                             add         rsp, 32
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_487
                             jmp         Ln_487
@@ -10366,7 +10370,7 @@ Ln_489:                     sub         rsp, 32
                             STORE_ARG32 16
                             APPLY_FN_N  S_bVisit_421, 2
                             add         rsp, 32
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             jmp         L_findRefs_0_155
 
@@ -10418,7 +10422,7 @@ L_findRefs_2_156:           sub         rsp, 32
                             STORE_ARG32 0
                             APPLY_FN_N  S_t, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             LOAD_STR    S_Id
@@ -10427,7 +10431,7 @@ L_findRefs_2_156:           sub         rsp, 32
                             STORE_ARG32 16
                             APPLY_FN_N  S_IDENT, 2
                             add         rsp, 32
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_493
                             jmp         Ln_493
@@ -10609,7 +10613,7 @@ Ln_502:                     sub         rsp, 32
                             STORE_ARG32 0
                             APPLY_FN_N  S_t, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             LOAD_STR    S_Stmt
@@ -10618,7 +10622,7 @@ Ln_502:                     sub         rsp, 32
                             STORE_ARG32 16
                             APPLY_FN_N  S_IDENT, 2
                             add         rsp, 32
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_503
                             jmp         Ln_503
@@ -10639,12 +10643,12 @@ Ln_504:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_t, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             APPLY_FN_N  S_IDENT, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_505
                             jmp         Ln_505
@@ -10658,7 +10662,7 @@ Ln_505:                     sub         rsp, 32
                             STORE_ARG32 0
                             APPLY_FN_N  S_t, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             LOAD_STR    S_EQ
@@ -10667,7 +10671,7 @@ Ln_505:                     sub         rsp, 32
                             STORE_ARG32 16
                             APPLY_FN_N  S_IDENT, 2
                             add         rsp, 32
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_506
                             jmp         Ln_506
@@ -10681,7 +10685,7 @@ Ln_506:                     sub         rsp, 32
                             STORE_ARG32 0
                             APPLY_FN_N  S_t, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             LOAD_STR    S_Id
@@ -10690,7 +10694,7 @@ Ln_506:                     sub         rsp, 32
                             STORE_ARG32 16
                             APPLY_FN_N  S_IDENT, 2
                             add         rsp, 32
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Ln_507
                             jmp         L_refs_1_161
@@ -10703,7 +10707,7 @@ Ln_507:                     sub         rsp, 32
                             STORE_ARG32 0
                             APPLY_FN_N  S_t, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             STORE_ARG32 0
                             LOAD_STR    S_DL
@@ -10712,7 +10716,7 @@ Ln_507:                     sub         rsp, 32
                             STORE_ARG32 16
                             APPLY_FN_N  S_IDENT, 2
                             add         rsp, 32
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_508
                             jmp         L_refs_1_161
@@ -10748,7 +10752,7 @@ Ln_510:                     sub         rsp, 32
                             STORE_ARG32 16
                             APPLY_FN_N  S_bVisit_421, 2
                             add         rsp, 32
-                            STORE_RESULT
+                            STORE_RESULT16
 
 
 ; ======================================================================================================================
@@ -11064,7 +11068,7 @@ Ln_523:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_DIFFER, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_524
                             jmp         Ln_524
@@ -11168,7 +11172,7 @@ Ln_526:                     sub         rsp, 16
                             STORE_ARG32 0
                             APPLY_FN_N  S_DIFFER, 1
                             add         rsp, 16
-                            STORE_RESULT
+                            STORE_RESULT16
 
                             FAIL_BR16   Lf_527
                             jmp         Ln_527
@@ -11501,8 +11505,8 @@ patdef_ppI_gamma:
 patdef_ppI_omega:           jmp         [P_ppI_ret_ω]
 
 ; P_Integer_α (α entry)
-P_Integer_α:                SPAN_ALPHA  lit_str_4, 0, span85_saved, cursor, subject_data, subject_len_val, patdef_Integer_gamma, patdef_Integer_omega ; SPAN α
-P_Integer_β:                SPAN_BETA   span85_saved, cursor, patdef_Integer_omega ; SPAN β
+P_Integer_α:                SPAN_ALPHA_VAR S_digits, span85_saved, cursor, subject_data, subject_len_val, patdef_Integer_gamma, patdef_Integer_omega ; SPAN(var) α
+P_Integer_β:                SPAN_BETA_VAR span85_saved, cursor, patdef_Integer_omega ; SPAN(var) β
 ;  γ/ω ---------------------------------------------------------------------------------------------------------------
 patdef_Integer_gamma:
                             jmp         [P_Integer_ret_γ]
@@ -11596,8 +11600,8 @@ seq_l97_alpha:              jmp         seq_l98_alpha ; SEQ
 seq_l97_beta:               jmp         seq_r98_beta
 seq_l98_alpha:              jmp         seq_l99_alpha ; SEQ
 seq_l98_beta:               jmp         seq_r99_beta
-seq_l99_alpha:              SPAN_ALPHA  lit_str_4, 0, span100_saved, cursor, subject_data, subject_len_val, seq_r99_alpha, alt95_left_omega ; SPAN α
-seq_l99_beta:               SPAN_BETA   span100_saved, cursor, alt95_left_omega ; SPAN β
+seq_l99_alpha:              SPAN_ALPHA_VAR S_digits, span100_saved, cursor, subject_data, subject_len_val, seq_r99_alpha, alt95_left_omega ; SPAN(var) α
+seq_l99_beta:               SPAN_BETA_VAR span100_saved, cursor, alt95_left_omega ; SPAN(var) β
 seq_r99_alpha:              ALT_ALPHA   alt101_cur_save, cursor, alt_l101_alpha ; ALT α — save cursor, enter left
 seq_r99_beta:               SEQ_BETA    alt_r101_beta ; ALT β — resume right
 alt_l101_alpha:             jmp         seq_l102_alpha ; SEQ
@@ -11634,15 +11638,15 @@ alt104_left_omega:          ALT_OMEGA   alt104_cur_save, cursor, alt_r104_alpha 
 ; UNRESOLVED named pattern ref: epsilon → ω
 alt_r104_alpha:
 alt_r104_beta:              jmp         seq_l97_beta
-seq_r96_alpha:              SPAN_ALPHA  lit_str_4, 0, span106_saved, cursor, subject_data, subject_len_val, patdef_Real_gamma, seq_l96_beta ; SPAN α
-seq_r96_beta:               SPAN_BETA   span106_saved, cursor, seq_l96_beta ; SPAN β
+seq_r96_alpha:              SPAN_ALPHA_VAR S_digits, span106_saved, cursor, subject_data, subject_len_val, patdef_Real_gamma, seq_l96_beta ; SPAN(var) α
+seq_r96_beta:               SPAN_BETA_VAR span106_saved, cursor, seq_l96_beta ; SPAN(var) β
 alt95_left_omega:           ALT_OMEGA   alt95_cur_save, cursor, alt_r95_alpha ; ALT left_ω — restore cursor, enter right
 alt_r95_alpha:              jmp         seq_l107_alpha ; SEQ
 alt_r95_beta:               jmp         seq_r107_beta
 seq_l107_alpha:             jmp         seq_l108_alpha ; SEQ
 seq_l107_beta:              jmp         seq_r108_beta
-seq_l108_alpha:             SPAN_ALPHA  lit_str_4, 0, span109_saved, cursor, subject_data, subject_len_val, seq_r108_alpha, patdef_Real_omega ; SPAN α
-seq_l108_beta:              SPAN_BETA   span109_saved, cursor, patdef_Real_omega ; SPAN β
+seq_l108_alpha:             SPAN_ALPHA_VAR S_digits, span109_saved, cursor, subject_data, subject_len_val, seq_r108_alpha, patdef_Real_omega ; SPAN(var) α
+seq_l108_beta:              SPAN_BETA_VAR span109_saved, cursor, patdef_Real_omega ; SPAN(var) β
 seq_r108_alpha:             LIT_ALPHA1  46, seq_r108_alpha_saved, cursor, subject_data, subject_len_val, seq_r107_alpha, seq_l108_beta ; LIT α
 seq_r108_beta:              LIT_BETA    seq_r108_alpha_saved, cursor, seq_l108_beta ; LIT β
 
@@ -13287,8 +13291,8 @@ P_Comment_α:                jmp         seq_l286_alpha ; SEQ
 P_Comment_β:                jmp         seq_r286_beta
 seq_l286_alpha:             LIT_ALPHA1  42, seq_l286_alpha_saved, cursor, subject_data, subject_len_val, seq_r286_alpha, patdef_Comment_omega ; LIT α
 seq_l286_beta:              LIT_BETA    seq_l286_alpha_saved, cursor, patdef_Comment_omega ; LIT β
-seq_r286_alpha:             BREAK_ALPHA lit_str_4, 0, brk287_saved, cursor, subject_data, subject_len_val, patdef_Comment_gamma, seq_l286_beta ; BREAK α
-seq_r286_beta:              BREAK_BETA  brk287_saved, cursor, seq_l286_beta ; BREAK β
+seq_r286_alpha:             BREAK_ALPHA_VAR S_nl, brk287_saved, cursor, subject_data, subject_len_val, patdef_Comment_gamma, seq_l286_beta ; BREAK(var) α
+seq_r286_beta:              BREAK_BETA_VAR brk287_saved, cursor, seq_l286_beta ; BREAK(var) β
 ;  γ/ω ---------------------------------------------------------------------------------------------------------------
 patdef_Comment_gamma:
                             jmp         [P_Comment_ret_γ]
@@ -13643,8 +13647,8 @@ seq_l325_alpha:             jmp         seq_l326_alpha ; SEQ
 seq_l325_beta:              jmp         seq_r326_beta
 seq_l326_alpha:             LIT_ALPHA1  32, seq_l326_alpha_saved, cursor, subject_data, subject_len_val, seq_r326_alpha, alt324_left_omega ; LIT α
 seq_l326_beta:              LIT_BETA    seq_l326_alpha_saved, cursor, alt324_left_omega ; LIT β
-seq_r326_alpha:             BREAK_ALPHA lit_str_4, 0, brk327_saved, cursor, subject_data, subject_len_val, seq_r325_alpha, seq_l326_beta ; BREAK α
-seq_r326_beta:              BREAK_BETA  brk327_saved, cursor, seq_l326_beta ; BREAK β
+seq_r326_alpha:             BREAK_ALPHA_VAR S_nl, brk327_saved, cursor, subject_data, subject_len_val, seq_r325_alpha, seq_l326_beta ; BREAK(var) α
+seq_r326_beta:              BREAK_BETA_VAR brk327_saved, cursor, seq_l326_beta ; BREAK(var) β
 
 ; UNRESOLVED named pattern ref: nl → ω
 seq_r325_alpha:
@@ -13684,8 +13688,8 @@ arb328_child_ok:            mov         rax, [cursor] ; ARBNO child_ok
 arb328_child_fail:          jmp         seq_l322_beta ; ARBNO child_fail
 arb328_child_alpha:         jmp         seq_l329_alpha ; SEQ
 arb328_child_beta:          jmp         seq_r329_beta
-seq_l329_alpha:             BREAK_ALPHA lit_str_4, 0, brk330_saved, cursor, subject_data, subject_len_val, seq_r329_alpha, arb328_child_fail ; BREAK α
-seq_l329_beta:              BREAK_BETA  brk330_saved, cursor, arb328_child_fail ; BREAK β
+seq_l329_alpha:             BREAK_ALPHA_VAR S_nl, brk330_saved, cursor, subject_data, subject_len_val, seq_r329_alpha, arb328_child_fail ; BREAK(var) α
+seq_l329_beta:              BREAK_BETA_VAR brk330_saved, cursor, arb328_child_fail ; BREAK(var) β
 
 ; UNRESOLVED named pattern ref: nl → ω
 seq_r329_alpha:
