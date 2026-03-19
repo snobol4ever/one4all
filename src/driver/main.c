@@ -7,7 +7,8 @@
  * The resulting Program* is passed to the same snoc_emit / asm_emit backend.
  */
 #include "sno2c.h"
-#include "sc_driver.h"   /* sc_compile() — Snocone frontend pipeline */
+#include "sc_driver.h"   /* sc_compile() — Snocone expression-only pipeline */
+#include "sc_cf.h"       /* sc_cf_compile() — full control-flow lowering (SC4-ASM) */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -99,9 +100,15 @@ int main(int argc, char *argv[]) {
         /* ---- Snocone frontend ------------------------------------------ */
         char *src = read_all(in);
         if (!src) { fprintf(stderr,"sno2c: read error\n"); return 1; }
-        prog = sc_compile(src, infile ? infile : "<stdin>");
+        if (asm_mode) {
+            /* ASM backend: use full control-flow lowering (SC4-ASM) */
+            prog = sc_cf_compile(src, infile ? infile : "<stdin>");
+        } else {
+            /* C backend: expression-only pipeline (SC3, legacy) */
+            prog = sc_compile(src, infile ? infile : "<stdin>");
+        }
         free(src);
-        if (!prog) { return 1; }   /* sc_compile already printed errors */
+        if (!prog) { return 1; }
     } else {
         /* ---- SNOBOL4 frontend ------------------------------------------ */
         prog = snoc_parse(in, infile ? infile : "<stdin>");
