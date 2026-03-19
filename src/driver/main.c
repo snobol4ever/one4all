@@ -17,7 +17,7 @@ extern int trampoline_mode;  /* defined in emit.c */
 void asm_emit(Program *prog, FILE *f); /* defined in emit_byrd_asm.c */
 extern int asm_body_mode;    /* defined in emit_byrd_asm.c */
 void jvm_emit(Program *prog, FILE *f, const char *filename); /* emit_byrd_jvm.c */
-void net_emit(Program *prog, FILE *f, const char *filename); /* net_emit.c */
+void net_emit(Program *prog, FILE *f, const char *filename); /* emit_byrd_net.c */
 
 static int asm_mode = 0;    /* -asm flag: emit x64 NASM instead of C */
 static int jvm_mode = 0;    /* -jvm flag: emit JVM Jasmin text */

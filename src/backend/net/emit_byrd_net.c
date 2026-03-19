@@ -1,5 +1,5 @@
 /*
- * net_emit.c — .NET CIL (MSIL) text emitter for sno2c
+ * emit_byrd_net.c — .NET CIL (MSIL) text emitter for sno2c
  *
  * Consumes the same Program* IR as emit_byrd_asm.c and emit_byrd_jvm.c.
  * Emits Mono CIL assembler text (.il files) assembled by ilasm.
@@ -255,9 +255,58 @@ static void net_emit_expr(EXPR_t *e) {
         break;
     }
     case E_KW:
-        /* keywords (&STCOUNT etc.) — stub as empty string for now */
+        /* &ALPHABET → call sno_alphabet(); others → "" stub */
+        if (e->sval && strcasecmp(e->sval, "ALPHABET") == 0) {
+            N("    call       string %s::sno_alphabet()\n", net_classname);
+        } else {
+            net_ldstr("");
+        }
+        break;
+    case E_FNC: {
+        /* Builtin functions: set local 0 (success flag), leave string on stack */
+        const char *fn = e->sval ? e->sval : "";
+        /* SIZE(x) — returns length string, always succeeds */
+        if (strcasecmp(fn, "SIZE") == 0) {
+            net_emit_expr(e->left);
+            N("    call       string %s::sno_size(string)\n", net_classname);
+            N("    ldc.i4.1\n");
+            N("    stloc.0\n");
+            break;
+        }
+        /* Numeric comparison: GT LT GE LE EQ NE — int32 helper */
+        const char *cmp_helper = NULL;
+        if      (strcasecmp(fn, "GT") == 0) cmp_helper = "sno_gt";
+        else if (strcasecmp(fn, "LT") == 0) cmp_helper = "sno_lt";
+        else if (strcasecmp(fn, "GE") == 0) cmp_helper = "sno_ge";
+        else if (strcasecmp(fn, "LE") == 0) cmp_helper = "sno_le";
+        else if (strcasecmp(fn, "EQ") == 0) cmp_helper = "sno_eq";
+        else if (strcasecmp(fn, "NE") == 0) cmp_helper = "sno_ne";
+        if (cmp_helper) {
+            net_emit_expr(e->left);
+            net_emit_expr(e->right);
+            N("    call       int32 %s::%s(string, string)\n", net_classname, cmp_helper);
+            N("    stloc.0\n");
+            /* push right-arg value as expression result */
+            net_emit_expr(e->right);
+            break;
+        }
+        /* String equality: IDENT DIFFER */
+        const char *str_helper = NULL;
+        if      (strcasecmp(fn, "IDENT")  == 0) str_helper = "sno_ident";
+        else if (strcasecmp(fn, "DIFFER") == 0) str_helper = "sno_differ";
+        if (str_helper) {
+            net_emit_expr(e->left);
+            net_emit_expr(e->right);
+            N("    call       int32 %s::%s(string, string)\n", net_classname, str_helper);
+            N("    stloc.0\n");
+            net_ldstr("");
+            break;
+        }
+        /* Unhandled FNC — stub */
+        NC("unhandled E_FNC stub");
         net_ldstr("");
         break;
+    }
     case E_CONC:
         /* string concatenation: eval both sides, String.Concat */
         net_emit_expr(e->left);
@@ -369,6 +418,45 @@ static void net_emit_one_stmt(STMT_t *s, const char *next_lbl) {
         /* goto */
         if (tgt_u) net_emit_goto(tgt_u, next_lbl);
         else {
+            if (tgt_s) net_emit_branch_success(tgt_s);
+            if (tgt_f) net_emit_branch_fail(tgt_f);
+        }
+        return;
+    }
+
+    /* Case 2: bare expression predicate — no has_eq, subject only, no pattern */
+    if (!s->has_eq && s->subject && !s->pattern) {
+        /* Evaluate subject as expression — sets local 0 (success flag) via E_FNC */
+        net_emit_expr(s->subject);
+        N("    pop\n");  /* discard string result — we only care about local 0 */
+        if (tgt_u) {
+            net_emit_goto(tgt_u, next_lbl);
+        } else {
+            if (tgt_s) net_emit_branch_success(tgt_s);
+            if (tgt_f) net_emit_branch_fail(tgt_f);
+        }
+        return;
+    }
+
+    /* Case 3: pattern match — subject has_eq=0, subject=var/expr, pattern present */
+    if (!s->has_eq && s->subject && s->pattern) {
+        /* Simple containment match using sno_litmatch for E_QLIT patterns */
+        int is_qlit_pat = (s->pattern->kind == E_QLIT);
+        if (is_qlit_pat) {
+            /* Load subject string */
+            net_emit_expr(s->subject);
+            /* Load pattern literal */
+            net_emit_expr(s->pattern);
+            N("    call       int32 %s::sno_litmatch(string, string)\n", net_classname);
+            N("    stloc.0\n");
+        } else {
+            /* Non-literal pattern — stub as failure */
+            N("    ldc.i4.0\n");
+            N("    stloc.0\n");
+        }
+        if (tgt_u) {
+            net_emit_goto(tgt_u, next_lbl);
+        } else {
             if (tgt_s) net_emit_branch_success(tgt_s);
             if (tgt_f) net_emit_branch_fail(tgt_f);
         }
@@ -559,6 +647,121 @@ static void net_emit_helper_neg(void) {
     N("  }\n\n");
 }
 
+/* sno_gt(a,b): numeric GT — returns b (right operand) on success, "" on fail.
+ * Sets local 0 success flag inside CIL caller via convention:
+ * helper returns non-empty string on success, "" on fail.
+ * Caller sets local 0 from ldloc analysis... simpler: we use a two-value return
+ * convention where the helper itself takes/sets no flags — instead we check the
+ * returned string: if it is "" that could be ambiguous. Better: return "1" on
+ * success and use brfalse/brtrue on int returned.
+ * 
+ * CIL design: sno_cmp(a,b,op_int) → returns int32: 1=success,0=fail.
+ * The stmt emitter pops the int, stores to local 0. Avoids ambiguous empty string.
+ */
+static void net_emit_helper_cmp(const char *name, const char *cil_brop) {
+    /* name: "sno_gt", cil_brop: "bgt" etc. Returns int32 1 or 0. */
+    N("  .method private static int32 %s(string a, string b) cil managed\n", name);
+    N("  {\n");
+    N("    .maxstack 4\n");
+    N("    .locals init (float64 V_0, float64 V_1)\n");
+    N("    ldarg.0\n");
+    N("    call       float64 %s::sno_parse_dbl(string)\n", net_classname);
+    N("    stloc.0\n");
+    N("    ldarg.1\n");
+    N("    call       float64 %s::sno_parse_dbl(string)\n", net_classname);
+    N("    stloc.1\n");
+    N("    ldloc.0\n");
+    N("    ldloc.1\n");
+    N("    %s         CMP_TRUE\n", cil_brop);
+    N("    ldc.i4.0\n");
+    N("    ret\n");
+    N("  CMP_TRUE:\n");
+    N("    ldc.i4.1\n");
+    N("    ret\n");
+    N("  }\n\n");
+}
+
+/* sno_ident(a,b): string equality — 1 if identical, 0 if different */
+static void net_emit_helper_ident(void) {
+    N("  .method private static int32 sno_ident(string a, string b) cil managed\n");
+    N("  {\n");
+    N("    .maxstack 2\n");
+    N("    ldarg.0\n");
+    N("    ldarg.1\n");
+    N("    call       bool [mscorlib]System.String::op_Equality(string, string)\n");
+    N("    ret\n");  /* bool is int32 on CLI */
+    N("  }\n\n");
+}
+
+/* sno_differ(a,b): 1 if NOT identical */
+static void net_emit_helper_differ(void) {
+    N("  .method private static int32 sno_differ(string a, string b) cil managed\n");
+    N("  {\n");
+    N("    .maxstack 2\n");
+    N("    ldarg.0\n");
+    N("    ldarg.1\n");
+    N("    call       bool [mscorlib]System.String::op_Inequality(string, string)\n");
+    N("    ret\n");
+    N("  }\n\n");
+}
+
+/* sno_size(a): returns length as integer string, always succeeds (sets flag=1) */
+static void net_emit_helper_size(void) {
+    N("  .method private static string sno_size(string a) cil managed\n");
+    N("  {\n");
+    N("    .maxstack 2\n");
+    N("    ldarg.0\n");
+    N("    callvirt   instance int32 [mscorlib]System.String::get_Length()\n");
+    N("    box        [mscorlib]System.Int32\n");
+    N("    callvirt   instance string object::ToString()\n");
+    N("    ret\n");
+    N("  }\n\n");
+}
+
+/* sno_litmatch(subj,pat): 1 if subj contains pat, 0 otherwise */
+static void net_emit_helper_litmatch(void) {
+    N("  .method private static int32 sno_litmatch(string subj, string pat) cil managed\n");
+    N("  {\n");
+    N("    .maxstack 2\n");
+    N("    ldarg.0\n");
+    N("    ldarg.1\n");
+    N("    callvirt   instance bool [mscorlib]System.String::Contains(string)\n");
+    N("    ret\n");
+    N("  }\n\n");
+}
+
+/* &ALPHABET — 256-char string of all bytes 0..255 */
+static void net_emit_helper_alphabet(void) {
+    N("  .method private static string sno_alphabet() cil managed\n");
+    N("  {\n");
+    N("    .maxstack 3\n");
+    N("    .locals init (char[] V_0, int32 V_1)\n");
+    N("    ldc.i4     256\n");
+    N("    newarr     [mscorlib]System.Char\n");
+    N("    stloc.0\n");
+    N("    ldc.i4.0\n");
+    N("    stloc.1\n");
+    N("  ALPHA_LOOP:\n");
+    N("    ldloc.1\n");
+    N("    ldc.i4     256\n");
+    N("    bge        ALPHA_DONE\n");
+    N("    ldloc.0\n");
+    N("    ldloc.1\n");
+    N("    ldloc.1\n");
+    N("    conv.u2\n");
+    N("    stelem.i2\n");
+    N("    ldloc.1\n");
+    N("    ldc.i4.1\n");
+    N("    add\n");
+    N("    stloc.1\n");
+    N("    br         ALPHA_LOOP\n");
+    N("  ALPHA_DONE:\n");
+    N("    ldloc.0\n");
+    N("    newobj     instance void [mscorlib]System.String::.ctor(char[])\n");
+    N("    ret\n");
+    N("  }\n\n");
+}
+
 static void net_emit_sno_helpers(void) {
     net_emit_helper_parse();
     net_emit_helper_fmt();
@@ -567,6 +770,18 @@ static void net_emit_sno_helpers(void) {
     net_emit_helper_binop("sno_mpy", "mul");
     net_emit_helper_binop("sno_div", "div");
     net_emit_helper_neg();
+    /* comparison helpers — return int32 1/0 */
+    net_emit_helper_cmp("sno_gt",  "bgt");
+    net_emit_helper_cmp("sno_lt",  "blt");
+    net_emit_helper_cmp("sno_ge",  "bge");
+    net_emit_helper_cmp("sno_le",  "ble");
+    net_emit_helper_cmp("sno_eq",  "beq");
+    net_emit_helper_cmp("sno_ne",  "bne.un");
+    net_emit_helper_ident();
+    net_emit_helper_differ();
+    net_emit_helper_size();
+    net_emit_helper_litmatch();
+    net_emit_helper_alphabet();
 }
 
 /* -----------------------------------------------------------------------

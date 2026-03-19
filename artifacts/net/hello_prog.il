@@ -3,12 +3,157 @@
     // Run:      mono <file>.exe
 
 .assembly extern mscorlib {}
-.assembly Null {}
-.module Null.exe
+.assembly Hello {}
+.module Hello.exe
 
-.class public auto ansi beforefieldinit Null
+.class public auto ansi beforefieldinit Hello
        extends [mscorlib]System.Object
 {
+
+  .method private static float64 sno_parse_dbl(string s) cil managed
+  {
+    .maxstack 2
+    .locals init (float64 V_0, bool V_1)
+    ldarg.0
+    ldloca.s V_0
+    call       bool [mscorlib]System.Double::TryParse(string, float64&)
+    pop
+    ldloc.0
+    ret
+  }
+
+  .method private static string sno_fmt_dbl(float64 v) cil managed
+  {
+    .maxstack 3
+    .locals init (float64 V_0, int64 V_1)
+    ldarg.0
+    stloc.0
+    ldloc.0
+    conv.i8
+    stloc.1
+    ldloc.0
+    ldloc.1
+    conv.r8
+    beq        IS_INT
+    ldloc.0
+    box        [mscorlib]System.Double
+    callvirt   instance string object::ToString()
+    ret
+  IS_INT:
+    ldloc.1
+    box        [mscorlib]System.Int64
+    callvirt   instance string object::ToString()
+    ret
+  }
+
+  .method private static string sno_add(string a, string b) cil managed
+  {
+    .maxstack 4
+    .locals init (float64 V_0, float64 V_1, bool V_2, bool V_3, string V_4, string V_5)
+    ldarg.0
+    callvirt   instance string [mscorlib]System.String::Trim()
+    stloc.s V_4
+    ldarg.1
+    callvirt   instance string [mscorlib]System.String::Trim()
+    stloc.s V_5
+    ldloc.s V_4
+    ldstr      ""
+    call       bool [mscorlib]System.String::op_Equality(string, string)
+    brfalse    SNO_ADD_PARSE_A
+    ldstr      "0"
+    stloc.s V_4
+  SNO_ADD_PARSE_A:
+    ldloc.s V_4
+    ldloca.s V_0
+    call       bool [mscorlib]System.Double::TryParse(string, float64&)
+    stloc.2
+    ldloc.s V_5
+    ldstr      ""
+    call       bool [mscorlib]System.String::op_Equality(string, string)
+    brfalse    SNO_ADD_PARSE_B
+    ldstr      "0"
+    stloc.s V_5
+  SNO_ADD_PARSE_B:
+    ldloc.s V_5
+    ldloca.s V_1
+    call       bool [mscorlib]System.Double::TryParse(string, float64&)
+    stloc.3
+    ldloc.2
+    ldloc.3
+    and
+    brfalse    SNO_ADD_CONCAT
+    ldloc.0
+    ldloc.1
+    add
+    call       string Hello::sno_fmt_dbl(float64)
+    ret
+  SNO_ADD_CONCAT:
+    ldarg.0
+    ldarg.1
+    call       string [mscorlib]System.String::Concat(string, string)
+    ret
+  }
+
+  .method private static string sno_sub(string a, string b) cil managed
+  {
+    .maxstack 3
+    .locals init (float64 V_0, float64 V_1)
+    ldarg.0
+    call       float64 Hello::sno_parse_dbl(string)
+    stloc.0
+    ldarg.1
+    call       float64 Hello::sno_parse_dbl(string)
+    stloc.1
+    ldloc.0
+    ldloc.1
+    sub
+    call       string Hello::sno_fmt_dbl(float64)
+    ret
+  }
+
+  .method private static string sno_mpy(string a, string b) cil managed
+  {
+    .maxstack 3
+    .locals init (float64 V_0, float64 V_1)
+    ldarg.0
+    call       float64 Hello::sno_parse_dbl(string)
+    stloc.0
+    ldarg.1
+    call       float64 Hello::sno_parse_dbl(string)
+    stloc.1
+    ldloc.0
+    ldloc.1
+    mul
+    call       string Hello::sno_fmt_dbl(float64)
+    ret
+  }
+
+  .method private static string sno_div(string a, string b) cil managed
+  {
+    .maxstack 3
+    .locals init (float64 V_0, float64 V_1)
+    ldarg.0
+    call       float64 Hello::sno_parse_dbl(string)
+    stloc.0
+    ldarg.1
+    call       float64 Hello::sno_parse_dbl(string)
+    stloc.1
+    ldloc.0
+    ldloc.1
+    div
+    call       string Hello::sno_fmt_dbl(float64)
+    ret
+  }
+
+  .method private static string sno_neg(string a) cil managed
+  {
+    .maxstack 2
+    ldarg.0
+    call       float64 Hello::sno_parse_dbl(string)
+    neg
+    call       string Hello::sno_fmt_dbl(float64)
+    ret
+  }
 
   .method public static void main(string[] args) cil managed
   {
@@ -16,6 +161,10 @@
     .maxstack 8
     .locals init (int32 V_0)  // V_0 = success flag
 
+    ldstr      "HELLO WORLD"
+    call       void [mscorlib]System.Console::WriteLine(string)
+    ldc.i4.1
+    stloc.0
 
     // --- END statement ---
 
@@ -25,4 +174,4 @@
                         ret
   }
 
-} // end class Null
+} // end class Hello

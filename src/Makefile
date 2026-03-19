@@ -31,7 +31,7 @@ BACKEND_JVM = \
     backend/jvm/emit_byrd_jvm.c
 
 BACKEND_NET = \
-    backend/net/net_emit.c
+    backend/net/emit_byrd_net.c
 
 SRCS = $(FRONTEND_SNO) $(FRONTEND_SNOCONE) $(BACKEND_C) $(BACKEND_X64) $(BACKEND_JVM) $(BACKEND_NET) $(DRIVER)
 OBJS = $(SRCS:.c=.o)
