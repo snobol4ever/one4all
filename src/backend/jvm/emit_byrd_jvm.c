@@ -1591,12 +1591,60 @@ static void jvm_emit_stmt(STMT_t *s, int stmt_idx) {
          * For J4 we do not yet implement in-place replacement; we handle
          * OUTPUT = subject in a later sprint.  The captures (. and $) are
          * already stored.  Just goto :S. */
-        if (s->has_eq && s->replacement) {
-            /* Subject replacement: rebuild subject with matched region replaced.
-             * Use String.substring(0,cursor_start) + replacement + String.substring(cursor,end)
-             * We stored cursor_start in a BSS slot; for J4 we approximate:
-             * full replacement not yet implemented — emit a TODO comment and skip. */
-            JC("TODO J5: subject replacement (= rhs) — Sprint J5");
+        if (s->has_eq) {
+            /* Subject replacement: rebuild subject.
+             * new_subject = subject[0..cursor_start] + replacement + subject[cursor..end]
+             * cursor_start lives in loc_retry_save (slot 9). */
+            JC("J5: subject replacement");
+            JI("new", "java/lang/StringBuilder");
+            JI("dup", "");
+            JI("invokespecial", "java/lang/StringBuilder/<init>()V");
+            /* sb.append(subject.substring(0, cursor_start)) */
+            J("    aload %d\n", loc_subj);
+            JI("iconst_0", "");
+            J("    iload %d\n", loc_retry_save);
+            JI("invokevirtual", "java/lang/String/substring(II)Ljava/lang/String;");
+            JI("invokevirtual", "java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;");
+            /* sb.append(replacement) */
+            if (s->replacement) {
+                jvm_emit_expr(s->replacement);
+            } else {
+                JI("ldc", "\"\"");
+            }
+            JI("invokevirtual", "java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;");
+            /* sb.append(subject.substring(cursor, subject.length())) */
+            J("    aload %d\n", loc_subj);
+            J("    iload %d\n", loc_cursor);
+            J("    aload %d\n", loc_subj);
+            JI("invokevirtual", "java/lang/String/length()I");
+            JI("invokevirtual", "java/lang/String/substring(II)Ljava/lang/String;");
+            JI("invokevirtual", "java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;");
+            JI("invokevirtual", "java/lang/StringBuilder/toString()Ljava/lang/String;");
+            /* store back into subject variable */
+            if (s->subject && s->subject->sval && s->subject->sval[0] &&
+                s->subject->kind == E_VART) {
+                const char *vname = s->subject->sval;
+                char nameesc[256];
+                {
+                    int o=0; nameesc[o++]='"';
+                    for (const char *p=vname; *p && o<(int)sizeof nameesc-4; p++) {
+                        unsigned char c=(unsigned char)*p;
+                        if (c=='"') { nameesc[o++]='\\'; nameesc[o++]='"'; }
+                        else nameesc[o++]=(char)c;
+                    }
+                    nameesc[o++]='"'; nameesc[o]='\0';
+                }
+                int loc_tmp = jvm_cap_local_counter++;
+                J("    astore %d\n", loc_tmp);
+                J("    ldc %s\n", nameesc);
+                J("    aload %d\n", loc_tmp);
+                char vpdesc[512];
+                snprintf(vpdesc, sizeof vpdesc,
+                         "%s/sno_var_put(Ljava/lang/String;Ljava/lang/String;)V", jvm_classname);
+                JI("invokestatic", vpdesc);
+            } else {
+                JI("pop", "");
+            }
         }
         JI("goto", lbl_success);
 
@@ -1629,8 +1677,22 @@ static void jvm_emit_stmt(STMT_t *s, int stmt_idx) {
         } else if (s->go && s->go->onsuccess && s->go->onsuccess[0]) {
             char glbl[128]; snprintf(glbl, sizeof glbl, "L_%s", s->go->onsuccess);
             JI("goto", glbl);
+        } else if (s->go && s->go->onfailure && s->go->onfailure[0]) {
+            /* No :S but there IS a :F — must jump past the fail block so
+             * success falls through to the next statement, not into :F goto */
+            char lbl_after[64];
+            snprintf(lbl_after, sizeof lbl_after, "Jpat%d_after", uid);
+            JI("goto", lbl_after);
+
+            /* --- FAIL --- */
+            J("%s:\n", lbl_fail);
+            char flbl[128]; snprintf(flbl, sizeof flbl, "L_%s", s->go->onfailure);
+            JI("goto", flbl);
+
+            J("%s:\n", lbl_after);
+            return;
         }
-        /* fall through if no :S */
+        /* fall through if no :S and no :F */
 
         /* --- FAIL --- */
         J("%s:\n", lbl_fail);
