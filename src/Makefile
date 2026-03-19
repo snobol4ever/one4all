@@ -27,7 +27,10 @@ BACKEND_X64 = \
 DRIVER = \
     driver/main.c
 
-SRCS = $(FRONTEND_SNO) $(FRONTEND_SNOCONE) $(BACKEND_C) $(BACKEND_X64) $(DRIVER)
+BACKEND_JVM = \
+    backend/jvm/emit_byrd_jvm.c
+
+SRCS = $(FRONTEND_SNO) $(FRONTEND_SNOCONE) $(BACKEND_C) $(BACKEND_X64) $(BACKEND_JVM) $(DRIVER)
 OBJS = $(SRCS:.c=.o)
 
 .PHONY: all clean

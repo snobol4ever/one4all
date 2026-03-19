@@ -16,8 +16,10 @@
 extern int trampoline_mode;  /* defined in emit.c */
 void asm_emit(Program *prog, FILE *f); /* defined in emit_byrd_asm.c */
 extern int asm_body_mode;    /* defined in emit_byrd_asm.c */
+void jvm_emit(Program *prog, FILE *f, const char *filename); /* emit_byrd_jvm.c */
 
 static int asm_mode = 0;    /* -asm flag: emit x64 NASM instead of C */
+static int jvm_mode = 0;    /* -jvm flag: emit JVM Jasmin text */
 static int sc_mode  = 0;    /* -sc  flag: Snocone frontend */
 
 /* Return 1 if filename ends with suffix (case-sensitive). */
@@ -58,6 +60,8 @@ int main(int argc, char *argv[]) {
             trampoline_mode = 1;
         } else if (!strcmp(argv[i],"-asm")) {
             asm_mode = 1;
+        } else if (!strcmp(argv[i],"-jvm")) {
+            jvm_mode = 1;
         } else if (!strcmp(argv[i],"-asm-body")) {
             asm_mode = 1;
             asm_body_mode = 1;
@@ -119,6 +123,8 @@ int main(int argc, char *argv[]) {
 
     if (asm_mode)
         asm_emit(prog, out);
+    else if (jvm_mode)
+        jvm_emit(prog, out, infile);
     else
         snoc_emit(prog, out);
 
