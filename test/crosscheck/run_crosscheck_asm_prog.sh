@@ -36,12 +36,12 @@ gcc -O0 -g -c "$RT/asm/snobol4_stmt_rt.c"       -I"$RT/snobol4" -I"$RT" -I"$TINY
 gcc -O0 -g -c "$RT/snobol4/snobol4.c"            -I"$RT/snobol4" -I"$RT" -I"$TINY/src/frontend/snobol4" -w -o "$WORK/snobol4.o"
 gcc -O0 -g -c "$RT/mock/mock_includes.c"          -I"$RT/snobol4" -I"$RT" -I"$TINY/src/frontend/snobol4" -w -o "$WORK/mock_includes.o"
 gcc -O0 -g -c "$RT/snobol4/snobol4_pattern.c"    -I"$RT/snobol4" -I"$RT" -I"$TINY/src/frontend/snobol4" -w -o "$WORK/snobol4_pattern.o"
-gcc -O0 -g -c "$RT/mock/mock_engine.c"            -I"$RT/snobol4" -I"$RT" -I"$TINY/src/frontend/snobol4" -w -o "$WORK/mock_engine.o"
+gcc -O0 -g -c "$RT/engine/engine.c"               -I"$RT/snobol4" -I"$RT" -I"$TINY/src/frontend/snobol4" -w -o "$WORK/engine.o"
 
 # Link beauty_asm_bin
 gcc -no-pie "$WORK/beauty.o" \
     "$WORK/stmt_rt.o" "$WORK/snobol4.o" "$WORK/mock_includes.o" \
-    "$WORK/snobol4_pattern.o" "$WORK/mock_engine.o" \
+    "$WORK/snobol4_pattern.o" "$WORK/engine.o" \
     -lgc -lm -o "$WORK/beauty_asm_bin" 2>&1 || {
     echo -e "${RED}FAIL${RESET} link failed"
     exit 1
