@@ -9,6 +9,7 @@ extern  stmt_concat, stmt_is_fail, stmt_finish
 extern  stmt_apply, stmt_goto_dispatch
 extern  stmt_setup_subject, stmt_apply_replacement
 extern  stmt_set_capture, stmt_match_var
+extern  kw_anchor
 global  cursor, subject_data, subject_len_val
 
 section .note.GNU-stack noalloc noexec nowrite progbits
@@ -346,9 +347,13 @@ L_START_0:
 
 ; ======================================================================================================================
 Ln_0:                       GET_VAR     S_AM_FULLSCAN
+                            ASSIGN_INT  S_FULLSCAN, 1, Ln_1
+                            jmp         Ln_1
 
 ; ======================================================================================================================
 Ln_1:                       GET_VAR     S_AM_MAXLNGTH
+                            ASSIGN_INT  S_MAXLNGTH, 524288, Ln_2
+                            jmp         Ln_2
 
 ; ======================================================================================================================
 Ln_2:                       GET_VAR     S_ppStop
@@ -470,7 +475,9 @@ P_12_γ:                     SET_CAPTURE S_ppTokName, cap_ppTokName_buf, cap_ppT
                             SET_CAPTURE S_RP, cap_RP_buf, cap_RP_len
                             SET_CAPTURE S_Label, cap_Label_buf, cap_Label_len
                             jmp         Ln_12
-P_12_ω:                     mov         rax, [scan_start_12]
+P_12_ω:                     cmp         qword [rel kw_anchor], 0
+                            jne         Ln_12
+                            mov         rax, [scan_start_12]
                             inc         rax
                             cmp         rax, [subject_len_val]
                             jg          Ln_12
@@ -531,10 +538,12 @@ P_14_γ:                     SET_CAPTURE S_ppTokName, cap_ppTokName_buf, cap_ppT
                             SET_CAPTURE S_RP, cap_RP_buf, cap_RP_len
                             SET_CAPTURE S_Label, cap_Label_buf, cap_Label_len
                             jmp         Ln_14
-P_14_ω:                     mov         rax, [scan_start_14]
+P_14_ω:                     cmp         qword [rel kw_anchor], 0
+                            jne         L_ppArgDone_2
+                            mov         rax, [scan_start_14]
                             inc         rax
                             cmp         rax, [subject_len_val]
-                            jg          Ln_14
+                            jg          L_ppArgDone_2
                             mov         [scan_start_14], rax
                             jmp         scan_retry_14
                             jmp         L_ppArgDone_2
@@ -1051,7 +1060,9 @@ P_77_γ:                     SET_CAPTURE S_ppTokName, cap_ppTokName_buf, cap_ppT
                             SET_CAPTURE S_RP, cap_RP_buf, cap_RP_len
                             SET_CAPTURE S_Label, cap_Label_buf, cap_Label_len
                             jmp         L_ppAutoR_16
-P_77_ω:                     mov         rax, [scan_start_77]
+P_77_ω:                     cmp         qword [rel kw_anchor], 0
+                            jne         Ln_77
+                            mov         rax, [scan_start_77]
                             inc         rax
                             cmp         rax, [subject_len_val]
                             jg          Ln_77
@@ -1090,7 +1101,9 @@ P_78_γ:                     SET_CAPTURE S_ppTokName, cap_ppTokName_buf, cap_ppT
                             SET_CAPTURE S_RP, cap_RP_buf, cap_RP_len
                             SET_CAPTURE S_Label, cap_Label_buf, cap_Label_len
                             jmp         L_ppAutoCont_18
-P_78_ω:                     mov         rax, [scan_start_78]
+P_78_ω:                     cmp         qword [rel kw_anchor], 0
+                            jne         Ln_78
+                            mov         rax, [scan_start_78]
                             inc         rax
                             cmp         rax, [subject_len_val]
                             jg          Ln_78
@@ -1151,10 +1164,12 @@ P_80_γ:                     SET_CAPTURE S_ppTokName, cap_ppTokName_buf, cap_ppT
                             SET_CAPTURE S_RP, cap_RP_buf, cap_RP_len
                             SET_CAPTURE S_Label, cap_Label_buf, cap_Label_len
                             jmp         Ln_80
-P_80_ω:                     mov         rax, [scan_start_80]
+P_80_ω:                     cmp         qword [rel kw_anchor], 0
+                            jne         L_ppAutoNew_19
+                            mov         rax, [scan_start_80]
                             inc         rax
                             cmp         rax, [subject_len_val]
-                            jg          Ln_80
+                            jg          L_ppAutoNew_19
                             mov         [scan_start_80], rax
                             jmp         scan_retry_80
                             jmp         L_ppAutoNew_19
@@ -1210,7 +1225,9 @@ P_82_γ:                     SET_CAPTURE S_ppTokName, cap_ppTokName_buf, cap_ppT
                             SET_CAPTURE S_RP, cap_RP_buf, cap_RP_len
                             SET_CAPTURE S_Label, cap_Label_buf, cap_Label_len
                             jmp         Ln_82
-P_82_ω:                     mov         rax, [scan_start_82]
+P_82_ω:                     cmp         qword [rel kw_anchor], 0
+                            jne         Ln_82
+                            mov         rax, [scan_start_82]
                             inc         rax
                             cmp         rax, [subject_len_val]
                             jg          Ln_82
@@ -8072,10 +8089,12 @@ P_407_γ:                    SET_CAPTURE S_ppTokName, cap_ppTokName_buf, cap_ppT
                             SET_CAPTURE S_RP, cap_RP_buf, cap_RP_len
                             SET_CAPTURE S_Label, cap_Label_buf, cap_Label_len
                             jmp         L_ss_Label0_101
-P_407_ω:                    mov         rax, [scan_start_407]
+P_407_ω:                    cmp         qword [rel kw_anchor], 0
+                            jne         L_ss_Label1_102
+                            mov         rax, [scan_start_407]
                             inc         rax
                             cmp         rax, [subject_len_val]
-                            jg          Ln_407
+                            jg          L_ss_Label1_102
                             mov         [scan_start_407], rax
                             jmp         scan_retry_407
                             jmp         L_ss_Label1_102
@@ -9574,10 +9593,12 @@ P_495_γ:                    SET_CAPTURE S_ppTokName, cap_ppTokName_buf, cap_ppT
                             SET_CAPTURE S_RP, cap_RP_buf, cap_RP_len
                             SET_CAPTURE S_Label, cap_Label_buf, cap_Label_len
                             jmp         Ln_495
-P_495_ω:                    mov         rax, [scan_start_495]
+P_495_ω:                    cmp         qword [rel kw_anchor], 0
+                            jne         L_FRETURN_170
+                            mov         rax, [scan_start_495]
                             inc         rax
                             cmp         rax, [subject_len_val]
-                            jg          Ln_495
+                            jg          L_FRETURN_170
                             mov         [scan_start_495], rax
                             jmp         scan_retry_495
                             GOTO_ALWAYS L_SNO_END     ; FRETURN
@@ -9998,10 +10019,12 @@ P_518_γ:                    SET_CAPTURE S_ppTokName, cap_ppTokName_buf, cap_ppT
                             SET_CAPTURE S_RP, cap_RP_buf, cap_RP_len
                             SET_CAPTURE S_Label, cap_Label_buf, cap_Label_len
                             jmp         Ln_518
-P_518_ω:                    mov         rax, [scan_start_518]
+P_518_ω:                    cmp         qword [rel kw_anchor], 0
+                            jne         L_main02_164
+                            mov         rax, [scan_start_518]
                             inc         rax
                             cmp         rax, [subject_len_val]
-                            jg          Ln_518
+                            jg          L_main02_164
                             mov         [scan_start_518], rax
                             jmp         scan_retry_518
                             jmp         L_main02_164
@@ -10080,7 +10103,9 @@ P_522_γ:                    SET_CAPTURE S_ppTokName, cap_ppTokName_buf, cap_ppT
                             SET_CAPTURE S_RP, cap_RP_buf, cap_RP_len
                             SET_CAPTURE S_Label, cap_Label_buf, cap_Label_len
                             jmp         L_main02_164
-P_522_ω:                    mov         rax, [scan_start_522]
+P_522_ω:                    cmp         qword [rel kw_anchor], 0
+                            jne         Ln_522
+                            mov         rax, [scan_start_522]
                             inc         rax
                             cmp         rax, [subject_len_val]
                             jg          Ln_522
@@ -10143,10 +10168,12 @@ P_523_γ:                    SET_CAPTURE S_ppTokName, cap_ppTokName_buf, cap_ppT
                             SET_CAPTURE S_RP, cap_RP_buf, cap_RP_len
                             SET_CAPTURE S_Label, cap_Label_buf, cap_Label_len
                             jmp         Ln_523
-P_523_ω:                    mov         rax, [scan_start_523]
+P_523_ω:                    cmp         qword [rel kw_anchor], 0
+                            jne         L_mainErr1_166
+                            mov         rax, [scan_start_523]
                             inc         rax
                             cmp         rax, [subject_len_val]
-                            jg          Ln_523
+                            jg          L_mainErr1_166
                             mov         [scan_start_523], rax
                             jmp         scan_retry_523
                             jmp         L_mainErr1_166
@@ -10230,10 +10257,12 @@ P_526_γ:                    SET_CAPTURE S_ppTokName, cap_ppTokName_buf, cap_ppT
                             SET_CAPTURE S_RP, cap_RP_buf, cap_RP_len
                             SET_CAPTURE S_Label, cap_Label_buf, cap_Label_len
                             jmp         Ln_526
-P_526_ω:                    mov         rax, [scan_start_526]
+P_526_ω:                    cmp         qword [rel kw_anchor], 0
+                            jne         L_mainErr1_166
+                            mov         rax, [scan_start_526]
                             inc         rax
                             cmp         rax, [subject_len_val]
-                            jg          Ln_526
+                            jg          L_mainErr1_166
                             mov         [scan_start_526], rax
                             jmp         scan_retry_526
                             jmp         L_mainErr1_166

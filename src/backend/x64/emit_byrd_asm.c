@@ -2635,6 +2635,7 @@ static void asm_emit_program(Program *prog) {
     A("    extern  stmt_apply, stmt_goto_dispatch\n");
     A("    extern  stmt_setup_subject, stmt_apply_replacement\n");
     A("    extern  stmt_set_capture, stmt_match_var\n");
+    A("    extern  kw_anchor\n");
     A("    global  cursor, subject_data, subject_len_val\n");
     A("\n");
     /* subject_data/subject_len_val/cursor: defined here, exported for stmt_rt.c */
@@ -2727,16 +2728,19 @@ static void asm_emit_program(Program *prog) {
 
             /* If has_eq: assign replacement to subject variable */
             if (s->has_eq && s->replacement && s->subject &&
-                s->subject->kind == E_VART) {
+                (s->subject->kind == E_VART || s->subject->kind == E_KW)) {
                 const char *fail_target = id_f >= 0 ? sfail_lbl : next_lbl;
                 int is_output = strcasecmp(s->subject->sval, "OUTPUT") == 0;
+                /* For keyword LHS (&VAR), NV_SET_fn expects bare name "ANCHOR" not "&ANCHOR" */
+                const char *subj_name = s->subject->sval ? s->subject->sval : "";
+                /* (E_KW: sval is already the bare keyword name e.g. "ANCHOR") */
                 /* Fast path: simple literal RHS + non-OUTPUT target → ASSIGN_INT/ASSIGN_STR */
                 if (!is_output && s->replacement->kind == E_ILIT) {
-                    const char *vlab = prog_str_intern(s->subject->sval);
+                    const char *vlab = prog_str_intern(subj_name);
                     A("    ASSIGN_INT  %s, %ld, %s\n", vlab,
                       (long)s->replacement->ival, fail_target);
                 } else if (!is_output && s->replacement->kind == E_QLIT) {
-                    const char *vlab = prog_str_intern(s->subject->sval);
+                    const char *vlab = prog_str_intern(subj_name);
                     const char *rlab = prog_str_intern(s->replacement->sval);
                     A("    ASSIGN_STR  %s, %s, %s\n", vlab, rlab, fail_target);
                 } else {
@@ -2748,7 +2752,7 @@ static void asm_emit_program(Program *prog) {
                     if (is_output) {
                         A("    SET_OUTPUT\n");
                     } else {
-                        const char *vlab = prog_str_intern(s->subject->sval);
+                        const char *vlab = prog_str_intern(subj_name);
                         A("    SET_VAR     %s\n", vlab);
                     }
                 }
@@ -2839,16 +2843,22 @@ static void asm_emit_program(Program *prog) {
         emit_jmp(tgt_s, next_lbl);
 
         /* -- omega: match failed at this scan_start position --
-         * Unanchored: advance scan_start by 1, retry if not past subject end.
-         * Anchored (&ANCHOR != 0): go directly to F-target. */
+         * Anchored (&ANCHOR != 0): go directly to F-target, no retry.
+         * Unanchored: advance scan_start by 1, retry if not past subject end. */
         asmL(pat_omega);
-        A("    mov     rax, [%s]\n", scan_start);
-        A("    inc     rax\n");
-        A("    cmp     rax, [subject_len_val]\n");
-        A("    jg      %s\n", next_lbl);     /* exhausted → F-target */
-        A("    mov     [%s], rax\n", scan_start);
-        A("    jmp     %s\n", scan_retry);
-        /* exhausted: fall through to F-target */
+        {
+            const char *scan_fail = tgt_f ? prog_label_nasm(tgt_f) : next_lbl;
+            /* &ANCHOR check: if kw_anchor != 0, skip retry entirely */
+            A("    cmp     qword [rel kw_anchor], 0\n");
+            A("    jne     %s\n", scan_fail);
+            /* Unanchored retry: advance scan_start, retry if not exhausted */
+            A("    mov     rax, [%s]\n", scan_start);
+            A("    inc     rax\n");
+            A("    cmp     rax, [subject_len_val]\n");
+            A("    jg      %s\n", scan_fail);
+            A("    mov     [%s], rax\n", scan_start);
+            A("    jmp     %s\n", scan_retry);
+        }
         emit_jmp(tgt_f, next_lbl);
 
         asmL(next_lbl);
