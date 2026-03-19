@@ -18,6 +18,7 @@ extern  stmt_breakx_var, stmt_breakx_lit
 extern  stmt_any_var, stmt_notany_var
 extern  stmt_at_capture
 extern  kw_anchor
+extern  comm_stno
 global  cursor, subject_data, subject_len_val
 
 section .note.GNU-stack noalloc noexec nowrite progbits
@@ -42,7 +43,8 @@ scan_start_3             resq 1
 scan_start_4             resq 1
 dol_entry_T              resq 1
 len2_saved               resq 1
-brk5_saved               resq 1
+litvar4_saved            resq 1
+brk6_saved               resq 1
 cap_T_buf                resb 256
 cap_T_len                resq 1
 conc_tmp0_rax            resq 1
@@ -57,22 +59,28 @@ main:
 
 ;  PROGRAM BODY ========================================================================================================
 
+                            mov         edi, 4
+                            call        comm_stno
                             ASSIGN_INT  S_TRIM, 1, Ln_0
                             jmp         Ln_0
 
 ; ======================================================================================================================
 
 ; ======================================================================================================================
-Ln_0:                       ASSIGN_INT  S_STLIMIT, 1000000000, Ln_1
+Ln_0:                       mov         edi, 5
+                            call        comm_stno
+                            ASSIGN_INT  S_STLIMIT, 1000000000, Ln_1
                             jmp         Ln_1
 
-Ln_1:
-
 ; ======================================================================================================================
+Ln_1:                       mov         edi, 6
+                            call        comm_stno
 
 Ln_2:
 ;  ROMAN ===============================================================================================================
-L_ROMAN_1:                  GET_VAR     S_N
+L_ROMAN_1:                  mov         edi, 7
+                            call        comm_stno
+                            GET_VAR     S_N
                             SUBJ_FROM16
 
                             mov         qword [scan_start_3], 0
@@ -110,7 +118,9 @@ P_3_ω:                      cmp         qword [rel kw_anchor], 0
                             jmp         [P_ROMAN_ret_γ]     ; RETURN
 
 ; ======================================================================================================================
-Ln_3:                       LOAD_STR    S_0_CM_1I_CM_2II_CM_3III_CM_4IV_CM_5V_CM_6VI_CM_7VII_CM_8VIII_C
+Ln_3:                       mov         edi, 8
+                            call        comm_stno
+                            LOAD_STR    S_0_CM_1I_CM_2II_CM_3III_CM_4IV_CM_5V_CM_6VI_CM_7VII_CM_8VIII_CM_9IX_CM
                             mov         [rbp-16], rax
                             mov         [rbp-8],  rdx
                             SUBJ_FROM16
@@ -124,17 +134,17 @@ scan_retry_4:
 P_4_α:                      jmp         seq_l3_alpha ; SEQ
 P_4_β:                      jmp         seq_r3_beta
 
-; UNRESOLVED named pattern ref: T → ω
-seq_l3_alpha:
-seq_l3_beta:                jmp         P_4_ω
+; E_VART T → LIT_VAR (stmt_match_var)
+seq_l3_alpha:               LIT_VAR_ALPHA S_T, litvar4_saved, cursor, seq_r3_alpha, P_4_ω
+seq_l3_beta:                LIT_VAR_BETA litvar4_saved, cursor, P_4_ω
 
 seq_r3_alpha: ; DOL(T $  T)
-                            DOL_SAVE    dol_entry_T, cursor, dol4_child_alpha ; DOL α — save entry cursor
-seq_r3_beta:                jmp         dol4_child_beta ; DOL β
-dol4_child_alpha:           BREAK_ALPHA lit_str_1, 1, brk5_saved, cursor, subject_data, subject_len_val, dol4_gamma, dol4_omega ; BREAK α
-dol4_child_beta:            BREAK_BETA  brk5_saved, cursor, dol4_omega ; BREAK β
-dol4_gamma:                 DOL_CAPTURE dol_entry_T, cursor, cap_T_buf, cap_T_len, subject_data, P_4_γ ; DOL γ — capture span
-dol4_omega:                 jmp         seq_l3_beta ; DOL ω — child failed
+                            DOL_SAVE    dol_entry_T, cursor, dol5_child_alpha ; DOL α — save entry cursor
+seq_r3_beta:                jmp         dol5_child_beta ; DOL β
+dol5_child_alpha:           BREAK_ALPHA lit_str_1, 1, brk6_saved, cursor, subject_data, subject_len_val, dol5_gamma, dol5_omega ; BREAK α
+dol5_child_beta:            BREAK_BETA  brk6_saved, cursor, dol5_omega ; BREAK β
+dol5_gamma:                 DOL_CAPTURE dol_entry_T, cursor, cap_T_buf, cap_T_len, subject_data, P_4_γ ; DOL γ — capture span
+dol5_omega:                 jmp         seq_l3_beta ; DOL ω — child failed
 
 P_4_γ:                      SET_CAPTURE S_T, cap_T_buf, cap_T_len
                             jmp         Ln_4
@@ -149,7 +159,9 @@ P_4_ω:                      cmp         qword [rel kw_anchor], 0
                             jmp         [P_ROMAN_ret_γ]     ; FRETURN
 
 ; ======================================================================================================================
-Ln_4:                       sub         rsp, 48
+Ln_4:                       mov         edi, 10
+                            call        comm_stno
+                            sub         rsp, 48
                             lea         rdi, [rel S_N]
                             call        stmt_get
                             mov         [rbp-32], rax
@@ -158,20 +170,20 @@ Ln_4:                       sub         rsp, 48
                             mov         rcx, [rbp-24]
                             mov         [fn_ROMAN_arg_0_t], rax
                             mov         [fn_ROMAN_arg_0_p], rcx
-                            lea         rax, [rel ucall6_ret_g]
+                            lea         rax, [rel ucall7_ret_g]
                             mov         [P_ROMAN_ret_γ], rax
-                            lea         rax, [rel ucall6_ret_o]
+                            lea         rax, [rel ucall7_ret_o]
                             mov         [P_ROMAN_ret_ω], rax
                             jmp         P_ROMAN_α
-ucall6_ret_g:
+ucall7_ret_g:
                             GET_VAR     S_ROMAN
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
-                            jmp         ucall6_done
-ucall6_ret_o:
+                            jmp         ucall7_done
+ucall7_ret_o:
                             LOAD_NULVCL32
 
-ucall6_done:
+ucall7_done:
                             STORE_ARG32 0
                             LOAD_STR    S_IVXLCDM
                             STORE_ARG32 16
@@ -200,12 +212,14 @@ ucall6_done:
 Lf_5:                       jmp         [P_ROMAN_ret_γ]     ; FRETURN
 
 Ln_5:
-L_ROMAN_END_0:
-
 ;  ROMAN_END ===========================================================================================================
+L_ROMAN_END_0:              mov         edi, 12
+                            call        comm_stno
 
 ; ======================================================================================================================
-Ln_6:                       APPLY_FN_0  S_TIME
+Ln_6:                       mov         edi, 13
+                            call        comm_stno
+                            APPLY_FN_0  S_TIME
                             STORE_RESULT
 
                             FAIL_BR     Ln_7
@@ -213,36 +227,42 @@ Ln_6:                       APPLY_FN_0  S_TIME
                             jmp         Ln_7
 
 ; ======================================================================================================================
-Ln_7:                       ASSIGN_INT  S_N, 0, Ln_8
+Ln_7:                       mov         edi, 14
+                            call        comm_stno
+                            ASSIGN_INT  S_N, 0, Ln_8
                             jmp         Ln_8
 
 Ln_8:
 ;  LOOP ================================================================================================================
-L_LOOP_2:                   LOAD_STR    S_1776
+L_LOOP_2:                   mov         edi, 15
+                            call        comm_stno
+                            LOAD_STR    S_1776
                             mov         rax, [rbp-32]
                             mov         rcx, [rbp-24]
                             mov         [fn_ROMAN_arg_0_t], rax
                             mov         [fn_ROMAN_arg_0_p], rcx
-                            lea         rax, [rel ucall7_ret_g]
+                            lea         rax, [rel ucall8_ret_g]
                             mov         [P_ROMAN_ret_γ], rax
-                            lea         rax, [rel ucall7_ret_o]
+                            lea         rax, [rel ucall8_ret_o]
                             mov         [P_ROMAN_ret_ω], rax
                             jmp         P_ROMAN_α
-ucall7_ret_g:
+ucall8_ret_g:
                             GET_VAR     S_ROMAN
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
-                            jmp         ucall7_done
-ucall7_ret_o:
+                            jmp         ucall8_done
+ucall8_ret_o:
                             LOAD_NULVCL32
 
-ucall7_done:
+ucall8_done:
                             FAIL_BR     Ln_9
                             SET_VAR     S_R
                             jmp         Ln_9
 
 ; ======================================================================================================================
-Ln_9:                       CONC2_VI    S_LT, S_N, 100000
+Ln_9:                       mov         edi, 16
+                            call        comm_stno
+                            CONC2_VI    S_LT, S_N, 100000
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             CONC2_VI    S_add, S_N, 1
@@ -258,7 +278,9 @@ Ln_9:                       CONC2_VI    S_LT, S_N, 100000
                             jmp         L_LOOP_2
 
 ; ======================================================================================================================
-Ln_10:                      APPLY_FN_0  S_TIME
+Ln_10:                      mov         edi, 17
+                            call        comm_stno
+                            APPLY_FN_0  S_TIME
                             STORE_RESULT
 
                             FAIL_BR     Ln_11
@@ -266,14 +288,18 @@ Ln_10:                      APPLY_FN_0  S_TIME
                             jmp         Ln_11
 
 ; ======================================================================================================================
-Ln_11:                      CAT2_SV     S_result_CL_SP, S_R
+Ln_11:                      mov         edi, 18
+                            call        comm_stno
+                            CAT2_SV     S_result_CL_SP, S_R
                             FAIL_BR     Ln_12
                             SET_OUTPUT
 
                             jmp         Ln_12
 
 ; ======================================================================================================================
-Ln_12:                      LOAD_STR    S_ms_CL_SP
+Ln_12:                      mov         edi, 19
+                            call        comm_stno
+                            LOAD_STR    S_ms_CL_SP
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             CONC2_VV    S_sub, S_T2, S_T1
@@ -349,16 +375,16 @@ patdef_R_gamma:
 patdef_R_omega:             jmp         [P_R_ret_ω]
 
 ; P_N_α (α entry)
-P_N_α:                      jmp         seq_l8_alpha ; SEQ
-P_N_β:                      jmp         seq_r8_beta
+P_N_α:                      jmp         seq_l9_alpha ; SEQ
+P_N_β:                      jmp         seq_r9_beta
 
 ; UNIMPLEMENTED: LT() → ω
-seq_l8_alpha:
-seq_l8_beta:                jmp         patdef_N_omega
+seq_l9_alpha:
+seq_l9_beta:                jmp         patdef_N_omega
 
 ; UNIMPLEMENTED node kind 8 → ω
-seq_r8_alpha:
-seq_r8_beta:                jmp         seq_l8_beta
+seq_r9_alpha:
+seq_r9_beta:                jmp         seq_l9_beta
 ;  γ/ω ---------------------------------------------------------------------------------------------------------------
 patdef_N_gamma:
                             jmp         [P_N_ret_γ]
@@ -395,7 +421,7 @@ S_N                  db 78, 0  ; "N"
 S_T                  db 84, 0  ; "T"
 S_LEN                db 76, 69, 78, 0  ; "LEN"
 S_RPOS               db 82, 80, 79, 83, 0  ; "RPOS"
-S_0_CM_1I_CM_2II_CM_3III_CM_4IV_CM_5V_CM_6VI_CM_7VII_CM_8VIII_C db 48, 44, 49, 73, 44, 50, 73, 73, 44, 51, 73, 73, 73, 44, 52, 73, 86, 44, 53, 86, 44, 54, 86, 73, 44, 55, 86, 73, 73, 44, 56, 86, 73, 73, 73, 44, 57, 73, 88, 44, 0  ; "0,1I,2II,3III,4IV,5V,6VI,7VII,8VIII,9IX,"
+S_0_CM_1I_CM_2II_CM_3III_CM_4IV_CM_5V_CM_6VI_CM_7VII_CM_8VIII_CM_9IX_CM db 48, 44, 49, 73, 44, 50, 73, 73, 44, 51, 73, 73, 73, 44, 52, 73, 86, 44, 53, 86, 44, 54, 86, 73, 44, 55, 86, 73, 73, 44, 56, 86, 73, 73, 73, 44, 57, 73, 88, 44, 0  ; "0,1I,2II,3III,4IV,5V,6VI,7VII,8VIII,9IX,"
 S_BREAK              db 66, 82, 69, 65, 75, 0  ; "BREAK"
 S_CM                 db 44, 0  ; ","
 S_REPLACE            db 82, 69, 80, 76, 65, 67, 69, 0  ; "REPLACE"

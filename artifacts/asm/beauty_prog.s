@@ -18,6 +18,7 @@ extern  stmt_breakx_var, stmt_breakx_lit
 extern  stmt_any_var, stmt_notany_var
 extern  stmt_at_capture
 extern  kw_anchor
+extern  comm_stno
 global  cursor, subject_data, subject_len_val
 
 section .note.GNU-stack noalloc noexec nowrite progbits
@@ -366,56 +367,78 @@ main:
 
 ;  PROGRAM BODY ========================================================================================================
 
-L_START_0:
-
 ;  START ===============================================================================================================
+L_START_0:                  mov         edi, 8
+                            call        comm_stno
 
 ; ======================================================================================================================
-Ln_0:                       ASSIGN_INT  S_FULLSCAN, 1, Ln_1
+Ln_0:                       mov         edi, 29
+                            call        comm_stno
+                            ASSIGN_INT  S_FULLSCAN, 1, Ln_1
                             jmp         Ln_1
 
 ; ======================================================================================================================
-Ln_1:                       ASSIGN_INT  S_MAXLNGTH, 524288, Ln_2
+Ln_1:                       mov         edi, 30
+                            call        comm_stno
+                            ASSIGN_INT  S_MAXLNGTH, 524288, Ln_2
                             jmp         Ln_2
 
 ; ======================================================================================================================
-Ln_2:                       CALL1_STR   S_ARRAY, S_1_CL_4
+Ln_2:                       mov         edi, 64
+                            call        comm_stno
+                            CALL1_STR   S_ARRAY, S_1_CL_4
                             FAIL_BR     Ln_3
                             SET_VAR     S_ppStop
                             jmp         Ln_3
 
 ; ======================================================================================================================
-Ln_3:                       mov         qword [rbp-32], 1
+Ln_3:                       mov         edi, 68
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
 
 ; ======================================================================================================================
-Ln_4:                       mov         qword [rbp-32], 1
+Ln_4:                       mov         edi, 69
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
 
 ; ======================================================================================================================
-Ln_5:                       mov         qword [rbp-32], 1
+Ln_5:                       mov         edi, 70
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
 
 ; ======================================================================================================================
-Ln_6:                       mov         qword [rbp-32], 1
+Ln_6:                       mov         edi, 71
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
 
 ; ======================================================================================================================
-Ln_7:                       ASSIGN_INT  S_ppSmBump, 5, Ln_8
+Ln_7:                       mov         edi, 72
+                            call        comm_stno
+                            ASSIGN_INT  S_ppSmBump, 5, Ln_8
                             jmp         Ln_8
 
 ; ======================================================================================================================
-Ln_8:                       ASSIGN_INT  S_ppLgBump, 42, Ln_9
+Ln_8:                       mov         edi, 73
+                            call        comm_stno
+                            ASSIGN_INT  S_ppLgBump, 42, Ln_9
                             jmp         Ln_9
 
 ; ======================================================================================================================
-Ln_9:                       CALL1_INT   S_HOST, 0
+Ln_9:                       mov         edi, 79
+                            call        comm_stno
+                            CALL1_INT   S_HOST, 0
                             FAIL_BR     Ln_10
                             SET_VAR     S_ppArgs
                             jmp         Ln_10
 
 ; ======================================================================================================================
-Ln_10:                      LOAD_STR    S_MI_MI
+Ln_10:                      mov         edi, 80
+                            call        comm_stno
+                            LOAD_STR    S_MI_MI
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             mov         qword [rbp-32], 1
@@ -463,7 +486,9 @@ Ln_10:                      LOAD_STR    S_MI_MI
 
 Ln_11:
 ;  ppArgLoop ===========================================================================================================
-L_ppArgLoop_1:              GET_VAR     S_ppArgs
+L_ppArgLoop_1:              mov         edi, 82
+                            call        comm_stno
+                            GET_VAR     S_ppArgs
                             SUBJ_FROM16
 
                             mov         qword [scan_start_12], 0
@@ -494,13 +519,17 @@ P_12_ω:                     cmp         qword [rel kw_anchor], 0
                             jmp         Ln_12
 
 ; ======================================================================================================================
-Ln_12:                      CALL1_VAR   S_DIFFER, S_ppArgs
+Ln_12:                      mov         edi, 83
+                            call        comm_stno
+                            CALL1_VAR   S_DIFFER, S_ppArgs
                             FAIL_BR     Lf_13
                             jmp         Ln_13
 Lf_13:                      jmp         L_ppArgDone_2
 
 ; ======================================================================================================================
-Ln_13:                      GET_VAR     S_ppArgs
+Ln_13:                      mov         edi, 84
+                            call        comm_stno
+                            GET_VAR     S_ppArgs
                             SUBJ_FROM16
 
                             mov         qword [scan_start_14], 0
@@ -543,216 +572,306 @@ P_14_ω:                     cmp         qword [rel kw_anchor], 0
                             jmp         L_ppArgDone_2
 
 ; ======================================================================================================================
-Ln_14:                      CONC2_VS    S_IDENT, S_ppTokName, S_micro
+Ln_14:                      mov         edi, 85
+                            call        comm_stno
+                            CONC2_VS    S_IDENT, S_ppTokName, S_micro
                             FAIL_BR     Lf_15
                             jmp         Ln_15
 Lf_15:                      jmp         L_ppArgP2_3
 
 ; ======================================================================================================================
-Ln_15:                      mov         qword [rbp-32], 1
+Ln_15:                      mov         edi, 86
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
 
 ; ======================================================================================================================
-Ln_16:                      mov         qword [rbp-32], 1
+Ln_16:                      mov         edi, 87
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
 
 ; ======================================================================================================================
-Ln_17:                      mov         qword [rbp-32], 1
+Ln_17:                      mov         edi, 88
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
 
 ; ======================================================================================================================
-Ln_18:                      mov         qword [rbp-32], 1
+Ln_18:                      mov         edi, 89
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
 
 ; ======================================================================================================================
-Ln_19:                      ASSIGN_INT  S_ppSmBump, 3, Ln_20
+Ln_19:                      mov         edi, 90
+                            call        comm_stno
+                            ASSIGN_INT  S_ppSmBump, 3, Ln_20
                             jmp         Ln_20
 
 ; ======================================================================================================================
-Ln_20:                      ASSIGN_INT  S_ppLgBump, 21, Ln_21
+Ln_20:                      mov         edi, 91
+                            call        comm_stno
+                            ASSIGN_INT  S_ppLgBump, 21, Ln_21
                             jmp         L_ppArgLoop_1
 
 Ln_21:
 ;  ppArgP2 =============================================================================================================
-L_ppArgP2_3:                CONC2_VS    S_IDENT, S_ppTokName, S_small
+L_ppArgP2_3:                mov         edi, 92
+                            call        comm_stno
+                            CONC2_VS    S_IDENT, S_ppTokName, S_small
                             FAIL_BR     Lf_22
                             jmp         Ln_22
 Lf_22:                      jmp         L_ppArgP3_4
 
 ; ======================================================================================================================
-Ln_22:                      mov         qword [rbp-32], 1
+Ln_22:                      mov         edi, 93
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
 
 ; ======================================================================================================================
-Ln_23:                      mov         qword [rbp-32], 1
+Ln_23:                      mov         edi, 94
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
 
 ; ======================================================================================================================
-Ln_24:                      mov         qword [rbp-32], 1
+Ln_24:                      mov         edi, 95
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
 
 ; ======================================================================================================================
-Ln_25:                      mov         qword [rbp-32], 1
+Ln_25:                      mov         edi, 96
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
 
 ; ======================================================================================================================
-Ln_26:                      ASSIGN_INT  S_ppSmBump, 4, Ln_27
+Ln_26:                      mov         edi, 97
+                            call        comm_stno
+                            ASSIGN_INT  S_ppSmBump, 4, Ln_27
                             jmp         Ln_27
 
 ; ======================================================================================================================
-Ln_27:                      ASSIGN_INT  S_ppLgBump, 24, Ln_28
+Ln_27:                      mov         edi, 98
+                            call        comm_stno
+                            ASSIGN_INT  S_ppLgBump, 24, Ln_28
                             jmp         L_ppArgLoop_1
 
 Ln_28:
 ;  ppArgP3 =============================================================================================================
-L_ppArgP3_4:                CONC2_VS    S_IDENT, S_ppTokName, S_medium
+L_ppArgP3_4:                mov         edi, 99
+                            call        comm_stno
+                            CONC2_VS    S_IDENT, S_ppTokName, S_medium
                             FAIL_BR     Lf_29
                             jmp         Ln_29
 Lf_29:                      jmp         L_ppArgP4_5
 
 ; ======================================================================================================================
-Ln_29:                      mov         qword [rbp-32], 1
+Ln_29:                      mov         edi, 100
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
 
 ; ======================================================================================================================
-Ln_30:                      mov         qword [rbp-32], 1
+Ln_30:                      mov         edi, 101
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
 
 ; ======================================================================================================================
-Ln_31:                      mov         qword [rbp-32], 1
+Ln_31:                      mov         edi, 102
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
 
 ; ======================================================================================================================
-Ln_32:                      mov         qword [rbp-32], 1
+Ln_32:                      mov         edi, 103
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
 
 ; ======================================================================================================================
-Ln_33:                      ASSIGN_INT  S_ppSmBump, 5, Ln_34
+Ln_33:                      mov         edi, 104
+                            call        comm_stno
+                            ASSIGN_INT  S_ppSmBump, 5, Ln_34
                             jmp         Ln_34
 
 ; ======================================================================================================================
-Ln_34:                      ASSIGN_INT  S_ppLgBump, 42, Ln_35
+Ln_34:                      mov         edi, 105
+                            call        comm_stno
+                            ASSIGN_INT  S_ppLgBump, 42, Ln_35
                             jmp         L_ppArgLoop_1
 
 Ln_35:
 ;  ppArgP4 =============================================================================================================
-L_ppArgP4_5:                CONC2_VS    S_IDENT, S_ppTokName, S_large
+L_ppArgP4_5:                mov         edi, 106
+                            call        comm_stno
+                            CONC2_VS    S_IDENT, S_ppTokName, S_large
                             FAIL_BR     Lf_36
                             jmp         Ln_36
 Lf_36:                      jmp         L_ppArgP5_6
 
 ; ======================================================================================================================
-Ln_36:                      mov         qword [rbp-32], 1
+Ln_36:                      mov         edi, 107
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
 
 ; ======================================================================================================================
-Ln_37:                      mov         qword [rbp-32], 1
+Ln_37:                      mov         edi, 108
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
 
 ; ======================================================================================================================
-Ln_38:                      mov         qword [rbp-32], 1
+Ln_38:                      mov         edi, 109
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
 
 ; ======================================================================================================================
-Ln_39:                      mov         qword [rbp-32], 1
+Ln_39:                      mov         edi, 110
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
 
 ; ======================================================================================================================
-Ln_40:                      ASSIGN_INT  S_ppSmBump, 6, Ln_41
+Ln_40:                      mov         edi, 111
+                            call        comm_stno
+                            ASSIGN_INT  S_ppSmBump, 6, Ln_41
                             jmp         Ln_41
 
 ; ======================================================================================================================
-Ln_41:                      ASSIGN_INT  S_ppLgBump, 54, Ln_42
+Ln_41:                      mov         edi, 112
+                            call        comm_stno
+                            ASSIGN_INT  S_ppLgBump, 54, Ln_42
                             jmp         L_ppArgLoop_1
 
 Ln_42:
 ;  ppArgP5 =============================================================================================================
-L_ppArgP5_6:                CONC2_VS    S_IDENT, S_ppTokName, S_wide
+L_ppArgP5_6:                mov         edi, 113
+                            call        comm_stno
+                            CONC2_VS    S_IDENT, S_ppTokName, S_wide
                             FAIL_BR     Lf_43
                             jmp         Ln_43
 Lf_43:                      jmp         L_ppArgChk1_7
 
 ; ======================================================================================================================
-Ln_43:                      mov         qword [rbp-32], 1
+Ln_43:                      mov         edi, 114
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
 
 ; ======================================================================================================================
-Ln_44:                      mov         qword [rbp-32], 1
+Ln_44:                      mov         edi, 115
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
 
 ; ======================================================================================================================
-Ln_45:                      mov         qword [rbp-32], 1
+Ln_45:                      mov         edi, 116
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
 
 ; ======================================================================================================================
-Ln_46:                      mov         qword [rbp-32], 1
+Ln_46:                      mov         edi, 117
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
 
 ; ======================================================================================================================
-Ln_47:                      ASSIGN_INT  S_ppSmBump, 7, Ln_48
+Ln_47:                      mov         edi, 118
+                            call        comm_stno
+                            ASSIGN_INT  S_ppSmBump, 7, Ln_48
                             jmp         Ln_48
 
 ; ======================================================================================================================
-Ln_48:                      ASSIGN_INT  S_ppLgBump, 68, Ln_49
+Ln_48:                      mov         edi, 119
+                            call        comm_stno
+                            ASSIGN_INT  S_ppLgBump, 68, Ln_49
                             jmp         L_ppArgLoop_1
 
 Ln_49:
 ;  ppArgChk1 ===========================================================================================================
-L_ppArgChk1_7:              CONC2_VS    S_IDENT, S_ppTokName, S_s1
+L_ppArgChk1_7:              mov         edi, 120
+                            call        comm_stno
+                            CONC2_VS    S_IDENT, S_ppTokName, S_s1
                             FAIL_BR     Lf_50
                             jmp         Ln_50
 Lf_50:                      jmp         L_ppArgChk2_8
 
 ; ======================================================================================================================
-Ln_50:                      mov         qword [rbp-32], 1
+Ln_50:                      mov         edi, 121
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             jmp         L_ppArgLoop_1
 
 Ln_51:
 ;  ppArgChk2 ===========================================================================================================
-L_ppArgChk2_8:              CONC2_VS    S_IDENT, S_ppTokName, S_s2
+L_ppArgChk2_8:              mov         edi, 122
+                            call        comm_stno
+                            CONC2_VS    S_IDENT, S_ppTokName, S_s2
                             FAIL_BR     Lf_52
                             jmp         Ln_52
 Lf_52:                      jmp         L_ppArgChk3_9
 
 ; ======================================================================================================================
-Ln_52:                      mov         qword [rbp-32], 1
+Ln_52:                      mov         edi, 123
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             jmp         L_ppArgLoop_1
 
 Ln_53:
 ;  ppArgChk3 ===========================================================================================================
-L_ppArgChk3_9:              CONC2_VS    S_IDENT, S_ppTokName, S_s3
+L_ppArgChk3_9:              mov         edi, 124
+                            call        comm_stno
+                            CONC2_VS    S_IDENT, S_ppTokName, S_s3
                             FAIL_BR     Lf_54
                             jmp         Ln_54
 Lf_54:                      jmp         L_ppArgChk4_10
 
 ; ======================================================================================================================
-Ln_54:                      mov         qword [rbp-32], 1
+Ln_54:                      mov         edi, 125
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             jmp         L_ppArgLoop_1
 
 Ln_55:
 ;  ppArgChk4 ===========================================================================================================
-L_ppArgChk4_10:             CONC2_VS    S_IDENT, S_ppTokName, S_s4
+L_ppArgChk4_10:             mov         edi, 126
+                            call        comm_stno
+                            CONC2_VS    S_IDENT, S_ppTokName, S_s4
                             FAIL_BR     Lf_56
                             jmp         Ln_56
 Lf_56:                      jmp         L_ppArgChk5_11
 
 ; ======================================================================================================================
-Ln_56:                      mov         qword [rbp-32], 1
+Ln_56:                      mov         edi, 127
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             jmp         L_ppArgLoop_1
 
 Ln_57:
 ;  ppArgChk5 ===========================================================================================================
-L_ppArgChk5_11:             CONC2_VS    S_IDENT, S_ppTokName, S_smbump
+L_ppArgChk5_11:             mov         edi, 128
+                            call        comm_stno
+                            CONC2_VS    S_IDENT, S_ppTokName, S_smbump
                             FAIL_BR     Lf_58
                             jmp         Ln_58
 Lf_58:                      jmp         L_ppArgChk6_12
 
 ; ======================================================================================================================
-Ln_58:                      lea         rdi, [rel S_ppTokVal]
+Ln_58:                      mov         edi, 129
+                            call        comm_stno
+                            lea         rdi, [rel S_ppTokVal]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -762,13 +881,17 @@ Ln_58:                      lea         rdi, [rel S_ppTokVal]
 
 Ln_59:
 ;  ppArgChk6 ===========================================================================================================
-L_ppArgChk6_12:             CONC2_VS    S_IDENT, S_ppTokName, S_lgbump
+L_ppArgChk6_12:             mov         edi, 130
+                            call        comm_stno
+                            CONC2_VS    S_IDENT, S_ppTokName, S_lgbump
                             FAIL_BR     Lf_60
                             jmp         Ln_60
 Lf_60:                      jmp         L_ppArgUnk_13
 
 ; ======================================================================================================================
-Ln_60:                      lea         rdi, [rel S_ppTokVal]
+Ln_60:                      mov         edi, 131
+                            call        comm_stno
+                            lea         rdi, [rel S_ppTokVal]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -778,42 +901,54 @@ Ln_60:                      lea         rdi, [rel S_ppTokVal]
 
 Ln_61:
 ;  ppArgUnk ============================================================================================================
-L_ppArgUnk_13:              CONC2_VS    S_IDENT, S_ppTokName, S_auto
+L_ppArgUnk_13:              mov         edi, 132
+                            call        comm_stno
+                            CONC2_VS    S_IDENT, S_ppTokName, S_auto
                             FAIL_BR     Lf_62
                             jmp         Ln_62
 Lf_62:                      jmp         L_ppArgWarn_14
 
 ; ======================================================================================================================
-Ln_62:                      ASSIGN_INT  S_ppAutoMode, 1, Ln_63
+Ln_62:                      mov         edi, 133
+                            call        comm_stno
+                            ASSIGN_INT  S_ppAutoMode, 1, Ln_63
                             jmp         L_ppArgLoop_1
 
 Ln_63:
 ;  ppArgWarn ===========================================================================================================
-L_ppArgWarn_14:             CAT2_SV     S_ST_SP_Warning_CL_SP_unknown_SP_switch_SP_MI_MI, S_ppTokName
+L_ppArgWarn_14:             mov         edi, 134
+                            call        comm_stno
+                            CAT2_SV     S_ST_SP_Warning_CL_SP_unknown_SP_switch_SP_MI_MI, S_ppTokName
                             FAIL_BR     Ln_64
                             SET_OUTPUT
 
                             jmp         L_ppArgLoop_1
 
 Ln_64:
-L_ppArgDone_2:
-
 ;  ppArgDone ===========================================================================================================
+L_ppArgDone_2:              mov         edi, 135
+                            call        comm_stno
 
 ; ======================================================================================================================
-Ln_65:                      CALL1_VAR   S_DIFFER, S_ppAutoMode
+Ln_65:                      mov         edi, 145
+                            call        comm_stno
+                            CALL1_VAR   S_DIFFER, S_ppAutoMode
                             FAIL_BR     Lf_66
                             jmp         Ln_66
 Lf_66:                      jmp         L_ppAutoSkip_15
 
 ; ======================================================================================================================
-Ln_66:                      CALL1_INT   S_CHAR, 9
+Ln_66:                      mov         edi, 149
+                            call        comm_stno
+                            CALL1_INT   S_CHAR, 9
                             FAIL_BR     Ln_67
                             SET_VAR     S_ppTab
                             jmp         Ln_67
 
 ; ======================================================================================================================
-Ln_67:                      sub         rsp, 32
+Ln_67:                      mov         edi, 150
+                            call        comm_stno
+                            sub         rsp, 32
                             sub         rsp, 16
                             CAT2_SV     S_SP, S_ppTab
                             STORE_ARG32 0
@@ -892,7 +1027,9 @@ Ln_67:                      sub         rsp, 32
                             jmp         Ln_68
 
 ; ======================================================================================================================
-Ln_68:                      mov         qword [rbp-32], 1
+Ln_68:                      mov         edi, 152
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
@@ -912,24 +1049,32 @@ Ln_68:                      mov         qword [rbp-32], 1
                             jmp         Ln_69
 
 ; ======================================================================================================================
-Ln_69:                      mov         qword [rbp-32], 1
+Ln_69:                      mov         edi, 153
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             FAIL_BR     Ln_70
                             SET_VAR     S_ppTrimPat
                             jmp         Ln_70
 
 ; ======================================================================================================================
-Ln_70:                      ASSIGN_INT  S_ppNg, 0, Ln_71
+Ln_70:                      mov         edi, 155
+                            call        comm_stno
+                            ASSIGN_INT  S_ppNg, 0, Ln_71
                             jmp         Ln_71
 
 ; ======================================================================================================================
-Ln_71:                      CALL1_INT   S_ARRAY, 2000
+Ln_71:                      mov         edi, 156
+                            call        comm_stno
+                            CALL1_INT   S_ARRAY, 2000
                             FAIL_BR     Ln_72
                             SET_VAR     S_ppWArr
                             jmp         Ln_72
 
 ; ======================================================================================================================
-Ln_72:                      LOAD_STR    S_SL_tmp_SL_beauty_auto
+Ln_72:                      mov         edi, 157
+                            call        comm_stno
+                            LOAD_STR    S_SL_tmp_SL_beauty_auto
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             CALL1_INT   S_HOST, 1
@@ -955,7 +1100,9 @@ Ln_72:                      LOAD_STR    S_SL_tmp_SL_beauty_auto
                             jmp         Ln_73
 
 ; ======================================================================================================================
-Ln_73:                      sub         rsp, 64
+Ln_73:                      mov         edi, 158
+                            call        comm_stno
+                            sub         rsp, 64
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             STORE_ARG32 0
@@ -975,7 +1122,9 @@ Ln_73:                      sub         rsp, 64
 
 Ln_74:
 ;  ppAutoR =============================================================================================================
-L_ppAutoR_16:               lea         rdi, [rel S_INPUT]
+L_ppAutoR_16:               mov         edi, 160
+                            call        comm_stno
+                            lea         rdi, [rel S_INPUT]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -985,7 +1134,9 @@ L_ppAutoR_16:               lea         rdi, [rel S_INPUT]
 Lf_75:                      jmp         L_ppAutoSort_17
 
 ; ======================================================================================================================
-Ln_75:                      lea         rdi, [rel S_ppLn]
+Ln_75:                      mov         edi, 161
+                            call        comm_stno
+                            lea         rdi, [rel S_ppLn]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -994,7 +1145,9 @@ Ln_75:                      lea         rdi, [rel S_ppLn]
                             jmp         Ln_76
 
 ; ======================================================================================================================
-Ln_76:                      GET_VAR     S_ppLn
+Ln_76:                      mov         edi, 162
+                            call        comm_stno
+                            GET_VAR     S_ppLn
                             SUBJ_FROM16
 
                             mov         qword [scan_start_77], 0
@@ -1022,7 +1175,9 @@ P_77_ω:                     cmp         qword [rel kw_anchor], 0
                             jmp         Ln_77
 
 ; ======================================================================================================================
-Ln_77:                      GET_VAR     S_ppLn
+Ln_77:                      mov         edi, 163
+                            call        comm_stno
+                            GET_VAR     S_ppLn
                             SUBJ_FROM16
 
                             mov         qword [scan_start_78], 0
@@ -1050,13 +1205,17 @@ P_78_ω:                     cmp         qword [rel kw_anchor], 0
                             jmp         Ln_78
 
 ; ======================================================================================================================
-Ln_78:                      CALL1_VAR   S_DIFFER, S_ppStmt
+Ln_78:                      mov         edi, 164
+                            call        comm_stno
+                            CALL1_VAR   S_DIFFER, S_ppStmt
                             FAIL_BR     Lf_79
                             jmp         Ln_79
 Lf_79:                      jmp         L_ppAutoNew_19
 
 ; ======================================================================================================================
-Ln_79:                      GET_VAR     S_ppStmt
+Ln_79:                      mov         edi, 165
+                            call        comm_stno
+                            GET_VAR     S_ppStmt
                             SUBJ_FROM16
 
                             mov         qword [scan_start_80], 0
@@ -1095,7 +1254,9 @@ P_80_ω:                     cmp         qword [rel kw_anchor], 0
                             jmp         L_ppAutoNew_19
 
 ; ======================================================================================================================
-Ln_80:                      lea         rdi, [rel S_ppGCon]
+Ln_80:                      mov         edi, 166
+                            call        comm_stno
+                            lea         rdi, [rel S_ppGCon]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -1104,7 +1265,9 @@ Ln_80:                      lea         rdi, [rel S_ppGCon]
                             jmp         Ln_81
 
 ; ======================================================================================================================
-Ln_81:                      GET_VAR     S_ppGConT
+Ln_81:                      mov         edi, 167
+                            call        comm_stno
+                            GET_VAR     S_ppGConT
                             SUBJ_FROM16
 
                             mov         qword [scan_start_82], 0
@@ -1146,30 +1309,40 @@ P_82_ω:                     cmp         qword [rel kw_anchor], 0
                             jmp         Ln_82
 
 ; ======================================================================================================================
-Ln_82:                      CALL1_VAR   S_SIZE, S_ppGConT
+Ln_82:                      mov         edi, 168
+                            call        comm_stno
+                            CALL1_VAR   S_SIZE, S_ppGConT
                             FAIL_BR     Ln_83
                             SET_VAR     S_ppW
                             jmp         Ln_83
 
 ; ======================================================================================================================
-Ln_83:                      CONC2_VN    S_DIFFER, S_ppW
+Ln_83:                      mov         edi, 169
+                            call        comm_stno
+                            CONC2_VN    S_DIFFER, S_ppW
                             FAIL_BR     Lf_84
                             jmp         Ln_84
 Lf_84:                      jmp         L_ppAutoNew_19
 
 ; ======================================================================================================================
-Ln_84:                      CONC2_VI    S_add, S_ppNg, 1
+Ln_84:                      mov         edi, 170
+                            call        comm_stno
+                            CONC2_VI    S_add, S_ppNg, 1
                             FAIL_BR     Ln_85
                             SET_VAR     S_ppNg
                             jmp         Ln_85
 
 ; ======================================================================================================================
-Ln_85:                      mov         qword [rbp-32], 1
+Ln_85:                      mov         edi, 171
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
 
 Ln_86:
 ;  ppAutoNew ===========================================================================================================
-L_ppAutoNew_19:             lea         rdi, [rel S_ppLn]
+L_ppAutoNew_19:             mov         edi, 172
+                            call        comm_stno
+                            lea         rdi, [rel S_ppLn]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -1179,7 +1352,9 @@ L_ppAutoNew_19:             lea         rdi, [rel S_ppLn]
 
 Ln_87:
 ;  ppAutoCont ==========================================================================================================
-L_ppAutoCont_18:            CAT2_VS     S_ppStmt, S_SP
+L_ppAutoCont_18:            mov         edi, 173
+                            call        comm_stno
+                            CAT2_VS     S_ppStmt, S_SP
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             lea         rdi, [rel S_ppLn]
@@ -1199,15 +1374,21 @@ L_ppAutoCont_18:            CAT2_VS     S_ppStmt, S_SP
 
 Ln_88:
 ;  ppAutoSort ==========================================================================================================
-L_ppAutoSort_17:            CALL1_INT   S_ENDFILE, 3
+L_ppAutoSort_17:            mov         edi, 176
+                            call        comm_stno
+                            CALL1_INT   S_ENDFILE, 3
 
 ; ======================================================================================================================
-Ln_89:                      ASSIGN_INT  S_ppI, 1, Ln_90
+Ln_89:                      mov         edi, 177
+                            call        comm_stno
+                            ASSIGN_INT  S_ppI, 1, Ln_90
                             jmp         Ln_90
 
 Ln_90:
 ;  ppAS1 ===============================================================================================================
-L_ppAS1_20:                 CONC2_VV    S_LT, S_ppI, S_ppNg
+L_ppAS1_20:                 mov         edi, 178
+                            call        comm_stno
+                            CONC2_VV    S_LT, S_ppI, S_ppNg
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             CONC2_VI    S_add, S_ppI, 1
@@ -1224,7 +1405,9 @@ L_ppAS1_20:                 CONC2_VV    S_LT, S_ppI, S_ppNg
 Lf_91:                      jmp         L_ppAutoCalc_21
 
 ; ======================================================================================================================
-Ln_91:                      lea         rdi, [rel S_ppI]
+Ln_91:                      mov         edi, 179
+                            call        comm_stno
+                            lea         rdi, [rel S_ppI]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -1233,7 +1416,9 @@ Ln_91:                      lea         rdi, [rel S_ppI]
                             jmp         Ln_92
 
 ; ======================================================================================================================
-Ln_92:                      mov         qword [rbp-32], 1
+Ln_92:                      mov         edi, 180
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             FAIL_BR     Ln_93
                             SET_VAR     S_ppKey
@@ -1241,18 +1426,24 @@ Ln_92:                      mov         qword [rbp-32], 1
 
 Ln_93:
 ;  ppAS2 ===============================================================================================================
-L_ppAS2_22:                 CONC2_VI    S_sub, S_ppJ, 1
+L_ppAS2_22:                 mov         edi, 181
+                            call        comm_stno
+                            CONC2_VI    S_sub, S_ppJ, 1
                             FAIL_BR     Ln_94
                             SET_VAR     S_ppJ1
                             jmp         Ln_94
 
 ; ======================================================================================================================
-Ln_94:                      CONC2_VI    S_LT, S_ppJ1, 1
+Ln_94:                      mov         edi, 182
+                            call        comm_stno
+                            CONC2_VI    S_LT, S_ppJ1, 1
                             FAIL_BR     Ln_95
                             jmp         L_ppASins_23
 
 ; ======================================================================================================================
-Ln_95:                      sub         rsp, 32
+Ln_95:                      mov         edi, 183
+                            call        comm_stno
+                            sub         rsp, 32
                             lea         rdi, [rel S_ppKey]
                             call        stmt_get
                             mov         [rbp-32], rax
@@ -1270,11 +1461,15 @@ Ln_95:                      sub         rsp, 32
 Lf_96:                      jmp         L_ppASins_23
 
 ; ======================================================================================================================
-Ln_96:                      mov         qword [rbp-32], 1
+Ln_96:                      mov         edi, 184
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
 
 ; ======================================================================================================================
-Ln_97:                      lea         rdi, [rel S_ppJ1]
+Ln_97:                      mov         edi, 185
+                            call        comm_stno
+                            lea         rdi, [rel S_ppJ1]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -1284,13 +1479,17 @@ Ln_97:                      lea         rdi, [rel S_ppJ1]
 
 Ln_98:
 ;  ppASins =============================================================================================================
-L_ppASins_23:               mov         qword [rbp-32], 1
+L_ppASins_23:               mov         edi, 186
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             jmp         L_ppAS1_20
 
 Ln_99:
 ;  ppAutoCalc ==========================================================================================================
-L_ppAutoCalc_21:            sub         rsp, 32
+L_ppAutoCalc_21:            mov         edi, 189
+                            call        comm_stno
+                            sub         rsp, 32
                             CONC2_VI    S_mul, S_ppNg, 9
                             STORE_ARG32 0
                             LOAD_INT    10
@@ -1304,44 +1503,58 @@ L_ppAutoCalc_21:            sub         rsp, 32
                             jmp         Ln_100
 
 ; ======================================================================================================================
-Ln_100:                     CONC2_VI    S_LT, S_ppP90i, 1
+Ln_100:                     mov         edi, 190
+                            call        comm_stno
+                            CONC2_VI    S_LT, S_ppP90i, 1
                             FAIL_BR     Lf_101
                             jmp         Ln_101
 Lf_101:                     jmp         L_ppAP90ok_24
 
 ; ======================================================================================================================
-Ln_101:                     ASSIGN_INT  S_ppP90i, 1, Ln_102
+Ln_101:                     mov         edi, 191
+                            call        comm_stno
+                            ASSIGN_INT  S_ppP90i, 1, Ln_102
                             jmp         Ln_102
 
 Ln_102:
 ;  ppAP90ok ============================================================================================================
-L_ppAP90ok_24:              mov         qword [rbp-32], 1
+L_ppAP90ok_24:              mov         edi, 192
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             FAIL_BR     Ln_103
                             SET_VAR     S_ppP90
                             jmp         Ln_103
 
 ; ======================================================================================================================
-Ln_103:                     CONC2_VI    S_LT, S_ppP90, 20
+Ln_103:                     mov         edi, 193
+                            call        comm_stno
+                            CONC2_VI    S_LT, S_ppP90, 20
                             FAIL_BR     Lf_104
                             jmp         Ln_104
 Lf_104:                     jmp         L_ppAscale_25
 
 ; ======================================================================================================================
-Ln_104:                     ASSIGN_INT  S_ppP90, 20, Ln_105
+Ln_104:                     mov         edi, 194
+                            call        comm_stno
+                            ASSIGN_INT  S_ppP90, 20, Ln_105
                             jmp         Ln_105
 
 Ln_105:
-L_ppAscale_25:
-
 ;  ppAscale ============================================================================================================
+L_ppAscale_25:              mov         edi, 195
+                            call        comm_stno
 
 ; ======================================================================================================================
-Ln_106:                     mov         qword [rbp-32], 1
+Ln_106:                     mov         edi, 197
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
 
 ; ======================================================================================================================
-Ln_107:                     sub         rsp, 32
+Ln_107:                     mov         edi, 198
+                            call        comm_stno
+                            sub         rsp, 32
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             STORE_ARG32 0
@@ -1356,24 +1569,34 @@ Ln_107:                     sub         rsp, 32
 Lf_108:                     jmp         L_ppAs1_26
 
 ; ======================================================================================================================
-Ln_108:                     mov         qword [rbp-32], 1
+Ln_108:                     mov         edi, 199
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
 
 Ln_109:
 ;  ppAs1 ===============================================================================================================
-L_ppAs1_26:                 mov         qword [rbp-32], 1
+L_ppAs1_26:                 mov         edi, 201
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
 
 ; ======================================================================================================================
-Ln_110:                     mov         qword [rbp-32], 1
+Ln_110:                     mov         edi, 203
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
 
 ; ======================================================================================================================
-Ln_111:                     mov         qword [rbp-32], 1
+Ln_111:                     mov         edi, 204
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
 
 ; ======================================================================================================================
-Ln_112:                     sub         rsp, 32
+Ln_112:                     mov         edi, 206
+                            call        comm_stno
+                            sub         rsp, 32
                             LOAD_INT    3
                             STORE_ARG32 0
                             sub         rsp, 32
@@ -1412,7 +1635,9 @@ Ln_112:                     sub         rsp, 32
                             jmp         Ln_113
 
 ; ======================================================================================================================
-Ln_113:                     sub         rsp, 32
+Ln_113:                     mov         edi, 207
+                            call        comm_stno
+                            sub         rsp, 32
                             sub         rsp, 32
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
@@ -1436,18 +1661,24 @@ Ln_113:                     sub         rsp, 32
                             jmp         Ln_114
 
 ; ======================================================================================================================
-Ln_114:                     CONC2_VI    S_LT, S_ppLgBump, 10
+Ln_114:                     mov         edi, 208
+                            call        comm_stno
+                            CONC2_VI    S_LT, S_ppLgBump, 10
                             FAIL_BR     Lf_115
                             jmp         Ln_115
 Lf_115:                     jmp         L_ppAutoMsg_27
 
 ; ======================================================================================================================
-Ln_115:                     ASSIGN_INT  S_ppLgBump, 10, Ln_116
+Ln_115:                     mov         edi, 209
+                            call        comm_stno
+                            ASSIGN_INT  S_ppLgBump, 10, Ln_116
                             jmp         Ln_116
 
 Ln_116:
 ;  ppAutoMsg ===========================================================================================================
-L_ppAutoMsg_27:             CAT2_SV     S_ST_SP_MI_MI_auto_CL_SP_n_EQ, S_ppNg
+L_ppAutoMsg_27:             mov         edi, 210
+                            call        comm_stno
+                            CAT2_SV     S_ST_SP_MI_MI_auto_CL_SP_n_EQ, S_ppNg
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             LOAD_STR    S_SP_p90_EQ
@@ -1607,7 +1838,9 @@ L_ppAutoMsg_27:             CAT2_SV     S_ST_SP_MI_MI_auto_CL_SP_n_EQ, S_ppNg
                             jmp         Ln_117
 
 ; ======================================================================================================================
-Ln_117:                     sub         rsp, 64
+Ln_117:                     mov         edi, 216
+                            call        comm_stno
+                            sub         rsp, 64
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             STORE_ARG32 0
@@ -1626,18 +1859,22 @@ Ln_117:                     sub         rsp, 64
 
 
 Ln_118:
-L_ppAutoSkip_15:
-
 ;  ppAutoSkip ==========================================================================================================
+L_ppAutoSkip_15:            mov         edi, 217
+                            call        comm_stno
 
 ; ======================================================================================================================
-Ln_119:                     CALL1_VAR   S_SPAN, S_digits
+Ln_119:                     mov         edi, 221
+                            call        comm_stno
+                            CALL1_VAR   S_SPAN, S_digits
                             FAIL_BR     Ln_120
                             SET_VAR     S_Integer
                             jmp         Ln_120
 
 ; ======================================================================================================================
-Ln_120:                     LOAD_STR    S_XX
+Ln_120:                     mov         edi, 222
+                            call        comm_stno
+                            LOAD_STR    S_XX
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             sub         rsp, 16
@@ -1669,7 +1906,9 @@ Ln_120:                     LOAD_STR    S_XX
                             jmp         Ln_121
 
 ; ======================================================================================================================
-Ln_121:                     LOAD_STR    S_XX_117
+Ln_121:                     mov         edi, 223
+                            call        comm_stno
+                            LOAD_STR    S_XX_117
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             sub         rsp, 16
@@ -1701,7 +1940,9 @@ Ln_121:                     LOAD_STR    S_XX_117
                             jmp         Ln_122
 
 ; ======================================================================================================================
-Ln_122:                     sub         rsp, 32
+Ln_122:                     mov         edi, 224
+                            call        comm_stno
+                            sub         rsp, 32
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             STORE_ARG32 0
@@ -1717,7 +1958,9 @@ Ln_122:                     sub         rsp, 32
                             jmp         Ln_123
 
 ; ======================================================================================================================
-Ln_123:                     sub         rsp, 32
+Ln_123:                     mov         edi, 225
+                            call        comm_stno
+                            sub         rsp, 32
                             CALL1_VAR   S_SPAN, S_digits
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
@@ -1857,7 +2100,9 @@ Ln_123:                     sub         rsp, 32
                             jmp         Ln_124
 
 ; ======================================================================================================================
-Ln_124:                     sub         rsp, 16
+Ln_124:                     mov         edi, 232
+                            call        comm_stno
+                            sub         rsp, 16
                             lea         rdi, [rel S_AM_UCASE]
                             call        stmt_get
                             mov         [rbp-32], rax
@@ -1954,28 +2199,36 @@ Ln_124:                     sub         rsp, 16
                             jmp         Ln_125
 
 ; ======================================================================================================================
-Ln_125:                     mov         qword [rbp-32], 1
+Ln_125:                     mov         edi, 234
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             FAIL_BR     Ln_126
                             SET_VAR     S_Function
                             jmp         Ln_126
 
 ; ======================================================================================================================
-Ln_126:                     mov         qword [rbp-32], 1
+Ln_126:                     mov         edi, 236
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             FAIL_BR     Ln_127
                             SET_VAR     S_BuiltinVar
                             jmp         Ln_127
 
 ; ======================================================================================================================
-Ln_127:                     mov         qword [rbp-32], 1
+Ln_127:                     mov         edi, 238
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             FAIL_BR     Ln_128
                             SET_VAR     S_SpecialNm
                             jmp         Ln_128
 
 ; ======================================================================================================================
-Ln_128:                     LOAD_STR    S_AM
+Ln_128:                     mov         edi, 240
+                            call        comm_stno
+                            LOAD_STR    S_AM
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             mov         qword [rbp-32], 1
@@ -1992,7 +2245,9 @@ Ln_128:                     LOAD_STR    S_AM
                             jmp         Ln_129
 
 ; ======================================================================================================================
-Ln_129:                     LOAD_STR    S_AM
+Ln_129:                     mov         edi, 241
+                            call        comm_stno
+                            LOAD_STR    S_AM
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             mov         qword [rbp-32], 1
@@ -2009,7 +2264,9 @@ Ln_129:                     LOAD_STR    S_AM
                             jmp         Ln_130
 
 ; ======================================================================================================================
-Ln_130:                     sub         rsp, 32
+Ln_130:                     mov         edi, 243
+                            call        comm_stno
+                            sub         rsp, 32
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             STORE_ARG32 0
@@ -2027,7 +2284,9 @@ Ln_130:                     sub         rsp, 32
                             jmp         Ln_131
 
 ; ======================================================================================================================
-Ln_131:                     sub         rsp, 32
+Ln_131:                     mov         edi, 244
+                            call        comm_stno
+                            sub         rsp, 32
                             sub         rsp, 16
                             CAT2_SV     S_SP, S_tab
                             STORE_ARG32 0
@@ -2166,7 +2425,9 @@ Ln_131:                     sub         rsp, 32
                             jmp         Ln_132
 
 ; ======================================================================================================================
-Ln_132:                     sub         rsp, 32
+Ln_132:                     mov         edi, 249
+                            call        comm_stno
+                            sub         rsp, 32
                             CALL1_INT   S_POS, 0
                             STORE_ARG32 0
                             LOAD_STR    S_SP
@@ -2209,15 +2470,21 @@ Ln_132:                     sub         rsp, 32
                             jmp         Ln_133
 
 ; ======================================================================================================================
-Ln_133:                     ASSIGN_STR  S_SpecialNms, S_ABORT_SP_CONTINUE_SP_END_SP_FRETURN_SP_NRETURN_SP_RETURN_SP_S, Ln_134
+Ln_133:                     mov         edi, 250
+                            call        comm_stno
+                            ASSIGN_STR  S_SpecialNms, S_ABORT_SP_CONTINUE_SP_END_SP_FRETURN_SP_NRETURN_SP_RETURN_SP_SCONTINUE_SP_START, Ln_134
                             jmp         Ln_134
 
 ; ======================================================================================================================
-Ln_134:                     ASSIGN_STR  S_BuiltinVars, S_ABORT_SP_ARB_SP_BAL_SP_FAIL_SP_FENCE_SP_INPUT_SP_OUTPUT_SP_RE, Ln_135
+Ln_134:                     mov         edi, 251
+                            call        comm_stno
+                            ASSIGN_STR  S_BuiltinVars, S_ABORT_SP_ARB_SP_BAL_SP_FAIL_SP_FENCE_SP_INPUT_SP_OUTPUT_SP_REM_SP_TERMINAL, Ln_135
                             jmp         Ln_135
 
 ; ======================================================================================================================
-Ln_135:                     CAT2_SS     S_ABORT_SP_ALPHABET_SP_ARB_SP_BAL_SP_FAIL_SP_FENCE_SP_FILE_SP_F, S_LASTFILE_SP_LASTLINE_SP_LASTNO_SP_LCASE_SP_LINE_SP_REM_SP_RTN
+Ln_135:                     mov         edi, 252
+                            call        comm_stno
+                            CAT2_SS     S_ABORT_SP_ALPHABET_SP_ARB_SP_BAL_SP_FAIL_SP_FENCE_SP_FILE_SP_FNCLEVEL_SP, S_LASTFILE_SP_LASTLINE_SP_LASTNO_SP_LCASE_SP_LINE_SP_REM_SP_RTNTYPE_SP
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             LOAD_STR    S_STCOUNT_SP_STNO_SP_SUCCEED_SP_UCASE
@@ -2233,7 +2500,9 @@ Ln_135:                     CAT2_SS     S_ABORT_SP_ALPHABET_SP_ARB_SP_BAL_SP_FAI
                             jmp         Ln_136
 
 ; ======================================================================================================================
-Ln_136:                     CAT2_SS     S_ABEND_SP_ANCHOR_SP_CASE_SP_CODE_SP_COMPARE_SP_DUMP_SP_ERRLIMI, S_ERRTEXT_SP_ERRTYPE_SP_FTRACE_SP_INPUT_SP_MAXLNGTH_SP_OUTPUT_S
+Ln_136:                     mov         edi, 255
+                            call        comm_stno
+                            CAT2_SS     S_ABEND_SP_ANCHOR_SP_CASE_SP_CODE_SP_COMPARE_SP_DUMP_SP_ERRLIMIT_SP, S_ERRTEXT_SP_ERRTYPE_SP_FTRACE_SP_INPUT_SP_MAXLNGTH_SP_OUTPUT_SP
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             LOAD_STR    S_PROFILE_SP_STLIMIT_SP_TRACE_SP_TRIM_SP_FULLSCAN
@@ -2249,10 +2518,12 @@ Ln_136:                     CAT2_SS     S_ABEND_SP_ANCHOR_SP_CASE_SP_CODE_SP_COM
                             jmp         Ln_137
 
 ; ======================================================================================================================
-Ln_137:                     CAT2_SS     S_ANY_SP_APPLY_SP_ARBNO_SP_ARG_SP_ARRAY_SP_ATAN_SP_BACKSPACE_SP, S_CHAR_SP_CHOP_SP_CLEAR_SP_CODE_SP_COLLECT_SP_CONVERT_SP_COPY_S
+Ln_137:                     mov         edi, 258
+                            call        comm_stno
+                            CAT2_SS     S_ANY_SP_APPLY_SP_ARBNO_SP_ARG_SP_ARRAY_SP_ATAN_SP_BACKSPACE_SP_BREAK_SP_BREAKX_SP, S_CHAR_SP_CHOP_SP_CLEAR_SP_CODE_SP_COLLECT_SP_CONVERT_SP_COPY_SP_COS_SP_DATA_SP
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
-                            LOAD_STR    S_DATATYPE_SP_DATE_SP_DEFINE_SP_DETACH_SP_DIFFER_SP_DUMP_SP_DUP
+                            LOAD_STR    S_DATATYPE_SP_DATE_SP_DEFINE_SP_DETACH_SP_DIFFER_SP_DUMP_SP_DUPL_SP_EJECT_SP
                             mov         rcx, rdx
                             mov         rdx, rax
                             mov         rdi, [conc_tmp0_rax]
@@ -2262,7 +2533,7 @@ Ln_137:                     CAT2_SS     S_ANY_SP_APPLY_SP_ARBNO_SP_ARG_SP_ARRAY_
                             mov         [rbp-24], rdx
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
-                            LOAD_STR    S_ENDFILE_SP_EQ_SP_EVAL_SP_EXIT_SP_EXP_SP_FENCE_SP_FIELD_SP_GE_
+                            LOAD_STR    S_ENDFILE_SP_EQ_SP_EVAL_SP_EXIT_SP_EXP_SP_FENCE_SP_FIELD_SP_GE_SP_GT_SP_HOST_SP
                             mov         rcx, rdx
                             mov         rdx, rax
                             mov         rdi, [conc_tmp0_rax]
@@ -2272,7 +2543,7 @@ Ln_137:                     CAT2_SS     S_ANY_SP_APPLY_SP_ARBNO_SP_ARG_SP_ARRAY_
                             mov         [rbp-24], rdx
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
-                            LOAD_STR    S_IDENT_SP_INPUT_SP_INTEGER_SP_ITEM_SP_LE_SP_LEN_SP_LEQ_SP_LGE_
+                            LOAD_STR    S_IDENT_SP_INPUT_SP_INTEGER_SP_ITEM_SP_LE_SP_LEN_SP_LEQ_SP_LGE_SP_LGT_SP_LLE_SP
                             mov         rcx, rdx
                             mov         rdx, rax
                             mov         rdi, [conc_tmp0_rax]
@@ -2282,7 +2553,7 @@ Ln_137:                     CAT2_SS     S_ANY_SP_APPLY_SP_ARBNO_SP_ARG_SP_ARRAY_
                             mov         [rbp-24], rdx
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
-                            LOAD_STR    S_LLT_SP_LN_SP_LNE_SP_LOAD_SP_LOCAL_SP_LPAD_SP_LT_SP_NE_SP_NOTA
+                            LOAD_STR    S_LLT_SP_LN_SP_LNE_SP_LOAD_SP_LOCAL_SP_LPAD_SP_LT_SP_NE_SP_NOTANY_SP_OPSYN_SP_OUTPUT_SP
                             mov         rcx, rdx
                             mov         rdx, rax
                             mov         rdi, [conc_tmp0_rax]
@@ -2292,7 +2563,7 @@ Ln_137:                     CAT2_SS     S_ANY_SP_APPLY_SP_ARBNO_SP_ARG_SP_ARRAY_
                             mov         [rbp-24], rdx
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
-                            LOAD_STR    S_POS_SP_PROTOTYPE_SP_REMDR_SP_REPLACE_SP_REVERSE_SP_REWIND_SP_
+                            LOAD_STR    S_POS_SP_PROTOTYPE_SP_REMDR_SP_REPLACE_SP_REVERSE_SP_REWIND_SP_RPAD_SP_RPOS_SP
                             mov         rcx, rdx
                             mov         rdx, rax
                             mov         rdi, [conc_tmp0_rax]
@@ -2302,7 +2573,7 @@ Ln_137:                     CAT2_SS     S_ANY_SP_APPLY_SP_ARBNO_SP_ARG_SP_ARRAY_
                             mov         [rbp-24], rdx
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
-                            LOAD_STR    S_RSORT_SP_RTAB_SP_SET_SP_SETEXIT_SP_SIN_SP_SIZE_SP_SORT_SP_SPA
+                            LOAD_STR    S_RSORT_SP_RTAB_SP_SET_SP_SETEXIT_SP_SIN_SP_SIZE_SP_SORT_SP_SPAN_SP_SQRT_SP_STOPTR_SP
                             mov         rcx, rdx
                             mov         rdx, rax
                             mov         rdi, [conc_tmp0_rax]
@@ -2312,7 +2583,7 @@ Ln_137:                     CAT2_SS     S_ANY_SP_APPLY_SP_ARBNO_SP_ARG_SP_ARRAY_
                             mov         [rbp-24], rdx
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
-                            LOAD_STR    S_SUBSTR_SP_TAB_SP_TABLE_SP_TAN_SP_TIME_SP_TRACE_SP_TRIM_SP_UNL
+                            LOAD_STR    S_SUBSTR_SP_TAB_SP_TABLE_SP_TAN_SP_TIME_SP_TRACE_SP_TRIM_SP_UNLOAD
                             mov         rcx, rdx
                             mov         rdx, rax
                             mov         rdi, [conc_tmp0_rax]
@@ -2325,7 +2596,9 @@ Ln_137:                     CAT2_SS     S_ANY_SP_APPLY_SP_ARBNO_SP_ARG_SP_ARRAY_
                             jmp         Ln_138
 
 ; ======================================================================================================================
-Ln_138:                     LOAD_STR    S_EQ
+Ln_138:                     mov         edi, 268
+                            call        comm_stno
+                            LOAD_STR    S_EQ
                             mov         [rbp-16], rax
                             mov         [rbp-8],  rdx
                             mov         qword [rbp-32], 1
@@ -2357,7 +2630,9 @@ Ln_138:                     LOAD_STR    S_EQ
                             jmp         Ln_139
 
 ; ======================================================================================================================
-Ln_139:                     LOAD_STR    S_QM
+Ln_139:                     mov         edi, 269
+                            call        comm_stno
+                            LOAD_STR    S_QM
                             mov         [rbp-16], rax
                             mov         [rbp-8],  rdx
                             mov         qword [rbp-32], 1
@@ -2389,7 +2664,9 @@ Ln_139:                     LOAD_STR    S_QM
                             jmp         Ln_140
 
 ; ======================================================================================================================
-Ln_140:                     LOAD_STR    S_OR
+Ln_140:                     mov         edi, 270
+                            call        comm_stno
+                            LOAD_STR    S_OR
                             mov         [rbp-16], rax
                             mov         [rbp-8],  rdx
                             mov         qword [rbp-32], 1
@@ -2421,7 +2698,9 @@ Ln_140:                     LOAD_STR    S_OR
                             jmp         Ln_141
 
 ; ======================================================================================================================
-Ln_141:                     LOAD_STR    S_PL
+Ln_141:                     mov         edi, 271
+                            call        comm_stno
+                            LOAD_STR    S_PL
                             mov         [rbp-16], rax
                             mov         [rbp-8],  rdx
                             mov         qword [rbp-32], 1
@@ -2453,7 +2732,9 @@ Ln_141:                     LOAD_STR    S_PL
                             jmp         Ln_142
 
 ; ======================================================================================================================
-Ln_142:                     LOAD_STR    S_MI
+Ln_142:                     mov         edi, 272
+                            call        comm_stno
+                            LOAD_STR    S_MI
                             mov         [rbp-16], rax
                             mov         [rbp-8],  rdx
                             mov         qword [rbp-32], 1
@@ -2485,7 +2766,9 @@ Ln_142:                     LOAD_STR    S_MI
                             jmp         Ln_143
 
 ; ======================================================================================================================
-Ln_143:                     LOAD_STR    S_SL
+Ln_143:                     mov         edi, 273
+                            call        comm_stno
+                            LOAD_STR    S_SL
                             mov         [rbp-16], rax
                             mov         [rbp-8],  rdx
                             mov         qword [rbp-32], 1
@@ -2517,7 +2800,9 @@ Ln_143:                     LOAD_STR    S_SL
                             jmp         Ln_144
 
 ; ======================================================================================================================
-Ln_144:                     LOAD_STR    S_ST
+Ln_144:                     mov         edi, 274
+                            call        comm_stno
+                            LOAD_STR    S_ST
                             mov         [rbp-16], rax
                             mov         [rbp-8],  rdx
                             mov         qword [rbp-32], 1
@@ -2549,7 +2834,9 @@ Ln_144:                     LOAD_STR    S_ST
                             jmp         Ln_145
 
 ; ======================================================================================================================
-Ln_145:                     LOAD_STR    S_CA
+Ln_145:                     mov         edi, 275
+                            call        comm_stno
+                            LOAD_STR    S_CA
                             mov         [rbp-16], rax
                             mov         [rbp-8],  rdx
                             mov         qword [rbp-32], 1
@@ -2581,7 +2868,9 @@ Ln_145:                     LOAD_STR    S_CA
                             jmp         Ln_146
 
 ; ======================================================================================================================
-Ln_146:                     LOAD_STR    S_BG
+Ln_146:                     mov         edi, 276
+                            call        comm_stno
+                            LOAD_STR    S_BG
                             mov         [rbp-16], rax
                             mov         [rbp-8],  rdx
                             mov         qword [rbp-32], 1
@@ -2613,7 +2902,9 @@ Ln_146:                     LOAD_STR    S_BG
                             jmp         Ln_147
 
 ; ======================================================================================================================
-Ln_147:                     LOAD_STR    S_ST_ST
+Ln_147:                     mov         edi, 277
+                            call        comm_stno
+                            LOAD_STR    S_ST_ST
                             mov         [rbp-16], rax
                             mov         [rbp-8],  rdx
                             mov         qword [rbp-32], 1
@@ -2645,7 +2936,9 @@ Ln_147:                     LOAD_STR    S_ST_ST
                             jmp         Ln_148
 
 ; ======================================================================================================================
-Ln_148:                     LOAD_STR    S_DL
+Ln_148:                     mov         edi, 278
+                            call        comm_stno
+                            LOAD_STR    S_DL
                             mov         [rbp-16], rax
                             mov         [rbp-8],  rdx
                             mov         qword [rbp-32], 1
@@ -2677,7 +2970,9 @@ Ln_148:                     LOAD_STR    S_DL
                             jmp         Ln_149
 
 ; ======================================================================================================================
-Ln_149:                     LOAD_STR    S_DT
+Ln_149:                     mov         edi, 279
+                            call        comm_stno
+                            LOAD_STR    S_DT
                             mov         [rbp-16], rax
                             mov         [rbp-8],  rdx
                             mov         qword [rbp-32], 1
@@ -2709,7 +3004,9 @@ Ln_149:                     LOAD_STR    S_DT
                             jmp         Ln_150
 
 ; ======================================================================================================================
-Ln_150:                     LOAD_STR    S_AM
+Ln_150:                     mov         edi, 280
+                            call        comm_stno
+                            LOAD_STR    S_AM
                             mov         [rbp-16], rax
                             mov         [rbp-8],  rdx
                             mov         qword [rbp-32], 1
@@ -2741,7 +3038,9 @@ Ln_150:                     LOAD_STR    S_AM
                             jmp         Ln_151
 
 ; ======================================================================================================================
-Ln_151:                     LOAD_STR    S_AT
+Ln_151:                     mov         edi, 281
+                            call        comm_stno
+                            LOAD_STR    S_AT
                             mov         [rbp-16], rax
                             mov         [rbp-8],  rdx
                             mov         qword [rbp-32], 1
@@ -2773,7 +3072,9 @@ Ln_151:                     LOAD_STR    S_AT
                             jmp         Ln_152
 
 ; ======================================================================================================================
-Ln_152:                     LOAD_STR    S_HS
+Ln_152:                     mov         edi, 282
+                            call        comm_stno
+                            LOAD_STR    S_HS
                             mov         [rbp-16], rax
                             mov         [rbp-8],  rdx
                             mov         qword [rbp-32], 1
@@ -2805,7 +3106,9 @@ Ln_152:                     LOAD_STR    S_HS
                             jmp         Ln_153
 
 ; ======================================================================================================================
-Ln_153:                     LOAD_STR    S_PC
+Ln_153:                     mov         edi, 283
+                            call        comm_stno
+                            LOAD_STR    S_PC
                             mov         [rbp-16], rax
                             mov         [rbp-8],  rdx
                             mov         qword [rbp-32], 1
@@ -2837,7 +3140,9 @@ Ln_153:                     LOAD_STR    S_PC
                             jmp         Ln_154
 
 ; ======================================================================================================================
-Ln_154:                     LOAD_STR    S_TL
+Ln_154:                     mov         edi, 284
+                            call        comm_stno
+                            LOAD_STR    S_TL
                             mov         [rbp-16], rax
                             mov         [rbp-8],  rdx
                             mov         qword [rbp-32], 1
@@ -2869,7 +3174,9 @@ Ln_154:                     LOAD_STR    S_TL
                             jmp         Ln_155
 
 ; ======================================================================================================================
-Ln_155:                     LOAD_STR    S_CM
+Ln_155:                     mov         edi, 285
+                            call        comm_stno
+                            LOAD_STR    S_CM
                             mov         [rbp-16], rax
                             mov         [rbp-8],  rdx
                             mov         qword [rbp-32], 1
@@ -2901,7 +3208,9 @@ Ln_155:                     LOAD_STR    S_CM
                             jmp         Ln_156
 
 ; ======================================================================================================================
-Ln_156:                     LOAD_STR    S_LP
+Ln_156:                     mov         edi, 286
+                            call        comm_stno
+                            LOAD_STR    S_LP
                             mov         [rbp-16], rax
                             mov         [rbp-8],  rdx
                             LOAD_STR    S_LP
@@ -2922,7 +3231,9 @@ Ln_156:                     LOAD_STR    S_LP
                             jmp         Ln_157
 
 ; ======================================================================================================================
-Ln_157:                     LOAD_STR    S_LB
+Ln_157:                     mov         edi, 287
+                            call        comm_stno
+                            LOAD_STR    S_LB
                             mov         [rbp-16], rax
                             mov         [rbp-8],  rdx
                             LOAD_STR    S_LB
@@ -2943,7 +3254,9 @@ Ln_157:                     LOAD_STR    S_LB
                             jmp         Ln_158
 
 ; ======================================================================================================================
-Ln_158:                     LOAD_STR    S_LT_181
+Ln_158:                     mov         edi, 288
+                            call        comm_stno
+                            LOAD_STR    S_LT_181
                             mov         [rbp-16], rax
                             mov         [rbp-8],  rdx
                             LOAD_STR    S_LT_181
@@ -2964,7 +3277,9 @@ Ln_158:                     LOAD_STR    S_LT_181
                             jmp         Ln_159
 
 ; ======================================================================================================================
-Ln_159:                     LOAD_STR    S_RP
+Ln_159:                     mov         edi, 289
+                            call        comm_stno
+                            LOAD_STR    S_RP
                             mov         [rbp-16], rax
                             mov         [rbp-8],  rdx
                             mov         qword [rbp-32], 1
@@ -2985,7 +3300,9 @@ Ln_159:                     LOAD_STR    S_RP
                             jmp         Ln_160
 
 ; ======================================================================================================================
-Ln_160:                     LOAD_STR    S_RB
+Ln_160:                     mov         edi, 290
+                            call        comm_stno
+                            LOAD_STR    S_RB
                             mov         [rbp-16], rax
                             mov         [rbp-8],  rdx
                             mov         qword [rbp-32], 1
@@ -3006,7 +3323,9 @@ Ln_160:                     LOAD_STR    S_RB
                             jmp         Ln_161
 
 ; ======================================================================================================================
-Ln_161:                     LOAD_STR    S_GT
+Ln_161:                     mov         edi, 291
+                            call        comm_stno
+                            LOAD_STR    S_GT
                             mov         [rbp-16], rax
                             mov         [rbp-8],  rdx
                             mov         qword [rbp-32], 1
@@ -3027,7 +3346,9 @@ Ln_161:                     LOAD_STR    S_GT
                             jmp         Ln_162
 
 ; ======================================================================================================================
-Ln_162:                     APPLY_FN_0  S_nPush
+Ln_162:                     mov         edi, 293
+                            call        comm_stno
+                            APPLY_FN_0  S_nPush
                             STORE_RESULT
 
                             mov         [conc_tmp0_rax], rax
@@ -3069,7 +3390,9 @@ Ln_162:                     APPLY_FN_0  S_nPush
                             jmp         Ln_163
 
 ; ======================================================================================================================
-Ln_163:                     APPLY_FN_0  S_nInc
+Ln_163:                     mov         edi, 297
+                            call        comm_stno
+                            APPLY_FN_0  S_nInc
                             STORE_RESULT
 
                             mov         [conc_tmp0_rax], rax
@@ -3136,14 +3459,18 @@ Ln_163:                     APPLY_FN_0  S_nInc
                             jmp         Ln_164
 
 ; ======================================================================================================================
-Ln_164:                     mov         qword [rbp-32], 1
+Ln_164:                     mov         edi, 298
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             FAIL_BR     Ln_165
                             SET_VAR     S_Expr
                             jmp         Ln_165
 
 ; ======================================================================================================================
-Ln_165:                     mov         qword [rbp-32], 1
+Ln_165:                     mov         edi, 299
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
@@ -3200,7 +3527,9 @@ Ln_165:                     mov         qword [rbp-32], 1
                             jmp         Ln_166
 
 ; ======================================================================================================================
-Ln_166:                     mov         qword [rbp-32], 1
+Ln_166:                     mov         edi, 300
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
@@ -3257,7 +3586,9 @@ Ln_166:                     mov         qword [rbp-32], 1
                             jmp         Ln_167
 
 ; ======================================================================================================================
-Ln_167:                     mov         qword [rbp-32], 1
+Ln_167:                     mov         edi, 301
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
@@ -3314,7 +3645,9 @@ Ln_167:                     mov         qword [rbp-32], 1
                             jmp         Ln_168
 
 ; ======================================================================================================================
-Ln_168:                     APPLY_FN_0  S_nPush
+Ln_168:                     mov         edi, 302
+                            call        comm_stno
+                            APPLY_FN_0  S_nPush
                             STORE_RESULT
 
                             mov         [conc_tmp0_rax], rax
@@ -3356,7 +3689,9 @@ Ln_168:                     APPLY_FN_0  S_nPush
                             jmp         Ln_169
 
 ; ======================================================================================================================
-Ln_169:                     APPLY_FN_0  S_nInc
+Ln_169:                     mov         edi, 303
+                            call        comm_stno
+                            APPLY_FN_0  S_nInc
                             STORE_RESULT
 
                             mov         [conc_tmp0_rax], rax
@@ -3414,7 +3749,9 @@ Ln_169:                     APPLY_FN_0  S_nInc
                             jmp         Ln_170
 
 ; ======================================================================================================================
-Ln_170:                     APPLY_FN_0  S_nPush
+Ln_170:                     mov         edi, 304
+                            call        comm_stno
+                            APPLY_FN_0  S_nPush
                             STORE_RESULT
 
                             mov         [conc_tmp0_rax], rax
@@ -3456,7 +3793,9 @@ Ln_170:                     APPLY_FN_0  S_nPush
                             jmp         Ln_171
 
 ; ======================================================================================================================
-Ln_171:                     APPLY_FN_0  S_nInc
+Ln_171:                     mov         edi, 305
+                            call        comm_stno
+                            APPLY_FN_0  S_nInc
                             STORE_RESULT
 
                             mov         [conc_tmp0_rax], rax
@@ -3514,7 +3853,9 @@ Ln_171:                     APPLY_FN_0  S_nInc
                             jmp         Ln_172
 
 ; ======================================================================================================================
-Ln_172:                     mov         qword [rbp-32], 1
+Ln_172:                     mov         edi, 306
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
@@ -3571,7 +3912,9 @@ Ln_172:                     mov         qword [rbp-32], 1
                             jmp         Ln_173
 
 ; ======================================================================================================================
-Ln_173:                     mov         qword [rbp-32], 1
+Ln_173:                     mov         edi, 307
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
@@ -3659,7 +4002,9 @@ Ln_173:                     mov         qword [rbp-32], 1
                             jmp         Ln_174
 
 ; ======================================================================================================================
-Ln_174:                     mov         qword [rbp-32], 1
+Ln_174:                     mov         edi, 311
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
@@ -3716,7 +4061,9 @@ Ln_174:                     mov         qword [rbp-32], 1
                             jmp         Ln_175
 
 ; ======================================================================================================================
-Ln_175:                     mov         qword [rbp-32], 1
+Ln_175:                     mov         edi, 312
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
@@ -3773,7 +4120,9 @@ Ln_175:                     mov         qword [rbp-32], 1
                             jmp         Ln_176
 
 ; ======================================================================================================================
-Ln_176:                     mov         qword [rbp-32], 1
+Ln_176:                     mov         edi, 313
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
@@ -3830,7 +4179,9 @@ Ln_176:                     mov         qword [rbp-32], 1
                             jmp         Ln_177
 
 ; ======================================================================================================================
-Ln_177:                     mov         qword [rbp-32], 1
+Ln_177:                     mov         edi, 314
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
@@ -3887,7 +4238,9 @@ Ln_177:                     mov         qword [rbp-32], 1
                             jmp         Ln_178
 
 ; ======================================================================================================================
-Ln_178:                     mov         qword [rbp-32], 1
+Ln_178:                     mov         edi, 315
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
@@ -3962,7 +4315,9 @@ Ln_178:                     mov         qword [rbp-32], 1
                             jmp         Ln_179
 
 ; ======================================================================================================================
-Ln_179:                     mov         qword [rbp-32], 1
+Ln_179:                     mov         edi, 317
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
@@ -4050,7 +4405,9 @@ Ln_179:                     mov         qword [rbp-32], 1
                             jmp         Ln_180
 
 ; ======================================================================================================================
-Ln_180:                     mov         qword [rbp-32], 1
+Ln_180:                     mov         edi, 323
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
@@ -4107,7 +4464,9 @@ Ln_180:                     mov         qword [rbp-32], 1
                             jmp         Ln_181
 
 ; ======================================================================================================================
-Ln_181:                     sub         rsp, 32
+Ln_181:                     mov         edi, 324
+                            call        comm_stno
+                            sub         rsp, 32
                             sub         rsp, 32
                             sub         rsp, 32
                             sub         rsp, 32
@@ -4582,7 +4941,9 @@ Ln_181:                     sub         rsp, 32
                             jmp         Ln_182
 
 ; ======================================================================================================================
-Ln_182:                     mov         qword [rbp-32], 1
+Ln_182:                     mov         edi, 342
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
@@ -4652,7 +5013,9 @@ Ln_182:                     mov         qword [rbp-32], 1
                             jmp         Ln_183
 
 ; ======================================================================================================================
-Ln_183:                     APPLY_FN_0  S_nInc
+Ln_183:                     mov         edi, 344
+                            call        comm_stno
+                            APPLY_FN_0  S_nInc
                             STORE_RESULT
 
                             mov         [conc_tmp0_rax], rax
@@ -4730,7 +5093,9 @@ Ln_183:                     APPLY_FN_0  S_nInc
                             jmp         Ln_184
 
 ; ======================================================================================================================
-Ln_184:                     sub         rsp, 16
+Ln_184:                     mov         edi, 347
+                            call        comm_stno
+                            sub         rsp, 16
                             sub         rsp, 32
                             sub         rsp, 32
                             sub         rsp, 32
@@ -4893,21 +5258,27 @@ Ln_184:                     sub         rsp, 16
                             jmp         Ln_185
 
 ; ======================================================================================================================
-Ln_185:                     mov         qword [rbp-32], 1
+Ln_185:                     mov         edi, 366
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             FAIL_BR     Ln_186
                             SET_VAR     S_SGoto
                             jmp         Ln_186
 
 ; ======================================================================================================================
-Ln_186:                     mov         qword [rbp-32], 1
+Ln_186:                     mov         edi, 367
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             FAIL_BR     Ln_187
                             SET_VAR     S_FGoto
                             jmp         Ln_187
 
 ; ======================================================================================================================
-Ln_187:                     sub         rsp, 32
+Ln_187:                     mov         edi, 368
+                            call        comm_stno
+                            sub         rsp, 32
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             STORE_ARG32 0
@@ -4923,7 +5294,9 @@ Ln_187:                     sub         rsp, 32
                             jmp         Ln_188
 
 ; ======================================================================================================================
-Ln_188:                     sub         rsp, 32
+Ln_188:                     mov         edi, 369
+                            call        comm_stno
+                            sub         rsp, 32
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         [conc_tmp0_rax], rax
@@ -4961,7 +5334,9 @@ Ln_188:                     sub         rsp, 32
                             jmp         Ln_189
 
 ; ======================================================================================================================
-Ln_189:                     mov         qword [rbp-32], 1
+Ln_189:                     mov         edi, 371
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
@@ -5118,7 +5493,9 @@ Ln_189:                     mov         qword [rbp-32], 1
                             jmp         Ln_190
 
 ; ======================================================================================================================
-Ln_190:                     LOAD_STR    S_MI
+Ln_190:                     mov         edi, 378
+                            call        comm_stno
+                            LOAD_STR    S_MI
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             sub         rsp, 16
@@ -5140,7 +5517,9 @@ Ln_190:                     LOAD_STR    S_MI
                             jmp         Ln_191
 
 ; ======================================================================================================================
-Ln_191:                     LOAD_STR    S_ST
+Ln_191:                     mov         edi, 379
+                            call        comm_stno
+                            LOAD_STR    S_ST
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             CALL1_VAR   S_BREAK, S_nl
@@ -5156,14 +5535,18 @@ Ln_191:                     LOAD_STR    S_ST
                             jmp         Ln_192
 
 ; ======================================================================================================================
-Ln_192:                     mov         qword [rbp-32], 1
+Ln_192:                     mov         edi, 380
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             FAIL_BR     Ln_193
                             SET_VAR     S_Label
                             jmp         Ln_193
 
 ; ======================================================================================================================
-Ln_193:                     mov         qword [rbp-32], 1
+Ln_193:                     mov         edi, 381
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
@@ -5513,7 +5896,9 @@ Ln_193:                     mov         qword [rbp-32], 1
                             jmp         Ln_194
 
 ; ======================================================================================================================
-Ln_194:                     mov         qword [rbp-32], 1
+Ln_194:                     mov         edi, 402
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
@@ -5548,7 +5933,9 @@ Ln_194:                     mov         qword [rbp-32], 1
                             jmp         Ln_195
 
 ; ======================================================================================================================
-Ln_195:                     APPLY_FN_0  S_nInc
+Ln_195:                     mov         edi, 403
+                            call        comm_stno
+                            APPLY_FN_0  S_nInc
                             STORE_RESULT
 
                             mov         [conc_tmp0_rax], rax
@@ -5657,7 +6044,9 @@ Ln_195:                     APPLY_FN_0  S_nInc
                             jmp         Ln_196
 
 ; ======================================================================================================================
-Ln_196:                     APPLY_FN_0  S_nPush
+Ln_196:                     mov         edi, 410
+                            call        comm_stno
+                            APPLY_FN_0  S_nPush
                             STORE_RESULT
 
                             mov         [conc_tmp0_rax], rax
@@ -5705,7 +6094,9 @@ Ln_196:                     APPLY_FN_0  S_nPush
                             jmp         Ln_197
 
 ; ======================================================================================================================
-Ln_197:                     APPLY_FN_0  S_nPush
+Ln_197:                     mov         edi, 415
+                            call        comm_stno
+                            APPLY_FN_0  S_nPush
                             STORE_RESULT
 
                             mov         [conc_tmp0_rax], rax
@@ -5846,43 +6237,55 @@ Ln_197:                     APPLY_FN_0  S_nPush
                             SET_VAR     S_Compiland
                             jmp         Ln_198
 
-Ln_198:
-
 ; ======================================================================================================================
+Ln_198:                     mov         edi, 426
+                            call        comm_stno
 
 Ln_199:
 ;  pp ==================================================================================================================
-L_pp_29:                    CALL1_VAR   S_DIFFER, S_x
+L_pp_29:                    mov         edi, 427
+                            call        comm_stno
+                            CALL1_VAR   S_DIFFER, S_x
                             FAIL_BR     Lf_200
                             jmp         Ln_200
 Lf_200:                     jmp         [P_pp_ret_γ]     ; RETURN
 
 ; ======================================================================================================================
-Ln_200:                     CALL1_VAR   S_t, S_x
+Ln_200:                     mov         edi, 428
+                            call        comm_stno
+                            CALL1_VAR   S_t, S_x
                             FAIL_BR     Ln_201
                             SET_VAR     S_t
                             jmp         Ln_201
 
 ; ======================================================================================================================
-Ln_201:                     CALL1_VAR   S_v, S_x
+Ln_201:                     mov         edi, 429
+                            call        comm_stno
+                            CALL1_VAR   S_v, S_x
                             FAIL_BR     Ln_202
                             SET_VAR     S_v
                             jmp         Ln_202
 
 ; ======================================================================================================================
-Ln_202:                     CALL1_VAR   S_n, S_x
+Ln_202:                     mov         edi, 430
+                            call        comm_stno
+                            CALL1_VAR   S_n, S_x
                             FAIL_BR     Ln_203
                             SET_VAR     S_n
                             jmp         Ln_203
 
 ; ======================================================================================================================
-Ln_203:                     CALL1_VAR   S_c, S_x
+Ln_203:                     mov         edi, 431
+                            call        comm_stno
+                            CALL1_VAR   S_c, S_x
                             FAIL_BR     Ln_204
                             SET_VAR     S_c
                             jmp         Ln_204
 
 ; ======================================================================================================================
-Ln_204:                     CONC2_VN    S_GT_279, S_doDebug
+Ln_204:                     mov         edi, 432
+                            call        comm_stno
+                            CONC2_VN    S_GT_279, S_doDebug
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             LOAD_STR    S_pp_LP
@@ -5988,14 +6391,18 @@ Ln_204:                     CONC2_VN    S_GT_279, S_doDebug
                             jmp         Ln_205
 
 ; ======================================================================================================================
-Ln_205:                     CALL1_VAR   S_DIFFER, S_t
+Ln_205:                     mov         edi, 433
+                            call        comm_stno
+                            CALL1_VAR   S_DIFFER, S_t
                             FAIL_BR     Lf_206
                             jmp         L_COMPUTED_pp_t_30
 Lf_206:                     jmp         [P_pp_ret_γ]     ; RETURN
 
 Ln_206:
 ;  pp_Parse ============================================================================================================
-L_pp_Parse_31:              mov         qword [rbp-32], 1
+L_pp_Parse_31:              mov         edi, 435
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             FAIL_BR     Ln_207
                             SET_VAR     S_ppWidth
@@ -6003,12 +6410,16 @@ L_pp_Parse_31:              mov         qword [rbp-32], 1
 
 Ln_207:
 ;  pp_0 ================================================================================================================
-L_pp_0_32:                  ASSIGN_INT  S_i, 0, Ln_208
+L_pp_0_32:                  mov         edi, 436
+                            call        comm_stno
+                            ASSIGN_INT  S_i, 0, Ln_208
                             jmp         Ln_208
 
 Ln_208:
 ;  pp_1 ================================================================================================================
-L_pp_1_33:                  CONC2_VV    S_LT, S_i, S_n
+L_pp_1_33:                  mov         edi, 437
+                            call        comm_stno
+                            CONC2_VV    S_LT, S_i, S_n
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             CONC2_VI    S_add, S_i, 1
@@ -6025,7 +6436,9 @@ L_pp_1_33:                  CONC2_VV    S_LT, S_i, S_n
 Lf_209:                     jmp         [P_pp_ret_γ]     ; RETURN
 
 ; ======================================================================================================================
-Ln_209:                     mov         qword [rbp-32], 1
+Ln_209:                     mov         edi, 438
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rax, [rbp-32]
                             mov         rcx, [rbp-24]
@@ -6049,7 +6462,9 @@ ucall9_done:
 
 Ln_210:
 ;  pp_BuiltinVar =======================================================================================================
-L_pp_BuiltinVar_34:         sub         rsp, 16
+L_pp_BuiltinVar_34:         mov         edi, 440
+                            call        comm_stno
+                            sub         rsp, 16
                             CALL1_VAR   S_ss, S_x
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
@@ -6062,7 +6477,9 @@ Lf_211:                     jmp         L_error_35
 
 Ln_211:
 ;  pp_Function =========================================================================================================
-L_pp_Function_36:           sub         rsp, 16
+L_pp_Function_36:           mov         edi, 441
+                            call        comm_stno
+                            sub         rsp, 16
                             CALL1_VAR   S_ss, S_x
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
@@ -6075,7 +6492,9 @@ Lf_212:                     jmp         L_error_35
 
 Ln_212:
 ;  pp_Id ===============================================================================================================
-L_pp_Id_37:                 sub         rsp, 16
+L_pp_Id_37:                 mov         edi, 442
+                            call        comm_stno
+                            sub         rsp, 16
                             CALL1_VAR   S_ss, S_x
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
@@ -6088,7 +6507,9 @@ Lf_213:                     jmp         L_error_35
 
 Ln_213:
 ;  pp_Integer ==========================================================================================================
-L_pp_Integer_38:            sub         rsp, 16
+L_pp_Integer_38:            mov         edi, 443
+                            call        comm_stno
+                            sub         rsp, 16
                             CALL1_VAR   S_ss, S_x
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
@@ -6101,7 +6522,9 @@ Lf_214:                     jmp         L_error_35
 
 Ln_214:
 ;  pp_Label ============================================================================================================
-L_pp_Label_39:              sub         rsp, 16
+L_pp_Label_39:              mov         edi, 444
+                            call        comm_stno
+                            sub         rsp, 16
                             CALL1_VAR   S_ss, S_x
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
@@ -6114,7 +6537,9 @@ Lf_215:                     jmp         L_error_35
 
 Ln_215:
 ;  pp_ProtKwd ==========================================================================================================
-L_pp_ProtKwd_40:            sub         rsp, 16
+L_pp_ProtKwd_40:            mov         edi, 445
+                            call        comm_stno
+                            sub         rsp, 16
                             CALL1_VAR   S_ss, S_x
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
@@ -6127,7 +6552,9 @@ Lf_216:                     jmp         L_error_35
 
 Ln_216:
 ;  pp_Real =============================================================================================================
-L_pp_Real_41:               sub         rsp, 16
+L_pp_Real_41:               mov         edi, 446
+                            call        comm_stno
+                            sub         rsp, 16
                             CALL1_VAR   S_ss, S_x
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
@@ -6140,7 +6567,9 @@ Lf_217:                     jmp         L_error_35
 
 Ln_217:
 ;  pp_SpecialNm ========================================================================================================
-L_pp_SpecialNm_42:          sub         rsp, 16
+L_pp_SpecialNm_42:          mov         edi, 447
+                            call        comm_stno
+                            sub         rsp, 16
                             CALL1_VAR   S_ss, S_x
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
@@ -6153,7 +6582,9 @@ Lf_218:                     jmp         L_error_35
 
 Ln_218:
 ;  pp_String ===========================================================================================================
-L_pp_String_43:             sub         rsp, 16
+L_pp_String_43:             mov         edi, 448
+                            call        comm_stno
+                            sub         rsp, 16
                             CALL1_VAR   S_ss, S_x
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
@@ -6166,7 +6597,9 @@ Lf_219:                     jmp         L_error_35
 
 Ln_219:
 ;  pp_UnprotKwd ========================================================================================================
-L_pp_UnprotKwd_44:          sub         rsp, 16
+L_pp_UnprotKwd_44:          mov         edi, 449
+                            call        comm_stno
+                            sub         rsp, 16
                             CALL1_VAR   S_ss, S_x
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
@@ -6179,7 +6612,9 @@ Lf_220:                     jmp         L_error_35
 
 Ln_220:
 ;  pp_:() ==============================================================================================================
-L_pp_45:                    sub         rsp, 16
+L_pp_45:                    mov         edi, 451
+                            call        comm_stno
+                            sub         rsp, 16
                             CALL1_VAR   S_ss, S_x
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
@@ -6192,7 +6627,9 @@ Lf_221:                     jmp         L_error_35
 
 Ln_221:
 ;  pp_:<> ==============================================================================================================
-L_pp_46:                    sub         rsp, 16
+L_pp_46:                    mov         edi, 452
+                            call        comm_stno
+                            sub         rsp, 16
                             CALL1_VAR   S_ss, S_x
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
@@ -6205,7 +6642,9 @@ Lf_222:                     jmp         L_error_35
 
 Ln_222:
 ;  pp_:S() =============================================================================================================
-L_pp_S_47:                  sub         rsp, 16
+L_pp_S_47:                  mov         edi, 453
+                            call        comm_stno
+                            sub         rsp, 16
                             CALL1_VAR   S_ss, S_x
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
@@ -6218,7 +6657,9 @@ Lf_223:                     jmp         L_error_35
 
 Ln_223:
 ;  pp_:S<> =============================================================================================================
-L_pp_S_48:                  sub         rsp, 16
+L_pp_S_48:                  mov         edi, 454
+                            call        comm_stno
+                            sub         rsp, 16
                             CALL1_VAR   S_ss, S_x
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
@@ -6231,7 +6672,9 @@ Lf_224:                     jmp         L_error_35
 
 Ln_224:
 ;  pp_:F() =============================================================================================================
-L_pp_F_49:                  sub         rsp, 16
+L_pp_F_49:                  mov         edi, 455
+                            call        comm_stno
+                            sub         rsp, 16
                             CALL1_VAR   S_ss, S_x
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
@@ -6244,7 +6687,9 @@ Lf_225:                     jmp         L_error_35
 
 Ln_225:
 ;  pp_:F<> =============================================================================================================
-L_pp_F_50:                  sub         rsp, 16
+L_pp_F_50:                  mov         edi, 456
+                            call        comm_stno
+                            sub         rsp, 16
                             CALL1_VAR   S_ss, S_x
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
@@ -6257,7 +6702,9 @@ Lf_226:                     jmp         L_error_35
 
 Ln_226:
 ;  ppUnOp ==============================================================================================================
-L_ppUnOp_51:                sub         rsp, 16
+L_ppUnOp_51:                mov         edi, 458
+                            call        comm_stno
+                            sub         rsp, 16
                             sub         rsp, 32
                             lea         rdi, [rel S_x]
                             call        stmt_get
@@ -6292,10 +6739,14 @@ L_ppUnOp_51:                sub         rsp, 16
                             jmp         [P_pp_ret_γ]     ; RETURN
 
 ; ======================================================================================================================
-Ln_227:                     CALL1_VAR   S_Gen, S_t
+Ln_227:                     mov         edi, 459
+                            call        comm_stno
+                            CALL1_VAR   S_Gen, S_t
 
 ; ======================================================================================================================
-Ln_228:                     mov         qword [rbp-32], 1
+Ln_228:                     mov         edi, 460
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rax, [rbp-32]
                             mov         rcx, [rbp-24]
@@ -6319,7 +6770,9 @@ ucall10_done:
 
 Ln_229:
 ;  ppBinOp =============================================================================================================
-L_ppBinOp_52:               sub         rsp, 16
+L_ppBinOp_52:               mov         edi, 461
+                            call        comm_stno
+                            sub         rsp, 16
                             sub         rsp, 32
                             lea         rdi, [rel S_x]
                             call        stmt_get
@@ -6354,7 +6807,9 @@ L_ppBinOp_52:               sub         rsp, 16
                             jmp         [P_pp_ret_γ]     ; RETURN
 
 ; ======================================================================================================================
-Ln_230:                     mov         qword [rbp-32], 1
+Ln_230:                     mov         edi, 462
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rax, [rbp-32]
                             mov         rcx, [rbp-24]
@@ -6376,28 +6831,40 @@ ucall11_ret_o:
 ucall11_done:
 
 ; ======================================================================================================================
-Ln_231:                     CALL1_VAR   S_Gen, S_nl
+Ln_231:                     mov         edi, 463
+                            call        comm_stno
+                            CALL1_VAR   S_Gen, S_nl
 
 ; ======================================================================================================================
-Ln_232:                     APPLY_FN_0  S_DecLevel
+Ln_232:                     mov         edi, 464
+                            call        comm_stno
+                            APPLY_FN_0  S_DecLevel
                             STORE_RESULT
 
 
 ; ======================================================================================================================
-Ln_233:                     CALL1_VAR   S_Gen, S_t
+Ln_233:                     mov         edi, 465
+                            call        comm_stno
+                            CALL1_VAR   S_Gen, S_t
 
 ; ======================================================================================================================
-Ln_234:                     APPLY_FN_0  S_IncLevel
+Ln_234:                     mov         edi, 466
+                            call        comm_stno
+                            APPLY_FN_0  S_IncLevel
                             STORE_RESULT
 
 
 ; ======================================================================================================================
-Ln_235:                     APPLY_FN_0  S_GenTab
+Ln_235:                     mov         edi, 467
+                            call        comm_stno
+                            APPLY_FN_0  S_GenTab
                             STORE_RESULT
 
 
 ; ======================================================================================================================
-Ln_236:                     mov         qword [rbp-32], 1
+Ln_236:                     mov         edi, 468
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rax, [rbp-32]
                             mov         rcx, [rbp-24]
@@ -6421,184 +6888,246 @@ ucall12_done:
 
 Ln_237:
 ;  pp_! ================================================================================================================
-L_pp_53:                    CONC2_VI    S_EQ_311, S_n, 1
+L_pp_53:                    mov         edi, 470
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 1
                             FAIL_BR     Ln_238
                             jmp         L_ppUnOp_51
 
 Ln_238:
 ;  pp_# ================================================================================================================
-L_pp_54:                    CONC2_VI    S_EQ_311, S_n, 1
+L_pp_54:                    mov         edi, 471
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 1
                             FAIL_BR     Ln_239
                             jmp         L_ppUnOp_51
 
 ; ======================================================================================================================
-Ln_239:                     CONC2_VI    S_EQ_311, S_n, 2
+Ln_239:                     mov         edi, 472
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 2
                             FAIL_BR     Lf_240
                             jmp         L_ppBinOp_52
 Lf_240:                     jmp         L_error_35
 
 Ln_240:
 ;  pp_$ ================================================================================================================
-L_pp_55:                    CONC2_VI    S_EQ_311, S_n, 1
+L_pp_55:                    mov         edi, 473
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 1
                             FAIL_BR     Ln_241
                             jmp         L_ppUnOp_51
 
 ; ======================================================================================================================
-Ln_241:                     CONC2_VI    S_EQ_311, S_n, 2
+Ln_241:                     mov         edi, 474
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 2
                             FAIL_BR     Lf_242
                             jmp         L_ppBinOp_52
 Lf_242:                     jmp         L_error_35
 
 Ln_242:
 ;  pp_% ================================================================================================================
-L_pp_56:                    CONC2_VI    S_EQ_311, S_n, 1
+L_pp_56:                    mov         edi, 475
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 1
                             FAIL_BR     Ln_243
                             jmp         L_ppUnOp_51
 
 ; ======================================================================================================================
-Ln_243:                     CONC2_VI    S_EQ_311, S_n, 2
+Ln_243:                     mov         edi, 476
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 2
                             FAIL_BR     Lf_244
                             jmp         L_ppBinOp_52
 Lf_244:                     jmp         L_error_35
 
 Ln_244:
 ;  pp_& ================================================================================================================
-L_pp_57:                    CONC2_VI    S_EQ_311, S_n, 1
+L_pp_57:                    mov         edi, 477
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 1
                             FAIL_BR     Ln_245
                             jmp         L_ppUnOp_51
 
 ; ======================================================================================================================
-Ln_245:                     CONC2_VI    S_EQ_311, S_n, 2
+Ln_245:                     mov         edi, 478
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 2
                             FAIL_BR     Lf_246
                             jmp         L_ppBinOp_52
 Lf_246:                     jmp         L_error_35
 
 Ln_246:
 ;  pp_* ================================================================================================================
-L_pp_58:                    CONC2_VI    S_EQ_311, S_n, 1
+L_pp_58:                    mov         edi, 479
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 1
                             FAIL_BR     Ln_247
                             jmp         L_ppUnOp_51
 
 ; ======================================================================================================================
-Ln_247:                     CONC2_VI    S_EQ_311, S_n, 2
+Ln_247:                     mov         edi, 480
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 2
                             FAIL_BR     Lf_248
                             jmp         L_ppBinOp_52
 Lf_248:                     jmp         L_error_35
 
 Ln_248:
 ;  pp_+ ================================================================================================================
-L_pp_59:                    CONC2_VI    S_EQ_311, S_n, 1
+L_pp_59:                    mov         edi, 481
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 1
                             FAIL_BR     Ln_249
                             jmp         L_ppUnOp_51
 
 ; ======================================================================================================================
-Ln_249:                     CONC2_VI    S_EQ_311, S_n, 2
+Ln_249:                     mov         edi, 482
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 2
                             FAIL_BR     Lf_250
                             jmp         L_ppBinOp_52
 Lf_250:                     jmp         L_error_35
 
 Ln_250:
 ;  pp_- ================================================================================================================
-L_pp_60:                    CONC2_VI    S_EQ_311, S_n, 1
+L_pp_60:                    mov         edi, 483
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 1
                             FAIL_BR     Ln_251
                             jmp         L_ppUnOp_51
 
 ; ======================================================================================================================
-Ln_251:                     CONC2_VI    S_EQ_311, S_n, 2
+Ln_251:                     mov         edi, 484
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 2
                             FAIL_BR     Lf_252
                             jmp         L_ppBinOp_52
 Lf_252:                     jmp         L_error_35
 
 Ln_252:
 ;  pp_. ================================================================================================================
-L_pp_61:                    CONC2_VI    S_EQ_311, S_n, 1
+L_pp_61:                    mov         edi, 485
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 1
                             FAIL_BR     Ln_253
                             jmp         L_ppUnOp_51
 
 ; ======================================================================================================================
-Ln_253:                     CONC2_VI    S_EQ_311, S_n, 2
+Ln_253:                     mov         edi, 486
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 2
                             FAIL_BR     Lf_254
                             jmp         L_ppBinOp_52
 Lf_254:                     jmp         L_error_35
 
 Ln_254:
 ;  pp_/ ================================================================================================================
-L_pp_62:                    CONC2_VI    S_EQ_311, S_n, 1
+L_pp_62:                    mov         edi, 487
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 1
                             FAIL_BR     Ln_255
                             jmp         L_ppUnOp_51
 
 ; ======================================================================================================================
-Ln_255:                     CONC2_VI    S_EQ_311, S_n, 2
+Ln_255:                     mov         edi, 488
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 2
                             FAIL_BR     Lf_256
                             jmp         L_ppBinOp_52
 Lf_256:                     jmp         L_error_35
 
 Ln_256:
 ;  pp_= ================================================================================================================
-L_pp_63:                    CONC2_VI    S_EQ_311, S_n, 1
+L_pp_63:                    mov         edi, 489
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 1
                             FAIL_BR     Ln_257
                             jmp         L_ppUnOp_51
 
 ; ======================================================================================================================
-Ln_257:                     CONC2_VI    S_EQ_311, S_n, 2
+Ln_257:                     mov         edi, 490
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 2
                             FAIL_BR     Lf_258
                             jmp         L_ppBinOp_52
 Lf_258:                     jmp         L_error_35
 
 Ln_258:
 ;  pp_? ================================================================================================================
-L_pp_64:                    CONC2_VI    S_EQ_311, S_n, 1
+L_pp_64:                    mov         edi, 491
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 1
                             FAIL_BR     Ln_259
                             jmp         L_ppUnOp_51
 
 ; ======================================================================================================================
-Ln_259:                     CONC2_VI    S_EQ_311, S_n, 2
+Ln_259:                     mov         edi, 492
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 2
                             FAIL_BR     Lf_260
                             jmp         L_ppBinOp_52
 Lf_260:                     jmp         L_error_35
 
 Ln_260:
 ;  pp_@ ================================================================================================================
-L_pp_65:                    CONC2_VI    S_EQ_311, S_n, 1
+L_pp_65:                    mov         edi, 493
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 1
                             FAIL_BR     Ln_261
                             jmp         L_ppUnOp_51
 
 ; ======================================================================================================================
-Ln_261:                     CONC2_VI    S_EQ_311, S_n, 2
+Ln_261:                     mov         edi, 494
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 2
                             FAIL_BR     Lf_262
                             jmp         L_ppBinOp_52
 Lf_262:                     jmp         L_error_35
 
 Ln_262:
 ;  pp_^ ================================================================================================================
-L_pp_66:                    CONC2_VI    S_EQ_311, S_n, 2
+L_pp_66:                    mov         edi, 495
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 2
                             FAIL_BR     Lf_263
                             jmp         L_ppBinOp_52
 Lf_263:                     jmp         L_error_35
 
 Ln_263:
 ;  pp_~ ================================================================================================================
-L_pp_67:                    CONC2_VI    S_EQ_311, S_n, 1
+L_pp_67:                    mov         edi, 496
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 1
                             FAIL_BR     Ln_264
                             jmp         L_ppUnOp_51
 
 ; ======================================================================================================================
-Ln_264:                     CONC2_VI    S_EQ_311, S_n, 2
+Ln_264:                     mov         edi, 497
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 2
                             FAIL_BR     Lf_265
                             jmp         L_ppBinOp_52
 Lf_265:                     jmp         L_error_35
 
 Ln_265:
 ;  pp_Comment ==========================================================================================================
-L_pp_Comment_68:            CALL1_INT   S_SetLevel, 0
+L_pp_Comment_68:            mov         edi, 499
+                            call        comm_stno
+                            CALL1_INT   S_SetLevel, 0
 
 ; ======================================================================================================================
-Ln_266:                     APPLY_FN_0  S_GenSetCont
+Ln_266:                     mov         edi, 500
+                            call        comm_stno
+                            APPLY_FN_0  S_GenSetCont
                             STORE_RESULT
 
 
 ; ======================================================================================================================
-Ln_267:                     sub         rsp, 16
+Ln_267:                     mov         edi, 501
+                            call        comm_stno
+                            sub         rsp, 16
                             sub         rsp, 16
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
@@ -6629,15 +7158,21 @@ Ln_267:                     sub         rsp, 16
 
 Ln_268:
 ;  pp_Control ==========================================================================================================
-L_pp_Control_69:            CALL1_INT   S_SetLevel, 0
+L_pp_Control_69:            mov         edi, 503
+                            call        comm_stno
+                            CALL1_INT   S_SetLevel, 0
 
 ; ======================================================================================================================
-Ln_269:                     APPLY_FN_0  S_GenSetCont
+Ln_269:                     mov         edi, 504
+                            call        comm_stno
+                            APPLY_FN_0  S_GenSetCont
                             STORE_RESULT
 
 
 ; ======================================================================================================================
-Ln_270:                     sub         rsp, 16
+Ln_270:                     mov         edi, 505
+                            call        comm_stno
+                            sub         rsp, 16
                             sub         rsp, 16
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
@@ -6668,20 +7203,28 @@ Ln_270:                     sub         rsp, 16
 
 Ln_271:
 ;  pp_Stmt =============================================================================================================
-L_pp_Stmt_70:               CALL1_INT   S_SetLevel, 0
+L_pp_Stmt_70:               mov         edi, 507
+                            call        comm_stno
+                            CALL1_INT   S_SetLevel, 0
 
 ; ======================================================================================================================
-Ln_272:                     CALL1_STR   S_GenSetCont, S_PL
+Ln_272:                     mov         edi, 508
+                            call        comm_stno
+                            CALL1_STR   S_GenSetCont, S_PL
 
 ; ======================================================================================================================
-Ln_273:                     mov         qword [rbp-32], 1
+Ln_273:                     mov         edi, 509
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             FAIL_BR     Ln_274
                             SET_VAR     S_ppWidth
                             jmp         Ln_274
 
 ; ======================================================================================================================
-Ln_274:                     sub         rsp, 16
+Ln_274:                     mov         edi, 510
+                            call        comm_stno
+                            sub         rsp, 16
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             STORE_ARG32 0
@@ -6694,21 +7237,27 @@ Ln_274:                     sub         rsp, 16
                             jmp         Ln_275
 
 ; ======================================================================================================================
-Ln_275:                     mov         qword [rbp-32], 1
+Ln_275:                     mov         edi, 511
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             FAIL_BR     Ln_276
                             SET_VAR     S_ppSubj
                             jmp         Ln_276
 
 ; ======================================================================================================================
-Ln_276:                     mov         qword [rbp-32], 1
+Ln_276:                     mov         edi, 512
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             FAIL_BR     Ln_277
                             SET_VAR     S_ppPatrn
                             jmp         Ln_277
 
 ; ======================================================================================================================
-Ln_277:                     sub         rsp, 16
+Ln_277:                     mov         edi, 513
+                            call        comm_stno
+                            sub         rsp, 16
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             STORE_ARG32 0
@@ -6721,31 +7270,41 @@ Ln_277:                     sub         rsp, 16
                             jmp         Ln_278
 
 ; ======================================================================================================================
-Ln_278:                     mov         qword [rbp-32], 1
+Ln_278:                     mov         edi, 514
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             FAIL_BR     Ln_279
                             SET_VAR     S_ppRepl
                             jmp         Ln_279
 
 ; ======================================================================================================================
-Ln_279:                     mov         qword [rbp-32], 1
+Ln_279:                     mov         edi, 515
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             FAIL_BR     Ln_280
                             SET_VAR     S_ppGo1
                             jmp         Ln_280
 
 ; ======================================================================================================================
-Ln_280:                     mov         qword [rbp-32], 1
+Ln_280:                     mov         edi, 516
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             FAIL_BR     Ln_281
                             SET_VAR     S_ppGo2
                             jmp         Ln_281
 
 ; ======================================================================================================================
-Ln_281:                     CALL1_VAR   S_Gen, S_ppLbl
+Ln_281:                     mov         edi, 517
+                            call        comm_stno
+                            CALL1_VAR   S_Gen, S_ppLbl
 
 ; ======================================================================================================================
-Ln_282:                     sub         rsp, 16
+Ln_282:                     mov         edi, 518
+                            call        comm_stno
+                            sub         rsp, 16
                             CALL1_VAR   S_t, S_ppSubj
                             STORE_ARG32 0
                             APPLY_FN_N  S_DIFFER, 1
@@ -6757,10 +7316,14 @@ Ln_282:                     sub         rsp, 16
 Lf_283:                     jmp         L_pp_Stmt7_71
 
 ; ======================================================================================================================
-Ln_283:                     CALL1_STR   S_Gen, S_SP
+Ln_283:                     mov         edi, 519
+                            call        comm_stno
+                            CALL1_STR   S_Gen, S_SP
 
 ; ======================================================================================================================
-Ln_284:                     sub         rsp, 16
+Ln_284:                     mov         edi, 520
+                            call        comm_stno
+                            sub         rsp, 16
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             STORE_ARG32 0
@@ -6770,7 +7333,9 @@ Ln_284:                     sub         rsp, 16
 
 
 ; ======================================================================================================================
-Ln_285:                     sub         rsp, 16
+Ln_285:                     mov         edi, 521
+                            call        comm_stno
+                            sub         rsp, 16
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             STORE_ARG32 0
@@ -6780,7 +7345,9 @@ Ln_285:                     sub         rsp, 16
 
 
 ; ======================================================================================================================
-Ln_286:                     sub         rsp, 16
+Ln_286:                     mov         edi, 522
+                            call        comm_stno
+                            sub         rsp, 16
                             CALL1_VAR   S_t, S_ppPatrn
                             STORE_ARG32 0
                             APPLY_FN_N  S_IDENT, 1
@@ -6840,7 +7407,9 @@ Ln_286:                     sub         rsp, 16
                             jmp         Ln_287
 
 ; ======================================================================================================================
-Ln_287:                     lea         rdi, [rel S_ppSubj]
+Ln_287:                     mov         edi, 523
+                            call        comm_stno
+                            lea         rdi, [rel S_ppSubj]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -6864,7 +7433,9 @@ ucall13_ret_o:
 ucall13_done:
 
 ; ======================================================================================================================
-Ln_288:                     sub         rsp, 16
+Ln_288:                     mov         edi, 524
+                            call        comm_stno
+                            sub         rsp, 16
                             CALL1_VAR   S_t, S_ppPatrn
                             STORE_ARG32 0
                             APPLY_FN_N  S_DIFFER, 1
@@ -6876,10 +7447,14 @@ Ln_288:                     sub         rsp, 16
 Lf_289:                     jmp         L_pp_Stmt5_72
 
 ; ======================================================================================================================
-Ln_289:                     CALL1_STR   S_Gen, S_SP
+Ln_289:                     mov         edi, 525
+                            call        comm_stno
+                            CALL1_STR   S_Gen, S_SP
 
 ; ======================================================================================================================
-Ln_290:                     sub         rsp, 16
+Ln_290:                     mov         edi, 526
+                            call        comm_stno
+                            sub         rsp, 16
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             STORE_ARG32 0
@@ -6889,7 +7464,9 @@ Ln_290:                     sub         rsp, 16
 
 
 ; ======================================================================================================================
-Ln_291:                     sub         rsp, 16
+Ln_291:                     mov         edi, 527
+                            call        comm_stno
+                            sub         rsp, 16
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             STORE_ARG32 0
@@ -6899,7 +7476,9 @@ Ln_291:                     sub         rsp, 16
 
 
 ; ======================================================================================================================
-Ln_292:                     CALL1_VAR   S_IDENT, S_ppAsgn
+Ln_292:                     mov         edi, 528
+                            call        comm_stno
+                            CALL1_VAR   S_IDENT, S_ppAsgn
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             sub         rsp, 16
@@ -6943,7 +7522,9 @@ Ln_292:                     CALL1_VAR   S_IDENT, S_ppAsgn
                             jmp         Ln_293
 
 ; ======================================================================================================================
-Ln_293:                     lea         rdi, [rel S_ppPatrn]
+Ln_293:                     mov         edi, 529
+                            call        comm_stno
+                            lea         rdi, [rel S_ppPatrn]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -6967,16 +7548,22 @@ ucall14_ret_o:
 ucall14_done:
 
 ; ======================================================================================================================
-Ln_294:                     CALL1_VAR   S_DIFFER, S_ppAsgn
+Ln_294:                     mov         edi, 530
+                            call        comm_stno
+                            CALL1_VAR   S_DIFFER, S_ppAsgn
                             FAIL_BR     Lf_295
                             jmp         Ln_295
 Lf_295:                     jmp         L_pp_Stmt7_71
 
 ; ======================================================================================================================
-Ln_295:                     CALL1_STR   S_Gen, S_SP_EQ
+Ln_295:                     mov         edi, 531
+                            call        comm_stno
+                            CALL1_STR   S_Gen, S_SP_EQ
 
 ; ======================================================================================================================
-Ln_296:                     sub         rsp, 16
+Ln_296:                     mov         edi, 532
+                            call        comm_stno
+                            sub         rsp, 16
                             CALL1_VAR   S_t, S_ppRepl
                             STORE_ARG32 0
                             APPLY_FN_N  S_DIFFER, 1
@@ -6988,10 +7575,14 @@ Ln_296:                     sub         rsp, 16
 Lf_297:                     jmp         L_pp_Stmt7_71
 
 ; ======================================================================================================================
-Ln_297:                     CALL1_STR   S_Gen, S_SP
+Ln_297:                     mov         edi, 533
+                            call        comm_stno
+                            CALL1_STR   S_Gen, S_SP
 
 ; ======================================================================================================================
-Ln_298:                     lea         rdi, [rel S_ppRepl]
+Ln_298:                     mov         edi, 534
+                            call        comm_stno
+                            lea         rdi, [rel S_ppRepl]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -7017,16 +7608,22 @@ ucall15_done:
 
 Ln_299:
 ;  pp_Stmt5 ============================================================================================================
-L_pp_Stmt5_72:              CALL1_VAR   S_DIFFER, S_ppAsgn
+L_pp_Stmt5_72:              mov         edi, 535
+                            call        comm_stno
+                            CALL1_VAR   S_DIFFER, S_ppAsgn
                             FAIL_BR     Lf_300
                             jmp         Ln_300
 Lf_300:                     jmp         L_pp_Stmt7_71
 
 ; ======================================================================================================================
-Ln_300:                     CALL1_STR   S_Gen, S_SP
+Ln_300:                     mov         edi, 536
+                            call        comm_stno
+                            CALL1_STR   S_Gen, S_SP
 
 ; ======================================================================================================================
-Ln_301:                     sub         rsp, 16
+Ln_301:                     mov         edi, 537
+                            call        comm_stno
+                            sub         rsp, 16
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             STORE_ARG32 0
@@ -7036,7 +7633,9 @@ Ln_301:                     sub         rsp, 16
 
 
 ; ======================================================================================================================
-Ln_302:                     sub         rsp, 16
+Ln_302:                     mov         edi, 538
+                            call        comm_stno
+                            sub         rsp, 16
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             STORE_ARG32 0
@@ -7046,10 +7645,14 @@ Ln_302:                     sub         rsp, 16
 
 
 ; ======================================================================================================================
-Ln_303:                     CALL1_STR   S_Gen, S_EQ
+Ln_303:                     mov         edi, 539
+                            call        comm_stno
+                            CALL1_STR   S_Gen, S_EQ
 
 ; ======================================================================================================================
-Ln_304:                     sub         rsp, 16
+Ln_304:                     mov         edi, 540
+                            call        comm_stno
+                            sub         rsp, 16
                             CALL1_VAR   S_t, S_ppRepl
                             STORE_ARG32 0
                             APPLY_FN_N  S_DIFFER, 1
@@ -7061,10 +7664,14 @@ Ln_304:                     sub         rsp, 16
 Lf_305:                     jmp         L_pp_Stmt7_71
 
 ; ======================================================================================================================
-Ln_305:                     CALL1_STR   S_Gen, S_SP
+Ln_305:                     mov         edi, 541
+                            call        comm_stno
+                            CALL1_STR   S_Gen, S_SP
 
 ; ======================================================================================================================
-Ln_306:                     sub         rsp, 16
+Ln_306:                     mov         edi, 542
+                            call        comm_stno
+                            sub         rsp, 16
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             STORE_ARG32 0
@@ -7074,7 +7681,9 @@ Ln_306:                     sub         rsp, 16
 
 
 ; ======================================================================================================================
-Ln_307:                     sub         rsp, 16
+Ln_307:                     mov         edi, 543
+                            call        comm_stno
+                            sub         rsp, 16
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             STORE_ARG32 0
@@ -7084,7 +7693,9 @@ Ln_307:                     sub         rsp, 16
 
 
 ; ======================================================================================================================
-Ln_308:                     sub         rsp, 16
+Ln_308:                     mov         edi, 544
+                            call        comm_stno
+                            sub         rsp, 16
                             CALL1_VAR   S_t, S_ppGo1
                             STORE_ARG32 0
                             APPLY_FN_N  S_IDENT, 1
@@ -7118,7 +7729,9 @@ Ln_308:                     sub         rsp, 16
                             jmp         Ln_309
 
 ; ======================================================================================================================
-Ln_309:                     lea         rdi, [rel S_ppRepl]
+Ln_309:                     mov         edi, 545
+                            call        comm_stno
+                            lea         rdi, [rel S_ppRepl]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -7144,7 +7757,9 @@ ucall16_done:
 
 Ln_310:
 ;  pp_Stmt7 ============================================================================================================
-L_pp_Stmt7_71:              sub         rsp, 16
+L_pp_Stmt7_71:              mov         edi, 546
+                            call        comm_stno
+                            sub         rsp, 16
                             CALL1_VAR   S_t, S_ppGo1
                             STORE_ARG32 0
                             APPLY_FN_N  S_DIFFER, 1
@@ -7156,14 +7771,20 @@ L_pp_Stmt7_71:              sub         rsp, 16
 Lf_311:                     jmp         L_pp_Stmt9_73
 
 ; ======================================================================================================================
-Ln_311:                     ASSIGN_INT  S_ppWidth, 256, Ln_312
+Ln_311:                     mov         edi, 547
+                            call        comm_stno
+                            ASSIGN_INT  S_ppWidth, 256, Ln_312
                             jmp         Ln_312
 
 ; ======================================================================================================================
-Ln_312:                     CALL1_STR   S_Gen, S_SP
+Ln_312:                     mov         edi, 548
+                            call        comm_stno
+                            CALL1_STR   S_Gen, S_SP
 
 ; ======================================================================================================================
-Ln_313:                     sub         rsp, 16
+Ln_313:                     mov         edi, 549
+                            call        comm_stno
+                            sub         rsp, 16
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             STORE_ARG32 0
@@ -7173,7 +7794,9 @@ Ln_313:                     sub         rsp, 16
 
 
 ; ======================================================================================================================
-Ln_314:                     sub         rsp, 16
+Ln_314:                     mov         edi, 550
+                            call        comm_stno
+                            sub         rsp, 16
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             STORE_ARG32 0
@@ -7183,10 +7806,14 @@ Ln_314:                     sub         rsp, 16
 
 
 ; ======================================================================================================================
-Ln_315:                     CALL1_STR   S_Gen, S_CL
+Ln_315:                     mov         edi, 551
+                            call        comm_stno
+                            CALL1_STR   S_Gen, S_CL
 
 ; ======================================================================================================================
-Ln_316:                     lea         rdi, [rel S_ppGo1]
+Ln_316:                     mov         edi, 552
+                            call        comm_stno
+                            lea         rdi, [rel S_ppGo1]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -7210,7 +7837,9 @@ ucall17_ret_o:
 ucall17_done:
 
 ; ======================================================================================================================
-Ln_317:                     sub         rsp, 16
+Ln_317:                     mov         edi, 553
+                            call        comm_stno
+                            sub         rsp, 16
                             CALL1_VAR   S_t, S_ppGo2
                             STORE_ARG32 0
                             APPLY_FN_N  S_DIFFER, 1
@@ -7222,7 +7851,9 @@ Ln_317:                     sub         rsp, 16
 Lf_318:                     jmp         L_pp_Stmt9_73
 
 ; ======================================================================================================================
-Ln_318:                     lea         rdi, [rel S_ppGo2]
+Ln_318:                     mov         edi, 554
+                            call        comm_stno
+                            lea         rdi, [rel S_ppGo2]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -7248,12 +7879,16 @@ ucall18_done:
 
 Ln_319:
 ;  pp_Stmt9 ============================================================================================================
-L_pp_Stmt9_73:              CALL1_VAR   S_Gen, S_nl
+L_pp_Stmt9_73:              mov         edi, 555
+                            call        comm_stno
+                            CALL1_VAR   S_Gen, S_nl
                             jmp         [P_pp_ret_γ]     ; RETURN
 
 Ln_320:
 ;  pp_ExprList =========================================================================================================
-L_pp_ExprList_74:           sub         rsp, 16
+L_pp_ExprList_74:           mov         edi, 557
+                            call        comm_stno
+                            sub         rsp, 16
                             sub         rsp, 32
                             lea         rdi, [rel S_x]
                             call        stmt_get
@@ -7288,7 +7923,9 @@ L_pp_ExprList_74:           sub         rsp, 16
                             jmp         [P_pp_ret_γ]     ; RETURN
 
 ; ======================================================================================================================
-Ln_321:                     mov         qword [rbp-32], 1
+Ln_321:                     mov         edi, 558
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rax, [rbp-32]
                             mov         rcx, [rbp-24]
@@ -7310,12 +7947,16 @@ ucall19_ret_o:
 ucall19_done:
 
 ; ======================================================================================================================
-Ln_322:                     ASSIGN_INT  S_i, 1, Ln_323
+Ln_322:                     mov         edi, 559
+                            call        comm_stno
+                            ASSIGN_INT  S_i, 1, Ln_323
                             jmp         Ln_323
 
 Ln_323:
 ;  pp_ExprList0 ========================================================================================================
-L_pp_ExprList0_75:          CONC2_VV    S_LT, S_i, S_n
+L_pp_ExprList0_75:          mov         edi, 560
+                            call        comm_stno
+                            CONC2_VV    S_LT, S_i, S_n
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             CONC2_VI    S_add, S_i, 1
@@ -7332,28 +7973,40 @@ L_pp_ExprList0_75:          CONC2_VV    S_LT, S_i, S_n
 Lf_324:                     jmp         [P_pp_ret_γ]     ; RETURN
 
 ; ======================================================================================================================
-Ln_324:                     CALL1_VAR   S_Gen, S_nl
+Ln_324:                     mov         edi, 561
+                            call        comm_stno
+                            CALL1_VAR   S_Gen, S_nl
 
 ; ======================================================================================================================
-Ln_325:                     APPLY_FN_0  S_DecLevel
+Ln_325:                     mov         edi, 562
+                            call        comm_stno
+                            APPLY_FN_0  S_DecLevel
                             STORE_RESULT
 
 
 ; ======================================================================================================================
-Ln_326:                     CALL1_STR   S_Gen, S_CM
+Ln_326:                     mov         edi, 563
+                            call        comm_stno
+                            CALL1_STR   S_Gen, S_CM
 
 ; ======================================================================================================================
-Ln_327:                     APPLY_FN_0  S_IncLevel
+Ln_327:                     mov         edi, 564
+                            call        comm_stno
+                            APPLY_FN_0  S_IncLevel
                             STORE_RESULT
 
 
 ; ======================================================================================================================
-Ln_328:                     APPLY_FN_0  S_GenTab
+Ln_328:                     mov         edi, 565
+                            call        comm_stno
+                            APPLY_FN_0  S_GenTab
                             STORE_RESULT
 
 
 ; ======================================================================================================================
-Ln_329:                     mov         qword [rbp-32], 1
+Ln_329:                     mov         edi, 566
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rax, [rbp-32]
                             mov         rcx, [rbp-24]
@@ -7377,7 +8030,9 @@ ucall20_done:
 
 Ln_330:
 ;  pp_, ================================================================================================================
-L_pp_76:                    sub         rsp, 16
+L_pp_76:                    mov         edi, 568
+                            call        comm_stno
+                            sub         rsp, 16
                             sub         rsp, 32
                             lea         rdi, [rel S_x]
                             call        stmt_get
@@ -7412,20 +8067,28 @@ L_pp_76:                    sub         rsp, 16
                             jmp         [P_pp_ret_γ]     ; RETURN
 
 ; ======================================================================================================================
-Ln_331:                     CALL1_STR   S_Gen, S_LP
+Ln_331:                     mov         edi, 569
+                            call        comm_stno
+                            CALL1_STR   S_Gen, S_LP
 
 ; ======================================================================================================================
-Ln_332:                     APPLY_FN_0  S_IncLevel
+Ln_332:                     mov         edi, 570
+                            call        comm_stno
+                            APPLY_FN_0  S_IncLevel
                             STORE_RESULT
 
 
 ; ======================================================================================================================
-Ln_333:                     APPLY_FN_0  S_GenTab
+Ln_333:                     mov         edi, 571
+                            call        comm_stno
+                            APPLY_FN_0  S_GenTab
                             STORE_RESULT
 
 
 ; ======================================================================================================================
-Ln_334:                     mov         qword [rbp-32], 1
+Ln_334:                     mov         edi, 572
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rax, [rbp-32]
                             mov         rcx, [rbp-24]
@@ -7447,12 +8110,16 @@ ucall21_ret_o:
 ucall21_done:
 
 ; ======================================================================================================================
-Ln_335:                     ASSIGN_INT  S_i, 1, Ln_336
+Ln_335:                     mov         edi, 573
+                            call        comm_stno
+                            ASSIGN_INT  S_i, 1, Ln_336
                             jmp         Ln_336
 
 Ln_336:
 ;  pp_,0 ===============================================================================================================
-L_pp_0_77:                  CONC2_VV    S_LT, S_i, S_n
+L_pp_0_77:                  mov         edi, 574
+                            call        comm_stno
+                            CONC2_VV    S_LT, S_i, S_n
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             CONC2_VI    S_add, S_i, 1
@@ -7469,28 +8136,40 @@ L_pp_0_77:                  CONC2_VV    S_LT, S_i, S_n
 Lf_337:                     jmp         L_COMPUTED_pp_1_78
 
 ; ======================================================================================================================
-Ln_337:                     CALL1_VAR   S_Gen, S_nl
+Ln_337:                     mov         edi, 575
+                            call        comm_stno
+                            CALL1_VAR   S_Gen, S_nl
 
 ; ======================================================================================================================
-Ln_338:                     APPLY_FN_0  S_DecLevel
+Ln_338:                     mov         edi, 576
+                            call        comm_stno
+                            APPLY_FN_0  S_DecLevel
                             STORE_RESULT
 
 
 ; ======================================================================================================================
-Ln_339:                     CALL1_STR   S_Gen, S_CM
+Ln_339:                     mov         edi, 577
+                            call        comm_stno
+                            CALL1_STR   S_Gen, S_CM
 
 ; ======================================================================================================================
-Ln_340:                     APPLY_FN_0  S_IncLevel
+Ln_340:                     mov         edi, 578
+                            call        comm_stno
+                            APPLY_FN_0  S_IncLevel
                             STORE_RESULT
 
 
 ; ======================================================================================================================
-Ln_341:                     APPLY_FN_0  S_GenTab
+Ln_341:                     mov         edi, 579
+                            call        comm_stno
+                            APPLY_FN_0  S_GenTab
                             STORE_RESULT
 
 
 ; ======================================================================================================================
-Ln_342:                     mov         qword [rbp-32], 1
+Ln_342:                     mov         edi, 580
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rax, [rbp-32]
                             mov         rcx, [rbp-24]
@@ -7514,25 +8193,35 @@ ucall22_done:
 
 Ln_343:
 ;  pp_,1 ===============================================================================================================
-L_pp_1_80:                  CALL1_VAR   S_Gen, S_nl
+L_pp_1_80:                  mov         edi, 581
+                            call        comm_stno
+                            CALL1_VAR   S_Gen, S_nl
 
 ; ======================================================================================================================
-Ln_344:                     APPLY_FN_0  S_DecLevel
+Ln_344:                     mov         edi, 582
+                            call        comm_stno
+                            APPLY_FN_0  S_DecLevel
                             STORE_RESULT
 
 
 ; ======================================================================================================================
-Ln_345:                     CALL1_STR   S_Gen, S_RP
+Ln_345:                     mov         edi, 583
+                            call        comm_stno
+                            CALL1_STR   S_Gen, S_RP
                             jmp         [P_pp_ret_γ]     ; RETURN
 
 Ln_346:
 ;  pp_| ================================================================================================================
-L_pp_81:                    CONC2_VI    S_EQ_311, S_n, 1
+L_pp_81:                    mov         edi, 585
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 1
                             FAIL_BR     Ln_347
                             jmp         L_ppUnOp_51
 
 ; ======================================================================================================================
-Ln_347:                     sub         rsp, 16
+Ln_347:                     mov         edi, 586
+                            call        comm_stno
+                            sub         rsp, 16
                             sub         rsp, 32
                             lea         rdi, [rel S_x]
                             call        stmt_get
@@ -7567,7 +8256,9 @@ Ln_347:                     sub         rsp, 16
                             jmp         [P_pp_ret_γ]     ; RETURN
 
 ; ======================================================================================================================
-Ln_348:                     mov         qword [rbp-32], 1
+Ln_348:                     mov         edi, 587
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rax, [rbp-32]
                             mov         rcx, [rbp-24]
@@ -7589,12 +8280,16 @@ ucall23_ret_o:
 ucall23_done:
 
 ; ======================================================================================================================
-Ln_349:                     ASSIGN_INT  S_i, 1, Ln_350
+Ln_349:                     mov         edi, 588
+                            call        comm_stno
+                            ASSIGN_INT  S_i, 1, Ln_350
                             jmp         Ln_350
 
 Ln_350:
 ;  pp_|0 ===============================================================================================================
-L_pp_0_82:                  CONC2_VV    S_LT, S_i, S_n
+L_pp_0_82:                  mov         edi, 589
+                            call        comm_stno
+                            CONC2_VV    S_LT, S_i, S_n
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             CONC2_VI    S_add, S_i, 1
@@ -7611,28 +8306,40 @@ L_pp_0_82:                  CONC2_VV    S_LT, S_i, S_n
 Lf_351:                     jmp         [P_pp_ret_γ]     ; RETURN
 
 ; ======================================================================================================================
-Ln_351:                     CALL1_VAR   S_Gen, S_nl
+Ln_351:                     mov         edi, 590
+                            call        comm_stno
+                            CALL1_VAR   S_Gen, S_nl
 
 ; ======================================================================================================================
-Ln_352:                     APPLY_FN_0  S_DecLevel
+Ln_352:                     mov         edi, 591
+                            call        comm_stno
+                            APPLY_FN_0  S_DecLevel
                             STORE_RESULT
 
 
 ; ======================================================================================================================
-Ln_353:                     CALL1_STR   S_Gen, S_OR
+Ln_353:                     mov         edi, 592
+                            call        comm_stno
+                            CALL1_STR   S_Gen, S_OR
 
 ; ======================================================================================================================
-Ln_354:                     APPLY_FN_0  S_IncLevel
+Ln_354:                     mov         edi, 593
+                            call        comm_stno
+                            APPLY_FN_0  S_IncLevel
                             STORE_RESULT
 
 
 ; ======================================================================================================================
-Ln_355:                     APPLY_FN_0  S_GenTab
+Ln_355:                     mov         edi, 594
+                            call        comm_stno
+                            APPLY_FN_0  S_GenTab
                             STORE_RESULT
 
 
 ; ======================================================================================================================
-Ln_356:                     mov         qword [rbp-32], 1
+Ln_356:                     mov         edi, 595
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rax, [rbp-32]
                             mov         rcx, [rbp-24]
@@ -7656,7 +8363,9 @@ ucall24_done:
 
 Ln_357:
 ;  pp_.. ===============================================================================================================
-L_pp_84:                    sub         rsp, 16
+L_pp_84:                    mov         edi, 597
+                            call        comm_stno
+                            sub         rsp, 16
                             sub         rsp, 32
                             lea         rdi, [rel S_x]
                             call        stmt_get
@@ -7691,12 +8400,16 @@ L_pp_84:                    sub         rsp, 16
                             jmp         [P_pp_ret_γ]     ; RETURN
 
 ; ======================================================================================================================
-Ln_358:                     ASSIGN_INT  S_i, 0, Ln_359
+Ln_358:                     mov         edi, 598
+                            call        comm_stno
+                            ASSIGN_INT  S_i, 0, Ln_359
                             jmp         Ln_359
 
 Ln_359:
 ;  pp_..0 ==============================================================================================================
-L_pp_0_85:                  CONC2_VV    S_LT, S_i, S_n
+L_pp_0_85:                  mov         edi, 599
+                            call        comm_stno
+                            CONC2_VV    S_LT, S_i, S_n
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             CONC2_VI    S_add, S_i, 1
@@ -7713,7 +8426,9 @@ L_pp_0_85:                  CONC2_VV    S_LT, S_i, S_n
 Lf_360:                     jmp         [P_pp_ret_γ]     ; RETURN
 
 ; ======================================================================================================================
-Ln_360:                     mov         qword [rbp-32], 1
+Ln_360:                     mov         edi, 600
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rax, [rbp-32]
                             mov         rcx, [rbp-24]
@@ -7735,7 +8450,9 @@ ucall25_ret_o:
 ucall25_done:
 
 ; ======================================================================================================================
-Ln_361:                     CONC2_VV    S_LT, S_i, S_n
+Ln_361:                     mov         edi, 601
+                            call        comm_stno
+                            CONC2_VV    S_LT, S_i, S_n
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             CALL1_VAR   S_Gen, S_nl
@@ -7750,7 +8467,9 @@ Ln_361:                     CONC2_VV    S_LT, S_i, S_n
 
 Ln_362:
 ;  pp_[] ===============================================================================================================
-L_pp_87:                    sub         rsp, 16
+L_pp_87:                    mov         edi, 603
+                            call        comm_stno
+                            sub         rsp, 16
                             sub         rsp, 32
                             lea         rdi, [rel S_x]
                             call        stmt_get
@@ -7785,7 +8504,9 @@ L_pp_87:                    sub         rsp, 16
                             jmp         [P_pp_ret_γ]     ; RETURN
 
 ; ======================================================================================================================
-Ln_363:                     mov         qword [rbp-32], 1
+Ln_363:                     mov         edi, 604
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rax, [rbp-32]
                             mov         rcx, [rbp-24]
@@ -7807,12 +8528,16 @@ ucall26_ret_o:
 ucall26_done:
 
 ; ======================================================================================================================
-Ln_364:                     ASSIGN_INT  S_i, 1, Ln_365
+Ln_364:                     mov         edi, 605
+                            call        comm_stno
+                            ASSIGN_INT  S_i, 1, Ln_365
                             jmp         Ln_365
 
 Ln_365:
 ;  pp_[]0 ==============================================================================================================
-L_pp_0_88:                  CONC2_VV    S_LT, S_i, S_n
+L_pp_0_88:                  mov         edi, 606
+                            call        comm_stno
+                            CONC2_VV    S_LT, S_i, S_n
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             CONC2_VI    S_add, S_i, 1
@@ -7829,20 +8554,28 @@ L_pp_0_88:                  CONC2_VV    S_LT, S_i, S_n
 Lf_366:                     jmp         [P_pp_ret_γ]     ; RETURN
 
 ; ======================================================================================================================
-Ln_366:                     CALL1_STR   S_Gen, S_LB
+Ln_366:                     mov         edi, 607
+                            call        comm_stno
+                            CALL1_STR   S_Gen, S_LB
 
 ; ======================================================================================================================
-Ln_367:                     APPLY_FN_0  S_IncLevel
+Ln_367:                     mov         edi, 608
+                            call        comm_stno
+                            APPLY_FN_0  S_IncLevel
                             STORE_RESULT
 
 
 ; ======================================================================================================================
-Ln_368:                     APPLY_FN_0  S_GenTab
+Ln_368:                     mov         edi, 609
+                            call        comm_stno
+                            APPLY_FN_0  S_GenTab
                             STORE_RESULT
 
 
 ; ======================================================================================================================
-Ln_369:                     mov         qword [rbp-32], 1
+Ln_369:                     mov         edi, 610
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rax, [rbp-32]
                             mov         rcx, [rbp-24]
@@ -7864,18 +8597,26 @@ ucall27_ret_o:
 ucall27_done:
 
 ; ======================================================================================================================
-Ln_370:                     CALL1_VAR   S_Gen, S_nl
+Ln_370:                     mov         edi, 611
+                            call        comm_stno
+                            CALL1_VAR   S_Gen, S_nl
 
 ; ======================================================================================================================
-Ln_371:                     APPLY_FN_0  S_DecLevel
+Ln_371:                     mov         edi, 612
+                            call        comm_stno
+                            APPLY_FN_0  S_DecLevel
                             STORE_RESULT
 
 
 ; ======================================================================================================================
-Ln_372:                     CALL1_STR   S_Gen, S_RB
+Ln_372:                     mov         edi, 613
+                            call        comm_stno
+                            CALL1_STR   S_Gen, S_RB
 
 ; ======================================================================================================================
-Ln_373:                     CONC2_VV    S_LT, S_i, S_n
+Ln_373:                     mov         edi, 614
+                            call        comm_stno
+                            CONC2_VV    S_LT, S_i, S_n
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             CALL1_VAR   S_Gen, S_nl
@@ -7890,7 +8631,9 @@ Ln_373:                     CONC2_VV    S_LT, S_i, S_n
 
 Ln_374:
 ;  pp_() ===============================================================================================================
-L_pp_90:                    sub         rsp, 16
+L_pp_90:                    mov         edi, 616
+                            call        comm_stno
+                            sub         rsp, 16
                             sub         rsp, 32
                             lea         rdi, [rel S_x]
                             call        stmt_get
@@ -7925,20 +8668,28 @@ L_pp_90:                    sub         rsp, 16
                             jmp         [P_pp_ret_γ]     ; RETURN
 
 ; ======================================================================================================================
-Ln_375:                     CALL1_STR   S_Gen, S_LP
+Ln_375:                     mov         edi, 617
+                            call        comm_stno
+                            CALL1_STR   S_Gen, S_LP
 
 ; ======================================================================================================================
-Ln_376:                     APPLY_FN_0  S_IncLevel
+Ln_376:                     mov         edi, 618
+                            call        comm_stno
+                            APPLY_FN_0  S_IncLevel
                             STORE_RESULT
 
 
 ; ======================================================================================================================
-Ln_377:                     APPLY_FN_0  S_GenTab
+Ln_377:                     mov         edi, 619
+                            call        comm_stno
+                            APPLY_FN_0  S_GenTab
                             STORE_RESULT
 
 
 ; ======================================================================================================================
-Ln_378:                     mov         qword [rbp-32], 1
+Ln_378:                     mov         edi, 620
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rax, [rbp-32]
                             mov         rcx, [rbp-24]
@@ -7960,20 +8711,28 @@ ucall28_ret_o:
 ucall28_done:
 
 ; ======================================================================================================================
-Ln_379:                     CALL1_VAR   S_Gen, S_nl
+Ln_379:                     mov         edi, 621
+                            call        comm_stno
+                            CALL1_VAR   S_Gen, S_nl
 
 ; ======================================================================================================================
-Ln_380:                     APPLY_FN_0  S_DecLevel
+Ln_380:                     mov         edi, 622
+                            call        comm_stno
+                            APPLY_FN_0  S_DecLevel
                             STORE_RESULT
 
 
 ; ======================================================================================================================
-Ln_381:                     CALL1_STR   S_Gen, S_RP
+Ln_381:                     mov         edi, 623
+                            call        comm_stno
+                            CALL1_STR   S_Gen, S_RP
                             jmp         [P_pp_ret_γ]     ; RETURN
 
 Ln_382:
 ;  pp_Call =============================================================================================================
-L_pp_Call_91:               sub         rsp, 16
+L_pp_Call_91:               mov         edi, 625
+                            call        comm_stno
+                            sub         rsp, 16
                             sub         rsp, 32
                             lea         rdi, [rel S_x]
                             call        stmt_get
@@ -8008,7 +8767,9 @@ L_pp_Call_91:               sub         rsp, 16
                             jmp         [P_pp_ret_γ]     ; RETURN
 
 ; ======================================================================================================================
-Ln_383:                     mov         qword [rbp-32], 1
+Ln_383:                     mov         edi, 626
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rax, [rbp-32]
                             mov         rcx, [rbp-24]
@@ -8030,7 +8791,9 @@ ucall29_ret_o:
 ucall29_done:
 
 ; ======================================================================================================================
-Ln_384:                     sub         rsp, 16
+Ln_384:                     mov         edi, 627
+                            call        comm_stno
+                            sub         rsp, 16
                             CAT2_SV     S_LP, S_nl
                             STORE_ARG32 0
                             APPLY_FN_N  S_Gen, 1
@@ -8039,17 +8802,23 @@ Ln_384:                     sub         rsp, 16
 
 
 ; ======================================================================================================================
-Ln_385:                     APPLY_FN_0  S_IncLevel
+Ln_385:                     mov         edi, 628
+                            call        comm_stno
+                            APPLY_FN_0  S_IncLevel
                             STORE_RESULT
 
 
 ; ======================================================================================================================
-Ln_386:                     APPLY_FN_0  S_GenTab
+Ln_386:                     mov         edi, 629
+                            call        comm_stno
+                            APPLY_FN_0  S_GenTab
                             STORE_RESULT
 
 
 ; ======================================================================================================================
-Ln_387:                     mov         qword [rbp-32], 1
+Ln_387:                     mov         edi, 630
+                            call        comm_stno
+                            mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rax, [rbp-32]
                             mov         rcx, [rbp-24]
@@ -8071,35 +8840,45 @@ ucall30_ret_o:
 ucall30_done:
 
 ; ======================================================================================================================
-Ln_388:                     CALL1_VAR   S_Gen, S_nl
+Ln_388:                     mov         edi, 631
+                            call        comm_stno
+                            CALL1_VAR   S_Gen, S_nl
 
 ; ======================================================================================================================
-Ln_389:                     APPLY_FN_0  S_DecLevel
+Ln_389:                     mov         edi, 632
+                            call        comm_stno
+                            APPLY_FN_0  S_DecLevel
                             STORE_RESULT
 
 
 ; ======================================================================================================================
-Ln_390:                     CALL1_STR   S_Gen, S_RP
+Ln_390:                     mov         edi, 633
+                            call        comm_stno
+                            CALL1_STR   S_Gen, S_RP
                             jmp         [P_pp_ret_γ]     ; RETURN
 
 Ln_391:
-L_ppEnd_28:
-
 ;  ppEnd ===============================================================================================================
-
-Ln_392:
+L_ppEnd_28:                 mov         edi, 634
+                            call        comm_stno
 
 ; ======================================================================================================================
+Ln_392:                     mov         edi, 640
+                            call        comm_stno
 
 Ln_393:
 ;  ss ==================================================================================================================
-L_ss_93:                    CALL1_VAR   S_DIFFER, S_x
+L_ss_93:                    mov         edi, 641
+                            call        comm_stno
+                            CALL1_VAR   S_DIFFER, S_x
                             FAIL_BR     Lf_394
                             jmp         Ln_394
 Lf_394:                     jmp         [P_pp_ret_γ]     ; RETURN
 
 ; ======================================================================================================================
-Ln_394:                     CALL1_VAR   S_IDENT, S_len
+Ln_394:                     mov         edi, 642
+                            call        comm_stno
+                            CALL1_VAR   S_IDENT, S_len
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             LOAD_INT    1024
@@ -8115,37 +8894,49 @@ Ln_394:                     CALL1_VAR   S_IDENT, S_len
                             jmp         Ln_395
 
 ; ======================================================================================================================
-Ln_395:                     CONC2_VN    S_GT_279, S_len
+Ln_395:                     mov         edi, 643
+                            call        comm_stno
+                            CONC2_VN    S_GT_279, S_len
                             FAIL_BR     Lf_396
                             jmp         Ln_396
 Lf_396:                     jmp         [P_pp_ret_γ]     ; FRETURN
 
 ; ======================================================================================================================
-Ln_396:                     CALL1_VAR   S_t, S_x
+Ln_396:                     mov         edi, 644
+                            call        comm_stno
+                            CALL1_VAR   S_t, S_x
                             FAIL_BR     Ln_397
                             SET_VAR     S_t
                             jmp         Ln_397
 
 ; ======================================================================================================================
-Ln_397:                     CALL1_VAR   S_v, S_x
+Ln_397:                     mov         edi, 645
+                            call        comm_stno
+                            CALL1_VAR   S_v, S_x
                             FAIL_BR     Ln_398
                             SET_VAR     S_v
                             jmp         Ln_398
 
 ; ======================================================================================================================
-Ln_398:                     CALL1_VAR   S_n, S_x
+Ln_398:                     mov         edi, 646
+                            call        comm_stno
+                            CALL1_VAR   S_n, S_x
                             FAIL_BR     Ln_399
                             SET_VAR     S_n
                             jmp         Ln_399
 
 ; ======================================================================================================================
-Ln_399:                     CALL1_VAR   S_c, S_x
+Ln_399:                     mov         edi, 647
+                            call        comm_stno
+                            CALL1_VAR   S_c, S_x
                             FAIL_BR     Ln_400
                             SET_VAR     S_c
                             jmp         Ln_400
 
 ; ======================================================================================================================
-Ln_400:                     CONC2_VN    S_GT_279, S_doDebug
+Ln_400:                     mov         edi, 648
+                            call        comm_stno
+                            CONC2_VN    S_GT_279, S_doDebug
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             LOAD_STR    S_ss_LP
@@ -8251,28 +9042,36 @@ Ln_400:                     CONC2_VN    S_GT_279, S_doDebug
                             jmp         Ln_401
 
 ; ======================================================================================================================
-Ln_401:                     CALL1_VAR   S_DIFFER, S_t
+Ln_401:                     mov         edi, 649
+                            call        comm_stno
+                            CALL1_VAR   S_DIFFER, S_t
                             FAIL_BR     Lf_402
                             jmp         L_COMPUTED_ss_t_94
 Lf_402:                     jmp         [P_pp_ret_γ]     ; RETURN
 
 Ln_402:
 ;  ss_BuiltinVar =======================================================================================================
-L_ss_BuiltinVar_95:         CALL1_VAR   S_upr, S_v
+L_ss_BuiltinVar_95:         mov         edi, 651
+                            call        comm_stno
+                            CALL1_VAR   S_upr, S_v
                             FAIL_BR     Ln_403
                             SET_VAR     S_ss
                             jmp         L_ss_atomic_96
 
 Ln_403:
 ;  ss_Function =========================================================================================================
-L_ss_Function_97:           CALL1_VAR   S_upr, S_v
+L_ss_Function_97:           mov         edi, 652
+                            call        comm_stno
+                            CALL1_VAR   S_upr, S_v
                             FAIL_BR     Ln_404
                             SET_VAR     S_ss
                             jmp         L_ss_atomic_96
 
 Ln_404:
 ;  ss_Id ===============================================================================================================
-L_ss_Id_98:                 lea         rdi, [rel S_v]
+L_ss_Id_98:                 mov         edi, 653
+                            call        comm_stno
+                            lea         rdi, [rel S_v]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -8282,7 +9081,9 @@ L_ss_Id_98:                 lea         rdi, [rel S_v]
 
 Ln_405:
 ;  ss_Integer ==========================================================================================================
-L_ss_Integer_99:            lea         rdi, [rel S_v]
+L_ss_Integer_99:            mov         edi, 654
+                            call        comm_stno
+                            lea         rdi, [rel S_v]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -8292,7 +9093,9 @@ L_ss_Integer_99:            lea         rdi, [rel S_v]
 
 Ln_406:
 ;  ss_Label ============================================================================================================
-L_ss_Label_100:             GET_VAR     S_v
+L_ss_Label_100:             mov         edi, 655
+                            call        comm_stno
+                            GET_VAR     S_v
                             SUBJ_FROM16
 
                             mov         qword [scan_start_407], 0
@@ -8340,14 +9143,18 @@ P_407_ω:                    cmp         qword [rel kw_anchor], 0
 
 Ln_407:
 ;  ss_Label0 ===========================================================================================================
-L_ss_Label0_101:            CALL1_VAR   S_upr, S_v
+L_ss_Label0_101:            mov         edi, 656
+                            call        comm_stno
+                            CALL1_VAR   S_upr, S_v
                             FAIL_BR     Ln_408
                             SET_VAR     S_ss
                             jmp         L_ss_atomic_96
 
 Ln_408:
 ;  ss_Label1 ===========================================================================================================
-L_ss_Label1_102:            lea         rdi, [rel S_v]
+L_ss_Label1_102:            mov         edi, 657
+                            call        comm_stno
+                            lea         rdi, [rel S_v]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -8357,14 +9164,18 @@ L_ss_Label1_102:            lea         rdi, [rel S_v]
 
 Ln_409:
 ;  ss_ProtKwd ==========================================================================================================
-L_ss_ProtKwd_103:           CALL1_VAR   S_upr, S_v
+L_ss_ProtKwd_103:           mov         edi, 658
+                            call        comm_stno
+                            CALL1_VAR   S_upr, S_v
                             FAIL_BR     Ln_410
                             SET_VAR     S_ss
                             jmp         L_ss_atomic_96
 
 Ln_410:
 ;  ss_Real =============================================================================================================
-L_ss_Real_104:              lea         rdi, [rel S_v]
+L_ss_Real_104:              mov         edi, 659
+                            call        comm_stno
+                            lea         rdi, [rel S_v]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -8374,14 +9185,18 @@ L_ss_Real_104:              lea         rdi, [rel S_v]
 
 Ln_411:
 ;  ss_SpecialNm ========================================================================================================
-L_ss_SpecialNm_105:         CALL1_VAR   S_upr, S_v
+L_ss_SpecialNm_105:         mov         edi, 660
+                            call        comm_stno
+                            CALL1_VAR   S_upr, S_v
                             FAIL_BR     Ln_412
                             SET_VAR     S_ss
                             jmp         L_ss_atomic_96
 
 Ln_412:
 ;  ss_String ===========================================================================================================
-L_ss_String_106:            lea         rdi, [rel S_v]
+L_ss_String_106:            mov         edi, 661
+                            call        comm_stno
+                            lea         rdi, [rel S_v]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -8391,14 +9206,18 @@ L_ss_String_106:            lea         rdi, [rel S_v]
 
 Ln_413:
 ;  ss_UnprotKwd ========================================================================================================
-L_ss_UnprotKwd_107:         CALL1_VAR   S_upr, S_v
+L_ss_UnprotKwd_107:         mov         edi, 662
+                            call        comm_stno
+                            CALL1_VAR   S_upr, S_v
                             FAIL_BR     Ln_414
                             SET_VAR     S_ss
                             jmp         L_ss_atomic_96
 
 Ln_414:
 ;  ss_atomic ===========================================================================================================
-L_ss_atomic_96:             sub         rsp, 32
+L_ss_atomic_96:             mov         edi, 663
+                            call        comm_stno
+                            sub         rsp, 32
                             CALL1_VAR   S_SIZE, S_ss
                             STORE_ARG32 0
                             lea         rdi, [rel S_len]
@@ -8416,7 +9235,9 @@ Lf_415:                     jmp         [P_pp_ret_γ]     ; FRETURN
 
 Ln_415:
 ;  ss_:() ==============================================================================================================
-L_ss_108:                   LOAD_STR    S_LP
+L_ss_108:                   mov         edi, 665
+                            call        comm_stno
+                            LOAD_STR    S_LP
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             sub         rsp, 32
@@ -8453,7 +9274,9 @@ Lf_416:                     jmp         L_error_35
 
 Ln_416:
 ;  ss_:<> ==============================================================================================================
-L_ss_109:                   LOAD_STR    S_LT_181
+L_ss_109:                   mov         edi, 666
+                            call        comm_stno
+                            LOAD_STR    S_LT_181
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             sub         rsp, 32
@@ -8490,7 +9313,9 @@ Lf_417:                     jmp         L_error_35
 
 Ln_417:
 ;  ss_:S() =============================================================================================================
-L_ss_S_110:                 LOAD_STR    S_S_LP
+L_ss_S_110:                 mov         edi, 667
+                            call        comm_stno
+                            LOAD_STR    S_S_LP
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             sub         rsp, 32
@@ -8527,7 +9352,9 @@ Lf_418:                     jmp         L_error_35
 
 Ln_418:
 ;  ss_:S<> =============================================================================================================
-L_ss_S_111:                 LOAD_STR    S_S_LT
+L_ss_S_111:                 mov         edi, 668
+                            call        comm_stno
+                            LOAD_STR    S_S_LT
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             sub         rsp, 32
@@ -8564,7 +9391,9 @@ Lf_419:                     jmp         L_error_35
 
 Ln_419:
 ;  ss_:F() =============================================================================================================
-L_ss_F_112:                 LOAD_STR    S_F_LP
+L_ss_F_112:                 mov         edi, 669
+                            call        comm_stno
+                            LOAD_STR    S_F_LP
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             sub         rsp, 32
@@ -8601,7 +9430,9 @@ Lf_420:                     jmp         L_error_35
 
 Ln_420:
 ;  ss_:F<> =============================================================================================================
-L_ss_F_113:                 LOAD_STR    S_F_LT
+L_ss_F_113:                 mov         edi, 670
+                            call        comm_stno
+                            LOAD_STR    S_F_LT
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             sub         rsp, 32
@@ -8638,7 +9469,9 @@ Lf_421:                     jmp         L_error_35
 
 Ln_421:
 ;  ssUnOp ==============================================================================================================
-L_ssUnOp_114:               lea         rdi, [rel S_t]
+L_ssUnOp_114:               mov         edi, 672
+                            call        comm_stno
+                            lea         rdi, [rel S_t]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -8679,7 +9512,9 @@ Lf_422:                     jmp         [P_pp_ret_γ]     ; FRETURN
 
 Ln_422:
 ;  ssBinOp =============================================================================================================
-L_ssBinOp_115:              sub         rsp, 32
+L_ssBinOp_115:              mov         edi, 673
+                            call        comm_stno
+                            sub         rsp, 32
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             STORE_ARG32 0
@@ -8698,7 +9533,9 @@ L_ssBinOp_115:              sub         rsp, 32
 Lf_423:                     jmp         [P_pp_ret_γ]     ; FRETURN
 
 ; ======================================================================================================================
-Ln_423:                     CAT2_VS     S_ss, S_SP
+Ln_423:                     mov         edi, 674
+                            call        comm_stno
+                            CAT2_VS     S_ss, S_SP
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             lea         rdi, [rel S_t]
@@ -8775,176 +9612,234 @@ Lf_424:                     jmp         [P_pp_ret_γ]     ; FRETURN
 
 Ln_424:
 ;  ss_! ================================================================================================================
-L_ss_116:                   CONC2_VI    S_EQ_311, S_n, 1
+L_ss_116:                   mov         edi, 676
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 1
                             FAIL_BR     Ln_425
                             jmp         L_ssUnOp_114
 
 Ln_425:
 ;  ss_# ================================================================================================================
-L_ss_117:                   CONC2_VI    S_EQ_311, S_n, 1
+L_ss_117:                   mov         edi, 677
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 1
                             FAIL_BR     Ln_426
                             jmp         L_ssUnOp_114
 
 ; ======================================================================================================================
-Ln_426:                     CONC2_VI    S_EQ_311, S_n, 2
+Ln_426:                     mov         edi, 678
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 2
                             FAIL_BR     Lf_427
                             jmp         L_ssBinOp_115
 Lf_427:                     jmp         L_error_35
 
 Ln_427:
 ;  ss_$ ================================================================================================================
-L_ss_118:                   CONC2_VI    S_EQ_311, S_n, 1
+L_ss_118:                   mov         edi, 679
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 1
                             FAIL_BR     Ln_428
                             jmp         L_ssUnOp_114
 
 ; ======================================================================================================================
-Ln_428:                     CONC2_VI    S_EQ_311, S_n, 2
+Ln_428:                     mov         edi, 680
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 2
                             FAIL_BR     Lf_429
                             jmp         L_ssBinOp_115
 Lf_429:                     jmp         L_error_35
 
 Ln_429:
 ;  ss_% ================================================================================================================
-L_ss_119:                   CONC2_VI    S_EQ_311, S_n, 1
+L_ss_119:                   mov         edi, 681
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 1
                             FAIL_BR     Ln_430
                             jmp         L_ssUnOp_114
 
 ; ======================================================================================================================
-Ln_430:                     CONC2_VI    S_EQ_311, S_n, 2
+Ln_430:                     mov         edi, 682
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 2
                             FAIL_BR     Lf_431
                             jmp         L_ssBinOp_115
 Lf_431:                     jmp         L_error_35
 
 Ln_431:
 ;  ss_& ================================================================================================================
-L_ss_120:                   CONC2_VI    S_EQ_311, S_n, 1
+L_ss_120:                   mov         edi, 683
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 1
                             FAIL_BR     Ln_432
                             jmp         L_ssUnOp_114
 
 ; ======================================================================================================================
-Ln_432:                     CONC2_VI    S_EQ_311, S_n, 2
+Ln_432:                     mov         edi, 684
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 2
                             FAIL_BR     Lf_433
                             jmp         L_ssBinOp_115
 Lf_433:                     jmp         L_error_35
 
 Ln_433:
 ;  ss_* ================================================================================================================
-L_ss_121:                   CONC2_VI    S_EQ_311, S_n, 1
+L_ss_121:                   mov         edi, 685
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 1
                             FAIL_BR     Ln_434
                             jmp         L_ssUnOp_114
 
 ; ======================================================================================================================
-Ln_434:                     CONC2_VI    S_EQ_311, S_n, 2
+Ln_434:                     mov         edi, 686
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 2
                             FAIL_BR     Lf_435
                             jmp         L_ssBinOp_115
 Lf_435:                     jmp         L_error_35
 
 Ln_435:
 ;  ss_+ ================================================================================================================
-L_ss_122:                   CONC2_VI    S_EQ_311, S_n, 1
+L_ss_122:                   mov         edi, 687
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 1
                             FAIL_BR     Ln_436
                             jmp         L_ssUnOp_114
 
 ; ======================================================================================================================
-Ln_436:                     CONC2_VI    S_EQ_311, S_n, 2
+Ln_436:                     mov         edi, 688
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 2
                             FAIL_BR     Lf_437
                             jmp         L_ssBinOp_115
 Lf_437:                     jmp         L_error_35
 
 Ln_437:
 ;  ss_- ================================================================================================================
-L_ss_123:                   CONC2_VI    S_EQ_311, S_n, 1
+L_ss_123:                   mov         edi, 689
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 1
                             FAIL_BR     Ln_438
                             jmp         L_ssUnOp_114
 
 ; ======================================================================================================================
-Ln_438:                     CONC2_VI    S_EQ_311, S_n, 2
+Ln_438:                     mov         edi, 690
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 2
                             FAIL_BR     Lf_439
                             jmp         L_ssBinOp_115
 Lf_439:                     jmp         L_error_35
 
 Ln_439:
 ;  ss_. ================================================================================================================
-L_ss_124:                   CONC2_VI    S_EQ_311, S_n, 1
+L_ss_124:                   mov         edi, 691
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 1
                             FAIL_BR     Ln_440
                             jmp         L_ssUnOp_114
 
 ; ======================================================================================================================
-Ln_440:                     CONC2_VI    S_EQ_311, S_n, 2
+Ln_440:                     mov         edi, 692
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 2
                             FAIL_BR     Lf_441
                             jmp         L_ssBinOp_115
 Lf_441:                     jmp         L_error_35
 
 Ln_441:
 ;  ss_/ ================================================================================================================
-L_ss_125:                   CONC2_VI    S_EQ_311, S_n, 1
+L_ss_125:                   mov         edi, 693
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 1
                             FAIL_BR     Ln_442
                             jmp         L_ssUnOp_114
 
 ; ======================================================================================================================
-Ln_442:                     CONC2_VI    S_EQ_311, S_n, 2
+Ln_442:                     mov         edi, 694
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 2
                             FAIL_BR     Lf_443
                             jmp         L_ssBinOp_115
 Lf_443:                     jmp         L_error_35
 
 Ln_443:
 ;  ss_= ================================================================================================================
-L_ss_126:                   CONC2_VI    S_EQ_311, S_n, 1
+L_ss_126:                   mov         edi, 695
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 1
                             FAIL_BR     Ln_444
                             jmp         L_ssUnOp_114
 
 ; ======================================================================================================================
-Ln_444:                     CONC2_VI    S_EQ_311, S_n, 2
+Ln_444:                     mov         edi, 696
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 2
                             FAIL_BR     Lf_445
                             jmp         L_ssBinOp_115
 Lf_445:                     jmp         L_error_35
 
 Ln_445:
 ;  ss_? ================================================================================================================
-L_ss_127:                   CONC2_VI    S_EQ_311, S_n, 1
+L_ss_127:                   mov         edi, 697
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 1
                             FAIL_BR     Ln_446
                             jmp         L_ssUnOp_114
 
 ; ======================================================================================================================
-Ln_446:                     CONC2_VI    S_EQ_311, S_n, 2
+Ln_446:                     mov         edi, 698
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 2
                             FAIL_BR     Lf_447
                             jmp         L_ssBinOp_115
 Lf_447:                     jmp         L_error_35
 
 Ln_447:
 ;  ss_@ ================================================================================================================
-L_ss_128:                   CONC2_VI    S_EQ_311, S_n, 1
+L_ss_128:                   mov         edi, 699
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 1
                             FAIL_BR     Ln_448
                             jmp         L_ssUnOp_114
 
 ; ======================================================================================================================
-Ln_448:                     CONC2_VI    S_EQ_311, S_n, 2
+Ln_448:                     mov         edi, 700
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 2
                             FAIL_BR     Lf_449
                             jmp         L_ssBinOp_115
 Lf_449:                     jmp         L_error_35
 
 Ln_449:
 ;  ss_^ ================================================================================================================
-L_ss_129:                   CONC2_VI    S_EQ_311, S_n, 2
+L_ss_129:                   mov         edi, 701
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 2
                             FAIL_BR     Lf_450
                             jmp         L_ssBinOp_115
 Lf_450:                     jmp         L_error_35
 
 Ln_450:
 ;  ss_~ ================================================================================================================
-L_ss_130:                   CONC2_VI    S_EQ_311, S_n, 1
+L_ss_130:                   mov         edi, 702
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 1
                             FAIL_BR     Ln_451
                             jmp         L_ssUnOp_114
 
 ; ======================================================================================================================
-Ln_451:                     CONC2_VI    S_EQ_311, S_n, 2
+Ln_451:                     mov         edi, 703
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 2
                             FAIL_BR     Lf_452
                             jmp         L_ssBinOp_115
 Lf_452:                     jmp         L_error_35
 
 Ln_452:
 ;  ss_ExprList =========================================================================================================
-L_ss_ExprList_131:          sub         rsp, 32
+L_ss_ExprList_131:          mov         edi, 705
+                            call        comm_stno
+                            sub         rsp, 32
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             STORE_ARG32 0
@@ -8963,12 +9858,16 @@ L_ss_ExprList_131:          sub         rsp, 32
 Lf_453:                     jmp         [P_pp_ret_γ]     ; FRETURN
 
 ; ======================================================================================================================
-Ln_453:                     ASSIGN_INT  S_i, 1, Ln_454
+Ln_453:                     mov         edi, 706
+                            call        comm_stno
+                            ASSIGN_INT  S_i, 1, Ln_454
                             jmp         Ln_454
 
 Ln_454:
 ;  ss_ExprList0 ========================================================================================================
-L_ss_ExprList0_132:         CONC2_VV    S_LT, S_i, S_n
+L_ss_ExprList0_132:         mov         edi, 707
+                            call        comm_stno
+                            CONC2_VV    S_LT, S_i, S_n
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             CONC2_VI    S_add, S_i, 1
@@ -8985,7 +9884,9 @@ L_ss_ExprList0_132:         CONC2_VV    S_LT, S_i, S_n
 Lf_455:                     jmp         [P_pp_ret_γ]     ; RETURN
 
 ; ======================================================================================================================
-Ln_455:                     CAT2_VS     S_ss, S_CM_SP
+Ln_455:                     mov         edi, 708
+                            call        comm_stno
+                            CAT2_VS     S_ss, S_CM_SP
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             sub         rsp, 32
@@ -9031,7 +9932,9 @@ Lf_456:                     jmp         [P_pp_ret_γ]     ; FRETURN
 
 Ln_456:
 ;  ss_, ================================================================================================================
-L_ss_133:                   LOAD_STR    S_LP
+L_ss_133:                   mov         edi, 710
+                            call        comm_stno
+                            LOAD_STR    S_LP
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             sub         rsp, 32
@@ -9057,12 +9960,16 @@ L_ss_133:                   LOAD_STR    S_LP
 Lf_457:                     jmp         [P_pp_ret_γ]     ; FRETURN
 
 ; ======================================================================================================================
-Ln_457:                     ASSIGN_INT  S_i, 1, Ln_458
+Ln_457:                     mov         edi, 711
+                            call        comm_stno
+                            ASSIGN_INT  S_i, 1, Ln_458
                             jmp         Ln_458
 
 Ln_458:
 ;  ss_,0 ===============================================================================================================
-L_ss_0_134:                 CONC2_VV    S_LT, S_i, S_n
+L_ss_0_134:                 mov         edi, 712
+                            call        comm_stno
+                            CONC2_VV    S_LT, S_i, S_n
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             CONC2_VI    S_add, S_i, 1
@@ -9079,7 +9986,9 @@ L_ss_0_134:                 CONC2_VV    S_LT, S_i, S_n
 Lf_459:                     jmp         L_COMPUTED_ss_1_135
 
 ; ======================================================================================================================
-Ln_459:                     CAT2_VS     S_ss, S_CM_SP
+Ln_459:                     mov         edi, 713
+                            call        comm_stno
+                            CAT2_VS     S_ss, S_CM_SP
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             sub         rsp, 32
@@ -9125,19 +10034,25 @@ Lf_460:                     jmp         [P_pp_ret_γ]     ; FRETURN
 
 Ln_460:
 ;  ss_,1 ===============================================================================================================
-L_ss_1_137:                 CAT2_VS     S_ss, S_RP
+L_ss_1_137:                 mov         edi, 714
+                            call        comm_stno
+                            CAT2_VS     S_ss, S_RP
                             FAIL_BR     Ln_461
                             SET_VAR     S_ss
                             jmp         [P_pp_ret_γ]     ; RETURN
 
 Ln_461:
 ;  ss_| ================================================================================================================
-L_ss_138:                   CONC2_VI    S_EQ_311, S_n, 1
+L_ss_138:                   mov         edi, 716
+                            call        comm_stno
+                            CONC2_VI    S_EQ_311, S_n, 1
                             FAIL_BR     Ln_462
                             jmp         L_ssUnOp_114
 
 ; ======================================================================================================================
-Ln_462:                     sub         rsp, 32
+Ln_462:                     mov         edi, 717
+                            call        comm_stno
+                            sub         rsp, 32
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             STORE_ARG32 0
@@ -9156,12 +10071,16 @@ Ln_462:                     sub         rsp, 32
 Lf_463:                     jmp         [P_pp_ret_γ]     ; FRETURN
 
 ; ======================================================================================================================
-Ln_463:                     ASSIGN_INT  S_i, 1, Ln_464
+Ln_463:                     mov         edi, 718
+                            call        comm_stno
+                            ASSIGN_INT  S_i, 1, Ln_464
                             jmp         Ln_464
 
 Ln_464:
 ;  ss_|0 ===============================================================================================================
-L_ss_0_139:                 CONC2_VV    S_LT, S_i, S_n
+L_ss_0_139:                 mov         edi, 719
+                            call        comm_stno
+                            CONC2_VV    S_LT, S_i, S_n
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             CONC2_VI    S_add, S_i, 1
@@ -9178,7 +10097,9 @@ L_ss_0_139:                 CONC2_VV    S_LT, S_i, S_n
 Lf_465:                     jmp         [P_pp_ret_γ]     ; RETURN
 
 ; ======================================================================================================================
-Ln_465:                     CAT2_VS     S_ss, S_SP_OR_SP
+Ln_465:                     mov         edi, 720
+                            call        comm_stno
+                            CAT2_VS     S_ss, S_SP_OR_SP
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             sub         rsp, 32
@@ -9224,7 +10145,9 @@ Lf_466:                     jmp         [P_pp_ret_γ]     ; FRETURN
 
 Ln_466:
 ;  ss_.. ===============================================================================================================
-L_ss_141:                   sub         rsp, 32
+L_ss_141:                   mov         edi, 722
+                            call        comm_stno
+                            sub         rsp, 32
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             STORE_ARG32 0
@@ -9243,12 +10166,16 @@ L_ss_141:                   sub         rsp, 32
 Lf_467:                     jmp         [P_pp_ret_γ]     ; FRETURN
 
 ; ======================================================================================================================
-Ln_467:                     ASSIGN_INT  S_i, 1, Ln_468
+Ln_467:                     mov         edi, 723
+                            call        comm_stno
+                            ASSIGN_INT  S_i, 1, Ln_468
                             jmp         Ln_468
 
 Ln_468:
 ;  ss_..0 ==============================================================================================================
-L_ss_0_142:                 CONC2_VV    S_LT, S_i, S_n
+L_ss_0_142:                 mov         edi, 724
+                            call        comm_stno
+                            CONC2_VV    S_LT, S_i, S_n
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             CONC2_VI    S_add, S_i, 1
@@ -9265,7 +10192,9 @@ L_ss_0_142:                 CONC2_VV    S_LT, S_i, S_n
 Lf_469:                     jmp         [P_pp_ret_γ]     ; RETURN
 
 ; ======================================================================================================================
-Ln_469:                     CAT2_VS     S_ss, S_SP
+Ln_469:                     mov         edi, 725
+                            call        comm_stno
+                            CAT2_VS     S_ss, S_SP
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             sub         rsp, 32
@@ -9311,7 +10240,9 @@ Lf_470:                     jmp         [P_pp_ret_γ]     ; FRETURN
 
 Ln_470:
 ;  ss_[] ===============================================================================================================
-L_ss_144:                   sub         rsp, 32
+L_ss_144:                   mov         edi, 727
+                            call        comm_stno
+                            sub         rsp, 32
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             STORE_ARG32 0
@@ -9330,12 +10261,16 @@ L_ss_144:                   sub         rsp, 32
 Lf_471:                     jmp         [P_pp_ret_γ]     ; FRETURN
 
 ; ======================================================================================================================
-Ln_471:                     ASSIGN_INT  S_i, 1, Ln_472
+Ln_471:                     mov         edi, 728
+                            call        comm_stno
+                            ASSIGN_INT  S_i, 1, Ln_472
                             jmp         Ln_472
 
 Ln_472:
 ;  ss_[]0 ==============================================================================================================
-L_ss_0_145:                 CONC2_VV    S_LT, S_i, S_n
+L_ss_0_145:                 mov         edi, 729
+                            call        comm_stno
+                            CONC2_VV    S_LT, S_i, S_n
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             CONC2_VI    S_add, S_i, 1
@@ -9352,7 +10287,9 @@ L_ss_0_145:                 CONC2_VV    S_LT, S_i, S_n
 Lf_473:                     jmp         [P_pp_ret_γ]     ; RETURN
 
 ; ======================================================================================================================
-Ln_473:                     CAT2_VS     S_ss, S_LB
+Ln_473:                     mov         edi, 730
+                            call        comm_stno
+                            CAT2_VS     S_ss, S_LB
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             sub         rsp, 32
@@ -9408,7 +10345,9 @@ Lf_474:                     jmp         [P_pp_ret_γ]     ; FRETURN
 
 Ln_474:
 ;  ss_() ===============================================================================================================
-L_ss_147:                   LOAD_STR    S_LP
+L_ss_147:                   mov         edi, 732
+                            call        comm_stno
+                            LOAD_STR    S_LP
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             sub         rsp, 32
@@ -9445,7 +10384,9 @@ Lf_475:                     jmp         [P_pp_ret_γ]     ; FRETURN
 
 Ln_475:
 ;  ss_Call =============================================================================================================
-L_ss_Call_148:              sub         rsp, 16
+L_ss_Call_148:              mov         edi, 734
+                            call        comm_stno
+                            sub         rsp, 16
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             STORE_ARG32 0
@@ -9517,28 +10458,34 @@ L_ss_Call_148:              sub         rsp, 16
 Lf_476:                     jmp         [P_pp_ret_γ]     ; FRETURN
 
 Ln_476:
-L_ssEnd_92:
-
 ;  ssEnd ===============================================================================================================
-
-Ln_477:
+L_ssEnd_92:                 mov         edi, 735
+                            call        comm_stno
 
 ; ======================================================================================================================
+Ln_477:                     mov         edi, 737
+                            call        comm_stno
 
 Ln_478:
 ;  bVisit_ =============================================================================================================
-L_bVisit_150:               CONC2_VV    S_APPLY, S_fnc, S_x
+L_bVisit_150:               mov         edi, 738
+                            call        comm_stno
+                            CONC2_VV    S_APPLY, S_fnc, S_x
                             FAIL_BR     Lf_479
                             jmp         Ln_479
 Lf_479:                     jmp         [P_pp_ret_γ]     ; RETURN
 
 ; ======================================================================================================================
-Ln_479:                     ASSIGN_INT  S_i, 0, Ln_480
+Ln_479:                     mov         edi, 739
+                            call        comm_stno
+                            ASSIGN_INT  S_i, 0, Ln_480
                             jmp         Ln_480
 
 Ln_480:
 ;  bVisit_1 ============================================================================================================
-L_bVisit_1_151:             sub         rsp, 32
+L_bVisit_1_151:             mov         edi, 740
+                            call        comm_stno
+                            sub         rsp, 32
                             lea         rdi, [rel S_i]
                             call        stmt_get
                             mov         [rbp-32], rax
@@ -9566,7 +10513,9 @@ L_bVisit_1_151:             sub         rsp, 32
 Lf_481:                     jmp         [P_pp_ret_γ]     ; RETURN
 
 ; ======================================================================================================================
-Ln_481:                     sub         rsp, 32
+Ln_481:                     mov         edi, 741
+                            call        comm_stno
+                            sub         rsp, 32
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             STORE_ARG32 0
@@ -9582,27 +10531,33 @@ Ln_481:                     sub         rsp, 32
                             jmp         L_bVisit_1_151
 
 Ln_482:
-L_bVisitEnd_149:
-
 ;  bVisitEnd ===========================================================================================================
-
-Ln_483:
-
-; ======================================================================================================================
+L_bVisitEnd_149:            mov         edi, 742
+                            call        comm_stno
 
 ; ======================================================================================================================
-Ln_484:                     ASSIGN_NULL S_Refs
+Ln_483:                     mov         edi, 744
+                            call        comm_stno
+
+; ======================================================================================================================
+Ln_484:                     mov         edi, 745
+                            call        comm_stno
+                            ASSIGN_NULL S_Refs
                             jmp         L_findRefsEnd_152
 
 Ln_485:
 ;  findRefs ============================================================================================================
-L_findRefs_153:             CALL1_VAR   S_DIFFER, S_x
+L_findRefs_153:             mov         edi, 746
+                            call        comm_stno
+                            CALL1_VAR   S_DIFFER, S_x
                             FAIL_BR     Lf_486
                             jmp         Ln_486
 Lf_486:                     jmp         [P_pp_ret_γ]     ; RETURN
 
 ; ======================================================================================================================
-Ln_486:                     sub         rsp, 32
+Ln_486:                     mov         edi, 747
+                            call        comm_stno
+                            sub         rsp, 32
                             CALL1_VAR   S_t, S_x
                             STORE_ARG32 0
                             LOAD_STR    S_Call
@@ -9616,12 +10571,16 @@ Ln_486:                     sub         rsp, 32
 Lf_487:                     jmp         L_findRefs_1_154
 
 ; ======================================================================================================================
-Ln_487:                     ASSIGN_INT  S_n, 1, Ln_488
+Ln_487:                     mov         edi, 748
+                            call        comm_stno
+                            ASSIGN_INT  S_n, 1, Ln_488
                             jmp         Ln_488
 
 Ln_488:
 ;  findRefs_0 ==========================================================================================================
-L_findRefs_0_155:           sub         rsp, 32
+L_findRefs_0_155:           mov         edi, 749
+                            call        comm_stno
+                            sub         rsp, 32
                             lea         rdi, [rel S_n]
                             call        stmt_get
                             mov         [rbp-32], rax
@@ -9649,7 +10608,9 @@ L_findRefs_0_155:           sub         rsp, 32
 Lf_489:                     jmp         [P_pp_ret_γ]     ; FRETURN
 
 ; ======================================================================================================================
-Ln_489:                     sub         rsp, 32
+Ln_489:                     mov         edi, 750
+                            call        comm_stno
+                            sub         rsp, 32
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             STORE_ARG32 0
@@ -9664,7 +10625,9 @@ Ln_489:                     sub         rsp, 32
 
 Ln_490:
 ;  findRefs_1 ==========================================================================================================
-L_findRefs_1_154:           sub         rsp, 32
+L_findRefs_1_154:           mov         edi, 751
+                            call        comm_stno
+                            sub         rsp, 32
                             CALL1_VAR   S_t, S_x
                             STORE_ARG32 0
                             LOAD_STR    S_AM
@@ -9696,14 +10659,18 @@ L_findRefs_1_154:           sub         rsp, 32
 Lf_491:                     jmp         L_findRefs_2_156
 
 ; ======================================================================================================================
-Ln_491:                     CALL1_VAR   S_ss, S_x
+Ln_491:                     mov         edi, 752
+                            call        comm_stno
+                            CALL1_VAR   S_ss, S_x
                             FAIL_BR     Ln_492
                             SET_VAR     S_v
                             jmp         L_findRefs_9_157
 
 Ln_492:
 ;  findRefs_2 ==========================================================================================================
-L_findRefs_2_156:           sub         rsp, 32
+L_findRefs_2_156:           mov         edi, 753
+                            call        comm_stno
+                            sub         rsp, 32
                             CALL1_VAR   S_t, S_x
                             STORE_ARG32 0
                             LOAD_STR    S_Id
@@ -9717,14 +10684,18 @@ L_findRefs_2_156:           sub         rsp, 32
 Lf_493:                     jmp         [P_pp_ret_γ]     ; RETURN
 
 ; ======================================================================================================================
-Ln_493:                     CALL1_VAR   S_v, S_x
+Ln_493:                     mov         edi, 754
+                            call        comm_stno
+                            CALL1_VAR   S_v, S_x
                             FAIL_BR     Ln_494
                             SET_VAR     S_v
                             jmp         L_findRefs_9_157
 
 Ln_494:
 ;  findRefs_9 ==========================================================================================================
-L_findRefs_9_157:           GET_VAR     S_v
+L_findRefs_9_157:           mov         edi, 755
+                            call        comm_stno
+                            GET_VAR     S_v
                             SUBJ_FROM16
 
                             mov         qword [scan_start_495], 0
@@ -9756,7 +10727,9 @@ P_495_ω:                    cmp         qword [rel kw_anchor], 0
                             jmp         [P_pp_ret_γ]     ; FRETURN
 
 ; ======================================================================================================================
-Ln_495:                     CALL1_VAR   S_DIFFER, S_Refs
+Ln_495:                     mov         edi, 756
+                            call        comm_stno
+                            CALL1_VAR   S_DIFFER, S_Refs
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             lea         rdi, [rel S_Refs]
@@ -9798,7 +10771,9 @@ Ln_495:                     CALL1_VAR   S_DIFFER, S_Refs
                             jmp         [P_pp_ret_γ]     ; FRETURN
 
 ; ======================================================================================================================
-Ln_496:                     CALL1_VAR   S_IDENT, S_Refs
+Ln_496:                     mov         edi, 757
+                            call        comm_stno
+                            CALL1_VAR   S_IDENT, S_Refs
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             lea         rdi, [rel S_v]
@@ -9817,28 +10792,34 @@ Ln_496:                     CALL1_VAR   S_IDENT, S_Refs
                             jmp         [P_pp_ret_γ]     ; FRETURN
 
 Ln_497:
-L_findRefsEnd_152:
-
 ;  findRefsEnd =========================================================================================================
-
-Ln_498:
+L_findRefsEnd_152:          mov         edi, 758
+                            call        comm_stno
 
 ; ======================================================================================================================
+Ln_498:                     mov         edi, 760
+                            call        comm_stno
 
 Ln_499:
 ;  refs ================================================================================================================
-L_refs_159:                 CALL1_VAR   S_c, S_p
+L_refs_159:                 mov         edi, 761
+                            call        comm_stno
+                            CALL1_VAR   S_c, S_p
                             FAIL_BR     Ln_500
                             SET_VAR     S_c
                             jmp         Ln_500
 
 ; ======================================================================================================================
-Ln_500:                     ASSIGN_INT  S_n, 0, Ln_501
+Ln_500:                     mov         edi, 762
+                            call        comm_stno
+                            ASSIGN_INT  S_n, 0, Ln_501
                             jmp         Ln_501
 
 Ln_501:
 ;  refs_0 ==============================================================================================================
-L_refs_0_160:               sub         rsp, 32
+L_refs_0_160:               mov         edi, 763
+                            call        comm_stno
+                            sub         rsp, 32
                             lea         rdi, [rel S_n]
                             call        stmt_get
                             mov         [rbp-32], rax
@@ -9866,7 +10847,9 @@ L_refs_0_160:               sub         rsp, 32
 Lf_502:                     jmp         [P_pp_ret_γ]     ; RETURN
 
 ; ======================================================================================================================
-Ln_502:                     sub         rsp, 32
+Ln_502:                     mov         edi, 764
+                            call        comm_stno
+                            sub         rsp, 32
                             sub         rsp, 16
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
@@ -9887,13 +10870,17 @@ Ln_502:                     sub         rsp, 32
 Lf_503:                     jmp         L_refs_0_160
 
 ; ======================================================================================================================
-Ln_503:                     CONC2_VI    S_add, S_s, 1
+Ln_503:                     mov         edi, 765
+                            call        comm_stno
+                            CONC2_VI    S_add, S_s, 1
                             FAIL_BR     Ln_504
                             SET_VAR     S_s
                             jmp         Ln_504
 
 ; ======================================================================================================================
-Ln_504:                     sub         rsp, 16
+Ln_504:                     mov         edi, 766
+                            call        comm_stno
+                            sub         rsp, 16
                             sub         rsp, 16
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
@@ -9912,7 +10899,9 @@ Ln_504:                     sub         rsp, 16
 Lf_505:                     jmp         L_refs_0_160
 
 ; ======================================================================================================================
-Ln_505:                     sub         rsp, 32
+Ln_505:                     mov         edi, 767
+                            call        comm_stno
+                            sub         rsp, 32
                             sub         rsp, 16
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
@@ -9933,7 +10922,9 @@ Ln_505:                     sub         rsp, 32
 Lf_506:                     jmp         L_refs_0_160
 
 ; ======================================================================================================================
-Ln_506:                     sub         rsp, 32
+Ln_506:                     mov         edi, 768
+                            call        comm_stno
+                            sub         rsp, 32
                             sub         rsp, 16
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
@@ -9953,7 +10944,9 @@ Ln_506:                     sub         rsp, 32
                             jmp         L_refs_1_161
 
 ; ======================================================================================================================
-Ln_507:                     sub         rsp, 32
+Ln_507:                     mov         edi, 769
+                            call        comm_stno
+                            sub         rsp, 32
                             sub         rsp, 16
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
@@ -9975,7 +10968,9 @@ Lf_508:                     jmp         L_refs_0_160
 
 Ln_508:
 ;  refs_1 ==============================================================================================================
-L_refs_1_161:               sub         rsp, 16
+L_refs_1_161:               mov         edi, 770
+                            call        comm_stno
+                            sub         rsp, 16
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             STORE_ARG32 0
@@ -9988,11 +10983,15 @@ L_refs_1_161:               sub         rsp, 16
                             jmp         Ln_509
 
 ; ======================================================================================================================
-Ln_509:                     ASSIGN_NULL S_Refs
+Ln_509:                     mov         edi, 771
+                            call        comm_stno
+                            ASSIGN_NULL S_Refs
                             jmp         Ln_510
 
 ; ======================================================================================================================
-Ln_510:                     sub         rsp, 32
+Ln_510:                     mov         edi, 772
+                            call        comm_stno
+                            sub         rsp, 32
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             STORE_ARG32 0
@@ -10005,7 +11004,9 @@ Ln_510:                     sub         rsp, 32
 
 
 ; ======================================================================================================================
-Ln_511:                     sub         rsp, 48
+Ln_511:                     mov         edi, 773
+                            call        comm_stno
+                            sub         rsp, 48
                             lea         rdi, [rel S_s]
                             call        stmt_get
                             mov         [rbp-32], rax
@@ -10068,16 +11069,20 @@ Ln_511:                     sub         rsp, 48
                             jmp         L_refs_0_160
 
 Ln_512:
-L_refsEnd_158:
-
 ;  refsEnd =============================================================================================================
+L_refsEnd_158:              mov         edi, 774
+                            call        comm_stno
 
 ; ======================================================================================================================
-Ln_513:                     ASSIGN_INT  S_doDebug, 0, Ln_514
+Ln_513:                     mov         edi, 781
+                            call        comm_stno
+                            ASSIGN_INT  S_doDebug, 0, Ln_514
                             jmp         Ln_514
 
 ; ======================================================================================================================
-Ln_514:                     sub         rsp, 32
+Ln_514:                     mov         edi, 782
+                            call        comm_stno
+                            sub         rsp, 32
                             sub         rsp, 16
                             CAT2_SV     S_SP, S_tab
                             STORE_ARG32 0
@@ -10101,7 +11106,9 @@ Ln_514:                     sub         rsp, 32
 
 Ln_515:
 ;  main00 ==============================================================================================================
-L_main00_162:               lea         rdi, [rel S_INPUT]
+L_main00_162:               mov         edi, 783
+                            call        comm_stno
+                            lea         rdi, [rel S_INPUT]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -10112,11 +11119,15 @@ Lf_516:                     GOTO_ALWAYS L_SNO_END     ; END
 
 Ln_516:
 ;  main01 ==============================================================================================================
-L_main01_163:               ASSIGN_NULL S_Src
+L_main01_163:               mov         edi, 784
+                            call        comm_stno
+                            ASSIGN_NULL S_Src
                             jmp         Ln_517
 
 ; ======================================================================================================================
-Ln_517:                     GET_VAR     S_Line
+Ln_517:                     mov         edi, 785
+                            call        comm_stno
+                            GET_VAR     S_Line
                             SUBJ_FROM16
 
                             mov         qword [scan_start_518], 0
@@ -10144,7 +11155,9 @@ P_518_ω:                    cmp         qword [rel kw_anchor], 0
                             jmp         L_main02_164
 
 ; ======================================================================================================================
-Ln_518:                     lea         rdi, [rel S_Line]
+Ln_518:                     mov         edi, 786
+                            call        comm_stno
+                            lea         rdi, [rel S_Line]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -10155,7 +11168,9 @@ Ln_518:                     lea         rdi, [rel S_Line]
 
 Ln_519:
 ;  main02 ==============================================================================================================
-L_main02_164:               CAT2_VV     S_Src, S_Line
+L_main02_164:               mov         edi, 787
+                            call        comm_stno
+                            CAT2_VV     S_Src, S_Line
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             lea         rdi, [rel S_nl]
@@ -10174,7 +11189,9 @@ L_main02_164:               CAT2_VV     S_Src, S_Line
                             jmp         Ln_520
 
 ; ======================================================================================================================
-Ln_520:                     lea         rdi, [rel S_INPUT]
+Ln_520:                     mov         edi, 788
+                            call        comm_stno
+                            lea         rdi, [rel S_INPUT]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -10184,7 +11201,9 @@ Ln_520:                     lea         rdi, [rel S_INPUT]
 Lf_521:                     jmp         L_main05_165
 
 ; ======================================================================================================================
-Ln_521:                     GET_VAR     S_Line
+Ln_521:                     mov         edi, 789
+                            call        comm_stno
+                            GET_VAR     S_Line
                             SUBJ_FROM16
 
                             mov         qword [scan_start_522], 0
@@ -10212,7 +11231,9 @@ P_522_ω:                    cmp         qword [rel kw_anchor], 0
                             jmp         Ln_522
 
 ; ======================================================================================================================
-Ln_522:                     GET_VAR     S_Src
+Ln_522:                     mov         edi, 790
+                            call        comm_stno
+                            GET_VAR     S_Src
                             SUBJ_FROM16
 
                             mov         qword [scan_start_523], 0
@@ -10272,7 +11293,9 @@ P_523_ω:                    cmp         qword [rel kw_anchor], 0
                             jmp         L_mainErr1_166
 
 ; ======================================================================================================================
-Ln_523:                     sub         rsp, 16
+Ln_523:                     mov         edi, 791
+                            call        comm_stno
+                            sub         rsp, 16
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             STORE_ARG32 0
@@ -10285,7 +11308,9 @@ Ln_523:                     sub         rsp, 16
 Lf_524:                     jmp         L_mainErr2_167
 
 ; ======================================================================================================================
-Ln_524:                     lea         rdi, [rel S_sno]
+Ln_524:                     mov         edi, 792
+                            call        comm_stno
+                            lea         rdi, [rel S_sno]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -10311,7 +11336,9 @@ ucall45_done:
 
 Ln_525:
 ;  main05 ==============================================================================================================
-L_main05_165:               GET_VAR     S_Src
+L_main05_165:               mov         edi, 793
+                            call        comm_stno
+                            GET_VAR     S_Src
                             SUBJ_FROM16
 
                             mov         qword [scan_start_526], 0
@@ -10371,7 +11398,9 @@ P_526_ω:                    cmp         qword [rel kw_anchor], 0
                             jmp         L_mainErr1_166
 
 ; ======================================================================================================================
-Ln_526:                     sub         rsp, 16
+Ln_526:                     mov         edi, 794
+                            call        comm_stno
+                            sub         rsp, 16
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             STORE_ARG32 0
@@ -10384,7 +11413,9 @@ Ln_526:                     sub         rsp, 16
 Lf_527:                     jmp         L_mainErr2_167
 
 ; ======================================================================================================================
-Ln_527:                     lea         rdi, [rel S_sno]
+Ln_527:                     mov         edi, 795
+                            call        comm_stno
+                            lea         rdi, [rel S_sno]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -10410,14 +11441,18 @@ ucall50_done:
 
 Ln_528:
 ;  mainErr1 ============================================================================================================
-L_mainErr1_166:             LOAD_STR    S_Parse_SP_Error
+L_mainErr1_166:             mov         edi, 796
+                            call        comm_stno
+                            LOAD_STR    S_Parse_SP_Error
                             FAIL_BR     Ln_529
                             SET_OUTPUT
 
                             jmp         Ln_529
 
 ; ======================================================================================================================
-Ln_529:                     lea         rdi, [rel S_Src]
+Ln_529:                     mov         edi, 797
+                            call        comm_stno
+                            lea         rdi, [rel S_Src]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -10428,14 +11463,18 @@ Ln_529:                     lea         rdi, [rel S_Src]
 
 Ln_530:
 ;  mainErr2 ============================================================================================================
-L_mainErr2_167:             LOAD_STR    S_Internal_SP_Error
+L_mainErr2_167:             mov         edi, 798
+                            call        comm_stno
+                            LOAD_STR    S_Internal_SP_Error
                             FAIL_BR     Ln_531
                             SET_OUTPUT
 
                             jmp         Ln_531
 
 ; ======================================================================================================================
-Ln_531:                     lea         rdi, [rel S_Src]
+Ln_531:                     mov         edi, 799
+                            call        comm_stno
+                            lea         rdi, [rel S_Src]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -13156,23 +14195,23 @@ S_Gray               db 71, 114, 97, 121, 0  ; "Gray"
 S_White              db 87, 104, 105, 116, 101, 0  ; "White"
 S_tab                db 116, 97, 98, 0  ; "tab"
 S_upr                db 117, 112, 114, 0  ; "upr"
-S_ABORT_SP_CONTINUE_SP_END_SP_FRETURN_SP_NRETURN_SP_RETURN_SP_S db 65, 66, 79, 82, 84, 32, 67, 79, 78, 84, 73, 78, 85, 69, 32, 69, 78, 68, 32, 70, 82, 69, 84, 85, 82, 78, 32, 78, 82, 69, 84, 85, 82, 78, 32, 82, 69, 84, 85, 82, 78, 32, 83, 67, 79, 78, 84, 73, 78, 85, 69, 32, 83, 84, 65, 82, 84, 0  ; "ABORT CONTINUE END FRETURN NRETURN RETURN SCONTINUE START"
-S_ABORT_SP_ARB_SP_BAL_SP_FAIL_SP_FENCE_SP_INPUT_SP_OUTPUT_SP_RE db 65, 66, 79, 82, 84, 32, 65, 82, 66, 32, 66, 65, 76, 32, 70, 65, 73, 76, 32, 70, 69, 78, 67, 69, 32, 73, 78, 80, 85, 84, 32, 79, 85, 84, 80, 85, 84, 32, 82, 69, 77, 32, 84, 69, 82, 77, 73, 78, 65, 76, 0  ; "ABORT ARB BAL FAIL FENCE INPUT OUTPUT REM TERMINAL"
+S_ABORT_SP_CONTINUE_SP_END_SP_FRETURN_SP_NRETURN_SP_RETURN_SP_SCONTINUE_SP_START db 65, 66, 79, 82, 84, 32, 67, 79, 78, 84, 73, 78, 85, 69, 32, 69, 78, 68, 32, 70, 82, 69, 84, 85, 82, 78, 32, 78, 82, 69, 84, 85, 82, 78, 32, 82, 69, 84, 85, 82, 78, 32, 83, 67, 79, 78, 84, 73, 78, 85, 69, 32, 83, 84, 65, 82, 84, 0  ; "ABORT CONTINUE END FRETURN NRETURN RETURN SCONTINUE START"
+S_ABORT_SP_ARB_SP_BAL_SP_FAIL_SP_FENCE_SP_INPUT_SP_OUTPUT_SP_REM_SP_TERMINAL db 65, 66, 79, 82, 84, 32, 65, 82, 66, 32, 66, 65, 76, 32, 70, 65, 73, 76, 32, 70, 69, 78, 67, 69, 32, 73, 78, 80, 85, 84, 32, 79, 85, 84, 80, 85, 84, 32, 82, 69, 77, 32, 84, 69, 82, 77, 73, 78, 65, 76, 0  ; "ABORT ARB BAL FAIL FENCE INPUT OUTPUT REM TERMINAL"
 S_STCOUNT_SP_STNO_SP_SUCCEED_SP_UCASE db 83, 84, 67, 79, 85, 78, 84, 32, 83, 84, 78, 79, 32, 83, 85, 67, 67, 69, 69, 68, 32, 85, 67, 65, 83, 69, 0  ; "STCOUNT STNO SUCCEED UCASE"
-S_LASTFILE_SP_LASTLINE_SP_LASTNO_SP_LCASE_SP_LINE_SP_REM_SP_RTN db 76, 65, 83, 84, 70, 73, 76, 69, 32, 76, 65, 83, 84, 76, 73, 78, 69, 32, 76, 65, 83, 84, 78, 79, 32, 76, 67, 65, 83, 69, 32, 76, 73, 78, 69, 32, 82, 69, 77, 32, 82, 84, 78, 84, 89, 80, 69, 32, 0  ; "LASTFILE LASTLINE LASTNO LCASE LINE REM RTNTYPE "
-S_ABORT_SP_ALPHABET_SP_ARB_SP_BAL_SP_FAIL_SP_FENCE_SP_FILE_SP_F db 65, 66, 79, 82, 84, 32, 65, 76, 80, 72, 65, 66, 69, 84, 32, 65, 82, 66, 32, 66, 65, 76, 32, 70, 65, 73, 76, 32, 70, 69, 78, 67, 69, 32, 70, 73, 76, 69, 32, 70, 78, 67, 76, 69, 86, 69, 76, 32, 0  ; "ABORT ALPHABET ARB BAL FAIL FENCE FILE FNCLEVEL "
+S_LASTFILE_SP_LASTLINE_SP_LASTNO_SP_LCASE_SP_LINE_SP_REM_SP_RTNTYPE_SP db 76, 65, 83, 84, 70, 73, 76, 69, 32, 76, 65, 83, 84, 76, 73, 78, 69, 32, 76, 65, 83, 84, 78, 79, 32, 76, 67, 65, 83, 69, 32, 76, 73, 78, 69, 32, 82, 69, 77, 32, 82, 84, 78, 84, 89, 80, 69, 32, 0  ; "LASTFILE LASTLINE LASTNO LCASE LINE REM RTNTYPE "
+S_ABORT_SP_ALPHABET_SP_ARB_SP_BAL_SP_FAIL_SP_FENCE_SP_FILE_SP_FNCLEVEL_SP db 65, 66, 79, 82, 84, 32, 65, 76, 80, 72, 65, 66, 69, 84, 32, 65, 82, 66, 32, 66, 65, 76, 32, 70, 65, 73, 76, 32, 70, 69, 78, 67, 69, 32, 70, 73, 76, 69, 32, 70, 78, 67, 76, 69, 86, 69, 76, 32, 0  ; "ABORT ALPHABET ARB BAL FAIL FENCE FILE FNCLEVEL "
 S_PROFILE_SP_STLIMIT_SP_TRACE_SP_TRIM_SP_FULLSCAN db 80, 82, 79, 70, 73, 76, 69, 32, 83, 84, 76, 73, 77, 73, 84, 32, 84, 82, 65, 67, 69, 32, 84, 82, 73, 77, 32, 70, 85, 76, 76, 83, 67, 65, 78, 0  ; "PROFILE STLIMIT TRACE TRIM FULLSCAN"
-S_ERRTEXT_SP_ERRTYPE_SP_FTRACE_SP_INPUT_SP_MAXLNGTH_SP_OUTPUT_S db 69, 82, 82, 84, 69, 88, 84, 32, 69, 82, 82, 84, 89, 80, 69, 32, 70, 84, 82, 65, 67, 69, 32, 73, 78, 80, 85, 84, 32, 77, 65, 88, 76, 78, 71, 84, 72, 32, 79, 85, 84, 80, 85, 84, 32, 0  ; "ERRTEXT ERRTYPE FTRACE INPUT MAXLNGTH OUTPUT "
-S_ABEND_SP_ANCHOR_SP_CASE_SP_CODE_SP_COMPARE_SP_DUMP_SP_ERRLIMI db 65, 66, 69, 78, 68, 32, 65, 78, 67, 72, 79, 82, 32, 67, 65, 83, 69, 32, 67, 79, 68, 69, 32, 67, 79, 77, 80, 65, 82, 69, 32, 68, 85, 77, 80, 32, 69, 82, 82, 76, 73, 77, 73, 84, 32, 0  ; "ABEND ANCHOR CASE CODE COMPARE DUMP ERRLIMIT "
-S_SUBSTR_SP_TAB_SP_TABLE_SP_TAN_SP_TIME_SP_TRACE_SP_TRIM_SP_UNL db 83, 85, 66, 83, 84, 82, 32, 84, 65, 66, 32, 84, 65, 66, 76, 69, 32, 84, 65, 78, 32, 84, 73, 77, 69, 32, 84, 82, 65, 67, 69, 32, 84, 82, 73, 77, 32, 85, 78, 76, 79, 65, 68, 0  ; "SUBSTR TAB TABLE TAN TIME TRACE TRIM UNLOAD"
-S_RSORT_SP_RTAB_SP_SET_SP_SETEXIT_SP_SIN_SP_SIZE_SP_SORT_SP_SPA db 82, 83, 79, 82, 84, 32, 82, 84, 65, 66, 32, 83, 69, 84, 32, 83, 69, 84, 69, 88, 73, 84, 32, 83, 73, 78, 32, 83, 73, 90, 69, 32, 83, 79, 82, 84, 32, 83, 80, 65, 78, 32, 83, 81, 82, 84, 32, 83, 84, 79, 80, 84, 82, 32, 0  ; "RSORT RTAB SET SETEXIT SIN SIZE SORT SPAN SQRT STOPTR "
-S_POS_SP_PROTOTYPE_SP_REMDR_SP_REPLACE_SP_REVERSE_SP_REWIND_SP_ db 80, 79, 83, 32, 80, 82, 79, 84, 79, 84, 89, 80, 69, 32, 82, 69, 77, 68, 82, 32, 82, 69, 80, 76, 65, 67, 69, 32, 82, 69, 86, 69, 82, 83, 69, 32, 82, 69, 87, 73, 78, 68, 32, 82, 80, 65, 68, 32, 82, 80, 79, 83, 32, 0  ; "POS PROTOTYPE REMDR REPLACE REVERSE REWIND RPAD RPOS "
-S_LLT_SP_LN_SP_LNE_SP_LOAD_SP_LOCAL_SP_LPAD_SP_LT_SP_NE_SP_NOTA db 76, 76, 84, 32, 76, 78, 32, 76, 78, 69, 32, 76, 79, 65, 68, 32, 76, 79, 67, 65, 76, 32, 76, 80, 65, 68, 32, 76, 84, 32, 78, 69, 32, 78, 79, 84, 65, 78, 89, 32, 79, 80, 83, 89, 78, 32, 79, 85, 84, 80, 85, 84, 32, 0  ; "LLT LN LNE LOAD LOCAL LPAD LT NE NOTANY OPSYN OUTPUT "
-S_IDENT_SP_INPUT_SP_INTEGER_SP_ITEM_SP_LE_SP_LEN_SP_LEQ_SP_LGE_ db 73, 68, 69, 78, 84, 32, 73, 78, 80, 85, 84, 32, 73, 78, 84, 69, 71, 69, 82, 32, 73, 84, 69, 77, 32, 76, 69, 32, 76, 69, 78, 32, 76, 69, 81, 32, 76, 71, 69, 32, 76, 71, 84, 32, 76, 76, 69, 32, 0  ; "IDENT INPUT INTEGER ITEM LE LEN LEQ LGE LGT LLE "
-S_ENDFILE_SP_EQ_SP_EVAL_SP_EXIT_SP_EXP_SP_FENCE_SP_FIELD_SP_GE_ db 69, 78, 68, 70, 73, 76, 69, 32, 69, 81, 32, 69, 86, 65, 76, 32, 69, 88, 73, 84, 32, 69, 88, 80, 32, 70, 69, 78, 67, 69, 32, 70, 73, 69, 76, 68, 32, 71, 69, 32, 71, 84, 32, 72, 79, 83, 84, 32, 0  ; "ENDFILE EQ EVAL EXIT EXP FENCE FIELD GE GT HOST "
-S_DATATYPE_SP_DATE_SP_DEFINE_SP_DETACH_SP_DIFFER_SP_DUMP_SP_DUP db 68, 65, 84, 65, 84, 89, 80, 69, 32, 68, 65, 84, 69, 32, 68, 69, 70, 73, 78, 69, 32, 68, 69, 84, 65, 67, 72, 32, 68, 73, 70, 70, 69, 82, 32, 68, 85, 77, 80, 32, 68, 85, 80, 76, 32, 69, 74, 69, 67, 84, 32, 0  ; "DATATYPE DATE DEFINE DETACH DIFFER DUMP DUPL EJECT "
-S_CHAR_SP_CHOP_SP_CLEAR_SP_CODE_SP_COLLECT_SP_CONVERT_SP_COPY_S db 67, 72, 65, 82, 32, 67, 72, 79, 80, 32, 67, 76, 69, 65, 82, 32, 67, 79, 68, 69, 32, 67, 79, 76, 76, 69, 67, 84, 32, 67, 79, 78, 86, 69, 82, 84, 32, 67, 79, 80, 89, 32, 67, 79, 83, 32, 68, 65, 84, 65, 32, 0  ; "CHAR CHOP CLEAR CODE COLLECT CONVERT COPY COS DATA "
-S_ANY_SP_APPLY_SP_ARBNO_SP_ARG_SP_ARRAY_SP_ATAN_SP_BACKSPACE_SP db 65, 78, 89, 32, 65, 80, 80, 76, 89, 32, 65, 82, 66, 78, 79, 32, 65, 82, 71, 32, 65, 82, 82, 65, 89, 32, 65, 84, 65, 78, 32, 66, 65, 67, 75, 83, 80, 65, 67, 69, 32, 66, 82, 69, 65, 75, 32, 66, 82, 69, 65, 75, 88, 32, 0  ; "ANY APPLY ARBNO ARG ARRAY ATAN BACKSPACE BREAK BREAKX "
+S_ERRTEXT_SP_ERRTYPE_SP_FTRACE_SP_INPUT_SP_MAXLNGTH_SP_OUTPUT_SP db 69, 82, 82, 84, 69, 88, 84, 32, 69, 82, 82, 84, 89, 80, 69, 32, 70, 84, 82, 65, 67, 69, 32, 73, 78, 80, 85, 84, 32, 77, 65, 88, 76, 78, 71, 84, 72, 32, 79, 85, 84, 80, 85, 84, 32, 0  ; "ERRTEXT ERRTYPE FTRACE INPUT MAXLNGTH OUTPUT "
+S_ABEND_SP_ANCHOR_SP_CASE_SP_CODE_SP_COMPARE_SP_DUMP_SP_ERRLIMIT_SP db 65, 66, 69, 78, 68, 32, 65, 78, 67, 72, 79, 82, 32, 67, 65, 83, 69, 32, 67, 79, 68, 69, 32, 67, 79, 77, 80, 65, 82, 69, 32, 68, 85, 77, 80, 32, 69, 82, 82, 76, 73, 77, 73, 84, 32, 0  ; "ABEND ANCHOR CASE CODE COMPARE DUMP ERRLIMIT "
+S_SUBSTR_SP_TAB_SP_TABLE_SP_TAN_SP_TIME_SP_TRACE_SP_TRIM_SP_UNLOAD db 83, 85, 66, 83, 84, 82, 32, 84, 65, 66, 32, 84, 65, 66, 76, 69, 32, 84, 65, 78, 32, 84, 73, 77, 69, 32, 84, 82, 65, 67, 69, 32, 84, 82, 73, 77, 32, 85, 78, 76, 79, 65, 68, 0  ; "SUBSTR TAB TABLE TAN TIME TRACE TRIM UNLOAD"
+S_RSORT_SP_RTAB_SP_SET_SP_SETEXIT_SP_SIN_SP_SIZE_SP_SORT_SP_SPAN_SP_SQRT_SP_STOPTR_SP db 82, 83, 79, 82, 84, 32, 82, 84, 65, 66, 32, 83, 69, 84, 32, 83, 69, 84, 69, 88, 73, 84, 32, 83, 73, 78, 32, 83, 73, 90, 69, 32, 83, 79, 82, 84, 32, 83, 80, 65, 78, 32, 83, 81, 82, 84, 32, 83, 84, 79, 80, 84, 82, 32, 0  ; "RSORT RTAB SET SETEXIT SIN SIZE SORT SPAN SQRT STOPTR "
+S_POS_SP_PROTOTYPE_SP_REMDR_SP_REPLACE_SP_REVERSE_SP_REWIND_SP_RPAD_SP_RPOS_SP db 80, 79, 83, 32, 80, 82, 79, 84, 79, 84, 89, 80, 69, 32, 82, 69, 77, 68, 82, 32, 82, 69, 80, 76, 65, 67, 69, 32, 82, 69, 86, 69, 82, 83, 69, 32, 82, 69, 87, 73, 78, 68, 32, 82, 80, 65, 68, 32, 82, 80, 79, 83, 32, 0  ; "POS PROTOTYPE REMDR REPLACE REVERSE REWIND RPAD RPOS "
+S_LLT_SP_LN_SP_LNE_SP_LOAD_SP_LOCAL_SP_LPAD_SP_LT_SP_NE_SP_NOTANY_SP_OPSYN_SP_OUTPUT_SP db 76, 76, 84, 32, 76, 78, 32, 76, 78, 69, 32, 76, 79, 65, 68, 32, 76, 79, 67, 65, 76, 32, 76, 80, 65, 68, 32, 76, 84, 32, 78, 69, 32, 78, 79, 84, 65, 78, 89, 32, 79, 80, 83, 89, 78, 32, 79, 85, 84, 80, 85, 84, 32, 0  ; "LLT LN LNE LOAD LOCAL LPAD LT NE NOTANY OPSYN OUTPUT "
+S_IDENT_SP_INPUT_SP_INTEGER_SP_ITEM_SP_LE_SP_LEN_SP_LEQ_SP_LGE_SP_LGT_SP_LLE_SP db 73, 68, 69, 78, 84, 32, 73, 78, 80, 85, 84, 32, 73, 78, 84, 69, 71, 69, 82, 32, 73, 84, 69, 77, 32, 76, 69, 32, 76, 69, 78, 32, 76, 69, 81, 32, 76, 71, 69, 32, 76, 71, 84, 32, 76, 76, 69, 32, 0  ; "IDENT INPUT INTEGER ITEM LE LEN LEQ LGE LGT LLE "
+S_ENDFILE_SP_EQ_SP_EVAL_SP_EXIT_SP_EXP_SP_FENCE_SP_FIELD_SP_GE_SP_GT_SP_HOST_SP db 69, 78, 68, 70, 73, 76, 69, 32, 69, 81, 32, 69, 86, 65, 76, 32, 69, 88, 73, 84, 32, 69, 88, 80, 32, 70, 69, 78, 67, 69, 32, 70, 73, 69, 76, 68, 32, 71, 69, 32, 71, 84, 32, 72, 79, 83, 84, 32, 0  ; "ENDFILE EQ EVAL EXIT EXP FENCE FIELD GE GT HOST "
+S_DATATYPE_SP_DATE_SP_DEFINE_SP_DETACH_SP_DIFFER_SP_DUMP_SP_DUPL_SP_EJECT_SP db 68, 65, 84, 65, 84, 89, 80, 69, 32, 68, 65, 84, 69, 32, 68, 69, 70, 73, 78, 69, 32, 68, 69, 84, 65, 67, 72, 32, 68, 73, 70, 70, 69, 82, 32, 68, 85, 77, 80, 32, 68, 85, 80, 76, 32, 69, 74, 69, 67, 84, 32, 0  ; "DATATYPE DATE DEFINE DETACH DIFFER DUMP DUPL EJECT "
+S_CHAR_SP_CHOP_SP_CLEAR_SP_CODE_SP_COLLECT_SP_CONVERT_SP_COPY_SP_COS_SP_DATA_SP db 67, 72, 65, 82, 32, 67, 72, 79, 80, 32, 67, 76, 69, 65, 82, 32, 67, 79, 68, 69, 32, 67, 79, 76, 76, 69, 67, 84, 32, 67, 79, 78, 86, 69, 82, 84, 32, 67, 79, 80, 89, 32, 67, 79, 83, 32, 68, 65, 84, 65, 32, 0  ; "CHAR CHOP CLEAR CODE COLLECT CONVERT COPY COS DATA "
+S_ANY_SP_APPLY_SP_ARBNO_SP_ARG_SP_ARRAY_SP_ATAN_SP_BACKSPACE_SP_BREAK_SP_BREAKX_SP db 65, 78, 89, 32, 65, 80, 80, 76, 89, 32, 65, 82, 66, 78, 79, 32, 65, 82, 71, 32, 65, 82, 82, 65, 89, 32, 65, 84, 65, 78, 32, 66, 65, 67, 75, 83, 80, 65, 67, 69, 32, 66, 82, 69, 65, 75, 32, 66, 82, 69, 65, 75, 88, 32, 0  ; "ANY APPLY ARBNO ARG ARRAY ATAN BACKSPACE BREAK BREAKX "
 S_QM                 db 63, 0  ; "?"
 S_OR                 db 124, 0  ; "|"
 S_SL                 db 47, 0  ; "/"

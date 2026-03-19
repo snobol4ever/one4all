@@ -34,8 +34,9 @@ int monitor_fd = -1;   /* -1 = disabled; set to 2 for stderr */
 int64_t kw_stcount = 0;
 
 void comm_stno(int n) {
-    /* Enforce &STLIMIT (patch P001 — was declared but never checked) */
-    if (kw_stlimit >= 0 && ++kw_stcount > kw_stlimit) {
+    /* Always increment &STCOUNT; enforce &STLIMIT only when set (patch P001) */
+    ++kw_stcount;
+    if (kw_stlimit >= 0 && kw_stcount > kw_stlimit) {
         fprintf(stderr, "\n** &STLIMIT exceeded at statement %d"
                         " (&STCOUNT=%lld &STLIMIT=%lld)\n",
                 n, (long long)kw_stcount, (long long)kw_stlimit);

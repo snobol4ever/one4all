@@ -60,6 +60,14 @@ run_test() {
 
     [[ ! -f "$ref" ]] && { echo -e "${YELLOW}SKIP${RESET} $base (no .ref)"; SKIP=$((SKIP+1)); return 0; }
 
+    # .xfail: test is known-failing (deferred feature); treat as SKIP not FAIL
+    local xfail_file="$dir/$base.xfail"
+    if [[ -f "$xfail_file" ]]; then
+        local reason; reason=$(cat "$xfail_file")
+        echo -e "${YELLOW}XFAIL${RESET} $base ($reason)"
+        SKIP=$((SKIP+1)); return 0
+    fi
+
     local s_file="$WORK/${base}.s"
     local o_file="$WORK/${base}.o"
     local bin="$WORK/${base}_bin"

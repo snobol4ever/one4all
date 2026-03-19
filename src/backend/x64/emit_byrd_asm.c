@@ -3160,6 +3160,7 @@ static void asm_emit_program(Program *prog) {
     A("    extern  stmt_any_var, stmt_notany_var\n");
     A("    extern  stmt_at_capture\n");
     A("    extern  kw_anchor\n");
+    A("    extern  comm_stno\n");
     A("    global  cursor, subject_data, subject_len_val\n");
     A("\n");
     /* subject_data/subject_len_val/cursor: defined here, exported for stmt_rt.c */
@@ -3242,6 +3243,11 @@ static void asm_emit_program(Program *prog) {
         int id_s = tgt_s ? prog_label_id(tgt_s) : -1;
         int id_f = tgt_f ? prog_label_id(tgt_f) : -1;
         int id_u = tgt_u ? prog_label_id(tgt_u) : -1;
+
+        /* Increment &STCOUNT / &STNO: call comm_stno(lineno) at top of every stmt.
+         * Mirrors trampoline_stno() in the C backend. */
+        A("    mov     edi, %d\n", s->lineno);
+        A("    call    comm_stno\n");
 
         /* Case 1: pattern-free assignment or expression */
         if (!s->pattern) {

@@ -18,6 +18,7 @@ extern  stmt_breakx_var, stmt_breakx_lit
 extern  stmt_any_var, stmt_notany_var
 extern  stmt_at_capture
 extern  kw_anchor
+extern  comm_stno
 global  cursor, subject_data, subject_len_val
 
 section .note.GNU-stack noalloc noexec nowrite progbits
@@ -41,17 +42,23 @@ main:
 
 ;  PROGRAM BODY ========================================================================================================
 
+                            mov         edi, 5
+                            call        comm_stno
                             ASSIGN_INT  S_TRIM, 1, Ln_0
                             jmp         Ln_0
 
 ; ======================================================================================================================
 
 ; ======================================================================================================================
-Ln_0:                       ASSIGN_STR  S_NUMERALS, S_0123456789, Ln_1
+Ln_0:                       mov         edi, 6
+                            call        comm_stno
+                            ASSIGN_STR  S_NUMERALS, S_0123456789, Ln_1
                             jmp         Ln_1
 
 ; ======================================================================================================================
-Ln_1:                       CAT2_SV     S_XX_MI, S_NUMERALS
+Ln_1:                       mov         edi, 7
+                            call        comm_stno
+                            CAT2_SV     S_XX_MI, S_NUMERALS
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             lea         rdi, [rel S_AM_UCASE]
@@ -83,7 +90,9 @@ Ln_1:                       CAT2_SV     S_XX_MI, S_NUMERALS
                             jmp         Ln_2
 
 ; ======================================================================================================================
-Ln_2:                       CALL1_VAR   S_BREAK, S_WORD
+Ln_2:                       mov         edi, 8
+                            call        comm_stno
+                            CALL1_VAR   S_BREAK, S_WORD
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             CALL1_VAR   S_SPAN, S_WORD
@@ -100,7 +109,9 @@ Ln_2:                       CALL1_VAR   S_BREAK, S_WORD
 
 Ln_3:
 ;  NEXTL ===============================================================================================================
-L_NEXTL_0:                  lea         rdi, [rel S_INPUT]
+L_NEXTL_0:                  mov         edi, 9
+                            call        comm_stno
+                            lea         rdi, [rel S_INPUT]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -111,7 +122,9 @@ Lf_4:                       jmp         L_DONE_1
 
 Ln_4:
 ;  NEXTW ===============================================================================================================
-L_NEXTW_2:                  GET_VAR     S_LINE
+L_NEXTW_2:                  mov         edi, 10
+                            call        comm_stno
+                            GET_VAR     S_LINE
                             SUBJ_FROM16
 
                             mov         qword [scan_start_5], 0
@@ -152,14 +165,18 @@ P_5_ω:                      cmp         qword [rel kw_anchor], 0
                             jmp         L_NEXTL_0
 
 ; ======================================================================================================================
-Ln_5:                       CONC2_VI    S_add, S_N, 1
+Ln_5:                       mov         edi, 11
+                            call        comm_stno
+                            CONC2_VI    S_add, S_N, 1
                             FAIL_BR     Ln_6
                             SET_VAR     S_N
                             jmp         L_NEXTW_2
 
 Ln_6:
 ;  DONE ================================================================================================================
-L_DONE_1:                   CAT2_VS     S_N, S_SP_words
+L_DONE_1:                   mov         edi, 12
+                            call        comm_stno
+                            CAT2_VS     S_N, S_SP_words
                             FAIL_BR     Ln_7
                             SET_OUTPUT
 
