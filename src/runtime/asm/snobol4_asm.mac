@@ -564,6 +564,17 @@
     jmp     %2
 %endmacro
 
+; POS_ALPHA_VAR varlab, cursor, gamma, omega
+; =============================================================================
+%macro POS_ALPHA_VAR 4        ; varlab, cursor, gamma, omega
+    lea     rdi, [rel %1]
+    mov     rsi, [%2]
+    call    stmt_pos_var
+    test    eax, eax
+    jz      %4
+    jmp     %3
+%endmacro
+
 ; =============================================================================
 ; RPOS_ALPHA n, cursor, subj_len, gamma, omega
 ; =============================================================================
@@ -579,6 +590,18 @@
 
 %macro RPOS_BETA 2            ; cursor, omega
     jmp     %2
+%endmacro
+
+; RPOS_ALPHA_VAR varlab, cursor, subj_len, gamma, omega
+; =============================================================================
+%macro RPOS_ALPHA_VAR 5       ; varlab, cursor, subj_len, gamma, omega
+    lea     rdi, [rel %1]
+    mov     rsi, [%2]
+    mov     rdx, [%3]
+    call    stmt_rpos_var
+    test    eax, eax
+    jz      %5
+    jmp     %4
 %endmacro
 
 ; =============================================================================

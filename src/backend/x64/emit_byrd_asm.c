@@ -526,12 +526,29 @@ static void emit_asm_pos(long n,
     ALF(beta,  "POS_BETA    %s, %s\n", cursor, omega);
 }
 
+static void emit_asm_pos_var(const char *varlab,
+                              const char *alpha, const char *beta,
+                              const char *gamma, const char *omega,
+                              const char *cursor) {
+    ALFC(alpha, "POS(var)", "POS_ALPHA_VAR %s, %s, %s, %s\n", varlab, cursor, gamma, omega);
+    ALF(beta,  "POS_BETA    %s, %s\n", cursor, omega);
+}
+
 static void emit_asm_rpos(long n,
                            const char *alpha, const char *beta,
                            const char *gamma, const char *omega,
                            const char *cursor,
                            const char *subj_len_sym) {
     ALFC(alpha, "RPOS(%ld)", "RPOS_ALPHA  %ld, %s, %s, %s, %s\n", n, cursor, subj_len_sym, gamma, omega);
+    ALF(beta,  "RPOS_BETA   %s, %s\n", cursor, omega);
+}
+
+static void emit_asm_rpos_var(const char *varlab,
+                               const char *alpha, const char *beta,
+                               const char *gamma, const char *omega,
+                               const char *cursor,
+                               const char *subj_len_sym) {
+    ALFC(alpha, "RPOS(var)", "RPOS_ALPHA_VAR %s, %s, %s, %s, %s\n", varlab, cursor, subj_len_sym, gamma, omega);
     ALF(beta,  "RPOS_BETA   %s, %s\n", cursor, omega);
 }
 
@@ -1164,12 +1181,22 @@ static void emit_asm_node(EXPR_t *pat,
     case E_FNC:
         if (pat->sval && strcasecmp(pat->sval, "POS") == 0 && pat->nargs == 1) {
             EXPR_t *arg = pat->args[0];
-            long n = (arg->kind == E_ILIT) ? arg->ival : 0;
-            emit_asm_pos(n, alpha, beta, gamma, omega, cursor);
+            if (arg->kind == E_VART && arg->sval) {
+                const char *varlab = prog_str_intern(arg->sval);
+                emit_asm_pos_var(varlab, alpha, beta, gamma, omega, cursor);
+            } else {
+                long n = (arg->kind == E_ILIT) ? arg->ival : 0;
+                emit_asm_pos(n, alpha, beta, gamma, omega, cursor);
+            }
         } else if (pat->sval && strcasecmp(pat->sval, "RPOS") == 0 && pat->nargs == 1) {
             EXPR_t *arg = pat->args[0];
-            long n = (arg->kind == E_ILIT) ? arg->ival : 0;
-            emit_asm_rpos(n, alpha, beta, gamma, omega, cursor, subj_len_sym);
+            if (arg->kind == E_VART && arg->sval) {
+                const char *varlab = prog_str_intern(arg->sval);
+                emit_asm_rpos_var(varlab, alpha, beta, gamma, omega, cursor, subj_len_sym);
+            } else {
+                long n = (arg->kind == E_ILIT) ? arg->ival : 0;
+                emit_asm_rpos(n, alpha, beta, gamma, omega, cursor, subj_len_sym);
+            }
         } else if (pat->sval && strcasecmp(pat->sval, "ARBNO") == 0 && pat->nargs == 1) {
             emit_asm_arbno(pat->args[0],
                            alpha, beta, gamma, omega,
@@ -2975,6 +3002,7 @@ static void asm_emit_program(Program *prog) {
     A("    extern  stmt_setup_subject, stmt_apply_replacement\n");
     A("    extern  stmt_apply_replacement_splice\n");
     A("    extern  stmt_set_capture, stmt_match_var\n");
+    A("    extern  stmt_pos_var, stmt_rpos_var\n");
     A("    extern  kw_anchor\n");
     A("    global  cursor, subject_data, subject_len_val\n");
     A("\n");

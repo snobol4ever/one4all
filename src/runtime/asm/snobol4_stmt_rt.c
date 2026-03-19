@@ -26,6 +26,12 @@
  *   int    stmt_is_fail(DESCR_t v)               → eax (0=ok, 1=fail)
  *       Returns 1 if descriptor is FAIL, 0 otherwise.
  *
+ *   int    stmt_pos_var(const char *varname, int64_t cursor)  → eax
+ *       POS(variable): fetch var, coerce to int, return 1 if cursor==n.
+ *
+ *   int    stmt_rpos_var(const char *varname, int64_t cursor, int64_t subj_len) → eax
+ *       RPOS(variable): fetch var, coerce to int, return 1 if cursor==subj_len-n.
+ *
  *   DESCR_t stmt_input(void)                     → rax:rdx
  *       Read one line from INPUT (stdin).  Returns FAILDESCR on EOF.
  *
@@ -92,6 +98,22 @@ void stmt_set_indirect(DESCR_t name_val, DESCR_t val) {
 }
 
 
+
+/* ---- POS(variable) — fetch var, coerce to int, compare with cursor ---- */
+
+int stmt_pos_var(const char *varname, int64_t cursor) {
+    DESCR_t v = NV_GET_fn(varname);
+    int64_t n = to_int(v);
+    return (cursor == n) ? 1 : 0;
+}
+
+/* ---- RPOS(variable) — fetch var, coerce to int, check from right ---- */
+
+int stmt_rpos_var(const char *varname, int64_t cursor, int64_t subj_len) {
+    DESCR_t v = NV_GET_fn(varname);
+    int64_t n = to_int(v);
+    return (cursor == subj_len - n) ? 1 : 0;
+}
 
 /* ---- fail test ---- */
 
