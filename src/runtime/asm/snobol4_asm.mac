@@ -139,6 +139,17 @@
 %endmacro
 
 ; -----------------------------------------------------------------------------
+; LOAD_REAL flab — make real (double) DESCR_t at [rbp-32]
+;   flab is a .data label holding a 64-bit IEEE 754 double (dq)
+; -----------------------------------------------------------------------------
+%macro LOAD_REAL 1
+    lea     rdi, [rel %1]
+    call    stmt_realval
+    mov     [rbp-32], rax
+    mov     [rbp-24], rdx
+%endmacro
+
+; -----------------------------------------------------------------------------
 ; CHECK_FAIL succeed, fail — branch on IS_FAIL of [rbp-32]
 ; -----------------------------------------------------------------------------
 %macro CHECK_FAIL 2
@@ -927,6 +938,27 @@
     mov     rsi, [rbp-32]
     mov     rdx, [rbp-24]
     call    stmt_set
+%endmacro
+
+; -----------------------------------------------------------------------------
+; ASSIGN_NULL var
+;   var =   (null assignment — clears var to empty string / NULVCL)
+; -----------------------------------------------------------------------------
+%macro ASSIGN_NULL 1          ; var_strlab
+    lea     rdi, [rel %1]
+    call    stmt_set_null
+%endmacro
+
+; -----------------------------------------------------------------------------
+; SET_VAR_INDIR
+;   $name = val  — indirect assignment: [rbp-16/8] = name DESCR_t, [rbp-32/24] = val DESCR_t
+; -----------------------------------------------------------------------------
+%macro SET_VAR_INDIR 0
+    mov     rdi, [rbp-16]
+    mov     rsi, [rbp-8]
+    mov     rdx, [rbp-32]
+    mov     rcx, [rbp-24]
+    call    stmt_set_indirect
 %endmacro
 
 ; -----------------------------------------------------------------------------

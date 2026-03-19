@@ -4,11 +4,14 @@
 %include "snobol4_asm.mac"
 global  main
 extern  stmt_init, stmt_strval, stmt_intval
+extern  stmt_realval, stmt_set_null, stmt_set_indirect
 extern  stmt_get, stmt_set, stmt_output, stmt_input
 extern  stmt_concat, stmt_is_fail, stmt_finish
+extern  stmt_realval, stmt_set_null, stmt_set_indirect
 extern  stmt_apply, stmt_goto_dispatch
 extern  stmt_setup_subject, stmt_apply_replacement
 extern  stmt_set_capture, stmt_match_var
+extern  kw_anchor
 global  cursor, subject_data, subject_len_val
 
 section .note.GNU-stack noalloc noexec nowrite progbits
@@ -33,6 +36,8 @@ main:
 ;  PROGRAM BODY ========================================================================================================
 
                             GET_VAR     S_AM_TRIM
+                            ASSIGN_INT  S_TRIM, 1, Ln_0
+                            jmp         Ln_0
 
 ; ======================================================================================================================
 
@@ -132,10 +137,12 @@ nref0_gamma:
 nref0_omega:                jmp         P_5_ω
 
 P_5_γ:                      jmp         Ln_5
-P_5_ω:                      mov         rax, [scan_start_5]
+P_5_ω:                      cmp         qword [rel kw_anchor], 0
+                            jne         L_NEXTL_0
+                            mov         rax, [scan_start_5]
                             inc         rax
                             cmp         rax, [subject_len_val]
-                            jg          Ln_5
+                            jg          L_NEXTL_0
                             mov         [scan_start_5], rax
                             jmp         scan_retry_5
                             jmp         L_NEXTL_0

@@ -31,6 +31,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <ctype.h>
+#include <stdint.h>
 
 /* -----------------------------------------------------------------------
  * Output helpers
@@ -1914,6 +1915,36 @@ static void prog_str_emit_data(void) {
     }
 }
 
+/* ---- float literal registry ---- */
+#define MAX_PROG_FLTS 256
+typedef struct { char label[32]; double val; } ProgFlt;
+static ProgFlt prog_flts[MAX_PROG_FLTS];
+static int     prog_flt_count = 0;
+
+static void prog_flt_reset(void) { prog_flt_count = 0; }
+
+static const char *prog_flt_intern(double d) {
+    uint64_t b; memcpy(&b, &d, 8);
+    for (int i = 0; i < prog_flt_count; i++) {
+        uint64_t a; memcpy(&a, &prog_flts[i].val, 8);
+        if (a == b) return prog_flts[i].label;
+    }
+    if (prog_flt_count >= MAX_PROG_FLTS) return "F_overflow";
+    ProgFlt *e = &prog_flts[prog_flt_count++];
+    snprintf(e->label, sizeof e->label, "F_%d", prog_flt_count);
+    e->val = d;
+    return e->label;
+}
+
+static void prog_flt_emit_data(void) {
+    for (int i = 0; i < prog_flt_count; i++) {
+        uint64_t bits; memcpy(&bits, &prog_flts[i].val, 8);
+        A("%-20s dq 0x%016llx  ; %g\n",
+          prog_flts[i].label, (unsigned long long)bits, prog_flts[i].val);
+    }
+}
+
+
 /* ---- expression value into DESCR_t on stack ----
  * Emits code to evaluate expr and store DESCR_t at [rbp+off].
  * Returns 1 if value might fail (needs is_fail check), 0 if always succeeds.
@@ -1950,6 +1981,18 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
             A("    mov     [rbp%+d], rdx\n", rbp_off+8);
         }
         return 0;
+    case E_FLIT: {
+        const char *flab = prog_flt_intern(e->dval);
+        A("    LOAD_REAL   %s\n", flab);
+        if (rbp_off == -16) {
+            A("    mov     [rbp-16], rax\n");
+            A("    mov     [rbp-8],  rdx\n");
+        } else if (rbp_off != -32) {
+            A("    mov     [rbp%+d], rax\n", rbp_off);
+            A("    mov     [rbp%+d], rdx\n", rbp_off+8);
+        }
+        return 0;
+    }
     case E_VART: {
         const char *lab = prog_str_intern(e->sval);
         if (rbp_off == -16) {
@@ -2518,6 +2561,7 @@ static void asm_emit_program(Program *prog) {
     if (!prog || !prog->head) { asm_emit_null_program(); return; }
 
     prog_str_reset();
+    prog_flt_reset();
     prog_labels_reset();
     bss_reset();
     lit_reset();
@@ -2630,8 +2674,10 @@ static void asm_emit_program(Program *prog) {
     A("%%include \"snobol4_asm.mac\"\n");
     A("    global  main\n");
     A("    extern  stmt_init, stmt_strval, stmt_intval\n");
+    A("    extern  stmt_realval, stmt_set_null, stmt_set_indirect\n");
     A("    extern  stmt_get, stmt_set, stmt_output, stmt_input\n");
     A("    extern  stmt_concat, stmt_is_fail, stmt_finish\n");
+    A("    extern  stmt_realval, stmt_set_null, stmt_set_indirect\n");
     A("    extern  stmt_apply, stmt_goto_dispatch\n");
     A("    extern  stmt_setup_subject, stmt_apply_replacement\n");
     A("    extern  stmt_set_capture, stmt_match_var\n");
@@ -2727,15 +2773,22 @@ static void asm_emit_program(Program *prog) {
             }
 
             /* If has_eq: assign replacement to subject variable */
-            if (s->has_eq && s->replacement && s->subject &&
+            if (s->has_eq && s->subject &&
                 (s->subject->kind == E_VART || s->subject->kind == E_KW)) {
                 const char *fail_target = id_f >= 0 ? sfail_lbl : next_lbl;
                 int is_output = strcasecmp(s->subject->sval, "OUTPUT") == 0;
                 /* For keyword LHS (&VAR), NV_SET_fn expects bare name "ANCHOR" not "&ANCHOR" */
                 const char *subj_name = s->subject->sval ? s->subject->sval : "";
                 /* (E_KW: sval is already the bare keyword name e.g. "ANCHOR") */
+                /* Null RHS: X = (no replacement or E_NULV) → clear variable */
+                if (!s->replacement ||
+                    (s->replacement->kind == E_NULV)) {
+                    if (!is_output) {
+                        const char *vlab = prog_str_intern(subj_name);
+                        A("    ASSIGN_NULL %s\n", vlab);
+                    }
                 /* Fast path: simple literal RHS + non-OUTPUT target → ASSIGN_INT/ASSIGN_STR */
-                if (!is_output && s->replacement->kind == E_ILIT) {
+                } else if (!is_output && s->replacement->kind == E_ILIT) {
                     const char *vlab = prog_str_intern(subj_name);
                     A("    ASSIGN_INT  %s, %ld, %s\n", vlab,
                       (long)s->replacement->ival, fail_target);
@@ -2759,6 +2812,27 @@ static void asm_emit_program(Program *prog) {
                 /* success path */
                 emit_jmp(tgt_s ? tgt_s : tgt_u, next_lbl);
                 /* failure path */
+                if (id_f >= 0) {
+                    asmL(sfail_lbl);
+                    emit_jmp(tgt_f, next_lbl);
+                }
+            } else if (s->has_eq && s->subject &&
+                       s->subject->kind == E_DOL) {
+                /* $expr = val  — indirect assignment */
+                const char *fail_target = id_f >= 0 ? sfail_lbl : next_lbl;
+                /* Eval the name expression → [rbp-16/8] */
+                prog_emit_expr(s->subject->left ? s->subject->left : s->subject->right, -16);
+                /* Eval the RHS → [rbp-32/24] */
+                if (!s->replacement || s->replacement->kind == E_NULV) {
+                    /* null RHS for indirect: load NULVCL into [rbp-32/24] */
+                    A("    mov     qword [rbp-32], 1\n");
+                    A("    mov     qword [rbp-24], 0\n");
+                } else {
+                    prog_emit_expr(s->replacement, -32);
+                    A("    FAIL_BR     %s\n", fail_target);
+                }
+                A("    SET_VAR_INDIR\n");
+                emit_jmp(tgt_s ? tgt_s : tgt_u, next_lbl);
                 if (id_f >= 0) {
                     asmL(sfail_lbl);
                     emit_jmp(tgt_f, next_lbl);
@@ -2917,6 +2991,7 @@ static void asm_emit_program(Program *prog) {
     flush_pending_sep(); emit_sep_major("STRING TABLE");
     A("section .data\n");
     prog_str_emit_data();
+    prog_flt_emit_data();
 }
 
 void asm_emit(Program *prog, FILE *f) {

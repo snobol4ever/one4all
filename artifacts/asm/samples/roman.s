@@ -4,11 +4,14 @@
 %include "snobol4_asm.mac"
 global  main
 extern  stmt_init, stmt_strval, stmt_intval
+extern  stmt_realval, stmt_set_null, stmt_set_indirect
 extern  stmt_get, stmt_set, stmt_output, stmt_input
 extern  stmt_concat, stmt_is_fail, stmt_finish
+extern  stmt_realval, stmt_set_null, stmt_set_indirect
 extern  stmt_apply, stmt_goto_dispatch
 extern  stmt_setup_subject, stmt_apply_replacement
 extern  stmt_set_capture, stmt_match_var
+extern  kw_anchor
 global  cursor, subject_data, subject_len_val
 
 section .note.GNU-stack noalloc noexec nowrite progbits
@@ -45,11 +48,15 @@ main:
 ;  PROGRAM BODY ========================================================================================================
 
                             GET_VAR     S_AM_TRIM
+                            ASSIGN_INT  S_TRIM, 1, Ln_0
+                            jmp         Ln_0
 
 ; ======================================================================================================================
 
 ; ======================================================================================================================
 Ln_0:                       GET_VAR     S_AM_STLIMIT
+                            ASSIGN_INT  S_STLIMIT, 1000000000, Ln_1
+                            jmp         Ln_1
 
 ; ======================================================================================================================
 Ln_1:                       sub         rsp, 16
@@ -89,10 +96,12 @@ dol1_omega:                 jmp         seq_l0_beta ; DOL ω — child failed
 
 P_3_γ:                      SET_CAPTURE S_T, cap_T_buf, cap_T_len
                             jmp         Ln_3
-P_3_ω:                      mov         rax, [scan_start_3]
+P_3_ω:                      cmp         qword [rel kw_anchor], 0
+                            jne         L_RETURN_4
+                            mov         rax, [scan_start_3]
                             inc         rax
                             cmp         rax, [subject_len_val]
-                            jg          Ln_3
+                            jg          L_RETURN_4
                             mov         [scan_start_3], rax
                             jmp         scan_retry_3
                             GOTO_ALWAYS L_SNO_END     ; RETURN
@@ -126,10 +135,12 @@ dol4_omega:                 jmp         seq_l3_beta ; DOL ω — child failed
 
 P_4_γ:                      SET_CAPTURE S_T, cap_T_buf, cap_T_len
                             jmp         Ln_4
-P_4_ω:                      mov         rax, [scan_start_4]
+P_4_ω:                      cmp         qword [rel kw_anchor], 0
+                            jne         L_FRETURN_5
+                            mov         rax, [scan_start_4]
                             inc         rax
                             cmp         rax, [subject_len_val]
-                            jg          Ln_4
+                            jg          L_FRETURN_5
                             mov         [scan_start_4], rax
                             jmp         scan_retry_4
                             GOTO_ALWAYS L_SNO_END     ; FRETURN

@@ -4,8 +4,10 @@
 %include "snobol4_asm.mac"
 global  main
 extern  stmt_init, stmt_strval, stmt_intval
+extern  stmt_realval, stmt_set_null, stmt_set_indirect
 extern  stmt_get, stmt_set, stmt_output, stmt_input
 extern  stmt_concat, stmt_is_fail, stmt_finish
+extern  stmt_realval, stmt_set_null, stmt_set_indirect
 extern  stmt_apply, stmt_goto_dispatch
 extern  stmt_setup_subject, stmt_apply_replacement
 extern  stmt_set_capture, stmt_match_var
@@ -9401,6 +9403,7 @@ Ln_483:                     sub         rsp, 16
 
 ; ======================================================================================================================
 Ln_484:                     GET_VAR     S_Refs
+                            ASSIGN_NULL S_Refs
                             jmp         L_findRefsEnd_152
 
 Ln_485:
@@ -9860,6 +9863,8 @@ L_refs_1_161:               GET_VAR     S_subj
 
 ; ======================================================================================================================
 Ln_509:                     GET_VAR     S_Refs
+                            ASSIGN_NULL S_Refs
+                            jmp         Ln_510
 
 ; ======================================================================================================================
 Ln_510:                     sub         rsp, 32
@@ -9987,6 +9992,8 @@ Lf_516:                     GOTO_ALWAYS L_SNO_END     ; END
 Ln_516:
 ;  main01 ==============================================================================================================
 L_main01_163:               GET_VAR     S_Src
+                            ASSIGN_NULL S_Src
+                            jmp         Ln_517
 
 ; ======================================================================================================================
 Ln_517:                     GET_VAR     S_Line

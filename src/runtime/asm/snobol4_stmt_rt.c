@@ -70,6 +70,29 @@ DESCR_t stmt_intval(int64_t i) {
     return INTVAL(i);
 }
 
+/* ---- real (double) value ---- */
+
+DESCR_t stmt_realval(const double *p) {
+    return REALVAL(*p);
+}
+
+/* ---- null assign (X =) ---- */
+
+void stmt_set_null(const char *name) {
+    if (name && name[0] == '&') name++;
+    NV_SET_fn(name, NULVCL);
+}
+
+/* ---- indirect assign ($name = val) ---- */
+
+void stmt_set_indirect(DESCR_t name_val, DESCR_t val) {
+    const char *s = VARVAL_fn(name_val);
+    if (!s || !*s) return;
+    NV_SET_fn(s, val);
+}
+
+
+
 /* ---- fail test ---- */
 
 int stmt_is_fail(DESCR_t v) {
