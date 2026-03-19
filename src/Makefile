@@ -1,12 +1,19 @@
 CC     = gcc
 CFLAGS = -Wall -Wno-unused-function -g -O0 \
          -I frontend/snobol4 \
+         -I frontend/snocone \
          -I backend/c \
          -I backend/x64
 
 FRONTEND_SNO = \
     frontend/snobol4/lex.c \
     frontend/snobol4/parse.c
+
+FRONTEND_SNOCONE = \
+    frontend/snocone/sc_lex.c \
+    frontend/snocone/sc_parse.c \
+    frontend/snocone/sc_lower.c \
+    frontend/snocone/sc_driver.c
 
 BACKEND_C = \
     backend/c/emit_cnode.c \
@@ -19,7 +26,7 @@ BACKEND_X64 = \
 DRIVER = \
     driver/main.c
 
-SRCS = $(FRONTEND_SNO) $(BACKEND_C) $(BACKEND_X64) $(DRIVER)
+SRCS = $(FRONTEND_SNO) $(FRONTEND_SNOCONE) $(BACKEND_C) $(BACKEND_X64) $(DRIVER)
 OBJS = $(SRCS:.c=.o)
 
 .PHONY: all clean
