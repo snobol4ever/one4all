@@ -255,9 +255,11 @@ static void net_emit_expr(EXPR_t *e) {
         break;
     }
     case E_KW:
-        /* &ALPHABET → call sno_alphabet(); others → "" stub */
+        /* &ALPHABET → call sno_alphabet(); &STNO → statement counter; others → "" stub */
         if (e->sval && strcasecmp(e->sval, "ALPHABET") == 0) {
             N("    call       string %s::sno_alphabet()\n", net_classname);
+        } else if (e->sval && strcasecmp(e->sval, "STNO") == 0) {
+            N("    ldsfld     string %s::kw_stno\n", net_classname);
         } else {
             net_ldstr("");
         }
@@ -298,6 +300,30 @@ static void net_emit_expr(EXPR_t *e) {
             net_emit_expr(e->nargs >= 1 ? e->args[0] : NULL);
             net_emit_expr(e->nargs >= 2 ? e->args[1] : NULL);
             N("    call       int32 %s::%s(string, string)\n", net_classname, str_helper);
+            N("    stloc.0\n");
+            net_ldstr("");
+            break;
+        }
+        /* DATATYPE(x) — returns "string", "integer", or "real" */
+        if (strcasecmp(fn, "DATATYPE") == 0) {
+            net_emit_expr(e->nargs >= 1 ? e->args[0] : NULL);
+            N("    call       string %s::sno_datatype(string)\n", net_classname);
+            N("    ldc.i4.1\n");
+            N("    stloc.0\n");
+            break;
+        }
+        /* Lexical string comparators: LGT LLT LGE LLE LEQ LNE */
+        const char *lcmp_helper = NULL;
+        if      (strcasecmp(fn, "LGT") == 0) lcmp_helper = "sno_lgt";
+        else if (strcasecmp(fn, "LLT") == 0) lcmp_helper = "sno_llt";
+        else if (strcasecmp(fn, "LGE") == 0) lcmp_helper = "sno_lge";
+        else if (strcasecmp(fn, "LLE") == 0) lcmp_helper = "sno_lle";
+        else if (strcasecmp(fn, "LEQ") == 0) lcmp_helper = "sno_leq";
+        else if (strcasecmp(fn, "LNE") == 0) lcmp_helper = "sno_lne";
+        if (lcmp_helper) {
+            net_emit_expr(e->nargs >= 1 ? e->args[0] : NULL);
+            net_emit_expr(e->nargs >= 2 ? e->args[1] : NULL);
+            N("    call       int32 %s::%s(string, string)\n", net_classname, lcmp_helper);
             N("    stloc.0\n");
             net_ldstr("");
             break;
@@ -489,6 +515,11 @@ static void net_emit_stmts(Program *prog) {
             NSep("END statement");
             break;
         }
+        /* increment &STNO before each statement */
+        N("    ldsfld     string %s::kw_stno\n", net_classname);
+        N("    ldstr      \"1\"\n");
+        N("    call       string %s::sno_add(string, string)\n", net_classname);
+        N("    stsfld     string %s::kw_stno\n", net_classname);
         net_emit_one_stmt(s, next_lbl);
     }
 }
@@ -762,6 +793,56 @@ static void net_emit_helper_alphabet(void) {
     N("  }\n\n");
 }
 
+static void net_emit_helper_datatype(void) {
+    N("  .method private static string sno_datatype(string s) cil managed\n");
+    N("  {\n");
+    N("    .maxstack 3\n");
+    N("    .locals init (float64 V_0, int64 V_1, bool V_2)\n");
+    /* try integer first */
+    N("    ldarg.0\n");
+    N("    ldloca.s V_0\n");
+    N("    call       bool [mscorlib]System.Double::TryParse(string, float64&)\n");
+    N("    stloc.2\n");
+    N("    ldloc.2\n");
+    N("    brfalse    DT_STRING\n");
+    /* it's numeric — check if whole number */
+    N("    ldloc.0\n");
+    N("    conv.i8\n");
+    N("    stloc.1\n");
+    N("    ldloc.0\n");
+    N("    ldloc.1\n");
+    N("    conv.r8\n");
+    N("    beq        DT_INTEGER\n");
+    N("    ldstr      \"real\"\n");
+    N("    ret\n");
+    N("  DT_INTEGER:\n");
+    N("    ldstr      \"integer\"\n");
+    N("    ret\n");
+    N("  DT_STRING:\n");
+    N("    ldstr      \"string\"\n");
+    N("    ret\n");
+    N("  }\n\n");
+}
+
+static void net_emit_helper_lcmp(const char *name, const char *brop) {
+    /* lexical string compare — uses String.Compare ordinal */
+    N("  .method private static int32 %s(string a, string b) cil managed\n", name);
+    N("  {\n");
+    N("    .maxstack 3\n");
+    N("    ldarg.0\n");
+    N("    ldarg.1\n");
+    N("    ldc.i4.4\n");  /* StringComparison.Ordinal = 4 */
+    N("    call       int32 [mscorlib]System.String::Compare(string, string, valuetype [mscorlib]System.StringComparison)\n");
+    N("    ldc.i4.0\n");
+    N("    %s         LCMP_TRUE\n", brop);
+    N("    ldc.i4.0\n");
+    N("    ret\n");
+    N("  LCMP_TRUE:\n");
+    N("    ldc.i4.1\n");
+    N("    ret\n");
+    N("  }\n\n");
+}
+
 static void net_emit_sno_helpers(void) {
     net_emit_helper_parse();
     net_emit_helper_fmt();
@@ -782,6 +863,13 @@ static void net_emit_sno_helpers(void) {
     net_emit_helper_size();
     net_emit_helper_litmatch();
     net_emit_helper_alphabet();
+    net_emit_helper_datatype();
+    net_emit_helper_lcmp("sno_lgt", "bgt");
+    net_emit_helper_lcmp("sno_llt", "blt");
+    net_emit_helper_lcmp("sno_lge", "bge");
+    net_emit_helper_lcmp("sno_lle", "ble");
+    net_emit_helper_lcmp("sno_leq", "beq");
+    net_emit_helper_lcmp("sno_lne", "bne.un");
 }
 
 /* -----------------------------------------------------------------------
@@ -808,9 +896,12 @@ static void net_emit_header(Program *prog) {
         }
         N("\n");
     }
+    /* &STNO keyword field */
+    N("  .field static string kw_stno\n");
+    N("\n");
 
     /* Static initialiser: set all variables to "" */
-    if (net_nvar > 0) {
+    {
         N("  .method static void .cctor() cil managed\n");
         N("  {\n");
         N("    .maxstack 1\n");
@@ -820,6 +911,8 @@ static void net_emit_header(Program *prog) {
             N("    ldstr      \"\"\n");
             N("    stsfld     string %s::%s\n", net_classname, fn);
         }
+        N("    ldstr      \"0\"\n");
+        N("    stsfld     string %s::kw_stno\n", net_classname);
         N("    ret\n");
         N("  }\n");
         N("\n");
