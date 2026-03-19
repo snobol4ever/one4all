@@ -551,6 +551,9 @@ typedef struct {
     char len_sym[128];
 } CaptureVar;
 static CaptureVar *cap_var_register(const char *varname);
+/* ASM_NAMED_MAXPARAMS — max args for a user-defined Snocone procedure */
+#define ASM_NAMED_MAXPARAMS 8
+
 struct AsmNamedPat {
     char varname[128];
     char safe[128];
@@ -559,6 +562,11 @@ struct AsmNamedPat {
     char ret_gamma[128];
     char ret_omega[128];
     EXPR_t *pat;
+    /* User-defined function fields (is_fn == 1) */
+    int  is_fn;                              /* 1 = user Snocone procedure */
+    int  nparams;
+    char param_names[ASM_NAMED_MAXPARAMS][64]; /* parameter variable names */
+    char body_label[128];                    /* NASM label of function body entry */
 };
 
 static const AsmNamedPat *asm_named_lookup(const char *varname);
@@ -569,6 +577,10 @@ static void emit_asm_named_ref(const AsmNamedPat *np,
 /* Forward declaration for plain-string variable registry (VAR = 'literal') */
 typedef struct { char varname[128]; const char *sval; } AsmStrVar;
 static const AsmStrVar *asm_str_var_lookup(const char *varname);
+
+/* Forward declarations for program-mode helpers used by emit_asm_named_def */
+static const char *prog_str_intern(const char *s);
+static const char *prog_label_nasm(const char *lbl);
 
 /* -----------------------------------------------------------------------
  * Forward declaration for recursive emit_asm_node
@@ -1382,6 +1394,10 @@ static AsmNamedPat *asm_named_register(const char *varname, EXPR_t *pat) {
     snprintf(e->ret_gamma, ASM_NAMED_NAMELEN, "P_%s_ret_γ", e->safe);
     snprintf(e->ret_omega, ASM_NAMED_NAMELEN, "P_%s_ret_ω", e->safe);
     e->pat = pat;
+    e->is_fn = 0;
+    e->nparams = 0;
+    e->body_label[0] = '\0';
+    memset(e->param_names, 0, sizeof e->param_names);
     return e;
 }
 
@@ -1453,6 +1469,100 @@ static void emit_asm_named_def(const AsmNamedPat *np,
                                 const char *cursor,
                                 const char *subj,
                                 const char *subj_len_sym) {
+    /* User-defined function (Snocone procedure): is_fn=1
+     * α port: save old param var values → param_save slots,
+     *         load arg descriptors from call-site stack → param vars,
+     *         jump to function body label.
+     * γ port: restore param vars from save slots, jmp [ret_γ].
+     * ω port: same restore, jmp [ret_ω] (for FRETURN path).
+     * The RETURN inside the body is already routed to jmp [ret_γ]
+     * by emit_jmp/prog_emit_goto when current_fn != NULL. */
+    if (np->is_fn) {
+        char safe[ASM_NAMED_NAMELEN];
+        snprintf(safe, sizeof safe, "%s", np->safe);
+
+        emit_sep_major(np->varname);
+        A("; %s — user function α entry (%d param%s)\n",
+          np->alpha_lbl, np->nparams, np->nparams==1?"":"s");
+
+        /* α label */
+        asmL(np->alpha_lbl);
+
+        /* Save old param variable values and load new args from call-site stack.
+         * Call-site convention (see call-site emission below):
+         *   The caller pushes args as DESCR_t pairs on the stack BEFORE jumping.
+         *   The call-site stack frame (rsp at time of jmp) holds:
+         *     [rsp + 0]  = arg0.type (qword)
+         *     [rsp + 8]  = arg0.ptr  (qword)
+         *     [rsp + 16] = arg1.type, etc.
+         *   The caller also sets ret_γ and ret_ω before jumping.
+         * We access args via a dedicated .bss arg-slot array. */
+        for (int i = 0; i < np->nparams; i++) {
+            char pname_safe[128]; asm_expand_name(np->param_names[i], pname_safe, sizeof pname_safe);
+            if (!pname_safe[0]) snprintf(pname_safe, sizeof pname_safe, "p%d", i);
+            char save_slot_t[260], save_slot_p[260];
+            snprintf(save_slot_t, sizeof save_slot_t, "fn_%s_save_%s_t", safe, pname_safe);
+            snprintf(save_slot_p, sizeof save_slot_p, "fn_%s_save_%s_p", safe, pname_safe);
+            char arg_slot_t[260], arg_slot_p[260];
+            snprintf(arg_slot_t, sizeof arg_slot_t, "fn_%s_arg_%d_t", safe, i);
+            snprintf(arg_slot_p, sizeof arg_slot_p, "fn_%s_arg_%d_p", safe, i);
+            const char *plab = prog_str_intern(np->param_names[i]);
+
+            /* Save old value of param variable: GET_VAR → [rbp-16/rbp-8], then stash */
+            A("    GET_VAR     %s\n", plab);
+            A("    mov     rax, [rbp-16]\n");
+            A("    mov     rdx, [rbp-8]\n");
+            A("    mov     [%s], rax\n", save_slot_t);
+            A("    mov     [%s], rdx\n", save_slot_p);
+
+            /* Load arg from arg_slot_t/p into param variable */
+            A("    lea     rdi, [rel %s]\n", plab);
+            A("    mov     rsi, [%s]\n", arg_slot_t);
+            A("    mov     rdx, [%s]\n", arg_slot_p);
+            A("    call    stmt_set\n");
+        }
+        /* Jump to function body */
+        A("    jmp     %s\n", prog_label_nasm(np->body_label));
+
+        emit_sep_minor("γ/ω");
+
+        /* γ: restore params, jump via ret_γ (RETURN path) */
+        char gamma_lbl[LBUF], omega_lbl[LBUF];
+        snprintf(gamma_lbl, LBUF, "fn_%s_gamma", safe);
+        snprintf(omega_lbl, LBUF, "fn_%s_omega", safe);
+        asmL(gamma_lbl);
+        for (int i = np->nparams - 1; i >= 0; i--) {
+            char pname_safe[128]; asm_expand_name(np->param_names[i], pname_safe, sizeof pname_safe);
+            if (!pname_safe[0]) snprintf(pname_safe, sizeof pname_safe, "p%d", i);
+            char save_slot_t[260], save_slot_p[260];
+            snprintf(save_slot_t, sizeof save_slot_t, "fn_%s_save_%s_t", safe, pname_safe);
+            snprintf(save_slot_p, sizeof save_slot_p, "fn_%s_save_%s_p", safe, pname_safe);
+            const char *plab = prog_str_intern(np->param_names[i]);
+            A("    lea     rdi, [rel %s]\n", plab);
+            A("    mov     rsi, [%s]\n", save_slot_t);
+            A("    mov     rdx, [%s]\n", save_slot_p);
+            A("    call    stmt_set\n");
+        }
+        A("    jmp     [%s]\n", np->ret_gamma);
+
+        /* ω: restore params, jump via ret_ω (FRETURN path) */
+        asmL(omega_lbl);
+        for (int i = np->nparams - 1; i >= 0; i--) {
+            char pname_safe[128]; asm_expand_name(np->param_names[i], pname_safe, sizeof pname_safe);
+            if (!pname_safe[0]) snprintf(pname_safe, sizeof pname_safe, "p%d", i);
+            char save_slot_t[260], save_slot_p[260];
+            snprintf(save_slot_t, sizeof save_slot_t, "fn_%s_save_%s_t", safe, pname_safe);
+            snprintf(save_slot_p, sizeof save_slot_p, "fn_%s_save_%s_p", safe, pname_safe);
+            const char *plab = prog_str_intern(np->param_names[i]);
+            A("    lea     rdi, [rel %s]\n", plab);
+            A("    mov     rsi, [%s]\n", save_slot_t);
+            A("    mov     rdx, [%s]\n", save_slot_p);
+            A("    call    stmt_set\n");
+        }
+        A("    jmp     [%s]\n", np->ret_omega);
+        return;
+    }
+
     if (!np->pat) {
         /* No pattern expression — emit stubs that always fail */
         A("\n; Named pattern %s — no expression, always fails\n", np->varname);
@@ -1536,13 +1646,81 @@ static int expr_is_pattern_expr(EXPR_t *e) {
 
 /* asm_scan_named_patterns — walk the program and register all
  * pattern assignments (VAR = <pattern-expr>) before emitting.
+ * Also detects Snocone sc_cf-generated DEFINE stmts and registers
+ * user-defined procedures as is_fn=1 entries.
  * ----------------------------------------------------------------------- */
+
+/* Parse "fname(arg1,arg2,...)" from a DEFINE string literal.
+ * Writes function name into fname_out (fname_max bytes),
+ * param names into params[][] (nparams_out count).
+ * Returns 1 on success, 0 on parse failure. */
+static int parse_define_str(const char *def,
+                             char *fname_out, int fname_max,
+                             char params[ASM_NAMED_MAXPARAMS][64],
+                             int *nparams_out) {
+    *nparams_out = 0;
+    /* Copy up to '(' into fname */
+    const char *p = def;
+    int fi = 0;
+    while (*p && *p != '(' && fi < fname_max - 1)
+        fname_out[fi++] = *p++;
+    fname_out[fi] = '\0';
+    if (!fi) return 0;  /* no function name */
+    if (*p != '(') return 1; /* no args — zero params */
+    p++; /* skip '(' */
+    while (*p && *p != ')') {
+        /* skip whitespace */
+        while (*p == ' ' || *p == '\t') p++;
+        if (*p == ')' || !*p) break;
+        /* read param name up to ',' or ')' */
+        int pi = 0;
+        while (*p && *p != ',' && *p != ')' && pi < 63)
+            params[*nparams_out][pi++] = *p++;
+        /* trim trailing whitespace */
+        while (pi > 0 && (params[*nparams_out][pi-1]==' '||
+                           params[*nparams_out][pi-1]=='\t')) pi--;
+        params[*nparams_out][pi] = '\0';
+        if (pi > 0) {
+            (*nparams_out)++;
+            if (*nparams_out >= ASM_NAMED_MAXPARAMS) break;
+        }
+        if (*p == ',') p++;
+    }
+    return 1;
+}
 
 static void asm_scan_named_patterns(Program *prog) {
     asm_named_reset();
     asm_str_vars_reset();
     if (!prog) return;
     for (STMT_t *s = prog->head; s; s = s->next) {
+        /* Detect Snocone sc_cf DEFINE statement:
+         * subject = E_FNC("DEFINE", E_QLIT("fname(args)"))
+         * has_eq = 0, no pattern.
+         * Register as user function (is_fn=1). */
+        if (s->subject && s->subject->kind == E_FNC &&
+            s->subject->sval && strcasecmp(s->subject->sval, "DEFINE") == 0 &&
+            s->subject->nargs == 1 &&
+            s->subject->args[0] && s->subject->args[0]->kind == E_QLIT &&
+            s->subject->args[0]->sval) {
+            const char *def_str = s->subject->args[0]->sval;
+            char fname[128];
+            char params[ASM_NAMED_MAXPARAMS][64];
+            int nparams = 0;
+            if (parse_define_str(def_str, fname, sizeof fname, params, &nparams)) {
+                AsmNamedPat *e = asm_named_register(fname, NULL);
+                if (e) {
+                    e->is_fn = 1;
+                    e->nparams = nparams;
+                    for (int i = 0; i < nparams; i++)
+                        snprintf(e->param_names[i], 64, "%s", params[i]);
+                    /* body_label = NASM form of fname (the function entry label) */
+                    snprintf(e->body_label, sizeof e->body_label, "%s", fname);
+                }
+            }
+            continue;
+        }
+
         /* A pattern assignment: subject is a variable, no pattern field,
          * has_eq is set, replacement holds the pattern expression.
          * E.g.   ASTAR = ARBNO(LIT("a"))
@@ -2025,6 +2203,71 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
         int na = e->nargs;
         if (na > 8) na = 8;
         const char *fnlab = prog_str_intern(e->sval);
+
+        /* Check if this is a user-defined Snocone function */
+        const AsmNamedPat *ufn = asm_named_lookup(e->sval);
+        if (ufn && ufn->is_fn) {
+            /* User function call-site:
+             *   1. Evaluate each arg → store into fn_FNAME_arg_N_t/p .bss slots
+             *   2. Store return-γ address → fn_FNAME_ret_γ
+             *   3. Store return-ω address → fn_FNAME_ret_ω
+             *   4. jmp fn_alpha
+             *   5. return_γ_N: result value comes back in [rbp-16/rbp-8]
+             *      (the function body assigns its return value to OUTPUT or
+             *       a variable; we need the return value in [rbp-32/24])
+             *   For now: result of user fn call is the value of the expression
+             *   that was the last assignment in the function.  We implement
+             *   this via a dedicated return-value .bss slot: fn_FNAME_retval_t/p.
+             *   The γ/ω restore code already runs stmt_set to restore params,
+             *   then jumps here — the function must have set fn_retval before
+             *   jumping to [ret_γ]. */
+            int call_uid = asm_uid();
+            char ret_gamma_lbl[LBUF], ret_omega_lbl[LBUF];
+            snprintf(ret_gamma_lbl, LBUF, "ucall%d_ret_g", call_uid);
+            snprintf(ret_omega_lbl, LBUF, "ucall%d_ret_o", call_uid);
+
+            /* Step 1: evaluate args into arg slots */
+            int actual_args = (na < ufn->nparams) ? na : ufn->nparams;
+            for (int ai = 0; ai < actual_args && e->args[ai]; ai++) {
+                char pname_safe[128];
+                asm_expand_name(ufn->param_names[ai], pname_safe, sizeof pname_safe);
+                if (!pname_safe[0]) snprintf(pname_safe, sizeof pname_safe, "p%d", ai);
+                char arg_slot_t[260], arg_slot_p[260];
+                snprintf(arg_slot_t, sizeof arg_slot_t, "fn_%s_arg_%d_t", ufn->safe, ai);
+                snprintf(arg_slot_p, sizeof arg_slot_p, "fn_%s_arg_%d_p", ufn->safe, ai);
+                /* Evaluate arg into [rbp-32/24] */
+                prog_emit_expr(e->args[ai], -32);
+                A("    mov     rax, [rbp-32]\n");
+                A("    mov     rcx, [rbp-24]\n");
+                A("    mov     [%s], rax\n", arg_slot_t);
+                A("    mov     [%s], rcx\n", arg_slot_p);
+            }
+
+            /* Step 2: store return addresses */
+            A("    lea     rax, [rel %s]\n", ret_gamma_lbl);
+            A("    mov     [%s], rax\n", ufn->ret_gamma);
+            A("    lea     rax, [rel %s]\n", ret_omega_lbl);
+            A("    mov     [%s], rax\n", ufn->ret_omega);
+
+            /* Step 3: call — jump to function alpha */
+            A("    jmp     %s\n", ufn->alpha_lbl);
+
+            /* Step 4: return landing — gamma means success.
+             * Return value convention (sc_cf.c do_return_stmt):
+             *   `return expr` emits `fname = expr` then `RETURN`.
+             * So after γ return, the result is in the SNOBOL4 variable
+             * named after the function (e->sval). Just GET_VAR it. */
+            A("%s:\n", ret_gamma_lbl);
+            A("    GET_VAR     %s\n", fnlab);
+            A("    mov     [rbp-32], rax\n");
+            A("    mov     [rbp-24], rdx\n");
+            /* omega: function failed (FRETURN) */
+            A("    jmp     ucall%d_done\n", call_uid);
+            A("%s:\n", ret_omega_lbl);
+            A("    LOAD_NULVCL32\n");  /* fail value */
+            A("ucall%d_done:\n", call_uid);
+            return 1;
+        }
         /* Fast path: 1-arg call with simple literal arg → CALL1_INT / CALL1_STR */
         if (na == 1 && e->args[0] && rbp_off == -32) {
             EXPR_t *arg0 = e->args[0];
@@ -2482,9 +2725,21 @@ static int is_special_goto(const char *t) {
 }
 
 /* Emit a jmp to a goto target, handling special targets. */
+/* current_fn — set to the AsmNamedPat* of the user function being emitted.
+ * NULL when outside any user function body.
+ * Used by emit_jmp / prog_emit_goto to route RETURN → [fn_ret_γ]. */
+static const AsmNamedPat *current_fn = NULL;
+
 static void emit_jmp(const char *tgt, const char *fallthrough) {
     if (!tgt || !*tgt) {
         if (fallthrough) A("    jmp     %s\n", fallthrough);
+        return;
+    }
+    /* If inside a user function, RETURN/FRETURN/NRETURN → indirect jmp via ret_γ */
+    if (current_fn && (strcasecmp(tgt,"RETURN")==0 ||
+                       strcasecmp(tgt,"FRETURN")==0 ||
+                       strcasecmp(tgt,"NRETURN")==0)) {
+        A("    jmp     [%s]     ; %s\n", current_fn->ret_gamma, tgt);
         return;
     }
     if (is_special_goto(tgt)) { A("    GOTO_ALWAYS  L_SNO_END     ; %s\n", tgt); return; }
@@ -2497,10 +2752,17 @@ static void prog_emit_goto(const char *target, const char *fallthrough) {
         return;
     }
     /* Special SNOBOL4 goto targets */
-    if (strcasecmp(target,"END")==0 || strcasecmp(target,"RETURN")==0 ||
-        strcasecmp(target,"FRETURN")==0 || strcasecmp(target,"NRETURN")==0 ||
-        strcasecmp(target,"SRETURN")==0) {
+    if (strcasecmp(target,"END")==0) {
         A("    GOTO_ALWAYS  L_SNO_END     ; %s\n", target);
+        return;
+    }
+    if (strcasecmp(target,"RETURN")==0 || strcasecmp(target,"FRETURN")==0 ||
+        strcasecmp(target,"NRETURN")==0 || strcasecmp(target,"SRETURN")==0) {
+        if (current_fn) {
+            A("    jmp     [%s]     ; %s\n", current_fn->ret_gamma, target);
+        } else {
+            A("    GOTO_ALWAYS  L_SNO_END     ; %s\n", target);
+        }
         return;
     }
     A("    jmp     %s\n", prog_label_nasm(target));
@@ -2560,6 +2822,8 @@ static void prog_label_register(const char *lbl) {
 static void asm_emit_program(Program *prog) {
     if (!prog || !prog->head) { asm_emit_null_program(); return; }
 
+    current_fn = NULL;
+
     prog_str_reset();
     prog_flt_reset();
     prog_labels_reset();
@@ -2609,6 +2873,35 @@ static void asm_emit_program(Program *prog) {
     /* subject_data is a byte array — emitted separately in .bss */
 
     for (int i = 0; i < asm_named_count; i++) {
+        if (asm_named[i].is_fn) {
+            /* User function: ret_γ/ret_ω return-address slots */
+            bss_add(asm_named[i].ret_gamma);
+            bss_add(asm_named[i].ret_omega);
+            /* Per-param save slots (old value backup) and arg slots (call-site input) */
+            for (int pi = 0; pi < asm_named[i].nparams; pi++) {
+                char pname_safe[128];
+                asm_expand_name(asm_named[i].param_names[pi], pname_safe, sizeof pname_safe);
+                if (!pname_safe[0]) snprintf(pname_safe, sizeof pname_safe, "p%d", pi);
+                char save_slot[256], arg_slot[256];
+                snprintf(save_slot, sizeof save_slot, "fn_%s_save_%s",
+                         asm_named[i].safe, pname_safe);
+                snprintf(arg_slot,  sizeof arg_slot,  "fn_%s_arg_%d",
+                         asm_named[i].safe, pi);
+                /* save_slot holds a DESCR_t (2 qwords): _t = type, _p = ptr */
+                char save_slot_t[260], save_slot_p[260];
+                snprintf(save_slot_t, sizeof save_slot_t, "%s_t", save_slot);
+                snprintf(save_slot_p, sizeof save_slot_p, "%s_p", save_slot);
+                bss_add(save_slot_t);
+                bss_add(save_slot_p);
+                /* arg_slot holds a DESCR_t (2 qwords): _t = type, _p = ptr */
+                char arg_slot_t[260], arg_slot_p[260];
+                snprintf(arg_slot_t, sizeof arg_slot_t, "%s_t", arg_slot);
+                snprintf(arg_slot_p, sizeof arg_slot_p, "%s_p", arg_slot);
+                bss_add(arg_slot_t);
+                bss_add(arg_slot_p);
+            }
+            continue;
+        }
         if (asm_named[i].pat) {
             EKind rk = asm_named[i].pat->kind;
             if (rk == E_QLIT || rk == E_ILIT || rk == E_FLIT || rk == E_NULV ||
@@ -2741,6 +3034,19 @@ static void asm_emit_program(Program *prog) {
             asmL(prog_label_nasm(s->label));
             { int _id = prog_label_id(s->label);
               if (_id >= 0) prog_label_defined[_id] = 1; }
+
+            /* current_fn tracking: entering a user function body */
+            const AsmNamedPat *fn_entry = asm_named_lookup(s->label);
+            if (fn_entry && fn_entry->is_fn) {
+                current_fn = fn_entry;
+            }
+            /* Leaving a user function body: label ends with ".END" */
+            if (current_fn) {
+                char end_lbl[256];
+                snprintf(end_lbl, sizeof end_lbl, "%s.END", current_fn->varname);
+                if (strcasecmp(s->label, end_lbl) == 0)
+                    current_fn = NULL;
+            }
         }
 
         /* Determine S/F/uncond targets */
@@ -2754,6 +3060,13 @@ static void asm_emit_program(Program *prog) {
 
         /* Case 1: pattern-free assignment or expression */
         if (!s->pattern) {
+            /* Skip DEFINE stmts — user function registration is compile-time only.
+             * The α entry and body are emitted in the NAMED PATTERN BODIES section. */
+            if (s->subject && s->subject->kind == E_FNC &&
+                s->subject->sval && strcasecmp(s->subject->sval, "DEFINE") == 0) {
+                asmL(next_lbl);
+                continue;
+            }
             /* Evaluate subject (the LHS or expression).
              * Skip for indirect-assignment ($X=val): has_eq + E_INDR/E_DOL subject.
              * The indirect handler below evaluates the inner name expression itself. */
