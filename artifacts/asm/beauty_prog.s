@@ -6535,33 +6535,27 @@ Lf_209:                     jmp         [P_pp_ret_γ]     ; RETURN
 Ln_209:                     mov         edi, 438
                             call        comm_stno
                             GET_VAR     S_x
-                            mov         rax, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            mov         [ucall0_sv_0_t], rax
-                            mov         [ucall0_sv_0_p], rdx
+                            push        qword [rbp-8]
+                            push        qword [rbp-16]
+                            push        qword [P_pp_ret_ω]
+                            push        qword [P_pp_ret_γ]
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rax, [rbp-32]
                             mov         rcx, [rbp-24]
                             mov         [fn_pp_arg_0_t], rax
                             mov         [fn_pp_arg_0_p], rcx
-                            mov         rax, [P_pp_ret_γ]
-                            mov         [ucall0_rsv_g], rax
-                            mov         rax, [P_pp_ret_ω]
-                            mov         [ucall0_rsv_o], rax
                             lea         rax, [rel ucall0_ret_g]
                             mov         [P_pp_ret_γ], rax
                             lea         rax, [rel ucall0_ret_o]
                             mov         [P_pp_ret_ω], rax
                             jmp         P_pp_α
 ucall0_ret_g:
-                            mov         rax, [ucall0_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall0_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall0_sv_0_t]
-                            mov         rdx, [ucall0_sv_0_p]
                             call        stmt_set
                             GET_VAR     S_pp
                             mov         rax, [rbp-16]
@@ -6579,15 +6573,13 @@ ucall0_has_val:
                             mov         [rbp-24], rdx
                             jmp         ucall0_done
 ucall0_ret_o:
-                            mov         rax, [ucall0_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall0_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall0_sv_0_t]
-                            mov         rdx, [ucall0_sv_0_p]
                             call        stmt_set
-                            LOAD_NULVCL32
+                            LOAD_FAILDESCR32
 
 ucall0_done:
                             jmp         L_pp_1_33
@@ -6879,33 +6871,27 @@ Ln_227:                     mov         edi, 459
 Ln_228:                     mov         edi, 460
                             call        comm_stno
                             GET_VAR     S_x
-                            mov         rax, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            mov         [ucall1_sv_0_t], rax
-                            mov         [ucall1_sv_0_p], rdx
+                            push        qword [rbp-8]
+                            push        qword [rbp-16]
+                            push        qword [P_pp_ret_ω]
+                            push        qword [P_pp_ret_γ]
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rax, [rbp-32]
                             mov         rcx, [rbp-24]
                             mov         [fn_pp_arg_0_t], rax
                             mov         [fn_pp_arg_0_p], rcx
-                            mov         rax, [P_pp_ret_γ]
-                            mov         [ucall1_rsv_g], rax
-                            mov         rax, [P_pp_ret_ω]
-                            mov         [ucall1_rsv_o], rax
                             lea         rax, [rel ucall1_ret_g]
                             mov         [P_pp_ret_γ], rax
                             lea         rax, [rel ucall1_ret_o]
                             mov         [P_pp_ret_ω], rax
                             jmp         P_pp_α
 ucall1_ret_g:
-                            mov         rax, [ucall1_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall1_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall1_sv_0_t]
-                            mov         rdx, [ucall1_sv_0_p]
                             call        stmt_set
                             GET_VAR     S_pp
                             mov         rax, [rbp-16]
@@ -6923,15 +6909,13 @@ ucall1_has_val:
                             mov         [rbp-24], rdx
                             jmp         ucall1_done
 ucall1_ret_o:
-                            mov         rax, [ucall1_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall1_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall1_sv_0_t]
-                            mov         rdx, [ucall1_sv_0_p]
                             call        stmt_set
-                            LOAD_NULVCL32
+                            LOAD_FAILDESCR32
 
 ucall1_done:
                             jmp         [P_pp_ret_γ]     ; RETURN
@@ -6978,33 +6962,27 @@ L_ppBinOp_52:               mov         edi, 461
 Ln_230:                     mov         edi, 462
                             call        comm_stno
                             GET_VAR     S_x
-                            mov         rax, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            mov         [ucall2_sv_0_t], rax
-                            mov         [ucall2_sv_0_p], rdx
+                            push        qword [rbp-8]
+                            push        qword [rbp-16]
+                            push        qword [P_pp_ret_ω]
+                            push        qword [P_pp_ret_γ]
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rax, [rbp-32]
                             mov         rcx, [rbp-24]
                             mov         [fn_pp_arg_0_t], rax
                             mov         [fn_pp_arg_0_p], rcx
-                            mov         rax, [P_pp_ret_γ]
-                            mov         [ucall2_rsv_g], rax
-                            mov         rax, [P_pp_ret_ω]
-                            mov         [ucall2_rsv_o], rax
                             lea         rax, [rel ucall2_ret_g]
                             mov         [P_pp_ret_γ], rax
                             lea         rax, [rel ucall2_ret_o]
                             mov         [P_pp_ret_ω], rax
                             jmp         P_pp_α
 ucall2_ret_g:
-                            mov         rax, [ucall2_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall2_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall2_sv_0_t]
-                            mov         rdx, [ucall2_sv_0_p]
                             call        stmt_set
                             GET_VAR     S_pp
                             mov         rax, [rbp-16]
@@ -7022,15 +7000,13 @@ ucall2_has_val:
                             mov         [rbp-24], rdx
                             jmp         ucall2_done
 ucall2_ret_o:
-                            mov         rax, [ucall2_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall2_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall2_sv_0_t]
-                            mov         rdx, [ucall2_sv_0_p]
                             call        stmt_set
-                            LOAD_NULVCL32
+                            LOAD_FAILDESCR32
 
 ucall2_done:
 
@@ -7069,33 +7045,27 @@ Ln_235:                     mov         edi, 467
 Ln_236:                     mov         edi, 468
                             call        comm_stno
                             GET_VAR     S_x
-                            mov         rax, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            mov         [ucall3_sv_0_t], rax
-                            mov         [ucall3_sv_0_p], rdx
+                            push        qword [rbp-8]
+                            push        qword [rbp-16]
+                            push        qword [P_pp_ret_ω]
+                            push        qword [P_pp_ret_γ]
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rax, [rbp-32]
                             mov         rcx, [rbp-24]
                             mov         [fn_pp_arg_0_t], rax
                             mov         [fn_pp_arg_0_p], rcx
-                            mov         rax, [P_pp_ret_γ]
-                            mov         [ucall3_rsv_g], rax
-                            mov         rax, [P_pp_ret_ω]
-                            mov         [ucall3_rsv_o], rax
                             lea         rax, [rel ucall3_ret_g]
                             mov         [P_pp_ret_γ], rax
                             lea         rax, [rel ucall3_ret_o]
                             mov         [P_pp_ret_ω], rax
                             jmp         P_pp_α
 ucall3_ret_g:
-                            mov         rax, [ucall3_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall3_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall3_sv_0_t]
-                            mov         rdx, [ucall3_sv_0_p]
                             call        stmt_set
                             GET_VAR     S_pp
                             mov         rax, [rbp-16]
@@ -7113,15 +7083,13 @@ ucall3_has_val:
                             mov         [rbp-24], rdx
                             jmp         ucall3_done
 ucall3_ret_o:
-                            mov         rax, [ucall3_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall3_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall3_sv_0_t]
-                            mov         rdx, [ucall3_sv_0_p]
                             call        stmt_set
-                            LOAD_NULVCL32
+                            LOAD_FAILDESCR32
 
 ucall3_done:
                             jmp         [P_pp_ret_γ]     ; RETURN
@@ -7650,10 +7618,10 @@ Ln_286:                     mov         edi, 522
 Ln_287:                     mov         edi, 523
                             call        comm_stno
                             GET_VAR     S_x
-                            mov         rax, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            mov         [ucall4_sv_0_t], rax
-                            mov         [ucall4_sv_0_p], rdx
+                            push        qword [rbp-8]
+                            push        qword [rbp-16]
+                            push        qword [P_pp_ret_ω]
+                            push        qword [P_pp_ret_γ]
                             lea         rdi, [rel S_ppSubj]
                             call        stmt_get
                             mov         [rbp-32], rax
@@ -7662,23 +7630,17 @@ Ln_287:                     mov         edi, 523
                             mov         rcx, [rbp-24]
                             mov         [fn_pp_arg_0_t], rax
                             mov         [fn_pp_arg_0_p], rcx
-                            mov         rax, [P_pp_ret_γ]
-                            mov         [ucall4_rsv_g], rax
-                            mov         rax, [P_pp_ret_ω]
-                            mov         [ucall4_rsv_o], rax
                             lea         rax, [rel ucall4_ret_g]
                             mov         [P_pp_ret_γ], rax
                             lea         rax, [rel ucall4_ret_o]
                             mov         [P_pp_ret_ω], rax
                             jmp         P_pp_α
 ucall4_ret_g:
-                            mov         rax, [ucall4_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall4_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall4_sv_0_t]
-                            mov         rdx, [ucall4_sv_0_p]
                             call        stmt_set
                             GET_VAR     S_pp
                             mov         rax, [rbp-16]
@@ -7696,15 +7658,13 @@ ucall4_has_val:
                             mov         [rbp-24], rdx
                             jmp         ucall4_done
 ucall4_ret_o:
-                            mov         rax, [ucall4_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall4_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall4_sv_0_t]
-                            mov         rdx, [ucall4_sv_0_p]
                             call        stmt_set
-                            LOAD_NULVCL32
+                            LOAD_FAILDESCR32
 
 ucall4_done:
 
@@ -7801,10 +7761,10 @@ Ln_292:                     mov         edi, 528
 Ln_293:                     mov         edi, 529
                             call        comm_stno
                             GET_VAR     S_x
-                            mov         rax, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            mov         [ucall5_sv_0_t], rax
-                            mov         [ucall5_sv_0_p], rdx
+                            push        qword [rbp-8]
+                            push        qword [rbp-16]
+                            push        qword [P_pp_ret_ω]
+                            push        qword [P_pp_ret_γ]
                             lea         rdi, [rel S_ppPatrn]
                             call        stmt_get
                             mov         [rbp-32], rax
@@ -7813,23 +7773,17 @@ Ln_293:                     mov         edi, 529
                             mov         rcx, [rbp-24]
                             mov         [fn_pp_arg_0_t], rax
                             mov         [fn_pp_arg_0_p], rcx
-                            mov         rax, [P_pp_ret_γ]
-                            mov         [ucall5_rsv_g], rax
-                            mov         rax, [P_pp_ret_ω]
-                            mov         [ucall5_rsv_o], rax
                             lea         rax, [rel ucall5_ret_g]
                             mov         [P_pp_ret_γ], rax
                             lea         rax, [rel ucall5_ret_o]
                             mov         [P_pp_ret_ω], rax
                             jmp         P_pp_α
 ucall5_ret_g:
-                            mov         rax, [ucall5_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall5_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall5_sv_0_t]
-                            mov         rdx, [ucall5_sv_0_p]
                             call        stmt_set
                             GET_VAR     S_pp
                             mov         rax, [rbp-16]
@@ -7847,15 +7801,13 @@ ucall5_has_val:
                             mov         [rbp-24], rdx
                             jmp         ucall5_done
 ucall5_ret_o:
-                            mov         rax, [ucall5_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall5_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall5_sv_0_t]
-                            mov         rdx, [ucall5_sv_0_p]
                             call        stmt_set
-                            LOAD_NULVCL32
+                            LOAD_FAILDESCR32
 
 ucall5_done:
 
@@ -7895,10 +7847,10 @@ Ln_297:                     mov         edi, 533
 Ln_298:                     mov         edi, 534
                             call        comm_stno
                             GET_VAR     S_x
-                            mov         rax, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            mov         [ucall6_sv_0_t], rax
-                            mov         [ucall6_sv_0_p], rdx
+                            push        qword [rbp-8]
+                            push        qword [rbp-16]
+                            push        qword [P_pp_ret_ω]
+                            push        qword [P_pp_ret_γ]
                             lea         rdi, [rel S_ppRepl]
                             call        stmt_get
                             mov         [rbp-32], rax
@@ -7907,23 +7859,17 @@ Ln_298:                     mov         edi, 534
                             mov         rcx, [rbp-24]
                             mov         [fn_pp_arg_0_t], rax
                             mov         [fn_pp_arg_0_p], rcx
-                            mov         rax, [P_pp_ret_γ]
-                            mov         [ucall6_rsv_g], rax
-                            mov         rax, [P_pp_ret_ω]
-                            mov         [ucall6_rsv_o], rax
                             lea         rax, [rel ucall6_ret_g]
                             mov         [P_pp_ret_γ], rax
                             lea         rax, [rel ucall6_ret_o]
                             mov         [P_pp_ret_ω], rax
                             jmp         P_pp_α
 ucall6_ret_g:
-                            mov         rax, [ucall6_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall6_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall6_sv_0_t]
-                            mov         rdx, [ucall6_sv_0_p]
                             call        stmt_set
                             GET_VAR     S_pp
                             mov         rax, [rbp-16]
@@ -7941,15 +7887,13 @@ ucall6_has_val:
                             mov         [rbp-24], rdx
                             jmp         ucall6_done
 ucall6_ret_o:
-                            mov         rax, [ucall6_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall6_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall6_sv_0_t]
-                            mov         rdx, [ucall6_sv_0_p]
                             call        stmt_set
-                            LOAD_NULVCL32
+                            LOAD_FAILDESCR32
 
 ucall6_done:
                             jmp         L_pp_Stmt7_71
@@ -8080,10 +8024,10 @@ Ln_308:                     mov         edi, 544
 Ln_309:                     mov         edi, 545
                             call        comm_stno
                             GET_VAR     S_x
-                            mov         rax, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            mov         [ucall7_sv_0_t], rax
-                            mov         [ucall7_sv_0_p], rdx
+                            push        qword [rbp-8]
+                            push        qword [rbp-16]
+                            push        qword [P_pp_ret_ω]
+                            push        qword [P_pp_ret_γ]
                             lea         rdi, [rel S_ppRepl]
                             call        stmt_get
                             mov         [rbp-32], rax
@@ -8092,23 +8036,17 @@ Ln_309:                     mov         edi, 545
                             mov         rcx, [rbp-24]
                             mov         [fn_pp_arg_0_t], rax
                             mov         [fn_pp_arg_0_p], rcx
-                            mov         rax, [P_pp_ret_γ]
-                            mov         [ucall7_rsv_g], rax
-                            mov         rax, [P_pp_ret_ω]
-                            mov         [ucall7_rsv_o], rax
                             lea         rax, [rel ucall7_ret_g]
                             mov         [P_pp_ret_γ], rax
                             lea         rax, [rel ucall7_ret_o]
                             mov         [P_pp_ret_ω], rax
                             jmp         P_pp_α
 ucall7_ret_g:
-                            mov         rax, [ucall7_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall7_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall7_sv_0_t]
-                            mov         rdx, [ucall7_sv_0_p]
                             call        stmt_set
                             GET_VAR     S_pp
                             mov         rax, [rbp-16]
@@ -8126,15 +8064,13 @@ ucall7_has_val:
                             mov         [rbp-24], rdx
                             jmp         ucall7_done
 ucall7_ret_o:
-                            mov         rax, [ucall7_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall7_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall7_sv_0_t]
-                            mov         rdx, [ucall7_sv_0_p]
                             call        stmt_set
-                            LOAD_NULVCL32
+                            LOAD_FAILDESCR32
 
 ucall7_done:
                             jmp         L_pp_Stmt7_71
@@ -8198,10 +8134,10 @@ Ln_315:                     mov         edi, 551
 Ln_316:                     mov         edi, 552
                             call        comm_stno
                             GET_VAR     S_x
-                            mov         rax, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            mov         [ucall8_sv_0_t], rax
-                            mov         [ucall8_sv_0_p], rdx
+                            push        qword [rbp-8]
+                            push        qword [rbp-16]
+                            push        qword [P_pp_ret_ω]
+                            push        qword [P_pp_ret_γ]
                             lea         rdi, [rel S_ppGo1]
                             call        stmt_get
                             mov         [rbp-32], rax
@@ -8210,23 +8146,17 @@ Ln_316:                     mov         edi, 552
                             mov         rcx, [rbp-24]
                             mov         [fn_pp_arg_0_t], rax
                             mov         [fn_pp_arg_0_p], rcx
-                            mov         rax, [P_pp_ret_γ]
-                            mov         [ucall8_rsv_g], rax
-                            mov         rax, [P_pp_ret_ω]
-                            mov         [ucall8_rsv_o], rax
                             lea         rax, [rel ucall8_ret_g]
                             mov         [P_pp_ret_γ], rax
                             lea         rax, [rel ucall8_ret_o]
                             mov         [P_pp_ret_ω], rax
                             jmp         P_pp_α
 ucall8_ret_g:
-                            mov         rax, [ucall8_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall8_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall8_sv_0_t]
-                            mov         rdx, [ucall8_sv_0_p]
                             call        stmt_set
                             GET_VAR     S_pp
                             mov         rax, [rbp-16]
@@ -8244,15 +8174,13 @@ ucall8_has_val:
                             mov         [rbp-24], rdx
                             jmp         ucall8_done
 ucall8_ret_o:
-                            mov         rax, [ucall8_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall8_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall8_sv_0_t]
-                            mov         rdx, [ucall8_sv_0_p]
                             call        stmt_set
-                            LOAD_NULVCL32
+                            LOAD_FAILDESCR32
 
 ucall8_done:
 
@@ -8274,10 +8202,10 @@ Lf_318:                     jmp         L_pp_Stmt9_73
 Ln_318:                     mov         edi, 554
                             call        comm_stno
                             GET_VAR     S_x
-                            mov         rax, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            mov         [ucall9_sv_0_t], rax
-                            mov         [ucall9_sv_0_p], rdx
+                            push        qword [rbp-8]
+                            push        qword [rbp-16]
+                            push        qword [P_pp_ret_ω]
+                            push        qword [P_pp_ret_γ]
                             lea         rdi, [rel S_ppGo2]
                             call        stmt_get
                             mov         [rbp-32], rax
@@ -8286,23 +8214,17 @@ Ln_318:                     mov         edi, 554
                             mov         rcx, [rbp-24]
                             mov         [fn_pp_arg_0_t], rax
                             mov         [fn_pp_arg_0_p], rcx
-                            mov         rax, [P_pp_ret_γ]
-                            mov         [ucall9_rsv_g], rax
-                            mov         rax, [P_pp_ret_ω]
-                            mov         [ucall9_rsv_o], rax
                             lea         rax, [rel ucall9_ret_g]
                             mov         [P_pp_ret_γ], rax
                             lea         rax, [rel ucall9_ret_o]
                             mov         [P_pp_ret_ω], rax
                             jmp         P_pp_α
 ucall9_ret_g:
-                            mov         rax, [ucall9_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall9_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall9_sv_0_t]
-                            mov         rdx, [ucall9_sv_0_p]
                             call        stmt_set
                             GET_VAR     S_pp
                             mov         rax, [rbp-16]
@@ -8320,15 +8242,13 @@ ucall9_has_val:
                             mov         [rbp-24], rdx
                             jmp         ucall9_done
 ucall9_ret_o:
-                            mov         rax, [ucall9_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall9_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall9_sv_0_t]
-                            mov         rdx, [ucall9_sv_0_p]
                             call        stmt_set
-                            LOAD_NULVCL32
+                            LOAD_FAILDESCR32
 
 ucall9_done:
                             jmp         L_pp_Stmt9_73
@@ -8382,33 +8302,27 @@ L_pp_ExprList_74:           mov         edi, 557
 Ln_321:                     mov         edi, 558
                             call        comm_stno
                             GET_VAR     S_x
-                            mov         rax, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            mov         [ucall10_sv_0_t], rax
-                            mov         [ucall10_sv_0_p], rdx
+                            push        qword [rbp-8]
+                            push        qword [rbp-16]
+                            push        qword [P_pp_ret_ω]
+                            push        qword [P_pp_ret_γ]
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rax, [rbp-32]
                             mov         rcx, [rbp-24]
                             mov         [fn_pp_arg_0_t], rax
                             mov         [fn_pp_arg_0_p], rcx
-                            mov         rax, [P_pp_ret_γ]
-                            mov         [ucall10_rsv_g], rax
-                            mov         rax, [P_pp_ret_ω]
-                            mov         [ucall10_rsv_o], rax
                             lea         rax, [rel ucall10_ret_g]
                             mov         [P_pp_ret_γ], rax
                             lea         rax, [rel ucall10_ret_o]
                             mov         [P_pp_ret_ω], rax
                             jmp         P_pp_α
 ucall10_ret_g:
-                            mov         rax, [ucall10_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall10_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall10_sv_0_t]
-                            mov         rdx, [ucall10_sv_0_p]
                             call        stmt_set
                             GET_VAR     S_pp
                             mov         rax, [rbp-16]
@@ -8426,15 +8340,13 @@ ucall10_has_val:
                             mov         [rbp-24], rdx
                             jmp         ucall10_done
 ucall10_ret_o:
-                            mov         rax, [ucall10_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall10_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall10_sv_0_t]
-                            mov         rdx, [ucall10_sv_0_p]
                             call        stmt_set
-                            LOAD_NULVCL32
+                            LOAD_FAILDESCR32
 
 ucall10_done:
 
@@ -8499,33 +8411,27 @@ Ln_328:                     mov         edi, 565
 Ln_329:                     mov         edi, 566
                             call        comm_stno
                             GET_VAR     S_x
-                            mov         rax, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            mov         [ucall11_sv_0_t], rax
-                            mov         [ucall11_sv_0_p], rdx
+                            push        qword [rbp-8]
+                            push        qword [rbp-16]
+                            push        qword [P_pp_ret_ω]
+                            push        qword [P_pp_ret_γ]
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rax, [rbp-32]
                             mov         rcx, [rbp-24]
                             mov         [fn_pp_arg_0_t], rax
                             mov         [fn_pp_arg_0_p], rcx
-                            mov         rax, [P_pp_ret_γ]
-                            mov         [ucall11_rsv_g], rax
-                            mov         rax, [P_pp_ret_ω]
-                            mov         [ucall11_rsv_o], rax
                             lea         rax, [rel ucall11_ret_g]
                             mov         [P_pp_ret_γ], rax
                             lea         rax, [rel ucall11_ret_o]
                             mov         [P_pp_ret_ω], rax
                             jmp         P_pp_α
 ucall11_ret_g:
-                            mov         rax, [ucall11_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall11_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall11_sv_0_t]
-                            mov         rdx, [ucall11_sv_0_p]
                             call        stmt_set
                             GET_VAR     S_pp
                             mov         rax, [rbp-16]
@@ -8543,15 +8449,13 @@ ucall11_has_val:
                             mov         [rbp-24], rdx
                             jmp         ucall11_done
 ucall11_ret_o:
-                            mov         rax, [ucall11_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall11_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall11_sv_0_t]
-                            mov         rdx, [ucall11_sv_0_p]
                             call        stmt_set
-                            LOAD_NULVCL32
+                            LOAD_FAILDESCR32
 
 ucall11_done:
                             jmp         L_pp_ExprList0_75
@@ -8617,33 +8521,27 @@ Ln_333:                     mov         edi, 571
 Ln_334:                     mov         edi, 572
                             call        comm_stno
                             GET_VAR     S_x
-                            mov         rax, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            mov         [ucall12_sv_0_t], rax
-                            mov         [ucall12_sv_0_p], rdx
+                            push        qword [rbp-8]
+                            push        qword [rbp-16]
+                            push        qword [P_pp_ret_ω]
+                            push        qword [P_pp_ret_γ]
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rax, [rbp-32]
                             mov         rcx, [rbp-24]
                             mov         [fn_pp_arg_0_t], rax
                             mov         [fn_pp_arg_0_p], rcx
-                            mov         rax, [P_pp_ret_γ]
-                            mov         [ucall12_rsv_g], rax
-                            mov         rax, [P_pp_ret_ω]
-                            mov         [ucall12_rsv_o], rax
                             lea         rax, [rel ucall12_ret_g]
                             mov         [P_pp_ret_γ], rax
                             lea         rax, [rel ucall12_ret_o]
                             mov         [P_pp_ret_ω], rax
                             jmp         P_pp_α
 ucall12_ret_g:
-                            mov         rax, [ucall12_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall12_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall12_sv_0_t]
-                            mov         rdx, [ucall12_sv_0_p]
                             call        stmt_set
                             GET_VAR     S_pp
                             mov         rax, [rbp-16]
@@ -8661,15 +8559,13 @@ ucall12_has_val:
                             mov         [rbp-24], rdx
                             jmp         ucall12_done
 ucall12_ret_o:
-                            mov         rax, [ucall12_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall12_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall12_sv_0_t]
-                            mov         rdx, [ucall12_sv_0_p]
                             call        stmt_set
-                            LOAD_NULVCL32
+                            LOAD_FAILDESCR32
 
 ucall12_done:
 
@@ -8734,33 +8630,27 @@ Ln_341:                     mov         edi, 579
 Ln_342:                     mov         edi, 580
                             call        comm_stno
                             GET_VAR     S_x
-                            mov         rax, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            mov         [ucall13_sv_0_t], rax
-                            mov         [ucall13_sv_0_p], rdx
+                            push        qword [rbp-8]
+                            push        qword [rbp-16]
+                            push        qword [P_pp_ret_ω]
+                            push        qword [P_pp_ret_γ]
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rax, [rbp-32]
                             mov         rcx, [rbp-24]
                             mov         [fn_pp_arg_0_t], rax
                             mov         [fn_pp_arg_0_p], rcx
-                            mov         rax, [P_pp_ret_γ]
-                            mov         [ucall13_rsv_g], rax
-                            mov         rax, [P_pp_ret_ω]
-                            mov         [ucall13_rsv_o], rax
                             lea         rax, [rel ucall13_ret_g]
                             mov         [P_pp_ret_γ], rax
                             lea         rax, [rel ucall13_ret_o]
                             mov         [P_pp_ret_ω], rax
                             jmp         P_pp_α
 ucall13_ret_g:
-                            mov         rax, [ucall13_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall13_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall13_sv_0_t]
-                            mov         rdx, [ucall13_sv_0_p]
                             call        stmt_set
                             GET_VAR     S_pp
                             mov         rax, [rbp-16]
@@ -8778,15 +8668,13 @@ ucall13_has_val:
                             mov         [rbp-24], rdx
                             jmp         ucall13_done
 ucall13_ret_o:
-                            mov         rax, [ucall13_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall13_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall13_sv_0_t]
-                            mov         rdx, [ucall13_sv_0_p]
                             call        stmt_set
-                            LOAD_NULVCL32
+                            LOAD_FAILDESCR32
 
 ucall13_done:
                             jmp         L_COMPUTED_pp_0_79
@@ -8859,33 +8747,27 @@ Ln_347:                     mov         edi, 586
 Ln_348:                     mov         edi, 587
                             call        comm_stno
                             GET_VAR     S_x
-                            mov         rax, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            mov         [ucall14_sv_0_t], rax
-                            mov         [ucall14_sv_0_p], rdx
+                            push        qword [rbp-8]
+                            push        qword [rbp-16]
+                            push        qword [P_pp_ret_ω]
+                            push        qword [P_pp_ret_γ]
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rax, [rbp-32]
                             mov         rcx, [rbp-24]
                             mov         [fn_pp_arg_0_t], rax
                             mov         [fn_pp_arg_0_p], rcx
-                            mov         rax, [P_pp_ret_γ]
-                            mov         [ucall14_rsv_g], rax
-                            mov         rax, [P_pp_ret_ω]
-                            mov         [ucall14_rsv_o], rax
                             lea         rax, [rel ucall14_ret_g]
                             mov         [P_pp_ret_γ], rax
                             lea         rax, [rel ucall14_ret_o]
                             mov         [P_pp_ret_ω], rax
                             jmp         P_pp_α
 ucall14_ret_g:
-                            mov         rax, [ucall14_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall14_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall14_sv_0_t]
-                            mov         rdx, [ucall14_sv_0_p]
                             call        stmt_set
                             GET_VAR     S_pp
                             mov         rax, [rbp-16]
@@ -8903,15 +8785,13 @@ ucall14_has_val:
                             mov         [rbp-24], rdx
                             jmp         ucall14_done
 ucall14_ret_o:
-                            mov         rax, [ucall14_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall14_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall14_sv_0_t]
-                            mov         rdx, [ucall14_sv_0_p]
                             call        stmt_set
-                            LOAD_NULVCL32
+                            LOAD_FAILDESCR32
 
 ucall14_done:
 
@@ -8976,33 +8856,27 @@ Ln_355:                     mov         edi, 594
 Ln_356:                     mov         edi, 595
                             call        comm_stno
                             GET_VAR     S_x
-                            mov         rax, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            mov         [ucall15_sv_0_t], rax
-                            mov         [ucall15_sv_0_p], rdx
+                            push        qword [rbp-8]
+                            push        qword [rbp-16]
+                            push        qword [P_pp_ret_ω]
+                            push        qword [P_pp_ret_γ]
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rax, [rbp-32]
                             mov         rcx, [rbp-24]
                             mov         [fn_pp_arg_0_t], rax
                             mov         [fn_pp_arg_0_p], rcx
-                            mov         rax, [P_pp_ret_γ]
-                            mov         [ucall15_rsv_g], rax
-                            mov         rax, [P_pp_ret_ω]
-                            mov         [ucall15_rsv_o], rax
                             lea         rax, [rel ucall15_ret_g]
                             mov         [P_pp_ret_γ], rax
                             lea         rax, [rel ucall15_ret_o]
                             mov         [P_pp_ret_ω], rax
                             jmp         P_pp_α
 ucall15_ret_g:
-                            mov         rax, [ucall15_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall15_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall15_sv_0_t]
-                            mov         rdx, [ucall15_sv_0_p]
                             call        stmt_set
                             GET_VAR     S_pp
                             mov         rax, [rbp-16]
@@ -9020,15 +8894,13 @@ ucall15_has_val:
                             mov         [rbp-24], rdx
                             jmp         ucall15_done
 ucall15_ret_o:
-                            mov         rax, [ucall15_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall15_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall15_sv_0_t]
-                            mov         rdx, [ucall15_sv_0_p]
                             call        stmt_set
-                            LOAD_NULVCL32
+                            LOAD_FAILDESCR32
 
 ucall15_done:
                             jmp         L_COMPUTED_pp_0_83
@@ -9101,33 +8973,27 @@ Lf_360:                     jmp         [P_pp_ret_γ]     ; RETURN
 Ln_360:                     mov         edi, 600
                             call        comm_stno
                             GET_VAR     S_x
-                            mov         rax, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            mov         [ucall16_sv_0_t], rax
-                            mov         [ucall16_sv_0_p], rdx
+                            push        qword [rbp-8]
+                            push        qword [rbp-16]
+                            push        qword [P_pp_ret_ω]
+                            push        qword [P_pp_ret_γ]
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rax, [rbp-32]
                             mov         rcx, [rbp-24]
                             mov         [fn_pp_arg_0_t], rax
                             mov         [fn_pp_arg_0_p], rcx
-                            mov         rax, [P_pp_ret_γ]
-                            mov         [ucall16_rsv_g], rax
-                            mov         rax, [P_pp_ret_ω]
-                            mov         [ucall16_rsv_o], rax
                             lea         rax, [rel ucall16_ret_g]
                             mov         [P_pp_ret_γ], rax
                             lea         rax, [rel ucall16_ret_o]
                             mov         [P_pp_ret_ω], rax
                             jmp         P_pp_α
 ucall16_ret_g:
-                            mov         rax, [ucall16_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall16_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall16_sv_0_t]
-                            mov         rdx, [ucall16_sv_0_p]
                             call        stmt_set
                             GET_VAR     S_pp
                             mov         rax, [rbp-16]
@@ -9145,15 +9011,13 @@ ucall16_has_val:
                             mov         [rbp-24], rdx
                             jmp         ucall16_done
 ucall16_ret_o:
-                            mov         rax, [ucall16_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall16_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall16_sv_0_t]
-                            mov         rdx, [ucall16_sv_0_p]
                             call        stmt_set
-                            LOAD_NULVCL32
+                            LOAD_FAILDESCR32
 
 ucall16_done:
 
@@ -9215,33 +9079,27 @@ L_pp_87:                    mov         edi, 603
 Ln_363:                     mov         edi, 604
                             call        comm_stno
                             GET_VAR     S_x
-                            mov         rax, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            mov         [ucall17_sv_0_t], rax
-                            mov         [ucall17_sv_0_p], rdx
+                            push        qword [rbp-8]
+                            push        qword [rbp-16]
+                            push        qword [P_pp_ret_ω]
+                            push        qword [P_pp_ret_γ]
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rax, [rbp-32]
                             mov         rcx, [rbp-24]
                             mov         [fn_pp_arg_0_t], rax
                             mov         [fn_pp_arg_0_p], rcx
-                            mov         rax, [P_pp_ret_γ]
-                            mov         [ucall17_rsv_g], rax
-                            mov         rax, [P_pp_ret_ω]
-                            mov         [ucall17_rsv_o], rax
                             lea         rax, [rel ucall17_ret_g]
                             mov         [P_pp_ret_γ], rax
                             lea         rax, [rel ucall17_ret_o]
                             mov         [P_pp_ret_ω], rax
                             jmp         P_pp_α
 ucall17_ret_g:
-                            mov         rax, [ucall17_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall17_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall17_sv_0_t]
-                            mov         rdx, [ucall17_sv_0_p]
                             call        stmt_set
                             GET_VAR     S_pp
                             mov         rax, [rbp-16]
@@ -9259,15 +9117,13 @@ ucall17_has_val:
                             mov         [rbp-24], rdx
                             jmp         ucall17_done
 ucall17_ret_o:
-                            mov         rax, [ucall17_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall17_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall17_sv_0_t]
-                            mov         rdx, [ucall17_sv_0_p]
                             call        stmt_set
-                            LOAD_NULVCL32
+                            LOAD_FAILDESCR32
 
 ucall17_done:
 
@@ -9320,33 +9176,27 @@ Ln_368:                     mov         edi, 609
 Ln_369:                     mov         edi, 610
                             call        comm_stno
                             GET_VAR     S_x
-                            mov         rax, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            mov         [ucall18_sv_0_t], rax
-                            mov         [ucall18_sv_0_p], rdx
+                            push        qword [rbp-8]
+                            push        qword [rbp-16]
+                            push        qword [P_pp_ret_ω]
+                            push        qword [P_pp_ret_γ]
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rax, [rbp-32]
                             mov         rcx, [rbp-24]
                             mov         [fn_pp_arg_0_t], rax
                             mov         [fn_pp_arg_0_p], rcx
-                            mov         rax, [P_pp_ret_γ]
-                            mov         [ucall18_rsv_g], rax
-                            mov         rax, [P_pp_ret_ω]
-                            mov         [ucall18_rsv_o], rax
                             lea         rax, [rel ucall18_ret_g]
                             mov         [P_pp_ret_γ], rax
                             lea         rax, [rel ucall18_ret_o]
                             mov         [P_pp_ret_ω], rax
                             jmp         P_pp_α
 ucall18_ret_g:
-                            mov         rax, [ucall18_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall18_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall18_sv_0_t]
-                            mov         rdx, [ucall18_sv_0_p]
                             call        stmt_set
                             GET_VAR     S_pp
                             mov         rax, [rbp-16]
@@ -9364,15 +9214,13 @@ ucall18_has_val:
                             mov         [rbp-24], rdx
                             jmp         ucall18_done
 ucall18_ret_o:
-                            mov         rax, [ucall18_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall18_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall18_sv_0_t]
-                            mov         rdx, [ucall18_sv_0_p]
                             call        stmt_set
-                            LOAD_NULVCL32
+                            LOAD_FAILDESCR32
 
 ucall18_done:
 
@@ -9470,33 +9318,27 @@ Ln_377:                     mov         edi, 619
 Ln_378:                     mov         edi, 620
                             call        comm_stno
                             GET_VAR     S_x
-                            mov         rax, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            mov         [ucall19_sv_0_t], rax
-                            mov         [ucall19_sv_0_p], rdx
+                            push        qword [rbp-8]
+                            push        qword [rbp-16]
+                            push        qword [P_pp_ret_ω]
+                            push        qword [P_pp_ret_γ]
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rax, [rbp-32]
                             mov         rcx, [rbp-24]
                             mov         [fn_pp_arg_0_t], rax
                             mov         [fn_pp_arg_0_p], rcx
-                            mov         rax, [P_pp_ret_γ]
-                            mov         [ucall19_rsv_g], rax
-                            mov         rax, [P_pp_ret_ω]
-                            mov         [ucall19_rsv_o], rax
                             lea         rax, [rel ucall19_ret_g]
                             mov         [P_pp_ret_γ], rax
                             lea         rax, [rel ucall19_ret_o]
                             mov         [P_pp_ret_ω], rax
                             jmp         P_pp_α
 ucall19_ret_g:
-                            mov         rax, [ucall19_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall19_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall19_sv_0_t]
-                            mov         rdx, [ucall19_sv_0_p]
                             call        stmt_set
                             GET_VAR     S_pp
                             mov         rax, [rbp-16]
@@ -9514,15 +9356,13 @@ ucall19_has_val:
                             mov         [rbp-24], rdx
                             jmp         ucall19_done
 ucall19_ret_o:
-                            mov         rax, [ucall19_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall19_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall19_sv_0_t]
-                            mov         rdx, [ucall19_sv_0_p]
                             call        stmt_set
-                            LOAD_NULVCL32
+                            LOAD_FAILDESCR32
 
 ucall19_done:
 
@@ -9586,33 +9426,27 @@ L_pp_Call_91:               mov         edi, 625
 Ln_383:                     mov         edi, 626
                             call        comm_stno
                             GET_VAR     S_x
-                            mov         rax, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            mov         [ucall20_sv_0_t], rax
-                            mov         [ucall20_sv_0_p], rdx
+                            push        qword [rbp-8]
+                            push        qword [rbp-16]
+                            push        qword [P_pp_ret_ω]
+                            push        qword [P_pp_ret_γ]
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rax, [rbp-32]
                             mov         rcx, [rbp-24]
                             mov         [fn_pp_arg_0_t], rax
                             mov         [fn_pp_arg_0_p], rcx
-                            mov         rax, [P_pp_ret_γ]
-                            mov         [ucall20_rsv_g], rax
-                            mov         rax, [P_pp_ret_ω]
-                            mov         [ucall20_rsv_o], rax
                             lea         rax, [rel ucall20_ret_g]
                             mov         [P_pp_ret_γ], rax
                             lea         rax, [rel ucall20_ret_o]
                             mov         [P_pp_ret_ω], rax
                             jmp         P_pp_α
 ucall20_ret_g:
-                            mov         rax, [ucall20_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall20_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall20_sv_0_t]
-                            mov         rdx, [ucall20_sv_0_p]
                             call        stmt_set
                             GET_VAR     S_pp
                             mov         rax, [rbp-16]
@@ -9630,15 +9464,13 @@ ucall20_has_val:
                             mov         [rbp-24], rdx
                             jmp         ucall20_done
 ucall20_ret_o:
-                            mov         rax, [ucall20_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall20_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall20_sv_0_t]
-                            mov         rdx, [ucall20_sv_0_p]
                             call        stmt_set
-                            LOAD_NULVCL32
+                            LOAD_FAILDESCR32
 
 ucall20_done:
 
@@ -9671,33 +9503,27 @@ Ln_386:                     mov         edi, 629
 Ln_387:                     mov         edi, 630
                             call        comm_stno
                             GET_VAR     S_x
-                            mov         rax, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            mov         [ucall21_sv_0_t], rax
-                            mov         [ucall21_sv_0_p], rdx
+                            push        qword [rbp-8]
+                            push        qword [rbp-16]
+                            push        qword [P_pp_ret_ω]
+                            push        qword [P_pp_ret_γ]
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rax, [rbp-32]
                             mov         rcx, [rbp-24]
                             mov         [fn_pp_arg_0_t], rax
                             mov         [fn_pp_arg_0_p], rcx
-                            mov         rax, [P_pp_ret_γ]
-                            mov         [ucall21_rsv_g], rax
-                            mov         rax, [P_pp_ret_ω]
-                            mov         [ucall21_rsv_o], rax
                             lea         rax, [rel ucall21_ret_g]
                             mov         [P_pp_ret_γ], rax
                             lea         rax, [rel ucall21_ret_o]
                             mov         [P_pp_ret_ω], rax
                             jmp         P_pp_α
 ucall21_ret_g:
-                            mov         rax, [ucall21_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall21_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall21_sv_0_t]
-                            mov         rdx, [ucall21_sv_0_p]
                             call        stmt_set
                             GET_VAR     S_pp
                             mov         rax, [rbp-16]
@@ -9715,15 +9541,13 @@ ucall21_has_val:
                             mov         [rbp-24], rdx
                             jmp         ucall21_done
 ucall21_ret_o:
-                            mov         rax, [ucall21_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall21_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall21_sv_0_t]
-                            mov         rdx, [ucall21_sv_0_p]
                             call        stmt_set
-                            LOAD_NULVCL32
+                            LOAD_FAILDESCR32
 
 ucall21_done:
 
@@ -12199,10 +12023,10 @@ Lf_524:                     jmp         L_mainErr2_167
 Ln_524:                     mov         edi, 792
                             call        comm_stno
                             GET_VAR     S_x
-                            mov         rax, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            mov         [ucall22_sv_0_t], rax
-                            mov         [ucall22_sv_0_p], rdx
+                            push        qword [rbp-8]
+                            push        qword [rbp-16]
+                            push        qword [P_pp_ret_ω]
+                            push        qword [P_pp_ret_γ]
                             lea         rdi, [rel S_sno]
                             call        stmt_get
                             mov         [rbp-32], rax
@@ -12211,23 +12035,17 @@ Ln_524:                     mov         edi, 792
                             mov         rcx, [rbp-24]
                             mov         [fn_pp_arg_0_t], rax
                             mov         [fn_pp_arg_0_p], rcx
-                            mov         rax, [P_pp_ret_γ]
-                            mov         [ucall22_rsv_g], rax
-                            mov         rax, [P_pp_ret_ω]
-                            mov         [ucall22_rsv_o], rax
                             lea         rax, [rel ucall22_ret_g]
                             mov         [P_pp_ret_γ], rax
                             lea         rax, [rel ucall22_ret_o]
                             mov         [P_pp_ret_ω], rax
                             jmp         P_pp_α
 ucall22_ret_g:
-                            mov         rax, [ucall22_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall22_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall22_sv_0_t]
-                            mov         rdx, [ucall22_sv_0_p]
                             call        stmt_set
                             GET_VAR     S_pp
                             mov         rax, [rbp-16]
@@ -12245,15 +12063,13 @@ ucall22_has_val:
                             mov         [rbp-24], rdx
                             jmp         ucall22_done
 ucall22_ret_o:
-                            mov         rax, [ucall22_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall22_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall22_sv_0_t]
-                            mov         rdx, [ucall22_sv_0_p]
                             call        stmt_set
-                            LOAD_NULVCL32
+                            LOAD_FAILDESCR32
 
 ucall22_done:
                             jmp         L_main01_163
@@ -12340,10 +12156,10 @@ Lf_527:                     jmp         L_mainErr2_167
 Ln_527:                     mov         edi, 795
                             call        comm_stno
                             GET_VAR     S_x
-                            mov         rax, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            mov         [ucall23_sv_0_t], rax
-                            mov         [ucall23_sv_0_p], rdx
+                            push        qword [rbp-8]
+                            push        qword [rbp-16]
+                            push        qword [P_pp_ret_ω]
+                            push        qword [P_pp_ret_γ]
                             lea         rdi, [rel S_sno]
                             call        stmt_get
                             mov         [rbp-32], rax
@@ -12352,23 +12168,17 @@ Ln_527:                     mov         edi, 795
                             mov         rcx, [rbp-24]
                             mov         [fn_pp_arg_0_t], rax
                             mov         [fn_pp_arg_0_p], rcx
-                            mov         rax, [P_pp_ret_γ]
-                            mov         [ucall23_rsv_g], rax
-                            mov         rax, [P_pp_ret_ω]
-                            mov         [ucall23_rsv_o], rax
                             lea         rax, [rel ucall23_ret_g]
                             mov         [P_pp_ret_γ], rax
                             lea         rax, [rel ucall23_ret_o]
                             mov         [P_pp_ret_ω], rax
                             jmp         P_pp_α
 ucall23_ret_g:
-                            mov         rax, [ucall23_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall23_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall23_sv_0_t]
-                            mov         rdx, [ucall23_sv_0_p]
                             call        stmt_set
                             GET_VAR     S_pp
                             mov         rax, [rbp-16]
@@ -12386,15 +12196,13 @@ ucall23_has_val:
                             mov         [rbp-24], rdx
                             jmp         ucall23_done
 ucall23_ret_o:
-                            mov         rax, [ucall23_rsv_g]
-                            mov         [P_pp_ret_γ], rax
-                            mov         rax, [ucall23_rsv_o]
-                            mov         [P_pp_ret_ω], rax
+                            pop         qword [P_pp_ret_γ]
+                            pop         qword [P_pp_ret_ω]
+                            pop         rsi
+                            pop         rdx
                             lea         rdi, [rel S_x]
-                            mov         rsi, [ucall23_sv_0_t]
-                            mov         rdx, [ucall23_sv_0_p]
                             call        stmt_set
-                            LOAD_NULVCL32
+                            LOAD_FAILDESCR32
 
 ucall23_done:
                             GOTO_ALWAYS L_SNO_END     ; END

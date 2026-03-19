@@ -369,6 +369,14 @@
     mov     qword [rbp-24], 0
 %endmacro
 
+; LOAD_FAILDESCR32 — load failure descriptor (DT_FAIL=99) into [rbp-32]/[rbp-24]
+; Used by ucall omega return path so FAIL_BR after call site takes :F branch.
+; -----------------------------------------------------------------------------
+%macro LOAD_FAILDESCR32 0
+    mov     qword [rbp-32], 99
+    mov     qword [rbp-24], 0
+%endmacro
+
 ; -----------------------------------------------------------------------------
 ; APPLY_FN_0 fnlab — call stmt_apply(fnlab, NULL, 0) → result at [rbp-16]/[rbp-8]
 ; -----------------------------------------------------------------------------

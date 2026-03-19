@@ -2444,24 +2444,44 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
             snprintf(ret_gamma_lbl, LBUF, "ucall%d_ret_g", call_uid);
             snprintf(ret_omega_lbl, LBUF, "ucall%d_ret_o", call_uid);
 
-            /* Per-call-uid bss slots were pre-registered in Pass 4 (pre-scan).
-             * Just compute the names consistently here. */
             int actual_args = (na < ufn->nparams) ? na : ufn->nparams;
 
-            /* Step 1: save old param variable values into per-call slots */
-            for (int ai = 0; ai < actual_args; ai++) {
+            /* Recursion-safe calling convention using the C stack.
+             *
+             * Layout pushed before jmp (grows down, pushed in this order):
+             *   [rsp+0]          old ret_γ  (8 bytes)
+             *   [rsp+8]          old ret_ω  (8 bytes)
+             *   [rsp+16+ai*16]   old param[ai].type  (8 bytes) × actual_args
+             *   [rsp+16+ai*16+8] old param[ai].ptr   (8 bytes) × actual_args
+             *
+             * Total stack delta = 16 + actual_args*16 bytes.
+             * Stack must be 16-byte aligned before the jmp (no implicit return
+             * addr since this is jmp not call).  We push an even number of
+             * 8-byte words; main() opens with sub rsp,N so rsp is already
+             * 16-aligned; we push 2+2*actual_args qwords.  If that count is
+             * odd we add an extra alignment pad.
+             *
+             * At the return labels (ucall_ret_g / ucall_ret_o) rsp still points
+             * to the bottom of our saved frame because the callee uses its own
+             * stack frame (push rbp / sub rsp).
+             */
+            int n_pushed = 2 + actual_args * 2;   /* qwords pushed */
+            int extra_align = (n_pushed % 2) ? 1 : 0;
+            if (extra_align) A("    sub     rsp, 8          ; align pad\n");
+
+            /* Step 1: save old param variable values onto the stack */
+            for (int ai = actual_args - 1; ai >= 0; ai--) {
                 const char *plab = prog_str_intern(ufn->param_names[ai]);
-                char sv_t[LBUF], sv_p[LBUF];
-                snprintf(sv_t, LBUF, "ucall%d_sv_%d_t", call_uid, ai);
-                snprintf(sv_p, LBUF, "ucall%d_sv_%d_p", call_uid, ai);
                 A("    GET_VAR     %s\n", plab);
-                A("    mov     rax, [rbp-16]\n");
-                A("    mov     rdx, [rbp-8]\n");
-                A("    mov     [%s], rax\n", sv_t);
-                A("    mov     [%s], rdx\n", sv_p);
+                A("    push    qword [rbp-8]\n");   /* ptr  (high qword of DESCR) */
+                A("    push    qword [rbp-16]\n");  /* type (low  qword of DESCR) */
             }
 
-            /* Step 2: evaluate args and set param variables */
+            /* Step 2: save old ret addresses onto the stack */
+            A("    push    qword [%s]\n", ufn->ret_omega);
+            A("    push    qword [%s]\n", ufn->ret_gamma);
+
+            /* Step 3: evaluate args and store into fn_arg slots */
             for (int ai = 0; ai < actual_args && e->args[ai]; ai++) {
                 char arg_slot_t[LBUF2+16], arg_slot_p[LBUF2+16];
                 snprintf(arg_slot_t, sizeof arg_slot_t, "fn_%s_arg_%d_t", ufn->safe, ai);
@@ -2473,42 +2493,49 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
                 A("    mov     [%s], rcx\n", arg_slot_p);
             }
 
-            /* Step 3: save old ret slots, store new return addresses */
-            char ret_sv_g[LBUF], ret_sv_o[LBUF];
-            snprintf(ret_sv_g, LBUF, "ucall%d_rsv_g", call_uid);
-            snprintf(ret_sv_o, LBUF, "ucall%d_rsv_o", call_uid);
-            A("    mov     rax, [%s]\n", ufn->ret_gamma);
-            A("    mov     [%s], rax\n", ret_sv_g);
-            A("    mov     rax, [%s]\n", ufn->ret_omega);
-            A("    mov     [%s], rax\n", ret_sv_o);
+            /* Step 4: install new return addresses and jump */
             A("    lea     rax, [rel %s]\n", ret_gamma_lbl);
             A("    mov     [%s], rax\n", ufn->ret_gamma);
             A("    lea     rax, [rel %s]\n", ret_omega_lbl);
             A("    mov     [%s], rax\n", ufn->ret_omega);
-
-            /* Step 4: call */
             A("    jmp     %s\n", ufn->alpha_lbl);
 
-            /* Step 5a: gamma return — restore ret slots, restore params, get result */
+            /* Helper: pop saved frame off stack.
+             * Stack layout (rsp→top): ret_γ, ret_ω, param[0].t, param[0].p, ...
+             * We pop ret addresses back into the ret slots, then restore params
+             * via stmt_set (which needs rdi/rsi/rdx — so we pop into temporaries
+             * first, then call stmt_set for each param).
+             *
+             * For param restore we pop type+ptr into r8+r9 (callee-saved in
+             * System V), then call stmt_set(name, r8, r9).  Actually stmt_set
+             * takes DESCR_t by value (rsi=type, rdx=ptr per ABI), so:
+             *   lea rdi, [param_name]
+             *   pop rsi   ; type
+             *   pop rdx   ; ptr  — wait, these are 64-bit fields; DESCR_t is
+             *              ; passed as two registers per System V aggregate rules.
+             * Simpler: pop into [rbp-32/24] then call stmt_set with rbp-32/24.
+             * But stmt_set signature is stmt_set(const char *name, DESCR_t d)
+             * where d is passed as rsi (type) + rdx (ptr) by value.
+             */
+
+            /* Step 5a: gamma return */
             A("%s:\n", ret_gamma_lbl);
-            A("    mov     rax, [%s]\n", ret_sv_g);
-            A("    mov     [%s], rax\n", ufn->ret_gamma);
-            A("    mov     rax, [%s]\n", ret_sv_o);
-            A("    mov     [%s], rax\n", ufn->ret_omega);
-            for (int ai = actual_args - 1; ai >= 0; ai--) {
+            /* Restore old ret addresses from stack */
+            A("    pop     qword [%s]\n", ufn->ret_gamma);
+            A("    pop     qword [%s]\n", ufn->ret_omega);
+            /* Restore old param values from stack */
+            for (int ai = 0; ai < actual_args; ai++) {
                 const char *plab = prog_str_intern(ufn->param_names[ai]);
-                char sv_t[LBUF], sv_p[LBUF];
-                snprintf(sv_t, LBUF, "ucall%d_sv_%d_t", call_uid, ai);
-                snprintf(sv_p, LBUF, "ucall%d_sv_%d_p", call_uid, ai);
+                A("    pop     rsi\n");              /* type */
+                A("    pop     rdx\n");              /* ptr  */
                 A("    lea     rdi, [rel %s]\n", plab);
-                A("    mov     rsi, [%s]\n", sv_t);
-                A("    mov     rdx, [%s]\n", sv_p);
                 A("    call    stmt_set\n");
             }
+            if (extra_align) A("    add     rsp, 8          ; remove align pad\n");
+            /* Get return value from function variable */
             A("    GET_VAR     %s\n", fnlab);
             A("    mov     rax, [rbp-16]\n");
             A("    mov     rdx, [rbp-8]\n");
-            /* If function variable is empty/fail, use NULVCL as success sentinel */
             A("    call    stmt_is_fail\n");
             A("    test    eax, eax\n");
             A("    jz      ucall%d_has_val\n", call_uid);
@@ -2521,23 +2548,20 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
             A("    mov     [rbp-24], rdx\n");
             A("    jmp     ucall%d_done\n", call_uid);
 
-            /* Step 5b: omega return (FRETURN) — restore ret slots, restore params */
+            /* Step 5b: omega return (FRETURN) */
             A("%s:\n", ret_omega_lbl);
-            A("    mov     rax, [%s]\n", ret_sv_g);
-            A("    mov     [%s], rax\n", ufn->ret_gamma);
-            A("    mov     rax, [%s]\n", ret_sv_o);
-            A("    mov     [%s], rax\n", ufn->ret_omega);
-            for (int ai = actual_args - 1; ai >= 0; ai--) {
+            A("    pop     qword [%s]\n", ufn->ret_gamma);
+            A("    pop     qword [%s]\n", ufn->ret_omega);
+            for (int ai = 0; ai < actual_args; ai++) {
                 const char *plab = prog_str_intern(ufn->param_names[ai]);
-                char sv_t[LBUF], sv_p[LBUF];
-                snprintf(sv_t, LBUF, "ucall%d_sv_%d_t", call_uid, ai);
-                snprintf(sv_p, LBUF, "ucall%d_sv_%d_p", call_uid, ai);
+                A("    pop     rsi\n");
+                A("    pop     rdx\n");
                 A("    lea     rdi, [rel %s]\n", plab);
-                A("    mov     rsi, [%s]\n", sv_t);
-                A("    mov     rdx, [%s]\n", sv_p);
                 A("    call    stmt_set\n");
             }
-            A("    LOAD_NULVCL32\n");
+            if (extra_align) A("    add     rsp, 8          ; remove align pad\n");
+            /* FRETURN: signal failure to caller via FAILDESCR */
+            A("    LOAD_FAILDESCR32\n");
             A("ucall%d_done:\n", call_uid);
             return 1;
         }
