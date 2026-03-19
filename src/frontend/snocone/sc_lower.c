@@ -1,0 +1,486 @@
+/*
+ * sc_lower.c -- Snocone postfix ScPToken[] → EXPR_t/STMT_t IR  (Sprint SC2)
+ *
+ * Ported from:
+ *   snobol4jvm  snocone_emitter.clj  (operator table, emit-binary logic)
+ *   snobol4dotnet SnoconeParser.cs   (shunting-yard reference)
+ *
+ * The postfix stream from sc_parse() is a standard RPN expression.
+ * We maintain an EXPR_t* operand stack.  When we hit SC_NEWLINE we
+ * pop the top expression and assemble a STMT_t.
+ *
+ * Assignment detection:
+ *   SC_ASSIGN in postfix: pop rhs, pop lhs.
+ *   If lhs is a simple E_VART or E_KW the STMT_t is:
+ *       subject=lhs  replacement=rhs  (no pattern field)
+ *   This matches OUTPUT = 'hello', x = expr, etc.
+ *
+ * Pattern match detection (future — Sprint SC4):
+ *   If subject is a variable and a pattern field would be present,
+ *   pattern match stmts use SNOBOL4's  subject ? pattern = replace
+ *   which maps to STMT_t subject/pattern/replacement.  Not emitted here.
+ */
+
+#include "sc_lower.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+/* ---------------------------------------------------------------------------
+ * Operand stack
+ * ------------------------------------------------------------------------- */
+#define STACK_MAX 1024
+
+typedef struct {
+    EXPR_t *v[STACK_MAX];
+    int     top;   /* index of next free slot */
+} ExprStack;
+
+static void  es_push(ExprStack *s, EXPR_t *e) {
+    if (s->top >= STACK_MAX) { fprintf(stderr, "sc_lower: stack overflow\n"); exit(1); }
+    s->v[s->top++] = e;
+}
+static EXPR_t *es_pop(ExprStack *s) {
+    if (s->top <= 0) { fprintf(stderr, "sc_lower: stack underflow\n"); return expr_new(E_NULV); }
+    return s->v[--s->top];
+}
+static EXPR_t *es_peek(ExprStack *s) {
+    if (s->top <= 0) return NULL;
+    return s->v[s->top - 1];
+}
+
+/* ---------------------------------------------------------------------------
+ * Helper: build a 2-arg E_FNC node
+ * ------------------------------------------------------------------------- */
+static EXPR_t *make_fnc2(const char *name, EXPR_t *l, EXPR_t *r) {
+    EXPR_t *e  = expr_new(E_FNC);
+    e->sval    = strdup(name);
+    e->nargs   = 2;
+    e->args    = malloc(2 * sizeof(EXPR_t *));
+    e->args[0] = l;
+    e->args[1] = r;
+    return e;
+}
+
+/* Helper: build a 1-arg E_FNC node */
+static EXPR_t *make_fnc1(const char *name, EXPR_t *arg) {
+    EXPR_t *e  = expr_new(E_FNC);
+    e->sval    = strdup(name);
+    e->nargs   = 1;
+    e->args    = malloc(sizeof(EXPR_t *));
+    e->args[0] = arg;
+    return e;
+}
+
+/* ---------------------------------------------------------------------------
+ * Lower one postfix token onto the operand stack
+ * Returns 0 on success, -1 on error.
+ * ------------------------------------------------------------------------- */
+static int lower_token(const ScPToken *tok, ExprStack *s,
+                       const char *filename, int *nerrors)
+{
+    (void)filename;
+
+    /* ---- Operands ---- */
+    switch ((int)tok->kind) {
+    case SC_INTEGER: {
+        EXPR_t *e = expr_new(E_ILIT);
+        e->ival   = strtol(tok->text, NULL, 10);
+        es_push(s, e);
+        return 0;
+    }
+    case SC_REAL: {
+        EXPR_t *e = expr_new(E_FLIT);
+        e->dval   = strtod(tok->text, NULL);
+        es_push(s, e);
+        return 0;
+    }
+    case SC_STRING: {
+        EXPR_t *e = expr_new(E_QLIT);
+        /* tok->text includes surrounding quotes — strip them */
+        int len = (int)strlen(tok->text);
+        if (len >= 2 && (tok->text[0] == '\'' || tok->text[0] == '"')) {
+            e->sval = strndup(tok->text + 1, len - 2);
+        } else {
+            e->sval = strdup(tok->text);
+        }
+        es_push(s, e);
+        return 0;
+    }
+    case SC_IDENT: {
+        EXPR_t *e = expr_new(E_VART);
+        e->sval   = strdup(tok->text);
+        es_push(s, e);
+        return 0;
+    }
+
+    /* ---- Binary arithmetic ---- */
+    case SC_PLUS: {
+        EXPR_t *r = es_pop(s), *l = es_pop(s);
+        EXPR_t *e = expr_new(E_ADD); e->left = l; e->right = r;
+        es_push(s, e); return 0;
+    }
+    case SC_MINUS:
+        if (tok->is_unary) {
+            EXPR_t *operand = es_pop(s);
+            EXPR_t *e = expr_new(E_MNS); e->left = operand;
+            es_push(s, e); return 0;
+        } else {
+            EXPR_t *r = es_pop(s), *l = es_pop(s);
+            EXPR_t *e = expr_new(E_SUB); e->left = l; e->right = r;
+            es_push(s, e); return 0;
+        }
+    case SC_STAR:
+        if (tok->is_unary) {
+            /* unary * = indirect reference */
+            EXPR_t *operand = es_pop(s);
+            EXPR_t *e = expr_new(E_INDR); e->left = operand;
+            es_push(s, e); return 0;
+        } else {
+            EXPR_t *r = es_pop(s), *l = es_pop(s);
+            EXPR_t *e = expr_new(E_MPY); e->left = l; e->right = r;
+            es_push(s, e); return 0;
+        }
+    case SC_SLASH: {
+        EXPR_t *r = es_pop(s), *l = es_pop(s);
+        EXPR_t *e = expr_new(E_DIV); e->left = l; e->right = r;
+        es_push(s, e); return 0;
+    }
+    case SC_CARET: {
+        EXPR_t *r = es_pop(s), *l = es_pop(s);
+        EXPR_t *e = expr_new(E_EXPOP); e->left = l; e->right = r;
+        es_push(s, e); return 0;
+    }
+
+    /* ---- String / pattern composition ---- */
+    case SC_CONCAT: {
+        /* && blank concat → E_CONC */
+        EXPR_t *r = es_pop(s), *l = es_pop(s);
+        EXPR_t *e = expr_new(E_CONC); e->left = l; e->right = r;
+        es_push(s, e); return 0;
+    }
+    case SC_PIPE: {
+        /* single | also string concat in SNOBOL4 context */
+        EXPR_t *r = es_pop(s), *l = es_pop(s);
+        EXPR_t *e = expr_new(E_CONC); e->left = l; e->right = r;
+        es_push(s, e); return 0;
+    }
+    case SC_OR: {
+        /* || pattern alternation → E_OR */
+        EXPR_t *r = es_pop(s), *l = es_pop(s);
+        EXPR_t *e = expr_new(E_OR); e->left = l; e->right = r;
+        es_push(s, e); return 0;
+    }
+    case SC_PERIOD: {
+        /* . conditional capture: expr . var → E_NAM(left=expr, right=var) */
+        EXPR_t *var  = es_pop(s);
+        EXPR_t *expr = es_pop(s);
+        EXPR_t *e    = expr_new(E_NAM);
+        e->left  = expr;
+        e->right = var;
+        es_push(s, e); return 0;
+    }
+    case SC_DOLLAR:
+        if (tok->is_unary) {
+            /* unary $ = indirect lvalue (E_INDR used as assignment target) */
+            EXPR_t *operand = es_pop(s);
+            EXPR_t *e = expr_new(E_INDR); e->left = operand;
+            es_push(s, e); return 0;
+        } else {
+            /* binary $ = immediate capture: expr $ var → E_DOL */
+            EXPR_t *var  = es_pop(s);
+            EXPR_t *expr = es_pop(s);
+            EXPR_t *e    = expr_new(E_DOL);
+            e->left  = expr;
+            e->right = var;
+            es_push(s, e); return 0;
+        }
+    case SC_AT: {
+        /* @var — cursor position capture */
+        EXPR_t *var = es_pop(s);
+        EXPR_t *e   = expr_new(E_ATP);
+        e->left = var;
+        es_push(s, e); return 0;
+    }
+    case SC_AMPERSAND: {
+        /* unary & — keyword reference: &IDENT → E_KW */
+        EXPR_t *operand = es_pop(s);
+        EXPR_t *e = expr_new(E_KW);
+        /* operand is E_VART with the keyword name */
+        e->sval = operand ? strdup(operand->sval ? operand->sval : "") : strdup("");
+        /* free the wrapper E_VART node we just consumed */
+        free(operand);
+        es_push(s, e); return 0;
+    }
+    case SC_TILDE: {
+        /* ~ logical negation → NOT(expr) */
+        EXPR_t *operand = es_pop(s);
+        es_push(s, make_fnc1("NOT", operand));
+        return 0;
+    }
+    case SC_QUESTION:
+        if (tok->is_unary) {
+            /* unary ? = DIFFER(x) or just return x — treat as DIFFER(x,"") */
+            EXPR_t *operand = es_pop(s);
+            es_push(s, make_fnc1("DIFFER", operand));
+        } else {
+            /* binary ? — alternation-like — map to DIFFER(a,b) per snocone.sc */
+            EXPR_t *r = es_pop(s), *l = es_pop(s);
+            es_push(s, make_fnc2("DIFFER", l, r));
+        }
+        return 0;
+
+    /* ---- Comparison operators → function calls ---- */
+    case SC_EQ: {
+        EXPR_t *r = es_pop(s), *l = es_pop(s);
+        es_push(s, make_fnc2("EQ", l, r)); return 0;
+    }
+    case SC_NE: {
+        EXPR_t *r = es_pop(s), *l = es_pop(s);
+        es_push(s, make_fnc2("NE", l, r)); return 0;
+    }
+    case SC_LT: {
+        EXPR_t *r = es_pop(s), *l = es_pop(s);
+        es_push(s, make_fnc2("LT", l, r)); return 0;
+    }
+    case SC_GT: {
+        EXPR_t *r = es_pop(s), *l = es_pop(s);
+        es_push(s, make_fnc2("GT", l, r)); return 0;
+    }
+    case SC_LE: {
+        EXPR_t *r = es_pop(s), *l = es_pop(s);
+        es_push(s, make_fnc2("LE", l, r)); return 0;
+    }
+    case SC_GE: {
+        EXPR_t *r = es_pop(s), *l = es_pop(s);
+        es_push(s, make_fnc2("GE", l, r)); return 0;
+    }
+    case SC_STR_IDENT: {
+        EXPR_t *r = es_pop(s), *l = es_pop(s);
+        es_push(s, make_fnc2("IDENT", l, r)); return 0;
+    }
+    case SC_STR_DIFFER: {
+        EXPR_t *r = es_pop(s), *l = es_pop(s);
+        es_push(s, make_fnc2("DIFFER", l, r)); return 0;
+    }
+    case SC_STR_LT: {
+        EXPR_t *r = es_pop(s), *l = es_pop(s);
+        es_push(s, make_fnc2("LLT", l, r)); return 0;
+    }
+    case SC_STR_GT: {
+        EXPR_t *r = es_pop(s), *l = es_pop(s);
+        es_push(s, make_fnc2("LGT", l, r)); return 0;
+    }
+    case SC_STR_LE: {
+        EXPR_t *r = es_pop(s), *l = es_pop(s);
+        es_push(s, make_fnc2("LLE", l, r)); return 0;
+    }
+    case SC_STR_GE: {
+        EXPR_t *r = es_pop(s), *l = es_pop(s);
+        es_push(s, make_fnc2("LGE", l, r)); return 0;
+    }
+    case SC_STR_EQ: {
+        EXPR_t *r = es_pop(s), *l = es_pop(s);
+        es_push(s, make_fnc2("LEQ", l, r)); return 0;
+    }
+    case SC_STR_NE: {
+        EXPR_t *r = es_pop(s), *l = es_pop(s);
+        es_push(s, make_fnc2("LNE", l, r)); return 0;
+    }
+    case SC_PERCENT: {
+        EXPR_t *r = es_pop(s), *l = es_pop(s);
+        es_push(s, make_fnc2("REMDR", l, r)); return 0;
+    }
+
+    /* ---- Assignment: pop rhs, pop lhs, push E_ASGN ---- */
+    case SC_ASSIGN: {
+        EXPR_t *rhs = es_pop(s);
+        EXPR_t *lhs = es_pop(s);
+        EXPR_t *e   = expr_new(E_ASGN);
+        e->left     = lhs;
+        e->right    = rhs;
+        es_push(s, e);
+        return 0;
+    }
+
+    /* ---- Function call: pop nargs args + name from stack ---- */
+    case SC_CALL: {
+        int     nargs = tok->arg_count;
+        EXPR_t *fn    = expr_new(E_FNC);
+        /* args are on stack in postfix order: arg0 pushed first → arg(n-1) on top */
+        EXPR_t **args = nargs > 0 ? malloc(nargs * sizeof(EXPR_t *)) : NULL;
+        for (int k = nargs - 1; k >= 0; k--)
+            args[k] = es_pop(s);
+        /* function name is the E_VART below the args */
+        EXPR_t *name_node = es_pop(s);
+        fn->sval  = name_node ? strdup(name_node->sval ? name_node->sval : "") : strdup("");
+        free(name_node);
+        fn->nargs = nargs;
+        fn->args  = args;
+        es_push(s, fn);
+        return 0;
+    }
+
+    /* ---- Array ref: a[i] → E_IDX ---- */
+    case SC_ARRAY_REF: {
+        int     nargs = tok->arg_count;
+        EXPR_t **args = nargs > 0 ? malloc(nargs * sizeof(EXPR_t *)) : NULL;
+        for (int k = nargs - 1; k >= 0; k--)
+            args[k] = es_pop(s);
+        EXPR_t *name_node = es_pop(s);
+        EXPR_t *e = expr_new(E_IDX);
+        e->sval   = name_node ? strdup(name_node->sval ? name_node->sval : "") : strdup("");
+        free(name_node);
+        e->nargs  = nargs;
+        e->args   = args;
+        es_push(s, e);
+        return 0;
+    }
+
+    /* ---- Statement terminators handled by caller ---- */
+    case SC_NEWLINE:
+    case SC_SEMICOLON:
+    case SC_EOF:
+        /* handled in the main loop */
+        return 0;
+
+    /* ---- Keywords not relevant to expression lowering ---- */
+    case SC_KW_IF:
+    case SC_KW_ELSE:
+    case SC_KW_WHILE:
+    case SC_KW_DO:
+    case SC_KW_FOR:
+    case SC_KW_RETURN:
+    case SC_KW_FRETURN:
+    case SC_KW_NRETURN:
+    case SC_KW_GO:
+    case SC_KW_TO:
+    case SC_KW_PROCEDURE:
+    case SC_KW_STRUCT:
+        /* Control-flow keywords — Sprint SC3 will handle these via a
+         * higher-level pass over sc_parse output.  For now, skip. */
+        return 0;
+
+    default:
+        fprintf(stderr, "sc_lower: unhandled token kind %d ('%s') at line %d\n",
+                (int)tok->kind, tok->text ? tok->text : "", tok->line);
+        (*nerrors)++;
+        return -1;
+    }
+}
+
+/* ---------------------------------------------------------------------------
+ * Assemble a STMT_t from the top of the stack after SC_NEWLINE
+ * ------------------------------------------------------------------------- */
+static STMT_t *assemble_stmt(ExprStack *s, int lineno) {
+    EXPR_t *top = es_peek(s);
+    if (!top) return NULL;   /* blank line */
+
+    STMT_t *st = stmt_new();
+    st->lineno = lineno;
+
+    if (top->kind == E_ASGN) {
+        /* Assignment: subject = lhs, replacement = rhs */
+        es_pop(s);
+        st->subject     = top->left;
+        st->replacement = top->right;
+        st->has_eq      = 1;
+        free(top);   /* free E_ASGN shell only */
+    } else {
+        /* Expression-only statement (output, pattern match, etc.) */
+        es_pop(s);
+        st->subject = top;
+    }
+
+    return st;
+}
+
+/* ---------------------------------------------------------------------------
+ * sc_lower — main entry point
+ * ------------------------------------------------------------------------- */
+ScLowerResult sc_lower(const ScPToken *ptoks, int count, const char *filename) {
+    ScLowerResult result = { NULL, 0 };
+    Program *prog = calloc(1, sizeof(Program));
+    result.prog   = prog;
+
+    ExprStack stack = { .top = 0 };
+    int       last_line = 1;
+
+    for (int i = 0; i < count; i++) {
+        const ScPToken *tok = &ptoks[i];
+
+        if (tok->kind == SC_NEWLINE || tok->kind == SC_SEMICOLON) {
+            /* End of logical statement — assemble if anything on stack */
+            if (stack.top > 0) {
+                STMT_t *st = assemble_stmt(&stack, last_line);
+                if (st) {
+                    if (!prog->head) {
+                        prog->head = prog->tail = st;
+                    } else {
+                        prog->tail->next = st;
+                        prog->tail = st;
+                    }
+                    prog->nstmts++;
+                }
+                /* If there are leftover operands (shouldn't happen), discard */
+                stack.top = 0;
+            }
+            if (tok->line) last_line = tok->line;
+            continue;
+        }
+
+        if (tok->kind == SC_EOF) break;
+
+        last_line = tok->line ? tok->line : last_line;
+        lower_token(tok, &stack, filename, &result.nerrors);
+    }
+
+    /* Flush any trailing expression (no final newline) */
+    if (stack.top > 0) {
+        STMT_t *st = assemble_stmt(&stack, last_line);
+        if (st) {
+            if (!prog->head) {
+                prog->head = prog->tail = st;
+            } else {
+                prog->tail->next = st;
+                prog->tail = st;
+            }
+            prog->nstmts++;
+        }
+    }
+
+    return result;
+}
+
+/* ---------------------------------------------------------------------------
+ * sc_lower_free
+ * ------------------------------------------------------------------------- */
+static void free_expr(EXPR_t *e) {
+    if (!e) return;
+    free_expr(e->left);
+    free_expr(e->right);
+    if (e->args) {
+        for (int i = 0; i < e->nargs; i++) free_expr(e->args[i]);
+        free(e->args);
+    }
+    free(e->sval);
+    free(e);
+}
+
+static void free_stmt(STMT_t *st) {
+    if (!st) return;
+    free_stmt(st->next);
+    free_expr(st->subject);
+    free_expr(st->pattern);
+    free_expr(st->replacement);
+    free(st->label);
+    free(st->go);
+    free(st);
+}
+
+void sc_lower_free(ScLowerResult *r) {
+    if (!r || !r->prog) return;
+    free_stmt(r->prog->head);
+    free(r->prog);
+    r->prog = NULL;
+}
