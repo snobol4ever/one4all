@@ -1,253 +1,157 @@
-# snobol4x
+# snobol4x — TINY compiler
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
-A native SNOBOL4 compiler targeting x86-64 ASM, JVM bytecode, and MSIL.
-Stackless. Goal-directed like Icon. Faster than SPITBOL.
-
+A SNOBOL4/SPITBOL compiler targeting x86-64 native ASM, JVM bytecode, and .NET MSIL.
 Part of the [snobol4ever](https://github.com/snobol4ever) organization.
 
 ---
 
 ## What This Is
 
-snobol4x compiles SNOBOL4 programs to native code using a
-**Byrd Box** compilation model. Every expression — pattern or arithmetic —
-is a generator with four labeled entry points:
+`snobol4x` is the **TINY** compiler — a from-scratch SNOBOL4 front-end (`sno2c`) with
+three independent back-ends sharing one IR. It compiles `.sno` source to:
 
-| Label | Meaning |
-|-------|---------|
-| **α** | Enter fresh (start) |
-| **β** | Resume (backtrack, try again) |
-| **γ** | Succeed (pass value up) |
-| **ω** | Fail (propagate failure up) |
+| Flag | Output | Status |
+|------|--------|--------|
+| *(default)* | C with gotos (trampoline) | ✅ 106/106 corpus |
+| `-asm` | x86-64 NASM assembly | ✅ 106/106 corpus, sample programs |
+| `-jvm` | JVM Jasmin bytecode (`.j`) | ✅ patterns/ rung, working toward 106/106 |
+| `-net` | .NET CIL (`.il`) | 🔧 hello/literals working |
 
-This gives snobol4x true **goal-directed evaluation** (like Icon), compiled
-to straight-line native code with no interpreter loop and no indirect dispatch.
+Sister repos: [`snobol4jvm`](https://github.com/snobol4ever/snobol4jvm) (full Clojure→JVM pipeline) and [`snobol4dotnet`](https://github.com/snobol4ever/snobol4dotnet) (full C#→MSIL pipeline).
 
 ---
 
-## Why Not Just SPITBOL?
+## The Byrd Box Model
 
-SPITBOL is the fastest SNOBOL4 implementation in existence. It uses the hardware
-x86 stack (`rsp`) as the backtracking history stack — fast, but bounded:
-
-| Limitation | SPITBOL | snobol4x |
-|------------|---------|--------------|
-| Backtrack stack | Hardware `rsp` (OS-bounded) | Heap `_t` structs (unbounded) |
-| Goal-directed eval | No | Yes — every expr is a generator |
-| Node dispatch | Indirect `jmp [pcode]` per node | Fully inlined template codegen |
-| SIMD primitives | No (one char/cycle) | SSE2/AVX2 (16–32 bytes/cycle) |
-| Targets | x86-64 only | x86-64, JVM bytecode, MSIL |
-| CODE/EVAL | Interpreter mode switch | Runtime JIT (compiler always on) |
-
----
-
-## The α/β/γ/ω Protocol
-
-Every compiled node owns four labels. Concatenation wires γ of one node
-to α of the next; failure wires ω back to β of the nearest choice point.
-
-```c
-// Example: LEN(3) compiled inline
-len3_α:
-    if (cursor + 3 > subject_len) goto len3_ω;
-    saved_cursor = cursor;
-    cursor += 3;
-    goto len3_γ;          // succeed — pass control forward
-
-len3_β:                   // resume (backtrack into us)
-    cursor = saved_cursor;
-    goto len3_ω;          // LEN is deterministic — immediately fail
-
-len3_γ: /* ... next node's α ... */
-len3_ω: /* ... previous choice point's β ... */
-```
-
-Alternation (`P | Q`) wires ω of P to α of Q, and Q's ω exits the choice.
-ARBNO wraps a node's γ back to its own α, with ω exiting the loop.
-
----
-
-## Architecture
+Every SNOBOL4 statement has the form:
 
 ```
-SNOBOL4 source
-    → Parser          → AST
-    → IR builder      → Node graph (named flat table, supports cycles)
-    → Code generator  → x86-64 ASM  /  JVM bytecode  /  MSIL
+label:   subject   pattern   = replacement   :S(x) F(y)
 ```
 
-**The runtime already exists.** `SNOBOL4c.c` (1,064 lines of C) is a complete
-SNOBOL4 pattern interpreter covering all 43 node types. Its match engine uses
-four actions — PROCEED / SUCCESS / FAILURE / RECEDE — which are exactly the
-α/β/γ/ω protocol implemented as an interpreter rather than compiled gotos.
-The `.h` files (`C_PATTERN.h`, `CALC_PATTERN.h`, etc.) are pre-compiled
-pattern data that the interpreter executes. A compiler emits C-with-gotos
-(the `test_sno_*.c` format) instead — same semantics, zero dispatch cost.
+Each pattern node compiles to a **Byrd box** — four labeled entry points:
 
-**The parser is already written.** `Beautiful.sno` (snobol4dotnet repo)
-contains a complete 17-level SNOBOL4 expression and statement parser written
-as SNOBOL4 patterns (`snoExpr` through `snoExpr17`, `snoStmt`, `snoParse`).
-Sprint 5: serialize those patterns into `SNOBOL4_EXPRESSION_PATTERN.h`,
-`#include` it, add a 5-line stdin loop. No yacc. No new grammar.
-The seed kernel executes the parser as pattern data — the Forth move.
+| Port | Meaning |
+|------|---------|
+| **α** | Enter fresh — cursor at current position |
+| **β** | Resume after backtrack from a child |
+| **γ** | Succeed — advance cursor, pass control forward |
+| **ω** | Fail — restore cursor, propagate failure back |
 
----
+Sequential composition wires γ of one node to α of the next.
+Alternation saves the cursor on the left-ω path and restores it before trying right.
+ARBNO wires child-γ back into α until child-ω exits.
 
-## Sprint Plan
-
-Development is test-driven. The test suite *is* the specification.
-Each sprint adds exactly one new mechanism.
-
-| Sprint | What | Mechanism |
-|--------|------|-----------|
-| 0 | Null program | Full runtime skeleton: α/β/γ/ω, output, entry/exit |
-| 1 | Single token: `"hello"`, `POS(0)`, `RPOS(0)` | Literal, cursor primitives |
-| 2 | Two-token sequences: `POS(0) RPOS(0)` | Concatenation wiring |
-| 3 | Alternation: `"a" \| "b"` | Choice point, β backtrack |
-| 4 | Assignment: `SPAN(DIGITS) $ OUTPUT` | Capture, immediate assign |
-| 5 | ARBNO | Generator loop with γ→α rewire |
-| 6 | Named patterns, recursive refs | REF node, cycle in IR graph |
-| 7 | Multiple statements, variable subjects | Statement loop, env |
-| 8 | CODE / EVAL | Runtime JIT, two-tier allocation |
-
-Each completed sprint is tagged as a named snapshot (not a version number).
+All three back-ends implement the same four-port wiring — the execution semantics
+are identical whether the target is C gotos, JVM bytecode, or MSIL.
 
 ---
 
-## Bootstrap Strategy
+## Build
 
-snobol4x follows the **Forth kernel discipline**: keep the seed as small
-as possible, then build everything else in the language itself.
+```bash
+# Dependencies
+apt-get install -y libgc-dev nasm default-jdk
 
-The analogy is direct:
+# Build sno2c
+make -C src
 
-| Forth | snobol4x |
-|-------|-------------|
-| ~12 native primitives | 8 primitive pattern nodes (LIT, ANY, POS, RPOS, LEN, SPAN, BREAK, ARB) |
-| NEXT (3-instruction dispatch) | α/β/γ/ω wiring baked into compiled gotos — **zero** dispatch cost |
-| `: word ... ;` defines new words | `NAME = pattern` defines new patterns |
-| Dictionary (self-extending) | Named IR graph (already built) |
-| Write Forth in Forth | Write the emitter in SNOBOL4 |
-
-**Three phases:**
-
-1. **Seed kernel (Sprints 0–4):** 8 primitive C templates in `emit_c.py`.
-   Never add a primitive that can be expressed from existing ones — ARBNO
-   is derivable from ARB + CAT + ALT and should be written in SNOBOL4, not
-   hardcoded.
-
-2. **Self-hosting emitter (Sprint 5+):** Rewrite `emit_c.py` as
-   `src/codegen/emit.sno` — a SNOBOL4 program that reads IR descriptions
-   and emits C. Runs on snobol4jvm for validation, snobol4python for speed.
-
-3. **Bootstrap closure (Sprint 8+):** The emitter compiles itself and
-   produces output identical to the CSNOBOL4/SPITBOL oracle. Same test
-   as Snocone Step 9 in the sibling repos.
-
-See [`doc/BOOTSTRAP.md`](doc/BOOTSTRAP.md) for the full design.
+# Run a program
+./sno2c -asm program.sno | nasm -f elf64 - -o prog.o && gcc prog.o -o prog && ./prog
+./sno2c -jvm program.sno > prog.j && java -jar src/backend/jvm/jasmin.jar prog.j -d . && java Prog
+```
 
 ---
 
-## Validation
+## Validate
 
-Correctness is validated against three oracles:
+```bash
+# C backend — 106/106 corpus
+bash test/crosscheck/run_crosscheck.sh
 
-- **SPITBOL x64** — speed reference
-- **CSNOBOL4 2.3.3** — conformance reference
-- **snobol4jvm / snobol4dotnet** — sibling implementations in this org
+# ASM backend — 106/106 corpus
+STOP_ON_FAIL=0 bash test/crosscheck/run_crosscheck_asm.sh
 
-Test corpus: `snobol4corpus` (shared submodule), Gimpel library, Shafto AI corpus.
+# JVM backend — patterns rung (19/20)
+JASMIN=src/backend/jvm/jasmin.jar
+PDIR=../snobol4corpus/crosscheck/patterns
+for sno in $PDIR/*.sno; do
+  base=$(basename $sno .sno); TMPD=$(mktemp -d)
+  ./sno2c -jvm "$sno" > $TMPD/p.j 2>/dev/null
+  java -jar $JASMIN $TMPD/p.j -d $TMPD/ 2>/dev/null
+  cls=$(ls $TMPD/*.class 2>/dev/null | head -1 | xargs basename 2>/dev/null | sed 's/.class//')
+  got=$(java -cp $TMPD $cls 2>/dev/null); exp=$(cat "${sno%.sno}.ref" 2>/dev/null)
+  rm -rf $TMPD
+  [ "$got" = "$exp" ] && echo "PASS $base" || echo "FAIL $base"
+done
+```
 
 ---
 
-## Open Decisions
+## Corpus Ladder
 
-Two foundational questions are currently on the table. See
-[`doc/DECISIONS.md`](doc/DECISIONS.md) for the full analysis.
+All back-ends climb the same 11-rung ladder against `snobol4corpus/crosscheck/`:
 
-**Decision 1 — Compiler implementation language: RESOLVED**
-No yacc. No new grammar. `Beautiful.sno` (snobol4dotnet) contains a complete
-17-level SNOBOL4 expression and statement parser written as SNOBOL4 patterns
-(`snoExpr` through `snoExpr17`, `snoStmt`, `snoParse`). Sprint 5: serialize
-those patterns into `SNOBOL4_EXPRESSION_PATTERN.h`, `#include` it in
-`SNOBOL4c.c`, add a 5-line stdin loop. The seed kernel executes the parser as
-pattern data. The language parses itself. See `doc/DECISIONS.md`.
+```
+Rung 1:  hello/output    Rung 5:  control       Rung  9: keywords
+Rung 2:  assign          Rung 6:  patterns      Rung 10: functions
+Rung 3:  concat          Rung 7:  capture       Rung 11: data
+Rung 4:  arith           Rung 8:  strings       Rung 12: beauty.sno
+```
 
-**Decision 2 — What language does snobol4x implement first: DECIDED**
-Expressions first, statements second. Sequence B → C → D confirmed:
-- **B** (Sprints 0–4): single pattern, stdin/stdout, no naming — already underway
-- **C** (Sprints 5–6): two named patterns with mutual recursion — the minimum
-  for a real language, validates the graph IR, first thing no other pattern
-  language can express
-- **D** (Sprint 7+): full SNOBOL4 statement model — recognizable SNOBOL4,
-  programs run unchanged on CSNOBOL4/SPITBOL
-
-The question of whether Stage C deserves its own name is open.
+| Backend | Rungs | Notes |
+|---------|-------|-------|
+| C (trampoline) | 1–11 ✅ | 106/106 |
+| x86-64 ASM | 1–11 ✅ | 106/106; roman/wordcount in progress |
+| JVM bytecode | 1–6 ✅ | patterns/ 19/20; capture rung next |
+| .NET MSIL | 1–2 🔧 | hello + literals passing |
 
 ---
 
 ## Repository Layout
 
 ```
-doc/            Design notes, α/β/γ/ω paper, ByrdBox reference
 src/
-  codegen/      Template emitter (Python → ASM/JVM/MSIL)
-  runtime/      Static runtime: str_t, output_t, enter/exit
-  ir/           Node graph: named flat table, REF nodes
+  frontend/
+    snobol4/          SNOBOL4 lexer + parser → AST + IR (EXPR_t / STMT_t)
+    snocone/          Snocone frontend (SC language)
+  backend/
+    c/                C-with-gotos emitter (emit_byrd.c, emit_cnode.c)
+    x64/              x86-64 NASM emitter  (emit_byrd_asm.c)
+    jvm/              JVM Jasmin emitter   (emit_byrd_jvm.c) + jasmin.jar
+    net/              .NET CIL emitter     (net_emit.c)
+  driver/
+    main.c            sno2c entry point — flag dispatch
+  runtime/
+    asm/              NASM macro library (snobol4_asm.mac) + runtime helpers
 test/
-  sprint0/      Null program
-  sprint1/      Single token
-  sprint2/      Two-token sequences
-  sprint3/      Alternation
-  sprint4/      Assignment / capture
-snapshots/      Tagged checkpoint outputs per sprint
-bench/          Benchmarks vs SPITBOL, CSNOBOL4
+  crosscheck/         106 SNOBOL4 corpus programs + .ref oracle outputs
+  jvm_j3/             JVM sprint J3 smoke tests
+artifacts/
+  asm/                Canonical ASM outputs (beauty_prog.s, roman.s, wordcount.s)
+  jvm/                Canonical JVM outputs (hello_prog.j)
+  net/                Canonical NET outputs (hello_prog.il)
+  c/                  Canonical C outputs
 ```
+
+---
+
+## Active Development
+
+Session tracking and sprint state live in [snobol4ever/.github](https://github.com/snobol4ever/.github):
+
+- **PLAN.md** — milestone dashboard, 4D feature matrix, active sprint per session
+- **JVM.md** — JVM back-end sprint state (current: J5 capture rung)
+- **TINY.md** — ASM back-end sprint state
+- **SESSIONS_ARCHIVE.md** — full session history
+
+**Oracle:** CSNOBOL4 2.3.3 (`snobol4 -f -P256k -I$INC file.sno`)
 
 ---
 
 ## Collaborators
 
-- **Lon Jones Cherryholmes** ([@LCherryholmes](https://github.com/LCherryholmes)) —
-  compiler architecture, x86-64 codegen, snobol4jvm author
-- **Jeffrey Cooper, M.D.** ([@jcooper0](https://github.com/jcooper0)) —
-  snobol4dotnet author, MSIL target
-
----
-
-## Related Repos
-
-| Repo | What |
-|------|------|
-| [snobol4jvm](https://github.com/snobol4ever/snobol4jvm) | Full SNOBOL4 → JVM bytecode (Clojure) |
-| [snobol4dotnet](https://github.com/snobol4ever/snobol4dotnet) | Full SNOBOL4 → MSIL (C#) |
-| [snobol4python](https://github.com/snobol4ever/snobol4python) | Pattern library (PyPI) |
-| [snobol4corpus](https://github.com/snobol4ever/snobol4corpus) | Shared test corpus |
-
----
-
-## Polyglot Parsing: Alt IS the Dispatcher
-
-snobol4x's stdin loop matches each input line against a root `PATTERN`.
-That root pattern is an **alternation** (`|`) of grammars:
-
-```c
-root = snoStmt | ednExpr | incStmt | ...
-```
-
-The backtracking engine dispatches between grammars automatically — no format
-detection, no switch statement. Each new language is one more arm, one more
-`*_PATTERN.h` file. This is not a feature; it falls out of `Alt` already existing.
-
-**Target grammar arms:**
-
-| Arm | Language | Source | Sprint |
-|-----|----------|--------|--------|
-| `snoStmt` | SNOBOL4 | `Beautiful.sno` serialized | 5 |
-| `ednExpr` | EDN (Clojure data literals) | New `EDN_PATTERN.h` | 7 |
-| `incStmt` | INC macro/include files | New `INC_PATTERN.h` | 8 |
-
-**The architectural consequence:** snobol4x is not a SNOBOL4 compiler.
-It is a **grammar-driven compiler compiler**. The input language is whatever
-grammar is loaded into the root Alt at compile time.
+- **Lon Jones Cherryholmes** — compiler architecture, ASM/JVM/NET back-ends
+- **Jeffrey Cooper, M.D.** — snobol4dotnet, MSIL target
+- **Claude Sonnet 4.6** — TINY co-author (JVM back-end sessions)

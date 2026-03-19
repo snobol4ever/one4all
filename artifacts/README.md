@@ -22,7 +22,8 @@ artifacts/
     samples/             ← sample programs (roman, wordcount)
   c/                     ← C backend generated output (.c files)
   jvm/
-    hello.j              ← hello.sno via -jvm  (canonical J1+ artifact)
+    hello_prog.j         ← null/hello program via -jvm (canonical J0+ artifact)
+    hello.j              ← hello.sno via -jvm
     multi.j              ← multi.sno via -jvm
     literals.j           ← literals.sno via -jvm
   net/
