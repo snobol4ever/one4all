@@ -478,9 +478,21 @@ static void do_stmt(CfState *st) {
 
         emit_cond(st, cond_s, lab_true, lab_false);
 
-        /* True branch */
+        /* Consume optional 'then' keyword */
+        skip_nl(st);
+        if (cur(st)->kind == SC_KW_THEN) advance(st);
+
+        /* True branch — if next token is '{' use block, otherwise
+         * compile a single expression stopping at SC_KW_ELSE so that
+         * single-line  if (c) then S1 else S2  works correctly. */
         emit_label(st, lab_true);
-        do_body(st);
+        skip_nl(st);
+        if (cur(st)->kind == SC_LBRACE) {
+            do_block(st);
+        } else {
+            STMT_t *body_s = compile_expr_clause(st, SC_KW_ELSE);
+            if (body_s) prog_append(st, body_s);
+        }
 
         /* Check for else */
         skip_nl(st);
@@ -511,6 +523,9 @@ static void do_stmt(CfState *st) {
         emit_cond(st, cond_s, lab_body, lab_end);
 
         emit_label(st, lab_body);
+        /* Consume optional 'do' keyword */
+        skip_nl(st);
+        if (cur(st)->kind == SC_KW_DO) advance(st);
         do_body(st);
         emit_goto(st, lab_start);
         emit_label(st, lab_end);
@@ -550,11 +565,11 @@ static void do_stmt(CfState *st) {
         advance(st); /* consume ( */
 
         /* init */
-        STMT_t *init_s = compile_expr_clause(st, SC_COMMA);
-        if (cur(st)->kind == SC_COMMA) advance(st);
+        STMT_t *init_s = compile_expr_clause(st, SC_SEMICOLON);
+        if (cur(st)->kind == SC_SEMICOLON) advance(st);
         /* cond */
-        STMT_t *cond_s = compile_expr_clause(st, SC_COMMA);
-        if (cur(st)->kind == SC_COMMA) advance(st);
+        STMT_t *cond_s = compile_expr_clause(st, SC_SEMICOLON);
+        if (cur(st)->kind == SC_SEMICOLON) advance(st);
         /* step */
         STMT_t *step_s = compile_expr_clause(st, SC_RPAREN);
         if (cur(st)->kind == SC_RPAREN) advance(st);
@@ -567,6 +582,9 @@ static void do_stmt(CfState *st) {
         emit_label(st, lab_test);
         emit_cond(st, cond_s, lab_body, lab_end);
         emit_label(st, lab_body);
+        /* Consume optional 'do' keyword */
+        skip_nl(st);
+        if (cur(st)->kind == SC_KW_DO) advance(st);
         do_body(st);
         if (step_s) prog_append(st, step_s);
         emit_goto(st, lab_test);

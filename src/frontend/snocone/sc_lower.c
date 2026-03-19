@@ -166,9 +166,9 @@ static int lower_token(const ScPToken *tok, ExprStack *s,
         es_push(s, e); return 0;
     }
     case SC_OR: {
-        /* || pattern alternation → E_OR */
+        /* || string concatenation (same as | and && in value context) → E_CONC */
         EXPR_t *r = es_pop(s), *l = es_pop(s);
-        EXPR_t *e = expr_new(E_OR); e->left = l; e->right = r;
+        EXPR_t *e = expr_new(E_CONC); e->left = l; e->right = r;
         es_push(s, e); return 0;
     }
     case SC_PERIOD: {

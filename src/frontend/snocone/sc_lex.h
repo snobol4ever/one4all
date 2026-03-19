@@ -92,7 +92,8 @@ typedef enum {
     /* Synthetic */
     SC_NEWLINE,      /* logical end-of-statement              */
     SC_EOF,
-    SC_UNKNOWN
+    SC_UNKNOWN,
+    SC_KW_THEN       /* appended last — never shifts existing values */
 } ScKind;
 
 /* ---------------------------------------------------------------------------

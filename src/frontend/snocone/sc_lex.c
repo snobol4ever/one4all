@@ -79,6 +79,7 @@ typedef struct { const char *word; ScKind kind; } KwEntry;
 
 static const KwEntry KW_TABLE[] = {
     { "if",        SC_KW_IF        },
+    { "then",      SC_KW_THEN      },
     { "else",      SC_KW_ELSE      },
     { "while",     SC_KW_WHILE     },
     { "do",        SC_KW_DO        },
@@ -418,6 +419,7 @@ const char *sc_kind_name(ScKind kind)
     case SC_STRING:      return "STRING";
     case SC_IDENT:       return "IDENT";
     case SC_KW_IF:       return "KW_IF";
+    case SC_KW_THEN:     return "KW_THEN";
     case SC_KW_ELSE:     return "KW_ELSE";
     case SC_KW_WHILE:    return "KW_WHILE";
     case SC_KW_DO:       return "KW_DO";
