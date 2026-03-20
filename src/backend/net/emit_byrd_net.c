@@ -53,6 +53,7 @@
  *   Proebsting 1996  — Byrd Box four-port translation scheme
  */
 
+#define EMIT_BYRD_NET_C
 #include "sno2c.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -73,26 +74,26 @@
  * ----------------------------------------------------------------------- */
 
 /* Function support (DEFINE/RETURN/FRETURN) */
-#define NET_FN_MAX      32
+#define FN_MAX      32
 #define NAME_LEN  128
-#define NET_FN_ARGMAX   16
+#define FN_ARGMAX   16
 typedef struct {
     char name[NAME_LEN];
-    char args[NET_FN_ARGMAX][NAME_LEN];
+    char args[FN_ARGMAX][NAME_LEN];
     int  nargs;
-    char locals[NET_FN_ARGMAX][NAME_LEN];
+    char locals[FN_ARGMAX][NAME_LEN];
     int  nlocals;
     char entry_label[NAME_LEN];
     char end_label[NAME_LEN];
 } FnDef;
-static FnDef  fn_table[NET_FN_MAX];
+static FnDef  fn_table[FN_MAX];
 static int       fn_count = 0;
 static const FnDef *cur_fn = NULL;
 static char fn_return_lbl[128];
 static char fn_freturn_lbl[128];
 static const FnDef *find_fn(const char *name);
-static int pat_uid_early = 0;  /* uid counter used before pattern section */
-#define pat_uid pat_uid_early
+static int uid_ctr = 0;
+static int next_uid(void) { return uid_ctr++; }
 
 static FILE *out;
 static int   col = 0;
@@ -266,7 +267,7 @@ static int  input_uid = 0;
  * Expr scanner — collect all variable refs before emitting
  * ----------------------------------------------------------------------- */
 
-static void scan_expr_vars(EXPR_t *e) {
+static void collect_vars_expr(EXPR_t *e) {
     if (!e) return;
     if (e->kind == E_VART && e->sval && !is_output(e->sval)
             && !is_input(e->sval))
@@ -276,10 +277,10 @@ static void scan_expr_vars(EXPR_t *e) {
             && !is_output(e->sval) && !is_input(e->sval))
         var_register(e->sval);
     for (int i = 0; i < expr_nargs(e); i++)
-        scan_expr_vars(expr_arg(e, i));
+        collect_vars_expr(expr_arg(e, i));
 }
 
-static void scan_prog_vars(Program *prog) {
+static void collect_vars(Program *prog) {
     if (!prog) return;
     for (STMT_t *s = prog->head; s; s = s->next) {
         /* subject variable (LHS of assignment) */
@@ -287,9 +288,9 @@ static void scan_prog_vars(Program *prog) {
                 && !is_output(s->subject->sval)
                 && !is_input(s->subject->sval))
             var_register(s->subject->sval);
-        scan_expr_vars(s->subject);
-        scan_expr_vars(s->pattern);
-        scan_expr_vars(s->replacement);
+        collect_vars_expr(s->subject);
+        collect_vars_expr(s->pattern);
+        collect_vars_expr(s->replacement);
     }
 }
 
@@ -595,10 +596,10 @@ static void emit_expr(EXPR_t *e) {
                 N("    stloc.0\n");
                 /* if null, replace with "" so stack is always a string */
                 N("    dup\n");
-                N("    brtrue     Nfc_%d_ok\n", pat_uid);
+                N("    brtrue     Nfc_%d_ok\n", uid_ctr);
                 N("    pop\n");
                 N("    ldstr      \"\"\n");
-                N("  Nfc_%d_ok:\n", pat_uid++);
+                N("  Nfc_%d_ok:\n", next_uid());
                 break;
             }
         }
@@ -710,7 +711,7 @@ static void emit_branch_fail(const char *target) {
  * p_next_str: string slot counter, starts at 20
  * ----------------------------------------------------------------------- */
 
-/* pat_uid defined via macro above */
+/* uid_ctr / next_uid() defined above */
 static char pat_abort_label[128];
 /* ARB backtrack label — set by ARB emitter, used by SEQ to wire continuation omega */
 static char arb_incr_label[128];
@@ -748,7 +749,7 @@ static void emit_pat_node(EXPR_t *pat,
                                int *p_next_int, int *p_next_str) {
     if (!pat) { N("    br         %s\n", gamma); return; }
 
-    int uid = pat_uid++;
+    int uid = next_uid();
 
     switch (pat->kind) {
 
@@ -1453,7 +1454,7 @@ static void emit_stmt(STMT_t *s, const char *next_lbl) {
 }
 
 /* Returns 1 if statement s is inside any user function body. */
-static int stmt_in_any_fn(STMT_t *s) {
+static int stmt_in_fn(STMT_t *s) {
     for (int fi = 0; fi < fn_count; fi++) {
         const FnDef *fn = &fn_table[fi];
         const char *entry = fn->entry_label[0] ? fn->entry_label : fn->name;
@@ -1690,7 +1691,7 @@ static int parse_proto(const char *proto, FnDef *fn) {
             fn->args[fn->nargs][ai++] = *p++;
         while (ai>0 && (fn->args[fn->nargs][ai-1]==' '||fn->args[fn->nargs][ai-1]=='\t')) ai--;
         fn->args[fn->nargs][ai] = '\0';
-        if (ai>0 && fn->nargs < NET_FN_ARGMAX) fn->nargs++;
+        if (ai>0 && fn->nargs < FN_ARGMAX) fn->nargs++;
         if (*p==',') p++;
     }
     if (*p==')') p++;
@@ -1703,7 +1704,7 @@ static int parse_proto(const char *proto, FnDef *fn) {
             fn->locals[fn->nlocals][li++] = *p++;
         while (li>0 && (fn->locals[fn->nlocals][li-1]==' '||fn->locals[fn->nlocals][li-1]=='\t')) li--;
         fn->locals[fn->nlocals][li] = '\0';
-        if (li>0 && fn->nlocals < NET_FN_ARGMAX) fn->nlocals++;
+        if (li>0 && fn->nlocals < FN_ARGMAX) fn->nlocals++;
     }
     return 1;
 }
@@ -1716,7 +1717,7 @@ static const char *flatten_str(EXPR_t *e, char *buf, int sz) {
     return NULL;
 }
 
-static void scan_fndefs(Program *prog) {
+static void collect_fndefs(Program *prog) {
     fn_count = 0;
     if (!prog) return;
     for (STMT_t *s = prog->head; s; s = s->next) {
@@ -1726,7 +1727,7 @@ static void scan_fndefs(Program *prog) {
         char pbuf[256];
         const char *proto = flatten_str(expr_arg(s->subject, 0), pbuf, sizeof pbuf);
         if (!proto) continue;
-        if (fn_count >= NET_FN_MAX) break;
+        if (fn_count >= FN_MAX) break;
         FnDef *fn = &fn_table[fn_count];
         memset(fn, 0, sizeof *fn);
         if (!parse_proto(proto, fn)) continue;
@@ -1912,8 +1913,8 @@ void net_emit(Program *prog, FILE *out, const char *filename) {
     set_classname(filename);
 
     /* Multi-pass: scan functions first (registers vars), then vars, named patterns */
-    scan_fndefs(prog);
-    scan_prog_vars(prog);
+    collect_fndefs(prog);
+    collect_vars(prog);
     scan_named_patterns(prog);
 
     NC("Generated by sno2c -net");

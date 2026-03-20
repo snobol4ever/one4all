@@ -25,6 +25,7 @@
  * root pattern against a hardcoded subject and exits 0/1.
  */
 
+#define EMIT_BYRD_ASM_C
 #include "sno2c.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -552,13 +553,13 @@ static void asmJe(const char *lbl) {
 }
 
 /* -----------------------------------------------------------------------
- * emit_asm_lit — LIT node  (Sprint A14: one macro call per port)
+ * emit_lit — LIT node  (Sprint A14: one macro call per port)
  *
  *   α: LIT_ALPHA / LIT_ALPHA1   — one call site line
  *   β: LIT_BETA                 — one call site line
  * ----------------------------------------------------------------------- */
 
-static void emit_asm_lit(const char *s, int n,
+static void emit_lit(const char *s, int n,
                           const char *alpha, const char *beta,
                           const char *gamma, const char *omega,
                           const char *cursor,
@@ -579,10 +580,10 @@ static void emit_asm_lit(const char *s, int n,
 }
 
 /* -----------------------------------------------------------------------
- * emit_asm_pos / emit_asm_rpos
+ * emit_pos / emit_rpos
  * ----------------------------------------------------------------------- */
 
-static void emit_asm_pos(long n,
+static void emit_pos(long n,
                           const char *alpha, const char *beta,
                           const char *gamma, const char *omega,
                           const char *cursor) {
@@ -590,7 +591,7 @@ static void emit_asm_pos(long n,
     ALF(beta,  "POS_BETA    %s, %s\n", cursor, omega);
 }
 
-static void emit_asm_pos_var(const char *varlab,
+static void emit_pos_var(const char *varlab,
                               const char *alpha, const char *beta,
                               const char *gamma, const char *omega,
                               const char *cursor) {
@@ -598,7 +599,7 @@ static void emit_asm_pos_var(const char *varlab,
     ALF(beta,  "POS_BETA    %s, %s\n", cursor, omega);
 }
 
-static void emit_asm_rpos(long n,
+static void emit_rpos(long n,
                            const char *alpha, const char *beta,
                            const char *gamma, const char *omega,
                            const char *cursor,
@@ -607,7 +608,7 @@ static void emit_asm_rpos(long n,
     ALF(beta,  "RPOS_BETA   %s, %s\n", cursor, omega);
 }
 
-static void emit_asm_rpos_var(const char *varlab,
+static void emit_rpos_var(const char *varlab,
                                const char *alpha, const char *beta,
                                const char *gamma, const char *omega,
                                const char *cursor,
@@ -654,7 +655,7 @@ struct NamedPat {
 
 static const NamedPat *named_pat_lookup(const char *varname);
 static const NamedPat *named_pat_lookup_fn(const char *varname);
-static void emit_asm_named_ref(const NamedPat *np,
+static void emit_named_ref(const NamedPat *np,
                                 const char *alpha, const char *beta,
                                 const char *gamma, const char *omega);
 
@@ -662,7 +663,7 @@ static void emit_asm_named_ref(const NamedPat *np,
 typedef struct { char varname[NAME_LEN]; const char *sval; } StrVar;
 static const StrVar *str_var_lookup(const char *varname);
 
-/* Forward declarations for program-mode helpers used by emit_asm_named_def */
+/* Forward declarations for program-mode helpers used by emit_named_def */
 static const char *str_intern(const char *s);
 static const char *label_nasm(const char *lbl);
 
@@ -678,7 +679,7 @@ static void emit_pat_node(EXPR_t *pat,
                            int depth);
 
 /* -----------------------------------------------------------------------
- * emit_asm_seq — SEQ (E_CONC / CAT)
+ * emit_seq — SEQ (E_CONC / CAT)
  *
  * Wiring (Proebsting §4.3, oracle cat_pos_lit_rpos.s):
  *   α → left_α
@@ -689,7 +690,7 @@ static void emit_pat_node(EXPR_t *pat,
  *   right_ω → left_β
  * ----------------------------------------------------------------------- */
 
-static void emit_asm_seq(EXPR_t *left, EXPR_t *right,
+static void emit_seq(EXPR_t *left, EXPR_t *right,
                           const char *alpha, const char *beta,
                           const char *gamma, const char *omega,
                           const char *cursor,
@@ -710,7 +711,7 @@ static void emit_asm_seq(EXPR_t *left, EXPR_t *right,
 }
 
 /* -----------------------------------------------------------------------
- * emit_asm_alt — ALT (E_OR)
+ * emit_alt — ALT (E_OR)
  *
  * Wiring (oracle alt_first.s, Proebsting §4.5 ifstmt):
  *   α → save cursor_at_alt; → left_α
@@ -721,7 +722,7 @@ static void emit_asm_seq(EXPR_t *left, EXPR_t *right,
  *   right_ω → ω
  * ----------------------------------------------------------------------- */
 
-static void emit_asm_alt(EXPR_t *left, EXPR_t *right,
+static void emit_alt(EXPR_t *left, EXPR_t *right,
                           const char *alpha, const char *beta,
                           const char *gamma, const char *omega,
                           const char *cursor,
@@ -756,7 +757,7 @@ static void emit_asm_alt(EXPR_t *left, EXPR_t *right,
 }
 
 /* -----------------------------------------------------------------------
- * emit_asm_arbno — ARBNO
+ * emit_arbno — ARBNO
  *
  * Wiring (oracle arbno_match.s, v311.sil ARBN/EARB/ARBF):
  *   α: push cursor; goto γ  (zero reps = immediate success)
@@ -765,7 +766,7 @@ static void emit_asm_alt(EXPR_t *left, EXPR_t *right,
  *      child_ω → ω
  * ----------------------------------------------------------------------- */
 
-static void emit_asm_arbno(EXPR_t *child,
+static void emit_arbno(EXPR_t *child,
                             const char *alpha, const char *beta,
                             const char *gamma, const char *omega,
                             const char *cursor,
@@ -853,10 +854,10 @@ static void emit_asm_arbno(EXPR_t *child,
 }
 
 /* -----------------------------------------------------------------------
- * emit_asm_any — ANY(S)  (Sprint A14: one macro call per port)
+ * emit_any — ANY(S)  (Sprint A14: one macro call per port)
  * ----------------------------------------------------------------------- */
 
-static void emit_asm_any(const char *charset, int cslen,
+static void emit_any(const char *charset, int cslen,
                           const char *alpha, const char *beta,
                           const char *gamma, const char *omega,
                           const char *cursor,
@@ -873,10 +874,10 @@ static void emit_asm_any(const char *charset, int cslen,
 }
 
 /* -----------------------------------------------------------------------
- * emit_asm_notany — NOTANY(S)  (Sprint A14)
+ * emit_notany — NOTANY(S)  (Sprint A14)
  * ----------------------------------------------------------------------- */
 
-static void emit_asm_notany(const char *charset, int cslen,
+static void emit_notany(const char *charset, int cslen,
                              const char *alpha, const char *beta,
                              const char *gamma, const char *omega,
                              const char *cursor,
@@ -893,10 +894,10 @@ static void emit_asm_notany(const char *charset, int cslen,
 }
 
 /* -----------------------------------------------------------------------
- * emit_asm_span — SPAN(S)  (Sprint A14)
+ * emit_span — SPAN(S)  (Sprint A14)
  * ----------------------------------------------------------------------- */
 
-static void emit_asm_span(const char *charset, int cslen,
+static void emit_span(const char *charset, int cslen,
                            const char *alpha, const char *beta,
                            const char *gamma, const char *omega,
                            const char *cursor,
@@ -912,7 +913,7 @@ static void emit_asm_span(const char *charset, int cslen,
     ALFC(beta, "SPAN β", "SPAN_BETA   %s, %s, %s\n", saved, cursor, omega);
 }
 
-static void emit_asm_break(const char *charset, int cslen,
+static void emit_break(const char *charset, int cslen,
                             const char *alpha, const char *beta,
                             const char *gamma, const char *omega,
                             const char *cursor,
@@ -932,7 +933,7 @@ static void emit_asm_break(const char *charset, int cslen,
  * Variable-charset emitters — SPAN/BREAK/ANY/NOTANY with E_VART arg
  * ----------------------------------------------------------------------- */
 
-static void emit_asm_span_var(const char *varlab,
+static void emit_span_var(const char *varlab,
                                const char *alpha, const char *beta,
                                const char *gamma, const char *omega,
                                const char *cursor,
@@ -945,7 +946,7 @@ static void emit_asm_span_var(const char *varlab,
     ALFC(beta,  "SPAN(var) β", "SPAN_BETA_VAR  %s, %s, %s\n", saved, cursor, omega);
 }
 
-static void emit_asm_break_var(const char *varlab,
+static void emit_break_var(const char *varlab,
                                 const char *alpha, const char *beta,
                                 const char *gamma, const char *omega,
                                 const char *cursor,
@@ -958,7 +959,7 @@ static void emit_asm_break_var(const char *varlab,
     ALFC(beta,  "BREAK(var) β", "BREAK_BETA_VAR  %s, %s, %s\n", saved, cursor, omega);
 }
 
-static void emit_asm_breakx_var(const char *varlab,
+static void emit_breakx_var(const char *varlab,
                                  const char *alpha, const char *beta,
                                  const char *gamma, const char *omega,
                                  const char *cursor,
@@ -971,7 +972,7 @@ static void emit_asm_breakx_var(const char *varlab,
     ALFC(beta,  "BREAKX(var) β", "BREAKX_BETA_VAR  %s, %s, %s\n", saved, cursor, omega);
 }
 
-static void emit_asm_breakx_lit(const char *charset, int cslen,
+static void emit_breakx_lit(const char *charset, int cslen,
                                  const char *alpha, const char *beta,
                                  const char *gamma, const char *omega,
                                  const char *cursor,
@@ -985,7 +986,7 @@ static void emit_asm_breakx_lit(const char *charset, int cslen,
     ALFC(beta,  "BREAKX(lit) β", "BREAKX_BETA_LIT  %s, %s, %s\n", saved, cursor, omega);
 }
 
-static void emit_asm_any_var(const char *varlab,
+static void emit_any_var(const char *varlab,
                               const char *alpha, const char *beta,
                               const char *gamma, const char *omega,
                               const char *cursor,
@@ -998,7 +999,7 @@ static void emit_asm_any_var(const char *varlab,
     ALFC(beta,  "ANY(var) β", "ANY_BETA_VAR    %s, %s, %s\n", saved, cursor, omega);
 }
 
-static void emit_asm_notany_var(const char *varlab,
+static void emit_notany_var(const char *varlab,
                                  const char *alpha, const char *beta,
                                  const char *gamma, const char *omega,
                                  const char *cursor,
@@ -1012,10 +1013,10 @@ static void emit_asm_notany_var(const char *varlab,
 }
 
 /* -----------------------------------------------------------------------
- * emit_asm_len — LEN(N)  (Sprint A14)
+ * emit_len — LEN(N)  (Sprint A14)
  * ----------------------------------------------------------------------- */
 
-static void emit_asm_len(long n,
+static void emit_len(long n,
                           const char *alpha, const char *beta,
                           const char *gamma, const char *omega,
                           const char *cursor,
@@ -1030,10 +1031,10 @@ static void emit_asm_len(long n,
 }
 
 /* -----------------------------------------------------------------------
- * emit_asm_tab — TAB(N)  (Sprint A14)
+ * emit_tab — TAB(N)  (Sprint A14)
  * ----------------------------------------------------------------------- */
 
-static void emit_asm_tab(long n,
+static void emit_tab(long n,
                           const char *alpha, const char *beta,
                           const char *gamma, const char *omega,
                           const char *cursor) {
@@ -1047,10 +1048,10 @@ static void emit_asm_tab(long n,
 }
 
 /* -----------------------------------------------------------------------
- * emit_asm_rtab — RTAB(N)  (Sprint A14)
+ * emit_rtab — RTAB(N)  (Sprint A14)
  * ----------------------------------------------------------------------- */
 
-static void emit_asm_rtab(long n,
+static void emit_rtab(long n,
                            const char *alpha, const char *beta,
                            const char *gamma, const char *omega,
                            const char *cursor,
@@ -1065,10 +1066,10 @@ static void emit_asm_rtab(long n,
 }
 
 /* -----------------------------------------------------------------------
- * emit_asm_rem — REM  (Sprint A14)
+ * emit_rem — REM  (Sprint A14)
  * ----------------------------------------------------------------------- */
 
-static void emit_asm_rem(const char *alpha, const char *beta,
+static void emit_rem(const char *alpha, const char *beta,
                           const char *gamma, const char *omega,
                           const char *cursor,
                           const char *subj_len_sym) {
@@ -1082,7 +1083,7 @@ static void emit_asm_rem(const char *alpha, const char *beta,
 }
 
 /* -----------------------------------------------------------------------
- * emit_asm_arb — ARB: match minimum (0 chars), then backtrack to extend
+ * emit_arb — ARB: match minimum (0 chars), then backtrack to extend
  *
  * ARB is like ARBNO(''): tries 0 chars first, then on backtrack extends
  * by 1 char at a time up to subj_len - cursor.
@@ -1095,7 +1096,7 @@ static void emit_asm_rem(const char *alpha, const char *beta,
  *   β: step++; if start+step > subj_len: goto ω; set cursor=start+step; goto γ
  * ----------------------------------------------------------------------- */
 
-static void emit_asm_arb(const char *alpha, const char *beta,
+static void emit_arb(const char *alpha, const char *beta,
                           const char *gamma, const char *omega,
                           const char *cursor,
                           const char *subj_len_sym) {
@@ -1127,7 +1128,7 @@ static void emit_asm_arb(const char *alpha, const char *beta,
 }
 
 /* -----------------------------------------------------------------------
- * emit_asm_assign — E_DOL (expr $ var) — immediate assignment
+ * emit_imm — E_DOL (expr $ var) — immediate assignment
  *
  * Byrd Box (v311.sil ENMI, Proebsting §4.3):
  *   dol_α:    save cursor → entry_cursor; goto child_α
@@ -1146,7 +1147,7 @@ static void emit_asm_arb(const char *alpha, const char *beta,
  * The buffer is emitted via extra_slots (like ARBNO stacks).
  * ----------------------------------------------------------------------- */
 
-static void emit_asm_assign(EXPR_t *child, const char *varname,
+static void emit_imm(EXPR_t *child, const char *varname,
                              const char *alpha, const char *beta,
                              const char *gamma, const char *omega,
                              const char *cursor,
@@ -1226,7 +1227,7 @@ static void emit_pat_node(EXPR_t *pat,
 
     switch (pat->kind) {
     case E_QLIT:
-        emit_asm_lit(pat->sval, (int)strlen(pat->sval),
+        emit_lit(pat->sval, (int)strlen(pat->sval),
                      alpha, beta, gamma, omega,
                      cursor, subj, subj_len_sym);
         break;
@@ -1235,7 +1236,7 @@ static void emit_pat_node(EXPR_t *pat,
         int _nc = pat->nchildren;
         if (_nc == 0) break;
         if (_nc == 1) { emit_pat_node(pat->children[0], alpha, beta, gamma, omega, cursor, subj, subj_len_sym, depth); break; }
-        if (_nc == 2) { emit_asm_seq(pat->children[0], pat->children[1], alpha, beta, gamma, omega, cursor, subj, subj_len_sym, depth); break; }
+        if (_nc == 2) { emit_seq(pat->children[0], pat->children[1], alpha, beta, gamma, omega, cursor, subj, subj_len_sym, depth); break; }
         /* >2: right-fold into heap-allocated binary nodes */
         EXPR_t **_nodes = malloc((size_t)(_nc - 1) * sizeof(EXPR_t *));
         EXPR_t **_kids  = malloc((size_t)(_nc - 1) * 2 * sizeof(EXPR_t *));
@@ -1260,7 +1261,7 @@ static void emit_pat_node(EXPR_t *pat,
         int _nc = pat->nchildren;
         if (_nc == 0) break;
         if (_nc == 1) { emit_pat_node(pat->children[0], alpha, beta, gamma, omega, cursor, subj, subj_len_sym, depth); break; }
-        if (_nc == 2) { emit_asm_alt(pat->children[0], pat->children[1], alpha, beta, gamma, omega, cursor, subj, subj_len_sym, depth); break; }
+        if (_nc == 2) { emit_alt(pat->children[0], pat->children[1], alpha, beta, gamma, omega, cursor, subj, subj_len_sym, depth); break; }
         /* >2: right-fold into heap-allocated binary nodes */
         EXPR_t **_nodes = malloc((size_t)(_nc - 1) * sizeof(EXPR_t *));
         EXPR_t **_kids  = malloc((size_t)(_nc - 1) * 2 * sizeof(EXPR_t *));
@@ -1287,11 +1288,11 @@ static void emit_pat_node(EXPR_t *pat,
          * parens. Intercept them before the named-pattern lookup. */
         const char *varname = pat->sval ? pat->sval : "";
         if (strcasecmp(varname, "REM") == 0) {
-            emit_asm_rem(alpha, beta, gamma, omega, cursor, subj_len_sym);
+            emit_rem(alpha, beta, gamma, omega, cursor, subj_len_sym);
             break;
         }
         if (strcasecmp(varname, "ARB") == 0) {
-            emit_asm_arb(alpha, beta, gamma, omega, cursor, subj_len_sym);
+            emit_arb(alpha, beta, gamma, omega, cursor, subj_len_sym);
             break;
         }
         if (strcasecmp(varname, "FAIL") == 0) {
@@ -1303,13 +1304,13 @@ static void emit_pat_node(EXPR_t *pat,
         /* Look up in the named-pattern registry */
         const NamedPat *np = named_pat_lookup(varname);
         if (np) {
-            emit_asm_named_ref(np, alpha, beta, gamma, omega);
+            emit_named_ref(np, alpha, beta, gamma, omega);
         } else {
             /* Fall back to plain-string variable registry (PAT = 'literal') */
             const StrVar *sv = str_var_lookup(varname);
             if (sv && sv->sval) {
                 A("\n; E_VART *%s → inline LIT '%s'\n", varname, sv->sval);
-                emit_asm_lit(sv->sval, (int)strlen(sv->sval),
+                emit_lit(sv->sval, (int)strlen(sv->sval),
                              alpha, beta, gamma, omega,
                              cursor, subj, subj_len_sym);
             } else {
@@ -1334,7 +1335,7 @@ static void emit_pat_node(EXPR_t *pat,
          * left = sub-pattern, right = capture variable (E_VART). */
         const char *varname = (pat->children[1] && pat->children[1]->sval)
                               ? pat->children[1]->sval : "cap";
-        emit_asm_assign(pat->children[0], varname,
+        emit_imm(pat->children[0], varname,
                         alpha, beta, gamma, omega,
                         cursor, subj, subj_len_sym, depth);
         break;
@@ -1344,7 +1345,7 @@ static void emit_pat_node(EXPR_t *pat,
         /* expr . var — conditional assignment. */
         const char *varname = (pat->children[1] && pat->children[1]->sval)
                               ? pat->children[1]->sval : "cap";
-        emit_asm_assign(pat->children[0], varname,
+        emit_imm(pat->children[0], varname,
                         alpha, beta, gamma, omega,
                         cursor, subj, subj_len_sym, depth);
         break;
@@ -1362,13 +1363,13 @@ static void emit_pat_node(EXPR_t *pat,
         if (varname) {
             const NamedPat *np = named_pat_lookup(varname);
             if (np) {
-                emit_asm_named_ref(np, alpha, beta, gamma, omega);
+                emit_named_ref(np, alpha, beta, gamma, omega);
             } else {
                 /* Try plain-string variable registry */
                 const StrVar *sv = str_var_lookup(varname);
                 if (sv && sv->sval) {
                     A("\n; E_INDR *%s → inline LIT '%s'\n", varname, sv->sval);
-                    emit_asm_lit(sv->sval, (int)strlen(sv->sval),
+                    emit_lit(sv->sval, (int)strlen(sv->sval),
                                  alpha, beta, gamma, omega,
                                  cursor, subj, subj_len_sym);
                 } else {
@@ -1388,85 +1389,85 @@ static void emit_pat_node(EXPR_t *pat,
             EXPR_t *arg = pat->children[0];
             if (arg->kind == E_VART && arg->sval) {
                 const char *varlab = str_intern(arg->sval);
-                emit_asm_pos_var(varlab, alpha, beta, gamma, omega, cursor);
+                emit_pos_var(varlab, alpha, beta, gamma, omega, cursor);
             } else {
                 long n = (arg->kind == E_ILIT) ? arg->ival : 0;
-                emit_asm_pos(n, alpha, beta, gamma, omega, cursor);
+                emit_pos(n, alpha, beta, gamma, omega, cursor);
             }
         } else if (pat->sval && strcasecmp(pat->sval, "RPOS") == 0 && pat->nchildren == 1) {
             EXPR_t *arg = pat->children[0];
             if (arg->kind == E_VART && arg->sval) {
                 const char *varlab = str_intern(arg->sval);
-                emit_asm_rpos_var(varlab, alpha, beta, gamma, omega, cursor, subj_len_sym);
+                emit_rpos_var(varlab, alpha, beta, gamma, omega, cursor, subj_len_sym);
             } else {
                 long n = (arg->kind == E_ILIT) ? arg->ival : 0;
-                emit_asm_rpos(n, alpha, beta, gamma, omega, cursor, subj_len_sym);
+                emit_rpos(n, alpha, beta, gamma, omega, cursor, subj_len_sym);
             }
         } else if (pat->sval && strcasecmp(pat->sval, "ARBNO") == 0 && pat->nchildren == 1) {
-            emit_asm_arbno(pat->children[0],
+            emit_arbno(pat->children[0],
                            alpha, beta, gamma, omega,
                            cursor, subj, subj_len_sym, depth);
         } else if (pat->sval && strcasecmp(pat->sval, "ANY") == 0 && pat->nchildren == 1) {
             EXPR_t *arg = pat->children[0];
             if (arg->kind == E_VART && arg->sval) {
-                emit_asm_any_var(str_intern(arg->sval), alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
+                emit_any_var(str_intern(arg->sval), alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
             } else {
                 const char *cs = (arg->kind == E_QLIT && arg->sval) ? arg->sval : "";
                 int cslen = (arg->kind == E_QLIT && arg->sval) ? (int)strlen(arg->sval) : 0;
-                emit_asm_any(cs, cslen, alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
+                emit_any(cs, cslen, alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
             }
         } else if (pat->sval && strcasecmp(pat->sval, "NOTANY") == 0 && pat->nchildren == 1) {
             EXPR_t *arg = pat->children[0];
             if (arg->kind == E_VART && arg->sval) {
-                emit_asm_notany_var(str_intern(arg->sval), alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
+                emit_notany_var(str_intern(arg->sval), alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
             } else {
                 const char *cs = (arg->kind == E_QLIT && arg->sval) ? arg->sval : "";
                 int cslen = (arg->kind == E_QLIT && arg->sval) ? (int)strlen(arg->sval) : 0;
-                emit_asm_notany(cs, cslen, alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
+                emit_notany(cs, cslen, alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
             }
         } else if (pat->sval && strcasecmp(pat->sval, "SPAN") == 0 && pat->nchildren == 1) {
             EXPR_t *arg = pat->children[0];
             if (arg->kind == E_VART && arg->sval) {
-                emit_asm_span_var(str_intern(arg->sval), alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
+                emit_span_var(str_intern(arg->sval), alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
             } else {
                 const char *cs = (arg->kind == E_QLIT && arg->sval) ? arg->sval : "";
                 int cslen = (arg->kind == E_QLIT && arg->sval) ? (int)strlen(arg->sval) : 0;
-                emit_asm_span(cs, cslen, alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
+                emit_span(cs, cslen, alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
             }
         } else if (pat->sval && strcasecmp(pat->sval, "BREAK") == 0 && pat->nchildren == 1) {
             EXPR_t *arg = pat->children[0];
             if (arg->kind == E_VART && arg->sval) {
-                emit_asm_break_var(str_intern(arg->sval), alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
+                emit_break_var(str_intern(arg->sval), alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
             } else {
                 const char *cs = (arg->kind == E_QLIT && arg->sval) ? arg->sval : "";
                 int cslen = (arg->kind == E_QLIT && arg->sval) ? (int)strlen(arg->sval) : 0;
-                emit_asm_break(cs, cslen, alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
+                emit_break(cs, cslen, alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
             }
         } else if (pat->sval && strcasecmp(pat->sval, "BREAKX") == 0 && pat->nchildren == 1) {
             EXPR_t *arg = pat->children[0];
             if (arg->kind == E_VART && arg->sval) {
-                emit_asm_breakx_var(str_intern(arg->sval), alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
+                emit_breakx_var(str_intern(arg->sval), alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
             } else {
                 const char *cs = (arg->kind == E_QLIT && arg->sval) ? arg->sval : "";
                 int cslen = (arg->kind == E_QLIT && arg->sval) ? (int)strlen(arg->sval) : 0;
-                emit_asm_breakx_lit(cs, cslen, alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
+                emit_breakx_lit(cs, cslen, alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
             }
         } else if (pat->sval && strcasecmp(pat->sval, "LEN") == 0 && pat->nchildren == 1) {
             EXPR_t *arg = pat->children[0];
             long n = (arg->kind == E_ILIT) ? arg->ival : 0;
-            emit_asm_len(n, alpha, beta, gamma, omega, cursor, subj_len_sym);
+            emit_len(n, alpha, beta, gamma, omega, cursor, subj_len_sym);
         } else if (pat->sval && strcasecmp(pat->sval, "TAB") == 0 && pat->nchildren == 1) {
             EXPR_t *arg = pat->children[0];
             long n = (arg->kind == E_ILIT) ? arg->ival : 0;
-            emit_asm_tab(n, alpha, beta, gamma, omega, cursor);
+            emit_tab(n, alpha, beta, gamma, omega, cursor);
         } else if (pat->sval && strcasecmp(pat->sval, "RTAB") == 0 && pat->nchildren == 1) {
             EXPR_t *arg = pat->children[0];
             long n = (arg->kind == E_ILIT) ? arg->ival : 0;
-            emit_asm_rtab(n, alpha, beta, gamma, omega, cursor, subj_len_sym);
+            emit_rtab(n, alpha, beta, gamma, omega, cursor, subj_len_sym);
         } else if (pat->sval && strcasecmp(pat->sval, "REM") == 0 && pat->nchildren == 0) {
-            emit_asm_rem(alpha, beta, gamma, omega, cursor, subj_len_sym);
+            emit_rem(alpha, beta, gamma, omega, cursor, subj_len_sym);
         } else if (pat->sval && strcasecmp(pat->sval, "ARB") == 0 && pat->nchildren == 0) {
-            emit_asm_arb(alpha, beta, gamma, omega, cursor, subj_len_sym);
+            emit_arb(alpha, beta, gamma, omega, cursor, subj_len_sym);
         } else if (pat->sval && strcasecmp(pat->sval, "FAIL") == 0) {
             /* FAIL always fails — alpha and beta both jump to omega */
             A("\n; FAIL  α=%s\n", alpha);
@@ -1750,7 +1751,7 @@ static const NamedPat *named_pat_lookup_fn(const char *varname) {
 }
 
 /* -----------------------------------------------------------------------
- * emit_asm_named_ref — call site for a named pattern reference (E_VART)
+ * emit_named_ref — call site for a named pattern reference (E_VART)
  *
  * Emits:
  *   alpha:  store γ → pat_NAME_ret_gamma; store ω → pat_NAME_ret_omega
@@ -1759,7 +1760,7 @@ static const NamedPat *named_pat_lookup_fn(const char *varname) {
  *           jmp pat_NAME_beta
  * ----------------------------------------------------------------------- */
 
-static void emit_asm_named_ref(const NamedPat *np,
+static void emit_named_ref(const NamedPat *np,
                                 const char *alpha, const char *beta,
                                 const char *gamma, const char *omega) {
     int uid = next_uid();
@@ -1797,7 +1798,7 @@ static void emit_asm_named_ref(const NamedPat *np,
 }
 
 /* -----------------------------------------------------------------------
- * emit_asm_named_def — emit the body of a named pattern
+ * emit_named_def — emit the body of a named pattern
  *
  * Emits:
  *   pat_NAME_alpha:  <recursive Byrd box for the pattern expression>
@@ -1806,7 +1807,7 @@ static void emit_asm_named_ref(const NamedPat *np,
  *   pat_NAME_beta:   <same, backtrack entry>
  * ----------------------------------------------------------------------- */
 
-static void emit_asm_named_def(const NamedPat *np,
+static void emit_named_def(const NamedPat *np,
                                 const char *cursor,
                                 const char *subj,
                                 const char *subj_len_sym) {
@@ -2183,7 +2184,7 @@ static void emit_pattern(STMT_t *stmt) {
 
     /* Emit named pattern bodies */
     for (int i = 0; i < named_pat_count; i++)
-        emit_asm_named_def(&named_pats[i], cursor_sym, subj_sym, subj_len_sym);
+        emit_named_def(&named_pats[i], cursor_sym, subj_sym, subj_len_sym);
 
     fclose(code_f);
 
@@ -2249,7 +2250,7 @@ static void emit_pattern(STMT_t *stmt) {
 }
 
 /* -----------------------------------------------------------------------
- * emit_body — body-only mode (-asm-body flag)
+ * emit_stmt — body-only mode (-asm-body flag)
  *
  * Emits the pattern code for linking with snobol4_asm_harness.c.
  * Instead of _start / match_success / match_fail:
@@ -2286,14 +2287,14 @@ static void scan_capture_vars(STMT_t *stmt) {
 }
 
 /* -----------------------------------------------------------------------
- * emit_body — body-only mode (-asm-body flag)
+ * emit_stmt — body-only mode (-asm-body flag)
  *
  * Single-pass: pre-scan registers all caps + named patterns first,
  * then emit header → .data → .bss → .text in one forward pass.
  * No open_memstream / two-pass needed.
  * ----------------------------------------------------------------------- */
 
-static void emit_body(STMT_t *stmt) {
+static void emit_stmt(STMT_t *stmt) {
     if (!stmt || !stmt->pattern) return;
 
     var_reset();
@@ -2327,7 +2328,7 @@ static void emit_body(STMT_t *stmt) {
                   "match_success", "match_fail",
                   cursor_sym, subj_sym, subj_len_sym, 0);
     for (int i = 0; i < named_pat_count; i++)
-        emit_asm_named_def(&named_pats[i], cursor_sym, subj_sym, subj_len_sym);
+        emit_named_def(&named_pats[i], cursor_sym, subj_sym, subj_len_sym);
 
     fclose(devnull);
     out = real_out;
@@ -2389,7 +2390,7 @@ static void emit_body(STMT_t *stmt) {
                   cursor_sym, subj_sym, subj_len_sym, 0);
 
     for (int i = 0; i < named_pat_count; i++)
-        emit_asm_named_def(&named_pats[i], cursor_sym, subj_sym, subj_len_sym);
+        emit_named_def(&named_pats[i], cursor_sym, subj_sym, subj_len_sym);
 }
 
 /* -----------------------------------------------------------------------
@@ -2499,7 +2500,7 @@ static void flt_emit(void) {
  * Emits code to evaluate expr and store DESCR_t at [rbp+off].
  * Returns 1 if value might fail (needs is_fail check), 0 if always succeeds.
  * Simple cases only: E_QLIT, E_ILIT, E_VART. Complex exprs use stmt_apply. */
-static int prog_emit_expr(EXPR_t *e, int rbp_off) {
+static int emit_expr(EXPR_t *e, int rbp_off) {
     if (!e) {
         /* null expr → NULVCL (DT_SNUL=1, ptr=0) */
         A("    mov     qword [rbp%+d], 1\n", rbp_off);   /* v=DT_SNUL */
@@ -2643,7 +2644,7 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
                 char arg_slot_t[LBUF2+16], arg_slot_p[LBUF2+16];
                 snprintf(arg_slot_t, sizeof arg_slot_t, "fn_%s_arg_%d_t", ufn->safe, ai);
                 snprintf(arg_slot_p, sizeof arg_slot_p, "fn_%s_arg_%d_p", ufn->safe, ai);
-                prog_emit_expr(e->children[ai], -32);
+                emit_expr(e->children[ai], -32);
                 A("    mov     rax, [rbp-32]\n");
                 A("    mov     rcx, [rbp-24]\n");
                 A("    mov     [%s], rax\n", arg_slot_t);
@@ -2882,7 +2883,7 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
             int arr_bytes = na * 16;
             A("    sub     rsp, %d\n", arr_bytes);
             for (int ai = 0; ai < na && e->children[ai]; ai++) {
-                prog_emit_expr(e->children[ai], -(rbp_off < 0 ? -rbp_off : 32) - 0);
+                emit_expr(e->children[ai], -(rbp_off < 0 ? -rbp_off : 32) - 0);
                 A("    STORE_ARG32 %d\n", ai * 16);
             }
             A("    APPLY_FN_N  %s, %d\n", fnlab, na);
@@ -2913,12 +2914,12 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
          * descriptor is restored from the stack into rdi:rsi. */
         if (e->nchildren < 2 || !e->children[0] || !e->children[1]) goto fallback;
         /* Step 1: evaluate array into [rbp-32/24] */
-        prog_emit_expr(e->children[0], -32);
+        emit_expr(e->children[0], -32);
         /* Step 2: push array descriptor onto C stack to protect from key eval */
         A("    push    qword [rbp-24]\n");   /* arr.p */
         A("    push    qword [rbp-32]\n");   /* arr.v */
         /* Step 3: evaluate key into [rbp-32/24] (safe now — arr saved on stack) */
-        prog_emit_expr(e->children[1], -32);
+        emit_expr(e->children[1], -32);
         /* Step 4: move key into rdx:rcx, pop arr into rdi:rsi */
         A("    mov     rdx, [rbp-32]\n");   /* key.v */
         A("    mov     rcx, [rbp-24]\n");   /* key.p */
@@ -2950,7 +2951,7 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
                 _nodes[_n]->children=&_kids[_n*2]; _nodes[_n]->nchildren=2;
                 _r=_nodes[_n];
             }
-            int _ret = prog_emit_expr(_r, rbp_off);
+            int _ret = emit_expr(_r, rbp_off);
             for (int _i=0;_i<_nc-1;_i++) free(_nodes[_i]);
             free(_nodes); free(_kids);
             return _ret;
@@ -2959,7 +2960,7 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
          * E_OR   = pattern SEQ (alternation):   call stmt_apply("ALT").
          *
          * Naming: CAT for string concatenation, SEQ/ALT for pattern alternation.
-         * E_CONC in prog_emit_expr is always value-context — pattern-context
+         * E_CONC in emit_expr is always value-context — pattern-context
          * E_CONC is handled by emit_pat_node, not here. */
 
         int left_is_str  = e->children[0]  && e->children[0]->kind  == E_QLIT;
@@ -3007,10 +3008,10 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
                 }
             }
             /* CAT generic fallback: evaluate both, call stmt_concat */
-            prog_emit_expr(e->children[0], -32);
+            emit_expr(e->children[0], -32);
             A("    mov     [conc_tmp0_rax], rax\n");
             A("    mov     [conc_tmp0_rdx], rdx\n");
-            prog_emit_expr(e->children[1], -32);
+            emit_expr(e->children[1], -32);
             A("    mov     rcx, rdx\n");
             A("    mov     rdx, rax\n");
             A("    mov     rdi, [conc_tmp0_rax]\n");
@@ -3108,9 +3109,9 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
 
         /* Generic ALT fallback */
         A("    sub     rsp, 32\n");
-        prog_emit_expr(e->children[0],  rbp_off);
+        emit_expr(e->children[0],  rbp_off);
         A("    STORE_ARG32 0\n");
-        prog_emit_expr(e->children[1], rbp_off);
+        emit_expr(e->children[1], rbp_off);
         A("    STORE_ARG32 16\n");
         A("    APPLY_FN_N  %s, 2\n", fnlab);
         A("    add     rsp, 32\n");
@@ -3177,9 +3178,9 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
         }
         /* Generic 2-arg path: evaluate each child, call via stmt_apply */
         A("    sub     rsp, 32\n");
-        prog_emit_expr(l, -32);
+        emit_expr(l, -32);
         A("    STORE_ARG32 0\n");
-        prog_emit_expr(r, -32);
+        emit_expr(r, -32);
         A("    STORE_ARG32 16\n");
         A("    APPLY_FN_N  %s, 2\n", fnlab);
         A("    add     rsp, 32\n");
@@ -3214,7 +3215,7 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
         }
         /* Generic 1-arg path */
         A("    sub     rsp, 16\n");
-        prog_emit_expr(operand, -32);
+        emit_expr(operand, -32);
         A("    STORE_ARG32 0\n");
         A("    APPLY_FN_N  %s, 1\n", fnlab);
         A("    add     rsp, 16\n");
@@ -3474,7 +3475,7 @@ static void emit_program(Program *prog) {
     }
 
     /* ---- Pass 3: dry-run all pattern emissions to collect bss/lit slots ----
-     * Mirrors emit_body dry-run. Redirects output to /dev/null,
+     * Mirrors emit_stmt dry-run. Redirects output to /dev/null,
      * runs emit_pat_node for every pattern stmt, then restores.
      * This ensures span_saved/lit_str slots are registered before .bss/.data. */
     {
@@ -3501,7 +3502,7 @@ static void emit_program(Program *prog) {
         for (int i = 0; i < named_pat_count; i++) {
             EKind rk = named_pats[i].pat ? named_pats[i].pat->kind : E_NULV;
             if (rk==E_QLIT||rk==E_ILIT||rk==E_FLIT||rk==E_NULV||rk==E_VART||rk==E_KW) continue;
-            emit_asm_named_def(&named_pats[i], "cursor","subject_data","subject_len_val");
+            emit_named_def(&named_pats[i], "cursor","subject_data","subject_len_val");
         }
         fclose(devnull);
         out = real_out_p3;
@@ -3640,7 +3641,7 @@ static void emit_program(Program *prog) {
                 !(s->has_eq && (s->subject->kind == E_VART || s->subject->kind == E_KW)) &&
                 !(s->has_eq && s->subject->kind == E_IDX) &&
                 !(s->has_eq && s->subject->kind == E_FNC && s->subject->nchildren == 1)) {
-                int may_fail = prog_emit_expr(s->subject, -32);
+                int may_fail = emit_expr(s->subject, -32);
                 /* If subject may fail AND there are S/F targets, dispatch.
                  * id_s/id_f == -1 for special targets (RETURN/FRETURN/END) —
                  * they are not in the label registry but emit_jmp handles them
@@ -3694,7 +3695,7 @@ static void emit_program(Program *prog) {
                     A("    ASSIGN_STR  %s, %s, %s\n", vlab, rlab, fail_target);
                 } else {
                     /* General path */
-                    prog_emit_expr(s->replacement, -32);
+                    emit_expr(s->replacement, -32);
                     /* stmt_is_fail check on RHS */
                     A("    FAIL_BR     %s\n", fail_target);
                     /* Assign: if subject is OUTPUT, call stmt_output */
@@ -3726,14 +3727,14 @@ static void emit_program(Program *prog) {
                     indir_name = s->subject->children[1] ? s->subject->children[1] : s->subject->children[0];
                 else
                     indir_name = s->subject->children[0]  ? s->subject->children[0]  : s->subject->children[1];
-                prog_emit_expr(indir_name, -16);
+                emit_expr(indir_name, -16);
                 /* Eval the RHS → [rbp-32/24] */
                 if (!s->replacement || s->replacement->kind == E_NULV) {
                     /* null RHS for indirect: load NULVCL into [rbp-32/24] */
                     A("    mov     qword [rbp-32], 1\n");
                     A("    mov     qword [rbp-24], 0\n");
                 } else {
-                    prog_emit_expr(s->replacement, -32);
+                    emit_expr(s->replacement, -32);
                     A("    FAIL_BR     %s\n", fail_target);
                 }
                 A("    SET_VAR_INDIR\n");
@@ -3775,12 +3776,12 @@ static void emit_program(Program *prog) {
                  * and rely on the .bss prescan pass.  Simpler: just push/pop. */
 
                 /* Evaluate arr → [rbp-16/8] */
-                prog_emit_expr(s->subject->children[0],      -16);
+                emit_expr(s->subject->children[0],      -16);
                 /* Save arr onto C stack */
                 A("    push    qword [rbp-8]\n");   /* arr ptr  (high) */
                 A("    push    qword [rbp-16]\n");  /* arr type (low) */
                 /* Evaluate key → [rbp-32/24] */
-                prog_emit_expr(s->subject->children[1],  -32);
+                emit_expr(s->subject->children[1],  -32);
                 /* Save key onto C stack (now arr is at [rsp+16]..[rsp+23],
                  * key at [rsp+0]..[rsp+7] and [rsp+8]..[rsp+15]) */
                 A("    push    qword [rbp-24]\n");  /* key ptr  (high) */
@@ -3790,7 +3791,7 @@ static void emit_program(Program *prog) {
                     A("    mov     qword [rbp-32], 1\n");  /* DT_SNUL */
                     A("    mov     qword [rbp-24], 0\n");
                 } else {
-                    prog_emit_expr(s->replacement, -32);
+                    emit_expr(s->replacement, -32);
                     A("    FAIL_BR     %s\n", fail_target);
                 }
                 /* Restore key (was at rsp+0..15) and arr (was at rsp+16..31) */
@@ -3824,7 +3825,7 @@ static void emit_program(Program *prog) {
                 const char *flab = str_intern(s->subject->sval);
 
                 /* Evaluate obj → push onto stack */
-                prog_emit_expr(s->subject->children[0], -16);
+                emit_expr(s->subject->children[0], -16);
                 A("    push    qword [rbp-8]\n");   /* obj ptr  */
                 A("    push    qword [rbp-16]\n");  /* obj type */
                 /* Evaluate val → [rbp-32/24] */
@@ -3832,7 +3833,7 @@ static void emit_program(Program *prog) {
                     A("    mov     qword [rbp-32], 1\n");
                     A("    mov     qword [rbp-24], 0\n");
                 } else {
-                    prog_emit_expr(s->replacement, -32);
+                    emit_expr(s->replacement, -32);
                     A("    FAIL_BR     %s\n", fail_target);
                 }
                 /* Set up args: obj in rdi:rsi, field name in rdx, val in rcx:r8 */
@@ -3860,11 +3861,11 @@ static void emit_program(Program *prog) {
                 EXPR_t *key_expr = s->subject->children[1];
 
                 /* Evaluate arr → push */
-                prog_emit_expr(arr_expr, -16);
+                emit_expr(arr_expr, -16);
                 A("    push    qword [rbp-8]\\n");   /* arr ptr  */
                 A("    push    qword [rbp-16]\\n");  /* arr type */
                 /* Evaluate key → push */
-                prog_emit_expr(key_expr, -16);
+                emit_expr(key_expr, -16);
                 A("    push    qword [rbp-8]\\n");   /* key ptr  */
                 A("    push    qword [rbp-16]\\n");  /* key type */
                 /* Evaluate val → [rbp-32/24] */
@@ -3872,7 +3873,7 @@ static void emit_program(Program *prog) {
                     A("    mov     qword [rbp-32], 1\\n");
                     A("    mov     qword [rbp-24], 0\\n");
                 } else {
-                    prog_emit_expr(s->replacement, -32);
+                    emit_expr(s->replacement, -32);
                     A("    FAIL_BR     %s\\n", fail_target);
                 }
                 /* stmt_aset(arr, key, val): arr→rdi:rsi, key→rdx:rcx, val→r8:r9 */
@@ -3928,7 +3929,7 @@ static void emit_program(Program *prog) {
         char pat_omega[64]; snprintf(pat_omega, sizeof pat_omega, "P_%d_ω", uid);
 
         /* -- subject eval -- */
-        prog_emit_expr(s->subject, -16);
+        emit_expr(s->subject, -16);
         /* stmt_setup_subject — copies into subject_data[], resets cursor=0 */
         A("    SUBJ_FROM16\n");
 
@@ -4022,7 +4023,7 @@ static void emit_program(Program *prog) {
                 A("    mov     qword [rbp-32], 1\n"); /* DT_SNUL */
                 A("    mov     qword [rbp-24], 0\n");
             } else {
-                prog_emit_expr(s->replacement, -32);
+                emit_expr(s->replacement, -32);
             }
             A("    APPLY_REPL_SPLICE  %s, %s\n", vlab, scan_start);
         }
@@ -4096,7 +4097,7 @@ static void emit_program(Program *prog) {
             EKind rk = named_pats[i].pat->kind;
             if (rk==E_QLIT||rk==E_ILIT||rk==E_FLIT||rk==E_NULV||rk==E_VART||rk==E_KW) continue;
         }
-        emit_asm_named_def(&named_pats[i],
+        emit_named_def(&named_pats[i],
                            "cursor","subject_data","subject_len_val");
     }
 
@@ -4137,7 +4138,7 @@ void asm_emit(Program *prog, FILE *f) {
     if (asm_body_mode) {
         /* -asm-body: emit pattern-only body for harness linking */
         if (!s) { emit_null_program(); return; }
-        emit_body(s);
+        emit_stmt(s);
     } else {
         /* -asm: full program mode — walk all statements */
         emit_program(prog);

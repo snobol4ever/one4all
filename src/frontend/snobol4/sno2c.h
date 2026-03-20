@@ -156,8 +156,10 @@ void     c_emit(Program *prog, FILE *out);
 
 /* ---- Byrd box emitter (emit_byrd.c) ---- */
 void byrd_fn_scope_reset(void);
-void byrd_named_pat_reset(void);
-void byrd_preregister_named_pattern(const char *varname);
+#if !defined(EMIT_BYRD_ASM_C) && !defined(EMIT_BYRD_JVM_C) && !defined(EMIT_BYRD_NET_C)
+void named_pat_reset(void);
+void scan_named_patterns(const char *varname);
+#endif
 void byrd_emit_named_typedecls(FILE *out_file);
 void byrd_emit_named_fwdecls(FILE *out_file);
 void byrd_emit_pattern(EXPR_t *pat, FILE *out_file,

@@ -140,7 +140,7 @@ typedef struct {
 static NamedPat named_pats[NAMED_PAT_MAX];
 static int      named_pat_count = 0;
 
-void byrd_named_pat_reset(void) { named_pat_count = 0; }
+void named_pat_reset(void) { named_pat_count = 0; }
 
 /* -----------------------------------------------------------------------
  * Pending conditional assignments (E_NAM / dot-capture)
@@ -206,7 +206,7 @@ static void named_pat_register(const char *varname,
 
 /* Pre-register a name without emitting anything — so all names are known
  * before any function body is emitted (handles forward/mutual references). */
-void byrd_preregister_named_pattern(const char *varname) {
+void scan_named_patterns(const char *varname) {
     char safe[NAMED_PAT_LBUF2];
     const char *s = varname;
     int i = 0;
@@ -240,7 +240,7 @@ void byrd_emit_named_typedecls(FILE *out_file) {
 }
 
 /* Emit forward declarations for ALL registered named patterns.
- * Must be called once, after all byrd_preregister_named_pattern calls,
+ * Must be called once, after all scan_named_patterns calls,
  * and BEFORE any byrd_emit_named_pattern calls.
  * Signature: pat_X(subj, slen, cur_ptr, zz, entry) */
 void byrd_emit_named_fwdecls(FILE *out_file) {
@@ -447,7 +447,7 @@ static void decl_emit_undefs(FILE *out_file) {
  * C-safe string literal emission
  * ----------------------------------------------------------------------- */
 
-static void emit_cstr(const char *s) {
+static void escape_string(const char *s) {
     fputc('"', out);
     for (; *s; s++) {
         if (*s == '"' || *s == '\\') fputc('\\', out);
@@ -473,7 +473,7 @@ static void emit_charset_cexpr(EXPR_t *arg, char *buf, int bufsz) {
     if (!arg) { snprintf(buf, bufsz, "\"\""); return; }
     switch (arg->kind) {
     case E_QLIT: {
-        /* Build a quoted C literal via emit_cstr logic, inline into buf */
+        /* Build a quoted C literal via escape_string logic, inline into buf */
         const char *s = arg->sval ? arg->sval : "";
         int pos = 0;
         buf[pos++] = '"';
@@ -590,9 +590,9 @@ static void emit_fence(const char *alpha, const char *beta,
                        const char *gamma, const char *omega);
 static void emit_succeed(const char *alpha, const char *beta,
                          const char *gamma);
-static void emit_fail_node(const char *alpha, const char *beta,
+static void emit_fail(const char *alpha, const char *beta,
                            const char *omega);
-static void emit_abort_node(const char *alpha, const char *beta,
+static void emit_abort(const char *alpha, const char *beta,
                             const char *omega);
 
 
@@ -1553,7 +1553,7 @@ static void emit_succeed(const char *alpha, const char *beta,
  * DT_FAIL node — always fails
  * ----------------------------------------------------------------------- */
 
-static void emit_fail_node(const char *alpha, const char *beta,
+static void emit_fail(const char *alpha, const char *beta,
                            const char *omega) {
     PLG(alpha, omega);   /* DT_FAIL: α and β both → ω */
     PLG(beta,  omega);
@@ -1563,7 +1563,7 @@ static void emit_fail_node(const char *alpha, const char *beta,
  * ABORT node — terminates the entire match
  * ----------------------------------------------------------------------- */
 
-static void emit_abort_node(const char *alpha, const char *beta,
+static void emit_abort(const char *alpha, const char *beta,
                             const char *omega) {
     PLG(alpha, omega);   /* TODO: propagate abort signal */
     PLG(beta,  omega);
@@ -1806,12 +1806,12 @@ static void emit_pat_node(EXPR_t *pat,
         }
         /* DT_FAIL */
         if (strcasecmp(n, "DT_FAIL") == 0) {
-            emit_fail_node(alpha, beta, omega);
+            emit_fail(alpha, beta, omega);
             return;
         }
         /* ABORT */
         if (strcasecmp(n, "ABORT") == 0) {
-            emit_abort_node(alpha, beta, omega);
+            emit_abort(alpha, beta, omega);
             return;
         }
 
@@ -2078,7 +2078,7 @@ static void emit_pat_node(EXPR_t *pat,
             return;
         }
         if (strcasecmp(varname, "FAIL") == 0 || strcasecmp(varname, "DT_FAIL") == 0) {
-            emit_fail_node(alpha, beta, omega);
+            emit_fail(alpha, beta, omega);
             return;
         }
         if (strcasecmp(varname, "SUCCEED") == 0) {
@@ -2090,7 +2090,7 @@ static void emit_pat_node(EXPR_t *pat,
             return;
         }
         if (strcasecmp(varname, "ABORT") == 0) {
-            emit_abort_node(alpha, beta, omega);
+            emit_abort(alpha, beta, omega);
             return;
         }
 

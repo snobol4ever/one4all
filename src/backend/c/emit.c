@@ -1879,7 +1879,7 @@ static void emit_trampoline_program(Program *prog) {
      * (e.g. *SpecialNm in ss()) resolve to compiled functions, not
      * interpreter fallback.  Registration is just name→fnname mapping;
      * no C is emitted yet. */
-    byrd_named_pat_reset();
+    named_pat_reset();
     for (STMT_t *s = prog->head; s; s = s->next) {
         if (s->is_end) break;
         if (stmt_in_phantom_body(s)) continue;
@@ -1887,7 +1887,7 @@ static void emit_trampoline_program(Program *prog) {
         if (!s->pattern && s->replacement &&
             s->subject && s->subject->kind == E_VART &&
             expr_contains_pattern(s->replacement)) {
-            byrd_preregister_named_pattern(s->subject->sval);
+            scan_named_patterns(s->subject->sval);
         }
     }
     /* Emit struct typedecls and function fwdecls now — before emit_fn —
@@ -1918,7 +1918,7 @@ static void emit_trampoline_program(Program *prog) {
     /* --- Pass 0b/c/d: emit compiled named pattern functions ---
      * Names already pre-registered and typedecls/fwdecls already emitted
      * in pass 0a above (before emit_fn).
-     * DO NOT call byrd_named_pat_reset() or re-emit typedecls here.
+     * DO NOT call named_pat_reset() or re-emit typedecls here.
      */
     C("/* --- compiled named pattern function bodies --- */\n");
 

@@ -53,6 +53,7 @@
  *   Jasmin docs      — http://jasmin.sourceforge.net/
  */
 
+#define EMIT_BYRD_JVM_C
 #include "sno2c.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -235,18 +236,18 @@ static int need_data_helpers     = 0;
 static int arith_local_base = 2;
 
 /* Forward declarations for user-function support (defined after emit_header) */
-#define JVM_FN_MAX_FWD  128
-#define JVM_ARG_MAX_FWD  32
-typedef struct JvmFnDef_s {
+#define FN_MAX  128
+#define FN_ARGMAX  32
+typedef struct FnDef_s {
     char  *name;
-    char  *args[JVM_ARG_MAX_FWD];
+    char  *args[FN_ARGMAX];
     int    nargs;
-    char  *locals[JVM_ARG_MAX_FWD];
+    char  *locals[FN_ARGMAX];
     int    nlocals;
     char  *end_label;
     char  *entry_label;
 } FnDef;
-static FnDef fn_table[JVM_FN_MAX_FWD];
+static FnDef fn_table[FN_MAX];
 static int       fn_count = 0;
 static const FnDef *cur_fn = NULL;
 static const FnDef *find_fn(const char *name);  /* fwd decl */
@@ -319,9 +320,9 @@ static void scan_named_patterns(Program *prog) {
 }
 
 /* DATA type registry */
-#define JVM_DATA_MAX 32
-typedef struct { char *type_name; char *fields[JVM_ARG_MAX_FWD]; int nfields; } DataType;
-static DataType data_types[JVM_DATA_MAX];
+#define DATA_MAX 32
+typedef struct { char *type_name; char *fields[FN_ARGMAX]; int nfields; } DataType;
+static DataType data_types[DATA_MAX];
 static int data_type_count = 0;
 static const DataType *find_data_type(const char *name);   /* fwd decl */
 static const DataType *find_data_field(const char *field); /* fwd decl — returns type if field found */
@@ -956,7 +957,7 @@ static void emit_expr(EXPR_t *e) {
             }
         }
         /* DEFINE('proto') — evaluated at runtime but a no-op in expression context
-         * (function registration happens at compile time via collect_functions) */
+         * (function registration happens at compile time via collect_fndefs) */
         if (strcasecmp(fname, "DEFINE") == 0) {
             JI("ldc", "\"\"");
             break;
@@ -1136,7 +1137,8 @@ static void emit_expr(EXPR_t *e) {
  * Label naming: Jn<uid>_<role>  — globally unique via static counter.
  * ----------------------------------------------------------------------- */
 
-static int uid_ctr = 0;  /* global label counter for pattern nodes */
+static int uid_ctr = 0;
+static int next_uid(void) { return uid_ctr++; }
 static char cur_pat_abort_label[128]; /* set per-statement: FAIL jumps here */
 
 /* Forward declaration for recursive calls */
@@ -1157,7 +1159,7 @@ static void emit_pat_node(EXPR_t *pat,
         return;
     }
 
-    int uid = uid_ctr++;
+    int uid = next_uid();
 
 #define PN(fmt,...) fprintf(out, "    " fmt "\n", ##__VA_ARGS__)
 #define PNL(lbl,fmt,...) fprintf(out, "%s:\n    " fmt "\n", lbl, ##__VA_ARGS__)
@@ -3297,9 +3299,7 @@ static void emit_runtime_helpers(void) {
  * (FnDef struct and fn_table/fn_count declared at top)
  * ----------------------------------------------------------------------- */
 
-#define JVM_FN_MAX  JVM_FN_MAX_FWD
-#define JVM_ARG_MAX JVM_ARG_MAX_FWD
-#define fn_count fn_count
+/* FN_MAX, FN_ARGMAX, fn_count declared at top */
 
 static void parse_proto(const char *proto, FnDef *fn) {
     int i=0; char buf[256]; int j=0;
@@ -3315,7 +3315,7 @@ static void parse_proto(const char *proto, FnDef *fn) {
             buf[j]='\0';
             while (j>0&&(buf[j-1]==' '||buf[j-1]=='\t')) buf[--j]='\0';
             int k=0; while(buf[k]==' '||buf[k]=='\t') k++;
-            if (buf[k] && fn->nargs < JVM_ARG_MAX) fn->args[fn->nargs++]=strdup(buf+k);
+            if (buf[k] && fn->nargs < FN_ARGMAX) fn->args[fn->nargs++]=strdup(buf+k);
             if (proto[i]==',') i++;
         }
         if (proto[i]==')') i++;
@@ -3326,7 +3326,7 @@ static void parse_proto(const char *proto, FnDef *fn) {
         buf[j]='\0';
         int k=0; while(buf[k]==' '||buf[k]=='\t') k++;
         while (j>0&&(buf[j-1]==' '||buf[j-1]=='\t')) buf[--j]='\0';
-        if (buf[k] && fn->nlocals < JVM_ARG_MAX) fn->locals[fn->nlocals++]=strdup(buf+k);
+        if (buf[k] && fn->nlocals < FN_ARGMAX) fn->locals[fn->nlocals++]=strdup(buf+k);
         if (proto[i]==',') i++;
     }
 }
@@ -3344,7 +3344,7 @@ static const char *flatten_str(EXPR_t *e, char *buf, int bufsz) {
     return NULL;
 }
 
-static void collect_functions(Program *prog) {
+static void collect_fndefs(Program *prog) {
     fn_count = 0;
     data_type_count = 0;
     char pbuf[4096];
@@ -3356,7 +3356,7 @@ static void collect_functions(Program *prog) {
         if (strcasecmp(sname, "DATA") == 0) {
             if (!s->subject->children || !s->subject->children[0]) continue;
             const char *proto = flatten_str(s->subject->children[0], pbuf, sizeof pbuf);
-            if (!proto || data_type_count >= JVM_DATA_MAX) continue;
+            if (!proto || data_type_count >= DATA_MAX) continue;
             /* Parse "typename(field1,field2,...)" */
             DataType *dt = &data_types[data_type_count];
             memset(dt, 0, sizeof *dt);
@@ -3374,7 +3374,7 @@ static void collect_functions(Program *prog) {
                     fb[j] = '\0';
                     int k = 0; while (fb[k] == ' ' || fb[k] == '\t') k++;
                     while (j > 0 && (fb[j-1] == ' ' || fb[j-1] == '\t')) fb[--j] = '\0';
-                    if (fb[k] && dt->nfields < JVM_ARG_MAX) dt->fields[dt->nfields++] = strdup(fb+k);
+                    if (fb[k] && dt->nfields < FN_ARGMAX) dt->fields[dt->nfields++] = strdup(fb+k);
                     if (proto[pi] == ',') pi++;
                 }
             }
@@ -3386,7 +3386,7 @@ static void collect_functions(Program *prog) {
         if (!s->subject->children || !s->subject->children[0]) continue;
         const char *proto = flatten_str(s->subject->children[0], pbuf, sizeof pbuf);
         if (!proto) continue;
-        if (fn_count >= JVM_FN_MAX) break;
+        if (fn_count >= FN_MAX) break;
         FnDef *fn = &fn_table[fn_count];
         memset(fn, 0, sizeof *fn);
         parse_proto(proto, fn);
@@ -3756,7 +3756,7 @@ void jvm_emit(Program *prog, FILE *out, const char *filename) {
 
     if (prog && prog->head) {
         collect_vars(prog);
-        collect_functions(prog);
+        collect_fndefs(prog);
         scan_named_patterns(prog);   /* register pattern variables before emit */
     }
 
