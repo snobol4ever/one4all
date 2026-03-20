@@ -162,9 +162,6 @@ static void jvm_collect_vars_expr(EXPR_t *e) {
     if (e->kind == E_VART && e->sval)
         jvm_var_register(e->sval);
     for (int _i = 0; _i < e->nchildren; _i++) jvm_collect_vars_expr(e->children[_i]);
-    if (e->children)
-        for (int i = 0; e->children[i]; i++)
-            jvm_collect_vars_expr(e->children[i]);
 }
 
 static void jvm_collect_vars(Program *prog) {
@@ -526,14 +523,14 @@ static void jvm_emit_expr(EXPR_t *e) {
         break;
     }
     case E_CONC: {
-        /* String concatenation: StringBuilder */
+        /* String concatenation: StringBuilder — n-ary, fold all children */
         JI("new", "java/lang/StringBuilder");
         JI("dup", "");
         JI("invokespecial", "java/lang/StringBuilder/<init>()V");
-        jvm_emit_expr(e->children[0]);
-        JI("invokevirtual", "java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;");
-        jvm_emit_expr(e->children[1]);
-        JI("invokevirtual", "java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;");
+        for (int _ci = 0; _ci < e->nchildren; _ci++) {
+            jvm_emit_expr(e->children[_ci]);
+            JI("invokevirtual", "java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;");
+        }
         JI("invokevirtual", "java/lang/StringBuilder/toString()Ljava/lang/String;");
         break;
     }
@@ -818,7 +815,6 @@ static void jvm_emit_expr(EXPR_t *e) {
             /* Use a static helper method sno_replace(str,from,to) */
             jvm_need_replace_helper = 1;
             for (int _i = 0; _i < e->nchildren; _i++) jvm_emit_expr(e->children[_i]);
-            jvm_emit_expr(e->children[2]);
             char rhdesc[512];
             snprintf(rhdesc, sizeof rhdesc,
                 "%s/sno_replace(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
@@ -1244,22 +1240,24 @@ static void jvm_emit_pat_node(EXPR_t *pat,
                 }
             }
 
-            /* arb_loop: save start on first pass; restore on retry */
+            /* arb_loop: ARB is minimum-first — start at 0 chars, grow on backtrack */
             PNLABEL(lbl_arb_loop);
             /* On first entry cursor is already at ARB position — save it */
             PN("iload %d", loc_cursor);
             PN("istore %d", loc_arb_start);
-            PN("iload %d", loc_len);
-            PN("iload %d", loc_cursor);
-            PN("isub");
-            PN("istore %d", loc_arb_len);
+            PN("ldc 0");
+            PN("istore %d", loc_arb_len);   /* arb_len = 0 (minimum first) */
 
             /* arb_retry: bounds check + set cursor */
             char lbl_arb_retry[64];
             snprintf(lbl_arb_retry, sizeof lbl_arb_retry, "Jn%d_arb_retry", uid);
             PNLABEL(lbl_arb_retry);
+            /* fail if arb_start + arb_len > len */
+            PN("iload %d", loc_arb_start);
             PN("iload %d", loc_arb_len);
-            PN("iflt %s", omega);
+            PN("iadd");
+            PN("iload %d", loc_len);
+            PN("if_icmpgt %s", omega);
             PN("iload %d", loc_arb_start);
             PN("iload %d", loc_arb_len);
             PN("iadd");
@@ -1311,7 +1309,7 @@ static void jvm_emit_pat_node(EXPR_t *pat,
             }
 
             PNLABEL(lbl_arb_decr);
-            PN("iinc %d -1", loc_arb_len);
+            PN("iinc %d 1", loc_arb_len);   /* grow ARB by 1 and retry */
             PN("goto %s", lbl_arb_retry);
             break;
         }
@@ -1389,6 +1387,32 @@ static void jvm_emit_pat_node(EXPR_t *pat,
 
         jvm_emit_pat_node(pat->children[1], gamma, omega,
                           loc_subj, loc_cursor, loc_len, p_cap_local, out, classname);
+        break;
+    }
+
+    /* ------------------------------------------------------------------ */
+    case E_ATP: {
+        /* @VAR — cursor-position capture.
+         * Zero-width: store current cursor as decimal string into VAR, always succeed.
+         * Parser: unary node, children[0] = E_VART(varname). */
+        const char *varname = (pat->children[0] && pat->children[0]->sval)
+                              ? pat->children[0]->sval : "";
+        char nameesc[256];
+        { int o = 0; nameesc[o++] = '"';
+          for (const char *p = varname; *p && o < (int)sizeof nameesc - 4; p++) {
+              if (*p == '"') { nameesc[o++] = '\\'; nameesc[o++] = '"'; }
+              else nameesc[o++] = *p;
+          }
+          nameesc[o++] = '"'; nameesc[o] = '\0'; }
+        /* push varname, cursor-as-string, call sno_var_put */
+        PN("ldc %s", nameesc);
+        PN("iload %d", loc_cursor);
+        PN("invokestatic java/lang/Integer/toString(I)Ljava/lang/String;");
+        char vpdesc[512];
+        snprintf(vpdesc, sizeof vpdesc,
+                 "%s/sno_var_put(Ljava/lang/String;Ljava/lang/String;)V", classname);
+        PN("invokestatic %s", vpdesc);
+        PN("goto %s", gamma);  /* zero-width: cursor unchanged, always succeed */
         break;
     }
 
@@ -2025,12 +2049,8 @@ static void jvm_emit_pat_node(EXPR_t *pat,
 static int expr_contains_input(EXPR_t *e) {
     if (!e) return 0;
     if (e->kind == E_VART && e->sval && strcasecmp(e->sval, "INPUT") == 0) return 1;
-    if (expr_contains_input(e->children[0]))  return 1;
-    if (expr_contains_input(e->children[1])) return 1;
-    if (e->children) {
-        for (int i = 0; e->children[i]; i++)
-            if (expr_contains_input(e->children[i])) return 1;
-    }
+    for (int _i = 0; _i < e->nchildren; _i++)
+        if (expr_contains_input(e->children[_i])) return 1;
     return 0;
 }
 
