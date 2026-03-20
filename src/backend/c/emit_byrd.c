@@ -493,8 +493,8 @@ static void emit_charset_cexpr(EXPR_t *arg, char *buf, int bufsz) {
         return;
     case E_CONC: {
         char lbuf[512], rbuf[512];
-        emit_charset_cexpr(arg->left,  lbuf, (int)sizeof lbuf);
-        emit_charset_cexpr(arg->right, rbuf, (int)sizeof rbuf);
+        emit_charset_cexpr(arg->children[0],  lbuf, (int)sizeof lbuf);
+        emit_charset_cexpr(arg->children[1], rbuf, (int)sizeof rbuf);
         /* CONCAT_fn is #define'd as CONCAT_fn(DESCR_t,DESCR_t) in snoc_runtime.h,
          * so we must wrap char* sides in STRVAL and extract result with VARVAL_fn. */
         snprintf(buf, bufsz,
@@ -509,8 +509,8 @@ static void emit_charset_cexpr(EXPR_t *arg, char *buf, int bufsz) {
         return;
     case E_INDR:
         /* $varname — indirect: left child holds the var name node */
-        if (arg->left && arg->left->sval)
-            snprintf(buf, bufsz, "VARVAL_fn(NV_GET_fn(\"%s\"))", arg->left->sval);
+        if (arg->children[0] && arg->children[0]->sval)
+            snprintf(buf, bufsz, "VARVAL_fn(NV_GET_fn(\"%s\"))", arg->children[0]->sval);
         else
             snprintf(buf, bufsz, "\"\"");
         return;
@@ -1678,85 +1678,85 @@ static void byrd_emit(EXPR_t *pat,
         }
 
         /* LEN(n) */
-        if (strcasecmp(n, "LEN") == 0 && pat->nargs >= 1) {
-            long v = (pat->args[0]->kind == E_ILIT) ? pat->args[0]->ival : 1;
+        if (strcasecmp(n, "LEN") == 0 && pat->nchildren >= 1) {
+            long v = (pat->children[0]->kind == E_ILIT) ? pat->children[0]->ival : 1;
             emit_len(v, alpha, beta, gamma, omega, subj_len, cursor);
             return;
         }
         /* POS(n) */
-        if (strcasecmp(n, "POS") == 0 && pat->nargs >= 1) {
-            if (pat->args[0]->kind == E_ILIT) {
-                emit_pos(pat->args[0]->ival, alpha, beta, gamma, omega, cursor);
+        if (strcasecmp(n, "POS") == 0 && pat->nchildren >= 1) {
+            if (pat->children[0]->kind == E_ILIT) {
+                emit_pos(pat->children[0]->ival, alpha, beta, gamma, omega, cursor);
             } else {
                 char expr[256];
                 snprintf(expr, sizeof expr, "to_int(NV_GET_fn(\"%s\"))",
-                         (pat->args[0]->sval ? pat->args[0]->sval : ""));
+                         (pat->children[0]->sval ? pat->children[0]->sval : ""));
                 emit_pos_expr(expr, alpha, beta, gamma, omega, cursor);
             }
             return;
         }
         /* RPOS(n) */
-        if (strcasecmp(n, "RPOS") == 0 && pat->nargs >= 1) {
-            if (pat->args[0]->kind == E_ILIT) {
-                emit_rpos(pat->args[0]->ival, alpha, beta, gamma, omega, subj_len, cursor);
+        if (strcasecmp(n, "RPOS") == 0 && pat->nchildren >= 1) {
+            if (pat->children[0]->kind == E_ILIT) {
+                emit_rpos(pat->children[0]->ival, alpha, beta, gamma, omega, subj_len, cursor);
             } else {
                 char expr[256];
                 snprintf(expr, sizeof expr, "to_int(NV_GET_fn(\"%s\"))",
-                         (pat->args[0]->sval ? pat->args[0]->sval : ""));
+                         (pat->children[0]->sval ? pat->children[0]->sval : ""));
                 emit_rpos_expr(expr, alpha, beta, gamma, omega, subj_len, cursor);
             }
             return;
         }
         /* TAB(n) */
-        if (strcasecmp(n, "TAB") == 0 && pat->nargs >= 1) {
-            if (pat->args[0]->kind == E_ILIT) {
-                emit_tab(pat->args[0]->ival, alpha, beta, gamma, omega, cursor);
+        if (strcasecmp(n, "TAB") == 0 && pat->nchildren >= 1) {
+            if (pat->children[0]->kind == E_ILIT) {
+                emit_tab(pat->children[0]->ival, alpha, beta, gamma, omega, cursor);
             } else {
                 char expr[256];
                 snprintf(expr, sizeof expr, "to_int(NV_GET_fn(\"%s\"))",
-                         (pat->args[0]->sval ? pat->args[0]->sval : ""));
+                         (pat->children[0]->sval ? pat->children[0]->sval : ""));
                 emit_tab_expr(expr, alpha, beta, gamma, omega, cursor);
             }
             return;
         }
         /* RTAB(n) */
-        if (strcasecmp(n, "RTAB") == 0 && pat->nargs >= 1) {
-            if (pat->args[0]->kind == E_ILIT) {
-                emit_rtab(pat->args[0]->ival, alpha, beta, gamma, omega, subj_len, cursor);
+        if (strcasecmp(n, "RTAB") == 0 && pat->nchildren >= 1) {
+            if (pat->children[0]->kind == E_ILIT) {
+                emit_rtab(pat->children[0]->ival, alpha, beta, gamma, omega, subj_len, cursor);
             } else {
                 char expr[256];
                 snprintf(expr, sizeof expr, "to_int(NV_GET_fn(\"%s\"))",
-                         (pat->args[0]->sval ? pat->args[0]->sval : ""));
+                         (pat->children[0]->sval ? pat->children[0]->sval : ""));
                 emit_rtab_expr(expr, alpha, beta, gamma, omega, subj_len, cursor);
             }
             return;
         }
         /* ANY(cs) */
-        if (strcasecmp(n, "ANY") == 0 && pat->nargs >= 1) {
-            char cs_buf[1024]; emit_charset_cexpr(pat->args[0], cs_buf, (int)sizeof cs_buf); const char *cs = cs_buf;
+        if (strcasecmp(n, "ANY") == 0 && pat->nchildren >= 1) {
+            char cs_buf[1024]; emit_charset_cexpr(pat->children[0], cs_buf, (int)sizeof cs_buf); const char *cs = cs_buf;
             emit_any(cs, alpha, beta, gamma, omega, subj, subj_len, cursor);
             return;
         }
         /* NOTANY(cs) */
-        if (strcasecmp(n, "NOTANY") == 0 && pat->nargs >= 1) {
-            char cs_buf[1024]; emit_charset_cexpr(pat->args[0], cs_buf, (int)sizeof cs_buf); const char *cs = cs_buf;
+        if (strcasecmp(n, "NOTANY") == 0 && pat->nchildren >= 1) {
+            char cs_buf[1024]; emit_charset_cexpr(pat->children[0], cs_buf, (int)sizeof cs_buf); const char *cs = cs_buf;
             emit_notany(cs, alpha, beta, gamma, omega, subj, subj_len, cursor);
             return;
         }
         /* SPAN(cs) */
-        if (strcasecmp(n, "SPAN") == 0 && pat->nargs >= 1) {
-            char cs_buf[1024]; emit_charset_cexpr(pat->args[0], cs_buf, (int)sizeof cs_buf); const char *cs = cs_buf;
+        if (strcasecmp(n, "SPAN") == 0 && pat->nchildren >= 1) {
+            char cs_buf[1024]; emit_charset_cexpr(pat->children[0], cs_buf, (int)sizeof cs_buf); const char *cs = cs_buf;
             emit_span(cs, alpha, beta, gamma, omega, subj, subj_len, cursor);
             return;
         }
         /* BREAK(cs) */
-        if (strcasecmp(n, "BREAK") == 0 && pat->nargs >= 1) {
-            char cs_buf[1024]; emit_charset_cexpr(pat->args[0], cs_buf, (int)sizeof cs_buf); const char *cs = cs_buf;
+        if (strcasecmp(n, "BREAK") == 0 && pat->nchildren >= 1) {
+            char cs_buf[1024]; emit_charset_cexpr(pat->children[0], cs_buf, (int)sizeof cs_buf); const char *cs = cs_buf;
             emit_break(cs, alpha, beta, gamma, omega, subj, subj_len, cursor);
             return;
         }
-        if (strcasecmp(n, "BREAKX") == 0 && pat->nargs >= 1) {
-            char cs_buf[1024]; emit_charset_cexpr(pat->args[0], cs_buf, (int)sizeof cs_buf); const char *cs = cs_buf;
+        if (strcasecmp(n, "BREAKX") == 0 && pat->nchildren >= 1) {
+            char cs_buf[1024]; emit_charset_cexpr(pat->children[0], cs_buf, (int)sizeof cs_buf); const char *cs = cs_buf;
             emit_breakx(cs, alpha, beta, gamma, omega, subj, subj_len, cursor);
             return;
         }
@@ -1771,18 +1771,18 @@ static void byrd_emit(EXPR_t *pat,
             return;
         }
         /* ARBNO(child_pat) */
-        if (strcasecmp(n, "ARBNO") == 0 && pat->nargs >= 1) {
-            emit_arbno(pat->args[0], alpha, beta, gamma, omega,
+        if (strcasecmp(n, "ARBNO") == 0 && pat->nchildren >= 1) {
+            emit_arbno(pat->children[0], alpha, beta, gamma, omega,
                        subj, subj_len, cursor, depth);
             return;
         }
         /* FENCE() — no arg form */
-        if (strcasecmp(n, "FENCE") == 0 && pat->nargs == 0) {
+        if (strcasecmp(n, "FENCE") == 0 && pat->nchildren == 0) {
             emit_fence(alpha, beta, gamma, omega);
             return;
         }
         /* FENCE(pat) — with argument: match pat, then cut */
-        if (strcasecmp(n, "FENCE") == 0 && pat->nargs >= 1) {
+        if (strcasecmp(n, "FENCE") == 0 && pat->nchildren >= 1) {
             int uid = byrd_uid();
             Label ca, cb;
             label_fmt(ca, "fence_p", uid, "α");
@@ -1791,7 +1791,7 @@ static void byrd_emit(EXPR_t *pat,
             snprintf(fence_after, LBUF, "fence_after_%d", uid);
 
             PLG(alpha, ca);   /* FENCE(p): enter child */
-            byrd_emit(pat->args[0],
+            byrd_emit(pat->children[0],
                       ca, cb,
                       fence_after, omega,
                       subj, subj_len, cursor, depth + 1);
@@ -1866,11 +1866,11 @@ static void byrd_emit(EXPR_t *pat,
             int uid = byrd_uid();
             PLG(alpha, NULL);
             /* Build args array */
-            int nargs = pat->nargs;
+            int nargs = pat->nchildren;
             if (nargs > 0) {
                 PS(NULL, "{ DESCR_t _fcall_%d_args[%d];", uid, nargs);
                 for (int ai = 0; ai < nargs; ai++) {
-                    EXPR_t *a = pat->args[ai];
+                    EXPR_t *a = pat->children[ai];
                     if (a && a->kind == E_VART && a->sval)
                         PS(NULL, "  _fcall_%d_args[%d] = NV_GET_fn(\"%s\");", uid, ai, a->sval);
                     else if (a && a->kind == E_QLIT && a->sval)
@@ -1891,29 +1891,73 @@ static void byrd_emit(EXPR_t *pat,
     }
 
     /* ----------------------------------------------------------- E_CONC (CAT / SEQ) */
-    case E_CONC:
-        emit_seq(pat->left, pat->right,
-                 alpha, beta, gamma, omega,
-                 subj, subj_len, cursor, depth);
+    case E_CONC: {
+        int _nc = pat->nchildren;
+        if (_nc == 0) { PLG(alpha, gamma); return; }
+        if (_nc == 1) { byrd_emit(pat->children[0], alpha, beta, gamma, omega, subj, subj_len, cursor, depth); return; }
+        if (_nc == 2) {
+            emit_seq(pat->children[0], pat->children[1], alpha, beta, gamma, omega, subj, subj_len, cursor, depth);
+            return;
+        }
+        /* >2: right-fold into heap-allocated binary nodes, then emit root */
+        EXPR_t **_nodes = malloc((size_t)(_nc - 1) * sizeof(EXPR_t *));
+        EXPR_t **_kids  = malloc((size_t)(_nc - 1) * 2 * sizeof(EXPR_t *));
+        EXPR_t *_right = pat->children[_nc - 1];
+        for (int _i = _nc - 2; _i >= 0; _i--) {
+            int _n = _nc - 2 - _i;
+            _nodes[_n] = calloc(1, sizeof(EXPR_t));
+            _nodes[_n]->kind = E_CONC;
+            _kids[_n*2+0] = pat->children[_i];
+            _kids[_n*2+1] = _right;
+            _nodes[_n]->children  = &_kids[_n*2];
+            _nodes[_n]->nchildren = 2;
+            _right = _nodes[_n];
+        }
+        byrd_emit(_right, alpha, beta, gamma, omega, subj, subj_len, cursor, depth);
+        for (int _i = 0; _i < _nc - 1; _i++) free(_nodes[_i]);
+        free(_nodes); free(_kids);
         return;
+    }
 
     /* ---------------------------------------------------------------- E_OR */
-    case E_OR:
-        emit_alt(pat->left, pat->right,
-                 alpha, beta, gamma, omega,
-                 subj, subj_len, cursor, depth);
+    case E_OR: {
+        int _nc = pat->nchildren;
+        if (_nc == 0) { PLG(alpha, omega); return; }
+        if (_nc == 1) { byrd_emit(pat->children[0], alpha, beta, gamma, omega, subj, subj_len, cursor, depth); return; }
+        if (_nc == 2) {
+            emit_alt(pat->children[0], pat->children[1], alpha, beta, gamma, omega, subj, subj_len, cursor, depth);
+            return;
+        }
+        /* >2: right-fold into heap-allocated binary nodes */
+        EXPR_t **_nodes = malloc((size_t)(_nc - 1) * sizeof(EXPR_t *));
+        EXPR_t **_kids  = malloc((size_t)(_nc - 1) * 2 * sizeof(EXPR_t *));
+        EXPR_t *_right = pat->children[_nc - 1];
+        for (int _i = _nc - 2; _i >= 0; _i--) {
+            int _n = _nc - 2 - _i;
+            _nodes[_n] = calloc(1, sizeof(EXPR_t));
+            _nodes[_n]->kind = E_OR;
+            _kids[_n*2+0] = pat->children[_i];
+            _kids[_n*2+1] = _right;
+            _nodes[_n]->children  = &_kids[_n*2];
+            _nodes[_n]->nchildren = 2;
+            _right = _nodes[_n];
+        }
+        byrd_emit(_right, alpha, beta, gamma, omega, subj, subj_len, cursor, depth);
+        for (int _i = 0; _i < _nc - 1; _i++) free(_nodes[_i]);
+        free(_nodes); free(_kids);
         return;
+    }
 
     /* ---------------------------------------------------------------- E_DOL ($ assign) */
     case E_DOL: {
         /* Normal case: right is a plain variable or quoted literal → direct capture. */
-        if (!pat->right ||
-            pat->right->kind == E_VART ||
-            pat->right->kind == E_QLIT) {
+        if (!pat->children[1] ||
+            pat->children[1]->kind == E_VART ||
+            pat->children[1]->kind == E_QLIT) {
             const char *varname = "OUTPUT";
-            if (pat->right && pat->right->sval)
-                varname = pat->right->sval;
-            emit_imm(pat->left, varname,
+            if (pat->children[1] && pat->children[1]->sval)
+                varname = pat->children[1]->sval;
+            emit_imm(pat->children[0], varname,
                      alpha, beta, gamma, omega,
                      subj, subj_len, cursor, depth, 0);
             return;
@@ -1951,12 +1995,12 @@ static void byrd_emit(EXPR_t *pat,
         PLG(alpha, left_a);
         PLG(beta,  right_b);
 
-        byrd_emit(pat->left,
+        byrd_emit(pat->children[0],
                   left_a, left_b,
                   mid_ok, omega,
                   subj, subj_len, cursor, depth + 1);
 
-        byrd_emit(pat->right,
+        byrd_emit(pat->children[1],
                   mid_ok, right_b,
                   gamma, omega,
                   subj, subj_len, cursor, depth + 1);
@@ -1967,18 +2011,18 @@ static void byrd_emit(EXPR_t *pat,
     /* --------------------------------------------------------------- E_NAM (. assign OR ~ shift) */
     case E_NAM: {
         const char *varname = "OUTPUT";
-        if (pat->right && (pat->right->kind == E_VART || pat->right->kind == E_QLIT))
-            varname = pat->right->sval;
+        if (pat->children[1] && (pat->children[1]->kind == E_VART || pat->children[1]->kind == E_QLIT))
+            varname = pat->children[1]->sval;
         /* Distinguish ~ (shift) from . (conditional name capture):
          * ~ right-hand side is always E_QLIT (a quoted tag like '=', 'Label', etc.)
          * . right-hand side is always E_VART (a plain variable name)
          * When tag is E_QLIT, route to emit_imm with do_shift=1 to call Shift(). */
-        if (pat->right && pat->right->kind == E_QLIT) {
-            emit_imm(pat->left, varname,
+        if (pat->children[1] && pat->children[1]->kind == E_QLIT) {
+            emit_imm(pat->children[0], varname,
                      alpha, beta, gamma, omega,
                      subj, subj_len, cursor, depth, 1);
         } else {
-            emit_cond(pat->left, varname,
+            emit_cond(pat->children[0], varname,
                       alpha, beta, gamma, omega,
                       subj, subj_len, cursor, depth);
         }
@@ -1993,8 +2037,8 @@ static void byrd_emit(EXPR_t *pat,
          * binary @VAR (rare): right holds the variable.
          * Prefer left->sval, fall back to right->sval. */
         const char *varname =
-            (pat->left  && pat->left->sval)  ? pat->left->sval  :
-            (pat->right && pat->right->sval) ? pat->right->sval : "_";
+            (pat->children[0]  && pat->children[0]->sval)  ? pat->children[0]->sval  :
+            (pat->children[1] && pat->children[1]->sval) ? pat->children[1]->sval : "_";
         char safe[NAMED_PAT_LBUF2];
         { int i=0; const char *s=varname;
           for(;*s&&i<(int)sizeof(safe)-1;s++,i++)
@@ -2139,20 +2183,20 @@ static void byrd_emit(EXPR_t *pat,
          * Also seen: left=E_VART in some paths — check both.
          * Also: left=E_FNC("name") — *name() where name is a named pattern fn.
          * Also: left=NULL, right=E_QLIT("x") — unary $'x' output capture. */
-        if (pat->right && pat->right->kind == E_VART)
-            varname = pat->right->sval;
-        else if (pat->left && pat->left->kind == E_VART)
-            varname = pat->left->sval;
-        else if (pat->left && pat->left->kind == E_FNC && pat->left->sval)
-            varname = pat->left->sval;
+        if (pat->children[1] && pat->children[1]->kind == E_VART)
+            varname = pat->children[1]->sval;
+        else if (pat->children[0] && pat->children[0]->kind == E_VART)
+            varname = pat->children[0]->sval;
+        else if (pat->children[0] && pat->children[0]->kind == E_FNC && pat->children[0]->sval)
+            varname = pat->children[0]->sval;
         if (!varname) varname = "";
 
         /* -------------------------------------------------------------------
          * Category: unary $'literal' — E_INDR(left=NULL, right=E_QLIT("x"))
          * Semantics: match the literal, capture matched span to OUTPUT.
          * ------------------------------------------------------------------- */
-        if (!pat->left && pat->right && pat->right->kind == E_QLIT && pat->right->sval) {
-            const char *lit = pat->right->sval;
+        if (!pat->children[0] && pat->children[1] && pat->children[1]->kind == E_QLIT && pat->children[1]->sval) {
+            const char *lit = pat->children[1]->sval;
             int uid2 = byrd_uid();
             Label lit_α, lit_β;
             label_fmt(lit_α, "dlit", uid2, "α");
@@ -2194,7 +2238,7 @@ static void byrd_emit(EXPR_t *pat,
          * This is the correct reading of SNOBOL4 *f(a,b): evaluate f(a,b),
          * treat the result as an unevaluated (deferred) pattern.
          *
-         * The bug (session 107): line 1951 above extracted only pat->left->sval
+         * The bug (session 107): line 1951 above extracted only pat->children[0]->sval
          * ("match") and fell through to NV_GET_fn("match") — a variable lookup
          * by name, dropping ALL arguments.  match_pattern_at(NULVCL,...) then
          * succeeded vacuously, making OUTPUT look like a Function.
@@ -2203,10 +2247,10 @@ static void byrd_emit(EXPR_t *pat,
          * args, nargs) to get the real pattern descriptor, then match against it.
          * beta → omega: function calls are non-resumable.
          * ------------------------------------------------------------------- */
-        if (pat->left && pat->left->kind == E_FNC && pat->left->nargs > 0) {
-            EXPR_t *fn = pat->left;
+        if (pat->children[0] && pat->children[0]->kind == E_FNC && pat->children[0]->nchildren > 0) {
+            EXPR_t *fn = pat->children[0];
             const char *fname = fn->sval ? fn->sval : "";
-            int nargs = fn->nargs;
+            int nargs = fn->nchildren;
             int uid = byrd_uid();
             char saved[LBUF];
             snprintf(saved, LBUF, "deref_fnc_%d_saved_cursor", uid);
@@ -2216,7 +2260,7 @@ static void byrd_emit(EXPR_t *pat,
             /* Build args array */
             B("    DESCR_t _fcall_%d_args[%d];\n", uid, nargs);
             for (int ai = 0; ai < nargs; ai++) {
-                EXPR_t *a = fn->args[ai];
+                EXPR_t *a = fn->children[ai];
                 if (a && a->kind == E_VART && a->sval)
                     B("    _fcall_%d_args[%d] = NV_GET_fn(\"%s\");\n", uid, ai, a->sval);
                 else if (a && a->kind == E_QLIT && a->sval)
@@ -2318,9 +2362,9 @@ static void byrd_emit(EXPR_t *pat,
          * '*(GT(nTop(), 1) nTop())', only call Reduce when count > 1.
          * When count==1 the single item is already on the stack — no wrapping needed.
          * For plain integer literals or 'nTop()' alone, always call Reduce. */
-        int conditional_ntop = (pat->right && pat->right->kind == E_QLIT
-                                && pat->right->sval
-                                && strcasestr(pat->right->sval, "GT(nTop()"));
+        int conditional_ntop = (pat->children[1] && pat->children[1]->kind == E_QLIT
+                                && pat->children[1]->sval
+                                && strcasestr(pat->children[1]->sval, "GT(nTop()"));
         if (conditional_ntop) {
             if (sf_uid >= 0)
                 B("    { int _cnt_%d = (_saved_frame_%d >= 0)"
@@ -2338,9 +2382,9 @@ static void byrd_emit(EXPR_t *pat,
          *   "*(':' SorF Brackets)"     → CONCAT_fn(STRVAL_fn(":"), CONCAT_fn(NV_GET_fn("SorF"), NV_GET_fn("Brackets")))
          * For any other '*'-prefixed literal, fall back to EVAL_fn (existing). */
         int bug6b = 0;
-        if (pat->left && pat->left->kind == E_QLIT && pat->left->sval
-            && pat->left->sval[0] == '*') {
-            const char *sv = pat->left->sval;
+        if (pat->children[0] && pat->children[0]->kind == E_QLIT && pat->children[0]->sval
+            && pat->children[0]->sval[0] == '*') {
+            const char *sv = pat->children[0]->sval;
             if (strcasestr(sv, "SorF") && strcasestr(sv, "Brackets")) {
                 B("    { DESCR_t _type_b = CONCAT_fn(STRVAL_fn(\":\"),"
                   " CONCAT_fn(NV_GET_fn(\"SorF\"), NV_GET_fn(\"Brackets\")));\n");
@@ -2354,12 +2398,12 @@ static void byrd_emit(EXPR_t *pat,
 
         if (bug6b) {
             B("    { DESCR_t _reduce_args[2] = {_type_b, ");
-            emit_simple_val(pat->right);
+            emit_simple_val(pat->children[1]);
             B("};\n");
             B("      APPLY_fn(\"Reduce\", _reduce_args, 2); } }\n");
         } else {
             B("    { DESCR_t _reduce_args[2] = {");
-            emit_simple_val(pat->left);
+            emit_simple_val(pat->children[0]);
             B(", ");
             if (sf_uid >= 0 && conditional_ntop)
                 B("INTVAL(_cnt_%d)", sf_uid);
@@ -2367,7 +2411,7 @@ static void byrd_emit(EXPR_t *pat,
                 B("INTVAL((_saved_frame_%d >= 0)"
                   " ? (int)NSTACK_AT_fn(_saved_frame_%d) : 0)", sf_uid, sf_uid);
             else
-                emit_simple_val(pat->right);
+                emit_simple_val(pat->children[1]);
             B("};\n");
             B("      APPLY_fn(\"Reduce\", _reduce_args, 2); }\n");
         }

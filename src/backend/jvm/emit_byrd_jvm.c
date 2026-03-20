@@ -161,11 +161,10 @@ static void jvm_collect_vars_expr(EXPR_t *e) {
     if (!e) return;
     if (e->kind == E_VART && e->sval)
         jvm_var_register(e->sval);
-    jvm_collect_vars_expr(e->left);
-    jvm_collect_vars_expr(e->right);
-    if (e->args)
-        for (int i = 0; e->args[i]; i++)
-            jvm_collect_vars_expr(e->args[i]);
+    for (int _i = 0; _i < e->nchildren; _i++) jvm_collect_vars_expr(e->children[_i]);
+    if (e->children)
+        for (int i = 0; e->children[i]; i++)
+            jvm_collect_vars_expr(e->children[i]);
 }
 
 static void jvm_collect_vars(Program *prog) {
@@ -295,10 +294,8 @@ static const JvmNamedPat *jvm_named_pat_lookup(const char *varname) {
 static int jvm_expr_has_pat_fn(EXPR_t *e) {
     if (!e) return 0;
     if (e->kind == E_FNC || e->kind == E_NAM || e->kind == E_DOL) return 1;
-    if (jvm_expr_has_pat_fn(e->left))  return 1;
-    if (jvm_expr_has_pat_fn(e->right)) return 1;
-    for (int i = 0; i < e->nargs; i++)
-        if (jvm_expr_has_pat_fn(e->args[i])) return 1;
+    for (int i = 0; i < e->nchildren; i++)
+        if (jvm_expr_has_pat_fn(e->children[i])) return 1;
     return 0;
 }
 static int jvm_expr_is_pattern_expr(EXPR_t *e) {
@@ -467,7 +464,7 @@ static void jvm_emit_expr(EXPR_t *e) {
     }
     case E_INDR: {
         /* $expr — indirect variable read: evaluate expr → string → lookup in sno_vars map */
-        jvm_emit_expr(e->right ? e->right : e->left);
+        jvm_emit_expr(e->children[1] ? e->children[1] : e->children[0]);
         char ivdesc[512];
         snprintf(ivdesc, sizeof ivdesc, "%s/sno_indr_get(Ljava/lang/String;)Ljava/lang/String;", jvm_classname);
         JI("invokestatic", ivdesc);
@@ -479,9 +476,9 @@ static void jvm_emit_expr(EXPR_t *e) {
     case E_DIV:
     case E_EXPOP: {
         /* Arithmetic: parse both sides to double, operate, convert back */
-        jvm_emit_expr(e->left);
+        jvm_emit_expr(e->children[0]);
         jvm_emit_to_double();
-        jvm_emit_expr(e->right);
+        jvm_emit_expr(e->children[1]);
         jvm_emit_to_double();
         switch (e->kind) {
         case E_ADD:   JI("dadd", ""); break;
@@ -533,16 +530,16 @@ static void jvm_emit_expr(EXPR_t *e) {
         JI("new", "java/lang/StringBuilder");
         JI("dup", "");
         JI("invokespecial", "java/lang/StringBuilder/<init>()V");
-        jvm_emit_expr(e->left);
+        jvm_emit_expr(e->children[0]);
         JI("invokevirtual", "java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;");
-        jvm_emit_expr(e->right);
+        jvm_emit_expr(e->children[1]);
         JI("invokevirtual", "java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;");
         JI("invokevirtual", "java/lang/StringBuilder/toString()Ljava/lang/String;");
         break;
     }
     case E_MNS: {
         /* Unary minus: -expr */
-        jvm_emit_expr(e->left);
+        jvm_emit_expr(e->children[0]);
         jvm_emit_to_double();
         JI("dneg", "");
         static int _mnslbl = 0;
@@ -574,10 +571,10 @@ static void jvm_emit_expr(EXPR_t *e) {
         else if (strcasecmp(fname, "mul") == 0) { is_arith=1; arith_op=2; }
         else if (strcasecmp(fname, "div") == 0) { is_arith=1; arith_op=3; }
         else if (strcasecmp(fname, "exp") == 0) { is_arith=1; arith_op=4; }
-        if (is_arith && e->args && e->args[0] && e->args[1]) {
-            jvm_emit_expr(e->args[0]);
+        if (is_arith && e->children && e->children[0] && e->children[1]) {
+            jvm_emit_expr(e->children[0]);
             jvm_emit_to_double();
-            jvm_emit_expr(e->args[1]);
+            jvm_emit_expr(e->children[1]);
             jvm_emit_to_double();
             switch (arith_op) {
             case 0: JI("dadd", ""); break;
@@ -604,8 +601,8 @@ static void jvm_emit_expr(EXPR_t *e) {
         }
 
         /* neg(x) — unary minus */
-        if (strcasecmp(fname, "neg") == 0 && e->args && e->args[0]) {
-            jvm_emit_expr(e->args[0]);
+        if (strcasecmp(fname, "neg") == 0 && e->children && e->children[0]) {
+            jvm_emit_expr(e->children[0]);
             jvm_emit_to_double();
             JI("dneg", "");
             /* convert back: whole-number check using jvm_arith_local_base slots */
@@ -633,8 +630,8 @@ static void jvm_emit_expr(EXPR_t *e) {
             break;
         }
         /* abs(x) — absolute value */
-        if (strcasecmp(fname, "abs") == 0 && e->args && e->args[0]) {
-            jvm_emit_expr(e->args[0]);
+        if (strcasecmp(fname, "abs") == 0 && e->children && e->children[0]) {
+            jvm_emit_expr(e->children[0]);
             jvm_emit_to_double();
             JI("invokestatic", "java/lang/Math/abs(D)D");
             static int _abslbl = 0;
@@ -661,48 +658,47 @@ static void jvm_emit_expr(EXPR_t *e) {
             break;
         }
         /* SIZE(str) → length as decimal string */
-        if (strcasecmp(fname, "SIZE") == 0 && e->args && e->args[0]) {
-            jvm_emit_expr(e->args[0]);
+        if (strcasecmp(fname, "SIZE") == 0 && e->children && e->children[0]) {
+            jvm_emit_expr(e->children[0]);
             JI("invokevirtual", "java/lang/String/length()I");
             JI("i2l", "");
             JI("invokestatic", "java/lang/Long/toString(J)Ljava/lang/String;");
             break;
         }
         /* DUPL(str, n) → str repeated n times (Java 11+ String.repeat) */
-        if (strcasecmp(fname, "DUPL") == 0 && e->args && e->args[0] && e->args[1]) {
-            jvm_emit_expr(e->args[0]);
-            jvm_emit_expr(e->args[1]);
+        if (strcasecmp(fname, "DUPL") == 0 && e->children && e->children[0] && e->children[1]) {
+            for (int _i = 0; _i < e->nchildren; _i++) jvm_emit_expr(e->children[_i]);
             jvm_emit_to_double();
             JI("d2i", "");
             JI("invokevirtual", "java/lang/String/repeat(I)Ljava/lang/String;");
             break;
         }
         /* REMDR(a, b) → a mod b as decimal string */
-        if (strcasecmp(fname, "REMDR") == 0 && e->args && e->args[0] && e->args[1]) {
-            jvm_emit_expr(e->args[0]);
+        if (strcasecmp(fname, "REMDR") == 0 && e->children && e->children[0] && e->children[1]) {
+            jvm_emit_expr(e->children[0]);
             jvm_emit_to_double(); JI("d2l", "");
-            jvm_emit_expr(e->args[1]);
+            jvm_emit_expr(e->children[1]);
             jvm_emit_to_double(); JI("d2l", "");
             JI("lrem", "");
             JI("invokestatic", "java/lang/Long/toString(J)Ljava/lang/String;");
             break;
         }
         /* IDENT(a,b) → succeeds (returns a) if a equals b, fails (null) otherwise */
-        if (strcasecmp(fname, "IDENT") == 0 && e->args && e->args[0]) {
+        if (strcasecmp(fname, "IDENT") == 0 && e->children && e->children[0]) {
             static int _identlbl = 0;
             char ifail[32], idone[32];
             snprintf(ifail, sizeof ifail, "Lident_f_%d", _identlbl);
             snprintf(idone, sizeof idone, "Lident_d_%d", _identlbl++);
-            jvm_emit_expr(e->args[0]);
-            if (e->args[1]) {
-                jvm_emit_expr(e->args[1]);
+            jvm_emit_expr(e->children[0]);
+            if (e->children[1]) {
+                jvm_emit_expr(e->children[1]);
             } else {
                 JI("ldc", "\"\"");
             }
             JI("invokevirtual", "java/lang/String/equals(Ljava/lang/Object;)Z");
             JI("ifeq", ifail);
             /* success: push arg0 again */
-            jvm_emit_expr(e->args[0]);
+            jvm_emit_expr(e->children[0]);
             JI("goto", idone);
             J("%s:\n", ifail);
             JI("aconst_null", "");
@@ -710,20 +706,20 @@ static void jvm_emit_expr(EXPR_t *e) {
             break;
         }
         /* DIFFER(a,b) → succeeds (returns a) if a differs from b, fails (null) if equal */
-        if (strcasecmp(fname, "DIFFER") == 0 && e->args && e->args[0]) {
+        if (strcasecmp(fname, "DIFFER") == 0 && e->children && e->children[0]) {
             static int _difflbl = 0;
             char dfail[32], ddone[32];
             snprintf(dfail, sizeof dfail, "Ldiff_f_%d", _difflbl);
             snprintf(ddone, sizeof ddone, "Ldiff_d_%d", _difflbl++);
-            jvm_emit_expr(e->args[0]);
-            if (e->args[1]) {
-                jvm_emit_expr(e->args[1]);
+            jvm_emit_expr(e->children[0]);
+            if (e->children[1]) {
+                jvm_emit_expr(e->children[1]);
             } else {
                 JI("ldc", "\"\"");
             }
             JI("invokevirtual", "java/lang/String/equals(Ljava/lang/Object;)Z");
             JI("ifne", dfail);
-            jvm_emit_expr(e->args[0]);
+            jvm_emit_expr(e->children[0]);
             JI("goto", ddone);
             J("%s:\n", dfail);
             JI("aconst_null", "");
@@ -752,8 +748,8 @@ static void jvm_emit_expr(EXPR_t *e) {
                 char cfail[40], cdone[40];
                 snprintf(cfail, sizeof cfail, "Lcmp_f_%d", _cmplbl);
                 snprintf(cdone, sizeof cdone, "Lcmp_d_%d", _cmplbl++);
-                EXPR_t *a0 = (e->args && e->args[0]) ? e->args[0] : NULL;
-                EXPR_t *a1 = (e->args && e->args[1]) ? e->args[1] : NULL;
+                EXPR_t *a0 = (e->children && e->children[0]) ? e->children[0] : NULL;
+                EXPR_t *a1 = (e->children && e->children[1]) ? e->children[1] : NULL;
                 if (a0) jvm_emit_expr(a0); else JI("ldc", "\"0\"");
                 jvm_emit_to_double();
                 if (a1) jvm_emit_expr(a1); else JI("ldc", "\"0\"");
@@ -770,21 +766,21 @@ static void jvm_emit_expr(EXPR_t *e) {
             }
         }
         /* SUBSTR(str, start, len) → substring (1-based start, SNOBOL4 semantics) */
-        if (strcasecmp(fname, "SUBSTR") == 0 && e->args && e->args[0]) {
+        if (strcasecmp(fname, "SUBSTR") == 0 && e->children && e->children[0]) {
             static int _sublbl = 0;
             char sfail[40], sdone[40];
             snprintf(sfail, sizeof sfail, "Lsub_f_%d", _sublbl);
             snprintf(sdone, sizeof sdone, "Lsub_d_%d", _sublbl++);
             /* SUBSTR(str, start [, len])
              * start is 1-based; len defaults to rest of string */
-            jvm_emit_expr(e->args[0]);  /* str */
+            jvm_emit_expr(e->children[0]);  /* str */
             /* get string length */
             JI("dup", "");
             JI("invokevirtual", "java/lang/String/length()I");
             /* store slen; we need: str, start0, end0 */
             /* Use Double.parseDouble approach for start */
-            EXPR_t *a1 = e->args[1] ? e->args[1] : NULL;
-            EXPR_t *a2 = e->args[2] ? e->args[2] : NULL;
+            EXPR_t *a1 = e->children[1] ? e->children[1] : NULL;
+            EXPR_t *a2 = e->children[2] ? e->children[2] : NULL;
             /* Stack: str, slen */
             /* store str and slen in scratch locals via helper approach:
              * emit inline without extra locals for simplicity — use StringBuilder
@@ -814,16 +810,15 @@ static void jvm_emit_expr(EXPR_t *e) {
             break;
         }
         /* REPLACE(str, from, to) → translate chars in str: for each char in from replace with corresponding char in to */
-        if (strcasecmp(fname, "REPLACE") == 0 && e->args && e->args[0] && e->args[1] && e->args[2]) {
+        if (strcasecmp(fname, "REPLACE") == 0 && e->children && e->children[0] && e->children[1] && e->children[2]) {
             static int _replbl = 0;
             char rloop[40], rdone[40];
             snprintf(rloop, sizeof rloop, "Lrep_lp_%d", _replbl);
             snprintf(rdone, sizeof rdone, "Lrep_dn_%d", _replbl++);
             /* Use a static helper method sno_replace(str,from,to) */
             jvm_need_replace_helper = 1;
-            jvm_emit_expr(e->args[0]);
-            jvm_emit_expr(e->args[1]);
-            jvm_emit_expr(e->args[2]);
+            for (int _i = 0; _i < e->nchildren; _i++) jvm_emit_expr(e->children[_i]);
+            jvm_emit_expr(e->children[2]);
             char rhdesc[512];
             snprintf(rhdesc, sizeof rhdesc,
                 "%s/sno_replace(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
@@ -832,8 +827,8 @@ static void jvm_emit_expr(EXPR_t *e) {
             break;
         }
         /* TRIM(str) → remove trailing whitespace */
-        if (strcasecmp(fname, "TRIM") == 0 && e->args && e->args[0]) {
-            jvm_emit_expr(e->args[0]);
+        if (strcasecmp(fname, "TRIM") == 0 && e->children && e->children[0]) {
+            jvm_emit_expr(e->children[0]);
             /* replaceAll("\\s+$","") */
             JI("ldc", "\"\\\\s+$\"");
             JI("ldc", "\"\"");
@@ -841,22 +836,21 @@ static void jvm_emit_expr(EXPR_t *e) {
             break;
         }
         /* REVERSE(str) → reverse string */
-        if (strcasecmp(fname, "REVERSE") == 0 && e->args && e->args[0]) {
+        if (strcasecmp(fname, "REVERSE") == 0 && e->children && e->children[0]) {
             JI("new", "java/lang/StringBuilder");
             JI("dup", "");
-            jvm_emit_expr(e->args[0]);
+            jvm_emit_expr(e->children[0]);
             JI("invokespecial", "java/lang/StringBuilder/<init>(Ljava/lang/String;)V");
             JI("invokevirtual", "java/lang/StringBuilder/reverse()Ljava/lang/StringBuilder;");
             JI("invokevirtual", "java/lang/StringBuilder/toString()Ljava/lang/String;");
             break;
         }
         /* LPAD(str, n [, pad]) → left-pad string to length n */
-        if (strcasecmp(fname, "LPAD") == 0 && e->args && e->args[0] && e->args[1]) {
+        if (strcasecmp(fname, "LPAD") == 0 && e->children && e->children[0] && e->children[1]) {
             jvm_need_lpad_helper = 1;
-            jvm_emit_expr(e->args[0]);
-            jvm_emit_expr(e->args[1]);
+            for (int _i = 0; _i < e->nchildren; _i++) jvm_emit_expr(e->children[_i]);
             jvm_emit_to_double(); JI("d2i", "");
-            EXPR_t *pad_arg = (e->args[2]) ? e->args[2] : NULL;
+            EXPR_t *pad_arg = (e->children[2]) ? e->children[2] : NULL;
             if (pad_arg) { jvm_emit_expr(pad_arg); }
             else { JI("ldc", "\" \""); }
             char lpdesc[512];
@@ -867,12 +861,11 @@ static void jvm_emit_expr(EXPR_t *e) {
             break;
         }
         /* RPAD(str, n [, pad]) → right-pad string to length n */
-        if (strcasecmp(fname, "RPAD") == 0 && e->args && e->args[0] && e->args[1]) {
+        if (strcasecmp(fname, "RPAD") == 0 && e->children && e->children[0] && e->children[1]) {
             jvm_need_rpad_helper = 1;
-            jvm_emit_expr(e->args[0]);
-            jvm_emit_expr(e->args[1]);
+            for (int _i = 0; _i < e->nchildren; _i++) jvm_emit_expr(e->children[_i]);
             jvm_emit_to_double(); JI("d2i", "");
-            EXPR_t *pad_arg = (e->args[2]) ? e->args[2] : NULL;
+            EXPR_t *pad_arg = (e->children[2]) ? e->children[2] : NULL;
             if (pad_arg) { jvm_emit_expr(pad_arg); }
             else { JI("ldc", "\" \""); }
             char rpdesc[512];
@@ -883,13 +876,13 @@ static void jvm_emit_expr(EXPR_t *e) {
             break;
         }
         /* INTEGER(x) → succeeds (returns x) if x is an integer string, fails otherwise */
-        if (strcasecmp(fname, "INTEGER") == 0 && e->args && e->args[0]) {
+        if (strcasecmp(fname, "INTEGER") == 0 && e->children && e->children[0]) {
             static int _intlbl = 0;
             char ifail[40], idone[40];
             snprintf(ifail, sizeof ifail, "Lint_f_%d", _intlbl);
             snprintf(idone, sizeof idone, "Lint_d_%d", _intlbl++);
             jvm_need_integer_helper = 1;
-            jvm_emit_expr(e->args[0]);
+            jvm_emit_expr(e->children[0]);
             char ihdesc[512];
             snprintf(ihdesc, sizeof ihdesc,
                 "%s/sno_is_integer(Ljava/lang/String;)Z", jvm_classname);
@@ -906,11 +899,11 @@ static void jvm_emit_expr(EXPR_t *e) {
         /* DATATYPE(x) → type name string.
          * For DATA instances: returns the user-defined type name (stored as __type__).
          * For plain strings: returns "STRING", "INTEGER", or "REAL". */
-        if (strcasecmp(fname, "DATATYPE") == 0 && e->args && e->args[0]) {
+        if (strcasecmp(fname, "DATATYPE") == 0 && e->children && e->children[0]) {
             jvm_need_datatype_helper = 1;
             jvm_need_data_helpers   = 1;
             jvm_need_array_helpers  = 1;
-            jvm_emit_expr(e->args[0]);
+            jvm_emit_expr(e->children[0]);
             char dtdesc[512];
             snprintf(dtdesc, sizeof dtdesc,
                 "%s/sno_datatype_ext(Ljava/lang/String;)Ljava/lang/String;", jvm_classname);
@@ -931,8 +924,8 @@ static void jvm_emit_expr(EXPR_t *e) {
                 char lcfail[40], lcdone[40];
                 snprintf(lcfail, sizeof lcfail, "Llcmp_f_%d", _lcmplbl);
                 snprintf(lcdone, sizeof lcdone, "Llcmp_d_%d", _lcmplbl++);
-                EXPR_t *a0 = (e->args && e->args[0]) ? e->args[0] : NULL;
-                EXPR_t *a1 = (e->args && e->args[1]) ? e->args[1] : NULL;
+                EXPR_t *a0 = (e->children && e->children[0]) ? e->children[0] : NULL;
+                EXPR_t *a1 = (e->children && e->children[1]) ? e->children[1] : NULL;
                 if (a0) jvm_emit_expr(a0); else JI("ldc", "\"\"");
                 if (a1) jvm_emit_expr(a1); else JI("ldc", "\"\"");
                 JI("invokevirtual", "java/lang/String/compareTo(Ljava/lang/String;)I");
@@ -954,7 +947,7 @@ static void jvm_emit_expr(EXPR_t *e) {
         /* ARRAY(n) — create indexed array, return an array-id string */
         if (strcasecmp(fname, "ARRAY") == 0) {
             jvm_need_array_helpers = 1;
-            EXPR_t *a0 = (e->args && e->args[0]) ? e->args[0] : NULL;
+            EXPR_t *a0 = (e->children && e->children[0]) ? e->children[0] : NULL;
             if (a0) jvm_emit_expr(a0); else JI("ldc", "\"1\"");
             char ardesc[512];
             snprintf(ardesc, sizeof ardesc,
@@ -974,7 +967,7 @@ static void jvm_emit_expr(EXPR_t *e) {
         /* DATA('proto') — register a data type, return "" */
         if (strcasecmp(fname, "DATA") == 0) {
             jvm_need_data_helpers = 1;
-            EXPR_t *a0 = (e->args && e->args[0]) ? e->args[0] : NULL;
+            EXPR_t *a0 = (e->children && e->children[0]) ? e->children[0] : NULL;
             if (a0) jvm_emit_expr(a0); else JI("ldc", "\"\"");
             char ddesc[512];
             snprintf(ddesc, sizeof ddesc,
@@ -989,7 +982,7 @@ static void jvm_emit_expr(EXPR_t *e) {
             if (ufn) {
                 /* Push args */
                 for (int i = 0; i < ufn->nargs; i++) {
-                    if (e->args && e->args[i]) jvm_emit_expr(e->args[i]);
+                    if (e->children && e->children[i]) jvm_emit_expr(e->children[i]);
                     else JI("ldc", "\"\"");
                 }
                 /* Build descriptor */
@@ -1029,7 +1022,7 @@ static void jvm_emit_expr(EXPR_t *e) {
                     JI("dup", "");
                     char fnesc[256]; jvm_escape_string(dt->fields[fi], fnesc, sizeof fnesc);
                     JI("ldc", fnesc);
-                    if (e->args && e->args[fi]) jvm_emit_expr(e->args[fi]);
+                    if (e->children && e->children[fi]) jvm_emit_expr(e->children[fi]);
                     else JI("ldc", "\"\"");
                     char apdesc[512]; snprintf(apdesc, sizeof apdesc,
                         "%s/sno_array_put(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
@@ -1055,7 +1048,7 @@ static void jvm_emit_expr(EXPR_t *e) {
             if (ft) {
                 jvm_need_data_helpers = 1;
                 /* push instance_id */
-                if (e->args && e->args[0]) jvm_emit_expr(e->args[0]);
+                if (e->children && e->children[0]) jvm_emit_expr(e->children[0]);
                 else JI("ldc", "\"\"");
                 /* push field name */
                 char fnesc[256]; jvm_escape_string(fname, fnesc, sizeof fnesc);
@@ -1079,7 +1072,7 @@ static void jvm_emit_expr(EXPR_t *e) {
         char igdesc_ary[512]; snprintf(igdesc_ary, sizeof igdesc_ary,
             "%s/sno_indr_get(Ljava/lang/String;)Ljava/lang/String;", jvm_classname);
         JI("invokestatic", igdesc_ary);
-        if (e->args && e->args[0]) jvm_emit_expr(e->args[0]);
+        if (e->children && e->children[0]) jvm_emit_expr(e->children[0]);
         else JI("ldc", "\"1\"");
         char agdesc_ary[512]; snprintf(agdesc_ary, sizeof agdesc_ary,
             "%s/sno_array_get(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;", jvm_classname);
@@ -1089,9 +1082,9 @@ static void jvm_emit_expr(EXPR_t *e) {
     case E_IDX: {
         /* expr[subscript] — subscript on expression (TABLE or DATA) */
         jvm_need_array_helpers = 1;
-        jvm_emit_expr(e->left);
-        if (e->right) jvm_emit_expr(e->right);
-        else if (e->args && e->args[0]) jvm_emit_expr(e->args[0]);
+        jvm_emit_expr(e->children[0]);
+        if (e->children[1]) jvm_emit_expr(e->children[1]);
+        else if (e->children && e->children[0]) jvm_emit_expr(e->children[0]);
         else JI("ldc", "\"0\"");
         char agdesc_idx[512]; snprintf(agdesc_idx, sizeof agdesc_idx,
             "%s/sno_array_get(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;", jvm_classname);
@@ -1204,11 +1197,11 @@ static void jvm_emit_pat_node(EXPR_t *pat,
          * ARB.NAM node; if found, emit greedy ARB+backtrack loop around right. */
         EXPR_t *arb_nam = NULL;
         {
-            EXPR_t *cur = pat->left;
-            while (cur && cur->kind == E_CONC) cur = cur->right;
-            if (cur && cur->kind == E_NAM && cur->left &&
-                ((cur->left->kind == E_FNC  && cur->left->sval && strcasecmp(cur->left->sval, "ARB") == 0) ||
-                 (cur->left->kind == E_VART && cur->left->sval && strcasecmp(cur->left->sval, "ARB") == 0)))
+            EXPR_t *cur = pat->children[0];
+            while (cur && cur->kind == E_CONC) cur = cur->children[1];
+            if (cur && cur->kind == E_NAM && cur->children[0] &&
+                ((cur->children[0]->kind == E_FNC  && cur->children[0]->sval && strcasecmp(cur->children[0]->sval, "ARB") == 0) ||
+                 (cur->children[0]->kind == E_VART && cur->children[0]->sval && strcasecmp(cur->children[0]->sval, "ARB") == 0)))
                 arb_nam = cur;
             else if (cur &&
                 ((cur->kind == E_FNC  && cur->sval && strcasecmp(cur->sval, "ARB") == 0) ||
@@ -1223,14 +1216,14 @@ static void jvm_emit_pat_node(EXPR_t *pat,
             snprintf(lbl_arb_loop, sizeof lbl_arb_loop, "Jn%d_arb_loop", uid);
             snprintf(lbl_arb_decr, sizeof lbl_arb_decr, "Jn%d_arb_decr", uid);
 
-            /* Emit prefix: all of pat->left except the trailing arb_nam node */
+            /* Emit prefix: all of pat->children[0] except the trailing arb_nam node */
             {
                 EXPR_t *nodes[64]; int n = 0;
-                EXPR_t *cur = pat->left;
+                EXPR_t *cur = pat->children[0];
                 while (cur && cur->kind == E_CONC) {
-                    nodes[n++] = cur->left;
-                    if (cur->right == arb_nam) break;
-                    cur = cur->right;
+                    nodes[n++] = cur->children[0];
+                    if (cur->children[1] == arb_nam) break;
+                    cur = cur->children[1];
                     if (!cur || cur->kind != E_CONC) break;
                 }
                 if (n > 0) {
@@ -1275,8 +1268,8 @@ static void jvm_emit_pat_node(EXPR_t *pat,
             /* Deferred capture: store ARB span in a temp local; only commit
              * (call sno_var_put) after right child SUCCEEDS.  This prevents
              * spurious output (e.g. OUTPUT =) on each backtrack attempt.    */
-            if (arb_nam->kind == E_NAM && arb_nam->right && arb_nam->right->sval) {
-                const char *capvar = arb_nam->right->sval;
+            if (arb_nam->kind == E_NAM && arb_nam->children[1] && arb_nam->children[1]->sval) {
+                const char *capvar = arb_nam->children[1]->sval;
                 int loc_tmp_cap = (*p_cap_local)++;
 
                 char nameesc[256];
@@ -1299,7 +1292,7 @@ static void jvm_emit_pat_node(EXPR_t *pat,
                 char lbl_arb_commit[64];
                 snprintf(lbl_arb_commit, sizeof lbl_arb_commit, "Jn%d_arb_commit", uid);
 
-                jvm_emit_pat_node(pat->right, lbl_arb_commit, lbl_arb_decr,
+                jvm_emit_pat_node(pat->children[1], lbl_arb_commit, lbl_arb_decr,
                                   loc_subj, loc_cursor, loc_len, p_cap_local, out, classname);
 
                 /* Commit: right child succeeded — now store capture and goto gamma */
@@ -1313,7 +1306,7 @@ static void jvm_emit_pat_node(EXPR_t *pat,
                 PN("goto %s", gamma);
             } else {
                 /* No capture — emit right child directly */
-                jvm_emit_pat_node(pat->right, gamma, lbl_arb_decr,
+                jvm_emit_pat_node(pat->children[1], gamma, lbl_arb_decr,
                                   loc_subj, loc_cursor, loc_len, p_cap_local, out, classname);
             }
 
@@ -1323,13 +1316,31 @@ static void jvm_emit_pat_node(EXPR_t *pat,
             break;
         }
 
-        /* Normal SEQ */
+        /* n-ary: right-fold into heap-allocated binary nodes */
+        if (pat->nchildren > 2) {
+            int _nc = pat->nchildren;
+            EXPR_t **_nodes = malloc((size_t)(_nc-1)*sizeof(EXPR_t*));
+            EXPR_t **_kids  = malloc((size_t)(_nc-1)*2*sizeof(EXPR_t*));
+            EXPR_t *_r = pat->children[_nc-1];
+            for (int _i=_nc-2;_i>=0;_i--) {
+                int _n=_nc-2-_i;
+                _nodes[_n]=calloc(1,sizeof(EXPR_t)); _nodes[_n]->kind=E_CONC;
+                _kids[_n*2]=pat->children[_i]; _kids[_n*2+1]=_r;
+                _nodes[_n]->children=&_kids[_n*2]; _nodes[_n]->nchildren=2;
+                _r=_nodes[_n];
+            }
+            jvm_emit_pat_node(_r, gamma, omega, loc_subj, loc_cursor, loc_len, p_cap_local, out, classname);
+            for (int _i=0;_i<_nc-1;_i++) free(_nodes[_i]);
+            free(_nodes); free(_kids);
+            break;
+        }
+                /* Normal SEQ */
         char lmid[64];
         snprintf(lmid, sizeof lmid, "Jn%d_seq_mid", uid);
-        jvm_emit_pat_node(pat->left,  lmid,  omega,
+        jvm_emit_pat_node(pat->children[0],  lmid,  omega,
                           loc_subj, loc_cursor, loc_len, p_cap_local, out, classname);
         PNLABEL(lmid);
-        jvm_emit_pat_node(pat->right, gamma, omega,
+        jvm_emit_pat_node(pat->children[1], gamma, omega,
                           loc_subj, loc_cursor, loc_len, p_cap_local, out, classname);
         break;
     }
@@ -1340,7 +1351,25 @@ static void jvm_emit_pat_node(EXPR_t *pat,
          *   save cursor_save
          *   left: gamma → gamma, omega → restore+right_alpha
          *   right: gamma → gamma, omega → omega                          */
-        int loc_save = (*p_cap_local)++;   /* allocate a local int for saved cursor */
+        /* n-ary: right-fold into heap-allocated binary nodes */
+        if (pat->nchildren > 2) {
+            int _nc = pat->nchildren;
+            EXPR_t **_nodes = malloc((size_t)(_nc-1)*sizeof(EXPR_t*));
+            EXPR_t **_kids  = malloc((size_t)(_nc-1)*2*sizeof(EXPR_t*));
+            EXPR_t *_r = pat->children[_nc-1];
+            for (int _i=_nc-2;_i>=0;_i--) {
+                int _n=_nc-2-_i;
+                _nodes[_n]=calloc(1,sizeof(EXPR_t)); _nodes[_n]->kind=E_OR;
+                _kids[_n*2]=pat->children[_i]; _kids[_n*2+1]=_r;
+                _nodes[_n]->children=&_kids[_n*2]; _nodes[_n]->nchildren=2;
+                _r=_nodes[_n];
+            }
+            jvm_emit_pat_node(_r, gamma, omega, loc_subj, loc_cursor, loc_len, p_cap_local, out, classname);
+            for (int _i=0;_i<_nc-1;_i++) free(_nodes[_i]);
+            free(_nodes); free(_kids);
+            break;
+        }
+                int loc_save = (*p_cap_local)++;   /* allocate a local int for saved cursor */
 
         char lbl_try_right[64], lbl_restore[64];
         snprintf(lbl_try_right, sizeof lbl_try_right, "Jn%d_alt_right", uid);
@@ -1350,7 +1379,7 @@ static void jvm_emit_pat_node(EXPR_t *pat,
         PN("iload %d", loc_cursor);
         PN("istore %d", loc_save);
 
-        jvm_emit_pat_node(pat->left, gamma, lbl_try_right,
+        jvm_emit_pat_node(pat->children[0], gamma, lbl_try_right,
                           loc_subj, loc_cursor, loc_len, p_cap_local, out, classname);
 
         PNLABEL(lbl_try_right);
@@ -1358,7 +1387,7 @@ static void jvm_emit_pat_node(EXPR_t *pat,
         PN("iload %d", loc_save);
         PN("istore %d", loc_cursor);
 
-        jvm_emit_pat_node(pat->right, gamma, omega,
+        jvm_emit_pat_node(pat->children[1], gamma, omega,
                           loc_subj, loc_cursor, loc_len, p_cap_local, out, classname);
         break;
     }
@@ -1377,12 +1406,12 @@ static void jvm_emit_pat_node(EXPR_t *pat,
         PN("iload %d", loc_cursor);
         PN("istore %d", loc_before);
 
-        jvm_emit_pat_node(pat->left, lbl_inner_ok, omega,
+        jvm_emit_pat_node(pat->children[0], lbl_inner_ok, omega,
                           loc_subj, loc_cursor, loc_len, p_cap_local, out, classname);
 
         PNLABEL(lbl_inner_ok);
         /* var = subject.substring(cursor_before, cursor) */
-        const char *varname = (pat->right && pat->right->sval) ? pat->right->sval : "";
+        const char *varname = (pat->children[1] && pat->children[1]->sval) ? pat->children[1]->sval : "";
         /* push name for sno_var_put */
         char nameesc[256];
         {
@@ -1418,11 +1447,11 @@ static void jvm_emit_pat_node(EXPR_t *pat,
         PN("iload %d", loc_cursor);
         PN("istore %d", loc_before);
 
-        jvm_emit_pat_node(pat->left, lbl_inner_ok, omega,
+        jvm_emit_pat_node(pat->children[0], lbl_inner_ok, omega,
                           loc_subj, loc_cursor, loc_len, p_cap_local, out, classname);
 
         PNLABEL(lbl_inner_ok);
-        const char *varname = (pat->right && pat->right->sval) ? pat->right->sval : "";
+        const char *varname = (pat->children[1] && pat->children[1]->sval) ? pat->children[1]->sval : "";
         char nameesc[256];
         {
             int o=0; nameesc[o++]='"';
@@ -1469,7 +1498,7 @@ static void jvm_emit_pat_node(EXPR_t *pat,
             snprintf(lbl_child_ok,   sizeof lbl_child_ok,   "Jn%d_arb_cok",  uid);
             snprintf(lbl_child_fail, sizeof lbl_child_fail, "Jn%d_arb_cfail",uid);
 
-            EXPR_t *child = (pat->args && pat->args[0]) ? pat->args[0] : NULL;
+            EXPR_t *child = (pat->children && pat->children[0]) ? pat->children[0] : NULL;
 
             /* loop: save cursor, try child */
             PNLABEL(lbl_loop);
@@ -1500,7 +1529,7 @@ static void jvm_emit_pat_node(EXPR_t *pat,
         /* ---- ANY(charset) ---- */
         if (strcasecmp(fname, "ANY") == 0) {
             /* cursor < len AND subject.charAt(cursor) in charset */
-            EXPR_t *cs_arg = (pat->args && pat->args[0]) ? pat->args[0] : NULL;
+            EXPR_t *cs_arg = (pat->children && pat->children[0]) ? pat->children[0] : NULL;
             char lbl_ok[64];
             snprintf(lbl_ok, sizeof lbl_ok, "Jn%d_any_ok", uid);
 
@@ -1550,7 +1579,7 @@ static void jvm_emit_pat_node(EXPR_t *pat,
 
         /* ---- NOTANY(charset) ---- */
         if (strcasecmp(fname, "NOTANY") == 0) {
-            EXPR_t *cs_arg = (pat->args && pat->args[0]) ? pat->args[0] : NULL;
+            EXPR_t *cs_arg = (pat->children && pat->children[0]) ? pat->children[0] : NULL;
             char lbl_ok[64];
             snprintf(lbl_ok, sizeof lbl_ok, "Jn%d_notany_ok", uid);
 
@@ -1582,7 +1611,7 @@ static void jvm_emit_pat_node(EXPR_t *pat,
         /* ---- SPAN(charset) ---- */
         if (strcasecmp(fname, "SPAN") == 0) {
             /* consume longest run of chars in charset (at least 1) */
-            EXPR_t *cs_arg = (pat->args && pat->args[0]) ? pat->args[0] : NULL;
+            EXPR_t *cs_arg = (pat->children && pat->children[0]) ? pat->children[0] : NULL;
             int loc_cs = (*p_cap_local)++;
             char lbl_loop[64], lbl_done[64];
             snprintf(lbl_loop, sizeof lbl_loop, "Jn%d_span_lp", uid);
@@ -1638,7 +1667,7 @@ static void jvm_emit_pat_node(EXPR_t *pat,
             /* BREAK:  consume chars NOT in charset until one IS; fail if none found (0 advance)
              * BREAKX: same but succeeds even with zero chars consumed (allows cursor at end) */
             int is_breakx = (strcasecmp(fname, "BREAKX") == 0);
-            EXPR_t *cs_arg = (pat->args && pat->args[0]) ? pat->args[0] : NULL;
+            EXPR_t *cs_arg = (pat->children && pat->children[0]) ? pat->children[0] : NULL;
             int loc_cs = (*p_cap_local)++;
             char lbl_loop[64], lbl_done[64];
             snprintf(lbl_loop, sizeof lbl_loop, "Jn%d_brk_lp", uid);
@@ -1685,7 +1714,7 @@ static void jvm_emit_pat_node(EXPR_t *pat,
 
         /* ---- LEN(n) ---- */
         if (strcasecmp(fname, "LEN") == 0) {
-            EXPR_t *n_arg = (pat->args && pat->args[0]) ? pat->args[0] : NULL;
+            EXPR_t *n_arg = (pat->children && pat->children[0]) ? pat->children[0] : NULL;
             int loc_n = (*p_cap_local)++;
             /* evaluate n, convert to int */
             FILE *saved_out = jvm_out; jvm_out = out;
@@ -1709,7 +1738,7 @@ static void jvm_emit_pat_node(EXPR_t *pat,
 
         /* ---- POS(n) ---- */
         if (strcasecmp(fname, "POS") == 0) {
-            EXPR_t *n_arg = (pat->args && pat->args[0]) ? pat->args[0] : NULL;
+            EXPR_t *n_arg = (pat->children && pat->children[0]) ? pat->children[0] : NULL;
             int loc_n = (*p_cap_local)++;
             FILE *saved_out = jvm_out; jvm_out = out;
             if (n_arg) jvm_emit_expr(n_arg); else PN("ldc \"0\"");
@@ -1726,7 +1755,7 @@ static void jvm_emit_pat_node(EXPR_t *pat,
 
         /* ---- RPOS(n) ---- */
         if (strcasecmp(fname, "RPOS") == 0) {
-            EXPR_t *n_arg = (pat->args && pat->args[0]) ? pat->args[0] : NULL;
+            EXPR_t *n_arg = (pat->children && pat->children[0]) ? pat->children[0] : NULL;
             int loc_n = (*p_cap_local)++;
             FILE *saved_out = jvm_out; jvm_out = out;
             if (n_arg) jvm_emit_expr(n_arg); else PN("ldc \"0\"");
@@ -1745,7 +1774,7 @@ static void jvm_emit_pat_node(EXPR_t *pat,
 
         /* ---- TAB(n) ---- */
         if (strcasecmp(fname, "TAB") == 0) {
-            EXPR_t *n_arg = (pat->args && pat->args[0]) ? pat->args[0] : NULL;
+            EXPR_t *n_arg = (pat->children && pat->children[0]) ? pat->children[0] : NULL;
             int loc_n = (*p_cap_local)++;
             FILE *saved_out = jvm_out; jvm_out = out;
             if (n_arg) jvm_emit_expr(n_arg); else PN("ldc \"0\"");
@@ -1767,7 +1796,7 @@ static void jvm_emit_pat_node(EXPR_t *pat,
 
         /* ---- RTAB(n) ---- */
         if (strcasecmp(fname, "RTAB") == 0) {
-            EXPR_t *n_arg = (pat->args && pat->args[0]) ? pat->args[0] : NULL;
+            EXPR_t *n_arg = (pat->children && pat->children[0]) ? pat->children[0] : NULL;
             int loc_n = (*p_cap_local)++;
             FILE *saved_out = jvm_out; jvm_out = out;
             if (n_arg) jvm_emit_expr(n_arg); else PN("ldc \"0\"");
@@ -1937,7 +1966,7 @@ static void jvm_emit_pat_node(EXPR_t *pat,
          * as a string, NOT its value.  So push the sval directly.        */
         int loc_lit  = (*p_cap_local)++;
         int loc_llen = (*p_cap_local)++;
-        EXPR_t *inner = pat->right ? pat->right : pat->left;
+        EXPR_t *inner = pat->children[1] ? pat->children[1] : pat->children[0];
 
         /* Push the variable name as a literal string (not its value) */
         const char *vname = (inner && inner->sval) ? inner->sval : "";
@@ -1996,11 +2025,11 @@ static void jvm_emit_pat_node(EXPR_t *pat,
 static int expr_contains_input(EXPR_t *e) {
     if (!e) return 0;
     if (e->kind == E_VART && e->sval && strcasecmp(e->sval, "INPUT") == 0) return 1;
-    if (expr_contains_input(e->left))  return 1;
-    if (expr_contains_input(e->right)) return 1;
-    if (e->args) {
-        for (int i = 0; e->args[i]; i++)
-            if (expr_contains_input(e->args[i])) return 1;
+    if (expr_contains_input(e->children[0]))  return 1;
+    if (expr_contains_input(e->children[1])) return 1;
+    if (e->children) {
+        for (int i = 0; e->children[i]; i++)
+            if (expr_contains_input(e->children[i])) return 1;
     }
     return 0;
 }
@@ -2074,7 +2103,7 @@ static void jvm_emit_stmt(STMT_t *s, int stmt_idx) {
             jvm_need_data_helpers  = 1;
             jvm_need_array_helpers = 1;
             /* push instance_id */
-            if (s->subject->args && s->subject->args[0]) jvm_emit_expr(s->subject->args[0]);
+            if (s->subject->children && s->subject->children[0]) jvm_emit_expr(s->subject->children[0]);
             else JI("ldc", "\"\"");
             /* push field name */
             char fnesc[256]; jvm_escape_string(sfname, fnesc, sizeof fnesc);
@@ -2105,12 +2134,12 @@ static void jvm_emit_stmt(STMT_t *s, int stmt_idx) {
                 "%s/sno_indr_get(Ljava/lang/String;)Ljava/lang/String;", jvm_classname);
             JI("invokestatic", igdesc);
             /* subscript */
-            if (s->subject->args && s->subject->args[0]) jvm_emit_expr(s->subject->args[0]);
+            if (s->subject->children && s->subject->children[0]) jvm_emit_expr(s->subject->children[0]);
             else JI("ldc", "\"1\"");
         } else { /* E_IDX */
-            jvm_emit_expr(s->subject->left);
-            if (s->subject->right) jvm_emit_expr(s->subject->right);
-            else if (s->subject->args && s->subject->args[0]) jvm_emit_expr(s->subject->args[0]);
+            jvm_emit_expr(s->subject->children[0]);
+            if (s->subject->children[1]) jvm_emit_expr(s->subject->children[1]);
+            else if (s->subject->children && s->subject->children[0]) jvm_emit_expr(s->subject->children[0]);
             else JI("ldc", "\"0\"");
         }
         /* value */
@@ -2284,7 +2313,7 @@ static void jvm_emit_stmt(STMT_t *s, int stmt_idx) {
     /* Case 3: indirect assignment — $expr = val */
     if (s->has_eq && s->subject && s->subject->kind == E_INDR && !s->pattern) {
         /* Evaluate the indirect target name */
-        EXPR_t *indr_operand = s->subject->right ? s->subject->right : s->subject->left;
+        EXPR_t *indr_operand = s->subject->children[1] ? s->subject->children[1] : s->subject->children[0];
         jvm_emit_expr(indr_operand);   /* → String: the variable name */
         /* Evaluate RHS value */
         if (!s->replacement || s->replacement->kind == E_NULV) {
@@ -3245,8 +3274,8 @@ static const char *jvm_flatten_str(EXPR_t *e, char *buf, int bufsz) {
     if (e->kind == E_QLIT) { strncpy(buf, e->sval ? e->sval : "", bufsz-1); return buf; }
     if (e->kind == E_CONC) {
         char lb[2048], rb[2048];
-        const char *l = jvm_flatten_str(e->left, lb, sizeof lb);
-        const char *r = jvm_flatten_str(e->right, rb, sizeof rb);
+        const char *l = jvm_flatten_str(e->children[0], lb, sizeof lb);
+        const char *r = jvm_flatten_str(e->children[1], rb, sizeof rb);
         if (!l || !r) return NULL;
         snprintf(buf, bufsz, "%s%s", l, r); return buf;
     }
@@ -3263,8 +3292,8 @@ static void jvm_collect_functions(Program *prog) {
 
         /* Collect DATA type definitions */
         if (strcasecmp(sname, "DATA") == 0) {
-            if (!s->subject->args || !s->subject->args[0]) continue;
-            const char *proto = jvm_flatten_str(s->subject->args[0], pbuf, sizeof pbuf);
+            if (!s->subject->children || !s->subject->children[0]) continue;
+            const char *proto = jvm_flatten_str(s->subject->children[0], pbuf, sizeof pbuf);
             if (!proto || jvm_data_type_count >= JVM_DATA_MAX) continue;
             /* Parse "typename(field1,field2,...)" */
             JvmDataType *dt = &jvm_data_types[jvm_data_type_count];
@@ -3292,17 +3321,17 @@ static void jvm_collect_functions(Program *prog) {
         }
 
         if (strcasecmp(sname, "DEFINE") != 0) continue;
-        if (!s->subject->args || !s->subject->args[0]) continue;
-        const char *proto = jvm_flatten_str(s->subject->args[0], pbuf, sizeof pbuf);
+        if (!s->subject->children || !s->subject->children[0]) continue;
+        const char *proto = jvm_flatten_str(s->subject->children[0], pbuf, sizeof pbuf);
         if (!proto) continue;
         if (jvm_fn_count >= JVM_FN_MAX) break;
         JvmFnDef *fn = &jvm_fn_table[jvm_fn_count];
         memset(fn, 0, sizeof *fn);
         jvm_parse_proto(proto, fn);
         /* entry label: 2nd arg of DEFINE if present */
-        if (s->subject->nargs >= 2) {
+        if (s->subject->nchildren >= 2) {
             char ebuf[256];
-            const char *el = jvm_flatten_str(s->subject->args[1], ebuf, sizeof ebuf);
+            const char *el = jvm_flatten_str(s->subject->children[1], ebuf, sizeof ebuf);
             if (el && el[0]) fn->entry_label = strdup(el);
         }
         /* end label: from goto on DEFINE stmt */

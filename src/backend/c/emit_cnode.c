@@ -180,84 +180,98 @@ CNODE_t *build_expr(CArena *a, EXPR_t *e) {
         return cn_rawf(a, "kw(\"%s\")", e->sval);
 
     case E_INDR:
-        if (!e->left) {
-            /* $expr — indirect lookup: operand is in e->right */
-            return cn_call1(a, "deref", build_expr(a, e->right));
-        } else if (e->left->kind == E_VART) {
+        if (!e->children[0]) {
+            /* $expr — indirect lookup: operand is in e->children[1] */
+            return cn_call1(a, "deref", build_expr(a, e->children[1]));
+        } else if (e->children[0]->kind == E_VART) {
             /* *varname — deferred pattern reference */
-            return cn_rawf(a, "var_as_pattern(pat_ref(\"%s\"))", e->left->sval);
-        } else if (e->left->kind == E_FNC && e->left->nargs >= 1
-                   && !is_defined_function_cn(e->left->sval)) {
+            return cn_rawf(a, "var_as_pattern(pat_ref(\"%s\"))", e->children[0]->sval);
+        } else if (e->children[0]->kind == E_FNC && e->children[0]->nchildren >= 1
+                   && !is_defined_function_cn(e->children[0]->sval)) {
             /* *varname(arg...) — continuation-line misparse: deref-ref cat arg */
             char buf[256];
-            snprintf(buf, sizeof buf, "CONCAT_fn(var_as_pattern(pat_ref(\"%s\")),", e->left->sval);
+            snprintf(buf, sizeof buf, "CONCAT_fn(var_as_pattern(pat_ref(\"%s\")),", e->children[0]->sval);
             return cn_seq(a,
                 cn_raw(a, buf),
-                cn_seq(a, build_expr(a, e->left->args[0]), cn_raw(a, ")")));
+                cn_seq(a, build_expr(a, e->children[0]->children[0]), cn_raw(a, ")")));
         }
         /* *(expr) — deref of compound expression */
-        return cn_call1(a, "deref", build_expr(a, e->left));
+        return cn_call1(a, "deref", build_expr(a, e->children[0]));
 
     case E_MNS:
-        return cn_call1(a, "neg", build_expr(a, e->left));
+        return cn_call1(a, "neg", build_expr(a, e->children[0]));
 
-    case E_CONC:
-        return cn_call2(a, "CONCAT_fn", build_expr(a, e->left), build_expr(a, e->right));
+    case E_CONC: {
+        if (e->nchildren == 0) return cn_raw(a, "STRVAL_fn(\"\")");
+        if (e->nchildren == 1) return build_expr(a, e->children[0]);
+        CNODE_t *_acc = cn_call2(a, "CONCAT_fn", build_expr(a, e->children[0]), build_expr(a, e->children[1]));
+        for (int _i = 2; _i < e->nchildren; _i++)
+            _acc = cn_call2(a, "CONCAT_fn", _acc, build_expr(a, e->children[_i]));
+        return _acc;
+    }
 
     case E_OR: {
-        /* If either side is pattern-valued, route to pat_alt */
-        if (expr_contains_pattern(e->left) || expr_contains_pattern(e->right))
-            return cn_call2(a, "pat_alt", build_pat(a, e->left), build_pat(a, e->right));
-        return cn_call2(a, "alt", build_expr(a, e->left), build_expr(a, e->right));
+        if (e->nchildren == 0) return cn_raw(a, "FAILDESCR");
+        if (e->nchildren == 1) return build_expr(a, e->children[0]);
+        int _is_pat = 0;
+        for (int _i = 0; _i < e->nchildren; _i++) if (expr_contains_pattern(e->children[_i])) { _is_pat = 1; break; }
+        CNODE_t *_acc = _is_pat
+            ? cn_call2(a, "pat_alt", build_pat(a, e->children[0]), build_pat(a, e->children[1]))
+            : cn_call2(a, "alt",     build_expr(a, e->children[0]), build_expr(a, e->children[1]));
+        for (int _i = 2; _i < e->nchildren; _i++)
+            _acc = _is_pat
+                ? cn_call2(a, "pat_alt", _acc, build_pat(a, e->children[_i]))
+                : cn_call2(a, "alt",     _acc, build_expr(a, e->children[_i]));
+        return _acc;
     }
 
     case E_OPSYN:
         return cn_seq(a,
             cn_raw(a, "APPLY_fn(\"reduce\",(DESCR_t[]){"),
-            cn_seq(a, build_expr(a, e->left),
+            cn_seq(a, build_expr(a, e->children[0]),
             cn_seq(a, cn_raw(a, ","),
-            cn_seq(a, build_expr(a, e->right),
+            cn_seq(a, build_expr(a, e->children[1]),
                    cn_raw(a, "},2)")))));
 
-    case E_ADD: return cn_call2(a, "add",    build_expr(a,e->left), build_expr(a,e->right));
-    case E_SUB: return cn_call2(a, "sub",    build_expr(a,e->left), build_expr(a,e->right));
-    case E_MPY: return cn_call2(a, "mul",    build_expr(a,e->left), build_expr(a,e->right));
-    case E_DIV: return cn_call2(a, "DIVIDE_fn", build_expr(a,e->left), build_expr(a,e->right));
-    case E_EXPOP: return cn_call2(a, "POWER_fn",   build_expr(a,e->left), build_expr(a,e->right));
+    case E_ADD: return cn_call2(a, "add",    build_expr(a,e->children[0]), build_expr(a,e->children[1]));
+    case E_SUB: return cn_call2(a, "sub",    build_expr(a,e->children[0]), build_expr(a,e->children[1]));
+    case E_MPY: return cn_call2(a, "mul",    build_expr(a,e->children[0]), build_expr(a,e->children[1]));
+    case E_DIV: return cn_call2(a, "DIVIDE_fn", build_expr(a,e->children[0]), build_expr(a,e->children[1]));
+    case E_EXPOP: return cn_call2(a, "POWER_fn",   build_expr(a,e->children[0]), build_expr(a,e->children[1]));
 
     case E_FNC: {
-        if (e->nargs == 0)
+        if (e->nchildren == 0)
             return cn_rawf(a, "APPLY_fn(\"%s\",NULL,0)", e->sval);
         /* Build args array: (DESCR_t[]){arg0, arg1, ...} */
         CNODE_t *arr_open = cn_rawf(a, "APPLY_fn(\"%s\",(DESCR_t[]){", e->sval);
-        CNODE_t *inner = build_expr(a, e->args[0]);
-        for (int i = 1; i < e->nargs; i++)
-            inner = cn_seq(a, inner, cn_seq(a, cn_raw(a,","), build_expr(a, e->args[i])));
-        char close[32]; snprintf(close, sizeof close, "},%d)", e->nargs);
+        CNODE_t *inner = build_expr(a, e->children[0]);
+        for (int i = 1; i < e->nchildren; i++)
+            inner = cn_seq(a, inner, cn_seq(a, cn_raw(a,","), build_expr(a, e->children[i])));
+        char close[32]; snprintf(close, sizeof close, "},%d)", e->nchildren);
         return cn_seq(a, arr_open, cn_seq(a, inner, cn_raw(a, close)));
     }
 
     case E_ARY: {
         CNODE_t *head = cn_rawf(a, "aref(%s,(DESCR_t[]){", cs_cn(e->sval));
-        CNODE_t *inner = build_expr(a, e->args[0]);
-        for (int i = 1; i < e->nargs; i++)
-            inner = cn_seq(a, inner, cn_seq(a, cn_raw(a,","), build_expr(a, e->args[i])));
-        char close[32]; snprintf(close, sizeof close, "},%d)", e->nargs);
+        CNODE_t *inner = build_expr(a, e->children[0]);
+        for (int i = 1; i < e->nchildren; i++)
+            inner = cn_seq(a, inner, cn_seq(a, cn_raw(a,","), build_expr(a, e->children[i])));
+        char close[32]; snprintf(close, sizeof close, "},%d)", e->nchildren);
         return cn_seq(a, head, cn_seq(a, inner, cn_raw(a, close)));
     }
 
     case E_NAM:
     case E_DOL:
         /* In value context, evaluate child */
-        return build_expr(a, e->left);
+        return build_expr(a, e->children[0]);
 
     case E_IDX: {
         CNODE_t *head = cn_raw(a, "INDEX_fn(");
-        CNODE_t *obj  = build_expr(a, e->left);
-        CNODE_t *idx  = build_expr(a, e->args[0]);
-        for (int i = 1; i < e->nargs; i++)
-            idx = cn_seq(a, idx, cn_seq(a, cn_raw(a,","), build_expr(a, e->args[i])));
-        char close[32]; snprintf(close, sizeof close, "},%d)", e->nargs);
+        CNODE_t *obj  = build_expr(a, e->children[0]);
+        CNODE_t *idx  = build_expr(a, e->children[0]);
+        for (int i = 1; i < e->nchildren; i++)
+            idx = cn_seq(a, idx, cn_seq(a, cn_raw(a,","), build_expr(a, e->children[i])));
+        char close[32]; snprintf(close, sizeof close, "},%d)", e->nchildren);
         return cn_seq(a, head,
                cn_seq(a, obj,
                cn_seq(a, cn_raw(a, ",(DESCR_t[]){"),
@@ -270,8 +284,8 @@ CNODE_t *build_expr(CArena *a, EXPR_t *e) {
 
     case E_ASGN:
         return cn_seq(a,
-            cn_rawf(a, "assign_expr(%s,", cs_cn(e->left->sval)),
-            cn_seq(a, build_expr(a, e->right), cn_raw(a, ")")));
+            cn_rawf(a, "assign_expr(%s,", cs_cn(e->children[0]->sval)),
+            cn_seq(a, build_expr(a, e->children[1]), cn_raw(a, ")")));
 
     default:
         return cn_rawf(a, "/*unknown-expr-%d*/NULVCL", e->kind);
@@ -289,36 +303,36 @@ CNODE_t *build_pat(CArena *a, EXPR_t *e) {
     case E_VART:  return cn_rawf(a, "pat_var(\"%s\")", e->sval);
 
     case E_INDR:
-        if (e->left && e->left->kind == E_VART)
-            return cn_rawf(a, "pat_ref(\"%s\")", e->left->sval);
-        if (e->left && e->left->kind == E_FNC && e->left->nargs >= 1
-                && !is_defined_function_cn(e->left->sval)) {
+        if (e->children[0] && e->children[0]->kind == E_VART)
+            return cn_rawf(a, "pat_ref(\"%s\")", e->children[0]->sval);
+        if (e->children[0] && e->children[0]->kind == E_FNC && e->children[0]->nchildren >= 1
+                && !is_defined_function_cn(e->children[0]->sval)) {
             return cn_seq(a,
-                cn_rawf(a, "pat_cat(pat_ref(\"%s\"),", e->left->sval),
-                cn_seq(a, build_pat(a, e->left->args[0]), cn_raw(a, ")")));
+                cn_rawf(a, "pat_cat(pat_ref(\"%s\"),", e->children[0]->sval),
+                cn_seq(a, build_pat(a, e->children[0]->children[0]), cn_raw(a, ")")));
         }
         return cn_call1(a, "pat_deref",
-            build_expr(a, e->right ? e->right : e->left));
+            build_expr(a, e->children[1] ? e->children[1] : e->children[0]));
 
     case E_CONC:
-        return cn_call2(a, "pat_cat", build_pat(a, e->left), build_pat(a, e->right));
+        return cn_call2(a, "pat_cat", build_pat(a, e->children[0]), build_pat(a, e->children[1]));
 
     case E_MPY:
-        if (e->right && e->right->kind == E_VART)
+        if (e->children[1] && e->children[1]->kind == E_VART)
             return cn_seq(a,
                 cn_raw(a, "pat_cat("),
-                cn_seq(a, build_pat(a, e->left),
-                cn_seq(a, cn_rawf(a, ",pat_ref(\"%s\"))", e->right->sval),
+                cn_seq(a, build_pat(a, e->children[0]),
+                cn_seq(a, cn_rawf(a, ",pat_ref(\"%s\"))", e->children[1]->sval),
                        cn_raw(a, ""))));
         return cn_seq(a,
             cn_raw(a, "pat_cat("),
-            cn_seq(a, build_pat(a, e->left),
+            cn_seq(a, build_pat(a, e->children[0]),
             cn_seq(a, cn_raw(a, ",pat_deref("),
-            cn_seq(a, build_expr(a, e->right),
+            cn_seq(a, build_expr(a, e->children[1]),
                    cn_raw(a, "))")))));
 
     case E_OR:
-        return cn_call2(a, "pat_alt", build_pat(a, e->left), build_pat(a, e->right));
+        return cn_call2(a, "pat_alt", build_pat(a, e->children[0]), build_pat(a, e->children[1]));
 
     case E_FNC: {
         /* Pattern builtins */
@@ -329,19 +343,19 @@ CNODE_t *build_pat(CArena *a, EXPR_t *e) {
         if (strcasecmp(n,"REM")==0)   return cn_raw(a, "pat_rem()");
         if (strcasecmp(n,"DT_FAIL")==0)  return cn_raw(a, "pat_fail()");
         if (strcasecmp(n,"ABORT")==0) return cn_raw(a, "pat_abort()");
-        if (strcasecmp(n,"FENCE")==0 && e->nargs==0) return cn_raw(a,"pat_fence()");
-        if (strcasecmp(n,"FENCE")==0 && e->nargs>=1)
-            return cn_call1(a, "pat_fence_p", build_pat(a, e->args[0]));
+        if (strcasecmp(n,"FENCE")==0 && e->nchildren==0) return cn_raw(a,"pat_fence()");
+        if (strcasecmp(n,"FENCE")==0 && e->nchildren>=1)
+            return cn_call1(a, "pat_fence_p", build_pat(a, e->children[0]));
         /* Fall through to pat_user_call for everything else */
-        if (e->nargs == 0) {
+        if (e->nchildren == 0) {
             snprintf(buf, sizeof buf, "pat_user_call(\"%s\",NULL,0)", n);
             return cn_raw(a, buf);
         }
         CNODE_t *head = cn_rawf(a, "pat_user_call(\"%s\",(DESCR_t[]){", n);
-        CNODE_t *inner = build_expr(a, e->args[0]);
-        for (int i = 1; i < e->nargs; i++)
-            inner = cn_seq(a, inner, cn_seq(a, cn_raw(a,","), build_expr(a, e->args[i])));
-        snprintf(buf, sizeof buf, "},%d)", e->nargs);
+        CNODE_t *inner = build_expr(a, e->children[0]);
+        for (int i = 1; i < e->nchildren; i++)
+            inner = cn_seq(a, inner, cn_seq(a, cn_raw(a,","), build_expr(a, e->children[i])));
+        snprintf(buf, sizeof buf, "},%d)", e->nchildren);
         return cn_seq(a, head, cn_seq(a, inner, cn_raw(a, buf)));
     }
 

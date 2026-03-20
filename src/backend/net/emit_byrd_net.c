@@ -181,8 +181,7 @@ static void scan_expr_vars(EXPR_t *e) {
     if (!e) return;
     if (e->kind == E_VART && e->sval && !net_is_output(e->sval))
         net_var_register(e->sval);
-    scan_expr_vars(e->left);
-    scan_expr_vars(e->right);
+    for (int _i = 0; _i < e->nchildren; _i++) scan_expr_vars(e->children[_i]);
 }
 
 static void scan_prog_vars(Program *prog) {
@@ -279,7 +278,7 @@ static void net_emit_expr(EXPR_t *e) {
         const char *fn = e->sval ? e->sval : "";
         /* SIZE(x) — returns length string, always succeeds */
         if (strcasecmp(fn, "SIZE") == 0) {
-            net_emit_expr(e->nargs >= 1 ? e->args[0] : NULL);
+            net_emit_expr(e->nchildren >= 1 ? e->children[0] : NULL);
             N("    call       string [snobol4lib]Snobol4Lib::sno_size(string)\n");
             N("    ldc.i4.1\n");
             N("    stloc.0\n");
@@ -294,12 +293,12 @@ static void net_emit_expr(EXPR_t *e) {
         else if (strcasecmp(fn, "EQ") == 0) cmp_helper = "sno_eq";
         else if (strcasecmp(fn, "NE") == 0) cmp_helper = "sno_ne";
         if (cmp_helper) {
-            net_emit_expr(e->nargs >= 1 ? e->args[0] : NULL);
-            net_emit_expr(e->nargs >= 2 ? e->args[1] : NULL);
+            net_emit_expr(e->nchildren >= 1 ? e->children[0] : NULL);
+            net_emit_expr(e->nchildren >= 2 ? e->children[1] : NULL);
             N("    call       int32 [snobol4lib]Snobol4Lib::%s(string, string)\n", cmp_helper);
             N("    stloc.0\n");
             /* push right-arg value as expression result */
-            net_emit_expr(e->nargs >= 2 ? e->args[1] : NULL);
+            net_emit_expr(e->nchildren >= 2 ? e->children[1] : NULL);
             break;
         }
         /* String equality: IDENT DIFFER */
@@ -307,8 +306,8 @@ static void net_emit_expr(EXPR_t *e) {
         if      (strcasecmp(fn, "IDENT")  == 0) str_helper = "sno_ident";
         else if (strcasecmp(fn, "DIFFER") == 0) str_helper = "sno_differ";
         if (str_helper) {
-            net_emit_expr(e->nargs >= 1 ? e->args[0] : NULL);
-            net_emit_expr(e->nargs >= 2 ? e->args[1] : NULL);
+            net_emit_expr(e->nchildren >= 1 ? e->children[0] : NULL);
+            net_emit_expr(e->nchildren >= 2 ? e->children[1] : NULL);
             N("    call       int32 [snobol4lib]Snobol4Lib::%s(string, string)\n", str_helper);
             N("    stloc.0\n");
             net_ldstr("");
@@ -316,7 +315,7 @@ static void net_emit_expr(EXPR_t *e) {
         }
         /* DATATYPE(x) — returns "string", "integer", or "real" */
         if (strcasecmp(fn, "DATATYPE") == 0) {
-            net_emit_expr(e->nargs >= 1 ? e->args[0] : NULL);
+            net_emit_expr(e->nchildren >= 1 ? e->children[0] : NULL);
             N("    call       string [snobol4lib]Snobol4Lib::sno_datatype(string)\n");
             N("    ldc.i4.1\n");
             N("    stloc.0\n");
@@ -331,8 +330,8 @@ static void net_emit_expr(EXPR_t *e) {
         else if (strcasecmp(fn, "LEQ") == 0) lcmp_helper = "sno_leq";
         else if (strcasecmp(fn, "LNE") == 0) lcmp_helper = "sno_lne";
         if (lcmp_helper) {
-            net_emit_expr(e->nargs >= 1 ? e->args[0] : NULL);
-            net_emit_expr(e->nargs >= 2 ? e->args[1] : NULL);
+            net_emit_expr(e->nchildren >= 1 ? e->children[0] : NULL);
+            net_emit_expr(e->nchildren >= 2 ? e->children[1] : NULL);
             N("    call       int32 [snobol4lib]Snobol4Lib::%s(string, string)\n", lcmp_helper);
             N("    stloc.0\n");
             net_ldstr("");
@@ -340,10 +339,10 @@ static void net_emit_expr(EXPR_t *e) {
         }
         /* SUBSTR(str, start [, len]) — 1-based substring */
         if (strcasecmp(fn, "SUBSTR") == 0) {
-            net_emit_expr(e->nargs >= 1 ? e->args[0] : NULL);
-            net_emit_expr(e->nargs >= 2 ? e->args[1] : NULL);
-            if (e->nargs >= 3 && e->args[2])
-                net_emit_expr(e->args[2]);
+            net_emit_expr(e->nchildren >= 1 ? e->children[0] : NULL);
+            net_emit_expr(e->nchildren >= 2 ? e->children[1] : NULL);
+            if (e->nchildren >= 3 && e->children[2])
+                net_emit_expr(e->children[2]);
             else
                 net_ldstr("-1");
             N("    call       string [snobol4lib]Snobol4Lib::sno_substr(string, string, string)\n");
@@ -353,9 +352,9 @@ static void net_emit_expr(EXPR_t *e) {
         }
         /* REPLACE(str, from, to) — char-by-char translation */
         if (strcasecmp(fn, "REPLACE") == 0) {
-            net_emit_expr(e->nargs >= 1 ? e->args[0] : NULL);
-            net_emit_expr(e->nargs >= 2 ? e->args[1] : NULL);
-            net_emit_expr(e->nargs >= 3 ? e->args[2] : NULL);
+            net_emit_expr(e->nchildren >= 1 ? e->children[0] : NULL);
+            net_emit_expr(e->nchildren >= 2 ? e->children[1] : NULL);
+            net_emit_expr(e->nchildren >= 3 ? e->children[2] : NULL);
             N("    call       string [snobol4lib]Snobol4Lib::sno_replace(string, string, string)\n");
             N("    ldc.i4.1\n");
             N("    stloc.0\n");
@@ -363,8 +362,8 @@ static void net_emit_expr(EXPR_t *e) {
         }
         /* DUPL(str, n) — repeat string n times */
         if (strcasecmp(fn, "DUPL") == 0) {
-            net_emit_expr(e->nargs >= 1 ? e->args[0] : NULL);
-            net_emit_expr(e->nargs >= 2 ? e->args[1] : NULL);
+            net_emit_expr(e->nchildren >= 1 ? e->children[0] : NULL);
+            net_emit_expr(e->nchildren >= 2 ? e->children[1] : NULL);
             N("    call       string [snobol4lib]Snobol4Lib::sno_dupl(string, string)\n");
             N("    ldc.i4.1\n");
             N("    stloc.0\n");
@@ -372,7 +371,7 @@ static void net_emit_expr(EXPR_t *e) {
         }
         /* TRIM(str) — remove trailing whitespace */
         if (strcasecmp(fn, "TRIM") == 0) {
-            net_emit_expr(e->nargs >= 1 ? e->args[0] : NULL);
+            net_emit_expr(e->nchildren >= 1 ? e->children[0] : NULL);
             N("    call       string [snobol4lib]Snobol4Lib::sno_trim(string)\n");
             N("    ldc.i4.1\n");
             N("    stloc.0\n");
@@ -380,7 +379,7 @@ static void net_emit_expr(EXPR_t *e) {
         }
         /* REVERSE(str) — reverse a string */
         if (strcasecmp(fn, "REVERSE") == 0) {
-            net_emit_expr(e->nargs >= 1 ? e->args[0] : NULL);
+            net_emit_expr(e->nchildren >= 1 ? e->children[0] : NULL);
             N("    call       string [snobol4lib]Snobol4Lib::sno_reverse(string)\n");
             N("    ldc.i4.1\n");
             N("    stloc.0\n");
@@ -388,7 +387,7 @@ static void net_emit_expr(EXPR_t *e) {
         }
         /* UCASE(str) — uppercase */
         if (strcasecmp(fn, "UCASE") == 0) {
-            net_emit_expr(e->nargs >= 1 ? e->args[0] : NULL);
+            net_emit_expr(e->nchildren >= 1 ? e->children[0] : NULL);
             N("    callvirt   instance string [mscorlib]System.String::ToUpper()\n");
             N("    ldc.i4.1\n");
             N("    stloc.0\n");
@@ -396,7 +395,7 @@ static void net_emit_expr(EXPR_t *e) {
         }
         /* LCASE(str) — lowercase */
         if (strcasecmp(fn, "LCASE") == 0) {
-            net_emit_expr(e->nargs >= 1 ? e->args[0] : NULL);
+            net_emit_expr(e->nchildren >= 1 ? e->children[0] : NULL);
             N("    callvirt   instance string [mscorlib]System.String::ToLower()\n");
             N("    ldc.i4.1\n");
             N("    stloc.0\n");
@@ -404,9 +403,9 @@ static void net_emit_expr(EXPR_t *e) {
         }
         /* LPAD(str, n [, pad]) — left-pad to width n */
         if (strcasecmp(fn, "LPAD") == 0) {
-            net_emit_expr(e->nargs >= 1 ? e->args[0] : NULL);
-            net_emit_expr(e->nargs >= 2 ? e->args[1] : NULL);
-            if (e->nargs >= 3 && e->args[2]) net_emit_expr(e->args[2]);
+            net_emit_expr(e->nchildren >= 1 ? e->children[0] : NULL);
+            net_emit_expr(e->nchildren >= 2 ? e->children[1] : NULL);
+            if (e->nchildren >= 3 && e->children[2]) net_emit_expr(e->children[2]);
             else net_ldstr(" ");
             N("    call       string [snobol4lib]Snobol4Lib::sno_lpad(string, string, string)\n");
             N("    ldc.i4.1\n");
@@ -415,9 +414,9 @@ static void net_emit_expr(EXPR_t *e) {
         }
         /* RPAD(str, n [, pad]) — right-pad to width n */
         if (strcasecmp(fn, "RPAD") == 0) {
-            net_emit_expr(e->nargs >= 1 ? e->args[0] : NULL);
-            net_emit_expr(e->nargs >= 2 ? e->args[1] : NULL);
-            if (e->nargs >= 3 && e->args[2]) net_emit_expr(e->args[2]);
+            net_emit_expr(e->nchildren >= 1 ? e->children[0] : NULL);
+            net_emit_expr(e->nchildren >= 2 ? e->children[1] : NULL);
+            if (e->nchildren >= 3 && e->children[2]) net_emit_expr(e->children[2]);
             else net_ldstr(" ");
             N("    call       string [snobol4lib]Snobol4Lib::sno_rpad(string, string, string)\n");
             N("    ldc.i4.1\n");
@@ -426,17 +425,17 @@ static void net_emit_expr(EXPR_t *e) {
         }
         /* INTEGER(x) — succeeds if x is integer string */
         if (strcasecmp(fn, "INTEGER") == 0) {
-            net_emit_expr(e->nargs >= 1 ? e->args[0] : NULL);
+            net_emit_expr(e->nchildren >= 1 ? e->children[0] : NULL);
             N("    call       int32 [snobol4lib]Snobol4Lib::sno_is_integer(string)\n");
             N("    stloc.0\n");
             /* push arg back as result value */
-            net_emit_expr(e->nargs >= 1 ? e->args[0] : NULL);
+            net_emit_expr(e->nchildren >= 1 ? e->children[0] : NULL);
             break;
         }
         /* REMDR(a, b) — integer remainder */
         if (strcasecmp(fn, "REMDR") == 0) {
-            net_emit_expr(e->nargs >= 1 ? e->args[0] : NULL);
-            net_emit_expr(e->nargs >= 2 ? e->args[1] : NULL);
+            net_emit_expr(e->nchildren >= 1 ? e->children[0] : NULL);
+            net_emit_expr(e->nchildren >= 2 ? e->children[1] : NULL);
             N("    call       string [snobol4lib]Snobol4Lib::sno_remdr(string, string)\n");
             N("    ldc.i4.1\n");
             N("    stloc.0\n");
@@ -449,42 +448,37 @@ static void net_emit_expr(EXPR_t *e) {
     }
     case E_CONC:
         /* string concatenation: eval all arms, fold with String.Concat */
-        if (e->nargs > 0) {
-            net_emit_expr(e->args[0]);
-            for (int i = 1; i < e->nargs; i++) {
-                net_emit_expr(e->args[i]);
+        if (e->nchildren > 0) {
+            net_emit_expr(e->children[0]);
+            for (int i = 1; i < e->nchildren; i++) {
+                net_emit_expr(e->children[i]);
                 N("    call       string [mscorlib]System.String::Concat(string, string)\n");
             }
         } else {
             /* legacy binary fallback */
-            net_emit_expr(e->left);
-            net_emit_expr(e->right);
+            for (int _i = 0; _i < e->nchildren; _i++) net_emit_expr(e->children[_i]);
             N("    call       string [mscorlib]System.String::Concat(string, string)\n");
         }
         break;
     case E_ADD:
-        net_emit_expr(e->left);
-        net_emit_expr(e->right);
+        for (int _i = 0; _i < e->nchildren; _i++) net_emit_expr(e->children[_i]);
         N("    call       string [snobol4lib]Snobol4Lib::sno_add(string, string)\n");
         break;
     case E_SUB:
-        net_emit_expr(e->left);
-        net_emit_expr(e->right);
+        for (int _i = 0; _i < e->nchildren; _i++) net_emit_expr(e->children[_i]);
         N("    call       string [snobol4lib]Snobol4Lib::sno_sub(string, string)\n");
         break;
     case E_MPY:
-        net_emit_expr(e->left);
-        net_emit_expr(e->right);
+        for (int _i = 0; _i < e->nchildren; _i++) net_emit_expr(e->children[_i]);
         N("    call       string [snobol4lib]Snobol4Lib::sno_mpy(string, string)\n");
         break;
     case E_DIV:
-        net_emit_expr(e->left);
-        net_emit_expr(e->right);
+        for (int _i = 0; _i < e->nchildren; _i++) net_emit_expr(e->children[_i]);
         N("    call       string [snobol4lib]Snobol4Lib::sno_div(string, string)\n");
         break;
     case E_MNS:
         /* unary minus */
-        net_emit_expr(e->left ? e->left : e->right);
+        net_emit_expr(e->children[0] ? e->children[0] : e->children[1]);
         N("    call       string [snobol4lib]Snobol4Lib::sno_neg(string)\n");
         break;
     default:
@@ -596,9 +590,9 @@ static void net_emit_pat_node(EXPR_t *pat,
 
     case E_CONC: {
         /* Sequence: chain gamma/omega through each arm in order */
-        int nkids = (pat->nargs > 0) ? pat->nargs : 2;
+        int nkids = pat->nchildren;
         if (nkids == 1) {
-            EXPR_t *only = pat->nargs > 0 ? pat->args[0] : pat->left;
+            EXPR_t *only = pat->children[0];
             net_emit_pat_node(only, gamma, omega, loc_subj, loc_cursor, loc_len, p_next_int, p_next_str);
             break;
         }
@@ -610,8 +604,7 @@ static void net_emit_pat_node(EXPR_t *pat,
         }
         mids[nkids - 1] = NULL; /* unused sentinel */
         for (int i = 0; i < nkids; i++) {
-            EXPR_t *kid = (pat->nargs > 0) ? pat->args[i]
-                        : (i == 0 ? pat->left : pat->right);
+            EXPR_t *kid = pat->children[i];
             const char *kid_gamma = (i < nkids - 1) ? mids[i] : gamma;
             net_emit_pat_node(kid, kid_gamma, omega, loc_subj, loc_cursor, loc_len, p_next_int, p_next_str);
             if (i < nkids - 1) N("  %s:\n", mids[i]);
@@ -623,12 +616,11 @@ static void net_emit_pat_node(EXPR_t *pat,
 
     case E_OR: {
         /* Alternation: try each arm; restore cursor on failure, try next */
-        int nkids = (pat->nargs > 0) ? pat->nargs : 2;
+        int nkids = pat->nchildren;
         int loc_save = (*p_next_int)++;
         net_ldloc_i(loc_cursor); net_stloc_i(loc_save);
         for (int i = 0; i < nkids; i++) {
-            EXPR_t *kid = (pat->nargs > 0) ? pat->args[i]
-                        : (i == 0 ? pat->left : pat->right);
+            EXPR_t *kid = pat->children[i];
             char lbl_next[64];
             const char *kid_omega;
             if (i < nkids - 1) {
@@ -650,9 +642,9 @@ static void net_emit_pat_node(EXPR_t *pat,
         int loc_before = (*p_next_int)++;  /* int32: cursor before capture */
         char lbl_ok[64]; snprintf(lbl_ok, sizeof lbl_ok, "Nn%d_nam_ok", uid);
         net_ldloc_i(loc_cursor); net_stloc_i(loc_before);
-        net_emit_pat_node(pat->left, lbl_ok, omega, loc_subj, loc_cursor, loc_len, p_next_int, p_next_str);
+        net_emit_pat_node(pat->children[0], lbl_ok, omega, loc_subj, loc_cursor, loc_len, p_next_int, p_next_str);
         N("  %s:\n", lbl_ok);
-        const char *varname = (pat->right && pat->right->sval) ? pat->right->sval : "";
+        const char *varname = (pat->children[1] && pat->children[1]->sval) ? pat->children[1]->sval : "";
         net_ldloc_i(loc_subj); net_ldloc_i(loc_before);
         net_ldloc_i(loc_cursor); net_ldloc_i(loc_before); N("    sub\n");
         N("    callvirt   instance string [mscorlib]System.String::Substring(int32, int32)\n");
@@ -666,9 +658,9 @@ static void net_emit_pat_node(EXPR_t *pat,
         int loc_before = (*p_next_int)++;
         char lbl_ok[64]; snprintf(lbl_ok, sizeof lbl_ok, "Nn%d_dol_ok", uid);
         net_ldloc_i(loc_cursor); net_stloc_i(loc_before);
-        net_emit_pat_node(pat->left, lbl_ok, omega, loc_subj, loc_cursor, loc_len, p_next_int, p_next_str);
+        net_emit_pat_node(pat->children[0], lbl_ok, omega, loc_subj, loc_cursor, loc_len, p_next_int, p_next_str);
         N("  %s:\n", lbl_ok);
-        const char *varname = (pat->right && pat->right->sval) ? pat->right->sval : "";
+        const char *varname = (pat->children[1] && pat->children[1]->sval) ? pat->children[1]->sval : "";
         net_ldloc_i(loc_subj); net_ldloc_i(loc_before);
         net_ldloc_i(loc_cursor); net_ldloc_i(loc_before); N("    sub\n");
         N("    callvirt   instance string [mscorlib]System.String::Substring(int32, int32)\n");
@@ -680,7 +672,7 @@ static void net_emit_pat_node(EXPR_t *pat,
 
     case E_FNC: {
         const char *fname = pat->sval ? pat->sval : "";
-        EXPR_t *arg0 = (pat->args && pat->nargs >= 1) ? pat->args[0] : NULL;
+        EXPR_t *arg0 = (pat->children && pat->nchildren >= 1) ? pat->children[0] : NULL;
 
         if (strcasecmp(fname, "ARBNO") == 0) {
             int loc_save = (*p_next_int)++;

@@ -1138,7 +1138,7 @@ static void emit_asm_arb(const char *alpha, const char *beta,
  *               goto γ            (succeed; assignment done — no rollback)
  *   child_ω → dol_ω: goto ω      (no assignment performed)
  *
- * The capture variable name (pat->right->sval) is used to derive
+ * The capture variable name (pat->children[1]->sval) is used to derive
  * the .bss buffer names:  cap_<varname>_N_buf  (resb 256)
  *                          cap_<varname>_N_len  (resq 1)
  *                          dol_<N>_entry        (resq 1)
@@ -1231,17 +1231,55 @@ static void emit_asm_node(EXPR_t *pat,
                      cursor, subj, subj_len_sym);
         break;
 
-    case E_CONC:
-        emit_asm_seq(pat->left, pat->right,
-                     alpha, beta, gamma, omega,
-                     cursor, subj, subj_len_sym, depth);
+    case E_CONC: {
+        int _nc = pat->nchildren;
+        if (_nc == 0) break;
+        if (_nc == 1) { emit_asm_node(pat->children[0], alpha, beta, gamma, omega, cursor, subj, subj_len_sym, depth); break; }
+        if (_nc == 2) { emit_asm_seq(pat->children[0], pat->children[1], alpha, beta, gamma, omega, cursor, subj, subj_len_sym, depth); break; }
+        /* >2: right-fold into heap-allocated binary nodes */
+        EXPR_t **_nodes = malloc((size_t)(_nc - 1) * sizeof(EXPR_t *));
+        EXPR_t **_kids  = malloc((size_t)(_nc - 1) * 2 * sizeof(EXPR_t *));
+        EXPR_t *_right = pat->children[_nc - 1];
+        for (int _i = _nc - 2; _i >= 0; _i--) {
+            int _n = _nc - 2 - _i;
+            _nodes[_n] = calloc(1, sizeof(EXPR_t));
+            _nodes[_n]->kind = E_CONC;
+            _kids[_n*2+0] = pat->children[_i];
+            _kids[_n*2+1] = _right;
+            _nodes[_n]->children  = &_kids[_n*2];
+            _nodes[_n]->nchildren = 2;
+            _right = _nodes[_n];
+        }
+        emit_asm_node(_right, alpha, beta, gamma, omega, cursor, subj, subj_len_sym, depth);
+        for (int _i = 0; _i < _nc - 1; _i++) free(_nodes[_i]);
+        free(_nodes); free(_kids);
         break;
+    }
 
-    case E_OR:
-        emit_asm_alt(pat->left, pat->right,
-                     alpha, beta, gamma, omega,
-                     cursor, subj, subj_len_sym, depth);
+    case E_OR: {
+        int _nc = pat->nchildren;
+        if (_nc == 0) break;
+        if (_nc == 1) { emit_asm_node(pat->children[0], alpha, beta, gamma, omega, cursor, subj, subj_len_sym, depth); break; }
+        if (_nc == 2) { emit_asm_alt(pat->children[0], pat->children[1], alpha, beta, gamma, omega, cursor, subj, subj_len_sym, depth); break; }
+        /* >2: right-fold into heap-allocated binary nodes */
+        EXPR_t **_nodes = malloc((size_t)(_nc - 1) * sizeof(EXPR_t *));
+        EXPR_t **_kids  = malloc((size_t)(_nc - 1) * 2 * sizeof(EXPR_t *));
+        EXPR_t *_right = pat->children[_nc - 1];
+        for (int _i = _nc - 2; _i >= 0; _i--) {
+            int _n = _nc - 2 - _i;
+            _nodes[_n] = calloc(1, sizeof(EXPR_t));
+            _nodes[_n]->kind = E_OR;
+            _kids[_n*2+0] = pat->children[_i];
+            _kids[_n*2+1] = _right;
+            _nodes[_n]->children  = &_kids[_n*2];
+            _nodes[_n]->nchildren = 2;
+            _right = _nodes[_n];
+        }
+        emit_asm_node(_right, alpha, beta, gamma, omega, cursor, subj, subj_len_sym, depth);
+        for (int _i = 0; _i < _nc - 1; _i++) free(_nodes[_i]);
+        free(_nodes); free(_kids);
         break;
+    }
 
     case E_VART: {
         /* Variable reference in pattern context — named pattern call site.
@@ -1294,9 +1332,9 @@ static void emit_asm_node(EXPR_t *pat,
     case E_DOL: {
         /* expr $ var — immediate assignment.
          * left = sub-pattern, right = capture variable (E_VART). */
-        const char *varname = (pat->right && pat->right->sval)
-                              ? pat->right->sval : "cap";
-        emit_asm_assign(pat->left, varname,
+        const char *varname = (pat->children[1] && pat->children[1]->sval)
+                              ? pat->children[1]->sval : "cap";
+        emit_asm_assign(pat->children[0], varname,
                         alpha, beta, gamma, omega,
                         cursor, subj, subj_len_sym, depth);
         break;
@@ -1304,9 +1342,9 @@ static void emit_asm_node(EXPR_t *pat,
 
     case E_NAM: {
         /* expr . var — conditional assignment. */
-        const char *varname = (pat->right && pat->right->sval)
-                              ? pat->right->sval : "cap";
-        emit_asm_assign(pat->left, varname,
+        const char *varname = (pat->children[1] && pat->children[1]->sval)
+                              ? pat->children[1]->sval : "cap";
+        emit_asm_assign(pat->children[0], varname,
                         alpha, beta, gamma, omega,
                         cursor, subj, subj_len_sym, depth);
         break;
@@ -1314,12 +1352,12 @@ static void emit_asm_node(EXPR_t *pat,
 
     case E_INDR: {
         /* *VAR — indirect pattern reference.
-         * pat->left is E_VART holding the variable name.
+         * pat->children[0] is E_VART holding the variable name.
          * Look it up in the named-pattern registry and call it.
          * If not a named pattern, try asm_str_vars for plain-string vars
          * (e.g. PAT = 'hello' → *PAT emitted as inline LIT). */
-        const char *varname = (pat->left && pat->left->sval)
-                              ? pat->left->sval
+        const char *varname = (pat->children[0] && pat->children[0]->sval)
+                              ? pat->children[0]->sval
                               : (pat->sval ? pat->sval : NULL);
         if (varname) {
             const AsmNamedPat *np = asm_named_lookup(varname);
@@ -1346,8 +1384,8 @@ static void emit_asm_node(EXPR_t *pat,
     }
 
     case E_FNC:
-        if (pat->sval && strcasecmp(pat->sval, "POS") == 0 && pat->nargs == 1) {
-            EXPR_t *arg = pat->args[0];
+        if (pat->sval && strcasecmp(pat->sval, "POS") == 0 && pat->nchildren == 1) {
+            EXPR_t *arg = pat->children[0];
             if (arg->kind == E_VART && arg->sval) {
                 const char *varlab = prog_str_intern(arg->sval);
                 emit_asm_pos_var(varlab, alpha, beta, gamma, omega, cursor);
@@ -1355,8 +1393,8 @@ static void emit_asm_node(EXPR_t *pat,
                 long n = (arg->kind == E_ILIT) ? arg->ival : 0;
                 emit_asm_pos(n, alpha, beta, gamma, omega, cursor);
             }
-        } else if (pat->sval && strcasecmp(pat->sval, "RPOS") == 0 && pat->nargs == 1) {
-            EXPR_t *arg = pat->args[0];
+        } else if (pat->sval && strcasecmp(pat->sval, "RPOS") == 0 && pat->nchildren == 1) {
+            EXPR_t *arg = pat->children[0];
             if (arg->kind == E_VART && arg->sval) {
                 const char *varlab = prog_str_intern(arg->sval);
                 emit_asm_rpos_var(varlab, alpha, beta, gamma, omega, cursor, subj_len_sym);
@@ -1364,12 +1402,12 @@ static void emit_asm_node(EXPR_t *pat,
                 long n = (arg->kind == E_ILIT) ? arg->ival : 0;
                 emit_asm_rpos(n, alpha, beta, gamma, omega, cursor, subj_len_sym);
             }
-        } else if (pat->sval && strcasecmp(pat->sval, "ARBNO") == 0 && pat->nargs == 1) {
-            emit_asm_arbno(pat->args[0],
+        } else if (pat->sval && strcasecmp(pat->sval, "ARBNO") == 0 && pat->nchildren == 1) {
+            emit_asm_arbno(pat->children[0],
                            alpha, beta, gamma, omega,
                            cursor, subj, subj_len_sym, depth);
-        } else if (pat->sval && strcasecmp(pat->sval, "ANY") == 0 && pat->nargs == 1) {
-            EXPR_t *arg = pat->args[0];
+        } else if (pat->sval && strcasecmp(pat->sval, "ANY") == 0 && pat->nchildren == 1) {
+            EXPR_t *arg = pat->children[0];
             if (arg->kind == E_VART && arg->sval) {
                 emit_asm_any_var(prog_str_intern(arg->sval), alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
             } else {
@@ -1377,8 +1415,8 @@ static void emit_asm_node(EXPR_t *pat,
                 int cslen = (arg->kind == E_QLIT && arg->sval) ? (int)strlen(arg->sval) : 0;
                 emit_asm_any(cs, cslen, alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
             }
-        } else if (pat->sval && strcasecmp(pat->sval, "NOTANY") == 0 && pat->nargs == 1) {
-            EXPR_t *arg = pat->args[0];
+        } else if (pat->sval && strcasecmp(pat->sval, "NOTANY") == 0 && pat->nchildren == 1) {
+            EXPR_t *arg = pat->children[0];
             if (arg->kind == E_VART && arg->sval) {
                 emit_asm_notany_var(prog_str_intern(arg->sval), alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
             } else {
@@ -1386,8 +1424,8 @@ static void emit_asm_node(EXPR_t *pat,
                 int cslen = (arg->kind == E_QLIT && arg->sval) ? (int)strlen(arg->sval) : 0;
                 emit_asm_notany(cs, cslen, alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
             }
-        } else if (pat->sval && strcasecmp(pat->sval, "SPAN") == 0 && pat->nargs == 1) {
-            EXPR_t *arg = pat->args[0];
+        } else if (pat->sval && strcasecmp(pat->sval, "SPAN") == 0 && pat->nchildren == 1) {
+            EXPR_t *arg = pat->children[0];
             if (arg->kind == E_VART && arg->sval) {
                 emit_asm_span_var(prog_str_intern(arg->sval), alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
             } else {
@@ -1395,8 +1433,8 @@ static void emit_asm_node(EXPR_t *pat,
                 int cslen = (arg->kind == E_QLIT && arg->sval) ? (int)strlen(arg->sval) : 0;
                 emit_asm_span(cs, cslen, alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
             }
-        } else if (pat->sval && strcasecmp(pat->sval, "BREAK") == 0 && pat->nargs == 1) {
-            EXPR_t *arg = pat->args[0];
+        } else if (pat->sval && strcasecmp(pat->sval, "BREAK") == 0 && pat->nchildren == 1) {
+            EXPR_t *arg = pat->children[0];
             if (arg->kind == E_VART && arg->sval) {
                 emit_asm_break_var(prog_str_intern(arg->sval), alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
             } else {
@@ -1404,8 +1442,8 @@ static void emit_asm_node(EXPR_t *pat,
                 int cslen = (arg->kind == E_QLIT && arg->sval) ? (int)strlen(arg->sval) : 0;
                 emit_asm_break(cs, cslen, alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
             }
-        } else if (pat->sval && strcasecmp(pat->sval, "BREAKX") == 0 && pat->nargs == 1) {
-            EXPR_t *arg = pat->args[0];
+        } else if (pat->sval && strcasecmp(pat->sval, "BREAKX") == 0 && pat->nchildren == 1) {
+            EXPR_t *arg = pat->children[0];
             if (arg->kind == E_VART && arg->sval) {
                 emit_asm_breakx_var(prog_str_intern(arg->sval), alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
             } else {
@@ -1413,21 +1451,21 @@ static void emit_asm_node(EXPR_t *pat,
                 int cslen = (arg->kind == E_QLIT && arg->sval) ? (int)strlen(arg->sval) : 0;
                 emit_asm_breakx_lit(cs, cslen, alpha, beta, gamma, omega, cursor, subj, subj_len_sym);
             }
-        } else if (pat->sval && strcasecmp(pat->sval, "LEN") == 0 && pat->nargs == 1) {
-            EXPR_t *arg = pat->args[0];
+        } else if (pat->sval && strcasecmp(pat->sval, "LEN") == 0 && pat->nchildren == 1) {
+            EXPR_t *arg = pat->children[0];
             long n = (arg->kind == E_ILIT) ? arg->ival : 0;
             emit_asm_len(n, alpha, beta, gamma, omega, cursor, subj_len_sym);
-        } else if (pat->sval && strcasecmp(pat->sval, "TAB") == 0 && pat->nargs == 1) {
-            EXPR_t *arg = pat->args[0];
+        } else if (pat->sval && strcasecmp(pat->sval, "TAB") == 0 && pat->nchildren == 1) {
+            EXPR_t *arg = pat->children[0];
             long n = (arg->kind == E_ILIT) ? arg->ival : 0;
             emit_asm_tab(n, alpha, beta, gamma, omega, cursor);
-        } else if (pat->sval && strcasecmp(pat->sval, "RTAB") == 0 && pat->nargs == 1) {
-            EXPR_t *arg = pat->args[0];
+        } else if (pat->sval && strcasecmp(pat->sval, "RTAB") == 0 && pat->nchildren == 1) {
+            EXPR_t *arg = pat->children[0];
             long n = (arg->kind == E_ILIT) ? arg->ival : 0;
             emit_asm_rtab(n, alpha, beta, gamma, omega, cursor, subj_len_sym);
-        } else if (pat->sval && strcasecmp(pat->sval, "REM") == 0 && pat->nargs == 0) {
+        } else if (pat->sval && strcasecmp(pat->sval, "REM") == 0 && pat->nchildren == 0) {
             emit_asm_rem(alpha, beta, gamma, omega, cursor, subj_len_sym);
-        } else if (pat->sval && strcasecmp(pat->sval, "ARB") == 0 && pat->nargs == 0) {
+        } else if (pat->sval && strcasecmp(pat->sval, "ARB") == 0 && pat->nchildren == 0) {
             emit_asm_arb(alpha, beta, gamma, omega, cursor, subj_len_sym);
         } else if (pat->sval && strcasecmp(pat->sval, "FAIL") == 0) {
             /* FAIL always fails — alpha and beta both jump to omega */
@@ -1445,7 +1483,7 @@ static void emit_asm_node(EXPR_t *pat,
     case E_ATP: {
         /* @VAR — cursor-position capture: store cursor as integer into VAR, always succeed.
          * Parser builds @VAR as unop(E_ATP, E_VART("VAR")), so varname is in left->sval. */
-        const char *varname = (pat->left && pat->left->sval) ? pat->left->sval
+        const char *varname = (pat->children[0] && pat->children[0]->sval) ? pat->children[0]->sval
                             : (pat->sval ? pat->sval : "");
         const char *varlab  = prog_str_intern(varname);
         ALFC(alpha, "@VAR α", "AT_ALPHA        %s, %s, %s, %s\n",
@@ -1497,7 +1535,7 @@ static void asm_prescan_ucall_expr(EXPR_t *e) {
         const AsmNamedPat *ufn = asm_named_lookup_fn(e->sval);
         if (ufn) {
             int uid = ucall_uid();
-            int na = e->nargs;
+            int na = e->nchildren;
             int actual_args = (na < ufn->nparams) ? na : ufn->nparams;
             for (int ai = 0; ai < actual_args; ai++) {
                 char sv_t[LBUF], sv_p[LBUF];
@@ -1510,15 +1548,14 @@ static void asm_prescan_ucall_expr(EXPR_t *e) {
             snprintf(rsv_o, LBUF, "ucall%d_rsv_o", uid);
             ucall_bss_add(rsv_g); ucall_bss_add(rsv_o);
             /* recurse into args */
-            for (int i = 0; i < e->nargs; i++)
-                asm_prescan_ucall_expr(e->args[i]);
+            for (int i = 0; i < e->nchildren; i++)
+                asm_prescan_ucall_expr(e->children[i]);
             return;
         }
     }
-    asm_prescan_ucall_expr(e->left);
-    asm_prescan_ucall_expr(e->right);
-    for (int i = 0; i < e->nargs; i++)
-        asm_prescan_ucall_expr(e->args[i]);
+
+    for (int i = 0; i < e->nchildren; i++)
+        asm_prescan_ucall_expr(e->children[i]);
 }
 
 static void asm_prescan_ucall(Program *prog) {
@@ -1924,10 +1961,8 @@ static int expr_has_pattern_fn(EXPR_t *e) {
     if (e->kind == E_FNC) return 1;
     /* E_NAM (. capture) and E_DOL ($ capture) wrap a pattern child */
     if (e->kind == E_NAM || e->kind == E_DOL) return 1;
-    if (expr_has_pattern_fn(e->left))  return 1;
-    if (expr_has_pattern_fn(e->right)) return 1;
-    for (int i = 0; i < e->nargs; i++)
-        if (expr_has_pattern_fn(e->args[i])) return 1;
+    for (int i = 0; i < e->nchildren; i++)
+        if (expr_has_pattern_fn(e->children[i])) return 1;
     return 0;
 }
 static int expr_is_pattern_expr(EXPR_t *e) {
@@ -2020,10 +2055,10 @@ static void asm_scan_named_patterns(Program *prog) {
          * Register as user function (is_fn=1). */
         if (s->subject && s->subject->kind == E_FNC &&
             s->subject->sval && strcasecmp(s->subject->sval, "DEFINE") == 0 &&
-            s->subject->nargs >= 1 &&
-            s->subject->args[0] && s->subject->args[0]->kind == E_QLIT &&
-            s->subject->args[0]->sval) {
-            const char *def_str = s->subject->args[0]->sval;
+            s->subject->nchildren >= 1 &&
+            s->subject->children[0] && s->subject->children[0]->kind == E_QLIT &&
+            s->subject->children[0]->sval) {
+            const char *def_str = s->subject->children[0]->sval;
             char fname[128];
             char params[ASM_NAMED_MAXPARAMS][64];
             int nparams = 0;
@@ -2043,8 +2078,8 @@ static void asm_scan_named_patterns(Program *prog) {
                     snprintf(e->body_label, sizeof e->body_label, "%s", fname);
                     /* Two-arg DEFINE('fname(args)', .entryLabel):
                      * args[1] is the explicit entry label (E_VART with leading '.' or plain name) */
-                    if (s->subject->nargs >= 2 && s->subject->args[1]) {
-                        EXPR_t *a1 = s->subject->args[1];
+                    if (s->subject->nchildren >= 2 && s->subject->children[1]) {
+                        EXPR_t *a1 = s->subject->children[1];
                         const char *entry = NULL;
                         if (a1->kind == E_VART && a1->sval) entry = a1->sval;
                         else if (a1->kind == E_QLIT && a1->sval) entry = a1->sval;
@@ -2221,14 +2256,13 @@ static void asm_emit_pattern(STMT_t *stmt) {
 static void asm_scan_expr_for_caps(EXPR_t *e) {
     if (!e) return;
     if (e->kind == E_DOL || e->kind == E_NAM) {
-        const char *vn = (e->right && e->right->sval) ? e->right->sval : "cap";
+        const char *vn = (e->children[1] && e->children[1]->sval) ? e->children[1]->sval : "cap";
         cap_var_register(vn);
     }
     /* recurse into all children */
-    asm_scan_expr_for_caps(e->left);
-    asm_scan_expr_for_caps(e->right);
-    for (int i = 0; i < e->nargs; i++)
-        asm_scan_expr_for_caps(e->args[i]);
+
+    for (int i = 0; i < e->nchildren; i++)
+        asm_scan_expr_for_caps(e->children[i]);
 }
 
 static void asm_scan_capture_vars(STMT_t *stmt) {
@@ -2538,7 +2572,7 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
     }
     case E_FNC: {
         if (!e->sval) goto fallback;
-        int na = e->nargs;
+        int na = e->nchildren;
         if (na > 8) na = 8;
         const char *fnlab = prog_str_intern(e->sval);
 
@@ -2599,11 +2633,11 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
             A("    push    qword [%s]\n", ufn->ret_gamma);
 
             /* Step 3: evaluate args and store into fn_arg slots */
-            for (int ai = 0; ai < actual_args && e->args[ai]; ai++) {
+            for (int ai = 0; ai < actual_args && e->children[ai]; ai++) {
                 char arg_slot_t[LBUF2+16], arg_slot_p[LBUF2+16];
                 snprintf(arg_slot_t, sizeof arg_slot_t, "fn_%s_arg_%d_t", ufn->safe, ai);
                 snprintf(arg_slot_p, sizeof arg_slot_p, "fn_%s_arg_%d_p", ufn->safe, ai);
-                prog_emit_expr(e->args[ai], -32);
+                prog_emit_expr(e->children[ai], -32);
                 A("    mov     rax, [rbp-32]\n");
                 A("    mov     rcx, [rbp-24]\n");
                 A("    mov     [%s], rax\n", arg_slot_t);
@@ -2698,8 +2732,8 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
             return 1;
         }
         /* Fast path: 1-arg call with simple literal arg → CALL1_INT / CALL1_STR */
-        if (na == 1 && e->args[0] && rbp_off == -32) {
-            EXPR_t *arg0 = e->args[0];
+        if (na == 1 && e->children[0] && rbp_off == -32) {
+            EXPR_t *arg0 = e->children[0];
             if (arg0->kind == E_ILIT) {
                 A("    CALL1_INT   %s, %ld\n", fnlab, (long)arg0->ival);
                 return 1;
@@ -2716,10 +2750,10 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
             }
         }
         /* Fast path: 2-arg call with atom args → CONC2_* macros (work for any fn) */
-        if (na == 2 && e->args[0] &&
+        if (na == 2 && e->children[0] &&
             (rbp_off == -32 || rbp_off == -16)) {
-            EXPR_t *a0 = e->args[0];
-            EXPR_t *a1 = e->args[1];  /* may be NULL → treated as E_NULV */
+            EXPR_t *a0 = e->children[0];
+            EXPR_t *a1 = e->children[1];  /* may be NULL → treated as E_NULV */
             int a0s = (a0->kind == E_QLIT);
             int a0v = (a0->kind == E_VART);
             int a1s = (a1 && a1->kind == E_QLIT);
@@ -2837,8 +2871,8 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
         } else {
             int arr_bytes = na * 16;
             A("    sub     rsp, %d\n", arr_bytes);
-            for (int ai = 0; ai < na && e->args[ai]; ai++) {
-                prog_emit_expr(e->args[ai], -(rbp_off < 0 ? -rbp_off : 32) - 0);
+            for (int ai = 0; ai < na && e->children[ai]; ai++) {
+                prog_emit_expr(e->children[ai], -(rbp_off < 0 ? -rbp_off : 32) - 0);
                 A("    STORE_ARG32 %d\n", ai * 16);
             }
             A("    APPLY_FN_N  %s, %d\n", fnlab, na);
@@ -2861,10 +2895,10 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
          *   arg0 (arr): rdi=type, rsi=ptr
          *   arg1 (key): rdx=type, rcx=ptr
          * Returns DESCR_t in rax:rdx. */
-        if (!e->left || e->nargs < 1 || !e->args[0]) goto fallback;
+        if (!e->children[0] || e->nchildren < 1 || !e->children[0]) goto fallback;
         /* Evaluate arr → [rbp-16/8], key → [rbp-32/24] */
-        prog_emit_expr(e->left,    -16);
-        prog_emit_expr(e->args[0], -32);
+        prog_emit_expr(e->children[0],    -16);
+        prog_emit_expr(e->children[0], -32);
         A("    mov     rdi, [rbp-16]\n");
         A("    mov     rsi, [rbp-8]\n");
         A("    mov     rdx, [rbp-32]\n");
@@ -2882,6 +2916,24 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
 
     case E_OR:
     case E_CONC: {
+        /* n-ary: if >2 children, right-fold into heap-allocated binary nodes */
+        if (e->nchildren > 2) {
+            int _nc = e->nchildren;
+            EXPR_t **_nodes = malloc((size_t)(_nc-1)*sizeof(EXPR_t*));
+            EXPR_t **_kids  = malloc((size_t)(_nc-1)*2*sizeof(EXPR_t*));
+            EXPR_t *_r = e->children[_nc-1];
+            for (int _i=_nc-2;_i>=0;_i--) {
+                int _n=_nc-2-_i;
+                _nodes[_n]=calloc(1,sizeof(EXPR_t)); _nodes[_n]->kind=e->kind;
+                _kids[_n*2]=e->children[_i]; _kids[_n*2+1]=_r;
+                _nodes[_n]->children=&_kids[_n*2]; _nodes[_n]->nchildren=2;
+                _r=_nodes[_n];
+            }
+            int _ret = prog_emit_expr(_r, rbp_off);
+            for (int _i=0;_i<_nc-1;_i++) free(_nodes[_i]);
+            free(_nodes); free(_kids);
+            return _ret;
+        }
         /* E_CONC = string CAT  (value context): call stmt_concat directly.
          * E_OR   = pattern SEQ (alternation):   call stmt_apply("ALT").
          *
@@ -2889,55 +2941,55 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
          * E_CONC in prog_emit_expr is always value-context — pattern-context
          * E_CONC is handled by emit_asm_node, not here. */
 
-        int left_is_str  = e->left  && e->left->kind  == E_QLIT;
-        int left_is_var  = e->left  && e->left->kind  == E_VART;
-        int right_is_nul = !e->right ||
-                            e->right->kind == E_NULV ||
-                           (e->right->kind == E_ILIT && e->right->ival == 0);
-        int right_is_str = e->right && e->right->kind == E_QLIT;
-        int right_is_var = e->right && e->right->kind == E_VART;
+        int left_is_str  = e->children[0]  && e->children[0]->kind  == E_QLIT;
+        int left_is_var  = e->children[0]  && e->children[0]->kind  == E_VART;
+        int right_is_nul = !e->children[1] ||
+                            e->children[1]->kind == E_NULV ||
+                           (e->children[1]->kind == E_ILIT && e->children[1]->ival == 0);
+        int right_is_str = e->children[1] && e->children[1]->kind == E_QLIT;
+        int right_is_var = e->children[1] && e->children[1]->kind == E_VART;
 
         if (e->kind == E_CONC) {
             /* CAT fast paths — CAT2_* macros call stmt_concat(a,b) */
             if (rbp_off == -32) {
                 if (left_is_str && right_is_str) {
                     A("    CAT2_SS  %s, %s\n",
-                      prog_str_intern(e->left->sval),
-                      prog_str_intern(e->right->sval));
+                      prog_str_intern(e->children[0]->sval),
+                      prog_str_intern(e->children[1]->sval));
                     return 1;
                 }
                 if (left_is_str && right_is_nul) {
-                    A("    CAT2_SN  %s\n", prog_str_intern(e->left->sval));
+                    A("    CAT2_SN  %s\n", prog_str_intern(e->children[0]->sval));
                     return 1;
                 }
                 if (left_is_str && right_is_var) {
                     A("    CAT2_SV  %s, %s\n",
-                      prog_str_intern(e->left->sval),
-                      prog_str_intern(e->right->sval));
+                      prog_str_intern(e->children[0]->sval),
+                      prog_str_intern(e->children[1]->sval));
                     return 1;
                 }
                 if (left_is_var && right_is_str) {
                     A("    CAT2_VS  %s, %s\n",
-                      prog_str_intern(e->left->sval),
-                      prog_str_intern(e->right->sval));
+                      prog_str_intern(e->children[0]->sval),
+                      prog_str_intern(e->children[1]->sval));
                     return 1;
                 }
                 if (left_is_var && right_is_nul) {
-                    A("    CAT2_VN  %s\n", prog_str_intern(e->left->sval));
+                    A("    CAT2_VN  %s\n", prog_str_intern(e->children[0]->sval));
                     return 1;
                 }
                 if (left_is_var && right_is_var) {
                     A("    CAT2_VV  %s, %s\n",
-                      prog_str_intern(e->left->sval),
-                      prog_str_intern(e->right->sval));
+                      prog_str_intern(e->children[0]->sval),
+                      prog_str_intern(e->children[1]->sval));
                     return 1;
                 }
             }
             /* CAT generic fallback: evaluate both, call stmt_concat */
-            prog_emit_expr(e->left, -32);
+            prog_emit_expr(e->children[0], -32);
             A("    mov     [conc_tmp0_rax], rax\n");
             A("    mov     [conc_tmp0_rdx], rdx\n");
-            prog_emit_expr(e->right, -32);
+            prog_emit_expr(e->children[1], -32);
             A("    mov     rcx, rdx\n");
             A("    mov     rdx, rax\n");
             A("    mov     rdi, [conc_tmp0_rax]\n");
@@ -2965,79 +3017,79 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
         const char *fnlab  = prog_str_intern(opname);
 
         if (left_is_str && right_is_nul && rbp_off == -32) {
-            const char *slab = prog_str_intern(e->left->sval);
+            const char *slab = prog_str_intern(e->children[0]->sval);
             A("    %s%s, %s\n", mac_sn, fnlab, slab);
             return 1;
         }
         if (left_is_str && right_is_str && rbp_off == -32) {
-            const char *s1 = prog_str_intern(e->left->sval);
-            const char *s2 = prog_str_intern(e->right->sval);
+            const char *s1 = prog_str_intern(e->children[0]->sval);
+            const char *s2 = prog_str_intern(e->children[1]->sval);
             A("    %s%s, %s, %s\n", mac_ss, fnlab, s1, s2);
             return 1;
         }
         if (left_is_str && right_is_var && rbp_off == -32) {
-            const char *slab = prog_str_intern(e->left->sval);
-            const char *vlab = prog_str_intern(e->right->sval);
+            const char *slab = prog_str_intern(e->children[0]->sval);
+            const char *vlab = prog_str_intern(e->children[1]->sval);
             A("    %s %s, %s, %s\n", mac_sv, fnlab, slab, vlab);
             return 1;
         }
         if (left_is_var && right_is_str && rbp_off == -32) {
-            const char *vlab = prog_str_intern(e->left->sval);
-            const char *slab = prog_str_intern(e->right->sval);
+            const char *vlab = prog_str_intern(e->children[0]->sval);
+            const char *slab = prog_str_intern(e->children[1]->sval);
             A("    %s %s, %s, %s\n", mac_vs, fnlab, vlab, slab);
             return 1;
         }
         if (left_is_var && right_is_nul && rbp_off == -32) {
-            const char *vlab = prog_str_intern(e->left->sval);
+            const char *vlab = prog_str_intern(e->children[0]->sval);
             A("    %s %s, %s\n", mac_vn, fnlab, vlab);
             return 1;
         }
         if (left_is_var && right_is_var && rbp_off == -32) {
-            const char *v1 = prog_str_intern(e->left->sval);
-            const char *v2 = prog_str_intern(e->right->sval);
+            const char *v1 = prog_str_intern(e->children[0]->sval);
+            const char *v2 = prog_str_intern(e->children[1]->sval);
             A("    %s %s, %s, %s\n", mac_vv, fnlab, v1, v2);
             return 1;
         }
         if (left_is_str && right_is_nul && rbp_off == -16) {
-            const char *slab = prog_str_intern(e->left->sval);
+            const char *slab = prog_str_intern(e->children[0]->sval);
             A("    %s%s, %s\n", mac_sn16, fnlab, slab);
             return 1;
         }
         if (left_is_str && right_is_str && rbp_off == -16) {
-            const char *s1 = prog_str_intern(e->left->sval);
-            const char *s2 = prog_str_intern(e->right->sval);
+            const char *s1 = prog_str_intern(e->children[0]->sval);
+            const char *s2 = prog_str_intern(e->children[1]->sval);
             A("    %s%s, %s, %s\n", mac_ss16, fnlab, s1, s2);
             return 1;
         }
         if (left_is_str && right_is_var && rbp_off == -16) {
-            const char *slab = prog_str_intern(e->left->sval);
-            const char *vlab = prog_str_intern(e->right->sval);
+            const char *slab = prog_str_intern(e->children[0]->sval);
+            const char *vlab = prog_str_intern(e->children[1]->sval);
             A("    %s %s, %s, %s\n", mac_sv16, fnlab, slab, vlab);
             return 1;
         }
         if (left_is_var && right_is_str && rbp_off == -16) {
-            const char *vlab = prog_str_intern(e->left->sval);
-            const char *slab = prog_str_intern(e->right->sval);
+            const char *vlab = prog_str_intern(e->children[0]->sval);
+            const char *slab = prog_str_intern(e->children[1]->sval);
             A("    %s %s, %s, %s\n", mac_vs16, fnlab, vlab, slab);
             return 1;
         }
         if (left_is_var && right_is_nul && rbp_off == -16) {
-            const char *vlab = prog_str_intern(e->left->sval);
+            const char *vlab = prog_str_intern(e->children[0]->sval);
             A("    %s %s, %s\n", mac_vn16, fnlab, vlab);
             return 1;
         }
         if (left_is_var && right_is_var && rbp_off == -16) {
-            const char *v1 = prog_str_intern(e->left->sval);
-            const char *v2 = prog_str_intern(e->right->sval);
+            const char *v1 = prog_str_intern(e->children[0]->sval);
+            const char *v2 = prog_str_intern(e->children[1]->sval);
             A("    %s %s, %s, %s\n", mac_vv16, fnlab, v1, v2);
             return 1;
         }
 
         /* Generic ALT fallback */
         A("    sub     rsp, 32\n");
-        prog_emit_expr(e->left,  rbp_off);
+        prog_emit_expr(e->children[0],  rbp_off);
         A("    STORE_ARG32 0\n");
-        prog_emit_expr(e->right, rbp_off);
+        prog_emit_expr(e->children[1], rbp_off);
         A("    STORE_ARG32 16\n");
         A("    APPLY_FN_N  %s, 2\n", fnlab);
         A("    add     rsp, 32\n");
@@ -3057,7 +3109,7 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
                          (e->kind == E_DIV)   ? "DIVIDE_fn" :
                                                 "POWER_fn";
         const char *fnlab = prog_str_intern(fn);
-        EXPR_t *l = e->left, *r = e->right;
+        EXPR_t *l = e->children[0], *r = e->children[1];
         int ls = (l && l->kind == E_QLIT);
         int lv = (l && l->kind == E_VART);
         int li = (l && l->kind == E_ILIT);
@@ -3121,7 +3173,7 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
     /* ---- unary minus ---- */
     case E_MNS: {
         const char *fnlab = prog_str_intern("neg");
-        EXPR_t *operand = e->left;   /* unop() puts operand in left */
+        EXPR_t *operand = e->children[0];   /* unop() puts operand in left */
         if (!operand) goto fallback;
         if (rbp_off == -32) {
             if (operand->kind == E_ILIT) {
@@ -3308,7 +3360,7 @@ static void asm_emit_program(Program *prog) {
 
     /* Pass 1: collect all labels + string literals (recursive expr walk) */
     /* Recursive helper: intern all string/var names reachable from an expr */
-    #define WALK_EXPR(root) do {         EXPR_t *_stk[256]; int _top = 0;         if (root) _stk[_top++] = (root);         while (_top > 0) {             EXPR_t *_e = _stk[--_top];             if (!_e) continue;             if (_e->kind == E_QLIT && _e->sval) prog_str_intern(_e->sval);             if (_e->kind == E_VART && _e->sval) prog_str_intern(_e->sval);             if (_e->kind == E_KW   && _e->sval) prog_str_intern(_e->sval);             if (_e->kind == E_FNC  && _e->sval) prog_str_intern(_e->sval);             if (_e->left  && _top < 255) _stk[_top++] = _e->left;             if (_e->right && _top < 255) _stk[_top++] = _e->right;             for (int _i = 0; _i < _e->nargs && _top < 254; _i++)                 if (_e->args[_i]) _stk[_top++] = _e->args[_i];         }     } while(0)
+    #define WALK_EXPR(root) do {         EXPR_t *_stk[256]; int _top = 0;         if (root) _stk[_top++] = (root);         while (_top > 0) {             EXPR_t *_e = _stk[--_top];             if (!_e) continue;             if (_e->kind == E_QLIT && _e->sval) prog_str_intern(_e->sval);             if (_e->kind == E_VART && _e->sval) prog_str_intern(_e->sval);             if (_e->kind == E_KW   && _e->sval) prog_str_intern(_e->sval);             if (_e->kind == E_FNC  && _e->sval) prog_str_intern(_e->sval);             for (int _i = 0; _i < _e->nchildren && _top < 254; _i++)                 if (_e->children[_i]) _stk[_top++] = _e->children[_i];         }     } while(0)
 
     for (STMT_t *s = prog->head; s; s = s->next) {
         if (s->label) { prog_label_register(s->label); prog_str_intern(s->label); }
@@ -3566,7 +3618,7 @@ static void asm_emit_program(Program *prog) {
                 !(s->has_eq && (s->subject->kind == E_INDR || s->subject->kind == E_DOL)) &&
                 !(s->has_eq && (s->subject->kind == E_VART || s->subject->kind == E_KW)) &&
                 !(s->has_eq && s->subject->kind == E_IDX) &&
-                !(s->has_eq && s->subject->kind == E_FNC && s->subject->nargs == 1)) {
+                !(s->has_eq && s->subject->kind == E_FNC && s->subject->nchildren == 1)) {
                 int may_fail = prog_emit_expr(s->subject, -32);
                 /* If subject may fail AND there are S/F targets, dispatch.
                  * id_s/id_f == -1 for special targets (RETURN/FRETURN/END) —
@@ -3646,13 +3698,13 @@ static void asm_emit_program(Program *prog) {
                  * E_DOL (left=operand) is the binary capture op; support both. */
                 const char *fail_target = id_f >= 0 ? sfail_lbl : next_lbl;
                 /* Eval the name expression → [rbp-16/8] */
-                /* SNOBOL4 parser puts operand in ->right for E_INDR.
-                 * Snocone sc_lower puts it in ->left.  Accept either. */
+                /* SNOBOL4 parser puts operand in ->children[1] for E_INDR.
+                 * Snocone sc_lower puts it in ->children[0].  Accept either. */
                 EXPR_t *indir_name;
                 if (s->subject->kind == E_INDR)
-                    indir_name = s->subject->right ? s->subject->right : s->subject->left;
+                    indir_name = s->subject->children[1] ? s->subject->children[1] : s->subject->children[0];
                 else
-                    indir_name = s->subject->left  ? s->subject->left  : s->subject->right;
+                    indir_name = s->subject->children[0]  ? s->subject->children[0]  : s->subject->children[1];
                 prog_emit_expr(indir_name, -16);
                 /* Eval the RHS → [rbp-32/24] */
                 if (!s->replacement || s->replacement->kind == E_NULV) {
@@ -3671,7 +3723,7 @@ static void asm_emit_program(Program *prog) {
                 }
             } else if (s->has_eq && s->subject &&
                        s->subject->kind == E_IDX &&
-                       s->subject->left && s->subject->nargs >= 1) {
+                       s->subject->children[0] && s->subject->nchildren >= 1) {
                 /* A<i> = val  or  T['key'] = val  →  stmt_aset(arr, key, val)
                  *
                  * SysV AMD64 calling convention for stmt_aset(arr, key, val):
@@ -3702,12 +3754,12 @@ static void asm_emit_program(Program *prog) {
                  * and rely on the .bss prescan pass.  Simpler: just push/pop. */
 
                 /* Evaluate arr → [rbp-16/8] */
-                prog_emit_expr(s->subject->left,      -16);
+                prog_emit_expr(s->subject->children[0],      -16);
                 /* Save arr onto C stack */
                 A("    push    qword [rbp-8]\n");   /* arr ptr  (high) */
                 A("    push    qword [rbp-16]\n");  /* arr type (low) */
                 /* Evaluate key → [rbp-32/24] */
-                prog_emit_expr(s->subject->args[0],  -32);
+                prog_emit_expr(s->subject->children[0],  -32);
                 /* Save key onto C stack (now arr is at [rsp+16]..[rsp+23],
                  * key at [rsp+0]..[rsp+7] and [rsp+8]..[rsp+15]) */
                 A("    push    qword [rbp-24]\n");  /* key ptr  (high) */
@@ -3738,7 +3790,7 @@ static void asm_emit_program(Program *prog) {
                 }
             } else if (s->has_eq && s->subject &&
                        s->subject->kind == E_FNC &&
-                       s->subject->nargs == 1 &&
+                       s->subject->nchildren == 1 &&
                        s->subject->sval) {
                 /* field(obj) = val  →  stmt_field_set(obj, "field", val)
                  *
@@ -3751,7 +3803,7 @@ static void asm_emit_program(Program *prog) {
                 const char *flab = prog_str_intern(s->subject->sval);
 
                 /* Evaluate obj → push onto stack */
-                prog_emit_expr(s->subject->args[0], -16);
+                prog_emit_expr(s->subject->children[0], -16);
                 A("    push    qword [rbp-8]\n");   /* obj ptr  */
                 A("    push    qword [rbp-16]\n");  /* obj type */
                 /* Evaluate val → [rbp-32/24] */
@@ -3850,13 +3902,13 @@ static void asm_emit_program(Program *prog) {
                 EXPR_t *e = stk[--top];
                 if (!e) continue;
                 if ((e->kind == E_DOL || e->kind == E_NAM) &&
-                    e->right && e->right->sval &&
+                    e->children[1] && e->children[1]->sval &&
                     stmt_cap_count < MAX_STMT_CAPS)
-                    stmt_cap_names[stmt_cap_count++] = e->right->sval;
+                    stmt_cap_names[stmt_cap_count++] = e->children[1]->sval;
                 /* Follow named pattern references */
                 if (e->kind == E_VART || e->kind == E_INDR) {
                     const char *vn = e->sval ? e->sval
-                                   : (e->left && e->left->sval ? e->left->sval : NULL);
+                                   : (e->children[0] && e->children[0]->sval ? e->children[0]->sval : NULL);
                     if (vn) {
                         for (int ni = 0; ni < asm_named_count; ni++) {
                             if (!np_visited[ni] && ni < 128 &&
@@ -3869,10 +3921,10 @@ static void asm_emit_program(Program *prog) {
                         }
                     }
                 }
-                if (e->left  && top < 511) stk[top++] = e->left;
-                if (e->right && top < 511) stk[top++] = e->right;
-                for (int _i = 0; _i < e->nargs && top < 510; _i++)
-                    if (e->args[_i]) stk[top++] = e->args[_i];
+                if (e->children[0]  && top < 511) stk[top++] = e->children[0];
+                if (e->children[1] && top < 511) stk[top++] = e->children[1];
+                for (int _i = 0; _i < e->nchildren && top < 510; _i++)
+                    if (e->children[_i]) stk[top++] = e->children[_i];
             }
         }
         emit_asm_node(s->pattern,

@@ -55,10 +55,8 @@ static EXPR_t *es_peek(ExprStack *s) {
 static EXPR_t *make_fnc2(const char *name, EXPR_t *l, EXPR_t *r) {
     EXPR_t *e  = expr_new(E_FNC);
     e->sval    = strdup(name);
-    e->nargs   = 2;
-    e->args    = malloc(2 * sizeof(EXPR_t *));
-    e->args[0] = l;
-    e->args[1] = r;
+    expr_add_child(e, l);
+    expr_add_child(e, r);
     return e;
 }
 
@@ -66,9 +64,7 @@ static EXPR_t *make_fnc2(const char *name, EXPR_t *l, EXPR_t *r) {
 static EXPR_t *make_fnc1(const char *name, EXPR_t *arg) {
     EXPR_t *e  = expr_new(E_FNC);
     e->sval    = strdup(name);
-    e->nargs   = 1;
-    e->args    = malloc(sizeof(EXPR_t *));
-    e->args[0] = arg;
+    expr_add_child(e, arg);
     return e;
 }
 
@@ -117,38 +113,38 @@ static int lower_token(const ScPToken *tok, ExprStack *s,
     /* ---- Binary arithmetic ---- */
     case SC_PLUS: {
         EXPR_t *r = es_pop(s), *l = es_pop(s);
-        EXPR_t *e = expr_new(E_ADD); e->left = l; e->right = r;
+        EXPR_t *e = expr_binary(E_ADD, l, r);
         es_push(s, e); return 0;
     }
     case SC_MINUS:
         if (tok->is_unary) {
             EXPR_t *operand = es_pop(s);
-            EXPR_t *e = expr_new(E_MNS); e->left = operand;
+            EXPR_t *e = expr_unary(E_MNS, operand);
             es_push(s, e); return 0;
         } else {
             EXPR_t *r = es_pop(s), *l = es_pop(s);
-            EXPR_t *e = expr_new(E_SUB); e->left = l; e->right = r;
+            EXPR_t *e = expr_binary(E_SUB, l, r);
             es_push(s, e); return 0;
         }
     case SC_STAR:
         if (tok->is_unary) {
             /* unary * = indirect reference */
             EXPR_t *operand = es_pop(s);
-            EXPR_t *e = expr_new(E_INDR); e->left = operand;
+            EXPR_t *e = expr_unary(E_INDR, operand);
             es_push(s, e); return 0;
         } else {
             EXPR_t *r = es_pop(s), *l = es_pop(s);
-            EXPR_t *e = expr_new(E_MPY); e->left = l; e->right = r;
+            EXPR_t *e = expr_binary(E_MPY, l, r);
             es_push(s, e); return 0;
         }
     case SC_SLASH: {
         EXPR_t *r = es_pop(s), *l = es_pop(s);
-        EXPR_t *e = expr_new(E_DIV); e->left = l; e->right = r;
+        EXPR_t *e = expr_binary(E_DIV, l, r);
         es_push(s, e); return 0;
     }
     case SC_CARET: {
         EXPR_t *r = es_pop(s), *l = es_pop(s);
-        EXPR_t *e = expr_new(E_EXPOP); e->left = l; e->right = r;
+        EXPR_t *e = expr_binary(E_EXPOP, l, r);
         es_push(s, e); return 0;
     }
 
@@ -156,50 +152,45 @@ static int lower_token(const ScPToken *tok, ExprStack *s,
     case SC_CONCAT: {
         /* && blank concat → E_CONC */
         EXPR_t *r = es_pop(s), *l = es_pop(s);
-        EXPR_t *e = expr_new(E_CONC); e->left = l; e->right = r;
+        EXPR_t *e = expr_binary(E_CONC, l, r);
         es_push(s, e); return 0;
     }
     case SC_PIPE: {
         /* single | also string concat in SNOBOL4 context */
         EXPR_t *r = es_pop(s), *l = es_pop(s);
-        EXPR_t *e = expr_new(E_CONC); e->left = l; e->right = r;
+        EXPR_t *e = expr_binary(E_CONC, l, r);
         es_push(s, e); return 0;
     }
     case SC_OR: {
         /* || string concatenation (same as | and && in value context) → E_CONC */
         EXPR_t *r = es_pop(s), *l = es_pop(s);
-        EXPR_t *e = expr_new(E_CONC); e->left = l; e->right = r;
+        EXPR_t *e = expr_binary(E_CONC, l, r);
         es_push(s, e); return 0;
     }
     case SC_PERIOD: {
         /* . conditional capture: expr . var → E_NAM(left=expr, right=var) */
         EXPR_t *var  = es_pop(s);
         EXPR_t *expr = es_pop(s);
-        EXPR_t *e    = expr_new(E_NAM);
-        e->left  = expr;
-        e->right = var;
+        EXPR_t *e    = expr_binary(E_NAM, expr, var);
         es_push(s, e); return 0;
     }
     case SC_DOLLAR:
         if (tok->is_unary) {
             /* unary $ = indirect lvalue (E_INDR used as assignment target) */
             EXPR_t *operand = es_pop(s);
-            EXPR_t *e = expr_new(E_INDR); e->left = operand;
+            EXPR_t *e = expr_unary(E_INDR, operand);
             es_push(s, e); return 0;
         } else {
             /* binary $ = immediate capture: expr $ var → E_DOL */
             EXPR_t *var  = es_pop(s);
             EXPR_t *expr = es_pop(s);
-            EXPR_t *e    = expr_new(E_DOL);
-            e->left  = expr;
-            e->right = var;
+            EXPR_t *e    = expr_binary(E_DOL, expr, var);
             es_push(s, e); return 0;
         }
     case SC_AT: {
         /* @var — cursor position capture */
         EXPR_t *var = es_pop(s);
-        EXPR_t *e   = expr_new(E_ATP);
-        e->left = var;
+        EXPR_t *e   = expr_unary(E_ATP, var);
         es_push(s, e); return 0;
     }
     case SC_AMPERSAND: {
@@ -296,9 +287,7 @@ static int lower_token(const ScPToken *tok, ExprStack *s,
     case SC_ASSIGN: {
         EXPR_t *rhs = es_pop(s);
         EXPR_t *lhs = es_pop(s);
-        EXPR_t *e   = expr_new(E_ASGN);
-        e->left     = lhs;
-        e->right    = rhs;
+        EXPR_t *e   = expr_binary(E_ASGN, lhs, rhs);
         es_push(s, e);
         return 0;
     }
@@ -307,16 +296,16 @@ static int lower_token(const ScPToken *tok, ExprStack *s,
     case SC_CALL: {
         int     nargs = tok->arg_count;
         EXPR_t *fn    = expr_new(E_FNC);
-        /* args are on stack in postfix order: arg0 pushed first → arg(n-1) on top */
-        EXPR_t **args = nargs > 0 ? malloc(nargs * sizeof(EXPR_t *)) : NULL;
+        /* args on stack postfix: arg0 pushed first → arg(n-1) on top */
+        /* collect into temp array to reverse, then add as children */
+        EXPR_t **tmp = nargs > 0 ? malloc(nargs * sizeof(EXPR_t *)) : NULL;
         for (int k = nargs - 1; k >= 0; k--)
-            args[k] = es_pop(s);
-        /* function name is the E_VART below the args */
+            tmp[k] = es_pop(s);
         EXPR_t *name_node = es_pop(s);
-        fn->sval  = name_node ? strdup(name_node->sval ? name_node->sval : "") : strdup("");
+        fn->sval = name_node ? strdup(name_node->sval ? name_node->sval : "") : strdup("");
         free(name_node);
-        fn->nargs = nargs;
-        fn->args  = args;
+        for (int k = 0; k < nargs; k++) expr_add_child(fn, tmp[k]);
+        if (tmp) free(tmp);
         es_push(s, fn);
         return 0;
     }
@@ -324,16 +313,17 @@ static int lower_token(const ScPToken *tok, ExprStack *s,
     /* ---- Array ref: a[i] → E_IDX ---- */
     case SC_ARRAY_REF: {
         int     nargs = tok->arg_count;
-        EXPR_t **args = nargs > 0 ? malloc(nargs * sizeof(EXPR_t *)) : NULL;
+        EXPR_t *base  = expr_new(E_IDX);
+        EXPR_t **tmp  = nargs > 0 ? malloc(nargs * sizeof(EXPR_t *)) : NULL;
         for (int k = nargs - 1; k >= 0; k--)
-            args[k] = es_pop(s);
+            tmp[k] = es_pop(s);
         EXPR_t *name_node = es_pop(s);
-        EXPR_t *e = expr_new(E_IDX);
-        e->sval   = name_node ? strdup(name_node->sval ? name_node->sval : "") : strdup("");
+        base->sval = name_node ? strdup(name_node->sval ? name_node->sval : "") : strdup("");
         free(name_node);
-        e->nargs  = nargs;
-        e->args   = args;
-        es_push(s, e);
+        /* children[0] = base (represented by sval only, no node), children[1..] = indices */
+        for (int k = 0; k < nargs; k++) expr_add_child(base, tmp[k]);
+        if (tmp) free(tmp);
+        es_push(s, base);
         return 0;
     }
 
@@ -382,8 +372,8 @@ static STMT_t *assemble_stmt(ExprStack *s, int lineno) {
     if (top->kind == E_ASGN) {
         /* Assignment: subject = lhs, replacement = rhs */
         es_pop(s);
-        st->subject     = top->left;
-        st->replacement = top->right;
+        st->subject     = expr_left(top);
+        st->replacement = expr_right(top);
         st->has_eq      = 1;
         free(top);   /* free E_ASGN shell only */
     } else {
@@ -457,12 +447,8 @@ ScLowerResult sc_lower(const ScPToken *ptoks, int count, const char *filename) {
  * ------------------------------------------------------------------------- */
 static void free_expr(EXPR_t *e) {
     if (!e) return;
-    free_expr(e->left);
-    free_expr(e->right);
-    if (e->args) {
-        for (int i = 0; i < e->nargs; i++) free_expr(e->args[i]);
-        free(e->args);
-    }
+    for (int i = 0; i < e->nchildren; i++) free_expr(e->children[i]);
+    if (e->children) free(e->children);
     free(e->sval);
     free(e);
 }

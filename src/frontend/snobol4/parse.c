@@ -40,12 +40,13 @@
 
 /* ── helpers ──────────────────────────────────────────────────────────────── */
 
+/* binop / unop — thin wrappers; all node construction goes through
+ * expr_binary / expr_unary which call expr_add_child internally. */
 static EXPR_t *binop(EKind k, EXPR_t *l, EXPR_t *r) {
-    EXPR_t *e = expr_new(k); e->left=l; e->right=r; return e;
+    return expr_binary(k, l, r);
 }
-
 static EXPR_t *unop(EKind k, EXPR_t *operand) {
-    EXPR_t *e = expr_new(k); e->left=operand; return e;
+    return expr_unary(k, operand);
 }
 
 /* Consume T_WS tokens (optional gray whitespace inside parens etc.). */
@@ -89,40 +90,29 @@ static EXPR_t *parse_expr17(Lex *lx);
  * )
  */
 
-/* Parse comma-separated expression list into args/nargs on an EXPR_t node. */
-static void parse_arglist(Lex *lx, EXPR_t ***args_out, int *nargs_out) {
-    /* Dynamic array */
-    int cap=4, n=0;
-    EXPR_t **args = malloc(cap * sizeof *args);
-
+/* Parse comma-separated expression list; append each arg as a child of `node`. */
+static void parse_arglist(Lex *lx, EXPR_t *node) {
     skip_ws(lx);
     if (lex_peek(lx).kind != T_RPAREN &&
         lex_peek(lx).kind != T_RBRACKET &&
         lex_peek(lx).kind != T_RANGLE &&
         lex_peek(lx).kind != T_EOF) {
-        /* parse first arg (may be empty — SNOBOL4 allows omitted args) */
         EXPR_t *e = parse_expr0(lx);
-        if (n >= cap) { cap*=2; args=realloc(args,cap*sizeof*args); }
-        args[n++] = e ? e : expr_new(E_NULV);
+        expr_add_child(node, e ? e : expr_new(E_NULV));
 
         while (lex_peek(lx).kind == T_COMMA) {
             lex_next(lx); /* consume , */
             skip_ws(lx);
             TokKind k = lex_peek(lx).kind;
             if (k==T_RPAREN||k==T_RBRACKET||k==T_RANGLE||k==T_EOF) {
-                /* trailing comma — PUSH_fn null arg */
-                if (n>=cap){cap*=2;args=realloc(args,cap*sizeof*args);}
-                args[n++] = expr_new(E_NULV);
+                expr_add_child(node, expr_new(E_NULV)); /* trailing comma */
                 break;
             }
             EXPR_t *a = parse_expr0(lx);
-            if (n>=cap){cap*=2;args=realloc(args,cap*sizeof*args);}
-            args[n++] = a ? a : expr_new(E_NULV);
+            expr_add_child(node, a ? a : expr_new(E_NULV));
         }
     }
     skip_ws(lx);
-    *args_out  = args;
-    *nargs_out = n;
 }
 
 static EXPR_t *parse_expr17(Lex *lx) {
@@ -134,15 +124,18 @@ static EXPR_t *parse_expr17(Lex *lx) {
         EXPR_t *inner = parse_expr0(lx);
         skip_ws(lx);
         if (lex_peek(lx).kind == T_COMMA) {
-            /* (expr, expr, ...) — alternation group */
-            EXPR_t *alt = inner;
+            /* (expr, expr, ...) — alternation group: flat n-ary E_OR */
+            EXPR_t *alt = expr_new(E_OR);
+            expr_add_child(alt, inner);
             while (lex_peek(lx).kind == T_COMMA) {
                 lex_next(lx); skip_ws(lx);
                 EXPR_t *r = parse_expr0(lx);
-                alt = binop(E_OR, alt, r);
+                expr_add_child(alt, r ? r : expr_new(E_NULV));
                 skip_ws(lx);
             }
             if (lex_peek(lx).kind==T_RPAREN) lex_next(lx);
+            /* unwrap single-child E_OR (degenerate case) */
+            if (alt->nchildren == 1) { EXPR_t *tmp = alt->children[0]; free(alt->children); free(alt); return tmp; }
             return alt;
         }
         skip_ws(lx);
@@ -179,11 +172,10 @@ static EXPR_t *parse_expr17(Lex *lx) {
         lex_next(lx);
         if (lex_peek(lx).kind == T_LPAREN) {
             lex_next(lx); /* consume '(' */
-            EXPR_t **args; int nargs;
-            parse_arglist(lx, &args, &nargs);
-            if (lex_peek(lx).kind==T_RPAREN) lex_next(lx);
             EXPR_t *e = expr_new(E_FNC);
-            e->sval=(char *)(t.sval); e->args=args; e->nargs=nargs;
+            e->sval = (char *)(t.sval);
+            parse_arglist(lx, e);   /* args become children[0..n-1] */
+            if (lex_peek(lx).kind==T_RPAREN) lex_next(lx);
             return e;
         }
         EXPR_t *e = expr_new(E_VART); (e)->sval = (char *)(t.sval); return e;
@@ -209,12 +201,16 @@ static EXPR_t *parse_expr15(Lex *lx) {
         else break;
 
         lex_next(lx); /* consume open bracket */
-        EXPR_t **args; int nargs;
-        parse_arglist(lx, &args, &nargs);
+        EXPR_t *tmp_node = expr_new(E_NULV); /* temp container for indices */
+        parse_arglist(lx, tmp_node);
         if (lex_peek(lx).kind==close) lex_next(lx);
 
         EXPR_t *idx = expr_new(E_IDX);
-        idx->left=e; idx->args=args; idx->nargs=nargs;
+        expr_add_child(idx, e);     /* children[0] = base expression */
+        for (int _ii = 0; _ii < tmp_node->nchildren; _ii++)
+            expr_add_child(idx, tmp_node->children[_ii]);
+        if (tmp_node->children) free(tmp_node->children);
+        free(tmp_node);
         e = idx;
     }
     return e;
@@ -260,12 +256,9 @@ static EXPR_t *parse_expr14(Lex *lx) {
      *   *X  (deferred ref):  e->left = operand, e->right = NULL
      *   $X  (indirect):      e->left = NULL,    e->right = operand
      * All other unary ops use e->left (via unop). */
-    if (uk == E_INDR && op_tok == T_DOLLAR) {
-        EXPR_t *e = expr_new(E_INDR);
-        e->right = operand;   /* $X — indirect: right holds operand */
-        return e;
-    }
-    return unop(uk, operand);  /* *X and all others: left holds operand */
+    /* All unary operators (including $X and *X) use children[0] = operand.
+     * The old left/right distinction is gone — backends use expr_left(). */
+    return unop(uk, operand);
 }
 
 /* ── expr13 — ~ binary ───────────────────────────────────────────────────── */
@@ -493,9 +486,9 @@ static EXPR_t *parse_expr4(Lex *lx) {
 
     if (n == 1) { free(items); return first; }
 
-    /* Build left-associative chain of E_CONC */
-    EXPR_t *e = items[0];
-    for (int i=1; i<n; i++) e = binop(E_CONC, e, items[i]);
+    /* Build flat n-ary E_CONC node */
+    EXPR_t *e = expr_new(E_CONC);
+    for (int i = 0; i < n; i++) expr_add_child(e, items[i]);
     free(items);
     return e;
 }
@@ -503,8 +496,21 @@ static EXPR_t *parse_expr4(Lex *lx) {
 /* ── expr3 — | (alternation, n-ary) ─────────────────────────────────────── */
 /* snoX3 = nInc() snoExpr4 FENCE($'|' snoX3 | ε) */
 static EXPR_t *parse_expr3(Lex *lx) {
-    EXPR_t *l = parse_expr4(lx);
-    if (!l) return NULL;
+    EXPR_t *first = parse_expr4(lx);
+    if (!first) return NULL;
+    /* peek ahead — if no | follows, return the single child as-is */
+    LexMark m3check = lex_mark(lx);
+    int has_pipe = 0;
+    if (lex_peek(lx).kind == T_WS) {
+        lex_next(lx);
+        if (lex_peek(lx).kind == T_PIPE) has_pipe = 1;
+        lex_restore(lx, m3check);
+    }
+    if (!has_pipe) return first;
+
+    /* Build flat n-ary E_OR */
+    EXPR_t *e = expr_new(E_OR);
+    expr_add_child(e, first);
     for (;;) {
         LexMark m3 = lex_mark(lx);
         if (lex_peek(lx).kind != T_WS) break;
@@ -515,9 +521,9 @@ static EXPR_t *parse_expr3(Lex *lx) {
         }
         lex_next(lx); skip_ws(lx);
         EXPR_t *r = parse_expr4(lx);
-        l = binop(E_OR, l, r);
+        expr_add_child(e, r ? r : expr_new(E_NULV));
     }
-    return l;
+    return e;
 }
 
 /* ── expr2 — & ───────────────────────────────────────────────────────────── */

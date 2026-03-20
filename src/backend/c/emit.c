@@ -200,29 +200,24 @@ static void emit_chain_pretty(EXPR_t *e, int kind,
                                const char *fn_name,
                                void (*emit_leaf)(EXPR_t *),
                                int min_depth) {
-    /* Count depth */
-    int depth = 0;
-    for (EXPR_t *n = e; n->kind == kind; n = n->left) depth++;
+    /* With n-ary children[], the leaves are already flat: children[0..nchildren-1] */
+    int depth = e->nchildren;
 
     if (depth < min_depth) {
         /* Short — keep inline */
-        E("%s(", fn_name); emit_leaf(e->left); E(","); emit_leaf(e->right); E(")");
+        E("%s(", fn_name);
+        for (int _ci = 0; _ci < e->nchildren; _ci++) {
+            if (_ci > 0) E(",");
+            emit_leaf(e->children[_ci]);
+        }
+        E(")");
         return;
     }
 
-    /* Collect leaves (left spine → right-to-left, then reverse) */
+    /* Collect leaves from flat children array */
     EXPR_t *leaves[CHAIN_MAX];
-    int n = 0;
-    EXPR_t *cur = e;
-    while (cur->kind == kind && n < CHAIN_MAX - 1) {
-        leaves[n++] = cur->right;
-        cur = cur->left;
-    }
-    leaves[n++] = cur;
-    /* Reverse to get left-to-right order */
-    for (int i = 0, j = n-1; i < j; i++, j--) {
-        EXPR_t *tmp = leaves[i]; leaves[i] = leaves[j]; leaves[j] = tmp;
-    }
+    int n = e->nchildren < CHAIN_MAX ? e->nchildren : CHAIN_MAX;
+    for (int _ci = 0; _ci < n; _ci++) leaves[_ci] = e->children[_ci];
 
     /* Emit: nested left-associative with 4-space indent per nesting level.
      *
@@ -270,80 +265,80 @@ static void emit_expr(EXPR_t *e) {
     case E_KW: E("kw(\"%s\")", e->sval); break;
 
     case E_INDR:
-        if (!e->left) {
+        if (!e->children[0]) {
             /* $expr — indirect lookup */
-            E("deref("); emit_expr(e->right); E(")");
-        } else if (e->left->kind == E_VART) {
+            E("deref("); emit_expr(e->children[1]); E(")");
+        } else if (e->children[0]->kind == E_VART) {
             /* *varname — deferred pattern reference (resolved at MATCH_fn time) */
-            E("var_as_pattern(pat_ref(\"%s\"))", e->left->sval);
-        } else if (e->left->kind == E_FNC && e->left->nargs >= 1
-                   && !is_defined_function(e->left->sval)) {
+            E("var_as_pattern(pat_ref(\"%s\"))", e->children[0]->sval);
+        } else if (e->children[0]->kind == E_FNC && e->children[0]->nchildren >= 1
+                   && !is_defined_function(e->children[0]->sval)) {
 
             /* *varname(arg...) — parser misparse: *varname concatenated with (arg).
              * SNOBOL4 continuation lines cause the parser to greedily consume the
              * next '(' as a function-call argument to varname.  The correct
              * semantics are: deferred-ref(*varname) cat arg. */
-            E("CONCAT_fn(var_as_pattern(pat_ref(\"%s\")),", e->left->sval);
-            emit_expr(e->left->args[0]);
+            E("CONCAT_fn(var_as_pattern(pat_ref(\"%s\")),", e->children[0]->sval);
+            emit_expr(e->children[0]->children[0]);
             E(")");
         } else {
             /* *(expr) — deref of compound expression */
-            E("deref("); emit_expr(e->left); E(")");
+            E("deref("); emit_expr(e->children[0]); E(")");
         }
         break;
 
-    case E_MNS: E("neg("); emit_expr(e->left); E(")"); break;
+    case E_MNS: E("neg("); emit_expr(e->children[0]); E(")"); break;
 
     case E_CONC:
         emit_chain_pretty(e, E_CONC, "CONCAT_fn", emit_expr, 2);
         break;
 
-    case E_OPSYN: E("APPLY_fn(\"reduce\",(DESCR_t[]){"); emit_expr(e->left); E(","); emit_expr(e->right); E("},2)"); break;
-    case E_ADD:    E("add(");    emit_expr(e->left); E(","); emit_expr(e->right); E(")"); break;
-    case E_SUB:    E("sub(");    emit_expr(e->left); E(","); emit_expr(e->right); E(")"); break;
-    case E_MPY:    E("mul(");    emit_expr(e->left); E(","); emit_expr(e->right); E(")"); break;
-    case E_DIV:    E("DIVIDE_fn(");    emit_expr(e->left); E(","); emit_expr(e->right); E(")"); break;
-    case E_EXPOP:    E("POWER_fn(");    emit_expr(e->left); E(","); emit_expr(e->right); E(")"); break;
+    case E_OPSYN: E("APPLY_fn(\"reduce\",(DESCR_t[]){"); emit_expr(e->children[0]); E(","); emit_expr(e->children[1]); E("},2)"); break;
+    case E_ADD:    E("add(");    emit_expr(e->children[0]); E(","); emit_expr(e->children[1]); E(")"); break;
+    case E_SUB:    E("sub(");    emit_expr(e->children[0]); E(","); emit_expr(e->children[1]); E(")"); break;
+    case E_MPY:    E("mul(");    emit_expr(e->children[0]); E(","); emit_expr(e->children[1]); E(")"); break;
+    case E_DIV:    E("DIVIDE_fn(");    emit_expr(e->children[0]); E(","); emit_expr(e->children[1]); E(")"); break;
+    case E_EXPOP:    E("POWER_fn(");    emit_expr(e->children[0]); E(","); emit_expr(e->children[1]); E(")"); break;
     case E_OR:
         /* Same: if either side is pattern-valued, use pat_alt */
-        if (expr_contains_pattern(e->left) || expr_contains_pattern(e->right)) {
-            E("pat_alt("); emit_pat(e->left); E(","); emit_pat(e->right); E(")");
+        if (expr_contains_pattern(e->children[0]) || expr_contains_pattern(e->children[1])) {
+            E("pat_alt("); emit_pat(e->children[0]); E(","); emit_pat(e->children[1]); E(")");
         } else {
-            E("alt("); emit_expr(e->left); E(","); emit_expr(e->right); E(")");
+            E("alt("); emit_expr(e->children[0]); E(","); emit_expr(e->children[1]); E(")");
         }
         break;
 
     /* capture nodes — in value context, evaluate the child */
-    case E_NAM: emit_expr(e->left); break;
-    case E_DOL:  emit_expr(e->left); break;
+    case E_NAM: emit_expr(e->children[0]); break;
+    case E_DOL:  emit_expr(e->children[0]); break;
 
     case E_FNC:
-        if (e->nargs == 0) {
+        if (e->nchildren == 0) {
             E("APPLY_fn(\"%s\",NULL,0)", e->sval);
         } else {
             E("APPLY_fn(\"%s\",(DESCR_t[]){", e->sval);
-            for (int i=0; i<e->nargs; i++) {
-                if (i) { E(","); } emit_expr(e->args[i]);
+            for (int i=0; i<e->nchildren; i++) {
+                if (i) { E(","); } emit_expr(e->children[i]);
             }
-            E("},%d)", e->nargs);
+            E("},%d)", e->nchildren);
         }
         break;
 
     case E_ARY:
         E("aref(%s,(DESCR_t[]){", cs(e->sval));
-        for (int i=0; i<e->nargs; i++) {
-            if (i) { E(","); } emit_expr(e->args[i]);
+        for (int i=0; i<e->nchildren; i++) {
+            if (i) { E(","); } emit_expr(e->children[i]);
         }
-        E("},%d)", e->nargs);
+        E("},%d)", e->nchildren);
         break;
 
     case E_IDX:
         /* postfix subscript: expr[i] — e.g. c(x)[i] */
-        E("INDEX_fn("); emit_expr(e->left); E(",(DESCR_t[]){");
-        for (int i=0; i<e->nargs; i++) {
-            if (i) { E(","); } emit_expr(e->args[i]);
+        E("INDEX_fn("); emit_expr(e->children[0]); E(",(DESCR_t[]){");
+        for (int i=0; i<e->nchildren; i++) {
+            if (i) { E(","); } emit_expr(e->children[i]);
         }
-        E("},%d)", e->nargs);
+        E("},%d)", e->nchildren);
         break;
 
     case E_ATP:
@@ -353,7 +348,7 @@ static void emit_expr(EXPR_t *e) {
 
     case E_ASGN:
         /* var = expr inside expression context */
-        E("assign_expr(%s,", cs(e->left->sval)); emit_expr(e->right); E(")");
+        E("assign_expr(%s,", cs(e->children[0]->sval)); emit_expr(e->children[1]); E(")");
         break;
     }
 }
@@ -384,17 +379,17 @@ static void emit_pat(EXPR_t *e) {
 
     case E_INDR:
         /* *X — deferred pattern reference */
-        if (e->left && e->left->kind == E_VART)
-            E("pat_ref(\"%s\")", e->left->sval);
-        else if (e->left && e->left->kind == E_FNC && e->left->nargs >= 1
-                 && !is_defined_function(e->left->sval)) {
+        if (e->children[0] && e->children[0]->kind == E_VART)
+            E("pat_ref(\"%s\")", e->children[0]->sval);
+        else if (e->children[0] && e->children[0]->kind == E_FNC && e->children[0]->nchildren >= 1
+                 && !is_defined_function(e->children[0]->sval)) {
             /* *varname(arg...) — continuation-line misparse: deref-ref cat arg
              * Only applies when varname is NOT a known function (it's a pat var). */
-            E("pat_cat(pat_ref(\"%s\"),", e->left->sval);
-            emit_pat(e->left->args[0]);
+            E("pat_cat(pat_ref(\"%s\"),", e->children[0]->sval);
+            emit_pat(e->children[0]->children[0]);
             E(")");
         } else {
-            E("pat_deref("); emit_expr(e->right ? e->right : e->left); E(")");
+            E("pat_deref("); emit_expr(e->children[1] ? e->children[1] : e->children[0]); E(")");
         }
         break;
 
@@ -405,10 +400,10 @@ static void emit_pat(EXPR_t *e) {
     case E_MPY:
         /* pat * x — parsed as arithmetic multiply, but in pattern context
          * this is: left_pattern CONCAT_fn *right (deferred ref to right) */
-        E("pat_cat("); emit_pat(e->left); E(",");
-        if (e->right && e->right->kind == E_VART)
-            E("pat_ref(\"%s\")", e->right->sval);
-        else { E("pat_deref("); emit_expr(e->right); E(")"); }
+        E("pat_cat("); emit_pat(e->children[0]); E(",");
+        if (e->children[1] && e->children[1]->kind == E_VART)
+            E("pat_ref(\"%s\")", e->children[1]->sval);
+        else { E("pat_deref("); emit_expr(e->children[1]); E(")"); }
         E(")"); break;
 
     case E_OPSYN:
@@ -417,7 +412,7 @@ static void emit_pat(EXPR_t *e) {
          * nTop() — which must be evaluated at MATCH_fn time, not build time.
          * Use pat_user_call to defer the call until the engine executes
          * this node during pattern matching. */
-        E("pat_user_call(\"reduce\",(DESCR_t[]){"); emit_expr(e->left); E(","); emit_expr(e->right); E("},2)"); break;
+        E("pat_user_call(\"reduce\",(DESCR_t[]){"); emit_expr(e->children[0]); E(","); emit_expr(e->children[1]); E("},2)"); break;
 
     case E_OR:
         emit_chain_pretty(e, E_OR, "pat_alt", emit_pat, 2);
@@ -425,15 +420,15 @@ static void emit_pat(EXPR_t *e) {
 
     case E_NAM: {
         /* pat . var */
-        const char *varname = (e->right && e->right->kind==E_VART)
-                              ? e->right->sval : "?";
-        E("pat_cond("); emit_pat(e->left); E(",\"%s\")", varname); break;
+        const char *varname = (e->children[1] && e->children[1]->kind==E_VART)
+                              ? e->children[1]->sval : "?";
+        E("pat_cond("); emit_pat(e->children[0]); E(",\"%s\")", varname); break;
     }
     case E_DOL: {
         /* pat $ var */
-        const char *varname = (e->right && e->right->kind==E_VART)
-                              ? e->right->sval : "?";
-        E("pat_imm("); emit_pat(e->left); E(",\"%s\")", varname); break;
+        const char *varname = (e->children[1] && e->children[1]->kind==E_VART)
+                              ? e->children[1]->sval : "?";
+        E("pat_imm("); emit_pat(e->children[0]); E(",\"%s\")", varname); break;
     }
 
     case E_FNC: {
@@ -441,14 +436,14 @@ static void emit_pat(EXPR_t *e) {
         const char *n = e->sval;
         /* B0: zero-arg pattern; B1i: one int64_t arg; B1s: one string arg; B1v: one DESCR_t arg */
         #define B0(nm,fn)  if(strcasecmp(n,nm)==0){E(fn"()");break;}
-        #define B1i(nm,fn) if(strcasecmp(n,nm)==0&&e->nargs>=1){E(fn"(to_int(");emit_expr(e->args[0]);E("))");break;}
-        #define B1s(nm,fn) if(strcasecmp(n,nm)==0&&e->nargs>=1){E(fn"(VARVAL_fn(");emit_expr(e->args[0]);E("))");break;}
-        #define B1v(nm,fn) if(strcasecmp(n,nm)==0&&e->nargs>=1){E(fn"(");emit_expr(e->args[0]);E(")");break;}
+        #define B1i(nm,fn) if(strcasecmp(n,nm)==0&&e->nchildren>=1){E(fn"(to_int(");emit_expr(e->children[0]);E("))");break;}
+        #define B1s(nm,fn) if(strcasecmp(n,nm)==0&&e->nchildren>=1){E(fn"(VARVAL_fn(");emit_expr(e->children[0]);E("))");break;}
+        #define B1v(nm,fn) if(strcasecmp(n,nm)==0&&e->nchildren>=1){E(fn"(");emit_expr(e->children[0]);E(")");break;}
         B0("ARB","pat_arb")  B0("REM","pat_rem")
         B0("DT_FAIL","pat_fail") B0("ABORT","pat_abort")
         /* FENCE() = bare fence; FENCE(p) = fence with sub-pattern */
         if(strcasecmp(n,"FENCE")==0){
-            if(e->nargs>=1){E("pat_fence_p(");emit_pat(e->args[0]);E(")");}
+            if(e->nchildren>=1){E("pat_fence_p(");emit_pat(e->children[0]);E(")");}
             else{E("pat_fence()");}
             break;
         }
@@ -473,23 +468,23 @@ static void emit_pat(EXPR_t *e) {
          * parser has misinterpreted  var(pat)  as a function call.  In SNOBOL4,
          * a variable followed by a parenthesised expression is CONCATENATION, not
          * a call.  Emit: pat_cat(pat_var(n), emit_pat(args[0])) instead. */
-        if (e->nargs > 0 && !is_defined_function(n)) {
+        if (e->nchildren > 0 && !is_defined_function(n)) {
             /* variable(args) → CONCAT(var, grouped_pat) */
             E("pat_cat(pat_var(\"%s\"),", n);
-            if (e->nargs == 1) {
-                emit_pat(e->args[0]);
+            if (e->nchildren == 1) {
+                emit_pat(e->children[0]);
             } else {
                 /* Multiple args: emit as successive concatenations */
-                for (int i = 0; i < e->nargs; i++) {
-                    if (i < e->nargs - 1) E("pat_cat(");
+                for (int i = 0; i < e->nchildren; i++) {
+                    if (i < e->nchildren - 1) E("pat_cat(");
                 }
-                emit_pat(e->args[0]);
-                for (int i = 1; i < e->nargs; i++) { E(","); emit_pat(e->args[i]); E(")"); }
+                emit_pat(e->children[0]);
+                for (int i = 1; i < e->nchildren; i++) { E(","); emit_pat(e->children[i]); E(")"); }
             }
             E(")");
             break;
         }
-        if (e->nargs == 0) {
+        if (e->nchildren == 0) {
             E("pat_user_call(\"%s\",NULL,0)", n);
         } else {
             /* Pattern-constructor functions are called eagerly at BUILD TIME.
@@ -506,12 +501,12 @@ static void emit_pat(EXPR_t *e) {
             }
             if (_is_build) {
                 E("var_as_pattern(APPLY_fn(\"%s\",(DESCR_t[]){", n);
-                for (int i=0; i<e->nargs; i++) { if(i) E(","); emit_expr(e->args[i]); }
-                E("},%d))", e->nargs);
+                for (int i=0; i<e->nchildren; i++) { if(i) E(","); emit_expr(e->children[i]); }
+                E("},%d))", e->nchildren);
             } else {
                 E("pat_user_call(\"%s\",(DESCR_t[]){", n);
-                for (int i=0; i<e->nargs; i++) { if(i) E(","); emit_expr(e->args[i]); }
-                E("},%d)", e->nargs);
+                for (int i=0; i<e->nchildren; i++) { if(i) E(","); emit_expr(e->children[i]); }
+                E("},%d)", e->nchildren);
             }
         }
         break;
@@ -540,26 +535,26 @@ static void emit_assign_target(EXPR_t *lhs, const char *rhs_str) {
         E("NV_SET_fn(\"%s\", %s);\n", lhs->sval, cs(lhs->sval)); /* all vars are natural/hashed */
     } else if (lhs->kind == E_ARY) {
         E("aset(%s,(DESCR_t[]){", cs(lhs->sval));
-        for (int i=0; i<lhs->nargs; i++) {
-            if (i) { E(","); } emit_expr(lhs->args[i]);
+        for (int i=0; i<lhs->nchildren; i++) {
+            if (i) { E(","); } emit_expr(lhs->children[i]);
         }
-        E("},%d,%s);\n", lhs->nargs, rhs_str);
+        E("},%d,%s);\n", lhs->nchildren, rhs_str);
     } else if (lhs->kind == E_KW) {
         E("kw_set(\"%s\",%s);\n", lhs->sval, rhs_str);
     } else if (lhs->kind == E_IDX) {
         /* v<i> = x  or  v[i] = x  →  aset(get(_v), {i}, nargs, x) */
         E("aset(");
-        emit_expr(lhs->left);
+        emit_expr(lhs->children[0]);
         E(",(DESCR_t[]){");
-        for (int i=0; i<lhs->nargs; i++) {
-            if (i) { E(","); } emit_expr(lhs->args[i]);
+        for (int i=0; i<lhs->nchildren; i++) {
+            if (i) { E(","); } emit_expr(lhs->children[i]);
         }
-        E("},%d,%s);\n", lhs->nargs, rhs_str);
+        E("},%d,%s);\n", lhs->nchildren, rhs_str);
     } else if (lhs->kind == E_INDR) {
-        E("iset("); emit_expr(lhs->right); E(",%s);\n", rhs_str);
-    } else if (lhs->kind == E_FNC && lhs->nargs == 1) {
+        E("iset("); emit_expr(lhs->children[1]); E(",%s);\n", rhs_str);
+    } else if (lhs->kind == E_FNC && lhs->nchildren == 1) {
         /* field accessor lvalue: val(n) = x  →  FIELD_SET_fn(n, "val", x) */
-        E("FIELD_SET_fn("); emit_expr(lhs->args[0]); E(", \"%s\", %s);\n", lhs->sval, rhs_str);
+        E("FIELD_SET_fn("); emit_expr(lhs->children[0]); E(", \"%s\", %s);\n", lhs->sval, rhs_str);
     } else {
         /* complex lvalue: evaluate and assign indirectly */
         E("iset("); emit_expr(lhs); E(",%s);\n", rhs_str);
@@ -784,7 +779,7 @@ static int is_pat_node(EXPR_t *e) {
     if (e->kind == E_OPSYN) return 1;  /* & reduce() call — always pattern context */
     /* E_MPY(pat_node, x) — parsed from "pat *x" where * is multiplication token
      * but semantically is pattern-CONCAT_fn with deferred ref *x */
-    if (e->kind == E_MPY && is_pat_node(e->left)) return 1;
+    if (e->kind == E_MPY && is_pat_node(e->children[0])) return 1;
     return 0;
 }
 
@@ -806,23 +801,23 @@ int expr_contains_pattern(EXPR_t *e) {
     if (!e) return 0;
     if (is_pat_node(e)) return 1;
     /* *varname — deferred pattern ref (grammar: left=NULL, right=E_VART) */
-    if (e->kind == E_INDR && e->right && e->right->kind == E_VART) return 1;
-    if (e->kind == E_INDR && e->left  && e->left->kind  == E_VART) return 1;
+    if (e->kind == E_INDR && e->children[1] && e->children[1]->kind == E_VART) return 1;
+    if (e->kind == E_INDR && e->children[0]  && e->children[0]->kind  == E_VART) return 1;
     /* *varname(arg) — parser misparse deref+CONCAT_fn */
-    if (e->kind == E_INDR && e->left && e->left->kind == E_FNC) return 1;
+    if (e->kind == E_INDR && e->children[0] && e->children[0]->kind == E_FNC) return 1;
     /* recurse into children */
     if (e->kind == E_CONC || e->kind == E_OR || e->kind == E_MPY)
-        return expr_contains_pattern(e->left) || expr_contains_pattern(e->right);
+        return expr_contains_pattern(e->children[0]) || expr_contains_pattern(e->children[1]);
     /* $ and . operators — pattern may be on the left side */
     if (e->kind == E_DOL || e->kind == E_NAM)
-        return expr_contains_pattern(e->left);
+        return expr_contains_pattern(e->children[0]);
     if (e->kind == E_FNC) {
         /* ARBNO, FENCE, etc. already caught by is_pat_builtin_call above.
          * Also treat reduce/EVAL_fn calls as pattern-valued when inside CONCAT_fn. */
         if (e->sval && (strcasecmp(e->sval,"reduce")==0 || strcasecmp(e->sval,"EVAL_fn")==0))
             return 1;
-        for (int i = 0; i < e->nargs; i++)
-            if (expr_contains_pattern(e->args[i])) return 1;
+        for (int i = 0; i < e->nchildren; i++)
+            if (expr_contains_pattern(e->children[i])) return 1;
     }
     return 0;
 }
@@ -845,7 +840,7 @@ static EXPR_t *make_concat(EXPR_t *left, EXPR_t *right) {
     if (!left)  return right;
     if (!right) return left;
     EXPR_t *e = expr_new(E_CONC);
-    e->left = left; e->right = right;
+    e->children[0] = left; e->children[1] = right;
     return e;
 }
 
@@ -863,31 +858,31 @@ static SplitResult split_spine(EXPR_t *e) {
 
     /* e = E_CONC(left, right) */
     /* First check if RIGHT is a pattern node (first pat on the right spine) */
-    if (is_pat_node(e->right)) {
+    if (is_pat_node(e->children[1])) {
         /* Split here: left is subject, right and above become pattern */
-        SplitResult inner = split_spine(e->left);
+        SplitResult inner = split_spine(e->children[0]);
         /* inner.pat (if any) should be prepended, but since left was already
          * recursed and left's right IS the current pat... */
         /* Actually: the split is between left and right.
-         * Subject = inner.subj (what was pure subject in e->left)
-         * Pattern = inner.pat (any pattern found in e->left's right chain) CONCAT_fn e->right */
+         * Subject = inner.subj (what was pure subject in e->children[0])
+         * Pattern = inner.pat (any pattern found in e->children[0]'s right chain) CONCAT_fn e->children[1] */
         SplitResult r;
         r.subj = inner.subj;
-        r.pat  = make_concat(inner.pat, e->right);
+        r.pat  = make_concat(inner.pat, e->children[1]);
         return r;
     }
 
     /* Right is not a pattern node. Recurse left. */
-    SplitResult inner = split_spine(e->left);
+    SplitResult inner = split_spine(e->children[0]);
     if (!inner.pat) {
         /* No split found in left, and right is not a pattern. No split. */
         SplitResult r = {e, NULL}; return r;
     }
     /* Split found in left spine: reassemble */
-    /* inner.subj is the new left, e->right gets appended to the pattern */
+    /* inner.subj is the new left, e->children[1] gets appended to the pattern */
     SplitResult r;
     r.subj = inner.subj;
-    r.pat  = make_concat(inner.pat, e->right);
+    r.pat  = make_concat(inner.pat, e->children[1]);
     return r;
 }
 
@@ -938,11 +933,11 @@ static int pat_is_anchored(EXPR_t *e) {
     if (e->kind == E_FNC && e->sval && strcasecmp(e->sval, "POS") == 0) {
         /* Only POS(0) literal anchors at start — no ARB needed.
          * Dynamic POS(N) needs ARB scan to advance cursor to position N. */
-        if (e->nargs >= 1 && e->args[0]->kind == E_ILIT && e->args[0]->ival == 0)
+        if (e->nchildren >= 1 && e->children[0]->kind == E_ILIT && e->children[0]->ival == 0)
             return 1;
         return 0;
     }
-    if (e->kind == E_CONC) return pat_is_anchored(e->left);
+    if (e->kind == E_CONC) return pat_is_anchored(e->children[0]);
     return 0;
 }
 
@@ -1073,21 +1068,15 @@ static void emit_stmt(STMT_t *s, const char *fn) {
         if (!pat_is_anchored(s->pattern)) {
             EXPR_t *arb = expr_new(E_FNC);
             arb->sval = strdup("ARB");
-            arb->nargs = 0;
 
             /* SNO_MSTART: zero-width node that captures cursor into _mstart after ARB scans */
             EXPR_t *mstart_node = expr_new(E_FNC);
             mstart_node->sval = strdup("SNO_MSTART");
-            mstart_node->nargs = 0;
             mstart_node->ival = u;  /* thread the statement uid so emit_byrd can name the var */
 
-            EXPR_t *seq1 = expr_new(E_CONC);
-            seq1->left  = arb;
-            seq1->right = mstart_node;
+            EXPR_t *seq1 = expr_binary(E_CONC, arb, mstart_node);
 
-            EXPR_t *seq = expr_new(E_CONC);
-            seq->left  = seq1;
-            seq->right = s->pattern;
+            EXPR_t *seq = expr_binary(E_CONC, seq1, s->pattern);
             scan_pat = seq;
         }
         byrd_cond_reset();
@@ -1185,9 +1174,7 @@ static void collect_expr(EXPR_t *e) {
     case E_ARY: sym_add(e->sval); break;
     default: break;
     }
-    collect_expr(e->left);
-    collect_expr(e->right);
-    for (int i=0; i<e->nargs; i++) collect_expr(e->args[i]);
+    for (int _i = 0; _i < e->nchildren; _i++) collect_expr(e->children[_i]);
 }
 
 static void collect_stmt(STMT_t *s) {
@@ -1431,8 +1418,8 @@ static const char *flatten_str_expr(EXPR_t *e) {
     if (!e) return NULL;
     if (e->kind == E_QLIT) return e->sval;
     if (e->kind == E_CONC) {
-        const char *l = flatten_str_expr(e->left);
-        const char *r = flatten_str_expr(e->right);
+        const char *l = flatten_str_expr(e->children[0]);
+        const char *r = flatten_str_expr(e->children[1]);
         if (!l || !r) return NULL;
         snprintf(_define_proto_buf, sizeof _define_proto_buf, "%s%s", l, r);
         return _define_proto_buf;
@@ -1447,8 +1434,8 @@ static const char *stmt_define_proto(STMT_t *s) {
     EXPR_t *e = s->subject;
     if (e->kind != E_FNC) return NULL;
     if (strcasecmp(e->sval,"DEFINE")!=0) return NULL;
-    if (e->nargs < 1) return NULL;
-    return flatten_str_expr(e->args[0]);
+    if (e->nchildren < 1) return NULL;
+    return flatten_str_expr(e->children[0]);
 }
 
 static void collect_functions(Program *prog) {
@@ -1464,8 +1451,8 @@ static void collect_functions(Program *prog) {
         /* Extract entry label from 2nd DEFINE_fn arg: DEFINE_fn('proto','entry_label') */
         fn->entry_label = NULL;
         if (s->subject && s->subject->kind == E_FNC &&
-            s->subject->nargs >= 2) {
-            const char *el = flatten_str_expr(s->subject->args[1]);
+            s->subject->nchildren >= 2) {
+            const char *el = flatten_str_expr(s->subject->children[1]);
             if (el && el[0]) fn->entry_label = strdup(el);
         }
         /* Extract end-of-body label from DEFINE_fn's goto.

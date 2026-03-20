@@ -423,9 +423,7 @@ static void do_procedure(CfState *st) {
         arg->sval = strdup(def_buf);
         EXPR_t *call = expr_new(E_FNC);
         call->sval   = strdup("DEFINE");
-        call->args   = malloc(sizeof(EXPR_t *));
-        call->args[0]= arg;
-        call->nargs  = 1;
+        expr_add_child(call, arg);
         STMT_t *def_s = stmt_new();
         def_s->subject = call;
         /* Mark deferred — emit at program start for now (append inline) */
