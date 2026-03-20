@@ -18,8 +18,7 @@ FRONTEND_SNOCONE = \
 
 BACKEND_C = \
     backend/c/emit_cnode.c \
-    backend/c/emit.c \
-    backend/c/emit_byrd.c
+    backend/c/emit_byrd_c.c
 
 BACKEND_X64 = \
     backend/x64/emit_byrd_asm.c

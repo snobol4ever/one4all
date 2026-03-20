@@ -1,70 +1,62 @@
 /*
- * emit_byrd.c — Compiled Byrd box emitter for sno2c
+ * emit_byrd_c.c — SNOBOL4→C emitter for sno2c
  *
- * C port of:
- *   src/ir/lower.py       (four-port lowering: α/β/γ/ω)
- *   src/codegen/emit_c_byrd.py  (labeled-goto C emission)
+ * Merged from emit.c + emit_byrd.c.
+ * Peer to emit_byrd_asm.c, emit_byrd_jvm.c, emit_byrd_net.c.
  *
- * This replaces emit_pat() for the compiled path.  The stopgap
- * pat_* / engine.c interpreter is NOT used here.
+ * Emits labeled-goto C — the same Byrd box α/β/γ/ω four-port model
+ * as the ASM backend, just with C syntax instead of NASM.
  *
- * API (called from emit.c):
- *   void byrd_emit_pattern(EXPR_t *pat, FILE *out,
- *                          const char *root_name,
- *                          const char *subject_var,
- *                          const char *subject_len_var,
- *                          const char *cursor_var,
- *                          const char *gamma_label,   // on success
- *                          const char *omega_label);  // on failure
+ * C-specific additions vs other backends:
+ *   - decl_buf / decl_flush(): two-pass local var declaration (C99
+ *     jump-over-declaration rule — locals must precede first goto)
+ *   - emit_cnode.h: expression pretty-printer (PP_EXPR/PP_PAT macros)
+ *   - trampoline mode (-trampoline flag): stmt-function dispatch table
+ *   - NamedPat carries typename/fnname for C struct typedef emission
+ *   - FnDef carries body_starts[]/define_stmt for complex body detection
  *
- * The caller (emit.c, emit_stmt pattern-MATCH_fn case) is responsible for:
- *   - emitting subject/cursor/subject_len setup
- *   - jumping to root_α
- *   - handling gamma_label (MATCH_fn succeeded) and omega_label (MATCH_fn failed)
- *
- * Byrd four-port model per node:
- *   α (alpha) — entry / start
- *   β (beta)  — resume (backtrack re-entry)
- *   γ (gamma) — succeed continuation  [inherited from parent]
- *   ω (omega) — concede continuation  [inherited from parent]
- *
- * Label convention matching the oracle files:
- *   <role>_<uid>_alpha, <role>_<uid>_beta, etc.
- *   role is derived from the node type: lit, pos, rpos, seq, alt, arbno, ...
- *
- * Reference oracles:
- *   test/sprint0/null.c          — skeleton
- *   test/sprint1/lit_hello.c     — LIT
- *   test/sprint2/cat_pos_lit_rpos.c — SEQ (CAT)
- *   test/sprint3/alt_first.c     — ALT
- *   test/sprint4/assign_lit.c    — E_DOL ($ capture)
- *   test/sprint5/arbno_match.c   — ARBNO
- *   src/codegen/emit_c_byrd.py   — Python ground truth
- *   src/ir/lower.py              — lowering ground truth
+ * Entry point: c_emit(Program*, FILE*)
  */
 
+#define EMIT_BYRD_C_C
 #include "sno2c.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
 #include <ctype.h>
+#include "emit_cnode.h"
 
 /* -----------------------------------------------------------------------
- * Output helpers
+ * Output
  * ----------------------------------------------------------------------- */
 
 static FILE *out;
 
-static void B(const char *fmt, ...) {
-    va_list ap;
-    va_start(ap, fmt);
-    vfprintf(out, fmt, ap);
-    va_end(ap);
+static void C(const char *fmt, ...) {
+    va_list ap; va_start(ap, fmt); vfprintf(out, fmt, ap); va_end(ap);
 }
+/* B() — alias used by pattern emitters (emit_byrd.c heritage) */
+#define B(...) C(__VA_ARGS__)
 
-/* cs — C static name for a SNOBOL4 variable (mirrors cs() in emit.c).
- * Prepends '_', replaces non-alnum/_ with '_'. Static buffer — use before next call. */
+/* Three-column pretty printer */
+#define PRETTY_OUT out
+#include "emit_pretty.h"
+
+/* -----------------------------------------------------------------------
+ * UID counter — single counter shared across both pattern and stmt emit
+ * ----------------------------------------------------------------------- */
+
+static int uid_ctr = 0;
+static int next_uid(void) { return ++uid_ctr; }
+
+/* -----------------------------------------------------------------------
+ * C-safe name for a SNOBOL4 variable
+ * Prepends '_', replaces non-alnum/_ with '_'.
+ * cs()      — static buffer (use before next call)
+ * cs_alloc()— heap-allocated (safe across multiple calls)
+ * ----------------------------------------------------------------------- */
+
 static const char *cs(const char *s) {
     static char buf[520];
     int i = 0, j = 0;
@@ -77,23 +69,191 @@ static const char *cs(const char *s) {
     return buf;
 }
 
-/* Three-column pretty printer — shared with emit.c via emit_pretty.h */
-#define PRETTY_OUT out
-#include "emit_pretty.h"
+/* cs_alloc and cs_label defined below (emit.c versions with lreg collision detection) */
+
+/* Forward declarations */
+static int is_io_name(const char *name);
+int is_defined_function(const char *name);
+static void emit_assign_target(EXPR_t *lhs, const char *rhs_str);
+static void emit_assign_target_io(EXPR_t *lhs, const char *rhs_str);
+static void emit_expr(EXPR_t *e);
+static const char *cs_label(const char *s);
+static int is_body_boundary(const char *label, const char *fn);
+
+/* escape_string — emit a C string literal (replaces emit_cstr) */
+static void escape_string(const char *s) {
+    C("\"");
+    for (; *s; s++) {
+        unsigned char c = (unsigned char)*s;
+        if      (c == '"')  C("\\\"");
+        else if (c == '\\') C("\\\\");
+        else if (c == '\n') C("\\n");
+        else if (c == '\r') C("\\r");
+        else if (c == '\t') C("\\t");
+        else if (c < 0x20 || c > 0x7E) C("\\x%02x", c);
+        else C("%c", c);
+    }
+    C("\"");
+}
 
 /* -----------------------------------------------------------------------
- * Label / UID generation
- *
- * Labels: <role>_<uid>_<port>
- * e.g.  lit_7_α   cat_12_β   arbno_3_child_fail
+ * CNode pretty-printer macros (C-specific expression formatting)
  * ----------------------------------------------------------------------- */
 
-static int uid_ctr = 0;
+#define PP_EXPR(e, col) do { \
+    CArena *_a = cn_arena_new(65536); \
+    pp_cnode(build_expr(_a, (e)), out, (col), 4, 120); \
+    cn_arena_free(_a); \
+} while(0)
 
-static void uid_reset(void) { uid_ctr = 0; }
-static int  next_uid(void)       { return ++uid_ctr; }
+#define PP_PAT(e, col) do { \
+    CArena *_a = cn_arena_new(65536); \
+    pp_cnode(build_pat(_a, (e)), out, (col), 4, 120); \
+    cn_arena_free(_a); \
+} while(0)
 
-/* Format a label into a static buffer — caller copies if needed */
+/* -----------------------------------------------------------------------
+ * Trampoline mode (-trampoline flag)
+ * When 1: each stmt is a void* function, goto → return block_ptr
+ * ----------------------------------------------------------------------- */
+int trampoline_mode = 0;
+static int cur_stmt_next_uid = 0;
+
+/* -----------------------------------------------------------------------
+ * Variable registry — collect all SNOBOL4 variable names
+ * ----------------------------------------------------------------------- */
+
+#define MAX_VARS 4096
+static char *vars[MAX_VARS];
+static int   nvar = 0;
+
+static const char *io_names[] = {
+    "OUTPUT","INPUT","PUNCH","TERMINAL","TRACE",NULL
+};
+
+static int is_io_name(const char *name) {
+    for (int i = 0; io_names[i]; i++)
+        if (strcasecmp(name, io_names[i]) == 0) return 1;
+    return 0;
+}
+
+static void var_register(const char *name) {
+    if (!name || !*name) return;
+    if (is_io_name(name)) return;
+    for (int i = 0; i < nvar; i++)
+        if (strcmp(vars[i], name) == 0) return;
+    if (nvar < MAX_VARS)
+        vars[nvar++] = strdup(name);
+}
+
+static void collect_expr_vars(EXPR_t *e) {
+    if (!e) return;
+    switch (e->kind) {
+    case E_VART: var_register(e->sval); break;
+    case E_ARY:  var_register(e->sval); break;
+    default: break;
+    }
+    for (int i = 0; i < e->nchildren; i++) collect_expr_vars(e->children[i]);
+}
+
+static void collect_vars(Program *prog) {
+    nvar = 0;
+    for (STMT_t *s = prog->head; s; s = s->next) {
+        collect_expr_vars(s->subject);
+        collect_expr_vars(s->pattern);
+        collect_expr_vars(s->replacement);
+    }
+}
+
+/* -----------------------------------------------------------------------
+ * FnDef — user-defined function table
+ * C-specific: body_starts[] + define_stmt for complex body detection
+ * ----------------------------------------------------------------------- */
+
+#define FN_MAX   256
+#define FN_ARGMAX 32
+#define ARG_MAX FN_ARGMAX  /* alias used in collect_fndefs/parse_proto */
+#define BODY_MAX   8
+
+typedef struct {
+    char   *name;
+    char   *args[FN_ARGMAX];
+    int     nargs;
+    char   *locals[FN_ARGMAX];
+    int     nlocals;
+    STMT_t *body_starts[BODY_MAX];
+    int     nbody_starts;
+    STMT_t *define_stmt;
+    char   *end_label;
+    char   *entry_label;
+} FnDef;
+
+static FnDef fn_table[FN_MAX];
+static int   fn_count = 0;
+static FnDef *cur_fn_def = NULL;
+
+int is_defined_function(const char *name) {
+    static const char *std[] = {
+        "APPLY","ARG","ARRAY","ATAN","BACKSPACE","BREAK","BREAKX",
+        "CHAR","CHOP","CLEAR","CODE","COLLECT","CONVERT","COPY","COS",
+        "DATA","DATATYPE","DATE","DEFINE","DETACH","DIFFER","DUMP","DUPL",
+        "EJECT","ENDFILE","EQ","EVAL","EXIT","EXP","FENCE","FIELD",
+        "GE","GT","HOST","IDENT","INPUT","INTEGER","ITEM",
+        "LE","LEN","LEQ","LGE","LGT","LLE","LLT","LN","LNE","LOAD",
+        "LOCAL","LPAD","LT","NE","NOTANY","OPSYN","OUTPUT",
+        "POS","PROTOTYPE","REMDR","REPLACE","REVERSE","REWIND","RPAD",
+        "RPOS","RSORT","RTAB","SET","SETEXIT","SIN","SIZE","SORT","SPAN",
+        "SQRT","STOPTR","SUBSTR","TAB","TRACE","TRIM","UNLOAD","UCASE","LCASE",
+        "ANY","ARB","ARBNO","BAL","DT_FAIL","ABORT","REM","SUCCEED",
+        "ICASE","UCASE","LCASE","REVERSE","REPLACE","DUPL","LPAD","RPAD",
+        NULL
+    };
+    for (int i = 0; std[i]; i++)
+        if (strcasecmp(name, std[i]) == 0) return 1;
+    for (int i = 0; i < fn_count; i++)
+        if (strcasecmp(fn_table[i].name, name) == 0) return 1;
+    return 0;
+}
+
+static void emit_computed_goto_inline(const char *label, const char *fn) {
+    const char *expr_src = (strncasecmp(label,"$COMPUTED",9)==0 && label[9]==':')
+                           ? label+10 : NULL;
+    if (!expr_src || !*expr_src || !fn) {
+        C("goto _SNO_NEXT_%d", cur_stmt_next_uid);
+        return;
+    }
+    char expr_buf[4096];
+    strncpy(expr_buf, expr_src, sizeof(expr_buf)-1);
+    expr_buf[sizeof(expr_buf)-1] = '\0';
+    int elen = (int)strlen(expr_buf);
+    while (elen > 0 && (expr_buf[elen-1] == ')' || expr_buf[elen-1] == ' ' || expr_buf[elen-1] == '\t'))
+        expr_buf[--elen] = '\0';
+    EXPR_t *ce = parse_expr_from_str(expr_buf);
+    if (!ce) { C("goto _SNO_NEXT_%d", cur_stmt_next_uid); return; }
+    C("{ const char *_cg_raw = VARVAL_fn(");
+    emit_expr(ce);
+    C("); char _cg_buf[512]; size_t _cg_j=0;");
+    C(" if(_cg_raw) { for(size_t _cg_i=0;_cg_raw[_cg_i]&&_cg_j<sizeof(_cg_buf)-1;_cg_i++)");
+    C(" { if(_cg_raw[_cg_i]=='\\'' || _cg_raw[_cg_i]=='\"') continue; _cg_buf[_cg_j++]=_cg_raw[_cg_i]; } }");
+    C(" _cg_buf[_cg_j]='\\0'; const char *_cg=_cg_buf;");
+    C(" if(0){}");
+    for (int i = 0; i < fn_count; i++) {
+        if (strcasecmp(fn_table[i].name, fn) != 0) continue;
+        for (int b = 0; b < fn_table[i].nbody_starts; b++) {
+            STMT_t *bs = fn_table[i].body_starts[b];
+            for (STMT_t *t = bs; t; t = t->next) {
+                if (t->is_end) break;
+                if (t != bs && is_body_boundary(t->label, fn_table[i].name)) break;
+                if (t->label)
+                    C(" else if(strcasecmp(_cg,\"%s\")==0) goto _L%s;",
+                      t->label, cs_label(t->label));
+            }
+        }
+        break;
+    }
+    C(" (void)_cg; }");
+}
+
 #define LBUF 320
 typedef char Label[LBUF];
 
@@ -146,8 +306,8 @@ void named_pat_reset(void) { named_pat_count = 0; }
  * Pending conditional assignments (E_NAM / dot-capture)
  *
  * emit_cond() registers (varname, c_tmpvar) pairs here.
- * emit.c calls byrd_cond_emit_assigns() at _byrd_ok to flush them.
- * byrd_cond_reset() is called before each MATCH_fn block.
+ * emit.c calls cond_emit_assigns() at _byrd_ok to flush them.
+ * cond_reset() is called before each MATCH_fn block.
  * ----------------------------------------------------------------------- */
 #define COND_ASSIGN_MAX 32
 typedef struct {
@@ -158,7 +318,7 @@ typedef struct {
 static CondAssign cond_assigns[COND_ASSIGN_MAX];
 static int        cond_assign_count = 0;
 
-void byrd_cond_reset(void) { cond_assign_count = 0; }
+static void cond_reset(void) { cond_assign_count = 0; }
 
 /* Called by emit_cond to register a pending conditional */
 static void cond_register(const char *varname, const char *tmpvar, int has_cs) {
@@ -170,7 +330,7 @@ static void cond_register(const char *varname, const char *tmpvar, int has_cs) {
 }
 
 /* Called by emit.c at _byrd_ok to flush pending conditional assigns */
-void byrd_cond_emit_assigns(FILE *fp, int stmt_u) {
+static void cond_emit_assigns(FILE *fp, int stmt_u) {
     (void)stmt_u;
     for (int i = 0; i < cond_assign_count; i++) {
         CondAssign *ca = &cond_assigns[i];
@@ -224,7 +384,7 @@ void scan_named_patterns(const char *varname) {
  * in function prototypes are valid incomplete-type pointers.
  *   typedef struct pat_X_t pat_X_t;   (incomplete — enough for pointer use)
  */
-void byrd_emit_named_typedecls(FILE *out_file) {
+static void emit_named_typedecls(FILE *out_file) {
     for (int i = 0; i < named_pat_count; i++) {
         fprintf(out_file,
             "typedef struct %s %s;\n",
@@ -243,7 +403,7 @@ void byrd_emit_named_typedecls(FILE *out_file) {
  * Must be called once, after all scan_named_patterns calls,
  * and BEFORE any byrd_emit_named_pattern calls.
  * Signature: pat_X(subj, slen, cur_ptr, zz, entry) */
-void byrd_emit_named_fwdecls(FILE *out_file) {
+static void emit_named_fwdecls(FILE *out_file) {
     for (int i = 0; i < named_pat_count; i++) {
         fprintf(out_file,
             "static DESCR_t %s(const char *, int64_t, int64_t *, %s **, int);\n",
@@ -284,7 +444,7 @@ static char child_decl_buf[DECL_BUF_MAX][DECL_LINE_MAX];
 static int  child_decl_count;
 
 /* Cross-call dedup: tracks statics already emitted in the current C function.
- * Reset by byrd_fn_scope_reset() when emit.c opens a new C function. */
+ * Reset by fn_scope_reset() when emit.c opens a new C function. */
 static char fn_seen[DECL_BUF_MAX][DECL_LINE_MAX];
 static int  fn_seen_count;
 
@@ -315,7 +475,7 @@ static int suppress_output_in_named_pat(void) {
  * instead of ntop().  Reset to -1 after E_OPSYN consumes it. */
 static int  pending_npush_uid = -1;
 
-void byrd_fn_scope_reset(void) { fn_seen_count = 0; }
+static void fn_scope_reset(void) { fn_seen_count = 0; }
 
 static void decl_reset(void) {
     decl_count = 0;
@@ -447,16 +607,7 @@ static void decl_emit_undefs(FILE *out_file) {
  * C-safe string literal emission
  * ----------------------------------------------------------------------- */
 
-static void escape_string(const char *s) {
-    fputc('"', out);
-    for (; *s; s++) {
-        if (*s == '"' || *s == '\\') fputc('\\', out);
-        else if (*s == '\n') { fputs("\\n", out); continue; }
-        else if (*s == '\t') { fputs("\\t", out); continue; }
-        fputc(*s, out);
-    }
-    fputc('"', out);
-}
+/* escape_string defined above */
 
 /* -----------------------------------------------------------------------
  * emit_charset_cexpr — build a C expression (written into buf) that evaluates
@@ -2459,7 +2610,7 @@ static void emit_pat_node(EXPR_t *pat,
  *   omega_label  — C label to jump to on MATCH_fn failure
  * ======================================================================= */
 
-void byrd_emit_pattern(EXPR_t *pat, FILE *out_file,
+static void emit_pattern(EXPR_t *pat, FILE *out_file,
                        const char *root_name,
                        const char *subject_var,
                        const char *subj_len_var,
@@ -2543,7 +2694,7 @@ void byrd_emit_pattern(EXPR_t *pat, FILE *out_file,
  * Registers the name so E_INDR (*varname) emits a direct call.
  * ======================================================================= */
 
-void byrd_emit_named_pattern(const char *varname, EXPR_t *pat, FILE *out_file) {
+static void emit_named_pattern(const char *varname, EXPR_t *pat, FILE *out_file) {
     /* C-safe name */
     char safe[NAMED_PAT_LBUF2];
     {
@@ -2575,7 +2726,7 @@ void byrd_emit_named_pattern(const char *varname, EXPR_t *pat, FILE *out_file) {
     if (np_entry) np_entry->emitted = 1;
 
     /* Reset fn_seen so statics aren't skipped due to a previous pattern's decls */
-    byrd_fn_scope_reset();
+    fn_scope_reset();
 
     /* NOTE: forward declaration is NOT emitted here.
      * Caller must emit all forward decls (via byrd_emit_named_fwdecls) BEFORE
@@ -2607,7 +2758,7 @@ void byrd_emit_named_pattern(const char *varname, EXPR_t *pat, FILE *out_file) {
     out = code_file;
     uid_ctr = uid_saved;
     decl_reset();
-    byrd_cond_reset();   /* clear any pending conditionals from prior pattern */
+    cond_reset();   /* clear any pending conditionals from prior pattern */
 
     /* Bug5: every named pattern gets a _parent_frame field so nInc()
      * can use NINC_AT_fn(_parent_frame) to increment the correct frame
@@ -2663,7 +2814,7 @@ void byrd_emit_named_pattern(const char *varname, EXPR_t *pat, FILE *out_file) {
         "    %s:;\n"
         "        *_cur_ptr_np = _cur_np;\n",
         γ_lbl);
-    byrd_cond_emit_assigns(out_file, 0);   /* flush . captures at pattern gamma */
+    cond_emit_assigns(out_file, 0);   /* flush . captures at pattern gamma */
     fprintf(out_file,
         "        return STRVAL(\"\");\n"
         "    %s:;\n"
@@ -2681,7 +2832,7 @@ void byrd_emit_named_pattern(const char *varname, EXPR_t *pat, FILE *out_file) {
  * a .sno file with sno2c in byrd mode and want a standalone executable.
  * ======================================================================= */
 
-void byrd_emit_standalone(EXPR_t *pat, FILE *out_file,
+static void emit_standalone(EXPR_t *pat, FILE *out_file,
                           const char *subject,
                           const char *root_name) {
     fprintf(out_file,
@@ -2696,7 +2847,7 @@ void byrd_emit_standalone(EXPR_t *pat, FILE *out_file,
     fprintf(out_file, "    int64_t     cursor      = 0;\n");
     fprintf(out_file, "    (void)cursor; (void)subject; (void)subject_len;\n\n");
 
-    byrd_emit_pattern(pat, out_file,
+    emit_pattern(pat, out_file,
                       root_name,
                       "subject", "subject_len", "cursor",
                       "root_MATCH_SUCCESS",
@@ -2706,4 +2857,1955 @@ void byrd_emit_standalone(EXPR_t *pat, FILE *out_file,
         "    root_MATCH_SUCCESS: return 0; /* matched */\n"
         "    root_MATCH_FAIL:    return 1; /* failed  */\n"
         "}\n");
+}
+static char *cs_alloc(const char *s) {
+    char base[512]; int j=0;
+    base[j++]='_';
+    for (int i=0; s[i]&&j<510; i++) {
+        unsigned char c=(unsigned char)s[i];
+        base[j++]=(isalnum(c)||c=='_')?(char)c:'_';
+    }
+    base[j]='\0';
+    return strdup(base);
+}
+
+/* Label registry — per-function, reset at the start of each function body.
+ * Detects collisions and appends disambiguation suffix.
+ * Maps original SNOBOL4 label → unique C label within the current function. */
+#define LREG_MAX 8192
+typedef struct { char *orig; char *csafe; } LReg;
+static LReg  lreg[LREG_MAX];
+static int   lreg_count = 0;
+
+static void lreg_reset(void) {
+    for (int i=0; i<lreg_count; i++) { free(lreg[i].orig); free(lreg[i].csafe); }
+    lreg_count = 0;
+}
+
+/* cs_label: return unique C label for SNOBOL4 label s within current function */
+static const char *cs_label(const char *s) {
+    /* Return previously registered entry */
+    for (int i=0; i<lreg_count; i++)
+        if (strcmp(lreg[i].orig, s)==0) return lreg[i].csafe;
+    /* Compute base C name */
+    char *base = cs_alloc(s);
+    /* Find unique candidate (no collision with existing csafe entries) */
+    char candidate[520];
+    strcpy(candidate, base);
+    int suffix=2, collision=1;
+    while (collision) {
+        collision=0;
+        for (int i=0; i<lreg_count; i++)
+            if (strcmp(lreg[i].csafe, candidate)==0) { collision=1; break; }
+        if (collision) snprintf(candidate, sizeof candidate, "%s_%d", base, suffix++);
+    }
+    free(base);
+    if (lreg_count < LREG_MAX) {
+        lreg[lreg_count].orig  = strdup(s);
+        lreg[lreg_count].csafe = strdup(candidate);
+        lreg_count++;
+    }
+    return lreg[lreg_count-1].csafe;
+}
+
+/* cs: C-safe name for variables (not labels) — simple, no registry */
+/* ============================================================
+ * Value expression emission → DESCR_t
+ * ============================================================ */
+static void emit_expr(EXPR_t *e);
+static void emit_pat(EXPR_t *e);
+int expr_contains_pattern(EXPR_t *e);
+
+/* -----------------------------------------------------------------------
+ * emit_chain_pretty — multi-line indented binary chain emitter
+ *
+ * Walks a left-associative binary chain (E_CONC/E_OR) collecting all
+ * leaves, then emits as indented multi-line nested calls.
+ *
+ * fn_name:  "CONCAT_fn", "pat_cat", "pat_alt"
+ * emit_leaf: emit_expr or emit_pat — called for each leaf node
+ * min_depth: minimum chain depth before pretty-printing kicks in (3)
+ *
+ * Output form (depth 4, fn="CONCAT_fn"):
+ *   CONCAT_fn(
+ *       CONCAT_fn(
+ *           CONCAT_fn(leaf0, leaf1),
+ *           leaf2),
+ *       leaf3)
+ * ----------------------------------------------------------------------- */
+#define CHAIN_MAX 64
+static void emit_chain_pretty(EXPR_t *e, int kind,
+                               const char *fn_name,
+                               void (*emit_leaf)(EXPR_t *),
+                               int min_depth) {
+    /* With n-ary children[], the leaves are already flat: children[0..nchildren-1] */
+    int depth = e->nchildren;
+
+    if (depth < min_depth) {
+        /* Short — keep inline */
+        C("%s(", fn_name);
+        for (int _ci = 0; _ci < e->nchildren; _ci++) {
+            if (_ci > 0) C(",");
+            emit_leaf(e->children[_ci]);
+        }
+        C(")");
+        return;
+    }
+
+    /* Collect leaves from flat children array */
+    EXPR_t *leaves[CHAIN_MAX];
+    int n = e->nchildren < CHAIN_MAX ? e->nchildren : CHAIN_MAX;
+    for (int _ci = 0; _ci < n; _ci++) leaves[_ci] = e->children[_ci];
+
+    /* Emit: nested left-associative with 4-space indent per nesting level.
+     *
+     * For n leaves:
+     *   fn(                  <- open (n-2) times
+     *     fn(
+     *       fn(leaf0, leaf1),
+     *       leaf2),
+     *     leaf3)
+     */
+    int indent = 4;
+    /* Opening preamble: (n-2) lines each starting a new concat level */
+    for (int i = 0; i < n - 2; i++) {
+        C("%s(\n", fn_name);
+        for (int s = 0; s < indent; s++) C(" ");
+    }
+    /* Innermost pair */
+    C("%s(", fn_name);
+    emit_leaf(leaves[0]);
+    C(",\n");
+    for (int s = 0; s < indent; s++) C(" ");
+    emit_leaf(leaves[1]);
+    C(")");
+    /* Close each outer level, appending next right-arg */
+    for (int i = 2; i < n; i++) {
+        C(",\n");
+        for (int s = 0; s < indent; s++) C(" ");
+        emit_leaf(leaves[i]);
+        C(")");
+    }
+}
+#undef CHAIN_MAX
+
+static void emit_expr(EXPR_t *e) {
+    if (!e) { C("NULVCL"); return; }
+    switch (e->kind) {
+    case E_NULV:    C("NULVCL"); break;
+    case E_QLIT:     C("STRVAL_fn("); escape_string(e->sval); C(")"); break;
+    case E_ILIT:     C("INTVAL_fn(%ld)", e->ival); break;
+    case E_FLIT:    C("real(%g)", e->dval); break;
+    case E_VART:
+        if (is_io_name(e->sval)) C("NV_GET_fn(\"%s\")", e->sval);
+        else C("get(%s)", cs(e->sval));
+        break;
+    case E_KW: C("kw(\"%s\")", e->sval); break;
+
+    case E_INDR:
+        if (!e->children[0] || (!e->children[1] && !(e->children[0]->kind == E_VART || e->children[0]->kind == E_FNC))) {
+            /* $expr — indirect lookup.
+             * Old tree: left=NULL, right=operand.
+             * New flat tree (M-FLAT-NARY): children[0]=operand (no right child).
+             * Accept both: if children[0] is not VART/FNC it's a $-deref operand. */
+            EXPR_t *operand = e->children[1] ? e->children[1] : e->children[0];
+            C("deref("); emit_expr(operand); C(")");
+        } else if (e->children[0]->kind == E_VART) {
+            /* *varname — deferred pattern reference (resolved at MATCH_fn time) */
+            C("var_as_pattern(pat_ref(\"%s\"))", e->children[0]->sval);
+        } else if (e->children[0]->kind == E_FNC && e->children[0]->nchildren >= 1
+                   && !is_defined_function(e->children[0]->sval)) {
+
+            /* *varname(arg...) — parser misparse: *varname concatenated with (arg).
+             * SNOBOL4 continuation lines cause the parser to greedily consume the
+             * next '(' as a function-call argument to varname.  The correct
+             * semantics are: deferred-ref(*varname) cat arg. */
+            C("CONCAT_fn(var_as_pattern(pat_ref(\"%s\")),", e->children[0]->sval);
+            emit_expr(e->children[0]->children[0]);
+            C(")");
+        } else {
+            /* *(expr) — deref of compound expression */
+            C("deref("); emit_expr(e->children[0]); C(")");
+        }
+        break;
+
+    case E_MNS: C("neg("); emit_expr(e->children[0]); C(")"); break;
+
+    case E_CONC:
+        emit_chain_pretty(e, E_CONC, "CONCAT_fn", emit_expr, 2);
+        break;
+
+    case E_OPSYN: C("APPLY_fn(\"reduce\",(DESCR_t[]){"); emit_expr(e->children[0]); C(","); emit_expr(e->children[1]); C("},2)"); break;
+    case E_ADD:    C("add(");    emit_expr(e->children[0]); C(","); emit_expr(e->children[1]); C(")"); break;
+    case E_SUB:    C("sub(");    emit_expr(e->children[0]); C(","); emit_expr(e->children[1]); C(")"); break;
+    case E_MPY:    C("mul(");    emit_expr(e->children[0]); C(","); emit_expr(e->children[1]); C(")"); break;
+    case E_DIV:    C("DIVIDE_fn(");    emit_expr(e->children[0]); C(","); emit_expr(e->children[1]); C(")"); break;
+    case E_EXPOP:    C("POWER_fn(");    emit_expr(e->children[0]); C(","); emit_expr(e->children[1]); C(")"); break;
+    case E_OR:
+        /* Same: if either side is pattern-valued, use pat_alt */
+        if (expr_contains_pattern(e->children[0]) || expr_contains_pattern(e->children[1])) {
+            C("pat_alt("); emit_pat(e->children[0]); C(","); emit_pat(e->children[1]); C(")");
+        } else {
+            C("alt("); emit_expr(e->children[0]); C(","); emit_expr(e->children[1]); C(")");
+        }
+        break;
+
+    /* capture nodes — in value context, evaluate the child */
+    case E_NAM: emit_expr(e->children[0]); break;
+    case E_DOL:  emit_expr(e->children[0]); break;
+
+    case E_FNC:
+        if (e->nchildren == 0) {
+            C("APPLY_fn(\"%s\",NULL,0)", e->sval);
+        } else {
+            C("APPLY_fn(\"%s\",(DESCR_t[]){", e->sval);
+            for (int i=0; i<e->nchildren; i++) {
+                if (i) { C(","); } emit_expr(e->children[i]);
+            }
+            C("},%d)", e->nchildren);
+        }
+        break;
+
+    case E_ARY:
+        C("aref(%s,(DESCR_t[]){", cs(e->sval));
+        for (int i=0; i<e->nchildren; i++) {
+            if (i) { C(","); } emit_expr(e->children[i]);
+        }
+        C("},%d)", e->nchildren);
+        break;
+
+    case E_IDX:
+        /* postfix subscript: expr<i,j,...> — children[0]=array expr, children[1..n-1]=subscripts */
+        C("INDEX_fn("); emit_expr(e->children[0]); C(",(DESCR_t[]){");
+        for (int i=1; i<e->nchildren; i++) {
+            if (i>1) { C(","); } emit_expr(e->children[i]);
+        }
+        C("},%d)", e->nchildren - 1);
+        break;
+
+    case E_ATP:
+        /* @var — cursor position capture: evaluates to cursor int */
+        C("cursor_get(\"%s\")", e->sval);
+        break;
+
+    case E_ASGN:
+        /* var = expr inside expression context */
+        C("assign_expr(%s,", cs(e->children[0]->sval)); emit_expr(e->children[1]); C(")");
+        break;
+    }
+}
+
+/* ============================================================
+ * Pattern expression emission → PATND_t*
+ *
+ * Same EXPR_t nodes, different routing:
+ *   E_FNC  → pat_builtin or pat_call
+ *   E_CONC → pat_cat
+ *   E_OR   → pat_alt
+ *   E_NAM  → pat_cond(child_pat, varname)
+ *   E_DOL   → pat_imm(child_pat, varname)
+ *   E_INDR → pat_ref(varname)   (deferred pattern reference *X)
+ *   E_QLIT   → pat_lit(STRVAL_fn)
+ *   E_VART   → pat_var(varname)   (pattern variable)
+ * ============================================================ */
+static void emit_pat(EXPR_t *e);
+
+static void emit_pat(EXPR_t *e) {
+    if (!e) { C("pat_epsilon()"); return; }
+    switch (e->kind) {
+    case E_QLIT:
+        C("pat_lit("); escape_string(e->sval); C(")"); break;
+
+    case E_VART:
+        C("pat_var(\"%s\")", e->sval); break;
+
+    case E_INDR:
+        /* *X — deferred pattern reference */
+        if (e->children[0] && e->children[0]->kind == E_VART)
+            C("pat_ref(\"%s\")", e->children[0]->sval);
+        else if (e->children[0] && e->children[0]->kind == E_FNC && e->children[0]->nchildren >= 1
+                 && !is_defined_function(e->children[0]->sval)) {
+            /* *varname(arg...) — continuation-line misparse: deref-ref cat arg
+             * Only applies when varname is NOT a known function (it's a pat var). */
+            C("pat_cat(pat_ref(\"%s\"),", e->children[0]->sval);
+            emit_pat(e->children[0]->children[0]);
+            C(")");
+        } else {
+            EXPR_t *op = e->children[1] ? e->children[1] : e->children[0];
+            C("pat_deref("); emit_expr(op); C(")");
+        }
+        break;
+
+    case E_CONC:
+        emit_chain_pretty(e, E_CONC, "pat_cat", emit_pat, 2);
+        break;
+
+    case E_MPY:
+        /* pat * x — parsed as arithmetic multiply, but in pattern context
+         * this is: left_pattern CONCAT_fn *right (deferred ref to right) */
+        C("pat_cat("); emit_pat(e->children[0]); C(",");
+        if (e->children[1] && e->children[1]->kind == E_VART)
+            C("pat_ref(\"%s\")", e->children[1]->sval);
+        else { C("pat_deref("); emit_expr(e->children[1]); C(")"); }
+        C(")"); break;
+
+    case E_OPSYN:
+        /* & in pattern context: reduce(left, right) — must fire at MATCH TIME.
+         * reduce() calls EVAL("epsilon . *Reduce(t, n)") where n may contain
+         * nTop() — which must be evaluated at MATCH_fn time, not build time.
+         * Use pat_user_call to defer the call until the engine executes
+         * this node during pattern matching. */
+        C("pat_user_call(\"reduce\",(DESCR_t[]){"); emit_expr(e->children[0]); C(","); emit_expr(e->children[1]); C("},2)"); break;
+
+    case E_OR:
+        emit_chain_pretty(e, E_OR, "pat_alt", emit_pat, 2);
+        break;
+
+    case E_NAM: {
+        /* pat . var */
+        const char *varname = (e->children[1] && e->children[1]->kind==E_VART)
+                              ? e->children[1]->sval : "?";
+        C("pat_cond("); emit_pat(e->children[0]); C(",\"%s\")", varname); break;
+    }
+    case E_DOL: {
+        /* pat $ var */
+        const char *varname = (e->children[1] && e->children[1]->kind==E_VART)
+                              ? e->children[1]->sval : "?";
+        C("pat_imm("); emit_pat(e->children[0]); C(",\"%s\")", varname); break;
+    }
+
+    case E_FNC: {
+        /* Route known builtins to pat_* */
+        const char *n = e->sval;
+        /* B0: zero-arg pattern; B1i: one int64_t arg; B1s: one string arg; B1v: one DESCR_t arg */
+        #define B0(nm,fn)  if(strcasecmp(n,nm)==0){C(fn"()");break;}
+        #define B1i(nm,fn) if(strcasecmp(n,nm)==0&&e->nchildren>=1){C(fn"(to_int(");emit_expr(e->children[0]);C("))");break;}
+        #define B1s(nm,fn) if(strcasecmp(n,nm)==0&&e->nchildren>=1){C(fn"(VARVAL_fn(");emit_expr(e->children[0]);C("))");break;}
+        #define B1v(nm,fn) if(strcasecmp(n,nm)==0&&e->nchildren>=1){C(fn"(");emit_expr(e->children[0]);C(")");break;}
+        B0("ARB","pat_arb")  B0("REM","pat_rem")
+        B0("DT_FAIL","pat_fail") B0("ABORT","pat_abort")
+        /* FENCE() = bare fence; FENCE(p) = fence with sub-pattern */
+        if(strcasecmp(n,"FENCE")==0){
+            if(e->nchildren>=1){C("pat_fence_p(");emit_pat(e->children[0]);C(")");}
+            else{C("pat_fence()");}
+            break;
+        }
+        B0("SUCCEED","pat_succeed")
+        B0("BAL","pat_bal")
+        B1i("LEN","pat_len")   B1i("POS","pat_pos")
+        B1i("RPOS","pat_rpos") B1i("TAB","pat_tab")
+        B1i("RTAB","pat_rtab")
+        B1s("SPAN","pat_span") B1s("BREAK","pat_break")
+        B1s("NOTANY","pat_notany") B1s("ANY","pat_any")
+        B1v("ARBNO","pat_arbno")
+        #undef B0
+        #undef B1i
+        #undef B1s
+        #undef B1v
+        /* user-defined pattern function — use pat_user_call so the function
+         * fires at MATCH TIME (XATP materialisation), not at build time.
+         * This correctly handles nPush()/nPop() side effects per MATCH_fn attempt,
+         * and reduce()/shift() which return pattern objects at materialisation time.
+         *
+         * EXCEPTION: if name is NOT a known/defined function AND has args, the
+         * parser has misinterpreted  var(pat)  as a function call.  In SNOBOL4,
+         * a variable followed by a parenthesised expression is CONCATENATION, not
+         * a call.  Emit: pat_cat(pat_var(n), emit_pat(args[0])) instead. */
+        if (e->nchildren > 0 && !is_defined_function(n)) {
+            /* variable(args) → CONCAT(var, grouped_pat) */
+            C("pat_cat(pat_var(\"%s\"),", n);
+            if (e->nchildren == 1) {
+                emit_pat(e->children[0]);
+            } else {
+                /* Multiple args: emit as successive concatenations */
+                for (int i = 0; i < e->nchildren; i++) {
+                    if (i < e->nchildren - 1) C("pat_cat(");
+                }
+                emit_pat(e->children[0]);
+                for (int i = 1; i < e->nchildren; i++) { C(","); emit_pat(e->children[i]); C(")"); }
+            }
+            C(")");
+            break;
+        }
+        if (e->nchildren == 0) {
+            C("pat_user_call(\"%s\",NULL,0)", n);
+        } else {
+            /* Pattern-constructor functions are called eagerly at BUILD TIME.
+             * They return a DESCR_t of type PATTERN — wrap with var_as_pattern.
+             * reduce(t,n), shift(p,t), EVAL(s) → build-time call → APPLY_fn.
+             * Side-effect functions (nPush, nPop, nInc, Reduce, Shift, TZ, etc.)
+             * must fire at MATCH TIME → stay as pat_user_call. */
+            static const char *_build_time_fns[] = {
+                "reduce", "shift", "EVAL", NULL
+            };
+            int _is_build = 0;
+            for (int _ci = 0; _build_time_fns[_ci]; _ci++) {
+                if (strcasecmp(n, _build_time_fns[_ci]) == 0) { _is_build = 1; break; }
+            }
+            if (_is_build) {
+                C("var_as_pattern(APPLY_fn(\"%s\",(DESCR_t[]){", n);
+                for (int i=0; i<e->nchildren; i++) { if(i) C(","); emit_expr(e->children[i]); }
+                C("},%d))", e->nchildren);
+            } else {
+                C("pat_user_call(\"%s\",(DESCR_t[]){", n);
+                for (int i=0; i<e->nchildren; i++) { if(i) C(","); emit_expr(e->children[i]); }
+                C("},%d)", e->nchildren);
+            }
+        }
+        break;
+    }
+
+    /* value nodes that shouldn't appear in pattern context — treat as var */
+    case E_IDX:
+    case E_ATP:
+    case E_ASGN:
+    default:
+        C("pat_val("); emit_expr(e); C(")"); break;
+    }
+}
+
+/* ============================================================
+ * Emit lvalue assignment target
+ * ============================================================ */
+
+/* cur_fn_def and is_fn_local() are defined after FnDef (below) */
+static int is_fn_local(const char *varname);
+
+static void emit_assign_target(EXPR_t *lhs, const char *rhs_str) {
+    if (!lhs) return;
+    if (lhs->kind == E_VART) {
+        C("set(%s, %s);\n", cs(lhs->sval), rhs_str);
+        C("NV_SET_fn(\"%s\", %s);\n", lhs->sval, cs(lhs->sval));
+    } else if (lhs->kind == E_ARY) {
+        /* var<i,...> = x  — sval is array var name, children are subscripts */
+        C("aset(%s,(DESCR_t[]){", cs(lhs->sval));
+        for (int i=0; i<lhs->nchildren; i++) {
+            if (i) C(",");
+            PP_EXPR(lhs->children[i], 0);
+        }
+        C("},%d,%s);\n", lhs->nchildren, rhs_str);
+    } else if (lhs->kind == E_KW) {
+        C("kw_set(\"%s\",%s);\n", lhs->sval, rhs_str);
+    } else if (lhs->kind == E_IDX) {
+        /* expr<i,...> = x  — children[0]=array expr, children[1..n-1]=subscripts */
+        C("aset("); PP_EXPR(lhs->children[0], 0);
+        C(",(DESCR_t[]){");
+        for (int i=1; i<lhs->nchildren; i++) {
+            if (i>1) C(",");
+            PP_EXPR(lhs->children[i], 0);
+        }
+        C("},%d,%s);\n", lhs->nchildren - 1, rhs_str);
+    } else if (lhs->kind == E_INDR) {
+        /* $X = val: flat tree children[0]=operand */
+        C("iset("); PP_EXPR(lhs->children[0], 0); C(",%s);\n", rhs_str);
+    } else if (lhs->kind == E_FNC && lhs->nchildren == 1) {
+        /* field accessor lvalue: val(n) = x  ->  FIELD_SET_fn(n, "val", x) */
+        C("FIELD_SET_fn("); PP_EXPR(lhs->children[0], 0);
+        C(", \"%s\", %s);\n", lhs->sval, rhs_str);
+    } else {
+        /* complex lvalue: evaluate and assign indirectly */
+        C("iset("); PP_EXPR(lhs, 0); C(",%s);\n", rhs_str);
+    }
+}
+
+/* Current function being emitted (NULL = main) */
+static const char *cur_fn_name = NULL;
+
+/* Return 1 if label is defined within the body region of fn_name.
+ * This is used to detect cross-function goto references. */
+static int label_is_in_fn_body(const char *label, const char *fn_name);
+static void emit_computed_goto_inline(const char *label, const char *fn);
+static int is_body_boundary(const char *label, const char *cur_fn);
+
+/* Forward: current stmt next uid for fallthrough */
+/* (cur_stmt_next_uid already declared above) */
+
+/* ============================================================
+ * Emit goto field
+ * ============================================================ */
+
+/* Emit a single branch target — handles RETURN/FRETURN/NRETURN/END specially.
+ * Also handles:
+ *   "error"     -> FRETURN (beauty.sno idiom: :F(error) means fail the function)
+ *   "_COMPUTED" -> computed-goto stub (just fall through)
+ *   Cross-fn labels -> fallthrough (label is in a different function's body)
+ * All SNOBOL4 label -> C label mappings go through cs_label() for uniqueness.
+ */
+
+/* Capture emit_goto_target output as a string (for use with PS/PL macros).
+ * PG/PS macros expect just the goto *target* (without "goto " prefix),
+ * because pretty_line col3 adds "goto " itself.
+ * For "return ..." targets (trampoline mode), returns the full statement
+ * with a leading "!" marker so callers can detect and use C() instead.
+ * Returns heap-allocated string; caller must free(). */
+static void emit_goto_target(const char *label, const char *fn);
+static char *goto_target_str(const char *label, const char *fn) {
+    char *buf = NULL; size_t sz = 0;
+    FILE *tmp = open_memstream(&buf, &sz);
+    FILE *saved = out; out = tmp;
+    emit_goto_target(label, fn);
+    out = saved; fclose(tmp);
+    /* Strip leading "goto " — pretty_line adds it back in col3 */
+    if (buf && strncmp(buf, "goto ", 5) == 0) {
+        char *stripped = strdup(buf + 5);
+        free(buf);
+        return stripped;
+    }
+    /* Return statements or other non-goto fragments: return as-is.
+     * Callers must use C("%s;\n", tgt) not PG(tgt) for these. */
+    return buf; /* caller frees */
+}
+
+/* Emit a conditional or unconditional goto line in 3-column format.
+ * cond: NULL/"" for unconditional; "if(_ok)" etc for conditional.
+ * tgt: raw output of goto_target_str — either a label (use PG/PS)
+ *      or a full "return ..." statement (use E). */
+static void emit_pretty_goto(const char *tgt, const char *cond) {
+    if (!tgt || !tgt[0]) return;
+    int is_return   = (strncmp(tgt, "return", 6) == 0);
+    int is_computed = (tgt[0] == '{');   /* computed-goto inline block */
+    if (is_return || is_computed) {
+        /* Can't put return/block in col3 — use C() raw */
+        if (cond && cond[0]) C("    %s { %s; }\n", cond, tgt);
+        else                  C("    %s;\n", tgt);
+    } else {
+        if (cond && cond[0]) PS(tgt, "%s", cond);
+        else                  PG(tgt);
+    }
+}
+
+static void emit_goto_target(const char *label, const char *fn) {
+    int in_main = !fn || strcasecmp(fn, "main") == 0;
+
+    /* ---- Trampoline mode: every exit is a return, not a goto ---- */
+    if (trampoline_mode) {
+        if      (strcasecmp(label,"RETURN") ==0 ||
+                 strcasecmp(label,"NRETURN")==0) {
+            if (in_main) { C("return NULL"); return; }
+            C("return _tramp_return_%s", fn); return;
+        }
+        else if (strcasecmp(label,"FRETURN")==0 ||
+                 strcasecmp(label,"error")  ==0) {
+            if (in_main) { C("return NULL"); return; }
+            C("return _tramp_freturn_%s", fn); return;
+        }
+        else if (strcasecmp(label,"END")==0) {
+            C("return NULL"); return;
+        }
+        else if (strncasecmp(label,"$COMPUTED",9)==0) {
+            /* Computed goto: $COMPUTED:expr_text
+             * Re-parse the stored expression, emit runtime label lookup. */
+            const char *expr_src = (label[9]==':') ? label+10 : NULL;
+            if (expr_src && *expr_src) {
+                EXPR_t *ce = parse_expr_from_str(expr_src);
+                if (ce) {
+                    C("{ const char *_cgoto_lbl = VARVAL_fn(");
+                    emit_expr(ce);
+                    C("); return sno_computed_goto(_cgoto_lbl); }");
+                } else {
+                    C("return (void*)_tramp_next_%d", cur_stmt_next_uid);
+                }
+            } else {
+                C("return (void*)_tramp_next_%d", cur_stmt_next_uid);
+            }
+            return;
+        }
+        /* Cross-scope: fall through */
+        if (label_is_in_fn_body(label, NULL) && !label_is_in_fn_body(label, fn)) {
+            C("return (void*)_tramp_next_%d", cur_stmt_next_uid); return;
+        }
+        if (!in_main && !label_is_in_fn_body(label, fn)) {
+            C("return (void*)_tramp_next_%d", cur_stmt_next_uid); return;
+        }
+        C("return (void*)block%s", cs_label(label));
+        return;
+    }
+
+    /* ---- Classic goto mode (unchanged) ---- */
+    if      (strcasecmp(label,"RETURN") ==0) {
+        if (in_main) { C("goto _SNO_END"); return; }
+        C("goto _SNO_RETURN_%s", fn); return;
+    }
+    else if (strcasecmp(label,"FRETURN")==0) {
+        if (in_main) { C("goto _SNO_END"); return; }
+        C("goto _SNO_FRETURN_%s", fn); return;
+    }
+    else if (strcasecmp(label,"NRETURN")==0) {
+        if (in_main) { C("goto _SNO_END"); return; }
+        C("goto _SNO_RETURN_%s", fn); return;
+    }
+    else if (strcasecmp(label,"END")    ==0) {
+        if (!in_main) { C("goto _SNO_FRETURN_%s", fn); return; }
+        C("goto _SNO_END"); return;
+    }
+    else if (strcasecmp(label,"error")  ==0) {
+        if (in_main) { C("goto _SNO_END"); return; }
+        C("goto _SNO_FRETURN_%s", fn); return;
+    }
+    else if (strncasecmp(label,"$COMPUTED",9)==0 || strcasecmp(label,"_COMPUTED")==0) {
+        /* Computed goto: delegate to helper defined after fn_table. */
+        emit_computed_goto_inline(label, fn);
+        return;
+    }
+    if (label_is_in_fn_body(label, NULL) && !label_is_in_fn_body(label, fn)) {
+        C("goto _SNO_NEXT_%d", cur_stmt_next_uid); return;
+    }
+    if (!in_main && !label_is_in_fn_body(label, fn)) {
+        C("goto _SNO_NEXT_%d", cur_stmt_next_uid); return;
+    }
+    C("goto _L%s", cs_label(label));
+}
+
+static void emit_goto(SnoGoto *g, const char *fn, int result_ok) {
+    if (trampoline_mode) {
+        if (!g) { C("    return (void*)_tramp_next_%d;\n", cur_stmt_next_uid); return; }
+        if (g->uncond) {
+            C("    "); emit_goto_target(g->uncond, fn); C(";\n");
+        } else {
+            if (result_ok) {
+                if (g->onsuccess) { C("    if(_ok) { "); emit_goto_target(g->onsuccess, fn); C("; }\n"); }
+                if (g->onfailure) { C("    if(!_ok) { "); emit_goto_target(g->onfailure, fn); C("; }\n"); }
+            } else {
+                if (g->onsuccess) { C("    "); emit_goto_target(g->onsuccess, fn); C(";\n"); }
+            }
+            C("    return (void*)_tramp_next_%d;\n", cur_stmt_next_uid);
+        }
+        return;
+    }
+    if (!g) { char _nl[64]; snprintf(_nl,sizeof _nl,"_SNO_NEXT_%d",cur_stmt_next_uid); PG(_nl); return; }
+    if (g->uncond) {
+        char *tgt = goto_target_str(g->uncond, fn);
+        emit_pretty_goto(tgt, NULL); free(tgt);
+    } else {
+        if (result_ok) {
+            if (g->onsuccess) { char *tgt=goto_target_str(g->onsuccess,fn); emit_pretty_goto(tgt,"if(_ok)"); free(tgt); }
+            if (g->onfailure) { char *tgt=goto_target_str(g->onfailure,fn); emit_pretty_goto(tgt,"if(!_ok)"); free(tgt); }
+        } else {
+            if (g->onsuccess) { char *tgt=goto_target_str(g->onsuccess,fn); emit_pretty_goto(tgt,NULL); free(tgt); }
+            if (g->onfailure) { /* can't reach failure — skip */ }
+        }
+        char _nl[64]; snprintf(_nl,sizeof _nl,"_SNO_NEXT_%d",cur_stmt_next_uid); PG(_nl);
+    }
+}
+
+/* ============================================================
+ * Post-parse pattern-statement repair
+ *
+ * The grammar is LALR(1) and cannot always distinguish:
+ *   subject pattern = replacement    (pattern MATCH_fn)
+ *   subject_expr = replacement       (pure assignment)
+ * when pattern primitives (LEN, POS, etc.) appear inside the subject_expr.
+ * The lexer returns PAT_BUILTIN only at bstack_top==0, but PAT_BUILTIN IS
+ * also in the `primary` grammar rule for value exprs, causing the parser to
+ * absorb the pattern into the subject.
+ *
+ * This function detects the case and repairs the STMT_t in place.
+ * It looks for: s->pattern==NULL, s->replacement==E_NULV, and the subject
+ * tree contains a PAT_BUILTIN call in a position that looks like a pattern start.
+ * ============================================================ */
+
+static int is_pat_builtin_call(EXPR_t *e) {
+    if (!e || e->kind != E_FNC) return 0;
+    static const char *pb[] = {
+        "LEN","POS","RPOS","TAB","RTAB","SPAN","BREAK",
+        "NOTANY","ANY","ARB","REM","DT_FAIL","ABORT",
+        "FENCE","SUCCEED","BAL","ARBNO", NULL
+    };
+    for (int i = 0; pb[i]; i++)
+        if (strcasecmp(e->sval, pb[i]) == 0) return 1;
+    return 0;
+}
+
+/* Returns 1 if expr e is a pattern node (E_FNC to pat_builtin, E_NAM capture,
+ * E_OR, or E_CONC whose left child is a pattern). */
+static int is_pat_node(EXPR_t *e) {
+    if (!e) return 0;
+    if (is_pat_builtin_call(e)) return 1;
+    if (e->kind == E_NAM)   return 1;  /* .var capture */
+    if (e->kind == E_OR)    return 1;  /* | alternation */
+    if (e->kind == E_OPSYN) return 1;  /* & reduce() call — always pattern context */
+    /* E_MPY(pat_node, x) — parsed from "pat *x" where * is multiplication token
+     * but semantically is pattern-CONCAT_fn with deferred ref *x */
+    if (e->kind == E_MPY && is_pat_node(e->children[0])) return 1;
+    return 0;
+}
+
+/* Recursively checks if any node in e's subtree indicates pattern context.
+ * Used to decide whether a pure assignment RHS should use emit_pat.
+ * Indicators: E_INDR (*var — always a pattern ref), E_OPSYN (& — reduce()),
+ * E_NAM (. capture), E_OR (| alternation in pattern context), E_FNC to
+ * any pattern builtin including ARBNO/FENCE/etc. */
+/* Returns 1 if the expression subtree rooted at e contains ANY pattern-valued
+ * node.  Used by emit_expr to decide whether E_CONC / E_OR should be routed
+ * through emit_pat (pat_cat / pat_alt) instead of the string path
+ * (CONCAT_fn / alt).
+ *
+ * Key cases that are pattern-valued but NOT caught by is_pat_node:
+ *   - E_INDR whose left child is E_VART — "*varname" deferred pattern ref
+ *   - E_CONC or E_OR whose subtree contains any of the above
+ */
+int expr_contains_pattern(EXPR_t *e) {
+    if (!e) return 0;
+    if (is_pat_node(e)) return 1;
+    /* *varname — deferred pattern ref (grammar: left=NULL, right=E_VART) */
+    if (e->kind == E_INDR && e->children[1] && e->children[1]->kind == E_VART) return 1;
+    if (e->kind == E_INDR && e->children[0]  && e->children[0]->kind  == E_VART) return 1;
+    /* *varname(arg) — parser misparse deref+CONCAT_fn */
+    if (e->kind == E_INDR && e->children[0] && e->children[0]->kind == E_FNC) return 1;
+    /* recurse into children */
+    if (e->kind == E_CONC || e->kind == E_OR || e->kind == E_MPY)
+        return expr_contains_pattern(e->children[0]) || expr_contains_pattern(e->children[1]);
+    /* $ and . operators — pattern may be on the left side */
+    if (e->kind == E_DOL || e->kind == E_NAM)
+        return expr_contains_pattern(e->children[0]);
+    if (e->kind == E_FNC) {
+        /* ARBNO, FENCE, etc. already caught by is_pat_builtin_call above.
+         * Also treat reduce/EVAL_fn calls as pattern-valued when inside CONCAT_fn. */
+        if (e->sval && (strcasecmp(e->sval,"reduce")==0 || strcasecmp(e->sval,"EVAL_fn")==0))
+            return 1;
+        for (int i = 0; i < e->nchildren; i++)
+            if (expr_contains_pattern(e->children[i])) return 1;
+    }
+    return 0;
+}
+
+/* Walk the E_CONC left spine. When we find a right child that is_pat_node,
+ * detach it and everything after it into the pattern.
+ * Returns the extracted pattern root, or NULL if nothing found.
+ * *subj_out is set to the remaining subject (may be the original expr if
+ * no split needed).
+ *
+ * The tree is LEFT-ASSOCIATIVE CONCAT_fn:
+ *   (((STRVAL_fn, POS(0)), ANY('abc')), E_NAM(letter))
+ * We walk the left spine, looking for the first right child that is a pat node.
+ * When found at depth D, the pattern is: right_at_D CONCAT_fn right_at_D-1 CONCAT_fn ... CONCAT_fn right_at_0
+ * assembled left-to-right.
+ */
+typedef struct { EXPR_t *subj; EXPR_t *pat; } SplitResult;
+
+static EXPR_t *make_concat(EXPR_t *left, EXPR_t *right) {
+    if (!left)  return right;
+    if (!right) return left;
+    EXPR_t *e = expr_new(E_CONC);
+    e->children[0] = left; e->children[1] = right;
+    return e;
+}
+
+static SplitResult split_spine(EXPR_t *e) {
+    /* Null or non-CONCAT_fn node that's a pure value: subject only */
+    if (!e) { SplitResult r = {NULL, NULL}; return r; }
+
+    if (e->kind != E_CONC) {
+        if (is_pat_node(e)) {
+            SplitResult r = {NULL, e}; return r;   /* entire node is pattern */
+        } else {
+            SplitResult r = {e, NULL}; return r;   /* entire node is subject */
+        }
+    }
+
+    /* e = E_CONC(left, right) */
+    /* First check if RIGHT is a pattern node (first pat on the right spine) */
+    if (is_pat_node(e->children[1])) {
+        /* Split here: left is subject, right and above become pattern */
+        SplitResult inner = split_spine(e->children[0]);
+        /* inner.pat (if any) should be prepended, but since left was already
+         * recursed and left's right IS the current pat... */
+        /* Actually: the split is between left and right.
+         * Subject = inner.subj (what was pure subject in e->children[0])
+         * Pattern = inner.pat (any pattern found in e->children[0]'s right chain) CONCAT_fn e->children[1] */
+        SplitResult r;
+        r.subj = inner.subj;
+        r.pat  = make_concat(inner.pat, e->children[1]);
+        return r;
+    }
+
+    /* Right is not a pattern node. Recurse left. */
+    SplitResult inner = split_spine(e->children[0]);
+    if (!inner.pat) {
+        /* No split found in left, and right is not a pattern. No split. */
+        SplitResult r = {e, NULL}; return r;
+    }
+    /* Split found in left spine: reassemble */
+    /* inner.subj is the new left, e->children[1] gets appended to the pattern */
+    SplitResult r;
+    r.subj = inner.subj;
+    r.pat  = make_concat(inner.pat, e->children[1]);
+    return r;
+}
+
+static EXPR_t *split_subject_pattern(EXPR_t *e, EXPR_t **subj_out) {
+    if (!e) { *subj_out = NULL; return NULL; }
+    SplitResult r = split_spine(e);
+    *subj_out = r.subj;
+    return r.pat;
+}
+
+/* Repair a misparsed pattern-MATCH_fn stmt.
+ * Called when s->pattern==NULL and s->replacement is E_NULV (bare '=').
+ * Also repairs pattern-MATCH_fn stmts with no replacement (s->replacement==NULL)
+ * where the subject absorbed the pattern (no '=' present).
+ * Returns 1 if the stmt was repaired. */
+static int maybe_fix_pattern_stmt(STMT_t *s) {
+    if (!s->subject) return 0;  /* no subject */
+    /* Heuristic: if replacement is non-null non-E_NULV, this is a plain assignment,
+     * not a pattern MATCH_fn. Skip. */
+    if (s->replacement && s->replacement->kind != E_NULV) return 0;
+
+    EXPR_t *new_subj = NULL;
+    EXPR_t *new_pat  = split_subject_pattern(s->subject, &new_subj);
+
+    if (!new_pat && !s->pattern) return 0;  /* nothing to fix */
+
+    if (new_pat) {
+        s->subject = new_subj;
+        if (s->pattern) {
+            /* Pattern already parsed (e.g. RPOS(0) at end). Prepend extracted
+             * pattern from subject in front of the existing s->pattern. */
+            s->pattern = make_concat(new_pat, s->pattern);
+        } else {
+            s->pattern = new_pat;
+        }
+        return 1;
+    }
+    return 0;
+}
+
+/* ============================================================
+ * pat_is_anchored — returns 1 if the leftmost node of pattern e
+ * is POS(), meaning the pattern anchors at a specific position.
+ * Used to decide whether to wrap in ARB for substring scan.
+ * ============================================================ */
+static int pat_is_anchored(EXPR_t *e) {
+    if (!e) return 0;
+    if (e->kind == E_FNC && e->sval && strcasecmp(e->sval, "POS") == 0) {
+        /* Only POS(0) literal anchors at start — no ARB needed.
+         * Dynamic POS(N) needs ARB scan to advance cursor to position N. */
+        if (e->nchildren >= 1 && e->children[0]->kind == E_ILIT && e->children[0]->ival == 0)
+            return 1;
+        return 0;
+    }
+    if (e->kind == E_CONC) return pat_is_anchored(e->children[0]);
+    return 0;
+}
+
+/* ============================================================
+ * emit_ok_goto — emit 3-column conditional :S/:F goto lines
+ *
+ * Replaces the repeated pattern:
+ *   if (!s->go) { fallthrough; }
+ *   else if (uncond) { emit_goto(g,fn,0); }
+ *   else {
+ *       if (onsuccess) PS(tgt, "if(_ok%d)", u);
+ *       if (onfailure) PS(tgt, "if(!_ok%d)", u);
+ *       fallthrough;
+ *   }
+ * Used by all three emit_stmt paths (pure-assign, pattern-match, expr-only).
+ * ============================================================ */
+static void emit_ok_goto(SnoGoto *g, const char *fn, int u) {
+    char next_lbl[64];
+    if (trampoline_mode)
+        snprintf(next_lbl, sizeof next_lbl, "return (void*)_tramp_next_%d", cur_stmt_next_uid);
+    else
+        snprintf(next_lbl, sizeof next_lbl, "_SNO_NEXT_%d", cur_stmt_next_uid);
+
+    if (!g) {
+        emit_pretty_goto(next_lbl, NULL);
+        return;
+    }
+    if (g->uncond) { emit_goto(g, fn, 0); return; }
+
+    if (g->onsuccess) {
+        char *tgt = goto_target_str(g->onsuccess, fn);
+        char cond[32]; snprintf(cond, sizeof cond, "if(_ok%d)", u);
+        emit_pretty_goto(tgt, cond);
+        free(tgt);
+    }
+    if (g->onfailure) {
+        char *tgt = goto_target_str(g->onfailure, fn);
+        char cond[32]; snprintf(cond, sizeof cond, "if(!_ok%d)", u);
+        emit_pretty_goto(tgt, cond);
+        free(tgt);
+    }
+    emit_pretty_goto(next_lbl, NULL);
+}
+
+/* ============================================================
+ * Emit one statement
+ * ============================================================ */
+static void emit_stmt(STMT_t *s, const char *fn) {
+    /* Repair misparsed pattern-MATCH_fn stmts (grammar absorbs pattern into subject) */
+    maybe_fix_pattern_stmt(s);
+
+    C("/* line %d */\n", s->lineno);
+    if (s->label) { char _sl[128]; snprintf(_sl, sizeof _sl, "_L%s", cs_label(s->label)); PLG(_sl, ""); }
+    PS("", "trampoline_stno(%d);", s->lineno);
+
+    /* label-only statement */
+    if (!s->subject) {
+        emit_goto(s->go, fn, 0);
+        return;
+    }
+
+    /* ---- pure assignment: subject = replacement, no pattern ---- */
+    if (!s->pattern && s->replacement) {
+        int u=next_uid();
+        /* If the RHS contains deferred refs (*var), reduce() calls (&), or
+         * pattern builtins (ARBNO/FENCE/etc.), emit in pattern context so
+         * E_CONC becomes pat_cat and *var becomes pat_ref.
+         * This handles: snoParse = nPush() ARBNO(*snoCommand) ... nPop() */
+        if (expr_contains_pattern(s->replacement)) {
+            int _col = fprintf(out, "DESCR_t _v%d = ", u);
+            PP_PAT(s->replacement, _col); C(";\n");
+        } else {
+            int _col = fprintf(out, "DESCR_t _v%d = ", u);
+            PP_EXPR(s->replacement, _col); C(";\n");
+        }
+        C("int _ok%d = !IS_FAIL_fn(_v%d);\n", u, u);
+        C("if(_ok%d) {\n", u);
+        char rhs[32]; snprintf(rhs,sizeof rhs,"_v%d",u);
+        emit_assign_target_io(s->subject, rhs);
+        C("}\n");
+        /* emit goto using _ok%d for conditional :S/:F branches */
+        emit_ok_goto(s->go, fn, u);
+        return;
+    }
+
+    /* ---- null assign: subject = (empty RHS) — clears variable to null ---- */
+    if (!s->pattern && !s->replacement && s->has_eq && s->subject) {
+        C("{ /* null assign */\n");
+        emit_assign_target_io(s->subject, "NULVCL");
+        C("}\n");
+        emit_ok_goto(s->go, fn, -1);
+        return;
+    }
+
+    /* ---- pattern MATCH_fn: subject pattern [= replacement] ---- */
+    /* Compiled Byrd box path — replaces pat_* / engine.c stopgap. */
+    if (s->pattern) {
+        int u = next_uid();
+        C("/* byrd MATCH_fn u%d */\n", u);
+        { int _col = fprintf(out, "DESCR_t _s%d = ", u); PP_EXPR(s->subject, _col); C(";\n"); }
+        C("const char *_subj%d = VARVAL_fn(_s%d);\n", u, u);
+        C("int64_t _slen%d = _subj%d ? (int64_t)strlen(_subj%d) : 0;\n", u, u, u);
+        C("int64_t _cur%d  = 0;\n", u);
+        C("int64_t _mstart%d = 0;\n", u);  /* cursor before MATCH_fn — for replacement */
+
+        char root_lbl[64], ok_lbl[64], fail_lbl[64], done_lbl[64];
+        snprintf(root_lbl, sizeof root_lbl, "_byrd_%d",      u);
+        snprintf(ok_lbl,   sizeof ok_lbl,   "_byrd_%d_ok",   u);
+        snprintf(fail_lbl, sizeof fail_lbl, "_byrd_%d_fail", u);
+        snprintf(done_lbl, sizeof done_lbl, "_byrd_%d_done", u);
+
+        char sv[32], sl[32], cv[32];
+        snprintf(sv, sizeof sv, "_subj%d", u);
+        snprintf(sl, sizeof sl, "_slen%d", u);
+        snprintf(cv, sizeof cv, "_cur%d",  u);
+
+        /* Declare _ok before the Byrd block (C: no jumps over declarations) */
+        C("int _ok%d = 0;\n", u);
+        /* NOTE: _mstart is NOT set here — it is set by SNO_MSTART node after ARB scans */
+        /* Checkpoint $'@S' (tree stack) before the pattern match.
+         * On match failure, restore to undo any Shift/Reduce side-effects
+         * (e.g. a zero-match ARBNO leaves a stray Parse tree on @S). */
+        C("DESCR_t _stk_save_%d = NV_GET_fn(\"@S\");\n", u);
+
+        /* SNOBOL4 pattern matching is a substring scan: wrap pattern in ARB
+         * unless the leftmost node is POS() which anchors to a position. */
+        EXPR_t *scan_pat = s->pattern;
+        if (!pat_is_anchored(s->pattern)) {
+            EXPR_t *arb = expr_new(E_FNC);
+            arb->sval = strdup("ARB");
+
+            /* SNO_MSTART: zero-width node that captures cursor into _mstart after ARB scans */
+            EXPR_t *mstart_node = expr_new(E_FNC);
+            mstart_node->sval = strdup("SNO_MSTART");
+            mstart_node->ival = u;  /* thread the statement uid so emit_byrd can name the var */
+
+            EXPR_t *seq1 = expr_binary(E_CONC, arb, mstart_node);
+
+            EXPR_t *seq = expr_binary(E_CONC, seq1, s->pattern);
+            scan_pat = seq;
+        }
+        cond_reset();
+        emit_pattern(scan_pat, out, root_lbl, sv, sl, cv, ok_lbl, fail_lbl);
+
+        /* gamma: MATCH_fn succeeded */
+        PLG(ok_lbl, "");
+        PS("", "_ok%d = 1;", u);
+        cond_emit_assigns(out, u);   /* flush pending . captures */
+        if (s->replacement || s->has_eq) {
+            /* Replace matched region [_mstart%d .. _cur%d) with replacement.
+             * If has_eq but replacement==NULL, that is a null replacement — delete match. */
+            C("{\n");
+            if (s->replacement) {
+                C("    DESCR_t _r%d = ", u); PP_EXPR(s->replacement, 4 + 10 + 3); C(";\n");
+            } else {
+                C("    DESCR_t _r%d = STRVAL_fn(\"\");\n", u);  /* null replacement = empty */
+            }
+            C("    const char *_rs%d = VARVAL_fn(_r%d);\n", u, u);
+            C("    int64_t _rlen%d = _rs%d ? (int64_t)strlen(_rs%d) : 0;\n", u, u, u);
+            C("    int64_t _tail%d = _slen%d - _cur%d;\n", u, u, u);
+            C("    int64_t _newlen%d = _mstart%d + _rlen%d + _tail%d;\n", u, u, u, u);
+            C("    char *_nb%d = (char*)GC_malloc(_newlen%d + 1);\n", u, u);
+            C("    if (_mstart%d > 0) memcpy(_nb%d, _subj%d, (size_t)_mstart%d);\n", u, u, u, u);
+            C("    if (_rlen%d  > 0) memcpy(_nb%d + _mstart%d, _rs%d, (size_t)_rlen%d);\n", u, u, u, u, u);
+            C("    if (_tail%d  > 0) memcpy(_nb%d + _mstart%d + _rlen%d, _subj%d + _cur%d, (size_t)_tail%d);\n", u, u, u, u, u, u, u);
+            C("    _nb%d[_newlen%d] = '\\0';\n", u, u);
+            C("    _s%d = STRVAL(_nb%d);\n", u, u);
+            /* write back to subject variable */
+            if (s->subject && s->subject->kind == E_VART) {
+                if (is_io_name(s->subject->sval))
+                    C("    NV_SET_fn(\"%s\", _s%d);\n", s->subject->sval, u);
+                else {
+                    C("    set(%s, _s%d);\n", cs(s->subject->sval), u);
+                    C("    NV_SET_fn(\"%s\", %s);\n", s->subject->sval, cs(s->subject->sval));
+                }
+            }
+            C("}\n");
+        }
+        PG(done_lbl);
+
+        /* omega: MATCH_fn failed — restore @S to pre-match state */
+        PLG(fail_lbl, "");
+        PS("", "NV_SET_fn(\"@S\", _stk_save_%d);", u);
+        PS("", "_ok%d = 0;", u);
+
+        PLG(done_lbl, "");
+
+        /* emit goto using _ok%d */
+        emit_ok_goto(s->go, fn, u);
+        return;
+    }
+
+    /* ---- expression evaluation only ---- */
+    {
+        int u=next_uid();
+        { int _col = fprintf(out, "DESCR_t _v%d = ", u); PP_EXPR(s->subject, _col); C(";\n"); }
+        C("int _ok%d = !IS_FAIL_fn(_v%d);\n", u, u);
+        /* emit goto using _ok%d */
+        emit_ok_goto(s->go, fn, u);
+    }
+}
+
+/* ============================================================
+ * IO assignment routing
+ * ============================================================ */
+
+static void emit_assign_target_io(EXPR_t *lhs, const char *rhs_str) {
+    if (lhs && lhs->kind == E_VART && is_io_name(lhs->sval)) {
+        C("NV_SET_fn(\"%s\", %s);\n", lhs->sval, rhs_str);
+        return;
+    }
+    emit_assign_target(lhs, rhs_str);
+}
+
+/* ============================================================
+ * DEFINE_fn function table
+ *
+ * Pre-pass: scan for DEFINE_fn('fn(a,b)loc1,loc2') calls.
+ * Parse the proto string → name, args[], locals[].
+ * The SNOBOL4 label matching fn_name marks the start of the body.
+
+/* is_fn_local: return 1 if varname is a declared param, local, or return-value
+ * of the current function.  Returns 0 when in global (main) scope. */
+static int is_fn_local(const char *varname) {
+    if (!cur_fn_def || !varname) return 0;
+    if (strcasecmp(cur_fn_def->name, varname) == 0) return 1;
+    for (int i = 0; i < cur_fn_def->nargs; i++)
+        if (strcasecmp(cur_fn_def->args[i], varname) == 0) return 1;
+    for (int i = 0; i < cur_fn_def->nlocals; i++)
+        if (strcasecmp(cur_fn_def->locals[i], varname) == 0) return 1;
+    return 0;
+}
+
+/* Return fn INDEX_fn if label matches a known function entry, else -1 */
+static int fn_by_label(const char *label) {
+    if (!label) return -1;
+    for (int i=0; i<fn_count; i++) {
+        if (strcasecmp(fn_table[i].name, label)==0) return i;
+        if (fn_table[i].entry_label && strcasecmp(fn_table[i].entry_label, label)==0) return i;
+    }
+    return -1;
+}
+
+/* Global boundary-label set: every function entry label AND every function
+ * end label.  A function body stops when it hits ANY boundary label that is
+ * not its own entry label. Built once after collect_fndefs() completes. */
+#define BOUNDARY_MAX (FN_MAX * 2 + 8)
+static char *boundary_labels[BOUNDARY_MAX];
+static int   boundary_count = 0;
+
+static void boundary_add(const char *lbl) {
+    if (!lbl || !*lbl) return;
+    for (int i = 0; i < boundary_count; i++)
+        if (strcasecmp(boundary_labels[i], lbl) == 0) return;
+    if (boundary_count < BOUNDARY_MAX)
+        boundary_labels[boundary_count++] = strdup(lbl);
+}
+
+static int is_boundary_label(const char *lbl) {
+    if (!lbl) return 0;
+    for (int i = 0; i < boundary_count; i++)
+        if (strcasecmp(boundary_labels[i], lbl) == 0) return 1;
+    return 0;
+}
+
+static void build_boundary_labels(void) {
+    boundary_count = 0;
+    for (int i = 0; i < fn_count; i++) {
+        boundary_add(fn_table[i].name);       /* entry label */
+        boundary_add(fn_table[i].end_label);  /* end label (may be NULL) */
+    }
+}
+
+/* Return fn INDEX_fn if stmt is the DEFINE_fn(...) call for it, else -1 */
+static int fn_by_define_stmt(STMT_t *s) {
+    for (int i=0; i<fn_count; i++)
+        if (fn_table[i].define_stmt == s) return i;
+    return -1;
+}
+
+/* Parse "fn(a,b)loc1,loc2" into a FnDef */
+static void parse_proto(const char *proto, FnDef *fn) {
+    /* fn name: up to '(' or end */
+    int i=0;
+    char buf[256];
+    int j=0;
+    while (proto[i] && proto[i]!='(' && proto[i]!=')') buf[j++]=proto[i++];
+    buf[j]='\0';
+    /* trim trailing spaces */
+    while (j>0 && buf[j-1]==' ') buf[--j]='\0';
+    fn->name = strdup(buf);
+    fn->nargs = 0;
+    fn->nlocals = 0;
+
+    if (proto[i]=='(') {
+        i++; /* skip ( */
+        while (proto[i] && proto[i]!=')') {
+            j=0;
+            while (proto[i] && proto[i]!=',' && proto[i]!=')') buf[j++]=proto[i++];
+            buf[j]='\0';
+            /* trim */
+            while (j>0&&(buf[j-1]==' '||buf[j-1]=='\t')) buf[--j]='\0';
+            int k=0; while(buf[k]==' '||buf[k]=='\t') k++;
+            if (buf[k] && fn->nargs < ARG_MAX)
+                fn->args[fn->nargs++] = strdup(buf+k);
+            if (proto[i]==',') i++;
+        }
+        if (proto[i]==')') i++;
+    }
+
+    /* locals after ')': comma-separated */
+    while (proto[i]) {
+        j=0;
+        while (proto[i] && proto[i]!=',') buf[j++]=proto[i++];
+        buf[j]='\0';
+        int k=0; while(buf[k]==' '||buf[k]=='\t') k++;
+        /* trim trailing */
+        while (j>0&&(buf[j-1]==' '||buf[j-1]=='\t')) buf[--j]='\0';
+        if (buf[k] && fn->nlocals < ARG_MAX)
+            fn->locals[fn->nlocals++] = strdup(buf+k);
+        if (proto[i]==',') i++;
+    }
+}
+
+/* Flatten a string-literal expression (E_QLIT or E_CONC chain of E_QLIT)
+ * into a single static buffer.  Returns NULL if any node is not a string. */
+static char _define_proto_buf[4096];
+static const char *flatten_str_expr(EXPR_t *e) {
+    if (!e) return NULL;
+    if (e->kind == E_QLIT) return e->sval;
+    if (e->kind == E_CONC) {
+        const char *l = flatten_str_expr(e->children[0]);
+        const char *r = flatten_str_expr(e->children[1]);
+        if (!l || !r) return NULL;
+        snprintf(_define_proto_buf, sizeof _define_proto_buf, "%s%s", l, r);
+        return _define_proto_buf;
+    }
+    return NULL;
+}
+
+/* Check if a statement is DEFINE_fn('proto') or DEFINE_fn('proto' 'locals' ...)
+ * The first argument may be a chain of concatenated string literals. */
+static const char *stmt_define_proto(STMT_t *s) {
+    if (!s->subject) return NULL;
+    EXPR_t *e = s->subject;
+    if (e->kind != E_FNC) return NULL;
+    if (strcasecmp(e->sval,"DEFINE")!=0) return NULL;
+    if (e->nchildren < 1) return NULL;
+    return flatten_str_expr(e->children[0]);
+}
+
+static void collect_fndefs(Program *prog) {
+    fn_count = 0;
+    for (STMT_t *s = prog->head; s; s = s->next) {
+        const char *proto = stmt_define_proto(s);
+        if (!proto) continue;
+        if (fn_count >= FN_MAX) break;
+        FnDef *fn = &fn_table[fn_count];
+        memset(fn, 0, sizeof *fn);
+        parse_proto(proto, fn);
+        fn->define_stmt = s;
+        /* Extract entry label from 2nd DEFINE_fn arg: DEFINE_fn('proto','entry_label') */
+        fn->entry_label = NULL;
+        if (s->subject && s->subject->kind == E_FNC &&
+            s->subject->nchildren >= 2) {
+            const char *el = flatten_str_expr(s->subject->children[1]);
+            if (el && el[0]) fn->entry_label = strdup(el);
+        }
+        /* Extract end-of-body label from DEFINE_fn's goto.
+         * Two forms:
+         *   1. DEFINE_fn('fn()')  :(FnEnd)   -- goto on same statement
+         *   2. DEFINE_fn('fn()')             -- goto on the NEXT standalone statement
+         *      :(FnEnd)
+         */
+        fn->end_label = NULL;
+        if (s->go) {
+            if (s->go->uncond)   fn->end_label = strdup(s->go->uncond);
+            else if (s->go->onsuccess) fn->end_label = strdup(s->go->onsuccess);
+        }
+        if (!fn->end_label && s->next) {
+            STMT_t *nxt = s->next;
+            /* A standalone goto: no label being defined here, no subject, just a goto */
+            if (!nxt->subject && !nxt->pattern && !nxt->replacement
+                    && nxt->go && nxt->go->uncond) {
+                fn->end_label = strdup(nxt->go->uncond);
+            }
+        }
+        /* Deduplicate: if this name already exists, overwrite it.
+         * SNOBOL4 function names are case-sensitive — use strcmp, not strcasecmp.
+         * e.g. "Pop(var)" (stack.sno) and "POP_fn()" (semantic.sno) are DIFFERENT. */
+        int found = -1;
+        for (int i=0; i<fn_count; i++)
+            if (strcmp(fn_table[i].name, fn->name)==0) { found=i; break; }
+        if (found >= 0) {
+            /* Free old name/args/locals, REPLACE_fn with new definition */
+            fn_table[found] = *fn;
+        } else {
+            fn_count++;
+        }
+    }
+    /* Second pass: find ALL body_starts for each function */
+    for (int i=0; i<fn_count; i++) {
+        fn_table[i].nbody_starts = 0;
+        /* The entry label is: entry_label if set, else function name */
+        const char *entry = fn_table[i].entry_label ? fn_table[i].entry_label : fn_table[i].name;
+        for (STMT_t *s = prog->head; s; s = s->next) {
+            if (s->label && strcasecmp(s->label, entry)==0) {
+                if (fn_table[i].nbody_starts < BODY_MAX)
+                    fn_table[i].body_starts[fn_table[i].nbody_starts++] = s;
+            }
+        }
+    }
+}
+
+/* ============================================================
+ * label_is_in_fn_body: return 1 if 'label' (a SNOBOL4 label) appears
+ * within any body region of function fn_name.
+ * If fn_name is NULL, return 1 if label appears in ANY function's body.
+ * ============================================================ */
+/* ============================================================
+ * Body boundary rule:
+ *   A function body stops when it hits a statement whose label is:
+ *   (a) another DEFINE_fn'd function's entry label, OR
+ *   (b) a known end_label of any function (the closing marker).
+ *   Plain internal labels (io1, assign2, etc.) do NOT stop the body.
+ * ============================================================ */
+
+static int is_body_boundary(const char *label, const char *cur_fn) {
+    if (!label) return 0;
+    for (int i = 0; i < fn_count; i++) {
+        /* The "entry" for this function is entry_label if set, else name */
+        const char *entry = fn_table[i].entry_label ? fn_table[i].entry_label : fn_table[i].name;
+        if (strcasecmp(entry, label) == 0 &&
+            strcasecmp(fn_table[i].name, cur_fn) != 0) return 1;
+        if (fn_table[i].end_label &&
+            strcasecmp(fn_table[i].end_label, label) == 0) return 1;
+    }
+    return 0;
+}
+
+/* Return 1 if stmt s is inside the body of fn_name (NULL = any fn) */
+static int stmt_in_fn_body(STMT_t *s, const char *fn_name) {
+    for (int i = 0; i < fn_count; i++) {
+        if (fn_name && strcasecmp(fn_table[i].name, fn_name) != 0) continue;
+        for (int b = 0; b < fn_table[i].nbody_starts; b++) {
+            STMT_t *bs = fn_table[i].body_starts[b];
+            for (STMT_t *t = bs; t; t = t->next) {
+                if (t->is_end) break;
+                if (t != bs && is_body_boundary(t->label, fn_table[i].name)) break;
+                if (t == s) return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+/* label_is_in_fn_body: used by emit_goto_target to detect cross-fn gotos */
+static int label_is_in_fn_body(const char *label, const char *fn_name) {
+    for (int i = 0; i < fn_count; i++) {
+        if (fn_name && strcasecmp(fn_table[i].name, fn_name) != 0) continue;
+        for (int b = 0; b < fn_table[i].nbody_starts; b++) {
+            STMT_t *bs = fn_table[i].body_starts[b];
+            for (STMT_t *t = bs; t; t = t->next) {
+                if (t->is_end) break;
+                if (t != bs && is_body_boundary(t->label, fn_table[i].name)) break;
+                if (t->label && strcasecmp(t->label, label) == 0) return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+/* ============================================================
+ * Emit header
+ * ============================================================ */
+static void emit_header(void) {
+    C("/* generated by sno2c */\n");
+    C("#include \"runtime_shim.h\"\n\n");
+}
+
+/* ============================================================
+ * Emit global variable declarations
+ * ============================================================ */
+static void emit_global_var_decls(void) {
+    C("/* --- global SNOBOL4 variables --- */\n");
+    for (int i = 0; i < nvar; i++)
+        C("static DESCR_t %s = {0};\n", cs(vars[i]));
+    C("\n");
+}
+
+/* ============================================================
+ * Emit one DEFINE_fn'd function
+ * ============================================================ */
+static void emit_fn(FnDef *fn, Program *prog) {
+    /* Phantoms exist only as boundary markers — no C function to emit */
+    if (!fn->define_stmt) return;
+    (void)prog;
+    lreg_reset();
+    fn_scope_reset();   /* clear cross-pattern static-decl dedup for this fn */
+    cur_fn_name = fn->name;
+    cur_fn_def  = fn;
+    C("static DESCR_t _sno_fn_%s(DESCR_t *_args, int _nargs) {\n", fn->name);
+
+    /* CSNOBOL4 DEFF8/DEFF10/DEFF6 semantics: save caller's hash values on entry,
+     * restore them on ALL exit paths (RETURN, FRETURN, abort/setjmp).
+     * ALL SNOBOL4 variables are natural (hashed) — NEVER skip save/restore. */
+
+    /* --- Save declarations (must come before setjmp to be in scope at restore labels) --- */
+    for (int i = 0; i < fn->nargs; i++)
+        C("    DESCR_t _saved_%s = NV_GET_fn(\"%s\"); /* save caller's hash value */\n",
+          cs(fn->args[i]), fn->args[i]);
+    for (int i = 0; i < fn->nlocals; i++)
+        C("    DESCR_t _saved_%s = NV_GET_fn(\"%s\"); /* save caller's hash value */\n",
+          cs(fn->locals[i]), fn->locals[i]);
+    C("\n");
+
+    C("    jmp_buf _fn_abort_jmp;\n");
+    C("    if (setjmp(_fn_abort_jmp) != 0) goto _SNO_ABORT_%s;\n", fn->name);
+    C("    push_abort_handler(&_fn_abort_jmp);\n\n");
+
+    /* Return-value variable — skip if an arg has the same name */
+    {
+        int clash = 0;
+        for (int i = 0; i < fn->nargs; i++)
+            if (strcasecmp(fn->args[i], fn->name) == 0) { clash = 1; break; }
+        if (!clash)
+            C("    DESCR_t %s = {0}; /* return value */\n", cs(fn->name));
+    }
+    /* Declare C stack locals and install args into hash (DEFF8: save+assign) */
+    for (int i = 0; i < fn->nargs; i++) {
+        C("    DESCR_t %s = (_nargs>%d)?_args[%d]:NULVCL;\n",
+          cs(fn->args[i]), i, i);
+        C("    NV_SET_fn(\"%s\", %s); /* install arg in hash */\n",
+          fn->args[i], cs(fn->args[i]));
+    }
+    /* Declare C stack locals and install as NULL into hash (DEFF10: save+null) */
+    for (int i = 0; i < fn->nlocals; i++) {
+        C("    DESCR_t %s = {0};\n", cs(fn->locals[i]));
+        C("    NV_SET_fn(\"%s\", NULVCL); /* install local as null in hash */\n",
+          fn->locals[i]);
+    }
+    C("\n");
+
+    if (fn->nbody_starts == 0) {
+        char _lbl[128]; snprintf(_lbl, sizeof _lbl, "_SNO_RETURN_%s", fn->name);
+        PG(_lbl);
+    } else {
+        STMT_t *bs = fn->body_starts[fn->nbody_starts - 1]; /* last DEFINE_fn wins */
+        for (STMT_t *s = bs; s; s = s->next) {
+            if (s->is_end) break;
+            if (s != bs && is_body_boundary(s->label, fn->name)) break;
+            cur_stmt_next_uid = next_uid();
+            emit_stmt(s, fn->name);
+            char _nl[64]; snprintf(_nl, sizeof _nl, "_SNO_NEXT_%d", cur_stmt_next_uid);
+            PLG(_nl, "");
+        }
+        char _lbl[128]; snprintf(_lbl, sizeof _lbl, "_SNO_RETURN_%s", fn->name);
+        PG(_lbl);
+    }
+
+    /* --- RETURN path: restore caller's hash values (DEFF6: restore in reverse) --- */
+    C("\n");
+    { char _lbl[128]; snprintf(_lbl, sizeof _lbl, "_SNO_RETURN_%s", fn->name); PLG(_lbl, ""); }
+    C("    pop_abort_handler();\n");
+    for (int i = fn->nlocals - 1; i >= 0; i--)
+        C("    NV_SET_fn(\"%s\", _saved_%s); /* restore caller's value */\n",
+          fn->locals[i], cs(fn->locals[i]));
+    for (int i = fn->nargs - 1; i >= 0; i--)
+        C("    NV_SET_fn(\"%s\", _saved_%s); /* restore caller's value */\n",
+          fn->args[i], cs(fn->args[i]));
+    C("    return get(%s);\n", cs(fn->name));
+
+    /* --- FRETURN path: restore caller's hash values --- */
+    { char _lbl[128]; snprintf(_lbl, sizeof _lbl, "_SNO_FRETURN_%s", fn->name); PLG(_lbl, ""); }
+    C("    pop_abort_handler();\n");
+    for (int i = fn->nlocals - 1; i >= 0; i--)
+        C("    NV_SET_fn(\"%s\", _saved_%s); /* restore caller's value */\n",
+          fn->locals[i], cs(fn->locals[i]));
+    for (int i = fn->nargs - 1; i >= 0; i--)
+        C("    NV_SET_fn(\"%s\", _saved_%s); /* restore caller's value */\n",
+          fn->args[i], cs(fn->args[i]));
+    C("    return FAILDESCR;\n");
+
+    /* --- ABORT path (setjmp fired): restore then return DT_FAIL --- */
+    { char _lbl[128]; snprintf(_lbl, sizeof _lbl, "_SNO_ABORT_%s", fn->name); PLG(_lbl, ""); }
+    for (int i = fn->nlocals - 1; i >= 0; i--)
+        C("    NV_SET_fn(\"%s\", _saved_%s); /* restore caller's value */\n",
+          fn->locals[i], cs(fn->locals[i]));
+    for (int i = fn->nargs - 1; i >= 0; i--)
+        C("    NV_SET_fn(\"%s\", _saved_%s); /* restore caller's value */\n",
+          fn->args[i], cs(fn->args[i]));
+    C("    return FAILDESCR;\n");
+
+    C("}\n\n");
+}
+
+/* ============================================================
+ * Emit forward declarations for all functions
+ * ============================================================ */
+static void emit_fn_forwards(void) {
+    for (int i = 0; i < fn_count; i++)
+        C("static DESCR_t _sno_fn_%s(DESCR_t *_args, int _nargs);\n",
+          fn_table[i].name);
+    C("\n");
+}
+
+/* Return 1 if stmt s lies within any real (non-phantom) function body */
+static int stmt_is_in_any_fn_body(STMT_t *s) {
+    return stmt_in_fn_body(s, NULL);
+}
+
+/* Return 1 if stmt s lies within a phantom function's body region.
+ * Phantoms have body_starts populated after injection — reuse stmt_in_fn_body. */
+static int stmt_in_phantom_body(STMT_t *s) {
+    for (int i = 0; i < fn_count; i++) {
+        if (fn_table[i].define_stmt) continue;  /* not a phantom */
+        if (stmt_in_fn_body(s, fn_table[i].name)) return 1;
+    }
+    return 0;
+}
+
+static void emit_main(Program *prog) {
+    lreg_reset();
+    fn_scope_reset();
+    cur_fn_name = "main";
+    cur_fn_def  = NULL;   /* NULL = global scope; is_fn_local returns 0 for all vars */
+    C("int main(void) {\n");
+    C("    INIT_fn();\n");
+    /* Register all global C statics so NV_SET_fn() can sync them back.
+     * This bridges the two-store gap: vars set via pattern conditional
+     * assignment (. varname) or pre-INIT_fn write to the hash table only;
+     * registration lets those writes also update the C statics. */
+    for (int i = 0; i < nvar; i++)
+        C("    NV_REG_fn(\"%s\", &%s);\n", vars[i], cs(vars[i]));
+    C("    NV_SYNC_fn(); /* pull pre-inited vars (nl,tab,etc) into C statics */\n");
+    C("\n");
+
+    /* Register all DEFINE_fn'd functions (skip phantoms — runtime-owned) */
+    for (int i=0; i<fn_count; i++) {
+        if (!fn_table[i].define_stmt) continue;  /* phantom — skip */
+        /* Reconstruct the proto spec string: "name(a,b)loc1,loc2" */
+        C("    DEFINE_fn(\"");
+        C("%s(", fn_table[i].name);
+        for (int j=0; j<fn_table[i].nargs; j++) {
+            if (j) C(",");
+            C("%s", fn_table[i].args[j]);
+        }
+        C(")");
+        for (int j=0; j<fn_table[i].nlocals; j++) {
+            if (j) C(","); else C("");
+            C("%s", fn_table[i].locals[j]);
+        }
+        C("\", _sno_fn_%s);\n", fn_table[i].name);
+    }
+    C("\n");
+
+    /* Emit main-level statements only */
+    for (STMT_t *s = prog->head; s; s = s->next) {
+        /* END stmt — emit the end label and stop */
+        if (s->is_end) {
+            C("\n");
+            PLG("_SNO_END", "");
+            C("    finish();\n");
+            C("    return 0;\n");
+            C("}\n");
+            return;
+        }
+        /* Skip statements that live inside a function body */
+        if (stmt_is_in_any_fn_body(s)) continue;
+        /* Skip statements inside phantom (runtime-owned) function bodies */
+        if (stmt_in_phantom_body(s)) continue;
+        /* Skip the DEFINE_fn(...) call statements themselves */
+        if (stmt_define_proto(s)) continue;
+
+        cur_stmt_next_uid = next_uid();
+        emit_stmt(s, "main");
+        { char _nl[64]; snprintf(_nl, sizeof _nl, "_SNO_NEXT_%d", cur_stmt_next_uid); PLG(_nl, ""); }
+    }
+
+    /* Fallback if no END stmt found */
+}
+
+/* ============================================================
+ * Trampoline emission (sprint stmt-fn)
+ *
+ * emit_trampoline_program() is called instead of the classic
+ * emit_fn/emit_main path when trampoline_mode=1.
+ *
+ * Output structure:
+ *   #include "trampoline.h"
+ *   #include runtime headers
+ *   static DESCR_t globals...
+ *   forward decls: block_X for every labeled stmt
+ *   static void* stmt_N(void) { ...emit_stmt body... }  per stmt
+ *   static void* block_L(void) { stmt sequence }        per labeled group
+ *   int main(void) { SNO_INIT_fn(); trampoline_run(block_START); }
+ * ============================================================ */
+
+/* Collect all labels that appear on statements (block entry points) */
+#define TRAMP_LABEL_MAX 4096
+static char *tramp_labels[TRAMP_LABEL_MAX];
+static int   tramp_nlabels = 0;
+
+/* Collect all goto targets (may include undefined labels from library code) */
+static char *tramp_goto_targets[TRAMP_LABEL_MAX];
+static int   tramp_ngoto_targets = 0;
+
+static int tramp_goto_target_known(const char *lbl) {
+    for (int i = 0; i < tramp_ngoto_targets; i++)
+        if (strcasecmp(tramp_goto_targets[i], lbl) == 0) return 1;
+    return 0;
+}
+
+static void tramp_collect_labels(Program *prog) {
+    tramp_nlabels = 0;
+    tramp_ngoto_targets = 0;
+    for (STMT_t *s = prog->head; s; s = s->next) {
+        /* Only collect top-level labels — skip labels inside DEFINE'd fn bodies.
+         * Those are emitted as goto labels inside _sno_fn_X(), not as block fns. */
+        if (s->label && tramp_nlabels < TRAMP_LABEL_MAX
+                && !label_is_in_fn_body(s->label, NULL))
+            tramp_labels[tramp_nlabels++] = s->label;
+        /* Collect goto targets from S/F/uncond branches */
+        if (s->go) {
+            const char *tgts[3] = {s->go->onsuccess, s->go->onfailure, s->go->uncond};
+            for (int t = 0; t < 3; t++) {
+                const char *tgt = tgts[t];
+                if (!tgt) continue;
+                if (tgt[0] == '$') continue;  /* computed — skip */
+                if (strcasecmp(tgt,"RETURN")==0 || strcasecmp(tgt,"FRETURN")==0) continue;
+                if (strcasecmp(tgt,"END")==0 || strcasecmp(tgt,"START")==0) continue;
+                if (tramp_goto_target_known(tgt)) continue;
+                if (tramp_ngoto_targets < TRAMP_LABEL_MAX)
+                    tramp_goto_targets[tramp_ngoto_targets++] = (char*)tgt;
+            }
+        }
+    }
+}
+
+static int tramp_has_label(const char *lbl) {
+    for (int i = 0; i < tramp_nlabels; i++)
+        if (strcasecmp(tramp_labels[i], lbl) == 0) return 1;
+    return 0;
+}
+
+static void emit_trampoline_program(Program *prog) {
+    /* --- Header --- */
+    C("/* generated by sno2c -trampoline */\n");
+    C("#include \"trampoline.h\"\n");
+    C("#include \"runtime_shim.h\"\n\n");
+
+    /* --- Global variable declarations --- */
+    C("/* --- global SNOBOL4 variables --- */\n");
+    for (int i = 0; i < nvar; i++)
+        C("static DESCR_t %s = {0};\n", cs(vars[i]));
+    C("\n");
+
+    /* --- Collect labels for forward declarations --- */
+    tramp_collect_labels(prog);
+
+    /* --- Forward declarations for all block functions --- */
+    C("/* --- block forward declarations --- */\n");
+    C("static void *block_START(void);\n");
+    C("static void *block_END(void);\n");
+    for (int i = 0; i < tramp_nlabels; i++) {
+        const char *lbl = tramp_labels[i];
+        if (strcasecmp(lbl,"END")==0) continue;
+        if (strcasecmp(lbl,"START")==0) continue;  /* hardcoded above */
+        C("static void *block%s(void);\n", cs_label(lbl));
+    }
+    /* Forward decls for undefined-label stubs */
+    for (int i = 0; i < tramp_ngoto_targets; i++) {
+        const char *tgt = tramp_goto_targets[i];
+        if (tramp_has_label(tgt)) continue;
+        C("static void *block%s(void);\n", cs_label(tgt));
+    }
+    C("\n");
+
+    /* --- Pass 0a: pre-register ALL named pattern names FIRST ---
+     * Must run before emit_fn so that *PatName inside DEFINE_fn bodies
+     * (e.g. *SpecialNm in ss()) resolve to compiled functions, not
+     * interpreter fallback.  Registration is just name→fnname mapping;
+     * no C is emitted yet. */
+    named_pat_reset();
+    for (STMT_t *s = prog->head; s; s = s->next) {
+        if (s->is_end) break;
+        if (stmt_in_phantom_body(s)) continue;
+        if (stmt_define_proto(s)) continue;
+        if (!s->pattern && s->replacement &&
+            s->subject && s->subject->kind == E_VART &&
+            expr_contains_pattern(s->replacement)) {
+            scan_named_patterns(s->subject->sval);
+        }
+    }
+    /* Emit struct typedecls and function fwdecls now — before emit_fn —
+     * so DEFINE_fn function bodies can use pat_X_t types and call pat_X(). */
+    emit_named_typedecls(out);
+    emit_named_fwdecls(out);
+
+    /* --- Emit DEFINE_fn'd functions using the existing emit_fn path ---
+     * Function bodies use classic goto emission (trampoline_mode=0 inside).
+     * Only main-level code uses the trampoline model. */
+    {
+        int saved = trampoline_mode;
+        trampoline_mode = 0;
+        emit_fn_forwards();
+        for (int i = 0; i < fn_count; i++)
+            emit_fn(&fn_table[i], prog);
+        trampoline_mode = saved;
+    }
+    C("\n");
+
+    /* --- Sentinel block pointers used by stmt_N as "continue" signals ---
+     * _tramp_next_N is just a unique non-NULL address the block fn
+     * recognises as "this stmt fell through; run next stmt". We use the
+     * address of a unique static char as the sentinel. */
+    /* (Generated inline per-stmt as needed — no pre-declaration required
+     *  because block_L compares by value, not by name.) */
+
+    /* --- Pass 0b/c/d: emit compiled named pattern functions ---
+     * Names already pre-registered and typedecls/fwdecls already emitted
+     * in pass 0a above (before emit_fn).
+     * DO NOT call named_pat_reset() or re-emit typedecls here.
+     */
+    C("/* --- compiled named pattern function bodies --- */\n");
+
+    /* 0d: emit function bodies (emitted flag prevents duplicates) */
+    for (STMT_t *s = prog->head; s; s = s->next) {
+        if (s->is_end) break;
+        if (stmt_in_phantom_body(s)) continue;
+        if (stmt_define_proto(s)) continue;
+        if (!s->pattern && s->replacement &&
+            s->subject && s->subject->kind == E_VART &&
+            expr_contains_pattern(s->replacement)) {
+            emit_named_pattern(s->subject->sval, s->replacement, out);
+        }
+    }
+    C("\n");
+
+    /* --- Emit each main-level stmt as its own function --- */
+    lreg_reset();
+    fn_scope_reset();
+    cur_fn_name = "main";
+    cur_fn_def  = NULL;
+
+    /* sid_uid[sid] = the cur_stmt_next_uid assigned to stmt sid (1-based) */
+#define TRAMP_STMT_MAX 8192
+    static int sid_uid[TRAMP_STMT_MAX];
+    static STMT_t *sid_stmt[TRAMP_STMT_MAX];
+    int stmt_count = 0;
+
+    /* Pass 1: emit stmt_N() functions, record sid→uid mapping */
+    for (STMT_t *s = prog->head; s; s = s->next) {
+        if (s->is_end) break;
+        if (stmt_is_in_any_fn_body(s)) continue;
+        if (stmt_in_phantom_body(s)) continue;
+        if (stmt_define_proto(s)) continue;
+        if (stmt_count >= TRAMP_STMT_MAX) break;
+
+        int sid = ++stmt_count;
+        cur_stmt_next_uid = next_uid();
+        sid_uid[sid]  = cur_stmt_next_uid;
+        sid_stmt[sid] = s;
+
+        /* sentinel: unique static char address == "this stmt fell through" */
+        C("static char _tramp_sentinel_%d;\n", cur_stmt_next_uid);
+        C("#define _tramp_next_%d ((void*)&_tramp_sentinel_%d)\n",
+          cur_stmt_next_uid, cur_stmt_next_uid);
+
+        C("static void *stmt_%d(void) { /* line %d%s%s */\n",
+          sid, s->lineno,
+          s->label ? " label:" : "",
+          s->label ? s->label  : "");
+        emit_stmt(s, "main");
+        C("}\n\n");
+    }
+
+    /* Pass 2: emit block grouping functions.
+     * Rule: a labeled stmt starts a new block.
+     * Unlabeled stmts after it belong to the same block.
+     * Each block calls its member stmts; if stmt returns _tramp_next_N
+     * (fall-through sentinel), continue; otherwise return immediately.
+     */
+    C("/* --- block functions --- */\n");
+
+    int block_open = 0;
+    int first_block = 1;  /* first block is always block_START */
+    const char *first_block_label = NULL; /* label on first stmt, needs alias */
+
+    for (int sid = 1; sid <= stmt_count; sid++) {
+        STMT_t *s = sid_stmt[sid];
+
+        /* A labeled stmt closes the current block (falls through to new label) */
+        if (s->label && block_open) {
+            C("    return block%s; /* fall into next block */\n}\n\n",
+              cs_label(s->label));
+            block_open = 0;
+        }
+
+        /* Open a new block if none is open */
+        if (!block_open) {
+            if (first_block) {
+                C("static void *block_START(void) {\n");
+                first_block = 0;
+                /* If first stmt carries a label, record it for alias emission */
+                if (s->label) first_block_label = s->label;
+                /* (alias emitted at block close — see first_block_label below) */
+            } else if (s->label) {
+                C("static void *block%s(void) {\n", cs_label(s->label));
+            } else {
+                /* Unlabeled stmt after a fall-through gap — shouldn't normally
+                 * happen in well-formed SNOBOL4, but handle gracefully */
+                C("static void *block_START(void) {\n");
+            }
+            block_open = 1;
+        }
+
+        /* Call stmt, propagate any non-fallthrough return */
+        C("    { void *_r = stmt_%d();\n", sid);
+        C("      if (_r != _tramp_next_%d) return _r; }\n", sid_uid[sid]);
+    }
+
+    /* Close the last open block */
+    if (block_open) {
+        C("    return block_END;\n}\n\n");
+    } else if (stmt_count == 0) {
+        /* Empty program */
+        C("static void *block_START(void) { return block_END; }\n\n");
+    }
+
+    /* If first stmt had a label other than START, block_START absorbed it
+     * but block_<label> was forward-declared. Emit a forwarding alias. */
+    if (first_block_label && strcasecmp(first_block_label, "START") != 0) {
+        C("static void *block%s(void) { return block_START(); }\n\n",
+          cs_label(first_block_label));
+    }
+
+    C("static void *block_END(void) { return NULL; }\n\n");
+
+    /* --- Stubs for undefined labels (e.g. 'err' from library code) --- */
+    C("/* --- undefined label stubs --- */\n");
+    for (int i = 0; i < tramp_ngoto_targets; i++) {
+        const char *tgt = tramp_goto_targets[i];
+        if (tramp_has_label(tgt)) continue;
+        C("static void *block%s(void) { return NULL; }\n", cs_label(tgt));
+    }
+    C("\n");
+
+    /* --- _block_label_table: label string -> block fn pointer --- */
+    C("/* --- computed-goto label table --- */\n");
+    C("_BlockEntry_t _block_label_table[] = {\n");
+    C("    {\"START\", block_START},\n");
+    C("    {\"END\",   block_END},\n");
+    for (int i = 0; i < tramp_nlabels; i++) {
+        const char *lbl = tramp_labels[i];
+        if (strcasecmp(lbl,"END")==0) continue;
+        if (strcasecmp(lbl,"START")==0) continue;  /* hardcoded above */
+        C("    {\"%s\", block%s},\n", lbl, cs_label(lbl));
+    }
+    /* Add undefined-label stubs to the table too */
+    for (int i = 0; i < tramp_ngoto_targets; i++) {
+        const char *tgt = tramp_goto_targets[i];
+        if (tramp_has_label(tgt)) continue;
+        C("    {\"%s\", block%s},\n", tgt, cs_label(tgt));
+    }
+    C("};\n");
+    C("int _block_label_count = (int)(sizeof(_block_label_table)/sizeof(_block_label_table[0]));\n\n");
+
+    /* --- main --- */
+    C("int main(void) {\n");
+    C("    INIT_fn();\n");
+    for (int i = 0; i < nvar; i++)
+        C("    NV_REG_fn(\"%s\", &%s);\n", vars[i], cs(vars[i]));
+    C("    NV_SYNC_fn();\n\n");
+    for (int i = 0; i < fn_count; i++) {
+        if (!fn_table[i].define_stmt) continue;
+        C("    DEFINE_fn(\"%s(", fn_table[i].name);
+        for (int j = 0; j < fn_table[i].nargs; j++) {
+            if (j) C(",");
+            C("%s", fn_table[i].args[j]);
+        }
+        C(")");
+        for (int j = 0; j < fn_table[i].nlocals; j++) {
+            if (j) C(","); else C("");
+            C("%s", fn_table[i].locals[j]);
+        }
+        C("\", _sno_fn_%s);\n", fn_table[i].name);
+    }
+    /* Initialize well-known globals that SNOBOL4 programs assume are set
+     * by the runtime but are not defined in beauty.sno's inc files.
+     * nl = CHAR(10), tab = CHAR(9) */
+    C("\n    /* runtime globals */\n");
+    C("    NV_SET_fn(\"nl\",  APPLY_fn(\"CHAR\",(DESCR_t[]){INTVAL(10)},1));\n");
+    C("    NV_SET_fn(\"tab\", APPLY_fn(\"CHAR\",(DESCR_t[]){INTVAL(9)},1));\n");
+    /* Fix: DATA('tree(...)') and DATA('link(...)') land in dead code inside
+     * _sno_fn_Top — tree.sno init block swallowed by StackEnd boundary.
+     * Register explicitly here so tree()/link() are live before trampoline. */
+    C("    /* DATA types from tree.sno/stack.sno (fn-body-walk bug) */\n");
+    C("    APPLY_fn(\"DATA\",(DESCR_t[]){STRVAL(\"tree(t,v,n,c)\")},1);\n");
+    C("    APPLY_fn(\"DATA\",(DESCR_t[]){STRVAL(\"link(next,value)\")},1);\n");
+    C("\n    trampoline_run(block_START);\n");
+    C("    return 0;\n}\n");
+}
+
+/* ============================================================
+ * Public entry point
+ * ============================================================ */
+void c_emit(Program *prog, FILE *f) {
+    out = f;
+
+    /* Phase 1: collect variable names and function definitions */
+    collect_vars(prog);
+    collect_fndefs(prog);
+
+    /* DEBUG: dump fn_table after collect */
+    if (getenv("SNOC_FN_DEBUG")) {
+        for (int _di = 0; _di < fn_count; _di++)
+            fprintf(stderr, "FN[%d] name=%-20s entry=%-12s end=%-14s nbody=%d\n",
+                _di, fn_table[_di].name,
+                fn_table[_di].entry_label ? fn_table[_di].entry_label : "(null)",
+                fn_table[_di].end_label   ? fn_table[_di].end_label   : "(null)",
+                fn_table[_di].nbody_starts);
+    }
+
+    /* Phase 1b: inject phantom FnDef entries for every runtime-owned function
+     * whose source body appears in the expanded -INCLUDE stream but whose DEFINE_fn
+     * is handled by mock_includes.c at runtime (so collect_functions never sees it).
+     *
+     * Phantoms have name + end_label only. define_stmt = NULL, nbody_starts = 0.
+     * They exist SOLELY so is_body_boundary() recognises their entry/end labels
+     * as boundaries and stops body-absorption into the wrong C function.
+     * emit_fn() skips phantoms (define_stmt == NULL → no C function emitted).
+     * emit_main() skips phantoms (define_stmt == NULL → no DEFINE_fn() call).
+     *
+     * Source: mock_includes.c inc_init() + inc_init_extra() registrations
+     * whose bodies appear in: ShiftReduce.sno, stack.sno, counter.sno, semantic.sno
+     */
+    static const struct { const char *name; const char *end_label; } phantoms[] = {
+        /* ShiftReduce.sno */
+        { "Shift",        "ShiftEnd"    },
+        { "Reduce",       "ReduceEnd"   },
+        /* stack.sno */
+        { "InitStack",    "StackEnd"    },
+        { "Push",         "StackEnd"    },
+        { "Pop",          "StackEnd"    },
+        { "Top",          "StackEnd"    },
+        /* counter.sno */
+        { "InitCounter",  "CounterEnd"  },
+        { "PushCounter",  "CounterEnd"  },
+        { "IncCounter",   "CounterEnd"  },
+        { "DecCounter",   "CounterEnd"  },
+        { "PopCounter",   "CounterEnd"  },
+        { "TopCounter",   "CounterEnd"  },
+        { "InitBegTag",   "BegTagEnd"   },
+        { "PushBegTag",   "BegTagEnd"   },
+        { "PopBegTag",    "BegTagEnd"   },
+        { "TopBegTag",    "BegTagEnd"   },
+        { "DumpBegTag",   "BegTagEnd"   },
+        { "InitEndTag",   "EndTagEnd"   },
+        { "PushEndTag",   "EndTagEnd"   },
+        { "PopEndTag",    "EndTagEnd"   },
+        { "TopEndTag",    "EndTagEnd"   },
+        { "DumpEndTag",   "EndTagEnd"   },
+        /* semantic.sno — entry labels are name_, end is semanticEnd */
+        { "shift_",       "semanticEnd" },
+        { "reduce_",      "semanticEnd" },
+        { "pop_",         "semanticEnd" },
+        { "nPush_",       "semanticEnd" },
+        { "nInc_",        "semanticEnd" },
+        { "nDec_",        "semanticEnd" },
+        { "nTop_",        "semanticEnd" },
+        { "nPop_",        "semanticEnd" },
+        { NULL, NULL }
+    };
+    for (int pi = 0; phantoms[pi].name && fn_count < FN_MAX; pi++) {
+        /* Skip if already in fn_table (defined by SNOBOL4 DEFINE_fn in-stream).
+         * Two-arg DEFINE_fn('nInc()', 'nInc_') stores name="nInc", entry_label="nInc_".
+         * Phantom name is "nInc_" — must check entry_label to avoid double-registering. */
+        int already = 0;
+        for (int fi = 0; fi < fn_count; fi++)
+            if (strcmp(fn_table[fi].name, phantoms[pi].name) == 0 ||
+                (fn_table[fi].entry_label &&
+                 strcmp(fn_table[fi].entry_label, phantoms[pi].name) == 0))
+            { already=1; break; }
+        if (already) continue;
+        FnDef *ph = &fn_table[fn_count++];
+        memset(ph, 0, sizeof *ph);
+        ph->name        = strdup(phantoms[pi].name);
+        ph->end_label   = strdup(phantoms[pi].end_label);
+        ph->define_stmt = NULL;   /* phantom: no SNOBOL4 DEFINE_fn, no C emission */
+        ph->entry_label = NULL;
+        ph->nbody_starts = 0;
+    }
+
+    /* Populate body_starts for phantoms by scanning the program for their entry label.
+     * This lets stmt_in_fn_body() work for phantoms exactly like real functions. */
+    for (int i = 0; i < fn_count; i++) {
+        if (fn_table[i].define_stmt) continue;  /* not a phantom */
+        const char *entry = fn_table[i].entry_label
+                          ? fn_table[i].entry_label
+                          : fn_table[i].name;
+        fn_table[i].nbody_starts = 0;
+        for (STMT_t *s = prog->head; s; s = s->next) {
+            if (s->label && strcmp(s->label, entry) == 0) {
+                if (fn_table[i].nbody_starts < BODY_MAX)
+                    fn_table[i].body_starts[fn_table[i].nbody_starts++] = s;
+            }
+        }
+    }
+
+    /* Phase 2: emit */
+    if (trampoline_mode) {
+        emit_trampoline_program(prog);
+        return;
+    }
+    emit_header();
+    emit_global_var_decls();
+    emit_fn_forwards();
+
+    for (int i=0; i<fn_count; i++)
+        emit_fn(&fn_table[i], prog);
+
+    emit_main(prog);
 }

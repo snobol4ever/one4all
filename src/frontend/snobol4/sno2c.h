@@ -154,27 +154,7 @@ Program *snoc_parse(FILE *f, const char *filename);
 EXPR_t  *parse_expr_from_str(const char *src);
 void     c_emit(Program *prog, FILE *out);
 
-/* ---- Byrd box emitter (emit_byrd.c) ---- */
-void byrd_fn_scope_reset(void);
-#if !defined(EMIT_BYRD_ASM_C) && !defined(EMIT_BYRD_JVM_C) && !defined(EMIT_BYRD_NET_C)
-void named_pat_reset(void);
-void scan_named_patterns(const char *varname);
-#endif
-void byrd_emit_named_typedecls(FILE *out_file);
-void byrd_emit_named_fwdecls(FILE *out_file);
-void byrd_emit_pattern(EXPR_t *pat, FILE *out_file,
-                       const char *root_name,
-                       const char *subject_var,
-                       const char *subj_len_var,
-                       const char *cursor_var,
-                       const char *gamma_label,
-                       const char *omega_label);
-void byrd_emit_standalone(EXPR_t *pat, FILE *out_file,
-                          const char *subject,
-                          const char *root_name);
-void byrd_emit_named_pattern(const char *varname, EXPR_t *pat, FILE *out_file);
-void byrd_cond_reset(void);
-void byrd_cond_emit_assigns(FILE *out_file, int stmt_u);
+/* emit_byrd.c interface now internal to emit_byrd_c.c */
 
 /* ---- error ---- */
 void snoc_error(int lineno, const char *fmt, ...);
