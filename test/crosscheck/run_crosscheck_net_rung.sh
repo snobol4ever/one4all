@@ -31,6 +31,7 @@ SNO2C="${SNO2C:-$TINY/sno2c}"
 STOP_ON_FAIL="${STOP_ON_FAIL:-0}"
 CACHE_DIR="${CACHE_DIR:-/tmp/snobol4x_net_cache}"
 mkdir -p "$CACHE_DIR"
+HARNESS="$TINY/src/runtime/net/SnobolHarness.exe"
 
 GREEN='\033[0;32m'; RED='\033[0;31m'; YELLOW='\033[0;33m'; RESET='\033[0m'
 
@@ -95,19 +96,43 @@ for pid in "${pids[@]:-}"; do
 done
 
 # -----------------------------------------------------------------------
-# Phase 2: run mono for each .exe, diff vs .ref
+# Phase 2: run ALL .exe files in ONE mono process via SnobolHarness
 # -----------------------------------------------------------------------
+out_dir="$CACHE_DIR/out"
+mkdir -p "$out_dir"
+
+# Collect exe list and job map
+harness_exes=()
+harness_jobs=()   # "sno|ref|out_file" for skipped-check pass
+skip_jobs=()      # jobs with no exe (ilasm failed)
+
 for job in "${jobs[@]:-}"; do
     IFS='|' read -r sno il exe ref <<< "$job"
     base="$(basename "$sno" .sno)"
+    rung="$(basename "$(dirname "$sno")")"
+    out_file="$out_dir/${rung}_${base}.out"
 
     if [ ! -f "$exe" ]; then
-        echo -e "  ${YELLOW}SKIP${RESET} $base (ilasm failed)"
+        skip_jobs+=("$base")
         skip=$((skip+1))
+        echo -e "  ${YELLOW}SKIP${RESET} $base (ilasm failed)"
         continue
     fi
+    harness_exes+=("$exe")
+    harness_jobs+=("$sno|$ref|$out_file")
+done
 
-    actual=$(mono "$exe" 2>/dev/null)
+# One mono invocation for all programs
+if [ ${#harness_exes[@]} -gt 0 ]; then
+    MONO_PATH="$CACHE_DIR" mono "$HARNESS" "$out_dir" "${harness_exes[@]}" 2>/dev/null
+fi
+
+# Collect results
+for mjob in "${harness_jobs[@]:-}"; do
+    IFS='|' read -r sno ref out_file <<< "$mjob"
+    base="$(basename "$sno" .sno)"
+
+    actual=$(cat "$out_file" 2>/dev/null || echo "")
     expected=$(cat "$ref")
 
     if [ "$actual" = "$expected" ]; then

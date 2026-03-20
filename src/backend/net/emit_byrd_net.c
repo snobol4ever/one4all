@@ -266,6 +266,10 @@ static void net_emit_expr(EXPR_t *e) {
             N("    call       string [snobol4lib]Snobol4Lib::sno_alphabet()\n");
         } else if (e->sval && strcasecmp(e->sval, "STNO") == 0) {
             N("    ldsfld     string %s::kw_stno\n", net_classname);
+        } else if (e->sval && strcasecmp(e->sval, "UCASE") == 0) {
+            net_ldstr("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+        } else if (e->sval && strcasecmp(e->sval, "LCASE") == 0) {
+            net_ldstr("abcdefghijklmnopqrstuvwxyz");
         } else {
             net_ldstr("");
         }
@@ -332,6 +336,110 @@ static void net_emit_expr(EXPR_t *e) {
             N("    call       int32 [snobol4lib]Snobol4Lib::%s(string, string)\n", lcmp_helper);
             N("    stloc.0\n");
             net_ldstr("");
+            break;
+        }
+        /* SUBSTR(str, start [, len]) — 1-based substring */
+        if (strcasecmp(fn, "SUBSTR") == 0) {
+            net_emit_expr(e->nargs >= 1 ? e->args[0] : NULL);
+            net_emit_expr(e->nargs >= 2 ? e->args[1] : NULL);
+            if (e->nargs >= 3 && e->args[2])
+                net_emit_expr(e->args[2]);
+            else
+                net_ldstr("-1");
+            N("    call       string [snobol4lib]Snobol4Lib::sno_substr(string, string, string)\n");
+            N("    ldc.i4.1\n");
+            N("    stloc.0\n");
+            break;
+        }
+        /* REPLACE(str, from, to) — char-by-char translation */
+        if (strcasecmp(fn, "REPLACE") == 0) {
+            net_emit_expr(e->nargs >= 1 ? e->args[0] : NULL);
+            net_emit_expr(e->nargs >= 2 ? e->args[1] : NULL);
+            net_emit_expr(e->nargs >= 3 ? e->args[2] : NULL);
+            N("    call       string [snobol4lib]Snobol4Lib::sno_replace(string, string, string)\n");
+            N("    ldc.i4.1\n");
+            N("    stloc.0\n");
+            break;
+        }
+        /* DUPL(str, n) — repeat string n times */
+        if (strcasecmp(fn, "DUPL") == 0) {
+            net_emit_expr(e->nargs >= 1 ? e->args[0] : NULL);
+            net_emit_expr(e->nargs >= 2 ? e->args[1] : NULL);
+            N("    call       string [snobol4lib]Snobol4Lib::sno_dupl(string, string)\n");
+            N("    ldc.i4.1\n");
+            N("    stloc.0\n");
+            break;
+        }
+        /* TRIM(str) — remove trailing whitespace */
+        if (strcasecmp(fn, "TRIM") == 0) {
+            net_emit_expr(e->nargs >= 1 ? e->args[0] : NULL);
+            N("    call       string [snobol4lib]Snobol4Lib::sno_trim(string)\n");
+            N("    ldc.i4.1\n");
+            N("    stloc.0\n");
+            break;
+        }
+        /* REVERSE(str) — reverse a string */
+        if (strcasecmp(fn, "REVERSE") == 0) {
+            net_emit_expr(e->nargs >= 1 ? e->args[0] : NULL);
+            N("    call       string [snobol4lib]Snobol4Lib::sno_reverse(string)\n");
+            N("    ldc.i4.1\n");
+            N("    stloc.0\n");
+            break;
+        }
+        /* UCASE(str) — uppercase */
+        if (strcasecmp(fn, "UCASE") == 0) {
+            net_emit_expr(e->nargs >= 1 ? e->args[0] : NULL);
+            N("    callvirt   instance string [mscorlib]System.String::ToUpper()\n");
+            N("    ldc.i4.1\n");
+            N("    stloc.0\n");
+            break;
+        }
+        /* LCASE(str) — lowercase */
+        if (strcasecmp(fn, "LCASE") == 0) {
+            net_emit_expr(e->nargs >= 1 ? e->args[0] : NULL);
+            N("    callvirt   instance string [mscorlib]System.String::ToLower()\n");
+            N("    ldc.i4.1\n");
+            N("    stloc.0\n");
+            break;
+        }
+        /* LPAD(str, n [, pad]) — left-pad to width n */
+        if (strcasecmp(fn, "LPAD") == 0) {
+            net_emit_expr(e->nargs >= 1 ? e->args[0] : NULL);
+            net_emit_expr(e->nargs >= 2 ? e->args[1] : NULL);
+            if (e->nargs >= 3 && e->args[2]) net_emit_expr(e->args[2]);
+            else net_ldstr(" ");
+            N("    call       string [snobol4lib]Snobol4Lib::sno_lpad(string, string, string)\n");
+            N("    ldc.i4.1\n");
+            N("    stloc.0\n");
+            break;
+        }
+        /* RPAD(str, n [, pad]) — right-pad to width n */
+        if (strcasecmp(fn, "RPAD") == 0) {
+            net_emit_expr(e->nargs >= 1 ? e->args[0] : NULL);
+            net_emit_expr(e->nargs >= 2 ? e->args[1] : NULL);
+            if (e->nargs >= 3 && e->args[2]) net_emit_expr(e->args[2]);
+            else net_ldstr(" ");
+            N("    call       string [snobol4lib]Snobol4Lib::sno_rpad(string, string, string)\n");
+            N("    ldc.i4.1\n");
+            N("    stloc.0\n");
+            break;
+        }
+        /* INTEGER(x) — succeeds if x is integer string */
+        if (strcasecmp(fn, "INTEGER") == 0) {
+            net_emit_expr(e->nargs >= 1 ? e->args[0] : NULL);
+            N("    call       int32 [snobol4lib]Snobol4Lib::sno_is_integer(string)\n");
+            N("    stloc.0\n");
+            /* push arg back as result value */
+            net_emit_expr(e->nargs >= 1 ? e->args[0] : NULL);
+            break;
+        }
+        /* REMDR(a, b) — integer remainder */
+        if (strcasecmp(fn, "REMDR") == 0) {
+            net_emit_expr(e->nargs >= 1 ? e->args[0] : NULL);
+            net_emit_expr(e->nargs >= 2 ? e->args[1] : NULL);
+            N("    call       string [snobol4lib]Snobol4Lib::sno_remdr(string, string)\n");
+            N("    ldc.i4.1\n");
+            N("    stloc.0\n");
             break;
         }
         /* Unhandled FNC — stub */
@@ -779,8 +887,8 @@ static void net_emit_one_stmt(STMT_t *s, const char *next_lbl) {
         return;
     }
 
-    /* Case 1: pure assignment — subject is a variable or OUTPUT, has_eq set */
-    if (s->has_eq && s->subject &&
+    /* Case 1: pure assignment — subject is a variable or OUTPUT, has_eq set, NO pattern */
+    if (s->has_eq && s->subject && !s->pattern &&
         (s->subject->kind == E_VART || s->subject->kind == E_KW)) {
 
         int is_out = net_is_output(s->subject->sval);
@@ -823,6 +931,98 @@ static void net_emit_one_stmt(STMT_t *s, const char *next_lbl) {
             if (tgt_s) net_emit_branch_success(tgt_s);
             if (tgt_f) net_emit_branch_fail(tgt_f);
         }
+        return;
+    }
+
+    /* Case 4: pattern replacement — has_eq=1, pattern present: X 'pat' = 'repl' */
+    if (s->has_eq && s->subject && s->pattern) {
+        static int net_prepl_uid = 0;
+        int suid = net_prepl_uid++;
+
+        char lbl_tok[64], lbl_tfail[64], lbl_retry[64], lbl_end[64];
+        snprintf(lbl_tok,   sizeof lbl_tok,   "Npr%d_tok",   suid);
+        snprintf(lbl_tfail, sizeof lbl_tfail,  "Npr%d_fail",  suid);
+        snprintf(lbl_retry, sizeof lbl_retry,  "Npr%d_retry", suid);
+        snprintf(lbl_end,   sizeof lbl_end,    "Npr%d_end",   suid);
+        snprintf(net_pat_abort_label, sizeof net_pat_abort_label, "Npr%d_abort", suid);
+
+        int loc_subj   = 2;
+        int loc_cursor = 3;
+        int loc_len    = 4;
+        int loc_mstart = 5;
+        int next_int = 6;
+        int next_str = 20;
+
+        /* load subject into V_2 */
+        net_emit_expr(s->subject);
+        N("    stloc.s    V_2\n");
+        N("    ldloc.s    V_2\n");
+        N("    callvirt   instance int32 [mscorlib]System.String::get_Length()\n");
+        N("    stloc.s    V_4\n");
+        N("    ldc.i4.0\n");
+        N("    stloc.s    V_3\n");
+
+        N("  %s:\n", lbl_retry);
+        N("    ldloc.s    V_3\n");
+        N("    stloc.s    V_5\n");
+
+        net_emit_pat_node(s->pattern, lbl_tok, lbl_tfail,
+                          loc_subj, loc_cursor, loc_len, &next_int, &next_str);
+
+        /* fail path */
+        N("  %s:\n", lbl_tfail);
+        N("    ldsfld     string %s::kw_anchor\n", net_classname);
+        N("    ldstr      \"0\"\n");
+        N("    call       bool [mscorlib]System.String::op_Equality(string, string)\n");
+        N("    brfalse    %s\n", net_pat_abort_label);
+        N("    ldloc.s    V_5\n");
+        N("    ldc.i4.1\n");
+        N("    add\n");
+        N("    stloc.s    V_3\n");
+        N("    ldloc.s    V_3\n");
+        N("    ldloc.s    V_4\n");
+        N("    ble        %s\n", lbl_retry);
+        N("  %s:\n", net_pat_abort_label);
+        N("    ldc.i4.0\n");
+        N("    stloc.0\n");
+        if (tgt_f) net_emit_branch_fail(tgt_f);
+        else if (tgt_u) net_emit_goto(tgt_u, next_lbl);
+        N("    br         %s\n", lbl_end);
+
+        /* success path — replace matched region in subject */
+        N("  %s:\n", lbl_tok);
+        N("    ldc.i4.1\n");
+        N("    stloc.0\n");
+        /* Build: prefix + replacement + suffix */
+        /* prefix = subject[0 .. mstart] */
+        N("    ldloc.s    V_2\n");       /* full subject */
+        N("    ldc.i4.0\n");
+        N("    ldloc.s    V_5\n");       /* mstart */
+        N("    callvirt   instance string [mscorlib]System.String::Substring(int32, int32)\n");
+        /* replacement string */
+        if (!s->replacement || s->replacement->kind == E_NULV)
+            net_ldstr("");
+        else
+            net_emit_expr(s->replacement);
+        N("    call       string [mscorlib]System.String::Concat(string, string)\n");
+        /* suffix = subject[cursor .. end] */
+        N("    ldloc.s    V_2\n");
+        N("    ldloc.s    V_3\n");       /* cursor = end of match */
+        N("    callvirt   instance string [mscorlib]System.String::Substring(int32)\n");
+        N("    call       string [mscorlib]System.String::Concat(string, string)\n");
+        /* store back to subject variable */
+        if (s->subject->kind == E_VART) {
+            char fn[256]; net_field_name(fn, sizeof fn, s->subject->sval);
+            N("    stsfld     string %s::%s\n", net_classname, fn);
+        } else {
+            N("    pop\n");  /* can't assign to non-var */
+        }
+        if (tgt_u) net_emit_goto(tgt_u, next_lbl);
+        else {
+            if (tgt_s) net_emit_branch_success(tgt_s);
+            if (tgt_f) net_emit_branch_fail(tgt_f);
+        }
+        N("  %s:\n", lbl_end);
         return;
     }
 
