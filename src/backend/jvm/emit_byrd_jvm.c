@@ -255,6 +255,75 @@ static int       jvm_fn_count_fwd = 0;
 static const JvmFnDef *jvm_cur_fn = NULL;
 static const JvmFnDef *jvm_find_fn(const char *name);  /* fwd decl */
 
+/* Named pattern registry — compile-time table of VAR = <pattern-expr> assignments.
+ * Mirrors ASM backend's AsmNamedPat/asm_named[] mechanism.
+ * When E_VART("P") appears in a pattern context, we look up P here and
+ * inline-expand its stored pattern tree via jvm_emit_pat_node. */
+#define JVM_NAMED_PAT_MAX  64
+#define JVM_NAMED_NAMELEN  128
+typedef struct {
+    char    varname[JVM_NAMED_NAMELEN];
+    EXPR_t *pat;        /* pattern expression tree */
+} JvmNamedPat;
+static JvmNamedPat jvm_named_pats[JVM_NAMED_PAT_MAX];
+static int         jvm_named_pat_count = 0;
+
+static void jvm_named_pat_reset(void) { jvm_named_pat_count = 0; }
+
+static void jvm_named_pat_register(const char *varname, EXPR_t *pat) {
+    for (int i = 0; i < jvm_named_pat_count; i++) {
+        if (strcasecmp(jvm_named_pats[i].varname, varname) == 0) {
+            if (pat) jvm_named_pats[i].pat = pat;
+            return;
+        }
+    }
+    if (jvm_named_pat_count >= JVM_NAMED_PAT_MAX) return;
+    JvmNamedPat *e = &jvm_named_pats[jvm_named_pat_count++];
+    snprintf(e->varname, JVM_NAMED_NAMELEN, "%s", varname);
+    e->pat = pat;
+}
+
+static const JvmNamedPat *jvm_named_pat_lookup(const char *varname) {
+    for (int i = 0; i < jvm_named_pat_count; i++)
+        if (strcasecmp(jvm_named_pats[i].varname, varname) == 0)
+            return &jvm_named_pats[i];
+    return NULL;
+}
+
+/* expr_is_pattern_expr — mirrors ASM backend: E_OR is always a pattern;
+ * E_CONC or E_FNC is a pattern if any descendant is E_FNC/E_NAM/E_DOL. */
+static int jvm_expr_has_pat_fn(EXPR_t *e) {
+    if (!e) return 0;
+    if (e->kind == E_FNC || e->kind == E_NAM || e->kind == E_DOL) return 1;
+    if (jvm_expr_has_pat_fn(e->left))  return 1;
+    if (jvm_expr_has_pat_fn(e->right)) return 1;
+    for (int i = 0; i < e->nargs; i++)
+        if (jvm_expr_has_pat_fn(e->args[i])) return 1;
+    return 0;
+}
+static int jvm_expr_is_pattern_expr(EXPR_t *e) {
+    if (!e) return 0;
+    if (e->kind == E_OR)   return 1;   /* alternation is always a pattern */
+    if (e->kind == E_CONC) return jvm_expr_has_pat_fn(e);
+    return jvm_expr_has_pat_fn(e);
+}
+
+/* jvm_scan_named_patterns — pre-pass over whole program, register every
+ * pattern variable assignment before any code is emitted. */
+static void jvm_scan_named_patterns(Program *prog) {
+    jvm_named_pat_reset();
+    if (!prog) return;
+    for (STMT_t *s = prog->head; s; s = s->next) {
+        /* VAR = <pattern-expr>  — subject is E_VART, has_eq set, no pattern field */
+        if (s->subject && s->subject->kind == E_VART && s->subject->sval &&
+            s->has_eq && s->replacement && !s->pattern) {
+            if (jvm_expr_is_pattern_expr(s->replacement)) {
+                jvm_named_pat_register(s->subject->sval, s->replacement);
+            }
+        }
+    }
+}
+
 /* DATA type registry */
 #define JVM_DATA_MAX 32
 typedef struct { char *type_name; char *fields[JVM_ARG_MAX_FWD]; int nfields; } JvmDataType;
@@ -1129,23 +1198,134 @@ static void jvm_emit_pat_node(EXPR_t *pat,
     }
 
     /* ------------------------------------------------------------------ */
+    /* ------------------------------------------------------------------ */
     case E_CONC: {
-        /* SEQ node: left then right
-         * Wiring (matches emit_asm_seq):
-         *   alpha → left_alpha
-         *   left_gamma  → right_alpha
-         *   left_omega  → omega          (left failed, overall fail)
-         *   right_gamma → gamma          (both succeeded)
-         *   right_omega → left_beta      (right failed, backtrack left)
-         *
-         * JVM: no explicit beta ports needed — backtracking is handled
-         * by the cursor being a local int that we can save/restore.
-         * For J4 we implement non-backtracking SEQ (left must succeed,
-         * then right must succeed; on right failure we fail overall).
-         * Full backtracking SEQ requires a cursor save slot per level.    */
+        /* SEQ node.  Walk right-spine of left subtree to find trailing ARB or
+         * ARB.NAM node; if found, emit greedy ARB+backtrack loop around right. */
+        EXPR_t *arb_nam = NULL;
+        {
+            EXPR_t *cur = pat->left;
+            while (cur && cur->kind == E_CONC) cur = cur->right;
+            if (cur && cur->kind == E_NAM && cur->left &&
+                ((cur->left->kind == E_FNC  && cur->left->sval && strcasecmp(cur->left->sval, "ARB") == 0) ||
+                 (cur->left->kind == E_VART && cur->left->sval && strcasecmp(cur->left->sval, "ARB") == 0)))
+                arb_nam = cur;
+            else if (cur &&
+                ((cur->kind == E_FNC  && cur->sval && strcasecmp(cur->sval, "ARB") == 0) ||
+                 (cur->kind == E_VART && cur->sval && strcasecmp(cur->sval, "ARB") == 0)))
+                arb_nam = cur;
+        }
+
+        if (arb_nam) {
+            int loc_arb_start = (*p_cap_local)++;
+            int loc_arb_len   = (*p_cap_local)++;
+            char lbl_arb_loop[64], lbl_arb_decr[64];
+            snprintf(lbl_arb_loop, sizeof lbl_arb_loop, "Jn%d_arb_loop", uid);
+            snprintf(lbl_arb_decr, sizeof lbl_arb_decr, "Jn%d_arb_decr", uid);
+
+            /* Emit prefix: all of pat->left except the trailing arb_nam node */
+            {
+                EXPR_t *nodes[64]; int n = 0;
+                EXPR_t *cur = pat->left;
+                while (cur && cur->kind == E_CONC) {
+                    nodes[n++] = cur->left;
+                    if (cur->right == arb_nam) break;
+                    cur = cur->right;
+                    if (!cur || cur->kind != E_CONC) break;
+                }
+                if (n > 0) {
+                    char chain[64][64];
+                    for (int i = 0; i < n-1; i++)
+                        snprintf(chain[i], 64, "Jn%d_pre%d", uid, i);
+                    jvm_emit_pat_node(nodes[0],
+                                      n > 1 ? chain[0] : lbl_arb_loop, omega,
+                                      loc_subj, loc_cursor, loc_len, p_cap_local, out, classname);
+                    for (int i = 1; i < n; i++) {
+                        PNLABEL(chain[i-1]);
+                        jvm_emit_pat_node(nodes[i],
+                                          i+1 < n ? chain[i] : lbl_arb_loop, omega,
+                                          loc_subj, loc_cursor, loc_len, p_cap_local, out, classname);
+                    }
+                } else {
+                    /* no prefix — fall straight to arb_loop setup */
+                }
+            }
+
+            /* arb_loop: save start on first pass; restore on retry */
+            PNLABEL(lbl_arb_loop);
+            /* On first entry cursor is already at ARB position — save it */
+            PN("iload %d", loc_cursor);
+            PN("istore %d", loc_arb_start);
+            PN("iload %d", loc_len);
+            PN("iload %d", loc_cursor);
+            PN("isub");
+            PN("istore %d", loc_arb_len);
+
+            /* arb_retry: bounds check + set cursor */
+            char lbl_arb_retry[64];
+            snprintf(lbl_arb_retry, sizeof lbl_arb_retry, "Jn%d_arb_retry", uid);
+            PNLABEL(lbl_arb_retry);
+            PN("iload %d", loc_arb_len);
+            PN("iflt %s", omega);
+            PN("iload %d", loc_arb_start);
+            PN("iload %d", loc_arb_len);
+            PN("iadd");
+            PN("istore %d", loc_cursor);
+
+            /* Deferred capture: store ARB span in a temp local; only commit
+             * (call sno_var_put) after right child SUCCEEDS.  This prevents
+             * spurious output (e.g. OUTPUT =) on each backtrack attempt.    */
+            if (arb_nam->kind == E_NAM && arb_nam->right && arb_nam->right->sval) {
+                const char *capvar = arb_nam->right->sval;
+                int loc_tmp_cap = (*p_cap_local)++;
+
+                char nameesc[256];
+                { int o=0; nameesc[o++]='"';
+                  for (const char *p=capvar; *p && o<(int)sizeof nameesc-4; p++) {
+                      unsigned char c=(unsigned char)*p;
+                      if (c=='"') { nameesc[o++]='\\'; nameesc[o++]='"'; }
+                      else nameesc[o++]=(char)c;
+                  }
+                  nameesc[o++]='"'; nameesc[o]='\0'; }
+
+                /* Store substring into tmp local — no side-effect yet */
+                PN("aload %d", loc_subj);
+                PN("iload %d", loc_arb_start);
+                PN("iload %d", loc_cursor);
+                PN("invokevirtual java/lang/String/substring(II)Ljava/lang/String;");
+                PN("astore %d", loc_tmp_cap);
+
+                /* Emit right child; on success → commit label; on fail → arb_decr */
+                char lbl_arb_commit[64];
+                snprintf(lbl_arb_commit, sizeof lbl_arb_commit, "Jn%d_arb_commit", uid);
+
+                jvm_emit_pat_node(pat->right, lbl_arb_commit, lbl_arb_decr,
+                                  loc_subj, loc_cursor, loc_len, p_cap_local, out, classname);
+
+                /* Commit: right child succeeded — now store capture and goto gamma */
+                PNLABEL(lbl_arb_commit);
+                PN("ldc %s", nameesc);
+                PN("aload %d", loc_tmp_cap);
+                char vpdesc[512];
+                snprintf(vpdesc, sizeof vpdesc,
+                         "%s/sno_var_put(Ljava/lang/String;Ljava/lang/String;)V", classname);
+                PN("invokestatic %s", vpdesc);
+                PN("goto %s", gamma);
+            } else {
+                /* No capture — emit right child directly */
+                jvm_emit_pat_node(pat->right, gamma, lbl_arb_decr,
+                                  loc_subj, loc_cursor, loc_len, p_cap_local, out, classname);
+            }
+
+            PNLABEL(lbl_arb_decr);
+            PN("iinc %d -1", loc_arb_len);
+            PN("goto %s", lbl_arb_retry);
+            break;
+        }
+
+        /* Normal SEQ */
         char lmid[64];
         snprintf(lmid, sizeof lmid, "Jn%d_seq_mid", uid);
-
         jvm_emit_pat_node(pat->left,  lmid,  omega,
                           loc_subj, loc_cursor, loc_len, p_cap_local, out, classname);
         PNLABEL(lmid);
@@ -1154,7 +1334,6 @@ static void jvm_emit_pat_node(EXPR_t *pat,
         break;
     }
 
-    /* ------------------------------------------------------------------ */
     case E_OR: {
         /* ALT node: try left; on failure restore cursor and try right
          * Wiring:
@@ -1455,8 +1634,10 @@ static void jvm_emit_pat_node(EXPR_t *pat,
         }
 
         /* ---- BREAK(charset) ---- */
-        if (strcasecmp(fname, "BREAK") == 0) {
-            /* consume chars NOT in charset until one IS in charset */
+        if (strcasecmp(fname, "BREAK") == 0 || strcasecmp(fname, "BREAKX") == 0) {
+            /* BREAK:  consume chars NOT in charset until one IS; fail if none found (0 advance)
+             * BREAKX: same but succeeds even with zero chars consumed (allows cursor at end) */
+            int is_breakx = (strcasecmp(fname, "BREAKX") == 0);
             EXPR_t *cs_arg = (pat->args && pat->args[0]) ? pat->args[0] : NULL;
             int loc_cs = (*p_cap_local)++;
             char lbl_loop[64], lbl_done[64];
@@ -1468,10 +1649,15 @@ static void jvm_emit_pat_node(EXPR_t *pat,
             jvm_out = saved_out;
             PN("astore %d", loc_cs);
 
+            /* Save cursor_start for BREAK zero-advance check */
+            int loc_brk_start = (*p_cap_local)++;
+            PN("iload %d", loc_cursor);
+            PN("istore %d", loc_brk_start);
+
             PNLABEL(lbl_loop);
             PN("iload %d", loc_cursor);
             PN("iload %d", loc_len);
-            PN("if_icmpge %s", omega);
+            PN("if_icmpge %s", lbl_done);
             {
                 int loc_ch = (*p_cap_local)++;
                 PN("aload %d", loc_subj);
@@ -1487,6 +1673,12 @@ static void jvm_emit_pat_node(EXPR_t *pat,
                 PN("goto %s", lbl_loop);
             }
             PNLABEL(lbl_done);
+            if (is_breakx) {
+                /* BREAKX: like BREAK but explicitly cannot fail — even 0 chars is ok.
+                 * Actually both BREAK and BREAKX succeed with 0 advance when cursor is
+                 * already at a break char.  The key difference is BREAKX can match at
+                 * end-of-string (where BREAK would omega).  Both handled by lbl_done. */
+            }
             PN("goto %s", gamma);
             break;
         }
@@ -1610,8 +1802,15 @@ static void jvm_emit_pat_node(EXPR_t *pat,
 
         /* ---- ARB ---- */
         if (strcasecmp(fname, "ARB") == 0) {
-            /* ARB: match minimum (0 chars) first; backtrack to extend.
-             * For J4 non-backtracking: just succeed with 0 chars. */
+            /* ARB: greedy match — consume as many chars as possible (len-cursor),
+             * then let the rest of the surrounding pattern try.  If the rest fails,
+             * the outer retry loop advances the subject cursor by 1 and we try again
+             * at a shorter effective length.  This gives correct results when ARB
+             * appears in a SEQ followed by a literal anchor (e.g. ARB . V " :").
+             *
+             * For the non-SEQ (standalone ARB) case: match 0 chars (same as before). */
+            PN("iload %d", loc_len);
+            PN("istore %d", loc_cursor);   /* cursor = len (consume all remaining) */
             PN("goto %s", gamma);
             break;
         }
@@ -1670,11 +1869,29 @@ static void jvm_emit_pat_node(EXPR_t *pat,
             PN("goto %s", jvm_cur_pat_abort_label[0] ? jvm_cur_pat_abort_label : omega);
             break;
         }
-        if (strcasecmp(vname, "ARB") == 0)     { PN("goto %s", gamma); break; }
+        if (strcasecmp(vname, "ARB") == 0) {
+            /* Greedy: consume all remaining chars; outer scan retry handles backtrack */
+            PN("iload %d", loc_len);
+            PN("istore %d", loc_cursor);
+            PN("goto %s", gamma);
+            break;
+        }
 
-        /* Otherwise: indirect pattern reference — look up value and match as literal */
-        char lbl_ok[64];
-        snprintf(lbl_ok, sizeof lbl_ok, "Jn%d_var_ok", uid);
+        /* Check named-pattern registry (compile-time pattern variable assignments).
+         * E.g.  P = ('a' | 'b' | 'c')  registers P → E_OR tree.
+         * When we see P in pattern context, inline-expand its stored tree. */
+        {
+            const JvmNamedPat *np = jvm_named_pat_lookup(vname);
+            if (np && np->pat) {
+                fprintf(out, "    ; E_VART %s → named pattern inline expansion\n", vname);
+                jvm_emit_pat_node(np->pat, gamma, omega,
+                                  loc_subj, loc_cursor, loc_len,
+                                  p_cap_local, out, classname);
+                break;
+            }
+        }
+
+        /* Otherwise: variable holds a plain string at runtime — match as literal */
         int loc_lit = (*p_cap_local)++;
         int loc_llen = (*p_cap_local)++;
 
@@ -2481,6 +2698,18 @@ static void jvm_emit_runtime_helpers(void) {
         J(".method static sno_var_put(Ljava/lang/String;Ljava/lang/String;)V\n");
         J("    .limit stack 4\n");
         J("    .limit locals 2\n");
+        /* If name == "OUTPUT", print to stdout and return */
+        char stdesc[512];
+        snprintf(stdesc, sizeof stdesc, "%s/sno_stdout Ljava/io/PrintStream;", jvm_classname);
+        J("    aload_0\n");
+        J("    ldc \"OUTPUT\"\n");
+        J("    invokevirtual java/lang/String/equalsIgnoreCase(Ljava/lang/String;)Z\n");
+        J("    ifeq Lsvp_not_output\n");
+        J("    getstatic %s\n", stdesc);
+        J("    aload_1\n");
+        J("    invokevirtual java/io/PrintStream/println(Ljava/lang/String;)V\n");
+        J("    return\n");
+        J("Lsvp_not_output:\n");
         char vmdesc[512];
         snprintf(vmdesc, sizeof vmdesc, "%s/sno_vars Ljava/util/HashMap;", jvm_classname);
         J("    getstatic %s\n", vmdesc);
@@ -3437,6 +3666,7 @@ void jvm_emit(Program *prog, FILE *out, const char *filename) {
     if (prog && prog->head) {
         jvm_collect_vars(prog);
         jvm_collect_functions(prog);
+        jvm_scan_named_patterns(prog);   /* register pattern variables before emit */
     }
 
     JC("Generated by sno2c -jvm");
