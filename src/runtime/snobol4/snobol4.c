@@ -174,6 +174,43 @@ static DESCR_t _b_DIFFER(DESCR_t *a, int n) {
     DESCR_t y = (n > 1) ? a[1] : NULVCL;
     return differ(x, y) ? NULVCL : FAILDESCR;
 }
+/* Lexical string comparators — return first arg on success, FAILDESCR on failure */
+static DESCR_t _b_LGT(DESCR_t *a, int n) {
+    if (n < 2) return FAILDESCR;
+    const char *x = VARVAL_fn(a[0]); const char *y = VARVAL_fn(a[1]);
+    if (!x) x = ""; if (!y) y = "";
+    return strcmp(x, y) > 0 ? a[0] : FAILDESCR;
+}
+static DESCR_t _b_LLT(DESCR_t *a, int n) {
+    if (n < 2) return FAILDESCR;
+    const char *x = VARVAL_fn(a[0]); const char *y = VARVAL_fn(a[1]);
+    if (!x) x = ""; if (!y) y = "";
+    return strcmp(x, y) < 0 ? a[0] : FAILDESCR;
+}
+static DESCR_t _b_LGE(DESCR_t *a, int n) {
+    if (n < 2) return FAILDESCR;
+    const char *x = VARVAL_fn(a[0]); const char *y = VARVAL_fn(a[1]);
+    if (!x) x = ""; if (!y) y = "";
+    return strcmp(x, y) >= 0 ? a[0] : FAILDESCR;
+}
+static DESCR_t _b_LLE(DESCR_t *a, int n) {
+    if (n < 2) return FAILDESCR;
+    const char *x = VARVAL_fn(a[0]); const char *y = VARVAL_fn(a[1]);
+    if (!x) x = ""; if (!y) y = "";
+    return strcmp(x, y) <= 0 ? a[0] : FAILDESCR;
+}
+static DESCR_t _b_LEQ(DESCR_t *a, int n) {
+    if (n < 2) return FAILDESCR;
+    const char *x = VARVAL_fn(a[0]); const char *y = VARVAL_fn(a[1]);
+    if (!x) x = ""; if (!y) y = "";
+    return strcmp(x, y) == 0 ? a[0] : FAILDESCR;
+}
+static DESCR_t _b_LNE(DESCR_t *a, int n) {
+    if (n < 2) return FAILDESCR;
+    const char *x = VARVAL_fn(a[0]); const char *y = VARVAL_fn(a[1]);
+    if (!x) x = ""; if (!y) y = "";
+    return strcmp(x, y) != 0 ? a[0] : FAILDESCR;
+}
 static DESCR_t _b_HOST(DESCR_t *a, int n) {
     /* HOST(0) = command args string, HOST(1) = PID, HOST(3) = argc */
     if (n < 1) return NULVCL;
@@ -670,6 +707,12 @@ void SNO_INIT_fn(void) {
     /* Sprint 23: string predicates and host interface */
     register_fn("IDENT",    _b_IDENT,    0, 2);
     register_fn("DIFFER",   _b_DIFFER,   0, 2);
+    register_fn("LGT",      _b_LGT,      2, 2);
+    register_fn("LLT",      _b_LLT,      2, 2);
+    register_fn("LGE",      _b_LGE,      2, 2);
+    register_fn("LLE",      _b_LLE,      2, 2);
+    register_fn("LEQ",      _b_LEQ,      2, 2);
+    register_fn("LNE",      _b_LNE,      2, 2);
     register_fn("HOST",     _b_HOST,     1, 4);
     register_fn("ENDFILE",  _b_ENDFILE,  1, 1);
     register_fn("APPLY",    _b_APPLY,    1, 9);
@@ -1411,7 +1454,7 @@ static void _func_init(void) {
 
 static unsigned _func_hash(const char *name) {
     unsigned h = 5381;
-    while (*name) h = h * 33 ^ (unsigned char)*name++;
+    while (*name) h = h * 33 ^ (unsigned char)toupper((unsigned char)*name++);
     return h % FUNC_BUCKETS;
 }
 

@@ -1957,8 +1957,19 @@ static void asm_emit_null_program(void) {
  * pattern-function calls) are NOT named patterns in program context. */
 static int expr_has_pattern_fn(EXPR_t *e) {
     if (!e) return 0;
-    /* E_FNC nodes that are pattern builtins make this a pattern expr */
-    if (e->kind == E_FNC) return 1;
+    /* E_FNC nodes are pattern exprs only if the function name is a known
+     * pattern-building builtin.  Value functions like REPLACE/SIZE/DIFFER
+     * are NOT pattern builders — they return strings/integers, not patterns. */
+    if (e->kind == E_FNC) {
+        static const char *pat_fns[] = {
+            "ARBNO","ANY","NOTANY","SPAN","BREAK","BREAKX",
+            "LEN","POS","RPOS","TAB","RTAB","REM","ARB",
+            "FAIL","SUCCEED","FENCE","ABORT","BAL", NULL };
+        if (e->sval)
+            for (int i = 0; pat_fns[i]; i++)
+                if (strcasecmp(e->sval, pat_fns[i]) == 0) return 1;
+        return 0;
+    }
     /* E_NAM (. capture) and E_DOL ($ capture) wrap a pattern child */
     if (e->kind == E_NAM || e->kind == E_DOL) return 1;
     for (int i = 0; i < e->nchildren; i++)
@@ -2422,6 +2433,7 @@ static int     prog_str_count = 0;
 static void prog_str_reset(void) { prog_str_count = 0; }
 
 static const char *prog_str_intern(const char *s) {
+    if (!s) s = "";  /* guard against NULL sval */
     for (int i = 0; i < prog_str_count; i++)
         if (strcmp(prog_strs[i].val, s) == 0) return prog_strs[i].label;
     if (prog_str_count >= MAX_PROG_STRS) return "S_overflow";
@@ -2556,9 +2568,15 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
         return 1; /* might be fail if var undefined */
     }
     case E_KW: {
-        /* &KEYWORD — treat as named variable lookup */
+        /* &KEYWORD — runtime stores keywords uppercase (e.g. "ALPHABET" not "alphabet").
+         * Upcase e->sval and strip any & so stmt_get finds it correctly. */
         char kwbuf[128];
-        snprintf(kwbuf, sizeof kwbuf, "&%s", e->sval ? e->sval : "");
+        const char *src = e->sval ? e->sval : "";
+        if (*src == '&') src++;  /* strip leading & if present */
+        int ki = 0;
+        for (; src[ki] && ki < (int)sizeof(kwbuf)-1; ki++)
+            kwbuf[ki] = (char)toupper((unsigned char)src[ki]);
+        kwbuf[ki] = '\0';
         const char *lab = prog_str_intern(kwbuf);
         if (rbp_off == -16) {
             A("    GET_VAR     %s\n", lab);
@@ -2749,8 +2767,12 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
                 return 1;
             }
         }
-        /* Fast path: 2-arg call with atom args → CONC2_* macros (work for any fn) */
-        if (na == 2 && e->children[0] &&
+        /* Fast path: 2-arg call with atom args → CONC2_* macros.
+         * ONLY valid for CONCAT and ALT — these macros call stmt_concat directly.
+         * All other 2-arg functions (LGT, DIFFER, GT, etc.) must use APPLY_FN_N. */
+        int is_concat_or_alt = e->sval && (strcasecmp(e->sval, "concat") == 0 ||
+                                            strcasecmp(e->sval, "alt")    == 0);
+        if (is_concat_or_alt && na == 2 && e->children[0] &&
             (rbp_off == -32 || rbp_off == -16)) {
             EXPR_t *a0 = e->children[0];
             EXPR_t *a1 = e->children[1];  /* may be NULL → treated as E_NULV */
@@ -2895,14 +2917,14 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
          *   arg0 (arr): rdi=type, rsi=ptr
          *   arg1 (key): rdx=type, rcx=ptr
          * Returns DESCR_t in rax:rdx. */
-        if (!e->children[0] || e->nchildren < 1 || !e->children[0]) goto fallback;
-        /* Evaluate arr → [rbp-16/8], key → [rbp-32/24] */
-        prog_emit_expr(e->children[0],    -16);
-        prog_emit_expr(e->children[0], -32);
-        A("    mov     rdi, [rbp-16]\n");
-        A("    mov     rsi, [rbp-8]\n");
-        A("    mov     rdx, [rbp-32]\n");
-        A("    mov     rcx, [rbp-24]\n");
+        if (e->nchildren < 2 || !e->children[0] || !e->children[1]) goto fallback;
+        /* Evaluate arr → [rbp-32/24], key → [rbp-16/8] */
+        prog_emit_expr(e->children[0], -32);  /* arr */
+        prog_emit_expr(e->children[1], -16);  /* key */
+        A("    mov     rdi, [rbp-32]\n");
+        A("    mov     rsi, [rbp-24]\n");
+        A("    mov     rdx, [rbp-16]\n");
+        A("    mov     rcx, [rbp-8]\n");
         A("    call    stmt_aref\n");
         if (rbp_off == -16) {
             A("    mov     [rbp-16], rax\n");
@@ -3723,7 +3745,7 @@ static void asm_emit_program(Program *prog) {
                 }
             } else if (s->has_eq && s->subject &&
                        s->subject->kind == E_IDX &&
-                       s->subject->children[0] && s->subject->nchildren >= 1) {
+                       s->subject->children[0] && s->subject->nchildren >= 2) {
                 /* A<i> = val  or  T['key'] = val  →  stmt_aset(arr, key, val)
                  *
                  * SysV AMD64 calling convention for stmt_aset(arr, key, val):
@@ -3759,7 +3781,7 @@ static void asm_emit_program(Program *prog) {
                 A("    push    qword [rbp-8]\n");   /* arr ptr  (high) */
                 A("    push    qword [rbp-16]\n");  /* arr type (low) */
                 /* Evaluate key → [rbp-32/24] */
-                prog_emit_expr(s->subject->children[0],  -32);
+                prog_emit_expr(s->subject->children[1],  -32);
                 /* Save key onto C stack (now arr is at [rsp+16]..[rsp+23],
                  * key at [rsp+0]..[rsp+7] and [rsp+8]..[rsp+15]) */
                 A("    push    qword [rbp-24]\n");  /* key ptr  (high) */
@@ -3922,7 +3944,7 @@ static void asm_emit_program(Program *prog) {
                     }
                 }
                 if (e->children[0]  && top < 511) stk[top++] = e->children[0];
-                if (e->children[1] && top < 511) stk[top++] = e->children[1];
+                if (e->nchildren > 1 && e->children[1] && top < 511) stk[top++] = e->children[1];
                 for (int _i = 0; _i < e->nchildren && top < 510; _i++)
                     if (e->children[_i]) stk[top++] = e->children[_i];
             }
