@@ -222,7 +222,12 @@ static void jvm_emit_expr(EXPR_t *e);
 /* jvm_emit_to_double — safe numeric coercion helper.
  * Pops String, pushes double. Empty string/null → 0.0 (SNOBOL4 semantics). */
 static int jvm_need_sno_parse_helper = 0;
-static int jvm_need_input_helper = 0;
+static int jvm_need_input_helper     = 0;
+static int jvm_need_replace_helper   = 0;
+static int jvm_need_lpad_helper      = 0;
+static int jvm_need_rpad_helper      = 0;
+static int jvm_need_integer_helper   = 0;
+static int jvm_need_datatype_helper  = 0;
 
 static void jvm_emit_to_double(void) {
     /* Stack: String → double.  Empty/null → 0.0 */
@@ -658,6 +663,178 @@ static void jvm_emit_expr(EXPR_t *e) {
                 J("%s:\n", cfail);
                 JI("aconst_null", "");
                 J("%s:\n", cdone);
+                break;
+            }
+        }
+        /* SUBSTR(str, start, len) → substring (1-based start, SNOBOL4 semantics) */
+        if (strcasecmp(fname, "SUBSTR") == 0 && e->args && e->args[0]) {
+            static int _sublbl = 0;
+            char sfail[40], sdone[40];
+            snprintf(sfail, sizeof sfail, "Lsub_f_%d", _sublbl);
+            snprintf(sdone, sizeof sdone, "Lsub_d_%d", _sublbl++);
+            /* SUBSTR(str, start [, len])
+             * start is 1-based; len defaults to rest of string */
+            jvm_emit_expr(e->args[0]);  /* str */
+            /* get string length */
+            JI("dup", "");
+            JI("invokevirtual", "java/lang/String/length()I");
+            /* store slen; we need: str, start0, end0 */
+            /* Use Double.parseDouble approach for start */
+            EXPR_t *a1 = e->args[1] ? e->args[1] : NULL;
+            EXPR_t *a2 = e->args[2] ? e->args[2] : NULL;
+            /* Stack: str, slen */
+            /* store str and slen in scratch locals via helper approach:
+             * emit inline without extra locals for simplicity — use StringBuilder
+             * We'll use invokevirtual substring after computing start0/end0
+             * approach: push str, push start-1, push end, call substring */
+            /* Discard slen pushed above — just use str */
+            JI("pop", "");   /* discard the length, recompute as needed */
+            /* Stack: str */
+            /* store str in scratch — use a static int approach: push str, then args */
+            /* Simplest: str.substring(start-1, start-1+len) */
+            /* We need start and optional len */
+            if (a1) { jvm_emit_expr(a1); } else { JI("ldc", "\"1\""); }
+            jvm_emit_to_double(); JI("d2i", "");  /* start (1-based) */
+            JI("iconst_1", ""); JI("isub", "");   /* start0 = start-1 */
+            if (a2) {
+                /* end0 = start0 + len */
+                JI("dup", "");  /* dup start0 */
+                jvm_emit_expr(a2);
+                jvm_emit_to_double(); JI("d2i", "");
+                JI("iadd", ""); /* end0 */
+                /* Stack: str, start0, end0 */
+                JI("invokevirtual", "java/lang/String/substring(II)Ljava/lang/String;");
+            } else {
+                /* substring(start0) — to end */
+                JI("invokevirtual", "java/lang/String/substring(I)Ljava/lang/String;");
+            }
+            break;
+        }
+        /* REPLACE(str, from, to) → translate chars in str: for each char in from replace with corresponding char in to */
+        if (strcasecmp(fname, "REPLACE") == 0 && e->args && e->args[0] && e->args[1] && e->args[2]) {
+            static int _replbl = 0;
+            char rloop[40], rdone[40];
+            snprintf(rloop, sizeof rloop, "Lrep_lp_%d", _replbl);
+            snprintf(rdone, sizeof rdone, "Lrep_dn_%d", _replbl++);
+            /* Use a static helper method sno_replace(str,from,to) */
+            jvm_need_replace_helper = 1;
+            jvm_emit_expr(e->args[0]);
+            jvm_emit_expr(e->args[1]);
+            jvm_emit_expr(e->args[2]);
+            char rhdesc[512];
+            snprintf(rhdesc, sizeof rhdesc,
+                "%s/sno_replace(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+                jvm_classname);
+            JI("invokestatic", rhdesc);
+            break;
+        }
+        /* TRIM(str) → remove trailing whitespace */
+        if (strcasecmp(fname, "TRIM") == 0 && e->args && e->args[0]) {
+            jvm_emit_expr(e->args[0]);
+            /* replaceAll("\\s+$","") */
+            JI("ldc", "\"\\\\s+$\"");
+            JI("ldc", "\"\"");
+            JI("invokevirtual", "java/lang/String/replaceAll(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
+            break;
+        }
+        /* REVERSE(str) → reverse string */
+        if (strcasecmp(fname, "REVERSE") == 0 && e->args && e->args[0]) {
+            JI("new", "java/lang/StringBuilder");
+            JI("dup", "");
+            jvm_emit_expr(e->args[0]);
+            JI("invokespecial", "java/lang/StringBuilder/<init>(Ljava/lang/String;)V");
+            JI("invokevirtual", "java/lang/StringBuilder/reverse()Ljava/lang/StringBuilder;");
+            JI("invokevirtual", "java/lang/StringBuilder/toString()Ljava/lang/String;");
+            break;
+        }
+        /* LPAD(str, n [, pad]) → left-pad string to length n */
+        if (strcasecmp(fname, "LPAD") == 0 && e->args && e->args[0] && e->args[1]) {
+            jvm_need_lpad_helper = 1;
+            jvm_emit_expr(e->args[0]);
+            jvm_emit_expr(e->args[1]);
+            jvm_emit_to_double(); JI("d2i", "");
+            EXPR_t *pad_arg = (e->args[2]) ? e->args[2] : NULL;
+            if (pad_arg) { jvm_emit_expr(pad_arg); }
+            else { JI("ldc", "\" \""); }
+            char lpdesc[512];
+            snprintf(lpdesc, sizeof lpdesc,
+                "%s/sno_lpad(Ljava/lang/String;ILjava/lang/String;)Ljava/lang/String;",
+                jvm_classname);
+            JI("invokestatic", lpdesc);
+            break;
+        }
+        /* RPAD(str, n [, pad]) → right-pad string to length n */
+        if (strcasecmp(fname, "RPAD") == 0 && e->args && e->args[0] && e->args[1]) {
+            jvm_need_rpad_helper = 1;
+            jvm_emit_expr(e->args[0]);
+            jvm_emit_expr(e->args[1]);
+            jvm_emit_to_double(); JI("d2i", "");
+            EXPR_t *pad_arg = (e->args[2]) ? e->args[2] : NULL;
+            if (pad_arg) { jvm_emit_expr(pad_arg); }
+            else { JI("ldc", "\" \""); }
+            char rpdesc[512];
+            snprintf(rpdesc, sizeof rpdesc,
+                "%s/sno_rpad(Ljava/lang/String;ILjava/lang/String;)Ljava/lang/String;",
+                jvm_classname);
+            JI("invokestatic", rpdesc);
+            break;
+        }
+        /* INTEGER(x) → succeeds (returns x) if x is an integer string, fails otherwise */
+        if (strcasecmp(fname, "INTEGER") == 0 && e->args && e->args[0]) {
+            static int _intlbl = 0;
+            char ifail[40], idone[40];
+            snprintf(ifail, sizeof ifail, "Lint_f_%d", _intlbl);
+            snprintf(idone, sizeof idone, "Lint_d_%d", _intlbl++);
+            jvm_need_integer_helper = 1;
+            jvm_emit_expr(e->args[0]);
+            char ihdesc[512];
+            snprintf(ihdesc, sizeof ihdesc,
+                "%s/sno_is_integer(Ljava/lang/String;)Z", jvm_classname);
+            JI("dup", "");
+            JI("invokestatic", ihdesc);
+            JI("ifeq", ifail);
+            JI("goto", idone);
+            J("%s:\n", ifail);
+            JI("pop", "");
+            JI("aconst_null", "");
+            J("%s:\n", idone);
+            break;
+        }
+        /* DATATYPE(x) → "STRING", "INTEGER", or "REAL" */
+        if (strcasecmp(fname, "DATATYPE") == 0 && e->args && e->args[0]) {
+            jvm_need_datatype_helper = 1;
+            jvm_emit_expr(e->args[0]);
+            char dtdesc[512];
+            snprintf(dtdesc, sizeof dtdesc,
+                "%s/sno_datatype(Ljava/lang/String;)Ljava/lang/String;", jvm_classname);
+            JI("invokestatic", dtdesc);
+            break;
+        }
+        /* Lexical comparison: LGT/LLT/LGE/LLE/LEQ/LNE */
+        {
+            static int _lcmplbl = 0;
+            const char *ljmp = NULL;
+            if      (strcasecmp(fname,"LGT")==0) ljmp = "ifle";
+            else if (strcasecmp(fname,"LLT")==0) ljmp = "ifge";
+            else if (strcasecmp(fname,"LGE")==0) ljmp = "iflt";
+            else if (strcasecmp(fname,"LLE")==0) ljmp = "ifgt";
+            else if (strcasecmp(fname,"LEQ")==0) ljmp = "ifne";
+            else if (strcasecmp(fname,"LNE")==0) ljmp = "ifeq";
+            if (ljmp) {
+                char lcfail[40], lcdone[40];
+                snprintf(lcfail, sizeof lcfail, "Llcmp_f_%d", _lcmplbl);
+                snprintf(lcdone, sizeof lcdone, "Llcmp_d_%d", _lcmplbl++);
+                EXPR_t *a0 = (e->args && e->args[0]) ? e->args[0] : NULL;
+                EXPR_t *a1 = (e->args && e->args[1]) ? e->args[1] : NULL;
+                if (a0) jvm_emit_expr(a0); else JI("ldc", "\"\"");
+                if (a1) jvm_emit_expr(a1); else JI("ldc", "\"\"");
+                JI("invokevirtual", "java/lang/String/compareTo(Ljava/lang/String;)I");
+                J("    %s %s\n", ljmp, lcfail);
+                JI("ldc", "\"\"");
+                JI("goto", lcdone);
+                J("%s:\n", lcfail);
+                JI("aconst_null", "");
+                J("%s:\n", lcdone);
                 break;
             }
         }
@@ -1455,6 +1632,16 @@ static void jvm_emit_stmt(STMT_t *s, int stmt_idx) {
         return;
     }
 
+    /* Increment &STNO before every real statement */
+    {
+        char stnodesc[512];
+        snprintf(stnodesc, sizeof stnodesc, "%s/sno_kw_STNO I", jvm_classname);
+        J("    getstatic %s\n", stnodesc);
+        J("    iconst_1\n");
+        J("    iadd\n");
+        J("    putstatic %s\n", stnodesc);
+    }
+
     /* Case 1: pure assignment — no pattern */
     if (s->has_eq && s->subject &&
         (s->subject->kind == E_VART || s->subject->kind == E_KW) &&
@@ -1888,7 +2075,7 @@ static void jvm_emit_runtime_helpers(void) {
     if (jvm_need_kw_helpers) {
         J(".method static sno_kw_get(Ljava/lang/String;)Ljava/lang/String;\n");
         J("    .limit stack 4\n");
-        J("    .limit locals 1\n");
+        J("    .limit locals 3\n");   /* local0=arg, local1=StringBuilder, local2=int counter */
         /* &ALPHABET */
         J("    aload_0\n");
         J("    ldc \"ALPHABET\"\n");
@@ -1898,22 +2085,55 @@ static void jvm_emit_runtime_helpers(void) {
         J("    new java/lang/StringBuilder\n");
         J("    dup\n");
         J("    invokespecial java/lang/StringBuilder/<init>()V\n");
-        J("    ldc 0\n"); /* using iconst */
-        J("    istore_0\n");  /* reuse local 0 as counter */
+        J("    astore_1\n");          /* store StringBuilder in local 1 */
+        J("    iconst_0\n");
+        J("    istore_2\n");          /* loop counter in local 2 */
         J("Lkwg_alpha_loop:\n");
-        J("    iload_0\n");
+        J("    iload_2\n");
         J("    sipush 256\n");
         J("    if_icmpge Lkwg_alpha_done\n");
-        J("    iload_0\n");
+        J("    aload_1\n");           /* push StringBuilder */
+        J("    iload_2\n");
         J("    i2c\n");
         J("    invokevirtual java/lang/StringBuilder/append(C)Ljava/lang/StringBuilder;\n");
-        J("    iinc 0 1\n");
+        J("    pop\n");               /* discard returned StringBuilder ref */
+        J("    iinc 2 1\n");          /* increment counter in local 2 */
         J("    goto Lkwg_alpha_loop\n");
         J("Lkwg_alpha_done:\n");
+        J("    aload_1\n");
         J("    invokevirtual java/lang/StringBuilder/toString()Ljava/lang/String;\n");
         J("    areturn\n");
         J("Lkwg_not_alphabet:\n");
-        /* &TRIM / &ANCHOR / &FULLSCAN: stored in sno_kw_* static int fields */
+        /* &UCASE — uppercase alphabet A-Z */
+        J("    aload_0\n");
+        J("    ldc \"UCASE\"\n");
+        J("    invokevirtual java/lang/String/equalsIgnoreCase(Ljava/lang/String;)Z\n");
+        J("    ifeq Lkwg_not_ucase\n");
+        J("    ldc \"ABCDEFGHIJKLMNOPQRSTUVWXYZ\"\n");
+        J("    areturn\n");
+        J("Lkwg_not_ucase:\n");
+        /* &LCASE — lowercase alphabet a-z */
+        J("    aload_0\n");
+        J("    ldc \"LCASE\"\n");
+        J("    invokevirtual java/lang/String/equalsIgnoreCase(Ljava/lang/String;)Z\n");
+        J("    ifeq Lkwg_not_lcase\n");
+        J("    ldc \"abcdefghijklmnopqrstuvwxyz\"\n");
+        J("    areturn\n");
+        J("Lkwg_not_lcase:\n");
+        /* &STNO — statement counter */
+        J("    aload_0\n");
+        J("    ldc \"STNO\"\n");
+        J("    invokevirtual java/lang/String/equalsIgnoreCase(Ljava/lang/String;)Z\n");
+        J("    ifeq Lkwg_not_stno\n");
+        {
+            char stnodesc[512];
+            snprintf(stnodesc, sizeof stnodesc, "%s/sno_kw_STNO I", jvm_classname);
+            J("    getstatic %s\n", stnodesc);
+        }
+        J("    invokestatic java/lang/Integer/toString(I)Ljava/lang/String;\n");
+        J("    areturn\n");
+        J("Lkwg_not_stno:\n");
+        /* &TRIM / &ANCHOR: stored in sno_kw_* static int fields */
         J("    aload_0\n");
         J("    ldc \"TRIM\"\n");
         J("    invokevirtual java/lang/String/equalsIgnoreCase(Ljava/lang/String;)Z\n");
@@ -1963,6 +2183,19 @@ static void jvm_emit_runtime_helpers(void) {
         J("    putstatic %s\n", andesc);
         J("    return\n");
         J("Lkws_not_anchor:\n");
+        J("    aload_0\n");
+        J("    ldc \"STNO\"\n");
+        J("    invokevirtual java/lang/String/equalsIgnoreCase(Ljava/lang/String;)Z\n");
+        J("    ifeq Lkws_not_stno\n");
+        J("    aload_1\n");
+        J("    invokestatic java/lang/Integer/parseInt(Ljava/lang/String;)I\n");
+        {
+            char stnodesc2[512];
+            snprintf(stnodesc2, sizeof stnodesc2, "%s/sno_kw_STNO I", jvm_classname);
+            J("    putstatic %s\n", stnodesc2);
+        }
+        J("    return\n");
+        J("Lkws_not_stno:\n");
         J("    return\n");
         J(".end method\n\n");
 
@@ -2047,9 +2280,197 @@ static void jvm_emit_runtime_helpers(void) {
         J(".end method\n\n");
         jvm_need_input_helper = 0;
     }
+
+    /* sno_replace(str, from, to) → translate chars char-by-char */
+    if (jvm_need_replace_helper) {
+        J(".method static sno_replace(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;\n");
+        J("    .limit stack 6\n");
+        J("    .limit locals 8\n");
+        /* locals: 0=str, 1=from, 2=to, 3=sb, 4=i(loop), 5=slen, 6=ch, 7=idx */
+        J("    new java/lang/StringBuilder\n");
+        J("    dup\n");
+        J("    invokespecial java/lang/StringBuilder/<init>()V\n");
+        J("    astore 3\n");
+        J("    iconst_0\n");
+        J("    istore 4\n");   /* i = 0 */
+        J("    aload_0\n");
+        J("    invokevirtual java/lang/String/length()I\n");
+        J("    istore 5\n");   /* slen */
+        J("Lrep_loop:\n");
+        J("    iload 4\n");
+        J("    iload 5\n");
+        J("    if_icmpge Lrep_done\n");
+        J("    aload_0\n");
+        J("    iload 4\n");
+        J("    invokevirtual java/lang/String/charAt(I)C\n");
+        J("    istore 6\n");   /* ch = str.charAt(i) */
+        /* idx = from.indexOf(ch) */
+        J("    aload_1\n");
+        J("    iload 6\n");
+        J("    invokevirtual java/lang/String/indexOf(I)I\n");
+        J("    istore 7\n");
+        J("    iload 7\n");
+        J("    iflt Lrep_no_trans\n");
+        /* translated: check idx < to.length() */
+        J("    iload 7\n");
+        J("    aload_2\n");
+        J("    invokevirtual java/lang/String/length()I\n");
+        J("    if_icmpge Lrep_no_trans\n");
+        /* append to.charAt(idx) */
+        J("    aload 3\n");
+        J("    aload_2\n");
+        J("    iload 7\n");
+        J("    invokevirtual java/lang/String/charAt(I)C\n");
+        J("    invokevirtual java/lang/StringBuilder/append(C)Ljava/lang/StringBuilder;\n");
+        J("    pop\n");
+        J("    goto Lrep_next\n");
+        J("Lrep_no_trans:\n");
+        /* keep original char */
+        J("    aload 3\n");
+        J("    iload 6\n");
+        J("    invokevirtual java/lang/StringBuilder/append(C)Ljava/lang/StringBuilder;\n");
+        J("    pop\n");
+        J("Lrep_next:\n");
+        J("    iinc 4 1\n");
+        J("    goto Lrep_loop\n");
+        J("Lrep_done:\n");
+        J("    aload 3\n");
+        J("    invokevirtual java/lang/StringBuilder/toString()Ljava/lang/String;\n");
+        J("    areturn\n");
+        J(".end method\n\n");
+        jvm_need_replace_helper = 0;
+    }
+
+    /* sno_lpad(str, n, pad) → left-pad str to width n using pad char */
+    if (jvm_need_lpad_helper) {
+        J(".method static sno_lpad(Ljava/lang/String;ILjava/lang/String;)Ljava/lang/String;\n");
+        J("    .limit stack 6\n");
+        J("    .limit locals 5\n");
+        /* locals: 0=str, 1=n, 2=pad, 3=slen, 4=sb */
+        J("    aload_0\n");
+        J("    invokevirtual java/lang/String/length()I\n");
+        J("    istore 3\n");
+        J("    iload_1\n");
+        J("    iload 3\n");
+        J("    if_icmple Llpad_done\n");  /* n <= slen → no padding */
+        J("    new java/lang/StringBuilder\n");
+        J("    dup\n");
+        J("    invokespecial java/lang/StringBuilder/<init>()V\n");
+        J("    astore 4\n");
+        J("Llpad_loop:\n");
+        J("    iload_1\n");
+        J("    iload 3\n");
+        J("    if_icmple Llpad_append_str\n");
+        J("    aload 4\n");
+        J("    aload_2\n");
+        J("    invokevirtual java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n");
+        J("    pop\n");
+        J("    iinc 3 1\n");
+        J("    goto Llpad_loop\n");
+        J("Llpad_append_str:\n");
+        J("    aload 4\n");
+        J("    aload_0\n");
+        J("    invokevirtual java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n");
+        J("    pop\n");
+        J("    aload 4\n");
+        J("    invokevirtual java/lang/StringBuilder/toString()Ljava/lang/String;\n");
+        J("    areturn\n");
+        J("Llpad_done:\n");
+        J("    aload_0\n");
+        J("    areturn\n");
+        J(".end method\n\n");
+        jvm_need_lpad_helper = 0;
+    }
+
+    /* sno_rpad(str, n, pad) → right-pad str to width n using pad char */
+    if (jvm_need_rpad_helper) {
+        J(".method static sno_rpad(Ljava/lang/String;ILjava/lang/String;)Ljava/lang/String;\n");
+        J("    .limit stack 6\n");
+        J("    .limit locals 5\n");
+        J("    aload_0\n");
+        J("    invokevirtual java/lang/String/length()I\n");
+        J("    istore 3\n");
+        J("    iload_1\n");
+        J("    iload 3\n");
+        J("    if_icmple Lrpad_done\n");
+        J("    new java/lang/StringBuilder\n");
+        J("    dup\n");
+        J("    aload_0\n");
+        J("    invokespecial java/lang/StringBuilder/<init>(Ljava/lang/String;)V\n");
+        J("    astore 4\n");
+        J("Lrpad_loop:\n");
+        J("    iload_1\n");
+        J("    iload 3\n");
+        J("    if_icmple Lrpad_finish\n");
+        J("    aload 4\n");
+        J("    aload_2\n");
+        J("    invokevirtual java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n");
+        J("    pop\n");
+        J("    iinc 3 1\n");
+        J("    goto Lrpad_loop\n");
+        J("Lrpad_finish:\n");
+        J("    aload 4\n");
+        J("    invokevirtual java/lang/StringBuilder/toString()Ljava/lang/String;\n");
+        J("    areturn\n");
+        J("Lrpad_done:\n");
+        J("    aload_0\n");
+        J("    areturn\n");
+        J(".end method\n\n");
+        jvm_need_rpad_helper = 0;
+    }
+
+    /* sno_is_integer(str) → boolean Z: true if str represents an integer */
+    if (jvm_need_integer_helper) {
+        J(".method static sno_is_integer(Ljava/lang/String;)Z\n");
+        J("    .limit stack 4\n");
+        J("    .limit locals 1\n");
+        J("    aload_0\n");
+        J("    ifnull Lisi_false\n");
+        J("    aload_0\n");
+        J("    invokevirtual java/lang/String/trim()Ljava/lang/String;\n");
+        J("    invokevirtual java/lang/String/isEmpty()Z\n");
+        J("    ifne Lisi_false\n");
+        /* Try Long.parseLong; catch NumberFormatException → false */
+        J("    aload_0\n");
+        J("    invokevirtual java/lang/String/trim()Ljava/lang/String;\n");
+        /* Use regex: optional sign, then digits */
+        J("    ldc \"-?[0-9]+\"\n");
+        J("    invokevirtual java/lang/String/matches(Ljava/lang/String;)Z\n");
+        J("    ireturn\n");
+        J("Lisi_false:\n");
+        J("    iconst_0\n");
+        J("    ireturn\n");
+        J(".end method\n\n");
+        jvm_need_integer_helper = 0;
+    }
+
+    /* sno_datatype(str) → "STRING", "INTEGER", or "REAL" */
+    if (jvm_need_datatype_helper) {
+        J(".method static sno_datatype(Ljava/lang/String;)Ljava/lang/String;\n");
+        J("    .limit stack 4\n");
+        J("    .limit locals 1\n");
+        /* Check integer: -?[0-9]+ */
+        J("    aload_0\n");
+        J("    ldc \"-?[0-9]+\"\n");
+        J("    invokevirtual java/lang/String/matches(Ljava/lang/String;)Z\n");
+        J("    ifeq Ldt_not_int\n");
+        J("    ldc \"integer\"\n");
+        J("    areturn\n");
+        J("Ldt_not_int:\n");
+        /* Check real: contains digit and (. or e/E) */
+        J("    aload_0\n");
+        J("    ldc \"-?[0-9]*\\\\.?[0-9]+([eEdD][+-]?[0-9]+)?\"\n");
+        J("    invokevirtual java/lang/String/matches(Ljava/lang/String;)Z\n");
+        J("    ifeq Ldt_not_real\n");
+        J("    ldc \"real\"\n");
+        J("    areturn\n");
+        J("Ldt_not_real:\n");
+        J("    ldc \"string\"\n");
+        J("    areturn\n");
+        J(".end method\n\n");
+        jvm_need_datatype_helper = 0;
+    }
 }
-
-
 
 static void jvm_emit_header(Program *prog) {
     J(".class public %s\n", jvm_classname);
@@ -2064,6 +2485,7 @@ static void jvm_emit_header(Program *prog) {
     /* Keyword int fields (J2) */
     J(".field static sno_kw_TRIM I\n");
     J(".field static sno_kw_ANCHOR I\n");
+    J(".field static sno_kw_STNO I\n");
 
     /* Dynamic variable map for indirect assignment (J2) */
     J(".field static sno_vars Ljava/util/HashMap;\n");
@@ -2090,6 +2512,8 @@ static void jvm_emit_header(Program *prog) {
     J("    putstatic       %s/sno_kw_TRIM I\n", jvm_classname);
     J("    iconst_0\n");
     J("    putstatic       %s/sno_kw_ANCHOR I\n", jvm_classname);
+    J("    iconst_0\n");
+    J("    putstatic       %s/sno_kw_STNO I\n", jvm_classname);
     /* init sno_vars HashMap */
     J("    new java/util/HashMap\n");
     J("    dup\n");
@@ -2134,9 +2558,14 @@ void jvm_emit(Program *prog, FILE *out, const char *filename) {
     jvm_nvar = 0;
     jvm_need_sno_parse_helper = 0;
     jvm_need_input_helper = 0;
-    jvm_need_kw_helpers   = 1;  /* always emit for J2 — callers may use &KEYWORD */
-    jvm_need_indr_helpers = 1;  /* always emit for J2 — indirect assign/get */
-    jvm_need_varmap       = 1;
+    jvm_need_kw_helpers      = 1;  /* always emit for J2 — callers may use &KEYWORD */
+    jvm_need_indr_helpers    = 1;  /* always emit for J2 — indirect assign/get */
+    jvm_need_varmap          = 1;
+    jvm_need_replace_helper  = 0;
+    jvm_need_lpad_helper     = 0;
+    jvm_need_rpad_helper     = 0;
+    jvm_need_integer_helper  = 0;
+    jvm_need_datatype_helper = 0;
     jvm_set_classname(filename);
 
     if (prog && prog->head)
