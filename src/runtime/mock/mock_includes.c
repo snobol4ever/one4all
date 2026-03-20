@@ -524,12 +524,9 @@ void inc_init(void) {
     register_fn("TZ",         _w_TZ,        3, 3);
     register_fn("T8Trace",    _w_T8Trace,   3, 3);
     register_fn("T8Pos",      _w_T8Pos,     2, 2);
-    register_fn("LEQ",        _w_LEQ,       2, 2);
-    register_fn("LGT",        _w_LGT,       2, 2);
-    register_fn("LGE",        _w_LGE,       2, 2);
-    register_fn("LLT",        _w_LLT,       2, 2);
-    register_fn("LLE",        _w_LLE,       2, 2);
-    register_fn("LNE",        _w_LNE,       2, 2);
+    /* LGT/LLT/LGE/LLE/LEQ/LNE registered by SNO_INIT_fn (snobol4.c) with
+     * correct FAILDESCR semantics. Do NOT re-register here — it overwrites
+     * the correct versions with _w_* wrappers that return NULVCL on failure. */
     void inc_init_extra(void);  /* forward declaration */
     inc_init_extra();
 }

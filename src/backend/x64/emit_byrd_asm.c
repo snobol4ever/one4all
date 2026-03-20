@@ -2916,15 +2916,26 @@ static int prog_emit_expr(EXPR_t *e, int rbp_off) {
          * SysV AMD64: DESCR_t args passed in pairs of int regs.
          *   arg0 (arr): rdi=type, rsi=ptr
          *   arg1 (key): rdx=type, rcx=ptr
-         * Returns DESCR_t in rax:rdx. */
+         * Returns DESCR_t in rax:rdx.
+         *
+         * ORDERING FIX: evaluate arr first into [rbp-32/24], then PUSH those
+         * two qwords onto the C stack before evaluating the key.  Key evaluation
+         * (e.g. LOAD_INT) always writes [rbp-32/24] first, which would clobber
+         * the array descriptor if we left it there.  After key eval the array
+         * descriptor is restored from the stack into rdi:rsi. */
         if (e->nchildren < 2 || !e->children[0] || !e->children[1]) goto fallback;
-        /* Evaluate arr → [rbp-32/24], key → [rbp-16/8] */
-        prog_emit_expr(e->children[0], -32);  /* arr */
-        prog_emit_expr(e->children[1], -16);  /* key */
-        A("    mov     rdi, [rbp-32]\n");
-        A("    mov     rsi, [rbp-24]\n");
-        A("    mov     rdx, [rbp-16]\n");
-        A("    mov     rcx, [rbp-8]\n");
+        /* Step 1: evaluate array into [rbp-32/24] */
+        prog_emit_expr(e->children[0], -32);
+        /* Step 2: push array descriptor onto C stack to protect from key eval */
+        A("    push    qword [rbp-24]\n");   /* arr.p */
+        A("    push    qword [rbp-32]\n");   /* arr.v */
+        /* Step 3: evaluate key into [rbp-32/24] (safe now — arr saved on stack) */
+        prog_emit_expr(e->children[1], -32);
+        /* Step 4: move key into rdx:rcx, pop arr into rdi:rsi */
+        A("    mov     rdx, [rbp-32]\n");   /* key.v */
+        A("    mov     rcx, [rbp-24]\n");   /* key.p */
+        A("    pop     rdi\n");              /* arr.v */
+        A("    pop     rsi\n");              /* arr.p */
         A("    call    stmt_aref\n");
         if (rbp_off == -16) {
             A("    mov     [rbp-16], rax\n");
