@@ -645,6 +645,11 @@ static void net_emit_expr(EXPR_t *e) {
         net_emit_expr(expr_arg(e, 1));
         N("    call       string [snobol4lib]Snobol4Lib::sno_div(string, string)\n");
         break;
+    case E_EXPOP:
+        net_emit_expr(expr_arg(e, 0));
+        net_emit_expr(expr_arg(e, 1));
+        N("    call       string [snobol4lib]Snobol4Lib::sno_pow(string, string)\n");
+        break;
     case E_MNS:
         /* unary minus */
         net_emit_expr(expr_arg(e, 0));
@@ -681,15 +686,22 @@ static void net_emit_goto(const char *target, const char *next_lbl) {
 }
 
 static void net_emit_branch_success(const char *target) {
-    /* local 0 = success flag (1=success,0=fail); brtrue if success */
     if (!target) return;
     N("    ldloc.0\n");
+    if (net_cur_fn) {
+        if (strcasecmp(target, "RETURN")  == 0) { N("    brtrue     %s\n", net_fn_return_lbl);  return; }
+        if (strcasecmp(target, "FRETURN") == 0) { N("    brtrue     %s\n", net_fn_freturn_lbl); return; }
+    }
     N("    brtrue     L_%s\n", target);
 }
 
 static void net_emit_branch_fail(const char *target) {
     if (!target) return;
     N("    ldloc.0\n");
+    if (net_cur_fn) {
+        if (strcasecmp(target, "RETURN")  == 0) { N("    brfalse    %s\n", net_fn_return_lbl);  return; }
+        if (strcasecmp(target, "FRETURN") == 0) { N("    brfalse    %s\n", net_fn_freturn_lbl); return; }
+    }
     N("    brfalse    L_%s\n", target);
 }
 
@@ -771,7 +783,23 @@ static void net_emit_pat_node(EXPR_t *pat,
     }
 
     case E_CONC: {
-        /* SEQ: chain gamma/omega through each arm left-to-right */
+        /* SEQ: chain gamma/omega left-to-right.
+         *
+         * Deferred-commit for NAM(ARB,...):
+         *   ARB backtracks by trying cursor+0, +1, +2 ...  If the capture
+         *   target is OUTPUT, firing Console.WriteLine on every candidate
+         *   produces spurious lines.  Solution:
+         *     1. Pre-scan children for NAM(ARB,...) occurrences.
+         *     2. If any found, the last child's gamma becomes lbl_dc
+         *        (deferred-commit label) instead of the outer gamma.
+         *     3. NAM(ARB,...) children store the captured substring in a
+         *        temp string slot without side-effects.
+         *     4. lbl_dc emits all committed stores, then branches to gamma.
+         *
+         * seq_omega is stored in a local buffer (not pointing into the
+         * global net_arb_incr_label) so clearing that global after capture
+         * does not clobber the accumulated omega value.
+         */
         int nkids = expr_nargs(pat);
         if (nkids == 0) { N("    br         %s\n", gamma); break; }
         if (nkids == 1) {
@@ -779,25 +807,106 @@ static void net_emit_pat_node(EXPR_t *pat,
                               loc_subj, loc_cursor, loc_len, p_next_int, p_next_str);
             break;
         }
+
+        /* Pre-scan: detect NAM(ARB,...) children */
+        #define SEQ_MAX_DEF 8
+        static int  def_slot_s[SEQ_MAX_DEF];
+        static char def_var_s[SEQ_MAX_DEF][256];
+        int ndef = 0;
+        int has_dc = 0;
+        for (int i = 0; i < nkids; i++) {
+            EXPR_t *c = expr_arg(pat, i);
+            if (c && c->kind == E_NAM) {
+                EXPR_t *lc = expr_left(c);
+                if (lc && ((lc->kind == E_FNC  && lc->sval && strcasecmp(lc->sval,"ARB")==0) ||
+                           (lc->kind == E_VART && lc->sval && strcasecmp(lc->sval,"ARB")==0)))
+                    has_dc = 1;
+            }
+        }
+
+        char lbl_dc[64];
+        snprintf(lbl_dc, sizeof lbl_dc, "Nn%d_dc", uid);
+        /* true_gamma: last child aims here; if deferred commits needed, it's lbl_dc */
+        const char *true_gamma = has_dc ? lbl_dc : gamma;
+
+        /* Build mid-point label array */
         char **mids = malloc(nkids * sizeof(char *));
         for (int i = 0; i < nkids - 1; i++) {
             mids[i] = malloc(64);
-            snprintf(mids[i], 64, "Nn%d_seq_m%d", uid, i);
+            snprintf(mids[i], 64, "Nn%d_sm%d", uid, i);
         }
-        const char *seq_omega = omega;  /* may be overridden after ARB */
+
+        char seq_omega_buf[128];
+        snprintf(seq_omega_buf, sizeof seq_omega_buf, "%s", omega);
+        const char *seq_omega = seq_omega_buf;
+
         for (int i = 0; i < nkids; i++) {
-            const char *kg = (i < nkids - 1) ? mids[i] : gamma;
+            EXPR_t *child = expr_arg(pat, i);
+            /* Last child uses true_gamma (may be lbl_dc); others use mids */
+            const char *kg = (i < nkids - 1) ? mids[i] : true_gamma;
             net_arb_incr_label[0] = '\0';
-            net_emit_pat_node(expr_arg(pat, i), kg, seq_omega,
-                              loc_subj, loc_cursor, loc_len, p_next_int, p_next_str);
-            /* If this child was ARB, subsequent children should use ARB's
-             * increment label as their omega (backtrack into ARB). */
+
+            /* NAM(ARB,...) — deferred capture */
+            int is_nam_arb = 0;
+            if (child && child->kind == E_NAM) {
+                EXPR_t *lc = expr_left(child);
+                if (lc && ((lc->kind == E_FNC  && lc->sval && strcasecmp(lc->sval,"ARB")==0) ||
+                           (lc->kind == E_VART && lc->sval && strcasecmp(lc->sval,"ARB")==0)))
+                    is_nam_arb = 1;
+            }
+
+            if (is_nam_arb && ndef < SEQ_MAX_DEF) {
+                EXPR_t *arb_child = expr_left(child);
+                const char *capvar = (expr_right(child) && expr_right(child)->sval)
+                                     ? expr_right(child)->sval : "";
+                int loc_bef = (*p_next_int)++;
+                int loc_tmp = (*p_next_str)++;
+                char lbl_arb_ok[64];
+                snprintf(lbl_arb_ok, sizeof lbl_arb_ok, "Nn%d_%d_aok", uid, i);
+
+                net_ldloc_i(loc_cursor); net_stloc_i(loc_bef);
+                net_emit_pat_node(arb_child, lbl_arb_ok, seq_omega,
+                                  loc_subj, loc_cursor, loc_len, p_next_int, p_next_str);
+                N("  %s:\n", lbl_arb_ok);
+                /* Tentative capture — no side-effect */
+                net_ldloc_i(loc_subj); net_ldloc_i(loc_bef);
+                net_ldloc_i(loc_cursor); net_ldloc_i(loc_bef); N("    sub\n");
+                N("    callvirt   instance string [mscorlib]System.String::Substring(int32, int32)\n");
+                net_stloc_s(loc_tmp);
+                N("    br         %s\n", kg);
+
+                def_slot_s[ndef] = loc_tmp;
+                snprintf(def_var_s[ndef], 256, "%s", capvar);
+                ndef++;
+            } else {
+                net_emit_pat_node(child, kg, seq_omega,
+                                  loc_subj, loc_cursor, loc_len, p_next_int, p_next_str);
+            }
+
+            /* Update seq_omega if ARB was just emitted */
             if (net_arb_incr_label[0]) {
-                seq_omega = net_arb_incr_label;
+                snprintf(seq_omega_buf, sizeof seq_omega_buf, "%s", net_arb_incr_label);
                 net_arb_incr_label[0] = '\0';
             }
             if (i < nkids - 1) N("  %s:\n", mids[i]);
         }
+
+        /* Deferred-commit block — only reachable when all SEQ children succeed */
+        if (has_dc) {
+            N("  %s:\n", lbl_dc);
+            for (int d = 0; d < ndef; d++) {
+                net_ldloc_s(def_slot_s[d]);
+                if (net_is_output(def_var_s[d])) {
+                    N("    call       void [mscorlib]System.Console::WriteLine(string)\n");
+                } else {
+                    char fn[256]; net_field_name(fn, sizeof fn, def_var_s[d]);
+                    N("    stsfld     string %s::%s\n", net_classname, fn);
+                }
+            }
+            N("    br         %s\n", gamma);
+        }
+        #undef SEQ_MAX_DEF
+
         for (int i = 0; i < nkids - 1; i++) free(mids[i]);
         free(mids);
         break;
@@ -834,12 +943,12 @@ static void net_emit_pat_node(EXPR_t *pat,
     }
 
     case E_NAM: {
-        int loc_before = (*p_next_int)++;  /* int32: cursor before capture */
+        int loc_before = (*p_next_int)++;
         char lbl_ok[64]; snprintf(lbl_ok, sizeof lbl_ok, "Nn%d_nam_ok", uid);
+        const char *varname = (expr_right(pat) && expr_right(pat)->sval) ? expr_right(pat)->sval : "";
         net_ldloc_i(loc_cursor); net_stloc_i(loc_before);
         net_emit_pat_node(expr_left(pat), lbl_ok, omega, loc_subj, loc_cursor, loc_len, p_next_int, p_next_str);
         N("  %s:\n", lbl_ok);
-        const char *varname = (expr_right(pat) && expr_right(pat)->sval) ? expr_right(pat)->sval : "";
         net_ldloc_i(loc_subj); net_ldloc_i(loc_before);
         net_ldloc_i(loc_cursor); net_ldloc_i(loc_before); N("    sub\n");
         N("    callvirt   instance string [mscorlib]System.String::Substring(int32, int32)\n");
@@ -985,6 +1094,39 @@ static void net_emit_pat_node(EXPR_t *pat,
             net_ldloc_i(loc_cursor); N("    ldc.i4.1\n"); N("    add\n"); net_stloc_i(loc_cursor);
             N("    br         %s\n", lbl_loop);
             N("  %s:\n", lbl_done);
+            N("    br         %s\n", gamma);
+            break;
+        }
+
+        if (strcasecmp(fname, "BREAKX") == 0) {
+            /* BREAKX(x): like BREAK but fails if no chars consumed (cursor unchanged).
+             * Scans forward skipping chars NOT in x; if it reaches EOS, fails.
+             * Unlike BREAK it requires at least one char consumed.            */
+            int loc_cs   = (*p_next_str)++;
+            int loc_ch   = (*p_next_str)++;
+            int loc_save = (*p_next_int)++;
+            char lbl_loop[64], lbl_done[64];
+            snprintf(lbl_loop, sizeof lbl_loop, "Nn%d_brkx_lp", uid);
+            snprintf(lbl_done, sizeof lbl_done, "Nn%d_brkx_dn", uid);
+            if (arg0) net_pat_emit_expr(arg0); else N("    ldstr      \"\"\n");
+            net_stloc_s(loc_cs);
+            /* Save cursor to verify progress */
+            net_ldloc_i(loc_cursor); net_stloc_i(loc_save);
+            N("  %s:\n", lbl_loop);
+            net_ldloc_i(loc_cursor); net_ldloc_i(loc_len); N("    bge        %s\n", omega);
+            net_ldloc_i(loc_subj); net_ldloc_i(loc_cursor);
+            N("    callvirt   instance char [mscorlib]System.String::get_Chars(int32)\n");
+            N("    call       string [mscorlib]System.Char::ToString(char)\n");
+            net_stloc_s(loc_ch);
+            net_ldloc_s(loc_cs); net_ldloc_s(loc_ch);
+            N("    callvirt   instance bool [mscorlib]System.String::Contains(string)\n");
+            N("    brtrue     %s\n", lbl_done);
+            net_ldloc_i(loc_cursor); N("    ldc.i4.1\n"); N("    add\n"); net_stloc_i(loc_cursor);
+            N("    br         %s\n", lbl_loop);
+            N("  %s:\n", lbl_done);
+            /* BREAKX fails if no progress (cursor == save) */
+            net_ldloc_i(loc_cursor); net_ldloc_i(loc_save);
+            N("    beq        %s\n", omega);
             N("    br         %s\n", gamma);
             break;
         }
@@ -1164,6 +1306,53 @@ static void net_emit_pat_node(EXPR_t *pat,
             net_ldloc_i(loc_cursor); net_ldloc_i(loc_llen); N("    add\n"); net_stloc_i(loc_cursor);
             N("    br         %s\n", gamma);
         }
+        break;
+    }
+
+    case E_INDR: {
+        /* *VAR — indirect pattern ref: get variable name, load its value,
+         * match the value as a literal string (same logic as VART literal path).
+         * Inner child (children[1] or children[0]) holds the E_VART whose sval
+         * is the variable NAME (not value) to dereference.                      */
+        EXPR_t *inner = (pat->nchildren > 1 && pat->children[1])
+                        ? pat->children[1] : pat->children[0];
+        const char *vname = (inner && inner->sval) ? inner->sval : "";
+        int loc_lit  = (*p_next_str)++;
+        int loc_llen = (*p_next_int)++;
+        char fn[256]; net_field_name(fn, sizeof fn, vname);
+        N("    ldsfld     string %s::%s\n", net_classname, fn);
+        net_stloc_s(loc_lit);
+        net_ldloc_s(loc_lit);
+        N("    callvirt   instance int32 [mscorlib]System.String::get_Length()\n");
+        net_stloc_i(loc_llen);
+        net_ldloc_i(loc_cursor); net_ldloc_i(loc_llen); N("    add\n");
+        net_ldloc_i(loc_len); N("    bgt        %s\n", omega);
+        net_ldloc_i(loc_subj); net_ldloc_i(loc_cursor); net_ldloc_i(loc_llen);
+        N("    callvirt   instance string [mscorlib]System.String::Substring(int32, int32)\n");
+        net_ldloc_s(loc_lit);
+        N("    call       bool [mscorlib]System.String::op_Equality(string, string)\n");
+        N("    brfalse    %s\n", omega);
+        net_ldloc_i(loc_cursor); net_ldloc_i(loc_llen); N("    add\n"); net_stloc_i(loc_cursor);
+        N("    br         %s\n", gamma);
+        break;
+    }
+
+    case E_ATP: {
+        /* @VAR — capture current cursor position (0-based) into var.
+         * Zero-width: does not advance cursor. Always succeeds.
+         * Stores integer string of current cursor position.          */
+        const char *varname = pat->sval ? pat->sval : "";
+        /* Convert cursor (int32) to string via Int32.ToString() */
+        net_ldloc_i(loc_cursor);
+        N("    box        [mscorlib]System.Int32\n");
+        N("    callvirt   instance string object::ToString()\n");
+        if (net_is_output(varname)) {
+            N("    call       void [mscorlib]System.Console::WriteLine(string)\n");
+        } else {
+            char fn[256]; net_field_name(fn, sizeof fn, varname);
+            N("    stsfld     string %s::%s\n", net_classname, fn);
+        }
+        N("    br         %s\n", gamma);
         break;
     }
 
