@@ -265,9 +265,13 @@ static void emit_expr(EXPR_t *e) {
     case E_KW: E("kw(\"%s\")", e->sval); break;
 
     case E_INDR:
-        if (!e->children[0]) {
-            /* $expr — indirect lookup */
-            E("deref("); emit_expr(e->children[1]); E(")");
+        if (!e->children[0] || (!e->children[1] && !(e->children[0]->kind == E_VART || e->children[0]->kind == E_FNC))) {
+            /* $expr — indirect lookup.
+             * Old tree: left=NULL, right=operand.
+             * New flat tree (M-FLAT-NARY): children[0]=operand (no right child).
+             * Accept both: if children[0] is not VART/FNC it's a $-deref operand. */
+            EXPR_t *operand = e->children[1] ? e->children[1] : e->children[0];
+            E("deref("); emit_expr(operand); E(")");
         } else if (e->children[0]->kind == E_VART) {
             /* *varname — deferred pattern reference (resolved at MATCH_fn time) */
             E("var_as_pattern(pat_ref(\"%s\"))", e->children[0]->sval);
@@ -389,7 +393,8 @@ static void emit_pat(EXPR_t *e) {
             emit_pat(e->children[0]->children[0]);
             E(")");
         } else {
-            E("pat_deref("); emit_expr(e->children[1] ? e->children[1] : e->children[0]); E(")");
+            EXPR_t *op = e->children[1] ? e->children[1] : e->children[0];
+            E("pat_deref("); emit_expr(op); E(")");
         }
         break;
 
@@ -551,7 +556,9 @@ static void emit_assign_target(EXPR_t *lhs, const char *rhs_str) {
         }
         E("},%d,%s);\n", lhs->nchildren, rhs_str);
     } else if (lhs->kind == E_INDR) {
-        E("iset("); emit_expr(lhs->children[1]); E(",%s);\n", rhs_str);
+        /* $X = val: old tree right=operand, new flat tree children[0]=operand */
+        EXPR_t *indir_op = lhs->children[1] ? lhs->children[1] : lhs->children[0];
+        E("iset("); emit_expr(indir_op); E(",%s);\n", rhs_str);
     } else if (lhs->kind == E_FNC && lhs->nchildren == 1) {
         /* field accessor lvalue: val(n) = x  →  FIELD_SET_fn(n, "val", x) */
         E("FIELD_SET_fn("); emit_expr(lhs->children[0]); E(", \"%s\", %s);\n", lhs->sval, rhs_str);
