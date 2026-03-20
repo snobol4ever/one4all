@@ -231,6 +231,13 @@ static int jvm_need_datatype_helper  = 0;
 static int jvm_need_array_helpers    = 0;
 static int jvm_need_data_helpers     = 0;
 
+/* Arithmetic scratch locals: double at [jvm_arith_local_base, +1],
+ * long at [jvm_arith_local_base+2, +3].
+ * Default 2 is safe in main() (locals 0-1 are args, 32 slots total).
+ * jvm_emit_fn_method raises this above its save area before emitting the
+ * body so dstore/lstore never clobber saved Object references. */
+static int jvm_arith_local_base = 2;
+
 /* Forward declarations for user-function support (defined after jvm_emit_header) */
 #define JVM_FN_MAX_FWD  128
 #define JVM_ARG_MAX_FWD  32
@@ -426,8 +433,8 @@ static void jvm_emit_expr(EXPR_t *e) {
          * non-nested arith which is all J1 corpus needs. Nested arith (J2+)
          * will use a local-stack allocator. */
         static int _arlbl = 0;
-        int loc_d = 2; /* double stored at locals 2-3 */
-        int loc_l = 4; /* long stored at locals 4-5 */
+        int loc_d = jvm_arith_local_base;     /* double stored at locals base, base+1 */
+        int loc_l = jvm_arith_local_base + 2; /* long  stored at locals base+2, base+3 */
         char arfrac[32], ardone[32];
         snprintf(arfrac, sizeof arfrac, "Larf_%d", _arlbl);
         snprintf(ardone, sizeof ardone, "Lard_%d", _arlbl++);
@@ -470,7 +477,7 @@ static void jvm_emit_expr(EXPR_t *e) {
         jvm_emit_to_double();
         JI("dneg", "");
         static int _mnslbl = 0;
-        int loc_d = 2, loc_l = 4;
+        int loc_d = jvm_arith_local_base, loc_l = jvm_arith_local_base + 2;
         char mfrac[32], mdone[32];
         snprintf(mfrac, sizeof mfrac, "Lmnsf_%d", _mnslbl);
         snprintf(mdone, sizeof mdone, "Lmnsd_%d", _mnslbl++);
@@ -511,7 +518,7 @@ static void jvm_emit_expr(EXPR_t *e) {
             case 4: JI("invokestatic", "java/lang/Math/pow(DD)D"); break;
             }
             static int _fnarlbl = 0;
-            int loc_d = 2, loc_l = 4;
+            int loc_d = jvm_arith_local_base, loc_l = jvm_arith_local_base + 2;
             char ffrac[32], ffdone[32];
             snprintf(ffrac,  sizeof ffrac,  "Lfnarf_%d", _fnarlbl);
             snprintf(ffdone, sizeof ffdone, "Lfnard_%d", _fnarlbl++);
@@ -532,9 +539,9 @@ static void jvm_emit_expr(EXPR_t *e) {
             jvm_emit_expr(e->args[0]);
             jvm_emit_to_double();
             JI("dneg", "");
-            /* convert back: whole-number check using locals 2-5 */
+            /* convert back: whole-number check using jvm_arith_local_base slots */
             static int _neglbl = 0;
-            int loc_d = 2, loc_l = 4;
+            int loc_d = jvm_arith_local_base, loc_l = jvm_arith_local_base + 2;
             char nfrac[32], ndone[32];
             snprintf(nfrac, sizeof nfrac, "Lnegf_%d", _neglbl);
             snprintf(ndone, sizeof ndone, "Lnegd_%d", _neglbl++);
@@ -562,7 +569,7 @@ static void jvm_emit_expr(EXPR_t *e) {
             jvm_emit_to_double();
             JI("invokestatic", "java/lang/Math/abs(D)D");
             static int _abslbl = 0;
-            int loc_d = 2, loc_l = 4;
+            int loc_d = jvm_arith_local_base, loc_l = jvm_arith_local_base + 2;
             char afrac[32], adone[32];
             snprintf(afrac, sizeof afrac, "Labsf_%d", _abslbl);
             snprintf(adone, sizeof adone, "Labsd_%d", _abslbl++);
@@ -1996,26 +2003,42 @@ static void jvm_emit_stmt(STMT_t *s, int stmt_idx) {
     /* Case 2: expression-only statement (no =, no pattern) — just evaluate */
     if (!s->has_eq && !s->pattern && s->subject) {
         jvm_emit_expr(s->subject);
-        /* Result may be null (IDENT/DIFFER failure) */
-        if (s->go && s->go->onfailure && s->go->onfailure[0]) {
-            /* Test for null → :F (pop null before jump, clean stack) */
-            static int _ef_lbl = 0;
-            char enotnull[32];
-            snprintf(enotnull, sizeof enotnull, "Lef_nn_%d", _ef_lbl++);
-            char flbl[128]; snprintf(flbl, sizeof flbl, "L_%s", s->go->onfailure);
-            JI("dup", "");
-            JI("ifnonnull", enotnull);
-            JI("pop", "");   /* discard null */
-            JI("goto", flbl);
-            J("%s:\n", enotnull);
-            JI("pop", "");   /* discard non-null result */
-        } else {
-            JI("pop", "");  /* discard result (no :F needed) */
-        }
-        if (s->go && s->go->uncond && s->go->uncond[0]) {
+        /* Result may be null (predicate failure) or non-null (success).
+         * Must route: non-null → :S (or fall through), null → :F (or fall through).
+         * Unconditional goto (:uncond) fires regardless of result. */
+        int has_s  = (s->go && s->go->onsuccess  && s->go->onsuccess[0]);
+        int has_f  = (s->go && s->go->onfailure  && s->go->onfailure[0]);
+        int has_uc = (s->go && s->go->uncond      && s->go->uncond[0]);
+
+        if (has_uc) {
+            /* Unconditional — result irrelevant */
+            JI("pop", "");
             jvm_emit_goto(s->go->uncond);
-        } else if (s->go && s->go->onsuccess && s->go->onsuccess[0]) {
-            jvm_emit_goto(s->go->onsuccess);
+        } else if (has_s || has_f) {
+            /* Need to branch on null/non-null */
+            static int _ef_lbl = 0;
+            char lbl_nonnull[48], lbl_done[48];
+            snprintf(lbl_nonnull, sizeof lbl_nonnull, "Lef_nn_%d", _ef_lbl);
+            snprintf(lbl_done,    sizeof lbl_done,    "Lef_dn_%d", _ef_lbl++);
+            JI("dup", "");
+            JI("ifnonnull", lbl_nonnull);
+            /* null path → :F or fall through */
+            JI("pop", "");
+            if (has_f) {
+                jvm_emit_goto(s->go->onfailure);
+            } else {
+                JI("goto", lbl_done);   /* :F falls through */
+            }
+            J("%s:\n", lbl_nonnull);
+            /* non-null path → :S or fall through */
+            JI("pop", "");
+            if (has_s) {
+                jvm_emit_goto(s->go->onsuccess);
+            }
+            /* else fall through on success */
+            J("%s:\n", lbl_done);
+        } else {
+            JI("pop", "");  /* no gotos — just discard */
         }
         return;
     }
@@ -3050,6 +3073,17 @@ static void jvm_emit_fn_method(const JvmFnDef *fn, Program *prog, int fn_idx) {
     const JvmFnDef *saved_cur_fn = jvm_cur_fn;
     jvm_cur_fn = fn;
 
+    /* Raise arithmetic scratch locals above the save area so dstore/lstore
+     * cannot clobber saved Object references.
+     * Save area occupies slots: save_base .. save_fnret (each 1 JVM slot).
+     * First free slot after save area: save_fnret + 1.
+     * We need 4 consecutive slots for double (2) + long (2): base and base+2.
+     * Round up to even for alignment: arith_base = (save_fnret + 1 + 1) & ~1 */
+    int saved_arith_base = jvm_arith_local_base;
+    int arith_base = save_fnret + 1;
+    if (arith_base % 2 != 0) arith_base++;   /* align to even for double slots */
+    jvm_arith_local_base = arith_base;
+
     for (STMT_t *s = prog->head; s; s = s->next) {
         if (s->label && strcasecmp(s->label, entry) == 0) in_body = 1;
         if (in_body && fn->end_label && s->label && strcasecmp(s->label, fn->end_label) == 0) { in_body = 0; break; }
@@ -3060,6 +3094,7 @@ static void jvm_emit_fn_method(const JvmFnDef *fn, Program *prog, int fn_idx) {
         jvm_emit_stmt(s, 10000 + fn_idx * 1000 + stmt_idx++);
     }
 
+    jvm_arith_local_base = saved_arith_base;
     jvm_cur_fn = saved_cur_fn;
 
     /* RETURN path: restore saved vars, return fn->name value */
@@ -3252,8 +3287,19 @@ void jvm_emit(Program *prog, FILE *out, const char *filename) {
     jvm_emit_header(prog);
     jvm_emit_main_open();
 
-    /* Walk statements */
+    /* Walk statements — skip user function bodies (emitted separately as methods).
+     *
+     * A function body begins at the statement whose label == fn->entry_label
+     * (or fn->name if entry_label is NULL) and ends just before the statement
+     * whose label == fn->end_label.  We must NOT emit those statements here;
+     * they are inlined into sno_userfn_NAME() by jvm_emit_fn_method().
+     *
+     * State machine: in_fn_body is set when we hit an entry label and cleared
+     * when we hit the matching end label.  Multiple functions nest correctly
+     * because SNOBOL4 function bodies never overlap (they are disjoint ranges).
+     */
     int idx = 0;
+    int in_fn_body = 0;   /* 1 while we are inside a function body */
     if (prog && prog->head) {
         for (STMT_t *s = prog->head; s; s = s->next, idx++) {
             if (s->is_end) {
@@ -3262,6 +3308,32 @@ void jvm_emit(Program *prog, FILE *out, const char *filename) {
                 JI("nop", "");
                 break;
             }
+
+            /* Check if this label is a function entry — start skipping */
+            if (!in_fn_body && s->label) {
+                for (int fi = 0; fi < jvm_fn_count; fi++) {
+                    const JvmFnDef *fn = &jvm_fn_table[fi];
+                    const char *entry = fn->entry_label ? fn->entry_label : fn->name;
+                    if (entry && strcasecmp(s->label, entry) == 0) {
+                        in_fn_body = 1;
+                        break;
+                    }
+                }
+            }
+
+            /* Check if this label is a function end — stop skipping (emit this stmt) */
+            if (in_fn_body && s->label) {
+                for (int fi = 0; fi < jvm_fn_count; fi++) {
+                    const JvmFnDef *fn = &jvm_fn_table[fi];
+                    if (fn->end_label && strcasecmp(s->label, fn->end_label) == 0) {
+                        in_fn_body = 0;
+                        break;
+                    }
+                }
+            }
+
+            if (in_fn_body) continue;   /* skip — belongs to a function method */
+
             jvm_emit_stmt(s, idx);
         }
     }

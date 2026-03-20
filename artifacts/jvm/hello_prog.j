@@ -12,6 +12,8 @@
 .field static sno_kw_ANCHOR I
 .field static sno_kw_STNO I
 .field static sno_vars Ljava/util/HashMap;
+.field static sno_arrays Ljava/util/HashMap;
+.field static sno_data_types Ljava/util/HashMap;
 
 .method static <clinit>()V
     .limit stack 4
@@ -28,6 +30,14 @@
     dup
     invokespecial java/util/HashMap/<init>()V
     putstatic       Null/sno_vars Ljava/util/HashMap;
+    new java/util/HashMap
+    dup
+    invokespecial java/util/HashMap/<init>()V
+    putstatic       Null/sno_arrays Ljava/util/HashMap;
+    new java/util/HashMap
+    dup
+    invokespecial java/util/HashMap/<init>()V
+    putstatic       Null/sno_data_types Ljava/util/HashMap;
     return
 .end method
 
