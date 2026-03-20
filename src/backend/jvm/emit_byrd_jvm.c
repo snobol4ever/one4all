@@ -834,13 +834,17 @@ static void jvm_emit_expr(EXPR_t *e) {
             J("%s:\n", idone);
             break;
         }
-        /* DATATYPE(x) → "STRING", "INTEGER", or "REAL" */
+        /* DATATYPE(x) → type name string.
+         * For DATA instances: returns the user-defined type name (stored as __type__).
+         * For plain strings: returns "STRING", "INTEGER", or "REAL". */
         if (strcasecmp(fname, "DATATYPE") == 0 && e->args && e->args[0]) {
             jvm_need_datatype_helper = 1;
+            jvm_need_data_helpers   = 1;
+            jvm_need_array_helpers  = 1;
             jvm_emit_expr(e->args[0]);
             char dtdesc[512];
             snprintf(dtdesc, sizeof dtdesc,
-                "%s/sno_datatype(Ljava/lang/String;)Ljava/lang/String;", jvm_classname);
+                "%s/sno_datatype_ext(Ljava/lang/String;)Ljava/lang/String;", jvm_classname);
             JI("invokestatic", dtdesc);
             break;
         }
@@ -934,6 +938,63 @@ static void jvm_emit_expr(EXPR_t *e) {
                 snprintf(umdesc, sizeof umdesc, "%s/sno_userfn_%s%s",
                          jvm_classname, ufn->name, udesc);
                 JI("invokestatic", umdesc);
+                break;
+            }
+        }
+        /* DATA type constructor call: typename(field1val, field2val, ...)
+         * If fname matches a registered DATA type, create a HashMap instance,
+         * store each field value keyed by field name, store __type__, return id. */
+        {
+            const JvmDataType *dt = jvm_find_data_type(fname);
+            if (dt) {
+                jvm_need_data_helpers  = 1;
+                jvm_need_array_helpers = 1;
+                /* Allocate new HashMap via sno_array_new("0") */
+                JI("ldc", "\"0\"");
+                char andesc[512]; snprintf(andesc, sizeof andesc,
+                    "%s/sno_array_new(Ljava/lang/String;)Ljava/lang/String;", jvm_classname);
+                JI("invokestatic", andesc);
+                /* stack: instance_id — store each field */
+                for (int fi = 0; fi < dt->nfields; fi++) {
+                    /* dup instance_id, push field name, push value, call sno_array_put */
+                    JI("dup", "");
+                    char fnesc[256]; jvm_escape_string(dt->fields[fi], fnesc, sizeof fnesc);
+                    JI("ldc", fnesc);
+                    if (e->args && e->args[fi]) jvm_emit_expr(e->args[fi]);
+                    else JI("ldc", "\"\"");
+                    char apdesc[512]; snprintf(apdesc, sizeof apdesc,
+                        "%s/sno_array_put(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
+                        jvm_classname);
+                    JI("invokestatic", apdesc);
+                }
+                /* Store __type__ = fname */
+                JI("dup", "");
+                JI("ldc", "\"__type__\"");
+                char typeesc[256]; jvm_escape_string(fname, typeesc, sizeof typeesc);
+                JI("ldc", typeesc);
+                char apdesc2[512]; snprintf(apdesc2, sizeof apdesc2,
+                    "%s/sno_array_put(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
+                    jvm_classname);
+                JI("invokestatic", apdesc2);
+                /* stack: instance_id — return it */
+                break;
+            }
+        }
+        /* DATA field accessor call: fieldname(instance) → field value */
+        {
+            const JvmDataType *ft = jvm_find_data_field(fname);
+            if (ft) {
+                jvm_need_data_helpers = 1;
+                /* push instance_id */
+                if (e->args && e->args[0]) jvm_emit_expr(e->args[0]);
+                else JI("ldc", "\"\"");
+                /* push field name */
+                char fnesc[256]; jvm_escape_string(fname, fnesc, sizeof fnesc);
+                JI("ldc", fnesc);
+                char dgfdesc[512]; snprintf(dgfdesc, sizeof dgfdesc,
+                    "%s/sno_data_get_field(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+                    jvm_classname);
+                JI("invokestatic", dgfdesc);
                 break;
             }
         }
@@ -1786,6 +1847,33 @@ static void jvm_emit_stmt(STMT_t *s, int stmt_idx) {
 
     /* If inside a user function, intercept RETURN/FRETURN/NRETURN gotos */
     /* (handled per-goto in jvm_emit_goto_target below) */
+
+    /* Case 1c: DATA field setter — fieldname(instance) = value
+     * subject is E_FNC where fname matches a known DATA field */
+    if (s->has_eq && s->subject && s->subject->kind == E_FNC && !s->pattern) {
+        const char *sfname = s->subject->sval ? s->subject->sval : "";
+        const JvmDataType *ft = jvm_find_data_field(sfname);
+        if (ft) {
+            jvm_need_data_helpers  = 1;
+            jvm_need_array_helpers = 1;
+            /* push instance_id */
+            if (s->subject->args && s->subject->args[0]) jvm_emit_expr(s->subject->args[0]);
+            else JI("ldc", "\"\"");
+            /* push field name */
+            char fnesc[256]; jvm_escape_string(sfname, fnesc, sizeof fnesc);
+            JI("ldc", fnesc);
+            /* push value */
+            if (!s->replacement || s->replacement->kind == E_NULV) JI("ldc", "\"\"");
+            else jvm_emit_expr(s->replacement);
+            char apdesc[512]; snprintf(apdesc, sizeof apdesc,
+                "%s/sno_array_put(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
+                jvm_classname);
+            JI("invokestatic", apdesc);
+            if (s->go && s->go->uncond && s->go->uncond[0]) jvm_emit_goto(s->go->uncond);
+            else if (s->go && s->go->onsuccess && s->go->onsuccess[0]) jvm_emit_goto(s->go->onsuccess);
+            return;
+        }
+    }
 
     /* Case 1b: array/table subscript assignment — A<I> = expr or T['key'] = expr */
     if (s->has_eq && s->subject &&
@@ -2653,6 +2741,42 @@ static void jvm_emit_runtime_helpers(void) {
         J("    ldc \"string\"\n");
         J("    areturn\n");
         J(".end method\n\n");
+
+        /* sno_datatype_ext(str) → user type name, "STRING", "INTEGER", or "REAL"
+         * Checks sno_arrays for a __type__ entry first (DATA instances).
+         * Falls back to sno_datatype for plain strings. */
+        char am_dt[512]; snprintf(am_dt, sizeof am_dt,
+            "%s/sno_arrays Ljava/util/HashMap;", jvm_classname);
+        J(".method static sno_datatype_ext(Ljava/lang/String;)Ljava/lang/String;\n");
+        J("    .limit stack 4\n");
+        J("    .limit locals 2\n");
+        /* Look up instance_id in sno_arrays */
+        J("    getstatic %s\n", am_dt);
+        J("    aload_0\n");
+        J("    invokevirtual java/util/HashMap/get(Ljava/lang/Object;)Ljava/lang/Object;\n");
+        J("    checkcast java/util/HashMap\n");
+        J("    astore_1\n");            /* local 1 = inner HashMap or null */
+        J("    aload_1\n");
+        J("    ifnull Ldte_plain\n");   /* no DATA instance → plain type */
+        /* Look up __type__ in the inner map */
+        J("    aload_1\n");
+        J("    ldc \"__type__\"\n");
+        J("    invokevirtual java/util/HashMap/get(Ljava/lang/Object;)Ljava/lang/Object;\n");
+        J("    checkcast java/lang/String\n");
+        J("    astore_1\n");            /* local 1 = type string or null */
+        J("    aload_1\n");
+        J("    ifnull Ldte_plain\n");   /* no __type__ → plain type */
+        J("    aload_1\n");
+        J("    areturn\n");             /* return user type name */
+        /* Plain type fallback — stack is empty, local 1 is null */
+        J("Ldte_plain:\n");
+        J("    aload_0\n");
+        char dtdesc2[512]; snprintf(dtdesc2, sizeof dtdesc2,
+            "%s/sno_datatype(Ljava/lang/String;)Ljava/lang/String;", jvm_classname);
+        J("    invokestatic %s\n", dtdesc2);
+        J("    areturn\n");
+        J(".end method\n\n");
+
         jvm_need_datatype_helper = 0;
     }
 
@@ -2792,40 +2916,45 @@ static void jvm_emit_runtime_helpers(void) {
 
         /* sno_data_new(String type_name, String[] field_values) → String (instance-id)
          * Implemented as sno_array_new with __type__ key set */
-        /* sno_data_get_field(String instance_id, String field_name) → String */
+        /* sno_data_get_field(String instance_id, String field_name) → String
+         * Stack-safe: store the inner HashMap in local 2, never leave it stranded. */
         J(".method static sno_data_get_field(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;\n");
         J("    .limit stack 4\n");
-        J("    .limit locals 2\n");
+        J("    .limit locals 3\n");
         char am2[512]; snprintf(am2, sizeof am2, "%s/sno_arrays Ljava/util/HashMap;", jvm_classname);
         J("    getstatic %s\n", am2);
         J("    aload_0\n");
         J("    invokevirtual java/util/HashMap/get(Ljava/lang/Object;)Ljava/lang/Object;\n");
         J("    checkcast java/util/HashMap\n");
-        J("    dup\n");
-        J("    ifnull Ldgf_null\n");
-        J("    aload_1\n");
+        J("    astore_2\n");              /* local 2 = inner HashMap (or null) */
+        J("    aload_2\n");
+        J("    ifnull Ldgf_null\n");      /* no inner map → return "" */
+        J("    aload_2\n");
+        J("    aload_1\n");              /* field name */
         J("    invokevirtual java/util/HashMap/get(Ljava/lang/Object;)Ljava/lang/Object;\n");
         J("    checkcast java/lang/String\n");
         J("    dup\n");
-        J("    ifnonnull Ldgf_done\n");
+        J("    ifnonnull Ldgf_done\n");  /* non-null value → return it */
         J("    pop\n");
         J("Ldgf_null:\n");
-        J("    pop\n");
         J("    ldc \"\"\n");
         J("Ldgf_done:\n");
         J("    areturn\n");
         J(".end method\n\n");
 
-        /* sno_data_get_type(String instance_id) → String type_name */
+        /* sno_data_get_type(String instance_id) → String type_name
+         * Stack-safe: same pattern as sno_data_get_field. */
         J(".method static sno_data_get_type(Ljava/lang/String;)Ljava/lang/String;\n");
         J("    .limit stack 4\n");
-        J("    .limit locals 1\n");
+        J("    .limit locals 2\n");
         J("    getstatic %s\n", am2);
         J("    aload_0\n");
         J("    invokevirtual java/util/HashMap/get(Ljava/lang/Object;)Ljava/lang/Object;\n");
         J("    checkcast java/util/HashMap\n");
-        J("    dup\n");
+        J("    astore_1\n");              /* local 1 = inner HashMap (or null) */
+        J("    aload_1\n");
         J("    ifnull Ldgt_null\n");
+        J("    aload_1\n");
         J("    ldc \"__type__\"\n");
         J("    invokevirtual java/util/HashMap/get(Ljava/lang/Object;)Ljava/lang/Object;\n");
         J("    checkcast java/lang/String\n");
@@ -2833,7 +2962,6 @@ static void jvm_emit_runtime_helpers(void) {
         J("    ifnonnull Ldgt_done\n");
         J("    pop\n");
         J("Ldgt_null:\n");
-        J("    pop\n");
         J("    ldc \"\"\n");
         J("Ldgt_done:\n");
         J("    areturn\n");
@@ -2902,7 +3030,39 @@ static void jvm_collect_functions(Program *prog) {
     char pbuf[4096];
     for (STMT_t *s = prog->head; s; s = s->next) {
         if (!s->subject || s->subject->kind != E_FNC) continue;
-        if (strcasecmp(s->subject->sval ? s->subject->sval : "", "DEFINE") != 0) continue;
+        const char *sname = s->subject->sval ? s->subject->sval : "";
+
+        /* Collect DATA type definitions */
+        if (strcasecmp(sname, "DATA") == 0) {
+            if (!s->subject->args || !s->subject->args[0]) continue;
+            const char *proto = jvm_flatten_str(s->subject->args[0], pbuf, sizeof pbuf);
+            if (!proto || jvm_data_type_count >= JVM_DATA_MAX) continue;
+            /* Parse "typename(field1,field2,...)" */
+            JvmDataType *dt = &jvm_data_types[jvm_data_type_count];
+            memset(dt, 0, sizeof *dt);
+            char tbuf[256]; int ti = 0, pi = 0;
+            while (proto[pi] && proto[pi] != '(') tbuf[ti++] = proto[pi++];
+            tbuf[ti] = '\0';
+            /* trim trailing spaces */
+            while (ti > 0 && tbuf[ti-1] == ' ') tbuf[--ti] = '\0';
+            dt->type_name = strdup(tbuf);
+            if (proto[pi] == '(') {
+                pi++;
+                while (proto[pi] && proto[pi] != ')') {
+                    int j = 0; char fb[256];
+                    while (proto[pi] && proto[pi] != ',' && proto[pi] != ')') fb[j++] = proto[pi++];
+                    fb[j] = '\0';
+                    int k = 0; while (fb[k] == ' ' || fb[k] == '\t') k++;
+                    while (j > 0 && (fb[j-1] == ' ' || fb[j-1] == '\t')) fb[--j] = '\0';
+                    if (fb[k] && dt->nfields < JVM_ARG_MAX) dt->fields[dt->nfields++] = strdup(fb+k);
+                    if (proto[pi] == ',') pi++;
+                }
+            }
+            jvm_data_type_count++;
+            continue;
+        }
+
+        if (strcasecmp(sname, "DEFINE") != 0) continue;
         if (!s->subject->args || !s->subject->args[0]) continue;
         const char *proto = jvm_flatten_str(s->subject->args[0], pbuf, sizeof pbuf);
         if (!proto) continue;
