@@ -387,16 +387,162 @@ static void expand_name(const char *src, char *dst, int dstlen) {
 }
 
 /* -----------------------------------------------------------------------
- * .bss slot registry
+ * Buffer size constants — needed by both BoxDataCtx and .bss registry
+ * ----------------------------------------------------------------------- */
+#define LBUF 320
+#define LBUF2 (LBUF * 2)
+#define NAME_LEN 320
+
+/* -----------------------------------------------------------------------
+ * M-T2-EMIT-SPLIT: per-box DATA layout registry
+ *
+ * When emitting a named box (pattern or function), vars that belong to
+ * that box move from flat .bss into a per-box DATA template section.
+ * The box's code accesses them as [r12+offset] instead of [var_name].
+ *
+ * Usage:
+ *   box_ctx_begin(safe_name)   — enter box context
+ *   box_var_register(name)     — register a var in the current box
+ *   bref(name)                 — returns "r12+N" or "name" if not in box
+ *   bref2(name)                — returns "[r12+N]" or "[name]"
+ *   box_ctx_end()              — leave box context
+ *   box_data_emit_section(s)   — emit the DATA template section for a box
+ *   box_data_size(safe_name)   — byte size of the DATA block
+ * ----------------------------------------------------------------------- */
+
+#define MAX_BOX_DATA_VARS 128
+#define MAX_BOXES 64
+
+typedef struct {
+    char safe[NAME_LEN];                    /* box safe name */
+    char vars[MAX_BOX_DATA_VARS][NAME_LEN]; /* var names in layout order */
+    int  nvar;                              /* number of vars */
+} BoxDataCtx;
+
+static BoxDataCtx box_data[MAX_BOXES];
+static int        box_data_count = 0;
+
+/* Currently active box context (-1 = none) */
+static int box_ctx_idx = -1;
+
+static BoxDataCtx *box_find(const char *safe) {
+    for (int i = 0; i < box_data_count; i++)
+        if (strcmp(box_data[i].safe, safe) == 0)
+            return &box_data[i];
+    return NULL;
+}
+
+static BoxDataCtx *box_get_or_create(const char *safe) {
+    BoxDataCtx *b = box_find(safe);
+    if (b) return b;
+    if (box_data_count >= MAX_BOXES) return NULL;
+    b = &box_data[box_data_count++];
+    snprintf(b->safe, sizeof b->safe, "%s", safe);
+    b->nvar = 0;
+    return b;
+}
+
+/* Enter box-emit context: subsequent var_register calls route to this box */
+static void box_ctx_begin(const char *safe) {
+    BoxDataCtx *b = box_get_or_create(safe);
+    if (!b) { box_ctx_idx = -1; return; }
+    box_ctx_idx = (int)(b - box_data);
+}
+
+static void box_ctx_end(void) { box_ctx_idx = -1; }
+
+/* Register a var in the active box context only (caller ensures box_ctx_idx >= 0) */
+static void box_var_register(const char *name) {
+    if (box_ctx_idx < 0) return;  /* safety: no active box — caller error */
+    BoxDataCtx *b = &box_data[box_ctx_idx];
+    for (int i = 0; i < b->nvar; i++)
+        if (strcmp(b->vars[i], name) == 0) return;
+    if (b->nvar < MAX_BOX_DATA_VARS)
+        snprintf(b->vars[b->nvar++], NAME_LEN, "%s", name);
+}
+
+/* Look up a var's byte offset in a box DATA block, or -1 if not found */
+static int box_var_offset(const char *safe, const char *name) {
+    const BoxDataCtx *b = box_find(safe);
+    if (!b) return -1;
+    for (int i = 0; i < b->nvar; i++)
+        if (strcmp(b->vars[i], name) == 0) return i * 8;
+    return -1;
+}
+
+/* Return byte size of a box's DATA block (0 if not found) */
+static int box_data_size(const char *safe) {
+    const BoxDataCtx *b = box_find(safe);
+    if (!b) return 0;
+    return b->nvar * 8;
+}
+
+/* Thread-local rewrite buffer used by bref() */
+static char _bref_buf[64];
+
+/*
+ * bref — resolve a var reference to either "[r12+N]" or "[var_name]".
+ * When emitting inside a named box (box_ctx_idx >= 0), vars that belong
+ * to the box are addressed via r12.  All others fall back to their .bss name.
+ */
+static const char *bref(const char *name) {
+    if (box_ctx_idx >= 0) {
+        BoxDataCtx *b = &box_data[box_ctx_idx];
+        for (int i = 0; i < b->nvar; i++) {
+            if (strcmp(b->vars[i], name) == 0) {
+                snprintf(_bref_buf, sizeof _bref_buf, "r12+%d", i * 8);
+                return _bref_buf;
+            }
+        }
+    }
+    return name;
+}
+
+/*
+ * bref2 — like bref but wraps in brackets: returns "[r12+N]" or "[name]".
+ * Use this when the caller would write A("    mov rax, [%s]\n", bref2(v)).
+ */
+static char _bref2_buf[72];
+static const char *bref2(const char *name) {
+    const char *inner = bref(name);
+    if (inner == name)
+        snprintf(_bref2_buf, sizeof _bref2_buf, "[%s]", name);
+    else
+        snprintf(_bref2_buf, sizeof _bref2_buf, "[%s]", inner);
+    return _bref2_buf;
+}
+
+/* Emit the DATA template section for a box (all qwords zero-initialized) */
+static void box_data_emit_section(const char *safe) {
+    const BoxDataCtx *b = box_find(safe);
+    if (!b || b->nvar == 0) return;
+    A("section .data\n");
+    A("    align 8\n");
+    A("box_%s_data_size: dq %d\n", safe, b->nvar * 8);
+    A("box_%s_data_template:\n", safe);
+    for (int i = 0; i < b->nvar; i++)
+        A("    dq 0  ; [r12+%d] = %s\n", i * 8, b->vars[i]);
+    A("\n");
+}
+
+static void box_data_reset(void) {
+    box_data_count = 0;
+    box_ctx_idx = -1;
+}
+
+/* -----------------------------------------------------------------------
+ * .bss slot registry — program-global (non-box) variables
  * ----------------------------------------------------------------------- */
 
 #define MAX_VARS 512
 static char *vars[MAX_VARS];
 static int   nvar = 0;
 
-static void var_reset(void) { nvar = 0; }
+static void var_reset(void) { nvar = 0; box_data_reset(); }
 
 static void var_register(const char *name) {
+    /* When inside a named box, route to per-box DATA layout */
+    if (box_ctx_idx >= 0) { box_var_register(name); return; }
     /* deduplicate */
     for (int i = 0; i < nvar; i++)
         if (strcmp(vars[i], name) == 0) return;
@@ -410,13 +556,6 @@ static void bss_emit(void) {
     for (int i = 0; i < nvar; i++)
         A("%-24s resq 1\n", vars[i]);
 }
-
-/* -----------------------------------------------------------------------
- * Buffer size constants — defined early, used throughout
- * ----------------------------------------------------------------------- */
-#define LBUF 320                 /* single label/name buffer */
-#define LBUF2 (LBUF * 2)        /* compound label: prefix + safe + suffix + safe */
-#define NAME_LEN 320    /* max expanded SNOBOL4 identifier length */
 
 /* -----------------------------------------------------------------------
  * .data string literals registry
@@ -1823,28 +1962,50 @@ static void emit_named_def(const NamedPat *np,
         char safe[NAME_LEN];
         snprintf(safe, sizeof safe, "%s", np->safe);
 
+        /* T2: establish box DATA context.  All var_register calls below
+         * route to the per-box DATA template instead of flat .bss. */
+        box_ctx_begin(safe);
+
+        /* Reserve first 48 bytes of DATA as DESCR_t scratch slots:
+         *   [r12+0 / r12+8]   = tmp1_t / tmp1_p  (was [rbp-16] / [rbp-8])
+         *   [r12+16/ r12+24]  = tmp2_t / tmp2_p  (was [rbp-32] / [rbp-24])
+         *   [r12+32/ r12+40]  = tmp3_t / tmp3_p  (was [rbp-48] / [rbp-40])
+         * These are the three DESCR_t temporaries that the near-term bridge
+         * allocated with sub rsp, 56. */
+        char t2_tmp1_t[NAME_LEN], t2_tmp1_p[NAME_LEN];
+        char t2_tmp2_t[NAME_LEN], t2_tmp2_p[NAME_LEN];
+        char t2_tmp3_t[NAME_LEN], t2_tmp3_p[NAME_LEN];
+        snprintf(t2_tmp1_t, sizeof t2_tmp1_t, "fn_%s_tmp1_t", safe);
+        snprintf(t2_tmp1_p, sizeof t2_tmp1_p, "fn_%s_tmp1_p", safe);
+        snprintf(t2_tmp2_t, sizeof t2_tmp2_t, "fn_%s_tmp2_t", safe);
+        snprintf(t2_tmp2_p, sizeof t2_tmp2_p, "fn_%s_tmp2_p", safe);
+        snprintf(t2_tmp3_t, sizeof t2_tmp3_t, "fn_%s_tmp3_t", safe);
+        snprintf(t2_tmp3_p, sizeof t2_tmp3_p, "fn_%s_tmp3_p", safe);
+        var_register(t2_tmp1_t); /* offset 0  — was [rbp-16] */
+        var_register(t2_tmp1_p); /* offset 8  — was [rbp-8]  */
+        var_register(t2_tmp2_t); /* offset 16 — was [rbp-32] */
+        var_register(t2_tmp2_p); /* offset 24 — was [rbp-24] */
+        var_register(t2_tmp3_t); /* offset 32 — was [rbp-48] */
+        var_register(t2_tmp3_p); /* offset 40 — was [rbp-40] */
+
         emit_sep_major(np->varname);
-        A("; %s — user function α entry (%d param%s)\n",
+        A("; %s — user function α entry (%d param%s) [T2: r12=DATA]\n",
           np->alpha_lbl, np->nparams, np->nparams==1?"":"s");
 
-        /* α — establish own stack frame.
-         * The call site (Byrd-box save side) has already pushed:
-         *   old ret_γ, old ret_ω, old param values  onto the C stack.
-         * We now open a fresh rbp frame so [rbp-8/16/32/48] are private
-         * to THIS invocation.  γ/ω (Byrd-box restore side) tear it down
-         * before dispatching via the ret_ slots the call site filled.
+        /* α — T2 entry: r12 points to this invocation's DATA block.
+         * M-T2-INVOKE will emit t2_alloc+memcpy+mov r12,new_data at call sites.
+         * Until then: self-initialize r12 to the static DATA template so that
+         * single-invocation (non-recursive) calls work correctly now.
+         * Recursive calls will corrupt the static template — fixed by M-T2-INVOKE.
          *
-         * Near-term bridge to Technique 2 (ARCH.md §Near-Term Bridge):
-         *   call site push  = Byrd-box α (save)
-         *   this frame      = per-invocation DATA block (on C stack)
-         *   γ/ω pop + jmp  = Byrd-box γ/ω (restore)
-         * sub rsp,56: three DESCR_t temps × 16 bytes + 8 align = 56. */
+         * The near-term bridge (push rbp / sub rsp, 56) is REMOVED.
+         * Scratch DESCR_t slots are now [r12+0/8], [r12+16/24], [r12+32/40]. */
         asmL(np->alpha_lbl);
-        A("    push    rbp\n");
-        A("    mov     rbp, rsp\n");
-        A("    sub     rsp, 56\n");
+        A("    lea     r12, [rel box_%s_data_template]\n", safe);
 
-        /* Load args from .bss arg slots into param variables. */
+        /* Load args from .bss arg slots into param variables.
+         * (arg slots remain in .bss — they are filled by the call site
+         *  before jumping here, and read once at α entry.) */
         for (int i = 0; i < np->nparams; i++) {
             char arg_slot_t[LBUF2 + 16], arg_slot_p[LBUF2 + 16];
             snprintf(arg_slot_t, sizeof arg_slot_t, "fn_%s_arg_%d_t", safe, i);
@@ -1857,21 +2018,24 @@ static void emit_named_def(const NamedPat *np,
         }
         /* Clear locals + function return-value variable to null at each call
          * entry (SNOBOL4 semantics: locals and retval are always null at entry).
-         * The function return-value variable has the same name as the function. */
-        A("    LOAD_NULVCL\n");   /* sets [rbp-16]=type, [rbp-8]=ptr once */
+         * Use DATA scratch tmp1 for the NULVCL pair instead of [rbp-16/8]. */
+        A("    LOAD_NULVCL\n");   /* loads NULVCL into rax:rdx */
+        /* Store NULVCL into DATA tmp1 slots so subsequent stmt_set calls can
+         * read rsi/rdx from r12+0/8. */
+        A("    mov     [%s], rax\n", bref(t2_tmp1_t));
+        A("    mov     [%s], rdx\n", bref(t2_tmp1_p));
         {
-            /* Clear return-value variable (function name) */
             const char *fnlab_clr = str_intern(np->varname);
             A("    lea     rdi, [rel %s]\n", fnlab_clr);
-            A("    mov     rsi, [rbp-16]\n");
-            A("    mov     rdx, [rbp-8]\n");
+            A("    mov     rsi, [%s]\n", bref(t2_tmp1_t));
+            A("    mov     rdx, [%s]\n", bref(t2_tmp1_p));
             A("    call    stmt_set\n");
         }
         for (int i = 0; i < np->nlocals; i++) {
             const char *llab = str_intern(np->local_names[i]);
             A("    lea     rdi, [rel %s]\n", llab);
-            A("    mov     rsi, [rbp-16]\n");
-            A("    mov     rdx, [rbp-8]\n");
+            A("    mov     rsi, [%s]\n", bref(t2_tmp1_t));
+            A("    mov     rdx, [%s]\n", bref(t2_tmp1_p));
             A("    call    stmt_set\n");
         }
         /* Jump to function body */
@@ -1879,22 +2043,22 @@ static void emit_named_def(const NamedPat *np,
 
         emit_sep_minor("γ/ω");
 
-        /* γ — Byrd-box restore side (success / RETURN).
-         * Tear down this invocation's frame before dispatching to caller. */
+        /* γ — T2 restore side (success / RETURN).
+         * No frame to tear down (stack-frame bridge removed).
+         * Caller's r12 is restored by M-T2-INVOKE after we return.
+         * (M-T2-INVOKE will emit t2_free + restore caller r12 at the return
+         *  labels.  For now we just dispatch via the ret slot.) */
         char gamma_lbl[LBUF2], omega_lbl[LBUF2];
         snprintf(gamma_lbl, sizeof gamma_lbl, "fn_%s_gamma", safe);
         snprintf(omega_lbl, sizeof omega_lbl, "fn_%s_omega", safe);
         asmL(gamma_lbl);
-        A("    add     rsp, 56\n");
-        A("    pop     rbp\n");
         A("    jmp     [%s]\n", np->ret_gamma);
 
-        /* ω — Byrd-box restore side (failure / FRETURN).
-         * Same frame teardown, different dispatch slot. */
+        /* ω — T2 restore side (failure / FRETURN). */
         asmL(omega_lbl);
-        A("    add     rsp, 56\n");
-        A("    pop     rbp\n");
         A("    jmp     [%s]\n", np->ret_omega);
+
+        box_ctx_end();
         return;
     }
 
@@ -1906,6 +2070,14 @@ static void emit_named_def(const NamedPat *np,
         return;
     }
 
+    /* --- Non-function named pattern box --- */
+
+    /* T2: register ret_γ / ret_ω in per-box DATA layout (reserved for M-T2-INVOKE).
+     * They remain in .bss too — call sites and trampolines use .bss for now. */
+    box_ctx_begin(np->safe);
+    var_register(np->ret_gamma);
+    var_register(np->ret_omega);
+
     /* The named pattern's inner γ and ω connect back via the ret_ slots */
     char inner_gamma[LBUF2], inner_omega[LBUF2];
     snprintf(inner_gamma, sizeof inner_gamma, "patdef_%s_gamma", np->safe);
@@ -1915,7 +2087,7 @@ static void emit_named_def(const NamedPat *np,
     emit_sep_major(np->varname);
 
     /* α entry — initial match */
-    A("; %s (α entry)\n", np->alpha_lbl);
+    A("; %s (α entry) [T2: r12=DATA]\n", np->alpha_lbl);
     emit_pat_node(np->pat,
                   np->alpha_lbl, np->beta_lbl,
                   inner_gamma, inner_omega,
@@ -1925,13 +2097,14 @@ static void emit_named_def(const NamedPat *np,
     /* Minor separator before γ/ω trampolines */
     emit_sep_minor("γ/ω");
 
-    /* γ trampoline: indirect jump to caller's continuation */
+    /* γ/ω trampolines: use .bss ret slots (M-T2-INVOKE will switch to r12) */
     A("%s:\n", inner_gamma);
     A("    jmp     [%s]\n", np->ret_gamma);
 
-    /* ω trampoline */
     asmL(inner_omega);
     A("    jmp     [%s]\n", np->ret_omega);
+
+    box_ctx_end();
 }
 
 /* -----------------------------------------------------------------------
@@ -2336,6 +2509,14 @@ static void emit_stmt(STMT_t *s) {
     fclose(devnull);
     out = real_out;
     uid_ctr = uid_before_dry;       /* reset so real pass generates same labels */
+
+    /* Body mode: box DATA vars must also appear in .bss — the harness has no
+     * per-box DATA template.  Flush all box DATA registrations into global .bss. */
+    for (int bi = 0; bi < box_data_count; bi++) {
+        BoxDataCtx *b = &box_data[bi];
+        for (int vi = 0; vi < b->nvar; vi++)
+            var_register(b->vars[vi]);  /* box_ctx_idx==-1 here → routes to .bss */
+    }
 
     /* ── Emit pass: all symbols now registered; emit sections in order ── */
 
@@ -3503,17 +3684,38 @@ static void emit_program(Program *prog) {
 
     /* Pass 2: collect .bss slots for pattern stmts (named-pat ret_ pointers).
      * In program mode, skip entries whose replacement is a plain value
-     * (E_QLIT/E_ILIT/E_VART) — those are variable assignments, not patterns. */
+     * (E_QLIT/E_ILIT/E_VART) — those are variable assignments, not patterns.
+     *
+     * T2: ret_γ/ret_ω for named patterns and fn tmp slots go into per-box DATA.
+     * arg_slots and save_slots remain in .bss (call-site communication). */
     var_register("cursor");
     var_register("subject_len_val");
     /* subject_data is a byte array — emitted separately in .bss */
 
     for (int i = 0; i < named_pat_count; i++) {
         if (named_pats[i].is_fn) {
-            /* User function: ret_γ/ret_ω return-address slots */
+            /* User function:
+             * ret_γ/ret_ω go into per-box DATA (T2 DATA layout).
+             * arg_slots remain in .bss (call-site sets them before jmp α). */
+            box_ctx_begin(named_pats[i].safe);
             var_register(named_pats[i].ret_gamma);
             var_register(named_pats[i].ret_omega);
-            /* Per-param save slots (old value backup) and arg slots (call-site input) */
+            /* Also reserve the 6 DESCR_t scratch slots in DATA (tmp1/tmp2/tmp3) */
+            {
+                char t[NAME_LEN], p[NAME_LEN];
+                snprintf(t, NAME_LEN, "fn_%s_tmp1_t", named_pats[i].safe); var_register(t);
+                snprintf(p, NAME_LEN, "fn_%s_tmp1_p", named_pats[i].safe); var_register(p);
+                snprintf(t, NAME_LEN, "fn_%s_tmp2_t", named_pats[i].safe); var_register(t);
+                snprintf(p, NAME_LEN, "fn_%s_tmp2_p", named_pats[i].safe); var_register(p);
+                snprintf(t, NAME_LEN, "fn_%s_tmp3_t", named_pats[i].safe); var_register(t);
+                snprintf(p, NAME_LEN, "fn_%s_tmp3_p", named_pats[i].safe); var_register(p);
+            }
+            box_ctx_end();
+            /* Also register ret_γ/ret_ω in .bss — fn_gamma/fn_omega jmp still uses them */
+            var_register(named_pats[i].ret_gamma);
+            var_register(named_pats[i].ret_omega);
+            /* Per-param save slots (old value backup) and arg slots (call-site input)
+             * stay in .bss — they are the call-site communication channel. */
             for (int pi = 0; pi < named_pats[i].nparams; pi++) {
                 char pname_safe[NAME_LEN];
                 expand_name(named_pats[i].param_names[pi], pname_safe, sizeof pname_safe);
@@ -3544,6 +3746,13 @@ static void emit_program(Program *prog) {
                 rk == E_VART || rk == E_KW)
                 continue; /* plain value assignment — not a real named pattern */
         }
+        /* Non-fn named pattern: ret_γ/ret_ω go into per-box DATA (M-T2-INVOKE).
+         * Also keep in .bss so call sites and trampolines work unchanged. */
+        box_ctx_begin(named_pats[i].safe);
+        var_register(named_pats[i].ret_gamma);
+        var_register(named_pats[i].ret_omega);
+        box_ctx_end();
+        /* Also register in .bss for current call-site compatibility */
         var_register(named_pats[i].ret_gamma);
         var_register(named_pats[i].ret_omega);
     }
@@ -4229,14 +4438,18 @@ static void emit_program(Program *prog) {
 }
 
 /* -----------------------------------------------------------------------
- * emit_t2_reloc_tables — emit per-box relocation tables in section .rodata
+ * emit_t2_reloc_tables — emit per-box relocation tables (.rodata) and
+ *                        per-box DATA template sections (.data)
  *
- * M-T2-EMIT-TABLE: tables are empty (count=0); M-T2-EMIT-SPLIT fills them.
+ * M-T2-EMIT-TABLE: reloc tables have count=0 (entries added by M-T2-INVOKE).
+ * M-T2-EMIT-SPLIT: DATA templates emitted here; box_SAFE_data_template global.
  * t2_reloc_kind: T2_RELOC_REL32=1  T2_RELOC_ABS64=2  (matches t2_reloc.h)
  * ----------------------------------------------------------------------- */
 static void emit_t2_reloc_tables(void) {
+    /* Collect boxes: named pattern bodies (non-trivial) + is_fn functions */
     int box_count = 0;
     for (int i = 0; i < named_pat_count; i++) {
+        if (named_pats[i].is_fn) { box_count++; continue; }
         if (!named_pats[i].pat) continue;
         EKind rk = named_pats[i].pat->kind;
         if (rk==E_QLIT||rk==E_ILIT||rk==E_FLIT||rk==E_NULV||rk==E_VART||rk==E_KW)
@@ -4252,27 +4465,55 @@ static void emit_t2_reloc_tables(void) {
         return;
     }
 
+    /* .rodata: reloc counts + tables (empty for now — M-T2-INVOKE fills them) */
     for (int i = 0; i < named_pat_count; i++) {
-        if (!named_pats[i].pat) continue;
-        EKind rk = named_pats[i].pat->kind;
-        if (rk==E_QLIT||rk==E_ILIT||rk==E_FLIT||rk==E_NULV||rk==E_VART||rk==E_KW)
-            continue;
+        int is_real_box = named_pats[i].is_fn;
+        if (!is_real_box) {
+            if (!named_pats[i].pat) continue;
+            EKind rk = named_pats[i].pat->kind;
+            if (rk==E_QLIT||rk==E_ILIT||rk==E_FLIT||rk==E_NULV||rk==E_VART||rk==E_KW) continue;
+            is_real_box = 1;
+        }
+        if (!is_real_box) continue;
         A("    global  box_%s_reloc_count, box_%s_reloc_table\n",
           named_pats[i].safe, named_pats[i].safe);
     }
-    A("\n");
-
     for (int i = 0; i < named_pat_count; i++) {
-        if (!named_pats[i].pat) continue;
-        EKind rk = named_pats[i].pat->kind;
-        if (rk==E_QLIT||rk==E_ILIT||rk==E_FLIT||rk==E_NULV||rk==E_VART||rk==E_KW)
-            continue;
+        int is_real_box = named_pats[i].is_fn;
+        if (!is_real_box) {
+            if (!named_pats[i].pat) continue;
+            EKind rk = named_pats[i].pat->kind;
+            if (rk==E_QLIT||rk==E_ILIT||rk==E_FLIT||rk==E_NULV||rk==E_VART||rk==E_KW) continue;
+            is_real_box = 1;
+        }
+        if (!is_real_box) continue;
         const char *safe = named_pats[i].safe;
         A("; --- box %s ---\n", named_pats[i].varname);
         A("box_%s_reloc_count: dq 0\n", safe);
         A("box_%s_reloc_table:\n", safe);
-        A("; (entries added by M-T2-EMIT-SPLIT)\n");
+        A("; (entries added by M-T2-INVOKE)\n");
         A("\n");
+    }
+
+    /* .data: per-box DATA templates (M-T2-EMIT-SPLIT) */
+    flush_pending_sep(); emit_sep_major("T2 DATA TEMPLATES");
+    for (int i = 0; i < named_pat_count; i++) {
+        int is_real_box = named_pats[i].is_fn;
+        if (!is_real_box) {
+            if (!named_pats[i].pat) continue;
+            EKind rk = named_pats[i].pat->kind;
+            if (rk==E_QLIT||rk==E_ILIT||rk==E_FLIT||rk==E_NULV||rk==E_VART||rk==E_KW) continue;
+            is_real_box = 1;
+        }
+        if (!is_real_box) continue;
+        const char *safe = named_pats[i].safe;
+        int dsz = box_data_size(safe);
+        if (dsz == 0) {
+            A("; box %s: no DATA slots\n", named_pats[i].varname);
+            continue;
+        }
+        A("    global  box_%s_data_template, box_%s_data_size\n", safe, safe);
+        box_data_emit_section(safe);
     }
 }
 
