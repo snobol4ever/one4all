@@ -43,15 +43,19 @@ int main(void) {
         t2_free(p, sz);
     }
 
-    /* --- Test 2: mprotect_rx then mprotect_rw toggle --- */
+    /* --- Test 2: flush icache, mprotect_rx, then mprotect_rw toggle --- */
     {
         size_t sz = (size_t)pgsz;
         unsigned char *p = t2_alloc(sz);
         CHECK(p != NULL, "t2_alloc page-sized block");
 
-        /* Write a recognisable pattern */
+        /* Write a recognisable pattern — simulate TEXT copy */
         memset(p, 0x90, sz);   /* NOP sled */
         p[0] = 0xC3;           /* RET — valid x64 instruction */
+
+        /* Flush icache AFTER memcpy, BEFORE mprotect_rx */
+        t2_flush_icache(p, sz);
+        CHECK(1, "t2_flush_icache after memcpy (portable; no-op on x86-64)");
 
         int r = t2_mprotect_rx(p, sz);
         CHECK(r == 0, "t2_mprotect_rx succeeds");
@@ -60,7 +64,8 @@ int main(void) {
         r = t2_mprotect_rw(p, sz);
         CHECK(r == 0, "t2_mprotect_rw succeeds");
         p[0] = 0xCC;           /* INT3 */
-        CHECK(p[0] == 0xCC, "write after mprotect_rw works");
+        t2_flush_icache(p, sz);
+        CHECK(p[0] == 0xCC, "write after mprotect_rw works + flush");
 
         t2_free(p, sz);
     }

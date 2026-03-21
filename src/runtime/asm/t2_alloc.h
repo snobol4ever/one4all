@@ -8,6 +8,7 @@
 
 void *t2_alloc(size_t sz);
 void  t2_free(void *p, size_t sz);
+void  t2_flush_icache(void *p, size_t sz);
 int   t2_mprotect_rx(void *p, size_t sz);
 int   t2_mprotect_rw(void *p, size_t sz);
 

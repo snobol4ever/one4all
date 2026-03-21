@@ -51,8 +51,25 @@ void t2_free(void *p, size_t sz) {
 }
 
 /*
+ * t2_flush_icache — flush CPU instruction cache over [p, p+sz).
+ *
+ * MUST be called after memcpy'ing code into a writable block and
+ * BEFORE calling t2_mprotect_rx().  On x86-64 the i-cache and d-cache
+ * are coherent so __builtin___clear_cache() compiles to nothing, but on
+ * ARM/AArch64/RISC-V the caches are NOT coherent and skipping this step
+ * causes stale-cache instruction fetches — a lesson from JIT work on
+ * non-x86 targets (cf. Pick Systems RISC ports, early 1990s).
+ * Using the builtin unconditionally keeps the code portable and correct
+ * on every architecture GCC/Clang supports.
+ */
+void t2_flush_icache(void *p, size_t sz) {
+    if (!p || sz == 0) return;
+    __builtin___clear_cache((char *)p, (char *)p + sz);
+}
+
+/*
  * t2_mprotect_rx — make a region read+execute (no write).
- * Call after copying TEXT into the block and before jumping to it.
+ * Call after t2_flush_icache() and before jumping to the block.
  * Returns 0 on success, -1 on failure (errno set).
  */
 int t2_mprotect_rx(void *p, size_t sz) {
