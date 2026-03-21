@@ -232,6 +232,8 @@ static DESCR_t _b_APPLY(DESCR_t *a, int n) {
     const char *fname = VARVAL_fn(a[0]);
     return APPLY_fn(fname, a + 1, n - 1);
 }
+static DESCR_t _b_ARG(DESCR_t *a, int n);    /* defined after FNCBLK_t */
+static DESCR_t _b_LOCAL(DESCR_t *a, int n);  /* defined after FNCBLK_t */
 static DESCR_t _b_LPAD(DESCR_t *a, int n) {
     if (n < 2) return n > 0 ? a[0] : NULVCL;
     return lpad_fn(a[0], a[1], n > 2 ? a[2] : STRVAL(" "));
@@ -790,6 +792,8 @@ void SNO_INIT_fn(void) {
     register_fn("COPY",    _b_COPY,    1, 1);
     register_fn("EVAL",  _b_EVAL,  1, 1);
     register_fn("OPSYN", _b_OPSYN, 2, 3);
+    register_fn("ARG",   _b_ARG,   2, 2);
+    register_fn("LOCAL", _b_LOCAL, 2, 2);
     register_fn("SORT",  _b_SORT,  1, 1);
     register_fn("INPUT", _b_INPUT, 1, 4);
     register_fn("nPush",    _b_nPush,    0, 0);
@@ -1679,6 +1683,50 @@ DESCR_t APPLY_fn(const char *name, DESCR_t *args, int nargs) {
         }
     }
     return NULVCL;
+}
+
+/* ARG(fname, n) — return uppercase name of nth parameter (1-based).
+ * Fails if fname not found or n out of bounds. */
+static DESCR_t _b_ARG(DESCR_t *a, int n) {
+    if (n < 2) return FAILDESCR;
+    const char *fname = VARVAL_fn(a[0]);
+    if (!fname) return FAILDESCR;
+    int64_t idx = to_int(a[1]);
+    _func_init();
+    unsigned h = _func_hash(fname);
+    for (FNCBLK_t *e = _func_buckets[h]; e; e = e->next) {
+        if (strcasecmp(e->name, fname) == 0) {
+            if (idx < 1 || idx > (int64_t)e->nparams) return FAILDESCR;
+            const char *pname = e->params[idx - 1];
+            size_t len = strlen(pname);
+            char *up = GC_malloc(len + 1);
+            for (size_t i = 0; i <= len; i++) up[i] = (char)toupper((unsigned char)pname[i]);
+            return STRVAL(up);
+        }
+    }
+    return FAILDESCR;
+}
+
+/* LOCAL(fname, n) — return uppercase name of nth local variable (1-based).
+ * Fails if fname not found or n out of bounds. */
+static DESCR_t _b_LOCAL(DESCR_t *a, int n) {
+    if (n < 2) return FAILDESCR;
+    const char *fname = VARVAL_fn(a[0]);
+    if (!fname) return FAILDESCR;
+    int64_t idx = to_int(a[1]);
+    _func_init();
+    unsigned h = _func_hash(fname);
+    for (FNCBLK_t *e = _func_buckets[h]; e; e = e->next) {
+        if (strcasecmp(e->name, fname) == 0) {
+            if (idx < 1 || idx > (int64_t)e->nlocals) return FAILDESCR;
+            const char *lname = e->locals[idx - 1];
+            size_t len = strlen(lname);
+            char *up = GC_malloc(len + 1);
+            for (size_t i = 0; i <= len; i++) up[i] = (char)toupper((unsigned char)lname[i]);
+            return STRVAL(up);
+        }
+    }
+    return FAILDESCR;
 }
 
 int FNCEX_fn(const char *name) {
