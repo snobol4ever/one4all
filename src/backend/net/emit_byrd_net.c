@@ -2309,39 +2309,43 @@ static void net_emit_fn_method(const NetFnDef *fn, Program *prog, int fn_idx) {
     }
     N(")\n\n");
 
-    /* Save old arg values */
+    /* Save old arg values — direct ldsfld, no reflection */
     for (int i = 0; i < fn->nargs; i++) {
-        N("    ldstr      \"%s\"\n", fn->args[i]);
-        N("    call       string %s::net_indr_get(string)\n", net_classname);
+        char af[256]; net_field_name(af, sizeof af, fn->args[i]);
+        N("    ldsfld     string %s::%s\n", net_classname, af);
         N("    stloc.s    V_%d\n", save_base + i);
     }
-    /* Save old local values */
+    /* Save old local values — direct ldsfld */
     for (int i = 0; i < fn->nlocals; i++) {
-        N("    ldstr      \"%s\"\n", fn->locals[i]);
-        N("    call       string %s::net_indr_get(string)\n", net_classname);
+        char lf[256]; net_field_name(lf, sizeof lf, fn->locals[i]);
+        N("    ldsfld     string %s::%s\n", net_classname, lf);
         N("    stloc.s    V_%d\n", save_base + fn->nargs + i);
     }
-    /* Save old fn-name value */
-    N("    ldstr      \"%s\"\n", fn->name);
-    N("    call       string %s::net_indr_get(string)\n", net_classname);
-    N("    stloc.s    V_%d\n", save_fnret);
+    /* Save old fn-name value — direct ldsfld */
+    {
+        char ff[256]; net_field_name(ff, sizeof ff, fn->name);
+        N("    ldsfld     string %s::%s\n", net_classname, ff);
+        N("    stloc.s    V_%d\n", save_fnret);
+    }
 
-    /* Bind incoming args: net_indr_set(name, arg_i) + update static field */
+    /* Bind incoming args — direct stsfld, no reflection */
     for (int i = 0; i < fn->nargs; i++) {
-        N("    ldstr      \"%s\"\n", fn->args[i]);
+        char af[256]; net_field_name(af, sizeof af, fn->args[i]);
         N("    ldarg.s    %d\n", i);
-        N("    call       void %s::net_indr_set(string, string)\n", net_classname);
+        N("    stsfld     string %s::%s\n", net_classname, af);
     }
-    /* Init locals to "" */
+    /* Init locals to "" — direct stsfld */
     for (int i = 0; i < fn->nlocals; i++) {
-        N("    ldstr      \"%s\"\n", fn->locals[i]);
+        char lf[256]; net_field_name(lf, sizeof lf, fn->locals[i]);
         N("    ldstr      \"\"\n");
-        N("    call       void %s::net_indr_set(string, string)\n", net_classname);
+        N("    stsfld     string %s::%s\n", net_classname, lf);
     }
-    /* Init fn-name var to "" */
-    N("    ldstr      \"%s\"\n", fn->name);
-    N("    ldstr      \"\"\n");
-    N("    call       void %s::net_indr_set(string, string)\n", net_classname);
+    /* Init fn-name var to "" — direct stsfld */
+    {
+        char ff[256]; net_field_name(ff, sizeof ff, fn->name);
+        N("    ldstr      \"\"\n");
+        N("    stsfld     string %s::%s\n", net_classname, ff);
+    }
 
     /* Return/freturn labels */
     snprintf(net_fn_return_lbl,  sizeof net_fn_return_lbl,  "Nfn%d_return",  fn_idx);
@@ -2376,44 +2380,44 @@ static void net_emit_fn_method(const NetFnDef *fn, Program *prog, int fn_idx) {
     }
     net_cur_fn = saved_fn;
 
-    /* RETURN path: restore, return fn->name value */
+    /* RETURN path: restore args/locals via direct stsfld, return fn->name value */
     N("  %s:\n", net_fn_return_lbl);
     for (int i = 0; i < fn->nargs; i++) {
-        N("    ldstr      \"%s\"\n", fn->args[i]);
+        char af[256]; net_field_name(af, sizeof af, fn->args[i]);
         N("    ldloc.s    V_%d\n", save_base + i);
-        N("    call       void %s::net_indr_set(string, string)\n", net_classname);
+        N("    stsfld     string %s::%s\n", net_classname, af);
     }
     for (int i = 0; i < fn->nlocals; i++) {
-        N("    ldstr      \"%s\"\n", fn->locals[i]);
+        char lf[256]; net_field_name(lf, sizeof lf, fn->locals[i]);
         N("    ldloc.s    V_%d\n", save_base + fn->nargs + i);
-        N("    call       void %s::net_indr_set(string, string)\n", net_classname);
+        N("    stsfld     string %s::%s\n", net_classname, lf);
     }
-    /* Get retval from static field (function body stores there via stsfld) */
+    /* Get retval from static field then restore fn-name field */
     {
         char fn_field[256]; net_field_name(fn_field, sizeof fn_field, fn->name);
         N("    ldsfld     string %s::%s\n", net_classname, fn_field);
+        N("    ldloc.s    V_%d\n", save_fnret);
+        N("    stsfld     string %s::%s\n", net_classname, fn_field);
     }
-    /* Restore fn name var */
-    N("    ldstr      \"%s\"\n", fn->name);
-    N("    ldloc.s    V_%d\n", save_fnret);
-    N("    call       void %s::net_indr_set(string, string)\n", net_classname);
     N("    ret\n");
 
-    /* FRETURN path: restore, return null */
+    /* FRETURN path: restore args/locals via direct stsfld, return null */
     N("  %s:\n", net_fn_freturn_lbl);
     for (int i = 0; i < fn->nargs; i++) {
-        N("    ldstr      \"%s\"\n", fn->args[i]);
+        char af[256]; net_field_name(af, sizeof af, fn->args[i]);
         N("    ldloc.s    V_%d\n", save_base + i);
-        N("    call       void %s::net_indr_set(string, string)\n", net_classname);
+        N("    stsfld     string %s::%s\n", net_classname, af);
     }
     for (int i = 0; i < fn->nlocals; i++) {
-        N("    ldstr      \"%s\"\n", fn->locals[i]);
+        char lf[256]; net_field_name(lf, sizeof lf, fn->locals[i]);
         N("    ldloc.s    V_%d\n", save_base + fn->nargs + i);
-        N("    call       void %s::net_indr_set(string, string)\n", net_classname);
+        N("    stsfld     string %s::%s\n", net_classname, lf);
     }
-    N("    ldstr      \"%s\"\n", fn->name);
-    N("    ldloc.s    V_%d\n", save_fnret);
-    N("    call       void %s::net_indr_set(string, string)\n", net_classname);
+    {
+        char fn_field[256]; net_field_name(fn_field, sizeof fn_field, fn->name);
+        N("    ldloc.s    V_%d\n", save_fnret);
+        N("    stsfld     string %s::%s\n", net_classname, fn_field);
+    }
     N("    ldnull\n");
     N("    ret\n");
     N("  }\n\n");
