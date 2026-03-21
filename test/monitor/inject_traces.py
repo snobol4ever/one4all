@@ -5,16 +5,20 @@ inject_traces.py — instrument a .sno file with TRACE() calls.
 Usage: python3 inject_traces.py <sno_file> [tracepoints_conf]
 
 Strategy:
+  - Injects LOAD() preamble for monitor_ipc.so (MON_OPEN/MON_SEND/MON_CLOSE).
   - Injects three SNOBOL4 callback functions (MONCALL, MONRET, MONVAL) that
-    write trace events to TERMINAL (stderr), keeping program stdout clean.
+    write trace events via MON_SEND() to a named FIFO.
+  - FIFO path read from env var MONITOR_FIFO; .so path from MONITOR_SO.
   - Sets &TRACE = 999999999 so TRACE events fire.
   - Injects TRACE() registration calls for all included functions/variables.
   - Output is a valid .sno file on stdout.
 
-Trace output format on stderr:
+Trace output format on FIFO (one line per event, atomic write):
     CALL   funcname
     RETURN funcname = retval
     VALUE  varname = value
+
+If MONITOR_FIFO is not set, falls back to TERMINAL= (stderr) for compatibility.
 """
 
 import sys
@@ -120,21 +124,58 @@ def scan_sno(lines, include_rules, exclude_rules):
 
 MONITOR_PREAMBLE = """\
 * --- MONITOR PREAMBLE: injected by inject_traces.py ---
+*     IPC mode: trace events → named FIFO via monitor_ipc.so
+*     MONITOR_FIFO env var = FIFO path; MONITOR_SO env var = .so path
         &TRACE         =  999999999
-        DEFINE('MONCALL(MONN,MONT)')                :(MONCALL_END)
-MONCALL TERMINAL       =  'CALL ' MONN              :(RETURN)
+*
+*     Read FIFO path and .so path from environment via HOST(4,name)
+        MON_FIFO_      =  HOST(4,'MONITOR_FIFO')
+        MON_SO_        =  HOST(4,'MONITOR_SO')
+*
+*     Load IPC functions (fail silently if not set — fallback to TERMINAL=)
+        IDENT(MON_SO_)                                    :S(MON_NOTERMINAL_)
+        LOAD('MON_OPEN(STRING)STRING',      MON_SO_)      :F(MON_NOTERMINAL_)
+        LOAD('MON_SEND(STRING,STRING)STRING',MON_SO_)     :F(MON_NOTERMINAL_)
+        LOAD('MON_CLOSE()STRING',           MON_SO_)      :F(MON_NOTERMINAL_)
+        IDENT(MON_FIFO_)                                  :S(MON_NOTERMINAL_)
+        MON_OPEN(MON_FIFO_)                               :F(MON_NOTERMINAL_)
+        MON_IPC_        =  '1'
+        :(MON_DEFS_)
+MON_NOTERMINAL_
+        MON_IPC_        =  ''
+MON_DEFS_
+*
+        DEFINE('MONCALL(MONN,MONT)')                      :(MONCALL_END)
+MONCALL IDENT(MON_IPC_,'1')                               :F(MONCALL_T)
+        MON_SEND('CALL',MONN)                             :(RETURN)
+MONCALL_T
+        TERMINAL       =  'CALL ' MONN                   :(RETURN)
 MONCALL_END
-        DEFINE('MONRET(MONN,MONT)MONV')             :(MONRET_END)
-MONRET  MONV           =  CONVERT(VALUE(MONN),'STRING')  :F(MONRET_NR)
-        TERMINAL       =  'RETURN ' MONN ' = ' MONV :(RETURN)
+*
+        DEFINE('MONRET(MONN,MONT)MONV')                   :(MONRET_END)
+MONRET  MONV           =  CONVERT(VALUE(MONN),'STRING')   :F(MONRET_NR)
+        IDENT(MON_IPC_,'1')                               :F(MONRET_T)
+        MON_SEND('RETURN',MONN ' = ' MONV)               :(RETURN)
+MONRET_T
+        TERMINAL       =  'RETURN ' MONN ' = ' MONV      :(RETURN)
 MONRET_NR
-        TERMINAL       =  'RETURN ' MONN            :(RETURN)
+        IDENT(MON_IPC_,'1')                               :F(MONRET_NT)
+        MON_SEND('RETURN',MONN)                           :(RETURN)
+MONRET_NT
+        TERMINAL       =  'RETURN ' MONN                 :(RETURN)
 MONRET_END
-        DEFINE('MONVAL(MONN,MONT)MONV')             :(MONVAL_END)
-MONVAL  MONV           =  CONVERT(VALUE(MONN),'STRING')  :F(MONVAL_U)
-        TERMINAL       =  'VALUE ' MONN ' = ' MONV  :(RETURN)
+*
+        DEFINE('MONVAL(MONN,MONT)MONV')                   :(MONVAL_END)
+MONVAL  MONV           =  CONVERT(VALUE(MONN),'STRING')   :F(MONVAL_U)
+        IDENT(MON_IPC_,'1')                               :F(MONVAL_T)
+        MON_SEND('VALUE',MONN ' = ' MONV)                :(RETURN)
+MONVAL_T
+        TERMINAL       =  'VALUE ' MONN ' = ' MONV       :(RETURN)
 MONVAL_U
-        TERMINAL       =  'VALUE ' MONN ' = (undef)' :(RETURN)
+        IDENT(MON_IPC_,'1')                               :F(MONVAL_UT)
+        MON_SEND('VALUE',MONN ' = (undef)')              :(RETURN)
+MONVAL_UT
+        TERMINAL       =  'VALUE ' MONN ' = (undef)'     :(RETURN)
 MONVAL_END
 * --- MONITOR PREAMBLE END ---
 """

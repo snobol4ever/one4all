@@ -13,6 +13,7 @@
 #include <math.h>
 #include <stdarg.h>
 #include <ctype.h>
+#include <fcntl.h>
 #include <inttypes.h>
 #include <unistd.h>
 
@@ -738,9 +739,19 @@ void SNO_INIT_fn(void) {
     alphabet[256] = '\0';
     /* Register as NV keyword — pointer identity used by SIZE for correct length */
     NV_SET_fn("ALPHABET", BSTRVAL(alphabet, 256));
-    /* Enable monitor if MONITOR=1 (writes to stderr) */
-    const char *mon = getenv("MONITOR");
-    if (mon && mon[0] == '1') monitor_fd = 2;
+    /* Enable monitor — prefer named FIFO (MONITOR_FIFO env var) over stderr.
+     * MONITOR_FIFO=/path/to/fifo  → open FIFO, write trace events there (no stderr pollution)
+     * MONITOR=1 (legacy)          → write trace events to stderr (fd 2)
+     */
+    const char *mon_fifo = getenv("MONITOR_FIFO");
+    if (mon_fifo && mon_fifo[0]) {
+        monitor_fd = open(mon_fifo, O_WRONLY | O_NONBLOCK);
+        if (monitor_fd < 0) monitor_fd = open(mon_fifo, O_WRONLY);
+        /* if open fails, monitor stays disabled — don't crash on missing FIFO */
+    } else {
+        const char *mon = getenv("MONITOR");
+        if (mon && mon[0] == '1') monitor_fd = 2;
+    }
 
     /* Register numeric comparison builtins */
     extern void register_fn(const char *, DESCR_t (*)(DESCR_t*, int), int, int);
