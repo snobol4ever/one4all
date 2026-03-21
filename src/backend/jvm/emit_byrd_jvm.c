@@ -111,6 +111,36 @@ static void JSep(const char *tag) {
 
 static char jvm_classname[256];
 
+/* jvm_expand_label — sanitize a SNOBOL4 label for use as a Jasmin identifier.
+ * Jasmin labels must not contain :  ( ) $ ' < > = etc.
+ * Same expansion table as asm_expand_name in emit_byrd_asm.c. */
+static void jvm_expand_label(const char *src, char *dst, int dstlen) {
+    static const struct { char ch; const char *nm; } tbl[] = {
+        {'>', "GT"}, {'<', "LT"}, {'=', "EQ"}, {'+', "PL"}, {'-', "MI"},
+        {'*', "ST"}, {'/', "SL"}, {'(', "LP"}, {')', "RP"}, {'$', "DL"},
+        {'.', "DT"}, {'?', "QM"}, {'!', "BG"}, {'&', "AM"}, {'|', "OR"},
+        {'@', "AT"}, {'~', "TL"}, {':', "CL"}, {',', "CM"}, {'#', "HS"},
+        {'%', "PC"}, {'^', "CA"}, {'[', "LB"}, {']', "RB"}, {' ', "SP"},
+        {'\'', "SQ"}, {'"', "DQ"}, {0, NULL}
+    };
+    int di = 0;
+    for (const char *p = src; *p && di < dstlen - 1; p++) {
+        if (isalnum((unsigned char)*p) || *p == '_') {
+            dst[di++] = *p;
+            continue;
+        }
+        const char *nm = NULL;
+        for (int i = 0; tbl[i].ch; i++)
+            if (tbl[i].ch == *p) { nm = tbl[i].nm; break; }
+        if (!nm) nm = "XX";
+        if (di > 0 && dst[di-1] != '_') dst[di++] = '_';
+        for (const char *q = nm; *q && di < dstlen - 2; q++) dst[di++] = *q;
+        if (di < dstlen - 1) dst[di++] = '_';
+    }
+    while (di > 0 && dst[di-1] == '_') di--;
+    dst[di] = '\0';
+}
+
 /* Module-level label globals — set per-statement, used by emit_expr */
 static char jvm_cur_pat_abort_label_early[128]; /* placeholder — real decl below */
 static char jvm_cur_stmt_fail_label[128];  /* INPUT EOF in expr → jump here (raw SNOBOL4 label) */
@@ -2079,6 +2109,8 @@ static int expr_contains_input(EXPR_t *e) {
 }
 
 /* Emit a goto to a SNOBOL4 label, intercepting RETURN/FRETURN when in a fn body */
+static Program *jvm_cur_prog = NULL;   /* set before main emit loop */
+
 static void jvm_emit_goto(const char *label) {
     if (!label || !label[0]) return;
     /* RETURN/FRETURN/NRETURN: route to function exit labels, or L_END if in main */
@@ -2104,7 +2136,136 @@ static void jvm_emit_goto(const char *label) {
         J("    goto L_END\n");
         return;
     }
-    char glbl[128]; snprintf(glbl, sizeof glbl, "L_%s", label);
+    /* $COMPUTED:expr — dynamic/computed goto: evaluate expr, dispatch via if-chain */
+    if (strncasecmp(label,"$COMPUTED:",10)==0) {
+        const char *expr_src = label + 10;
+        /* Strip trailing ) left by parser capture */
+        char expr_buf[4096];
+        strncpy(expr_buf, expr_src, sizeof(expr_buf)-1);
+        expr_buf[sizeof(expr_buf)-1] = '\0';
+        int elen = (int)strlen(expr_buf);
+        while (elen > 0 && (expr_buf[elen-1]==')' || expr_buf[elen-1]==' ' || expr_buf[elen-1]=='\t'))
+            expr_buf[--elen] = '\0';
+        EXPR_t *ce = parse_expr_from_str(expr_buf);
+        if (!ce) { J("    goto L_END\n"); return; }
+        /* Evaluate expression → string on stack */
+        jvm_emit_expr(ce);
+        /* Store in a local string variable via sno_indr_set/get — use temp var */
+        static int _cgoto_uid = 0;
+        char tmpvar[64]; snprintf(tmpvar, sizeof tmpvar, "_cgoto_%d", _cgoto_uid++);
+        char tmpesc[128]; jvm_escape_string(tmpvar, tmpesc, sizeof tmpesc);
+        char vpdesc[512]; snprintf(vpdesc, sizeof vpdesc,
+            "%s/sno_var_put(Ljava/lang/String;Ljava/lang/String;)V", jvm_classname);
+        char vgdesc[512]; snprintf(vgdesc, sizeof vgdesc,
+            "%s/sno_indr_get(Ljava/lang/String;)Ljava/lang/String;", jvm_classname);
+        /* stack: String (computed label value) */
+        J("    ldc %s\n", tmpesc);
+        J("    swap\n");
+        J("    invokestatic %s\n", vpdesc);
+        /* Now emit if-chain over reachable labels */
+        /* Collect labels: if in function, use function body labels; else main labels */
+        static int _cgoto_lbl = 0;
+        char lbl_done[64]; snprintf(lbl_done, sizeof lbl_done, "Lcg_done_%d", _cgoto_lbl++);
+        /* Walk program statements to find labels in scope */
+        if (jvm_cur_prog) {
+            int in_scope = 0;
+            const char *scope_entry = jvm_cur_fn ?
+                (jvm_cur_fn->entry_label ? jvm_cur_fn->entry_label : jvm_cur_fn->name) : NULL;
+            const char *scope_end = jvm_cur_fn ? jvm_cur_fn->end_label : NULL;
+            for (STMT_t *t = jvm_cur_prog->head; t; t = t->next) {
+                if (t->is_end) break;
+                if (jvm_cur_fn) {
+                    /* function scope: include labels between entry and end */
+                    if (scope_entry && t->label && strcasecmp(t->label, scope_entry)==0) in_scope=1;
+                    if (scope_end && t->label && strcasecmp(t->label, scope_end)==0) break;
+                } else {
+                    /* main scope: skip function bodies */
+                    if (t->label) {
+                        int is_fn_entry = 0;
+                        for (int fi=0; fi<jvm_fn_count_fwd; fi++) {
+                            const char *e = jvm_fn_table_fwd[fi].entry_label ?
+                                jvm_fn_table_fwd[fi].entry_label : jvm_fn_table_fwd[fi].name;
+                            if (e && strcasecmp(t->label,e)==0) { is_fn_entry=1; break; }
+                        }
+                        if (is_fn_entry) { in_scope=0; continue; }
+                        /* check if end of a fn body */
+                        for (int fi=0; fi<jvm_fn_count_fwd; fi++) {
+                            if (jvm_fn_table_fwd[fi].end_label &&
+                                strcasecmp(t->label, jvm_fn_table_fwd[fi].end_label)==0) {
+                                in_scope=1; break;
+                            }
+                        }
+                    }
+                    if (!jvm_cur_fn) in_scope=1; /* main: always in scope when not in fn */
+                }
+                if (!t->label) continue;
+                if (jvm_cur_fn && !in_scope) continue;
+                /* Emit: load computed value, compare, jump */
+                char lsafe[128]; jvm_expand_label(t->label, lsafe, sizeof lsafe);
+                char jlbl[256]; snprintf(jlbl, sizeof jlbl, "L_%s", lsafe);
+                J("    ldc %s\n", tmpesc);
+                J("    invokestatic %s\n", vgdesc);
+                char ciesc[256]; jvm_escape_string(t->label, ciesc, sizeof ciesc);
+                J("    ldc %s\n", ciesc);
+                char eqdesc[256]; snprintf(eqdesc, sizeof eqdesc,
+                    "%s/sno_str_eq(Ljava/lang/String;Ljava/lang/String;)Z", jvm_classname);
+                J("    invokestatic %s\n", eqdesc);
+                char lbl_next[64]; snprintf(lbl_next, sizeof lbl_next, "Lcg_n_%d_%s", _cgoto_lbl, lsafe);
+                J("    ifeq %s\n", lbl_next);
+                J("    goto %s\n", jlbl);
+                J("%s:\n", lbl_next);
+            }
+        }
+        /* no-match fallback: freturn if in function, L_END if in main */
+        if (jvm_cur_fn) {
+            int fn_idx2 = (int)(jvm_cur_fn - jvm_fn_table_fwd);
+            char lbl_fr[64]; snprintf(lbl_fr, sizeof lbl_fr, "Jfn%d_freturn", fn_idx2);
+            J("    goto %s\n", lbl_fr);
+        } else {
+            J("    goto L_END\n");   /* no match in main → end */
+        }
+        J("%s:\n", lbl_done);
+        return;
+    }
+    char safe[128]; jvm_expand_label(label, safe, sizeof safe);
+    char glbl[256]; snprintf(glbl, sizeof glbl, "L_%s", safe);
+
+    /* Cross-scope check: if we are inside a function method, verify that
+     * the target label actually exists within this function's body range.
+     * If not (e.g. ":F(error)" jumping to a main-level label), SNOBOL4
+     * semantics treat it as FRETURN — the function fails.
+     * See JVM.md J-212 sprint notes. */
+    if (jvm_cur_fn && jvm_cur_prog) {
+        const char *entry = jvm_cur_fn->entry_label
+                            ? jvm_cur_fn->entry_label
+                            : jvm_cur_fn->name;
+        int in_body = 0;
+        int found_in_fn = 0;
+        for (STMT_t *t = jvm_cur_prog->head; t; t = t->next) {
+            /* Start of this function's body */
+            if (!in_body && t->label && entry &&
+                strcasecmp(t->label, entry) == 0)
+                in_body = 1;
+            /* End of this function's body */
+            if (in_body && jvm_cur_fn->end_label && t->label &&
+                strcasecmp(t->label, jvm_cur_fn->end_label) == 0)
+                break;
+            if (in_body && t->label) {
+                char ts[128];
+                jvm_expand_label(t->label, ts, sizeof ts);
+                if (strcmp(ts, safe) == 0) { found_in_fn = 1; break; }
+            }
+        }
+        if (!found_in_fn) {
+            /* Out-of-scope: SNOBOL4 semantics = FRETURN */
+            int fn_idx = (int)(jvm_cur_fn - jvm_fn_table_fwd);
+            char lbl_fr[64];
+            snprintf(lbl_fr, sizeof lbl_fr, "Jfn%d_freturn", fn_idx);
+            J("    goto %s\n", lbl_fr);
+            return;
+        }
+    }
+
     JI("goto", glbl);
 }
 
@@ -2122,8 +2283,9 @@ static void jvm_emit_stmt(STMT_t *s, int stmt_idx) {
     /* Label */
     if (s->label) {
         JSep(s->label);
-        char lbuf[128];
-        snprintf(lbuf, sizeof lbuf, "L_%s", s->label);
+        char lsafe[128]; jvm_expand_label(s->label, lsafe, sizeof lsafe);
+        char lbuf[256];
+        snprintf(lbuf, sizeof lbuf, "L_%s", lsafe);
         J("%s:\n", lbuf);
     }
 
@@ -2368,17 +2530,33 @@ static void jvm_emit_stmt(STMT_t *s, int stmt_idx) {
                     char vpdesc[512];
                     snprintf(vpdesc, sizeof vpdesc, "%s/sno_var_put(Ljava/lang/String;Ljava/lang/String;)V", jvm_classname);
                     JI("invokestatic", vpdesc);
+                    /* :S goto — emitted here, BEFORE vnfail label, so only success path takes it */
+                    if (!is_output) {
+                        if (s->go && s->go->uncond && s->go->uncond[0]) {
+                            jvm_emit_goto(s->go->uncond);
+                        } else if (s->go && s->go->onsuccess && s->go->onsuccess[0]) {
+                            jvm_emit_goto(s->go->onsuccess);
+                        }
+                    }
+                    /* vnfail: — failure fall-through target (only reached when no explicit :F jump above) */
                     J("%s:\n", vnfail);
+                    /* :F goto after vnfail (explicit failure branch, if any — uncond already handled above) */
+                    /* Note: onfailure was already emitted inline in the null path above; no re-emit needed */
                 }
             }
         }
 
-        /* :S goto for non-OUTPUT assigns (OUTPUT emits its own :S inline above) */
+        /* :S/:uncond already emitted inside the RHS-null block above for non-output assigns.
+         * For output assigns or null/empty RHS (no vnfail block), emit :S/:uncond here. */
         if (!is_output) {
-            if (s->go && s->go->uncond && s->go->uncond[0]) {
-                jvm_emit_goto(s->go->uncond);
-            } else if (s->go && s->go->onsuccess && s->go->onsuccess[0]) {
-                jvm_emit_goto(s->go->onsuccess);
+            /* Only emit if we did NOT enter the vnfail block (i.e. replacement was null/empty) */
+            int has_rhs = (s->replacement && s->replacement->kind != E_NULV);
+            if (!has_rhs) {
+                if (s->go && s->go->uncond && s->go->uncond[0]) {
+                    jvm_emit_goto(s->go->uncond);
+                } else if (s->go && s->go->onsuccess && s->go->onsuccess[0]) {
+                    jvm_emit_goto(s->go->onsuccess);
+                }
             }
         }
         /* :F fallthrough (no-op — already jumped or falling through) */
@@ -2660,10 +2838,27 @@ static int jvm_need_indr_helpers = 0;
 static int jvm_need_varmap       = 0;
 
 static void jvm_emit_runtime_helpers(void) {
+    /* sno_str_eq(String a, String b) → boolean (case-insensitive, null-safe) */
+    J(".method static sno_str_eq(Ljava/lang/String;Ljava/lang/String;)Z\n");
+    J("    .limit stack 4\n");
+    J("    .limit locals 2\n");
+    J("    aload_0\n");
+    J("    ifnull Lstreq_false\n");
+    J("    aload_1\n");
+    J("    ifnull Lstreq_false\n");
+    J("    aload_0\n");
+    J("    aload_1\n");
+    J("    invokevirtual java/lang/String/equalsIgnoreCase(Ljava/lang/String;)Z\n");
+    J("    ireturn\n");
+    J("Lstreq_false:\n");
+    J("    iconst_0\n");
+    J("    ireturn\n");
+    J(".end method\n\n");
+
     /* sno_kw_get(String name) → String
      * Returns value of SNOBOL4 keyword &name.
      * For J2: ALPHABET=256-char string, TRIM/ANCHOR/FULLSCAN/STCOUNT/STLIMIT = integers.
-     * Unrecognised keyword → "" (unset). */
+     * Unrecognised keyword -> "" (unset). */
     if (jvm_need_kw_helpers) {
         J(".method static sno_kw_get(Ljava/lang/String;)Ljava/lang/String;\n");
         J("    .limit stack 4\n");
@@ -3413,6 +3608,15 @@ static void jvm_collect_functions(Program *prog) {
             if (s->go->uncond) fn->end_label = strdup(s->go->uncond);
             else if (s->go->onsuccess) fn->end_label = strdup(s->go->onsuccess);
         }
+        /* Fallback: DEFINE has no goto — check next stmt for :(endLabel) pattern.
+         * Beauty.sno pattern: DEFINE('findRefs(x)n,v') on one line,
+         * then next stmt has :(findRefsEnd) unconditional goto. */
+        if (!fn->end_label && s->next && s->next->go) {
+            if (s->next->go->uncond && s->next->go->uncond[0])
+                fn->end_label = strdup(s->next->go->uncond);
+            else if (s->next->go->onsuccess && s->next->go->onsuccess[0])
+                fn->end_label = strdup(s->next->go->onsuccess);
+        }
         jvm_fn_count++;
     }
 }
@@ -3764,6 +3968,8 @@ void jvm_emit(Program *prog, FILE *out, const char *filename) {
     jvm_need_array_helpers   = 0;
     jvm_need_data_helpers    = 0;
     jvm_set_classname(filename);
+
+    jvm_cur_prog = prog;   /* make program visible to jvm_emit_goto for computed gotos */
 
     if (prog && prog->head) {
         jvm_collect_vars(prog);
