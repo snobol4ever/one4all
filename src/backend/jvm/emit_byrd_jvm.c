@@ -2368,17 +2368,33 @@ static void jvm_emit_stmt(STMT_t *s, int stmt_idx) {
                     char vpdesc[512];
                     snprintf(vpdesc, sizeof vpdesc, "%s/sno_var_put(Ljava/lang/String;Ljava/lang/String;)V", jvm_classname);
                     JI("invokestatic", vpdesc);
+                    /* :S goto — emitted here, BEFORE vnfail label, so only success path takes it */
+                    if (!is_output) {
+                        if (s->go && s->go->uncond && s->go->uncond[0]) {
+                            jvm_emit_goto(s->go->uncond);
+                        } else if (s->go && s->go->onsuccess && s->go->onsuccess[0]) {
+                            jvm_emit_goto(s->go->onsuccess);
+                        }
+                    }
+                    /* vnfail: — failure fall-through target (only reached when no explicit :F jump above) */
                     J("%s:\n", vnfail);
+                    /* :F goto after vnfail (explicit failure branch, if any — uncond already handled above) */
+                    /* Note: onfailure was already emitted inline in the null path above; no re-emit needed */
                 }
             }
         }
 
-        /* :S goto for non-OUTPUT assigns (OUTPUT emits its own :S inline above) */
+        /* :S/:uncond already emitted inside the RHS-null block above for non-output assigns.
+         * For output assigns or null/empty RHS (no vnfail block), emit :S/:uncond here. */
         if (!is_output) {
-            if (s->go && s->go->uncond && s->go->uncond[0]) {
-                jvm_emit_goto(s->go->uncond);
-            } else if (s->go && s->go->onsuccess && s->go->onsuccess[0]) {
-                jvm_emit_goto(s->go->onsuccess);
+            /* Only emit if we did NOT enter the vnfail block (i.e. replacement was null/empty) */
+            int has_rhs = (s->replacement && s->replacement->kind != E_NULV);
+            if (!has_rhs) {
+                if (s->go && s->go->uncond && s->go->uncond[0]) {
+                    jvm_emit_goto(s->go->uncond);
+                } else if (s->go && s->go->onsuccess && s->go->onsuccess[0]) {
+                    jvm_emit_goto(s->go->onsuccess);
+                }
             }
         }
         /* :F fallthrough (no-op — already jumped or falling through) */
