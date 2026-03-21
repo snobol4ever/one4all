@@ -48,6 +48,7 @@ struct _DATINST_t;
 
 typedef struct DESCR_t {
     DTYPE_t v;             /* type tag — SIL v field (DTYPE_t enum) */
+    uint32_t slen;         /* binary string byte length; 0 = use strlen (fits in padding) */
     union {              /* value   — SIL a field               */
         char             *s;   /* S    — string pointer (GC)    */
         int64_t           i;   /* I    — integer                */
@@ -60,8 +61,23 @@ typedef struct DESCR_t {
     };
 } DESCR_t;
 
-#define NULVCL    ((DESCR_t){ .v = DT_SNUL, .s = "" })
-#define STRVAL(s_) ((DESCR_t){ .v = DT_S,  .s = (s_) })
+/* descr_slen: byte length of a string descriptor.
+ * If slen field is nonzero, use it (binary string with possible embedded NULs).
+ * Otherwise fall back to strlen — correct for all normal NUL-terminated strings. */
+static inline size_t descr_slen(DESCR_t d) {
+    /* Only honour slen for string types; for all others use strlen/0 */
+    if (d.v == DT_S) {
+        if (d.slen) return (size_t)d.slen;
+        return d.s ? strlen(d.s) : 0;
+    }
+    /* Non-string: convert to string representation then measure */
+    return 0;
+}
+
+#define NULVCL    ((DESCR_t){ .v = DT_SNUL, .slen = 0, .s = "" })
+#define STRVAL(s_) ((DESCR_t){ .v = DT_S,  .slen = 0, .s = (s_) })
+/* BSTRVAL: binary string with explicit byte length (may contain embedded NULs) */
+#define BSTRVAL(s_, len_) ((DESCR_t){ .v = DT_S, .slen = (uint32_t)(len_), .s = (s_) })
 #define INTVAL(i_) ((DESCR_t){ .v = DT_I,  .i = (i_) })
 #define REALVAL(r_)((DESCR_t){ .v = DT_R, .r = (r_) })
 #define FAILDESCR    ((DESCR_t){ .v = DT_FAIL, .i = 0 })   /* P002/P003 */
@@ -243,6 +259,7 @@ int    STACK_DEPTH_fn(void);
 typedef DESCR_t (*FNCPTR_t)(DESCR_t *args, int nargs);
 
 void    DEFINE_fn(const char *spec, FNCPTR_t fn);  /* DEFINE_fn('name(a,b)local1,local2') */
+void    register_fn_alias(const char *newname, const char *oldname); /* OPSYN alias */
 DESCR_t  APPLY_fn(const char *name, DESCR_t *args, int nargs);  /* APPLY(name,...) */
 int     FNCEX_fn(const char *name);
 

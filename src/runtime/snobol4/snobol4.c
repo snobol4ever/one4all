@@ -13,6 +13,7 @@
 #include <math.h>
 #include <stdarg.h>
 #include <ctype.h>
+#include <fcntl.h>
 #include <inttypes.h>
 #include <unistd.h>
 
@@ -156,9 +157,9 @@ static DESCR_t _b_REAL(DESCR_t *a, int n) {
 }
 static DESCR_t _b_SIZE(DESCR_t *a, int n) {
     if (n < 1) return INTVAL(0);
-    /* Special case: &ALPHABET is a 256-char binary string starting with NUL.
-     * strlen would return 0. Check pointer identity against the alphabet buffer. */
-    if (a[0].v == DT_S && a[0].s == alphabet) return INTVAL(256);
+    /* Binary string (e.g. &ALPHABET-derived): use slen field directly. */
+    if (a[0].v == DT_S && a[0].slen) return INTVAL((int64_t)a[0].slen);
+    /* Normal case: convert to string, measure with strlen. */
     const char *s = VARVAL_fn(a[0]);
     return INTVAL((int64_t)(s ? strlen(s) : 0));
 }
@@ -232,6 +233,8 @@ static DESCR_t _b_APPLY(DESCR_t *a, int n) {
     const char *fname = VARVAL_fn(a[0]);
     return APPLY_fn(fname, a + 1, n - 1);
 }
+static DESCR_t _b_ARG(DESCR_t *a, int n);    /* defined after FNCBLK_t */
+static DESCR_t _b_LOCAL(DESCR_t *a, int n);  /* defined after FNCBLK_t */
 static DESCR_t _b_LPAD(DESCR_t *a, int n) {
     if (n < 2) return n > 0 ? a[0] : NULVCL;
     return lpad_fn(a[0], a[1], n > 2 ? a[2] : STRVAL(" "));
@@ -735,10 +738,20 @@ void SNO_INIT_fn(void) {
     for (int i = 0; i < 256; i++) alphabet[i] = (char)i;
     alphabet[256] = '\0';
     /* Register as NV keyword — pointer identity used by SIZE for correct length */
-    NV_SET_fn("ALPHABET", STRVAL(alphabet));
-    /* Enable monitor if MONITOR=1 (writes to stderr) */
-    const char *mon = getenv("MONITOR");
-    if (mon && mon[0] == '1') monitor_fd = 2;
+    NV_SET_fn("ALPHABET", BSTRVAL(alphabet, 256));
+    /* Enable monitor — prefer named FIFO (MONITOR_FIFO env var) over stderr.
+     * MONITOR_FIFO=/path/to/fifo  → open FIFO, write trace events there (no stderr pollution)
+     * MONITOR=1 (legacy)          → write trace events to stderr (fd 2)
+     */
+    const char *mon_fifo = getenv("MONITOR_FIFO");
+    if (mon_fifo && mon_fifo[0]) {
+        monitor_fd = open(mon_fifo, O_WRONLY | O_NONBLOCK);
+        if (monitor_fd < 0) monitor_fd = open(mon_fifo, O_WRONLY);
+        /* if open fails, monitor stays disabled — don't crash on missing FIFO */
+    } else {
+        const char *mon = getenv("MONITOR");
+        if (mon && mon[0] == '1') monitor_fd = 2;
+    }
 
     /* Register numeric comparison builtins */
     extern void register_fn(const char *, DESCR_t (*)(DESCR_t*, int), int, int);
@@ -790,6 +803,8 @@ void SNO_INIT_fn(void) {
     register_fn("COPY",    _b_COPY,    1, 1);
     register_fn("EVAL",  _b_EVAL,  1, 1);
     register_fn("OPSYN", _b_OPSYN, 2, 3);
+    register_fn("ARG",   _b_ARG,   2, 2);
+    register_fn("LOCAL", _b_LOCAL, 2, 2);
     register_fn("SORT",  _b_SORT,  1, 1);
     register_fn("INPUT", _b_INPUT, 1, 4);
     register_fn("nPush",    _b_nPush,    0, 0);
@@ -1327,6 +1342,11 @@ void NV_SET_fn(const char *name, DESCR_t val) {
     comm_var(name, val);
     /* Special I/O variables */
     if (strcmp(name, "OUTPUT") == 0) { output_val(val); return; }
+    if (strcmp(name, "TERMINAL") == 0) {
+        const char *s = (val.v == DT_S) ? (const char *)val.i : "";
+        fprintf(stderr, "%s\n", s);
+        return;
+    }
     /* Unprotected keywords backed by C globals */
     if (strcmp(name, "STLIMIT")  == 0) { kw_stlimit  = (val.v==DT_I)?val.i:(int64_t)to_real(val); return; }
     if (strcmp(name, "ANCHOR")   == 0) { kw_anchor   = (val.v==DT_I)?val.i:(int64_t)to_real(val); return; }
@@ -1625,6 +1645,48 @@ void DEFINE_fn(const char *spec, FNCPTR_t fn) {
     _func_buckets[h] = fe;
 }
 
+/* register_fn_alias — OPSYN support: make newname an alias for oldname.
+ * Copies the FNCBLK_t entry for oldname into a new entry for newname,
+ * so APPLY_fn(newname,...) dispatches identically to APPLY_fn(oldname,...).
+ * If oldname is not found, newname is registered as a no-op (NULVCL). */
+void register_fn_alias(const char *newname, const char *oldname) {
+    _func_init();
+    /* Find the old entry */
+    FNCBLK_t *old_entry = NULL;
+    unsigned ho = _func_hash(oldname);
+    for (FNCBLK_t *e = _func_buckets[ho]; e; e = e->next) {
+        if (strcasecmp(e->name, oldname) == 0) { old_entry = e; break; }
+    }
+    /* Build new entry */
+    FNCBLK_t *fe = GC_malloc(sizeof(FNCBLK_t));
+    fe->name    = GC_strdup(newname);
+    if (old_entry) {
+        fe->spec    = old_entry->spec;
+        fe->fn      = old_entry->fn;
+        fe->nparams = old_entry->nparams;
+        fe->params  = old_entry->params;
+        fe->nlocals = old_entry->nlocals;
+        fe->locals  = old_entry->locals;
+    } else {
+        fe->spec = GC_strdup(newname); fe->fn = NULL;
+        fe->nparams = 0; fe->params = NULL;
+        fe->nlocals = 0; fe->locals = NULL;
+    }
+    fe->next = NULL;
+    unsigned hn = _func_hash(newname);
+    /* Replace if already present */
+    for (FNCBLK_t *e = _func_buckets[hn]; e; e = e->next) {
+        if (strcasecmp(e->name, newname) == 0) {
+            e->spec = fe->spec; e->fn = fe->fn;
+            e->nparams = fe->nparams; e->params = fe->params;
+            e->nlocals = fe->nlocals; e->locals = fe->locals;
+            return;
+        }
+    }
+    fe->next = _func_buckets[hn];
+    _func_buckets[hn] = fe;
+}
+
 DESCR_t APPLY_fn(const char *name, DESCR_t *args, int nargs) {
     _func_init();
     if (!name) return NULVCL;
@@ -1637,6 +1699,50 @@ DESCR_t APPLY_fn(const char *name, DESCR_t *args, int nargs) {
         }
     }
     return NULVCL;
+}
+
+/* ARG(fname, n) — return uppercase name of nth parameter (1-based).
+ * Fails if fname not found or n out of bounds. */
+static DESCR_t _b_ARG(DESCR_t *a, int n) {
+    if (n < 2) return FAILDESCR;
+    const char *fname = VARVAL_fn(a[0]);
+    if (!fname) return FAILDESCR;
+    int64_t idx = to_int(a[1]);
+    _func_init();
+    unsigned h = _func_hash(fname);
+    for (FNCBLK_t *e = _func_buckets[h]; e; e = e->next) {
+        if (strcasecmp(e->name, fname) == 0) {
+            if (idx < 1 || idx > (int64_t)e->nparams) return FAILDESCR;
+            const char *pname = e->params[idx - 1];
+            size_t len = strlen(pname);
+            char *up = GC_malloc(len + 1);
+            for (size_t i = 0; i <= len; i++) up[i] = (char)toupper((unsigned char)pname[i]);
+            return STRVAL(up);
+        }
+    }
+    return FAILDESCR;
+}
+
+/* LOCAL(fname, n) — return uppercase name of nth local variable (1-based).
+ * Fails if fname not found or n out of bounds. */
+static DESCR_t _b_LOCAL(DESCR_t *a, int n) {
+    if (n < 2) return FAILDESCR;
+    const char *fname = VARVAL_fn(a[0]);
+    if (!fname) return FAILDESCR;
+    int64_t idx = to_int(a[1]);
+    _func_init();
+    unsigned h = _func_hash(fname);
+    for (FNCBLK_t *e = _func_buckets[h]; e; e = e->next) {
+        if (strcasecmp(e->name, fname) == 0) {
+            if (idx < 1 || idx > (int64_t)e->nlocals) return FAILDESCR;
+            const char *lname = e->locals[idx - 1];
+            size_t len = strlen(lname);
+            char *up = GC_malloc(len + 1);
+            for (size_t i = 0; i <= len; i++) up[i] = (char)toupper((unsigned char)lname[i]);
+            return STRVAL(up);
+        }
+    }
+    return FAILDESCR;
 }
 
 int FNCEX_fn(const char *name) {
@@ -1670,29 +1776,35 @@ DESCR_t DUPL_fn(DESCR_t s, DESCR_t n) {
 }
 
 DESCR_t REPLACE_fn(DESCR_t s, DESCR_t from, DESCR_t to) {
-    /* REPLACE(s, from, to): for each char in from, REPLACE_fn with corresponding
-     * char in to. Like tr command. */
-    const char *STRVAL_fn  = VARVAL_fn(s);
-    const char *f    = VARVAL_fn(from);
-    const char *t    = VARVAL_fn(to);
-    size_t slen = strlen(STRVAL_fn);
-    char *r = GC_malloc(slen + 1);
-    /* Build translation table */
+    /* REPLACE(s, from, to): for each char in from, map to corresponding char in to.
+     * Like tr command. Uses descr_slen() to support binary strings (e.g. &ALPHABET). */
+    const char *sp   = s.v == DT_S ? s.s : VARVAL_fn(s);
+    const char *fp   = from.v == DT_S ? from.s : VARVAL_fn(from);
+    const char *tp   = to.v == DT_S ? to.s : VARVAL_fn(to);
+    size_t slen_val  = descr_slen(s);
+    /* Build translation table: identity by default */
     unsigned char xlat[256];
     for (int i = 0; i < 256; i++) xlat[i] = (unsigned char)i;
-    size_t flen = strlen(f), tlen = strlen(t);
+    size_t flen = descr_slen(from), tlen = descr_slen(to);
     for (size_t i = 0; i < flen; i++) {
-        unsigned char fc = (unsigned char)f[i];
-        unsigned char tc = (i < tlen) ? (unsigned char)t[i] : 0;
+        unsigned char fc = (unsigned char)fp[i];
+        unsigned char tc = (i < tlen) ? (unsigned char)tp[i] : 0;
         xlat[fc] = tc;
     }
+    /* Apply translation.
+     * binary_mode: from/to/subject is a binary string (slen>0) — preserve NULs
+     * in result so positional alignment is maintained (&ALPHABET use-case).
+     * Normal mode: drop NUL-mapped chars (traditional SNOBOL4 REPLACE). */
+    int binary_mode = (from.v == DT_S && from.slen) || (to.v == DT_S && to.slen)
+                   || (s.v == DT_S && s.slen);
+    char *r = GC_malloc(slen_val + 1);
     size_t rlen = 0;
-    for (size_t i = 0; i < slen; i++) {
-        unsigned char c = xlat[(unsigned char)STRVAL_fn[i]];
-        if (c) r[rlen++] = (char)c;
+    for (size_t i = 0; i < slen_val; i++) {
+        unsigned char c = xlat[(unsigned char)sp[i]];
+        if (binary_mode || c) r[rlen++] = (char)c;
     }
     r[rlen] = '\0';
-    return STRVAL(r);
+    return binary_mode ? BSTRVAL(r, rlen) : STRVAL(r);
 }
 
 DESCR_t SUBSTR_fn(DESCR_t s, DESCR_t i, DESCR_t n) {

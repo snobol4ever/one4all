@@ -56,10 +56,22 @@ Ln_0:                       mov         edi, 6
 ; ======================================================================================================================
 Ln_1:                       mov         edi, 7
                             call        comm_stno
-                            CAT2_SV     S_XX_MI, S_NUMERALS
+                            LOAD_STR    S_XX_MI
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
-                            lea         rdi, [rel S_AM_UCASE]
+                            lea         rdi, [rel S_NUMERALS]
+                            call        stmt_get
+                            mov         [rbp-32], rax
+                            mov         [rbp-24], rdx
+                            mov         [conc_tmp0_rax], rax
+                            mov         [conc_tmp0_rdx], rdx
+                            lea         rdi, [rel S_UCASE]
+                            call        stmt_get
+                            mov         [rbp-32], rax
+                            mov         [rbp-24], rdx
+                            mov         [conc_tmp0_rax], rax
+                            mov         [conc_tmp0_rdx], rdx
+                            lea         rdi, [rel S_LCASE]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -70,10 +82,11 @@ Ln_1:                       mov         edi, 7
                             call        stmt_concat
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
-                            mov         [conc_tmp0_rax], rax
-                            mov         [conc_tmp0_rdx], rdx
-                            lea         rdi, [rel S_AM_LCASE]
-                            call        stmt_get
+                            mov         rcx, rdx
+                            mov         rdx, rax
+                            mov         rdi, [conc_tmp0_rax]
+                            mov         rsi, [conc_tmp0_rdx]
+                            call        stmt_concat
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
                             mov         rcx, rdx
@@ -223,6 +236,4 @@ S_DONE               db 68, 79, 78, 69, 0  ; "DONE"
 S_OUTPUT             db 79, 85, 84, 80, 85, 84, 0  ; "OUTPUT"
 S_SP_words           db 32, 119, 111, 114, 100, 115, 0  ; " words"
 S_END                db 69, 78, 68, 0  ; "END"
-S_AM_UCASE           db 38, 85, 67, 65, 83, 69, 0  ; "&UCASE"
-S_AM_LCASE           db 38, 76, 67, 65, 83, 69, 0  ; "&LCASE"
 S_add                db 97, 100, 100, 0  ; "add"

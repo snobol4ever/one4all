@@ -92,6 +92,22 @@ static char net_fn_return_lbl[128];
 static char net_fn_freturn_lbl[128];
 static const NetFnDef *net_find_fn(const char *name);
 static int net_pat_uid_early = 0;  /* uid counter used before pattern section */
+
+/* DATA type support */
+#define NET_DATA_MAX     32
+typedef struct {
+    char type_name[NET_FN_NAMELEN];
+    char fields[NET_FN_ARGMAX][NET_FN_NAMELEN];
+    int  nfields;
+} NetDataType;
+static NetDataType net_data_types[NET_DATA_MAX];
+static int         net_data_type_count = 0;
+static const NetDataType *net_find_data_type(const char *name);
+static const NetDataType *net_find_data_field(const char *field);
+
+/* Deferred helper emission flags */
+static int net_need_array_helpers = 0;
+static int net_need_data_helpers  = 0;
 #define net_pat_uid net_pat_uid_early
 
 static FILE *net_out;
@@ -275,6 +291,10 @@ static void scan_expr_vars(EXPR_t *e) {
     if ((e->kind == E_NAM || e->kind == E_DOL) && e->sval
             && !net_is_output(e->sval) && !net_is_input(e->sval))
         net_var_register(e->sval);
+    /* E_ATP (@VAR): varname in children[0]->sval */
+    if (e->kind == E_ATP && expr_left(e) && expr_left(e)->sval
+            && !net_is_output(expr_left(e)->sval) && !net_is_input(expr_left(e)->sval))
+        net_var_register(expr_left(e)->sval);
     for (int i = 0; i < expr_nargs(e); i++)
         scan_expr_vars(expr_arg(e, i));
 }
@@ -311,6 +331,42 @@ static void net_ldstr(const char *s) {
 /* -----------------------------------------------------------------------
  * Expr emitter — leaves one string on the CIL eval stack
  * ----------------------------------------------------------------------- */
+
+/* net_expr_can_fail: returns 1 if expression can set local 0 = 0 (failure).
+ * Used by E_CONC to decide whether to emit a goal-directed short-circuit check.
+ * Only predicate/comparison functions actually fail — pattern constructors and
+ * string functions always succeed and must NOT be treated as failing. */
+static int net_expr_can_fail(EXPR_t *e) {
+    if (!e) return 0;
+    if (e->kind == E_FNC && e->sval) {
+        /* Predicate functions that can fail (return int32 success flag) */
+        const char *fn = e->sval;
+        if (strcasecmp(fn, "DIFFER") == 0) return 1;
+        if (strcasecmp(fn, "IDENT")  == 0) return 1;
+        if (strcasecmp(fn, "GT")     == 0) return 1;
+        if (strcasecmp(fn, "LT")     == 0) return 1;
+        if (strcasecmp(fn, "GE")     == 0) return 1;
+        if (strcasecmp(fn, "LE")     == 0) return 1;
+        if (strcasecmp(fn, "EQ")     == 0) return 1;
+        if (strcasecmp(fn, "NE")     == 0) return 1;
+        if (strcasecmp(fn, "LGT")    == 0) return 1;
+        if (strcasecmp(fn, "LLT")    == 0) return 1;
+        if (strcasecmp(fn, "LGE")    == 0) return 1;
+        if (strcasecmp(fn, "LLE")    == 0) return 1;
+        if (strcasecmp(fn, "LEQ")    == 0) return 1;
+        if (strcasecmp(fn, "LNE")    == 0) return 1;
+        if (strcasecmp(fn, "INTEGER") == 0) return 1;
+        /* User-defined functions: checked via net_find_fn */
+        if (net_find_fn(fn)) return 1;
+        /* Pattern constructors and string functions: always succeed */
+        return 0;
+    }
+    if (e->kind == E_CONC) {
+        for (int i = 0; i < e->nchildren; i++)
+            if (net_expr_can_fail(e->children[i])) return 1;
+    }
+    return 0;
+}
 
 static void net_emit_expr(EXPR_t *e) {
     if (!e) {
@@ -446,10 +502,33 @@ static void net_emit_expr(EXPR_t *e) {
             net_ldstr("");
             break;
         }
-        /* DATATYPE(x) — returns "string", "integer", or "real" */
+        /* DATATYPE(x) — returns user DATA type name, or "string"/"integer"/"real" */
         if (strcasecmp(fn, "DATATYPE") == 0) {
+            net_need_array_helpers = 1;
+            int uid = net_pat_uid++;
+            char lbl_prim[64], lbl_done[64];
+            snprintf(lbl_prim, sizeof lbl_prim, "Ndt%d_prim", uid);
+            snprintf(lbl_done, sizeof lbl_done, "Ndt%d_done", uid);
+            /* Evaluate arg, dup it so we can use it twice */
             net_emit_expr(expr_arg(e, 0));
+            N("    dup\n");                   /* stack: arg arg */
+            net_ldstr("__type__");            /* stack: arg arg "__type__" */
+            N("    call       string %s::net_array_get(string, string)\n", net_classname);
+            /* stack: arg type_or_empty */
+            N("    dup\n");
+            N("    ldstr      \"\"\n");
+            N("    call       bool [mscorlib]System.String::op_Equality(string, string)\n");
+            N("    brtrue     %s\n", lbl_prim);
+            /* non-empty __type__: discard original arg, keep type string */
+            N("    stloc.s    V_22\n");       /* save type string */
+            N("    pop\n");                   /* discard original arg */
+            N("    ldloc.s    V_22\n");
+            N("    br         %s\n", lbl_done);
+            N("  %s:\n", lbl_prim);
+            N("    pop\n");                   /* discard empty type string */
+            /* original arg still on stack */
             N("    call       string [snobol4lib]Snobol4Lib::sno_datatype(string)\n");
+            N("  %s:\n", lbl_done);
             N("    ldc.i4.1\n");
             N("    stloc.0\n");
             break;
@@ -574,6 +653,78 @@ static void net_emit_expr(EXPR_t *e) {
             N("    stloc.0\n");
             break;
         }
+        /* ARRAY(n) — create indexed array, return an array-id string */
+        if (strcasecmp(fn, "ARRAY") == 0) {
+            net_need_array_helpers = 1;
+            EXPR_t *a0 = expr_arg(e, 0);
+            if (a0) net_emit_expr(a0); else net_ldstr("1");
+            N("    call       string %s::net_array_new(string)\n", net_classname);
+            N("    ldc.i4.1\n");
+            N("    stloc.0\n");
+            break;
+        }
+        /* TABLE([n]) — create associative table, return a table-id string */
+        if (strcasecmp(fn, "TABLE") == 0) {
+            net_need_array_helpers = 1;
+            net_ldstr("0");
+            N("    call       string %s::net_array_new(string)\n", net_classname);
+            N("    ldc.i4.1\n");
+            N("    stloc.0\n");
+            break;
+        }
+        /* DATA('proto') — register a data type, return "" */
+        if (strcasecmp(fn, "DATA") == 0) {
+            net_need_data_helpers = 1;
+            EXPR_t *a0 = expr_arg(e, 0);
+            if (a0) net_emit_expr(a0); else net_ldstr("");
+            N("    call       void %s::net_data_define(string)\n", net_classname);
+            net_ldstr("");
+            N("    ldc.i4.1\n");
+            N("    stloc.0\n");
+            break;
+        }
+        /* DATA type constructor call: typename(field1val, ...) */
+        {
+            const NetDataType *dt = net_find_data_type(fn);
+            if (dt) {
+                net_need_data_helpers  = 1;
+                net_need_array_helpers = 1;
+                /* allocate new array (size=0 → plain table) */
+                net_ldstr("0");
+                N("    call       string %s::net_array_new(string)\n", net_classname);
+                /* store each field */
+                for (int fi = 0; fi < dt->nfields; fi++) {
+                    N("    dup\n");
+                    net_ldstr(dt->fields[fi]);
+                    EXPR_t *fv = expr_arg(e, fi);
+                    if (fv) net_emit_expr(fv); else net_ldstr("");
+                    N("    call       void %s::net_array_put(string, string, string)\n", net_classname);
+                }
+                /* store __type__ */
+                N("    dup\n");
+                net_ldstr("__type__");
+                net_ldstr(fn);
+                N("    call       void %s::net_array_put(string, string, string)\n", net_classname);
+                N("    ldc.i4.1\n");
+                N("    stloc.0\n");
+                break;
+            }
+        }
+        /* DATA field accessor: fieldname(instance) → field value */
+        {
+            const NetDataType *ft = net_find_data_field(fn);
+            if (ft) {
+                net_need_data_helpers  = 1;
+                net_need_array_helpers = 1;
+                EXPR_t *inst = expr_arg(e, 0);
+                if (inst) net_emit_expr(inst); else net_ldstr("");
+                net_ldstr(fn);
+                N("    call       string %s::net_array_get(string, string)\n", net_classname);
+                N("    ldc.i4.1\n");
+                N("    stloc.0\n");
+                break;
+            }
+        }
         /* User-defined function call */
         {
             const NetFnDef *ufn = net_find_fn(fn);
@@ -607,18 +758,52 @@ static void net_emit_expr(EXPR_t *e) {
         net_ldstr("");
         break;
     }
-    case E_CONC:
-        /* string concatenation: eval all arms, fold with String.Concat */
-        if (expr_nargs(e) > 0) {
-            net_emit_expr(expr_arg(e, 0));
-            for (int i = 1; i < expr_nargs(e); i++) {
-                net_emit_expr(expr_arg(e, i));
-                N("    call       string [mscorlib]System.String::Concat(string, string)\n");
+    case E_CONC: {
+        /* String concatenation with goal-directed short-circuit.
+         * After each child that can set local 0 = 0 (failure), check and branch
+         * to the statement fail label WITHOUT leaving any string on the stack.
+         * Stack discipline: after the check+branch the stack depth is the same
+         * as it was before this E_CONC started (zero strings contributed).
+         * On success path: one accumulated string remains on stack (as expected).
+         *
+         * CIL stack balance rule: every branch target must have consistent depth.
+         * Fail path: pop all accumulated strings, branch with depth unchanged.
+         * Success path: one string on stack (the concat result).
+         */
+        static int _cconc_uid = 0;
+        int conc_id = _cconc_uid++;
+        if (expr_nargs(e) == 0) { net_ldstr(""); break; }
+        /* depth_on_stack: how many strings we have accumulated on the eval stack
+         * when we reach a fail check.  We must pop this many before branching. */
+        net_emit_expr(expr_arg(e, 0));
+        /* depth = 1 (one string from first child) */
+        if (net_expr_can_fail(expr_arg(e, 0)) && net_cur_stmt_fail_label[0]) {
+            char lbl_ok[64]; snprintf(lbl_ok, sizeof lbl_ok, "Ncc%d_ok0", conc_id);
+            N("    ldloc.0\n");
+            N("    brtrue     %s\n", lbl_ok);
+            /* fail: 1 string on stack — pop it, then branch with depth=0 */
+            N("    pop\n");
+            N("    br         L_%s\n", net_cur_stmt_fail_label);
+            N("  %s:\n", lbl_ok);
+        }
+        for (int i = 1; i < expr_nargs(e); i++) {
+            net_emit_expr(expr_arg(e, i));
+            /* stack: accumulated(1) + new_child(1) = 2 strings before Concat */
+            if (net_expr_can_fail(expr_arg(e, i)) && net_cur_stmt_fail_label[0]) {
+                char lbl_ok[64]; snprintf(lbl_ok, sizeof lbl_ok, "Ncc%d_ok%d", conc_id, i);
+                N("    ldloc.0\n");
+                N("    brtrue     %s\n", lbl_ok);
+                /* fail: 2 strings on stack (accumulated + new child) — pop both */
+                N("    pop\n");
+                N("    pop\n");
+                N("    br         L_%s\n", net_cur_stmt_fail_label);
+                N("  %s:\n", lbl_ok);
             }
-        } else {
-            net_ldstr("");
+            N("    call       string [mscorlib]System.String::Concat(string, string)\n");
+            /* after Concat: 1 string on stack */
         }
         break;
+    }
     case E_OR:
         /* Pattern alternation used as an expression value (e.g. P = 'a' | 'b').
          * The string value is a placeholder — pattern matching uses the structural
@@ -645,11 +830,39 @@ static void net_emit_expr(EXPR_t *e) {
         net_emit_expr(expr_arg(e, 1));
         N("    call       string [snobol4lib]Snobol4Lib::sno_div(string, string)\n");
         break;
+    case E_EXPOP:
+        net_emit_expr(expr_arg(e, 0));
+        net_emit_expr(expr_arg(e, 1));
+        N("    call       string [snobol4lib]Snobol4Lib::sno_pow(string, string)\n");
+        break;
     case E_MNS:
         /* unary minus */
         net_emit_expr(expr_arg(e, 0));
         N("    call       string [snobol4lib]Snobol4Lib::sno_neg(string)\n");
         break;
+    case E_ARY: {
+        /* varname<subscript> — indexed array/table read */
+        net_need_array_helpers = 1;
+        char fn_ary[256];
+        net_field_name(fn_ary, sizeof fn_ary, e->sval ? e->sval : "");
+        N("    ldsfld     string %s::%s\n", net_classname, fn_ary);
+        EXPR_t *sub_ary = (e->nchildren > 0 && e->children) ? e->children[0] : NULL;
+        if (sub_ary) net_emit_expr(sub_ary); else net_ldstr("1");
+        N("    call       string %s::net_array_get(string, string)\n", net_classname);
+        break;
+    }
+    case E_IDX: {
+        /* expr[subscript] — subscript on expression value (TABLE or DATA) */
+        net_need_array_helpers = 1;
+        if (e->nchildren >= 1 && e->children && e->children[0])
+            net_emit_expr(e->children[0]);
+        else net_ldstr("");
+        if (e->nchildren >= 2 && e->children && e->children[1])
+            net_emit_expr(e->children[1]);
+        else net_ldstr("0");
+        N("    call       string %s::net_array_get(string, string)\n", net_classname);
+        break;
+    }
     default:
         /* unhandled — push empty string stub */
         NC("unhandled expr kind — stub");
@@ -681,15 +894,22 @@ static void net_emit_goto(const char *target, const char *next_lbl) {
 }
 
 static void net_emit_branch_success(const char *target) {
-    /* local 0 = success flag (1=success,0=fail); brtrue if success */
     if (!target) return;
     N("    ldloc.0\n");
+    if (net_cur_fn) {
+        if (strcasecmp(target, "RETURN")  == 0) { N("    brtrue     %s\n", net_fn_return_lbl);  return; }
+        if (strcasecmp(target, "FRETURN") == 0) { N("    brtrue     %s\n", net_fn_freturn_lbl); return; }
+    }
     N("    brtrue     L_%s\n", target);
 }
 
 static void net_emit_branch_fail(const char *target) {
     if (!target) return;
     N("    ldloc.0\n");
+    if (net_cur_fn) {
+        if (strcasecmp(target, "RETURN")  == 0) { N("    brfalse    %s\n", net_fn_return_lbl);  return; }
+        if (strcasecmp(target, "FRETURN") == 0) { N("    brfalse    %s\n", net_fn_freturn_lbl); return; }
+    }
     N("    brfalse    L_%s\n", target);
 }
 
@@ -771,7 +991,23 @@ static void net_emit_pat_node(EXPR_t *pat,
     }
 
     case E_CONC: {
-        /* SEQ: chain gamma/omega through each arm left-to-right */
+        /* SEQ: chain gamma/omega left-to-right.
+         *
+         * Deferred-commit for NAM(ARB,...):
+         *   ARB backtracks by trying cursor+0, +1, +2 ...  If the capture
+         *   target is OUTPUT, firing Console.WriteLine on every candidate
+         *   produces spurious lines.  Solution:
+         *     1. Pre-scan children for NAM(ARB,...) occurrences.
+         *     2. If any found, the last child's gamma becomes lbl_dc
+         *        (deferred-commit label) instead of the outer gamma.
+         *     3. NAM(ARB,...) children store the captured substring in a
+         *        temp string slot without side-effects.
+         *     4. lbl_dc emits all committed stores, then branches to gamma.
+         *
+         * seq_omega is stored in a local buffer (not pointing into the
+         * global net_arb_incr_label) so clearing that global after capture
+         * does not clobber the accumulated omega value.
+         */
         int nkids = expr_nargs(pat);
         if (nkids == 0) { N("    br         %s\n", gamma); break; }
         if (nkids == 1) {
@@ -779,25 +1015,106 @@ static void net_emit_pat_node(EXPR_t *pat,
                               loc_subj, loc_cursor, loc_len, p_next_int, p_next_str);
             break;
         }
+
+        /* Pre-scan: detect NAM(ARB,...) children */
+        #define SEQ_MAX_DEF 8
+        static int  def_slot_s[SEQ_MAX_DEF];
+        static char def_var_s[SEQ_MAX_DEF][256];
+        int ndef = 0;
+        int has_dc = 0;
+        for (int i = 0; i < nkids; i++) {
+            EXPR_t *c = expr_arg(pat, i);
+            if (c && c->kind == E_NAM) {
+                EXPR_t *lc = expr_left(c);
+                if (lc && ((lc->kind == E_FNC  && lc->sval && strcasecmp(lc->sval,"ARB")==0) ||
+                           (lc->kind == E_VART && lc->sval && strcasecmp(lc->sval,"ARB")==0)))
+                    has_dc = 1;
+            }
+        }
+
+        char lbl_dc[64];
+        snprintf(lbl_dc, sizeof lbl_dc, "Nn%d_dc", uid);
+        /* true_gamma: last child aims here; if deferred commits needed, it's lbl_dc */
+        const char *true_gamma = has_dc ? lbl_dc : gamma;
+
+        /* Build mid-point label array */
         char **mids = malloc(nkids * sizeof(char *));
         for (int i = 0; i < nkids - 1; i++) {
             mids[i] = malloc(64);
-            snprintf(mids[i], 64, "Nn%d_seq_m%d", uid, i);
+            snprintf(mids[i], 64, "Nn%d_sm%d", uid, i);
         }
-        const char *seq_omega = omega;  /* may be overridden after ARB */
+
+        char seq_omega_buf[128];
+        snprintf(seq_omega_buf, sizeof seq_omega_buf, "%s", omega);
+        const char *seq_omega = seq_omega_buf;
+
         for (int i = 0; i < nkids; i++) {
-            const char *kg = (i < nkids - 1) ? mids[i] : gamma;
+            EXPR_t *child = expr_arg(pat, i);
+            /* Last child uses true_gamma (may be lbl_dc); others use mids */
+            const char *kg = (i < nkids - 1) ? mids[i] : true_gamma;
             net_arb_incr_label[0] = '\0';
-            net_emit_pat_node(expr_arg(pat, i), kg, seq_omega,
-                              loc_subj, loc_cursor, loc_len, p_next_int, p_next_str);
-            /* If this child was ARB, subsequent children should use ARB's
-             * increment label as their omega (backtrack into ARB). */
+
+            /* NAM(ARB,...) — deferred capture */
+            int is_nam_arb = 0;
+            if (child && child->kind == E_NAM) {
+                EXPR_t *lc = expr_left(child);
+                if (lc && ((lc->kind == E_FNC  && lc->sval && strcasecmp(lc->sval,"ARB")==0) ||
+                           (lc->kind == E_VART && lc->sval && strcasecmp(lc->sval,"ARB")==0)))
+                    is_nam_arb = 1;
+            }
+
+            if (is_nam_arb && ndef < SEQ_MAX_DEF) {
+                EXPR_t *arb_child = expr_left(child);
+                const char *capvar = (expr_right(child) && expr_right(child)->sval)
+                                     ? expr_right(child)->sval : "";
+                int loc_bef = (*p_next_int)++;
+                int loc_tmp = (*p_next_str)++;
+                char lbl_arb_ok[64];
+                snprintf(lbl_arb_ok, sizeof lbl_arb_ok, "Nn%d_%d_aok", uid, i);
+
+                net_ldloc_i(loc_cursor); net_stloc_i(loc_bef);
+                net_emit_pat_node(arb_child, lbl_arb_ok, seq_omega,
+                                  loc_subj, loc_cursor, loc_len, p_next_int, p_next_str);
+                N("  %s:\n", lbl_arb_ok);
+                /* Tentative capture — no side-effect */
+                net_ldloc_i(loc_subj); net_ldloc_i(loc_bef);
+                net_ldloc_i(loc_cursor); net_ldloc_i(loc_bef); N("    sub\n");
+                N("    callvirt   instance string [mscorlib]System.String::Substring(int32, int32)\n");
+                net_stloc_s(loc_tmp);
+                N("    br         %s\n", kg);
+
+                def_slot_s[ndef] = loc_tmp;
+                snprintf(def_var_s[ndef], 256, "%s", capvar);
+                ndef++;
+            } else {
+                net_emit_pat_node(child, kg, seq_omega,
+                                  loc_subj, loc_cursor, loc_len, p_next_int, p_next_str);
+            }
+
+            /* Update seq_omega if ARB was just emitted */
             if (net_arb_incr_label[0]) {
-                seq_omega = net_arb_incr_label;
+                snprintf(seq_omega_buf, sizeof seq_omega_buf, "%s", net_arb_incr_label);
                 net_arb_incr_label[0] = '\0';
             }
             if (i < nkids - 1) N("  %s:\n", mids[i]);
         }
+
+        /* Deferred-commit block — only reachable when all SEQ children succeed */
+        if (has_dc) {
+            N("  %s:\n", lbl_dc);
+            for (int d = 0; d < ndef; d++) {
+                net_ldloc_s(def_slot_s[d]);
+                if (net_is_output(def_var_s[d])) {
+                    N("    call       void [mscorlib]System.Console::WriteLine(string)\n");
+                } else {
+                    char fn[256]; net_field_name(fn, sizeof fn, def_var_s[d]);
+                    N("    stsfld     string %s::%s\n", net_classname, fn);
+                }
+            }
+            N("    br         %s\n", gamma);
+        }
+        #undef SEQ_MAX_DEF
+
         for (int i = 0; i < nkids - 1; i++) free(mids[i]);
         free(mids);
         break;
@@ -834,12 +1151,12 @@ static void net_emit_pat_node(EXPR_t *pat,
     }
 
     case E_NAM: {
-        int loc_before = (*p_next_int)++;  /* int32: cursor before capture */
+        int loc_before = (*p_next_int)++;
         char lbl_ok[64]; snprintf(lbl_ok, sizeof lbl_ok, "Nn%d_nam_ok", uid);
+        const char *varname = (expr_right(pat) && expr_right(pat)->sval) ? expr_right(pat)->sval : "";
         net_ldloc_i(loc_cursor); net_stloc_i(loc_before);
         net_emit_pat_node(expr_left(pat), lbl_ok, omega, loc_subj, loc_cursor, loc_len, p_next_int, p_next_str);
         N("  %s:\n", lbl_ok);
-        const char *varname = (expr_right(pat) && expr_right(pat)->sval) ? expr_right(pat)->sval : "";
         net_ldloc_i(loc_subj); net_ldloc_i(loc_before);
         net_ldloc_i(loc_cursor); net_ldloc_i(loc_before); N("    sub\n");
         N("    callvirt   instance string [mscorlib]System.String::Substring(int32, int32)\n");
@@ -985,6 +1302,39 @@ static void net_emit_pat_node(EXPR_t *pat,
             net_ldloc_i(loc_cursor); N("    ldc.i4.1\n"); N("    add\n"); net_stloc_i(loc_cursor);
             N("    br         %s\n", lbl_loop);
             N("  %s:\n", lbl_done);
+            N("    br         %s\n", gamma);
+            break;
+        }
+
+        if (strcasecmp(fname, "BREAKX") == 0) {
+            /* BREAKX(x): like BREAK but fails if no chars consumed (cursor unchanged).
+             * Scans forward skipping chars NOT in x; if it reaches EOS, fails.
+             * Unlike BREAK it requires at least one char consumed.            */
+            int loc_cs   = (*p_next_str)++;
+            int loc_ch   = (*p_next_str)++;
+            int loc_save = (*p_next_int)++;
+            char lbl_loop[64], lbl_done[64];
+            snprintf(lbl_loop, sizeof lbl_loop, "Nn%d_brkx_lp", uid);
+            snprintf(lbl_done, sizeof lbl_done, "Nn%d_brkx_dn", uid);
+            if (arg0) net_pat_emit_expr(arg0); else N("    ldstr      \"\"\n");
+            net_stloc_s(loc_cs);
+            /* Save cursor to verify progress */
+            net_ldloc_i(loc_cursor); net_stloc_i(loc_save);
+            N("  %s:\n", lbl_loop);
+            net_ldloc_i(loc_cursor); net_ldloc_i(loc_len); N("    bge        %s\n", omega);
+            net_ldloc_i(loc_subj); net_ldloc_i(loc_cursor);
+            N("    callvirt   instance char [mscorlib]System.String::get_Chars(int32)\n");
+            N("    call       string [mscorlib]System.Char::ToString(char)\n");
+            net_stloc_s(loc_ch);
+            net_ldloc_s(loc_cs); net_ldloc_s(loc_ch);
+            N("    callvirt   instance bool [mscorlib]System.String::Contains(string)\n");
+            N("    brtrue     %s\n", lbl_done);
+            net_ldloc_i(loc_cursor); N("    ldc.i4.1\n"); N("    add\n"); net_stloc_i(loc_cursor);
+            N("    br         %s\n", lbl_loop);
+            N("  %s:\n", lbl_done);
+            /* BREAKX fails if no progress (cursor == save) */
+            net_ldloc_i(loc_cursor); net_ldloc_i(loc_save);
+            N("    beq        %s\n", omega);
             N("    br         %s\n", gamma);
             break;
         }
@@ -1167,6 +1517,55 @@ static void net_emit_pat_node(EXPR_t *pat,
         break;
     }
 
+    case E_INDR: {
+        /* *VAR — indirect pattern ref: get variable name, load its value,
+         * match the value as a literal string (same logic as VART literal path).
+         * Inner child (children[1] or children[0]) holds the E_VART whose sval
+         * is the variable NAME (not value) to dereference.                      */
+        EXPR_t *inner = (pat->nchildren > 1 && pat->children[1])
+                        ? pat->children[1] : pat->children[0];
+        const char *vname = (inner && inner->sval) ? inner->sval : "";
+        int loc_lit  = (*p_next_str)++;
+        int loc_llen = (*p_next_int)++;
+        char fn[256]; net_field_name(fn, sizeof fn, vname);
+        N("    ldsfld     string %s::%s\n", net_classname, fn);
+        net_stloc_s(loc_lit);
+        net_ldloc_s(loc_lit);
+        N("    callvirt   instance int32 [mscorlib]System.String::get_Length()\n");
+        net_stloc_i(loc_llen);
+        net_ldloc_i(loc_cursor); net_ldloc_i(loc_llen); N("    add\n");
+        net_ldloc_i(loc_len); N("    bgt        %s\n", omega);
+        net_ldloc_i(loc_subj); net_ldloc_i(loc_cursor); net_ldloc_i(loc_llen);
+        N("    callvirt   instance string [mscorlib]System.String::Substring(int32, int32)\n");
+        net_ldloc_s(loc_lit);
+        N("    call       bool [mscorlib]System.String::op_Equality(string, string)\n");
+        N("    brfalse    %s\n", omega);
+        net_ldloc_i(loc_cursor); net_ldloc_i(loc_llen); N("    add\n"); net_stloc_i(loc_cursor);
+        N("    br         %s\n", gamma);
+        break;
+    }
+
+    case E_ATP: {
+        /* @VAR — capture current cursor position (0-based) into var.
+         * Zero-width: does not advance cursor. Always succeeds.
+         * Stores integer string of current cursor position.
+         * Parser builds @VAR as unop(E_ATP, E_VART("VAR")), varname in children[0]->sval. */
+        const char *varname = (expr_left(pat) && expr_left(pat)->sval) ? expr_left(pat)->sval
+                            : (pat->sval ? pat->sval : "");
+        /* Convert cursor (int32) to string via Int32.ToString() */
+        net_ldloc_i(loc_cursor);
+        N("    box        [mscorlib]System.Int32\n");
+        N("    callvirt   instance string object::ToString()\n");
+        if (net_is_output(varname)) {
+            N("    call       void [mscorlib]System.Console::WriteLine(string)\n");
+        } else {
+            char fn[256]; net_field_name(fn, sizeof fn, varname);
+            N("    stsfld     string %s::%s\n", net_classname, fn);
+        }
+        N("    br         %s\n", gamma);
+        break;
+    }
+
     default:
         N("    // STUB: unhandled pattern node kind=%d\n", pat->kind);
         N("    br         %s\n", gamma);
@@ -1204,11 +1603,19 @@ static void net_emit_one_stmt(STMT_t *s, const char *next_lbl) {
         int is_out = net_is_output(s->subject->sval);
         EXPR_t *rhs = s->replacement;
 
-        /* Set fail label so INPUT inside rhs can branch directly on EOF */
-        if (tgt_f)
+        /* Set fail label so INPUT/CONC inside rhs can branch directly on failure.
+         * When tgt_f is NULL, generate a local skip label so that a failing
+         * sub-expression in the RHS (e.g. DIFFER()) can still abort the assignment. */
+        static int _asgn_uid = 0;
+        char local_fail_lbl[64];
+        int need_local_fail = 0;
+        if (tgt_f) {
             snprintf(net_cur_stmt_fail_label, sizeof net_cur_stmt_fail_label, "%s", tgt_f);
-        else
-            net_cur_stmt_fail_label[0] = '\0';
+        } else {
+            snprintf(local_fail_lbl, sizeof local_fail_lbl, "Nasgn%d_skip", _asgn_uid++);
+            snprintf(net_cur_stmt_fail_label, sizeof net_cur_stmt_fail_label, "%s", local_fail_lbl);
+            need_local_fail = 1;
+        }
 
         /* eval RHS onto stack */
         net_emit_expr(rhs);
@@ -1243,6 +1650,9 @@ static void net_emit_one_stmt(STMT_t *s, const char *next_lbl) {
             if (tgt_s) net_emit_branch_success(tgt_s);
             if (tgt_f) net_emit_branch_fail(tgt_f);
         }
+        /* emit local skip label if we generated one for RHS failure */
+        if (need_local_fail)
+            N("  L_%s:\n", local_fail_lbl);
         return;
     }
 
@@ -1264,6 +1674,69 @@ static void net_emit_one_stmt(STMT_t *s, const char *next_lbl) {
             if (tgt_f) net_emit_branch_fail(tgt_f);
         }
         return;
+    }
+
+    /* Case 1c: array/table subscript assignment — A<I> = expr or T<'key'> = expr */
+    if (s->has_eq && s->subject &&
+        (s->subject->kind == E_ARY || s->subject->kind == E_IDX) &&
+        !s->pattern) {
+        net_need_array_helpers = 1;
+        if (s->subject->kind == E_ARY) {
+            /* push array-id from the variable holding the array */
+            char fn_ary[256];
+            net_field_name(fn_ary, sizeof fn_ary, s->subject->sval ? s->subject->sval : "");
+            N("    ldsfld     string %s::%s\n", net_classname, fn_ary);
+            /* push subscript */
+            EXPR_t *sub = (s->subject->nchildren > 0 && s->subject->children)
+                          ? s->subject->children[0] : NULL;
+            if (sub) net_emit_expr(sub); else net_ldstr("1");
+        } else { /* E_IDX */
+            if (s->subject->nchildren >= 1 && s->subject->children && s->subject->children[0])
+                net_emit_expr(s->subject->children[0]);
+            else net_ldstr("");
+            if (s->subject->nchildren >= 2 && s->subject->children && s->subject->children[1])
+                net_emit_expr(s->subject->children[1]);
+            else net_ldstr("0");
+        }
+        /* push value */
+        if (!s->replacement || s->replacement->kind == E_NULV) net_ldstr("");
+        else net_emit_expr(s->replacement);
+        N("    call       void %s::net_array_put(string, string, string)\n", net_classname);
+        N("    ldc.i4.1\n");
+        N("    stloc.0\n");
+        if (tgt_u) net_emit_goto(tgt_u, next_lbl);
+        else {
+            if (tgt_s) net_emit_branch_success(tgt_s);
+            if (tgt_f) net_emit_branch_fail(tgt_f);
+        }
+        return;
+    }
+
+    /* Case 1d: DATA field setter — fieldname(instance) = val */
+    if (s->has_eq && s->subject && s->subject->kind == E_FNC && !s->pattern) {
+        const char *sfname = s->subject->sval ? s->subject->sval : "";
+        const NetDataType *ft = net_find_data_field(sfname);
+        if (ft) {
+            net_need_data_helpers  = 1;
+            net_need_array_helpers = 1;
+            /* push instance-id */
+            EXPR_t *inst = expr_arg(s->subject, 0);
+            if (inst) net_emit_expr(inst); else net_ldstr("");
+            /* push field name */
+            net_ldstr(sfname);
+            /* push value */
+            if (!s->replacement || s->replacement->kind == E_NULV) net_ldstr("");
+            else net_emit_expr(s->replacement);
+            N("    call       void %s::net_array_put(string, string, string)\n", net_classname);
+            N("    ldc.i4.1\n");
+            N("    stloc.0\n");
+            if (tgt_u) net_emit_goto(tgt_u, next_lbl);
+            else {
+                if (tgt_s) net_emit_branch_success(tgt_s);
+                if (tgt_f) net_emit_branch_fail(tgt_f);
+            }
+            return;
+        }
     }
 
     /* Case 2: bare expression predicate — no has_eq, subject only, no pattern */
@@ -1547,6 +2020,7 @@ static void net_emit_header(Program *prog) {
     N("  .field static string kw_stno\n");
     N("  .field static string kw_anchor\n");
     N("  .field static class [mscorlib]System.Collections.Generic.Dictionary`2<string,string> sno_vars\n");
+    N("  .field static class [mscorlib]System.Collections.Generic.Dictionary`2<string,class [mscorlib]System.Collections.Generic.Dictionary`2<string,string>> sno_arrays\n");
     N("\n");
 
     /* Static initialiser: set all variables to "" */
@@ -1566,6 +2040,8 @@ static void net_emit_header(Program *prog) {
         N("    stsfld     string %s::kw_anchor\n", net_classname);
         N("    newobj     instance void class [mscorlib]System.Collections.Generic.Dictionary`2<string,string>::.ctor()\n");
         N("    stsfld     class [mscorlib]System.Collections.Generic.Dictionary`2<string,string> %s::sno_vars\n", net_classname);
+        N("    newobj     instance void class [mscorlib]System.Collections.Generic.Dictionary`2<string,class [mscorlib]System.Collections.Generic.Dictionary`2<string,string>>::.ctor()\n");
+        N("    stsfld     class [mscorlib]System.Collections.Generic.Dictionary`2<string,class [mscorlib]System.Collections.Generic.Dictionary`2<string,string>> %s::sno_arrays\n", net_classname);
         N("    ret\n");
         N("  }\n");
         N("\n");
@@ -1667,6 +2143,22 @@ static const NetFnDef *net_find_fn(const char *name) {
     return NULL;
 }
 
+static const NetDataType *net_find_data_type(const char *name) {
+    for (int i = 0; i < net_data_type_count; i++)
+        if (net_data_types[i].type_name[0] && strcasecmp(net_data_types[i].type_name, name) == 0)
+            return &net_data_types[i];
+    return NULL;
+}
+
+static const NetDataType *net_find_data_field(const char *field) {
+    for (int i = 0; i < net_data_type_count; i++)
+        for (int j = 0; j < net_data_types[i].nfields; j++)
+            if (net_data_types[i].fields[j][0] &&
+                strcasecmp(net_data_types[i].fields[j], field) == 0)
+                return &net_data_types[i];
+    return NULL;
+}
+
 /* Parse DEFINE prototype string "fname(a,b)l1,l2" into NetFnDef. */
 static int net_parse_proto(const char *proto, NetFnDef *fn) {
     fn->nargs = 0; fn->nlocals = 0;
@@ -1718,10 +2210,44 @@ static const char *net_flatten_str(EXPR_t *e, char *buf, int sz) {
 
 static void net_scan_fndefs(Program *prog) {
     net_fn_count = 0;
+    net_data_type_count = 0;
     if (!prog) return;
     for (STMT_t *s = prog->head; s; s = s->next) {
         if (!s->subject || s->subject->kind != E_FNC) continue;
-        if (!s->subject->sval || strcasecmp(s->subject->sval, "DEFINE") != 0) continue;
+        const char *sname = s->subject->sval ? s->subject->sval : "";
+        /* Collect DATA type definitions */
+        if (strcasecmp(sname, "DATA") == 0) {
+            if (expr_nargs(s->subject) < 1) continue;
+            char pbuf[256];
+            const char *proto = net_flatten_str(expr_arg(s->subject, 0), pbuf, sizeof pbuf);
+            if (!proto || net_data_type_count >= NET_DATA_MAX) continue;
+            NetDataType *dt = &net_data_types[net_data_type_count];
+            memset(dt, 0, sizeof *dt);
+            int pi = 0, ti = 0;
+            while (proto[pi] && proto[pi] != '(' && ti < NET_FN_NAMELEN-1)
+                dt->type_name[ti++] = proto[pi++];
+            dt->type_name[ti] = '\0';
+            while (ti > 0 && (dt->type_name[ti-1]==' '||dt->type_name[ti-1]=='\t'))
+                dt->type_name[--ti] = '\0';
+            if (proto[pi] == '(') {
+                pi++;
+                while (proto[pi] && proto[pi] != ')') {
+                    while (proto[pi]==' '||proto[pi]=='\t') pi++;
+                    if (proto[pi]==')'||!proto[pi]) break;
+                    int j = 0; char fb[NET_FN_NAMELEN];
+                    while (proto[pi] && proto[pi]!=',' && proto[pi]!=')' && j < NET_FN_NAMELEN-1)
+                        fb[j++] = proto[pi++];
+                    while (j > 0 && (fb[j-1]==' '||fb[j-1]=='\t')) j--;
+                    fb[j] = '\0';
+                    if (j > 0 && dt->nfields < NET_FN_ARGMAX)
+                        snprintf(dt->fields[dt->nfields++], NET_FN_NAMELEN, "%s", fb);
+                    if (proto[pi]==',') pi++;
+                }
+            }
+            net_data_type_count++;
+            continue;
+        }
+        if (strcasecmp(sname, "DEFINE") != 0) continue;
         if (expr_nargs(s->subject) < 1) continue;
         char pbuf[256];
         const char *proto = net_flatten_str(expr_arg(s->subject, 0), pbuf, sizeof pbuf);
@@ -1783,39 +2309,43 @@ static void net_emit_fn_method(const NetFnDef *fn, Program *prog, int fn_idx) {
     }
     N(")\n\n");
 
-    /* Save old arg values */
+    /* Save old arg values — direct ldsfld, no reflection */
     for (int i = 0; i < fn->nargs; i++) {
-        N("    ldstr      \"%s\"\n", fn->args[i]);
-        N("    call       string %s::net_indr_get(string)\n", net_classname);
+        char af[256]; net_field_name(af, sizeof af, fn->args[i]);
+        N("    ldsfld     string %s::%s\n", net_classname, af);
         N("    stloc.s    V_%d\n", save_base + i);
     }
-    /* Save old local values */
+    /* Save old local values — direct ldsfld */
     for (int i = 0; i < fn->nlocals; i++) {
-        N("    ldstr      \"%s\"\n", fn->locals[i]);
-        N("    call       string %s::net_indr_get(string)\n", net_classname);
+        char lf[256]; net_field_name(lf, sizeof lf, fn->locals[i]);
+        N("    ldsfld     string %s::%s\n", net_classname, lf);
         N("    stloc.s    V_%d\n", save_base + fn->nargs + i);
     }
-    /* Save old fn-name value */
-    N("    ldstr      \"%s\"\n", fn->name);
-    N("    call       string %s::net_indr_get(string)\n", net_classname);
-    N("    stloc.s    V_%d\n", save_fnret);
+    /* Save old fn-name value — direct ldsfld */
+    {
+        char ff[256]; net_field_name(ff, sizeof ff, fn->name);
+        N("    ldsfld     string %s::%s\n", net_classname, ff);
+        N("    stloc.s    V_%d\n", save_fnret);
+    }
 
-    /* Bind incoming args: net_indr_set(name, arg_i) + update static field */
+    /* Bind incoming args — direct stsfld, no reflection */
     for (int i = 0; i < fn->nargs; i++) {
-        N("    ldstr      \"%s\"\n", fn->args[i]);
+        char af[256]; net_field_name(af, sizeof af, fn->args[i]);
         N("    ldarg.s    %d\n", i);
-        N("    call       void %s::net_indr_set(string, string)\n", net_classname);
+        N("    stsfld     string %s::%s\n", net_classname, af);
     }
-    /* Init locals to "" */
+    /* Init locals to "" — direct stsfld */
     for (int i = 0; i < fn->nlocals; i++) {
-        N("    ldstr      \"%s\"\n", fn->locals[i]);
+        char lf[256]; net_field_name(lf, sizeof lf, fn->locals[i]);
         N("    ldstr      \"\"\n");
-        N("    call       void %s::net_indr_set(string, string)\n", net_classname);
+        N("    stsfld     string %s::%s\n", net_classname, lf);
     }
-    /* Init fn-name var to "" */
-    N("    ldstr      \"%s\"\n", fn->name);
-    N("    ldstr      \"\"\n");
-    N("    call       void %s::net_indr_set(string, string)\n", net_classname);
+    /* Init fn-name var to "" — direct stsfld */
+    {
+        char ff[256]; net_field_name(ff, sizeof ff, fn->name);
+        N("    ldstr      \"\"\n");
+        N("    stsfld     string %s::%s\n", net_classname, ff);
+    }
 
     /* Return/freturn labels */
     snprintf(net_fn_return_lbl,  sizeof net_fn_return_lbl,  "Nfn%d_return",  fn_idx);
@@ -1850,44 +2380,44 @@ static void net_emit_fn_method(const NetFnDef *fn, Program *prog, int fn_idx) {
     }
     net_cur_fn = saved_fn;
 
-    /* RETURN path: restore, return fn->name value */
+    /* RETURN path: restore args/locals via direct stsfld, return fn->name value */
     N("  %s:\n", net_fn_return_lbl);
     for (int i = 0; i < fn->nargs; i++) {
-        N("    ldstr      \"%s\"\n", fn->args[i]);
+        char af[256]; net_field_name(af, sizeof af, fn->args[i]);
         N("    ldloc.s    V_%d\n", save_base + i);
-        N("    call       void %s::net_indr_set(string, string)\n", net_classname);
+        N("    stsfld     string %s::%s\n", net_classname, af);
     }
     for (int i = 0; i < fn->nlocals; i++) {
-        N("    ldstr      \"%s\"\n", fn->locals[i]);
+        char lf[256]; net_field_name(lf, sizeof lf, fn->locals[i]);
         N("    ldloc.s    V_%d\n", save_base + fn->nargs + i);
-        N("    call       void %s::net_indr_set(string, string)\n", net_classname);
+        N("    stsfld     string %s::%s\n", net_classname, lf);
     }
-    /* Get retval from static field (function body stores there via stsfld) */
+    /* Get retval from static field then restore fn-name field */
     {
         char fn_field[256]; net_field_name(fn_field, sizeof fn_field, fn->name);
         N("    ldsfld     string %s::%s\n", net_classname, fn_field);
+        N("    ldloc.s    V_%d\n", save_fnret);
+        N("    stsfld     string %s::%s\n", net_classname, fn_field);
     }
-    /* Restore fn name var */
-    N("    ldstr      \"%s\"\n", fn->name);
-    N("    ldloc.s    V_%d\n", save_fnret);
-    N("    call       void %s::net_indr_set(string, string)\n", net_classname);
     N("    ret\n");
 
-    /* FRETURN path: restore, return null */
+    /* FRETURN path: restore args/locals via direct stsfld, return null */
     N("  %s:\n", net_fn_freturn_lbl);
     for (int i = 0; i < fn->nargs; i++) {
-        N("    ldstr      \"%s\"\n", fn->args[i]);
+        char af[256]; net_field_name(af, sizeof af, fn->args[i]);
         N("    ldloc.s    V_%d\n", save_base + i);
-        N("    call       void %s::net_indr_set(string, string)\n", net_classname);
+        N("    stsfld     string %s::%s\n", net_classname, af);
     }
     for (int i = 0; i < fn->nlocals; i++) {
-        N("    ldstr      \"%s\"\n", fn->locals[i]);
+        char lf[256]; net_field_name(lf, sizeof lf, fn->locals[i]);
         N("    ldloc.s    V_%d\n", save_base + fn->nargs + i);
-        N("    call       void %s::net_indr_set(string, string)\n", net_classname);
+        N("    stsfld     string %s::%s\n", net_classname, lf);
     }
-    N("    ldstr      \"%s\"\n", fn->name);
-    N("    ldloc.s    V_%d\n", save_fnret);
-    N("    call       void %s::net_indr_set(string, string)\n", net_classname);
+    {
+        char fn_field[256]; net_field_name(fn_field, sizeof fn_field, fn->name);
+        N("    ldloc.s    V_%d\n", save_fnret);
+        N("    stsfld     string %s::%s\n", net_classname, fn_field);
+    }
     N("    ldnull\n");
     N("    ret\n");
     N("  }\n\n");
@@ -1896,6 +2426,94 @@ static void net_emit_fn_method(const NetFnDef *fn, Program *prog, int fn_idx) {
 static void net_emit_fn_methods(Program *prog) {
     for (int i = 0; i < net_fn_count; i++)
         net_emit_fn_method(&net_fn_table[i], prog, i);
+}
+
+/* Emit CIL helper methods for ARRAY/TABLE/DATA support */
+static void net_emit_array_helpers(void) {
+    /* Shorthand for the sno_arrays field type */
+    const char *AFT = "class [mscorlib]System.Collections.Generic.Dictionary`2<string,class [mscorlib]System.Collections.Generic.Dictionary`2<string,string>>";
+    const char *IFT = "class [mscorlib]System.Collections.Generic.Dictionary`2<string,string>";
+
+    if (net_need_array_helpers) {
+        /* net_array_new(string size) : string
+         * Creates a new inner Dictionary<string,string>, stores it in sno_arrays
+         * keyed by its hash code string, returns that key as the array-id. */
+        N("  .method static string net_array_new(string) cil managed\n");
+        N("  {\n");
+        N("    .maxstack 4\n");
+        N("    .locals init (%s V_0, string V_1, int32 V_2)\n", IFT);
+        N("    newobj     instance void %s::.ctor()\n", IFT);
+        N("    stloc.0\n");
+        /* id = RuntimeHelpers.GetHashCode(map) boxed to string */
+        N("    ldloc.0\n");
+        N("    call       int32 [mscorlib]System.Runtime.CompilerServices.RuntimeHelpers::GetHashCode(object)\n");
+        N("    stloc.2\n");
+        N("    ldloca.s   V_2\n");
+        N("    call       instance string [mscorlib]System.Int32::ToString()\n");
+        N("    stloc.1\n");
+        /* sno_arrays[id] = map */
+        N("    ldsfld     %s %s::sno_arrays\n", AFT, net_classname);
+        N("    ldloc.1\n");
+        N("    ldloc.0\n");
+        N("    callvirt   instance void %s::set_Item(!0, !1)\n", AFT);
+        N("    ldloc.1\n");
+        N("    ret\n");
+        N("  }\n\n");
+
+        /* net_array_get(string array_id, string key) : string */
+        N("  .method static string net_array_get(string, string) cil managed\n");
+        N("  {\n");
+        N("    .maxstack 4\n");
+        N("    .locals init (%s V_0, string V_1)\n", IFT);
+        N("    ldsfld     %s %s::sno_arrays\n", AFT, net_classname);
+        N("    ldarg.0\n");
+        N("    ldloca.s   V_0\n");
+        N("    callvirt   instance bool %s::TryGetValue(!0, !1&)\n", AFT);
+        N("    brfalse    Nag_miss\n");
+        N("    ldloc.0\n");
+        N("    ldarg.1\n");
+        N("    ldloca.s   V_1\n");
+        N("    callvirt   instance bool %s::TryGetValue(!0, !1&)\n", IFT);
+        N("    brfalse    Nag_miss\n");
+        N("    ldloc.1\n");
+        N("    ret\n");
+        N("  Nag_miss:\n");
+        N("    ldstr      \"\"\n");
+        N("    ret\n");
+        N("  }\n\n");
+
+        /* net_array_put(string array_id, string key, string val) : void */
+        N("  .method static void net_array_put(string, string, string) cil managed\n");
+        N("  {\n");
+        N("    .maxstack 4\n");
+        N("    .locals init (%s V_0)\n", IFT);
+        N("    ldsfld     %s %s::sno_arrays\n", AFT, net_classname);
+        N("    ldarg.0\n");
+        N("    ldloca.s   V_0\n");
+        N("    callvirt   instance bool %s::TryGetValue(!0, !1&)\n", AFT);
+        N("    brfalse    Nap_done\n");
+        N("    ldloc.0\n");
+        N("    ldarg.1\n");
+        N("    ldarg.2\n");
+        N("    callvirt   instance void %s::set_Item(!0, !1)\n", IFT);
+        N("  Nap_done:\n");
+        N("    ret\n");
+        N("  }\n\n");
+
+        net_need_array_helpers = 0;
+    }
+
+    if (net_need_data_helpers) {
+        /* net_data_define(string proto) : void
+         * proto = "typename(field1,field2,...)" — no-op at runtime, type is pre-parsed */
+        N("  .method static void net_data_define(string) cil managed\n");
+        N("  {\n");
+        N("    .maxstack 1\n");
+        N("    ret\n");
+        N("  }\n\n");
+
+        net_need_data_helpers = 0;
+    }
 }
 
 static void net_emit_footer(void) {
@@ -1926,6 +2544,7 @@ void net_emit(Program *prog, FILE *out, const char *filename) {
     net_emit_stmts(prog);
     net_emit_main_close();
     net_emit_fn_methods(prog);
+    net_emit_array_helpers();
     net_emit_footer();
 
     /* free registered variable names */

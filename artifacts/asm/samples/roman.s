@@ -32,14 +32,6 @@ fn_ROMAN_save_N_t        resq 1
 fn_ROMAN_save_N_p        resq 1
 fn_ROMAN_arg_0_t         resq 1
 fn_ROMAN_arg_0_p         resq 1
-P_T1_ret_γ              resq 1
-P_T1_ret_ω              resq 1
-P_R_ret_γ               resq 1
-P_R_ret_ω               resq 1
-P_N_ret_γ               resq 1
-P_N_ret_ω               resq 1
-P_T2_ret_γ              resq 1
-P_T2_ret_ω              resq 1
 scan_start_3             resq 1
 scan_start_4             resq 1
 dol_entry_T              resq 1
@@ -341,7 +333,17 @@ ucall1_done:
 ; ======================================================================================================================
 Ln_9:                       mov         edi, 16
                             call        comm_stno
-                            CONC2_VI    S_LT, S_N, 100000
+                            sub         rsp, 32
+                            lea         rdi, [rel S_N]
+                            call        stmt_get
+                            mov         [rbp-32], rax
+                            mov         [rbp-24], rdx
+                            STORE_ARG32 0
+                            LOAD_INT    100000
+                            STORE_ARG32 16
+                            APPLY_FN_N  S_LT, 2
+                            add         rsp, 32
+                            STORE_RESULT
                             mov         [conc_tmp0_rax], rax
                             mov         [conc_tmp0_rdx], rdx
                             CONC2_VI    S_add, S_N, 1
@@ -429,56 +431,6 @@ fn_ROMAN_gamma:             add         rsp, 56
 fn_ROMAN_omega:             add         rsp, 56
                             pop         rbp
                             jmp         [P_ROMAN_ret_ω]
-
-; P_T1_α (α entry)
-
-; UNIMPLEMENTED: TIME() → ω
-P_T1_α:
-P_T1_β:                     jmp         patdef_T1_omega
-;  γ/ω ---------------------------------------------------------------------------------------------------------------
-patdef_T1_gamma:
-;  T1 ==================================================================================================================
-                            jmp         [P_T1_ret_γ]
-patdef_T1_omega:            jmp         [P_T1_ret_ω]
-
-; P_R_α (α entry)
-
-; UNIMPLEMENTED: ROMAN() → ω
-P_R_α:
-P_R_β:                      jmp         patdef_R_omega
-;  γ/ω ---------------------------------------------------------------------------------------------------------------
-patdef_R_gamma:
-;  R ===================================================================================================================
-                            jmp         [P_R_ret_γ]
-patdef_R_omega:             jmp         [P_R_ret_ω]
-
-; P_N_α (α entry)
-P_N_α:                      jmp         seq_l7_alpha ; SEQ
-P_N_β:                      jmp         seq_r7_beta
-
-; UNIMPLEMENTED: LT() → ω
-seq_l7_alpha:
-seq_l7_beta:                jmp         patdef_N_omega
-
-; UNIMPLEMENTED node kind 8 → ω
-seq_r7_alpha:
-seq_r7_beta:                jmp         seq_l7_beta
-;  γ/ω ---------------------------------------------------------------------------------------------------------------
-patdef_N_gamma:
-;  N ===================================================================================================================
-                            jmp         [P_N_ret_γ]
-patdef_N_omega:             jmp         [P_N_ret_ω]
-
-; P_T2_α (α entry)
-
-; UNIMPLEMENTED: TIME() → ω
-P_T2_α:
-P_T2_β:                     jmp         patdef_T2_omega
-;  γ/ω ---------------------------------------------------------------------------------------------------------------
-patdef_T2_gamma:
-;  T2 ==================================================================================================================
-                            jmp         [P_T2_ret_γ]
-patdef_T2_omega:            jmp         [P_T2_ret_ω]
 
 section .text
 ;  STUB LABELS =========================================================================================================

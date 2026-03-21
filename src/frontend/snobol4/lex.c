@@ -154,8 +154,51 @@ static void join_file(FILE *fp, const char *fname, LineArray *out) {
 #define FLUSH() do { \
     if (!llen) break; \
     logical[llen] = '\0'; \
-    SnoLine sl = split_line(logical, llen, logical_lineno); \
-    la_push(out, sl); \
+    /* Semicolon multi-statement: split logical line on bare ';' (depth 0, \
+     * outside quotes), push each segment as its own SnoLine.  Only the  \
+     * first segment can carry a label (non-space column 1). Subsequent    \
+     * segments are body-only (prepend a space so split_line sees no label). */ \
+    { \
+        char seg_buf[65536]; \
+        const char *src = logical; \
+        int src_len = llen; \
+        int first_seg = 1; \
+        while (src_len >= 0) { \
+            int ci2 = find_goto_colon(src, src_len); \
+            int semi_end = (ci2 < -1) ? ((-ci2) - 1) : -1; \
+            int piece_len; \
+            const char *next_src; \
+            int next_len; \
+            if (semi_end < 0) { \
+                /* last (or only) piece */ \
+                piece_len = src_len; \
+                next_src  = src + src_len; \
+                next_len  = -1; /* sentinel: stop after this */ \
+            } else { \
+                piece_len = semi_end; \
+                next_src  = src + semi_end + 1; \
+                /* skip leading whitespace on continuation */ \
+                while (*next_src == ' ' || *next_src == '\t') { next_src++; } \
+                next_len  = (int)strlen(next_src); \
+            } \
+            /* Build segment string; for non-first segments prepend a space \
+             * so split_line treats them as label-less continuation lines. */ \
+            if (!first_seg) { \
+                seg_buf[0] = ' '; \
+                if (piece_len > 0) memcpy(seg_buf+1, src, (size_t)piece_len); \
+                seg_buf[piece_len+1] = '\0'; \
+                SnoLine sl2 = split_line(seg_buf, piece_len+1, logical_lineno); \
+                la_push(out, sl2); \
+            } else { \
+                SnoLine sl2 = split_line(src, piece_len, logical_lineno); \
+                la_push(out, sl2); \
+            } \
+            first_seg = 0; \
+            if (next_len < 0) break; \
+            src = next_src; \
+            src_len = next_len; \
+        } \
+    } \
     llen = 0; \
 } while(0)
 
