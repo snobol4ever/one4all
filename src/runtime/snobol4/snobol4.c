@@ -951,6 +951,12 @@ char *VARVAL_fn(DESCR_t v) {
         case DT_DATA:
             /* Trees stringify as their tag */
             return v.u ? GC_strdup(v.u->type->name) : GC_strdup("");
+        case DT_P:
+            return GC_strdup("PATTERN");
+        case DT_A:
+            return GC_strdup("ARRAY");
+        case DT_T:
+            return GC_strdup("TABLE");
         default:
             return GC_strdup("");
     }

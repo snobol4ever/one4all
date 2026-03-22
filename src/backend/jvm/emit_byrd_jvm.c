@@ -3057,7 +3057,8 @@ static void jvm_emit_runtime_helpers(void) {
 
     if (jvm_need_varmap || jvm_need_indr_helpers) {
         /* sno_var_put(String name, String val) → void
-         * Stores val into sno_vars HashMap for indirect access. */
+         * Stores val into sno_vars HashMap for indirect access.
+         * Also calls sno_mon_var(name,val) when MONITOR_FIFO is set (compiled trace pathway). */
         J(".method static sno_var_put(Ljava/lang/String;Ljava/lang/String;)V\n");
         J("    .limit stack 4\n");
         J("    .limit locals 2\n");
@@ -3080,6 +3081,65 @@ static void jvm_emit_runtime_helpers(void) {
         J("    aload_1\n");
         J("    invokevirtual java/util/HashMap/put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;\n");
         J("    pop\n");
+        /* Compiled trace pathway: emit VAR name "val" to MONITOR_FIFO if set */
+        {
+            char mmdesc[512];
+            snprintf(mmdesc, sizeof mmdesc,
+                "%s/sno_mon_var(Ljava/lang/String;Ljava/lang/String;)V", jvm_classname);
+            J("    aload_0\n");
+            J("    aload_1\n");
+            J("    invokestatic %s\n", mmdesc);
+        }
+        J("    return\n");
+        J(".end method\n\n");
+
+        /* sno_mon_var(String name, String val) → void
+         * Compiled trace pathway: writes "VAR name \"val\"\n" to MONITOR_FIFO.
+         * Gated on System.getenv("MONITOR_FIFO") — no-op if not set.
+         * This mirrors comm_var() in snobol4.c for the ASM/C runtime pathway. */
+        J(".method static sno_mon_var(Ljava/lang/String;Ljava/lang/String;)V\n");
+        J("    .limit stack 6\n");
+        J("    .limit locals 4\n");
+        /* locals: 0=name, 1=val, 2=fifo-path String, 3=line String */
+        J("    ldc \"MONITOR_FIFO\"\n");
+        J("    invokestatic java/lang/System/getenv(Ljava/lang/String;)Ljava/lang/String;\n");
+        J("    astore_2\n");
+        J("    aload_2\n");
+        J("    ifnull Lsmv_done\n");
+        J("    aload_2\n");
+        J("    invokevirtual java/lang/String/isEmpty()Z\n");
+        J("    ifne Lsmv_done\n");
+        /* Build: "VAR " + name + " \"" + val + "\"\n" */
+        J("    new java/lang/StringBuilder\n");
+        J("    dup\n");
+        J("    invokespecial java/lang/StringBuilder/<init>()V\n");
+        J("    ldc \"VAR \"\n");
+        J("    invokevirtual java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n");
+        J("    aload_0\n");
+        J("    invokevirtual java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n");
+        J("    ldc \" \\\"\"\n");
+        J("    invokevirtual java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n");
+        J("    aload_1\n");
+        J("    invokevirtual java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n");
+        J("    ldc \"\\\"\\n\"\n");
+        J("    invokevirtual java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n");
+        J("    invokevirtual java/lang/StringBuilder/toString()Ljava/lang/String;\n");
+        J("    astore_3\n");
+        /* Write via PrintStream to the FIFO path using FileOutputStream(path, append=true) */
+        /* Wrapped in try/catch IOException — silently ignore write failures */
+        J("    aload_2\n");
+        J("    iconst_1\n");
+        J("    new java/io/FileOutputStream\n");
+        J("    dup\n");
+        J("    aload_2\n");
+        J("    iconst_1\n");
+        J("    invokespecial java/io/FileOutputStream/<init>(Ljava/lang/String;Z)V\n");
+        /* stack: fos */
+        J("    aload_3\n");
+        J("    ldc \"UTF-8\"\n");
+        J("    invokevirtual java/lang/String/getBytes(Ljava/lang/String;)[B\n");
+        J("    invokevirtual java/io/FileOutputStream/write([B)V\n");
+        J("Lsmv_done:\n");
         J("    return\n");
         J(".end method\n\n");
 

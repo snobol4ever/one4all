@@ -1634,10 +1634,22 @@ static void net_emit_one_stmt(STMT_t *s, const char *next_lbl) {
             else
                 N("    pop\n");  /* unknown keyword: discard */
         } else {
-            /* VAR = expr → stsfld */
+            /* VAR = expr → stsfld + compiled trace pathway */
             char fn[256];
             net_field_name(fn, sizeof fn, s->subject->sval);
+            /* dup val before stsfld so we can pass it to net_mon_var */
+            N("    dup\n");
             N("    stsfld     string %s::%s\n", net_classname, fn);
+            /* stack now has: val (the dup copy). Push name, swap → (name, val) */
+            {
+                /* Variable names are plain ASCII identifiers — no escaping needed */
+                const char *varname = s->subject->sval ? s->subject->sval : "";
+                N("    ldstr      \"%s\"\n", varname);
+                N("    swap\n");  /* stack: val name → name val */
+                char mndesc[512];
+                snprintf(mndesc, sizeof mndesc, "void %s::net_mon_var(string, string)", net_classname);
+                N("    call       %s\n", mndesc);
+            }
         }
 
         /* success: set flag=1 */
@@ -2090,6 +2102,53 @@ static void net_emit_header(Program *prog) {
     N("  Nis_nofld:\n");
     N("    pop\n");
     N("  Nis_done:\n");
+    N("    ret\n");
+    N("  }\n\n");
+
+    /* net_mon_var(string name, string val) -> void
+     * Compiled trace pathway: writes "VAR name \"val\"\n" to MONITOR_FIFO.
+     * Gated on Environment.GetEnvironmentVariable("MONITOR_FIFO") — no-op if unset.
+     * Mirrors comm_var() in snobol4.c for the ASM/C runtime pathway. */
+    N("  .method static void net_mon_var(string name, string val) cil managed\n");
+    N("  {\n");
+    N("    .maxstack 8\n");
+    N("    .locals init (string V_fifo, string V_line, class [mscorlib]System.IO.StreamWriter V_sw)\n");
+    /* local 0=fifo path, local 1=line string, local 2=StreamWriter */
+    N("    ldstr      \"MONITOR_FIFO\"\n");
+    N("    call       string [mscorlib]System.Environment::GetEnvironmentVariable(string)\n");
+    N("    stloc.0\n");
+    N("    ldloc.0\n");
+    N("    brfalse    Nmv_done\n");
+    N("    ldloc.0\n");
+    N("    callvirt   instance int32 [mscorlib]System.String::get_Length()\n");
+    N("    brfalse    Nmv_done\n");
+    /* Build: "VAR " + name + " \"" + val + "\"\n" */
+    N("    newobj     instance void [mscorlib]System.Text.StringBuilder::.ctor()\n");
+    N("    ldstr      \"VAR \"\n");
+    N("    callvirt   instance class [mscorlib]System.Text.StringBuilder [mscorlib]System.Text.StringBuilder::Append(string)\n");
+    N("    ldarg.0\n");
+    N("    callvirt   instance class [mscorlib]System.Text.StringBuilder [mscorlib]System.Text.StringBuilder::Append(string)\n");
+    N("    ldstr      \" \\\"\"\n");
+    N("    callvirt   instance class [mscorlib]System.Text.StringBuilder [mscorlib]System.Text.StringBuilder::Append(string)\n");
+    N("    ldarg.1\n");
+    N("    callvirt   instance class [mscorlib]System.Text.StringBuilder [mscorlib]System.Text.StringBuilder::Append(string)\n");
+    N("    ldstr      \"\\\"\\n\"\n");
+    N("    callvirt   instance class [mscorlib]System.Text.StringBuilder [mscorlib]System.Text.StringBuilder::Append(string)\n");
+    N("    callvirt   instance string [mscorlib]System.Text.StringBuilder::ToString()\n");
+    N("    stloc.1\n");
+    /* Open FIFO (append=true), write line, flush, close */
+    N("    ldloc.0\n");
+    N("    ldc.i4.1\n");
+    N("    newobj     instance void [mscorlib]System.IO.StreamWriter::.ctor(string, bool)\n");
+    N("    stloc.2\n");
+    N("    ldloc.2\n");
+    N("    ldloc.1\n");
+    N("    callvirt   instance void [mscorlib]System.IO.TextWriter::Write(string)\n");
+    N("    ldloc.2\n");
+    N("    callvirt   instance void [mscorlib]System.IO.StreamWriter::Flush()\n");
+    N("    ldloc.2\n");
+    N("    callvirt   instance void [mscorlib]System.IO.StreamWriter::Close()\n");
+    N("  Nmv_done:\n");
     N("    ret\n");
     N("  }\n\n");
     (void)prog;
