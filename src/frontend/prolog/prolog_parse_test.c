@@ -5,13 +5,13 @@
  * Acceptance: 0 parse errors, clause count matches expected.
  *
  * Build:
- *   gcc -I. -o pl_parse_test pl_parse_test.c pl_parse.c pl_lex.c \
- *       pl_atom.c pl_unify.c
+ *   gcc -I. -o pl_parse_test pl_parse_test.c prolog_parse.c pl_lex.c \
+ *       prolog_atom.c prolog_unify.c
  */
 
-#include "pl_parse.h"
-#include "pl_lex.h"
-#include "pl_atom.h"
+#include "prolog_parse.h"
+#include "prolog_lex.h"
+#include "prolog_atom.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,7 +33,7 @@ static void test_facts(void) {
         "person(brown).\n"
         "person(jones).\n"
         "person(smith).\n";
-    PlProgram *prog = pl_parse(src, "test_facts");
+    PlProgram *prog = prolog_parse(src, "test_facts");
     CHECK("facts: 0 errors",  prog->nerrors == 0);
     CHECK("facts: 3 clauses", prog->nclauses == 3);
     /* All three are facts (no body) */
@@ -41,7 +41,7 @@ static void test_facts(void) {
     for (PlClause *cl = prog->head; cl; cl = cl->next)
         if (cl->nbody != 0) all_facts = 0;
     CHECK("facts: all have empty body", all_facts);
-    pl_program_free(prog);
+    prolog_program_free(prog);
 }
 
 /* -------------------------------------------------------------------------
@@ -54,13 +54,13 @@ static void test_rule(void) {
         "    write(' Manager='), write(M),\n"
         "    write(' Teller='), write(T),\n"
         "    write('\\n').\n";
-    PlProgram *prog = pl_parse(src, "test_rule");
+    PlProgram *prog = prolog_parse(src, "test_rule");
     CHECK("rule: 0 errors",  prog->nerrors == 0);
     CHECK("rule: 1 clause",  prog->nclauses == 1);
     PlClause *cl = prog->head;
     CHECK("rule: head not null",  cl && cl->head != NULL);
     CHECK("rule: 5 body goals",   cl && cl->nbody == 7);
-    pl_program_free(prog);
+    prolog_program_free(prog);
 }
 
 /* -------------------------------------------------------------------------
@@ -70,13 +70,13 @@ static void test_cut(void) {
     const char *src =
         "differ(X, X) :- !, fail.\n"
         "differ(_, _).\n";
-    PlProgram *prog = pl_parse(src, "test_cut");
+    PlProgram *prog = prolog_parse(src, "test_cut");
     CHECK("cut: 0 errors",  prog->nerrors == 0);
     CHECK("cut: 2 clauses", prog->nclauses == 2);
     /* First clause body: [!, fail] */
     PlClause *cl1 = prog->head;
     CHECK("cut: first clause has 2 body goals", cl1 && cl1->nbody == 2);
-    pl_program_free(prog);
+    prolog_program_free(prog);
 }
 
 /* -------------------------------------------------------------------------
@@ -84,12 +84,12 @@ static void test_cut(void) {
  * ---------------------------------------------------------------------- */
 static void test_directive(void) {
     const char *src = ":- initialization(main).\n";
-    PlProgram *prog = pl_parse(src, "test_directive");
+    PlProgram *prog = prolog_parse(src, "test_directive");
     CHECK("directive: 0 errors",  prog->nerrors == 0);
     CHECK("directive: 1 clause",  prog->nclauses == 1);
     CHECK("directive: head null", prog->head && prog->head->head == NULL);
     CHECK("directive: 1 body goal", prog->head && prog->head->nbody == 1);
-    pl_program_free(prog);
+    prolog_program_free(prog);
 }
 
 /* -------------------------------------------------------------------------
@@ -99,10 +99,10 @@ static void test_lists(void) {
     const char *src =
         "member(X, [X|_]).\n"
         "member(X, [_|T]) :- member(X, T).\n";
-    PlProgram *prog = pl_parse(src, "test_lists");
+    PlProgram *prog = prolog_parse(src, "test_lists");
     CHECK("lists: 0 errors",  prog->nerrors == 0);
     CHECK("lists: 2 clauses", prog->nclauses == 2);
-    pl_program_free(prog);
+    prolog_program_free(prog);
 }
 
 /* -------------------------------------------------------------------------
@@ -114,10 +114,10 @@ static void test_arith(void) {
         "fib(1, 1).\n"
         "fib(N, F) :- N > 1, N1 is N - 1, N2 is N - 2,\n"
         "             fib(N1, F1), fib(N2, F2), F is F1 + F2.\n";
-    PlProgram *prog = pl_parse(src, "test_arith");
+    PlProgram *prog = prolog_parse(src, "test_arith");
     CHECK("arith: 0 errors",  prog->nerrors == 0);
     CHECK("arith: 3 clauses", prog->nclauses == 3);
-    pl_program_free(prog);
+    prolog_program_free(prog);
 }
 
 /* -------------------------------------------------------------------------
@@ -158,10 +158,10 @@ static const char *PUZZLE02 =
     "differ(_, _, _).\n";
 
 static void test_puzzle02(void) {
-    PlProgram *prog = pl_parse(PUZZLE02, "puzzle02");
+    PlProgram *prog = prolog_parse(PUZZLE02, "puzzle02");
     CHECK("puzzle02: 0 errors",     prog->nerrors == 0);
     CHECK("puzzle02: >= 16 clauses", prog->nclauses >= 16);
-    pl_program_free(prog);
+    prolog_program_free(prog);
 }
 
 /* -------------------------------------------------------------------------
@@ -171,25 +171,25 @@ static void test_pretty(void) {
     const char *src =
         "append([], L, L).\n"
         "append([H|T], L, [H|R]) :- append(T, L, R).\n";
-    PlProgram *prog = pl_parse(src, "test_pretty");
+    PlProgram *prog = prolog_parse(src, "test_pretty");
     CHECK("pretty: 0 errors",  prog->nerrors == 0);
     CHECK("pretty: 2 clauses", prog->nclauses == 2);
     /* Pretty-print to a string buffer; verify it contains 'append' */
     FILE *tmp = tmpfile();
-    pl_program_pretty(prog, tmp);
+    prolog_program_pretty(prog, tmp);
     rewind(tmp);
     char buf[1024]; int n = (int)fread(buf, 1, sizeof buf - 1, tmp);
     buf[n] = '\0';
     fclose(tmp);
     CHECK("pretty: output contains 'append'", strstr(buf, "append") != NULL);
-    pl_program_free(prog);
+    prolog_program_free(prog);
 }
 
 /* -------------------------------------------------------------------------
  * main
  * ---------------------------------------------------------------------- */
 int main(void) {
-    pl_atom_init();
+    prolog_atom_init();
 
     test_facts();
     test_rule();

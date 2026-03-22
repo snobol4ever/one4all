@@ -1,5 +1,5 @@
 /*
- * pl_parse.c — recursive-descent Prolog parser
+ * prolog_parse.c — recursive-descent Prolog parser
  *
  * Grammar (simplified Edinburgh/ISO Prolog):
  *
@@ -32,9 +32,9 @@
  * Slot indices are assigned in order of first appearance.
  */
 
-#include "pl_parse.h"
-#include "pl_lex.h"
-#include "pl_atom.h"
+#include "prolog_parse.h"
+#include "prolog_lex.h"
+#include "prolog_atom.h"
 #include "term.h"
 
 #include <stdio.h>
@@ -221,7 +221,7 @@ static Term *parse_primary(Parser *p) {
 
         case TK_STRING: {
             /* Treat "str" as an atom for now (no char-list lowering yet) */
-            int id = pl_atom_intern(tk.text);
+            int id = prolog_atom_intern(tk.text);
             return term_new_atom(id);
         }
 
@@ -235,13 +235,13 @@ static Term *parse_primary(Parser *p) {
                 Token rp = lexer_peek(&p->lx);
                 if (rp.kind == TK_RPAREN) lexer_next(&p->lx);
                 else perror_at(p, rp.line, "expected ) after args");
-                int fid = pl_atom_intern(tk.text);
+                int fid = prolog_atom_intern(tk.text);
                 Term *t = term_new_compound(fid, nargs, args);
                 free(args);
                 return t;
             }
             /* Plain atom */
-            int id = pl_atom_intern(tk.text);
+            int id = prolog_atom_intern(tk.text);
             return term_new_atom(id);
         }
 
@@ -263,7 +263,7 @@ static Term *parse_primary(Parser *p) {
             /* Prefix operator: \+ or - or not */
             if (strcmp(tk.text, "\\+") == 0 || strcmp(tk.text, "not") == 0) {
                 Term *arg = parse_term(p, 900);
-                int fid = pl_atom_intern(tk.text);
+                int fid = prolog_atom_intern(tk.text);
                 Term *args[1] = { arg };
                 return term_new_compound(fid, 1, args);
             }
@@ -274,7 +274,7 @@ static Term *parse_primary(Parser *p) {
                 if (num.kind == TK_FLOAT) return term_new_float(-num.fval);
             }
             /* Fallthrough: treat as atom */
-            int id = pl_atom_intern(tk.text);
+            int id = prolog_atom_intern(tk.text);
             return term_new_atom(id);
         }
 
@@ -317,7 +317,7 @@ static Term *parse_term(Parser *p, int max_prec) {
         Term *rhs = parse_term(p, rprec);
         if (!rhs) break;
 
-        int fid = pl_atom_intern(op->name);
+        int fid = prolog_atom_intern(op->name);
         Term *args[2] = { lhs, rhs };
         lhs = term_new_compound(fid, 2, args);
     }
@@ -331,7 +331,7 @@ static Term *parse_term(Parser *p, int max_prec) {
 static int count_conj(Term *t) {
     t = term_deref(t);
     if (!t) return 0;
-    int comma_id = pl_atom_intern(",");
+    int comma_id = prolog_atom_intern(",");
     if (t->tag == TT_COMPOUND && t->compound.functor == comma_id && t->compound.arity == 2)
         return count_conj(t->compound.args[0]) + count_conj(t->compound.args[1]);
     return 1;
@@ -340,7 +340,7 @@ static int count_conj(Term *t) {
 static int flatten_conj(Term *t, Term **buf, int idx) {
     t = term_deref(t);
     if (!t) return idx;
-    int comma_id = pl_atom_intern(",");
+    int comma_id = prolog_atom_intern(",");
     if (t->tag == TT_COMPOUND && t->compound.functor == comma_id && t->compound.arity == 2) {
         idx = flatten_conj(t->compound.args[0], buf, idx);
         idx = flatten_conj(t->compound.args[1], buf, idx);
@@ -400,10 +400,10 @@ static PlClause *parse_clause(Parser *p) {
 }
 
 /* =========================================================================
- * pl_parse — public entry point
+ * prolog_parse — public entry point
  * ======================================================================= */
-PlProgram *pl_parse(const char *src, const char *filename) {
-    pl_atom_init(); /* idempotent — safe to call multiple times */
+PlProgram *prolog_parse(const char *src, const char *filename) {
+    prolog_atom_init(); /* idempotent — safe to call multiple times */
 
     Parser p;
     lexer_init(&p.lx, src);
@@ -447,7 +447,7 @@ void term_pretty(Term *t, FILE *out) {
 
     switch (t->tag) {
         case TT_ATOM: {
-            const char *n = pl_atom_name(t->atom_id);
+            const char *n = prolog_atom_name(t->atom_id);
             if (!n) n = "?";
             /* Quote if needed */
             int needs_quote = !islower((unsigned char)n[0]) && n[0] != '[';
@@ -470,7 +470,7 @@ void term_pretty(Term *t, FILE *out) {
             fprintf(out, "%g", t->fval);
             break;
         case TT_COMPOUND: {
-            const char *fn = pl_atom_name(t->compound.functor);
+            const char *fn = prolog_atom_name(t->compound.functor);
             if (!fn) fn = "?";
             /* List notation */
             if (t->compound.functor == ATOM_DOT && t->compound.arity == 2) {
@@ -515,9 +515,9 @@ void term_pretty(Term *t, FILE *out) {
 }
 
 /* =========================================================================
- * pl_program_pretty — print all clauses
+ * prolog_program_pretty — print all clauses
  * ======================================================================= */
-void pl_program_pretty(PlProgram *prog, FILE *out) {
+void prolog_program_pretty(PlProgram *prog, FILE *out) {
     for (PlClause *cl = prog->head; cl; cl = cl->next) {
         if (!cl->head) {
             /* directive */
@@ -540,9 +540,9 @@ void pl_program_pretty(PlProgram *prog, FILE *out) {
 }
 
 /* =========================================================================
- * pl_program_free
+ * prolog_program_free
  * ======================================================================= */
-void pl_program_free(PlProgram *prog) {
+void prolog_program_free(PlProgram *prog) {
     PlClause *cl = prog->head;
     while (cl) {
         PlClause *next = cl->next;

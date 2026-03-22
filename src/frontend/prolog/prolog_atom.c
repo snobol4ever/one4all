@@ -1,11 +1,11 @@
 /*
- * pl_atom.c — atom interning table for the Prolog frontend
+ * prolog_atom.c — atom interning table for the Prolog frontend
  *
  * Uses a simple open-addressing hash table for O(1) average lookup,
  * plus a flat id→name array for O(1) reverse lookup.
  */
 
-#include "pl_atom.h"
+#include "prolog_atom.h"
 #include "term.h"
 
 #include <stdlib.h>
@@ -62,9 +62,9 @@ static void ht_grow(int new_size) {
 }
 
 /* -------------------------------------------------------------------------
- * pl_atom_intern
+ * prolog_atom_intern
  * ---------------------------------------------------------------------- */
-int pl_atom_intern(const char *name) {
+int prolog_atom_intern(const char *name) {
     if (!name) name = "";
 
     /* Lazy init */
@@ -107,27 +107,27 @@ int pl_atom_intern(const char *name) {
 }
 
 /* -------------------------------------------------------------------------
- * pl_atom_name
+ * prolog_atom_name
  * ---------------------------------------------------------------------- */
-const char *pl_atom_name(int id) {
+const char *prolog_atom_name(int id) {
     if (id < 0 || id >= atom_len) return NULL;
     return atom_names[id];
 }
 
 /* -------------------------------------------------------------------------
- * pl_atom_count
+ * prolog_atom_count
  * ---------------------------------------------------------------------- */
-int pl_atom_count(void) { return atom_len; }
+int prolog_atom_count(void) { return atom_len; }
 
 /* -------------------------------------------------------------------------
- * pl_atom_init — intern well-known atoms and populate globals
+ * prolog_atom_init — intern well-known atoms and populate globals
  * ---------------------------------------------------------------------- */
-void pl_atom_init(void) {
-    ATOM_DOT  = pl_atom_intern(".");
-    ATOM_NIL  = pl_atom_intern("[]");
-    ATOM_TRUE = pl_atom_intern("true");
-    ATOM_FAIL = pl_atom_intern("fail");
-    ATOM_CUT  = pl_atom_intern("!");
+void prolog_atom_init(void) {
+    ATOM_DOT  = prolog_atom_intern(".");
+    ATOM_NIL  = prolog_atom_intern("[]");
+    ATOM_TRUE = prolog_atom_intern("true");
+    ATOM_FAIL = prolog_atom_intern("fail");
+    ATOM_CUT  = prolog_atom_intern("!");
 }
 
 /* -------------------------------------------------------------------------
