@@ -42,6 +42,7 @@ RT_OBJS="$WORK/stmt_rt.o $WORK/snobol4.o $WORK/mock_includes.o $WORK/snobol4_pat
 run_test() {
     local sno="$1"
     local ref="${sno%.sno}.ref"
+    local input="${sno%.sno}.input"
     local name
     name=$(basename "$sno" .sno)
 
@@ -76,9 +77,11 @@ run_test() {
         return
     fi
 
-    # Run
+    # Run (feed .input file to stdin if present, else /dev/null to avoid blocking)
     local got
-    if ! got=$(timeout "$TIMEOUT" "$bin" 2>/dev/null); then
+    local stdin_src="/dev/null"
+    [[ -f "$input" ]] && stdin_src="$input"
+    if ! got=$(timeout "$TIMEOUT" "$bin" < "$stdin_src" 2>/dev/null); then
         local ec=$?
         if [[ $ec -eq 124 ]]; then
             echo -e "${YELLOW}TIMEOUT${RESET} $name"

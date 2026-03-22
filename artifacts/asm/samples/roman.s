@@ -20,7 +20,7 @@ extern  stmt_at_capture
 extern  kw_anchor
 extern  stmt_aref, stmt_aset, stmt_field_set
 extern  comm_stno
-extern  t2_alloc, t2_free, memcpy  ; T2 runtime
+extern  blk_alloc, blk_free, memcpy  ; per-invocation DATA block runtime
 global  cursor, subject_data, subject_len_val
 
 section .note.GNU-stack noalloc noexec nowrite progbits
@@ -145,7 +145,9 @@ dol5_child_β:               BREAK_β     brk6_saved, cursor, dol5_ω ; BREAK β
 dol5_γ:                     DOL_CAPTURE dol_entry_T, cursor, cap_T_buf, cap_T_len, subject_data, P_4_γ ; DOL γ — capture span
 dol5_ω:                     jmp         seq_l3_β ; DOL ω — child failed
 
-P_4_γ:                      SET_CAPTURE S_T, cap_T_buf, cap_T_len
+P_4_γ:                      mov         rax, [cursor]
+                            mov         [scan_start_4], rax
+                            SET_CAPTURE S_T, cap_T_buf, cap_T_len
                             jmp         Ln_4
 P_4_ω:                      cmp         qword [rel kw_anchor], 0
                             jne         scan_fail_tramp_1
@@ -182,7 +184,7 @@ Ln_4:                       mov         edi, 10
                             mov         [fn_ROMAN_arg_0_t], rax
                             mov         [fn_ROMAN_arg_0_p], rcx
                             mov         rdi, [rel box_ROMAN_data_size]
-                            call        t2_alloc
+                            call        blk_alloc
                             mov         rdi, rax
                             lea         rsi, [rel box_ROMAN_data_template]
                             mov         rdx, [rel box_ROMAN_data_size]
@@ -198,7 +200,7 @@ ucall0_ret_g:
                             pop         qword [P_ROMAN_ret_ω]
                             pop         rdi
                             mov         rsi, [rel box_ROMAN_data_size]
-                            call        t2_free
+                            call        blk_free
                             pop         rsi
                             pop         rdx
                             lea         rdi, [rel S_T]
@@ -227,7 +229,7 @@ ucall0_ret_o:
                             pop         qword [P_ROMAN_ret_ω]
                             pop         rdi
                             mov         rsi, [rel box_ROMAN_data_size]
-                            call        t2_free
+                            call        blk_free
                             pop         rsi
                             pop         rdx
                             lea         rdi, [rel S_T]
@@ -247,22 +249,23 @@ ucall0_done:
                             APPLY_FN_N  S_REPLACE, 3
                             add         rsp, 48
                             STORE_RESULT
-                            mov         [conc_tmp0_rax], rax
-                            mov         [conc_tmp0_rdx], rdx
+                            push        rdx
+                            push        rax
                             lea         rdi, [rel S_T]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
                             mov         rcx, rdx
                             mov         rdx, rax
-                            mov         rdi, [conc_tmp0_rax]
-                            mov         rsi, [conc_tmp0_rdx]
+                            pop         rdi
+                            pop         rsi
                             call        stmt_concat
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
-                            FAIL_BR     Ln_5
+                            FAIL_BR     Lf_5
                             SET_VAR     S_ROMAN
                             jmp         fn_ROMAN_γ     ; RETURN
+Lf_5:                       jmp         fn_ROMAN_ω     ; FRETURN
 
 Ln_5:
 ;  ROMAN_END ===========================================================================================================
@@ -304,7 +307,7 @@ L_LOOP_2:                   mov         edi, 15
                             mov         [fn_ROMAN_arg_0_t], rax
                             mov         [fn_ROMAN_arg_0_p], rcx
                             mov         rdi, [rel box_ROMAN_data_size]
-                            call        t2_alloc
+                            call        blk_alloc
                             mov         rdi, rax
                             lea         rsi, [rel box_ROMAN_data_template]
                             mov         rdx, [rel box_ROMAN_data_size]
@@ -320,7 +323,7 @@ ucall1_ret_g:
                             pop         qword [P_ROMAN_ret_ω]
                             pop         rdi
                             mov         rsi, [rel box_ROMAN_data_size]
-                            call        t2_free
+                            call        blk_free
                             pop         rsi
                             pop         rdx
                             lea         rdi, [rel S_T]
@@ -349,7 +352,7 @@ ucall1_ret_o:
                             pop         qword [P_ROMAN_ret_ω]
                             pop         rdi
                             mov         rsi, [rel box_ROMAN_data_size]
-                            call        t2_free
+                            call        blk_free
                             pop         rsi
                             pop         rdx
                             lea         rdi, [rel S_T]
@@ -379,13 +382,13 @@ Ln_9:                       mov         edi, 16
                             APPLY_FN_N  S_LT, 2
                             add         rsp, 32
                             STORE_RESULT
-                            mov         [conc_tmp0_rax], rax
-                            mov         [conc_tmp0_rdx], rdx
+                            push        rdx
+                            push        rax
                             CONC2_VI    S_add, S_N, 1
                             mov         rcx, rdx
                             mov         rdx, rax
-                            mov         rdi, [conc_tmp0_rax]
-                            mov         rsi, [conc_tmp0_rdx]
+                            pop         rdi
+                            pop         rsi
                             call        stmt_concat
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -414,13 +417,13 @@ Ln_11:                      mov         edi, 18
 Ln_12:                      mov         edi, 19
                             call        comm_stno
                             LOAD_STR    S_ms_CL_SP
-                            mov         [conc_tmp0_rax], rax
-                            mov         [conc_tmp0_rdx], rdx
+                            push        rdx
+                            push        rax
                             CONC2_VV    S_sub, S_T2, S_T1
                             mov         rcx, rdx
                             mov         rdx, rax
-                            mov         rdi, [conc_tmp0_rax]
-                            mov         rsi, [conc_tmp0_rdx]
+                            pop         rdi
+                            pop         rsi
                             call        stmt_concat
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -440,7 +443,7 @@ section .text
 
 ;  NAMED PATTERN BODIES ================================================================================================
 
-; P_ROMAN_α — user function α entry (1 param) [T2: r12=DATA]
+; P_ROMAN_α — user function α entry (1 param) [r12=DATA block]
 ;  ROMAN ===============================================================================================================
 P_ROMAN_α:                  FN_α_INIT   ROMAN
                             mov         rsi, [fn_ROMAN_arg_0_t]
@@ -470,11 +473,11 @@ box_ROMAN_reloc_count: dq 0
 box_ROMAN_reloc_table:
 ; (entries added by M-T2-INVOKE)
 
-;  T2 RELOCATION TABLES ================================================================================================
+;  BOX RELOCATION TABLES ===============================================================================================
 
 global  box_ROMAN_data_template, box_ROMAN_data_size
 section .data
-;  T2 DATA TEMPLATES ===================================================================================================
+;  BOX DATA TEMPLATES ==================================================================================================
                             align       8
 box_ROMAN_data_size: dq 64
 box_ROMAN_data_template:

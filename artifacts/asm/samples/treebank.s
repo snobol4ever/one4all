@@ -20,7 +20,7 @@ extern  stmt_at_capture
 extern  kw_anchor
 extern  stmt_aref, stmt_aset, stmt_field_set
 extern  comm_stno
-extern  t2_alloc, t2_free, memcpy  ; T2 runtime
+extern  blk_alloc, blk_free, memcpy  ; per-invocation DATA block runtime
 global  cursor, subject_data, subject_len_val
 
 section .note.GNU-stack noalloc noexec nowrite progbits
@@ -370,13 +370,13 @@ Ln_26:                      mov         edi, 58
                             APPLY_FN_N  S_GT, 2
                             add         rsp, 32
                             STORE_RESULT
-                            mov         [conc_tmp0_rax], rax
-                            mov         [conc_tmp0_rdx], rdx
+                            push        rdx
+                            push        rax
                             CONC2_VI    S_sub, S_i, 1
                             mov         rcx, rdx
                             mov         rdx, rax
-                            mov         rdi, [conc_tmp0_rax]
-                            mov         rsi, [conc_tmp0_rdx]
+                            pop         rdi
+                            pop         rsi
                             call        stmt_concat
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -571,13 +571,13 @@ Ln_46:                      mov         edi, 79
                             APPLY_FN_N  S_GT, 2
                             add         rsp, 32
                             STORE_RESULT
-                            mov         [conc_tmp0_rax], rax
-                            mov         [conc_tmp0_rdx], rdx
+                            push        rdx
+                            push        rax
                             CONC2_VI    S_sub, S_i, 1
                             mov         rcx, rdx
                             mov         rdx, rax
-                            mov         rdi, [conc_tmp0_rax]
-                            mov         rsi, [conc_tmp0_rdx]
+                            pop         rdi
+                            pop         rsi
                             call        stmt_concat
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -720,11 +720,13 @@ dol2_child_α: ; REF(word)
                             mov         [P_word_ret_γ], rax
                             lea         rax, [rel nref3_ω]
                             mov         [P_word_ret_ω], rax
+                            lea         r12, [rel box_word_data_template]
                             jmp         P_word_α
 dol2_child_β:               lea         rax, [rel nref3_γ] ; REF(%s)
                             mov         [P_word_ret_γ], rax
                             lea         rax, [rel nref3_ω]
                             mov         [P_word_ret_ω], rax
+                            lea         r12, [rel box_word_data_template]
                             jmp         P_word_β
 
 nref3_γ:
@@ -769,7 +771,7 @@ Ln_57:                      mov         edi, 93
                             mov         [fn_do_push_list_arg_0_t], rax
                             mov         [fn_do_push_list_arg_0_p], rcx
                             mov         rdi, [rel box_do_push_list_data_size]
-                            call        t2_alloc
+                            call        blk_alloc
                             mov         rdi, rax
                             lea         rsi, [rel box_do_push_list_data_template]
                             mov         rdx, [rel box_do_push_list_data_size]
@@ -785,7 +787,7 @@ ucall0_ret_g:
                             pop         qword [P_do_push_list_ret_ω]
                             pop         rdi
                             mov         rsi, [rel box_do_push_list_data_size]
-                            call        t2_free
+                            call        blk_free
                             pop         rsi
                             pop         rdx
                             lea         rdi, [rel S_v]
@@ -810,7 +812,7 @@ ucall0_ret_o:
                             pop         qword [P_do_push_list_ret_ω]
                             pop         rdi
                             mov         rsi, [rel box_do_push_list_data_size]
-                            call        t2_free
+                            call        blk_free
                             pop         rsi
                             pop         rdx
                             lea         rdi, [rel S_v]
@@ -873,7 +875,9 @@ seq_l6_β:                   POS_β       cursor, P_60_ω
 seq_r6_α:                   LIT_α1      40, seq_r6_α_saved, cursor, subject_data, subject_len_val, P_60_γ, seq_l6_β ; LIT α
 seq_r6_β:                   LIT_β       seq_r6_α_saved, cursor, seq_l6_β ; LIT β
 
-P_60_γ:                     jmp         L_group_recurse_20
+P_60_γ:                     mov         rax, [cursor]
+                            mov         [scan_start_60], rax
+                            jmp         L_group_recurse_20
 P_60_ω:                     cmp         qword [rel kw_anchor], 0
                             jne         Ln_60
                             mov         rax, [scan_start_60]
@@ -909,11 +913,13 @@ dol8_child_α: ; REF(word)
                             mov         [P_word_ret_γ], rax
                             lea         rax, [rel nref9_ω]
                             mov         [P_word_ret_ω], rax
+                            lea         r12, [rel box_word_data_template]
                             jmp         P_word_α
 dol8_child_β:               lea         rax, [rel nref9_γ] ; REF(%s)
                             mov         [P_word_ret_γ], rax
                             lea         rax, [rel nref9_ω]
                             mov         [P_word_ret_ω], rax
+                            lea         r12, [rel box_word_data_template]
                             jmp         P_word_β
 
 nref9_γ:
@@ -956,7 +962,7 @@ Ln_61:                      mov         edi, 97
                             mov         [fn_do_push_item_arg_0_t], rax
                             mov         [fn_do_push_item_arg_0_p], rcx
                             mov         rdi, [rel box_do_push_item_data_size]
-                            call        t2_alloc
+                            call        blk_alloc
                             mov         rdi, rax
                             lea         rsi, [rel box_do_push_item_data_template]
                             mov         rdx, [rel box_do_push_item_data_size]
@@ -972,7 +978,7 @@ ucall1_ret_g:
                             pop         qword [P_do_push_item_ret_ω]
                             pop         rdi
                             mov         rsi, [rel box_do_push_item_data_size]
-                            call        t2_free
+                            call        blk_free
                             pop         rsi
                             pop         rdx
                             lea         rdi, [rel S_v]
@@ -997,7 +1003,7 @@ ucall1_ret_o:
                             pop         qword [P_do_push_item_ret_ω]
                             pop         rdi
                             mov         rsi, [rel box_do_push_item_data_size]
-                            call        t2_free
+                            call        blk_free
                             pop         rsi
                             pop         rdx
                             lea         rdi, [rel S_v]
@@ -1024,7 +1030,7 @@ L_group_recurse_20:         mov         edi, 98
                             push        qword [P_group_ret_ω]
                             push        qword [P_group_ret_γ]
                             mov         rdi, [rel box_group_data_size]
-                            call        t2_alloc
+                            call        blk_alloc
                             mov         rdi, rax
                             lea         rsi, [rel box_group_data_template]
                             mov         rdx, [rel box_group_data_size]
@@ -1040,7 +1046,7 @@ ucall2_ret_g:
                             pop         qword [P_group_ret_ω]
                             pop         rdi
                             mov         rsi, [rel box_group_data_size]
-                            call        t2_free
+                            call        blk_free
                             pop         rsi
                             pop         rdx
                             lea         rdi, [rel S_tag]
@@ -1069,7 +1075,7 @@ ucall2_ret_o:
                             pop         qword [P_group_ret_ω]
                             pop         rdi
                             mov         rsi, [rel box_group_data_size]
-                            call        t2_free
+                            call        blk_free
                             pop         rsi
                             pop         rdx
                             lea         rdi, [rel S_tag]
@@ -1140,7 +1146,7 @@ Ln_64:                      mov         edi, 100
                             push        qword [P_do_pop_list_ret_ω]
                             push        qword [P_do_pop_list_ret_γ]
                             mov         rdi, [rel box_do_pop_list_data_size]
-                            call        t2_alloc
+                            call        blk_alloc
                             mov         rdi, rax
                             lea         rsi, [rel box_do_pop_list_data_template]
                             mov         rdx, [rel box_do_pop_list_data_size]
@@ -1156,7 +1162,7 @@ ucall3_ret_g:
                             pop         qword [P_do_pop_list_ret_ω]
                             pop         rdi
                             mov         rsi, [rel box_do_pop_list_data_size]
-                            call        t2_free
+                            call        blk_free
                             pop         rsi
                             pop         rdx
                             lea         rdi, [rel S_p]
@@ -1193,7 +1199,7 @@ ucall3_ret_o:
                             pop         qword [P_do_pop_list_ret_ω]
                             pop         rdi
                             mov         rsi, [rel box_do_pop_list_data_size]
-                            call        t2_free
+                            call        blk_free
                             pop         rsi
                             pop         rdx
                             lea         rdi, [rel S_p]
@@ -1261,11 +1267,16 @@ Ln_69:                      mov         edi, 108
                             APPLY_FN_N  S_DUPL, 2
                             add         rsp, 32
                             STORE_RESULT
-                            mov         [conc_tmp0_rax], rax
-                            mov         [conc_tmp0_rdx], rdx
+                            push        rdx
+                            push        rax
                             LOAD_STR    S_LP
-                            mov         [conc_tmp0_rax], rax
-                            mov         [conc_tmp0_rdx], rdx
+                            mov         rcx, rdx
+                            mov         rdx, rax
+                            pop         rdi
+                            pop         rsi
+                            call        stmt_concat
+                            push        rdx
+                            push        rax
                             lea         rdi, [rel S_a]
                             call        stmt_get
                             mov         [rbp-32], rax
@@ -1282,15 +1293,8 @@ Ln_69:                      mov         edi, 108
                             mov         [rbp-24], rdx
                             mov         rcx, rdx
                             mov         rdx, rax
-                            mov         rdi, [conc_tmp0_rax]
-                            mov         rsi, [conc_tmp0_rdx]
-                            call        stmt_concat
-                            mov         [rbp-32], rax
-                            mov         [rbp-24], rdx
-                            mov         rcx, rdx
-                            mov         rdx, rax
-                            mov         rdi, [conc_tmp0_rax]
-                            mov         rsi, [conc_tmp0_rdx]
+                            pop         rdi
+                            pop         rsi
                             call        stmt_concat
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -1371,7 +1375,7 @@ Ln_73:                      mov         edi, 112
                             mov         [fn_print_node_arg_1_t], rax
                             mov         [fn_print_node_arg_1_p], rcx
                             mov         rdi, [rel box_print_node_data_size]
-                            call        t2_alloc
+                            call        blk_alloc
                             mov         rdi, rax
                             lea         rsi, [rel box_print_node_data_template]
                             mov         rdx, [rel box_print_node_data_size]
@@ -1387,7 +1391,7 @@ ucall4_ret_g:
                             pop         qword [P_print_node_ret_ω]
                             pop         rdi
                             mov         rsi, [rel box_print_node_data_size]
-                            call        t2_free
+                            call        blk_free
                             pop         rsi
                             pop         rdx
                             lea         rdi, [rel S_i]
@@ -1424,7 +1428,7 @@ ucall4_ret_o:
                             pop         qword [P_print_node_ret_ω]
                             pop         rdi
                             mov         rsi, [rel box_print_node_data_size]
-                            call        t2_free
+                            call        blk_free
                             pop         rsi
                             pop         rdx
                             lea         rdi, [rel S_i]
@@ -1463,13 +1467,13 @@ L_print_node_cl_25:         mov         edi, 113
                             APPLY_FN_N  S_DUPL, 2
                             add         rsp, 32
                             STORE_RESULT
-                            mov         [conc_tmp0_rax], rax
-                            mov         [conc_tmp0_rdx], rdx
+                            push        rdx
+                            push        rax
                             LOAD_STR    S_RP
                             mov         rcx, rdx
                             mov         rdx, rax
-                            mov         rdi, [conc_tmp0_rax]
-                            mov         rsi, [conc_tmp0_rdx]
+                            pop         rdi
+                            pop         rsi
                             call        stmt_concat
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -1492,16 +1496,16 @@ L_print_leaf_23:            mov         edi, 114
                             APPLY_FN_N  S_DUPL, 2
                             add         rsp, 32
                             STORE_RESULT
-                            mov         [conc_tmp0_rax], rax
-                            mov         [conc_tmp0_rdx], rdx
+                            push        rdx
+                            push        rax
                             lea         rdi, [rel S_a]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
                             mov         rcx, rdx
                             mov         rdx, rax
-                            mov         rdi, [conc_tmp0_rax]
-                            mov         rsi, [conc_tmp0_rdx]
+                            pop         rdi
+                            pop         rsi
                             call        stmt_concat
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -1523,8 +1527,8 @@ Ln_77:                      mov         edi, 119
                             APPLY_FN_N  S_NOTANY, 1
                             add         rsp, 16
                             STORE_RESULT
-                            mov         [conc_tmp0_rax], rax
-                            mov         [conc_tmp0_rdx], rdx
+                            push        rdx
+                            push        rax
                             sub         rsp, 16
                             CAT2_SV     S_LP_SP_RP, S_NL
                             STORE_ARG32 0
@@ -1533,8 +1537,8 @@ Ln_77:                      mov         edi, 119
                             STORE_RESULT
                             mov         rcx, rdx
                             mov         rdx, rax
-                            mov         rdi, [conc_tmp0_rax]
-                            mov         rsi, [conc_tmp0_rdx]
+                            pop         rdi
+                            pop         rsi
                             call        stmt_concat
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -1568,13 +1572,27 @@ Ln_80:                      mov         edi, 127
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
-                            mov         [conc_tmp0_rax], rax
-                            mov         [conc_tmp0_rdx], rdx
-                            CAT2_VV     S_SPC, S_line
+                            push        rdx
+                            push        rax
+                            lea         rdi, [rel S_SPC]
+                            call        stmt_get
+                            mov         [rbp-32], rax
+                            mov         [rbp-24], rdx
                             mov         rcx, rdx
                             mov         rdx, rax
-                            mov         rdi, [conc_tmp0_rax]
-                            mov         rsi, [conc_tmp0_rdx]
+                            pop         rdi
+                            pop         rsi
+                            call        stmt_concat
+                            push        rdx
+                            push        rax
+                            lea         rdi, [rel S_line]
+                            call        stmt_get
+                            mov         [rbp-32], rax
+                            mov         [rbp-24], rdx
+                            mov         rcx, rdx
+                            mov         rdx, rax
+                            pop         rdi
+                            pop         rsi
                             call        stmt_concat
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -1613,7 +1631,7 @@ Ln_83:                      mov         edi, 132
                             mov         [fn_do_push_list_arg_0_t], rax
                             mov         [fn_do_push_list_arg_0_p], rcx
                             mov         rdi, [rel box_do_push_list_data_size]
-                            call        t2_alloc
+                            call        blk_alloc
                             mov         rdi, rax
                             lea         rsi, [rel box_do_push_list_data_template]
                             mov         rdx, [rel box_do_push_list_data_size]
@@ -1629,7 +1647,7 @@ ucall5_ret_g:
                             pop         qword [P_do_push_list_ret_ω]
                             pop         rdi
                             mov         rsi, [rel box_do_push_list_data_size]
-                            call        t2_free
+                            call        blk_free
                             pop         rsi
                             pop         rdx
                             lea         rdi, [rel S_v]
@@ -1654,7 +1672,7 @@ ucall5_ret_o:
                             pop         qword [P_do_push_list_ret_ω]
                             pop         rdi
                             mov         rsi, [rel box_do_push_list_data_size]
-                            call        t2_free
+                            call        blk_free
                             pop         rsi
                             pop         rdx
                             lea         rdi, [rel S_v]
@@ -1717,7 +1735,9 @@ seq_l13_β:                  POS_β       cursor, P_86_ω
 seq_r13_α:                  LIT_α1      40, seq_r13_α_saved, cursor, subject_data, subject_len_val, P_86_γ, seq_l13_β ; LIT α
 seq_r13_β:                  LIT_β       seq_r13_α_saved, cursor, seq_l13_β ; LIT β
 
-P_86_γ:                     jmp         Ln_86
+P_86_γ:                     mov         rax, [cursor]
+                            mov         [scan_start_86], rax
+                            jmp         Ln_86
 P_86_ω:                     cmp         qword [rel kw_anchor], 0
                             jne         L_parse_done_29
                             mov         rax, [scan_start_86]
@@ -1744,7 +1764,7 @@ Ln_86:                      mov         edi, 136
                             mov         [fn_do_push_list_arg_0_t], rax
                             mov         [fn_do_push_list_arg_0_p], rcx
                             mov         rdi, [rel box_do_push_list_data_size]
-                            call        t2_alloc
+                            call        blk_alloc
                             mov         rdi, rax
                             lea         rsi, [rel box_do_push_list_data_template]
                             mov         rdx, [rel box_do_push_list_data_size]
@@ -1760,7 +1780,7 @@ ucall6_ret_g:
                             pop         qword [P_do_push_list_ret_ω]
                             pop         rdi
                             mov         rsi, [rel box_do_push_list_data_size]
-                            call        t2_free
+                            call        blk_free
                             pop         rsi
                             pop         rdx
                             lea         rdi, [rel S_v]
@@ -1785,7 +1805,7 @@ ucall6_ret_o:
                             pop         qword [P_do_push_list_ret_ω]
                             pop         rdi
                             mov         rsi, [rel box_do_push_list_data_size]
-                            call        t2_free
+                            call        blk_free
                             pop         rsi
                             pop         rdx
                             lea         rdi, [rel S_v]
@@ -1811,7 +1831,7 @@ Ln_87:                      mov         edi, 137
                             push        qword [P_group_ret_ω]
                             push        qword [P_group_ret_γ]
                             mov         rdi, [rel box_group_data_size]
-                            call        t2_alloc
+                            call        blk_alloc
                             mov         rdi, rax
                             lea         rsi, [rel box_group_data_template]
                             mov         rdx, [rel box_group_data_size]
@@ -1827,7 +1847,7 @@ ucall7_ret_g:
                             pop         qword [P_group_ret_ω]
                             pop         rdi
                             mov         rsi, [rel box_group_data_size]
-                            call        t2_free
+                            call        blk_free
                             pop         rsi
                             pop         rdx
                             lea         rdi, [rel S_tag]
@@ -1856,7 +1876,7 @@ ucall7_ret_o:
                             pop         qword [P_group_ret_ω]
                             pop         rdi
                             mov         rsi, [rel box_group_data_size]
-                            call        t2_free
+                            call        blk_free
                             pop         rsi
                             pop         rdx
                             lea         rdi, [rel S_tag]
@@ -1892,7 +1912,7 @@ Ln_88:                      mov         edi, 138
                             push        qword [P_do_pop_list_ret_ω]
                             push        qword [P_do_pop_list_ret_γ]
                             mov         rdi, [rel box_do_pop_list_data_size]
-                            call        t2_alloc
+                            call        blk_alloc
                             mov         rdi, rax
                             lea         rsi, [rel box_do_pop_list_data_template]
                             mov         rdx, [rel box_do_pop_list_data_size]
@@ -1908,7 +1928,7 @@ ucall8_ret_g:
                             pop         qword [P_do_pop_list_ret_ω]
                             pop         rdi
                             mov         rsi, [rel box_do_pop_list_data_size]
-                            call        t2_free
+                            call        blk_free
                             pop         rsi
                             pop         rdx
                             lea         rdi, [rel S_p]
@@ -1945,7 +1965,7 @@ ucall8_ret_o:
                             pop         qword [P_do_pop_list_ret_ω]
                             pop         rdi
                             mov         rsi, [rel box_do_pop_list_data_size]
-                            call        t2_free
+                            call        blk_free
                             pop         rsi
                             pop         rdx
                             lea         rdi, [rel S_p]
@@ -1998,7 +2018,7 @@ L_parse_done_29:            mov         edi, 140
                             mov         [fn_do_pop_final_arg_0_t], rax
                             mov         [fn_do_pop_final_arg_0_p], rcx
                             mov         rdi, [rel box_do_pop_final_data_size]
-                            call        t2_alloc
+                            call        blk_alloc
                             mov         rdi, rax
                             lea         rsi, [rel box_do_pop_final_data_template]
                             mov         rdx, [rel box_do_pop_final_data_size]
@@ -2014,7 +2034,7 @@ ucall9_ret_g:
                             pop         qword [P_do_pop_final_ret_ω]
                             pop         rdi
                             mov         rsi, [rel box_do_pop_final_data_size]
-                            call        t2_free
+                            call        blk_free
                             pop         rsi
                             pop         rdx
                             lea         rdi, [rel S_p]
@@ -2055,7 +2075,7 @@ ucall9_ret_o:
                             pop         qword [P_do_pop_final_ret_ω]
                             pop         rdi
                             mov         rsi, [rel box_do_pop_final_data_size]
-                            call        t2_free
+                            call        blk_free
                             pop         rsi
                             pop         rdx
                             lea         rdi, [rel S_p]
@@ -2133,9 +2153,10 @@ Ln_93:                      mov         edi, 145
                             call        stmt_aref
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
-                            FAIL_BR     Ln_94
+                            FAIL_BR     Lf_94
                             SET_VAR     S_r
                             jmp         Ln_94
+Lf_94:                      GOTO_ALWAYS L_SNO_END     ; END
 
 ; ======================================================================================================================
 Ln_94:                      mov         edi, 146
@@ -2170,7 +2191,7 @@ Ln_94:                      mov         edi, 146
                             mov         [fn_print_node_arg_1_t], rax
                             mov         [fn_print_node_arg_1_p], rcx
                             mov         rdi, [rel box_print_node_data_size]
-                            call        t2_alloc
+                            call        blk_alloc
                             mov         rdi, rax
                             lea         rsi, [rel box_print_node_data_template]
                             mov         rdx, [rel box_print_node_data_size]
@@ -2186,7 +2207,7 @@ ucall10_ret_g:
                             pop         qword [P_print_node_ret_ω]
                             pop         rdi
                             mov         rsi, [rel box_print_node_data_size]
-                            call        t2_free
+                            call        blk_free
                             pop         rsi
                             pop         rdx
                             lea         rdi, [rel S_i]
@@ -2223,7 +2244,7 @@ ucall10_ret_o:
                             pop         qword [P_print_node_ret_ω]
                             pop         rdi
                             mov         rsi, [rel box_print_node_data_size]
-                            call        t2_free
+                            call        blk_free
                             pop         rsi
                             pop         rdx
                             lea         rdi, [rel S_i]
@@ -2256,8 +2277,8 @@ L_parse_err_30:             mov         edi, 148
 Ln_96:                      mov         edi, 149
                             call        comm_stno
                             LOAD_STR    S_ST_ST_ST_SP_parse_SP_error_SP_near_CL_SP
-                            mov         [conc_tmp0_rax], rax
-                            mov         [conc_tmp0_rdx], rdx
+                            push        rdx
+                            push        rax
                             sub         rsp, 48
                             lea         rdi, [rel S_buf]
                             call        stmt_get
@@ -2273,8 +2294,8 @@ Ln_96:                      mov         edi, 149
                             STORE_RESULT
                             mov         rcx, rdx
                             mov         rdx, rax
-                            mov         rdi, [conc_tmp0_rax]
-                            mov         rsi, [conc_tmp0_rdx]
+                            pop         rdi
+                            pop         rsi
                             call        stmt_concat
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -2294,7 +2315,7 @@ section .text
 
 ;  NAMED PATTERN BODIES ================================================================================================
 
-; P_do_push_list_α — user function α entry (1 param) [T2: r12=DATA]
+; P_do_push_list_α — user function α entry (1 param) [r12=DATA block]
 ;  do_push_list ========================================================================================================
 P_do_push_list_α:           FN_α_INIT   do_push_list
                             mov         rsi, [fn_do_push_list_arg_0_t]
@@ -2311,7 +2332,7 @@ P_do_push_list_α:           FN_α_INIT   do_push_list
 fn_do_push_list_γ:          FN_γ        P_do_push_list_ret_γ ; fn γ
 fn_do_push_list_ω:          FN_ω        P_do_push_list_ret_ω ; fn ω
 
-; P_do_push_item_α — user function α entry (1 param) [T2: r12=DATA]
+; P_do_push_item_α — user function α entry (1 param) [r12=DATA block]
 ;  do_push_item ========================================================================================================
 P_do_push_item_α:           FN_α_INIT   do_push_item
                             mov         rsi, [fn_do_push_item_arg_0_t]
@@ -2328,7 +2349,7 @@ P_do_push_item_α:           FN_α_INIT   do_push_item
 fn_do_push_item_γ:          FN_γ        P_do_push_item_ret_γ ; fn γ
 fn_do_push_item_ω:          FN_ω        P_do_push_item_ret_ω ; fn ω
 
-; P_do_pop_list_α — user function α entry (0 params) [T2: r12=DATA]
+; P_do_pop_list_α — user function α entry (0 params) [r12=DATA block]
 ;  do_pop_list =========================================================================================================
 P_do_pop_list_α:            FN_α_INIT   do_pop_list
                             LOAD_NULVCL
@@ -2354,7 +2375,7 @@ P_do_pop_list_α:            FN_α_INIT   do_pop_list
 fn_do_pop_list_γ:           FN_γ        P_do_pop_list_ret_γ ; fn γ
 fn_do_pop_list_ω:           FN_ω        P_do_pop_list_ret_ω ; fn ω
 
-; P_do_pop_final_α — user function α entry (1 param) [T2: r12=DATA]
+; P_do_pop_final_α — user function α entry (1 param) [r12=DATA block]
 ;  do_pop_final ========================================================================================================
 P_do_pop_final_α:           FN_α_INIT   do_pop_final
                             mov         rsi, [fn_do_pop_final_arg_0_t]
@@ -2383,7 +2404,7 @@ P_do_pop_final_α:           FN_α_INIT   do_pop_final
 fn_do_pop_final_γ:          FN_γ        P_do_pop_final_ret_γ ; fn γ
 fn_do_pop_final_ω:          FN_ω        P_do_pop_final_ret_ω ; fn ω
 
-; P_group_α — user function α entry (0 params) [T2: r12=DATA]
+; P_group_α — user function α entry (0 params) [r12=DATA block]
 ;  group ===============================================================================================================
 P_group_α:                  FN_α_INIT   group
                             LOAD_NULVCL
@@ -2403,7 +2424,7 @@ P_group_α:                  FN_α_INIT   group
 fn_group_γ:                 FN_γ        P_group_ret_γ ; fn γ
 fn_group_ω:                 FN_ω        P_group_ret_ω ; fn ω
 
-; P_print_node_α — user function α entry (2 params) [T2: r12=DATA]
+; P_print_node_α — user function α entry (2 params) [r12=DATA block]
 ;  print_node ==========================================================================================================
 P_print_node_α:             FN_α_INIT   print_node
                             mov         rsi, [fn_print_node_arg_0_t]
@@ -2429,7 +2450,7 @@ P_print_node_α:             FN_α_INIT   print_node
 fn_print_node_γ:            FN_γ        P_print_node_ret_γ ; fn γ
 fn_print_node_ω:            FN_ω        P_print_node_ret_ω ; fn ω
 
-; P_word_α (α entry) [T2: r12=DATA]
+; P_word_α (α entry) [r12=DATA block]
 P_word_α:                   jmp         seq_l14_α ; SEQ
 P_word_β:                   jmp         seq_r14_β
 seq_l14_α:                  NOTANY_α    lit_str_1, 0, r12+16, cursor, subject_data, subject_len_val, seq_r14_α, patdef_word_ω ; NOTANY α
@@ -2487,11 +2508,11 @@ box_word_reloc_count: dq 0
 box_word_reloc_table:
 ; (entries added by M-T2-INVOKE)
 
-;  T2 RELOCATION TABLES ================================================================================================
+;  BOX RELOCATION TABLES ===============================================================================================
 
 global  box_do_push_list_data_template, box_do_push_list_data_size
 section .data
-;  T2 DATA TEMPLATES ===================================================================================================
+;  BOX DATA TEMPLATES ==================================================================================================
                             align       8
 box_do_push_list_data_size: dq 64
 box_do_push_list_data_template:

@@ -3968,7 +3968,8 @@ static void emit_program(Program *prog) {
             /* If has_eq: assign replacement to subject variable */
             if (s->has_eq && s->subject &&
                 (s->subject->kind == E_VART || s->subject->kind == E_KW)) {
-                const char *fail_target = id_f >= 0 ? sfail_lbl : next_lbl;
+                int has_f_tgt = (id_f >= 0 || (tgt_f && is_special_goto(tgt_f)));
+                const char *fail_target = has_f_tgt ? sfail_lbl : next_lbl;
                 int is_output = strcasecmp(s->subject->sval, "OUTPUT") == 0;
                 /* For keyword LHS (&VAR), NV_SET_fn expects bare name "ANCHOR" not "&ANCHOR" */
                 const char *subj_name = s->subject->sval ? s->subject->sval : "";
@@ -4009,7 +4010,7 @@ static void emit_program(Program *prog) {
                 /* success path */
                 emit_jmp(tgt_s ? tgt_s : tgt_u, next_lbl);
                 /* failure path */
-                if (id_f >= 0) {
+                if (has_f_tgt) {
                     asmL(sfail_lbl);
                     emit_jmp(tgt_f, next_lbl);
                 }
@@ -4018,7 +4019,8 @@ static void emit_program(Program *prog) {
                 /* $expr = val  — indirect assignment.
                  * Parser uses E_INDR (right=operand) for $X in subject position.
                  * E_DOL (left=operand) is the binary capture op; support both. */
-                const char *fail_target = id_f >= 0 ? sfail_lbl : next_lbl;
+                int has_f_tgt = (id_f >= 0 || (tgt_f && is_special_goto(tgt_f)));
+                const char *fail_target = has_f_tgt ? sfail_lbl : next_lbl;
                 /* Eval the name expression → [rbp-16/8] */
                 /* SNOBOL4 parser puts operand in ->children[1] for E_INDR.
                  * Snocone sc_lower puts it in ->children[0].  Accept either. */
@@ -4039,7 +4041,7 @@ static void emit_program(Program *prog) {
                 }
                 A("    SET_VAR_INDIR\n");
                 emit_jmp(tgt_s ? tgt_s : tgt_u, next_lbl);
-                if (id_f >= 0) {
+                if (has_f_tgt) {
                     asmL(sfail_lbl);
                     emit_jmp(tgt_f, next_lbl);
                 }
@@ -4057,9 +4059,8 @@ static void emit_program(Program *prog) {
                  * We stash arr and key in .bss scratch slots to survive the
                  * RHS evaluation (which may clobber [rbp-16/8] and [rbp-32/24]).
                  */
-                const char *fail_target = id_f >= 0 ? sfail_lbl : next_lbl;
-
-                /* Use a unique scratch uid to avoid slot collisions */
+                int has_f_tgt_idx = (id_f >= 0 || (tgt_f && is_special_goto(tgt_f)));
+                const char *fail_target = has_f_tgt_idx ? sfail_lbl : next_lbl;
                 static int idx_uid_counter = 0;
                 int idx_uid = idx_uid_counter++;
 
@@ -4106,7 +4107,7 @@ static void emit_program(Program *prog) {
                 A("    add     rsp, 32\n");         /* pop 4 saved qwords */
                 A("    call    stmt_aset\n");
                 emit_jmp(tgt_s ? tgt_s : tgt_u, next_lbl);
-                if (id_f >= 0) {
+                if (has_f_tgt_idx) {
                     asmL(sfail_lbl);
                     emit_jmp(tgt_f, next_lbl);
                 }
@@ -4114,14 +4115,9 @@ static void emit_program(Program *prog) {
                        s->subject->kind == E_FNC &&
                        s->subject->nchildren == 1 &&
                        s->subject->sval) {
-                /* field(obj) = val  →  stmt_field_set(obj, "field", val)
-                 *
-                 * SysV AMD64 for stmt_field_set(obj, field, val):
-                 *   obj:   rdi=type, rsi=ptr
-                 *   field: rdx = pointer to C string label
-                 *   val:   rcx=type, r8=ptr
-                 */
-                const char *fail_target = id_f >= 0 ? sfail_lbl : next_lbl;
+                /* field(obj) = val  →  stmt_field_set(obj, "field", val) */
+                int has_f_tgt_fnc = (id_f >= 0 || (tgt_f && is_special_goto(tgt_f)));
+                const char *fail_target = has_f_tgt_fnc ? sfail_lbl : next_lbl;
                 const char *flab = str_intern(s->subject->sval);
 
                 /* Evaluate obj → push onto stack */
@@ -4145,7 +4141,7 @@ static void emit_program(Program *prog) {
                 A("    add     rsp, 16\n");         /* pop 2 saved qwords */
                 A("    call    stmt_field_set\n");
                 emit_jmp(tgt_s ? tgt_s : tgt_u, next_lbl);
-                if (id_f >= 0) {
+                if (has_f_tgt_fnc) {
                     asmL(sfail_lbl);
                     emit_jmp(tgt_f, next_lbl);
                 }
@@ -4154,9 +4150,9 @@ static void emit_program(Program *prog) {
                        s->subject->sval &&
                        strcasecmp(s->subject->sval, "ITEM") == 0 &&
                        s->subject->nchildren >= 2) {
-                /* item(arr, key) = val  →  stmt_aset(arr, key, val)
-                 * Same calling convention as E_IDX write path. */
-                const char *fail_target = id_f >= 0 ? sfail_lbl : next_lbl;
+                /* item(arr, key) = val  →  stmt_aset(arr, key, val) */
+                int has_f_tgt_item = (id_f >= 0 || (tgt_f && is_special_goto(tgt_f)));
+                const char *fail_target = has_f_tgt_item ? sfail_lbl : next_lbl;
                 EXPR_t *arr_expr = s->subject->children[0];
                 EXPR_t *key_expr = s->subject->children[1];
 
@@ -4192,7 +4188,7 @@ static void emit_program(Program *prog) {
                 A("    mov     r9,  [rbp-24]\\n");   /* val ptr  */
                 A("    call    stmt_aset\\n");
                 emit_jmp(tgt_s ? tgt_s : tgt_u, next_lbl);
-                if (id_f >= 0) {
+                if (has_f_tgt_item) {
                     asmL(sfail_lbl);
                     emit_jmp(tgt_f, next_lbl);
                 }
@@ -4319,6 +4315,14 @@ static void emit_program(Program *prog) {
 
         /* -- gamma: match succeeded -- */
         asmL(pat_gamma);
+        /* For ? stmts (no replacement): advance scan_start BEFORE SET_CAPTURE.
+         * SET_CAPTURE calls stmt_set_capture (C ABI), trashing rax.
+         * [cursor] memory is safe across the call, but we save it early to
+         * keep the advance adjacent to the match point and avoid confusion. */
+        if (!s->has_eq) {
+            A("    mov     rax, [cursor]\n");
+            A("    mov     [%s], rax\n", scan_start);
+        }
         /* Materialise DOL/NAM captures — only those reachable from this stmt. */
         for (int ci = 0; ci < cap_var_count; ci++) {
             int found = 0;
@@ -4342,11 +4346,6 @@ static void emit_program(Program *prog) {
                 emit_expr(s->replacement, -32);
             }
             A("    APPLY_REPL_SPLICE  %s, %s\n", vlab, scan_start);
-        } else {
-            /* No replacement: advance scan_start to cursor so the next
-             * unanchored retry doesn't re-match at the same position. */
-            A("    mov     rax, [cursor]\n");
-            A("    mov     [%s], rax\n", scan_start);
         }
         emit_jmp(tgt_s ? tgt_s : tgt_u, next_lbl);
 
@@ -4366,6 +4365,15 @@ static void emit_program(Program *prog) {
                 static int tramp_uid = 0;
                 snprintf(tramp, sizeof tramp, "scan_fail_tramp_%d", tramp_uid++);
                 scan_fail = tramp;
+            } else if (scan_fail_tgt && is_special_goto(scan_fail_tgt)) {
+                /* Special goto at top level (e.g. END outside a function):
+                 * label_nasm() can't resolve it — use the known ASM label directly. */
+                if (strcasecmp(scan_fail_tgt, "END") == 0)
+                    scan_fail = "L_SNO_END";
+                else {
+                    /* RETURN/FRETURN outside a function — treat as END */
+                    scan_fail = "L_SNO_END";
+                }
             } else {
                 scan_fail = scan_fail_tgt ? label_nasm(scan_fail_tgt) : next_lbl;
             }

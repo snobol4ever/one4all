@@ -20,7 +20,7 @@ extern  stmt_at_capture
 extern  kw_anchor
 extern  stmt_aref, stmt_aset, stmt_field_set
 extern  comm_stno
-extern  t2_alloc, t2_free, memcpy  ; T2 runtime
+extern  blk_alloc, blk_free, memcpy  ; per-invocation DATA block runtime
 global  cursor, subject_data, subject_len_val
 
 section .note.GNU-stack noalloc noexec nowrite progbits
@@ -57,42 +57,38 @@ Ln_0:                       mov         edi, 6
 Ln_1:                       mov         edi, 7
                             call        comm_stno
                             LOAD_STR    S_XX_MI
-                            mov         [conc_tmp0_rax], rax
-                            mov         [conc_tmp0_rdx], rdx
+                            push        rdx
+                            push        rax
                             lea         rdi, [rel S_NUMERALS]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
-                            mov         [conc_tmp0_rax], rax
-                            mov         [conc_tmp0_rdx], rdx
+                            mov         rcx, rdx
+                            mov         rdx, rax
+                            pop         rdi
+                            pop         rsi
+                            call        stmt_concat
+                            push        rdx
+                            push        rax
                             lea         rdi, [rel S_UCASE]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
-                            mov         [conc_tmp0_rax], rax
-                            mov         [conc_tmp0_rdx], rdx
+                            mov         rcx, rdx
+                            mov         rdx, rax
+                            pop         rdi
+                            pop         rsi
+                            call        stmt_concat
+                            push        rdx
+                            push        rax
                             lea         rdi, [rel S_LCASE]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
                             mov         rcx, rdx
                             mov         rdx, rax
-                            mov         rdi, [conc_tmp0_rax]
-                            mov         rsi, [conc_tmp0_rdx]
-                            call        stmt_concat
-                            mov         [rbp-32], rax
-                            mov         [rbp-24], rdx
-                            mov         rcx, rdx
-                            mov         rdx, rax
-                            mov         rdi, [conc_tmp0_rax]
-                            mov         rsi, [conc_tmp0_rdx]
-                            call        stmt_concat
-                            mov         [rbp-32], rax
-                            mov         [rbp-24], rdx
-                            mov         rcx, rdx
-                            mov         rdx, rax
-                            mov         rdi, [conc_tmp0_rax]
-                            mov         rsi, [conc_tmp0_rdx]
+                            pop         rdi
+                            pop         rsi
                             call        stmt_concat
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -104,13 +100,13 @@ Ln_1:                       mov         edi, 7
 Ln_2:                       mov         edi, 8
                             call        comm_stno
                             CALL1_VAR   S_BREAK, S_WORD
-                            mov         [conc_tmp0_rax], rax
-                            mov         [conc_tmp0_rdx], rdx
+                            push        rdx
+                            push        rax
                             CALL1_VAR   S_SPAN, S_WORD
                             mov         rcx, rdx
                             mov         rdx, rax
-                            mov         rdi, [conc_tmp0_rax]
-                            mov         rsi, [conc_tmp0_rdx]
+                            pop         rdi
+                            pop         rsi
                             call        stmt_concat
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -149,11 +145,13 @@ P_5_α: ; REF(WPAT)
                             mov         [P_WPAT_ret_γ], rax
                             lea         rax, [rel nref0_ω]
                             mov         [P_WPAT_ret_ω], rax
+                            lea         r12, [rel box_WPAT_data_template]
                             jmp         P_WPAT_α
 P_5_β:                      lea         rax, [rel nref0_γ] ; REF(%s)
                             mov         [P_WPAT_ret_γ], rax
                             lea         rax, [rel nref0_ω]
                             mov         [P_WPAT_ret_ω], rax
+                            lea         r12, [rel box_WPAT_data_template]
                             jmp         P_WPAT_β
 
 nref0_γ:
@@ -200,7 +198,7 @@ section .text
 
 ;  NAMED PATTERN BODIES ================================================================================================
 
-; P_WPAT_α (α entry) [T2: r12=DATA]
+; P_WPAT_α (α entry) [r12=DATA block]
 P_WPAT_α:                   jmp         seq_l1_α ; SEQ
 P_WPAT_β:                   jmp         seq_r1_β
 seq_l1_α:                   BREAK_α_VAR S_WORD, r12+16, cursor, subject_data, subject_len_val, seq_r1_α, patdef_WPAT_ω ; BREAK(var) α
@@ -222,11 +220,11 @@ box_WPAT_reloc_count: dq 0
 box_WPAT_reloc_table:
 ; (entries added by M-T2-INVOKE)
 
-;  T2 RELOCATION TABLES ================================================================================================
+;  BOX RELOCATION TABLES ===============================================================================================
 
 global  box_WPAT_data_template, box_WPAT_data_size
 section .data
-;  T2 DATA TEMPLATES ===================================================================================================
+;  BOX DATA TEMPLATES ==================================================================================================
                             align       8
 box_WPAT_data_size: dq 32
 box_WPAT_data_template:

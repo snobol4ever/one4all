@@ -20,7 +20,7 @@ extern  stmt_at_capture
 extern  kw_anchor
 extern  stmt_aref, stmt_aset, stmt_field_set
 extern  comm_stno
-extern  t2_alloc, t2_free, memcpy  ; T2 runtime
+extern  blk_alloc, blk_free, memcpy  ; per-invocation DATA block runtime
 global  cursor, subject_data, subject_len_val
 
 section .note.GNU-stack noalloc noexec nowrite progbits
@@ -439,8 +439,8 @@ L_TopCounter_10:            mov         edi, 69
                             APPLY_FN_N  S_DIFFER, 1
                             add         rsp, 16
                             STORE_RESULT
-                            mov         [conc_tmp0_rax], rax
-                            mov         [conc_tmp0_rdx], rdx
+                            push        rdx
+                            push        rax
                             sub         rsp, 16
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
@@ -450,14 +450,15 @@ L_TopCounter_10:            mov         edi, 69
                             STORE_RESULT
                             mov         rcx, rdx
                             mov         rdx, rax
-                            mov         rdi, [conc_tmp0_rax]
-                            mov         rsi, [conc_tmp0_rdx]
+                            pop         rdi
+                            pop         rsi
                             call        stmt_concat
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
-                            FAIL_BR     Ln_36
+                            FAIL_BR     Lf_36
                             SET_VAR     S_TopCounter
                             jmp         Ln_36
+Lf_36:                      jmp         fn_TopCounter_ω     ; FRETURN
 
 ; ======================================================================================================================
 Ln_36:                      mov         edi, 70
@@ -473,13 +474,24 @@ Ln_36:                      mov         edi, 70
                             APPLY_FN_N  S_GT, 2
                             add         rsp, 32
                             STORE_RESULT
-                            mov         [conc_tmp0_rax], rax
-                            mov         [conc_tmp0_rdx], rdx
-                            CAT2_VS     S_TopCounter, S_SP_EQ_SP_TopCounter_LP_RP
+                            push        rdx
+                            push        rax
+                            lea         rdi, [rel S_TopCounter]
+                            call        stmt_get
+                            mov         [rbp-32], rax
+                            mov         [rbp-24], rdx
                             mov         rcx, rdx
                             mov         rdx, rax
-                            mov         rdi, [conc_tmp0_rax]
-                            mov         rsi, [conc_tmp0_rdx]
+                            pop         rdi
+                            pop         rsi
+                            call        stmt_concat
+                            push        rdx
+                            push        rax
+                            LOAD_STR    S_SP_EQ_SP_TopCounter_LP_RP
+                            mov         rcx, rdx
+                            mov         rdx, rax
+                            pop         rdi
+                            pop         rsi
                             call        stmt_concat
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -501,8 +513,8 @@ L_PopCounter_11:            mov         edi, 71
                             APPLY_FN_N  S_DIFFER, 1
                             add         rsp, 16
                             STORE_RESULT
-                            mov         [conc_tmp0_rax], rax
-                            mov         [conc_tmp0_rdx], rdx
+                            push        rdx
+                            push        rax
                             sub         rsp, 16
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
@@ -512,14 +524,15 @@ L_PopCounter_11:            mov         edi, 71
                             STORE_RESULT
                             mov         rcx, rdx
                             mov         rdx, rax
-                            mov         rdi, [conc_tmp0_rax]
-                            mov         rsi, [conc_tmp0_rdx]
+                            pop         rdi
+                            pop         rsi
                             call        stmt_concat
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
-                            FAIL_BR     Ln_38
+                            FAIL_BR     Lf_38
                             SET_VAR_INDIR
                             jmp         Ln_38
+Lf_38:                      jmp         fn_PopCounter_ω     ; FRETURN
 
 ; ======================================================================================================================
 Ln_38:                      mov         edi, 72
@@ -974,39 +987,49 @@ Ln_60:                      mov         edi, 100
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
-                            mov         [conc_tmp0_rax], rax
-                            mov         [conc_tmp0_rdx], rdx
+                            push        rdx
+                            push        rax
                             lea         rdi, [rel S_TAB]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
-                            mov         [conc_tmp0_rax], rax
-                            mov         [conc_tmp0_rdx], rdx
+                            mov         rcx, rdx
+                            mov         rdx, rax
+                            pop         rdi
+                            pop         rsi
+                            call        stmt_concat
+                            push        rdx
+                            push        rax
                             lea         rdi, [rel S_wrd]
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
-                            mov         [conc_tmp0_rax], rax
-                            mov         [conc_tmp0_rdx], rdx
-                            CAT2_VV     S_TAB, S_tag
                             mov         rcx, rdx
                             mov         rdx, rax
-                            mov         rdi, [conc_tmp0_rax]
-                            mov         rsi, [conc_tmp0_rdx]
+                            pop         rdi
+                            pop         rsi
                             call        stmt_concat
+                            push        rdx
+                            push        rax
+                            lea         rdi, [rel S_TAB]
+                            call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
                             mov         rcx, rdx
                             mov         rdx, rax
-                            mov         rdi, [conc_tmp0_rax]
-                            mov         rsi, [conc_tmp0_rdx]
+                            pop         rdi
+                            pop         rsi
                             call        stmt_concat
+                            push        rdx
+                            push        rax
+                            lea         rdi, [rel S_tag]
+                            call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
                             mov         rcx, rdx
                             mov         rdx, rax
-                            mov         rdi, [conc_tmp0_rax]
-                            mov         rsi, [conc_tmp0_rdx]
+                            pop         rdi
+                            pop         rsi
                             call        stmt_concat
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -1031,66 +1054,65 @@ L_do_add_tok_end_16:        mov         edi, 102
 Ln_63:                      mov         edi, 106
                             call        comm_stno
                             CALL1_INT   S_POS, 0
-                            mov         [conc_tmp0_rax], rax
-                            mov         [conc_tmp0_rdx], rdx
+                            push        rdx
+                            push        rax
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
-                            mov         [conc_tmp0_rax], rax
-                            mov         [conc_tmp0_rdx], rdx
+                            mov         rcx, rdx
+                            mov         rdx, rax
+                            pop         rdi
+                            pop         rsi
+                            call        stmt_concat
+                            push        rdx
+                            push        rax
                             sub         rsp, 16
                             sub         rsp, 32
                             LOAD_STR    S_SPAN
-                            mov         [conc_tmp0_rax], rax
-                            mov         [conc_tmp0_rdx], rdx
+                            push        rdx
+                            push        rax
                             LOAD_STR    S__CRD_SP_CL__PUN
-                            mov         [conc_tmp0_rax], rax
-                            mov         [conc_tmp0_rdx], rdx
+                            mov         rcx, rdx
+                            mov         rdx, rax
+                            pop         rdi
+                            pop         rsi
+                            call        stmt_concat
+                            push        rdx
+                            push        rax
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rcx, rdx
                             mov         rdx, rax
-                            mov         rdi, [conc_tmp0_rax]
-                            mov         rsi, [conc_tmp0_rdx]
-                            call        stmt_concat
-                            mov         [rbp-32], rax
-                            mov         [rbp-24], rdx
-                            mov         rcx, rdx
-                            mov         rdx, rax
-                            mov         rdi, [conc_tmp0_rax]
-                            mov         rsi, [conc_tmp0_rdx]
+                            pop         rdi
+                            pop         rsi
                             call        stmt_concat
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
                             STORE_ARG32 0
                             LOAD_STR    S_81
-                            mov         [conc_tmp0_rax], rax
-                            mov         [conc_tmp0_rdx], rdx
+                            push        rdx
+                            push        rax
                             LOAD_STR    S_75
-                            mov         [conc_tmp0_rax], rax
-                            mov         [conc_tmp0_rdx], rdx
+                            mov         rcx, rdx
+                            mov         rdx, rax
+                            pop         rdi
+                            pop         rsi
+                            call        stmt_concat
+                            push        rdx
+                            push        rax
                             LOAD_STR    S_81
-                            mov         [conc_tmp0_rax], rax
-                            mov         [conc_tmp0_rdx], rdx
+                            mov         rcx, rdx
+                            mov         rdx, rax
+                            pop         rdi
+                            pop         rsi
+                            call        stmt_concat
+                            push        rdx
+                            push        rax
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             mov         rcx, rdx
                             mov         rdx, rax
-                            mov         rdi, [conc_tmp0_rax]
-                            mov         rsi, [conc_tmp0_rdx]
-                            call        stmt_concat
-                            mov         [rbp-32], rax
-                            mov         [rbp-24], rdx
-                            mov         rcx, rdx
-                            mov         rdx, rax
-                            mov         rdi, [conc_tmp0_rax]
-                            mov         rsi, [conc_tmp0_rdx]
-                            call        stmt_concat
-                            mov         [rbp-32], rax
-                            mov         [rbp-24], rdx
-                            mov         rcx, rdx
-                            mov         rdx, rax
-                            mov         rdi, [conc_tmp0_rax]
-                            mov         rsi, [conc_tmp0_rdx]
+                            pop         rdi
+                            pop         rsi
                             call        stmt_concat
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -1099,13 +1121,13 @@ Ln_63:                      mov         edi, 106
                             add         rsp, 32
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
-                            mov         [conc_tmp0_rax], rax
-                            mov         [conc_tmp0_rdx], rdx
+                            push        rdx
+                            push        rax
                             LOAD_STR    S_SP
                             mov         rcx, rdx
                             mov         rdx, rax
-                            mov         rdi, [conc_tmp0_rax]
-                            mov         rsi, [conc_tmp0_rdx]
+                            pop         rdi
+                            pop         rsi
                             call        stmt_concat
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -1113,27 +1135,18 @@ Ln_63:                      mov         edi, 106
                             APPLY_FN_N  S_ARBNO, 1
                             add         rsp, 16
                             STORE_RESULT
-                            mov         [conc_tmp0_rax], rax
-                            mov         [conc_tmp0_rdx], rdx
+                            mov         rcx, rdx
+                            mov         rdx, rax
+                            pop         rdi
+                            pop         rsi
+                            call        stmt_concat
+                            push        rdx
+                            push        rax
                             CALL1_INT   S_RPOS, 0
                             mov         rcx, rdx
                             mov         rdx, rax
-                            mov         rdi, [conc_tmp0_rax]
-                            mov         rsi, [conc_tmp0_rdx]
-                            call        stmt_concat
-                            mov         [rbp-32], rax
-                            mov         [rbp-24], rdx
-                            mov         rcx, rdx
-                            mov         rdx, rax
-                            mov         rdi, [conc_tmp0_rax]
-                            mov         rsi, [conc_tmp0_rdx]
-                            call        stmt_concat
-                            mov         [rbp-32], rax
-                            mov         [rbp-24], rdx
-                            mov         rcx, rdx
-                            mov         rdx, rax
-                            mov         rdi, [conc_tmp0_rax]
-                            mov         rsi, [conc_tmp0_rdx]
+                            pop         rdi
+                            pop         rsi
                             call        stmt_concat
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -1149,7 +1162,7 @@ Ln_64:                      mov         edi, 123
                             push        qword [P_InitStack_ret_ω]
                             push        qword [P_InitStack_ret_γ]
                             mov         rdi, [rel box_InitStack_data_size]
-                            call        t2_alloc
+                            call        blk_alloc
                             mov         rdi, rax
                             lea         rsi, [rel box_InitStack_data_template]
                             mov         rdx, [rel box_InitStack_data_size]
@@ -1165,7 +1178,7 @@ ucall0_ret_g:
                             pop         qword [P_InitStack_ret_ω]
                             pop         rdi
                             mov         rsi, [rel box_InitStack_data_size]
-                            call        t2_free
+                            call        blk_free
                             add         rsp, 8          ; remove align pad
                             GET_VAR     S_InitStack
                             mov         rax, [rbp-16]
@@ -1186,7 +1199,7 @@ ucall0_ret_o:
                             pop         qword [P_InitStack_ret_ω]
                             pop         rdi
                             mov         rsi, [rel box_InitStack_data_size]
-                            call        t2_free
+                            call        blk_free
                             add         rsp, 8          ; remove align pad
                             LOAD_FAILDESCR32
 ucall0_done:
@@ -1202,7 +1215,7 @@ Ln_65:                      mov         edi, 124
                             push        qword [P_InitCounter_ret_ω]
                             push        qword [P_InitCounter_ret_γ]
                             mov         rdi, [rel box_InitCounter_data_size]
-                            call        t2_alloc
+                            call        blk_alloc
                             mov         rdi, rax
                             lea         rsi, [rel box_InitCounter_data_template]
                             mov         rdx, [rel box_InitCounter_data_size]
@@ -1218,7 +1231,7 @@ ucall1_ret_g:
                             pop         qword [P_InitCounter_ret_ω]
                             pop         rdi
                             mov         rsi, [rel box_InitCounter_data_size]
-                            call        t2_free
+                            call        blk_free
                             add         rsp, 8          ; remove align pad
                             GET_VAR     S_InitCounter
                             mov         rax, [rbp-16]
@@ -1239,7 +1252,7 @@ ucall1_ret_o:
                             pop         qword [P_InitCounter_ret_ω]
                             pop         rdi
                             mov         rsi, [rel box_InitCounter_data_size]
-                            call        t2_free
+                            call        blk_free
                             add         rsp, 8          ; remove align pad
                             LOAD_FAILDESCR32
 ucall1_done:
@@ -1273,13 +1286,24 @@ Ln_68:                      mov         edi, 128
                             call        stmt_get
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
-                            mov         [conc_tmp0_rax], rax
-                            mov         [conc_tmp0_rdx], rdx
-                            CAT2_VS     S_line, S_SP
+                            push        rdx
+                            push        rax
+                            lea         rdi, [rel S_line]
+                            call        stmt_get
+                            mov         [rbp-32], rax
+                            mov         [rbp-24], rdx
                             mov         rcx, rdx
                             mov         rdx, rax
-                            mov         rdi, [conc_tmp0_rax]
-                            mov         rsi, [conc_tmp0_rdx]
+                            pop         rdi
+                            pop         rsi
+                            call        stmt_concat
+                            push        rdx
+                            push        rax
+                            LOAD_STR    S_SP
+                            mov         rcx, rdx
+                            mov         rdx, rax
+                            pop         rdi
+                            pop         rsi
                             call        stmt_concat
                             mov         [rbp-32], rax
                             mov         [rbp-24], rdx
@@ -1305,18 +1329,22 @@ P_70_α: ; REF(claws_info)
                             mov         [P_claws_info_ret_γ], rax
                             lea         rax, [rel nref0_ω]
                             mov         [P_claws_info_ret_ω], rax
+                            lea         r12, [rel box_claws_info_data_template]
                             jmp         P_claws_info_α
 P_70_β:                     lea         rax, [rel nref0_γ] ; REF(%s)
                             mov         [P_claws_info_ret_γ], rax
                             lea         rax, [rel nref0_ω]
                             mov         [P_claws_info_ret_ω], rax
+                            lea         r12, [rel box_claws_info_data_template]
                             jmp         P_claws_info_β
 
 nref0_γ:
                             jmp         P_70_γ
 nref0_ω:                    jmp         P_70_ω
 
-P_70_γ:                     SET_CAPTURE S_num, cap_num_buf, cap_num_len
+P_70_γ:                     mov         rax, [cursor]
+                            mov         [scan_start_70], rax
+                            SET_CAPTURE S_num, cap_num_buf, cap_num_len
                             SET_CAPTURE S_wrd, cap_wrd_buf, cap_wrd_len
                             SET_CAPTURE S_tag, cap_tag_buf, cap_tag_len
                             GOTO_ALWAYS L_SNO_END     ; END
@@ -1352,7 +1380,7 @@ section .text
 
 ;  NAMED PATTERN BODIES ================================================================================================
 
-; P_InitStack_α — user function α entry (0 params) [T2: r12=DATA]
+; P_InitStack_α — user function α entry (0 params) [r12=DATA block]
 ;  InitStack ===========================================================================================================
 P_InitStack_α:              FN_α_INIT   InitStack
                             LOAD_NULVCL
@@ -1366,7 +1394,7 @@ P_InitStack_α:              FN_α_INIT   InitStack
 fn_InitStack_γ:             FN_γ        P_InitStack_ret_γ ; fn γ
 fn_InitStack_ω:             FN_ω        P_InitStack_ret_ω ; fn ω
 
-; P_Push_α — user function α entry (1 param) [T2: r12=DATA]
+; P_Push_α — user function α entry (1 param) [r12=DATA block]
 ;  Push ================================================================================================================
 P_Push_α:                   FN_α_INIT   Push
                             mov         rsi, [fn_Push_arg_0_t]
@@ -1383,7 +1411,7 @@ P_Push_α:                   FN_α_INIT   Push
 fn_Push_γ:                  FN_γ        P_Push_ret_γ ; fn γ
 fn_Push_ω:                  FN_ω        P_Push_ret_ω ; fn ω
 
-; P_Pop_α — user function α entry (1 param) [T2: r12=DATA]
+; P_Pop_α — user function α entry (1 param) [r12=DATA block]
 ;  Pop =================================================================================================================
 P_Pop_α:                    FN_α_INIT   Pop
                             mov         rsi, [fn_Pop_arg_0_t]
@@ -1400,7 +1428,7 @@ P_Pop_α:                    FN_α_INIT   Pop
 fn_Pop_γ:                   FN_γ        P_Pop_ret_γ ; fn γ
 fn_Pop_ω:                   FN_ω        P_Pop_ret_ω ; fn ω
 
-; P_Top_α — user function α entry (0 params) [T2: r12=DATA]
+; P_Top_α — user function α entry (0 params) [r12=DATA block]
 ;  Top =================================================================================================================
 P_Top_α:                    FN_α_INIT   Top
                             LOAD_NULVCL
@@ -1414,7 +1442,7 @@ P_Top_α:                    FN_α_INIT   Top
 fn_Top_γ:                   FN_γ        P_Top_ret_γ ; fn γ
 fn_Top_ω:                   FN_ω        P_Top_ret_ω ; fn ω
 
-; P_InitCounter_α — user function α entry (0 params) [T2: r12=DATA]
+; P_InitCounter_α — user function α entry (0 params) [r12=DATA block]
 ;  InitCounter =========================================================================================================
 P_InitCounter_α:            FN_α_INIT   InitCounter
                             LOAD_NULVCL
@@ -1428,7 +1456,7 @@ P_InitCounter_α:            FN_α_INIT   InitCounter
 fn_InitCounter_γ:           FN_γ        P_InitCounter_ret_γ ; fn γ
 fn_InitCounter_ω:           FN_ω        P_InitCounter_ret_ω ; fn ω
 
-; P_PushCounter_α — user function α entry (0 params) [T2: r12=DATA]
+; P_PushCounter_α — user function α entry (0 params) [r12=DATA block]
 ;  PushCounter =========================================================================================================
 P_PushCounter_α:            FN_α_INIT   PushCounter
                             LOAD_NULVCL
@@ -1442,7 +1470,7 @@ P_PushCounter_α:            FN_α_INIT   PushCounter
 fn_PushCounter_γ:           FN_γ        P_PushCounter_ret_γ ; fn γ
 fn_PushCounter_ω:           FN_ω        P_PushCounter_ret_ω ; fn ω
 
-; P_IncCounter_α — user function α entry (0 params) [T2: r12=DATA]
+; P_IncCounter_α — user function α entry (0 params) [r12=DATA block]
 ;  IncCounter ==========================================================================================================
 P_IncCounter_α:             FN_α_INIT   IncCounter
                             LOAD_NULVCL
@@ -1456,7 +1484,7 @@ P_IncCounter_α:             FN_α_INIT   IncCounter
 fn_IncCounter_γ:            FN_γ        P_IncCounter_ret_γ ; fn γ
 fn_IncCounter_ω:            FN_ω        P_IncCounter_ret_ω ; fn ω
 
-; P_TopCounter_α — user function α entry (0 params) [T2: r12=DATA]
+; P_TopCounter_α — user function α entry (0 params) [r12=DATA block]
 ;  TopCounter ==========================================================================================================
 P_TopCounter_α:             FN_α_INIT   TopCounter
                             LOAD_NULVCL
@@ -1470,7 +1498,7 @@ P_TopCounter_α:             FN_α_INIT   TopCounter
 fn_TopCounter_γ:            FN_γ        P_TopCounter_ret_γ ; fn γ
 fn_TopCounter_ω:            FN_ω        P_TopCounter_ret_ω ; fn ω
 
-; P_PopCounter_α — user function α entry (0 params) [T2: r12=DATA]
+; P_PopCounter_α — user function α entry (0 params) [r12=DATA block]
 ;  PopCounter ==========================================================================================================
 P_PopCounter_α:             FN_α_INIT   PopCounter
                             LOAD_NULVCL
@@ -1484,7 +1512,7 @@ P_PopCounter_α:             FN_α_INIT   PopCounter
 fn_PopCounter_γ:            FN_γ        P_PopCounter_ret_γ ; fn γ
 fn_PopCounter_ω:            FN_ω        P_PopCounter_ret_ω ; fn ω
 
-; P_do_mem_init_α — user function α entry (0 params) [T2: r12=DATA]
+; P_do_mem_init_α — user function α entry (0 params) [r12=DATA block]
 ;  do_mem_init =========================================================================================================
 P_do_mem_init_α:            FN_α_INIT   do_mem_init
                             LOAD_NULVCL
@@ -1498,7 +1526,7 @@ P_do_mem_init_α:            FN_α_INIT   do_mem_init
 fn_do_mem_init_γ:           FN_γ        P_do_mem_init_ret_γ ; fn γ
 fn_do_mem_init_ω:           FN_ω        P_do_mem_init_ret_ω ; fn ω
 
-; P_do_new_sent_α — user function α entry (0 params) [T2: r12=DATA]
+; P_do_new_sent_α — user function α entry (0 params) [r12=DATA block]
 ;  do_new_sent =========================================================================================================
 P_do_new_sent_α:            FN_α_INIT   do_new_sent
                             LOAD_NULVCL
@@ -1512,7 +1540,7 @@ P_do_new_sent_α:            FN_α_INIT   do_new_sent
 fn_do_new_sent_γ:           FN_γ        P_do_new_sent_ret_γ ; fn γ
 fn_do_new_sent_ω:           FN_ω        P_do_new_sent_ret_ω ; fn ω
 
-; P_do_add_tok_α — user function α entry (0 params) [T2: r12=DATA]
+; P_do_add_tok_α — user function α entry (0 params) [r12=DATA block]
 ;  do_add_tok ==========================================================================================================
 P_do_add_tok_α:             FN_α_INIT   do_add_tok
                             LOAD_NULVCL
@@ -1526,7 +1554,7 @@ P_do_add_tok_α:             FN_α_INIT   do_add_tok
 fn_do_add_tok_γ:            FN_γ        P_do_add_tok_ret_γ ; fn γ
 fn_do_add_tok_ω:            FN_ω        P_do_add_tok_ret_ω ; fn ω
 
-; P_claws_info_α (α entry) [T2: r12=DATA]
+; P_claws_info_α (α entry) [r12=DATA block]
 P_claws_info_α:             jmp         seq_l1_α ; SEQ
 P_claws_info_β:             jmp         seq_r1_β
 seq_l1_α:                   POS_α       0, cursor, seq_r1_α, patdef_claws_info_ω ; POS(%ld)
@@ -1554,8 +1582,8 @@ seq_r2_α:                   jmp         seq_l4_α ; SEQ
 seq_r2_β:                   jmp         seq_r4_β
 
 seq_l4_α:                   ARBNO_α     r12+16, arb5_stack, cursor, seq_r4_α ; ARBNO α
-seq_l4_β:                   ARBNO_β     r12+16, arb5_stack, r12+16, cursor, arb5_child_α, seq_l2_β ; ARBNO β
-arb5_child_ok:              ARBNO_α1    r12+16, arb5_stack, r12+16, cursor, seq_r4_α, seq_l2_β ; ARBNO child_ok
+seq_l4_β:                   ARBNO_β     r12+16, arb5_stack, r12+24, cursor, arb5_child_α, seq_l2_β ; ARBNO β
+arb5_child_ok:              ARBNO_α1    r12+16, arb5_stack, r12+24, cursor, seq_r4_α, seq_l2_β ; ARBNO child_ok
 arb5_child_fail:            ARBNO_β1    seq_l2_β ; ARBNO β1
 arb5_child_α:               jmp         seq_l6_α ; SEQ
 arb5_child_β:               jmp         seq_r6_β
@@ -1730,11 +1758,11 @@ box_claws_info_reloc_count: dq 0
 box_claws_info_reloc_table:
 ; (entries added by M-T2-INVOKE)
 
-;  T2 RELOCATION TABLES ================================================================================================
+;  BOX RELOCATION TABLES ===============================================================================================
 
 global  box_InitStack_data_template, box_InitStack_data_size
 section .data
-;  T2 DATA TEMPLATES ===================================================================================================
+;  BOX DATA TEMPLATES ==================================================================================================
                             align       8
 box_InitStack_data_size: dq 64
 box_InitStack_data_template:
