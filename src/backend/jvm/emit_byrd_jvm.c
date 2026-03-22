@@ -500,10 +500,74 @@ static void jvm_emit_expr(EXPR_t *e) {
         JI("invokestatic", ivdesc);
         break;
     }
+    case E_DIV: {
+        /* SNOBOL4 division: integer/integer -> integer (truncate toward zero).
+         * Emit both operands as strings into scratch locals, check sno_is_integer
+         * on each; if both integers use ldiv, else ddiv. */
+        static int _divlbl = 0;
+        int div_id = _divlbl++;
+        char div_float[32], div_done[32];
+        snprintf(div_float, sizeof div_float, "Ldivf_%d", div_id);
+        snprintf(div_done,  sizeof div_done,  "Ldivd_%d", div_id);
+        /* loc_s0, loc_s1: string operands (single-wide Object refs) */
+        int loc_s0 = jvm_arith_local_base + 4;
+        int loc_s1 = jvm_arith_local_base + 5;
+        int loc_d  = jvm_arith_local_base;       /* double scratch */
+        int loc_l  = jvm_arith_local_base + 2;   /* long   scratch */
+        jvm_need_integer_helper = 1;
+        /* Evaluate and stash operands */
+        jvm_emit_expr(e->children[0]);
+        J("    astore %d\n", loc_s0);
+        jvm_emit_expr(e->children[1]);
+        J("    astore %d\n", loc_s1);
+        /* Check both are integers */
+        char desc_isi[512];
+        snprintf(desc_isi, sizeof desc_isi, "%s/sno_is_integer(Ljava/lang/String;)Z", jvm_classname);
+        J("    aload %d\n", loc_s0);
+        JI("invokestatic", desc_isi);
+        J("    ifeq %s\n", div_float);    /* s0 not integer -> float path */
+        J("    aload %d\n", loc_s1);
+        JI("invokestatic", desc_isi);
+        J("    ifeq %s\n", div_float);    /* s1 not integer -> float path */
+        /* Integer path: Long.parseLong(s0) / Long.parseLong(s1) */
+        J("    aload %d\n", loc_s0);
+        JI("invokestatic", "java/lang/Long/parseLong(Ljava/lang/String;)J");
+        J("    aload %d\n", loc_s1);
+        JI("invokestatic", "java/lang/Long/parseLong(Ljava/lang/String;)J");
+        JI("ldiv", "");
+        jvm_l2sno();
+        JI("goto", div_done);
+        /* Float path: sno_to_double(s0) / sno_to_double(s1), then whole-check */
+        J("%s:\n", div_float);
+        J("    aload %d\n", loc_s0);
+        jvm_emit_to_double();
+        J("    aload %d\n", loc_s1);
+        jvm_emit_to_double();
+        JI("ddiv", "");
+        /* whole-number check */
+        J("    dstore %d\n", loc_d);
+        J("    dload %d\n",  loc_d);
+        JI("d2l",  "");
+        J("    lstore %d\n", loc_l);
+        J("    lload %d\n",  loc_l);
+        JI("l2d",  "");
+        J("    dload %d\n",  loc_d);
+        JI("dcmpl", "");
+        char div_frac[32];
+        snprintf(div_frac, sizeof div_frac, "Ldivfr_%d", div_id);
+        JI("ifne", div_frac);
+        J("    lload %d\n", loc_l);
+        jvm_l2sno();
+        JI("goto", div_done);
+        J("%s:\n", div_frac);
+        J("    dload %d\n", loc_d);
+        jvm_d2sno();
+        J("%s:\n", div_done);
+        break;
+    }
     case E_ADD:
     case E_SUB:
     case E_MPY:
-    case E_DIV:
     case E_EXPOP: {
         /* Arithmetic: parse both sides to double, operate, convert back */
         jvm_emit_expr(e->children[0]);
@@ -514,7 +578,6 @@ static void jvm_emit_expr(EXPR_t *e) {
         case E_ADD:   JI("dadd", ""); break;
         case E_SUB:   JI("dsub", ""); break;
         case E_MPY:   JI("dmul", ""); break;
-        case E_DIV:   JI("ddiv", ""); break;
         case E_EXPOP:
             /* Math.pow(a, b) */
             JI("invokestatic", "java/lang/Math/pow(DD)D");
@@ -2817,7 +2880,10 @@ static void jvm_emit_stmt(STMT_t *s, int stmt_idx) {
 
         /* --- FAIL --- */
         J("%s:\n", lbl_fail);
-        if (s->go && s->go->onfailure && s->go->onfailure[0]) {
+        if (s->go && s->go->uncond && s->go->uncond[0]) {
+            /* Unconditional goto fires on failure too */
+            jvm_emit_goto(s->go->uncond);
+        } else if (s->go && s->go->onfailure && s->go->onfailure[0]) {
             jvm_emit_goto(s->go->onfailure);
         }
         return;
