@@ -1,12 +1,12 @@
 /*
- * pl_unify_test.c — unit test for M-PROLOG-TERM
+ * prolog_unify_test.c — unit test for M-PROLOG-TERM
  *
  * Acceptance criterion (from PLAN.md):
  *   unify(f(X,a), f(b,Y)) -> X=b, Y=a
  *   trail_unwind restores both X and Y to unbound.
  *
  * Build:
- *   gcc -I. -o pl_unify_test pl_unify_test.c pl_unify.c pl_atom.c
+ *   gcc -I. -o prolog_unify_test prolog_unify_test.c prolog_unify.c prolog_atom.c
  *
  * Expected output:
  *   PASS: unify(f(X,a), f(b,Y)) succeeds
@@ -18,8 +18,8 @@
  */
 
 #include "term.h"
-#include "pl_atom.h"
-#include "pl_runtime.h"
+#include "prolog_atom.h"
+#include "prolog_runtime.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,11 +40,11 @@ static int tests_passed = 0;
 
 int main(void) {
     /* --- setup ---------------------------------------------------------- */
-    pl_atom_init();
+    prolog_atom_init();
 
-    int atom_f = pl_atom_intern("f");
-    int atom_a = pl_atom_intern("a");
-    int atom_b = pl_atom_intern("b");
+    int atom_f = prolog_atom_intern("f");
+    int atom_a = prolog_atom_intern("a");
+    int atom_b = prolog_atom_intern("b");
 
     Trail trail;
     trail_init(&trail);

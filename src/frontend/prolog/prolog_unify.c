@@ -1,5 +1,5 @@
 /*
- * pl_unify.c — Trail and unification for the Prolog frontend
+ * prolog_unify.c — Trail and unification for the Prolog frontend
  *
  * Implements Robinson's unification algorithm with occurs-check omitted
  * (standard Prolog semantics).  All variable bindings are recorded on
@@ -12,7 +12,7 @@
  *   the variable environment before retrying or signalling failure.
  */
 
-#include "pl_runtime.h"
+#include "prolog_runtime.h"
 #include "term.h"
 
 #include <stdlib.h>

@@ -1,7 +1,7 @@
 #ifndef PL_PARSE_H
 #define PL_PARSE_H
 /*
- * pl_parse.h — ClauseAST for the Prolog frontend
+ * prolog_parse.h — ClauseAST for the Prolog frontend
  *
  * The parser produces a linked list of PlClause nodes (one per clause
  * or directive).  Each clause has a head Term* and a body Term** array.
@@ -13,7 +13,7 @@
  */
 
 #include "term.h"
-#include "pl_atom.h"
+#include "prolog_atom.h"
 #include <stdio.h>
 
 /* -------------------------------------------------------------------------
@@ -43,25 +43,25 @@ typedef struct {
  * ---------------------------------------------------------------------- */
 
 /*
- * pl_parse(src, filename) — parse a NUL-terminated Prolog source string.
+ * prolog_parse(src, filename) — parse a NUL-terminated Prolog source string.
  *
  * Returns a heap-allocated PlProgram*.  The caller owns it.
  * prog->nerrors > 0 means parse errors were reported to stderr.
  * The program is still returned (partial parse); caller decides whether
  * to abort on errors.
  */
-PlProgram *pl_parse(const char *src, const char *filename);
+PlProgram *prolog_parse(const char *src, const char *filename);
 
 /*
- * pl_program_pretty(prog, out) — pretty-print parsed program for
+ * prolog_program_pretty(prog, out) — pretty-print parsed program for
  * round-trip verification.
  */
-void pl_program_pretty(PlProgram *prog, FILE *out);
+void prolog_program_pretty(PlProgram *prog, FILE *out);
 
 /*
- * pl_program_free(prog) — release all memory.
+ * prolog_program_free(prog) — release all memory.
  */
-void pl_program_free(PlProgram *prog);
+void prolog_program_free(PlProgram *prog);
 
 /* -------------------------------------------------------------------------
  * Term pretty-printer (also used by pl_lower.c diagnostics)

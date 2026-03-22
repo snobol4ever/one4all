@@ -14,7 +14,7 @@
  *   - Clause terminator: . followed by whitespace or EOF
  */
 
-#include "pl_lex.h"
+#include "prolog_lex.h"
 
 #include <stdlib.h>
 #include <string.h>
