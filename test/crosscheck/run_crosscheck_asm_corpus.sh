@@ -34,10 +34,10 @@ gcc -O0 -g -c "$RT/snobol4/snobol4.c"         -I"$RT/snobol4" -I"$RT" -I"$SNO2C_
 gcc -O0 -g -c "$RT/mock/mock_includes.c"       -I"$RT/snobol4" -I"$RT" -I"$SNO2C_INC" -w -o "$WORK/mock_includes.o"
 gcc -O0 -g -c "$RT/snobol4/snobol4_pattern.c" -I"$RT/snobol4" -I"$RT" -I"$SNO2C_INC" -w -o "$WORK/snobol4_pattern.o"
 gcc -O0 -g -c "$RT/mock/mock_engine.c"         -I"$RT/snobol4" -I"$RT" -I"$SNO2C_INC" -w -o "$WORK/mock_engine.o"
-gcc -O0 -g -c "$RT/asm/t2_alloc.c"            -I"$RT/asm"                              -w -o "$WORK/t2_alloc.o"
-gcc -O0 -g -c "$RT/asm/t2_reloc.c"            -I"$RT/asm"                              -w -o "$WORK/t2_reloc.o"
+gcc -O0 -g -c "$RT/asm/blk_alloc.c"            -I"$RT/asm"                              -w -o "$WORK/blk_alloc.o"
+gcc -O0 -g -c "$RT/asm/blk_reloc.c"            -I"$RT/asm"                              -w -o "$WORK/blk_reloc.o"
 
-RT_OBJS="$WORK/stmt_rt.o $WORK/snobol4.o $WORK/mock_includes.o $WORK/snobol4_pattern.o $WORK/mock_engine.o $WORK/t2_alloc.o $WORK/t2_reloc.o"
+RT_OBJS="$WORK/stmt_rt.o $WORK/snobol4.o $WORK/mock_includes.o $WORK/snobol4_pattern.o $WORK/mock_engine.o $WORK/blk_alloc.o $WORK/blk_reloc.o"
 
 run_test() {
     local sno="$1"

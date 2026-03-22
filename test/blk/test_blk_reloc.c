@@ -1,19 +1,19 @@
 /*
- * test_t2_reloc.c — unit test for t2_relocate()
+ * test_blk_reloc.c — unit test for blk_relocate()
  *
  * Builds synthetic TEXT blocks with known REL32 and ABS64 fields,
- * applies t2_relocate with a known delta, and verifies the patched values.
+ * applies blk_relocate with a known delta, and verifies the patched values.
  *
  * Also exercises the full copy→relocate→flush→mprotect_rx pipeline
  * to confirm the idiom is correct end-to-end.
  *
  * Compile:
- *   gcc -Wall -o /tmp/test_t2_reloc \
- *       test/t2/test_t2_reloc.c \
- *       src/runtime/asm/t2_reloc.c \
- *       src/runtime/asm/t2_alloc.c
+ *   gcc -Wall -o /tmp/test_blk_reloc \
+ *       test/t2/test_blk_reloc.c \
+ *       src/runtime/asm/blk_reloc.c \
+ *       src/runtime/asm/blk_alloc.c
  * Run:
- *   /tmp/test_t2_reloc  → PASS for each test, exit 0
+ *   /tmp/test_blk_reloc  → PASS for each test, exit 0
  */
 
 #include <stdio.h>
@@ -21,8 +21,8 @@
 #include <string.h>
 #include <stdint.h>
 #include <unistd.h>
-#include "../../src/runtime/asm/t2_alloc.h"
-#include "../../src/runtime/asm/t2_reloc.h"
+#include "../../src/runtime/asm/blk_alloc.h"
+#include "../../src/runtime/asm/blk_reloc.h"
 
 static int failures = 0;
 
@@ -56,11 +56,11 @@ static void test_rel32_forward(void) {
     uint8_t text[16] = {0};
     put_i32(text, 4, 0x10);  /* original rel32 */
 
-    t2_reloc_entry e = { .offset = 4, .kind = T2_RELOC_REL32 };
+    blk_reloc_entry e = { .offset = 4, .kind = BLK_RELOC_REL32 };
     ptrdiff_t delta = 0x1000;  /* block moved forward 4096 bytes */
 
-    int r = t2_relocate(text, sizeof text, delta, &e, 1);
-    CHECK(r == 0, "rel32_forward: t2_relocate returns 0");
+    int r = blk_relocate(text, sizeof text, delta, &e, 1);
+    CHECK(r == 0, "rel32_forward: blk_relocate returns 0");
 
     /* new_rel32 = 0x10 - 0x1000 = -0xFF0 */
     int32_t expected = 0x10 - 0x1000;
@@ -74,10 +74,10 @@ static void test_rel32_backward(void) {
     uint8_t text[16] = {0};
     put_i32(text, 0, -0x80);   /* rel32 = -128 */
 
-    t2_reloc_entry e = { .offset = 0, .kind = T2_RELOC_REL32 };
+    blk_reloc_entry e = { .offset = 0, .kind = BLK_RELOC_REL32 };
     ptrdiff_t delta = -0x200;  /* block moved backward 512 bytes */
 
-    int r = t2_relocate(text, sizeof text, delta, &e, 1);
+    int r = blk_relocate(text, sizeof text, delta, &e, 1);
     CHECK(r == 0, "rel32_backward: returns 0");
 
     int32_t expected = -0x80 - (-0x200);   /* = 0x180 */
@@ -92,10 +92,10 @@ static void test_abs64(void) {
     uint64_t orig_ptr = 0xDEADBEEF12340000ULL;
     put_u64(text, 4, orig_ptr);
 
-    t2_reloc_entry e = { .offset = 4, .kind = T2_RELOC_ABS64 };
+    blk_reloc_entry e = { .offset = 4, .kind = BLK_RELOC_ABS64 };
     ptrdiff_t delta = 0x8000;
 
-    int r = t2_relocate(text, sizeof text, delta, &e, 1);
+    int r = blk_relocate(text, sizeof text, delta, &e, 1);
     CHECK(r == 0, "abs64: returns 0");
     CHECK(get_u64(text, 4) == orig_ptr + 0x8000, "abs64: patched value correct");
 }
@@ -109,14 +109,14 @@ static void test_mixed_table(void) {
     put_i32(text,  8, -0x40);
     put_u64(text, 16, 0xCAFEBABE00000000ULL);
 
-    t2_reloc_entry table[3] = {
-        { .offset =  0, .kind = T2_RELOC_REL32 },
-        { .offset =  8, .kind = T2_RELOC_REL32 },
-        { .offset = 16, .kind = T2_RELOC_ABS64 },
+    blk_reloc_entry table[3] = {
+        { .offset =  0, .kind = BLK_RELOC_REL32 },
+        { .offset =  8, .kind = BLK_RELOC_REL32 },
+        { .offset = 16, .kind = BLK_RELOC_ABS64 },
     };
     ptrdiff_t delta = 0x4000;
 
-    int r = t2_relocate(text, sizeof text, delta, table, 3);
+    int r = blk_relocate(text, sizeof text, delta, table, 3);
     CHECK(r == 0, "mixed_table: returns 0");
     CHECK(get_i32(text,  0) == 0x100  - 0x4000, "mixed_table: rel32[0] correct");
     CHECK(get_i32(text,  8) == -0x40  - 0x4000, "mixed_table: rel32[1] correct");
@@ -132,11 +132,11 @@ static void test_zero_delta(void) {
     put_i32(text, 0, 0x55AA);
     put_u64(text, 8, 0x1234567890ABCDEFULL);
 
-    t2_reloc_entry table[2] = {
-        { .offset = 0, .kind = T2_RELOC_REL32 },
-        { .offset = 8, .kind = T2_RELOC_ABS64 },
+    blk_reloc_entry table[2] = {
+        { .offset = 0, .kind = BLK_RELOC_REL32 },
+        { .offset = 8, .kind = BLK_RELOC_ABS64 },
     };
-    int r = t2_relocate(text, sizeof text, 0, table, 2);
+    int r = blk_relocate(text, sizeof text, 0, table, 2);
     CHECK(r == 0, "zero_delta: returns 0");
     CHECK(get_i32(text, 0) == 0x55AA, "zero_delta: rel32 unchanged");
     CHECK(get_u64(text, 8) == 0x1234567890ABCDEFULL, "zero_delta: abs64 unchanged");
@@ -149,9 +149,9 @@ static void test_rel32_overflow(void) {
     uint8_t text[16] = {0};
     put_i32(text, 0, INT32_MAX);   /* max positive */
 
-    t2_reloc_entry e = { .offset = 0, .kind = T2_RELOC_REL32 };
+    blk_reloc_entry e = { .offset = 0, .kind = BLK_RELOC_REL32 };
     /* delta = -1 → new_rel32 = INT32_MAX - (-1) = INT32_MAX+1 → overflow */
-    int r = t2_relocate(text, sizeof text, -1, &e, 1);
+    int r = blk_relocate(text, sizeof text, -1, &e, 1);
     CHECK(r == -1, "rel32_overflow: returns -1 on overflow");
 }
 
@@ -160,12 +160,12 @@ static void test_rel32_overflow(void) {
  * --------------------------------------------------------------------- */
 static void test_oob_offset(void) {
     uint8_t text[8] = {0};
-    t2_reloc_entry e = { .offset = 6, .kind = T2_RELOC_REL32 };  /* 6+4=10 > 8 */
-    int r = t2_relocate(text, sizeof text, 0, &e, 1);
+    blk_reloc_entry e = { .offset = 6, .kind = BLK_RELOC_REL32 };  /* 6+4=10 > 8 */
+    int r = blk_relocate(text, sizeof text, 0, &e, 1);
     CHECK(r == -1, "oob_offset: returns -1 for out-of-bounds REL32");
 
-    t2_reloc_entry e2 = { .offset = 4, .kind = T2_RELOC_ABS64 };  /* 4+8=12 > 8 */
-    int r2 = t2_relocate(text, sizeof text, 0, &e2, 1);
+    blk_reloc_entry e2 = { .offset = 4, .kind = BLK_RELOC_ABS64 };  /* 4+8=12 > 8 */
+    int r2 = blk_relocate(text, sizeof text, 0, &e2, 1);
     CHECK(r2 == -1, "oob_offset: returns -1 for out-of-bounds ABS64");
 }
 
@@ -174,8 +174,8 @@ static void test_oob_offset(void) {
  * --------------------------------------------------------------------- */
 static void test_empty_table(void) {
     uint8_t text[8] = {0xCC};
-    CHECK(t2_relocate(text, 8, 100, NULL, 0) == 0, "empty_table: NULL table returns 0");
-    CHECK(t2_relocate(text, 8, 100, (t2_reloc_entry*)text, 0) == 0,
+    CHECK(blk_relocate(text, 8, 100, NULL, 0) == 0, "empty_table: NULL table returns 0");
+    CHECK(blk_relocate(text, 8, 100, (blk_reloc_entry*)text, 0) == 0,
           "empty_table: n=0 returns 0");
 }
 
@@ -192,21 +192,21 @@ static void test_full_pipeline(void) {
     };
     size_t sz = sizeof snippet;
 
-    uint8_t *text = t2_alloc(sz);
-    CHECK(text != NULL, "pipeline: t2_alloc succeeds");
+    uint8_t *text = blk_alloc(sz);
+    CHECK(text != NULL, "pipeline: blk_alloc succeeds");
 
     memcpy(text, snippet, sz);
 
     /* No relocations in this snippet */
-    int r = t2_relocate(text, sz, 0, NULL, 0);
-    CHECK(r == 0, "pipeline: t2_relocate (no entries) succeeds");
+    int r = blk_relocate(text, sz, 0, NULL, 0);
+    CHECK(r == 0, "pipeline: blk_relocate (no entries) succeeds");
 
     /* Flush i$/d$ before marking executable */
-    t2_flush_icache(text, sz);
-    CHECK(1, "pipeline: t2_flush_icache called");
+    blk_flush_icache(text, sz);
+    CHECK(1, "pipeline: blk_flush_icache called");
 
-    int rx = t2_mprotect_rx(text, sz);
-    CHECK(rx == 0, "pipeline: t2_mprotect_rx succeeds");
+    int rx = blk_mprotect_rx(text, sz);
+    CHECK(rx == 0, "pipeline: blk_mprotect_rx succeeds");
 
     /* Call the snippet — expect return value 0x42 */
     typedef int (*fn_t)(void);
@@ -214,7 +214,7 @@ static void test_full_pipeline(void) {
     int val = fn();
     CHECK(val == 0x42, "pipeline: JIT'd snippet returns 0x42");
 
-    t2_free(text, sz);
+    blk_free(text, sz);
 }
 
 /* -----------------------------------------------------------------------

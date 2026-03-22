@@ -1988,7 +1988,7 @@
 ;   ω trampoline for non-function named pattern: jmp [ret_ω]
 ;
 ; FN_α_INIT
-;   Start of function α: self-init r12 to static DATA template (pre-T2-INVOKE)
+;   Start of function α: self-init r12 to static DATA template (pre-invoke)
 ;   Arg: safe name of the box (used to derive box_<safe>_data_template label)
 ;   This is a %macro taking 1 arg: the safe name string — emitted as a label ref.
 ;
@@ -2029,7 +2029,7 @@
     jmp     [%1]
 %endmacro
 
-%macro FN_α_INIT 1        ; box_safe_name  (no-op: T2 alloc+memcpy done at call site)
+%macro FN_α_INIT 1        ; box_safe_name  (no-op: blk_alloc+memcpy done at call site)
 %endmacro
 
 %macro FN_SET_PARAM 1         ; param_varlab  (rdi=varlab, rsi/rdx=arg from arg slots)
