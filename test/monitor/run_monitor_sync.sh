@@ -6,8 +6,8 @@
 # all 5 immediately and reports exactly who diverged and what they said.
 #
 # Two FIFOs per participant:
-#   <name>.evt  — participant writes events, controller reads
-#   <name>.ack  — controller writes GO/STOP, participant reads
+#   <name>.ready  — participant writes events, controller reads
+#   <name>.go  — controller writes GO/STOP, participant reads
 #
 # Exit 0 = all agree. Exit 1 = divergence. Exit 2 = timeout/error.
 
@@ -39,25 +39,25 @@ echo "[sync] program: $SNO_BASE"
 
 # ── Step 1: inject traces ────────────────────────────────────────────────
 python3 "$MDIR/inject_traces.py" "$SNO" "$CONF" > "$TMP/instr.sno"
-# Patch preamble: MON_OPEN now takes TWO args (event_fifo, ack_fifo)
-# inject_traces.py emits: MON_OPEN(MON_FIFO_)
-# We need:               MON_OPEN(MON_EVT_FIFO_, MON_ACK_FIFO_)
-# Also add MON_ACK_FIFO_ read from env MONITOR_ACK_FIFO
+# Patch preamble: MON_OPEN now takes TWO args (ready_pipe, go_pipe)
+# inject_traces.py emits: MON_OPEN(MON_READY_PIPE_)
+# We need:               MON_OPEN(MON_EVT_FIFO_, MON_GO_PIPE_)
+# Also add MON_GO_PIPE_ read from env MONITOR_GO_PIPE
 python3 - "$TMP/instr.sno" << 'PYEOF'
 import sys, re
 path = sys.argv[1]
 with open(path) as f:
     src = f.read()
-# Insert MON_ACK_FIFO_ read after MON_FIFO_ read
+# Insert MON_GO_PIPE_ read after MON_READY_PIPE_ read
 src = src.replace(
-    "        MON_FIFO_       =  HOST(4,'MONITOR_FIFO')\n",
-    "        MON_FIFO_       =  HOST(4,'MONITOR_FIFO')\n"
-    "        MON_ACK_FIFO_   =  HOST(4,'MONITOR_ACK_FIFO')\n"
+    "        MON_READY_PIPE_       =  HOST(4,'MONITOR_READY_PIPE')\n",
+    "        MON_READY_PIPE_       =  HOST(4,'MONITOR_READY_PIPE')\n"
+    "        MON_GO_PIPE_   =  HOST(4,'MONITOR_GO_PIPE')\n"
 )
 # Patch MON_OPEN call to pass both FIFOs
 src = src.replace(
-    "        MON_OPEN(MON_FIFO_)",
-    "        MON_OPEN(MON_FIFO_, MON_ACK_FIFO_)"
+    "        MON_OPEN(MON_READY_PIPE_)",
+    "        MON_OPEN(MON_READY_PIPE_, MON_GO_PIPE_)"
 )
 with open(path, 'w') as f:
     f.write(src)
@@ -109,36 +109,36 @@ fi
 # ── Step 5: create FIFOs (two per participant) ───────────────────────────
 NAMES="csn spl asm jvm net"
 for p in $NAMES; do
-    mkfifo "$TMP/$p.evt"
-    mkfifo "$TMP/$p.ack"
+    mkfifo "$TMP/$p.ready"
+    mkfifo "$TMP/$p.go"
 done
 
-EVT_PATHS=$(echo $NAMES | tr ' ' '\n' | sed "s|.*|$TMP/&.evt|" | tr '\n' ',' | sed 's/,$//')
-ACK_PATHS=$(echo $NAMES | tr ' ' '\n' | sed "s|.*|$TMP/&.ack|" | tr '\n' ',' | sed 's/,$//')
+READY_PATHS=$(echo $NAMES | tr ' ' '\n' | sed "s|.*|$TMP/&.ready|" | tr '\n' ',' | sed 's/,$//')
+GO_PATHS=$(echo $NAMES | tr ' ' '\n' | sed "s|.*|$TMP/&.go|" | tr '\n' ',' | sed 's/,$//')
 
 # ── Step 6: launch all 5 participants (background) ───────────────────────
 # Must start before controller so both FIFO ends open simultaneously.
-MONITOR_FIFO="$TMP/csn.evt" MONITOR_ACK_FIFO="$TMP/csn.ack" MONITOR_SO="$SO" \
+MONITOR_READY_PIPE="$TMP/csn.ready" MONITOR_GO_PIPE="$TMP/csn.go" MONITOR_SO="$SO" \
     snobol4 -f -P256k -I"$INC" "$TMP/instr.sno" \
     < "$STDIN_SRC" > "$TMP/csn.out" 2>"$TMP/csn.err" &
 CSN_PID=$!
 
-SNOLIB="$X64_DIR" MONITOR_FIFO="$TMP/spl.evt" MONITOR_ACK_FIFO="$TMP/spl.ack" \
+SNOLIB="$X64_DIR" MONITOR_READY_PIPE="$TMP/spl.ready" MONITOR_GO_PIPE="$TMP/spl.go" \
     MONITOR_SO="$X64_DIR/monitor_ipc_spitbol.so" \
     "$X64_DIR/bootsbl" "$TMP/instr.sno" \
     < "$STDIN_SRC" > "$TMP/spl.out" 2>"$TMP/spl.err" &
 SPL_PID=$!
 
-MONITOR_FIFO="$TMP/asm.evt" MONITOR_ACK_FIFO="$TMP/asm.ack" \
+MONITOR_READY_PIPE="$TMP/asm.ready" MONITOR_GO_PIPE="$TMP/asm.go" \
     "$TMP/prog_asm" < "$STDIN_SRC" > "$TMP/asm.out" 2>"$TMP/asm.err" &
 ASM_PID=$!
 
-MONITOR_FIFO="$TMP/jvm.evt" MONITOR_ACK_FIFO="$TMP/jvm.ack" \
+MONITOR_READY_PIPE="$TMP/jvm.ready" MONITOR_GO_PIPE="$TMP/jvm.go" \
     java -cp "$JVM_CACHE" "$classname" \
     < "$STDIN_SRC" > "$TMP/jvm.out" 2>"$TMP/jvm.err" &
 JVM_PID=$!
 
-MONITOR_FIFO="$TMP/net.evt" MONITOR_ACK_FIFO="$TMP/net.ack" \
+MONITOR_READY_PIPE="$TMP/net.ready" MONITOR_GO_PIPE="$TMP/net.go" \
     mono "$exe" < "$STDIN_SRC" > "$TMP/net.out" 2>"$TMP/net.err" &
 NET_PID=$!
 
@@ -146,8 +146,8 @@ NET_PID=$!
 python3 "$MDIR/monitor_sync.py" \
     "$TIMEOUT" \
     "csn,spl,asm,jvm,net" \
-    "$EVT_PATHS" \
-    "$ACK_PATHS" > "$TMP/ctrl.out" 2>&1 &
+    "$READY_PATHS" \
+    "$GO_PATHS" > "$TMP/ctrl.out" 2>&1 &
 CTRL_PID=$!
 
 # ── Step 8: wait for controller ──────────────────────────────────────────

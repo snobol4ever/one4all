@@ -18,25 +18,41 @@
 #include <unistd.h>
 
 /* ============================================================
- * COMM — monitor telemetry (Pick Monitor / double-trace)
+ * COMM — monitor telemetry (sync-step 5-way monitor)
  *
- * When monitor_fd >= 0, every statement and every variable
- * assignment emits an event to that file descriptor.
- * Run with:  ./beautiful 2>/tmp/binary_trace.txt
- * (monitor_fd defaults to stderr = fd 2)
- *
- * Format mirrors CSNOBOL4 &TRACE output:
- *   STNO <n>
- *   VAR <name> <quoted-value>
+ * Wire protocol — RS/US delimiters (ASCII 0x1E / 0x1F):
+ *   KIND \x1E name \x1F value \x1E
+ *   \x1E (RS) = record terminator; \x1F (US) = name/value separator
+ *   Newlines and all bytes in values pass through unescaped.
  * ============================================================ */
-int monitor_fd  = -1;   /* -1 = disabled; write end of event FIFO */
-int monitor_ack_fd = -1; /* -1 = async mode; read end of ack FIFO (sync-step) */
+#define MON_RS "\x1e"
+#define MON_US "\x1f"
+#include <sys/uio.h>
 
-/* &STCOUNT — incremented every statement; checked against &STLIMIT */
+int monitor_fd  = -1;
+int monitor_ack_fd = -1;
+
 int64_t kw_stcount = 0;
 
+static void mon_send(const char *kind, const char *name, const char *value) {
+    if (monitor_fd < 0) return;
+    if (!value) value = "";
+    struct iovec iov[6];
+    iov[0].iov_base = (void*)kind;   iov[0].iov_len = strlen(kind);
+    iov[1].iov_base = MON_RS;        iov[1].iov_len = 1;
+    iov[2].iov_base = (void*)name;   iov[2].iov_len = strlen(name);
+    iov[3].iov_base = MON_US;        iov[3].iov_len = 1;
+    iov[4].iov_base = (void*)value;  iov[4].iov_len = strlen(value);
+    iov[5].iov_base = MON_RS;        iov[5].iov_len = 1;
+    writev(monitor_fd, iov, 6);
+    if (monitor_ack_fd >= 0) {
+        char ack[1];
+        ssize_t r = read(monitor_ack_fd, ack, 1);
+        if (r != 1 || ack[0] == 'S') exit(0);
+    }
+}
+
 void comm_stno(int n) {
-    /* Always increment &STCOUNT; enforce &STLIMIT only when set (patch P001) */
     ++kw_stcount;
     if (kw_stlimit >= 0 && kw_stcount > kw_stlimit) {
         fprintf(stderr, "\n** &STLIMIT exceeded at statement %d"
@@ -44,24 +60,13 @@ void comm_stno(int n) {
                 n, (long long)kw_stcount, (long long)kw_stlimit);
         exit(1);
     }
-    if (monitor_fd < 0) return;
-    dprintf(monitor_fd, "STNO %d\n", n);
 }
 
 void comm_var(const char *name, DESCR_t val) {
     if (monitor_fd < 0) return;
-    /* skip noisy internal variables */
-    if (!name) return;
-    if (name[0] == '_') return;          /* internal scratch vars */
+    if (!name || name[0] == '_') return;
     const char *s = VARVAL_fn(val);
-    dprintf(monitor_fd, "VAR %s \"%s\"\n", name, s ? s : "<null>");
-    /* sync-step: block waiting for GO/STOP ack from controller */
-    if (monitor_ack_fd >= 0) {
-        char ack[1];
-        ssize_t r = read(monitor_ack_fd, ack, 1);
-        /* 'S' (stop) or read error → exit cleanly */
-        if (r != 1 || ack[0] == 'S') exit(0);
-    }
+    mon_send("VALUE", name, s ? s : "(undef)");
 }
 
 /* ============================================================
@@ -747,18 +752,18 @@ void SNO_INIT_fn(void) {
     alphabet[256] = '\0';
     /* Register as NV keyword — pointer identity used by SIZE for correct length */
     NV_SET_fn("ALPHABET", BSTRVAL(alphabet, 256));
-    /* Enable monitor — prefer named FIFO (MONITOR_FIFO env var) over stderr.
-     * MONITOR_FIFO=/path/to/fifo  → open FIFO, write trace events there (no stderr pollution)
+    /* Enable monitor — prefer named FIFO (MONITOR_READY_PIPE env var) over stderr.
+     * MONITOR_READY_PIPE=/path/to/fifo  → open FIFO, write trace events there (no stderr pollution)
      * MONITOR=1 (legacy)          → write trace events to stderr (fd 2)
      */
-    const char *mon_fifo = getenv("MONITOR_FIFO");
+    const char *mon_fifo = getenv("MONITOR_READY_PIPE");
     if (mon_fifo && mon_fifo[0]) {
         monitor_fd = open(mon_fifo, O_WRONLY | O_NONBLOCK);
         if (monitor_fd < 0) monitor_fd = open(mon_fifo, O_WRONLY);
-        /* sync-step ack FIFO */
-        const char *ack_fifo = getenv("MONITOR_ACK_FIFO");
-        if (ack_fifo && ack_fifo[0])
-            monitor_ack_fd = open(ack_fifo, O_RDONLY);
+        /* sync-step go pipe */
+        const char *go_pipe = getenv("MONITOR_GO_PIPE");
+        if (go_pipe && go_pipe[0])
+            monitor_ack_fd = open(go_pipe, O_RDONLY);
     } else {
         const char *mon = getenv("MONITOR");
         if (mon && mon[0] == '1') monitor_fd = 2;

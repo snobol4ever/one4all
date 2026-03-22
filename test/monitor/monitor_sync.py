@@ -3,15 +3,15 @@
 monitor_sync.py — synchronous barrier-step monitor controller.
 
 Each participant blocks after each trace event waiting for a 1-byte ack.
-Controller reads one event from each of N event FIFOs, compares to oracle
-(participant 0 = CSNOBOL4), sends 'G' (go) or 'S' (stop) to each ack FIFO.
+Controller reads one event from each of N ready pipes, compares to oracle
+(participant 0 = CSNOBOL4), sends 'G' (go) or 'S' (stop) to each go pipe.
 
 Usage:
-    monitor_sync.py <timeout> <names> <event_fifos> <ack_fifos>
+    monitor_sync.py <timeout> <names> <ready_pipes> <go_pipes>
 
     names       = comma-separated: csn,spl,asm,jvm,net
-    event_fifos = comma-separated paths (same order as names)
-    ack_fifos   = comma-separated paths (same order as names)
+    ready_pipes = comma-separated paths (same order as names)
+    go_pipes   = comma-separated paths (same order as names)
 
 Exit 0 = all participants reached END agreeing with oracle.
 Exit 1 = divergence detected (first diverging event printed).
@@ -23,50 +23,71 @@ import os
 import select
 import time
 
-def open_fifos(paths, mode, timeout=30):
-    """Open FIFOs non-blocking for reading, blocking for writing."""
-    fds = []
-    for p in paths:
-        if mode == 'r':
-            fd = os.open(p, os.O_RDONLY | os.O_NONBLOCK)
-            flags = fcntl_module.fcntl(fd, fcntl_module.F_GETFL)
-            fcntl_module.fcntl(fd, fcntl_module.F_SETFL, flags & ~os.O_NONBLOCK)
-        else:
-            fd = os.open(p, os.O_WRONLY)
-        fds.append(fd)
-    return fds
-
 import fcntl as fcntl_module
+
+RS = b'\x1e'   # Record Separator — record terminator
+US = b'\x1f'   # Unit Separator  — name/value delimiter within record
+
+def read_until(fobj, delim):
+    """Read bytes from fobj until delim byte is seen. Returns bytes without delim, or None on EOF."""
+    buf = b''
+    while True:
+        ch = fobj.read(1)
+        if not ch:
+            return None
+        if ch == delim:
+            return buf
+        buf += ch
+
+def read_record(fobj):
+    """Read one KIND RS body RS record.
+    Returns (kind_str, name_str, value_str) or None on EOF."""
+    kind_b = read_until(fobj, RS)
+    if kind_b is None:
+        return None
+    body_b = read_until(fobj, RS)
+    if body_b is None:
+        return None
+    if US in body_b:
+        name_b, value_b = body_b.split(US, 1)
+    else:
+        name_b, value_b = body_b, b''
+    return (kind_b.decode('utf-8', errors='replace'),
+            name_b.decode('utf-8', errors='replace'),
+            value_b.decode('utf-8', errors='replace'))
 
 def main():
     if len(sys.argv) < 5:
-        print("Usage: monitor_sync.py <timeout> <names> <event_fifos> <ack_fifos>")
+        print("Usage: monitor_sync.py <timeout> <names> <ready_pipes> <go_pipes>")
         sys.exit(2)
 
     timeout    = float(sys.argv[1])
     names      = sys.argv[2].split(',')
     evt_paths  = sys.argv[3].split(',')
-    ack_paths  = sys.argv[4].split(',')
+    go_paths  = sys.argv[4].split(',')
     n          = len(names)
 
-    assert len(evt_paths) == n and len(ack_paths) == n
+    assert len(evt_paths) == n and len(go_paths) == n
 
-    print(f"[sync monitor] opening {n} event FIFOs (read)...", flush=True)
-    # Open event FIFOs read-side non-blocking (no writer yet — that's ok)
+    print(f"[sync monitor] opening {n} ready pipes (read)...", flush=True)
+    # Open ready pipes read-side non-blocking (no writer yet — that's ok)
     evt_fds = []
     for p in evt_paths:
         fd = os.open(p, os.O_RDONLY | os.O_NONBLOCK)
         flags = fcntl_module.fcntl(fd, fcntl_module.F_GETFL)
         fcntl_module.fcntl(fd, fcntl_module.F_SETFL, flags & ~os.O_NONBLOCK)
-        evt_fds.append(os.fdopen(fd, 'r', buffering=1))
+        evt_fds.append(os.fdopen(fd, 'rb', buffering=0))  # binary, unbuffered
 
-    print(f"[sync monitor] opening {n} ack FIFOs (write)...", flush=True)
+    print(f"[sync monitor] opening {n} go pipes (write)...", flush=True)
     ack_fds = []
-    for p in ack_paths:
-        fd = os.open(p, os.O_WRONLY)
+    for p in go_paths:
+        # O_RDWR: opens immediately without blocking even if no reader yet.
+        # This is the canonical solution for the FIFO bidirectional open deadlock.
+        # (O_WRONLY|O_NONBLOCK fails with ENXIO if no reader; O_RDWR succeeds always.)
+        fd = os.open(p, os.O_RDWR)
         ack_fds.append(fd)
 
-    print(f"[sync monitor] all FIFOs open — signalling ready", flush=True)
+    print(f"[sync monitor] all named pipes open — signalling ready", flush=True)
     # Signal ready to run_monitor_sync.sh via stdout line
     print("READY", flush=True)
 
@@ -99,14 +120,16 @@ def main():
 
             for fobj in readable:
                 i = evt_fds.index(fobj)
-                line = fobj.readline()
-                if line == '':
+                rec = read_record(fobj)
+                if rec is None:
                     # EOF — participant exited
                     done[i] = True
                     remaining.remove(i)
                     events[i] = '__EOF__'
                 else:
-                    events[i] = line.rstrip('\n')
+                    kind, name, value = rec
+                    # Canonical event key: "KIND\x1fNAME\x1fVALUE"
+                    events[i] = f'{kind}\x1f{name}\x1f{value}'
                     remaining.remove(i)
 
         step += 1
@@ -126,9 +149,15 @@ def main():
 
         if diverged:
             print(f"\nDIVERGENCE at step {step}:")
-            print(f"  oracle [{names[0]}]: {oracle_event!r}")
+            def fmt(e):
+                if e == '__EOF__': return '<EOF>'
+                parts = e.split('\x1f', 2)
+                if len(parts) == 3:
+                    return f'{parts[0]} {parts[1]} = {parts[2]!r}'
+                return repr(e)
+            print(f"  oracle [{names[0]}]: {fmt(oracle_event)}")
             for i in diverged:
-                print(f"  FAIL   [{names[i]}]: {events[i]!r}")
+                print(f"  FAIL   [{names[i]}]: {fmt(events[i])}")
             agree = [i for i in alive if i not in diverged and i != 0]
             if agree:
                 print(f"  AGREE  [{','.join(names[i] for i in agree)}]: {oracle_event!r}")

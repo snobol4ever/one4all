@@ -8,7 +8,7 @@ Strategy:
   - Injects LOAD() preamble for monitor_ipc.so (MON_OPEN/MON_SEND/MON_CLOSE).
   - Injects three SNOBOL4 callback functions (MONCALL, MONRET, MONVAL) that
     write trace events via MON_SEND() to a named FIFO.
-  - FIFO path read from env var MONITOR_FIFO; .so path from MONITOR_SO.
+  - FIFO path read from env var MONITOR_READY_PIPE; .so path from MONITOR_SO.
   - Sets &TRACE = 16000000 (SPITBOL max ~16M; CSNOBOL4 accepts any) so TRACE events fire (INT_MAX: SPITBOL rejects 999999999).
   - Injects TRACE() registration calls for all included functions/variables.
   - Output is a valid .sno file on stdout.
@@ -18,7 +18,7 @@ Trace output format on FIFO (one line per event, atomic write):
     RETURN funcname = retval
     VALUE  varname = value
 
-If MONITOR_FIFO is not set, falls back to TERMINAL= (stderr) for compatibility.
+If MONITOR_READY_PIPE is not set, falls back to TERMINAL= (stderr) for compatibility.
 """
 
 import sys
@@ -125,15 +125,15 @@ def scan_sno(lines, include_rules, exclude_rules):
 MONITOR_PREAMBLE = """\
 * --- MONITOR PREAMBLE: injected by inject_traces.py ---
 *     Sync-step IPC: each MON_SEND blocks for GO/STOP ack from controller.
-*     MONITOR_FIFO     env var = event FIFO path (participant writes)
-*     MONITOR_ACK_FIFO env var = ack   FIFO path (participant reads)
+*     MONITOR_READY_PIPE     env var = ready pipe path (participant writes)
+*     MONITOR_GO_PIPE env var = ack   FIFO path (participant reads)
 *     MONITOR_SO       env var = monitor_ipc_sync.so path
         &TRACE         =  16000000
         &STLIMIT       =  5000000
 *
 *     Read paths from environment via HOST(4,name)
-        MON_FIFO_      =  HOST(4,'MONITOR_FIFO')
-        MON_ACK_FIFO_  =  HOST(4,'MONITOR_ACK_FIFO')
+        MON_READY_PIPE_      =  HOST(4,'MONITOR_READY_PIPE')
+        MON_GO_PIPE_  =  HOST(4,'MONITOR_GO_PIPE')
         MON_SO_        =  HOST(4,'MONITOR_SO')
 *
 *     Load IPC functions (fail silently if not set — no-op mode)
@@ -141,8 +141,8 @@ MONITOR_PREAMBLE = """\
         LOAD('MON_OPEN(STRING,STRING)STRING', MON_SO_)    :F(MON_NOTERMINAL_)
         LOAD('MON_SEND(STRING,STRING)STRING', MON_SO_)    :F(MON_NOTERMINAL_)
         LOAD('MON_CLOSE()STRING',             MON_SO_)    :F(MON_NOTERMINAL_)
-        IDENT(MON_FIFO_)                                  :S(MON_NOTERMINAL_)
-        MON_OPEN(MON_FIFO_, MON_ACK_FIFO_)               :F(MON_NOTERMINAL_)
+        IDENT(MON_READY_PIPE_)                                  :S(MON_NOTERMINAL_)
+        MON_OPEN(MON_READY_PIPE_, MON_GO_PIPE_)               :F(MON_NOTERMINAL_)
         MON_IPC_        =  '1'
         :(MON_DEFS_)
 MON_NOTERMINAL_
@@ -151,7 +151,7 @@ MON_DEFS_
 *
         DEFINE('MONCALL(MONN,MONT)')                      :(MONCALL_END)
 MONCALL IDENT(MON_IPC_,'1')                               :F(MONCALL_T)
-        MON_SEND('CALL',MONN)                             :(RETURN)
+        MON_SEND('CALL',MONN CHAR(31))                    :(RETURN)
 MONCALL_T
         TERMINAL       =  'CALL ' MONN                   :(RETURN)
 MONCALL_END
@@ -159,12 +159,12 @@ MONCALL_END
         DEFINE('MONRET(MONN,MONT)MONV')                   :(MONRET_END)
 MONRET  MONV           =  CONVERT($MONN,'STRING')   :F(MONRET_NR)
         IDENT(MON_IPC_,'1')                               :F(MONRET_T)
-        MON_SEND('RETURN',MONN ' = ' MONV)               :(RETURN)
+        MON_SEND('RETURN',MONN CHAR(31) MONV)             :(RETURN)
 MONRET_T
         TERMINAL       =  'RETURN ' MONN ' = ' MONV      :(RETURN)
 MONRET_NR
         IDENT(MON_IPC_,'1')                               :F(MONRET_NT)
-        MON_SEND('RETURN',MONN)                           :(RETURN)
+        MON_SEND('RETURN',MONN CHAR(31) '(undef)')        :(RETURN)
 MONRET_NT
         TERMINAL       =  'RETURN ' MONN                 :(RETURN)
 MONRET_END
@@ -172,12 +172,12 @@ MONRET_END
         DEFINE('MONVAL(MONN,MONT)MONV')                   :(MONVAL_END)
 MONVAL  MONV           =  CONVERT($MONN,'STRING')   :F(MONVAL_U)
         IDENT(MON_IPC_,'1')                               :F(MONVAL_T)
-        MON_SEND('VALUE',MONN ' = ' MONV)                :(RETURN)
+        MON_SEND('VALUE',MONN CHAR(31) MONV)              :(RETURN)
 MONVAL_T
         TERMINAL       =  'VALUE ' MONN ' = ' MONV       :(RETURN)
 MONVAL_U
         IDENT(MON_IPC_,'1')                               :F(MONVAL_UT)
-        MON_SEND('VALUE',MONN ' = (undef)')              :(RETURN)
+        MON_SEND('VALUE',MONN CHAR(31) '(undef)')         :(RETURN)
 MONVAL_UT
         TERMINAL       =  'VALUE ' MONN ' = (undef)'     :(RETURN)
 MONVAL_END

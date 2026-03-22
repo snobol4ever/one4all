@@ -3058,7 +3058,7 @@ static void jvm_emit_runtime_helpers(void) {
     if (jvm_need_varmap || jvm_need_indr_helpers) {
         /* sno_var_put(String name, String val) → void
          * Stores val into sno_vars HashMap for indirect access.
-         * Also calls sno_mon_var(name,val) when MONITOR_FIFO is set (compiled trace pathway). */
+         * Also calls sno_mon_var(name,val) when MONITOR_READY_PIPE is set (compiled trace pathway). */
         J(".method static sno_var_put(Ljava/lang/String;Ljava/lang/String;)V\n");
         J("    .limit stack 4\n");
         J("    .limit locals 2\n");
@@ -3094,34 +3094,36 @@ static void jvm_emit_runtime_helpers(void) {
         J(".end method\n\n");
 
         /* sno_mon_var(String name, String val) → void
-         * Compiled trace pathway: writes "VAR name \"val\"\n" to sno_mon_fd (static field).
-         * Sync-step: after write, blocks reading 1 byte from sno_mon_ack_fd.
-         * 'G' → return normally. 'S' or error → call System.exit(0).
-         * sno_mon_fd/sno_mon_ack_fd opened once at main() entry via sno_mon_init().
+         * Wire protocol: VALUE RS name US val RS
+         * \x1E (RS 0x1E) = record terminator; \x1F (US 0x1F) = name/value separator.
+         * Sync-step: after write, blocks reading 1 byte ack from sno_mon_go_fd.
+         * 'G' → return normally. 'S' or error → System.exit(0).
          * No-op if sno_mon_fd is null. */
         J(".method static sno_mon_var(Ljava/lang/String;Ljava/lang/String;)V\n");
         J("    .limit stack 6\n");
         J("    .limit locals 3\n");
-        /* local 0=name, 1=val, 2=line bytes */
+        /* local 0=name, 1=val, 2=record bytes */
         char monfd2[512], monackfd2[512];
         snprintf(monfd2,    sizeof monfd2,    "%s/sno_mon_fd Ljava/io/OutputStream;", jvm_classname);
-        snprintf(monackfd2, sizeof monackfd2, "%s/sno_mon_ack_fd Ljava/io/InputStream;", jvm_classname);
+        snprintf(monackfd2, sizeof monackfd2, "%s/sno_mon_go_fd Ljava/io/InputStream;", jvm_classname);
         J("    getstatic %s\n", monfd2);
         J("    ifnull Lsmv_done\n");
-        /* Build: "VAR " + name + " \"" + val + "\"\n" */
+        /* Build: "VALUE" + RS + name + US + val + RS  (RS=\x1E, US=\x1F) */
         J("    new java/lang/StringBuilder\n");
         J("    dup\n");
         J("    invokespecial java/lang/StringBuilder/<init>()V\n");
-        J("    ldc \"VAR \"\n");
+        J("    ldc \"VALUE\"\n");
         J("    invokevirtual java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n");
-        J("    aload_0\n");
+        J("    bipush 30\n");   /* RS = 0x1E */
+        J("    invokevirtual java/lang/StringBuilder/append(C)Ljava/lang/StringBuilder;\n");
+        J("    aload_0\n");     /* name */
         J("    invokevirtual java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n");
-        J("    ldc \" \\\"\"\n");
+        J("    bipush 31\n");   /* US = 0x1F */
+        J("    invokevirtual java/lang/StringBuilder/append(C)Ljava/lang/StringBuilder;\n");
+        J("    aload_1\n");     /* val */
         J("    invokevirtual java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n");
-        J("    aload_1\n");
-        J("    invokevirtual java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n");
-        J("    ldc \"\\\"\\n\"\n");
-        J("    invokevirtual java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n");
+        J("    bipush 30\n");   /* RS = 0x1E */
+        J("    invokevirtual java/lang/StringBuilder/append(C)Ljava/lang/StringBuilder;\n");
         J("    invokevirtual java/lang/StringBuilder/toString()Ljava/lang/String;\n");
         J("    ldc \"UTF-8\"\n");
         J("    invokevirtual java/lang/String/getBytes(Ljava/lang/String;)[B\n");
@@ -4009,10 +4011,10 @@ static void jvm_emit_header(Program *prog) {
     J(".field static sno_arrays Ljava/util/HashMap;\n");
     /* DATA type registry: maps type-name → comma-separated field list */
     J(".field static sno_data_types Ljava/util/HashMap;\n");
-    /* Monitor trace fd — opened once from MONITOR_FIFO env var, null if not set */
+    /* Monitor trace fd — opened once from MONITOR_READY_PIPE env var, null if not set */
     J(".field static sno_mon_fd Ljava/io/OutputStream;\n");
-    /* Monitor ack fd (sync-step) — opened once from MONITOR_ACK_FIFO env var, null if not set */
-    J(".field static sno_mon_ack_fd Ljava/io/InputStream;\n");
+    /* Monitor ack fd (sync-step) — opened once from MONITOR_GO_PIPE env var, null if not set */
+    J(".field static sno_mon_go_fd Ljava/io/InputStream;\n");
 
     /* static fields for SNOBOL4 variables */
     for (int i = 0; i < jvm_nvar; i++) {
@@ -4066,18 +4068,18 @@ static void jvm_emit_header(Program *prog) {
     J("    return\n");
     J(".end method\n");
     J("\n");
-    /* sno_mon_init() — opens MONITOR_FIFO once, stores in sno_mon_fd static field.
+    /* sno_mon_init() — opens MONITOR_READY_PIPE once, stores in sno_mon_fd static field.
      * Called from main() before any statements so FIFO is ready before first var write.
      * Separate from <clinit> because FileOutputStream open blocks on FIFO until
      * monitor_collect.py has the read side open — must happen at runtime, not class-load. */
     char monfd[512], monackfd[512];
     snprintf(monfd,    sizeof monfd,    "%s/sno_mon_fd Ljava/io/OutputStream;", jvm_classname);
-    snprintf(monackfd, sizeof monackfd, "%s/sno_mon_ack_fd Ljava/io/InputStream;", jvm_classname);
+    snprintf(monackfd, sizeof monackfd, "%s/sno_mon_go_fd Ljava/io/InputStream;", jvm_classname);
     J(".method static sno_mon_init()V\n");
     J("    .limit stack 6\n");
     J("    .limit locals 2\n");
-    /* Open event FIFO (MONITOR_FIFO) */
-    J("    ldc \"MONITOR_FIFO\"\n");
+    /* Open ready pipe (MONITOR_READY_PIPE) */
+    J("    ldc \"MONITOR_READY_PIPE\"\n");
     J("    invokestatic java/lang/System/getenv(Ljava/lang/String;)Ljava/lang/String;\n");
     J("    astore_0\n");
     J("    aload_0\n");
@@ -4091,8 +4093,8 @@ static void jvm_emit_header(Program *prog) {
     J("    iconst_1\n");
     J("    invokespecial java/io/FileOutputStream/<init>(Ljava/lang/String;Z)V\n");
     J("    putstatic %s\n", monfd);
-    /* Open ack FIFO (MONITOR_ACK_FIFO) for sync-step — blocks until controller opens write end */
-    J("    ldc \"MONITOR_ACK_FIFO\"\n");
+    /* Open go pipe (MONITOR_GO_PIPE) for sync-step — blocks until controller opens write end */
+    J("    ldc \"MONITOR_GO_PIPE\"\n");
     J("    invokestatic java/lang/System/getenv(Ljava/lang/String;)Ljava/lang/String;\n");
     J("    astore_1\n");
     J("    aload_1\n");
@@ -4115,7 +4117,7 @@ static void jvm_emit_main_open(void) {
     J("    .limit stack 16\n");
     J("    .limit locals 32\n");
     J("\n");
-    /* Open MONITOR_FIFO (if set) before any statements — compiled trace pathway */
+    /* Open MONITOR_READY_PIPE (if set) before any statements — compiled trace pathway */
     {
         char initdesc[512];
         snprintf(initdesc, sizeof initdesc, "%s/sno_mon_init()V", jvm_classname);

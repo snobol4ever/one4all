@@ -2108,7 +2108,7 @@ static void net_emit_header(Program *prog) {
     N("    ret\n");
     N("  }\n\n");
 
-    /* net_mon_init() — opens MONITOR_FIFO (StreamWriter) and MONITOR_ACK_FIFO (FileStream)
+    /* net_mon_init() — opens MONITOR_READY_PIPE (StreamWriter) and MONITOR_GO_PIPE (FileStream)
      * once at startup. Mirrors sno_mon_init() in JVM backend and comm_var init in snobol4.c.
      * Called from main() before any statements. */
     {
@@ -2117,8 +2117,8 @@ static void net_emit_header(Program *prog) {
     N("  {\n");
     N("    .maxstack 8\n");
     N("    .locals init (string V_fifo, string V_ack)\n");
-    /* Open event FIFO (MONITOR_FIFO) */
-    N("    ldstr      \"MONITOR_FIFO\"\n");
+    /* Open ready pipe (MONITOR_READY_PIPE) */
+    N("    ldstr      \"MONITOR_READY_PIPE\"\n");
     N("    call       string [mscorlib]System.Environment::GetEnvironmentVariable(string)\n");
     N("    stloc.0\n");
     N("    ldloc.0\n");
@@ -2137,8 +2137,8 @@ static void net_emit_header(Program *prog) {
     N("    newobj     instance void [mscorlib]System.IO.StreamWriter::.ctor(string, bool)\n");
     snprintf(nbuf, sizeof nbuf, "    stsfld     class [mscorlib]System.IO.StreamWriter %s::net_mon_sw\n", net_classname);
     N("%s", nbuf);
-    /* Open ack FIFO (MONITOR_ACK_FIFO) as FileStream read-only */
-    N("    ldstr      \"MONITOR_ACK_FIFO\"\n");
+    /* Open go pipe (MONITOR_GO_PIPE) as FileStream read-only */
+    N("    ldstr      \"MONITOR_GO_PIPE\"\n");
     N("    call       string [mscorlib]System.Environment::GetEnvironmentVariable(string)\n");
     N("    stloc.1\n");
     N("    ldloc.1\n");
@@ -2157,29 +2157,32 @@ static void net_emit_header(Program *prog) {
     N("  }\n\n");
 
     /* net_mon_var(string name, string val) -> void
-     * Compiled trace pathway: writes "VAR name \"val\"\n" to net_mon_sw (static StreamWriter).
-     * Sync-step: after write+flush, reads 1 byte from net_mon_ack.
+     * Wire protocol: VALUE RS name US val RS  (RS=\x1E, US=\x1F)
+     * Written as raw bytes via FileStream to avoid StreamWriter text encoding.
+     * Sync-step: after write+flush, reads 1 byte ack from net_mon_ack.
      * 'G' (71) → return. Anything else → Environment.Exit(0).
      * net_mon_sw/net_mon_ack opened once at startup via net_mon_init(). No-op if null. */
     N("  .method static void net_mon_var(string name, string val) cil managed\n");
     N("  {\n");
     N("    .maxstack 8\n");
-    N("    .locals init (string V_line, int32 V_ack)\n");
+    N("    .locals init (string V_line, int32 V_ack, uint8[] V_bytes)\n");
     snprintf(nbuf, sizeof nbuf, "    ldsfld     class [mscorlib]System.IO.StreamWriter %s::net_mon_sw\n", net_classname);
     N("%s", nbuf);
     N("    brfalse    Nmv_done\n");
-    /* Build: "VAR " + name + " \"" + val + "\"\n" */
+    /* Build: "VALUE" + RS(\x1E) + name + US(\x1F) + val + RS(\x1E) */
     N("    newobj     instance void [mscorlib]System.Text.StringBuilder::.ctor()\n");
-    N("    ldstr      \"VAR \"\n");
+    N("    ldstr      \"VALUE\"\n");
     N("    callvirt   instance class [mscorlib]System.Text.StringBuilder [mscorlib]System.Text.StringBuilder::Append(string)\n");
+    N("    ldc.i4     30\n");  /* RS = 0x1E */
+    N("    callvirt   instance class [mscorlib]System.Text.StringBuilder [mscorlib]System.Text.StringBuilder::Append(char)\n");
     N("    ldarg.0\n");
     N("    callvirt   instance class [mscorlib]System.Text.StringBuilder [mscorlib]System.Text.StringBuilder::Append(string)\n");
-    N("    ldstr      \" \\\"\"\n");
-    N("    callvirt   instance class [mscorlib]System.Text.StringBuilder [mscorlib]System.Text.StringBuilder::Append(string)\n");
+    N("    ldc.i4     31\n");  /* US = 0x1F */
+    N("    callvirt   instance class [mscorlib]System.Text.StringBuilder [mscorlib]System.Text.StringBuilder::Append(char)\n");
     N("    ldarg.1\n");
     N("    callvirt   instance class [mscorlib]System.Text.StringBuilder [mscorlib]System.Text.StringBuilder::Append(string)\n");
-    N("    ldstr      \"\\\"\\n\"\n");
-    N("    callvirt   instance class [mscorlib]System.Text.StringBuilder [mscorlib]System.Text.StringBuilder::Append(string)\n");
+    N("    ldc.i4     30\n");  /* RS = 0x1E */
+    N("    callvirt   instance class [mscorlib]System.Text.StringBuilder [mscorlib]System.Text.StringBuilder::Append(char)\n");
     N("    callvirt   instance string [mscorlib]System.Text.StringBuilder::ToString()\n");
     N("    stloc.0\n");
     snprintf(nbuf, sizeof nbuf, "    ldsfld     class [mscorlib]System.IO.StreamWriter %s::net_mon_sw\n", net_classname);
