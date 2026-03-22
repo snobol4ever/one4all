@@ -1637,15 +1637,16 @@ static void net_emit_one_stmt(STMT_t *s, const char *next_lbl) {
             /* VAR = expr → stsfld + compiled trace pathway */
             char fn[256];
             net_field_name(fn, sizeof fn, s->subject->sval);
-            /* dup val before stsfld so we can pass it to net_mon_var */
+            /* save val to V_mon_val before stsfld (mono ilasm lacks swap opcode) */
             N("    dup\n");
+            N("    stloc      V_mon_val\n");
             N("    stsfld     string %s::%s\n", net_classname, fn);
-            /* stack now has: val (the dup copy). Push name, swap → (name, val) */
+            /* stloc saves val; stsfld stores it; ldstr+ldloc give (name,val) for net_mon_var */
             {
                 /* Variable names are plain ASCII identifiers — no escaping needed */
                 const char *varname = s->subject->sval ? s->subject->sval : "";
                 N("    ldstr      \"%s\"\n", varname);
-                N("    swap\n");  /* stack: val name → name val */
+                N("    ldloc      V_mon_val\n");
                 char mndesc[512];
                 snprintf(mndesc, sizeof mndesc, "void %s::net_mon_var(string, string)", net_classname);
                 N("    call       %s\n", mndesc);
@@ -2224,7 +2225,8 @@ static void net_emit_main_open(void) {
     N("                  int32 V_18, int32 V_19,\n");
     N("                  string V_20, string V_21, string V_22, string V_23,\n");
     N("                  string V_24, string V_25, string V_26, string V_27,\n");
-    N("                  string V_28, string V_29)\n");
+    N("                  string V_28, string V_29,\n");
+    N("                  string V_mon_val)\n");
     N("\n");
     /* Open monitor FIFOs once before any statements — sync-step compiled trace pathway */
     N("    call       void %s::net_mon_init()\n", net_classname);
@@ -2421,7 +2423,7 @@ static void net_emit_fn_method(const NetFnDef *fn, Program *prog, int fn_idx) {
         if (i > 0) N(", ");
         N("string V_%d", save_base + i);
     }
-    N(")\n\n");
+    N(",\n                  string V_mon_val)\n\n");
 
     /* Save old arg values — direct ldsfld, no reflection */
     for (int i = 0; i < fn->nargs; i++) {
