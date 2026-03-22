@@ -19,6 +19,10 @@ TMP=$(mktemp -d /tmp/monitor_XXXXXX)
 trap 'rm -rf "$TMP"' EXIT
 SNO_BASE=$(basename "$SNO" .sno)
 base="$(basename "$SNO" .sno)"; dh="$(echo "$SNO"|md5sum|cut -c1-8)"
+# Feed .input file to stdin if present (mirrors crosscheck harness behaviour)
+SNO_INPUT="${SNO%.sno}.input"
+STDIN_SRC="/dev/null"
+[[ -f "$SNO_INPUT" ]] && STDIN_SRC="$SNO_INPUT"
 
 # ── Step 1: inject traces ────────────────────────────────────────────────
 python3 "$MDIR/inject_traces.py" "$SNO" "$CONF" > "$TMP/instr.sno"
@@ -109,26 +113,26 @@ fi
 # ── Step 7: all 5 FIFOs have readers — launch participants in parallel ────
 MONITOR_FIFO="$TMP/csn.fifo" MONITOR_SO="$SO" \
     snobol4 -f -P256k -I"$INC" "$TMP/instr.sno" \
-    < /dev/null > "$TMP/csn.out" 2>"$TMP/csn.stderr" &
+    < "$STDIN_SRC" > "$TMP/csn.out" 2>"$TMP/csn.stderr" &
 CSN_PID=$!
 
 SNOLIB="$X64_DIR" MONITOR_FIFO="$TMP/spl.fifo" \
     MONITOR_SO="$X64_DIR/monitor_ipc_spitbol.so" \
     "$X64_DIR/bootsbl" "$TMP/instr.sno" \
-    < /dev/null > "$TMP/spl.out" 2>"$TMP/spl.stderr" &
+    < "$STDIN_SRC" > "$TMP/spl.out" 2>"$TMP/spl.stderr" &
 SPL_PID=$!
 
 MONITOR_FIFO="$TMP/asm.fifo" \
-    "$TMP/prog_asm" < /dev/null > "$TMP/asm.out" 2>"$TMP/asm.stderr" &
+    "$TMP/prog_asm" < "$STDIN_SRC" > "$TMP/asm.out" 2>"$TMP/asm.stderr" &
 ASM_PID=$!
 
 MONITOR_FIFO="$TMP/net.fifo" \
-    mono "$exe" < /dev/null > "$TMP/net.out" 2>"$TMP/net.stderr" &
+    mono "$exe" < "$STDIN_SRC" > "$TMP/net.out" 2>"$TMP/net.stderr" &
 NET_PID=$!
 
 MONITOR_FIFO="$TMP/jvm.fifo" \
     java -cp "$JVM_CACHE" "$classname" \
-    < /dev/null > "$TMP/jvm.out" 2>"$TMP/jvm.stderr" &
+    < "$STDIN_SRC" > "$TMP/jvm.out" 2>"$TMP/jvm.stderr" &
 JVM_PID=$!
 
 # Write PID map to sidecar so collector can kill hung participants
