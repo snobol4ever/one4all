@@ -1,0 +1,9 @@
+*  f19: real number support
+        R = 3.14
+        INTEGER(R)                              :S(FAIL)
+        IDENT(DATATYPE(R), 'REAL')              :F(FAIL)
+        GT(R, 3.0)                              :F(FAIL)
+        EQ(CHOP(3.9), 3.0)                      :F(FAIL)
+        OUTPUT = 'PASS'                         :(END)
+FAIL    OUTPUT = 'FAIL'
+END

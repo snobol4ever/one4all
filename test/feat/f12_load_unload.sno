@@ -1,0 +1,13 @@
+*  f12: LOAD / UNLOAD — UNLOAD removes a defined function (call after is error)
+        DEFINE('MYFN(X)')
+        IDENT(MYFN('hello'), 'hello')           :F(FAIL)
+        UNLOAD('MYFN')
+        &ERRLIMIT = 1
+        SETEXIT('OK')
+        MYFN('a')
+        OUTPUT = 'FAIL'                         :(END)
+OK      OUTPUT = 'PASS'
+        :(END)
+FAIL    OUTPUT = 'FAIL'                         :(END)
+MYFN    MYFN = X                               :(RETURN)
+END

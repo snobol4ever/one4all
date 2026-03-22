@@ -1,0 +1,7 @@
+*  f18: error handling — SETEXIT + &ERRLIMIT
+        &ERRLIMIT = 1
+        SETEXIT('HANDLER')
+        X = 1 / 0
+        OUTPUT = 'FAIL (should have jumped to HANDLER)'  :(END)
+HANDLER OUTPUT = 'PASS'
+END

@@ -1,0 +1,16 @@
+*  f04: pattern primitives — LIT ANY SPAN BREAK ARB ARBNO LEN POS RPOS TAB RTAB REM FENCE FAIL ABORT SUCCEED
+        'hello' POS(0) 'he' RPOS(3)            :F(FAIL)
+        'abcde' ANY('abc')                      :F(FAIL)
+        'abcxyz' SPAN('abc') . V
+        IDENT(V, 'abc')                         :F(FAIL)
+        'abcxyz' BREAK('x') . V
+        IDENT(V, 'abc')                         :F(FAIL)
+        'hi' ARB                                :F(FAIL)
+        'aaa' ARBNO('a')                        :F(FAIL)
+        'hello' LEN(3)                          :F(FAIL)
+        'abc' TAB(2)                            :F(FAIL)
+        'abc' RTAB(1)                           :F(FAIL)
+        'abc' REM                               :F(FAIL)
+        OUTPUT = 'PASS'                         :(END)
+FAIL    OUTPUT = 'FAIL'
+END

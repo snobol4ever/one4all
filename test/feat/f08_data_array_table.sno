@@ -1,0 +1,14 @@
+*  f08: DATA / ARRAY / TABLE
+        DATA('POINT(X,Y)')
+        P = POINT(3, 4)
+        IDENT(DATATYPE(P), 'POINT')             :F(FAIL)
+        EQ(X(P), 3)                             :F(FAIL)
+        A = ARRAY(3, 0)
+        A<2> = 99
+        EQ(A<2>, 99)                            :F(FAIL)
+        T = TABLE()
+        T<'key'> = 'val'
+        IDENT(T<'key'>, 'val')                  :F(FAIL)
+        OUTPUT = 'PASS'                         :(END)
+FAIL    OUTPUT = 'FAIL'
+END

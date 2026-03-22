@@ -1,0 +1,6 @@
+*  f14: OPSYN — operator synonym
+        OPSYN('STRLEN', 'SIZE', 1)
+        EQ(STRLEN('hello'), 5)                  :F(FAIL)
+        OUTPUT = 'PASS'                         :(END)
+FAIL    OUTPUT = 'FAIL'
+END

@@ -1,0 +1,11 @@
+*  f02: string operations — SUBSTR REPLACE DUPL SIZE REVERSE TRIM
+        S = 'abcdef'
+        IDENT(SIZE(S), 6)                       :F(FAIL)
+        IDENT(SUBSTR(S, 2, 3), 'bcd')           :F(FAIL)
+        IDENT(DUPL('ab', 3), 'ababab')          :F(FAIL)
+        IDENT(REPLACE('aeiou','aeiou','AEIOU'), 'AEIOU')  :F(FAIL)
+        IDENT(REVERSE('abc'), 'cba')            :F(FAIL)
+        IDENT(TRIM('hello   '), 'hello')        :F(FAIL)
+        OUTPUT = 'PASS'                         :(END)
+FAIL    OUTPUT = 'FAIL'
+END

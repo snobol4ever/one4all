@@ -1,0 +1,9 @@
+*  f09: user-defined functions + recursion (factorial)
+        DEFINE('FACT(N)')
+        EQ(FACT(5), 120)                        :F(FAIL)
+        OUTPUT = 'PASS'                         :(END)
+FAIL    OUTPUT = 'FAIL'                         :(END)
+FACT    EQ(N, 0)                               :S(FACT_Z)
+        FACT = N * FACT(N - 1)                 :(RETURN)
+FACT_Z  FACT = 1                               :(RETURN)
+END

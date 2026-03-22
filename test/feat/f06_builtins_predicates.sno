@@ -1,0 +1,11 @@
+*  f06: built-in predicates — IDENT DIFFER INTEGER LGT DATATYPE CONVERT
+        IDENT('a', 'a')                         :F(FAIL)
+        DIFFER('a', 'b')                        :F(FAIL)
+        INTEGER(42)                             :F(FAIL)
+        LGT('b', 'a')                           :F(FAIL)
+        IDENT(DATATYPE(42), 'INTEGER')          :F(FAIL)
+        IDENT(DATATYPE('hi'), 'STRING')         :F(FAIL)
+        IDENT(CONVERT(3, 'STRING'), '3')        :F(FAIL)
+        OUTPUT = 'PASS'                         :(END)
+FAIL    OUTPUT = 'FAIL'
+END

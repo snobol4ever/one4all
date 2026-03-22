@@ -1,0 +1,8 @@
+*  f15: TRACE / DUMP / &TRACE — just test they don't crash
+        &TRACE = 1
+        TRACE('X', 'VALUE')
+        X = 'traced'
+        STOPTR('X', 'VALUE')
+        &TRACE = 0
+        OUTPUT = 'PASS'
+END

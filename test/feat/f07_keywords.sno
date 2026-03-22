@@ -1,0 +1,10 @@
+*  f07: keywords — &STLIMIT &ANCHOR &TRIM &ALPHABET &UCASE &LCASE
+        IDENT(SIZE(&ALPHABET), 256)             :F(FAIL)
+        IDENT(SIZE(&UCASE), 26)                 :F(FAIL)
+        IDENT(SIZE(&LCASE), 26)                 :F(FAIL)
+        &ANCHOR = 1
+        'xyz' POS(0) 'x'                        :F(FAIL)
+        &ANCHOR = 0
+        OUTPUT = 'PASS'                         :(END)
+FAIL    OUTPUT = 'FAIL'
+END

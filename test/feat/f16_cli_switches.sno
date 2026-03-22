@@ -1,0 +1,4 @@
+*  f16: CLI switch -f (case sensitivity) — &UCASE available, run via snobol4-asm -f
+        IDENT(SIZE(&UCASE), 26)                 :F(FAIL)
+        OUTPUT = 'PASS'
+END

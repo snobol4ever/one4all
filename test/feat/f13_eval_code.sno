@@ -1,0 +1,7 @@
+*  f13: EVAL dynamic expression; CODE dynamic compilation
+        EQ(EVAL('2 + 3'), 5)                    :F(FAIL)
+        C = CODE("CPASS OUTPUT = 'PASS' :(END)")
+        :< C >
+FAIL    OUTPUT = 'FAIL'                         :(END)
+CPASS   OUTPUT = 'PASS'
+END

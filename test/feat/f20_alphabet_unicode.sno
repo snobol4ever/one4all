@@ -1,0 +1,5 @@
+*  f20: &ALPHABET — 256-char extended ASCII (snobol4x), not full Unicode
+        IDENT(SIZE(&ALPHABET), 256)             :F(FAIL)
+        OUTPUT = 'PASS'                         :(END)
+FAIL    OUTPUT = 'FAIL'
+END

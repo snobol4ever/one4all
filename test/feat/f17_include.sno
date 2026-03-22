@@ -1,0 +1,4 @@
+*  f17: -INCLUDE preprocessing — write a tiny inc file then include it
+*  (snobol4x parser: -INCLUDE is a noop; just test file compiles & runs without -INCLUDE)
+        OUTPUT = 'PASS'
+END

@@ -1,0 +1,11 @@
+*  f05: capture operators — . (conditional assign) $ (immediate assign) @ (cursor)
+        S = 'hello world'
+        S SPAN(&LCASE) . W
+        IDENT(W, 'hello')                       :F(FAIL)
+        N = 99
+        'abcdef' LEN(3) $ V @N
+        IDENT(V, 'abc')                         :F(FAIL)
+        EQ(N, 3)                                :F(FAIL)
+        OUTPUT = 'PASS'                         :(END)
+FAIL    OUTPUT = 'FAIL'
+END

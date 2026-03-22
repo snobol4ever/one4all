@@ -1,0 +1,10 @@
+*  f03: numeric — INTEGER REAL arithmetic predicates GT LT EQ NE GE LE REMDR
+        EQ(2 + 3, 5)                            :F(FAIL)
+        GT(10, 5)                               :F(FAIL)
+        LT(3, 7)                                :F(FAIL)
+        NE(1, 2)                                :F(FAIL)
+        GT(1.5, 1.0)                            :F(FAIL)
+        EQ(REMDR(10, 3), 1)                     :F(FAIL)
+        OUTPUT = 'PASS'                         :(END)
+FAIL    OUTPUT = 'FAIL'
+END

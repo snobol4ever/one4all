@@ -1,0 +1,6 @@
+*  f01: core language — labels, GOTO, :S/:F
+        X = 'hello'
+        IDENT(X, 'hello')                       :S(OK)F(FAIL)
+OK      OUTPUT = 'PASS'                         :(END)
+FAIL    OUTPUT = 'FAIL'
+END

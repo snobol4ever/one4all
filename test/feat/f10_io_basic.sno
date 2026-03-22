@@ -1,0 +1,10 @@
+*  f10: named I/O channels — OUTPUT() associates variable; INPUT() reads back
+        OUTPUT('FOUT', 1, , '/tmp/sno_f10.tmp')
+        FOUT = 'test_line'
+        ENDFILE(1)
+        INPUT('FIN', 2, , '/tmp/sno_f10.tmp')
+        LINE = FIN
+        IDENT(LINE, 'test_line')                :F(FAIL)
+        OUTPUT = 'PASS'                         :(END)
+FAIL    OUTPUT = 'FAIL'
+END
