@@ -300,3 +300,5 @@ Sprint state lives in [snobol4ever/.github](https://github.com/snobol4ever/.gith
 - **Jeffrey Cooper, M.D.** — snobol4dotnet, .NET MSIL target
 - **Claude Sonnet 4.6** — TINY co-author; every sprint, every Byrd box,
   every labeled goto — written in session, committed, pushed
+
+
