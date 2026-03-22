@@ -694,8 +694,8 @@ static void asmJe(const char *lbl) {
 /* -----------------------------------------------------------------------
  * emit_lit — LIT node  (Sprint A14: one macro call per port)
  *
- *   α: LIT_ALPHA / LIT_ALPHA1   — one call site line
- *   β: LIT_BETA                 — one call site line
+ *   α: LIT_α / LIT_α1   — one call site line
+ *   β: LIT_β                 — one call site line
  * ----------------------------------------------------------------------- */
 
 static void emit_lit(const char *s, int n,
@@ -708,14 +708,14 @@ static void emit_lit(const char *s, int n,
     var_register(saved);
 
     if (n == 1) {
-        ALFC(alpha, "LIT α", "LIT_ALPHA1  %d, %s, %s, %s, %s, %s, %s\n",
+        ALFC(alpha, "LIT α", "LIT_α1  %d, %s, %s, %s, %s, %s, %s\n",
             (unsigned char)s[0], bref(saved), cursor, subj, subj_len, gamma, omega);
     } else {
         const char *lstr = lit_intern(s, n);
-        ALFC(alpha, "LIT α", "LIT_ALPHA   %s, %d, %s, %s, %s, %s, %s, %s\n",
+        ALFC(alpha, "LIT α", "LIT_α   %s, %d, %s, %s, %s, %s, %s, %s\n",
             lstr, n, bref(saved), cursor, subj, subj_len, gamma, omega);
     }
-    ALFC(beta, "LIT β", "LIT_BETA    %s, %s, %s\n", bref(saved), cursor, omega);
+    ALFC(beta, "LIT β", "LIT_β    %s, %s, %s\n", bref(saved), cursor, omega);
 }
 
 /* -----------------------------------------------------------------------
@@ -726,16 +726,16 @@ static void emit_pos(long n,
                           const char *alpha, const char *beta,
                           const char *gamma, const char *omega,
                           const char *cursor) {
-    ALFC(alpha, "POS(%ld)", "POS_ALPHA   %ld, %s, %s, %s\n", n, cursor, gamma, omega);
-    ALF(beta,  "POS_BETA    %s, %s\n", cursor, omega);
+    ALFC(alpha, "POS(%ld)", "POS_α   %ld, %s, %s, %s\n", n, cursor, gamma, omega);
+    ALF(beta,  "POS_β    %s, %s\n", cursor, omega);
 }
 
 static void emit_pos_var(const char *varlab,
                               const char *alpha, const char *beta,
                               const char *gamma, const char *omega,
                               const char *cursor) {
-    ALFC(alpha, "POS(var)", "POS_ALPHA_VAR %s, %s, %s, %s\n", varlab, cursor, gamma, omega);
-    ALF(beta,  "POS_BETA    %s, %s\n", cursor, omega);
+    ALFC(alpha, "POS(var)", "POS_α_VAR %s, %s, %s, %s\n", varlab, cursor, gamma, omega);
+    ALF(beta,  "POS_β    %s, %s\n", cursor, omega);
 }
 
 static void emit_rpos(long n,
@@ -743,8 +743,8 @@ static void emit_rpos(long n,
                            const char *gamma, const char *omega,
                            const char *cursor,
                            const char *subj_len) {
-    ALFC(alpha, "RPOS(%ld)", "RPOS_ALPHA  %ld, %s, %s, %s, %s\n", n, cursor, subj_len, gamma, omega);
-    ALF(beta,  "RPOS_BETA   %s, %s\n", cursor, omega);
+    ALFC(alpha, "RPOS(%ld)", "RPOS_α  %ld, %s, %s, %s, %s\n", n, cursor, subj_len, gamma, omega);
+    ALF(beta,  "RPOS_β   %s, %s\n", cursor, omega);
 }
 
 static void emit_rpos_var(const char *varlab,
@@ -752,8 +752,8 @@ static void emit_rpos_var(const char *varlab,
                                const char *gamma, const char *omega,
                                const char *cursor,
                                const char *subj_len) {
-    ALFC(alpha, "RPOS(var)", "RPOS_ALPHA_VAR %s, %s, %s, %s, %s\n", varlab, cursor, subj_len, gamma, omega);
-    ALF(beta,  "RPOS_BETA   %s, %s\n", cursor, omega);
+    ALFC(alpha, "RPOS(var)", "RPOS_α_VAR %s, %s, %s, %s, %s\n", varlab, cursor, subj_len, gamma, omega);
+    ALF(beta,  "RPOS_β   %s, %s\n", cursor, omega);
 }
 
 /* -----------------------------------------------------------------------
@@ -837,10 +837,10 @@ static void emit_seq(EXPR_t *left, EXPR_t *right,
                           int depth) {
     int uid = next_uid();
     char lα[LBUF], lβ[LBUF], rα[LBUF], rβ[LBUF];
-    snprintf(lα, LBUF, "seq_l%d_alpha", uid);
-    snprintf(lβ, LBUF, "seq_l%d_beta",  uid);
-    snprintf(rα, LBUF, "seq_r%d_alpha", uid);
-    snprintf(rβ, LBUF, "seq_r%d_beta",  uid);
+    snprintf(lα, LBUF, "seq_l%d_α", uid);
+    snprintf(lβ, LBUF, "seq_l%d_β",  uid);
+    snprintf(rα, LBUF, "seq_r%d_α", uid);
+    snprintf(rβ, LBUF, "seq_r%d_β",  uid);
 
     ALFC(alpha, "SEQ", "jmp     %s\n", lα);
     ALF(beta, "jmp     %s\n", rβ);
@@ -870,26 +870,26 @@ static void emit_alt(EXPR_t *left, EXPR_t *right,
     int uid = next_uid();
     char lα[LBUF], lβ[LBUF], rα[LBUF], rβ[LBUF];
     char cursor_save[LBUF], restore_lbl[LBUF];
-    snprintf(lα,           LBUF, "alt_l%d_alpha",   uid);
-    snprintf(lβ,           LBUF, "alt_l%d_beta",    uid);
-    snprintf(rα,           LBUF, "alt_r%d_alpha",   uid);
-    snprintf(rβ,           LBUF, "alt_r%d_beta",    uid);
+    snprintf(lα,           LBUF, "alt_l%d_α",   uid);
+    snprintf(lβ,           LBUF, "alt_l%d_β",    uid);
+    snprintf(rα,           LBUF, "alt_r%d_α",   uid);
+    snprintf(rβ,           LBUF, "alt_r%d_β",    uid);
     snprintf(cursor_save,  LBUF, "alt%d_cur_save",  uid);
     snprintf(restore_lbl,  LBUF, "alt%d_restore",   uid);
     var_register(cursor_save);
 
     char left_omega_tramp[LBUF];
-    snprintf(left_omega_tramp, LBUF, "alt%d_left_omega", uid);
+    snprintf(left_omega_tramp, LBUF, "alt%d_left_ω", uid);
 
     ALFC(alpha, "ALT α — save cursor, enter left",
-         "ALT_ALPHA   %s, %s, %s\n", bref(cursor_save), cursor, lα);
-    ALFC(beta,  "ALT β — resume right", "SEQ_BETA    %s\n", rβ);
+         "ALT_α   %s, %s, %s\n", bref(cursor_save), cursor, lα);
+    ALFC(beta,  "ALT β — resume right", "SEQ_β    %s\n", rβ);
 
     emit_pat_node(left, lα, lβ, gamma, left_omega_tramp,
                   cursor, subj, subj_len, depth+1);
 
     ALFC(left_omega_tramp, "ALT left_ω — restore cursor, enter right",
-         "ALT_OMEGA   %s, %s, %s\n", bref(cursor_save), cursor, rα);
+         "ALT_ω   %s, %s, %s\n", bref(cursor_save), cursor, rα);
 
     emit_pat_node(right, rα, rβ, gamma, omega,
                   cursor, subj, subj_len, depth+1);
@@ -919,8 +919,8 @@ static void emit_arbno(EXPR_t *child,
     snprintf(stk,        LBUF, "arb%d_stack",       uid);
     snprintf(dep,        LBUF, "arb%d_depth",        uid);
     snprintf(cur_before, LBUF, "arb%d_cur_before",   uid);
-    snprintf(cα,         LBUF, "arb%d_child_alpha",  uid);
-    snprintf(cβ,         LBUF, "arb%d_child_beta",   uid);
+    snprintf(cα,         LBUF, "arb%d_child_α",  uid);
+    snprintf(cβ,         LBUF, "arb%d_child_β",   uid);
     snprintf(child_ok,   LBUF, "arb%d_child_ok",     uid);
     snprintf(child_fail, LBUF, "arb%d_child_fail",   uid);
     snprintf(push_lbl,   LBUF, "arb%d_push",         uid);
@@ -943,11 +943,11 @@ static void emit_arbno(EXPR_t *child,
 
     /* α: init depth=0, push cursor onto stk[0], goto γ */
     ALFC(alpha, "ARBNO α",
-         "ARBNO_ALPHA %s, %s, %s, %s\n", bref(dep), stk, cursor, gamma);
+         "ARBNO_α %s, %s, %s, %s\n", bref(dep), stk, cursor, gamma);
 
     /* β: pop, save cursor-before-rep, try child (or ω if empty) */
     ALFC(beta, "ARBNO β",
-         "ARBNO_BETA  %s, %s, %s, %s, %s, %s\n",
+         "ARBNO_β  %s, %s, %s, %s, %s, %s\n",
          bref(dep), stk, bref(cur_before), cursor, cα, omega);
 
     /* child_ok: zero-advance guard, push new cursor, re-succeed */
@@ -988,9 +988,9 @@ static void emit_any(const char *charset, int cslen,
     var_register(saved);
     const char *clabel = lit_intern(charset, cslen);
 
-    ALFC(alpha, "ANY α", "ANY_ALPHA   %s, %d, %s, %s, %s, %s, %s, %s\n",
-      clabel, cslen, saved, cursor, subj, subj_len, gamma, omega);
-    ALFC(beta, "ANY β", "ANY_BETA    %s, %s, %s\n", bref(saved), cursor, omega);
+    ALFC(alpha, "ANY α", "ANY_α   %s, %d, %s, %s, %s, %s, %s, %s\n",
+      clabel, cslen, bref(saved), cursor, subj, subj_len, gamma, omega);
+    ALFC(beta, "ANY β", "ANY_β    %s, %s, %s\n", bref(saved), cursor, omega);
 }
 
 /* -----------------------------------------------------------------------
@@ -1008,9 +1008,9 @@ static void emit_notany(const char *charset, int cslen,
     var_register(saved);
     const char *clabel = lit_intern(charset, cslen);
 
-    ALFC(alpha, "NOTANY α", "NOTANY_ALPHA %s, %d, %s, %s, %s, %s, %s, %s\n",
-      clabel, cslen, saved, cursor, subj, subj_len, gamma, omega);
-    ALFC(beta, "NOTANY β", "NOTANY_BETA  %s, %s, %s\n", bref(saved), cursor, omega);
+    ALFC(alpha, "NOTANY α", "NOTANY_α %s, %d, %s, %s, %s, %s, %s, %s\n",
+      clabel, cslen, bref(saved), cursor, subj, subj_len, gamma, omega);
+    ALFC(beta, "NOTANY β", "NOTANY_β  %s, %s, %s\n", bref(saved), cursor, omega);
 }
 
 /* -----------------------------------------------------------------------
@@ -1028,9 +1028,9 @@ static void emit_span(const char *charset, int cslen,
     var_register(saved);
     const char *clabel = lit_intern(charset, cslen);
 
-    ALFC(alpha, "SPAN α", "SPAN_ALPHA  %s, %d, %s, %s, %s, %s, %s, %s\n",
-      clabel, cslen, saved, cursor, subj, subj_len, gamma, omega);
-    ALFC(beta, "SPAN β", "SPAN_BETA   %s, %s, %s\n", bref(saved), cursor, omega);
+    ALFC(alpha, "SPAN α", "SPAN_α  %s, %d, %s, %s, %s, %s, %s, %s\n",
+      clabel, cslen, bref(saved), cursor, subj, subj_len, gamma, omega);
+    ALFC(beta, "SPAN β", "SPAN_β   %s, %s, %s\n", bref(saved), cursor, omega);
 }
 
 static void emit_break(const char *charset, int cslen,
@@ -1044,9 +1044,9 @@ static void emit_break(const char *charset, int cslen,
     var_register(saved);
     const char *clabel = lit_intern(charset, cslen);
 
-    ALFC(alpha, "BREAK α", "BREAK_ALPHA %s, %d, %s, %s, %s, %s, %s, %s\n",
-      clabel, cslen, saved, cursor, subj, subj_len, gamma, omega);
-    ALFC(beta, "BREAK β", "BREAK_BETA  %s, %s, %s\n", bref(saved), cursor, omega);
+    ALFC(alpha, "BREAK α", "BREAK_α %s, %d, %s, %s, %s, %s, %s, %s\n",
+      clabel, cslen, bref(saved), cursor, subj, subj_len, gamma, omega);
+    ALFC(beta, "BREAK β", "BREAK_β  %s, %s, %s\n", bref(saved), cursor, omega);
 }
 
 /* -----------------------------------------------------------------------
@@ -1061,9 +1061,9 @@ static void emit_span_var(const char *varlab,
     char saved[LBUF];
     snprintf(saved, LBUF, "span%d_saved", next_uid());
     var_register(saved);
-    ALFC(alpha, "SPAN(var) α", "SPAN_ALPHA_VAR %s, %s, %s, %s, %s, %s, %s\n",
-         varlab, saved, cursor, subj, subj_len, gamma, omega);
-    ALFC(beta,  "SPAN(var) β", "SPAN_BETA_VAR  %s, %s, %s\n", bref(saved), cursor, omega);
+    ALFC(alpha, "SPAN(var) α", "SPAN_α_VAR %s, %s, %s, %s, %s, %s, %s\n",
+         varlab, bref(saved), cursor, subj, subj_len, gamma, omega);
+    ALFC(beta,  "SPAN(var) β", "SPAN_β_VAR  %s, %s, %s\n", bref(saved), cursor, omega);
 }
 
 static void emit_break_var(const char *varlab,
@@ -1074,9 +1074,9 @@ static void emit_break_var(const char *varlab,
     char saved[LBUF];
     snprintf(saved, LBUF, "brk%d_saved", next_uid());
     var_register(saved);
-    ALFC(alpha, "BREAK(var) α", "BREAK_ALPHA_VAR %s, %s, %s, %s, %s, %s, %s\n",
-         varlab, saved, cursor, subj, subj_len, gamma, omega);
-    ALFC(beta,  "BREAK(var) β", "BREAK_BETA_VAR  %s, %s, %s\n", bref(saved), cursor, omega);
+    ALFC(alpha, "BREAK(var) α", "BREAK_α_VAR %s, %s, %s, %s, %s, %s, %s\n",
+         varlab, bref(saved), cursor, subj, subj_len, gamma, omega);
+    ALFC(beta,  "BREAK(var) β", "BREAK_β_VAR  %s, %s, %s\n", bref(saved), cursor, omega);
 }
 
 static void emit_breakx_var(const char *varlab,
@@ -1087,9 +1087,9 @@ static void emit_breakx_var(const char *varlab,
     char saved[LBUF];
     snprintf(saved, LBUF, "brkx%d_saved", next_uid());
     var_register(saved);
-    ALFC(alpha, "BREAKX(var) α", "BREAKX_ALPHA_VAR %s, %s, %s, %s, %s, %s, %s\n",
-         varlab, saved, cursor, subj, subj_len, gamma, omega);
-    ALFC(beta,  "BREAKX(var) β", "BREAKX_BETA_VAR  %s, %s, %s\n", bref(saved), cursor, omega);
+    ALFC(alpha, "BREAKX(var) α", "BREAKX_α_VAR %s, %s, %s, %s, %s, %s, %s\n",
+         varlab, bref(saved), cursor, subj, subj_len, gamma, omega);
+    ALFC(beta,  "BREAKX(var) β", "BREAKX_β_VAR  %s, %s, %s\n", bref(saved), cursor, omega);
 }
 
 static void emit_breakx_lit(const char *charset, int cslen,
@@ -1101,9 +1101,9 @@ static void emit_breakx_lit(const char *charset, int cslen,
     snprintf(saved, LBUF, "brkx%d_saved", next_uid());
     var_register(saved);
     const char *clabel = lit_intern(charset, cslen);
-    ALFC(alpha, "BREAKX(lit) α", "BREAKX_ALPHA_LIT %s, %s, %s, %s, %s, %s, %s\n",
-         clabel, saved, cursor, subj, subj_len, gamma, omega);
-    ALFC(beta,  "BREAKX(lit) β", "BREAKX_BETA_LIT  %s, %s, %s\n", bref(saved), cursor, omega);
+    ALFC(alpha, "BREAKX(lit) α", "BREAKX_α_LIT %s, %s, %s, %s, %s, %s, %s\n",
+         clabel, bref(saved), cursor, subj, subj_len, gamma, omega);
+    ALFC(beta,  "BREAKX(lit) β", "BREAKX_β_LIT  %s, %s, %s\n", bref(saved), cursor, omega);
 }
 
 static void emit_any_var(const char *varlab,
@@ -1114,9 +1114,9 @@ static void emit_any_var(const char *varlab,
     char saved[LBUF];
     snprintf(saved, LBUF, "any%d_saved", next_uid());
     var_register(saved);
-    ALFC(alpha, "ANY(var) α", "ANY_ALPHA_VAR   %s, %s, %s, %s, %s, %s, %s\n",
-         varlab, saved, cursor, subj, subj_len, gamma, omega);
-    ALFC(beta,  "ANY(var) β", "ANY_BETA_VAR    %s, %s, %s\n", bref(saved), cursor, omega);
+    ALFC(alpha, "ANY(var) α", "ANY_α_VAR   %s, %s, %s, %s, %s, %s, %s\n",
+         varlab, bref(saved), cursor, subj, subj_len, gamma, omega);
+    ALFC(beta,  "ANY(var) β", "ANY_β_VAR    %s, %s, %s\n", bref(saved), cursor, omega);
 }
 
 static void emit_notany_var(const char *varlab,
@@ -1127,9 +1127,9 @@ static void emit_notany_var(const char *varlab,
     char saved[LBUF];
     snprintf(saved, LBUF, "nany%d_saved", next_uid());
     var_register(saved);
-    ALFC(alpha, "NOTANY(var) α", "NOTANY_ALPHA_VAR %s, %s, %s, %s, %s, %s, %s\n",
-         varlab, saved, cursor, subj, subj_len, gamma, omega);
-    ALFC(beta,  "NOTANY(var) β", "NOTANY_BETA_VAR  %s, %s, %s\n", bref(saved), cursor, omega);
+    ALFC(alpha, "NOTANY(var) α", "NOTANY_α_VAR %s, %s, %s, %s, %s, %s, %s\n",
+         varlab, bref(saved), cursor, subj, subj_len, gamma, omega);
+    ALFC(beta,  "NOTANY(var) β", "NOTANY_β_VAR  %s, %s, %s\n", bref(saved), cursor, omega);
 }
 
 /* -----------------------------------------------------------------------
@@ -1146,8 +1146,8 @@ static void emit_len(long n,
     snprintf(saved, LBUF, "len%d_saved", uid);
     var_register(saved);
 
-    ALFC(alpha, "LEN(%ld)", "LEN_ALPHA   %ld, %s, %s, %s, %s, %s\n", n, bref(saved), cursor, subj_len, gamma, omega);
-    ALFC(beta, "LEN β", "LEN_BETA    %s, %s, %s\n", bref(saved), cursor, omega);
+    ALFC(alpha, "LEN(%ld)", "LEN_α   %ld, %s, %s, %s, %s, %s\n", n, bref(saved), cursor, subj_len, gamma, omega);
+    ALFC(beta, "LEN β", "LEN_β    %s, %s, %s\n", bref(saved), cursor, omega);
 }
 
 /* -----------------------------------------------------------------------
@@ -1163,8 +1163,8 @@ static void emit_tab(long n,
     snprintf(saved, LBUF, "tab%d_saved", uid);
     var_register(saved);
 
-    ALFC(alpha, "TAB(%ld)", "TAB_ALPHA   %ld, %s, %s, %s, %s\n", n, bref(saved), cursor, gamma, omega);
-    ALFC(beta, "TAB β", "TAB_BETA    %s, %s, %s\n", bref(saved), cursor, omega);
+    ALFC(alpha, "TAB(%ld)", "TAB_α   %ld, %s, %s, %s, %s\n", n, bref(saved), cursor, gamma, omega);
+    ALFC(beta, "TAB β", "TAB_β    %s, %s, %s\n", bref(saved), cursor, omega);
 }
 
 /* -----------------------------------------------------------------------
@@ -1181,8 +1181,8 @@ static void emit_rtab(long n,
     snprintf(saved, LBUF, "rtab%d_saved", uid);
     var_register(saved);
 
-    ALFC(alpha, "RTAB(%ld)", "RTAB_ALPHA  %ld, %s, %s, %s, %s, %s\n", n, bref(saved), cursor, subj_len, gamma, omega);
-    ALFC(beta, "RTAB β", "RTAB_BETA   %s, %s, %s\n", bref(saved), cursor, omega);
+    ALFC(alpha, "RTAB(%ld)", "RTAB_α  %ld, %s, %s, %s, %s, %s\n", n, bref(saved), cursor, subj_len, gamma, omega);
+    ALFC(beta, "RTAB β", "RTAB_β   %s, %s, %s\n", bref(saved), cursor, omega);
 }
 
 /* -----------------------------------------------------------------------
@@ -1198,8 +1198,8 @@ static void emit_rem(const char *alpha, const char *beta,
     snprintf(saved, LBUF, "rem%d_saved", uid);
     var_register(saved);
 
-    ALFC(alpha, "REM", "REM_ALPHA   %s, %s, %s, %s\n", bref(saved), cursor, subj_len, gamma);
-    ALFC(beta, "REM β", "REM_BETA    %s, %s, %s\n", bref(saved), cursor, omega);
+    ALFC(alpha, "REM", "REM_α   %s, %s, %s, %s\n", bref(saved), cursor, subj_len, gamma);
+    ALFC(beta, "REM β", "REM_β    %s, %s, %s\n", bref(saved), cursor, omega);
 }
 
 /* -----------------------------------------------------------------------
@@ -1228,22 +1228,11 @@ static void emit_arb(const char *alpha, const char *beta,
     var_register(arb_start);
     var_register(arb_step);
 
-    ALFC(alpha, "ARB", "mov     rax, [%s]\n", cursor);
-    A("    mov     [%s], rax\n", arb_start);
-    A("    mov     qword [%s], 0\n", arb_step);
-    /* cursor stays at start (0-length match first) */
-    asmJ(gamma);
+    ALFC(alpha, "ARB α", "ARB_α   %s, %s, %s, %s\n",
+         bref(arb_start), bref(arb_step), cursor, gamma);
 
-    ALFC(beta, "ARB", "mov     rax, [%s]\n", arb_step);
-    A("    inc     rax\n");
-    A("    mov     [%s], rax\n", arb_step);
-    /* check start + step <= subj_len */
-    A("    mov     rbx, [%s]\n", arb_start);
-    A("    add     rbx, rax\n");
-    A("    cmp     rbx, [%s]\n", subj_len);
-    asmJg(omega);
-    A("    mov     [%s], rbx\n", cursor);
-    asmJ(gamma);
+    ALFC(beta,  "ARB β", "ARB_β    %s, %s, %s, %s, %s, %s\n",
+         bref(arb_start), bref(arb_step), cursor, subj_len, gamma, omega);
     (void)chk;
 }
 
@@ -1283,10 +1272,10 @@ static void emit_imm(EXPR_t *child, const char *varname,
     expand_name(varname ? varname : "", safe, sizeof safe);
     if (!safe[0]) { safe[0]='v'; safe[1]='\0'; }
 
-    snprintf(cα,        LBUF, "dol%d_child_alpha", uid);
-    snprintf(cβ,        LBUF, "dol%d_child_beta",  uid);
-    snprintf(dol_gamma, LBUF, "dol%d_gamma",        uid);
-    snprintf(dol_omega, LBUF, "dol%d_omega",        uid);
+    snprintf(cα,        LBUF, "dol%d_child_α", uid);
+    snprintf(cβ,        LBUF, "dol%d_child_β",  uid);
+    snprintf(dol_gamma, LBUF, "dol%d_γ",        uid);
+    snprintf(dol_omega, LBUF, "dol%d_ω",        uid);
     snprintf(entry_cur, LBUF, "dol%d_entry",        uid);
 
     /* Per-variable capture buffers — register var and get its symbols */
@@ -1315,19 +1304,19 @@ static void emit_imm(EXPR_t *child, const char *varname,
 
     /* α instruction: save entry cursor, enter child — one macro call */
     ALFC("", "DOL α — save entry cursor",
-         "DOL_SAVE    %s, %s, %s\n", entry_cur, cursor, cα);
+         "DOL_SAVE    %s, %s, %s\n", bref(entry_cur), cursor, cα);
 
     /* β: transparent — backtrack into child */
     ALFC(beta, "DOL β", "jmp     %s\n", cβ);
 
-    /* Emit child subtree — child's γ goes to dol_gamma, child's ω to dol_omega */
+    /* Emit child subtree — child's γ goes to dol_γ, child's ω to dol_ω */
     emit_pat_node(child, cα, cβ, dol_gamma, dol_omega,
                   cursor, subj, subj_len, depth + 1);
 
     /* dol_γ: compute span, copy to cap_buf, proceed to outer γ — one macro call */
     ALFC(dol_gamma, "DOL γ — capture span",
          "DOL_CAPTURE %s, %s, %s, %s, %s, %s\n",
-         entry_cur, cursor, cap_buf, cap_len, subj, gamma);
+         bref(entry_cur), cursor, cap_buf, bref(cap_len), subj, gamma);
 
     /* dol_ω: child failed — no assignment, propagate failure */
     ALFC(dol_omega, "DOL ω — child failed", "jmp     %s\n", omega);
@@ -1441,10 +1430,10 @@ static void emit_pat_node(EXPR_t *pat,
                 var_register(saved);
                 const char *vlab = str_intern(varname);
                 A("\n; E_VART %s → LIT_VAR (stmt_match_var)\n", varname);
-                ALF(alpha, "LIT_VAR_ALPHA %s, %s, %s, %s, %s\n",
-                    vlab, saved, cursor, gamma, omega);
-                ALF(beta,  "LIT_VAR_BETA  %s, %s, %s\n",
-                    saved, cursor, omega);
+                ALF(alpha, "LIT_VAR_α %s, %s, %s, %s, %s\n",
+                    vlab, bref(saved), cursor, gamma, omega);
+                ALF(beta,  "LIT_VAR_β  %s, %s, %s\n",
+                    bref(saved), cursor, omega);
             }
         }
         break;
@@ -1607,9 +1596,9 @@ static void emit_pat_node(EXPR_t *pat,
         const char *varname = (pat->children[0] && pat->children[0]->sval) ? pat->children[0]->sval
                             : (pat->sval ? pat->sval : "");
         const char *varlab  = str_intern(varname);
-        ALFC(alpha, "@VAR α", "AT_ALPHA        %s, %s, %s, %s\n",
+        ALFC(alpha, "@VAR α", "AT_α        %s, %s, %s, %s\n",
              varlab, cursor, gamma, omega);
-        ALFC(beta,  "@VAR β", "AT_BETA         %s\n", omega);
+        ALFC(beta,  "@VAR β", "AT_β         %s\n", omega);
         break;
     }
 
@@ -1885,8 +1874,8 @@ static void emit_named_ref(const NamedPat *np,
                                 const char *gamma, const char *omega) {
     int uid = next_uid();
     char glbl[LBUF], olbl[LBUF];
-    snprintf(glbl, LBUF, "nref%d_gamma", uid);
-    snprintf(olbl, LBUF, "nref%d_omega", uid);
+    snprintf(glbl, LBUF, "nref%d_γ", uid);
+    snprintf(olbl, LBUF, "nref%d_ω", uid);
 
     {
         char ref_hdr[LBUF + 8];
@@ -1982,44 +1971,34 @@ static void emit_named_def(const NamedPat *np,
          * The near-term bridge (push rbp / sub rsp, 56) is REMOVED.
          * Scratch DESCR_t slots are now [r12+0/8], [r12+16/24], [r12+32/40]. */
         asmL(np->alpha_lbl);
-        A("    lea     r12, [rel box_%s_data_template]\n", safe);
+        A("    FN_α_INIT %s\n", safe);
 
-        /* Load args from .bss arg slots into param variables.
-         * (arg slots remain in .bss — they are filled by the call site
-         *  before jumping here, and read once at α entry.) */
+        /* Load args from .bss arg slots into param variables */
         for (int i = 0; i < np->nparams; i++) {
             char arg_slot_t[LBUF2 + 16], arg_slot_p[LBUF2 + 16];
             snprintf(arg_slot_t, sizeof arg_slot_t, "fn_%s_arg_%d_t", safe, i);
             snprintf(arg_slot_p, sizeof arg_slot_p, "fn_%s_arg_%d_p", safe, i);
             const char *plab = str_intern(np->param_names[i]);
-            A("    lea     rdi, [rel %s]\n", plab);
             A("    mov     rsi, [%s]\n", arg_slot_t);
             A("    mov     rdx, [%s]\n", arg_slot_p);
-            A("    call    stmt_set\n");
+            A("    FN_SET_PARAM %s\n", plab);
         }
-        /* Clear locals + function return-value variable to null at each call
-         * entry (SNOBOL4 semantics: locals and retval are always null at entry).
-         * Use DATA scratch tmp1 for the NULVCL pair instead of [rbp-16/8]. */
-        A("    LOAD_NULVCL\n");   /* loads NULVCL into rax:rdx */
-        /* Store NULVCL into DATA tmp1 slots so subsequent stmt_set calls can
-         * read rsi/rdx from r12+0/8. */
+        /* Clear locals + retval to NULVCL */
+        A("    LOAD_NULVCL\n");
         A("    mov     [%s], rax\n", bref(t2_tmp1_t));
         A("    mov     [%s], rdx\n", bref(t2_tmp1_p));
         {
             const char *fnlab_clr = str_intern(np->varname);
-            A("    lea     rdi, [rel %s]\n", fnlab_clr);
             A("    mov     rsi, [%s]\n", bref(t2_tmp1_t));
             A("    mov     rdx, [%s]\n", bref(t2_tmp1_p));
-            A("    call    stmt_set\n");
+            A("    FN_CLEAR_VAR %s\n", fnlab_clr);
         }
         for (int i = 0; i < np->nlocals; i++) {
             const char *llab = str_intern(np->local_names[i]);
-            A("    lea     rdi, [rel %s]\n", llab);
             A("    mov     rsi, [%s]\n", bref(t2_tmp1_t));
             A("    mov     rdx, [%s]\n", bref(t2_tmp1_p));
-            A("    call    stmt_set\n");
+            A("    FN_CLEAR_VAR %s\n", llab);
         }
-        /* Jump to function body */
         A("    jmp     %s\n", label_nasm(np->body_label));
 
         emit_sep_minor("γ/ω");
@@ -2030,14 +2009,10 @@ static void emit_named_def(const NamedPat *np,
          * (M-T2-INVOKE will emit t2_free + restore caller r12 at the return
          *  labels.  For now we just dispatch via the ret slot.) */
         char gamma_lbl[LBUF2], omega_lbl[LBUF2];
-        snprintf(gamma_lbl, sizeof gamma_lbl, "fn_%s_gamma", safe);
-        snprintf(omega_lbl, sizeof omega_lbl, "fn_%s_omega", safe);
-        asmL(gamma_lbl);
-        A("    jmp     [%s]\n", np->ret_gamma);
-
-        /* ω — T2 restore side (failure / FRETURN). */
-        asmL(omega_lbl);
-        A("    jmp     [%s]\n", np->ret_omega);
+        snprintf(gamma_lbl, sizeof gamma_lbl, "fn_%s_γ", safe);
+        snprintf(omega_lbl, sizeof omega_lbl, "fn_%s_ω", safe);
+        ALFC(gamma_lbl, "fn γ", "FN_γ %s\n", np->ret_gamma);
+        ALFC(omega_lbl, "fn ω", "FN_ω %s\n", np->ret_omega);
 
         box_ctx_end();
         return;
@@ -2061,8 +2036,8 @@ static void emit_named_def(const NamedPat *np,
 
     /* The named pattern's inner γ and ω connect back via the ret_ slots */
     char inner_gamma[LBUF2], inner_omega[LBUF2];
-    snprintf(inner_gamma, sizeof inner_gamma, "patdef_%s_gamma", np->safe);
-    snprintf(inner_omega, sizeof inner_omega, "patdef_%s_omega", np->safe);
+    snprintf(inner_gamma, sizeof inner_gamma, "patdef_%s_γ", np->safe);
+    snprintf(inner_omega, sizeof inner_omega, "patdef_%s_ω", np->safe);
 
     /* Major separator: named pattern header */
     emit_sep_major(np->varname);
@@ -2078,12 +2053,9 @@ static void emit_named_def(const NamedPat *np,
     /* Minor separator before γ/ω trampolines */
     emit_sep_minor("γ/ω");
 
-    /* γ/ω trampolines: use .bss ret slots (M-T2-INVOKE will switch to r12) */
-    A("%s:\n", inner_gamma);
-    A("    jmp     [%s]\n", np->ret_gamma);
-
-    asmL(inner_omega);
-    A("    jmp     [%s]\n", np->ret_omega);
+    /* γ/ω trampolines */
+    ALFC(inner_gamma, "named pat γ", "NAMED_PAT_γ %s\n", np->ret_gamma);
+    ALFC(inner_omega, "named pat ω", "NAMED_PAT_ω %s\n", np->ret_omega);
 
     box_ctx_end();
 }
@@ -2334,7 +2306,7 @@ static void emit_pattern(STMT_t *stmt) {
 
     /* Emit the root pattern tree */
     emit_pat_node(stmt->pattern,
-                  "root_alpha", "root_beta",
+                  "root_α", "root_β",
                   "match_success", "match_fail",
                   cursor_sym, subj_sym, subj_len_label,
                   0);
@@ -2389,7 +2361,7 @@ static void emit_pattern(STMT_t *stmt) {
     A("    ; init\n");
     A("    mov     qword [%s], %d\n", subj_len_label, subj_len);
     A("    mov     qword [%s], 0\n", cursor_sym);
-    A("    jmp     root_alpha\n");
+    A("    jmp     root_α\n");
 
     /* Paste collected pattern + named pattern code */
     A("%.*s", (int)code_size, code_buf);
@@ -2481,7 +2453,7 @@ static void emit_stmt(STMT_t *s) {
     int uid_before_dry = uid_ctr;   /* save uid counter state */
 
     emit_pat_node(s->pattern,
-                  "root_alpha", "root_beta",
+                  "root_α", "root_β",
                   "match_success", "match_fail",
                   cursor_sym, subj_sym, subj_len_label, 0);
     for (int i = 0; i < named_pat_count; i++)
@@ -2508,7 +2480,7 @@ static void emit_stmt(STMT_t *s) {
 
     A("%%include \"snobol4_asm.mac\"\n");
 
-    A("    global root_alpha, root_beta\n");
+    A("    global root_α, root_β\n");
     A("    extern cursor, subject_data, subject_len_val\n");
     A("    extern match_success, match_fail\n");
     A("    extern outer_cursor\n");
@@ -2550,7 +2522,7 @@ static void emit_stmt(STMT_t *s) {
     A("\nsection .text\n");
 
     emit_pat_node(s->pattern,
-                  "root_alpha", "root_beta",
+                  "root_α", "root_β",
                   "match_success", "match_fail",
                   cursor_sym, subj_sym, subj_len_label, 0);
 
@@ -3523,9 +3495,9 @@ static void emit_jmp(const char *tgt, const char *fallthrough) {
                        strcasecmp(tgt,"NRETURN")==0)) {
         char lbl[NAME_LEN + 32];
         if (strcasecmp(tgt,"RETURN")==0)
-            snprintf(lbl, sizeof lbl, "fn_%s_gamma", cur_fn->safe);
+            snprintf(lbl, sizeof lbl, "fn_%s_γ", cur_fn->safe);
         else
-            snprintf(lbl, sizeof lbl, "fn_%s_omega", cur_fn->safe);
+            snprintf(lbl, sizeof lbl, "fn_%s_ω", cur_fn->safe);
         A("    jmp     %s     ; %s\n", lbl, tgt);
         return;
     }
@@ -3548,9 +3520,9 @@ static void prog_emit_goto(const char *target, const char *fallthrough) {
         if (cur_fn) {
             char lbl[NAME_LEN + 32];
             if (strcasecmp(target,"RETURN")==0 || strcasecmp(target,"SRETURN")==0)
-                snprintf(lbl, sizeof lbl, "fn_%s_gamma", cur_fn->safe);
+                snprintf(lbl, sizeof lbl, "fn_%s_γ", cur_fn->safe);
             else
-                snprintf(lbl, sizeof lbl, "fn_%s_omega", cur_fn->safe);
+                snprintf(lbl, sizeof lbl, "fn_%s_ω", cur_fn->safe);
             A("    jmp     %s     ; %s\n", lbl, target);
         } else {
             A("    GOTO_ALWAYS  L_SNO_END     ; %s\n", target);

@@ -86,18 +86,18 @@ scan_retry_3:
                             mov         [cursor], rax
                             jmp         P_3_α
 
-P_3_α:                      jmp         seq_l0_alpha ; SEQ
-P_3_β:                      jmp         seq_r0_beta
-seq_l0_alpha:               RPOS_ALPHA  1, cursor, subject_len_val, seq_r0_alpha, P_3_ω ; RPOS(%ld)
-seq_l0_beta:                RPOS_BETA   cursor, P_3_ω
+P_3_α:                      jmp         seq_l0_α ; SEQ
+P_3_β:                      jmp         seq_r0_β
+seq_l0_α:                   RPOS_α      1, cursor, subject_len_val, seq_r0_α, P_3_ω ; RPOS(%ld)
+seq_l0_β:                   RPOS_β      cursor, P_3_ω
 
-seq_r0_alpha: ; DOL(T $  T)
-                            DOL_SAVE    dol_entry_T, cursor, dol1_child_alpha ; DOL α — save entry cursor
-seq_r0_beta:                jmp         dol1_child_beta ; DOL β
-dol1_child_alpha:           LEN_ALPHA   1, len2_saved, cursor, subject_len_val, dol1_gamma, dol1_omega ; LEN(%ld)
-dol1_child_beta:            LEN_BETA    len2_saved, cursor, dol1_omega ; LEN β
-dol1_gamma:                 DOL_CAPTURE dol_entry_T, cursor, cap_T_buf, cap_T_len, subject_data, P_3_γ ; DOL γ — capture span
-dol1_omega:                 jmp         seq_l0_beta ; DOL ω — child failed
+seq_r0_α: ; DOL(T $  T)
+                            DOL_SAVE    dol_entry_T, cursor, dol1_child_α ; DOL α — save entry cursor
+seq_r0_β:                   jmp         dol1_child_β ; DOL β
+dol1_child_α:               LEN_α       1, len2_saved, cursor, subject_len_val, dol1_γ, dol1_ω ; LEN(%ld)
+dol1_child_β:               LEN_β       len2_saved, cursor, dol1_ω ; LEN β
+dol1_γ:                     DOL_CAPTURE dol_entry_T, cursor, cap_T_buf, cap_T_len, subject_data, P_3_γ ; DOL γ — capture span
+dol1_ω:                     jmp         seq_l0_β ; DOL ω — child failed
 
 P_3_γ:                      SET_CAPTURE S_T, cap_T_buf, cap_T_len
                             mov         qword [rbp-32], 1
@@ -113,8 +113,8 @@ P_3_ω:                      cmp         qword [rel kw_anchor], 0
                             mov         [scan_start_3], rax
                             jmp         scan_retry_3
 scan_fail_tramp_0:
-                            jmp         fn_ROMAN_gamma     ; RETURN
-                            jmp         fn_ROMAN_gamma     ; RETURN
+                            jmp         fn_ROMAN_γ     ; RETURN
+                            jmp         fn_ROMAN_γ     ; RETURN
 
 ; ======================================================================================================================
 Ln_3:                       mov         edi, 8
@@ -129,20 +129,20 @@ scan_retry_4:
                             mov         [cursor], rax
                             jmp         P_4_α
 
-P_4_α:                      jmp         seq_l3_alpha ; SEQ
-P_4_β:                      jmp         seq_r3_beta
+P_4_α:                      jmp         seq_l3_α ; SEQ
+P_4_β:                      jmp         seq_r3_β
 
 ; E_VART T → LIT_VAR (stmt_match_var)
-seq_l3_alpha:               LIT_VAR_ALPHA S_T, litvar4_saved, cursor, seq_r3_alpha, P_4_ω
-seq_l3_beta:                LIT_VAR_BETA litvar4_saved, cursor, P_4_ω
+seq_l3_α:                   LIT_VAR_α   S_T, litvar4_saved, cursor, seq_r3_α, P_4_ω
+seq_l3_β:                   LIT_VAR_β   litvar4_saved, cursor, P_4_ω
 
-seq_r3_alpha: ; DOL(T $  T)
-                            DOL_SAVE    dol_entry_T, cursor, dol5_child_alpha ; DOL α — save entry cursor
-seq_r3_beta:                jmp         dol5_child_beta ; DOL β
-dol5_child_alpha:           BREAK_ALPHA lit_str_1, 1, brk6_saved, cursor, subject_data, subject_len_val, dol5_gamma, dol5_omega ; BREAK α
-dol5_child_beta:            BREAK_BETA  brk6_saved, cursor, dol5_omega ; BREAK β
-dol5_gamma:                 DOL_CAPTURE dol_entry_T, cursor, cap_T_buf, cap_T_len, subject_data, P_4_γ ; DOL γ — capture span
-dol5_omega:                 jmp         seq_l3_beta ; DOL ω — child failed
+seq_r3_α: ; DOL(T $  T)
+                            DOL_SAVE    dol_entry_T, cursor, dol5_child_α ; DOL α — save entry cursor
+seq_r3_β:                   jmp         dol5_child_β ; DOL β
+dol5_child_α:               BREAK_α     lit_str_1, 1, brk6_saved, cursor, subject_data, subject_len_val, dol5_γ, dol5_ω ; BREAK α
+dol5_child_β:               BREAK_β     brk6_saved, cursor, dol5_ω ; BREAK β
+dol5_γ:                     DOL_CAPTURE dol_entry_T, cursor, cap_T_buf, cap_T_len, subject_data, P_4_γ ; DOL γ — capture span
+dol5_ω:                     jmp         seq_l3_β ; DOL ω — child failed
 
 P_4_γ:                      SET_CAPTURE S_T, cap_T_buf, cap_T_len
                             jmp         Ln_4
@@ -155,8 +155,8 @@ P_4_ω:                      cmp         qword [rel kw_anchor], 0
                             mov         [scan_start_4], rax
                             jmp         scan_retry_4
 scan_fail_tramp_1:
-                            jmp         fn_ROMAN_omega     ; FRETURN
-                            jmp         fn_ROMAN_omega     ; FRETURN
+                            jmp         fn_ROMAN_ω     ; FRETURN
+                            jmp         fn_ROMAN_ω     ; FRETURN
 
 ; ======================================================================================================================
 Ln_4:                       mov         edi, 10
@@ -244,7 +244,7 @@ ucall0_done:
                             mov         [rbp-24], rdx
                             FAIL_BR     Ln_5
                             SET_VAR     S_ROMAN
-                            jmp         fn_ROMAN_gamma     ; RETURN
+                            jmp         fn_ROMAN_γ     ; RETURN
 
 Ln_5:
 ;  ROMAN_END ===========================================================================================================
@@ -405,35 +405,53 @@ section .text
 
 ;  NAMED PATTERN BODIES ================================================================================================
 
-; P_ROMAN_α — user function α entry (1 param)
+; P_ROMAN_α — user function α entry (1 param) [T2: r12=DATA]
 ;  ROMAN ===============================================================================================================
-P_ROMAN_α:                  push        rbp
-                            mov         rbp, rsp
-                            sub         rsp, 56
-                            lea         rdi, [rel S_N]
+P_ROMAN_α:                  FN_α_INIT   ROMAN
                             mov         rsi, [fn_ROMAN_arg_0_t]
                             mov         rdx, [fn_ROMAN_arg_0_p]
-                            call        stmt_set
+                            FN_SET_PARAM S_N
                             LOAD_NULVCL
-                            lea         rdi, [rel S_ROMAN]
-                            mov         rsi, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            call        stmt_set
-                            lea         rdi, [rel S_T]
-                            mov         rsi, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            call        stmt_set
+                            mov         [r12+16], rax
+                            mov         [r12+24], rdx
+                            mov         rsi, [r12+16]
+                            mov         rdx, [r12+24]
+                            FN_CLEAR_VAR S_ROMAN
+                            mov         rsi, [r12+16]
+                            mov         rdx, [r12+24]
+                            FN_CLEAR_VAR S_T
                             jmp         L_ROMAN_1
 ;  γ/ω ---------------------------------------------------------------------------------------------------------------
-fn_ROMAN_gamma:             add         rsp, 56
-                            pop         rbp
-                            jmp         [P_ROMAN_ret_γ]
-fn_ROMAN_omega:             add         rsp, 56
-                            pop         rbp
-                            jmp         [P_ROMAN_ret_ω]
+fn_ROMAN_γ:                 FN_γ        P_ROMAN_ret_γ ; fn γ
+fn_ROMAN_ω:                 FN_ω        P_ROMAN_ret_ω ; fn ω
 
 section .text
 ;  STUB LABELS =========================================================================================================
+
+section .rodata
+global  box_ROMAN_reloc_count, box_ROMAN_reloc_table
+; --- box ROMAN ---
+box_ROMAN_reloc_count: dq 0
+box_ROMAN_reloc_table:
+; (entries added by M-T2-INVOKE)
+
+;  T2 RELOCATION TABLES ================================================================================================
+
+global  box_ROMAN_data_template, box_ROMAN_data_size
+section .data
+;  T2 DATA TEMPLATES ===================================================================================================
+                            align       8
+box_ROMAN_data_size: dq 64
+box_ROMAN_data_template:
+dq 0  ; [r12+0] = P_ROMAN_ret_γ
+dq 0  ; [r12+8] = P_ROMAN_ret_ω
+dq 0  ; [r12+16] = fn_ROMAN_tmp1_t
+dq 0  ; [r12+24] = fn_ROMAN_tmp1_p
+dq 0  ; [r12+32] = fn_ROMAN_tmp2_t
+dq 0  ; [r12+40] = fn_ROMAN_tmp2_p
+dq 0  ; [r12+48] = fn_ROMAN_tmp3_t
+dq 0  ; [r12+56] = fn_ROMAN_tmp3_p
+
 
 section .data
 S_TRIM               db 84, 82, 73, 77, 0  ; "TRIM"

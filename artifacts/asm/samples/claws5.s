@@ -61,20 +61,6 @@ P_do_add_tok_ret_ω      resq 1
 P_claws_info_ret_γ      resq 1
 P_claws_info_ret_ω      resq 1
 scan_start_70            resq 1
-arb5_depth               resq 1
-arb5_cur_before          resq 1
-alt7_cur_save            resq 1
-dol_entry_num            resq 1
-span10_saved             resq 1
-seq_l11_alpha_saved      resq 1
-dol_entry_wrd            resq 1
-nany16_saved             resq 1
-brk17_saved              resq 1
-seq_l18_alpha_saved      resq 1
-dol_entry_tag            resq 1
-any22_saved              resq 1
-span23_saved             resq 1
-seq_r6_alpha_saved       resq 1
 arb5_stack               resq 64
 ucall0_rsv_g             resq 1
 ucall0_rsv_o             resq 1
@@ -172,7 +158,7 @@ L_InitStack_1:              mov         edi, 41
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             SET_VAR_INDIR
-                            jmp         fn_InitStack_gamma     ; RETURN
+                            jmp         fn_InitStack_γ     ; RETURN
 
 Ln_11:
 ;  Push ================================================================================================================
@@ -203,7 +189,7 @@ Ln_12:                      mov         edi, 43
                             LOAD_STR    S_IDENT
                             FAIL_BR     Ln_13
                             SET_VAR     S_Push
-                            jmp         fn_Push_omega     ; NRETURN
+                            jmp         fn_Push_ω     ; NRETURN
 
 ; ======================================================================================================================
 Ln_13:                      mov         edi, 44
@@ -211,7 +197,7 @@ Ln_13:                      mov         edi, 44
                             LOAD_STR    S_DIFFER
                             FAIL_BR     Ln_14
                             SET_VAR     S_Push
-                            jmp         fn_Push_omega     ; NRETURN
+                            jmp         fn_Push_ω     ; NRETURN
 
 Ln_14:
 ;  Pop =================================================================================================================
@@ -226,7 +212,7 @@ L_Pop_3:                    mov         edi, 45
                             STORE_RESULT
                             FAIL_BR     Lf_15
                             jmp         Ln_15
-Lf_15:                      jmp         fn_Pop_omega     ; FRETURN
+Lf_15:                      jmp         fn_Pop_ω     ; FRETURN
 
 ; ======================================================================================================================
 Ln_15:                      mov         edi, 46
@@ -265,7 +251,7 @@ Ln_17:                      mov         edi, 48
                             STORE_RESULT
                             FAIL_BR     Ln_18
                             SET_VAR_INDIR
-                            jmp         fn_Pop_gamma     ; RETURN
+                            jmp         fn_Pop_γ     ; RETURN
 
 Ln_18:
 ;  Pop1 ================================================================================================================
@@ -306,7 +292,7 @@ Ln_20:                      mov         edi, 51
                             STORE_RESULT
                             FAIL_BR     Ln_21
                             SET_VAR_INDIR
-                            jmp         fn_Pop_omega     ; NRETURN
+                            jmp         fn_Pop_ω     ; NRETURN
 
 Ln_21:
 ;  Top =================================================================================================================
@@ -321,7 +307,7 @@ L_Top_5:                    mov         edi, 52
                             STORE_RESULT
                             FAIL_BR     Lf_22
                             jmp         Ln_22
-Lf_22:                      jmp         fn_Top_omega     ; FRETURN
+Lf_22:                      jmp         fn_Top_ω     ; FRETURN
 
 ; ======================================================================================================================
 Ln_22:                      mov         edi, 53
@@ -329,7 +315,7 @@ Ln_22:                      mov         edi, 53
                             LOAD_STR    S_value
                             FAIL_BR     Ln_23
                             SET_VAR     S_Top
-                            jmp         fn_Top_omega     ; NRETURN
+                            jmp         fn_Top_ω     ; NRETURN
 
 Ln_23:
 ;  StackEnd ============================================================================================================
@@ -372,7 +358,7 @@ L_InitCounter_7:            mov         edi, 64
                             mov         qword [rbp-32], 1
                             mov         qword [rbp-24], 0
                             SET_VAR_INDIR
-                            jmp         fn_InitCounter_gamma     ; RETURN
+                            jmp         fn_InitCounter_γ     ; RETURN
 
 Ln_31:
 ;  PushCounter =========================================================================================================
@@ -400,7 +386,7 @@ Ln_32:                      mov         edi, 66
                             LOAD_STR    S_dummy
                             FAIL_BR     Ln_33
                             SET_VAR     S_PushCounter
-                            jmp         fn_PushCounter_omega     ; NRETURN
+                            jmp         fn_PushCounter_ω     ; NRETURN
 
 Ln_33:
 ;  IncCounter ==========================================================================================================
@@ -439,7 +425,7 @@ Ln_34:                      mov         edi, 68
                             LOAD_STR    S_dummy
                             FAIL_BR     Ln_35
                             SET_VAR     S_IncCounter
-                            jmp         fn_IncCounter_omega     ; NRETURN
+                            jmp         fn_IncCounter_ω     ; NRETURN
 
 Ln_35:
 ;  TopCounter ==========================================================================================================
@@ -498,7 +484,7 @@ Ln_36:                      mov         edi, 70
                             mov         [rbp-24], rdx
                             FAIL_BR     Ln_37
                             SET_OUTPUT
-                            jmp         fn_TopCounter_gamma     ; RETURN
+                            jmp         fn_TopCounter_γ     ; RETURN
 
 Ln_37:
 ;  PopCounter ==========================================================================================================
@@ -540,7 +526,7 @@ Ln_38:                      mov         edi, 72
                             LOAD_STR    S_dummy
                             FAIL_BR     Ln_39
                             SET_VAR     S_PopCounter
-                            jmp         fn_PopCounter_omega     ; NRETURN
+                            jmp         fn_PopCounter_ω     ; NRETURN
 
 Ln_39:
 ;  CounterEnd ==========================================================================================================
@@ -573,7 +559,7 @@ Ln_43:                      mov         edi, 81
                             LOAD_STR    S_dummy
                             FAIL_BR     Ln_44
                             SET_VAR     S_do_mem_init
-                            jmp         fn_do_mem_init_omega     ; NRETURN
+                            jmp         fn_do_mem_init_ω     ; NRETURN
 
 Ln_44:
 ;  do_mem_init_end =====================================================================================================
@@ -624,7 +610,7 @@ Ln_48:                      mov         edi, 87
                             LOAD_STR    S_dummy
                             FAIL_BR     Ln_49
                             SET_VAR     S_do_new_sent
-                            jmp         fn_do_new_sent_omega     ; NRETURN
+                            jmp         fn_do_new_sent_ω     ; NRETURN
 
 Ln_49:
 ;  do_new_sent_end =====================================================================================================
@@ -1033,7 +1019,7 @@ Ln_61:                      mov         edi, 101
                             LOAD_STR    S_dummy
                             FAIL_BR     Ln_62
                             SET_VAR     S_do_add_tok
-                            jmp         fn_do_add_tok_omega     ; NRETURN
+                            jmp         fn_do_add_tok_ω     ; NRETURN
 
 Ln_62:
 ;  do_add_tok_end ======================================================================================================
@@ -1280,20 +1266,20 @@ scan_retry_70:
 
 
 P_70_α: ; REF(claws_info)
-                            lea         rax, [rel nref0_gamma]
+                            lea         rax, [rel nref0_γ]
                             mov         [P_claws_info_ret_γ], rax
-                            lea         rax, [rel nref0_omega]
+                            lea         rax, [rel nref0_ω]
                             mov         [P_claws_info_ret_ω], rax
                             jmp         P_claws_info_α
-P_70_β:                     lea         rax, [rel nref0_gamma] ; REF(%s)
+P_70_β:                     lea         rax, [rel nref0_γ] ; REF(%s)
                             mov         [P_claws_info_ret_γ], rax
-                            lea         rax, [rel nref0_omega]
+                            lea         rax, [rel nref0_ω]
                             mov         [P_claws_info_ret_ω], rax
                             jmp         P_claws_info_β
 
-nref0_gamma:
+nref0_γ:
                             jmp         P_70_γ
-nref0_omega:                jmp         P_70_ω
+nref0_ω:                    jmp         P_70_ω
 
 P_70_γ:                     SET_CAPTURE S_num, cap_num_buf, cap_num_len
                             SET_CAPTURE S_wrd, cap_wrd_buf, cap_wrd_len
@@ -1331,390 +1317,577 @@ section .text
 
 ;  NAMED PATTERN BODIES ================================================================================================
 
-; P_InitStack_α — user function α entry (0 params)
+; P_InitStack_α — user function α entry (0 params) [T2: r12=DATA]
 ;  InitStack ===========================================================================================================
-P_InitStack_α:              push        rbp
-                            mov         rbp, rsp
-                            sub         rsp, 56
+P_InitStack_α:              FN_α_INIT   InitStack
                             LOAD_NULVCL
-                            lea         rdi, [rel S_InitStack]
-                            mov         rsi, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            call        stmt_set
+                            mov         [r12+16], rax
+                            mov         [r12+24], rdx
+                            mov         rsi, [r12+16]
+                            mov         rdx, [r12+24]
+                            FN_CLEAR_VAR S_InitStack
                             jmp         L_InitStack_1
 ;  γ/ω ---------------------------------------------------------------------------------------------------------------
-fn_InitStack_gamma:         add         rsp, 56
-                            pop         rbp
-                            jmp         [P_InitStack_ret_γ]
-fn_InitStack_omega:         add         rsp, 56
-                            pop         rbp
-                            jmp         [P_InitStack_ret_ω]
+fn_InitStack_γ:             FN_γ        P_InitStack_ret_γ ; fn γ
+fn_InitStack_ω:             FN_ω        P_InitStack_ret_ω ; fn ω
 
-; P_Push_α — user function α entry (1 param)
+; P_Push_α — user function α entry (1 param) [T2: r12=DATA]
 ;  Push ================================================================================================================
-P_Push_α:                   push        rbp
-                            mov         rbp, rsp
-                            sub         rsp, 56
-                            lea         rdi, [rel S_x]
+P_Push_α:                   FN_α_INIT   Push
                             mov         rsi, [fn_Push_arg_0_t]
                             mov         rdx, [fn_Push_arg_0_p]
-                            call        stmt_set
+                            FN_SET_PARAM S_x
                             LOAD_NULVCL
-                            lea         rdi, [rel S_Push]
-                            mov         rsi, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            call        stmt_set
+                            mov         [r12+16], rax
+                            mov         [r12+24], rdx
+                            mov         rsi, [r12+16]
+                            mov         rdx, [r12+24]
+                            FN_CLEAR_VAR S_Push
                             jmp         L_Push_2
 ;  γ/ω ---------------------------------------------------------------------------------------------------------------
-fn_Push_gamma:              add         rsp, 56
-                            pop         rbp
-                            jmp         [P_Push_ret_γ]
-fn_Push_omega:              add         rsp, 56
-                            pop         rbp
-                            jmp         [P_Push_ret_ω]
+fn_Push_γ:                  FN_γ        P_Push_ret_γ ; fn γ
+fn_Push_ω:                  FN_ω        P_Push_ret_ω ; fn ω
 
-; P_Pop_α — user function α entry (1 param)
+; P_Pop_α — user function α entry (1 param) [T2: r12=DATA]
 ;  Pop =================================================================================================================
-P_Pop_α:                    push        rbp
-                            mov         rbp, rsp
-                            sub         rsp, 56
-                            lea         rdi, [rel S_var]
+P_Pop_α:                    FN_α_INIT   Pop
                             mov         rsi, [fn_Pop_arg_0_t]
                             mov         rdx, [fn_Pop_arg_0_p]
-                            call        stmt_set
+                            FN_SET_PARAM S_var
                             LOAD_NULVCL
-                            lea         rdi, [rel S_Pop]
-                            mov         rsi, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            call        stmt_set
+                            mov         [r12+16], rax
+                            mov         [r12+24], rdx
+                            mov         rsi, [r12+16]
+                            mov         rdx, [r12+24]
+                            FN_CLEAR_VAR S_Pop
                             jmp         L_Pop_3
 ;  γ/ω ---------------------------------------------------------------------------------------------------------------
-fn_Pop_gamma:               add         rsp, 56
-                            pop         rbp
-                            jmp         [P_Pop_ret_γ]
-fn_Pop_omega:               add         rsp, 56
-                            pop         rbp
-                            jmp         [P_Pop_ret_ω]
+fn_Pop_γ:                   FN_γ        P_Pop_ret_γ ; fn γ
+fn_Pop_ω:                   FN_ω        P_Pop_ret_ω ; fn ω
 
-; P_Top_α — user function α entry (0 params)
+; P_Top_α — user function α entry (0 params) [T2: r12=DATA]
 ;  Top =================================================================================================================
-P_Top_α:                    push        rbp
-                            mov         rbp, rsp
-                            sub         rsp, 56
+P_Top_α:                    FN_α_INIT   Top
                             LOAD_NULVCL
-                            lea         rdi, [rel S_Top]
-                            mov         rsi, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            call        stmt_set
+                            mov         [r12+16], rax
+                            mov         [r12+24], rdx
+                            mov         rsi, [r12+16]
+                            mov         rdx, [r12+24]
+                            FN_CLEAR_VAR S_Top
                             jmp         L_Top_5
 ;  γ/ω ---------------------------------------------------------------------------------------------------------------
-fn_Top_gamma:               add         rsp, 56
-                            pop         rbp
-                            jmp         [P_Top_ret_γ]
-fn_Top_omega:               add         rsp, 56
-                            pop         rbp
-                            jmp         [P_Top_ret_ω]
+fn_Top_γ:                   FN_γ        P_Top_ret_γ ; fn γ
+fn_Top_ω:                   FN_ω        P_Top_ret_ω ; fn ω
 
-; P_InitCounter_α — user function α entry (0 params)
+; P_InitCounter_α — user function α entry (0 params) [T2: r12=DATA]
 ;  InitCounter =========================================================================================================
-P_InitCounter_α:            push        rbp
-                            mov         rbp, rsp
-                            sub         rsp, 56
+P_InitCounter_α:            FN_α_INIT   InitCounter
                             LOAD_NULVCL
-                            lea         rdi, [rel S_InitCounter]
-                            mov         rsi, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            call        stmt_set
+                            mov         [r12+16], rax
+                            mov         [r12+24], rdx
+                            mov         rsi, [r12+16]
+                            mov         rdx, [r12+24]
+                            FN_CLEAR_VAR S_InitCounter
                             jmp         L_InitCounter_7
 ;  γ/ω ---------------------------------------------------------------------------------------------------------------
-fn_InitCounter_gamma:       add         rsp, 56
-                            pop         rbp
-                            jmp         [P_InitCounter_ret_γ]
-fn_InitCounter_omega:       add         rsp, 56
-                            pop         rbp
-                            jmp         [P_InitCounter_ret_ω]
+fn_InitCounter_γ:           FN_γ        P_InitCounter_ret_γ ; fn γ
+fn_InitCounter_ω:           FN_ω        P_InitCounter_ret_ω ; fn ω
 
-; P_PushCounter_α — user function α entry (0 params)
+; P_PushCounter_α — user function α entry (0 params) [T2: r12=DATA]
 ;  PushCounter =========================================================================================================
-P_PushCounter_α:            push        rbp
-                            mov         rbp, rsp
-                            sub         rsp, 56
+P_PushCounter_α:            FN_α_INIT   PushCounter
                             LOAD_NULVCL
-                            lea         rdi, [rel S_PushCounter]
-                            mov         rsi, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            call        stmt_set
+                            mov         [r12+16], rax
+                            mov         [r12+24], rdx
+                            mov         rsi, [r12+16]
+                            mov         rdx, [r12+24]
+                            FN_CLEAR_VAR S_PushCounter
                             jmp         L_PushCounter_8
 ;  γ/ω ---------------------------------------------------------------------------------------------------------------
-fn_PushCounter_gamma:       add         rsp, 56
-                            pop         rbp
-                            jmp         [P_PushCounter_ret_γ]
-fn_PushCounter_omega:       add         rsp, 56
-                            pop         rbp
-                            jmp         [P_PushCounter_ret_ω]
+fn_PushCounter_γ:           FN_γ        P_PushCounter_ret_γ ; fn γ
+fn_PushCounter_ω:           FN_ω        P_PushCounter_ret_ω ; fn ω
 
-; P_IncCounter_α — user function α entry (0 params)
+; P_IncCounter_α — user function α entry (0 params) [T2: r12=DATA]
 ;  IncCounter ==========================================================================================================
-P_IncCounter_α:             push        rbp
-                            mov         rbp, rsp
-                            sub         rsp, 56
+P_IncCounter_α:             FN_α_INIT   IncCounter
                             LOAD_NULVCL
-                            lea         rdi, [rel S_IncCounter]
-                            mov         rsi, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            call        stmt_set
+                            mov         [r12+16], rax
+                            mov         [r12+24], rdx
+                            mov         rsi, [r12+16]
+                            mov         rdx, [r12+24]
+                            FN_CLEAR_VAR S_IncCounter
                             jmp         L_IncCounter_9
 ;  γ/ω ---------------------------------------------------------------------------------------------------------------
-fn_IncCounter_gamma:        add         rsp, 56
-                            pop         rbp
-                            jmp         [P_IncCounter_ret_γ]
-fn_IncCounter_omega:        add         rsp, 56
-                            pop         rbp
-                            jmp         [P_IncCounter_ret_ω]
+fn_IncCounter_γ:            FN_γ        P_IncCounter_ret_γ ; fn γ
+fn_IncCounter_ω:            FN_ω        P_IncCounter_ret_ω ; fn ω
 
-; P_TopCounter_α — user function α entry (0 params)
+; P_TopCounter_α — user function α entry (0 params) [T2: r12=DATA]
 ;  TopCounter ==========================================================================================================
-P_TopCounter_α:             push        rbp
-                            mov         rbp, rsp
-                            sub         rsp, 56
+P_TopCounter_α:             FN_α_INIT   TopCounter
                             LOAD_NULVCL
-                            lea         rdi, [rel S_TopCounter]
-                            mov         rsi, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            call        stmt_set
+                            mov         [r12+16], rax
+                            mov         [r12+24], rdx
+                            mov         rsi, [r12+16]
+                            mov         rdx, [r12+24]
+                            FN_CLEAR_VAR S_TopCounter
                             jmp         L_TopCounter_10
 ;  γ/ω ---------------------------------------------------------------------------------------------------------------
-fn_TopCounter_gamma:        add         rsp, 56
-                            pop         rbp
-                            jmp         [P_TopCounter_ret_γ]
-fn_TopCounter_omega:        add         rsp, 56
-                            pop         rbp
-                            jmp         [P_TopCounter_ret_ω]
+fn_TopCounter_γ:            FN_γ        P_TopCounter_ret_γ ; fn γ
+fn_TopCounter_ω:            FN_ω        P_TopCounter_ret_ω ; fn ω
 
-; P_PopCounter_α — user function α entry (0 params)
+; P_PopCounter_α — user function α entry (0 params) [T2: r12=DATA]
 ;  PopCounter ==========================================================================================================
-P_PopCounter_α:             push        rbp
-                            mov         rbp, rsp
-                            sub         rsp, 56
+P_PopCounter_α:             FN_α_INIT   PopCounter
                             LOAD_NULVCL
-                            lea         rdi, [rel S_PopCounter]
-                            mov         rsi, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            call        stmt_set
+                            mov         [r12+16], rax
+                            mov         [r12+24], rdx
+                            mov         rsi, [r12+16]
+                            mov         rdx, [r12+24]
+                            FN_CLEAR_VAR S_PopCounter
                             jmp         L_PopCounter_11
 ;  γ/ω ---------------------------------------------------------------------------------------------------------------
-fn_PopCounter_gamma:        add         rsp, 56
-                            pop         rbp
-                            jmp         [P_PopCounter_ret_γ]
-fn_PopCounter_omega:        add         rsp, 56
-                            pop         rbp
-                            jmp         [P_PopCounter_ret_ω]
+fn_PopCounter_γ:            FN_γ        P_PopCounter_ret_γ ; fn γ
+fn_PopCounter_ω:            FN_ω        P_PopCounter_ret_ω ; fn ω
 
-; P_do_mem_init_α — user function α entry (0 params)
+; P_do_mem_init_α — user function α entry (0 params) [T2: r12=DATA]
 ;  do_mem_init =========================================================================================================
-P_do_mem_init_α:            push        rbp
-                            mov         rbp, rsp
-                            sub         rsp, 56
+P_do_mem_init_α:            FN_α_INIT   do_mem_init
                             LOAD_NULVCL
-                            lea         rdi, [rel S_do_mem_init]
-                            mov         rsi, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            call        stmt_set
+                            mov         [r12+16], rax
+                            mov         [r12+24], rdx
+                            mov         rsi, [r12+16]
+                            mov         rdx, [r12+24]
+                            FN_CLEAR_VAR S_do_mem_init
                             jmp         L_do_mem_init_13
 ;  γ/ω ---------------------------------------------------------------------------------------------------------------
-fn_do_mem_init_gamma:       add         rsp, 56
-                            pop         rbp
-                            jmp         [P_do_mem_init_ret_γ]
-fn_do_mem_init_omega:       add         rsp, 56
-                            pop         rbp
-                            jmp         [P_do_mem_init_ret_ω]
+fn_do_mem_init_γ:           FN_γ        P_do_mem_init_ret_γ ; fn γ
+fn_do_mem_init_ω:           FN_ω        P_do_mem_init_ret_ω ; fn ω
 
-; P_do_new_sent_α — user function α entry (0 params)
+; P_do_new_sent_α — user function α entry (0 params) [T2: r12=DATA]
 ;  do_new_sent =========================================================================================================
-P_do_new_sent_α:            push        rbp
-                            mov         rbp, rsp
-                            sub         rsp, 56
+P_do_new_sent_α:            FN_α_INIT   do_new_sent
                             LOAD_NULVCL
-                            lea         rdi, [rel S_do_new_sent]
-                            mov         rsi, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            call        stmt_set
+                            mov         [r12+16], rax
+                            mov         [r12+24], rdx
+                            mov         rsi, [r12+16]
+                            mov         rdx, [r12+24]
+                            FN_CLEAR_VAR S_do_new_sent
                             jmp         L_do_new_sent_15
 ;  γ/ω ---------------------------------------------------------------------------------------------------------------
-fn_do_new_sent_gamma:       add         rsp, 56
-                            pop         rbp
-                            jmp         [P_do_new_sent_ret_γ]
-fn_do_new_sent_omega:       add         rsp, 56
-                            pop         rbp
-                            jmp         [P_do_new_sent_ret_ω]
+fn_do_new_sent_γ:           FN_γ        P_do_new_sent_ret_γ ; fn γ
+fn_do_new_sent_ω:           FN_ω        P_do_new_sent_ret_ω ; fn ω
 
-; P_do_add_tok_α — user function α entry (0 params)
+; P_do_add_tok_α — user function α entry (0 params) [T2: r12=DATA]
 ;  do_add_tok ==========================================================================================================
-P_do_add_tok_α:             push        rbp
-                            mov         rbp, rsp
-                            sub         rsp, 56
+P_do_add_tok_α:             FN_α_INIT   do_add_tok
                             LOAD_NULVCL
-                            lea         rdi, [rel S_do_add_tok]
-                            mov         rsi, [rbp-16]
-                            mov         rdx, [rbp-8]
-                            call        stmt_set
+                            mov         [r12+16], rax
+                            mov         [r12+24], rdx
+                            mov         rsi, [r12+16]
+                            mov         rdx, [r12+24]
+                            FN_CLEAR_VAR S_do_add_tok
                             jmp         L_do_add_tok_17
 ;  γ/ω ---------------------------------------------------------------------------------------------------------------
-fn_do_add_tok_gamma:        add         rsp, 56
-                            pop         rbp
-                            jmp         [P_do_add_tok_ret_γ]
-fn_do_add_tok_omega:        add         rsp, 56
-                            pop         rbp
-                            jmp         [P_do_add_tok_ret_ω]
+fn_do_add_tok_γ:            FN_γ        P_do_add_tok_ret_γ ; fn γ
+fn_do_add_tok_ω:            FN_ω        P_do_add_tok_ret_ω ; fn ω
 
-; P_claws_info_α (α entry)
-P_claws_info_α:             jmp         seq_l1_alpha ; SEQ
-P_claws_info_β:             jmp         seq_r1_beta
-seq_l1_alpha:               POS_ALPHA   0, cursor, seq_r1_alpha, patdef_claws_info_omega ; POS(%ld)
-seq_l1_beta:                POS_BETA    cursor, patdef_claws_info_omega
-seq_r1_alpha:               jmp         seq_l2_alpha ; SEQ
-seq_r1_beta:                jmp         seq_r2_beta
+; P_claws_info_α (α entry) [T2: r12=DATA]
+P_claws_info_α:             jmp         seq_l1_α ; SEQ
+P_claws_info_β:             jmp         seq_r1_β
+seq_l1_α:                   POS_α       0, cursor, seq_r1_α, patdef_claws_info_ω ; POS(%ld)
+seq_l1_β:                   POS_β       cursor, patdef_claws_info_ω
+seq_r1_α:                   jmp         seq_l2_α ; SEQ
+seq_r1_β:                   jmp         seq_r2_β
 
-seq_l2_alpha: ; REF(do_mem_init)
+seq_l2_α: ; REF(do_mem_init)
 ;  claws_info ==========================================================================================================
-                            lea         rax, [rel nref3_gamma]
+                            lea         rax, [rel nref3_γ]
                             mov         [P_do_mem_init_ret_γ], rax
-                            lea         rax, [rel nref3_omega]
+                            lea         rax, [rel nref3_ω]
                             mov         [P_do_mem_init_ret_ω], rax
                             jmp         P_do_mem_init_α
-seq_l2_beta:                lea         rax, [rel nref3_gamma] ; REF(%s)
+seq_l2_β:                   lea         rax, [rel nref3_γ] ; REF(%s)
                             mov         [P_do_mem_init_ret_γ], rax
-                            lea         rax, [rel nref3_omega]
+                            lea         rax, [rel nref3_ω]
                             mov         [P_do_mem_init_ret_ω], rax
                             jmp         P_do_mem_init_β
 
-nref3_gamma:
-                            jmp         seq_r2_alpha
-nref3_omega:                jmp         seq_l1_beta
-seq_r2_alpha:               jmp         seq_l4_alpha ; SEQ
-seq_r2_beta:                jmp         seq_r4_beta
+nref3_γ:
+                            jmp         seq_r2_α
+nref3_ω:                    jmp         seq_l1_β
+seq_r2_α:                   jmp         seq_l4_α ; SEQ
+seq_r2_β:                   jmp         seq_r4_β
 
-seq_l4_alpha: ; ARBNO
-                            mov         qword [arb5_depth], 0
-                            lea         rbx, [rel arb5_stack]
-                            mov         rax, [cursor]
-                            mov         [rbx], rax
-                            mov         qword [arb5_depth], 1
-                            jmp         seq_r4_alpha
-seq_l4_beta:                mov         rax, [arb5_depth] ; ARBNO
-                            test        rax, rax
-                            je          seq_l2_beta
-                            dec         rax
-                            mov         [arb5_depth], rax
-                            lea         rbx, [rel arb5_stack]
-                            mov         rcx, [rbx + rax*8]
-                            mov         [cursor], rcx
-                            mov         [arb5_cur_before], rcx
-                            jmp         arb5_child_alpha
-arb5_child_ok:              mov         rax, [cursor] ; ARBNO child_ok
-                            mov         rbx, [arb5_cur_before]
-                            cmp         rax, rbx
-                            je          seq_l2_beta
-                            mov         rdx, [arb5_depth]
-                            lea         rbx, [rel arb5_stack]
-                            mov         [rbx + rdx*8], rax
-                            inc         qword [arb5_depth]
-                            jmp         seq_r4_alpha
-arb5_child_fail:            jmp         seq_l2_beta ; ARBNO child_fail
-arb5_child_alpha:           jmp         seq_l6_alpha ; SEQ
-arb5_child_beta:            jmp         seq_r6_beta
-seq_l6_alpha:               ALT_ALPHA   alt7_cur_save, cursor, alt_l7_alpha ; ALT α — save cursor, enter left
-seq_l6_beta:                SEQ_BETA    alt_r7_beta ; ALT β — resume right
-alt_l7_alpha:               jmp         seq_l8_alpha ; SEQ
-alt_l7_beta:                jmp         seq_r8_beta
+seq_l4_α:                   ARBNO_α     r12+16, arb5_stack, cursor, seq_r4_α ; ARBNO α
+seq_l4_β:                   ARBNO_β     r12+16, arb5_stack, r12+16, cursor, arb5_child_α, seq_l2_β ; ARBNO β
+arb5_child_ok:              ARBNO_CHILD_OK r12+16, arb5_stack, r12+16, cursor, seq_r4_α, seq_l2_β ; ARBNO child_ok
+arb5_child_fail:            ARBNO_CHILD_FAIL seq_l2_β ; ARBNO child_fail
+arb5_child_α:               jmp         seq_l6_α ; SEQ
+arb5_child_β:               jmp         seq_r6_β
+seq_l6_α:                   ALT_α       r12+32, cursor, alt_l7_α ; ALT α — save cursor, enter left
+seq_l6_β:                   SEQ_β       alt_r7_β ; ALT β — resume right
+alt_l7_α:                   jmp         seq_l8_α ; SEQ
+alt_l7_β:                   jmp         seq_r8_β
 
-seq_l8_alpha: ; DOL(num $  num)
-                            DOL_SAVE    dol_entry_num, cursor, dol9_child_alpha ; DOL α — save entry cursor
-seq_l8_beta:                jmp         dol9_child_beta ; DOL β
-dol9_child_alpha:           SPAN_ALPHA_VAR S_DIGITS, span10_saved, cursor, subject_data, subject_len_val, dol9_gamma, dol9_omega ; SPAN(var) α
-dol9_child_beta:            SPAN_BETA_VAR span10_saved, cursor, dol9_omega ; SPAN(var) β
-dol9_gamma:                 DOL_CAPTURE dol_entry_num, cursor, cap_num_buf, cap_num_len, subject_data, seq_r8_alpha ; DOL γ — capture span
-dol9_omega:                 jmp         alt7_left_omega ; DOL ω — child failed
-seq_r8_alpha:               jmp         seq_l11_alpha ; SEQ
-seq_r8_beta:                jmp         seq_r11_beta
-seq_l11_alpha:              LIT_ALPHA   lit_str_1, 10, seq_l11_alpha_saved, cursor, subject_data, subject_len_val, seq_r11_alpha, seq_l8_beta ; LIT α
-seq_l11_beta:               LIT_BETA    seq_l11_alpha_saved, cursor, seq_l8_beta ; LIT β
+seq_l8_α: ; DOL(num $  num)
+                            DOL_SAVE    r12+40, cursor, dol9_child_α ; DOL α — save entry cursor
+seq_l8_β:                   jmp         dol9_child_β ; DOL β
+dol9_child_α:               SPAN_α_VAR  S_DIGITS, r12+48, cursor, subject_data, subject_len_val, dol9_γ, dol9_ω ; SPAN(var) α
+dol9_child_β:               SPAN_β_VAR  r12+48, cursor, dol9_ω ; SPAN(var) β
+dol9_γ:                     DOL_CAPTURE r12+40, cursor, cap_num_buf, cap_num_len, subject_data, seq_r8_α ; DOL γ — capture span
+dol9_ω:                     jmp         alt7_left_ω ; DOL ω — child failed
+seq_r8_α:                   jmp         seq_l11_α ; SEQ
+seq_r8_β:                   jmp         seq_r11_β
+seq_l11_α:                  LIT_α       lit_str_1, 10, r12+56, cursor, subject_data, subject_len_val, seq_r11_α, seq_l8_β ; LIT α
+seq_l11_β:                  LIT_β       r12+56, cursor, seq_l8_β ; LIT β
 
-seq_r11_alpha: ; REF(do_new_sent)
-                            lea         rax, [rel nref12_gamma]
+seq_r11_α: ; REF(do_new_sent)
+                            lea         rax, [rel nref12_γ]
                             mov         [P_do_new_sent_ret_γ], rax
-                            lea         rax, [rel nref12_omega]
+                            lea         rax, [rel nref12_ω]
                             mov         [P_do_new_sent_ret_ω], rax
                             jmp         P_do_new_sent_α
-seq_r11_beta:               lea         rax, [rel nref12_gamma] ; REF(%s)
+seq_r11_β:                  lea         rax, [rel nref12_γ] ; REF(%s)
                             mov         [P_do_new_sent_ret_γ], rax
-                            lea         rax, [rel nref12_omega]
+                            lea         rax, [rel nref12_ω]
                             mov         [P_do_new_sent_ret_ω], rax
                             jmp         P_do_new_sent_β
 
-nref12_gamma:
-                            jmp         seq_r6_alpha
-nref12_omega:               jmp         seq_l11_beta
-alt7_left_omega:            ALT_OMEGA   alt7_cur_save, cursor, alt_r7_alpha ; ALT left_ω — restore cursor, enter right
-alt_r7_alpha:               jmp         seq_l13_alpha ; SEQ
-alt_r7_beta:                jmp         seq_r13_beta
+nref12_γ:
+                            jmp         seq_r6_α
+nref12_ω:                   jmp         seq_l11_β
+alt7_left_ω:                ALT_ω       r12+32, cursor, alt_r7_α ; ALT left_ω — restore cursor, enter right
+alt_r7_α:                   jmp         seq_l13_α ; SEQ
+alt_r7_β:                   jmp         seq_r13_β
 
-seq_l13_alpha: ; DOL(wrd $  wrd)
-                            DOL_SAVE    dol_entry_wrd, cursor, dol14_child_alpha ; DOL α — save entry cursor
-seq_l13_beta:               jmp         dol14_child_beta ; DOL β
-dol14_child_alpha:          jmp         seq_l15_alpha ; SEQ
-dol14_child_beta:           jmp         seq_r15_beta
-seq_l15_alpha:              NOTANY_ALPHA lit_str_2, 1, nany16_saved, cursor, subject_data, subject_len_val, seq_r15_alpha, dol14_omega ; NOTANY α
-seq_l15_beta:               NOTANY_BETA nany16_saved, cursor, dol14_omega ; NOTANY β
-seq_r15_alpha:              BREAK_ALPHA lit_str_2, 1, brk17_saved, cursor, subject_data, subject_len_val, dol14_gamma, seq_l15_beta ; BREAK α
-seq_r15_beta:               BREAK_BETA  brk17_saved, cursor, seq_l15_beta ; BREAK β
-dol14_gamma:                DOL_CAPTURE dol_entry_wrd, cursor, cap_wrd_buf, cap_wrd_len, subject_data, seq_r13_alpha ; DOL γ — capture span
-dol14_omega:                jmp         arb5_child_fail ; DOL ω — child failed
-seq_r13_alpha:              jmp         seq_l18_alpha ; SEQ
-seq_r13_beta:               jmp         seq_r18_beta
-seq_l18_alpha:              LIT_ALPHA1  95, seq_l18_alpha_saved, cursor, subject_data, subject_len_val, seq_r18_alpha, seq_l13_beta ; LIT α
-seq_l18_beta:               LIT_BETA    seq_l18_alpha_saved, cursor, seq_l13_beta ; LIT β
-seq_r18_alpha:              jmp         seq_l19_alpha ; SEQ
-seq_r18_beta:               jmp         seq_r19_beta
+seq_l13_α: ; DOL(wrd $  wrd)
+                            DOL_SAVE    r12+64, cursor, dol14_child_α ; DOL α — save entry cursor
+seq_l13_β:                  jmp         dol14_child_β ; DOL β
+dol14_child_α:              jmp         seq_l15_α ; SEQ
+dol14_child_β:              jmp         seq_r15_β
+seq_l15_α:                  NOTANY_α    lit_str_2, 1, r12+72, cursor, subject_data, subject_len_val, seq_r15_α, dol14_ω ; NOTANY α
+seq_l15_β:                  NOTANY_β    r12+72, cursor, dol14_ω ; NOTANY β
+seq_r15_α:                  BREAK_α     lit_str_2, 1, r12+80, cursor, subject_data, subject_len_val, dol14_γ, seq_l15_β ; BREAK α
+seq_r15_β:                  BREAK_β     r12+80, cursor, seq_l15_β ; BREAK β
+dol14_γ:                    DOL_CAPTURE r12+64, cursor, cap_wrd_buf, cap_wrd_len, subject_data, seq_r13_α ; DOL γ — capture span
+dol14_ω:                    jmp         arb5_child_fail ; DOL ω — child failed
+seq_r13_α:                  jmp         seq_l18_α ; SEQ
+seq_r13_β:                  jmp         seq_r18_β
+seq_l18_α:                  LIT_α1      95, r12+88, cursor, subject_data, subject_len_val, seq_r18_α, seq_l13_β ; LIT α
+seq_l18_β:                  LIT_β       r12+88, cursor, seq_l13_β ; LIT β
+seq_r18_α:                  jmp         seq_l19_α ; SEQ
+seq_r18_β:                  jmp         seq_r19_β
 
-seq_l19_alpha: ; DOL(tag $  tag)
-                            DOL_SAVE    dol_entry_tag, cursor, dol20_child_alpha ; DOL α — save entry cursor
-seq_l19_beta:               jmp         dol20_child_beta ; DOL β
-dol20_child_alpha:          jmp         seq_l21_alpha ; SEQ
-dol20_child_beta:           jmp         seq_r21_beta
-seq_l21_alpha:              ANY_ALPHA_VAR S_UCASE, any22_saved, cursor, subject_data, subject_len_val, seq_r21_alpha, dol20_omega ; ANY(var) α
-seq_l21_beta:               ANY_BETA_VAR any22_saved, cursor, dol20_omega ; ANY(var) β
-seq_r21_alpha:              SPAN_ALPHA  lit_str_3, 0, span23_saved, cursor, subject_data, subject_len_val, dol20_gamma, seq_l21_beta ; SPAN α
-seq_r21_beta:               SPAN_BETA   span23_saved, cursor, seq_l21_beta ; SPAN β
-dol20_gamma:                DOL_CAPTURE dol_entry_tag, cursor, cap_tag_buf, cap_tag_len, subject_data, seq_r19_alpha ; DOL γ — capture span
-dol20_omega:                jmp         seq_l18_beta ; DOL ω — child failed
+seq_l19_α: ; DOL(tag $  tag)
+                            DOL_SAVE    r12+96, cursor, dol20_child_α ; DOL α — save entry cursor
+seq_l19_β:                  jmp         dol20_child_β ; DOL β
+dol20_child_α:              jmp         seq_l21_α ; SEQ
+dol20_child_β:              jmp         seq_r21_β
+seq_l21_α:                  ANY_α_VAR   S_UCASE, r12+104, cursor, subject_data, subject_len_val, seq_r21_α, dol20_ω ; ANY(var) α
+seq_l21_β:                  ANY_β_VAR   r12+104, cursor, dol20_ω ; ANY(var) β
+seq_r21_α:                  SPAN_α      lit_str_3, 0, r12+112, cursor, subject_data, subject_len_val, dol20_γ, seq_l21_β ; SPAN α
+seq_r21_β:                  SPAN_β      r12+112, cursor, seq_l21_β ; SPAN β
+dol20_γ:                    DOL_CAPTURE r12+96, cursor, cap_tag_buf, cap_tag_len, subject_data, seq_r19_α ; DOL γ — capture span
+dol20_ω:                    jmp         seq_l18_β ; DOL ω — child failed
 
-seq_r19_alpha: ; REF(do_add_tok)
-                            lea         rax, [rel nref24_gamma]
+seq_r19_α: ; REF(do_add_tok)
+                            lea         rax, [rel nref24_γ]
                             mov         [P_do_add_tok_ret_γ], rax
-                            lea         rax, [rel nref24_omega]
+                            lea         rax, [rel nref24_ω]
                             mov         [P_do_add_tok_ret_ω], rax
                             jmp         P_do_add_tok_α
-seq_r19_beta:               lea         rax, [rel nref24_gamma] ; REF(%s)
+seq_r19_β:                  lea         rax, [rel nref24_γ] ; REF(%s)
                             mov         [P_do_add_tok_ret_γ], rax
-                            lea         rax, [rel nref24_omega]
+                            lea         rax, [rel nref24_ω]
                             mov         [P_do_add_tok_ret_ω], rax
                             jmp         P_do_add_tok_β
 
-nref24_gamma:
-                            jmp         seq_r6_alpha
-nref24_omega:               jmp         seq_l19_beta
-seq_r6_alpha:               LIT_ALPHA1  32, seq_r6_alpha_saved, cursor, subject_data, subject_len_val, arb5_child_ok, seq_l6_beta ; LIT α
-seq_r6_beta:                LIT_BETA    seq_r6_alpha_saved, cursor, seq_l6_beta ; LIT β
-seq_r4_alpha:               RPOS_ALPHA  0, cursor, subject_len_val, patdef_claws_info_gamma, seq_l4_beta ; RPOS(%ld)
-seq_r4_beta:                RPOS_BETA   cursor, seq_l4_beta
+nref24_γ:
+                            jmp         seq_r6_α
+nref24_ω:                   jmp         seq_l19_β
+seq_r6_α:                   LIT_α1      32, r12+120, cursor, subject_data, subject_len_val, arb5_child_ok, seq_l6_β ; LIT α
+seq_r6_β:                   LIT_β       r12+120, cursor, seq_l6_β ; LIT β
+seq_r4_α:                   RPOS_α      0, cursor, subject_len_val, patdef_claws_info_γ, seq_l4_β ; RPOS(%ld)
+seq_r4_β:                   RPOS_β      cursor, seq_l4_β
 ;  γ/ω ---------------------------------------------------------------------------------------------------------------
-patdef_claws_info_gamma:
-                            jmp         [P_claws_info_ret_γ]
-patdef_claws_info_omega:    jmp         [P_claws_info_ret_ω]
+patdef_claws_info_γ:        NAMED_PAT_γ P_claws_info_ret_γ ; named pat γ
+patdef_claws_info_ω:        NAMED_PAT_ω P_claws_info_ret_ω ; named pat ω
 
 section .text
 ;  STUB LABELS =========================================================================================================
+
+section .rodata
+global  box_InitStack_reloc_count, box_InitStack_reloc_table
+global  box_Push_reloc_count, box_Push_reloc_table
+global  box_Pop_reloc_count, box_Pop_reloc_table
+global  box_Top_reloc_count, box_Top_reloc_table
+global  box_InitCounter_reloc_count, box_InitCounter_reloc_table
+global  box_PushCounter_reloc_count, box_PushCounter_reloc_table
+global  box_IncCounter_reloc_count, box_IncCounter_reloc_table
+global  box_TopCounter_reloc_count, box_TopCounter_reloc_table
+global  box_PopCounter_reloc_count, box_PopCounter_reloc_table
+global  box_do_mem_init_reloc_count, box_do_mem_init_reloc_table
+global  box_do_new_sent_reloc_count, box_do_new_sent_reloc_table
+global  box_do_add_tok_reloc_count, box_do_add_tok_reloc_table
+global  box_claws_info_reloc_count, box_claws_info_reloc_table
+; --- box InitStack ---
+box_InitStack_reloc_count: dq 0
+box_InitStack_reloc_table:
+; (entries added by M-T2-INVOKE)
+
+; --- box Push ---
+box_Push_reloc_count: dq 0
+box_Push_reloc_table:
+; (entries added by M-T2-INVOKE)
+
+; --- box Pop ---
+box_Pop_reloc_count: dq 0
+box_Pop_reloc_table:
+; (entries added by M-T2-INVOKE)
+
+; --- box Top ---
+box_Top_reloc_count: dq 0
+box_Top_reloc_table:
+; (entries added by M-T2-INVOKE)
+
+; --- box InitCounter ---
+box_InitCounter_reloc_count: dq 0
+box_InitCounter_reloc_table:
+; (entries added by M-T2-INVOKE)
+
+; --- box PushCounter ---
+box_PushCounter_reloc_count: dq 0
+box_PushCounter_reloc_table:
+; (entries added by M-T2-INVOKE)
+
+; --- box IncCounter ---
+box_IncCounter_reloc_count: dq 0
+box_IncCounter_reloc_table:
+; (entries added by M-T2-INVOKE)
+
+; --- box TopCounter ---
+box_TopCounter_reloc_count: dq 0
+box_TopCounter_reloc_table:
+; (entries added by M-T2-INVOKE)
+
+; --- box PopCounter ---
+box_PopCounter_reloc_count: dq 0
+box_PopCounter_reloc_table:
+; (entries added by M-T2-INVOKE)
+
+; --- box do_mem_init ---
+box_do_mem_init_reloc_count: dq 0
+box_do_mem_init_reloc_table:
+; (entries added by M-T2-INVOKE)
+
+; --- box do_new_sent ---
+box_do_new_sent_reloc_count: dq 0
+box_do_new_sent_reloc_table:
+; (entries added by M-T2-INVOKE)
+
+; --- box do_add_tok ---
+box_do_add_tok_reloc_count: dq 0
+box_do_add_tok_reloc_table:
+; (entries added by M-T2-INVOKE)
+
+; --- box claws_info ---
+box_claws_info_reloc_count: dq 0
+box_claws_info_reloc_table:
+; (entries added by M-T2-INVOKE)
+
+;  T2 RELOCATION TABLES ================================================================================================
+
+global  box_InitStack_data_template, box_InitStack_data_size
+section .data
+;  T2 DATA TEMPLATES ===================================================================================================
+                            align       8
+box_InitStack_data_size: dq 64
+box_InitStack_data_template:
+dq 0  ; [r12+0] = P_InitStack_ret_γ
+dq 0  ; [r12+8] = P_InitStack_ret_ω
+dq 0  ; [r12+16] = fn_InitStack_tmp1_t
+dq 0  ; [r12+24] = fn_InitStack_tmp1_p
+dq 0  ; [r12+32] = fn_InitStack_tmp2_t
+dq 0  ; [r12+40] = fn_InitStack_tmp2_p
+dq 0  ; [r12+48] = fn_InitStack_tmp3_t
+dq 0  ; [r12+56] = fn_InitStack_tmp3_p
+
+global  box_Push_data_template, box_Push_data_size
+section .data
+                            align       8
+box_Push_data_size: dq 64
+box_Push_data_template:
+dq 0  ; [r12+0] = P_Push_ret_γ
+dq 0  ; [r12+8] = P_Push_ret_ω
+dq 0  ; [r12+16] = fn_Push_tmp1_t
+dq 0  ; [r12+24] = fn_Push_tmp1_p
+dq 0  ; [r12+32] = fn_Push_tmp2_t
+dq 0  ; [r12+40] = fn_Push_tmp2_p
+dq 0  ; [r12+48] = fn_Push_tmp3_t
+dq 0  ; [r12+56] = fn_Push_tmp3_p
+
+global  box_Pop_data_template, box_Pop_data_size
+section .data
+                            align       8
+box_Pop_data_size: dq 64
+box_Pop_data_template:
+dq 0  ; [r12+0] = P_Pop_ret_γ
+dq 0  ; [r12+8] = P_Pop_ret_ω
+dq 0  ; [r12+16] = fn_Pop_tmp1_t
+dq 0  ; [r12+24] = fn_Pop_tmp1_p
+dq 0  ; [r12+32] = fn_Pop_tmp2_t
+dq 0  ; [r12+40] = fn_Pop_tmp2_p
+dq 0  ; [r12+48] = fn_Pop_tmp3_t
+dq 0  ; [r12+56] = fn_Pop_tmp3_p
+
+global  box_Top_data_template, box_Top_data_size
+section .data
+                            align       8
+box_Top_data_size: dq 64
+box_Top_data_template:
+dq 0  ; [r12+0] = P_Top_ret_γ
+dq 0  ; [r12+8] = P_Top_ret_ω
+dq 0  ; [r12+16] = fn_Top_tmp1_t
+dq 0  ; [r12+24] = fn_Top_tmp1_p
+dq 0  ; [r12+32] = fn_Top_tmp2_t
+dq 0  ; [r12+40] = fn_Top_tmp2_p
+dq 0  ; [r12+48] = fn_Top_tmp3_t
+dq 0  ; [r12+56] = fn_Top_tmp3_p
+
+global  box_InitCounter_data_template, box_InitCounter_data_size
+section .data
+                            align       8
+box_InitCounter_data_size: dq 64
+box_InitCounter_data_template:
+dq 0  ; [r12+0] = P_InitCounter_ret_γ
+dq 0  ; [r12+8] = P_InitCounter_ret_ω
+dq 0  ; [r12+16] = fn_InitCounter_tmp1_t
+dq 0  ; [r12+24] = fn_InitCounter_tmp1_p
+dq 0  ; [r12+32] = fn_InitCounter_tmp2_t
+dq 0  ; [r12+40] = fn_InitCounter_tmp2_p
+dq 0  ; [r12+48] = fn_InitCounter_tmp3_t
+dq 0  ; [r12+56] = fn_InitCounter_tmp3_p
+
+global  box_PushCounter_data_template, box_PushCounter_data_size
+section .data
+                            align       8
+box_PushCounter_data_size: dq 64
+box_PushCounter_data_template:
+dq 0  ; [r12+0] = P_PushCounter_ret_γ
+dq 0  ; [r12+8] = P_PushCounter_ret_ω
+dq 0  ; [r12+16] = fn_PushCounter_tmp1_t
+dq 0  ; [r12+24] = fn_PushCounter_tmp1_p
+dq 0  ; [r12+32] = fn_PushCounter_tmp2_t
+dq 0  ; [r12+40] = fn_PushCounter_tmp2_p
+dq 0  ; [r12+48] = fn_PushCounter_tmp3_t
+dq 0  ; [r12+56] = fn_PushCounter_tmp3_p
+
+global  box_IncCounter_data_template, box_IncCounter_data_size
+section .data
+                            align       8
+box_IncCounter_data_size: dq 64
+box_IncCounter_data_template:
+dq 0  ; [r12+0] = P_IncCounter_ret_γ
+dq 0  ; [r12+8] = P_IncCounter_ret_ω
+dq 0  ; [r12+16] = fn_IncCounter_tmp1_t
+dq 0  ; [r12+24] = fn_IncCounter_tmp1_p
+dq 0  ; [r12+32] = fn_IncCounter_tmp2_t
+dq 0  ; [r12+40] = fn_IncCounter_tmp2_p
+dq 0  ; [r12+48] = fn_IncCounter_tmp3_t
+dq 0  ; [r12+56] = fn_IncCounter_tmp3_p
+
+global  box_TopCounter_data_template, box_TopCounter_data_size
+section .data
+                            align       8
+box_TopCounter_data_size: dq 64
+box_TopCounter_data_template:
+dq 0  ; [r12+0] = P_TopCounter_ret_γ
+dq 0  ; [r12+8] = P_TopCounter_ret_ω
+dq 0  ; [r12+16] = fn_TopCounter_tmp1_t
+dq 0  ; [r12+24] = fn_TopCounter_tmp1_p
+dq 0  ; [r12+32] = fn_TopCounter_tmp2_t
+dq 0  ; [r12+40] = fn_TopCounter_tmp2_p
+dq 0  ; [r12+48] = fn_TopCounter_tmp3_t
+dq 0  ; [r12+56] = fn_TopCounter_tmp3_p
+
+global  box_PopCounter_data_template, box_PopCounter_data_size
+section .data
+                            align       8
+box_PopCounter_data_size: dq 64
+box_PopCounter_data_template:
+dq 0  ; [r12+0] = P_PopCounter_ret_γ
+dq 0  ; [r12+8] = P_PopCounter_ret_ω
+dq 0  ; [r12+16] = fn_PopCounter_tmp1_t
+dq 0  ; [r12+24] = fn_PopCounter_tmp1_p
+dq 0  ; [r12+32] = fn_PopCounter_tmp2_t
+dq 0  ; [r12+40] = fn_PopCounter_tmp2_p
+dq 0  ; [r12+48] = fn_PopCounter_tmp3_t
+dq 0  ; [r12+56] = fn_PopCounter_tmp3_p
+
+global  box_do_mem_init_data_template, box_do_mem_init_data_size
+section .data
+                            align       8
+box_do_mem_init_data_size: dq 64
+box_do_mem_init_data_template:
+dq 0  ; [r12+0] = P_do_mem_init_ret_γ
+dq 0  ; [r12+8] = P_do_mem_init_ret_ω
+dq 0  ; [r12+16] = fn_do_mem_init_tmp1_t
+dq 0  ; [r12+24] = fn_do_mem_init_tmp1_p
+dq 0  ; [r12+32] = fn_do_mem_init_tmp2_t
+dq 0  ; [r12+40] = fn_do_mem_init_tmp2_p
+dq 0  ; [r12+48] = fn_do_mem_init_tmp3_t
+dq 0  ; [r12+56] = fn_do_mem_init_tmp3_p
+
+global  box_do_new_sent_data_template, box_do_new_sent_data_size
+section .data
+                            align       8
+box_do_new_sent_data_size: dq 64
+box_do_new_sent_data_template:
+dq 0  ; [r12+0] = P_do_new_sent_ret_γ
+dq 0  ; [r12+8] = P_do_new_sent_ret_ω
+dq 0  ; [r12+16] = fn_do_new_sent_tmp1_t
+dq 0  ; [r12+24] = fn_do_new_sent_tmp1_p
+dq 0  ; [r12+32] = fn_do_new_sent_tmp2_t
+dq 0  ; [r12+40] = fn_do_new_sent_tmp2_p
+dq 0  ; [r12+48] = fn_do_new_sent_tmp3_t
+dq 0  ; [r12+56] = fn_do_new_sent_tmp3_p
+
+global  box_do_add_tok_data_template, box_do_add_tok_data_size
+section .data
+                            align       8
+box_do_add_tok_data_size: dq 64
+box_do_add_tok_data_template:
+dq 0  ; [r12+0] = P_do_add_tok_ret_γ
+dq 0  ; [r12+8] = P_do_add_tok_ret_ω
+dq 0  ; [r12+16] = fn_do_add_tok_tmp1_t
+dq 0  ; [r12+24] = fn_do_add_tok_tmp1_p
+dq 0  ; [r12+32] = fn_do_add_tok_tmp2_t
+dq 0  ; [r12+40] = fn_do_add_tok_tmp2_p
+dq 0  ; [r12+48] = fn_do_add_tok_tmp3_t
+dq 0  ; [r12+56] = fn_do_add_tok_tmp3_p
+
+global  box_claws_info_data_template, box_claws_info_data_size
+section .data
+                            align       8
+box_claws_info_data_size: dq 128
+box_claws_info_data_template:
+dq 0  ; [r12+0] = P_claws_info_ret_γ
+dq 0  ; [r12+8] = P_claws_info_ret_ω
+dq 0  ; [r12+16] = arb5_depth
+dq 0  ; [r12+24] = arb5_cur_before
+dq 0  ; [r12+32] = alt7_cur_save
+dq 0  ; [r12+40] = dol_entry_num
+dq 0  ; [r12+48] = span10_saved
+dq 0  ; [r12+56] = seq_l11_α_saved
+dq 0  ; [r12+64] = dol_entry_wrd
+dq 0  ; [r12+72] = nany16_saved
+dq 0  ; [r12+80] = brk17_saved
+dq 0  ; [r12+88] = seq_l18_α_saved
+dq 0  ; [r12+96] = dol_entry_tag
+dq 0  ; [r12+104] = any22_saved
+dq 0  ; [r12+112] = span23_saved
+dq 0  ; [r12+120] = seq_r6_α_saved
+
 
 section .data
 S_TRIM               db 84, 82, 73, 77, 0  ; "TRIM"
