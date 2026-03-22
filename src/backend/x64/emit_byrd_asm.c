@@ -477,11 +477,17 @@ static int box_data_size(const char *safe) {
     return b->nvar * 8;
 }
 
-/* Thread-local rewrite buffer used by bref() */
-static char _bref_buf[64];
+/*
+ * bref/bref2 use a rotating pool of buffers so multiple calls in a single
+ * printf-style format string (e.g. A("ARB_α %s, %s\n", bref(a), bref(b)))
+ * don't alias each other.  8 slots is far more than any single emission uses.
+ */
+#define BREF_POOL 8
+static char _bref_pool[BREF_POOL][72];
+static int  _bref_slot = 0;
 
 /*
- * bref — resolve a var reference to either "[r12+N]" or "[var_name]".
+ * bref — resolve a var reference to either "r12+N" or "var_name".
  * When emitting inside a named box (box_ctx_idx >= 0), vars that belong
  * to the box are addressed via r12.  All others fall back to their .bss name.
  */
@@ -490,8 +496,9 @@ static const char *bref(const char *name) {
         BoxDataCtx *b = &box_data[box_ctx_idx];
         for (int i = 0; i < b->nvar; i++) {
             if (strcmp(b->vars[i], name) == 0) {
-                snprintf(_bref_buf, sizeof _bref_buf, "r12+%d", i * 8);
-                return _bref_buf;
+                char *buf = _bref_pool[_bref_slot++ % BREF_POOL];
+                snprintf(buf, 72, "r12+%d", i * 8);
+                return buf;
             }
         }
     }
@@ -502,14 +509,11 @@ static const char *bref(const char *name) {
  * bref2 — like bref but wraps in brackets: returns "[r12+N]" or "[name]".
  * Use this when the caller would write A("    mov rax, [%s]\n", bref2(v)).
  */
-static char _bref2_buf[72];
 static const char *bref2(const char *name) {
     const char *inner = bref(name);
-    if (inner == name)
-        snprintf(_bref2_buf, sizeof _bref2_buf, "[%s]", name);
-    else
-        snprintf(_bref2_buf, sizeof _bref2_buf, "[%s]", inner);
-    return _bref2_buf;
+    char *buf = _bref_pool[_bref_slot++ % BREF_POOL];
+    snprintf(buf, 72, "[%s]", inner);
+    return buf;
 }
 
 /* Emit the DATA template section for a box (all qwords zero-initialized) */
@@ -1885,18 +1889,22 @@ static void emit_named_ref(const NamedPat *np,
         asmLC(alpha, ref_hdr);
     }
 
-    /* α instructions: load continuations, jump to named pattern α */
+    /* α instructions: load continuations, set r12 to data template, jump to α */
     A("    lea     rax, [rel %s]\n", glbl);
     A("    mov     [%s], rax\n", np->ret_gamma);
     A("    lea     rax, [rel %s]\n", olbl);
     A("    mov     [%s], rax\n", np->ret_omega);
+    if (!np->is_fn)
+        A("    lea     r12, [rel box_%s_data_template]\n", np->safe);
     A("    jmp     %s\n", np->alpha_lbl);
 
-    /* β: reload continuations (caller may have changed them), jump to β */
+    /* β: reload continuations, set r12, jump to β */
     ALFC(beta, "REF(%s)", "lea     rax, [rel %s]\n", glbl);
     A("    mov     [%s], rax\n", np->ret_gamma);
     A("    lea     rax, [rel %s]\n", olbl);
     A("    mov     [%s], rax\n", np->ret_omega);
+    if (!np->is_fn)
+        A("    lea     r12, [rel box_%s_data_template]\n", np->safe);
     A("    jmp     %s\n", np->beta_lbl);
 
     /* γ and ω trampolines — named pattern jumps here, we forward */
@@ -3111,8 +3119,30 @@ static int emit_expr(EXPR_t *e, int rbp_off) {
             }
             return 1;
         }
-        /* n-ary: if >2 children, right-fold into heap-allocated binary nodes */
+        /*
+         * n-ary E_CONC (string concat): inline left-fold avoids slot aliasing.
+         * Each step: push accumulator, eval next child, pop+call stmt_concat.
+         * n-ary E_OR (pattern ALT): right-fold into binary nodes (unchanged).
+         */
+        if (e->nchildren > 2 && e->kind == E_CONC) {
+            int _nc = e->nchildren;
+            emit_expr(e->children[0], -32);
+            for (int _i = 1; _i < _nc; _i++) {
+                A("    push    rdx\n");
+                A("    push    rax\n");
+                emit_expr(e->children[_i], -32);
+                A("    mov     rcx, rdx\n");
+                A("    mov     rdx, rax\n");
+                A("    pop     rdi\n");
+                A("    pop     rsi\n");
+                A("    call    stmt_concat\n");
+            }
+            A("    mov     [rbp%+d], rax\n", rbp_off);
+            A("    mov     [rbp%+d], rdx\n", rbp_off + 8);
+            return 1;
+        }
         if (e->nchildren > 2) {
+            /* E_OR right-fold */
             int _nc = e->nchildren;
             EXPR_t **_nodes = malloc((size_t)(_nc-1)*sizeof(EXPR_t*));
             EXPR_t **_kids  = malloc((size_t)(_nc-1)*2*sizeof(EXPR_t*));
@@ -3180,15 +3210,16 @@ static int emit_expr(EXPR_t *e, int rbp_off) {
                     return 1;
                 }
             }
-            /* CAT generic fallback: evaluate both, call stmt_concat */
+            /* CAT generic fallback: push left result, eval right, pop+call.
+             * push/pop is stack-safe regardless of depth — conc_tmp0 aliased. */
             emit_expr(e->children[0], -32);
-            A("    mov     [conc_tmp0_rax], rax\n");
-            A("    mov     [conc_tmp0_rdx], rdx\n");
+            A("    push    rdx\n");
+            A("    push    rax\n");
             emit_expr(e->children[1], -32);
             A("    mov     rcx, rdx\n");
             A("    mov     rdx, rax\n");
-            A("    mov     rdi, [conc_tmp0_rax]\n");
-            A("    mov     rsi, [conc_tmp0_rdx]\n");
+            A("    pop     rdi\n");
+            A("    pop     rsi\n");
             A("    call    stmt_concat\n");
             A("    mov     [rbp%+d], rax\n", rbp_off);
             A("    mov     [rbp%+d], rdx\n", rbp_off + 8);
@@ -4311,6 +4342,11 @@ static void emit_program(Program *prog) {
                 emit_expr(s->replacement, -32);
             }
             A("    APPLY_REPL_SPLICE  %s, %s\n", vlab, scan_start);
+        } else {
+            /* No replacement: advance scan_start to cursor so the next
+             * unanchored retry doesn't re-match at the same position. */
+            A("    mov     rax, [cursor]\n");
+            A("    mov     [%s], rax\n", scan_start);
         }
         emit_jmp(tgt_s ? tgt_s : tgt_u, next_lbl);
 
