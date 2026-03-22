@@ -163,16 +163,18 @@ static void emit_term_val(EXPR_t *e) {
             if (arity == 0) {
                 PL_C("term_new_atom(prolog_atom_intern(\"%s\"))", fn);
             } else {
-                /* Build args array then construct compound */
+                /* Capture uid BEFORE emitting children — nested compounds
+                 * call pl_next_uid() and would collide with pl_uid_ctr. */
+                int cuid = pl_next_uid();
                 PL_C("({\n");
-                PL_C("    Term *_args%d[%d];\n", pl_uid_ctr, arity);
+                PL_C("    Term *_args%d[%d];\n", cuid, arity);
                 for (int i = 0; i < arity; i++) {
-                    PL_C("    _args%d[%d] = ", pl_uid_ctr, i);
+                    PL_C("    _args%d[%d] = ", cuid, i);
                     emit_term_val(e->children[i]);
                     PL_C(";\n");
                 }
                 PL_C("    term_new_compound(prolog_atom_intern(\"%s\"), %d, _args%d);\n",
-                     fn, arity, pl_uid_ctr);
+                     fn, arity, cuid);
                 PL_C("})");
             }
             return;
@@ -411,18 +413,19 @@ static void emit_goal(EXPR_t *goal, int uid,
                 }
             }
 
-            /* ,/2 — conjunction: A, B
-             * Proebsting: A.succeed -> B.start; A.fail -> omega; B.fail -> omega */
+            /* ,/2 — conjunction: flatten tree and emit via emit_body so
+             * user-calls inside get the Proebsting retry loop.
+             * E2.fail → E1.resume wiring is in emit_body, not here. */
             if (strcmp(fn, ",") == 0 && arity == 2) {
-                char mid[LBUF];
-                snprintf(mid, LBUF, "conj%d_mid", uid);
-                PL_C("%s:\n", mid);   /* mid is the γ of left = entry of right */
-                /* emit left, its γ is the right goal */
-                char right_entry[LBUF];
-                snprintf(right_entry, LBUF, "conj%d_rhs", uid);
-                emit_goal(goal->children[0], uid * 10 + 1, right_entry, omega);
-                PL_C("%s:\n", right_entry);
-                emit_goal(goal->children[1], uid * 10 + 2, gamma, omega);
+                EXPR_t *flat[256]; int nflat = 0;
+                EXPR_t *cur = goal;
+                while (cur && cur->kind == E_FNC && cur->sval &&
+                       strcmp(cur->sval, ",") == 0 && cur->nchildren == 2) {
+                    if (nflat < 255) flat[nflat++] = cur->children[0];
+                    cur = cur->children[1];
+                }
+                if (cur && nflat < 256) flat[nflat++] = cur;
+                emit_body(flat, nflat, pl_next_uid(), gamma, omega);
                 return;
             }
 
@@ -573,43 +576,80 @@ static void emit_goal(EXPR_t *goal, int uid,
 }
 
 /* =========================================================================
- * emit_body — chain N goals together
+ * is_user_call — true for user-defined predicates that need retry loop
+ * ======================================================================= */
+static int is_user_call(EXPR_t *goal) {
+    if (!goal || goal->kind != E_FNC || !goal->sval) return 0;
+    const char *fn = goal->sval;
+    static const char *builtins[] = {
+        "true","fail","halt","nl","write","writeln","print","tab","is",
+        "<",">","=<",">=","=:=","=\\=","=","\\=","==","\\==",
+        "@<","@>","@=<","@>=",
+        "var","nonvar","atom","integer","float","compound","atomic","is_list",
+        "functor","arg","=..","\\+","not",",",";","->",
+        NULL
+    };
+    for (int i = 0; builtins[i]; i++)
+        if (strcmp(fn, builtins[i]) == 0) return 0;
+    return 1;
+}
+
+/* =========================================================================
+ * emit_body — chain N goals with Proebsting retry wiring
  *
- * Proebsting's sequential chaining:
- *   goal_0.succeed  →  goal_1.start
- *   goal_1.succeed  →  goal_2.start
- *   ...
- *   goal_N-1.succeed → outer gamma
- *   any goal.fail    → outer omega (backtracking not supported inside body
- *                       for this first milestone; full backtracking wired
- *                       at the E_CHOICE level)
+ * For user-defined predicates: wrap call + suffix in for(;;) retry loop.
+ *   suffix.fail → retry_top  (Proebsting: E2.fail → E1.resume)
+ * For deterministic goals: linear chain, fail → outer omega.
  * ======================================================================= */
 static void emit_body(EXPR_t **goals, int ngoals, int base_uid,
                       const char *gamma, const char *omega) {
-    if (ngoals == 0) {
-        PG(gamma); return;
-    }
-    /* Build per-goal γ labels */
-    char **goal_gamma = malloc(ngoals * sizeof(char *));
+    if (ngoals == 0) { PG(gamma); return; }
+
     for (int i = 0; i < ngoals; i++) {
-        goal_gamma[i] = malloc(LBUF);
-        if (i + 1 < ngoals) {
-            snprintf(goal_gamma[i], LBUF, "g%d_%d_γ", base_uid, i + 1);
-        } else {
-            /* Last goal succeeds → outer gamma */
-            snprintf(goal_gamma[i], LBUF, "%s", gamma);
+        EXPR_t *g = goals[i];
+
+        if (is_user_call(g)) {
+            const char *fn = g->sval;
+            int arity = g->nchildren;
+            char fname[256];
+            snprintf(fname, sizeof fname, "pl_%s_%d", safe_name(fn) + 2, arity);
+            int cmu = pl_next_uid();
+            char retry_lbl[LBUF], call_lbl[LBUF];
+            snprintf(call_lbl,  LBUF, "call%d_α", cmu);
+            snprintf(retry_lbl, LBUF, "retry%d",  cmu);
+
+            PLG(call_lbl, NULL);
+            PL_C("    int _cs%d = 0, _cr%d;\n", cmu, cmu);
+            PL_C("    int _cm%d = trail_mark(&_trail);\n", cmu);
+            PL_C("%s:\n", retry_lbl);
+            PL_C("    trail_unwind(&_trail, _cm%d);\n", cmu);
+            PL_C("    _cr%d = %s_r(", cmu, fname);
+            for (int j = 0; j < arity; j++) {
+                emit_term_val(g->children[j]); PL_C(", ");
+            }
+            PL_C("&_trail, _cs%d);\n", cmu);
+            PL_C("    if (_cr%d < 0) goto %s;\n", cmu, omega);
+            PL_C("    _cs%d = _cr%d + 1;\n", cmu, cmu);
+
+            if (i + 1 < ngoals) {
+                emit_body(goals + i + 1, ngoals - i - 1,
+                          pl_next_uid(), gamma, retry_lbl);
+            } else {
+                PG(gamma);
+            }
+            return;
         }
+
+        /* Deterministic goal */
+        char next_lbl[LBUF];
+        if (i + 1 < ngoals)
+            snprintf(next_lbl, LBUF, "g%d_γ", pl_next_uid());
+        else
+            snprintf(next_lbl, LBUF, "%s", gamma);
+
+        emit_goal(g, pl_next_uid(), next_lbl, omega);
+        if (i + 1 < ngoals) PL_C("%s:\n", next_lbl);
     }
-    /* Emit each goal; its γ is the entry label of the next */
-    for (int i = 0; i < ngoals; i++) {
-        if (i > 0) {
-            /* Emit the γ label as the entry point for this goal */
-            PL_C("%s:\n", goal_gamma[i - 1]);
-        }
-        emit_goal(goals[i], base_uid * 100 + i, goal_gamma[i], omega);
-    }
-    for (int i = 0; i < ngoals; i++) free(goal_gamma[i]);
-    free(goal_gamma);
 }
 
 /* =========================================================================
