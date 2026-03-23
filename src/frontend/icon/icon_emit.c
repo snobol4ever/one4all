@@ -73,18 +73,34 @@ static void alloc_str_label(char *b, size_t s) { snprintf(b,s,"icn_str_%d",str_c
 #define MAX_USER_PROCS 64
 static char user_procs[MAX_USER_PROCS][64];
 static int  user_proc_nparams[MAX_USER_PROCS];
+static int  user_proc_is_gen[MAX_USER_PROCS];  /* 1 if proc contains ICN_SUSPEND */
 static int  user_proc_count=0;
 
-static void register_user_proc(const char *name, int nparams) {
+static void register_user_proc(const char *name, int nparams, int is_gen) {
     for(int i=0;i<user_proc_count;i++) if(!strcmp(user_procs[i],name)) return;
     if(user_proc_count<MAX_USER_PROCS){
         strncpy(user_procs[user_proc_count],name,63);
         user_proc_nparams[user_proc_count]=nparams;
+        user_proc_is_gen[user_proc_count]=is_gen;
         user_proc_count++;
     }
 }
 static int is_user_proc(const char *name) {
     for(int i=0;i<user_proc_count;i++) if(!strcmp(user_procs[i],name)) return 1;
+    return 0;
+}
+static int is_generator_proc(const char *name) {
+    for(int i=0;i<user_proc_count;i++)
+        if(!strcmp(user_procs[i],name)) return user_proc_is_gen[i];
+    return 0;
+}
+
+/* Recursively check if any node in the tree is ICN_SUSPEND */
+static int has_suspend(IcnNode *n) {
+    if(!n) return 0;
+    if(n->kind==ICN_SUSPEND) return 1;
+    for(int i=0;i<n->nchildren;i++)
+        if(has_suspend(n->children[i])) return 1;
     return 0;
 }
 
@@ -336,18 +352,21 @@ static void emit_suspend(IcnEmitter *em, IcnNode *n, IcnPorts ports,
     /* yield to caller — bare ret, frame stays alive */
     Jmp(em, cur_suspend_ret_label[0] ? cur_suspend_ret_label : "icn_dead");
 
-    /* resume_here: execution resumes here after caller's β fires */
-    Ldef(em, resume_here);
+    /* resume_here: execution resumes here after caller's β fires.
+     * ORDERING FIX: emit body nodes FIRST (they may emit sub-labels inline),
+     * then define resume_here + jmp to body's α.  This ensures that
+     * resume_here: is immediately followed by jmp ba — not by a sub-node label
+     * that would cause fall-through into the wrong place. */
     if (body_node) {
-        /* run body; on success/fail both continue after the suspend statement */
         char ba[64], bb[64];
         IcnPorts bp;
         strncpy(bp.succeed, ports.succeed, 63);
         strncpy(bp.fail,    ports.succeed, 63);  /* body fail also continues */
         emit_expr(em, body_node, bp, ba, bb);
-        Jmp(em, ba);  /* run body starting here */
+        Ldef(em, resume_here);
+        Jmp(em, ba);
     } else {
-        /* no do body: resume simply continues after the suspend statement */
+        Ldef(em, resume_here);
         Jmp(em, ports.succeed);
     }
 }
@@ -438,9 +457,7 @@ static void emit_call(IcnEmitter *em, IcnNode *n, IcnPorts ports,
 
     /* --- user procedure call --- */
     if(is_user_proc(fname)){
-        /* Evaluate args left-to-right; each arg pushes its value on hw stack.
-         * push_relay pops from hw stack and calls icn_push (software stack).
-         * After all args transferred, call the procedure. */
+        int is_gen = is_generator_proc(fname);
         char do_call[64]; snprintf(do_call,sizeof do_call,"icon_%d_docall",id);
 
         char (*arg_alphas)[64] = nargs>0 ? malloc(nargs*64) : NULL;
@@ -448,13 +465,10 @@ static void emit_call(IcnEmitter *em, IcnNode *n, IcnPorts ports,
 
         char prev_succ[64]; strncpy(prev_succ,do_call,63);
 
-        /* Emit args right-to-left so leftmost arg ends up pushed last
-         * (icn_pop in callee pops in reverse → slot 0 = first param) */
         for(int i=nargs-1;i>=0;i--){
             char push_relay[64]; snprintf(push_relay,sizeof push_relay,"icon_%d_push%d",id,i);
             IcnPorts ap3; strncpy(ap3.succeed,push_relay,63); strncpy(ap3.fail,ports.fail,63);
             emit_expr(em,n->children[i+1],ap3,arg_alphas[i],arg_betas[i]);
-            /* push_relay: pop hw stack value → rdi → icn_push (software stack) */
             Ldef(em,push_relay);
             E(em,"    pop     rdi\n");
             E(em,"    call    icn_push\n");
@@ -462,45 +476,58 @@ static void emit_call(IcnEmitter *em, IcnNode *n, IcnPorts ports,
             strncpy(prev_succ,arg_alphas[i],63);
         }
 
-        /* α: start first arg */
         Ldef(em,a);
         if(nargs>0) Jmp(em,prev_succ);
         else Jmp(em,do_call);
 
-        /* β: resume a suspended generator, or fail if proc already returned */
+        /* β: for generators resume via suspend slot; for normal procs just fail */
         Ldef(em,b);
-        E(em,"    ; call β — resume if suspended, fail otherwise\n");
-        E(em,"    movzx   rax, byte [rel icn_suspended]\n");
-        E(em,"    test    rax, rax\n");
-        E(em,"    jz      %s\n", ports.fail);           /* not suspended → exhausted */
-        E(em,"    mov     byte [rel icn_suspended], 0\n"); /* clear before resuming */
-        E(em,"    jmp     [rel icn_suspend_resume]\n");
+        if(is_gen){
+            E(em,"    ; call β — resume if suspended, fail otherwise\n");
+            E(em,"    movzx   rax, byte [rel icn_suspended]\n");
+            E(em,"    test    rax, rax\n");
+            E(em,"    jz      %s\n", ports.fail);
+            E(em,"    mov     byte [rel icn_suspended], 0\n");
+            E(em,"    jmp     [rel icn_suspend_resume]\n");
+        } else {
+            Jmp(em,ports.fail);
+        }
 
-        /* do_call: all args on icn_stack, call proc */
+        /* do_call: all args on icn_stack */
         Ldef(em,do_call);
-        /* clear suspended flag before call */
-        E(em,"    mov     byte [rel icn_suspended], 0\n");
-        E(em,"    call    icn_%s\n",fname);
-        /* Check icn_failed first */
-        E(em,"    movzx   rax, byte [rel icn_failed]\n");
-        E(em,"    test    rax, rax\n");
-        E(em,"    jnz     %s\n",ports.fail);
-        /* Check if proc suspended (icn_suspended==1) vs returned */
-        E(em,"    movzx   rax, byte [rel icn_suspended]\n");
-        E(em,"    test    rax, rax\n");
-        char did_return[64]; snprintf(did_return,sizeof did_return,"icon_%d_returned",id);
-        E(em,"    jz      %s\n",did_return);
-        /* Suspended: value already in icn_retval; push and succeed.
-         * Next β will resume via icn_suspend_resume. */
-        E(em,"    mov     rax, [rel icn_retval]\n");
-        E(em,"    push    rax\n");
-        Jmp(em,ports.succeed);
-        /* Returned normally: push return value, succeed.
-         * β will check icn_suspended==0 and go to fail (exhausted). */
-        Ldef(em,did_return);
-        E(em,"    mov     rax, [rel icn_retval]\n");
-        E(em,"    push    rax\n");
-        Jmp(em,ports.succeed);
+        if(is_gen){
+            /* jmp-based trampoline — frame stays live across suspend/resume */
+            char after_call[64]; snprintf(after_call,sizeof after_call,"icon_%d_after_call",id);
+            char caller_ret[80]; snprintf(caller_ret,sizeof caller_ret,"icn_%s_caller_ret",fname);
+            E(em,"    mov     byte [rel icn_suspended], 0\n");
+            E(em,"    lea     rax, [rel %s]\n", after_call);
+            E(em,"    mov     [rel %s], rax\n", caller_ret);
+            E(em,"    jmp     icn_%s\n", fname);
+            Ldef(em,after_call);
+            E(em,"    movzx   rax, byte [rel icn_failed]\n");
+            E(em,"    test    rax, rax\n");
+            E(em,"    jnz     %s\n",ports.fail);
+            E(em,"    movzx   rax, byte [rel icn_suspended]\n");
+            E(em,"    test    rax, rax\n");
+            char did_return[64]; snprintf(did_return,sizeof did_return,"icon_%d_returned",id);
+            E(em,"    jz      %s\n",did_return);
+            E(em,"    mov     rax, [rel icn_retval]\n");
+            E(em,"    push    rax\n");
+            Jmp(em,ports.succeed);
+            Ldef(em,did_return);
+            E(em,"    mov     rax, [rel icn_retval]\n");
+            E(em,"    push    rax\n");
+            Jmp(em,ports.succeed);
+        } else {
+            /* Normal call/ret — safe for recursion */
+            E(em,"    call    icn_%s\n",fname);
+            E(em,"    movzx   rax, byte [rel icn_failed]\n");
+            E(em,"    test    rax, rax\n");
+            E(em,"    jnz     %s\n",ports.fail);
+            E(em,"    mov     rax, [rel icn_retval]\n");
+            E(em,"    push    rax\n");
+            Jmp(em,ports.succeed);
+        }
 
         if(arg_alphas) free(arg_alphas);
         if(arg_betas)  free(arg_betas);
@@ -893,13 +920,17 @@ static void emit_expr(IcnEmitter *em, IcnNode *n, IcnPorts ports,
 void icn_emit_file(IcnEmitter *em, IcnNode **nodes, int count) {
     bss_count=0; rodata_count=0; str_counter=0; user_proc_count=0;
 
-    /* Pass 1: register all user procs */
+    /* Pass 1: register all user procs, detect generators */
     for(int pi=0;pi<count;pi++){
         IcnNode *proc=nodes[pi];
         if(!proc||proc->kind!=ICN_PROC||proc->nchildren<1) continue;
         const char *pname=proc->children[0]->val.sval;
         if(strcmp(pname,"main")==0) continue;
-        register_user_proc(pname, (int)proc->val.ival);
+        int gen=0;
+        int body_start_p=1+(int)proc->val.ival;
+        for(int si=body_start_p;si<proc->nchildren;si++)
+            if(has_suspend(proc->children[si])){ gen=1; break; }
+        register_user_proc(pname, (int)proc->val.ival, gen);
     }
 
     /* Emit to temp buffer */
@@ -920,6 +951,10 @@ void icn_emit_file(IcnEmitter *em, IcnNode **nodes, int count) {
         char proc_done[64]; snprintf(proc_done,sizeof proc_done,"icn_%s_done",pname);
         char proc_ret[64];  snprintf(proc_ret, sizeof proc_ret, "icn_%s_ret", pname);
         char proc_sret[64]; snprintf(proc_sret,sizeof proc_sret,"icn_%s_sret",pname);
+
+        int is_gen = !is_main && is_generator_proc(pname);
+        char caller_ret_bss[80];
+        if(is_gen) snprintf(caller_ret_bss,sizeof caller_ret_bss,"icn_%s_caller_ret",pname);
 
         /* Setup local env */
         locals_reset();
@@ -980,18 +1015,38 @@ void icn_emit_file(IcnEmitter *em, IcnNode **nodes, int count) {
         }
         if(nstmts>0) Jmp(em,alphas[0]);
 
-        /* Return label (for non-main: restore frame, ret) */
+        /* Return label (for non-main) */
         if(!is_main){
-            Ldef(em,proc_ret);
+            if(is_gen){
+                /* Generator: jmp-based — frame stays live between suspend/resume */
+                Ldef(em,proc_ret);
+                if(frame_size>0) E(em,"    add     rsp, %d\n",frame_size);
+                E(em,"    pop     rbp\n");
+                E(em,"    jmp     [rel %s]\n", caller_ret_bss);
+                /* Suspend-yield: frame stays live, just jump back to caller */
+                Ldef(em,proc_sret);
+                E(em,"    jmp     [rel %s]\n", caller_ret_bss);
+            } else {
+                /* Normal proc: standard call/ret — safe for recursion */
+                Ldef(em,proc_ret);
+                if(frame_size>0) E(em,"    add     rsp, %d\n",frame_size);
+                E(em,"    pop     rbp\n    ret\n");
+            }
+        }
+        /* proc_done: procedure fell off end or explicit fail — signal failure to caller */
+        Ldef(em,proc_done);
+        E(em,"    mov     byte [rel icn_failed], 1\n");
+        if(is_gen){
+            if(frame_size>0) E(em,"    add     rsp, %d\n",frame_size);
+            E(em,"    pop     rbp\n");
+            E(em,"    jmp     [rel %s]\n", caller_ret_bss);
+        } else if(!is_main){
             if(frame_size>0) E(em,"    add     rsp, %d\n",frame_size);
             E(em,"    pop     rbp\n    ret\n");
-            /* Suspend-return: bare ret only — frame stays live for resume */
-            Ldef(em,proc_sret);
-            E(em,"    ret\n");
+        } else {
+            if(frame_size>0) E(em,"    add     rsp, %d\n",frame_size);
+            E(em,"    pop     rbp\n    ret\n");
         }
-        Ldef(em,proc_done);
-        if(frame_size>0) E(em,"    add     rsp, %d\n",frame_size);
-        E(em,"    pop     rbp\n    ret\n");
 
         for(int i=0;i<nstmts;i++) free(alphas[i]);
         free(alphas);
@@ -1023,6 +1078,11 @@ void icn_emit_file(IcnEmitter *em, IcnNode **nodes, int count) {
         if(strcmp(bss_entries[i].name,"icn_suspended")==0) continue;
         if(strcmp(bss_entries[i].name,"icn_suspend_resume")==0) continue;
         E(em,"    %s: resq 1\n",bss_entries[i].name);
+    }
+    /* Per-generator-proc caller_ret slots */
+    for(int i=0;i<user_proc_count;i++){
+        if(user_proc_is_gen[i])
+            E(em,"    icn_%s_caller_ret: resq 1\n", user_procs[i]);
     }
     E(em,"    icn_failed: resb 1\n");
     E(em,"    icn_suspended: resb 1\n");
