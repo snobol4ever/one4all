@@ -1435,3 +1435,93 @@ Verify with a debug trace before fixing the setter.
 - `test/beauty/counter/driver.ref`
 - `PLAN.md`
 
+
+---
+
+## §24 — Session Handoff (2026-03-23): M-BEAUTY-COUNTER ✅ → M-BEAUTY-STACK
+
+### Completed this session
+
+**B-266: M-BEAUTY-COUNTER ✅** — commit `a64ae21`, pushed to `origin/main`.
+3-way monitor: PASS — 15/15 steps, all 3 participants agree.
+
+### Bugs fixed (7 total across multiple sub-sessions)
+
+| # | File | Bug | Fix |
+|---|------|-----|-----|
+| 1 | `emit_byrd_asm.c` | `$X` in value/arg context (`E_INDR`) fell to `default:` → NULVCL | Added `case E_INDR` in `emit_expr` calling `stmt_get_indirect` |
+| 2 | `snobol4_stmt_rt.c` | `stmt_get_indirect` didn't exist | Added: looks up variable named by `name_val` via `NV_GET_fn` |
+| 3 | `emit_byrd_asm.c` | `E_INDR` wrote result to wrong slot when `rbp_off==-16` | Use temp stack frame (`sub rsp,16`) + write to correct slot |
+| 4 | `snobol4_stmt_rt.c` | `stmt_concat("", INTEGER)` returned STRING | Empty-string identity: `la==0 → return b`, `lb==0 → return a` |
+| 5 | `emit_byrd_asm.c` | `NRETURN` routed to `fn_ω` (failure) not `fn_γ` (success) | Fixed in `emit_jmp` + `prog_emit_goto` |
+| 6 | `snobol4/snobol4.c` | `HOST(4, name)` returned NULVCL — monitor env vars unreadable | Added `selector==4 && n>=2 → getenv(envname)` |
+| 7 | `emit_byrd_asm.c` | NRETURN retval not dereferenced as NAME — caller got name string not named value | `uses_nreturn` field in `NamedPat`; scan pass sets it; ucall gamma return calls `stmt_get_indirect` when set |
+
+### Monitor technique note
+
+The 3-way sync monitor proved essential: each divergence printed the exact step, the oracle value, and the ASM value. This made root-cause identification deterministic rather than exploratory. Recommended: continue using monitor-first debugging for all remaining milestones.
+
+### Current milestone: `M-BEAUTY-STACK`
+
+**Status:** `demo/inc/stack.sno` exists. `test/beauty/stack/` does NOT exist — needs driver + ref.
+
+`stack.sno` key behaviors to test:
+- `InitStack()` — clears `$'@S'`
+- `Push(x)` — pushes onto linked list; uses NRETURN with `.value($'@S')` or `.dummy`
+- `Pop(var)` — pops and assigns to `var` via `$var = value($'@S')`; NRETURN path
+- `Top()` — returns `.value($'@S')` via NRETURN
+
+**Known hard cases:**
+- `Push` has two NRETURN paths: `Push = IDENT(x) .value($'@S') :S(NRETURN)` and `Push = DIFFER(x) .dummy :(NRETURN)`. The first path's NAME is a **field getter call** `.value($'@S')` — this is `E_NAM(E_FNC("value", [E_INDR("@S")]))`. Our current NRETURN deref does `stmt_get_indirect(GET_VAR("Push"))` — but `GET_VAR("Push")` will be the string `"value($'@S')"` or similar, which won't indirect correctly. This may need special handling.
+- `Pop(var)` — `$var = value($'@S')` with a parameter as the indirect target. Tests `E_INDR` in LHS assignment with a variable holding the target name.
+- `Top()` — `Top = .value($'@S') :(NRETURN)` — same field-getter NAME issue as Push.
+
+### Next session action plan
+
+```bash
+bash /home/claude/snobol4x/setup.sh
+
+# Step 1: Create driver and ref
+mkdir -p test/beauty/stack
+
+cat > demo/inc/stack.sno  # verify it exists (already does)
+
+# Write test/beauty/stack/driver.sno covering:
+#   1. push 3 integers, top = 3rd
+#   2. pop returns value
+#   3. pop with var — assigns through param
+#   4. nested push/pop
+#   5. empty stack — Pop fails, Top fails
+
+# Step 2: Run oracle to generate ref
+INC=demo/inc snobol4 -f -P256k -I demo/inc test/beauty/stack/driver.sno > test/beauty/stack/driver.ref
+
+# Step 3: Run monitor
+INC=demo/inc bash test/beauty/run_beauty_subsystem.sh stack
+
+# Step 4: On PASS commit B-267: M-BEAUTY-STACK ✅, advance M-BEAUTY-TREE
+```
+
+### §START table update
+
+| # | Subsystem | Status |
+|---|-----------|--------|
+| 1 | global | ✅ |
+| 2 | is | ✅ |
+| 3 | FENCE | ✅ |
+| 4 | io | ✅ |
+| 5 | case | ✅ |
+| 6 | assign | ✅ |
+| 7 | match | ✅ |
+| 8 | counter | ✅ |
+| 9 | **stack** | ← next |
+| 10 | tree | |
+| 11 | ShiftReduce | |
+| 12 | TDump | |
+| 13 | Gen | |
+| 14 | Qize | |
+| 15 | ReadWrite | |
+| 16 | XDump | |
+| 17 | semantic | |
+| 18 | omega | |
+
