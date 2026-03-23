@@ -1,0 +1,49 @@
+*  driver.sno — test driver for counter.sno
+*  Oracle: snobol4 -f -P256k -I$INC driver.sno
+*  Run via: bash test/beauty/run_beauty_subsystem.sh counter
+-INCLUDE 'global.sno'
+-INCLUDE 'is.sno'
+-INCLUDE 'counter.sno'
+
+        &STLIMIT = 1000000
+        dummy = InitCounter()
+
+*  1: push and increment 3 times, top = 3
+        dummy = PushCounter()
+        dummy = IncCounter()
+        dummy = IncCounter()
+        dummy = IncCounter()
+        IDENT(TopCounter(), 3)                                 :S(P1)
+        OUTPUT = 'FAIL: 1 push/inc/top'                       :(T1)
+P1      OUTPUT = 'PASS: 1 push/inc/top = 3'
+T1
+
+*  2: nested push, inc once, top = 1
+        dummy = PushCounter()
+        dummy = IncCounter()
+        IDENT(TopCounter(), 1)                                 :S(P2)
+        OUTPUT = 'FAIL: 2 nested top'                         :(T2)
+P2      OUTPUT = 'PASS: 2 nested top = 1'
+T2
+
+*  3: pop restores outer (top = 3)
+        dummy = PopCounter()
+        IDENT(TopCounter(), 3)                                 :S(P3)
+        OUTPUT = 'FAIL: 3 pop restore'                        :(T3)
+P3      OUTPUT = 'PASS: 3 pop restore = 3'
+T3
+
+*  4: pop outer, stack empty → PopCounter fails
+        dummy = PopCounter()
+        PopCounter()                                           :F(P4)
+        OUTPUT = 'FAIL: 4 empty pop'                          :(T4)
+P4      OUTPUT = 'PASS: 4 empty pop fails'
+T4
+
+*  5: TopCounter on empty stack fails
+        TopCounter()                                           :F(P5)
+        OUTPUT = 'FAIL: 5 empty top'                          :(T5)
+P5      OUTPUT = 'PASS: 5 empty top fails'
+T5
+
+END
