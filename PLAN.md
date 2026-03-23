@@ -17,7 +17,7 @@ are always the cause when builds fail with "not found" errors.
 
 ### Current milestone
 
-**BEAUTY session:** `M-BEAUTY-TREE`
+**BEAUTY session:** `M-BEAUTY-READWRITE`
 - create `demo/inc/tree.sno`, driver + ref at `test/beauty/tree/`
 - run: `bash test/beauty/run_beauty_subsystem.sh tree`
 - on pass: commit `B-268: M-BEAUTY-TREE ✅`, advance to `M-BEAUTY-ShiftReduce`
@@ -42,7 +42,7 @@ are always the cause when builds fail with "not found" errors.
 | 12 | TDump | |
 | 13 | Gen | |
 | 14 | Qize | |
-| 15 | ReadWrite | |
+| 15 | ReadWrite | ← next |
 | 16 | XDump | |
 | 17 | semantic | |
 | 18 | omega | |
@@ -1520,7 +1520,7 @@ INC=demo/inc bash test/beauty/run_beauty_subsystem.sh stack
 | 12 | TDump | |
 | 13 | Gen | |
 | 14 | Qize | |
-| 15 | ReadWrite | |
+| 15 | ReadWrite | ← next |
 | 16 | XDump | |
 | 17 | semantic | |
 | 18 | omega | |
@@ -2014,4 +2014,138 @@ bash /home/claude/beauty_project/snobol4x/setup.sh
 
 ### Trigger phrase for next session
 **"playing with beauty"** → B-273 → snobol4x PLAN.md §29, milestone `M-BEAUTY-READWRITE`
+
+---
+
+## §30 — Session Handoff B-273 (2026-03-23): M-BEAUTY-READWRITE partial ✅ steps 1–5 pass
+
+### Work completed this session
+
+**B-273 partial commit `695ce11`:** Fix binary `E_ATP` (pat `@x`) cursor capture.
+
+**Bug fixed — `emit_byrd_asm.c` `E_ATP` binary case:**
+`@` is a binary operator at `parse_expr5` (via `parse_lbin`), producing
+`E_ATP(child_pat, E_VART("varname"))`.  Old code grabbed `children[0]->sval`
+(the sub-pattern's name, e.g. `"LEN"`, `"POS"`) instead of `children[1]->sval`
+(the capture variable).
+
+Fix: when `nchildren >= 2`, wire the child sub-pattern through `cap_γ/cap_ω`
+and emit `AT_α` with `children[1]->sval`. Unary `@x` (nchildren == 1) unchanged.
+
+This fixes `ReadWrite.sno` `LineMap()`:
+```snobol4
+str POS(0) BREAK(nl) nl @xOfs =   →  AT_α S_xOfs  (was AT_α S_POS)
+```
+
+**Corpus invariant: 106/106 ALL PASS ✅.**
+
+**3-way monitor result after fix:** Steps 1–5 PASS, step 6 (test 4) diverges.
+
+### §30.1 — Remaining blocker: `_b_INPUT` ignores filename when `n == 3`
+
+**The call:** `INPUT(.rdInput, 8, fileName '[-m10 -l131072]')` — 3 args total.
+
+**Current `_b_INPUT`:**
+```c
+const char *fname = (n >= 4) ? VARVAL_fn(a[3]) : NULL;
+if (!fname || !fname[0]) { ... return NULVCL; }   // ← n=3 falls here, returns success!
+```
+
+With `n=3`, `fname=NULL` → returns `NULVCL` (success) instead of opening the file.
+So `INPUT(.rdInput, 8, '/bad/path [-opts]')` always "succeeds" and `:F(FRETURN)` never fires.
+
+**The SNOBOL4 INPUT association syntax:**
+- 4-arg form: `INPUT(varname, channel, options, filename)` — classic
+- 3-arg form: `INPUT(varname, channel, filename_with_options)` — CSNOBOL4 extension
+  where the 3rd arg is `filename '[-opts]'` (filename concatenated with options in `[...]`)
+
+**The fix (implement next session):**
+
+In `snobol4.c` `_b_INPUT`, handle `n == 3` by extracting the filename from `a[2]`:
+
+```c
+static DESCR_t _b_INPUT(DESCR_t *a, int n) {
+    const char *fname = NULL;
+    char fname_buf[4096];
+    if (n >= 4) {
+        fname = VARVAL_fn(a[3]);
+    } else if (n >= 3) {
+        /* 3-arg form: a[2] = "filename[-opts]" or "filename [-opts]"
+         * Extract filename = everything before '[' (trimmed) */
+        const char *opts_str = VARVAL_fn(a[2]);
+        if (opts_str && opts_str[0]) {
+            const char *bracket = strchr(opts_str, '[');
+            if (bracket) {
+                size_t len = bracket - opts_str;
+                /* trim trailing whitespace */
+                while (len > 0 && opts_str[len-1] == ' ') len--;
+                if (len > 0 && len < sizeof(fname_buf)) {
+                    memcpy(fname_buf, opts_str, len);
+                    fname_buf[len] = '\0';
+                    fname = fname_buf;
+                }
+            } else {
+                fname = opts_str;   /* no options bracket — whole string is filename */
+            }
+        }
+    }
+    if (!fname || !fname[0]) {
+        if (_input_fp && _input_fp != stdin) fclose(_input_fp);
+        _input_fp = stdin;
+        return NULVCL;
+    }
+    FILE *f = fopen(fname, "r");
+    if (!f) return FAILDESCR;
+    if (_input_fp && _input_fp != stdin) fclose(_input_fp);
+    _input_fp = f;
+    return NULVCL;
+}
+```
+
+Same fix needed for `_b_OUTPUT` if `Write.sno` uses the same 3-arg pattern.
+
+### §30.2 — Next session action plan (B-274)
+
+```bash
+ln -sfn /home/claude/beauty-project/x64 /home/claude/x64  # if needed
+bash /home/claude/snobol4x/setup.sh
+```
+
+1. Read snobol4x PLAN.md §30 (this section)
+2. Fix `_b_INPUT` in `src/runtime/snobol4/snobol4.c` — handle `n==3` (extract filename from opts)
+3. Check `_b_OUTPUT` — apply same `n==3` pattern if `Write.sno` uses same syntax
+4. Rebuild: `cd src && make`
+5. Run unit test: `snobol4 /tmp/test_input_fail.sno` → PASS; compile+run via ASM → PASS
+6. Run 3-way monitor: `INC=demo/inc bash test/beauty/run_beauty_subsystem.sh ReadWrite`
+7. On 8/8 PASS:
+   ```bash
+   git add src/runtime/snobol4/snobol4.c PLAN.md
+   git commit -m "B-274: M-BEAUTY-READWRITE ✅"
+   git push
+   ```
+8. Update HQ PLAN.md row: `ReadWrite → ✅`, next milestone `M-BEAUTY-XDUMP`
+9. Run `bash test/crosscheck/run_crosscheck_asm_corpus.sh` → must stay 106/106
+
+### §30.3 — Files committed this session
+
+| File | Change |
+|------|--------|
+| `src/backend/x64/emit_byrd_asm.c` | Binary `E_ATP` fix: `children[1]->sval` for varname, child wiring |
+| `PLAN.md` | This handoff note |
+
+### §30.4 — Test status going into B-274
+
+| Step | Test | ASM |
+|------|------|-----|
+| 1 | LineMap[0]=1 | ✅ |
+| 2 | LineMap offset 6 = line 2 | ✅ |
+| 3 | LineMap offset 11 = line 3 | ✅ |
+| 4 | Read FRETURN bad path | ❌ `_b_INPUT n==3` returns NULVCL not FAILDESCR |
+| 5 | Write FRETURN bad path | ❌ same class |
+| 6 | LineMap empty string | ? |
+| 7 | LineMap single word | ? |
+| 8 | LineMap 2-line second offset | ? |
+
+### Trigger phrase for next session
+**"playing with beauty"** → B-274 → snobol4x PLAN.md §30, milestone `M-BEAUTY-READWRITE`
 
