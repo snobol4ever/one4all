@@ -1711,14 +1711,53 @@ static void emit_pat_node(EXPR_t *pat,
         break;
 
     case E_ATP: {
-        /* @VAR — cursor-position capture: store cursor as integer into VAR, always succeed.
-         * Parser builds @VAR as unop(E_ATP, E_VART("VAR")), so varname is in left->sval. */
-        const char *varname = (pat->children[0] && pat->children[0]->sval) ? pat->children[0]->sval
-                            : (pat->sval ? pat->sval : "");
-        const char *varlab  = str_intern(varname);
-        ALFC(α, "@VAR α", "AT_α        %s, %s, %s, %s\n",
-             varlab, cursor, γ, ω);
-        ALFC(β,  "@VAR β", "AT_β         %s\n", ω);
+        /* @VAR — cursor-position capture: store cursor as integer into VAR.
+         *
+         * Two forms:
+         *   Unary:  @x     — nchildren==1, children[0] = E_VART("x")
+         *                    Always succeeds. AT_α stores cursor into x.
+         *   Binary: pat @x — nchildren==2, children[0]=sub-pat, children[1]=E_VART("x")
+         *                    Wire child; on child γ store cursor into x, then outer γ.
+         *                    On child ω propagate ω (no capture).
+         */
+        if (pat->nchildren >= 2) {
+            /* Binary: sub-pattern @x */
+            const char *varname = (pat->children[1] && pat->children[1]->sval)
+                                  ? pat->children[1]->sval : "";
+            const char *varlab  = str_intern(varname);
+            int uid = next_uid();
+            char cα[LBUF], cβ[LBUF], cap_γ[LBUF], cap_ω[LBUF];
+            snprintf(cα,    LBUF, "at%d_child_α", uid);
+            snprintf(cβ,    LBUF, "at%d_child_β",  uid);
+            snprintf(cap_γ, LBUF, "at%d_γ",        uid);
+            snprintf(cap_ω, LBUF, "at%d_ω",        uid);
+
+            char hdr[LBUF];
+            snprintf(hdr, LBUF, "AT(%s @ %s)", varname, varname);
+            asmLC(α, hdr);
+            A("jmp     %s\n", cα);
+            ALFC(β, "AT β", "jmp     %s\n", cβ);
+
+            /* Emit child sub-pattern */
+            emit_pat_node(pat->children[0], cα, cβ, cap_γ, cap_ω,
+                          cursor, subj, subj_len, depth + 1);
+
+            /* cap_γ: child succeeded — store cursor as integer into varname */
+            ALFC(cap_γ, "AT γ — store cursor",
+                 "AT_α        %s, %s, %s, %s\n", varlab, cursor, γ, ω);
+
+            /* cap_ω: child failed */
+            ALFC(cap_ω, "AT ω — child failed", "jmp     %s\n", ω);
+        } else {
+            /* Unary: @x — store cursor immediately, always succeed */
+            const char *varname = (pat->children[0] && pat->children[0]->sval)
+                                  ? pat->children[0]->sval
+                                  : (pat->sval ? pat->sval : "");
+            const char *varlab  = str_intern(varname);
+            ALFC(α, "@VAR α", "AT_α        %s, %s, %s, %s\n",
+                 varlab, cursor, γ, ω);
+            ALFC(β,  "@VAR β", "AT_β         %s\n", ω);
+        }
         break;
     }
 
