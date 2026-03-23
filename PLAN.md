@@ -1793,3 +1793,90 @@ F-223 greek pass (`b0b190c`) is the last clean commit.
 
 ### Trigger phrase for next session
 **"playing with Prolog frontend"** → F-226 → pick up at snobol4x PLAN.md §26.
+
+## §27 — Session Handoff F-226 (2026-03-23): βN unwind fix — 2-ucall PASS, regressions in 1-ucall
+
+### What was built (F-226)
+
+Three fixes applied to `src/backend/x64/emit_byrd_asm.c` (all uncommitted — last clean commit is `b0b190c` F-224):
+
+| # | Fix | Location | Status |
+|---|-----|----------|--------|
+| 1 | Guard trail mark at αN: `test edx,edx / jnz .skip_mark` — only take fresh mark on first entry, not resume | αN label emission | ✅ correct |
+| 2 | βN unwind (N>0): unwind to `UCALL_MARK_OFFSET(N-1)` not `UCALL_MARK_OFFSET(N)` | β handler `ucall_seq>0` branch | ⚠ causes regression |
+| 3 | (same as fix 2, iterative rename) | same | ⚠ same regression |
+
+### Test results
+
+- ✅ Mini 2-ucall `color(X), color(Y), write(X-Y), fail` → 9/9 correct
+- ✅ puzzle_01: `Cashier=smith Manager=brown Teller=jones`
+- ✅ puzzle_05: correct (multiple solutions printed)
+- ✅ puzzle_06: `Clark=druggist Jones=grocer Morgan=butcher Smith=policeman`
+- ✅ rung01–04, rung07, rung09 still PASS
+- ❌ rung05 (backtrack/member): prints `a b b b b...` instead of `a b c`
+- ❌ rung06 (lists): length/2 prints too many repeated values
+- ❌ rung08 (recursion/fib): crash/empty output
+- 💥 puzzle_02: segfault (complex cut+multi-clause body — separate issue, pre-existing)
+
+### Root cause analysis
+
+Fix 2 (`βN` unwinds to `UCALL_MARK_OFFSET(N-1)`) is **correct for the 2-ucall flat case**
+(`color(X), color(Y)`) but **wrong for recursive predicates** (`member/2`).
+
+In `member(X,[H|T]) :- member(X,T)`, the recursive call is itself a ucall. When inner
+`member` backtracks (its βN fires), it unwinds to the outer clause's `UCALL_MARK_OFFSET(0)`
+— wiping bindings it shouldn't touch at that level.
+
+### The real fix needed (F-227)
+
+The invariant that must hold:
+
+> **βN should unwind to `UCALL_MARK_OFFSET(N)` (its own mark), NOT `UCALL_MARK_OFFSET(N-1)`.**
+> 
+> The skip-mark guard (fix 1) is correct. But the REASON βN was broken before fix 1 was
+> different: it was unwinding to `[rbp-8]` (the CLAUSE mark), which wiped ALL ucalls.
+> Fix 1 alone (skip-mark guard on αN) is the right approach — revert fix 2.
+
+**Correct logic:**
+- `αN` takes mark on fresh entry only (`edx==0`) ← Fix 1, KEEP
+- `βN` unwinds to **`UCALL_MARK_OFFSET(N)`** (own mark) ← REVERT fix 2 back to this
+- `βN` then jumps to `αN-1` with `edx = saved sub_cs of ucall N-1`
+- `αN-1` runs with `edx≠0` → skips taking a new mark (correct — mark already set from first entry)
+- But X is now still bound from its last value! That's the original bug.
+
+**Why X stays bound:** `αN-1`'s mark was taken when X was first bound. `βN` unwinds to
+`UCALL_MARK_OFFSET(N)` — Y's mark — which only undoes Y's bindings. X's binding (taken
+*before* Y's mark) is not unwound.
+
+**True fix**: The trail mark for ucall N must be taken **after ucall N-1 has bound its variable**
+— i.e., at γ_{N-1} time (after ucall N-1 succeeds), not at αN time (before args are pushed).
+
+Concretely: move the trail mark emission from the `αN` label to the `γ_{N-1}` label:
+
+```c
+// At γ_{N-1} (after ucall N-1 succeeds, before ucall N starts):
+A("    lea     rdi, [rel pl_trail]\\n");
+A("    call    trail_mark_fn\\n");
+A("    mov     [rbp - %d], eax   ; mark for ucall %d (taken after ucall %d bound its var)\\n",
+  UCALL_MARK_OFFSET(ucall_seq), ucall_seq, ucall_seq-1);
+A("pl_%s_c%d_γ%d:\\n", pred_safe, idx, bi-1);
+```
+
+Then `βN` always unwinds to its own mark (correctly undoes X's binding from N-1's last success),
+and `αN-1`'s skip-mark guard can be removed (marks are now taken at γ time, not α time).
+
+### Next session action plan (F-227)
+
+1. `bash setup.sh` (or just `cd src && make`)
+2. Read snobol4x PLAN.md §27 (this section)
+3. **Revert fix 2**: change `βN` unwind back to `UCALL_MARK_OFFSET(ucall_seq)` (own mark)
+4. **Move trail mark to γ_{N-1} time**: emit mark just BEFORE the `γ_{N-1}` label
+5. **Remove the `edx==0` skip-mark guard at αN** (fix 1 no longer needed if marks are at γ time)
+6. Test mini cross-product → 9/9
+7. Test 3-ucall `person(C),person(M),differ(C,M)` → 6 pairs
+8. Run rungs 01–09 → all PASS
+9. Run rung10 puzzles → puzzle_01, puzzle_05, puzzle_06 PASS
+10. Commit `F-227: M-PROLOG-R10 ✅` if all pass, update dashboards, push both repos
+
+### Trigger phrase for next session
+**"playing with Prolog frontend"** → F-227 → snobol4x PLAN.md §27
