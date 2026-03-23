@@ -1,0 +1,5 @@
+PASS: 1 push/inc/top = 3
+PASS: 2 nested top = 1
+PASS: 3 pop restore = 3
+PASS: 4 empty pop fails
+PASS: 5 empty top fails

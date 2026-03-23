@@ -1332,3 +1332,106 @@ Update §START: `case → ✅`, next milestone `M-BEAUTY-ASSIGN`.
 | 8 | icase(world) matches WORLD | ❌ same |
 | 9 | lwr(upr(MiXeD)) roundtrip | ✅ |
 
+
+---
+
+## §23 — Session Handoff (2026-03-23): M-BEAUTY-COUNTER blocked on DATA() field-setter
+
+### §START update
+**Completed this session:**
+- B-265: M-BEAUTY-MATCH ✅ (7/7, per-subsystem tracepoints.conf pattern established)
+- B-264: M-BEAUTY-ASSIGN ✅ (7/7, committed prior session)
+
+**Current milestone:** `M-BEAUTY-COUNTER` — blocked on DATA() field-setter l-value
+
+### Divergence at step 1
+
+```
+oracle [csn]: VALUE DUMMY = ''
+FAIL   [asm]: VALUE OUTPUT = 'FAIL: 1 push/inc/top'
+AGREE  [spl]: VALUE DUMMY = ''
+```
+
+`IncCounter` body: `value($'#N') = value($'#N') + 1`
+This is a **field accessor as l-value** — `value(obj) = newval`.
+The ASM emitter generates a function call for `value($'#N')` on the LHS,
+which is not handled as an assignment target. Per §14.3, this requires
+compiler recognition: emit `sno_field_set(obj, "value", rhs)` directly.
+
+### Root cause: emit_assign_target doesn't handle E_FNC on LHS
+
+In `emit_byrd_asm.c`, the assignment emitter (`emit_stmt_assign` or equivalent)
+handles LHS targets: `E_VAR`, `E_DEREF`, `E_ARRAY`, `E_KEYWORD`.
+It does NOT handle `E_FNC` (function call) as an l-value.
+
+`value($'#N') = expr` parses as `E_FNC("value", [E_DEREF("$'#N'")])` on the LHS.
+The emitter must recognize this pattern and emit a field-set call.
+
+### The fix
+
+In `emit_byrd_asm.c` assignment target handling, add `E_FNC` case:
+
+```c
+case E_FNC: {
+    /* Field accessor as l-value: fieldFn(obj) = rhs
+     * Emit: stmt_field_set(obj_descr, "fieldname", rhs_descr) */
+    const char *fname = target->sval;  /* "value", "next", etc. */
+    EXPR_t *obj_arg = target->nchildren > 0 ? target->children[0] : NULL;
+    if (!fname || !obj_arg) goto fallback_assign;
+    /* Evaluate rhs into [rbp-32/rbp-24] */
+    emit_expr(rhs, -32);
+    /* Evaluate obj into temp */
+    emit_expr(obj_arg, -48);  /* use deeper slot */
+    A("    lea     rdi, [rel %s]\n", str_intern(fname));  /* field name */
+    A("    mov     rsi, [rbp-48]\n");  /* obj type */
+    A("    mov     rdx, [rbp-40]\n");  /* obj ptr */
+    A("    mov     rcx, [rbp-32]\n");  /* val type */
+    A("    mov     r8,  [rbp-24]\n");  /* val ptr */
+    A("    call    stmt_field_set\n");
+    break;
+}
+```
+
+And add `stmt_field_set` to `snobol4_stmt_rt.c`:
+
+```c
+void stmt_field_set(const char *fname, DESCR_t obj, DESCR_t val) {
+    /* Find the field index in the object's UDefType */
+    if (obj.v != DT_UDEF || !obj.ptr) return;
+    UDefInst *inst = (UDefInst*)obj.ptr;
+    UDefType *t = inst->type;
+    for (int i = 0; i < t->nfields; i++) {
+        if (strcmp(t->fields[i], fname) == 0) {
+            inst->fields[i] = val;
+            return;
+        }
+    }
+}
+```
+
+Also need `stmt_field_get(const char *fname, DESCR_t obj)` for the getter side
+(already mostly works via `stmt_apply("value", &obj, 1)` → `_facc_fns[slot]`).
+
+### Also needed: DATA() field accessor getter via stmt_apply
+
+`value($'#N')` on the RHS should call `stmt_apply("value", &obj, 1)` which
+routes through `_facc_fns[slot]` → `sno_field_get(obj, "value")`.
+This SHOULD work if `_b_DATA` registered the accessor correctly.
+Verify with a debug trace before fixing the setter.
+
+### Next session action plan
+
+1. `bash setup.sh`
+2. Add `stmt_field_set` to `snobol4_stmt_rt.c`
+3. Add `extern stmt_field_set` to ASM preamble emitter
+4. Add `E_FNC` case to `emit_assign_target` in `emit_byrd_asm.c`
+5. Rebuild: `cd src && make`
+6. Run: `INC=demo/inc bash test/beauty/run_beauty_subsystem.sh counter`
+7. On 5/5 PASS: commit `B-266: M-BEAUTY-COUNTER ✅`, advance to `M-BEAUTY-STACK`
+
+### Files created (need commit)
+- `demo/inc/counter.sno`
+- `test/beauty/counter/driver.sno`
+- `test/beauty/counter/driver.ref`
+- `PLAN.md`
+
