@@ -77,10 +77,10 @@ MONITOR_READY_PIPE="$TMP/csn.ready" MONITOR_GO_PIPE="$TMP/csn.go" MONITOR_SO="$S
     < "$STDIN_SRC" > "$TMP/csn.out" 2>"$TMP/csn.err" &
 CSN_PID=$!
 
-SNOLIB="$X64_DIR" MONITOR_READY_PIPE="$TMP/spl.ready" MONITOR_GO_PIPE="$TMP/spl.go" \
-    MONITOR_SO="$X64_DIR/monitor_ipc_spitbol.so" \
+(cd "$INC" && SNOLIB="$X64_DIR:$INC" MONITOR_READY_PIPE="$TMP/spl.ready" \
+    MONITOR_GO_PIPE="$TMP/spl.go" MONITOR_SO="$X64_DIR/monitor_ipc_spitbol.so" \
     "$X64_DIR/bootsbl" "$TMP/instr.sno" \
-    < "$STDIN_SRC" > "$TMP/spl.out" 2>"$TMP/spl.err" &
+    < "$STDIN_SRC" > "$TMP/spl.out" 2>"$TMP/spl.err") &
 SPL_PID=$!
 
 MONITOR_READY_PIPE="$TMP/asm.ready" MONITOR_GO_PIPE="$TMP/asm.go" \

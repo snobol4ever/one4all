@@ -788,7 +788,7 @@ static void apply_captures(MatchCtx *ctx) {
         if (ctx->subject)
             memcpy(text, ctx->subject + cap->start, len);
         text[len] = '\0';
-        NV_SET_fn(vname, STRVAL(text));
+        NV_SET_fn(vname, BSTRVAL(text, len));
         if (getenv("PAT_DEBUG"))
             fprintf(stderr, "CAPTURE: %s = \"%.*s\"\n", vname, len, text);
     }

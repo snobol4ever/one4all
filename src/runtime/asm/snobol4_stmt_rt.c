@@ -344,7 +344,8 @@ extern char     subject_data[65536];
 int stmt_setup_subject(DESCR_t subj) {
     const char *s = VARVAL_fn(subj);
     if (!s) s = "";
-    size_t len = strlen(s);
+    size_t len = descr_slen(subj);
+    if (len == 0) len = strlen(s);  /* fallback for non-binary strings */
     if (len >= 65536) len = 65535;
     memcpy(subject_data, s, len);
     subject_data[len] = '\0';
@@ -462,6 +463,6 @@ void stmt_set_capture(const char *varname, const char *buf, uint64_t len) {
     if (!s) return;
     memcpy(s, buf, len);
     s[len] = '\0';
-    NV_SET_fn(varname, STRVAL(s));
+    NV_SET_fn(varname, BSTRVAL(s, len));
 }
 

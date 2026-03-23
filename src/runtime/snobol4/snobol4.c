@@ -1966,10 +1966,10 @@ DESCR_t REVERS_fn(DESCR_t s) {
 
 DESCR_t BCHAR_fn(DESCR_t n) {
     int64_t code = to_int(n);
-    char buf[2];
+    char *buf = GC_malloc_atomic(2);
     buf[0] = (char)(code & 0xFF);
     buf[1] = '\0';
-    return STRVAL(GC_strdup(buf));
+    return BSTRVAL(buf, 1);
 }
 
 DESCR_t INTGER_fn(DESCR_t v) {
@@ -2118,14 +2118,18 @@ int ge(DESCR_t a, DESCR_t b) {
 int ident(DESCR_t a, DESCR_t b) {
     if (a.v != b.v) {
         /* "" and NULL are identical */
-        int a_null = (a.v == DT_SNUL || (a.v == DT_S && (!a.s || !*a.s)));
-        int b_null = (b.v == DT_SNUL || (b.v == DT_S && (!b.s || !*b.s)));
+        int a_null = (a.v == DT_SNUL || (a.v == DT_S && descr_slen(a) == 0));
+        int b_null = (b.v == DT_SNUL || (b.v == DT_S && descr_slen(b) == 0));
         if (a_null && b_null) return 1;
         return 0;
     }
     switch (a.v) {
         case DT_SNUL: return 1;
-        case DT_S:  return strcmp(a.s ? a.s : "", b.s ? b.s : "") == 0;
+        case DT_S: {
+            size_t la = descr_slen(a), lb = descr_slen(b);
+            const char *sa = a.s ? a.s : "", *sb = b.s ? b.s : "";
+            return la == lb && memcmp(sa, sb, la) == 0;
+        }
         case DT_I:  return a.i == b.i;
         case DT_R: return a.r == b.r;
         case DT_DATA: return a.u /* .t->tree gone */ == b.u /* .t->tree gone */;  /* pointer identity */
