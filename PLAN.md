@@ -17,10 +17,10 @@ are always the cause when builds fail with "not found" errors.
 
 ### Current milestone
 
-**BEAUTY session:** `M-BEAUTY-STACK`
-- create `demo/inc/stack.sno`, driver + ref at `test/beauty/stack/`
-- run: `bash test/beauty/run_beauty_subsystem.sh stack`
-- on pass: commit `B-267: M-BEAUTY-STACK ✅`, advance to `M-BEAUTY-TREE`
+**BEAUTY session:** `M-BEAUTY-TREE`
+- create `demo/inc/tree.sno`, driver + ref at `test/beauty/tree/`
+- run: `bash test/beauty/run_beauty_subsystem.sh tree`
+- on pass: commit `B-268: M-BEAUTY-TREE ✅`, advance to `M-BEAUTY-ShiftReduce`
 
 ### Beauty subsystem sequence (18 total)
 
@@ -36,7 +36,7 @@ are always the cause when builds fail with "not found" errors.
 | 8 | counter | ✅ |
 | 7 | match | |
 | 8 | counter | ✅ |
-| 9 | stack | |
+| 9 | stack | ✅ |
 | 10 | tree | |
 | 11 | ShiftReduce | |
 | 12 | TDump | |
@@ -1880,3 +1880,40 @@ and `αN-1`'s skip-mark guard can be removed (marks are now taken at γ time, no
 
 ### Trigger phrase for next session
 **"playing with Prolog frontend"** → F-227 → snobol4x PLAN.md §27
+
+---
+
+## §28 — Session Handoff B-270 (2026-03-23): M-BEAUTY-STACK 3-way PASS ✅
+
+### Work completed this session
+
+- **M-BEAUTY-STACK 3-way PASS confirmed** — CSN + SPL + ASM, 8 sync steps, 0 divergences.
+- **Monitor infrastructure fix:** `X64_DIR` defaulted to `/home/claude/x64` (missing).
+  SPITBOL IPC hung at step 0 with error 142 (LOAD failed — wrong `.so` path).
+  Fix: `ln -sfn /home/claude/beauty-project/x64 /home/claude/x64`
+  This symlink must be created at session start whenever x64 is cloned to a non-default path.
+  **Add to setup.sh or session bootstrap.**
+- **§START table updated:** `stack → ✅`, current milestone `M-BEAUTY-TREE` (already ✅ at `ed72c0f`).
+  Effective next milestone: **M-BEAUTY-TDUMP** (per HQ PLAN.md `3251cd4`).
+
+### PLAN.md §START update
+
+**Current milestone:** `M-BEAUTY-TDUMP` — 2 bugs open from B-269:
+1. `ANY(&UCASE &LCASE)` charset quoting — SPITBOL and CSNOBOL4 handle `&UCASE &LCASE` literal concat differently
+2. `STLIMIT` loop in `Gen.sno` — Gen loops indefinitely without STLIMIT guard
+
+### Next session action plan (B-271)
+
+```bash
+ln -sfn /home/claude/beauty-project/x64 /home/claude/x64   # if needed
+bash /home/claude/beauty-project/snobol4x/setup.sh
+```
+
+1. Read snobol4x PLAN.md §28 (this section) + `test/beauty/TDump/` for current state
+2. Fix bug 1: `ANY(&UCASE &LCASE)` quoting in `emit_byrd_asm.c`
+3. Fix bug 2: `STLIMIT` loop guard in `Gen.sno`
+4. Run: `INC=demo/inc bash test/beauty/run_beauty_subsystem.sh TDump`
+5. On PASS: commit `B-271: M-BEAUTY-TDUMP ✅`, update §START → `M-BEAUTY-GEN`
+
+### Trigger phrase
+**"playing with beauty"** → B-271 → snobol4x PLAN.md §28, milestone `M-BEAUTY-TDUMP`
