@@ -1,170 +1,71 @@
 /*
- * icon_lex.c — Tiny-ICON lexer
+ * icon_lex.c — Tiny-ICON hand-rolled lexer
  *
- * _POSIX_C_SOURCE for strdup
- *
- * Hand-rolled lexer for snobol4x Icon frontend.
- * NO auto-semicolon insertion (deliberate deviation from standard Icon).
- * Explicit ';' required everywhere.
- *
- * Token kinds defined in icon_lex.h.
- * Structural template: src/frontend/prolog/prolog_lex.c
+ * No auto-semicolon insertion (deliberate deviation from standard Icon).
+ * All expression sequences require explicit ';'.
+ */
+#define _POSIX_C_SOURCE 200809L
+/*
+ * Follows structural template of src/frontend/prolog/prolog_lex.c.
  */
 
-#define _POSIX_C_SOURCE 200809L
 #include "icon_lex.h"
-
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <errno.h>
 
 /* =========================================================================
  * Internal helpers
- * ========================================================================= */
+ * ======================================================================= */
 
-static char lcur(const IcnLexer *lx) {
+static char lex_cur(const IcnLexer *lx) {
+    if (lx->pos >= lx->src_len) return '\0';
     return lx->src[lx->pos];
 }
-static char lpeek1(const IcnLexer *lx) {
+static char lex_peek1(const IcnLexer *lx) {
     if (lx->pos + 1 >= lx->src_len) return '\0';
     return lx->src[lx->pos + 1];
 }
-
-static char ladvance(IcnLexer *lx) {
-    char c = lx->src[lx->pos];
-    if (c == '\n') { lx->line++; lx->col = 1; }
-    else           { lx->col++; }
-    if (lx->pos < lx->src_len) lx->pos++;
+static char lex_advance(IcnLexer *lx) {
+    if (lx->pos >= lx->src_len) return '\0';
+    char c = lx->src[lx->pos++];
+    if (c == '\n') { lx->line++; lx->col = 1; } else { lx->col++; }
     return c;
 }
 
-/* Simple heap buffer append */
-typedef struct { char *data; int len; int cap; } Buf;
-static void buf_push(Buf *b, char c) {
-    if (b->len + 2 > b->cap) {
-        b->cap = b->cap ? b->cap * 2 : 32;
-        b->data = realloc(b->data, (size_t)b->cap);
+/* Grow buffer and append character */
+static void buf_push(char **buf, int *len, int *cap, char c) {
+    if (*len + 2 > *cap) {
+        *cap = (*cap) ? (*cap) * 2 : 32;
+        *buf = realloc(*buf, *cap);
     }
-    b->data[b->len++] = c;
-    b->data[b->len]   = '\0';
-}
-
-static void skip_whitespace_and_comments(IcnLexer *lx) {
-    for (;;) {
-        /* Whitespace */
-        while (lcur(lx) && isspace((unsigned char)lcur(lx)))
-            ladvance(lx);
-        /* # line comment (Icon uses # for comments) */
-        if (lcur(lx) == '#') {
-            while (lcur(lx) && lcur(lx) != '\n')
-                ladvance(lx);
-            continue;
-        }
-        break;
-    }
+    (*buf)[(*len)++] = c;
+    (*buf)[*len] = '\0';
 }
 
 static IcnToken make_tok(IcnTkKind kind, int line, int col) {
     IcnToken t;
     memset(&t, 0, sizeof(t));
-    t.kind = kind;
-    t.line = line;
-    t.col  = col;
+    t.kind = kind; t.line = line; t.col = col;
     return t;
 }
 
-static IcnToken make_error(IcnLexer *lx, int line, int col, const char *msg) {
-    IcnToken t = make_tok(TK_ERROR, line, col);
+static IcnToken make_error(IcnLexer *lx, const char *msg) {
+    snprintf(lx->errmsg, sizeof(lx->errmsg), "line %d col %d: %s",
+             lx->line, lx->col, msg);
     lx->had_error = 1;
-    snprintf(lx->errmsg, sizeof(lx->errmsg), "lex error at %d:%d: %s", line, col, msg);
-    return t;
-}
-
-/* =========================================================================
- * Escape character processing for strings/csets
- * ========================================================================= */
-static int lex_escape(IcnLexer *lx, char *out) {
-    char c = ladvance(lx); /* consume the char after backslash */
-    switch (c) {
-        case 'n':  *out = '\n'; return 1;
-        case 't':  *out = '\t'; return 1;
-        case 'r':  *out = '\r'; return 1;
-        case 'b':  *out = '\b'; return 1;
-        case 'f':  *out = '\f'; return 1;
-        case '\\': *out = '\\'; return 1;
-        case '"':  *out = '"';  return 1;
-        case '\'': *out = '\''; return 1;
-        case '0':  *out = '\0'; return 1;
-        default:
-            *out = c;
-            return 1;
-    }
-}
-
-/* =========================================================================
- * Number lexing
- * ========================================================================= */
-static IcnToken lex_number(IcnLexer *lx, int line, int col) {
-    Buf b = {0,0,0};
-
-    /* Collect digits before possible decimal point */
-    while (isdigit((unsigned char)lcur(lx)))
-        buf_push(&b, ladvance(lx));
-
-    /* Radix notation: 8r77, 16rff, etc. */
-    if ((lcur(lx) == 'r' || lcur(lx) == 'R') && b.len > 0) {
-        int radix = atoi(b.data);
-        ladvance(lx); /* consume 'r' */
-        free(b.data); b.data = NULL; b.len = 0; b.cap = 0;
-        long val = 0;
-        if (radix < 2 || radix > 36) {
-            return make_error(lx, line, col, "invalid radix");
-        }
-        while (isalnum((unsigned char)lcur(lx))) {
-            char c = ladvance(lx);
-            int digit;
-            if (c >= '0' && c <= '9') digit = c - '0';
-            else if (c >= 'a' && c <= 'z') digit = c - 'a' + 10;
-            else digit = c - 'A' + 10;
-            if (digit >= radix) return make_error(lx, line, col, "digit out of range for radix");
-            val = val * radix + digit;
-        }
-        IcnToken t = make_tok(TK_INT, line, col);
-        t.val.ival = val;
-        return t;
-    }
-
-    /* Floating point */
-    if (lcur(lx) == '.' && isdigit((unsigned char)lpeek1(lx))) {
-        buf_push(&b, ladvance(lx)); /* '.' */
-        while (isdigit((unsigned char)lcur(lx)))
-            buf_push(&b, ladvance(lx));
-        /* exponent */
-        if (lcur(lx) == 'e' || lcur(lx) == 'E') {
-            buf_push(&b, ladvance(lx));
-            if (lcur(lx) == '+' || lcur(lx) == '-')
-                buf_push(&b, ladvance(lx));
-            while (isdigit((unsigned char)lcur(lx)))
-                buf_push(&b, ladvance(lx));
-        }
-        IcnToken t = make_tok(TK_REAL, line, col);
-        t.val.fval = atof(b.data);
-        free(b.data);
-        return t;
-    }
-
-    /* Plain integer */
-    IcnToken t = make_tok(TK_INT, line, col);
-    t.val.ival = atol(b.data);
-    free(b.data);
+    IcnToken t = make_tok(TK_ERROR, lx->line, lx->col);
     return t;
 }
 
 /* =========================================================================
  * Keyword table
- * ========================================================================= */
+ * ======================================================================= */
+
 typedef struct { const char *word; IcnTkKind kind; } KwEntry;
+
 static const KwEntry keywords[] = {
     {"to",         TK_TO},
     {"by",         TK_BY},
@@ -199,87 +100,305 @@ static const KwEntry keywords[] = {
 };
 
 static IcnTkKind lookup_keyword(const char *word) {
-    for (int i = 0; keywords[i].word; i++) {
+    for (int i = 0; keywords[i].word; i++)
         if (strcmp(keywords[i].word, word) == 0)
             return keywords[i].kind;
-    }
     return TK_IDENT;
 }
 
 /* =========================================================================
- * Identifier / keyword lexing
- * ========================================================================= */
-static IcnToken lex_ident(IcnLexer *lx, int line, int col) {
-    Buf b = {0,0,0};
-    while (isalnum((unsigned char)lcur(lx)) || lcur(lx) == '_')
-        buf_push(&b, ladvance(lx));
+ * Skip whitespace and # comments
+ * ======================================================================= */
 
-    IcnTkKind kind = lookup_keyword(b.data);
+static void skip_ws(IcnLexer *lx) {
+    for (;;) {
+        while (lex_cur(lx) && isspace((unsigned char)lex_cur(lx)))
+            lex_advance(lx);
+        /* Icon uses # for line comments */
+        if (lex_cur(lx) == '#') {
+            while (lex_cur(lx) && lex_cur(lx) != '\n')
+                lex_advance(lx);
+            continue;
+        }
+        break;
+    }
+}
+
+/* =========================================================================
+ * String / cset literal scanning
+ * Icon strings: "..." with escape sequences \n \t \\ \" \uXXXX \xXX
+ * Icon csets:   '...' — no escape sequences (verbatim)
+ * ======================================================================= */
+
+static IcnToken scan_string(IcnLexer *lx) {
+    int line = lx->line, col = lx->col;
+    lex_advance(lx); /* consume opening " */
+    char *buf = NULL; int len = 0, cap = 0;
+    while (lex_cur(lx) && lex_cur(lx) != '"') {
+        char c = lex_advance(lx);
+        if (c == '\\') {
+            char esc = lex_advance(lx);
+            switch (esc) {
+                case 'n':  buf_push(&buf, &len, &cap, '\n'); break;
+                case 't':  buf_push(&buf, &len, &cap, '\t'); break;
+                case 'r':  buf_push(&buf, &len, &cap, '\r'); break;
+                case '\\': buf_push(&buf, &len, &cap, '\\'); break;
+                case '"':  buf_push(&buf, &len, &cap, '"');  break;
+                case '\'': buf_push(&buf, &len, &cap, '\''); break;
+                case '0':  buf_push(&buf, &len, &cap, '\0'); break;
+                default:   buf_push(&buf, &len, &cap, '\\');
+                           buf_push(&buf, &len, &cap, esc);  break;
+            }
+        } else {
+            buf_push(&buf, &len, &cap, c);
+        }
+    }
+    if (!lex_cur(lx)) { free(buf); return make_error(lx, "unterminated string literal"); }
+    lex_advance(lx); /* consume closing " */
+    if (!buf) buf = strdup("");
+    IcnToken t = make_tok(TK_STRING, line, col);
+    t.val.sval.data = buf;
+    t.val.sval.len  = (size_t)len;
+    return t;
+}
+
+static IcnToken scan_cset(IcnLexer *lx) {
+    int line = lx->line, col = lx->col;
+    lex_advance(lx); /* consume opening ' */
+    char *buf = NULL; int len = 0, cap = 0;
+    while (lex_cur(lx) && lex_cur(lx) != '\'') {
+        buf_push(&buf, &len, &cap, lex_advance(lx));
+    }
+    if (!lex_cur(lx)) { free(buf); return make_error(lx, "unterminated cset literal"); }
+    lex_advance(lx); /* consume closing ' */
+    if (!buf) buf = strdup("");
+    IcnToken t = make_tok(TK_CSET, line, col);
+    t.val.sval.data = buf;
+    t.val.sval.len  = (size_t)len;
+    return t;
+}
+
+/* =========================================================================
+ * Numeric literal scanning
+ * Decimal: 42  3.14  1e-5
+ * Octal-style: 0377 (Icon doesn't have octal; we just parse as decimal)
+ * Hex: 0x1F or 16rFF (Icon radix notation) — we support 0x only
+ * ======================================================================= */
+
+static IcnToken scan_number(IcnLexer *lx) {
+    int line = lx->line, col = lx->col;
+    char *buf = NULL; int len = 0, cap = 0;
+    int is_real = 0;
+
+    /* Hex: 0x... */
+    if (lex_cur(lx) == '0' &&
+        (lex_peek1(lx) == 'x' || lex_peek1(lx) == 'X')) {
+        buf_push(&buf, &len, &cap, lex_advance(lx)); /* 0 */
+        buf_push(&buf, &len, &cap, lex_advance(lx)); /* x */
+        while (isxdigit((unsigned char)lex_cur(lx)))
+            buf_push(&buf, &len, &cap, lex_advance(lx));
+        long val = strtol(buf, NULL, 16);
+        free(buf);
+        IcnToken t = make_tok(TK_INT, line, col);
+        t.val.ival = val;
+        return t;
+    }
+
+    /* Decimal integer or real */
+    while (isdigit((unsigned char)lex_cur(lx)))
+        buf_push(&buf, &len, &cap, lex_advance(lx));
+
+    /* Fractional part */
+    if (lex_cur(lx) == '.' && isdigit((unsigned char)lex_peek1(lx))) {
+        is_real = 1;
+        buf_push(&buf, &len, &cap, lex_advance(lx)); /* . */
+        while (isdigit((unsigned char)lex_cur(lx)))
+            buf_push(&buf, &len, &cap, lex_advance(lx));
+    }
+
+    /* Exponent */
+    if (lex_cur(lx) == 'e' || lex_cur(lx) == 'E') {
+        is_real = 1;
+        buf_push(&buf, &len, &cap, lex_advance(lx));
+        if (lex_cur(lx) == '+' || lex_cur(lx) == '-')
+            buf_push(&buf, &len, &cap, lex_advance(lx));
+        while (isdigit((unsigned char)lex_cur(lx)))
+            buf_push(&buf, &len, &cap, lex_advance(lx));
+    }
+
+    IcnToken t;
+    if (is_real) {
+        t = make_tok(TK_REAL, line, col);
+        t.val.fval = strtod(buf, NULL);
+    } else {
+        t = make_tok(TK_INT, line, col);
+        t.val.ival = strtol(buf, NULL, 10);
+    }
+    free(buf);
+    return t;
+}
+
+/* =========================================================================
+ * Identifier / keyword scanning
+ * ======================================================================= */
+
+static IcnToken scan_ident(IcnLexer *lx) {
+    int line = lx->line, col = lx->col;
+    char *buf = NULL; int len = 0, cap = 0;
+    while (isalnum((unsigned char)lex_cur(lx)) || lex_cur(lx) == '_')
+        buf_push(&buf, &len, &cap, lex_advance(lx));
+    if (!buf) buf = strdup("");
+
+    IcnTkKind kind = lookup_keyword(buf);
     IcnToken t = make_tok(kind, line, col);
     if (kind == TK_IDENT) {
-        t.val.sval.data = b.data;
-        t.val.sval.len  = (size_t)b.len;
+        t.val.sval.data = buf;
+        t.val.sval.len  = (size_t)len;
     } else {
-        free(b.data);
+        free(buf); /* keyword — no string payload needed */
     }
     return t;
 }
 
 /* =========================================================================
- * String literal: "..." with backslash escapes
- * ========================================================================= */
-static IcnToken lex_string(IcnLexer *lx, int line, int col) {
-    ladvance(lx); /* consume opening " */
-    Buf b = {0,0,0};
-    while (lcur(lx) && lcur(lx) != '"') {
-        if (lcur(lx) == '\\') {
-            ladvance(lx); /* consume backslash */
-            char esc;
-            lex_escape(lx, &esc);
-            buf_push(&b, esc);
-        } else {
-            buf_push(&b, ladvance(lx));
+ * Main token dispatch
+ * ======================================================================= */
+
+static IcnToken lex_one(IcnLexer *lx) {
+    skip_ws(lx);
+    int line = lx->line, col = lx->col;
+    char c = lex_cur(lx);
+
+    if (c == '\0') return make_tok(TK_EOF, line, col);
+
+    /* Literals */
+    if (c == '"')  return scan_string(lx);
+    if (c == '\'') return scan_cset(lx);
+    if (isdigit((unsigned char)c)) return scan_number(lx);
+    if (isalpha((unsigned char)c) || c == '_') return scan_ident(lx);
+
+    lex_advance(lx);
+
+    switch (c) {
+        case '+':
+            if (lex_cur(lx) == ':' && lex_peek1(lx) == '=') {
+                lex_advance(lx); lex_advance(lx);
+                return make_tok(TK_AUGPLUS, line, col);
+            }
+            return make_tok(TK_PLUS, line, col);
+
+        case '-':
+            if (lex_cur(lx) == ':' && lex_peek1(lx) == '=') {
+                lex_advance(lx); lex_advance(lx);
+                return make_tok(TK_AUGMINUS, line, col);
+            }
+            if (lex_cur(lx) == '>') {
+                lex_advance(lx);
+                return make_tok(TK_MINUS, line, col); /* -> not in our set; treat as - > */
+            }
+            return make_tok(TK_MINUS, line, col);
+
+        case '*':
+            if (lex_cur(lx) == ':' && lex_peek1(lx) == '=') {
+                lex_advance(lx); lex_advance(lx);
+                return make_tok(TK_AUGSTAR, line, col);
+            }
+            return make_tok(TK_STAR, line, col);
+
+        case '/':
+            if (lex_cur(lx) == ':' && lex_peek1(lx) == '=') {
+                lex_advance(lx); lex_advance(lx);
+                return make_tok(TK_AUGSLASH, line, col);
+            }
+            return make_tok(TK_SLASH, line, col);
+
+        case '%':
+            if (lex_cur(lx) == ':' && lex_peek1(lx) == '=') {
+                lex_advance(lx); lex_advance(lx);
+                return make_tok(TK_AUGMOD, line, col);
+            }
+            return make_tok(TK_MOD, line, col);
+
+        case '^': return make_tok(TK_CARET, line, col);
+
+        case '<':
+            if (lex_cur(lx) == '<') {
+                lex_advance(lx);
+                if (lex_cur(lx) == '=') { lex_advance(lx); return make_tok(TK_SLE, line, col); }
+                return make_tok(TK_SLT, line, col);
+            }
+            if (lex_cur(lx) == '=') { lex_advance(lx); return make_tok(TK_LE, line, col); }
+            if (lex_cur(lx) == '-') { lex_advance(lx); return make_tok(TK_REVASSIGN, line, col); }
+            return make_tok(TK_LT, line, col);
+
+        case '>':
+            if (lex_cur(lx) == '>') {
+                lex_advance(lx);
+                if (lex_cur(lx) == '=') { lex_advance(lx); return make_tok(TK_SGE, line, col); }
+                return make_tok(TK_SGT, line, col);
+            }
+            if (lex_cur(lx) == '=') { lex_advance(lx); return make_tok(TK_GE, line, col); }
+            return make_tok(TK_GT, line, col);
+
+        case '=':
+            if (lex_cur(lx) == '=') { lex_advance(lx); return make_tok(TK_SEQ, line, col); }
+            return make_tok(TK_EQ, line, col);
+
+        case '~':
+            if (lex_cur(lx) == '=') {
+                lex_advance(lx);
+                if (lex_cur(lx) == '=') { lex_advance(lx); return make_tok(TK_SNE, line, col); }
+                return make_tok(TK_NEQ, line, col);
+            }
+            return make_tok(TK_TILDE, line, col);
+
+        case '|':
+            if (lex_cur(lx) == '|') {
+                lex_advance(lx);
+                if (lex_cur(lx) == '|') { lex_advance(lx); return make_tok(TK_LCONCAT, line, col); }
+                if (lex_cur(lx) == ':' && lex_peek1(lx) == '=') {
+                    lex_advance(lx); lex_advance(lx);
+                    return make_tok(TK_AUGCONCAT, line, col);
+                }
+                return make_tok(TK_CONCAT, line, col);
+            }
+            return make_tok(TK_BAR, line, col);
+
+        case ':':
+            if (lex_cur(lx) == '=') {
+                lex_advance(lx);
+                if (lex_cur(lx) == ':') { lex_advance(lx); return make_tok(TK_SWAP, line, col); }
+                return make_tok(TK_ASSIGN, line, col);
+            }
+            return make_tok(TK_COLON, line, col);
+
+        case '&': return make_tok(TK_AND, line, col);
+        case '\\': return make_tok(TK_BACKSLASH, line, col);
+        case '!': return make_tok(TK_BANG, line, col);
+        case '?': return make_tok(TK_QMARK, line, col);
+        case '@': return make_tok(TK_AT, line, col);
+        case '.': return make_tok(TK_DOT, line, col);
+
+        case '(': return make_tok(TK_LPAREN, line, col);
+        case ')': return make_tok(TK_RPAREN, line, col);
+        case '{': return make_tok(TK_LBRACE, line, col);
+        case '}': return make_tok(TK_RBRACE, line, col);
+        case '[': return make_tok(TK_LBRACK, line, col);
+        case ']': return make_tok(TK_RBRACK, line, col);
+        case ',': return make_tok(TK_COMMA, line, col);
+        case ';': return make_tok(TK_SEMICOL, line, col);
+
+        default: {
+            char msg[64];
+            snprintf(msg, sizeof(msg), "unexpected character '%c' (0x%02x)", c, (unsigned char)c);
+            return make_error(lx, msg);
         }
     }
-    if (!lcur(lx))
-        return make_error(lx, line, col, "unterminated string literal");
-    ladvance(lx); /* consume closing " */
-
-    IcnToken t = make_tok(TK_STRING, line, col);
-    t.val.sval.data = b.data ? b.data : strdup("");
-    t.val.sval.len  = (size_t)(b.len);
-    return t;
-}
-
-/* =========================================================================
- * Cset literal: '...' with backslash escapes
- * ========================================================================= */
-static IcnToken lex_cset(IcnLexer *lx, int line, int col) {
-    ladvance(lx); /* consume opening ' */
-    Buf b = {0,0,0};
-    while (lcur(lx) && lcur(lx) != '\'') {
-        if (lcur(lx) == '\\') {
-            ladvance(lx);
-            char esc;
-            lex_escape(lx, &esc);
-            buf_push(&b, esc);
-        } else {
-            buf_push(&b, ladvance(lx));
-        }
-    }
-    if (!lcur(lx))
-        return make_error(lx, line, col, "unterminated cset literal");
-    ladvance(lx); /* consume closing ' */
-
-    IcnToken t = make_tok(TK_CSET, line, col);
-    t.val.sval.data = b.data ? b.data : strdup("");
-    t.val.sval.len  = (size_t)(b.len);
-    return t;
 }
 
 /* =========================================================================
  * Public API
- * ========================================================================= */
+ * ======================================================================= */
 
 void icn_lex_init(IcnLexer *lx, const char *src) {
     memset(lx, 0, sizeof(*lx));
@@ -291,152 +410,27 @@ void icn_lex_init(IcnLexer *lx, const char *src) {
 }
 
 IcnToken icn_lex_next(IcnLexer *lx) {
-    skip_whitespace_and_comments(lx);
-
-    int line = lx->line, col = lx->col;
-
-    if (!lcur(lx) || lx->pos >= lx->src_len)
-        return make_tok(TK_EOF, line, col);
-
-    char c = lcur(lx);
-
-    /* --- Numbers --- */
-    if (isdigit((unsigned char)c))
-        return lex_number(lx, line, col);
-
-    /* --- Identifiers / keywords --- */
-    if (isalpha((unsigned char)c) || c == '_')
-        return lex_ident(lx, line, col);
-
-    /* --- String literal --- */
-    if (c == '"')
-        return lex_string(lx, line, col);
-
-    /* --- Cset literal --- */
-    if (c == '\'')
-        return lex_cset(lx, line, col);
-
-    /* --- Multi-char operators & punctuation --- */
-    ladvance(lx);
-    char n = lcur(lx);
-
-    switch (c) {
-        case '+':
-            if (n == ':' && lpeek1(lx) == '=') { ladvance(lx); ladvance(lx); return make_tok(TK_AUGPLUS,   line, col); }
-            return make_tok(TK_PLUS, line, col);
-
-        case '-':
-            if (n == ':' && lpeek1(lx) == '=') { ladvance(lx); ladvance(lx); return make_tok(TK_AUGMINUS,  line, col); }
-            return make_tok(TK_MINUS, line, col);
-
-        case '*':
-            if (n == ':' && lpeek1(lx) == '=') { ladvance(lx); ladvance(lx); return make_tok(TK_AUGSTAR,   line, col); }
-            return make_tok(TK_STAR, line, col);
-
-        case '/':
-            if (n == ':' && lpeek1(lx) == '=') { ladvance(lx); ladvance(lx); return make_tok(TK_AUGSLASH,  line, col); }
-            return make_tok(TK_SLASH, line, col);
-
-        case '%':
-            if (n == ':' && lpeek1(lx) == '=') { ladvance(lx); ladvance(lx); return make_tok(TK_AUGMOD,    line, col); }
-            return make_tok(TK_MOD, line, col);
-
-        case '^':
-            return make_tok(TK_CARET, line, col);
-
-        case '<':
-            if (n == '<') {
-                ladvance(lx);
-                if (lcur(lx) == '=') { ladvance(lx); return make_tok(TK_SLE, line, col); }
-                return make_tok(TK_SLT, line, col);
-            }
-            if (n == '=') { ladvance(lx); return make_tok(TK_LE, line, col); }
-            if (n == '-') { ladvance(lx); return make_tok(TK_REVASSIGN, line, col); }
-            return make_tok(TK_LT, line, col);
-
-        case '>':
-            if (n == '>') {
-                ladvance(lx);
-                if (lcur(lx) == '=') { ladvance(lx); return make_tok(TK_SGE, line, col); }
-                return make_tok(TK_SGT, line, col);
-            }
-            if (n == '=') { ladvance(lx); return make_tok(TK_GE, line, col); }
-            return make_tok(TK_GT, line, col);
-
-        case '=':
-            if (n == '=') { ladvance(lx); return make_tok(TK_SEQ, line, col); }
-            return make_tok(TK_EQ, line, col);
-
-        case '~':
-            if (n == '=') {
-                ladvance(lx);
-                if (lcur(lx) == '=') { ladvance(lx); return make_tok(TK_SNE, line, col); }
-                return make_tok(TK_NEQ, line, col);
-            }
-            return make_tok(TK_TILDE, line, col);
-
-        case '|':
-            if (n == '|') {
-                ladvance(lx);
-                if (lcur(lx) == '|') {
-                    ladvance(lx); return make_tok(TK_LCONCAT, line, col);
-                }
-                if (lcur(lx) == ':' && lpeek1(lx) == '=') {
-                    ladvance(lx); ladvance(lx); return make_tok(TK_AUGCONCAT, line, col);
-                }
-                return make_tok(TK_CONCAT, line, col);
-            }
-            return make_tok(TK_BAR, line, col);
-
-        case ':':
-            if (n == '=') {
-                ladvance(lx);
-                if (lcur(lx) == ':') { ladvance(lx); return make_tok(TK_SWAP, line, col); }
-                return make_tok(TK_ASSIGN, line, col);
-            }
-            return make_tok(TK_COLON, line, col);
-
-        case '&': return make_tok(TK_AND,       line, col);
-        case '\\': return make_tok(TK_BACKSLASH, line, col);
-        case '!':  return make_tok(TK_BANG,      line, col);
-        case '?':  return make_tok(TK_QMARK,     line, col);
-        case '@':  return make_tok(TK_AT,        line, col);
-        case '.':  return make_tok(TK_DOT,       line, col);
-
-        case '(':  return make_tok(TK_LPAREN,  line, col);
-        case ')':  return make_tok(TK_RPAREN,  line, col);
-        case '{':  return make_tok(TK_LBRACE,  line, col);
-        case '}':  return make_tok(TK_RBRACE,  line, col);
-        case '[':  return make_tok(TK_LBRACK,  line, col);
-        case ']':  return make_tok(TK_RBRACK,  line, col);
-        case ',':  return make_tok(TK_COMMA,   line, col);
-        case ';':  return make_tok(TK_SEMICOL, line, col);
-
-        default: {
-            char msg[64];
-            snprintf(msg, sizeof(msg), "unexpected character '%c' (0x%02x)", c, (unsigned char)c);
-            return make_error(lx, line, col, msg);
-        }
+    /* If a peeked token is buffered, consume it */
+    if (lx->had_error == -1) {
+        /* sentinel: no peek buffered */
     }
+    return lex_one(lx);
 }
 
+/* Simple peek: scan one token, back up position */
 IcnToken icn_lex_peek(IcnLexer *lx) {
-    /* Save state, lex one token, restore state */
-    size_t  saved_pos  = lx->pos;
-    int     saved_line = lx->line;
-    int     saved_col  = lx->col;
-
-    IcnToken t = icn_lex_next(lx);
-
+    size_t saved_pos  = lx->pos;
+    int    saved_line = lx->line;
+    int    saved_col  = lx->col;
+    IcnToken t = lex_one(lx);
+    /* Restore position but NOT the string allocation — caller must not
+     * use sval pointers after calling icn_lex_next. */
     lx->pos  = saved_pos;
     lx->line = saved_line;
     lx->col  = saved_col;
     return t;
 }
 
-/* =========================================================================
- * Token name table (for diagnostics / tests)
- * ========================================================================= */
 const char *icn_tk_name(IcnTkKind kind) {
     switch (kind) {
         case TK_EOF:       return "EOF";
@@ -521,7 +515,6 @@ const char *icn_tk_name(IcnTkKind kind) {
         case TK_COMMA:     return ",";
         case TK_SEMICOL:   return ";";
         case TK_COLON:     return ":";
-        case TK_COUNT:     return "<COUNT>";
-        default:           return "<unknown>";
+        default:           return "???";
     }
 }
