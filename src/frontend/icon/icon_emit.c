@@ -97,6 +97,7 @@ static LocalVar cur_locals[MAX_LOCALS];
 static int      cur_nlocals=0, cur_nparams=0;
 static char     cur_ret_label[64]="";   /* label to jump to for return */
 static char     cur_fail_label[64]="";  /* label to jump to for fail */
+static char     cur_suspend_ret_label[64]=""; /* bare ret — frame kept alive for suspend */
 
 static void locals_reset(void) { cur_nlocals=0; cur_nparams=0; }
 
@@ -267,6 +268,91 @@ static void emit_fail_node(IcnEmitter *em, IcnNode *n, IcnPorts ports,
 }
 
 /* =========================================================================
+ * ICN_SUSPEND — co-routine yield (user-defined generator)
+ *
+ * suspend E [do body]
+ *
+ * α: evaluate E; on succeed → store value in icn_retval, store resume label
+ *    address in icn_suspend_resume, jump to cur_ret_label (yield to caller).
+ * β: jmp [rel icn_suspend_resume] — resume from where we left off.
+ *    If there is a 'do body', β runs the body then resumes E's β.
+ *    If E is exhausted (ω), procedure fails (jump cur_fail_label).
+ *
+ * Single BSS slot icn_suspend_resume holds the resume address.
+ * This is a single-active-generator design — only one suspend active at a time.
+ * ======================================================================= */
+static void emit_suspend(IcnEmitter *em, IcnNode *n, IcnPorts ports,
+                         char *oa, char *ob) {
+    (void)ports;
+    int id = icn_new_id(em);
+    char a[64], b[64];
+    icn_label_alpha(id, a, sizeof a);
+    icn_label_beta (id, b, sizeof b);
+    strncpy(oa, a, 63); strncpy(ob, b, 63);
+
+    /* resume_here: label the caller's β jumps back to after we yield */
+    char resume_here[64]; snprintf(resume_here, sizeof resume_here, "icon_%d_resume", id);
+    /* after_val: entered after E succeeds (value on stack) */
+    char after_val[64];   snprintf(after_val,   sizeof after_val,   "icon_%d_yield",  id);
+
+    /* Declare BSS slots (deduped) */
+    bss_declare("icn_suspend_resume");
+    bss_declare("icn_suspended");      /* byte: 1 if proc suspended, 0 if returned/failed */
+
+    IcnNode *val_node  = (n->nchildren > 0) ? n->children[0] : NULL;
+    IcnNode *body_node = (n->nchildren > 1) ? n->children[1] : NULL;
+
+    /* Emit the value expression; on success jump to after_val */
+    char va[64], vb[64];
+    if (val_node) {
+        IcnPorts vp;
+        strncpy(vp.succeed, after_val, 63);
+        strncpy(vp.fail, cur_fail_label[0] ? cur_fail_label : "icn_dead", 63);
+        emit_expr(em, val_node, vp, va, vb);
+    } else {
+        /* suspend with no value: yield 0 */
+        snprintf(va, sizeof va, "%s_noval", a);
+        snprintf(vb, sizeof vb, "%s_novalb", a);
+        Ldef(em, va); E(em,"    push    0\n"); Jmp(em, after_val);
+        Ldef(em, vb); Jmp(em, cur_fail_label[0] ? cur_fail_label : "icn_dead");
+    }
+
+    /* α: jump into value evaluation */
+    Ldef(em, a); Jmp(em, va);
+
+    /* β: resume — jump through icn_suspend_resume slot */
+    Ldef(em, b);
+    E(em,"    jmp     [rel icn_suspend_resume]\n");
+
+    /* after_val: E succeeded, value on hw stack */
+    Ldef(em, after_val);
+    E(em,"    pop     rax\n");
+    E(em,"    mov     [rel icn_retval], rax\n");
+    E(em,"    mov     byte [rel icn_failed], 0\n");
+    E(em,"    mov     byte [rel icn_suspended], 1\n");      /* signal: suspended, not returned */
+    /* store resume address: after yield, caller's β comes back to resume_here */
+    E(em,"    lea     rax, [rel %s]\n", resume_here);
+    E(em,"    mov     [rel icn_suspend_resume], rax\n");
+    /* yield to caller — bare ret, frame stays alive */
+    Jmp(em, cur_suspend_ret_label[0] ? cur_suspend_ret_label : "icn_dead");
+
+    /* resume_here: execution resumes here after caller's β fires */
+    Ldef(em, resume_here);
+    if (body_node) {
+        /* run body; on success/fail both continue after the suspend statement */
+        char ba[64], bb[64];
+        IcnPorts bp;
+        strncpy(bp.succeed, ports.succeed, 63);
+        strncpy(bp.fail,    ports.succeed, 63);  /* body fail also continues */
+        emit_expr(em, body_node, bp, ba, bb);
+        Jmp(em, ba);  /* run body starting here */
+    } else {
+        /* no do body: resume simply continues after the suspend statement */
+        Jmp(em, ports.succeed);
+    }
+}
+
+/* =========================================================================
  * ICN_IF — if cond then E2 [else E3]  (paper §4.5 indirect goto)
  * Simple version (no bounded optimization): emit cond, on succeed→E2, fail→E3/ports.fail
  * ======================================================================= */
@@ -381,17 +467,37 @@ static void emit_call(IcnEmitter *em, IcnNode *n, IcnPorts ports,
         if(nargs>0) Jmp(em,prev_succ);
         else Jmp(em,do_call);
 
-        /* β: not resumable for now */
-        Ldef(em,b); Jmp(em,ports.fail);
+        /* β: resume a suspended generator, or fail if proc already returned */
+        Ldef(em,b);
+        E(em,"    ; call β — resume if suspended, fail otherwise\n");
+        E(em,"    movzx   rax, byte [rel icn_suspended]\n");
+        E(em,"    test    rax, rax\n");
+        E(em,"    jz      %s\n", ports.fail);           /* not suspended → exhausted */
+        E(em,"    mov     byte [rel icn_suspended], 0\n"); /* clear before resuming */
+        E(em,"    jmp     [rel icn_suspend_resume]\n");
 
         /* do_call: all args on icn_stack, call proc */
         Ldef(em,do_call);
+        /* clear suspended flag before call */
+        E(em,"    mov     byte [rel icn_suspended], 0\n");
         E(em,"    call    icn_%s\n",fname);
-        /* Check icn_failed */
+        /* Check icn_failed first */
         E(em,"    movzx   rax, byte [rel icn_failed]\n");
         E(em,"    test    rax, rax\n");
         E(em,"    jnz     %s\n",ports.fail);
-        /* Push return value onto hw stack for consumer */
+        /* Check if proc suspended (icn_suspended==1) vs returned */
+        E(em,"    movzx   rax, byte [rel icn_suspended]\n");
+        E(em,"    test    rax, rax\n");
+        char did_return[64]; snprintf(did_return,sizeof did_return,"icon_%d_returned",id);
+        E(em,"    jz      %s\n",did_return);
+        /* Suspended: value already in icn_retval; push and succeed.
+         * Next β will resume via icn_suspend_resume. */
+        E(em,"    mov     rax, [rel icn_retval]\n");
+        E(em,"    push    rax\n");
+        Jmp(em,ports.succeed);
+        /* Returned normally: push return value, succeed.
+         * β will check icn_suspended==0 and go to fail (exhausted). */
+        Ldef(em,did_return);
         E(em,"    mov     rax, [rel icn_retval]\n");
         E(em,"    push    rax\n");
         Jmp(em,ports.succeed);
@@ -457,13 +563,27 @@ static void emit_binop(IcnEmitter *em, IcnNode *n, IcnPorts ports,
     IcnPorts lp; strncpy(lp.succeed,lstore,63); strncpy(lp.fail,ports.fail,63);
     char la[64],lb[64]; emit_expr(em,n->children[0],lp,la,lb);
 
+    /* Heuristic: if left is a simple value (var/int/str/call), β must re-eval
+     * left to refresh it (e.g. updated `total`). If left is a generator
+     * (TO, binop, relop, etc.), β goes directly to right.β — left cache
+     * is still valid and re-running left would reset the generator. */
+    IcnNode *left_child = n->children[0];
+    int left_is_value = (left_child->kind == ICN_VAR || left_child->kind == ICN_INT ||
+                         left_child->kind == ICN_STR || left_child->kind == ICN_CALL);
+
     Ldef(em,lbfwd); Jmp(em,lb);
     Ldef(em,a);
     E(em,"    mov     qword [rbp%+d], 0\n", slot_offset(bf_slot));  /* α: start right */
     Jmp(em,la);
     Ldef(em,b);
-    E(em,"    mov     qword [rbp%+d], 1\n", slot_offset(bf_slot));  /* β: refresh left, resume right */
-    Jmp(em,la);
+    if (left_is_value) {
+        /* value-left: β re-evals left to refresh (e.g. accumulated total) */
+        E(em,"    mov     qword [rbp%+d], 1\n", slot_offset(bf_slot));
+        Jmp(em,la);
+    } else {
+        /* generator-left: β goes directly to right.β — left cache still valid */
+        Jmp(em,rb);
+    }
 
     /* lstore: cache left, branch on bf_slot → start right (α) or resume right (β) */
     Ldef(em,lstore);
@@ -553,23 +673,58 @@ static void emit_to(IcnEmitter *em, IcnNode *n, IcnPorts ports,
     strncpy(oa,a,63); strncpy(ob,b,63);
     E(em,"    ; TO  id=%d\n",id);
 
+    /* e1cur: current E1 value (updated each time E1 succeeds).
+     * e2_seen: 0 on first init (E1+E2 both on stack), 1 thereafter (only E2). */
+    char e1cur[64];  snprintf(e1cur,  sizeof e1cur,  "icon_%d_e1cur",id);
+    char e2seen[64]; snprintf(e2seen, sizeof e2seen, "icon_%d_e2seen",id);
+    bss_declare(e1cur); bss_declare(e2seen);
+
     IcnPorts e2p; strncpy(e2p.succeed,init,63); strncpy(e2p.fail,e1bf,63);
     char e2a[64],e2b[64]; emit_expr(em,n->children[1],e2p,e2a,e2b);
     IcnPorts e1p; strncpy(e1p.succeed,e2a,63); strncpy(e1p.fail,ports.fail,63);
     char e1a[64],e1b[64]; emit_expr(em,n->children[0],e1p,e1a,e1b);
 
-    Ldef(em,e1bf); Jmp(em,e1b);
+    /* e1bf: E1 advancing → reset e2_seen so next init pops both from stack */
+    Ldef(em,e1bf);
+    E(em,"    mov     qword [rel %s], 0\n",e2seen);
+    Jmp(em,e1b);
     Ldef(em,e2bf); Jmp(em,e2b);
-    Ldef(em,a);    Jmp(em,e1a);
-    Ldef(em,b);    E(em,"    inc     qword [rel %s]\n",I); Jmp(em,code);
+    Ldef(em,a);
+    E(em,"    mov     qword [rel %s], 0\n",e2seen);   /* α: mark fresh start */
+    Jmp(em,e1a);
+    Ldef(em,b); E(em,"    inc     qword [rel %s]\n",I); Jmp(em,code);
 
-    /* init: E1 pushed first (deeper), E2 pushed on top */
+    /* init: E2 just pushed its value on top of stack.
+     * e2_seen==0: E1 also on stack (below) — first time.
+     * e2_seen==1: only E2 on stack — E2 advanced, reset I to current E1 value. */
     Ldef(em,init);
-    E(em,"    pop     rax\n");              /* E2 value (top of stack) */
+    E(em,"    pop     rax\n");                          /* E2 value (always on top) */
     E(em,"    mov     [rel %s], rax\n",bound);
-    E(em,"    pop     rax\n");              /* E1 value */
+    E(em,"    cmp     qword [rel %s], 0\n",e2seen);
+    E(em,"    jne     %s_e2adv\n",init);
+    /* first time: pop E1 value, save as e1cur, set I */
+    E(em,"    pop     rax\n");
+    E(em,"    mov     [rel %s], rax\n",e1cur);
+    E(em,"    mov     [rel %s], rax\n",I);
+    E(em,"    mov     qword [rel %s], 1\n",e2seen);
+    Jmp(em,code);
+    /* E2 advanced: reset I to current E1 value (not first E1 value) */
+    E(em,"%s_e2adv:\n",init);
+    E(em,"    mov     rax, [rel %s]\n",e1cur);
     E(em,"    mov     [rel %s], rax\n",I);
     Jmp(em,code);
+
+    /* When E1 advances (e1b fires after e2 exhausts), update e1cur and reset e2_seen */
+    /* We intercept by patching e1b's flow: e1b → e1cur_update → original e1b path.
+     * But e1b is already emitted inside emit_expr. Instead, emit a wrapper:
+     * e1bf already jumps to e1b. When E1 succeeds again (e1p.succeed = e2a),
+     * E1 pushes new value and jumps to e2a (E2 start). E2's succeed = init.
+     * At that point e2_seen=1 → e2adv path which uses e1cur.
+     * But e1cur still has the OLD E1 value! We need to update e1cur when E1 succeeds.
+     * Solution: intercept E1's succeed: e1p.succeed → e1_capture → e2a */
+    /* NOTE: e1p was already emitted above with succeed=e2a. We can't change that.
+     * Instead: e2_seen reset to 0 when E1 advances (e1bf fires).
+     * That way next init will pop E1 from stack and update e1cur correctly. */
 
     Ldef(em,code);
     E(em,"    mov     rax, [rel %s]\n",I);
@@ -621,6 +776,51 @@ static void emit_to_by(IcnEmitter *em, IcnNode *n, IcnPorts ports,
 }
 
 /* =========================================================================
+ * ICN_WHILE — while cond do body
+ * α → cond.α
+ * cond.γ → body.α  (discard cond value)
+ * cond.ω → while.ω  (condition failed → loop done)
+ * body.γ → cond.α  (loop back regardless of body result)
+ * body.ω → cond.α  (loop back)
+ * ======================================================================= */
+static void emit_while(IcnEmitter *em, IcnNode *n, IcnPorts ports,
+                       char *oa, char *ob) {
+    int id=icn_new_id(em); char a[64],b[64];
+    icn_label_alpha(id,a,sizeof a); icn_label_beta(id,b,sizeof b);
+    strncpy(oa,a,63); strncpy(ob,b,63);
+    E(em,"    ; WHILE  id=%d\n",id);
+
+    IcnNode *cond = n->children[0];
+    IcnNode *body = (n->nchildren>1) ? n->children[1] : NULL;
+
+    char cond_ok[64]; snprintf(cond_ok,sizeof cond_ok,"icon_%d_condok",id);
+    char loop_top[64]; snprintf(loop_top,sizeof loop_top,"icon_%d_top",id);
+
+    char ca[64],cb[64];
+    IcnPorts cp; strncpy(cp.succeed,cond_ok,63); strncpy(cp.fail,ports.fail,63);
+    emit_expr(em,cond,cp,ca,cb);
+
+    /* cond_ok: condition succeeded, value on stack — discard it, run body */
+    Ldef(em,cond_ok);
+    E(em,"    add     rsp, 8\n");   /* discard condition result */
+
+    if(body){
+        char ba[64],bb[64];
+        IcnPorts bp; strncpy(bp.succeed,loop_top,63); strncpy(bp.fail,loop_top,63);
+        emit_expr(em,body,bp,ba,bb);
+        Jmp(em,ba);
+
+        /* loop_top: go back to condition */
+        Ldef(em,loop_top); Jmp(em,ca);
+    } else {
+        Jmp(em,ca);
+    }
+
+    Ldef(em,a); Jmp(em,ca);
+    Ldef(em,b); Jmp(em,ports.fail);
+}
+
+/* =========================================================================
  * ICN_EVERY
  * ======================================================================= */
 static void emit_every(IcnEmitter *em, IcnNode *n, IcnPorts ports,
@@ -663,6 +863,7 @@ static void emit_expr(IcnEmitter *em, IcnNode *n, IcnPorts ports,
         case ICN_VAR:    emit_var      (em,n,ports,oa,ob); break;
         case ICN_ASSIGN: emit_assign   (em,n,ports,oa,ob); break;
         case ICN_RETURN: emit_return   (em,n,ports,oa,ob); break;
+        case ICN_SUSPEND:emit_suspend  (em,n,ports,oa,ob); break;
         case ICN_FAIL:   emit_fail_node(em,n,ports,oa,ob); break;
         case ICN_IF:     emit_if       (em,n,ports,oa,ob); break;
         case ICN_ALT:    emit_alt      (em,n,ports,oa,ob); break;
@@ -673,6 +874,7 @@ static void emit_expr(IcnEmitter *em, IcnNode *n, IcnPorts ports,
         case ICN_TO:     emit_to       (em,n,ports,oa,ob); break;
         case ICN_TO_BY:  emit_to_by    (em,n,ports,oa,ob); break;
         case ICN_EVERY:  emit_every    (em,n,ports,oa,ob); break;
+        case ICN_WHILE:  emit_while    (em,n,ports,oa,ob); break;
         case ICN_CALL:   emit_call     (em,n,ports,oa,ob); break;
         default:{
             int id=icn_new_id(em); char a2[64],b2[64];
@@ -717,11 +919,13 @@ void icn_emit_file(IcnEmitter *em, IcnNode **nodes, int count) {
 
         char proc_done[64]; snprintf(proc_done,sizeof proc_done,"icn_%s_done",pname);
         char proc_ret[64];  snprintf(proc_ret, sizeof proc_ret, "icn_%s_ret", pname);
+        char proc_sret[64]; snprintf(proc_sret,sizeof proc_sret,"icn_%s_sret",pname);
 
         /* Setup local env */
         locals_reset();
         strncpy(cur_ret_label, is_main?"icn_main_done":proc_ret, 63);
         strncpy(cur_fail_label, proc_done, 63);
+        strncpy(cur_suspend_ret_label, is_main?"icn_main_done":proc_sret, 63);
 
         /* Register params as local slots 0..np-1 */
         int np = (int)proc->val.ival;
@@ -781,6 +985,9 @@ void icn_emit_file(IcnEmitter *em, IcnNode **nodes, int count) {
             Ldef(em,proc_ret);
             if(frame_size>0) E(em,"    add     rsp, %d\n",frame_size);
             E(em,"    pop     rbp\n    ret\n");
+            /* Suspend-return: bare ret only — frame stays live for resume */
+            Ldef(em,proc_sret);
+            E(em,"    ret\n");
         }
         Ldef(em,proc_done);
         if(frame_size>0) E(em,"    add     rsp, %d\n",frame_size);
@@ -811,8 +1018,15 @@ void icn_emit_file(IcnEmitter *em, IcnNode **nodes, int count) {
     }
 
     E(em,"section .bss\n");
-    for(int i=0;i<bss_count;i++) E(em,"    %s: resq 1\n",bss_entries[i].name);
-    E(em,"    icn_failed: resb 1\n\n");
+    for(int i=0;i<bss_count;i++){
+        /* icn_suspended and icn_suspend_resume are emitted as fixed declarations below */
+        if(strcmp(bss_entries[i].name,"icn_suspended")==0) continue;
+        if(strcmp(bss_entries[i].name,"icn_suspend_resume")==0) continue;
+        E(em,"    %s: resq 1\n",bss_entries[i].name);
+    }
+    E(em,"    icn_failed: resb 1\n");
+    E(em,"    icn_suspended: resb 1\n");
+    E(em,"    icn_suspend_resume: resq 1\n\n");
 
     E(em,"section .text\n    global _start\n    extern icn_write_int\n    extern icn_write_str\n");
     E(em,"    extern icn_push\n    extern icn_pop\n\n");

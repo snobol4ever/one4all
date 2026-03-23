@@ -1,0 +1,11 @@
+# rung03 t01: user-defined generator via suspend
+# upto(n) generates 1, 2, ..., n using suspend E do body
+procedure upto(n);
+  local i;
+  i := 1;
+  while i <= n do suspend i do i := i + 1;
+end
+
+procedure main();
+  every write(upto(4));
+end
