@@ -99,12 +99,24 @@ void stmt_set_indirect(DESCR_t name_val, DESCR_t val) {
 
 /* ---- indirect read ($name → value of variable named by name_val) ---- */
 DESCR_t stmt_get_indirect(DESCR_t name_val) {
+    if (name_val.v != DT_S) return NULVCL;   /* guard: only strings are valid names */
     const char *s = VARVAL_fn(name_val);
     if (!s || !*s) return NULVCL;
     return NV_GET_fn(s);
 }
 
-
+/* ---- NRETURN deref: if return val is a string (NAME), resolve it;
+ *      if it's already a typed value (DT_I, DT_DATA, etc.), pass through.
+ *      Needed because E_NAM+E_FNC resolves .field(obj) to the actual value
+ *      at assignment time, while .varname still stores the name string. ---- */
+DESCR_t stmt_nreturn_deref(DESCR_t retval) {
+    if (retval.v != DT_S) return retval;   /* already a value — pass through */
+    const char *s = VARVAL_fn(retval);
+    if (!s || !*s) return retval;          /* empty string — keep as-is */
+    DESCR_t v = NV_GET_fn(s);
+    if (v.v == DT_SNUL) return retval;     /* unknown variable — keep string */
+    return v;
+}
 
 /* ---- POS(variable) — fetch var, coerce to int, compare with cursor ---- */
 

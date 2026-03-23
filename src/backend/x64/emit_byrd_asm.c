@@ -1854,8 +1854,28 @@ static void cap_vars_emit_data_section(void) {
 static NamedPat named_pats[NAMED_PAT_MAX];
 static int         named_pat_count = 0;
 
-static void named_pat_reset(void) { named_pat_count = 0; }
+static void named_pat_reset(void);  /* forward decl — defined below after nreturn_fns */
 
+/* nreturn_fns — set of function names that use :(NRETURN).
+ * Populated during scan_named_patterns. Used at fast-path guard to ensure
+ * CALL1_* is not used for NRETURN functions even when ufn lookup misses. */
+#define NRETURN_FNS_MAX 64
+static char nreturn_fns[NRETURN_FNS_MAX][64];
+static int  nreturn_fn_count = 0;
+static void nreturn_fns_reset(void) { nreturn_fn_count = 0; }
+static void nreturn_fns_add(const char *name) {
+    for (int i = 0; i < nreturn_fn_count; i++)
+        if (strcasecmp(nreturn_fns[i], name) == 0) return;
+    if (nreturn_fn_count < NRETURN_FNS_MAX)
+        snprintf(nreturn_fns[nreturn_fn_count++], 64, "%s", name);
+}
+static int nreturn_fns_has(const char *name) {
+    for (int i = 0; i < nreturn_fn_count; i++)
+        if (strcasecmp(nreturn_fns[i], name) == 0) return 1;
+    return 0;
+}
+
+static void named_pat_reset(void) { named_pat_count = 0; nreturn_fns_reset(); }
 /* str_vars — registry for plain-string variable assignments (VAR = 'literal').
  * Used by E_INDR (*VAR) when the variable holds a string, not a named pattern.
  * At compile time we know the literal value, so we emit an inline LIT. */
@@ -2373,6 +2393,7 @@ static void scan_named_patterns(Program *prog) {
                 for (int ti = 0; ti < 3; ti++) {
                     if (targets[ti] && strcasecmp(targets[ti], "NRETURN") == 0) {
                         cur_np->uses_nreturn = 1;
+                        nreturn_fns_add(cur_np->varname);
                     }
                 }
             }
@@ -2976,12 +2997,15 @@ static int emit_expr(EXPR_t *e, int rbp_off) {
              * Fix: B-263. Restore outer subject globals first (B-263 icase fix). */
             A("    call    stmt_restore_subject\n");
             A("    GET_VAR     %s\n", fnlab);
-            /* NRETURN: function returned a NAME (l-value string). Resolve it
-             * via indirection so caller gets value($(retvar)) not retvar itself. */
-            if (ufn->uses_nreturn) {
+            /* NRETURN deref: if retval is a NAME string (e.g. Pop = .dummy),
+             * resolve it to the variable's value. If retval is already a typed
+             * value (e.g. Top = .value($'@S') resolved by E_NAM+E_FNC fix),
+             * stmt_nreturn_deref passes it through unchanged. */
+            int emit_nret = ufn->uses_nreturn || nreturn_fns_has(fnlab);
+            if (emit_nret) {
                 A("    mov     rdi, [rbp-16]\n");
                 A("    mov     rsi, [rbp-8]\n");
-                A("    call    stmt_get_indirect\n");
+                A("    call    stmt_nreturn_deref\n");
                 A("    STORE_RESULT16\n");
             }
             /* Restore old param values from stack */
@@ -3038,8 +3062,11 @@ static int emit_expr(EXPR_t *e, int rbp_off) {
             A("ucall%d_done:\n", cuid);
             return 1;
         }
-        /* Fast path: 1-arg call with simple literal arg → CALL1_INT / CALL1_STR */
-        if (na == 1 && e->children[0] && rbp_off == -32) {
+        /* Fast path: 1-arg call with simple literal arg → CALL1_INT / CALL1_STR
+         * Skip fast path if function uses NRETURN — needs full ucall + deref. */
+        int fn_uses_nreturn = (ufn && ufn->uses_nreturn) ||
+                              (e->sval && nreturn_fns_has(e->sval));
+        if (na == 1 && e->children[0] && rbp_off == -32 && !fn_uses_nreturn) {
             EXPR_t *arg0 = e->children[0];
             if (arg0->kind == E_ILIT) {
                 A("    CALL1_INT   %s, %ld\n", fnlab, (long)arg0->ival);
@@ -3989,7 +4016,7 @@ static void emit_program(Program *prog) {
     A("%%include \"snobol4_asm.mac\"\n");
     A("    global  main\n");
     A("    extern  stmt_init, stmt_strval, stmt_intval\n");
-    A("    extern  stmt_realval, stmt_set_null, stmt_set_indirect, stmt_get_indirect\n");
+    A("    extern  stmt_realval, stmt_set_null, stmt_set_indirect, stmt_get_indirect, stmt_nreturn_deref\n");
     A("    extern  stmt_get, stmt_set, stmt_output, stmt_input\n");
     A("    extern  stmt_concat, stmt_is_fail, stmt_finish\n");
     A("    extern  stmt_realval, stmt_set_null, stmt_set_indirect\n");
