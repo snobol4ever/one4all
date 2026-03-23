@@ -438,18 +438,18 @@ static void emit_alt(IcnEmitter *em, IcnNode *n, IcnPorts ports,
  * ======================================================================= */
 static void emit_binop(IcnEmitter *em, IcnNode *n, IcnPorts ports,
                        char *oa, char *ob) {
-    int id=icn_new_id(em); char a[64],b[64],compute[64],lbfwd[64],lstore[64],bflag[64];
+    int id=icn_new_id(em); char a[64],b[64],compute[64],lbfwd[64],lstore[64];
     icn_label_alpha(id,a,sizeof a); icn_label_beta(id,b,sizeof b);
     snprintf(compute,sizeof compute,"icon_%d_compute",id);
     snprintf(lbfwd,  sizeof lbfwd,  "icon_%d_lb",id);
     snprintf(lstore, sizeof lstore, "icon_%d_lstore",id);
-    snprintf(bflag,  sizeof bflag,  "icon_%d_bflag",id);
-    bss_declare(bflag);
+    strncpy(oa,a,63); strncpy(ob,b,63);
     strncpy(oa,a,63); strncpy(ob,b,63);
     const char *op=n->kind==ICN_ADD?"ADD":n->kind==ICN_SUB?"SUB":n->kind==ICN_MUL?"MUL":n->kind==ICN_DIV?"DIV":"MOD";
     E(em,"    ; %s  id=%d\n",op,id);
 
     int lc_slot = locals_alloc_tmp();
+    int bf_slot = locals_alloc_tmp();
 
     IcnPorts rp; strncpy(rp.succeed,compute,63); strncpy(rp.fail,lbfwd,63);
     char ra[64],rb[64]; emit_expr(em,n->children[1],rp,ra,rb);
@@ -459,19 +459,19 @@ static void emit_binop(IcnEmitter *em, IcnNode *n, IcnPorts ports,
 
     Ldef(em,lbfwd); Jmp(em,lb);
     Ldef(em,a);
-    E(em,"    mov     byte [rel %s], 0\n",bflag);  /* α path */
+    E(em,"    mov     qword [rbp%+d], 0\n", slot_offset(bf_slot));  /* α: start right */
     Jmp(em,la);
     Ldef(em,b);
-    E(em,"    mov     byte [rel %s], 1\n",bflag);  /* β path: re-eval left */
+    E(em,"    mov     qword [rbp%+d], 1\n", slot_offset(bf_slot));  /* β: refresh left, resume right */
     Jmp(em,la);
 
-    /* lstore: left pushed value; pop, cache, branch on bflag */
+    /* lstore: cache left, branch on bf_slot → start right (α) or resume right (β) */
     Ldef(em,lstore);
     E(em,"    pop     rax\n");
     E(em,"    mov     [rbp%+d], rax\n", slot_offset(lc_slot));
-    E(em,"    cmp     byte [rel %s], 0\n", bflag);
-    E(em,"    je      %s\n", ra);   /* α path: start right */
-    Jmp(em,rb);                     /* β path: resume right */
+    E(em,"    cmp     qword [rbp%+d], 0\n", slot_offset(bf_slot));
+    E(em,"    je      %s\n", ra);
+    Jmp(em,rb);
 
     Ldef(em,compute);
     E(em,"    pop     rax\n");
