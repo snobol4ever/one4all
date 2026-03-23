@@ -1703,3 +1703,93 @@ Expected:
 
 ### Next session trigger phrase
 **"playing with Prolog frontend"** → F-225 session → pick up at snobol4x PLAN.md §25.
+
+## §26 — Session Handoff F-225 (2026-03-23): per-ucall trail marks — mini PASS, rung10 WIP
+
+### What was built (F-225)
+
+**Root cause found and partially fixed** for multi-ucall backtracking with `fail/0`.
+
+**Bug:** `fail/0` retried the innermost ucall (color(Y)) by jumping to `αN` with the saved
+`sub_cs`, but did not unwind Y's bindings first. Y remained bound, so color(Y) saw a bound
+variable and found no further solutions, exhausting immediately and retrying color(X) instead.
+
+**Diagnostic trace:** Added inline `printf` instrumentation showing `color(Y) returned eax=1`
+on every retry — confirming Y was re-called with sub_cs=1 but returning -1 (exhausted)
+because Y was still bound to red.
+
+### Fixes applied to `src/backend/x64/emit_byrd_asm.c`
+
+| # | Change | Location |
+|---|--------|----------|
+| 1 | `VAR_SLOT_OFFSET(k)` now uses `(5+max_ucalls+max_ucalls+k)*8` — adds room for mark slots | `emit_prolog_clause_block` macro defs |
+| 2 | `UCALL_MARK_OFFSET(bi)` new macro: `(5+max_ucalls+bi)*8` — per-ucall trail mark slot | `emit_prolog_clause_block` macro defs |
+| 3 | Frame size: `40 + max_ucalls*8 + max_ucalls*8 + max_vars*8` | `emit_prolog_choice` |
+| 4 | At each `αN` label: emit `trail_mark_fn` + store in `UCALL_MARK_OFFSET(N)` | `emit_prolog_clause_block` ucall block |
+| 5 | `fail/0`: unwind to `UCALL_MARK_OFFSET(ucall_seq-1)` not `[rbp-8]` | `fail/0` branch |
+| 6 | `emit_pl_term_load`: var offset updated to `(5+pl_cur_max_ucalls+pl_cur_max_ucalls+slot)*8` | `emit_pl_term_load` |
+| 7 | Var allocation store: updated to `(5+max_ucalls+max_ucalls+k)*8` | `emit_prolog_clause_block` |
+
+### Test results
+
+- **Mini cross-product PASS ✅:** `color(X), color(Y), write(X), write('-'), write(Y), nl, fail` → 9 lines (`red-red` through `blue-blue`). All correct.
+- **Rung10 puzzle_01:** No output — `person(C), person(M), differ(C,M)` with 3 ucalls still broken
+- **Rung10 puzzle_02:** Blank lines (write issue?)
+- **Rung10 puzzle_06:** No output
+
+### Remaining bug: N>2 ucall chains with fail/0
+
+The 2-ucall case (color(X), color(Y)) now works. The 3-ucall case
+(`person(Cashier), person(Manager), differ(C,M)`) does not.
+
+Simplified test: `person(C), person(M), differ(C,M), write(C-M), nl, fail.`
+Expected 6 lines (all ordered pairs with C≠M). Actual: 2 lines (jones-brown, smith-brown).
+
+**Hypothesis:** `fail/0` retry of ucall 2 (differ) unwinds to `UCALL_MARK_OFFSET(1)`.
+This correctly unbinds Manager. But then it jumps to `α1` (person(Manager)) with
+`sub_cs=[rbp-UCALL_SLOT_OFFSET(1)]`. After person(M) exhausts (β1), it unwinds to clause
+mark `[rbp-8]` and retries ucall 0 (person(Cashier)) — but `[rbp-8]` is the CLAUSE mark
+which also unbinds Cashier. This part should be correct.
+
+The issue may be that `UCALL_MARK_OFFSET(1)` for the differ retry doesn't unwind
+Manager's binding fully, OR that `α1`'s trail mark (taken at α1 entry) is being re-taken
+on the retry path with the wrong trail state.
+
+**Key question for F-226:** Does taking a new trail mark at `αN` on every entry (including
+retries) cause the mark to be set AFTER unwind — meaning `UCALL_MARK_OFFSET(1)` captures
+a mark of 0 on retry, so unwind(0) clears everything including Cashier?
+
+**Proposed fix for F-226:** The per-ucall trail mark should only be taken on **fresh entry**
+(when `edx==0`), not on resume. Add a guard:
+```nasm
+pl_main_sl_0_c0_α1:
+    test    edx, edx
+    jnz     .skip_mark           ; resume path — mark already set
+    lea     rdi, [rel pl_trail]
+    call    trail_mark_fn
+    mov     [rbp - UCALL_MARK_OFFSET(1)], eax
+.skip_mark:
+```
+Or alternatively: take the mark BEFORE the `αN` label (at γ_{N-1} time), so it captures
+the trail state after ucall N-1 has bound its variables.
+
+### Uncommitted state
+
+All changes are in `src/backend/x64/emit_byrd_asm.c` only, not committed.
+F-223 greek pass (`b0b190c`) is the last clean commit.
+
+**Do NOT commit the current state** — rung09 corpus must still pass, need to verify.
+
+### Next session action plan (F-226)
+
+1. `bash setup.sh` (installs deps, builds sno2c)
+2. Read snobol4x PLAN.md §26 (this section)
+3. Fix the `αN` trail mark to only fire on fresh entry (`edx==0`), not resume
+4. Test mini cross-product → must stay 9/9
+5. Test `person(C), person(M), differ(C,M)` 3-ucall case → must give 6 pairs
+6. Run rung09 corpus to confirm no regression (rungs 1–9 must still PASS)
+7. Run rung10 puzzles
+8. If PASS: commit `F-226: M-PROLOG-R10 ✅`, update dashboard, push both repos
+
+### Trigger phrase for next session
+**"playing with Prolog frontend"** → F-226 → pick up at snobol4x PLAN.md §26.

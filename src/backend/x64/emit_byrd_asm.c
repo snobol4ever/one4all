@@ -4998,7 +4998,7 @@ static void emit_pl_term_load(EXPR_t *e, int frame_base_words) {
                 A("    call    term_new_var    ; anon wildcard\n");
             } else {
                 A("    mov     rax, [rbp - %d]  ; var slot %d (%s)\n",
-                  (5 + pl_cur_max_ucalls + slot)*8, slot, e->sval ? e->sval : "_");
+                  (5 + pl_cur_max_ucalls + pl_cur_max_ucalls + slot)*8, slot, e->sval ? e->sval : "_");
             }
             break;
         }
@@ -5085,11 +5085,13 @@ static void emit_prolog_clause_block(EXPR_t *clause, int idx, int total,
     int n_vars = (int)clause->ival;
     int nbody  = clause->nchildren - arity;
     if (nbody < 0) nbody = 0;
-    /* Var slot k is at [rbp - (5 + max_ucalls + k)*8].
-     * Ucall slot bi is at [rbp - (5 + bi)*8].
-     * This keeps ucall slots and var slots non-overlapping. */
-#define VAR_SLOT_OFFSET(k)   ((5 + max_ucalls + (k)) * 8)
-#define UCALL_SLOT_OFFSET(bi) ((5 + (bi)) * 8)
+    /* Var slot k is at [rbp - (5 + max_ucalls + max_ucalls + k)*8].
+     * Ucall sub_cs slot bi is at [rbp - (5 + bi)*8].
+     * Ucall trail-mark slot bi is at [rbp - (5 + max_ucalls + bi)*8].
+     * This keeps all slots non-overlapping. */
+#define VAR_SLOT_OFFSET(k)        ((5 + max_ucalls + max_ucalls + (k)) * 8)
+#define UCALL_SLOT_OFFSET(bi)     ((5 + (bi)) * 8)
+#define UCALL_MARK_OFFSET(bi)     ((5 + max_ucalls + (bi)) * 8)
 #define PL_RESUME_BIG 4096  /* stride between ucall levels in return encoding */
 
     char this_α[128], next_clause[128];
@@ -5126,7 +5128,7 @@ static void emit_prolog_clause_block(EXPR_t *clause, int idx, int total,
     for (int k = 0; k < n_vars; k++) {
         A("    mov     rdi, %d\n", k);
         A("    call    term_new_var\n");
-        A("    mov     [rbp - %d], rax    ; var slot %d\n", (5 + max_ucalls + k)*8, k);
+        A("    mov     [rbp - %d], rax    ; var slot %d\n", (5 + max_ucalls + max_ucalls + k)*8, k);
     }
 
     /* Trail mark — save in frame slot [rbp-8] */
@@ -5246,7 +5248,14 @@ static void emit_prolog_clause_block(EXPR_t *clause, int idx, int total,
             /* --- fail/0 --- */
             if (strcmp(fn, "fail") == 0 && garity == 0) {
                 if (ucall_seq > 0) {
-                    /* retry innermost ucall — Proebsting E2.fail→E1.resume */
+                    /* retry innermost ucall — Proebsting E2.fail→E1.resume
+                     * Unwind to the per-ucall trail mark (not the clause mark)
+                     * so only this ucall's bindings are cleared, leaving
+                     * earlier ucalls' bindings (e.g. color(X)) intact. */
+                    A("    lea     rdi, [rel pl_trail]\n");
+                    A("    mov     esi, [rbp - %d]    ; ucall %d trail mark\n",
+                      UCALL_MARK_OFFSET(ucall_seq - 1), ucall_seq - 1);
+                    A("    call    trail_unwind\n");
                     A("    mov     edx, [rbp - %d]    ; restore sub_cs for retry\n",
                       UCALL_SLOT_OFFSET(ucall_seq - 1));
                     A("    jmp     pl_%s_c%d_α%d\n", pred_safe, idx, ucall_seq - 1);
@@ -5846,6 +5855,12 @@ static void emit_prolog_clause_block(EXPR_t *clause, int idx, int total,
                  * On fresh first call: fall through with edx=0 (xor below).
                  * On E2.fail→E1.resume retry: jumped here with edx=saved sub_cs. */
                 A("pl_%s_c%d_α%d:\n", pred_safe, idx, ucall_seq);
+                /* Take a fresh trail mark for this ucall so fail/0 can unwind
+                 * only this ucall's bindings (not earlier ucalls') on retry. */
+                A("    lea     rdi, [rel pl_trail]\n");
+                A("    call    trail_mark_fn\n");
+                A("    mov     [rbp - %d], eax    ; ucall %d trail mark\n",
+                  UCALL_MARK_OFFSET(ucall_seq), ucall_seq);
                 /* push args in reverse then pass array ptr */
                 if (garity > 0) {
                     int alloc = ALIGN16(garity*8);
@@ -6009,8 +6024,9 @@ static void emit_prolog_choice(EXPR_t *choice) {
         }
         if (nuc > max_body_ucalls) max_body_ucalls = nuc;
     }
-    int frame = 40 + max_body_ucalls*8 + max_vars*8;
-    /* 40 base (trail+cut+args_ptr+start+sub_cs_acc) + ucall slots + vars */
+    int frame = 40 + max_body_ucalls*8 + max_body_ucalls*8 + max_vars*8;
+    /* 40 base (trail+cut+args_ptr+start+sub_cs_acc) + ucall sub_cs slots
+     * + ucall trail-mark slots + var slots */
     if (frame % 16) frame = (frame/16+1)*16;
 
     /* Resumable function */
