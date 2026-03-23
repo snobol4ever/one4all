@@ -322,7 +322,12 @@ static DESCR_t _b_TRIM(DESCR_t *a, int n) {
     return TRIM_fn(a[0]);
 }
 static DESCR_t _b_SUBSTR(DESCR_t *a, int n) {
-    if (n < 3) return NULVCL;
+    if (n < 2) return NULVCL;
+    if (n < 3) {
+        /* 2-arg SUBSTR(s, i): from position i to end of string */
+        DESCR_t big = { .v = DT_I, .slen = 0, .i = 999999999 };
+        return SUBSTR_fn(a[0], a[1], big);
+    }
     return SUBSTR_fn(a[0], a[1], a[2]);
 }
 static DESCR_t _b_REVERSE(DESCR_t *a, int n) {
@@ -760,7 +765,13 @@ static DESCR_t _b_PAT_SUCCEED(DESCR_t *a, int n) { (void)a;(void)n; return pat_s
 static DESCR_t _b_PAT_BAL(DESCR_t *a, int n)     { (void)a;(void)n; return pat_bal();     }
 static DESCR_t _b_PAT_ARBNO(DESCR_t *a, int n)   { return n>=1 ? pat_arbno(a[0])  : FAILDESCR; }
 static DESCR_t _b_PAT_FENCE(DESCR_t *a, int n)   { return n>=1 ? pat_fence_p(a[0]) : pat_fence(); }
-static DESCR_t _b_PAT_ALT(DESCR_t *a, int n)     { return n>=2 ? pat_alt(a[0], a[1])  : (n>=1 ? a[0] : FAILDESCR); }
+static DESCR_t _b_PAT_ALT(DESCR_t *a, int n) {
+    if (n < 2) return n >= 1 ? a[0] : FAILDESCR;
+    fprintf(stderr, "DEBUG ALT: a0.v=%d a0.s=%.8s  a1.v=%d a1.s=%.8s\n",
+            (int)a[0].v, (a[0].v==1&&a[0].s)?a[0].s:"?",
+            (int)a[1].v, (a[1].v==1&&a[1].s)?a[1].s:"?");
+    return pat_alt(a[0], a[1]);
+}
 static DESCR_t _b_PAT_CONCAT(DESCR_t *a, int n)  { return n>=2 ? pat_cat(a[0], a[1])  : (n>=1 ? a[0] : FAILDESCR); }
 
 /* PROTOTYPE(array_or_table) — returns dimension string e.g. "3" or "2,3" */
@@ -874,7 +885,7 @@ void SNO_INIT_fn(void) {
     register_fn("REPLACE",  _b_REPLACE,  3, 3);
     register_fn("REMDR",    _b_REMDR,    2, 2);
     register_fn("TRIM",        _b_TRIM,     1, 1);
-    register_fn("SUBSTR",      _b_SUBSTR,   3, 3);
+    register_fn("SUBSTR",      _b_SUBSTR,   2, 3);
     register_fn("REVERSE",  _b_REVERSE,  1, 1);
     register_fn("DATATYPE", _b_DATATYPE, 1, 1);
     register_fn("DATA",        _b_DATA,     1, 1);

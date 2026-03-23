@@ -879,3 +879,85 @@ OR the emitter passes `stmt_get` the wrong variable name for keyword args.
 - `test/beauty/case/driver.ref` — oracle reference output
 - `PLAN.md` — this session note
 
+
+---
+
+## §19 — Session 51+ Handoff (2026-03-23): M-BEAUTY-CASE progress + static pattern architecture
+
+### Work completed this session
+
+**Three bugs fixed — steps 1–6 of case driver now pass in 3-way monitor:**
+
+| Bug | Location | Fix |
+|-----|----------|-----|
+| `FN_CLEAR_VAR` clobbered param when fn name == param name (`lwr(lwr)`) | `emit_byrd_asm.c` α-entry emission | Skip `FN_CLEAR_VAR` for retval var when it matches a param name |
+| `GET_VAR` (return value capture) placed AFTER param restore, overwriting result | `emit_byrd_asm.c` ucall gamma return | Move `GET_VAR fnlab` before the param restore loop |
+| 2-arg `SUBSTR(s,i)` returning empty string | `snobol4.c` `_b_SUBSTR` | Handle `n<3` with large length; register min arity=2 |
+
+**Steps 7–8 (`icase`) still fail.** Root cause identified but not yet fixed.
+
+### §19.1 — Root cause of `icase` failure: static pattern architecture bug
+
+`icase` builds a runtime pattern by accumulating `upr(letter) | lwr(letter)` alternations. This fails because of a fundamental architectural problem in the ASM emitter's treatment of pattern expressions.
+
+**Current (broken) behavior:**
+
+When the emitter sees `p = upr('h') | lwr('H')`, it detects `E_OR` and registers `p` as a *named pattern box* — compiling a static Byrd-box with hardcoded α/β/γ/ω labels. But since the arms (`upr('h')`, `lwr('h')`) are ucall expressions unknown at compile time, their pattern nodes are emitted as `; UNIMPLEMENTED → ω` stubs that always fail.
+
+**The correct architecture (per Lon, session 51+):**
+
+> Every pattern sub-expression — `'H' | 'h'`, `ANY(&UCASE)`, `LEN(1)`, etc. — should be compiled to a static anonymous Byrd-box fragment at compile time, independent of which variable it gets assigned to. The variable name is just a reference; the compiled node is not tied to it.
+
+Concretely:
+
+1. **Static pattern literals and combinators** (`'a' | 'b'`, `ANY(str)`, `LEN(n)`, etc.) are compiled to anonymous boxes with generated unique names (`pat_anon_N_α` etc.). These exist unconditionally — they don't depend on which variable (if any) holds the result.
+
+2. **Runtime pattern values** — the result of functions like `upr(x) | lwr(x)` where the arms are computed at runtime — are stored in SNOBOL4 variables as `DT_P` descriptors. The match `'subj' p` must dispatch dynamically via the variable's runtime value.
+
+3. **`stmt_match_var` currently does string match only** — it calls `VARVAL_fn()` and does `memcmp`. It must be upgraded to: if the variable holds `DT_P`, dispatch through the pattern engine; otherwise do string literal match.
+
+4. **`E_VART` in `emit_pat_node`** — the fallback for unknown variables currently uses `LIT_VAR_α` (string match). It must check whether the variable is known to hold a pattern at compile time (registered named pattern) and emit a pattern-dispatch call if so; otherwise use `LIT_VAR_α` for string vars.
+
+**The immediate fix needed for `icase`:**
+
+`stmt_match_var` (in `snobol4_stmt_rt.c`) must handle `DT_P` variables:
+
+```c
+int stmt_match_var(const char *varname) {
+    DESCR_t val = NV_GET_fn(varname);
+    if (val.v == DT_P) {
+        /* Runtime pattern — dispatch through engine */
+        return engine_match_pattern(val, subject_data, subject_len_val, &cursor);
+    }
+    /* String literal match (existing behavior) */
+    const char *s = VARVAL_fn(val);
+    ...
+}
+```
+
+And `expr_is_pattern_expr` for `E_OR` should NOT register a named-pattern box unless both children are themselves compile-time pattern expressions. When arms contain ucalls (like `upr(x)`), the assignment is a runtime value — use `LIT_VAR` / `stmt_match_var` dispatch at match time.
+
+**The partial fix already applied:**
+```c
+// emit_byrd_asm.c expr_is_pattern_expr:
+if (e->kind == E_OR) return expr_has_pattern_fn(e);  // was: return 1
+```
+This prevents broken static boxes for `upr('h') | lwr('H')`. But without the `stmt_match_var` DT_P upgrade, the match still fails (falls back to string match against `VARVAL_fn(DT_P)` = `"PATTERN"`).
+
+### §19.2 — Next session action plan
+
+1. `bash setup.sh`
+2. Upgrade `stmt_match_var` in `snobol4_stmt_rt.c` to dispatch DT_P variables through the pattern engine
+3. Verify `icase` test passes: `INC=demo/inc ./sno2c -asm ... && nasm ... && gcc ... && ./prog_asm`
+4. Run full 3-way monitor: `INC=demo/inc bash test/beauty/run_beauty_subsystem.sh case`
+5. On 9/9 PASS: commit all fixes + `B-263: M-BEAUTY-CASE ✅`, update §START table
+6. Advance to `M-BEAUTY-ASSIGN`
+
+### §19.3 — Files changed this session (need commit)
+
+- `src/backend/x64/emit_byrd_asm.c` — 3 fixes: FN_CLEAR_VAR param skip, GET_VAR before restore, expr_is_pattern_expr E_OR fix
+- `src/runtime/snobol4/snobol4.c` — 2-arg SUBSTR fix + datatype() uppercase fix
+- `test/beauty/case/driver.sno` — case subsystem driver
+- `test/beauty/case/driver.ref` — oracle reference (9 lines)
+- `PLAN.md` — this session note
+

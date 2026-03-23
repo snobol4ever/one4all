@@ -1996,10 +1996,22 @@ static void emit_named_def(const NamedPat *np,
         A("    mov     [%s], rax\n", bref(t2_tmp1_t));
         A("    mov     [%s], rdx\n", bref(t2_tmp1_p));
         {
+            /* Clear return-value variable ONLY if it is not also a parameter.
+             * When fn name == param name (e.g. DEFINE('lwr(lwr)')) the
+             * FN_SET_PARAM above already initialised it; clearing here
+             * would discard the caller's argument.  Fix: B-263. */
             const char *fnlab_clr = str_intern(np->varname);
-            A("    mov     rsi, [%s]\n", bref(t2_tmp1_t));
-            A("    mov     rdx, [%s]\n", bref(t2_tmp1_p));
-            A("    FN_CLEAR_VAR %s\n", fnlab_clr);
+            int is_param = 0;
+            for (int pi = 0; pi < np->nparams; pi++) {
+                if (strcasecmp(np->param_names[pi], np->varname) == 0) {
+                    is_param = 1; break;
+                }
+            }
+            if (!is_param) {
+                A("    mov     rsi, [%s]\n", bref(t2_tmp1_t));
+                A("    mov     rdx, [%s]\n", bref(t2_tmp1_p));
+                A("    FN_CLEAR_VAR %s\n", fnlab_clr);
+            }
         }
         for (int i = 0; i < np->nlocals; i++) {
             const char *llab = str_intern(np->local_names[i]);
@@ -2117,9 +2129,13 @@ static int expr_has_pattern_fn(EXPR_t *e) {
 }
 static int expr_is_pattern_expr(EXPR_t *e) {
     if (!e) return 0;
-    /* E_OR (alternation, i.e. P = 'a' | 'b') is always a pattern expression —
-     * alternation has no meaning in pure value context. */
-    if (e->kind == E_OR) return 1;
+    /* E_OR (alternation) is a named-pattern expression only when at least one
+     * child contains a compile-time pattern function (ANY, LEN, etc.).
+     * If both sides are pure value expressions (e.g. upr('h') | lwr('H')),
+     * the result is a runtime pattern VALUE — treat as value assignment so
+     * the match 'subj' p uses XDSAR (runtime deref), not a broken static box.
+     * Fix: B-263 icase. */
+    if (e->kind == E_OR) return expr_has_pattern_fn(e);
     /* E_CONC (concatenation) is a pattern expression only when it contains
      * a pattern function call. Pure literal concat like 'hello' ' world'
      * is a VALUE expression (string join), not a pattern. */
@@ -2850,6 +2866,10 @@ static int emit_expr(EXPR_t *e, int rbp_off) {
                 A("    lea     rdi, [rel %s]\n", llab);
                 A("    call    stmt_set\n");
             }
+            /* Get return value BEFORE restoring params — param restore would
+             * overwrite the return-value variable when fn name == param name.
+             * Fix: B-263. */
+            A("    GET_VAR     %s\n", fnlab);
             /* Restore old param values from stack */
             for (int ai = 0; ai < actual_args; ai++) {
                 const char *plab = str_intern(ufn->param_names[ai]);
@@ -2859,8 +2879,7 @@ static int emit_expr(EXPR_t *e, int rbp_off) {
                 A("    call    stmt_set\n");
             }
             if (extra_align) A("    add     rsp, 8          ; remove align pad\n");
-            /* Get return value from function variable */
-            A("    GET_VAR     %s\n", fnlab);
+            /* Return value already in [rbp-16/8] from GET_VAR above */
             A("    mov     rax, [rbp-16]\n");
             A("    mov     rdx, [rbp-8]\n");
             A("    call    stmt_is_fail\n");
