@@ -1,0 +1,5 @@
+# rung02 t04: nested generators + relational filter
+# (1 to 3) + (1 to 3) > 4 yields 4 for each sum > 4
+procedure main();
+  every write((1 to 3) + (1 to 3) > 4);
+end

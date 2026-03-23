@@ -1,0 +1,4 @@
+# rung02 t02: relational filter — (1 to 6) > 3 yields 3 for each i > 3
+procedure main();
+  every write((1 to 6) > 3);
+end

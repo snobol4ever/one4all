@@ -1,0 +1,4 @@
+# rung02 t05: Proebsting paper example — 5 > ((1 to 2) * (3 to 4))
+procedure main();
+  every write(5 > ((1 to 2) * (3 to 4)));
+end
