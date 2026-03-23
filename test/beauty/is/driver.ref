@@ -1,2 +1,1 @@
-PASS: IsSnobol4 correctly succeeds in CSNOBOL4
-PASS: IsSpitbol correctly fails in CSNOBOL4
+PASS: exactly one of IsSnobol4/IsSpitbol succeeded
