@@ -1533,21 +1533,32 @@ static void emit_pat_node(EXPR_t *pat,
                 emit_any(cs, cslen, alpha, beta, gamma, omega, cursor, subj, subj_len);
             } else {
                 /* Runtime expression (e.g. E_CONC of vars like &UCASE &LCASE):
-                 * evaluate into a temp .bss slot and use ANY_α_VAR at match time. */
+                 * Evaluate into raw BSS temp slots and dispatch via ANY_α_PTR.
+                 * We do NOT call var_register() here — doing so would emit
+                 * S_any_expr_tmp_N in BOTH the BSS (resq 1) and the string
+                 * literal table (db ...), causing a NASM duplicate-label error.
+                 * ANY_α_PTR calls stmt_any_ptr(vtype,vptr,...) directly. */
                 char tmplab[LBUF];
                 snprintf(tmplab, LBUF, "any_expr_tmp_%d", next_uid());
+                char tlab[LBUF], plab[LBUF], saved[LBUF];
+                snprintf(tlab,  sizeof tlab,  "%s_t", tmplab);
+                snprintf(plab,  sizeof plab,  "%s_p", tmplab);
+                snprintf(saved, sizeof saved, "any%d_saved", next_uid());
+                var_register(saved);
                 A("section .bss\n");
-                A("%s_t resq 1\n", tmplab);
-                A("%s_p resq 1\n", tmplab);
+                A("%s resq 1\n", tlab);
+                A("%s resq 1\n", plab);
                 A("section .text\n");
-                /* Emit expression evaluation code — result lands in [rbp-32/24] */
                 emit_expr(arg, -32);
-                /* Store result into temp slot */
-                A("    mov     [rel %s_t], rax\n", tmplab);
-                A("    mov     [rel %s_p], rdx\n", tmplab);
-                /* Register temp as a named variable so ANY_α_VAR can look it up */
-                var_register(str_intern(tmplab));
-                emit_any_var(str_intern(tmplab), alpha, beta, gamma, omega, cursor, subj, subj_len);
+                A("    mov     [rel %s], rax\n", tlab);
+                A("    mov     [rel %s], rdx\n", plab);
+                ALFC(alpha, "ANY(expr) α",
+                     "ANY_α_PTR   %s, %s, %s, %s, %s, %s, %s, %s\n",
+                     tlab, plab, bref(saved),
+                     cursor, subj, subj_len, gamma, omega);
+                ALFC(beta,  "ANY(expr) β",
+                     "ANY_β_PTR    %s, %s, %s\n",
+                     bref(saved), cursor, omega);
             }
         } else if (pat->sval && strcasecmp(pat->sval, "NOTANY") == 0 && pat->nchildren == 1) {
             EXPR_t *arg = pat->children[0];
@@ -3900,7 +3911,7 @@ static void emit_program(Program *prog) {
     A("    extern  stmt_pos_var, stmt_rpos_var\n");
     A("    extern  stmt_span_var, stmt_break_var\n");
     A("    extern  stmt_breakx_var, stmt_breakx_lit\n");
-    A("    extern  stmt_any_var, stmt_notany_var\n");
+    A("    extern  stmt_any_var, stmt_notany_var, stmt_any_ptr\n");
     A("    extern  stmt_at_capture\n");
     A("    extern  kw_anchor\n");
     A("    extern  stmt_aref, stmt_aset, stmt_field_set\n");

@@ -189,6 +189,22 @@ int stmt_any_var(const char *varname, int64_t cursor,
     return strchr(cs, subj[cursor]) ? 1 : 0;
 }
 
+/* stmt_any_ptr — ANY() with a pre-evaluated DESCR_t (type+ptr pair).
+ * Used for ANY(runtime-expr) where the result is stored in BSS temp slots.
+ * Avoids the variable-name hash lookup and the S_ label collision. */
+int stmt_any_ptr(uint64_t vtype, void *vptr, int64_t cursor,
+                 const char *subj, int64_t subj_len) {
+    DESCR_t v; v.v = (int)vtype; v.p = vptr;
+    const char *cs = VARVAL_fn(v);
+    if (getenv("SNO_CALLDEBUG"))
+        fprintf(stderr, "[stmt_any_ptr] vtype=%llu cs='%.20s' cursor=%lld subj[cur]='%c'\n",
+                (unsigned long long)vtype, cs?cs:"(nil)",
+                (long long)cursor,
+                (cursor < subj_len) ? subj[cursor] : '?');
+    if (!cs || cursor >= subj_len) return 0;
+    return strchr(cs, subj[cursor]) ? 1 : 0;
+}
+
 /* ---- NOTANY(variable) — match one char NOT IN charset, return 1/0 ---- */
 int stmt_notany_var(const char *varname, int64_t cursor,
                     const char *subj, int64_t subj_len) {
@@ -214,12 +230,20 @@ int stmt_is_fail(DESCR_t v) {
 DESCR_t stmt_get(const char *name) {
     /* Strip leading & so &KEYWORD routes to NV_GET_fn("KEYWORD") */
     if (name && name[0] == '&') name++;
-    return NV_GET_fn(name);
+    DESCR_t r = NV_GET_fn(name);
+    if (getenv("SNO_CALLDEBUG") && name &&
+        (strcmp(name,"UCASE")==0 || strcmp(name,"LCASE")==0))
+        fprintf(stderr, "[stmt_get %s] type=%d val='%.30s'\n",
+                name, (int)r.v, r.v==1&&r.ptr?(const char*)r.ptr:"<non-str>");
+    return r;
 }
 
 void stmt_set(const char *name, DESCR_t v) {
     /* Strip leading & so &KEYWORD routes to NV_SET_fn("KEYWORD") */
     if (name && name[0] == '&') name++;
+    if (getenv("SNO_CALLDEBUG") && name && strcmp(name,"icase")==0)
+        fprintf(stderr, "[SET icase] type=%d ptr=%p val=%s\n",
+                (int)v.v, v.ptr, v.v==1&&v.ptr?(const char*)v.ptr:"<non-str>");
     NV_SET_fn(name, v);
 }
 
@@ -327,7 +351,14 @@ int stmt_gt(DESCR_t a, DESCR_t b) {
 /* stmt_apply: call a named SNOBOL4 builtin function with an array of DESCR_t args.
  * Returns FAILDESCR on failure. */
 DESCR_t stmt_apply(const char *name, DESCR_t *args, int nargs) {
-    return APPLY_fn(name, args, nargs);
+    DESCR_t r = APPLY_fn(name, args, nargs);
+    if (getenv("SNO_CALLDEBUG") && name && strcmp(name,"ALT")==0)
+        fprintf(stderr, "[stmt_apply ALT] nargs=%d arg0.type=%d arg1.type=%d -> result.type=%d\n",
+                nargs,
+                nargs>0?(int)args[0].v:-1,
+                nargs>1?(int)args[1].v:-1,
+                (int)r.v);
+    return r;
 }
 
 /* ---- Pattern match subject setup ---- */
@@ -439,6 +470,10 @@ int stmt_match_var(const char *varname) {
  * Used for function-call results in pattern position (e.g. icase('hello')). */
 int stmt_match_descr(uint64_t vtype, void *vptr) {
     DESCR_t val = { .v = (DTYPE_t)vtype, .slen = 0, .ptr = vptr };
+    if (getenv("SNO_CALLDEBUG"))
+        fprintf(stderr, "[stmt_match_descr] vtype=%llu DT_P=%d cursor=%llu subj_len=%llu\n",
+                (unsigned long long)vtype, (int)DT_P,
+                (unsigned long long)cursor, (unsigned long long)subject_len_val);
     if (val.v == DT_P) {
         int new_cur = match_pattern_at(val, subject_data,
                                        (int)subject_len_val, (int)cursor);
