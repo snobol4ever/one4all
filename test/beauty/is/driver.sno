@@ -1,25 +1,34 @@
 *  driver.sno — test driver for is.sno
-*  Oracle: SPITBOL -I$INC driver.sno   (snobol4x targets SPITBOL semantics)
-*  Exercises: IsSnobol4() / IsSpitbol() predicates
-*  Note: IsType() uses DATATYPE() which differs between CSNOBOL4/SPITBOL;
-*        IsType tests are covered by M-BEAUTY-CASE milestone instead.
+*  Oracle: snobol4 -f -P256k -I$INC driver.sno
+*  Run via: bash test/beauty/run_beauty_subsystem.sh is
+*  All 3 participants (CSNOBOL4, SPITBOL, ASM) must produce identical output.
+*  Strategy: IsSnobol4 XOR IsSpitbol — exactly one succeeds on any runtime.
+*  We test that property (exactly one fires) rather than which one.
 -INCLUDE 'global.sno'
 -INCLUDE 'is.sno'
 
         &STLIMIT = 1000000
 
-*  IsSnobol4() — fails in SPITBOL
-        IsSnobol4()                                         :S(sno4_yes)
-        OUTPUT = 'PASS: IsSnobol4 correctly fails in SPITBOL'  :(sk1)
-sno4_yes
-        OUTPUT = 'PASS: IsSnobol4 correctly succeeds in CSNOBOL4'
-sk1
-
-*  IsSpitbol() — succeeds in SPITBOL
-        IsSpitbol()                                         :S(spl_yes)
-        OUTPUT = 'PASS: IsSpitbol correctly fails in CSNOBOL4'  :(sk2)
-spl_yes
-        OUTPUT = 'PASS: IsSpitbol correctly succeeds in SPITBOL'
-sk2
-
+*  Exactly one of IsSnobol4/IsSpitbol must succeed
+        sno4_ = 0
+        spl_  = 0
+        IsSnobol4()   :S(mark_sno4)
+        :(check_spl)
+mark_sno4
+        sno4_ = 1
+check_spl
+        IsSpitbol()   :S(mark_spl)
+        :(xor_check)
+mark_spl
+        spl_ = 1
+xor_check
+*  XOR: exactly one must be 1
+        IDENT(sno4_, 1) IDENT(spl_, 1)   :S(both_fail)
+        IDENT(sno4_, 0) IDENT(spl_, 0)   :S(neither_fail)
+        OUTPUT = 'PASS: exactly one of IsSnobol4/IsSpitbol succeeded'   :(done)
+both_fail
+        OUTPUT = 'FAIL: both IsSnobol4 and IsSpitbol succeeded'   :(done)
+neither_fail
+        OUTPUT = 'FAIL: neither IsSnobol4 nor IsSpitbol succeeded'
+done
 END
