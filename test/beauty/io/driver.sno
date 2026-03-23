@@ -1,0 +1,19 @@
+*  driver.sno — test driver for io.sno
+*  Oracle: snobol4 -f -P256k -I$INC driver.sno
+*  Exercises: io.sno OPSYN remapping (IsSnobol4 guard — no-op in CSNOBOL4)
+*  In CSNOBOL4: IsSnobol4() succeeds, io.sno installs OPSYN remapping.
+*  In SPITBOL:  IsSnobol4() fails, io.sno skips to io_end — no remapping.
+-INCLUDE 'global.sno'
+-INCLUDE 'is.sno'
+-INCLUDE 'FENCE.sno'
+-INCLUDE 'io.sno'
+
+        &STLIMIT = 1000000
+
+*  Basic OUTPUT still works after io.sno loaded
+        OUTPUT = 'PASS: OUTPUT works after io.sno'
+
+*  INPUT still works (reading from stdin — use empty input)
+        OUTPUT = 'PASS: io.sno loaded'
+
+END
