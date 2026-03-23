@@ -794,6 +794,35 @@
 %endmacro
 
 ; =============================================================================
+; ANY_α_PTR tlab, plab, saved, cursor, subj, subj_len, γ, ω
+; Like ANY_α_VAR but takes pre-evaluated DESCR_t fields (BSS slots) directly.
+; Calls stmt_any_ptr(vtype, vptr, cursor, subj, subj_len) — no hash lookup.
+; =============================================================================
+%macro ANY_α_PTR 8        ; tlab, plab, saved, cursor, subj, subj_len, γ, ω
+    mov     rax, [%4]
+    mov     [%3], rax
+    mov     rdi, [rel %1]       ; vtype
+    mov     rsi, [rel %2]       ; vptr
+    mov     rdx, [%4]           ; cursor
+    lea     rcx, [rel %5]       ; subj
+    mov     r8,  [%6]           ; subj_len
+    call    stmt_any_ptr
+    test    eax, eax
+    jz      %8
+    mov     rax, [%4]
+    inc     rax
+    mov     [%4], rax
+    jmp     %7
+%endmacro
+
+; ANY_β_PTR is identical to ANY_β_VAR — just restore cursor on backtrack
+%macro ANY_β_PTR 3         ; saved, cursor, ω
+    mov     rax, [%1]
+    mov     [%2], rax
+    jmp     %3
+%endmacro
+
+; =============================================================================
 ; NOTANY_α_VAR varlab, saved, cursor, subj, subj_len, γ, ω
 ; =============================================================================
 %macro NOTANY_α_VAR 7     ; varlab, saved, cursor, subj, subj_len, γ, ω
