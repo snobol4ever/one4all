@@ -1007,9 +1007,10 @@ static void pj_emit_body(EXPR_t **goals, int ngoals, const char *lbl_gamma,
         snprintf(desc, sizeof desc, "%s/p_%s_%d(%sI)[Ljava/lang/Object;",
                  pj_classname, safe, nargs, argpart);
 
-        int uid      = pj_fresh_label();
-        int local_cs = (*next_local)++;
-        int local_rv = (*next_local)++;
+        int uid          = pj_fresh_label();
+        int local_cs     = (*next_local)++;
+        int local_rv     = (*next_local)++;
+        int local_tmark  = (*next_local)++;  /* per-call trail mark for β-unwind */
 
         char call_try[128], call_omega[128];
         snprintf(call_try,   sizeof call_try,   "call%d_try",   uid);
@@ -1020,6 +1021,10 @@ static void pj_emit_body(EXPR_t **goals, int ngoals, const char *lbl_gamma,
         J("    istore %d\n", local_cs);
 
         J("%s:\n", call_try);
+        /* Save trail mark before call — unwind here on β-retry to reset
+         * any bindings made by the previous solution (e.g. X bound by member). */
+        J("    invokestatic %s/pj_trail_mark()I\n", pj_classname);
+        J("    istore %d\n", local_tmark);
         for (int j = 0; j < nargs && j < g->nchildren; j++)
             pj_emit_term(g->children[j], var_locals, n_vars);
         J("    iload %d\n", local_cs);
@@ -1038,7 +1043,7 @@ static void pj_emit_body(EXPR_t **goals, int ngoals, const char *lbl_gamma,
         JI("iconst_1", "");
         JI("iadd", "");
         J("    istore %d\n", local_cs);
-        /* suffix: failure saves local_cs → init_cs_local, goto lbl_omega (retry_head) */
+        /* suffix: failure → unwind bindings from this call, then retry */
         {
             int fresh_init = (*next_local)++;
             JI("iconst_0", ""); J("    istore %d\n", fresh_init);
@@ -1050,10 +1055,13 @@ static void pj_emit_body(EXPR_t **goals, int ngoals, const char *lbl_gamma,
                          trail_local, var_locals, n_vars, next_local,
                          fresh_init, fresh_sub);
             J("%s:\n", suffix_fail);
-            /* save updated cs into init_cs_local for retry_head re-entry */
+            /* β port: unwind trail to pre-call mark (undo bindings from last solution),
+             * update cs, then loop to call_try to demand next solution. */
+            J("    iload %d\n", local_tmark);
+            J("    invokestatic %s/pj_trail_unwind(I)V\n", pj_classname);
             J("    iload %d\n", local_cs);
             J("    istore %d\n", init_cs_local);
-            JI("goto", lbl_omega);   /* → retry_head_lbl */
+            JI("goto", call_try);   /* β port: retry ucall for next solution */
         }
         /* ucall exhausted → outer omega (next clause) */
         J("%s:\n", call_omega);
@@ -1339,7 +1347,8 @@ static void pj_emit_main(Program *prog) {
     J("    .limit stack 8\n");
     J("    .limit locals 2\n");
 
-    /* call p_main_0() — the main/0 predicate */
+    /* Call p_main_0(0) once. The internal fail-loop inside main/0 drives
+     * all backtracking via call_sfail→call_try. No outer retry needed. */
     JI("iconst_0", ""); /* cs = 0 */
     J("    invokestatic %s/p_main_0(I)[Ljava/lang/Object;\n", pj_classname);
     JI("pop", "");
