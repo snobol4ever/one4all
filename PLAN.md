@@ -10,13 +10,22 @@ ln -sfn /home/claude/snobol4ever/x64 /home/claude/x64   # if x64 missing
 
 ---
 
-## Current milestone: `M-BEAUTY-TRACE` (B-277)
+## Current milestone: `M-BEAUTIFY-BOOTSTRAP` (B-278)
 
-1. Check `demo/inc/trace.sno` exists
-2. `INC=demo/inc bash test/beauty/run_beauty_subsystem.sh trace`
-3. Fix any ASM divergences
-4. On PASS: `git commit -m "B-277: M-BEAUTY-TRACE ✅"` + push
-5. Update PLAN.md, advance to `M-BEAUTIFY-BOOTSTRAP`
+All 19 beauty subsystems ✅. Now run `beauty.sno` on itself end-to-end through
+all 3 backends and verify fixed-point output.
+
+1. Locate `demo/beauty.sno` (the full beautifier)
+2. Run CSNOBOL4 oracle: `INC=demo/inc snobol4 -f -P256k -Idemo/inc demo/beauty.sno < demo/beauty.sno > /tmp/beauty_oracle.sno`
+3. Verify fixed point: oracle output == input
+4. Run ASM and SPITBOL backends through the same pipeline
+5. Diff all three against oracle
+6. Fix any ASM divergences in `emit_byrd_asm.c`
+7. On PASS: `git commit -m "B-278: M-BEAUTIFY-BOOTSTRAP ✅"` + push
+
+**Fixed B-277:** M-BEAUTY-TRACE — T8Trace/T8Pos helpers pass 3-way monitor;
+9 tests PASS (CSNOBOL4 + SPITBOL + ASM). Key: GE(t8MaxLine,621) guard, DATATYPE
+case portability, TABLE var exclusion. Commit `22e291c`.
 
 **Fixed B-276:** M-BEAUTY-OMEGA — binary `E_ATP` (`pat @txOfs`) in value context
 emitted OPSYN dispatch instead of LHS+cursor-capture. Fixed `expr_has_pattern_fn`
@@ -48,7 +57,9 @@ and value-context `E_ATP` handler in `emit_byrd_asm.c`. 15 tests PASS. Commit `1
 | 16 | XDump       | ✅ |
 | 17 | semantic    | ✅ |
 | 18 | omega       | ✅ |
-| 19 | trace       | ← now |
+| 19 | trace       | ✅ |
+
+**All 19 subsystems PASS → M-BEAUTIFY-BOOTSTRAP sprint begins.**
 
 ---
 
