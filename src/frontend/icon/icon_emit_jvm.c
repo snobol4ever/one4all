@@ -26,7 +26,7 @@
  *   Return value   → static long icn_retval
  *
  * Label conventions (parallel to ASM):
- *   Node α:  icn_N_a     Node β: icn_N_b
+ *   α icn_N_α   β icn_N_β   γ (inherited IjPorts.γ)   ω (inherited IjPorts.ω)
  *   Node γ:  (inherited, passed as string)
  *   Node ω:  (inherited, passed as string)
  *   Extra:   icn_N_code, icn_N_init, icn_N_lstore, etc.
@@ -100,14 +100,14 @@ static int ij_node_id = 0;
 
 static int ij_new_id(void) { return ij_node_id++; }
 
-static void lbl_a   (int id, char *b, size_t s) { snprintf(b,s,"icn_%d_a",   id); }
-static void lbl_b   (int id, char *b, size_t s) { snprintf(b,s,"icn_%d_b",   id); }
+static void lbl_α  (int id, char *b, size_t s) { snprintf(b,s,"icn_%d_α",   id); }
+static void lbl_β  (int id, char *b, size_t s) { snprintf(b,s,"icn_%d_β",   id); }
 static void lbl_code(int id, char *b, size_t s) { snprintf(b,s,"icn_%d_code",id); }
 
 /* =========================================================================
  * IcnPorts — inherited success/fail labels (same struct as icon_emit.h)
  * ======================================================================= */
-typedef struct { char succeed[64]; char fail[64]; } IjPorts;
+typedef struct { char γ[64]; char ω[64]; } IjPorts;
 
 /* =========================================================================
  * User procedure registry (mirrors icon_emit.c)
@@ -244,33 +244,33 @@ static int ij_intern_string(const char *s) {
  * Forward declaration
  * ======================================================================= */
 static void ij_emit_expr(IcnNode *n, IjPorts ports,
-                         char *out_alpha, char *out_beta);
+                         char *out_α, char *out_β);
 
 /* =========================================================================
  * Emit helpers for static field load/store
  * ======================================================================= */
 static void ij_get_long(const char *fname) {
-    char buf[128]; snprintf(buf, sizeof buf, "%s/%s J", ij_classname, fname);
+    char buf[384]; snprintf(buf, sizeof buf, "%s/%s J", ij_classname, fname);
     JI("getstatic", buf);
 }
 static void ij_put_long(const char *fname) {
-    char buf[128]; snprintf(buf, sizeof buf, "%s/%s J", ij_classname, fname);
+    char buf[384]; snprintf(buf, sizeof buf, "%s/%s J", ij_classname, fname);
     JI("putstatic", buf);
 }
 static void ij_get_byte(const char *fname) {
-    char buf[128]; snprintf(buf, sizeof buf, "%s/%s B", ij_classname, fname);
+    char buf[384]; snprintf(buf, sizeof buf, "%s/%s B", ij_classname, fname);
     JI("getstatic", buf);
 }
 static void ij_put_byte(const char *fname) {
-    char buf[128]; snprintf(buf, sizeof buf, "%s/%s B", ij_classname, fname);
+    char buf[384]; snprintf(buf, sizeof buf, "%s/%s B", ij_classname, fname);
     JI("putstatic", buf);
 }
 static void ij_get_int_field(const char *fname) {
-    char buf[128]; snprintf(buf, sizeof buf, "%s/%s I", ij_classname, fname);
+    char buf[384]; snprintf(buf, sizeof buf, "%s/%s I", ij_classname, fname);
     JI("getstatic", buf);
 }
 static void ij_put_int_field(const char *fname) {
-    char buf[128]; snprintf(buf, sizeof buf, "%s/%s I", ij_classname, fname);
+    char buf[384]; snprintf(buf, sizeof buf, "%s/%s I", ij_classname, fname);
     JI("putstatic", buf);
 }
 
@@ -288,24 +288,21 @@ static void ij_jmp_if_failed(const char *lbl) {
     J("    ifne %s\n", lbl);
 }
 /* Test icn_failed — if zero jump to lbl */
-static void ij_jmp_if_ok(const char *lbl) {
-    ij_get_byte("icn_failed");
-    J("    ifeq %s\n", lbl);
-}
+/* ij_jmp_if_ok removed — was unused */
 
 /* =========================================================================
  * ICN_INT
  * α: push long literal, goto succeed
  * β: goto fail (one-shot)
  * ======================================================================= */
-static void ij_emit_int(IcnNode *n, IjPorts ports, char *oa, char *ob) {
+static void ij_emit_int(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     int id = ij_new_id(); char a[64], b[64];
-    lbl_a(id,a,sizeof a); lbl_b(id,b,sizeof b);
-    strncpy(oa,a,63); strncpy(ob,b,63);
+    lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
+    strncpy(oα,a,63); strncpy(oβ,b,63);
     JC("INT"); JL(a);
     J("    ldc2_w %ld\n", n->val.ival);
-    JGoto(ports.succeed);
-    JL(b); JGoto(ports.fail);
+    JGoto(ports.γ);
+    JL(b); JGoto(ports.ω);
 }
 
 /* =========================================================================
@@ -313,16 +310,16 @@ static void ij_emit_int(IcnNode *n, IjPorts ports, char *oa, char *ob) {
  * α: push String ref via ldc, goto succeed
  * β: goto fail
  * ======================================================================= */
-static void ij_emit_str(IcnNode *n, IjPorts ports, char *oa, char *ob) {
+static void ij_emit_str(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     int id = ij_new_id(); char a[64], b[64];
-    lbl_a(id,a,sizeof a); lbl_b(id,b,sizeof b);
-    strncpy(oa,a,63); strncpy(ob,b,63);
+    lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
+    strncpy(oα,a,63); strncpy(oβ,b,63);
     (void)ij_intern_string(n->val.sval);
     JC("STR"); JL(a);
     /* Push string — ldc with quoted string */
     J("    ldc \"%s\"\n", n->val.sval);
-    JGoto(ports.succeed);
-    JL(b); JGoto(ports.fail);
+    JGoto(ports.γ);
+    JL(b); JGoto(ports.ω);
 }
 
 /* =========================================================================
@@ -333,10 +330,10 @@ static void ij_emit_str(IcnNode *n, IjPorts ports, char *oa, char *ob) {
  * For long locals: lload slot_jvm(logical_slot)
  * For globals: getstatic classname/icn_gvar_NAME J
  * ======================================================================= */
-static void ij_emit_var(IcnNode *n, IjPorts ports, char *oa, char *ob) {
+static void ij_emit_var(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     int id = ij_new_id(); char a[64], b[64];
-    lbl_a(id,a,sizeof a); lbl_b(id,b,sizeof b);
-    strncpy(oa,a,63); strncpy(ob,b,63);
+    lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
+    strncpy(oα,a,63); strncpy(oβ,b,63);
     JC("VAR"); JL(a);
     int slot = ij_locals_find(n->val.sval);
     if (slot >= 0) {
@@ -346,28 +343,28 @@ static void ij_emit_var(IcnNode *n, IjPorts ports, char *oa, char *ob) {
         ij_declare_static(gname);
         ij_get_long(gname);
     }
-    JGoto(ports.succeed);
-    JL(b); JGoto(ports.fail);
+    JGoto(ports.γ);
+    JL(b); JGoto(ports.ω);
 }
 
 /* =========================================================================
  * ICN_ASSIGN — E1 := E2
  * Evaluate RHS, store into LHS variable slot
  * ======================================================================= */
-static void ij_emit_assign(IcnNode *n, IjPorts ports, char *oa, char *ob) {
+static void ij_emit_assign(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     if (n->nchildren < 2) {
         /* degenerate */
         int id = ij_new_id(); char a[64], b[64];
-        lbl_a(id,a,sizeof a); lbl_b(id,b,sizeof b);
-        strncpy(oa,a,63); strncpy(ob,b,63);
-        JL(a); JGoto(ports.fail); JL(b); JGoto(ports.fail); return;
+        lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
+        strncpy(oα,a,63); strncpy(oβ,b,63);
+        JL(a); JGoto(ports.ω); JL(b); JGoto(ports.ω); return;
     }
     int id = ij_new_id(); char a[64], b[64];
-    lbl_a(id,a,sizeof a); lbl_b(id,b,sizeof b);
-    strncpy(oa,a,63); strncpy(ob,b,63);
+    lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
+    strncpy(oα,a,63); strncpy(oβ,b,63);
     char store[64]; snprintf(store, sizeof store, "icn_%d_store", id);
 
-    IjPorts rp; strncpy(rp.succeed, store, 63); strncpy(rp.fail, ports.fail, 63);
+    IjPorts rp; strncpy(rp.γ, store, 63); strncpy(rp.ω, ports.ω, 63);
     char ra[64], rb[64];
     ij_emit_expr(n->children[1], rp, ra, rb);
 
@@ -403,23 +400,23 @@ static void ij_emit_assign(IcnNode *n, IjPorts ports, char *oa, char *ob) {
     } else {
         JI("lconst_0", "");
     }
-    JGoto(ports.succeed);
+    JGoto(ports.γ);
 }
 
 /* =========================================================================
  * ICN_RETURN
  * Store value into icn_retval, set icn_failed=0, jump to ret label
  * ======================================================================= */
-static void ij_emit_return(IcnNode *n, IjPorts ports, char *oa, char *ob) {
+static void ij_emit_return(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     (void)ports;
     int id = ij_new_id(); char a[64], b[64];
-    lbl_a(id,a,sizeof a); lbl_b(id,b,sizeof b);
-    strncpy(oa,a,63); strncpy(ob,b,63);
+    lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
+    strncpy(oα,a,63); strncpy(oβ,b,63);
 
     if (n->nchildren > 0) {
         char after[64]; snprintf(after, sizeof after, "icn_%d_ret_store", id);
         char on_fail[64]; snprintf(on_fail, sizeof on_fail, "icn_%d_ret_fail", id);
-        IjPorts vp; strncpy(vp.succeed, after, 63); strncpy(vp.fail, on_fail, 63);
+        IjPorts vp; strncpy(vp.γ, after, 63); strncpy(vp.ω, on_fail, 63);
         char va[64], vb[64];
         ij_emit_expr(n->children[0], vp, va, vb);
         JL(a); JGoto(va);
@@ -446,15 +443,15 @@ static void ij_emit_return(IcnNode *n, IjPorts ports, char *oa, char *ob) {
 /* =========================================================================
  * ICN_FAIL
  * ======================================================================= */
-static void ij_emit_fail_node(IcnNode *n, IjPorts ports, char *oa, char *ob) {
+static void ij_emit_fail_node(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     (void)n;
     int id = ij_new_id(); char a[64], b[64];
-    lbl_a(id,a,sizeof a); lbl_b(id,b,sizeof b);
-    strncpy(oa,a,63); strncpy(ob,b,63);
+    lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
+    strncpy(oα,a,63); strncpy(oβ,b,63);
     JL(a);
     ij_set_fail();
-    JGoto(ij_fail_label[0] ? ij_fail_label : ports.fail);
-    JL(b); JGoto(ports.fail);
+    JGoto(ij_fail_label[0] ? ij_fail_label : ports.ω);
+    JL(b); JGoto(ports.ω);
 }
 
 /* =========================================================================
@@ -466,11 +463,11 @@ static void ij_emit_fail_node(IcnNode *n, IjPorts ports, char *oa, char *ob) {
  * β: indirect — the proc β entry does tableswitch → resume_here
  * resume_here: run optional body, then loop back to E's β
  * ======================================================================= */
-static void ij_emit_suspend(IcnNode *n, IjPorts ports, char *oa, char *ob) {
+static void ij_emit_suspend(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     (void)ports;
     int id = ij_new_id(); char a[64], b[64];
-    lbl_a(id,a,sizeof a); lbl_b(id,b,sizeof b);
-    strncpy(oa,a,63); strncpy(ob,b,63);
+    lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
+    strncpy(oα,a,63); strncpy(oβ,b,63);
 
     /* Assign a unique suspend ID for tableswitch */
     int susp_id = ij_next_suspend_id++;
@@ -485,12 +482,12 @@ static void ij_emit_suspend(IcnNode *n, IjPorts ports, char *oa, char *ob) {
     char va[64], vb[64];
     if (val_node) {
         IjPorts vp;
-        strncpy(vp.succeed, after_val, 63);
-        strncpy(vp.fail, ij_fail_label[0] ? ij_fail_label : "icn_dead", 63);
+        strncpy(vp.γ, after_val, 63);
+        strncpy(vp.ω, ij_fail_label[0] ? ij_fail_label : "icn_dead", 63);
         ij_emit_expr(val_node, vp, va, vb);
     } else {
-        snprintf(va, sizeof va, "icn_%d_noval", id);
-        snprintf(vb, sizeof vb, "icn_%d_novalb", id);
+        snprintf(va, 80, "icn_%d_noval", id);
+        snprintf(vb, 80, "icn_%d_nvlb", id);
         JL(va); JI("lconst_0",""); JGoto(after_val);
         JL(vb); JGoto(ij_fail_label[0] ? ij_fail_label : "icn_dead");
     }
@@ -514,22 +511,22 @@ static void ij_emit_suspend(IcnNode *n, IjPorts ports, char *oa, char *ob) {
     if (body_node) {
         char ba[64], bb[64];
         IjPorts bp;
-        strncpy(bp.succeed, ports.succeed, 63);
-        strncpy(bp.fail,    ports.succeed, 63);  /* body fail also continues */
+        strncpy(bp.γ, ports.γ, 63);
+        strncpy(bp.ω,    ports.γ, 63);  /* body fail also continues */
         ij_emit_expr(body_node, bp, ba, bb);
         JL(resume_here); JGoto(ba);
     } else {
-        JL(resume_here); JGoto(ports.succeed);
+        JL(resume_here); JGoto(ports.γ);
     }
 }
 
 /* =========================================================================
  * ICN_IF — if cond then E2 [else E3]
  * ======================================================================= */
-static void ij_emit_if(IcnNode *n, IjPorts ports, char *oa, char *ob) {
+static void ij_emit_if(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     int id = ij_new_id(); char a[64], b[64];
-    lbl_a(id,a,sizeof a); lbl_b(id,b,sizeof b);
-    strncpy(oa,a,63); strncpy(ob,b,63);
+    lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
+    strncpy(oα,a,63); strncpy(oβ,b,63);
 
     IcnNode *cond  = n->children[0];
     IcnNode *thenb = (n->nchildren > 1) ? n->children[1] : NULL;
@@ -540,25 +537,25 @@ static void ij_emit_if(IcnNode *n, IjPorts ports, char *oa, char *ob) {
 
     char then_a[64]="", then_b[64]="", else_a[64]="";
     if (thenb) {
-        IjPorts tp; strncpy(tp.succeed,ports.succeed,63); strncpy(tp.fail,ports.fail,63);
+        IjPorts tp; strncpy(tp.γ,ports.γ,63); strncpy(tp.ω,ports.ω,63);
         ij_emit_expr(thenb, tp, then_a, then_b);
-    } else { strncpy(then_a,ports.succeed,63); }
+    } else { strncpy(then_a,ports.γ,63); }
 
     if (elseb) {
-        IjPorts ep; strncpy(ep.succeed,ports.succeed,63); strncpy(ep.fail,ports.fail,63);
+        IjPorts ep; strncpy(ep.γ,ports.γ,63); strncpy(ep.ω,ports.ω,63);
         char ea[64], eb[64];
         ij_emit_expr(elseb, ep, ea, eb);
         strncpy(else_a, ea, 63);
-    } else { strncpy(else_a, ports.fail, 63); }
+    } else { strncpy(else_a, ports.ω, 63); }
 
-    IjPorts cp; strncpy(cp.succeed,cond_then,63); strncpy(cp.fail,cond_else,63);
+    IjPorts cp; strncpy(cp.γ,cond_then,63); strncpy(cp.ω,cond_else,63);
     char ca[64], cb[64];
     ij_emit_expr(cond, cp, ca, cb);
 
     /* cond_then: condition succeeded — value (long) on stack, discard */
     JL(cond_then);
     JI("pop2","");   /* discard condition result */
-    JGoto(thenb ? then_a : ports.succeed);
+    JGoto(thenb ? then_a : ports.γ);
 
     JL(cond_else);
     JGoto(else_a);
@@ -570,14 +567,14 @@ static void ij_emit_if(IcnNode *n, IjPorts ports, char *oa, char *ob) {
 /* =========================================================================
  * ICN_CALL — write() built-in or user procedure
  * ======================================================================= */
-static void ij_emit_call(IcnNode *n, IjPorts ports, char *oa, char *ob) {
-    if (n->nchildren < 1) { ij_emit_fail_node(NULL,ports,oa,ob); return; }
+static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
+    if (n->nchildren < 1) { ij_emit_fail_node(NULL,ports,oα,oβ); return; }
     IcnNode *fn = n->children[0];
     int nargs = n->nchildren - 1;
     const char *fname = (fn->kind == ICN_VAR) ? fn->val.sval : "unknown";
     int id = ij_new_id(); char a[64], b[64];
-    lbl_a(id,a,sizeof a); lbl_b(id,b,sizeof b);
-    strncpy(oa,a,63); strncpy(ob,b,63);
+    lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
+    strncpy(oα,a,63); strncpy(oβ,b,63);
 
     /* --- built-in write --- */
     if (strcmp(fname, "write") == 0) {
@@ -586,13 +583,13 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oa, char *ob) {
             JI("getstatic", "java/lang/System/out Ljava/io/PrintStream;");
             JI("ldc", "\"\"");
             JI("invokevirtual", "java/io/PrintStream/println(Ljava/lang/String;)V");
-            JGoto(ports.succeed);
-            JL(b); JGoto(ports.fail);
+            JGoto(ports.γ);
+            JL(b); JGoto(ports.ω);
             return;
         }
         IcnNode *arg = n->children[1];
         char after[64]; snprintf(after, sizeof after, "icn_%d_call", id);
-        IjPorts ap; strncpy(ap.succeed, after, 63); strncpy(ap.fail, ports.fail, 63);
+        IjPorts ap; strncpy(ap.γ, after, 63); strncpy(ap.ω, ports.ω, 63);
         char arg_a[64], arg_b[64];
         ij_emit_expr(arg, ap, arg_a, arg_b);
         JL(a); JGoto(arg_a);
@@ -620,7 +617,7 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oa, char *ob) {
             J("    lload %d\n", slot_jvm(scratch));
             JI("invokevirtual", "java/io/PrintStream/println(J)V");
         }
-        JGoto(ports.succeed);
+        JGoto(ports.γ);
         return;
     }
 
@@ -638,7 +635,7 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oa, char *ob) {
 
         for (int i = nargs-1; i >= 0; i--) {
             char push_relay[64]; snprintf(push_relay, sizeof push_relay, "icn_%d_arg%d", id, i);
-            IjPorts ap; strncpy(ap.succeed, push_relay, 63); strncpy(ap.fail, ports.fail, 63);
+            IjPorts ap; strncpy(ap.γ, push_relay, 63); strncpy(ap.ω, ports.ω, 63);
             ij_emit_expr(n->children[i+1], ap, arg_alphas[i], arg_betas[i]);
             char argfield[64]; snprintf(argfield, sizeof argfield, "icn_arg_%d", i);
             ij_declare_static(argfield);
@@ -661,17 +658,17 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oa, char *ob) {
             J("    ifeq %s\n", b_fail);
             /* Resume: clear suspended flag, call again — proc will tableswitch on icn_suspend_id */
             JI("iconst_0",""); ij_put_byte("icn_suspended");
-            char sig[128]; snprintf(sig, sizeof sig, "%s/icn_%s()V", ij_classname, fname);
+            char sig[384]; snprintf(sig, sizeof sig, "%s/icn_%s()V", ij_classname, fname);
             JI("invokestatic", sig);
             /* Check result */
             char after_resume[64]; snprintf(after_resume, sizeof after_resume, "icn_%d_after_resume", id);
             ij_jmp_if_failed(after_resume);
             ij_get_long("icn_retval");
-            JGoto(ports.succeed);
-            JL(after_resume); JGoto(ports.fail);
-            JL(b_fail); JGoto(ports.fail);
+            JGoto(ports.γ);
+            JL(after_resume); JGoto(ports.ω);
+            JL(b_fail); JGoto(ports.ω);
         } else {
-            JGoto(ports.fail);
+            JGoto(ports.ω);
         }
 
         /* do_call: push args from static fields, invoke proc */
@@ -679,7 +676,7 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oa, char *ob) {
         /* Load args into static arg fields — already done above.
          * Proc pops from icn_arg_0..N-1. */
         {
-            char sig[128]; snprintf(sig, sizeof sig, "%s/icn_%s()V", ij_classname, fname);
+            char sig[384]; snprintf(sig, sizeof sig, "%s/icn_%s()V", ij_classname, fname);
             JI("invokestatic", sig);
         }
         /* Check icn_failed */
@@ -687,8 +684,8 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oa, char *ob) {
         ij_jmp_if_failed(after_call);
         /* Check if suspended (generator yielded) or returned */
         ij_get_long("icn_retval");
-        JGoto(ports.succeed);
-        JL(after_call); JGoto(ports.fail);
+        JGoto(ports.γ);
+        JL(after_call); JGoto(ports.ω);
 
         if (arg_alphas) free(arg_alphas);
         if (arg_betas)  free(arg_betas);
@@ -697,8 +694,8 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oa, char *ob) {
     }
 
     /* Unknown — fail */
-    JL(a); JGoto(ports.fail);
-    JL(b); JGoto(ports.fail);
+    JL(a); JGoto(ports.ω);
+    JL(b); JGoto(ports.ω);
 }
 
 /* =========================================================================
@@ -706,10 +703,10 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oa, char *ob) {
  * α → E1.α; E1.ω → E2.α; ... ; En.ω → node.ω
  * β → E1.β
  * ======================================================================= */
-static void ij_emit_alt(IcnNode *n, IjPorts ports, char *oa, char *ob) {
+static void ij_emit_alt(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     int id = ij_new_id(); char a[64], b[64];
-    lbl_a(id,a,sizeof a); lbl_b(id,b,sizeof b);
-    strncpy(oa,a,63); strncpy(ob,b,63);
+    lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
+    strncpy(oα,a,63); strncpy(oβ,b,63);
 
     int nc = n->nchildren;
     char (*ca)[64] = malloc(nc*64);
@@ -717,8 +714,8 @@ static void ij_emit_alt(IcnNode *n, IjPorts ports, char *oa, char *ob) {
 
     for (int i = nc-1; i >= 0; i--) {
         IjPorts ep;
-        strncpy(ep.succeed, ports.succeed, 63);
-        strncpy(ep.fail, (i == nc-1) ? ports.fail : ca[i+1], 63);
+        strncpy(ep.γ, ports.γ, 63);
+        strncpy(ep.ω, (i == nc-1) ? ports.ω : ca[i+1], 63);
         ij_emit_expr(n->children[i], ep, ca[i], cb[i]);
     }
 
@@ -732,53 +729,52 @@ static void ij_emit_alt(IcnNode *n, IjPorts ports, char *oa, char *ob) {
  * JVM discipline: operand stack EMPTY at every label boundary.
  * Values passed across labels go through static fields (lc, rc, bf).
  * ======================================================================= */
-static void ij_emit_binop(IcnNode *n, IjPorts ports, char *oa, char *ob) {
+static void ij_emit_binop(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     int id = ij_new_id(); char a[64], b[64];
-    lbl_a(id,a,sizeof a); lbl_b(id,b,sizeof b);
+    lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     char compute[64]; snprintf(compute, sizeof compute, "icn_%d_compute", id);
     char lbfwd[64];   snprintf(lbfwd,   sizeof lbfwd,   "icn_%d_lb",     id);
     char lstore[64];  snprintf(lstore,  sizeof lstore,  "icn_%d_lstore", id);
-    char lc_field[64]; snprintf(lc_field, sizeof lc_field, "icn_%d_lc", id);
-    char rc_field[64]; snprintf(rc_field, sizeof rc_field, "icn_%d_rc", id);
-    char bf_field[64]; snprintf(bf_field, sizeof bf_field, "icn_%d_bf", id);
-    ij_declare_static(lc_field);
-    ij_declare_static(rc_field);
-    ij_declare_static_int(bf_field);
-    strncpy(oa,a,63); strncpy(ob,b,63);
+    /* Bug 1 fix: use local slots instead of static fields to support recursion.
+     * Static fields are class-global and get clobbered by recursive calls. */
+    int lc_slot = ij_locals_alloc_tmp();   /* long: 2 JVM slots */
+    int rc_slot = ij_locals_alloc_tmp();   /* long: 2 JVM slots */
+    int bf_slot = ij_locals_alloc_tmp();   /* used as int (istore/iload) */
+    strncpy(oα,a,63); strncpy(oβ,b,63);
 
     char right_relay[64]; snprintf(right_relay, sizeof right_relay, "icn_%d_rrelay", id);
     char left_relay[64];  snprintf(left_relay,  sizeof left_relay,  "icn_%d_lrelay", id);
 
-    IjPorts rp; strncpy(rp.succeed, right_relay, 63); strncpy(rp.fail, lbfwd, 63);
+    IjPorts rp; strncpy(rp.γ, right_relay, 63); strncpy(rp.ω, lbfwd, 63);
     char ra[64], rb[64]; ij_emit_expr(n->children[1], rp, ra, rb);
-    IjPorts lp; strncpy(lp.succeed, left_relay, 63); strncpy(lp.fail, ports.fail, 63);
+    IjPorts lp; strncpy(lp.γ, left_relay, 63); strncpy(lp.ω, ports.ω, 63);
     char la[64], lb[64]; ij_emit_expr(n->children[0], lp, la, lb);
 
     IcnNode *lchild = n->children[0];
     int left_is_value = (lchild->kind == ICN_VAR || lchild->kind == ICN_INT ||
                          lchild->kind == ICN_STR || lchild->kind == ICN_CALL);
 
-    /* left_relay: left long on stack → drain to lc_field → goto lstore */
-    JL(left_relay); ij_put_long(lc_field); JGoto(lstore);
-    /* right_relay: right long on stack → drain to rc_field → goto compute */
-    JL(right_relay); ij_put_long(rc_field); JGoto(compute);
+    /* left_relay: left long on stack → drain to lc_slot → goto lstore */
+    JL(left_relay); J("    lstore %d\n", slot_jvm(lc_slot)); JGoto(lstore);
+    /* right_relay: right long on stack → drain to rc_slot → goto compute */
+    JL(right_relay); J("    lstore %d\n", slot_jvm(rc_slot)); JGoto(compute);
 
     JL(lbfwd); JGoto(lb);
-    JL(a); JI("iconst_0",""); ij_put_int_field(bf_field); JGoto(la);
+    JL(a); JI("iconst_0",""); J("    istore %d\n", slot_jvm(bf_slot)); JGoto(la);
     JL(b);
-    if (left_is_value) { JI("iconst_1",""); ij_put_int_field(bf_field); JGoto(la); }
+    if (left_is_value) { JI("iconst_1",""); J("    istore %d\n", slot_jvm(bf_slot)); JGoto(la); }
     else { JGoto(rb); }
 
-    /* lstore: lc_field has left, decide ra vs rb based on bf_field */
+    /* lstore: lc_slot has left, decide ra vs rb based on bf_slot */
     JL(lstore);
-    ij_get_int_field(bf_field);
+    J("    iload %d\n", slot_jvm(bf_slot));
     J("    ifeq %s\n", ra);
     JGoto(rb);
 
-    /* compute: lc_field=left, rc_field=right — stack empty */
+    /* compute: lc_slot=left, rc_slot=right — stack empty */
     JL(compute);
-    ij_get_long(lc_field);   /* push left  = value2 (below) */
-    ij_get_long(rc_field);   /* push right = value1 (top)   */
+    J("    lload %d\n", slot_jvm(lc_slot));   /* push left  = value2 (below) */
+    J("    lload %d\n", slot_jvm(rc_slot));   /* push right = value1 (top)   */
     /* JVM: lsub/ldiv/lrem = value2 op value1 = left op right ✓ */
     switch (n->kind) {
         case ICN_ADD: JI("ladd",""); break;
@@ -788,7 +784,7 @@ static void ij_emit_binop(IcnNode *n, IjPorts ports, char *oa, char *ob) {
         case ICN_MOD: JI("lrem",""); break;
         default: break;
     }
-    JGoto(ports.succeed);
+    JGoto(ports.γ);
 }
 
 
@@ -797,42 +793,41 @@ static void ij_emit_binop(IcnNode *n, IjPorts ports, char *oa, char *ob) {
  * JVM discipline: stack empty at all label boundaries.
  * lc_field = left cache, rc_field = right staging.
  * ======================================================================= */
-static void ij_emit_relop(IcnNode *n, IjPorts ports, char *oa, char *ob) {
+static void ij_emit_relop(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     int id = ij_new_id(); char a[64], b[64];
-    lbl_a(id,a,sizeof a); lbl_b(id,b,sizeof b);
+    lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     char chk[64];    snprintf(chk,    sizeof chk,    "icn_%d_check",  id);
     char lbfwd[64];  snprintf(lbfwd,  sizeof lbfwd,  "icn_%d_lb",     id);
     char lstore[64]; snprintf(lstore, sizeof lstore, "icn_%d_lstore", id);
-    char lc_field[64]; snprintf(lc_field, sizeof lc_field, "icn_%d_lc", id);
-    char rc_field[64]; snprintf(rc_field, sizeof rc_field, "icn_%d_rc", id);
-    ij_declare_static(lc_field);
-    ij_declare_static(rc_field);
-    strncpy(oa,a,63); strncpy(ob,b,63);
+    /* Bug 1 fix: use local slots instead of static fields to support recursion. */
+    int lc_slot = ij_locals_alloc_tmp();   /* long: 2 JVM slots */
+    int rc_slot = ij_locals_alloc_tmp();   /* long: 2 JVM slots */
+    strncpy(oα,a,63); strncpy(oβ,b,63);
 
     char right_relay[64]; snprintf(right_relay, sizeof right_relay, "icn_%d_rrelay", id);
     char left_relay[64];  snprintf(left_relay,  sizeof left_relay,  "icn_%d_lrelay", id);
 
-    IjPorts rp; strncpy(rp.succeed, right_relay, 63); strncpy(rp.fail, lbfwd, 63);
+    IjPorts rp; strncpy(rp.γ, right_relay, 63); strncpy(rp.ω, lbfwd, 63);
     char ra[64], rb[64]; ij_emit_expr(n->children[1], rp, ra, rb);
-    IjPorts lp; strncpy(lp.succeed, left_relay,  63); strncpy(lp.fail, ports.fail, 63);
+    IjPorts lp; strncpy(lp.γ, left_relay,  63); strncpy(lp.ω, ports.ω, 63);
     char la[64], lb[64]; ij_emit_expr(n->children[0], lp, la, lb);
 
-    /* left_relay: left long on stack → drain to lc_field → goto lstore (→ ra) */
-    JL(left_relay); ij_put_long(lc_field); JGoto(lstore);
-    /* right_relay: right long on stack → drain to rc_field → goto chk */
-    JL(right_relay); ij_put_long(rc_field); JGoto(chk);
+    /* left_relay: left long on stack → drain to lc_slot → goto lstore (→ ra) */
+    JL(left_relay); J("    lstore %d\n", slot_jvm(lc_slot)); JGoto(lstore);
+    /* right_relay: right long on stack → drain to rc_slot → goto chk */
+    JL(right_relay); J("    lstore %d\n", slot_jvm(rc_slot)); JGoto(chk);
 
     JL(lbfwd); JGoto(lb);
     JL(a); JGoto(la);
     JL(b); JGoto(rb);
 
-    /* lstore: lc_field has left → go to right.α */
+    /* lstore: lc_slot has left → go to right.α */
     JL(lstore); JGoto(ra);
 
-    /* chk: lc_field=left, rc_field=right — stack empty */
+    /* chk: lc_slot=left, rc_slot=right — stack empty */
     JL(chk);
-    ij_get_long(lc_field);   /* push left  = value2 */
-    ij_get_long(rc_field);   /* push right = value1 */
+    J("    lload %d\n", slot_jvm(lc_slot));   /* push left  = value2 */
+    J("    lload %d\n", slot_jvm(rc_slot));   /* push right = value1 */
     /* lcmp: value2 vs value1 = left vs right → negative if left<right */
     JI("lcmp","");
     const char *jfail;
@@ -847,16 +842,16 @@ static void ij_emit_relop(IcnNode *n, IjPorts ports, char *oa, char *ob) {
     }
     J("    %s %s\n", jfail, rb);
     /* success: reload right as result value */
-    ij_get_long(rc_field);
-    JGoto(ports.succeed);
+    J("    lload %d\n", slot_jvm(rc_slot));
+    JGoto(ports.γ);
 }
 
 /* =========================================================================
  * ICN_TO — range generator inline counter (§4.4)
  * ======================================================================= */
-static void ij_emit_to(IcnNode *n, IjPorts ports, char *oa, char *ob) {
+static void ij_emit_to(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     int id = ij_new_id(); char a[64], b[64], code[64];
-    lbl_a(id,a,sizeof a); lbl_b(id,b,sizeof b); lbl_code(id,code,sizeof code);
+    lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b); lbl_code(id,code,sizeof code);
     char init[64]; snprintf(init,sizeof init,"icn_%d_init",id);
     char e1bf[64]; snprintf(e1bf,sizeof e1bf,"icn_%d_e1b",id);
     char e2bf[64]; snprintf(e2bf,sizeof e2bf,"icn_%d_e2b",id);
@@ -874,15 +869,15 @@ static void ij_emit_to(IcnNode *n, IjPorts ports, char *oa, char *ob) {
     ij_declare_static_int(e2seen_field);
     ij_declare_static(e1val_field);
     ij_declare_static(e2val_field);
-    strncpy(oa,a,63); strncpy(ob,b,63);
+    strncpy(oα,a,63); strncpy(oβ,b,63);
 
     /* Relay labels: drain stack before crossing to init */
     char e1_relay[64]; snprintf(e1_relay, sizeof e1_relay, "icn_%d_e1relay", id);
     char e2_relay[64]; snprintf(e2_relay, sizeof e2_relay, "icn_%d_e2relay", id);
 
-    IjPorts e2p; strncpy(e2p.succeed, e2_relay, 63); strncpy(e2p.fail, e1bf, 63);
+    IjPorts e2p; strncpy(e2p.γ, e2_relay, 63); strncpy(e2p.ω, e1bf, 63);
     char e2a[64],e2b[64]; ij_emit_expr(n->children[1], e2p, e2a, e2b);
-    IjPorts e1p; strncpy(e1p.succeed, e1_relay, 63); strncpy(e1p.fail, ports.fail, 63);
+    IjPorts e1p; strncpy(e1p.γ, e1_relay, 63); strncpy(e1p.ω, ports.ω, 63);
     char e1a[64],e1b[64]; ij_emit_expr(n->children[0], e1p, e1a, e1b);
 
     /* e1_relay: E1 long on stack → store to e1val, jump to e2a */
@@ -938,17 +933,17 @@ static void ij_emit_to(IcnNode *n, IjPorts ports, char *oa, char *ob) {
     J("    ifgt %s\n", e2bf);
     /* Push I as the generated value — consumer must drain before next label */
     ij_get_long(I_field);
-    JGoto(ports.succeed);
+    JGoto(ports.γ);
 }
 
 /* =========================================================================
  * ICN_EVERY
  * ======================================================================= */
-static void ij_emit_every(IcnNode *n, IjPorts ports, char *oa, char *ob) {
+static void ij_emit_every(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     int id = ij_new_id(); char a[64], b[64];
-    lbl_a(id,a,sizeof a); lbl_b(id,b,sizeof b);
+    lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     char gbfwd[64]; snprintf(gbfwd, sizeof gbfwd, "icn_%d_genb", id);
-    strncpy(oa,a,63); strncpy(ob,b,63);
+    strncpy(oα,a,63); strncpy(oβ,b,63);
 
     IcnNode *gen  = n->children[0];
     IcnNode *body = (n->nchildren > 1) ? n->children[1] : NULL;
@@ -957,28 +952,28 @@ static void ij_emit_every(IcnNode *n, IjPorts ports, char *oa, char *ob) {
     if (body) {
         /* bstart: generator yielded a value — drain it, then run body */
         char bstart[64]; snprintf(bstart, sizeof bstart, "icn_%d_body", id);
-        IjPorts bp; strncpy(bp.succeed,gbfwd,63); strncpy(bp.fail,gbfwd,63);
+        IjPorts bp; strncpy(bp.γ,gbfwd,63); strncpy(bp.ω,gbfwd,63);
         char ba[64], bb[64]; ij_emit_expr(body, bp, ba, bb);
-        IjPorts gp; strncpy(gp.succeed,bstart,63); strncpy(gp.fail,ports.fail,63);
+        IjPorts gp; strncpy(gp.γ,bstart,63); strncpy(gp.ω,ports.ω,63);
         ij_emit_expr(gen, gp, ga, gb);
         JL(bstart); JI("pop2",""); JGoto(ba);
     } else {
-        IjPorts gp; strncpy(gp.succeed,gbfwd,63); strncpy(gp.fail,ports.fail,63);
+        IjPorts gp; strncpy(gp.γ,gbfwd,63); strncpy(gp.ω,ports.ω,63);
         ij_emit_expr(gen, gp, ga, gb);
     }
     /* gbfwd: generator yielded — drain value, kick beta to get next */
     JL(gbfwd); JI("pop2",""); JGoto(gb);
     JL(a); JGoto(ga);
-    JL(b); JGoto(ports.fail);
+    JL(b); JGoto(ports.ω);
 }
 
 /* =========================================================================
  * ICN_WHILE
  * ======================================================================= */
-static void ij_emit_while(IcnNode *n, IjPorts ports, char *oa, char *ob) {
+static void ij_emit_while(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     int id = ij_new_id(); char a[64], b[64];
-    lbl_a(id,a,sizeof a); lbl_b(id,b,sizeof b);
-    strncpy(oa,a,63); strncpy(ob,b,63);
+    lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
+    strncpy(oα,a,63); strncpy(oβ,b,63);
 
     IcnNode *cond = n->children[0];
     IcnNode *body = (n->nchildren > 1) ? n->children[1] : NULL;
@@ -986,14 +981,14 @@ static void ij_emit_while(IcnNode *n, IjPorts ports, char *oa, char *ob) {
     char cond_ok[64];  snprintf(cond_ok,  sizeof cond_ok,  "icn_%d_condok", id);
     char loop_top[64]; snprintf(loop_top, sizeof loop_top, "icn_%d_top",    id);
 
-    IjPorts cp; strncpy(cp.succeed,cond_ok,63); strncpy(cp.fail,ports.fail,63);
+    IjPorts cp; strncpy(cp.γ,cond_ok,63); strncpy(cp.ω,ports.ω,63);
     char ca[64], cb[64]; ij_emit_expr(cond, cp, ca, cb);
 
     JL(cond_ok);
     JI("pop2","");   /* discard condition value */
     if (body) {
         char ba[64], bb[64];
-        IjPorts bp; strncpy(bp.succeed,loop_top,63); strncpy(bp.fail,loop_top,63);
+        IjPorts bp; strncpy(bp.γ,loop_top,63); strncpy(bp.ω,loop_top,63);
         ij_emit_expr(body, bp, ba, bb);
         JGoto(ba);
         JL(loop_top); JGoto(ca);
@@ -1001,37 +996,37 @@ static void ij_emit_while(IcnNode *n, IjPorts ports, char *oa, char *ob) {
         JGoto(ca);
     }
     JL(a); JGoto(ca);
-    JL(b); JGoto(ports.fail);
+    JL(b); JGoto(ports.ω);
 }
 
 /* =========================================================================
  * Dispatch
  * ======================================================================= */
-static void ij_emit_expr(IcnNode *n, IjPorts ports, char *oa, char *ob) {
-    if (!n) { ij_emit_fail_node(NULL,ports,oa,ob); return; }
+static void ij_emit_expr(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
+    if (!n) { ij_emit_fail_node(NULL,ports,oα,oβ); return; }
     switch (n->kind) {
-        case ICN_INT:     ij_emit_int      (n,ports,oa,ob); break;
-        case ICN_STR:     ij_emit_str      (n,ports,oa,ob); break;
-        case ICN_VAR:     ij_emit_var      (n,ports,oa,ob); break;
-        case ICN_ASSIGN:  ij_emit_assign   (n,ports,oa,ob); break;
-        case ICN_RETURN:  ij_emit_return   (n,ports,oa,ob); break;
-        case ICN_SUSPEND: ij_emit_suspend  (n,ports,oa,ob); break;
-        case ICN_FAIL:    ij_emit_fail_node(n,ports,oa,ob); break;
-        case ICN_IF:      ij_emit_if       (n,ports,oa,ob); break;
-        case ICN_ALT:     ij_emit_alt      (n,ports,oa,ob); break;
+        case ICN_INT:     ij_emit_int      (n,ports,oα,oβ); break;
+        case ICN_STR:     ij_emit_str      (n,ports,oα,oβ); break;
+        case ICN_VAR:     ij_emit_var      (n,ports,oα,oβ); break;
+        case ICN_ASSIGN:  ij_emit_assign   (n,ports,oα,oβ); break;
+        case ICN_RETURN:  ij_emit_return   (n,ports,oα,oβ); break;
+        case ICN_SUSPEND: ij_emit_suspend  (n,ports,oα,oβ); break;
+        case ICN_FAIL:    ij_emit_fail_node(n,ports,oα,oβ); break;
+        case ICN_IF:      ij_emit_if       (n,ports,oα,oβ); break;
+        case ICN_ALT:     ij_emit_alt      (n,ports,oα,oβ); break;
         case ICN_AND: {
             /* n-ary conjunction: E1 & E2 & ... & En
              * irgen.icn ir_conjunction: Ei.γ → E(i+1).α; Ei.ω → E(i-1).β; β → En.β */
             int nc = n->nchildren;
             int cid = ij_new_id(); char ca2[64], cb2[64];
-            lbl_a(cid,ca2,sizeof ca2); lbl_b(cid,cb2,sizeof cb2);
-            strncpy(oa,ca2,63); strncpy(ob,cb2,63);
+            lbl_α(cid,ca2,sizeof ca2); lbl_β(cid,cb2,sizeof cb2);
+            strncpy(oα,ca2,63); strncpy(oβ,cb2,63);
             char (*cca)[64] = malloc(nc*64);
             char (*ccb)[64] = malloc(nc*64);
             for (int i = nc-1; i >= 0; i--) {
                 IjPorts ep;
-                strncpy(ep.succeed, (i == nc-1) ? ports.succeed : cca[i+1], 63);
-                strncpy(ep.fail,    (i == 0)    ? ports.fail    : ccb[i-1], 63);
+                strncpy(ep.γ, (i == nc-1) ? ports.γ : cca[i+1], 63);
+                strncpy(ep.ω,    (i == 0)    ? ports.ω    : ccb[i-1], 63);
                 ij_emit_expr(n->children[i], ep, cca[i], ccb[i]);
             }
             JL(ca2); JGoto(cca[0]);
@@ -1040,20 +1035,20 @@ static void ij_emit_expr(IcnNode *n, IjPorts ports, char *oa, char *ob) {
             break;
         }
         case ICN_ADD: case ICN_SUB: case ICN_MUL: case ICN_DIV: case ICN_MOD:
-                          ij_emit_binop    (n,ports,oa,ob); break;
+                          ij_emit_binop    (n,ports,oα,oβ); break;
         case ICN_LT: case ICN_LE: case ICN_GT: case ICN_GE: case ICN_EQ: case ICN_NE:
-                          ij_emit_relop    (n,ports,oa,ob); break;
-        case ICN_TO:      ij_emit_to       (n,ports,oa,ob); break;
-        case ICN_EVERY:   ij_emit_every    (n,ports,oa,ob); break;
-        case ICN_WHILE:   ij_emit_while    (n,ports,oa,ob); break;
-        case ICN_CALL:    ij_emit_call     (n,ports,oa,ob); break;
+                          ij_emit_relop    (n,ports,oα,oβ); break;
+        case ICN_TO:      ij_emit_to       (n,ports,oα,oβ); break;
+        case ICN_EVERY:   ij_emit_every    (n,ports,oα,oβ); break;
+        case ICN_WHILE:   ij_emit_while    (n,ports,oα,oβ); break;
+        case ICN_CALL:    ij_emit_call     (n,ports,oα,oβ); break;
         default: {
             int id = ij_new_id(); char a2[64], b2[64];
-            lbl_a(id,a2,sizeof a2); lbl_b(id,b2,sizeof b2);
-            strncpy(oa,a2,63); strncpy(ob,b2,63);
+            lbl_α(id,a2,sizeof a2); lbl_β(id,b2,sizeof b2);
+            strncpy(oα,a2,63); strncpy(oβ,b2,63);
             J(";  UNIMPL %d id=%d\n", n->kind, id);
-            JL(a2); JGoto(ports.fail);
-            JL(b2); JGoto(ports.fail);
+            JL(a2); JGoto(ports.ω);
+            JL(b2); JGoto(ports.ω);
         }
     }
 }
@@ -1113,7 +1108,7 @@ static void ij_emit_proc(IcnNode *proc, FILE *out_target) {
     for (int i = nstmts-1; i >= 0; i--) {
         IcnNode *stmt = proc->children[body_start + i];
         if (!stmt || stmt->kind == ICN_GLOBAL) { strncpy(alphas[i], next_a, 63); continue; }
-        IjPorts sp; strncpy(sp.succeed, next_a, 63); strncpy(sp.fail, next_a, 63);
+        IjPorts sp; strncpy(sp.γ, next_a, 63); strncpy(sp.ω, next_a, 63);
         char sa[64], sb[64]; ij_emit_expr(stmt, sp, sa, sb);
         strncpy(alphas[i], sa, 63);
         strncpy(next_a, sa, 63);

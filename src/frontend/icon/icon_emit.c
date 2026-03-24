@@ -37,8 +37,8 @@ static void Jmp (IcnEmitter *em, const char *t) { fprintf(em->out, "    jmp     
  * Label utilities
  * ======================================================================= */
 int  icn_new_id(IcnEmitter *em)                          { return em->node_id++; }
-void icn_label_alpha(int id, char *b, size_t s)          { snprintf(b,s,"icon_%d_a",id); }
-void icn_label_beta (int id, char *b, size_t s)          { snprintf(b,s,"icon_%d_b",id); }
+void icn_label_α(int id, char *b, size_t s)          { snprintf(b,s,"icon_%d_α",id); }
+void icn_label_β (int id, char *b, size_t s)          { snprintf(b,s,"icon_%d_β",id); }
 void icn_label_code (int id, char *b, size_t s)          { snprintf(b,s,"icon_%d_code",id); }
 static void label_val(int id, char *b, size_t s)         { snprintf(b,s,"icon_%d_val",id); }
 static void label_I  (int id, char *b, size_t s)         { snprintf(b,s,"icon_%d_I",id); }
@@ -142,7 +142,7 @@ static int slot_offset(int slot) { return -8*(slot+1); }
  * Forward declaration
  * ======================================================================= */
 static void emit_expr(IcnEmitter *em, IcnNode *n, IcnPorts ports,
-                      char *out_alpha, char *out_beta);
+                      char *out_α, char *out_β);
 
 /* =========================================================================
  * ICN_INT
@@ -152,11 +152,11 @@ static void emit_expr(IcnEmitter *em, IcnNode *n, IcnPorts ports,
 static void emit_int(IcnEmitter *em, IcnNode *n, IcnPorts ports,
                      char *oa, char *ob) {
     int id=icn_new_id(em); char a[64],b[64];
-    icn_label_alpha(id,a,sizeof a); icn_label_beta(id,b,sizeof b);
+    icn_label_α(id,a,sizeof a); icn_label_β(id,b,sizeof b);
     strncpy(oa,a,63); strncpy(ob,b,63);
     E(em,"    ; INT %ld  id=%d\n",n->val.ival,id);
-    Ldef(em,a); E(em,"    push    %ld\n",n->val.ival); Jmp(em,ports.succeed);
-    Ldef(em,b); Jmp(em,ports.fail);
+    Ldef(em,a); E(em,"    push    %ld\n",n->val.ival); Jmp(em,ports.γ);
+    Ldef(em,b); Jmp(em,ports.ω);
 }
 
 /* =========================================================================
@@ -165,11 +165,11 @@ static void emit_int(IcnEmitter *em, IcnNode *n, IcnPorts ports,
 static void emit_str(IcnEmitter *em, IcnNode *n, IcnPorts ports,
                      char *oa, char *ob) {
     int id=icn_new_id(em); char a[64],b[64],sl[64];
-    icn_label_alpha(id,a,sizeof a); icn_label_beta(id,b,sizeof b);
+    icn_label_α(id,a,sizeof a); icn_label_β(id,b,sizeof b);
     alloc_str_label(sl,sizeof sl); rodata_declare(sl,n->val.sval);
     strncpy(oa,a,63); strncpy(ob,b,63);
-    Ldef(em,a); E(em,"    lea     rdi, [rel %s]\n",sl); Jmp(em,ports.succeed);
-    Ldef(em,b); Jmp(em,ports.fail);
+    Ldef(em,a); E(em,"    lea     rdi, [rel %s]\n",sl); Jmp(em,ports.γ);
+    Ldef(em,b); Jmp(em,ports.ω);
 }
 
 /* =========================================================================
@@ -180,7 +180,7 @@ static void emit_str(IcnEmitter *em, IcnNode *n, IcnPorts ports,
 static void emit_var(IcnEmitter *em, IcnNode *n, IcnPorts ports,
                      char *oa, char *ob) {
     int id=icn_new_id(em); char a[64],b[64];
-    icn_label_alpha(id,a,sizeof a); icn_label_beta(id,b,sizeof b);
+    icn_label_α(id,a,sizeof a); icn_label_β(id,b,sizeof b);
     strncpy(oa,a,63); strncpy(ob,b,63);
     E(em,"    ; VAR %s  id=%d\n",n->val.sval,id);
     Ldef(em,a);
@@ -194,8 +194,8 @@ static void emit_var(IcnEmitter *em, IcnNode *n, IcnPorts ports,
         E(em,"    mov     rax, [rel %s]\n", gv);
     }
     E(em,"    push    rax\n");
-    Jmp(em,ports.succeed);
-    Ldef(em,b); Jmp(em,ports.fail);
+    Jmp(em,ports.γ);
+    Ldef(em,b); Jmp(em,ports.ω);
 }
 
 /* =========================================================================
@@ -206,11 +206,11 @@ static void emit_assign(IcnEmitter *em, IcnNode *n, IcnPorts ports,
                         char *oa, char *ob) {
     if(n->nchildren<2){ emit_expr(em,NULL,ports,oa,ob); return; }
     int id=icn_new_id(em); char a[64],b[64],store[64];
-    icn_label_alpha(id,a,sizeof a); icn_label_beta(id,b,sizeof b);
+    icn_label_α(id,a,sizeof a); icn_label_β(id,b,sizeof b);
     snprintf(store,sizeof store,"icon_%d_store",id);
     strncpy(oa,a,63); strncpy(ob,b,63);
 
-    IcnPorts rhs_ports; strncpy(rhs_ports.succeed,store,63); strncpy(rhs_ports.fail,ports.fail,63);
+    IcnPorts rhs_ports; strncpy(rhs_ports.γ,store,63); strncpy(rhs_ports.ω,ports.ω,63);
     char ra[64],rb[64];
     emit_expr(em,n->children[1],rhs_ports,ra,rb);
 
@@ -231,7 +231,7 @@ static void emit_assign(IcnEmitter *em, IcnNode *n, IcnPorts ports,
             E(em,"    mov     [rel %s], rax\n",gv);
         }
     }
-    Jmp(em,ports.succeed);
+    Jmp(em,ports.γ);
 }
 
 /* =========================================================================
@@ -241,13 +241,13 @@ static void emit_assign(IcnEmitter *em, IcnNode *n, IcnPorts ports,
 static void emit_return(IcnEmitter *em, IcnNode *n, IcnPorts ports,
                         char *oa, char *ob) {
     int id=icn_new_id(em); char a[64],b[64];
-    icn_label_alpha(id,a,sizeof a); icn_label_beta(id,b,sizeof b);
+    icn_label_α(id,a,sizeof a); icn_label_β(id,b,sizeof b);
     strncpy(oa,a,63); strncpy(ob,b,63);
     (void)ports;
 
     if(n->nchildren>0){
         char after[64]; snprintf(after,sizeof after,"icon_%d_ret_store",id);
-        IcnPorts vp; strncpy(vp.succeed,after,63); strncpy(vp.fail,after,63);
+        IcnPorts vp; strncpy(vp.γ,after,63); strncpy(vp.ω,after,63);
         char va2[64],vb2[64];
         emit_expr(em,n->children[0],vp,va2,vb2);
         Ldef(em,a); Jmp(em,va2);
@@ -273,14 +273,14 @@ static void emit_fail_node(IcnEmitter *em, IcnNode *n, IcnPorts ports,
                            char *oa, char *ob) {
     (void)n; (void)ports;
     int id=icn_new_id(em); char a[64],b[64];
-    icn_label_alpha(id,a,sizeof a); icn_label_beta(id,b,sizeof b);
+    icn_label_α(id,a,sizeof a); icn_label_β(id,b,sizeof b);
     strncpy(oa,a,63); strncpy(ob,b,63);
     Ldef(em,a);
     if(cur_fail_label[0]){
         E(em,"    mov     byte [rel icn_failed], 1\n");
         Jmp(em,cur_fail_label);
-    } else Jmp(em,ports.fail);
-    Ldef(em,b); Jmp(em,ports.fail);
+    } else Jmp(em,ports.ω);
+    Ldef(em,b); Jmp(em,ports.ω);
 }
 
 /* =========================================================================
@@ -302,8 +302,8 @@ static void emit_suspend(IcnEmitter *em, IcnNode *n, IcnPorts ports,
     (void)ports;
     int id = icn_new_id(em);
     char a[64], b[64];
-    icn_label_alpha(id, a, sizeof a);
-    icn_label_beta (id, b, sizeof b);
+    icn_label_α(id, a, sizeof a);
+    icn_label_β (id, b, sizeof b);
     strncpy(oa, a, 63); strncpy(ob, b, 63);
 
     /* resume_here: label the caller's β jumps back to after we yield */
@@ -319,11 +319,11 @@ static void emit_suspend(IcnEmitter *em, IcnNode *n, IcnPorts ports,
     IcnNode *body_node = (n->nchildren > 1) ? n->children[1] : NULL;
 
     /* Emit the value expression; on success jump to after_val */
-    char va[64], vb[64];
+    char va[80], vb[80];
     if (val_node) {
         IcnPorts vp;
-        strncpy(vp.succeed, after_val, 63);
-        strncpy(vp.fail, cur_fail_label[0] ? cur_fail_label : "icn_dead", 63);
+        strncpy(vp.γ, after_val, 63);
+        strncpy(vp.ω, cur_fail_label[0] ? cur_fail_label : "icn_dead", 63);
         emit_expr(em, val_node, vp, va, vb);
     } else {
         /* suspend with no value: yield 0 */
@@ -360,25 +360,25 @@ static void emit_suspend(IcnEmitter *em, IcnNode *n, IcnPorts ports,
     if (body_node) {
         char ba[64], bb[64];
         IcnPorts bp;
-        strncpy(bp.succeed, ports.succeed, 63);
-        strncpy(bp.fail,    ports.succeed, 63);  /* body fail also continues */
+        strncpy(bp.γ, ports.γ, 63);
+        strncpy(bp.ω,    ports.γ, 63);  /* body fail also continues */
         emit_expr(em, body_node, bp, ba, bb);
         Ldef(em, resume_here);
         Jmp(em, ba);
     } else {
         Ldef(em, resume_here);
-        Jmp(em, ports.succeed);
+        Jmp(em, ports.γ);
     }
 }
 
 /* =========================================================================
  * ICN_IF — if cond then E2 [else E3]  (paper §4.5 indirect goto)
- * Simple version (no bounded optimization): emit cond, on succeed→E2, fail→E3/ports.fail
+ * Simple version (no bounded optimization): emit cond, on succeed→E2, fail→E3/ports.ω
  * ======================================================================= */
 static void emit_if(IcnEmitter *em, IcnNode *n, IcnPorts ports,
                     char *oa, char *ob) {
     int id=icn_new_id(em); char a[64],b[64];
-    icn_label_alpha(id,a,sizeof a); icn_label_beta(id,b,sizeof b);
+    icn_label_α(id,a,sizeof a); icn_label_β(id,b,sizeof b);
     strncpy(oa,a,63); strncpy(ob,b,63);
 
     IcnNode *cond=n->children[0];
@@ -390,25 +390,25 @@ static void emit_if(IcnEmitter *em, IcnNode *n, IcnPorts ports,
     char cond_else[64]; snprintf(cond_else,sizeof cond_else,"icon_%d_else",id);
 
     if(thenb){
-        IcnPorts tp; strncpy(tp.succeed,ports.succeed,63); strncpy(tp.fail,ports.fail,63);
+        IcnPorts tp; strncpy(tp.γ,ports.γ,63); strncpy(tp.ω,ports.ω,63);
         emit_expr(em,thenb,tp,then_a,then_b);
-    } else { strncpy(then_a,ports.succeed,63); strncpy(then_b,ports.fail,63); }
+    } else { strncpy(then_a,ports.γ,63); strncpy(then_b,ports.ω,63); }
 
     if(elseb){
-        IcnPorts ep; strncpy(ep.succeed,ports.succeed,63); strncpy(ep.fail,ports.fail,63);
+        IcnPorts ep; strncpy(ep.γ,ports.γ,63); strncpy(ep.ω,ports.ω,63);
         emit_expr(em,elseb,ep,else_a,else_b);
-    } else { strncpy(else_a,ports.fail,63); }
+    } else { strncpy(else_a,ports.ω,63); }
 
-    IcnPorts cp; strncpy(cp.succeed,cond_then,63); strncpy(cp.fail,cond_else,63);
+    IcnPorts cp; strncpy(cp.γ,cond_then,63); strncpy(cp.ω,cond_else,63);
     char ca[64],cb[64];
     emit_expr(em,cond,cp,ca,cb);
 
     /* cond_then: condition succeeded and pushed a value — discard it, enter then */
     Ldef(em,cond_then);
     E(em,"    add     rsp, 8\n");  /* discard condition result value */
-    Jmp(em,thenb?then_a:ports.succeed);
+    Jmp(em,thenb?then_a:ports.γ);
     /* cond_else: condition failed (no value pushed) — enter else */
-    Ldef(em,cond_else); Jmp(em,elseb?else_a:ports.fail);
+    Ldef(em,cond_else); Jmp(em,elseb?else_a:ports.ω);
 
     Ldef(em,a); Jmp(em,ca);
     Ldef(em,b); Jmp(em,cb);
@@ -424,7 +424,7 @@ static void emit_call(IcnEmitter *em, IcnNode *n, IcnPorts ports,
     int nargs=n->nchildren-1;
     const char *fname=(fn->kind==ICN_VAR)?fn->val.sval:"unknown";
     int id=icn_new_id(em); char a[64],b[64];
-    icn_label_alpha(id,a,sizeof a); icn_label_beta(id,b,sizeof b);
+    icn_label_α(id,a,sizeof a); icn_label_β(id,b,sizeof b);
     strncpy(oa,a,63); strncpy(ob,b,63);
 
     E(em,"    ; CALL %s  id=%d\n",fname,id);
@@ -432,12 +432,12 @@ static void emit_call(IcnEmitter *em, IcnNode *n, IcnPorts ports,
     /* --- built-in write --- */
     if(strcmp(fname,"write")==0){
         if(nargs==0){
-            Ldef(em,a); E(em,"    call    icn_write_str\n"); Jmp(em,ports.succeed);
-            Ldef(em,b); Jmp(em,ports.fail); return;
+            Ldef(em,a); E(em,"    call    icn_write_str\n"); Jmp(em,ports.γ);
+            Ldef(em,b); Jmp(em,ports.ω); return;
         }
         IcnNode *arg=n->children[1];
         char after[64]; snprintf(after,sizeof after,"icon_%d_call",id);
-        IcnPorts ap2; strncpy(ap2.succeed,after,63); strncpy(ap2.fail,ports.fail,63);
+        IcnPorts ap2; strncpy(ap2.γ,after,63); strncpy(ap2.ω,ports.ω,63);
         char arg_a[64],arg_b[64];
         emit_expr(em,arg,ap2,arg_a,arg_b);
         Ldef(em,a); Jmp(em,arg_a);
@@ -451,7 +451,7 @@ static void emit_call(IcnEmitter *em, IcnNode *n, IcnPorts ports,
             E(em,"    pop     rdi\n");
             E(em,"    call    icn_write_int\n");
         }
-        Jmp(em,ports.succeed);
+        Jmp(em,ports.γ);
         return;
     }
 
@@ -467,7 +467,7 @@ static void emit_call(IcnEmitter *em, IcnNode *n, IcnPorts ports,
 
         for(int i=nargs-1;i>=0;i--){
             char push_relay[64]; snprintf(push_relay,sizeof push_relay,"icon_%d_push%d",id,i);
-            IcnPorts ap3; strncpy(ap3.succeed,push_relay,63); strncpy(ap3.fail,ports.fail,63);
+            IcnPorts ap3; strncpy(ap3.γ,push_relay,63); strncpy(ap3.ω,ports.ω,63);
             emit_expr(em,n->children[i+1],ap3,arg_alphas[i],arg_betas[i]);
             Ldef(em,push_relay);
             E(em,"    pop     rdi\n");
@@ -486,11 +486,11 @@ static void emit_call(IcnEmitter *em, IcnNode *n, IcnPorts ports,
             E(em,"    ; call β — resume if suspended, fail otherwise\n");
             E(em,"    movzx   rax, byte [rel icn_suspended]\n");
             E(em,"    test    rax, rax\n");
-            E(em,"    jz      %s\n", ports.fail);
+            E(em,"    jz      %s\n", ports.ω);
             E(em,"    mov     byte [rel icn_suspended], 0\n");
             E(em,"    jmp     [rel icn_suspend_resume]\n");
         } else {
-            Jmp(em,ports.fail);
+            Jmp(em,ports.ω);
         }
 
         /* do_call: all args on icn_stack */
@@ -506,27 +506,27 @@ static void emit_call(IcnEmitter *em, IcnNode *n, IcnPorts ports,
             Ldef(em,after_call);
             E(em,"    movzx   rax, byte [rel icn_failed]\n");
             E(em,"    test    rax, rax\n");
-            E(em,"    jnz     %s\n",ports.fail);
+            E(em,"    jnz     %s\n",ports.ω);
             E(em,"    movzx   rax, byte [rel icn_suspended]\n");
             E(em,"    test    rax, rax\n");
             char did_return[64]; snprintf(did_return,sizeof did_return,"icon_%d_returned",id);
             E(em,"    jz      %s\n",did_return);
             E(em,"    mov     rax, [rel icn_retval]\n");
             E(em,"    push    rax\n");
-            Jmp(em,ports.succeed);
+            Jmp(em,ports.γ);
             Ldef(em,did_return);
             E(em,"    mov     rax, [rel icn_retval]\n");
             E(em,"    push    rax\n");
-            Jmp(em,ports.succeed);
+            Jmp(em,ports.γ);
         } else {
             /* Normal call/ret — safe for recursion */
             E(em,"    call    icn_%s\n",fname);
             E(em,"    movzx   rax, byte [rel icn_failed]\n");
             E(em,"    test    rax, rax\n");
-            E(em,"    jnz     %s\n",ports.fail);
+            E(em,"    jnz     %s\n",ports.ω);
             E(em,"    mov     rax, [rel icn_retval]\n");
             E(em,"    push    rax\n");
-            Jmp(em,ports.succeed);
+            Jmp(em,ports.γ);
         }
 
         if(arg_alphas) free(arg_alphas);
@@ -535,8 +535,8 @@ static void emit_call(IcnEmitter *em, IcnNode *n, IcnPorts ports,
     }
 
     /* Unknown call — just fail */
-    Ldef(em,a); Jmp(em,ports.fail);
-    Ldef(em,b); Jmp(em,ports.fail);
+    Ldef(em,a); Jmp(em,ports.ω);
+    Ldef(em,b); Jmp(em,ports.ω);
 }
 
 /* =========================================================================
@@ -547,7 +547,7 @@ static void emit_call(IcnEmitter *em, IcnNode *n, IcnPorts ports,
 static void emit_alt(IcnEmitter *em, IcnNode *n, IcnPorts ports,
                      char *oa, char *ob) {
     int id=icn_new_id(em); char a[64],b[64];
-    icn_label_alpha(id,a,sizeof a); icn_label_beta(id,b,sizeof b);
+    icn_label_α(id,a,sizeof a); icn_label_β(id,b,sizeof b);
     strncpy(oa,a,63); strncpy(ob,b,63);
 
     int nc = n->nchildren;
@@ -558,8 +558,8 @@ static void emit_alt(IcnEmitter *em, IcnNode *n, IcnPorts ports,
     /* Emit right-to-left so ω of child[i] → α of child[i+1] */
     for (int i = nc - 1; i >= 0; i--) {
         IcnPorts ep;
-        strncpy(ep.succeed, ports.succeed, 63);
-        strncpy(ep.fail, (i == nc-1) ? ports.fail : ca[i+1], 63);
+        strncpy(ep.γ, ports.γ, 63);
+        strncpy(ep.ω, (i == nc-1) ? ports.ω : ca[i+1], 63);
         emit_expr(em, n->children[i], ep, ca[i], cb[i]);
     }
 
@@ -579,7 +579,7 @@ static void emit_alt(IcnEmitter *em, IcnNode *n, IcnPorts ports,
 static void emit_binop(IcnEmitter *em, IcnNode *n, IcnPorts ports,
                        char *oa, char *ob) {
     int id=icn_new_id(em); char a[64],b[64],compute[64],lbfwd[64],lstore[64];
-    icn_label_alpha(id,a,sizeof a); icn_label_beta(id,b,sizeof b);
+    icn_label_α(id,a,sizeof a); icn_label_β(id,b,sizeof b);
     snprintf(compute,sizeof compute,"icon_%d_compute",id);
     snprintf(lbfwd,  sizeof lbfwd,  "icon_%d_lb",id);
     snprintf(lstore, sizeof lstore, "icon_%d_lstore",id);
@@ -591,10 +591,10 @@ static void emit_binop(IcnEmitter *em, IcnNode *n, IcnPorts ports,
     int lc_slot = locals_alloc_tmp();
     int bf_slot = locals_alloc_tmp();
 
-    IcnPorts rp; strncpy(rp.succeed,compute,63); strncpy(rp.fail,lbfwd,63);
+    IcnPorts rp; strncpy(rp.γ,compute,63); strncpy(rp.ω,lbfwd,63);
     char ra[64],rb[64]; emit_expr(em,n->children[1],rp,ra,rb);
 
-    IcnPorts lp; strncpy(lp.succeed,lstore,63); strncpy(lp.fail,ports.fail,63);
+    IcnPorts lp; strncpy(lp.γ,lstore,63); strncpy(lp.ω,ports.ω,63);
     char la[64],lb[64]; emit_expr(em,n->children[0],lp,la,lb);
 
     /* Heuristic: if left is a simple value (var/int/str/call), β must re-eval
@@ -639,7 +639,7 @@ static void emit_binop(IcnEmitter *em, IcnNode *n, IcnPorts ports,
         default: break;
     }
     E(em,"    push    rcx\n");
-    Jmp(em,ports.succeed);
+    Jmp(em,ports.γ);
 }
 
 /* =========================================================================
@@ -651,7 +651,7 @@ static void emit_binop(IcnEmitter *em, IcnNode *n, IcnPorts ports,
 static void emit_relop(IcnEmitter *em, IcnNode *n, IcnPorts ports,
                        char *oa, char *ob) {
     int id=icn_new_id(em); char a[64],b[64],chk[64],lbfwd[64];
-    icn_label_alpha(id,a,sizeof a); icn_label_beta(id,b,sizeof b);
+    icn_label_α(id,a,sizeof a); icn_label_β(id,b,sizeof b);
     snprintf(chk,       sizeof chk,       "icon_%d_check",id);
     snprintf(lbfwd,     sizeof lbfwd,     "icon_%d_lb",id);
     strncpy(oa,a,63); strncpy(ob,b,63);
@@ -661,9 +661,9 @@ static void emit_relop(IcnEmitter *em, IcnNode *n, IcnPorts ports,
     char lcache_store[64]; snprintf(lcache_store,sizeof lcache_store,"icon_%d_lstore",id);
     int lc_slot = locals_alloc_tmp();
 
-    IcnPorts rp; strncpy(rp.succeed,chk,63); strncpy(rp.fail,lbfwd,63);
+    IcnPorts rp; strncpy(rp.γ,chk,63); strncpy(rp.ω,lbfwd,63);
     char ra[64],rb[64]; emit_expr(em,n->children[1],rp,ra,rb);
-    IcnPorts lp; strncpy(lp.succeed,lcache_store,63); strncpy(lp.fail,ports.fail,63);
+    IcnPorts lp; strncpy(lp.γ,lcache_store,63); strncpy(lp.ω,ports.ω,63);
     char la[64],lb[64]; emit_expr(em,n->children[0],lp,la,lb);
 
     Ldef(em,lbfwd); Jmp(em,lb);
@@ -682,7 +682,7 @@ static void emit_relop(IcnEmitter *em, IcnNode *n, IcnPorts ports,
     const char *jfail=n->kind==ICN_LT?"jge":n->kind==ICN_LE?"jg":n->kind==ICN_GT?"jle":n->kind==ICN_GE?"jl":n->kind==ICN_EQ?"jne":"je";
     E(em,"    %s      %s\n",jfail,rb);
     E(em,"    push    rcx\n");
-    Jmp(em,ports.succeed);
+    Jmp(em,ports.γ);
 }
 
 /* =========================================================================
@@ -696,7 +696,7 @@ static void emit_relop(IcnEmitter *em, IcnNode *n, IcnPorts ports,
 static void emit_to(IcnEmitter *em, IcnNode *n, IcnPorts ports,
                     char *oa, char *ob) {
     int id=icn_new_id(em); char a[64],b[64],code[64],init[64],e1bf[64],e2bf[64];
-    icn_label_alpha(id,a,sizeof a); icn_label_beta(id,b,sizeof b);
+    icn_label_α(id,a,sizeof a); icn_label_β(id,b,sizeof b);
     icn_label_code(id,code,sizeof code);
     snprintf(init,sizeof init,"icon_%d_init",id);
     snprintf(e1bf,sizeof e1bf,"icon_%d_e1b",id);
@@ -713,9 +713,9 @@ static void emit_to(IcnEmitter *em, IcnNode *n, IcnPorts ports,
     char e2seen[64]; snprintf(e2seen, sizeof e2seen, "icon_%d_e2seen",id);
     bss_declare(e1cur); bss_declare(e2seen);
 
-    IcnPorts e2p; strncpy(e2p.succeed,init,63); strncpy(e2p.fail,e1bf,63);
+    IcnPorts e2p; strncpy(e2p.γ,init,63); strncpy(e2p.ω,e1bf,63);
     char e2a[64],e2b[64]; emit_expr(em,n->children[1],e2p,e2a,e2b);
-    IcnPorts e1p; strncpy(e1p.succeed,e2a,63); strncpy(e1p.fail,ports.fail,63);
+    IcnPorts e1p; strncpy(e1p.γ,e2a,63); strncpy(e1p.ω,ports.ω,63);
     char e1a[64],e1b[64]; emit_expr(em,n->children[0],e1p,e1a,e1b);
 
     /* e1bf: E1 advancing → reset e2_seen so next init pops both from stack */
@@ -751,11 +751,11 @@ static void emit_to(IcnEmitter *em, IcnNode *n, IcnPorts ports,
     /* When E1 advances (e1b fires after e2 exhausts), update e1cur and reset e2_seen */
     /* We intercept by patching e1b's flow: e1b → e1cur_update → original e1b path.
      * But e1b is already emitted inside emit_expr. Instead, emit a wrapper:
-     * e1bf already jumps to e1b. When E1 succeeds again (e1p.succeed = e2a),
+     * e1bf already jumps to e1b. When E1 succeeds again (e1p.γ = e2a),
      * E1 pushes new value and jumps to e2a (E2 start). E2's succeed = init.
      * At that point e2_seen=1 → e2adv path which uses e1cur.
      * But e1cur still has the OLD E1 value! We need to update e1cur when E1 succeeds.
-     * Solution: intercept E1's succeed: e1p.succeed → e1_capture → e2a */
+     * Solution: intercept E1's succeed: e1p.γ → e1_capture → e2a */
     /* NOTE: e1p was already emitted above with succeed=e2a. We can't change that.
      * Instead: e2_seen reset to 0 when E1 advances (e1bf fires).
      * That way next init will pop E1 from stack and update e1cur correctly. */
@@ -765,7 +765,7 @@ static void emit_to(IcnEmitter *em, IcnNode *n, IcnPorts ports,
     E(em,"    cmp     rax, [rel %s]\n",bound);
     E(em,"    jg      %s\n",e2bf);
     E(em,"    push    rax\n");              /* push current counter value */
-    Jmp(em,ports.succeed);
+    Jmp(em,ports.γ);
 }
 
 /* =========================================================================
@@ -774,7 +774,7 @@ static void emit_to(IcnEmitter *em, IcnNode *n, IcnPorts ports,
 static void emit_to_by(IcnEmitter *em, IcnNode *n, IcnPorts ports,
                        char *oa, char *ob) {
     int id=icn_new_id(em); char a[64],b[64],code[64],init[64],e1bf[64],e2bf[64];
-    icn_label_alpha(id,a,sizeof a); icn_label_beta(id,b,sizeof b);
+    icn_label_α(id,a,sizeof a); icn_label_β(id,b,sizeof b);
     icn_label_code(id,code,sizeof code);
     snprintf(init,sizeof init,"icon_%d_init",id);
     snprintf(e1bf,sizeof e1bf,"icon_%d_e1b",id);
@@ -783,18 +783,18 @@ static void emit_to_by(IcnEmitter *em, IcnNode *n, IcnPorts ports,
     bss_declare(I); bss_declare(v);
     strncpy(oa,a,63); strncpy(ob,b,63);
 
-    IcnPorts e3p; strncpy(e3p.succeed,init,63); strncpy(e3p.fail,e2bf,63);
+    IcnPorts e3p; strncpy(e3p.γ,init,63); strncpy(e3p.ω,e2bf,63);
     char e3a[64],e3b[64]; emit_expr(em,n->children[2],e3p,e3a,e3b);
-    IcnPorts e2p; strncpy(e2p.succeed,e3a,63); strncpy(e2p.fail,e1bf,63);
+    IcnPorts e2p; strncpy(e2p.γ,e3a,63); strncpy(e2p.ω,e1bf,63);
     char e2a[64],e2b[64]; emit_expr(em,n->children[1],e2p,e2a,e2b);
-    IcnPorts e1p; strncpy(e1p.succeed,e2a,63); strncpy(e1p.fail,ports.fail,63);
+    IcnPorts e1p; strncpy(e1p.γ,e2a,63); strncpy(e1p.ω,ports.ω,63);
     char e1a[64],e1b[64]; emit_expr(em,n->children[0],e1p,e1a,e1b);
 
     Ldef(em,e1bf); Jmp(em,e1b);
     Ldef(em,e2bf); Jmp(em,e2b);
     Ldef(em,a);    Jmp(em,e1a);
     int e1id=-1,e2id=-1,e3id=-1;
-    sscanf(e1a,"icon_%d_a",&e1id); sscanf(e2a,"icon_%d_a",&e2id); sscanf(e3a,"icon_%d_a",&e3id);
+    sscanf(e1a,"icon_%d_α",&e1id); sscanf(e2a,"icon_%d_α",&e2id); sscanf(e3a,"icon_%d_α",&e3id);
     Ldef(em,b);
     if(e3id>=0) E(em,"    mov     rcx, [rel icon_%d_val]\n",e3id);
     E(em,"    add     [rel %s], rcx\n",I); Jmp(em,code);
@@ -806,7 +806,7 @@ static void emit_to_by(IcnEmitter *em, IcnNode *n, IcnPorts ports,
     if(e2id>=0) E(em,"    cmp     rax, [rel icon_%d_val]\n",e2id);
     E(em,"    jg      %s\n",e2bf);
     E(em,"    mov     [rel %s], rax\n",v);
-    Jmp(em,ports.succeed);
+    Jmp(em,ports.γ);
 }
 
 /* =========================================================================
@@ -820,7 +820,7 @@ static void emit_to_by(IcnEmitter *em, IcnNode *n, IcnPorts ports,
 static void emit_while(IcnEmitter *em, IcnNode *n, IcnPorts ports,
                        char *oa, char *ob) {
     int id=icn_new_id(em); char a[64],b[64];
-    icn_label_alpha(id,a,sizeof a); icn_label_beta(id,b,sizeof b);
+    icn_label_α(id,a,sizeof a); icn_label_β(id,b,sizeof b);
     strncpy(oa,a,63); strncpy(ob,b,63);
     E(em,"    ; WHILE  id=%d\n",id);
 
@@ -831,7 +831,7 @@ static void emit_while(IcnEmitter *em, IcnNode *n, IcnPorts ports,
     char loop_top[64]; snprintf(loop_top,sizeof loop_top,"icon_%d_top",id);
 
     char ca[64],cb[64];
-    IcnPorts cp; strncpy(cp.succeed,cond_ok,63); strncpy(cp.fail,ports.fail,63);
+    IcnPorts cp; strncpy(cp.γ,cond_ok,63); strncpy(cp.ω,ports.ω,63);
     emit_expr(em,cond,cp,ca,cb);
 
     /* cond_ok: condition succeeded, value on stack — discard it, run body */
@@ -840,7 +840,7 @@ static void emit_while(IcnEmitter *em, IcnNode *n, IcnPorts ports,
 
     if(body){
         char ba[64],bb[64];
-        IcnPorts bp; strncpy(bp.succeed,loop_top,63); strncpy(bp.fail,loop_top,63);
+        IcnPorts bp; strncpy(bp.γ,loop_top,63); strncpy(bp.ω,loop_top,63);
         emit_expr(em,body,bp,ba,bb);
         Jmp(em,ba);
 
@@ -851,7 +851,7 @@ static void emit_while(IcnEmitter *em, IcnNode *n, IcnPorts ports,
     }
 
     Ldef(em,a); Jmp(em,ca);
-    Ldef(em,b); Jmp(em,ports.fail);
+    Ldef(em,b); Jmp(em,ports.ω);
 }
 
 /* =========================================================================
@@ -860,7 +860,7 @@ static void emit_while(IcnEmitter *em, IcnNode *n, IcnPorts ports,
 static void emit_every(IcnEmitter *em, IcnNode *n, IcnPorts ports,
                        char *oa, char *ob) {
     int id=icn_new_id(em); char a[64],b[64],gbfwd[64];
-    icn_label_alpha(id,a,sizeof a); icn_label_beta(id,b,sizeof b);
+    icn_label_α(id,a,sizeof a); icn_label_β(id,b,sizeof b);
     snprintf(gbfwd,sizeof gbfwd,"icon_%d_genb",id);
     strncpy(oa,a,63); strncpy(ob,b,63);
     E(em,"    ; EVERY  id=%d\n",id);
@@ -871,18 +871,18 @@ static void emit_every(IcnEmitter *em, IcnNode *n, IcnPorts ports,
 
     if(body){
         char bstart[64]; snprintf(bstart,sizeof bstart,"icon_%d_body",id);
-        IcnPorts bp; strncpy(bp.succeed,gbfwd,63); strncpy(bp.fail,gbfwd,63);
+        IcnPorts bp; strncpy(bp.γ,gbfwd,63); strncpy(bp.ω,gbfwd,63);
         char ba[64],bb[64]; emit_expr(em,body,bp,ba,bb);
-        IcnPorts gp; strncpy(gp.succeed,bstart,63); strncpy(gp.fail,ports.fail,63);
+        IcnPorts gp; strncpy(gp.γ,bstart,63); strncpy(gp.ω,ports.ω,63);
         emit_expr(em,gen,gp,ga,gb);
         Ldef(em,bstart); Jmp(em,ba);
     } else {
-        IcnPorts gp; strncpy(gp.succeed,gbfwd,63); strncpy(gp.fail,ports.fail,63);
+        IcnPorts gp; strncpy(gp.γ,gbfwd,63); strncpy(gp.ω,ports.ω,63);
         emit_expr(em,gen,gp,ga,gb);
     }
     Ldef(em,gbfwd); Jmp(em,gb);
     Ldef(em,a); Jmp(em,ga);
-    Ldef(em,b); Jmp(em,ports.fail);
+    Ldef(em,b); Jmp(em,ports.ω);
 }
 
 /* =========================================================================
@@ -918,7 +918,7 @@ static void emit_expr(IcnEmitter *em, IcnNode *n, IcnPorts ports,
              *   β → En.β (resume rightmost) */
             int nc = n->nchildren;
             int cid = icn_new_id(em); char ca2[64],cb2[64];
-            icn_label_alpha(cid,ca2,sizeof ca2); icn_label_beta(cid,cb2,sizeof cb2);
+            icn_label_α(cid,ca2,sizeof ca2); icn_label_β(cid,cb2,sizeof cb2);
             strncpy(oa,ca2,63); strncpy(ob,cb2,63);
 
             char (*cca)[64] = malloc(nc*64);
@@ -927,12 +927,12 @@ static void emit_expr(IcnEmitter *em, IcnNode *n, IcnPorts ports,
             /* Emit right-to-left: Ei.ω → E(i-1).β, En.ω → node.ω */
             for (int i = nc-1; i >= 0; i--) {
                 IcnPorts ep;
-                strncpy(ep.succeed, ports.succeed, 63);
-                strncpy(ep.fail, (i == 0) ? ports.fail : ccb[i-1], 63);
+                strncpy(ep.γ, ports.γ, 63);
+                strncpy(ep.ω, (i == 0) ? ports.ω : ccb[i-1], 63);
                 emit_expr(em, n->children[i], ep, cca[i], ccb[i]);
             }
             /* Chain γ left-to-right: Ei.γ → E(i+1).α already handled via
-             * ports.succeed threading; just wire the node entry/resume */
+             * ports.γ threading; just wire the node entry/resume */
             Ldef(em,ca2); Jmp(em,cca[0]);
             Ldef(em,cb2); Jmp(em,ccb[nc-1]);
             free(cca); free(ccb);
@@ -940,11 +940,11 @@ static void emit_expr(IcnEmitter *em, IcnNode *n, IcnPorts ports,
         }
         default:{
             int id=icn_new_id(em); char a2[64],b2[64];
-            icn_label_alpha(id,a2,sizeof a2); icn_label_beta(id,b2,sizeof b2);
+            icn_label_α(id,a2,sizeof a2); icn_label_β(id,b2,sizeof b2);
             strncpy(oa,a2,63); strncpy(ob,b2,63);
             E(em,"    ; UNIMPL %s id=%d\n",icn_kind_name(n->kind),id);
-            Ldef(em,a2); Jmp(em,ports.fail);
-            Ldef(em,b2); Jmp(em,ports.fail);
+            Ldef(em,a2); Jmp(em,ports.ω);
+            Ldef(em,b2); Jmp(em,ports.ω);
         }
     }
 }
@@ -1027,7 +1027,7 @@ void icn_emit_file(IcnEmitter *em, IcnNode **nodes, int count) {
         for(int i=nstmts-1;i>=0;i--){
             IcnNode *stmt=proc->children[body_start+i];
             if(!stmt||stmt->kind==ICN_GLOBAL){ strncpy(alphas[i],next_a,63); continue; }
-            IcnPorts sp; strncpy(sp.succeed,next_a,63); strncpy(sp.fail,next_a,63);
+            IcnPorts sp; strncpy(sp.γ,next_a,63); strncpy(sp.ω,next_a,63);
             char sa[64],sb[64]; emit_expr(em,stmt,sp,sa,sb);
             strncpy(alphas[i],sa,63); strncpy(next_a,sa,63);
         }

@@ -2,24 +2,24 @@
  * icon_emit.h — Tiny-ICON four-port x64 ASM emitter API
  *
  * Translates an IcnNode AST to NASM x64 assembly using the Byrd Box
- * four-port model (α/β/γ/ω) as described in Proebsting 1996.
+ * four-port model as described in Proebsting 1996.
  *
- * Label convention (matches existing snobol4x ASM backend):
- *   icon_N_a   α — initial entry (start)
- *   icon_N_b   β — re-entry (resume)
- *   icon_N_g   γ — success departure
- *   icon_N_w   ω — failure departure
- * where N is a unique node ID assigned during emission.
+ * Ports — named with their Greek letters throughout this codebase:
+ *   α  — initial entry        (synthesized label: icon_N_α)
+ *   β  — re-entry / resume    (synthesized label: icon_N_β)
+ *   γ  — success departure    (inherited, passed as label string in IcnPorts.γ)
+ *   ω  — failure departure    (inherited, passed as label string in IcnPorts.ω)
  *
- * Extra labels (e.g. for ICN_TO counter check):
- *   icon_N_code   (intermediate logic label)
+ * α and β are synthesized (emitted inline per node).
+ * γ and ω are inherited — passed down as strings from parent to child.
  *
- * Port threading:
- *   α and β are synthesized (emitted inline).
- *   γ and ω are inherited — passed as label strings from the parent node.
+ * Extra label: icon_N_code  (intermediate logic, e.g. ICN_TO counter check)
  *
- * Bounded flag:
- *   All four ports emitted unconditionally (bounded optimization deferred).
+ * Bounded flag: all four ports emitted unconditionally (deferred optimization).
+ *
+ * Note: generated NASM labels use UTF-8 (α β γ ω) directly — NASM 2.x
+ * accepts UTF-8 in local labels.  These are never exported (not in 'global'),
+ * so there is no ELF symbol-table issue.
  */
 
 #ifndef ICON_EMIT_H
@@ -29,20 +29,20 @@
 #include <stdio.h>
 
 /* -------------------------------------------------------------------------
- * Port set: inherited ports passed down from parent to child
+ * IcnPorts — inherited γ/ω labels threaded from parent to child
  * -------------------------------------------------------------------------*/
 typedef struct {
-    char succeed[64];  /* γ — where to jump on success */
-    char fail[64];     /* ω — where to jump on failure */
+    char γ[64];   /* success port — jump here on γ (succeed) */
+    char ω[64];   /* failure port — jump here on ω (fail)    */
 } IcnPorts;
 
 /* -------------------------------------------------------------------------
- * Emitter state
+ * IcnEmitter state
  * -------------------------------------------------------------------------*/
 typedef struct {
-    FILE *out;          /* output stream */
-    int   node_id;      /* monotonic counter for unique label generation */
-    int   bounded;      /* non-zero = value-needed context (deferred) */
+    FILE *out;
+    int   node_id;
+    int   bounded;
     char  errmsg[256];
     int   had_error;
 } IcnEmitter;
@@ -50,28 +50,17 @@ typedef struct {
 /* -------------------------------------------------------------------------
  * API
  * -------------------------------------------------------------------------*/
-
-/* Initialize emitter writing to 'out' */
 void icn_emit_init(IcnEmitter *em, FILE *out);
-
-/* Emit the full assembly for a list of top-level nodes (procedures + globals).
- * This is the main entry point called by icon_driver.c */
 void icn_emit_file(IcnEmitter *em, IcnNode **nodes, int count);
-
-/* Emit a single procedure */
 void icn_emit_proc(IcnEmitter *em, IcnNode *proc);
 
-/* Emit one expression node with given inherited ports.
- * Fills 'out_alpha' and 'out_beta' with the synthesized port labels.
- * Callers chain: parent's γ/ω → child's constructor → child emits, returns α/β labels. */
-void icn_emit_expr(IcnEmitter *em, IcnNode *n,
-                   IcnPorts ports,
-                   char *out_alpha, char *out_beta);
+/* Emit one expression; returns synthesized α/β labels in *out_α, *out_β */
+void icn_emit_expr(IcnEmitter *em, IcnNode *n, IcnPorts ports,
+                   char *out_α, char *out_β);
 
-/* Allocate a unique node ID and fill label strings */
-int  icn_new_id(IcnEmitter *em);
-void icn_label_alpha(int id, char *buf, size_t sz);
-void icn_label_beta (int id, char *buf, size_t sz);
-void icn_label_code (int id, char *buf, size_t sz);  /* extra: to.code etc */
+int  icn_new_id   (IcnEmitter *em);
+void icn_label_α  (int id, char *buf, size_t sz);
+void icn_label_β  (int id, char *buf, size_t sz);
+void icn_label_code(int id, char *buf, size_t sz);
 
 #endif /* ICON_EMIT_H */
