@@ -2331,6 +2331,58 @@ static int expr_is_pattern_expr(EXPR_t *e) {
  * local names into locals[][] (nlocals_out count).
  * SNOBOL4 prototype: 'fname(p1,p2)l1,l2'  — params inside (), locals after ')'.
  * Returns 1 on success, 0 on parse failure. */
+
+/* Flatten an EXPR_t tree of E_CONC / E_QLIT nodes into a single string.
+ * Handles multi-line DEFINE specs built by continuation (+) lines, e.g.:
+ *   DEFINE('Read(fileName,rdMapName)'
+ *   +      'rdInput,rdIn,...')
+ * which parses as E_CONC(E_QLIT("Read(fileName,rdMapName)"), E_QLIT("rdInput,...")).
+ * Writes into buf[bufsz]. Returns buf on success, NULL on truncation/failure. */
+static const char *expr_flatten_str(const EXPR_t *e, char *buf, size_t bufsz) {
+    if (!e || bufsz == 0) return NULL;
+    if (e->kind == E_QLIT) {
+        if (!e->sval) { buf[0] = '\0'; return buf; }
+        size_t len = strlen(e->sval);
+        if (len >= bufsz) return NULL;  /* truncation */
+        memcpy(buf, e->sval, len + 1);
+        return buf;
+    }
+    if (e->kind == E_CONC) {
+        /* Left-fold: flatten left child first, then append right */
+        char *pos = buf;
+        size_t rem = bufsz;
+        /* Iterative in-order traversal — collect all E_QLIT leaves */
+        const EXPR_t *leaves[256];
+        int nleaves = 0;
+        /* Iterative in-order via explicit stack */
+        const EXPR_t *stk2[128];
+        int t2 = 0;
+        stk2[t2++] = e;
+        while (t2 > 0 && nleaves < 255) {
+            const EXPR_t *cur = stk2[--t2];
+            if (!cur) continue;
+            if (cur->kind == E_QLIT) {
+                leaves[nleaves++] = cur;
+            } else if (cur->kind == E_CONC) {
+                /* Push right then left so left is processed first */
+                if (cur->nchildren >= 2 && cur->children[1]) stk2[t2++] = cur->children[1];
+                if (cur->nchildren >= 1 && cur->children[0]) stk2[t2++] = cur->children[0];
+            }
+        }
+        for (int i = 0; i < nleaves; i++) {
+            const char *s = leaves[i]->sval ? leaves[i]->sval : "";
+            size_t slen = strlen(s);
+            if (slen >= rem) return NULL;  /* truncation */
+            memcpy(pos, s, slen);
+            pos += slen;
+            rem -= slen;
+        }
+        *pos = '\0';
+        return buf;
+    }
+    return NULL;  /* unsupported expr kind */
+}
+
 static int parse_define_str(const char *def,
                              char *fname_out, int fname_max,
                              char params[MAX_PARAMS][64],
@@ -2397,9 +2449,18 @@ static void scan_named_patterns(Program *prog) {
         if (s->subject && s->subject->kind == E_FNC &&
             s->subject->sval && strcasecmp(s->subject->sval, "DEFINE") == 0 &&
             s->subject->nchildren >= 1 &&
-            s->subject->children[0] && s->subject->children[0]->kind == E_QLIT &&
-            s->subject->children[0]->sval) {
-            const char *def_str = s->subject->children[0]->sval;
+            s->subject->children[0] &&
+            (s->subject->children[0]->kind == E_QLIT ||
+             s->subject->children[0]->kind == E_CONC)) {
+            /* B-275: Handle multi-line DEFINE specs built via continuation (+) lines.
+             * Single-line: DEFINE('fname(p)loc')  → children[0] is E_QLIT.
+             * Multi-line:  DEFINE('fname(p)'      → children[0] is E_CONC of E_QLITs.
+             *              +      'loc1,loc2')
+             * expr_flatten_str() handles both cases by DFS-collecting E_QLIT leaves. */
+            char def_buf[1024];
+            const char *def_str = expr_flatten_str(s->subject->children[0],
+                                                    def_buf, sizeof def_buf);
+            if (!def_str) continue;  /* truncation or unsupported shape — skip */
             char fname[128];
             char params[MAX_PARAMS][64];
             int nparams = 0;
