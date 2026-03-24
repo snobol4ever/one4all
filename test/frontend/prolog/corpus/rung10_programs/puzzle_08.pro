@@ -1,39 +1,62 @@
 %-------------------------------------------------------------------------------
-% 8
-% In a certain department store the positions of buyer, cashier, clerk,
-% floorwalker, and manager are held by Miss Ames, Miss Brown, Mr. Conroy,
-% Mr. Davis, and Mr. Evans.
-% The cashier and the manager were roommates in college.
-% The buyer is a bachelor.
-% Evans and Miss Ames have had only business contacts with each other.
-% Mrs. Conroy was greatly disappointed when her husband told her that the
-% manager had refused to give him a raise.
-% Davis is going to be the best man when the clerk and the cashier are married.
-% What position does each person hold?
+% 8 — Department store positions
 %-------------------------------------------------------------------------------
-:- initialization(main). main :- puzzle; true.
+:- initialization(main). main :- puzzle ; true.
 
-% Deduction:
-%   Mrs. Conroy => Conroy married => Conroy \= buyer (buyer=bachelor), \= manager (manager refused him).
-%   Cashier+manager = college roommates (same sex).
-%   Clerk marries cashier (Davis is best man => Davis \= clerk, \= cashier).
-%   Cashier+manager same sex. Women: Ames, Brown. Men: Conroy, Davis, Evans.
-%   If cashier=Brown, manager=Ames (both women, roommates):
-%     Clerk marries Brown(cashier). Clerk is male. Clerk in {Conroy,Evans} (Davis \= clerk).
-%     Conroy married => if Conroy=clerk, Conroy marries Brown (already married). Contradiction.
-%     => Clerk=Evans.
-%     "Evans+Ames only business contacts": Evans=clerk, Ames=manager — business contact ✓.
-%     Buyer=bachelor: Conroy(married) \= buyer. Davis=buyer. Conroy=floorwalker.
-%   Solution: Ames=manager, Brown=cashier, Conroy=floorwalker, Davis=buyer, Evans=clerk.
+position(buyer). position(cashier). position(clerk). position(floorwalker). position(manager).
 
 puzzle :-
-    display(manager, cashier, floorwalker, buyer, clerk),
-    fail.
-
-display(Ames, Brown, Conroy, Davis, Evans) :-
+    position(Ames), position(Brown), position(Conroy), position(Davis), position(Evans),
+    all_diff5(Ames, Brown, Conroy, Davis, Evans),
+    % buyer is a bachelor (male, unmarried): women and Conroy(married) excluded
+    Ames   \= buyer,
+    Brown  \= buyer,
+    Conroy \= buyer,
+    % Conroy married => not cashier (to marry clerk) and not clerk (to marry cashier)
+    Conroy \= cashier,
+    Conroy \= clerk,
+    % Manager refused Conroy a raise => Conroy \= manager
+    Conroy \= manager,
+    % Davis is best man at clerk+cashier wedding => Davis \= clerk, Davis \= cashier
+    Davis  \= clerk,
+    Davis  \= cashier,
+    % Cashier and manager were college roommates => same sex
+    cashier_manager_same_sex(Ames, Brown, Conroy, Davis, Evans),
+    % Clerk marries cashier => opposite sex
+    clerk_cashier_opp(Ames, Brown, Conroy, Davis, Evans),
+    % Evans and Ames only business contacts => not the marrying pair
+    \+ (Evans = clerk, Ames = cashier),
+    \+ (Ames  = clerk, Evans = cashier),
     write('Ames='),   write(Ames),
     write(' Brown='), write(Brown),
     write(' Conroy='),write(Conroy),
     write(' Davis='), write(Davis),
     write(' Evans='), write(Evans),
-    write('\n').
+    write('\n'),
+    fail.
+
+sex(ames, f). sex(brown, f).
+sex(conroy, m). sex(davis, m). sex(evans, m).
+
+holder_sex(Pos, Ames, Brown, Conroy, Davis, Evans, Sex) :-
+    ( Ames   = Pos -> sex(ames,   Sex)
+    ; Brown  = Pos -> sex(brown,  Sex)
+    ; Conroy = Pos -> sex(conroy, Sex)
+    ; Davis  = Pos -> sex(davis,  Sex)
+    ; Evans  = Pos -> sex(evans,  Sex)
+    ).
+
+cashier_manager_same_sex(A,B,C,D,E) :-
+    holder_sex(cashier, A,B,C,D,E, S1),
+    holder_sex(manager, A,B,C,D,E, S2),
+    S1 = S2.
+
+clerk_cashier_opp(A,B,C,D,E) :-
+    holder_sex(clerk,   A,B,C,D,E, S1),
+    holder_sex(cashier, A,B,C,D,E, S2),
+    S1 \= S2.
+
+all_diff5(A,B,C,D,E) :-
+    A\=B, A\=C, A\=D, A\=E,
+    B\=C, B\=D, B\=E,
+    C\=D, C\=E, D\=E.
