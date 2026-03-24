@@ -1,0 +1,6 @@
+# rung04 t04: multiple string writes
+procedure main();
+  write("one");
+  write("two");
+  write("three");
+end

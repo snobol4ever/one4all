@@ -1,0 +1,4 @@
+# rung04 t02: string concatenation of two literals
+procedure main();
+  write("foo" || "bar");
+end

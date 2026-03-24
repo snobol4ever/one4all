@@ -1,0 +1,4 @@
+# rung04 t01: string literal write
+procedure main();
+  write("hello");
+end
