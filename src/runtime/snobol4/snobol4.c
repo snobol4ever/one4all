@@ -288,9 +288,46 @@ static DESCR_t _b_HOST(DESCR_t *a, int n) {
     }
     return NULVCL;
 }
+/* ============================================================
+ * Named-channel I/O table
+ * Supports INPUT(var,chan,fname) / OUTPUT(var,chan,fname) / ENDFILE(chan)
+ * ============================================================ */
+#define IO_CHAN_MAX 32
+typedef struct {
+    FILE  *fp;
+    char  *varname;   /* bound variable name, or NULL if unused */
+    int    is_output; /* 1=write, 0=read */
+    char  *buf;       /* read buffer */
+    size_t cap;       /* read buffer capacity */
+} io_chan_t;
+static io_chan_t _io_chan[IO_CHAN_MAX];
+static int _io_chan_init = 0;
+static void _io_chan_setup(void) {
+    if (_io_chan_init) return;
+    memset(_io_chan, 0, sizeof(_io_chan));
+    _io_chan_init = 1;
+}
+static int _io_chan_find_by_var(const char *name) {
+    _io_chan_setup();
+    for (int i = 0; i < IO_CHAN_MAX; i++)
+        if (_io_chan[i].varname && strcmp(_io_chan[i].varname, name) == 0) return i;
+    return -1;
+}
+static void _io_chan_close(int ch) {
+    _io_chan_setup();
+    if (ch < 0 || ch >= IO_CHAN_MAX) return;
+    if (_io_chan[ch].fp) { fclose(_io_chan[ch].fp); _io_chan[ch].fp = NULL; }
+    if (_io_chan[ch].varname) { free(_io_chan[ch].varname); _io_chan[ch].varname = NULL; }
+    if (_io_chan[ch].buf)  { free(_io_chan[ch].buf); _io_chan[ch].buf = NULL; }
+    _io_chan[ch].cap = 0;
+    _io_chan[ch].is_output = 0;
+}
+
 static DESCR_t _b_ENDFILE(DESCR_t *a, int n) {
-    (void)a; (void)n;
-    return FAILDESCR;  /* not at EOF on any channel */
+    if (n < 1) return NULVCL;
+    int ch = (int)a[0].i;
+    if (ch >= 0 && ch < IO_CHAN_MAX) _io_chan_close(ch);
+    return NULVCL;
 }
 static DESCR_t _b_APPLY(DESCR_t *a, int n) {
     if (n < 1) return NULVCL;
@@ -355,7 +392,8 @@ static DESCR_t _b_EVAL(DESCR_t *a, int n)  { return EVAL_fn(n>0?a[0]:NULVCL); }
 static DESCR_t _b_OPSYN(DESCR_t *a, int n) {
     return opsyn(n>0?a[0]:NULVCL,n>1?a[1]:NULVCL,n>2?a[2]:NULVCL); }
 static DESCR_t _b_SORT(DESCR_t *a, int n)  { return sort_fn(n>0?a[0]:NULVCL); }
-static DESCR_t _b_INPUT(DESCR_t *a, int n);  /* defined near input_read below */
+static DESCR_t _b_INPUT(DESCR_t *a, int n);   /* defined near input_read below */
+static DESCR_t _b_OUTPUT(DESCR_t *a, int n);  /* defined near input_read below */
 
 /* ARRAY(n) or ARRAY('lo:hi') or ARRAY('lo:hi,lo2:hi2') */
 static DESCR_t _b_ARRAY(DESCR_t *a, int n) {
@@ -906,7 +944,8 @@ void SNO_INIT_fn(void) {
     register_fn("ARG",   _b_ARG,   2, 2);
     register_fn("LOCAL", _b_LOCAL, 2, 2);
     register_fn("SORT",  _b_SORT,  1, 1);
-    register_fn("INPUT", _b_INPUT, 1, 4);
+    register_fn("INPUT",  _b_INPUT,  1, 4);
+    register_fn("OUTPUT", _b_OUTPUT, 1, 4);
     register_fn("nPush",    _b_nPush,    0, 0);
     register_fn("nInc",     _b_nInc,     0, 0);
     register_fn("nDec",     _b_nDec,     0, 0);
@@ -1435,6 +1474,15 @@ DESCR_t NV_GET_fn(const char *name) {
     if (!name) return NULVCL;
     /* Special I/O variables */
     if (strcmp(name, "INPUT") == 0) return input_read();
+    /* Channel-bound input variable? */
+    _io_chan_setup();
+    int ch = _io_chan_find_by_var(name);
+    if (ch >= 0 && !_io_chan[ch].is_output && _io_chan[ch].fp) {
+        ssize_t nread = getline(&_io_chan[ch].buf, &_io_chan[ch].cap, _io_chan[ch].fp);
+        if (nread < 0) return FAILDESCR;
+        if (nread > 0 && _io_chan[ch].buf[nread-1] == '\n') _io_chan[ch].buf[nread-1] = '\0';
+        return STRVAL(GC_strdup(_io_chan[ch].buf));
+    }
     /* Protected/unprotected keywords backed by C globals */
     if (strcmp(name, "STCOUNT")  == 0) return INTVAL(kw_stcount);
     if (strcmp(name, "STNO")     == 0) return INTVAL(kw_stcount);
@@ -1452,6 +1500,14 @@ void NV_SET_fn(const char *name, DESCR_t val) {
     _var_init();
     if (!name) return;
     comm_var(name, val);
+    /* Channel-bound output variable? */
+    _io_chan_setup();
+    int ch = _io_chan_find_by_var(name);
+    if (ch >= 0 && _io_chan[ch].is_output && _io_chan[ch].fp) {
+        char *s = VARVAL_fn(val);
+        fprintf(_io_chan[ch].fp, "%s\n", s ? s : "");
+        return;
+    }
     /* Special I/O variables */
     if (strcmp(name, "OUTPUT") == 0) { output_val(val); return; }
     if (strcmp(name, "TERMINAL") == 0) {
@@ -2184,33 +2240,45 @@ DESCR_t input_read(void) {
     return STRVAL(GC_strdup(_input_buf));
 }
 
-/* INPUT(name, channel, options, fileName) — I/O association (SPITBOL-style).
- * io.sno OPSYNs the original INPUT builtin to input__ then calls it with 4 args.
- * We support the essential case: reassign INPUT source to a named file. */
+/* Extract filename from "filename[-opts]" or "filename" string */
+static const char *_io_extract_fname(const char *opts_str, char *buf, size_t bufsz) {
+    if (!opts_str || !opts_str[0]) return NULL;
+    const char *bracket = strchr(opts_str, '[');
+    if (bracket) {
+        size_t len = (size_t)(bracket - opts_str);
+        while (len > 0 && opts_str[len-1] == ' ') len--;
+        if (len > 0 && len < bufsz) {
+            memcpy(buf, opts_str, len);
+            buf[len] = '\0';
+            return buf;
+        }
+        return NULL;
+    }
+    return opts_str;  /* no bracket — whole string is filename */
+}
+
+/* Get the variable name from a descriptor (handles NAME/indirect form) */
+static const char *_io_varname(DESCR_t d) {
+    /* a[0] is passed as .varname — it may be a string holding the var name */
+    if (d.v == DT_S) return (const char *)d.i;
+    return NULL;
+}
+
+/* INPUT(varname, channel, options_or_fname [, fname4])
+ * 3-arg: INPUT(.rdInput, 8, "file.txt[-opts]")
+ * 4-arg: INPUT(.rdInput, 8, "", "file.txt")  */
 static DESCR_t _b_INPUT(DESCR_t *a, int n) {
-    const char *fname = NULL;
+    _io_chan_setup();
     char fname_buf[4096];
+    const char *fname = NULL;
     if (n >= 4) {
         fname = VARVAL_fn(a[3]);
     } else if (n >= 3) {
-        /* 3-arg form: INPUT(var, chan, "filename[-opts]")
-         * Extract filename = everything before '[', trimmed */
-        const char *opts_str = VARVAL_fn(a[2]);
-        if (opts_str && opts_str[0]) {
-            const char *bracket = strchr(opts_str, '[');
-            if (bracket) {
-                size_t len = (size_t)(bracket - opts_str);
-                while (len > 0 && opts_str[len-1] == ' ') len--;
-                if (len > 0 && len < sizeof(fname_buf)) {
-                    memcpy(fname_buf, opts_str, len);
-                    fname_buf[len] = '\0';
-                    fname = fname_buf;
-                }
-            } else {
-                fname = opts_str;  /* no bracket — whole string is filename */
-            }
-        }
+        fname = _io_extract_fname(VARVAL_fn(a[2]), fname_buf, sizeof(fname_buf));
     }
+    /* channel number */
+    int ch = (n >= 2 && a[1].v == DT_I) ? (int)a[1].i : -1;
+    /* fallback: no channel / no fname → reset global stdin */
     if (!fname || !fname[0]) {
         if (_input_fp && _input_fp != stdin) fclose(_input_fp);
         _input_fp = stdin;
@@ -2218,8 +2286,48 @@ static DESCR_t _b_INPUT(DESCR_t *a, int n) {
     }
     FILE *f = fopen(fname, "r");
     if (!f) return FAILDESCR;
-    if (_input_fp && _input_fp != stdin) fclose(_input_fp);
-    _input_fp = f;
+    if (ch >= 0 && ch < IO_CHAN_MAX) {
+        _io_chan_close(ch);
+        _io_chan[ch].fp = f;
+        _io_chan[ch].is_output = 0;
+        const char *vn = (n >= 1) ? _io_varname(a[0]) : NULL;
+        _io_chan[ch].varname = vn ? strdup(vn) : NULL;
+    } else {
+        /* no valid channel — fall back to global */
+        if (_input_fp && _input_fp != stdin) fclose(_input_fp);
+        _input_fp = f;
+    }
+    return NULVCL;
+}
+
+/* OUTPUT(varname, channel, fname)
+ * 3-arg: OUTPUT(.wrOutput, 8, "file.txt") */
+static DESCR_t _b_OUTPUT(DESCR_t *a, int n) {
+    _io_chan_setup();
+    char fname_buf[4096];
+    const char *fname = NULL;
+    if (n >= 4) {
+        fname = VARVAL_fn(a[3]);
+    } else if (n >= 3) {
+        fname = _io_extract_fname(VARVAL_fn(a[2]), fname_buf, sizeof(fname_buf));
+    } else if (n >= 1) {
+        /* 1-arg degenerate: OUTPUT(expr) — not a channel association, ignore */
+        return NULVCL;
+    }
+    int ch = (n >= 2 && a[1].v == DT_I) ? (int)a[1].i : -1;
+    if (!fname || !fname[0]) return FAILDESCR;
+    FILE *f = fopen(fname, "w");
+    if (!f) return FAILDESCR;
+    if (ch >= 0 && ch < IO_CHAN_MAX) {
+        _io_chan_close(ch);
+        _io_chan[ch].fp = f;
+        _io_chan[ch].is_output = 1;
+        const char *vn = (n >= 1) ? _io_varname(a[0]) : NULL;
+        _io_chan[ch].varname = vn ? strdup(vn) : NULL;
+    } else {
+        fclose(f);
+        return FAILDESCR;
+    }
     return NULVCL;
 }
 
