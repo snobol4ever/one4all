@@ -10,13 +10,17 @@ ln -sfn /home/claude/snobol4ever/x64 /home/claude/x64   # if x64 missing
 
 ---
 
-## Current milestone: `M-BEAUTY-OMEGA` (B-276)
+## Current milestone: `M-BEAUTY-TRACE` (B-277)
 
-1. Check `demo/inc/omega.sno` exists ✅
-2. `INC=demo/inc bash test/beauty/run_beauty_subsystem.sh omega`
+1. Check `demo/inc/trace.sno` exists
+2. `INC=demo/inc bash test/beauty/run_beauty_subsystem.sh trace`
 3. Fix any ASM divergences
-4. On PASS: `git commit -m "B-276: M-BEAUTY-OMEGA ✅"` + push
-5. Update PLAN.md, advance to `M-BEAUTY-TRACE` (final subsystem before bootstrap)
+4. On PASS: `git commit -m "B-277: M-BEAUTY-TRACE ✅"` + push
+5. Update PLAN.md, advance to `M-BEAUTIFY-BOOTSTRAP`
+
+**Fixed B-276:** M-BEAUTY-OMEGA — binary `E_ATP` (`pat @txOfs`) in value context
+emitted OPSYN dispatch instead of LHS+cursor-capture. Fixed `expr_has_pattern_fn`
+and value-context `E_ATP` handler in `emit_byrd_asm.c`. 15 tests PASS. Commit `151a99b`.
 
 **Fixed B-275:** M-BEAUTY-SEMANTIC — `nPush/nInc/nPop/nTop` pattern helpers pass
 3-way monitor; all 8 tests PASS (CSNOBOL4 + SPITBOL + ASM). Commit `fe86477`.
@@ -43,7 +47,8 @@ ln -sfn /home/claude/snobol4ever/x64 /home/claude/x64   # if x64 missing
 | 15 | ReadWrite   | ✅ |
 | 16 | XDump       | ✅ |
 | 17 | semantic    | ✅ |
-| 18 | omega       | ← now |
+| 18 | omega       | ✅ |
+| 19 | trace       | ← now |
 
 ---
 
