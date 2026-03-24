@@ -49,7 +49,7 @@ ln -sfn /home/claude/snobol4ever/x64 /home/claude/x64   # if x64 missing
 
 ## Trigger phrases
 - `"playing with beauty"` → B-session → beauty milestone above
-- `"playing with Prolog frontend"` → F-session → M-PROLOG-R10 (bi→ucall_seq label fix)
+- `"playing with Prolog frontend"` → F-session → M-PROLOG-R10 (puzzle_02 doesEarnMore cut bug; puzzle_01 ✅ puzzle_06 ✅)
 
 ## L2 docs
 - `doc/DESIGN.md` — architecture / emitter

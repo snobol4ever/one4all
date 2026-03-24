@@ -62,6 +62,20 @@ static void PL_C(const char *fmt, ...) {
     va_list ap; va_start(ap, fmt); vfprintf(pl_out, fmt, ap); va_end(ap);
 }
 
+/* Emit a C string literal body with proper escaping */
+static void emit_c_string(const char *s) {
+    for (; *s; s++) {
+        if      (*s == '"')                  PL_C("\\\"");
+        else if (*s == '\\')                 PL_C("\\\\");
+        else if (*s == '\n')                 PL_C("\\n");
+        else if (*s == '\r')                 PL_C("\\r");
+        else if (*s == '\t')                 PL_C("\\t");
+        else if ((unsigned char)*s < 32)     PL_C("\\x%02x", (unsigned char)*s);
+        else                                 PL_C("%c", *s);
+    }
+}
+
+
 /* Use the same 3-column pretty-printer as the C backend */
 #define PRETTY_OUT pl_out
 #include "emit_pretty.h"
@@ -131,12 +145,7 @@ static void emit_term_val(EXPR_t *e) {
             if (strcmp(name, "fail") == 0){ PL_C("term_new_atom(ATOM_FAIL)"); return; }
             /* General atom: intern at runtime */
             PL_C("term_new_atom(prolog_atom_intern(\"");
-            /* escape the name */
-            for (const char *p = name; *p; p++) {
-                if (*p == '"')  PL_C("\\\"");
-                else if (*p == '\\') PL_C("\\\\");
-                else PL_C("%c", *p);
-            }
+            emit_c_string(name);
             PL_C("\"))");
             return;
         }
@@ -161,7 +170,7 @@ static void emit_term_val(EXPR_t *e) {
             const char *fn = e->sval ? e->sval : "?";
             int arity = e->nchildren;
             if (arity == 0) {
-                PL_C("term_new_atom(prolog_atom_intern(\"%s\"))", fn);
+                PL_C("term_new_atom(prolog_atom_intern(\""); emit_c_string(fn); PL_C("\"))");
             } else {
                 /* Capture uid BEFORE emitting children — nested compounds
                  * call pl_next_uid() and would collide with pl_uid_ctr. */
@@ -173,8 +182,7 @@ static void emit_term_val(EXPR_t *e) {
                     emit_term_val(e->children[i]);
                     PL_C(";\n");
                 }
-                PL_C("    term_new_compound(prolog_atom_intern(\"%s\"), %d, _args%d);\n",
-                     fn, arity, cuid);
+                PL_C("    term_new_compound(prolog_atom_intern(\""); emit_c_string(fn); PL_C("\"), %d, _args%d);\\n", arity, cuid);
                 PL_C("})");
             }
             return;
