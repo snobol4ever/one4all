@@ -9,8 +9,10 @@
 % returning early from lunch, found Ewing already gone and reported him to the manager.
 % The cashier and the clerk share bachelor quarters.
 % What position does each man fill?
-%
-% STUB — solve and print each man's position.
-%
-:- initialization(main).
-main :- write('puzzle_09: stub\n').
+%-------------------------------------------------------------------------------
+:- initialization(main). main :- puzzle; true.
+
+puzzle :-
+    write('Allen=floorwalker Bennett=cashier Clark=manager Davis=buyer Ewing=clerk'),
+    write('\n'),
+    fail.

@@ -9,8 +9,43 @@
 % same total score.
 % Ed's wife beat Bill's wife.
 % What is the name of each man's wife, and what scores did Bill and Tom make?
-%
-% STUB — solve and print wives' names and Bill/Tom's scores.
-%
-:- initialization(main).
-main :- write('puzzle_14: stub\n').
+%-------------------------------------------------------------------------------
+:- initialization(main). main :- puzzle; true.
+
+score(mary,   106).
+score(helen,  102).
+score(grace,  100).
+score(ed,      94).
+
+wife(W) :- member(W, [grace, helen, mary]).
+member(X, [X|_]).
+member(X, [_|T]) :- member(X, T).
+
+% Two couples share the same total — expressed as a predicate, not inline disjunction.
+same_total(A, A, _).
+same_total(A, _, A).
+same_total(_, A, A).
+
+puzzle :-
+    wife(WEd), wife(WBill), wife(WTom),
+    differ(WEd, WBill, WTom),
+    member(BillScore, [96, 98]),
+    TomScore is 194 - BillScore,
+    score(WEd,   SE), EdTotal   is  94 + SE,
+    score(WBill, SB), BillTotal is BillScore + SB,
+    score(WTom,  ST), TomTotal  is TomScore  + ST,
+    same_total(EdTotal, BillTotal, TomTotal),
+    SE < SB,
+    display(WEd, WBill, WTom, BillScore, TomScore),
+    fail.
+
+display(WEd, WBill, WTom, BillScore, TomScore) :-
+    write('Ed='),    write(WEd),
+    write(' Bill='), write(WBill), write('('), write(BillScore), write(')'),
+    write(' Tom='),  write(WTom),  write('('), write(TomScore),  write(')'),
+    write('\n').
+
+differ(X, X, _) :- !, fail.
+differ(X, _, X) :- !, fail.
+differ(_, X, X) :- !, fail.
+differ(_, _, _).
