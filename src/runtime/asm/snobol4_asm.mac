@@ -2136,6 +2136,21 @@
     jmp     [%1]
 %endmacro
 
+; PAT_α_RESET safe_name
+;   Reset non-function named pattern DATA block to template values at α-entry.
+;   B-288: without this, re-entry via scan loop uses stale ARBNO depth/state
+;   from the previous attempt (all invocations share one static template block).
+;   Call memcpy(r12, &box_<safe>_data_template, box_<safe>_data_size).
+;   r12 already points to box_<safe>_data_template, so rdi=rsi=r12, but we
+;   need a separate source — use the template label directly.
+;   Preserves r12. Clobbers rdi/rsi/rdx (caller-saved per SysV ABI).
+%macro PAT_α_RESET 1      ; safe_name
+    mov     rdi, r12
+    lea     rsi, [rel box_%1_data_template]
+    mov     rdx, [rel box_%1_data_size]
+    call    memcpy
+%endmacro
+
 %macro FN_α_INIT 1        ; box_safe_name  (no-op: blk_alloc+memcpy done at call site)
 %endmacro
 

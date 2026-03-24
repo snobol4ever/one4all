@@ -1442,17 +1442,49 @@ static void emit_pat_node(EXPR_t *pat,
                              α, β, γ, ω,
                              cursor, subj, subj_len);
             } else {
-                /* Dynamic string variable: match subject against runtime value
-                 * of the variable using stmt_match_var.  Same β/restore as LIT. */
+                /* Dynamic variable: may hold DT_P (pattern) or DT_S (string) at
+                 * runtime.  B-288: M-BUG-BOOTSTRAP-PARSE — 'Cmd = Word Space Word'
+                 * is a concat of E_VARTs; expr_is_pattern_expr returns 0 so Cmd is
+                 * never registered as a named pattern.  At match time Cmd holds a
+                 * DT_P descriptor — LIT_VAR_α (stmt_match_var) does a memcmp and
+                 * always fails against a pattern object.
+                 * Fix: use CALL_PAT_α (stmt_match_descr) which dispatches DT_P
+                 * through the full engine OR does string match for DT_S.
+                 * This is the same path used for E_STAR/*VAR runtime dispatch. */
                 int vuid = next_uid();
-                char saved[64]; snprintf(saved, sizeof saved, "litvar%d_saved", vuid);
-                var_register(saved);
+                char dt_slot[64], dp_slot[64], saved_slot[64];
+                snprintf(dt_slot,    sizeof dt_slot,    "rpat%d_t", vuid);
+                snprintf(dp_slot,    sizeof dp_slot,    "rpat%d_p", vuid);
+                snprintf(saved_slot, sizeof saved_slot, "rpat%d_s", vuid);
+                /* B-288: use var_register (box-aware) so slots land in r12 DATA
+                 * block when inside a named pattern, not flat .bss.  Flat .bss
+                 * slots are global and get clobbered on re-entry via β. */
+                var_register(dt_slot);
+                var_register(dp_slot);
+                var_register(saved_slot);
                 const char *vlab = str_intern(varname);
-                A("\n; E_VART %s → LIT_VAR (stmt_match_var)\n", varname);
-                ALF(α, "LIT_VAR_α %s, %s, %s, %s, %s\n",
-                    vlab, bref(saved), cursor, γ, ω);
-                ALF(β,  "LIT_VAR_β  %s, %s, %s\n",
-                    bref(saved), cursor, ω);
+                A("\n; E_VART %s → CALL_PAT (runtime DT_P/DT_S dispatch)\n", varname);
+                asmL(α);
+                A("    lea     rdi, [rel %s]\n", vlab);
+                A("    call    stmt_get\n");
+                /* Use explicit mov with bref2() addressing — avoids double-deref
+                 * that occurs if CALL_PAT_α macro wraps 'r12+N' in extra brackets. */
+                A("    mov     %s, rax\n", bref2(dt_slot));
+                A("    mov     %s, rdx\n", bref2(dp_slot));
+                /* Expand CALL_PAT_α inline: save cursor, load type+ptr, call engine */
+                A("    mov     rax, [%s]\n", cursor);
+                A("    mov     %s, rax\n",   bref2(saved_slot));
+                A("    mov     rdi, %s\n",   bref2(dt_slot));
+                A("    mov     rsi, %s\n",   bref2(dp_slot));
+                A("    call    stmt_match_descr\n");
+                A("    test    eax, eax\n");
+                A("    jz      %s\n", ω);
+                A("    jmp     %s\n", γ);
+                /* β port: restore cursor, jump ω */
+                asmL(β);
+                A("    mov     rax, %s\n",   bref2(saved_slot));
+                A("    mov     [%s], rax\n", cursor);
+                A("    jmp     %s\n", ω);
             }
         }
         break;
@@ -2269,14 +2301,41 @@ static void emit_named_def(const NamedPat *np,
     /* Major separator: named pattern header */
     emit_sep_major(np->varname);
 
-    /* α entry — initial match */
+    /* α entry — initial match.
+     * B-288: zero all mutable DATA block slots (offset ≥16) so ARBNO depth/
+     * state from a previous scan attempt doesn't corrupt re-entry.  Slots 0/8
+     * are ret_γ/ret_ω, written by the call site — don't touch them.
+     * (M-T2-INVOKE will replace this with blk_alloc+memcpy per-invocation.) */
     A("; %s (α entry) [r12=DATA block]\n", np->α_lbl);
-    emit_pat_node(np->pat,
-                  np->α_lbl, np->β_lbl,
-                  inner_γ, inner_ω,
-                  cursor, subj, subj_len,
-                  1);
-
+    {
+        int dsz = box_data_size(np->safe);
+        if (dsz > 16) {
+            /* Emit α label + slot zeroing, then redirect emit_pat_node to a
+             * fall-through stub label so the pattern body follows immediately
+             * without re-emitting P_<name>_α. */
+            asmL(np->α_lbl);
+            for (int off = 16; off < dsz; off += 8)
+                A("    mov     qword [r12+%d], 0\n", off);
+            char after_reset[LBUF2];
+            snprintf(after_reset, sizeof after_reset, "pat_%s_body", np->safe);
+            NamedPat *np_mut = (NamedPat *)np;
+            char saved_α[sizeof np_mut->α_lbl];
+            memcpy(saved_α, np_mut->α_lbl, sizeof saved_α);
+            snprintf(np_mut->α_lbl, sizeof np_mut->α_lbl, "%s", after_reset);
+            emit_pat_node(np->pat,
+                          np_mut->α_lbl, np->β_lbl,
+                          inner_γ, inner_ω,
+                          cursor, subj, subj_len,
+                          1);
+            memcpy(np_mut->α_lbl, saved_α, sizeof saved_α);
+        } else {
+            emit_pat_node(np->pat,
+                          np->α_lbl, np->β_lbl,
+                          inner_γ, inner_ω,
+                          cursor, subj, subj_len,
+                          1);
+        }
+    }
     /* Minor separator before γ/ω trampolines */
     emit_sep_minor("γ/ω");
 
