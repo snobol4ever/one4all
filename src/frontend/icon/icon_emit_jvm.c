@@ -230,6 +230,9 @@ static void ij_declare_static(const char *name) {
 static void ij_declare_static_int(const char *name) {
     ij_declare_static_typed(name, 'I');
 }
+static void ij_declare_static_str(const char *name) {
+    ij_declare_static_typed(name, 'A');  /* 'A' = Ljava/lang/String; */
+}
 
 /* String pool for rodata */
 #define MAX_STRINGS 256
@@ -281,6 +284,19 @@ static void ij_put_int_field(const char *fname) {
     char buf[384]; snprintf(buf, sizeof buf, "%s/%s I", ij_classname, fname);
     JI("putstatic", buf);
 }
+
+/* String-typed static field helpers */
+static void ij_get_str_field(const char *fname) {
+    char buf[384]; snprintf(buf, sizeof buf, "%s/%s Ljava/lang/String;", ij_classname, fname);
+    JI("getstatic", buf);
+}
+static void ij_put_str_field(const char *fname) {
+    char buf[384]; snprintf(buf, sizeof buf, "%s/%s Ljava/lang/String;", ij_classname, fname);
+    JI("putstatic", buf);
+}
+
+/* Forward declaration needed for ij_expr_is_string */
+static int ij_expr_is_string(IcnNode *n);
 
 /* Push 0 to icn_failed (success) */
 static void ij_set_ok(void) {
@@ -347,12 +363,25 @@ static void ij_emit_var(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     if (slot >= 0) {
         /* Named local/param: use per-proc static field (suspend-safe) */
         char fld[128]; ij_var_field(n->val.sval, fld, sizeof fld);
-        ij_declare_static(fld);
-        ij_get_long(fld);
+        /* Determine type: look up in statics table */
+        int is_str = 0;
+        for (int i = 0; i < ij_nstatics; i++)
+            if (!strcmp(ij_statics[i], fld) && ij_static_types[i] == 'A') { is_str = 1; break; }
+        if (is_str) {
+            ij_declare_static_str(fld);
+            ij_get_str_field(fld);
+        } else {
+            ij_declare_static(fld);
+            ij_get_long(fld);
+        }
     } else {
         char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", n->val.sval);
-        ij_declare_static(gname);
-        ij_get_long(gname);
+        /* Check global type */
+        int is_str = 0;
+        for (int i = 0; i < ij_nstatics; i++)
+            if (!strcmp(ij_statics[i], gname) && ij_static_types[i] == 'A') { is_str = 1; break; }
+        if (is_str) { ij_declare_static_str(gname); ij_get_str_field(gname); }
+        else        { ij_declare_static(gname);     ij_get_long(gname); }
     }
     JGoto(ports.γ);
     JL(b); JGoto(ports.ω);
@@ -384,34 +413,45 @@ static void ij_emit_assign(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     JL(store);
 
     IcnNode *lhs = n->children[0];
+    IcnNode *rhs = n->children[1];
+    int is_str = ij_expr_is_string(rhs);
+
     if (lhs && lhs->kind == ICN_VAR) {
         int slot = ij_locals_find(lhs->val.sval);
         if (slot >= 0) {
-            /* Named local/param: store into per-proc static field */
             char fld[128]; ij_var_field(lhs->val.sval, fld, sizeof fld);
-            ij_declare_static(fld);
-            ij_put_long(fld);
+            if (is_str) {
+                ij_declare_static_str(fld);
+                ij_put_str_field(fld);
+            } else {
+                ij_declare_static(fld);
+                ij_put_long(fld);
+            }
         } else {
             char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", lhs->val.sval);
-            ij_declare_static(gname);
-            ij_put_long(gname);
+            if (is_str) { ij_declare_static_str(gname); ij_put_str_field(gname); }
+            else        { ij_declare_static(gname);     ij_put_long(gname); }
         }
     } else {
-        /* discard */
-        JI("pop2", "");
+        /* discard — pop appropriate type */
+        if (is_str) JI("pop", "");
+        else        JI("pop2", "");
     }
     /* Push back value for expression result (Icon := returns the value) */
     if (lhs && lhs->kind == ICN_VAR) {
         int slot = ij_locals_find(lhs->val.sval);
         if (slot >= 0) {
             char fld[128]; ij_var_field(lhs->val.sval, fld, sizeof fld);
-            ij_get_long(fld);
+            if (is_str) ij_get_str_field(fld);
+            else        ij_get_long(fld);
         } else {
             char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", lhs->val.sval);
-            ij_get_long(gname);
+            if (is_str) ij_get_str_field(gname);
+            else        ij_get_long(gname);
         }
     } else {
-        JI("lconst_0", "");
+        if (is_str) JI("aconst_null", "");
+        else        JI("lconst_0", "");
     }
     JGoto(ports.γ);
 }
@@ -615,28 +655,24 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         JL(a); JGoto(arg_a);
         JL(b); JGoto(arg_b);
         JL(after);
-        /* Value on stack */
-        if (arg->kind == ICN_STR) {
-            /* String on stack */
-            JI("getstatic", "java/lang/System/out Ljava/io/PrintStream;");
-            JI("swap","");  /* swap: PrintStream, String → String, PrintStream; not ideal */
-            /* Actually: push stream, then string */
-            /* The string is already on stack; we need stream below it.
-             * Simpler: store string in scratch local, push stream, load string */
+        /* Value on stack: String ref or long depending on arg type */
+        if (ij_expr_is_string(arg)) {
+            /* String ref on stack — store to scratch, push stream, load, println */
             int scratch = ij_locals_alloc_tmp();
             J("    astore %d\n", slot_jvm(scratch));
             JI("getstatic", "java/lang/System/out Ljava/io/PrintStream;");
             J("    aload %d\n", slot_jvm(scratch));
             JI("invokevirtual", "java/io/PrintStream/println(Ljava/lang/String;)V");
+            /* write() returns its argument — reload String for caller */
+            J("    aload %d\n", slot_jvm(scratch));
         } else {
             /* Long on stack — print as integer */
-            /* Store long, get stream, load long, println; reload for caller (write returns arg) */
             int scratch = ij_locals_alloc_tmp();
             J("    lstore %d\n", slot_jvm(scratch));
             JI("getstatic", "java/lang/System/out Ljava/io/PrintStream;");
             J("    lload %d\n", slot_jvm(scratch));
             JI("invokevirtual", "java/io/PrintStream/println(J)V");
-            /* Reload: write() returns its argument; γ port / gbfwd pop2 needs value on stack */
+            /* Reload: write() returns its argument */
             J("    lload %d\n", slot_jvm(scratch));
         }
         JGoto(ports.γ);
@@ -1023,6 +1059,99 @@ static void ij_emit_while(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
 }
 
 /* =========================================================================
+ * String type predicate and concat emitter
+ * ======================================================================= */
+static int ij_expr_is_string(IcnNode *n) {
+    if (!n) return 0;
+    switch (n->kind) {
+        case ICN_STR:    return 1;
+        case ICN_CONCAT: return 1;
+        case ICN_CALL: {
+            /* write(str_arg) returns its argument — check arg type */
+            if (n->nchildren >= 2) {
+                IcnNode *fn = n->children[0];
+                if (fn && fn->kind == ICN_VAR && strcmp(fn->val.sval, "write") == 0)
+                    return ij_expr_is_string(n->children[1]);
+            }
+            return 0;
+        }
+        case ICN_ASSIGN: {
+            /* Assignment returns the RHS value */
+            if (n->nchildren >= 2) return ij_expr_is_string(n->children[1]);
+            return 0;
+        }
+        case ICN_VAR: {
+            /* Check if var's static field is typed 'A' (String) */
+            char fld[128]; ij_var_field(n->val.sval, fld, sizeof fld);
+            for (int i = 0; i < ij_nstatics; i++)
+                if (!strcmp(ij_statics[i], fld) && ij_static_types[i] == 'A') return 1;
+            /* Also check global var */
+            char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", n->val.sval);
+            for (int i = 0; i < ij_nstatics; i++)
+                if (!strcmp(ij_statics[i], gname) && ij_static_types[i] == 'A') return 1;
+            return 0;
+        }
+        default: return 0;
+    }
+}
+
+/* ICN_CONCAT — E1 || E2  (string concatenation)
+ * Byrd-box wiring: same funcs-set pattern as binop (Proebsting §4.3).
+ * Left/right values are String refs stored in String-typed static fields.
+ * Compute: invokevirtual String.concat → result String ref on stack → ports.γ
+ *
+ * Stack discipline: EMPTY at every label. String refs passed via static fields.
+ */
+static void ij_emit_concat(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
+    int id = ij_new_id(); char a[64], b[64];
+    lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
+    char compute[64]; snprintf(compute, sizeof compute, "icn_%d_compute", id);
+    char lbfwd[64];   snprintf(lbfwd,   sizeof lbfwd,   "icn_%d_lb",     id);
+    char lstore[64];  snprintf(lstore,  sizeof lstore,  "icn_%d_lstore", id);
+    char lc_fld[64];  snprintf(lc_fld,  sizeof lc_fld,  "icn_%d_lc",     id);
+    char rc_fld[64];  snprintf(rc_fld,  sizeof rc_fld,  "icn_%d_rc",     id);
+    /* bf: track whether we are on fresh (0) or resume (1) path */
+    int bf_slot = ij_locals_alloc_tmp();
+    ij_declare_static_str(lc_fld);
+    ij_declare_static_str(rc_fld);
+    strncpy(oα,a,63); strncpy(oβ,b,63);
+
+    char right_relay[64]; snprintf(right_relay, sizeof right_relay, "icn_%d_rrelay", id);
+    char left_relay[64];  snprintf(left_relay,  sizeof left_relay,  "icn_%d_lrelay", id);
+
+    IjPorts rp; strncpy(rp.γ, right_relay, 63); strncpy(rp.ω, lbfwd, 63);
+    char ra[64], rb[64]; ij_emit_expr(n->children[1], rp, ra, rb);
+    IjPorts lp; strncpy(lp.γ, left_relay,  63); strncpy(lp.ω, ports.ω, 63);
+    char la[64], lb[64]; ij_emit_expr(n->children[0], lp, la, lb);
+
+    IcnNode *lchild = n->children[0];
+    int left_is_value = ij_expr_is_string(lchild);  /* strings are one-shot */
+
+    /* left_relay: String ref on stack → astore into lc_fld → lstore */
+    JL(left_relay); ij_put_str_field(lc_fld); JGoto(lstore);
+    /* right_relay: String ref on stack → astore into rc_fld → compute */
+    JL(right_relay); ij_put_str_field(rc_fld); JGoto(compute);
+
+    JL(lbfwd); JGoto(lb);
+    JL(a); JI("iconst_0",""); J("    istore %d\n", slot_jvm(bf_slot)); JGoto(la);
+    JL(b);
+    if (left_is_value) { JI("iconst_1",""); J("    istore %d\n", slot_jvm(bf_slot)); JGoto(la); }
+    else { JGoto(rb); }
+
+    JL(lstore);
+    J("    iload %d\n", slot_jvm(bf_slot));
+    J("    ifeq %s\n", ra);
+    JGoto(rb);
+
+    /* compute: lc_fld = left String, rc_fld = right String */
+    JL(compute);
+    ij_get_str_field(lc_fld);
+    ij_get_str_field(rc_fld);
+    JI("invokevirtual", "java/lang/String/concat(Ljava/lang/String;)Ljava/lang/String;");
+    JGoto(ports.γ);
+}
+
+/* =========================================================================
  * Dispatch
  * ======================================================================= */
 static void ij_emit_expr(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
@@ -1059,6 +1188,7 @@ static void ij_emit_expr(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         }
         case ICN_ADD: case ICN_SUB: case ICN_MUL: case ICN_DIV: case ICN_MOD:
                           ij_emit_binop    (n,ports,oα,oβ); break;
+        case ICN_CONCAT:  ij_emit_concat   (n,ports,oα,oβ); break;
         case ICN_LT: case ICN_LE: case ICN_GT: case ICN_GE: case ICN_EQ: case ICN_NE:
                           ij_emit_relop    (n,ports,oα,oβ); break;
         case ICN_TO:      ij_emit_to       (n,ports,oα,oβ); break;
@@ -1124,6 +1254,27 @@ static void ij_emit_proc(IcnNode *proc, FILE *out_target) {
         }
     }
 
+    /* Pre-pass (forward): register string-typed variable fields so ij_expr_is_string
+     * works correctly when the reverse emit loop checks statement result types.
+     * Walk assignments left-to-right: if RHS is a string expression, declare the
+     * LHS var's static field as type 'A' (String) before emit begins. */
+    for (int si = 0; si < nstmts; si++) {
+        IcnNode *stmt = proc->children[body_start + si];
+        if (!stmt || stmt->kind != ICN_ASSIGN || stmt->nchildren < 2) continue;
+        IcnNode *lhs = stmt->children[0];
+        IcnNode *rhs = stmt->children[1];
+        if (!lhs || lhs->kind != ICN_VAR) continue;
+        if (!ij_expr_is_string(rhs)) continue;
+        int slot = ij_locals_find(lhs->val.sval);
+        if (slot >= 0) {
+            char fld[128]; ij_var_field(lhs->val.sval, fld, sizeof fld);
+            ij_declare_static_str(fld);
+        } else {
+            char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", lhs->val.sval);
+            ij_declare_static_str(gname);
+        }
+    }
+
     /* Chain statements.
      * Fix IJ-6 Bug3: every top-level statement (assignment etc.) leaves its result
      * value (a long) on the JVM operand stack when it jumps to its γ port.  The γ
@@ -1138,16 +1289,15 @@ static void ij_emit_proc(IcnNode *proc, FILE *out_target) {
     for (int i = nstmts-1; i >= 0; i--) {
         IcnNode *stmt = proc->children[body_start + i];
         if (!stmt || stmt->kind == ICN_GLOBAL) { strncpy(alphas[i], next_a, 63); continue; }
+        /* Determine if statement produces a String (1-slot) or long (2-slot) result */
+        int stmt_is_str = ij_expr_is_string(stmt);
         /* Build a drain label for this statement's success port */
         char sdrain[64]; snprintf(sdrain, sizeof sdrain, "icn_s%d_sdrain", i);
         IjPorts sp; strncpy(sp.γ, sdrain, 63); strncpy(sp.ω, next_a, 63);
         char sa[64], sb[64]; ij_emit_expr(stmt, sp, sa, sb);
-        /* Emit the drain: pop result long, then fall through to next_a */
-        char lbl_sdrain_code[128];
-        snprintf(lbl_sdrain_code, sizeof lbl_sdrain_code, "%s", sdrain);
-        /* We emit the drain inline into the body buffer (jout = tmp at this point) */
+        /* Emit the drain: pop result (1-slot String or 2-slot long) then fall through */
         J("%s:\n", sdrain);
-        JI("pop2", "");
+        JI(stmt_is_str ? "pop" : "pop2", "");
         JGoto(next_a);
         strncpy(alphas[i], sa, 63);
         strncpy(next_a, sa, 63);
@@ -1309,7 +1459,11 @@ void ij_emit_file(IcnNode **nodes, int count, FILE *out, const char *filename) {
     J(".field public static icn_retval J\n");
     /* Per-user-proc arg static fields (already in statics array from emit_call) */
     for (int i = 0; i < ij_nstatics; i++) {
-        J(".field public static %s %c\n", ij_statics[i], ij_static_types[i]);
+        char type = ij_static_types[i];
+        if (type == 'A')
+            J(".field public static %s Ljava/lang/String;\n", ij_statics[i]);
+        else
+            J(".field public static %s %c\n", ij_statics[i], type);
     }
     J("\n");
 
