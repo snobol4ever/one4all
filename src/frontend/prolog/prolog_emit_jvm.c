@@ -971,6 +971,17 @@ static void pj_emit_arith(EXPR_t *e, int *var_locals, int n_vars) {
 }
 
 /* -------------------------------------------------------------------------
+ * pj_is_always_fail — true for goals that unconditionally fail (no retry).
+ * These must route their omega to lbl_pred_ω (next clause), not to the
+ * clause's own alpha/retry label, to avoid infinite retry loops.
+ * ------------------------------------------------------------------------- */
+static int pj_is_always_fail(EXPR_t *goal) {
+    if (!goal || goal->kind != E_FNC || !goal->sval) return 0;
+    return (strcmp(goal->sval, "fail") == 0 || strcmp(goal->sval, "false") == 0)
+           && goal->nchildren == 0;
+}
+
+/* -------------------------------------------------------------------------
  * pj_is_user_call — true for user-defined predicates needing retry loop
  * ------------------------------------------------------------------------- */
 static int pj_is_user_call(EXPR_t *goal) {
@@ -2003,7 +2014,13 @@ static void pj_emit_choice(EXPR_t *choice) {
             char pred_ω_lbl[128];
             snprintf(pred_ω_lbl, sizeof pred_ω_lbl, "p_%s_%d_omega", safe_fn, arity);
             int next_local = vars_base + n_vars;
-            pj_emit_body(body_goals, nbody, γ_lbl, α_retry_lbl, ω_lbl,
+            /* PJ-16 fix: pass ω_lbl (next clause / predicate omega) as lbl_ω,
+             * not α_retry_lbl (clause head-retry).  When the outermost body
+             * user-call exhausts, the clause is fully done → fall to next clause.
+             * α_retry_lbl was causing infinite re-entry of the clause body.
+             * Nested user calls still wire correctly: their call_ω goes to the
+             * enclosing call_β (set at the recursive pj_emit_body call site). */
+            pj_emit_body(body_goals, nbody, γ_lbl, ω_lbl, ω_lbl,
                          trail_local, var_locals, n_vars, &next_local,
                          init_cs_local, sub_cs_out_local,
                          base[nclauses], cs_local, pred_ω_lbl);
