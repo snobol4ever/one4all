@@ -10,16 +10,17 @@ ln -sfn /home/claude/snobol4ever/x64 /home/claude/x64   # if x64 missing
 
 ---
 
-## Current milestone: `M-BEAUTY-READWRITE` (B-274)
+## Current milestone: `M-BEAUTY-XDUMP` (B-275)
 
-1. Check/fix `_b_OUTPUT` 3-arg form in `src/runtime/snobol4/snobol4.c` (same n==3 as `_b_INPUT`)
-2. `cd src && make`
-3. `INC=demo/inc bash test/beauty/run_beauty_subsystem.sh ReadWrite`
-4. On 8/8 PASS: `git commit -m "B-274: M-BEAUTY-READWRITE ✅"` + push
-5. Update `.github/PLAN.md` TINY backend row, advance to `M-BEAUTY-XDUMP`
+1. Check `demo/inc/XDump.sno` exists; if not, create driver + ref from CSNOBOL4 oracle
+2. `INC=demo/inc bash test/beauty/run_beauty_subsystem.sh XDump`
+3. Fix any ASM divergences
+4. On PASS: `git commit -m "B-275: M-BEAUTY-XDUMP ✅"` + push
+5. Update `.github/PLAN.md` TINY backend row, advance to `M-BEAUTY-SEMANTIC`
 
-**Fixed this session:** `_b_INPUT` n==3 (bad path returned NULVCL not FAILDESCR).
-Steps 1–5 pass; `_b_OUTPUT` n==3 fix needed for steps 6–8.
+**Fixed B-274:** `expr_flatten_str` in `emit_byrd_asm.c` — multi-line DEFINE specs
+(E_CONC of E_QLITs) now registered as user functions; `fn_Read_γ/ω` emitted;
+FRETURN inside `Read` body routes correctly. 8/8 ASM PASS. Commit `eeeb5ad`.
 
 ---
 
@@ -41,8 +42,8 @@ Steps 1–5 pass; `_b_OUTPUT` n==3 fix needed for steps 6–8.
 | 12 | TDump       | ✅ |
 | 13 | Gen         | ✅ |
 | 14 | Qize        | ✅ |
-| 15 | ReadWrite   | ← now |
-| 16 | XDump       | |
+| 15 | ReadWrite   | ✅ |
+| 16 | XDump       | ← now |
 | 17 | semantic    | |
 | 18 | omega       | |
 
