@@ -1016,7 +1016,12 @@ static void pj_emit_body(EXPR_t **goals, int ngoals, const char *lbl_gamma,
         snprintf(call_try,   sizeof call_try,   "call%d_try",   uid);
         snprintf(call_omega, sizeof call_omega, "call%d_omega", uid);
 
-        /* init: local_cs = init_cs_local */
+        /* init: local_cs = init_cs_local.
+         * init_cs_local is set by the clause dispatcher to (incoming_cs - base[ci]),
+         * which is 0 on first entry and non-zero only when resuming a suspended body
+         * ucall (i.e., when the CALLER retries this clause for a next solution and
+         * the clause itself has an inner ucall that was mid-stream).
+         * local_cs is self-contained after init — sfail updates it directly. */
         J("    iload %d\n", init_cs_local);
         J("    istore %d\n", local_cs);
 
@@ -1032,7 +1037,8 @@ static void pj_emit_body(EXPR_t **goals, int ngoals, const char *lbl_gamma,
         JI("dup", "");
         J("    astore %d\n", local_rv);
         J("    ifnull %s\n", call_omega);
-        /* extract returned cs */
+        /* extract returned cs — store into sub_cs_out_local for γ encoding,
+         * and advance local_cs for the next β-retry of THIS call. */
         J("    aload %d\n", local_rv);
         JI("iconst_0", "");
         JI("aaload", "");
@@ -1040,8 +1046,9 @@ static void pj_emit_body(EXPR_t **goals, int ngoals, const char *lbl_gamma,
         JI("invokevirtual", "java/lang/Integer/intValue()I");
         JI("dup", "");
         J("    istore %d\n", sub_cs_out_local);
-        JI("iconst_1", "");
-        JI("iadd", "");
+        /* γ already encodes base[ci]+sub_cs+1 — pass directly as next cs.
+         * Do NOT add another +1 here; the predicate's dispatch (cs >= base[ci])
+         * handles advancement. Double-incrementing causes clause skipping. */
         J("    istore %d\n", local_cs);
         /* suffix: failure → unwind bindings from this call, then retry */
         {
@@ -1056,11 +1063,13 @@ static void pj_emit_body(EXPR_t **goals, int ngoals, const char *lbl_gamma,
                          fresh_init, fresh_sub);
             J("%s:\n", suffix_fail);
             /* β port: unwind trail to pre-call mark (undo bindings from last solution),
-             * update cs, then loop to call_try to demand next solution. */
+             * then loop to call_try.  local_cs already holds the next cs to try —
+             * do NOT update init_cs_local here; that would corrupt the outer clause's
+             * sub-cs tracking and cause recursive predicates (like member/2) to skip
+             * clause0 on re-entry by handing a non-zero init_cs into the next
+             * iteration's local_cs init above. */
             J("    iload %d\n", local_tmark);
             J("    invokestatic %s/pj_trail_unwind(I)V\n", pj_classname);
-            J("    iload %d\n", local_cs);
-            J("    istore %d\n", init_cs_local);
             JI("goto", call_try);   /* β port: retry ucall for next solution */
         }
         /* ucall exhausted → outer omega (next clause) */
@@ -1238,9 +1247,17 @@ static void pj_emit_choice(EXPR_t *choice) {
         J("    invokestatic %s/pj_trail_mark()I\n", pj_classname);
         J("    istore %d\n", trail_local);
 
-        /* allocate variable cells */
+        /* allocate variable cells.
+         * Only load from the JVM arg register when this var slot IS the direct
+         * arg (head pattern = E_VART pointing at slot vi). If the head has a
+         * compound at position vi (e.g. [_|T]), var vi may be T — a fresh body
+         * var — and must NOT be pre-loaded with the arg value. */
         for (int vi = 0; vi < n_vars; vi++) {
-            if (vi < n_args) {
+            int is_direct_arg = (vi < n_args && vi < clause->nchildren &&
+                                 clause->children[vi] &&
+                                 clause->children[vi]->kind == E_VART &&
+                                 clause->children[vi]->ival == vi);
+            if (is_direct_arg) {
                 J("    aload %d\n", vi);
                 J("    astore %d\n", var_locals[vi]);
             } else {
@@ -1271,9 +1288,13 @@ static void pj_emit_choice(EXPR_t *choice) {
         J("p_%s_%d_retry_head_%d:\n", safe_fn, arity, ci);
         J("    iload %d\n", trail_local);
         J("    invokestatic %s/pj_trail_unwind(I)V\n", pj_classname);
-        /* re-allocate variable cells */
+        /* re-allocate variable cells (same logic as initial alloc) */
         for (int vi = 0; vi < n_vars; vi++) {
-            if (vi < n_args) {
+            int is_direct_arg = (vi < n_args && vi < clause->nchildren &&
+                                 clause->children[vi] &&
+                                 clause->children[vi]->kind == E_VART &&
+                                 clause->children[vi]->ival == vi);
+            if (is_direct_arg) {
                 J("    aload %d\n", vi);
                 J("    astore %d\n", var_locals[vi]);
             } else {
