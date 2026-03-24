@@ -182,8 +182,14 @@ static void pj_emit_runtime_helpers(void) {
     JI("iconst_1", "");
     JI("isub", "");
     JI("invokevirtual", "java/util/ArrayList/remove(I)Ljava/lang/Object;");
-    /* cast to Object[] and clear slot [1] */
+    /* cast to Object[] and restore both slots: [0]="var", [1]=null */
     JI("checkcast", "[Ljava/lang/Object;");
+    /* restore [0] = "var" */
+    JI("dup", "");
+    JI("iconst_0", "");
+    JI("ldc", "\"var\"");
+    JI("aastore", "");
+    /* restore [1] = null */
     JI("iconst_1", "");
     JI("aconst_null", "");
     JI("aastore", "");
@@ -392,7 +398,7 @@ static void pj_emit_runtime_helpers(void) {
     JI("aaload", "");
     JI("ldc", "\"int\"");
     JI("invokevirtual", "java/lang/Object/equals(Ljava/lang/Object;)Z");
-    JI("ifeq", "pj_unify_false");
+    JI("ifeq", "pj_unify_check_compound");
     JI("aload_1", "");
     JI("checkcast", "[Ljava/lang/Object;");
     JI("iconst_0", "");
@@ -409,7 +415,74 @@ static void pj_emit_runtime_helpers(void) {
     JI("iconst_1", "");
     JI("aaload", "");
     JI("invokevirtual", "java/lang/Object/equals(Ljava/lang/Object;)Z");
+    JI("ifeq", "pj_unify_check_compound");
+    JI("goto", "pj_unify_true");
+    /* check compound==compound: same functor, same arity, recurse on args
+     * Flat encoding: [0]="compound",[1]=functor,[2..]=args; length=2+arity */
+    J("pj_unify_check_compound:\n");
+    JI("aload_0", "");
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("iconst_0", "");
+    JI("aaload", "");
+    JI("ldc", "\"compound\"");
+    JI("invokevirtual", "java/lang/Object/equals(Ljava/lang/Object;)Z");
     JI("ifeq", "pj_unify_false");
+    JI("aload_1", "");
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("iconst_0", "");
+    JI("aaload", "");
+    JI("ldc", "\"compound\"");
+    JI("invokevirtual", "java/lang/Object/equals(Ljava/lang/Object;)Z");
+    JI("ifeq", "pj_unify_false");
+    /* check same functor [1] */
+    JI("aload_0", "");
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("iconst_1", "");
+    JI("aaload", "");
+    JI("aload_1", "");
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("iconst_1", "");
+    JI("aaload", "");
+    JI("invokevirtual", "java/lang/Object/equals(Ljava/lang/Object;)Z");
+    JI("ifeq", "pj_unify_false");
+    /* check same arity: array length must match */
+    JI("aload_0", "");
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("arraylength", "");
+    JI("aload_1", "");
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("arraylength", "");
+    JI("if_icmpne", "pj_unify_false");
+    /* recurse on args: local 2=arity (arr.length-2), local 3=i */
+    JI("aload_0", "");
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("arraylength", "");
+    JI("iconst_2", "");
+    JI("isub", "");
+    JI("istore_2", "");   /* local 2 = arity */
+    JI("iconst_0", "");
+    JI("istore_3", "");   /* local 3 = i = 0 */
+    J("pj_unify_cmp_loop:\n");
+    JI("iload_3", "");
+    JI("iload_2", "");
+    JI("if_icmpge", "pj_unify_true");   /* all args matched */
+    /* unify a.args[i] with b.args[i] */
+    JI("aload_0", "");
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("iload_3", "");
+    JI("iconst_2", "");
+    JI("iadd", "");
+    JI("aaload", "");          /* a.args[i] */
+    JI("aload_1", "");
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("iload_3", "");
+    JI("iconst_2", "");
+    JI("iadd", "");
+    JI("aaload", "");          /* b.args[i] */
+    J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+    JI("ifeq", "pj_unify_false");
+    JI("iinc", "3 1");         /* i++ */
+    JI("goto", "pj_unify_cmp_loop");
     J("pj_unify_true:\n");
     JI("iconst_1", "");
     JI("ireturn", "");
@@ -524,7 +597,7 @@ static void pj_emit_term(EXPR_t *e, int *var_locals, int n_vars) {
         break;
     }
     case E_ILIT: {
-        J("    ldc2_w %ldL\n", e->ival);
+        J("    ldc2_w %ld\n", e->ival);
         J("    invokestatic %s/pj_term_int(J)[Ljava/lang/Object;\n", pj_classname);
         break;
     }
@@ -538,11 +611,36 @@ static void pj_emit_term(EXPR_t *e, int *var_locals, int n_vars) {
         break;
     }
     case E_FNC: {
-        /* compound term f(args) */
-        /* simplified: emit as atom for now (M-PJ-UNIFY will extend) */
-        J("    ldc \"%s\"\n", e->sval ? e->sval : "");
-        J("    invokestatic %s/pj_term_atom(Ljava/lang/String;)[Ljava/lang/Object;\n",
-          pj_classname);
+        /* compound term f(arg0, arg1, ...) — flat Object[] encoding:
+         * [0]="compound", [1]=functor_string, [2..2+arity-1]=args */
+        int arity = e->nchildren;
+        if (arity == 0) {
+            /* arity-0 compound = atom */
+            J("    ldc \"%s\"\n", e->sval ? e->sval : "");
+            J("    invokestatic %s/pj_term_atom(Ljava/lang/String;)[Ljava/lang/Object;\n",
+              pj_classname);
+        } else {
+            /* allocate array of size 2+arity */
+            J("    bipush %d\n", 2 + arity);
+            JI("anewarray", "java/lang/Object");
+            /* [0] = "compound" */
+            JI("dup", "");
+            JI("iconst_0", "");
+            JI("ldc", "\"compound\"");
+            JI("aastore", "");
+            /* [1] = functor string */
+            JI("dup", "");
+            JI("iconst_1", "");
+            J("    ldc \"%s\"\n", e->sval ? e->sval : "");
+            JI("aastore", "");
+            /* [2..] = args */
+            for (int ai = 0; ai < arity; ai++) {
+                JI("dup", "");
+                J("    bipush %d\n", 2 + ai);
+                pj_emit_term(e->children[ai], var_locals, n_vars);
+                JI("aastore", "");
+            }
+        }
         break;
     }
     default:
@@ -560,7 +658,7 @@ static void pj_emit_arith(EXPR_t *e, int *var_locals, int n_vars) {
     if (!e) { JI("lconst_0", ""); return; }
     switch (e->kind) {
     case E_ILIT:
-        J("    ldc2_w %ldL\n", e->ival);
+        J("    ldc2_w %ld\n", e->ival);
         break;
     case E_VART: {
         int slot = e->ival;
@@ -735,46 +833,82 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_gamma, const char *lbl_om
             JI("goto", lbl_gamma);
             return;
         }
-        /* ,/2 — conjunction (occurs nested inside ;/2 branches).
-         * Flatten the ,/2 tree into an array and use pj_emit_body
-         * so user calls get proper Proebsting retry wiring. */
-        if (strcmp(fn, ",") == 0 && nargs == 2) {
-            /* flatten: collect up to 64 conjuncts */
-            EXPR_t *flat[64]; int nflat = 0;
-            EXPR_t *cur = goal;
-            while (cur && cur->kind == E_FNC && cur->sval &&
-                   strcmp(cur->sval, ",") == 0 && cur->nchildren == 2 && nflat < 62) {
-                flat[nflat++] = cur->children[0];
-                cur = cur->children[1];
-            }
-            flat[nflat++] = cur;
-            int next_local_tmp = trail_local + 1 + n_vars + 8; /* rough base */
-            pj_emit_body(flat, nflat, lbl_gamma, lbl_omega,
+        /* ,/2 (now n-ary after lowering) — conjunction.
+         * All children are conjuncts; pass directly to pj_emit_body. */
+        if (strcmp(fn, ",") == 0 && nargs >= 1) {
+            int next_local_tmp = trail_local + 1 + n_vars + 8;
+            pj_emit_body(goal->children, nargs, lbl_gamma, lbl_omega,
                          trail_local, var_locals, n_vars, &next_local_tmp);
             return;
         }
-        /* ;/2 — disjunction: (A ; B).  Try A; on failure try B. */
-        if (strcmp(fn, ";") == 0 && nargs == 2) {
-            EXPR_t *left  = goal->children[0];
-            EXPR_t *right = goal->children[1];
+        /* ;/2 (now n-ary after lowering) — disjunction: try each branch.
+         * Special case: if first child is ->/2, it's an if-then-else:
+         *   (Cond -> Then ; Else)  ==> branch on Cond; take Then or Else.
+         * On success goto lbl_gamma; on failure of all branches goto lbl_omega. */
+        if (strcmp(fn, ";") == 0 && nargs >= 2) {
+            /* check for (Cond -> Then) as first branch = if-then-else */
+            EXPR_t *first = goal->children[0];
+            if (first && first->kind == E_FNC && first->sval &&
+                strcmp(first->sval, "->") == 0 && first->nchildren == 2) {
+                /* if-then-else: Cond -> Then ; Else1 ; Else2 ... */
+                int uid = pj_fresh_label();
+                char cond_ok[128], cond_fail[128], done_lbl[128];
+                snprintf(cond_ok,   sizeof cond_ok,   "ite%d_ok",   uid);
+                snprintf(cond_fail, sizeof cond_fail, "ite%d_else", uid);
+                snprintf(done_lbl,  sizeof done_lbl,  "ite%d_done", uid);
+                /* emit condition — success falls through to cond_ok, failure jumps to else */
+                pj_emit_goal(first->children[0], cond_ok, cond_fail,
+                             trail_local, var_locals, n_vars);
+                J("%s:\n", cond_ok);
+                pj_emit_goal(first->children[1], lbl_gamma, lbl_omega,
+                             trail_local, var_locals, n_vars);
+                J("    goto %s\n", done_lbl);
+                J("%s:\n", cond_fail);
+                /* emit remaining else branches */
+                for (int bi = 1; bi < nargs; bi++) {
+                    char next_lbl[128];
+                    snprintf(next_lbl, sizeof next_lbl, "ite%d_alt%d", uid, bi + 1);
+                    const char *fail_to = (bi < nargs - 1) ? next_lbl : lbl_omega;
+                    pj_emit_goal(goal->children[bi], lbl_gamma, fail_to,
+                                 trail_local, var_locals, n_vars);
+                    if (bi < nargs - 1) {
+                        J("    goto %s\n", done_lbl);
+                        J("%s:\n", next_lbl);
+                    }
+                }
+                J("%s:\n", done_lbl);
+                return;
+            }
+            /* plain disjunction: try each branch in sequence */
             int uid = pj_fresh_label();
-            char else_lbl[128], done_lbl[128];
-            snprintf(else_lbl, sizeof else_lbl, "disj%d_b", uid);
+            char done_lbl[128];
             snprintf(done_lbl, sizeof done_lbl, "disj%d_done", uid);
-            pj_emit_goal(left,  lbl_gamma, else_lbl, trail_local, var_locals, n_vars);
-            J("    goto %s\n", done_lbl);
-            J("%s:\n", else_lbl);
-            pj_emit_goal(right, lbl_gamma, lbl_omega, trail_local, var_locals, n_vars);
+            for (int bi = 0; bi < nargs; bi++) {
+                char next_lbl[128];
+                snprintf(next_lbl, sizeof next_lbl, "disj%d_alt%d", uid, bi + 1);
+                const char *fail_to = (bi < nargs - 1) ? next_lbl : lbl_omega;
+                pj_emit_goal(goal->children[bi], lbl_gamma, fail_to,
+                             trail_local, var_locals, n_vars);
+                if (bi < nargs - 1) {
+                    J("    goto %s\n", done_lbl);
+                    J("%s:\n", next_lbl);
+                }
+            }
             J("%s:\n", done_lbl);
             return;
         }
-        /* ->/2 — if-then (without else): Cond -> Then */
+        /* ->/2 — if-then (without else): Cond -> Then.
+         * Condition success = fall through to Then; failure = goto lbl_omega. */
         if (strcmp(fn, "->") == 0 && nargs == 2) {
             int uid = pj_fresh_label();
-            char cond_fail[128];
-            snprintf(cond_fail, sizeof cond_fail, "ifthen%d_fail", uid);
-            pj_emit_goal(goal->children[0], "", cond_fail, trail_local, var_locals, n_vars);
+            char cond_ok[128], cond_fail[128];
+            snprintf(cond_ok,   sizeof cond_ok,   "ifthen%d_ok",   uid);
+            snprintf(cond_fail, sizeof cond_fail,  "ifthen%d_fail", uid);
+            /* emit condition: success falls through, failure jumps to omega */
+            pj_emit_goal(goal->children[0], cond_ok, cond_fail, trail_local, var_locals, n_vars);
+            J("%s:\n", cond_ok);
             pj_emit_goal(goal->children[1], lbl_gamma, lbl_omega, trail_local, var_locals, n_vars);
+            J("    goto %s\n", lbl_omega);  /* if Then fails */
             J("%s:\n", cond_fail);
             JI("goto", lbl_omega);
             return;

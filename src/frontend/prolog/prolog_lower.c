@@ -145,6 +145,41 @@ static EXPR_t *lower_term(Term *t) {
                 }
             }
 
+            /* ,/2 — conjunction: flatten right-spine into n-ary E_FNC(",")
+             * e.g. (A,(B,(C,D))) -> E_FNC(",") [A, B, C, D]  */
+            int comma_id = prolog_atom_intern(",");
+            if (t->compound.functor == comma_id && arity == 2) {
+                EXPR_t *e = expr_new(E_FNC);
+                e->sval = strdup(",");
+                /* walk the right spine collecting all conjuncts */
+                Term *cur = t;
+                while (cur && cur->tag == TT_COMPOUND &&
+                       cur->compound.functor == comma_id &&
+                       cur->compound.arity == 2) {
+                    expr_add_child(e, lower_term(cur->compound.args[0]));
+                    cur = term_deref(cur->compound.args[1]);
+                }
+                if (cur) expr_add_child(e, lower_term(cur));
+                return e;
+            }
+
+            /* ;/2 — disjunction: flatten right-spine into n-ary E_FNC(";")
+             * e.g. (A;(B;C)) -> E_FNC(";") [A, B, C]  */
+            int semi_id = prolog_atom_intern(";");
+            if (t->compound.functor == semi_id && arity == 2) {
+                EXPR_t *e = expr_new(E_FNC);
+                e->sval = strdup(";");
+                Term *cur = t;
+                while (cur && cur->tag == TT_COMPOUND &&
+                       cur->compound.functor == semi_id &&
+                       cur->compound.arity == 2) {
+                    expr_add_child(e, lower_term(cur->compound.args[0]));
+                    cur = term_deref(cur->compound.args[1]);
+                }
+                if (cur) expr_add_child(e, lower_term(cur));
+                return e;
+            }
+
             /* General compound / goal -> E_FNC */
             EXPR_t *e = expr_new(E_FNC);
             e->sval = strdup(fn);
