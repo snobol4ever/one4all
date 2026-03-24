@@ -93,6 +93,13 @@ void ij_set_classname(const char *filename) {
     ij_classname[i] = '\0';
 }
 
+/* Build "ClassName/methodSig" into a static buffer for JI() calls */
+static const char *ij_classname_buf(const char *sig) {
+    static char buf[512];
+    snprintf(buf, sizeof buf, "%s/%s", ij_classname, sig);
+    return buf;
+}
+
 /* =========================================================================
  * Node ID counter and label generation
  * ======================================================================= */
@@ -689,6 +696,123 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         return;
     }
 
+    /* --- built-in any(cs) ---
+     * Only fires if 'any' is NOT a user-defined procedure in this file. */
+    if (strcmp(fname, "any") == 0 && nargs >= 1 && !ij_is_user_proc(fname)) {
+        IcnNode *csarg = n->children[1];
+        char after[64]; snprintf(after, sizeof after, "icn_%d_after", id);
+        char chk[64];   snprintf(chk,   sizeof chk,   "icn_%d_chk",  id);
+        IjPorts ap; strncpy(ap.γ, after, 63); strncpy(ap.ω, ports.ω, 63);
+        char arg_a[64], arg_b[64];
+        ij_emit_expr(csarg, ap, arg_a, arg_b);
+        JL(a); JGoto(arg_a);
+        JL(b); JGoto(arg_b);
+        JL(after);
+        JC("any: cs String on stack");
+        ij_declare_static_str("icn_subject");
+        ij_declare_static_int("icn_pos");
+        /* stack: cs_String */
+        ij_get_str_field("icn_subject");
+        ij_get_int_field("icn_pos");
+        /* invoke helper: icn_builtin_any(cs, subj, pos) → long newpos or -1 */
+        JI("invokestatic", ij_classname_buf("icn_builtin_any(Ljava/lang/String;Ljava/lang/String;I)J"));
+        /* result: long on stack — lconst_m1 check */
+        J("    dup2\n");                         /* [res res] */
+        J("    lconst_1\n"); J("    lneg\n");    /* [res res -1L] */
+        J("    lcmp\n");                         /* [res cmp] */
+        J("    ifne %s\n", chk);                /* cmp!=0 → ok (not -1) */
+        J("    pop2\n");                         /* discard -1L result */
+        JGoto(ports.ω);
+        JL(chk);
+        JC("any ok: advance icn_pos, push newpos");
+        /* newpos is on stack as long = (icn_pos+2); update icn_pos = newpos-1 (0-based) */
+        J("    dup2\n");
+        J("    lconst_1\n"); J("    lsub\n");    /* newpos-1 = new 0-based pos */
+        J("    l2i\n");
+        ij_put_int_field("icn_pos");             /* store updated pos */
+        /* newpos long remains on stack → ports.γ */
+        JGoto(ports.γ);
+        return;
+    }
+
+    /* --- built-in many(cs) --- only if not user-defined */
+    if (strcmp(fname, "many") == 0 && nargs >= 1 && !ij_is_user_proc(fname)) {
+        IcnNode *csarg = n->children[1];
+        char after[64]; snprintf(after, sizeof after, "icn_%d_after", id);
+        char chk[64];   snprintf(chk,   sizeof chk,   "icn_%d_chk",  id);
+        IjPorts ap; strncpy(ap.γ, after, 63); strncpy(ap.ω, ports.ω, 63);
+        char arg_a[64], arg_b[64];
+        ij_emit_expr(csarg, ap, arg_a, arg_b);
+        JL(a); JGoto(arg_a);
+        JL(b); JGoto(arg_b);
+        JL(after);
+        JC("many: cs String on stack");
+        ij_declare_static_str("icn_subject");
+        ij_declare_static_int("icn_pos");
+        ij_get_str_field("icn_subject");
+        ij_get_int_field("icn_pos");
+        JI("invokestatic", ij_classname_buf("icn_builtin_many(Ljava/lang/String;Ljava/lang/String;I)J"));
+        J("    dup2\n");
+        J("    lconst_1\n"); J("    lneg\n");
+        J("    lcmp\n");
+        J("    ifne %s\n", chk);
+        J("    pop2\n");
+        JGoto(ports.ω);
+        JL(chk);
+        JC("many ok: advance icn_pos");
+        J("    dup2\n");
+        J("    lconst_1\n"); J("    lsub\n");
+        J("    l2i\n");
+        ij_put_int_field("icn_pos");
+        JGoto(ports.γ);
+        return;
+    }
+
+    /* --- built-in upto(cs) --- only if not user-defined */
+    if (strcmp(fname, "upto") == 0 && nargs >= 1 && !ij_is_user_proc(fname)) {
+        IcnNode *csarg = n->children[1];
+        char after[64]; snprintf(after, sizeof after, "icn_%d_after", id);
+        char step[64];  snprintf(step,  sizeof step,  "icn_%d_step",  id);
+        char chk[64];   snprintf(chk,   sizeof chk,   "icn_%d_chk",  id);
+        /* Allocate a static String field to hold the cset across resume */
+        char cs_fld[64]; snprintf(cs_fld, sizeof cs_fld, "icn_upto_cs_%d", id);
+        ij_declare_static_str(cs_fld);
+        IjPorts ap; strncpy(ap.γ, after, 63); strncpy(ap.ω, ports.ω, 63);
+        char arg_a[64], arg_b[64];
+        ij_emit_expr(csarg, ap, arg_a, arg_b);
+        /* α: evaluate cs, store, then enter step */
+        JL(a); JGoto(arg_a);
+        JL(after);
+        JC("upto α: save cs, enter step");
+        ij_put_str_field(cs_fld);         /* consume cs String from stack */
+        JGoto(step);
+        /* β: cs already saved, re-enter step (pos already advanced) */
+        JL(b); JGoto(step);
+        /* step: scan forward until char in cs or end */
+        JL(step);
+        JC("upto step");
+        ij_declare_static_str("icn_subject");
+        ij_declare_static_int("icn_pos");
+        ij_get_str_field(cs_fld);
+        ij_get_str_field("icn_subject");
+        ij_get_int_field("icn_pos");
+        JI("invokestatic", ij_classname_buf("icn_builtin_upto_step(Ljava/lang/String;Ljava/lang/String;I)J"));
+        J("    dup2\n");
+        J("    lconst_1\n"); J("    lneg\n");
+        J("    lcmp\n");
+        J("    ifne %s\n", chk);
+        J("    pop2\n");
+        JGoto(ports.ω);
+        JL(chk);
+        JC("upto: advance icn_pos past match, yield pos");
+        /* result long = matched position (1-based); advance icn_pos to pos (0-based = result) */
+        J("    dup2\n");
+        J("    l2i\n");
+        ij_put_int_field("icn_pos");      /* icn_pos = result (0-based next scan start) */
+        JGoto(ports.γ);
+        return;
+    }
+
     /* --- user procedure call --- */
     if (ij_is_user_proc(fname)) {
         int is_gen = ij_is_gen_proc(fname);
@@ -1075,6 +1199,7 @@ static int ij_expr_is_string(IcnNode *n) {
     if (!n) return 0;
     switch (n->kind) {
         case ICN_STR:    return 1;
+        case ICN_CSET:   return 1;  /* cset literal is a String */
         case ICN_CONCAT: return 1;
         case ICN_CALL: {
             /* write(str_arg) returns its argument — check arg type */
@@ -1304,6 +1429,7 @@ static void ij_emit_expr(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     switch (n->kind) {
         case ICN_INT:     ij_emit_int      (n,ports,oα,oβ); break;
         case ICN_STR:     ij_emit_str      (n,ports,oα,oβ); break;
+        case ICN_CSET:    ij_emit_str      (n,ports,oα,oβ); break; /* cset = typed String */
         case ICN_VAR:     ij_emit_var      (n,ports,oα,oβ); break;
         case ICN_ASSIGN:  ij_emit_assign   (n,ports,oα,oβ); break;
         case ICN_RETURN:  ij_emit_return   (n,ports,oα,oβ); break;
@@ -1313,22 +1439,47 @@ static void ij_emit_expr(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         case ICN_ALT:     ij_emit_alt      (n,ports,oα,oβ); break;
         case ICN_AND: {
             /* n-ary conjunction: E1 & E2 & ... & En
-             * irgen.icn ir_conjunction: Ei.γ → E(i+1).α; Ei.ω → E(i-1).β; β → En.β */
+             * irgen.icn ir_conjunction: Ei.γ → E(i+1).α; Ei.ω → E(i-1).β; β → En.β
+             *
+             * Bug fix: must emit LEFT-TO-RIGHT so ccb[i-1] is known when wiring
+             * E[i].ω.  But Ei.γ needs to point to E(i+1).α which isn't known yet.
+             * Solution: pre-allocate a unique "relay" label for each child's γ,
+             * emit left-to-right using those relay labels as γ targets, then emit
+             * the relay → real-α trampolines after all children.
+             */
             int nc = n->nchildren;
             int cid = ij_new_id(); char ca2[64], cb2[64];
             lbl_α(cid,ca2,sizeof ca2); lbl_β(cid,cb2,sizeof cb2);
             strncpy(oα,ca2,63); strncpy(oβ,cb2,63);
-            char (*cca)[64] = malloc(nc*64);
-            char (*ccb)[64] = malloc(nc*64);
-            for (int i = nc-1; i >= 0; i--) {
+            char (*cca)[64] = malloc(nc * 64);
+            char (*ccb)[64] = malloc(nc * 64);
+            /* Pre-allocate relay labels for each γ port */
+            char (*relay_g)[64] = malloc(nc * 64);
+            for (int i = 0; i < nc; i++) {
+                snprintf(relay_g[i], 64, "icn_%d_and_rg_%d", cid, i);
+                cca[i][0] = '\0'; ccb[i][0] = '\0';
+            }
+            /* Emit children left-to-right */
+            for (int i = 0; i < nc; i++) {
                 IjPorts ep;
-                strncpy(ep.γ, (i == nc-1) ? ports.γ : cca[i+1], 63);
-                strncpy(ep.ω,    (i == 0)    ? ports.ω    : ccb[i-1], 63);
+                /* γ: last child → ports.γ; otherwise relay_g[i] (trampoline) */
+                strncpy(ep.γ, (i == nc-1) ? ports.γ : relay_g[i], 63);
+                /* ω: first child → ports.ω; otherwise ccb[i-1] (already populated) */
+                strncpy(ep.ω, (i == 0) ? ports.ω : ccb[i-1], 63);
                 ij_emit_expr(n->children[i], ep, cca[i], ccb[i]);
+            }
+            /* Emit relay trampolines: relay_g[i] → pop result → cca[i+1]
+             * E[i].γ leaves a value on the JVM stack; E[i+1].α expects empty stack.
+             * Drain: String result = pop (1 slot); long result = pop2 (2 slots). */
+            for (int i = 0; i < nc-1; i++) {
+                JL(relay_g[i]);
+                int child_is_str = ij_expr_is_string(n->children[i]);
+                JI(child_is_str ? "pop" : "pop2", "");
+                JGoto(cca[i+1]);
             }
             JL(ca2); JGoto(cca[0]);
             JL(cb2); JGoto(ccb[nc-1]);
-            free(cca); free(ccb);
+            free(cca); free(ccb); free(relay_g);
             break;
         }
         case ICN_ADD: case ICN_SUB: case ICN_MUL: case ICN_DIV: case ICN_MOD:
@@ -1635,6 +1786,95 @@ void ij_emit_file(IcnNode **nodes, int count, FILE *out, const char *filename) {
     J("    invokestatic %s/icn_main()V\n", ij_classname);
     J("    return\n");
     J(".end method\n\n");
+
+    /* Emit built-in scan helper methods (only if cset/scan builtins are used).
+     * icn_builtin_any(cs, subj, pos)      → long newpos (1-based) or -1L
+     * icn_builtin_many(cs, subj, pos)     → long newpos (1-based) or -1L
+     * icn_builtin_upto_step(cs, subj, pos)→ long matched-pos (1-based) or -1L
+     *   upto_step scans forward from pos until it finds a char in cs,
+     *   returns that 1-based position (caller sets icn_pos=result for next resume). */
+    int need_scan_builtins = 0;
+    for (int i = 0; i < ij_nstatics; i++)
+        if (!strncmp(ij_statics[i], "icn_upto_cs_", 12)) { need_scan_builtins = 1; break; }
+    /* Also check if any/many were used (they don't leave a marker; emit always if scan present) */
+    for (int i = 0; i < ij_nstatics; i++)
+        if (!strcmp(ij_statics[i], "icn_subject")) { need_scan_builtins = 1; break; }
+    if (need_scan_builtins) {
+        /* icn_builtin_any(String cs, String subj, int pos) → long */
+        J(".method public static icn_builtin_any(Ljava/lang/String;Ljava/lang/String;I)J\n");
+        J("    .limit stack 4\n    .limit locals 3\n");
+        J("    ; if pos >= subj.length() → return -1\n");
+        J("    aload_1\n");
+        J("    invokevirtual java/lang/String/length()I\n");
+        J("    iload_2\n");
+        J("    if_icmpgt icn_any_inbounds\n");
+        J("    ldc2_w -1\n    lreturn\n");
+        J("icn_any_inbounds:\n");
+        J("    ; cs.indexOf(subj.charAt(pos)) >= 0?\n");
+        J("    aload_0\n");
+        J("    aload_1\n    iload_2\n");
+        J("    invokevirtual java/lang/String/charAt(I)C\n");
+        J("    invokevirtual java/lang/String/indexOf(I)I\n");
+        J("    ifge icn_any_match\n");
+        J("    ldc2_w -1\n    lreturn\n");
+        J("icn_any_match:\n");
+        J("    ; return pos+2 (new 1-based pos after consuming one char)\n");
+        J("    iload_2\n    iconst_2\n    iadd\n    i2l\n    lreturn\n");
+        J(".end method\n\n");
+
+        /* icn_builtin_many(String cs, String subj, int pos) → long */
+        J(".method public static icn_builtin_many(Ljava/lang/String;Ljava/lang/String;I)J\n");
+        J("    .limit stack 4\n    .limit locals 4\n");
+        J("    ; check first char in cs — must match at least one\n");
+        J("    aload_1\n");
+        J("    invokevirtual java/lang/String/length()I\n");
+        J("    iload_2\n");
+        J("    if_icmpgt icn_many_first_ok\n");
+        J("    ldc2_w -1\n    lreturn\n");
+        J("icn_many_first_ok:\n");
+        J("    aload_0\n    aload_1\n    iload_2\n");
+        J("    invokevirtual java/lang/String/charAt(I)C\n");
+        J("    invokevirtual java/lang/String/indexOf(I)I\n");
+        J("    ifge icn_many_loop_init\n");
+        J("    ldc2_w -1\n    lreturn\n");
+        J("icn_many_loop_init:\n");
+        J("    ; local 3 = pos (working)\n");
+        J("    iload_2\n    istore_3\n");
+        J("icn_many_loop:\n");
+        J("    iinc 3 1\n");
+        J("    ; if pos3 >= length → done\n");
+        J("    aload_1\n    invokevirtual java/lang/String/length()I\n");
+        J("    iload_3\n    if_icmpgt icn_many_cont\n");
+        J("    iload_3\n    i2l\n    lconst_1\n    ladd\n    lreturn\n");
+        J("icn_many_cont:\n");
+        J("    aload_0\n    aload_1\n    iload_3\n");
+        J("    invokevirtual java/lang/String/charAt(I)C\n");
+        J("    invokevirtual java/lang/String/indexOf(I)I\n");
+        J("    ifge icn_many_loop\n");
+        J("    ; stopped — return pos3+1 (1-based)\n");
+        J("    iload_3\n    iconst_1\n    iadd\n    i2l\n    lreturn\n");
+        J(".end method\n\n");
+
+        /* icn_builtin_upto_step(String cs, String subj, int pos) → long */
+        J(".method public static icn_builtin_upto_step(Ljava/lang/String;Ljava/lang/String;I)J\n");
+        J("    .limit stack 4\n    .limit locals 4\n");
+        J("    iload_2\n    istore_3\n");
+        J("icn_upto_scan:\n");
+        J("    ; if pos3 >= length → -1\n");
+        J("    aload_1\n    invokevirtual java/lang/String/length()I\n");
+        J("    iload_3\n    if_icmpgt icn_upto_inbounds\n");
+        J("    ldc2_w -1\n    lreturn\n");
+        J("icn_upto_inbounds:\n");
+        J("    aload_0\n    aload_1\n    iload_3\n");
+        J("    invokevirtual java/lang/String/charAt(I)C\n");
+        J("    invokevirtual java/lang/String/indexOf(I)I\n");
+        J("    ifge icn_upto_found\n");
+        J("    iinc 3 1\n    goto icn_upto_scan\n");
+        J("icn_upto_found:\n");
+        J("    ; return pos3+1 (1-based); caller sets icn_pos=result for next resume\n");
+        J("    iload_3\n    iconst_1\n    iadd\n    i2l\n    lreturn\n");
+        J(".end method\n\n");
+    }
 
     /* Emit all procedure methods */
     fputs(procs_text, jout);
