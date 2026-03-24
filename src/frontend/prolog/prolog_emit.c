@@ -182,7 +182,7 @@ static void emit_term_val(EXPR_t *e) {
                     emit_term_val(e->children[i]);
                     PL_C(";\n");
                 }
-                PL_C("    term_new_compound(prolog_atom_intern(\""); emit_c_string(fn); PL_C("\"), %d, _args%d);\\n", arity, cuid);
+                PL_C("    term_new_compound(prolog_atom_intern(\""); emit_c_string(fn); PL_C("\"), %d, _args%d);\n", arity, cuid);
                 PL_C("})");
             }
             return;
