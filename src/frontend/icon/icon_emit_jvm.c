@@ -509,11 +509,18 @@ static void ij_emit_suspend(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
 
     /* resume_here: execution resumes here after proc β dispatches */
     if (body_node) {
+        /* Fix IJ-6 Bug2: body assignment leaves a long result on the JVM operand
+         * stack.  ports.γ is the while-loop top (icn_0_top), also reached from the
+         * relop with an EMPTY stack.  Entering it with a stale long gives:
+         *   "Inconsistent stack height 0 != 2"
+         * Route body γ and ω through a drain label: pop2 then loop back. */
+        char body_done[64]; snprintf(body_done, sizeof body_done, "icn_%d_bdone", id);
         char ba[64], bb[64];
         IjPorts bp;
-        strncpy(bp.γ, ports.γ, 63);
-        strncpy(bp.ω,    ports.γ, 63);  /* body fail also continues */
+        strncpy(bp.γ, body_done, 63);
+        strncpy(bp.ω, body_done, 63);  /* body fail also drains then continues */
         ij_emit_expr(body_node, bp, ba, bb);
+        JL(body_done); JI("pop2", ""); JGoto(ports.γ);
         JL(resume_here); JGoto(ba);
     } else {
         JL(resume_here); JGoto(ports.γ);
@@ -1103,7 +1110,13 @@ static void ij_emit_proc(IcnNode *proc, FILE *out_target) {
         }
     }
 
-    /* Chain statements */
+    /* Chain statements.
+     * Fix IJ-6 Bug3: every top-level statement (assignment etc.) leaves its result
+     * value (a long) on the JVM operand stack when it jumps to its γ port.  The γ
+     * port of statement[i] is the α port of statement[i+1], which is ALSO entered
+     * from other paths with an empty stack → "Inconsistent stack height 0 != 2".
+     * Solution: route each statement's γ through a private sdrain label that pops
+     * the result before forwarding to the real next_a. */
     char **alphas = calloc(nstmts, sizeof(char*));
     for (int i = 0; i < nstmts; i++) alphas[i] = malloc(64);
     char next_a[64]; strncpy(next_a, proc_done, 63);
@@ -1111,8 +1124,17 @@ static void ij_emit_proc(IcnNode *proc, FILE *out_target) {
     for (int i = nstmts-1; i >= 0; i--) {
         IcnNode *stmt = proc->children[body_start + i];
         if (!stmt || stmt->kind == ICN_GLOBAL) { strncpy(alphas[i], next_a, 63); continue; }
-        IjPorts sp; strncpy(sp.γ, next_a, 63); strncpy(sp.ω, next_a, 63);
+        /* Build a drain label for this statement's success port */
+        char sdrain[64]; snprintf(sdrain, sizeof sdrain, "icn_s%d_sdrain", i);
+        IjPorts sp; strncpy(sp.γ, sdrain, 63); strncpy(sp.ω, next_a, 63);
         char sa[64], sb[64]; ij_emit_expr(stmt, sp, sa, sb);
+        /* Emit the drain: pop result long, then fall through to next_a */
+        char lbl_sdrain_code[128];
+        snprintf(lbl_sdrain_code, sizeof lbl_sdrain_code, "%s", sdrain);
+        /* We emit the drain inline into the body buffer (jout = tmp at this point) */
+        J("%s:\n", sdrain);
+        JI("pop2", "");
+        JGoto(next_a);
         strncpy(alphas[i], sa, 63);
         strncpy(next_a, sa, 63);
     }
@@ -1172,6 +1194,16 @@ static void ij_emit_proc(IcnNode *proc, FILE *out_target) {
     if (is_gen && total_susp > 0) {
         char beta_entry[64]; snprintf(beta_entry, sizeof beta_entry, "icn_%s_beta", pname);
         char fresh_entry[64]; snprintf(fresh_entry, sizeof fresh_entry, "icn_%s_fresh", pname);
+        /* Fix IJ-6 Bug1: initialise every long slot to 0L BEFORE the suspend_id
+         * dispatch branch so the JVM verifier sees a consistent slot type at every
+         * control-flow join point (icn_upto_beta / tableswitch targets).
+         * Without this the verifier reports "Register pair 2/3 contains wrong type"
+         * because the fall-through path (suspend_id == 0) has untyped slots while
+         * resume paths have them typed as long. */
+        for (int s = 0; s < ij_nlocals; s++) {
+            JI("lconst_0", "");
+            J("    lstore %d\n", slot_jvm(s));
+        }
         J("    getstatic %s/icn_suspend_id I\n", ij_classname);
         J("    ifne %s\n", beta_entry);
         JL(fresh_entry);
