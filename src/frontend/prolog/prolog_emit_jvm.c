@@ -492,54 +492,234 @@ static void pj_emit_runtime_helpers(void) {
     J(".end method\n\n");
 
     /* ------------------------------------------------------------------
-     * write_term(Object) — write/1 builtin
+     * pj_term_str(Object) — convert any term to its Prolog string representation
+     * Returns String on stack.  Handles atom, int, float, compound, var, list.
+     * Flat compound encoding: [0]="compound",[1]=functor,[2..2+arity-1]=args
+     * Lists: functor=".", arity=2 → printed as [H|T] or [a,b,c]
      * ------------------------------------------------------------------ */
-    J(".method static pj_write(Ljava/lang/Object;)V\n");
-    J("    .limit stack 4\n");
-    J("    .limit locals 2\n");
-    /* deref first */
+    J(".method static pj_term_str(Ljava/lang/Object;)Ljava/lang/String;\n");
+    J("    .limit stack 8\n");
+    J("    .limit locals 4\n");
+    /* deref */
     JI("aload_0", "");
     J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
     JI("astore_0", "");
-    /* null = unbound var, print "_" */
+    /* null → "_" */
     JI("aload_0", "");
-    JI("ifnonnull", "pj_write_notnull");
-    JI("getstatic", "java/lang/System/out Ljava/io/PrintStream;");
+    JI("ifnonnull", "pts_notnull");
     JI("ldc", "\"_\"");
-    JI("invokevirtual", "java/io/PrintStream/print(Ljava/lang/String;)V");
-    JI("return", "");
-    J("pj_write_notnull:\n");
-    /* check tag */
+    JI("areturn", "");
+    J("pts_notnull:\n");
     JI("aload_0", "");
     JI("checkcast", "[Ljava/lang/Object;");
     JI("iconst_0", "");
     JI("aaload", "");
-    JI("astore_1", "");
-    /* atom or int → print [1] as string */
+    JI("astore_1", "");  /* local 1 = tag */
+    /* atom/int/float → return [1] */
     JI("aload_1", "");
     JI("ldc", "\"atom\"");
     JI("invokevirtual", "java/lang/Object/equals(Ljava/lang/Object;)Z");
-    JI("ifne", "pj_write_scalar");
+    JI("ifne", "pts_scalar");
     JI("aload_1", "");
     JI("ldc", "\"int\"");
     JI("invokevirtual", "java/lang/Object/equals(Ljava/lang/Object;)Z");
-    JI("ifne", "pj_write_scalar");
+    JI("ifne", "pts_scalar");
     JI("aload_1", "");
     JI("ldc", "\"float\"");
     JI("invokevirtual", "java/lang/Object/equals(Ljava/lang/Object;)Z");
-    JI("ifne", "pj_write_scalar");
-    /* var or ref: print tag[0]...[1] recursively — simplified: print atom name or "_" */
-    JI("getstatic", "java/lang/System/out Ljava/io/PrintStream;");
-    JI("ldc", "\"_\"");
-    JI("invokevirtual", "java/io/PrintStream/print(Ljava/lang/String;)V");
-    JI("return", "");
-    J("pj_write_scalar:\n");
-    JI("getstatic", "java/lang/System/out Ljava/io/PrintStream;");
+    JI("ifne", "pts_scalar");
+    /* compound */
+    JI("aload_1", "");
+    JI("ldc", "\"compound\"");
+    JI("invokevirtual", "java/lang/Object/equals(Ljava/lang/Object;)Z");
+    JI("ifeq", "pts_var");
+    /* compound: check if it's a list ('.'/2) */
     JI("aload_0", "");
     JI("checkcast", "[Ljava/lang/Object;");
     JI("iconst_1", "");
     JI("aaload", "");
-    JI("checkcast", "java/lang/String");  /* verifier: Object → String */
+    JI("ldc", "\".\"");
+    JI("invokevirtual", "java/lang/Object/equals(Ljava/lang/Object;)Z");
+    JI("ifeq", "pts_plain_compound");
+    JI("aload_0", "");
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("arraylength", "");
+    JI("iconst_4", "");  /* 2+arity=4 for arity=2 */
+    JI("if_icmpne", "pts_plain_compound");
+    /* it's a list: build "[a,b,c]" using StringBuilder */
+    JI("new", "java/lang/StringBuilder");
+    JI("dup", "");
+    JI("invokespecial", "java/lang/StringBuilder/<init>()V");
+    JI("ldc", "\"[\"");
+    JI("invokevirtual", "java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;");
+    JI("astore_2", "");   /* local 2 = sb */
+    JI("aload_0", "");    /* local 3 = current list cell */
+    JI("astore_3", "");
+    J("pts_list_loop:\n");
+    /* print head */
+    JI("aload_2", "");
+    JI("aload_3", "");
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("iconst_2", "");
+    JI("aaload", "");   /* head */
+    J("    invokestatic %s/pj_term_str(Ljava/lang/Object;)Ljava/lang/String;\n", pj_classname);
+    JI("invokevirtual", "java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;");
+    JI("pop", "");
+    /* deref tail */
+    JI("aload_3", "");
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("iconst_3", "");
+    JI("aaload", "");   /* tail */
+    J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    JI("astore_3", "");
+    /* if tail is '[]' atom → done */
+    JI("aload_3", "");
+    JI("ifnull", "pts_list_close");
+    JI("aload_3", "");
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("iconst_0", "");
+    JI("aaload", "");
+    JI("ldc", "\"atom\"");
+    JI("invokevirtual", "java/lang/Object/equals(Ljava/lang/Object;)Z");
+    JI("ifeq", "pts_list_tail_check");
+    /* atom tail: check if it's [] */
+    JI("aload_3", "");
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("iconst_1", "");
+    JI("aaload", "");
+    JI("ldc", "\"[]\"");
+    JI("invokevirtual", "java/lang/Object/equals(Ljava/lang/Object;)Z");
+    JI("ifne", "pts_list_close");
+    /* non-[] atom tail: print as |atom] */
+    J("pts_list_tail_check:\n");
+    /* check if tail is another '.' compound */
+    JI("aload_3", "");
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("iconst_0", "");
+    JI("aaload", "");
+    JI("ldc", "\"compound\"");
+    JI("invokevirtual", "java/lang/Object/equals(Ljava/lang/Object;)Z");
+    JI("ifeq", "pts_list_improper");
+    JI("aload_3", "");
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("iconst_1", "");
+    JI("aaload", "");
+    JI("ldc", "\".\"");
+    JI("invokevirtual", "java/lang/Object/equals(Ljava/lang/Object;)Z");
+    JI("ifeq", "pts_list_improper");
+    /* proper cons cell: append comma and continue */
+    JI("aload_2", "");
+    JI("ldc", "\",\"");
+    JI("invokevirtual", "java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;");
+    JI("pop", "");
+    JI("goto", "pts_list_loop");
+    J("pts_list_improper:\n");
+    /* improper list tail: print |tail */
+    JI("aload_2", "");
+    JI("ldc", "\"|\"");
+    JI("invokevirtual", "java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;");
+    JI("pop", "");
+    JI("aload_2", "");
+    JI("aload_3", "");
+    J("    invokestatic %s/pj_term_str(Ljava/lang/Object;)Ljava/lang/String;\n", pj_classname);
+    JI("invokevirtual", "java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;");
+    JI("pop", "");
+    J("pts_list_close:\n");
+    JI("aload_2", "");
+    JI("ldc", "\"]\"");
+    JI("invokevirtual", "java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;");
+    JI("pop", "");
+    JI("aload_2", "");
+    JI("invokevirtual", "java/lang/StringBuilder/toString()Ljava/lang/String;");
+    JI("areturn", "");
+    /* plain compound: functor(arg1,...) */
+    J("pts_plain_compound:\n");
+    JI("new", "java/lang/StringBuilder");
+    JI("dup", "");
+    JI("invokespecial", "java/lang/StringBuilder/<init>()V");
+    JI("astore_2", "");   /* local 2 = sb */
+    /* append functor */
+    JI("aload_2", "");
+    JI("aload_0", "");
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("iconst_1", "");
+    JI("aaload", "");
+    JI("checkcast", "java/lang/String");
+    JI("invokevirtual", "java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;");
+    JI("pop", "");
+    /* arity = arraylength - 2 */
+    JI("aload_0", "");
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("arraylength", "");
+    JI("iconst_2", "");
+    JI("isub", "");
+    JI("istore_3", "");   /* local 3 = arity */
+    JI("iload_3", "");
+    JI("ifeq", "pts_compound_done");
+    /* arity > 0: append "(" then args */
+    JI("aload_2", "");
+    JI("ldc", "\"(\"");
+    JI("invokevirtual", "java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;");
+    JI("pop", "");
+    /* use local 1 (was tag, now free) as loop index i=0 */
+    JI("iconst_0", "");
+    JI("istore_1", "");
+    J("pts_compound_loop:\n");
+    JI("iload_1", "");
+    JI("iload_3", "");
+    JI("if_icmpge", "pts_compound_close");
+    /* if i>0 append "," */
+    JI("iload_1", "");
+    JI("ifeq", "pts_compound_nocomma");
+    JI("aload_2", "");
+    JI("ldc", "\",\"");
+    JI("invokevirtual", "java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;");
+    JI("pop", "");
+    J("pts_compound_nocomma:\n");
+    JI("aload_2", "");
+    JI("aload_0", "");
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("iload_1", "");
+    JI("iconst_2", "");
+    JI("iadd", "");
+    JI("aaload", "");   /* args[i] */
+    J("    invokestatic %s/pj_term_str(Ljava/lang/Object;)Ljava/lang/String;\n", pj_classname);
+    JI("invokevirtual", "java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;");
+    JI("pop", "");
+    JI("iinc", "1 1");
+    JI("goto", "pts_compound_loop");
+    J("pts_compound_close:\n");
+    JI("aload_2", "");
+    JI("ldc", "\")\"");
+    JI("invokevirtual", "java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;");
+    JI("pop", "");
+    J("pts_compound_done:\n");
+    JI("aload_2", "");
+    JI("invokevirtual", "java/lang/StringBuilder/toString()Ljava/lang/String;");
+    JI("areturn", "");
+    /* var/ref → "_" */
+    J("pts_var:\n");
+    JI("ldc", "\"_\"");
+    JI("areturn", "");
+    J("pts_scalar:\n");
+    JI("aload_0", "");
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("iconst_1", "");
+    JI("aaload", "");
+    JI("checkcast", "java/lang/String");
+    JI("areturn", "");
+    J(".end method\n\n");
+
+    /* ------------------------------------------------------------------
+     * write_term(Object) — write/1 builtin
+     * ------------------------------------------------------------------ */
+    J(".method static pj_write(Ljava/lang/Object;)V\n");
+    J("    .limit stack 3\n");
+    J("    .limit locals 1\n");
+    JI("aload_0", "");
+    J("    invokestatic %s/pj_term_str(Ljava/lang/Object;)Ljava/lang/String;\n", pj_classname);
+    JI("getstatic", "java/lang/System/out Ljava/io/PrintStream;");
+    JI("swap", "");
     JI("invokevirtual", "java/io/PrintStream/print(Ljava/lang/String;)V");
     JI("return", "");
     J(".end method\n\n");
@@ -1261,33 +1441,70 @@ static void pj_emit_choice(EXPR_t *choice) {
         J("    istore %d\n", trail_local);
 
         /* allocate variable cells.
-         * Only load from the JVM arg register when this var slot IS the direct
-         * arg (head pattern = E_VART pointing at slot vi). If the head has a
-         * compound at position vi (e.g. [_|T]), var vi may be T — a fresh body
-         * var — and must NOT be pre-loaded with the arg value. */
+         * Build jvm_arg_for_slot[]: for each var slot, which JVM arg local
+         * provides its initial binding (-1 = none, allocate fresh var cell).
+         * A var slot is a "direct arg" when head position ai is E_VART with
+         * ival==slot.  slot and ai can differ (e.g. append([H|T],L,[H|R]):
+         * H=slot0, T=slot1, L=slot2, R=slot3; L is at head arg position 1
+         * with slot 2 — old code failed because it tested slot==ai). */
+        int *jvm_arg_for_slot = calloc(n_vars + 1, sizeof(int));
+        for (int vi = 0; vi < n_vars; vi++) jvm_arg_for_slot[vi] = -1;
+        for (int ai = 0; ai < n_args && ai < clause->nchildren; ai++) {
+            EXPR_t *ht = clause->children[ai];
+            if (ht && ht->kind == E_VART && ht->ival >= 0 && ht->ival < n_vars)
+                jvm_arg_for_slot[ht->ival] = ai;
+        }
         for (int vi = 0; vi < n_vars; vi++) {
-            int is_direct_arg = (vi < n_args && vi < clause->nchildren &&
-                                 clause->children[vi] &&
-                                 clause->children[vi]->kind == E_VART &&
-                                 clause->children[vi]->ival == vi);
-            if (is_direct_arg) {
-                J("    aload %d\n", vi);
+            if (jvm_arg_for_slot[vi] >= 0) {
+                J("    aload %d\n", jvm_arg_for_slot[vi]);
                 J("    astore %d\n", var_locals[vi]);
             } else {
                 J("    invokestatic %s/pj_term_var()[Ljava/lang/Object;\n", pj_classname);
                 J("    astore %d\n", var_locals[vi]);
             }
         }
+        free(jvm_arg_for_slot);
 
-        /* head unification */
-        for (int ai = 0; ai < n_args && ai < clause->nchildren; ai++) {
-            EXPR_t *head_term = clause->children[ai];
-            if (!head_term) continue;
-            if (head_term->kind == E_VART) continue;
-            J("    aload %d\n", ai);
-            pj_emit_term(head_term, var_locals, n_vars);
-            J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
-            J("    ifeq p_%s_%d_alphafail_%d\n", safe_fn, arity, ci);
+        /* head unification.
+         * For compound/atom/int head terms: unify arg[ai] with the emitted term.
+         * For E_VART head terms: the var was initialized from the FIRST occurrence's
+         * JVM arg (via jvm_arg_for_slot above).  Subsequent occurrences of the same
+         * slot need an explicit unify to enforce non-linear equality.
+         * E.g. append([],L,L): L=slot0, first at ai=1 → slot loaded from arg1.
+         * At ai=2: also E_VART slot0, but var_locals[0] already holds arg1 value.
+         * We must unify arg2 with var_locals[0] to enforce arg1==arg2. */
+        {
+            /* seen_at_arg[slot] = first arg index that claimed this slot, or -1 */
+            int *seen_at = calloc(n_vars + 1, sizeof(int));
+            for (int vi = 0; vi < n_vars; vi++) seen_at[vi] = -1;
+            /* first pass: record first-claim arg for each var slot */
+            for (int ai = 0; ai < n_args && ai < clause->nchildren; ai++) {
+                EXPR_t *ht = clause->children[ai];
+                if (ht && ht->kind == E_VART && ht->ival >= 0 && ht->ival < n_vars) {
+                    if (seen_at[ht->ival] < 0) seen_at[ht->ival] = ai;
+                }
+            }
+            for (int ai = 0; ai < n_args && ai < clause->nchildren; ai++) {
+                EXPR_t *head_term = clause->children[ai];
+                if (!head_term) continue;
+                if (head_term->kind == E_VART) {
+                    int slot = head_term->ival;
+                    if (slot < 0 || slot >= n_vars) continue;
+                    if (seen_at[slot] == ai) continue;  /* first occurrence: no-op */
+                    /* second+ occurrence: unify arg[ai] with the var cell */
+                    J("    aload %d\n", ai);
+                    J("    aload %d\n", var_locals[slot]);
+                    J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+                    J("    ifeq p_%s_%d_alphafail_%d\n", safe_fn, arity, ci);
+                    continue;
+                }
+                /* compound/atom/int: standard unify */
+                J("    aload %d\n", ai);
+                pj_emit_term(head_term, var_locals, n_vars);
+                J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+                J("    ifeq p_%s_%d_alphafail_%d\n", safe_fn, arity, ci);
+            }
+            free(seen_at);
         }
         J("    goto p_%s_%d_beta_%d\n", safe_fn, arity, ci);
         J("p_%s_%d_alphafail_%d:\n", safe_fn, arity, ci);
@@ -1301,19 +1518,25 @@ static void pj_emit_choice(EXPR_t *choice) {
         J("p_%s_%d_alpha_%d:\n", safe_fn, arity, ci);
         J("    iload %d\n", trail_local);
         J("    invokestatic %s/pj_trail_unwind(I)V\n", pj_classname);
-        /* re-allocate variable cells (same logic as initial alloc) */
-        for (int vi = 0; vi < n_vars; vi++) {
-            int is_direct_arg = (vi < n_args && vi < clause->nchildren &&
-                                 clause->children[vi] &&
-                                 clause->children[vi]->kind == E_VART &&
-                                 clause->children[vi]->ival == vi);
-            if (is_direct_arg) {
-                J("    aload %d\n", vi);
-                J("    astore %d\n", var_locals[vi]);
-            } else {
-                J("    invokestatic %s/pj_term_var()[Ljava/lang/Object;\n", pj_classname);
-                J("    astore %d\n", var_locals[vi]);
+        /* re-allocate variable cells (same fix as initial alloc above) */
+        {
+            int *jaf = calloc(n_vars + 1, sizeof(int));
+            for (int vi = 0; vi < n_vars; vi++) jaf[vi] = -1;
+            for (int ai = 0; ai < n_args && ai < clause->nchildren; ai++) {
+                EXPR_t *ht = clause->children[ai];
+                if (ht && ht->kind == E_VART && ht->ival >= 0 && ht->ival < n_vars)
+                    jaf[ht->ival] = ai;
             }
+            for (int vi = 0; vi < n_vars; vi++) {
+                if (jaf[vi] >= 0) {
+                    J("    aload %d\n", jaf[vi]);
+                    J("    astore %d\n", var_locals[vi]);
+                } else {
+                    J("    invokestatic %s/pj_term_var()[Ljava/lang/Object;\n", pj_classname);
+                    J("    astore %d\n", var_locals[vi]);
+                }
+            }
+            free(jaf);
         }
         /* re-run head unification */
         for (int ai = 0; ai < n_args && ai < clause->nchildren; ai++) {
