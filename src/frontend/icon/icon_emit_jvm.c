@@ -422,6 +422,15 @@ static int ij_expr_is_real(IcnNode *n) {
         if (n->nchildren >= 2)
             return ij_expr_is_real(n->children[0]) || ij_expr_is_real(n->children[1]);
     }
+    /* Relops return the right-hand value on success: real if either operand is real */
+    if (n->kind == ICN_LT || n->kind == ICN_LE || n->kind == ICN_GT ||
+        n->kind == ICN_GE || n->kind == ICN_EQ || n->kind == ICN_NE) {
+        if (n->nchildren >= 2)
+            return ij_expr_is_real(n->children[0]) || ij_expr_is_real(n->children[1]);
+    }
+    /* ICN_ALT: real if first alternative is real (all alternatives must be same type) */
+    if (n->kind == ICN_ALT && n->nchildren >= 1)
+        return ij_expr_is_real(n->children[0]);
     /* real() builtin call always returns double */
     if (n->kind == ICN_CALL && n->nchildren >= 1) {
         IcnNode *fn = n->children[0];
@@ -1379,9 +1388,14 @@ static void ij_emit_relop(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     char chk[64];    snprintf(chk,    sizeof chk,    "icn_%d_check",  id);
     char lbfwd[64];  snprintf(lbfwd,  sizeof lbfwd,  "icn_%d_lb",     id);
     char lstore[64]; snprintf(lstore, sizeof lstore, "icn_%d_lstore", id);
-    /* Bug 1 fix: use local slots instead of static fields to support recursion. */
-    int lc_slot = ij_locals_alloc_tmp();   /* long: 2 JVM slots */
-    int rc_slot = ij_locals_alloc_tmp();   /* long: 2 JVM slots */
+
+    /* Determine if either operand is real — doubles need dstore/dload/dcmpl */
+    int is_dbl = ij_expr_is_real(n->children[0]) || ij_expr_is_real(n->children[1]);
+    const char *st_op = is_dbl ? "dstore" : "lstore";
+    const char *ld_op = is_dbl ? "dload"  : "lload";
+
+    int lc_slot = ij_locals_alloc_tmp();   /* long or double: 2 JVM slots */
+    int rc_slot = ij_locals_alloc_tmp();   /* long or double: 2 JVM slots */
     strncpy(oα,a,63); strncpy(oβ,b,63);
 
     char right_relay[64]; snprintf(right_relay, sizeof right_relay, "icn_%d_rrelay", id);
@@ -1392,10 +1406,14 @@ static void ij_emit_relop(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     IjPorts lp; strncpy(lp.γ, left_relay,  63); strncpy(lp.ω, ports.ω, 63);
     char la[64], lb[64]; ij_emit_expr(n->children[0], lp, la, lb);
 
-    /* left_relay: left long on stack → drain to lc_slot → goto lstore (→ ra) */
-    JL(left_relay); J("    lstore %d\n", slot_jvm(lc_slot)); JGoto(lstore);
-    /* right_relay: right long on stack → drain to rc_slot → goto chk */
-    JL(right_relay); J("    lstore %d\n", slot_jvm(rc_slot)); JGoto(chk);
+    /* left_relay: value on stack → promote to double if needed → drain to lc_slot */
+    JL(left_relay);
+    if (is_dbl && !ij_expr_is_real(n->children[0])) JI("l2d", "");
+    J("    %s %d\n", st_op, slot_jvm(lc_slot)); JGoto(lstore);
+    /* right_relay: value on stack → promote to double if needed → drain to rc_slot */
+    JL(right_relay);
+    if (is_dbl && !ij_expr_is_real(n->children[1])) JI("l2d", "");
+    J("    %s %d\n", st_op, slot_jvm(rc_slot)); JGoto(chk);
 
     JL(lbfwd); JGoto(lb);
     JL(a); JGoto(la);
@@ -1406,23 +1424,40 @@ static void ij_emit_relop(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
 
     /* chk: lc_slot=left, rc_slot=right — stack empty */
     JL(chk);
-    J("    lload %d\n", slot_jvm(lc_slot));   /* push left  = value2 */
-    J("    lload %d\n", slot_jvm(rc_slot));   /* push right = value1 */
-    /* lcmp: value2 vs value1 = left vs right → negative if left<right */
-    JI("lcmp","");
+    J("    %s %d\n", ld_op, slot_jvm(lc_slot));   /* push left */
+    J("    %s %d\n", ld_op, slot_jvm(rc_slot));   /* push right */
+
     const char *jfail;
-    switch (n->kind) {
-        case ICN_LT: jfail = "ifge"; break;
-        case ICN_LE: jfail = "ifgt"; break;
-        case ICN_GT: jfail = "ifle"; break;
-        case ICN_GE: jfail = "iflt"; break;
-        case ICN_EQ: jfail = "ifne"; break;
-        case ICN_NE: jfail = "ifeq"; break;
-        default:     jfail = "ifne"; break;
+    if (is_dbl) {
+        /* dcmpl: pushes -1 if either NaN, or left < right; 0 if equal; 1 if left > right.
+         * Use dcmpl for </<= (NaN → -1 → treated as less, safe fail for > case).
+         * Use dcmpg for >/>= (NaN → +1 → treated as greater, safe fail for < case).
+         * For = and ~=, dcmpl works (NaN yields -1 or 1, never 0 → correct). */
+        switch (n->kind) {
+            case ICN_LT: JI("dcmpl",""); jfail = "ifge"; break;
+            case ICN_LE: JI("dcmpl",""); jfail = "ifgt"; break;
+            case ICN_GT: JI("dcmpg",""); jfail = "ifle"; break;
+            case ICN_GE: JI("dcmpg",""); jfail = "iflt"; break;
+            case ICN_EQ: JI("dcmpl",""); jfail = "ifne"; break;
+            case ICN_NE: JI("dcmpl",""); jfail = "ifeq"; break;
+            default:     JI("dcmpl",""); jfail = "ifne"; break;
+        }
+    } else {
+        /* Integer path: lcmp leaves int on stack */
+        JI("lcmp","");
+        switch (n->kind) {
+            case ICN_LT: jfail = "ifge"; break;
+            case ICN_LE: jfail = "ifgt"; break;
+            case ICN_GT: jfail = "ifle"; break;
+            case ICN_GE: jfail = "iflt"; break;
+            case ICN_EQ: jfail = "ifne"; break;
+            case ICN_NE: jfail = "ifeq"; break;
+            default:     jfail = "ifne"; break;
+        }
     }
     J("    %s %s\n", jfail, rb);
     /* success: reload right as result value */
-    J("    lload %d\n", slot_jvm(rc_slot));
+    J("    %s %d\n", ld_op, slot_jvm(rc_slot));
     JGoto(ports.γ);
 }
 
