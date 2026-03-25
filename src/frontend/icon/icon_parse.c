@@ -145,6 +145,27 @@ static IcnNode *parse_primary(IcnParser *p) {
         expect(p, TK_RPAREN, "grouped expression");
         return first;
     }
+    if (t.kind == TK_LBRACK) {
+        /* [e1, e2, ...] — list constructor → ICN_MAKELIST */
+        advance(p);
+        IcnNode **children = malloc(8 * sizeof(IcnNode*));
+        int cap = 8, nc = 0;
+        if (!check(p, TK_RBRACK)) {
+            children[nc++] = parse_expr(p);
+            while (check(p, TK_COMMA)) {
+                advance(p);
+                if (check(p, TK_RBRACK)) break;
+                if (nc >= cap) { cap *= 2; children = realloc(children, cap * sizeof(IcnNode*)); }
+                children[nc++] = parse_expr(p);
+            }
+        }
+        expect(p, TK_RBRACK, "list literal");
+        IcnNode *lst = calloc(1, sizeof(IcnNode));
+        lst->kind = ICN_MAKELIST; lst->line = line;
+        lst->nchildren = nc; lst->children = (nc > 0) ? children : NULL;
+        if (nc == 0) free(children);
+        return lst;
+    }
     if (t.kind == TK_FAIL) {
         advance(p);
         return icn_node_new(ICN_FAIL, line, 0);
