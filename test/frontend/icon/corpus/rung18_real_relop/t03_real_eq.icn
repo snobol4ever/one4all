@@ -1,0 +1,4 @@
+procedure main();
+  x := 3.0;
+  if x = 3.0 then write("equal") else write("nope");
+end

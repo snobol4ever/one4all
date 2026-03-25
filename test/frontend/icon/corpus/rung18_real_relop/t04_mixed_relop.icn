@@ -1,0 +1,4 @@
+procedure main();
+  n := 2;
+  if n < 2.5 then write("yes") else write("no");
+end
