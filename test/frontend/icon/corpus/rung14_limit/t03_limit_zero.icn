@@ -1,0 +1,4 @@
+procedure main();
+  every write((1 to 5) \ 0);
+  write("done");
+end
