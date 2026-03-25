@@ -917,6 +917,33 @@ static void pj_emit_term(EXPR_t *e, int *var_locals, int n_vars) {
         }
         break;
     }
+    case E_ADD: case E_SUB: case E_MPY: case E_DIV: {
+        /* Arithmetic op node in TERM position (e.g. write(X-Y), write(A+B)).
+         * Lowerer maps -/+/* to E_SUB/E_ADD/E_MPY unconditionally.
+         * In term position emit as compound so write/1 and unification work. */
+        const char *afn = (e->kind==E_ADD)?"+": (e->kind==E_SUB)?"-":
+                          (e->kind==E_MPY)?"*": "/";
+        int arity = e->nchildren;
+        if (arity == 0) {
+            J("    ldc \"%s\"\n", afn);
+            J("    invokestatic %s/pj_term_atom(Ljava/lang/String;)[Ljava/lang/Object;\n",
+              pj_classname);
+        } else {
+            J("    bipush %d\n", 2 + arity);
+            JI("anewarray", "java/lang/Object");
+            JI("dup",""); JI("iconst_0",""); JI("ldc","\"compound\""); JI("aastore","");
+            JI("dup",""); JI("iconst_1","");
+            J("    ldc \"%s\"\n", afn);
+            JI("aastore","");
+            for (int ai = 0; ai < arity; ai++) {
+                JI("dup","");
+                J("    bipush %d\n", 2 + ai);
+                pj_emit_term(e->children[ai], var_locals, n_vars);
+                JI("aastore","");
+            }
+        }
+        break;
+    }
     default:
         JI("aconst_null", "");
         break;
