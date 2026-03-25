@@ -375,6 +375,49 @@ static void ij_emit_int(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
 }
 
 /* =========================================================================
+ * ICN_REAL
+ * α: push double via ldc2_w, goto succeed
+ * β: goto fail (one-shot literal)
+ * Doubles are stored in 'D' static fields; write() uses println(D).
+ * ======================================================================= */
+static void ij_declare_static_dbl(const char *name) {
+    ij_declare_static_typed(name, 'D');
+}
+static void ij_get_dbl(const char *fld) {
+    J("    getstatic %s/%s D\n", ij_classname, fld);
+}
+static void ij_put_dbl(const char *fld) {
+    J("    putstatic %s/%s D\n", ij_classname, fld);
+}
+
+static void ij_emit_real(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
+    int id = ij_new_id(); char a[64], b[64];
+    lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
+    strncpy(oα,a,63); strncpy(oβ,b,63);
+    JC("REAL"); JL(a);
+    /* Emit as double constant. Jasmin requires 'd' suffix for ldc2_w double literals
+     * (without it Jasmin treats the value as float and widens, losing precision). */
+    J("    ldc2_w %gd\n", n->val.fval);
+    JGoto(ports.γ);
+    JL(b); JGoto(ports.ω);
+}
+
+/* Returns 1 if this node produces a double (real) value */
+static int ij_expr_is_real(IcnNode *n) {
+    if (!n) return 0;
+    if (n->kind == ICN_REAL) return 1;
+    if (n->kind == ICN_VAR) {
+        char fld[128]; ij_var_field(n->val.sval, fld, sizeof fld);
+        for (int i = 0; i < ij_nstatics; i++)
+            if (!strcmp(ij_statics[i], fld) && ij_static_types[i] == 'D') return 1;
+        char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", n->val.sval);
+        for (int i = 0; i < ij_nstatics; i++)
+            if (!strcmp(ij_statics[i], gname) && ij_static_types[i] == 'D') return 1;
+    }
+    return 0;
+}
+
+/* =========================================================================
  * ICN_STR
  * α: push String ref via ldc, goto succeed
  * β: goto fail
@@ -419,12 +462,17 @@ static void ij_emit_var(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         /* Named local/param: use per-proc static field (suspend-safe) */
         char fld[128]; ij_var_field(n->val.sval, fld, sizeof fld);
         /* Determine type: look up in statics table */
-        int is_str = 0;
-        for (int i = 0; i < ij_nstatics; i++)
+        int is_str = 0, is_dbl = 0;
+        for (int i = 0; i < ij_nstatics; i++) {
             if (!strcmp(ij_statics[i], fld) && ij_static_types[i] == 'A') { is_str = 1; break; }
+            if (!strcmp(ij_statics[i], fld) && ij_static_types[i] == 'D') { is_dbl = 1; break; }
+        }
         if (is_str) {
             ij_declare_static_str(fld);
             ij_get_str_field(fld);
+        } else if (is_dbl) {
+            ij_declare_static_dbl(fld);
+            ij_get_dbl(fld);
         } else {
             ij_declare_static(fld);
             ij_get_long(fld);
@@ -432,10 +480,13 @@ static void ij_emit_var(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     } else {
         char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", n->val.sval);
         /* Check global type */
-        int is_str = 0;
-        for (int i = 0; i < ij_nstatics; i++)
+        int is_str = 0, is_dbl = 0;
+        for (int i = 0; i < ij_nstatics; i++) {
             if (!strcmp(ij_statics[i], gname) && ij_static_types[i] == 'A') { is_str = 1; break; }
-        if (is_str) { ij_declare_static_str(gname); ij_get_str_field(gname); }
+            if (!strcmp(ij_statics[i], gname) && ij_static_types[i] == 'D') { is_dbl = 1; break; }
+        }
+        if (is_str)      { ij_declare_static_str(gname); ij_get_str_field(gname); }
+        else if (is_dbl) { ij_declare_static_dbl(gname); ij_get_dbl(gname); }
         else        { ij_declare_static(gname);     ij_get_long(gname); }
     }
     JGoto(ports.γ);
@@ -470,43 +521,44 @@ static void ij_emit_assign(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     IcnNode *lhs = n->children[0];
     IcnNode *rhs = n->children[1];
     int is_str = ij_expr_is_string(rhs);
+    int is_dbl = !is_str && ij_expr_is_real(rhs);
 
     if (lhs && lhs->kind == ICN_VAR) {
         int slot = ij_locals_find(lhs->val.sval);
         if (slot >= 0) {
             char fld[128]; ij_var_field(lhs->val.sval, fld, sizeof fld);
-            if (is_str) {
-                ij_declare_static_str(fld);
-                ij_put_str_field(fld);
-            } else {
-                ij_declare_static(fld);
-                ij_put_long(fld);
-            }
+            if (is_str)      { ij_declare_static_str(fld); ij_put_str_field(fld); }
+            else if (is_dbl) { ij_declare_static_dbl(fld); ij_put_dbl(fld); }
+            else             { ij_declare_static(fld);     ij_put_long(fld); }
         } else {
             char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", lhs->val.sval);
-            if (is_str) { ij_declare_static_str(gname); ij_put_str_field(gname); }
-            else        { ij_declare_static(gname);     ij_put_long(gname); }
+            if (is_str)      { ij_declare_static_str(gname); ij_put_str_field(gname); }
+            else if (is_dbl) { ij_declare_static_dbl(gname); ij_put_dbl(gname); }
+            else             { ij_declare_static(gname);     ij_put_long(gname); }
         }
     } else {
         /* discard — pop appropriate type */
         if (is_str) JI("pop", "");
-        else        JI("pop2", "");
+        else        JI("pop2", "");  /* double and long both take 2 JVM slots */
     }
     /* Push back value for expression result (Icon := returns the value) */
     if (lhs && lhs->kind == ICN_VAR) {
         int slot = ij_locals_find(lhs->val.sval);
         if (slot >= 0) {
             char fld[128]; ij_var_field(lhs->val.sval, fld, sizeof fld);
-            if (is_str) ij_get_str_field(fld);
-            else        ij_get_long(fld);
+            if (is_str)      ij_get_str_field(fld);
+            else if (is_dbl) ij_get_dbl(fld);
+            else             ij_get_long(fld);
         } else {
             char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", lhs->val.sval);
-            if (is_str) ij_get_str_field(gname);
-            else        ij_get_long(gname);
+            if (is_str)      ij_get_str_field(gname);
+            else if (is_dbl) ij_get_dbl(gname);
+            else             ij_get_long(gname);
         }
     } else {
-        if (is_str) JI("aconst_null", "");
-        else        JI("lconst_0", "");
+        if (is_str)      JI("aconst_null", "");
+        else if (is_dbl) JI("dconst_0", "");
+        else             JI("lconst_0", "");
     }
     JGoto(ports.γ);
 }
@@ -720,6 +772,14 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
             JI("invokevirtual", "java/io/PrintStream/println(Ljava/lang/String;)V");
             /* write() returns its argument — reload String for caller */
             J("    aload %d\n", slot_jvm(scratch));
+        } else if (ij_expr_is_real(arg)) {
+            /* Double on stack — print as real */
+            int scratch = ij_locals_alloc_tmp();
+            J("    dstore %d\n", slot_jvm(scratch));
+            JI("getstatic", "java/lang/System/out Ljava/io/PrintStream;");
+            J("    dload %d\n", slot_jvm(scratch));
+            JI("invokevirtual", "java/io/PrintStream/println(D)V");
+            J("    dload %d\n", slot_jvm(scratch));
         } else {
             /* Long on stack — print as integer */
             int scratch = ij_locals_alloc_tmp();
@@ -1502,6 +1562,7 @@ static int ij_expr_is_string(IcnNode *n) {
         case ICN_STR:    return 1;
         case ICN_CSET:   return 1;  /* cset literal is a String */
         case ICN_CONCAT: return 1;
+        case ICN_LCONCAT:return 1;  /* Tiny-ICON: ||| treated as string concat */
         case ICN_BANG:   return 1;  /* !E yields single-char Strings */
         case ICN_AUGOP:  /* ||:= (TK_AUGCONCAT=35) yields String; arithmetic augops yield long */
             return (n->val.ival == 35) ? 1 : 0;
@@ -1543,6 +1604,11 @@ static int ij_expr_is_string(IcnNode *n) {
         }
         case ICN_LIMIT: {
             /* E \ N yields same type as E */
+            if (n->nchildren >= 1) return ij_expr_is_string(n->children[0]);
+            return 0;
+        }
+        case ICN_SWAP: {
+            /* :=: returns new lhs value — same type as children */
             if (n->nchildren >= 1) return ij_expr_is_string(n->children[0]);
             return 0;
         }
@@ -2222,12 +2288,93 @@ static void ij_emit_limit(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
 }
 
 /* =========================================================================
+ * ICN_SWAP — E1 :=: E2  (swap values of two variables)
+ * Semantics: atomically exchange values of lhs and rhs variables.
+ * Returns the new value of E1 (Icon :=: returns lhs after swap).
+ * Implementation: read both, write both crossed, using per-site temp statics.
+ * Only handles VAR := VAR (the common case); other forms fall to UNIMPL.
+ * ======================================================================= */
+static void ij_emit_swap(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
+    int id = ij_new_id(); char a[64], b[64];
+    lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
+    strncpy(oα,a,63); strncpy(oβ,b,63);
+
+    if (n->nchildren < 2 ||
+        !n->children[0] || n->children[0]->kind != ICN_VAR ||
+        !n->children[1] || n->children[1]->kind != ICN_VAR) {
+        /* Degenerate/unsupported form — fail */
+        JL(a); JGoto(ports.ω);
+        JL(b); JGoto(ports.ω);
+        return;
+    }
+
+    IcnNode *lv = n->children[0];
+    IcnNode *rv = n->children[1];
+
+    /* Determine field names for both sides */
+    char lfld[128], rfld[128];
+    int lslot = ij_locals_find(lv->val.sval);
+    int rslot = ij_locals_find(rv->val.sval);
+    if (lslot >= 0) ij_var_field(lv->val.sval, lfld, sizeof lfld);
+    else            snprintf(lfld, sizeof lfld, "icn_gvar_%s", lv->val.sval);
+    if (rslot >= 0) ij_var_field(rv->val.sval, rfld, sizeof rfld);
+    else            snprintf(rfld, sizeof rfld, "icn_gvar_%s", rv->val.sval);
+
+    /* Determine types from statics table — default long */
+    int l_str = 0, l_dbl = 0, r_str = 0, r_dbl = 0;
+    for (int i = 0; i < ij_nstatics; i++) {
+        if (!strcmp(ij_statics[i], lfld)) {
+            l_str = (ij_static_types[i] == 'A');
+            l_dbl = (ij_static_types[i] == 'D');
+        }
+        if (!strcmp(ij_statics[i], rfld)) {
+            r_str = (ij_static_types[i] == 'A');
+            r_dbl = (ij_static_types[i] == 'D');
+        }
+    }
+    /* Treat both as same type (swap between mismatched types is unusual) */
+    int is_str = l_str || r_str;
+    int is_dbl = l_dbl || r_dbl;
+
+    /* Declare tmp fields for the swap */
+    char tmp1[64], tmp2[64];
+    snprintf(tmp1, sizeof tmp1, "icn_%d_swap_t1", id);
+    snprintf(tmp2, sizeof tmp2, "icn_%d_swap_t2", id);
+    if (is_str)      { ij_declare_static_str(tmp1); ij_declare_static_str(tmp2); }
+    else if (is_dbl) { ij_declare_static_dbl(tmp1); ij_declare_static_dbl(tmp2); }
+    else             { ij_declare_static(tmp1);     ij_declare_static(tmp2); }
+
+    JL(a);
+    /* Read both values into tmps */
+    if (is_str)      { ij_get_str_field(lfld); ij_put_str_field(tmp1);
+                       ij_get_str_field(rfld); ij_put_str_field(tmp2); }
+    else if (is_dbl) { ij_get_dbl(lfld); ij_put_dbl(tmp1);
+                       ij_get_dbl(rfld); ij_put_dbl(tmp2); }
+    else             { ij_get_long(lfld); ij_put_long(tmp1);
+                       ij_get_long(rfld); ij_put_long(tmp2); }
+    /* Write crossed */
+    if (is_str)      { ij_get_str_field(tmp2); ij_put_str_field(lfld);
+                       ij_get_str_field(tmp1); ij_put_str_field(rfld); }
+    else if (is_dbl) { ij_get_dbl(tmp2); ij_put_dbl(lfld);
+                       ij_get_dbl(tmp1); ij_put_dbl(rfld); }
+    else             { ij_get_long(tmp2); ij_put_long(lfld);
+                       ij_get_long(tmp1); ij_put_long(rfld); }
+    /* Return new value of lhs (tmp2 = old rhs = new lhs) */
+    if (is_str)      ij_get_str_field(lfld);
+    else if (is_dbl) ij_get_dbl(lfld);
+    else             ij_get_long(lfld);
+    JGoto(ports.γ);
+    JL(b); JGoto(ports.ω);
+}
+
+/* =========================================================================
  * Dispatch
  * ======================================================================= */
 static void ij_emit_expr(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     if (!n) { ij_emit_fail_node(NULL,ports,oα,oβ); return; }
     switch (n->kind) {
         case ICN_INT:     ij_emit_int      (n,ports,oα,oβ); break;
+        case ICN_REAL:    ij_emit_real     (n,ports,oα,oβ); break;
         case ICN_STR:     ij_emit_str      (n,ports,oα,oβ); break;
         case ICN_CSET:    ij_emit_str      (n,ports,oα,oβ); break; /* cset = typed String */
         case ICN_VAR:     ij_emit_var      (n,ports,oα,oβ); break;
@@ -2285,6 +2432,8 @@ static void ij_emit_expr(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         case ICN_ADD: case ICN_SUB: case ICN_MUL: case ICN_DIV: case ICN_MOD:
                           ij_emit_binop    (n,ports,oα,oβ); break;
         case ICN_CONCAT:  ij_emit_concat   (n,ports,oα,oβ); break;
+        case ICN_LCONCAT: ij_emit_concat   (n,ports,oα,oβ); break; /* Tiny-ICON: ||| = || */
+        case ICN_SWAP:    ij_emit_swap     (n,ports,oα,oβ); break;
         case ICN_LT: case ICN_LE: case ICN_GT: case ICN_GE: case ICN_EQ: case ICN_NE:
                           ij_emit_relop    (n,ports,oα,oβ); break;
         case ICN_TO:      ij_emit_to       (n,ports,oα,oβ); break;
@@ -2365,25 +2514,27 @@ static void ij_emit_proc(IcnNode *proc, FILE *out_target) {
         }
     }
 
-    /* Pre-pass (forward): register string-typed variable fields so ij_expr_is_string
-     * works correctly when the reverse emit loop checks statement result types.
-     * Walk assignments left-to-right: if RHS is a string expression, declare the
-     * LHS var's static field as type 'A' (String) before emit begins. */
+    /* Pre-pass (forward): register string-typed and double-typed variable fields so
+     * ij_expr_is_string / ij_expr_is_real work correctly when the reverse emit loop
+     * checks statement result types.
+     * Walk assignments left-to-right: declare the LHS var's static field type
+     * before emit begins. */
     for (int si = 0; si < nstmts; si++) {
         IcnNode *stmt = proc->children[body_start + si];
         if (!stmt || stmt->kind != ICN_ASSIGN || stmt->nchildren < 2) continue;
         IcnNode *lhs = stmt->children[0];
         IcnNode *rhs = stmt->children[1];
         if (!lhs || lhs->kind != ICN_VAR) continue;
-        if (!ij_expr_is_string(rhs)) continue;
         int slot = ij_locals_find(lhs->val.sval);
-        if (slot >= 0) {
-            char fld[128]; ij_var_field(lhs->val.sval, fld, sizeof fld);
+        char fld[128];
+        if (slot >= 0) ij_var_field(lhs->val.sval, fld, sizeof fld);
+        else           snprintf(fld, sizeof fld, "icn_gvar_%s", lhs->val.sval);
+        if (ij_expr_is_string(rhs)) {
             ij_declare_static_str(fld);
-        } else {
-            char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", lhs->val.sval);
-            ij_declare_static_str(gname);
+        } else if (ij_expr_is_real(rhs)) {
+            ij_declare_static_dbl(fld);
         }
+        /* long-typed vars are declared on first use — no pre-declaration needed */
     }
 
     /* Chain statements.

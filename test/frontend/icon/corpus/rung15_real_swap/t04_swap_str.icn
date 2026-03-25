@@ -1,0 +1,7 @@
+procedure main();
+  a := "hello";
+  b := "world";
+  a :=: b;
+  write(a);
+  write(b);
+end

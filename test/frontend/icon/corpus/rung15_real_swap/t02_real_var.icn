@@ -1,0 +1,4 @@
+procedure main();
+  x := 2.5;
+  write(x);
+end
