@@ -1,0 +1,4 @@
+# rung08 t05: move(n) — advance by n
+procedure main();
+  "abcdef" ? write(move(3));
+end

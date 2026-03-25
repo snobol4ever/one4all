@@ -1,0 +1,4 @@
+# rung08 t04: tab(n) — scanned substring
+procedure main();
+  "abcdef" ? write(tab(4));
+end

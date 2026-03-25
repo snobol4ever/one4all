@@ -1,0 +1,5 @@
+# rung08 t03: match(s) — match at current scan pos
+procedure main();
+  "hello" ? write(match("hel"));
+  "world" ? write(match("xyz") | 0);
+end

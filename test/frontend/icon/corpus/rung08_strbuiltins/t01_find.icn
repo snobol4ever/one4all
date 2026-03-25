@@ -1,0 +1,5 @@
+# rung08 t01: find(s1,s2) — one-shot first match
+procedure main();
+  write(find("b","abc"));
+  write(find("lo","hello"));
+end

@@ -1,0 +1,4 @@
+# rung08 t02: find() as generator — every occurrence
+procedure main();
+  every write(find("a","banana"));
+end
