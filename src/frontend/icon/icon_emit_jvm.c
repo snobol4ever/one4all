@@ -378,6 +378,7 @@ static void ij_put_real_field(const char *fname) {
 
 /* Forward declaration needed for ij_expr_is_string */
 static int ij_expr_is_string(IcnNode *n);
+static int ij_expr_is_list(IcnNode *n);
 
 /* Push 0 to icn_failed (success) */
 static void ij_set_ok(void) {
@@ -565,14 +566,18 @@ static void ij_emit_var(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         /* Named local/param: use per-proc static field (suspend-safe) */
         char fld[128]; ij_var_field(n->val.sval, fld, sizeof fld);
         /* Determine type: look up in statics table */
-        int is_str = 0, is_dbl = 0;
+        int is_str = 0, is_dbl = 0, is_list = 0;
         for (int i = 0; i < ij_nstatics; i++) {
-            if (!strcmp(ij_statics[i], fld) && ij_static_types[i] == 'A') { is_str = 1; break; }
-            if (!strcmp(ij_statics[i], fld) && ij_static_types[i] == 'D') { is_dbl = 1; break; }
+            if (!strcmp(ij_statics[i], fld) && ij_static_types[i] == 'A') { is_str  = 1; break; }
+            if (!strcmp(ij_statics[i], fld) && ij_static_types[i] == 'D') { is_dbl  = 1; break; }
+            if (!strcmp(ij_statics[i], fld) && ij_static_types[i] == 'L') { is_list = 1; break; }
         }
         if (is_str) {
             ij_declare_static_str(fld);
             ij_get_str_field(fld);
+        } else if (is_list) {
+            ij_declare_static_list(fld);
+            ij_get_list_field(fld);
         } else if (is_dbl) {
             ij_declare_static_dbl(fld);
             ij_get_dbl(fld);
@@ -583,14 +588,16 @@ static void ij_emit_var(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     } else {
         char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", n->val.sval);
         /* Check global type */
-        int is_str = 0, is_dbl = 0;
+        int is_str = 0, is_dbl = 0, is_list = 0;
         for (int i = 0; i < ij_nstatics; i++) {
-            if (!strcmp(ij_statics[i], gname) && ij_static_types[i] == 'A') { is_str = 1; break; }
-            if (!strcmp(ij_statics[i], gname) && ij_static_types[i] == 'D') { is_dbl = 1; break; }
+            if (!strcmp(ij_statics[i], gname) && ij_static_types[i] == 'A') { is_str  = 1; break; }
+            if (!strcmp(ij_statics[i], gname) && ij_static_types[i] == 'D') { is_dbl  = 1; break; }
+            if (!strcmp(ij_statics[i], gname) && ij_static_types[i] == 'L') { is_list = 1; break; }
         }
-        if (is_str)      { ij_declare_static_str(gname); ij_get_str_field(gname); }
-        else if (is_dbl) { ij_declare_static_dbl(gname); ij_get_dbl(gname); }
-        else        { ij_declare_static(gname);     ij_get_long(gname); }
+        if (is_str)       { ij_declare_static_str(gname);  ij_get_str_field(gname); }
+        else if (is_list) { ij_declare_static_list(gname); ij_get_list_field(gname); }
+        else if (is_dbl)  { ij_declare_static_dbl(gname);  ij_get_dbl(gname); }
+        else              { ij_declare_static(gname);      ij_get_long(gname); }
     }
     JGoto(ports.γ);
     JL(b); JGoto(ports.ω);
@@ -623,45 +630,50 @@ static void ij_emit_assign(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
 
     IcnNode *lhs = n->children[0];
     IcnNode *rhs = n->children[1];
-    int is_str = ij_expr_is_string(rhs);
-    int is_dbl = !is_str && ij_expr_is_real(rhs);
+    int is_str  = ij_expr_is_string(rhs);
+    int is_list = !is_str && ij_expr_is_list(rhs);
+    int is_dbl  = !is_str && !is_list && ij_expr_is_real(rhs);
 
     if (lhs && lhs->kind == ICN_VAR) {
         int slot = ij_locals_find(lhs->val.sval);
         if (slot >= 0) {
             char fld[128]; ij_var_field(lhs->val.sval, fld, sizeof fld);
-            if (is_str)      { ij_declare_static_str(fld); ij_put_str_field(fld); }
-            else if (is_dbl) { ij_declare_static_dbl(fld); ij_put_dbl(fld); }
-            else             { ij_declare_static(fld);     ij_put_long(fld); }
+            if (is_str)       { ij_declare_static_str(fld);  ij_put_str_field(fld); }
+            else if (is_list) { ij_declare_static_list(fld); ij_put_list_field(fld); }
+            else if (is_dbl)  { ij_declare_static_dbl(fld);  ij_put_dbl(fld); }
+            else              { ij_declare_static(fld);      ij_put_long(fld); }
         } else {
             char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", lhs->val.sval);
-            if (is_str)      { ij_declare_static_str(gname); ij_put_str_field(gname); }
-            else if (is_dbl) { ij_declare_static_dbl(gname); ij_put_dbl(gname); }
-            else             { ij_declare_static(gname);     ij_put_long(gname); }
+            if (is_str)       { ij_declare_static_str(gname);  ij_put_str_field(gname); }
+            else if (is_list) { ij_declare_static_list(gname); ij_put_list_field(gname); }
+            else if (is_dbl)  { ij_declare_static_dbl(gname);  ij_put_dbl(gname); }
+            else              { ij_declare_static(gname);      ij_put_long(gname); }
         }
     } else {
         /* discard — pop appropriate type */
-        if (is_str) JI("pop", "");
-        else        JI("pop2", "");  /* double and long both take 2 JVM slots */
+        if (is_str || is_list) JI("pop", "");
+        else                   JI("pop2", "");  /* double and long both take 2 JVM slots */
     }
     /* Push back value for expression result (Icon := returns the value) */
     if (lhs && lhs->kind == ICN_VAR) {
         int slot = ij_locals_find(lhs->val.sval);
         if (slot >= 0) {
             char fld[128]; ij_var_field(lhs->val.sval, fld, sizeof fld);
-            if (is_str)      ij_get_str_field(fld);
-            else if (is_dbl) ij_get_dbl(fld);
-            else             ij_get_long(fld);
+            if (is_str)       ij_get_str_field(fld);
+            else if (is_list) ij_get_list_field(fld);
+            else if (is_dbl)  ij_get_dbl(fld);
+            else              ij_get_long(fld);
         } else {
             char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", lhs->val.sval);
-            if (is_str)      ij_get_str_field(gname);
-            else if (is_dbl) ij_get_dbl(gname);
-            else             ij_get_long(gname);
+            if (is_str)       ij_get_str_field(gname);
+            else if (is_list) ij_get_list_field(gname);
+            else if (is_dbl)  ij_get_dbl(gname);
+            else              ij_get_long(gname);
         }
     } else {
-        if (is_str)      JI("aconst_null", "");
-        else if (is_dbl) JI("dconst_0", "");
-        else             JI("lconst_0", "");
+        if (is_str || is_list) JI("aconst_null", "");
+        else if (is_dbl)       JI("dconst_0", "");
+        else                   JI("lconst_0", "");
     }
     JGoto(ports.γ);
 }
@@ -1219,6 +1231,223 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         JGoto(ports.γ);
         return;
     }
+
+    /* === LIST BUILTINS ===
+     * push(L, v) — prepend v to front of list (index 0); returns L
+     * put(L, v)  — append v to back of list; returns L
+     * get(L)/pop(L) — remove+return first element; fail if empty
+     * pull(L)    — remove+return last element; fail if empty
+     * list(n, x) — create list of n copies of x
+     * All guarded: !ij_is_user_proc(fname)
+     */
+
+    /* Helper: determine element unbox opcode from the list variable's elem type.
+     * We use a simple heuristic: if v arg is string → checkcast String (no unbox);
+     * if real → checkcast Double + doubleValue()D + d2l for long return;
+     * else → checkcast Long + longValue()J. */
+#define LIST_UNBOX_LONG(label_ok) \
+    do { \
+        J("    dup\n    ifnonnull %s\n", label_ok); \
+        J("    pop\n"); JGoto(ports.ω); \
+        JL(label_ok); \
+        JI("checkcast", "java/lang/Long"); \
+        JI("invokevirtual", "java/lang/Long/longValue()J"); \
+    } while(0)
+
+    if ((strcmp(fname, "push") == 0 || strcmp(fname, "put") == 0)
+            && nargs >= 2 && !ij_is_user_proc(fname)) {
+        /* push(L, v): add v to front (index 0) of L; put(L,v): add to back */
+        int is_push = (strcmp(fname, "push") == 0);
+        IcnNode *larg = n->children[1];   /* list */
+        IcnNode *varg = n->children[2];   /* value */
+        char lrelay[64], vrelay[64];
+        snprintf(lrelay, sizeof lrelay, "icn_%d_lr", id);
+        snprintf(vrelay, sizeof vrelay, "icn_%d_vr", id);
+        /* elem temp field */
+        char elem_fld[80]; snprintf(elem_fld, sizeof elem_fld, "icn_%d_pushval", id);
+        ij_declare_static_obj(elem_fld);
+        /* list temp field */
+        char list_fld[80]; snprintf(list_fld, sizeof list_fld, "icn_%d_pushlist", id);
+        ij_declare_static_list(list_fld);
+
+        int is_str_v = ij_expr_is_string(varg);
+        int is_dbl_v = !is_str_v && ij_expr_is_real(varg);
+
+        IjPorts lp; strncpy(lp.γ, lrelay, 63); strncpy(lp.ω, ports.ω, 63);
+        char la[64], lb[64]; ij_emit_expr(larg, lp, la, lb);
+        IjPorts vp; strncpy(vp.γ, vrelay, 63); strncpy(vp.ω, ports.ω, 63);
+        char va[64], vb[64]; ij_emit_expr(varg, vp, va, vb);
+
+        JL(a); JGoto(la);
+        JL(b); JGoto(ports.ω);
+
+        /* lrelay: ArrayList ref on stack → store, eval v */
+        JL(lrelay);
+        ij_put_list_field(list_fld);
+        JGoto(va);
+
+        /* vrelay: value on stack → box → store elem → call add */
+        JL(vrelay);
+        if (is_str_v) {
+            /* String — already Object */
+        } else if (is_dbl_v) {
+            JI("invokestatic", "java/lang/Double/valueOf(D)Ljava/lang/Double;");
+        } else {
+            JI("invokestatic", "java/lang/Long/valueOf(J)Ljava/lang/Long;");
+        }
+        ij_put_obj_field(elem_fld);
+        ij_get_list_field(list_fld);
+        if (is_push) {
+            JI("iconst_0", "");
+            ij_get_obj_field(elem_fld);
+            JI("invokevirtual", "java/util/ArrayList/add(ILjava/lang/Object;)V");
+        } else {
+            ij_get_obj_field(elem_fld);
+            JI("invokevirtual", "java/util/ArrayList/add(Ljava/lang/Object;)Z");
+            JI("pop", "");
+        }
+        /* return L (the list) */
+        ij_get_list_field(list_fld);
+        JGoto(ports.γ);
+        return;
+    }
+
+    if ((strcmp(fname, "get") == 0 || strcmp(fname, "pop") == 0)
+            && nargs >= 1 && !ij_is_user_proc(fname)) {
+        /* get(L)/pop(L): remove+return first element; fail if empty */
+        IcnNode *larg = n->children[1];
+        char lrelay[64]; snprintf(lrelay, sizeof lrelay, "icn_%d_lr", id);
+        char list_fld[80]; snprintf(list_fld, sizeof list_fld, "icn_%d_glist", id);
+        char ok[64]; snprintf(ok, sizeof ok, "icn_%d_gok", id);
+        ij_declare_static_list(list_fld);
+        IjPorts lp; strncpy(lp.γ, lrelay, 63); strncpy(lp.ω, ports.ω, 63);
+        char la[64], lb[64]; ij_emit_expr(larg, lp, la, lb);
+        JL(a); JGoto(la);
+        JL(b); JGoto(ports.ω);
+        JL(lrelay);
+        ij_put_list_field(list_fld);
+        /* size check */
+        ij_get_list_field(list_fld);
+        JI("invokevirtual", "java/util/ArrayList/size()I");
+        J("    ifeq %s\n", ports.ω);   /* empty → fail */
+        /* remove(0) → Object */
+        ij_get_list_field(list_fld);
+        JI("iconst_0", "");
+        JI("invokevirtual", "java/util/ArrayList/remove(I)Ljava/lang/Object;");
+        /* unbox as long */
+        LIST_UNBOX_LONG(ok);
+        JGoto(ports.γ);
+        return;
+    }
+
+    if (strcmp(fname, "pull") == 0 && nargs >= 1 && !ij_is_user_proc(fname)) {
+        /* pull(L): remove+return last element; fail if empty */
+        IcnNode *larg = n->children[1];
+        char lrelay[64]; snprintf(lrelay, sizeof lrelay, "icn_%d_lr", id);
+        char list_fld[80]; snprintf(list_fld, sizeof list_fld, "icn_%d_plist", id);
+        char sz_tmp[80]; snprintf(sz_tmp, sizeof sz_tmp, "icn_%d_psz", id);
+        char ok[64]; snprintf(ok, sizeof ok, "icn_%d_pok", id);
+        ij_declare_static_list(list_fld);
+        ij_declare_static_int(sz_tmp);
+        IjPorts lp; strncpy(lp.γ, lrelay, 63); strncpy(lp.ω, ports.ω, 63);
+        char la[64], lb[64]; ij_emit_expr(larg, lp, la, lb);
+        JL(a); JGoto(la);
+        JL(b); JGoto(ports.ω);
+        JL(lrelay);
+        ij_put_list_field(list_fld);
+        /* size check — use a pop-then-fail trampoline so stack is clean at ports.ω */
+        char pull_fail[64]; snprintf(pull_fail, sizeof pull_fail, "icn_%d_pfail", id);
+        ij_get_list_field(list_fld);
+        JI("invokevirtual", "java/util/ArrayList/size()I");
+        J("    dup\n    ifeq %s\n", pull_fail); /* empty → pop + fail */
+        /* sz is on stack; compute sz-1 */
+        JI("iconst_1", "");
+        JI("isub", "");
+        ij_put_int_field(sz_tmp);
+        /* remove(sz-1) → Object */
+        ij_get_list_field(list_fld);
+        ij_get_int_field(sz_tmp);
+        JI("invokevirtual", "java/util/ArrayList/remove(I)Ljava/lang/Object;");
+        /* unbox as long */
+        LIST_UNBOX_LONG(ok);
+        JGoto(ports.γ);
+        /* pull_fail: pop the dup'd size int, then fail */
+        JL(pull_fail); JI("pop", ""); JGoto(ports.ω);
+        return;
+    }
+
+    if (strcmp(fname, "list") == 0 && nargs >= 2 && !ij_is_user_proc(fname)) {
+        /* list(n, x): create ArrayList of n copies of x */
+        IcnNode *narg = n->children[1];
+        IcnNode *xarg = n->children[2];
+        char nrelay[64], xrelay[64];
+        snprintf(nrelay, sizeof nrelay, "icn_%d_nlr", id);
+        snprintf(xrelay, sizeof xrelay, "icn_%d_xlr", id);
+        char n_fld[80];    snprintf(n_fld,    sizeof n_fld,    "icn_%d_ln", id);
+        char x_fld[80];    snprintf(x_fld,    sizeof x_fld,    "icn_%d_lx", id);
+        char list_fld[80]; snprintf(list_fld, sizeof list_fld, "icn_%d_ll", id);
+        char cnt_fld[80];  snprintf(cnt_fld,  sizeof cnt_fld,  "icn_%d_lc", id);
+        char loop[64];     snprintf(loop,     sizeof loop,     "icn_%d_llp", id);
+        char done[64];     snprintf(done,     sizeof done,     "icn_%d_lld", id);
+        ij_declare_static(n_fld);       /* long: count */
+        ij_declare_static_obj(x_fld);  /* Object: boxed value */
+        ij_declare_static_list(list_fld);
+        ij_declare_static_int(cnt_fld);
+
+        int is_str_x = ij_expr_is_string(xarg);
+        int is_dbl_x = !is_str_x && ij_expr_is_real(xarg);
+
+        IjPorts np2; strncpy(np2.γ, nrelay, 63); strncpy(np2.ω, ports.ω, 63);
+        char na[64], nb[64]; ij_emit_expr(narg, np2, na, nb);
+        IjPorts xp; strncpy(xp.γ, xrelay, 63); strncpy(xp.ω, ports.ω, 63);
+        char xa[64], xb[64]; ij_emit_expr(xarg, xp, xa, xb);
+
+        JL(a); JGoto(na);
+        JL(b); JGoto(ports.ω);
+
+        /* nrelay: n (long) on stack */
+        JL(nrelay);
+        ij_put_long(n_fld);
+        JGoto(xa);
+
+        /* xrelay: x value on stack → box → store */
+        JL(xrelay);
+        if (is_str_x) {
+            /* String — no boxing */
+        } else if (is_dbl_x) {
+            JI("invokestatic", "java/lang/Double/valueOf(D)Ljava/lang/Double;");
+        } else {
+            JI("invokestatic", "java/lang/Long/valueOf(J)Ljava/lang/Long;");
+        }
+        ij_put_obj_field(x_fld);
+        /* Build new ArrayList */
+        JI("new", "java/util/ArrayList");
+        JI("dup", "");
+        JI("invokespecial", "java/util/ArrayList/<init>()V");
+        ij_put_list_field(list_fld);
+        /* n as int → counter */
+        ij_get_long(n_fld);
+        JI("l2i", "");
+        ij_put_int_field(cnt_fld);
+        /* loop: while cnt > 0: add x; cnt-- */
+        JL(loop);
+        ij_get_int_field(cnt_fld);
+        J("    ifeq %s\n", done);
+        ij_get_list_field(list_fld);
+        ij_get_obj_field(x_fld);
+        JI("invokevirtual", "java/util/ArrayList/add(Ljava/lang/Object;)Z");
+        JI("pop", "");
+        ij_get_int_field(cnt_fld);
+        JI("iconst_1", ""); JI("isub", "");
+        ij_put_int_field(cnt_fld);
+        JGoto(loop);
+        JL(done);
+        ij_get_list_field(list_fld);
+        JGoto(ports.γ);
+        return;
+    }
+
+    /* === END LIST BUILTINS === */
 
     /* --- user procedure call --- */
     if (ij_is_user_proc(fname)) {
@@ -1830,7 +2059,11 @@ static int ij_expr_is_string(IcnNode *n) {
         case ICN_CSET:   return 1;  /* cset literal is a String */
         case ICN_CONCAT: return 1;
         case ICN_LCONCAT:return 1;  /* Tiny-ICON: ||| treated as string concat */
-        case ICN_BANG:   return 1;  /* !E yields single-char Strings */
+        case ICN_BANG:
+            /* !E yields single-char Strings for string operands,
+             * but longs for list operands */
+            if (n->nchildren >= 1) return ij_expr_is_list(n->children[0]) ? 0 : 1;
+            return 1;
         case ICN_AUGOP:  /* ||:= (TK_AUGCONCAT=35) yields String; arithmetic augops yield long */
             return (n->val.ival == 35) ? 1 : 0;
         case ICN_CALL: {
@@ -1905,6 +2138,41 @@ static int ij_expr_is_string(IcnNode *n) {
         }
         default: return 0;
     }
+}
+
+/* =========================================================================
+ * List type predicate — returns 1 if node is known to produce an ArrayList
+ * ======================================================================= */
+static int ij_expr_is_list(IcnNode *n) {
+    if (!n) return 0;
+    if (n->kind == ICN_MAKELIST) return 1;
+    if (n->kind == ICN_ASSIGN) {
+        /* Assignment returns the RHS value */
+        if (n->nchildren >= 2) return ij_expr_is_list(n->children[1]);
+        return 0;
+    }
+    if (n->kind == ICN_CALL) {
+        /* push(L,v) and put(L,v) return the list; list(n,x) returns a new list */
+        if (n->nchildren >= 1) {
+            IcnNode *fn = n->children[0];
+            if (fn && fn->kind == ICN_VAR) {
+                const char *fname = fn->val.sval;
+                if (strcmp(fname, "push") == 0 || strcmp(fname, "put") == 0 ||
+                    strcmp(fname, "list") == 0) return 1;
+            }
+        }
+        return 0;
+    }
+    if (n->kind == ICN_VAR) {
+        /* Check local/global var static type tag 'L' */
+        char fld[128]; ij_var_field(n->val.sval, fld, sizeof fld);
+        for (int i = 0; i < ij_nstatics; i++)
+            if (!strcmp(ij_statics[i], fld) && ij_static_types[i] == 'L') return 1;
+        char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", n->val.sval);
+        for (int i = 0; i < ij_nstatics; i++)
+            if (!strcmp(ij_statics[i], gname) && ij_static_types[i] == 'L') return 1;
+    }
+    return 0;
 }
 
 /* ICN_CONCAT — E1 || E2  (string concatenation)
@@ -2486,6 +2754,56 @@ static void ij_emit_bang(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
 
+    IcnNode *child = (n->nchildren > 0) ? n->children[0] : NULL;
+
+    /* --- LIST bang branch: !L iterates ArrayList by index --- */
+    if (child && ij_expr_is_list(child)) {
+        char list_fld[80]; snprintf(list_fld, sizeof list_fld, "icn_%d_bang_list", id);
+        char idx_fld[80];  snprintf(idx_fld,  sizeof idx_fld,  "icn_%d_bang_idx",  id);
+        char store[64];    snprintf(store,    sizeof store,    "icn_%d_bang_st",   id);
+        char chk[64];      snprintf(chk,      sizeof chk,      "icn_%d_bang_chk",  id);
+        char ok[64];       snprintf(ok,       sizeof ok,       "icn_%d_bang_ok",   id);
+        ij_declare_static_list(list_fld);
+        ij_declare_static_int(idx_fld);
+
+        /* child γ → store relay; β → chk (resume, no re-eval) */
+        IjPorts ep; strncpy(ep.γ, store, 63); strncpy(ep.ω, ports.ω, 63);
+        char ea[64], eb[64]; ij_emit_expr(child, ep, ea, eb);
+
+        /* α: eval child list once */
+        JL(a); JGoto(ea);
+        /* β: resume — list already stored, just re-check */
+        JL(b); JGoto(chk);
+
+        /* store: ArrayList ref on stack → store list, reset idx=0, fall to chk */
+        JL(store);
+        ij_put_list_field(list_fld);
+        JI("iconst_0", ""); ij_put_int_field(idx_fld);
+        /* fall through to chk */
+
+        /* chk: stack empty, list in field */
+        JL(chk);
+        ij_get_list_field(list_fld);
+        JI("invokevirtual", "java/util/ArrayList/size()I");
+        ij_get_int_field(idx_fld);
+        J("    if_icmple %s\n", ports.ω); /* size <= idx → exhausted */
+        /* get(idx) → Object → unbox as long */
+        ij_get_list_field(list_fld);
+        ij_get_int_field(idx_fld);
+        JI("invokevirtual", "java/util/ArrayList/get(I)Ljava/lang/Object;");
+        JL(ok);
+        JI("checkcast", "java/lang/Long");
+        JI("invokevirtual", "java/lang/Long/longValue()J");
+        /* increment idx */
+        ij_get_int_field(idx_fld);
+        JI("iconst_1", ""); JI("iadd", "");
+        ij_put_int_field(idx_fld);
+        JGoto(ports.γ);
+        return;
+    }
+
+    /* --- STRING bang branch (original) --- */
+
     char str_fld[128]; snprintf(str_fld, sizeof str_fld, "icn_%d_bang_str", id);
     char pos_fld[128]; snprintf(pos_fld, sizeof pos_fld, "icn_%d_bang_pos", id);
     char check[64];    snprintf(check,   sizeof check,   "icn_%d_bang_chk", id);
@@ -2547,11 +2865,16 @@ static void ij_emit_size(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     IjPorts cp; strncpy(cp.γ, relay, 63); strncpy(cp.ω, ports.ω, 63);
     char ca[64], cb[64]; ij_emit_expr(child, cp, ca, cb);
     JL(a); JGoto(ca);
-    JL(b); JGoto(cb);          /* one-shot: β = re-eval child β = fail */
-    /* relay: String ref on stack */
+    JL(b); JGoto(cb);
     JL(relay);
-    JI("invokevirtual", "java/lang/String/length()I");
-    JI("i2l", "");             /* int → long for uniform numeric stack type */
+    if (child && ij_expr_is_list(child)) {
+        /* ArrayList ref on stack → size()I → i2l → long */
+        JI("invokevirtual", "java/util/ArrayList/size()I");
+    } else {
+        /* String ref on stack */
+        JI("invokevirtual", "java/lang/String/length()I");
+    }
+    JI("i2l", "");         /* int → long for uniform numeric stack type */
     JGoto(ports.γ);
 }
 
@@ -3289,6 +3612,8 @@ static void ij_emit_proc(IcnNode *proc, FILE *out_target) {
         else           snprintf(fld, sizeof fld, "icn_gvar_%s", lhs->val.sval);
         if (ij_expr_is_string(rhs)) {
             ij_declare_static_str(fld);
+        } else if (ij_expr_is_list(rhs)) {
+            ij_declare_static_list(fld);
         } else if (ij_expr_is_real(rhs)) {
             ij_declare_static_dbl(fld);
         }
@@ -3320,15 +3645,17 @@ static void ij_emit_proc(IcnNode *proc, FILE *out_target) {
             strncpy(next_a, sa, 63);
             continue;
         }
-        /* Determine if statement produces a String (1-slot) or long (2-slot) result */
-        int stmt_is_str = ij_expr_is_string(stmt);
+        /* Determine if statement produces a 1-slot ref (String or ArrayList) or 2-slot (long/double) */
+        int stmt_is_str  = ij_expr_is_string(stmt);
+        int stmt_is_list = !stmt_is_str && ij_expr_is_list(stmt);
+        int stmt_is_ref  = stmt_is_str || stmt_is_list;
         /* Build a drain label for this statement's success port */
         char sdrain[64]; snprintf(sdrain, sizeof sdrain, "icn_s%d_sdrain", i);
         IjPorts sp; strncpy(sp.γ, sdrain, 63); strncpy(sp.ω, next_a, 63);
         char sa[64], sb[64]; ij_emit_expr(stmt, sp, sa, sb);
         /* Emit the drain: pop result (1-slot String or 2-slot long) then fall through */
         J("%s:\n", sdrain);
-        JI(stmt_is_str ? "pop" : "pop2", "");
+        JI(stmt_is_ref ? "pop" : "pop2", "");
         JGoto(next_a);
         strncpy(alphas[i], sa, 63);
         strncpy(next_a, sa, 63);

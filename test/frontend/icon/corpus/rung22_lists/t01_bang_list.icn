@@ -1,0 +1,4 @@
+procedure main();
+  L := [1, 2, 3];
+  every write(!L);
+end
