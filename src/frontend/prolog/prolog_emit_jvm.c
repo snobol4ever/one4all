@@ -1803,14 +1803,15 @@ static void pj_emit_body(EXPR_t **goals, int ngoals, const char *lbl_γ,
          * body continues, causing puzzle_18-style double-output. */
         /* M-PJ-CUT-UCALL: if callee has cut and reliable sentinel, propagate cutgamma.
          * MAX_VALUE (2147483647) is the unambiguous sentinel — check rv[0] >= it. */
-        if (lbl_cutγ && pj_callee_has_cut_no_last_ucall(fn, nargs)) {
+        if (pj_callee_has_cut_no_last_ucall(fn, nargs)) {
+            const char *cut_dest = lbl_cutγ ? lbl_cutγ : call_ω;
             J("    aload %d\n", local_rv);
             JI("iconst_0", "");
             JI("aaload", "");
             JI("checkcast", "java/lang/Integer");
             JI("invokevirtual", "java/lang/Integer/intValue()I");
             J("    ldc 2147483647\n");
-            J("    if_icmpeq %s\n", lbl_cutγ);
+            J("    if_icmpeq %s\n", cut_dest);
         }
         /* extract returned cs — store into sub_cs_out_local for γ encoding,
          * and advance local_cs for the next β-retry of THIS call. */
