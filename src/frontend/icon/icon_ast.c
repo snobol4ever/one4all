@@ -117,6 +117,7 @@ const char *icn_kind_name(IcnKind kind) {
         case ICN_FIELD:    return "FIELD";
         case ICN_SUBSCRIPT:return "SUBSCRIPT";
         case ICN_SECTION:  return "SECTION";
+        case ICN_MAKELIST: return "MAKELIST";
         case ICN_RECORD:   return "RECORD";
         case ICN_GLOBAL:   return "GLOBAL";
         case ICN_INITIAL:  return "INITIAL";

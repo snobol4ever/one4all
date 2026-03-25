@@ -106,6 +106,7 @@ typedef enum {
     ICN_FIELD,     /* E.name  -- Tier 2 */
     ICN_SUBSCRIPT, /* E[i]    -- Tier 2 */
     ICN_SECTION,   /* E[i:j]  -- string section (substring), 3 children: str, lo, hi */
+    ICN_MAKELIST,  /* [e1,e2,...] -- list constructor, n children */
     ICN_RECORD,    /* record decl -- Tier 2 */
     ICN_GLOBAL,    /* global decl */
     ICN_INITIAL,   /* initial stmt — runs once on first proc call */

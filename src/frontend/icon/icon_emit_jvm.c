@@ -426,6 +426,31 @@ static void ij_put_dbl(const char *fld) {
     J("    putstatic %s/%s D\n", ij_classname, fld);
 }
 
+/* ArrayList-typed static field helpers ('L' type tag) */
+static void ij_declare_static_list(const char *name) {
+    ij_declare_static_typed(name, 'L');
+}
+static void ij_get_list_field(const char *fname) {
+    char buf[384]; snprintf(buf, sizeof buf, "%s/%s Ljava/util/ArrayList;", ij_classname, fname);
+    JI("getstatic", buf);
+}
+static void ij_put_list_field(const char *fname) {
+    char buf[384]; snprintf(buf, sizeof buf, "%s/%s Ljava/util/ArrayList;", ij_classname, fname);
+    JI("putstatic", buf);
+}
+/* Object-typed static field helpers ('O' type tag) — for boxed element temps */
+static void ij_declare_static_obj(const char *name) {
+    ij_declare_static_typed(name, 'O');
+}
+static void ij_get_obj_field(const char *fname) {
+    char buf[384]; snprintf(buf, sizeof buf, "%s/%s Ljava/lang/Object;", ij_classname, fname);
+    JI("getstatic", buf);
+}
+static void ij_put_obj_field(const char *fname) {
+    char buf[384]; snprintf(buf, sizeof buf, "%s/%s Ljava/lang/Object;", ij_classname, fname);
+    JI("putstatic", buf);
+}
+
 static void ij_emit_real(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     int id = ij_new_id(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
@@ -2531,6 +2556,56 @@ static void ij_emit_size(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
 }
 
 /* =========================================================================
+ * ICN_MAKELIST — [e1, e2, ...] list constructor
+ * Builds a java.util.ArrayList.  Each child is evaluated one-shot:
+ *   - long values boxed via Long.valueOf(J)
+ *   - double values boxed via Double.valueOf(D)
+ *   - String refs left as-is (already Object)
+ * Result: ArrayList ref on stack at ports.γ.
+ * ======================================================================= */
+static void ij_emit_makelist(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
+    int id = ij_new_id(); char a[64], b[64];
+    lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
+    strncpy(oα,a,63); strncpy(oβ,b,63);
+
+    char list_fld[80]; snprintf(list_fld, sizeof list_fld, "icn_%d_mklist", id);
+    ij_declare_static_list(list_fld);
+
+    JL(a);
+    JI("new", "java/util/ArrayList");
+    JI("dup", "");
+    JI("invokespecial", "java/util/ArrayList/<init>()V");
+    ij_put_list_field(list_fld);
+
+    for (int i = 0; i < n->nchildren; i++) {
+        char relay[64]; snprintf(relay, sizeof relay, "icn_%d_mke_%d", id, i);
+        char elem_fld[80]; snprintf(elem_fld, sizeof elem_fld, "icn_%d_elem_%d", id, i);
+        ij_declare_static_obj(elem_fld);
+
+        IjPorts cp; strncpy(cp.γ, relay, 63); strncpy(cp.ω, ports.ω, 63);
+        char ca[64], cb[64]; ij_emit_expr(n->children[i], cp, ca, cb);
+        JGoto(ca);
+        JL(relay);
+        if (ij_expr_is_string(n->children[i])) {
+            /* String is already Object — no boxing needed */
+        } else if (ij_expr_is_real(n->children[i])) {
+            JI("invokestatic", "java/lang/Double/valueOf(D)Ljava/lang/Double;");
+        } else {
+            JI("invokestatic", "java/lang/Long/valueOf(J)Ljava/lang/Long;");
+        }
+        ij_put_obj_field(elem_fld);
+        ij_get_list_field(list_fld);
+        ij_get_obj_field(elem_fld);
+        JI("invokevirtual", "java/util/ArrayList/add(Ljava/lang/Object;)Z");
+        JI("pop", "");
+    }
+
+    ij_get_list_field(list_fld);
+    JGoto(ports.γ);
+    JL(b); JGoto(ports.ω);
+}
+
+/* =========================================================================
  * ICN_LIMIT — E \ N  (limitation operator, JCON-ANALYSIS §"E \ N")
  *
  * Semantics: yield at most N values from E.
@@ -3092,7 +3167,8 @@ static void ij_emit_expr(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         case ICN_LCONCAT: ij_emit_concat   (n,ports,oα,oβ); break; /* Tiny-ICON: ||| = || */
         case ICN_SWAP:    ij_emit_swap      (n,ports,oα,oβ); break;
         case ICN_SUBSCRIPT: ij_emit_subscript(n,ports,oα,oβ); break;
-        case ICN_SECTION: ij_emit_section   (n,ports,oα,oβ); break;
+        case ICN_SECTION:   ij_emit_section  (n,ports,oα,oβ); break;
+        case ICN_MAKELIST:  ij_emit_makelist (n,ports,oα,oβ); break;
         case ICN_SEQ_EXPR: ij_emit_seq_expr (n,ports,oα,oβ); break;
         case ICN_LT: case ICN_LE: case ICN_GT: case ICN_GE: case ICN_EQ: case ICN_NE:
                           ij_emit_relop    (n,ports,oα,oβ); break;
@@ -3433,6 +3509,10 @@ void ij_emit_file(IcnNode **nodes, int count, FILE *out, const char *filename) {
         char type = ij_static_types[i];
         if (type == 'A')
             J(".field public static %s Ljava/lang/String;\n", ij_statics[i]);
+        else if (type == 'L')
+            J(".field public static %s Ljava/util/ArrayList;\n", ij_statics[i]);
+        else if (type == 'O')
+            J(".field public static %s Ljava/lang/Object;\n", ij_statics[i]);
         else
             J(".field public static %s %c\n", ij_statics[i], type);
     }
