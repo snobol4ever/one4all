@@ -1,0 +1,6 @@
+procedure main();
+  L := [];
+  push(L, 10);
+  push(L, 20);
+  write(*L);
+end

@@ -1,0 +1,5 @@
+procedure main();
+  L := [5, 6, 7];
+  write(get(L));
+  write(get(L));
+end
