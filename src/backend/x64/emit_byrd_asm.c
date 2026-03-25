@@ -410,7 +410,7 @@ static void expand_name(const char *src, char *dst, int dstlen) {
  *   box_data_size(safe_name)   — byte size of the DATA block
  * ----------------------------------------------------------------------- */
 
-#define MAX_BOX_DATA_VARS 512
+#define MAX_BOX_DATA_VARS 128
 #define MAX_BOXES 512
 
 typedef struct {
@@ -419,8 +419,14 @@ typedef struct {
     int  nvar;                              /* number of vars */
 } BoxDataCtx;
 
-static BoxDataCtx box_data[MAX_BOXES];
-static int        box_data_count = 0;
+/* Heap-allocated to avoid huge BSS segment (512*128*320 = 20MB static) */
+static BoxDataCtx *box_data = NULL;
+static int         box_data_count = 0;
+
+static void box_data_init(void) {
+    if (!box_data)
+        box_data = (BoxDataCtx *)calloc(MAX_BOXES, sizeof(BoxDataCtx));
+}
 
 /* Currently active box context (-1 = none) */
 static int box_ctx_idx = -1;
@@ -2120,9 +2126,11 @@ static void emit_named_ref(const NamedPat *np,
     snprintf(olbl,     LBUF, "nref%d_ω",    uid);
     snprintf(r12_save, LBUF, "nref%d_r12",  uid);
 
-    /* Save slot for caller's r12 — must survive across the nested call */
+    /* Save slot for caller's r12 — must survive across the nested call.
+     * Use flat_bss_register (not var_register) so the slot always lands in
+     * the flat .bss section, not inside a named-pattern DATA block. */
     if (!np->is_fn)
-        var_register(r12_save);
+        flat_bss_register(r12_save);
 
     {
         char ref_hdr[LBUF + 8];
@@ -5357,6 +5365,7 @@ static void emit_prolog_program(Program *prog);  /* forward */
 
 void asm_emit(Program *prog, FILE *f) {
     out = f;
+    box_data_init();
 
     /* Pass 1: scan for named pattern assignments */
     scan_named_patterns(prog);
