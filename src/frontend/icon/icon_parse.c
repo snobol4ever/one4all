@@ -552,6 +552,11 @@ static IcnNode *parse_stmt(IcnParser *p) {
         expect(p, TK_SEMICOL, "fail statement");
         return icn_node_new(ICN_FAIL, line, 0);
     }
+    if (check(p, TK_INITIAL)) {
+        advance(p);
+        IcnNode *body = parse_stmt(p); /* single stmt or block */
+        return icn_node_new(ICN_INITIAL, line, body ? 1 : 0, body);
+    }
     if (check(p, TK_LOCAL)) {
         int line2 = p->cur.line; advance(p);
         IcnNode **locs = NULL; int nlocs = 0, lcap = 0;
@@ -655,9 +660,23 @@ IcnNode **icn_parse_file(IcnParser *p, int *out_count) {
         if (check(p, TK_PROCEDURE))
             proc = parse_proc(p);
         else if (check(p, TK_GLOBAL)) {
-            advance(p);
-            while (!check(p, TK_SEMICOL) && !check(p, TK_EOF)) advance(p);
+            int gline = p->cur.line; advance(p);
+            IcnNode **gvars = NULL; int ngv = 0, gcap = 0;
+            while (!check(p, TK_SEMICOL) && !check(p, TK_EOF)) {
+                if (p->cur.kind == TK_IDENT) {
+                    IcnNode *v = icn_leaf_str(ICN_VAR, p->cur.line,
+                        p->cur.val.sval.data, p->cur.val.sval.len);
+                    if (ngv+1 > gcap) { gcap = gcap ? gcap*2 : 4; gvars = realloc(gvars, gcap*sizeof(IcnNode*)); }
+                    gvars[ngv++] = v; advance(p);
+                }
+                if (!match(p, TK_COMMA)) break;
+            }
             match(p, TK_SEMICOL);
+            IcnNode *gn = calloc(1, sizeof(IcnNode));
+            gn->kind = ICN_GLOBAL; gn->line = gline;
+            gn->nchildren = ngv; gn->children = gvars;
+            if (n + 1 > cap) { cap = cap ? cap*2 : 4; procs = realloc(procs, cap * sizeof(IcnNode*)); }
+            procs[n++] = gn;
         } else {
             parser_error(p, "expected 'procedure' or 'global'");
             break;
