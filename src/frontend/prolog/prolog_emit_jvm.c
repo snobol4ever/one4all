@@ -1026,6 +1026,38 @@ static int pj_count_neq(EXPR_t **goals, int ngoals) {
     return count;
 }
 
+/* pj_count_disj_locals — extra JVM locals for plain disjunctions in a body.
+ * Each plain ; allocates: 2 (local_cs+local_tmark) + 2*narms (ics+sco per arm)
+ * + 2 (fresh_init + fresh_sub). Also recurse into arm bodies. */
+static int pj_count_disj_locals(EXPR_t **goals, int ngoals) {
+    int total = 0;
+    for (int i = 0; i < ngoals; i++) {
+        EXPR_t *g = goals[i];
+        if (!g || g->kind != E_FNC || !g->sval) continue;
+        if (strcmp(g->sval, ";") == 0 && g->nchildren >= 2) {
+            if (g->children[0] && g->children[0]->kind == E_FNC &&
+                g->children[0]->sval && strcmp(g->children[0]->sval, "->") == 0)
+                continue; /* ITE handled separately */
+            /* base cost: 2 + 2 + 2*narms locals at this disjunction level */
+            total += 4 + 2 * g->nchildren;
+            /* recurse into each arm — each arm may have user calls (5 locals each) */
+            for (int ai = 0; ai < g->nchildren; ai++) {
+                EXPR_t *arm = g->children[ai];
+                if (!arm) continue;
+                if (arm->kind == E_FNC && arm->sval && strcmp(arm->sval, ",") == 0) {
+                    /* count user calls in conjunction arm */
+                    total += 5 * pj_count_ucalls(arm->children, arm->nchildren);
+                    total += pj_count_disj_locals(arm->children, arm->nchildren);
+                } else {
+                    /* single goal arm */
+                    if (pj_is_user_call(arm)) total += 5;
+                }
+            }
+        }
+    }
+    return total;
+}
+
 /* pj_term_stack_depth — compute max JVM stack slots needed to emit a term.
  * Compound: dup+idx+child leaves [arr,arr,idx,child]=4 per level before aastore.
  * Worst case per nesting level = 4 slots. */
@@ -1786,6 +1818,115 @@ static void pj_emit_body(EXPR_t **goals, int ngoals, const char *lbl_γ,
         return;
     }
 
+    /* Plain disjunction in body — needs retry loop like a user call.
+     * Each arm is a choice point: try arm[local_cs], on success continue
+     * body; if body later fails, unwind trail and try arm[local_cs+1].
+     * This handles (A ; B), (A ; B ; C), etc. without ITE.
+     * ITE (Cond -> Then ; Else) is handled above in pj_emit_goal. */
+    if (g->kind == E_FNC && g->sval && strcmp(g->sval, ";") == 0 &&
+        g->nchildren >= 2 &&
+        !(g->children[0] && g->children[0]->kind == E_FNC &&
+          g->children[0]->sval && strcmp(g->children[0]->sval, "->") == 0)) {
+        int narms = g->nchildren;
+        int uid = pj_fresh_label();
+        int local_cs    = (*next_local)++;
+        int local_tmark = (*next_local)++;
+        char dj_α[128], dj_β[128], dj_ω[128];
+        snprintf(dj_α, sizeof dj_α, "dj%d_alpha", uid);
+        snprintf(dj_β, sizeof dj_β, "dj%d_beta",  uid);
+        snprintf(dj_ω, sizeof dj_ω, "dj%d_omega", uid);
+
+        /* init local_cs = 0 on first entry (disjunction always starts fresh) */
+        J("    iconst_0\n");
+        J("    istore %d\n", local_cs);
+
+        J("%s:\n", dj_α);
+        /* save trail mark so β can undo bindings from previous arm */
+        J("    invokestatic %s/pj_trail_mark()I\n", pj_classname);
+        J("    istore %d\n", local_tmark);
+
+        /* dispatch: if local_cs >= narms → dj_ω */
+        J("    iload %d\n", local_cs);
+        J("    ldc %d\n", narms);
+        J("    if_icmpge %s\n", dj_ω);
+
+        /* tableswitch on local_cs → arm labels */
+        char arm_done[128];
+        snprintf(arm_done, sizeof arm_done, "dj%d_arm_done", uid);
+        char **arm_ok  = (char**)malloc(narms * sizeof(char*));
+        char **arm_fail = (char**)malloc(narms * sizeof(char*));
+        for (int ai = 0; ai < narms; ai++) {
+            arm_ok[ai]   = (char*)malloc(128);
+            arm_fail[ai] = (char*)malloc(128);
+            snprintf(arm_ok[ai],   128, "dj%d_arm%d_ok",   uid, ai);
+            snprintf(arm_fail[ai], 128, "dj%d_arm%d_fail", uid, ai);
+        }
+        J("    iload %d\n", local_cs);
+        J("    tableswitch 0\n");
+        for (int ai = 0; ai < narms; ai++)
+            J("        %s\n", arm_ok[ai]);
+        J("        default: %s\n", dj_ω);
+
+        /* emit each arm: success falls to arm_done, failure to dj_β */
+        for (int ai = 0; ai < narms; ai++) {
+            J("%s:\n", arm_ok[ai]);
+            EXPR_t *arm = g->children[ai];
+            int next_local_arm = *next_local;
+            int ics_arm = next_local_arm++;
+            int sco_arm = next_local_arm++;
+            *next_local = next_local_arm;
+            J("    iconst_0\n"); J("    istore %d\n", ics_arm);
+            J("    iconst_0\n"); J("    istore %d\n", sco_arm);
+            if (arm && arm->kind == E_FNC && arm->sval && strcmp(arm->sval, ",") == 0) {
+                pj_emit_body(arm->children, arm->nchildren,
+                             arm_done, arm_fail[ai], arm_fail[ai],
+                             trail_local, var_locals, n_vars, next_local,
+                             ics_arm, sco_arm, cut_cs_seal, cs_local_for_cut, NULL);
+            } else {
+                pj_emit_body(&arm, 1,
+                             arm_done, arm_fail[ai], arm_fail[ai],
+                             trail_local, var_locals, n_vars, next_local,
+                             ics_arm, sco_arm, cut_cs_seal, cs_local_for_cut, NULL);
+            }
+            J("%s:\n", arm_fail[ai]);
+            /* arm failed: fall through to dj_β to try next arm */
+            J("    goto %s\n", dj_β);
+        }
+
+        /* arm succeeded — now emit the rest of the body */
+        J("%s:\n", arm_done);
+        {
+            int fresh_init = (*next_local)++;
+            J("    iconst_0\n"); J("    istore %d\n", fresh_init);
+            int fresh_sub = (*next_local)++;
+            J("    iconst_0\n"); J("    istore %d\n", fresh_sub);
+            pj_emit_body(goals + 1, ngoals - 1, lbl_γ, dj_β, lbl_outer_ω,
+                         trail_local, var_locals, n_vars, next_local,
+                         fresh_init, fresh_sub,
+                         cut_cs_seal, cs_local_for_cut, lbl_pred_ω);
+        }
+
+        /* β: unwind trail (undo arm bindings), advance to next arm */
+        J("%s:\n", dj_β);
+        J("    iload %d\n", local_tmark);
+        J("    invokestatic %s/pj_trail_unwind(I)V\n", pj_classname);
+        J("    iload %d\n", local_cs);
+        J("    iconst_1\n");
+        J("    iadd\n");
+        J("    istore %d\n", local_cs);
+        J("    goto %s\n", dj_α);
+
+        /* ω: all arms exhausted → outer fail */
+        J("%s:\n", dj_ω);
+        J("    iconst_0\n");
+        J("    istore %d\n", local_cs);
+        J("    goto %s\n", lbl_ω);
+
+        for (int ai = 0; ai < narms; ai++) { free(arm_ok[ai]); free(arm_fail[ai]); }
+        free(arm_ok); free(arm_fail);
+        return;
+    }
+
     /* Deterministic goal */
     {
         int uid = pj_fresh_label();
@@ -1967,6 +2108,7 @@ static void pj_emit_choice(EXPR_t *choice) {
     /* count max user calls in any single clause body — each allocates 5 locals */
     int max_ucalls = 0;
     int max_neq = 0;
+    int max_disj = 0;
     int max_stack = 16;
     for (int ci2 = 0; ci2 < nclauses; ci2++) {
         EXPR_t *cl2 = choice->children[ci2];
@@ -1978,6 +2120,8 @@ static void pj_emit_choice(EXPR_t *choice) {
         if (uc > max_ucalls) max_ucalls = uc;
         int nq = pj_count_neq(cl2->children + n_args_ci2, nb2);
         if (nq > max_neq) max_neq = nq;
+        int dj = pj_count_disj_locals(cl2->children + n_args_ci2, nb2);
+        if (dj > max_disj) max_disj = dj;
         /* also check head args for deep terms */
         int s = pj_clause_stack_needed(cl2->children + n_args_ci2, nb2);
         for (int hi = 0; hi < n_args_ci2; hi++) {
@@ -1986,7 +2130,7 @@ static void pj_emit_choice(EXPR_t *choice) {
         }
         if (s > max_stack) max_stack = s;
     }
-    int locals_needed = vars_base + max_vars + 5 * max_ucalls + 2 * max_neq + 16;
+    int locals_needed = vars_base + max_vars + 5 * max_ucalls + 2 * max_neq + max_disj + 16;
 
     J("    .limit stack %d\n", max_stack < 16 ? 16 : max_stack);
     J("    .limit locals %d\n", locals_needed);
