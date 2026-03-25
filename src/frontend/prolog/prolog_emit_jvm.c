@@ -636,17 +636,67 @@ static void pj_emit_runtime_helpers(void) {
     JI("areturn", "");
     /* plain compound: functor(arg1,...) */
     J("pts_plain_compound:\n");
+    /* Check for infix operators: -/2, +/2, */2, //2, mod/2 → print infix */
+    JI("aload_0", "");
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("iconst_1", ""); JI("aaload", "");  /* functor */
+    JI("checkcast", "java/lang/String");
+    JI("astore_1", "");
+    JI("aload_0", "");
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("arraylength", "");
+    JI("ldc", "4");  /* arity 2 → arraylength 4 */
+    JI("if_icmpne", "pts_plain_noninfix");
+    /* check functor is one of: - + * / mod */
+    JI("aload_1", "");
+    JI("ldc", "\"-\"");
+    JI("invokevirtual", "java/lang/Object/equals(Ljava/lang/Object;)Z");
+    JI("ifne", "pts_infix");
+    JI("aload_1", "");
+    JI("ldc", "\"+\"");
+    JI("invokevirtual", "java/lang/Object/equals(Ljava/lang/Object;)Z");
+    JI("ifne", "pts_infix");
+    JI("aload_1", "");
+    JI("ldc", "\"*\"");
+    JI("invokevirtual", "java/lang/Object/equals(Ljava/lang/Object;)Z");
+    JI("ifne", "pts_infix");
+    JI("aload_1", "");
+    JI("ldc", "\"/\"");
+    JI("invokevirtual", "java/lang/Object/equals(Ljava/lang/Object;)Z");
+    JI("ifne", "pts_infix");
+    JI("goto", "pts_plain_noninfix");
+    J("pts_infix:\n");
+    JI("new", "java/lang/StringBuilder");
+    JI("dup", "");
+    JI("invokespecial", "java/lang/StringBuilder/<init>()V");
+    JI("astore_2", "");
+    /* left arg */
+    JI("aload_2", "");
+    JI("aload_0", ""); JI("checkcast", "[Ljava/lang/Object;"); JI("iconst_2", ""); JI("aaload", "");
+    J("    invokestatic %s/pj_term_str(Ljava/lang/Object;)Ljava/lang/String;\n", pj_classname);
+    JI("invokevirtual", "java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;");
+    JI("pop", "");
+    /* functor */
+    JI("aload_2", ""); JI("aload_1", "");
+    JI("invokevirtual", "java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;");
+    JI("pop", "");
+    /* right arg */
+    JI("aload_2", "");
+    JI("aload_0", ""); JI("checkcast", "[Ljava/lang/Object;"); JI("iconst_3", ""); JI("aaload", "");
+    J("    invokestatic %s/pj_term_str(Ljava/lang/Object;)Ljava/lang/String;\n", pj_classname);
+    JI("invokevirtual", "java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;");
+    JI("pop", "");
+    JI("aload_2", "");
+    JI("invokevirtual", "java/lang/StringBuilder/toString()Ljava/lang/String;");
+    JI("areturn", "");
+    J("pts_plain_noninfix:\n");
     JI("new", "java/lang/StringBuilder");
     JI("dup", "");
     JI("invokespecial", "java/lang/StringBuilder/<init>()V");
     JI("astore_2", "");   /* local 2 = sb */
-    /* append functor */
+    /* append functor (already in local 1) */
     JI("aload_2", "");
-    JI("aload_0", "");
-    JI("checkcast", "[Ljava/lang/Object;");
-    JI("iconst_1", "");
-    JI("aaload", "");
-    JI("checkcast", "java/lang/String");
+    JI("aload_1", "");  /* functor string already loaded into local 1 */
     JI("invokevirtual", "java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;");
     JI("pop", "");
     /* arity = arraylength - 2 */
@@ -2118,6 +2168,458 @@ static void pj_emit_between_builtin(void) {
 }
 
 /* -------------------------------------------------------------------------
+ * pj_emit_findall_builtin — emit synthetic p_findall_3 method.
+ *
+ * findall(Template, Goal, List) — collect all solutions to Goal,
+ * binding Template on each, copy each bound template, unify List with
+ * the resulting Prolog list.  Never fails (returns [] on no solutions).
+ *
+ * Signature: p_findall_3([Template], [Goal], [List], cs) → Object[] | null
+ * cs is always 0 on entry (findall is deterministic / never retried).
+ *
+ * Runtime strategy:
+ *   1. Mark the trail.
+ *   2. Use reflection to call p_functor_arity(args..., cs) in a loop,
+ *      incrementing cs until null (ω).
+ *   3. On each success: deep-copy the deref'd template, add to ArrayList.
+ *   4. Unwind trail to mark after each attempt to reset bindings.
+ *   5. Build Prolog list from ArrayList, unify with List arg.
+ *   6. Return {1} (success).
+ *
+ * Goal dispatch: handles atom "fail/0", "true/0", compound "," (conj),
+ * compound "is" (arithmetic), and user predicates via reflection.
+ * Conjunction is handled by pj_call_goal_conj helper.
+ * ------------------------------------------------------------------------- */
+static void pj_emit_findall_builtin(void) {
+    /* ---- pj_copy_term: deep-copy a deref'd term with fresh vars ---------- */
+    J("; === pj_copy_term (deep copy for findall) ===========================\n");
+    J(".method static pj_copy_term(Ljava/lang/Object;)Ljava/lang/Object;\n");
+    J("    .limit stack 10\n");
+    J("    .limit locals 6\n");
+    /* deref arg */
+    J("    aload_0\n");
+    J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    J("    astore_0\n");
+    /* if null → return null */
+    J("    aload_0\n");
+    J("    ifnonnull pj_ct_notnull\n");
+    J("    aconst_null\n");
+    J("    areturn\n");
+    J("pj_ct_notnull:\n");
+    J("    aload_0\n");
+    J("    checkcast [Ljava/lang/Object;\n");
+    J("    astore_1\n");  /* t = (Object[]) term */
+    /* tag = t[0] */
+    J("    aload_1\n");
+    J("    iconst_0\n");
+    J("    aaload\n");
+    J("    astore_2\n");  /* tag string */
+    /* if tag == "var" → return fresh var */
+    J("    aload_2\n");
+    J("    ldc \"var\"\n");
+    J("    invokevirtual java/lang/Object/equals(Ljava/lang/Object;)Z\n");
+    J("    ifeq pj_ct_not_var\n");
+    J("    invokestatic %s/pj_term_var()[Ljava/lang/Object;\n", pj_classname);
+    J("    areturn\n");
+    J("pj_ct_not_var:\n");
+    /* if tag == "atom" → return same (atoms are immutable) */
+    J("    aload_2\n");
+    J("    ldc \"atom\"\n");
+    J("    invokevirtual java/lang/Object/equals(Ljava/lang/Object;)Z\n");
+    J("    ifeq pj_ct_not_atom\n");
+    J("    aload_1\n");  /* return same atom */
+    J("    areturn\n");
+    J("pj_ct_not_atom:\n");
+    /* if tag == "int" → return same (ints are immutable) */
+    J("    aload_2\n");
+    J("    ldc \"int\"\n");
+    J("    invokevirtual java/lang/Object/equals(Ljava/lang/Object;)Z\n");
+    J("    ifeq pj_ct_not_int\n");
+    J("    aload_1\n");
+    J("    areturn\n");
+    J("pj_ct_not_int:\n");
+    /* compound: copy all args */
+    J("    aload_1\n");
+    J("    arraylength\n");
+    J("    istore_3\n");  /* len */
+    J("    iload_3\n");
+    J("    anewarray java/lang/Object\n");
+    J("    astore 4\n");  /* newArr */
+    /* copy [0] tag and [1] functor unchanged */
+    J("    aload 4\n"); J("    iconst_0\n"); J("    aload_1\n"); J("    iconst_0\n"); J("    aaload\n"); J("    aastore\n");
+    J("    aload 4\n"); J("    iconst_1\n"); J("    aload_1\n"); J("    iconst_1\n"); J("    aaload\n"); J("    aastore\n");
+    /* copy args [2..len-1] recursively */
+    J("    iconst_2\n");
+    J("    istore 5\n");  /* i = 2 */
+    J("pj_ct_arg_loop:\n");
+    J("    iload 5\n");
+    J("    iload_3\n");
+    J("    if_icmpge pj_ct_done\n");
+    J("    aload 4\n");
+    J("    iload 5\n");
+    J("    aload_1\n");
+    J("    iload 5\n");
+    J("    aaload\n");  /* t[i] */
+    J("    invokestatic %s/pj_copy_term(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    J("    aastore\n");
+    J("    iinc 5 1\n");
+    J("    goto pj_ct_arg_loop\n");
+    J("pj_ct_done:\n");
+    J("    aload 4\n");
+    J("    areturn\n");
+    J(".end method\n\n");
+
+    /* ---- pj_call_goal: interpret a goal term.
+     * Returns new_cs (>=0) on success so caller can resume, -1 on failure.
+     * For user predicates: extracts result[0].intValue() as the new cs.
+     * For builtins (true, is, conj): returns 0 on success (deterministic).
+     * Caller (p_findall_3) stores the returned value as goal_cs for next iter.
+     * --------------------------------------------------------------------- */
+    J("; === pj_call_goal (goal interpreter for findall) ====================\n");
+    J(".method static pj_call_goal(Ljava/lang/Object;I)I\n");
+    J("    .limit stack 20\n");
+    J("    .limit locals 12\n");
+    /* local 0 = goal, local 1 = cs, local 2..11 = scratch */
+    J("    aload_0\n");
+    J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    J("    astore_0\n");
+    J("    aload_0\n");
+    J("    ifnull pj_cg_fail\n");
+    J("    aload_0\n");
+    J("    checkcast [Ljava/lang/Object;\n");
+    J("    astore 2\n");  /* t */
+    /* get tag */
+    J("    aload 2\n"); J("    iconst_0\n"); J("    aaload\n"); J("    checkcast java/lang/String\n"); J("    astore 3\n"); /* tag */
+    /* atom? */
+    J("    aload 3\n");
+    J("    ldc \"atom\"\n");
+    J("    invokevirtual java/lang/Object/equals(Ljava/lang/Object;)Z\n");
+    J("    ifeq pj_cg_not_atom\n");
+    /* atom: get name */
+    J("    aload 2\n"); J("    iconst_1\n"); J("    aaload\n"); J("    checkcast java/lang/String\n"); J("    astore 4\n");
+    /* fail? */
+    J("    aload 4\n"); J("    ldc \"fail\"\n");
+    J("    invokevirtual java/lang/Object/equals(Ljava/lang/Object;)Z\n");
+    J("    ifeq pj_cg_not_fail_atom\n");
+    J("    ldc -1\n"); J("    ireturn\n");
+    J("pj_cg_not_fail_atom:\n");
+    /* true? */
+    J("    aload 4\n"); J("    ldc \"true\"\n");
+    J("    invokevirtual java/lang/Object/equals(Ljava/lang/Object;)Z\n");
+    J("    ifeq pj_cg_atom_user\n");
+    J("    iconst_0\n"); J("    ireturn\n");
+    J("pj_cg_atom_user:\n");
+    /* atom user predicate (arity 0) — call via reflection, return new cs */
+    J("    aload 4\n");      /* functor name */
+    J("    iconst_0\n");     /* arity 0 */
+    J("    aconst_null\n");  /* args[] = null for arity 0 */
+    J("    iload_1\n");      /* cs */
+    J("    invokestatic %s/pj_reflect_call(Ljava/lang/String;I[Ljava/lang/Object;I)[Ljava/lang/Object;\n", pj_classname);
+    J("    astore 5\n");
+    J("    aload 5\n"); J("    ifnull pj_cg_fail\n");
+    /* extract new cs from result[0].intValue() */
+    J("    aload 5\n"); J("    iconst_0\n"); J("    aaload\n");
+    J("    checkcast java/lang/Integer\n");
+    J("    invokevirtual java/lang/Integer/intValue()I\n");
+    J("    ireturn\n");
+    J("pj_cg_not_atom:\n");
+    /* compound */
+    J("    aload 3\n"); J("    ldc \"compound\"\n");
+    J("    invokevirtual java/lang/Object/equals(Ljava/lang/Object;)Z\n");
+    J("    ifeq pj_cg_fail\n");
+    /* functor */
+    J("    aload 2\n"); J("    iconst_1\n"); J("    aaload\n"); J("    checkcast java/lang/String\n"); J("    astore 4\n");
+    /* arity = arraylength - 2 */
+    J("    aload 2\n"); J("    arraylength\n"); J("    iconst_2\n"); J("    isub\n"); J("    istore 5\n");
+    /* conjunction? */
+    J("    aload 4\n"); J("    ldc \",\"\n");
+    J("    invokevirtual java/lang/Object/equals(Ljava/lang/Object;)Z\n");
+    J("    ifeq pj_cg_not_conj\n");
+    /* conjunction: call left with cs=0 (det), if >=0 call right with cs=0 */
+    J("    aload 2\n"); J("    iconst_2\n"); J("    aaload\n");  /* left */
+    J("    iconst_0\n");
+    J("    invokestatic %s/pj_call_goal(Ljava/lang/Object;I)I\n", pj_classname);
+    J("    ldc -1\n"); J("    if_icmpeq pj_cg_fail\n");
+    J("    aload 2\n"); J("    iconst_3\n"); J("    aaload\n");  /* right */
+    J("    iconst_0\n");
+    J("    invokestatic %s/pj_call_goal(Ljava/lang/Object;I)I\n", pj_classname);
+    J("    istore 9\n");   /* save right result */
+    J("    iload 9\n"); J("    ldc -1\n"); J("    if_icmpeq pj_cg_fail\n");
+    J("    iconst_0\n"); J("    ireturn\n");  /* conjunction success → return 0 (det) */
+    J("pj_cg_not_conj:\n");
+    /* is/2? */
+    J("    aload 4\n"); J("    ldc \"is\"\n");
+    J("    invokevirtual java/lang/Object/equals(Ljava/lang/Object;)Z\n");
+    J("    ifeq pj_cg_not_is\n");
+    /* is(Var, Expr): evaluate expr, unify with var — return 0 on success, -1 on fail */
+    J("    aload 2\n"); J("    iconst_2\n"); J("    aaload\n"); J("    astore 6\n"); /* lhs */
+    J("    aload 2\n"); J("    iconst_3\n"); J("    aaload\n"); J("    astore 7\n"); /* rhs expr */
+    J("    aload 7\n");
+    J("    invokestatic %s/pj_eval_arith(Ljava/lang/Object;)J\n", pj_classname);
+    J("    invokestatic %s/pj_term_int(J)[Ljava/lang/Object;\n", pj_classname);
+    J("    astore 8\n");
+    J("    aload 6\n"); J("    aload 8\n");
+    J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+    J("    ifeq pj_cg_fail\n");
+    J("    iconst_0\n"); J("    ireturn\n");
+    J("pj_cg_not_is:\n");
+    /* user predicate: build args array, call via reflection, return new cs */
+    J("    aload 2\n"); J("    arraylength\n"); J("    iconst_2\n"); J("    isub\n"); J("    istore 5\n"); /* arity */
+    J("    iload 5\n");
+    J("    anewarray java/lang/Object\n");
+    J("    astore 6\n");  /* args array */
+    J("    iconst_0\n"); J("    istore 7\n"); /* i=0 */
+    J("pj_cg_args_loop:\n");
+    J("    iload 7\n"); J("    iload 5\n"); J("    if_icmpge pj_cg_args_done\n");
+    J("    aload 6\n"); J("    iload 7\n");
+    J("    aload 2\n"); J("    iload 7\n"); J("    iconst_2\n"); J("    iadd\n"); J("    aaload\n"); /* t[i+2] */
+    J("    aastore\n");
+    J("    iinc 7 1\n");
+    J("    goto pj_cg_args_loop\n");
+    J("pj_cg_args_done:\n");
+    J("    aload 4\n"); /* functor */
+    J("    iload 5\n"); /* arity */
+    J("    aload 6\n"); /* args */
+    J("    iload_1\n"); /* cs */
+    J("    invokestatic %s/pj_reflect_call(Ljava/lang/String;I[Ljava/lang/Object;I)[Ljava/lang/Object;\n", pj_classname);
+    J("    astore 8\n");
+    J("    aload 8\n"); J("    ifnull pj_cg_fail\n");
+    /* extract new cs from result[0].intValue() */
+    J("    aload 8\n"); J("    iconst_0\n"); J("    aaload\n");
+    J("    checkcast java/lang/Integer\n");
+    J("    invokevirtual java/lang/Integer/intValue()I\n");
+    J("    ireturn\n");
+    J("pj_cg_fail:\n");
+    J("    ldc -1\n"); J("    ireturn\n");
+    J(".end method\n\n");
+
+    /* ---- pj_eval_arith: evaluate arithmetic term, return long ------------ */
+    J("; === pj_eval_arith (arithmetic evaluator for findall/is) ============\n");
+    J(".method static pj_eval_arith(Ljava/lang/Object;)J\n");
+    J("    .limit stack 10\n");
+    J("    .limit locals 8\n");
+    J("    aload_0\n");
+    J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    J("    astore_0\n");
+    J("    aload_0\n");
+    J("    checkcast [Ljava/lang/Object;\n");
+    J("    astore_1\n");
+    J("    aload_1\n"); J("    iconst_0\n"); J("    aaload\n"); J("    checkcast java/lang/String\n"); J("    astore_2\n"); /* tag */
+    /* int? */
+    J("    aload_2\n"); J("    ldc \"int\"\n");
+    J("    invokevirtual java/lang/Object/equals(Ljava/lang/Object;)Z\n");
+    J("    ifeq pj_ea_not_int\n");
+    J("    aload_1\n"); J("    iconst_1\n"); J("    aaload\n"); J("    checkcast java/lang/String\n");
+    J("    invokestatic java/lang/Long/parseLong(Ljava/lang/String;)J\n");
+    J("    lreturn\n");
+    J("pj_ea_not_int:\n");
+    /* compound: get functor */
+    J("    aload_1\n"); J("    iconst_1\n"); J("    aaload\n"); J("    checkcast java/lang/String\n"); J("    astore_3\n");
+    /* eval left (arg[0] = t[2]) and right (arg[1] = t[3]) */
+    J("    aload_1\n"); J("    iconst_2\n"); J("    aaload\n");
+    J("    invokestatic %s/pj_eval_arith(Ljava/lang/Object;)J\n", pj_classname);
+    J("    lstore 4\n");  /* L */
+    /* check arity before loading right */
+    J("    aload_1\n"); J("    arraylength\n"); J("    iconst_3\n"); J("    if_icmplt pj_ea_unary\n");
+    J("    aload_1\n"); J("    iconst_3\n"); J("    aaload\n");
+    J("    invokestatic %s/pj_eval_arith(Ljava/lang/Object;)J\n", pj_classname);
+    J("    lstore 6\n");  /* R */
+    /* dispatch on functor */
+    J("    aload_3\n"); J("    ldc \"+\"\n"); J("    invokevirtual java/lang/Object/equals(Ljava/lang/Object;)Z\n"); J("    ifeq pj_ea_not_add\n");
+    J("    lload 4\n"); J("    lload 6\n"); J("    ladd\n"); J("    lreturn\n");
+    J("pj_ea_not_add:\n");
+    J("    aload_3\n"); J("    ldc \"-\"\n"); J("    invokevirtual java/lang/Object/equals(Ljava/lang/Object;)Z\n"); J("    ifeq pj_ea_not_sub\n");
+    J("    lload 4\n"); J("    lload 6\n"); J("    lsub\n"); J("    lreturn\n");
+    J("pj_ea_not_sub:\n");
+    J("    aload_3\n"); J("    ldc \"*\"\n"); J("    invokevirtual java/lang/Object/equals(Ljava/lang/Object;)Z\n"); J("    ifeq pj_ea_not_mul\n");
+    J("    lload 4\n"); J("    lload 6\n"); J("    lmul\n"); J("    lreturn\n");
+    J("pj_ea_not_mul:\n");
+    J("    aload_3\n"); J("    ldc \"/\"\n"); J("    invokevirtual java/lang/Object/equals(Ljava/lang/Object;)Z\n"); J("    ifeq pj_ea_not_div\n");
+    J("    lload 4\n"); J("    lload 6\n"); J("    ldiv\n"); J("    lreturn\n");
+    J("pj_ea_not_div:\n");
+    J("    aload_3\n"); J("    ldc \"mod\"\n"); J("    invokevirtual java/lang/Object/equals(Ljava/lang/Object;)Z\n"); J("    ifeq pj_ea_not_mod\n");
+    J("    lload 4\n"); J("    lload 6\n"); J("    lrem\n"); J("    lreturn\n");
+    J("pj_ea_not_mod:\n");
+    J("    lload 4\n"); J("    lreturn\n"); /* fallback */
+    J("pj_ea_unary:\n");
+    /* unary minus */
+    J("    aload_3\n"); J("    ldc \"-\"\n"); J("    invokevirtual java/lang/Object/equals(Ljava/lang/Object;)Z\n"); J("    ifeq pj_ea_unary_other\n");
+    J("    lload 4\n"); J("    lneg\n"); J("    lreturn\n");
+    J("pj_ea_unary_other:\n");
+    J("    lload 4\n"); J("    lreturn\n");
+    J(".end method\n\n");
+
+    /* ---- pj_reflect_call: call p_name_arity via reflection --------------- */
+    /* Signature: pj_reflect_call(String functor, int arity, Object[] args, int cs) → Object[] | null */
+    J("; === pj_reflect_call (reflection dispatch for findall) ==============\n");
+    J(".method static pj_reflect_call(Ljava/lang/String;I[Ljava/lang/Object;I)[Ljava/lang/Object;\n");
+    J("    .limit stack 20\n");
+    J("    .limit locals 14\n");
+    /* wrap entire body in try/catch Exception → return null */
+    J("    .catch java/lang/Exception from pj_rc_try_start to pj_rc_try_end using pj_rc_catch\n");
+    J("pj_rc_try_start:\n");
+    /* build method name: "p_" + functor + "_" + arity */
+    J("    ldc \"p_\"\n");
+    J("    aload_0\n");
+    J("    invokevirtual java/lang/String/concat(Ljava/lang/String;)Ljava/lang/String;\n");
+    J("    ldc \"_\"\n");
+    J("    invokevirtual java/lang/String/concat(Ljava/lang/String;)Ljava/lang/String;\n");
+    J("    iload_1\n");
+    J("    invokestatic java/lang/Integer/toString(I)Ljava/lang/String;\n");
+    J("    invokevirtual java/lang/String/concat(Ljava/lang/String;)Ljava/lang/String;\n");
+    J("    astore 4\n");  /* methodName = "p_functor_arity" */
+    /* build param type array: [Object[]]*arity + [int] */
+    J("    iload_1\n"); J("    iconst_1\n"); J("    iadd\n");
+    J("    anewarray java/lang/Class\n");
+    J("    astore 5\n");  /* paramTypes */
+    J("    iconst_0\n"); J("    istore 6\n"); /* i=0 */
+    J("pj_rc_param_loop:\n");
+    J("    iload 6\n"); J("    iload_1\n"); J("    if_icmpge pj_rc_param_done\n");
+    J("    aload 5\n"); J("    iload 6\n");
+    /* Get Object[].class by creating a zero-length Object[] and calling getClass() */
+    J("    iconst_0\n");
+    J("    anewarray java/lang/Object\n");
+    J("    invokevirtual java/lang/Object/getClass()Ljava/lang/Class;\n");
+    J("    aastore\n");
+    J("    iinc 6 1\n"); J("    goto pj_rc_param_loop\n");
+    J("pj_rc_param_done:\n");
+    /* last param: int.class */
+    J("    aload 5\n"); J("    iload_1\n");
+    J("    getstatic java/lang/Integer/TYPE Ljava/lang/Class;\n");
+    J("    aastore\n");
+    /* get class */
+    J("    ldc \"%s\"\n", pj_classname);
+    J("    invokestatic java/lang/Class/forName(Ljava/lang/String;)Ljava/lang/Class;\n");
+    J("    astore 7\n");
+    /* getDeclaredMethod(name, paramTypes) — finds non-public methods too */
+    J("    aload 7\n");
+    J("    aload 4\n");
+    J("    aload 5\n");
+    J("    invokevirtual java/lang/Class/getDeclaredMethod(Ljava/lang/String;[Ljava/lang/Class;)Ljava/lang/reflect/Method;\n");
+    J("    astore 8\n");  /* method */
+    /* setAccessible(true) so we can call package-private static methods */
+    J("    aload 8\n");
+    J("    iconst_1\n");
+    J("    invokevirtual java/lang/reflect/Method/setAccessible(Z)V\n");
+    /* build invoke args: [args[0], args[1], ..., Integer(cs)] */
+    J("    iload_1\n"); J("    iconst_1\n"); J("    iadd\n");
+    J("    anewarray java/lang/Object\n");
+    J("    astore 9\n");
+    J("    iconst_0\n"); J("    istore 6\n");
+    J("pj_rc_invoke_loop:\n");
+    J("    iload 6\n"); J("    iload_1\n"); J("    if_icmpge pj_rc_invoke_done\n");
+    J("    aload 9\n"); J("    iload 6\n");
+    J("    aload_2\n"); J("    iload 6\n"); J("    aaload\n");
+    J("    aastore\n");
+    J("    iinc 6 1\n"); J("    goto pj_rc_invoke_loop\n");
+    J("pj_rc_invoke_done:\n");
+    J("    aload 9\n"); J("    iload_1\n");
+    J("    iload_3\n");
+    J("    invokestatic java/lang/Integer/valueOf(I)Ljava/lang/Integer;\n");
+    J("    aastore\n");
+    /* invoke: null target for static */
+    J("    aload 8\n");
+    J("    aconst_null\n");
+    J("    aload 9\n");
+    J("    invokevirtual java/lang/reflect/Method/invoke(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;\n");
+    J("pj_rc_try_end:\n");
+    J("    checkcast [Ljava/lang/Object;\n");
+    J("    areturn\n");
+    J("pj_rc_catch:\n");
+    J("    pop\n");  /* discard exception */
+    J("    aconst_null\n");
+    J("    areturn\n");
+    J(".end method\n\n");
+
+    /* ---- p_findall_3: the main findall predicate -------------------------- */
+    J("; === findall/3 synthetic predicate ===================================\n");
+    J(".method static p_findall_3([Ljava/lang/Object;[Ljava/lang/Object;[Ljava/lang/Object;I)[Ljava/lang/Object;\n");
+    J("    .limit stack 20\n");
+    J("    .limit locals 16\n");
+    /* locals: 0=template, 1=goal, 2=list_var, 3=cs(unused), 4=results(ArrayList),
+               5=trail_mark, 6=goal_cs, 7=call_result, 8=copied_template,
+               9=prolog_list(built), 10=nil, 11=cons */
+    /* results = new ArrayList */
+    J("    new java/util/ArrayList\n");
+    J("    dup\n");
+    J("    invokespecial java/util/ArrayList/<init>()V\n");
+    J("    astore 4\n");
+    /* save trail mark */
+    J("    invokestatic %s/pj_trail_mark()I\n", pj_classname);
+    J("    istore 5\n");
+    /* goal_cs = 0 */
+    J("    iconst_0\n"); J("    istore 6\n");
+    /* loop: call goal with goal_cs, collect solutions */
+    J("pj_fa_loop:\n");
+    /* call pj_call_goal(goal, goal_cs) → new_cs or -1 */
+    J("    aload_1\n");
+    J("    iload 6\n");
+    J("    invokestatic %s/pj_call_goal(Ljava/lang/Object;I)I\n", pj_classname);
+    J("    istore 6\n");        /* goal_cs = returned new_cs (or -1) */
+    J("    iload 6\n");
+    J("    ldc -1\n");
+    J("    if_icmpeq pj_fa_done\n");  /* -1 = failure → done */
+    /* success: copy template and add to results */
+    J("    aload_0\n");
+    J("    invokestatic %s/pj_copy_term(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    J("    astore 8\n");
+    J("    aload 4\n");
+    J("    aload 8\n");
+    J("    invokevirtual java/util/ArrayList/add(Ljava/lang/Object;)Z\n");
+    J("    pop\n");
+    /* unwind trail to reset bindings */
+    J("    iload 5\n");
+    J("    invokestatic %s/pj_trail_unwind(I)V\n", pj_classname);
+    /* goal_cs already updated above — loop back */
+    J("    goto pj_fa_loop\n");
+    J("pj_fa_done:\n");
+    /* unwind any residual trail */
+    J("    iload 5\n");
+    J("    invokestatic %s/pj_trail_unwind(I)V\n", pj_classname);
+    /* build Prolog list from results ArrayList (reverse iterate) */
+    /* nil = atom("[]") */
+    J("    ldc \"[]\"\n");
+    J("    invokestatic %s/pj_term_atom(Ljava/lang/String;)[Ljava/lang/Object;\n", pj_classname);
+    J("    astore 9\n");
+    /* i = results.size()-1, down to 0 */
+    J("    aload 4\n");
+    J("    invokevirtual java/util/ArrayList/size()I\n");
+    J("    iconst_1\n"); J("    isub\n"); J("    istore 10\n");
+    J("pj_fa_list_loop:\n");
+    J("    iload 10\n"); J("    iflt pj_fa_list_done\n");
+    /* cons = ["compound", ".", element, tail] */
+    J("    bipush 4\n"); J("    anewarray java/lang/Object\n"); J("    astore 11\n");
+    J("    aload 11\n"); J("    iconst_0\n"); J("    ldc \"compound\"\n"); J("    aastore\n");
+    J("    aload 11\n"); J("    iconst_1\n"); J("    ldc \".\"\n"); J("    aastore\n");
+    J("    aload 11\n"); J("    iconst_2\n");
+    J("    aload 4\n"); J("    iload 10\n");
+    J("    invokevirtual java/util/ArrayList/get(I)Ljava/lang/Object;\n");
+    J("    aastore\n");
+    J("    aload 11\n"); J("    iconst_3\n"); J("    aload 9\n"); J("    aastore\n");
+    J("    aload 11\n"); J("    astore 9\n");  /* tail = cons */
+    J("    iinc 10 -1\n");
+    J("    goto pj_fa_list_loop\n");
+    J("pj_fa_list_done:\n");
+    /* unify list var with built list */
+    J("    aload_2\n");  /* list_var */
+    J("    aload 9\n");  /* prolog_list */
+    J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+    J("    ifeq pj_fa_fail\n");
+    /* return success {1} */
+    J("    iconst_1\n");
+    J("    anewarray java/lang/Object\n");
+    J("    dup\n");
+    J("    iconst_0\n");
+    J("    iconst_1\n");
+    J("    invokestatic java/lang/Integer/valueOf(I)Ljava/lang/Integer;\n");
+    J("    aastore\n");
+    J("    areturn\n");
+    J("pj_fa_fail:\n");
+    J("    aconst_null\n"); J("    areturn\n");
+    J(".end method\n\n");
+}
+
+/* -------------------------------------------------------------------------
  * Clause emitter
  * Emits one clause block inside the predicate method (switch case).
  * Layout: p_functor_arity(arg0..argN-1, cs) — cs = continuation state
@@ -2663,6 +3165,19 @@ void prolog_emit_jvm(Program *prog, FILE *out, const char *filename) {
         }
         if (!defines_between)
             pj_emit_between_builtin();
+    }
+
+    /* Check if program uses findall/3 but doesn't define it — emit synthetic method */
+    {
+        int defines_findall = 0;
+        for (STMT_t *s = prog->head; s; s = s->next) {
+            if (!s->subject) continue;
+            if (s->subject->kind == E_CHOICE && s->subject->sval &&
+                strcmp(s->subject->sval, "findall") == 0)
+                defines_findall = 1;
+        }
+        if (!defines_findall)
+            pj_emit_findall_builtin();
     }
 
     /* emit each predicate */
