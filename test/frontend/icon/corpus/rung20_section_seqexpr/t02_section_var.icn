@@ -1,0 +1,6 @@
+procedure main();
+  s := "abcdef";
+  i := 2;
+  j := 5;
+  write(s[i:j]);
+end

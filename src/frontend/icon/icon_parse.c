@@ -124,9 +124,26 @@ static IcnNode *parse_primary(IcnParser *p) {
     }
     if (t.kind == TK_LPAREN) {
         advance(p);
-        IcnNode *inner = parse_expr(p);
+        IcnNode *first = parse_expr(p);
+        if (check(p, TK_SEMICOL)) {
+            /* (E1; E2; ...) — expression sequence, ICN_SEQ_EXPR */
+            IcnNode **children = malloc(8 * sizeof(IcnNode*));
+            int cap = 8, nc = 0;
+            children[nc++] = first;
+            while (check(p, TK_SEMICOL)) {
+                advance(p); /* consume ; */
+                if (check(p, TK_RPAREN)) break; /* trailing ; allowed */
+                if (nc >= cap) { cap *= 2; children = realloc(children, cap * sizeof(IcnNode*)); }
+                children[nc++] = parse_expr(p);
+            }
+            expect(p, TK_RPAREN, "sequence expression");
+            IcnNode *seq = calloc(1, sizeof(IcnNode));
+            seq->kind = ICN_SEQ_EXPR; seq->line = line;
+            seq->nchildren = nc; seq->children = children;
+            return seq;
+        }
         expect(p, TK_RPAREN, "grouped expression");
-        return inner;
+        return first;
     }
     if (t.kind == TK_FAIL) {
         advance(p);
@@ -185,8 +202,16 @@ static IcnNode *parse_postfix(IcnParser *p) {
         } else if (check(p, TK_LBRACK)) {
             advance(p);
             IcnNode *idx = parse_expr(p);
-            expect(p, TK_RBRACK, "subscript");
-            n = icn_node_new(ICN_SUBSCRIPT, line, 2, n, idx);
+            if (check(p, TK_COLON)) {
+                /* s[i:j] — string section */
+                advance(p);
+                IcnNode *hi = parse_expr(p);
+                expect(p, TK_RBRACK, "section");
+                n = icn_node_new(ICN_SECTION, line, 3, n, idx, hi);
+            } else {
+                expect(p, TK_RBRACK, "subscript");
+                n = icn_node_new(ICN_SUBSCRIPT, line, 2, n, idx);
+            }
         } else if (check(p, TK_DOT)) {
             advance(p);
             if (p->cur.kind != TK_IDENT) { parser_error(p, "expected field name"); break; }

@@ -105,6 +105,7 @@ typedef enum {
     /* --- Structure (icont: N_Field, subscript, record) --- */
     ICN_FIELD,     /* E.name  -- Tier 2 */
     ICN_SUBSCRIPT, /* E[i]    -- Tier 2 */
+    ICN_SECTION,   /* E[i:j]  -- string section (substring), 3 children: str, lo, hi */
     ICN_RECORD,    /* record decl -- Tier 2 */
     ICN_GLOBAL,    /* global decl */
 
