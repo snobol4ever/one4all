@@ -279,6 +279,29 @@ static void ij_declare_static_str(const char *name) {
     ij_declare_static_typed(name, 'A');  /* 'A' = Ljava/lang/String; */
 }
 
+/* =========================================================================
+ * Global variable name registry — separate from statics.
+ * Pass 0 registers names here WITHOUT pre-declaring a field type.
+ * Type is inferred naturally on first assignment (same as locals).
+ * ij_is_global() tells var/assign emit to use icn_gvar_* fields.
+ * ======================================================================= */
+#define MAX_GLOBALS 64
+static char ij_global_names[MAX_GLOBALS][64];
+static int  ij_nglobals = 0;
+
+static void ij_register_global(const char *name) {
+    for (int i = 0; i < ij_nglobals; i++)
+        if (!strcmp(ij_global_names[i], name)) return;
+    if (ij_nglobals < MAX_GLOBALS)
+        strncpy(ij_global_names[ij_nglobals++], name, 63);
+}
+
+static int ij_is_global(const char *name) {
+    for (int i = 0; i < ij_nglobals; i++)
+        if (!strcmp(ij_global_names[i], name)) return 1;
+    return 0;
+}
+
 /* String pool for rodata */
 #define MAX_STRINGS 256
 static char ij_strings[MAX_STRINGS][512];
@@ -2074,10 +2097,23 @@ static void ij_emit_initial(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     /* First call: set flag, run body */
     JI("iconst_1", ""); ij_put_int_field(flag_fld);
     if (n->nchildren >= 1 && n->children[0]) {
+        /* Wire body's γ to a drain label so we pop the body's result before
+         * pushing lconst_0.  Both the run-path (body succeeded) and the
+         * body-fail path (body.ω → run) converge at the drain label.
+         * This keeps stack height at ports.γ = 2 (one long slot) on all paths. */
+        char body_drain[64];
+        snprintf(body_drain, sizeof body_drain, "icn_%d_init_drain", id);
         IjPorts cp;
-        strncpy(cp.γ, run, 63); strncpy(cp.ω, run, 63); /* body succeed/fail → run */
+        strncpy(cp.γ, body_drain, 63);  /* body success → drain */
+        strncpy(cp.ω, run,        63);  /* body fail    → run (no value on stack) */
         char ca[64], cb[64]; ij_emit_expr(n->children[0], cp, ca, cb);
         JGoto(ca);
+        JL(body_drain);
+        /* Drain the value the body left on the stack */
+        int bstr = ij_expr_is_string(n->children[0]);
+        int bdbl = !bstr && ij_expr_is_real(n->children[0]);
+        if (bstr) JI("pop", ""); else (void)bdbl, JI("pop2", "");
+        /* Fall through to run */
         JL(run);
     }
     JI("lconst_0", ""); JGoto(ports.γ);
@@ -3149,7 +3185,12 @@ static void ij_emit_proc(IcnNode *proc, FILE *out_target) {
         if (s && s->kind == ICN_GLOBAL) {
             for (int ci = 0; ci < s->nchildren; ci++) {
                 IcnNode *v = s->children[ci];
-                if (v && v->kind == ICN_VAR && ij_locals_find(v->val.sval) < 0)
+                /* Top-level globals (registered in ij_global_names) must NOT
+                 * be added to ij_locals — they live as icn_gvar_* static fields
+                 * shared across all procs.  Only proc-local var declarations
+                 * that somehow have ICN_GLOBAL kind should be added. */
+                if (v && v->kind == ICN_VAR && ij_locals_find(v->val.sval) < 0
+                        && !ij_is_global(v->val.sval))
                     ij_locals_add(v->val.sval);
             }
         }
@@ -3330,17 +3371,18 @@ void ij_emit_file(IcnNode **nodes, int count, FILE *out, const char *filename) {
 
     ij_set_classname(filename ? filename : "IconProg");
 
-    /* Pass 0: register top-level global var names so var emit uses icn_gvar_*
-     * and does NOT add them to ij_locals. Declare as long fields by default;
-     * type refinement happens naturally when assignment is emitted. */
+    /* Pass 0: register top-level global var names in ij_global_names so that
+     * var/assign emit routes them to icn_gvar_* fields instead of ij_locals.
+     * Do NOT pre-declare a typed field here — type is inferred on first
+     * assignment, same as local vars.  ij_is_global(name) is the predicate. */
+    ij_nglobals = 0;
     for (int pi = 0; pi < count; pi++) {
         IcnNode *nd = nodes[pi];
         if (!nd || nd->kind != ICN_GLOBAL) continue;
         for (int ci = 0; ci < nd->nchildren; ci++) {
             IcnNode *v = nd->children[ci];
             if (!v || v->kind != ICN_VAR) continue;
-            char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", v->val.sval);
-            ij_declare_static(gname); /* long J by default */
+            ij_register_global(v->val.sval);
         }
     }
 
