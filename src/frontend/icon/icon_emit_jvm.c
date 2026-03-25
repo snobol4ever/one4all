@@ -813,6 +813,146 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         return;
     }
 
+    /* --- built-in find(s1, s2) --- generator: every occurrence of s1 in s2
+     * α: eval s1, eval s2, store both, reset pos=0, goto check
+     * β: advance pos (pos was 1-based result; next search starts at pos), goto check
+     * check: icn_builtin_find(s1,s2,pos) → -1L → ω; else store pos=result, push result → γ */
+    if (strcmp(fname, "find") == 0 && nargs >= 2 && !ij_is_user_proc(fname)) {
+        IcnNode *s1arg = n->children[1];
+        IcnNode *s2arg = n->children[2];
+        char after1[64], after2[64], chk[64], ok[64];
+        snprintf(after1, sizeof after1, "icn_%d_fa1",  id);
+        snprintf(after2, sizeof after2, "icn_%d_fa2",  id);
+        snprintf(chk,    sizeof chk,    "icn_%d_fchk", id);
+        snprintf(ok,     sizeof ok,     "icn_%d_fok",  id);
+        char s1f[64], s2f[64], pf[64];
+        snprintf(s1f, sizeof s1f, "icn_find_s1_%d",  id);
+        snprintf(s2f, sizeof s2f, "icn_find_s2_%d",  id);
+        snprintf(pf,  sizeof pf,  "icn_find_pos_%d", id);
+        ij_declare_static_str(s1f);
+        ij_declare_static_str(s2f);
+        ij_declare_static_int(pf);
+        IjPorts ap1; strncpy(ap1.γ, after1, 63); strncpy(ap1.ω, ports.ω, 63);
+        char a1[64], b1[64];
+        ij_emit_expr(s1arg, ap1, a1, b1);
+        IjPorts ap2; strncpy(ap2.γ, after2, 63); strncpy(ap2.ω, ports.ω, 63);
+        char a2[64], b2[64];
+        ij_emit_expr(s2arg, ap2, a2, b2);
+        /* α */
+        JL(a); JGoto(a1);
+        JL(after1); ij_put_str_field(s1f); JGoto(a2);
+        JL(after2); ij_put_str_field(s2f);
+        J("    iconst_0\n"); ij_put_int_field(pf);
+        JGoto(chk);
+        /* β: last result was 1-based idx; next search from that same 0-based pos (idx itself) */
+        JL(b);
+        ij_get_int_field(pf);            /* pf holds 1-based last result */
+        ij_put_int_field(pf);            /* no change — s2.indexOf scans from pf (0-based=pf-1+1=pf) */
+        JGoto(chk);
+        /* check */
+        JL(chk);
+        ij_get_str_field(s1f);
+        ij_get_str_field(s2f);
+        ij_get_int_field(pf);
+        JI("invokestatic", ij_classname_buf("icn_builtin_find(Ljava/lang/String;Ljava/lang/String;I)J"));
+        J("    dup2\n    lconst_1\n    lneg\n    lcmp\n    ifne %s\n", ok);
+        J("    pop2\n"); JGoto(ports.ω);
+        JL(ok);
+        JC("find ok: store result as new pos, push result → γ");
+        J("    dup2\n    l2i\n"); ij_put_int_field(pf);
+        JGoto(ports.γ);
+        return;
+    }
+
+    /* --- built-in match(s) — one-shot: match s at current icn_pos
+     * Calls icn_builtin_match(s, subject, pos) → new 1-based pos or -1L.
+     * On success: advance icn_pos = result-1 (0-based), push result → γ. */
+    if (strcmp(fname, "match") == 0 && nargs >= 1 && !ij_is_user_proc(fname)) {
+        IcnNode *sarg = n->children[1];
+        char after[64], ok[64];
+        snprintf(after, sizeof after, "icn_%d_ma", id);
+        snprintf(ok,    sizeof ok,    "icn_%d_mo", id);
+        IjPorts ap; strncpy(ap.γ, after, 63); strncpy(ap.ω, ports.ω, 63);
+        char arg_a[64], arg_b[64];
+        ij_emit_expr(sarg, ap, arg_a, arg_b);
+        JL(a); JGoto(arg_a);
+        JL(b); JGoto(ports.ω);
+        JL(after);
+        JC("match: s String on stack");
+        ij_declare_static_str("icn_subject");
+        ij_declare_static_int("icn_pos");
+        ij_get_str_field("icn_subject");
+        ij_get_int_field("icn_pos");
+        JI("invokestatic", ij_classname_buf("icn_builtin_match(Ljava/lang/String;Ljava/lang/String;I)J"));
+        J("    dup2\n    lconst_1\n    lneg\n    lcmp\n    ifne %s\n", ok);
+        J("    pop2\n"); JGoto(ports.ω);
+        JL(ok);
+        JC("match ok: icn_pos = result-1 (0-based), push result → γ");
+        J("    dup2\n    l2i\n    iconst_1\n    isub\n");
+        ij_put_int_field("icn_pos");
+        JGoto(ports.γ);
+        return;
+    }
+
+    /* --- built-in tab(n) — one-shot: substring from icn_pos to n-1 (0-based), returns String
+     * Calls icn_builtin_tab_str(n_int, subj, pos) → String or null on failure.
+     * On success: icn_pos = n-1, push String → γ. */
+    if (strcmp(fname, "tab") == 0 && nargs >= 1 && !ij_is_user_proc(fname)) {
+        IcnNode *narg = n->children[1];
+        char after[64], ok[64];
+        snprintf(after, sizeof after, "icn_%d_ta", id);
+        snprintf(ok,    sizeof ok,    "icn_%d_to", id);
+        IjPorts ap; strncpy(ap.γ, after, 63); strncpy(ap.ω, ports.ω, 63);
+        char arg_a[64], arg_b[64];
+        ij_emit_expr(narg, ap, arg_a, arg_b);
+        JL(a); JGoto(arg_a);
+        JL(b); JGoto(ports.ω);
+        JL(after);
+        JC("tab: n (long) on stack");
+        J("    l2i\n");   /* convert long n to int */
+        ij_declare_static_str("icn_subject");
+        ij_declare_static_int("icn_pos");
+        ij_get_str_field("icn_subject");
+        ij_get_int_field("icn_pos");
+        JI("invokestatic", ij_classname_buf("icn_builtin_tab_str(ILjava/lang/String;I)Ljava/lang/String;"));
+        J("    dup\n    ifnonnull %s\n", ok);
+        J("    pop\n"); JGoto(ports.ω);
+        JL(ok);
+        JC("tab ok: advance icn_pos = n-1, push String → γ");
+        /* Helper already updated icn_pos — just push String */
+        JGoto(ports.γ);
+        return;
+    }
+
+    /* --- built-in move(n) — one-shot: substring of length n from icn_pos, returns String
+     * Calls icn_builtin_move_str(n_int, subj, pos) → String or null on failure.
+     * On success: icn_pos = pos+n, push String → γ. */
+    if (strcmp(fname, "move") == 0 && nargs >= 1 && !ij_is_user_proc(fname)) {
+        IcnNode *narg = n->children[1];
+        char after[64], ok[64];
+        snprintf(after, sizeof after, "icn_%d_mva", id);
+        snprintf(ok,    sizeof ok,    "icn_%d_mvo", id);
+        IjPorts ap; strncpy(ap.γ, after, 63); strncpy(ap.ω, ports.ω, 63);
+        char arg_a[64], arg_b[64];
+        ij_emit_expr(narg, ap, arg_a, arg_b);
+        JL(a); JGoto(arg_a);
+        JL(b); JGoto(ports.ω);
+        JL(after);
+        JC("move: n (long) on stack");
+        J("    l2i\n");   /* convert long n to int */
+        ij_declare_static_str("icn_subject");
+        ij_declare_static_int("icn_pos");
+        ij_get_str_field("icn_subject");
+        ij_get_int_field("icn_pos");
+        JI("invokestatic", ij_classname_buf("icn_builtin_move_str(ILjava/lang/String;I)Ljava/lang/String;"));
+        J("    dup\n    ifnonnull %s\n", ok);
+        J("    pop\n"); JGoto(ports.ω);
+        JL(ok);
+        JC("move ok: icn_pos advanced by helper, push String → γ");
+        JGoto(ports.γ);
+        return;
+    }
+
     /* --- user procedure call --- */
     if (ij_is_user_proc(fname)) {
         int is_gen = ij_is_gen_proc(fname);
@@ -1202,11 +1342,18 @@ static int ij_expr_is_string(IcnNode *n) {
         case ICN_CSET:   return 1;  /* cset literal is a String */
         case ICN_CONCAT: return 1;
         case ICN_CALL: {
-            /* write(str_arg) returns its argument — check arg type */
-            if (n->nchildren >= 2) {
+            if (n->nchildren >= 1) {
                 IcnNode *fn = n->children[0];
-                if (fn && fn->kind == ICN_VAR && strcmp(fn->val.sval, "write") == 0)
-                    return ij_expr_is_string(n->children[1]);
+                if (fn && fn->kind == ICN_VAR) {
+                    const char *fn_name = fn->val.sval;
+                    /* write(str_arg) returns its argument */
+                    if (strcmp(fn_name, "write") == 0 && n->nchildren >= 2)
+                        return ij_expr_is_string(n->children[1]);
+                    /* tab/move return String substrings */
+                    if (strcmp(fn_name, "tab") == 0)  return 1;
+                    if (strcmp(fn_name, "move") == 0) return 1;
+                    /* match returns a long position, not a String */
+                }
             }
             return 0;
         }
@@ -1991,9 +2138,11 @@ void ij_emit_file(IcnNode **nodes, int count, FILE *out, const char *filename) {
     int need_scan_builtins = 0;
     for (int i = 0; i < ij_nstatics; i++)
         if (!strncmp(ij_statics[i], "icn_upto_cs_", 12)) { need_scan_builtins = 1; break; }
-    /* Also check if any/many were used (they don't leave a marker; emit always if scan present) */
     for (int i = 0; i < ij_nstatics; i++)
         if (!strcmp(ij_statics[i], "icn_subject")) { need_scan_builtins = 1; break; }
+    /* Also detect find usage (it uses icn_find_s1_N statics) */
+    for (int i = 0; i < ij_nstatics; i++)
+        if (!strncmp(ij_statics[i], "icn_find_s1_", 12)) { need_scan_builtins = 1; break; }
     if (need_scan_builtins) {
         /* icn_builtin_any(String cs, String subj, int pos) → long */
         J(".method public static icn_builtin_any(Ljava/lang/String;Ljava/lang/String;I)J\n");
@@ -2068,6 +2217,76 @@ void ij_emit_file(IcnNode **nodes, int count, FILE *out, const char *filename) {
         J("icn_upto_found:\n");
         J("    ; return pos3+1 (1-based); caller sets icn_pos=result for next resume\n");
         J("    iload_3\n    iconst_1\n    iadd\n    i2l\n    lreturn\n");
+        J(".end method\n\n");
+
+        /* icn_builtin_find(String s1, String s2, int startpos) → long
+         * Returns 1-based index of s1 in s2 starting from startpos (0-based), or -1L. */
+        J(".method public static icn_builtin_find(Ljava/lang/String;Ljava/lang/String;I)J\n");
+        J("    .limit stack 4\n    .limit locals 3\n");
+        J("    aload_1\n    aload_0\n    iload_2\n");
+        J("    invokevirtual java/lang/String/indexOf(Ljava/lang/String;I)I\n");
+        J("    dup\n    ifge icn_find_ok\n");
+        J("    pop\n    ldc2_w -1\n    lreturn\n");
+        J("icn_find_ok:\n");
+        J("    iconst_1\n    iadd\n    i2l\n    lreturn\n");
+        J(".end method\n\n");
+
+        /* icn_builtin_match(String s1, String subj, int pos) → long
+         * If subj starts with s1 at pos, return pos+len(s1)+1 as 1-based new pos; else -1L. */
+        J(".method public static icn_builtin_match(Ljava/lang/String;Ljava/lang/String;I)J\n");
+        J("    .limit stack 4\n    .limit locals 3\n");
+        J("    aload_1\n    aload_0\n    iload_2\n");
+        J("    invokevirtual java/lang/String/startsWith(Ljava/lang/String;I)Z\n");
+        J("    ifne icn_match_ok\n");
+        J("    ldc2_w -1\n    lreturn\n");
+        J("icn_match_ok:\n");
+        J("    iload_2\n    aload_0\n    invokevirtual java/lang/String/length()I\n    iadd\n");
+        J("    iconst_1\n    iadd\n    i2l\n    lreturn\n");
+        J(".end method\n\n");
+
+        /* icn_builtin_tab_str(int n, String subj, int pos) → String or null
+         * n is 1-based target position.  end = n-1 (0-based).
+         * Returns subj.substring(pos, end) and sets icn_pos = end; null on bounds failure. */
+        J(".method public static icn_builtin_tab_str(ILjava/lang/String;I)Ljava/lang/String;\n");
+        J("    .limit stack 4\n    .limit locals 4\n");
+        J("    ; end = n-1 (0-based)\n");
+        J("    iload_0\n    iconst_1\n    isub\n    istore_3\n");
+        J("    ; fail if end < pos\n");
+        J("    iload_3\n    iload_2\n    if_icmpge icn_tab_posok\n");
+        J("    aconst_null\n    areturn\n");
+        J("icn_tab_posok:\n");
+        J("    ; fail if end > subj.length()\n");
+        J("    aload_1\n    invokevirtual java/lang/String/length()I\n");
+        J("    iload_3\n    if_icmpge icn_tab_lenok\n");
+        J("    aconst_null\n    areturn\n");
+        J("icn_tab_lenok:\n");
+        J("    ; update icn_pos = end (static field)\n");
+        J("    iload_3\n");
+        J("    putstatic %s/icn_pos I\n", ij_classname);
+        J("    ; return subj.substring(pos, end)\n");
+        J("    aload_1\n    iload_2\n    iload_3\n");
+        J("    invokevirtual java/lang/String/substring(II)Ljava/lang/String;\n");
+        J("    areturn\n");
+        J(".end method\n\n");
+
+        /* icn_builtin_move_str(int n, String subj, int pos) → String or null
+         * Returns subj.substring(pos, pos+n) and sets icn_pos = pos+n; null if out of bounds. */
+        J(".method public static icn_builtin_move_str(ILjava/lang/String;I)Ljava/lang/String;\n");
+        J("    .limit stack 4\n    .limit locals 4\n");
+        J("    ; end = pos+n\n");
+        J("    iload_2\n    iload_0\n    iadd\n    istore_3\n");
+        J("    ; fail if end > subj.length()\n");
+        J("    aload_1\n    invokevirtual java/lang/String/length()I\n");
+        J("    iload_3\n    if_icmpge icn_move_ok\n");
+        J("    aconst_null\n    areturn\n");
+        J("icn_move_ok:\n");
+        J("    ; update icn_pos = end\n");
+        J("    iload_3\n");
+        J("    putstatic %s/icn_pos I\n", ij_classname);
+        J("    ; return subj.substring(pos, end)\n");
+        J("    aload_1\n    iload_2\n    iload_3\n");
+        J("    invokevirtual java/lang/String/substring(II)Ljava/lang/String;\n");
+        J("    areturn\n");
         J(".end method\n\n");
     }
 
