@@ -838,7 +838,7 @@ static void pj_emit_class_header(void) {
 static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
                          int trail_local, int *var_locals, int n_vars,
                          int cut_cs_seal, int cs_local_for_cut,
-                         int *next_local);
+                         int *next_local, const char *lbl_cutγ);
 static void pj_emit_term(EXPR_t *term, int *var_locals, int n_vars);
 static void pj_emit_arith(EXPR_t *e, int *var_locals, int n_vars);
 
@@ -1112,12 +1112,13 @@ static void pj_emit_body(EXPR_t **goals, int ngoals, const char *lbl_γ,
                          int *var_locals, int n_vars, int *next_local,
                          int init_cs_local, int sub_cs_out_local,
                          int cut_cs_seal, int cs_local_for_cut,
-                         const char *lbl_pred_ω);
+                         const char *lbl_pred_ω,
+                         const char *lbl_cutγ);
 
 static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
                          int trail_local, int *var_locals, int n_vars,
                          int cut_cs_seal, int cs_local_for_cut,
-                         int *next_local) {
+                         int *next_local, const char *lbl_cutγ) {
     if (!goal) { JI("goto", lbl_γ); return; }
 
     if (goal->kind == E_CUT) {
@@ -1128,7 +1129,9 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
             J("    ldc %d\n", cut_cs_seal);
             J("    istore %d\n", cs_local_for_cut);
         }
-        JI("goto", lbl_γ);
+        /* Jump to cutgamma label which returns base[nclauses] sentinel,
+         * preventing caller from retrying this predicate. */
+        JI("goto", lbl_cutγ ? lbl_cutγ : lbl_γ);
         return;
     }
 
@@ -1234,7 +1237,7 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
             JI("iconst_0", ""); J("    istore %d\n", sco);
             pj_emit_body(goal->children, nargs, lbl_γ, lbl_ω, lbl_ω,
                          trail_local, var_locals, n_vars, &next_local_tmp,
-                         ics, sco, cut_cs_seal, cs_local_for_cut, NULL);
+                         ics, sco, cut_cs_seal, cs_local_for_cut, NULL, lbl_cutγ);
             return;
         }
         /* ;/2 (now n-ary after lowering) — disjunction: try each branch.
@@ -1256,7 +1259,7 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
                 /* emit condition — success falls through to cond_ok, failure jumps to else */
                 pj_emit_goal(first->children[0], cond_ok, cond_fail,
                              trail_local, var_locals, n_vars,
-                             cut_cs_seal, cs_local_for_cut, next_local);
+                             cut_cs_seal, cs_local_for_cut, next_local, lbl_cutγ);
                 J("%s:\n", cond_ok);
                 /* ITE cut: once condition succeeds, commit — seal the enclosing
                  * clause β so backtrack cannot retry the else branches.
@@ -1275,7 +1278,7 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
                     const char *step_γ = (ti == nthen - 1) ? lbl_γ : tstep_γ;
                     pj_emit_goal(first->children[1 + ti], step_γ, lbl_ω,
                                  trail_local, var_locals, n_vars,
-                                 cut_cs_seal, cs_local_for_cut, next_local);
+                                 cut_cs_seal, cs_local_for_cut, next_local, lbl_cutγ);
                     if (ti < nthen - 1) J("%s:\n", tstep_γ);
                 }
                 J("    goto %s\n", done_lbl);
@@ -1287,7 +1290,7 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
                     const char *fail_to = (bi < nargs - 1) ? next_lbl : lbl_ω;
                     pj_emit_goal(goal->children[bi], lbl_γ, fail_to,
                                  trail_local, var_locals, n_vars,
-                                 cut_cs_seal, cs_local_for_cut, next_local);
+                                 cut_cs_seal, cs_local_for_cut, next_local, lbl_cutγ);
                     if (bi < nargs - 1) {
                         J("    goto %s\n", done_lbl);
                         J("%s:\n", next_lbl);
@@ -1319,13 +1322,13 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
                     pj_emit_body(branch->children, branch->nchildren,
                                  lbl_γ, fail_to, fail_to,
                                  trail_local, var_locals, n_vars, &next_local_disj,
-                                 ics_disj, sco_disj, cut_cs_seal, cs_local_for_cut, NULL);
+                                 ics_disj, sco_disj, cut_cs_seal, cs_local_for_cut, NULL, lbl_cutγ);
                 } else {
                     /* single goal branch */
                     pj_emit_body(&branch, 1,
                                  lbl_γ, fail_to, fail_to,
                                  trail_local, var_locals, n_vars, &next_local_disj,
-                                 ics_disj, sco_disj, cut_cs_seal, cs_local_for_cut, NULL);
+                                 ics_disj, sco_disj, cut_cs_seal, cs_local_for_cut, NULL, lbl_cutγ);
                 }
                 if (bi < nargs - 1) {
                     J("    goto %s\n", done_lbl);
@@ -1345,7 +1348,7 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
             snprintf(cond_ok,   sizeof cond_ok,   "ifthen%d_ok",   uid);
             snprintf(cond_fail, sizeof cond_fail,  "ifthen%d_fail", uid);
             pj_emit_goal(goal->children[0], cond_ok, cond_fail, trail_local, var_locals, n_vars,
-                         cut_cs_seal, cs_local_for_cut, next_local);
+                         cut_cs_seal, cs_local_for_cut, next_local, lbl_cutγ);
             J("%s:\n", cond_ok);
             int nthen = nargs - 1;
             for (int ti = 0; ti < nthen; ti++) {
@@ -1354,7 +1357,7 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
                 const char *step_γ = (ti == nthen - 1) ? lbl_γ : tstep_γ;
                 pj_emit_goal(goal->children[1 + ti], step_γ, lbl_ω,
                              trail_local, var_locals, n_vars,
-                             cut_cs_seal, cs_local_for_cut, next_local);
+                             cut_cs_seal, cs_local_for_cut, next_local, lbl_cutγ);
                 if (ti < nthen - 1) J("%s:\n", tstep_γ);
             }
             J("%s:\n", cond_fail);
@@ -1420,7 +1423,7 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
             J("    invokestatic %s/pj_trail_mark()I\n", pj_classname);
             J("    istore %d\n", scratch_tmark);
             pj_emit_goal(goal->children[0], inner_ok, inner_fail,
-                         trail_local, var_locals, n_vars, cut_cs_seal, cs_local_for_cut, next_local);
+                         trail_local, var_locals, n_vars, cut_cs_seal, cs_local_for_cut, next_local, lbl_cutγ);
             /* Unwind trail on both paths before routing \+ result */
             J("%s:\n", inner_ok);
             J("    iload %d\n", scratch_tmark);
@@ -1702,7 +1705,8 @@ static void pj_emit_body(EXPR_t **goals, int ngoals, const char *lbl_γ,
                          int *var_locals, int n_vars, int *next_local,
                          int init_cs_local, int sub_cs_out_local,
                          int cut_cs_seal, int cs_local_for_cut,
-                         const char *lbl_pred_ω) {
+                         const char *lbl_pred_ω,
+                         const char *lbl_cutγ) {
     if (ngoals == 0) { JI("goto", lbl_γ); return; }
 
     EXPR_t *g = goals[0];
@@ -1711,7 +1715,7 @@ static void pj_emit_body(EXPR_t **goals, int ngoals, const char *lbl_γ,
         pj_emit_body(goals + 1, ngoals - 1, lbl_γ, lbl_ω, lbl_outer_ω,
                      trail_local, var_locals, n_vars, next_local,
                      init_cs_local, sub_cs_out_local,
-                     cut_cs_seal, cs_local_for_cut, lbl_pred_ω);
+                     cut_cs_seal, cs_local_for_cut, lbl_pred_ω, lbl_cutγ);
         return;
     }
 
@@ -1721,12 +1725,15 @@ static void pj_emit_body(EXPR_t **goals, int ngoals, const char *lbl_γ,
             J("    ldc %d\n", cut_cs_seal);
             J("    istore %d\n", cs_local_for_cut);
         }
-        /* Remaining goals after cut: failure goes to predicate omega (skip all clauses). */
+        /* Remaining goals after cut: failure goes to predicate omega.
+         * Success goes to cutgamma which returns base[nclauses] so caller
+         * cannot retry — fixes M-PJ-CUT-UCALL double-output. */
         const char *cut_fail = lbl_pred_ω ? lbl_pred_ω : lbl_outer_ω;
-        pj_emit_body(goals + 1, ngoals - 1, lbl_γ, cut_fail, cut_fail,
+        const char *cut_succ = lbl_cutγ ? lbl_cutγ : lbl_γ;
+        pj_emit_body(goals + 1, ngoals - 1, cut_succ, cut_fail, cut_fail,
                      trail_local, var_locals, n_vars, next_local,
                      init_cs_local, sub_cs_out_local,
-                     cut_cs_seal, cs_local_for_cut, lbl_pred_ω);
+                     cut_cs_seal, cs_local_for_cut, lbl_pred_ω, lbl_cutγ);
         return;
     }
 
@@ -1793,7 +1800,7 @@ static void pj_emit_body(EXPR_t **goals, int ngoals, const char *lbl_γ,
             pj_emit_body(goals + 1, ngoals - 1, lbl_γ, call_β, lbl_outer_ω,
                          trail_local, var_locals, n_vars, next_local,
                          fresh_init, fresh_sub,
-                         cut_cs_seal, cs_local_for_cut, lbl_pred_ω);
+                         cut_cs_seal, cs_local_for_cut, lbl_pred_ω, lbl_cutγ);
             J("%s:\n", call_β);
             /* β port: body conjunction after ucall succeeded has failed.
              * Unwind trail (undo bindings from last solution) then retry the
@@ -1881,12 +1888,12 @@ static void pj_emit_body(EXPR_t **goals, int ngoals, const char *lbl_γ,
                 pj_emit_body(arm->children, arm->nchildren,
                              arm_done, arm_fail[ai], arm_fail[ai],
                              trail_local, var_locals, n_vars, next_local,
-                             ics_arm, sco_arm, cut_cs_seal, cs_local_for_cut, NULL);
+                             ics_arm, sco_arm, cut_cs_seal, cs_local_for_cut, NULL, lbl_cutγ);
             } else {
                 pj_emit_body(&arm, 1,
                              arm_done, arm_fail[ai], arm_fail[ai],
                              trail_local, var_locals, n_vars, next_local,
-                             ics_arm, sco_arm, cut_cs_seal, cs_local_for_cut, NULL);
+                             ics_arm, sco_arm, cut_cs_seal, cs_local_for_cut, NULL, lbl_cutγ);
             }
             J("%s:\n", arm_fail[ai]);
             /* arm failed: fall through to dj_β to try next arm */
@@ -1903,7 +1910,7 @@ static void pj_emit_body(EXPR_t **goals, int ngoals, const char *lbl_γ,
             pj_emit_body(goals + 1, ngoals - 1, lbl_γ, dj_β, lbl_outer_ω,
                          trail_local, var_locals, n_vars, next_local,
                          fresh_init, fresh_sub,
-                         cut_cs_seal, cs_local_for_cut, lbl_pred_ω);
+                         cut_cs_seal, cs_local_for_cut, lbl_pred_ω, lbl_cutγ);
         }
 
         /* β: unwind trail (undo arm bindings), advance to next arm */
@@ -1934,12 +1941,12 @@ static void pj_emit_body(EXPR_t **goals, int ngoals, const char *lbl_γ,
         snprintf(g_γ, sizeof g_γ, "dg%d_gamma", uid);
         snprintf(g_ω, sizeof g_ω, "dg%d_omega", uid);
         pj_emit_goal(g, g_γ, g_ω, trail_local, var_locals, n_vars,
-                     cut_cs_seal, cs_local_for_cut, next_local);
+                     cut_cs_seal, cs_local_for_cut, next_local, lbl_cutγ);
         J("%s:\n", g_γ);
         pj_emit_body(goals + 1, ngoals - 1, lbl_γ, lbl_ω, lbl_outer_ω,
                      trail_local, var_locals, n_vars, next_local,
                      init_cs_local, sub_cs_out_local,
-                     cut_cs_seal, cs_local_for_cut, lbl_pred_ω);
+                     cut_cs_seal, cs_local_for_cut, lbl_pred_ω, lbl_cutγ);
         J("%s:\n", g_ω);
         JI("goto", lbl_ω);
     }
@@ -2327,6 +2334,8 @@ static void pj_emit_choice(EXPR_t *choice) {
             snprintf(α_retry_lbl, sizeof α_retry_lbl, "p_%s_%d_alpha_%d", safe_fn, arity, ci);
             char pred_ω_lbl[128];
             snprintf(pred_ω_lbl, sizeof pred_ω_lbl, "p_%s_%d_omega", safe_fn, arity);
+            char cutγ_lbl[128];
+            snprintf(cutγ_lbl, sizeof cutγ_lbl, "p_%s_%d_cutgamma_%d", safe_fn, arity, ci);
             int next_local = vars_base + n_vars;
             /* PJ-24 fix: body-fail trail unwind.
              * When a body goal fails it jumps to lbl_ω (next clause label).
@@ -2349,7 +2358,7 @@ static void pj_emit_choice(EXPR_t *choice) {
             pj_emit_body(body_goals, nbody, γ_lbl, body_fail_lbl, ω_lbl,
                          trail_local, var_locals, n_vars, &next_local,
                          init_cs_local, sub_cs_out_local,
-                         base[nclauses], cs_local, pred_ω_lbl);
+                         base[nclauses], cs_local, pred_ω_lbl, cutγ_lbl);
             /* body_fail trampoline: unwind this clause's trail, jump to next
              * clause (or predicate omega for the last clause). */
             J("p_%s_%d_bodyfail_%d:\n", safe_fn, arity, ci);
@@ -2378,6 +2387,15 @@ static void pj_emit_choice(EXPR_t *choice) {
         JI("iadd", "");
         JI("invokestatic", "java/lang/Integer/valueOf(I)Ljava/lang/Integer;");
         JI("aastore", "");
+        JI("areturn", "");
+
+        /* cutgamma port: cut fired — return null (same as omega) so the caller's
+         * ifnull check routes to call_omega immediately and does NOT retry.
+         * Returning base[nclauses] was wrong: it got stored as a new cs and
+         * the predicate was re-entered with that cs, causing duplicate output.
+         * M-PJ-CUT-UCALL fix. */
+        J("p_%s_%d_cutgamma_%d:\n", safe_fn, arity, ci);
+        JI("aconst_null", "");
         JI("areturn", "");
 
         free(var_locals);
