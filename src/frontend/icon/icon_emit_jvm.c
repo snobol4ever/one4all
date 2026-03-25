@@ -1835,6 +1835,13 @@ static int ij_expr_is_string(IcnNode *n) {
         }
         case ICN_SUBSCRIPT:
             return 1;  /* s[i] always yields a single-char String */
+        case ICN_SECTION:
+            return 1;  /* s[i:j] always yields a String */
+        case ICN_SEQ_EXPR: {
+            /* Result type is that of the last child */
+            if (n->nchildren >= 1) return ij_expr_is_string(n->children[n->nchildren-1]);
+            return 0;
+        }
         case ICN_VAR: {
             /* &subject keyword is always a String */
             if (strcmp(n->val.sval, "&subject") == 0) return 1;
@@ -2662,6 +2669,205 @@ static void ij_emit_subscript(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
 
 
 /* =========================================================================
+ * ICN_SECTION — s[i:j]  (string section / substring)
+ * 3 children: str, lo, hi  (all 1-based Icon positions)
+ * JCON: ir_a_Sectionop — eval str → lo → hi, then call substring.
+ * Convention: 1-based lo/hi → 0-based lo-1 and hi-1 for Java substring.
+ * Positive i: offset = i-1.  Negative i: offset = length+i.  0 → fail.
+ * One-shot: β → ω.  Result is a String.
+ * ======================================================================= */
+static void ij_emit_section(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
+    int id = ij_new_id(); char a[64], b[64];
+    lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
+    strncpy(oα,a,63); strncpy(oβ,b,63);
+
+    if (n->nchildren < 3) {
+        JL(a); JGoto(ports.ω); JL(b); JGoto(ports.ω); return;
+    }
+    IcnNode *str_child = n->children[0];
+    IcnNode *lo_child  = n->children[1];
+    IcnNode *hi_child  = n->children[2];
+
+    /* Per-site statics */
+    char s_fld[64], lo_fld[64], hi_fld[64];
+    snprintf(s_fld,  sizeof s_fld,  "icn_%d_sec_s",  id);
+    snprintf(lo_fld, sizeof lo_fld, "icn_%d_sec_lo", id);
+    snprintf(hi_fld, sizeof hi_fld, "icn_%d_sec_hi", id);
+    ij_declare_static_str(s_fld);
+    ij_declare_static_int(lo_fld);
+    ij_declare_static_int(hi_fld);
+
+    /* Relay labels */
+    char s_relay[64], lo_relay[64], hi_relay[64], compute[64];
+    snprintf(s_relay,  sizeof s_relay,  "icn_%d_sec_sr",  id);
+    snprintf(lo_relay, sizeof lo_relay, "icn_%d_sec_lor", id);
+    snprintf(hi_relay, sizeof hi_relay, "icn_%d_sec_hir", id);
+    snprintf(compute,  sizeof compute,  "icn_%d_sec_cmp", id);
+
+    /* Helper macro: convert 1-based Icon pos to 0-based Java index,
+       store into a field; fail on 0.  Uses an istore slot. */
+    /* Emit string child */
+    IjPorts sp; strncpy(sp.γ, s_relay, 63); strncpy(sp.ω, ports.ω, 63);
+    char sa[64], sb[64]; ij_emit_expr(str_child, sp, sa, sb);
+
+    /* Emit lo child */
+    IjPorts lp; strncpy(lp.γ, lo_relay, 63); strncpy(lp.ω, ports.ω, 63);
+    char la[64], lb[64]; ij_emit_expr(lo_child, lp, la, lb);
+
+    /* Emit hi child */
+    IjPorts hp; strncpy(hp.γ, hi_relay, 63); strncpy(hp.ω, ports.ω, 63);
+    char ha[64], hb[64]; ij_emit_expr(hi_child, hp, ha, hb);
+
+    /* Inline helper: convert long on stack to 0-based int, store in field.
+       Negative: length+i.  Zero: fail.  Positive: i-1. */
+    /* lo_relay: long lo on stack */
+    char lo_pos[64], lo_neg[64], lo_zero[64];
+    snprintf(lo_pos,  sizeof lo_pos,  "icn_%d_sec_lop", id);
+    snprintf(lo_neg,  sizeof lo_neg,  "icn_%d_sec_lon", id);
+    snprintf(lo_zero, sizeof lo_zero, "icn_%d_sec_loz", id);
+    int lo_slot = ij_locals_alloc_tmp();
+
+    JL(lo_relay);
+    JI("l2i", "");
+    J("    istore %d\n", slot_jvm(lo_slot));
+    J("    iload %d\n",  slot_jvm(lo_slot));
+    J("    ifgt %s\n", lo_pos);
+    J("    iload %d\n",  slot_jvm(lo_slot));
+    J("    iflt %s\n", lo_neg);
+    JL(lo_zero); JGoto(ports.ω);          /* lo == 0 → fail */
+    JL(lo_pos);
+    J("    iload %d\n", slot_jvm(lo_slot));
+    JI("iconst_1", ""); JI("isub", "");    /* lo - 1 */
+    ij_put_int_field(lo_fld);
+    JGoto(ha);
+    JL(lo_neg);
+    ij_get_str_field(s_fld);
+    JI("invokevirtual", "java/lang/String/length()I");
+    J("    iload %d\n", slot_jvm(lo_slot));
+    JI("iadd", "");                        /* length + lo (lo is negative) */
+    ij_put_int_field(lo_fld);
+    JGoto(ha);
+
+    /* hi_relay: long hi on stack */
+    char hi_pos[64], hi_neg[64], hi_zero[64];
+    snprintf(hi_pos,  sizeof hi_pos,  "icn_%d_sec_hip", id);
+    snprintf(hi_neg,  sizeof hi_neg,  "icn_%d_sec_hin", id);
+    snprintf(hi_zero, sizeof hi_zero, "icn_%d_sec_hiz", id);
+    int hi_slot = ij_locals_alloc_tmp();
+
+    JL(hi_relay);
+    JI("l2i", "");
+    J("    istore %d\n", slot_jvm(hi_slot));
+    J("    iload %d\n",  slot_jvm(hi_slot));
+    J("    ifgt %s\n", hi_pos);
+    J("    iload %d\n",  slot_jvm(hi_slot));
+    J("    iflt %s\n", hi_neg);
+    JL(hi_zero); JGoto(ports.ω);          /* hi == 0 is valid: s[1:0] = "" but map to empty */
+    JL(hi_pos);
+    J("    iload %d\n", slot_jvm(hi_slot));
+    JI("iconst_1", ""); JI("isub", "");    /* hi - 1 */
+    ij_put_int_field(hi_fld);
+    JGoto(compute);
+    JL(hi_neg);
+    ij_get_str_field(s_fld);
+    JI("invokevirtual", "java/lang/String/length()I");
+    J("    iload %d\n", slot_jvm(hi_slot));
+    JI("iadd", "");
+    ij_put_int_field(hi_fld);
+    JGoto(compute);
+
+    /* compute: bounds check then substring(lo_0based, hi_0based) */
+    JL(compute);
+    /* if lo > hi → empty string (valid in Icon: s[3:2] = "") */
+    /* if lo < 0 or hi < 0 → fail */
+    ij_get_int_field(lo_fld);
+    J("    iflt %s\n", ports.ω);
+    ij_get_int_field(hi_fld);
+    J("    iflt %s\n", ports.ω);
+    /* if lo > length → fail */
+    ij_get_str_field(s_fld);
+    JI("invokevirtual", "java/lang/String/length()I");
+    ij_get_int_field(lo_fld);
+    JI("if_icmplt", ports.ω);             /* length < lo → fail */
+    /* clamp hi to length */
+    int len_slot = ij_locals_alloc_tmp();
+    ij_get_str_field(s_fld);
+    JI("invokevirtual", "java/lang/String/length()I");
+    J("    istore %d\n", slot_jvm(len_slot));
+    ij_get_int_field(hi_fld);
+    J("    iload %d\n", slot_jvm(len_slot));
+    char hi_ok[64]; snprintf(hi_ok, sizeof hi_ok, "icn_%d_sec_hiok", id);
+    J("    if_icmple %s\n", hi_ok);
+    /* hi > length: clamp */
+    J("    iload %d\n", slot_jvm(len_slot));
+    ij_put_int_field(hi_fld);
+    JL(hi_ok);
+    /* substring(lo_0based, hi_0based) — Java substring end is exclusive,
+       Icon hi is already the exclusive end after our -1 conversion */
+    ij_get_str_field(s_fld);
+    ij_get_int_field(lo_fld);
+    ij_get_int_field(hi_fld);
+    JI("invokevirtual", "java/lang/String/substring(II)Ljava/lang/String;");
+    JGoto(ports.γ);
+
+    /* α: eval str → lo → hi */
+    JL(a);  JGoto(sa);
+    JL(s_relay); ij_put_str_field(s_fld); JGoto(la);
+    /* β: one-shot → ω */
+    JL(b);  JGoto(ports.ω);
+}
+
+/* =========================================================================
+ * ICN_SEQ_EXPR — (E1; E2; ... En)  expression sequence
+ * Semantics: evaluate E1..E(n-1), discard results, then E_n — its
+ * success/failure is the result of the whole expression.
+ * Wiring: identical to ICN_AND (ir_conjunction) — drain intermediates,
+ * last child's γ/ω flow to ports.γ/ω.  β → last child's β.
+ * ======================================================================= */
+static void ij_emit_seq_expr(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
+    int nc = n->nchildren;
+    if (nc == 0) { /* degenerate */
+        int id = ij_new_id(); char a[64], b[64];
+        lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
+        strncpy(oα,a,63); strncpy(oβ,b,63);
+        JL(a); JI("lconst_0",""); JGoto(ports.γ);
+        JL(b); JGoto(ports.ω);
+        return;
+    }
+    if (nc == 1) {
+        ij_emit_expr(n->children[0], ports, oα, oβ);
+        return;
+    }
+    /* n >= 2: same relay-label pattern as ICN_AND */
+    int cid = ij_new_id(); char ca2[64], cb2[64];
+    lbl_α(cid,ca2,sizeof ca2); lbl_β(cid,cb2,sizeof cb2);
+    strncpy(oα,ca2,63); strncpy(oβ,cb2,63);
+    char (*cca)[64] = malloc(nc * 64);
+    char (*ccb)[64] = malloc(nc * 64);
+    char (*relay_g)[64] = malloc(nc * 64);
+    for (int i = 0; i < nc; i++) {
+        snprintf(relay_g[i], 64, "icn_%d_seq_rg_%d", cid, i);
+        cca[i][0] = '\0'; ccb[i][0] = '\0';
+    }
+    for (int i = 0; i < nc; i++) {
+        IjPorts ep;
+        strncpy(ep.γ, (i == nc-1) ? ports.γ : relay_g[i], 63);
+        strncpy(ep.ω, (i == 0)    ? ports.ω  : ccb[i-1],  63);
+        ij_emit_expr(n->children[i], ep, cca[i], ccb[i]);
+    }
+    /* relay trampolines: drain Ei.γ result, jump to E(i+1).α */
+    for (int i = 0; i < nc-1; i++) {
+        JL(relay_g[i]);
+        int child_is_str = ij_expr_is_string(n->children[i]);
+        JI(child_is_str ? "pop" : "pop2", "");
+        JGoto(cca[i+1]);
+    }
+    JL(ca2); JGoto(cca[0]);
+    JL(cb2); JGoto(ccb[nc-1]);
+    free(cca); free(ccb); free(relay_g);
+}
+
+/* =========================================================================
  * ICN_SWAP — E1 :=: E2  (swap values of two variables)
  * Semantics: atomically exchange values of lhs and rhs variables.
  * Returns the new value of E1 (Icon :=: returns lhs after swap).
@@ -2810,6 +3016,8 @@ static void ij_emit_expr(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         case ICN_LCONCAT: ij_emit_concat   (n,ports,oα,oβ); break; /* Tiny-ICON: ||| = || */
         case ICN_SWAP:    ij_emit_swap      (n,ports,oα,oβ); break;
         case ICN_SUBSCRIPT: ij_emit_subscript(n,ports,oα,oβ); break;
+        case ICN_SECTION: ij_emit_section   (n,ports,oα,oβ); break;
+        case ICN_SEQ_EXPR: ij_emit_seq_expr (n,ports,oα,oβ); break;
         case ICN_LT: case ICN_LE: case ICN_GT: case ICN_GE: case ICN_EQ: case ICN_NE:
                           ij_emit_relop    (n,ports,oα,oβ); break;
         case ICN_TO:      ij_emit_to       (n,ports,oα,oβ); break;
