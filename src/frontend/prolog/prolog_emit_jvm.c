@@ -859,6 +859,298 @@ static void pj_emit_runtime_helpers(void) {
     JI("dup", ""); JI("bipush", "3"); JI("aload_3", ""); JI("aastore", "");
     JI("areturn", "");
     J(".end method\n\n");
+
+    /* ------------------------------------------------------------------
+     * M-PJ-ATOM-BUILTINS — PJ-48 runtime helpers
+     * ------------------------------------------------------------------ */
+
+    /* pj_atom_name(Object term) → String
+     * Extracts the name string from an ATOM or INT term.
+     * For INT: converts to decimal string. For ATOM: returns field[1].
+     * local 0 = term */
+    J(".method static pj_atom_name(Ljava/lang/Object;)Ljava/lang/String;\n");
+    J("    .limit stack 4\n");
+    J("    .limit locals 2\n");
+    JI("aload_0", "");
+    J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("astore_0", "");
+    /* check tag */
+    JI("aload_0", ""); JI("iconst_0", ""); JI("aaload", "");
+    JI("ldc", "\"int\"");
+    JI("invokevirtual", "java/lang/Object/equals(Ljava/lang/Object;)Z");
+    JI("ifeq", "pan_atom");
+    /* INT: field[1] is a Long — toString */
+    JI("aload_0", ""); JI("iconst_1", ""); JI("aaload", "");
+    JI("checkcast", "java/lang/Long");
+    JI("invokevirtual", "java/lang/Long/longValue()J");
+    JI("invokestatic", "java/lang/Long/toString(J)Ljava/lang/String;");
+    JI("areturn", "");
+    J("pan_atom:\n");
+    /* ATOM: field[1] is the name String */
+    JI("aload_0", ""); JI("iconst_1", ""); JI("aaload", "");
+    JI("checkcast", "java/lang/String");
+    JI("areturn", "");
+    J(".end method\n\n");
+
+    /* pj_int_val(Object term) → J
+     * Extracts the long value from an INT term. */
+    J(".method static pj_int_val(Ljava/lang/Object;)J\n");
+    J("    .limit stack 3\n");
+    J("    .limit locals 2\n");
+    JI("aload_0", "");
+    J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("iconst_1", ""); JI("aaload", "");
+    JI("checkcast", "java/lang/Long");
+    JI("invokevirtual", "java/lang/Long/longValue()J");
+    JI("lreturn", "");
+    J(".end method\n\n");
+
+    /* pj_string_to_char_list(String s) → Object[] list
+     * Builds a Prolog list of single-char atoms from a String.
+     * local 0=s, 1=len(I), 2=i(I), 3=list(Object[]), 4=char_atom(Object[]) */
+    J(".method static pj_string_to_char_list(Ljava/lang/String;)[Ljava/lang/Object;\n");
+    J("    .limit stack 8\n");
+    J("    .limit locals 5\n");
+    JI("aload_0", "");
+    JI("invokevirtual", "java/lang/String/length()I");
+    JI("istore_1", "");
+    /* list = nil */
+    JI("ldc", "\"[]\"");
+    J("    invokestatic %s/pj_term_atom(Ljava/lang/String;)[Ljava/lang/Object;\n", pj_classname);
+    JI("astore_3", "");
+    /* loop i from len-1 down to 0 */
+    JI("iload_1", ""); JI("iconst_1", ""); JI("isub", ""); JI("istore_2", "");
+    J("scl_loop:\n");
+    JI("iload_2", ""); JI("iflt", "scl_done");
+    /* char_atom = pj_term_atom(String.valueOf(s.charAt(i))) */
+    JI("aload_0", ""); JI("iload_2", "");
+    JI("invokevirtual", "java/lang/String/charAt(I)C");
+    JI("invokestatic", "java/lang/String/valueOf(C)Ljava/lang/String;");
+    J("    invokestatic %s/pj_term_atom(Ljava/lang/String;)[Ljava/lang/Object;\n", pj_classname);
+    JI("astore", "4");
+    /* cons = {"compound", ".", char_atom, list} */
+    JI("bipush", "4"); JI("anewarray", "java/lang/Object");
+    JI("dup", ""); JI("iconst_0", ""); JI("ldc", "\"compound\""); JI("aastore", "");
+    JI("dup", ""); JI("iconst_1", ""); JI("ldc", "\".\""); JI("aastore", "");
+    JI("dup", ""); JI("iconst_2", ""); JI("aload", "4"); JI("aastore", "");
+    JI("dup", ""); JI("bipush", "3"); JI("aload_3", ""); JI("aastore", "");
+    JI("astore_3", "");
+    JI("iinc", "2 -1");
+    JI("goto", "scl_loop");
+    J("scl_done:\n");
+    JI("aload_3", ""); JI("areturn", "");
+    J(".end method\n\n");
+
+    /* pj_string_to_code_list(String s) → Object[] list of INT code terms */
+    J(".method static pj_string_to_code_list(Ljava/lang/String;)[Ljava/lang/Object;\n");
+    J("    .limit stack 8\n");
+    J("    .limit locals 5\n");
+    JI("aload_0", "");
+    JI("invokevirtual", "java/lang/String/length()I");
+    JI("istore_1", "");
+    JI("ldc", "\"[]\"");
+    J("    invokestatic %s/pj_term_atom(Ljava/lang/String;)[Ljava/lang/Object;\n", pj_classname);
+    JI("astore_3", "");
+    JI("iload_1", ""); JI("iconst_1", ""); JI("isub", ""); JI("istore_2", "");
+    J("scol_loop:\n");
+    JI("iload_2", ""); JI("iflt", "scol_done");
+    JI("aload_0", ""); JI("iload_2", "");
+    JI("invokevirtual", "java/lang/String/charAt(I)C");
+    JI("i2l", "");
+    J("    invokestatic %s/pj_term_int(J)[Ljava/lang/Object;\n", pj_classname);
+    JI("astore", "4");
+    JI("bipush", "4"); JI("anewarray", "java/lang/Object");
+    JI("dup", ""); JI("iconst_0", ""); JI("ldc", "\"compound\""); JI("aastore", "");
+    JI("dup", ""); JI("iconst_1", ""); JI("ldc", "\".\""); JI("aastore", "");
+    JI("dup", ""); JI("iconst_2", ""); JI("aload", "4"); JI("aastore", "");
+    JI("dup", ""); JI("bipush", "3"); JI("aload_3", ""); JI("aastore", "");
+    JI("astore_3", "");
+    JI("iinc", "2 -1");
+    JI("goto", "scol_loop");
+    J("scol_done:\n");
+    JI("aload_3", ""); JI("areturn", "");
+    J(".end method\n\n");
+
+    /* pj_atom_chars_2(Object atom_or_var, Object list_or_var) → Z
+     * Both-direction: if atom bound → build char list and unify.
+     *                 if atom unbound → read list → build string → unify atom.
+     * local 0=atom, 1=list, 2=da(Object[]), 3=dl(Object[]) */
+    J(".method static pj_atom_chars_2(Ljava/lang/Object;Ljava/lang/Object;)Z\n");
+    J("    .limit stack 8\n");
+    J("    .limit locals 6\n");
+    JI("aload_0", "");
+    J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("astore_2", "");
+    /* check if atom is bound (tag != "var") */
+    JI("aload_2", ""); JI("iconst_0", ""); JI("aaload", "");
+    JI("ldc", "\"var\"");
+    JI("invokevirtual", "java/lang/Object/equals(Ljava/lang/Object;)Z");
+    JI("ifne", "ac2_reverse");
+    /* forward: atom→chars */
+    J("    invokestatic %s/pj_atom_name(Ljava/lang/Object;)Ljava/lang/String;\n", pj_classname);
+    /* we still have the deref'd term on stack? No — we need to reload */
+    /* actually: call pj_atom_name with aload_2 */
+    /* Fix: redo with aload_2 */
+    JI("pop", "");
+    JI("aload_2", "");
+    J("    invokestatic %s/pj_atom_name(Ljava/lang/Object;)Ljava/lang/String;\n", pj_classname);
+    J("    invokestatic %s/pj_string_to_char_list(Ljava/lang/String;)[Ljava/lang/Object;\n", pj_classname);
+    JI("aload_1", "");
+    J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+    JI("ireturn", "");
+    J("ac2_reverse:\n");
+    /* reverse: list of char atoms → concat → unify with atom arg */
+    JI("aload_1", "");
+    J("    invokestatic %s/pj_char_list_to_string(Ljava/lang/Object;)Ljava/lang/String;\n", pj_classname);
+    J("    invokestatic %s/pj_term_atom(Ljava/lang/String;)[Ljava/lang/Object;\n", pj_classname);
+    JI("aload_0", "");
+    J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+    JI("ireturn", "");
+    J(".end method\n\n");
+
+    /* pj_atom_codes_2(Object atom_or_var, Object list_or_var) → Z */
+    J(".method static pj_atom_codes_2(Ljava/lang/Object;Ljava/lang/Object;)Z\n");
+    J("    .limit stack 8\n");
+    J("    .limit locals 4\n");
+    JI("aload_0", "");
+    J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("astore_2", "");
+    JI("aload_2", ""); JI("iconst_0", ""); JI("aaload", "");
+    JI("ldc", "\"var\"");
+    JI("invokevirtual", "java/lang/Object/equals(Ljava/lang/Object;)Z");
+    JI("ifne", "acd2_reverse");
+    /* forward: atom→codes */
+    JI("aload_2", "");
+    J("    invokestatic %s/pj_atom_name(Ljava/lang/Object;)Ljava/lang/String;\n", pj_classname);
+    J("    invokestatic %s/pj_string_to_code_list(Ljava/lang/String;)[Ljava/lang/Object;\n", pj_classname);
+    JI("aload_1", "");
+    J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+    JI("ireturn", "");
+    J("acd2_reverse:\n");
+    JI("aload_1", "");
+    J("    invokestatic %s/pj_code_list_to_string(Ljava/lang/Object;)Ljava/lang/String;\n", pj_classname);
+    J("    invokestatic %s/pj_term_atom(Ljava/lang/String;)[Ljava/lang/Object;\n", pj_classname);
+    JI("aload_0", "");
+    J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+    JI("ireturn", "");
+    J(".end method\n\n");
+
+    /* pj_char_code_2(Object char_or_var, Object code_or_var) → Z */
+    J(".method static pj_char_code_2(Ljava/lang/Object;Ljava/lang/Object;)Z\n");
+    J("    .limit stack 8\n");
+    J("    .limit locals 4\n");
+    JI("aload_0", "");
+    J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("astore_2", "");
+    JI("aload_2", ""); JI("iconst_0", ""); JI("aaload", "");
+    JI("ldc", "\"var\"");
+    JI("invokevirtual", "java/lang/Object/equals(Ljava/lang/Object;)Z");
+    JI("ifne", "cc2_reverse");
+    /* forward: char atom → code int */
+    JI("aload_2", "");
+    J("    invokestatic %s/pj_atom_name(Ljava/lang/Object;)Ljava/lang/String;\n", pj_classname);
+    JI("iconst_0", "");
+    JI("invokevirtual", "java/lang/String/charAt(I)C");
+    JI("i2l", "");
+    J("    invokestatic %s/pj_term_int(J)[Ljava/lang/Object;\n", pj_classname);
+    JI("aload_1", "");
+    J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+    JI("ireturn", "");
+    J("cc2_reverse:\n");
+    /* reverse: code → char atom */
+    JI("aload_1", "");
+    J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    J("    invokestatic %s/pj_int_val(Ljava/lang/Object;)J\n", pj_classname);
+    JI("l2i", "");
+    JI("invokestatic", "java/lang/String/valueOf(C)Ljava/lang/String;");
+    J("    invokestatic %s/pj_term_atom(Ljava/lang/String;)[Ljava/lang/Object;\n", pj_classname);
+    JI("aload_0", "");
+    J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+    JI("ireturn", "");
+    J(".end method\n\n");
+
+    /* pj_char_list_to_string(Object list) → String
+     * Walk a Prolog list of char atoms, concat chars into StringBuilder. */
+    J(".method static pj_char_list_to_string(Ljava/lang/Object;)Ljava/lang/String;\n");
+    J("    .limit stack 6\n");
+    J("    .limit locals 3\n");
+    JI("new", "java/lang/StringBuilder");
+    JI("dup", "");
+    JI("invokespecial", "java/lang/StringBuilder/<init>()V");
+    JI("astore_1", "");
+    JI("aload_0", "");
+    J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    JI("astore_2", "");
+    J("clts_loop:\n");
+    /* check if nil */
+    JI("aload_2", ""); JI("checkcast", "[Ljava/lang/Object;");
+    JI("iconst_1", ""); JI("aaload", "");  /* functor or name */
+    JI("ldc", "\"[]\"");
+    JI("invokevirtual", "java/lang/Object/equals(Ljava/lang/Object;)Z");
+    JI("ifne", "clts_done");
+    /* head = args[0] = field[2] */
+    JI("aload_2", ""); JI("checkcast", "[Ljava/lang/Object;");
+    JI("iconst_2", ""); JI("aaload", "");
+    J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    J("    invokestatic %s/pj_atom_name(Ljava/lang/Object;)Ljava/lang/String;\n", pj_classname);
+    JI("aload_1", ""); JI("swap", "");
+    JI("invokevirtual", "java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;");
+    JI("pop", "");
+    /* tail = args[1] = field[3] */
+    JI("aload_2", ""); JI("checkcast", "[Ljava/lang/Object;");
+    JI("bipush", "3"); JI("aaload", "");
+    J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    JI("astore_2", "");
+    JI("goto", "clts_loop");
+    J("clts_done:\n");
+    JI("aload_1", "");
+    JI("invokevirtual", "java/lang/StringBuilder/toString()Ljava/lang/String;");
+    JI("areturn", "");
+    J(".end method\n\n");
+
+    /* pj_code_list_to_string(Object list) → String
+     * Walk a Prolog list of INT code terms, build string from char codes. */
+    J(".method static pj_code_list_to_string(Ljava/lang/Object;)Ljava/lang/String;\n");
+    J("    .limit stack 6\n");
+    J("    .limit locals 3\n");
+    JI("new", "java/lang/StringBuilder");
+    JI("dup", "");
+    JI("invokespecial", "java/lang/StringBuilder/<init>()V");
+    JI("astore_1", "");
+    JI("aload_0", "");
+    J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    JI("astore_2", "");
+    J("colts_loop:\n");
+    JI("aload_2", ""); JI("checkcast", "[Ljava/lang/Object;");
+    JI("iconst_1", ""); JI("aaload", "");
+    JI("ldc", "\"[]\"");
+    JI("invokevirtual", "java/lang/Object/equals(Ljava/lang/Object;)Z");
+    JI("ifne", "colts_done");
+    /* head code */
+    JI("aload_2", ""); JI("checkcast", "[Ljava/lang/Object;");
+    JI("iconst_2", ""); JI("aaload", "");
+    J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    J("    invokestatic %s/pj_int_val(Ljava/lang/Object;)J\n", pj_classname);
+    JI("l2i", ""); JI("i2c", "");
+    JI("aload_1", ""); JI("swap", "");
+    JI("invokevirtual", "java/lang/StringBuilder/append(C)Ljava/lang/StringBuilder;");
+    JI("pop", "");
+    /* tail */
+    JI("aload_2", ""); JI("checkcast", "[Ljava/lang/Object;");
+    JI("bipush", "3"); JI("aaload", "");
+    J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    JI("astore_2", "");
+    JI("goto", "colts_loop");
+    J("colts_done:\n");
+    JI("aload_1", "");
+    JI("invokevirtual", "java/lang/StringBuilder/toString()Ljava/lang/String;");
+    JI("areturn", "");
+    J(".end method\n\n");
 }
 
 /* -------------------------------------------------------------------------
@@ -1346,6 +1638,146 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
             JI("goto", lbl_γ);
             return;
         }
+        /* ------------------------------------------------------------------ *
+         * M-PJ-ATOM-BUILTINS — PJ-48
+         * All atom/string builtins are JVM String operations.
+         * Pattern: deref the bound arg → extract String → operate → box result
+         * as a PlTerm atom → unify with the output variable.
+         * pj_term_atom(String) → Object[]   (tag=ATOM, name=String)
+         * pj_term_int(long)    → Object[]   (tag=INT, val=long)
+         * pj_unify(a,b)        → Z
+         * pj_deref(Object)     → Object   (follow REF chain)
+         * pj_atom_name(Object) → String   (extract name field from ATOM term)
+         * pj_int_val(Object)   → J        (extract val field from INT term)
+         * pj_term_list_chars(String) → Object[]  (build char-atom list)
+         * pj_term_list_codes(String) → Object[]  (build int-code list)
+         * pj_list_to_string(Object)  → String    (build String from char/code list)
+         * ------------------------------------------------------------------ */
+
+        /* atom_length(+Atom, ?Length) */
+        if (strcmp(fn, "atom_length") == 0 && nargs == 2) {
+            int uid = pj_fresh_label();
+            char ok[64]; snprintf(ok, sizeof ok, "atlen%d_ok", uid);
+            /* deref arg0, extract atom name string, call .length() */
+            pj_emit_term(goal->children[0], var_locals, n_vars);
+            J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+            J("    invokestatic %s/pj_atom_name(Ljava/lang/Object;)Ljava/lang/String;\n", pj_classname);
+            J("    invokevirtual java/lang/String/length()I\n");
+            J("    i2l\n");
+            J("    invokestatic %s/pj_term_int(J)[Ljava/lang/Object;\n", pj_classname);
+            /* unify result with arg1 */
+            pj_emit_term(goal->children[1], var_locals, n_vars);
+            J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+            J("    ifeq %s\n", lbl_ω);
+            JI("goto", lbl_γ);
+            return;
+        }
+
+        /* atom_concat(+A, +B, ?C) */
+        if (strcmp(fn, "atom_concat") == 0 && nargs == 3) {
+            /* extract A name, extract B name, concatenate, box as atom, unify with C */
+            pj_emit_term(goal->children[0], var_locals, n_vars);
+            J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+            J("    invokestatic %s/pj_atom_name(Ljava/lang/Object;)Ljava/lang/String;\n", pj_classname);
+            pj_emit_term(goal->children[1], var_locals, n_vars);
+            J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+            J("    invokestatic %s/pj_atom_name(Ljava/lang/Object;)Ljava/lang/String;\n", pj_classname);
+            J("    invokevirtual java/lang/String/concat(Ljava/lang/String;)Ljava/lang/String;\n");
+            J("    invokestatic %s/pj_term_atom(Ljava/lang/String;)[Ljava/lang/Object;\n", pj_classname);
+            pj_emit_term(goal->children[2], var_locals, n_vars);
+            J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+            J("    ifeq %s\n", lbl_ω);
+            JI("goto", lbl_γ);
+            return;
+        }
+
+        /* atom_chars(+Atom, ?Chars) or atom_chars(?Atom, +Chars)
+         * Direction detected at runtime via pj_atom_chars_2 helper. */
+        if (strcmp(fn, "atom_chars") == 0 && nargs == 2) {
+            pj_emit_term(goal->children[0], var_locals, n_vars);
+            pj_emit_term(goal->children[1], var_locals, n_vars);
+            J("    invokestatic %s/pj_atom_chars_2(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+            J("    ifeq %s\n", lbl_ω);
+            JI("goto", lbl_γ);
+            return;
+        }
+
+        /* atom_codes(+Atom, ?Codes) or atom_codes(?Atom, +Codes) */
+        if (strcmp(fn, "atom_codes") == 0 && nargs == 2) {
+            pj_emit_term(goal->children[0], var_locals, n_vars);
+            pj_emit_term(goal->children[1], var_locals, n_vars);
+            J("    invokestatic %s/pj_atom_codes_2(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+            J("    ifeq %s\n", lbl_ω);
+            JI("goto", lbl_γ);
+            return;
+        }
+
+        /* number_chars(+Number, ?Chars) — one-directional (+N → chars) */
+        if (strcmp(fn, "number_chars") == 0 && nargs == 2) {
+            pj_emit_term(goal->children[0], var_locals, n_vars);
+            J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+            J("    invokestatic %s/pj_int_val(Ljava/lang/Object;)J\n", pj_classname);
+            J("    invokestatic java/lang/Long/toString(J)Ljava/lang/String;\n");
+            J("    invokestatic %s/pj_string_to_char_list(Ljava/lang/String;)[Ljava/lang/Object;\n", pj_classname);
+            pj_emit_term(goal->children[1], var_locals, n_vars);
+            J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+            J("    ifeq %s\n", lbl_ω);
+            JI("goto", lbl_γ);
+            return;
+        }
+
+        /* number_codes(+Number, ?Codes) — one-directional */
+        if (strcmp(fn, "number_codes") == 0 && nargs == 2) {
+            pj_emit_term(goal->children[0], var_locals, n_vars);
+            J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+            J("    invokestatic %s/pj_int_val(Ljava/lang/Object;)J\n", pj_classname);
+            J("    invokestatic java/lang/Long/toString(J)Ljava/lang/String;\n");
+            J("    invokestatic %s/pj_string_to_code_list(Ljava/lang/String;)[Ljava/lang/Object;\n", pj_classname);
+            pj_emit_term(goal->children[1], var_locals, n_vars);
+            J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+            J("    ifeq %s\n", lbl_ω);
+            JI("goto", lbl_γ);
+            return;
+        }
+
+        /* char_code(+Char, ?Code) or char_code(?Char, +Code) */
+        if (strcmp(fn, "char_code") == 0 && nargs == 2) {
+            pj_emit_term(goal->children[0], var_locals, n_vars);
+            pj_emit_term(goal->children[1], var_locals, n_vars);
+            J("    invokestatic %s/pj_char_code_2(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+            J("    ifeq %s\n", lbl_ω);
+            JI("goto", lbl_γ);
+            return;
+        }
+
+        /* upcase_atom(+Atom, ?Upper) */
+        if (strcmp(fn, "upcase_atom") == 0 && nargs == 2) {
+            pj_emit_term(goal->children[0], var_locals, n_vars);
+            J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+            J("    invokestatic %s/pj_atom_name(Ljava/lang/Object;)Ljava/lang/String;\n", pj_classname);
+            J("    invokevirtual java/lang/String/toUpperCase()Ljava/lang/String;\n");
+            J("    invokestatic %s/pj_term_atom(Ljava/lang/String;)[Ljava/lang/Object;\n", pj_classname);
+            pj_emit_term(goal->children[1], var_locals, n_vars);
+            J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+            J("    ifeq %s\n", lbl_ω);
+            JI("goto", lbl_γ);
+            return;
+        }
+
+        /* downcase_atom(+Atom, ?Lower) */
+        if (strcmp(fn, "downcase_atom") == 0 && nargs == 2) {
+            pj_emit_term(goal->children[0], var_locals, n_vars);
+            J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+            J("    invokestatic %s/pj_atom_name(Ljava/lang/Object;)Ljava/lang/String;\n", pj_classname);
+            J("    invokevirtual java/lang/String/toLowerCase()Ljava/lang/String;\n");
+            J("    invokestatic %s/pj_term_atom(Ljava/lang/String;)[Ljava/lang/Object;\n", pj_classname);
+            pj_emit_term(goal->children[1], var_locals, n_vars);
+            J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+            J("    ifeq %s\n", lbl_ω);
+            JI("goto", lbl_γ);
+            return;
+        }
+
         /* ,/2 (now n-ary after lowering) — conjunction.
          * All children are conjuncts; pass directly to pj_emit_body. */
         if (strcmp(fn, ",") == 0 && nargs >= 1) {
