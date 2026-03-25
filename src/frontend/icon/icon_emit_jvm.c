@@ -280,6 +280,37 @@ static void ij_declare_static_str(const char *name) {
 }
 
 /* =========================================================================
+ * Table default-value field map.
+ * Maps table-variable field name → dflt Object static field name.
+ * Populated by the table(dflt) emitter; consumed by ij_emit_subscript.
+ * ij_pending_tdflt: set by table() emitter so assign store can register map.
+ * ======================================================================= */
+#define MAX_TBL_DFLT 64
+static char ij_tdflt_tbl[MAX_TBL_DFLT][80];   /* table var field name   */
+static char ij_tdflt_fld[MAX_TBL_DFLT][80];   /* dflt Object field name */
+static int  ij_ntdflt = 0;
+static char ij_pending_tdflt[80] = "";         /* set by table() emitter */
+
+static void ij_register_tdflt(const char *tbl_field, const char *dflt_field) {
+    for (int i = 0; i < ij_ntdflt; i++)
+        if (!strcmp(ij_tdflt_tbl[i], tbl_field)) {
+            strncpy(ij_tdflt_fld[i], dflt_field, 79); return;
+        }
+    if (ij_ntdflt < MAX_TBL_DFLT) {
+        strncpy(ij_tdflt_tbl[ij_ntdflt], tbl_field, 79);
+        strncpy(ij_tdflt_fld[ij_ntdflt], dflt_field, 79);
+        ij_ntdflt++;
+    }
+}
+
+/* Returns the dflt field for tbl_field, or NULL if not registered. */
+static const char *ij_lookup_tdflt(const char *tbl_field) {
+    for (int i = 0; i < ij_ntdflt; i++)
+        if (!strcmp(ij_tdflt_tbl[i], tbl_field)) return ij_tdflt_fld[i];
+    return NULL;
+}
+
+/* =========================================================================
  * Global variable name registry — separate from statics.
  * Pass 0 registers names here WITHOUT pre-declaring a field type.
  * Type is inferred naturally on first assignment (same as locals).
@@ -634,6 +665,78 @@ static void ij_emit_assign(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         strncpy(oα,a,63); strncpy(oβ,b,63);
         JL(a); JGoto(ports.ω); JL(b); JGoto(ports.ω); return;
     }
+
+    /* -----------------------------------------------------------------------
+     * EARLY EXIT: t[k] := v   (subscript-LHS table assignment)
+     * Handle this BEFORE any generic emit to avoid mid-relay stack confusion.
+     * Flow: eval v → v_relay → box+save; eval k → k_relay → str-convert+save;
+     *       load T; load k_str; load v_obj; HashMap.put; pop; load v_long → γ
+     * --------------------------------------------------------------------- */
+    {
+        IcnNode *lhs = n->children[0];
+        IcnNode *rhs = n->children[1];
+        if (lhs && lhs->kind == ICN_SUBSCRIPT && lhs->nchildren >= 2
+                && ij_expr_is_table(lhs->children[0])) {
+            IcnNode *tvar  = lhs->children[0];
+            IcnNode *kexpr = lhs->children[1];
+            int sid = ij_new_id();
+            char a[64], b[64]; lbl_α(sid,a,sizeof a); lbl_β(sid,b,sizeof b);
+            strncpy(oα,a,63); strncpy(oβ,b,63);
+
+            char v_relay[64]; snprintf(v_relay, sizeof v_relay, "icn_%d_tsa_vr", sid);
+            char k_relay[64]; snprintf(k_relay, sizeof k_relay, "icn_%d_tsa_kr", sid);
+            char do_put[64];  snprintf(do_put,  sizeof do_put,  "icn_%d_tsa_put",sid);
+            char val_long_fld[80]; snprintf(val_long_fld, sizeof val_long_fld, "icn_%d_tsa_vl", sid);
+            char val_obj_fld[80];  snprintf(val_obj_fld,  sizeof val_obj_fld,  "icn_%d_tsa_vo", sid);
+            char k_str_fld[80];    snprintf(k_str_fld,    sizeof k_str_fld,    "icn_%d_tsa_ks", sid);
+            ij_declare_static(val_long_fld);
+            ij_declare_static_obj(val_obj_fld);
+            ij_declare_static_str(k_str_fld);
+
+            /* Emit RHS v */
+            IjPorts vp; strncpy(vp.γ, v_relay, 63); strncpy(vp.ω, ports.ω, 63);
+            char va[64], vb[64]; ij_emit_expr(rhs, vp, va, vb);
+
+            /* Emit key k */
+            IjPorts kp; strncpy(kp.γ, k_relay, 63); strncpy(kp.ω, ports.ω, 63);
+            char ka[64], kb[64]; ij_emit_expr(kexpr, kp, ka, kb);
+
+            /* α/β entry points */
+            JL(a); JGoto(va);
+            JL(b); JGoto(ports.ω);
+
+            /* v_relay: RHS long on stack → save long + box to obj */
+            JL(v_relay);
+            JI("dup2",""); ij_put_long(val_long_fld);
+            JI("invokestatic", "java/lang/Long/valueOf(J)Ljava/lang/Long;");
+            ij_put_obj_field(val_obj_fld);
+            /* Now evaluate key */
+            JGoto(ka);
+
+            /* k_relay: key long on stack → convert to String key */
+            JL(k_relay);
+            JI("invokestatic", "java/lang/Long/toString(J)Ljava/lang/String;");
+            ij_put_str_field(k_str_fld);
+            JGoto(do_put);
+
+            /* do_put: load T, k_str, v_obj; call put; pop result */
+            JL(do_put);
+            {
+                char taf[128]; ij_var_field(tvar->val.sval, taf, sizeof taf);
+                ij_get_table_field(taf);
+            }
+            ij_get_str_field(k_str_fld);
+            ij_get_obj_field(val_obj_fld);
+            JI("invokevirtual",
+               "java/util/HashMap/put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+            JI("pop","");
+            /* result = v (long) */
+            ij_get_long(val_long_fld);
+            JGoto(ports.γ);
+            return;
+        }
+    }
+
     int id = ij_new_id(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
@@ -660,74 +763,36 @@ static void ij_emit_assign(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
             char fld[128]; ij_var_field(lhs->val.sval, fld, sizeof fld);
             if (is_str)       { ij_declare_static_str(fld);   ij_put_str_field(fld); }
             else if (is_list) { ij_declare_static_list(fld);  ij_put_list_field(fld); }
-            else if (is_tbl)  { ij_declare_static_table(fld); ij_put_table_field(fld); }
+            else if (is_tbl)  {
+                ij_declare_static_table(fld); ij_put_table_field(fld);
+                if (ij_pending_tdflt[0]) {
+                    /* Copy dflt to var-based dflt field: {fld}_dflt */
+                    char vdflt[144]; snprintf(vdflt, sizeof vdflt, "%s_dflt", fld);
+                    ij_declare_static_obj(vdflt);
+                    ij_get_obj_field(ij_pending_tdflt);
+                    ij_put_obj_field(vdflt);
+                    ij_pending_tdflt[0] = '\0';
+                }
+            }
             else if (is_dbl)  { ij_declare_static_dbl(fld);   ij_put_dbl(fld); }
             else              { ij_declare_static(fld);       ij_put_long(fld); }
         } else {
             char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", lhs->val.sval);
             if (is_str)       { ij_declare_static_str(gname);   ij_put_str_field(gname); }
             else if (is_list) { ij_declare_static_list(gname);  ij_put_list_field(gname); }
-            else if (is_tbl)  { ij_declare_static_table(gname); ij_put_table_field(gname); }
+            else if (is_tbl)  {
+                ij_declare_static_table(gname); ij_put_table_field(gname);
+                if (ij_pending_tdflt[0]) {
+                    char vdflt[144]; snprintf(vdflt, sizeof vdflt, "%s_dflt", gname);
+                    ij_declare_static_obj(vdflt);
+                    ij_get_obj_field(ij_pending_tdflt);
+                    ij_put_obj_field(vdflt);
+                    ij_pending_tdflt[0] = '\0';
+                }
+            }
             else if (is_dbl)  { ij_declare_static_dbl(gname);   ij_put_dbl(gname); }
             else              { ij_declare_static(gname);       ij_put_long(gname); }
         }
-    } else if (lhs && lhs->kind == ICN_SUBSCRIPT && lhs->nchildren >= 2
-               && ij_expr_is_table(lhs->children[0])) {
-        /* t[k] := v  — HashMap.put(key_str, boxed_v)
-         * At this point the RHS value (long) is on the JVM stack (from the
-         * store relay).  We need: box it, save it; load the table; load the
-         * key (evaluate lhs->children[1]); do put; restore value for result.
-         *
-         * But the key hasn't been evaluated yet — ij_emit_assign evaluates RHS
-         * first, then calls the store relay.  We must snapshot the table and key
-         * here using statics. Strategy: emit key evaluation in a relay chain
-         * that fires after the store label.
-         *
-         * Simpler path: rewrite the whole assign for subscript LHS before
-         * entering the generic RHS-first flow.  Since we're already past the
-         * RHS emit, use: box RHS → val_fld; evaluate key from lhs->children[1]
-         * using a secondary emit; put; reload val for result.
-         */
-        IcnNode *tvar  = lhs->children[0];
-        IcnNode *kexpr = lhs->children[1];
-        int assign_id = ij_new_id();
-        char val_fld[80]; snprintf(val_fld, sizeof val_fld, "icn_%d_tsa_val", assign_id);
-        char t_fld[80];   snprintf(t_fld,   sizeof t_fld,   "icn_%d_tsa_tbl", assign_id);
-        char k_fld[80];   snprintf(k_fld,   sizeof k_fld,   "icn_%d_tsa_key", assign_id);
-        char kv_fld[80];  snprintf(kv_fld,  sizeof kv_fld,  "icn_%d_tsa_kv",  assign_id);
-        char krelay2[64]; snprintf(krelay2, sizeof krelay2, "icn_%d_tsa_kr",   assign_id);
-        ij_declare_static_obj(val_fld);
-        ij_declare_static_table(t_fld);
-        ij_declare_static_str(k_fld);
-        ij_declare_static(kv_fld);
-        /* RHS long on stack → box, store */
-        JI("invokestatic", "java/lang/Long/valueOf(J)Ljava/lang/Long;");
-        ij_put_obj_field(val_fld);
-        /* Store table ref */
-        {
-            char taf[128]; ij_var_field(tvar->val.sval, taf, sizeof taf);
-            ij_get_table_field(taf);
-        }
-        ij_put_table_field(t_fld);
-        /* Evaluate key — one-shot, no generator context: use a direct relay */
-        IjPorts kp_assign; strncpy(kp_assign.γ, krelay2, 63); strncpy(kp_assign.ω, ports.ω, 63);
-        char kaa[64], kba[64]; ij_emit_expr(kexpr, kp_assign, kaa, kba);
-        JGoto(kaa);
-        JL(krelay2);
-        /* key long on stack → save as long, convert to string */
-        JI("dup2",""); ij_put_long(kv_fld);
-        JI("invokestatic", "java/lang/Long/toString(J)Ljava/lang/String;");
-        ij_put_str_field(k_fld);
-        /* T.put(k, v) */
-        ij_get_table_field(t_fld);
-        ij_get_str_field(k_fld);
-        ij_get_obj_field(val_fld);
-        JI("invokevirtual", "java/util/HashMap/put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
-        JI("pop", "");
-        /* push back RHS value (long) for expression result */
-        ij_get_long(kv_fld);
-        JGoto(ports.γ);
-        return;   /* skip the generic push-back block below */
     } else {
         /* discard — pop appropriate type */
         if (is_str || is_list || is_tbl) JI("pop", "");
@@ -1566,6 +1631,8 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         JI("dup", "");
         JI("invokespecial", "java/util/HashMap/<init>()V");
         ij_put_table_field(tbl_fld);
+        /* Record pending dflt so ij_emit_assign can register var→dflt map */
+        strncpy(ij_pending_tdflt, dflt_fld, 79);
         ij_get_table_field(tbl_fld);
         JGoto(ports.γ);
         return;
@@ -2477,6 +2544,8 @@ static int ij_expr_is_table(IcnNode *n) {
             if (fn && fn->kind == ICN_VAR) {
                 const char *fname = fn->val.sval;
                 if (strcmp(fname, "table") == 0) return 1;
+                if (strcmp(fname, "insert") == 0) return 1;
+                if (strcmp(fname, "delete") == 0) return 1;
             }
         }
         return 0;
@@ -3409,15 +3478,35 @@ static void ij_emit_subscript(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         ij_get_table_field(t_fld);
         ij_get_str_field(k_fld);
         JI("invokevirtual", "java/util/HashMap/get(Ljava/lang/Object;)Ljava/lang/Object;");
-        /* if null: return default (stored as Long in _dflt); else unbox Long */
+        /* if null: return default (stored as Long in {varfld}_dflt); else unbox Long */
         JI("dup", "");
         J("    ifnonnull %s\n", got_val);
-        /* null branch: look up _dflt field for this table variable */
+        /* null branch: load {varfld}_dflt (pre-declared by pre-pass if table(x) was used) */
         JI("pop", "");
-        /* We need the _dflt field name. Convention: for var T, dflt field is
-         * the icn_%d_tdflt stored when table() was called. We can't easily
-         * recover that ID here. Fallback: return 0 as default. */
-        JI("lconst_0", "");
+        if (str_child && str_child->kind == ICN_VAR) {
+            char tvfld[128];
+            int slot = ij_locals_find(str_child->val.sval);
+            if (slot >= 0) {
+                ij_var_field(str_child->val.sval, tvfld, sizeof tvfld);
+            } else {
+                snprintf(tvfld, sizeof tvfld, "icn_gvar_%s", str_child->val.sval);
+            }
+            char vdflt[144]; snprintf(vdflt, sizeof vdflt, "%s_dflt", tvfld);
+            /* Check if declared in statics (pre-pass registered it) */
+            int dflt_declared = 0;
+            for (int _di = 0; _di < ij_nstatics; _di++) {
+                if (!strcmp(ij_statics[_di], vdflt)) { dflt_declared = 1; break; }
+            }
+            if (dflt_declared) {
+                ij_get_obj_field(vdflt);
+                JI("checkcast", "java/lang/Long");
+                JI("invokevirtual", "java/lang/Long/longValue()J");
+            } else {
+                JI("lconst_0", "");
+            }
+        } else {
+            JI("lconst_0", "");
+        }
         JGoto(ports.γ);
         JL(got_val);
         JI("checkcast", "java/lang/Long");
@@ -3988,6 +4077,15 @@ static void ij_emit_proc(IcnNode *proc, FILE *out_target) {
             ij_declare_static_list(fld);
         } else if (ij_expr_is_table(rhs)) {
             ij_declare_static_table(fld);
+            /* Check if rhs is table(dflt) — if so, pre-declare {fld}_dflt */
+            if (rhs->kind == ICN_CALL && rhs->nchildren >= 1) {
+                IcnNode *fn = rhs->children[0];
+                if (fn && fn->kind == ICN_VAR &&
+                        strcmp(fn->val.sval, "table") == 0) {
+                    char vdflt[144]; snprintf(vdflt, sizeof vdflt, "%s_dflt", fld);
+                    ij_declare_static_obj(vdflt);
+                }
+            }
         } else if (ij_expr_is_real(rhs)) {
             ij_declare_static_dbl(fld);
         }
@@ -4146,6 +4244,7 @@ void ij_emit_file(IcnNode **nodes, int count, FILE *out, const char *filename) {
     ij_user_count = 0;
     ij_nstatics = 0;
     ij_nstrings = 0;
+    ij_ntdflt = 0;
 
     ij_set_classname(filename ? filename : "IconProg");
 
