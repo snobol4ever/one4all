@@ -1047,6 +1047,31 @@ static void pj_emit_arith(EXPR_t *e, int *var_locals, int n_vars) {
         pj_emit_arith(e->children[1], var_locals, n_vars);
         JI("ldiv", "");
         break;
+    case E_FNC:
+        /* mod/2, rem/2, //2 (integer div) — not given dedicated opcodes by lowerer */
+        if (e->sval && e->nchildren >= 2) {
+            if (strcmp(e->sval, "mod") == 0 || strcmp(e->sval, "rem") == 0) {
+                pj_emit_arith(e->children[0], var_locals, n_vars);
+                pj_emit_arith(e->children[1], var_locals, n_vars);
+                JI("lrem", "");
+                break;
+            }
+            if (strcmp(e->sval, "//") == 0) {
+                pj_emit_arith(e->children[0], var_locals, n_vars);
+                pj_emit_arith(e->children[1], var_locals, n_vars);
+                JI("ldiv", "");
+                break;
+            }
+            if (strcmp(e->sval, "abs") == 0 && e->nchildren == 1) {
+                pj_emit_arith(e->children[0], var_locals, n_vars);
+                /* abs: dup, negate, take max */
+                J("    dup2\n    lneg\n");
+                J("    invokestatic java/lang/Math/max(JJ)J\n");
+                break;
+            }
+        }
+        JI("lconst_0", "");
+        break;
     default:
         JI("lconst_0", "");
         break;
