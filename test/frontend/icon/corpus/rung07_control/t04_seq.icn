@@ -1,0 +1,5 @@
+# rung07 t04: string equality ==
+procedure main();
+  if ("hello" == "hello") then write(1);
+  if ("hello" == "world") then write(2);
+end

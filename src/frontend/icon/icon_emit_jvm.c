@@ -1421,6 +1421,153 @@ static void ij_emit_scan(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     JGoto(bb);   /* body.β */
 }
 
+/* Re-implement ICN_NOT cleanly with succeed trampoline */
+static void ij_emit_not(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
+    int id = ij_new_id(); char a[64], b[64];
+    lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
+    strncpy(oα,a,63); strncpy(oβ,b,63);
+    IcnNode *child = (n->nchildren >= 1) ? n->children[0] : NULL;
+    char child_ok[64];  snprintf(child_ok,  sizeof child_ok,  "icn_%d_cok",  id);
+    char succeed[64];   snprintf(succeed,   sizeof succeed,   "icn_%d_succ", id);
+    IjPorts cp;
+    strncpy(cp.γ, child_ok, 63);  /* child success → not fails */
+    strncpy(cp.ω, succeed,  63);  /* child fail    → not succeeds */
+    char ca[64], cb[64];
+    ij_emit_expr(child, cp, ca, cb);
+    JC("NOT"); JL(a); JGoto(ca);
+    JL(b); JGoto(cb);
+    JL(child_ok);
+    if (ij_expr_is_string(child)) { JI("pop",""); } else { JI("pop2",""); }
+    JGoto(ports.ω);
+    JL(succeed);
+    JI("lconst_0","");   /* push dummy long 0 as result */
+    JGoto(ports.γ);
+}
+
+/* =========================================================================
+ * ICN_NEG — unary minus: -E
+ * ======================================================================= */
+static void ij_emit_neg(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
+    int id = ij_new_id(); char a[64], b[64];
+    lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
+    strncpy(oα,a,63); strncpy(oβ,b,63);
+    IcnNode *child = (n->nchildren >= 1) ? n->children[0] : NULL;
+    char negate[64]; snprintf(negate, sizeof negate, "icn_%d_neg", id);
+    IjPorts cp; strncpy(cp.γ, negate, 63); strncpy(cp.ω, ports.ω, 63);
+    char ca[64], cb[64]; ij_emit_expr(child, cp, ca, cb);
+    JC("NEG"); JL(a); JGoto(ca); JL(b); JGoto(cb);
+    JL(negate); JI("lneg",""); JGoto(ports.γ);
+}
+
+/* =========================================================================
+ * ICN_TO_BY — E1 to E2 by E3  (stepped range generator)
+ * step>0: yield i while i<=end; step<0: yield i while i>=end.
+ * ======================================================================= */
+static void ij_emit_to_by(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
+    int id = ij_new_id(); char a[64], b[64];
+    lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
+    strncpy(oα,a,63); strncpy(oβ,b,63);
+    char I_f[64], end_f[64], step_f[64];
+    snprintf(I_f,    sizeof I_f,    "icn_%d_toby_i",   id);
+    snprintf(end_f,  sizeof end_f,  "icn_%d_toby_end", id);
+    snprintf(step_f, sizeof step_f, "icn_%d_toby_stp", id);
+    ij_declare_static(I_f); ij_declare_static(end_f); ij_declare_static(step_f);
+    char r1[64], r2[64], code[64], chkp[64], chkn[64], adv[64];
+    snprintf(r1,   sizeof r1,   "icn_%d_tb_r1",  id);
+    snprintf(r2,   sizeof r2,   "icn_%d_tb_r2",  id);
+    snprintf(code, sizeof code, "icn_%d_tb_code",id);
+    snprintf(chkp, sizeof chkp, "icn_%d_tb_ckp", id);
+    snprintf(chkn, sizeof chkn, "icn_%d_tb_ckn", id);
+    snprintf(adv,  sizeof adv,  "icn_%d_tb_adv", id);
+    IcnNode *e1=(n->nchildren>0)?n->children[0]:NULL;
+    IcnNode *e2=(n->nchildren>1)?n->children[1]:NULL;
+    IcnNode *e3=(n->nchildren>2)?n->children[2]:NULL;
+    IjPorts p1; strncpy(p1.γ,r1,63); strncpy(p1.ω,ports.ω,63);
+    IjPorts p2; strncpy(p2.γ,r2,63); strncpy(p2.ω,ports.ω,63);
+    IjPorts p3; strncpy(p3.γ,code,63); strncpy(p3.ω,ports.ω,63);
+    char a1[64],b1[64],a2[64],b2[64],a3[64],b3[64];
+    ij_emit_expr(e1,p1,a1,b1);
+    ij_emit_expr(e2,p2,a2,b2);
+    ij_emit_expr(e3,p3,a3,b3);
+    JC("TO_BY");
+    JL(a); JGoto(a1);
+    JL(b); JGoto(adv);
+    JL(r1); ij_put_long(I_f);    JGoto(a2);
+    JL(r2); ij_put_long(end_f);  JGoto(a3);
+    JL(code); ij_put_long(step_f);
+    /* check direction */
+    ij_get_long(step_f); JI("lconst_0",""); JI("lcmp","");
+    J("    ifgt %s\n", chkp);
+    J("    iflt %s\n", chkn);
+    JGoto(ports.ω);   /* step=0 → fail */
+    JL(chkp);
+    ij_get_long(I_f); ij_get_long(end_f); JI("lcmp","");
+    J("    ifgt %s\n", ports.ω);
+    ij_get_long(I_f); JGoto(ports.γ);
+    JL(chkn);
+    ij_get_long(I_f); ij_get_long(end_f); JI("lcmp","");
+    J("    iflt %s\n", ports.ω);
+    ij_get_long(I_f); JGoto(ports.γ);
+    JL(adv);
+    ij_get_long(I_f); ij_get_long(step_f); JI("ladd",""); ij_put_long(I_f);
+    ij_get_long(step_f); JI("lconst_0",""); JI("lcmp","");
+    J("    ifgt %s\n", chkp);
+    JGoto(chkn);
+    (void)b1;(void)b2;(void)b3;
+}
+
+/* =========================================================================
+ * String relational ops: ICN_SEQ (==), ICN_SNE (~==), ICN_SLT (<<),
+ * ICN_SLE (<<=), ICN_SGT (>>), ICN_SGE (>>=)
+ * Use String.compareTo() and compare result to 0.
+ * Both operands are String refs on the stack.
+ * ======================================================================= */
+static void ij_emit_strrelop(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
+    int id = ij_new_id(); char a[64], b[64];
+    lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
+    strncpy(oα,a,63); strncpy(oβ,b,63);
+    char lrelay[64], rrelay[64], chk[64], lstore_lbl[64];
+    snprintf(lrelay,    sizeof lrelay,    "icn_%d_lrelay", id);
+    snprintf(rrelay,    sizeof rrelay,    "icn_%d_rrelay", id);
+    snprintf(chk,       sizeof chk,       "icn_%d_chk",    id);
+    snprintf(lstore_lbl,sizeof lstore_lbl,"icn_%d_lstore", id);
+    /* Allocate scratch slots for String refs (astore uses 1 slot each) */
+    int ls = ij_locals_alloc_tmp(); /* left String */
+    int rs = ij_locals_alloc_tmp(); /* right String */
+    IcnNode *lhs = (n->nchildren > 0) ? n->children[0] : NULL;
+    IcnNode *rhs = (n->nchildren > 1) ? n->children[1] : NULL;
+    IjPorts lp; strncpy(lp.γ, lrelay, 63); strncpy(lp.ω, ports.ω, 63);
+    IjPorts rp; strncpy(rp.γ, rrelay, 63); strncpy(rp.ω, ports.ω, 63);
+    char la[64], lb2[64], ra[64], rb2[64];
+    ij_emit_expr(lhs, lp, la, lb2);
+    ij_emit_expr(rhs, rp, ra, rb2);
+    JC("STRRELOP"); JL(a); JGoto(la);
+    JL(b); JGoto(lb2);
+    JL(lrelay); J("    astore %d\n", slot_jvm(ls)); JGoto(lstore_lbl);
+    JL(lstore_lbl); JGoto(ra);
+    JL(rrelay); J("    astore %d\n", slot_jvm(rs)); JGoto(chk);
+    JL(chk);
+    J("    aload %d\n", slot_jvm(ls));
+    J("    aload %d\n", slot_jvm(rs));
+    JI("invokevirtual", "java/lang/String/compareTo(Ljava/lang/String;)I");
+    const char *jfail;
+    switch (n->kind) {
+        case ICN_SEQ: jfail = "ifne"; break;
+        case ICN_SNE: jfail = "ifeq"; break;
+        case ICN_SLT: jfail = "ifge"; break;
+        case ICN_SLE: jfail = "ifgt"; break;
+        case ICN_SGT: jfail = "ifle"; break;
+        case ICN_SGE: jfail = "iflt"; break;
+        default:      jfail = "ifne"; break;
+    }
+    J("    %s %s\n", jfail, rb2);
+    /* success: reload right String as result, convert to long (dummy 0) */
+    /* String relops return the right operand in Icon — but we need a long
+     * for consistent stack. Push 0L as dummy result. */
+    JI("lconst_0","");
+    JGoto(ports.γ);
+}
+
 /* =========================================================================
  * Dispatch
  * ======================================================================= */
@@ -1488,10 +1635,16 @@ static void ij_emit_expr(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         case ICN_LT: case ICN_LE: case ICN_GT: case ICN_GE: case ICN_EQ: case ICN_NE:
                           ij_emit_relop    (n,ports,oα,oβ); break;
         case ICN_TO:      ij_emit_to       (n,ports,oα,oβ); break;
+        case ICN_TO_BY:   ij_emit_to_by    (n,ports,oα,oβ); break;
         case ICN_EVERY:   ij_emit_every    (n,ports,oα,oβ); break;
         case ICN_WHILE:   ij_emit_while    (n,ports,oα,oβ); break;
         case ICN_CALL:    ij_emit_call     (n,ports,oα,oβ); break;
         case ICN_SCAN:    ij_emit_scan     (n,ports,oα,oβ); break;
+        case ICN_NOT:     ij_emit_not      (n,ports,oα,oβ); break;
+        case ICN_NEG:     ij_emit_neg      (n,ports,oα,oβ); break;
+        case ICN_SEQ: case ICN_SNE: case ICN_SLT:
+        case ICN_SLE: case ICN_SGT: case ICN_SGE:
+                          ij_emit_strrelop (n,ports,oα,oβ); break;
         default: {
             int id = ij_new_id(); char a2[64], b2[64];
             lbl_α(id,a2,sizeof a2); lbl_β(id,b2,sizeof b2);
@@ -1586,6 +1739,17 @@ static void ij_emit_proc(IcnNode *proc, FILE *out_target) {
     for (int i = nstmts-1; i >= 0; i--) {
         IcnNode *stmt = proc->children[body_start + i];
         if (!stmt || stmt->kind == ICN_GLOBAL) { strncpy(alphas[i], next_a, 63); continue; }
+        /* ICN_EVERY / ICN_WHILE / ICN_UNTIL / ICN_REPEAT never fire ports.γ with a value —
+         * they always end via ports.ω (exhaustion/failure). Skip the drain to avoid
+         * JVM VerifyError on dead pop2 with empty stack. */
+        if (stmt->kind == ICN_EVERY || stmt->kind == ICN_WHILE ||
+            stmt->kind == ICN_UNTIL || stmt->kind == ICN_REPEAT) {
+            IjPorts sp; strncpy(sp.γ, next_a, 63); strncpy(sp.ω, next_a, 63);
+            char sa[64], sb[64]; ij_emit_expr(stmt, sp, sa, sb);
+            strncpy(alphas[i], sa, 63);
+            strncpy(next_a, sa, 63);
+            continue;
+        }
         /* Determine if statement produces a String (1-slot) or long (2-slot) result */
         int stmt_is_str = ij_expr_is_string(stmt);
         /* Build a drain label for this statement's success port */
@@ -1744,6 +1908,7 @@ void ij_emit_file(IcnNode **nodes, int count, FILE *out, const char *filename) {
 
     /* Emit class header */
     J("; Auto-generated by icon_emit_jvm.c — Tiny-ICON Byrd Box JVM\n");
+    J(".bytecode 50.0\n");   /* Java 6 — no StackMapTable required */
     J(".class public %s\n", ij_classname);
     J(".super java/lang/Object\n\n");
 

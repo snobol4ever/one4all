@@ -1,0 +1,6 @@
+# rung07 t05: nested not and alternation
+procedure main();
+  local x;
+  x := 7;
+  if not (x < 5) then write(x);
+end

@@ -1,0 +1,4 @@
+# rung07 t01: not E succeeds iff E fails
+procedure main();
+  if not (1 > 2) then write(1);
+end

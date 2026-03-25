@@ -1,0 +1,4 @@
+# rung07 t03: every (1 to 10 by 3)
+procedure main();
+  every write(1 to 10 by 3);
+end
