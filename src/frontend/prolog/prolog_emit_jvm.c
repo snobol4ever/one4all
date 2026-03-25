@@ -2335,17 +2335,18 @@ static void pj_emit_findall_builtin(void) {
     J("    aload 4\n"); J("    ldc \",\"\n");
     J("    invokevirtual java/lang/Object/equals(Ljava/lang/Object;)Z\n");
     J("    ifeq pj_cg_not_conj\n");
-    /* conjunction: call left with cs=0 (det), if >=0 call right with cs=0 */
+    /* conjunction: pass cs to left (backtracking), right always cs=0 (det).
+     * Return left_new_cs so p_findall_3 can advance left on next iteration. (PJ-46) */
     J("    aload 2\n"); J("    iconst_2\n"); J("    aaload\n");  /* left */
-    J("    iconst_0\n");
+    J("    iload_1\n");  /* pass incoming cs to left — was iconst_0 */
     J("    invokestatic %s/pj_call_goal(Ljava/lang/Object;I)I\n", pj_classname);
-    J("    ldc -1\n"); J("    if_icmpeq pj_cg_fail\n");
+    J("    istore 9\n");  /* left_new_cs */
+    J("    iload 9\n"); J("    ldc -1\n"); J("    if_icmpeq pj_cg_fail\n");
     J("    aload 2\n"); J("    iconst_3\n"); J("    aaload\n");  /* right */
     J("    iconst_0\n");
     J("    invokestatic %s/pj_call_goal(Ljava/lang/Object;I)I\n", pj_classname);
-    J("    istore 9\n");   /* save right result */
-    J("    iload 9\n"); J("    ldc -1\n"); J("    if_icmpeq pj_cg_fail\n");
-    J("    iconst_0\n"); J("    ireturn\n");  /* conjunction success → return 0 (det) */
+    J("    ldc -1\n"); J("    if_icmpeq pj_cg_fail\n");
+    J("    iload 9\n"); J("    ireturn\n");  /* return left_new_cs → findall advances left */
     J("pj_cg_not_conj:\n");
     /* is/2? */
     J("    aload 4\n"); J("    ldc \"is\"\n");
@@ -3058,24 +3059,30 @@ static void pj_emit_choice(EXPR_t *choice) {
             J("    goto %s\n", ω_lbl);
         }
 
-        /* γ port: return base[ci] + init_cs + 1
-         * init_cs is the cs we entered this clause with (minus base[ci]).
-         * On next entry caller provides cs = base[ci] + init_cs + 1, so
-         * clause computes init_cs_new = init_cs + 1 — incrementing the inner
-         * cs by exactly 1 each retry, matching the ASM conjunction behaviour.
-         * Using sub_cs_out here was wrong for recursive predicates: it could
-         * skip inner cs values (e.g. member/2 skipping 'c'). */
+        /* γ port: return new_cs for caller to retry this predicate.
+         * General case: base[ci] + init_cs + 1  (advances outer clause cs by 1).
+         * Special case: nclauses==1 && last_has_ucall — single-clause predicate
+         *   whose body contains a ucall (e.g. even/1 :- num(X), ...).
+         *   The outer cs (init_cs) is always 0 here; what the caller needs to
+         *   advance is the sub_cs from the inner ucall (sub_cs_out_local = local4).
+         *   Returning init_cs+1=1 always would restart the inner call from 0
+         *   on every retry, producing duplicates (PJ-46 fix). */
         J("p_%s_%d_gamma_%d:\n", safe_fn, arity, ci);
         JI("iconst_1", "");
         JI("anewarray", "java/lang/Object");
         JI("dup", "");
         JI("iconst_0", "");
-        /* compute base[ci] + init_cs_local + 1 */
-        J("    ldc %d\n", base[ci]);
-        J("    iload %d\n", init_cs_local);   /* was sub_cs_out_local — fixed PJ-7 */
-        JI("iadd", "");
-        JI("iconst_1", "");
-        JI("iadd", "");
+        if (nclauses == 1 && last_has_ucall) {
+            /* Return sub_cs_out so caller can drive the inner ucall forward. */
+            J("    iload %d\n", sub_cs_out_local);  /* sub_cs_out (PJ-46) */
+        } else {
+            /* Multi-clause or no-ucall: advance outer clause cs by 1. */
+            J("    ldc %d\n", base[ci]);
+            J("    iload %d\n", init_cs_local);
+            JI("iadd", "");
+            JI("iconst_1", "");
+            JI("iadd", "");
+        }
         JI("invokestatic", "java/lang/Integer/valueOf(I)Ljava/lang/Integer;");
         JI("aastore", "");
         JI("areturn", "");
