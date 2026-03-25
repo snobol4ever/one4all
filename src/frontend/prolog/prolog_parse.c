@@ -102,7 +102,7 @@ typedef struct { const char *name; int prec; Assoc assoc; } OpEntry;
 static const OpEntry BIN_OPS[] = {
     { ",",    1000, ASSOC_RIGHT },
     { ";",    1100, ASSOC_RIGHT },
-    { "->",    900, ASSOC_RIGHT },
+    { "->",   1050, ASSOC_RIGHT },
     { "=",     700, ASSOC_NONE  },
     { "\\=",   700, ASSOC_NONE  },
     { "==",    700, ASSOC_NONE  },

@@ -1226,6 +1226,14 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
                              trail_local, var_locals, n_vars,
                              cut_cs_seal, cs_local_for_cut, next_local);
                 J("%s:\n", cond_ok);
+                /* ITE cut: once condition succeeds, commit — seal the enclosing
+                 * clause β so backtrack cannot retry the else branches.
+                 * This matches swipl semantics: (Cond -> Then ; Else) is
+                 * deterministic once Cond succeeds. */
+                if (cut_cs_seal >= 0 && cs_local_for_cut >= 0) {
+                    J("    ldc %d\n", cut_cs_seal);
+                    J("    istore %d\n", cs_local_for_cut);
+                }
                 /* emit Then goals: children[1..nchildren-1] as flat sequence */
                 int nthen = first->nchildren - 1;
                 for (int ti = 0; ti < nthen; ti++) {
