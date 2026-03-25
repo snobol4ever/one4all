@@ -989,12 +989,7 @@ static void pj_emit_runtime_helpers(void) {
     JI("ldc", "\"var\"");
     JI("invokevirtual", "java/lang/Object/equals(Ljava/lang/Object;)Z");
     JI("ifne", "ac2_reverse");
-    /* forward: atom→chars */
-    J("    invokestatic %s/pj_atom_name(Ljava/lang/Object;)Ljava/lang/String;\n", pj_classname);
-    /* we still have the deref'd term on stack? No — we need to reload */
-    /* actually: call pj_atom_name with aload_2 */
-    /* Fix: redo with aload_2 */
-    JI("pop", "");
+    /* forward: atom→chars — reload deref'd term and call pj_atom_name */
     JI("aload_2", "");
     J("    invokestatic %s/pj_atom_name(Ljava/lang/Object;)Ljava/lang/String;\n", pj_classname);
     J("    invokestatic %s/pj_string_to_char_list(Ljava/lang/String;)[Ljava/lang/Object;\n", pj_classname);
@@ -1407,6 +1402,9 @@ static int pj_is_user_call(EXPR_t *goal) {
         "@<","@>","@=<","@>=",
         "var","nonvar","atom","integer","float","compound","atomic","is_list",
         "functor","arg","=..","\\+","not",",",";","->",
+        "atom_length","atom_concat","atom_chars","atom_codes","char_code",
+        "number_chars","number_codes","upcase_atom","downcase_atom",
+        "between","findall",
         NULL
     };
     for (int i = 0; builtins[i]; i++)
