@@ -1757,17 +1757,23 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         char trelay[64]; snprintf(trelay, sizeof trelay, "icn_%d_ktr", id);
         char t_fld[80];   snprintf(t_fld,   sizeof t_fld,   "icn_%d_ktbl",  id);
         char arr_fld[80]; snprintf(arr_fld,  sizeof arr_fld, "icn_%d_karr",  id);
-        char idx_fld[80]; snprintf(idx_fld,  sizeof idx_fld, "icn_%d_kidx",  id);
-        char check[64];   snprintf(check,    sizeof check,   "icn_%d_kchk",  id);
+        char idx_fld[80];  snprintf(idx_fld,   sizeof idx_fld,  "icn_%d_kidx",  id);
+        char kinit_fld[80];snprintf(kinit_fld, sizeof kinit_fld,"icn_%d_kinit", id);
+        char check[64];    snprintf(check,     sizeof check,    "icn_%d_kchk",  id);
         ij_declare_static_table(t_fld);
         ij_declare_static_obj(arr_fld);   /* Object[] stored as Object ref */
         ij_declare_static_int(idx_fld);
+        ij_declare_static_int(kinit_fld); /* 0=fresh, 1=already init'd */
 
         IjPorts tp5; strncpy(tp5.γ, trelay, 63); strncpy(tp5.ω, ports.ω, 63);
         char ta5[64], tb5[64]; ij_emit_expr(targ, tp5, ta5, tb5);
 
-        /* α: eval T, snapshot keys */
-        JL(a); JGoto(ta5);
+        /* α: if already initialized, skip re-snapshot and jump straight to kchk */
+        JL(a);
+        ij_get_int_field(kinit_fld);
+        JI("ifne", check);           /* kinit != 0 → already init'd, skip to check */
+        JGoto(ta5);
+        /* ktr: eval T result arrives here; snapshot keys and mark init'd */
         JL(trelay);
         ij_put_table_field(t_fld);
         /* T.keySet().toArray() → Object[] */
@@ -1778,6 +1784,9 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         /* idx = 0 */
         JI("iconst_0", "");
         ij_put_int_field(idx_fld);
+        /* mark initialized */
+        JI("iconst_1", "");
+        ij_put_int_field(kinit_fld);
         JGoto(check);
 
         /* β: increment index, fall into check */
@@ -3465,7 +3474,7 @@ static void ij_emit_subscript(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         char ka[64], kb[64]; ij_emit_expr(idx_child, kp, ka, kb);
 
         JL(a); JGoto(ta);
-        JL(b); JGoto(ports.ω);  /* one-shot */
+        JL(b); JGoto(kb);  /* resume key generator (or idx expression) on β */
 
         JL(trelay); ij_put_table_field(t_fld); JGoto(ka);
         JL(krelay);
