@@ -1,0 +1,3 @@
+procedure main();
+  every write("a"|"b"|"c");
+end

@@ -1,0 +1,5 @@
+procedure main();
+  s := "";
+  every s ||:= ("a"|"b"|"c");
+  write(s);
+end

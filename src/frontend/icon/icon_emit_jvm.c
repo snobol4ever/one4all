@@ -1071,8 +1071,19 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
 
 /* =========================================================================
  * ICN_ALT — E1 | E2 | ... | En  value alternation (n-ary flat)
- * α → E1.α; E1.ω → E2.α; ... ; En.ω → node.ω
- * β → E1.β
+ *
+ * Naïve wiring (old, BUGGY for β-resume):
+ *   α → E1.α; E1.ω → E2.α; ... ; En.ω → node.ω
+ *   β → E1.β   ← always restarts from E1, loops infinitely in every
+ *
+ * Correct wiring — indirect-goto gate (JCON ir_a_Alt + JCON-ANALYSIS §'| value alternation'):
+ *   Per-site static int field icn_N_alt_gate tracks which Ei last succeeded.
+ *   α:    gate=0, goto E1.α
+ *   Ei.γ: gate=i (1-based), goto ports.γ     (MoveLabel + succeed)
+ *   Ei.ω: goto E(i+1).α  (En.ω → ports.ω)
+ *   β:    iload gate → tableswitch → E1.β / E2.β / ... / En.β
+ *
+ * This matches JCON irgen.icn ir_MoveLabel + ir_IndirectGoto (§4.5).
  * ======================================================================= */
 static void ij_emit_alt(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     int id = ij_new_id(); char a[64], b[64];
@@ -1082,17 +1093,50 @@ static void ij_emit_alt(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     int nc = n->nchildren;
     char (*ca)[64] = malloc(nc*64);
     char (*cb)[64] = malloc(nc*64);
+    /* Per-alternative γ relay labels: we intercept Ei.γ to set the gate */
+    char (*cg)[64] = malloc(nc*64);
 
+    /* Gate field name — unique per alt site */
+    char gate_fld[64]; snprintf(gate_fld, sizeof gate_fld, "icn_%d_alt_gate", id);
+    ij_declare_static_int(gate_fld);
+
+    /* Emit children right-to-left so each child's α/β/γ/ω are known
+     * when we wire the chain. Each child's ports.γ → our relay cg[i],
+     * ports.ω → next child's α (or ports.ω for last child). */
     for (int i = nc-1; i >= 0; i--) {
+        /* relay label: child[i] success lands here → set gate, goto ports.γ */
+        snprintf(cg[i], 64, "icn_%d_alt_g%d", id, i);
         IjPorts ep;
-        strncpy(ep.γ, ports.γ, 63);
+        strncpy(ep.γ, cg[i], 63);
         strncpy(ep.ω, (i == nc-1) ? ports.ω : ca[i+1], 63);
         ij_emit_expr(n->children[i], ep, ca[i], cb[i]);
     }
 
-    JL(a); JGoto(ca[0]);
-    JL(b); JGoto(cb[0]);
-    free(ca); free(cb);
+    /* Emit relay labels: cg[i]: gate = i+1 (1-based), goto ports.γ */
+    for (int i = 0; i < nc; i++) {
+        JL(cg[i]);
+        J("    sipush %d\n", i+1);
+        ij_put_int_field(gate_fld);
+        JGoto(ports.γ);
+    }
+
+    /* α: gate=0 (mark "in α, no prior success"), goto E1.α */
+    JL(a);
+    JI("iconst_0",""); ij_put_int_field(gate_fld);
+    JGoto(ca[0]);
+
+    /* β: indirect-goto via gate → tableswitch → each Ei.β
+     * gate values: 0 = never succeeded (shouldn't happen in bounded ctx, go to ω)
+     *              1..nc = Ei last succeeded → resume Ei.β                         */
+    JL(b);
+    ij_get_int_field(gate_fld);
+    J("    tableswitch 1 %d\n", nc);
+    for (int i = 0; i < nc; i++) {
+        J("        %s\n", cb[i]);
+    }
+    J("        default: %s\n", ports.ω);
+
+    free(ca); free(cb); free(cg);
 }
 
 /* =========================================================================
@@ -1492,6 +1536,11 @@ static int ij_expr_is_string(IcnNode *n) {
             if (n->nchildren >= 2) return ij_expr_is_string(n->children[1]);
             return 0;
         }
+        case ICN_ALT: {
+            /* Alternation yields string iff children yield strings (check first child) */
+            if (n->nchildren >= 1) return ij_expr_is_string(n->children[0]);
+            return 0;
+        }
         case ICN_VAR: {
             /* &subject keyword is always a String */
             if (strcmp(n->val.sval, "&subject") == 0) return 1;
@@ -1539,7 +1588,9 @@ static void ij_emit_concat(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     char la[64], lb[64]; ij_emit_expr(n->children[0], lp, la, lb);
 
     IcnNode *lchild = n->children[0];
-    int left_is_value = ij_expr_is_string(lchild);  /* strings are one-shot */
+    /* left_is_value: true only for one-shot string producers (literals, vars, one-shot calls).
+     * ICN_ALT is a generator — its β must be used to advance it, not restart from α. */
+    int left_is_value = ij_expr_is_string(lchild) && lchild->kind != ICN_ALT;
 
     /* left_relay: String ref on stack → astore into lc_fld → lstore */
     JL(left_relay); ij_put_str_field(lc_fld); JGoto(lstore);
