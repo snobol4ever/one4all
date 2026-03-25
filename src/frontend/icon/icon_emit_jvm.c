@@ -100,6 +100,13 @@ static const char *ij_classname_buf(const char *sig) {
     return buf;
 }
 
+/* Build "ClassName/fieldName descriptor" for getstatic/putstatic */
+static const char *ij_classname_buf_fld(const char *fld, const char *desc) {
+    static char buf2[512];
+    snprintf(buf2, sizeof buf2, "%s/%s %s", ij_classname, fld, desc);
+    return buf2;
+}
+
 /* =========================================================================
  * Node ID counter and label generation
  * ======================================================================= */
@@ -172,9 +179,40 @@ static int     ij_suspend_ids[64];
 static int     ij_suspend_count = 0;
 static int     ij_next_suspend_id = 1;
 
+/* =========================================================================
+ * Loop label stack — for break/next
+ * Each loop emitter pushes before emitting body, pops after.
+ * break  → ij_loop_exit[top]    (= ports.ω of enclosing loop)
+ * next   → ij_loop_next[top]    (= loop restart: top-of-body / cond label)
+ * ======================================================================= */
+#define IJ_LOOP_STACK_MAX 32
+static char ij_loop_exit[IJ_LOOP_STACK_MAX][64];  /* ports.ω for break */
+static char ij_loop_next[IJ_LOOP_STACK_MAX][64];  /* restart label for next */
+static int  ij_loop_depth = 0;
+
+static void ij_loop_push(const char *exit_lbl, const char *next_lbl) {
+    if (ij_loop_depth < IJ_LOOP_STACK_MAX) {
+        strncpy(ij_loop_exit[ij_loop_depth], exit_lbl, 63);
+        strncpy(ij_loop_next[ij_loop_depth], next_lbl, 63);
+        ij_loop_depth++;
+    }
+}
+static void ij_loop_pop(void) {
+    if (ij_loop_depth > 0) ij_loop_depth--;
+}
+static const char *ij_loop_break_target(void) {
+    if (ij_loop_depth > 0) return ij_loop_exit[ij_loop_depth-1];
+    return "icn_main_done";  /* fallback: top-level fail */
+}
+static const char *ij_loop_next_target(void) {
+    if (ij_loop_depth > 0) return ij_loop_next[ij_loop_depth-1];
+    return "icn_main_done";
+}
+
 static void ij_locals_reset(void) {
     ij_nlocals = 0; ij_nparams = 0;
     ij_suspend_count = 0;
+    ij_loop_depth = 0;
 }
 static int ij_locals_find(const char *name) {
     for (int i=0;i<ij_nlocals;i++)
@@ -1286,7 +1324,10 @@ static void ij_emit_every(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         /* bstart: generator yielded a value — drain it, then run body */
         char bstart[64]; snprintf(bstart, sizeof bstart, "icn_%d_body", id);
         IjPorts bp; strncpy(bp.γ,gbfwd,63); strncpy(bp.ω,gbfwd,63);
-        char ba[64], bb[64]; ij_emit_expr(body, bp, ba, bb);
+        char ba[64], bb[64];
+        ij_loop_push(ports.ω, ga);   /* break→exit every, next→pump generator */
+        ij_emit_expr(body, bp, ba, bb);
+        ij_loop_pop();
         IjPorts gp; strncpy(gp.γ,bstart,63); strncpy(gp.ω,ports.ω,63);
         ij_emit_expr(gen, gp, ga, gb);
         JL(bstart); JI("pop2",""); JGoto(ba);
@@ -1322,7 +1363,9 @@ static void ij_emit_while(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     if (body) {
         char ba[64], bb[64];
         IjPorts bp; strncpy(bp.γ,loop_top,63); strncpy(bp.ω,loop_top,63);
+        ij_loop_push(ports.ω, ca);   /* break→exit, next→re-eval cond */
         ij_emit_expr(body, bp, ba, bb);
+        ij_loop_pop();
         JGoto(ba);
         JL(loop_top); JGoto(ca);
     } else {
@@ -1362,7 +1405,9 @@ static void ij_emit_until(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         char ba[64], bb[64];
         char body_ok[64]; snprintf(body_ok, sizeof body_ok, "icn_%d_bok", id);
         IjPorts bp; strncpy(bp.γ, body_ok, 63); strncpy(bp.ω, loop_top, 63);
+        ij_loop_push(ports.ω, ca);   /* break→exit, next→re-eval cond */
         ij_emit_expr(body, bp, ba, bb);
+        ij_loop_pop();
         JGoto(ba);
         /* body succeeded: drain value, loop */
         JL(body_ok);
@@ -1390,7 +1435,9 @@ static void ij_emit_repeat(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         char ba[64], bb[64];
         char body_ok[64]; snprintf(body_ok, sizeof body_ok, "icn_%d_bok", id);
         IjPorts bp; strncpy(bp.γ, body_ok, 63); strncpy(bp.ω, loop_top, 63);
+        ij_loop_push(ports.ω, loop_top);  /* break→exit, next→loop_top */
         ij_emit_expr(body, bp, ba, bb);
+        ij_loop_pop();
         JL(a); JL(loop_top); JGoto(ba);
         /* body succeeded: drain value, loop again */
         JL(body_ok);
@@ -1816,6 +1863,107 @@ static void ij_emit_strrelop(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
 }
 
 /* =========================================================================
+ * ICN_BREAK — exit enclosing loop; optional value (ignored in our impl)
+ * break jumps directly to the enclosing loop's ports.ω (exit path).
+ * ======================================================================= */
+static void ij_emit_break(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
+    int id = ij_new_id(); char a[64], b[64];
+    lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
+    strncpy(oα,a,63); strncpy(oβ,b,63);
+    const char *exit_lbl = ij_loop_break_target();
+    JL(a); JGoto(exit_lbl);
+    JL(b); JGoto(exit_lbl);  /* β also exits — break is one-shot */
+    (void)ports; (void)n;
+}
+
+/* =========================================================================
+ * ICN_NEXT — restart enclosing loop body (skip rest of current iteration)
+ * next jumps to the loop's restart label (loop_top / cond re-eval).
+ * ======================================================================= */
+static void ij_emit_next(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
+    int id = ij_new_id(); char a[64], b[64];
+    lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
+    strncpy(oα,a,63); strncpy(oβ,b,63);
+    const char *next_lbl = ij_loop_next_target();
+    JL(a); JGoto(next_lbl);
+    JL(b); JGoto(next_lbl);
+    (void)ports; (void)n;
+}
+
+/* =========================================================================
+ * ICN_AUGOP — augmented assignment: lhs op:= rhs
+ *   Semantics: lhs := lhs op rhs  (lhs must be a variable)
+ *   node->val.ival encodes the augop token kind (TK_AUGPLUS etc.)
+ *   We: load lhs, eval rhs, apply op, store back, push result → ports.γ
+ * ======================================================================= */
+static void ij_emit_augop(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
+    if (n->nchildren < 2) {
+        int id = ij_new_id(); char a[64], b[64];
+        lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
+        strncpy(oα,a,63); strncpy(oβ,b,63);
+        JL(a); JGoto(ports.ω); JL(b); JGoto(ports.ω); return;
+    }
+
+    int id = ij_new_id(); char a[64], b[64];
+    lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
+    strncpy(oα,a,63); strncpy(oβ,b,63);
+
+    IcnNode *lhs = n->children[0];
+    IcnNode *rhs = n->children[1];
+    long aug_kind = n->val.ival;
+
+    /* Eval rhs; on rhs fail → ports.ω */
+    char rhs_ok[64]; snprintf(rhs_ok, sizeof rhs_ok, "icn_%d_rhsok", id);
+    IjPorts rp; strncpy(rp.γ, rhs_ok, 63); strncpy(rp.ω, ports.ω, 63);
+    char ra[64], rb[64]; ij_emit_expr(rhs, rp, ra, rb);
+
+    JL(a); JGoto(ra);
+    JL(b); JGoto(rb);
+
+    JL(rhs_ok);
+    /* rhs value is on stack (long).
+     * Load lhs current value, apply op, store result back, push result. */
+    if (lhs && lhs->kind == ICN_VAR) {
+        char fld[128];
+        int is_local = (ij_locals_find(lhs->val.sval) >= 0);
+        if (is_local) {
+            ij_var_field(lhs->val.sval, fld, sizeof fld);
+        } else {
+            snprintf(fld, sizeof fld, "icn_gvar_%s", lhs->val.sval);
+            ij_declare_static(fld);
+        }
+
+        /* Stack: [rhs_val]  — store rhs to a temp, load lhs, reload rhs, apply op. */
+        char tmp_fld[128]; snprintf(tmp_fld, sizeof tmp_fld, "icn_%d_augtemp", id);
+        ij_declare_static(tmp_fld);
+        ij_put_long(tmp_fld);              /* save rhs */
+
+        ij_declare_static(fld);
+        ij_get_long(fld);                  /* load current lhs value */
+        ij_get_long(tmp_fld);              /* reload rhs */
+
+        /* Apply arithmetic op. Actual TK_AUG* values (from icon_lex.h enum):
+         * TK_AUGPLUS=30 TK_AUGMINUS=31 TK_AUGSTAR=32 TK_AUGSLASH=33 TK_AUGMOD=34 */
+        switch ((int)aug_kind) {
+            case 30: JI("ladd",""); break;  /* TK_AUGPLUS   */
+            case 31: JI("lsub",""); break;  /* TK_AUGMINUS  */
+            case 32: JI("lmul",""); break;  /* TK_AUGSTAR   */
+            case 33: JI("ldiv",""); break;  /* TK_AUGSLASH  */
+            case 34: JI("lrem",""); break;  /* TK_AUGMOD    */
+            default: JI("ladd",""); break;
+        }
+
+        /* dup result: one copy stored back to lhs, one stays on stack as expr result */
+        JI("dup2","");
+        ij_put_long(fld);
+        JGoto(ports.γ);
+    } else {
+        /* Non-var lhs — just discard and push rhs as result (rare/error case) */
+        JGoto(ports.γ);
+    }
+}
+
+/* =========================================================================
  * Dispatch
  * ======================================================================= */
 static void ij_emit_expr(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
@@ -1891,6 +2039,9 @@ static void ij_emit_expr(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         case ICN_SCAN:    ij_emit_scan     (n,ports,oα,oβ); break;
         case ICN_NOT:     ij_emit_not      (n,ports,oα,oβ); break;
         case ICN_NEG:     ij_emit_neg      (n,ports,oα,oβ); break;
+        case ICN_BREAK:   ij_emit_break    (n,ports,oα,oβ); break;
+        case ICN_NEXT:    ij_emit_next     (n,ports,oα,oβ); break;
+        case ICN_AUGOP:   ij_emit_augop    (n,ports,oα,oβ); break;
         case ICN_SEQ: case ICN_SNE: case ICN_SLT:
         case ICN_SLE: case ICN_SGT: case ICN_SGE:
                           ij_emit_strrelop (n,ports,oα,oβ); break;

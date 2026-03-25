@@ -1,0 +1,7 @@
+procedure main();
+  x := 20;
+  x -:= 5;
+  write(x);
+  x %:= 7;
+  write(x);
+end
