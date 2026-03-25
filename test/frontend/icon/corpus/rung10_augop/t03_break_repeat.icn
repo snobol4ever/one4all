@@ -1,0 +1,7 @@
+# rung10 t03: augmented add accumulator via every
+procedure main();
+  local sum;
+  sum := 0;
+  every sum +:= (1 to 5);
+  write(sum);
+end

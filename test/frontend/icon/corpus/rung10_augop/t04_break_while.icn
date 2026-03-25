@@ -1,0 +1,7 @@
+# rung10 t04: augmented divide
+procedure main();
+  local x;
+  x := 100;
+  x /:= 4;
+  write(x);
+end

@@ -1,0 +1,5 @@
+procedure main();
+  x := 3;
+  x *:= 4;
+  write(x);
+end
