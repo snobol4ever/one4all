@@ -119,6 +119,7 @@ const char *icn_kind_name(IcnKind kind) {
         case ICN_SECTION:  return "SECTION";
         case ICN_RECORD:   return "RECORD";
         case ICN_GLOBAL:   return "GLOBAL";
+        case ICN_INITIAL:  return "INITIAL";
         default:           return "???";
     }
 }

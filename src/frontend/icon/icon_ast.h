@@ -108,6 +108,7 @@ typedef enum {
     ICN_SECTION,   /* E[i:j]  -- string section (substring), 3 children: str, lo, hi */
     ICN_RECORD,    /* record decl -- Tier 2 */
     ICN_GLOBAL,    /* global decl */
+    ICN_INITIAL,   /* initial stmt — runs once on first proc call */
 
     /* --- Co-expression (out of scope) --- */
     /* ICN_CREATE intentionally omitted */

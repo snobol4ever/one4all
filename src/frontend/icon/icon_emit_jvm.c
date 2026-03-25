@@ -2046,6 +2046,46 @@ static void ij_emit_scan(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
 }
 
 /* Re-implement ICN_NOT cleanly with succeed trampoline */
+/* =========================================================================
+ * ICN_INITIAL — initial stmt
+ * Runs the child statement exactly once, on the first call to this procedure.
+ * Implementation: per-proc static boolean field icn_init_PROCNAME (I, default 0).
+ * α: load flag; if non-zero → skip (already ran) → ports.γ with lconst_0.
+ *    else: set flag=1, emit child stmt, → ports.γ.
+ * Always succeeds (initial block failure is ignored — Icon spec).
+ * β → ports.ω (one-shot; if called again after first, just succeeds silently).
+ * ======================================================================= */
+static void ij_emit_initial(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
+    int id = ij_new_id(); char a[64], b[64];
+    lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
+    strncpy(oα,a,63); strncpy(oβ,b,63);
+
+    /* Per-proc init flag: icn_init_PROCNAME */
+    char flag_fld[80]; snprintf(flag_fld, sizeof flag_fld, "icn_init_%s", ij_cur_proc);
+    ij_declare_static_int(flag_fld);
+
+    char skip[64], run[64];
+    snprintf(skip, sizeof skip, "icn_%d_init_skip", id);
+    snprintf(run,  sizeof run,  "icn_%d_init_run",  id);
+
+    JL(a);
+    ij_get_int_field(flag_fld);
+    J("    ifne %s\n", skip);        /* flag != 0 → already ran, skip */
+    /* First call: set flag, run body */
+    JI("iconst_1", ""); ij_put_int_field(flag_fld);
+    if (n->nchildren >= 1 && n->children[0]) {
+        IjPorts cp;
+        strncpy(cp.γ, run, 63); strncpy(cp.ω, run, 63); /* body succeed/fail → run */
+        char ca[64], cb[64]; ij_emit_expr(n->children[0], cp, ca, cb);
+        JGoto(ca);
+        JL(run);
+    }
+    JI("lconst_0", ""); JGoto(ports.γ);
+    JL(skip);
+    JI("lconst_0", ""); JGoto(ports.γ);
+    JL(b); JGoto(ports.ω);
+}
+
 static void ij_emit_not(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     int id = ij_new_id(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
@@ -3029,6 +3069,23 @@ static void ij_emit_expr(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         case ICN_CALL:    ij_emit_call     (n,ports,oα,oβ); break;
         case ICN_SCAN:    ij_emit_scan     (n,ports,oα,oβ); break;
         case ICN_NOT:     ij_emit_not      (n,ports,oα,oβ); break;
+        case ICN_INITIAL: ij_emit_initial  (n,ports,oα,oβ); break;
+        case ICN_GLOBAL: {
+            /* local 'global x,y;' decl inside proc body — declare icn_gvar_* fields,
+               skip as a statement (no runtime effect beyond declaration). */
+            for (int ci = 0; ci < n->nchildren; ci++) {
+                IcnNode *v = n->children[ci];
+                if (!v || v->kind != ICN_VAR) continue;
+                char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", v->val.sval);
+                ij_declare_static(gname);
+            }
+            int id2 = ij_new_id(); char a2[64], b2[64];
+            lbl_α(id2,a2,sizeof a2); lbl_β(id2,b2,sizeof b2);
+            strncpy(oα,a2,63); strncpy(oβ,b2,63);
+            JL(a2); JI("lconst_0",""); JGoto(ports.γ);
+            JL(b2); JGoto(ports.ω);
+            break;
+        }
         case ICN_NEG:     ij_emit_neg      (n,ports,oα,oβ); break;
         case ICN_BREAK:   ij_emit_break    (n,ports,oα,oβ); break;
         case ICN_NEXT:    ij_emit_next     (n,ports,oα,oβ); break;
@@ -3272,6 +3329,20 @@ void ij_emit_file(IcnNode **nodes, int count, FILE *out, const char *filename) {
     ij_nstrings = 0;
 
     ij_set_classname(filename ? filename : "IconProg");
+
+    /* Pass 0: register top-level global var names so var emit uses icn_gvar_*
+     * and does NOT add them to ij_locals. Declare as long fields by default;
+     * type refinement happens naturally when assignment is emitted. */
+    for (int pi = 0; pi < count; pi++) {
+        IcnNode *nd = nodes[pi];
+        if (!nd || nd->kind != ICN_GLOBAL) continue;
+        for (int ci = 0; ci < nd->nchildren; ci++) {
+            IcnNode *v = nd->children[ci];
+            if (!v || v->kind != ICN_VAR) continue;
+            char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", v->val.sval);
+            ij_declare_static(gname); /* long J by default */
+        }
+    }
 
     /* Pass 1: register all user procs */
     for (int pi = 0; pi < count; pi++) {
