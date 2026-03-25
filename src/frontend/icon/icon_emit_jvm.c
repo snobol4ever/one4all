@@ -1541,6 +1541,11 @@ static int ij_expr_is_string(IcnNode *n) {
             if (n->nchildren >= 1) return ij_expr_is_string(n->children[0]);
             return 0;
         }
+        case ICN_LIMIT: {
+            /* E \ N yields same type as E */
+            if (n->nchildren >= 1) return ij_expr_is_string(n->children[0]);
+            return 0;
+        }
         case ICN_VAR: {
             /* &subject keyword is always a String */
             if (strcmp(n->val.sval, "&subject") == 0) return 1;
@@ -2119,6 +2124,104 @@ static void ij_emit_size(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
 }
 
 /* =========================================================================
+ * ICN_LIMIT — E \ N  (limitation operator, JCON-ANALYSIS §"E \ N")
+ *
+ * Semantics: yield at most N values from E.
+ *   - N is evaluated once (bounded) at α → stored in limit_max (long)
+ *   - counter starts 0 at α
+ *   - each time E yields: if counter >= max → exhaust (goto E.β → ports.ω)
+ *                          else counter++; propagate value → ports.γ
+ *   - β: if counter >= max → ports.ω; else counter++; → E.β
+ *
+ * Per-site static fields:
+ *   icn_N_limit_count  J  — how many values yielded so far (long)
+ *   icn_N_limit_max    J  — N value, evaluated once
+ *
+ * Children: [0]=E (the generator), [1]=N (the bound)
+ * ======================================================================= */
+static void ij_emit_limit(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
+    int id = ij_new_id(); char a[64], b[64];
+    lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
+    strncpy(oα,a,63); strncpy(oβ,b,63);
+
+    /* Per-site statics */
+    char cnt_fld[64], max_fld[64];
+    snprintf(cnt_fld, sizeof cnt_fld, "icn_%d_limit_count", id);
+    snprintf(max_fld, sizeof max_fld, "icn_%d_limit_max",   id);
+    ij_declare_static(cnt_fld);   /* long */
+    ij_declare_static(max_fld);   /* long */
+
+    IcnNode *expr  = (n->nchildren > 0) ? n->children[0] : NULL;
+    IcnNode *bound = (n->nchildren > 1) ? n->children[1] : NULL;
+
+    /* Relay labels */
+    char n_relay[64]; snprintf(n_relay, sizeof n_relay, "icn_%d_limit_nrelay", id);
+    char e_gamma[64]; snprintf(e_gamma, sizeof e_gamma, "icn_%d_limit_egamma", id);
+    char chk_ex[64];  snprintf(chk_ex,  sizeof chk_ex,  "icn_%d_limit_chkex",  id);
+
+    /* Emit N (bounded — one-shot, eval once) */
+    IjPorts np; strncpy(np.γ, n_relay, 63); strncpy(np.ω, ports.ω, 63);
+    char na[64], nb[64]; ij_emit_expr(bound, np, na, nb);
+
+    /* Emit E — γ → e_gamma (we intercept), ω → ports.ω */
+    IjPorts ep; strncpy(ep.γ, e_gamma, 63); strncpy(ep.ω, ports.ω, 63);
+    char ea[64], eb[64]; ij_emit_expr(expr, ep, ea, eb);
+
+    /* n_relay: N value (long) on stack → store max, reset count=0, goto E.α */
+    JL(n_relay);
+    ij_put_long(max_fld);
+    JI("lconst_0", ""); ij_put_long(cnt_fld);
+    JGoto(ea);
+
+    /* e_gamma: E yielded a value (long or String) on stack.
+     * Check counter: if count >= max → pop value, goto E.β (exhaust).
+     * Else: count++, propagate value to ports.γ.
+     * We must not disturb the value on the stack during the check, so we
+     * use a relay: store value in a temp static first, check, then reload. */
+    char val_fld[64]; snprintf(val_fld, sizeof val_fld, "icn_%d_limit_val", id);
+    int expr_is_str = ij_expr_is_string(expr);
+    if (expr_is_str) {
+        ij_declare_static_str(val_fld);
+    } else {
+        ij_declare_static(val_fld);
+    }
+    JL(e_gamma);
+    /* store value */
+    if (expr_is_str) { ij_put_str_field(val_fld); }
+    else             { ij_put_long(val_fld); }
+
+    /* check: count >= max? */
+    JL(chk_ex);
+    ij_get_long(cnt_fld);
+    ij_get_long(max_fld);
+    JI("lcmp", "");
+    J("    ifge %s\n", eb);       /* count >= max → exhaust via E.β */
+
+    /* count++ */
+    ij_get_long(cnt_fld);
+    JI("lconst_1", ""); JI("ladd", "");
+    ij_put_long(cnt_fld);
+
+    /* reload value and succeed */
+    if (expr_is_str) { ij_get_str_field(val_fld); }
+    else             { ij_get_long(val_fld); }
+    JGoto(ports.γ);
+
+    /* α: eval N first (to get max), then will fall through to E.α via n_relay */
+    JL(a); JGoto(na);
+
+    /* β: check counter; if exhausted → ports.ω; else resume E.β
+     * Do NOT increment here — counter only increments when a value is actually
+     * yielded (in e_gamma path).  β just checks and re-drives the inner generator. */
+    JL(b);
+    ij_get_long(cnt_fld);
+    ij_get_long(max_fld);
+    JI("lcmp", "");
+    J("    ifge %s\n", ports.ω);  /* count >= max: already gave all allowed values */
+    JGoto(eb);
+}
+
+/* =========================================================================
  * Dispatch
  * ======================================================================= */
 static void ij_emit_expr(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
@@ -2199,6 +2302,7 @@ static void ij_emit_expr(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         case ICN_AUGOP:   ij_emit_augop    (n,ports,oα,oβ); break;
         case ICN_BANG:    ij_emit_bang     (n,ports,oα,oβ); break;
         case ICN_SIZE:    ij_emit_size     (n,ports,oα,oβ); break;
+        case ICN_LIMIT:   ij_emit_limit    (n,ports,oα,oβ); break;
         case ICN_SEQ: case ICN_SNE: case ICN_SLT:
         case ICN_SLE: case ICN_SGT: case ICN_SGE:
                           ij_emit_strrelop (n,ports,oα,oβ); break;
