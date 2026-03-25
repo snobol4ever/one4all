@@ -1,0 +1,10 @@
+# rung09 t05: until with separate proc to avoid slot collision
+procedure decr(n);
+  local x;
+  x := n;
+  until (x := x - 1) < 0 do 0;
+  write(x);
+end
+procedure main();
+  decr(3);
+end

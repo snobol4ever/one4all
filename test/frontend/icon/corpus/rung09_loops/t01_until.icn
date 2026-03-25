@@ -1,0 +1,9 @@
+# rung09 t01: until E do body — runs while E fails, stops when E succeeds
+procedure countdown(n);
+  local i;
+  i := 1;
+  until i > n do write(i) & (i := i + 1);
+end
+procedure main();
+  countdown(3);
+end

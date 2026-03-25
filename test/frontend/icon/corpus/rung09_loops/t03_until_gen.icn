@@ -1,0 +1,7 @@
+# rung09 t03: until with assignment as condition
+procedure main();
+  local i;
+  i := 0;
+  until (i := i + 1) > 4 do write(i);
+  write(i);
+end

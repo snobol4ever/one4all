@@ -1332,6 +1332,76 @@ static void ij_emit_while(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     JL(b); JGoto(ports.ω);
 }
 
+static void ij_emit_until(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
+    /* until E do body end — loop while E FAILS; exit when E SUCCEEDS.
+     * Byrd-box dual of while: cond.γ → ports.ω (cond succeeded → stop)
+     *                         cond.ω → body.α  (cond failed → run body) */
+    int id = ij_new_id(); char a[64], b[64];
+    lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
+    strncpy(oα,a,63); strncpy(oβ,b,63);
+
+    IcnNode *cond = n->children[0];
+    IcnNode *body = (n->nchildren > 1) ? n->children[1] : NULL;
+
+    char cond_ok[64];   snprintf(cond_ok,   sizeof cond_ok,   "icn_%d_condok",  id);
+    char cond_fail[64]; snprintf(cond_fail, sizeof cond_fail, "icn_%d_cfail",   id);
+    char loop_top[64];  snprintf(loop_top,  sizeof loop_top,  "icn_%d_top",     id);
+
+    /* cond.γ → cond_ok (discard value, then exit); cond.ω → cond_fail → body */
+    IjPorts cp; strncpy(cp.γ, cond_ok, 63); strncpy(cp.ω, cond_fail, 63);
+    char ca[64], cb[64]; ij_emit_expr(cond, cp, ca, cb);
+
+    /* cond succeeded → discard value, jump to ports.ω */
+    JL(cond_ok);
+    if (!ij_expr_is_string(cond)) { JI("pop2",""); } else { JI("pop",""); }
+    JGoto(ports.ω);
+
+    /* cond failed → run body */
+    JL(cond_fail);
+    if (body) {
+        char ba[64], bb[64];
+        char body_ok[64]; snprintf(body_ok, sizeof body_ok, "icn_%d_bok", id);
+        IjPorts bp; strncpy(bp.γ, body_ok, 63); strncpy(bp.ω, loop_top, 63);
+        ij_emit_expr(body, bp, ba, bb);
+        JGoto(ba);
+        /* body succeeded: drain value, loop */
+        JL(body_ok);
+        if (!ij_expr_is_string(body)) { JI("pop2",""); } else { JI("pop",""); }
+        JL(loop_top); JGoto(ca);
+    } else {
+        JL(loop_top); JGoto(ca);
+    }
+    JL(a); JGoto(ca);
+    JL(b); JGoto(ports.ω);
+}
+
+static void ij_emit_repeat(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
+    /* repeat body end — run body forever; break exits via ports.ω.
+     * body.γ and body.ω both loop back to body.α. */
+    int id = ij_new_id(); char a[64], b[64];
+    lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
+    strncpy(oα,a,63); strncpy(oβ,b,63);
+
+    IcnNode *body = (n->nchildren > 0) ? n->children[0] : NULL;
+
+    char loop_top[64]; snprintf(loop_top, sizeof loop_top, "icn_%d_top", id);
+
+    if (body) {
+        char ba[64], bb[64];
+        char body_ok[64]; snprintf(body_ok, sizeof body_ok, "icn_%d_bok", id);
+        IjPorts bp; strncpy(bp.γ, body_ok, 63); strncpy(bp.ω, loop_top, 63);
+        ij_emit_expr(body, bp, ba, bb);
+        JL(a); JL(loop_top); JGoto(ba);
+        /* body succeeded: drain value, loop again */
+        JL(body_ok);
+        if (!ij_expr_is_string(body)) { JI("pop2",""); } else { JI("pop",""); }
+        JGoto(loop_top);
+    } else {
+        JL(a); JL(loop_top); JGoto(loop_top);  /* infinite empty loop */
+    }
+    JL(b); JGoto(ports.ω);
+}
+
 /* =========================================================================
  * String type predicate and concat emitter
  * ======================================================================= */
@@ -1815,6 +1885,8 @@ static void ij_emit_expr(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         case ICN_TO_BY:   ij_emit_to_by    (n,ports,oα,oβ); break;
         case ICN_EVERY:   ij_emit_every    (n,ports,oα,oβ); break;
         case ICN_WHILE:   ij_emit_while    (n,ports,oα,oβ); break;
+        case ICN_UNTIL:   ij_emit_until    (n,ports,oα,oβ); break;
+        case ICN_REPEAT:  ij_emit_repeat   (n,ports,oα,oβ); break;
         case ICN_CALL:    ij_emit_call     (n,ports,oα,oβ); break;
         case ICN_SCAN:    ij_emit_scan     (n,ports,oα,oβ); break;
         case ICN_NOT:     ij_emit_not      (n,ports,oα,oβ); break;

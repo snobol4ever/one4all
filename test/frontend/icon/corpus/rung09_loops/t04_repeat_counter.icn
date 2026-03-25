@@ -1,0 +1,9 @@
+# rung09 t04: until with procedure doing the work
+procedure count(n);
+  local i;
+  i := n;
+  until (i := i - 1) < 0 do write(i);
+end
+procedure main();
+  count(3);
+end
