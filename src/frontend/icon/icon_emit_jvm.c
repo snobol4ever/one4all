@@ -3333,8 +3333,10 @@ static void ij_emit_relop(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     char lbfwd[64];  snprintf(lbfwd,  sizeof lbfwd,  "icn_%d_lb",     id);
     char lstore[64]; snprintf(lstore, sizeof lstore, "icn_%d_lstore", id);
 
-    /* Determine if either operand is real — doubles need dstore/dload/dcmpl */
-    int is_dbl = ij_expr_is_real(n->children[0]) || ij_expr_is_real(n->children[1]);
+    /* Determine operand type: string > double > long */
+    int is_str = ij_expr_is_string(n->children[0]) || ij_expr_is_string(n->children[1]);
+    int is_dbl = !is_str &&
+                 (ij_expr_is_real(n->children[0]) || ij_expr_is_real(n->children[1]));
 
     /* Use static fields for relay staging (not JVM locals) so that relay labels
      * are safe to reach on an empty stack — e.g. from an ICN_EVERY β-tableswitch
@@ -3343,7 +3345,8 @@ static void ij_emit_relop(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
      * getstatic do not, because the field is already live on all paths. */
     char lc_field[80]; snprintf(lc_field, sizeof lc_field, "icn_%d_relop_lc", id);
     char rc_field[80]; snprintf(rc_field, sizeof rc_field, "icn_%d_relop_rc", id);
-    if (is_dbl) { ij_declare_static_dbl(lc_field); ij_declare_static_dbl(rc_field); }
+    if (is_str) { ij_declare_static_str(lc_field); ij_declare_static_str(rc_field); }
+    else if (is_dbl) { ij_declare_static_dbl(lc_field); ij_declare_static_dbl(rc_field); }
     else        { ij_declare_static(lc_field);      ij_declare_static(rc_field);     }
     strncpy(oα,a,63); strncpy(oβ,b,63);
 
@@ -3355,15 +3358,19 @@ static void ij_emit_relop(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     IjPorts lp; strncpy(lp.γ, left_relay,  63); strncpy(lp.ω, ports.ω, 63);
     char la[64], lb[64]; ij_emit_expr(n->children[0], lp, la, lb);
 
-    /* left_relay: value on stack → promote to double if needed → store to lc_field */
+    /* left_relay: value on stack → store to lc_field */
     JL(left_relay);
-    if (is_dbl && !ij_expr_is_real(n->children[0])) JI("l2d", "");
-    if (is_dbl) ij_put_dbl(lc_field); else ij_put_long(lc_field);
+    if (is_str)      ij_put_str_field(lc_field);
+    else if (is_dbl) { if (!ij_expr_is_real(n->children[0])) JI("l2d","");
+                       ij_put_dbl(lc_field); }
+    else             ij_put_long(lc_field);
     JGoto(lstore);
-    /* right_relay: value on stack → promote to double if needed → store to rc_field */
+    /* right_relay: value on stack → store to rc_field */
     JL(right_relay);
-    if (is_dbl && !ij_expr_is_real(n->children[1])) JI("l2d", "");
-    if (is_dbl) ij_put_dbl(rc_field); else ij_put_long(rc_field);
+    if (is_str)      ij_put_str_field(rc_field);
+    else if (is_dbl) { if (!ij_expr_is_real(n->children[1])) JI("l2d","");
+                       ij_put_dbl(rc_field); }
+    else             ij_put_long(rc_field);
     JGoto(chk);
 
     JL(lbfwd); JGoto(lb);
@@ -3375,11 +3382,28 @@ static void ij_emit_relop(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
 
     /* chk: lc_field=left, rc_field=right — stack empty */
     JL(chk);
-    if (is_dbl) { ij_get_dbl(lc_field); ij_get_dbl(rc_field); }
-    else        { ij_get_long(lc_field); ij_get_long(rc_field); }
-
     const char *jfail;
-    if (is_dbl) {
+    if (is_str) {
+        /* String comparison: lc.compareTo(rc) → int; 0=eq, <0=lt, >0=gt */
+        ij_get_str_field(lc_field);
+        ij_get_str_field(rc_field);
+        JI("invokevirtual", "java/lang/String/compareTo(Ljava/lang/String;)I");
+        switch (n->kind) {
+            case ICN_LT: jfail = "ifge"; break;
+            case ICN_LE: jfail = "ifgt"; break;
+            case ICN_GT: jfail = "ifle"; break;
+            case ICN_GE: jfail = "iflt"; break;
+            case ICN_EQ: jfail = "ifne"; break;
+            case ICN_NE: jfail = "ifeq"; break;
+            default:     jfail = "ifne"; break;
+        }
+        J("    %s %s\n", jfail, rb);
+        /* success: reload right as String result, convert to lconst_0 token */
+        ij_get_str_field(rc_field);
+        JGoto(ports.γ);
+        return;
+    } else if (is_dbl) {
+        ij_get_dbl(lc_field); ij_get_dbl(rc_field);
         /* dcmpl: pushes -1 if either NaN, or left < right; 0 if equal; 1 if left > right.
          * Use dcmpl for </<= (NaN → -1 → treated as less, safe fail for > case).
          * Use dcmpg for >/>= (NaN → +1 → treated as greater, safe fail for < case).
@@ -3394,6 +3418,7 @@ static void ij_emit_relop(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
             default:     JI("dcmpl",""); jfail = "ifne"; break;
         }
     } else {
+        ij_get_long(lc_field); ij_get_long(rc_field);
         /* Integer path: lcmp leaves int on stack */
         JI("lcmp","");
         switch (n->kind) {
@@ -3753,6 +3778,12 @@ static int ij_expr_is_string(IcnNode *n) {
             if (n->nchildren >= 1) return ij_expr_is_string(n->children[0]);
             return 0;
         }
+        case ICN_LT: case ICN_LE: case ICN_GT: case ICN_GE: case ICN_EQ: case ICN_NE:
+            /* Numeric relops yield long; string relops yield the rc String value */
+            if (n->nchildren >= 2)
+                return ij_expr_is_string(n->children[0]) ||
+                       ij_expr_is_string(n->children[1]);
+            return 0;
         case ICN_SUBSCRIPT:
             /* t[k] on a table yields a long, not a String */
             if (n->nchildren >= 1 && ij_expr_is_table(n->children[0])) return 0;
@@ -5439,6 +5470,40 @@ static void ij_emit_expr(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
 /* =========================================================================
  * Emit one procedure as a static method
  * ======================================================================= */
+/* Pre-pass 3 (recursive): walk the entire AST and register VAR types for all
+ * ICN_ASSIGN nodes, regardless of nesting depth.  This ensures that variables
+ * assigned inside ICN_AND/ICN_ALT/ICN_WHILE sub-expressions are typed before
+ * any drain-type query fires during emission.  Must be called after the locals
+ * list is populated (so ij_locals_find works) and before ij_emit_expr. */
+static void ij_prepass_types(IcnNode *n) {
+    if (!n) return;
+    if (n->kind == ICN_ASSIGN && n->nchildren >= 2) {
+        IcnNode *lhs = n->children[0];
+        IcnNode *rhs = n->children[1];
+        if (lhs && lhs->kind == ICN_VAR) {
+            int slot = ij_locals_find(lhs->val.sval);
+            char fld[128];
+            if (slot >= 0) ij_var_field(lhs->val.sval, fld, sizeof fld);
+            else           snprintf(fld, sizeof fld, "icn_gvar_%s", lhs->val.sval);
+            if (ij_expr_is_string(rhs)) {
+                ij_declare_static_str(fld);
+            } else if (ij_expr_is_list(rhs)) {
+                if (ij_expr_is_record_list(rhs))
+                    ij_declare_static_reclist(fld);
+                else
+                    ij_declare_static_list(fld);
+            } else if (ij_expr_is_table(rhs)) {
+                ij_declare_static_table(fld);
+            } else if (ij_expr_is_real(rhs)) {
+                ij_declare_static_dbl(fld);
+            }
+            /* long-typed: declared on first use, no pre-declaration needed */
+        }
+    }
+    for (int i = 0; i < n->nchildren; i++)
+        ij_prepass_types(n->children[i]);
+}
+
 static void ij_emit_proc(IcnNode *proc, FILE *out_target) {
     FILE *save = jout;
     /* Emit proc body to a temp buffer first (so we know locals count) */
@@ -5548,6 +5613,10 @@ static void ij_emit_proc(IcnNode *proc, FILE *out_target) {
         else           snprintf(fld, sizeof fld, "icn_gvar_%s", lhs->val.sval);
         ij_declare_static_obj(fld);
     }
+
+    /* Pre-pass 3: recursive walk — catches assigns nested inside AND/ALT/WHILE. */
+    for (int si = 0; si < nstmts; si++)
+        ij_prepass_types(proc->children[body_start + si]);
 
     /* Chain statements.
      * Fix IJ-6 Bug3: every top-level statement (assignment etc.) leaves its result
