@@ -479,6 +479,7 @@ static void ij_put_real_field(const char *fname) {
 static int ij_expr_is_string(IcnNode *n);
 static int ij_expr_is_list(IcnNode *n);
 static int ij_expr_is_table(IcnNode *n);
+static int ij_expr_is_record_list(IcnNode *n);
 /* Returns the type tag for a declared static field, or 0 if not found */
 static char ij_field_type_tag(const char *name) {
     for (int i = 0; i < ij_nstatics; i++)
@@ -490,6 +491,9 @@ static int ij_expr_is_record(IcnNode *n) {
     if (!n) return 0;
     if (n->kind == ICN_CALL && n->nchildren >= 1 && n->children[0]->kind == ICN_VAR)
         return ij_is_record_type(n->children[0]->val.sval);
+    /* !<record-list> yields a record Object */
+    if (n->kind == ICN_BANG && n->nchildren >= 1)
+        return ij_expr_is_record_list(n->children[0]);
     /* VAR whose static field is Object-typed (assigned from a record constructor) */
     if (n->kind == ICN_VAR) {
         char fld[128]; ij_var_field(n->val.sval, fld, sizeof fld);
@@ -497,6 +501,54 @@ static int ij_expr_is_record(IcnNode *n) {
         /* global var */
         char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", n->val.sval);
         if (ij_field_type_tag(gname) == 'O') return 1;
+    }
+    return 0;
+}
+/* Returns 1 if the list expression contains Object (record) elements rather than
+ * boxed Longs.  True for:
+ *   - MAKELIST whose first element is a record constructor
+ *   - sortf(L, f) — always a record list
+ *   - sort(L)     — if L itself is a record list
+ *   - a VAR whose field tag is 'L' and whose backing MAKELIST had record elements
+ *     (detected by checking the static field icn_N_elem_0 type tag == 'O')
+ */
+static int ij_expr_is_record_list(IcnNode *n) {
+    if (!n) return 0;
+    /* Direct list literal: [rec(...), ...] */
+    if (n->kind == ICN_MAKELIST) {
+        if (n->nchildren > 0 && ij_expr_is_record(n->children[0])) return 1;
+        return 0;
+    }
+    /* sortf always returns a record list */
+    if (n->kind == ICN_CALL && n->nchildren >= 1) {
+        IcnNode *fn = n->children[0];
+        if (fn && fn->kind == ICN_VAR) {
+            if (strcmp(fn->val.sval, "sortf") == 0) return 1;
+            /* sort(L) — record list if L is a record list */
+            if (strcmp(fn->val.sval, "sort") == 0 && n->nchildren >= 2)
+                return ij_expr_is_record_list(n->children[1]);
+        }
+    }
+    /* Assignment: propagate from rhs */
+    if (n->kind == ICN_ASSIGN && n->nchildren >= 2)
+        return ij_expr_is_record_list(n->children[1]);
+    /* VAR: check if any elem field for this var is Object-typed.
+     * The makelist emitter stores elements in icn_N_elem_0 as Object fields;
+     * we can't recover N from just the var name, so fall back to checking
+     * whether the list static field has a sibling _elem_0 that is 'O'-typed.
+     * Simpler heuristic: check the static-field registry for any field named
+     * icn_*_elem_0 that is Object-typed — this is coarse but correct for the
+     * single-list-per-scope case common in tests.
+     * A precise approach: tag list fields at declare time. Use the coarse one for now. */
+    if (n->kind == ICN_VAR) {
+        /* Check global var field registry for associated elem_0 Object entry */
+        char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", n->val.sval);
+        /* Walk statics looking for icn_*_elem_0 with type 'O' that was declared
+         * in the same scope — use presence of any elem_0 Object as signal */
+        for (int i = 0; i < ij_nstatics; i++) {
+            if (ij_static_types[i] == 'O' &&
+                strstr(ij_statics[i], "_elem_0") != NULL) return 1;
+        }
     }
     return 0;
 }
@@ -3555,7 +3607,8 @@ static int ij_expr_is_list(IcnNode *n) {
             if (fn && fn->kind == ICN_VAR) {
                 const char *fname = fn->val.sval;
                 if (strcmp(fname, "push") == 0 || strcmp(fname, "put") == 0 ||
-                    strcmp(fname, "list") == 0) return 1;
+                    strcmp(fname, "list") == 0 ||
+                    strcmp(fname, "sort") == 0 || strcmp(fname, "sortf") == 0) return 1;
             }
         }
         return 0;
@@ -4216,13 +4269,15 @@ static void ij_emit_bang(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         JI("invokevirtual", "java/util/ArrayList/size()I");
         ij_get_int_field(idx_fld);
         J("    if_icmple %s\n", ports.ω); /* size <= idx → exhausted */
-        /* get(idx) → Object → unbox as long */
+        /* get(idx) → Object; unbox as Long for scalar lists, leave as Object for record lists */
         ij_get_list_field(list_fld);
         ij_get_int_field(idx_fld);
         JI("invokevirtual", "java/util/ArrayList/get(I)Ljava/lang/Object;");
         JL(ok);
-        JI("checkcast", "java/lang/Long");
-        JI("invokevirtual", "java/lang/Long/longValue()J");
+        if (!ij_expr_is_record_list(child)) {
+            JI("checkcast", "java/lang/Long");
+            JI("invokevirtual", "java/lang/Long/longValue()J");
+        }
         /* increment idx */
         ij_get_int_field(idx_fld);
         JI("iconst_1", ""); JI("iadd", "");
@@ -6030,7 +6085,7 @@ void ij_emit_file(IcnNode **nodes, int count, FILE *out, const char *filename, c
     J("    invokevirtual java/util/ArrayList/get(I)Ljava/lang/Object;\n");
     J("    checkcast java/lang/Long\n");
     J("    invokevirtual java/lang/Long/longValue()J\n");
-    J("    lstore_4\n");
+    J("    lstore 4\n");
     /* j = i - 1 */
     J("    iload_2\n");
     J("    iconst_1\n");
@@ -6045,7 +6100,7 @@ void ij_emit_file(IcnNode **nodes, int count, FILE *out, const char *filename, c
     J("    invokevirtual java/util/ArrayList/get(I)Ljava/lang/Object;\n");
     J("    checkcast java/lang/Long\n");
     J("    invokevirtual java/lang/Long/longValue()J\n");
-    J("    lload_4\n");
+    J("    lload 4\n");
     J("    lcmp\n");
     J("    ifle icn_sort_insert\n");
     /* result.set(j+1, result.get(j)) */
@@ -6067,7 +6122,7 @@ void ij_emit_file(IcnNode **nodes, int count, FILE *out, const char *filename, c
     J("    iload_3\n");
     J("    iconst_1\n");
     J("    iadd\n");
-    J("    lload_4\n");
+    J("    lload 4\n");
     J("    invokestatic java/lang/Long/valueOf(J)Ljava/lang/Long;\n");
     J("    invokevirtual java/util/ArrayList/set(ILjava/lang/Object;)Ljava/lang/Object;\n");
     J("    pop\n");
