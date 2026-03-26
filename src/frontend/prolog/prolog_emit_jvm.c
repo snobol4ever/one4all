@@ -1917,6 +1917,23 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
             JI("goto", lbl_γ);
             return;
         }
+        /* term-order comparisons @< @> @=< @>= */
+        if ((strcmp(fn, "@<")  == 0 || strcmp(fn, "@>")  == 0 ||
+             strcmp(fn, "@=<") == 0 || strcmp(fn, "@>=") == 0) && nargs == 2) {
+            pj_emit_term(goal->children[0], var_locals, n_vars);
+            J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+            J("    invokestatic %s/pj_term_str(Ljava/lang/Object;)Ljava/lang/String;\n", pj_classname);
+            pj_emit_term(goal->children[1], var_locals, n_vars);
+            J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+            J("    invokestatic %s/pj_term_str(Ljava/lang/Object;)Ljava/lang/String;\n", pj_classname);
+            J("    invokevirtual java/lang/String/compareTo(Ljava/lang/String;)I\n");
+            if      (strcmp(fn, "@<")  == 0) J("    ifge %s\n", lbl_ω);
+            else if (strcmp(fn, "@>")  == 0) J("    ifle %s\n", lbl_ω);
+            else if (strcmp(fn, "@=<") == 0) J("    ifgt %s\n", lbl_ω);
+            else if (strcmp(fn, "@>=") == 0) J("    iflt %s\n", lbl_ω);
+            JI("goto", lbl_γ);
+            return;
+        }
         /* ------------------------------------------------------------------ *
          * M-PJ-ATOM-BUILTINS — PJ-48
          * All atom/string builtins are JVM String operations.
