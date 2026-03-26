@@ -93,39 +93,6 @@ if [ -z "$JASMIN" ]; then
     fi
 fi
 
-# ── Icon semicolon converter ───────────────────────────────────────────────────
-# The snobol4x icon_driver uses explicit-semicolon Icon dialect.
-# This function adds ';' after procedure headers and statements.
-icon_add_semis() {
-    python3 - "$1" << 'PYEOF'
-import re, sys
-
-def needs_semi(line):
-    s = line.rstrip()
-    if not s or s.lstrip().startswith('#'):
-        return False
-    if s.rstrip().endswith((';', '{', '}')):
-        return False
-    if re.match(r'^\s*end\s*$', s.rstrip()):
-        return False
-    return True
-
-lines = open(sys.argv[1]).read().split('\n')
-out = []
-for line in lines:
-    s = line.rstrip()
-    m = re.match(r'^(\s*procedure\s+\w+\s*\([^)]*\))\s*$', s)
-    if m:
-        out.append(m.group(1) + ';')
-        continue
-    if needs_semi(s):
-        out.append(s + ';')
-    else:
-        out.append(s)
-print('\n'.join(out), end='')
-PYEOF
-}
-
 # ── Reference interpreter runners ─────────────────────────────────────────────
 SNOBOL4="${SNOBOL4:-snobol4}"
 SWIPL="${SWIPL:-swipl}"
@@ -214,9 +181,7 @@ run_jvm_backend() {
                 SKIP_COUNT=$((SKIP_COUNT+1))
                 return
             fi
-            local semi_src="$TMP/icon_demo.icn"
-            icon_add_semis "$src" > "$semi_src"
-            "$ICON_DRIVER" -jvm "$semi_src" -o "$jfile" 2>/dev/null || true
+            "$ICON_DRIVER" -jvm "$src" -o "$jfile" 2>/dev/null || true
             ;;
         PROLOG-JVM)
             if [ -z "$SNO2C" ]; then

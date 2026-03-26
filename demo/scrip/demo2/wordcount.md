@@ -17,16 +17,16 @@ END
 ```Icon
 # SCRIP DEMO2 -- Word Count (Icon section)
 # Idiom: string scanning with tab(upto)/tab(many) generator
-procedure main()
-    s := "the quick brown fox jumps over the lazy dog"
-    count := 0
+procedure main();
+    s := "the quick brown fox jumps over the lazy dog";
+    count := 0;
     s ? {
         while tab(upto(&letters)) do {
-            tab(many(&letters))
-            count +:= 1
+            tab(many(&letters));
+            count +:= 1;
         }
-    }
-    write(count)
+    };
+    write(count);
 end
 ```
 

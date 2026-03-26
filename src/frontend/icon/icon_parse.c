@@ -85,6 +85,7 @@ static int expect(IcnParser *p, IcnTkKind kind, const char *ctx) {
 static IcnNode *parse_expr(IcnParser *p);
 static IcnNode *parse_stmt(IcnParser *p);
 static IcnNode *parse_do_clause(IcnParser *p);
+static IcnNode *parse_block_or_expr(IcnParser *p);
 
 /* =========================================================================
  * Expression parsing (recursive descent)
@@ -479,7 +480,7 @@ static IcnNode *parse_assign(IcnParser *p) {
     }
     if (check(p, TK_QMARK)) {
         advance(p);
-        IcnNode *rhs = parse_assign(p);
+        IcnNode *rhs = parse_block_or_expr(p);
         return icn_node_new(ICN_SCAN, line, 2, n, rhs);
     }
     return n;
@@ -584,7 +585,7 @@ static IcnNode *parse_stmt(IcnParser *p) {
         advance(p);
         IcnNode *gen = parse_expr(p);
         IcnNode *body = parse_do_clause(p);
-        expect(p, TK_SEMICOL, "every statement");
+        match(p, TK_SEMICOL);
         if (body) return icn_node_new(ICN_EVERY, line, 2, gen, body);
         return icn_node_new(ICN_EVERY, line, 1, gen);
     }
@@ -595,7 +596,7 @@ static IcnNode *parse_stmt(IcnParser *p) {
         IcnNode *thenb = parse_block_or_expr(p);
         IcnNode *elseb = NULL;
         if (match(p, TK_ELSE)) elseb = parse_block_or_expr(p);
-        expect(p, TK_SEMICOL, "if statement");
+        match(p, TK_SEMICOL);
         if (elseb) return icn_node_new(ICN_IF, line, 3, cond, thenb, elseb);
         return icn_node_new(ICN_IF, line, 2, cond, thenb);
     }
@@ -603,7 +604,7 @@ static IcnNode *parse_stmt(IcnParser *p) {
         advance(p);
         IcnNode *cond = parse_expr(p);
         IcnNode *body = parse_do_clause(p);
-        expect(p, TK_SEMICOL, "while statement");
+        match(p, TK_SEMICOL);
         if (body) return icn_node_new(ICN_WHILE, line, 2, cond, body);
         return icn_node_new(ICN_WHILE, line, 1, cond);
     }
@@ -611,14 +612,14 @@ static IcnNode *parse_stmt(IcnParser *p) {
         advance(p);
         IcnNode *cond = parse_expr(p);
         IcnNode *body = parse_do_clause(p);
-        expect(p, TK_SEMICOL, "until statement");
+        match(p, TK_SEMICOL);
         if (body) return icn_node_new(ICN_UNTIL, line, 2, cond, body);
         return icn_node_new(ICN_UNTIL, line, 1, cond);
     }
     if (check(p, TK_REPEAT)) {
         advance(p);
         IcnNode *body = parse_block_or_expr(p);
-        expect(p, TK_SEMICOL, "repeat statement");
+        match(p, TK_SEMICOL);
         return icn_node_new(ICN_REPEAT, line, 1, body);
     }
     if (check(p, TK_RETURN)) {

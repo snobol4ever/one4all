@@ -807,6 +807,33 @@ static void ij_emit_var(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         return;
     }
 
+    /* &keyword cset constants — push as String literals */
+    if (strcmp(n->val.sval, "&letters") == 0) {
+        J("    ldc \"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz\"\n");
+        JGoto(ports.γ); JL(b); JGoto(ports.ω); return;
+    }
+    if (strcmp(n->val.sval, "&ucase") == 0) {
+        J("    ldc \"ABCDEFGHIJKLMNOPQRSTUVWXYZ\"\n");
+        JGoto(ports.γ); JL(b); JGoto(ports.ω); return;
+    }
+    if (strcmp(n->val.sval, "&lcase") == 0) {
+        J("    ldc \"abcdefghijklmnopqrstuvwxyz\"\n");
+        JGoto(ports.γ); JL(b); JGoto(ports.ω); return;
+    }
+    if (strcmp(n->val.sval, "&digits") == 0) {
+        J("    ldc \"0123456789\"\n");
+        JGoto(ports.γ); JL(b); JGoto(ports.ω); return;
+    }
+    if (strcmp(n->val.sval, "&ascii") == 0) {
+        /* first 128 chars */
+        J("    ldc \"\\u0000\\u0001\\u0002\\u0003\\u0004\\u0005\\u0006\\u0007\\u0008\\u0009\\u000a\\u000b\\u000c\\u000d\\u000e\\u000f\\u0010\\u0011\\u0012\\u0013\\u0014\\u0015\\u0016\\u0017\\u0018\\u0019\\u001a\\u001b\\u001c\\u001d\\u001e\\u001f !\\\"#$%%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\\u007f\"\n");
+        JGoto(ports.γ); JL(b); JGoto(ports.ω); return;
+    }
+    if (strcmp(n->val.sval, "&cset") == 0) {
+        J("    ldc \"\\u0000\\u0001\\u0002\\u0003\\u0004\\u0005\\u0006\\u0007\\u0008\\u0009\\u000a\\u000b\\u000c\\u000d\\u000e\\u000f\\u0010\\u0011\\u0012\\u0013\\u0014\\u0015\\u0016\\u0017\\u0018\\u0019\\u001a\\u001b\\u001c\\u001d\\u001e\\u001f !\\\"#$%%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\\u007f\"\n");
+        JGoto(ports.γ); JL(b); JGoto(ports.ω); return;
+    }
+
     int slot = ij_locals_find(n->val.sval);
     if (slot >= 0) {
         /* Named local/param: use per-proc static field (suspend-safe) */
@@ -1877,11 +1904,7 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         J("    pop2\n");
         JGoto(ports.ω);
         JL(chk);
-        JC("upto: advance icn_pos past match, yield pos");
-        /* result long = matched position (1-based); advance icn_pos to pos (0-based = result) */
-        J("    dup2\n");
-        J("    l2i\n");
-        ij_put_int_field("icn_pos");      /* icn_pos = result (0-based next scan start) */
+        JC("upto: yield 1-based pos (tab advances icn_pos)");
         JGoto(ports.γ);
         return;
     }

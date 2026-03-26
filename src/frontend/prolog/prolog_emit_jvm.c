@@ -1890,6 +1890,51 @@ static void pj_emit_assertz_helpers(void) {
     JI("areturn", "");
     J(".end method\n\n");
 
+    /* pj_length_2(Object list, Object n) -> Z
+     * length(+List, ?N): count cons cells, unify N with result.
+     * locals: 0=list, 1=n, 2=cur(deref'd cell), 3=count(int) */
+    J("; pj_length_2(Object list, Object n) -> Z\n");
+    J(".method static pj_length_2(Ljava/lang/Object;Ljava/lang/Object;)Z\n");
+    J("    .limit stack 6\n");
+    J("    .limit locals 4\n");
+    JI("aload_0", "");
+    J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    JI("astore_2", "");   /* cur = deref(list) */
+    JI("iconst_0", "");
+    JI("istore_3", "");   /* count = 0 */
+    J("pj_len_loop:\n");
+    /* if cur is not Object[] → it's [] atom, done */
+    JI("aload_2", "");
+    J("    instanceof [Ljava/lang/Object;\n");
+    J("    ifeq pj_len_done\n");
+    /* check functor == "[]" → done */
+    JI("aload_2", "");
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("iconst_1", "");
+    JI("aaload", "");   /* arr[1] = functor */
+    JI("ldc", "\"[]\"");
+    JI("invokevirtual", "java/lang/Object/equals(Ljava/lang/Object;)Z");
+    J("    ifne pj_len_done\n");
+    /* count++ */
+    JI("iinc", "3 1");
+    /* advance to tail arr[3] */
+    JI("aload_2", "");
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("iconst_3", "");
+    JI("aaload", "");
+    J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    JI("astore_2", "");
+    J("    goto pj_len_loop\n");
+    J("pj_len_done:\n");
+    /* build int term from count and unify with n */
+    JI("iload_3", "");
+    JI("i2l", "");
+    J("    invokestatic %s/pj_term_int(J)[Ljava/lang/Object;\n", pj_classname);
+    JI("aload_1", "");
+    J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+    JI("ireturn", "");
+    J(".end method\n\n");
+
     /* pj_arraylist_to_list(ArrayList) -> Object
      * Rebuilds a pj cons list from an ArrayList (last element first). */
     J("; pj_arraylist_to_list(ArrayList) -> Object\n");
@@ -3464,6 +3509,8 @@ static int pj_is_user_call(EXPR_t *goal) {
         "char_type",
         "writeq","write_canonical",
         "atom_string","number_string",
+        "string_chars","string_codes",
+        "length",
         "string_concat","string_length","string_lower","string_upper",
         "term_to_atom","term_string",
         "copy_term",
@@ -3835,6 +3882,16 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
             JI("goto", lbl_γ);
             return;
         }
+        /* length(+List, ?N) — count list elements, unify N */
+        if (strcmp(fn, "length") == 0 && nargs == 2) {
+            pj_emit_term(goal->children[0], var_locals, n_vars);
+            pj_emit_term(goal->children[1], var_locals, n_vars);
+            J("    invokestatic %s/pj_length_2(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+            J("    ifeq %s\n", lbl_ω);
+            JI("goto", lbl_γ);
+            return;
+        }
+
         /* sort(+List, -Sorted) — sort with deduplication */
         /* msort(+List, -Sorted) — sort without deduplication */
         if ((strcmp(fn, "sort") == 0 || strcmp(fn, "msort") == 0) && nargs == 2) {
@@ -3977,6 +4034,26 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
 
         /* atom_codes(+Atom, ?Codes) or atom_codes(?Atom, +Codes) */
         if (strcmp(fn, "atom_codes") == 0 && nargs == 2) {
+            pj_emit_term(goal->children[0], var_locals, n_vars);
+            pj_emit_term(goal->children[1], var_locals, n_vars);
+            J("    invokestatic %s/pj_atom_codes_2(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+            J("    ifeq %s\n", lbl_ω);
+            JI("goto", lbl_γ);
+            return;
+        }
+
+        /* string_chars(+Str, ?Chars) — identical semantics to atom_chars on JVM */
+        if (strcmp(fn, "string_chars") == 0 && nargs == 2) {
+            pj_emit_term(goal->children[0], var_locals, n_vars);
+            pj_emit_term(goal->children[1], var_locals, n_vars);
+            J("    invokestatic %s/pj_atom_chars_2(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+            J("    ifeq %s\n", lbl_ω);
+            JI("goto", lbl_γ);
+            return;
+        }
+
+        /* string_codes(+Str, ?Codes) — identical semantics to atom_codes on JVM */
+        if (strcmp(fn, "string_codes") == 0 && nargs == 2) {
             pj_emit_term(goal->children[0], var_locals, n_vars);
             pj_emit_term(goal->children[1], var_locals, n_vars);
             J("    invokestatic %s/pj_atom_codes_2(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
