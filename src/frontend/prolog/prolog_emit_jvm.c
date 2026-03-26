@@ -1150,13 +1150,219 @@ static void pj_emit_runtime_helpers(void) {
  * Class-level scaffold: header + <clinit>
  * ------------------------------------------------------------------------- */
 
+static void pj_emit_assertz_helpers(void) {
+    JSep("Dynamic DB helpers: pj_db_assert_key, pj_db_assert, pj_db_query");
+
+    /* pj_db_assert_key(Object term) -> String
+     * Returns "functor/arity" key for the term.
+     * atom → "atom/0", compound Object[] → "{sval}/{nargs}" */
+    J("; pj_db_assert_key(Object) -> String\n");
+    J(".method static pj_db_assert_key(Ljava/lang/Object;)Ljava/lang/String;\n");
+    J("    .limit stack 6\n");
+    J("    .limit locals 3\n");
+    /* is it an Object[]? */
+    JI("aload_0", "");
+    JI("dup", "");
+    J("    instanceof [Ljava/lang/Object;\n");
+    J("    ifeq pj_db_key_atom\n");
+    /* compound: arr[0] = functor string */
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("iconst_0", "");
+    JI("aaload", "");  /* arr[0] = functor */
+    JI("checkcast", "java/lang/String");
+    JI("astore_1", "");
+    /* arr.length - 1 = arity */
+    JI("aload_0", "");
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("arraylength", "");
+    JI("iconst_1", "");
+    JI("isub", "");
+    JI("istore_2", "");
+    /* build "functor/arity" */
+    JI("new", "java/lang/StringBuilder");
+    JI("dup", "");
+    JI("invokespecial", "java/lang/StringBuilder/<init>()V");
+    JI("aload_1", "");
+    JI("invokevirtual", "java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;");
+    JI("ldc", "\"/\"");
+    JI("invokevirtual", "java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;");
+    JI("iload_2", "");
+    JI("invokevirtual", "java/lang/StringBuilder/append(I)Ljava/lang/StringBuilder;");
+    JI("invokevirtual", "java/lang/StringBuilder/toString()Ljava/lang/String;");
+    JI("areturn", "");
+    /* atom: key = "atom/0" */
+    J("pj_db_key_atom:\n");
+    JI("aload_0", "");
+    JI("checkcast", "java/lang/String");
+    JI("astore_1", "");
+    JI("new", "java/lang/StringBuilder");
+    JI("dup", "");
+    JI("invokespecial", "java/lang/StringBuilder/<init>()V");
+    JI("aload_1", "");
+    JI("invokevirtual", "java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;");
+    JI("ldc", "\"/0\"");
+    JI("invokevirtual", "java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;");
+    JI("invokevirtual", "java/lang/StringBuilder/toString()Ljava/lang/String;");
+    JI("areturn", "");
+    J(".end method\n\n");
+
+    /* pj_db_assert(String key, Object term, int prepend) -> void
+     * Appends (prepend=0) or prepends (prepend=1) a deep-copy of term
+     * to the list keyed by key in pj_db. */
+    J("; pj_db_assert(String key, Object term, int prepend) -> void\n");
+    J(".method static pj_db_assert(Ljava/lang/String;Ljava/lang/Object;I)V\n");
+    J("    .limit stack 6\n");
+    J("    .limit locals 4\n");
+    /* local 0=key, 1=term, 2=prepend, 3=list */
+    /* get or create list */
+    J("    getstatic %s/pj_db Ljava/util/HashMap;\n", pj_classname);
+    JI("aload_0", "");
+    JI("invokevirtual", "java/util/HashMap/get(Ljava/lang/Object;)Ljava/lang/Object;");
+    JI("dup", "");
+    J("    ifnonnull pj_db_assert_have_list\n");
+    JI("pop", "");
+    JI("new", "java/util/ArrayList");
+    JI("dup", "");
+    JI("invokespecial", "java/util/ArrayList/<init>()V");
+    /* put new list in map */
+    J("    getstatic %s/pj_db Ljava/util/HashMap;\n", pj_classname);
+    JI("aload_0", "");
+    /* stack: new_list, map, key */
+    /* need: map.put(key, list); keep list on stack */
+    /* use dup strategy */
+    JI("dup_x2", "");  /* list, map, key, list -> list on top after dup_x2 -> nope, do it differently */
+    /* reset: just store list, then re-get */
+    /* stack here: new_list (TOS), map, key — dup_x2 inserts copy below map,key */
+    /* Actually simpler: store list, then get map + key + list, put */
+    J("    astore_3\n");  /* store new list */
+    J("    getstatic %s/pj_db Ljava/util/HashMap;\n", pj_classname);
+    JI("aload_0", "");
+    JI("aload_3", "");
+    JI("invokevirtual", "java/util/HashMap/put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+    JI("pop", "");
+    JI("aload_3", "");
+    J("    goto pj_db_assert_have_list\n");
+    J("pj_db_assert_have_list:\n");
+    /* stack: list (ArrayList) */
+    JI("checkcast", "java/util/ArrayList");
+    JI("astore_3", "");
+    /* deep-copy the term for storage */
+    JI("aload_1", "");
+    J("    invokestatic %s/pj_copy_term_ground(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    JI("astore_1", "");
+    /* prepend==1 → list.add(0, term); else list.add(term) */
+    JI("iload_2", "");
+    J("    ifeq pj_db_assert_append\n");
+    JI("aload_3", "");
+    JI("iconst_0", "");
+    JI("aload_1", "");
+    JI("invokevirtual", "java/util/ArrayList/add(ILjava/lang/Object;)V");
+    JI("return", "");
+    J("pj_db_assert_append:\n");
+    JI("aload_3", "");
+    JI("aload_1", "");
+    JI("invokevirtual", "java/util/ArrayList/add(Ljava/lang/Object;)Z");
+    JI("pop", "");
+    JI("return", "");
+    J(".end method\n\n");
+
+    /* pj_db_query(String key, int idx) -> Object | null
+     * Returns term at index idx in the DB list for key, or null if OOB. */
+    J("; pj_db_query(String key, int idx) -> Object | null\n");
+    J(".method static pj_db_query(Ljava/lang/String;I)Ljava/lang/Object;\n");
+    J("    .limit stack 4\n");
+    J("    .limit locals 3\n");
+    J("    getstatic %s/pj_db Ljava/util/HashMap;\n", pj_classname);
+    JI("aload_0", "");
+    JI("invokevirtual", "java/util/HashMap/get(Ljava/lang/Object;)Ljava/lang/Object;");
+    JI("dup", "");
+    J("    ifnonnull pj_db_query_have\n");
+    JI("areturn", "");  /* null → no entries */
+    J("pj_db_query_have:\n");
+    JI("checkcast", "java/util/ArrayList");
+    JI("astore_2", "");
+    /* bounds check: idx < list.size() */
+    JI("aload_2", "");
+    JI("invokevirtual", "java/util/ArrayList/size()I");
+    JI("iload_1", "");
+    J("    if_icmpgt pj_db_query_ok\n");
+    JI("aconst_null", "");
+    JI("areturn", "");
+    J("pj_db_query_ok:\n");
+    JI("aload_2", "");
+    JI("iload_1", "");
+    JI("invokevirtual", "java/util/ArrayList/get(I)Ljava/lang/Object;");
+    JI("areturn", "");
+    J(".end method\n\n");
+
+    /* pj_copy_term_ground(Object) -> Object
+     * Deep-copy a ground term (atoms, ints, compounds) for DB storage.
+     * Variables are stored as-is (for future retract support). */
+    J("; pj_copy_term_ground(Object) -> Object\n");
+    J(".method static pj_copy_term_ground(Ljava/lang/Object;)Ljava/lang/Object;\n");
+    J("    .limit stack 8\n");
+    J("    .limit locals 5\n");
+    JI("aload_0", "");
+    /* atom (String) or int (Long)? return as-is */
+    JI("dup", "");
+    J("    instanceof [Ljava/lang/Object;\n");
+    J("    ifne pj_ctg_compound\n");
+    JI("areturn", "");
+    J("pj_ctg_compound:\n");
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("astore_1", "");
+    /* new array of same length */
+    JI("aload_1", "");
+    JI("arraylength", "");
+    JI("istore_2", "");
+    JI("iload_2", "");
+    JI("anewarray", "java/lang/Object");
+    JI("astore_3", "");
+    /* copy slot 0 (functor string) as-is */
+    JI("astore", "4");  /* use local 4 as loop var */
+    /* Actually: copy each slot recursively */
+    /* slot 0 = functor (String) — copy as-is */
+    JI("aload_3", "");
+    JI("iconst_0", "");
+    JI("aload_1", "");
+    JI("iconst_0", "");
+    JI("aaload", "");
+    JI("aastore", "");
+    /* loop i=1..length-1 */
+    JI("iconst_1", "");
+    JI("istore", "4");
+    J("pj_ctg_loop:\n");
+    JI("iload", "4");
+    JI("iload_2", "");
+    J("    if_icmpge pj_ctg_done\n");
+    JI("aload_3", "");
+    JI("iload", "4");
+    JI("aload_1", "");
+    JI("iload", "4");
+    JI("aaload", "");
+    J("    invokestatic %s/pj_copy_term_ground(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    JI("aastore", "");
+    JI("iinc", "4 1");
+    J("    goto pj_ctg_loop\n");
+    J("pj_ctg_done:\n");
+    JI("aload_3", "");
+    JI("areturn", "");
+    J(".end method\n\n");
+}
+
+/* -------------------------------------------------------------------------
+ * Class-level scaffold: header + <clinit>
+ * ------------------------------------------------------------------------- */
+
 static void pj_emit_class_header(void) {
     J(".class public %s\n", pj_classname);
     J(".super java/lang/Object\n\n");
     JC("Trail field");
     J(".field static pj_trail Ljava/util/ArrayList;\n\n");
+    JC("Dynamic DB field: HashMap<String, ArrayList<Object[]>>");
+    J(".field static pj_db Ljava/util/HashMap;\n\n");
 
-    /* <clinit> — init trail */
+    /* <clinit> — init trail and dynamic DB */
     J(".method static <clinit>()V\n");
     J("    .limit stack 3\n");
     J("    .limit locals 0\n");
@@ -1164,6 +1370,10 @@ static void pj_emit_class_header(void) {
     JI("dup", "");
     JI("invokespecial", "java/util/ArrayList/<init>()V");
     J("    putstatic %s/pj_trail Ljava/util/ArrayList;\n", pj_classname);
+    JI("new", "java/util/HashMap");
+    JI("dup", "");
+    JI("invokespecial", "java/util/HashMap/<init>()V");
+    J("    putstatic %s/pj_db Ljava/util/HashMap;\n", pj_classname);
     JI("return", "");
     J(".end method\n\n");
 }
@@ -1403,6 +1613,7 @@ static int pj_is_user_call(EXPR_t *goal) {
         "atom_length","atom_concat","atom_chars","atom_codes","char_code",
         "number_chars","number_codes","upcase_atom","downcase_atom",
         "between","findall",
+        "assertz","asserta","abolish",
         NULL
     };
     for (int i = 0; builtins[i]; i++)
@@ -1649,6 +1860,23 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
          * pj_term_list_codes(String) → Object[]  (build int-code list)
          * pj_list_to_string(Object)  → String    (build String from char/code list)
          * ------------------------------------------------------------------ */
+
+        /* assertz(+Term) — append fact to dynamic DB */
+        if ((strcmp(fn, "assertz") == 0 || strcmp(fn, "asserta") == 0) && nargs == 1) {
+            int is_asserta = (strcmp(fn, "asserta") == 0);
+            /* We emit a call to the static helper pj_db_assert(key, term, append).
+             * key = functor/arity string of the asserted fact.
+             * We push: term (Object[]), key (String), is_asserta (I) */
+            pj_emit_term(goal->children[0], var_locals, n_vars);
+            J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+            J("    invokestatic %s/pj_db_assert_key(Ljava/lang/Object;)Ljava/lang/String;\n", pj_classname);
+            pj_emit_term(goal->children[0], var_locals, n_vars);
+            J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+            J("    %s\n", is_asserta ? "iconst_1" : "iconst_0");
+            J("    invokestatic %s/pj_db_assert(Ljava/lang/String;Ljava/lang/Object;I)V\n", pj_classname);
+            JI("goto", lbl_γ);
+            return;
+        }
 
         /* atom_length(+Atom, ?Length) */
         if (strcmp(fn, "atom_length") == 0 && nargs == 2) {
@@ -3276,7 +3504,7 @@ static void pj_emit_choice(EXPR_t *choice) {
         }
         if (s > max_stack) max_stack = s;
     }
-    int locals_needed = vars_base + max_vars + 5 * max_ucalls + 2 * max_neq + max_disj + 16;
+    int locals_needed = vars_base + max_vars + 5 * max_ucalls + 2 * max_neq + max_disj + 16 + 42;
 
     J("    .limit stack %d\n", max_stack < 16 ? 16 : max_stack);
     J("    .limit locals %d\n", locals_needed);
@@ -3560,8 +3788,97 @@ static void pj_emit_choice(EXPR_t *choice) {
         free(var_locals);
     }
 
-    /* ω port */
+    /* ω port — first try dynamic DB, then truly fail */
     J("p_%s_%d_omega:\n", safe_fn, arity);
+
+    /* Dynamic DB walker: key = "name/arity", cs encodes db index as base[nclauses]+idx */
+    {
+        /* cs range for dynamic clauses: base[nclauses], base[nclauses]+1, ...
+         * db_idx = cs - base[nclauses]  (0 = first dynamic clause)
+         * On static-clause exhaustion cs < base[nclauses]+N, so we check if
+         * cs >= base[nclauses] which is already assured by reaching omega.
+         * We use a local for db_idx. */
+        int db_idx_local = arity + 4 + 32 + 4; /* safe scratch local beyond all clause locals */
+        int db_lbl = pj_fresh_label();
+        char db_key[128], db_loop[128], db_hit[128], db_miss[128];
+        snprintf(db_key,  sizeof db_key,  "pj_db%d_key",  db_lbl);
+        snprintf(db_loop, sizeof db_loop, "pj_db%d_loop", db_lbl);
+        snprintf(db_hit,  sizeof db_hit,  "pj_db%d_hit",  db_lbl);
+        snprintf(db_miss, sizeof db_miss, "pj_db%d_miss", db_lbl);
+
+        /* compute db_idx = max(0, cs - base[nclauses]) */
+        J("    iload %d\n", cs_local);
+        J("    ldc %d\n", base[nclauses]);
+        JI("isub", "");
+        JI("dup", "");
+        J("    ifge pj_db%d_store\n", db_lbl);
+        JI("pop", "");
+        JI("iconst_0", "");
+        J("pj_db%d_store:\n", db_lbl);
+        J("    istore %d\n", db_idx_local);
+
+        /* retry entry point — db_idx_local already set */
+        J("%s:\n", db_loop);
+
+        /* query DB for this index */
+        J("    ldc \"%s/%d\"\n", name_only, arity);
+        J("    iload %d\n", db_idx_local);
+        J("    invokestatic %s/pj_db_query(Ljava/lang/String;I)Ljava/lang/Object;\n", pj_classname);
+        JI("dup", "");
+        J("    ifnonnull %s\n", db_hit);
+        JI("pop", "");
+        J("    goto %s\n", db_miss);
+
+        J("%s:\n", db_hit);
+        /* stack: term (Object[]) — try to unify with each arg */
+        /* For arity 0 (atom fact): just succeed */
+        if (arity == 0) {
+            JI("pop", ""); /* discard term */
+        } else {
+            /* term is Object[]: slot 0=functor, slots 1..arity = args */
+            JI("checkcast", "[Ljava/lang/Object;");
+            /* unify each arg */
+            int db_term_local = db_idx_local + 1;
+            J("    astore %d\n", db_term_local);
+            /* save trail mark for backtrack-on-fail */
+            J("    invokestatic %s/pj_trail_mark()I\n", pj_classname);
+            J("    istore %d\n", trail_local);
+
+            int unify_ok_lbl = pj_fresh_label();
+            char unify_ok[128], unify_fail[128];
+            snprintf(unify_ok,   sizeof unify_ok,   "pj_dbu%d_ok",   unify_ok_lbl);
+            snprintf(unify_fail, sizeof unify_fail, "pj_dbu%d_fail", unify_ok_lbl);
+
+            for (int ai = 0; ai < arity; ai++) {
+                J("    aload %d\n", ai);  /* incoming arg */
+                J("    aload %d\n", db_term_local);
+                J("    ldc %d\n", ai + 1);
+                JI("aaload", ""); /* term->args[ai] */
+                J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+                J("    ifeq %s\n", unify_fail);
+            }
+            J("    goto %s\n", unify_ok);
+
+            J("%s:\n", unify_fail);
+            /* undo bindings, try next */
+            J("    iload %d\n", trail_local);
+            J("    invokestatic %s/pj_trail_unwind(I)V\n", pj_classname);
+            J("    iinc %d 1\n", db_idx_local);
+            J("    goto %s\n", db_loop);
+
+            J("%s:\n", unify_ok);
+        }
+
+        /* success — unification happened in-place via pj_unify above.
+         * Return any non-null Object[] as success token. */
+        J("    ldc \"true\"\n");
+        J("    invokestatic %s/pj_term_atom(Ljava/lang/String;)[Ljava/lang/Object;\n", pj_classname);
+        JI("areturn", "");
+
+        J("%s:\n", db_miss);
+    }
+
+    /* truly exhausted */
     JI("aconst_null", "");
     JI("areturn", "");
 
@@ -3612,6 +3929,7 @@ void prolog_emit_jvm(Program *prog, FILE *out, const char *filename) {
 
     pj_emit_class_header();
     pj_emit_runtime_helpers();
+    pj_emit_assertz_helpers();
 
     /* Check if program uses between/3 but doesn't define it — emit synthetic method */
     {
