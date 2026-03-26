@@ -1,0 +1,6 @@
+procedure tag(s);
+  return "[" || s || "]";
+end
+procedure main();
+  every write(tag("a" | "b" | "c"));
+end

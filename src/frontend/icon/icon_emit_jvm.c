@@ -2883,6 +2883,9 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
             char argfield[64];    snprintf(argfield,    sizeof argfield,    "icn_arg_%d",     i);
             char argobjfield[64]; snprintf(argobjfield, sizeof argobjfield, "icn_arg_obj_%d", i);
             int arg_is_rec = ij_expr_is_record(n->children[i+1]);
+            int arg_is_str = !arg_is_rec && ij_expr_is_string(n->children[i+1]);
+            int arg_is_dbl = !arg_is_rec && !arg_is_str && ij_expr_is_real(n->children[i+1]);
+            char argstrfield[64]; snprintf(argstrfield, sizeof argstrfield, "icn_arg_str_%d", i);
             JL(push_relay);
             if (arg_is_rec) {
                 /* record arg: value is in icn_retval_obj; pop the lconst_0 placeholder,
@@ -2893,6 +2896,12 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
                 ij_put_obj_field(argobjfield);
                 ij_declare_static(argfield);
                 JI("lconst_0", ""); ij_put_long(argfield);
+            } else if (arg_is_str) {
+                /* string arg: store in icn_arg_str_N */
+                ij_declare_static_str(argstrfield);
+                ij_put_str_field(argstrfield);
+                ij_declare_static(argfield);
+                JI("lconst_0", ""); ij_put_long(argfield); /* sentinel */
             } else {
                 ij_declare_static(argfield);
                 ij_put_long(argfield);
@@ -5546,11 +5555,16 @@ static void ij_emit_proc(IcnNode *proc, FILE *out_target) {
             const char *pname2 = (pv && pv->kind == ICN_VAR) ? pv->val.sval : "";
             char argfield[64];    snprintf(argfield,    sizeof argfield,    "icn_arg_%d",     i);
             char argobjfield[64]; snprintf(argobjfield, sizeof argobjfield, "icn_arg_obj_%d", i);
+            char argstrfield[64]; snprintf(argstrfield, sizeof argstrfield, "icn_arg_str_%d", i);
             char fld[128]; ij_var_field(pname2, fld, sizeof fld);
             if (ij_field_type_tag(argobjfield) == 'O') {
                 ij_declare_static_obj(fld);
                 ij_get_obj_field(argobjfield);
                 ij_put_obj_field(fld);
+            } else if (ij_field_type_tag(argstrfield) == 'A') {
+                ij_declare_static_str(fld);
+                ij_get_str_field(argstrfield);
+                ij_put_str_field(fld);
             } else {
                 ij_declare_static(fld);
                 ij_get_long(argfield);
@@ -5581,11 +5595,16 @@ static void ij_emit_proc(IcnNode *proc, FILE *out_target) {
                 const char *pvname = (pv2 && pv2->kind == ICN_VAR) ? pv2->val.sval : "";
                 char argfield[64];    snprintf(argfield,    sizeof argfield,    "icn_arg_%d",     i);
                 char argobjfield[64]; snprintf(argobjfield, sizeof argobjfield, "icn_arg_obj_%d", i);
+                char argstrfield[64]; snprintf(argstrfield, sizeof argstrfield, "icn_arg_str_%d", i);
                 char fld[128]; ij_var_field(pvname, fld, sizeof fld);
                 if (ij_field_type_tag(argobjfield) == 'O') {
                     ij_declare_static_obj(fld);
                     ij_get_obj_field(argobjfield);
                     ij_put_obj_field(fld);
+                } else if (ij_field_type_tag(argstrfield) == 'A') {
+                    ij_declare_static_str(fld);
+                    ij_get_str_field(argstrfield);
+                    ij_put_str_field(fld);
                 } else {
                     ij_declare_static(fld);
                     ij_get_long(argfield);
@@ -5772,6 +5791,75 @@ void ij_emit_file(IcnNode **nodes, int count, FILE *out, const char *filename, c
             }
         }
         #undef MAX_SCAN_STACK2
+    }
+
+    /* Pass 1d: pre-register icn_arg_str_N as String for each string arg at user-proc
+     * call sites, and pre-declare callee param var field as String, so the callee
+     * prologue can detect string params via ij_field_type_tag("icn_arg_str_N")=='A'.
+     * Run to fixpoint: each iteration may expose new string-typed vars that enable
+     * further propagation (e.g. wrap(s) → suffix(s) where s is string). */
+    {
+        #define MAX_SCAN_STACK3 512
+        /* Three passes covers depth-3 call chains; fixpoint for deeper chains */
+        for (int pass1d = 0; pass1d < 3; pass1d++) {
+        IcnNode *stack3[MAX_SCAN_STACK3]; int top3 = 0;
+        for (int pi = 0; pi < count; pi++) {
+            IcnNode *proc = nodes[pi];
+            if (!proc || proc->kind != ICN_PROC) continue;
+            int np3 = (int)proc->val.ival;
+            /* Set ij_cur_proc so ij_var_field() resolves correctly */
+            if (proc->children[0] && proc->children[0]->kind == ICN_VAR)
+                strncpy(ij_cur_proc, proc->children[0]->val.sval, 63);
+            top3 = 0;
+            for (int i = 1 + np3; i < proc->nchildren; i++)
+                if (top3 < MAX_SCAN_STACK3) stack3[top3++] = proc->children[i];
+            while (top3 > 0) {
+                IcnNode *cur = stack3[--top3];
+                if (!cur) continue;
+                if (cur->kind == ICN_CALL && cur->nchildren >= 1
+                        && cur->children[0]->kind == ICN_VAR
+                        && ij_is_user_proc(cur->children[0]->val.sval)) {
+                    const char *callee = cur->children[0]->val.sval;
+                    int na = cur->nchildren - 1;
+                    IcnNode *callee_proc = NULL;
+                    for (int ci = 0; ci < count; ci++) {
+                        IcnNode *cp = nodes[ci];
+                        if (cp && cp->kind == ICN_PROC && cp->nchildren >= 1
+                                && cp->children[0]->kind == ICN_VAR
+                                && !strcmp(cp->children[0]->val.sval, callee)) {
+                            callee_proc = cp; break;
+                        }
+                    }
+                    for (int i = 0; i < na; i++) {
+                        if (ij_expr_is_string(cur->children[i+1])
+                                && !ij_expr_is_record(cur->children[i+1])) {
+                            char argstrfield[64];
+                            snprintf(argstrfield, sizeof argstrfield, "icn_arg_str_%d", i);
+                            ij_declare_static_str(argstrfield);
+                            /* Pre-declare callee param var field as String */
+                            if (callee_proc) {
+                                int cnp = (int)callee_proc->val.ival;
+                                if (i < cnp) {
+                                    IcnNode *pv = callee_proc->children[1 + i];
+                                    if (pv && pv->kind == ICN_VAR) {
+                                        char saved_proc[64];
+                                        strncpy(saved_proc, ij_cur_proc, 63);
+                                        strncpy(ij_cur_proc, callee, 63);
+                                        char fld[128]; ij_var_field(pv->val.sval, fld, sizeof fld);
+                                        ij_declare_static_str(fld);
+                                        strncpy(ij_cur_proc, saved_proc, 63);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                for (int i = 0; i < cur->nchildren && top3 < MAX_SCAN_STACK3; i++)
+                    stack3[top3++] = cur->children[i];
+            }
+        }
+        } /* end pass1d loop */
+        #undef MAX_SCAN_STACK3
     }
 
     /* Pass 2: emit each proc to a buffer */

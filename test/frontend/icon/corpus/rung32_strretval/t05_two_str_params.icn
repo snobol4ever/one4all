@@ -1,0 +1,7 @@
+procedure join(a, b);
+  return a || "-" || b;
+end
+procedure main();
+  write(join("foo", "bar"));
+  write(join("hello", "world"));
+end
