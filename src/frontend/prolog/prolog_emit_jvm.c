@@ -2158,6 +2158,97 @@ static void pj_emit_assertz_helpers(void) {
     J(".end method\n\n");
 
     /* ------------------------------------------------------------------
+     * pj_nb_setval_2(Object name, Object value) -> V
+     * nb_setval(+Name, +Value): store Value in global nb table under Name.
+     * Destructive (no trail). Always succeeds.
+     * ------------------------------------------------------------------ */
+    J("; pj_nb_setval_2(Object name, Object value) -> V\n");
+    J(".method static pj_nb_setval_2(Ljava/lang/Object;Ljava/lang/Object;)V\n");
+    J("    .limit stack 4\n");
+    J("    .limit locals 2\n");
+    /* deref name → String key */
+    JI("aload_0", "");
+    J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    J("    invokestatic %s/pj_atom_name(Ljava/lang/Object;)Ljava/lang/String;\n", pj_classname);
+    /* deref value */
+    JI("aload_1", "");
+    J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    /* pj_nb.put(key, value) */
+    J("    getstatic %s/pj_nb Ljava/util/HashMap;\n", pj_classname);
+    /* stack: key value map — need map key value */
+    JI("dup_x2", "");
+    JI("pop", "");
+    /* stack: map key value */
+    JI("invokevirtual", "java/util/HashMap/put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+    JI("pop", "");
+    JI("return", "");
+    J(".end method\n\n");
+
+    /* ------------------------------------------------------------------
+     * pj_nb_getval_2(Object name, Object var) -> Z
+     * nb_getval(+Name, -Value): unify Value with stored term.
+     * Fails if Name not set.
+     * ------------------------------------------------------------------ */
+    J("; pj_nb_getval_2(Object name, Object var) -> Z\n");
+    J(".method static pj_nb_getval_2(Ljava/lang/Object;Ljava/lang/Object;)Z\n");
+    J("    .limit stack 4\n");
+    J("    .limit locals 3\n");
+    /* key = atom_name(deref(name)) */
+    JI("aload_0", "");
+    J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    J("    invokestatic %s/pj_atom_name(Ljava/lang/Object;)Ljava/lang/String;\n", pj_classname);
+    J("    astore_2\n");
+    /* val = pj_nb.get(key) */
+    J("    getstatic %s/pj_nb Ljava/util/HashMap;\n", pj_classname);
+    J("    aload_2\n");
+    JI("invokevirtual", "java/util/HashMap/get(Ljava/lang/Object;)Ljava/lang/Object;");
+    JI("dup", "");
+    J("    ifnonnull pj_nb_getval_found\n");
+    JI("pop", "");
+    JI("iconst_0", "");
+    JI("ireturn", "");
+    J("pj_nb_getval_found:\n");
+    /* unify val with arg1 */
+    JI("aload_1", "");
+    J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+    JI("ireturn", "");
+    J(".end method\n\n");
+
+    /* ------------------------------------------------------------------
+     * pj_succ_or_zero_2(Object x, Object y) -> Z
+     * succ_or_zero(+X, ?Y): Y = max(0, X-1).
+     * X must be bound non-negative integer. Y unified with result.
+     * ------------------------------------------------------------------ */
+    J("; pj_succ_or_zero_2(Object x, Object y) -> Z\n");
+    J(".method static pj_succ_or_zero_2(Ljava/lang/Object;Ljava/lang/Object;)Z\n");
+    J("    .limit stack 6\n");
+    J("    .limit locals 4\n");
+    JI("aload_0", "");
+    J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    J("    invokestatic %s/pj_int_val(Ljava/lang/Object;)J\n", pj_classname);
+    JI("lstore_2", "");       /* local 2-3 = x (long) */
+    JI("lload_2", "");
+    JI("lconst_0", "");
+    JI("lcmp", "");
+    J("    ifle pj_soz_zero\n");
+    /* x > 0: result = x - 1 */
+    JI("lload_2", "");
+    JI("lconst_1", "");
+    JI("lsub", "");
+    J("    invokestatic %s/pj_term_int(J)[Ljava/lang/Object;\n", pj_classname);
+    JI("aload_1", "");
+    J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+    JI("ireturn", "");
+    J("pj_soz_zero:\n");
+    /* x <= 0: result = 0 */
+    JI("lconst_0", "");
+    J("    invokestatic %s/pj_term_int(J)[Ljava/lang/Object;\n", pj_classname);
+    JI("aload_1", "");
+    J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+    JI("ireturn", "");
+    J(".end method\n\n");
+
+    /* ------------------------------------------------------------------
      * pj_format_2(Object fmt, Object arglist) -> V
      * Implements format/1 (pass nil as arglist) and format/2.
      * Directives: ~w ~a ~d (write term/int), ~n (newline), ~i (ignore).
@@ -2762,8 +2853,10 @@ static void pj_emit_class_header(void) {
     J(".field static pj_trail Ljava/util/ArrayList;\n\n");
     JC("Dynamic DB field: HashMap<String, ArrayList<Object[]>>");
     J(".field static pj_db Ljava/util/HashMap;\n\n");
+    JC("Global nb_setval/nb_getval store: HashMap<String, Object[]>");
+    J(".field static pj_nb Ljava/util/HashMap;\n\n");
 
-    /* <clinit> — init trail and dynamic DB */
+    /* <clinit> — init trail, dynamic DB, and nb store */
     J(".method static <clinit>()V\n");
     J("    .limit stack 3\n");
     J("    .limit locals 0\n");
@@ -2775,6 +2868,10 @@ static void pj_emit_class_header(void) {
     JI("dup", "");
     JI("invokespecial", "java/util/HashMap/<init>()V");
     J("    putstatic %s/pj_db Ljava/util/HashMap;\n", pj_classname);
+    JI("new", "java/util/HashMap");
+    JI("dup", "");
+    JI("invokespecial", "java/util/HashMap/<init>()V");
+    J("    putstatic %s/pj_nb Ljava/util/HashMap;\n", pj_classname);
     JI("return", "");
     J(".end method\n\n");
 }
@@ -3104,6 +3201,9 @@ static int pj_is_user_call(EXPR_t *goal) {
         "copy_term",
         "string_to_atom","concat_atom",
         "atomic_list_concat",
+        "nb_setval","nb_getval",
+        "aggregate_all",
+        "succ_or_zero",
         NULL
     };
     for (int i = 0; builtins[i]; i++)
@@ -3831,6 +3931,52 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
             pj_emit_term(goal->children[1], var_locals, n_vars);
             J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
             J("    ifeq %s\n", lbl_ω);
+            JI("goto", lbl_γ);
+            return;
+        }
+
+        /* nb_setval(+Name, +Value) — destructive global store */
+        if (strcmp(fn, "nb_setval") == 0 && nargs == 2) {
+            pj_emit_term(goal->children[0], var_locals, n_vars);
+            pj_emit_term(goal->children[1], var_locals, n_vars);
+            J("    invokestatic %s/pj_nb_setval_2(Ljava/lang/Object;Ljava/lang/Object;)V\n", pj_classname);
+            JI("goto", lbl_γ);
+            return;
+        }
+        /* nb_getval(+Name, -Value) — read global store */
+        if (strcmp(fn, "nb_getval") == 0 && nargs == 2) {
+            pj_emit_term(goal->children[0], var_locals, n_vars);
+            pj_emit_term(goal->children[1], var_locals, n_vars);
+            J("    invokestatic %s/pj_nb_getval_2(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+            J("    ifeq %s\n", lbl_ω);
+            JI("goto", lbl_γ);
+            return;
+        }
+        /* succ_or_zero(+X, ?Y) — Y = max(0, X-1) */
+        if (strcmp(fn, "succ_or_zero") == 0 && nargs == 2) {
+            pj_emit_term(goal->children[0], var_locals, n_vars);
+            pj_emit_term(goal->children[1], var_locals, n_vars);
+            J("    invokestatic %s/pj_succ_or_zero_2(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+            J("    ifeq %s\n", lbl_ω);
+            JI("goto", lbl_γ);
+            return;
+        }
+        /* aggregate_all(+Template, +Goal, -Result)
+         * Supported templates: count, sum(E), max(E), min(E), bag(T), set(T).
+         * Dispatched as a synthetic predicate p_aggregate_all_3 (like findall). */
+        if (strcmp(fn, "aggregate_all") == 0 && nargs == 3) {
+            int agg_rv = (*next_local)++;
+            char desc[512];
+            snprintf(desc, sizeof desc,
+                     "%s/p_aggregate_all_3([Ljava/lang/Object;[Ljava/lang/Object;[Ljava/lang/Object;I)[Ljava/lang/Object;",
+                     pj_classname);
+            for (int i = 0; i < 3; i++)
+                pj_emit_term(goal->children[i], var_locals, n_vars);
+            JI("iconst_0", "");
+            J("    invokestatic %s\n", desc);
+            J("    astore %d\n", agg_rv);
+            J("    aload %d\n", agg_rv);
+            J("    ifnull %s\n", lbl_ω);
             JI("goto", lbl_γ);
             return;
         }
@@ -4678,6 +4824,314 @@ static void pj_emit_between_builtin(void) {
     J("p_between_3_fail:\n");
     JI("aconst_null", "");
     JI("areturn", "");
+    J(".end method\n\n");
+}
+
+/* -------------------------------------------------------------------------
+ * pj_emit_aggregate_all_builtin — emit synthetic p_aggregate_all_3 method.
+ *
+ * aggregate_all(+Template, +Goal, -Result)
+ * Supported templates:
+ *   count       → Result = N (integer count of solutions)
+ *   sum(Expr)   → Result = sum of Expr over solutions
+ *   max(Expr)   → Result = max of Expr over solutions (fail if 0 solutions)
+ *   min(Expr)   → Result = min of Expr over solutions (fail if 0 solutions)
+ *   bag(T)      → Result = list of T  (alias for findall)
+ *   set(T)      → Result = sorted deduped list of T
+ *
+ * Strategy: run the same pj_call_goal loop as findall, collecting solutions
+ * into an ArrayList.  After loop, reduce according to Template tag.
+ *
+ * Locals: 0=tmpl 1=goal 2=result_var 3=cs(unused)
+ *         4=acc(ArrayList) 5=trail_mark 6=goal_cs
+ *         7=tag(String) 8=count(I) 9=tmp 10=i 11=sum(long lo) 12=sum hi
+ *         13=best(long lo) 14=best hi 15=has_val(I)
+ * ------------------------------------------------------------------------- */
+static void pj_emit_aggregate_all_builtin(void) {
+    J("; === aggregate_all/3 synthetic predicate ============================\n");
+    J(".method static p_aggregate_all_3([Ljava/lang/Object;[Ljava/lang/Object;[Ljava/lang/Object;I)[Ljava/lang/Object;\n");
+    J("    .limit stack 20\n");
+    J("    .limit locals 20\n");
+
+    /* deref template to get tag string */
+    J("    aload_0\n");
+    J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    J("    astore_0\n");
+
+    /* acc = new ArrayList */
+    J("    new java/util/ArrayList\n");
+    J("    dup\n");
+    J("    invokespecial java/util/ArrayList/<init>()V\n");
+    J("    astore 4\n");
+
+    /* trail mark */
+    J("    invokestatic %s/pj_trail_mark()I\n", pj_classname);
+    J("    istore 5\n");
+
+    /* goal_cs = 0 */
+    J("    iconst_0\n"); J("    istore 6\n");
+
+    /* --- solution loop (same as findall) --- */
+    J("pj_agg_loop:\n");
+    J("    aload_1\n");
+    J("    iload 6\n");
+    J("    invokestatic %s/pj_call_goal(Ljava/lang/Object;I)I\n", pj_classname);
+    J("    istore 6\n");
+    J("    iload 6\n");
+    J("    ldc -1\n");
+    J("    if_icmpeq pj_agg_done\n");
+    /* copy template and accumulate */
+    J("    aload_0\n");
+    J("    invokestatic %s/pj_copy_term(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    J("    astore 9\n");
+    J("    aload 4\n");
+    J("    aload 9\n");
+    J("    invokevirtual java/util/ArrayList/add(Ljava/lang/Object;)Z\n");
+    J("    pop\n");
+    /* unwind trail */
+    J("    iload 5\n");
+    J("    invokestatic %s/pj_trail_unwind(I)V\n", pj_classname);
+    J("    goto pj_agg_loop\n");
+
+    J("pj_agg_done:\n");
+    J("    iload 5\n");
+    J("    invokestatic %s/pj_trail_unwind(I)V\n", pj_classname);
+
+    /* --- determine template functor name ---
+     * atom term:     tmpl = ["atom", name]        → functor = tmpl[1]
+     * compound term: tmpl = ["compound", name, …] → functor = tmpl[1]
+     * Either way, tmpl[1] gives us the functor name. */
+    J("    aload_0\n");
+    J("    checkcast [Ljava/lang/Object;\n");
+    J("    iconst_1\n");
+    J("    aaload\n");
+    J("    invokevirtual java/lang/Object/toString()Ljava/lang/String;\n");
+    J("    astore 7\n");  /* functor name */
+
+    /* --- dispatch on tag --- */
+
+    /* count */
+    J("    aload 7\n");
+    J("    ldc \"count\"\n");
+    J("    invokevirtual java/lang/String/equals(Ljava/lang/Object;)Z\n");
+    J("    ifeq pj_agg_not_count\n");
+    /* Result = size of acc */
+    J("    aload 4\n");
+    J("    invokevirtual java/util/ArrayList/size()I\n");
+    J("    i2l\n");
+    J("    invokestatic %s/pj_term_int(J)[Ljava/lang/Object;\n", pj_classname);
+    J("    aload_2\n");
+    J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+    J("    ifeq pj_agg_fail\n");
+    J("    goto pj_agg_succeed\n");
+
+    J("pj_agg_not_count:\n");
+
+    /* bag(T) — build list of T values */
+    J("    aload 7\n");
+    J("    ldc \"bag\"\n");
+    J("    invokevirtual java/lang/String/equals(Ljava/lang/Object;)Z\n");
+    J("    ifne pj_agg_build_list\n");
+    /* set(T) — sorted deduped list */
+    J("    aload 7\n");
+    J("    ldc \"set\"\n");
+    J("    invokevirtual java/lang/String/equals(Ljava/lang/Object;)Z\n");
+    J("    ifne pj_agg_build_sorted_list\n");
+    /* not bag or set — fall through to sum/max/min */
+    J("    goto pj_agg_not_bag\n");
+
+    J("pj_agg_build_list:\n");
+    /* Build Prolog list from acc — each element is bag(T), extract T at index [2] */
+    J("    ldc \"[]\"\n");
+    J("    invokestatic %s/pj_term_atom(Ljava/lang/String;)[Ljava/lang/Object;\n", pj_classname);
+    J("    astore 10\n");  /* tail = [] */
+    J("    aload 4\n");
+    J("    invokevirtual java/util/ArrayList/size()I\n");
+    J("    iconst_1\n"); J("    isub\n"); J("    istore 11\n"); /* i */
+    J("pj_agg_bag_loop:\n");
+    J("    iload 11\n"); J("    iflt pj_agg_bag_done\n");
+    /* elem = acc[i][2] (the T in bag(T)) */
+    J("    aload 4\n"); J("    iload 11\n");
+    J("    invokevirtual java/util/ArrayList/get(I)Ljava/lang/Object;\n");
+    J("    checkcast [Ljava/lang/Object;\n");
+    J("    iconst_2\n"); J("    aaload\n");  /* T value */
+    J("    astore 12\n");
+    /* cons = [compound, ".", T, tail] */
+    J("    bipush 4\n"); J("    anewarray java/lang/Object\n"); J("    astore 13\n");
+    J("    aload 13\n"); J("    iconst_0\n"); J("    ldc \"compound\"\n"); J("    aastore\n");
+    J("    aload 13\n"); J("    iconst_1\n"); J("    ldc \".\"\n"); J("    aastore\n");
+    J("    aload 13\n"); J("    iconst_2\n"); J("    aload 12\n"); J("    aastore\n");
+    J("    aload 13\n"); J("    iconst_3\n"); J("    aload 10\n"); J("    aastore\n");
+    J("    aload 13\n"); J("    astore 10\n");
+    J("    iinc 11 -1\n");
+    J("    goto pj_agg_bag_loop\n");
+    J("pj_agg_bag_done:\n");
+    J("    aload_2\n"); J("    aload 10\n");
+    J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+    J("    ifeq pj_agg_fail\n");
+    J("    goto pj_agg_succeed\n");
+
+    J("pj_agg_build_sorted_list:\n");
+    /* Build list first, sort it (dedup=1), unify with result_var */
+    J("    ldc \"[]\"\n");
+    J("    invokestatic %s/pj_term_atom(Ljava/lang/String;)[Ljava/lang/Object;\n", pj_classname);
+    J("    astore 10\n");
+    J("    aload 4\n");
+    J("    invokevirtual java/util/ArrayList/size()I\n");
+    J("    iconst_1\n"); J("    isub\n"); J("    istore 11\n");
+    J("pj_agg_set_bld_loop:\n");
+    J("    iload 11\n"); J("    iflt pj_agg_set_bld_done\n");
+    J("    bipush 4\n"); J("    anewarray java/lang/Object\n"); J("    astore 12\n");
+    J("    aload 12\n"); J("    iconst_0\n"); J("    ldc \"compound\"\n"); J("    aastore\n");
+    J("    aload 12\n"); J("    iconst_1\n"); J("    ldc \".\"\n"); J("    aastore\n");
+    J("    aload 12\n"); J("    iconst_2\n");
+    J("    aload 4\n"); J("    iload 11\n");
+    J("    invokevirtual java/util/ArrayList/get(I)Ljava/lang/Object;\n");
+    J("    aastore\n");
+    J("    aload 12\n"); J("    iconst_3\n"); J("    aload 10\n"); J("    aastore\n");
+    J("    aload 12\n"); J("    astore 10\n");
+    J("    iinc 11 -1\n");
+    J("    goto pj_agg_set_bld_loop\n");
+    J("pj_agg_set_bld_done:\n");
+    /* sort with dedup=1 via pj_sort_list */
+    J("    aload 10\n");
+    J("    iconst_1\n");  /* dedup=1 */
+    J("    invokestatic %s/pj_sort_list(Ljava/lang/Object;I)Ljava/lang/Object;\n", pj_classname);
+    J("    astore 10\n");
+    J("    aload_2\n"); J("    aload 10\n");
+    J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+    J("    ifeq pj_agg_fail\n");
+    J("    goto pj_agg_succeed\n");
+
+    J("pj_agg_not_bag:\n");
+
+    /* sum(Expr), max(Expr), min(Expr) — local 7 already holds functor name */
+    J("    lconst_0\n"); J("    lstore 11\n");  /* accumulator = 0 */
+    J("    lconst_0\n"); J("    lstore 13\n");  /* best = 0 */
+    J("    iconst_0\n"); J("    istore 15\n");  /* has_val = false */
+
+    J("    aload 7\n");
+    J("    ldc \"sum\"\n");
+    J("    invokevirtual java/lang/String/equals(Ljava/lang/Object;)Z\n");
+    J("    ifne pj_agg_sum\n");
+    J("    aload 7\n");
+    J("    ldc \"max\"\n");
+    J("    invokevirtual java/lang/String/equals(Ljava/lang/Object;)Z\n");
+    J("    ifne pj_agg_max\n");
+    J("    aload 7\n");
+    J("    ldc \"min\"\n");
+    J("    invokevirtual java/lang/String/equals(Ljava/lang/Object;)Z\n");
+    J("    ifne pj_agg_min\n");
+    J("    goto pj_agg_unknown\n");
+
+    /* --- sum loop --- */
+    J("pj_agg_sum:\n");
+    J("    iconst_0\n"); J("    istore 10\n");  /* i=0 */
+    J("pj_agg_sum_loop:\n");
+    J("    iload 10\n");
+    J("    aload 4\n"); J("    invokevirtual java/util/ArrayList/size()I\n");
+    J("    if_icmpge pj_agg_sum_done\n");
+    J("    aload 4\n"); J("    iload 10\n");
+    J("    invokevirtual java/util/ArrayList/get(I)Ljava/lang/Object;\n");
+    J("    checkcast [Ljava/lang/Object;\n");
+    J("    iconst_2\n"); J("    aaload\n");  /* bag(Expr) — arg0 of compound */
+    J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    J("    invokestatic %s/pj_int_val(Ljava/lang/Object;)J\n", pj_classname);
+    J("    lload 11\n"); J("    ladd\n"); J("    lstore 11\n");
+    J("    iinc 10 1\n");
+    J("    goto pj_agg_sum_loop\n");
+    J("pj_agg_sum_done:\n");
+    J("    lload 11\n");
+    J("    invokestatic %s/pj_term_int(J)[Ljava/lang/Object;\n", pj_classname);
+    J("    aload_2\n");
+    J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+    J("    ifeq pj_agg_fail\n");
+    J("    goto pj_agg_succeed\n");
+
+    /* --- max loop --- */
+    J("pj_agg_max:\n");
+    J("    iconst_0\n"); J("    istore 10\n");
+    J("pj_agg_max_loop:\n");
+    J("    iload 10\n");
+    J("    aload 4\n"); J("    invokevirtual java/util/ArrayList/size()I\n");
+    J("    if_icmpge pj_agg_max_done\n");
+    J("    aload 4\n"); J("    iload 10\n");
+    J("    invokevirtual java/util/ArrayList/get(I)Ljava/lang/Object;\n");
+    J("    checkcast [Ljava/lang/Object;\n");
+    J("    iconst_2\n"); J("    aaload\n");
+    J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    J("    invokestatic %s/pj_int_val(Ljava/lang/Object;)J\n", pj_classname);
+    J("    lstore 13\n");  /* val */
+    J("    iload 15\n"); J("    ifne pj_agg_max_cmp\n");
+    /* first element */
+    J("    lload 13\n"); J("    lstore 11\n");
+    J("    iconst_1\n"); J("    istore 15\n");
+    J("    goto pj_agg_max_next\n");
+    J("pj_agg_max_cmp:\n");
+    J("    lload 13\n"); J("    lload 11\n"); J("    lcmp\n");
+    J("    ifle pj_agg_max_next\n");
+    J("    lload 13\n"); J("    lstore 11\n");
+    J("pj_agg_max_next:\n");
+    J("    iinc 10 1\n");
+    J("    goto pj_agg_max_loop\n");
+    J("pj_agg_max_done:\n");
+    J("    iload 15\n"); J("    ifeq pj_agg_fail\n");  /* no solutions → fail */
+    J("    lload 11\n");
+    J("    invokestatic %s/pj_term_int(J)[Ljava/lang/Object;\n", pj_classname);
+    J("    aload_2\n");
+    J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+    J("    ifeq pj_agg_fail\n");
+    J("    goto pj_agg_succeed\n");
+
+    /* --- min loop --- */
+    J("pj_agg_min:\n");
+    J("    iconst_0\n"); J("    istore 10\n");
+    J("pj_agg_min_loop:\n");
+    J("    iload 10\n");
+    J("    aload 4\n"); J("    invokevirtual java/util/ArrayList/size()I\n");
+    J("    if_icmpge pj_agg_min_done\n");
+    J("    aload 4\n"); J("    iload 10\n");
+    J("    invokevirtual java/util/ArrayList/get(I)Ljava/lang/Object;\n");
+    J("    checkcast [Ljava/lang/Object;\n");
+    J("    iconst_2\n"); J("    aaload\n");
+    J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    J("    invokestatic %s/pj_int_val(Ljava/lang/Object;)J\n", pj_classname);
+    J("    lstore 13\n");
+    J("    iload 15\n"); J("    ifne pj_agg_min_cmp\n");
+    J("    lload 13\n"); J("    lstore 11\n");
+    J("    iconst_1\n"); J("    istore 15\n");
+    J("    goto pj_agg_min_next\n");
+    J("pj_agg_min_cmp:\n");
+    J("    lload 13\n"); J("    lload 11\n"); J("    lcmp\n");
+    J("    ifge pj_agg_min_next\n");
+    J("    lload 13\n"); J("    lstore 11\n");
+    J("pj_agg_min_next:\n");
+    J("    iinc 10 1\n");
+    J("    goto pj_agg_min_loop\n");
+    J("pj_agg_min_done:\n");
+    J("    iload 15\n"); J("    ifeq pj_agg_fail\n");
+    J("    lload 11\n");
+    J("    invokestatic %s/pj_term_int(J)[Ljava/lang/Object;\n", pj_classname);
+    J("    aload_2\n");
+    J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+    J("    ifeq pj_agg_fail\n");
+    J("    goto pj_agg_succeed\n");
+
+    J("pj_agg_unknown:\n");
+    J("    aconst_null\n"); J("    areturn\n");
+
+    J("pj_agg_succeed:\n");
+    J("    iconst_1\n");
+    J("    anewarray java/lang/Object\n");
+    J("    dup\n");
+    J("    iconst_0\n");
+    J("    iconst_1\n");
+    J("    invokestatic java/lang/Integer/valueOf(I)Ljava/lang/Integer;\n");
+    J("    aastore\n");
+    J("    areturn\n");
+
+    J("pj_agg_fail:\n");
+    J("    aconst_null\n"); J("    areturn\n");
     J(".end method\n\n");
 }
 
@@ -5837,6 +6291,19 @@ void prolog_emit_jvm(Program *prog, FILE *out, const char *filename) {
         }
         if (!defines_findall)
             pj_emit_findall_builtin();
+    }
+
+    /* Check if program uses aggregate_all/3 but doesn't define it */
+    {
+        int defines_agg = 0;
+        for (STMT_t *s = prog->head; s; s = s->next) {
+            if (!s->subject) continue;
+            if (s->subject->kind == E_CHOICE && s->subject->sval &&
+                strcmp(s->subject->sval, "aggregate_all") == 0)
+                defines_agg = 1;
+        }
+        if (!defines_agg)
+            pj_emit_aggregate_all_builtin();
     }
 
     /* emit each predicate */
