@@ -1,0 +1,6 @@
+procedure greet(name);
+  return "hello " || name;
+end
+procedure main();
+  write(greet("world"));
+end

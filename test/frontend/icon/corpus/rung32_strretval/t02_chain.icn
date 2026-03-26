@@ -1,0 +1,12 @@
+procedure prefix(s);
+  return "pre:" || s;
+end
+procedure suffix(s);
+  return s || ":suf";
+end
+procedure wrap(s);
+  return prefix(suffix(s));
+end
+procedure main();
+  write(wrap("mid"));
+end
