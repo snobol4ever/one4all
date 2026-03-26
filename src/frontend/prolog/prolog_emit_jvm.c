@@ -3497,9 +3497,17 @@ static void pj_emit_choice(EXPR_t *choice) {
         if (s > max_stack) max_stack = s;
     }
     int locals_needed = vars_base + max_vars + 5 * max_ucalls + 2 * max_neq + max_disj + 16 + 42;
+    /* Reserve last two slots for dynamic DB walker: db_idx (int) and db_term (ref).
+     * Using locals_needed-2/locals_needed-1 ensures no overlap with clause locals.
+     * Declared here so we can emit iconst_0/istore at method entry before any branch,
+     * ensuring the JVM verifier types the slot as int (avoids ClassCastException on iinc). */
+    int db_idx_local_slot  = locals_needed - 2;
 
     J("    .limit stack %d\n", max_stack < 16 ? 16 : max_stack);
     J("    .limit locals %d\n", locals_needed);
+    /* Pre-initialise db_idx slot as int so iinc is always valid */
+    J("    iconst_0\n");
+    J("    istore %d\n", db_idx_local_slot);
 
     /* dispatch: linear scan from last clause down.
      * cs >= base[ci] → enter clause ci.
@@ -3790,7 +3798,7 @@ static void pj_emit_choice(EXPR_t *choice) {
          * On static-clause exhaustion cs < base[nclauses]+N, so we check if
          * cs >= base[nclauses] which is already assured by reaching omega.
          * We use a local for db_idx. */
-        int db_idx_local = arity + 4 + 32 + 4; /* safe scratch local beyond all clause locals */
+        int db_idx_local = db_idx_local_slot; /* fixed: use locals_needed-2, not hardcoded offset */
         int db_lbl = pj_fresh_label();
         char db_key[128], db_loop[128], db_hit[128], db_miss[128];
         snprintf(db_key,  sizeof db_key,  "pj_db%d_key",  db_lbl);
@@ -3830,7 +3838,7 @@ static void pj_emit_choice(EXPR_t *choice) {
             /* term is Object[]: slot 0=functor, slots 1..arity = args */
             JI("checkcast", "[Ljava/lang/Object;");
             /* unify each arg */
-            int db_term_local = db_idx_local + 1;
+            int db_term_local = db_idx_local_slot + 1; /* locals_needed-1 */
             J("    astore %d\n", db_term_local);
             /* save trail mark for backtrack-on-fail */
             J("    invokestatic %s/pj_trail_mark()I\n", pj_classname);
@@ -3861,10 +3869,27 @@ static void pj_emit_choice(EXPR_t *choice) {
             J("%s:\n", unify_ok);
         }
 
-        /* success — unification happened in-place via pj_unify above.
-         * Return any non-null Object[] as success token. */
-        J("    ldc \"true\"\n");
-        J("    invokestatic %s/pj_term_atom(Ljava/lang/String;)[Ljava/lang/Object;\n", pj_classname);
+        /* success — return proper continuation array: Object[1+arity]
+         * slot [0] = Integer(base[nclauses] + db_idx + 1)  (next cs for retry)
+         * slots [1..arity] = args (already unified in-place above) */
+        J("    ldc %d\n", arity + 1);
+        JI("anewarray", "java/lang/Object");
+        JI("dup", "");
+        JI("iconst_0", "");
+        /* next cs = base[nclauses] + db_idx + 1 */
+        J("    ldc %d\n", base[nclauses]);
+        J("    iload %d\n", db_idx_local);
+        JI("iadd", "");
+        JI("iconst_1", "");
+        JI("iadd", "");
+        JI("invokestatic", "java/lang/Integer/valueOf(I)Ljava/lang/Integer;");
+        JI("aastore", "");
+        for (int ai = 0; ai < arity; ai++) {
+            JI("dup", "");
+            J("    ldc %d\n", ai + 1);
+            J("    aload %d\n", ai);
+            JI("aastore", "");
+        }
         JI("areturn", "");
 
         J("%s:\n", db_miss);
@@ -4095,8 +4120,23 @@ void prolog_emit_jvm(Program *prog, FILE *out, const char *filename) {
                 J("    goto %s\n", sb_loop);
                 J("%s:\n", sb_ok);
             }
-            J("    ldc \"true\"\n");
-            J("    invokestatic %s/pj_term_atom(Ljava/lang/String;)[Ljava/lang/Object;\n", pj_classname);
+            /* return proper continuation array: Object[1+dyn_arity]
+             * [0] = Integer(idx_loc + 1),  [1..N] = args (unified in-place) */
+            J("    ldc %d\n", dyn_arity + 1);
+            JI("anewarray", "java/lang/Object");
+            JI("dup", "");
+            JI("iconst_0", "");
+            J("    iload %d\n", idx_loc);
+            JI("iconst_1", "");
+            JI("iadd", "");
+            JI("invokestatic", "java/lang/Integer/valueOf(I)Ljava/lang/Integer;");
+            JI("aastore", "");
+            for (int ai = 0; ai < dyn_arity; ai++) {
+                JI("dup", "");
+                J("    ldc %d\n", ai + 1);
+                J("    aload %d\n", ai);
+                JI("aastore", "");
+            }
             JI("areturn", "");
             J("%s:\n", sb_miss);
             JI("aconst_null", "");
