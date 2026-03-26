@@ -204,8 +204,14 @@ static IcnNode *parse_postfix(IcnParser *p) {
             int nargs = 0, cap = 0;
             if (!check(p, TK_RPAREN)) {
                 do {
-                    IcnNode *arg = parse_expr(p);
-                    if (!arg) break;
+                    /* Omitted arg: f(,x) f(x,) f(x,,z) — treat as &null */
+                    IcnNode *arg;
+                    if (check(p, TK_COMMA) || check(p, TK_RPAREN)) {
+                        arg = icn_leaf_str(ICN_VAR, p->cur.line, "&null", 5);
+                    } else {
+                        arg = parse_expr(p);
+                        if (!arg) break;
+                    }
                     if (nargs + 1 > cap) {
                         cap = cap ? cap*2 : 4;
                         args = realloc(args, cap * sizeof(IcnNode*));

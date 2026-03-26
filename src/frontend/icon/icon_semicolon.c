@@ -359,6 +359,14 @@ int main(int argc, char **argv) {
         if (!out) { perror(outpath); free(src); return 1; }
     }
 
+    /* JCON preprocessor: $< -> [  and  $> -> ] */
+    for (size_t i = 0; i + 1 < src_len; i++) {
+        if (src[i] == '$' && src[i+1] == '<') { src[i] = '['; src[i+1] = ' '; }
+        if (src[i] == '$' && src[i+1] == '>') { src[i] = ' '; src[i+1] = ']'; }
+        /* $( -> { and $) -> } (JCON block syntax) */
+        if (src[i] == '$' && src[i+1] == '(') { src[i] = '{'; src[i+1] = ' '; }
+        if (src[i] == '$' && src[i+1] == ')') { src[i] = ' '; src[i+1] = '}'; }
+    }
     process(src, src_len, out);
 
     if (outpath) fclose(out);
