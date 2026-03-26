@@ -29,6 +29,8 @@ typedef enum {
     TK_PIPE,        /* |  */
     TK_COMMA,       /* ,  */
     TK_DOT,         /* .  followed by whitespace/EOF — clause terminator */
+    TK_LBRACE,      /* {  */
+    TK_RBRACE,      /* }  */
     TK_DOTDOT,      /* .. — not valid Prolog; reject gracefully */
 
     /* operators (returned as TK_OP; text in tok_text) */

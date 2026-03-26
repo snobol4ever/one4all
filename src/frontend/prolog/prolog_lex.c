@@ -312,6 +312,8 @@ Token lexer_next(Lexer *lx) {
         case ',': return make_tok(TK_COMMA,    strdup(","), line);
         case '!': return make_tok(TK_CUT,      strdup("!"), line);
         case ';': return make_tok(TK_SEMI,     strdup(";"), line);
+        case '{': return make_tok(TK_LBRACE,   strdup("{"), line);
+        case '}': return make_tok(TK_RBRACE,   strdup("}"), line);
         case '.':
             /* Clause terminator: . followed by whitespace or EOF */
             if (cur(lx) == '\0' || isspace((unsigned char)cur(lx)))
@@ -377,6 +379,8 @@ const char *tk_name(TkKind kind) {
         case TK_RBRACKET: return "]";
         case TK_PIPE:     return "|";
         case TK_COMMA:    return ",";
+        case TK_LBRACE:   return "{";
+        case TK_RBRACE:   return "}";
         case TK_DOT:      return ".";
         case TK_OP:       return "operator";
         case TK_NECK:     return ":-";

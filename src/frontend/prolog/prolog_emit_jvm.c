@@ -4827,6 +4827,33 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
             JI("goto", lbl_γ);
             return;
         }
+        /* phrase/2 — phrase(NT, List) -> NT(List, [])
+         * phrase/3 — phrase(NT, List, Rest) -> NT(List, Rest)
+         * Rewrite into a direct NT/+2 call so the normal ucall retry loop
+         * handles backtracking correctly. */
+        if (strcmp(fn, "phrase") == 0 && (nargs == 2 || nargs == 3)) {
+            EXPR_t *nt_expr  = goal->children[0];
+            EXPR_t *list_arg = goal->children[1];
+            EXPR_t *rest_arg = (nargs == 3) ? goal->children[2] : NULL;
+            EXPR_t *nil_node = NULL;
+            if (!rest_arg) {
+                nil_node = expr_new(E_QLIT);
+                nil_node->sval = strdup("[]");
+            }
+            EXPR_t *call = expr_new(E_FNC);
+            int base = (nt_expr->kind == E_FNC) ? nt_expr->nchildren : 0;
+            call->sval = strdup(nt_expr->sval ? nt_expr->sval : "unknown");
+            call->nchildren = base + 2;
+            call->children  = malloc(call->nchildren * sizeof(EXPR_t *));
+            for (int i = 0; i < base; i++) call->children[i] = nt_expr->children[i];
+            call->children[base]   = list_arg;
+            call->children[base+1] = rest_arg ? rest_arg : nil_node;
+            pj_emit_goal(call, lbl_γ, lbl_ω,
+                         trail_local, var_locals, n_vars,
+                         cut_cs_seal, cs_local_for_cut, next_local, lbl_cutγ);
+            return;
+        }
+
         /* user-defined predicate call — deterministic single-solution call.
          * For backtracking calls in a clause body, pj_emit_body() wraps
          * this in a retry loop (Proebsting E2.fail→E1.resume). */

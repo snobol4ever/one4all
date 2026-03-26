@@ -302,6 +302,23 @@ static Term *parse_primary(Parser *p) {
             return NULL;
         }
 
+        case TK_LBRACE: {
+            /* { Term } — parsed as '{}'(Term) compound, used in DCG bodies */
+            Token pk2 = lexer_peek(&p->lx);
+            if (pk2.kind == TK_RBRACE) {
+                /* {} — empty braces → atom '{}' */
+                lexer_next(&p->lx);
+                return term_new_atom(prolog_atom_intern("{}"));
+            }
+            Term *inner = parse_term(p, 1200);
+            Token rb = lexer_next(&p->lx);
+            if (rb.kind != TK_RBRACE)
+                perror_at(p, rb.line, "expected } after term");
+            int curl_id = prolog_atom_intern("{}");
+            Term *args[1] = { inner };
+            return term_new_compound(curl_id, 1, args);
+        }
+
         default:
             perror_at(p, tk.line, "unexpected token in term");
             return NULL;
@@ -368,6 +385,214 @@ static int flatten_conj(Term *t, Term **buf, int idx) {
 }
 
 /* =========================================================================
+ * DCG expansion — inline, no second parse pass
+ *
+ * dcg_expand_body(body_term, s_in, s_out, sc, buf, idx)
+ *   Walks the DCG body term and appends regular Prolog goal Terms* to buf[].
+ *   s_in / s_out are the difference-list threading vars for this segment.
+ *   Returns the new idx.
+ *
+ * Expansion rules:
+ *   []            -> s_in = s_out   (unify, i.e. =/2)
+ *   [t1,t2,...]   -> s_in = [t1,t2,...|s_out]
+ *   {Goal}        -> Goal (inline Prolog, no list threading)
+ *   !             -> !
+ *   (A,B)         -> expand A with s_in..s_mid, expand B with s_mid..s_out
+ *   (A;B)         -> (expand A) ; (expand B)  -- both see s_in/s_out
+ *   NT            -> NT(s_in, s_out)          -- non-terminal call, arity 0
+ *   NT(args...)   -> NT(args..., s_in, s_out) -- non-terminal call, arity n
+ * ======================================================================= */
+
+/* Counter for generating unique hidden DCG var names within a clause */
+static int dcg_var_counter = 0;
+
+static Term *dcg_fresh_var(VarScope *sc) {
+    char name[32];
+    snprintf(name, sizeof(name), "_S%d", dcg_var_counter++);
+    return scope_get(sc, name);
+}
+
+/* Build list term [t1,t2,...|tail] from an existing list term spine,
+ * appending tail at the end. The list term is already fully parsed
+ * (possibly TT_ATOM NIL at end). We walk to the tail and replace NIL with tail. */
+static Term *dcg_append_tail(Term *list, Term *tail) {
+    /* list is either ATOM_NIL (empty) or compound('.', [H, rest]) */
+    list = term_deref(list);
+    if (!list) return tail;
+    if (list->tag == TT_ATOM && list->atom_id == ATOM_NIL)
+        return tail;
+    if (list->tag == TT_COMPOUND && list->compound.arity == 2) {
+        /* Recurse into tail position */
+        Term *new_tail = dcg_append_tail(list->compound.args[1], tail);
+        Term **args = malloc(2 * sizeof(Term *));
+        args[0] = list->compound.args[0];
+        args[1] = new_tail;
+        return term_new_compound(list->compound.functor, 2, args);
+    }
+    return tail; /* shouldn't happen */
+}
+
+/* Build unify goal: =(A, B) */
+static Term *dcg_make_unify(Term *a, Term *b) {
+    int eq_id = prolog_atom_intern("=");
+    Term **args = malloc(2 * sizeof(Term *));
+    args[0] = a; args[1] = b;
+    return term_new_compound(eq_id, 2, args);
+}
+
+/* Add a non-terminal call: append s_in, s_out to its arg list */
+static Term *dcg_call_nt(Term *nt, Term *s_in, Term *s_out) {
+    nt = term_deref(nt);
+    if (nt->tag == TT_ATOM) {
+        Term **args = malloc(2 * sizeof(Term *));
+        args[0] = s_in; args[1] = s_out;
+        return term_new_compound(nt->atom_id, 2, args);
+    } else if (nt->tag == TT_COMPOUND) {
+        int new_arity = nt->compound.arity + 2;
+        Term **args = malloc(new_arity * sizeof(Term *));
+        for (int i = 0; i < nt->compound.arity; i++)
+            args[i] = nt->compound.args[i];
+        args[new_arity-2] = s_in;
+        args[new_arity-1] = s_out;
+        return term_new_compound(nt->compound.functor, new_arity, args);
+    }
+    /* Fallback — shouldn't happen */
+    return term_new_atom(prolog_atom_intern("true"));
+}
+
+/* Forward declaration */
+static int dcg_expand_body(Term *body, Term *s_in, Term *s_out,
+                           VarScope *sc, Term **buf, int idx);
+
+static int dcg_expand_body(Term *body, Term *s_in, Term *s_out,
+                           VarScope *sc, Term **buf, int idx) {
+    body = term_deref(body);
+    if (!body) {
+        buf[idx++] = dcg_make_unify(s_in, s_out);
+        return idx;
+    }
+
+    int comma_id = prolog_atom_intern(",");
+    int semi_id  = prolog_atom_intern(";");
+    int curl_id  = prolog_atom_intern("{}");
+
+    /* {} — inline Prolog goal, no list threading */
+    if (body->tag == TT_COMPOUND && body->compound.functor == curl_id
+            && body->compound.arity == 1) {
+        /* flatten the inner goal into buf */
+        int n = count_conj(body->compound.args[0]);
+        int old = idx;
+        Term **tmp = malloc((n+1) * sizeof(Term *));
+        int nn = flatten_conj(body->compound.args[0], tmp, 0);
+        for (int i = 0; i < nn; i++) buf[idx++] = tmp[i];
+        free(tmp);
+        (void)old;
+        /* s_in = s_out */
+        buf[idx++] = dcg_make_unify(s_in, s_out);
+        return idx;
+    }
+
+    /* [] — empty terminal list: s_in = s_out */
+    if (body->tag == TT_ATOM && body->atom_id == ATOM_NIL) {
+        buf[idx++] = dcg_make_unify(s_in, s_out);
+        return idx;
+    }
+
+    /* [t1,...] — terminal list: s_in = [t1,...|s_out] */
+    if (body->tag == TT_COMPOUND && body->compound.functor == ATOM_DOT) {
+        Term *list_with_tail = dcg_append_tail(body, s_out);
+        buf[idx++] = dcg_make_unify(s_in, list_with_tail);
+        return idx;
+    }
+
+    /* (A , B) — conjunction: thread s_in -> s_mid -> s_out */
+    if (body->tag == TT_COMPOUND && body->compound.functor == comma_id
+            && body->compound.arity == 2) {
+        Term *s_mid = dcg_fresh_var(sc);
+        idx = dcg_expand_body(body->compound.args[0], s_in,  s_mid, sc, buf, idx);
+        idx = dcg_expand_body(body->compound.args[1], s_mid, s_out, sc, buf, idx);
+        return idx;
+    }
+
+    /* (A ; B) — disjunction: build (expanded_A ; expanded_B) as single goal */
+    if (body->tag == TT_COMPOUND && body->compound.functor == semi_id
+            && body->compound.arity == 2) {
+        /* Expand each branch into a conjunction term */
+        Term *buf_a[256]; int na = 0;
+        Term *buf_b[256]; int nb = 0;
+        na = dcg_expand_body(body->compound.args[0], s_in, s_out, sc, buf_a, 0);
+        nb = dcg_expand_body(body->compound.args[1], s_in, s_out, sc, buf_b, 0);
+        /* Build conjunction term for each branch */
+        Term *conj_a = buf_a[0];
+        for (int i = 1; i < na; i++) {
+            Term **ca = malloc(2 * sizeof(Term *));
+            ca[0] = conj_a; ca[1] = buf_a[i];
+            conj_a = term_new_compound(comma_id, 2, ca);
+        }
+        Term *conj_b = buf_b[0];
+        for (int i = 1; i < nb; i++) {
+            Term **cb = malloc(2 * sizeof(Term *));
+            cb[0] = conj_b; cb[1] = buf_b[i];
+            conj_b = term_new_compound(comma_id, 2, cb);
+        }
+        Term **sargs = malloc(2 * sizeof(Term *));
+        sargs[0] = conj_a; sargs[1] = conj_b;
+        buf[idx++] = term_new_compound(semi_id, 2, sargs);
+        return idx;
+    }
+
+    /* ! — cut passes through, s_in = s_out */
+    if (body->tag == TT_ATOM && body->atom_id == prolog_atom_intern("!")) {
+        buf[idx++] = body;
+        buf[idx++] = dcg_make_unify(s_in, s_out);
+        return idx;
+    }
+
+    /* true — no-op */
+    if (body->tag == TT_ATOM && body->atom_id == prolog_atom_intern("true")) {
+        buf[idx++] = dcg_make_unify(s_in, s_out);
+        return idx;
+    }
+
+    /* Non-terminal: atom or compound — append s_in, s_out */
+    buf[idx++] = dcg_call_nt(body, s_in, s_out);
+    return idx;
+}
+
+/* Expand a DCG clause (head --> body) into a normal PlClause.
+ * Modifies cl->head (adds S0, S args) and cl->body (expanded goals). */
+static void dcg_expand_clause(PlClause *cl, Term *dcg_body, VarScope *sc) {
+    dcg_var_counter = 0;
+
+    /* Add S0, S to head */
+    Term *s0 = dcg_fresh_var(sc);
+    Term *s  = dcg_fresh_var(sc);
+
+    Term *head = term_deref(cl->head);
+    if (head->tag == TT_ATOM) {
+        Term **args = malloc(2 * sizeof(Term *));
+        args[0] = s0; args[1] = s;
+        cl->head = term_new_compound(head->atom_id, 2, args);
+    } else if (head->tag == TT_COMPOUND) {
+        int new_arity = head->compound.arity + 2;
+        Term **args = malloc(new_arity * sizeof(Term *));
+        for (int i = 0; i < head->compound.arity; i++)
+            args[i] = head->compound.args[i];
+        args[new_arity-2] = s0;
+        args[new_arity-1] = s;
+        cl->head = term_new_compound(head->compound.functor, new_arity, args);
+    }
+
+    /* Expand body */
+    Term *buf[1024];
+    int n = dcg_expand_body(dcg_body, s0, s, sc, buf, 0);
+
+    cl->body  = malloc(n * sizeof(Term *));
+    cl->nbody = n;
+    for (int i = 0; i < n; i++) cl->body[i] = buf[i];
+}
+
+/* =========================================================================
  * parse_clause — one clause or directive
  * ======================================================================= */
 static PlClause *parse_clause(Parser *p) {
@@ -404,6 +629,10 @@ static PlClause *parse_clause(Parser *p) {
         int n = count_conj(body_term);
         cl->body  = malloc((n ? n : 1) * sizeof(Term *));
         cl->nbody = flatten_conj(body_term, cl->body, 0);
+    } else if (pk.kind == TK_OP && strcmp(pk.text, "-->") == 0) {
+        lexer_next(&p->lx); /* consume --> */
+        Term *dcg_body = parse_term(p, 1200);
+        dcg_expand_clause(cl, dcg_body, &p->sc);
     } else {
         cl->body  = NULL;
         cl->nbody = 0;
