@@ -1,21 +1,20 @@
 ```SNOBOL4
 *  SCRIP DEMO2 -- Word Count (SNOBOL4 section)
-*  Idiom: SPAN consumes a word; loop accumulates count
-*  Input:  fixed string
-*  Output: integer word count
-        STR   = 'the quick brown fox jumps over the lazy dog'
-        WORDS = SPAN(&LCASE &UCASE)
-        COUNT = 0
-LOOP    STR   WORDS . W          :F(DONE)
-        COUNT = COUNT + 1
-        STR   LEN(SIZE(W)) = ''  :S(LOOP)
-DONE    OUTPUT = COUNT
+*  Idiom: BREAK/SPAN word boundary pattern; subject replacement loop
+*  Ref: Gimpel wordcount.sno idiom
+        &TRIM  = 1
+        WORD   = &UCASE &LCASE
+        WPAT   = BREAK(WORD) SPAN(WORD)
+        LINE   = 'the quick brown fox jumps over the lazy dog'
+NEXTW   LINE   WPAT  =                     :F(DONE)
+        N      = N + 1                     :(NEXTW)
+DONE    OUTPUT = N
 END
 ```
 
 ```Icon
 # SCRIP DEMO2 -- Word Count (Icon section)
-# Idiom: !str character generator with move()/tab() scanning
+# Idiom: string scanning with tab(upto)/tab(many) generator
 procedure main()
     s := "the quick brown fox jumps over the lazy dog"
     count := 0
@@ -31,7 +30,7 @@ end
 
 ```Prolog
 % SCRIP DEMO2 -- Word Count (Prolog section)
-% Idiom: DCG rule tokenises char list into word list
+% Idiom: DCG rules tokenise char list; phrase/3 counts words
 :- initialization(main, main).
 
 whites --> [].
