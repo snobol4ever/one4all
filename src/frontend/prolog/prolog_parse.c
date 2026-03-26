@@ -115,6 +115,9 @@ static const OpEntry BIN_OPS[] = {
     { "=:=",   700, ASSOC_NONE  },
     { "=\\=",  700, ASSOC_NONE  },
     { "=..",   700, ASSOC_NONE  },
+    { "=@=",   700, ASSOC_NONE  },
+    { "\\=@=", 700, ASSOC_NONE  },
+    { "?=",    700, ASSOC_NONE  },
     { "@<",    700, ASSOC_NONE  },
     { "@>",    700, ASSOC_NONE  },
     { "@=<",   700, ASSOC_NONE  },
@@ -193,6 +196,13 @@ static Term *parse_list(Parser *p) {
 static int parse_args(Parser *p, Term ***args_out) {
     int cap = 8, n = 0;
     Term **args = malloc(cap * sizeof(Term *));
+
+    /* f() — zero-arity compound: peek for immediate ')' */
+    Token pk0 = lexer_peek(&p->lx);
+    if (pk0.kind == TK_RPAREN) {
+        *args_out = args;
+        return 0;
+    }
 
     for (;;) {
         if (n >= cap) { cap *= 2; args = realloc(args, cap * sizeof(Term *)); }
@@ -290,9 +300,23 @@ static Term *parse_primary(Parser *p) {
                 if (num.kind == TK_INT)   return term_new_int(-num.ival);
                 if (num.kind == TK_FLOAT) return term_new_float(-num.fval);
             }
-            /* Fallthrough: treat as atom */
-            int id = prolog_atom_intern(tk.text);
-            return term_new_atom(id);
+            /* Fallthrough: treat as atom, but check for compound f(...) */
+            {
+                int id = prolog_atom_intern(tk.text);
+                Token pk2 = lexer_peek(&p->lx);
+                if (pk2.kind == TK_LPAREN) {
+                    lexer_next(&p->lx); /* consume ( */
+                    Term **args = NULL;
+                    int nargs = parse_args(p, &args);
+                    Token rp = lexer_peek(&p->lx);
+                    if (rp.kind == TK_RPAREN) lexer_next(&p->lx);
+                    else perror_at(p, rp.line, "expected ) after args");
+                    Term *t = term_new_compound(id, nargs, args);
+                    free(args);
+                    return t;
+                }
+                return term_new_atom(id);
+            }
         }
 
         case TK_NECK:
