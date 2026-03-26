@@ -3005,15 +3005,48 @@ static void ij_emit_alt(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
      * Contract: ICN_ALT always delivers exactly one long (lconst_0) on the
      * stack at ports.γ.  AND relay trampolines issue putstatic :J for ALT
      * children — same as for any long-typed child. */
+    /* Determine if all alternatives have the same type for pass-through */
+    int alt_is_str = 1, alt_is_dbl = 1;
+    for (int i = 0; i < nc; i++) {
+        if (!ij_expr_is_string(n->children[i])) alt_is_str = 0;
+        if (!ij_expr_is_real(n->children[i]))   alt_is_dbl  = 0;
+    }
+    /* For uniform-typed ALT (all str, all dbl, or all long): pass value through.
+     * For mixed: discard and use lconst_0 sentinel (legacy behaviour). */
+    int alt_uniform = alt_is_str || alt_is_dbl || (!alt_is_str && !alt_is_dbl);
+    /* alt_val_fld: temp static to hold the yielded value while we set gate */
+    char alt_val_fld[80]; snprintf(alt_val_fld, sizeof alt_val_fld, "icn_%d_alt_val", id);
+    if (!alt_is_str) {
+        if (alt_is_dbl) ij_declare_static_real(alt_val_fld);
+        else            ij_declare_static(alt_val_fld);
+    }
+
     for (int i = 0; i < nc; i++) {
         JL(cg[i]);
-        if (ij_expr_is_string(n->children[i]))
-            JI("pop","");
-        else
-            JI("pop2","");
-        JI("lconst_0","");   /* push sentinel J so ports.γ sees uniform stack */
-        J("    sipush %d\n", i+1);
-        ij_put_int_field(gate_fld);
+        if (alt_is_str) {
+            /* String on stack — store to scratch astore, set gate, reload */
+            int scratch = ij_alloc_int_scratch();
+            J("    astore %d\n", scratch);
+            J("    sipush %d\n", i+1);
+            ij_put_int_field(gate_fld);
+            J("    aload %d\n", scratch);
+        } else if (alt_is_dbl) {
+            /* Double on stack — store to temp dbl field, set gate, reload */
+            ij_put_dbl(alt_val_fld);
+            J("    sipush %d\n", i+1);
+            ij_put_int_field(gate_fld);
+            ij_get_dbl(alt_val_fld);
+        } else {
+            /* Long (or mixed) — store to temp long field, set gate, reload */
+            if (ij_expr_is_string(n->children[i])) JI("pop","");
+            else if (ij_expr_is_real(n->children[i])) {
+                JI("invokestatic","java/lang/Double/doubleToRawLongBits(D)J");
+            }
+            ij_put_long(alt_val_fld);
+            J("    sipush %d\n", i+1);
+            ij_put_int_field(gate_fld);
+            ij_get_long(alt_val_fld);
+        }
         JGoto(ports.γ);
     }
 
@@ -3581,8 +3614,11 @@ static int ij_expr_is_string(IcnNode *n) {
             return 0;
         }
         case ICN_ALT: {
-            /* ALT normalises its result to lconst_0 (long) at ports.γ — never a string */
-            return 0;
+            /* ALT is string-typed if all alternatives are strings */
+            if (n->nchildren == 0) return 0;
+            for (int i = 0; i < n->nchildren; i++)
+                if (!ij_expr_is_string(n->children[i])) return 0;
+            return 1;
         }
         case ICN_AND: {
             /* AND chain result type = last child's type */
