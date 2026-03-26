@@ -1,4 +1,3 @@
-:- dynamic color/1.
 :- assertz(color(red)).
 :- assertz(color(green)).
 :- assertz(color(blue)).

@@ -1,4 +1,3 @@
-:- dynamic animal/1.
 :- assertz(animal(cat)).
 :- assertz(animal(dog)).
 :- assertz(animal(bird)).

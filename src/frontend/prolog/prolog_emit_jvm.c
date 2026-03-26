@@ -1318,9 +1318,7 @@ static void pj_emit_assertz_helpers(void) {
     JI("iload_2", "");
     JI("anewarray", "java/lang/Object");
     JI("astore_3", "");
-    /* copy slot 0 (functor string) as-is */
-    JI("astore", "4");  /* use local 4 as loop var */
-    /* Actually: copy each slot recursively */
+    /* copy each slot recursively */
     /* slot 0 = functor (String) — copy as-is */
     JI("aload_3", "");
     JI("iconst_0", "");
@@ -3902,7 +3900,30 @@ static void pj_emit_choice(EXPR_t *choice) {
 static void pj_emit_main(Program *prog) {
     J(".method public static main([Ljava/lang/String;)V\n");
     J("    .limit stack 8\n");
-    J("    .limit locals 2\n");
+    J("    .limit locals 4\n");
+
+    /* Bug 2 fix: execute :- assertz/asserta directives before calling main/0.
+     * Directives are STMT_t nodes whose subject is NOT E_CHOICE. */
+    for (STMT_t *s = prog->head; s; s = s->next) {
+        if (!s->subject) continue;
+        if (s->subject->kind == E_CHOICE) continue;
+        EXPR_t *g = s->subject;
+        if (g->kind != E_FNC || !g->sval) continue;
+        if ((strcmp(g->sval, "assertz") == 0 || strcmp(g->sval, "asserta") == 0)
+             && g->nchildren == 1) {
+            /* emit assertz/asserta inline — same logic as pj_emit_goal assertz case */
+            int is_asserta = (strcmp(g->sval, "asserta") == 0);
+            int *dummy_locals = NULL;
+            pj_emit_term(g->children[0], dummy_locals, 0);
+            J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+            J("    invokestatic %s/pj_db_assert_key(Ljava/lang/Object;)Ljava/lang/String;\n", pj_classname);
+            pj_emit_term(g->children[0], dummy_locals, 0);
+            J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+            J("    %s\n", is_asserta ? "iconst_1" : "iconst_0");
+            J("    invokestatic %s/pj_db_assert(Ljava/lang/String;Ljava/lang/Object;I)V\n", pj_classname);
+        }
+        /* ignore :- dynamic and other directives silently */
+    }
 
     /* Call p_main_0(0) once. The internal fail-loop inside main/0 drives
      * all backtracking via call_sfail→call_α. No outer retry needed. */
@@ -3963,6 +3984,131 @@ void prolog_emit_jvm(Program *prog, FILE *out, const char *filename) {
         if (!s->subject) continue;
         if (s->subject->kind == E_CHOICE)
             pj_emit_choice(s->subject);
+    }
+
+    /* Bug 1 fix: emit stub methods for pure-dynamic predicates.
+     * A predicate is "pure-dynamic" if it appears as assertz/asserta arg
+     * in a directive but has no E_CHOICE in the program. */
+    {
+        /* Collect all statically-defined functor/arity keys */
+        /* Simple approach: for each directive assertz(foo(...)), check if
+         * foo/arity has an E_CHOICE; if not, emit a stub. */
+        for (STMT_t *s = prog->head; s; s = s->next) {
+            if (!s->subject || s->subject->kind == E_CHOICE) continue;
+            EXPR_t *g = s->subject;
+            if (!g || g->kind != E_FNC || !g->sval) continue;
+            if ((strcmp(g->sval, "assertz") != 0 && strcmp(g->sval, "asserta") != 0)
+                || g->nchildren != 1) continue;
+            EXPR_t *term = g->children[0];
+            if (!term || term->kind != E_FNC || !term->sval) continue;
+            /* get functor and arity */
+            const char *raw = term->sval;
+            int dyn_arity = term->nchildren;
+            /* check if static choice exists */
+            int has_static = 0;
+            for (STMT_t *s2 = prog->head; s2; s2 = s2->next) {
+                if (!s2->subject || s2->subject->kind != E_CHOICE) continue;
+                EXPR_t *ch = s2->subject;
+                if (!ch->sval) continue;
+                /* ch->sval is "name/arity" */
+                const char *sl2 = strrchr(ch->sval, '/');
+                int ch_arity = sl2 ? atoi(sl2+1) : 0;
+                int nlen = sl2 ? (int)(sl2 - ch->sval) : (int)strlen(ch->sval);
+                if (ch_arity == dyn_arity && strncmp(ch->sval, raw, nlen) == 0
+                    && (int)strlen(raw) == nlen) {
+                    has_static = 1; break;
+                }
+            }
+            if (has_static) continue;
+            /* check we haven't already emitted a stub for this functor/arity
+             * (multiple assertz calls for same predicate) — use a dedup scan
+             * of earlier directives */
+            int already = 0;
+            for (STMT_t *s3 = prog->head; s3 != s; s3 = s3->next) {
+                if (!s3->subject || s3->subject->kind == E_CHOICE) continue;
+                EXPR_t *g3 = s3->subject;
+                if (!g3 || g3->kind != E_FNC || !g3->sval) continue;
+                if ((strcmp(g3->sval,"assertz")!=0 && strcmp(g3->sval,"asserta")!=0)
+                    || g3->nchildren!=1) continue;
+                EXPR_t *t3 = g3->children[0];
+                if (t3 && t3->kind == E_FNC && t3->sval &&
+                    strcmp(t3->sval, raw) == 0 && t3->nchildren == dyn_arity) {
+                    already = 1; break;
+                }
+            }
+            if (already) continue;
+
+            /* emit stub: only the dynamic DB walker */
+            char safe_stub[256];
+            pj_safe_name(raw, safe_stub, sizeof safe_stub);
+            JSep(raw);
+            J("; stub for pure-dynamic predicate %s/%d\n", raw, dyn_arity);
+            J(".method static p_%s_%d(", safe_stub, dyn_arity);
+            for (int i = 0; i < dyn_arity; i++) J("[Ljava/lang/Object;");
+            J("I)[Ljava/lang/Object;\n");
+            int stub_locals = dyn_arity + 50;
+            J("    .limit stack 16\n");
+            J("    .limit locals %d\n", stub_locals);
+            int cs_loc  = dyn_arity;
+            int tr_loc  = dyn_arity + 1;
+            int idx_loc = dyn_arity + 2;
+            int trm_loc = dyn_arity + 3;
+            int stub_lbl = pj_fresh_label();
+            char sb_store[64], sb_loop[64], sb_hit[64], sb_miss[64], sb_ok[64], sb_fail[64];
+            snprintf(sb_store, sizeof sb_store, "stub%d_store", stub_lbl);
+            snprintf(sb_loop,  sizeof sb_loop,  "stub%d_loop",  stub_lbl);
+            snprintf(sb_hit,   sizeof sb_hit,   "stub%d_hit",   stub_lbl);
+            snprintf(sb_miss,  sizeof sb_miss,  "stub%d_miss",  stub_lbl);
+            snprintf(sb_ok,    sizeof sb_ok,    "stub%d_ok",    stub_lbl);
+            snprintf(sb_fail,  sizeof sb_fail,  "stub%d_fail",  stub_lbl);
+            /* db_idx = max(0, cs) */
+            J("    iload %d\n", cs_loc);
+            JI("dup", "");
+            J("    ifge %s\n", sb_store);
+            JI("pop", "");
+            JI("iconst_0", "");
+            J("%s:\n", sb_store);
+            J("    istore %d\n", idx_loc);
+            J("%s:\n", sb_loop);
+            J("    ldc \"%s/%d\"\n", raw, dyn_arity);
+            J("    iload %d\n", idx_loc);
+            J("    invokestatic %s/pj_db_query(Ljava/lang/String;I)Ljava/lang/Object;\n", pj_classname);
+            JI("dup", "");
+            J("    ifnonnull %s\n", sb_hit);
+            JI("pop", "");
+            J("    goto %s\n", sb_miss);
+            J("%s:\n", sb_hit);
+            if (dyn_arity == 0) {
+                JI("pop", "");
+            } else {
+                JI("checkcast", "[Ljava/lang/Object;");
+                J("    astore %d\n", trm_loc);
+                J("    invokestatic %s/pj_trail_mark()I\n", pj_classname);
+                J("    istore %d\n", tr_loc);
+                for (int ai = 0; ai < dyn_arity; ai++) {
+                    J("    aload %d\n", ai);
+                    J("    aload %d\n", trm_loc);
+                    J("    ldc %d\n", ai + 1);
+                    JI("aaload", "");
+                    J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+                    J("    ifeq %s\n", sb_fail);
+                }
+                J("    goto %s\n", sb_ok);
+                J("%s:\n", sb_fail);
+                J("    iload %d\n", tr_loc);
+                J("    invokestatic %s/pj_trail_unwind(I)V\n", pj_classname);
+                J("    iinc %d 1\n", idx_loc);
+                J("    goto %s\n", sb_loop);
+                J("%s:\n", sb_ok);
+            }
+            J("    ldc \"true\"\n");
+            J("    invokestatic %s/pj_term_atom(Ljava/lang/String;)[Ljava/lang/Object;\n", pj_classname);
+            JI("areturn", "");
+            J("%s:\n", sb_miss);
+            JI("aconst_null", "");
+            JI("areturn", "");
+            J(".end method\n\n");
+        }
     }
 
     pj_emit_main(prog);
