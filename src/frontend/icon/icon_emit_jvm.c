@@ -328,6 +328,9 @@ static void ij_declare_static_typed(const char *name, char type) {
             /* Allow upgrade to Object type if previously declared as J (long) */
             if (type == 'O' && ij_static_types[i] == 'J')
                 ij_static_types[i] = 'O';
+            /* Allow upgrade to record-list if previously declared as plain list */
+            if (type == 'R' && ij_static_types[i] == 'L')
+                ij_static_types[i] = 'R';
             return;
         }
     }
@@ -541,10 +544,12 @@ static int ij_expr_is_record_list(IcnNode *n) {
      * single-list-per-scope case common in tests.
      * A precise approach: tag list fields at declare time. Use the coarse one for now. */
     if (n->kind == ICN_VAR) {
-        /* Check global var field registry for associated elem_0 Object entry */
+        /* Fast path: var tagged 'R' (record-list) at assign time */
+        char fld[128]; ij_var_field(n->val.sval, fld, sizeof fld);
+        if (ij_field_type_tag(fld) == 'R') return 1;
         char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", n->val.sval);
-        /* Walk statics looking for icn_*_elem_0 with type 'O' that was declared
-         * in the same scope — use presence of any elem_0 Object as signal */
+        if (ij_field_type_tag(gname) == 'R') return 1;
+        /* Coarse fallback: any elem_0 Object in scope (single-list-per-scope) */
         for (int i = 0; i < ij_nstatics; i++) {
             if (ij_static_types[i] == 'O' &&
                 strstr(ij_statics[i], "_elem_0") != NULL) return 1;
@@ -610,6 +615,10 @@ static void ij_put_dbl(const char *fld) {
 /* ArrayList-typed static field helpers ('L' type tag) */
 static void ij_declare_static_list(const char *name) {
     ij_declare_static_typed(name, 'L');
+}
+/* Record-list helpers ('R' type tag — ArrayList of record Objects) */
+static void ij_declare_static_reclist(const char *name) {
+    ij_declare_static_typed(name, 'R');
 }
 static void ij_get_list_field(const char *fname) {
     char buf[384]; snprintf(buf, sizeof buf, "%s/%s Ljava/util/ArrayList;", ij_classname, fname);
@@ -773,7 +782,7 @@ static void ij_emit_var(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         for (int i = 0; i < ij_nstatics; i++) {
             if (!strcmp(ij_statics[i], fld) && ij_static_types[i] == 'A') { is_str  = 1; break; }
             if (!strcmp(ij_statics[i], fld) && ij_static_types[i] == 'D') { is_dbl  = 1; break; }
-            if (!strcmp(ij_statics[i], fld) && ij_static_types[i] == 'L') { is_list = 1; break; }
+            if (!strcmp(ij_statics[i], fld) && (ij_static_types[i] == 'L' || ij_static_types[i] == 'R')) { is_list = 1; break; }
             if (!strcmp(ij_statics[i], fld) && ij_static_types[i] == 'T') { is_table= 1; break; }
             if (!strcmp(ij_statics[i], fld) && ij_static_types[i] == 'O') { is_obj  = 1; break; }
         }
@@ -804,7 +813,7 @@ static void ij_emit_var(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         for (int i = 0; i < ij_nstatics; i++) {
             if (!strcmp(ij_statics[i], gname) && ij_static_types[i] == 'A') { is_str  = 1; break; }
             if (!strcmp(ij_statics[i], gname) && ij_static_types[i] == 'D') { is_dbl  = 1; break; }
-            if (!strcmp(ij_statics[i], gname) && ij_static_types[i] == 'L') { is_list = 1; break; }
+            if (!strcmp(ij_statics[i], gname) && (ij_static_types[i] == 'L' || ij_static_types[i] == 'R')) { is_list = 1; break; }
             if (!strcmp(ij_statics[i], gname) && ij_static_types[i] == 'T') { is_table= 1; break; }
             if (!strcmp(ij_statics[i], gname) && ij_static_types[i] == 'O') { is_obj  = 1; break; }
         }
@@ -977,13 +986,20 @@ static void ij_emit_assign(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     int is_tbl  = !is_str && !is_list && ij_expr_is_table(rhs);
     int is_dbl  = !is_str && !is_list && !is_tbl && ij_expr_is_real(rhs);
     int is_rec  = !is_str && !is_list && !is_tbl && !is_dbl && ij_expr_is_record(rhs);
+    /* Bang of a record-list yields the Object directly on the stack (no 0L placeholder) */
+    int is_rec_direct = is_rec && rhs->kind == ICN_BANG && ij_expr_is_record_list(rhs->children[0]);
+    int is_reclist = is_list && ij_expr_is_record_list(rhs);
 
     if (lhs && lhs->kind == ICN_VAR) {
         int slot = ij_locals_find(lhs->val.sval);
         if (slot >= 0) {
             char fld[128]; ij_var_field(lhs->val.sval, fld, sizeof fld);
             if (is_str)       { ij_declare_static_str(fld);   ij_put_str_field(fld); }
-            else if (is_list) { ij_declare_static_list(fld);  ij_put_list_field(fld); }
+            else if (is_list) {
+                if (is_reclist) ij_declare_static_reclist(fld);
+                else            ij_declare_static_list(fld);
+                ij_put_list_field(fld);
+            }
             else if (is_tbl)  {
                 ij_declare_static_table(fld); ij_put_table_field(fld);
                 if (ij_pending_tdflt[0]) {
@@ -997,19 +1013,27 @@ static void ij_emit_assign(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
             }
             else if (is_dbl)  { ij_declare_static_dbl(fld);   ij_put_dbl(fld); }
             else if (is_rec)  {
-                /* Pop the 0L placeholder, load the record object from icn_retval_obj */
-                JI("pop2","");
-                J("    getstatic %s/icn_retval_obj Ljava/lang/Object;\n", ij_classname);
                 ij_declare_static_obj(fld);
-                ij_put_obj_field(fld);
-                /* push 0L as result for assign expression value */
-                JI("lconst_0","");
+                if (is_rec_direct) {
+                    /* Object is already on the stack (bang of record-list) */
+                    ij_put_obj_field(fld);
+                } else {
+                    /* Constructor: stack has 0L placeholder, record in icn_retval_obj */
+                    JI("pop2","");
+                    J("    getstatic %s/icn_retval_obj Ljava/lang/Object;\n", ij_classname);
+                    ij_put_obj_field(fld);
+                }
+                /* lconst_0 pushed by push-back section below */
             }
             else              { ij_declare_static(fld);       ij_put_long(fld); }
         } else {
             char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", lhs->val.sval);
             if (is_str)       { ij_declare_static_str(gname);   ij_put_str_field(gname); }
-            else if (is_list) { ij_declare_static_list(gname);  ij_put_list_field(gname); }
+            else if (is_list) {
+                if (is_reclist) ij_declare_static_reclist(gname);
+                else            ij_declare_static_list(gname);
+                ij_put_list_field(gname);
+            }
             else if (is_tbl)  {
                 ij_declare_static_table(gname); ij_put_table_field(gname);
                 if (ij_pending_tdflt[0]) {
@@ -1022,11 +1046,15 @@ static void ij_emit_assign(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
             }
             else if (is_dbl)  { ij_declare_static_dbl(gname);   ij_put_dbl(gname); }
             else if (is_rec)  {
-                JI("pop2","");
-                J("    getstatic %s/icn_retval_obj Ljava/lang/Object;\n", ij_classname);
                 ij_declare_static_obj(gname);
-                ij_put_obj_field(gname);
-                JI("lconst_0","");
+                if (is_rec_direct) {
+                    ij_put_obj_field(gname);
+                } else {
+                    JI("pop2","");
+                    J("    getstatic %s/icn_retval_obj Ljava/lang/Object;\n", ij_classname);
+                    ij_put_obj_field(gname);
+                }
+                /* lconst_0 pushed by push-back section below */
             }
             else              { ij_declare_static(gname);       ij_put_long(gname); }
         }
@@ -3628,10 +3656,10 @@ static int ij_expr_is_list(IcnNode *n) {
         /* Check local/global var static type tag 'L' */
         char fld[128]; ij_var_field(n->val.sval, fld, sizeof fld);
         for (int i = 0; i < ij_nstatics; i++)
-            if (!strcmp(ij_statics[i], fld) && ij_static_types[i] == 'L') return 1;
+            if (!strcmp(ij_statics[i], fld) && (ij_static_types[i] == 'L' || ij_static_types[i] == 'R')) return 1;
         char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", n->val.sval);
         for (int i = 0; i < ij_nstatics; i++)
-            if (!strcmp(ij_statics[i], gname) && ij_static_types[i] == 'L') return 1;
+            if (!strcmp(ij_statics[i], gname) && (ij_static_types[i] == 'L' || ij_static_types[i] == 'R')) return 1;
     }
     return 0;
 }
@@ -4408,6 +4436,10 @@ static void ij_emit_makelist(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
             /* String is already Object — no boxing needed */
         } else if (ij_expr_is_real(n->children[i])) {
             JI("invokestatic", "java/lang/Double/valueOf(D)Ljava/lang/Double;");
+        } else if (ij_expr_is_record(n->children[i])) {
+            /* Constructor left 0L on stack; actual record is in icn_retval_obj */
+            JI("pop2", "");
+            J("    getstatic %s/icn_retval_obj Ljava/lang/Object;\n", ij_classname);
         } else {
             JI("invokestatic", "java/lang/Long/valueOf(J)Ljava/lang/Long;");
         }
@@ -5325,7 +5357,10 @@ static void ij_emit_proc(IcnNode *proc, FILE *out_target) {
         if (ij_expr_is_string(rhs)) {
             ij_declare_static_str(fld);
         } else if (ij_expr_is_list(rhs)) {
-            ij_declare_static_list(fld);
+            if (ij_expr_is_record_list(rhs))
+                ij_declare_static_reclist(fld);
+            else
+                ij_declare_static_list(fld);
         } else if (ij_expr_is_table(rhs)) {
             ij_declare_static_table(fld);
             /* Check if rhs is table(dflt) — if so, pre-declare {fld}_dflt */
@@ -5341,6 +5376,27 @@ static void ij_emit_proc(IcnNode *proc, FILE *out_target) {
             ij_declare_static_dbl(fld);
         }
         /* long-typed vars are declared on first use — no pre-declaration needed */
+    }
+
+    /* Pre-pass 2: scan ICN_EVERY generators for `v := !reclist` assigns.
+     * The every emitter emits body before gen, so the ICN_VAR for v in the body
+     * would be emitted before the assign tags v as 'O'. Pre-tag here. */
+    for (int si = 0; si < nstmts; si++) {
+        IcnNode *stmt = proc->children[body_start + si];
+        if (!stmt || stmt->kind != ICN_EVERY || stmt->nchildren < 1) continue;
+        IcnNode *gen = stmt->children[0];
+        if (!gen || gen->kind != ICN_ASSIGN || gen->nchildren < 2) continue;
+        IcnNode *lhs = gen->children[0];
+        IcnNode *rhs = gen->children[1];  /* should be ICN_BANG(!reclist) */
+        if (!lhs || lhs->kind != ICN_VAR) continue;
+        if (!rhs || rhs->kind != ICN_BANG || rhs->nchildren < 1) continue;
+        if (!ij_expr_is_record_list(rhs->children[0])) continue;
+        /* lhs var is assigned a record from a record-list bang — tag as Object */
+        int slot = ij_locals_find(lhs->val.sval);
+        char fld[128];
+        if (slot >= 0) ij_var_field(lhs->val.sval, fld, sizeof fld);
+        else           snprintf(fld, sizeof fld, "icn_gvar_%s", lhs->val.sval);
+        ij_declare_static_obj(fld);
     }
 
     /* Chain statements.
@@ -5717,7 +5773,7 @@ void ij_emit_file(IcnNode **nodes, int count, FILE *out, const char *filename, c
         char type = ij_static_types[i];
         if (type == 'A')
             J(".field public static %s Ljava/lang/String;\n", ij_statics[i]);
-        else if (type == 'L')
+        else if (type == 'L' || type == 'R')
             J(".field public static %s Ljava/util/ArrayList;\n", ij_statics[i]);
         else if (type == 'T')
             J(".field public static %s Ljava/util/HashMap;\n", ij_statics[i]);
