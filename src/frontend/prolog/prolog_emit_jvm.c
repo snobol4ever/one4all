@@ -1757,6 +1757,107 @@ static void pj_emit_assertz_helpers(void) {
     J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
     JI("ireturn", "");
     J(".end method\n\n");
+
+    /* ------------------------------------------------------------------
+     * pj_format_2(Object fmt, Object arglist) -> V
+     * Implements format/1 (pass nil as arglist) and format/2.
+     * Directives: ~w ~a ~d (write term/int), ~n (newline), ~i (ignore).
+     * locals: 0=fmt 1=arglist 2=fmtstr(String) 3=len(int)
+     *         4=i(int) 5=ch(int) 6=head(Object)
+     * ------------------------------------------------------------------ */
+    J("; pj_format_2(Object fmt, Object arglist) -> V\n");
+    J(".method static pj_format_2(Ljava/lang/Object;Ljava/lang/Object;)V\n");
+    J("    .limit stack 6\n");
+    J("    .limit locals 7\n");
+    /* deref fmt, extract name string */
+    JI("aload_0", "");
+    J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    JI("astore_0", "");
+    JI("aload_0", "");
+    J("    invokestatic %s/pj_atom_name(Ljava/lang/Object;)Ljava/lang/String;\n", pj_classname);
+    JI("astore_2", "");      /* fmtstr */
+    JI("aload_2", "");
+    JI("invokevirtual", "java/lang/String/length()I");
+    JI("istore_3", "");      /* len */
+    JI("iconst_0", "");
+    JI("istore", "4");       /* i = 0 */
+    J("pjfmt_loop:\n");
+    JI("iload", "4");
+    JI("iload_3", "");
+    JI("if_icmpge", "pjfmt_done");
+    JI("aload_2", "");
+    JI("iload", "4");
+    JI("invokevirtual", "java/lang/String/charAt(I)C");
+    JI("istore", "5");       /* ch */
+    /* if ch != '~' goto plain */
+    JI("iload", "5");
+    JI("bipush", "126");
+    JI("if_icmpne", "pjfmt_plain");
+    /* tilde: consume it, read next */
+    JI("iinc", "4 1");
+    JI("iload", "4");
+    JI("iload_3", "");
+    JI("if_icmpge", "pjfmt_done");
+    JI("aload_2", "");
+    JI("iload", "4");
+    JI("invokevirtual", "java/lang/String/charAt(I)C");
+    JI("istore", "5");
+    /* dispatch on directive */
+    JI("iload", "5"); JI("bipush", "119"); JI("if_icmpeq", "pjfmt_write"); /* w */
+    JI("iload", "5"); JI("bipush", "97");  JI("if_icmpeq", "pjfmt_write"); /* a */
+    JI("iload", "5"); JI("bipush", "100"); JI("if_icmpeq", "pjfmt_write"); /* d */
+    JI("iload", "5"); JI("bipush", "105"); JI("if_icmpeq", "pjfmt_ignore");/* i */
+    JI("iload", "5"); JI("bipush", "110"); JI("if_icmpeq", "pjfmt_nl");    /* n */
+    /* unknown: skip */
+    JI("iinc", "4 1");
+    JI("goto", "pjfmt_loop");
+
+    J("pjfmt_write:\n");
+    /* head = car(arglist) */
+    JI("aload_1", "");
+    J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("iconst_2", ""); JI("aaload", "");   /* args[2] = head */
+    JI("astore", "6");
+    /* arglist = cdr(arglist) */
+    JI("aload_1", "");
+    J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("bipush", "3"); JI("aaload", "");    /* args[3] = tail */
+    JI("astore_1", "");
+    JI("aload", "6");
+    J("    invokestatic %s/pj_write(Ljava/lang/Object;)V\n", pj_classname);
+    JI("iinc", "4 1");
+    JI("goto", "pjfmt_loop");
+
+    J("pjfmt_ignore:\n");
+    /* advance arglist, discard head */
+    JI("aload_1", "");
+    J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    JI("checkcast", "[Ljava/lang/Object;");
+    JI("bipush", "3"); JI("aaload", "");
+    JI("astore_1", "");
+    JI("iinc", "4 1");
+    JI("goto", "pjfmt_loop");
+
+    J("pjfmt_nl:\n");
+    JI("getstatic", "java/lang/System/out Ljava/io/PrintStream;");
+    JI("invokevirtual", "java/io/PrintStream/println()V");
+    JI("iinc", "4 1");
+    JI("goto", "pjfmt_loop");
+
+    J("pjfmt_plain:\n");
+    JI("getstatic", "java/lang/System/out Ljava/io/PrintStream;");
+    JI("iload", "5");
+    JI("i2c", "");
+    JI("invokestatic", "java/lang/Character/toString(C)Ljava/lang/String;");
+    JI("invokevirtual", "java/io/PrintStream/print(Ljava/lang/String;)V");
+    JI("iinc", "4 1");
+    JI("goto", "pjfmt_loop");
+
+    J("pjfmt_done:\n");
+    JI("return", "");
+    J(".end method\n\n");
 }
 
 /* -------------------------------------------------------------------------
@@ -2025,6 +2126,7 @@ static int pj_is_user_call(EXPR_t *goal) {
         "assertz","asserta","abolish","retract",
         "sort","msort",
         "succ","plus",
+        "format",
         NULL
     };
     for (int i = 0; builtins[i]; i++)
@@ -2410,6 +2512,24 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
             pj_emit_term(goal->children[2], var_locals, n_vars);
             J("    invokestatic %s/pj_plus_3(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
             J("    ifeq %s\n", lbl_ω);
+            JI("goto", lbl_γ);
+            return;
+        }
+        /* format/1: format(Fmt) — no args */
+        if (strcmp(fn, "format") == 0 && nargs == 1) {
+            pj_emit_term(goal->children[0], var_locals, n_vars);
+            /* push nil as arglist */
+            JI("ldc", "\"[]\"");
+            J("    invokestatic %s/pj_term_atom(Ljava/lang/String;)[Ljava/lang/Object;\n", pj_classname);
+            J("    invokestatic %s/pj_format_2(Ljava/lang/Object;Ljava/lang/Object;)V\n", pj_classname);
+            JI("goto", lbl_γ);
+            return;
+        }
+        /* format/2: format(Fmt, Args) */
+        if (strcmp(fn, "format") == 0 && nargs == 2) {
+            pj_emit_term(goal->children[0], var_locals, n_vars);
+            pj_emit_term(goal->children[1], var_locals, n_vars);
+            J("    invokestatic %s/pj_format_2(Ljava/lang/Object;Ljava/lang/Object;)V\n", pj_classname);
             JI("goto", lbl_γ);
             return;
         }
