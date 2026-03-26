@@ -1,26 +1,27 @@
 ```SNOBOL4
 *  SCRIP DEMO6 -- Sieve of Eratosthenes, primes to 50 (SNOBOL4 section)
 *  Idiom: ARRAY as bitset; nested labeled-goto loops
+        &CASE  = 1
         &TRIM  = 1
-        LIMIT  = 50
-        A      = ARRAY(LIMIT, 1)
-        A<1>   = 0
-        I      = 2
-OUTER   GT(I * I, LIMIT)                    :S(PRINT)
-        DIFFER(A<I>)                         :F(NEXT)
-        J      = I * I
-INNER   GT(J, LIMIT)                        :S(NEXT)
-        A<J>   = 0
-        J      = J + I                       :(INNER)
-NEXT    I      = I + 1                       :(OUTER)
-PRINT   I      = 1
-        OUT    =
-PLOOP   I      = I + 1
-        GT(I, LIMIT)                         :S(DONE)
-        DIFFER(A<I>)                         :F(PLOOP)
-        OUT    = IDENT(OUT) I                :S(PLOOP)
-        OUT    = OUT ' ' I                   :(PLOOP)
-DONE    OUTPUT = OUT
+        limit  = 50
+        a      = ARRAY(limit, 1)
+        a<1>   = 0
+        i      = 2
+outer   GT(i * i, limit)                    :S(print)
+        EQ(a<i>, 1)                         :F(next)
+        j      = i * i
+inner   GT(j, limit)                        :S(next)
+        a<j>   = 0
+        j      = j + i                      :(inner)
+next    i      = i + 1                      :(outer)
+print   i      = 1
+        out    =
+p_loop  i      = i + 1
+        GT(i, limit)                        :S(done)
+        EQ(a<i>, 1)                         :F(p_loop)
+        out    = IDENT(out) i               :S(p_loop)
+        out    = out ' ' i                  :(p_loop)
+done    OUTPUT = out
 END
 ```
 
@@ -37,8 +38,10 @@ procedure main()
                 sieve[j] := 0
     out := ""
     every i := 2 to limit do
-        if sieve[i] = 1 then
-            out ||:= (if *out = 0 then "" else " ") || i
+        if sieve[i] = 1 then {
+            if *out > 0 then out ||:= " "
+            out ||:= i
+        }
     write(out)
 end
 ```

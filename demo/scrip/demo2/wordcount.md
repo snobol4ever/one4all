@@ -2,13 +2,15 @@
 *  SCRIP DEMO2 -- Word Count (SNOBOL4 section)
 *  Idiom: BREAK/SPAN word boundary pattern; subject replacement loop
 *  Ref: Gimpel wordcount.sno idiom
+        &CASE  = 1
         &TRIM  = 1
-        WORD   = &UCASE &LCASE
-        WPAT   = BREAK(WORD) SPAN(WORD)
-        LINE   = 'the quick brown fox jumps over the lazy dog'
-NEXTW   LINE   WPAT  =                     :F(DONE)
-        N      = N + 1                     :(NEXTW)
-DONE    OUTPUT = N
+        word   = &UCASE &LCASE
+        w_pat  = BREAK(word) SPAN(word)
+        line   = 'the quick brown fox jumps over the lazy dog'
+        n      = 0
+next_w  line   w_pat =                     :F(done)
+        n      = n + 1                     :(next_w)
+done    OUTPUT = n
 END
 ```
 

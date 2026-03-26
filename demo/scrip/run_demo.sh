@@ -104,7 +104,7 @@ run_backend() {
             ;;
         ICONT)
             local exe="$TMP/icon_demo"
-            "$ICONT" -o "$exe" "$outfile" > /dev/null 2>&1 && \
+            "$ICONT" -s -o "$exe" "$outfile" 2>/dev/null && \
             "$exe" > "$actual" 2>/dev/null
             ;;
     esac

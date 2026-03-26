@@ -2,23 +2,24 @@
 *  SCRIP DEMO3 -- Roman Numerals (SNOBOL4 section)
 *  Idiom: recursive digit-strip with table lookup; REPLACE shifts place value
 *  Ref: Gimpel ROMAN.inc
+        &CASE  = 1
         &TRIM  = 1
-        DEFINE('ROMAN(N)T')                 :(ROMAN_END)
-ROMAN   N   RPOS(1)  LEN(1) . T  =         :F(RETURN)
+        DEFINE('roman(n)t')                 :(roman_end)
+roman   n   RPOS(1)  LEN(1) . t  =         :F(RETURN)
         '0,1I,2II,3III,4IV,5V,6VI,7VII,8VIII,9IX,'
-+       T   BREAK(',') . T                  :F(FRETURN)
-        ROMAN = REPLACE(ROMAN(N), 'IVXLCDM', 'XLCDM**') T
++       t   BREAK(',') . t                  :F(FRETURN)
+        roman = REPLACE(roman(n), 'IVXLCDM', 'XLCDM**') t
 +                                           :S(RETURN)F(FRETURN)
-ROMAN_END
-        OUTPUT = ROMAN('1776')
-        OUTPUT = ROMAN('42')
-        OUTPUT = ROMAN('9')
+roman_end
+        OUTPUT = roman('1776')
+        OUTPUT = roman('42')
+        OUTPUT = roman('9')
 END
 ```
 
 ```Icon
 # SCRIP DEMO3 -- Roman Numerals (Icon section)
-# Idiom: suspend generator yields digit->numeral pairs; every builds result
+# Idiom: greedy subtraction loop with parallel vals/syms lists
 procedure roman(n)
     vals := [1000,900,500,400,100,90,50,40,10,9,5,4,1]
     syms := ["M","CM","D","CD","C","XC","L","XL","X","IX","V","IV","I"]

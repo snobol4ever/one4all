@@ -1,27 +1,32 @@
 ```SNOBOL4
 *  SCRIP DEMO8 -- Sort 8 integers (SNOBOL4 section)
 *  Idiom: Gimpel BSORT insertion sort on ARRAY; LGT drives shifts
-        &TRIM = 1
-        DEFINE('BSORT(A,I,N)J,K,V')         :(BSORT_END)
-BSORT   J  = I
-BSORT_1 J  = J + 1  LT(J,N)                :F(RETURN)
-        K  = J
-        V  = A<J>
-BSORT_2 K  = K - 1  GT(K,I)                :F(BSORT_RO)
-        A<K + 1>  = LGT(A<K>,V)  A<K>      :S(BSORT_2)
-        A<K + 1>  = V                       :(BSORT_1)
-BSORT_RO A<I> = V                          :(BSORT_1)
-BSORT_END
-        A      = ARRAY(8)
-        A<1>   = 5  ;  A<2>  = 3  ;  A<3>  = 8  ;  A<4>  = 1
-        A<5>   = 9  ;  A<6>  = 2  ;  A<7>  = 7  ;  A<8>  = 4
-        BSORT(A, 1, 8)
-        OUT    =
-        I      = 0
-PLOOP   I      = I + 1  GT(I, 8)            :S(DONE)
-        OUT    = IDENT(OUT) A<I>             :S(PLOOP)
-        OUT    = OUT ' ' A<I>               :(PLOOP)
-DONE    OUTPUT = OUT
+        &CASE  = 1
+        &TRIM  = 1
+        DEFINE('b_sort(a,lo,hi)j,k,v')      :(b_sort_end)
+b_sort  j      = lo
+b_s1    j      = j + 1
+        LE(j, hi)                           :F(RETURN)
+        k      = j
+        v      = a<j>
+b_s2    GT(k, lo)                           :F(b_s_place)
+        LGT(a<k - 1>, v)                    :F(b_s_place)
+        a<k>   = a<k - 1>
+        k      = k - 1                      :(b_s2)
+b_s_place
+        a<k>   = v                          :(b_s1)
+b_sort_end
+        a      = ARRAY(8)
+        a<1>   = 5  ;  a<2>  = 3  ;  a<3>  = 8  ;  a<4>  = 1
+        a<5>   = 9  ;  a<6>  = 2  ;  a<7>  = 7  ;  a<8>  = 4
+        b_sort(a, 1, 8)
+        out    =
+        i      = 0
+p_loop  i      = i + 1
+        GT(i, 8)                            :S(done)
+        out    = IDENT(out) a<i>            :S(p_loop)
+        out    = out ' ' a<i>              :(p_loop)
+done    OUTPUT = out
 END
 ```
 
@@ -45,8 +50,10 @@ procedure main()
     a := [5, 3, 8, 1, 9, 2, 7, 4]
     isort(a)
     out := ""
-    every x := !a do
-        out ||:= (if *out = 0 then "" else " ") || x
+    every x := !a do {
+        if *out > 0 then out ||:= " "
+        out ||:= x
+    }
     write(out)
 end
 ```

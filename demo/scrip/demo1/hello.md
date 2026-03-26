@@ -1,6 +1,8 @@
 ```SNOBOL4
 *  SCRIP DEMO1 -- Hello World (SNOBOL4 section)
 *  Idiom: assignment to OUTPUT
+        &CASE  = 1
+        &TRIM  = 1
         OUTPUT = 'Hello, World!'
 END
 ```

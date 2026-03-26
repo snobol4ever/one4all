@@ -1,16 +1,17 @@
 ```SNOBOL4
 *  SCRIP DEMO4 -- Palindrome (SNOBOL4 section)
-*  Idiom: IDENT(S, REVERSE(S)) -- one comparison, no loop
+*  Idiom: IDENT(s, REVERSE(s)) -- one comparison, no loop
 *  Ref: Gimpel/dotnet palin.sno idiom
-        &TRIM = 1
-        DEFINE('CHECK(S)')                  :(CHECK_END)
-CHECK   S         = REPLACE(S, &LCASE, &UCASE)
-        CHECK     = IDENT(S, REVERSE(S)) 'yes'  :S(RETURN)
-        CHECK     = 'no'                    :(RETURN)
-CHECK_END
-        OUTPUT = CHECK('racecar')
-        OUTPUT = CHECK('hello')
-        OUTPUT = CHECK('level')
+        &CASE  = 1
+        &TRIM  = 1
+        DEFINE('check(s)')                  :(check_end)
+check   s      = REPLACE(s, &LCASE, &UCASE)
+        check  = IDENT(s, REVERSE(s)) 'yes' :S(RETURN)
+        check  = 'no'                       :(RETURN)
+check_end
+        OUTPUT = check('racecar')
+        OUTPUT = check('hello')
+        OUTPUT = check('level')
 END
 ```
 

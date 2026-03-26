@@ -1,54 +1,63 @@
 ```SNOBOL4
 *  SCRIP DEMO10 -- Detect anagrams (SNOBOL4 section)
-*  Idiom: BSORT char-ARRAY -> canonical key; TABLE groups words by key;
-*         CONVERT(T,'ARRAY') iterates table entries
-        &TRIM = 1
-        DEFINE('BSORT(A,I,N)J,K,V)')        :(BSORT_END)
-BSORT   J  = I
-BS1     J  = J + 1  LT(J,N)                :F(RETURN)
-        K  = J
-        V  = A<J>
-BS2     K  = K - 1  GT(K,I)                :F(BS_RO)
-        A<K + 1>  = LGT(A<K>,V)  A<K>      :S(BS2)
-        A<K + 1>  = V                       :(BS1)
-BS_RO   A<I>  = V                          :(BS1)
-BSORT_END
-        DEFINE('SORTCHARS(W)A,I,N,KEY)')    :(SC_END)
-SORTCHARS
-        N      = SIZE(W)
-        A      = ARRAY(N)
-        I      = 0
-SC1     I      = I + 1  GT(I, N)           :S(SC2)
-        A<I>   = SUBSTR(W, I, 1)           :(SC1)
-SC2     BSORT(A, 1, N)
-        KEY    =
-        I      = 0
-SC3     I      = I + 1  GT(I, N)           :S(SC_RET)
-        KEY    = KEY A<I>                  :(SC3)
-SC_RET  SORTCHARS = KEY                    :(RETURN)
-SC_END
-        T      = TABLE()
-        WORDS  = 'eat tea tan ate nat bat'
-        WPAT   = BREAK(' ') . W
-WLOOP   WORDS  WPAT =                      :F(WDONE)
-        KEY    = SORTCHARS(W)
-        T<KEY> = IDENT(T<KEY>) W            :S(WLOOP)
-        T<KEY> = T<KEY> ' ' W              :(WLOOP)
-WDONE   T<SORTCHARS('bat')> = SORTCHARS(IDENT(WORDS)) * skip solo entries
-        ROWS   = CONVERT(T, 'ARRAY')
-        I      = 0
-RLOOP   I      = I + 1
-        GT(I, PROTOTYPE(ROWS))              :S(END)
-        ENTRY  = ROWS<I,2>
-        ENTRY  BREAK(' ')                   :F(RLOOP)
-        OUTPUT = ENTRY                      :(RLOOP)
+*  Idiom: b_sort char-ARRAY -> canonical key; TABLE groups words;
+*         BREAK/SPAN word scan; CONVERT(T,'ARRAY') iterates entries
+        &CASE  = 1
+        &TRIM  = 1
+        DEFINE('b_sort(a,lo,hi)j,k,v')      :(b_sort_end)
+b_sort  j      = lo
+b_s1    j      = j + 1
+        LE(j, hi)                           :F(RETURN)
+        k      = j
+        v      = a<j>
+b_s2    GT(k, lo)                           :F(b_s_place)
+        LGT(a<k - 1>, v)                    :F(b_s_place)
+        a<k>   = a<k - 1>
+        k      = k - 1                      :(b_s2)
+b_s_place
+        a<k>   = v                          :(b_s1)
+b_sort_end
+        DEFINE('sort_chars(w)a,i,n,key')    :(sort_chars_end)
+sort_chars
+        n      = SIZE(w)
+        a      = ARRAY(n)
+        i      = 0
+sc1     i      = i + 1
+        GT(i, n)                            :S(sc2)
+        a<i>   = SUBSTR(w, i, 1)            :(sc1)
+sc2     b_sort(a, 1, n)
+        key    =
+        i      = 0
+sc3     i      = i + 1
+        GT(i, n)                            :S(sc_ret)
+        key    = key a<i>                   :(sc3)
+sc_ret  sort_chars = key                    :(RETURN)
+sort_chars_end
+        t      = TABLE()
+        word   = &LCASE &UCASE
+        w_pat  = BREAK(word) SPAN(word) . w
+        line   = 'eat tea tan ate nat bat'
+w_loop  line   w_pat =                     :F(w_done)
+        key    = sort_chars(w)
+        t<key> = IDENT(t<key>) w            :S(w_loop)
+        t<key> = t<key> ' ' w              :(w_loop)
+w_done  rows   = CONVERT(t, 'ARRAY')
+        proto  = PROTOTYPE(rows)
+        proto  BREAK(',') . n_rows  =
+        i      = 0
+r_loop  i      = i + 1
+        GT(i, +n_rows)                      :S(END)
+        entry  = rows<i,2>
+        entry  BREAK(' ')                   :S(do_out)
+                                            :(r_loop)
+do_out  OUTPUT = entry                      :(r_loop)
 END
 ```
 
 ```Icon
 # SCRIP DEMO10 -- Detect anagrams (Icon section)
 # Idiom: sort string chars as list -> canonical key; table groups by key
-procedure sortchars(w)
+procedure sort_chars(w)
     chars := []
     every put(chars, !w)
     chars := sort(chars)
@@ -61,14 +70,17 @@ procedure main()
     words := ["eat", "tea", "tan", "ate", "nat", "bat"]
     t := table()
     every w := !words do {
-        key := sortchars(w)
+        key := sort_chars(w)
         /t[key] := []
         put(t[key], w)
     }
     every pair := !sort(t) do {
         if *pair[2] > 1 then {
             out := ""
-            every out ||:= (if *out = 0 then "" else " ") || !pair[2]
+            every w2 := !pair[2] do {
+                if *out > 0 then out ||:= " "
+                out ||:= w2
+            }
             write(out)
         }
     }

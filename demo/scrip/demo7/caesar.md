@@ -2,13 +2,13 @@
 *  SCRIP DEMO7 -- ROT13 cipher (SNOBOL4 section)
 *  Idiom: REPLACE with two parallel 52-char alphabet strings
 *  Ref: Gimpel UPLO.inc idiom
-        &TRIM = 1
-        PLAIN  = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
-        ROT13  = 'NOPQRSTUVWXYZABCDEFGHIJKLMnopqrstuvwxyzabcdefghijklm'
-        S      = 'Hello, World!'
-        OUTPUT = REPLACE(S, PLAIN, ROT13)
-        T      = REPLACE(REPLACE(S, PLAIN, ROT13), PLAIN, ROT13)
-        OUTPUT = T
+        &CASE  = 1
+        &TRIM  = 1
+        plain  = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+        rot13  = 'NOPQRSTUVWXYZABCDEFGHIJKLMnopqrstuvwxyzabcdefghijklm'
+        s      = 'Hello, World!'
+        OUTPUT = REPLACE(s, plain, rot13)
+        OUTPUT = REPLACE(REPLACE(s, plain, rot13), plain, rot13)
 END
 ```
 

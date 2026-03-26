@@ -1,16 +1,17 @@
 ```SNOBOL4
 *  SCRIP DEMO5 -- Fibonacci first 10 (SNOBOL4 section)
 *  Idiom: iterative labeled-goto loop; two accumulators
-        &TRIM = 1
-        A     = 0
-        B     = 1
-        N     = 0
-LOOP    OUTPUT = A
-        N      = N + 1
-        LT(N, 10)                           :F(END)
-        T      = B
-        B      = A + B
-        A      = T                          :(LOOP)
+        &CASE  = 1
+        &TRIM  = 1
+        a      = 0
+        b      = 1
+        n      = 0
+loop    OUTPUT = a
+        n      = n + 1
+        LT(n, 10)                           :F(END)
+        t      = b
+        b      = a + b
+        a      = t                          :(loop)
 END
 ```
 
