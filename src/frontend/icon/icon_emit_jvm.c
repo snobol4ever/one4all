@@ -221,6 +221,16 @@ typedef struct { char name[32]; int slot; } IjLocal;
 static IjLocal ij_locals[MAX_LOCALS];
 static int     ij_nlocals = 0;
 static int     ij_nparams = 0;
+static int     ij_nstrefs = 0; /* count of logical slots used for astore (String refs) */
+static int     ij_nint_scratch = 0; /* count of int/ref scratch slots above long-pair region */
+/* Allocate a raw JVM slot for int/ref scratch — lives at 2*MAX_LOCALS + n,
+ * entirely above the slot_jvm() long-pair region, so istore/astore never
+ * alias lstore targets.  Returns the raw JVM slot index. */
+static int ij_alloc_int_scratch(void) {
+    /* Start well above the long-pair ceiling (2*MAX_LOCALS + generous padding)
+     * so int/ref scratch slots never alias any slot_jvm(n) = 2*n target. */
+    return 2 * MAX_LOCALS + 20 + ij_nint_scratch++;
+}
 static char    ij_ret_label[64]  = "";   /* label for return */
 static char    ij_fail_label[64] = "";   /* label for proc fail */
 static char    ij_sret_label[64] = "";   /* label for suspend-yield (frame kept) */
@@ -260,7 +270,7 @@ static const char *ij_loop_next_target(void) {
 }
 
 static void ij_locals_reset(void) {
-    ij_nlocals = 0; ij_nparams = 0;
+    ij_nlocals = 0; ij_nparams = 0; ij_nstrefs = 0; ij_nint_scratch = 0;
     ij_suspend_count = 0;
     ij_loop_depth = 0;
 }
@@ -292,7 +302,8 @@ static int slot_jvm(int logical) { return 2 * logical; }
 
 /* Total JVM locals needed for .limit locals directive */
 static int ij_jvm_locals_count(void) {
-    return 2 * ij_nlocals + 2;   /* +2 for scratch */
+    int top = 2 * MAX_LOCALS + 20 + ij_nint_scratch;
+    return top + 4;
 }
 
 /* Current procedure name — used to namespace per-proc static var fields */
@@ -1287,13 +1298,13 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         /* Value on stack: String ref or long depending on arg type */
         if (ij_expr_is_string(arg)) {
             /* String ref on stack — store to scratch, push stream, load, println */
-            int scratch = ij_locals_alloc_tmp();
-            J("    astore %d\n", slot_jvm(scratch));
+            int scratch = ij_alloc_int_scratch();
+            J("    astore %d\n", scratch);
             JI("getstatic", "java/lang/System/out Ljava/io/PrintStream;");
-            J("    aload %d\n", slot_jvm(scratch));
+            J("    aload %d\n", scratch);
             JI("invokevirtual", "java/io/PrintStream/println(Ljava/lang/String;)V");
             /* write() returns its argument — reload String for caller */
-            J("    aload %d\n", slot_jvm(scratch));
+            J("    aload %d\n", scratch);
         } else if (ij_expr_is_real(arg)) {
             /* Double on stack — print as real */
             int scratch = ij_locals_alloc_tmp();
@@ -1382,8 +1393,8 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         JL(after);
         /* arg (long) on stack → cast to int */
         JI("l2i", "");
-        int n_slot = ij_locals_alloc_tmp();
-        J("    istore %d\n", slot_jvm(n_slot));
+        int n_slot = ij_alloc_int_scratch();
+        J("    istore %d\n", n_slot);
         /* lazy-init reader */
         ij_get_int_field("icn_stdin_init");
         J("    ifne %s\n", call_lbl);
@@ -1399,7 +1410,7 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         JI("iconst_1", ""); ij_put_int_field("icn_stdin_init");
         JL(call_lbl);
         /* allocate char[] of size n */
-        J("    iload %d\n", slot_jvm(n_slot));
+        J("    iload %d\n", n_slot);
         JI("newarray", "char");
         int arr_slot = ij_locals_alloc_tmp();
         J("    astore %d\n", slot_jvm(arr_slot));
@@ -1409,19 +1420,19 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         JI("checkcast", "java/io/BufferedReader");
         J("    aload %d\n", slot_jvm(arr_slot));
         JI("iconst_0", "");
-        J("    iload %d\n", slot_jvm(n_slot));
+        J("    iload %d\n", n_slot);
         JI("invokevirtual", "java/io/BufferedReader/read([CII)I");
         /* result: -1 = EOF, 0 = nothing read → ω; else build String */
         JI("dup", "");
         J("    ifle %s\n", eof_lbl);
         /* nread on stack */
-        int nread_slot = ij_locals_alloc_tmp();
-        J("    istore %d\n", slot_jvm(nread_slot));
+        int nread_slot = ij_alloc_int_scratch();
+        J("    istore %d\n", nread_slot);
         JI("new", "java/lang/String");
         JI("dup", "");
         J("    aload %d\n", slot_jvm(arr_slot));
         JI("iconst_0", "");
-        J("    iload %d\n", slot_jvm(nread_slot));
+        J("    iload %d\n", nread_slot);
         JI("invokespecial", "java/lang/String/<init>([CII)V");
         JGoto(ports.γ);
         JL(eof_lbl);
@@ -1442,9 +1453,9 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         if (ij_expr_is_real(arg))        JI("d2l", "");   /* double → long */
         else if (ij_expr_is_string(arg)) {
             /* String → Long.parseLong */
-            int scratch = ij_locals_alloc_tmp();
-            J("    astore %d\n", slot_jvm(scratch));
-            J("    aload %d\n",  slot_jvm(scratch));
+            int scratch = ij_alloc_int_scratch();
+            J("    astore %d\n", scratch);
+            J("    aload %d\n",  scratch);
             JI("invokestatic", "java/lang/Long/parseLong(Ljava/lang/String;)J");
         }
         /* else already long — no conversion needed */
@@ -1462,9 +1473,9 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         JL(b); JGoto(ab);
         JL(after);
         if (ij_expr_is_string(arg)) {
-            int scratch = ij_locals_alloc_tmp();
-            J("    astore %d\n", slot_jvm(scratch));
-            J("    aload %d\n",  slot_jvm(scratch));
+            int scratch = ij_alloc_int_scratch();
+            J("    astore %d\n", scratch);
+            J("    aload %d\n",  scratch);
             JI("invokestatic", "java/lang/Double/parseDouble(Ljava/lang/String;)D");
         } else if (!ij_expr_is_real(arg)) {
             JI("l2d", "");  /* long → double */
@@ -2954,7 +2965,7 @@ static void ij_emit_binop(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     /* Bug 1 fix: use local slots instead of static fields to support recursion. */
     int lc_slot = ij_locals_alloc_tmp();   /* long or double: 2 JVM slots */
     int rc_slot = ij_locals_alloc_tmp();   /* long or double: 2 JVM slots */
-    int bf_slot = ij_locals_alloc_tmp();   /* used as int (istore/iload) */
+    int bf_slot = ij_alloc_int_scratch(); /* int (istore/iload) */
     strncpy(oα,a,63); strncpy(oβ,b,63);
 
     char right_relay[64]; snprintf(right_relay, sizeof right_relay, "icn_%d_rrelay", id);
@@ -2983,13 +2994,13 @@ static void ij_emit_binop(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     J("    %s %d\n", st_op, slot_jvm(rc_slot)); JGoto(compute);
 
     JL(lbfwd); JGoto(lb);
-    JL(a); JI("iconst_0",""); J("    istore %d\n", slot_jvm(bf_slot)); JGoto(la);
+    JL(a); JI("iconst_0",""); J("    istore %d\n", bf_slot); JGoto(la);
     JL(b);
-    if (left_is_value) { JI("iconst_1",""); J("    istore %d\n", slot_jvm(bf_slot)); JGoto(la); }
+    if (left_is_value) { JI("iconst_1",""); J("    istore %d\n", bf_slot); JGoto(la); }
     else { JGoto(rb); }
 
     JL(lstore);
-    J("    iload %d\n", slot_jvm(bf_slot));
+    J("    iload %d\n", bf_slot);
     J("    ifeq %s\n", ra);
     JGoto(rb);
 
@@ -3545,7 +3556,7 @@ static void ij_emit_concat(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     char lc_fld[64];  snprintf(lc_fld,  sizeof lc_fld,  "icn_%d_lc",     id);
     char rc_fld[64];  snprintf(rc_fld,  sizeof rc_fld,  "icn_%d_rc",     id);
     /* bf: track whether we are on fresh (0) or resume (1) path */
-    int bf_slot = ij_locals_alloc_tmp();
+    int bf_slot = ij_alloc_int_scratch();
     ij_declare_static_str(lc_fld);
     ij_declare_static_str(rc_fld);
     strncpy(oα,a,63); strncpy(oβ,b,63);
@@ -3569,13 +3580,13 @@ static void ij_emit_concat(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     JL(right_relay); ij_put_str_field(rc_fld); JGoto(compute);
 
     JL(lbfwd); JGoto(lb);
-    JL(a); JI("iconst_0",""); J("    istore %d\n", slot_jvm(bf_slot)); JGoto(la);
+    JL(a); JI("iconst_0",""); J("    istore %d\n", bf_slot); JGoto(la);
     JL(b);
-    if (left_is_value) { JI("iconst_1",""); J("    istore %d\n", slot_jvm(bf_slot)); JGoto(la); }
+    if (left_is_value) { JI("iconst_1",""); J("    istore %d\n", bf_slot); JGoto(la); }
     else { JGoto(rb); }
 
     JL(lstore);
-    J("    iload %d\n", slot_jvm(bf_slot));
+    J("    iload %d\n", bf_slot);
     J("    ifeq %s\n", ra);
     JGoto(rb);
 
@@ -3943,9 +3954,6 @@ static void ij_emit_strrelop(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     snprintf(rrelay,    sizeof rrelay,    "icn_%d_rrelay", id);
     snprintf(chk,       sizeof chk,       "icn_%d_chk",    id);
     snprintf(lstore_lbl,sizeof lstore_lbl,"icn_%d_lstore", id);
-    /* Allocate scratch slots for String refs (astore uses 1 slot each) */
-    int ls = ij_locals_alloc_tmp(); /* left String */
-    int rs = ij_locals_alloc_tmp(); /* right String */
     IcnNode *lhs = (n->nchildren > 0) ? n->children[0] : NULL;
     IcnNode *rhs = (n->nchildren > 1) ? n->children[1] : NULL;
     IjPorts lp; strncpy(lp.γ, lrelay, 63); strncpy(lp.ω, ports.ω, 63);
@@ -3953,14 +3961,20 @@ static void ij_emit_strrelop(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     char la[64], lb2[64], ra[64], rb2[64];
     ij_emit_expr(lhs, lp, la, lb2);
     ij_emit_expr(rhs, rp, ra, rb2);
+    /* Allocate String scratch AFTER child emits so slots land above all
+     * long-pair slots.  Use int scratch region (raw JVM slots above 2*MAX_LOCALS)
+     * so they never alias lstore/lload targets. */
+    int ls_jvm = ij_alloc_int_scratch();
+    int rs_jvm = ij_alloc_int_scratch();
+    ij_nstrefs++;  /* track for zero-init — these get iconst_0/istore */
     JC("STRRELOP"); JL(a); JGoto(la);
     JL(b); JGoto(lb2);
-    JL(lrelay); J("    astore %d\n", slot_jvm(ls)); JGoto(lstore_lbl);
+    JL(lrelay); J("    astore %d\n", ls_jvm); JGoto(lstore_lbl);
     JL(lstore_lbl); JGoto(ra);
-    JL(rrelay); J("    astore %d\n", slot_jvm(rs)); JGoto(chk);
+    JL(rrelay); J("    astore %d\n", rs_jvm); JGoto(chk);
     JL(chk);
-    J("    aload %d\n", slot_jvm(ls));
-    J("    aload %d\n", slot_jvm(rs));
+    J("    aload %d\n", ls_jvm);
+    J("    aload %d\n", rs_jvm);
     JI("invokevirtual", "java/lang/String/compareTo(Ljava/lang/String;)I");
     const char *jfail;
     switch (n->kind) {
@@ -4643,18 +4657,18 @@ static void ij_emit_subscript(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     snprintf(neg_branch, sizeof neg_branch, "icn_%d_sub_neg", id);
     snprintf(zero_fail,  sizeof zero_fail,  "icn_%d_sub_z",   id);
     /* Duplicate int on stack for the comparison (it's on stack once) */
-    int idx_slot = ij_locals_alloc_tmp();
-    J("    istore %d\n", slot_jvm(idx_slot));
-    J("    iload %d\n",  slot_jvm(idx_slot));
+    int idx_slot = ij_alloc_int_scratch();
+    J("    istore %d\n", idx_slot);
+    J("    iload %d\n",  idx_slot);
     J("    ifgt %s\n", pos_branch);
-    J("    iload %d\n",  slot_jvm(idx_slot));
+    J("    iload %d\n",  idx_slot);
     J("    iflt %s\n", neg_branch);
     /* i == 0 → fail */
     JL(zero_fail); JGoto(ports.ω);
 
     /* pos_branch: offset = i - 1 */
     JL(pos_branch);
-    J("    iload %d\n", slot_jvm(idx_slot));
+    J("    iload %d\n", idx_slot);
     JI("iconst_1", ""); JI("isub", "");
     ij_put_int_field(i_fld);
     JGoto(check);
@@ -4663,7 +4677,7 @@ static void ij_emit_subscript(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     JL(neg_branch);
     ij_get_str_field(s_fld);
     JI("invokevirtual", "java/lang/String/length()I");
-    J("    iload %d\n", slot_jvm(idx_slot));
+    J("    iload %d\n", idx_slot);
     JI("iadd", "");
     ij_put_int_field(i_fld);
     JGoto(check);
@@ -4750,25 +4764,25 @@ static void ij_emit_section(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     snprintf(lo_pos,  sizeof lo_pos,  "icn_%d_sec_lop", id);
     snprintf(lo_neg,  sizeof lo_neg,  "icn_%d_sec_lon", id);
     snprintf(lo_zero, sizeof lo_zero, "icn_%d_sec_loz", id);
-    int lo_slot = ij_locals_alloc_tmp();
+    int lo_slot = ij_alloc_int_scratch();
 
     JL(lo_relay);
     JI("l2i", "");
-    J("    istore %d\n", slot_jvm(lo_slot));
-    J("    iload %d\n",  slot_jvm(lo_slot));
+    J("    istore %d\n", lo_slot);
+    J("    iload %d\n",  lo_slot);
     J("    ifgt %s\n", lo_pos);
-    J("    iload %d\n",  slot_jvm(lo_slot));
+    J("    iload %d\n",  lo_slot);
     J("    iflt %s\n", lo_neg);
     JL(lo_zero); JGoto(ports.ω);          /* lo == 0 → fail */
     JL(lo_pos);
-    J("    iload %d\n", slot_jvm(lo_slot));
+    J("    iload %d\n", lo_slot);
     JI("iconst_1", ""); JI("isub", "");    /* lo - 1 */
     ij_put_int_field(lo_fld);
     JGoto(ha);
     JL(lo_neg);
     ij_get_str_field(s_fld);
     JI("invokevirtual", "java/lang/String/length()I");
-    J("    iload %d\n", slot_jvm(lo_slot));
+    J("    iload %d\n", lo_slot);
     JI("iadd", "");                        /* length + lo (lo is negative) */
     ij_put_int_field(lo_fld);
     JGoto(ha);
@@ -4778,25 +4792,25 @@ static void ij_emit_section(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     snprintf(hi_pos,  sizeof hi_pos,  "icn_%d_sec_hip", id);
     snprintf(hi_neg,  sizeof hi_neg,  "icn_%d_sec_hin", id);
     snprintf(hi_zero, sizeof hi_zero, "icn_%d_sec_hiz", id);
-    int hi_slot = ij_locals_alloc_tmp();
+    int hi_slot = ij_alloc_int_scratch();
 
     JL(hi_relay);
     JI("l2i", "");
-    J("    istore %d\n", slot_jvm(hi_slot));
-    J("    iload %d\n",  slot_jvm(hi_slot));
+    J("    istore %d\n", hi_slot);
+    J("    iload %d\n",  hi_slot);
     J("    ifgt %s\n", hi_pos);
-    J("    iload %d\n",  slot_jvm(hi_slot));
+    J("    iload %d\n",  hi_slot);
     J("    iflt %s\n", hi_neg);
     JL(hi_zero); JGoto(ports.ω);          /* hi == 0 is valid: s[1:0] = "" but map to empty */
     JL(hi_pos);
-    J("    iload %d\n", slot_jvm(hi_slot));
+    J("    iload %d\n", hi_slot);
     JI("iconst_1", ""); JI("isub", "");    /* hi - 1 */
     ij_put_int_field(hi_fld);
     JGoto(compute);
     JL(hi_neg);
     ij_get_str_field(s_fld);
     JI("invokevirtual", "java/lang/String/length()I");
-    J("    iload %d\n", slot_jvm(hi_slot));
+    J("    iload %d\n", hi_slot);
     JI("iadd", "");
     ij_put_int_field(hi_fld);
     JGoto(compute);
@@ -4815,16 +4829,16 @@ static void ij_emit_section(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     ij_get_int_field(lo_fld);
     JI("if_icmplt", ports.ω);             /* length < lo → fail */
     /* clamp hi to length */
-    int len_slot = ij_locals_alloc_tmp();
+    int len_slot = ij_alloc_int_scratch();
     ij_get_str_field(s_fld);
     JI("invokevirtual", "java/lang/String/length()I");
-    J("    istore %d\n", slot_jvm(len_slot));
+    J("    istore %d\n", len_slot);
     ij_get_int_field(hi_fld);
-    J("    iload %d\n", slot_jvm(len_slot));
+    J("    iload %d\n", len_slot);
     char hi_ok[64]; snprintf(hi_ok, sizeof hi_ok, "icn_%d_sec_hiok", id);
     J("    if_icmple %s\n", hi_ok);
     /* hi > length: clamp */
-    J("    iload %d\n", slot_jvm(len_slot));
+    J("    iload %d\n", len_slot);
     ij_put_int_field(hi_fld);
     JL(hi_ok);
     /* substring(lo_0based, hi_0based) — Java substring end is exclusive,
@@ -5272,13 +5286,19 @@ static void ij_emit_proc(IcnNode *proc, FILE *out_target) {
     J("    .limit stack 16\n");
     J("    .limit locals %d\n", jvm_locals);
 
-    /* Zero-init ALL JVM local slots unconditionally so the verifier sees
-     * consistent types at every control-flow join point (loop backs, etc.).
-     * This avoids "Register pair N contains wrong type" VerifyErrors when
-     * ij_locals_alloc_tmp slots are used in only one path of a loop. */
-    for (int s = 0; s < jvm_locals / 2; s++) {
+    /* Zero-init ALL JVM local slots so the verifier sees consistent types at
+     * every control-flow join point.
+     * - Long-pair region [0 .. 2*ij_nlocals-1]: lconst_0/lstore (every 2 slots)
+     * - Padding long-pairs up to 2*MAX_LOCALS: lconst_0/lstore
+     * - Int/ref scratch region [2*MAX_LOCALS .. 2*MAX_LOCALS+ij_nint_scratch-1]:
+     *   iconst_0/istore (single slots, never touched by lstore) */
+    for (int s = 0; s < MAX_LOCALS; s++) {
         JI("lconst_0", "");
         J("    lstore %d\n", s * 2);
+    }
+    for (int i = 0; i < ij_nint_scratch + 4; i++) {
+        JI("iconst_0", "");
+        J("    istore %d\n", 2 * MAX_LOCALS + 20 + i);
     }
 
     /* For non-main procs, load params from static arg fields */
