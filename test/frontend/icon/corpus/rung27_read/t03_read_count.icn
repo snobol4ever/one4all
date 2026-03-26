@@ -1,0 +1,7 @@
+procedure main();
+  local n;
+  n := 0;
+  while read() do
+    n := n + 1;
+  write(n);
+end

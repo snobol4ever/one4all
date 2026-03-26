@@ -1,0 +1,5 @@
+procedure main();
+  local line;
+  line := read();
+  write(line);
+end

@@ -1305,6 +1305,120 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         return;
     }
 
+    /* --- built-in read() --- read one line from stdin; fail on EOF ---
+     * Returns a String value on γ, fails (→ ω) on EOF.
+     * Uses a static BufferedReader field icn_stdin_reader (Object slot).
+     * Lazy-initialised on first call via a static int flag icn_stdin_init.
+     * JVM: invokestatic icn_builtin_read_line()Ljava/lang/String; → null on EOF */
+    if (strcmp(fname, "read") == 0 && nargs == 0 && !ij_is_user_proc(fname)) {
+        ij_declare_static_obj("icn_stdin_reader");
+        ij_declare_static_int("icn_stdin_init");
+        char init_lbl[64], call_lbl[64], null_lbl[64];
+        snprintf(init_lbl, sizeof init_lbl, "icn_%d_rd_init",  id);
+        snprintf(call_lbl, sizeof call_lbl, "icn_%d_rd_call",  id);
+        snprintf(null_lbl, sizeof null_lbl, "icn_%d_rd_null",  id);
+
+        /* α: lazily construct BufferedReader wrapping System.in */
+        JL(a);
+        ij_get_int_field("icn_stdin_init");
+        J("    ifne %s\n", call_lbl);
+        /* First call: build reader */
+        JI("new", "java/io/BufferedReader");
+        JI("dup", "");
+        JI("new", "java/io/InputStreamReader");
+        JI("dup", "");
+        JI("getstatic", "java/lang/System/in Ljava/io/InputStream;");
+        JI("invokespecial", "java/io/InputStreamReader/<init>(Ljava/io/InputStream;)V");
+        JI("invokespecial", "java/io/BufferedReader/<init>(Ljava/io/Reader;)V");
+        /* store reader */
+        { char buf[384]; snprintf(buf,sizeof buf,"%s/icn_stdin_reader Ljava/lang/Object;",ij_classname);
+          JI("putstatic", buf); }
+        JI("iconst_1", ""); ij_put_int_field("icn_stdin_init");
+        JL(call_lbl);
+        /* load reader, cast, call readLine() */
+        { char buf[384]; snprintf(buf,sizeof buf,"%s/icn_stdin_reader Ljava/lang/Object;",ij_classname);
+          JI("getstatic", buf); }
+        JI("checkcast", "java/io/BufferedReader");
+        JI("invokevirtual", "java/io/BufferedReader/readLine()Ljava/lang/String;");
+        /* null → EOF → ω */
+        JI("dup", "");
+        J("    ifnull %s\n", null_lbl);
+        JGoto(ports.γ);         /* String ref on stack */
+        JL(null_lbl);
+        JI("pop", "");          /* discard null */
+        JGoto(ports.ω);
+        JL(b); JGoto(ports.ω);
+        return;
+    }
+
+    /* --- built-in reads(n) --- read n bytes from stdin; fail on EOF ---
+     * Reads exactly n chars via BufferedReader.read(char[],0,n).
+     * Returns String on γ, fails on EOF / 0 bytes read. */
+    if (strcmp(fname, "reads") == 0 && nargs >= 1 && !ij_is_user_proc(fname)) {
+        ij_declare_static_obj("icn_stdin_reader");
+        ij_declare_static_int("icn_stdin_init");
+        IcnNode *arg = n->children[1];
+        char after[64], init_lbl[64], call_lbl[64], eof_lbl[64];
+        snprintf(after,    sizeof after,    "icn_%d_rds_after", id);
+        snprintf(init_lbl, sizeof init_lbl, "icn_%d_rds_init",  id);
+        snprintf(call_lbl, sizeof call_lbl, "icn_%d_rds_call",  id);
+        snprintf(eof_lbl,  sizeof eof_lbl,  "icn_%d_rds_eof",   id);
+        IjPorts ap; strncpy(ap.γ, after, 63); strncpy(ap.ω, ports.ω, 63);
+        char aa[64], ab[64]; ij_emit_expr(arg, ap, aa, ab);
+
+        JL(a); JGoto(aa);
+        JL(b); JGoto(ab);
+        JL(after);
+        /* arg (long) on stack → cast to int */
+        JI("l2i", "");
+        int n_slot = ij_locals_alloc_tmp();
+        J("    istore %d\n", slot_jvm(n_slot));
+        /* lazy-init reader */
+        ij_get_int_field("icn_stdin_init");
+        J("    ifne %s\n", call_lbl);
+        JI("new", "java/io/BufferedReader");
+        JI("dup", "");
+        JI("new", "java/io/InputStreamReader");
+        JI("dup", "");
+        JI("getstatic", "java/lang/System/in Ljava/io/InputStream;");
+        JI("invokespecial", "java/io/InputStreamReader/<init>(Ljava/io/InputStream;)V");
+        JI("invokespecial", "java/io/BufferedReader/<init>(Ljava/io/Reader;)V");
+        { char buf[384]; snprintf(buf,sizeof buf,"%s/icn_stdin_reader Ljava/lang/Object;",ij_classname);
+          JI("putstatic", buf); }
+        JI("iconst_1", ""); ij_put_int_field("icn_stdin_init");
+        JL(call_lbl);
+        /* allocate char[] of size n */
+        J("    iload %d\n", slot_jvm(n_slot));
+        JI("newarray", "char");
+        int arr_slot = ij_locals_alloc_tmp();
+        J("    astore %d\n", slot_jvm(arr_slot));
+        /* load reader */
+        { char buf[384]; snprintf(buf,sizeof buf,"%s/icn_stdin_reader Ljava/lang/Object;",ij_classname);
+          JI("getstatic", buf); }
+        JI("checkcast", "java/io/BufferedReader");
+        J("    aload %d\n", slot_jvm(arr_slot));
+        JI("iconst_0", "");
+        J("    iload %d\n", slot_jvm(n_slot));
+        JI("invokevirtual", "java/io/BufferedReader/read([CII)I");
+        /* result: -1 = EOF, 0 = nothing read → ω; else build String */
+        JI("dup", "");
+        J("    ifle %s\n", eof_lbl);
+        /* nread on stack */
+        int nread_slot = ij_locals_alloc_tmp();
+        J("    istore %d\n", slot_jvm(nread_slot));
+        JI("new", "java/lang/String");
+        JI("dup", "");
+        J("    aload %d\n", slot_jvm(arr_slot));
+        JI("iconst_0", "");
+        J("    iload %d\n", slot_jvm(nread_slot));
+        JI("invokespecial", "java/lang/String/<init>([CII)V");
+        JGoto(ports.γ);
+        JL(eof_lbl);
+        JI("pop", "");
+        JGoto(ports.ω);
+        return;
+    }
+
     /* --- built-in integer(x) --- convert real or string to long */
     if (strcmp(fname, "integer") == 0 && nargs >= 1 && !ij_is_user_proc(fname)) {
         IcnNode *arg = n->children[1];
@@ -2586,14 +2700,25 @@ static void ij_emit_while(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     char ca[64], cb[64]; ij_emit_expr(cond, cp, ca, cb);
 
     JL(cond_ok);
-    JI("pop2","");   /* discard condition value */
+    if (ij_expr_is_string(cond)) { JI("pop",""); } else { JI("pop2",""); }  /* discard condition value */
     if (body) {
         char ba[64], bb[64];
-        IjPorts bp; strncpy(bp.γ,loop_top,63); strncpy(bp.ω,loop_top,63);
+        char body_start[64]; snprintf(body_start, sizeof body_start, "icn_%d_wbstart", id);
+        char body_drain[64]; snprintf(body_drain, sizeof body_drain, "icn_%d_wbdrain", id);
+        /* Jump explicitly to body start (avoid fall-through into mid-body code) */
+        JGoto(body_start);
+        /* body.γ → drain (pop body result), body.ω → loop_top (no value) */
+        IjPorts bp; strncpy(bp.γ, body_drain, 63); strncpy(bp.ω, loop_top, 63);
         ij_loop_push(ports.ω, ca);   /* break→exit, next→re-eval cond */
         ij_emit_expr(body, bp, ba, bb);
         ij_loop_pop();
-        JGoto(ba);
+        /* body_start label anchors the explicit jump from cond_ok */
+        JL(body_start); JGoto(ba);
+        /* drain body return value then loop */
+        JL(body_drain);
+        if (ij_expr_is_string(body)) { JI("pop",""); }
+        else if (ij_expr_is_real(body)) { JI("pop2",""); }
+        else { JI("pop2",""); }
         JL(loop_top); JGoto(ca);
     } else {
         JGoto(ca);
@@ -2706,6 +2831,9 @@ static int ij_expr_is_string(IcnNode *n) {
                     if (strcmp(fn_name, "move") == 0)   return 1;
                     /* string() conversion returns String */
                     if (strcmp(fn_name, "string") == 0) return 1;
+                    /* read()/reads() return String (or fail) */
+                    if (strcmp(fn_name, "read")  == 0) return 1;
+                    if (strcmp(fn_name, "reads") == 0) return 1;
                     /* match returns a long position, not a String */
                     /* user-defined proc — check proc table */
                     if (ij_proc_returns_str(fn_name)) return 1;
@@ -4575,6 +4703,15 @@ static void ij_emit_proc(IcnNode *proc, FILE *out_target) {
     J(".method public static icn_%s()V\n", pname);
     J("    .limit stack 16\n");
     J("    .limit locals %d\n", jvm_locals);
+
+    /* Zero-init ALL JVM local slots unconditionally so the verifier sees
+     * consistent types at every control-flow join point (loop backs, etc.).
+     * This avoids "Register pair N contains wrong type" VerifyErrors when
+     * ij_locals_alloc_tmp slots are used in only one path of a loop. */
+    for (int s = 0; s < jvm_locals / 2; s++) {
+        JI("lconst_0", "");
+        J("    lstore %d\n", s * 2);
+    }
 
     /* For non-main procs, load params from static arg fields */
     /* NOTE: for generators, param load happens at fresh_entry (after zero-init).
