@@ -647,7 +647,7 @@ static IcnNode *parse_stmt(IcnParser *p) {
         match(p, TK_SEMICOL);
         return e;
     }
-    if (check(p, TK_LOCAL)) {
+    if (check(p, TK_LOCAL) || check(p, TK_STATIC)) {
         int line2 = p->cur.line; advance(p);
         IcnNode **locs = NULL; int nlocs = 0, lcap = 0;
         while (!check(p, TK_SEMICOL) && !check(p, TK_EOF)) {

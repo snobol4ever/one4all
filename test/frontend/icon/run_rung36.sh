@@ -1,14 +1,13 @@
 #!/bin/bash
 # run_rung36.sh — rung36_jcon JCON oracle corpus runner
-# 75 tests from JCON test suite (jcon-master/test/), ordered easy→hard.
-# .expected files are the authoritative JCON oracle outputs (.std renamed).
-# .stdin files feed stdin (from JCON .dat files) for tests that use read().
-# .xfail files mark tests requiring unimplemented features (SET, BIGINT, COEXPR, etc.)
+# 75 tests from JCON test suite, ordered easy→hard.
+# Uses icon_semi to convert standard Icon (newline-terminated) to
+# semicolon-explicit form before compilation.
 #
-# Usage: bash run_rung36.sh [/path/to/icon_driver]
-# Default driver: /tmp/icon_driver
+# Usage: bash run_rung36.sh [/path/to/icon_driver] [/path/to/icon_semi]
 
 DRIVER="${1:-/tmp/icon_driver}"
+SEMI="${2:-/tmp/icon_semi}"
 JASMIN="$(dirname "$0")/../../../src/backend/jvm/jasmin.jar"
 CORPUS="$(dirname "$0")/corpus/rung36_jcon"
 PASS=0; FAIL=0; XFAIL=0
@@ -24,9 +23,19 @@ for icn in "$CORPUS"/t*.icn; do
     continue
   fi
 
-  "$DRIVER" -jvm "$icn" -o /tmp/t36.j 2>/dev/null
+  # Convert to semicolon-explicit form
+  semi_f="/tmp/rung36_$(basename ${icn%.icn})_semi.icn"
+  "$SEMI" "$icn" > "$semi_f" 2>/dev/null
+
+  "$DRIVER" -jvm "$semi_f" -o /tmp/t36.j 2>/dev/null
   java -jar "$JASMIN" /tmp/t36.j -d /tmp/ 2>/dev/null
-  cls=$(grep -m1 '\.class' /tmp/t36.j | awk '{print $NF}')
+  cls=$(grep -m1 '\.class' /tmp/t36.j 2>/dev/null | awk '{print $NF}')
+
+  if [ -z "$cls" ]; then
+    FAIL=$((FAIL+1))
+    echo "FAIL: $(basename $icn) [compile error]"
+    continue
+  fi
 
   stdin_f="$base.stdin"
   if [ -f "$stdin_f" ]; then
@@ -42,8 +51,8 @@ for icn in "$CORPUS"/t*.icn; do
   else
     FAIL=$((FAIL+1))
     echo "FAIL: $(basename $icn)"
-    echo "  want: $(echo "$want" | tr '\n' '|')"
-    echo "  got:  $(echo "$got"  | tr '\n' '|')"
+    echo "  want: $(echo "$want" | head -3 | tr '\n' '|')"
+    echo "  got:  $(echo "$got"  | head -3 | tr '\n' '|')"
   fi
 done
 
