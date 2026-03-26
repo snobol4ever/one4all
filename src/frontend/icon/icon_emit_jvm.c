@@ -2972,18 +2972,18 @@ static void ij_emit_alt(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         ij_emit_expr(n->children[i], ep, ca[i], cb[i]);
     }
 
-    /* Emit relay labels: cg[i]: pop child value (type-correct per child),
-     * push lconst_0 sentinel, set gate, goto ports.γ.
+    /* Emit relay labels: cg[i] → pop child value, push lconst_0 sentinel,
+     * set gate, goto ports.γ with J on stack.
      * Contract: ICN_ALT always delivers exactly one long (lconst_0) on the
-     * stack at ports.γ.  AND trampolines and other consumers therefore always
-     * issue pop2 for an ICN_ALT child — same as for any long-typed child. */
+     * stack at ports.γ.  AND relay trampolines issue putstatic :J for ALT
+     * children — same as for any long-typed child. */
     for (int i = 0; i < nc; i++) {
         JL(cg[i]);
         if (ij_expr_is_string(n->children[i]))
             JI("pop","");
         else
             JI("pop2","");
-        JI("lconst_0","");   /* push sentinel long so ports.γ sees uniform stack */
+        JI("lconst_0","");   /* push sentinel J so ports.γ sees uniform stack */
         J("    sipush %d\n", i+1);
         ij_put_int_field(gate_fld);
         JGoto(ports.γ);
@@ -3075,10 +3075,15 @@ static void ij_emit_binop(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     char lstore[64];  snprintf(lstore,  sizeof lstore,  "icn_%d_lstore", id);
     /* Determine if this is a double (real) operation */
     int is_dbl = ij_expr_is_real(n->children[0]) || ij_expr_is_real(n->children[1]);
-    /* Bug 1 fix: use local slots instead of static fields to support recursion. */
-    int lc_slot = ij_locals_alloc_tmp();   /* long or double: 2 JVM slots */
-    int rc_slot = ij_locals_alloc_tmp();   /* long or double: 2 JVM slots */
-    int bf_slot = ij_alloc_int_scratch(); /* int (istore/iload) */
+    /* Use static fields for relay staging so relay labels are safe to reach on
+     * an empty stack (e.g. from ICN_EVERY β-tableswitch).  JVM lstore/lload
+     * require the verifier to see a long on the stack at every predecessor. */
+    char lc_field[80]; snprintf(lc_field, sizeof lc_field, "icn_%d_binop_lc", id);
+    char rc_field[80]; snprintf(rc_field, sizeof rc_field, "icn_%d_binop_rc", id);
+    char bf_field[80]; snprintf(bf_field, sizeof bf_field, "icn_%d_binop_bf", id);
+    if (is_dbl) { ij_declare_static_dbl(lc_field); ij_declare_static_dbl(rc_field); }
+    else        { ij_declare_static(lc_field);      ij_declare_static(rc_field);     }
+    ij_declare_static_int(bf_field);
     strncpy(oα,a,63); strncpy(oβ,b,63);
 
     char right_relay[64]; snprintf(right_relay, sizeof right_relay, "icn_%d_rrelay", id);
@@ -3094,33 +3099,32 @@ static void ij_emit_binop(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
                          lchild->kind == ICN_REAL ||
                          lchild->kind == ICN_STR || lchild->kind == ICN_CALL);
 
-    const char *st_op = is_dbl ? "dstore" : "lstore";
-    const char *ld_op = is_dbl ? "dload"  : "lload";
-
-    /* left_relay: value on stack → promote if needed → drain to lc_slot */
+    /* left_relay: value on stack → promote if needed → store to lc_field */
     JL(left_relay);
     if (is_dbl && !ij_expr_is_real(n->children[0])) JI("l2d", "");
-    J("    %s %d\n", st_op, slot_jvm(lc_slot)); JGoto(lstore);
-    /* right_relay: value on stack → promote if needed → drain to rc_slot */
+    if (is_dbl) ij_put_dbl(lc_field); else ij_put_long(lc_field);
+    JGoto(lstore);
+    /* right_relay: value on stack → promote if needed → store to rc_field */
     JL(right_relay);
     if (is_dbl && !ij_expr_is_real(n->children[1])) JI("l2d", "");
-    J("    %s %d\n", st_op, slot_jvm(rc_slot)); JGoto(compute);
+    if (is_dbl) ij_put_dbl(rc_field); else ij_put_long(rc_field);
+    JGoto(compute);
 
     JL(lbfwd); JGoto(lb);
-    JL(a); JI("iconst_0",""); J("    istore %d\n", bf_slot); JGoto(la);
+    JL(a); JI("iconst_0",""); ij_put_int_field(bf_field); JGoto(la);
     JL(b);
-    if (left_is_value) { JI("iconst_1",""); J("    istore %d\n", bf_slot); JGoto(la); }
+    if (left_is_value) { JI("iconst_1",""); ij_put_int_field(bf_field); JGoto(la); }
     else { JGoto(rb); }
 
     JL(lstore);
-    J("    iload %d\n", bf_slot);
+    ij_get_int_field(bf_field);
     J("    ifeq %s\n", ra);
     JGoto(rb);
 
-    /* compute: lc_slot=left, rc_slot=right — stack empty */
+    /* compute: lc_field=left, rc_field=right — stack empty */
     JL(compute);
-    J("    %s %d\n", ld_op, slot_jvm(lc_slot));
-    J("    %s %d\n", ld_op, slot_jvm(rc_slot));
+    if (is_dbl) { ij_get_dbl(lc_field); ij_get_dbl(rc_field); }
+    else        { ij_get_long(lc_field); ij_get_long(rc_field); }
     if (is_dbl) {
         switch (n->kind) {
             case ICN_ADD: JI("dadd",""); break;
@@ -3158,11 +3162,16 @@ static void ij_emit_relop(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
 
     /* Determine if either operand is real — doubles need dstore/dload/dcmpl */
     int is_dbl = ij_expr_is_real(n->children[0]) || ij_expr_is_real(n->children[1]);
-    const char *st_op = is_dbl ? "dstore" : "lstore";
-    const char *ld_op = is_dbl ? "dload"  : "lload";
 
-    int lc_slot = ij_locals_alloc_tmp();   /* long or double: 2 JVM slots */
-    int rc_slot = ij_locals_alloc_tmp();   /* long or double: 2 JVM slots */
+    /* Use static fields for relay staging (not JVM locals) so that relay labels
+     * are safe to reach on an empty stack — e.g. from an ICN_EVERY β-tableswitch
+     * branch that dispatches through the same label region.  JVM locals require
+     * the verifier to see a long on the stack at every predecessor; putstatic/
+     * getstatic do not, because the field is already live on all paths. */
+    char lc_field[80]; snprintf(lc_field, sizeof lc_field, "icn_%d_relop_lc", id);
+    char rc_field[80]; snprintf(rc_field, sizeof rc_field, "icn_%d_relop_rc", id);
+    if (is_dbl) { ij_declare_static_dbl(lc_field); ij_declare_static_dbl(rc_field); }
+    else        { ij_declare_static(lc_field);      ij_declare_static(rc_field);     }
     strncpy(oα,a,63); strncpy(oβ,b,63);
 
     char right_relay[64]; snprintf(right_relay, sizeof right_relay, "icn_%d_rrelay", id);
@@ -3173,26 +3182,28 @@ static void ij_emit_relop(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     IjPorts lp; strncpy(lp.γ, left_relay,  63); strncpy(lp.ω, ports.ω, 63);
     char la[64], lb[64]; ij_emit_expr(n->children[0], lp, la, lb);
 
-    /* left_relay: value on stack → promote to double if needed → drain to lc_slot */
+    /* left_relay: value on stack → promote to double if needed → store to lc_field */
     JL(left_relay);
     if (is_dbl && !ij_expr_is_real(n->children[0])) JI("l2d", "");
-    J("    %s %d\n", st_op, slot_jvm(lc_slot)); JGoto(lstore);
-    /* right_relay: value on stack → promote to double if needed → drain to rc_slot */
+    if (is_dbl) ij_put_dbl(lc_field); else ij_put_long(lc_field);
+    JGoto(lstore);
+    /* right_relay: value on stack → promote to double if needed → store to rc_field */
     JL(right_relay);
     if (is_dbl && !ij_expr_is_real(n->children[1])) JI("l2d", "");
-    J("    %s %d\n", st_op, slot_jvm(rc_slot)); JGoto(chk);
+    if (is_dbl) ij_put_dbl(rc_field); else ij_put_long(rc_field);
+    JGoto(chk);
 
     JL(lbfwd); JGoto(lb);
     JL(a); JGoto(la);
     JL(b); JGoto(rb);
 
-    /* lstore: lc_slot has left → go to right.α */
+    /* lstore: lc_field has left → go to right.α */
     JL(lstore); JGoto(ra);
 
-    /* chk: lc_slot=left, rc_slot=right — stack empty */
+    /* chk: lc_field=left, rc_field=right — stack empty */
     JL(chk);
-    J("    %s %d\n", ld_op, slot_jvm(lc_slot));   /* push left */
-    J("    %s %d\n", ld_op, slot_jvm(rc_slot));   /* push right */
+    if (is_dbl) { ij_get_dbl(lc_field); ij_get_dbl(rc_field); }
+    else        { ij_get_long(lc_field); ij_get_long(rc_field); }
 
     const char *jfail;
     if (is_dbl) {
@@ -3224,7 +3235,7 @@ static void ij_emit_relop(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     }
     J("    %s %s\n", jfail, rb);
     /* success: reload right as result value */
-    J("    %s %d\n", ld_op, slot_jvm(rc_slot));
+    if (is_dbl) ij_get_dbl(rc_field); else ij_get_long(rc_field);
     JGoto(ports.γ);
 }
 
@@ -5150,15 +5161,32 @@ static void ij_emit_expr(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
                 strncpy(ep.ω, (i == 0) ? ports.ω : ccb[i-1], 63);
                 ij_emit_expr(n->children[i], ep, cca[i], ccb[i]);
             }
-            /* Emit relay trampolines: relay_g[i] → pop result → cca[i+1]
+            /* Emit relay trampolines: relay_g[i] → drain result to static field → cca[i+1]
              * E[i].γ leaves a value on the JVM stack; E[i+1].α expects empty stack.
-             * Drain: String result = pop (1 slot); long/ALT result = pop2 (2 slots).
-             * ICN_ALT children normalise to long (lconst_0 sentinel) at their γ. */
+             * Use putstatic (static field drain) instead of pop/pop2 so relay labels
+             * are safe to reach from any stack state (e.g. ICN_EVERY β-tableswitch).
+             * ICN_ALT children deliver lconst_0 (J) at ports.γ — same as long-typed
+             * non-ALT children, so putstatic :J handles them correctly. */
             for (int i = 0; i < nc-1; i++) {
+                char drain_fld[80];
+                snprintf(drain_fld, sizeof drain_fld, "icn_%d_and_drain_%d", cid, i);
+                int child_is_str  = (n->children[i]->kind != ICN_ALT)
+                                    && ij_expr_is_string(n->children[i]);
+                int child_is_list = !child_is_str && (n->children[i]->kind != ICN_ALT)
+                                    && ij_expr_is_list(n->children[i]);
+                int child_is_tbl  = !child_is_str && !child_is_list
+                                    && (n->children[i]->kind != ICN_ALT)
+                                    && ij_expr_is_table(n->children[i]);
+                int child_is_ref  = child_is_str || child_is_list || child_is_tbl;
+                int child_is_dbl  = !child_is_ref && (n->children[i]->kind != ICN_ALT)
+                                    && ij_expr_is_real(n->children[i]);
+                if (child_is_ref)      ij_declare_static_str(drain_fld);
+                else if (child_is_dbl) ij_declare_static_dbl(drain_fld);
+                else                   ij_declare_static(drain_fld);
                 JL(relay_g[i]);
-                int child_is_str = (n->children[i]->kind != ICN_ALT)
-                                   && ij_expr_is_string(n->children[i]);
-                JI(child_is_str ? "pop" : "pop2", "");
+                if (child_is_ref)      ij_put_str_field(drain_fld);
+                else if (child_is_dbl) ij_put_dbl(drain_fld);
+                else                   ij_put_long(drain_fld);
                 JGoto(cca[i+1]);
             }
             JL(ca2); JGoto(cca[0]);
