@@ -1,4 +1,4 @@
-# family_icon.icn -- Icon block of the Scripten family-tree demo.
+# family_icon.icn -- Icon block of the Scrip family-tree demo.
 # Pure expression style -- no if/then as expr, no {} blocks, no string params.
 
 procedure prolog_query_count();

@@ -1,4 +1,4 @@
-% family_prolog.pro — Prolog block of the Scripten family-tree demo.
+% family_prolog.pro — Prolog block of the Scrip family-tree demo.
 % Uses only builtins confirmed supported by sno2c -pl -jvm parser+emitter.
 % Deduplication of symmetric pairs done in Icon output stage.
 
@@ -68,7 +68,7 @@ anc_line(UID, Line) :-
 
 % ── Cross-language entry points ───────────────────────────────────────────
 
-scripten_init :- true.
+scrip_init :- true.
 
 assert_person(UID, Name, Year, Gender) :-
     assertz(person(Name, UID, Year, Gender)).

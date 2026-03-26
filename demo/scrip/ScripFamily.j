@@ -1,4 +1,4 @@
-.class public ScriptenFamily
+.class public ScripFamily
 .super java/lang/Object
 
 .method public static main([Ljava/lang/String;)V

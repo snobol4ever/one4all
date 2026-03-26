@@ -23,13 +23,13 @@ def write(path, text):
 # Step 1: append String-bridge methods to FamilyProlog.j
 # ---------------------------------------------------------------------------
 PROLOG_BRIDGES = r"""
-; ===== Scripten funny-linkage bridges (injected by inject_linkage.py) =====
+; ===== Scrip funny-linkage bridges (injected by inject_linkage.py) =====
 
-; scripten_init() -- called once by SNOBOL4 before CSV parsing.
-.method public static scripten_init()V
+; scrip_init() -- called once by SNOBOL4 before CSV parsing.
+.method public static scrip_init()V
     .limit stack 2
     .limit locals 1
-    invokestatic Family_prolog/p_scripten_init_0(I)[Ljava/lang/Object;
+    invokestatic Family_prolog/p_scrip_init_0(I)[Ljava/lang/Object;
     pop
     return
 .end method
@@ -206,10 +206,10 @@ def inject_prolog(path):
 # Step 2: patch SNOBOL4 stub method bodies
 # ---------------------------------------------------------------------------
 
-SNO_SCRIPTEN_INIT_BODY = """\
+SNO_SCRIP_INIT_BODY = """\
     .limit stack 2
     .limit locals 1
-    invokestatic Family_prolog/scripten_init()V
+    invokestatic Family_prolog/scrip_init()V
     ldc ""
     areturn"""
 
@@ -248,8 +248,8 @@ def replace_method_body(text, sig, new_body):
 def inject_snobol4(path):
     text = read(path)
     text = replace_method_body(text,
-        ".method static sno_userfn_SCRIPTEN_INIT()Ljava/lang/String;",
-        SNO_SCRIPTEN_INIT_BODY)
+        ".method static sno_userfn_SCRIP_INIT()Ljava/lang/String;",
+        SNO_SCRIP_INIT_BODY)
     text = replace_method_body(text,
         ".method static sno_userfn_PROLOG_ASSERT_PERSON(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
         SNO_ASSERT_PERSON_BODY)
@@ -314,7 +314,7 @@ def inject_icon(path):
 
 if __name__ == "__main__":
     import os
-    tmp = sys.argv[1] if len(sys.argv) > 1 else "/tmp/scripten_demo"
+    tmp = sys.argv[1] if len(sys.argv) > 1 else "/tmp/scrip_demo"
     print(f"Injecting linkage in {tmp}/")
     inject_prolog(os.path.join(tmp, "Family_prolog.j"))
     inject_snobol4(os.path.join(tmp, "Family_snobol4.j"))
