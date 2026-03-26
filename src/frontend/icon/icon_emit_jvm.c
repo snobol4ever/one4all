@@ -2311,9 +2311,18 @@ static void ij_emit_alt(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         ij_emit_expr(n->children[i], ep, ca[i], cb[i]);
     }
 
-    /* Emit relay labels: cg[i]: gate = i+1 (1-based), goto ports.γ */
+    /* Emit relay labels: cg[i]: pop child value (type-correct per child),
+     * push lconst_0 sentinel, set gate, goto ports.γ.
+     * Contract: ICN_ALT always delivers exactly one long (lconst_0) on the
+     * stack at ports.γ.  AND trampolines and other consumers therefore always
+     * issue pop2 for an ICN_ALT child — same as for any long-typed child. */
     for (int i = 0; i < nc; i++) {
         JL(cg[i]);
+        if (ij_expr_is_string(n->children[i]))
+            JI("pop","");
+        else
+            JI("pop2","");
+        JI("lconst_0","");   /* push sentinel long so ports.γ sees uniform stack */
         J("    sipush %d\n", i+1);
         ij_put_int_field(gate_fld);
         JGoto(ports.γ);
@@ -2857,8 +2866,13 @@ static int ij_expr_is_string(IcnNode *n) {
             return 0;
         }
         case ICN_ALT: {
-            /* Alternation yields string iff children yield strings (check first child) */
-            if (n->nchildren >= 1) return ij_expr_is_string(n->children[0]);
+            /* ALT normalises its result to lconst_0 (long) at ports.γ — never a string */
+            return 0;
+        }
+        case ICN_AND: {
+            /* AND chain result type = last child's type */
+            if (n->nchildren >= 1)
+                return ij_expr_is_string(n->children[n->nchildren - 1]);
             return 0;
         }
         case ICN_LIMIT: {
@@ -4456,10 +4470,12 @@ static void ij_emit_expr(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
             }
             /* Emit relay trampolines: relay_g[i] → pop result → cca[i+1]
              * E[i].γ leaves a value on the JVM stack; E[i+1].α expects empty stack.
-             * Drain: String result = pop (1 slot); long result = pop2 (2 slots). */
+             * Drain: String result = pop (1 slot); long/ALT result = pop2 (2 slots).
+             * ICN_ALT children normalise to long (lconst_0 sentinel) at their γ. */
             for (int i = 0; i < nc-1; i++) {
                 JL(relay_g[i]);
-                int child_is_str = ij_expr_is_string(n->children[i]);
+                int child_is_str = (n->children[i]->kind != ICN_ALT)
+                                   && ij_expr_is_string(n->children[i]);
                 JI(child_is_str ? "pop" : "pop2", "");
                 JGoto(cca[i+1]);
             }

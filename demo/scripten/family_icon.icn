@@ -36,9 +36,8 @@ procedure main();
   raw := prolog_query_grandparents();
   n := *raw; i := 1;
   while i <= n do
-    (j := (find("
-", raw, i) | (n+1))) &
-    ((j > i) & write("  " || raw[i:j]) | 1) &
+    (j := (find("\n", raw, i) | (n+1))) &
+    ((j > i) & write("  " || raw[i:j]) | (i := i)) &
     (i := j+1);
   write("");
 
@@ -46,8 +45,7 @@ procedure main();
   raw := prolog_query_siblings();
   t := table("0"); n := *raw; i := 1;
   while i <= n do
-    (j := (find("
-", raw, i) | (n+1))) &
+    (j := (find("\n", raw, i) | (n+1))) &
     ((j > i) &
       (line := raw[i:j]) &
       (pi := find("|", line)) &
@@ -57,7 +55,7 @@ procedure main();
       (key := lo || "|" || hi) &
       (t[key] = "0") &
       (t[key] := "1") &
-      write("  " || a || " and " || b || " are siblings") | 1) &
+      write("  " || a || " and " || b || " are siblings") | (i := i)) &
     (i := j+1);
   write("");
 
@@ -65,8 +63,7 @@ procedure main();
   raw := prolog_query_cousins();
   t := table("0"); n := *raw; i := 1;
   while i <= n do
-    (j := (find("
-", raw, i) | (n+1))) &
+    (j := (find("\n", raw, i) | (n+1))) &
     ((j > i) &
       (line := raw[i:j]) &
       (pi := find("|", line)) &
@@ -76,7 +73,7 @@ procedure main();
       (key := lo || "|" || hi) &
       (t[key] = "0") &
       (t[key] := "1") &
-      write("  " || a || " and " || b || " are cousins") | 1) &
+      write("  " || a || " and " || b || " are cousins") | (i := i)) &
     (i := j+1);
   write("");
 
@@ -84,12 +81,11 @@ procedure main();
   raw := prolog_query_generations();
   n := *raw; i := 1;
   while i <= n do
-    (j := (find("
-", raw, i) | (n+1))) &
+    (j := (find("\n", raw, i) | (n+1))) &
     ((j > i) &
       (line := raw[i:j]) &
       (pi := find("|", line)) &
-      write("  " || line[pi+1:*line+1] || " : generation " || line[1:pi]) | 1) &
+      write("  " || line[pi+1:*line+1] || " : generation " || line[1:pi]) | (i := i)) &
     (i := j+1);
   write("");
 
@@ -97,11 +93,10 @@ procedure main();
   raw := prolog_query_ancestors("U008");
   n := *raw; i := 1;
   while i <= n do
-    (j := (find("
-", raw, i) | (n+1))) &
+    (j := (find("\n", raw, i) | (n+1))) &
     ((j > i) &
       (line := raw[i:j]) &
       (pi := find("|", line)) &
-      write("  " || line[pi+1:*line+1] || " (generation " || line[1:pi] || ")") | 1) &
+      write("  " || line[pi+1:*line+1] || " (generation " || line[1:pi] || ")") | (i := i)) &
     (i := j+1);
 end
