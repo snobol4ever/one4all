@@ -6861,7 +6861,9 @@ static const char pj_plunit_shim_src[] =
     "    fail.\n"
     "run_suite_tests(_).\n"
     "run_one(Suite, Name, Opts, Goal) :-\n"
-    "    ( pj_has_sto(Opts) ->\n"
+    "    ( Opts = pj_inline ->\n"
+    "        ( catch(Goal, _E, fail) -> true ; true )\n"
+    "    ; pj_has_sto(Opts) ->\n"
     "        pj_inc_skip, format('  skip: ~w:~w  [sto]~n',[Suite,Name])\n"
     "    ; pj_skip_condition(Opts) ->\n"
     "        pj_inc_skip, format('  skip: ~w:~w  [condition]~n',[Suite,Name])\n"
@@ -7097,6 +7099,7 @@ static void pj_linker_emit_dynamic_stubs(void) {
 typedef struct {
     char suite[64]; char name[64]; char bridge[128];
     int  arity; EXPR_t *opts_expr;
+    EXPR_t *clause_expr;  /* full E_CLAUSE node — needed for true(Expr) var-sharing fix */
 } PjTestInfo;
 static PjTestInfo pj_linker_tests[PJ_LINKER_MAX_TESTS];
 static int        pj_linker_ntest = 0;
@@ -7111,28 +7114,146 @@ static int        pj_linker_nsuite = 0;
  * bridge_fn is "suite_name" (safe-name), test_name is the raw atom.
  * For test/2 the opts term is emitted inline so p_test_2 gets both args.
  * ------------------------------------------------------------------------- */
-static void pj_linker_emit_bridge(const char *bridge_fn, const char *test_name) {
+static void pj_linker_emit_bridge(const char *bridge_fn, const char *test_name, const char *suite_name) {
     /* arity and opts_expr are picked up from the PjTestInfo array by the caller;
      * we need them here — find the matching entry */
     int arity = 1;
-    EXPR_t *opts_expr = NULL;
+    EXPR_t *opts_expr   = NULL;
+    EXPR_t *clause_expr = NULL;
     for (int i = 0; i < pj_linker_ntest; i++) {
         if (strcmp(pj_linker_tests[i].bridge, bridge_fn) == 0) {
-            arity     = pj_linker_tests[i].arity;
-            opts_expr = pj_linker_tests[i].opts_expr;
+            arity       = pj_linker_tests[i].arity;
+            opts_expr   = pj_linker_tests[i].opts_expr;
+            clause_expr = pj_linker_tests[i].clause_expr;
             break;
+        }
+    }
+
+    /* Detect true(Expr) opts — may be bare true(E) or inside a list [true(E)|_].
+     * Walk the list to find the first true(Expr) element. */
+    int has_true_expr = 0;
+    EXPR_t *true_expr_arg = NULL;
+    if (arity == 2 && opts_expr) {
+        /* bare true(Expr) */
+        if (opts_expr->sval && strcmp(opts_expr->sval, "true") == 0
+            && opts_expr->nchildren == 1) {
+            has_true_expr = 1;
+            true_expr_arg = opts_expr->children[0];
+        } else {
+            /* walk list .(Head, Tail): look for true(E) as head */
+            EXPR_t *node = opts_expr;
+            while (node && node->sval && strcmp(node->sval, ".") == 0
+                   && node->nchildren >= 2) {
+                EXPR_t *head = node->children[0];
+                if (head && head->sval && strcmp(head->sval, "true") == 0
+                    && head->nchildren == 1) {
+                    has_true_expr = 1;
+                    true_expr_arg = head->children[0];
+                    break;
+                }
+                node = node->children[1];
+            }
         }
     }
 
     JC("bridge predicate (M-PJ-LINKER)");
     J(".method static p_%s_0(I)[Ljava/lang/Object;\n", bridge_fn);
     J("    .limit stack 16\n");
-    J("    .limit locals 4\n");
+    /* For true(Expr) we need locals: 0=cs(I), 1=trail(I), 2..2+n_vars-1=vars, then scratch */
+    if (has_true_expr && clause_expr) {
+        int n_vars = (int)clause_expr->ival;
+        J("    .limit locals %d\n", 4 + n_vars + 32);  /* generous: vars + scratch for body/check */
+    } else {
+        J("    .limit locals 4\n");
+    }
     /* cs dispatch — single clause, cs==0 only */
     J("    iload 0\n");
     J("    ifne p_%s_0_omega_empty\n", bridge_fn);
 
-    if (arity == 2) {
+    if (has_true_expr && clause_expr) {
+        /* true(Expr) opts: inline body + check in same frame so vars are shared.
+         * Locals layout: 0=cs(I), 1=trail(I), 2..2+n_vars-1=Prolog vars */
+        int n_vars = (int)clause_expr->ival;
+        int n_args = (int)clause_expr->dval;
+        int trail_local = 1;
+        int vars_base   = 2;
+        int *var_locals = (int*)calloc(n_vars + 1, sizeof(int));
+        for (int vi = 0; vi < n_vars; vi++) var_locals[vi] = vars_base + vi;
+        int next_local_val = vars_base + n_vars;
+        int *next_local = &next_local_val;
+
+        /* trail mark */
+        J("    invokestatic %s/pj_trail_mark()I\n", pj_classname);
+        J("    istore %d\n", trail_local);
+
+        /* allocate fresh var cells for all Prolog variables */
+        for (int vi = 0; vi < n_vars; vi++) {
+            J("    invokestatic %s/pj_term_var()[Ljava/lang/Object;\n", pj_classname);
+            J("    astore %d\n", var_locals[vi]);
+        }
+
+        /* allocate scratch locals for cs bookkeeping */
+        int init_cs_local    = (*next_local)++;
+        int sub_cs_out_local = (*next_local)++;
+        /* initialise them to 0 */
+        J("    iconst_0\n"); J("    istore %d\n", init_cs_local);
+        J("    iconst_0\n"); J("    istore %d\n", sub_cs_out_local);
+
+        /* emit body goals (children[n_args..nchildren-1]) */
+        int nbody = (int)clause_expr->nchildren - n_args;
+        if (nbody > 0) {
+            EXPR_t **body_goals = clause_expr->children + n_args;
+            char lbl_body_ok[128], lbl_body_fail[128];
+            snprintf(lbl_body_ok,   sizeof lbl_body_ok,   "p_%s_0_body_ok",   bridge_fn);
+            snprintf(lbl_body_fail, sizeof lbl_body_fail, "p_%s_0_omega_fail", bridge_fn);
+            pj_emit_body(body_goals, nbody,
+                         lbl_body_ok, lbl_body_fail, lbl_body_fail,
+                         trail_local, var_locals, n_vars, next_local,
+                         init_cs_local, sub_cs_out_local,
+                         /*cut_cs_seal=*/0, /*cs_local_for_cut=*/0,
+                         lbl_body_fail, NULL);
+            J("%s:\n", lbl_body_ok);
+        }
+
+        /* emit the true(Expr) check as a goal */
+        {
+            char lbl_check_ok[128], lbl_check_fail[128];
+            snprintf(lbl_check_ok,   sizeof lbl_check_ok,   "p_%s_0_check_ok",   bridge_fn);
+            snprintf(lbl_check_fail, sizeof lbl_check_fail, "p_%s_0_omega_fail",  bridge_fn);
+            pj_emit_goal(true_expr_arg, lbl_check_ok, lbl_check_fail,
+                         trail_local, var_locals, n_vars,
+                         /*cut_cs_seal=*/0, /*cs_local_for_cut=*/0,
+                         next_local, NULL);
+            J("%s:\n", lbl_check_ok);
+        }
+
+        free(var_locals);
+
+        /* check_ok: body+expr both succeeded — report pass, return null */
+        J("    iconst_0\n");
+        J("    invokestatic %s/p_pj_inc_pass_0(I)[Ljava/lang/Object;\n", pj_classname);
+        J("    pop\n");
+        J("    getstatic java/lang/System/out Ljava/io/PrintStream;\n");
+        J("    ldc \"  pass: %s:%s\"\n", suite_name, test_name);
+        J("    invokevirtual java/io/PrintStream/println(Ljava/lang/String;)V\n");
+        J("    aconst_null\n");
+        J("    areturn\n");
+        J("p_%s_0_omega_fail:\n", bridge_fn);
+        J("    iconst_0\n");
+        J("    invokestatic %s/p_pj_inc_fail_0(I)[Ljava/lang/Object;\n", pj_classname);
+        J("    pop\n");
+        J("    getstatic java/lang/System/out Ljava/io/PrintStream;\n");
+        J("    ldc \"  FAIL: %s:%s  (true-check failed)\"\n", suite_name, test_name);
+        J("    invokevirtual java/io/PrintStream/println(Ljava/lang/String;)V\n");
+        J("    aconst_null\n");
+        J("    areturn\n");
+        J("p_%s_0_omega_empty:\n", bridge_fn);
+        J("    aconst_null\n");
+        J("    areturn\n");
+        J(".end method\n\n");
+        return;
+
+    } else if (arity == 2) {
         /* call test(name, opts) — emit as p_test_2(atom(name), opts_term, 0) */
         J("    ldc \"%s\"\n", test_name);
         J("    invokestatic %s/pj_term_atom(Ljava/lang/String;)[Ljava/lang/Object;\n", pj_classname);
@@ -7233,8 +7354,9 @@ static void pj_linker_scan(Program *prog) {
             PjTestInfo *ti = &pj_linker_tests[pj_linker_ntest++];
             strncpy(ti->suite, suite, 63);
             strncpy(ti->name,  name_arg->sval, 63);
-            ti->arity     = is_test2 ? 2 : 1;
-            ti->opts_expr = (is_test2 && n_args >= 2) ? cl->children[1] : NULL;
+            ti->arity       = is_test2 ? 2 : 1;
+            ti->opts_expr   = (is_test2 && n_args >= 2) ? cl->children[1] : NULL;
+            ti->clause_expr = cl;
             char raw[128];
             snprintf(raw, sizeof raw, "%s_%s", suite, name_arg->sval);
             pj_safe_name(raw, ti->bridge, sizeof ti->bridge);
@@ -7315,43 +7437,62 @@ static void pj_linker_emit_main_assertz(void) {
             J("    invokestatic %s/pj_term_atom(Ljava/lang/String;)[Ljava/lang/Object;\n", pj_classname);
             J("    aastore\n");
             /* arg2: Opts — emit as term if available, else []
-             * If opts_expr is a bare goal (not atom, not list), wrap as true(Opts)
-             * so pj_has_true/2 in the shim recognises it correctly. */
+             * If opts contain true(Expr) (var-sharing case), emit pj_inline atom
+             * so run_one delegates entirely to the self-reporting bridge. */
             J("    dup\n");
             J("    bipush 4\n");
             if (ti->opts_expr) {
                 EXPR_t *oe = ti->opts_expr;
-                /* Detect bare goal: E_FNC with sval, nchildren > 0,
-                 * and NOT a list head "." or nil "[]",
-                 * and NOT a known opt atom (fail/false/sto/error/throws/true/all/condition) */
-                int is_list_or_nil = (oe->sval && (strcmp(oe->sval,".")==0 || strcmp(oe->sval,"[]")==0));
-                int is_known_atom  = (oe->nchildren == 0 && oe->sval &&
-                    (strcmp(oe->sval,"fail")==0 || strcmp(oe->sval,"false")==0 ||
-                     strcmp(oe->sval,"true")==0));
-                int is_wrapped     = (oe->sval && oe->nchildren == 1 &&
-                    (strcmp(oe->sval,"true")==0 || strcmp(oe->sval,"error")==0 ||
-                     strcmp(oe->sval,"throws")==0 || strcmp(oe->sval,"all")==0 ||
-                     strcmp(oe->sval,"sto")==0 || strcmp(oe->sval,"condition")==0));
-                int bare_goal = (!is_list_or_nil && !is_known_atom && !is_wrapped &&
-                                 oe->nchildren > 0);
-                if (bare_goal) {
-                    /* emit true(Opts) compound — array ["compound","true", opts_term] */
-                    J("    bipush 3\n");
-                    J("    anewarray java/lang/Object\n");
-                    J("    dup\n");
-                    J("    iconst_0\n");
-                    J("    ldc \"compound\"\n");
-                    J("    aastore\n");
-                    J("    dup\n");
-                    J("    iconst_1\n");
-                    J("    ldc \"true\"\n");
-                    J("    aastore\n");
-                    J("    dup\n");
-                    J("    bipush 2\n");
-                    pj_emit_term(oe, dummy_locals, 0);
-                    J("    aastore\n");
+                /* Check for true(Expr) — bare or inside list */
+                int is_true_expr = 0;
+                if (oe->sval && strcmp(oe->sval,"true")==0 && oe->nchildren==1) {
+                    is_true_expr = 1;
+                } else if (oe->sval && strcmp(oe->sval,".")==0 && oe->nchildren>=2) {
+                    EXPR_t *nd = oe;
+                    while (nd && nd->sval && strcmp(nd->sval,".")==0 && nd->nchildren>=2) {
+                        EXPR_t *hd = nd->children[0];
+                        if (hd && hd->sval && strcmp(hd->sval,"true")==0 && hd->nchildren==1)
+                            { is_true_expr=1; break; }
+                        nd = nd->children[1];
+                    }
+                }
+                if (is_true_expr) {
+                    /* emit pj_inline atom — bridge is self-reporting */
+                    J("    ldc \"pj_inline\"\n");
+                    J("    invokestatic %s/pj_term_atom(Ljava/lang/String;)[Ljava/lang/Object;\n", pj_classname);
                 } else {
-                    pj_emit_term(oe, dummy_locals, 0);
+                    /* Detect bare goal: E_FNC with sval, nchildren > 0,
+                     * and NOT a list head "." or nil "[]",
+                     * and NOT a known opt atom */
+                    int is_list_or_nil = (oe->sval && (strcmp(oe->sval,".")==0 || strcmp(oe->sval,"[]")==0));
+                    int is_known_atom  = (oe->nchildren == 0 && oe->sval &&
+                        (strcmp(oe->sval,"fail")==0 || strcmp(oe->sval,"false")==0 ||
+                         strcmp(oe->sval,"true")==0));
+                    int is_wrapped     = (oe->sval && oe->nchildren == 1 &&
+                        (strcmp(oe->sval,"true")==0 || strcmp(oe->sval,"error")==0 ||
+                         strcmp(oe->sval,"throws")==0 || strcmp(oe->sval,"all")==0 ||
+                         strcmp(oe->sval,"sto")==0 || strcmp(oe->sval,"condition")==0));
+                    int bare_goal = (!is_list_or_nil && !is_known_atom && !is_wrapped &&
+                                     oe->nchildren > 0);
+                    if (bare_goal) {
+                        /* emit true(Opts) compound */
+                        J("    bipush 3\n");
+                        J("    anewarray java/lang/Object\n");
+                        J("    dup\n");
+                        J("    iconst_0\n");
+                        J("    ldc \"compound\"\n");
+                        J("    aastore\n");
+                        J("    dup\n");
+                        J("    iconst_1\n");
+                        J("    ldc \"true\"\n");
+                        J("    aastore\n");
+                        J("    dup\n");
+                        J("    bipush 2\n");
+                        pj_emit_term(oe, dummy_locals, 0);
+                        J("    aastore\n");
+                    } else {
+                        pj_emit_term(oe, dummy_locals, 0);
+                    }
                 }
             } else {
                 /* [] */
@@ -7558,7 +7699,7 @@ void prolog_emit_jvm(Program *prog, FILE *out, const char *filename) {
     /* M-PJ-LINKER: emit bridge predicates suite_name/0 :- test(name). */
     if (use_plunit) {
         for (int i = 0; i < pj_linker_ntest; i++)
-            pj_linker_emit_bridge(pj_linker_tests[i].bridge, pj_linker_tests[i].name);
+            pj_linker_emit_bridge(pj_linker_tests[i].bridge, pj_linker_tests[i].name, pj_linker_tests[i].suite);
     }
 
     /* Bug 1 fix: emit stub methods for pure-dynamic predicates.
