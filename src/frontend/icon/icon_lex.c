@@ -12,6 +12,7 @@
 #include "icon_lex.h"
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <stdio.h>
 #include <ctype.h>
 #include <errno.h>
@@ -119,6 +120,28 @@ static void skip_ws(IcnLexer *lx) {
             while (lex_cur(lx) && lex_cur(lx) != '\n')
                 lex_advance(lx);
             continue;
+        }
+        /* Skip $import / $export control lines (consumed by icn_prescan_imports) */
+        if (lex_cur(lx) == '$') {
+            while (lex_cur(lx) && lex_cur(lx) != '\n')
+                lex_advance(lx);
+            continue;
+        }
+        /* Skip -IMPORT / -EXPORT control lines (SNOBOL4-style, also accepted) */
+        if (lex_cur(lx) == '-') {
+            /* peek ahead for IMPORT or EXPORT */
+            size_t save = lx->pos;
+            lex_advance(lx);
+            /* skip optional spaces */
+            while (lex_cur(lx) == ' ' || lex_cur(lx) == '\t') lex_advance(lx);
+            /* check for IMPORT or EXPORT (case-insensitive) */
+            const char *rest = lx->src + lx->pos;
+            if (strncasecmp(rest, "IMPORT", 6) == 0 || strncasecmp(rest, "EXPORT", 6) == 0) {
+                while (lex_cur(lx) && lex_cur(lx) != '\n') lex_advance(lx);
+                continue;
+            }
+            /* not a control line — restore and let normal tokenizer handle '-' */
+            lx->pos = save;
         }
         break;
     }

@@ -94,13 +94,6 @@ static ImportEntry *ij_imports = NULL;
 static ImportEntry *ij_find_import(const char *name) {
     for (ImportEntry *ie = ij_imports; ie; ie = ie->next) {
         if (ie->method && strcmp(ie->method, name) == 0) return ie;
-        /* also try uppercase comparison */
-        if (ie->method) {
-            char up[256]; int k = 0;
-            for (const char *p = name; *p && k < 255; p++, k++) up[k] = (char)toupper((unsigned char)*p);
-            up[k] = '\0';
-            if (strcmp(ie->method, up) == 0) return ie;
-        }
     }
     return NULL;
 }
@@ -113,8 +106,7 @@ void ij_set_classname(const char *filename) {
         ij_classname[i] = isalnum((unsigned char)*p) ? *p : '_';
     }
     if (i == 0) { strcpy(ij_classname, "IconProg"); return; }
-    /* Capitalize first letter for valid Java class name */
-    ij_classname[0] = toupper((unsigned char)ij_classname[0]);
+    /* ABI §5: no language prefix, lowercase classnames — do NOT capitalize */
     ij_classname[i] = '\0';
 }
 
@@ -714,6 +706,18 @@ static void ij_get_obj_field(const char *fname) {
 }
 static void ij_put_obj_field(const char *fname) {
     char buf[384]; snprintf(buf, sizeof buf, "%s/%s Ljava/lang/Object;", ij_classname, fname);
+    JI("putstatic", buf);
+}
+/* Object[]-typed static field helpers — for import arg arrays */
+static void ij_declare_static_arr(const char *name) {
+    ij_declare_static_typed(name, 'P');  /* 'P' = [Ljava/lang/Object; */
+}
+static void ij_get_arr_field(const char *fname) {
+    char buf[384]; snprintf(buf, sizeof buf, "%s/%s [Ljava/lang/Object;", ij_classname, fname);
+    JI("getstatic", buf);
+}
+static void ij_put_arr_field(const char *fname) {
+    char buf[384]; snprintf(buf, sizeof buf, "%s/%s [Ljava/lang/Object;", ij_classname, fname);
     JI("putstatic", buf);
 }
 /* HashMap-typed static field helpers ('T' type tag) — Icon tables */
@@ -2579,7 +2583,7 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         char kinit_fld[80];snprintf(kinit_fld, sizeof kinit_fld,"icn_%d_kinit", id);
         char check[64];    snprintf(check,     sizeof check,    "icn_%d_kchk",  id);
         ij_declare_static_table(t_fld);
-        ij_declare_static_obj(arr_fld);   /* Object[] stored as Object ref */
+        ij_declare_static_arr(arr_fld);   /* Object[] stored as Object ref */
         ij_declare_static_int(idx_fld);
         ij_declare_static_int(kinit_fld); /* 0=fresh, 1=already init'd */
 
@@ -2598,7 +2602,7 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         ij_get_table_field(t_fld);
         JI("invokevirtual", "java/util/HashMap/keySet()Ljava/util/Set;");
         JI("invokeinterface", "java/util/Set/toArray()[Ljava/lang/Object; 1");
-        ij_put_obj_field(arr_fld);
+        ij_put_arr_field(arr_fld);
         /* idx = 0 */
         JI("iconst_0", "");
         ij_put_int_field(idx_fld);
@@ -2615,13 +2619,13 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
 
         /* check: if idx >= arr.length → fail; else load arr[idx], parse long, → γ */
         JL(check);
-        ij_get_obj_field(arr_fld);
+        ij_get_arr_field(arr_fld);
         JI("checkcast", "[Ljava/lang/Object;");
         JI("arraylength", "");
         ij_get_int_field(idx_fld);
         JI("if_icmple", ports.ω);         /* arr.length <= idx → fail */
         /* load arr[idx] as String key */
-        ij_get_obj_field(arr_fld);
+        ij_get_arr_field(arr_fld);
         JI("checkcast", "[Ljava/lang/Object;");
         ij_get_int_field(idx_fld);
         JI("aaload", "");
@@ -3326,57 +3330,70 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     /* === END M-IJ-BUILTINS-STR === */
 
     /* --- cross-class IMPORT call (M-SCRIP-DEMO) ---
-     * $import assembly.METHOD causes calls to METHOD to emit:
-     *   invokestatic assembly/METHOD([Ljava/lang/Object;Ljava/lang/Runnable;Ljava/lang/Runnable;)V
-     * per ARCH-scrip-abi.md §3.1.  Args are passed as Object[] via ByrdBoxLinkage.
-     * Sprint stub: push null for args/gamma/omega — wired for string-result queries. */
+     * Emits invokestatic Assembly/METHOD([Object;Runnable;Runnable;)V
+     * per ARCH-scrip-abi.md ss3.1. Args packed into Object[] via static scratch. */
     {
         ImportEntry *ie = ij_find_import(fname);
         if (ie) {
-            /* Emit α/β labels */
             JL(a); JL(b);
-            /* Push Object[] args — pack nargs strings/longs into array */
+
             if (nargs == 0) {
                 JI("aconst_null", "");
             } else {
-                /* Allocate Object[nargs] */
-                char push_relay[64];
-                snprintf(push_relay, sizeof push_relay, "icn_%d_imp_args", id);
+                char arr_fld[80]; snprintf(arr_fld, sizeof arr_fld, "icn_imp_arr_%d", id);
+                ij_declare_static_arr(arr_fld);
                 J("    ldc %d\n", nargs);
                 JI("anewarray", "java/lang/Object");
-                /* For each arg, evaluate and store into array slot */
+                ij_put_arr_field(arr_fld);
+
+                char start_lbl[64]; snprintf(start_lbl, sizeof start_lbl, "icn_%d_imp_s0", id);
+                JGoto(start_lbl); JBarrier();
+
                 for (int i = 0; i < nargs; i++) {
-                    char arg_relay[64]; snprintf(arg_relay, sizeof arg_relay, "icn_%d_imp_a%d", id, i);
-                    /* dup array ref, push index */
-                    JI("dup", "");
-                    J("    ldc %d\n", i);
-                    /* evaluate arg — we need it on stack as Object */
-                    IjPorts ap; strncpy(ap.γ, arg_relay, 63); strncpy(ap.ω, ports.ω, 63);
+                    /* Use a relay label INSIDE the expr stream as gamma so that
+                     * done_lbl is only reachable via an unconditional goto (depth 0).
+                     * sv_fld stores the value; done_lbl loads it back at depth 0. */
+                    char relay_lbl[64]; snprintf(relay_lbl, sizeof relay_lbl, "icn_%d_imp_r%d", id, i);
+                    char done_lbl[64];  snprintf(done_lbl,  sizeof done_lbl,  "icn_%d_imp_d%d", id, i);
+                    char sv_fld[80];    snprintf(sv_fld,    sizeof sv_fld,    "icn_imp_sv_%d_%d", id, i);
+                    ij_declare_static_obj(sv_fld);
+
+                    IjPorts ap;
+                    strncpy(ap.γ, relay_lbl, 63);
+                    strncpy(ap.ω, ports.ω, 63);
                     char aa[64], ab[64];
-                    ij_emit_expr(n->children[i+1], ap, aa, ab);
-                    /* jump to arg eval α, result lands at arg_relay */
-                    /* We inline: goto aa; arg_relay: box; */
-                    /* Actually we need to evaluate inline — use static scratch */
-                    char arg_fld[64]; snprintf(arg_fld, sizeof arg_fld, "icn_imp_arg_%d_%d", id, i);
-                    ij_declare_static_str(arg_fld);
-                    (void)push_relay; (void)aa; (void)ab; (void)arg_fld;
-                    /* Simplified: store null for non-string, string for string args */
-                    if (ij_expr_is_string(n->children[i+1])) {
-                        /* evaluate string arg directly */
-                        /* For now push null placeholder — full wiring in LP-JVM-2 */
-                        JI("aconst_null", "");
+                    ij_emit_expr(n->children[i + 1], ap, aa, ab);
+
+                    /* relay_lbl: value on stack at depth 1 — store to sv_fld, goto done */
+                    JL(relay_lbl);
+                    if (ij_expr_is_string(n->children[i + 1])) {
+                        ij_put_obj_field(sv_fld);
                     } else {
-                        JI("aconst_null", "");
+                        JI("invokestatic", "java/lang/Long/valueOf(J)Ljava/lang/Long;");
+                        ij_put_obj_field(sv_fld);
                     }
+                    JGoto(done_lbl); JBarrier();
+
+                    if (i == 0) { JL(start_lbl); }
+                    JGoto(aa); JBarrier();
+
+                    /* done_lbl: depth 0 — load array, index, value, aastore */
+                    JL(done_lbl);
+                    ij_get_arr_field(arr_fld);
+                    J("    ldc %d\n", i);
+                    ij_get_obj_field(sv_fld);
                     JI("aastore", "");
+
+                    if (i + 1 == nargs) {
+                        char pack_lbl[64]; snprintf(pack_lbl, sizeof pack_lbl, "icn_%d_imp_pack", id);
+                        JL(pack_lbl);
+                        ij_get_arr_field(arr_fld);
+                    }
                 }
             }
-            /* gamma: lambda that reads ByrdBoxLinkage.RESULT and jumps γ */
-            /* omega: lambda that jumps ω */
-            /* Sprint stub: push null for both continuations */
-            JI("aconst_null", "");   /* gamma Runnable — stub */
-            JI("aconst_null", "");   /* omega Runnable — stub */
-            /* invokestatic assembly/METHOD([Ljava/lang/Object;Ljava/lang/Runnable;Ljava/lang/Runnable;)V */
+
+            JI("aconst_null", "");
+            JI("aconst_null", "");
             {
                 char sig[512];
                 snprintf(sig, sizeof sig,
@@ -3384,12 +3401,13 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
                     ie->name, ie->method);
                 JI("invokestatic", sig);
             }
-            /* Read result from ByrdBoxLinkage.RESULT into icn_retval_obj, then γ */
             J("    getstatic ByrdBoxLinkage/RESULT Ljava/util/concurrent/atomic/AtomicReference;\n");
             JI("invokevirtual", "java/util/concurrent/atomic/AtomicReference/get()Ljava/lang/Object;");
             J("    putstatic %s/icn_retval_obj Ljava/lang/Object;\n", ij_classname);
-            /* Push empty string as numeric placeholder for γ */
-            JI("lconst_0", "");
+            /* Push String result on stack — ij_expr_is_string returns 1 for imports
+             * so callers expect a String reference, not a long. */
+            J("    getstatic %s/icn_retval_obj Ljava/lang/Object;\n", ij_classname);
+            JI("checkcast", "java/lang/String");
             JGoto(ports.γ); JBarrier();
             return;
         }
@@ -4268,6 +4286,9 @@ static int ij_expr_is_string(IcnNode *n) {
                     /* match returns a long position, not a String */
                     /* user-defined proc — check proc table */
                     if (ij_proc_returns_str(fn_name)) return 1;
+                    /* imported cross-class call — result is always String
+                     * (retrieved from ByrdBoxLinkage.RESULT cast to Object/String) */
+                    if (ij_find_import(fn_name)) return 1;
                 }
             }
             return 0;
@@ -7233,6 +7254,8 @@ void ij_emit_file(IcnNode **nodes, int count, FILE *out, const char *filename, c
             J(".field public static %s Ljava/util/HashMap;\n", ij_statics[i]);
         else if (type == 'O')
             J(".field public static %s Ljava/lang/Object;\n", ij_statics[i]);
+        else if (type == 'P')
+            J(".field public static %s [Ljava/lang/Object;\n", ij_statics[i]);
         else
             J(".field public static %s %c\n", ij_statics[i], type);
     }

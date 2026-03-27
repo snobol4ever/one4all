@@ -1,0 +1,93 @@
+# family_icon.icn -- Icon block of the Scrip family-tree demo.
+# Queries Prolog DB via real IMPORT linkage (ARCH-scrip-abi.md §6).
+# Entrypoint: main() drives the full pipeline:
+#   1. Call PARSE_CSV (SNOBOL4) -- reads stdin, populates Prolog DB
+#   2. Query Prolog, format and print reports
+#
+# Cross-language imports
+$import family_snobol4.parse_csv
+$import family_prolog.query_count
+$import family_prolog.query_grandparents
+$import family_prolog.query_siblings
+$import family_prolog.query_cousins
+$import family_prolog.query_generations
+$import family_prolog.query_ancestors
+
+procedure main()
+  local raw, n, i, j, line, pi, a, b, key, t, cnt, lo, hi;
+
+  # Step 1: SNOBOL4 reads stdin, asserts persons/parents into Prolog DB
+  parse_csv();
+
+  cnt := query_count();
+  write("Parsed " || cnt || " family members.");
+  write("");
+
+  write("=== Grandparent relationships ===");
+  raw := query_grandparents();
+  n := *raw; i := 1;
+  while i <= n do
+    (j := (find("\n", raw, i) | (n+1))) &
+    ((j > i) & write("  " || raw[i:j]) | (i := i)) &
+    (i := j+1);
+  write("");
+
+  write("=== Siblings ===");
+  raw := query_siblings();
+  t := table("0"); n := *raw; i := 1;
+  while i <= n do
+    (j := (find("\n", raw, i) | (n+1))) &
+    ((j > i) &
+      (line := raw[i:j]) &
+      (pi := find("|", line)) &
+      (a := line[1:pi]) &
+      (b := line[pi+1:*line+1]) &
+      ((a > b & (lo := b) & (hi := a)) | ((lo := a) & (hi := b))) &
+      (key := lo || "|" || hi) &
+      (t[key] = "0") &
+      (t[key] := "1") &
+      write("  " || a || " and " || b || " are siblings") | (i := i)) &
+    (i := j+1);
+  write("");
+
+  write("=== Cousins ===");
+  raw := query_cousins();
+  t := table("0"); n := *raw; i := 1;
+  while i <= n do
+    (j := (find("\n", raw, i) | (n+1))) &
+    ((j > i) &
+      (line := raw[i:j]) &
+      (pi := find("|", line)) &
+      (a := line[1:pi]) &
+      (b := line[pi+1:*line+1]) &
+      ((a > b & (lo := b) & (hi := a)) | ((lo := a) & (hi := b))) &
+      (key := lo || "|" || hi) &
+      (t[key] = "0") &
+      (t[key] := "1") &
+      write("  " || a || " and " || b || " are cousins") | (i := i)) &
+    (i := j+1);
+  write("");
+
+  write("=== Generations (root=0) ===");
+  raw := query_generations();
+  n := *raw; i := 1;
+  while i <= n do
+    (j := (find("\n", raw, i) | (n+1))) &
+    ((j > i) &
+      (line := raw[i:j]) &
+      (pi := find("|", line)) &
+      write("  " || line[pi+1:*line+1] || " : generation " || line[1:pi]) | (i := i)) &
+    (i := j+1);
+  write("");
+
+  write("=== Ancestors of James (U008) ===");
+  raw := query_ancestors("U008");
+  n := *raw; i := 1;
+  while i <= n do
+    (j := (find("\n", raw, i) | (n+1))) &
+    ((j > i) &
+      (line := raw[i:j]) &
+      (pi := find("|", line)) &
+      write("  " || line[pi+1:*line+1] || " (generation " || line[1:pi] || ")") | (i := i)) &
+    (i := j+1);
+end
