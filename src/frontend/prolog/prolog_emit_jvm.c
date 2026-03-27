@@ -3604,6 +3604,9 @@ static void pj_emit_stdlib_shim(Program *prog) {
         pj_emit_stdlib_pred("member(X, [X|_]).\nmember(X, [_|T]) :- member(X, T).\n");
     if (!pj_prog_defines(prog, "memberchk", 2))
         pj_emit_stdlib_pred("memberchk(X, [X|_]) :- !.\nmemberchk(X, [_|T]) :- memberchk(X, T).\n");
+    if (!pj_prog_defines(prog, "forall", 2)) {
+        /* forall/2 is now a synthetic JVM method — no pure-Prolog shim needed */
+    }
 }
 
 /* pj_gcd(J,J)J emitter — emitted once into the class */
@@ -5581,8 +5584,63 @@ static void pj_emit_reverse_builtin(void) {
 }
 
 /* -------------------------------------------------------------------------
+ * pj_emit_forall_builtin — emit synthetic p_forall_2 method.
+ * forall(Cond, Action): for each solution of Cond call Action; succeed iff
+ * all Actions succeed (vacuously true if Cond has no solutions).
+ * Signature: p_forall_2([Cond], [Action], cs) → Object[] | null
+ * cs is ignored (forall always deterministic); returns singleton {0} on success.
+ * Uses pj_call_goal to drive Cond with backtracking and call Action for each.
+ * ------------------------------------------------------------------------- */
+static void pj_emit_forall_builtin(void) {
+    J("; === forall/2 synthetic predicate =========================================\n");
+    J(".method static p_forall_2([Ljava/lang/Object;[Ljava/lang/Object;I)[Ljava/lang/Object;\n");
+    J("    .limit stack 6\n");
+    J("    .limit locals 6\n");
+    /* locals: 0=Cond[], 1=Action[], 2=cs(ignored), 3=cs_cond(int), 4=r(int) */
+    /* deref Cond */
+    J("    aload_0\n");
+    J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    J("    iconst_0\n");
+    J("    istore 3\n");             /* cs_cond = 0 */
+    J("p_forall_2_loop:\n");
+    /* call Cond with cs_cond */
+    J("    dup\n");                  /* Cond still on stack */
+    J("    iload 3\n");
+    J("    invokestatic %s/pj_call_goal(Ljava/lang/Object;I)I\n", pj_classname);
+    J("    istore 4\n");
+    J("    iload 4\n");
+    J("    ldc -1\n");
+    J("    if_icmpeq p_forall_2_done\n");  /* Cond exhausted → success */
+    J("    iload 4\n");
+    J("    istore 3\n");             /* cs_cond = next cs */
+    /* call Action */
+    J("    aload_1\n");
+    J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    J("    iconst_0\n");
+    J("    invokestatic %s/pj_call_goal(Ljava/lang/Object;I)I\n", pj_classname);
+    J("    ldc -1\n");
+    J("    if_icmpeq p_forall_2_fail\n");  /* Action failed → fail */
+    J("    goto p_forall_2_loop\n");
+    J("p_forall_2_done:\n");
+    J("    pop\n");                  /* pop Cond ref */
+    J("    iconst_1\n");
+    J("    anewarray java/lang/Object\n");
+    J("    dup\n");
+    J("    iconst_0\n");
+    J("    iconst_0\n");
+    J("    invokestatic java/lang/Integer/valueOf(I)Ljava/lang/Integer;\n");
+    J("    aastore\n");
+    J("    areturn\n");
+    J("p_forall_2_fail:\n");
+    J("    pop\n");                  /* pop Cond ref */
+    J("    aconst_null\n");
+    J("    areturn\n");
+    J(".end method\n\n");
+}
+
+/* -------------------------------------------------------------------------
  * pj_emit_between_builtin — emit synthetic p_between_3 method.
- * Signature: p_between_3([Low], [High], [Var], cs) → Object[] | null
+ * Signature: p_between_3([Low], [High], [Var], cs) -> Object[] | null
  * cs = offset from Low: try value Low+cs each invocation.
  * Returns {cs+1} on success so caller retries with the next value.
  * ------------------------------------------------------------------------- */
@@ -8236,6 +8294,19 @@ void prolog_emit_jvm(Program *prog, FILE *out, const char *filename) {
     pj_emit_class_header();
     pj_emit_runtime_helpers();
     pj_emit_assertz_helpers();
+
+    /* Always emit forall/2 synthetic (unless user defines it) */
+    {
+        int defines_forall = 0;
+        for (STMT_t *s = prog->head; s; s = s->next) {
+            if (!s->subject) continue;
+            if (s->subject->kind == E_CHOICE && s->subject->sval &&
+                strcmp(s->subject->sval, "forall") == 0)
+                defines_forall = 1;
+        }
+        if (!defines_forall)
+            pj_emit_forall_builtin();
+    }
 
     /* Check if program uses between/3 but doesn't define it — emit synthetic method */
     {
