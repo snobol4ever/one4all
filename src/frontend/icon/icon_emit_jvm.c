@@ -47,6 +47,7 @@
 
 #define _POSIX_C_SOURCE 200809L
 #include "icon_ast.h"
+#include "icon_lex.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -3886,8 +3887,8 @@ static int ij_expr_is_string(IcnNode *n) {
              * but longs for list operands */
             if (n->nchildren >= 1) return ij_expr_is_list(n->children[0]) ? 0 : 1;
             return 1;
-        case ICN_AUGOP:  /* ||:= (TK_AUGCONCAT=35) yields String; arithmetic augops yield long */
-            return (n->val.ival == 35) ? 1 : 0;
+        case ICN_AUGOP:  /* ||:= (TK_AUGCONCAT=36) yields String; arithmetic augops yield long */
+            return (n->val.ival == (int)TK_AUGCONCAT) ? 1 : 0;
         case ICN_CALL: {
             if (n->nchildren >= 1) {
                 IcnNode *fn = n->children[0];
@@ -4681,8 +4682,8 @@ static void ij_emit_augop(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
             snprintf(fld, sizeof fld, "icn_gvar_%s", lhs->val.sval);
         }
 
-        if ((int)aug_kind == 35) {
-            /* TK_AUGCONCAT=35: String ||:= String
+        if ((int)aug_kind == (int)TK_AUGCONCAT) {
+            /* TK_AUGCONCAT=36: String ||:= String
              * Stack at rhs_ok: String ref (rhs). */
             char tmp_str_fld[128]; snprintf(tmp_str_fld, sizeof tmp_str_fld, "icn_%d_augtemp_s", id);
             ij_declare_static_str(tmp_str_fld);
@@ -6404,8 +6405,8 @@ void ij_emit_file(IcnNode **nodes, int count, FILE *out, const char *filename, c
                                         rhs->kind == ICN_CONCAT ||
                                         rhs->kind == ICN_LCONCAT)) is_str = 1;
                         }
-                        /* var ||:= anything  (ICN_AUGOP with TK_AUGCONCAT==35) */
-                        if (!is_str && s2->kind == ICN_AUGOP && s2->val.ival == 35 &&
+                        /* var ||:= anything  (ICN_AUGOP with TK_AUGCONCAT==36) */
+                        if (!is_str && s2->kind == ICN_AUGOP && s2->val.ival == (int)TK_AUGCONCAT &&
                             s2->nchildren >= 1 &&
                             s2->children[0] && s2->children[0]->kind == ICN_VAR &&
                             strcmp(s2->children[0]->val.sval, vname) == 0) is_str = 1;
