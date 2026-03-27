@@ -3443,6 +3443,39 @@ static void pj_emit_arith(EXPR_t *e, int *var_locals, int n_vars) {
     }
 }
 
+/* pj_emit_stdlib_shim — always-emitted pure-Prolog stdlib predicates.
+ * member/2 and memberchk/2 are general builtins, skipped if user defines them. */
+static void pj_emit_choice(EXPR_t *choice); /* forward decl */
+
+static int pj_prog_defines(Program *prog, const char *name, int arity) {
+    char key[128]; snprintf(key, sizeof key, "%s/%d", name, arity);
+    for (STMT_t *s = prog->head; s; s = s->next) {
+        if (!s->subject || s->subject->kind != E_CHOICE) continue;
+        if (s->subject->sval && strcmp(s->subject->sval, key) == 0)
+            return 1;
+    }
+    return 0;
+}
+
+static void pj_emit_stdlib_pred(const char *src) {
+    PlProgram *pl = prolog_parse(src, "stdlib");
+    if (!pl) return;
+    PlProgram *lowered = prolog_lower(pl);
+    if (!lowered) return;
+    for (STMT_t *s = lowered->head; s; s = s->next) {
+        if (!s->subject) continue;
+        if (s->subject->kind == E_CHOICE)
+            pj_emit_choice(s->subject);
+    }
+}
+
+static void pj_emit_stdlib_shim(Program *prog) {
+    if (!pj_prog_defines(prog, "member", 2))
+        pj_emit_stdlib_pred("member(X, [X|_]).\nmember(X, [_|T]) :- member(X, T).\n");
+    if (!pj_prog_defines(prog, "memberchk", 2))
+        pj_emit_stdlib_pred("memberchk(X, [X|_]) :- !.\nmemberchk(X, [_|T]) :- memberchk(X, T).\n");
+}
+
 /* pj_gcd(J,J)J emitter — emitted once into the class */
 static void pj_emit_gcd_helper(void) {
     J(".method static pj_gcd(JJ)J\n");
@@ -7157,10 +7190,6 @@ static void pj_emit_choice(EXPR_t *choice) {
 static const char pj_plunit_shim_src[] =
     "begin_tests(_).\n"
     "end_tests(_).\n"
-    "member(X, [X|_]).\n"
-    "member(X, [_|T]) :- member(X, T).\n"
-    "memberchk(X, [X|_]) :- !.\n"
-    "memberchk(X, [_|T]) :- memberchk(X, T).\n"
     "forall(Cond, Action) :- \\+ forall_fails(Cond, Action).\n"
     "forall_fails(Cond, Action) :- Cond, \\+ Action.\n"
     "acyclic_term(_).\n"
@@ -8023,6 +8052,9 @@ void prolog_emit_jvm(Program *prog, FILE *out, const char *filename) {
 
     /* Always emit pj_gcd helper (used by gcd/2 in is/2) */
     pj_emit_gcd_helper();
+
+    /* Always emit stdlib shim: member/2, memberchk/2 (skipped if user-defined) */
+    pj_emit_stdlib_shim(prog);
 
     /* emit each predicate */
     for (STMT_t *s = prog->head; s; s = s->next) {
