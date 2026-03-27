@@ -232,6 +232,12 @@ static int ij_alloc_int_scratch(void) {
      * so int/ref scratch slots never alias any slot_jvm(n) = 2*n target. */
     return 2 * MAX_LOCALS + 20 + ij_nint_scratch++;
 }
+static int     ij_nref_scratch = 0; /* count of ref-typed scratch slots (astore targets) */
+/* Allocate a ref-typed scratch slot — above int-scratch region.
+ * Initialized with aconst_null/astore in prologue so verifier sees ref type. */
+static int ij_alloc_ref_scratch(void) {
+    return 2 * MAX_LOCALS + 20 + 64 + ij_nref_scratch++;
+}
 static char    ij_ret_label[64]  = "";   /* label for return */
 static char    ij_fail_label[64] = "";   /* label for proc fail */
 static char    ij_sret_label[64] = "";   /* label for suspend-yield (frame kept) */
@@ -271,7 +277,7 @@ static const char *ij_loop_next_target(void) {
 }
 
 static void ij_locals_reset(void) {
-    ij_nlocals = 0; ij_nparams = 0; ij_nstrefs = 0; ij_nint_scratch = 0;
+    ij_nlocals = 0; ij_nparams = 0; ij_nstrefs = 0; ij_nint_scratch = 0; ij_nref_scratch = 0;
     ij_suspend_count = 0;
     ij_loop_depth = 0;
 }
@@ -303,7 +309,7 @@ static int slot_jvm(int logical) { return 2 * logical; }
 
 /* Total JVM locals needed for .limit locals directive */
 static int ij_jvm_locals_count(void) {
-    int top = 2 * MAX_LOCALS + 20 + ij_nint_scratch;
+    int top = 2 * MAX_LOCALS + 20 + 64 + ij_nref_scratch;
     return top + 4;
 }
 
@@ -866,6 +872,12 @@ static void ij_emit_var(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         JGoto(ports.γ); JL(b); JGoto(ports.ω); return;
     }
 
+
+    /* &null keyword — push 0L (integer null), always succeeds */
+    if (strcmp(n->val.sval, "&null") == 0) {
+        JI("lconst_0", "");
+        JGoto(ports.γ); JL(b); JGoto(ports.ω); return;
+    }
     int slot = ij_locals_find(n->val.sval);
     if (slot >= 0) {
         /* Named local/param: use per-proc static field (suspend-safe) */
@@ -1693,7 +1705,7 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         /* Value on stack: String ref or long depending on arg type */
         if (ij_expr_is_string(arg)) {
             /* String ref on stack — store to scratch, push stream, load, println */
-            int scratch = ij_alloc_int_scratch();
+            int scratch = ij_alloc_ref_scratch();
             J("    astore %d\n", scratch);
             JI("getstatic", "java/lang/System/out Ljava/io/PrintStream;");
             J("    aload %d\n", scratch);
@@ -1807,8 +1819,8 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         /* allocate char[] of size n */
         J("    iload %d\n", n_slot);
         JI("newarray", "char");
-        int arr_slot = ij_locals_alloc_tmp();
-        J("    astore %d\n", slot_jvm(arr_slot));
+        int arr_slot = ij_alloc_ref_scratch();
+        J("    astore %d\n", arr_slot);
         /* load reader */
         { char buf[384]; snprintf(buf,sizeof buf,"%s/icn_stdin_reader Ljava/lang/Object;",ij_classname);
           JI("getstatic", buf); }
@@ -1848,7 +1860,7 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         if (ij_expr_is_real(arg))        JI("d2l", "");   /* double → long */
         else if (ij_expr_is_string(arg)) {
             /* String → Long.parseLong */
-            int scratch = ij_alloc_int_scratch();
+            int scratch = ij_alloc_ref_scratch();
             J("    astore %d\n", scratch);
             J("    aload %d\n",  scratch);
             JI("invokestatic", "java/lang/Long/parseLong(Ljava/lang/String;)J");
@@ -1868,7 +1880,7 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         JL(b); JGoto(ab);
         JL(after);
         if (ij_expr_is_string(arg)) {
-            int scratch = ij_alloc_int_scratch();
+            int scratch = ij_alloc_ref_scratch();
             J("    astore %d\n", scratch);
             J("    aload %d\n",  scratch);
             JI("invokestatic", "java/lang/Double/parseDouble(Ljava/lang/String;)D");
@@ -2602,7 +2614,7 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     /* --- repl(s, n) --- repeat string s n times */
     if (strcmp(fname, "repl") == 0 && nargs >= 2 && !ij_is_user_proc(fname)) {
         IcnNode *sarg = n->children[1];
-        IcnNode *narg = n->children[2];
+        IcnNode *narg = (nargs >= 2) ? n->children[2] : NULL;
         char mid[64]; snprintf(mid, sizeof mid, "icn_%d_repl_mid", id);
         char after[64]; snprintf(after, sizeof after, "icn_%d_repl_after", id);
         IjPorts ap; strncpy(ap.γ, mid, 63); strncpy(ap.ω, ports.ω, 63);
@@ -2613,20 +2625,20 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         JL(b); JGoto(sb);
         JL(mid);
         /* stack: String s */
-        int scratch_s = ij_locals_alloc_tmp();
-        J("    astore %d\n", slot_jvm(scratch_s));
+        int scratch_s = ij_alloc_ref_scratch();
+        J("    astore %d\n", scratch_s);
         JGoto(na);
         JL(after);
         /* stack: long n — convert to int */
         JI("l2i", "");
-        int scratch_n = ij_locals_alloc_tmp();
-        J("    istore %d\n", slot_jvm(scratch_n));
+        int scratch_n = ij_alloc_int_scratch();
+        J("    istore %d\n", scratch_n);
         /* StringBuilder sb = new StringBuilder() */
         JI("new", "java/lang/StringBuilder");
         JI("dup", "");
         JI("invokespecial", "java/lang/StringBuilder/<init>()V");
-        int scratch_sb = ij_locals_alloc_tmp();
-        J("    astore %d\n", slot_jvm(scratch_sb));
+        int scratch_sb = ij_alloc_ref_scratch();
+        J("    astore %d\n", scratch_sb);
         /* loop i=0; i<n; i++ */
         char loop[64], done[64];
         snprintf(loop, sizeof loop, "icn_%d_repl_loop", id);
@@ -2636,16 +2648,16 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         J("    istore %d\n", slot_jvm(scratch_i));
         JL(loop);
         J("    iload %d\n", slot_jvm(scratch_i));
-        J("    iload %d\n", slot_jvm(scratch_n));
+        J("    iload %d\n", scratch_n);
         J("    if_icmpge %s\n", done);
-        J("    aload %d\n", slot_jvm(scratch_sb));
-        J("    aload %d\n", slot_jvm(scratch_s));
+        J("    aload %d\n", scratch_sb);
+        J("    aload %d\n", scratch_s);
         JI("invokevirtual", "java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;");
         JI("pop", "");
         J("    iinc %d 1\n", slot_jvm(scratch_i));
         JGoto(loop);
         JL(done);
-        J("    aload %d\n", slot_jvm(scratch_sb));
+        J("    aload %d\n", scratch_sb);
         JI("invokevirtual", "java/lang/StringBuilder/toString()Ljava/lang/String;");
         JGoto(ports.γ);
         return;
@@ -2672,36 +2684,73 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     }
 
     /* --- left(s, n [, pad]) --- pad/truncate to width n, left-aligned */
-    if (strcmp(fname, "left") == 0 && nargs >= 2 && !ij_is_user_proc(fname)) {
+    if (strcmp(fname, "left") == 0 && nargs >= 1 && !ij_is_user_proc(fname)) {
         IcnNode *sarg = n->children[1];
-        IcnNode *narg = n->children[2];
+        IcnNode *narg = (nargs >= 2) ? n->children[2] : NULL;
         /* pad arg optional — use space if absent */
         char mid[64]; snprintf(mid, sizeof mid, "icn_%d_left_mid", id);
         char after[64]; snprintf(after, sizeof after, "icn_%d_left_after", id);
-        IjPorts ap; strncpy(ap.γ, mid, 63); strncpy(ap.ω, ports.ω, 63);
-        char sa[64], sb[64]; ij_emit_expr(sarg, ap, sa, sb);
-        IjPorts bp; strncpy(bp.γ, after, 63); strncpy(bp.ω, ports.ω, 63);
-        char na[64], nb[64]; ij_emit_expr(narg, bp, na, nb);
-        JL(a); JGoto(sa);
-        JL(b); JGoto(sb);
-        JL(mid);
-        int scratch_s = ij_locals_alloc_tmp();
-        J("    astore %d\n", slot_jvm(scratch_s));
-        JGoto(na);
-        JL(after);
-        JI("l2i", "");
-        int scratch_n = ij_locals_alloc_tmp();
-        J("    istore %d\n", slot_jvm(scratch_n));
-        /* call static helper */
-        J("    aload %d\n", slot_jvm(scratch_s));
-        J("    iload %d\n", slot_jvm(scratch_n));
+        /* Use a static String field for scratch_s — long-pair locals can't hold refs */
+        char sfld_left[64]; snprintf(sfld_left, sizeof sfld_left, "icn_%d_left_s", id);
+        ij_declare_static_str(sfld_left);
+        /* &null coercions: left(&null,n) → left("",n); left(s,&null) → left(s,1) */
+        int sarg_is_null = (sarg && sarg->kind == ICN_VAR && strcmp(sarg->val.sval,"&null")==0);
+        int narg_is_null = (!narg || (narg->kind == ICN_VAR && strcmp(narg->val.sval,"&null")==0));
+        int scratch_n = ij_alloc_int_scratch();
+        if (sarg_is_null && narg_is_null) {
+            /* both null: left("", 1) */
+            JL(a); JL(b);
+            JI("ldc", """"); ij_put_str_field(sfld_left);
+            JI("iconst_1", ""); J("    istore %d\n", scratch_n);
+        } else if (sarg_is_null) {
+            /* string arg is null → "" */
+            IjPorts bp; strncpy(bp.γ, after, 63); strncpy(bp.ω, ports.ω, 63);
+            char na[64], nb[64]; ij_emit_expr(narg, bp, na, nb);
+            JL(a); JL(b);
+            JI("ldc", """"); ij_put_str_field(sfld_left);
+            JGoto(na);
+            JL(after); JI("l2i",""); J("    istore %d\n", scratch_n);
+            ij_get_str_field(sfld_left);
+            J("    iload %d\n", scratch_n);
+        } else if (narg_is_null) {
+            /* width arg is null → 1 */
+            IjPorts ap; strncpy(ap.γ, mid, 63); strncpy(ap.ω, ports.ω, 63);
+            char sa[64], sb[64]; ij_emit_expr(sarg, ap, sa, sb);
+            JL(a); JGoto(sa);
+            JL(b); JGoto(sb);
+            JL(mid); ij_put_str_field(sfld_left);
+            JI("iconst_1",""); J("    istore %d\n", scratch_n);
+            ij_get_str_field(sfld_left);
+            J("    iload %d\n", scratch_n);
+        } else {
+            IjPorts ap; strncpy(ap.γ, mid, 63); strncpy(ap.ω, ports.ω, 63);
+            char sa[64], sb[64]; ij_emit_expr(sarg, ap, sa, sb);
+            IjPorts bp; strncpy(bp.γ, after, 63); strncpy(bp.ω, ports.ω, 63);
+            char na[64], nb[64]; ij_emit_expr(narg, bp, na, nb);
+            JL(a); JGoto(sa);
+            JL(b); JGoto(sb);
+            JL(mid); ij_put_str_field(sfld_left);
+            JGoto(na);
+            JL(after); JI("l2i",""); J("    istore %d\n", scratch_n);
+            ij_get_str_field(sfld_left);
+            J("    iload %d\n", scratch_n);
+        }
         if (nargs >= 3) {
-            char mid2[64]; snprintf(mid2, sizeof mid2, "icn_%d_left_mid2", id);
-            IjPorts cp; strncpy(cp.γ, mid2, 63); strncpy(cp.ω, ports.ω, 63);
-            char ca[64], cb[64]; ij_emit_expr(n->children[3], cp, ca, cb);
-            JGoto(ca);
-            JL(mid2);
-            /* pad string on stack */
+            IcnNode *parg = n->children[3];
+            if (parg->kind == ICN_VAR && strcmp(parg->val.sval,"&null")==0) {
+                JI("ldc", "\" \"");
+            } else {
+                /* Use static field for pad arg to avoid dead-JGoto VerifyError */
+                /* JGoto(ca) is LIVE: falls through from iload scratch_n above */
+                char mid2[64]; snprintf(mid2, sizeof mid2, "icn_%d_left_mid2", id);
+                IjPorts cp; strncpy(cp.γ, mid2, 63); strncpy(cp.ω, ports.ω, 63);
+                FILE *pad_save = jout; FILE *pad_tmp = tmpfile(); jout = pad_tmp;
+                char ca[64], cb[64]; ij_emit_expr(parg, cp, ca, cb);
+                long pad_sz = ftell(pad_tmp); rewind(pad_tmp);
+                char *pad_body = malloc(pad_sz + 1); fread(pad_body, 1, pad_sz, pad_tmp); pad_body[pad_sz] = '\0'; fclose(pad_tmp);
+                jout = pad_save;
+                JGoto(ca); fputs(pad_body, jout); free(pad_body); JL(mid2);
+            }
             JI("invokestatic", ij_classname_buf("icn_builtin_left(Ljava/lang/String;ILjava/lang/String;)Ljava/lang/String;"));
         } else {
             JI("ldc", "\" \"");
@@ -2712,33 +2761,59 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     }
 
     /* --- right(s, n [, pad]) --- pad/truncate to width n, right-aligned */
-    if (strcmp(fname, "right") == 0 && nargs >= 2 && !ij_is_user_proc(fname)) {
+    if (strcmp(fname, "right") == 0 && nargs >= 1 && !ij_is_user_proc(fname)) {
         IcnNode *sarg = n->children[1];
-        IcnNode *narg = n->children[2];
+        IcnNode *narg = (nargs >= 2) ? n->children[2] : NULL;
         char mid[64]; snprintf(mid, sizeof mid, "icn_%d_right_mid", id);
         char after[64]; snprintf(after, sizeof after, "icn_%d_right_after", id);
-        IjPorts ap; strncpy(ap.γ, mid, 63); strncpy(ap.ω, ports.ω, 63);
-        char sa[64], sb[64]; ij_emit_expr(sarg, ap, sa, sb);
-        IjPorts bp; strncpy(bp.γ, after, 63); strncpy(bp.ω, ports.ω, 63);
-        char na[64], nb[64]; ij_emit_expr(narg, bp, na, nb);
-        JL(a); JGoto(sa);
-        JL(b); JGoto(sb);
-        JL(mid);
-        int scratch_s = ij_locals_alloc_tmp();
-        J("    astore %d\n", slot_jvm(scratch_s));
-        JGoto(na);
-        JL(after);
-        JI("l2i", "");
-        int scratch_n = ij_locals_alloc_tmp();
-        J("    istore %d\n", slot_jvm(scratch_n));
-        J("    aload %d\n", slot_jvm(scratch_s));
-        J("    iload %d\n", slot_jvm(scratch_n));
+        char sfld_right[64]; snprintf(sfld_right, sizeof sfld_right, "icn_%d_right_s", id);
+        ij_declare_static_str(sfld_right);
+        int sarg_is_null = (sarg && sarg->kind == ICN_VAR && strcmp(sarg->val.sval,"&null")==0);
+        int narg_is_null = (!narg || (narg->kind == ICN_VAR && strcmp(narg->val.sval,"&null")==0));
+        int scratch_n = ij_alloc_int_scratch();
+        if (sarg_is_null && narg_is_null) {
+            JL(a); JL(b);
+            JI("ldc", "\"\""); ij_put_str_field(sfld_right);
+            JI("iconst_1", ""); J("    istore %d\n", scratch_n);
+        } else if (sarg_is_null) {
+            IjPorts bp; strncpy(bp.γ, after, 63); strncpy(bp.ω, ports.ω, 63);
+            char na[64], nb[64]; ij_emit_expr(narg, bp, na, nb);
+            JL(a); JL(b);
+            JI("ldc", "\"\""); ij_put_str_field(sfld_right);
+            JGoto(na);
+            JL(after); JI("l2i",""); J("    istore %d\n", scratch_n);
+            ij_get_str_field(sfld_right); J("    iload %d\n", scratch_n);
+        } else if (narg_is_null) {
+            IjPorts ap; strncpy(ap.γ, mid, 63); strncpy(ap.ω, ports.ω, 63);
+            char sa[64], sb[64]; ij_emit_expr(sarg, ap, sa, sb);
+            JL(a); JGoto(sa); JL(b); JGoto(sb);
+            JL(mid); ij_put_str_field(sfld_right);
+            JI("iconst_1",""); J("    istore %d\n", scratch_n);
+            ij_get_str_field(sfld_right); J("    iload %d\n", scratch_n);
+        } else {
+            IjPorts ap; strncpy(ap.γ, mid, 63); strncpy(ap.ω, ports.ω, 63);
+            char sa[64], sb[64]; ij_emit_expr(sarg, ap, sa, sb);
+            IjPorts bp; strncpy(bp.γ, after, 63); strncpy(bp.ω, ports.ω, 63);
+            char na[64], nb[64]; ij_emit_expr(narg, bp, na, nb);
+            JL(a); JGoto(sa); JL(b); JGoto(sb);
+            JL(mid); ij_put_str_field(sfld_right); JGoto(na);
+            JL(after); JI("l2i",""); J("    istore %d\n", scratch_n);
+            ij_get_str_field(sfld_right); J("    iload %d\n", scratch_n);
+        }
         if (nargs >= 3) {
-            char mid2[64]; snprintf(mid2, sizeof mid2, "icn_%d_right_mid2", id);
-            IjPorts cp; strncpy(cp.γ, mid2, 63); strncpy(cp.ω, ports.ω, 63);
-            char ca[64], cb[64]; ij_emit_expr(n->children[3], cp, ca, cb);
-            JGoto(ca);
-            JL(mid2);
+            IcnNode *parg = n->children[3];
+            if (parg->kind == ICN_VAR && strcmp(parg->val.sval,"&null")==0) {
+                JI("ldc", "\" \"");
+            } else {
+                char mid2[64]; snprintf(mid2, sizeof mid2, "icn_%d_right_mid2", id);
+                IjPorts cp; strncpy(cp.γ, mid2, 63); strncpy(cp.ω, ports.ω, 63);
+                FILE *pad_save = jout; FILE *pad_tmp = tmpfile(); jout = pad_tmp;
+                char ca[64], cb[64]; ij_emit_expr(parg, cp, ca, cb);
+                long pad_sz = ftell(pad_tmp); rewind(pad_tmp);
+                char *pad_body = malloc(pad_sz + 1); fread(pad_body, 1, pad_sz, pad_tmp); pad_body[pad_sz] = '\0'; fclose(pad_tmp);
+                jout = pad_save;
+                JGoto(ca); fputs(pad_body, jout); free(pad_body); JL(mid2);
+            }
             JI("invokestatic", ij_classname_buf("icn_builtin_right(Ljava/lang/String;ILjava/lang/String;)Ljava/lang/String;"));
         } else {
             JI("ldc", "\" \"");
@@ -2749,33 +2824,59 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     }
 
     /* --- center(s, n [, pad]) --- */
-    if (strcmp(fname, "center") == 0 && nargs >= 2 && !ij_is_user_proc(fname)) {
+    if (strcmp(fname, "center") == 0 && nargs >= 1 && !ij_is_user_proc(fname)) {
         IcnNode *sarg = n->children[1];
-        IcnNode *narg = n->children[2];
+        IcnNode *narg = (nargs >= 2) ? n->children[2] : NULL;
         char mid[64]; snprintf(mid, sizeof mid, "icn_%d_ctr_mid", id);
         char after[64]; snprintf(after, sizeof after, "icn_%d_ctr_after", id);
-        IjPorts ap; strncpy(ap.γ, mid, 63); strncpy(ap.ω, ports.ω, 63);
-        char sa[64], sb[64]; ij_emit_expr(sarg, ap, sa, sb);
-        IjPorts bp; strncpy(bp.γ, after, 63); strncpy(bp.ω, ports.ω, 63);
-        char na[64], nb[64]; ij_emit_expr(narg, bp, na, nb);
-        JL(a); JGoto(sa);
-        JL(b); JGoto(sb);
-        JL(mid);
-        int scratch_s = ij_locals_alloc_tmp();
-        J("    astore %d\n", slot_jvm(scratch_s));
-        JGoto(na);
-        JL(after);
-        JI("l2i", "");
-        int scratch_n = ij_locals_alloc_tmp();
-        J("    istore %d\n", slot_jvm(scratch_n));
-        J("    aload %d\n", slot_jvm(scratch_s));
-        J("    iload %d\n", slot_jvm(scratch_n));
+        char sfld_ctr[64]; snprintf(sfld_ctr, sizeof sfld_ctr, "icn_%d_ctr_s", id);
+        ij_declare_static_str(sfld_ctr);
+        int sarg_is_null = (sarg && sarg->kind == ICN_VAR && strcmp(sarg->val.sval,"&null")==0);
+        int narg_is_null = (!narg || (narg->kind == ICN_VAR && strcmp(narg->val.sval,"&null")==0));
+        int scratch_n = ij_alloc_int_scratch();
+        if (sarg_is_null && narg_is_null) {
+            JL(a); JL(b);
+            JI("ldc", "\"\""); ij_put_str_field(sfld_ctr);
+            JI("iconst_1", ""); J("    istore %d\n", scratch_n);
+        } else if (sarg_is_null) {
+            IjPorts bp; strncpy(bp.γ, after, 63); strncpy(bp.ω, ports.ω, 63);
+            char na[64], nb[64]; ij_emit_expr(narg, bp, na, nb);
+            JL(a); JL(b);
+            JI("ldc", "\"\""); ij_put_str_field(sfld_ctr);
+            JGoto(na);
+            JL(after); JI("l2i",""); J("    istore %d\n", scratch_n);
+            ij_get_str_field(sfld_ctr); J("    iload %d\n", scratch_n);
+        } else if (narg_is_null) {
+            IjPorts ap; strncpy(ap.γ, mid, 63); strncpy(ap.ω, ports.ω, 63);
+            char sa[64], sb[64]; ij_emit_expr(sarg, ap, sa, sb);
+            JL(a); JGoto(sa); JL(b); JGoto(sb);
+            JL(mid); ij_put_str_field(sfld_ctr);
+            JI("iconst_1",""); J("    istore %d\n", scratch_n);
+            ij_get_str_field(sfld_ctr); J("    iload %d\n", scratch_n);
+        } else {
+            IjPorts ap; strncpy(ap.γ, mid, 63); strncpy(ap.ω, ports.ω, 63);
+            char sa[64], sb[64]; ij_emit_expr(sarg, ap, sa, sb);
+            IjPorts bp; strncpy(bp.γ, after, 63); strncpy(bp.ω, ports.ω, 63);
+            char na[64], nb[64]; ij_emit_expr(narg, bp, na, nb);
+            JL(a); JGoto(sa); JL(b); JGoto(sb);
+            JL(mid); ij_put_str_field(sfld_ctr); JGoto(na);
+            JL(after); JI("l2i",""); J("    istore %d\n", scratch_n);
+            ij_get_str_field(sfld_ctr); J("    iload %d\n", scratch_n);
+        }
         if (nargs >= 3) {
-            char mid2[64]; snprintf(mid2, sizeof mid2, "icn_%d_ctr_mid2", id);
-            IjPorts cp; strncpy(cp.γ, mid2, 63); strncpy(cp.ω, ports.ω, 63);
-            char ca[64], cb[64]; ij_emit_expr(n->children[3], cp, ca, cb);
-            JGoto(ca);
-            JL(mid2);
+            IcnNode *parg = n->children[3];
+            if (parg->kind == ICN_VAR && strcmp(parg->val.sval,"&null")==0) {
+                JI("ldc", "\" \"");
+            } else {
+                char mid2[64]; snprintf(mid2, sizeof mid2, "icn_%d_ctr_mid2", id);
+                IjPorts cp; strncpy(cp.γ, mid2, 63); strncpy(cp.ω, ports.ω, 63);
+                FILE *pad_save = jout; FILE *pad_tmp = tmpfile(); jout = pad_tmp;
+                char ca[64], cb[64]; ij_emit_expr(parg, cp, ca, cb);
+                long pad_sz = ftell(pad_tmp); rewind(pad_tmp);
+                char *pad_body = malloc(pad_sz + 1); fread(pad_body, 1, pad_sz, pad_tmp); pad_body[pad_sz] = '\0'; fclose(pad_tmp);
+                jout = pad_save;
+                JGoto(ca); fputs(pad_body, jout); free(pad_body); JL(mid2);
+            }
             JI("invokestatic", ij_classname_buf("icn_builtin_center(Ljava/lang/String;ILjava/lang/String;)Ljava/lang/String;"));
         } else {
             JI("ldc", "\" \"");
@@ -2798,11 +2899,11 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
             JL(a); JGoto(sa);
             JL(b); JGoto(sb);
             JL(mid);
-            int scratch_s = ij_locals_alloc_tmp();
-            J("    astore %d\n", slot_jvm(scratch_s));
+            int scratch_s = ij_alloc_ref_scratch();
+            J("    astore %d\n", scratch_s);
             JGoto(ca);
             JL(after);
-            J("    aload %d\n", slot_jvm(scratch_s));
+            J("    aload %d\n", scratch_s);
             JI("swap", "");  /* stack: cs, s → s, cs */
             JI("invokestatic", ij_classname_buf("icn_builtin_trim(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;"));
         } else {
@@ -2852,20 +2953,20 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         JL(a); JGoto(sa);
         JL(b); JGoto(sb);
         JL(mid1);
-        int scratch_s = ij_locals_alloc_tmp();
-        J("    astore %d\n", slot_jvm(scratch_s));
+        int scratch_s = ij_alloc_ref_scratch();
+        J("    astore %d\n", scratch_s);
         JGoto(srca);
         JL(mid2);
-        int scratch_src = ij_locals_alloc_tmp();
-        J("    astore %d\n", slot_jvm(scratch_src));
+        int scratch_src = ij_alloc_ref_scratch();
+        J("    astore %d\n", scratch_src);
         JGoto(dsta);
         JL(after);
         /* stack: dst String */
-        int scratch_dst = ij_locals_alloc_tmp();
-        J("    astore %d\n", slot_jvm(scratch_dst));
-        J("    aload %d\n", slot_jvm(scratch_s));
-        J("    aload %d\n", slot_jvm(scratch_src));
-        J("    aload %d\n", slot_jvm(scratch_dst));
+        int scratch_dst = ij_alloc_ref_scratch();
+        J("    astore %d\n", scratch_dst);
+        J("    aload %d\n", scratch_s);
+        J("    aload %d\n", scratch_src);
+        J("    aload %d\n", scratch_dst);
         JI("invokestatic", ij_classname_buf("icn_builtin_map(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;"));
         JGoto(ports.γ);
         return;
@@ -3425,7 +3526,7 @@ static void ij_emit_alt(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         JL(cg[i]);
         if (alt_is_str) {
             /* String on stack — store to scratch astore, set gate, reload */
-            int scratch = ij_alloc_int_scratch();
+            int scratch = ij_alloc_ref_scratch();
             J("    astore %d\n", scratch);
             J("    sipush %d\n", i+1);
             ij_put_int_field(gate_fld);
@@ -6490,6 +6591,27 @@ static void ij_emit_proc(IcnNode *proc, FILE *out_target) {
             strncpy(next_a, sa, 63);
             continue;
         }
+        /* ICN_IF where ALL branches are non-value (fail/return/break/next/suspend)
+         * never fires γ with a value — skip drain to avoid pop on empty stack. */
+        if (stmt->kind == ICN_IF) {
+            int all_branches_novalue = 1;
+            /* Check then-branch (children[1]) and else-branch (children[2] if present) */
+            for (int bi = 1; bi < stmt->nchildren && bi <= 2; bi++) {
+                IcnNode *branch = stmt->children[bi];
+                if (!branch) continue;
+                IcnKind bk = branch->kind;
+                if (bk != ICN_FAIL && bk != ICN_RETURN && bk != ICN_SUSPEND &&
+                    bk != ICN_BREAK && bk != ICN_NEXT)
+                    all_branches_novalue = 0;
+            }
+            if (all_branches_novalue) {
+                IjPorts sp; strncpy(sp.γ, next_a, 63); strncpy(sp.ω, next_a, 63);
+                char sa[64], sb[64]; ij_emit_expr(stmt, sp, sa, sb);
+                strncpy(alphas[i], sa, 63);
+                strncpy(next_a, sa, 63);
+                continue;
+            }
+        }
         /* Determine if statement produces a 1-slot ref (String or ArrayList) or 2-slot (long/double) */
         int stmt_is_ref  = ij_expr_is_obj(stmt);
         /* Build a drain label for this statement's success port */
@@ -6562,6 +6684,10 @@ static void ij_emit_proc(IcnNode *proc, FILE *out_target) {
     for (int i = 0; i < ij_nint_scratch + 4; i++) {
         JI("iconst_0", "");
         J("    istore %d\n", 2 * MAX_LOCALS + 20 + i);
+    }
+    for (int i = 0; i < ij_nref_scratch + 4; i++) {
+        JI("aconst_null", "");
+        J("    astore %d\n", 2 * MAX_LOCALS + 20 + 64 + i);
     }
 
     /* For non-main procs, load params from static arg fields */
