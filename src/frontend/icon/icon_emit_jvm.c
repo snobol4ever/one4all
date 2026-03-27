@@ -6377,13 +6377,41 @@ void ij_emit_file(IcnNode **nodes, int count, FILE *out, const char *filename, c
         for (int si = body_start; si < proc->nchildren; si++)
             if (ij_has_suspend(proc->children[si])) { gen = 1; break; }
         ij_register_proc(pname, np, gen);
-        /* Mark string-returning procs: scan body for ICN_RETURN with string child */
+        /* Mark string-returning procs: scan body for ICN_RETURN with string child.
+         * ij_expr_is_string on a VAR requires statics to be populated (not done yet),
+         * so when the returned expr is a VAR we do a lightweight AST scan of the body
+         * to check if that var is ever assigned from a string without touching statics. */
         for (int si = body_start; si < proc->nchildren; si++) {
             IcnNode *stmt = proc->children[si];
-            if (stmt && stmt->kind == ICN_RETURN &&
-                stmt->nchildren > 0 && ij_expr_is_string(stmt->children[0])) {
-                ij_mark_proc_returns_str(pname);
-                break;
+            if (stmt && stmt->kind == ICN_RETURN && stmt->nchildren > 0) {
+                IcnNode *ret_expr = stmt->children[0];
+                /* Direct non-VAR check (works without statics) */
+                int is_str = (ret_expr->kind == ICN_STR    ||
+                              ret_expr->kind == ICN_CONCAT  ||
+                              ret_expr->kind == ICN_LCONCAT);
+                /* For VAR returns: scan body for string assignment to that var */
+                if (!is_str && ret_expr->kind == ICN_VAR) {
+                    const char *vname = ret_expr->val.sval;
+                    for (int sj = body_start; sj < proc->nchildren && !is_str; sj++) {
+                        IcnNode *s2 = proc->children[sj];
+                        if (!s2) continue;
+                        /* var := str_literal  or  var := concat_expr */
+                        if (s2->kind == ICN_ASSIGN && s2->nchildren >= 2 &&
+                            s2->children[0] && s2->children[0]->kind == ICN_VAR &&
+                            strcmp(s2->children[0]->val.sval, vname) == 0) {
+                            IcnNode *rhs = s2->children[1];
+                            if (rhs && (rhs->kind == ICN_STR ||
+                                        rhs->kind == ICN_CONCAT ||
+                                        rhs->kind == ICN_LCONCAT)) is_str = 1;
+                        }
+                        /* var ||:= anything  (ICN_AUGOP with TK_AUGCONCAT==35) */
+                        if (!is_str && s2->kind == ICN_AUGOP && s2->val.ival == 35 &&
+                            s2->nchildren >= 1 &&
+                            s2->children[0] && s2->children[0]->kind == ICN_VAR &&
+                            strcmp(s2->children[0]->val.sval, vname) == 0) is_str = 1;
+                    }
+                }
+                if (is_str) { ij_mark_proc_returns_str(pname); break; }
             }
         }
     }
