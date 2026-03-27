@@ -93,6 +93,18 @@ static char net_fn_freturn_lbl[128];
 static const NetFnDef *net_find_fn(const char *name);
 static int net_pat_uid_early = 0;  /* uid counter used before pattern section */
 
+/* Program pointer — stored at emit time for IMPORT lookup */
+static Program *net_prog = NULL;
+
+/* Find an ImportEntry by method name (case-insensitive).
+ * Returns the entry if the function being called is an imported symbol. */
+static const ImportEntry *net_find_import(const char *name) {
+    if (!net_prog) return NULL;
+    for (ImportEntry *ie = net_prog->imports; ie; ie = ie->next)
+        if (strcasecmp(ie->method, name) == 0) return ie;
+    return NULL;
+}
+
 /* DATA type support */
 #define NET_DATA_MAX     32
 typedef struct {
@@ -176,7 +188,10 @@ static void net_set_classname(const char *filename) {
     for (; *p; p++)
         if (!isalnum((unsigned char)*p) && *p != '_') *p = '_';
     buf[0] = (char)toupper((unsigned char)buf[0]);
-    strncpy(net_classname, buf, sizeof net_classname - 1);
+    /* Prefix SNOBOL4_ per ARCH-scrip-abi.md §5 symbol naming convention */
+    char prefixed[256];
+    snprintf(prefixed, sizeof prefixed, "SNOBOL4_%s", buf);
+    strncpy(net_classname, prefixed, sizeof net_classname - 1);
     net_classname[sizeof net_classname - 1] = '\0';
 }
 
@@ -720,6 +735,37 @@ static void net_emit_expr(EXPR_t *e) {
                 if (inst) net_emit_expr(inst); else net_ldstr("");
                 net_ldstr(fn);
                 N("    call       string %s::net_array_get(string, string)\n", net_classname);
+                N("    ldc.i4.1\n");
+                N("    stloc.0\n");
+                break;
+            }
+        }
+        /* Imported function call (IMPORT directive — LP-4) */
+        {
+            const ImportEntry *imp = net_find_import(fn);
+            if (imp) {
+                int uid = net_pat_uid++;
+                /* LP-4 stub: pass null gamma/omega — called method stores result
+                 * in ByrdBoxLinkage.Result directly then returns.
+                 * Full Action wiring (real continuations) in LP-5. */
+                N("    ldnull\n");   /* gamma = null */
+                N("    ldnull\n");   /* omega = null */
+                N("    call       void [%s_%s]%s_%s::%s("
+                  "class [mscorlib]System.Action,"
+                  "class [mscorlib]System.Action)\n",
+                  imp->lang, imp->name,
+                  imp->lang, imp->name,
+                  imp->method);
+                /* retrieve result from ByrdBoxLinkage.Result */
+                N("    ldsfld     class [snobol4lib]DESCR [snobol4lib]ByrdBoxLinkage::Result\n");
+                N("    dup\n");
+                N("    brtrue     Nimp_%d_ok\n", uid);
+                N("    pop\n");
+                N("    ldstr      \"\"\n");
+                N("    br         Nimp_%d_done\n", uid);
+                N("  Nimp_%d_ok:\n", uid);
+                N("    callvirt   instance string object::ToString()\n");
+                N("  Nimp_%d_done:\n", uid);
                 N("    ldc.i4.1\n");
                 N("    stloc.0\n");
                 break;
@@ -2001,7 +2047,47 @@ static void net_emit_stmts(Program *prog) {
     }
 }
 
-/* helpers live in snobol4lib.dll — see src/runtime/net/snobol4lib.il */
+/* -----------------------------------------------------------------------
+ * EXPORT / IMPORT helpers — LP-4
+ * ----------------------------------------------------------------------- */
+
+/* Return 1 if name appears in prog->exports list. */
+static int net_is_exported(Program *prog, const char *name) {
+    for (ExportEntry *e = prog->exports; e; e = e->next)
+        if (strcasecmp(e->name, name) == 0) return 1;
+    return 0;
+}
+
+/* Emit a cross-assembly call to an IMPORTed Byrd box method.
+ * ImportEntry fields:
+ *   ie->lang  — language prefix,   e.g. "SNOBOL4"
+ *   ie->name  — assembly base name e.g. "Greet_lib"
+ *
+ * The exported method name is derived from prog->exports matching the
+ * assembly — for Sprint LP-4 we use ie->name as the method name too
+ * when lang+name assembly exports a single symbol.  Full symbol table
+ * lookup added LP-5.
+ *
+ * CIL emitted:
+ *   call void [SNOBOL4_Greet_lib]SNOBOL4_Greet_lib::GREET(
+ *       class [mscorlib]System.Action,
+ *       class [mscorlib]System.Action)
+ *
+ * The method name on the call site must match the EXPORT name in the
+ * target assembly.  For LP-4 the caller is responsible for using
+ * IMPORT LANG.AssemblyBase and invoking the symbol by its exported name
+ * in the SNOBOL4 source (e.g. OUTPUT = GREET(...)).
+ */
+static void emit_net_import_call(FILE *out, ImportEntry *ie) {
+    /* assembly name: LANG_AssemblyBase, e.g. SNOBOL4_Greet_lib */
+    fprintf(out,
+        "    call void [%s_%s]%s_%s::%s("
+        "class [mscorlib]System.Action,"
+        "class [mscorlib]System.Action)\n",
+        ie->lang, ie->name,   /* assembly ref  e.g. SNOBOL4_Greet_lib */
+        ie->lang, ie->name,   /* class name    e.g. SNOBOL4_Greet_lib */
+        ie->name);             /* method name   — LP-5 replaces with symbol lookup */
+}
 
 /* -----------------------------------------------------------------------
  * Header / footer emitters
@@ -2011,8 +2097,17 @@ static void net_emit_header(Program *prog) {
     N(".assembly extern mscorlib {}\n");
     N(".assembly extern snobol4lib {}\n");
     N(".assembly extern snobol4run {}\n");
+
+    /* Emit .assembly extern for each IMPORT — LP-4 */
+    for (ImportEntry *ie = prog->imports; ie; ie = ie->next) {
+        /* assembly name is LANG_AssemblyBase, e.g. SNOBOL4_Greet_lib */
+        N(".assembly extern %s_%s {}\n", ie->lang, ie->name);
+    }
+
     N(".assembly %s {}\n", net_classname);
-    N(".module %s.exe\n", net_classname);
+    /* module extension: .dll if any EXPORTs, .exe otherwise */
+    const char *ext = prog->exports ? "dll" : "exe";
+    N(".module %s.%s\n", net_classname, ext);
     N("\n");
     N(".class public auto ansi beforefieldinit %s\n", net_classname);
     N("       extends [mscorlib]System.Object\n");
@@ -2542,6 +2637,52 @@ static void net_emit_fn_method(const NetFnDef *fn, Program *prog, int fn_idx) {
 static void net_emit_fn_methods(Program *prog) {
     for (int i = 0; i < net_fn_count; i++)
         net_emit_fn_method(&net_fn_table[i], prog, i);
+
+    /* LP-4: for each EXPORTed DEFINE emit a public Byrd-ABI wrapper.
+     * Signature per ARCH-scrip-abi.md §4.1:
+     *   public static void NAME(Action gamma, Action omega)
+     * The wrapper calls the internal net_fn_NAME(), stores the result
+     * in ByrdBoxLinkage.Result, then invokes gamma (γ port).
+     * On empty/null result it invokes omega (ω port). */
+    const char *ACT = "class [mscorlib]System.Action";
+    for (int i = 0; i < net_fn_count; i++) {
+        const NetFnDef *fn = &net_fn_table[i];
+        if (!net_is_exported(prog, fn->name)) continue;
+
+        NC("Byrd-ABI public export wrapper");
+        N("  .method public static void %s(%s, %s) cil managed\n",
+          fn->name, ACT, ACT);
+        N("  {\n");
+        N("    .maxstack 4\n");
+        N("    .locals init (string V_0)\n");
+        /* call internal method with empty string args (LP-5 wires real args) */
+        for (int a = 0; a < fn->nargs; a++)
+            N("    ldstr \"\"\n");
+        N("    call       string %s::net_fn_%s(", net_classname, fn->name);
+        for (int a = 0; a < fn->nargs; a++) {
+            if (a > 0) N(", ");
+            N("string");
+        }
+        N(")\n");
+        N("    stloc.0\n");
+        /* if result null/empty → ω, else store in ByrdBoxLinkage.Result → γ */
+        N("    ldloc.0\n");
+        N("    brfalse    OMEGA_%s\n", fn->name);
+        /* store result: new DESCR(result) → ByrdBoxLinkage.Result */
+        N("    ldloc.0\n");
+        N("    newobj     instance void [snobol4lib]DESCR::.ctor(string)\n");
+        N("    stsfld     class [snobol4lib]DESCR [snobol4lib]ByrdBoxLinkage::Result\n");
+        /* call gamma */
+        N("    ldarg.0\n");
+        N("    callvirt   instance void [mscorlib]System.Action::Invoke()\n");
+        N("    ret\n");
+        N("    OMEGA_%s:\n", fn->name);
+        /* call omega */
+        N("    ldarg.1\n");
+        N("    callvirt   instance void [mscorlib]System.Action::Invoke()\n");
+        N("    ret\n");
+        N("  }\n\n");
+    }
 }
 
 /* Emit CIL helper methods for ARRAY/TABLE/DATA support */
@@ -2643,6 +2784,7 @@ static void net_emit_footer(void) {
 void net_emit(Program *prog, FILE *out, const char *filename) {
     net_out = out;
     net_nvar = 0;
+    net_prog = prog;
     net_set_classname(filename);
 
     /* Multi-pass: scan functions first (registers vars), then vars, named patterns */

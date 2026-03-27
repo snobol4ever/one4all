@@ -1,0 +1,7 @@
+* greet_main.sno — imports GREET from greet_lib assembly
+* LP-4 acceptance test (M-LINK-NET-3)
+* Three-part IMPORT: LANG.AssemblyBase.METHOD
+IMPORT          SNOBOL4.Greet_lib.GREET
+
+        OUTPUT = GREET('World')
+END
