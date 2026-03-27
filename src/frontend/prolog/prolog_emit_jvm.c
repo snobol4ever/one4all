@@ -6480,9 +6480,6 @@ static void pj_emit_choice(EXPR_t *choice) {
      * Sub-method signature: same args as parent + I (init_cs), no outer cs.
      * Returns: null = clause failed (→ try next), Object[] = gamma/cutgamma result.
      */
-#define PJ_SPLIT_THRESHOLD 16
-    int do_split = (nclauses > PJ_SPLIT_THRESHOLD);
-
     if (do_split) {
         /* ---- SPLIT PATH: dispatcher calls per-clause sub-methods ---- */
 
