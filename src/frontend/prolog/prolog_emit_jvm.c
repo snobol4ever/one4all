@@ -4713,13 +4713,20 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
                 JI("dup", ""); JI("iconst_0", ""); JI("aaload", "");
                 JI("ldc", "\"var\"");
                 JI("invokevirtual", "java/lang/Object/equals(Ljava/lang/Object;)Z");
-                J("    ifeq %s\n", vfail);   /* not var tag → fail */
-                /* tag=="var": check [1]==null (unbound) */
+                /* stack: [cast-ref, bool] - swap+pop to get bool alone, stack clean */
+                JI("swap", ""); JI("pop", "");
+                J("    ifeq %s\n", vfail);   /* not var tag → fail; stack empty */
+                /* tag=="var": re-deref and check [1]==null */
+                pj_emit_term(goal->children[0], var_locals, n_vars);
+                J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+                JI("checkcast", "[Ljava/lang/Object;");
                 JI("iconst_1", ""); JI("aaload", "");
-                J("    ifnonnull %s\n", vfail); /* bound → fail */
+                J("    ifnonnull %s\n", vfail); /* bound → fail; stack empty */
                 JI("goto", lbl_γ);
+                /* vok: reached via ifnull (which popped dup'd copy); original ref still on stack → pop it */
                 J("%s:\n", vok);   JI("pop", ""); JI("goto", lbl_γ);
-                J("%s:\n", vfail); JI("pop", ""); JI("goto", lbl_ω);
+                /* vfail: reached via ifeq/ifnonnull (which already popped); stack clean */
+                J("%s:\n", vfail); JI("goto", lbl_ω);
                 return;
             }
             if (strcmp(fn, "nonvar") == 0) {
@@ -4734,14 +4741,19 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
                 JI("dup", ""); JI("iconst_0", ""); JI("aaload", "");
                 JI("ldc", "\"var\"");
                 JI("invokevirtual", "java/lang/Object/equals(Ljava/lang/Object;)Z");
-                J("    ifeq %s\n", nok);   /* not var tag → nonvar → succeed */
-                /* tag=="var": check if [1]!=null (bound ref = nonvar) */
+                /* stack: [cast-ref, bool] - swap+pop to get bool alone */
+                JI("swap", ""); JI("pop", "");
+                J("    ifeq %s\n", nok);   /* not var tag → nonvar → succeed; stack empty */
+                /* tag=="var": re-deref, check if [1]!=null (bound ref = nonvar) */
+                pj_emit_term(goal->children[0], var_locals, n_vars);
+                J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+                JI("checkcast", "[Ljava/lang/Object;");
                 JI("iconst_1", ""); JI("aaload", "");
-                J("    ifnonnull %s\n", nok); /* bound ref → succeed */
+                J("    ifnonnull %s\n", nok); /* bound ref → succeed; stack empty */
                 /* unbound var → fail */
                 JI("goto", lbl_ω);
-                J("%s:\n", nok);   JI("pop", ""); JI("goto", lbl_γ);
-                J("%s:\n", nfail); JI("pop", ""); JI("goto", lbl_ω);
+                J("%s:\n", nok);   JI("goto", lbl_γ);
+                J("%s:\n", nfail); JI("goto", lbl_ω);
                 return;
             }
             /* For remaining type tests: get tag string */
