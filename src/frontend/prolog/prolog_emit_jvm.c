@@ -2334,8 +2334,41 @@ static void pj_emit_assertz_helpers(void) {
     J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
     JI("ireturn", "");
     J("pj_succ2_neg:\n");
-    JI("iconst_0", "");
-    JI("ireturn", "");
+    /* Y < 0: throw domain_error(not_less_than_zero, Y) */
+    /* Build error term: error(domain_error(not_less_than_zero, Y), context) */
+    JI("lload_2", "");
+    J("    invokestatic %s/pj_term_int(J)[Ljava/lang/Object;\n", pj_classname); /* Y-1 as term */
+    /* domain_error(not_less_than_zero, Y-1+1) — actually Y is aload_1 */
+    JI("pop", ""); /* discard Y-1 term */
+    JI("aload_1", ""); /* Y term */
+    J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    /* build domain_error(not_less_than_zero, Y) compound */
+    JI("bipush", "4"); JI("anewarray", "java/lang/Object");
+    JI("dup", ""); JI("iconst_0", ""); JI("ldc", "\"compound\""); JI("aastore", "");
+    JI("dup", ""); JI("iconst_1", ""); JI("ldc", "\"domain_error\""); JI("aastore", "");
+    JI("dup", ""); JI("iconst_2", "");
+    JI("ldc", "\"not_less_than_zero\"");
+    J("    invokestatic %s/pj_term_atom(Ljava/lang/String;)[Ljava/lang/Object;\n", pj_classname);
+    JI("aastore", "");
+    JI("dup", ""); JI("bipush", "3");
+    JI("aload_1", ""); J("    invokestatic %s/pj_deref(Ljava/lang/Object;)Ljava/lang/Object;\n", pj_classname);
+    JI("aastore", "");
+    JI("astore_2", ""); /* save domain_error term */
+    /* build error(domain_error(...), succ/2) compound */
+    JI("bipush", "4"); JI("anewarray", "java/lang/Object");
+    JI("dup", ""); JI("iconst_0", ""); JI("ldc", "\"compound\""); JI("aastore", "");
+    JI("dup", ""); JI("iconst_1", ""); JI("ldc", "\"error\""); JI("aastore", "");
+    JI("dup", ""); JI("iconst_2", ""); JI("aload_2", ""); JI("aastore", "");
+    JI("dup", ""); JI("bipush", "3");
+    JI("ldc", "\"succ/2\"");
+    J("    invokestatic %s/pj_term_atom(Ljava/lang/String;)[Ljava/lang/Object;\n", pj_classname);
+    JI("aastore", "");
+    /* throw it */
+    J("    putstatic %s/pj_throw_term Ljava/lang/Object;\n", pj_classname);
+    J("    new java/lang/RuntimeException\n");
+    JI("dup", ""); JI("ldc", "\"PROLOG_THROW\"");
+    J("    invokespecial java/lang/RuntimeException/<init>(Ljava/lang/String;)V\n");
+    J("    athrow\n");
     J(".end method\n\n");
 
     /* pj_plus_3(Object x, Object y, Object z) -> Z
