@@ -5092,33 +5092,128 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
             JI("goto", lbl_γ);
             return;
         }
-        /* phrase/2 — phrase(NT, List) -> NT(List, [])
-         * phrase/3 — phrase(NT, List, Rest) -> NT(List, Rest)
-         * Rewrite into a direct NT/+2 call so the normal ucall retry loop
-         * handles backtracking correctly. */
+        /* phrase/2 — phrase(NT, List) -> NT(List, [])\n         * phrase/3 — phrase(NT, List, Rest) -> NT(List, Rest)\n         * Rewrite into a direct NT/+2 call so the normal ucall retry loop\n         * handles backtracking correctly. */
         if (strcmp(fn, "phrase") == 0 && (nargs == 2 || nargs == 3)) {
             EXPR_t *nt_expr  = goal->children[0];
             EXPR_t *list_arg = goal->children[1];
             EXPR_t *rest_arg = (nargs == 3) ? goal->children[2] : NULL;
-            EXPR_t *nil_node = NULL;
-            if (!rest_arg) {
-                nil_node = expr_new(E_QLIT);
-                nil_node->sval = strdup("[]");
-            }
-            EXPR_t *call = expr_new(E_FNC);
-            int base = (nt_expr->kind == E_FNC) ? nt_expr->nchildren : 0;
-            call->sval = strdup(nt_expr->sval ? nt_expr->sval : "unknown");
-            call->nchildren = base + 2;
-            call->children  = malloc(call->nchildren * sizeof(EXPR_t *));
-            for (int i = 0; i < base; i++) call->children[i] = nt_expr->children[i];
-            call->children[base]   = list_arg;
-            call->children[base+1] = rest_arg ? rest_arg : nil_node;
-            pj_emit_goal(call, lbl_γ, lbl_ω,
-                         trail_local, var_locals, n_vars,
-                         cut_cs_seal, cs_local_for_cut, next_local, lbl_cutγ);
-            return;
-        }
 
+            /* Variable NT: phrase(Var, List[, Rest]) — NT is unbound/runtime-determined.
+             * Build a phrase/N term and dispatch via pj_call_goal at runtime. */
+            if (nt_expr->kind == E_VART) {
+                int n_phrase = nargs; /* 2 or 3 */
+                /* build phrase(NT, List[, Rest]) as a compound term on stack */
+                J("    ldc %d\n", n_phrase + 2);
+                J("    anewarray java/lang/Object\n");
+                J("    dup\n"); J("    iconst_0\n"); J("    ldc \"compound\"\n"); J("    aastore\n");
+                J("    dup\n"); J("    iconst_1\n"); J("    ldc \"phrase\"\n");   J("    aastore\n");
+                J("    dup\n"); J("    iconst_2\n");
+                pj_emit_term(nt_expr, var_locals, n_vars);
+                J("    aastore\n");
+                J("    dup\n"); J("    iconst_3\n");
+                pj_emit_term(list_arg, var_locals, n_vars);
+                J("    aastore\n");
+                if (rest_arg) {
+                    J("    dup\n"); J("    bipush 4\n");
+                    pj_emit_term(rest_arg, var_locals, n_vars);
+                    J("    aastore\n");
+                }
+                J("    iconst_0\n");
+                J("    invokestatic %s/pj_call_goal(Ljava/lang/Object;I)I\n", pj_classname);
+                J("    ldc -1\n");
+                J("    if_icmpeq %s\n", lbl_ω);
+                J("    goto %s\n", lbl_γ);
+                return;
+            }
+
+            /* Special case: NT = [] (empty list body).
+             * phrase([], List)       -> List = []
+             * phrase([], List, Rest) -> List = Rest */
+            int nt_is_nil = (nt_expr->sval && strcmp(nt_expr->sval, "[]") == 0 &&
+                             nt_expr->nchildren == 0);
+            if (nt_is_nil) {
+                EXPR_t *rhs;
+                if (rest_arg) {
+                    rhs = rest_arg;
+                } else {
+                    rhs = expr_new(E_QLIT);
+                    rhs->sval = strdup("[]");
+                }
+                /* emit: pj_unify(list_arg, rhs); ifeq omega; goto gamma */
+                pj_emit_term(list_arg, var_locals, n_vars);
+                pj_emit_term(rhs, var_locals, n_vars);
+                J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+                J("    ifeq %s\n", lbl_ω);
+                J("    goto %s\n", lbl_γ);
+                return;
+            }
+
+            /* Special case: NT = '.'(H, T) — list terminal body.
+             * phrase([H|T], L0)       -> L0 = [H|L1], phrase(T, L1)
+             * phrase([H|T], L0, L)    -> L0 = [H|L1], phrase(T, L1, L)
+             * Allocate a fresh local for L1, extend var_locals so pj_emit_term
+             * can address it via an E_VART at index n_vars, then recurse. */
+            int nt_is_cons = (nt_expr->sval && strcmp(nt_expr->sval, ".") == 0 &&
+                              nt_expr->nchildren == 2);
+            if (nt_is_cons) {
+                EXPR_t *head_elem = nt_expr->children[0];
+                EXPR_t *tail_nt   = nt_expr->children[1];
+                int l1_local = *next_local; *next_local += 1;
+                J("    invokestatic %s/pj_term_var()[Ljava/lang/Object;\n", pj_classname);
+                J("    astore %d\n", l1_local);
+                /* emit: L0 = [H | L1] */
+                pj_emit_term(list_arg, var_locals, n_vars);
+                J("    ldc 4\n"); J("    anewarray java/lang/Object\n");
+                J("    dup\n"); J("    iconst_0\n"); J("    ldc \"compound\"\n"); J("    aastore\n");
+                J("    dup\n"); J("    iconst_1\n"); J("    ldc \".\"\n");       J("    aastore\n");
+                J("    dup\n"); J("    iconst_2\n");
+                pj_emit_term(head_elem, var_locals, n_vars);
+                J("    aastore\n");
+                J("    dup\n"); J("    iconst_3\n"); J("    aload %d\n", l1_local); J("    aastore\n");
+                J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+                J("    ifeq %s\n", lbl_ω);
+                /* extend var_locals: index n_vars → l1_local */
+                int *vl2 = malloc((n_vars + 1) * sizeof(int));
+                for (int i = 0; i < n_vars; i++) vl2[i] = var_locals ? var_locals[i] : 0;
+                vl2[n_vars] = l1_local;
+                /* build E_VART for L1 at index n_vars */
+                EXPR_t *l1_vart = expr_new(E_VART); l1_vart->ival = n_vars;
+                /* build phrase(tail_nt, L1 [, rest_arg]) goal */
+                EXPR_t *rec = expr_new(E_FNC);
+                rec->sval = strdup("phrase");
+                rec->nchildren = rest_arg ? 3 : 2;
+                rec->children = malloc(rec->nchildren * sizeof(EXPR_t *));
+                rec->children[0] = tail_nt;
+                rec->children[1] = l1_vart;
+                if (rest_arg) rec->children[2] = rest_arg;
+                pj_emit_goal(rec, lbl_γ, lbl_ω,
+                             trail_local, vl2, n_vars + 1,
+                             cut_cs_seal, cs_local_for_cut, next_local, lbl_cutγ);
+                free(vl2);
+                return;
+            }
+
+            /* General NT (atom or compound, non-list): phrase(NT, List[, Rest]) -> NT/+2 call */
+            {
+                EXPR_t *nil_node = NULL;
+                if (!rest_arg) {
+                    nil_node = expr_new(E_QLIT);
+                    nil_node->sval = strdup("[]");
+                }
+                EXPR_t *call = expr_new(E_FNC);
+                int base = (nt_expr->kind == E_FNC) ? nt_expr->nchildren : 0;
+                call->sval = strdup(nt_expr->sval ? nt_expr->sval : "unknown");
+                call->nchildren = base + 2;
+                call->children  = malloc(call->nchildren * sizeof(EXPR_t *));
+                for (int i = 0; i < base; i++) call->children[i] = nt_expr->children[i];
+                call->children[base]   = list_arg;
+                call->children[base+1] = rest_arg ? rest_arg : nil_node;
+                pj_emit_goal(call, lbl_γ, lbl_ω,
+                             trail_local, var_locals, n_vars,
+                             cut_cs_seal, cs_local_for_cut, next_local, lbl_cutγ);
+                return;
+            }
+        }
         /* user-defined predicate call — deterministic single-solution call.
          * For backtracking calls in a clause body, pj_emit_body() wraps
          * this in a retry loop (Proebsting E2.fail→E1.resume). */
@@ -5222,11 +5317,106 @@ static void pj_emit_body(EXPR_t **goals, int ngoals, const char *lbl_γ,
             EXPR_t *nt_expr  = g->children[0];
             EXPR_t *list_arg = g->children[1];
             EXPR_t *rest_arg = (g->nchildren == 3) ? g->children[2] : NULL;
+
+            /* Variable NT: dispatch at runtime via pj_call_goal */
+            if (nt_expr->kind == E_VART) {
+                int np = g->nchildren;
+                J("    ldc %d\n", np + 2);
+                J("    anewarray java/lang/Object\n");
+                J("    dup\n"); J("    iconst_0\n"); J("    ldc \"compound\"\n"); J("    aastore\n");
+                J("    dup\n"); J("    iconst_1\n"); J("    ldc \"phrase\"\n");   J("    aastore\n");
+                J("    dup\n"); J("    iconst_2\n");
+                pj_emit_term(nt_expr, var_locals, n_vars);
+                J("    aastore\n");
+                J("    dup\n"); J("    iconst_3\n");
+                pj_emit_term(list_arg, var_locals, n_vars);
+                J("    aastore\n");
+                if (rest_arg) {
+                    J("    dup\n"); J("    bipush 4\n");
+                    pj_emit_term(rest_arg, var_locals, n_vars);
+                    J("    aastore\n");
+                }
+                J("    iconst_0\n");
+                J("    invokestatic %s/pj_call_goal(Ljava/lang/Object;I)I\n", pj_classname);
+                J("    ldc -1\n"); J("    if_icmpeq %s\n", lbl_ω);
+                pj_emit_body(goals + 1, ngoals - 1, lbl_γ, lbl_ω, lbl_outer_ω,
+                             trail_local, var_locals, n_vars, next_local,
+                             init_cs_local, sub_cs_out_local,
+                             cut_cs_seal, cs_local_for_cut, lbl_pred_ω, lbl_cutγ);
+                return;
+            }
+
+            /* Special case: NT = [] — phrase([], List) -> List = []
+             *                        phrase([], List, Rest) -> List = Rest */
+            int nt_is_nil = (nt_expr->sval && strcmp(nt_expr->sval, "[]") == 0 &&
+                             nt_expr->nchildren == 0);
+            if (nt_is_nil) {
+                EXPR_t *rhs;
+                if (rest_arg) {
+                    rhs = rest_arg;
+                } else {
+                    rhs = expr_new(E_QLIT);
+                    rhs->sval = strdup("[]");
+                }
+                pj_emit_term(list_arg, var_locals, n_vars);
+                pj_emit_term(rhs, var_locals, n_vars);
+                J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+                J("    ifeq %s\n", lbl_ω);
+                pj_emit_body(goals + 1, ngoals - 1, lbl_γ, lbl_ω, lbl_outer_ω,
+                             trail_local, var_locals, n_vars, next_local,
+                             init_cs_local, sub_cs_out_local,
+                             cut_cs_seal, cs_local_for_cut, lbl_pred_ω, lbl_cutγ);
+                return;
+            }
+
             EXPR_t *nil_node = NULL;
             if (!rest_arg) {
                 nil_node = expr_new(E_QLIT);
                 nil_node->sval = strdup("[]");
             }
+
+            /* Special case: NT = '.'(H, T) — list terminal.
+             * Allocate L1 local, extend var_locals, recurse via pj_emit_body. */
+            int nt_is_cons2 = (nt_expr->sval && strcmp(nt_expr->sval, ".") == 0 &&
+                               nt_expr->nchildren == 2);
+            if (nt_is_cons2) {
+                EXPR_t *hd2 = nt_expr->children[0];
+                EXPR_t *tl2 = nt_expr->children[1];
+                int l1_loc = *next_local; *next_local += 1;
+                J("    invokestatic %s/pj_term_var()[Ljava/lang/Object;\n", pj_classname);
+                J("    astore %d\n", l1_loc);
+                pj_emit_term(list_arg, var_locals, n_vars);
+                J("    ldc 4\n"); J("    anewarray java/lang/Object\n");
+                J("    dup\n"); J("    iconst_0\n"); J("    ldc \"compound\"\n"); J("    aastore\n");
+                J("    dup\n"); J("    iconst_1\n"); J("    ldc \".\"\n");       J("    aastore\n");
+                J("    dup\n"); J("    iconst_2\n"); pj_emit_term(hd2, var_locals, n_vars); J("    aastore\n");
+                J("    dup\n"); J("    iconst_3\n"); J("    aload %d\n", l1_loc); J("    aastore\n");
+                J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+                J("    ifeq %s\n", lbl_ω);
+                /* extend var_locals: new index n_vars → l1_loc */
+                int *vl2b = malloc((n_vars + 1) * sizeof(int));
+                for (int i = 0; i < n_vars; i++) vl2b[i] = var_locals ? var_locals[i] : 0;
+                vl2b[n_vars] = l1_loc;
+                EXPR_t *l1v2 = expr_new(E_VART); l1v2->ival = n_vars;
+                EXPR_t *rec2 = expr_new(E_FNC);
+                rec2->sval = strdup("phrase");
+                rec2->nchildren = rest_arg ? 3 : 2;
+                rec2->children = malloc(rec2->nchildren * sizeof(EXPR_t *));
+                rec2->children[0] = tl2; rec2->children[1] = l1v2;
+                if (rest_arg) rec2->children[2] = rest_arg;
+                /* Prepend rec2 to remaining goals */
+                int ngoals2 = ngoals; /* total remaining including current phrase */
+                EXPR_t **goals2 = malloc((ngoals2) * sizeof(EXPR_t *));
+                goals2[0] = rec2;
+                for (int gi = 1; gi < ngoals2; gi++) goals2[gi] = goals[gi]; /* goals[0]=current phrase, rest follow */
+                pj_emit_body(goals2, ngoals2, lbl_γ, lbl_ω, lbl_outer_ω,
+                             trail_local, vl2b, n_vars + 1, next_local,
+                             init_cs_local, sub_cs_out_local,
+                             cut_cs_seal, cs_local_for_cut, lbl_pred_ω, lbl_cutγ);
+                free(goals2); free(vl2b);
+                return;
+            }
+
             EXPR_t *call = expr_new(E_FNC);
             int base = (nt_expr->kind == E_FNC) ? nt_expr->nchildren : 0;
             call->sval      = strdup(nt_expr->sval ? nt_expr->sval : "unknown");
@@ -6232,6 +6422,23 @@ static void pj_emit_findall_builtin(void) {
     J("    aload 6\n"); J("    checkcast java/lang/String\n"); J("    astore 8\n"); /* nt_fn */
     J("    iconst_0\n"); J("    istore 9\n"); /* nt_base = 0 */
     J("pj_cg_phrase_have_nt:\n");
+    /* nil-NT shortcut: phrase([], List) -> List=[] ; phrase([], List, Rest) -> List=Rest */
+    J("    aload 8\n"); J("    ldc \"[]\"\n");
+    J("    invokevirtual java/lang/Object/equals(Ljava/lang/Object;)Z\n");
+    J("    ifeq pj_cg_phrase_not_nil_nt\n");
+    /* nt_fn == "[]": List unifies with Rest (or []) */
+    J("    aload 2\n"); J("    iconst_3\n"); J("    aaload\n"); /* list arg */
+    J("    iload 5\n"); J("    iconst_3\n"); J("    if_icmpeq pj_cg_phrase_nil_has_rest\n");
+    J("    ldc \"[]\"\n");
+    J("    invokestatic %s/pj_term_atom(Ljava/lang/String;)[Ljava/lang/Object;\n", pj_classname);
+    J("    goto pj_cg_phrase_nil_do_unify\n");
+    J("pj_cg_phrase_nil_has_rest:\n");
+    J("    aload 2\n"); J("    bipush 4\n"); J("    aaload\n"); /* rest arg */
+    J("pj_cg_phrase_nil_do_unify:\n");
+    J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
+    J("    ifeq pj_cg_fail\n");
+    J("    iconst_0\n"); J("    ireturn\n");
+    J("pj_cg_phrase_not_nil_nt:\n");
     /* total call arity = nt_base + 2 */
     J("    iload 9\n"); J("    iconst_2\n"); J("    iadd\n"); J("    istore 10\n"); /* call_arity */
     /* build args array: [nt_args..., list, rest_or_nil] */
@@ -6751,7 +6958,7 @@ static void pj_emit_choice(EXPR_t *choice) {
      * ensuring the JVM verifier types the slot as int (avoids ClassCastException on iinc). */
     int db_idx_local_slot  = locals_needed - 2;
 
-    J("    .limit stack %d\n", max_stack < 16 ? 16 : max_stack);
+    J("    .limit stack %d\n", max_stack < 512 ? 512 : max_stack);
     J("    .limit locals %d\n", locals_needed);
     /* Pre-initialise db_idx slot as int so iinc is always valid */
     J("    iconst_0\n");
@@ -7293,7 +7500,7 @@ static void pj_emit_choice(EXPR_t *choice) {
                     int d = pj_term_stack_depth(clause->children[hi]) + 4;
                     if (d > sm_max_stack) sm_max_stack = d;
                 }
-                if (sm_max_stack < 16) sm_max_stack = 16;
+                if (sm_max_stack < 512) sm_max_stack = 512;
             }
             int sm_locals = sm_vars_base + sm_max_vars + 5*sm_max_uc + 2*sm_max_neq + sm_max_disj + 16 + 4;
             J("    .limit stack %d\n", sm_max_stack);
@@ -7563,6 +7770,7 @@ static const char pj_plunit_shim_src[] =
     "    ).\n"
     "run_succeed(Suite, Name, Goal, Opts) :-\n"
     "    Opts \\= [], \\+ is_list(Opts), Opts \\= true, Opts \\= fail, Opts \\= false,\n"
+    "    Opts \\= pj_inline,\n"
     "    run_true(Suite, Name, Goal, Opts).\n"
     "run_fail(Suite, Name, Goal) :-\n"
     "    ( catch(Goal, _E, true) ->\n"
@@ -7865,8 +8073,8 @@ static void pj_linker_emit_bridge(const char *bridge_fn, const char *test_name, 
         }
     }
 
-    /* Detect true(Expr) opts — may be bare true(E) or inside a list [true(E)|_].
-     * Walk the list to find the first true(Expr) element. */
+    /* Detect true(Expr) opts — may be bare true(E), a bare expression, or inside a list.
+     * Walk the list to find the first true(Expr) or bare-expression element. */
     int has_true_expr = 0;
     EXPR_t *true_expr_arg = NULL;
     if (arity == 2 && opts_expr) {
@@ -7875,8 +8083,24 @@ static void pj_linker_emit_bridge(const char *bridge_fn, const char *test_name, 
             && opts_expr->nchildren == 1) {
             has_true_expr = 1;
             true_expr_arg = opts_expr->children[0];
+        } else if (opts_expr->sval &&
+                   strcmp(opts_expr->sval, ".") != 0 &&
+                   strcmp(opts_expr->sval, "[]") != 0 &&
+                   strcmp(opts_expr->sval, "fail") != 0 &&
+                   strcmp(opts_expr->sval, "error") != 0 &&
+                   strcmp(opts_expr->sval, "throws") != 0 &&
+                   strcmp(opts_expr->sval, "all") != 0 &&
+                   strcmp(opts_expr->sval, "forall") != 0 &&
+                   strcmp(opts_expr->sval, "sto") != 0 &&
+                   strcmp(opts_expr->sval, "blocked") != 0 &&
+                   strcmp(opts_expr->sval, "setup") != 0 &&
+                   strcmp(opts_expr->sval, "cleanup") != 0 &&
+                   opts_expr->nchildren > 0) {
+            /* bare expression like X==y or Bs==[b]: treat as true(Expr) */
+            has_true_expr = 1;
+            true_expr_arg = opts_expr;
         } else {
-            /* walk list .(Head, Tail): look for true(E) as head */
+            /* walk list .(Head, Tail): look for true(E) or bare expr as head */
             EXPR_t *node = opts_expr;
             while (node && node->sval && strcmp(node->sval, ".") == 0
                    && node->nchildren >= 2) {
@@ -7886,6 +8110,22 @@ static void pj_linker_emit_bridge(const char *bridge_fn, const char *test_name, 
                     has_true_expr = 1;
                     true_expr_arg = head->children[0];
                     break;
+                } else if (head && head->sval &&
+                           strcmp(head->sval, "fail") != 0 &&
+                           strcmp(head->sval, "error") != 0 &&
+                           strcmp(head->sval, "throws") != 0 &&
+                           strcmp(head->sval, "all") != 0 &&
+                           strcmp(head->sval, "forall") != 0 &&
+                           strcmp(head->sval, "sto") != 0 &&
+                           strcmp(head->sval, "blocked") != 0 &&
+                           strcmp(head->sval, "setup") != 0 &&
+                           strcmp(head->sval, "cleanup") != 0 &&
+                           strcmp(head->sval, ".") != 0 &&
+                           strcmp(head->sval, "[]") != 0 &&
+                           head->nchildren > 0) {
+                    has_true_expr = 1;
+                    true_expr_arg = head;
+                    break;
                 }
                 node = node->children[1];
             }
@@ -7894,7 +8134,7 @@ static void pj_linker_emit_bridge(const char *bridge_fn, const char *test_name, 
 
     JC("bridge predicate (M-PJ-LINKER)");
     J(".method static p_%s_0(I)[Ljava/lang/Object;\n", bridge_fn);
-    J("    .limit stack 16\n");
+    J("    .limit stack 512\n");
     /* For true(Expr) we need locals: 0=cs(I), 1=trail(I), 2..2+n_vars-1=vars, then scratch */
     if (has_true_expr && clause_expr) {
         int n_vars = (int)clause_expr->ival;
@@ -8208,52 +8448,44 @@ static void pj_linker_emit_main_assertz(void) {
                 int is_true_expr = 0;
                 if (oe->sval && strcmp(oe->sval,"true")==0 && oe->nchildren==1) {
                     is_true_expr = 1;
+                } else if (oe->sval && strcmp(oe->sval,".") != 0 &&
+                           strcmp(oe->sval,"[]") != 0 &&
+                           strcmp(oe->sval,"fail") != 0 && strcmp(oe->sval,"false") != 0 &&
+                           strcmp(oe->sval,"error") != 0 && strcmp(oe->sval,"throws") != 0 &&
+                           strcmp(oe->sval,"all") != 0 && strcmp(oe->sval,"sto") != 0 &&
+                           strcmp(oe->sval,"blocked") != 0 && strcmp(oe->sval,"setup") != 0 &&
+                           strcmp(oe->sval,"cleanup") != 0 && strcmp(oe->sval,"forall") != 0 &&
+                           oe->nchildren > 0) {
+                    is_true_expr = 1; /* bare expression like X==y */
                 } else if (oe->sval && strcmp(oe->sval,".")==0 && oe->nchildren>=2) {
                     EXPR_t *nd = oe;
                     while (nd && nd->sval && strcmp(nd->sval,".")==0 && nd->nchildren>=2) {
                         EXPR_t *hd = nd->children[0];
                         if (hd && hd->sval && strcmp(hd->sval,"true")==0 && hd->nchildren==1)
                             { is_true_expr=1; break; }
+                        /* bare expression inside list */
+                        if (hd && hd->sval &&
+                            strcmp(hd->sval,"fail")!=0 && strcmp(hd->sval,"false")!=0 &&
+                            strcmp(hd->sval,"error")!=0 && strcmp(hd->sval,"throws")!=0 &&
+                            strcmp(hd->sval,"all")!=0 && strcmp(hd->sval,"sto")!=0 &&
+                            strcmp(hd->sval,"blocked")!=0 && strcmp(hd->sval,"setup")!=0 &&
+                            strcmp(hd->sval,"cleanup")!=0 && strcmp(hd->sval,"forall")!=0 &&
+                            strcmp(hd->sval,".")!=0 && strcmp(hd->sval,"[]")!=0 &&
+                            hd->nchildren > 0)
+                            { is_true_expr=1; break; }
                         nd = nd->children[1];
                     }
                 }
                 if (is_true_expr) {
-                    /* emit pj_inline atom — bridge is self-reporting */
+                    /* emit pj_inline atom — bridge is self-reporting.
+                     * For bare goals (X==y) this is essential: the check
+                     * shares variables with the body only inside the bridge
+                     * JVM frame, so we cannot re-evaluate the expression
+                     * from a disconnected assertz'd term. */
                     J("    ldc \"pj_inline\"\n");
                     J("    invokestatic %s/pj_term_atom(Ljava/lang/String;)[Ljava/lang/Object;\n", pj_classname);
                 } else {
-                    /* Detect bare goal: E_FNC with sval, nchildren > 0,
-                     * and NOT a list head "." or nil "[]",
-                     * and NOT a known opt atom */
-                    int is_list_or_nil = (oe->sval && (strcmp(oe->sval,".")==0 || strcmp(oe->sval,"[]")==0));
-                    int is_known_atom  = (oe->nchildren == 0 && oe->sval &&
-                        (strcmp(oe->sval,"fail")==0 || strcmp(oe->sval,"false")==0 ||
-                         strcmp(oe->sval,"true")==0));
-                    int is_wrapped     = (oe->sval && oe->nchildren == 1 &&
-                        (strcmp(oe->sval,"true")==0 || strcmp(oe->sval,"error")==0 ||
-                         strcmp(oe->sval,"throws")==0 || strcmp(oe->sval,"all")==0 ||
-                         strcmp(oe->sval,"sto")==0 || strcmp(oe->sval,"condition")==0));
-                    int bare_goal = (!is_list_or_nil && !is_known_atom && !is_wrapped &&
-                                     oe->nchildren > 0);
-                    if (bare_goal) {
-                        /* emit true(Opts) compound */
-                        J("    bipush 3\n");
-                        J("    anewarray java/lang/Object\n");
-                        J("    dup\n");
-                        J("    iconst_0\n");
-                        J("    ldc \"compound\"\n");
-                        J("    aastore\n");
-                        J("    dup\n");
-                        J("    iconst_1\n");
-                        J("    ldc \"true\"\n");
-                        J("    aastore\n");
-                        J("    dup\n");
-                        J("    bipush 2\n");
-                        pj_emit_term(oe, dummy_locals, 0);
-                        J("    aastore\n");
-                    } else {
-                        pj_emit_term(oe, dummy_locals, 0);
-                    }
+                    pj_emit_term(oe, dummy_locals, 0);
                 }
             } else {
                 /* [] */
@@ -8283,7 +8515,7 @@ static void pj_linker_emit_main_assertz(void) {
 
 static void pj_emit_main(Program *prog) {
     J(".method public static main([Ljava/lang/String;)V\n");
-    J("    .limit stack 32\n");
+    J("    .limit stack 512\n");
     J("    .limit locals 4\n");
 
     /* M-PJ-LINKER: assert pj_suite/pj_test facts FIRST — before any directives

@@ -170,18 +170,32 @@ static Token scan_number(Lexer *lx) {
     if (cur(lx) == '0' && (peek1(lx) == 'b' || peek1(lx) == 'x' || peek1(lx) == 'o')) {
         buf_push(&buf, &len, &cap, advance(lx));
         buf_push(&buf, &len, &cap, advance(lx));
-        while (isxdigit((unsigned char)cur(lx)) || cur(lx) == '_')
-            if (cur(lx) != '_') buf_push(&buf, &len, &cap, advance(lx));
-            else advance(lx);
-        Token t = make_tok(TK_INT, buf, line);
         int radix = (buf[1]=='b'||buf[1]=='B') ? 2 :
                     (buf[1]=='o'||buf[1]=='O') ? 8 : 16;
+        while (1) {
+            if (isxdigit((unsigned char)cur(lx)) || cur(lx) == '_') {
+                if (cur(lx) != '_') buf_push(&buf, &len, &cap, advance(lx));
+                else advance(lx);
+            } else if (cur(lx) == ' ' && isxdigit((unsigned char)peek1(lx))) {
+                /* spaced numeric literal: skip space, continue scanning */
+                advance(lx);
+            } else {
+                break;
+            }
+        }
+        Token t = make_tok(TK_INT, buf, line);
         t.ival = strtol(buf+2, NULL, radix);
         return t;
     }
 
     while (isdigit((unsigned char)cur(lx)))
         buf_push(&buf, &len, &cap, advance(lx));
+    /* spaced decimal literal: absorb space + digits (e.g. 9 223 372 036...) */
+    while (cur(lx) == ' ' && isdigit((unsigned char)peek1(lx))) {
+        advance(lx); /* skip space */
+        while (isdigit((unsigned char)cur(lx)))
+            buf_push(&buf, &len, &cap, advance(lx));
+    }
 
     /* float: digits '.' digits  OR  digits 'e'/'E' exponent */
     if (cur(lx) == '.' && isdigit((unsigned char)peek1(lx))) {
@@ -195,6 +209,13 @@ static Token scan_number(Lexer *lx) {
                 buf_push(&buf, &len, &cap, advance(lx));
             while (isdigit((unsigned char)cur(lx)))
                 buf_push(&buf, &len, &cap, advance(lx));
+        }
+        /* SWI extension: float suffix NaN or Inf (e.g. 1.5NaN, 0.0Inf) */
+        if ((cur(lx)=='N' && lx->src[lx->pos+1]=='a' && lx->src[lx->pos+2]=='N') ||
+            (cur(lx)=='I' && lx->src[lx->pos+1]=='n' && lx->src[lx->pos+2]=='f')) {
+            advance(lx); advance(lx); advance(lx); /* consume NaN or Inf */
+            /* represent as NaN/Inf double */
+            if (!buf) buf = strdup("nan");
         }
     } else if (cur(lx) == 'e' || cur(lx) == 'E') {
         /* digits 'e' exponent — no decimal point (e.g. 10e300) */
