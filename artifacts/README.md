@@ -138,3 +138,49 @@ for pro in artifacts/prolog/samples/*.pro; do
     ./sno2c -pl -jvm "$pro" > "${base}.j" 2>/dev/null
 done
 ```
+
+---
+
+## Regen commands — run after touching any emitter
+
+```bash
+export JAVA_TOOL_OPTIONS=""
+cd /home/claude/snobol4x
+JASMIN=src/backend/jvm/jasmin.jar
+INC=demo/inc
+mkdir -p /tmp/art_out
+
+# --- SNOBOL4 × JVM (touch emit_byrd_jvm.c) ---
+./sno2c -jvm -I$INC demo/roman.sno    > artifacts/jvm/samples/roman.j
+./sno2c -jvm -I$INC demo/wordcount.sno > artifacts/jvm/samples/wordcount.j
+printf "        OUTPUT = 'HELLO WORLD'\nEND\n" | ./sno2c -jvm -I$INC /dev/stdin > artifacts/jvm/hello.j
+
+# --- SNOBOL4 × ASM (touch emit_byrd_asm.c) ---
+./sno2c -asm -I$INC demo/roman.sno     > artifacts/asm/samples/roman.s
+./sno2c -asm -I$INC demo/wordcount.sno > artifacts/asm/samples/wordcount.s
+./sno2c -asm -I$INC demo/beauty.sno    > artifacts/asm/beauty_prog.s
+
+# --- SNOBOL4 × NET (touch emit_byrd_net.c) ---
+./sno2c -net -I$INC demo/roman.sno     > artifacts/net/samples/roman.il
+./sno2c -net -I$INC demo/wordcount.sno > artifacts/net/samples/wordcount.il
+
+# --- Icon × JVM (touch icon_emit_jvm.c) ---
+# Build icon_driver first: gcc ... -o /tmp/icon_driver (see SESSION-scrip-jvm.md §BUILD)
+for icn in artifacts/icon/samples/*.icn; do
+    base="${icn%.icn}"
+    /tmp/icon_driver -jvm "$icn" -o "${base}.j" 2>/dev/null
+    java -jar $JASMIN "${base}.j" -d /tmp/art_out/ 2>&1 | grep -i error | grep -v Picked && echo "FAIL ${base}.j" || echo "OK   ${base}.j"
+done
+
+# --- Prolog × JVM (touch prolog_emit_jvm.c) ---
+for pro in artifacts/prolog/samples/*.pro; do
+    base="${pro%.pro}"
+    ./sno2c -pl -jvm "$pro" > "${base}.j" 2>/dev/null
+    java -jar $JASMIN "${base}.j" -d /tmp/art_out/ 2>&1 | grep -i error | grep -v Picked && echo "FAIL ${base}.j" || echo "OK   ${base}.j"
+done
+
+# --- Verify all .j files assemble ---
+for j in artifacts/**/*.j; do
+    java -jar $JASMIN "$j" -d /tmp/art_out/ 2>&1 | grep -i error | grep -v Picked && echo "BROKEN: $j" || true
+done
+```

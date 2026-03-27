@@ -1180,6 +1180,9 @@ static void ij_emit_assign(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
             }
             else              { ij_declare_static(gname);       ij_put_long(gname); }
         }
+    } else if (lhs && lhs->kind == ICN_SUBSCRIPT) {
+        /* List/string subscript LHS — value stays on stack; handled in push-back block below */
+        (void)0;
     } else {
         /* discard — pop appropriate type */
         if (is_str || is_strlist || is_list || is_tbl) JI("pop", "");
@@ -1207,7 +1210,71 @@ static void ij_emit_assign(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
             else if (is_rec)    JI("lconst_0","");
             else                ij_get_long(gname);
         }
+    } else if (lhs && lhs->kind == ICN_SUBSCRIPT && lhs->nchildren >= 2) {
+        /* List subscript assignment: a[i] := v
+         * RHS value is on stack (long or String).
+         * Need: load list, compute 0-based int index, box value, call ArrayList.set */
+        IcnNode *lvar  = lhs->children[0];
+        IcnNode *kidx  = lhs->children[1];
+        int lsid = ij_new_id();
+        char lsub_l[128], lsub_i[80], lsub_v[80], lsub_vi[80], lsub_do[80];
+        snprintf(lsub_l,  sizeof lsub_l,  "icn_%d_lsa_l",  lsid);
+        snprintf(lsub_i,  sizeof lsub_i,  "icn_%d_lsa_i",  lsid);
+        snprintf(lsub_v,  sizeof lsub_v,  "icn_%d_lsa_v",  lsid);
+        snprintf(lsub_vi, sizeof lsub_vi, "icn_%d_lsa_vi", lsid);
+        snprintf(lsub_do, sizeof lsub_do, "icn_%d_lsa_do", lsid);
+        /* Declare temp statics for list ref, index (int), value (long/str) */
+        ij_declare_static_list(lsub_l);
+        ij_declare_static(lsub_i);   /* stores 0-based int index as long */
+        if (is_str) ij_declare_static_str(lsub_v);
+        else        ij_declare_static(lsub_v);
+        /* RHS value already on stack — save it */
+        if (is_str) ij_put_str_field(lsub_v);
+        else        ij_put_long(lsub_v);
+        /* Load list from variable */
+        if (lvar->kind == ICN_VAR) {
+            int lslot = ij_locals_find(lvar->val.sval);
+            if (lslot >= 0) {
+                char fld[128]; ij_var_field(lvar->val.sval, fld, sizeof fld);
+                ij_get_list_field(fld);
+            } else {
+                char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", lvar->val.sval);
+                ij_get_list_field(gname);
+            }
+        } else {
+            /* Fallback: just push null and fail gracefully */
+            JI("aconst_null", "");
+        }
+        ij_put_list_field(lsub_l);
+        /* Evaluate index — long on stack, convert to 0-based long, store */
+        {
+            char idx_relay[80]; snprintf(idx_relay, sizeof idx_relay, "icn_%d_lsa_ir", lsid);
+            IjPorts ip; strncpy(ip.γ, idx_relay, 63); strncpy(ip.ω, ports.ω, 63);
+            char ia[64], ib[64]; ij_emit_expr(kidx, ip, ia, ib);
+            JGoto(ia);           /* enter index expression */
+            JL(idx_relay);
+            /* Convert Icon 1-based long to 0-based long, store in lsub_i */
+            JI("lconst_1", ""); JI("lsub", "");
+            ij_put_long(lsub_i);
+            JGoto(lsub_do);
+            JL(lsub_do);
+        }
+        /* Load list, load int index, load boxed value, call ArrayList.set */
+        ij_get_list_field(lsub_l);
+        ij_get_long(lsub_i); JI("l2i", "");   /* 0-based int index */
+        if (is_str) {
+            ij_get_str_field(lsub_v);           /* String ref */
+        } else {
+            ij_get_long(lsub_v);
+            JI("invokestatic", "java/lang/Long/valueOf(J)Ljava/lang/Long;");
+        }
+        JI("invokevirtual", "java/util/ArrayList/set(ILjava/lang/Object;)Ljava/lang/Object;");
+        JI("pop", "");   /* discard old value returned by set() */
+        /* Push result (Icon := returns assigned value) */
+        if (is_str) ij_get_str_field(lsub_v);
+        else        ij_get_long(lsub_v);
     } else {
+        /* Unknown LHS form — discard value, push placeholder */
         if (is_str || is_strlist || is_list || is_tbl) JI("aconst_null", "");
         else if (is_dbl)                               JI("dconst_0", "");
         else                                           JI("lconst_0", "");
@@ -5769,25 +5836,29 @@ static void ij_emit_seq_expr(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         ij_emit_expr(n->children[0], ports, oα, oβ);
         return;
     }
-    /* n >= 2: same relay-label pattern as ICN_AND */
+    /* n >= 2: same relay-label pattern as ICN_AND, but with failure-relay
+     * for statement sequences: a failing non-last child (e.g. `if` without
+     * `else`) must NOT abort the sequence — it silently continues to the
+     * next child's α.  Only the LAST child's ω propagates to ports.ω. */
     int cid = ij_new_id(); char ca2[64], cb2[64];
     lbl_α(cid,ca2,sizeof ca2); lbl_β(cid,cb2,sizeof cb2);
     strncpy(oα,ca2,63); strncpy(oβ,cb2,63);
     char (*cca)[64] = malloc(nc * 64);
     char (*ccb)[64] = malloc(nc * 64);
     char (*relay_g)[64] = malloc(nc * 64);
+    char (*relay_f)[64] = malloc(nc * 64);
     for (int i = 0; i < nc; i++) {
         snprintf(relay_g[i], 64, "icn_%d_seq_rg_%d", cid, i);
+        snprintf(relay_f[i], 64, "icn_%d_seq_rf_%d", cid, i);
         cca[i][0] = '\0'; ccb[i][0] = '\0';
     }
     for (int i = 0; i < nc; i++) {
         IjPorts ep;
-        strncpy(ep.γ, (i == nc-1) ? ports.γ : relay_g[i], 63);
-        strncpy(ep.ω, (i == 0)    ? ports.ω  : ccb[i-1],  63);
+        strncpy(ep.γ, (i == nc-1) ? ports.γ  : relay_g[i], 63);
+        strncpy(ep.ω, (i == nc-1) ? ports.ω  : relay_f[i], 63);
         ij_emit_expr(n->children[i], ep, cca[i], ccb[i]);
     }
-    /* relay trampolines: drain Ei.γ result, jump to E(i+1).α
-     * Jump over relay block first — same verifier fall-through fix as ICN_AND. */
+    /* relay trampolines: drain Ei.γ result, jump to E(i+1).α */
     JGoto(ca2);
     for (int i = 0; i < nc-1; i++) {
         JL(relay_g[i]);
@@ -5795,9 +5866,14 @@ static void ij_emit_seq_expr(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         JI(child_is_str ? "pop" : "pop2", "");
         JGoto(cca[i+1]);
     }
+    /* failure relay: Ei fails (no-else if, etc.) → silently skip to E(i+1).α */
+    for (int i = 0; i < nc-1; i++) {
+        JL(relay_f[i]);
+        JGoto(cca[i+1]);
+    }
     JL(ca2); JGoto(cca[0]);
     JL(cb2); JGoto(ccb[nc-1]);
-    free(cca); free(ccb); free(relay_g);
+    free(cca); free(ccb); free(relay_g); free(relay_f);
 }
 
 /* =========================================================================
