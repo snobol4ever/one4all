@@ -167,21 +167,23 @@ static Token scan_number(Lexer *lx) {
         t.ival = (long)c; t.text = strdup("0'c");
         return t;
     }
-    if (cur(lx) == '0' && (peek1(lx) == 'b' || peek1(lx) == 'x')) {
+    if (cur(lx) == '0' && (peek1(lx) == 'b' || peek1(lx) == 'x' || peek1(lx) == 'o')) {
         buf_push(&buf, &len, &cap, advance(lx));
         buf_push(&buf, &len, &cap, advance(lx));
         while (isxdigit((unsigned char)cur(lx)) || cur(lx) == '_')
             if (cur(lx) != '_') buf_push(&buf, &len, &cap, advance(lx));
             else advance(lx);
         Token t = make_tok(TK_INT, buf, line);
-        t.ival = strtol(buf+2, NULL, (buf[1]=='b'||buf[1]=='B') ? 2 : 16);
+        int radix = (buf[1]=='b'||buf[1]=='B') ? 2 :
+                    (buf[1]=='o'||buf[1]=='O') ? 8 : 16;
+        t.ival = strtol(buf+2, NULL, radix);
         return t;
     }
 
     while (isdigit((unsigned char)cur(lx)))
         buf_push(&buf, &len, &cap, advance(lx));
 
-    /* float: digits '.' digits */
+    /* float: digits '.' digits  OR  digits 'e'/'E' exponent */
     if (cur(lx) == '.' && isdigit((unsigned char)peek1(lx))) {
         is_float = 1;
         buf_push(&buf, &len, &cap, advance(lx)); /* . */
@@ -194,6 +196,14 @@ static Token scan_number(Lexer *lx) {
             while (isdigit((unsigned char)cur(lx)))
                 buf_push(&buf, &len, &cap, advance(lx));
         }
+    } else if (cur(lx) == 'e' || cur(lx) == 'E') {
+        /* digits 'e' exponent — no decimal point (e.g. 10e300) */
+        is_float = 1;
+        buf_push(&buf, &len, &cap, advance(lx)); /* e or E */
+        if (cur(lx) == '+' || cur(lx) == '-')
+            buf_push(&buf, &len, &cap, advance(lx));
+        while (isdigit((unsigned char)cur(lx)))
+            buf_push(&buf, &len, &cap, advance(lx));
     }
 
     if (!buf) buf = strdup("0");

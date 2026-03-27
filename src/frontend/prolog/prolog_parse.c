@@ -100,6 +100,8 @@ typedef struct { const char *name; int prec; Assoc assoc; } OpEntry;
 
 /* Binary operators in ascending precedence order */
 static const OpEntry BIN_OPS[] = {
+    { ":-",   1200, ASSOC_NONE  },  /* :- as binary op inside parens/args */
+    { "-->",  1200, ASSOC_NONE  },  /* --> DCG rule as binary op inside parens/args */
     { ",",    1000, ASSOC_RIGHT },
     { ";",    1100, ASSOC_RIGHT },
     { "->",   1050, ASSOC_RIGHT },
@@ -303,8 +305,8 @@ static Term *parse_primary(Parser *p) {
                     if (num.kind == TK_INT)   return term_new_int(-num.ival);
                     if (num.kind == TK_FLOAT) return term_new_float(-num.fval);
                 }
-                /* -atom or -compound: treat as -(Arg) prefix compound (prec 200) */
-                if (pk.kind == TK_ATOM || pk.kind == TK_OP) {
+                /* -atom, -compound, -Variable: treat as -(Arg) prefix compound (prec 200) */
+                if (pk.kind == TK_ATOM || pk.kind == TK_OP || pk.kind == TK_VAR || pk.kind == TK_LPAREN) {
                     Term *arg = parse_term(p, 200);
                     int fid = prolog_atom_intern("-");
                     Term *args[1] = { arg };
@@ -375,6 +377,7 @@ static Term *parse_term(Parser *p, int max_prec) {
         else if (pk.kind == TK_ATOM) optext = pk.text; /* mod, is, etc */
         else if (pk.kind == TK_COMMA && max_prec >= 1000) optext = ",";
         else if (pk.kind == TK_SEMI  && max_prec >= 1100) optext = ";";
+        else if (pk.kind == TK_NECK  && max_prec >= 1200) optext = ":-";
         else break;
 
         const OpEntry *op = optext ? find_binop(optext) : NULL;
