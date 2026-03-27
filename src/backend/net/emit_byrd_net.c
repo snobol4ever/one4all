@@ -188,10 +188,8 @@ static void net_set_classname(const char *filename) {
     for (; *p; p++)
         if (!isalnum((unsigned char)*p) && *p != '_') *p = '_';
     buf[0] = (char)toupper((unsigned char)buf[0]);
-    /* Prefix SNOBOL4_ per ARCH-scrip-abi.md §5 symbol naming convention */
-    char prefixed[256];
-    snprintf(prefixed, sizeof prefixed, "SNOBOL4_%s", buf);
-    strncpy(net_classname, prefixed, sizeof net_classname - 1);
+    /* Class name = bare basename (no language prefix — YAGNI, two-part IMPORT) */
+    strncpy(net_classname, buf, sizeof net_classname - 1);
     net_classname[sizeof net_classname - 1] = '\0';
 }
 
@@ -745,18 +743,44 @@ static void net_emit_expr(EXPR_t *e) {
             const ImportEntry *imp = net_find_import(fn);
             if (imp) {
                 int uid = net_pat_uid++;
-                /* LP-4 stub: pass null gamma/omega — called method stores result
-                 * in ByrdBoxLinkage.Result directly then returns.
-                 * Full Action wiring (real continuations) in LP-5. */
-                N("    ldnull\n");   /* gamma = null */
-                N("    ldnull\n");   /* omega = null */
-                N("    call       void [%s_%s]%s_%s::%s("
+                /* M-LINK-NET-4: real Action delegate wiring.
+                 * Emit two private static helper methods (net_imp_gamma_N /
+                 * net_imp_omega_N) that set a local int flag stored in a static
+                 * field, then build Action delegates via ldftn+newobj and pass
+                 * them to the cross-assembly Byrd-box call.
+                 * The flag field net_imp_flag_N is read back after the call. */
+                N("  .method private static void net_imp_gamma_%d() cil managed\n", uid);
+                N("  {\n    .maxstack 1\n");
+                N("    ldc.i4.1\n");
+                N("    stsfld     int32 %s::net_imp_flag_%d\n", net_classname, uid);
+                N("    ret\n  }\n");
+                N("  .method private static void net_imp_omega_%d() cil managed\n", uid);
+                N("  {\n    .maxstack 1\n");
+                N("    ldc.i4.0\n");
+                N("    stsfld     int32 %s::net_imp_flag_%d\n", net_classname, uid);
+                N("    ret\n  }\n");
+                /* static int32 flag field — emitted inline; ilasm allows forward refs */
+                N("  .field private static int32 net_imp_flag_%d\n", uid);
+                /* build gamma Action delegate */
+                N("    ldnull\n");
+                N("    ldftn      void %s::net_imp_gamma_%d()\n", net_classname, uid);
+                N("    newobj     instance void [mscorlib]System.Action::.ctor(object, native int)\n");
+                /* build omega Action delegate */
+                N("    ldnull\n");
+                N("    ldftn      void %s::net_imp_omega_%d()\n", net_classname, uid);
+                N("    newobj     instance void [mscorlib]System.Action::.ctor(object, native int)\n");
+                N("    call       void [%s]%s::%s("
                   "class [mscorlib]System.Action,"
                   "class [mscorlib]System.Action)\n",
-                  imp->lang, imp->name,
-                  imp->lang, imp->name,
+                  imp->name,
+                  imp->name,
                   imp->method);
-                /* retrieve result from ByrdBoxLinkage.Result */
+                /* Check flag set by gamma/omega helper, set loc.0 success/fail */
+                N("    ldsfld     int32 %s::net_imp_flag_%d\n", net_classname, uid);
+                N("    stloc.0\n");
+                /* retrieve result string from ByrdBoxLinkage.Result (γ path only) */
+                N("    ldloc.0\n");
+                N("    brfalse    Nimp_%d_done\n", uid);
                 N("    ldsfld     class [snobol4lib]DESCR [snobol4lib]ByrdBoxLinkage::Result\n");
                 N("    dup\n");
                 N("    brtrue     Nimp_%d_ok\n", uid);
@@ -764,10 +788,8 @@ static void net_emit_expr(EXPR_t *e) {
                 N("    ldstr      \"\"\n");
                 N("    br         Nimp_%d_done\n", uid);
                 N("  Nimp_%d_ok:\n", uid);
-                N("    callvirt   instance string object::ToString()\n");
+                N("    callvirt   instance string [snobol4lib]DESCR::ToString()\n");
                 N("  Nimp_%d_done:\n", uid);
-                N("    ldc.i4.1\n");
-                N("    stloc.0\n");
                 break;
             }
         }
@@ -2069,7 +2091,7 @@ static int net_is_exported(Program *prog, const char *name) {
  * lookup added LP-5.
  *
  * CIL emitted:
- *   call void [SNOBOL4_Greet_lib]SNOBOL4_Greet_lib::GREET(
+ *   call void [greet_lib]greet_lib::GREET(
  *       class [mscorlib]System.Action,
  *       class [mscorlib]System.Action)
  *
@@ -2079,14 +2101,14 @@ static int net_is_exported(Program *prog, const char *name) {
  * in the SNOBOL4 source (e.g. OUTPUT = GREET(...)).
  */
 static void emit_net_import_call(FILE *out, ImportEntry *ie) {
-    /* assembly name: LANG_AssemblyBase, e.g. SNOBOL4_Greet_lib */
+    /* assembly name = bare basename, e.g. greet_lib */
     fprintf(out,
-        "    call void [%s_%s]%s_%s::%s("
+        "    call void [%s]%s::%s("
         "class [mscorlib]System.Action,"
         "class [mscorlib]System.Action)\n",
-        ie->lang, ie->name,   /* assembly ref  e.g. SNOBOL4_Greet_lib */
-        ie->lang, ie->name,   /* class name    e.g. SNOBOL4_Greet_lib */
-        ie->name);             /* method name   — LP-5 replaces with symbol lookup */
+        ie->name,   /* assembly ref = bare basename */
+        ie->name,   /* class name   = bare basename */
+        ie->method);
 }
 
 /* -----------------------------------------------------------------------
@@ -2100,8 +2122,8 @@ static void net_emit_header(Program *prog) {
 
     /* Emit .assembly extern for each IMPORT — LP-4 */
     for (ImportEntry *ie = prog->imports; ie; ie = ie->next) {
-        /* assembly name is LANG_AssemblyBase, e.g. SNOBOL4_Greet_lib */
-        N(".assembly extern %s_%s {}\n", ie->lang, ie->name);
+        /* assembly name = bare basename, e.g. greet_lib */
+        N(".assembly extern %s {}\n", ie->name);
     }
 
     N(".assembly %s {}\n", net_classname);

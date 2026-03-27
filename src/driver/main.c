@@ -25,6 +25,7 @@ void jvm_emit(Program *prog, FILE *f, const char *filename);
 void net_emit(Program *prog, FILE *f, const char *filename);
 void pl_emit(Program *prog, FILE *f);   /* defined in prolog_emit.c */
 void prolog_emit_jvm(Program *prog, FILE *f, const char *filename); /* prolog_emit_jvm.c */
+void prolog_emit_net(Program *prog, FILE *f, const char *filename); /* prolog_emit_net.c */
 void pj_linker_prescan(PlProgram *pl_prog);                         /* prolog_emit_jvm.c */
 
 static int asm_mode = 0;
@@ -147,11 +148,14 @@ int main(int argc, char *argv[]) {
         if (!prog) { return 1; }
         /* Route: -pl -asm  -> x64 ASM backend
          *        -pl -jvm  -> JVM Jasmin backend (M-PJ-SCAFFOLD+)
+         *        -pl -net  -> .NET CIL backend (M-LINK-NET-4)
          *        -pl       -> C backend (existing pl_emit) */
         if (asm_mode)
             asm_emit_prolog(prog, out);
         else if (jvm_mode)
             prolog_emit_jvm(prog, out, infile);
+        else if (net_mode)
+            prolog_emit_net(prog, out, infile);
         else
             pl_emit(prog, out);
         if (infile)  fclose(in);
