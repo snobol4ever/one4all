@@ -825,36 +825,36 @@ Program *parse_program(LineArray *lines) {
         if (sl->label && strcasecmp(sl->label, "IMPORT") == 0) {
             if (sl->body && sl->body[0]) {
                 /* body formats:
-                 *   LANG.AssemblyBase.METHOD  — three-part (preferred)
-                 *   LANG.NAME                 — two-part (NAME = assembly = method)
+                 *   assembly.METHOD           — two-part (preferred, no lang prefix)
+                 *   lang.assembly.METHOD      — three-part (legacy, lang ignored)
+                 * Assembly name preserves case (CLR is case-sensitive).
+                 * METHOD is uppercased to match EXPORT convention.
                  */
                 char *dot1 = strchr(sl->body, '.');
                 ImportEntry *e = calloc(1, sizeof *e);
                 if (dot1) {
-                    e->lang = strndup(sl->body, (size_t)(dot1 - sl->body));
                     char *dot2 = strchr(dot1 + 1, '.');
                     if (dot2) {
-                        /* three-part: lang . assembly . method */
+                        /* three-part: lang . assembly . method — lang ignored */
+                        e->lang   = strndup(sl->body, (size_t)(dot1 - sl->body));
                         e->name   = strndup(dot1 + 1, (size_t)(dot2 - dot1 - 1));
                         e->method = strdup(dot2 + 1);
-                        for (char *p = e->method; *p; p++)
-                            *p = (char)toupper((unsigned char)*p);
                     } else {
-                        /* two-part: lang . name  (name doubles as assembly+method) */
-                        e->name   = strdup(dot1 + 1);
+                        /* two-part: assembly . method */
+                        e->lang   = strdup("");
+                        e->name   = strndup(sl->body, (size_t)(dot1 - sl->body));
                         e->method = strdup(dot1 + 1);
-                        for (char *p = e->method; *p; p++)
-                            *p = (char)toupper((unsigned char)*p);
                     }
+                    for (char *p = e->method; *p; p++)
+                        *p = (char)toupper((unsigned char)*p);
                 } else {
-                    e->lang   = strdup("UNKNOWN");
+                    /* bare name: use as both assembly and method */
+                    e->lang   = strdup("");
                     e->name   = strdup(sl->body);
                     e->method = strdup(sl->body);
                     for (char *p = e->method; *p; p++)
                         *p = (char)toupper((unsigned char)*p);
                 }
-                /* NOTE: lang and name preserve case — assembly names are
-                 * case-sensitive on .NET */
                 e->next = prog->imports;
                 prog->imports = e;
             }

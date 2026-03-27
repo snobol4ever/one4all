@@ -18,6 +18,7 @@ FRONTEND_PROLOG = \
     frontend/prolog/prolog_lower.c \
     frontend/prolog/prolog_emit.c \
     frontend/prolog/prolog_emit_jvm.c \
+    frontend/prolog/prolog_emit_net.c \
     frontend/prolog/prolog_builtin.c
 
 FRONTEND_SNOCONE = \

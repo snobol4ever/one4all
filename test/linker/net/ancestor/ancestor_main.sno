@@ -1,0 +1,8 @@
+* ancestor_main.sno — M-LINK-NET-4 acceptance test
+* Calls Prolog ANCESTOR predicate from SNOBOL4 via .NET ABI.
+* IMPORT assembly.METHOD (two-part, no LANG prefix)
+IMPORT          ancestor.ANCESTOR
+
+*       ancestor(tom, ann) should succeed → prints "ann"
+        OUTPUT = ANCESTOR('tom', 'ann')
+END
