@@ -845,15 +845,12 @@ Program *parse_program(LineArray *lines) {
                         e->name   = strndup(sl->body, (size_t)(dot1 - sl->body));
                         e->method = strdup(dot1 + 1);
                     }
-                    for (char *p = e->method; *p; p++)
-                        *p = (char)toupper((unsigned char)*p);
+                    /* method name preserved verbatim — caller must match case */
                 } else {
                     /* bare name: use as both assembly and method */
                     e->lang   = strdup("");
                     e->name   = strdup(sl->body);
                     e->method = strdup(sl->body);
-                    for (char *p = e->method; *p; p++)
-                        *p = (char)toupper((unsigned char)*p);
                 }
                 e->next = prog->imports;
                 prog->imports = e;

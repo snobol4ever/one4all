@@ -2,6 +2,16 @@
 % Uses only builtins confirmed supported by sno2c -pl -jvm parser+emitter.
 % Deduplication of symmetric pairs done in Icon output stage.
 
+:- export(scrip_init/0).
+:- export(assert_person/4).
+:- export(assert_parent/2).
+:- export(query_count/1).
+:- export(query_grandparents/1).
+:- export(query_siblings/1).
+:- export(query_cousins/1).
+:- export(query_generations/1).
+:- export(query_ancestors/2).
+
 % ── Pure helpers ──────────────────────────────────────────────────────────
 
 findall_length([], 0).

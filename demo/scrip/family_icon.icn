@@ -1,102 +1,131 @@
 # family_icon.icn -- Icon block of the Scrip family-tree demo.
-# Pure expression style -- no if/then as expr, no {} blocks, no string params.
+# Queries the Prolog DB via IMPORT; prints the report.
+$import family_prolog.query_count
+$import family_prolog.query_grandparents
+$import family_prolog.query_siblings
+$import family_prolog.query_cousins
+$import family_prolog.query_generations
+$import family_prolog.query_ancestors
 
-procedure prolog_query_count()
-  return "0";
+global g_raw;
+global g_line;
+global g_kind;
+
+procedure next_line(i, n)
+  local j;
+  j := find("\n", g_raw, i);
+  if j = 0 then j := n + 1;
+  return j;
 end
 
-procedure prolog_query_grandparents()
-  return "";
+procedure print_lines()
+  local n, i, j;
+  n := *g_raw;
+  i := 1;
+  while i <= n do {
+    j := next_line(i, n);
+    if j > i then
+      write("  " || g_raw[i:j]);
+    i := j + 1;
+  };
 end
 
-procedure prolog_query_siblings()
-  return "";
+procedure emit_pair()
+  local pi, a, b;
+  pi := find("|", g_line);
+  if pi = 0 then return;
+  a := g_line[1:pi];
+  b := g_line[pi+1:*g_line+1];
+  if a <= b then
+    write("  " || a || " and " || b || " are " || g_kind);
 end
 
-procedure prolog_query_cousins()
-  return "";
+procedure print_pair_lines()
+  local n, i, j;
+  n := *g_raw;
+  i := 1;
+  while i <= n do {
+    j := next_line(i, n);
+    if j > i then {
+      g_line := g_raw[i:j];
+      emit_pair();
+    };
+    i := j + 1;
+  };
 end
 
-procedure prolog_query_generations()
-  return "";
+procedure emit_gen()
+  local pi;
+  pi := find("|", g_line);
+  if pi > 0 then
+    write("  " || g_line[pi+1:*g_line+1] || " : generation " || g_line[1:pi]);
 end
 
-procedure prolog_query_ancestors(uid)
-  return "";
+procedure print_gen_lines()
+  local n, i, j;
+  n := *g_raw;
+  i := 1;
+  while i <= n do {
+    j := next_line(i, n);
+    if j > i then {
+      g_line := g_raw[i:j];
+      emit_gen();
+    };
+    i := j + 1;
+  };
+end
+
+procedure emit_anc()
+  local pi;
+  pi := find("|", g_line);
+  if pi > 0 then
+    write("  " || g_line[pi+1:*g_line+1] || " (generation " || g_line[1:pi] || ")");
+end
+
+procedure print_anc_lines()
+  local n, i, j;
+  n := *g_raw;
+  i := 1;
+  while i <= n do {
+    j := next_line(i, n);
+    if j > i then {
+      g_line := g_raw[i:j];
+      emit_anc();
+    };
+    i := j + 1;
+  };
 end
 
 procedure main()
-  local raw, n, i, j, line, pi, a, b, key, t, cnt, lo, hi;
+  local cnt;
 
-  cnt := prolog_query_count();
+  cnt := QUERY_COUNT();
   write("Parsed " || cnt || " family members.");
   write("");
 
   write("=== Grandparent relationships ===");
-  raw := prolog_query_grandparents();
-  n := *raw; i := 1;
-  while i <= n do
-    (j := (find("\n", raw, i) | (n+1))) &
-    ((j > i) & write("  " || raw[i:j]) | (i := i)) &
-    (i := j+1);
+  g_raw := QUERY_GRANDPARENTS();
+  print_lines();
   write("");
 
   write("=== Siblings ===");
-  raw := prolog_query_siblings();
-  t := table("0"); n := *raw; i := 1;
-  while i <= n do
-    (j := (find("\n", raw, i) | (n+1))) &
-    ((j > i) &
-      (line := raw[i:j]) &
-      (pi := find("|", line)) &
-      (a := line[1:pi]) &
-      (b := line[pi+1:*line+1]) &
-      ((a > b & (lo := b) & (hi := a)) | ((lo := a) & (hi := b))) &
-      (key := lo || "|" || hi) &
-      (t[key] = "0") &
-      (t[key] := "1") &
-      write("  " || a || " and " || b || " are siblings") | (i := i)) &
-    (i := j+1);
+  g_raw := QUERY_SIBLINGS();
+  g_kind := "siblings";
+  print_pair_lines();
   write("");
 
   write("=== Cousins ===");
-  raw := prolog_query_cousins();
-  t := table("0"); n := *raw; i := 1;
-  while i <= n do
-    (j := (find("\n", raw, i) | (n+1))) &
-    ((j > i) &
-      (line := raw[i:j]) &
-      (pi := find("|", line)) &
-      (a := line[1:pi]) &
-      (b := line[pi+1:*line+1]) &
-      ((a > b & (lo := b) & (hi := a)) | ((lo := a) & (hi := b))) &
-      (key := lo || "|" || hi) &
-      (t[key] = "0") &
-      (t[key] := "1") &
-      write("  " || a || " and " || b || " are cousins") | (i := i)) &
-    (i := j+1);
+  g_raw := QUERY_COUSINS();
+  g_kind := "cousins";
+  print_pair_lines();
   write("");
 
   write("=== Generations (root=0) ===");
-  raw := prolog_query_generations();
-  n := *raw; i := 1;
-  while i <= n do
-    (j := (find("\n", raw, i) | (n+1))) &
-    ((j > i) &
-      (line := raw[i:j]) &
-      (pi := find("|", line)) &
-      write("  " || line[pi+1:*line+1] || " : generation " || line[1:pi]) | (i := i)) &
-    (i := j+1);
+  g_raw := QUERY_GENERATIONS();
+  print_gen_lines();
   write("");
 
   write("=== Ancestors of James (U008) ===");
-  raw := prolog_query_ancestors("U008");
-  n := *raw; i := 1;
-  while i <= n do
-    (j := (find("\n", raw, i) | (n+1))) &
-    ((j > i) &
-      (line := raw[i:j]) &
-      (pi := find("|", line)) &
-      write("  " || line[pi+1:*line+1] || " (generation " || line[1:pi] || ")") | (i := i)) &
-    (i := j+1);
+  g_raw := QUERY_ANCESTORS("U008");
+  print_anc_lines();
 end

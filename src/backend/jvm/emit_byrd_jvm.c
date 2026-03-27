@@ -75,7 +75,7 @@ static int jvm_is_exported(Program *prog, const char *name) {
 static ImportEntry *jvm_find_import(Program *prog, const char *name) {
     if (!prog) return NULL;
     for (ImportEntry *ie = prog->imports; ie; ie = ie->next)
-        if (strcmp(ie->method, name) == 0) return ie;
+        if (strcasecmp(ie->method, name) == 0) return ie;
     return NULL;
 }
 
@@ -297,6 +297,7 @@ typedef struct JvmFnDef_s {
 static JvmFnDef jvm_fn_table_fwd[JVM_FN_MAX_FWD];
 static int       jvm_fn_count_fwd = 0;
 static const JvmFnDef *jvm_cur_fn = NULL;
+static Program *jvm_cur_prog = NULL;   /* set before main emit loop; visible to jvm_emit_expr */
 static const JvmFnDef *jvm_find_fn(const char *name);  /* fwd decl */
 
 /* Named pattern registry — compile-time table of VAR = <pattern-expr> assignments.
@@ -1178,6 +1179,42 @@ static void jvm_emit_expr(EXPR_t *e) {
             JI("invokestatic", ddesc);
             JI("ldc", "\"\"");
             break;
+        }
+        /* M-LINK-JVM: cross-language IMPORT call (ARCH-scrip-abi.md §3)
+         * Emits: pack args into Object[], invokestatic assembly/METHOD(...V),
+         * read result from ByrdBoxLinkage/RESULT, cast to String. */
+        {
+            ImportEntry *ie = jvm_find_import(jvm_cur_prog, fname);
+            if (ie) {
+                int nargs = e->nchildren;
+                /* Pack args into Object[] */
+                if (nargs == 0) {
+                    JI("aconst_null", "");
+                } else {
+                    J("    ldc %d\n", nargs);
+                    JI("anewarray", "java/lang/Object");
+                    for (int i = 0; i < nargs; i++) {
+                        JI("dup", "");
+                        J("    ldc %d\n", i);
+                        if (e->children && e->children[i]) jvm_emit_expr(e->children[i]);
+                        else JI("ldc", "\"\"");
+                        JI("aastore", "");
+                    }
+                }
+                /* null gamma, null omega — synchronous call, result via RESULT */
+                JI("aconst_null", "");
+                JI("aconst_null", "");
+                char sig[512];
+                snprintf(sig, sizeof sig,
+                    "%s/%s([Ljava/lang/Object;Ljava/lang/Runnable;Ljava/lang/Runnable;)V",
+                    ie->name, ie->method);
+                JI("invokestatic", sig);
+                /* Read result from ByrdBoxLinkage.RESULT */
+                J("    getstatic ByrdBoxLinkage/RESULT Ljava/util/concurrent/atomic/AtomicReference;\n");
+                JI("invokevirtual", "java/util/concurrent/atomic/AtomicReference/get()Ljava/lang/Object;");
+                JI("checkcast", "java/lang/String");
+                break;
+            }
         }
         /* User-defined function call */
         {
@@ -2296,8 +2333,6 @@ static int expr_contains_input(EXPR_t *e) {
 }
 
 /* Emit a goto to a SNOBOL4 label, intercepting RETURN/FRETURN when in a fn body */
-static Program *jvm_cur_prog = NULL;   /* set before main emit loop */
-
 static void jvm_emit_goto(const char *label) {
     if (!label || !label[0]) return;
     /* RETURN/FRETURN/NRETURN: route to function exit labels, or L_END if in main */

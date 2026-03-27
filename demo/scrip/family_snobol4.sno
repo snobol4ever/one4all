@@ -1,20 +1,12 @@
 *  family_snobol4.sno — SNOBOL4 block of the Scrip family-tree demo.
-*  Reads family.csv from stdin. Calls cross-language stubs (replaced by
-*  inject_linkage.py with invokestatic FamilyProlog/assert_person etc.).
+*  Reads family.csv from stdin. Calls into family_prolog via IMPORT.
+IMPORT  family_prolog.scrip_init
+IMPORT  family_prolog.assert_person
+IMPORT  family_prolog.assert_parent
 
-         DEFINE('PROLOG_ASSERT_PERSON(UID,PNAME,PYEAR,PGENDER)')
-         DEFINE('PROLOG_ASSERT_PARENT(CHILD_UID,PARENT_UID)')
-         DEFINE('SCRIP_INIT()')
-         GOTO(STUBS_DONE)
+         &CASE  = 1
+         &TRIM  = 1
 
-PROLOG_ASSERT_PERSON
-         PROLOG_ASSERT_PERSON = ''          :(RETURN)
-PROLOG_ASSERT_PARENT
-         PROLOG_ASSERT_PARENT = ''          :(RETURN)
-SCRIP_INIT
-         SCRIP_INIT = ''                 :(RETURN)
-
-STUBS_DONE
 *  Named structural patterns.
          PAT_NAME   = SPAN(&UCASE &LCASE)
          PAT_UID    = SPAN(&UCASE &LCASE '0123456789')
@@ -22,7 +14,7 @@ STUBS_DONE
          PAT_GENDER = ANY('MF')
          PAT_EMPTY  = POS(0) RPOS(0)
 
-*  Composite row pattern — one structural description is the parser.
+*  Composite row pattern.
          PAT_ROW    = PAT_NAME   . F_NAME   ','
 +                     PAT_UID    . F_UID    ','
 +                     PAT_YEAR   . F_YEAR   ','
@@ -37,9 +29,9 @@ STUBS_DONE
 *  Parse loop.
 NEXTROW  LINE = INPUT                                  :F(DONE)
          LINE PAT_ROW                                  :F(NEXTROW)
-         PROLOG_ASSERT_PERSON(F_UID, F_NAME, F_YEAR, F_GENDER)
+         ASSERT_PERSON(F_UID, F_NAME, F_YEAR, F_GENDER)
          F_PARENT SPAN('U0123456789')                  :F(NEXTROW)
-         PROLOG_ASSERT_PARENT(F_UID, F_PARENT)         :(NEXTROW)
+         ASSERT_PARENT(F_UID, F_PARENT)                :(NEXTROW)
 
 DONE
 END

@@ -149,7 +149,7 @@ static ImportEntry *ij_imports = NULL;
  * We match on ie->method (uppercased exported name). */
 static ImportEntry *ij_find_import(const char *name) {
     for (ImportEntry *ie = ij_imports; ie; ie = ie->next) {
-        if (ie->method && strcmp(ie->method, name) == 0) return ie;
+        if (ie->method && strcasecmp(ie->method, name) == 0) return ie;
     }
     return NULL;
 }
@@ -6622,7 +6622,10 @@ static void ij_emit_expr(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
                 IcnNode *v = n->children[ci];
                 if (!v || v->kind != ICN_VAR) continue;
                 char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", v->val.sval);
-                ij_declare_static(gname);
+                /* Globals pre-tagged as 'A' (String) by pre-scan; declare accordingly */
+                int gtag = ij_field_type_tag(gname);
+                if (gtag == 'A') ij_declare_static_str(gname);
+                else             ij_declare_static(gname);
             }
             int id2 = ij_new_id(); char a2[64], b2[64];
             lbl_α(id2,a2,sizeof a2); lbl_β(id2,b2,sizeof b2);
@@ -7143,6 +7146,35 @@ void ij_emit_file(IcnNode **nodes, int count, FILE *out, const char *filename, c
             IcnNode *v = nd->children[ci];
             if (!v || v->kind != ICN_VAR) continue;
             ij_register_global(v->val.sval);
+        }
+    }
+
+    /* Pre-scan: tag globals assigned from import calls as String type ('A').
+     * This ensures ij_emit_var uses Ljava/lang/String; even in helper procs
+     * that are emitted before the assignment in main() is processed. */
+    for (int pi = 0; pi < count; pi++) {
+        IcnNode *proc = nodes[pi];
+        if (!proc || proc->kind != ICN_PROC) continue;
+        int np = (int)proc->val.ival;
+        int body_start = 1 + np;
+        for (int si = body_start; si < proc->nchildren; si++) {
+            IcnNode *s = proc->children[si];
+            if (!s || s->kind != ICN_ASSIGN || s->nchildren < 2) continue;
+            IcnNode *lhs = s->children[0];
+            IcnNode *rhs = s->children[1];
+            if (!lhs || lhs->kind != ICN_VAR) continue;
+            if (!ij_is_global(lhs->val.sval)) continue;
+            /* If RHS is an import call, result is always String */
+            int rhs_is_import_call = 0;
+            if (rhs && rhs->kind == ICN_CALL && rhs->nchildren >= 1) {
+                IcnNode *fn = rhs->children[0];
+                if (fn && fn->kind == ICN_VAR)
+                    rhs_is_import_call = (ij_find_import(fn->val.sval) != NULL);
+            }
+            if (rhs_is_import_call || ij_expr_is_string(rhs)) {
+                char gname2[80]; snprintf(gname2, sizeof gname2, "icn_gvar_%s", lhs->val.sval);
+                ij_declare_static_str(gname2);
+            }
         }
     }
 
