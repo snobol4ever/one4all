@@ -631,8 +631,10 @@ static int dcg_expand_body(Term *body, Term *s_in, Term *s_out,
 }
 
 /* Expand a DCG clause (head --> body) into a normal PlClause.
- * Modifies cl->head (adds S0, S args) and cl->body (expanded goals). */
-static void dcg_expand_clause(PlClause *cl, Term *dcg_body, VarScope *sc) {
+ * Modifies cl->head (adds S0, S args) and cl->body (expanded goals).
+ * pushback: non-NULL for pushback notation  Head, Pushback --> Body
+ *   The pushback list is prepended to the output difference list tail. */
+static void dcg_expand_clause(PlClause *cl, Term *dcg_body, Term *pushback, VarScope *sc) {
     dcg_var_counter = 0;
 
     /* Add S0, S to head */
@@ -656,7 +658,19 @@ static void dcg_expand_clause(PlClause *cl, Term *dcg_body, VarScope *sc) {
 
     /* Expand body */
     Term *buf[1024];
-    int n = dcg_expand_body(dcg_body, s0, s, sc, buf, 0);
+    int n;
+
+    if (pushback) {
+        /* Pushback notation: Head, Pushback --> Body
+         * Body expands between S0 and S_mid.
+         * Then S_mid is unified with dcg_append_tail(pushback, S). */
+        Term *s_mid = dcg_fresh_var(sc);
+        n = dcg_expand_body(dcg_body, s0, s_mid, sc, buf, 0);
+        Term *pushback_with_tail = dcg_append_tail(pushback, s);
+        buf[n++] = dcg_make_unify(s_mid, pushback_with_tail);
+    } else {
+        n = dcg_expand_body(dcg_body, s0, s, sc, buf, 0);
+    }
 
     cl->body  = malloc(n * sizeof(Term *));
     cl->nbody = n;
@@ -690,11 +704,15 @@ static PlClause *parse_clause(Parser *p) {
     }
 
     /* Fact or rule: head [:-  body] . */
-    Term *head = parse_term(p, 999);
+    /* Parse at 1199 so that  Head, Pushback --> Body  captures the pushback as ','(Head,Pushback),
+     * but the 1200-priority operators :- and --> are NOT consumed into the head term. */
+    Term *head = parse_term(p, 1199);
     cl->head = head;
 
     pk = lexer_peek(&p->lx);
     if (pk.kind == TK_NECK) {
+        /* Normal :- rule — head was parsed at 1200 but comma at top level is fine
+         * because the head of a :- clause is never a bare conjunction. */
         lexer_next(&p->lx); /* consume :- */
         Term *body_term = parse_term(p, 1200);
         int n = count_conj(body_term);
@@ -703,7 +721,15 @@ static PlClause *parse_clause(Parser *p) {
     } else if (pk.kind == TK_OP && strcmp(pk.text, "-->") == 0) {
         lexer_next(&p->lx); /* consume --> */
         Term *dcg_body = parse_term(p, 1200);
-        dcg_expand_clause(cl, dcg_body, &p->sc);
+        /* Pushback notation: if head is ','(RealHead, Pushback), split it */
+        Term *pushback = NULL;
+        Term *hd = term_deref(cl->head);
+        int comma_id = prolog_atom_intern(",");
+        if (hd->tag == TT_COMPOUND && hd->compound.functor == comma_id && hd->compound.arity == 2) {
+            cl->head = hd->compound.args[0];
+            pushback = hd->compound.args[1];
+        }
+        dcg_expand_clause(cl, dcg_body, pushback, &p->sc);
     } else {
         cl->body  = NULL;
         cl->nbody = 0;
