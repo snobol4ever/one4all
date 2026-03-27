@@ -37,6 +37,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 /* ── helpers ──────────────────────────────────────────────────────────────── */
 
@@ -804,6 +805,62 @@ Program *parse_program(LineArray *lines) {
     for (int i=0; i<lines->n; i++) {
         SnoLine *sl = &lines->a[i];
         STMT_t *s;
+
+        /* ---- EXPORT / IMPORT control lines (LP-4) ----
+         * EXPORT appears as label="EXPORT", body=<name>
+         * IMPORT appears as label="IMPORT", body=<lang>.<name>
+         * These are not SNOBOL4 statements — consume and skip. */
+        if (sl->label && strcasecmp(sl->label, "EXPORT") == 0) {
+            if (sl->body && sl->body[0]) {
+                ExportEntry *e = calloc(1, sizeof *e);
+                e->name = strdup(sl->body);
+                /* uppercase the name to match SNOBOL4 convention */
+                for (char *p = e->name; *p; p++)
+                    *p = (char)toupper((unsigned char)*p);
+                e->next = prog->exports;
+                prog->exports = e;
+            }
+            continue;
+        }
+        if (sl->label && strcasecmp(sl->label, "IMPORT") == 0) {
+            if (sl->body && sl->body[0]) {
+                /* body formats:
+                 *   LANG.AssemblyBase.METHOD  — three-part (preferred)
+                 *   LANG.NAME                 — two-part (NAME = assembly = method)
+                 */
+                char *dot1 = strchr(sl->body, '.');
+                ImportEntry *e = calloc(1, sizeof *e);
+                if (dot1) {
+                    e->lang = strndup(sl->body, (size_t)(dot1 - sl->body));
+                    char *dot2 = strchr(dot1 + 1, '.');
+                    if (dot2) {
+                        /* three-part: lang . assembly . method */
+                        e->name   = strndup(dot1 + 1, (size_t)(dot2 - dot1 - 1));
+                        e->method = strdup(dot2 + 1);
+                        for (char *p = e->method; *p; p++)
+                            *p = (char)toupper((unsigned char)*p);
+                    } else {
+                        /* two-part: lang . name  (name doubles as assembly+method) */
+                        e->name   = strdup(dot1 + 1);
+                        e->method = strdup(dot1 + 1);
+                        for (char *p = e->method; *p; p++)
+                            *p = (char)toupper((unsigned char)*p);
+                    }
+                } else {
+                    e->lang   = strdup("UNKNOWN");
+                    e->name   = strdup(sl->body);
+                    e->method = strdup(sl->body);
+                    for (char *p = e->method; *p; p++)
+                        *p = (char)toupper((unsigned char)*p);
+                }
+                /* NOTE: lang and name preserve case — assembly names are
+                 * case-sensitive on .NET */
+                e->next = prog->imports;
+                prog->imports = e;
+            }
+            continue;
+        }
+        /* ---- end EXPORT/IMPORT ---- */
 
         if (sl->is_end) {
             s = stmt_new();

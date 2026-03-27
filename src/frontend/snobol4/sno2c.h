@@ -115,10 +115,26 @@ struct STMT_t {
 };
 
 /* ---- program ---- */
+/* ---- EXPORT / IMPORT lists (linker sprint LP-4) ---- */
+
+typedef struct ExportEntry {
+    char              *name;   /* exported symbol name, e.g. "WORDCOUNT" */
+    struct ExportEntry *next;
+} ExportEntry;
+
+typedef struct ImportEntry {
+    char              *lang;   /* source language prefix, e.g. "SNOBOL4"  */
+    char              *name;   /* assembly base name,     e.g. "Greet_lib" */
+    char              *method; /* exported method name,   e.g. "GREET"     */
+    struct ImportEntry *next;
+} ImportEntry;
+
 typedef struct {
-    STMT_t *head;
-    STMT_t *tail;
-    int     nstmts;
+    STMT_t      *head;
+    STMT_t      *tail;
+    int          nstmts;
+    ExportEntry *exports;   /* singly-linked list of EXPORT directives */
+    ImportEntry *imports;   /* singly-linked list of IMPORT directives */
 } Program;
 
 /* ---- allocators ---- */
