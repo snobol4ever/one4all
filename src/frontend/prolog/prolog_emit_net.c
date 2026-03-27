@@ -311,8 +311,10 @@ static void pn_emit_predicate(STMT_t *stmt) {
     method[sizeof method - 1] = '\0';
     for (char *p = method; *p; p++) *p = (char)toupper((unsigned char)*p);
 
-    int exported = pn_is_exported(functor) || pn_is_exported(method);
-    const char *vis = exported ? "public" : "private";
+    /* M-LINK-NET-6: all predicates public — Prolog export directives in future sprint */
+    int exported = 1;
+    (void)pn_is_exported;
+    const char *vis = "public";
     const char *ACT = "class [mscorlib]System.Action";
 
     /* Emit one clause method per clause */
@@ -352,7 +354,16 @@ static void pn_emit_predicate(STMT_t *stmt) {
             pn_emit_goal(goal, omega_lbl, n_vars);
         }
 
-        /* Success: call gamma */
+        /* Success: store result (last arg) in ByrdBoxLinkage.Result, then call gamma */
+        if (n_args > 0) {
+            /* Store args[n_args-1] (the output variable) as Result */
+            N("    ldloc.1\n");   /* vars array — bound variable values */
+            N("    ldc.i4  %d\n", n_args - 1);
+            N("    ldelem.ref\n");
+            N("    castclass [mscorlib]System.String\n");
+            N("    newobj     instance void [snobol4lib]DESCR::.ctor(string)\n");
+            N("    stsfld     class [snobol4lib]DESCR [snobol4lib]ByrdBoxLinkage::Result\n");
+        }
         N("    ldarg.2\n");
         N("    callvirt   instance void [mscorlib]System.Action::Invoke()\n");
         N("    ret\n");

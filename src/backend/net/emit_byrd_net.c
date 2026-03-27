@@ -742,43 +742,37 @@ static void net_emit_expr(EXPR_t *e) {
         {
             const ImportEntry *imp = net_find_import(fn);
             if (imp) {
+                /* Find import index (matches pre-emitted helper index) */
+                int imp_idx = 0;
+                for (ImportEntry *ie2 = net_prog->imports; ie2; ie2 = ie2->next, imp_idx++)
+                    if (ie2 == imp) break;
                 int uid = net_pat_uid++;
-                /* M-LINK-NET-4: real Action delegate wiring.
-                 * Emit two private static helper methods (net_imp_gamma_N /
-                 * net_imp_omega_N) that set a local int flag stored in a static
-                 * field, then build Action delegates via ldftn+newobj and pass
-                 * them to the cross-assembly Byrd-box call.
-                 * The flag field net_imp_flag_N is read back after the call. */
-                N("  .method private static void net_imp_gamma_%d() cil managed\n", uid);
-                N("  {\n    .maxstack 1\n");
-                N("    ldc.i4.1\n");
-                N("    stsfld     int32 %s::net_imp_flag_%d\n", net_classname, uid);
-                N("    ret\n  }\n");
-                N("  .method private static void net_imp_omega_%d() cil managed\n", uid);
-                N("  {\n    .maxstack 1\n");
-                N("    ldc.i4.0\n");
-                N("    stsfld     int32 %s::net_imp_flag_%d\n", net_classname, uid);
-                N("    ret\n  }\n");
-                /* static int32 flag field — emitted inline; ilasm allows forward refs */
-                N("  .field private static int32 net_imp_flag_%d\n", uid);
-                /* build gamma Action delegate */
+                /* Build args array from call-site arguments */
+                int na = expr_nargs(e);
+                N("    ldc.i4  %d\n", na);
+                N("    newarr     [mscorlib]System.Object\n");
+                for (int ai = 0; ai < na; ai++) {
+                    EXPR_t *ca = expr_arg(e, ai);
+                    N("    dup\n");
+                    N("    ldc.i4  %d\n", ai);
+                    if (ca) net_emit_expr(ca); else net_ldstr("");
+                    N("    stelem.ref\n");
+                }
+                /* gamma/omega delegates — helpers pre-emitted at class scope */
                 N("    ldnull\n");
-                N("    ldftn      void %s::net_imp_gamma_%d()\n", net_classname, uid);
+                N("    ldftn      void %s::net_imp_gamma_%d()\n", net_classname, imp_idx);
                 N("    newobj     instance void [mscorlib]System.Action::.ctor(object, native int)\n");
-                /* build omega Action delegate */
                 N("    ldnull\n");
-                N("    ldftn      void %s::net_imp_omega_%d()\n", net_classname, uid);
+                N("    ldftn      void %s::net_imp_omega_%d()\n", net_classname, imp_idx);
                 N("    newobj     instance void [mscorlib]System.Action::.ctor(object, native int)\n");
                 N("    call       void [%s]%s::%s("
+                  "object[],"
                   "class [mscorlib]System.Action,"
                   "class [mscorlib]System.Action)\n",
-                  imp->name,
-                  imp->name,
-                  imp->method);
-                /* Check flag set by gamma/omega helper, set loc.0 success/fail */
-                N("    ldsfld     int32 %s::net_imp_flag_%d\n", net_classname, uid);
+                  imp->name, imp->name, imp->method);
+                /* Check flag, retrieve result */
+                N("    ldsfld     int32 %s::net_imp_flag_%d\n", net_classname, imp_idx);
                 N("    stloc.0\n");
-                /* retrieve result string from ByrdBoxLinkage.Result (γ path only) */
                 N("    ldloc.0\n");
                 N("    brfalse    Nimp_%d_done\n", uid);
                 N("    ldsfld     class [snobol4lib]DESCR [snobol4lib]ByrdBoxLinkage::Result\n");
@@ -2326,6 +2320,19 @@ static void net_emit_header(Program *prog) {
 }
 
 static void net_emit_main_open(void) {
+    /* Emit import delegate helpers at class scope before main() */
+    {
+        int imp_idx = 0;
+        for (ImportEntry *ie = net_prog->imports; ie; ie = ie->next, imp_idx++) {
+            N("  .field private static int32 net_imp_flag_%d\n", imp_idx);
+            N("  .method private static void net_imp_gamma_%d() cil managed\n", imp_idx);
+            N("  {\n    .maxstack 1\n    ldc.i4.1\n");
+            N("    stsfld     int32 %s::net_imp_flag_%d\n    ret\n  }\n", net_classname, imp_idx);
+            N("  .method private static void net_imp_omega_%d() cil managed\n", imp_idx);
+            N("  {\n    .maxstack 1\n    ldc.i4.0\n");
+            N("    stsfld     int32 %s::net_imp_flag_%d\n    ret\n  }\n", net_classname, imp_idx);
+        }
+    }
     N("  .method public static void main(string[] args) cil managed\n");
     N("  {\n");
     N("    .entrypoint\n");
