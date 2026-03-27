@@ -5727,6 +5727,104 @@ static void ij_emit_swap(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
 }
 
 /* =========================================================================
+ * ICN_IDENTICAL — E1 === E2  (same type and value)
+ * For our unboxed representation: longs compare ==, strings compare .equals()
+ * ======================================================================= */
+static void ij_emit_identical(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
+    int id = ij_new_id(); char a[64], b[64];
+    lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
+    strncpy(oα,a,63); strncpy(oβ,b,63);
+
+    if (n->nchildren < 2) { JL(a); JGoto(ports.ω); JL(b); JGoto(ports.ω); return; }
+
+    char lrf[80], rrf[80];
+    snprintf(lrf, sizeof lrf, "icn_%d_id_lc", id);
+    snprintf(rrf, sizeof rrf, "icn_%d_id_rc", id);
+    int is_str = ij_expr_is_string(n->children[0]) || ij_expr_is_string(n->children[1]);
+    if (is_str) { ij_declare_static_str(lrf); ij_declare_static_str(rrf); }
+    else        { ij_declare_static(lrf);     ij_declare_static(rrf);     }
+
+    char rrelay[64], lrelay[64], chk[64];
+    snprintf(rrelay, sizeof rrelay, "icn_%d_id_rr", id);
+    snprintf(lrelay, sizeof lrelay, "icn_%d_id_lr", id);
+    snprintf(chk,    sizeof chk,    "icn_%d_id_chk", id);
+
+    IjPorts rp; strncpy(rp.γ, rrelay, 63); strncpy(rp.ω, ports.ω, 63);
+    char ra[64], rb[64]; ij_emit_expr(n->children[1], rp, ra, rb);
+    IjPorts lp; strncpy(lp.γ, lrelay, 63); strncpy(lp.ω, ports.ω, 63);
+    char la[64], lb[64]; ij_emit_expr(n->children[0], lp, la, lb);
+
+    JL(lrelay);
+    if (is_str) ij_put_str_field(lrf); else ij_put_long(lrf);
+    JL(rrelay);
+    if (is_str) ij_put_str_field(rrf); else ij_put_long(rrf);
+
+    JL(a); JGoto(la);
+    JL(chk);
+    if (is_str) {
+        ij_get_str_field(lrf); ij_get_str_field(rrf);
+        JI("invokevirtual", "java/lang/String/equals(Ljava/lang/Object;)Z");
+        JI("ifeq", ports.ω);
+        ij_get_str_field(lrf);
+    } else {
+        ij_get_long(lrf); ij_get_long(rrf);
+        JI("lcmp", ""); JI("ifne", ports.ω);
+        ij_get_long(lrf);
+    }
+    JGoto(ports.γ);
+    JL(b); JGoto(ports.ω);
+}
+
+/* =========================================================================
+ * ICN_MATCH — =E  (scan: succeed if subject starts with E, advance &pos)
+ * Implemented as a call to icn_rt_match(subject, pos, pattern)
+ * which returns new pos or -1 on failure.
+ * ======================================================================= */
+static void ij_emit_match(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
+    int id = ij_new_id(); char a[64], b[64];
+    lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
+    strncpy(oα,a,63); strncpy(oβ,b,63);
+
+    if (n->nchildren < 1) { JL(a); JGoto(ports.ω); JL(b); JGoto(ports.ω); return; }
+
+    /* Evaluate the pattern expression */
+    char pat_relay[64]; snprintf(pat_relay, sizeof pat_relay, "icn_%d_match_pr", id);
+    char pat_field[80]; snprintf(pat_field, sizeof pat_field, "icn_%d_match_pat", id);
+    ij_declare_static_str(pat_field);
+
+    IjPorts pp; strncpy(pp.γ, pat_relay, 63); strncpy(pp.ω, ports.ω, 63);
+    char pa[64], pb[64]; ij_emit_expr(n->children[0], pp, pa, pb);
+
+    JL(pat_relay); ij_put_str_field(pat_field);
+
+    JL(a); JGoto(pa);
+
+    /* Call: IjRT.match(&subject, &pos, pat) → new_pos or -1 */
+    char chk[64]; snprintf(chk, sizeof chk, "icn_%d_match_chk", id);
+    JL(chk);
+    JI("getstatic",  "IjRT/icn_subject Ljava/lang/String;");
+    JI("getstatic",  "IjRT/icn_pos J");
+    ij_get_str_field(pat_field);
+    JI("invokestatic","IjRT/icn_rt_match(Ljava/lang/String;JLjava/lang/String;)J");
+    /* result: new pos (>=0) or -1 */
+    char result_fld[80]; snprintf(result_fld, sizeof result_fld, "icn_%d_match_res", id);
+    ij_declare_static(result_fld);
+    ij_put_long(result_fld);
+    ij_get_long(result_fld);
+    JI("lconst_0",""); JI("lcmp",""); JI("iflt", ports.ω);
+    /* update &pos */
+    ij_get_long(result_fld);
+    JI("putstatic", "IjRT/icn_pos J");
+    /* return matched substring */
+    JI("getstatic", "IjRT/icn_subject Ljava/lang/String;");
+    JI("getstatic", "IjRT/icn_pos J"); JI("l2i","");
+    ij_get_long(result_fld); JI("l2i","");
+    JI("invokevirtual","java/lang/String/substring(II)Ljava/lang/String;");
+    JGoto(ports.γ);
+    JL(b); JGoto(ports.ω);
+}
+
+/* =========================================================================
  * Dispatch
  * ======================================================================= */
 static void ij_emit_expr(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
@@ -5818,6 +5916,13 @@ static void ij_emit_expr(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         case ICN_CONCAT:  ij_emit_concat   (n,ports,oα,oβ); break;
         case ICN_LCONCAT: ij_emit_concat   (n,ports,oα,oβ); break; /* Tiny-ICON: ||| = || */
         case ICN_SWAP:    ij_emit_swap      (n,ports,oα,oβ); break;
+        case ICN_IDENTICAL: ij_emit_identical(n,ports,oα,oβ); break;
+        case ICN_MATCH:   ij_emit_match     (n,ports,oα,oβ); break;
+        case ICN_SECTION_PLUS:
+        case ICN_SECTION_MINUS:
+            /* M+:N / M-:N — emit as plain section for now (stub) */
+            ij_emit_section(n,ports,oα,oβ); break;
+        case ICN_BANG_BINARY: ij_emit_call(n,ports,oα,oβ); break; /* stub */
         case ICN_SUBSCRIPT: ij_emit_subscript(n,ports,oα,oβ); break;
         case ICN_SECTION:   ij_emit_section  (n,ports,oα,oβ); break;
         case ICN_MAKELIST:  ij_emit_makelist (n,ports,oα,oβ); break;

@@ -64,10 +64,30 @@ typedef enum {
     TK_AUGSTAR,    /* *:= */
     TK_AUGSLASH,   /* /:= */
     TK_AUGMOD,     /* %:= */
+    TK_AUGPOW,     /* ^:= */
     TK_AUGCONCAT,  /* ||:= */
+    TK_AUGCSET_UNION, /* ++:= */
+    TK_AUGCSET_DIFF,  /* --:= */
+    TK_AUGCSET_INTER, /* **:= */
+    TK_AUGSCAN,    /* ?:= */
     TK_AUGEQ,      /* =:= (augmented numeric =) */
     TK_AUGSEQ,     /* ==:= (augmented string ==) */
     TK_EQSWAP,     /* =:= — same token; alias */
+    TK_AUGLT,      /* <:= */
+    TK_AUGLE,      /* <=:= */
+    TK_AUGGT,      /* >:= */
+    TK_AUGGE,      /* >=:= */
+    TK_AUGNE,      /* ~=:= */
+    TK_AUGSLT,     /* <<:= */
+    TK_AUGSLE,     /* <<=:= */
+    TK_AUGSGT,     /* >>:= */
+    TK_AUGSGE,     /* >>=:= */
+    TK_AUGSNE,     /* ~==:= */
+    TK_VALSWAP,    /* <-> (value swap) */
+    TK_IDENTICAL,  /* === (type+value equality) */
+    TK_NOTIDENT,   /* ~=== (type+value inequality) */
+    TK_PLUSCOLON,  /* +: (section offset) */
+    TK_MINUSCOLON, /* -: (section offset) */
 
     /* Cset / set operators */
     TK_PLUSPLUS,   /* ++ (cset union) */

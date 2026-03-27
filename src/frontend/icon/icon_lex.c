@@ -167,7 +167,19 @@ static IcnToken scan_cset(IcnLexer *lx) {
     lex_advance(lx); /* consume opening ' */
     char *buf = NULL; int len = 0, cap = 0;
     while (lex_cur(lx) && lex_cur(lx) != '\'') {
-        buf_push(&buf, &len, &cap, lex_advance(lx));
+        char c = lex_advance(lx);
+        if (c == '\\' && lex_cur(lx)) {
+            char esc = lex_advance(lx);
+            switch (esc) {
+                case '\'': c = '\''; break;
+                case '\\': c = '\\'; break;
+                case 'n':  c = '\n'; break;
+                case 't':  c = '\t'; break;
+                case 'r':  c = '\r'; break;
+                default:   buf_push(&buf, &len, &cap, c); c = esc; break;
+            }
+        }
+        buf_push(&buf, &len, &cap, c);
     }
     if (!lex_cur(lx)) { free(buf); return make_error(lx, "unterminated cset literal"); }
     lex_advance(lx); /* consume closing ' */
@@ -304,27 +316,56 @@ static IcnToken lex_one(IcnLexer *lx) {
 
     switch (c) {
         case '+':
-            if (lex_cur(lx) == '+') { lex_advance(lx); return make_tok(TK_PLUSPLUS,   line, col); }
+            if (lex_cur(lx) == '+') {
+                lex_advance(lx);
+                if (lex_cur(lx) == ':' && lex_peek1(lx) == '=') {
+                    lex_advance(lx); lex_advance(lx);
+                    return make_tok(TK_AUGCSET_UNION, line, col);
+                }
+                return make_tok(TK_PLUSPLUS, line, col);
+            }
             if (lex_cur(lx) == ':' && lex_peek1(lx) == '=') {
                 lex_advance(lx); lex_advance(lx);
                 return make_tok(TK_AUGPLUS, line, col);
             }
+            if (lex_cur(lx) == ':') {
+                lex_advance(lx);
+                return make_tok(TK_PLUSCOLON, line, col);
+            }
             return make_tok(TK_PLUS, line, col);
 
         case '-':
-            if (lex_cur(lx) == '-') { lex_advance(lx); return make_tok(TK_MINUSMINUS, line, col); }
+            if (lex_cur(lx) == '-') {
+                lex_advance(lx);
+                if (lex_cur(lx) == ':' && lex_peek1(lx) == '=') {
+                    lex_advance(lx); lex_advance(lx);
+                    return make_tok(TK_AUGCSET_DIFF, line, col);
+                }
+                return make_tok(TK_MINUSMINUS, line, col);
+            }
             if (lex_cur(lx) == ':' && lex_peek1(lx) == '=') {
                 lex_advance(lx); lex_advance(lx);
                 return make_tok(TK_AUGMINUS, line, col);
             }
+            if (lex_cur(lx) == ':') {
+                lex_advance(lx);
+                return make_tok(TK_MINUSCOLON, line, col);
+            }
             if (lex_cur(lx) == '>') {
                 lex_advance(lx);
-                return make_tok(TK_MINUS, line, col); /* -> not in our set; treat as - > */
+                return make_tok(TK_MINUS, line, col);
             }
             return make_tok(TK_MINUS, line, col);
 
         case '*':
-            if (lex_cur(lx) == '*') { lex_advance(lx); return make_tok(TK_STARSTAR,   line, col); }
+            if (lex_cur(lx) == '*') {
+                lex_advance(lx);
+                if (lex_cur(lx) == ':' && lex_peek1(lx) == '=') {
+                    lex_advance(lx); lex_advance(lx);
+                    return make_tok(TK_AUGCSET_INTER, line, col);
+                }
+                return make_tok(TK_STARSTAR, line, col);
+            }
             if (lex_cur(lx) == ':' && lex_peek1(lx) == '=') {
                 lex_advance(lx); lex_advance(lx);
                 return make_tok(TK_AUGSTAR, line, col);
@@ -345,30 +386,88 @@ static IcnToken lex_one(IcnLexer *lx) {
             }
             return make_tok(TK_MOD, line, col);
 
-        case '^': return make_tok(TK_CARET, line, col);
+        case '^':
+            if (lex_cur(lx) == ':' && lex_peek1(lx) == '=') {
+                lex_advance(lx); lex_advance(lx);
+                return make_tok(TK_AUGPOW, line, col);
+            }
+            return make_tok(TK_CARET, line, col);
 
         case '<':
             if (lex_cur(lx) == '<') {
                 lex_advance(lx);
-                if (lex_cur(lx) == '=') { lex_advance(lx); return make_tok(TK_SLE, line, col); }
+                if (lex_cur(lx) == '=') {
+                    lex_advance(lx);
+                    if (lex_cur(lx) == ':' && lex_peek1(lx) == '=') {
+                        lex_advance(lx); lex_advance(lx);
+                        return make_tok(TK_AUGSLE, line, col);
+                    }
+                    return make_tok(TK_SLE, line, col);
+                }
+                if (lex_cur(lx) == ':' && lex_peek1(lx) == '=') {
+                    lex_advance(lx); lex_advance(lx);
+                    return make_tok(TK_AUGSLT, line, col);
+                }
                 return make_tok(TK_SLT, line, col);
             }
-            if (lex_cur(lx) == '=') { lex_advance(lx); return make_tok(TK_LE, line, col); }
-            if (lex_cur(lx) == '-') { lex_advance(lx); return make_tok(TK_REVASSIGN, line, col); }
+            if (lex_cur(lx) == '=') {
+                lex_advance(lx);
+                if (lex_cur(lx) == ':' && lex_peek1(lx) == '=') {
+                    lex_advance(lx); lex_advance(lx);
+                    return make_tok(TK_AUGLE, line, col);
+                }
+                return make_tok(TK_LE, line, col);
+            }
+            if (lex_cur(lx) == '-') {
+                lex_advance(lx);
+                if (lex_cur(lx) == '>') { lex_advance(lx); return make_tok(TK_VALSWAP, line, col); }
+                return make_tok(TK_REVASSIGN, line, col);
+            }
+            if (lex_cur(lx) == ':' && lex_peek1(lx) == '=') {
+                lex_advance(lx); lex_advance(lx);
+                return make_tok(TK_AUGLT, line, col);
+            }
             return make_tok(TK_LT, line, col);
 
         case '>':
             if (lex_cur(lx) == '>') {
                 lex_advance(lx);
-                if (lex_cur(lx) == '=') { lex_advance(lx); return make_tok(TK_SGE, line, col); }
+                if (lex_cur(lx) == '=') {
+                    lex_advance(lx);
+                    if (lex_cur(lx) == ':' && lex_peek1(lx) == '=') {
+                        lex_advance(lx); lex_advance(lx);
+                        return make_tok(TK_AUGSGE, line, col);
+                    }
+                    return make_tok(TK_SGE, line, col);
+                }
+                if (lex_cur(lx) == ':' && lex_peek1(lx) == '=') {
+                    lex_advance(lx); lex_advance(lx);
+                    return make_tok(TK_AUGSGT, line, col);
+                }
                 return make_tok(TK_SGT, line, col);
             }
-            if (lex_cur(lx) == '=') { lex_advance(lx); return make_tok(TK_GE, line, col); }
+            if (lex_cur(lx) == '=') {
+                lex_advance(lx);
+                if (lex_cur(lx) == ':' && lex_peek1(lx) == '=') {
+                    lex_advance(lx); lex_advance(lx);
+                    return make_tok(TK_AUGGE, line, col);
+                }
+                return make_tok(TK_GE, line, col);
+            }
+            if (lex_cur(lx) == ':' && lex_peek1(lx) == '=') {
+                lex_advance(lx); lex_advance(lx);
+                return make_tok(TK_AUGGT, line, col);
+            }
             return make_tok(TK_GT, line, col);
 
         case '=':
             if (lex_cur(lx) == '=') {
                 lex_advance(lx);
+                if (lex_cur(lx) == '=') {
+                    lex_advance(lx);
+                    /* ~=== handled under ~ */
+                    return make_tok(TK_IDENTICAL, line, col);
+                }
                 /* ==:= augmented string-eq assign */
                 if (lex_cur(lx) == ':' && lex_peek1(lx) == '=') {
                     lex_advance(lx); lex_advance(lx);
@@ -386,7 +485,21 @@ static IcnToken lex_one(IcnLexer *lx) {
         case '~':
             if (lex_cur(lx) == '=') {
                 lex_advance(lx);
-                if (lex_cur(lx) == '=') { lex_advance(lx); return make_tok(TK_SNE, line, col); }
+                if (lex_cur(lx) == '=') {
+                    lex_advance(lx);
+                    if (lex_cur(lx) == '=') { lex_advance(lx); return make_tok(TK_NOTIDENT, line, col); }
+                    /* ~==:= */
+                    if (lex_cur(lx) == ':' && lex_peek1(lx) == '=') {
+                        lex_advance(lx); lex_advance(lx);
+                        return make_tok(TK_AUGSNE, line, col);
+                    }
+                    return make_tok(TK_SNE, line, col);
+                }
+                /* ~=:= */
+                if (lex_cur(lx) == ':' && lex_peek1(lx) == '=') {
+                    lex_advance(lx); lex_advance(lx);
+                    return make_tok(TK_AUGNE, line, col);
+                }
                 return make_tok(TK_NEQ, line, col);
             }
             return make_tok(TK_TILDE, line, col);
@@ -414,7 +527,12 @@ static IcnToken lex_one(IcnLexer *lx) {
         case '&': return make_tok(TK_AND, line, col);
         case '\\': return make_tok(TK_BACKSLASH, line, col);
         case '!': return make_tok(TK_BANG, line, col);
-        case '?': return make_tok(TK_QMARK, line, col);
+        case '?':
+            if (lex_cur(lx) == ':' && lex_peek1(lx) == '=') {
+                lex_advance(lx); lex_advance(lx);
+                return make_tok(TK_AUGSCAN, line, col);
+            }
+            return make_tok(TK_QMARK, line, col);
         case '@': return make_tok(TK_AT, line, col);
         case '.':
             /* .digit -> real literal e.g. .23  .5 */
@@ -514,9 +632,29 @@ const char *icn_tk_name(IcnTkKind kind) {
         case TK_AUGSTAR:   return "*:=";
         case TK_AUGSLASH:  return "/:=";
         case TK_AUGMOD:    return "%:=";
+        case TK_AUGPOW:    return "^:=";
         case TK_AUGCONCAT: return "||:=";
+        case TK_AUGCSET_UNION: return "++:=";
+        case TK_AUGCSET_DIFF:  return "--:=";
+        case TK_AUGCSET_INTER: return "**:=";
+        case TK_AUGSCAN:   return "?:=";
         case TK_AUGEQ:     return "=:=";
         case TK_AUGSEQ:    return "==:=";
+        case TK_AUGLT:     return "<:=";
+        case TK_AUGLE:     return "<=:=";
+        case TK_AUGGT:     return ">:=";
+        case TK_AUGGE:     return ">=:=";
+        case TK_AUGNE:     return "~=:=";
+        case TK_AUGSLT:    return "<<:=";
+        case TK_AUGSLE:    return "<<=:=";
+        case TK_AUGSGT:    return ">>:=";
+        case TK_AUGSGE:    return ">>=:=";
+        case TK_AUGSNE:    return "~==:=";
+        case TK_VALSWAP:   return "<->";
+        case TK_IDENTICAL: return "===";
+        case TK_NOTIDENT:  return "~===";
+        case TK_PLUSCOLON: return "+:";
+        case TK_MINUSCOLON: return "-:";
         case TK_PLUSPLUS:  return "++";
         case TK_MINUSMINUS: return "--";
         case TK_STARSTAR:  return "**";

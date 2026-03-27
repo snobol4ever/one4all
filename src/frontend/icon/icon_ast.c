@@ -107,6 +107,8 @@ const char *icn_kind_name(IcnKind kind) {
         case ICN_ASSIGN:   return "ASSIGN";
         case ICN_AUGOP:    return "AUGOP";
         case ICN_SWAP:     return "SWAP";
+        case ICN_IDENTICAL: return "IDENTICAL";
+        case ICN_MATCH:    return "MATCH";
         case ICN_SCAN:     return "SCAN";
         case ICN_SCAN_AUGOP: return "SCAN_AUGOP";
         case ICN_CALL:     return "CALL";

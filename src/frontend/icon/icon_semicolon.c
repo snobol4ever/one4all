@@ -358,14 +358,104 @@ int main(int argc, char **argv) {
         if (!out) { perror(outpath); free(src); return 1; }
     }
 
-    /* JCON preprocessor: $< -> [  and  $> -> ] */
-    for (size_t i = 0; i + 1 < src_len; i++) {
-        if (src[i] == '$' && src[i+1] == '<') { src[i] = '['; src[i+1] = ' '; }
-        if (src[i] == '$' && src[i+1] == '>') { src[i] = ' '; src[i+1] = ']'; }
-        /* $( -> { and $) -> } (JCON block syntax) */
-        if (src[i] == '$' && src[i+1] == '(') { src[i] = '{'; src[i+1] = ' '; }
-        if (src[i] == '$' && src[i+1] == ')') { src[i] = ' '; src[i+1] = '}'; }
+    /* JCON preprocessor pass 1: handle $define and expand macros.
+       Also: $< -> [, $> -> ], $( -> {, $) -> } */
+    {
+        /* First pass: collect all $define NAME value lines into a table,
+           blank them out, then do a second pass substituting. */
+        #define MAX_MACROS 256
+        #define MAX_MACRO_NAME 64
+        #define MAX_MACRO_VAL  1024
+        static char mname[MAX_MACROS][MAX_MACRO_NAME];
+        static char mval [MAX_MACROS][MAX_MACRO_VAL];
+        int nmacros = 0;
+
+        /* Scan for $define lines */
+        size_t i = 0;
+        while (i < src_len) {
+            /* skip whitespace at line start */
+            size_t ls = i;
+            while (i < src_len && (src[i] == ' ' || src[i] == '\t')) i++;
+            if (i + 7 < src_len && src[i] == '$') {
+                /* check for $define (with optional spaces) */
+                size_t j = i + 1;
+                while (j < src_len && (src[j] == ' ' || src[j] == '\t')) j++;
+                if (j + 6 <= src_len && strncmp(src+j, "define", 6) == 0 &&
+                    (src[j+6] == ' ' || src[j+6] == '\t')) {
+                    /* found $define */
+                    j += 6;
+                    while (j < src_len && (src[j] == ' ' || src[j] == '\t')) j++;
+                    /* read name */
+                    size_t ns = j;
+                    while (j < src_len && (isalnum((unsigned char)src[j]) || src[j]=='_')) j++;
+                    size_t nlen = j - ns;
+                    while (j < src_len && (src[j] == ' ' || src[j] == '\t')) j++;
+                    /* read value (to end of line, strip trailing ; and whitespace) */
+                    size_t vs = j;
+                    while (j < src_len && src[j] != '\n') j++;
+                    size_t vlen = j - vs;
+                    /* strip trailing whitespace and ; */
+                    while (vlen > 0 && (src[vs+vlen-1] == ' ' || src[vs+vlen-1] == '\t' ||
+                                        src[vs+vlen-1] == ';' || src[vs+vlen-1] == '\r')) vlen--;
+                    if (nlen > 0 && nlen < MAX_MACRO_NAME && vlen < MAX_MACRO_VAL && nmacros < MAX_MACROS) {
+                        /* check for duplicate */
+                        int dup = 0;
+                        for (int m = 0; m < nmacros; m++)
+                            if (strncmp(mname[m], src+ns, nlen)==0 && mname[m][nlen]=='\0') { dup=1; break; }
+                        if (!dup) {
+                            strncpy(mname[nmacros], src+ns, nlen); mname[nmacros][nlen]='\0';
+                            strncpy(mval[nmacros], src+vs, vlen);  mval[nmacros][vlen]='\0';
+                            nmacros++;
+                        }
+                    }
+                    /* blank out the $define line */
+                    for (size_t k = ls; k < j && k < src_len; k++) src[k] = ' ';
+                    i = j;
+                    continue;
+                }
+            }
+            /* advance to next line */
+            while (i < src_len && src[i] != '\n') i++;
+            if (i < src_len) i++;
+        }
+
+        /* Pass 2: expand macros and handle $< $> $( $) */
+        if (nmacros > 0 || 1) {
+            /* Build expanded output */
+            size_t cap2 = src_len * 2 + 1024;
+            char *out2 = malloc(cap2);
+            size_t olen = 0;
+            #define ENSURE(n) do { if (olen+(n) >= cap2) { cap2=(cap2+(n))*2; out2=realloc(out2,cap2); } } while(0)
+            for (size_t k = 0; k < src_len; ) {
+                /* $< $> $( $) */
+                if (src[k] == '$' && k+1 < src_len) {
+                    char nc = src[k+1];
+                    if (nc=='<') { ENSURE(1); out2[olen++]='['; k+=2; continue; }
+                    if (nc=='>') { ENSURE(1); out2[olen++]=']'; k+=2; continue; }
+                    if (nc=='(') { ENSURE(1); out2[olen++]='{'; k+=2; continue; }
+                    if (nc==')') { ENSURE(1); out2[olen++]='}'; k+=2; continue; }
+                }
+                /* Try macro expansion: only at word boundaries */
+                if (nmacros > 0 && (isalpha((unsigned char)src[k]) || src[k]=='_')) {
+                    int matched = 0;
+                    for (int m = 0; m < nmacros; m++) {
+                        size_t nl = strlen(mname[m]);
+                        if (k+nl <= src_len && strncmp(src+k, mname[m], nl)==0 &&
+                            !isalnum((unsigned char)src[k+nl]) && src[k+nl]!='_') {
+                            size_t vl = strlen(mval[m]);
+                            ENSURE(vl); memcpy(out2+olen, mval[m], vl); olen+=vl;
+                            k += nl; matched = 1; break;
+                        }
+                    }
+                    if (matched) continue;
+                }
+                ENSURE(1); out2[olen++] = src[k++];
+            }
+            out2[olen] = '\0';
+            free(src); src = out2; src_len = olen;
+        }
     }
+
     process(src, src_len, out);
 
     if (outpath) fclose(out);

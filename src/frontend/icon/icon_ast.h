@@ -99,6 +99,8 @@ typedef enum {
     ICN_ASSIGN,    /* E1 := E2 */
     ICN_AUGOP,     /* E1 op:= E2  (augmented -- subtype in val.ival) */
     ICN_SWAP,      /* E1 :=: E2 */
+    ICN_IDENTICAL, /* E1 === E2 (same object identity) */
+    ICN_MATCH,     /* =E  (scan: tab(match(E))) */
 
     /* --- String scanning (icont: N_Scan) --- */
     ICN_SCAN,      /* E ? body  -- Tier 2 */
