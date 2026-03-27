@@ -13,6 +13,9 @@
 #include "prolog_atom.h"
 #include "prolog_parse.h"
 #include "prolog_lower.h"
+#include "icon_lex.h"         /* IcnLexer, icn_lex_init */
+#include "icon_ast.h"
+#include "icon_parse.h"       /* IcnParser, icn_parse_init, icn_parse_file */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,12 +30,16 @@ void pl_emit(Program *prog, FILE *f);   /* defined in prolog_emit.c */
 void prolog_emit_jvm(Program *prog, FILE *f, const char *filename); /* prolog_emit_jvm.c */
 void prolog_emit_net(Program *prog, FILE *f, const char *filename); /* prolog_emit_net.c */
 void pj_linker_prescan(PlProgram *pl_prog);                         /* prolog_emit_jvm.c */
+ImportEntry *icn_prescan_imports(const char *src);                  /* icon_driver.c */
+void ij_emit_file(IcnNode **nodes, int count, FILE *out,            /* icon_emit_jvm.c */
+                  const char *filename, const char *outpath, ImportEntry *imports);
 
 static int asm_mode = 0;
 static int jvm_mode = 0;
 static int net_mode = 0;
 static int sc_mode  = 0;
 static int pl_mode  = 0;    /* -pl flag: Prolog frontend */
+static int icn_mode = 0;    /* -icn flag (or .icn suffix): Icon frontend */
 /* Case folding (SPITBOL-compatible switch names):
  *   -F = fold identifiers to uppercase (DEFAULT; matches SPITBOL/CSNOBOL4 default).
  *   -f = do not fold (case-sensitive).
@@ -81,6 +88,8 @@ int main(int argc, char *argv[]) {
             asm_mode = 1;
         } else if (!strcmp(argv[i],"-jvm")) {
             jvm_mode = 1;
+        } else if (!strcmp(argv[i],"-icn")) {
+            icn_mode = 1;
         } else if (!strcmp(argv[i],"-net")) {
             net_mode = 1;
         } else if (!strcmp(argv[i],"-asm-body")) {
@@ -109,6 +118,10 @@ int main(int argc, char *argv[]) {
     if (!pl_mode && ends_with(infile, ".pl"))
         pl_mode = 1;
 
+    /* Auto-detect Icon by .icn suffix */
+    if (!icn_mode && ends_with(infile, ".icn"))
+        icn_mode = 1;
+
     FILE *in = stdin;
     if (infile) {
         in = fopen(infile,"r");
@@ -130,6 +143,37 @@ int main(int argc, char *argv[]) {
     }
 
     Program *prog;
+
+    if (icn_mode) {
+        /* ---- Icon frontend (M-SCRIP-DEMO) -------------------------------- */
+        char *src = read_all(in);
+        if (!src) { fprintf(stderr, "sno2c: read error\n"); return 1; }
+        ImportEntry *icn_imports = icn_prescan_imports(src);
+        IcnLexer lx;
+        icn_lex_init(&lx, src);
+        IcnParser parser;
+        icn_parse_init(&parser, &lx);
+        int count = 0;
+        IcnNode **procs = icn_parse_file(&parser, &count);
+        free(src);
+        if (parser.had_error) {
+            fprintf(stderr, "sno2c: Icon parse error: %s\n", parser.errmsg);
+            return 1;
+        }
+        if (jvm_mode) {
+            ij_emit_file(procs, count, out, infile, outfile, icn_imports);
+        } else {
+            /* x64 ASM path — route through existing icon_emit */
+            /* (net_mode not yet implemented for Icon) */
+            fprintf(stderr, "sno2c: Icon requires -jvm (x64/net not yet implemented)\n");
+            return 1;
+        }
+        for (int i = 0; i < count; i++) icn_node_free(procs[i]);
+        free(procs);
+        if (infile)  fclose(in);
+        if (outfile) fclose(out);
+        return 0;
+    }
 
     if (pl_mode) {
         /* ---- Prolog frontend (M-PROLOG-R1+) ----------------------------- */

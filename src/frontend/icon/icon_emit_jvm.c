@@ -48,6 +48,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "icon_ast.h"
 #include "icon_lex.h"
+#include "sno2c.h"          /* ImportEntry — for cross-class IMPORT dispatch */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -80,6 +81,29 @@ static void JC(const char *comment) {
  * Class name
  * ======================================================================= */
 static char ij_classname[256];
+
+/* =========================================================================
+ * Import table — populated by ij_emit_file from icn_prescan_imports()
+ * ======================================================================= */
+static ImportEntry *ij_imports = NULL;
+
+/* Return the ImportEntry for a given local call name, or NULL if not imported.
+ * Icon source writes: $import family_prolog.QUERY_COUNT
+ * then calls:         QUERY_COUNT(...)
+ * We match on ie->method (uppercased exported name). */
+static ImportEntry *ij_find_import(const char *name) {
+    for (ImportEntry *ie = ij_imports; ie; ie = ie->next) {
+        if (ie->method && strcmp(ie->method, name) == 0) return ie;
+        /* also try uppercase comparison */
+        if (ie->method) {
+            char up[256]; int k = 0;
+            for (const char *p = name; *p && k < 255; p++, k++) up[k] = (char)toupper((unsigned char)*p);
+            up[k] = '\0';
+            if (strcmp(ie->method, up) == 0) return ie;
+        }
+    }
+    return NULL;
+}
 
 void ij_set_classname(const char *filename) {
     const char *base = strrchr(filename, '/');
@@ -3300,6 +3324,76 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
     /* === END M-IJ-BUILTINS-TYPE === */
 
     /* === END M-IJ-BUILTINS-STR === */
+
+    /* --- cross-class IMPORT call (M-SCRIP-DEMO) ---
+     * $import assembly.METHOD causes calls to METHOD to emit:
+     *   invokestatic assembly/METHOD([Ljava/lang/Object;Ljava/lang/Runnable;Ljava/lang/Runnable;)V
+     * per ARCH-scrip-abi.md §3.1.  Args are passed as Object[] via ByrdBoxLinkage.
+     * Sprint stub: push null for args/gamma/omega — wired for string-result queries. */
+    {
+        ImportEntry *ie = ij_find_import(fname);
+        if (ie) {
+            /* Emit α/β labels */
+            JL(a); JL(b);
+            /* Push Object[] args — pack nargs strings/longs into array */
+            if (nargs == 0) {
+                JI("aconst_null", "");
+            } else {
+                /* Allocate Object[nargs] */
+                char push_relay[64];
+                snprintf(push_relay, sizeof push_relay, "icn_%d_imp_args", id);
+                J("    ldc %d\n", nargs);
+                JI("anewarray", "java/lang/Object");
+                /* For each arg, evaluate and store into array slot */
+                for (int i = 0; i < nargs; i++) {
+                    char arg_relay[64]; snprintf(arg_relay, sizeof arg_relay, "icn_%d_imp_a%d", id, i);
+                    /* dup array ref, push index */
+                    JI("dup", "");
+                    J("    ldc %d\n", i);
+                    /* evaluate arg — we need it on stack as Object */
+                    IjPorts ap; strncpy(ap.γ, arg_relay, 63); strncpy(ap.ω, ports.ω, 63);
+                    char aa[64], ab[64];
+                    ij_emit_expr(n->children[i+1], ap, aa, ab);
+                    /* jump to arg eval α, result lands at arg_relay */
+                    /* We inline: goto aa; arg_relay: box; */
+                    /* Actually we need to evaluate inline — use static scratch */
+                    char arg_fld[64]; snprintf(arg_fld, sizeof arg_fld, "icn_imp_arg_%d_%d", id, i);
+                    ij_declare_static_str(arg_fld);
+                    (void)push_relay; (void)aa; (void)ab; (void)arg_fld;
+                    /* Simplified: store null for non-string, string for string args */
+                    if (ij_expr_is_string(n->children[i+1])) {
+                        /* evaluate string arg directly */
+                        /* For now push null placeholder — full wiring in LP-JVM-2 */
+                        JI("aconst_null", "");
+                    } else {
+                        JI("aconst_null", "");
+                    }
+                    JI("aastore", "");
+                }
+            }
+            /* gamma: lambda that reads ByrdBoxLinkage.RESULT and jumps γ */
+            /* omega: lambda that jumps ω */
+            /* Sprint stub: push null for both continuations */
+            JI("aconst_null", "");   /* gamma Runnable — stub */
+            JI("aconst_null", "");   /* omega Runnable — stub */
+            /* invokestatic assembly/METHOD([Ljava/lang/Object;Ljava/lang/Runnable;Ljava/lang/Runnable;)V */
+            {
+                char sig[512];
+                snprintf(sig, sizeof sig,
+                    "%s/%s([Ljava/lang/Object;Ljava/lang/Runnable;Ljava/lang/Runnable;)V",
+                    ie->name, ie->method);
+                JI("invokestatic", sig);
+            }
+            /* Read result from ByrdBoxLinkage.RESULT into icn_retval_obj, then γ */
+            J("    getstatic ByrdBoxLinkage/RESULT Ljava/util/concurrent/atomic/AtomicReference;\n");
+            JI("invokevirtual", "java/util/concurrent/atomic/AtomicReference/get()Ljava/lang/Object;");
+            J("    putstatic %s/icn_retval_obj Ljava/lang/Object;\n", ij_classname);
+            /* Push empty string as numeric placeholder for γ */
+            JI("lconst_0", "");
+            JGoto(ports.γ); JBarrier();
+            return;
+        }
+    }
 
     if (ij_is_user_proc(fname)) {
         int is_gen = ij_is_gen_proc(fname);
@@ -6774,7 +6868,8 @@ static void ij_emit_proc(IcnNode *proc, FILE *out_target) {
 /* =========================================================================
  * ij_emit_file — entry point
  * ======================================================================= */
-void ij_emit_file(IcnNode **nodes, int count, FILE *out, const char *filename, const char *outpath) {
+void ij_emit_file(IcnNode **nodes, int count, FILE *out, const char *filename, const char *outpath, ImportEntry *imports) {
+    ij_imports = imports;
     ij_node_id = 0;
     ij_user_count = 0;
     ij_nstatics = 0;

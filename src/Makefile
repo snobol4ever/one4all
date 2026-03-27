@@ -3,6 +3,7 @@ CFLAGS = -Wall -Wno-unused-function -g -O0 \
          -I frontend/snobol4 \
          -I frontend/snocone \
          -I frontend/prolog \
+         -I frontend/icon \
          -I backend/c \
          -I backend/x64
 
@@ -44,7 +45,16 @@ BACKEND_JVM = \
 BACKEND_NET = \
     backend/net/emit_byrd_net.c
 
-SRCS = $(FRONTEND_SNO) $(FRONTEND_PROLOG) $(FRONTEND_SNOCONE) $(BACKEND_C) $(BACKEND_X64) $(BACKEND_JVM) $(BACKEND_NET) $(DRIVER)
+FRONTEND_ICON = \
+    frontend/icon/icon_driver.c \
+    frontend/icon/icon_lex.c \
+    frontend/icon/icon_parse.c \
+    frontend/icon/icon_ast.c \
+    frontend/icon/icon_emit.c \
+    frontend/icon/icon_emit_jvm.c \
+    frontend/icon/icon_runtime.c
+
+SRCS = $(FRONTEND_SNO) $(FRONTEND_PROLOG) $(FRONTEND_SNOCONE) $(FRONTEND_ICON) $(BACKEND_C) $(BACKEND_X64) $(BACKEND_JVM) $(BACKEND_NET) $(DRIVER)
 OBJS = $(SRCS:.c=.o)
 
 .PHONY: all clean
