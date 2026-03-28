@@ -64,7 +64,7 @@ BIN    = ../sno2c
 all: $(BIN)
 
 $(BIN): $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^ -lm
 
 # Pattern rule — each .c depends on the shared headers
 %.o: %.c \

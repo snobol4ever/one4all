@@ -33,6 +33,7 @@
 #include <stdarg.h>
 #include <ctype.h>
 #include <stdint.h>
+#include <inttypes.h>
 
 /* -----------------------------------------------------------------------
  * Output helpers
@@ -5637,6 +5638,15 @@ static void emit_pl_term_load(EXPR_t *e, int frame_base_words) {
                 A("    add     rsp, %d\n", arity * 8);
             }
             break;
+        case E_FLIT: {
+            /* Float literal — load IEEE 754 bits into xmm0, call term_new_float */
+            union { double d; uint64_t u; } fconv;
+            fconv.d = e->dval;
+            A("    mov     rax, 0x%"PRIx64"   ; float %.17g\n", fconv.u, e->dval);
+            A("    movq    xmm0, rax\n");
+            A("    call    term_new_float\n");
+            break;
+        }
         case E_ADD: case E_SUB: case E_MPY: case E_DIV: {
             /* Build a compound Term for pl_eval_arith: +(L,R) etc. */
             const char *opname = (e->kind==E_ADD) ? "+" :
@@ -6537,7 +6547,6 @@ static void emit_prolog_clause_block(EXPR_t *clause, int idx, int total,
                 A("    xor     edx, edx               ; next ucall starts fresh\n");
                 snprintf(last_β_lbl, sizeof last_β_lbl,
                          "pl_%s_c%d_β%d", pred_safe, idx, bi);
-                ucall_seq++;
                 ucall_seq++;
             }
         }

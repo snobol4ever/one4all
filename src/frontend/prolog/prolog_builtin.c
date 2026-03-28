@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <math.h>
 
 /* =========================================================================
  * pl_write — print a term to stdout
@@ -52,9 +53,14 @@ void pl_write(Term *t) {
         case TT_INT:
             printf("%ld", t->ival);
             break;
-        case TT_FLOAT:
-            printf("%g", t->fval);
+        case TT_FLOAT: {
+            double fv = t->fval;
+            if (fv == (long)fv && fv >= -1e15 && fv <= 1e15)
+                printf("%.1f", fv);
+            else
+                printf("%g", fv);
             break;
+        }
         case TT_COMPOUND: {
             const char *fn = prolog_atom_name(t->compound.functor);
             if (!fn) fn = "?";
@@ -323,49 +329,132 @@ static void arith_atoms_init(void) {
     _aid_mod   = prolog_atom_intern("mod");
 }
 
-long pl_eval_arith(Term *t) {
+/* Type-preserving arithmetic evaluator — returns Term* (TT_INT or TT_FLOAT) */
+static Term *pl_eval_arith_term(Term *t) {
+    static int _aid_pow = -1, _aid_idiv = -1, _aid_sqrt = -1, _aid_log = -1,
+               _aid_exp = -1, _aid_sin = -1, _aid_cos = -1, _aid_abs = -1,
+               _aid_max = -1, _aid_min = -1, _aid_truncate = -1,
+               _aid_round = -1, _aid_ceiling = -1, _aid_floor = -1,
+               _aid_float = -1, _aid_float_int = -1,
+               _aid_band = -1, _aid_bor = -1, _aid_bxor = -1,
+               _aid_lshift = -1, _aid_rshift = -1, _aid_bnot = -1,
+               _aid_msb = -1, _aid_pi = -1, _aid_e = -1;
     arith_atoms_init();
+    if (_aid_pow < 0) {
+        _aid_pow      = prolog_atom_intern("**");
+        _aid_idiv     = prolog_atom_intern("//");
+        _aid_sqrt     = prolog_atom_intern("sqrt");
+        _aid_log      = prolog_atom_intern("log");
+        _aid_exp      = prolog_atom_intern("exp");
+        _aid_sin      = prolog_atom_intern("sin");
+        _aid_cos      = prolog_atom_intern("cos");
+        _aid_abs      = prolog_atom_intern("abs");
+        _aid_max      = prolog_atom_intern("max");
+        _aid_min      = prolog_atom_intern("min");
+        _aid_truncate = prolog_atom_intern("truncate");
+        _aid_round    = prolog_atom_intern("round");
+        _aid_ceiling  = prolog_atom_intern("ceiling");
+        _aid_floor    = prolog_atom_intern("floor");
+        _aid_float    = prolog_atom_intern("float");
+        _aid_float_int= prolog_atom_intern("float_integer_part");
+        _aid_band     = prolog_atom_intern("/\\");
+        _aid_bor      = prolog_atom_intern("\\/");
+        _aid_bxor     = prolog_atom_intern("xor");
+        _aid_lshift   = prolog_atom_intern("<<");
+        _aid_rshift   = prolog_atom_intern(">>");
+        _aid_bnot     = prolog_atom_intern("\\");
+        _aid_msb      = prolog_atom_intern("msb");
+        _aid_pi       = prolog_atom_intern("pi");
+        _aid_e        = prolog_atom_intern("e");
+    }
     t = term_deref(t);
-    if (!t) return 0;
+    if (!t) return term_new_int(0);
     switch (t->tag) {
-        case TT_INT: return t->ival;
-        case TT_FLOAT: return (long)t->fval;
+        case TT_INT:   return t;
+        case TT_FLOAT: return t;
+        case TT_ATOM:
+            if (t->atom_id == _aid_pi) return term_new_float(M_PI);
+            if (t->atom_id == _aid_e)  return term_new_float(M_E);
+            return term_new_int(0);
         case TT_COMPOUND: {
             int f = t->compound.functor;
             int a = t->compound.arity;
             if (a == 2) {
-                long l = pl_eval_arith(t->compound.args[0]);
-                long r = pl_eval_arith(t->compound.args[1]);
-                if (f == _aid_plus)  return l + r;
-                if (f == _aid_minus) return l - r;
-                if (f == _aid_times) return l * r;
-                if (f == _aid_div)   return r ? l / r : 0;
-                if (f == _aid_mod)   return r ? l % r : 0;
+                Term *lv = pl_eval_arith_term(t->compound.args[0]);
+                Term *rv = pl_eval_arith_term(t->compound.args[1]);
+                int is_float = (lv->tag == TT_FLOAT || rv->tag == TT_FLOAT);
+                double ld = (lv->tag == TT_FLOAT) ? lv->fval : (double)lv->ival;
+                double rd = (rv->tag == TT_FLOAT) ? rv->fval : (double)rv->ival;
+                long   li = (lv->tag == TT_INT)   ? lv->ival : (long)lv->fval;
+                long   ri = (rv->tag == TT_INT)   ? rv->ival : (long)rv->fval;
+                if (f == _aid_plus)   return is_float ? term_new_float(ld+rd) : term_new_int(li+ri);
+                if (f == _aid_minus)  return is_float ? term_new_float(ld-rd) : term_new_int(li-ri);
+                if (f == _aid_times)  return is_float ? term_new_float(ld*rd) : term_new_int(li*ri);
+                if (f == _aid_div)    return is_float ? term_new_float(rd?ld/rd:0) : term_new_int(ri?li/ri:0);
+                if (f == _aid_mod)    return term_new_int(ri ? li % ri : 0);
+                if (f == _aid_idiv)   return term_new_int(ri ? li / ri : 0);
+                if (f == _aid_pow)    return term_new_float(pow(ld, rd));
+                if (f == _aid_max)    return is_float ? (ld>=rd?lv:rv) : (li>=ri?lv:rv);
+                if (f == _aid_min)    return is_float ? (ld<=rd?lv:rv) : (li<=ri?lv:rv);
+                if (f == _aid_band)   return term_new_int(li & ri);
+                if (f == _aid_bor)    return term_new_int(li | ri);
+                if (f == _aid_bxor)   return term_new_int(li ^ ri);
+                if (f == _aid_lshift) return term_new_int(li << ri);
+                if (f == _aid_rshift) return term_new_int(li >> ri);
             }
             if (a == 1) {
-                long v = pl_eval_arith(t->compound.args[0]);
-                if (f == _aid_minus) return -v;
+                Term *v = pl_eval_arith_term(t->compound.args[0]);
+                double d = (v->tag == TT_FLOAT) ? v->fval : (double)v->ival;
+                long   i = (v->tag == TT_INT)   ? v->ival : (long)v->fval;
+                if (f == _aid_minus)    return (v->tag==TT_FLOAT) ? term_new_float(-d) : term_new_int(-i);
+                if (f == _aid_abs)      return (v->tag==TT_FLOAT) ? term_new_float(fabs(d)) : term_new_int(i<0?-i:i);
+                if (f == _aid_sqrt)     return term_new_float(sqrt(d));
+                if (f == _aid_log)      return term_new_float(log(d));
+                if (f == _aid_exp)      return term_new_float(exp(d));
+                if (f == _aid_sin)      return term_new_float(sin(d));
+                if (f == _aid_cos)      return term_new_float(cos(d));
+                if (f == _aid_truncate) return term_new_int((long)d);
+                if (f == _aid_round)    return term_new_int((long)round(d));
+                if (f == _aid_ceiling)  return term_new_int((long)ceil(d));
+                if (f == _aid_floor)    return term_new_int((long)floor(d));
+                if (f == _aid_float)    return term_new_float(d);
+                if (f == _aid_float_int)return term_new_float(trunc(d));
+                if (f == _aid_bnot)     return term_new_int(~i);
+                if (f == _aid_msb)      return term_new_int(i>0 ? 63 - __builtin_clzl(i) : -1);
             }
-            return 0;
+            return term_new_int(0);
         }
-        default: return 0;
+        default: return term_new_int(0);
     }
 }
 
-/* is/2: Result is Expr — unify Result with evaluated Expr */
-int pl_is(Term *result, Term *expr, Trail *trail) {
-    long val = pl_eval_arith(expr);
-    Term *res_term = term_new_int(val);
-    return unify(result, res_term, trail);
+/* Legacy integer evaluator — still used by comparisons */
+long pl_eval_arith(Term *t) {
+    Term *r = pl_eval_arith_term(t);
+    if (!r) return 0;
+    return (r->tag == TT_FLOAT) ? (long)r->fval : r->ival;
 }
 
-/* Numeric comparisons */
-int pl_num_lt(Term *a, Term *b)  { return pl_eval_arith(a) <  pl_eval_arith(b); }
-int pl_num_gt(Term *a, Term *b)  { return pl_eval_arith(a) >  pl_eval_arith(b); }
-int pl_num_le(Term *a, Term *b)  { return pl_eval_arith(a) <= pl_eval_arith(b); }
-int pl_num_ge(Term *a, Term *b)  { return pl_eval_arith(a) >= pl_eval_arith(b); }
-int pl_num_eq(Term *a, Term *b)  { return pl_eval_arith(a) == pl_eval_arith(b); }
-int pl_num_ne(Term *a, Term *b)  { return pl_eval_arith(a) != pl_eval_arith(b); }
+/* Floating-point version for mixed-type comparisons */
+static double pl_eval_dbl(Term *t) {
+    Term *r = pl_eval_arith_term(t);
+    if (!r) return 0.0;
+    return (r->tag == TT_FLOAT) ? r->fval : (double)r->ival;
+}
+
+/* is/2: Result is Expr — unify Result with correctly-typed evaluated term */
+int pl_is(Term *result, Term *expr, Trail *trail) {
+    Term *val = pl_eval_arith_term(expr);
+    return unify(result, val, trail);
+}
+
+/* Numeric comparisons — use double to handle int/float mixing */
+int pl_num_lt(Term *a, Term *b)  { return pl_eval_dbl(a) <  pl_eval_dbl(b); }
+int pl_num_gt(Term *a, Term *b)  { return pl_eval_dbl(a) >  pl_eval_dbl(b); }
+int pl_num_le(Term *a, Term *b)  { return pl_eval_dbl(a) <= pl_eval_dbl(b); }
+int pl_num_ge(Term *a, Term *b)  { return pl_eval_dbl(a) >= pl_eval_dbl(b); }
+int pl_num_eq(Term *a, Term *b)  { return pl_eval_dbl(a) == pl_eval_dbl(b); }
+int pl_num_ne(Term *a, Term *b)  { return pl_eval_dbl(a) != pl_eval_dbl(b); }
 
 /* Type-test builtins — return 1 (true) or 0 (false), no Trail needed */
 int pl_atom(Term *t)     { t = term_deref(t); return t && t->tag == TT_ATOM; }
