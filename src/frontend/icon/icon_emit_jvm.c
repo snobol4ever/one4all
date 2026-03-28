@@ -1973,7 +1973,7 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         { char buf[384]; snprintf(buf,sizeof buf,"%s/icn_stdin_reader Ljava/lang/Object;",ij_classname);
           JI("getstatic", buf); }
         JI("checkcast", "java/io/BufferedReader");
-        J("    aload %d\n", slot_jvm(arr_slot));
+        J("    aload %d\n", arr_slot);
         JI("iconst_0", "");
         J("    iload %d\n", n_slot);
         JI("invokevirtual", "java/io/BufferedReader/read([CII)I");
@@ -1985,7 +1985,7 @@ static void ij_emit_call(IcnNode *n, IjPorts ports, char *oα, char *oβ) {
         J("    istore %d\n", nread_slot);
         JI("new", "java/lang/String");
         JI("dup", "");
-        J("    aload %d\n", slot_jvm(arr_slot));
+        J("    aload %d\n", arr_slot);
         JI("iconst_0", "");
         J("    iload %d\n", nread_slot);
         JI("invokespecial", "java/lang/String/<init>([CII)V");
@@ -6716,6 +6716,16 @@ static void ij_prepass_types(IcnNode *n) {
                 }
             } else if (ij_expr_is_real(rhs)) {
                 ij_declare_static_dbl(fld);
+            } else if (ij_expr_is_record(rhs)) {
+                ij_declare_static_obj(fld);
+                /* dual-register so both local and global field name resolve to 'O' */
+                if (slot >= 0) {
+                    char gname2[80]; snprintf(gname2, sizeof gname2, "icn_gvar_%s", lhs->val.sval);
+                    ij_declare_static_obj(gname2);
+                } else {
+                    char fld2[128]; ij_var_field(lhs->val.sval, fld2, sizeof fld2);
+                    ij_declare_static_obj(fld2);
+                }
             }
             /* long-typed: declared on first use, no pre-declaration needed */
         }
