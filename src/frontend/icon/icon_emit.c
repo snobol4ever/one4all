@@ -184,6 +184,23 @@ static void emit_var(IcnEmitter *em, IcnNode *n, IcnPorts ports,
     strncpy(oa,a,63); strncpy(ob,b,63);
     E(em,"    ; VAR %s  id=%d\n",n->val.sval,id);
     Ldef(em,a);
+    /* &subject / &pos keywords */
+    if (strcmp(n->val.sval, "&subject") == 0) {
+        bss_declare("icn_subject");
+        E(em,"    mov     rax, [rel icn_subject]\n");
+        E(em,"    push    rax\n");
+        Jmp(em,ports.γ);
+        Ldef(em,b); Jmp(em,ports.ω);
+        return;
+    }
+    if (strcmp(n->val.sval, "&pos") == 0) {
+        bss_declare("icn_pos");
+        E(em,"    mov     rax, [rel icn_pos]\n");
+        E(em,"    push    rax\n");
+        Jmp(em,ports.γ);
+        Ldef(em,b); Jmp(em,ports.ω);
+        return;
+    }
     int slot=locals_find(n->val.sval);
     if(slot>=0) {
         E(em,"    mov     rax, [rbp%+d]\n", slot_offset(slot));
@@ -218,17 +235,30 @@ static void emit_assign(IcnEmitter *em, IcnNode *n, IcnPorts ports,
     Ldef(em,b); Jmp(em,rb);
 
     Ldef(em,store);
-    E(em,"    pop     rax\n"); /* consume value pushed by RHS */
+    /* ICN_STR leaves pointer in rdi (nothing pushed); all others push a value */
+    IcnNode *rhs = n->children[1];
+    int rhs_is_str = (rhs && rhs->kind == ICN_STR);
+    if (rhs_is_str) {
+        E(em,"    ; str assign: rdi already has pointer\n");
+    } else {
+        E(em,"    pop     rax\n"); /* consume value pushed by RHS */
+    }
 
     IcnNode *lhs=n->children[0];
     if(lhs && lhs->kind==ICN_VAR){
         int slot=locals_find(lhs->val.sval);
         if(slot>=0){
-            E(em,"    mov     [rbp%+d], rax\n",slot_offset(slot));
+            if (rhs_is_str)
+                E(em,"    mov     [rbp%+d], rdi\n",slot_offset(slot));
+            else
+                E(em,"    mov     [rbp%+d], rax\n",slot_offset(slot));
         } else {
             char gv[80]; snprintf(gv,sizeof gv,"icn_gvar_%s",lhs->val.sval);
             bss_declare(gv);
-            E(em,"    mov     [rel %s], rax\n",gv);
+            if (rhs_is_str)
+                E(em,"    mov     [rel %s], rdi\n",gv);
+            else
+                E(em,"    mov     [rel %s], rax\n",gv);
         }
     }
     Jmp(em,ports.γ);
@@ -447,11 +477,51 @@ static void emit_call(IcnEmitter *em, IcnNode *n, IcnPorts ports,
         if(arg->kind==ICN_STR){
             /* emit_str sets rdi via lea; nothing on hw stack — just call */
             E(em,"    call    icn_write_str\n");
+        } else if(arg->kind==ICN_CONCAT || arg->kind==ICN_LCONCAT){
+            /* emit_concat pushes result char* onto hw stack */
+            E(em,"    pop     rdi\n");
+            E(em,"    call    icn_write_str\n");
+        } else if(arg->kind==ICN_VAR){
+            /* var could be a string pointer or an int — for now treat as str pointer
+             * (Tier-2: full type tracking needed for mixed programs) */
+            E(em,"    pop     rdi\n");
+            E(em,"    call    icn_write_str\n");
         } else {
-            /* arg value is on the hardware stack — pop into rdi */
+            /* numeric value on the hardware stack */
             E(em,"    pop     rdi\n");
             E(em,"    call    icn_write_int\n");
         }
+        Jmp(em,ports.γ);
+        return;
+    }
+
+    /* --- scan builtins: any / many / upto --- */
+    if(strcmp(fname,"any")==0||strcmp(fname,"many")==0||strcmp(fname,"upto")==0){
+        const char *rtfn = strcmp(fname,"any")==0  ? "icn_any"  :
+                           strcmp(fname,"many")==0 ? "icn_many" : "icn_upto";
+        char after[64]; snprintf(after,sizeof after,"icon_%d_sbuiltin",id);
+        if(nargs<1){
+            Ldef(em,a); Jmp(em,ports.ω);
+            Ldef(em,b); Jmp(em,ports.ω); return;
+        }
+        IcnNode *arg=n->children[1];
+        IcnPorts ap2; strncpy(ap2.γ,after,63); strncpy(ap2.ω,ports.ω,63);
+        char arg_a[64],arg_b[64];
+        emit_expr(em,arg,ap2,arg_a,arg_b);
+        Ldef(em,a); Jmp(em,arg_a);
+        Ldef(em,b); Jmp(em,arg_b);
+        Ldef(em,after);
+        /* arg is cset/str: rdi already set; var/other: pop into rdi */
+        if(arg->kind==ICN_CSET||arg->kind==ICN_STR){
+            /* rdi already has the cset pointer from emit_str/emit_cset */
+        } else {
+            E(em,"    pop     rdi\n");
+        }
+        E(em,"    call    %s\n",rtfn);
+        /* returns new pos (1-based int) or 0 on fail */
+        E(em,"    test    rax, rax\n");
+        E(em,"    jz      %s\n",ports.ω);
+        E(em,"    push    rax\n");
         Jmp(em,ports.γ);
         return;
     }
@@ -568,6 +638,313 @@ static void emit_alt(IcnEmitter *em, IcnNode *n, IcnPorts ports,
     Ldef(em,a); Jmp(em,ca[0]);
     Ldef(em,b); Jmp(em,cb[0]);
     free(ca); free(cb);
+}
+
+/* =========================================================================
+ * ICN_CSET — cset literal (single-quoted string)
+ * Treated identically to ICN_STR for pointer passing: lea rdi, [rel label]
+ * ======================================================================= */
+static void emit_cset(IcnEmitter *em, IcnNode *n, IcnPorts ports,
+                      char *oa, char *ob) {
+    emit_str(em, n, ports, oa, ob);   /* same layout — char* in rdi, nothing pushed */
+}
+
+/* =========================================================================
+ * ICN_NEG — unary minus: -E
+ * Evaluate E, negate result, push, succeed. One-shot (no β retry).
+ * ======================================================================= */
+static void emit_neg(IcnEmitter *em, IcnNode *n, IcnPorts ports,
+                     char *oa, char *ob) {
+    int id = icn_new_id(em); char a[64], b[64];
+    icn_label_α(id, a, sizeof a); icn_label_β(id, b, sizeof b);
+    strncpy(oa, a, 63); strncpy(ob, b, 63);
+    char after[64]; snprintf(after, sizeof after, "icon_%d_neg", id);
+    IcnPorts cp; strncpy(cp.γ, after, 63); strncpy(cp.ω, ports.ω, 63);
+    char ca[64], cb[64];
+    emit_expr(em, n->children[0], cp, ca, cb);
+    Ldef(em, a); Jmp(em, ca);
+    Ldef(em, b); Jmp(em, cb);
+    Ldef(em, after);
+    E(em, "    pop     rax\n");
+    E(em, "    neg     rax\n");
+    E(em, "    push    rax\n");
+    Jmp(em, ports.γ);
+}
+
+/* =========================================================================
+ * emit_not  --  /E: succeed iff E fails
+ * ======================================================================= */
+static void emit_not(IcnEmitter *em, IcnNode *n, IcnPorts ports,
+                     char *oa, char *ob) {
+    int id = icn_new_id(em); char a[64], b[64];
+    icn_label_α(id, a, sizeof a); icn_label_β(id, b, sizeof b);
+    strncpy(oa, a, 63); strncpy(ob, b, 63);
+    char e_ok[64];   snprintf(e_ok,   sizeof e_ok,   "icon_%d_eok",   id);
+    char e_fail[64]; snprintf(e_fail, sizeof e_fail, "icon_%d_efail", id);
+    IcnPorts cp;
+    strncpy(cp.γ, e_ok,   63);
+    strncpy(cp.ω, e_fail, 63);
+    char ca[64], cb[64];
+    emit_expr(em, n->children[0], cp, ca, cb);
+    Ldef(em, a); Jmp(em, ca);
+    Ldef(em, b); Jmp(em, ports.ω);
+    Ldef(em, e_ok);
+    E(em, "    add     rsp, 8\n");
+    Jmp(em, ports.ω);
+    Ldef(em, e_fail);
+    E(em, "    push    0\n");
+    Jmp(em, ports.γ);
+}
+
+/* =========================================================================
+ * emit_seq  --  string equality E1 == E2
+ * ======================================================================= */
+static void emit_seq(IcnEmitter *em, IcnNode *n, IcnPorts ports,
+                     char *oa, char *ob) {
+    int id = icn_new_id(em); char a[64], b[64];
+    icn_label_α(id, a, sizeof a); icn_label_β(id, b, sizeof b);
+    char chk[64];         snprintf(chk,        sizeof chk,        "icon_%d_check",  id);
+    char lbfwd[64];       snprintf(lbfwd,       sizeof lbfwd,      "icon_%d_lb",     id);
+    char lstore[64];      snprintf(lstore,      sizeof lstore,     "icon_%d_lstore", id);
+    char left_relay[64];  snprintf(left_relay,  sizeof left_relay, "icon_%d_lrelay", id);
+    char right_relay[64]; snprintf(right_relay, sizeof right_relay,"icon_%d_rrelay", id);
+    char lc_ptr[64];      snprintf(lc_ptr,      sizeof lc_ptr,     "icn_sq%d_lptr",  id);
+    char rc_ptr[64];      snprintf(rc_ptr,      sizeof rc_ptr,     "icn_sq%d_rptr",  id);
+    bss_declare(lc_ptr); bss_declare(rc_ptr);
+    strncpy(oa, a, 63); strncpy(ob, b, 63);
+    E(em, "    ; SEQ  id=%d\n", id);
+    IcnPorts rp; strncpy(rp.γ, right_relay, 63); strncpy(rp.ω, lbfwd, 63);
+    char ra[64], rb[64]; emit_expr(em, n->children[1], rp, ra, rb);
+    IcnPorts lp; strncpy(lp.γ, left_relay,  63); strncpy(lp.ω, ports.ω, 63);
+    char la[64], lb2[64]; emit_expr(em, n->children[0], lp, la, lb2);
+    int lstr=(n->children[0]->kind==ICN_STR||n->children[0]->kind==ICN_CSET);
+    int rstr=(n->children[1]->kind==ICN_STR||n->children[1]->kind==ICN_CSET);
+    Ldef(em,left_relay);
+    if(lstr){E(em,"    mov     [rel %s], rdi\n",lc_ptr);}
+    else    {E(em,"    pop     rax\n");E(em,"    mov     [rel %s], rax\n",lc_ptr);}
+    Jmp(em,lstore);
+    Ldef(em,right_relay);
+    if(rstr){E(em,"    mov     [rel %s], rdi\n",rc_ptr);}
+    else    {E(em,"    pop     rax\n");E(em,"    mov     [rel %s], rax\n",rc_ptr);}
+    Jmp(em,chk);
+    Ldef(em,lbfwd);  Jmp(em,lb2);
+    Ldef(em,a);      Jmp(em,la);
+    Ldef(em,b);      Jmp(em,rb);
+    Ldef(em,lstore); Jmp(em,ra);
+    Ldef(em,chk);
+    E(em,"    mov     rdi, [rel %s]\n",lc_ptr);
+    E(em,"    mov     rsi, [rel %s]\n",rc_ptr);
+    E(em,"    call    icn_str_eq\n");
+    E(em,"    test    rax, rax\n");
+    E(em,"    jz      %s\n",rb);
+    E(em,"    push    0\n");
+    Jmp(em,ports.γ);
+}
+
+static void emit_concat(IcnEmitter *em, IcnNode *n, IcnPorts ports,
+                        char *oa, char *ob) {
+    int id = icn_new_id(em); char a[64], b[64];
+    icn_label_α(id, a, sizeof a); icn_label_β(id, b, sizeof b);
+    char compute[64];     snprintf(compute,     sizeof compute,     "icon_%d_compute", id);
+    char lbfwd[64];       snprintf(lbfwd,       sizeof lbfwd,       "icon_%d_lb",      id);
+    char lstore[64];      snprintf(lstore,      sizeof lstore,      "icon_%d_lstore",  id);
+    char left_relay[64];  snprintf(left_relay,  sizeof left_relay,  "icon_%d_lrelay",  id);
+    char right_relay[64]; snprintf(right_relay, sizeof right_relay, "icon_%d_rrelay",  id);
+    char lc_ptr[64];      snprintf(lc_ptr,      sizeof lc_ptr,      "icn_cc%d_lptr",   id);
+    char rc_ptr[64];      snprintf(rc_ptr,      sizeof rc_ptr,      "icn_cc%d_rptr",   id);
+    bss_declare(lc_ptr);
+    bss_declare(rc_ptr);
+    int bf_slot = locals_alloc_tmp();
+    strncpy(oa, a, 63); strncpy(ob, b, 63);
+
+    E(em, "    ; CONCAT  id=%d\n", id);
+
+    IcnPorts rp; strncpy(rp.γ, right_relay, 63); strncpy(rp.ω, lbfwd, 63);
+    char ra[64], rb[64];
+    emit_expr(em, n->children[1], rp, ra, rb);
+
+    IcnPorts lp; strncpy(lp.γ, left_relay, 63); strncpy(lp.ω, ports.ω, 63);
+    char la[64], lb[64];
+    emit_expr(em, n->children[0], lp, la, lb);
+
+    IcnNode *lch = n->children[0];
+    IcnNode *rch = n->children[1];
+    int left_is_value = (lch->kind == ICN_VAR || lch->kind == ICN_STR || lch->kind == ICN_CALL);
+    int left_is_str   = (lch->kind == ICN_STR);
+    int right_is_str  = (rch->kind == ICN_STR);
+
+    /* left_relay: left succeeded → normalise to pointer in lc_ptr */
+    Ldef(em, left_relay);
+    if (left_is_str) {
+        /* emit_str put pointer in rdi, nothing on hw stack */
+        E(em, "    mov     [rel %s], rdi\n", lc_ptr);
+    } else {
+        /* emit_var/emit_call pushed value onto hw stack */
+        E(em, "    pop     rax\n");
+        E(em, "    mov     [rel %s], rax\n", lc_ptr);
+    }
+    Jmp(em, lstore);
+
+    /* right_relay: right succeeded → normalise to pointer in rc_ptr */
+    Ldef(em, right_relay);
+    if (right_is_str) {
+        E(em, "    mov     [rel %s], rdi\n", rc_ptr);
+    } else {
+        E(em, "    pop     rax\n");
+        E(em, "    mov     [rel %s], rax\n", rc_ptr);
+    }
+    Jmp(em, compute);
+
+    /* lbfwd: right exhausted → retry left */
+    Ldef(em, lbfwd); Jmp(em, lb);
+
+    /* node α: fresh start */
+    Ldef(em, a);
+    E(em, "    mov     qword [rbp%+d], 0\n", slot_offset(bf_slot));
+    Jmp(em, la);
+
+    /* node β: resume */
+    Ldef(em, b);
+    if (left_is_value) {
+        E(em, "    mov     qword [rbp%+d], 1\n", slot_offset(bf_slot));
+        Jmp(em, la);
+    } else {
+        Jmp(em, rb);
+    }
+
+    /* lstore: left cached → start (α) or resume (β) right */
+    Ldef(em, lstore);
+    E(em, "    cmp     qword [rbp%+d], 0\n", slot_offset(bf_slot));
+    E(em, "    je      %s\n", ra);
+    Jmp(em, rb);
+
+    /* compute: call icn_str_concat(lc_ptr, rc_ptr) → push result char* */
+    Ldef(em, compute);
+    E(em, "    mov     rdi, [rel %s]\n", lc_ptr);
+    E(em, "    mov     rsi, [rel %s]\n", rc_ptr);
+    E(em, "    call    icn_str_concat\n");
+    E(em, "    push    rax\n");
+    Jmp(em, ports.γ);
+}
+
+/* =========================================================================
+ * ICN_SCAN — E ? body
+ *
+ * Byrd-box wiring (following JVM ij_emit_scan):
+ *   α → expr.α
+ *   expr.γ (new subject — char* on hw stack or rdi for ICN_STR):
+ *     save old icn_subject → old_subj_N
+ *     save old icn_pos    → old_pos_N
+ *     install new subject into icn_subject, reset icn_pos=0
+ *     → body.α
+ *   body.γ → restore old subject/pos → ports.γ
+ *   body.ω → restore old subject/pos → expr.β → ports.ω (one-shot)
+ *   β → restore → body.β
+ *
+ * &subject keyword is handled in emit_var: loads icn_subject.
+ * ======================================================================= */
+static void emit_scan(IcnEmitter *em, IcnNode *n, IcnPorts ports,
+                      char *oa, char *ob) {
+    int id = icn_new_id(em); char a[64], b[64];
+    icn_label_α(id, a, sizeof a); icn_label_β(id, b, sizeof b);
+    strncpy(oa, a, 63); strncpy(ob, b, 63);
+
+    /* Global subject/pos */
+    bss_declare("icn_subject");
+    bss_declare("icn_pos");
+
+    /* Per-scan save slots */
+    char old_subj[64], old_pos[64];
+    snprintf(old_subj, sizeof old_subj, "icn_scan_oldsubj_%d", id);
+    snprintf(old_pos,  sizeof old_pos,  "icn_scan_oldpos_%d",  id);
+    bss_declare(old_subj);
+    bss_declare(old_pos);
+
+    char setup[64], body_ok[64], body_fail[64], beta_restore[64];
+    snprintf(setup,        sizeof setup,        "icon_%d_scan_setup", id);
+    snprintf(body_ok,      sizeof body_ok,      "icon_%d_scan_bok",   id);
+    snprintf(body_fail,    sizeof body_fail,     "icon_%d_scan_bfail", id);
+    snprintf(beta_restore, sizeof beta_restore,  "icon_%d_scan_bret",  id);
+
+    IcnNode *expr_node = (n->nchildren >= 1) ? n->children[0] : NULL;
+    IcnNode *body_node = (n->nchildren >= 2) ? n->children[1] : NULL;
+
+    /* Wire expr: γ → setup, ω → ports.ω */
+    IcnPorts ep; strncpy(ep.γ, setup, 63); strncpy(ep.ω, ports.ω, 63);
+    char ea[64], eb[64];
+    emit_expr(em, expr_node, ep, ea, eb);
+
+    /* Wire body: γ → body_ok, ω → body_fail */
+    IcnPorts bp; strncpy(bp.γ, body_ok, 63); strncpy(bp.ω, body_fail, 63);
+    char ba[64], bb[64];
+    if (body_node)
+        emit_expr(em, body_node, bp, ba, bb);
+    else {
+        strncpy(ba, body_ok, 63); strncpy(bb, body_fail, 63);
+    }
+
+    int expr_is_str = (expr_node && expr_node->kind == ICN_STR);
+
+    /* α → expr.α */
+    E(em, "    ; SCAN  id=%d\n", id);
+    Ldef(em, a); Jmp(em, ea);
+
+    /* β → restore + body.β */
+    Ldef(em, b); Jmp(em, beta_restore);
+
+    /* setup: expr succeeded — new subject pointer in rdi (ICN_STR) or on hw stack */
+    Ldef(em, setup);
+    if (expr_is_str) {
+        E(em, "    ; scan setup: subject in rdi\n");
+        /* save old subject */
+        E(em, "    mov     rax, [rel icn_subject]\n");
+        E(em, "    mov     [rel %s], rax\n", old_subj);
+        /* save old pos */
+        E(em, "    mov     rax, [rel icn_pos]\n");
+        E(em, "    mov     [rel %s], rax\n", old_pos);
+        /* install new subject from rdi */
+        E(em, "    mov     [rel icn_subject], rdi\n");
+    } else {
+        /* new subject pointer on hw stack */
+        E(em, "    pop     rax\n");
+        /* save old subject */
+        E(em, "    push    rax\n");   /* keep new on stack while saving old */
+        E(em, "    mov     rcx, [rel icn_subject]\n");
+        E(em, "    mov     [rel %s], rcx\n", old_subj);
+        /* save old pos */
+        E(em, "    mov     rcx, [rel icn_pos]\n");
+        E(em, "    mov     [rel %s], rcx\n", old_pos);
+        /* install new subject */
+        E(em, "    pop     rax\n");
+        E(em, "    mov     [rel icn_subject], rax\n");
+    }
+    /* reset pos to 0 */
+    E(em, "    mov     qword [rel icn_pos], 0\n");
+    Jmp(em, ba);
+
+    /* body.γ — success: restore, → ports.γ */
+    Ldef(em, body_ok);
+    E(em, "    mov     rax, [rel %s]\n", old_subj);
+    E(em, "    mov     [rel icn_subject], rax\n");
+    E(em, "    mov     rax, [rel %s]\n", old_pos);
+    E(em, "    mov     [rel icn_pos], rax\n");
+    Jmp(em, ports.γ);
+
+    /* body.ω — fail: restore, → expr.β → ports.ω */
+    Ldef(em, body_fail);
+    E(em, "    mov     rax, [rel %s]\n", old_subj);
+    E(em, "    mov     [rel icn_subject], rax\n");
+    E(em, "    mov     rax, [rel %s]\n", old_pos);
+    E(em, "    mov     [rel icn_pos], rax\n");
+    Jmp(em, eb);
+
+    /* beta_restore: node β — restore then body.β */
+    Ldef(em, beta_restore);
+    E(em, "    mov     rax, [rel %s]\n", old_subj);
+    E(em, "    mov     [rel icn_subject], rax\n");
+    E(em, "    mov     rax, [rel %s]\n", old_pos);
+    E(em, "    mov     [rel icn_pos], rax\n");
+    Jmp(em, bb);
 }
 
 /* =========================================================================
@@ -778,36 +1155,72 @@ static void emit_to_by(IcnEmitter *em, IcnNode *n, IcnPorts ports,
     int id=icn_new_id(em); char a[64],b[64],code[64],init[64],e1bf[64],e2bf[64];
     icn_label_α(id,a,sizeof a); icn_label_β(id,b,sizeof b);
     icn_label_code(id,code,sizeof code);
-    snprintf(init,sizeof init,"icon_%d_init",id);
-    snprintf(e1bf,sizeof e1bf,"icon_%d_e1b",id);
-    snprintf(e2bf,sizeof e2bf,"icon_%d_e2b",id);
-    char I[64],v[64]; label_I(id,I,sizeof I); label_val(id,v,sizeof v);
-    bss_declare(I); bss_declare(v);
+    snprintf(init, sizeof init, "icon_%d_init", id);
+    snprintf(e1bf, sizeof e1bf, "icon_%d_e1b",  id);
+    snprintf(e2bf, sizeof e2bf, "icon_%d_e2b",  id);
+    /* BSS slots for I (counter), bound, step */
+    char I[64], bound[64], step[64];
+    label_I(id,I,sizeof I);
+    snprintf(bound, sizeof bound, "icon_%d_bound", id);
+    snprintf(step,  sizeof step,  "icon_%d_step",  id);
+    bss_declare(I); bss_declare(bound); bss_declare(step);
     strncpy(oa,a,63); strncpy(ob,b,63);
+    E(em,"    ; TO_BY  id=%d\n",id);
 
-    IcnPorts e3p; strncpy(e3p.γ,init,63); strncpy(e3p.ω,e2bf,63);
+    /* Wire E3 (step): succeed → init, fail → e2bf */
+    char step_relay[64]; snprintf(step_relay,sizeof step_relay,"icon_%d_stepr",id);
+    IcnPorts e3p; strncpy(e3p.γ,step_relay,63); strncpy(e3p.ω,e2bf,63);
     char e3a[64],e3b[64]; emit_expr(em,n->children[2],e3p,e3a,e3b);
-    IcnPorts e2p; strncpy(e2p.γ,e3a,63); strncpy(e2p.ω,e1bf,63);
+
+    /* Wire E2 (bound): succeed → e3a, fail → e1bf */
+    char bound_relay[64]; snprintf(bound_relay,sizeof bound_relay,"icon_%d_boundr",id);
+    IcnPorts e2p; strncpy(e2p.γ,bound_relay,63); strncpy(e2p.ω,e1bf,63);
     char e2a[64],e2b[64]; emit_expr(em,n->children[1],e2p,e2a,e2b);
-    IcnPorts e1p; strncpy(e1p.γ,e2a,63); strncpy(e1p.ω,ports.ω,63);
+
+    /* Wire E1 (start): succeed → e2a, fail → ports.ω */
+    char start_relay[64]; snprintf(start_relay,sizeof start_relay,"icon_%d_startr",id);
+    IcnPorts e1p; strncpy(e1p.γ,start_relay,63); strncpy(e1p.ω,ports.ω,63);
     char e1a[64],e1b[64]; emit_expr(em,n->children[0],e1p,e1a,e1b);
+
+    /* Relay: E1 pushed start → pop into I */
+    Ldef(em,start_relay);
+    E(em,"    pop     rax\n");
+    E(em,"    mov     [rel %s], rax\n", I);
+    Jmp(em,e2a);
+
+    /* Relay: E2 pushed bound → pop into bound slot */
+    Ldef(em,bound_relay);
+    E(em,"    pop     rax\n");
+    E(em,"    mov     [rel %s], rax\n", bound);
+    Jmp(em,e3a);
+
+    /* Relay: E3 pushed step → pop into step slot → proceed to code */
+    Ldef(em,step_relay);
+    E(em,"    pop     rax\n");
+    E(em,"    mov     [rel %s], rax\n", step);
+    Jmp(em,code);
 
     Ldef(em,e1bf); Jmp(em,e1b);
     Ldef(em,e2bf); Jmp(em,e2b);
-    Ldef(em,a);    Jmp(em,e1a);
-    int e1id=-1,e2id=-1,e3id=-1;
-    sscanf(e1a,"icon_%d_α",&e1id); sscanf(e2a,"icon_%d_α",&e2id); sscanf(e3a,"icon_%d_α",&e3id);
+
+    /* α: start from E1 */
+    Ldef(em,a); Jmp(em,e1a);
+
+    /* β: advance I by step, re-check */
     Ldef(em,b);
-    if(e3id>=0) E(em,"    mov     rcx, [rel icon_%d_val]\n",e3id);
-    E(em,"    add     [rel %s], rcx\n",I); Jmp(em,code);
-    Ldef(em,init);
-    if(e1id>=0) E(em,"    mov     rax, [rel icon_%d_val]\n",e1id);
-    E(em,"    mov     [rel %s], rax\n",I); Jmp(em,code);
+    E(em,"    mov     rax, [rel %s]\n", step);
+    E(em,"    add     [rel %s], rax\n", I);
+    Jmp(em,code);
+
+    /* init label kept for compatibility — not used in this design */
+    Ldef(em,init); Jmp(em,code);
+
+    /* code: check I <= bound, push I, succeed */
     Ldef(em,code);
-    E(em,"    mov     rax, [rel %s]\n",I);
-    if(e2id>=0) E(em,"    cmp     rax, [rel icon_%d_val]\n",e2id);
-    E(em,"    jg      %s\n",e2bf);
-    E(em,"    mov     [rel %s], rax\n",v);
+    E(em,"    mov     rax, [rel %s]\n", I);
+    E(em,"    cmp     rax, [rel %s]\n", bound);
+    E(em,"    jg      %s\n", e2bf);
+    E(em,"    push    rax\n");
     Jmp(em,ports.γ);
 }
 
@@ -896,6 +1309,7 @@ static void emit_expr(IcnEmitter *em, IcnNode *n, IcnPorts ports,
     switch(n->kind){
         case ICN_INT:    emit_int      (em,n,ports,oa,ob); break;
         case ICN_STR:    emit_str      (em,n,ports,oa,ob); break;
+        case ICN_CSET:   emit_cset     (em,n,ports,oa,ob); break;
         case ICN_VAR:    emit_var      (em,n,ports,oa,ob); break;
         case ICN_ASSIGN: emit_assign   (em,n,ports,oa,ob); break;
         case ICN_RETURN: emit_return   (em,n,ports,oa,ob); break;
@@ -903,6 +1317,13 @@ static void emit_expr(IcnEmitter *em, IcnNode *n, IcnPorts ports,
         case ICN_FAIL:   emit_fail_node(em,n,ports,oa,ob); break;
         case ICN_IF:     emit_if       (em,n,ports,oa,ob); break;
         case ICN_ALT:    emit_alt      (em,n,ports,oa,ob); break;
+        case ICN_SCAN:   emit_scan     (em,n,ports,oa,ob); break;
+        case ICN_NEG:    emit_neg      (em,n,ports,oa,ob); break;
+        case ICN_NOT:    emit_not      (em,n,ports,oa,ob); break;
+        case ICN_NULL:   emit_not      (em,n,ports,oa,ob); break;
+        case ICN_SEQ:    emit_seq      (em,n,ports,oa,ob); break;
+        case ICN_CONCAT: case ICN_LCONCAT:
+                         emit_concat   (em,n,ports,oa,ob); break;
         case ICN_ADD: case ICN_SUB: case ICN_MUL: case ICN_DIV: case ICN_MOD:
                          emit_binop    (em,n,ports,oa,ob); break;
         case ICN_LT: case ICN_LE: case ICN_GT: case ICN_GE: case ICN_EQ: case ICN_NE:
@@ -1111,9 +1532,11 @@ void icn_emit_file(IcnEmitter *em, IcnNode **nodes, int count) {
 
     E(em,"section .bss\n");
     for(int i=0;i<bss_count;i++){
-        /* icn_suspended and icn_suspend_resume are emitted as fixed declarations below */
+        /* skip symbols owned by C runtime */
         if(strcmp(bss_entries[i].name,"icn_suspended")==0) continue;
         if(strcmp(bss_entries[i].name,"icn_suspend_resume")==0) continue;
+        if(strcmp(bss_entries[i].name,"icn_subject")==0) continue;
+        if(strcmp(bss_entries[i].name,"icn_pos")==0) continue;
         E(em,"    %s: resq 1\n",bss_entries[i].name);
     }
     /* Per-generator-proc caller_ret slots */
@@ -1127,7 +1550,9 @@ void icn_emit_file(IcnEmitter *em, IcnNode **nodes, int count) {
     E(em,"    icn_suspend_rbp: resq 1\n\n");
 
     E(em,"section .text\n    global _start\n    extern icn_write_int\n    extern icn_write_str\n");
-    E(em,"    extern icn_push\n    extern icn_pop\n\n");
+    E(em,"    extern icn_push\n    extern icn_pop\n    extern icn_str_concat\n    extern icn_str_eq\n");
+    E(em,"    extern icn_any\n    extern icn_many\n    extern icn_upto\n");
+    E(em,"    extern icn_subject\n    extern icn_pos\n\n");
     E(em,"_start:\n    call    icn_main\n    mov     rax, 60\n    xor     rdi, rdi\n    syscall\n\n");
 
     fputs(body,em->out); free(body);
