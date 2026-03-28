@@ -5733,7 +5733,7 @@ static void emit_prolog_clause_block(EXPR_t *clause, int idx, int total,
             strcmp(gn,">=")==0||strcmp(gn,"=:=")==0||strcmp(gn,"=\\=")==0||
             strcmp(gn,",")==0||strcmp(gn,";")==0||strcmp(gn,"functor")==0||strcmp(gn,"arg")==0||strcmp(gn,"=..")==0||
             strcmp(gn,"atom")==0||strcmp(gn,"integer")==0||strcmp(gn,"float")==0||
-            strcmp(gn,"var")==0||strcmp(gn,"nonvar")==0||strcmp(gn,"compound")==0) continue;
+            strcmp(gn,"var")==0||strcmp(gn,"nonvar")==0||strcmp(gn,"compound")==0||strcmp(gn,"\\+")==0||strcmp(gn,"\\=")==0) continue;
         if (g->kind == E_CUT) continue;
         body_user_call_count++;
     }
@@ -5895,6 +5895,122 @@ static void emit_prolog_clause_block(EXPR_t *clause, int idx, int total,
                 }
                 continue;
             }
+            /* --- \+/1  negation-as-failure ---
+             * Semantics: call inner goal with fresh start=0.  If it succeeds
+             * (eax >= 0) \+ fails; if it fails (eax == -1) \+ succeeds.
+             * Trail is unwound regardless so inner bindings never escape.
+             * The trail mark is pushed on the stack before arg-building so it
+             * survives the inner _r call (which may clobber all caller-saved
+             * registers).  We use push/pop rather than a named frame slot to
+             * avoid touching the carefully-sized frame layout. */
+            if (strcmp(fn, "\\+") == 0 && garity == 1) {
+                EXPR_t *inner = goal->children[0];
+                const char *ifn   = (inner && inner->sval) ? inner->sval : NULL;
+                int         ia    = inner ? (int)inner->nchildren : 0;
+                char naf_ok[128], naf_fail[128];
+                snprintf(naf_ok,   sizeof naf_ok,   "pl_%s_c%d_naf_ok%d",   pred_safe, idx, bi);
+                snprintf(naf_fail, sizeof naf_fail,  "pl_%s_c%d_naf_fail%d", pred_safe, idx, bi);
+
+                /* 1. Take a trail mark and push it (survives inner call). */
+                A("    lea     rdi, [rel pl_trail]\n");
+                A("    call    trail_mark_fn\n");
+                A("    push    rax                    ; NAF trail mark\n");
+
+                /* 2. Call inner goal deterministically (start=0 → fresh). */
+                if (!ifn) {
+                    /* degenerate: no functor → treat as fail */
+                    A("    mov     eax, -1\n");
+                } else if (strcmp(ifn, "fail") == 0 && ia == 0) {
+                    A("    mov     eax, -1            ; \\+ fail → will succeed\n");
+                } else if (strcmp(ifn, "true") == 0 && ia == 0) {
+                    A("    mov     eax, 0             ; \\+ true → will fail\n");
+                } else {
+                    /* General inner goal: build args on stack, call _r with start=0. */
+                    char icall_fa[300];
+                    snprintf(icall_fa, sizeof icall_fa, "%s/%d", ifn, ia);
+                    char icall_safe[256];
+                    snprintf(icall_safe, sizeof icall_safe, "%s", pl_safe(icall_fa));
+                    if (ia > 0) {
+                        int ialloc = ALIGN16(ia * 8);
+                        A("    sub     rsp, %d              ; args for \\+ inner %s/%d\n", ialloc, ifn, ia);
+                        A("    mov     rbx, rsp               ; stable base\n");
+                        for (int ai2 = 0; ai2 < ia; ai2++) {
+                            emit_pl_term_load(inner->children[ai2], n_vars);
+                            A("    mov     [rbx + %d], rax    ; inner arg[%d]\n", ai2*8, ai2);
+                        }
+                        A("    mov     rdi, rbx               ; args ptr\n");
+                        A("    lea     rsi, [rel pl_trail]\n");
+                        A("    xor     edx, edx               ; start=0 (fresh)\n");
+                        A("    call    pl_%s_r\n", icall_safe);
+                        A("    add     rsp, %d\n", ialloc);
+                    } else {
+                        A("    xor     rdi, rdi               ; no args\n");
+                        A("    lea     rsi, [rel pl_trail]\n");
+                        A("    xor     edx, edx               ; start=0\n");
+                        A("    call    pl_%s_r\n", icall_safe);
+                    }
+                }
+
+                /* 3. Unwind trail regardless of result (pop mark into rsi). */
+                A("    push    rax                    ; save inner result\n");
+                A("    lea     rdi, [rel pl_trail]\n");
+                A("    mov     rsi, [rsp + 8]         ; NAF mark (below saved rax)\n");
+                A("    call    trail_unwind\n");
+                A("    pop     rax                    ; restore inner result\n");
+                A("    add     rsp, 8                 ; discard NAF mark\n");
+
+                /* 4. Invert: inner succeeded (eax >= 0) → \+ fails. */
+                A("    cmp     eax, -1\n");
+                A("    je      %s\n", naf_ok);   /* inner failed → \+ succeeds */
+                /* inner succeeded → \+ fails → unwind clause mark, try next clause */
+                A("%s:\n", naf_fail);
+                A("    lea     rdi, [rel pl_trail]\n");
+                A("    mov     esi, [rbp - 8]\n");
+                A("    call    trail_unwind\n");
+                A("    jmp     %s\n", next_clause);
+                A("%s:\n", naf_ok);
+                /* inner failed → \+ succeeds → fall through to next body goal */
+                continue;
+            }
+            /* --- \=/2  not-unifiable --- */
+            if (strcmp(fn, "\\=") == 0 && garity == 2) {
+                char neq_ok[128], neq_fail[128];
+                snprintf(neq_ok,   sizeof neq_ok,   "pl_%s_c%d_neq_ok%d",   pred_safe, idx, bi);
+                snprintf(neq_fail, sizeof neq_fail,  "pl_%s_c%d_neq_fail%d", pred_safe, idx, bi);
+
+                /* 1. Take a trail mark and push it. */
+                A("    lea     rdi, [rel pl_trail]\n");
+                A("    call    trail_mark_fn\n");
+                A("    push    rax                    ; \\= trail mark\n");
+
+                /* 2. Attempt unification. */
+                emit_pl_term_load(goal->children[0], n_vars);
+                A("    mov     [rel pl_tmp], rax\n");
+                emit_pl_term_load(goal->children[1], n_vars);
+                A("    mov     rsi, rax\n");
+                A("    mov     rdi, [rel pl_tmp]\n");
+                A("    lea     rdx, [rel pl_trail]\n");
+                A("    call    unify\n");
+                A("    push    rax                    ; save unify result\n");
+
+                /* 3. Unwind trail regardless (pop result, then mark). */
+                A("    lea     rdi, [rel pl_trail]\n");
+                A("    mov     rsi, [rsp + 8]         ; \\= mark (below saved result)\n");
+                A("    call    trail_unwind\n");
+                A("    pop     rax                    ; restore unify result\n");
+                A("    add     rsp, 8                 ; discard \\= mark\n");
+
+                /* 4. Invert: unify succeeded (eax != 0) → \= fails. */
+                A("    test    eax, eax\n");
+                A("    jz      %s\n", neq_ok);   /* unify failed → \= succeeds */
+                A("%s:\n", neq_fail);
+                A("    lea     rdi, [rel pl_trail]\n");
+                A("    mov     esi, [rbp - 8]\n");
+                A("    call    trail_unwind\n");
+                A("    jmp     %s\n", next_clause);
+                A("%s:\n", neq_ok);
+                continue;
+            }
             /* --- writeln/1 --- */
             if (strcmp(fn, "writeln") == 0 && garity == 1) {
                 emit_pl_term_load(goal->children[0], n_vars);
@@ -6041,6 +6157,79 @@ static void emit_prolog_clause_block(EXPR_t *clause, int idx, int total,
                             cond_handled = 1;
                         }
                     }
+                    /* \+/1 as condition: take else_lbl if inner succeeds */
+                    if (!cond_handled && cond && cond->kind == E_FNC && cond->sval &&
+                        strcmp(cond->sval, "\\+") == 0 && cond->nchildren == 1) {
+                        EXPR_t *ci = cond->children[0];
+                        const char *cifn = (ci && ci->sval) ? ci->sval : NULL;
+                        int cia = ci ? (int)ci->nchildren : 0;
+                        /* Take trail mark, call inner, unwind, invert */
+                        A("    lea     rdi, [rel pl_trail]\n");
+                        A("    call    trail_mark_fn\n");
+                        A("    push    rax                    ; NAF cond mark\n");
+                        if (!cifn || (strcmp(cifn,"fail")==0 && cia==0)) {
+                            A("    mov     eax, -1\n");  /* \+ fail → cond true */
+                        } else if (strcmp(cifn,"true")==0 && cia==0) {
+                            A("    mov     eax, 0\n");   /* \+ true → cond false */
+                        } else {
+                            char cifa[300]; snprintf(cifa, sizeof cifa, "%s/%d", cifn, cia);
+                            char cisafe[256]; strncpy(cisafe, pl_safe(cifa), 255);
+                            if (cia > 0) {
+                                int cialloc = ALIGN16(cia*8);
+                                A("    sub     rsp, %d\n", cialloc);
+                                A("    mov     rbx, rsp\n");
+                                for (int ai=0; ai<cia; ai++) {
+                                    emit_pl_term_load(ci->children[ai], n_vars);
+                                    A("    mov     [rbx + %d], rax\n", ai*8);
+                                }
+                                A("    mov     rdi, rbx\n");
+                                A("    lea     rsi, [rel pl_trail]\n");
+                                A("    xor     edx, edx\n");
+                                A("    call    pl_%s_r\n", cisafe);
+                                A("    add     rsp, %d\n", cialloc);
+                            } else {
+                                A("    xor     rdi, rdi\n");
+                                A("    lea     rsi, [rel pl_trail]\n");
+                                A("    xor     edx, edx\n");
+                                A("    call    pl_%s_r\n", cisafe);
+                            }
+                        }
+                        A("    push    rax\n");
+                        A("    lea     rdi, [rel pl_trail]\n");
+                        A("    mov     rsi, [rsp + 8]\n");
+                        A("    call    trail_unwind\n");
+                        A("    pop     rax\n");
+                        A("    add     rsp, 8\n");
+                        /* inner failed (eax==-1) → \+ true → condition holds → fall through */
+                        /* inner succeeded (eax>=0) → \+ false → goto else */
+                        A("    cmp     eax, -1\n");
+                        A("    jne     %s\n", else_lbl);
+                        cond_handled = 1;
+                    }
+                    /* \=/2 as condition: take else_lbl if unify succeeds */
+                    if (!cond_handled && cond && cond->kind == E_FNC && cond->sval &&
+                        strcmp(cond->sval, "\\=") == 0 && cond->nchildren == 2) {
+                        A("    lea     rdi, [rel pl_trail]\n");
+                        A("    call    trail_mark_fn\n");
+                        A("    push    rax                    ; \\= cond mark\n");
+                        emit_pl_term_load(cond->children[0], n_vars);
+                        A("    mov     [rel pl_tmp], rax\n");
+                        emit_pl_term_load(cond->children[1], n_vars);
+                        A("    mov     rsi, rax\n");
+                        A("    mov     rdi, [rel pl_tmp]\n");
+                        A("    lea     rdx, [rel pl_trail]\n");
+                        A("    call    unify\n");
+                        A("    push    rax\n");
+                        A("    lea     rdi, [rel pl_trail]\n");
+                        A("    mov     rsi, [rsp + 8]\n");
+                        A("    call    trail_unwind\n");
+                        A("    pop     rax\n");
+                        A("    add     rsp, 8\n");
+                        /* unify succeeded (eax!=0) → \= false → goto else */
+                        A("    test    eax, eax\n");
+                        A("    jnz     %s\n", else_lbl);
+                        cond_handled = 1;
+                    }
                     /* User-defined predicate call as condition */
                     if (!cond_handled && cond && cond->kind == E_FNC && cond->sval) {
                         const char *cfn2 = cond->sval; int ca2 = cond->nchildren;
@@ -6083,6 +6272,30 @@ static void emit_prolog_clause_block(EXPR_t *clause, int idx, int total,
                         } else if (strcmp(tfn,"true")==0) { /* no-op */ }
                         else if (strcmp(tfn,"fail")==0) {
                             A("    jmp     %s\n", next_clause);
+                        } else if (strcmp(tfn,"\\+")==0 && ta==1) {
+                            /* \+ in then-branch */
+                            EXPR_t *ti = then->children[0];
+                            const char *tifn = (ti && ti->sval) ? ti->sval : NULL;
+                            int tia = ti ? (int)ti->nchildren : 0;
+                            A("    lea     rdi, [rel pl_trail]\n"); A("    call    trail_mark_fn\n"); A("    push    rax\n");
+                            if (!tifn||(strcmp(tifn,"fail")==0&&tia==0)){A("    mov     eax, -1\n");}
+                            else if(strcmp(tifn,"true")==0&&tia==0){A("    mov     eax, 0\n");}
+                            else {
+                                char tifa[300]; snprintf(tifa,sizeof tifa,"%s/%d",tifn,tia);
+                                char tisafe[256]; strncpy(tisafe,pl_safe(tifa),255);
+                                if(tia>0){int ta2=ALIGN16(tia*8);A("    sub     rsp, %d\n",ta2);A("    mov     rbx, rsp\n");for(int ai=0;ai<tia;ai++){emit_pl_term_load(ti->children[ai],n_vars);A("    mov     [rbx + %d], rax\n",ai*8);}A("    mov     rdi, rbx\n");}else{A("    xor     rdi, rdi\n");}
+                                A("    lea     rsi, [rel pl_trail]\n"); A("    xor     edx, edx\n"); A("    call    pl_%s_r\n",tisafe);
+                                if(tia>0)A("    add     rsp, %d\n",ALIGN16(tia*8));
+                            }
+                            A("    push    rax\n");A("    lea     rdi, [rel pl_trail]\n");A("    mov     rsi, [rsp + 8]\n");A("    call    trail_unwind\n");A("    pop     rax\n");A("    add     rsp, 8\n");
+                            A("    cmp     eax, -1\n"); A("    jne     %s\n", next_clause); /* inner succeeded → \+ fails */
+                        } else if (strcmp(tfn,"\\=")==0 && ta==2) {
+                            /* \= in then-branch */
+                            A("    lea     rdi, [rel pl_trail]\n"); A("    call    trail_mark_fn\n"); A("    push    rax\n");
+                            emit_pl_term_load(then->children[0], n_vars); A("    mov     [rel pl_tmp], rax\n");
+                            emit_pl_term_load(then->children[1], n_vars); A("    mov     rsi, rax\n"); A("    mov     rdi, [rel pl_tmp]\n"); A("    lea     rdx, [rel pl_trail]\n"); A("    call    unify\n");
+                            A("    push    rax\n");A("    lea     rdi, [rel pl_trail]\n");A("    mov     rsi, [rsp + 8]\n");A("    call    trail_unwind\n");A("    pop     rax\n");A("    add     rsp, 8\n");
+                            A("    test    eax, eax\n"); A("    jnz     %s\n", next_clause); /* unified → \= fails */
                         } else {
                             /* user call — call once, deterministic */
                             char tfa[300]; snprintf(tfa, sizeof tfa, "%s/%d", tfn, ta);
@@ -6119,6 +6332,30 @@ static void emit_prolog_clause_block(EXPR_t *clause, int idx, int total,
                         } else if (strcmp(efn,"true")==0) { /* no-op */ }
                         else if (strcmp(efn,"fail")==0) {
                             A("    jmp     %s\n", next_clause);
+                        } else if (strcmp(efn,"\\+")==0 && ea==1) {
+                            /* \+ in else-branch */
+                            EXPR_t *ei = right->children[0];
+                            const char *eifn = (ei && ei->sval) ? ei->sval : NULL;
+                            int eia = ei ? (int)ei->nchildren : 0;
+                            A("    lea     rdi, [rel pl_trail]\n"); A("    call    trail_mark_fn\n"); A("    push    rax\n");
+                            if (!eifn||(strcmp(eifn,"fail")==0&&eia==0)){A("    mov     eax, -1\n");}
+                            else if(strcmp(eifn,"true")==0&&eia==0){A("    mov     eax, 0\n");}
+                            else {
+                                char eifa[300]; snprintf(eifa,sizeof eifa,"%s/%d",eifn,eia);
+                                char eisafe[256]; strncpy(eisafe,pl_safe(eifa),255);
+                                if(eia>0){int ea2=ALIGN16(eia*8);A("    sub     rsp, %d\n",ea2);A("    mov     rbx, rsp\n");for(int ai=0;ai<eia;ai++){emit_pl_term_load(ei->children[ai],n_vars);A("    mov     [rbx + %d], rax\n",ai*8);}A("    mov     rdi, rbx\n");}else{A("    xor     rdi, rdi\n");}
+                                A("    lea     rsi, [rel pl_trail]\n"); A("    xor     edx, edx\n"); A("    call    pl_%s_r\n",eisafe);
+                                if(eia>0)A("    add     rsp, %d\n",ALIGN16(eia*8));
+                            }
+                            A("    push    rax\n");A("    lea     rdi, [rel pl_trail]\n");A("    mov     rsi, [rsp + 8]\n");A("    call    trail_unwind\n");A("    pop     rax\n");A("    add     rsp, 8\n");
+                            A("    cmp     eax, -1\n"); A("    jne     %s\n", next_clause);
+                        } else if (strcmp(efn,"\\=")==0 && ea==2) {
+                            /* \= in else-branch */
+                            A("    lea     rdi, [rel pl_trail]\n"); A("    call    trail_mark_fn\n"); A("    push    rax\n");
+                            emit_pl_term_load(right->children[0], n_vars); A("    mov     [rel pl_tmp], rax\n");
+                            emit_pl_term_load(right->children[1], n_vars); A("    mov     rsi, rax\n"); A("    mov     rdi, [rel pl_tmp]\n"); A("    lea     rdx, [rel pl_trail]\n"); A("    call    unify\n");
+                            A("    push    rax\n");A("    lea     rdi, [rel pl_trail]\n");A("    mov     rsi, [rsp + 8]\n");A("    call    trail_unwind\n");A("    pop     rax\n");A("    add     rsp, 8\n");
+                            A("    test    eax, eax\n"); A("    jnz     %s\n", next_clause);
                         } else {
                             char efa[300]; snprintf(efa, sizeof efa, "%s/%d", efn, ea);
                             char esafe[256]; strncpy(esafe, pl_safe(efa), 255);
@@ -6654,7 +6891,7 @@ static void emit_prolog_choice(EXPR_t *choice) {
                 strcmp(gn,",")==0||strcmp(gn,";")==0||strcmp(gn,"functor")==0||
                 strcmp(gn,"arg")==0||strcmp(gn,"=..")==0||strcmp(gn,"atom")==0||
                 strcmp(gn,"integer")==0||strcmp(gn,"float")==0||
-                strcmp(gn,"var")==0||strcmp(gn,"nonvar")==0||strcmp(gn,"compound")==0) continue;
+                strcmp(gn,"var")==0||strcmp(gn,"nonvar")==0||strcmp(gn,"compound")==0||strcmp(gn,"\\+")==0||strcmp(gn,"\\=")==0) continue;
             if (g->kind == E_CUT) continue;
             nuc++;
         }
@@ -6730,7 +6967,7 @@ static void emit_prolog_choice(EXPR_t *choice) {
                 strcmp(gn,">=")==0||strcmp(gn,"=:=")==0||strcmp(gn,"=\\=")==0||
                 strcmp(gn,",")==0||strcmp(gn,";")==0||strcmp(gn,"functor")==0||strcmp(gn,"arg")==0||strcmp(gn,"=..")==0||
                 strcmp(gn,"atom")==0||strcmp(gn,"integer")==0||strcmp(gn,"float")==0||
-                strcmp(gn,"var")==0||strcmp(gn,"nonvar")==0||strcmp(gn,"compound")==0) continue;
+                strcmp(gn,"var")==0||strcmp(gn,"nonvar")==0||strcmp(gn,"compound")==0||strcmp(gn,"\\+")==0||strcmp(gn,"\\=")==0) continue;
             if (g->kind == E_CUT) continue;
             has_ucall = 1;
         }
@@ -6758,7 +6995,7 @@ static void emit_prolog_choice(EXPR_t *choice) {
                 strcmp(gn,">=")==0||strcmp(gn,"=:=")==0||strcmp(gn,"=\\=")==0||
                 strcmp(gn,",")==0||strcmp(gn,";")==0||strcmp(gn,"functor")==0||strcmp(gn,"arg")==0||strcmp(gn,"=..")==0||
                 strcmp(gn,"atom")==0||strcmp(gn,"integer")==0||strcmp(gn,"float")==0||
-                strcmp(gn,"var")==0||strcmp(gn,"nonvar")==0||strcmp(gn,"compound")==0) continue;
+                strcmp(gn,"var")==0||strcmp(gn,"nonvar")==0||strcmp(gn,"compound")==0||strcmp(gn,"\\+")==0||strcmp(gn,"\\=")==0) continue;
             if (g->kind == E_CUT) continue;
             last_has_ucall = 1;
         }
