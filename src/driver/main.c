@@ -16,6 +16,7 @@
 #include "icon_lex.h"         /* IcnLexer, icn_lex_init */
 #include "icon_ast.h"
 #include "icon_parse.h"       /* IcnParser, icn_parse_init, icn_parse_file */
+#include "icon_emit.h"         /* IcnEmitter, icn_emit_init, icn_emit_file */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -163,10 +164,10 @@ int main(int argc, char *argv[]) {
         if (jvm_mode) {
             ij_emit_file(procs, count, out, infile, outfile, icn_imports);
         } else {
-            /* x64 ASM path — route through existing icon_emit */
-            /* (net_mode not yet implemented for Icon) */
-            fprintf(stderr, "sno2c: Icon requires -jvm (x64/net not yet implemented)\n");
-            return 1;
+            /* x64 ASM path — route through icon_emit.c (Byrd Box NASM emitter) */
+            IcnEmitter em;
+            icn_emit_init(&em, out);
+            icn_emit_file(&em, procs, count);
         }
         for (int i = 0; i < count; i++) icn_node_free(procs[i]);
         free(procs);
