@@ -9,7 +9,7 @@ If it can be lowered or is a builtin call, it does not get its own EKind.
 
 ---
 
-## Result: 37 Node Kinds
+## Result: 37 Node Kinds — Starting Point, Not Frozen
 
 The unified IR has **37 node kinds**. This is the minimal set covering all six
 frontends. The previous audit draft overcounted by ~35 nodes due to mechanical
@@ -17,6 +17,14 @@ frontends. The previous audit draft overcounted by ~35 nodes due to mechanical
 
 See GRAND_MASTER_REORG.md § The Shared IR for the canonical table with α/β
 wiring. This document explains the lowering decisions.
+**This 37-node set is analysis-time best judgment, not a frozen contract.**
+The real test comes during Phases 3–5 when emitters are actually unified.
+Some lowering combinations that look clean on paper may require distinct β-wiring
+in practice — those warrant new nodes. Some nodes kept separate may prove to emit
+identically across all backends — those merge. The CISC/RISC tension between
+giving each construct its own node vs pushing complexity into the lowering layer
+is resolved empirically by the code, not theoretically in advance.
+See GRAND_MASTER_REORG.md § IR Node Set — Living Target for the change protocol.
 
 ---
 
