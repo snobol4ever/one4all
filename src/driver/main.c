@@ -28,11 +28,11 @@ extern int asm_body_mode;
 void jvm_emit(Program *prog, FILE *f, const char *filename);
 void net_emit(Program *prog, FILE *f, const char *filename);
 void pl_emit(Program *prog, FILE *f);   /* defined in prolog_emit.c */
-void prolog_emit_jvm(Program *prog, FILE *f, const char *filename); /* prolog_emit_jvm.c */
+void prolog_emit_jvm(Program *prog, FILE *f, const char *filename); /* emit_jvm_prolog.c */
 void prolog_emit_net(Program *prog, FILE *f, const char *filename); /* prolog_emit_net.c */
-void pj_linker_prescan(PlProgram *pl_prog);                         /* prolog_emit_jvm.c */
+void pj_linker_prescan(PlProgram *pl_prog);                         /* emit_jvm_prolog.c */
 ImportEntry *icn_prescan_imports(const char *src);                  /* icn_main.c */
-void ij_emit_file(IcnNode **nodes, int count, FILE *out,            /* icon_emit_jvm.c */
+void ij_emit_file(IcnNode **nodes, int count, FILE *out,            /* emit_jvm_icon.c */
                   const char *filename, const char *outpath, ImportEntry *imports);
 
 static int asm_mode = 0;
@@ -164,7 +164,7 @@ int main(int argc, char *argv[]) {
         if (jvm_mode) {
             ij_emit_file(procs, count, out, infile, outfile, icn_imports);
         } else {
-            /* x64 ASM path — route through icon_emit.c (Byrd Box NASM emitter) */
+            /* x64 ASM path — route through emit_x64_icon.c (Byrd Box NASM emitter) */
             IcnEmitter em;
             icn_emit_init(&em, out);
             icn_emit_file(&em, procs, count);

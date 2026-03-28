@@ -19,7 +19,6 @@ FRONTEND_PROLOG = \
     frontend/prolog/prolog_unify.c \
     frontend/prolog/prolog_lower.c \
     frontend/prolog/prolog_emit.c \
-    frontend/prolog/prolog_emit_jvm.c \
     frontend/prolog/prolog_emit_net.c \
     frontend/prolog/prolog_builtin.c
 
@@ -35,16 +34,22 @@ BACKEND_C = \
     backend/c/emit_byrd_c.c
 
 BACKEND_X64 = \
-    backend/x64/emit_byrd_asm.c
+    backend/x64/emit_x64.c \
+    backend/x64/emit_x64_icon.c
 
 DRIVER = \
     driver/main.c
 
 BACKEND_JVM = \
-    backend/jvm/emit_byrd_jvm.c
+    backend/jvm/emit_jvm.c \
+    backend/jvm/emit_jvm_icon.c \
+    backend/jvm/emit_jvm_prolog.c
 
 BACKEND_NET = \
-    backend/net/emit_byrd_net.c
+    backend/net/emit_net.c
+
+BACKEND_WASM = \
+    backend/wasm/emit_wasm.c
 
 IR = \
     ir/ir_print.c \
@@ -55,11 +60,9 @@ FRONTEND_ICON = \
     frontend/icon/icon_lex.c \
     frontend/icon/icon_parse.c \
     frontend/icon/icon_ast.c \
-    frontend/icon/icon_emit.c \
-    frontend/icon/icon_emit_jvm.c \
     frontend/icon/icon_runtime.c
 
-SRCS = $(FRONTEND_SNO) $(FRONTEND_PROLOG) $(FRONTEND_SNOCONE) $(FRONTEND_ICON) $(BACKEND_C) $(BACKEND_X64) $(BACKEND_JVM) $(BACKEND_NET) $(IR) $(DRIVER)
+SRCS = $(FRONTEND_SNO) $(FRONTEND_PROLOG) $(FRONTEND_SNOCONE) $(FRONTEND_ICON) $(BACKEND_C) $(BACKEND_X64) $(BACKEND_JVM) $(BACKEND_NET) $(BACKEND_WASM) $(IR) $(DRIVER)
 OBJS = $(SRCS:.c=.o)
 
 .PHONY: all clean
@@ -91,8 +94,8 @@ ICON_SRCS = \
     frontend/icon/icon_lex.c \
     frontend/icon/icon_parse.c \
     frontend/icon/icon_ast.c \
-    frontend/icon/icon_emit.c \
-    frontend/icon/icon_emit_jvm.c \
+    backend/x64/emit_x64_icon.c \
+    backend/jvm/emit_jvm_icon.c \
     frontend/icon/icon_runtime.c
 
 ICON_BIN = ../sno2c_icon
