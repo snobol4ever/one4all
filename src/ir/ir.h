@@ -71,7 +71,12 @@ typedef enum EKind {
 
     /* --- Sequence and Alternation ---------------------------------------- */
 
-    E_SEQ,          /* Sequence / concat, n-ary (CONCAT/CONCL; was E_CONC)  */
+    E_SEQ,          /* Goal-directed sequence, n-ary — Byrd-box wiring       */
+                    /* α→lα, lγ→rα, rω→lβ, rγ→γ. SNOBOL4 pattern CAT;      */
+                    /* Icon ||/;/&/loop bodies. (CONCAT/CONCL; was E_CONC)   */
+    E_CONCAT,       /* Pure value-context string concat, n-ary, cannot fail  */
+                    /* SNOBOL4 value ctx; JVM StringBuilder; .NET Concat.     */
+                    /* M-G4-SPLIT-SEQ-CONCAT (2026-03-28).                   */
     E_ALT,          /* Pattern alternation, n-ary (ORPP in SIL; was E_OR)   */
     E_OPSYN,        /* & operator: reduce(left, right)                      */
 
@@ -206,6 +211,7 @@ static const char * const ekind_name[E_KIND_COUNT] = {
     [E_MOD]          = "E_MOD",
     [E_POW]          = "E_POW",
     [E_SEQ]          = "E_SEQ",
+    [E_CONCAT]       = "E_CONCAT",
     [E_ALT]          = "E_ALT",
     [E_OPSYN]        = "E_OPSYN",
     [E_ARB]          = "E_ARB",
@@ -266,7 +272,10 @@ static const char * const ekind_name[E_KIND_COUNT] = {
 #define E_STAR      E_DEFER
 #define E_MNS       E_NEG
 #define E_EXPOP     E_POW
-#define E_CONC      E_SEQ
+#define E_CONC      E_SEQ     /* pattern-context: SEQ Byrd-box wiring.
+                               * Value-context callers: use E_CONCAT.
+                               * M-G4-SPLIT-SEQ-CONCAT: migrate value-context
+                               * E_CONC sites to E_CONCAT, then remove alias. */
 #define E_OR        E_ALT
 #define E_NAM       E_CAPT_COND
 #define E_DOL       E_CAPT_IMM
