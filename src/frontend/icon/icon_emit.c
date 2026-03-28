@@ -1550,6 +1550,96 @@ static void emit_every(IcnEmitter *em, IcnNode *n, IcnPorts ports,
 }
 
 /* =========================================================================
+ * ICN_AUGOP — E1 op:= E2   (augmented assignment)
+ *
+ * Semantics: E1 := E1 op E2  (E1 must be ICN_VAR)
+ *
+ * Strategy: build a synthetic binop/relop/concat node (two children: E1-copy
+ * and E2), emit it, then store the result back into E1.
+ *
+ * The subtype is in n->val.ival (TK_AUGxxx enum value).  Map to the
+ * corresponding ICN_xxx kind, emit as that node, then wrap in an assign store.
+ * ======================================================================= */
+#include "icon_lex.h"   /* TK_AUGPLUS etc. — needed for the subtype map */
+static void emit_augop(IcnEmitter *em, IcnNode *n, IcnPorts ports,
+                       char *oa, char *ob) {
+    if (n->nchildren < 2) { emit_fail_node(em, n, ports, oa, ob); return; }
+
+    IcnNode *lhs = n->children[0];   /* must be ICN_VAR */
+    IcnNode *rhs = n->children[1];
+
+    /* Map TK_AUGxxx → ICN_xxx */
+    IcnKind op_kind;
+    switch ((IcnTkKind)n->val.ival) {
+        case TK_AUGPLUS:   op_kind = ICN_ADD;    break;
+        case TK_AUGMINUS:  op_kind = ICN_SUB;    break;
+        case TK_AUGSTAR:   op_kind = ICN_MUL;    break;
+        case TK_AUGSLASH:  op_kind = ICN_DIV;    break;
+        case TK_AUGMOD:    op_kind = ICN_MOD;    break;
+        case TK_AUGCONCAT: op_kind = ICN_CONCAT; break;
+        case TK_AUGEQ:     op_kind = ICN_EQ;     break;
+        case TK_AUGSEQ:    op_kind = ICN_SEQ;    break;
+        case TK_AUGLT:     op_kind = ICN_LT;     break;
+        case TK_AUGLE:     op_kind = ICN_LE;     break;
+        case TK_AUGGT:     op_kind = ICN_GT;     break;
+        case TK_AUGGE:     op_kind = ICN_GE;     break;
+        case TK_AUGNE:     op_kind = ICN_NE;     break;
+        default:
+            /* Unhandled augop — fall back to fail */
+            emit_fail_node(em, n, ports, oa, ob); return;
+    }
+
+    int id = icn_new_id(em); char a[64], b[64];
+    icn_label_α(id, a, sizeof a); icn_label_β(id, b, sizeof b);
+    strncpy(oa, a, 63); strncpy(ob, b, 63);
+
+    char store[64]; snprintf(store, sizeof store, "icon_%d_aug_store", id);
+
+    /* Build a synthetic two-child node for the op on the stack.
+     * We borrow lhs and rhs as children (no ownership transfer — they remain
+     * owned by the parent ICN_AUGOP node). */
+    IcnNode syn;
+    memset(&syn, 0, sizeof syn);
+    syn.kind      = op_kind;
+    syn.nchildren = 2;
+    IcnNode *ch[2] = { lhs, rhs };
+    syn.children  = ch;
+
+    /* Wire: op succeeds → store; op fails → ports.ω */
+    IcnPorts op_ports;
+    strncpy(op_ports.γ, store, 63);
+    strncpy(op_ports.ω, ports.ω, 63);
+
+    char opa[64], opb[64];
+    emit_expr(em, &syn, op_ports, opa, opb);
+
+    /* α → op.α;  β → op.β */
+    Ldef(em, a); Jmp(em, opa);
+    Ldef(em, b); Jmp(em, opb);
+
+    /* store: result is on hw stack (all binop/relop/concat push a value).
+     * Pop it and write back into LHS variable. */
+    Ldef(em, store);
+    if (op_kind == ICN_CONCAT) {
+        /* concat pushes a char* — pop into rax, store as pointer */
+        E(em, "    pop     rax\n");
+    } else {
+        E(em, "    pop     rax\n");
+    }
+    if (lhs && lhs->kind == ICN_VAR) {
+        int slot = locals_find(lhs->val.sval);
+        if (slot >= 0) {
+            E(em, "    mov     [rbp%+d], rax\n", slot_offset(slot));
+        } else {
+            char gv[80]; snprintf(gv, sizeof gv, "icn_gvar_%s", lhs->val.sval);
+            bss_declare(gv);
+            E(em, "    mov     [rel %s], rax\n", gv);
+        }
+    }
+    Jmp(em, ports.γ);
+}
+
+/* =========================================================================
  * Dispatch
  * ======================================================================= */
 static void emit_expr(IcnEmitter *em, IcnNode *n, IcnPorts ports,
@@ -1583,6 +1673,7 @@ static void emit_expr(IcnEmitter *em, IcnNode *n, IcnPorts ports,
         case ICN_WHILE:  emit_while    (em,n,ports,oa,ob); break;
         case ICN_UNTIL:  emit_until    (em,n,ports,oa,ob); break;
         case ICN_CALL:   emit_call     (em,n,ports,oa,ob); break;
+        case ICN_AUGOP:  emit_augop    (em,n,ports,oa,ob); break;
         case ICN_AND: {
             /* n-ary conjunction: E1 & E2 & ... & En
              * irgen.icn ir_conjunction wiring:
