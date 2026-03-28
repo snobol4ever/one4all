@@ -116,11 +116,11 @@ are E_FNC. No new node kinds.
   ICN_TO -> E_TO
   ICN_TO_BY -> E_TO_BY
   ICN_ALT -> E_GENALT
-  ICN_BANG -> E_BANG
+  ICN_BANG -> E_ITER
   ICN_LIMIT -> E_LIMIT
-  ICN_SCAN -> E_SCAN
-  ICN_SCAN_AUGOP -> E_ASSIGN + E_SCAN
-  ICN_MATCH (=E) -> E_SCAN + E_FNC("match")
+  ICN_SCAN -> E_MATCH
+  ICN_SCAN_AUGOP -> E_ASSIGN + E_MATCH
+  ICN_MATCH (=E) -> E_MATCH + E_FNC("match")
 
 **Call/suspend:**
   ICN_CALL -> E_FNC
@@ -143,7 +143,7 @@ are E_FNC. No new node kinds.
 Rebus is a SNOBOL4/Icon hybrid. Every REKind and RSKind maps to an existing
 SNOBOL4 EKind, the two new Icon kinds, or a lowering/E_FNC call.
 
-  P-component (SNOBOL4 patterns): RE_COND/IMM/CURSOR/DEREF -> E_DOT/DOL/ATP/STAR
+  P-component (SNOBOL4 patterns): RE_COND/IMM/CURSOR/DEREF -> E_CAPT_COND/DOL/ATP/STAR
   L-component (Icon control): same lowering as Icon
   RE_UNLESS -> FENCE pattern via E_CUT
   RE_FOR -> E_SEQ(E_ASSIGN, E_ARBNO(...)) composition
@@ -156,12 +156,12 @@ Rebus additional gap: 0.
 
 ## Name Alias Issue — must resolve in M-G1
 
-The reorg doc uses E_DOT/E_DOLLAR for cursor/value capture.
-sno2c.h uses E_DOT/E_DOLLAR for the same nodes.
+The reorg doc uses E_CAPT_COND/E_CAPT_IMM for cursor/value capture.
+sno2c.h uses E_CAPT_COND/E_CAPT_IMM for the same nodes.
 The reorg doc uses E_ASSIGN; sno2c.h uses E_ASSIGN.
 
 M-G1-IR-HEADER-DEF picks the canonical names for ir.h.
-Recommendation: use reorg doc names (E_DOT, E_DOLLAR, E_ASSIGN) — more
+Recommendation: use reorg doc names (E_CAPT_COND, E_CAPT_IMM, E_ASSIGN) — more
 self-documenting. sno2c.h gets #define aliases during Phase 1, removed in Phase 3.
 
 ---
@@ -171,8 +171,8 @@ self-documenting. sno2c.h gets #define aliases during Phase 1, removed in Phase 
 Beyond what currently exists in sno2c.h, ir.h adds:
 
 From the planned shared IR table (not yet in sno2c.h):
-  E_ARB, E_ARBNO, E_POS, E_RPOS, E_DOT, E_DOLLAR, E_ASSIGN (canonical name),
-  E_SUSPEND, E_TO, E_TO_BY, E_LIMIT, E_GENALT, E_BANG, E_SCAN, E_SWAP,
+  E_ARB, E_ARBNO, E_POS, E_RPOS, E_CAPT_COND, E_CAPT_IMM, E_ASSIGN (canonical name),
+  E_SUSPEND, E_TO, E_TO_BY, E_LIMIT, E_GENALT, E_ITER, E_MATCH, E_SWAP,
   E_POW, E_MOD
 
 From this audit (genuinely new):
