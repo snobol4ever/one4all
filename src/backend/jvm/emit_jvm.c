@@ -3409,7 +3409,7 @@ static void jvm_emit_runtime_helpers(void) {
         J("    bipush 71\n");    /* 'G' */
         J("    if_icmpeq Lsmv_done\n");
         J("    iconst_0\n");
-        J("    invokestatic java/lang/System/exit(I)V\n");
+        J("    invokestatic SnoRuntime/sno_exit(I)V\n");
         J("Lsmv_done:\n");
         J("    return\n");
         J(".end method\n\n");
@@ -3440,7 +3440,7 @@ static void jvm_emit_runtime_helpers(void) {
             J("    ldc \"Termination: statement limit\"\n");
             J("    invokevirtual java/io/PrintStream/println(Ljava/lang/String;)V\n");
             J("    iconst_1\n");
-            J("    invokestatic java/lang/System/exit(I)V\n");
+            J("    invokestatic SnoRuntime/sno_exit(I)V\n");
             J("Lstick_ok:\n");
         }
         J("    return\n");

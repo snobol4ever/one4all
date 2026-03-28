@@ -150,21 +150,21 @@ static int lower_token(const ScPToken *tok, ExprStack *s,
 
     /* ---- String / pattern composition ---- */
     case SNOCONE_CONCAT: {
-        /* && blank concat → E_CONC */
+        /* && blank concat → E_CONCAT (value-context string concat) */
         EXPR_t *r = es_pop(s), *l = es_pop(s);
-        EXPR_t *e = expr_binary(E_CONC, l, r);
+        EXPR_t *e = expr_binary(E_CONCAT, l, r);
         es_push(s, e); return 0;
     }
     case SNOCONE_PIPE: {
         /* single | also string concat in SNOBOL4 context */
         EXPR_t *r = es_pop(s), *l = es_pop(s);
-        EXPR_t *e = expr_binary(E_CONC, l, r);
+        EXPR_t *e = expr_binary(E_CONCAT, l, r);
         es_push(s, e); return 0;
     }
     case SNOCONE_OR: {
-        /* || string concatenation (same as | and && in value context) → E_CONC */
+        /* || string concatenation (same as | and && in value context) → E_CONCAT */
         EXPR_t *r = es_pop(s), *l = es_pop(s);
-        EXPR_t *e = expr_binary(E_CONC, l, r);
+        EXPR_t *e = expr_binary(E_CONCAT, l, r);
         es_push(s, e); return 0;
     }
     case SNOCONE_PERIOD: {

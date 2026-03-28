@@ -131,6 +131,18 @@ run_snobol4_jvm() {
     echo "SKIP" > "$RESULTS/${cell}_status"; return
   fi
   local W="$WORK/$cell"; mkdir -p "$W"
+
+  # M-G-INV-JVM: single-JVM harness. Compile all .j + assemble all .class first,
+  # then run SnoHarness once — one JVM startup for the full suite.
+  local HARNESS_DIR="$ROOT/test/jvm"
+  if [[ ! -f "$HARNESS_DIR/SnoHarness.class" ]]; then
+    javac "$HARNESS_DIR/SnoRuntime.java" "$HARNESS_DIR/SnoHarness.java" \
+      -d "$HARNESS_DIR" 2>/dev/null || { echo "SKIP" > "$RESULTS/${cell}_status"; return; }
+  fi
+  cp "$HARNESS_DIR"/SnoHarness.class "$HARNESS_DIR"/SnoRuntime.class \
+     "$HARNESS_DIR"/'SnoRuntime$SnoExitException.class' "$W/" 2>/dev/null
+
+  local compile_fail=0
   local DIRS="hello output assign concat arith_new control_new patterns capture strings functions data keywords rung2 rung3 rung10 rung11"
   for dir in $DIRS; do
     local full="$CORPUS/crosscheck/$dir"
@@ -139,22 +151,31 @@ run_snobol4_jvm() {
       [[ -f "$sno" ]] || continue
       local base; base=$(basename "$sno" .sno)
       local ref="${sno%.sno}.ref"; [[ -f "$ref" ]] || continue
+      local input="${sno%.sno}.input"
       local jfile="$W/${base}.j"
-      if "$SNO2C" -jvm "$sno" > "$jfile" 2>/dev/null &&
-         java -jar "$JASMIN" "$jfile" -d "$W/" 2>/dev/null; then
-        local cls; cls=$(grep '\.class' "$jfile" | awk '{print $NF}' | head -1)
-        local got; got=$(timeout "$TIMEOUT_JVM" java -cp "$W/" "$cls" 2>/dev/null) || got="__FAIL__"
-        if [[ "$got" == "$(cat "$ref")" ]]; then
-          pass=$((pass+1))
-          [[ $VERBOSE -eq 1 ]] && echo "  PASS $cell $base"
-        else
-          fail=$((fail+1)); echo "  FAIL $cell $base"
-        fi
+      # Copy ref and input flat into W for SnoHarness lookup
+      cp "$ref" "$W/${base}.ref"
+      [[ -f "$input" ]] && cp "$input" "$W/${base}.input"
+      if "$SNO2C" -jvm "$sno" > "$jfile" 2>/dev/null; then
+        java -jar "$JASMIN" "$jfile" -d "$W/" 2>/dev/null || compile_fail=$((compile_fail+1))
       else
-        fail=$((fail+1)); echo "  FAIL $cell $base [compile]"
+        compile_fail=$((compile_fail+1))
       fi
     done
   done
+
+  # Run all tests in one JVM process via SnoHarness
+  local harness_out
+  harness_out=$(java -cp "$W" SnoHarness "$W" "$W" "$W" 2>/dev/null)
+  while IFS= read -r line; do
+    case "$line" in
+      PASS*) pass=$((pass+1)); [[ $VERBOSE -eq 1 ]] && echo "  $cell $line" ;;
+      FAIL*) fail=$((fail+1)); echo "  FAIL $cell ${line#FAIL }" ;;
+      TIMEOUT*) fail=$((fail+1)); echo "  TIMEOUT $cell ${line#TIMEOUT }" ;;
+    esac
+  done <<< "$harness_out"
+  fail=$((fail+compile_fail))
+
   echo "$pass" > "$RESULTS/${cell}_pass"
   echo "$fail"  > "$RESULTS/${cell}_fail"
 }

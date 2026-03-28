@@ -115,7 +115,8 @@ ok "sno2c ready"
 
 # ── 5. Java / Jasmin ─────────────────────────────────────────────────────────
 step "Java / Jasmin (JVM backend)"
-which java &>/dev/null || fail "java not found — install openjdk"
+which java  &>/dev/null || fail "java not found — install openjdk"
+which javac &>/dev/null || { apt-get install -y openjdk-21-jdk-headless 2>&1 | tail -2; which javac &>/dev/null || fail "javac not found after install"; }
 [ -f "$SNOBOL4X/src/backend/jvm/jasmin.jar" ] || fail "jasmin.jar missing"
 ok "java $(java -version 2>&1 | grep -o 'version "[^"]*"' || echo 'found')"
 ok "jasmin.jar present"

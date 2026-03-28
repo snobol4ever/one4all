@@ -799,6 +799,39 @@ static STMT_t *parse_body_field(const char *body, int lineno) {
  * Top-level: convert LineArray → Program
  * ═══════════════════════════════════════════════════════════════════════════ */
 
+/* ── M-G4-SPLIT-SEQ-CONCAT: post-parse E_CONC context fixup ─────────────────
+ * parse_expr4 emits E_CONC (= E_SEQ alias) for all juxtaposition-concat sites.
+ * After parsing, we know context for s->subject (always value).
+ * s->replacement is ambiguous: it may be a pure value expression OR a pattern
+ * expression (e.g. PAT = " the " ARB . OUTPUT ("of"|"a")).
+ *
+ * fixup_val_tree : walk a value-context tree — rename E_SEQ (alias E_CONC)
+ *                  to E_CONCAT (pure string concat, cannot fail).
+ *
+ * repl_is_pat_tree: lightweight check — true if tree contains any node that is
+ *   unambiguously pattern-only: E_ARB, E_ARBNO, E_NAM, E_DOL, E_ATP, E_STAR.
+ *   (E_FNC pattern-function detection is left to the emitter's expr_is_pattern_expr.)
+ *   If true, do NOT apply fixup_val_tree to s->replacement — leave as E_SEQ.
+ */
+static void fixup_val_tree(EXPR_t *e) {
+    if (!e) return;
+    if (e->kind == E_SEQ) e->kind = E_CONCAT;   /* value concat, cannot fail */
+    for (int i = 0; i < e->nchildren; i++) fixup_val_tree(e->children[i]);
+}
+
+static int repl_is_pat_tree(EXPR_t *e) {
+    if (!e) return 0;
+    switch (e->kind) {
+        case E_ARB: case E_ARBNO:
+        case E_NAM: case E_DOL: case E_ATP: case E_STAR:
+            return 1;
+        default: break;
+    }
+    for (int i = 0; i < e->nchildren; i++)
+        if (repl_is_pat_tree(e->children[i])) return 1;
+    return 0;
+}
+
 Program *parse_program(LineArray *lines) {
     Program *prog = calloc(1, sizeof *prog);
 
@@ -870,6 +903,14 @@ Program *parse_program(LineArray *lines) {
             s->lineno = sl->lineno;
             if (sl->label) s->label = strdup(sl->label);
             s->go = parse_goto_field(sl->goto_str, sl->lineno);
+            /* M-G4-SPLIT-SEQ-CONCAT: fix value-context E_SEQ→E_CONCAT.
+             * s->subject is always value context.
+             * s->replacement is value context UNLESS it is a pattern expression
+             * (e.g. PAT = " the " ARB . OUTPUT ...) — guard with repl_is_pat_tree.
+             * s->pattern is pattern context — E_SEQ already correct, no action. */
+            fixup_val_tree(s->subject);
+            if (s->replacement && !repl_is_pat_tree(s->replacement))
+                fixup_val_tree(s->replacement);
         }
 
         s->next = NULL;
