@@ -46,6 +46,9 @@ BACKEND_JVM = \
 BACKEND_NET = \
     backend/net/emit_byrd_net.c
 
+IR = \
+    ir/ir_print.c
+
 FRONTEND_ICON = \
     frontend/icon/icn_main.c \
     frontend/icon/icon_lex.c \
@@ -55,7 +58,7 @@ FRONTEND_ICON = \
     frontend/icon/icon_emit_jvm.c \
     frontend/icon/icon_runtime.c
 
-SRCS = $(FRONTEND_SNO) $(FRONTEND_PROLOG) $(FRONTEND_SNOCONE) $(FRONTEND_ICON) $(BACKEND_C) $(BACKEND_X64) $(BACKEND_JVM) $(BACKEND_NET) $(DRIVER)
+SRCS = $(FRONTEND_SNO) $(FRONTEND_PROLOG) $(FRONTEND_SNOCONE) $(FRONTEND_ICON) $(BACKEND_C) $(BACKEND_X64) $(BACKEND_JVM) $(BACKEND_NET) $(IR) $(DRIVER)
 OBJS = $(SRCS:.c=.o)
 
 .PHONY: all clean
