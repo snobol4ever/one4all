@@ -435,30 +435,32 @@ This table drives Phase 3 work. Each column is one change type; each row is one 
 | prolog_emit_jvm.c (Prolog JVM) | `J()` ✓ | `lbl_γ/lbl_ω` → `lbl_gamma/lbl_omega` ✗ | `pj_emit_*` → `emit_jvm_prolog_*` ✗ | `pj_*` ✓ (runtime names) |
 | emit_wasm.c | establish `W()` | establish `lbl_alpha` etc | establish `emit_wasm_*` | establish `W<id>_*` |
 
-*`icon_emit.c`'s `E()` writes to `IcnEmitter` buffer — same letter as the law's
-x64 output macro but different mechanism. M-G3-NAME-X64-ICON must resolve this
-naming collision explicitly.
+*`icon_emit.c`'s `E()` writes to an `IcnEmitter` buffer — same letter as the law's
+x64 output macro but different mechanism. M-G3-NAME-X64-ICON must rename it to
+`EI_ICN()` or similar to eliminate the collision, then apply the law's `E()` for
+actual x64 output.
 
 ---
 
-## Key Finding: Unicode Greek Letters Throughout
+## Key Finding: Unicode Greek Letters Are a Deviation — Not a Choice
 
-Every current emitter uses Unicode Greek characters (α β γ ω) either in:
-- C parameter names (`const char *α`)
-- Struct fields (`char γ[64]`)
-- Label generation strings (`"icon_%d_α"`)
-- Local variable names (`char this_α[64]`)
+Every current emitter uses Unicode Greek characters (α β γ ω) in C source code:
+parameter names, struct fields, label strings, local variable names, and comments.
 
-The naming law replaces all of these with ASCII (`lbl_alpha`, `lbl_beta`,
-`lbl_gamma`, `lbl_omega`) in C source, while **preserving** Unicode in generated
-output labels only where the backend assembler/JVM supports them (NASM does;
-Jasmin does; ilasm does). This distinction must be maintained carefully in Phase 3:
-change C variable names to ASCII, but generated label strings may retain Unicode
-if the backend tools accept it — or switch to ASCII equivalents if not.
+The naming law is unambiguous: **Greek letters are prohibited everywhere** — in C
+source variables, in C comments, and in generated output labels. The law already
+prescribes ASCII throughout:
 
-**Recommendation:** Switch all generated labels to ASCII (`_alpha`, `_beta`, etc.)
-for maximum portability and grep-ability. The visual appeal of Unicode in `.asm`
-output is not worth the toolchain dependency.
+- C source: `lbl_alpha`, `lbl_beta`, `lbl_gamma`, `lbl_omega`
+- Generated labels: `P_<id>_alpha` / `P_<id>_beta` (x64), `L<id>_alpha` / `L<id>_beta` (JVM/.NET)
+- Comments: spell out `alpha`, `beta`, `gamma`, `omega`
+
+Greek letters appear in the law document itself only in the **semantic description
+column** — explaining what the port means. They are never prescribed for use in
+code or output.
+
+Phase 3 mechanically replaces all Unicode Greek in C source and generated labels
+with the ASCII equivalents. This is not a design decision — it is already decided.
 
 ---
 
