@@ -1372,7 +1372,7 @@ static void emit_pat_node(EXPR_t *pat,
                      cursor, subj, subj_len);
         break;
 
-    case E_CONC: {
+    case E_SEQ: {  /* M-G4-SPLIT-SEQ-CONCAT: pattern context — Byrd-box SEQ */
         int _nc = pat->nchildren;
         if (_nc == 0) break;
         if (_nc == 1) { emit_pat_node(pat->children[0], α, β, γ, ω, cursor, subj, subj_len, depth); break; }
@@ -1384,7 +1384,7 @@ static void emit_pat_node(EXPR_t *pat,
         for (int _i = _nc - 2; _i >= 0; _i--) {
             int _n = _nc - 2 - _i;
             _nodes[_n] = calloc(1, sizeof(EXPR_t));
-            _nodes[_n]->kind = E_CONC;
+            _nodes[_n]->kind = E_SEQ;
             _kids[_n*2+0] = pat->children[_i];
             _kids[_n*2+1] = _right;
             _nodes[_n]->children  = &_kids[_n*2];
@@ -2447,10 +2447,11 @@ static int expr_is_pattern_expr(EXPR_t *e) {
      * the match 'subj' p uses XDSAR (runtime deref), not a broken static box.
      * Fix: B-263 icase. */
     if (e->kind == E_OR) return expr_has_pattern_fn(e);
-    /* E_CONC (concatenation) is a pattern expression only when it contains
-     * a pattern function call. Pure literal concat like 'hello' ' world'
-     * is a VALUE expression (string join), not a pattern. */
-    if (e->kind == E_CONC) return expr_has_pattern_fn(e);
+    /* E_SEQ = goal-directed sequence — always a pattern expression.
+     * E_CONCAT = pure value concat — never a pattern expression.
+     * M-G4-SPLIT-SEQ-CONCAT: E_CONC compat alias -> E_SEQ handled above. */
+    if (e->kind == E_SEQ) return 1;
+    if (e->kind == E_CONCAT) return 0;
     /* E_ATP (@var cursor capture) is always a pattern expression:
      * unary @x or binary pat @x — both yield a pattern value. */
     if (e->kind == E_ATP) return 1;
@@ -2471,11 +2472,11 @@ static int expr_is_pattern_expr(EXPR_t *e) {
  * SNOBOL4 prototype: 'fname(p1,p2)l1,l2'  — params inside (), locals after ')'.
  * Returns 1 on success, 0 on parse failure. */
 
-/* Flatten an EXPR_t tree of E_CONC / E_QLIT nodes into a single string.
+/* Flatten an EXPR_t tree of E_CONCAT / E_QLIT nodes into a single string.
  * Handles multi-line DEFINE specs built by continuation (+) lines, e.g.:
  *   DEFINE('Read(fileName,rdMapName)'
  *   +      'rdInput,rdIn,...')
- * which parses as E_CONC(E_QLIT("Read(fileName,rdMapName)"), E_QLIT("rdInput,...")).
+ * which parses as E_CONCAT(E_QLIT("Read(fileName,rdMapName)"), E_QLIT("rdInput,...")).
  * Writes into buf[bufsz]. Returns buf on success, NULL on truncation/failure. */
 static const char *expr_flatten_str(const EXPR_t *e, char *buf, size_t bufsz) {
     if (!e || bufsz == 0) return NULL;
@@ -2486,7 +2487,7 @@ static const char *expr_flatten_str(const EXPR_t *e, char *buf, size_t bufsz) {
         memcpy(buf, e->sval, len + 1);
         return buf;
     }
-    if (e->kind == E_CONC) {
+    if (e->kind == E_CONCAT || e->kind == E_SEQ) {
         /* Left-fold: flatten left child first, then append right */
         char *pos = buf;
         size_t rem = bufsz;
@@ -2502,7 +2503,7 @@ static const char *expr_flatten_str(const EXPR_t *e, char *buf, size_t bufsz) {
             if (!cur) continue;
             if (cur->kind == E_QLIT) {
                 leaves[nleaves++] = cur;
-            } else if (cur->kind == E_CONC) {
+            } else if (cur->kind == E_CONCAT || cur->kind == E_SEQ) {
                 /* Push right then left so left is processed first */
                 if (cur->nchildren >= 2 && cur->children[1]) stk2[t2++] = cur->children[1];
                 if (cur->nchildren >= 1 && cur->children[0]) stk2[t2++] = cur->children[0];
@@ -2590,7 +2591,7 @@ static void scan_named_patterns(Program *prog) {
             s->subject->nchildren >= 1 &&
             s->subject->children[0] &&
             (s->subject->children[0]->kind == E_QLIT ||
-             s->subject->children[0]->kind == E_CONC)) {
+             s->subject->children[0]->kind == E_CONCAT)) {
             /* B-275: Handle multi-line DEFINE specs built via continuation (+) lines.
              * Single-line: DEFINE('fname(p)loc')  → children[0] is E_QLIT.
              * Multi-line:  DEFINE('fname(p)'      → children[0] is E_CONC of E_QLITs.
@@ -3596,7 +3597,7 @@ static int emit_expr(EXPR_t *e, int rbp_off) {
     }
 
     case E_OR:
-    case E_CONC: {
+    case E_CONCAT: {  /* M-G4-SPLIT-SEQ-CONCAT: value context — string concat */
         /* Unary | in value context — OPSYN dispatch: opsyn('|',.size,1) → APPLY_fn("|",arg,1).
          * Parser creates E_OR with 1 child for prefix |expr. */
         if (e->kind == E_OR && e->nchildren == 1 && e->children[0]) {
@@ -3619,7 +3620,7 @@ static int emit_expr(EXPR_t *e, int rbp_off) {
          * Each step: push accumulator, eval next child, pop+call stmt_concat.
          * n-ary E_OR (pattern ALT): right-fold into binary nodes (unchanged).
          */
-        if (e->nchildren > 2 && e->kind == E_CONC) {
+        if (e->nchildren > 2 && e->kind == E_CONCAT) {
             int _nc = e->nchildren;
             emit_expr(e->children[0], -32);
             for (int _i = 1; _i < _nc; _i++) {
@@ -3669,7 +3670,7 @@ static int emit_expr(EXPR_t *e, int rbp_off) {
         int right_is_str = e->children[1] && e->children[1]->kind == E_QLIT;
         int right_is_var = e->children[1] && e->children[1]->kind == E_VART;
 
-        if (e->kind == E_CONC) {
+        if (e->kind == E_CONCAT) {
             /* CAT fast paths — CAT2_* macros call stmt_concat(a,b) */
             if (rbp_off == -32) {
                 if (left_is_str && right_is_str) {

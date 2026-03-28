@@ -252,7 +252,8 @@ static int net_expr_has_pat_fn(EXPR_t *e) {
 static int net_expr_is_pattern_expr(EXPR_t *e) {
     if (!e) return 0;
     if (e->kind == E_OR)   return 1;
-    if (e->kind == E_CONC) return net_expr_has_pat_fn(e);
+    if (e->kind == E_SEQ) return 1;
+    if (e->kind == E_CONCAT) return 0;
     return net_expr_has_pat_fn(e);
 }
 
@@ -374,7 +375,7 @@ static int net_expr_can_fail(EXPR_t *e) {
         /* Pattern constructors and string functions: always succeed */
         return 0;
     }
-    if (e->kind == E_CONC) {
+    if (e->kind == E_CONCAT || e->kind == E_SEQ) {
         for (int i = 0; i < e->nchildren; i++)
             if (net_expr_can_fail(e->children[i])) return 1;
     }
@@ -820,7 +821,7 @@ static void net_emit_expr(EXPR_t *e) {
         net_ldstr("");
         break;
     }
-    case E_CONC: {
+    case E_CONCAT: {  /* M-G4-SPLIT-SEQ-CONCAT: value context — string concat */
         /* String concatenation with goal-directed short-circuit.
          * After each child that can set local 0 = 0 (failure), check and branch
          * to the statement fail label WITHOUT leaving any string on the stack.
@@ -1053,7 +1054,7 @@ static void net_emit_pat_node(EXPR_t *pat,
         break;
     }
 
-    case E_CONC: {
+    case E_SEQ: {  /* M-G4-SPLIT-SEQ-CONCAT: pattern context — Byrd-box SEQ */
         /* SEQ: chain gamma/omega left-to-right.
          *
          * Deferred-commit for NAM(ARB,...):

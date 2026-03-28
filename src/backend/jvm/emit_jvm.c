@@ -353,7 +353,8 @@ static int jvm_expr_has_pat_fn(EXPR_t *e) {
 static int jvm_expr_is_pattern_expr(EXPR_t *e) {
     if (!e) return 0;
     if (e->kind == E_OR)   return 1;   /* alternation is always a pattern */
-    if (e->kind == E_CONC) return jvm_expr_has_pat_fn(e);
+    if (e->kind == E_SEQ) return 1;
+    if (e->kind == E_CONCAT) return 0;
     return jvm_expr_has_pat_fn(e);
 }
 
@@ -640,7 +641,7 @@ static void jvm_emit_expr(EXPR_t *e) {
         J("%s:\n", ardone);
         break;
     }
-    case E_CONC: {
+    case E_CONCAT: {  /* M-G4-SPLIT-SEQ-CONCAT: value context — StringBuilder concat */
         /* String concatenation: StringBuilder — n-ary, fold all children.
          * Null propagation: if any child returns null (failure), discard
          * the StringBuilder and return null to propagate the failure. */
@@ -1460,13 +1461,13 @@ static void jvm_emit_pat_node(EXPR_t *pat,
 
     /* ------------------------------------------------------------------ */
     /* ------------------------------------------------------------------ */
-    case E_CONC: {
+    case E_SEQ: {  /* M-G4-SPLIT-SEQ-CONCAT: pattern context — Byrd-box SEQ */
         /* SEQ node.  Walk right-spine of left subtree to find trailing ARB or
          * ARB.NAM node; if found, emit greedy ARB+backtrack loop around right. */
         EXPR_t *arb_nam = NULL;
         {
             EXPR_t *cur = pat->children[0];
-            while (cur && cur->kind == E_CONC) cur = cur->children[1];
+            while (cur && cur->kind == E_SEQ) cur = cur->children[1];
             if (cur && cur->kind == E_NAM && cur->children[0] &&
                 ((cur->children[0]->kind == E_FNC  && cur->children[0]->sval && strcasecmp(cur->children[0]->sval, "ARB") == 0) ||
                  (cur->children[0]->kind == E_VART && cur->children[0]->sval && strcasecmp(cur->children[0]->sval, "ARB") == 0)))
@@ -1594,7 +1595,7 @@ static void jvm_emit_pat_node(EXPR_t *pat,
             EXPR_t *_r = pat->children[_nc-1];
             for (int _i=_nc-2;_i>=0;_i--) {
                 int _n=_nc-2-_i;
-                _nodes[_n]=calloc(1,sizeof(EXPR_t)); _nodes[_n]->kind=E_CONC;
+                _nodes[_n]=calloc(1,sizeof(EXPR_t)); _nodes[_n]->kind=E_SEQ;
                 _kids[_n*2]=pat->children[_i]; _kids[_n*2+1]=_r;
                 _nodes[_n]->children=&_kids[_n*2]; _nodes[_n]->nchildren=2;
                 _r=_nodes[_n];
