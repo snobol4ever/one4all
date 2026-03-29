@@ -117,23 +117,45 @@ ensure_sno_harness() {
   cp "$HARNESS_DIR"/'SnoRuntime$SnoExitException.class' "$W/" 2>/dev/null || true
 }
 
-# ── x86 compile worker (called via xargs -P) ──────────────────────────────────
-# Exported so subshell can call it
-_x86_compile_one() {
-  # args: sno ref input asm obj bin LIB TIMEOUT VERBOSE
-  local sno="$1" ref="$2" input="$3" asm="$4" obj="$5" bin="$6" LIB="$7" TIMEOUT="$8" VERBOSE="$9"
+# ── x86 compile worker — written as per-test mini-script (M-G-INV-FAST-X86-FIX)
+# Root cause: exported bash functions are NOT visible inside `bash -c` subshells
+# spawned by xargs (xargs exec's bash fresh; BASH_FUNC_* env vars only work when
+# the parent bash itself forks, not via execve). Fix: bake the worker body + all
+# required variable values into a self-contained mini-script per test, then let
+# xargs -P invoke plain `bash <script>` — no function inheritance required.
+#
+# _x86_write_job JOBS_DIR sno ref input asm obj bin lib timeout verbose → writes NNN.sh
+_x86_write_job() {
+  local jobs_dir="$1" sno="$2" ref="$3" input="$4" asm="$5" obj="$6" bin="$7"
+  local lib="$8" tmo="$9" verb="${10}"
   local base; base=$(basename "$sno" .sno)
-  local RT_ASM; RT_ASM="$(dirname "$LIB")/../src/runtime/asm/"
-  # scrip-cc + nasm + gcc link
-  "$SCRIP_CC_BIN" -asm "$sno" > "$asm" 2>/dev/null || { echo "COMPILE_FAIL $base"; return; }
-  nasm -f elf64 -I"$RT_ASM_INC" "$asm" -o "$obj" 2>/dev/null || { echo "ASM_FAIL $base"; return; }
-  gcc -O0 -no-pie "$obj" "$LIB" -lgc -lm -o "$bin" 2>/dev/null || { echo "LINK_FAIL $base"; return; }
-  local stdin_src="/dev/null"; [[ -f "$input" ]] && stdin_src="$input"
-  local got; got=$(timeout "$TIMEOUT" "$bin" < "$stdin_src" 2>/dev/null) || got="__TIMEOUT__"
-  local exp; exp=$(cat "$ref")
-  if [[ "$got" == "$exp" ]]; then echo "PASS $base"; else echo "FAIL $base"; fi
+  local n; n=$(ls "$jobs_dir" 2>/dev/null | wc -l)
+  local script="$jobs_dir/$(printf '%05d' "$n").sh"
+  cat > "$script" <<EOJOB
+#!/usr/bin/env bash
+set -uo pipefail
+base=$(printf '%q' "$base")
+sno=$(printf '%q' "$sno")
+ref=$(printf '%q' "$ref")
+input=$(printf '%q' "$input")
+asm=$(printf '%q' "$asm")
+obj=$(printf '%q' "$obj")
+bin=$(printf '%q' "$bin")
+lib=$(printf '%q' "$lib")
+scrip_cc=$(printf '%q' "$SCRIP_CC")
+rt_asm_inc=$(printf '%q' "${RT}/asm/")
+tmo=$(printf '%q' "$tmo")
+verb=$(printf '%q' "$verb")
+"\$scrip_cc" -asm "\$sno" > "\$asm" 2>/dev/null || { echo "COMPILE_FAIL \$base"; exit 0; }
+nasm -f elf64 -I"\$rt_asm_inc" "\$asm" -o "\$obj" 2>/dev/null || { echo "ASM_FAIL \$base"; exit 0; }
+gcc -O0 -no-pie "\$obj" "\$lib" -lgc -lm -o "\$bin" 2>/dev/null || { echo "LINK_FAIL \$base"; exit 0; }
+stdin_src=/dev/null; [[ -f "\$input" ]] && stdin_src="\$input"
+got=\$(timeout "\$tmo" "\$bin" < "\$stdin_src" 2>/dev/null) || got="__TIMEOUT__"
+exp=\$(cat "\$ref")
+if [[ "\$got" == "\$exp" ]]; then echo "PASS \$base"; else echo "FAIL \$base"; fi
+EOJOB
+  chmod +x "$script"
 }
-export -f _x86_compile_one
 
 # ── Suite: SNOBOL4 x86 ────────────────────────────────────────────────────────
 run_snobol4_x86() {
@@ -163,14 +185,16 @@ run_snobol4_x86() {
     done
   done > "$manifest"
 
-  export SCRIP_CC_BIN="$SCRIP_CC" RT_ASM_INC="$RT/asm/"
-
-  # Run nasm+link+exec in parallel via xargs
+  # Write per-test mini-scripts and dispatch via xargs -P (M-G-INV-FAST-X86-FIX)
+  # xargs bash -c cannot see exported bash functions; mini-scripts need no inheritance.
+  local jobs_dir="$WORK/${cell}_jobs"; mkdir -p "$jobs_dir"
   local results_file="$WORK/${cell}_results"
   while IFS='|' read -r sno ref input asm obj bin lib tmo verb; do
-    echo "$sno $ref $input $asm $obj $bin $lib $tmo $verb"
-  done < "$manifest" | \
-    xargs -P"$JOBS" -L1 bash -c '_x86_compile_one "$@"' _ > "$results_file" 2>/dev/null || true
+    _x86_write_job "$jobs_dir" "$sno" "$ref" "$input" "$asm" "$obj" "$bin" "$lib" "$tmo" "$verb"
+  done < "$manifest"
+
+  ls "$jobs_dir"/*.sh 2>/dev/null | \
+    xargs -P"$JOBS" -I{} bash {} > "$results_file" 2>/dev/null || true
 
   while IFS= read -r line; do
     case "$line" in
