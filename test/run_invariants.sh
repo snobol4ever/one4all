@@ -403,7 +403,7 @@ run_prolog_x86() {
     local xfail="${pl%.pl}.xfail"
     [[ -f "$xfail" ]] && { rpass=$((rpass+1)); continue; }
     local asm="$W/${base}.s" obj="$W/${base}.o" bin="$W/${base}"
-    if "$SCRIP_CC" -pl -asm "$pl" > "$asm" 2>/dev/null &&
+    if "$SCRIP_CC" -pl -asm -o "$asm" "$pl" 2>/dev/null &&
        nasm -f elf64 "$asm" -o "$obj" 2>/dev/null &&
        gcc -O0 -no-pie "$obj" "$PL_LIB" -lm -o "$bin" 2>/dev/null; then
       local got; got=$(timeout "$TIMEOUT_X86" "$bin" 2>/dev/null) || got="__FAIL__"
