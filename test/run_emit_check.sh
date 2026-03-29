@@ -31,9 +31,21 @@ done
 
 GREEN='\033[0;32m'; RED='\033[0;31m'; BOLD='\033[1m'; RESET='\033[0m'
 
-if [[ ! -x "$SCRIP_CC" ]]; then
-  echo "ERROR: scrip-cc not found at $SCRIP_CC — build first (cd src && make)" >&2; exit 1
-fi
+# ── Tool bootstrap (run_emit_check needs: scrip-cc only) ─────────────────────
+# Self-healing: builds scrip-cc from source if missing. Fast-fails before doing
+# any emit work, so a missing binary is caught in seconds not minutes.
+ensure_tools() {
+  if [[ ! -x "$SCRIP_CC" || ! -s "$SCRIP_CC" ]]; then
+    echo -e "${BOLD}  [tools] scrip-cc missing — building from $ROOT/src ...${RESET}"
+    if (cd "$ROOT/src" && make -j"$(nproc 2>/dev/null || echo 4)" 2>/dev/null); then
+      echo -e "${GREEN}  [tools] scrip-cc built ✓${RESET}"
+    else
+      echo -e "${RED}  [tools] scrip-cc build FAILED — run: cd $ROOT/src && make${RESET}" >&2; exit 2
+    fi
+  fi
+  [[ -x "$SCRIP_CC" && -s "$SCRIP_CC" ]] || { echo -e "${RED}  [tools] scrip-cc still missing after build attempt${RESET}" >&2; exit 2; }
+}
+ensure_tools
 
 mapfile -t SNO_FILES < <(find "$TEST_SNO" -name "*.sno" | sort)
 mapfile -t ICN_FILES < <(find "$TEST_ICN" -name "*.icn" 2>/dev/null | sort)

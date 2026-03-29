@@ -46,6 +46,55 @@ done
 GREEN='\033[0;32m'; RED='\033[0;31m'; YELLOW='\033[0;33m'
 BOLD='\033[1m'; RESET='\033[0m'
 
+# ── Tool bootstrap (run_invariants needs: scrip-cc, nasm, libgc, java) ────────
+# Checked and fixed HERE, before the watchdog starts, so a missing tool is never
+# discovered 5 minutes into the suite. Each check is self-healing where possible.
+ensure_tools() {
+  local ok=1
+
+  # 1. scrip-cc — build from source if binary absent or zero-size
+  if [[ ! -x "$SCRIP_CC" || ! -s "$SCRIP_CC" ]]; then
+    echo -e "${YELLOW}  [tools] scrip-cc missing — building from $ROOT/src ...${RESET}"
+    if (cd "$ROOT/src" && make -j"$(nproc 2>/dev/null || echo 4)" 2>/dev/null); then
+      echo -e "${GREEN}  [tools] scrip-cc built ✓${RESET}"
+    else
+      echo -e "${RED}  [tools] scrip-cc build FAILED — cannot continue${RESET}" >&2; ok=0
+    fi
+  fi
+  [[ -x "$SCRIP_CC" && -s "$SCRIP_CC" ]] || { echo -e "${RED}  [tools] scrip-cc still missing${RESET}" >&2; ok=0; }
+
+  # 2. nasm — install via apt if absent
+  if ! command -v nasm &>/dev/null; then
+    echo -e "${YELLOW}  [tools] nasm missing — installing ...${RESET}"
+    if apt-get install -y nasm >/dev/null 2>&1; then
+      echo -e "${GREEN}  [tools] nasm installed ✓${RESET}"
+    else
+      echo -e "${RED}  [tools] nasm install FAILED (try: apt-get install nasm)${RESET}" >&2; ok=0
+    fi
+  fi
+
+  # 3. libgc (Boehm GC) — needed for -lgc link; check header presence as proxy
+  if ! ldconfig -p 2>/dev/null | grep -q 'libgc\.so' && \
+     ! pkg-config --exists bdw-gc 2>/dev/null && \
+     [[ ! -f /usr/include/gc/gc.h && ! -f /usr/local/include/gc/gc.h ]]; then
+    echo -e "${YELLOW}  [tools] libgc-dev missing — installing ...${RESET}"
+    if apt-get install -y libgc-dev >/dev/null 2>&1; then
+      echo -e "${GREEN}  [tools] libgc-dev installed ✓${RESET}"
+    else
+      echo -e "${RED}  [tools] libgc-dev install FAILED (try: apt-get install libgc-dev)${RESET}" >&2; ok=0
+    fi
+  fi
+
+  # 4. java — JVM cells will SKIP gracefully if absent, but warn early
+  if ! command -v java &>/dev/null; then
+    echo -e "${YELLOW}  [tools] java not found — JVM cells will SKIP${RESET}"
+  fi
+
+  [[ $ok -eq 1 ]] || { echo -e "${RED}${BOLD}  TOOL BOOTSTRAP FAILED — fix above errors and retry${RESET}" >&2; exit 2; }
+  echo -e "${GREEN}  [tools] all required tools present ✓${RESET}"
+}
+ensure_tools
+
 # ── Suite-level hard ceiling ───────────────────────────────────────────────────
 # If the entire harness has not finished in SUITE_TIMEOUT seconds, kill it.
 # Individual test timeouts (TIMEOUT_X86=5, TIMEOUT_JVM=10, jasmin=30, harness=120)
@@ -146,7 +195,7 @@ scrip_cc=$(printf '%q' "$SCRIP_CC")
 rt_asm_inc=$(printf '%q' "${RT}/asm/")
 tmo=$(printf '%q' "$tmo")
 verb=$(printf '%q' "$verb")
-"\$scrip_cc" -asm "\$sno" > "\$asm" 2>/dev/null || { echo "COMPILE_FAIL \$base"; exit 0; }
+"\$scrip_cc" -asm -o "\$asm" "\$sno" 2>/dev/null || { echo "COMPILE_FAIL \$base"; exit 0; }
 nasm -f elf64 -I"\$rt_asm_inc" "\$asm" -o "\$obj" 2>/dev/null || { echo "ASM_FAIL \$base"; exit 0; }
 gcc -O0 -no-pie "\$obj" "\$lib" -lgc -lm -o "\$bin" 2>/dev/null || { echo "LINK_FAIL \$base"; exit 0; }
 stdin_src=/dev/null; [[ -f "\$input" ]] && stdin_src="\$input"
