@@ -84,9 +84,45 @@ ensure_tools() {
     fi
   fi
 
-  # 4. java — JVM cells will SKIP gracefully if absent, but warn early
+  # 4. java runtime — install JRE if absent
   if ! command -v java &>/dev/null; then
-    echo -e "${YELLOW}  [tools] java not found — JVM cells will SKIP${RESET}"
+    echo -e "${YELLOW}  [tools] java missing — installing default-jre ...${RESET}"
+    if apt-get install -y default-jre >/dev/null 2>&1; then
+      echo -e "${GREEN}  [tools] default-jre installed ✓${RESET}"
+    else
+      echo -e "${RED}  [tools] default-jre install FAILED${RESET}" >&2; ok=0
+    fi
+  fi
+
+  # 5. javac — install JDK if absent (needed to compile SnoHarness)
+  if ! command -v javac &>/dev/null; then
+    echo -e "${YELLOW}  [tools] javac missing — installing default-jdk ...${RESET}"
+    if apt-get install -y default-jdk >/dev/null 2>&1; then
+      echo -e "${GREEN}  [tools] default-jdk installed ✓${RESET}"
+    else
+      echo -e "${RED}  [tools] default-jdk install FAILED${RESET}" >&2; ok=0
+    fi
+  fi
+
+  # 6. SnoHarness — compile if .class absent or stale
+  local HARNESS_DIR="$ROOT/test/jvm"
+  if command -v javac &>/dev/null &&      [[ ! -f "$HARNESS_DIR/SnoHarness.class" ||         "$HARNESS_DIR/SnoHarness.java" -nt "$HARNESS_DIR/SnoHarness.class" ]]; then
+    echo -e "${YELLOW}  [tools] SnoHarness.class missing or stale — compiling ...${RESET}"
+    if javac "$HARNESS_DIR/SnoRuntime.java" "$HARNESS_DIR/SnoHarness.java" -d "$HARNESS_DIR" 2>/dev/null; then
+      echo -e "${GREEN}  [tools] SnoHarness compiled ✓${RESET}"
+    else
+      echo -e "${RED}  [tools] SnoHarness compile FAILED${RESET}" >&2; ok=0
+    fi
+  fi
+
+  # 7. mono + ilasm — needed for snobol4_net cell
+  if ! command -v mono &>/dev/null || ! command -v ilasm &>/dev/null; then
+    echo -e "${YELLOW}  [tools] mono/ilasm missing — installing mono-devel ...${RESET}"
+    if apt-get install -y mono-devel >/dev/null 2>&1; then
+      echo -e "${GREEN}  [tools] mono-devel installed ✓${RESET}"
+    else
+      echo -e "${RED}  [tools] mono-devel install FAILED${RESET}" >&2; ok=0
+    fi
   fi
 
   [[ $ok -eq 1 ]] || { echo -e "${RED}${BOLD}  TOOL BOOTSTRAP FAILED — fix above errors and retry${RESET}" >&2; exit 2; }
