@@ -1,6 +1,6 @@
 # Prolog Frontend Corpus
 
-Ten-rung ladder for the Tiny-Prolog frontend (`-pl` flag).
+Ten-rung ladder for the Prolog frontend (`-pl` flag).
 Mirrors the SNOBOL4 10-rung crosscheck ladder.
 
 Each rung is a directory. Programs in a rung test exactly the features
