@@ -37,9 +37,8 @@ SCRIP_CC_INC="$ROOT/src/frontend/snobol4"
 TIMEOUT_X86="${TIMEOUT_X86:-5}"
 TIMEOUT_JVM="${TIMEOUT_JVM:-10}"
 JOBS="${JOBS:-$(nproc 2>/dev/null || echo 4)}"
-SERIAL=0; VERBOSE=0
+VERBOSE=0
 for arg in "$@"; do
-  [[ "$arg" == "--serial"  ]] && SERIAL=1
   [[ "$arg" == "--verbose" ]] && VERBOSE=1
 done
 
@@ -95,14 +94,7 @@ ensure_tools() {
 }
 ensure_tools
 
-# ── Suite-level hard ceiling ───────────────────────────────────────────────────
-# If the entire harness has not finished in SUITE_TIMEOUT seconds, kill it.
-# Individual test timeouts (TIMEOUT_X86=5, TIMEOUT_JVM=10, jasmin=30, harness=120)
-# should fire long before this. This is the final backstop against hung processes.
-SUITE_TIMEOUT="${SUITE_TIMEOUT:-300}"
-( sleep "$SUITE_TIMEOUT" && echo -e "\n${RED}${BOLD}SUITE TIMEOUT: harness exceeded ${SUITE_TIMEOUT}s — killed${RESET}" && kill $$ ) &
-WATCHDOG_PID=$!
-trap 'kill $WATCHDOG_PID 2>/dev/null; rm -rf "$WORK"' EXIT
+trap 'rm -rf "$WORK"' EXIT
 
 WORK=$(mktemp -d /tmp/inv_XXXXXX)
 RESULTS="$WORK/results"
@@ -470,23 +462,19 @@ run_prolog_jvm() {
   echo "$fail"  > "$RESULTS/${cell}_fail"
 }
 
-# ── Parallel dispatch ─────────────────────────────────────────────────────────
-PIDS=()
-launch() {
-  local fn="$1"
-  if [[ $SERIAL -eq 1 ]]; then $fn
-  else $fn & PIDS+=($!); fi
-}
-
-launch run_snobol4_x86
-launch run_snobol4_jvm
-launch run_snobol4_net
-launch run_icon_x86
-launch run_icon_jvm
-launch run_prolog_x86
-launch run_prolog_jvm
-
-for pid in "${PIDS[@]:-}"; do wait "$pid" || true; done
+# ── Serial dispatch — all 7 cells run sequentially, no background forks ───────
+# Parallel dispatch caused suite-level timeouts in Claude session environment:
+# all 7 cells started simultaneously, saturating the container before any
+# finished. Serial execution is slower but completes reliably. Per-test timeouts
+# (TIMEOUT_X86=5, TIMEOUT_JVM=10) and per-suite ceilings (jasmin=60s,
+# SnoHarness=120s) still protect against individual hangs.
+run_snobol4_x86
+run_snobol4_jvm
+run_snobol4_net
+run_icon_x86
+run_icon_jvm
+run_prolog_x86
+run_prolog_jvm
 
 # ── Results matrix ────────────────────────────────────────────────────────────
 END_TIME=$(date +%s%N 2>/dev/null || date +%s)
