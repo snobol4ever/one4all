@@ -70,3 +70,41 @@ Every box above is checked. `one4all/test/` contains no `.icn`, `.pl`, `.sno`,
 ## ✅ MIGRATION COMPLETE — G-9 session 8 (2026-03-29)
 
 All source programs migrated to corpus repo. one4all/test/ is clean.
+
+## Icon non-rung programs (`programs/icon/`)
+
+- [x] Copy `test/icon/*.icn + .j .s` → `corpus/programs/icon/` — corpus `c230de7`
+- [x] Copy `test/icon/coverage/*` → `corpus/programs/icon/coverage/` — corpus `c230de7`
+- [x] Copy `artifacts/icon/samples/*` → `corpus/programs/icon/samples/` — corpus `c230de7`
+- [x] Copy `demo/scrip/*.icn + family_net/family_icon.icn` → `corpus/programs/icon/demo/` — corpus `c230de7`
+- [x] **DELETE** all above from one4all — commit `f9fbf15`
+
+## Prolog non-rung programs (`programs/prolog/`)
+
+- [x] Copy `test/prolog/*.pl + .j .s` → `corpus/programs/prolog/` — corpus `c230de7`
+- [x] Copy `test/prolog/coverage/*` → `corpus/programs/prolog/coverage/` — corpus `c230de7`
+- [x] Copy `test/frontend/prolog/plunit*.pl` → `corpus/programs/prolog/frontend/` — corpus `c230de7`
+- [x] Copy `test/linker/net/ancestor/ancestor.pl + .il` → `corpus/programs/prolog/linker/ancestor/` — corpus `c230de7`
+- [x] Copy `artifacts/prolog/samples/*` → `corpus/programs/prolog/samples/` — corpus `c230de7`
+- [x] Copy `demo/scrip/*.pl + family_net/family_prolog.pl` → `corpus/programs/prolog/demo/` — corpus `c230de7`
+- [x] **DELETE** all above from one4all — commit `f9fbf15`
+
+## SNOBOL4 crosscheck artifacts (`.j .s .il` alongside existing `.sno .ref`)
+
+- [x] Copy all `.j .s .il` artifacts from `test/snobol4/{arith,arith_new,assign,...}` → `corpus/crosscheck/` — corpus `c230de7`
+- [x] Copy `test/snobol4/coverage/*` → `corpus/crosscheck/coverage/` (new dir) — corpus `c230de7`
+- [x] **DELETE** all `test/snobol4/` from one4all — commit `f9fbf15`
+
+## SNOBOL4 demo, bench, smoke, linker programs
+
+- [x] Copy `demo/*.sno + associated` → `corpus/programs/snobol4/demo/` — corpus `c230de7`
+- [x] Copy `demo/inc/*.sno` → `corpus/programs/snobol4/demo/inc/` — corpus `c230de7`
+- [x] Copy `demo/scrip/family_snobol4.sno + family_net/` → `corpus/programs/snobol4/demo/scrip/` — corpus `c230de7`
+- [x] Copy `bench/test_icon.sno` → `corpus/programs/snobol4/bench/` — corpus `c230de7`
+- [x] Copy `test/smoke/outputs/session50/beauty_*.sno` → `corpus/programs/snobol4/smoke/` — corpus `c230de7`
+- [x] Copy `test/linker/net/greet_lib greet_main ancestor_main` → `corpus/programs/snobol4/linker/` — corpus `c230de7`
+- [x] **DELETE** all above from one4all — commit `f9fbf15`
+
+## VERIFIED COMPLETE
+
+`find one4all -name "*.sno" -o -name "*.icn" -o -name "*.pl"` → **zero results** ✅
