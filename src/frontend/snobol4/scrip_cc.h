@@ -1,5 +1,5 @@
-#ifndef SNO2C_H
-#define SNO2C_H
+#ifndef SCRIP_CC_H
+#define SCRIP_CC_H
 /*
  * scrip_cc.h — IR for the scrip-cc SNOBOL4→C compiler
  *
