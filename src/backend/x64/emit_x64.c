@@ -27,6 +27,7 @@
 
 #define EMIT_BYRD_ASM_C
 #include "sno2c.h"
+#include "ir/ir_emit_common.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1377,23 +1378,11 @@ static void emit_pat_node(EXPR_t *pat,
         if (_nc == 0) break;
         if (_nc == 1) { emit_pat_node(pat->children[0], α, β, γ, ω, cursor, subj, subj_len, depth); break; }
         if (_nc == 2) { emit_seq(pat->children[0], pat->children[1], α, β, γ, ω, cursor, subj, subj_len, depth); break; }
-        /* >2: right-fold into heap-allocated binary nodes */
-        EXPR_t **_nodes = malloc((size_t)(_nc - 1) * sizeof(EXPR_t *));
-        EXPR_t **_kids  = malloc((size_t)(_nc - 1) * 2 * sizeof(EXPR_t *));
-        EXPR_t *_right = pat->children[_nc - 1];
-        for (int _i = _nc - 2; _i >= 0; _i--) {
-            int _n = _nc - 2 - _i;
-            _nodes[_n] = calloc(1, sizeof(EXPR_t));
-            _nodes[_n]->kind = E_SEQ;
-            _kids[_n*2+0] = pat->children[_i];
-            _kids[_n*2+1] = _right;
-            _nodes[_n]->children  = &_kids[_n*2];
-            _nodes[_n]->nchildren = 2;
-            _right = _nodes[_n];
-        }
-        emit_pat_node(_right, α, β, γ, ω, cursor, subj, subj_len, depth);
-        for (int _i = 0; _i < _nc - 1; _i++) free(_nodes[_i]);
-        free(_nodes); free(_kids);
+        /* >2: right-fold via shared helper */
+        { EXPR_t **_fn, **_fk;
+          EXPR_t *_root = ir_nary_right_fold(pat, E_SEQ, &_fn, &_fk);
+          emit_pat_node(_root, α, β, γ, ω, cursor, subj, subj_len, depth);
+          ir_nary_right_fold_free(_fn, _fk, _nc - 1); }
         break;
     }
 
@@ -1402,23 +1391,11 @@ static void emit_pat_node(EXPR_t *pat,
         if (_nc == 0) break;
         if (_nc == 1) { emit_pat_node(pat->children[0], α, β, γ, ω, cursor, subj, subj_len, depth); break; }
         if (_nc == 2) { emit_alt(pat->children[0], pat->children[1], α, β, γ, ω, cursor, subj, subj_len, depth); break; }
-        /* >2: right-fold into heap-allocated binary nodes */
-        EXPR_t **_nodes = malloc((size_t)(_nc - 1) * sizeof(EXPR_t *));
-        EXPR_t **_kids  = malloc((size_t)(_nc - 1) * 2 * sizeof(EXPR_t *));
-        EXPR_t *_right = pat->children[_nc - 1];
-        for (int _i = _nc - 2; _i >= 0; _i--) {
-            int _n = _nc - 2 - _i;
-            _nodes[_n] = calloc(1, sizeof(EXPR_t));
-            _nodes[_n]->kind = E_OR;
-            _kids[_n*2+0] = pat->children[_i];
-            _kids[_n*2+1] = _right;
-            _nodes[_n]->children  = &_kids[_n*2];
-            _nodes[_n]->nchildren = 2;
-            _right = _nodes[_n];
-        }
-        emit_pat_node(_right, α, β, γ, ω, cursor, subj, subj_len, depth);
-        for (int _i = 0; _i < _nc - 1; _i++) free(_nodes[_i]);
-        free(_nodes); free(_kids);
+        /* >2: right-fold via shared helper */
+        { EXPR_t **_fn, **_fk;
+          EXPR_t *_root = ir_nary_right_fold(pat, E_OR, &_fn, &_fk);
+          emit_pat_node(_root, α, β, γ, ω, cursor, subj, subj_len, depth);
+          ir_nary_right_fold_free(_fn, _fk, _nc - 1); }
         break;
     }
 
@@ -3638,21 +3615,12 @@ static int emit_expr(EXPR_t *e, int rbp_off) {
             return 1;
         }
         if (e->nchildren > 2) {
-            /* E_OR right-fold */
+            /* E_OR right-fold via shared helper */
             int _nc = e->nchildren;
-            EXPR_t **_nodes = malloc((size_t)(_nc-1)*sizeof(EXPR_t*));
-            EXPR_t **_kids  = malloc((size_t)(_nc-1)*2*sizeof(EXPR_t*));
-            EXPR_t *_r = e->children[_nc-1];
-            for (int _i=_nc-2;_i>=0;_i--) {
-                int _n=_nc-2-_i;
-                _nodes[_n]=calloc(1,sizeof(EXPR_t)); _nodes[_n]->kind=e->kind;
-                _kids[_n*2]=e->children[_i]; _kids[_n*2+1]=_r;
-                _nodes[_n]->children=&_kids[_n*2]; _nodes[_n]->nchildren=2;
-                _r=_nodes[_n];
-            }
+            EXPR_t **_fn, **_fk;
+            EXPR_t *_r = ir_nary_right_fold(e, e->kind, &_fn, &_fk);
             int _ret = emit_expr(_r, rbp_off);
-            for (int _i=0;_i<_nc-1;_i++) free(_nodes[_i]);
-            free(_nodes); free(_kids);
+            ir_nary_right_fold_free(_fn, _fk, _nc - 1);
             return _ret;
         }
         /* E_CONC = string CAT  (value context): call stmt_concat directly.

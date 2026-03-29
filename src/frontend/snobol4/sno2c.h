@@ -154,6 +154,7 @@ static inline char *intern_n(const char *s, int n) {
 
 /* ---- public API ---- */
 void     snoc_add_include_dir(const char *d);
+void     snoc_reset(void);          /* reset per-file state between multi-file compilations */
 Program *snoc_parse(FILE *f, const char *filename);
 EXPR_t  *parse_expr_from_str(const char *src);
 void     c_emit(Program *prog, FILE *out);

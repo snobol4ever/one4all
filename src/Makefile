@@ -53,7 +53,8 @@ BACKEND_WASM = \
 
 IR = \
     ir/ir_print.c \
-    ir/ir_verify.c
+    ir/ir_verify.c \
+    ir/ir_emit_common.c
 
 FRONTEND_ICON = \
     frontend/icon/icn_main.c \

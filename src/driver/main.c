@@ -1,22 +1,29 @@
 /*
  * main.c — sno2c driver
- * Usage: sno2c [-I dir] [-o out.c] [-trampoline] [-sc] [-pl] input.sno|input.sc|input.pl
  *
- * Sprint SC3: -sc flag (or .sc suffix) routes through the Snocone frontend.
- * Sprint PL1: -pl flag (or .pl suffix) routes through the Prolog frontend
- *   (prolog_lex -> prolog_parse -> prolog_lower -> prolog_emit).
- *   Produces C with Byrd box α/β/γ/ω four-port clause selection.
+ * Usage (gcc-style):
+ *   sno2c -asm file1.sno file2.sno ...   → file1.s  file2.s  ...
+ *   sno2c -jvm file1.sno file2.sno ...   → file1.j  file2.j  ...
+ *   sno2c -net file1.sno file2.sno ...   → file1.il file2.il ...
+ *   sno2c -asm -o out.s file.sno         → out.s  (single file, explicit output)
+ *   sno2c -asm                           → stdout (stdin mode)
+ *
+ * Multiple source files: each input produces one output alongside the source
+ * (suffix replaced). -o is an error with more than one input file.
+ * Frontend auto-detected from suffix: .sc→Snocone .pl→Prolog .icn→Icon.
+ *
+ * Milestone: M-G-INV-EMIT — multi-file support for emit-diff invariant check
  */
 #include "sno2c.h"
-#include "snocone_driver.h"   /* snocone_compile() */
-#include "snocone_cf.h"       /* snocone_cf_compile() */
+#include "snocone_driver.h"
+#include "snocone_cf.h"
 #include "prolog_atom.h"
 #include "prolog_parse.h"
 #include "prolog_lower.h"
-#include "icon_lex.h"         /* IcnLexer, icn_lex_init */
+#include "icon_lex.h"
 #include "icon_ast.h"
-#include "icon_parse.h"       /* IcnParser, icn_parse_init, icn_parse_file */
-#include "icon_emit.h"         /* IcnEmitter, icn_emit_init, icn_emit_file */
+#include "icon_parse.h"
+#include "icon_emit.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,216 +34,213 @@ void asm_emit_prolog(Program *prog, FILE *f);
 extern int asm_body_mode;
 void jvm_emit(Program *prog, FILE *f, const char *filename);
 void net_emit(Program *prog, FILE *f, const char *filename);
-void pl_emit(Program *prog, FILE *f);   /* defined in prolog_emit.c */
-void prolog_emit_jvm(Program *prog, FILE *f, const char *filename); /* emit_jvm_prolog.c */
-void prolog_emit_net(Program *prog, FILE *f, const char *filename); /* prolog_emit_net.c */
-void pj_linker_prescan(PlProgram *pl_prog);                         /* emit_jvm_prolog.c */
-ImportEntry *icn_prescan_imports(const char *src);                  /* icn_main.c */
-void ij_emit_file(IcnNode **nodes, int count, FILE *out,            /* emit_jvm_icon.c */
+void pl_emit(Program *prog, FILE *f);
+void prolog_emit_jvm(Program *prog, FILE *f, const char *filename);
+void prolog_emit_net(Program *prog, FILE *f, const char *filename);
+void pj_linker_prescan(PlProgram *pl_prog);
+ImportEntry *icn_prescan_imports(const char *src);
+void ij_emit_file(IcnNode **nodes, int count, FILE *out,
                   const char *filename, const char *outpath, ImportEntry *imports);
 
-static int asm_mode = 0;
-static int jvm_mode = 0;
-static int net_mode = 0;
-static int sc_mode  = 0;
-static int pl_mode  = 0;    /* -pl flag: Prolog frontend */
-static int icn_mode = 0;    /* -icn flag (or .icn suffix): Icon frontend */
-/* Case folding (SPITBOL-compatible switch names):
- *   -F = fold identifiers to uppercase (DEFAULT; matches SPITBOL/CSNOBOL4 default).
- *   -f = do not fold (case-sensitive).
- * Today: accepted, recorded in fold_mode, but lexer does not yet fold at parse
- * time — runtime folds on lookup so correctness is preserved.
- * Full parse-time fold is milestone M-SNO2C-FOLD. */
-static int fold_mode = 1;   /* 1=fold(default,-F)  0=no-fold(-f) */
+static int asm_mode  = 0;
+static int jvm_mode  = 0;
+static int net_mode  = 0;
+static int sc_mode   = 0;
+static int pl_mode   = 0;
+static int icn_mode  = 0;
+static int fold_mode = 1;
 
-/* Return 1 if filename ends with suffix (case-sensitive). */
-static int ends_with(const char *filename, const char *suffix) {
-    if (!filename) return 0;
-    size_t fl = strlen(filename), sl = strlen(suffix);
-    return fl >= sl && strcmp(filename + fl - sl, suffix) == 0;
+static int ends_with(const char *f, const char *s) {
+    if (!f) return 0;
+    size_t fl = strlen(f), sl = strlen(s);
+    return fl >= sl && strcmp(f + fl - sl, s) == 0;
 }
 
-/* Read all of FILE *f into a heap-allocated NUL-terminated string. */
 static char *read_all(FILE *f) {
     size_t cap = 4096, used = 0;
     char *buf = malloc(cap);
     if (!buf) return NULL;
     size_t n;
-    while ((n = fread(buf + used, 1, cap - used - 1, f)) > 0) {
+    while ((n = fread(buf+used, 1, cap-used-1, f)) > 0) {
         used += n;
-        if (used + 1 >= cap) {
-            cap *= 2;
-            buf = realloc(buf, cap);
-            if (!buf) return NULL;
-        }
+        if (used+1 >= cap) { cap *= 2; buf = realloc(buf, cap); if (!buf) return NULL; }
     }
     buf[used] = '\0';
     return buf;
 }
 
-int main(int argc, char *argv[]) {
-    const char *outfile = NULL, *infile = NULL;
-    for (int i=1; i<argc; i++) {
-        if (!strcmp(argv[i],"-I") && i+1<argc) {
-            snoc_add_include_dir(argv[++i]);
-        } else if (!strncmp(argv[i],"-I",2)) {
-            snoc_add_include_dir(argv[i]+2);
-        } else if (!strcmp(argv[i],"-o") && i+1<argc) {
-            outfile = argv[++i];
-        } else if (!strcmp(argv[i],"-trampoline")) {
-            trampoline_mode = 1;
-        } else if (!strcmp(argv[i],"-asm")) {
-            asm_mode = 1;
-        } else if (!strcmp(argv[i],"-jvm")) {
-            jvm_mode = 1;
-        } else if (!strcmp(argv[i],"-icn")) {
-            icn_mode = 1;
-        } else if (!strcmp(argv[i],"-net")) {
-            net_mode = 1;
-        } else if (!strcmp(argv[i],"-asm-body")) {
-            asm_mode = 1;
-            asm_body_mode = 1;
-        } else if (!strcmp(argv[i],"-pl")) {
-            pl_mode = 1;
-        } else if (!strcmp(argv[i],"-sc")) {
-            sc_mode = 1;
-        } else if (!strcmp(argv[i],"-F")) {
-            fold_mode = 1;   /* fold ON  — default; explicit -F is a no-op */
-        } else if (!strcmp(argv[i],"-f")) {
-            fold_mode = 0;   /* fold OFF — no-op until M-SNO2C-FOLD */
-        } else if (argv[i][0]!='-') {
-            infile = argv[i];
-        } else {
-            fprintf(stderr,"sno2c: unknown option %s\n",argv[i]); return 1;
-        }
-    }
+/* Replace suffix of infile with out_ext (e.g. ".s"). Caller frees. */
+static char *derive_outname(const char *infile, const char *out_ext) {
+    const char *dot = strrchr(infile, '.');
+    size_t base = dot ? (size_t)(dot - infile) : strlen(infile);
+    size_t elen  = strlen(out_ext);
+    char *out = malloc(base + elen + 1);
+    if (!out) { perror("malloc"); exit(1); }
+    memcpy(out, infile, base);
+    memcpy(out + base, out_ext, elen + 1);
+    return out;
+}
 
-    /* Auto-detect Snocone by .sc suffix */
-    if (!sc_mode && ends_with(infile, ".sc"))
-        sc_mode = 1;
+static const char *backend_ext(void) {
+    if (asm_mode) return ".s";
+    if (jvm_mode) return ".j";
+    if (net_mode) return ".il";
+    return ".c";
+}
 
-    /* Auto-detect Prolog by .pl suffix */
-    if (!pl_mode && ends_with(infile, ".pl"))
-        pl_mode = 1;
+/* Compile infile (NULL = stdin) and emit to out. outpath used for JVM class name. */
+static int compile_one(const char *infile, const char *outpath, FILE *out) {
+    snoc_reset();   /* clear per-file parser state: nerrors, include dirs */
 
-    /* Auto-detect Icon by .icn suffix */
-    if (!icn_mode && ends_with(infile, ".icn"))
-        icn_mode = 1;
+    int file_sc  = sc_mode  || ends_with(infile, ".sc");
+    int file_pl  = pl_mode  || ends_with(infile, ".pl");
+    int file_icn = icn_mode || ends_with(infile, ".icn");
 
     FILE *in = stdin;
     if (infile) {
-        in = fopen(infile,"r");
+        in = fopen(infile, "r");
         if (!in) { perror(infile); return 1; }
-        if (!sc_mode && !pl_mode) {
-            /* SNOBOL4 frontend: add directory to include search path */
+        if (!file_sc && !file_pl && !file_icn) {
             char *dir = strdup(infile);
-            char *sl  = strrchr(dir,'/');
-            if (sl) { *sl='\0'; snoc_add_include_dir(dir); }
+            char *sl  = strrchr(dir, '/');
+            if (sl) { *sl = '\0'; snoc_add_include_dir(dir); }
             else snoc_add_include_dir(".");
             free(dir);
         }
     }
 
-    FILE *out = stdout;
-    if (outfile) {
-        out = fopen(outfile,"w");
-        if (!out) { perror(outfile); return 1; }
-    }
+    int rc = 0;
+    Program *prog = NULL;
 
-    Program *prog;
-
-    if (icn_mode) {
-        /* ---- Icon frontend (M-SCRIP-DEMO) -------------------------------- */
+    if (file_icn) {
         char *src = read_all(in);
-        if (!src) { fprintf(stderr, "sno2c: read error\n"); return 1; }
-        ImportEntry *icn_imports = icn_prescan_imports(src);
-        IcnLexer lx;
-        icn_lex_init(&lx, src);
-        IcnParser parser;
-        icn_parse_init(&parser, &lx);
+        if (!src) { fprintf(stderr, "sno2c: read error\n"); rc = 1; goto done; }
+        ImportEntry *imports = icn_prescan_imports(src);
+        IcnLexer lx; icn_lex_init(&lx, src);
+        IcnParser parser; icn_parse_init(&parser, &lx);
         int count = 0;
         IcnNode **procs = icn_parse_file(&parser, &count);
         free(src);
         if (parser.had_error) {
             fprintf(stderr, "sno2c: Icon parse error: %s\n", parser.errmsg);
-            return 1;
+            rc = 1; goto done;
         }
-        if (jvm_mode) {
-            ij_emit_file(procs, count, out, infile, outfile, icn_imports);
-        } else {
-            /* x64 ASM path — route through emit_x64_icon.c (Byrd Box NASM emitter) */
-            IcnEmitter em;
-            icn_emit_init(&em, out);
-            icn_emit_file(&em, procs, count);
-        }
+        if (jvm_mode) ij_emit_file(procs, count, out, infile, outpath, imports);
+        else { IcnEmitter em; icn_emit_init(&em, out); icn_emit_file(&em, procs, count); }
         for (int i = 0; i < count; i++) icn_node_free(procs[i]);
         free(procs);
-        if (infile)  fclose(in);
-        if (outfile) fclose(out);
-        return 0;
+        goto done;
     }
 
-    if (pl_mode) {
-        /* ---- Prolog frontend (M-PROLOG-R1+) ----------------------------- */
+    if (file_pl) {
         char *src = read_all(in);
-        if (!src) { fprintf(stderr,"sno2c: read error\n"); return 1; }
+        if (!src) { fprintf(stderr, "sno2c: read error\n"); rc = 1; goto done; }
         prolog_atom_init();
         PlProgram *pl_prog = prolog_parse(src, infile ? infile : "<stdin>");
         free(src);
         if (pl_prog->nerrors) {
-            fprintf(stderr,"sno2c: %d Prolog parse error(s)\n", pl_prog->nerrors);
-            return 1;
+            fprintf(stderr, "sno2c: %d Prolog parse error(s)\n", pl_prog->nerrors);
+            rc = 1; goto done;
         }
         prog = prolog_lower(pl_prog);
-        if (jvm_mode) pj_linker_prescan(pl_prog);  /* must precede prolog_program_free */
+        if (jvm_mode) pj_linker_prescan(pl_prog);
         prolog_program_free(pl_prog);
-        if (!prog) { return 1; }
-        /* Route: -pl -asm  -> x64 ASM backend
-         *        -pl -jvm  -> JVM Jasmin backend (M-PJ-SCAFFOLD+)
-         *        -pl -net  -> .NET CIL backend (M-LINK-NET-4)
-         *        -pl       -> C backend (existing pl_emit) */
-        if (asm_mode)
-            asm_emit_prolog(prog, out);
-        else if (jvm_mode)
-            prolog_emit_jvm(prog, out, infile);
-        else if (net_mode)
-            prolog_emit_net(prog, out, infile);
-        else
-            pl_emit(prog, out);
-        if (infile)  fclose(in);
-        if (outfile) fclose(out);
-        return 0;
-    } else if (sc_mode) {
-        /* ---- Snocone frontend ------------------------------------------ */
+        if (!prog) { rc = 1; goto done; }
+        if      (asm_mode) asm_emit_prolog(prog, out);
+        else if (jvm_mode) prolog_emit_jvm(prog, out, infile);
+        else if (net_mode) prolog_emit_net(prog, out, infile);
+        else               pl_emit(prog, out);
+        goto done;
+    }
+
+    if (file_sc) {
         char *src = read_all(in);
-        if (!src) { fprintf(stderr,"sno2c: read error\n"); return 1; }
-        if (asm_mode) {
-            /* ASM backend: use full control-flow lowering (SC4-ASM) */
-            prog = snocone_cf_compile(src, infile ? infile : "<stdin>");
-        } else {
-            /* C backend: expression-only pipeline (SC3, legacy) */
-            prog = snocone_compile(src, infile ? infile : "<stdin>");
-        }
+        if (!src) { fprintf(stderr, "sno2c: read error\n"); rc = 1; goto done; }
+        prog = asm_mode ? snocone_cf_compile(src, infile ? infile : "<stdin>")
+                        : snocone_compile   (src, infile ? infile : "<stdin>");
         free(src);
-        if (!prog) { return 1; }
+        if (!prog) { rc = 1; goto done; }
     } else {
-        /* ---- SNOBOL4 frontend ------------------------------------------ */
         prog = snoc_parse(in, infile ? infile : "<stdin>");
         if (snoc_nerrors) {
-            fprintf(stderr,"sno2c: %d error(s)\n", snoc_nerrors); return 1;
+            fprintf(stderr, "sno2c: %d error(s)\n", snoc_nerrors); rc = 1; goto done;
         }
     }
 
-    if (asm_mode)
-        asm_emit(prog, out);
-    else if (jvm_mode)
-        jvm_emit(prog, out, infile);
-    else if (net_mode)
-        net_emit(prog, out, infile);
-    else
-        c_emit(prog, out);
+    if      (asm_mode) asm_emit(prog, out);
+    else if (jvm_mode) jvm_emit(prog, out, infile);
+    else if (net_mode) net_emit(prog, out, infile);
+    else               c_emit(prog, out);
 
-    if (infile)  fclose(in);
-    if (outfile) fclose(out);
-    return 0;
+done:
+    if (infile && in != stdin) fclose(in);
+    return rc;
+}
+
+int main(int argc, char *argv[]) {
+    const char *explicit_out = NULL;
+    const char *files[1024];
+    int nfiles = 0;
+
+    for (int i = 1; i < argc; i++) {
+        if (!strcmp(argv[i], "-I") && i+1 < argc) {
+            snoc_add_include_dir(argv[++i]);
+        } else if (!strncmp(argv[i], "-I", 2)) {
+            snoc_add_include_dir(argv[i]+2);
+        } else if (!strcmp(argv[i], "-o") && i+1 < argc) {
+            explicit_out = argv[++i];
+        } else if (!strcmp(argv[i], "-trampoline")) { trampoline_mode = 1;
+        } else if (!strcmp(argv[i], "-asm"))         { asm_mode = 1;
+        } else if (!strcmp(argv[i], "-jvm"))         { jvm_mode = 1;
+        } else if (!strcmp(argv[i], "-icn"))         { icn_mode = 1;
+        } else if (!strcmp(argv[i], "-net"))         { net_mode = 1;
+        } else if (!strcmp(argv[i], "-asm-body"))    { asm_mode = 1; asm_body_mode = 1;
+        } else if (!strcmp(argv[i], "-pl"))          { pl_mode = 1;
+        } else if (!strcmp(argv[i], "-sc"))          { sc_mode = 1;
+        } else if (!strcmp(argv[i], "-F"))           { fold_mode = 1;
+        } else if (!strcmp(argv[i], "-f"))           { fold_mode = 0;
+        } else if (argv[i][0] != '-') {
+            if (nfiles >= 1024) { fprintf(stderr, "sno2c: too many input files\n"); return 1; }
+            files[nfiles++] = argv[i];
+        } else {
+            fprintf(stderr, "sno2c: unknown option %s\n", argv[i]); return 1;
+        }
+    }
+
+    /* stdin mode */
+    if (nfiles == 0) {
+        FILE *out = stdout;
+        if (explicit_out) { out = fopen(explicit_out, "w"); if (!out) { perror(explicit_out); return 1; } }
+        int rc = compile_one(NULL, explicit_out, out);
+        if (explicit_out) fclose(out);
+        return rc;
+    }
+
+    /* -o with multiple files: error */
+    if (explicit_out && nfiles > 1) {
+        fprintf(stderr, "sno2c: -o cannot be used with multiple input files\n"); return 1;
+    }
+
+    /* Single file, explicit -o */
+    if (nfiles == 1 && explicit_out) {
+        FILE *out = fopen(explicit_out, "w");
+        if (!out) { perror(explicit_out); return 1; }
+        int rc = compile_one(files[0], explicit_out, out);
+        fclose(out);
+        return rc;
+    }
+
+    /* One or more files: gcc-style, derive output name per input */
+    const char *ext = backend_ext();
+    int any_error = 0;
+    for (int i = 0; i < nfiles; i++) {
+        char *outname = derive_outname(files[i], ext);
+        FILE *out = fopen(outname, "w");
+        if (!out) { perror(outname); free(outname); any_error = 1; continue; }
+        int rc = compile_one(files[i], outname, out);
+        fclose(out);
+        if (rc) { fprintf(stderr, "sno2c: error compiling %s\n", files[i]); any_error = 1; }
+        free(outname);
+    }
+    return any_error ? 1 : 0;
 }

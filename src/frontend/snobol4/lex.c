@@ -37,6 +37,14 @@ void snoc_add_include_dir(const char *d) {
     if (n_inc < MAX_INC-1) inc_dirs[n_inc++] = strdup(d);
 }
 
+/* Reset all per-file lexer state between files in multi-file mode. */
+void snoc_reset(void) {
+    snoc_nerrors = 0;
+    yyfilename   = (char *)"<stdin>";
+    for (int i = 0; i < n_inc; i++) { free(inc_dirs[i]); inc_dirs[i] = NULL; }
+    n_inc = 0;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
  * Pass 1 - source line joining and field splitting
  * ═══════════════════════════════════════════════════════════════════════════ */

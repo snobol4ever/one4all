@@ -54,6 +54,7 @@
  */
 
 #include "sno2c.h"
+#include "ir/ir_emit_common.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1587,22 +1588,13 @@ static void jvm_emit_pat_node(EXPR_t *pat,
             break;
         }
 
-        /* n-ary: right-fold into heap-allocated binary nodes */
+        /* n-ary: right-fold via shared helper */
         if (pat->nchildren > 2) {
             int _nc = pat->nchildren;
-            EXPR_t **_nodes = malloc((size_t)(_nc-1)*sizeof(EXPR_t*));
-            EXPR_t **_kids  = malloc((size_t)(_nc-1)*2*sizeof(EXPR_t*));
-            EXPR_t *_r = pat->children[_nc-1];
-            for (int _i=_nc-2;_i>=0;_i--) {
-                int _n=_nc-2-_i;
-                _nodes[_n]=calloc(1,sizeof(EXPR_t)); _nodes[_n]->kind=E_SEQ;
-                _kids[_n*2]=pat->children[_i]; _kids[_n*2+1]=_r;
-                _nodes[_n]->children=&_kids[_n*2]; _nodes[_n]->nchildren=2;
-                _r=_nodes[_n];
-            }
+            EXPR_t **_fn, **_fk;
+            EXPR_t *_r = ir_nary_right_fold(pat, E_SEQ, &_fn, &_fk);
             jvm_emit_pat_node(_r, gamma, omega, loc_subj, loc_cursor, loc_len, p_cap_local, out, classname);
-            for (int _i=0;_i<_nc-1;_i++) free(_nodes[_i]);
-            free(_nodes); free(_kids);
+            ir_nary_right_fold_free(_fn, _fk, _nc - 1);
             break;
         }
                 /* Normal SEQ */
@@ -1622,22 +1614,13 @@ static void jvm_emit_pat_node(EXPR_t *pat,
          *   save cursor_save
          *   left: gamma → gamma, omega → restore+right_alpha
          *   right: gamma → gamma, omega → omega                          */
-        /* n-ary: right-fold into heap-allocated binary nodes */
+        /* n-ary: right-fold via shared helper */
         if (pat->nchildren > 2) {
             int _nc = pat->nchildren;
-            EXPR_t **_nodes = malloc((size_t)(_nc-1)*sizeof(EXPR_t*));
-            EXPR_t **_kids  = malloc((size_t)(_nc-1)*2*sizeof(EXPR_t*));
-            EXPR_t *_r = pat->children[_nc-1];
-            for (int _i=_nc-2;_i>=0;_i--) {
-                int _n=_nc-2-_i;
-                _nodes[_n]=calloc(1,sizeof(EXPR_t)); _nodes[_n]->kind=E_OR;
-                _kids[_n*2]=pat->children[_i]; _kids[_n*2+1]=_r;
-                _nodes[_n]->children=&_kids[_n*2]; _nodes[_n]->nchildren=2;
-                _r=_nodes[_n];
-            }
+            EXPR_t **_fn, **_fk;
+            EXPR_t *_r = ir_nary_right_fold(pat, E_OR, &_fn, &_fk);
             jvm_emit_pat_node(_r, gamma, omega, loc_subj, loc_cursor, loc_len, p_cap_local, out, classname);
-            for (int _i=0;_i<_nc-1;_i++) free(_nodes[_i]);
-            free(_nodes); free(_kids);
+            ir_nary_right_fold_free(_fn, _fk, _nc - 1);
             break;
         }
                 int loc_save = (*p_cap_local)++;   /* allocate a local int for saved cursor */
