@@ -10,7 +10,7 @@
  * This is THE canonical non-context-free, context-sensitive language.
  * Its non-context-freeness is proven by the pumping lemma for CFLs:
  * a PDA can count two things simultaneously (its stack), but not three.
- * A linear-bounded automaton can recognize it — and so can snobol4x,
+ * A linear-bounded automaton can recognize it — and so can scrip-cc,
  * using the counter stack mechanism (nPush/nInc/nTop/nPop).
  *
  * Strategy — two-pass counter:
@@ -19,7 +19,7 @@
  *   Pass 3: consume exactly that many 'c's (decrement counter again).
  *   After pass 3: counter must be zero AND cursor at end.
  *
- * In snobol4x this maps to the nPush/nInc/nTop/nPop action nodes
+ * In scrip-cc this maps to the nPush/nInc/nTop/nPop action nodes
  * that live on the cstack. Here, in the hand-written oracle, we implement
  * the counter directly as a frame field — the semantic equivalent.
  *
@@ -32,7 +32,7 @@
  *   ASSERT_ZERO                         -- counter must be 0
  *
  * What this oracle proves:
- *   1. snobol4x can recognize a Type 1 language — something no PDA
+ *   1. scrip-cc can recognize a Type 1 language — something no PDA
  *      can do. This is the first context-sensitive proof in the suite.
  *   2. The counter stack mechanism: a single integer counter, pushed on
  *      entry, incremented while consuming 'a's, decremented while consuming

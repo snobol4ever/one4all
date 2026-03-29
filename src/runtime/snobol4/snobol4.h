@@ -1,4 +1,4 @@
-/* snobol4.h — snobol4x universal value type and runtime API
+/* snobol4.h — scrip-cc universal value type and runtime API
  *
  * Architecture decisions (recorded PLAN.md 2026-03-10):
  *   D1: Memory model = Boehm GC  (no ref-counting, no free() anywhere)

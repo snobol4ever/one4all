@@ -1,7 +1,7 @@
 #ifndef PL_BUILTIN_H
 #define PL_BUILTIN_H
 /*
- * pl_builtin.h — Prolog runtime builtin declarations for snobol4x
+ * pl_builtin.h — Prolog runtime builtin declarations for scrip-cc
  *
  * These are the C-side implementations of write/1, nl/0, functor/3,
  * arg/3, =../2, and type tests.  Called from pl_emit.c generated code.

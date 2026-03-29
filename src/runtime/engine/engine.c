@@ -1,5 +1,5 @@
 /*======================================================================================
- * engine.c — snobol4x Byrd Box MATCH_fn engine (pure C, no Python)
+ * engine.c — scrip-cc Byrd Box MATCH_fn engine (pure C, no Python)
  *
  * Derived from SNOBOL4cython/snobol4c_module.c (Lon Cherryholmes, 2026).
  * Extracted: Python→C converter and CPython module removed entirely.

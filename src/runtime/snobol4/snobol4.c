@@ -1,4 +1,4 @@
-/* snobol4.c — snobol4x Sprint 20 runtime implementation
+/* snobol4.c — scrip-cc Sprint 20 runtime implementation
  *
  * Implements everything declared in snobol4.h.
  * Memory model: Boehm GC (D1) — no free() anywhere.

@@ -5,7 +5,7 @@
  * icont node names (from tcode.c) annotated in comments for cross-reference.
  *
  * Port model: α (start) / β (resume) / γ (succeed) / ω (fail)
- * as in Byrd Box IR used throughout snobol4x.
+ * as in Byrd Box IR used throughout scrip-cc.
  */
 
 #ifndef ICON_AST_H

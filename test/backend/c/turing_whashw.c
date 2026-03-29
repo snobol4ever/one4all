@@ -63,7 +63,7 @@
  *   a read head and explicit position arithmetic — TM semantics in C.
  *
  * What this oracle proves:
- *   1. snobol4x can implement Turing machine computation — the engine
+ *   1. scrip-cc can implement Turing machine computation — the engine
  *      is Turing-complete in its computational model.
  *   2. The copy language { w#w } requires comparing two separated regions
  *      of the tape — impossible for a PDA (which only sees one end of its

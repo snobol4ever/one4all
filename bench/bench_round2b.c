@@ -60,10 +60,10 @@ int main(void) {
     double t_pcre2=(double)(t1-t0)/ITERS;
 
     printf("--- (a|b)*abb ---\n");
-    printf("  snobol4x (arena)  : %7.2f ns/match\n", t_tiny_re);
+    printf("  scrip-cc (arena)  : %7.2f ns/match\n", t_tiny_re);
     printf("  PCRE2 JIT             : %7.2f ns/match\n", t_pcre2);
     if (t_tiny_re < t_pcre2)
-        printf("  Result: snobol4x is %.2fx FASTER\n\n", t_pcre2/t_tiny_re);
+        printf("  Result: scrip-cc is %.2fx FASTER\n\n", t_pcre2/t_tiny_re);
     else
         printf("  Result: PCRE2 JIT is %.2fx faster\n\n", t_tiny_re/t_pcre2);
 
@@ -82,10 +82,10 @@ int main(void) {
     double t_bison=(double)(t1-t0)/ITERS;
 
     printf("--- {a^n b^n} ---\n");
-    printf("  snobol4x (arena)  : %7.2f ns/parse\n", t_tiny_ab);
+    printf("  scrip-cc (arena)  : %7.2f ns/parse\n", t_tiny_ab);
     printf("  Bison LALR(1)         : %7.2f ns/parse\n", t_bison);
     if (t_tiny_ab < t_bison)
-        printf("  Result: snobol4x is %.2fx FASTER\n\n", t_bison/t_tiny_ab);
+        printf("  Result: scrip-cc is %.2fx FASTER\n\n", t_bison/t_tiny_ab);
     else
         printf("  Result: Bison is %.2fx faster\n\n", t_tiny_ab/t_bison);
 

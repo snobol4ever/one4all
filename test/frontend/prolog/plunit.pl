@@ -1,4 +1,4 @@
-/* plunit.pl — minimal plunit shim for snobol4x Prolog JVM backend
+/* plunit.pl — minimal plunit shim for scrip-cc Prolog JVM backend
  * No call/N. Goals executed directly. Single-clause dispatch avoids
  * ucall retry loops from multi-clause predicates.
  */

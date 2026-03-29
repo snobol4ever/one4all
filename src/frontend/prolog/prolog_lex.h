@@ -1,7 +1,7 @@
 #ifndef PL_LEX_H
 #define PL_LEX_H
 /*
- * pl_lex.h — Prolog lexer for snobol4x Prolog frontend
+ * pl_lex.h — Prolog lexer for scrip-cc Prolog frontend
  *
  * Tokenises standard Edinburgh/ISO Prolog source.
  * Hand-rolled; no flex dependency.

@@ -1,5 +1,5 @@
 /*======================================================================================
- * engine.h — snobol4x Byrd Box MATCH_fn engine
+ * engine.h — scrip-cc Byrd Box MATCH_fn engine
  *
  * Pure C.  No Python.  No external dependencies beyond the C standard library.
  *

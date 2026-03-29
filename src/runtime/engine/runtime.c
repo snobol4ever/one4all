@@ -1,4 +1,4 @@
-/* runtime.c — snobol4x static runtime implementation */
+/* runtime.c — scrip-cc static runtime implementation */
 
 #include "runtime.h"
 #include <stdio.h>
@@ -21,7 +21,7 @@ void output_cstr(const char *s) {
  * arena_reset() resets the arena between matches — zero malloc,
  * zero free, zero system calls per MATCH_fn.
  *
- * This is the fix that takes snobol4x from 1,700 ns/MATCH_fn (malloc)
+ * This is the fix that takes scrip-cc from 1,700 ns/MATCH_fn (malloc)
  * to 40 ns/MATCH_fn (arena) — competitive with PCRE2 JIT and faster than
  * Bison LALR(1) on context-free patterns.
  *

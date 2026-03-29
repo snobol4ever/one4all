@@ -1,5 +1,5 @@
 /*
- * pl_lex.c — Prolog lexer for snobol4x Prolog frontend
+ * pl_lex.c — Prolog lexer for scrip-cc Prolog frontend
  *
  * Handles Edinburgh/ISO Prolog surface syntax:
  *   - % line comments

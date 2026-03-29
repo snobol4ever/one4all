@@ -2,7 +2,7 @@
  * ir.h — Unified Intermediate Representation
  *
  * THE single source of truth for all IR node kinds across all frontends
- * and all backends in snobol4x. Every frontend lowers to EXPR_t nodes
+ * and all backends in scrip-cc. Every frontend lowers to EXPR_t nodes
  * using this EKind enum. Every backend consumes it.
  *
  * 59 canonical node kinds:

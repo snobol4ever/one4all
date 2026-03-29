@@ -1,7 +1,7 @@
 #ifndef TERM_H
 #define TERM_H
 /*
- * term.h — Prolog term representation for snobol4x Prolog frontend
+ * term.h — Prolog term representation for scrip-cc Prolog frontend
  *
  * TERM_t is independent of DESCR_t (SNOBOL4 runtime descriptor).
  * Lives entirely in the compile-time / unification world.

@@ -1,6 +1,6 @@
 *  081 - DATATYPE returns type name of value
 *  Normalize to uppercase via REPLACE so output is oracle-stable across
-*  engines (CSNOBOL4 returns 'STRING'; SPITBOL/snobol4x return 'string').
+*  engines (CSNOBOL4 returns 'STRING'; SPITBOL/scrip-cc return 'string').
         OUTPUT = REPLACE(DATATYPE('hello'), &LCASE, &UCASE)
         OUTPUT = REPLACE(DATATYPE(42),      &LCASE, &UCASE)
         OUTPUT = REPLACE(DATATYPE(3.14),    &LCASE, &UCASE)
