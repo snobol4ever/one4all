@@ -10,7 +10,7 @@ Part of the [snobol4ever](https://github.com/snobol4ever) organization.
 
 ## What This Is
 
-`one4all` (the **TINY** compiler) is a from-scratch SNOBOL4 compiler: one frontend
+`one4all` (the **scrip-cc** compiler) is a from-scratch SNOBOL4 compiler: one frontend
 pipeline (`scrip-cc`) feeding four independent backend emitters. Write SNOBOL4 once.
 Run it anywhere.
 
@@ -74,8 +74,8 @@ Five frontends share the same IR (`EXPR_t` / `STMT_t`):
 | **SNOBOL4 / SPITBOL** | Full SNOBOL4 + SPITBOL extensions | ✅ active — all backends |
 | **Snocone** | Andrew Koenig's structured C-like frontend (Bell Labs TR 124, 1986) | ✅ active — ASM backend (`-sc -asm`) |
 | **Rebus** | Structured transpiler — Rebus source → SNOBOL4 | ✅ complete — M-REBUS ✅ |
-| **Tiny-Icon** | Icon generators via Byrd Box IR | 🗓 planned — post-bootstrap |
-| **Tiny-Prolog** | Prolog unification via Byrd Box IR | 🗓 planned — post-bootstrap |
+| **Icon** | Icon — generators, suspend/resume, string scanning | ✅ active — ASM + JVM backends (`-icn`) |
+| **Prolog** | Prolog — unification, backtrack, Byrd Box wiring | ✅ active — ASM + JVM backends (`-pl`) |
 
 The Byrd Box IR is the bridge between languages. Icon generators map to the same
 four ports. Prolog unification is goal-directed evaluation — the same model.
@@ -191,8 +191,8 @@ src/
     snobol4/          SNOBOL4/SPITBOL lexer + parser → AST + IR
     snocone/          Snocone frontend (SC language, ~10 source files)
     rebus/            Rebus transpiler
-    icon/             Tiny-Icon (planned)
-    prolog/           Tiny-Prolog (planned)
+    icon/             Icon frontend — ASM + JVM
+    prolog/           Prolog frontend — ASM + JVM
   backend/
     c/                Portable C emitter (emit_byrd.c 2,709 lines · emit.c 2,220 lines)
     x64/              x86-64 NASM emitter (emit_byrd_asm.c 4,159 lines)
@@ -284,7 +284,7 @@ the compiler writing itself — one session at a time.
 Sprint state lives in [snobol4ever/.github](https://github.com/snobol4ever/.github):
 
 - **PLAN.md** — milestone dashboard, 4D feature matrix
-- **TINY.md** — one4all sprint state, invariants, next actions per session
+- **PLAN.md** — milestone dashboard, sprint state, session handoffs
 - **JVM.md** — JVM backend sprint state
 - **MONITOR.md** — five-way monitor design and sprint detail
 - **SESSIONS_ARCHIVE.md** — full session history, append-only
@@ -298,7 +298,7 @@ Sprint state lives in [snobol4ever/.github](https://github.com/snobol4ever/.gith
 
 - **Lon Jones Cherryholmes** — compiler architecture, all backends, one4all lead
 - **Jeffrey Cooper, M.D.** — snobol4dotnet, .NET MSIL target
-- **Claude Sonnet 4.6** — TINY co-author; every sprint, every Byrd box,
+- **Claude Sonnet 4.6** — scrip-cc co-author; every sprint, every Byrd box,
   every labeled goto — written in session, committed, pushed
 
 
