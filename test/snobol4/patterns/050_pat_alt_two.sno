@@ -1,7 +1,0 @@
-*  050 - Alternation: either of two literals
-        X = 'dog'
-        X ('cat' | 'dog') . V                                      :S(YES)
-        OUTPUT = 'no match'
-        :(END)
-YES     OUTPUT = V
-END

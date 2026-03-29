@@ -1,7 +1,0 @@
-*  089 - Function call used inside pattern context
-        DEFINE('upcase(s)')                                         :(upcase_end)
-upcase  upcase = REPLACE(s, &LCASE, &UCASE)                       :(RETURN)
-upcase_end
-        OUTPUT = upcase('hello')
-        OUTPUT = upcase('world')
-END

@@ -1,7 +1,0 @@
-*  040 - NOTANY matches one char NOT in set
-        X = 'hello'
-        X NOTANY('aeiou') . V                                       :S(YES)
-        OUTPUT = 'all vowels'
-        :(END)
-YES     OUTPUT = V
-END

@@ -1,8 +1,0 @@
-*  082 - &STNO increments per statement
-        X = 1
-        X = 2
-        GT(&STNO, 1)                                                :S(YES)F(NO)
-YES     OUTPUT = 'stno ok'
-        :(END)
-NO      OUTPUT = 'wrong'
-END

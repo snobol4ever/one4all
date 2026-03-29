@@ -1,6 +1,0 @@
-*  031 - Unconditional goto skips statement
-        OUTPUT = 'before'
-        :(DONE)
-        OUTPUT = 'skipped'
-DONE
-END

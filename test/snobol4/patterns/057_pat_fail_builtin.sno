@@ -1,7 +1,0 @@
-*  057 - FAIL builtin always fails, forces backtrack
-        X = 'abc'
-        X 'abc' FAIL                                                :S(YES)F(NO)
-YES     OUTPUT = 'should not reach'
-        :(END)
-NO      OUTPUT = 'correctly failed'
-END

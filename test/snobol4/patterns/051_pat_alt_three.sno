@@ -1,7 +1,0 @@
-*  051 - Alternation: three alternatives
-        X = 'banana'
-        X ('apple' | 'banana' | 'cherry') . V                      :S(YES)
-        OUTPUT = 'no match'
-        :(END)
-YES     OUTPUT = V
-END

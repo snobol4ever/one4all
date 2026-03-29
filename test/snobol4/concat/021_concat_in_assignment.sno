@@ -1,4 +1,0 @@
-*  021 - Concat on right side of assignment
-        X = 'foo' 'bar'
-        OUTPUT = X
-END

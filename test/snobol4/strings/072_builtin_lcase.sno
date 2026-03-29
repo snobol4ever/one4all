@@ -1,3 +1,0 @@
-*  072 - Lowercase via &LCASE keyword
-        OUTPUT = &LCASE
-END

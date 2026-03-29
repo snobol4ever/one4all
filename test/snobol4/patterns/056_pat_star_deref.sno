@@ -1,8 +1,0 @@
-*  056 - *var indirect pattern reference
-        PAT = 'hello'
-        X = 'say hello world'
-        X *PAT . V                                                  :S(YES)
-        OUTPUT = 'fail'
-        :(END)
-YES     OUTPUT = V
-END

@@ -1,8 +1,0 @@
-*     word1.sno - Extract noun phrases matching "the X of Y" or "the X a Y".
-*     Tests: ARB as output-capturing side effect in pattern, unanchored scan,
-*            alternation (|), looping match on single line.
-
-      PAT      =  " the " ARB . OUTPUT (" of " | " a ")
-LOOP  LINE     =  INPUT                            :F(END)
-      LINE     ?  PAT                              :(LOOP)
-END

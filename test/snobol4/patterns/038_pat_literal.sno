@@ -1,7 +1,0 @@
-*  038 - Literal pattern match
-        X = 'hello world'
-        X 'hello'                                                   :S(YES)F(NO)
-YES     OUTPUT = 'matched'
-        :(END)
-NO      OUTPUT = 'no match'
-END

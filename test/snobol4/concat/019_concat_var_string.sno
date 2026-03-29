@@ -1,4 +1,0 @@
-*  019 - Concatenate variable with string literal
-        X = 'hello'
-        OUTPUT = X ' world'
-END

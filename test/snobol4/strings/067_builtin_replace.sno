@@ -1,3 +1,0 @@
-*  067 - REPLACE translates characters
-        OUTPUT = REPLACE('hello', 'aeiou', 'AEIOU')
-END

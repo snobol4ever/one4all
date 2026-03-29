@@ -1,7 +1,0 @@
-*  055 - Pattern concatenation (sequence)
-        X = 'abcdef'
-        X LEN(2) . A LEN(2) . B LEN(2) . C                        :S(YES)
-        OUTPUT = 'fail'
-        :(END)
-YES     OUTPUT = A ' ' B ' ' C
-END

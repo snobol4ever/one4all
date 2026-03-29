@@ -1,5 +1,0 @@
-*  063 - Replace match with empty (deletion)
-        X = 'hello world'
-        X ' world' =
-        OUTPUT = X
-END

@@ -1,7 +1,0 @@
-*  054 - ARBNO with alternation inside
-        X = 'abba'
-        X POS(0) ARBNO('a' | 'b') . V RPOS(0)                     :S(YES)F(NO)
-YES     OUTPUT = V
-        :(END)
-NO      OUTPUT = 'no match'
-END

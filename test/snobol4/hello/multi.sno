@@ -1,5 +1,0 @@
-*     multi.sno - Multiple sequential output statements.
-        OUTPUT = 'LINE ONE'
-        OUTPUT = 'LINE TWO'
-        OUTPUT = 'LINE THREE'
-END

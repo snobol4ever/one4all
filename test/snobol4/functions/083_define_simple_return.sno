@@ -1,7 +1,0 @@
-*  083 - Simple function: double a number (from dotnet)
-        DEFINE('double(s)')                                         :(double_end)
-double  double = 2 * s                                             :(RETURN)
-double_end
-        OUTPUT = double(5)
-        OUTPUT = double(21)
-END

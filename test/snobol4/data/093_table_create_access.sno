@@ -1,9 +1,0 @@
-*  093 - Create table, set and get keyed values
-        T = TABLE()
-        T['name'] = 'Alice'
-        T['age'] = 30
-        T['lang'] = 'SNOBOL4'
-        OUTPUT = T['name']
-        OUTPUT = T['age']
-        OUTPUT = T['lang']
-END

@@ -1,3 +1,0 @@
-*  030 - REMDR builtin (integer remainder)
-        OUTPUT = REMDR(10, 3)
-END

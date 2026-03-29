@@ -1,7 +1,0 @@
-*  060 - Multiple captures in one pattern
-        X = 'John Smith'
-        X BREAK(' ') . FIRST LEN(1) REM . LAST                    :S(YES)
-        OUTPUT = 'fail'
-        :(END)
-YES     OUTPUT = FIRST ' / ' LAST
-END

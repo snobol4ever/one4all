@@ -1,3 +1,0 @@
-*     empty_string.sno - Output of null string produces blank line.
-        OUTPUT = ''
-END

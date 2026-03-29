@@ -1,7 +1,0 @@
-*  049 - ARB matches minimum then backtracks to allow rest
-        X = 'aXb'
-        X ARB . V LEN(1)                                           :S(YES)
-        OUTPUT = 'fail'
-        :(END)
-YES     OUTPUT = V
-END

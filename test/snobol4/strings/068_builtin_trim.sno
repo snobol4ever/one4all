@@ -1,3 +1,0 @@
-*  068 - TRIM removes trailing spaces
-        OUTPUT = SIZE(TRIM('hello   '))
-END

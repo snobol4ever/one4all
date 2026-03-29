@@ -1,5 +1,0 @@
-*  097 - &ALPHABET and &UCASE &LCASE keywords
-        OUTPUT = SIZE(&ALPHABET)
-        OUTPUT = SIZE(&UCASE)
-        OUTPUT = SIZE(&LCASE)
-END

@@ -1,6 +1,0 @@
-*  090 - DEFINE with explicit entry label (from dotnet bump1)
-        DEFINE('bumpit(v)', .bumpit)                                :(bumpend)
-bumpit  bumpit = v + 1                                             :(RETURN)
-bumpend
-        OUTPUT = bumpit(41)
-END

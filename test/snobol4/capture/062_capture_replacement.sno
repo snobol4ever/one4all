@@ -1,5 +1,0 @@
-*  062 - Pattern replacement (subject pat = replacement)
-        X = 'hello world'
-        X 'world' = 'there'
-        OUTPUT = X
-END

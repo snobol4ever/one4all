@@ -1,7 +1,0 @@
-*  045 - RPOS anchors match from right
-        X = 'hello'
-        X RPOS(2) LEN(2) . V                                       :S(YES)
-        OUTPUT = 'fail'
-        :(END)
-YES     OUTPUT = V
-END

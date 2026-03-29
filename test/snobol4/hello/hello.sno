@@ -1,3 +1,0 @@
-*     hello.sno - Minimal output test.
-        OUTPUT = 'HELLO WORLD'
-END

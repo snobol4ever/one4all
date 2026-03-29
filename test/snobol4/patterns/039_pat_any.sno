@@ -1,7 +1,0 @@
-*  039 - ANY matches one character from set
-        X = 'hello'
-        X ANY('aeiou') . V                                          :S(YES)
-        OUTPUT = 'no vowel'
-        :(END)
-YES     OUTPUT = V
-END

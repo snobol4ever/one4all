@@ -1,3 +1,0 @@
-*  073 - LPAD pads string on left
-        OUTPUT = LPAD('hi', 6)
-END

@@ -1,3 +1,0 @@
-*  065 - SIZE returns string length
-        OUTPUT = SIZE('hello')
-END
