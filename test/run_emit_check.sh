@@ -45,7 +45,8 @@ if [[ $UPDATE -eq 1 ]]; then
     local src="$1" backend="$2" ext="$3"
     local dir name; dir="$(dirname "$src")"; name="$(basename "${src%.*}")"
     local tmp; tmp=$(mktemp)
-    "$SCRIP_CC" "$backend" "$src" > "$tmp" 2>/dev/null
+    local pl_flag=""; [[ "$src" == *.pro ]] && pl_flag="-pl"
+    "$SCRIP_CC" $pl_flag "$backend" -o /dev/stdout "$src" > "$tmp" 2>/dev/null
     [[ -s "$tmp" ]] && mv "$tmp" "$dir/$name.$ext" || rm -f "$tmp"
   }
   export -f regen_one; export SCRIP_CC
@@ -76,7 +77,8 @@ check_one() {
   label="$(basename "$dir")/$name"
   expected="$dir/$name.$ext"
   local tmp; tmp=$(mktemp)
-  "$SCRIP_CC" "$backend" "$src" > "$tmp" 2>/dev/null
+  local pl_flag=""; [[ "$src" == *.pro ]] && pl_flag="-pl"
+  "$SCRIP_CC" $pl_flag "$backend" -o /dev/stdout "$src" > "$tmp" 2>/dev/null
   if [[ ! -f "$expected" ]]; then
     rm -f "$tmp"; echo "MISSING $backend $label.$ext" >> "$FAIL_LOG"; return
   fi
