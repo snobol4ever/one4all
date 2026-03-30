@@ -1,38 +1,35 @@
 #!/usr/bin/env node
-// test/wasm/run_wasm.js — WASM runner shim for snobol4ever
-// Usage: node run_wasm.js <prog.wasm>
-// Contract: module exports { main, memory }
-//   main() returns byte-length of output written to memory[0..]
-//   stdout receives exactly those bytes (no trailing newline added here)
-
-'use strict';
+// run_wasm.js — SNOBOL4 WASM runner
+// Usage: node run_wasm.js <prog.wasm> [runtime.wasm]
+//
+// Loads sno_runtime.wasm first, passes its exports as the import object
+// for the program module. This means the runtime is compiled once by V8
+// (cached) rather than inlined and recompiled in every program binary.
+//
+// Memory is owned by the runtime module and shared with the program via import.
+// main() returns byte-count written to output buffer starting at offset 0.
 
 const fs = require('fs');
 const path = require('path');
 
-const wasmFile = process.argv[2];
-if (!wasmFile) {
-  process.stderr.write('usage: node run_wasm.js <prog.wasm>\n');
-  process.exit(1);
-}
+const progPath = process.argv[2];
+const rtPath = process.argv[3] ||
+  path.join(__dirname, '../../src/runtime/wasm/sno_runtime.wasm');
 
-const bytes = fs.readFileSync(wasmFile);
+if (!progPath) { process.stderr.write('usage: run_wasm.js <prog.wasm>\n'); process.exit(1); }
 
-WebAssembly.instantiate(bytes).then(result => {
-  const { main, memory } = result.instance.exports;
-  if (typeof main !== 'function') {
-    process.stderr.write('run_wasm.js: module does not export "main"\n');
-    process.exit(1);
-  }
-  if (!memory) {
-    process.stderr.write('run_wasm.js: module does not export "memory"\n');
-    process.exit(1);
-  }
-  const len = main();
-  if (len > 0) {
-    process.stdout.write(Buffer.from(new Uint8Array(memory.buffer, 0, len)));
-  }
-}).catch(err => {
-  process.stderr.write('run_wasm.js: ' + err.message + '\n');
-  process.exit(1);
-});
+const rtBytes = fs.readFileSync(rtPath);
+const progBytes = fs.readFileSync(progPath);
+
+WebAssembly.instantiate(rtBytes).then(rtResult => {
+  const rtExports = rtResult.instance.exports;
+  // Program imports everything from the "sno" namespace
+  const importObj = { sno: rtExports };
+  return WebAssembly.instantiate(progBytes, importObj).then(progResult => {
+    const { main } = progResult.instance.exports;
+    const len = main();
+    // Read output from runtime's memory
+    process.stdout.write(Buffer.from(
+      new Uint8Array(rtExports.memory.buffer, 0, len)));
+  });
+}).catch(e => { process.stderr.write(e + '\n'); process.exit(1); });
