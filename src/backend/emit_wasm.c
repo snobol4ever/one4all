@@ -2,9 +2,12 @@
  * emit_wasm.c — WebAssembly text-format emitter for scrip-cc
  *
  * Memory layout (matches sno_runtime.wat):
- *   [0..8191]     output buffer  (written by $sno_output_*)
- *   [8192..32767] string literal data segment (STR_DATA_BASE)
- *   [32768..]     string heap    ($sno_str_alloc bump pointer)
+ *   [0..32767]   output buffer  (written by $sno_output_*; runtime page 0 lower)
+ *   [32768..65535] string heap  ($sno_str_alloc bump pointer; runtime page 0 upper)
+ *   [65536..]    string literal data segment (STR_DATA_BASE; program page 1)
+ *
+ * Runtime uses 2 pages (128KB). Program (data) segment lives in page 1 (65536+)
+ * so it never collides with output buffer or dynamic heap.
  *
  * Value representation on WASM stack:
  *   String  → two i32: (offset, len)
@@ -32,7 +35,7 @@ static FILE *wasm_out = NULL;
 
 /* ── String literal table ─────────────────────────────────────────────────── */
 #define MAX_STRLITS   4096
-#define STR_DATA_BASE 8192
+#define STR_DATA_BASE 65536
 
 typedef struct { char *text; int len; int offset; } StrLit;
 static StrLit str_lits[MAX_STRLITS];
@@ -66,7 +69,7 @@ static WasmTy emit_expr(const EXPR_t *e);
 /* The runtime module (sno_runtime.wasm) is pre-compiled once per session.   */
 static void emit_runtime_imports(void) {
     W("  ;; Memory imported from runtime module\n");
-    W("  (import \"sno\" \"memory\" (memory 1))\n");
+    W("  (import \"sno\" \"memory\" (memory 2))  ;; runtime exports 2 pages; data segment at 65536\n");
     W("  ;; Runtime function imports\n");
     W("  (import \"sno\" \"sno_output_str\"   (func $sno_output_str   (param i32 i32)))\n");
     W("  (import \"sno\" \"sno_output_int\"   (func $sno_output_int   (param i64)))\n");
@@ -308,30 +311,72 @@ static void emit_output(const EXPR_t *val) {
 }
 
 /* ── Main body: dispatch-loop state machine ───────────────────────────────── */
+/*
+ * Pattern: $pc sentinel = nlabels (out of br_table range → sequential fall-through).
+ *   index 0      → br $exit (end program)
+ *   index 1..N-1 → br $LN  (jump to label)
+ *   default      → fall through (sentinel, sequential execution)
+ * Label blocks $L1..$LN wrap statement ranges. Breaking out of $LN skips
+ * past those statements to the code following $LN's close (the label body).
+ */
 static void emit_main_body(Program *prog) {
     W("    (local $pc i32)\n");
     W("    (local $ok i32)\n");
-    W("    (local $tmp_f f64)\n");  /* temp for int-lhs + float-rhs promotion */
+    W("    (local $tmp_f f64)\n");
 
-    /* Open nested blocks in reverse order for br_table */
+    int closed[MAX_LABELS] = {0};
+    closed[0] = 1;
+
+    /* Dispatch-loop pattern:
+     *   $pc=0       -> br $exit  (terminate program)
+     *   $pc=1..N-1  -> br $LN   (jump to label N; skips stmts in $LN's body)
+     *   $pc=N (sentinel, default) -> br $br_nop (exits only $br_nop; sequential)
+     *
+     * Layout: $br_nop is innermost, nested INSIDE $L1 (innermost label block).
+     * "br $br_nop" exits only $br_nop — sequential execution continues inside $L1.
+     * "br $L1" exits $br_nop AND $L1 — skips stmts before L1's position.
+     * "br $exit" exits everything — terminates.
+     *
+     *   (block $exit
+     *     (loop $dispatch
+     *       (block $L{N-1}
+     *         ...
+     *         (block $L1          <- innermost label block
+     *           (block $br_nop    <- default target; exits immediately
+     *             (br_table $exit $L1 ... $L{N-1} $br_nop (local.get $pc))
+     *           )                 <- falls through here, still inside $L1
+     *           <- stmts before L1 label (skipped by br $L1)
+     *         ) ;; $L1 closes     <- L1 entry; stmts at/after L1 label
+     *         <- stmts before L2
+     *       ) ;; $L2 closes       <- L2 entry...
+     */
+    W("    (local.set $pc (i32.const %d)) ;; sentinel: sequential start\n", nlabels);
+
+    W("    (block $exit\n");
     W("    (loop $dispatch\n");
-    for (int i = nlabels - 1; i >= 0; i--)
+
+    /* Open label blocks outermost-first ($L{N-1} outermost, $L1 innermost) */
+    for (int i = nlabels - 1; i >= 1; i--)
         W("      (block $L%d\n", i);
 
-    /* Dispatch on $pc */
-    W("        (br_table");
-    for (int i = 0; i < nlabels; i++) W(" $L%d", i);
-    W(" $L0 (local.get $pc))\n");   /* default → L0 = __end__ */
+    /* $br_nop: innermost block, default target — exits only itself */
+    W("      (block $br_nop\n");
+    W("        (br_table $exit");               /* index 0 -> $exit */
+    for (int i = 1; i < nlabels; i++) W(" $L%d", i);  /* index i -> $Li */
+    W(" $br_nop (local.get $pc))\n");          /* default (sentinel) -> $br_nop */
+    W("      ) ;; $br_nop -- sequential falls through here\n");
 
-    /* L0 (__end__) closes immediately — represents program end */
-    W("      ) ;; $L0 __end__\n");
+    /* Reset $pc to sentinel so next dispatch is sequential again */
+    W("      (local.set $pc (i32.const %d))\n", nlabels);
 
     /* Emit statements */
     for (STMT_t *s = prog->head; s; s = s->next) {
-        /* Close the block for this statement's label */
         if (s->label && *s->label) {
             int idx = lbl_index(s->label);
-            if (idx > 0) W("      ) ;; $L%d %s\n", idx, s->label);
+            if (idx > 0 && !closed[idx]) {
+                W("      ) ;; $L%d %s\n", idx, s->label);
+                closed[idx] = 1;
+            }
         }
 
         if (s->is_end) {
@@ -340,7 +385,6 @@ static void emit_main_body(Program *prog) {
             continue;
         }
 
-        /* Evaluate subject */
         int has_subject = s->subject && s->subject->kind != E_NUL;
         int is_output = 0;
         if (s->has_eq && s->subject) {
@@ -359,10 +403,9 @@ static void emit_main_body(Program *prog) {
             emit_subject_as_bool(s->subject);
             W("      (local.set $ok)\n");
         } else {
-            W("      (local.set $ok (i32.const 1)) ;; no subject — succeed\n");
+            W("      (local.set $ok (i32.const 1)) ;; no subject\n");
         }
 
-        /* Goto routing */
         if (s->go) {
             if (s->go->uncond && *s->go->uncond) {
                 emit_goto_target(s->go->uncond);
@@ -388,14 +431,16 @@ static void emit_main_body(Program *prog) {
                 }
             }
         }
-        /* fall through to next statement */
     }
 
-    /* Close remaining open blocks */
     for (int i = nlabels - 1; i >= 1; i--)
-        W("      ) ;; close $L%d (unreached)\n", i);
+        if (!closed[i]) W("      ) ;; close $L%d (unreached)\n", i);
 
+    /* Fall off end = terminate */
+    W("      (local.set $pc (i32.const 0))\n");
+    W("      (br $dispatch) ;; fall-off end -> $exit\n");
     W("    ) ;; loop $dispatch\n");
+    W("    ) ;; block $exit\n");
 }
 
 /* ── Shared string table API (used by emit_wasm_prolog.c, emit_wasm_icon.c) ── */
