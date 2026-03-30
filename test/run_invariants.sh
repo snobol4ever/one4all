@@ -700,6 +700,55 @@ else
 fi
 FINISH_HUMAN=$(date '+%Y-%m-%d %H:%M:%S')
 
+# ── Suite: Prolog WASM ────────────────────────────────────────────────────────
+# PW-session owns this cell. Run: run_invariants.sh prolog_wasm
+# Emitter: src/backend/emit_wasm_prolog.c (M-PW-HELLO → M-PW-PARITY)
+run_prolog_wasm() {
+  local cell="prolog_wasm"
+  local pass=0 fail=0
+  if ! command -v wat2wasm &>/dev/null || ! command -v node &>/dev/null; then
+    echo "SKIP" > "$RESULTS/${cell}_status"; return
+  fi
+  local W="$WORK/$cell"; mkdir -p "$W"
+  local PL_CORPUS="${CORPUS:-$ROOT/../corpus}/programs/prolog"
+  local PL_RUNNER="$ROOT/test/wasm/pl_run_wasm.js"
+  local PL_RUNTIME="$ROOT/src/runtime/wasm/pl_runtime.wasm"
+  if [[ ! -f "$PL_RUNNER" ]]; then
+    echo "SKIP" > "$RESULTS/${cell}_status"; return
+  fi
+  if [[ ! -f "$PL_RUNTIME" ]]; then
+    echo "SKIP" > "$RESULTS/${cell}_status"; return
+  fi
+  for pl in "$PL_CORPUS"/*.pl; do
+    [[ -f "$pl" ]] || continue
+    local base; base=$(basename "$pl" .pl)
+    local expected="${pl%.pl}.expected"; [[ -f "$expected" ]] || continue
+    local xfail="${pl%.pl}.xfail"
+    [[ -f "$xfail" ]] && { pass=$((pass+1)); continue; }
+    local wat="$W/${base}.wat"
+    local wasm="$W/${base}.wasm"
+    if ! "$SCRIP_CC" -pl -wasm -o "$wat" "$pl" 2>/dev/null; then
+      fail=$((fail+1)); echo "  FAIL $cell $base [compile]"
+      csv_row COMPILE_FAIL "$cell" "$base" "compile"; continue
+    fi
+    if ! wat2wasm --enable-tail-call "$wat" -o "$wasm" 2>/dev/null; then
+      fail=$((fail+1)); echo "  FAIL $cell $base [wat2wasm]"
+      csv_row COMPILE_FAIL "$cell" "$base" "wat2wasm"; continue
+    fi
+    local got; got=$(timeout "$TIMEOUT_X86" node "$PL_RUNNER" "$wasm" "$PL_RUNTIME" 2>/dev/null) || got="__FAIL__"
+    if [[ "$got" == "$(cat "$expected")" ]]; then
+      pass=$((pass+1)); csv_row PASS "$cell" "$base"
+      [[ $VERBOSE -eq 1 ]] && echo "  PASS $cell $base"
+    else
+      fail=$((fail+1)); echo "  FAIL $cell $base [output]"
+      csv_row FAIL "$cell" "$base"
+    fi
+  done
+  echo "$pass" > "$RESULTS/${cell}_pass"
+  echo "$fail"  > "$RESULTS/${cell}_fail"
+}
+run_prolog_wasm
+
 any_fail() {
   local cell="$1"
   [[ -f "$RESULTS/${cell}_fail" ]] && [[ $(cat "$RESULTS/${cell}_fail") -gt 0 ]]
@@ -719,7 +768,7 @@ for row_label in "SNOBOL4" "Icon   " "Prolog " "Snocone"; do
   printf "  %s  " "$row_label"
   for cell in $cells; do
     if [[ "$cell" == "icon_net" || "$cell" == "prolog_net" || \
-          "$cell" == "icon_wasm" || "$cell" == "prolog_wasm" || \
+          "$cell" == "icon_wasm" || \
           "$cell" == "snocone_jvm" || "$cell" == "snocone_net" || "$cell" == "snocone_wasm" ]]; then
       printf "  ${YELLOW}%-14s${RESET}" "SKIP"
     elif [[ -f "$RESULTS/${cell}_status" ]]; then
@@ -738,7 +787,7 @@ done
 echo -e "${BOLD}──────────────────────────────────────────────────${RESET}"
 
 OVERALL_FAIL=0
-for cell in snobol4_x86 snobol4_jvm snobol4_net snobol4_wasm icon_x86 icon_jvm icon_wasm prolog_x86 prolog_jvm snocone_x86; do
+for cell in snobol4_x86 snobol4_jvm snobol4_net snobol4_wasm icon_x86 icon_jvm icon_wasm prolog_x86 prolog_jvm prolog_wasm snocone_x86; do
   any_fail "$cell" && OVERALL_FAIL=1
 done
 
@@ -748,7 +797,7 @@ echo -e "${BOLD}ELAPSED ${ELAPSED_MS}ms  (${ELAPSED_S}s)${RESET}"
 echo ""
 
 # Finalise CSV — summary rows per cell + latest symlink
-for cell in snobol4_x86 snobol4_jvm snobol4_net snobol4_wasm icon_x86 icon_jvm icon_wasm prolog_x86 prolog_jvm snocone_x86; do
+for cell in snobol4_x86 snobol4_jvm snobol4_net snobol4_wasm icon_x86 icon_jvm icon_wasm prolog_x86 prolog_jvm prolog_wasm snocone_x86; do
   p=0; f=0
   [[ -f "$RESULTS/${cell}_pass" ]] && p=$(cat "$RESULTS/${cell}_pass")
   [[ -f "$RESULTS/${cell}_fail" ]] && f=$(cat "$RESULTS/${cell}_fail")
