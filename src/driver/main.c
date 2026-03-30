@@ -39,7 +39,7 @@ void net_emit(Program *prog, FILE *f, const char *filename);
 void pl_emit(Program *prog, FILE *f);
 void prolog_emit_jvm(Program *prog, FILE *f, const char *filename);
 void prolog_emit_net(Program *prog, FILE *f, const char *filename);
-void pj_linker_prescan(PlProgram *pl_prog);
+void pl_linker_prescan(PlProgram *pl_prog);
 ImportEntry *icn_prescan_imports(const char *src);
 void ij_emit_file(IcnNode **nodes, int count, FILE *out,
                   const char *filename, const char *outpath, ImportEntry *imports);
@@ -147,7 +147,7 @@ static int compile_one(const char *infile, const char *outpath, FILE *out) {
             rc = 1; goto done;
         }
         prog = prolog_lower(pl_prog);
-        if (jvm_mode) pj_linker_prescan(pl_prog);
+        if (jvm_mode) pl_linker_prescan(pl_prog);
         prolog_program_free(pl_prog);
         if (!prog) { rc = 1; goto done; }
         if      (asm_mode) asm_emit_prolog(prog, out);
