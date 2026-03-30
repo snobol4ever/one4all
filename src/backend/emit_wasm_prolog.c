@@ -136,6 +136,18 @@ static void emit_write_atom(const EXPR_t *arg) {
         return;
     }
 
+    /* Atom argument: prolog_lower() emits TT_ATOM args as nullary E_FNC */
+    if (arg->kind == E_FNC && arg->sval && arg->nchildren == 0) {
+        int idx = emit_wasm_strlit_intern(arg->sval);
+        int off = emit_wasm_strlit_abs(idx);
+        int len = emit_wasm_strlit_len(idx);
+        W("    ;; write('%s') atom\n", arg->sval);
+        W("    (i32.const %d)\n", off);
+        W("    (i32.const %d)\n", len);
+        W("    (call $pl_output_str)\n");
+        return;
+    }
+
     if (arg->kind == E_ILIT) {
         char numbuf[32];
         snprintf(numbuf, sizeof numbuf, "%ld", arg->ival);
@@ -177,6 +189,13 @@ static void emit_pl_goal(const EXPR_t *goal) {
     /* E_FNC — builtin goals */
     if (goal->kind == E_FNC && goal->sval) {
         const char *fn = goal->sval;
+
+        /* Body goal may be wrapped in E_FNC(",") conjunction */
+        if (strcmp(fn, ",") == 0) {
+            for (int i = 0; i < goal->nchildren; i++)
+                emit_pl_goal(goal->children[i]);
+            return;
+        }
 
         if (strcasecmp(fn, "nl") == 0) {
             W("    ;; nl/0\n");
@@ -294,6 +313,9 @@ static void emit_pl_main(Program *prog) {
 static void prescan_goal(const EXPR_t *g) {
     if (!g) return;
     if (g->kind == E_QLIT && g->sval)
+        emit_wasm_strlit_intern(g->sval);
+    /* Atom arg lowered as nullary E_FNC */
+    if (g->kind == E_FNC && g->sval && g->nchildren == 0)
         emit_wasm_strlit_intern(g->sval);
     if (g->kind == E_ILIT) {
         char numbuf[32];
