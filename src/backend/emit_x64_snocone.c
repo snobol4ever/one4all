@@ -286,13 +286,18 @@ static int lower_token(const ScPToken *tok, ExprStack *s,
 
     /* ---- Array ref ---- */
     case SNOCONE_ARRAY_REF: {
+        /* Build E_IDX matching the SNOBOL4 parser convention:
+         *   children[0] = base array (E_VAR node)
+         *   children[1..n] = index args
+         * The emitter (emit_x64.c) guards on nchildren >= 2 and uses
+         * children[0] for the array, children[1] for the key. */
         int nargs = tok->arg_count;
         EXPR_t *base = expr_new(E_IDX);
         EXPR_t **tmp = nargs > 0 ? malloc(nargs * sizeof(EXPR_t *)) : NULL;
         for (int k = nargs - 1; k >= 0; k--) tmp[k] = es_pop(s);
         EXPR_t *name_node = es_pop(s);
-        base->sval = strdup(name_node && name_node->sval ? name_node->sval : "");
-        free(name_node);
+        /* Make the array-name node children[0] (keep it as E_VAR) */
+        expr_add_child(base, name_node);
         for (int k = 0; k < nargs; k++) expr_add_child(base, tmp[k]);
         free(tmp);
         es_push(s, base); return 0;

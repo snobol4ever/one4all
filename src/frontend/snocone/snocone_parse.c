@@ -289,6 +289,16 @@ ScParseResult snocone_parse(const SnoconeToken *toks, int count) {
                 continue;
             }
 
+            /* IDENT immediately followed by '<' -> angle-bracket array ref (SNOBOL4 style) */
+            if (tok->kind == SNOCONE_IDENT && next == SNOCONE_LT) {
+                vec_push(&out, make_pt(tok));
+                Frame f = { FRAME_ARRAY, 0, out.count, tok->line };
+                fvec_push(&calls, f);
+                vec_push(&ops, make_pt(&toks[i+1]));
+                i += 2;
+                continue;
+            }
+
             vec_push(&out, make_pt(tok));
             i++;
             continue;
@@ -347,12 +357,31 @@ ScParseResult snocone_parse(const SnoconeToken *toks, int count) {
             continue;
         }
 
+        /* ---- Right angle '>' — closes angle-bracket array ref A<i> ---- */
+        if (tok->kind == SNOCONE_GT) {
+            Frame *fp = fvec_top(&calls);
+            if (fp && fp->kind == FRAME_ARRAY) {
+                /* closing an angle-bracket array ref opened by IDENT + '<' */
+                drain_to_delim(&out, &ops, SNOCONE_LT);
+                Frame f = fvec_pop(&calls);
+                int has_args = out.count > f.output_start;
+                int n = has_args ? f.arg_count + 1 : 0;
+                vec_push(&out, make_synthetic(SNOCONE_ARRAY_REF, n, tok->line));
+            } else {
+                /* not closing an array frame — treat as binary GT operator */
+                push_binop(&out, &ops, make_pt(tok));
+            }
+            i++;
+            continue;
+        }
+
         /* ---- Comma ---- */
         if (tok->kind == SNOCONE_COMMA) {
             /* drain to nearest open delimiter */
             while (ops.count > 0 &&
                    vec_peek(&ops).kind != SNOCONE_LPAREN &&
-                   vec_peek(&ops).kind != SNOCONE_LBRACKET)
+                   vec_peek(&ops).kind != SNOCONE_LBRACKET &&
+                   vec_peek(&ops).kind != SNOCONE_LT)
                 vec_push(&out, vec_pop(&ops));
             /* increment arg count in topmost call/array frame */
             Frame *fp = fvec_top(&calls);
@@ -502,6 +531,15 @@ static int parse_operand_into(const SnoconeToken *toks, int count, int i,
         /* IDENT immediately followed by '[' -> array ref */
         if (tok->kind == SNOCONE_IDENT && i + 1 < count &&
             toks[i+1].kind == SNOCONE_LBRACKET) {
+            vec_push(out, make_pt(tok));
+            Frame f = { FRAME_ARRAY, 0, out->count, tok->line };
+            fvec_push(calls, f);
+            vec_push(ops, make_pt(&toks[i+1]));
+            return i + 2;
+        }
+        /* IDENT immediately followed by '<' -> angle-bracket array ref */
+        if (tok->kind == SNOCONE_IDENT && i + 1 < count &&
+            toks[i+1].kind == SNOCONE_LT) {
             vec_push(out, make_pt(tok));
             Frame f = { FRAME_ARRAY, 0, out->count, tok->line };
             fvec_push(calls, f);
