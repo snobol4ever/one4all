@@ -398,6 +398,17 @@ static void emit_main_body(Program *prog) {
     W("    ) ;; loop $dispatch\n");
 }
 
+/* ── Shared string table API (used by emit_wasm_prolog.c, emit_wasm_icon.c) ── */
+void emit_wasm_set_out(FILE *f)              { wasm_out = f; }
+int  emit_wasm_strlit_intern(const char *s)  { return strlit_intern(s); }
+int  emit_wasm_strlit_abs(int idx)           { return strlit_abs(idx); }
+int  emit_wasm_strlit_len(int idx)           { return str_lits[idx].len; }
+void emit_wasm_data_segment(void)            { emit_data_segment(); }
+void emit_wasm_strlit_reset(void) {
+    for (int i = 0; i < str_nlit; i++) { free(str_lits[i].text); str_lits[i].text = NULL; }
+    str_nlit = str_bytes = 0;
+}
+
 /* ── Public entry point ───────────────────────────────────────────────────── */
 void emit_wasm(Program *prog, FILE *out, const char *filename) {
     (void)filename;
