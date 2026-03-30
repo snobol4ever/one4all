@@ -137,9 +137,7 @@ int icn_main(int argc, char **argv) {
     if (do_jvm) {
         emit_jvm_icon_file(procs, count, out_file, input, output, NULL);
     } else {
-        IcnEmitter em;
-        icn_emit_init(&em, out_file);
-        icn_emit_file(&em, procs, count);
+        icn_emit_file(procs, count, out_file);
     }
 
     if (output) fclose(out_file);

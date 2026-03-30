@@ -323,7 +323,7 @@ static void emit_assign(EXPR_t *n, const char *γ, const char *ω,
 
     char rhs_γ[64]; char rhs_ω[64]; strncpy(rhs_γ,store,63); strncpy(rhs_ω,ω,63);
     char ra[64],rb[64];
-    emit_expr(n->children[1], rhs_γ, rhs_ω, ra, rb);
+    emit_expr(n->children[1], rhs_ports_γ, rhs_ports_ω, ra, rb);
 
     Ldef(a); Jmp(ra);
     Ldef(b); Jmp(rb);
@@ -367,6 +367,7 @@ static void emit_return(EXPR_t *n, const char *γ, const char *ω,
     int id=next_uid(); char a[64],b[64];
     icn_label_α(id,a,sizeof a); icn_label_β(id,b,sizeof b);
     strncpy(oa,a,63); strncpy(ob,b,63);
+    (void)ports;
 
     if(n->nchildren>0){
         char after[64]; snprintf(after,sizeof after,"icon_%d_ret_store",id);
@@ -394,7 +395,8 @@ static void emit_return(EXPR_t *n, const char *γ, const char *ω,
  * ======================================================================= */
 static void emit_fail_node(EXPR_t *n, const char *γ, const char *ω,
                            char *oa, char *ob) {
-    (void)n;    int id=next_uid(); char a[64],b[64];
+    (void)n; (void)ports;
+    int id=next_uid(); char a[64],b[64];
     icn_label_α(id,a,sizeof a); icn_label_β(id,b,sizeof b);
     strncpy(oa,a,63); strncpy(ob,b,63);
     Ldef(a);
@@ -421,6 +423,7 @@ static void emit_fail_node(EXPR_t *n, const char *γ, const char *ω,
  * ======================================================================= */
 static void emit_suspend(EXPR_t *n, const char *γ, const char *ω,
                          char *oa, char *ob) {
+    (void)ports;
     int id = next_uid();
     char a[64], b[64];
     icn_label_α(id, a, sizeof a);
@@ -445,7 +448,7 @@ static void emit_suspend(EXPR_t *n, const char *γ, const char *ω,
         char vp_γ[64]; char vp_ω[64];
         strncpy(vp_γ, after_val, 63);
         strncpy(vp_ω, cur_fail_label[0] ? cur_fail_label : "icn_dead", 63);
-        emit_expr(val_node, vp_γ, vp_ω, va, vb);
+        emit_expr(val_node_γ, val_node_ω, vp, va, vb);
     } else {
         /* suspend with no value: yield 0 */
         snprintf(va, sizeof va, "%s_noval", a);
@@ -484,7 +487,7 @@ static void emit_suspend(EXPR_t *n, const char *γ, const char *ω,
         char bp_γ[64]; char bp_ω[64];
         strncpy(bp_γ, γ, 63);
         strncpy(bp_ω,    γ, 63);  /* body fail also continues */
-        emit_expr(body_node, bp_γ, bp_ω, ba, bb);
+        emit_expr(body_node_γ, body_node_ω, bp, ba, bb);
         Ldef( resume_here);
         Jmp( ba);
     } else {
@@ -513,17 +516,17 @@ static void emit_if(EXPR_t *n, const char *γ, const char *ω,
 
     if(thenb){
         char tp_γ[64]; char tp_ω[64]; strncpy(tp_γ,γ,63); strncpy(tp_ω,ω,63);
-        emit_expr(thenb, tp_γ, tp_ω, then_a,then_b);
+        emit_expr(thenb_γ, thenb_ω, tp, then_a,then_b);
     } else { strncpy(then_a,γ,63); strncpy(then_b,ω,63); }
 
     if(elseb){
         char ep_γ[64]; char ep_ω[64]; strncpy(ep_γ,γ,63); strncpy(ep_ω,ω,63);
-        emit_expr(elseb, ep_γ, ep_ω, else_a,else_b);
+        emit_expr(elseb_γ, elseb_ω, ep, else_a,else_b);
     } else { strncpy(else_a,ω,63); }
 
     char cp_γ[64]; char cp_ω[64]; strncpy(cp_γ,cond_then,63); strncpy(cp_ω,cond_else,63);
     char ca[64],cb[64];
-    emit_expr(cond, cp_γ, cp_ω, ca,cb);
+    emit_expr(cond_γ, cond_ω, cp, ca,cb);
 
     /* cond_then: condition succeeded and pushed a value — discard it, enter then */
     Ldef(cond_then);
@@ -541,7 +544,7 @@ static void emit_if(EXPR_t *n, const char *γ, const char *ω,
  * ======================================================================= */
 static void emit_call(EXPR_t *n, const char *γ, const char *ω,
                       char *oa, char *ob) {
-    if(n->nchildren<1){ emit_fail_node(n, γ, ω, oa, ob); return; }
+    if(n->nchildren<1){ emit_fail_node(em, NULL_γ, NULL_ω, ports, oa,ob); return; }
     EXPR_t *fn=n->children[0];
     int nargs=n->nchildren-1;
     const char *fname=(fn->kind==E_VAR)?fn->sval:"unknown";
@@ -561,7 +564,7 @@ static void emit_call(EXPR_t *n, const char *γ, const char *ω,
         char after[64]; snprintf(after,sizeof after,"icon_%d_call",id);
         char ap2_γ[64]; char ap2_ω[64]; strncpy(ap2_γ,after,63); strncpy(ap2_ω,ω,63);
         char arg_a[64],arg_b[64];
-        emit_expr(arg, ap2_γ, ap2_ω, arg_a,arg_b);
+        emit_expr(arg_γ, arg_ω, ap2, arg_a,arg_b);
         Ldef(a); Jmp(arg_a);
         Ldef(b); Jmp(arg_b);
         Ldef(after);
@@ -601,7 +604,7 @@ static void emit_call(EXPR_t *n, const char *γ, const char *ω,
         EXPR_t *arg=n->children[1];
         char ap2_γ[64]; char ap2_ω[64]; strncpy(ap2_γ,after,63); strncpy(ap2_ω,ω,63);
         char arg_a[64],arg_b[64];
-        emit_expr(arg, ap2_γ, ap2_ω, arg_a,arg_b);
+        emit_expr(arg_γ, arg_ω, ap2, arg_a,arg_b);
         Ldef(a); Jmp(arg_a);
         Ldef(b); Jmp(arg_b);
         Ldef(after);
@@ -626,7 +629,7 @@ static void emit_call(EXPR_t *n, const char *γ, const char *ω,
         if(nargs<1){ Ldef(a); Jmp(ω); Ldef(b); Jmp(ω); return; }
         EXPR_t *arg=n->children[1];
         char ap_γ[64]; char ap_ω[64]; strncpy(ap_γ,after,63); strncpy(ap_ω,ω,63);
-        char aa[64],ab[64]; emit_expr(arg, ap_γ, ap_ω, aa,ab);
+        char aa[64],ab[64]; emit_expr(arg_γ, arg_ω, ap, aa,ab);
         Ldef(a); Jmp(aa);
         Ldef(b); Jmp(ω);
         Ldef(after);
@@ -646,7 +649,7 @@ static void emit_call(EXPR_t *n, const char *γ, const char *ω,
         if(nargs<1){ Ldef(a); Jmp(ω); Ldef(b); Jmp(ω); return; }
         EXPR_t *arg=n->children[1];
         char ap_γ[64]; char ap_ω[64]; strncpy(ap_γ,after,63); strncpy(ap_ω,ω,63);
-        char aa[64],ab[64]; emit_expr(arg, ap_γ, ap_ω, aa,ab);
+        char aa[64],ab[64]; emit_expr(arg_γ, arg_ω, ap, aa,ab);
         Ldef(a); Jmp(aa);
         Ldef(b); Jmp(ω);
         Ldef(after);
@@ -665,7 +668,7 @@ static void emit_call(EXPR_t *n, const char *γ, const char *ω,
         if(nargs<1){ Ldef(a); Jmp(ω); Ldef(b); Jmp(ω); return; }
         EXPR_t *arg=n->children[1];
         char ap_γ[64]; char ap_ω[64]; strncpy(ap_γ,after,63); strncpy(ap_ω,ω,63);
-        char aa[64],ab[64]; emit_expr(arg, ap_γ, ap_ω, aa,ab);
+        char aa[64],ab[64]; emit_expr(arg_γ, arg_ω, ap, aa,ab);
         Ldef(a); Jmp(aa);
         Ldef(b); Jmp(ω);
         Ldef(after);
@@ -698,9 +701,9 @@ static void emit_call(EXPR_t *n, const char *γ, const char *ω,
 
         EXPR_t *s1arg=n->children[1], *s2arg=n->children[2];
         char ap1_γ[64]; char ap1_ω[64]; strncpy(ap1_γ,after1,63); strncpy(ap1_ω,ω,63);
-        char a1[64],b1[64]; emit_expr(s1arg, ap1_γ, ap1_ω, a1,b1);
+        char a1[64],b1[64]; emit_expr(s1arg_γ, s1arg_ω, ap1, a1,b1);
         char ap2_γ[64]; char ap2_ω[64]; strncpy(ap2_γ,after2,63); strncpy(ap2_ω,ω,63);
-        char a2[64],b2[64]; emit_expr(s2arg, ap2_γ, ap2_ω, a2,b2);
+        char a2[64],b2[64]; emit_expr(s2arg_γ, s2arg_ω, ap2, a2,b2);
 
         /* α: eval s1 → store, eval s2 → store, init pos=0, check */
         Ldef(a); Jmp(a1);
@@ -856,7 +859,7 @@ static void emit_alt(EXPR_t *n, const char *γ, const char *ω,
  * ======================================================================= */
 static void emit_cset(EXPR_t *n, const char *γ, const char *ω,
                       char *oa, char *ob) {
-    emit_str(n, γ, ω, oa, ob);   /* same layout — char* in rdi, nothing pushed */
+    emit_str(em, n_γ, n_ω, ports, oa, ob);   /* same layout — char* in rdi, nothing pushed */
 }
 
 /* =========================================================================
@@ -1105,13 +1108,13 @@ static void emit_scan(EXPR_t *n, const char *γ, const char *ω,
     /* Wire expr: γ → setup, ω → ω */
     char ep_γ[64]; char ep_ω[64]; strncpy(ep_γ, setup, 63); strncpy(ep_ω, ω, 63);
     char ea[64], eb[64];
-    emit_expr(expr_node, ep_γ, ep_ω, ea, eb);
+    emit_expr(expr_node_γ, expr_node_ω, ep, ea, eb);
 
     /* Wire body: γ → body_ok, ω → body_fail */
     char bp_γ[64]; char bp_ω[64]; strncpy(bp_γ, body_ok, 63); strncpy(bp_ω, body_fail, 63);
     char ba[64], bb[64];
     if (body_node)
-        emit_expr(body_node, bp_γ, bp_ω, ba, bb);
+        emit_expr(body_node_γ, body_node_ω, bp, ba, bb);
     else {
         strncpy(ba, body_ok, 63); strncpy(bb, body_fail, 63);
     }
@@ -1480,7 +1483,7 @@ static void emit_while(EXPR_t *n, const char *γ, const char *ω,
 
     char ca[64],cb[64];
     char cp_γ[64]; char cp_ω[64]; strncpy(cp_γ,cond_ok,63); strncpy(cp_ω,ω,63);
-    emit_expr(cond, cp_γ, cp_ω, ca,cb);
+    emit_expr(cond_γ, cond_ω, cp, ca,cb);
 
     /* cond_ok: condition succeeded, value on stack — discard it, run body */
     Ldef(cond_ok);
@@ -1490,7 +1493,7 @@ static void emit_while(EXPR_t *n, const char *γ, const char *ω,
         char ba[64],bb[64];
         char bp_γ[64]; char bp_ω[64]; strncpy(bp_γ,loop_top,63); strncpy(bp_ω,loop_top,63);
         loop_push(ω, loop_top);
-        emit_expr(body, bp_γ, bp_ω, ba,bb);
+        emit_expr(body_γ, body_ω, bp, ba,bb);
         loop_pop();
         Jmp(ba);
 
@@ -1528,7 +1531,7 @@ static void emit_until(EXPR_t *n, const char *γ, const char *ω,
 
     char ca[64],cb[64];
     char cp_γ[64]; char cp_ω[64]; strncpy(cp_γ,cond_ok,63); strncpy(cp_ω,cond_fail,63);
-    emit_expr(cond, cp_γ, cp_ω, ca,cb);
+    emit_expr(cond_γ, cond_ω, cp, ca,cb);
 
     /* cond succeeded → discard value, exit */
     Ldef(cond_ok);
@@ -1541,7 +1544,7 @@ static void emit_until(EXPR_t *n, const char *γ, const char *ω,
         char ba[64],bb[64];
         char bp_γ[64]; char bp_ω[64]; strncpy(bp_γ,loop_top,63); strncpy(bp_ω,loop_top,63);
         loop_push(ω, loop_top);
-        emit_expr(body, bp_γ, bp_ω, ba,bb);
+        emit_expr(body_γ, body_ω, bp, ba,bb);
         loop_pop();
         Jmp(ba);
 
@@ -1573,14 +1576,14 @@ static void emit_every(EXPR_t *n, const char *γ, const char *ω,
         char bstart[64]; snprintf(bstart,sizeof bstart,"icon_%d_body",id);
         char bp_γ[64]; char bp_ω[64]; strncpy(bp_γ,gbfwd,63); strncpy(bp_ω,gbfwd,63);
         loop_push(ω, gbfwd);
-        char ba[64],bb[64]; emit_expr(body, bp_γ, bp_ω, ba,bb);
+        char ba[64],bb[64]; emit_expr(body_γ, body_ω, bp, ba,bb);
         loop_pop();
         char gp_γ[64]; char gp_ω[64]; strncpy(gp_γ,bstart,63); strncpy(gp_ω,ω,63);
-        emit_expr(gen, gp_γ, gp_ω, ga,gb);
+        emit_expr(gen_γ, gen_ω, gp, ga,gb);
         Ldef(bstart); Jmp(ba);
     } else {
         char gp_γ[64]; char gp_ω[64]; strncpy(gp_γ,gbfwd,63); strncpy(gp_ω,ω,63);
-        emit_expr(gen, gp_γ, gp_ω, ga,gb);
+        emit_expr(gen_γ, gen_ω, gp, ga,gb);
     }
     Ldef(gbfwd); Jmp(gb);
     Ldef(a); Jmp(ga);
@@ -1601,13 +1604,13 @@ static void emit_every(EXPR_t *n, const char *γ, const char *ω,
 #include "icon_lex.h"   /* TK_AUGPLUS etc. — needed for the subtype map */
 static void emit_augop(EXPR_t *n, const char *γ, const char *ω,
                        char *oa, char *ob) {
-    if (n->nchildren < 2) { emit_fail_node(n, γ, ω, oa, ob); return; }
+    if (n->nchildren < 2) { emit_fail_node(em, n_γ, n_ω, ports, oa, ob); return; }
 
     EXPR_t *lhs = n->children[0];   /* must be E_VAR */
     EXPR_t *rhs = n->children[1];
 
     /* Map TK_AUGxxx → ICN_xxx */
-    EKind op_kind;
+    IcnKind op_kind;
     switch ((IcnTkKind)n->ival) {
         case TK_AUGPLUS:   op_kind = E_ADD;    break;
         case TK_AUGMINUS:  op_kind = E_SUB;    break;
@@ -1624,7 +1627,7 @@ static void emit_augop(EXPR_t *n, const char *γ, const char *ω,
         case TK_AUGNE:     op_kind = E_NE;     break;
         default:
             /* Unhandled augop — fall back to fail */
-            emit_fail_node(n, γ, ω, oa, ob); return;
+            emit_fail_node(em, n_γ, n_ω, ports, oa, ob); return;
     }
 
     int id = next_uid(); char a[64], b[64];
@@ -1644,12 +1647,12 @@ static void emit_augop(EXPR_t *n, const char *γ, const char *ω,
     syn.children  = ch;
 
     /* Wire: op succeeds → store; op fails → ω */
-    char op_γ[64]; char op_ω[64];
+    char op_ports_γ[64]; char op_ports_ω[64];
     strncpy(op_γ, store, 63);
     strncpy(op_ω, ω, 63);
 
     char opa[64], opb[64];
-    emit_expr(&syn, op_γ, op_ω, opa, opb);
+    emit_expr(&syn, op_ports_γ, op_ports_ω, opa, opb);
 
     /* α → op.α;  β → op.β */
     Ldef( a); Jmp( opa);
@@ -1694,7 +1697,7 @@ static void emit_nonnull(EXPR_t *n, const char *γ, const char *ω,
     strncpy(oa,a,63); strncpy(ob,b,63);
     char ca[64], cb[64];
     char cp_γ[64]; char cp_ω[64]; strncpy(cp_γ,γ,63); strncpy(cp_ω,ω,63);
-    emit_expr(child, cp_γ, cp_ω, ca, cb);
+    emit_expr(child_γ, child_ω, cp, ca, cb);
     Ldef(a); Jmp(ca);
     Ldef(b); Jmp(cb);
 }
@@ -1723,7 +1726,7 @@ static void emit_size(EXPR_t *n, const char *γ, const char *ω,
     EXPR_t *child = n->nchildren > 0 ? n->children[0] : NULL;
     char ca[64], cb[64];
     char cp_γ[64]; char cp_ω[64]; strncpy(cp_γ,relay,63); strncpy(cp_ω,ω,63);
-    emit_expr(child, cp_γ, cp_ω, ca, cb);
+    emit_expr(child_γ, child_ω, cp, ca, cb);
     Ldef(a); Jmp(ca);
     Ldef(b); Jmp(cb);
     Ldef(relay);
@@ -1961,7 +1964,7 @@ static void emit_repeat(EXPR_t *n, const char *γ, const char *ω,
     loop_push(brk, top);
     char ba[64], bb[64];
     char bp_γ[64]; char bp_ω[64]; strncpy(bp_γ,top,63); strncpy(bp_ω,top,63);
-    if (body) emit_expr(body, bp_γ, bp_ω, ba, bb);
+    if (body) emit_expr(body_γ, body_ω, bp, ba, bb);
     loop_pop();
     Ldef(a);
     Ldef(top);
@@ -1973,7 +1976,8 @@ static void emit_repeat(EXPR_t *n, const char *γ, const char *ω,
 /* ICN_BREAK — exit enclosing loop */
 static void emit_break_node(EXPR_t *n, const char *γ, const char *ω,
                             char *oa, char *ob) {
-    (void)n;    int id = next_uid(); char a[64], b[64];
+    (void)n; (void)ports;
+    int id = next_uid(); char a[64], b[64];
     icn_label_α(id,a,sizeof a); icn_label_β(id,b,sizeof b);
     strncpy(oa,a,63); strncpy(ob,b,63);
     const char *brk = loop_break_target();
@@ -1984,7 +1988,8 @@ static void emit_break_node(EXPR_t *n, const char *γ, const char *ω,
 /* ICN_NEXT — next iteration of enclosing loop */
 static void emit_next_node(EXPR_t *n, const char *γ, const char *ω,
                            char *oa, char *ob) {
-    (void)n;    int id = next_uid(); char a[64], b[64];
+    (void)n; (void)ports;
+    int id = next_uid(); char a[64], b[64];
     icn_label_α(id,a,sizeof a); icn_label_β(id,b,sizeof b);
     strncpy(oa,a,63); strncpy(ob,b,63);
     const char *nxt = loop_next_target();
@@ -2005,7 +2010,7 @@ static void emit_initial(EXPR_t *n, const char *γ, const char *ω,
     EXPR_t *body = n->nchildren > 0 ? n->children[0] : NULL;
     char ba[64], bb[64];
     char bp_γ[64]; char bp_ω[64]; strncpy(bp_γ,skip,63); strncpy(bp_ω,skip,63);
-    if (body) emit_expr(body, bp_γ, bp_ω, ba, bb);
+    if (body) emit_expr(body_γ, body_ω, bp, ba, bb);
     Ldef(a);
     E("    cmp     qword [rel %s], 0\n", flag);
     E("    jne     %s\n", skip);
@@ -2036,9 +2041,9 @@ static void emit_limit(EXPR_t *n, const char *γ, const char *ω,
     EXPR_t *lim = n->nchildren>1?n->children[1]:NULL;
     char ga[64],gb[64],la[64],lb[64];
     char gp_γ[64]; char gp_ω[64]; strncpy(gp_γ,got_val,63); strncpy(gp_ω,ω,63);
-    emit_expr(gen, gp_γ, gp_ω, ga,gb);
+    emit_expr(gen_γ, gen_ω, gp, ga,gb);
     char lp_γ[64]; char lp_ω[64]; strncpy(lp_γ,got_lim,63); strncpy(lp_ω,ω,63);
-    emit_expr(lim, lp_γ, lp_ω, la,lb);
+    emit_expr(lim_γ, lim_ω, lp, la,lb);
     /* α: eval limit once, store, set counter, start gen */
     Ldef(a);
     Jmp(la);
@@ -2072,9 +2077,9 @@ static void emit_subscript(EXPR_t *n, const char *γ, const char *ω,
     EXPR_t *idx = n->nchildren>1?n->children[1]:NULL;
     char ia[64],ib[64],oa2[64],ob2[64];
     char ip_γ[64]; char ip_ω[64]; strncpy(ip_γ,got_idx,63); strncpy(ip_ω,ω,63);
-    emit_expr(idx, ip_γ, ip_ω, ia,ib);
+    emit_expr(idx_γ, idx_ω, ip, ia,ib);
     char op2_γ[64]; char op2_ω[64]; strncpy(op2_γ,got_obj,63); strncpy(op2_ω,ω,63);
-    emit_expr(obj, op2_γ, op2_ω, oa2,ob2);
+    emit_expr(obj_γ, obj_ω, op2, oa2,ob2);
     Ldef(a); Jmp(oa2);
     Ldef(b); Jmp(ib);
     Ldef(got_idx);
@@ -2110,11 +2115,11 @@ static void emit_section(EXPR_t *n, const char *γ, const char *ω,
     snprintf(got_j,  sizeof got_j,   "icon_%d_sec_gj",id);
     snprintf(got_obj,sizeof got_obj, "icon_%d_sec_go",id);
     char ip_γ[64]; char ip_ω[64]; strncpy(ip_γ,got_i,63); strncpy(ip_ω,ω,63);
-    emit_expr(ifrom, ip_γ, ip_ω, ia,ib);
+    emit_expr(ifrom_γ, ifrom_ω, ip, ia,ib);
     char jp_γ[64]; char jp_ω[64]; strncpy(jp_γ,got_j,63); strncpy(jp_ω,ω,63);
-    emit_expr(ito, jp_γ, jp_ω, ja,jb);
+    emit_expr(ito_γ, ito_ω, jp, ja,jb);
     char op2_γ[64]; char op2_ω[64]; strncpy(op2_γ,got_obj,63); strncpy(op2_ω,ω,63);
-    emit_expr(obj, op2_γ, op2_ω, oa2,ob2);
+    emit_expr(obj_γ, obj_ω, op2, oa2,ob2);
     Ldef(a); Jmp(oa2);
     Ldef(b); Jmp(ib);
     Ldef(got_i);
@@ -2184,7 +2189,7 @@ static void emit_case(EXPR_t *n, const char *γ, const char *ω,
     EXPR_t *sel = n->children[0];
     char sa[64], sb[64];
     char sp_γ[64]; char sp_ω[64]; strncpy(sp_γ,got_sel,63); strncpy(sp_ω,ω,63);
-    emit_expr(sel, sp_γ, sp_ω, sa,sb);
+    emit_expr(sel_γ, sel_ω, sp, sa,sb);
     Ldef(a); Jmp(sa);
     Ldef(b); Jmp(sb);
     Ldef(got_sel);
@@ -2201,7 +2206,7 @@ static void emit_case(EXPR_t *n, const char *γ, const char *ω,
         char got_key[64];  snprintf(got_key, sizeof got_key, "icon_%d_key_%d",id,i);
         char ka[64],kb[64];
         char kp_γ[64]; char kp_ω[64]; strncpy(kp_γ,got_key,63); strncpy(kp_ω,next_arm,63);
-        emit_expr(key, kp_γ, kp_ω, ka,kb);
+        emit_expr(key_γ, key_ω, kp, ka,kb);
         Jmp(ka);
         Ldef(got_key);
         E("    pop     rax\n");
@@ -2209,7 +2214,7 @@ static void emit_case(EXPR_t *n, const char *γ, const char *ω,
         E("    jne     %s\n", next_arm);
         char ba2[64],bb2[64];
         char bp_γ[64]; char bp_ω[64]; strncpy(bp_γ,γ,63); strncpy(bp_ω,ω,63);
-        emit_expr(body, bp_γ, bp_ω, ba2,bb2);
+        emit_expr(body_γ, body_ω, bp, ba2,bb2);
         Jmp(ba2);
         Ldef(next_arm);
     }
@@ -2217,7 +2222,7 @@ static void emit_case(EXPR_t *n, const char *γ, const char *ω,
         EXPR_t *def_body = n->children[n->nchildren-1];
         char da[64],db[64];
         char dp_γ[64]; char dp_ω[64]; strncpy(dp_γ,γ,63); strncpy(dp_ω,ω,63);
-        emit_expr(def_body, dp_γ, dp_ω, da,db);
+        emit_expr(def_body_γ, def_body_ω, dp, da,db);
         Jmp(da);
     } else {
         Jmp(ω);
@@ -2263,7 +2268,7 @@ static void emit_bang(EXPR_t *n, const char *γ, const char *ω,
     /* Emit child expression; success → after_str (char* on stack) */
     char ca[64], cb[64];
     char cp_γ[64]; char cp_ω[64]; strncpy(cp_γ, after_str, 63); strncpy(cp_ω, ω, 63);
-    if (child) emit_expr(child, cp_γ, cp_ω, ca, cb);
+    if (child) emit_expr(child_γ, child_ω, cp, ca, cb);
     else { snprintf(ca,64,"%s_noc",a); Ldef(ca); Jmp(ω); }
 
     /* after_str: child produced char* on hw stack → store, reset pos */
@@ -2362,7 +2367,7 @@ static void emit_cset_complement(EXPR_t *n, const char *γ, const char *ω,
     int child_is_cset = child && (child->kind == E_CSET || child->kind == E_QLIT);
     char ca[64], cb[64];
     char cp_γ[64]; char cp_ω[64]; strncpy(cp_γ, relay, 63); strncpy(cp_ω, ω, 63);
-    emit_expr(child, cp_γ, cp_ω, ca, cb);
+    emit_expr(child_γ, child_ω, cp, ca, cb);
     Ldef( a); Jmp( ca);
     Ldef( b); Jmp( cb);
     Ldef( relay);
@@ -2395,10 +2400,10 @@ static void emit_cset_binop(EXPR_t *n, const char *γ, const char *ω,
     int rcs = rch && (rch->kind == E_CSET || rch->kind == E_QLIT);
     char ra[64], rb[64];
     char rp_γ[64]; char rp_ω[64]; strncpy(rp_γ, compute, 63); strncpy(rp_ω, lbfwd, 63);
-    emit_expr(rch, rp_γ, rp_ω, ra, rb);
+    emit_expr(rch_γ, rch_ω, rp, ra, rb);
     char la[64], lb[64];
     char lp_γ[64]; char lp_ω[64]; strncpy(lp_γ, lstore, 63); strncpy(lp_ω, ω, 63);
-    emit_expr(lch, lp_γ, lp_ω, la, lb);
+    emit_expr(lch_γ, lch_ω, lp, la, lb);
     Ldef( lbfwd); Jmp( lb);
     Ldef( a); Jmp( la);
     Ldef( b); Jmp( rb);
@@ -2420,65 +2425,65 @@ static void emit_cset_binop(EXPR_t *n, const char *γ, const char *ω,
 
 static void emit_expr(EXPR_t *n, const char *γ, const char *ω,
                       char *oa, char *ob) {
-    if(!n){ emit_fail_node(n, γ, ω, oa, ob); return; }
+    if(!n){ emit_fail_node(em, n_γ, n_ω, ports, oa,ob); return; }
     switch(n->kind){
-        case E_ILIT:    emit_int(n, γ, ω, oa, ob); break;
-        case E_QLIT:    emit_str(n, γ, ω, oa, ob); break;
-        case E_CSET:   emit_cset(n, γ, ω, oa, ob); break;
-        case E_VAR:    emit_var(n, γ, ω, oa, ob); break;
-        case E_ASSIGN: emit_assign(n, γ, ω, oa, ob); break;
-        case E_RETURN: emit_return(n, γ, ω, oa, ob); break;
-        case E_SUSPEND:emit_suspend(n, γ, ω, oa, ob); break;
-        case E_FAIL:   emit_fail_node(n, γ, ω, oa, ob); break;
-        case E_IF:     emit_if(n, γ, ω, oa, ob); break;
-        case E_GENALT:    emit_alt(n, γ, ω, oa, ob); break;
-        case E_MATCH:   emit_scan(n, γ, ω, oa, ob); break;
-        case E_NEG:    emit_neg(n, γ, ω, oa, ob); break;
-        case E_NOT:    emit_not(n, γ, ω, oa, ob); break;
-        case E_NULL:   emit_not(n, γ, ω, oa, ob); break;
-        case E_SSEQ:    emit_seq(n, γ, ω, oa, ob); break;
+        case E_ILIT:    emit_int      (em,n,ports,oa,ob); break;
+        case E_QLIT:    emit_str      (em,n,ports,oa,ob); break;
+        case E_CSET:   emit_cset     (em,n,ports,oa,ob); break;
+        case E_VAR:    emit_var      (em,n,ports,oa,ob); break;
+        case E_ASSIGN: emit_assign   (em,n,ports,oa,ob); break;
+        case E_RETURN: emit_return   (em,n,ports,oa,ob); break;
+        case E_SUSPEND:emit_suspend  (em,n,ports,oa,ob); break;
+        case E_FAIL:   emit_fail_node(em, n_γ, n_ω, ports, oa,ob); break;
+        case E_IF:     emit_if       (em,n,ports,oa,ob); break;
+        case E_GENALT:    emit_alt      (em,n,ports,oa,ob); break;
+        case E_MATCH:   emit_scan     (em,n,ports,oa,ob); break;
+        case E_NEG:    emit_neg      (em,n,ports,oa,ob); break;
+        case E_NOT:    emit_not      (em,n,ports,oa,ob); break;
+        case E_NULL:   emit_not      (em,n,ports,oa,ob); break;
+        case E_SSEQ:    emit_seq      (em,n,ports,oa,ob); break;
         case E_CONCAT: case E_LCONCAT:
-                         emit_concat(n, γ, ω, oa, ob); break;
+                         emit_concat   (em,n,ports,oa,ob); break;
         case E_ADD: case E_SUB: case E_MPY: case E_DIV: case E_MOD:
-                         emit_binop(n, γ, ω, oa, ob); break;
+                         emit_binop    (em,n,ports,oa,ob); break;
         case E_LT: case E_LE: case E_GT: case E_GE: case E_EQ: case E_NE:
-                         emit_relop(n, γ, ω, oa, ob); break;
-        case E_TO:     emit_to(n, γ, ω, oa, ob); break;
-        case E_TO_BY:  emit_to_by(n, γ, ω, oa, ob); break;
-        case E_EVERY:  emit_every(n, γ, ω, oa, ob); break;
-        case E_WHILE:  emit_while(n, γ, ω, oa, ob); break;
-        case E_UNTIL:  emit_until(n, γ, ω, oa, ob); break;
-        case E_FNC:   emit_call(n, γ, ω, oa, ob); break;
-        case E_AUGOP:  emit_augop(n, γ, ω, oa, ob); break;
+                         emit_relop    (em,n,ports,oa,ob); break;
+        case E_TO:     emit_to       (em,n,ports,oa,ob); break;
+        case E_TO_BY:  emit_to_by    (em,n,ports,oa,ob); break;
+        case E_EVERY:  emit_every    (em,n,ports,oa,ob); break;
+        case E_WHILE:  emit_while    (em,n,ports,oa,ob); break;
+        case E_UNTIL:  emit_until    (em,n,ports,oa,ob); break;
+        case E_FNC:   emit_call     (em,n,ports,oa,ob); break;
+        case E_AUGOP:  emit_augop    (em,n,ports,oa,ob); break;
         /* G-9 gap-fill cases */
-        case E_NONNULL:   emit_nonnull(n, γ, ω, oa, ob); break;
-        case E_FLIT:      emit_real(n, γ, ω, oa, ob); break;
-        case E_SIZE:      emit_size(n, γ, ω, oa, ob); break;
-        case E_POW:       emit_pow(n, γ, ω, oa, ob); break;
-        case E_SEQ_EXPR:  emit_seq_expr(n, γ, ω, oa, ob); break;
-        case E_IDENTICAL: emit_identical(n, γ, ω, oa, ob); break;
-        case E_SWAP:      emit_swap(n, γ, ω, oa, ob); break;
+        case E_NONNULL:   emit_nonnull   (em,n,ports,oa,ob); break;
+        case E_FLIT:      emit_real      (em,n,ports,oa,ob); break;
+        case E_SIZE:      emit_size      (em,n,ports,oa,ob); break;
+        case E_POW:       emit_pow       (em,n,ports,oa,ob); break;
+        case E_SEQ_EXPR:  emit_seq_expr  (em,n,ports,oa,ob); break;
+        case E_IDENTICAL: emit_identical (em,n,ports,oa,ob); break;
+        case E_SWAP:      emit_swap      (em,n,ports,oa,ob); break;
         case E_SGT: case E_SGE: case E_SLT:
         case E_SLE: case E_SNE:
-                            emit_strrelop(n, γ, ω, oa, ob); break;
-        case E_REPEAT:    emit_repeat(n, γ, ω, oa, ob); break;
-        case E_LOOP_BREAK:     emit_break_node(n, γ, ω, oa, ob); break;
-        case E_LOOP_NEXT:      emit_next_node(n, γ, ω, oa, ob); break;
-        case E_INITIAL:   emit_initial(n, γ, ω, oa, ob); break;
-        case E_LIMIT:     emit_limit(n, γ, ω, oa, ob); break;
-        case E_IDX: emit_subscript(n, γ, ω, oa, ob); break;
+                            emit_strrelop  (em,n,ports,oa,ob); break;
+        case E_REPEAT:    emit_repeat    (em,n,ports,oa,ob); break;
+        case E_LOOP_BREAK:     emit_break_node(em, n_γ, n_ω, ports, oa,ob); break;
+        case E_LOOP_NEXT:      emit_next_node (em,n,ports,oa,ob); break;
+        case E_INITIAL:   emit_initial   (em,n,ports,oa,ob); break;
+        case E_LIMIT:     emit_limit     (em,n,ports,oa,ob); break;
+        case E_IDX: emit_subscript (em,n,ports,oa,ob); break;
         case E_SECTION: case E_SECTION_PLUS: case E_SECTION_MINUS:
-                            emit_section(n, γ, ω, oa, ob); break;
-        case E_MAKELIST:  emit_makelist(n, γ, ω, oa, ob); break;
-        case E_RECORD:    emit_record(n, γ, ω, oa, ob); break;
-        case E_FIELD:     emit_field(n, γ, ω, oa, ob); break;
-        case E_CASE:      emit_case(n, γ, ω, oa, ob); break;
-        case E_ITER:      emit_bang(n, γ, ω, oa, ob); break;
-        case E_BANG_BINARY: emit_stub_fail(n, γ, ω, oa, ob); break;
+                            emit_section   (em,n,ports,oa,ob); break;
+        case E_MAKELIST:  emit_makelist  (em,n,ports,oa,ob); break;
+        case E_RECORD:    emit_record    (em,n,ports,oa,ob); break;
+        case E_FIELD:     emit_field     (em,n,ports,oa,ob); break;
+        case E_CASE:      emit_case      (em,n,ports,oa,ob); break;
+        case E_ITER:      emit_bang      (em,n,ports,oa,ob); break;
+        case E_BANG_BINARY: emit_stub_fail(em, n_γ, n_ω, ports, oa,ob); break;
         /* G1: ICN_POS — unary plus, identity: emit child unchanged */
-        case E_PLS:    emit_expr(n->children[0], γ, ω, oa, ob); break;
+        case E_PLS:    emit_expr(n->children[0], ports_γ, ports_ω, oa, ob); break;
         /* G2: ICN_RANDOM — ?E: random integer 1..E via icn_random() */
-        case E_RANDOM: emit_random(n, γ, ω, oa, ob); break;
+        case E_RANDOM: emit_random(em, n_γ, n_ω, ports, oa,ob); break;
         /* G7: ICN_SCAN_AUGOP — E ?:= body: unimplemented, stub-fail to ω */
         case E_SCAN_AUGOP: {
             int id=next_uid(); char a2[64],b2[64];
@@ -2489,10 +2494,11 @@ static void emit_expr(EXPR_t *n, const char *γ, const char *ω,
             break;
         }
         /* G3–G6: cset operations */
-        case E_CSET_COMPL:  emit_cset_complement(n, γ, ω, oa, ob); break;
-        case E_CSET_UNION:  emit_cset_binop(n, γ, ω, oa, ob); break;
-        case E_CSET_DIFF:   emit_cset_binop(n, γ, ω, oa, ob); break;
-        case E_CSET_INTER:  emit_cset_binop(n, γ, ω, oa, ob); break;
+        case E_CSET_COMPL:  emit_cset_complement(em, n_γ, n_ω, ports, oa,ob); break;
+        case E_CSET_UNION:  emit_cset_binop(em, n_γ, n_ω, ports, oa,ob); break;
+        case E_CSET_DIFF:   emit_cset_binop(em, n_γ, n_ω, ports, oa,ob); break;
+        case E_CSET_INTER:  emit_cset_binop(em, n_γ, n_ω, ports, oa,ob); break;
+        case E_MATCH:     emit_match     (em,n,ports,oa,ob); break;
         case E_SEQ: {
             /* n-ary conjunction: E1 & E2 & ... & En
              * irgen.icn ir_conjunction wiring:
@@ -2553,8 +2559,7 @@ static void emit_expr(EXPR_t *n, const char *γ, const char *ω,
 /* =========================================================================
  * icn_emit_file — full file emission
  * ======================================================================= */
-void icn_emit_file(EXPR_t **nodes, int count, FILE *outf) {
-    out = outf;
+void icn_emit_file(EXPR_t **nodes, int count) {
     bss_count=0; rodata_count=0; str_counter=0; user_proc_count=0;
 
     /* Pass 1: register all user procs, detect generators */
@@ -2571,7 +2576,7 @@ void icn_emit_file(EXPR_t **nodes, int count, FILE *outf) {
     }
 
     /* Emit to temp buffer */
-    FILE *tmp=tmpfile(); FILE *real=out; out=tmp; uid=0;
+    FILE *tmp=tmpfile(); FILE *real=f; out=tmp; uid=0;
 
     /* Declare globals needed by runtime */
     bss_declare("icn_retval");
@@ -2633,7 +2638,7 @@ void icn_emit_file(EXPR_t **nodes, int count, FILE *outf) {
             EXPR_t *stmt=proc->children[body_start+i];
             if(!stmt||stmt->kind==E_GLOBAL){ strncpy(alphas[i],next_a,63); continue; }
             char sp_γ[64]; char sp_ω[64]; strncpy(sp_γ,next_a,63); strncpy(sp_ω,next_a,63);
-            char sa[64],sb[64]; emit_expr(stmt, sp_γ, sp_ω, sa,sb);
+            char sa[64],sb[64]; emit_expr(stmt_γ, stmt_ω, sp, sa,sb);
             strncpy(alphas[i],sa,63); strncpy(next_a,sa,63);
         }
 
@@ -2740,7 +2745,7 @@ void icn_emit_file(EXPR_t **nodes, int count, FILE *outf) {
     E("    extern icn_str_subscript\n    extern icn_str_section\n    extern icn_bang_char_at\n    extern icn_match_pat\n    extern icn_cset_complement\n    extern icn_cset_union\n    extern icn_cset_diff\n    extern icn_cset_inter\n\n");
     E("_start:\n    call    icn_main\n    mov     rax, 60\n    xor     rdi, rdi\n    syscall\n\n");
 
-    fputs(body,real); free(body);
+    fputs(body,em->out); free(body);
 }
 
 /* =========================================================================
@@ -2748,5 +2753,5 @@ void icn_emit_file(EXPR_t **nodes, int count, FILE *outf) {
  * ======================================================================= */
 void icn_emit_expr(EXPR_t *n,
                       const char *γ, const char *ω, char *oa, char *ob) {
-    emit_expr(n, γ, ω, oa,ob);
+    emit_expr(n_γ, n_ω, ports, oa,ob);
 }
