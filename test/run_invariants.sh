@@ -311,9 +311,12 @@ run_snobol4_jvm() {
       local ref="${sno%.sno}.ref"; [[ -f "$ref" ]] || continue
       local input="${sno%.sno}.input"
       local jfile="$W/${base}.j"
-      cp "$ref" "$W/${base}.ref"
-      [[ -f "$input" ]] && cp "$input" "$W/${base}.input"
-      if "$SCRIP_CC" -jvm "$sno" > "$jfile" 2>/dev/null; then
+      if "$SCRIP_CC" -jvm -o "$jfile" "$sno" 2>/dev/null; then
+        # Extract class name — SnoHarness looks for <classname>.ref not <basename>.ref
+        local classname; classname=$(grep '\.class public' "$jfile" | head -1 | awk '{print $3}')
+        [[ -z "$classname" ]] && classname="$base"
+        cp "$ref" "$W/${classname}.ref"
+        [[ -f "$input" ]] && cp "$input" "$W/${classname}.input"
         jfiles+=("$jfile")
       else
         compile_fail=$((compile_fail+1))
@@ -472,8 +475,10 @@ run_prolog_jvm() {
     local expected="${pl%.pl}.expected"; [[ -f "$expected" ]] || continue
     local xfail="${pl%.pl}.xfail"; [[ -f "$xfail" ]] && continue
     local jfile="$W/${base}.j"
-    cp "$expected" "$W/${base}.ref"
-    if "$SCRIP_CC" -pl -jvm "$pl" > "$jfile" 2>/dev/null; then
+    if "$SCRIP_CC" -pl -jvm -o "$jfile" "$pl" 2>/dev/null; then
+      local classname; classname=$(grep '\.class public' "$jfile" | head -1 | awk '{print $3}')
+      [[ -z "$classname" ]] && classname="$base"
+      cp "$expected" "$W/${classname}.ref"
       jfiles+=("$jfile")
     else
       compile_fail=$((compile_fail+1))
