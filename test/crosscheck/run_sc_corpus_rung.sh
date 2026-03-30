@@ -71,7 +71,7 @@ run_test() {
     local bin="$WORK/${base}_bin"
 
     # scrip-cc -sc -asm
-    if ! "$SCRIP_CC" -sc -asm "$sc" > "$s_file" 2>"$WORK/${base}.scrip-cc_err"; then
+    if ! "$SCRIP_CC" -sc -asm "$sc" -o "$s_file" 2>"$WORK/${base}.scrip-cc_err"; then
         echo -e "${RED}FAIL${RESET} $base  [scrip-cc error]"
         cat "$WORK/${base}.scrip-cc_err" | head -3
         FAIL=$((FAIL+1))
