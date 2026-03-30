@@ -29,13 +29,13 @@
  *   :>:  → LGT      :<:  → LLT
  *   :>=: → LGE      :<=: → LLE
  *   %   → REMDR(a,b)
- *   ^   → E_EXPOP (right-assoc)
- *   .   → E_NAM    $  → E_DOL
+ *   ^   → E_POW (right-assoc)
+ *   .   → E_CAPT_COND    $  → E_CAPT_IMM
  *   unary *  → E_INDR
  *   unary ~  → NOT(x)
  *   unary ?  → DIFFER(x)
  *   &name    → E_KW
- *   @var     → E_ATP
+ *   @var     → E_CAPT_CUR
  *
  * Control-flow lowering (for loop separator note):
  *   Our for uses ; separators: for (init; cond; step)
@@ -81,7 +81,7 @@ static void es_push(ExprStack *s, EXPR_t *e) {
 static EXPR_t *es_pop(ExprStack *s) {
     if (s->top <= 0) {
         fprintf(stderr, "emit_x64_snocone: expression stack underflow\n");
-        return expr_new(E_NULV);
+        return expr_new(E_NUL);
     }
     return s->v[--s->top];
 }
@@ -130,7 +130,7 @@ static int lower_token(const ScPToken *tok, ExprStack *s,
         es_push(s, e); return 0;
     }
     case SNOCONE_IDENT: {
-        EXPR_t *e = expr_new(E_VART);
+        EXPR_t *e = expr_new(E_VAR);
         e->sval   = strdup(tok->text);
         es_push(s, e); return 0;
     }
@@ -142,7 +142,7 @@ static int lower_token(const ScPToken *tok, ExprStack *s,
     }
     case SNOCONE_MINUS:
         if (tok->is_unary) {
-            es_push(s, expr_unary(E_MNS, es_pop(s))); return 0;
+            es_push(s, expr_unary(E_NEG, es_pop(s))); return 0;
         } else {
             EXPR_t *r = es_pop(s), *l = es_pop(s);
             es_push(s, expr_binary(E_SUB, l, r)); return 0;
@@ -160,7 +160,7 @@ static int lower_token(const ScPToken *tok, ExprStack *s,
     }
     case SNOCONE_CARET: {
         EXPR_t *r = es_pop(s), *l = es_pop(s);
-        es_push(s, expr_binary(E_EXPOP, l, r)); return 0;
+        es_push(s, expr_binary(E_POW, l, r)); return 0;
     }
 
     /* ---- String / pattern composition ---- */
@@ -172,17 +172,17 @@ static int lower_token(const ScPToken *tok, ExprStack *s,
     }
     case SNOCONE_PERIOD: {
         EXPR_t *var = es_pop(s), *expr = es_pop(s);
-        es_push(s, expr_binary(E_NAM, expr, var)); return 0;
+        es_push(s, expr_binary(E_CAPT_COND, expr, var)); return 0;
     }
     case SNOCONE_DOLLAR:
         if (tok->is_unary) {
             es_push(s, expr_unary(E_INDR, es_pop(s))); return 0;
         } else {
             EXPR_t *var = es_pop(s), *expr = es_pop(s);
-            es_push(s, expr_binary(E_DOL, expr, var)); return 0;
+            es_push(s, expr_binary(E_CAPT_IMM, expr, var)); return 0;
         }
     case SNOCONE_AT: {
-        es_push(s, expr_unary(E_ATP, es_pop(s))); return 0;
+        es_push(s, expr_unary(E_CAPT_CUR, es_pop(s))); return 0;
     }
     case SNOCONE_AMPERSAND: {
         EXPR_t *operand = es_pop(s);
@@ -226,41 +226,41 @@ static int lower_token(const ScPToken *tok, ExprStack *s,
     case SNOCONE_PLUS_ASSIGN: {
         EXPR_t *rhs = es_pop(s), *lhs = es_pop(s);
         /* duplicate lhs for the operation */
-        EXPR_t *lhs2 = expr_new(E_VART);
+        EXPR_t *lhs2 = expr_new(E_VAR);
         lhs2->sval = strdup(lhs->sval ? lhs->sval : "");
         EXPR_t *op  = expr_binary(E_ADD, lhs2, rhs);
-        es_push(s, expr_binary(E_ASGN, lhs, op)); return 0;
+        es_push(s, expr_binary(E_ASSIGN, lhs, op)); return 0;
     }
     case SNOCONE_MINUS_ASSIGN: {
         EXPR_t *rhs = es_pop(s), *lhs = es_pop(s);
-        EXPR_t *lhs2 = expr_new(E_VART); lhs2->sval = strdup(lhs->sval ? lhs->sval : "");
-        es_push(s, expr_binary(E_ASGN, lhs, expr_binary(E_SUB, lhs2, rhs))); return 0;
+        EXPR_t *lhs2 = expr_new(E_VAR); lhs2->sval = strdup(lhs->sval ? lhs->sval : "");
+        es_push(s, expr_binary(E_ASSIGN, lhs, expr_binary(E_SUB, lhs2, rhs))); return 0;
     }
     case SNOCONE_STAR_ASSIGN: {
         EXPR_t *rhs = es_pop(s), *lhs = es_pop(s);
-        EXPR_t *lhs2 = expr_new(E_VART); lhs2->sval = strdup(lhs->sval ? lhs->sval : "");
-        es_push(s, expr_binary(E_ASGN, lhs, expr_binary(E_MPY, lhs2, rhs))); return 0;
+        EXPR_t *lhs2 = expr_new(E_VAR); lhs2->sval = strdup(lhs->sval ? lhs->sval : "");
+        es_push(s, expr_binary(E_ASSIGN, lhs, expr_binary(E_MPY, lhs2, rhs))); return 0;
     }
     case SNOCONE_SLASH_ASSIGN: {
         EXPR_t *rhs = es_pop(s), *lhs = es_pop(s);
-        EXPR_t *lhs2 = expr_new(E_VART); lhs2->sval = strdup(lhs->sval ? lhs->sval : "");
-        es_push(s, expr_binary(E_ASGN, lhs, expr_binary(E_DIV, lhs2, rhs))); return 0;
+        EXPR_t *lhs2 = expr_new(E_VAR); lhs2->sval = strdup(lhs->sval ? lhs->sval : "");
+        es_push(s, expr_binary(E_ASSIGN, lhs, expr_binary(E_DIV, lhs2, rhs))); return 0;
     }
     case SNOCONE_PERCENT_ASSIGN: {
         EXPR_t *rhs = es_pop(s), *lhs = es_pop(s);
-        EXPR_t *lhs2 = expr_new(E_VART); lhs2->sval = strdup(lhs->sval ? lhs->sval : "");
-        es_push(s, expr_binary(E_ASGN, lhs, make_fnc2("REMDR", lhs2, rhs))); return 0;
+        EXPR_t *lhs2 = expr_new(E_VAR); lhs2->sval = strdup(lhs->sval ? lhs->sval : "");
+        es_push(s, expr_binary(E_ASSIGN, lhs, make_fnc2("REMDR", lhs2, rhs))); return 0;
     }
     case SNOCONE_CARET_ASSIGN: {
         EXPR_t *rhs = es_pop(s), *lhs = es_pop(s);
-        EXPR_t *lhs2 = expr_new(E_VART); lhs2->sval = strdup(lhs->sval ? lhs->sval : "");
-        es_push(s, expr_binary(E_ASGN, lhs, expr_binary(E_EXPOP, lhs2, rhs))); return 0;
+        EXPR_t *lhs2 = expr_new(E_VAR); lhs2->sval = strdup(lhs->sval ? lhs->sval : "");
+        es_push(s, expr_binary(E_ASSIGN, lhs, expr_binary(E_POW, lhs2, rhs))); return 0;
     }
 
     /* ---- Assignment ---- */
     case SNOCONE_ASSIGN: {
         EXPR_t *rhs = es_pop(s), *lhs = es_pop(s);
-        es_push(s, expr_binary(E_ASGN, lhs, rhs)); return 0;
+        es_push(s, expr_binary(E_ASSIGN, lhs, rhs)); return 0;
     }
 
     /* ---- Function call ---- */
@@ -327,7 +327,7 @@ static STMT_t *assemble_stmt(ExprStack *s, int lineno) {
     if (!top) return NULL;
     STMT_t *st = stmt_new();
     st->lineno = lineno;
-    if (top->kind == E_ASGN) {
+    if (top->kind == E_ASSIGN) {
         es_pop(s);
         st->subject     = expr_left(top);
         st->replacement = expr_right(top);
@@ -597,7 +597,7 @@ static void sc_do_return(CfState *st, SnoconeKind ret_kind) {
     if (has_expr && ret_kind != SNOCONE_KW_FRETURN) {
         STMT_t *val_s = sc_compile_expr(st, SNOCONE_EOF);
         if (val_s && st->fname && val_s->subject) {
-            EXPR_t *lhs = expr_new(E_VART);
+            EXPR_t *lhs = expr_new(E_VAR);
             lhs->sval = strdup(st->fname);
             STMT_t *asgn = stmt_new();
             asgn->subject     = lhs;
