@@ -23,4 +23,9 @@ int emit_wasm_icon_node(const IcnNode *n, FILE *out);
 /* True if kind is an ICN_* node handled by this emitter. */
 int is_icon_node(int kind);
 
+/* Top-level file emitter — called from main.c for -icn -wasm (M-IW-A01).
+ * Emits a complete .wat module for an array of ICN_PROC nodes. */
+void emit_wasm_icon_file(IcnNode **procs, int count, FILE *out,
+                          const char *filename);
+
 #endif /* EMIT_WASM_ICON_H */
