@@ -94,10 +94,11 @@ void emit_wasm_icon_set_out(FILE *f) { icon_wasm_out = f; }
  * ICN_LIMIT uses: slot[0] = remaining count
  * ICN_SUSPEND: slot[0] = resume-gate index
  *
- * Base address: 0x10000 (64KB) — well above the snobol4 runtime heap.
- * Each generator node gets a unique offset assigned at emit time.
+ * Base address: 0xC000 (49152) — variable table area [49152..65535], unused in Tier 0.
+ * 16KB = 256 slots × 64 bytes, fits within the 1-page (64KB) sno_runtime.
+ * (0x10000 would require a 2nd page — deferred to M-IW-DEEP.)
  */
-#define ICON_GEN_STATE_BASE  0x10000
+#define ICON_GEN_STATE_BASE  0xC000   /* 49152 — variable table area */
 #define ICON_GEN_SLOT_BYTES  64
 #define ICON_GEN_MAX_SLOTS   256
 
@@ -722,63 +723,292 @@ static void emit_icn_stub(const IcnNode *n, int id, const char *fail) {
     WI("  (func $%s (result i32)  return_call $%s)  ;; stub-fail\n", ra, fail);
 }
 
-/* ── §4  Public dispatch ──────────────────────────────────────────────────── */
+/* ── §4  Recursive expression emitter ────────────────────────────────────── */
 
 /*
- * emit_wasm_icon_node() — called from emit_wasm.c when it encounters an
- * ICN_* node kind.  Returns 1 if handled, 0 if unknown.
+ * emit_expr_wasm() — recursive Byrd-box expression emitter.
  *
- * For Tier 0 (rung01) this is a partial implementation: ICN_TO, ICN_EVERY,
- * ICN_ADD/SUB/MUL/DIV, ICN_LT/GT, ICN_INT are fully wired.
- * All others emit stub-fail per RULES.md §FRONTEND/BACKEND SEPARATION.
+ * Walks an IcnNode tree depth-first, emitting WAT functions for each node.
+ * Threading: succ/fail are the caller's γ/ω ports (string names of WAT funcs).
+ * Returns: this node's α (start) name in out_start, β (resume) name in out_resume.
  *
- * The full recursive dispatch (walking the IcnNode tree, threading α/β/γ/ω
- * names down through children) is built out incrementally per milestone.
- * This scaffold connects the emitter into the build system cleanly.
+ * All individual emitter functions (emit_icn_int, emit_icn_binop, etc.) are
+ * already written above. This dispatcher calls them with correct arguments by
+ * first recursively emitting children, then wiring the glue.
  *
- * CURRENT STATE: scaffold only — all paths emit stub-fail.
- * M-IW-A01 is the first milestone to make tests pass.
+ * M-IW-A01: ICN_INT, ICN_REAL, ICN_STR, ICN_VAR (stub), ICN_ASSIGN (stub),
+ *           ICN_ADD/SUB/MUL/DIV/MOD, ICN_NEG/POS, ICN_LT/LE/GT/GE/EQ/NE,
+ *           ICN_TO, ICN_EVERY, ICN_ALT, ICN_CALL(write), ICN_RETURN, ICN_FAIL.
+ */
+static void emit_expr_wasm(const IcnNode *n,
+                            const char *succ, const char *fail,
+                            char *out_start, char *out_resume) {
+    if (!n) {
+        /* Null node: emit passthrough to fail */
+        int id = wasm_icon_ctr++;
+        char sa[64], ra[64];
+        wfn(sa, sizeof sa, id, "start");
+        wfn(ra, sizeof ra, id, "resume");
+        WI("  ;; NULL node %d\n", id);
+        WI("  (func $%s (result i32)  return_call $%s)\n", sa, fail);
+        WI("  (func $%s (result i32)  return_call $%s)\n", ra, fail);
+        if (out_start)  snprintf(out_start,  64, "%s", sa);
+        if (out_resume) snprintf(out_resume, 64, "%s", ra);
+        return;
+    }
+
+    int id = wasm_icon_ctr++;
+    char sa[64], ra[64];
+    wfn(sa, sizeof sa, id, "start");
+    wfn(ra, sizeof ra, id, "resume");
+
+    switch (n->kind) {
+
+    /* ── Integer literal ────────────────────────────────────────────────── */
+    case ICN_INT:
+        emit_icn_int(n, id, succ, fail);
+        break;
+
+    /* ── Real literal ───────────────────────────────────────────────────── */
+    case ICN_REAL:
+        emit_icn_real(n, id, succ, fail);
+        break;
+
+    /* ── String literal ─────────────────────────────────────────────────── */
+    case ICN_STR: {
+        /* String: store interned offset+len into a pair of i64 globals.
+         * For Tier 0: write() only handles integers. Stub string path
+         * (passes through to fail — write() with string arg is M-IW-S01). */
+        WI("  ;; ICN_STR \"%s\" (node %d) — stub until M-IW-S01\n", n->val.sval ? n->val.sval : "", id);
+        WI("  (func $%s (result i32)  return_call $%s)\n", sa, succ);
+        WI("  (func $%s (result i32)  return_call $%s)\n", ra, fail);
+        /* Store string data as i64 pair (offset << 32 | len) in icn_int global.
+         * write(str) handled in M-IW-S01. For now, succeed with value 0. */
+        break;
+    }
+
+    /* ── Variable ───────────────────────────────────────────────────────── */
+    case ICN_VAR:
+        emit_icn_var(n, id, succ, fail);
+        break;
+
+    /* ── Assignment ─────────────────────────────────────────────────────── */
+    case ICN_ASSIGN:
+        emit_icn_assign(n, id, succ, fail);
+        break;
+
+    /* ── Unary arithmetic ───────────────────────────────────────────────── */
+    case ICN_NEG:
+    case ICN_POS: {
+        if (n->nchildren < 1) { emit_icn_stub(n, id, fail); break; }
+        /* unop: child's succ = our esucc (which applies op then calls outer succ) */
+        char esucc[64], efail[64];
+        wfn(esucc, sizeof esucc, id, "esucc");
+        wfn(efail, sizeof efail, id, "efail");
+        char e_start[64], e_resume[64];
+        int e_id = wasm_icon_ctr;
+        emit_expr_wasm(n->children[0], esucc, efail, e_start, e_resume);
+        emit_icn_unop(n, id, succ, fail, e_start, e_resume, e_id);
+        break;
+    }
+
+    /* ── Binary arithmetic ──────────────────────────────────────────────── */
+    case ICN_ADD: case ICN_SUB: case ICN_MUL:
+    case ICN_DIV: case ICN_MOD: {
+        if (n->nchildren < 2) { emit_icn_stub(n, id, fail); break; }
+        /* Pre-compute glue names so children wire into them correctly. */
+        char e1f[64], e1s[64], e2f[64], e2s[64];
+        wfn(e1f, sizeof e1f, id, "e1fail");
+        wfn(e1s, sizeof e1s, id, "e1succ");
+        wfn(e2f, sizeof e2f, id, "e2fail");
+        wfn(e2s, sizeof e2s, id, "e2succ");
+        char e1_start[64], e1_resume[64], e2_start[64], e2_resume[64];
+        int e1_id = wasm_icon_ctr;
+        emit_expr_wasm(n->children[0], e1s, e1f, e1_start, e1_resume);
+        int e2_id = wasm_icon_ctr;
+        emit_expr_wasm(n->children[1], e2s, e2f, e2_start, e2_resume);
+        emit_icn_binop(n, id, succ, fail,
+                       e1_start, e1_resume, e2_start, e2_resume,
+                       e1_id, e2_id);
+        break;
+    }
+
+    /* ── Numeric relational ─────────────────────────────────────────────── */
+    case ICN_LT: case ICN_LE: case ICN_GT: case ICN_GE:
+    case ICN_EQ: case ICN_NE: {
+        if (n->nchildren < 2) { emit_icn_stub(n, id, fail); break; }
+        char e1f[64], e1s[64], e2f[64], e2s[64];
+        wfn(e1f, sizeof e1f, id, "e1fail");
+        wfn(e1s, sizeof e1s, id, "e1succ");
+        wfn(e2f, sizeof e2f, id, "e2fail");
+        wfn(e2s, sizeof e2s, id, "e2succ");
+        char e1_start[64], e1_resume[64], e2_start[64], e2_resume[64];
+        int e1_id = wasm_icon_ctr;
+        emit_expr_wasm(n->children[0], e1s, e1f, e1_start, e1_resume);
+        int e2_id = wasm_icon_ctr;
+        emit_expr_wasm(n->children[1], e2s, e2f, e2_start, e2_resume);
+        emit_icn_relop(n, id, succ, fail,
+                       e1_start, e1_resume, e2_start, e2_resume,
+                       e1_id, e2_id);
+        break;
+    }
+
+    /* ── Range generator: E1 to E2 ─────────────────────────────────────── */
+    case ICN_TO: {
+        if (n->nchildren < 2) { emit_icn_stub(n, id, fail); break; }
+        char e1f[64], e1s[64], e2f[64], e2s[64];
+        wfn(e1f, sizeof e1f, id, "e1fail");
+        wfn(e1s, sizeof e1s, id, "e1succ");
+        wfn(e2f, sizeof e2f, id, "e2fail");
+        wfn(e2s, sizeof e2s, id, "e2succ");
+        char e1_start[64], e1_resume[64], e2_start[64], e2_resume[64];
+        int e1_id = wasm_icon_ctr;
+        emit_expr_wasm(n->children[0], e1s, e1f, e1_start, e1_resume);
+        int e2_id = wasm_icon_ctr;
+        emit_expr_wasm(n->children[1], e2s, e2f, e2_start, e2_resume);
+        emit_icn_to(n, id, succ, fail,
+                    e1_start, e1_resume, e2_start, e2_resume,
+                    e1_id, e2_id);
+        break;
+    }
+
+    /* ── Value alternation: E1 | E2 ─────────────────────────────────────── */
+    case ICN_ALT: {
+        if (n->nchildren < 2) { emit_icn_stub(n, id, fail); break; }
+        char e1f[64], e1s[64], e2f[64], e2s[64];
+        wfn(e1f, sizeof e1f, id, "e1fail");
+        wfn(e1s, sizeof e1s, id, "e1succ");
+        wfn(e2f, sizeof e2f, id, "e2fail");
+        wfn(e2s, sizeof e2s, id, "e2succ");
+        char e1_start[64], e1_resume[64], e2_start[64], e2_resume[64];
+        int e1_id = wasm_icon_ctr;
+        emit_expr_wasm(n->children[0], e1s, e1f, e1_start, e1_resume);
+        int e2_id = wasm_icon_ctr;
+        emit_expr_wasm(n->children[1], e2s, e2f, e2_start, e2_resume);
+        emit_icn_alt(n, id, succ, fail,
+                     e1_start, e1_resume, e2_start, e2_resume,
+                     e1_id, e2_id);
+        break;
+    }
+
+    /* ── every E ────────────────────────────────────────────────────────── */
+    case ICN_EVERY: {
+        /* every E — drives generator E to exhaustion.
+         * E's success target loops back to E's resume (drives next value).
+         * every.fail is the overall fail port.
+         *
+         * For rung01: every write(E) — E is ICN_CALL(write, arg).
+         * The write call succeeds, then every resumes E.
+         * When E is exhausted, every fails (falls through to succ of the stmt
+         * which is typically proc-end). */
+        if (n->nchildren < 1) { emit_icn_stub(n, id, fail); break; }
+
+        /* every.resume WAT function name — must be known before emitting E
+         * because E's success points back to every.resume. */
+        /* We emit every's resume func after E, forward-referencing every.resume
+         * by name. WAT allows forward references within a module. */
+
+        /* Emit E with:
+         *   E.succ → every.resume (loop back to get next value)
+         *   E.fail → every.fail (= succ of every, since every succeeds when exhausted) */
+        char every_resume[64];
+        wfn(every_resume, sizeof every_resume, id, "resume");
+        char every_fail[64];
+        wfn(every_fail, sizeof every_fail, id, "efail");
+
+        char e_start[64], e_resume[64];
+        emit_expr_wasm(n->children[0], every_resume, every_fail,
+                       e_start, e_resume);
+
+        /* every.start → E.start */
+        WI("  ;; ICN_EVERY  (node %d)\n", id);
+        WI("  (func $%s (result i32)  return_call $%s)\n", sa, e_start);
+        /* every.resume → E.resume (drives next iteration) */
+        WI("  (func $%s (result i32)  return_call $%s)\n", every_resume, e_resume);
+        /* every.efail → succ (generator exhausted = every succeeded) */
+        WI("  (func $%s (result i32)  return_call $%s)\n", every_fail, succ);
+        /* every.resume is already emitted above (same as ra) — ra IS every_resume */
+        /* ra = iconN_resume = every_resume — already emitted above, don't redeclare */
+        /* Fix: rename ra to not conflict */
+        snprintf(ra, sizeof ra, "%s", every_resume); /* ra = every_resume */
+        break;
+    }
+
+    /* ── Procedure call ─────────────────────────────────────────────────── */
+    case ICN_CALL: {
+        if (n->nchildren < 1) { emit_icn_stub(n, id, fail); break; }
+        IcnNode *fn_node = n->children[0];
+        const char *fname = (fn_node->kind == ICN_VAR) ? fn_node->val.sval : "unknown";
+        int nargs = n->nchildren - 1;
+
+        /* write() builtin: Tier 0 */
+        if (fname && strcmp(fname, "write") == 0 && nargs >= 1) {
+            /* The arg's success port must be call's own esucc (which runs output).
+             * NOT the outer succ — that would bypass sno_output_int. */
+            char esucc_name[64];
+            wfn(esucc_name, sizeof esucc_name, id, "esucc");
+            char e_start[64], e_resume[64];
+            int e_id = wasm_icon_ctr;
+            emit_expr_wasm(n->children[1], esucc_name, fail, e_start, e_resume);
+            emit_icn_call_write(id, succ, fail, e_start, e_resume, e_id);
+            break;
+        }
+        /* write() with no args: write newline — just succeed */
+        if (fname && strcmp(fname, "write") == 0 && nargs == 0) {
+            WI("  ;; ICN_CALL write() no args (node %d)\n", id);
+            WI("  (func $%s (result i32)\n", sa);
+            WI("    ;; write() no-arg: output newline (M-IW-S01 full impl)\n");
+            WI("    return_call $%s)\n", succ);
+            WI("  (func $%s (result i32)  return_call $%s)\n", ra, fail);
+            break;
+        }
+        /* All other calls: stub-fail (M-IW-P01) */
+        emit_icn_stub(n, id, fail);
+        break;
+    }
+
+    /* ── return [E] ─────────────────────────────────────────────────────── */
+    case ICN_RETURN:
+        /* For Tier 0 (main procedure): return = flush output and succeed.
+         * succ here is "icn_prog_end" (emitted by emit_wasm_icon_file). */
+        WI("  ;; ICN_RETURN (node %d)\n", id);
+        WI("  (func $%s (result i32)  return_call $%s)\n", sa, succ);
+        WI("  (func $%s (result i32)  return_call $%s)\n", ra, fail);
+        break;
+
+    /* ── fail ───────────────────────────────────────────────────────────── */
+    case ICN_FAIL:
+        WI("  ;; ICN_FAIL (node %d)\n", id);
+        WI("  (func $%s (result i32)  return_call $%s)\n", sa, fail);
+        WI("  (func $%s (result i32)  return_call $%s)\n", ra, fail);
+        break;
+
+    /* ── Unimplemented: stub-fail with .xfail visibility ────────────────── */
+    default:
+        emit_icn_stub(n, id, fail);
+        break;
+    }
+
+    if (out_start)  snprintf(out_start,  64, "%s", sa);
+    if (out_resume) snprintf(out_resume, 64, "%s", ra);
+}
+
+/* ── §5  Public entry points ──────────────────────────────────────────────── */
+
+/*
+ * emit_wasm_icon_node() — legacy hook for emit_wasm.c routing.
+ * Returns 1 if kind is an ICN_* node handled here, 0 otherwise.
+ * (Not used for the primary file-level path; kept for compatibility.)
  */
 int emit_wasm_icon_node(const IcnNode *n, FILE *out) {
     if (!n) return 0;
     emit_wasm_icon_set_out(out);
-    icon_gen_slot_next = 0;  /* reset per top-level call */
-    wasm_icon_ctr = 0;
-
-    /* All ICN_ nodes are recognised; stubs emitted for unimplemented ones. */
-    switch (n->kind) {
-        /* Tier 0 nodes — real implementations above, connected in M-IW-A01+ */
-        case ICN_INT: case ICN_REAL: case ICN_STR: case ICN_VAR:
-        case ICN_ADD: case ICN_SUB: case ICN_MUL: case ICN_DIV: case ICN_MOD:
-        case ICN_NEG: case ICN_POS:
-        case ICN_LT:  case ICN_LE:  case ICN_GT:  case ICN_GE:
-        case ICN_EQ:  case ICN_NE:
-        case ICN_TO:  case ICN_TO_BY:
-        case ICN_EVERY: case ICN_ALT:
-        case ICN_ASSIGN: case ICN_CALL: case ICN_PROC:
-        case ICN_RETURN: case ICN_FAIL:
-            /* Full recursive wiring implemented in M-IW-A01 onwards.
-             * For now: emit stub-fail so build is clean and tests show FAIL
-             * (not silence). */
-            emit_icn_stub(n, wasm_icon_ctr++, "icn_program_fail");
-            return 1;
-
-        /* All remaining ICN_ nodes: stub-fail, visible in test output */
-        default:
-            emit_icn_stub(n, wasm_icon_ctr++, "icn_program_fail");
-            return 1;
-    }
+    return (n->kind >= ICN_INT && n->kind < ICN_KIND_COUNT);
 }
 
 /*
- * emit_wasm_icon_globals() — emit WAT (global …) declarations for all
- * per-node value globals used by the functions above.
- * Called once by emit_wasm.c before the function section.
- *
- * For Tier 0 we emit a fixed block of 64 i64 globals ($icn_int0..$icn_int63)
- * and 16 f64 globals ($icn_flt0..$icn_flt15).
- * These mirror the "global x_V" variables in test_icon-4.py.
- * Deeper nesting (rung02+) will need a proper stack; deferred to M-IW-DEEP.
+ * emit_wasm_icon_globals() — emit WAT (global …) declarations.
+ * Called once by emit_wasm_icon_file() before the function section.
  */
 void emit_wasm_icon_globals(FILE *out) {
     emit_wasm_icon_set_out(out);
@@ -787,14 +1017,181 @@ void emit_wasm_icon_globals(FILE *out) {
         WI("  (global $icn_int%d (mut i64) (i64.const 0))\n", i);
     for (int i = 0; i < 16; i++)
         WI("  (global $icn_flt%d (mut f64) (f64.const 0))\n", i);
-    WI("  ;; Icon generator state memory is at 0x%x (%d slots × %d bytes)\n",
+    WI("  ;; Icon generator state memory at 0x%x (%d slots × %d bytes)\n",
        ICON_GEN_STATE_BASE, ICON_GEN_MAX_SLOTS, ICON_GEN_SLOT_BYTES);
 }
 
 /*
- * is_icon_node() — true if kind is an ICN_* node that belongs to this emitter.
- * Used by emit_wasm.c to route dispatch.
+ * is_icon_node() — true if kind is an ICN_* node.
  */
 int is_icon_node(int kind) {
     return (kind >= ICN_INT && kind < ICN_KIND_COUNT);
+}
+
+/* ── Emit one ICN_PROC as a WAT function group ───────────────────────────── */
+/*
+ * ICN_PROC layout (from emit_x64_icon.c analysis):
+ *   children[0]          = ICN_VAR name node  (val.sval = proc name)
+ *   val.ival             = number of params
+ *   children[1..nparams] = param nodes
+ *   children[1+nparams..nchildren-1] = body statement nodes
+ *
+ * For Tier 0 (rung01): main() has 0 params, body is a sequence of stmts.
+ * We emit each body statement as an expression, chaining succ ports sequentially.
+ * Final stmt's succ = "icn_prog_end"; all fail ports = "icn_program_fail".
+ */
+static void emit_wasm_icon_proc(const IcnNode *proc) {
+    if (!proc || proc->kind != ICN_PROC || proc->nchildren < 1) return;
+
+    const char *pname = proc->children[0]->val.sval;
+    int nparams = (int)proc->val.ival;
+    int body_start = 1 + nparams;
+    int nstmts = proc->nchildren - body_start;
+
+    WI("\n  ;; ── Procedure %s (%d params, %d stmts) ──\n", pname, nparams, nstmts);
+
+    /* Reset per-procedure state */
+    wasm_icon_ctr = 0;
+    icon_gen_slot_next = 0;
+
+    if (nstmts == 0) {
+        /* Empty body: just emit a start→prog_end function */
+        WI("  (func $icn_proc_%s_start (result i32)  return_call $icn_prog_end)\n", pname);
+        return;
+    }
+
+    /* Build the chain: stmt[i].succ = stmt[i+1].start
+     * Last stmt.succ = icn_prog_end
+     * All stmt.fail  = icn_program_fail
+     *
+     * We emit statements in reverse order so each stmt knows the next start name.
+     * But WAT allows forward references, so we can also emit forward.
+     * Strategy: emit all stmts front-to-back, building name arrays.
+     */
+
+    /* Arrays to hold each stmt's start/resume names (allocated on stack — max 64 stmts) */
+    #define MAX_STMTS_PER_PROC 64
+    char stmt_start [MAX_STMTS_PER_PROC][64];
+    char stmt_resume[MAX_STMTS_PER_PROC][64];
+
+    if (nstmts > MAX_STMTS_PER_PROC) {
+        WI("  ;; WARNING: too many stmts in %s (%d > %d)\n", pname, nstmts, MAX_STMTS_PER_PROC);
+        nstmts = MAX_STMTS_PER_PROC;
+    }
+
+    /* For each stmt, determine its succ port (= next stmt's start, or prog_end) */
+    /* We do two passes: first emit all exprs (which fills stmt_start/resume),
+     * then emit the chain glue. But emit_expr_wasm emits WAT immediately.
+     * Solution: emit in order, using forward references. WAT modules allow
+     * function forward references — they're just identifiers resolved at link time. */
+
+    /* Pass 1: emit all stmt expressions.
+     * Each stmt i has:
+     *   succ = "icn_stmt_chain_N_i" (a glue func we emit after)
+     *   fail = "icn_program_fail"
+     * After pass 1 we know all start/resume names.
+     * Then emit the chain glue funcs. */
+
+    char chain_names[MAX_STMTS_PER_PROC][64];
+    for (int i = 0; i < nstmts; i++)
+        snprintf(chain_names[i], 64, "icn_%s_chain%d", pname, i);
+
+    for (int i = 0; i < nstmts; i++) {
+        const IcnNode *stmt = proc->children[body_start + i];
+        /* succ of this stmt = chain_names[i] which routes to next stmt or prog_end */
+        emit_expr_wasm(stmt, chain_names[i], "icn_program_fail",
+                       stmt_start[i], stmt_resume[i]);
+    }
+
+    /* Pass 2: emit chain glue functions.
+     * chain[i] → stmt[i+1].start  (or icn_prog_end for last) */
+    for (int i = 0; i < nstmts; i++) {
+        const char *next = (i + 1 < nstmts) ? stmt_start[i+1] : "icn_prog_end";
+        WI("  (func $%s (result i32)  return_call $%s)  ;; chain %d→%d\n",
+           chain_names[i], next, i, i+1);
+    }
+
+    /* Procedure entry: icn_proc_NAME_start → first stmt's start */
+    WI("  (func $icn_proc_%s_start (result i32)  return_call $%s)\n",
+       pname, stmt_start[0]);
+}
+
+/*
+ * emit_wasm_icon_file() — top-level entry point for Icon × WASM compilation.
+ *
+ * Called from main.c when -icn -wasm flags are both set.
+ * Emits a complete .wat module for a file containing one or more ICN_PROC nodes.
+ *
+ * Module structure:
+ *   1. imports from "sno" namespace (shared runtime — same as SNOBOL4 WASM)
+ *   2. globals: $icn_int0..$icn_int63, $icn_flt0..$icn_flt15
+ *   3. Per-procedure function groups (emitted by emit_wasm_icon_proc)
+ *   4. Terminal functions: $icn_prog_end (flush+return), $icn_program_fail (return 0)
+ *   5. Exported "main" function that calls the main procedure entry
+ *
+ * M-IW-A01 (2026-03-30)
+ */
+void emit_wasm_icon_file(IcnNode **procs, int count, FILE *out,
+                          const char *filename) {
+    (void)filename;
+    emit_wasm_icon_set_out(out);
+
+    WI(";; Generated by scrip-cc -icn -wasm (M-IW-A01)\n");
+    WI("(module\n");
+
+    /* 1. Runtime imports (shared "sno" namespace) */
+    WI("  ;; Memory imported from runtime module\n");
+    WI("  (import \"sno\" \"memory\" (memory 1))\n");
+    WI("  ;; Runtime function imports\n");
+    WI("  (import \"sno\" \"sno_output_str\"   (func $sno_output_str   (param i32 i32)))\n");
+    WI("  (import \"sno\" \"sno_output_int\"   (func $sno_output_int   (param i64)))\n");
+    WI("  (import \"sno\" \"sno_output_flush\" (func $sno_output_flush (result i32)))\n");
+    WI("  (import \"sno\" \"sno_str_alloc\"    (func $sno_str_alloc    (param i32) (result i32)))\n");
+    WI("  (import \"sno\" \"sno_str_concat\"   (func $sno_str_concat   (param i32 i32 i32 i32) (result i32 i32)))\n");
+    WI("  (import \"sno\" \"sno_str_eq\"       (func $sno_str_eq       (param i32 i32 i32 i32) (result i32)))\n");
+    WI("  (import \"sno\" \"sno_str_to_int\"   (func $sno_str_to_int   (param i32 i32) (result i64)))\n");
+    WI("  (import \"sno\" \"sno_int_to_str\"   (func $sno_int_to_str   (param i64) (result i32 i32)))\n");
+    WI("  (import \"sno\" \"sno_float_to_str\" (func $sno_float_to_str (param f64) (result i32 i32)))\n");
+    WI("  (import \"sno\" \"sno_pow\"          (func $sno_pow          (param f64 f64) (result f64)))\n");
+
+    /* 2. Per-node value globals */
+    emit_wasm_icon_globals(out);
+
+    /* 3. Emit all procedures */
+    for (int i = 0; i < count; i++) {
+        if (procs[i] && procs[i]->kind == ICN_PROC) {
+            emit_wasm_icon_proc(procs[i]);
+        }
+    }
+
+    /* 4. Terminal functions */
+    WI("\n  ;; ── Terminal functions ──\n");
+    /* icn_prog_end: flush output buffer, return byte-count to runner */
+    WI("  (func $icn_prog_end (result i32)\n");
+    WI("    call $sno_output_flush)\n");
+    /* icn_program_fail: generator exhaustion = normal end (return 0 bytes) */
+    WI("  (func $icn_program_fail (result i32)\n");
+    WI("    call $sno_output_flush)\n");
+
+    /* 5. Exported main: find and call the "main" procedure */
+    WI("\n  ;; ── Exported main entry ──\n");
+    WI("  (func (export \"main\") (result i32)\n");
+    /* Find main procedure */
+    int found_main = 0;
+    for (int i = 0; i < count; i++) {
+        if (procs[i] && procs[i]->kind == ICN_PROC &&
+            procs[i]->nchildren >= 1 &&
+            procs[i]->children[0]->val.sval &&
+            strcmp(procs[i]->children[0]->val.sval, "main") == 0) {
+            WI("    return_call $icn_proc_main_start)\n");
+            found_main = 1;
+            break;
+        }
+    }
+    if (!found_main) {
+        WI("    ;; no main procedure found\n");
+        WI("    call $sno_output_flush)\n");
+    }
+
+    WI(")\n");
 }
