@@ -1433,7 +1433,7 @@ static void emit_pat_node(EXPR_t *pat,
             } else {
                 /* Dynamic variable: may hold DT_P (pattern) or DT_S (string) at
                  * runtime.  B-288: M-BUG-BOOTSTRAP-PARSE — 'Cmd = Word Space Word'
-                 * is a concat of E_VARTs; expr_is_pattern_expr returns 0 so Cmd is
+                 * is a concat of E_VARs; expr_is_pattern_expr returns 0 so Cmd is
                  * never registered as a named pattern.  At match time Cmd holds a
                  * DT_P descriptor — LIT_VAR_α (stmt_match_var) does a memcmp and
                  * always fails against a pattern object.
