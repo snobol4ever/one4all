@@ -73,7 +73,7 @@
  * ----------------------------------------------------------------------- */
 
 /* Function support (DEFINE/RETURN/FRETURN) */
-#define NET_FN_MAX      32
+#define FN_MAX      32
 #define NET_FN_NAMELEN  128
 #define NET_FN_ARGMAX   16
 typedef struct {
@@ -84,73 +84,73 @@ typedef struct {
     int  nlocals;
     char entry_label[NET_FN_NAMELEN];
     char end_label[NET_FN_NAMELEN];
-} NetFnDef;
-static NetFnDef  net_fn_table[NET_FN_MAX];
-static int       net_fn_count = 0;
-static const NetFnDef *net_cur_fn = NULL;
-static char net_fn_return_lbl[128];
-static char net_fn_freturn_lbl[128];
-static const NetFnDef *net_find_fn(const char *name);
-static int net_pat_uid_early = 0;  /* uid counter used before pattern section */
+} FnDef;
+static FnDef  fn_table[FN_MAX];
+static int       fn_count = 0;
+static const FnDef *cur_fn = NULL;
+static char fn_return[128];
+static char fn_freturn[128];
+static const FnDef *find_fn(const char *name);
+static int pat_uid_early = 0;  /* uid counter used before pattern section */
 
 /* Program pointer — stored at emit time for IMPORT lookup */
-static Program *net_prog = NULL;
+static Program *prog = NULL;
 
 /* Find an ImportEntry by method name (case-insensitive).
  * Returns the entry if the function being called is an imported symbol. */
-static const ImportEntry *net_find_import(const char *name) {
-    if (!net_prog) return NULL;
-    for (ImportEntry *ie = net_prog->imports; ie; ie = ie->next)
+static const ImportEntry *find_import(const char *name) {
+    if (!prog) return NULL;
+    for (ImportEntry *ie = prog->imports; ie; ie = ie->next)
         if (strcasecmp(ie->method, name) == 0) return ie;
     return NULL;
 }
 
 /* DATA type support */
-#define NET_DATA_MAX     32
+#define DATA_MAX     32
 typedef struct {
     char type_name[NET_FN_NAMELEN];
     char fields[NET_FN_ARGMAX][NET_FN_NAMELEN];
     int  nfields;
-} NetDataType;
-static NetDataType net_data_types[NET_DATA_MAX];
-static int         net_data_type_count = 0;
-static const NetDataType *net_find_data_type(const char *name);
-static const NetDataType *net_find_data_field(const char *field);
+} DataType;
+static DataType data_types[DATA_MAX];
+static int         data_type_count = 0;
+static const DataType *find_data_type(const char *name);
+static const DataType *find_data_field(const char *field);
 
 /* Deferred helper emission flags */
-static int net_need_array_helpers = 0;
-static int net_need_data_helpers  = 0;
-#define net_pat_uid net_pat_uid_early
+static int need_array_helpers = 0;
+static int need_data_helpers  = 0;
 
-static FILE *net_out;
-static int   net_col = 0;
+
+static FILE *out;
+static int   col = 0;
 
 static void nc(char c) {
-    fputc(c, net_out);
-    if (c == '\n') net_col = 0;
-    else if ((c & 0xC0) != 0x80) net_col++;
+    fputc(c, out);
+    if (c == '\n') col = 0;
+    else if ((c & 0xC0) != 0x80) col++;
 }
 
 static void ns(const char *s) { for (; *s; s++) nc(*s); }
 
 static void npad(int col) {
-    if (net_col >= col) nc('\n');
-    while (net_col < col) nc(' ');
+    if (col >= col) nc('\n');
+    while (col < col) nc(' ');
 }
 
 /* N(fmt, ...) — emit raw text */
 static void N(const char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
-    vfprintf(net_out, fmt, ap);
+    vfprintf(out, fmt, ap);
     va_end(ap);
     const char *p = fmt;
-    while (*p) { if (*p == '\n') net_col = 0; p++; }
+    while (*p) { if (*p == '\n') col = 0; p++; }
 }
 
 /* NL(label, instr, ops) — three-column line */
 static void NL(const char *label, const char *instr, const char *ops) {
-    net_col = 0;
+    col = 0;
     if (label && label[0]) { ns(label); nc(':'); }
     npad(COL_INSTR);
     ns(instr);
@@ -171,11 +171,11 @@ static void NSep(const char *tag) { N("\n    // --- %s ---\n", tag); }
  * Class name derivation
  * ----------------------------------------------------------------------- */
 
-static char net_classname[256];
+static char classname[256];
 
-static void net_set_classname(const char *filename) {
+static void set_classname(const char *filename) {
     if (!filename || strcmp(filename, "<stdin>") == 0) {
-        strcpy(net_classname, "SnobolProg");
+        strcpy(classname, "SnobolProg");
         return;
     }
     const char *base = strrchr(filename, '/');
@@ -189,8 +189,8 @@ static void net_set_classname(const char *filename) {
         if (!isalnum((unsigned char)*p) && *p != '_') *p = '_';
     buf[0] = (char)toupper((unsigned char)buf[0]);
     /* Class name = bare basename (no language prefix — YAGNI, two-part IMPORT) */
-    strncpy(net_classname, buf, sizeof net_classname - 1);
-    net_classname[sizeof net_classname - 1] = '\0';
+    strncpy(classname, buf, sizeof classname - 1);
+    classname[sizeof classname - 1] = '\0';
 }
 
 /* -----------------------------------------------------------------------
@@ -198,79 +198,79 @@ static void net_set_classname(const char *filename) {
  * ----------------------------------------------------------------------- */
 
 #define MAX_VARS 512
-static char *net_vars[MAX_VARS];
-static int   net_nvar = 0;
+static char *vars[MAX_VARS];
+static int   nvar = 0;
 
-static void net_var_register(const char *name) {
+static void var_register(const char *name) {
     if (!name || !name[0]) return;
     /* case-insensitive dedup */
-    for (int i = 0; i < net_nvar; i++)
-        if (strcasecmp(net_vars[i], name) == 0) return;
-    if (net_nvar < MAX_VARS)
-        net_vars[net_nvar++] = strdup(name);
+    for (int i = 0; i < nvar; i++)
+        if (strcasecmp(vars[i], name) == 0) return;
+    if (nvar < MAX_VARS)
+        vars[nvar++] = strdup(name);
 }
 
 /* -----------------------------------------------------------------------
  * Named pattern registry — VAR = <pattern-expr> assignments.
  * When E_VART appears in pattern context, inline-expand stored pattern tree.
  * ----------------------------------------------------------------------- */
-#define NET_NAMED_PAT_MAX 64
-typedef struct { char varname[128]; EXPR_t *pat; } NetNamedPat;
-static NetNamedPat net_named_pats[NET_NAMED_PAT_MAX];
-static int         net_named_pat_count = 0;
+#define NAMED_PAT_MAX 64
+typedef struct { char varname[128]; EXPR_t *pat; } NamedPat;
+static NamedPat named_pats[NAMED_PAT_MAX];
+static int         named_pat_count = 0;
 
-static void net_named_pat_reset(void) { net_named_pat_count = 0; }
+static void named_pat_reset(void) { named_pat_count = 0; }
 
-static void net_named_pat_register(const char *varname, EXPR_t *pat) {
-    for (int i = 0; i < net_named_pat_count; i++) {
-        if (strcasecmp(net_named_pats[i].varname, varname) == 0) {
-            if (pat) net_named_pats[i].pat = pat;
+static void named_pat_register(const char *varname, EXPR_t *pat) {
+    for (int i = 0; i < named_pat_count; i++) {
+        if (strcasecmp(named_pats[i].varname, varname) == 0) {
+            if (pat) named_pats[i].pat = pat;
             return;
         }
     }
-    if (net_named_pat_count >= NET_NAMED_PAT_MAX) return;
-    NetNamedPat *e = &net_named_pats[net_named_pat_count++];
+    if (named_pat_count >= NAMED_PAT_MAX) return;
+    NamedPat *e = &named_pats[named_pat_count++];
     snprintf(e->varname, sizeof e->varname, "%s", varname);
     e->pat = pat;
 }
 
-static const NetNamedPat *net_named_pat_lookup(const char *varname) {
-    for (int i = 0; i < net_named_pat_count; i++)
-        if (strcasecmp(net_named_pats[i].varname, varname) == 0)
-            return &net_named_pats[i];
+static const NamedPat *named_pat_lookup(const char *varname) {
+    for (int i = 0; i < named_pat_count; i++)
+        if (strcasecmp(named_pats[i].varname, varname) == 0)
+            return &named_pats[i];
     return NULL;
 }
 
-static int net_expr_has_pat_fn(EXPR_t *e) {
+static int expr_has_pat_fn(EXPR_t *e) {
     if (!e) return 0;
     if (e->kind == E_FNC || e->kind == E_NAM || e->kind == E_DOL) return 1;
     for (int i = 0; i < expr_nargs(e); i++)
-        if (net_expr_has_pat_fn(expr_arg(e, i))) return 1;
+        if (expr_has_pat_fn(expr_arg(e, i))) return 1;
     return 0;
 }
 
-static int net_expr_is_pattern_expr(EXPR_t *e) {
+static int expr_is_pattern_expr(EXPR_t *e) {
     if (!e) return 0;
     if (e->kind == E_OR)   return 1;
     if (e->kind == E_SEQ) return 1;
     if (e->kind == E_CONCAT) return 0;
-    return net_expr_has_pat_fn(e);
+    return expr_has_pat_fn(e);
 }
 
-static void net_scan_named_patterns(Program *prog) {
-    net_named_pat_reset();
+static void scan_named_patterns(Program *prog) {
+    named_pat_reset();
     if (!prog) return;
     for (STMT_t *s = prog->head; s; s = s->next) {
         if (s->subject && s->subject->kind == E_VART && s->subject->sval &&
             s->has_eq && s->replacement && !s->pattern) {
-            if (net_expr_is_pattern_expr(s->replacement))
-                net_named_pat_register(s->subject->sval, s->replacement);
+            if (expr_is_pattern_expr(s->replacement))
+                named_pat_register(s->subject->sval, s->replacement);
         }
     }
 }
 
 /* Safe field name: uppercase, replace special chars with _ */
-static void net_field_name(char *out, size_t sz, const char *var) {
+static void field_name(char *out, size_t sz, const char *var) {
     size_t i = 0;
     for (; *var && i < sz - 1; var++, i++) {
         char c = (char)toupper((unsigned char)*var);
@@ -279,18 +279,18 @@ static void net_field_name(char *out, size_t sz, const char *var) {
     out[i] = '\0';
 }
 
-static int net_is_output(const char *name) {
+static int is_output(const char *name) {
     return name && strcasecmp(name, "OUTPUT") == 0;
 }
 
-static int net_is_input(const char *name) {
+static int is_input(const char *name) {
     return name && strcasecmp(name, "INPUT") == 0;
 }
 
-/* Current statement fail label — set by stmt emitter so net_emit_expr
+/* Current statement fail label — set by stmt emitter so emit_expr
  * can emit an inline null-check when it encounters INPUT (EOF → fail). */
-static char net_cur_stmt_fail_label[128];
-static int  net_input_uid = 0;
+static char cur_stmt_fail[128];
+static int  input_uid = 0;
 
 /* -----------------------------------------------------------------------
  * Expr scanner — collect all variable refs before emitting
@@ -298,17 +298,17 @@ static int  net_input_uid = 0;
 
 static void scan_expr_vars(EXPR_t *e) {
     if (!e) return;
-    if (e->kind == E_VART && e->sval && !net_is_output(e->sval)
-            && !net_is_input(e->sval))
-        net_var_register(e->sval);
+    if (e->kind == E_VART && e->sval && !is_output(e->sval)
+            && !is_input(e->sval))
+        var_register(e->sval);
     /* E_NAM (. capture) and E_DOL ($ capture): sval = target variable name */
     if ((e->kind == E_NAM || e->kind == E_DOL) && e->sval
-            && !net_is_output(e->sval) && !net_is_input(e->sval))
-        net_var_register(e->sval);
+            && !is_output(e->sval) && !is_input(e->sval))
+        var_register(e->sval);
     /* E_ATP (@VAR): varname in children[0]->sval */
     if (e->kind == E_ATP && expr_left(e) && expr_left(e)->sval
-            && !net_is_output(expr_left(e)->sval) && !net_is_input(expr_left(e)->sval))
-        net_var_register(expr_left(e)->sval);
+            && !is_output(expr_left(e)->sval) && !is_input(expr_left(e)->sval))
+        var_register(expr_left(e)->sval);
     for (int i = 0; i < expr_nargs(e); i++)
         scan_expr_vars(expr_arg(e, i));
 }
@@ -318,9 +318,9 @@ static void scan_prog_vars(Program *prog) {
     for (STMT_t *s = prog->head; s; s = s->next) {
         /* subject variable (LHS of assignment) */
         if (s->subject && s->subject->kind == E_VART && s->subject->sval
-                && !net_is_output(s->subject->sval)
-                && !net_is_input(s->subject->sval))
-            net_var_register(s->subject->sval);
+                && !is_output(s->subject->sval)
+                && !is_input(s->subject->sval))
+            var_register(s->subject->sval);
         scan_expr_vars(s->subject);
         scan_expr_vars(s->pattern);
         scan_expr_vars(s->replacement);
@@ -331,7 +331,7 @@ static void scan_prog_vars(Program *prog) {
  * CIL string escape — escape backslash and double-quote inside ldstr
  * ----------------------------------------------------------------------- */
 
-static void net_ldstr(const char *s) {
+static void ldstr(const char *s) {
     /* emit:  ldstr  "<escaped>" */
     N("    ldstr      \"");
     for (; *s; s++) {
@@ -346,11 +346,11 @@ static void net_ldstr(const char *s) {
  * Expr emitter — leaves one string on the CIL eval stack
  * ----------------------------------------------------------------------- */
 
-/* net_expr_can_fail: returns 1 if expression can set local 0 = 0 (failure).
+/* expr_can_fail: returns 1 if expression can set local 0 = 0 (failure).
  * Used by E_CONCAT to decide whether to emit a goal-directed short-circuit check.
  * Only predicate/comparison functions actually fail — pattern constructors and
  * string functions always succeed and must NOT be treated as failing. */
-static int net_expr_can_fail(EXPR_t *e) {
+static int expr_can_fail(EXPR_t *e) {
     if (!e) return 0;
     if (e->kind == E_FNC && e->sval) {
         /* Predicate functions that can fail (return int32 success flag) */
@@ -370,33 +370,33 @@ static int net_expr_can_fail(EXPR_t *e) {
         if (strcasecmp(fn, "LEQ")    == 0) return 1;
         if (strcasecmp(fn, "LNE")    == 0) return 1;
         if (strcasecmp(fn, "INTEGER") == 0) return 1;
-        /* User-defined functions: checked via net_find_fn */
-        if (net_find_fn(fn)) return 1;
+        /* User-defined functions: checked via find_fn */
+        if (find_fn(fn)) return 1;
         /* Pattern constructors and string functions: always succeed */
         return 0;
     }
     if (e->kind == E_CONCAT || e->kind == E_SEQ) {
         for (int i = 0; i < e->nchildren; i++)
-            if (net_expr_can_fail(e->children[i])) return 1;
+            if (expr_can_fail(e->children[i])) return 1;
     }
     return 0;
 }
 
-static void net_emit_expr(EXPR_t *e) {
+static void emit_expr(EXPR_t *e) {
     if (!e) {
         /* null expr → empty string */
-        net_ldstr("");
+        ldstr("");
         return;
     }
     switch (e->kind) {
     case E_QLIT:
-        net_ldstr(e->sval ? e->sval : "");
+        ldstr(e->sval ? e->sval : "");
         break;
     case E_ILIT: {
         /* integer literal → push as string directly (avoids runtime parse) */
         char buf[64];
         snprintf(buf, sizeof buf, "%ld", e->ival);
-        net_ldstr(buf);
+        ldstr(buf);
         break;
     }
     case E_FLIT: {
@@ -407,31 +407,31 @@ static void net_emit_expr(EXPR_t *e) {
             snprintf(buf, sizeof buf, "%ld.", (long)v);
         else
             snprintf(buf, sizeof buf, "%g", v);
-        net_ldstr(buf);
+        ldstr(buf);
         break;
     }
     case E_INDR: {
         /* $expr — indirect variable read: eval name, call net_indr_get */
-        net_emit_expr(expr_arg(e, 0));
-        N("    call       string %s::net_indr_get(string)\n", net_classname);
+        emit_expr(expr_arg(e, 0));
+        N("    call       string %s::net_indr_get(string)\n", classname);
         break;
     }
     case E_NULV:
-        net_ldstr("");
+        ldstr("");
         break;
     case E_VART: {
-        if (!e->sval) { net_ldstr(""); break; }
-        if (net_is_output(e->sval)) {
+        if (!e->sval) { ldstr(""); break; }
+        if (is_output(e->sval)) {
             /* reading OUTPUT not common but handle gracefully */
-            net_ldstr("");
+            ldstr("");
             break;
         }
-        if (net_is_input(e->sval)) {
+        if (is_input(e->sval)) {
             /* INPUT — call sno_input(); null → EOF → statement fails.
              * Stack convention: on success, leaves string on stack.
              * On EOF, branches directly to fail label (or pops + pushes ""
              * if no fail label available), keeping stack depth consistent. */
-            int uid = net_input_uid++;
+            int uid = input_uid++;
             char inp_ok[64];
             snprintf(inp_ok, sizeof inp_ok, "Ninp%d_ok", uid);
             N("    call       string [snobol4run]Snobol4Run::sno_input()\n");
@@ -441,10 +441,10 @@ static void net_emit_expr(EXPR_t *e) {
             N("    pop\n");
             N("    ldc.i4.0\n");
             N("    stloc.0\n");
-            if (net_cur_stmt_fail_label[0]) {
+            if (cur_stmt_fail[0]) {
                 /* Branch to fail — stack depth is 0 here (null was popped),
                  * fail label entry must also expect depth 0 (it's a stmt top) */
-                N("    br         L_%s\n", net_cur_stmt_fail_label);
+                N("    br         L_%s\n", cur_stmt_fail);
             }
             /* If no fail label: fall through with stack empty — stsfld below
              * would underflow, but that only happens with no :F and EOF, which
@@ -458,8 +458,8 @@ static void net_emit_expr(EXPR_t *e) {
             break;
         }
         char fn[256];
-        net_field_name(fn, sizeof fn, e->sval);
-        N("    ldsfld     string %s::%s\n", net_classname, fn);
+        field_name(fn, sizeof fn, e->sval);
+        N("    ldsfld     string %s::%s\n", classname, fn);
         break;
     }
     case E_KW:
@@ -467,13 +467,13 @@ static void net_emit_expr(EXPR_t *e) {
         if (e->sval && strcasecmp(e->sval, "ALPHABET") == 0) {
             N("    call       string [snobol4lib]Snobol4Lib::sno_alphabet()\n");
         } else if (e->sval && strcasecmp(e->sval, "STNO") == 0) {
-            N("    ldsfld     string %s::kw_stno\n", net_classname);
+            N("    ldsfld     string %s::kw_stno\n", classname);
         } else if (e->sval && strcasecmp(e->sval, "UCASE") == 0) {
-            net_ldstr("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+            ldstr("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
         } else if (e->sval && strcasecmp(e->sval, "LCASE") == 0) {
-            net_ldstr("abcdefghijklmnopqrstuvwxyz");
+            ldstr("abcdefghijklmnopqrstuvwxyz");
         } else {
-            net_ldstr("");
+            ldstr("");
         }
         break;
     case E_FNC: {
@@ -481,7 +481,7 @@ static void net_emit_expr(EXPR_t *e) {
         const char *fn = e->sval ? e->sval : "";
         /* SIZE(x) — returns length string, always succeeds */
         if (strcasecmp(fn, "SIZE") == 0) {
-            net_emit_expr(expr_arg(e, 0));
+            emit_expr(expr_arg(e, 0));
             N("    call       string [snobol4lib]Snobol4Lib::sno_size(string)\n");
             N("    ldc.i4.1\n");
             N("    stloc.0\n");
@@ -496,12 +496,12 @@ static void net_emit_expr(EXPR_t *e) {
         else if (strcasecmp(fn, "EQ") == 0) cmp_helper = "sno_eq";
         else if (strcasecmp(fn, "NE") == 0) cmp_helper = "sno_ne";
         if (cmp_helper) {
-            net_emit_expr(expr_arg(e, 0));
-            net_emit_expr(expr_arg(e, 1));
+            emit_expr(expr_arg(e, 0));
+            emit_expr(expr_arg(e, 1));
             N("    call       int32 [snobol4lib]Snobol4Lib::%s(string, string)\n", cmp_helper);
             N("    stloc.0\n");
             /* push right-arg value as expression result */
-            net_emit_expr(expr_arg(e, 1));
+            emit_expr(expr_arg(e, 1));
             break;
         }
         /* String equality: IDENT DIFFER */
@@ -509,25 +509,25 @@ static void net_emit_expr(EXPR_t *e) {
         if      (strcasecmp(fn, "IDENT")  == 0) str_helper = "sno_ident";
         else if (strcasecmp(fn, "DIFFER") == 0) str_helper = "sno_differ";
         if (str_helper) {
-            net_emit_expr(expr_arg(e, 0));
-            net_emit_expr(expr_arg(e, 1));
+            emit_expr(expr_arg(e, 0));
+            emit_expr(expr_arg(e, 1));
             N("    call       int32 [snobol4lib]Snobol4Lib::%s(string, string)\n", str_helper);
             N("    stloc.0\n");
-            net_ldstr("");
+            ldstr("");
             break;
         }
         /* DATATYPE(x) — returns user DATA type name, or "string"/"integer"/"real" */
         if (strcasecmp(fn, "DATATYPE") == 0) {
-            net_need_array_helpers = 1;
-            int uid = net_pat_uid++;
+            need_array_helpers = 1;
+            int uid = pat_uid_early++;
             char lbl_prim[64], lbl_done[64];
             snprintf(lbl_prim, sizeof lbl_prim, "Ndt%d_prim", uid);
             snprintf(lbl_done, sizeof lbl_done, "Ndt%d_done", uid);
             /* Evaluate arg, dup it so we can use it twice */
-            net_emit_expr(expr_arg(e, 0));
+            emit_expr(expr_arg(e, 0));
             N("    dup\n");                   /* stack: arg arg */
-            net_ldstr("__type__");            /* stack: arg arg "__type__" */
-            N("    call       string %s::net_array_get(string, string)\n", net_classname);
+            ldstr("__type__");            /* stack: arg arg "__type__" */
+            N("    call       string %s::net_array_get(string, string)\n", classname);
             /* stack: arg type_or_empty */
             N("    dup\n");
             N("    ldstr      \"\"\n");
@@ -556,21 +556,21 @@ static void net_emit_expr(EXPR_t *e) {
         else if (strcasecmp(fn, "LEQ") == 0) lcmp_helper = "sno_leq";
         else if (strcasecmp(fn, "LNE") == 0) lcmp_helper = "sno_lne";
         if (lcmp_helper) {
-            net_emit_expr(expr_arg(e, 0));
-            net_emit_expr(expr_arg(e, 1));
+            emit_expr(expr_arg(e, 0));
+            emit_expr(expr_arg(e, 1));
             N("    call       int32 [snobol4lib]Snobol4Lib::%s(string, string)\n", lcmp_helper);
             N("    stloc.0\n");
-            net_ldstr("");
+            ldstr("");
             break;
         }
         /* SUBSTR(str, start [, len]) — 1-based substring */
         if (strcasecmp(fn, "SUBSTR") == 0) {
-            net_emit_expr(expr_arg(e, 0));
-            net_emit_expr(expr_arg(e, 1));
+            emit_expr(expr_arg(e, 0));
+            emit_expr(expr_arg(e, 1));
             if (expr_arg(e, 2))
-                net_emit_expr(expr_arg(e, 2));
+                emit_expr(expr_arg(e, 2));
             else
-                net_ldstr("-1");
+                ldstr("-1");
             N("    call       string [snobol4lib]Snobol4Lib::sno_substr(string, string, string)\n");
             N("    ldc.i4.1\n");
             N("    stloc.0\n");
@@ -578,9 +578,9 @@ static void net_emit_expr(EXPR_t *e) {
         }
         /* REPLACE(str, from, to) — char-by-char translation */
         if (strcasecmp(fn, "REPLACE") == 0) {
-            net_emit_expr(expr_arg(e, 0));
-            net_emit_expr(expr_arg(e, 1));
-            net_emit_expr(expr_arg(e, 2));
+            emit_expr(expr_arg(e, 0));
+            emit_expr(expr_arg(e, 1));
+            emit_expr(expr_arg(e, 2));
             N("    call       string [snobol4lib]Snobol4Lib::sno_replace(string, string, string)\n");
             N("    ldc.i4.1\n");
             N("    stloc.0\n");
@@ -588,8 +588,8 @@ static void net_emit_expr(EXPR_t *e) {
         }
         /* DUPL(str, n) — repeat string n times */
         if (strcasecmp(fn, "DUPL") == 0) {
-            net_emit_expr(expr_arg(e, 0));
-            net_emit_expr(expr_arg(e, 1));
+            emit_expr(expr_arg(e, 0));
+            emit_expr(expr_arg(e, 1));
             N("    call       string [snobol4lib]Snobol4Lib::sno_dupl(string, string)\n");
             N("    ldc.i4.1\n");
             N("    stloc.0\n");
@@ -597,7 +597,7 @@ static void net_emit_expr(EXPR_t *e) {
         }
         /* TRIM(str) — remove trailing whitespace */
         if (strcasecmp(fn, "TRIM") == 0) {
-            net_emit_expr(expr_arg(e, 0));
+            emit_expr(expr_arg(e, 0));
             N("    call       string [snobol4lib]Snobol4Lib::sno_trim(string)\n");
             N("    ldc.i4.1\n");
             N("    stloc.0\n");
@@ -605,7 +605,7 @@ static void net_emit_expr(EXPR_t *e) {
         }
         /* REVERSE(str) — reverse a string */
         if (strcasecmp(fn, "REVERSE") == 0) {
-            net_emit_expr(expr_arg(e, 0));
+            emit_expr(expr_arg(e, 0));
             N("    call       string [snobol4lib]Snobol4Lib::sno_reverse(string)\n");
             N("    ldc.i4.1\n");
             N("    stloc.0\n");
@@ -613,7 +613,7 @@ static void net_emit_expr(EXPR_t *e) {
         }
         /* UCASE(str) — uppercase */
         if (strcasecmp(fn, "UCASE") == 0) {
-            net_emit_expr(expr_arg(e, 0));
+            emit_expr(expr_arg(e, 0));
             N("    callvirt   instance string [mscorlib]System.String::ToUpper()\n");
             N("    ldc.i4.1\n");
             N("    stloc.0\n");
@@ -621,7 +621,7 @@ static void net_emit_expr(EXPR_t *e) {
         }
         /* LCASE(str) — lowercase */
         if (strcasecmp(fn, "LCASE") == 0) {
-            net_emit_expr(expr_arg(e, 0));
+            emit_expr(expr_arg(e, 0));
             N("    callvirt   instance string [mscorlib]System.String::ToLower()\n");
             N("    ldc.i4.1\n");
             N("    stloc.0\n");
@@ -629,10 +629,10 @@ static void net_emit_expr(EXPR_t *e) {
         }
         /* LPAD(str, n [, pad]) — left-pad to width n */
         if (strcasecmp(fn, "LPAD") == 0) {
-            net_emit_expr(expr_arg(e, 0));
-            net_emit_expr(expr_arg(e, 1));
-            if (expr_arg(e, 2)) net_emit_expr(expr_arg(e, 2));
-            else net_ldstr(" ");
+            emit_expr(expr_arg(e, 0));
+            emit_expr(expr_arg(e, 1));
+            if (expr_arg(e, 2)) emit_expr(expr_arg(e, 2));
+            else ldstr(" ");
             N("    call       string [snobol4lib]Snobol4Lib::sno_lpad(string, string, string)\n");
             N("    ldc.i4.1\n");
             N("    stloc.0\n");
@@ -640,10 +640,10 @@ static void net_emit_expr(EXPR_t *e) {
         }
         /* RPAD(str, n [, pad]) — right-pad to width n */
         if (strcasecmp(fn, "RPAD") == 0) {
-            net_emit_expr(expr_arg(e, 0));
-            net_emit_expr(expr_arg(e, 1));
-            if (expr_arg(e, 2)) net_emit_expr(expr_arg(e, 2));
-            else net_ldstr(" ");
+            emit_expr(expr_arg(e, 0));
+            emit_expr(expr_arg(e, 1));
+            if (expr_arg(e, 2)) emit_expr(expr_arg(e, 2));
+            else ldstr(" ");
             N("    call       string [snobol4lib]Snobol4Lib::sno_rpad(string, string, string)\n");
             N("    ldc.i4.1\n");
             N("    stloc.0\n");
@@ -651,17 +651,17 @@ static void net_emit_expr(EXPR_t *e) {
         }
         /* INTEGER(x) — succeeds if x is integer string */
         if (strcasecmp(fn, "INTEGER") == 0) {
-            net_emit_expr(expr_arg(e, 0));
+            emit_expr(expr_arg(e, 0));
             N("    call       int32 [snobol4lib]Snobol4Lib::sno_is_integer(string)\n");
             N("    stloc.0\n");
             /* push arg back as result value */
-            net_emit_expr(expr_arg(e, 0));
+            emit_expr(expr_arg(e, 0));
             break;
         }
         /* REMDR(a, b) — integer remainder */
         if (strcasecmp(fn, "REMDR") == 0) {
-            net_emit_expr(expr_arg(e, 0));
-            net_emit_expr(expr_arg(e, 1));
+            emit_expr(expr_arg(e, 0));
+            emit_expr(expr_arg(e, 1));
             N("    call       string [snobol4lib]Snobol4Lib::sno_remdr(string, string)\n");
             N("    ldc.i4.1\n");
             N("    stloc.0\n");
@@ -669,56 +669,56 @@ static void net_emit_expr(EXPR_t *e) {
         }
         /* ARRAY(n) — create indexed array, return an array-id string */
         if (strcasecmp(fn, "ARRAY") == 0) {
-            net_need_array_helpers = 1;
+            need_array_helpers = 1;
             EXPR_t *a0 = expr_arg(e, 0);
-            if (a0) net_emit_expr(a0); else net_ldstr("1");
-            N("    call       string %s::net_array_new(string)\n", net_classname);
+            if (a0) emit_expr(a0); else ldstr("1");
+            N("    call       string %s::net_array_new(string)\n", classname);
             N("    ldc.i4.1\n");
             N("    stloc.0\n");
             break;
         }
         /* TABLE([n]) — create associative table, return a table-id string */
         if (strcasecmp(fn, "TABLE") == 0) {
-            net_need_array_helpers = 1;
-            net_ldstr("0");
-            N("    call       string %s::net_array_new(string)\n", net_classname);
+            need_array_helpers = 1;
+            ldstr("0");
+            N("    call       string %s::net_array_new(string)\n", classname);
             N("    ldc.i4.1\n");
             N("    stloc.0\n");
             break;
         }
         /* DATA('proto') — register a data type, return "" */
         if (strcasecmp(fn, "DATA") == 0) {
-            net_need_data_helpers = 1;
+            need_data_helpers = 1;
             EXPR_t *a0 = expr_arg(e, 0);
-            if (a0) net_emit_expr(a0); else net_ldstr("");
-            N("    call       void %s::net_data_define(string)\n", net_classname);
-            net_ldstr("");
+            if (a0) emit_expr(a0); else ldstr("");
+            N("    call       void %s::net_data_define(string)\n", classname);
+            ldstr("");
             N("    ldc.i4.1\n");
             N("    stloc.0\n");
             break;
         }
         /* DATA type constructor call: typename(field1val, ...) */
         {
-            const NetDataType *dt = net_find_data_type(fn);
+            const DataType *dt = find_data_type(fn);
             if (dt) {
-                net_need_data_helpers  = 1;
-                net_need_array_helpers = 1;
+                need_data_helpers  = 1;
+                need_array_helpers = 1;
                 /* allocate new array (size=0 → plain table) */
-                net_ldstr("0");
-                N("    call       string %s::net_array_new(string)\n", net_classname);
+                ldstr("0");
+                N("    call       string %s::net_array_new(string)\n", classname);
                 /* store each field */
                 for (int fi = 0; fi < dt->nfields; fi++) {
                     N("    dup\n");
-                    net_ldstr(dt->fields[fi]);
+                    ldstr(dt->fields[fi]);
                     EXPR_t *fv = expr_arg(e, fi);
-                    if (fv) net_emit_expr(fv); else net_ldstr("");
-                    N("    call       void %s::net_array_put(string, string, string)\n", net_classname);
+                    if (fv) emit_expr(fv); else ldstr("");
+                    N("    call       void %s::net_array_put(string, string, string)\n", classname);
                 }
                 /* store __type__ */
                 N("    dup\n");
-                net_ldstr("__type__");
-                net_ldstr(fn);
-                N("    call       void %s::net_array_put(string, string, string)\n", net_classname);
+                ldstr("__type__");
+                ldstr(fn);
+                N("    call       void %s::net_array_put(string, string, string)\n", classname);
                 N("    ldc.i4.1\n");
                 N("    stloc.0\n");
                 break;
@@ -726,14 +726,14 @@ static void net_emit_expr(EXPR_t *e) {
         }
         /* DATA field accessor: fieldname(instance) → field value */
         {
-            const NetDataType *ft = net_find_data_field(fn);
+            const DataType *ft = find_data_field(fn);
             if (ft) {
-                net_need_data_helpers  = 1;
-                net_need_array_helpers = 1;
+                need_data_helpers  = 1;
+                need_array_helpers = 1;
                 EXPR_t *inst = expr_arg(e, 0);
-                if (inst) net_emit_expr(inst); else net_ldstr("");
-                net_ldstr(fn);
-                N("    call       string %s::net_array_get(string, string)\n", net_classname);
+                if (inst) emit_expr(inst); else ldstr("");
+                ldstr(fn);
+                N("    call       string %s::net_array_get(string, string)\n", classname);
                 N("    ldc.i4.1\n");
                 N("    stloc.0\n");
                 break;
@@ -741,13 +741,13 @@ static void net_emit_expr(EXPR_t *e) {
         }
         /* Imported function call (IMPORT directive — LP-4) */
         {
-            const ImportEntry *imp = net_find_import(fn);
+            const ImportEntry *imp = find_import(fn);
             if (imp) {
                 /* Find import index (matches pre-emitted helper index) */
                 int imp_idx = 0;
-                for (ImportEntry *ie2 = net_prog->imports; ie2; ie2 = ie2->next, imp_idx++)
+                for (ImportEntry *ie2 = prog->imports; ie2; ie2 = ie2->next, imp_idx++)
                     if (ie2 == imp) break;
-                int uid = net_pat_uid++;
+                int uid = pat_uid_early++;
                 /* Build args array from call-site arguments */
                 int na = expr_nargs(e);
                 N("    ldc.i4  %d\n", na);
@@ -756,15 +756,15 @@ static void net_emit_expr(EXPR_t *e) {
                     EXPR_t *ca = expr_arg(e, ai);
                     N("    dup\n");
                     N("    ldc.i4  %d\n", ai);
-                    if (ca) net_emit_expr(ca); else net_ldstr("");
+                    if (ca) emit_expr(ca); else ldstr("");
                     N("    stelem.ref\n");
                 }
                 /* γ/ω delegates — helpers pre-emitted at class scope */
                 N("    ldnull\n");
-                N("    ldftn      void %s::net_imp_gamma_%d()\n", net_classname, imp_idx);
+                N("    ldftn      void %s::net_imp_gamma_%d()\n", classname, imp_idx);
                 N("    newobj     instance void [mscorlib]System.Action::.ctor(object, native int)\n");
                 N("    ldnull\n");
-                N("    ldftn      void %s::net_imp_omega_%d()\n", net_classname, imp_idx);
+                N("    ldftn      void %s::net_imp_omega_%d()\n", classname, imp_idx);
                 N("    newobj     instance void [mscorlib]System.Action::.ctor(object, native int)\n");
                 N("    call       void [%s]%s::%s("
                   "object[],"
@@ -772,7 +772,7 @@ static void net_emit_expr(EXPR_t *e) {
                   "class [mscorlib]System.Action)\n",
                   imp->name, imp->name, imp->method);
                 /* Check flag, retrieve result */
-                N("    ldsfld     int32 %s::net_imp_flag_%d\n", net_classname, imp_idx);
+                N("    ldsfld     int32 %s::net_imp_flag_%d\n", classname, imp_idx);
                 N("    stloc.0\n");
                 N("    ldloc.0\n");
                 N("    brfalse    Nimp_%d_done\n", uid);
@@ -790,14 +790,14 @@ static void net_emit_expr(EXPR_t *e) {
         }
         /* User-defined function call */
         {
-            const NetFnDef *ufn = net_find_fn(fn);
+            const FnDef *ufn = find_fn(fn);
             if (ufn) {
                 int na = expr_nargs(e);
                 for (int i = 0; i < ufn->nargs && i < na; i++)
-                    net_emit_expr(expr_arg(e, i));
+                    emit_expr(expr_arg(e, i));
                 /* pad missing args with "" */
-                for (int i = na; i < ufn->nargs; i++) net_ldstr("");
-                N("    call       string %s::net_fn_%s(", net_classname, ufn->name);
+                for (int i = na; i < ufn->nargs; i++) ldstr("");
+                N("    call       string %s::net_fn_%s(", classname, ufn->name);
                 for (int i = 0; i < ufn->nargs; i++) { if (i>0) N(", "); N("string"); }
                 N(")\n");
                 /* null return = FRETURN = failure */
@@ -809,16 +809,16 @@ static void net_emit_expr(EXPR_t *e) {
                 N("    stloc.0\n");
                 /* if null, replace with "" so stack is always a string */
                 N("    dup\n");
-                N("    brtrue     Nfc_%d_ok\n", net_pat_uid);
+                N("    brtrue     Nfc_%d_ok\n", pat_uid_early);
                 N("    pop\n");
                 N("    ldstr      \"\"\n");
-                N("  Nfc_%d_ok:\n", net_pat_uid++);
+                N("  Nfc_%d_ok:\n", pat_uid_early++);
                 break;
             }
         }
         /* Unhandled FNC — stub */
         NC("unhandled E_FNC stub");
-        net_ldstr("");
+        ldstr("");
         break;
     }
     case E_CONCAT: {  /* M-G4-SPLIT-SEQ-CONCAT: value context — string concat */
@@ -835,31 +835,31 @@ static void net_emit_expr(EXPR_t *e) {
          */
         static int _cconc_uid = 0;
         int conc_id = _cconc_uid++;
-        if (expr_nargs(e) == 0) { net_ldstr(""); break; }
+        if (expr_nargs(e) == 0) { ldstr(""); break; }
         /* depth_on_stack: how many strings we have accumulated on the eval stack
          * when we reach a fail check.  We must pop this many before branching. */
-        net_emit_expr(expr_arg(e, 0));
+        emit_expr(expr_arg(e, 0));
         /* depth = 1 (one string from first child) */
-        if (net_expr_can_fail(expr_arg(e, 0)) && net_cur_stmt_fail_label[0]) {
+        if (expr_can_fail(expr_arg(e, 0)) && cur_stmt_fail[0]) {
             char lbl_ok[64]; snprintf(lbl_ok, sizeof lbl_ok, "Ncc%d_ok0", conc_id);
             N("    ldloc.0\n");
             N("    brtrue     %s\n", lbl_ok);
             /* fail: 1 string on stack — pop it, then branch with depth=0 */
             N("    pop\n");
-            N("    br         L_%s\n", net_cur_stmt_fail_label);
+            N("    br         L_%s\n", cur_stmt_fail);
             N("  %s:\n", lbl_ok);
         }
         for (int i = 1; i < expr_nargs(e); i++) {
-            net_emit_expr(expr_arg(e, i));
+            emit_expr(expr_arg(e, i));
             /* stack: accumulated(1) + new_child(1) = 2 strings before Concat */
-            if (net_expr_can_fail(expr_arg(e, i)) && net_cur_stmt_fail_label[0]) {
+            if (expr_can_fail(expr_arg(e, i)) && cur_stmt_fail[0]) {
                 char lbl_ok[64]; snprintf(lbl_ok, sizeof lbl_ok, "Ncc%d_ok%d", conc_id, i);
                 N("    ldloc.0\n");
                 N("    brtrue     %s\n", lbl_ok);
                 /* fail: 2 strings on stack (accumulated + new child) — pop both */
                 N("    pop\n");
                 N("    pop\n");
-                N("    br         L_%s\n", net_cur_stmt_fail_label);
+                N("    br         L_%s\n", cur_stmt_fail);
                 N("  %s:\n", lbl_ok);
             }
             N("    call       string [mscorlib]System.String::Concat(string, string)\n");
@@ -871,66 +871,66 @@ static void net_emit_expr(EXPR_t *e) {
         /* Pattern alternation used as an expression value (e.g. P = 'a' | 'b').
          * The string value is a placeholder — pattern matching uses the structural
          * node tree, not this string.  Push non-empty sentinel so assignment succeeds. */
-        net_ldstr("*pat*");
+        ldstr("*pat*");
         break;
     case E_ADD:
-        net_emit_expr(expr_arg(e, 0));
-        net_emit_expr(expr_arg(e, 1));
+        emit_expr(expr_arg(e, 0));
+        emit_expr(expr_arg(e, 1));
         N("    call       string [snobol4lib]Snobol4Lib::sno_add(string, string)\n");
         break;
     case E_SUB:
-        net_emit_expr(expr_arg(e, 0));
-        net_emit_expr(expr_arg(e, 1));
+        emit_expr(expr_arg(e, 0));
+        emit_expr(expr_arg(e, 1));
         N("    call       string [snobol4lib]Snobol4Lib::sno_sub(string, string)\n");
         break;
     case E_MPY:
-        net_emit_expr(expr_arg(e, 0));
-        net_emit_expr(expr_arg(e, 1));
+        emit_expr(expr_arg(e, 0));
+        emit_expr(expr_arg(e, 1));
         N("    call       string [snobol4lib]Snobol4Lib::sno_mpy(string, string)\n");
         break;
     case E_DIV:
-        net_emit_expr(expr_arg(e, 0));
-        net_emit_expr(expr_arg(e, 1));
+        emit_expr(expr_arg(e, 0));
+        emit_expr(expr_arg(e, 1));
         N("    call       string [snobol4lib]Snobol4Lib::sno_div(string, string)\n");
         break;
     case E_EXPOP:
-        net_emit_expr(expr_arg(e, 0));
-        net_emit_expr(expr_arg(e, 1));
+        emit_expr(expr_arg(e, 0));
+        emit_expr(expr_arg(e, 1));
         N("    call       string [snobol4lib]Snobol4Lib::sno_pow(string, string)\n");
         break;
     case E_MNS:
         /* unary minus */
-        net_emit_expr(expr_arg(e, 0));
+        emit_expr(expr_arg(e, 0));
         N("    call       string [snobol4lib]Snobol4Lib::sno_neg(string)\n");
         break;
     case E_IDX: {
         /* E_IDX = canonical (absorbs E_ARY via compat alias — M-G1-IR-HEADER-WIRE).
          * Named-array path (sval set): load field, then subscript.
          * Postfix-subscript path (sval NULL): emit expr, then subscript. */
-        net_need_array_helpers = 1;
+        need_array_helpers = 1;
         if (e->sval) {
             /* Named array: varname<sub> — ldsfld array, push key, net_array_get */
             char fn_ary[256];
-            net_field_name(fn_ary, sizeof fn_ary, e->sval);
-            N("    ldsfld     string %s::%s\n", net_classname, fn_ary);
+            field_name(fn_ary, sizeof fn_ary, e->sval);
+            N("    ldsfld     string %s::%s\n", classname, fn_ary);
             EXPR_t *sub_ary = (e->nchildren > 0 && e->children) ? e->children[0] : NULL;
-            if (sub_ary) net_emit_expr(sub_ary); else net_ldstr("1");
+            if (sub_ary) emit_expr(sub_ary); else ldstr("1");
         } else {
             /* Postfix subscript: expr[sub] — children[0]=array, children[1]=key */
             if (e->nchildren >= 1 && e->children && e->children[0])
-                net_emit_expr(e->children[0]);
-            else net_ldstr("");
+                emit_expr(e->children[0]);
+            else ldstr("");
             if (e->nchildren >= 2 && e->children && e->children[1])
-                net_emit_expr(e->children[1]);
-            else net_ldstr("0");
+                emit_expr(e->children[1]);
+            else ldstr("0");
         }
-        N("    call       string %s::net_array_get(string, string)\n", net_classname);
+        N("    call       string %s::net_array_get(string, string)\n", classname);
         break;
     }
     default:
         /* unhandled — push empty string stub */
         NC("unhandled expr kind — stub");
-        net_ldstr("");
+        ldstr("");
         break;
     }
 }
@@ -940,16 +940,16 @@ static void net_emit_expr(EXPR_t *e) {
  * ----------------------------------------------------------------------- */
 
 /* Emit a branch to target label, or fall through if NULL */
-static void net_emit_goto(const char *target, const char *next_lbl) {
+static void emit_goto(const char *target, const char *next_lbl) {
     if (!target) return;
     /* RETURN/FRETURN inside a function body → branch to function return labels */
-    if (net_cur_fn) {
+    if (cur_fn) {
         if (strcasecmp(target, "RETURN") == 0) {
-            N("    br         %s\n", net_fn_return_lbl);
+            N("    br         %s\n", fn_return);
             return;
         }
         if (strcasecmp(target, "FRETURN") == 0) {
-            N("    br         %s\n", net_fn_freturn_lbl);
+            N("    br         %s\n", fn_freturn);
             return;
         }
     }
@@ -957,22 +957,22 @@ static void net_emit_goto(const char *target, const char *next_lbl) {
     N("    br         L_%s\n", target);
 }
 
-static void net_emit_branch_success(const char *target) {
+static void emit_branch_success(const char *target) {
     if (!target) return;
     N("    ldloc.0\n");
-    if (net_cur_fn) {
-        if (strcasecmp(target, "RETURN")  == 0) { N("    brtrue     %s\n", net_fn_return_lbl);  return; }
-        if (strcasecmp(target, "FRETURN") == 0) { N("    brtrue     %s\n", net_fn_freturn_lbl); return; }
+    if (cur_fn) {
+        if (strcasecmp(target, "RETURN")  == 0) { N("    brtrue     %s\n", fn_return);  return; }
+        if (strcasecmp(target, "FRETURN") == 0) { N("    brtrue     %s\n", fn_freturn); return; }
     }
     N("    brtrue     L_%s\n", target);
 }
 
-static void net_emit_branch_fail(const char *target) {
+static void emit_branch_fail(const char *target) {
     if (!target) return;
     N("    ldloc.0\n");
-    if (net_cur_fn) {
-        if (strcasecmp(target, "RETURN")  == 0) { N("    brfalse    %s\n", net_fn_return_lbl);  return; }
-        if (strcasecmp(target, "FRETURN") == 0) { N("    brfalse    %s\n", net_fn_freturn_lbl); return; }
+    if (cur_fn) {
+        if (strcasecmp(target, "RETURN")  == 0) { N("    brfalse    %s\n", fn_return);  return; }
+        if (strcasecmp(target, "FRETURN") == 0) { N("    brfalse    %s\n", fn_freturn); return; }
     }
     N("    brfalse    L_%s\n", target);
 }
@@ -994,20 +994,20 @@ static void net_emit_branch_fail(const char *target) {
  * p_next_str: string slot counter, starts at 20
  * ----------------------------------------------------------------------- */
 
-/* net_pat_uid defined via macro above */
-static char net_pat_abort_label[128];
+/* pat_uid_early defined via macro above */
+static char cur_pat_abort[128];
 /* ARB backtrack label — set by ARB emitter, used by SEQ to wire continuation ω */
-static char net_arb_incr_label[128];
+static char arb_incr_label[128];
 
 /* Int32 slot load/store */
-static void net_ldloc_i(int idx) {
+static void ldloc_i(int idx) {
     if      (idx == 0) N("    ldloc.0\n");
     else if (idx == 1) N("    ldloc.1\n");
     else if (idx == 2) N("    ldloc.2\n");
     else if (idx == 3) N("    ldloc.3\n");
     else               N("    ldloc.s    V_%d\n", idx);
 }
-static void net_stloc_i(int idx) {
+static void stloc_i(int idx) {
     if      (idx == 0) N("    stloc.0\n");
     else if (idx == 1) N("    stloc.1\n");
     else if (idx == 2) N("    stloc.2\n");
@@ -1015,24 +1015,24 @@ static void net_stloc_i(int idx) {
     else               N("    stloc.s    V_%d\n", idx);
 }
 /* String slot load/store */
-static void net_ldloc_s(int idx) { N("    ldloc.s    V_%d\n", idx); }
-static void net_stloc_s(int idx) { N("    stloc.s    V_%d\n", idx); }
+static void ldloc_s(int idx) { N("    ldloc.s    V_%d\n", idx); }
+static void stloc_s(int idx) { N("    stloc.s    V_%d\n", idx); }
 
 /* Forward declaration */
-static void net_emit_pat_node(EXPR_t *pat,
+static void emit_pat_node(EXPR_t *pat,
                                const char *γ, const char *ω,
                                int loc_subj, int loc_cursor, int loc_len,
                                int *p_next_int, int *p_next_str);
 
-static void net_pat_emit_expr(EXPR_t *e) { net_emit_expr(e); }
+static void pat_emit_expr(EXPR_t *e) { emit_expr(e); }
 
-static void net_emit_pat_node(EXPR_t *pat,
+static void emit_pat_node(EXPR_t *pat,
                                const char *γ, const char *ω,
                                int loc_subj, int loc_cursor, int loc_len,
                                int *p_next_int, int *p_next_str) {
     if (!pat) { N("    br         %s\n", γ); return; }
 
-    int uid = net_pat_uid++;
+    int uid = pat_uid_early++;
 
     switch (pat->kind) {
 
@@ -1040,16 +1040,16 @@ static void net_emit_pat_node(EXPR_t *pat,
         const char *s = pat->sval ? pat->sval : "";
         int slen = (int)strlen(s);
         /* cursor + slen <= len? */
-        net_ldloc_i(loc_cursor); N("    ldc.i4     %d\n", slen); N("    add\n");
-        net_ldloc_i(loc_len); N("    bgt        %s\n", ω);
+        ldloc_i(loc_cursor); N("    ldc.i4     %d\n", slen); N("    add\n");
+        ldloc_i(loc_len); N("    bgt        %s\n", ω);
         /* subject.Substring(cursor, slen) == lit? */
-        net_ldloc_i(loc_subj); net_ldloc_i(loc_cursor); N("    ldc.i4     %d\n", slen);
+        ldloc_i(loc_subj); ldloc_i(loc_cursor); N("    ldc.i4     %d\n", slen);
         N("    callvirt   instance string [mscorlib]System.String::Substring(int32, int32)\n");
         N("    ldstr      \"%s\"\n", s);
         N("    call       bool [mscorlib]System.String::op_Equality(string, string)\n");
         N("    brfalse    %s\n", ω);
-        net_ldloc_i(loc_cursor); N("    ldc.i4     %d\n", slen); N("    add\n");
-        net_stloc_i(loc_cursor);
+        ldloc_i(loc_cursor); N("    ldc.i4     %d\n", slen); N("    add\n");
+        stloc_i(loc_cursor);
         N("    br         %s\n", γ);
         break;
     }
@@ -1069,13 +1069,13 @@ static void net_emit_pat_node(EXPR_t *pat,
          *     4. lbl_dc emits all committed stores, then branches to γ.
          *
          * seq_omega is stored in a local buffer (not pointing into the
-         * global net_arb_incr_label) so clearing that global after capture
+         * global arb_incr_label) so clearing that global after capture
          * does not clobber the accumulated ω value.
          */
         int nkids = expr_nargs(pat);
         if (nkids == 0) { N("    br         %s\n", γ); break; }
         if (nkids == 1) {
-            net_emit_pat_node(expr_arg(pat, 0), γ, ω,
+            emit_pat_node(expr_arg(pat, 0), γ, ω,
                               loc_subj, loc_cursor, loc_len, p_next_int, p_next_str);
             break;
         }
@@ -1116,7 +1116,7 @@ static void net_emit_pat_node(EXPR_t *pat,
             EXPR_t *child = expr_arg(pat, i);
             /* Last child uses true_gamma (may be lbl_dc); others use mids */
             const char *kg = (i < nkids - 1) ? mids[i] : true_gamma;
-            net_arb_incr_label[0] = '\0';
+            arb_incr_label[0] = '\0';
 
             /* NAM(ARB,...) — deferred capture */
             int is_nam_arb = 0;
@@ -1136,29 +1136,29 @@ static void net_emit_pat_node(EXPR_t *pat,
                 char lbl_arb_ok[64];
                 snprintf(lbl_arb_ok, sizeof lbl_arb_ok, "Nn%d_%d_aok", uid, i);
 
-                net_ldloc_i(loc_cursor); net_stloc_i(loc_bef);
-                net_emit_pat_node(arb_child, lbl_arb_ok, seq_omega,
+                ldloc_i(loc_cursor); stloc_i(loc_bef);
+                emit_pat_node(arb_child, lbl_arb_ok, seq_omega,
                                   loc_subj, loc_cursor, loc_len, p_next_int, p_next_str);
                 N("  %s:\n", lbl_arb_ok);
                 /* Tentative capture — no side-effect */
-                net_ldloc_i(loc_subj); net_ldloc_i(loc_bef);
-                net_ldloc_i(loc_cursor); net_ldloc_i(loc_bef); N("    sub\n");
+                ldloc_i(loc_subj); ldloc_i(loc_bef);
+                ldloc_i(loc_cursor); ldloc_i(loc_bef); N("    sub\n");
                 N("    callvirt   instance string [mscorlib]System.String::Substring(int32, int32)\n");
-                net_stloc_s(loc_tmp);
+                stloc_s(loc_tmp);
                 N("    br         %s\n", kg);
 
                 def_slot_s[ndef] = loc_tmp;
                 snprintf(def_var_s[ndef], 256, "%s", capvar);
                 ndef++;
             } else {
-                net_emit_pat_node(child, kg, seq_omega,
+                emit_pat_node(child, kg, seq_omega,
                                   loc_subj, loc_cursor, loc_len, p_next_int, p_next_str);
             }
 
             /* Update seq_omega if ARB was just emitted */
-            if (net_arb_incr_label[0]) {
-                snprintf(seq_omega_buf, sizeof seq_omega_buf, "%s", net_arb_incr_label);
-                net_arb_incr_label[0] = '\0';
+            if (arb_incr_label[0]) {
+                snprintf(seq_omega_buf, sizeof seq_omega_buf, "%s", arb_incr_label);
+                arb_incr_label[0] = '\0';
             }
             if (i < nkids - 1) N("  %s:\n", mids[i]);
         }
@@ -1167,12 +1167,12 @@ static void net_emit_pat_node(EXPR_t *pat,
         if (has_dc) {
             N("  %s:\n", lbl_dc);
             for (int d = 0; d < ndef; d++) {
-                net_ldloc_s(def_slot_s[d]);
-                if (net_is_output(def_var_s[d])) {
+                ldloc_s(def_slot_s[d]);
+                if (is_output(def_var_s[d])) {
                     N("    call       void [mscorlib]System.Console::WriteLine(string)\n");
                 } else {
-                    char fn[256]; net_field_name(fn, sizeof fn, def_var_s[d]);
-                    N("    stsfld     string %s::%s\n", net_classname, fn);
+                    char fn[256]; field_name(fn, sizeof fn, def_var_s[d]);
+                    N("    stsfld     string %s::%s\n", classname, fn);
                 }
             }
             N("    br         %s\n", γ);
@@ -1189,12 +1189,12 @@ static void net_emit_pat_node(EXPR_t *pat,
         int nkids = expr_nargs(pat);
         if (nkids == 0) { N("    br         %s\n", ω); break; }
         if (nkids == 1) {
-            net_emit_pat_node(expr_arg(pat, 0), γ, ω,
+            emit_pat_node(expr_arg(pat, 0), γ, ω,
                               loc_subj, loc_cursor, loc_len, p_next_int, p_next_str);
             break;
         }
         int loc_save = (*p_next_int)++;
-        net_ldloc_i(loc_cursor); net_stloc_i(loc_save);
+        ldloc_i(loc_cursor); stloc_i(loc_save);
         for (int i = 0; i < nkids; i++) {
             const char *kid_omega;
             char lbl_next[64];
@@ -1204,11 +1204,11 @@ static void net_emit_pat_node(EXPR_t *pat,
             } else {
                 kid_omega = ω;
             }
-            net_emit_pat_node(expr_arg(pat, i), γ, kid_omega,
+            emit_pat_node(expr_arg(pat, i), γ, kid_omega,
                               loc_subj, loc_cursor, loc_len, p_next_int, p_next_str);
             if (i < nkids - 1) {
                 N("  %s:\n", lbl_next);
-                net_ldloc_i(loc_save); net_stloc_i(loc_cursor);
+                ldloc_i(loc_save); stloc_i(loc_cursor);
             }
         }
         break;
@@ -1218,17 +1218,17 @@ static void net_emit_pat_node(EXPR_t *pat,
         int loc_before = (*p_next_int)++;
         char lbl_ok[64]; snprintf(lbl_ok, sizeof lbl_ok, "Nn%d_nam_ok", uid);
         const char *varname = (expr_right(pat) && expr_right(pat)->sval) ? expr_right(pat)->sval : "";
-        net_ldloc_i(loc_cursor); net_stloc_i(loc_before);
-        net_emit_pat_node(expr_left(pat), lbl_ok, ω, loc_subj, loc_cursor, loc_len, p_next_int, p_next_str);
+        ldloc_i(loc_cursor); stloc_i(loc_before);
+        emit_pat_node(expr_left(pat), lbl_ok, ω, loc_subj, loc_cursor, loc_len, p_next_int, p_next_str);
         N("  %s:\n", lbl_ok);
-        net_ldloc_i(loc_subj); net_ldloc_i(loc_before);
-        net_ldloc_i(loc_cursor); net_ldloc_i(loc_before); N("    sub\n");
+        ldloc_i(loc_subj); ldloc_i(loc_before);
+        ldloc_i(loc_cursor); ldloc_i(loc_before); N("    sub\n");
         N("    callvirt   instance string [mscorlib]System.String::Substring(int32, int32)\n");
-        if (net_is_output(varname)) {
+        if (is_output(varname)) {
             N("    call       void [mscorlib]System.Console::WriteLine(string)\n");
         } else {
-            char fn[256]; net_field_name(fn, sizeof fn, varname);
-            N("    stsfld     string %s::%s\n", net_classname, fn);
+            char fn[256]; field_name(fn, sizeof fn, varname);
+            N("    stsfld     string %s::%s\n", classname, fn);
         }
         N("    br         %s\n", γ);
         break;
@@ -1237,18 +1237,18 @@ static void net_emit_pat_node(EXPR_t *pat,
     case E_DOL: {
         int loc_before = (*p_next_int)++;
         char lbl_ok[64]; snprintf(lbl_ok, sizeof lbl_ok, "Nn%d_dol_ok", uid);
-        net_ldloc_i(loc_cursor); net_stloc_i(loc_before);
-        net_emit_pat_node(expr_left(pat), lbl_ok, ω, loc_subj, loc_cursor, loc_len, p_next_int, p_next_str);
+        ldloc_i(loc_cursor); stloc_i(loc_before);
+        emit_pat_node(expr_left(pat), lbl_ok, ω, loc_subj, loc_cursor, loc_len, p_next_int, p_next_str);
         N("  %s:\n", lbl_ok);
         const char *varname = (expr_right(pat) && expr_right(pat)->sval) ? expr_right(pat)->sval : "";
-        net_ldloc_i(loc_subj); net_ldloc_i(loc_before);
-        net_ldloc_i(loc_cursor); net_ldloc_i(loc_before); N("    sub\n");
+        ldloc_i(loc_subj); ldloc_i(loc_before);
+        ldloc_i(loc_cursor); ldloc_i(loc_before); N("    sub\n");
         N("    callvirt   instance string [mscorlib]System.String::Substring(int32, int32)\n");
-        if (net_is_output(varname)) {
+        if (is_output(varname)) {
             N("    call       void [mscorlib]System.Console::WriteLine(string)\n");
         } else {
-            char fn[256]; net_field_name(fn, sizeof fn, varname);
-            N("    stsfld     string %s::%s\n", net_classname, fn);
+            char fn[256]; field_name(fn, sizeof fn, varname);
+            N("    stsfld     string %s::%s\n", classname, fn);
         }
         N("    br         %s\n", γ);
         break;
@@ -1267,14 +1267,14 @@ static void net_emit_pat_node(EXPR_t *pat,
             snprintf(lbl_cfail, sizeof lbl_cfail,  "Nn%d_arb_cf",   uid);
             EXPR_t *child = arg0;
             N("  %s:\n", lbl_loop);
-            net_ldloc_i(loc_cursor); net_stloc_i(loc_save);
-            net_emit_pat_node(child, lbl_cok, lbl_cfail, loc_subj, loc_cursor, loc_len, p_next_int, p_next_str);
+            ldloc_i(loc_cursor); stloc_i(loc_save);
+            emit_pat_node(child, lbl_cok, lbl_cfail, loc_subj, loc_cursor, loc_len, p_next_int, p_next_str);
             N("  %s:\n", lbl_cok);
-            net_ldloc_i(loc_cursor); net_ldloc_i(loc_save);
+            ldloc_i(loc_cursor); ldloc_i(loc_save);
             N("    beq        %s\n", lbl_done);
             N("    br         %s\n", lbl_loop);
             N("  %s:\n", lbl_cfail);
-            net_ldloc_i(loc_save); net_stloc_i(loc_cursor);
+            ldloc_i(loc_save); stloc_i(loc_cursor);
             N("  %s:\n", lbl_done);
             N("    br         %s\n", γ);
             break;
@@ -1282,32 +1282,32 @@ static void net_emit_pat_node(EXPR_t *pat,
 
         if (strcasecmp(fname, "ANY") == 0) {
             int loc_ch = (*p_next_str)++;   /* string: single-char string */
-            net_ldloc_i(loc_cursor); net_ldloc_i(loc_len); N("    bge        %s\n", ω);
-            net_ldloc_i(loc_subj); net_ldloc_i(loc_cursor);
+            ldloc_i(loc_cursor); ldloc_i(loc_len); N("    bge        %s\n", ω);
+            ldloc_i(loc_subj); ldloc_i(loc_cursor);
             N("    callvirt   instance char [mscorlib]System.String::get_Chars(int32)\n");
             N("    call       string [mscorlib]System.Char::ToString(char)\n");
-            net_stloc_s(loc_ch);
-            if (arg0) net_pat_emit_expr(arg0); else N("    ldstr      \"\"\n");
-            net_ldloc_s(loc_ch);
+            stloc_s(loc_ch);
+            if (arg0) pat_emit_expr(arg0); else N("    ldstr      \"\"\n");
+            ldloc_s(loc_ch);
             N("    callvirt   instance bool [mscorlib]System.String::Contains(string)\n");
             N("    brfalse    %s\n", ω);
-            net_ldloc_i(loc_cursor); N("    ldc.i4.1\n"); N("    add\n"); net_stloc_i(loc_cursor);
+            ldloc_i(loc_cursor); N("    ldc.i4.1\n"); N("    add\n"); stloc_i(loc_cursor);
             N("    br         %s\n", γ);
             break;
         }
 
         if (strcasecmp(fname, "NOTANY") == 0) {
             int loc_ch = (*p_next_str)++;
-            net_ldloc_i(loc_cursor); net_ldloc_i(loc_len); N("    bge        %s\n", ω);
-            net_ldloc_i(loc_subj); net_ldloc_i(loc_cursor);
+            ldloc_i(loc_cursor); ldloc_i(loc_len); N("    bge        %s\n", ω);
+            ldloc_i(loc_subj); ldloc_i(loc_cursor);
             N("    callvirt   instance char [mscorlib]System.String::get_Chars(int32)\n");
             N("    call       string [mscorlib]System.Char::ToString(char)\n");
-            net_stloc_s(loc_ch);
-            if (arg0) net_pat_emit_expr(arg0); else N("    ldstr      \"\"\n");
-            net_ldloc_s(loc_ch);
+            stloc_s(loc_ch);
+            if (arg0) pat_emit_expr(arg0); else N("    ldstr      \"\"\n");
+            ldloc_s(loc_ch);
             N("    callvirt   instance bool [mscorlib]System.String::Contains(string)\n");
             N("    brtrue     %s\n", ω);
-            net_ldloc_i(loc_cursor); N("    ldc.i4.1\n"); N("    add\n"); net_stloc_i(loc_cursor);
+            ldloc_i(loc_cursor); N("    ldc.i4.1\n"); N("    add\n"); stloc_i(loc_cursor);
             N("    br         %s\n", γ);
             break;
         }
@@ -1318,28 +1318,28 @@ static void net_emit_pat_node(EXPR_t *pat,
             char lbl_loop[64], lbl_done[64];
             snprintf(lbl_loop, sizeof lbl_loop, "Nn%d_spn_lp", uid);
             snprintf(lbl_done, sizeof lbl_done, "Nn%d_spn_dn", uid);
-            if (arg0) net_pat_emit_expr(arg0); else N("    ldstr      \"\"\n");
-            net_stloc_s(loc_cs);
+            if (arg0) pat_emit_expr(arg0); else N("    ldstr      \"\"\n");
+            stloc_s(loc_cs);
             /* must match at least 1 */
-            net_ldloc_i(loc_cursor); net_ldloc_i(loc_len); N("    bge        %s\n", ω);
-            net_ldloc_i(loc_subj); net_ldloc_i(loc_cursor);
+            ldloc_i(loc_cursor); ldloc_i(loc_len); N("    bge        %s\n", ω);
+            ldloc_i(loc_subj); ldloc_i(loc_cursor);
             N("    callvirt   instance char [mscorlib]System.String::get_Chars(int32)\n");
             N("    call       string [mscorlib]System.Char::ToString(char)\n");
-            net_stloc_s(loc_ch);
-            net_ldloc_s(loc_cs); net_ldloc_s(loc_ch);
+            stloc_s(loc_ch);
+            ldloc_s(loc_cs); ldloc_s(loc_ch);
             N("    callvirt   instance bool [mscorlib]System.String::Contains(string)\n");
             N("    brfalse    %s\n", ω);
-            net_ldloc_i(loc_cursor); N("    ldc.i4.1\n"); N("    add\n"); net_stloc_i(loc_cursor);
+            ldloc_i(loc_cursor); N("    ldc.i4.1\n"); N("    add\n"); stloc_i(loc_cursor);
             N("  %s:\n", lbl_loop);
-            net_ldloc_i(loc_cursor); net_ldloc_i(loc_len); N("    bge        %s\n", lbl_done);
-            net_ldloc_i(loc_subj); net_ldloc_i(loc_cursor);
+            ldloc_i(loc_cursor); ldloc_i(loc_len); N("    bge        %s\n", lbl_done);
+            ldloc_i(loc_subj); ldloc_i(loc_cursor);
             N("    callvirt   instance char [mscorlib]System.String::get_Chars(int32)\n");
             N("    call       string [mscorlib]System.Char::ToString(char)\n");
-            net_stloc_s(loc_ch);
-            net_ldloc_s(loc_cs); net_ldloc_s(loc_ch);
+            stloc_s(loc_ch);
+            ldloc_s(loc_cs); ldloc_s(loc_ch);
             N("    callvirt   instance bool [mscorlib]System.String::Contains(string)\n");
             N("    brfalse    %s\n", lbl_done);
-            net_ldloc_i(loc_cursor); N("    ldc.i4.1\n"); N("    add\n"); net_stloc_i(loc_cursor);
+            ldloc_i(loc_cursor); N("    ldc.i4.1\n"); N("    add\n"); stloc_i(loc_cursor);
             N("    br         %s\n", lbl_loop);
             N("  %s:\n", lbl_done);
             N("    br         %s\n", γ);
@@ -1352,18 +1352,18 @@ static void net_emit_pat_node(EXPR_t *pat,
             char lbl_loop[64], lbl_done[64];
             snprintf(lbl_loop, sizeof lbl_loop, "Nn%d_brk_lp", uid);
             snprintf(lbl_done, sizeof lbl_done, "Nn%d_brk_dn", uid);
-            if (arg0) net_pat_emit_expr(arg0); else N("    ldstr      \"\"\n");
-            net_stloc_s(loc_cs);
+            if (arg0) pat_emit_expr(arg0); else N("    ldstr      \"\"\n");
+            stloc_s(loc_cs);
             N("  %s:\n", lbl_loop);
-            net_ldloc_i(loc_cursor); net_ldloc_i(loc_len); N("    bge        %s\n", ω);
-            net_ldloc_i(loc_subj); net_ldloc_i(loc_cursor);
+            ldloc_i(loc_cursor); ldloc_i(loc_len); N("    bge        %s\n", ω);
+            ldloc_i(loc_subj); ldloc_i(loc_cursor);
             N("    callvirt   instance char [mscorlib]System.String::get_Chars(int32)\n");
             N("    call       string [mscorlib]System.Char::ToString(char)\n");
-            net_stloc_s(loc_ch);
-            net_ldloc_s(loc_cs); net_ldloc_s(loc_ch);
+            stloc_s(loc_ch);
+            ldloc_s(loc_cs); ldloc_s(loc_ch);
             N("    callvirt   instance bool [mscorlib]System.String::Contains(string)\n");
             N("    brtrue     %s\n", lbl_done);
-            net_ldloc_i(loc_cursor); N("    ldc.i4.1\n"); N("    add\n"); net_stloc_i(loc_cursor);
+            ldloc_i(loc_cursor); N("    ldc.i4.1\n"); N("    add\n"); stloc_i(loc_cursor);
             N("    br         %s\n", lbl_loop);
             N("  %s:\n", lbl_done);
             N("    br         %s\n", γ);
@@ -1380,24 +1380,24 @@ static void net_emit_pat_node(EXPR_t *pat,
             char lbl_loop[64], lbl_done[64];
             snprintf(lbl_loop, sizeof lbl_loop, "Nn%d_brkx_lp", uid);
             snprintf(lbl_done, sizeof lbl_done, "Nn%d_brkx_dn", uid);
-            if (arg0) net_pat_emit_expr(arg0); else N("    ldstr      \"\"\n");
-            net_stloc_s(loc_cs);
+            if (arg0) pat_emit_expr(arg0); else N("    ldstr      \"\"\n");
+            stloc_s(loc_cs);
             /* Save cursor to verify progress */
-            net_ldloc_i(loc_cursor); net_stloc_i(loc_save);
+            ldloc_i(loc_cursor); stloc_i(loc_save);
             N("  %s:\n", lbl_loop);
-            net_ldloc_i(loc_cursor); net_ldloc_i(loc_len); N("    bge        %s\n", ω);
-            net_ldloc_i(loc_subj); net_ldloc_i(loc_cursor);
+            ldloc_i(loc_cursor); ldloc_i(loc_len); N("    bge        %s\n", ω);
+            ldloc_i(loc_subj); ldloc_i(loc_cursor);
             N("    callvirt   instance char [mscorlib]System.String::get_Chars(int32)\n");
             N("    call       string [mscorlib]System.Char::ToString(char)\n");
-            net_stloc_s(loc_ch);
-            net_ldloc_s(loc_cs); net_ldloc_s(loc_ch);
+            stloc_s(loc_ch);
+            ldloc_s(loc_cs); ldloc_s(loc_ch);
             N("    callvirt   instance bool [mscorlib]System.String::Contains(string)\n");
             N("    brtrue     %s\n", lbl_done);
-            net_ldloc_i(loc_cursor); N("    ldc.i4.1\n"); N("    add\n"); net_stloc_i(loc_cursor);
+            ldloc_i(loc_cursor); N("    ldc.i4.1\n"); N("    add\n"); stloc_i(loc_cursor);
             N("    br         %s\n", lbl_loop);
             N("  %s:\n", lbl_done);
             /* BREAKX fails if no progress (cursor == save) */
-            net_ldloc_i(loc_cursor); net_ldloc_i(loc_save);
+            ldloc_i(loc_cursor); ldloc_i(loc_save);
             N("    beq        %s\n", ω);
             N("    br         %s\n", γ);
             break;
@@ -1405,45 +1405,45 @@ static void net_emit_pat_node(EXPR_t *pat,
 
         if (strcasecmp(fname, "LEN") == 0) {
             int loc_n = (*p_next_int)++;
-            if (arg0) net_pat_emit_expr(arg0); else N("    ldstr      \"0\"\n");
+            if (arg0) pat_emit_expr(arg0); else N("    ldstr      \"0\"\n");
             N("    call       int32 [mscorlib]System.Int32::Parse(string)\n");
-            net_stloc_i(loc_n);
-            net_ldloc_i(loc_cursor); net_ldloc_i(loc_n); N("    add\n");
-            net_ldloc_i(loc_len); N("    bgt        %s\n", ω);
-            net_ldloc_i(loc_cursor); net_ldloc_i(loc_n); N("    add\n"); net_stloc_i(loc_cursor);
+            stloc_i(loc_n);
+            ldloc_i(loc_cursor); ldloc_i(loc_n); N("    add\n");
+            ldloc_i(loc_len); N("    bgt        %s\n", ω);
+            ldloc_i(loc_cursor); ldloc_i(loc_n); N("    add\n"); stloc_i(loc_cursor);
             N("    br         %s\n", γ);
             break;
         }
 
         if (strcasecmp(fname, "POS") == 0) {
             int loc_n = (*p_next_int)++;
-            if (arg0) net_pat_emit_expr(arg0); else N("    ldstr      \"0\"\n");
+            if (arg0) pat_emit_expr(arg0); else N("    ldstr      \"0\"\n");
             N("    call       int32 [mscorlib]System.Int32::Parse(string)\n");
-            net_stloc_i(loc_n);
-            net_ldloc_i(loc_cursor); net_ldloc_i(loc_n); N("    bne.un     %s\n", ω);
+            stloc_i(loc_n);
+            ldloc_i(loc_cursor); ldloc_i(loc_n); N("    bne.un     %s\n", ω);
             N("    br         %s\n", γ);
             break;
         }
 
         if (strcasecmp(fname, "RPOS") == 0) {
             int loc_n = (*p_next_int)++;
-            if (arg0) net_pat_emit_expr(arg0); else N("    ldstr      \"0\"\n");
+            if (arg0) pat_emit_expr(arg0); else N("    ldstr      \"0\"\n");
             N("    call       int32 [mscorlib]System.Int32::Parse(string)\n");
-            net_stloc_i(loc_n);
-            net_ldloc_i(loc_len); net_ldloc_i(loc_n); N("    sub\n");
-            net_ldloc_i(loc_cursor); N("    bne.un     %s\n", ω);
+            stloc_i(loc_n);
+            ldloc_i(loc_len); ldloc_i(loc_n); N("    sub\n");
+            ldloc_i(loc_cursor); N("    bne.un     %s\n", ω);
             N("    br         %s\n", γ);
             break;
         }
 
         if (strcasecmp(fname, "TAB") == 0) {
             int loc_n = (*p_next_int)++;
-            if (arg0) net_pat_emit_expr(arg0); else N("    ldstr      \"0\"\n");
+            if (arg0) pat_emit_expr(arg0); else N("    ldstr      \"0\"\n");
             N("    call       int32 [mscorlib]System.Int32::Parse(string)\n");
-            net_stloc_i(loc_n);
-            net_ldloc_i(loc_cursor); net_ldloc_i(loc_n); N("    bgt        %s\n", ω);
-            net_ldloc_i(loc_n); net_ldloc_i(loc_len); N("    bgt        %s\n", ω);
-            net_ldloc_i(loc_n); net_stloc_i(loc_cursor);
+            stloc_i(loc_n);
+            ldloc_i(loc_cursor); ldloc_i(loc_n); N("    bgt        %s\n", ω);
+            ldloc_i(loc_n); ldloc_i(loc_len); N("    bgt        %s\n", ω);
+            ldloc_i(loc_n); stloc_i(loc_cursor);
             N("    br         %s\n", γ);
             break;
         }
@@ -1451,18 +1451,18 @@ static void net_emit_pat_node(EXPR_t *pat,
         if (strcasecmp(fname, "RTAB") == 0) {
             int loc_n   = (*p_next_int)++;
             int loc_tgt = (*p_next_int)++;
-            if (arg0) net_pat_emit_expr(arg0); else N("    ldstr      \"0\"\n");
+            if (arg0) pat_emit_expr(arg0); else N("    ldstr      \"0\"\n");
             N("    call       int32 [mscorlib]System.Int32::Parse(string)\n");
-            net_stloc_i(loc_n);
-            net_ldloc_i(loc_len); net_ldloc_i(loc_n); N("    sub\n"); net_stloc_i(loc_tgt);
-            net_ldloc_i(loc_cursor); net_ldloc_i(loc_tgt); N("    bgt        %s\n", ω);
-            net_ldloc_i(loc_tgt); net_stloc_i(loc_cursor);
+            stloc_i(loc_n);
+            ldloc_i(loc_len); ldloc_i(loc_n); N("    sub\n"); stloc_i(loc_tgt);
+            ldloc_i(loc_cursor); ldloc_i(loc_tgt); N("    bgt        %s\n", ω);
+            ldloc_i(loc_tgt); stloc_i(loc_cursor);
             N("    br         %s\n", γ);
             break;
         }
 
         if (strcasecmp(fname, "REM") == 0) {
-            net_ldloc_i(loc_len); net_stloc_i(loc_cursor);
+            ldloc_i(loc_len); stloc_i(loc_cursor);
             N("    br         %s\n", γ); break;
         }
         if (strcasecmp(fname, "ARB") == 0) {
@@ -1480,17 +1480,17 @@ static void net_emit_pat_node(EXPR_t *pat,
             snprintf(arb_loop, sizeof arb_loop, "Nn%d_arb_lp",  uid);
             snprintf(arb_incr, sizeof arb_incr, "Nn%d_arb_inc", uid);
             snprintf(arb_fail, sizeof arb_fail, "Nn%d_arb_fx",  uid);
-            net_ldloc_i(loc_cursor); net_stloc_i(loc_arb_save);
-            N("    ldc.i4.0\n"); net_stloc_i(loc_arb_try);
+            ldloc_i(loc_cursor); stloc_i(loc_arb_save);
+            N("    ldc.i4.0\n"); stloc_i(loc_arb_try);
             N("  %s:\n", arb_loop);
-            net_ldloc_i(loc_arb_save); net_ldloc_i(loc_arb_try); N("    add\n");
-            net_ldloc_i(loc_len); N("    bgt        %s\n", arb_fail);
-            net_ldloc_i(loc_arb_save); net_ldloc_i(loc_arb_try); N("    add\n");
-            net_stloc_i(loc_cursor);
+            ldloc_i(loc_arb_save); ldloc_i(loc_arb_try); N("    add\n");
+            ldloc_i(loc_len); N("    bgt        %s\n", arb_fail);
+            ldloc_i(loc_arb_save); ldloc_i(loc_arb_try); N("    add\n");
+            stloc_i(loc_cursor);
             N("    br         %s\n", γ);
             /* arb_incr: continuation failed, try one more char */
             N("  %s:\n", arb_incr);
-            net_ldloc_i(loc_arb_try); N("    ldc.i4.1\n"); N("    add\n"); net_stloc_i(loc_arb_try);
+            ldloc_i(loc_arb_try); N("    ldc.i4.1\n"); N("    add\n"); stloc_i(loc_arb_try);
             N("    br         %s\n", arb_loop);
             /* arb_fail: exhausted — caller's ω */
             N("  %s:\n", arb_fail);
@@ -1504,11 +1504,11 @@ static void net_emit_pat_node(EXPR_t *pat,
             /* This is a structural limitation — ARB backtracking requires
              * the SEQ emitter cooperation. For now accept that ω is not
              * wired back; pattern will work only for ARB at end of pattern. */
-            snprintf(net_arb_incr_label, sizeof net_arb_incr_label, "%s", arb_incr);
+            snprintf(arb_incr_label, sizeof arb_incr_label, "%s", arb_incr);
             break;
         }
         if (strcasecmp(fname, "FAIL")  == 0 || strcasecmp(fname, "ABORT")   == 0) {
-            N("    br         %s\n", net_pat_abort_label[0] ? net_pat_abort_label : ω); break;
+            N("    br         %s\n", cur_pat_abort[0] ? cur_pat_abort : ω); break;
         }
         if (strcasecmp(fname, "SUCCEED") == 0 || strcasecmp(fname, "FENCE") == 0) {
             N("    br         %s\n", γ); break;
@@ -1520,7 +1520,7 @@ static void net_emit_pat_node(EXPR_t *pat,
 
     case E_VART: {
         const char *vname = pat->sval ? pat->sval : "";
-        if (strcasecmp(vname, "REM")     == 0) { net_ldloc_i(loc_len); net_stloc_i(loc_cursor); N("    br %s\n", γ); break; }
+        if (strcasecmp(vname, "REM")     == 0) { ldloc_i(loc_len); stloc_i(loc_cursor); N("    br %s\n", γ); break; }
         if (strcasecmp(vname, "ARB") == 0) {
             int loc_arb_save = (*p_next_int)++;
             int loc_arb_try  = (*p_next_int)++;
@@ -1528,32 +1528,32 @@ static void net_emit_pat_node(EXPR_t *pat,
             snprintf(arb_loop, sizeof arb_loop, "Nn%d_varb_lp",  uid);
             snprintf(arb_incr, sizeof arb_incr, "Nn%d_varb_inc", uid);
             snprintf(arb_fail, sizeof arb_fail, "Nn%d_varb_fx",  uid);
-            net_ldloc_i(loc_cursor); net_stloc_i(loc_arb_save);
-            N("    ldc.i4.0\n"); net_stloc_i(loc_arb_try);
+            ldloc_i(loc_cursor); stloc_i(loc_arb_save);
+            N("    ldc.i4.0\n"); stloc_i(loc_arb_try);
             N("  %s:\n", arb_loop);
-            net_ldloc_i(loc_arb_save); net_ldloc_i(loc_arb_try); N("    add\n");
-            net_ldloc_i(loc_len); N("    bgt        %s\n", arb_fail);
-            net_ldloc_i(loc_arb_save); net_ldloc_i(loc_arb_try); N("    add\n");
-            net_stloc_i(loc_cursor);
+            ldloc_i(loc_arb_save); ldloc_i(loc_arb_try); N("    add\n");
+            ldloc_i(loc_len); N("    bgt        %s\n", arb_fail);
+            ldloc_i(loc_arb_save); ldloc_i(loc_arb_try); N("    add\n");
+            stloc_i(loc_cursor);
             N("    br         %s\n", γ);
             N("  %s:\n", arb_incr);
-            net_ldloc_i(loc_arb_try); N("    ldc.i4.1\n"); N("    add\n"); net_stloc_i(loc_arb_try);
+            ldloc_i(loc_arb_try); N("    ldc.i4.1\n"); N("    add\n"); stloc_i(loc_arb_try);
             N("    br         %s\n", arb_loop);
             N("  %s:\n", arb_fail);
             N("    br         %s\n", ω);
-            snprintf(net_arb_incr_label, sizeof net_arb_incr_label, "%s", arb_incr);
+            snprintf(arb_incr_label, sizeof arb_incr_label, "%s", arb_incr);
             break;
         }
         if (strcasecmp(vname, "SUCCEED") == 0) { N("    br         %s\n", γ); break; }
         if (strcasecmp(vname, "FENCE")   == 0) { N("    br         %s\n", γ); break; }
         if (strcasecmp(vname, "FAIL")    == 0 || strcasecmp(vname, "ABORT") == 0) {
-            N("    br         %s\n", net_pat_abort_label[0] ? net_pat_abort_label : ω); break;
+            N("    br         %s\n", cur_pat_abort[0] ? cur_pat_abort : ω); break;
         }
         /* Check named-pattern registry — inline expand if registered */
         {
-            const NetNamedPat *np = net_named_pat_lookup(vname);
+            const NamedPat *np = named_pat_lookup(vname);
             if (np && np->pat) {
-                net_emit_pat_node(np->pat, γ, ω,
+                emit_pat_node(np->pat, γ, ω,
                                   loc_subj, loc_cursor, loc_len, p_next_int, p_next_str);
                 break;
             }
@@ -1562,20 +1562,20 @@ static void net_emit_pat_node(EXPR_t *pat,
         {
             int loc_lit  = (*p_next_str)++;
             int loc_llen = (*p_next_int)++;
-            char fn[256]; net_field_name(fn, sizeof fn, vname);
-            N("    ldsfld     string %s::%s\n", net_classname, fn);
-            net_stloc_s(loc_lit);
-            net_ldloc_s(loc_lit);
+            char fn[256]; field_name(fn, sizeof fn, vname);
+            N("    ldsfld     string %s::%s\n", classname, fn);
+            stloc_s(loc_lit);
+            ldloc_s(loc_lit);
             N("    callvirt   instance int32 [mscorlib]System.String::get_Length()\n");
-            net_stloc_i(loc_llen);
-            net_ldloc_i(loc_cursor); net_ldloc_i(loc_llen); N("    add\n");
-            net_ldloc_i(loc_len); N("    bgt        %s\n", ω);
-            net_ldloc_i(loc_subj); net_ldloc_i(loc_cursor); net_ldloc_i(loc_llen);
+            stloc_i(loc_llen);
+            ldloc_i(loc_cursor); ldloc_i(loc_llen); N("    add\n");
+            ldloc_i(loc_len); N("    bgt        %s\n", ω);
+            ldloc_i(loc_subj); ldloc_i(loc_cursor); ldloc_i(loc_llen);
             N("    callvirt   instance string [mscorlib]System.String::Substring(int32, int32)\n");
-            net_ldloc_s(loc_lit);
+            ldloc_s(loc_lit);
             N("    call       bool [mscorlib]System.String::op_Equality(string, string)\n");
             N("    brfalse    %s\n", ω);
-            net_ldloc_i(loc_cursor); net_ldloc_i(loc_llen); N("    add\n"); net_stloc_i(loc_cursor);
+            ldloc_i(loc_cursor); ldloc_i(loc_llen); N("    add\n"); stloc_i(loc_cursor);
             N("    br         %s\n", γ);
         }
         break;
@@ -1591,20 +1591,20 @@ static void net_emit_pat_node(EXPR_t *pat,
         const char *vname = (inner && inner->sval) ? inner->sval : "";
         int loc_lit  = (*p_next_str)++;
         int loc_llen = (*p_next_int)++;
-        char fn[256]; net_field_name(fn, sizeof fn, vname);
-        N("    ldsfld     string %s::%s\n", net_classname, fn);
-        net_stloc_s(loc_lit);
-        net_ldloc_s(loc_lit);
+        char fn[256]; field_name(fn, sizeof fn, vname);
+        N("    ldsfld     string %s::%s\n", classname, fn);
+        stloc_s(loc_lit);
+        ldloc_s(loc_lit);
         N("    callvirt   instance int32 [mscorlib]System.String::get_Length()\n");
-        net_stloc_i(loc_llen);
-        net_ldloc_i(loc_cursor); net_ldloc_i(loc_llen); N("    add\n");
-        net_ldloc_i(loc_len); N("    bgt        %s\n", ω);
-        net_ldloc_i(loc_subj); net_ldloc_i(loc_cursor); net_ldloc_i(loc_llen);
+        stloc_i(loc_llen);
+        ldloc_i(loc_cursor); ldloc_i(loc_llen); N("    add\n");
+        ldloc_i(loc_len); N("    bgt        %s\n", ω);
+        ldloc_i(loc_subj); ldloc_i(loc_cursor); ldloc_i(loc_llen);
         N("    callvirt   instance string [mscorlib]System.String::Substring(int32, int32)\n");
-        net_ldloc_s(loc_lit);
+        ldloc_s(loc_lit);
         N("    call       bool [mscorlib]System.String::op_Equality(string, string)\n");
         N("    brfalse    %s\n", ω);
-        net_ldloc_i(loc_cursor); net_ldloc_i(loc_llen); N("    add\n"); net_stloc_i(loc_cursor);
+        ldloc_i(loc_cursor); ldloc_i(loc_llen); N("    add\n"); stloc_i(loc_cursor);
         N("    br         %s\n", γ);
         break;
     }
@@ -1617,14 +1617,14 @@ static void net_emit_pat_node(EXPR_t *pat,
         const char *varname = (expr_left(pat) && expr_left(pat)->sval) ? expr_left(pat)->sval
                             : (pat->sval ? pat->sval : "");
         /* Convert cursor (int32) to string via Int32.ToString() */
-        net_ldloc_i(loc_cursor);
+        ldloc_i(loc_cursor);
         N("    box        [mscorlib]System.Int32\n");
         N("    callvirt   instance string object::ToString()\n");
-        if (net_is_output(varname)) {
+        if (is_output(varname)) {
             N("    call       void [mscorlib]System.Console::WriteLine(string)\n");
         } else {
-            char fn[256]; net_field_name(fn, sizeof fn, varname);
-            N("    stsfld     string %s::%s\n", net_classname, fn);
+            char fn[256]; field_name(fn, sizeof fn, varname);
+            N("    stsfld     string %s::%s\n", classname, fn);
         }
         N("    br         %s\n", γ);
         break;
@@ -1642,11 +1642,11 @@ static void net_emit_pat_node(EXPR_t *pat,
  * Statement emitter — N-R1: assignments + OUTPUT + goto
  * ----------------------------------------------------------------------- */
 
-static void net_emit_one_stmt(STMT_t *s, const char *next_lbl) {
+static void emit_one_stmt(STMT_t *s, const char *next_lbl) {
     const char *tgt_s = s->go ? s->go->onsuccess : NULL;
     const char *tgt_f = s->go ? s->go->onfailure : NULL;
     const char *tgt_u = s->go ? s->go->uncond    : NULL;
-    net_cur_stmt_fail_label[0] = '\0';  /* reset per-stmt */
+    cur_stmt_fail[0] = '\0';  /* reset per-stmt */
 
     /* Emit statement label if present */
     if (s->label) {
@@ -1656,7 +1656,7 @@ static void net_emit_one_stmt(STMT_t *s, const char *next_lbl) {
 
     if (s->is_end) {
         NSep("END");
-        net_emit_goto(tgt_u, "END");
+        emit_goto(tgt_u, "END");
         return;
     }
 
@@ -1664,7 +1664,7 @@ static void net_emit_one_stmt(STMT_t *s, const char *next_lbl) {
     if (s->has_eq && s->subject && !s->pattern &&
         (s->subject->kind == E_VART || s->subject->kind == E_KW)) {
 
-        int is_out = net_is_output(s->subject->sval);
+        int is_out = is_output(s->subject->sval);
         EXPR_t *rhs = s->replacement;
 
         /* Set fail label so INPUT/CONC inside rhs can branch directly on failure.
@@ -1674,16 +1674,16 @@ static void net_emit_one_stmt(STMT_t *s, const char *next_lbl) {
         char local_fail_lbl[64];
         int need_local_fail = 0;
         if (tgt_f) {
-            snprintf(net_cur_stmt_fail_label, sizeof net_cur_stmt_fail_label, "%s", tgt_f);
+            snprintf(cur_stmt_fail, sizeof cur_stmt_fail, "%s", tgt_f);
         } else {
-            snprintf(local_fail_lbl, sizeof local_fail_lbl, "Nasgn%d_skip", _asgn_uid++);
-            snprintf(net_cur_stmt_fail_label, sizeof net_cur_stmt_fail_label, "%s", local_fail_lbl);
+            snprintf(local_fail_lbl, sizeof local_fail_lbl, "sno_%d_skip", _asgn_uid++);
+            snprintf(cur_stmt_fail, sizeof cur_stmt_fail, "%s", local_fail_lbl);
             need_local_fail = 1;
         }
 
         /* eval RHS onto stack */
-        net_emit_expr(rhs);
-        net_cur_stmt_fail_label[0] = '\0';  /* reset after expr */
+        emit_expr(rhs);
+        cur_stmt_fail[0] = '\0';  /* reset after expr */
 
         if (is_out) {
             /* OUTPUT = expr → Console.WriteLine */
@@ -1692,7 +1692,7 @@ static void net_emit_one_stmt(STMT_t *s, const char *next_lbl) {
             /* &KEYWORD = expr — write to known keyword field */
             const char *kw = s->subject->sval ? s->subject->sval : "";
             if (strcasecmp(kw, "ANCHOR") == 0)
-                N("    stsfld     string %s::kw_anchor\n", net_classname);
+                N("    stsfld     string %s::kw_anchor\n", classname);
             else if (strcasecmp(kw, "TRIM") == 0)
                 N("    pop\n");  /* &TRIM: ignore for now (plain pop) */
             else
@@ -1700,11 +1700,11 @@ static void net_emit_one_stmt(STMT_t *s, const char *next_lbl) {
         } else {
             /* VAR = expr → stsfld + compiled trace pathway */
             char fn[256];
-            net_field_name(fn, sizeof fn, s->subject->sval);
+            field_name(fn, sizeof fn, s->subject->sval);
             /* save val to V_mon_val before stsfld (mono ilasm lacks swap opcode) */
             N("    dup\n");
             N("    stloc      V_mon_val\n");
-            N("    stsfld     string %s::%s\n", net_classname, fn);
+            N("    stsfld     string %s::%s\n", classname, fn);
             /* stloc saves val; stsfld stores it; ldstr+ldloc give (name,val) for net_mon_var */
             {
                 /* Variable names are plain ASCII identifiers — no escaping needed */
@@ -1712,7 +1712,7 @@ static void net_emit_one_stmt(STMT_t *s, const char *next_lbl) {
                 N("    ldstr      \"%s\"\n", varname);
                 N("    ldloc      V_mon_val\n");
                 char mndesc[512];
-                snprintf(mndesc, sizeof mndesc, "void %s::net_mon_var(string, string)", net_classname);
+                snprintf(mndesc, sizeof mndesc, "void %s::net_mon_var(string, string)", classname);
                 N("    call       %s\n", mndesc);
             }
         }
@@ -1722,10 +1722,10 @@ static void net_emit_one_stmt(STMT_t *s, const char *next_lbl) {
         N("    stloc.0\n");
 
         /* goto */
-        if (tgt_u) net_emit_goto(tgt_u, next_lbl);
+        if (tgt_u) emit_goto(tgt_u, next_lbl);
         else {
-            if (tgt_s) net_emit_branch_success(tgt_s);
-            if (tgt_f) net_emit_branch_fail(tgt_f);
+            if (tgt_s) emit_branch_success(tgt_s);
+            if (tgt_f) emit_branch_fail(tgt_f);
         }
         /* emit local skip label if we generated one for RHS failure */
         if (need_local_fail)
@@ -1738,17 +1738,17 @@ static void net_emit_one_stmt(STMT_t *s, const char *next_lbl) {
         EXPR_t *indr_operand = expr_arg(s->subject, 0);
         EXPR_t *rhs = s->replacement;
         /* push name string */
-        net_emit_expr(indr_operand);
+        emit_expr(indr_operand);
         /* push value string */
-        if (!rhs || rhs->kind == E_NULV) net_ldstr("");
-        else net_emit_expr(rhs);
-        N("    call       void %s::net_indr_set(string, string)\n", net_classname);
+        if (!rhs || rhs->kind == E_NULV) ldstr("");
+        else emit_expr(rhs);
+        N("    call       void %s::net_indr_set(string, string)\n", classname);
         N("    ldc.i4.1\n");
         N("    stloc.0\n");
-        if (tgt_u) net_emit_goto(tgt_u, next_lbl);
+        if (tgt_u) emit_goto(tgt_u, next_lbl);
         else {
-            if (tgt_s) net_emit_branch_success(tgt_s);
-            if (tgt_f) net_emit_branch_fail(tgt_f);
+            if (tgt_s) emit_branch_success(tgt_s);
+            if (tgt_f) emit_branch_fail(tgt_f);
         }
         return;
     }
@@ -1757,33 +1757,33 @@ static void net_emit_one_stmt(STMT_t *s, const char *next_lbl) {
     if (s->has_eq && s->subject &&
         s->subject->kind == E_IDX &&
         !s->pattern) {
-        net_need_array_helpers = 1;
+        need_array_helpers = 1;
         if (s->subject->sval) {
             /* Named array: A<sub> — sval holds array name, children[0] = subscript */
             char fn_ary[256];
-            net_field_name(fn_ary, sizeof fn_ary, s->subject->sval);
-            N("    ldsfld     string %s::%s\n", net_classname, fn_ary);
+            field_name(fn_ary, sizeof fn_ary, s->subject->sval);
+            N("    ldsfld     string %s::%s\n", classname, fn_ary);
             EXPR_t *sub = (s->subject->nchildren > 0 && s->subject->children)
                           ? s->subject->children[0] : NULL;
-            if (sub) net_emit_expr(sub); else net_ldstr("1");
+            if (sub) emit_expr(sub); else ldstr("1");
         } else { /* postfix subscript: children[0]=array expr, children[1]=key */
             if (s->subject->nchildren >= 1 && s->subject->children && s->subject->children[0])
-                net_emit_expr(s->subject->children[0]);
-            else net_ldstr("");
+                emit_expr(s->subject->children[0]);
+            else ldstr("");
             if (s->subject->nchildren >= 2 && s->subject->children && s->subject->children[1])
-                net_emit_expr(s->subject->children[1]);
-            else net_ldstr("0");
+                emit_expr(s->subject->children[1]);
+            else ldstr("0");
         }
         /* push value */
-        if (!s->replacement || s->replacement->kind == E_NULV) net_ldstr("");
-        else net_emit_expr(s->replacement);
-        N("    call       void %s::net_array_put(string, string, string)\n", net_classname);
+        if (!s->replacement || s->replacement->kind == E_NULV) ldstr("");
+        else emit_expr(s->replacement);
+        N("    call       void %s::net_array_put(string, string, string)\n", classname);
         N("    ldc.i4.1\n");
         N("    stloc.0\n");
-        if (tgt_u) net_emit_goto(tgt_u, next_lbl);
+        if (tgt_u) emit_goto(tgt_u, next_lbl);
         else {
-            if (tgt_s) net_emit_branch_success(tgt_s);
-            if (tgt_f) net_emit_branch_fail(tgt_f);
+            if (tgt_s) emit_branch_success(tgt_s);
+            if (tgt_f) emit_branch_fail(tgt_f);
         }
         return;
     }
@@ -1791,25 +1791,25 @@ static void net_emit_one_stmt(STMT_t *s, const char *next_lbl) {
     /* Case 1d: DATA field setter — fieldname(instance) = val */
     if (s->has_eq && s->subject && s->subject->kind == E_FNC && !s->pattern) {
         const char *sfname = s->subject->sval ? s->subject->sval : "";
-        const NetDataType *ft = net_find_data_field(sfname);
+        const DataType *ft = find_data_field(sfname);
         if (ft) {
-            net_need_data_helpers  = 1;
-            net_need_array_helpers = 1;
+            need_data_helpers  = 1;
+            need_array_helpers = 1;
             /* push instance-id */
             EXPR_t *inst = expr_arg(s->subject, 0);
-            if (inst) net_emit_expr(inst); else net_ldstr("");
+            if (inst) emit_expr(inst); else ldstr("");
             /* push field name */
-            net_ldstr(sfname);
+            ldstr(sfname);
             /* push value */
-            if (!s->replacement || s->replacement->kind == E_NULV) net_ldstr("");
-            else net_emit_expr(s->replacement);
-            N("    call       void %s::net_array_put(string, string, string)\n", net_classname);
+            if (!s->replacement || s->replacement->kind == E_NULV) ldstr("");
+            else emit_expr(s->replacement);
+            N("    call       void %s::net_array_put(string, string, string)\n", classname);
             N("    ldc.i4.1\n");
             N("    stloc.0\n");
-            if (tgt_u) net_emit_goto(tgt_u, next_lbl);
+            if (tgt_u) emit_goto(tgt_u, next_lbl);
             else {
-                if (tgt_s) net_emit_branch_success(tgt_s);
-                if (tgt_f) net_emit_branch_fail(tgt_f);
+                if (tgt_s) emit_branch_success(tgt_s);
+                if (tgt_f) emit_branch_fail(tgt_f);
             }
             return;
         }
@@ -1818,28 +1818,28 @@ static void net_emit_one_stmt(STMT_t *s, const char *next_lbl) {
     /* Case 2: bare expression predicate — no has_eq, subject only, no pattern */
     if (!s->has_eq && s->subject && !s->pattern) {
         /* Evaluate subject as expression — sets local 0 (success flag) via E_FNC */
-        net_emit_expr(s->subject);
+        emit_expr(s->subject);
         N("    pop\n");  /* discard string result — we only care about local 0 */
         if (tgt_u) {
-            net_emit_goto(tgt_u, next_lbl);
+            emit_goto(tgt_u, next_lbl);
         } else {
-            if (tgt_s) net_emit_branch_success(tgt_s);
-            if (tgt_f) net_emit_branch_fail(tgt_f);
+            if (tgt_s) emit_branch_success(tgt_s);
+            if (tgt_f) emit_branch_fail(tgt_f);
         }
         return;
     }
 
     /* Case 4: pattern replacement — has_eq=1, pattern present: X 'pat' = 'repl' */
     if (s->has_eq && s->subject && s->pattern) {
-        static int net_prepl_uid = 0;
-        int suid = net_prepl_uid++;
+        static int prepl_uid = 0;
+        int suid = prepl_uid++;
 
         char lbl_tok[64], lbl_tfail[64], lbl_retry[64], lbl_end[64];
         snprintf(lbl_tok,   sizeof lbl_tok,   "Npr%d_tok",   suid);
         snprintf(lbl_tfail, sizeof lbl_tfail,  "Npr%d_fail",  suid);
         snprintf(lbl_retry, sizeof lbl_retry,  "Npr%d_retry", suid);
         snprintf(lbl_end,   sizeof lbl_end,    "Npr%d_end",   suid);
-        snprintf(net_pat_abort_label, sizeof net_pat_abort_label, "Npr%d_abort", suid);
+        snprintf(cur_pat_abort, sizeof cur_pat_abort, "Npr%d_abort", suid);
 
         int loc_subj   = 2;
         int loc_cursor = 3;
@@ -1849,7 +1849,7 @@ static void net_emit_one_stmt(STMT_t *s, const char *next_lbl) {
         int next_str = 20;
 
         /* load subject into V_2 */
-        net_emit_expr(s->subject);
+        emit_expr(s->subject);
         N("    stloc.s    V_2\n");
         N("    ldloc.s    V_2\n");
         N("    callvirt   instance int32 [mscorlib]System.String::get_Length()\n");
@@ -1861,15 +1861,15 @@ static void net_emit_one_stmt(STMT_t *s, const char *next_lbl) {
         N("    ldloc.s    V_3\n");
         N("    stloc.s    V_5\n");
 
-        net_emit_pat_node(s->pattern, lbl_tok, lbl_tfail,
+        emit_pat_node(s->pattern, lbl_tok, lbl_tfail,
                           loc_subj, loc_cursor, loc_len, &next_int, &next_str);
 
         /* fail path */
         N("  %s:\n", lbl_tfail);
-        N("    ldsfld     string %s::kw_anchor\n", net_classname);
+        N("    ldsfld     string %s::kw_anchor\n", classname);
         N("    ldstr      \"0\"\n");
         N("    call       bool [mscorlib]System.String::op_Equality(string, string)\n");
-        N("    brfalse    %s\n", net_pat_abort_label);
+        N("    brfalse    %s\n", cur_pat_abort);
         N("    ldloc.s    V_5\n");
         N("    ldc.i4.1\n");
         N("    add\n");
@@ -1877,11 +1877,11 @@ static void net_emit_one_stmt(STMT_t *s, const char *next_lbl) {
         N("    ldloc.s    V_3\n");
         N("    ldloc.s    V_4\n");
         N("    ble        %s\n", lbl_retry);
-        N("  %s:\n", net_pat_abort_label);
+        N("  %s:\n", cur_pat_abort);
         N("    ldc.i4.0\n");
         N("    stloc.0\n");
-        if (tgt_f) net_emit_branch_fail(tgt_f);
-        else if (tgt_u) net_emit_goto(tgt_u, next_lbl);
+        if (tgt_f) emit_branch_fail(tgt_f);
+        else if (tgt_u) emit_goto(tgt_u, next_lbl);
         N("    br         %s\n", lbl_end);
 
         /* success path — replace matched region in subject */
@@ -1896,9 +1896,9 @@ static void net_emit_one_stmt(STMT_t *s, const char *next_lbl) {
         N("    callvirt   instance string [mscorlib]System.String::Substring(int32, int32)\n");
         /* replacement string */
         if (!s->replacement || s->replacement->kind == E_NULV)
-            net_ldstr("");
+            ldstr("");
         else
-            net_emit_expr(s->replacement);
+            emit_expr(s->replacement);
         N("    call       string [mscorlib]System.String::Concat(string, string)\n");
         /* suffix = subject[cursor .. end] */
         N("    ldloc.s    V_2\n");
@@ -1907,15 +1907,15 @@ static void net_emit_one_stmt(STMT_t *s, const char *next_lbl) {
         N("    call       string [mscorlib]System.String::Concat(string, string)\n");
         /* store back to subject variable */
         if (s->subject->kind == E_VART) {
-            char fn[256]; net_field_name(fn, sizeof fn, s->subject->sval);
-            N("    stsfld     string %s::%s\n", net_classname, fn);
+            char fn[256]; field_name(fn, sizeof fn, s->subject->sval);
+            N("    stsfld     string %s::%s\n", classname, fn);
         } else {
             N("    pop\n");  /* can't assign to non-var */
         }
-        if (tgt_u) net_emit_goto(tgt_u, next_lbl);
+        if (tgt_u) emit_goto(tgt_u, next_lbl);
         else {
-            if (tgt_s) net_emit_branch_success(tgt_s);
-            if (tgt_f) net_emit_branch_fail(tgt_f);
+            if (tgt_s) emit_branch_success(tgt_s);
+            if (tgt_f) emit_branch_fail(tgt_f);
         }
         N("  %s:\n", lbl_end);
         return;
@@ -1923,14 +1923,14 @@ static void net_emit_one_stmt(STMT_t *s, const char *next_lbl) {
 
     /* Case 3: pattern match — subject has_eq=0, subject=var/expr, pattern present */
     if (!s->has_eq && s->subject && s->pattern) {
-        static int net_pat_stmt_uid = 0;
-        int suid = net_pat_stmt_uid++;
+        static int pat_stmt_uid = 0;
+        int suid = pat_stmt_uid++;
 
         char lbl_tok[64], lbl_tfail[64], lbl_retry[64];
         snprintf(lbl_tok,   sizeof lbl_tok,   "Npat%d_tok",   suid);
         snprintf(lbl_tfail, sizeof lbl_tfail,  "Npat%d_fail",  suid);
         snprintf(lbl_retry, sizeof lbl_retry,  "Npat%d_retry", suid);
-        snprintf(net_pat_abort_label, sizeof net_pat_abort_label, "Npat%d_abort", suid);
+        snprintf(cur_pat_abort, sizeof cur_pat_abort, "Npat%d_abort", suid);
 
         /* locals: V_0=success, V_1=unused,
          *         V_2=subj(string), V_3=cursor(int32), V_4=len(int32),
@@ -1943,7 +1943,7 @@ static void net_emit_one_stmt(STMT_t *s, const char *next_lbl) {
         int next_str = 20;  /* string slots: V_20..V_29 */
 
         /* load subject */
-        net_emit_expr(s->subject);
+        emit_expr(s->subject);
         N("    stloc.s    V_2\n");   /* loc_subj */
         N("    ldloc.s    V_2\n");
         N("    callvirt   instance int32 [mscorlib]System.String::get_Length()\n");
@@ -1956,15 +1956,15 @@ static void net_emit_one_stmt(STMT_t *s, const char *next_lbl) {
         N("    ldloc.s    V_3\n");
         N("    stloc.s    V_5\n");   /* mstart = cursor */
 
-        net_emit_pat_node(s->pattern, lbl_tok, lbl_tfail,
+        emit_pat_node(s->pattern, lbl_tok, lbl_tfail,
                           loc_subj, loc_cursor, loc_len, &next_int, &next_str);
 
         N("  %s:\n", lbl_tfail);
         /* if anchor, fail; else advance start and retry */
-        N("    ldsfld     string %s::kw_anchor\n", net_classname);
+        N("    ldsfld     string %s::kw_anchor\n", classname);
         N("    ldstr      \"0\"\n");
         N("    call       bool [mscorlib]System.String::op_Equality(string, string)\n");
-        N("    brfalse    %s\n", net_pat_abort_label);  /* anchored → fail */
+        N("    brfalse    %s\n", cur_pat_abort);  /* anchored → fail */
         N("    ldloc.s    V_5\n");  /* mstart */
         N("    ldc.i4.1\n");
         N("    add\n");
@@ -1973,11 +1973,11 @@ static void net_emit_one_stmt(STMT_t *s, const char *next_lbl) {
         N("    ldloc.s    V_4\n");
         N("    ble        %s\n", lbl_retry);
         /* fell off end — fail */
-        N("  %s:\n", net_pat_abort_label);
+        N("  %s:\n", cur_pat_abort);
         N("    ldc.i4.0\n");
         N("    stloc.0\n");
-        if (tgt_f) net_emit_branch_fail(tgt_f);
-        else if (tgt_u) net_emit_goto(tgt_u, next_lbl);
+        if (tgt_f) emit_branch_fail(tgt_f);
+        else if (tgt_u) emit_goto(tgt_u, next_lbl);
         /* fall through on fail */
         /* jump past success block */
         {
@@ -1986,10 +1986,10 @@ static void net_emit_one_stmt(STMT_t *s, const char *next_lbl) {
             N("  %s:\n", lbl_tok);
             N("    ldc.i4.1\n");
             N("    stloc.0\n");
-            if (tgt_u) net_emit_goto(tgt_u, next_lbl);
+            if (tgt_u) emit_goto(tgt_u, next_lbl);
             else {
-                if (tgt_s) net_emit_branch_success(tgt_s);
-                if (tgt_f) net_emit_branch_fail(tgt_f);
+                if (tgt_s) emit_branch_success(tgt_s);
+                if (tgt_f) emit_branch_fail(tgt_f);
             }
             N("  %s:\n", lbl_end);
         }
@@ -1998,13 +1998,13 @@ static void net_emit_one_stmt(STMT_t *s, const char *next_lbl) {
 
     /* No-op / unhandled statement — emit nop + goto only */
     N("    nop\n");
-    if (tgt_u) net_emit_goto(tgt_u, next_lbl);
+    if (tgt_u) emit_goto(tgt_u, next_lbl);
 }
 
 /* Returns 1 if statement s is inside any user function body. */
-static int net_stmt_in_any_fn(STMT_t *s) {
-    for (int fi = 0; fi < net_fn_count; fi++) {
-        const NetFnDef *fn = &net_fn_table[fi];
+static int stmt_in_any_fn(STMT_t *s) {
+    for (int fi = 0; fi < fn_count; fi++) {
+        const FnDef *fn = &fn_table[fi];
         const char *entry = fn->entry_label[0] ? fn->entry_label : fn->name;
         int in_body = 0;
         /* Walk program to find whether s is between entry and end_label */
@@ -2014,7 +2014,7 @@ static int net_stmt_in_any_fn(STMT_t *s) {
     return 0;  /* determined per-statement during emit via in_fn_body flag below */
 }
 
-static void net_emit_stmts(Program *prog) {
+static void emit_stmts(Program *prog) {
     if (!prog || !prog->head) return;
 
     STMT_t *stmts[4096];
@@ -2025,8 +2025,8 @@ static void net_emit_stmts(Program *prog) {
     /* Build a bitmask of which statements are inside function bodies */
     char in_fn_body[4096];
     memset(in_fn_body, 0, sizeof in_fn_body);
-    for (int fi = 0; fi < net_fn_count; fi++) {
-        const NetFnDef *fn = &net_fn_table[fi];
+    for (int fi = 0; fi < fn_count; fi++) {
+        const FnDef *fn = &fn_table[fi];
         const char *entry = fn->entry_label[0] ? fn->entry_label : fn->name;
         int inside = 0;
         for (int i = 0; i < n; i++) {
@@ -2039,7 +2039,7 @@ static void net_emit_stmts(Program *prog) {
 
     for (int i = 0; i < n; i++) {
         STMT_t *s = stmts[i];
-        /* Skip statements inside function bodies — they are emitted by net_emit_fn_method */
+        /* Skip statements inside function bodies — they are emitted by emit_fn_method */
         if (in_fn_body[i]) continue;
 
         /* compute next_lbl for fall-through optimisation (skip over fn-body stmts) */
@@ -2056,11 +2056,11 @@ static void net_emit_stmts(Program *prog) {
             break;
         }
         /* increment &STNO before each statement */
-        N("    ldsfld     string %s::kw_stno\n", net_classname);
+        N("    ldsfld     string %s::kw_stno\n", classname);
         N("    ldstr      \"1\"\n");
         N("    call       string [snobol4lib]Snobol4Lib::sno_add(string, string)\n");
-        N("    stsfld     string %s::kw_stno\n", net_classname);
-        net_emit_one_stmt(s, next_lbl);
+        N("    stsfld     string %s::kw_stno\n", classname);
+        emit_one_stmt(s, next_lbl);
     }
 }
 
@@ -2069,7 +2069,7 @@ static void net_emit_stmts(Program *prog) {
  * ----------------------------------------------------------------------- */
 
 /* Return 1 if name appears in prog->exports list. */
-static int net_is_exported(Program *prog, const char *name) {
+static int is_exported(Program *prog, const char *name) {
     for (ExportEntry *e = prog->exports; e; e = e->next)
         if (strcasecmp(e->name, name) == 0) return 1;
     return 0;
@@ -2110,7 +2110,7 @@ static void emit_net_import_call(FILE *out, ImportEntry *ie) {
  * Header / footer emitters
  * ----------------------------------------------------------------------- */
 
-static void net_emit_header(Program *prog) {
+static void emit_header(Program *prog) {
     N(".assembly extern mscorlib {}\n");
     N(".assembly extern snobol4lib {}\n");
     N(".assembly extern snobol4run {}\n");
@@ -2121,22 +2121,22 @@ static void net_emit_header(Program *prog) {
         N(".assembly extern %s {}\n", ie->name);
     }
 
-    N(".assembly %s {}\n", net_classname);
+    N(".assembly %s {}\n", classname);
     /* module extension: .dll if any EXPORTs, .exe otherwise */
     const char *ext = prog->exports ? "dll" : "exe";
-    N(".module %s.%s\n", net_classname, ext);
+    N(".module %s.%s\n", classname, ext);
     N("\n");
-    N(".class public auto ansi beforefieldinit %s\n", net_classname);
+    N(".class public auto ansi beforefieldinit %s\n", classname);
     N("       extends [mscorlib]System.Object\n");
     N("{\n");
     N("\n");
 
     /* Emit one static string field per SNOBOL4 variable */
-    if (net_nvar > 0) {
+    if (nvar > 0) {
         NC("SNOBOL4 variable fields");
-        for (int i = 0; i < net_nvar; i++) {
+        for (int i = 0; i < nvar; i++) {
             char fn[256];
-            net_field_name(fn, sizeof fn, net_vars[i]);
+            field_name(fn, sizeof fn, vars[i]);
             N("  .field static string %s\n", fn);
         }
         N("\n");
@@ -2156,20 +2156,20 @@ static void net_emit_header(Program *prog) {
         N("  .method static void .cctor() cil managed\n");
         N("  {\n");
         N("    .maxstack 2\n");
-        for (int i = 0; i < net_nvar; i++) {
+        for (int i = 0; i < nvar; i++) {
             char fn[256];
-            net_field_name(fn, sizeof fn, net_vars[i]);
+            field_name(fn, sizeof fn, vars[i]);
             N("    ldstr      \"\"\n");
-            N("    stsfld     string %s::%s\n", net_classname, fn);
+            N("    stsfld     string %s::%s\n", classname, fn);
         }
         N("    ldstr      \"0\"\n");
-        N("    stsfld     string %s::kw_stno\n", net_classname);
+        N("    stsfld     string %s::kw_stno\n", classname);
         N("    ldstr      \"0\"\n");
-        N("    stsfld     string %s::kw_anchor\n", net_classname);
+        N("    stsfld     string %s::kw_anchor\n", classname);
         N("    newobj     instance void class [mscorlib]System.Collections.Generic.Dictionary`2<string,string>::.ctor()\n");
-        N("    stsfld     class [mscorlib]System.Collections.Generic.Dictionary`2<string,string> %s::sno_vars\n", net_classname);
+        N("    stsfld     class [mscorlib]System.Collections.Generic.Dictionary`2<string,string> %s::sno_vars\n", classname);
         N("    newobj     instance void class [mscorlib]System.Collections.Generic.Dictionary`2<string,class [mscorlib]System.Collections.Generic.Dictionary`2<string,string>>::.ctor()\n");
-        N("    stsfld     class [mscorlib]System.Collections.Generic.Dictionary`2<string,class [mscorlib]System.Collections.Generic.Dictionary`2<string,string>> %s::sno_arrays\n", net_classname);
+        N("    stsfld     class [mscorlib]System.Collections.Generic.Dictionary`2<string,class [mscorlib]System.Collections.Generic.Dictionary`2<string,string>> %s::sno_arrays\n", classname);
         N("    ret\n");
         N("  }\n");
         N("\n");
@@ -2180,7 +2180,7 @@ static void net_emit_header(Program *prog) {
     N("  {\n");
     N("    .maxstack 4\n");
     N("    .locals init (string V_0)\n");
-    N("    ldsfld     class [mscorlib]System.Collections.Generic.Dictionary`2<string,string> %s::sno_vars\n", net_classname);
+    N("    ldsfld     class [mscorlib]System.Collections.Generic.Dictionary`2<string,string> %s::sno_vars\n", classname);
     N("    ldarg.0\n");
     N("    ldloca.s   V_0\n");
     N("    callvirt   instance bool class [mscorlib]System.Collections.Generic.Dictionary`2<string,string>::TryGetValue(!0, !1&)\n");
@@ -2197,12 +2197,12 @@ static void net_emit_header(Program *prog) {
     N("  {\n");
     N("    .maxstack 5\n");
     /* Store in Dictionary */
-    N("    ldsfld     class [mscorlib]System.Collections.Generic.Dictionary`2<string,string> %s::sno_vars\n", net_classname);
+    N("    ldsfld     class [mscorlib]System.Collections.Generic.Dictionary`2<string,string> %s::sno_vars\n", classname);
     N("    ldarg.0\n");
     N("    ldarg.1\n");
     N("    callvirt   instance void class [mscorlib]System.Collections.Generic.Dictionary`2<string,string>::set_Item(!0, !1)\n");
     /* Also update static field via reflection */
-    N("    ldtoken    %s\n", net_classname);
+    N("    ldtoken    %s\n", classname);
     N("    call       class [mscorlib]System.Type [mscorlib]System.Type::GetTypeFromHandle(valuetype [mscorlib]System.RuntimeTypeHandle)\n");
     N("    ldarg.0\n");
     /* Field name is uppercase in our scheme — use ToUpper */
@@ -2243,7 +2243,7 @@ static void net_emit_header(Program *prog) {
     N("    ldloc.0\n");
     N("    ldc.i4.1\n");
     N("    newobj     instance void [mscorlib]System.IO.StreamWriter::.ctor(string, bool)\n");
-    snprintf(nbuf, sizeof nbuf, "    stsfld     class [mscorlib]System.IO.StreamWriter %s::net_mon_sw\n", net_classname);
+    snprintf(nbuf, sizeof nbuf, "    stsfld     class [mscorlib]System.IO.StreamWriter %s::net_mon_sw\n", classname);
     N("%s", nbuf);
     /* Open go pipe (MONITOR_GO_PIPE) as FileStream read-only */
     N("    ldstr      \"MONITOR_GO_PIPE\"\n");
@@ -2258,7 +2258,7 @@ static void net_emit_header(Program *prog) {
     N("    ldc.i4.3\n");   /* FileMode.Open = 3 */
     N("    ldc.i4.1\n");   /* FileAccess.Read = 1 */
     N("    newobj     instance void [mscorlib]System.IO.FileStream::.ctor(string, valuetype [mscorlib]System.IO.FileMode, valuetype [mscorlib]System.IO.FileAccess)\n");
-    snprintf(nbuf, sizeof nbuf, "    stsfld     class [mscorlib]System.IO.Stream %s::net_mon_ack\n", net_classname);
+    snprintf(nbuf, sizeof nbuf, "    stsfld     class [mscorlib]System.IO.Stream %s::net_mon_ack\n", classname);
     N("%s", nbuf);
     N("  Nnmi_done:\n");
     N("    ret\n");
@@ -2274,7 +2274,7 @@ static void net_emit_header(Program *prog) {
     N("  {\n");
     N("    .maxstack 8\n");
     N("    .locals init (string V_line, int32 V_ack, uint8[] V_bytes)\n");
-    snprintf(nbuf, sizeof nbuf, "    ldsfld     class [mscorlib]System.IO.StreamWriter %s::net_mon_sw\n", net_classname);
+    snprintf(nbuf, sizeof nbuf, "    ldsfld     class [mscorlib]System.IO.StreamWriter %s::net_mon_sw\n", classname);
     N("%s", nbuf);
     N("    brfalse    Nmv_done\n");
     /* Build: "VALUE" + RS(\x1E) + name + US(\x1F) + val + RS(\x1E) */
@@ -2293,18 +2293,18 @@ static void net_emit_header(Program *prog) {
     N("    callvirt   instance class [mscorlib]System.Text.StringBuilder [mscorlib]System.Text.StringBuilder::Append(char)\n");
     N("    callvirt   instance string [mscorlib]System.Text.StringBuilder::ToString()\n");
     N("    stloc.0\n");
-    snprintf(nbuf, sizeof nbuf, "    ldsfld     class [mscorlib]System.IO.StreamWriter %s::net_mon_sw\n", net_classname);
+    snprintf(nbuf, sizeof nbuf, "    ldsfld     class [mscorlib]System.IO.StreamWriter %s::net_mon_sw\n", classname);
     N("%s", nbuf);
     N("    ldloc.0\n");
     N("    callvirt   instance void [mscorlib]System.IO.TextWriter::Write(string)\n");
-    snprintf(nbuf, sizeof nbuf, "    ldsfld     class [mscorlib]System.IO.StreamWriter %s::net_mon_sw\n", net_classname);
+    snprintf(nbuf, sizeof nbuf, "    ldsfld     class [mscorlib]System.IO.StreamWriter %s::net_mon_sw\n", classname);
     N("%s", nbuf);
     N("    callvirt   instance void [mscorlib]System.IO.StreamWriter::Flush()\n");
     /* Sync-step: read 1-byte ack */
-    snprintf(nbuf, sizeof nbuf, "    ldsfld     class [mscorlib]System.IO.Stream %s::net_mon_ack\n", net_classname);
+    snprintf(nbuf, sizeof nbuf, "    ldsfld     class [mscorlib]System.IO.Stream %s::net_mon_ack\n", classname);
     N("%s", nbuf);
     N("    brfalse    Nmv_done\n");
-    snprintf(nbuf, sizeof nbuf, "    ldsfld     class [mscorlib]System.IO.Stream %s::net_mon_ack\n", net_classname);
+    snprintf(nbuf, sizeof nbuf, "    ldsfld     class [mscorlib]System.IO.Stream %s::net_mon_ack\n", classname);
     N("%s", nbuf);
     N("    callvirt   instance int32 [mscorlib]System.IO.Stream::ReadByte()\n");
     N("    stloc.1\n");
@@ -2320,18 +2320,18 @@ static void net_emit_header(Program *prog) {
     } /* end nbuf scope */
 }
 
-static void net_emit_main_open(void) {
+static void emit_main_open(void) {
     /* Emit import delegate helpers at class scope before main() */
     {
         int imp_idx = 0;
-        for (ImportEntry *ie = net_prog->imports; ie; ie = ie->next, imp_idx++) {
+        for (ImportEntry *ie = prog->imports; ie; ie = ie->next, imp_idx++) {
             N("  .field private static int32 net_imp_flag_%d\n", imp_idx);
             N("  .method private static void net_imp_gamma_%d() cil managed\n", imp_idx);
             N("  {\n    .maxstack 1\n    ldc.i4.1\n");
-            N("    stsfld     int32 %s::net_imp_flag_%d\n    ret\n  }\n", net_classname, imp_idx);
+            N("    stsfld     int32 %s::net_imp_flag_%d\n    ret\n  }\n", classname, imp_idx);
             N("  .method private static void net_imp_omega_%d() cil managed\n", imp_idx);
             N("  {\n    .maxstack 1\n    ldc.i4.0\n");
-            N("    stsfld     int32 %s::net_imp_flag_%d\n    ret\n  }\n", net_classname, imp_idx);
+            N("    stsfld     int32 %s::net_imp_flag_%d\n    ret\n  }\n", classname, imp_idx);
         }
     }
     N("  .method public static void main(string[] args) cil managed\n");
@@ -2354,10 +2354,10 @@ static void net_emit_main_open(void) {
     N("                  string V_mon_val)\n");
     N("\n");
     /* Open monitor FIFOs once before any statements — sync-step compiled trace pathway */
-    N("    call       void %s::net_mon_init()\n", net_classname);
+    N("    call       void %s::net_mon_init()\n", classname);
 }
 
-static void net_emit_main_close(void) {
+static void emit_main_close(void) {
     NSep("END");
     N("  L_END:\n");
     NI("nop", "");
@@ -2375,33 +2375,33 @@ static void net_emit_main_close(void) {
  * RETURN -> load fn-name var, restore, ret value.
  * FRETURN -> restore, ldnull ret (null = failure signal).
  * ----------------------------------------------------------------------- */
-/* NetFnDef, net_fn_table, net_fn_count, net_cur_fn declared at top of file */
+/* FnDef, fn_table, fn_count, cur_fn declared at top of file */
 
-static const NetFnDef *net_find_fn(const char *name) {
-    for (int i = 0; i < net_fn_count; i++)
-        if (net_fn_table[i].name[0] && strcasecmp(net_fn_table[i].name, name) == 0)
-            return &net_fn_table[i];
+static const FnDef *find_fn(const char *name) {
+    for (int i = 0; i < fn_count; i++)
+        if (fn_table[i].name[0] && strcasecmp(fn_table[i].name, name) == 0)
+            return &fn_table[i];
     return NULL;
 }
 
-static const NetDataType *net_find_data_type(const char *name) {
-    for (int i = 0; i < net_data_type_count; i++)
-        if (net_data_types[i].type_name[0] && strcasecmp(net_data_types[i].type_name, name) == 0)
-            return &net_data_types[i];
+static const DataType *find_data_type(const char *name) {
+    for (int i = 0; i < data_type_count; i++)
+        if (data_types[i].type_name[0] && strcasecmp(data_types[i].type_name, name) == 0)
+            return &data_types[i];
     return NULL;
 }
 
-static const NetDataType *net_find_data_field(const char *field) {
-    for (int i = 0; i < net_data_type_count; i++)
-        for (int j = 0; j < net_data_types[i].nfields; j++)
-            if (net_data_types[i].fields[j][0] &&
-                strcasecmp(net_data_types[i].fields[j], field) == 0)
-                return &net_data_types[i];
+static const DataType *find_data_field(const char *field) {
+    for (int i = 0; i < data_type_count; i++)
+        for (int j = 0; j < data_types[i].nfields; j++)
+            if (data_types[i].fields[j][0] &&
+                strcasecmp(data_types[i].fields[j], field) == 0)
+                return &data_types[i];
     return NULL;
 }
 
-/* Parse DEFINE prototype string "fname(a,b)l1,l2" into NetFnDef. */
-static int net_parse_proto(const char *proto, NetFnDef *fn) {
+/* Parse DEFINE prototype string "fname(a,b)l1,l2" into FnDef. */
+static int parse_proto(const char *proto, FnDef *fn) {
     fn->nargs = 0; fn->nlocals = 0;
     const char *p = proto;
     int ni = 0;
@@ -2442,16 +2442,16 @@ static int net_parse_proto(const char *proto, NetFnDef *fn) {
 }
 
 /* Flatten a simple literal/var expr to a string buffer (for DEFINE arg parsing). */
-static const char *net_flatten_str(EXPR_t *e, char *buf, int sz) {
+static const char *flatten_str(EXPR_t *e, char *buf, int sz) {
     if (!e) return NULL;
     if (e->kind == E_QLIT && e->sval) { snprintf(buf, sz, "%s", e->sval); return buf; }
     if (e->kind == E_VART && e->sval) { snprintf(buf, sz, "%s", e->sval); return buf; }
     return NULL;
 }
 
-static void net_scan_fndefs(Program *prog) {
-    net_fn_count = 0;
-    net_data_type_count = 0;
+static void scan_fndefs(Program *prog) {
+    fn_count = 0;
+    data_type_count = 0;
     if (!prog) return;
     for (STMT_t *s = prog->head; s; s = s->next) {
         if (!s->subject || s->subject->kind != E_FNC) continue;
@@ -2460,9 +2460,9 @@ static void net_scan_fndefs(Program *prog) {
         if (strcasecmp(sname, "DATA") == 0) {
             if (expr_nargs(s->subject) < 1) continue;
             char pbuf[256];
-            const char *proto = net_flatten_str(expr_arg(s->subject, 0), pbuf, sizeof pbuf);
-            if (!proto || net_data_type_count >= NET_DATA_MAX) continue;
-            NetDataType *dt = &net_data_types[net_data_type_count];
+            const char *proto = flatten_str(expr_arg(s->subject, 0), pbuf, sizeof pbuf);
+            if (!proto || data_type_count >= DATA_MAX) continue;
+            DataType *dt = &data_types[data_type_count];
             memset(dt, 0, sizeof *dt);
             int pi = 0, ti = 0;
             while (proto[pi] && proto[pi] != '(' && ti < NET_FN_NAMELEN-1)
@@ -2485,22 +2485,22 @@ static void net_scan_fndefs(Program *prog) {
                     if (proto[pi]==',') pi++;
                 }
             }
-            net_data_type_count++;
+            data_type_count++;
             continue;
         }
         if (strcasecmp(sname, "DEFINE") != 0) continue;
         if (expr_nargs(s->subject) < 1) continue;
         char pbuf[256];
-        const char *proto = net_flatten_str(expr_arg(s->subject, 0), pbuf, sizeof pbuf);
+        const char *proto = flatten_str(expr_arg(s->subject, 0), pbuf, sizeof pbuf);
         if (!proto) continue;
-        if (net_fn_count >= NET_FN_MAX) break;
-        NetFnDef *fn = &net_fn_table[net_fn_count];
+        if (fn_count >= FN_MAX) break;
+        FnDef *fn = &fn_table[fn_count];
         memset(fn, 0, sizeof *fn);
-        if (!net_parse_proto(proto, fn)) continue;
+        if (!parse_proto(proto, fn)) continue;
         /* Optional 2nd arg: explicit entry label */
         if (expr_nargs(s->subject) >= 2) {
             char ebuf[128];
-            const char *el = net_flatten_str(expr_arg(s->subject, 1), ebuf, sizeof ebuf);
+            const char *el = flatten_str(expr_arg(s->subject, 1), ebuf, sizeof ebuf);
             if (el && el[0]) snprintf(fn->entry_label, NET_FN_NAMELEN, "%s", el);
         }
         /* end_label from goto on DEFINE stmt */
@@ -2511,15 +2511,15 @@ static void net_scan_fndefs(Program *prog) {
             if (gl) snprintf(fn->end_label, NET_FN_NAMELEN, "%s", gl);
         }
         /* Register fn name, args, locals as SNOBOL4 variables (need static fields) */
-        net_var_register(fn->name);
-        for (int ai = 0; ai < fn->nargs; ai++) net_var_register(fn->args[ai]);
-        for (int li = 0; li < fn->nlocals; li++) net_var_register(fn->locals[li]);
-        net_fn_count++;
+        var_register(fn->name);
+        for (int ai = 0; ai < fn->nargs; ai++) var_register(fn->args[ai]);
+        for (int li = 0; li < fn->nlocals; li++) var_register(fn->locals[li]);
+        fn_count++;
     }
 }
 
 /* Emit one user function as a static CIL method. */
-static void net_emit_fn_method(const NetFnDef *fn, Program *prog, int fn_idx) {
+static void emit_fn_method(const FnDef *fn, Program *prog, int fn_idx) {
     /* Build method signature: (string, string, ...) → string */
     N("  .method static string net_fn_%s(", fn->name);
     for (int i = 0; i < fn->nargs; i++) {
@@ -2552,52 +2552,52 @@ static void net_emit_fn_method(const NetFnDef *fn, Program *prog, int fn_idx) {
 
     /* Save old arg values — direct ldsfld, no reflection */
     for (int i = 0; i < fn->nargs; i++) {
-        char af[256]; net_field_name(af, sizeof af, fn->args[i]);
-        N("    ldsfld     string %s::%s\n", net_classname, af);
+        char af[256]; field_name(af, sizeof af, fn->args[i]);
+        N("    ldsfld     string %s::%s\n", classname, af);
         N("    stloc.s    V_%d\n", save_base + i);
     }
     /* Save old local values — direct ldsfld */
     for (int i = 0; i < fn->nlocals; i++) {
-        char lf[256]; net_field_name(lf, sizeof lf, fn->locals[i]);
-        N("    ldsfld     string %s::%s\n", net_classname, lf);
+        char lf[256]; field_name(lf, sizeof lf, fn->locals[i]);
+        N("    ldsfld     string %s::%s\n", classname, lf);
         N("    stloc.s    V_%d\n", save_base + fn->nargs + i);
     }
     /* Save old fn-name value — direct ldsfld */
     {
-        char ff[256]; net_field_name(ff, sizeof ff, fn->name);
-        N("    ldsfld     string %s::%s\n", net_classname, ff);
+        char ff[256]; field_name(ff, sizeof ff, fn->name);
+        N("    ldsfld     string %s::%s\n", classname, ff);
         N("    stloc.s    V_%d\n", save_fnret);
     }
 
     /* Bind incoming args — direct stsfld, no reflection */
     for (int i = 0; i < fn->nargs; i++) {
-        char af[256]; net_field_name(af, sizeof af, fn->args[i]);
+        char af[256]; field_name(af, sizeof af, fn->args[i]);
         N("    ldarg.s    %d\n", i);
-        N("    stsfld     string %s::%s\n", net_classname, af);
+        N("    stsfld     string %s::%s\n", classname, af);
     }
     /* Init locals to "" — direct stsfld */
     for (int i = 0; i < fn->nlocals; i++) {
-        char lf[256]; net_field_name(lf, sizeof lf, fn->locals[i]);
+        char lf[256]; field_name(lf, sizeof lf, fn->locals[i]);
         N("    ldstr      \"\"\n");
-        N("    stsfld     string %s::%s\n", net_classname, lf);
+        N("    stsfld     string %s::%s\n", classname, lf);
     }
     /* Init fn-name var to "" — direct stsfld */
     {
-        char ff[256]; net_field_name(ff, sizeof ff, fn->name);
+        char ff[256]; field_name(ff, sizeof ff, fn->name);
         N("    ldstr      \"\"\n");
-        N("    stsfld     string %s::%s\n", net_classname, ff);
+        N("    stsfld     string %s::%s\n", classname, ff);
     }
 
     /* Return/freturn labels */
-    snprintf(net_fn_return_lbl,  sizeof net_fn_return_lbl,  "Nfn%d_return",  fn_idx);
-    snprintf(net_fn_freturn_lbl, sizeof net_fn_freturn_lbl, "Nfn%d_freturn", fn_idx);
+    snprintf(fn_return,  sizeof fn_return,  "sno_fn%d_return",  fn_idx);
+    snprintf(fn_freturn, sizeof fn_freturn, "sno_fn%d_freturn", fn_idx);
 
     /* Emit function body statements */
     const char *entry = fn->entry_label[0] ? fn->entry_label : fn->name;
     int in_body = 0;
     int si = 0;
-    const NetFnDef *saved_fn = net_cur_fn;
-    net_cur_fn = fn;
+    const FnDef *saved_fn = cur_fn;
+    cur_fn = fn;
 
     STMT_t *stmts[4096]; int ns = 0;
     for (STMT_t *s = prog->head; s && ns < 4095; s = s->next) stmts[ns++] = s;
@@ -2612,61 +2612,61 @@ static void net_emit_fn_method(const NetFnDef *fn, Program *prog, int fn_idx) {
         if (i+1 < ns && stmts[i+1]->label) next_lbl = stmts[i+1]->label;
         else if (i+1 < ns && stmts[i+1]->is_end) next_lbl = "END";
         /* increment &STNO */
-        N("    ldsfld     string %s::kw_stno\n", net_classname);
+        N("    ldsfld     string %s::kw_stno\n", classname);
         N("    ldstr      \"1\"\n");
         N("    call       string [snobol4lib]Snobol4Lib::sno_add(string, string)\n");
-        N("    stsfld     string %s::kw_stno\n", net_classname);
-        net_emit_one_stmt(s, next_lbl);
+        N("    stsfld     string %s::kw_stno\n", classname);
+        emit_one_stmt(s, next_lbl);
         si++;
     }
-    net_cur_fn = saved_fn;
+    cur_fn = saved_fn;
 
     /* RETURN path: restore args/locals via direct stsfld, return fn->name value */
-    N("  %s:\n", net_fn_return_lbl);
+    N("  %s:\n", fn_return);
     for (int i = 0; i < fn->nargs; i++) {
-        char af[256]; net_field_name(af, sizeof af, fn->args[i]);
+        char af[256]; field_name(af, sizeof af, fn->args[i]);
         N("    ldloc.s    V_%d\n", save_base + i);
-        N("    stsfld     string %s::%s\n", net_classname, af);
+        N("    stsfld     string %s::%s\n", classname, af);
     }
     for (int i = 0; i < fn->nlocals; i++) {
-        char lf[256]; net_field_name(lf, sizeof lf, fn->locals[i]);
+        char lf[256]; field_name(lf, sizeof lf, fn->locals[i]);
         N("    ldloc.s    V_%d\n", save_base + fn->nargs + i);
-        N("    stsfld     string %s::%s\n", net_classname, lf);
+        N("    stsfld     string %s::%s\n", classname, lf);
     }
     /* Get retval from static field then restore fn-name field */
     {
-        char fn_field[256]; net_field_name(fn_field, sizeof fn_field, fn->name);
-        N("    ldsfld     string %s::%s\n", net_classname, fn_field);
+        char fn_field[256]; field_name(fn_field, sizeof fn_field, fn->name);
+        N("    ldsfld     string %s::%s\n", classname, fn_field);
         N("    ldloc.s    V_%d\n", save_fnret);
-        N("    stsfld     string %s::%s\n", net_classname, fn_field);
+        N("    stsfld     string %s::%s\n", classname, fn_field);
     }
     N("    ret\n");
 
     /* FRETURN path: restore args/locals via direct stsfld, return null */
-    N("  %s:\n", net_fn_freturn_lbl);
+    N("  %s:\n", fn_freturn);
     for (int i = 0; i < fn->nargs; i++) {
-        char af[256]; net_field_name(af, sizeof af, fn->args[i]);
+        char af[256]; field_name(af, sizeof af, fn->args[i]);
         N("    ldloc.s    V_%d\n", save_base + i);
-        N("    stsfld     string %s::%s\n", net_classname, af);
+        N("    stsfld     string %s::%s\n", classname, af);
     }
     for (int i = 0; i < fn->nlocals; i++) {
-        char lf[256]; net_field_name(lf, sizeof lf, fn->locals[i]);
+        char lf[256]; field_name(lf, sizeof lf, fn->locals[i]);
         N("    ldloc.s    V_%d\n", save_base + fn->nargs + i);
-        N("    stsfld     string %s::%s\n", net_classname, lf);
+        N("    stsfld     string %s::%s\n", classname, lf);
     }
     {
-        char fn_field[256]; net_field_name(fn_field, sizeof fn_field, fn->name);
+        char fn_field[256]; field_name(fn_field, sizeof fn_field, fn->name);
         N("    ldloc.s    V_%d\n", save_fnret);
-        N("    stsfld     string %s::%s\n", net_classname, fn_field);
+        N("    stsfld     string %s::%s\n", classname, fn_field);
     }
     N("    ldnull\n");
     N("    ret\n");
     N("  }\n\n");
 }
 
-static void net_emit_fn_methods(Program *prog) {
-    for (int i = 0; i < net_fn_count; i++)
-        net_emit_fn_method(&net_fn_table[i], prog, i);
+static void emit_fn_methods(Program *prog) {
+    for (int i = 0; i < fn_count; i++)
+        emit_fn_method(&fn_table[i], prog, i);
 
     /* LP-4: for each EXPORTed DEFINE emit a public Byrd-ABI wrapper.
      * Signature per ARCH-scrip-abi.md §4.1:
@@ -2675,9 +2675,9 @@ static void net_emit_fn_methods(Program *prog) {
      * in ByrdBoxLinkage.Result, then invokes γ (γ port).
      * On empty/null result it invokes ω (ω port). */
     const char *ACT = "class [mscorlib]System.Action";
-    for (int i = 0; i < net_fn_count; i++) {
-        const NetFnDef *fn = &net_fn_table[i];
-        if (!net_is_exported(prog, fn->name)) continue;
+    for (int i = 0; i < fn_count; i++) {
+        const FnDef *fn = &fn_table[i];
+        if (!is_exported(prog, fn->name)) continue;
 
         NC("Byrd-ABI public export wrapper");
         N("  .method public static void %s(%s, %s) cil managed\n",
@@ -2688,7 +2688,7 @@ static void net_emit_fn_methods(Program *prog) {
         /* call internal method with empty string args (LP-5 wires real args) */
         for (int a = 0; a < fn->nargs; a++)
             N("    ldstr \"\"\n");
-        N("    call       string %s::net_fn_%s(", net_classname, fn->name);
+        N("    call       string %s::net_fn_%s(", classname, fn->name);
         for (int a = 0; a < fn->nargs; a++) {
             if (a > 0) N(", ");
             N("string");
@@ -2716,12 +2716,12 @@ static void net_emit_fn_methods(Program *prog) {
 }
 
 /* Emit CIL helper methods for ARRAY/TABLE/DATA support */
-static void net_emit_array_helpers(void) {
+static void emit_array_helpers(void) {
     /* Shorthand for the sno_arrays field type */
     const char *AFT = "class [mscorlib]System.Collections.Generic.Dictionary`2<string,class [mscorlib]System.Collections.Generic.Dictionary`2<string,string>>";
     const char *IFT = "class [mscorlib]System.Collections.Generic.Dictionary`2<string,string>";
 
-    if (net_need_array_helpers) {
+    if (need_array_helpers) {
         /* net_array_new(string size) : string
          * Creates a new inner Dictionary<string,string>, stores it in sno_arrays
          * keyed by its hash code string, returns that key as the array-id. */
@@ -2739,7 +2739,7 @@ static void net_emit_array_helpers(void) {
         N("    call       instance string [mscorlib]System.Int32::ToString()\n");
         N("    stloc.1\n");
         /* sno_arrays[id] = map */
-        N("    ldsfld     %s %s::sno_arrays\n", AFT, net_classname);
+        N("    ldsfld     %s %s::sno_arrays\n", AFT, classname);
         N("    ldloc.1\n");
         N("    ldloc.0\n");
         N("    callvirt   instance void %s::set_Item(!0, !1)\n", AFT);
@@ -2752,7 +2752,7 @@ static void net_emit_array_helpers(void) {
         N("  {\n");
         N("    .maxstack 4\n");
         N("    .locals init (%s V_0, string V_1)\n", IFT);
-        N("    ldsfld     %s %s::sno_arrays\n", AFT, net_classname);
+        N("    ldsfld     %s %s::sno_arrays\n", AFT, classname);
         N("    ldarg.0\n");
         N("    ldloca.s   V_0\n");
         N("    callvirt   instance bool %s::TryGetValue(!0, !1&)\n", AFT);
@@ -2774,7 +2774,7 @@ static void net_emit_array_helpers(void) {
         N("  {\n");
         N("    .maxstack 4\n");
         N("    .locals init (%s V_0)\n", IFT);
-        N("    ldsfld     %s %s::sno_arrays\n", AFT, net_classname);
+        N("    ldsfld     %s %s::sno_arrays\n", AFT, classname);
         N("    ldarg.0\n");
         N("    ldloca.s   V_0\n");
         N("    callvirt   instance bool %s::TryGetValue(!0, !1&)\n", AFT);
@@ -2787,10 +2787,10 @@ static void net_emit_array_helpers(void) {
         N("    ret\n");
         N("  }\n\n");
 
-        net_need_array_helpers = 0;
+        need_array_helpers = 0;
     }
 
-    if (net_need_data_helpers) {
+    if (need_data_helpers) {
         /* net_data_define(string proto) : void
          * proto = "typename(field1,field2,...)" — no-op at runtime, type is pre-parsed */
         N("  .method static void net_data_define(string) cil managed\n");
@@ -2799,43 +2799,43 @@ static void net_emit_array_helpers(void) {
         N("    ret\n");
         N("  }\n\n");
 
-        net_need_data_helpers = 0;
+        need_data_helpers = 0;
     }
 }
 
-static void net_emit_footer(void) {
-    N("} // end class %s\n", net_classname);
+static void emit_footer(void) {
+    N("} // end class %s\n", classname);
 }
 
 /* -----------------------------------------------------------------------
  * Public entry point
  * ----------------------------------------------------------------------- */
 
-void net_emit(Program *prog, FILE *out, const char *filename) {
-    net_out = out;
-    net_nvar = 0;
-    net_prog = prog;
-    net_set_classname(filename);
+void net_emit(Program *prog_in, FILE *fp, const char *filename) {
+    prog = prog_in;
+    out  = fp;
+    nvar = 0;
+    set_classname(filename);
 
     /* Multi-pass: scan functions first (registers vars), then vars, named patterns */
-    net_scan_fndefs(prog);
+    scan_fndefs(prog);
     scan_prog_vars(prog);
-    net_scan_named_patterns(prog);
+    scan_named_patterns(prog);
 
     NC("Generated by scrip-cc -net");
     NC("Assemble: ilasm <file>.il /output:<file>.exe");
     NC("Run:      mono <file>.exe");
     N("\n");
 
-    net_emit_header(prog);
-    net_emit_main_open();
-    net_emit_stmts(prog);
-    net_emit_main_close();
-    net_emit_fn_methods(prog);
-    net_emit_array_helpers();
-    net_emit_footer();
+    emit_header(prog);
+    emit_main_open();
+    emit_stmts(prog);
+    emit_main_close();
+    emit_fn_methods(prog);
+    emit_array_helpers();
+    emit_footer();
 
     /* free registered variable names */
-    for (int i = 0; i < net_nvar; i++) { free(net_vars[i]); net_vars[i] = NULL; }
-    net_nvar = 0;
+    for (int i = 0; i < nvar; i++) { free(vars[i]); vars[i] = NULL; }
+    nvar = 0;
 }
