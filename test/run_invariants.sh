@@ -30,6 +30,7 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIP_CC="${SCRIP_CC:-$ROOT/scrip-cc}"
 CORPUS="${CORPUS:-$(cd "$ROOT/../corpus" 2>/dev/null && pwd || echo "")}"
+export CORPUS_REPO="$CORPUS"   # rung scripts use CORPUS_REPO; M-G-INV-FAST-X86-FIX
 JASMIN="${JASMIN:-$ROOT/src/backend/jvm/jasmin.jar}"
 RT_CACHE="${RT_CACHE:-$ROOT/out/rt_cache}"
 RT="$ROOT/src/runtime"
@@ -378,13 +379,14 @@ _parse_rung_summary() {
 run_icon_x86() {
   local cell="icon_x86"
   local pass=0 fail=0
-  # Icon x86 uses scrip-cc directly (ICON_ASM binary removed in reorg)
+  local ICON_X86_RUNNER="$ROOT/test/frontend/icon/icon_x86_runner.sh"
   if [[ ! -x "$SCRIP_CC" ]]; then
     echo "SKIP" > "$RESULTS/${cell}_status"; return
   fi
+  export SCRIP_CC  # used by icon_x86_runner.sh
   for rung_sh in "$ROOT"/test/frontend/icon/run_rung*.sh; do
     local result p m
-    result=$(bash "$rung_sh" "$SCRIP_CC" 2>/dev/null | tail -1) || true
+    result=$(bash "$rung_sh" "$ICON_X86_RUNNER" 2>/dev/null | tail -1) || true
     _parse_rung_summary "$result"
     pass=$((pass + p)); fail=$((fail + m))
     [[ $m -gt 0 ]] && echo "  FAIL $cell $(basename "$rung_sh"): $m fail"
@@ -397,12 +399,14 @@ run_icon_x86() {
 run_icon_jvm() {
   local cell="icon_jvm"
   local pass=0 fail=0
+  local ICON_JVM_RUNNER="$ROOT/test/frontend/icon/icon_jvm_runner.sh"
   if ! command -v java &>/dev/null || [[ ! -f "$JASMIN" ]]; then
     echo "SKIP" > "$RESULTS/${cell}_status"; return
   fi
+  export SCRIP_CC JASMIN  # used by icon_jvm_runner.sh and newer rung scripts
   for rung_sh in "$ROOT"/test/frontend/icon/run_rung*.sh; do
     local result p m
-    result=$(bash "$rung_sh" "$SCRIP_CC" 2>/dev/null | tail -1) || true
+    result=$(bash "$rung_sh" "$ICON_JVM_RUNNER" 2>/dev/null | tail -1) || true
     _parse_rung_summary "$result"
     pass=$((pass + p)); fail=$((fail + m))
     [[ $m -gt 0 ]] && echo "  FAIL $cell $(basename "$rung_sh"): $m fail"
