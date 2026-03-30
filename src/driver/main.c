@@ -137,7 +137,7 @@ static int compile_one(const char *infile, const char *outpath, FILE *out) {
         }
         if (jvm_mode) emit_jvm_icon_file(procs, count, out, infile, outpath, imports);
         else if (wasm_mode) emit_wasm_icon_file(procs, count, out, infile);
-        else { IcnEmitter em; icn_emit_init(&em, out); icn_emit_file(&em, procs, count); }
+        else { icn_emit_file(procs, count, out); }
         for (int i = 0; i < count; i++) icn_node_free(procs[i]);
         free(procs);
         goto done;

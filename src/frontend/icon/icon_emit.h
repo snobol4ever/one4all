@@ -48,19 +48,12 @@ typedef struct {
 } IcnEmitter;
 
 /* -------------------------------------------------------------------------
- * API
+ * API (post G-9 migration — IcnEmitter struct removed)
  * -------------------------------------------------------------------------*/
-void icn_emit_init(IcnEmitter *em, FILE *out);
-void icn_emit_file(IcnEmitter *em, IcnNode **nodes, int count);
-void icn_emit_proc(IcnEmitter *em, IcnNode *proc);
-
-/* Emit one expression; returns synthesized α/β labels in *out_α, *out_β */
-void icn_emit_expr(IcnEmitter *em, IcnNode *n, IcnPorts ports,
-                   char *out_α, char *out_β);
-
-int  icn_new_id   (IcnEmitter *em);
+#include "ir/ir.h"
+void icn_emit_file(EXPR_t **nodes, int count, FILE *out);
+void icn_emit_expr(EXPR_t *n, const char *γ, const char *ω, char *oa, char *ob);
 void icn_label_α  (int id, char *buf, size_t sz);
 void icn_label_β  (int id, char *buf, size_t sz);
-void icn_label_code(int id, char *buf, size_t sz);
 
 #endif /* ICON_EMIT_H */
