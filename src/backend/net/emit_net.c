@@ -2196,18 +2196,18 @@ static void net_emit_header(Program *prog) {
     N("  .method static void net_indr_set(string name, string val) cil managed\n");
     N("  {\n");
     N("    .maxstack 5\n");
-    // Store in Dictionary
+    /* Store in Dictionary */
     N("    ldsfld     class [mscorlib]System.Collections.Generic.Dictionary`2<string,string> %s::sno_vars\n", net_classname);
     N("    ldarg.0\n");
     N("    ldarg.1\n");
     N("    callvirt   instance void class [mscorlib]System.Collections.Generic.Dictionary`2<string,string>::set_Item(!0, !1)\n");
-    // Also update static field via reflection
+    /* Also update static field via reflection */
     N("    ldtoken    %s\n", net_classname);
     N("    call       class [mscorlib]System.Type [mscorlib]System.Type::GetTypeFromHandle(valuetype [mscorlib]System.RuntimeTypeHandle)\n");
     N("    ldarg.0\n");
-    // Field name is uppercase in our scheme — use ToUpper
+    /* Field name is uppercase in our scheme — use ToUpper */
     N("    callvirt   instance string [mscorlib]System.String::ToUpper()\n");
-    N("    ldc.i4     56\n");  // BindingFlags.Static|Public|NonPublic = 16|32|4=52
+    N("    ldc.i4     56\n");  /* BindingFlags.Static|Public|NonPublic = 16|32|4=52 */
     N("    callvirt   instance class [mscorlib]System.Reflection.FieldInfo [mscorlib]System.Type::GetField(string, valuetype [mscorlib]System.Reflection.BindingFlags)\n");
     N("    dup\n");
     N("    brfalse    Nis_nofld\n");
