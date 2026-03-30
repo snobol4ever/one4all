@@ -495,6 +495,60 @@ run_icon_jvm() {
   echo "$fail"  > "$RESULTS/${cell}_fail"
 }
 
+# ── Suite: Icon WASM ──────────────────────────────────────────────────────────
+# IW-session owns this cell. Run: run_invariants.sh icon_wasm
+# Structural oracle: ByrdBox/test_icon-4.py + jcon-master/tran/irgen.icn
+# Emitter: src/backend/emit_wasm_icon.c (M-IW-SCAFFOLD → M-IW-A01+)
+run_icon_wasm() {
+  local cell="icon_wasm"
+  local pass=0 fail=0
+  local ICN_CORPUS="${CORPUS}/programs/icon"
+  if [[ ! -x "$SCRIP_CC" || ! -d "$ICN_CORPUS" ]]; then
+    echo "SKIP" > "$RESULTS/${cell}_status"; return
+  fi
+  if ! command -v wat2wasm &>/dev/null || ! command -v node &>/dev/null; then
+    echo "SKIP" > "$RESULTS/${cell}_status"; return
+  fi
+  local WASM_RUNNER="$ROOT/test/wasm/run_wasm.js"
+  if [[ ! -f "$WASM_RUNNER" ]]; then
+    echo "SKIP" > "$RESULTS/${cell}_status"; return
+  fi
+  local W="$WORK/$cell"; mkdir -p "$W"
+
+  for icn in "$ICN_CORPUS"/rung*.icn; do
+    [[ -f "$icn" ]] || continue
+    local base; base=$(basename "$icn" .icn)
+    local exp="${icn%.icn}.expected"; [[ -f "$exp" ]] || continue
+    [[ -f "${icn%.icn}.xfail" ]] && { pass=$((pass+1)); continue; }
+    local wat="$W/${base}.wat"
+    local wasm="$W/${base}.wasm"
+    local got="$W/${base}.got"
+
+    # compile: scrip-cc -icn -wasm → .wat
+    if ! "$SCRIP_CC" -icn -wasm -o "$wat" "$icn" 2>/dev/null; then
+      fail=$((fail+1)); echo "  FAIL $cell $base [compile]"; continue
+    fi
+    # assemble: .wat → .wasm
+    if ! wat2wasm --enable-tail-call "$wat" -o "$wasm" 2>/dev/null; then
+      fail=$((fail+1)); echo "  FAIL $cell $base [wat2wasm]"; continue
+    fi
+    # run
+    if ! timeout "$TIMEOUT_X86" node "$WASM_RUNNER" "$wasm" > "$got" 2>/dev/null; then
+      fail=$((fail+1)); echo "  FAIL $cell $base [run/timeout]"; continue
+    fi
+    if diff -q "$exp" "$got" > /dev/null 2>&1; then
+      pass=$((pass+1)); [[ $VERBOSE -eq 1 ]] && echo "  PASS $cell $base"
+      csv_row PASS "$cell" "$base"
+    else
+      fail=$((fail+1)); echo "  FAIL $cell $base [output]"
+      csv_row FAIL "$cell" "$base"
+    fi
+  done
+
+  echo "$pass" > "$RESULTS/${cell}_pass"
+  echo "$fail"  > "$RESULTS/${cell}_fail"
+}
+
 # ── Suite: Prolog x86 ─────────────────────────────────────────────────────────
 run_prolog_x86() {
   local cell="prolog_x86"
@@ -596,6 +650,7 @@ run_snobol4_jvm
 run_snobol4_net
 run_icon_x86
 run_icon_jvm
+run_icon_wasm
 run_prolog_x86
 run_prolog_jvm
 
@@ -628,7 +683,7 @@ for row_label in "SNOBOL4" "Icon   " "Prolog "; do
   printf "  %s  " "$row_label"
   for cell in $cells; do
     if [[ "$cell" == "icon_net" || "$cell" == "prolog_net" || \
-          "$cell" == "icon_wasm" || "$cell" == "prolog_wasm" ]]; then
+          "$cell" == "prolog_wasm" ]]; then
       printf "  ${YELLOW}%-14s${RESET}" "SKIP"
     elif [[ -f "$RESULTS/${cell}_status" ]]; then
       printf "  %-14s" "$(cat "$RESULTS/${cell}_status")"
@@ -646,7 +701,7 @@ done
 echo -e "${BOLD}──────────────────────────────────────────────────${RESET}"
 
 OVERALL_FAIL=0
-for cell in snobol4_x86 snobol4_jvm snobol4_net snobol4_wasm icon_x86 icon_jvm prolog_x86 prolog_jvm; do
+for cell in snobol4_x86 snobol4_jvm snobol4_net snobol4_wasm icon_x86 icon_jvm icon_wasm prolog_x86 prolog_jvm; do
   any_fail "$cell" && OVERALL_FAIL=1
 done
 
@@ -656,7 +711,7 @@ echo -e "${BOLD}ELAPSED ${ELAPSED_MS}ms  (${ELAPSED_S}s)${RESET}"
 echo ""
 
 # Finalise CSV — summary rows per cell + latest symlink
-for cell in snobol4_x86 snobol4_jvm snobol4_net snobol4_wasm icon_x86 icon_jvm prolog_x86 prolog_jvm; do
+for cell in snobol4_x86 snobol4_jvm snobol4_net snobol4_wasm icon_x86 icon_jvm icon_wasm prolog_x86 prolog_jvm; do
   p=0; f=0
   [[ -f "$RESULTS/${cell}_pass" ]] && p=$(cat "$RESULTS/${cell}_pass")
   [[ -f "$RESULTS/${cell}_fail" ]] && f=$(cat "$RESULTS/${cell}_fail")

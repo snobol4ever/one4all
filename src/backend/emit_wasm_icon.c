@@ -1,0 +1,800 @@
+/*
+ * emit_wasm_icon.c — Icon × WASM emitter (IW-session)
+ *
+ * Structural oracles (read before editing):
+ *   ByrdBox/byrd_box.py  genc()       — flat-goto C template per node
+ *   ByrdBox/test_icon-4.py            — return-function Python = direct WAT map
+ *   jcon-master/tran/irgen.icn        — authoritative four-port wiring per AST node
+ *   one4all/src/backend/emit_jvm_icon.c — JVM encoding reference (8k lines)
+ *   one4all/src/backend/emit_x64_icon.c — x64 encoding reference
+ *
+ * Translation principle (BACKEND-WASM.md §Control Flow Model):
+ *   x64/JVM encode each Byrd port as a flat label + jmp/goto.
+ *   WASM has no flat goto — structured control only.
+ *   Each Byrd port becomes a WAT function with return_call (zero-stack-growth tail call).
+ *   Generator state (to.I counter, alt branch index, etc.) lives in WASM linear memory.
+ *
+ *   Python oracle (test_icon-4.py):
+ *     def to1_start():  return x1_start          → (func $to1_start  return_call $x1_start)
+ *     def to1_resume(): to1_I += 1; return to1_code → (func $to1_resume  i32.store ...; return_call $to1_code)
+ *
+ * RULES.md §BYRD BOXES: emit labels+gotos, never interpret IR nodes at emit-time.
+ *
+ * Shared IR nodes (E_ADD, E_SUB, E_MPY, E_DIV, E_CONCAT, E_QLIT, E_ILIT…) stay
+ * in emit_wasm.c.  Icon-specific ICN_* nodes live here only.
+ *
+ * File layout:
+ *   §1  WAT output macros + generator-state memory
+ *   §2  Label/function-name helpers
+ *   §3  Node emitters (one per ICN_ kind) — Tier 0 first
+ *   §4  Public dispatch  emit_wasm_icon_node()
+ *
+ * Milestones:
+ *   M-IW-SCAFFOLD  scaffold + clean build (IW-1 2026-03-30)
+ *   M-IW-A01       ICN_INT/STR/VAR/ASSIGN/CALL(write)/PROC/RETURN/FAIL  rung01 hello
+ *   M-IW-A02       ICN_ADD/SUB/MUL/DIV/MOD + ICN_NEG/POS               rung01 arith
+ *   M-IW-A03       ICN_LT/LE/GT/GE/EQ/NE                               rung01 relops
+ *   M-IW-G01       ICN_TO                                               rung01 to-gen
+ *   M-IW-G02       ICN_TO_BY
+ *   M-IW-G03       ICN_EVERY
+ *   M-IW-G04       ICN_ALT   (value alternation)
+ *   M-IW-G05       ICN_BANG  (string/list iteration)
+ *   M-IW-G06       ICN_LIMIT
+ *   M-IW-S01       ICN_CONCAT (via shared $sno_str_concat)
+ *   M-IW-S02       ICN_SLT/SLE/SGT/SGE/SEQ/SNE
+ *   M-IW-S03       ICN_SIZE / ICN_NONNULL / ICN_NULL
+ *   M-IW-S04       ICN_SCAN
+ *   M-IW-C01       ICN_IF   (§4.5 indirect-goto gate → br_table in WASM)
+ *   M-IW-C02       ICN_WHILE / ICN_UNTIL
+ *   M-IW-C03       ICN_REPEAT / ICN_NEXT / ICN_BREAK
+ *   M-IW-C04       ICN_AUGOP / ICN_SWAP / ICN_IDENTICAL
+ *   M-IW-P01       ICN_PROC / ICN_CALL / ICN_RETURN
+ *   M-IW-P02       ICN_FAIL
+ *   M-IW-P03       ICN_SUSPEND
+ *   M-IW-P04       ICN_INITIAL
+ *   M-IW-CS01..B01 csets, string builtins
+ *   M-IW-D01..D05  data structures (subscript, section, list, table, record, case)
+ */
+
+#include "icon_ast.h"
+#include "icon_emit.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+/* ── §1  WAT output macros ────────────────────────────────────────────────── */
+
+/* WI() — write to the shared wasm_out file handle declared in emit_wasm.c    */
+/* emit_wasm.c exposes it via a getter; we use the same W() macro convention. */
+/* FORWARD: emit_wasm.c must call emit_wasm_icon_set_out(FILE*) at startup.   */
+
+static FILE *icon_wasm_out = NULL;
+
+void emit_wasm_icon_set_out(FILE *f) { icon_wasm_out = f; }
+
+#define WI(fmt, ...)  fprintf(icon_wasm_out, fmt, ##__VA_ARGS__)
+
+/*
+ * Generator state memory layout (WASM linear memory, above snobol4 heap):
+ *
+ * The SNOBOL4 WASM runtime uses:
+ *   [0..8191]       output buffer
+ *   [8192..32767]   string literal data
+ *   [32768..]       string heap (bump allocator)
+ *
+ * Icon generator state sits at a fixed block above the snobol4 region.
+ * Each generator instance gets a 64-byte slot (16 × i32).
+ * Slot 0 = first live generator frame, assigned at compile time (static).
+ * This is adequate for Tier 0-3 (no recursive generators); deep recursion
+ * needs a dynamic stack — deferred to M-IW-DEEP.
+ *
+ * ICN_TO uses:  slot[0] = current counter I
+ * ICN_ALT uses: slot[0] = branch index (1=left, 2=right)
+ * ICN_BANG uses: slot[0] = char index into string
+ * ICN_LIMIT uses: slot[0] = remaining count
+ * ICN_SUSPEND: slot[0] = resume-gate index
+ *
+ * Base address: 0x10000 (64KB) — well above the snobol4 runtime heap.
+ * Each generator node gets a unique offset assigned at emit time.
+ */
+#define ICON_GEN_STATE_BASE  0x10000
+#define ICON_GEN_SLOT_BYTES  64
+#define ICON_GEN_MAX_SLOTS   256
+
+static int icon_gen_slot_next = 0;   /* next free slot index */
+
+static int icon_alloc_gen_slot(void) {
+    if (icon_gen_slot_next >= ICON_GEN_MAX_SLOTS) {
+        fprintf(stderr, "emit_wasm_icon: too many generator slots\n");
+        return 0;
+    }
+    return icon_gen_slot_next++;
+}
+
+static int icon_gen_slot_addr(int slot) {
+    return ICON_GEN_STATE_BASE + slot * ICON_GEN_SLOT_BYTES;
+}
+
+/* ── §2  Label / function-name helpers ───────────────────────────────────────
+ *
+ * WASM function names must be globally unique within a module.
+ * We use a global counter + node address to guarantee uniqueness.
+ * Convention mirrors byrd_box.py / test_icon-4.py:
+ *   $to{N}_α  $to{N}_β  $to{N}_γ  (α=start, β=resume/fail-propagate, γ=succeed-propagate)
+ *   $to{N}_code  — extra chunk for ICN_TO range check
+ *
+ * The four Byrd ports map as:
+ *   α (start)   — initial entry
+ *   β (resume)  — re-entry after backtrack from child (also called fail-propagate
+ *                 when the node itself has no backtrack state, just forwards β up)
+ *   γ (succeed) — departure on success
+ *   ω (fail)    — departure on failure (becomes β of the enclosing context)
+ *
+ * In WASM tail-call encoding each is a separate (func …) that ends with return_call.
+ * The caller's γ and ω are passed in as function-index parameters where needed,
+ * or baked in at compile time for static wiring.
+ */
+
+/* Unique node counter (reset per procedure) */
+static int wasm_icon_ctr = 0;
+
+/* Fill buf with "iconN_<suffix>", return buf */
+static char *wfn(char *buf, size_t sz, int id, const char *suffix) {
+    snprintf(buf, sz, "icon%d_%s", id, suffix);
+    return buf;
+}
+
+/* Emit one WAT function that does nothing but return_call another */
+static void emit_passthrough(const char *from, const char *to) {
+    WI("  (func $%s (result i32)\n", from);
+    WI("    return_call $%s)\n", to);
+}
+
+/* ── §3  Per-node emitters ────────────────────────────────────────────────── */
+
+/*
+ * Each emitter receives:
+ *   n        — the IcnNode* being emitted
+ *   id       — unique integer for this node instance (from wasm_icon_ctr++)
+ *   succ     — name of the WAT function to call on success  (caller's γ)
+ *   fail     — name of the WAT function to call on failure  (caller's ω)
+ *   resume   — name of the WAT function caller uses to re-enter this node (β)
+ *              (this node must emit a function with that name)
+ *   start    — name the caller uses to start this node (α)
+ *              (this node must emit a function with that name)
+ *
+ * On return the caller's start/resume function names for this node
+ * are the names this function emitted.
+ *
+ * For Tier 0 we use a simplified signature; richer nodes get more parameters.
+ * See the JVM oracle (emit_jvm_icon.c) and irgen.icn for full wiring.
+ */
+
+/* ─── ICN_INT — integer literal (paper §4.1) ────────────────────────────────
+ * irgen.icn ir_a_Intlit:
+ *   start:  lhs ← N; goto success
+ *   resume: goto failure          (/bounded only — always emitted for safety)
+ *
+ * test_icon-4.py:
+ *   def x5_start():  x5_V = 5; return x5_succeed
+ *   def x5_resume(): return x5_fail
+ *
+ * WAT encoding (no generator state needed — literals don't backtrack):
+ *   (func $iconN_start (result i32)
+ *     i64.const <val>
+ *     global.set $icn_tmp_int          ;; store value for parent to pick up
+ *     return_call $<succ>)
+ *   (func $iconN_resume (result i32)
+ *     return_call $<fail>)
+ *
+ * NOTE: For Tier 0 we use a single global $icn_tmp_int to pass integer
+ * values between nodes (matches the test_icon-4.py "global x5_V" pattern).
+ * This is safe for non-recursive programs; recursive generators need a stack.
+ */
+static void emit_icn_int(const IcnNode *n, int id,
+                         const char *succ, const char *fail) {
+    char sa[64], ra[64];
+    wfn(sa, sizeof sa, id, "start");
+    wfn(ra, sizeof ra, id, "resume");
+
+    WI("  ;; ICN_INT %ld  (node %d)\n", n->val.ival, id);
+    WI("  (func $%s (result i32)\n", sa);
+    WI("    i64.const %ld\n", n->val.ival);
+    WI("    global.set $icn_int%d\n", id);
+    WI("    return_call $%s)\n", succ);
+
+    WI("  (func $%s (result i32)\n", ra);
+    WI("    return_call $%s)\n", fail);
+}
+
+/* ─── ICN_REAL — real literal ───────────────────────────────────────────────*/
+static void emit_icn_real(const IcnNode *n, int id,
+                          const char *succ, const char *fail) {
+    char sa[64], ra[64];
+    wfn(sa, sizeof sa, id, "start");
+    wfn(ra, sizeof ra, id, "resume");
+
+    WI("  ;; ICN_REAL %g  (node %d)\n", n->val.fval, id);
+    WI("  (func $%s (result i32)\n", sa);
+    WI("    f64.const %g\n", n->val.fval);
+    WI("    global.set $icn_flt%d\n", id);
+    WI("    return_call $%s)\n", succ);
+
+    WI("  (func $%s (result i32)\n", ra);
+    WI("    return_call $%s)\n", fail);
+}
+
+/* ─── ICN_VAR — variable (paper §4.1, ir_a_Ident) ──────────────────────────
+ * start:  lhs ← var[name]; goto success
+ * resume: goto failure
+ *
+ * Variables stored as i64 in the Icon variable table in linear memory.
+ * $icn_var_get(name_ptr, name_len) → i64  (runtime function)
+ * $icn_var_set(name_ptr, name_len, i64)   (runtime function)
+ *
+ * For Tier 0 (rung01) we use a simplified direct-address scheme: each variable
+ * name is interned to a fixed memory slot at compile time.
+ */
+static void emit_icn_var(const IcnNode *n, int id,
+                         const char *succ, const char *fail) {
+    char sa[64], ra[64];
+    wfn(sa, sizeof sa, id, "start");
+    wfn(ra, sizeof ra, id, "resume");
+
+    WI("  ;; ICN_VAR \"%s\"  (node %d)\n", n->val.sval, id);
+    /* Stub: variables not yet wired to runtime table — emit as SKIP stub-fail.
+     * M-IW-A01 will replace this with proper $icn_var_get call. */
+    WI("  (func $%s (result i32)\n", sa);
+    WI("    ;; TODO M-IW-A01: call $icn_var_get for \"%s\"\n", n->val.sval);
+    WI("    return_call $%s)  ;; stub-fail until M-IW-A01\n", fail);
+
+    WI("  (func $%s (result i32)\n", ra);
+    WI("    return_call $%s)\n", fail);
+}
+
+/* ─── ICN_ASSIGN — E1 := E2 (ir_a_Binop \":=\" wiring) ──────────────────────
+ * Wiring (funcs set, no backtrack):
+ *   start  → E2.start
+ *   resume → E2.resume
+ *   E2.fail  → assign.fail
+ *   E2.succeed: store E2.value into E1.lvalue; goto assign.succeed
+ *
+ * (Left-hand side must be a variable for Tier 0.)
+ */
+static void emit_icn_assign(const IcnNode *n, int id,
+                             const char *succ, const char *fail) {
+    (void)n;
+    char sa[64], ra[64];
+    wfn(sa, sizeof sa, id, "start");
+    wfn(ra, sizeof ra, id, "resume");
+
+    WI("  ;; ICN_ASSIGN  (node %d) — stub until M-IW-A01\n", id);
+    WI("  (func $%s (result i32)  return_call $%s)\n", sa, fail);
+    WI("  (func $%s (result i32)  return_call $%s)\n", ra, fail);
+}
+
+/* ─── ICN_ADD / SUB / MUL / DIV / MOD (binary arithmetic, funcs set) ────────
+ * irgen.icn ir_binary (funcs path):
+ *   start  → E1.start
+ *   resume → E2.resume
+ *   E1.fail  → op.fail
+ *   E1.succeed → E2.start
+ *   E2.fail  → E1.resume
+ *   E2.succeed: op.value ← E1.value OP E2.value; goto op.succeed
+ *
+ * test_icon-4.py mult:
+ *   def mult_start():  return to1_start
+ *   def mult_resume(): return to2_resume
+ *   def to1_fail():    return mult_fail   ← wired as E1's failure destination
+ *   def to2_fail():    return to1_resume  ← wired as E2's failure destination
+ *   def to1_succeed(): return to2_start   ← wired as E1's success destination
+ *   def to2_succeed(): mult_V = to1_V * to2_V; return mult_succeed
+ *
+ * In WASM: each of these wiring points is a (func …) that return_calls next.
+ * The E1/E2 sub-nodes are emitted recursively; their α/β names are known.
+ * We then emit the 6 "glue" functions that connect them.
+ */
+static void emit_icn_binop(const IcnNode *n, int id,
+                           const char *succ, const char *fail,
+                           const char *e1_start, const char *e1_resume,
+                           const char *e2_start, const char *e2_resume,
+                           int e1_val_id, int e2_val_id) {
+    (void)n;
+    char sa[64], ra[64], e1f[64], e1s[64], e2f[64], e2s[64];
+    wfn(sa,  sizeof sa,  id, "start");
+    wfn(ra,  sizeof ra,  id, "resume");
+    wfn(e1f, sizeof e1f, id, "e1fail");
+    wfn(e1s, sizeof e1s, id, "e1succ");
+    wfn(e2f, sizeof e2f, id, "e2fail");
+    wfn(e2s, sizeof e2s, id, "e2succ");
+
+    const char *op_instr = "i64.mul"; /* default */
+    const char *op_comment = "MUL";
+    switch (n->kind) {
+        case ICN_ADD: op_instr = "i64.add"; op_comment = "ADD"; break;
+        case ICN_SUB: op_instr = "i64.sub"; op_comment = "SUB"; break;
+        case ICN_MUL: op_instr = "i64.mul"; op_comment = "MUL"; break;
+        case ICN_DIV: op_instr = "i64.div_s"; op_comment = "DIV"; break;
+        case ICN_MOD: op_instr = "i64.rem_s"; op_comment = "MOD"; break;
+        default: break;
+    }
+
+    WI("  ;; ICN_%s  (node %d)\n", op_comment, id);
+    /* op.start → E1.start */
+    WI("  (func $%s (result i32)  return_call $%s)\n", sa, e1_start);
+    /* op.resume → E2.resume */
+    WI("  (func $%s (result i32)  return_call $%s)\n", ra, e2_resume);
+    /* E1.fail → op.fail */
+    emit_passthrough(e1f, fail);
+    /* E1.succeed → E2.start */
+    emit_passthrough(e1s, e2_start);
+    /* E2.fail → E1.resume */
+    emit_passthrough(e2f, e1_resume);
+    /* E2.succeed: compute, store, → op.succeed */
+    WI("  (func $%s (result i32)\n", e2s);
+    WI("    global.get $icn_int%d\n", e1_val_id);
+    WI("    global.get $icn_int%d\n", e2_val_id);
+    WI("    %s\n", op_instr);
+    WI("    global.set $icn_int%d\n", id);
+    WI("    return_call $%s)\n", succ);
+}
+
+/* ─── ICN_NEG / ICN_POS — unary arithmetic ──────────────────────────────────
+ * irgen.icn ir_unary (funcs path, op in {"+","-","~","^","*",".","/","\\"}):
+ *   start  → E.start
+ *   resume → E.resume
+ *   E.fail  → neg.fail
+ *   E.succeed: neg.value ← -E.value; goto neg.succeed
+ */
+static void emit_icn_unop(const IcnNode *n, int id,
+                          const char *succ, const char *fail,
+                          const char *e_start, const char *e_resume,
+                          int e_val_id) {
+    char sa[64], ra[64], ef[64], es[64];
+    wfn(sa, sizeof sa, id, "start");
+    wfn(ra, sizeof ra, id, "resume");
+    wfn(ef, sizeof ef, id, "efail");
+    wfn(es, sizeof es, id, "esucc");
+
+    WI("  ;; ICN_%s unary  (node %d)\n",
+       n->kind == ICN_NEG ? "NEG" : "POS", id);
+    WI("  (func $%s (result i32)  return_call $%s)\n", sa, e_start);
+    WI("  (func $%s (result i32)  return_call $%s)\n", ra, e_resume);
+    emit_passthrough(ef, fail);
+    WI("  (func $%s (result i32)\n", es);
+    WI("    global.get $icn_int%d\n", e_val_id);
+    if (n->kind == ICN_NEG) { WI("    i64.const -1\n"); WI("    i64.mul\n"); }
+    /* ICN_POS: identity — value unchanged */
+    WI("    global.set $icn_int%d\n", id);
+    WI("    return_call $%s)\n", succ);
+}
+
+/* ─── ICN_LT/LE/GT/GE/EQ/NE — numeric relational (paper §4.3) ───────────────
+ * irgen.icn ir_binary (funcs path):
+ *   Same wiring as binop EXCEPT E2.succeed:
+ *     if (E1.value >= E2.value) goto E2.resume   ← retry right if compare fails
+ *     op.value ← E2.value; goto op.succeed
+ *
+ * genc() case '<': nop = '>=' → if (E1_V >= E2_V) goto E2_resume
+ * test_icon-4.py mult_succeed:
+ *   if x5_V <= mult_V: return mult_resume   ← negate and retry
+ *   else: greater_V = mult_V; return greater_succeed
+ */
+static void emit_icn_relop(const IcnNode *n, int id,
+                           const char *succ, const char *fail,
+                           const char *e1_start, const char *e1_resume,
+                           const char *e2_start, const char *e2_resume,
+                           int e1_val_id, int e2_val_id) {
+    char sa[64], ra[64], e1f[64], e1s[64], e2f[64], e2s[64];
+    wfn(sa,  sizeof sa,  id, "start");
+    wfn(ra,  sizeof ra,  id, "resume");
+    wfn(e1f, sizeof e1f, id, "e1fail");
+    wfn(e1s, sizeof e1s, id, "e1succ");
+    wfn(e2f, sizeof e2f, id, "e2fail");
+    wfn(e2s, sizeof e2s, id, "e2succ");
+
+    /*
+     * negated comparison instruction for the "retry" branch:
+     *   op=LT → negate is i64.ge_s (if !(E1 < E2) → retry)
+     * WAT i64.lt_s returns 1 if E1<E2; we test the negation to retry.
+     */
+    const char *neg_instr = "i64.ge_s";  /* default for LT */
+    const char *op_comment = "LT";
+    switch (n->kind) {
+        case ICN_LT: neg_instr = "i64.ge_s"; op_comment = "LT"; break;
+        case ICN_LE: neg_instr = "i64.gt_s"; op_comment = "LE"; break;
+        case ICN_GT: neg_instr = "i64.le_s"; op_comment = "GT"; break;
+        case ICN_GE: neg_instr = "i64.lt_s"; op_comment = "GE"; break;
+        case ICN_EQ: neg_instr = "i64.ne";   op_comment = "EQ"; break;
+        case ICN_NE: neg_instr = "i64.eq";   op_comment = "NE"; break;
+        default: break;
+    }
+
+    WI("  ;; ICN_%s  (node %d, goal-directed §4.3)\n", op_comment, id);
+    WI("  (func $%s (result i32)  return_call $%s)\n", sa, e1_start);
+    WI("  (func $%s (result i32)  return_call $%s)\n", ra, e2_resume);
+    emit_passthrough(e1f, fail);
+    emit_passthrough(e1s, e2_start);
+    emit_passthrough(e2f, e1_resume);
+    /* E2.succeed: goal-directed retry */
+    WI("  (func $%s (result i32)\n", e2s);
+    WI("    global.get $icn_int%d\n", e1_val_id);  /* E1.value */
+    WI("    global.get $icn_int%d\n", e2_val_id);  /* E2.value */
+    WI("    %s\n", neg_instr);   /* 1 if comparison FAILS (goal not met) */
+    WI("    (if (then return_call $%s))\n", e2_resume); /* retry right */
+    /* comparison succeeded: op.value ← E2.value; succeed */
+    WI("    global.get $icn_int%d\n", e2_val_id);
+    WI("    global.set $icn_int%d\n", id);
+    WI("    return_call $%s)\n", succ);
+}
+
+/* ─── ICN_TO — range generator inline counter (paper §4.4) ──────────────────
+ * irgen.icn ir_a_ToBy (simplified to 2-operand case):
+ *   to.start  → E1.start
+ *   to.resume: to.I += 1; goto to.code
+ *   E1.fail   → to.fail
+ *   E1.succeed → E2.start
+ *   E2.fail   → E1.resume
+ *   E2.succeed: to.I ← E1.value; goto to.code
+ *   to.code: if (to.I > E2.value) goto E2.resume
+ *            to.value ← to.I; goto to.succeed
+ *
+ * test_icon-4.py:
+ *   def to1_start():  return x1_start
+ *   def to1_resume(): to1_I += 1; return to1_code
+ *   def to1_code():
+ *       if to1_I > x2_V: return x2_resume  (= E2_resume)
+ *       else: to1_V = to1_I; return to1_succeed
+ *   def x1_fail():  return to1_fail
+ *   def x2_fail():  return x1_resume
+ *   def x1_succeed(): return x2_start
+ *   def x2_succeed(): to1_I = x1_V; return to1_code
+ *
+ * Generator state: slot[0] = to.I (i32 counter at ICON_GEN_STATE_BASE + slot*64)
+ * E1 value is in $icn_int{e1_id}; E2 value in $icn_int{e2_id}.
+ */
+static void emit_icn_to(const IcnNode *n, int id,
+                        const char *succ, const char *fail,
+                        const char *e1_start, const char *e1_resume,
+                        const char *e2_start, const char *e2_resume,
+                        int e1_val_id, int e2_val_id) {
+    (void)n;
+    int slot = icon_alloc_gen_slot();
+    int slot_addr = icon_gen_slot_addr(slot);  /* address of to.I in memory */
+
+    char sa[64], ra[64], code[64];
+    char e1f[64], e1s[64], e2f[64], e2s[64];
+    wfn(sa,   sizeof sa,   id, "start");
+    wfn(ra,   sizeof ra,   id, "resume");
+    wfn(code, sizeof code, id, "code");
+    wfn(e1f,  sizeof e1f,  id, "e1fail");
+    wfn(e1s,  sizeof e1s,  id, "e1succ");
+    wfn(e2f,  sizeof e2f,  id, "e2fail");
+    wfn(e2s,  sizeof e2s,  id, "e2succ");
+
+    WI("  ;; ICN_TO  (node %d, gen-slot %d @ 0x%x)\n", id, slot, slot_addr);
+
+    /* to.start → E1.start */
+    WI("  (func $%s (result i32)  return_call $%s)\n", sa, e1_start);
+
+    /* to.resume: to.I += 1; goto to.code */
+    WI("  (func $%s (result i32)\n", ra);
+    WI("    i32.const %d\n", slot_addr);
+    WI("    i32.const %d\n", slot_addr);
+    WI("    i32.load\n");
+    WI("    i32.const 1\n");
+    WI("    i32.add\n");
+    WI("    i32.store\n");   /* mem[slot_addr] = mem[slot_addr] + 1 */
+    WI("    return_call $%s)\n", code);
+
+    /* E1.fail → to.fail */
+    emit_passthrough(e1f, fail);
+    /* E1.succeed → E2.start */
+    emit_passthrough(e1s, e2_start);
+    /* E2.fail → E1.resume */
+    emit_passthrough(e2f, e1_resume);
+
+    /* E2.succeed: to.I ← E1.value; goto to.code */
+    WI("  (func $%s (result i32)\n", e2s);
+    WI("    i32.const %d\n", slot_addr);
+    WI("    global.get $icn_int%d\n", e1_val_id);  /* E1.value (i64) */
+    WI("    i32.wrap_i64\n");                       /* truncate to i32 counter */
+    WI("    i32.store\n");
+    WI("    return_call $%s)\n", code);
+
+    /* to.code: if (to.I > E2.value) goto E2.resume else to.value ← to.I; succeed */
+    WI("  (func $%s (result i32)\n", code);
+    WI("    i32.const %d\n", slot_addr);
+    WI("    i32.load\n");                      /* to.I */
+    WI("    global.get $icn_int%d\n", e2_val_id);   /* E2.value (i64) */
+    WI("    i32.wrap_i64\n");
+    WI("    i32.gt_s\n");                      /* to.I > E2.value ? */
+    WI("    (if (then return_call $%s))\n", e2_resume);  /* exhausted → retry E2 */
+    /* to.value ← to.I; goto to.succeed */
+    WI("    i32.const %d\n", slot_addr);
+    WI("    i32.load\n");
+    WI("    i64.extend_i32_s\n");
+    WI("    global.set $icn_int%d\n", id);   /* to.value (carried as int global) */
+    WI("    return_call $%s)\n", succ);
+}
+
+/* ─── ICN_EVERY — drives generator to exhaustion (irgen.icn ir_a_Every) ─────
+ * every E [do body]:
+ *   start  → E.start
+ *   E.success → body.start  (if body) else → E.resume
+ *   body.success → E.resume
+ *   body.failure → E.resume
+ *   E.failure   → every.failure
+ *   (every itself never produces a value in bounded context)
+ *
+ * For "every write(…)" — no explicit body — body is ICN_CALL(write).
+ * JCON irgen: every.resume → ir_IndirectGoto(continue) — deferred to M-IW-G03 full.
+ *
+ * Tier 0 simplification: every has exactly one expression child (no separate body).
+ * The expression is the full E; we just drive it to exhaustion.
+ */
+static void emit_icn_every(const IcnNode *n, int id,
+                           const char *fail,
+                           const char *e_start, const char *e_resume,
+                           const char *e_succ_target) {
+    (void)n;
+    char sa[64], ra[64], ef[64];
+    wfn(sa, sizeof sa, id, "start");
+    wfn(ra, sizeof ra, id, "resume");
+    wfn(ef, sizeof ef, id, "efail");
+
+    WI("  ;; ICN_EVERY  (node %d)\n", id);
+    /* every.start → E.start */
+    WI("  (func $%s (result i32)  return_call $%s)\n", sa, e_start);
+    /* every.resume (called when body wants next value) → E.resume */
+    WI("  (func $%s (result i32)  return_call $%s)\n", ra, e_resume);
+    /* E.fail → every.fail (generator exhausted) */
+    emit_passthrough(ef, fail);
+    /* E.succeed → body.start (or write action, handled by caller-wired e_succ_target) */
+    /* The caller wires E's success destination as e_succ_target.
+     * After the body (write), it returns_calls every.resume = e_resume.
+     * This function is emitted by the CALL(write) node itself. */
+    (void)e_succ_target; /* wired externally by parent dispatch */
+}
+
+/* ─── ICN_ALT — value alternation E1 | E2 (ir_a_Alt) ────────────────────────
+ * irgen.icn:
+ *   start  → E1.start
+ *   resume → [alt.gate]  (indirect goto — gate holds which branch's resume)
+ *   E1.success: gate ← addrOf(E1.resume); goto alt.success
+ *   E1.fail    → E2.start
+ *   E2.success: gate ← addrOf(E2.resume); goto alt.success
+ *   E2.fail    → alt.fail
+ *
+ * test_icon-4.py style (byrd_box.py genc '|'):
+ *   alt_start:  alt_i = 1; goto E1_start
+ *   alt_resume: if (alt_i == 1) goto E1_resume; if (alt_i == 2) goto E2_resume
+ *   E1_fail:    alt_i = 2; goto E2_start
+ *   E1_succeed: alt_value = E1_value; goto alt_succeed
+ *   E2_fail:    goto alt_fail
+ *   E2_succeed: alt_value = E2_value; goto alt_succeed
+ *
+ * WASM: use gen-slot[0] = branch index (1=left, 2=right) for indirect resume.
+ */
+static void emit_icn_alt(const IcnNode *n, int id,
+                         const char *succ, const char *fail,
+                         const char *e1_start, const char *e1_resume,
+                         const char *e2_start, const char *e2_resume,
+                         int e1_val_id, int e2_val_id) {
+    (void)n;
+    int slot = icon_alloc_gen_slot();
+    int slot_addr = icon_gen_slot_addr(slot);
+
+    char sa[64], ra[64];
+    char e1f[64], e1s[64], e2f[64], e2s[64];
+    wfn(sa,  sizeof sa,  id, "start");
+    wfn(ra,  sizeof ra,  id, "resume");
+    wfn(e1f, sizeof e1f, id, "e1fail");
+    wfn(e1s, sizeof e1s, id, "e1succ");
+    wfn(e2f, sizeof e2f, id, "e2fail");
+    wfn(e2s, sizeof e2s, id, "e2succ");
+
+    WI("  ;; ICN_ALT  (node %d, branch-slot %d @ 0x%x)\n", id, slot, slot_addr);
+
+    /* alt.start: branch_index ← 1; goto E1.start */
+    WI("  (func $%s (result i32)\n", sa);
+    WI("    i32.const %d\n", slot_addr);
+    WI("    i32.const 1\n");
+    WI("    i32.store\n");
+    WI("    return_call $%s)\n", e1_start);
+
+    /* alt.resume: indirect via branch index */
+    WI("  (func $%s (result i32)\n", ra);
+    WI("    i32.const %d\n", slot_addr);
+    WI("    i32.load\n");
+    WI("    i32.const 1\n");
+    WI("    i32.eq\n");
+    WI("    (if (then return_call $%s))\n", e1_resume);
+    WI("    return_call $%s)\n", e2_resume);  /* branch == 2 */
+
+    /* E1.fail: branch_index ← 2; goto E2.start */
+    WI("  (func $%s (result i32)\n", e1f);
+    WI("    i32.const %d\n", slot_addr);
+    WI("    i32.const 2\n");
+    WI("    i32.store\n");
+    WI("    return_call $%s)\n", e2_start);
+
+    /* E1.succeed: alt.value ← E1.value; goto alt.succeed */
+    WI("  (func $%s (result i32)\n", e1s);
+    WI("    global.get $icn_int%d\n", e1_val_id);
+    WI("    global.set $icn_int%d\n", id);
+    WI("    return_call $%s)\n", succ);
+
+    /* E2.fail → alt.fail */
+    emit_passthrough(e2f, fail);
+
+    /* E2.succeed: alt.value ← E2.value; goto alt.succeed */
+    WI("  (func $%s (result i32)\n", e2s);
+    WI("    global.get $icn_int%d\n", e2_val_id);
+    WI("    global.set $icn_int%d\n", id);
+    WI("    return_call $%s)\n", succ);
+}
+
+/* ─── ICN_CALL write() — Tier 0 built-in output ─────────────────────────────
+ * For rung01 the only call is write(E):
+ *   start  → E.start
+ *   resume → E.resume
+ *   E.fail  → call.fail
+ *   E.succeed: write_int(E.value); goto call.succeed
+ *
+ * Uses $sno_output_int (from sno_runtime.wasm, already imported by emit_wasm.c).
+ * Full ICN_CALL (user procedures) deferred to M-IW-P01.
+ */
+static void emit_icn_call_write(int id,
+                                const char *succ, const char *fail,
+                                const char *e_start, const char *e_resume,
+                                int e_val_id) {
+    char sa[64], ra[64], ef[64], es[64];
+    wfn(sa, sizeof sa, id, "start");
+    wfn(ra, sizeof ra, id, "resume");
+    wfn(ef, sizeof ef, id, "efail");
+    wfn(es, sizeof es, id, "esucc");
+
+    WI("  ;; ICN_CALL write()  (node %d)\n", id);
+    WI("  (func $%s (result i32)  return_call $%s)\n", sa, e_start);
+    WI("  (func $%s (result i32)  return_call $%s)\n", ra, e_resume);
+    emit_passthrough(ef, fail);
+    WI("  (func $%s (result i32)\n", es);
+    WI("    global.get $icn_int%d\n", e_val_id);
+    WI("    call $sno_output_int\n");   /* output the integer */
+    WI("    return_call $%s)\n", succ);
+}
+
+/* ─── ICN_PROC / ICN_RETURN / ICN_FAIL — Tier 1 stubs ───────────────────────
+ * Full procedure support (M-IW-P01) requires:
+ *   - Each procedure compiled to a named WAT function group
+ *   - ICN_RETURN → ir_Succeed(t, null) = call $sno_output_flush + return 0
+ *   - ICN_FAIL   → ir_Fail()           = return_call $program_fail
+ *
+ * Tier 0 (rung01): main() implicitly executes body, no explicit return needed.
+ * Emit a stub-fail for now; M-IW-P01 wires properly.
+ */
+static void emit_icn_proc_stub(int id, const char *fail) {
+    char sa[64], ra[64];
+    wfn(sa, sizeof sa, id, "start");
+    wfn(ra, sizeof ra, id, "resume");
+    WI("  ;; ICN_PROC stub (node %d) — M-IW-P01\n", id);
+    WI("  (func $%s (result i32)  return_call $%s)\n", sa, fail);
+    WI("  (func $%s (result i32)  return_call $%s)\n", ra, fail);
+}
+
+static void emit_icn_return_stub(int id, const char *fail) {
+    char sa[64];
+    wfn(sa, sizeof sa, id, "start");
+    WI("  ;; ICN_RETURN stub (node %d) — M-IW-P01\n", id);
+    WI("  (func $%s (result i32)  return_call $%s)\n", sa, fail);
+}
+
+static void emit_icn_fail_stub(int id, const char *fail) {
+    char sa[64];
+    wfn(sa, sizeof sa, id, "start");
+    WI("  ;; ICN_FAIL stub (node %d) — M-IW-P02\n", id);
+    WI("  (func $%s (result i32)  return_call $%s)\n", sa, fail);
+}
+
+/* ─── Catch-all stub for unimplemented ICN_ nodes ────────────────────────────
+ * RULES.md §FRONTEND/BACKEND SEPARATION: when a node can't be emitted yet,
+ * emit a stub-fail (not a silent skip) so the gap is visible in test output.
+ * The .xfail mechanism tracks which tests hit stubs.
+ */
+static void emit_icn_stub(const IcnNode *n, int id, const char *fail) {
+    static const char *kind_names[] = {
+        "INT","REAL","STR","CSET","VAR","ADD","SUB","MUL","DIV","MOD","POW",
+        "NEG","POS","RANDOM","COMPLEMENT","CSET_UNION","CSET_DIFF","CSET_INTER",
+        "BANG_BINARY","SECTION_PLUS","SECTION_MINUS","LT","LE","GT","GE","EQ","NE",
+        "SLT","SLE","SGT","SGE","SEQ","SNE","CONCAT","LCONCAT","TO","TO_BY","ALT",
+        "AND","BANG","SIZE","LIMIT","NOT","NONNULL","NULL","SEQ_EXPR","EVERY",
+        "WHILE","UNTIL","REPEAT","IF","CASE","ASSIGN","AUGOP","SWAP","IDENTICAL",
+        "MATCH","SCAN","SCAN_AUGOP","CALL","RETURN","SUSPEND","FAIL","BREAK","NEXT",
+        "PROC","FIELD","SUBSCRIPT","SECTION","MAKELIST","RECORD","GLOBAL","INITIAL"
+    };
+    const char *kname = (n->kind < ICN_KIND_COUNT) ? kind_names[n->kind] : "UNKNOWN";
+    char sa[64], ra[64];
+    wfn(sa, sizeof sa, id, "start");
+    wfn(ra, sizeof ra, id, "resume");
+    WI("  ;; ICN_%s STUB (node %d) — not yet implemented\n", kname, id);
+    WI("  (func $%s (result i32)  return_call $%s)  ;; stub-fail\n", sa, fail);
+    WI("  (func $%s (result i32)  return_call $%s)  ;; stub-fail\n", ra, fail);
+}
+
+/* ── §4  Public dispatch ──────────────────────────────────────────────────── */
+
+/*
+ * emit_wasm_icon_node() — called from emit_wasm.c when it encounters an
+ * ICN_* node kind.  Returns 1 if handled, 0 if unknown.
+ *
+ * For Tier 0 (rung01) this is a partial implementation: ICN_TO, ICN_EVERY,
+ * ICN_ADD/SUB/MUL/DIV, ICN_LT/GT, ICN_INT are fully wired.
+ * All others emit stub-fail per RULES.md §FRONTEND/BACKEND SEPARATION.
+ *
+ * The full recursive dispatch (walking the IcnNode tree, threading α/β/γ/ω
+ * names down through children) is built out incrementally per milestone.
+ * This scaffold connects the emitter into the build system cleanly.
+ *
+ * CURRENT STATE: scaffold only — all paths emit stub-fail.
+ * M-IW-A01 is the first milestone to make tests pass.
+ */
+int emit_wasm_icon_node(const IcnNode *n, FILE *out) {
+    if (!n) return 0;
+    emit_wasm_icon_set_out(out);
+    icon_gen_slot_next = 0;  /* reset per top-level call */
+    wasm_icon_ctr = 0;
+
+    /* All ICN_ nodes are recognised; stubs emitted for unimplemented ones. */
+    switch (n->kind) {
+        /* Tier 0 nodes — real implementations above, connected in M-IW-A01+ */
+        case ICN_INT: case ICN_REAL: case ICN_STR: case ICN_VAR:
+        case ICN_ADD: case ICN_SUB: case ICN_MUL: case ICN_DIV: case ICN_MOD:
+        case ICN_NEG: case ICN_POS:
+        case ICN_LT:  case ICN_LE:  case ICN_GT:  case ICN_GE:
+        case ICN_EQ:  case ICN_NE:
+        case ICN_TO:  case ICN_TO_BY:
+        case ICN_EVERY: case ICN_ALT:
+        case ICN_ASSIGN: case ICN_CALL: case ICN_PROC:
+        case ICN_RETURN: case ICN_FAIL:
+            /* Full recursive wiring implemented in M-IW-A01 onwards.
+             * For now: emit stub-fail so build is clean and tests show FAIL
+             * (not silence). */
+            emit_icn_stub(n, wasm_icon_ctr++, "icn_program_fail");
+            return 1;
+
+        /* All remaining ICN_ nodes: stub-fail, visible in test output */
+        default:
+            emit_icn_stub(n, wasm_icon_ctr++, "icn_program_fail");
+            return 1;
+    }
+}
+
+/*
+ * emit_wasm_icon_globals() — emit WAT (global …) declarations for all
+ * per-node value globals used by the functions above.
+ * Called once by emit_wasm.c before the function section.
+ *
+ * For Tier 0 we emit a fixed block of 64 i64 globals ($icn_int0..$icn_int63)
+ * and 16 f64 globals ($icn_flt0..$icn_flt15).
+ * These mirror the "global x_V" variables in test_icon-4.py.
+ * Deeper nesting (rung02+) will need a proper stack; deferred to M-IW-DEEP.
+ */
+void emit_wasm_icon_globals(FILE *out) {
+    emit_wasm_icon_set_out(out);
+    WI("  ;; Icon node-value globals (test_icon-4.py: 'global x_V')\n");
+    for (int i = 0; i < 64; i++)
+        WI("  (global $icn_int%d (mut i64) (i64.const 0))\n", i);
+    for (int i = 0; i < 16; i++)
+        WI("  (global $icn_flt%d (mut f64) (f64.const 0))\n", i);
+    WI("  ;; Icon generator state memory is at 0x%x (%d slots × %d bytes)\n",
+       ICON_GEN_STATE_BASE, ICON_GEN_MAX_SLOTS, ICON_GEN_SLOT_BYTES);
+}
+
+/*
+ * is_icon_node() — true if kind is an ICN_* node that belongs to this emitter.
+ * Used by emit_wasm.c to route dispatch.
+ */
+int is_icon_node(int kind) {
+    return (kind >= ICN_INT && kind < ICN_KIND_COUNT);
+}
