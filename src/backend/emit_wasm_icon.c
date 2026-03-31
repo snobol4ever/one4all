@@ -131,6 +131,26 @@ static void icn_strlit_reset(void) {
     icn_str_bytes = 0;
 }
 
+/* ── §1c  Per-proc local variable table (M-IW-V01) ───────────────────────── */
+/* Local vars are emitted as per-proc globals: $icn_lv_PROC_VAR (mut i64).
+ * This matches the param model (already globals) and is correct for
+ * non-recursive local vars.  Recursive procs with locals need a stack frame
+ * (future work); for now sum_to/fact class programs work correctly. */
+
+#define ICN_MAX_LOCALS 32
+
+typedef struct {
+    char proc[64];
+    char name[64];
+    int  slot;   /* index within this proc's local table */
+} IcnLocalVar;
+
+static IcnLocalVar icn_locals[ICN_MAX_LOCALS];
+static int         icn_nlocals = 0;
+
+/* Reset local table at the start of each proc. */
+static void icn_locals_reset(void) { icn_nlocals = 0; }
+
 static int icon_alloc_gen_slot(void) {
     if (icon_gen_slot_next >= ICON_GEN_MAX_SLOTS) {
         fprintf(stderr, "emit_wasm_icon: too many generator slots\n");
@@ -160,6 +180,63 @@ static void emit_passthrough(const char *from, const char *to) {
     WI("  (func $%s (result i32)\n", from);
     WI("    return_call $%s)\n", to);
 }
+
+/* M-IW-V01: local-var helpers (need icn_cur_nparams / icn_cur_params from §2) */
+
+/* Scan EXPR_t tree; for every E_ASSIGN whose LHS is E_VAR and not a param,
+ * register a local slot for proc_name. */
+static void icn_locals_scan(const EXPR_t *n, const char *proc_name) {
+    if (!n) return;
+    if (n->kind == E_ASSIGN && n->nchildren >= 1) {
+        const EXPR_t *lhs = n->children[0];
+        if (lhs && lhs->kind == E_VAR && lhs->sval && lhs->sval[0]) {
+            int is_param = 0;
+            for (int i = 0; i < icn_cur_nparams; i++)
+                if (strcmp(lhs->sval, icn_cur_params[i]) == 0) { is_param = 1; break; }
+            if (!is_param) {
+                int found = 0;
+                for (int i = 0; i < icn_nlocals; i++)
+                    if (strcmp(icn_locals[i].proc, proc_name) == 0 &&
+                        strcmp(icn_locals[i].name, lhs->sval) == 0) { found = 1; break; }
+                if (!found && icn_nlocals < ICN_MAX_LOCALS) {
+                    snprintf(icn_locals[icn_nlocals].proc, 64, "%s", proc_name);
+                    snprintf(icn_locals[icn_nlocals].name, 64, "%s", lhs->sval);
+                    icn_locals[icn_nlocals].slot = icn_nlocals;
+                    icn_nlocals++;
+                }
+            }
+        }
+    }
+    for (int i = 0; i < n->nchildren; i++)
+        icn_locals_scan(n->children[i], proc_name);
+}
+
+/* Find local slot index for (proc, varname); return >=0 or -1 if not found. */
+static int icn_local_find(const char *proc_name, const char *var_name) {
+    int slot = 0;
+    for (int i = 0; i < icn_nlocals; i++) {
+        if (strcmp(icn_locals[i].proc, proc_name) == 0) {
+            if (strcmp(icn_locals[i].name, var_name) == 0) return slot;
+            slot++;
+        }
+    }
+    return -1;
+}
+
+/* Emit WAT global declarations for all locals of proc_name. */
+static void icn_emit_local_globals(const char *proc_name) {
+    for (int i = 0; i < icn_nlocals; i++) {
+        if (strcmp(icn_locals[i].proc, proc_name) == 0) {
+            WI("  (global $icn_lv_%s_%s (mut i64) (i64.const 0))\n",
+               proc_name, icn_locals[i].name);
+        }
+    }
+}
+
+/* Forward declaration — emit_icn_assign calls emit_expr_wasm */
+static void emit_expr_wasm(const EXPR_t *n,
+                            const char *succ, const char *fail,
+                            char *out_start, char *out_resume);
 
 /* ── §3  Per-node emitters (operate on EXPR_t*) ───────────────────────────── */
 
@@ -210,22 +287,99 @@ static void emit_icn_var(const EXPR_t *n, int id,
         WI("    return_call $%s)\n", succ);
         WI("  (func $%s (result i32)  return_call $%s)\n", ra, fail);
     } else {
-        WI("  (func $%s (result i32)\n", sa);
-        WI("    ;; TODO M-IW-V01: $icn_var_get for \"%s\"\n", n->sval ? n->sval : "");
-        WI("    return_call $%s)  ;; stub-fail: local vars not yet impl\n", fail);
-        WI("  (func $%s (result i32)  return_call $%s)\n", ra, fail);
+        /* Check local var table (M-IW-V01) */
+        int local_slot = (n->sval && icn_cur_proc_name[0])
+                         ? icn_local_find(icn_cur_proc_name, n->sval) : -1;
+        (void)local_slot;
+        if (local_slot >= 0) {
+            WI("  (func $%s (result i32)\n", sa);
+            WI("    global.get $icn_lv_%s_%s\n", icn_cur_proc_name, n->sval);
+            WI("    global.set $icn_int%d\n", id);
+            WI("    return_call $%s)\n", succ);
+            WI("  (func $%s (result i32)  return_call $%s)\n", ra, fail);
+        } else {
+            WI("  (func $%s (result i32)\n", sa);
+            WI("    ;; TODO: global var \"%s\" not yet impl\n", n->sval ? n->sval : "");
+            WI("    return_call $%s)  ;; stub-fail\n", fail);
+            WI("  (func $%s (result i32)  return_call $%s)\n", ra, fail);
+        }
     }
 }
 
 static void emit_icn_assign(const EXPR_t *n, int id,
                              const char *succ, const char *fail) {
-    (void)n;
     char sa[64], ra[64];
     wfn(sa, sizeof sa, id, "start");
     wfn(ra, sizeof ra, id, "resume");
-    WI("  ;; E_ASSIGN  (node %d) — stub until M-IW-A01\n", id);
-    WI("  (func $%s (result i32)  return_call $%s)\n", sa, fail);
-    WI("  (func $%s (result i32)  return_call $%s)\n", ra, fail);
+
+    /* E_ASSIGN: children[0] = LHS E_VAR, children[1] = RHS expr */
+    if (!n || n->nchildren < 2) {
+        WI("  ;; E_ASSIGN  (node %d) — malformed, stub-fail\n", id);
+        WI("  (func $%s (result i32)  return_call $%s)\n", sa, fail);
+        WI("  (func $%s (result i32)  return_call $%s)\n", ra, fail);
+        return;
+    }
+    const EXPR_t *lhs = n->children[0];
+    const EXPR_t *rhs = n->children[1];
+    const char *vname = (lhs && lhs->sval) ? lhs->sval : NULL;
+
+    /* Check if LHS is a local var */
+    int local_slot = (vname && icn_cur_proc_name[0])
+                     ? icn_local_find(icn_cur_proc_name, vname) : -1;
+    (void)local_slot;
+
+    if (vname && local_slot >= 0) {
+        /* Emit RHS; on success store into local global, then call succ */
+        char rhs_start[64], rhs_resume[64];
+        char esucc[64];
+        wfn(esucc, sizeof esucc, id, "esucc");
+        int rhs_id = wasm_icon_ctr;
+        emit_expr_wasm(rhs, esucc, fail, rhs_start, rhs_resume);
+
+        WI("  ;; E_ASSIGN \"%s\" := ...  (node %d, local)\n", vname, id);
+        WI("  (func $%s (result i32)  return_call $%s)\n", sa, rhs_start);
+        WI("  (func $%s (result i32)  return_call $%s)\n", ra, rhs_resume);
+        /* esucc: store RHS result into local global, then proceed */
+        WI("  (func $%s (result i32)\n", esucc);
+        WI("    global.get $icn_int%d\n", rhs_id);
+        WI("    global.set $icn_lv_%s_%s\n", icn_cur_proc_name, vname);
+        /* Icon assignment yields RHS value */
+        WI("    global.get $icn_int%d\n", rhs_id);
+        WI("    global.set $icn_int%d\n", id);
+        WI("    return_call $%s)\n", succ);
+    } else if (vname) {
+        /* param assignment (update param global) or unknown — stub for now */
+        int param_idx = -1;
+        for (int i = 0; i < icn_cur_nparams; i++)
+            if (strcmp(vname, icn_cur_params[i]) == 0) { param_idx = i; break; }
+
+        if (param_idx >= 0) {
+            char rhs_start[64], rhs_resume[64];
+            char esucc[64];
+            wfn(esucc, sizeof esucc, id, "esucc");
+            int rhs_id = wasm_icon_ctr;
+            emit_expr_wasm(rhs, esucc, fail, rhs_start, rhs_resume);
+
+            WI("  ;; E_ASSIGN param%d \"%s\" := ...  (node %d)\n", param_idx, vname, id);
+            WI("  (func $%s (result i32)  return_call $%s)\n", sa, rhs_start);
+            WI("  (func $%s (result i32)  return_call $%s)\n", ra, rhs_resume);
+            WI("  (func $%s (result i32)\n", esucc);
+            WI("    global.get $icn_int%d\n", rhs_id);
+            WI("    global.set $icn_param%d\n", param_idx);
+            WI("    global.get $icn_int%d\n", rhs_id);
+            WI("    global.set $icn_int%d\n", id);
+            WI("    return_call $%s)\n", succ);
+        } else {
+            WI("  ;; E_ASSIGN \"%s\" (node %d) — not a known local/param, stub-fail\n",
+               vname, id);
+            WI("  (func $%s (result i32)  return_call $%s)\n", sa, fail);
+            WI("  (func $%s (result i32)  return_call $%s)\n", ra, fail);
+        }
+    } else {
+        WI("  ;; E_ASSIGN  (node %d) — no LHS name, stub-fail\n", id);
+        WI("  (func $%s (result i32)  return_call $%s)\n", sa, fail);
+        WI("  (func $%s (result i32)  return_call $%s)\n", ra, fail);
+    }
 }
 
 static void emit_icn_binop(const EXPR_t *n, int id,
@@ -349,8 +503,27 @@ static void emit_icn_to(const EXPR_t *n, int id,
     wfn(e2f,  sizeof e2f,  id, "e2fail");
     wfn(e2s,  sizeof e2s,  id, "e2succ");
 
+    /* slot layout: [slot_addr+0] = current counter (i32)
+     *              [slot_addr+4] = initialized flag (i32, 0=fresh 1=running) */
+    int slot_flag = slot_addr + 4;
+
     WI("  ;; E_TO  (node %d, gen-slot %d @ 0x%x)\n", id, slot, slot_addr);
-    WI("  (func $%s (result i32)  return_call $%s)\n", sa, e1_start);
+    /* start: if already initialized (flag=1), skip re-eval and go to code (increment+check) */
+    WI("  (func $%s (result i32)\n", sa);
+    WI("    i32.const %d\n", slot_flag);
+    WI("    i32.load\n");
+    WI("    i32.const 1\n");
+    WI("    i32.eq\n");
+    WI("    (if (then\n");
+    WI("      i32.const %d\n", slot_addr);
+    WI("      i32.const %d\n", slot_addr);
+    WI("      i32.load\n");
+    WI("      i32.const 1\n");
+    WI("      i32.add\n");
+    WI("      i32.store\n");
+    WI("      return_call $%s))\n", code);
+    WI("    ;; fresh start: evaluate bounds\n");
+    WI("    return_call $%s)\n", e1_start);
     WI("  (func $%s (result i32)\n", ra);
     WI("    i32.const %d\n", slot_addr);
     WI("    i32.const %d\n", slot_addr);
@@ -367,6 +540,10 @@ static void emit_icn_to(const EXPR_t *n, int id,
     WI("    global.get $icn_int%d\n", e1_val_id);
     WI("    i32.wrap_i64\n");
     WI("    i32.store\n");
+    /* mark as initialized */
+    WI("    i32.const %d\n", slot_flag);
+    WI("    i32.const 1\n");
+    WI("    i32.store\n");
     WI("    return_call $%s)\n", code);
     WI("  (func $%s (result i32)\n", code);
     WI("    i32.const %d\n", slot_addr);
@@ -374,7 +551,12 @@ static void emit_icn_to(const EXPR_t *n, int id,
     WI("    global.get $icn_int%d\n", e2_val_id);
     WI("    i32.wrap_i64\n");
     WI("    i32.gt_s\n");
-    WI("    (if (then return_call $%s))\n", e2_resume);
+    WI("    (if (then\n");
+    /* exhausted: clear flag for potential reuse, then call outer fail directly */
+    WI("      i32.const %d\n", slot_flag);
+    WI("      i32.const 0\n");
+    WI("      i32.store\n");
+    WI("      return_call $%s))\n", fail);
     WI("    i32.const %d\n", slot_addr);
     WI("    i32.load\n");
     WI("    i64.extend_i32_s\n");
@@ -470,10 +652,6 @@ static void emit_icn_stub(const EXPR_t *n, int id, const char *fail) {
 }
 
 /* ── §4  Recursive expression emitter ─────────────────────────────────────── */
-
-static void emit_expr_wasm(const EXPR_t *n,
-                            const char *succ, const char *fail,
-                            char *out_start, char *out_resume);
 
 static void emit_expr_wasm(const EXPR_t *n,
                             const char *succ, const char *fail,
@@ -640,7 +818,9 @@ static void emit_expr_wasm(const EXPR_t *n,
                        e_start, e_resume);
         WI("  ;; E_EVERY  (node %d)\n", id);
         WI("  (func $%s (result i32)  return_call $%s)\n", sa, e_start);
-        WI("  (func $%s (result i32)  return_call $%s)\n", every_resume, e_resume);
+        /* every_resume re-enters body at START (not resume) so variables are
+         * re-read with current values; E_TO initialized-flag prevents slot reset */
+        WI("  (func $%s (result i32)  return_call $%s)\n", every_resume, e_start);
         WI("  (func $%s (result i32)  return_call $%s)\n", every_fail, succ);
         snprintf(ra, sizeof ra, "%s", every_resume);
         break;
@@ -863,6 +1043,14 @@ static void emit_wasm_icon_proc(const EXPR_t *proc) {
         const char *pn = (pnode && pnode->sval) ? pnode->sval : "";
         snprintf(icn_cur_params[i], 64, "%s", pn);
     }
+
+    /* M-IW-V01: scan proc body for local vars (E_ASSIGN LHS that aren't params) */
+    icn_locals_reset();
+    for (int i = 0; i < nstmts; i++)
+        icn_locals_scan(proc->children[body_start + i], pname);
+
+    /* Emit (global $icn_lv_PROC_VAR ...) for each discovered local */
+    icn_emit_local_globals(pname);
 
     if (nstmts == 0) {
         WI("  (func $icn_proc_%s_start (result i32)  return_call $icn_prog_end)\n", pname);
