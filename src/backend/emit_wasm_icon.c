@@ -1038,6 +1038,10 @@ static void emit_expr_wasm(const EXPR_t *n,
     case E_RETURN:
         WI("  ;; E_RETURN (node %d)\n", id);
         if (strcmp(icn_cur_proc_name, "main") != 0 && icn_cur_proc_name[0] != '\0') {
+            /* return bypasses the statement chain — jump directly to proc retcont */
+            char retcont_target[160];
+            snprintf(retcont_target, sizeof retcont_target,
+                     "icn_proc_%s_retcont", icn_cur_proc_name);
             if (n->nchildren >= 1) {
                 char e_start[64], e_resume[64];
                 char esucc[64];
@@ -1047,13 +1051,13 @@ static void emit_expr_wasm(const EXPR_t *n,
                 WI("  (func $%s (result i32)\n", esucc);
                 WI("    global.get $icn_int%d\n", e_id);
                 WI("    global.set $icn_retval\n");
-                WI("    return_call $%s)\n", succ);
+                WI("    return_call $%s)\n", retcont_target);
                 WI("  (func $%s (result i32)  return_call $%s)\n", sa, e_start);
             } else {
                 WI("  (func $%s (result i32)\n", sa);
                 WI("    i64.const 0\n");
                 WI("    global.set $icn_retval\n");
-                WI("    return_call $%s)\n", succ);
+                WI("    return_call $%s)\n", retcont_target);
             }
         } else {
             WI("  (func $%s (result i32)  return_call $%s)\n", sa, succ);
