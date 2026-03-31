@@ -60,6 +60,15 @@ void emit_wasm_icon_set_out(FILE *f) { icon_wasm_out = f; }
 #define ICON_RETCONT_STACK_BASE 0x24004   /* 147460: stack data starts here */
 #define ICON_RETCONT_MAX_DEPTH  1024      /* max recursion depth */
 
+/* M-IW-R01: activation frame stack for recursion.
+ * Each frame: [count i32][int0..N i64 each][param0..M i64 each]
+ * SP stored at ICON_FRAME_SP_ADDR (i32); stack grows upward.
+ * Layout above retcont stack (which tops out at ~0x27FFF for 1024 frames): */
+#define ICON_FRAME_SP_ADDR     0x30000   /* 196608: frame stack SP — page 3 start */
+#define ICON_FRAME_STACK_BASE  0x30004   /* 196612: frame data starts here */
+#define ICON_FRAME_MAX_INTS    64        /* save up to 64 icn_intN globals */
+#define ICON_FRAME_MAX_PARAMS  8         /* save up to 8 params */
+
 static int icon_gen_slot_next = 0;
 
 /* M-IW-P01: funcref table for call-site esucc trampolines.
@@ -666,6 +675,78 @@ static void emit_icn_call_write(int id,
 }
 
 /* Catch-all stub for unimplemented nodes */
+/* M-IW-R01: emit inline WAT to push icn_int0..nints-1 onto the frame stack.
+ * Frame layout: [nints i32][nparams i32][int0..N i64][param0..M i64]
+ * Uses $icn_frame_sp global as the bump pointer.
+ * Call-site wraps push before docall, pop in esucc. */
+static void emit_frame_push(int nints, int nparams) {
+    if (nints <= 0 && nparams <= 0) return;
+    WI("    ;; M-IW-R01 frame push (%d ints, %d params)\n", nints, nparams);
+    /* Store nints count at [sp+0] */
+    WI("    global.get $icn_frame_sp\n");
+    WI("    i32.const %d\n", nints);
+    WI("    i32.store\n");
+    /* Store nparams count at [sp+4] */
+    WI("    global.get $icn_frame_sp\n");
+    WI("    i32.const 4\n");
+    WI("    i32.add\n");
+    WI("    i32.const %d\n", nparams);
+    WI("    i32.store\n");
+    /* Save each icn_intN at [sp+8 + i*8] */
+    for (int i = 0; i < nints; i++) {
+        int off = 8 + i * 8;
+        WI("    global.get $icn_frame_sp\n");
+        WI("    i32.const %d\n", off);
+        WI("    i32.add\n");
+        WI("    global.get $icn_int%d\n", i);
+        WI("    i64.store\n");
+    }
+    /* Save each icn_paramN at [sp+8+nints*8 + i*8] */
+    for (int i = 0; i < nparams; i++) {
+        int off = 8 + nints * 8 + i * 8;
+        WI("    global.get $icn_frame_sp\n");
+        WI("    i32.const %d\n", off);
+        WI("    i32.add\n");
+        WI("    global.get $icn_param%d\n", i);
+        WI("    i64.store\n");
+    }
+    /* Bump SP past entire frame */
+    int frame_size = 8 + (nints + nparams) * 8;
+    WI("    global.get $icn_frame_sp\n");
+    WI("    i32.const %d\n", frame_size);
+    WI("    i32.add\n");
+    WI("    global.set $icn_frame_sp\n");
+}
+
+static void emit_frame_pop(int nints, int nparams) {
+    if (nints <= 0 && nparams <= 0) return;
+    WI("    ;; M-IW-R01 frame pop (%d ints, %d params)\n", nints, nparams);
+    /* Move SP back to frame base */
+    int frame_size = 8 + (nints + nparams) * 8;
+    WI("    global.get $icn_frame_sp\n");
+    WI("    i32.const %d\n", frame_size);
+    WI("    i32.sub\n");
+    WI("    global.set $icn_frame_sp\n");
+    /* Restore params (can be in any order since we know counts) */
+    for (int i = 0; i < nparams; i++) {
+        int off = 8 + nints * 8 + i * 8;
+        WI("    global.get $icn_frame_sp\n");
+        WI("    i32.const %d\n", off);
+        WI("    i32.add\n");
+        WI("    i64.load\n");
+        WI("    global.set $icn_param%d\n", i);
+    }
+    /* Restore ints */
+    for (int i = 0; i < nints; i++) {
+        int off = 8 + i * 8;
+        WI("    global.get $icn_frame_sp\n");
+        WI("    i32.const %d\n", off);
+        WI("    i32.add\n");
+        WI("    i64.load\n");
+        WI("    global.set $icn_int%d\n", i);
+    }
+}
+
 static void emit_icn_stub(const EXPR_t *n, int id, const char *fail) {
     char kname_buf[32]; snprintf(kname_buf, sizeof kname_buf, "kind%d", (int)n->kind);
     const char *kname = kname_buf;
@@ -899,6 +980,11 @@ static void emit_expr_wasm(const EXPR_t *n,
             char esucc[64];
             wfn(esucc, sizeof esucc, id, "esucc");
 
+            /* Number of live icn_intN slots to save = all slots used so far.
+             * wasm_icon_ctr is the NEXT id to allocate; all ids < id are live. */
+            int nints_to_save = id;  /* save icn_int0..id-1 */
+            if (nints_to_save > ICON_FRAME_MAX_INTS) nints_to_save = ICON_FRAME_MAX_INTS;
+
             if (nargs > 0) {
                 /* Two-pass: emit all arg expressions first to get their start names,
                  * then emit esucc trampolines that forward to the next arg's start. */
@@ -931,21 +1017,24 @@ static void emit_expr_wasm(const EXPR_t *n,
                     WI("    global.set $icn_param%d\n", ai);
                     WI("    return_call $%s)\n", next_buf);
                 }
-                /* Register esucc in retcont table; docall sets $icn_retcont then calls proc */
+                /* Register esucc in retcont table; docall saves frame then calls proc */
                 int retcont_idx = icn_retcont_register(esucc);
                 WI("  (func $icon%d_docall (result i32)\n", id);
+                emit_frame_push(nints_to_save, 0);  /* M-IW-R01: save live ints */
                 WI("    i32.const %d\n", retcont_idx);
-                WI("    call $icn_retcont_push\n");  /* IW-9: stack push for recursion */
+                WI("    call $icn_retcont_push\n");
                 WI("    return_call $icn_proc_%s_start)\n", fname);
             } else {
                 int retcont_idx = icn_retcont_register(esucc);
                 WI("  (func $%s (result i32)\n", sa);
+                emit_frame_push(nints_to_save, 0);  /* M-IW-R01: save live ints */
                 WI("    i32.const %d\n", retcont_idx);
-                WI("    call $icn_retcont_push\n");  /* IW-9: stack push for recursion */
+                WI("    call $icn_retcont_push\n");
                 WI("    return_call $icn_proc_%s_start)\n", fname);
             }
 
             WI("  (func $%s (result i32)\n", esucc);
+            emit_frame_pop(nints_to_save, 0);   /* M-IW-R01: restore live ints */
             WI("    global.get $icn_retval\n");
             WI("    global.set $icn_int%d\n", id);
             WI("    return_call $%s)\n", succ);
@@ -1109,6 +1198,16 @@ void emit_wasm_icon_globals(FILE *out) {
     WI("    local.get $sp\n");
     WI("    i32.load)\n");
     WI("  (global $icn_retcont (mut i32) (i32.const 0))\n");
+    /* M-IW-R01: frame stack push/pop helpers.
+     * icn_frame_push(nints, nparams): saves icn_int0..nints-1 then
+     *   icn_param0..nparams-1 to the frame stack.
+     * icn_frame_pop(nints, nparams): restores them in reverse.
+     * We emit parameterised versions that take counts as i32 args
+     * and loop, but for simplicity we emit fixed-count helpers per call-site
+     * (see emit_icn_frame_push/pop below). */
+    WI("  ;; M-IW-R01: frame SP (page 3, 0x30000)\n");
+    WI("  (global $icn_frame_sp (mut i32) (i32.const %d))\n", ICON_FRAME_STACK_BASE);
+    /* Shared param globals still needed for arg passing between call-site and callee */
     for (int i = 0; i < 8; i++)
         WI("  (global $icn_param%d (mut i64) (i64.const 0))\n", i);
 }
@@ -1250,7 +1349,7 @@ void emit_wasm_icon_file(EXPR_t **procs, int count, FILE *out,
     WI("  ;; M-IW-P01: continuation type for return_call_indirect\n");
     WI("  (type $cont_t (func (result i32)))\n");
     WI("  ;; Memory imported from runtime module\n");
-    WI("  (import \"sno\" \"memory\" (memory 3))  ;; page0=output/heap page1=str literals page2=gen state\n");
+    WI("  (import \"sno\" \"memory\" (memory 4))  ;; page0=output page1=str page2=gen-state page3=icn-frame-stack\n");
     WI("  ;; Runtime function imports\n");
     WI("  (import \"sno\" \"sno_output_str\"   (func $sno_output_str   (param i32 i32)))\n");
     WI("  (import \"sno\" \"sno_output_int\"   (func $sno_output_int   (param i64)))\n");
