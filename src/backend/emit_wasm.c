@@ -92,19 +92,9 @@ static WasmTy emit_expr(const EXPR_t *e);
 /* Programs import all runtime functions from the "sno" namespace.           */
 /* The runtime module (sno_runtime.wasm) is pre-compiled once per session.   */
 static void emit_runtime_imports(void) {
-    W("  ;; Memory imported from runtime module\n");
-    W("  (import \"sno\" \"memory\" (memory 2))  ;; runtime exports 2 pages; data segment at 65536\n");
-    W("  ;; Runtime function imports\n");
-    W("  (import \"sno\" \"sno_output_str\"   (func $sno_output_str   (param i32 i32)))\n");
-    W("  (import \"sno\" \"sno_output_int\"   (func $sno_output_int   (param i64)))\n");
-    W("  (import \"sno\" \"sno_output_flush\" (func $sno_output_flush (result i32)))\n");
-    W("  (import \"sno\" \"sno_str_alloc\"    (func $sno_str_alloc    (param i32) (result i32)))\n");
-    W("  (import \"sno\" \"sno_str_concat\"   (func $sno_str_concat   (param i32 i32 i32 i32) (result i32 i32)))\n");
-    W("  (import \"sno\" \"sno_str_eq\"       (func $sno_str_eq       (param i32 i32 i32 i32) (result i32)))\n");
-    W("  (import \"sno\" \"sno_str_to_int\"   (func $sno_str_to_int   (param i32 i32) (result i64)))\n");
-    W("  (import \"sno\" \"sno_int_to_str\"   (func $sno_int_to_str   (param i64) (result i32 i32)))\n");
-    W("  (import \"sno\" \"sno_float_to_str\" (func $sno_float_to_str (param f64) (result i32 i32)))\n");
-    W("  (import \"sno\" \"sno_pow\"          (func $sno_pow          (param f64 f64) (result f64)))\n");
+    emit_wasm_runtime_imports_sno_base(wasm_out, 2,
+        "runtime exports 2 pages; data segment at 65536");
+    /* SNOBOL4-specific imports (pattern engine, builtins, string utilities) */
     W("  (import \"sno\" \"sno_size\"         (func $sno_size         (param i32 i32) (result i64)))\n");
     W("  (import \"sno\" \"sno_dupl\"         (func $sno_dupl         (param i32 i32 i64) (result i32 i32)))\n");
     W("  (import \"sno\" \"sno_replace\"      (func $sno_replace      (param i32 i32 i32 i32 i32 i32) (result i32 i32)))\n");
@@ -167,6 +157,15 @@ static void prescan_expr(const EXPR_t *e) {
         else if (ch && ch->kind == E_CAPT_COND && ch->nchildren > 0
                  && ch->children[0] && ch->children[0]->sval)
             var_intern(ch->children[0]->sval);
+    }
+    /* CAPT_COND/CAPT_IMM/CAPT_CUR: varname in children[1]->sval (binop shape) */
+    if (e->kind == E_CAPT_COND || e->kind == E_CAPT_IMM || e->kind == E_CAPT_CUR) {
+        /* Try sval first (legacy path), then children[1] (parser binop path) */
+        const char *vn = e->sval;
+        if (!vn && e->nchildren >= 2 && e->children[1] && e->children[1]->sval)
+            vn = e->children[1]->sval;
+        if (vn && !is_keyword_name(vn))
+            var_intern(vn);
     }
     for (int i = 0; i < e->nchildren; i++) prescan_expr(e->children[i]);
 }
@@ -701,6 +700,164 @@ static void emit_pattern_node(const EXPR_t *pat) {
         W("      ))\n");
         return;
     }
+    /* E_CAPT_COND (.var) — conditional capture: extract subj[before..cursor] on success
+     * IR shape: binop(E_CAPT_COND, pattern_child, E_VAR(varname))
+     * sval is NOT set; varname lives in children[1]->sval. */
+    if (pat->kind == E_CAPT_COND) {
+        const EXPR_t *child   = (pat->nchildren >= 1) ? pat->children[0] : NULL;
+        const EXPR_t *varnode = (pat->nchildren >= 2) ? pat->children[1] : NULL;
+        const char *varname = varnode && varnode->sval ? varnode->sval
+                            : (pat->sval ? pat->sval : "");
+
+        W("      ;; E_CAPT_COND .%s: save cursor, run child, capture on success\n", varname);
+        W("      (local.set $pat_before (local.get $pat_cursor))\n");
+        if (child) emit_pattern_node(child);
+        /* only assign if child succeeded (cursor >= 0) */
+        if (*varname && !is_keyword_name(varname)) {
+            W("      (if (i32.ge_s (local.get $pat_cursor) (i32.const 0)) (then\n");
+            W("        (global.set $var_%s_off\n", varname);
+            W("          (i32.add (local.get $pat_subj_off) (local.get $pat_before)))\n");
+            W("        (global.set $var_%s_len\n", varname);
+            W("          (i32.sub (local.get $pat_cursor) (local.get $pat_before)))\n");
+            W("      ))\n");
+        }
+        return;
+    }
+    /* E_CAPT_IMM ($var) — immediate capture: captures exactly what the inner pattern matched.
+     * IR shape: binop(E_CAPT_IMM, pattern_child, E_VAR(varname))
+     * For a QLIT child: sno_pat_search may scan forward from cursor to find the literal,
+     * so the match starts at (new_cursor - ndl_len), not at pat_before.
+     * We track child cursor-before to compute match length = new_cursor - child_cursor_before,
+     * and match offset via a second local $pat_imm_start that we set before child runs. */
+    if (pat->kind == E_CAPT_IMM) {
+        const EXPR_t *child   = (pat->nchildren >= 1) ? pat->children[0] : NULL;
+        const EXPR_t *varnode = (pat->nchildren >= 2) ? pat->children[1] : NULL;
+        const char *varname = varnode && varnode->sval ? varnode->sval
+                            : (pat->sval ? pat->sval : "");
+        W("      ;; E_CAPT_IMM $%s: run child, capture exactly matched span\n", varname);
+        /* Save cursor before child so we can detect how far child advanced */
+        W("      (local.set $pat_before (local.get $pat_cursor))\n");
+        if (child) emit_pattern_node(child);
+        /* After child: pat_cursor = end of match (or -1).
+         * For QLIT the match may not start at pat_before (search scans forward).
+         * The child (QLIT) leaves cursor = match_start + ndl_len.
+         * We don't have match_start directly; use sno_pat_search convention:
+         * captured len = cursor - pat_before only if anchored. For unanchored search
+         * (QLIT in non-ANCHOR mode), use the actual child match length.
+         * Simplest correct approach: emit a sno_pat_search wrapper that also
+         * returns match_start. Until then: for QLIT child, len = ndl_len,
+         * off = subj_off + (cursor - ndl_len). For generic child: off = subj_off + pat_before,
+         * len = cursor - pat_before (COND semantics as fallback). */
+        if (*varname && !is_keyword_name(varname)) {
+            if (child && child->kind == E_QLIT) {
+                int idx = strlit_intern(child->sval ? child->sval : "");
+                int ndl_len = str_lits[idx].len;
+                W("      (if (i32.ge_s (local.get $pat_cursor) (i32.const 0)) (then\n");
+                W("        (global.set $var_%s_off\n", varname);
+                W("          (i32.add (local.get $pat_subj_off)\n");
+                W("                   (i32.sub (local.get $pat_cursor) (i32.const %d))))\n", ndl_len);
+                W("        (global.set $var_%s_len (i32.const %d))\n", varname, ndl_len);
+                W("      ))\n");
+            } else {
+                /* Generic child: capture subj[pat_before..cursor] (same as COND) */
+                W("      (if (i32.ge_s (local.get $pat_cursor) (i32.const 0)) (then\n");
+                W("        (global.set $var_%s_off\n", varname);
+                W("          (i32.add (local.get $pat_subj_off) (local.get $pat_before)))\n");
+                W("        (global.set $var_%s_len\n", varname);
+                W("          (i32.sub (local.get $pat_cursor) (local.get $pat_before)))\n");
+                W("      ))\n");
+            }
+        }
+        return;
+    }
+    /* E_CAPT_CUR (@var) — zero-width cursor capture: store cursor position as integer string
+     * IR shape (cursor-after): binop(E_CAPT_CUR, pattern_child, E_VAR(varname))
+     * children[0] = pattern to match first; children[1] = target variable.
+     * Cursor position captured AFTER children[0] matches. */
+    if (pat->kind == E_CAPT_CUR) {
+        const EXPR_t *child   = (pat->nchildren >= 1) ? pat->children[0] : NULL;
+        const EXPR_t *varnode = (pat->nchildren >= 2) ? pat->children[1] : NULL;
+        const char *varname = varnode && varnode->sval ? varnode->sval
+                            : (pat->sval ? pat->sval : "");
+        /* Run the child pattern first (advances cursor), then capture position */
+        if (child) emit_pattern_node(child);
+        W("      ;; E_CAPT_CUR @%s: store cursor position as int string into var\n", varname);
+        if (*varname && !is_keyword_name(varname)) {
+            /* Only capture if child succeeded */
+            W("      (if (i32.ge_s (local.get $pat_cursor) (i32.const 0)) (then\n");
+            W("        (i64.extend_i32_u (local.get $pat_cursor))\n");
+            W("        (call $sno_int_to_str)\n");
+            W("        (global.set $var_%s_len)\n", varname);
+            W("        (global.set $var_%s_off)\n", varname);
+            W("      ))\n");
+        }
+        /* zero-width as far as pattern matching is concerned: cursor already set by child */
+        return;
+    }
+    /* E_FNC cursor-assertion / cursor-advance patterns: POS RPOS LEN TAB RTAB REM */
+    if (pat->kind == E_FNC && pat->sval) {
+        const char *fn = pat->sval;
+        /* REM — no arg: cursor = subj_len */
+        if (strcasecmp(fn, "REM") == 0) {
+            W("      ;; REM: cursor = subj_len\n");
+            W("      (local.set $pat_cursor (local.get $pat_subj_len))\n");
+            return;
+        }
+        /* One-arg cursor ops: POS RPOS LEN TAB RTAB */
+        if (pat->nchildren == 1 &&
+            (strcasecmp(fn,"POS")==0  || strcasecmp(fn,"RPOS")==0 ||
+             strcasecmp(fn,"LEN")==0  || strcasecmp(fn,"TAB")==0  ||
+             strcasecmp(fn,"RTAB")==0)) {
+            /* Evaluate arg → i32 n (arg is typically E_ILIT → TY_INT i64) */
+            W("      ;; %s: evaluate arg → $pat_n\n", fn);
+            WasmTy at = emit_expr(pat->children[0]);
+            if (at == TY_INT)   W("      (i32.wrap_i64)\n");
+            else if (at == TY_FLOAT) W("      (i32.trunc_f64_s)\n");
+            else /* STR */      W("      (call $sno_str_to_int) (i32.wrap_i64)\n");
+            W("      (local.set $pat_n)\n");
+            if (strcasecmp(fn, "POS") == 0) {
+                /* fail unless cursor == n */
+                W("      (if (i32.ne (local.get $pat_cursor) (local.get $pat_n)) (then\n");
+                W("        (local.set $pat_cursor (i32.const -1))\n");
+                W("      ))\n");
+            } else if (strcasecmp(fn, "RPOS") == 0) {
+                /* fail unless cursor == subj_len - n */
+                W("      (if (i32.ne (local.get $pat_cursor)\n");
+                W("              (i32.sub (local.get $pat_subj_len) (local.get $pat_n))) (then\n");
+                W("        (local.set $pat_cursor (i32.const -1))\n");
+                W("      ))\n");
+            } else if (strcasecmp(fn, "LEN") == 0) {
+                /* advance by n if cursor+n <= subj_len */
+                W("      (if (i32.gt_s\n");
+                W("            (i32.add (local.get $pat_cursor) (local.get $pat_n))\n");
+                W("            (local.get $pat_subj_len)) (then\n");
+                W("        (local.set $pat_cursor (i32.const -1))\n");
+                W("      ) (else\n");
+                W("        (local.set $pat_cursor\n");
+                W("          (i32.add (local.get $pat_cursor) (local.get $pat_n)))\n");
+                W("      ))\n");
+            } else if (strcasecmp(fn, "TAB") == 0) {
+                /* set cursor=n if cursor<=n and n<=subj_len, else fail */
+                W("      (if (i32.or\n");
+                W("            (i32.gt_s (local.get $pat_cursor) (local.get $pat_n))\n");
+                W("            (i32.gt_s (local.get $pat_n) (local.get $pat_subj_len))) (then\n");
+                W("        (local.set $pat_cursor (i32.const -1))\n");
+                W("      ) (else\n");
+                W("        (local.set $pat_cursor (local.get $pat_n))\n");
+                W("      ))\n");
+            } else { /* RTAB */
+                /* tgt = subj_len - n; set cursor=tgt if cursor<=tgt, else fail */
+                W("      (local.set $pat_n\n");
+                W("        (i32.sub (local.get $pat_subj_len) (local.get $pat_n)))\n");
+                W("      (if (i32.gt_s (local.get $pat_cursor) (local.get $pat_n)) (then\n");
+                W("        (local.set $pat_cursor (i32.const -1))\n");
+                W("      ) (else\n");
+                W("        (local.set $pat_cursor (local.get $pat_n))\n");
+                W("      ))\n");
+            }
+            return;
+        }
+    }
     /* E_FNC with sval ANY / NOTANY / SPAN / BREAK / BREAKX — character-class patterns */
     if (pat->kind == E_FNC && pat->sval && pat->nchildren == 1) {
         const char *fn = pat->sval;
@@ -942,6 +1099,8 @@ static void emit_main_body(Program *prog) {
     W("    (local $pat_ndl_off i32)\n");
     W("    (local $pat_ndl_len i32)\n");
     W("    (local $pat_save_cursor i32)\n");
+    W("    (local $pat_n i32)\n");
+    W("    (local $pat_before i32)\n");
 
     int closed[MAX_LABELS] = {0};
     closed[0] = 1;
@@ -1146,10 +1305,27 @@ void emit_wasm_set_out(FILE *f)              { wasm_out = f; }
 int  emit_wasm_strlit_intern(const char *s)  { return strlit_intern(s); }
 int  emit_wasm_strlit_abs(int idx)           { return strlit_abs(idx); }
 int  emit_wasm_strlit_len(int idx)           { return str_lits[idx].len; }
+int  emit_wasm_strlit_count(void)            { return str_nlit; }
 void emit_wasm_data_segment(void)            { emit_data_segment(); }
 void emit_wasm_strlit_reset(void) {
     for (int i = 0; i < str_nlit; i++) { free(str_lits[i].text); str_lits[i].text = NULL; }
     str_nlit = str_bytes = 0;
+}
+
+void emit_wasm_runtime_imports_sno_base(FILE *out, int npages, const char *page_comment) {
+    fprintf(out, "  ;; Memory imported from runtime module\n");
+    fprintf(out, "  (import \"sno\" \"memory\" (memory %d))  ;; %s\n", npages, page_comment ? page_comment : "");
+    fprintf(out, "  ;; Runtime function imports (base set — shared by SNOBOL4 and Icon)\n");
+    fprintf(out, "  (import \"sno\" \"sno_output_str\"   (func $sno_output_str   (param i32 i32)))\n");
+    fprintf(out, "  (import \"sno\" \"sno_output_int\"   (func $sno_output_int   (param i64)))\n");
+    fprintf(out, "  (import \"sno\" \"sno_output_flush\" (func $sno_output_flush (result i32)))\n");
+    fprintf(out, "  (import \"sno\" \"sno_str_alloc\"    (func $sno_str_alloc    (param i32) (result i32)))\n");
+    fprintf(out, "  (import \"sno\" \"sno_str_concat\"   (func $sno_str_concat   (param i32 i32 i32 i32) (result i32 i32)))\n");
+    fprintf(out, "  (import \"sno\" \"sno_str_eq\"       (func $sno_str_eq       (param i32 i32 i32 i32) (result i32)))\n");
+    fprintf(out, "  (import \"sno\" \"sno_str_to_int\"   (func $sno_str_to_int   (param i32 i32) (result i64)))\n");
+    fprintf(out, "  (import \"sno\" \"sno_int_to_str\"   (func $sno_int_to_str   (param i64) (result i32 i32)))\n");
+    fprintf(out, "  (import \"sno\" \"sno_float_to_str\" (func $sno_float_to_str (param f64) (result i32 i32)))\n");
+    fprintf(out, "  (import \"sno\" \"sno_pow\"          (func $sno_pow          (param f64 f64) (result f64)))\n");
 }
 
 /* ── Public entry point ───────────────────────────────────────────────────── */

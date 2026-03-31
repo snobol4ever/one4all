@@ -42,4 +42,14 @@ void emit_wasm_data_segment(void);
 /* Reset the string table (called at start of each emit pass) */
 void emit_wasm_strlit_reset(void);
 
+/* Number of interned string literals (used to emit per-literal globals) */
+int  emit_wasm_strlit_count(void);
+
+/* Emit the 10 base "sno" namespace imports shared by SNOBOL4 and Icon:
+ *   memory (npages pages), sno_output_str/int/flush, sno_str_alloc/concat/eq/
+ *   sno_str_to_int/sno_int_to_str/sno_float_to_str, sno_pow.
+ * npages: 2 for SNOBOL4 (output+heap), 3 for Icon (adds gen-state page).
+ * Caller appends any additional frontend-specific imports after this call. */
+void emit_wasm_runtime_imports_sno_base(FILE *out, int npages, const char *page_comment);
+
 #endif /* EMIT_WASM_H */
