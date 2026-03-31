@@ -69,6 +69,12 @@ static Program *g_prog = NULL;  /* set at emit start; used by emit_goals for pre
 
 static int g_clause_env_idx = 0;  /* bumped per clause emitted */
 
+/* Head-param → clause-slot mapping for current clause being emitted.
+ * Lets emit_goal pass local.get $a{i} instead of clause slot addr for
+ * vars that were bound from head params (fixes recursive body call writeback). */
+static int g_head_var_slot[32];  /* g_head_var_slot[ai] = clause-slot addr, -1 if not a simple var */
+static int g_head_arity = 0;
+
 static int env_slot_addr(int env_idx, int slot) {
     return ENV_BASE + env_idx * ENV_STRIDE + slot * 4;
 }
@@ -433,14 +439,12 @@ static void emit_pl_predicate(const EXPR_t *choice) {
 
             int n_body = clause->nchildren - n_args;
 
-            /* Output-var writeback for E_VAR head args before body */
-            /* Actually we need writeback AFTER body succeeds. For Byrd-box,
-             * writeback happens when γ is called — but γ is the continuation.
-             * Solution: emit writeback inline after body goals, before calling γ. */
-
-            /* Emit body goals inline (they do writes/calls but don't branch to γ/ω) */
-            /* For body goals that are non-backtracking (write, nl, is/2, recursive det calls):
-             * emit them inline. The final γ call at end of body. */
+            /* Publish head-param→slot mapping so emit_goal can pass caller slot
+             * addrs through recursive body calls (fixes rung05 writeback). */
+            memset(g_head_var_slot, -1, sizeof g_head_var_slot);
+            g_head_arity = n_args;
+            for (int ai = 0; ai < n_args && ai < 32; ai++)
+                g_head_var_slot[ai] = head_var_slot[ai];
 
             if (n_body > 0) {
                 for (int bi = n_args; bi < clause->nchildren; bi++) {
@@ -963,7 +967,13 @@ static void emit_goal(const EXPR_t *goal, int env_idx, int in_disj_left) {
                 if (!arg) { W("    (i32.const 0)\n"); continue; }
                 if (arg->kind == E_VAR && (int)arg->ival >= 0) {
                     int addr = env_slot_addr(env_idx, (int)arg->ival);
-                    W("    (i32.const %d) ;; slot addr _V%d\n", addr, (int)arg->ival);
+                    int hp = -1;
+                    for (int hi = 0; hi < g_head_arity; hi++)
+                        if (g_head_var_slot[hi] == addr) { hp = hi; break; }
+                    if (hp >= 0)
+                        W("    (local.get $a%d) ;; caller slot for _V%d\n", hp, (int)arg->ival);
+                    else
+                        W("    (i32.load (i32.const %d)) ;; value of _V%d\n", addr, (int)arg->ival);
                 } else {
                     emit_term_value(arg, env_idx);
                 }
@@ -973,9 +983,7 @@ static void emit_goal(const EXPR_t *goal, int env_idx, int in_disj_left) {
             return;
         }
 
-        /* Multi-clause body call: return_call alpha with outer γ/ω unchanged.
-         * cp_set_arg in [H|T] head unification sets PL_SET_ARG_FLAG so the
-         * outer GT loop knows to retry at same ci (not advance).  PW-15. */
+        /* Multi-clause body call */
         W("    ;; call %s/%d (multi-clause, Byrd-box α → outer γ/ω)\n", fn, n);
         W("    (local.get $trail)\n");
         for (int ai = 0; ai < n; ai++) {
@@ -983,7 +991,13 @@ static void emit_goal(const EXPR_t *goal, int env_idx, int in_disj_left) {
             if (!arg) { W("    (i32.const 0)\n"); continue; }
             if (arg->kind == E_VAR && (int)arg->ival >= 0) {
                 int addr = env_slot_addr(env_idx, (int)arg->ival);
-                W("    (i32.const %d) ;; slot addr _V%d\n", addr, (int)arg->ival);
+                int hp = -1;
+                for (int hi = 0; hi < g_head_arity; hi++)
+                    if (g_head_var_slot[hi] == addr) { hp = hi; break; }
+                if (hp >= 0)
+                    W("    (local.get $a%d) ;; caller slot for _V%d\n", hp, (int)arg->ival);
+                else
+                    W("    (i32.load (i32.const %d)) ;; value of _V%d\n", addr, (int)arg->ival);
             } else {
                 emit_term_value(arg, env_idx);
             }
@@ -1454,6 +1468,8 @@ void prolog_emit_wasm(Program *prog, FILE *out, const char *filename) {
     gt_site_total   = 0;
     gt_scratch_used = 0;
     bgt_site_counter = 0;
+    memset(g_head_var_slot, -1, sizeof g_head_var_slot);
+    g_head_arity = 0;
 
     emit_wasm_set_out(out);
     emit_wasm_strlit_reset();
