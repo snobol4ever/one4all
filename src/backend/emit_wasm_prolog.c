@@ -60,6 +60,8 @@ static void W(const char *fmt, ...) {
     vfprintf(wpl_out, fmt, ap); va_end(ap);
 }
 
+static Program *g_prog = NULL;  /* set at emit start; used by emit_goals for pred lookup */
+
 /* ── Memory layout constants ───────────────────────────────────────────── */
 #define ATOM_TABLE_BASE 8192   /* atom_id*8 → {i32 off, i32 len} */
 #define ENV_BASE        32768  /* variable env frames             */
@@ -231,6 +233,33 @@ static int cont_register(const char *name) {
     strncpy(cont_func_names[cont_func_count], name, 255);
     return cont_func_count++;
 }
+
+/* GT scratch cells for ground arg storage: [8000..8127] (32 i32 cells).
+ * At each GT call site, ground args are stored here so γ can pass them
+ * back to α on each re-call (the runtime cons-cell pointer doesn't change). */
+#define GT_SCRATCH_BASE  8000
+#define GT_SCRATCH_CELLS 32
+static int gt_scratch_used = 0;  /* bumped per ground arg slot allocated */
+
+#define MAX_GT_SITES   64
+#define MAX_GT_BODY    32
+typedef struct {
+    int  site_id;
+    char mangled[256];        /* e.g. "pl_member_2" */
+    int  arity;
+    int  arg_slots[16];       /* slot addrs for var args (-1 if ground) */
+    int  ground_cells[16];    /* scratch cell addr for ground args (-1 if var) */
+    int  n_body_goals;        /* goals between pred call and fail */
+    const EXPR_t *body_goals[MAX_GT_BODY];
+    int  env_idx;             /* clause env_idx for body goal emit */
+    int  gamma_idx;           /* funcref table index */
+    int  omega_idx;
+    /* γ calls beta1 (not alpha) to get the next solution after first match */
+    /* For single-clause predicates gamma calls alpha (retry=alpha).         */
+    int  nclauses;            /* number of clauses — if >1, γ calls beta1 */
+} GTSiteData;
+static GTSiteData gt_site_data[MAX_GT_SITES];
+static int        gt_site_total = 0;
 
 /* ── emit_pl_predicate ──────────────────────────────────────────────────
  *
@@ -911,10 +940,15 @@ static void emit_goals(const EXPR_t *g, int env_idx, int in_disj_left) {
                         arg_slots[ai] = env_slot_addr(env_idx, (int)arg->ival);
                 }
 
-                /* Register γ and ω continuation functions in the table.
-                 * They have type $pl_cont_t: (param $trail i32) (result i32).
-                 * γ: writes 1 to mem[PL_GT_FLAG=4], returns 0
-                 * ω: writes 0 to mem[PL_GT_FLAG=4], returns 0 */
+                /* Register γ and ω continuation functions.
+                 * γ: emits body goals, resets var slots, return_call $alpha
+                 *    (gets the next solution — proper Byrd-box continuation)
+                 * ω: called when α exhausts all clauses — just returns 0 (done)
+                 *
+                 * γ must be a real WAT function, not a flag trampoline, because
+                 * return_call_indirect from α ends that activation.  The only way
+                 * to get back into α for the next solution is via a tail-call from γ.
+                 */
                 int site_id = gt_site_counter++;
                 char gamma_name[64], omega_name[64];
                 snprintf(gamma_name, sizeof gamma_name, "pl_gt_gamma_%d", site_id);
@@ -922,47 +956,95 @@ static void emit_goals(const EXPR_t *g, int env_idx, int in_disj_left) {
                 int gamma_idx = cont_register(gamma_name);
                 int omega_idx = cont_register(omega_name);
 
+                /* Store site data for emit_cont_functions_and_table */
+                if (gt_site_total < MAX_GT_SITES) {
+                    GTSiteData *sd = &gt_site_data[gt_site_total++];
+                    sd->site_id   = site_id;
+                    strncpy(sd->mangled, mangled, 255);
+                    sd->arity     = n_call_args;
+                    for (int ai = 0; ai < 16; ai++) {
+                        sd->arg_slots[ai]    = (ai < n_call_args) ? arg_slots[ai] : -1;
+                        sd->ground_cells[ai] = -1;
+                    }
+                    /* Allocate scratch cells for ground args */
+                    for (int ai = 0; ai < n_call_args; ai++) {
+                        if (arg_slots[ai] < 0 && gt_scratch_used < GT_SCRATCH_CELLS) {
+                            sd->ground_cells[ai] = GT_SCRATCH_BASE + gt_scratch_used * 4;
+                            gt_scratch_used++;
+                        }
+                    }
+                    /* Body goals: children[1..nc-2] (skip pred call and fail) */
+                    int nb = 0;
+                    for (int gi = 1; gi < nc - 1 && nb < MAX_GT_BODY; gi++)
+                        sd->body_goals[nb++] = g->children[gi];
+                    sd->n_body_goals = nb;
+                    sd->env_idx   = env_idx;
+                    sd->gamma_idx = gamma_idx;
+                    sd->omega_idx = omega_idx;
+                    /* Look up clause count so γ can call β1 instead of α for multi-clause preds */
+                    sd->nclauses = 1;
+                    if (g_prog) {
+                        char pred_key[256];
+                        snprintf(pred_key, sizeof pred_key, "%s/%d",
+                                 pred_call->sval, n_call_args);
+                        for (STMT_t *s = g_prog->head; s; s = s->next) {
+                            if (!s->subject) continue;
+                            EXPR_t *ch = s->subject;
+                            if (ch->kind == E_CHOICE && ch->sval &&
+                                strcmp(ch->sval, pred_key) == 0) {
+                                sd->nclauses = ch->nchildren;
+                                break;
+                            }
+                        }
+                    }
+                }
+
                 W("    ;; generate-and-test (Byrd-box): %s/%d ... fail\n",
                   pred_call->sval, n_call_args);
-                W("    ;; γ_idx=%d ω_idx=%d\n", gamma_idx, omega_idx);
+                W("    ;; γ_idx=%d ω_idx=%d (γ is a real body-goal function)\n",
+                  gamma_idx, omega_idx);
 
-                /* Zero + loop */
+                /* Reset var slots before first α call */
                 for (int ai = 0; ai < n_call_args; ai++) {
                     if (arg_slots[ai] >= 0)
                         W("    (i32.store (i32.const %d) (i32.const 0)) ;; clear V%d\n",
                           arg_slots[ai], ai);
                 }
 
-                W("    (loop $retry_%s_%d\n", mangled, site_id);
-                /* Reset var slots */
-                for (int ai = 0; ai < n_call_args; ai++) {
-                    if (arg_slots[ai] >= 0)
-                        W("      (i32.store (i32.const %d) (i32.const 0))\n", arg_slots[ai]);
+                /* Store ground args into scratch cells so γ can pass them back */
+                GTSiteData *sd_cur = (gt_site_total > 0) ? &gt_site_data[gt_site_total-1] : NULL;
+                if (sd_cur) {
+                    for (int ai = 0; ai < n_call_args; ai++) {
+                        if (sd_cur->ground_cells[ai] >= 0) {
+                            /* Compute the runtime value and store to scratch */
+                            EXPR_t *arg = pred_call->children[ai];
+                            W("    ;; store ground arg %d into scratch cell %d\n",
+                              ai, sd_cur->ground_cells[ai]);
+                            W("    (i32.const %d)\n", sd_cur->ground_cells[ai]); /* addr */
+                            emit_term_value(arg, env_idx);                        /* value */
+                            W("    (i32.store)\n");
+                        }
+                    }
                 }
-                /* Call α: trail, args, gamma_idx, omega_idx */
-                W("      (local.get $trail)\n");
+
+                /* Single call to α — no loop needed.
+                 * On first solution α tail-calls γ; γ runs body goals then calls α again.
+                 * On exhaustion α tail-calls ω; ω returns 0. */
+                W("    (local.get $trail)\n");
                 for (int ai = 0; ai < n_call_args; ai++) {
                     EXPR_t *arg = pred_call->children[ai];
-                    if (!arg) { W("      (i32.const 0)\n"); continue; }
+                    if (!arg) { W("    (i32.const 0)\n"); continue; }
                     if (arg_slots[ai] >= 0)
-                        W("      (i32.const %d) ;; slot addr V%d\n", arg_slots[ai], ai);
+                        W("    (i32.const %d) ;; slot addr V%d\n", arg_slots[ai], ai);
                     else
                         emit_term_value(arg, env_idx);
                 }
-                W("      (i32.const %d) ;; gamma_idx\n", gamma_idx);
-                W("      (i32.const %d) ;; omega_idx\n", omega_idx);
-                W("      (call $pl_%s_alpha)\n", mangled + 3);
-                W("      drop\n");
-                /* Poll flag at mem[4]: 1 = γ fired (solution), 0 = ω fired (done) */
-                W("      (i32.load (i32.const 8188)) ;; PL_GT_FLAG\n");
-                W("      (if (i32.eqz) (then) (else\n");
-                /* Solution: emit body goals */
-                for (int gi = 1; gi < nc - 1; gi++)
-                    emit_goal(g->children[gi], env_idx, 0);
-                W("      (br $retry_%s_%d)\n", mangled, site_id);
-                W("      )) ;; if\n");
-                W("    ) ;; $retry_%s_%d\n", mangled, site_id);
-                W("    (br $disj_end) ;; exhausted → fail\n");
+                W("    (i32.const %d) ;; gamma_idx\n", gamma_idx);
+                W("    (i32.const %d) ;; omega_idx\n", omega_idx);
+                W("    (call $pl_%s_alpha)\n", mangled + 3);
+                W("    drop\n");
+                W("    ;; α called once; γ loops internally via return_call\n");
+                W("    (br $disj_end) ;; after all solutions (ω fired) → fail side\n");
                 return;
             }
         }
@@ -1093,25 +1175,99 @@ static void prescan_prog(Program *prog) {
     }
 }
 
-/* ── emit_cont_functions: emit γ/ω continuation stubs + funcref table ───
- * γ stub: writes 1 to mem[4] (PL_GT_FLAG), returns 0
- * ω stub: writes 0 to mem[4], returns 0
+/* ── emit_cont_functions: emit γ/ω continuation functions + funcref table ─
+ *
+ * γ function for site N:
+ *   (func $pl_gt_gamma_N (param $trail i32) (result i32)
+ *     ;; run body goals (write(X), nl, etc.) using bound var slots
+ *     ;; reset var slots for next iteration
+ *     ;; return_call $pl_FOO_alpha  ← get next solution
+ *   )
+ *
+ * ω function for site N:
+ *   (func $pl_gt_omega_N (param $trail i32) (result i32)
+ *     (i32.const 0)
+ *   )
+ *
  * Called after all predicates and main are emitted.
  */
 static void emit_cont_functions_and_table(void) {
     if (cont_func_count == 0) return;
-    W("  ;; Continuation stubs (γ/ω) for generate-and-test\n");
-    W("  ;; mem[4] = PL_GT_FLAG: 1=success(γ), 0=failure(ω)\n");
+    W("  ;; Continuation functions (γ/ω) for generate-and-test\n");
+
     for (int i = 0; i < cont_func_count; i++) {
         const char *name = cont_func_names[i];
         int is_gamma = (strstr(name, "_gamma_") != NULL);
+
         W("  (func $%s (param $trail i32) (result i32)\n", name);
-        W("    (i32.store (i32.const 8188) (i32.const %d)) ;; %s\n",
-          is_gamma ? 1 : 0, is_gamma ? "γ: success" : "ω: failure");
-        W("    (i32.const 0)\n");
+
+        if (is_gamma) {
+            /* Locals needed by emit_write_var and emit_write_atom_lit helpers */
+            W("    (local $tmp i32)\n");
+            W("    (local $tbl_entry i32)\n");
+            /* Find the GTSiteData for this γ */
+            int site_id = -1;
+            char site_str[16];
+            /* name = "pl_gt_gamma_N" — extract N */
+            const char *p = strrchr(name, '_');
+            if (p) site_id = atoi(p + 1);
+
+            GTSiteData *sd = NULL;
+            for (int si = 0; si < gt_site_total; si++) {
+                if (gt_site_data[si].site_id == site_id) { sd = &gt_site_data[si]; break; }
+            }
+            (void)site_str;
+
+            if (sd) {
+                W("    ;; γ for GT site %d (%s/%d): body goals + loop back to α\n",
+                  site_id, sd->mangled, sd->arity);
+
+                /* Emit body goals (write(X), nl, etc.) */
+                for (int gi = 0; gi < sd->n_body_goals; gi++)
+                    emit_goal(sd->body_goals[gi], sd->env_idx, 0);
+
+                /* Unwind trail to parent mark — undo this clause's bindings */
+                W("    (call $trail_unwind (local.get $trail))\n");
+
+                /* Reset var slots so α/β can rebind on next solution */
+                for (int ai = 0; ai < sd->arity; ai++) {
+                    if (sd->arg_slots[ai] >= 0)
+                        W("    (i32.store (i32.const %d) (i32.const 0)) ;; reset V%d\n",
+                          sd->arg_slots[ai], ai);
+                }
+
+                /* Call α again for next solution: trail, slot-addrs/ground-cells, same γ/ω indices */
+                W("    (local.get $trail)\n");
+                for (int ai = 0; ai < sd->arity; ai++) {
+                    if (sd->arg_slots[ai] >= 0)
+                        W("    (i32.const %d) ;; slot addr V%d\n", sd->arg_slots[ai], ai);
+                    else if (sd->ground_cells[ai] >= 0)
+                        W("    (i32.load (i32.const %d)) ;; ground arg %d (scratch)\n",
+                          sd->ground_cells[ai], ai);
+                    else
+                        W("    (i32.const 0) ;; ground arg %d (no scratch — bug)\n", ai);
+                }
+                W("    (i32.const %d) ;; gamma_idx (self)\n", sd->gamma_idx);
+                W("    (i32.const %d) ;; omega_idx\n",        sd->omega_idx);
+                /* return_call to β1 (skip clause 0 — already succeeded) for multi-clause preds,
+                 * or α for single-clause preds (e.g. deterministic facts). */
+                if (sd->nclauses > 1)
+                    W("    (return_call $pl_%s_beta1)\n", sd->mangled + 3);
+                else
+                    W("    (return_call $pl_%s_alpha)\n", sd->mangled + 3);
+            } else {
+                /* Fallback: should not happen */
+                W("    (i32.const 0) ;; γ stub (no site data)\n");
+            }
+        } else {
+            /* ω: all solutions exhausted — just return 0 */
+            W("    ;; ω: done\n");
+            W("    (i32.const 0)\n");
+        }
         W("  )\n");
     }
-    /* Funcref table */
+
+    /* Funcref table — same type $pl_cont_t for all entries */
     W("  (table %d funcref)\n", cont_func_count);
     W("  (elem (i32.const 0)");
     for (int i = 0; i < cont_func_count; i++)
@@ -1123,10 +1279,13 @@ static void emit_cont_functions_and_table(void) {
 void prolog_emit_wasm(Program *prog, FILE *out, const char *filename) {
     (void)filename;
     wpl_out = out;
+    g_prog  = prog;
     g_clause_env_idx = 0;
     atom_count = 0;
     cont_func_count = 0;
     gt_site_counter = 0;
+    gt_site_total   = 0;
+    gt_scratch_used = 0;
 
     emit_wasm_set_out(out);
     emit_wasm_strlit_reset();
