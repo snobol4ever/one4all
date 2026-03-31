@@ -110,6 +110,7 @@ static void emit_runtime_imports(void) {
     W("  (import \"sno\" \"sno_replace\"      (func $sno_replace      (param i32 i32 i32 i32 i32 i32) (result i32 i32)))\n");
     W("  (import \"sno\" \"sno_str_to_float\" (func $sno_str_to_float (param i32 i32) (result f64)))\n");
     W("  (import \"sno\" \"sno_lgt\"          (func $sno_lgt          (param i32 i32 i32 i32) (result i32)))\n");
+    W("  (import \"sno\" \"sno_str_contains\" (func $sno_str_contains (param i32 i32 i32 i32) (result i32)))\n");
     W("  ;; String heap pointer: programs use sno_str_alloc from runtime\n");
     W("  ;; (global $str_ptr is internal to runtime; programs use sno_str_alloc)\n");
 }
@@ -965,6 +966,20 @@ static void emit_main_body(Program *prog) {
             W("      (local.get $indr_vo) (local.get $indr_vl)\n");
             W("      (call $sno_var_set)\n");
             W("      (local.set $ok (i32.const 1))\n");
+        } else if (has_subject && s->pattern && s->pattern->kind != E_NUL) {
+            /* Pattern-match statement: subject 'pattern'  :s/:f */
+            W("      ;; pattern match: subject ? pattern\n");
+            /* Evaluate subject — must be a string */
+            WasmTy ts = emit_expr(s->subject);
+            if (ts == TY_INT)   W("      (call $sno_int_to_str)\n");
+            if (ts == TY_FLOAT) W("      (call $sno_float_to_str)\n");
+            /* Evaluate pattern */
+            WasmTy tp = emit_expr(s->pattern);
+            if (tp == TY_INT)   W("      (call $sno_int_to_str)\n");
+            if (tp == TY_FLOAT) W("      (call $sno_float_to_str)\n");
+            /* Stack: (subj_off subj_len pat_off pat_len) */
+            W("      (call $sno_str_contains)\n");
+            W("      (local.set $ok)\n");
         } else if (has_subject) {
             W("      ;; subject eval\n");
             emit_subject_as_bool(s->subject);

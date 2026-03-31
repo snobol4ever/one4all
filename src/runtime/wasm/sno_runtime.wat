@@ -505,4 +505,42 @@
     (i32.gt_u (local.get $a_len) (local.get $b_len))
   )
 
+
+  ;; ── sno_str_contains (hay_off i32, hay_len i32, ndl_off i32, ndl_len i32) → i32
+  ;; Unanchored substring search. Returns 1 if needle found anywhere in haystack, 0 if not.
+  ;; Empty needle always matches (returns 1).
+  (func $sno_str_contains (export "sno_str_contains")
+    (param $ho i32) (param $hl i32) (param $no i32) (param $nl i32)
+    (result i32)
+    (local $i i32) (local $j i32) (local $limit i32) (local $match i32)
+    ;; empty needle → always match
+    (if (i32.eqz (local.get $nl)) (then (return (i32.const 1))))
+    ;; needle longer than haystack → no match
+    (if (i32.gt_u (local.get $nl) (local.get $hl)) (then (return (i32.const 0))))
+    ;; limit = haystack_len - needle_len  (last valid start position)
+    (local.set $limit (i32.sub (local.get $hl) (local.get $nl)))
+    (local.set $i (i32.const 0))
+    (block $outer_done
+      (loop $outer
+        (br_if $outer_done (i32.gt_u (local.get $i) (local.get $limit)))
+        ;; try to match needle at position i
+        (local.set $j (i32.const 0))
+        (local.set $match (i32.const 1))
+        (block $inner_done
+          (loop $inner
+            (br_if $inner_done (i32.ge_u (local.get $j) (local.get $nl)))
+            (if (i32.ne
+                  (i32.load8_u (i32.add (local.get $ho) (i32.add (local.get $i) (local.get $j))))
+                  (i32.load8_u (i32.add (local.get $no) (local.get $j))))
+              (then
+                (local.set $match (i32.const 0))
+                (br $inner_done)))
+            (local.set $j (i32.add (local.get $j) (i32.const 1)))
+            (br $inner)))
+        (if (local.get $match) (then (return (i32.const 1))))
+        (local.set $i (i32.add (local.get $i) (i32.const 1)))
+        (br $outer)))
+    (i32.const 0)
+  )
+
 )
