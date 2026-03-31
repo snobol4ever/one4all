@@ -22,7 +22,18 @@
 
 #include <stdio.h>
 
-/* Share the output stream — call before any W() output from a sibling emitter */
+/* Share the output stream — call before any W() output from a sibling emitter.
+ *
+ * ⚠ SIBLING EMITTER CONTRACT (IW-12):
+ *   Every sibling entry point (emit_wasm_icon_file, prolog_emit_wasm, etc.)
+ *   MUST call emit_wasm_set_out(out) in addition to its own set_out.
+ *   emit_wasm.c's W() macro uses the shared wasm_out; helpers like
+ *   emit_wasm_data_segment() will SIGSEGV if wasm_out is NULL.
+ *
+ *   Correct pattern (Icon example):
+ *     emit_wasm_icon_set_out(out);   // sets icon_wasm_out → WI() macro
+ *     emit_wasm_set_out(out);        // sets wasm_out      → W() macro in emit_wasm.c
+ */
 void emit_wasm_set_out(FILE *f);
 
 /* Intern a string literal into the shared string table.

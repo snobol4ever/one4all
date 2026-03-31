@@ -1290,6 +1290,7 @@ void emit_wasm_icon_file(EXPR_t **procs, int count, FILE *out,
                           const char *filename) {
     (void)filename;
     emit_wasm_icon_set_out(out);
+    emit_wasm_set_out(out);   /* IW-12: sync shared wasm_out — emit_wasm_data_segment() uses W() */
 
     /* Prescan: intern all E_QLIT strings so globals declared before funcs */
     emit_wasm_strlit_reset();
