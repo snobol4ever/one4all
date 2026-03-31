@@ -86,7 +86,7 @@ static void var_table_reset(void) {
 typedef enum { TY_STR = 0, TY_INT = 1, TY_FLOAT = 2 } WasmTy;
 
 /* ── Forward decls ────────────────────────────────────────────────────────── */
-static WasmTy emit_wasm_expr(const EXPR_t *e);
+WasmTy emit_wasm_expr(const EXPR_t *e);
 
 /* ── Runtime imports ─────────────────────────────────────────────────────── */
 /* Programs import all runtime functions from the "sno" namespace.           */
@@ -419,7 +419,7 @@ static void emit_data_init_func(void) {
 }
 
 
-static WasmTy emit_wasm_expr(const EXPR_t *e) {
+WasmTy emit_wasm_expr(const EXPR_t *e) {
     if (!e || e->kind == E_NUL) {
         int idx = strlit_intern("");
         W("    (i32.const %d)\n", strlit_abs(idx));
