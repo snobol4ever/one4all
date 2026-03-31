@@ -696,24 +696,6 @@ _run_cell() {
   esac
 }
 
-for _cell in snobol4_wasm snobol4_x86 snobol4_jvm snobol4_net \
-             icon_x86 icon_jvm icon_wasm \
-             prolog_x86 prolog_jvm prolog_wasm \
-             snocone_x86; do
-  _run_cell "$_cell"
-done
-
-# ── Results matrix ────────────────────────────────────────────────────────────
-END_TIME=$(date +%s%N 2>/dev/null || date +%s)
-if [[ ${#START_TIME} -gt 10 ]]; then
-  ELAPSED_MS=$(( (END_TIME - START_TIME) / 1000000 ))
-  ELAPSED_S=$(awk "BEGIN{printf \"%.1f\", $ELAPSED_MS/1000}")
-else
-  ELAPSED_MS=$(( (END_TIME - START_TIME) * 1000 ))
-  ELAPSED_S=$((END_TIME - START_TIME))
-fi
-FINISH_HUMAN=$(date '+%Y-%m-%d %H:%M:%S')
-
 # ── Suite: Prolog WASM ────────────────────────────────────────────────────────
 # PW-session owns this cell. Run: run_invariants.sh prolog_wasm
 # Emitter: src/backend/emit_wasm_prolog.c (M-PW-HELLO → M-PW-PARITY)
@@ -761,6 +743,24 @@ run_prolog_wasm() {
   echo "$pass" > "$RESULTS/${cell}_pass"
   echo "$fail"  > "$RESULTS/${cell}_fail"
 }
+
+for _cell in snobol4_wasm snobol4_x86 snobol4_jvm snobol4_net \
+             icon_x86 icon_jvm icon_wasm \
+             prolog_x86 prolog_jvm prolog_wasm \
+             snocone_x86; do
+  _run_cell "$_cell"
+done
+
+# ── Results matrix ────────────────────────────────────────────────────────────
+END_TIME=$(date +%s%N 2>/dev/null || date +%s)
+if [[ ${#START_TIME} -gt 10 ]]; then
+  ELAPSED_MS=$(( (END_TIME - START_TIME) / 1000000 ))
+  ELAPSED_S=$(awk "BEGIN{printf \"%.1f\", $ELAPSED_MS/1000}")
+else
+  ELAPSED_MS=$(( (END_TIME - START_TIME) * 1000 ))
+  ELAPSED_S=$((END_TIME - START_TIME))
+fi
+FINISH_HUMAN=$(date '+%Y-%m-%d %H:%M:%S')
 
 any_fail() {
   local cell="$1"
