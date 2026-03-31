@@ -245,4 +245,38 @@
     )
     (local.get $result)
   )
+
+  ;; ── Term heap ──────────────────────────────────────────────────────────
+  ;; Term heap: 57344..131071 (from memory layout)
+  ;; Cons cell encoding: 0x80000000 | offset   (offset into term heap)
+  ;; Atom encoding:      atom_id  (0..254, high bit clear)
+  ;; Unbound:            0
+  (global $term_heap_top (mut i32) (i32.const 57344))
+
+  ;; Allocate a cons cell (head, tail) → tagged pointer
+  (func (export "cons") (param $head i32) (param $tail i32) (result i32)
+    (local $ptr i32)
+    (local.set $ptr (global.get $term_heap_top))
+    (i32.store (local.get $ptr) (local.get $head))
+    (i32.store (i32.add (local.get $ptr) (i32.const 4)) (local.get $tail))
+    (global.set $term_heap_top (i32.add (global.get $term_heap_top) (i32.const 8)))
+    ;; return tagged pointer: 0x80000000 | ptr
+    (i32.or (i32.const 0x80000000) (local.get $ptr))
+  )
+
+  ;; Is this term a cons cell? (high bit set)
+  (func (export "is_cons") (param $t i32) (result i32)
+    (i32.shr_u (local.get $t) (i32.const 31))
+  )
+
+  ;; Get head of cons cell
+  (func (export "cons_head") (param $t i32) (result i32)
+    (i32.load (i32.and (local.get $t) (i32.const 0x7fffffff)))
+  )
+
+  ;; Get tail of cons cell
+  (func (export "cons_tail") (param $t i32) (result i32)
+    (i32.load (i32.add (i32.and (local.get $t) (i32.const 0x7fffffff)) (i32.const 4)))
+  )
+
 )

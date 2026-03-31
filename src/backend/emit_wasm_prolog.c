@@ -149,6 +149,10 @@ static void emit_pl_runtime_imports(void) {
     W("  (import \"pl\" \"var_deref\"       (func $pl_var_deref    (param i32) (result i32)))\n");
     W("  (import \"pl\" \"int_to_atom\"     (func $pl_int_to_atom  (param i32) (result i32)))\n");
     W("  (import \"pl\" \"atom_to_int\"     (func $pl_atom_to_int  (param i32) (result i32)))\n");
+    W("  (import \"pl\" \"cons\"            (func $pl_cons         (param i32 i32) (result i32)))\n");
+    W("  (import \"pl\" \"is_cons\"         (func $pl_is_cons      (param i32) (result i32)))\n");
+    W("  (import \"pl\" \"cons_head\"       (func $pl_cons_head    (param i32) (result i32)))\n");
+    W("  (import \"pl\" \"cons_tail\"       (func $pl_cons_tail    (param i32) (result i32)))\n");
     W("\n");
 }
 
@@ -224,6 +228,7 @@ static void emit_write_goal(const EXPR_t *arg, int env_idx) {
  * On each successful call, ci is left pointing to the NEXT clause to try.
  * Caller loops calling foo until it returns 0.
  * ─────────────────────────────────────────────────────────────────────── */
+static void emit_goals(const EXPR_t *g, int env_idx, int in_disj_left);
 static void emit_pl_predicate(const EXPR_t *choice) {
     if (!choice || choice->kind != E_CHOICE) return;
 
@@ -245,6 +250,9 @@ static void emit_pl_predicate(const EXPR_t *choice) {
     for (int a = 0; a < arity; a++) W(" (param $a%d i32)", a);
     W(" (result i32)\n");
     W("    (local $tm i32)\n");
+    /* One matched-flag local per clause */
+    for (int i2 = 0; i2 < choice->nchildren; i2++)
+        W("    (local $tm_%d i32)\n", i2);
 
     int nclauses = choice->nchildren;
 
@@ -268,48 +276,76 @@ static void emit_pl_predicate(const EXPR_t *choice) {
         W("      (then\n");
         W("        (local.set $tm (call $trail_mark))\n");
 
-        /* Head argument unification */
+        /* Head argument unification — (block $clause_N_end ...) pattern:
+         * Head checks br_if $clause_N_end on mismatch (skip body+success).
+         * Body runs on match. $local_matched set to 1. After block:
+         * if matched==0 → trail_unwind. if matched==1 → advance ci, return 1. */
+        W("        (local.set $tm_%d (i32.const 0))\n", ci); /* matched flag */
+        W("        (block $clause_%d_end\n", ci);
         for (int ai = 0; ai < n_args && ai < clause->nchildren; ai++) {
             EXPR_t *harg = clause->children[ai];
             if (!harg) continue;
 
             if ((harg->kind == E_FNC && harg->sval && harg->nchildren == 0) ||
-                (harg->kind == E_QLIT && harg->sval)) {
-                /* Ground atom head: $aN is a slot address — bind it to atom_id */
+                harg->kind == E_QLIT) {
                 int atom_id = atom_intern(harg->sval);
-                W("        ;; bind slot $a%d to atom '%s' (id=%d)\n",
-                  ai, harg->sval, atom_id);
-                W("        (i32.store (local.get $a%d) (i32.const %d))\n",
-                  ai, atom_id);
+                W("          ;; head arg %d: atom '%s' (bind-or-match)\n", ai, harg->sval);
+                /* If a_i >= ENV_BASE it's an output slot address — bind it.
+                 * If a_i < ENV_BASE it's a bound value — check equality. */
+                W("          (if (i32.ge_u (local.get $a%d) (i32.const %d))\n", ai, ENV_BASE);
+                W("            (then (i32.store (local.get $a%d) (i32.const %d)))\n", ai, atom_id);
+                W("            (else\n");
+                W("              (i32.ne (local.get $a%d) (i32.const %d))\n", ai, atom_id);
+                W("              (br_if $clause_%d_end)\n", ci);
+                W("          ))\n");
 
             } else if (harg->kind == E_VAR) {
-                /* Variable head arg: bind slot to call arg */
                 int slot = (int)harg->ival;
                 if (slot >= 0) {
                     int addr = env_slot_addr(env_idx, slot);
-                    W("        ;; bind head var slot=%d addr=%d to a%d\n",
-                      slot, addr, ai);
-                    W("        (i32.const %d) (local.get $a%d) (call $pl_var_bind)\n",
-                      addr, ai);
+                    W("          (i32.const %d) (local.get $a%d) (call $pl_var_bind)\n", addr, ai);
+                }
+
+            } else if (harg->kind == E_FNC && harg->sval &&
+                       strcmp(harg->sval, ".") == 0 && harg->nchildren == 2) {
+                W("          ;; head arg %d: cons [H|T]\n", ai);
+                W("          (i32.eqz (call $pl_is_cons (local.get $a%d)))\n", ai);
+                W("          (br_if $clause_%d_end)\n", ci);
+                EXPR_t *hh = harg->children[0];
+                if (hh && hh->kind == E_VAR && (int)hh->ival >= 0) {
+                    int addr = env_slot_addr(env_idx, (int)hh->ival);
+                    W("          (i32.const %d) (call $pl_cons_head (local.get $a%d)) (call $pl_var_bind)\n", addr, ai);
+                }
+                EXPR_t *ht = harg->children[1];
+                if (ht && ht->kind == E_VAR && (int)ht->ival >= 0) {
+                    int addr = env_slot_addr(env_idx, (int)ht->ival);
+                    W("          (i32.const %d) (call $pl_cons_tail (local.get $a%d)) (call $pl_var_bind)\n", addr, ai);
                 }
             }
         }
-
-        /* Body goals (facts have no body) */
-        int n_body = clause->nchildren - n_args;
-        if (n_body > 0) {
-            W("        ;; body goals (%d) — stub until M-PW-B01\n", n_body);
+        /* Body goals */
+        {
+            int n_body = clause->nchildren - n_args;
+            if (n_body > 0) {
+                for (int bi = n_args; bi < clause->nchildren; bi++)
+                    emit_goals(clause->children[bi], env_idx, 0);
+            }
         }
+        W("          (local.set $tm_%d (i32.const 1)) ;; matched\n", ci);
+        W("        ) ;; end clause_%d_end\n", ci);
+        /* If matched==0: trail unwind, fall to next clause */
+        W("        (if (i32.eqz (local.get $tm_%d)) (then\n", ci);
+        W("          (call $trail_unwind (local.get $tm))\n");
+        W("        ) (else\n");
 
-        /* Clause matched: advance ci to next clause, return 1 */
-        W("        ;; success: advance ci to %d, return 1\n",
-          ci + 1 < nclauses ? ci + 1 : nclauses);
-        W("        (global.set $%s_ci (i32.const %d))\n",
+
+        /* Clause matched: advance ci, return 1 (inside (else of matched-if)) */
+        W("          (global.set $%s_ci (i32.const %d))\n",
           mname, ci + 1 < nclauses ? ci + 1 : nclauses);
-        W("        (i32.const 1) (return)\n");
-        W("      )\n"); /* close (then */
-        /* else branch opened below — remaining clauses emit inside it,
-         * or exhausted path if this is the last clause */
+        W("          (i32.const 1) (return)\n");
+        W("        )) ;; close matched-if else + matched-if\n");
+        W("      )\n"); /* close outer (then of clause-dispatch if */
+        /* else branch for clause-dispatch if — remaining clauses */
         if (ci < nclauses - 1)
             W("      (else\n");
     }
@@ -418,6 +454,52 @@ static void emit_unify_terms(const EXPR_t *lhs, const EXPR_t *rhs, int env_idx) 
 
     W("    ;; STUB unify lhs_kind=%d rhs_kind=%d\n    unreachable\n",
       (int)lhs->kind, (int)rhs->kind);
+}
+
+/* ── emit_term_value: emit an i32 term value onto WASM stack ────────────
+ * Atoms   → atom_id (i32)
+ * Cons    → call $pl_cons(head, tail) → tagged pointer
+ * Var     → load from env slot (dereferenced value)
+ * []      → atom_id of "[]"
+ */
+static void emit_term_value(const EXPR_t *e, int env_idx) {
+    if (!e) { W("    (i32.const 0)\\n"); return; }
+
+    /* Variable: load current value from slot */
+    if (e->kind == E_VAR) {
+        int slot = (int)e->ival;
+        if (slot < 0) {
+            W("    (i32.const 0) ;; anon var\\n");
+            return;
+        }
+        int addr = env_slot_addr(env_idx, slot);
+        W("    (i32.load (i32.const %d)) ;; var _V%d value\n", addr, slot);
+        return;
+    }
+
+    /* Atom literal (0-arity functor or quoted) */
+    if ((e->kind == E_FNC && e->sval && e->nchildren == 0) ||
+        e->kind == E_QLIT) {
+        W("    (i32.const %d) ;; atom '%s'\n", atom_intern(e->sval), e->sval);
+        return;
+    }
+
+    /* Integer literal */
+    if (e->kind == E_ILIT) {
+        char nb[32]; snprintf(nb, sizeof nb, "%ld", e->ival);
+        W("    (i32.const %d) ;; int atom '%s'\n", atom_intern(nb), nb);
+        return;
+    }
+
+    /* Cons cell: E_FNC "." with 2 children = [Head|Tail] */
+    if (e->kind == E_FNC && e->sval && strcmp(e->sval, ".") == 0 && e->nchildren == 2) {
+        emit_term_value(e->children[0], env_idx);  /* head */
+        emit_term_value(e->children[1], env_idx);  /* tail */
+        W("    (call $pl_cons)\n");
+        return;
+    }
+
+    W("    (i32.const 0) ;; term stub kind=%d\\n", (int)e->kind);
 }
 
 /* ── emit_arith_i32: emit inline i32 arithmetic for is/2 RHS ──────────── */
@@ -657,28 +739,8 @@ static void emit_goal(const EXPR_t *goal, int env_idx, int in_disj_left) {
             for (int ai = 0; ai < n; ai++) {
                 EXPR_t *arg = goal->children[ai];
                 if (!arg) { W("        (i32.const 0)\n"); continue; }
-                if (arg->kind == E_VAR) {
-                    /* Pass var slot address so predicate can bind it */
-                    int slot = (int)arg->ival;
-                    int addr = env_slot_addr(env_idx, slot < 0 ? 0 : slot);
-                    /* For head unification: pass atom_id stored in slot.
-                     * But slot is UNBOUND here — predicate needs to write to it.
-                     * Solution: pass the SLOT ADDRESS (not its value) as arg.
-                     * Predicate treats arg as address and var_binds it.
-                     * Mark arg as address by passing ENV_BASE | slot_addr. */
-                    W("        (i32.const %d) ;; var slot addr for _V%d\n",
-                      addr, slot);
-                } else if (arg->kind == E_FNC && arg->sval && arg->nchildren==0) {
-                    int atom_id = atom_intern(arg->sval);
-                    W("        (i32.const %d) ;; atom '%s'\n", atom_id, arg->sval);
-                } else if (arg->kind == E_QLIT && arg->sval) {
-                    int atom_id = atom_intern(arg->sval);
-                    W("        (i32.const %d) ;; qlit '%s'\n", atom_id, arg->sval);
-                } else if (arg->kind == E_ILIT) {
-                    W("        (i32.const %ld)\n", arg->ival);
-                } else {
-                    W("        (i32.const 0) ;; unknown arg\n");
-                }
+                /* Pass term value (atom_id or tagged cons pointer) */
+                emit_term_value(arg, env_idx);
             }
             W("        (call $%s_call)\n", mangled);
             /* result 0 = fail → break out of retry loop */
@@ -708,16 +770,7 @@ static void emit_goal(const EXPR_t *goal, int env_idx, int in_disj_left) {
         for (int ai = 0; ai < n; ai++) {
             EXPR_t *arg = goal->children[ai];
             if (!arg) { W("    (i32.const 0)\n"); continue; }
-            if (arg->kind == E_VAR) {
-                int slot = (int)arg->ival;
-                int addr = env_slot_addr(env_idx, slot < 0 ? 0 : slot);
-                W("    (i32.const %d) ;; var addr _V%d\n", addr, slot);
-            } else if (arg->kind == E_FNC && arg->sval && arg->nchildren==0) {
-                W("    (i32.const %d) ;; atom '%s'\n",
-                  atom_intern(arg->sval), arg->sval);
-            } else if (arg->kind == E_ILIT) {
-                W("    (i32.const %ld)\n", arg->ival);
-            } else { W("    (i32.const 0)\n"); }
+            emit_term_value(arg, env_idx); /* pass term value */
         }
         W("    (call $%s_call) drop\n", mangled);
         return;
@@ -775,18 +828,18 @@ static void emit_goals(const EXPR_t *g, int env_idx, int in_disj_left) {
                         W("      (i32.store (i32.const %d) (i32.const 0))\n", addr);
                     }
                 }
-                /* Call predicate with trail + var slot addresses */
+                /* Call predicate with trail + args (slot addr for unbound var, value otherwise) */
                 W("      (local.get $trail)\n");
                 for (int ai = 0; ai < n_call_args; ai++) {
                     EXPR_t *arg = pred_call->children[ai];
                     if (!arg) { W("      (i32.const 0)\n"); continue; }
-                    if (arg->kind == E_VAR) {
-                        int addr = env_slot_addr(env_idx, (int)arg->ival < 0 ? 0 : (int)arg->ival);
-                        W("      (i32.const %d) ;; slot addr _V%ld\n", addr, arg->ival);
-                    } else if (arg->kind == E_FNC && arg->sval && arg->nchildren==0) {
-                        W("      (i32.const %d) ;; atom '%s'\n",
-                          atom_intern(arg->sval), arg->sval);
-                    } else { W("      (i32.const 0)\n"); }
+                    if (arg->kind == E_VAR && (int)arg->ival >= 0) {
+                        int addr = env_slot_addr(env_idx, (int)arg->ival);
+                        /* Pass slot address — predicate will var_bind into it */
+                        W("      (i32.const %d) ;; slot addr _V%d\n", addr, (int)arg->ival);
+                    } else {
+                        emit_term_value(arg, env_idx);
+                    }
                 }
                 W("      (call $%s_call)\n", mangled);
                 /* 0 = exhausted: exit loop (br to after loop) */
