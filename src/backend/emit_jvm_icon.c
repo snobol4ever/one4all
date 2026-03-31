@@ -1,7 +1,7 @@
 /*
  * icon_emit_jvm.c — Tiny-ICON Byrd Box → JVM Jasmin emitter (Sprint IJ-1)
  *
- * Consumes the same IcnNode* AST as icon_emit.c.
+ * Consumes the same EXPR_t* AST as icon_emit.c.
  * Emits Jasmin assembler (.j) text assembled by jasmin.jar into .class files.
  *
  * Pipeline:
@@ -48,6 +48,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "icon_ast.h"
 #include "icon_lex.h"
+#include "icon_emit.h"
 #include "scrip_cc.h"          /* ImportEntry — for cross-class IMPORT dispatch */
 #include <stdio.h>
 #include <stdlib.h>
@@ -253,14 +254,14 @@ static char rec_fields[MAX_RECORD_TYPES][MAX_RECORD_FIELDS][64];
 static int  rec_nfields[MAX_RECORD_TYPES];
 static int  nrec = 0;
 
-static void register_record(const char *name, IcnNode *rn) {
+static void register_record(const char *name, EXPR_t *rn) {
     for (int i = 0; i < nrec; i++) if (!strcmp(rec_names[i], name)) return;
     if (nrec >= MAX_RECORD_TYPES) return;
     strncpy(rec_names[nrec], name, 63);
     int nf = rn->nchildren < MAX_RECORD_FIELDS ? rn->nchildren : MAX_RECORD_FIELDS;
     rec_nfields[nrec] = nf;
     for (int i = 0; i < nf; i++)
-        strncpy(rec_fields[nrec][i], rn->children[i]->val.sval, 63);
+        strncpy(rec_fields[nrec][i], rn->children[i]->sval, 63);
     nrec++;
 }
 static int is_record_type(const char *name) {
@@ -280,9 +281,9 @@ static const char *record_field(const char *name, int idx) {
     return NULL;
 }
 
-static int has_suspend(IcnNode *n) {
+static int has_suspend(EXPR_t *n) {
     if (!n) return 0;
-    if (n->kind == ICN_SUSPEND) return 1;
+    if (n->kind == E_SUSPEND) return 1;
     for (int i=0;i<n->nchildren;i++)
         if (has_suspend(n->children[i])) return 1;
     return 0;
@@ -560,7 +561,7 @@ static int intern_string(const char *s) {
 /* =========================================================================
  * Forward declaration
  * ======================================================================= */
-static void emit_jvm_icon_expr(IcnNode *n, Ports ports,
+static void emit_jvm_icon_expr(EXPR_t *n, Ports ports,
                          char *out_α, char *out_β);
 
 /* =========================================================================
@@ -615,12 +616,12 @@ static void put_real_field(const char *fname) {
 }
 
 /* Forward declaration needed for expr_is_string */
-static int expr_is_string(IcnNode *n);
-static int expr_is_list(IcnNode *n);
-static int expr_is_strlist(IcnNode *n);
-static int expr_is_table(IcnNode *n);
-static int expr_is_record_list(IcnNode *n);
-static int expr_is_obj(IcnNode *n);  /* any 1-slot ref: String, list, table, record */
+static int expr_is_string(EXPR_t *n);
+static int expr_is_list(EXPR_t *n);
+static int expr_is_strlist(EXPR_t *n);
+static int expr_is_table(EXPR_t *n);
+static int expr_is_record_list(EXPR_t *n);
+static int expr_is_obj(EXPR_t *n);  /* any 1-slot ref: String, list, table, record */
 /* Returns the type tag for a declared static field, or 0 if not found */
 static char field_type_tag(const char *name) {
     for (int i = 0; i < nstatics; i++)
@@ -628,19 +629,19 @@ static char field_type_tag(const char *name) {
     return 0;
 }
 
-static int expr_is_record(IcnNode *n) {
+static int expr_is_record(EXPR_t *n) {
     if (!n) return 0;
-    if (n->kind == ICN_CALL && n->nchildren >= 1 && n->children[0]->kind == ICN_VAR)
-        return is_record_type(n->children[0]->val.sval);
+    if (n->kind == E_FNC && n->nchildren >= 1 && n->children[0]->kind == E_VAR)
+        return is_record_type(n->children[0]->sval);
     /* !<record-list> yields a record Object */
-    if (n->kind == ICN_BANG && n->nchildren >= 1)
+    if (n->kind == E_ITER && n->nchildren >= 1)
         return expr_is_record_list(n->children[0]);
     /* VAR whose static field is Object-typed (assigned from a record constructor) */
-    if (n->kind == ICN_VAR) {
-        char fld[128]; var_field(n->val.sval, fld, sizeof fld);
+    if (n->kind == E_VAR) {
+        char fld[128]; var_field(n->sval, fld, sizeof fld);
         if (field_type_tag(fld) == 'O') return 1;
         /* global var */
-        char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", n->val.sval);
+        char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", n->sval);
         if (field_type_tag(gname) == 'O') return 1;
     }
     return 0;
@@ -653,25 +654,25 @@ static int expr_is_record(IcnNode *n) {
  *   - a VAR whose field tag is 'L' and whose backing MAKELIST had record elements
  *     (detected by checking the static field icn_N_elem_0 type tag == 'O')
  */
-static int expr_is_record_list(IcnNode *n) {
+static int expr_is_record_list(EXPR_t *n) {
     if (!n) return 0;
     /* Direct list literal: [rec(...), ...] */
-    if (n->kind == ICN_MAKELIST) {
+    if (n->kind == E_MAKELIST) {
         if (n->nchildren > 0 && expr_is_record(n->children[0])) return 1;
         return 0;
     }
     /* sortf always returns a record list */
-    if (n->kind == ICN_CALL && n->nchildren >= 1) {
-        IcnNode *fn = n->children[0];
-        if (fn && fn->kind == ICN_VAR) {
-            if (strcmp(fn->val.sval, "sortf") == 0) return 1;
+    if (n->kind == E_FNC && n->nchildren >= 1) {
+        EXPR_t *fn = n->children[0];
+        if (fn && fn->kind == E_VAR) {
+            if (strcmp(fn->sval, "sortf") == 0) return 1;
             /* sort(L) — record list if L is a record list */
-            if (strcmp(fn->val.sval, "sort") == 0 && n->nchildren >= 2)
+            if (strcmp(fn->sval, "sort") == 0 && n->nchildren >= 2)
                 return expr_is_record_list(n->children[1]);
         }
     }
     /* Assignment: propagate from rhs */
-    if (n->kind == ICN_ASSIGN && n->nchildren >= 2)
+    if (n->kind == E_ASSIGN && n->nchildren >= 2)
         return expr_is_record_list(n->children[1]);
     /* VAR: check if any elem field for this var is Object-typed.
      * The makelist emitter stores elements in icn_N_elem_0 as Object fields;
@@ -681,11 +682,11 @@ static int expr_is_record_list(IcnNode *n) {
      * icn_*_elem_0 that is Object-typed — this is coarse but correct for the
      * single-list-per-scope case common in tests.
      * A precise approach: tag list fields at declare time. Use the coarse one for now. */
-    if (n->kind == ICN_VAR) {
+    if (n->kind == E_VAR) {
         /* Fast path: var tagged 'R' (record-list) at assign time */
-        char fld[128]; var_field(n->val.sval, fld, sizeof fld);
+        char fld[128]; var_field(n->sval, fld, sizeof fld);
         if (field_type_tag(fld) == 'R') return 1;
-        char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", n->val.sval);
+        char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", n->sval);
         if (field_type_tag(gname) == 'R') return 1;
         /* Coarse fallback: any elem_0 Object in scope (single-list-per-scope) */
         for (int i = 0; i < nstatics; i++) {
@@ -696,10 +697,10 @@ static int expr_is_record_list(IcnNode *n) {
     return 0;
 }
 /* Returns record type name if expr is a record constructor, else NULL */
-static const char *expr_record_type(IcnNode *n) {
-    if (!n || n->kind != ICN_CALL || n->nchildren < 1) return NULL;
-    if (n->children[0]->kind != ICN_VAR) return NULL;
-    const char *nm = n->children[0]->val.sval;
+static const char *expr_record_type(EXPR_t *n) {
+    if (!n || n->kind != E_FNC || n->nchildren < 1) return NULL;
+    if (n->children[0]->kind != E_VAR) return NULL;
+    const char *nm = n->children[0]->sval;
     return is_record_type(nm) ? nm : NULL;
 }
 
@@ -724,12 +725,12 @@ static void jmp_if_failed(const char *lbl) {
  * α: push long literal, goto succeed
  * β: goto fail (one-shot)
  * ======================================================================= */
-static void emit_jvm_icon_int(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_int(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
     JC("INT"); JL(a);
-    J("    ldc2_w %ld\n", n->val.ival);
+    J("    ldc2_w %ld\n", n->ival);
     JGoto(ports.γ);
     JL(b); JGoto(ports.ω);
 }
@@ -807,7 +808,7 @@ static void put_table_field(const char *fname) {
     JI("putstatic", buf);
 }
 
-static void emit_jvm_icon_real(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_real(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
@@ -818,7 +819,7 @@ static void emit_jvm_icon_real(IcnNode *n, Ports ports, char *oα, char *oβ) {
      * %g may produce "2" for 2.0; append ".0" if no decimal or exponent present. */
     {
         char dbuf[64];
-        snprintf(dbuf, sizeof dbuf, "%g", n->val.fval);
+        snprintf(dbuf, sizeof dbuf, "%g", n->dval);
         int has_dot = 0;
         for (int ci = 0; dbuf[ci]; ci++)
             if (dbuf[ci] == '.' || dbuf[ci] == 'e' || dbuf[ci] == 'E' || dbuf[ci] == 'n') { has_dot = 1; break; }
@@ -830,38 +831,38 @@ static void emit_jvm_icon_real(IcnNode *n, Ports ports, char *oα, char *oβ) {
 }
 
 /* Returns 1 if this node produces a double (real) value */
-static int expr_is_real(IcnNode *n) {
+static int expr_is_real(EXPR_t *n) {
     if (!n) return 0;
-    if (n->kind == ICN_REAL) return 1;
+    if (n->kind == E_FLIT) return 1;
     /* ICN_NEG: real if child is real */
-    if (n->kind == ICN_NEG && n->nchildren >= 1)
+    if (n->kind == E_NEG && n->nchildren >= 1)
         return expr_is_real(n->children[0]);
     /* ICN_POW always returns double (Math.pow returns D) */
-    if (n->kind == ICN_POW) return 1;
+    if (n->kind == E_POW) return 1;
     /* Binop is real if either operand is real */
-    if (n->kind == ICN_ADD || n->kind == ICN_SUB || n->kind == ICN_MUL ||
-        n->kind == ICN_DIV || n->kind == ICN_MOD) {
+    if (n->kind == E_ADD || n->kind == E_SUB || n->kind == E_MPY ||
+        n->kind == E_DIV || n->kind == E_MOD) {
         if (n->nchildren >= 2)
             return expr_is_real(n->children[0]) || expr_is_real(n->children[1]);
     }
     /* Relops return the right-hand value on success: real if either operand is real */
-    if (n->kind == ICN_LT || n->kind == ICN_LE || n->kind == ICN_GT ||
-        n->kind == ICN_GE || n->kind == ICN_EQ || n->kind == ICN_NE) {
+    if (n->kind == E_LT || n->kind == E_LE || n->kind == E_GT ||
+        n->kind == E_GE || n->kind == E_EQ || n->kind == E_NE) {
         if (n->nchildren >= 2)
             return expr_is_real(n->children[0]) || expr_is_real(n->children[1]);
     }
     /* ICN_ALT: real if first alternative is real (all alternatives must be same type) */
-    if (n->kind == ICN_ALT && n->nchildren >= 1)
+    if (n->kind == E_GENALT && n->nchildren >= 1)
         return expr_is_real(n->children[0]);
     /* real() builtin call always returns double */
-    if (n->kind == ICN_CALL && n->nchildren >= 1) {
-        IcnNode *fn = n->children[0];
-        if (fn && fn->kind == ICN_VAR && strcmp(fn->val.sval, "real") == 0) return 1;
+    if (n->kind == E_FNC && n->nchildren >= 1) {
+        EXPR_t *fn = n->children[0];
+        if (fn && fn->kind == E_VAR && strcmp(fn->sval, "real") == 0) return 1;
         /* sqrt always returns double */
-        if (fn && fn->kind == ICN_VAR && strcmp(fn->val.sval, "sqrt") == 0) return 1;
+        if (fn && fn->kind == E_VAR && strcmp(fn->sval, "sqrt") == 0) return 1;
         /* abs/max/min are real if any arg is real */
-        if (fn && fn->kind == ICN_VAR) {
-            const char *fn_name = fn->val.sval;
+        if (fn && fn->kind == E_VAR) {
+            const char *fn_name = fn->sval;
             if ((strcmp(fn_name,"abs")==0 || strcmp(fn_name,"max")==0 || strcmp(fn_name,"min")==0)
                 && n->nchildren >= 2) {
                 for (int ci = 1; ci < n->nchildren; ci++)
@@ -870,17 +871,17 @@ static int expr_is_real(IcnNode *n) {
         }
     }
     /* ICN_TO_BY: real if any of start/end/step is real */
-    if (n->kind == ICN_TO_BY && n->nchildren >= 3)
+    if (n->kind == E_TO_BY && n->nchildren >= 3)
         return expr_is_real(n->children[0]) || expr_is_real(n->children[1])
                || expr_is_real(n->children[2]);
     /* ICN_TO: real if either bound is real */
-    if (n->kind == ICN_TO && n->nchildren >= 2)
+    if (n->kind == E_TO && n->nchildren >= 2)
         return expr_is_real(n->children[0]) || expr_is_real(n->children[1]);
-    if (n->kind == ICN_VAR) {
-        char fld[128]; var_field(n->val.sval, fld, sizeof fld);
+    if (n->kind == E_VAR) {
+        char fld[128]; var_field(n->sval, fld, sizeof fld);
         for (int i = 0; i < nstatics; i++)
             if (!strcmp(statics[i], fld) && static_types[i] == 'D') return 1;
-        char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", n->val.sval);
+        char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", n->sval);
         for (int i = 0; i < nstatics; i++)
             if (!strcmp(statics[i], gname) && static_types[i] == 'D') return 1;
     }
@@ -912,14 +913,14 @@ static void jasmin_ldc(const char *s) {
  * α: push String ref via ldc, goto succeed
  * β: goto fail
  * ======================================================================= */
-static void emit_jvm_icon_str(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_str(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
-    (void)intern_string(n->val.sval);
+    (void)intern_string(n->sval);
     JC("STR"); JL(a);
     /* Push string — ldc with properly escaped string */
-    jasmin_ldc(n->val.sval);
+    jasmin_ldc(n->sval);
     JGoto(ports.γ);
     JL(b); JGoto(ports.ω);
 }
@@ -932,14 +933,14 @@ static void emit_jvm_icon_str(IcnNode *n, Ports ports, char *oα, char *oβ) {
  * For long locals: lload slot_jvm(logical_slot)
  * For globals: getstatic classname/icn_gvar_NAME J
  * ======================================================================= */
-static void emit_jvm_icon_var(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_var(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
     JC("VAR"); JL(a);
 
     /* &subject keyword — push current scan subject (String) */
-    if (strcmp(n->val.sval, "&subject") == 0) {
+    if (strcmp(n->sval, "&subject") == 0) {
         declare_static_str("icn_subject");
         get_str_field("icn_subject");
         JGoto(ports.γ);
@@ -948,42 +949,42 @@ static void emit_jvm_icon_var(IcnNode *n, Ports ports, char *oα, char *oβ) {
     }
 
     /* &keyword cset constants — push as String literals */
-    if (strcmp(n->val.sval, "&letters") == 0) {
+    if (strcmp(n->sval, "&letters") == 0) {
         J("    ldc \"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz\"\n");
         JGoto(ports.γ); JL(b); JGoto(ports.ω); return;
     }
-    if (strcmp(n->val.sval, "&ucase") == 0) {
+    if (strcmp(n->sval, "&ucase") == 0) {
         J("    ldc \"ABCDEFGHIJKLMNOPQRSTUVWXYZ\"\n");
         JGoto(ports.γ); JL(b); JGoto(ports.ω); return;
     }
-    if (strcmp(n->val.sval, "&lcase") == 0) {
+    if (strcmp(n->sval, "&lcase") == 0) {
         J("    ldc \"abcdefghijklmnopqrstuvwxyz\"\n");
         JGoto(ports.γ); JL(b); JGoto(ports.ω); return;
     }
-    if (strcmp(n->val.sval, "&digits") == 0) {
+    if (strcmp(n->sval, "&digits") == 0) {
         J("    ldc \"0123456789\"\n");
         JGoto(ports.γ); JL(b); JGoto(ports.ω); return;
     }
-    if (strcmp(n->val.sval, "&ascii") == 0) {
+    if (strcmp(n->sval, "&ascii") == 0) {
         /* first 128 chars */
         J("    ldc \"\\u0000\\u0001\\u0002\\u0003\\u0004\\u0005\\u0006\\u0007\\u0008\\u0009\\u000a\\u000b\\u000c\\u000d\\u000e\\u000f\\u0010\\u0011\\u0012\\u0013\\u0014\\u0015\\u0016\\u0017\\u0018\\u0019\\u001a\\u001b\\u001c\\u001d\\u001e\\u001f !\\\"#$%%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\\u007f\"\n");
         JGoto(ports.γ); JL(b); JGoto(ports.ω); return;
     }
-    if (strcmp(n->val.sval, "&cset") == 0) {
+    if (strcmp(n->sval, "&cset") == 0) {
         J("    ldc \"\\u0000\\u0001\\u0002\\u0003\\u0004\\u0005\\u0006\\u0007\\u0008\\u0009\\u000a\\u000b\\u000c\\u000d\\u000e\\u000f\\u0010\\u0011\\u0012\\u0013\\u0014\\u0015\\u0016\\u0017\\u0018\\u0019\\u001a\\u001b\\u001c\\u001d\\u001e\\u001f !\\\"#$%%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\\u007f\"\n");
         JGoto(ports.γ); JL(b); JGoto(ports.ω); return;
     }
 
 
     /* &null keyword — push 0L (integer null), always succeeds */
-    if (strcmp(n->val.sval, "&null") == 0) {
+    if (strcmp(n->sval, "&null") == 0) {
         JI("lconst_0", "");
         JGoto(ports.γ); JL(b); JGoto(ports.ω); return;
     }
-    int slot = locals_find(n->val.sval);
+    int slot = locals_find(n->sval);
     if (slot >= 0) {
         /* Named local/param: use per-proc static field (suspend-safe) */
-        char fld[128]; var_field(n->val.sval, fld, sizeof fld);
+        char fld[128]; var_field(n->sval, fld, sizeof fld);
         /* Determine type: look up in statics table */
         int is_str = 0, is_dbl = 0, is_list = 0, is_table = 0, is_obj = 0;
         for (int i = 0; i < nstatics; i++) {
@@ -1014,7 +1015,7 @@ static void emit_jvm_icon_var(IcnNode *n, Ports ports, char *oα, char *oβ) {
             get_long(fld);
         }
     } else {
-        char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", n->val.sval);
+        char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", n->sval);
         /* Check global type */
         int is_str = 0, is_dbl = 0, is_list = 0, is_table = 0, is_obj = 0;
         for (int i = 0; i < nstatics; i++) {
@@ -1039,7 +1040,7 @@ static void emit_jvm_icon_var(IcnNode *n, Ports ports, char *oα, char *oβ) {
  * ICN_ASSIGN — E1 := E2
  * Evaluate RHS, store into LHS variable slot
  * ======================================================================= */
-static void emit_jvm_icon_assign(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_assign(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     if (n->nchildren < 2) {
         /* degenerate */
         int id = next_uid(); char a[64], b[64];
@@ -1053,18 +1054,18 @@ static void emit_jvm_icon_assign(IcnNode *n, Ports ports, char *oα, char *oβ) 
      * Flow: eval v → relay → box → load record obj → putfield → v_long → γ
      * --------------------------------------------------------------------- */
     {
-        IcnNode *lhs = n->children[0];
-        IcnNode *rhs = n->children[1];
-        if (lhs && lhs->kind == ICN_FIELD && lhs->nchildren >= 2) {
-            IcnNode *rec_expr  = lhs->children[0];
-            IcnNode *field_var = lhs->children[1];
-            const char *fname  = field_var->val.sval;
+        EXPR_t *lhs = n->children[0];
+        EXPR_t *rhs = n->children[1];
+        if (lhs && lhs->kind == E_FIELD && lhs->nchildren >= 2) {
+            EXPR_t *rec_expr  = lhs->children[0];
+            EXPR_t *field_var = lhs->children[1];
+            const char *fname  = field_var->sval;
             /* Determine record type */
             const char *rtype = NULL;
             for (int ri = 0; ri < nrec && !rtype; ri++)
                 for (int fi = 0; fi < rec_nfields[ri]; fi++)
                     if (!strcmp(rec_fields[ri][fi], fname)) { rtype = rec_names[ri]; break; }
-            if (rtype && rec_expr && rec_expr->kind == ICN_VAR) {
+            if (rtype && rec_expr && rec_expr->kind == E_VAR) {
                 int sid = next_uid();
                 char a[64], b[64]; lbl_α(sid,a,sizeof a); lbl_β(sid,b,sizeof b);
                 strncpy(oα,a,63); strncpy(oβ,b,63);
@@ -1085,9 +1086,9 @@ static void emit_jvm_icon_assign(IcnNode *n, Ports ports, char *oα, char *oβ) 
                 put_obj_field(val_obj);
                 /* Load record object */
                 char recfld[128];
-                int slot = locals_find(rec_expr->val.sval);
-                if (slot >= 0) var_field(rec_expr->val.sval, recfld, sizeof recfld);
-                else           snprintf(recfld, sizeof recfld, "icn_gvar_%s", rec_expr->val.sval);
+                int slot = locals_find(rec_expr->sval);
+                if (slot >= 0) var_field(rec_expr->sval, recfld, sizeof recfld);
+                else           snprintf(recfld, sizeof recfld, "icn_gvar_%s", rec_expr->sval);
                 J("    getstatic %s/%s Ljava/lang/Object;\n", classname, recfld);
                 J("    checkcast %s$%s\n", classname, rtype);
                 /* Load boxed value */
@@ -1109,12 +1110,12 @@ static void emit_jvm_icon_assign(IcnNode *n, Ports ports, char *oα, char *oβ) 
      *       load T; load k_str; load v_obj; HashMap.put; pop; load v_long → γ
      * --------------------------------------------------------------------- */
     {
-        IcnNode *lhs = n->children[0];
-        IcnNode *rhs = n->children[1];
-        if (lhs && lhs->kind == ICN_SUBSCRIPT && lhs->nchildren >= 2
+        EXPR_t *lhs = n->children[0];
+        EXPR_t *rhs = n->children[1];
+        if (lhs && lhs->kind == E_IDX && lhs->nchildren >= 2
                 && expr_is_table(lhs->children[0])) {
-            IcnNode *tvar  = lhs->children[0];
-            IcnNode *kexpr = lhs->children[1];
+            EXPR_t *tvar  = lhs->children[0];
+            EXPR_t *kexpr = lhs->children[1];
             int sid = next_uid();
             char a[64], b[64]; lbl_α(sid,a,sizeof a); lbl_β(sid,b,sizeof b);
             strncpy(oα,a,63); strncpy(oβ,b,63);
@@ -1174,7 +1175,7 @@ static void emit_jvm_icon_assign(IcnNode *n, Ports ports, char *oα, char *oβ) 
             /* do_put: load T, k_str, v_obj; call put; pop result */
             JL(do_put);
             {
-                char taf[128]; var_field(tvar->val.sval, taf, sizeof taf);
+                char taf[128]; var_field(tvar->sval, taf, sizeof taf);
                 get_table_field(taf);
             }
             get_str_field(k_str_fld);
@@ -1208,8 +1209,8 @@ static void emit_jvm_icon_assign(IcnNode *n, Ports ports, char *oα, char *oβ) 
     JL(b); JGoto(rb);
     JL(store);
 
-    IcnNode *lhs = n->children[0];
-    IcnNode *rhs = n->children[1];
+    EXPR_t *lhs = n->children[0];
+    EXPR_t *rhs = n->children[1];
     int is_str  = expr_is_string(rhs);
     int is_strlist = !is_str && expr_is_strlist(rhs);
     int is_list = !is_str && !is_strlist && expr_is_list(rhs);
@@ -1217,13 +1218,13 @@ static void emit_jvm_icon_assign(IcnNode *n, Ports ports, char *oα, char *oβ) 
     int is_dbl  = !is_str && !is_list && !is_tbl && expr_is_real(rhs);
     int is_rec  = !is_str && !is_list && !is_tbl && !is_dbl && expr_is_record(rhs);
     /* Bang of a record-list yields the Object directly on the stack (no 0L placeholder) */
-    int is_rec_direct = is_rec && rhs->kind == ICN_BANG && expr_is_record_list(rhs->children[0]);
+    int is_rec_direct = is_rec && rhs->kind == E_ITER && expr_is_record_list(rhs->children[0]);
     int is_reclist = is_list && expr_is_record_list(rhs);
 
-    if (lhs && lhs->kind == ICN_VAR) {
-        int slot = locals_find(lhs->val.sval);
+    if (lhs && lhs->kind == E_VAR) {
+        int slot = locals_find(lhs->sval);
         if (slot >= 0) {
-            char fld[128]; var_field(lhs->val.sval, fld, sizeof fld);
+            char fld[128]; var_field(lhs->sval, fld, sizeof fld);
             if (is_str)         { declare_static_str(fld);     put_str_field(fld); }
             else if (is_strlist){ declare_static_strlist(fld); put_list_field(fld); }
             else if (is_list) {
@@ -1260,7 +1261,7 @@ static void emit_jvm_icon_assign(IcnNode *n, Ports ports, char *oα, char *oβ) 
             }
             else              { declare_static(fld);       put_long(fld); }
         } else {
-            char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", lhs->val.sval);
+            char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", lhs->sval);
             if (is_str)         { declare_static_str(gname);     put_str_field(gname); }
             else if (is_strlist){ declare_static_strlist(gname); put_list_field(gname); }
             else if (is_list) {
@@ -1294,7 +1295,7 @@ static void emit_jvm_icon_assign(IcnNode *n, Ports ports, char *oα, char *oβ) 
             }
             else              { declare_static(gname);       put_long(gname); }
         }
-    } else if (lhs && lhs->kind == ICN_SUBSCRIPT) {
+    } else if (lhs && lhs->kind == E_IDX) {
         /* List/string subscript LHS — value stays on stack; handled in push-back block below */
         (void)0;
     } else {
@@ -1303,10 +1304,10 @@ static void emit_jvm_icon_assign(IcnNode *n, Ports ports, char *oα, char *oβ) 
         else                                           JI("pop2", "");
     }
     /* Push back value for expression result (Icon := returns the value) */
-    if (lhs && lhs->kind == ICN_VAR) {
-        int slot = locals_find(lhs->val.sval);
+    if (lhs && lhs->kind == E_VAR) {
+        int slot = locals_find(lhs->sval);
         if (slot >= 0) {
-            char fld[128]; var_field(lhs->val.sval, fld, sizeof fld);
+            char fld[128]; var_field(lhs->sval, fld, sizeof fld);
             if (is_str)         get_str_field(fld);
             else if (is_strlist)get_list_field(fld);
             else if (is_list)   get_list_field(fld);
@@ -1315,7 +1316,7 @@ static void emit_jvm_icon_assign(IcnNode *n, Ports ports, char *oα, char *oβ) 
             else if (is_rec)    JI("lconst_0","");
             else                get_long(fld);
         } else {
-            char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", lhs->val.sval);
+            char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", lhs->sval);
             if (is_str)         get_str_field(gname);
             else if (is_strlist)get_list_field(gname);
             else if (is_list)   get_list_field(gname);
@@ -1324,12 +1325,12 @@ static void emit_jvm_icon_assign(IcnNode *n, Ports ports, char *oα, char *oβ) 
             else if (is_rec)    JI("lconst_0","");
             else                get_long(gname);
         }
-    } else if (lhs && lhs->kind == ICN_SUBSCRIPT && lhs->nchildren >= 2) {
+    } else if (lhs && lhs->kind == E_IDX && lhs->nchildren >= 2) {
         /* List subscript assignment: a[i] := v
          * RHS value is on stack (long or String).
          * Need: load list, compute 0-based int index, box value, call ArrayList.set */
-        IcnNode *lvar  = lhs->children[0];
-        IcnNode *kidx  = lhs->children[1];
+        EXPR_t *lvar  = lhs->children[0];
+        EXPR_t *kidx  = lhs->children[1];
         int lsid = next_uid();
         char lsub_l[128], lsub_i[80], lsub_v[80], lsub_vi[80], lsub_do[80];
         snprintf(lsub_l,  sizeof lsub_l,  "icn_%d_lsa_l",  lsid);
@@ -1346,13 +1347,13 @@ static void emit_jvm_icon_assign(IcnNode *n, Ports ports, char *oα, char *oβ) 
         if (is_str) put_str_field(lsub_v);
         else        put_long(lsub_v);
         /* Load list from variable */
-        if (lvar->kind == ICN_VAR) {
-            int lslot = locals_find(lvar->val.sval);
+        if (lvar->kind == E_VAR) {
+            int lslot = locals_find(lvar->sval);
             if (lslot >= 0) {
-                char fld[128]; var_field(lvar->val.sval, fld, sizeof fld);
+                char fld[128]; var_field(lvar->sval, fld, sizeof fld);
                 get_list_field(fld);
             } else {
-                char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", lvar->val.sval);
+                char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", lvar->sval);
                 get_list_field(gname);
             }
         } else {
@@ -1400,7 +1401,7 @@ static void emit_jvm_icon_assign(IcnNode *n, Ports ports, char *oα, char *oβ) 
  * ICN_RETURN
  * Store value into icn_retval, set icn_failed=0, jump to ret label
  * ======================================================================= */
-static void emit_jvm_icon_return(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_return(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     (void)ports;
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
@@ -1441,7 +1442,7 @@ static void emit_jvm_icon_return(IcnNode *n, Ports ports, char *oα, char *oβ) 
 /* =========================================================================
  * ICN_FAIL
  * ======================================================================= */
-static void emit_jvm_icon_fail_node(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_fail_node(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     (void)n;
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
@@ -1461,7 +1462,7 @@ static void emit_jvm_icon_fail_node(IcnNode *n, Ports ports, char *oα, char *o�
  * β: indirect — the proc β entry does tableswitch → resume_here
  * resume_here: run optional body, then loop back to E's β
  * ======================================================================= */
-static void emit_jvm_icon_suspend(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_suspend(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     (void)ports;
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
@@ -1474,8 +1475,8 @@ static void emit_jvm_icon_suspend(IcnNode *n, Ports ports, char *oα, char *oβ)
     char resume_here[64]; snprintf(resume_here, sizeof resume_here, "icn_%d_resume", id);
     char after_val[64];   snprintf(after_val,   sizeof after_val,   "icn_%d_yield",  id);
 
-    IcnNode *val_node  = (n->nchildren > 0) ? n->children[0] : NULL;
-    IcnNode *body_node = (n->nchildren > 1) ? n->children[1] : NULL;
+    EXPR_t *val_node  = (n->nchildren > 0) ? n->children[0] : NULL;
+    EXPR_t *body_node = (n->nchildren > 1) ? n->children[1] : NULL;
 
     char va[64], vb[64];
     if (val_node) {
@@ -1533,14 +1534,14 @@ static void emit_jvm_icon_suspend(IcnNode *n, Ports ports, char *oα, char *oβ)
  * Semantics: eval dispatch once; compare to each Vi in order; first match → eval Ri → γ;
  * no match → eval default → γ (or fail → ω if no default).
  * ======================================================================= */
-static void emit_jvm_icon_case(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_case(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
 
     if (n->nchildren < 1) { JL(a); JGoto(ports.ω); JL(b); JGoto(ports.ω); return; }
 
-    IcnNode *disp = n->children[0];
+    EXPR_t *disp = n->children[0];
     int nc = n->nchildren;
     /* nc-1 remaining children: pairs (val,res) + optional default */
     int npairs = (nc - 1) / 2;
@@ -1567,8 +1568,8 @@ static void emit_jvm_icon_case(IcnNode *n, Ports ports, char *oα, char *oβ) {
 
     /* For each clause: eval Vi, compare to dispatch, branch to Ri or next */
     for (int ci = 0; ci < npairs; ci++) {
-        IcnNode *vnode = n->children[1 + ci*2];
-        IcnNode *rnode = n->children[2 + ci*2];
+        EXPR_t *vnode = n->children[1 + ci*2];
+        EXPR_t *rnode = n->children[2 + ci*2];
         char vcmp[64];  snprintf(vcmp,  sizeof vcmp,  "icn_%d_cv%d",  id, ci);
         char vmatch[64];snprintf(vmatch,sizeof vmatch,"icn_%d_cm%d",  id, ci);
         char vnext[64]; snprintf(vnext, sizeof vnext, "icn_%d_cn%d",  id, ci);
@@ -1618,7 +1619,7 @@ static void emit_jvm_icon_case(IcnNode *n, Ports ports, char *oα, char *oβ) {
 
     /* Default or fail */
     if (has_default) {
-        IcnNode *dnode = n->children[nc-1];
+        EXPR_t *dnode = n->children[nc-1];
         char drelay[64]; snprintf(drelay, sizeof drelay, "icn_%d_cdefr", id);
         char dstart[64]; snprintf(dstart, sizeof dstart, "icn_%d_cdef",  id);
         Ports defp; strncpy(defp.γ, drelay, 63); strncpy(defp.ω, ports.ω, 63);
@@ -1631,14 +1632,14 @@ static void emit_jvm_icon_case(IcnNode *n, Ports ports, char *oα, char *oβ) {
 /* =========================================================================
  * ICN_IF — if cond then E2 [else E3]
  * ======================================================================= */
-static void emit_jvm_icon_if(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_if(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
 
-    IcnNode *cond  = n->children[0];
-    IcnNode *thenb = (n->nchildren > 1) ? n->children[1] : NULL;
-    IcnNode *elseb = (n->nchildren > 2) ? n->children[2] : NULL;
+    EXPR_t *cond  = n->children[0];
+    EXPR_t *thenb = (n->nchildren > 1) ? n->children[1] : NULL;
+    EXPR_t *elseb = (n->nchildren > 2) ? n->children[2] : NULL;
 
     char cond_then[64]; snprintf(cond_then, sizeof cond_then, "icn_%d_then", id);
     char cond_else[64]; snprintf(cond_else, sizeof cond_else, "icn_%d_else", id);
@@ -1698,11 +1699,11 @@ static void emit_jvm_icon_if(IcnNode *n, Ports ports, char *oα, char *oβ) {
 /* =========================================================================
  * ICN_CALL — write() built-in or user procedure
  * ======================================================================= */
-static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_call(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     if (n->nchildren < 1) { emit_jvm_icon_fail_node(NULL,ports,oα,oβ); return; }
-    IcnNode *fn = n->children[0];
+    EXPR_t *fn = n->children[0];
     int nargs = n->nchildren - 1;
-    const char *fname = (fn->kind == ICN_VAR) ? fn->val.sval : "unknown";
+    const char *fname = (fn->kind == E_VAR) ? fn->sval : "unknown";
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
@@ -1814,7 +1815,7 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
 
         /* Emit each arg subtree; their γ fires into aft[i] */
         for (int i = 0; i < nargs; i++) {
-            IcnNode *arg = n->children[i+1];
+            EXPR_t *arg = n->children[i+1];
             Ports ap;
             strncpy(ap.γ, aft[i], 63);
             strncpy(ap.ω, ports.ω, 63);
@@ -1828,7 +1829,7 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
 
         /* Relay blocks: one per arg */
         for (int i = 0; i < nargs; i++) {
-            IcnNode *arg = n->children[i+1];
+            EXPR_t *arg = n->children[i+1];
             int is_last = (i == nargs - 1);
             JL(aft[i]);
             if (expr_is_string(arg)) {
@@ -1936,7 +1937,7 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
     if (strcmp(fname, "reads") == 0 && nargs >= 1 && !is_user_proc(fname)) {
         declare_static_obj("icn_stdin_reader");
         declare_static_int("icn_stdin_init");
-        IcnNode *arg = n->children[1];
+        EXPR_t *arg = n->children[1];
         char after[64], init_lbl[64], call_lbl[64], eof_lbl[64];
         snprintf(after,    sizeof after,    "icn_%d_rds_after", id);
         snprintf(init_lbl, sizeof init_lbl, "icn_%d_rds_init",  id);
@@ -2000,7 +2001,7 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
 
     /* --- built-in integer(x) --- convert real or string to long */
     if (strcmp(fname, "integer") == 0 && nargs >= 1 && !is_user_proc(fname)) {
-        IcnNode *arg = n->children[1];
+        EXPR_t *arg = n->children[1];
         char after[64]; snprintf(after, sizeof after, "icn_%d_int_after", id);
         char fail_lbl[64]; snprintf(fail_lbl, sizeof fail_lbl, "icn_%d_int_fail", id);
         Ports ap; strncpy(ap.γ, after, 63); strncpy(ap.ω, ports.ω, 63);
@@ -2033,7 +2034,7 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
 
     /* --- built-in real(x) --- convert long or string to double */
     if (strcmp(fname, "real") == 0 && nargs >= 1 && !is_user_proc(fname)) {
-        IcnNode *arg = n->children[1];
+        EXPR_t *arg = n->children[1];
         char after[64]; snprintf(after, sizeof after, "icn_%d_real_after", id);
         Ports ap; strncpy(ap.γ, after, 63); strncpy(ap.ω, ports.ω, 63);
         char aa[64], ab[64]; emit_jvm_icon_expr(arg, ap, aa, ab);
@@ -2055,7 +2056,7 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
 
     /* --- built-in string(x) --- convert numeric to String */
     if (strcmp(fname, "string") == 0 && nargs >= 1 && !is_user_proc(fname)) {
-        IcnNode *arg = n->children[1];
+        EXPR_t *arg = n->children[1];
         char after[64]; snprintf(after, sizeof after, "icn_%d_str_after", id);
         Ports ap; strncpy(ap.γ, after, 63); strncpy(ap.ω, ports.ω, 63);
         char aa[64], ab[64]; emit_jvm_icon_expr(arg, ap, aa, ab);
@@ -2076,7 +2077,7 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
     /* --- built-in any(cs) ---
      * Only fires if 'any' is NOT a user-defined procedure in this file. */
     if (strcmp(fname, "any") == 0 && nargs >= 1 && !is_user_proc(fname)) {
-        IcnNode *csarg = n->children[1];
+        EXPR_t *csarg = n->children[1];
         char after[64]; snprintf(after, sizeof after, "icn_%d_after", id);
         char chk[64];   snprintf(chk,   sizeof chk,   "icn_%d_chk",  id);
         Ports ap; strncpy(ap.γ, after, 63); strncpy(ap.ω, ports.ω, 63);
@@ -2114,7 +2115,7 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
 
     /* --- built-in many(cs) --- only if not user-defined */
     if (strcmp(fname, "many") == 0 && nargs >= 1 && !is_user_proc(fname)) {
-        IcnNode *csarg = n->children[1];
+        EXPR_t *csarg = n->children[1];
         char after[64]; snprintf(after, sizeof after, "icn_%d_after", id);
         char chk[64];   snprintf(chk,   sizeof chk,   "icn_%d_chk",  id);
         Ports ap; strncpy(ap.γ, after, 63); strncpy(ap.ω, ports.ω, 63);
@@ -2147,7 +2148,7 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
 
     /* --- built-in upto(cs) --- only if not user-defined */
     if (strcmp(fname, "upto") == 0 && nargs >= 1 && !is_user_proc(fname)) {
-        IcnNode *csarg = n->children[1];
+        EXPR_t *csarg = n->children[1];
         char after[64]; snprintf(after, sizeof after, "icn_%d_after", id);
         char step[64];  snprintf(step,  sizeof step,  "icn_%d_step",  id);
         char chk[64];   snprintf(chk,   sizeof chk,   "icn_%d_chk",  id);
@@ -2191,8 +2192,8 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
      * β: advance pos (pos was 1-based result; next search starts at pos), goto check
      * check: icn_builtin_find(s1,s2,pos) → -1L → ω; else store pos=result, push result → γ */
     if (strcmp(fname, "find") == 0 && nargs >= 2 && !is_user_proc(fname)) {
-        IcnNode *s1arg = n->children[1];
-        IcnNode *s2arg = n->children[2];
+        EXPR_t *s1arg = n->children[1];
+        EXPR_t *s2arg = n->children[2];
         char after1[64], after2[64], chk[64], ok[64];
         snprintf(after1, sizeof after1, "icn_%d_fa1",  id);
         snprintf(after2, sizeof after2, "icn_%d_fa2",  id);
@@ -2241,7 +2242,7 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
      * Calls icn_builtin_match(s, subject, pos) → new 1-based pos or -1L.
      * On success: advance icn_pos = result-1 (0-based), push result → γ. */
     if (strcmp(fname, "match") == 0 && nargs >= 1 && !is_user_proc(fname)) {
-        IcnNode *sarg = n->children[1];
+        EXPR_t *sarg = n->children[1];
         char after[64], ok[64];
         snprintf(after, sizeof after, "icn_%d_ma", id);
         snprintf(ok,    sizeof ok,    "icn_%d_mo", id);
@@ -2271,7 +2272,7 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
      * Calls icn_builtin_tab_str(n_int, subj, pos) → String or null on failure.
      * On success: icn_pos = n-1, push String → γ. */
     if (strcmp(fname, "tab") == 0 && nargs >= 1 && !is_user_proc(fname)) {
-        IcnNode *narg = n->children[1];
+        EXPR_t *narg = n->children[1];
         char after[64], ok[64];
         snprintf(after, sizeof after, "icn_%d_ta", id);
         snprintf(ok,    sizeof ok,    "icn_%d_to", id);
@@ -2301,7 +2302,7 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
      * Calls icn_builtin_move_str(n_int, subj, pos) → String or null on failure.
      * On success: icn_pos = pos+n, push String → γ. */
     if (strcmp(fname, "move") == 0 && nargs >= 1 && !is_user_proc(fname)) {
-        IcnNode *narg = n->children[1];
+        EXPR_t *narg = n->children[1];
         char after[64], ok[64];
         snprintf(after, sizeof after, "icn_%d_mva", id);
         snprintf(ok,    sizeof ok,    "icn_%d_mvo", id);
@@ -2352,8 +2353,8 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
             && nargs >= 2 && !is_user_proc(fname)) {
         /* push(L, v): add v to front (index 0) of L; put(L,v): add to back */
         int is_push = (strcmp(fname, "push") == 0);
-        IcnNode *larg = n->children[1];   /* list */
-        IcnNode *varg = n->children[2];   /* value */
+        EXPR_t *larg = n->children[1];   /* list */
+        EXPR_t *varg = n->children[2];   /* value */
         char lrelay[64], vrelay[64];
         snprintf(lrelay, sizeof lrelay, "icn_%d_lr", id);
         snprintf(vrelay, sizeof vrelay, "icn_%d_vr", id);
@@ -2409,7 +2410,7 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
     if ((strcmp(fname, "get") == 0 || strcmp(fname, "pop") == 0)
             && nargs >= 1 && !is_user_proc(fname)) {
         /* get(L)/pop(L): remove+return first element; fail if empty */
-        IcnNode *larg = n->children[1];
+        EXPR_t *larg = n->children[1];
         char lrelay[64]; snprintf(lrelay, sizeof lrelay, "icn_%d_lr", id);
         char list_fld[80]; snprintf(list_fld, sizeof list_fld, "icn_%d_glist", id);
         char ok[64]; snprintf(ok, sizeof ok, "icn_%d_gok", id);
@@ -2436,7 +2437,7 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
 
     if (strcmp(fname, "pull") == 0 && nargs >= 1 && !is_user_proc(fname)) {
         /* pull(L): remove+return last element; fail if empty */
-        IcnNode *larg = n->children[1];
+        EXPR_t *larg = n->children[1];
         char lrelay[64]; snprintf(lrelay, sizeof lrelay, "icn_%d_lr", id);
         char list_fld[80]; snprintf(list_fld, sizeof list_fld, "icn_%d_plist", id);
         char sz_tmp[80]; snprintf(sz_tmp, sizeof sz_tmp, "icn_%d_psz", id);
@@ -2472,8 +2473,8 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
 
     if (strcmp(fname, "list") == 0 && nargs >= 2 && !is_user_proc(fname)) {
         /* list(n, x): create ArrayList of n copies of x */
-        IcnNode *narg = n->children[1];
-        IcnNode *xarg = n->children[2];
+        EXPR_t *narg = n->children[1];
+        EXPR_t *xarg = n->children[2];
         char nrelay[64], xrelay[64];
         snprintf(nrelay, sizeof nrelay, "icn_%d_nlr", id);
         snprintf(xrelay, sizeof xrelay, "icn_%d_xlr", id);
@@ -2557,7 +2558,7 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
 
     if (strcmp(fname, "table") == 0 && nargs >= 1 && !is_user_proc(fname)) {
         /* table(dflt): create new HashMap; store default in _dflt static */
-        IcnNode *darg = n->children[1];
+        EXPR_t *darg = n->children[1];
         char drelay[64]; snprintf(drelay, sizeof drelay, "icn_%d_tdr", id);
         char tbl_fld[80];  snprintf(tbl_fld,  sizeof tbl_fld,  "icn_%d_tbl",  id);
         char dflt_fld[80]; snprintf(dflt_fld, sizeof dflt_fld, "icn_%d_tdflt", id);
@@ -2594,9 +2595,9 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
     }
 
     if (strcmp(fname, "insert") == 0 && nargs >= 3 && !is_user_proc(fname)) {
-        IcnNode *targ = n->children[1];
-        IcnNode *karg = n->children[2];
-        IcnNode *varg = n->children[3];
+        EXPR_t *targ = n->children[1];
+        EXPR_t *karg = n->children[2];
+        EXPR_t *varg = n->children[3];
         char trelay[64], krelay[64], vrelay[64];
         snprintf(trelay, sizeof trelay, "icn_%d_itr2", id);
         snprintf(krelay, sizeof krelay, "icn_%d_ikr2", id);
@@ -2637,8 +2638,8 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
 
     if (strcmp(fname, "delete") == 0 && nargs >= 2 && !is_user_proc(fname)) {
         /* delete(T, k): T.remove(key_str); return T */
-        IcnNode *targ = n->children[1];
-        IcnNode *karg = n->children[2];
+        EXPR_t *targ = n->children[1];
+        EXPR_t *karg = n->children[2];
         char trelay[64], krelay[64];
         snprintf(trelay, sizeof trelay, "icn_%d_dtr", id);
         snprintf(krelay, sizeof krelay, "icn_%d_dkr", id);
@@ -2669,8 +2670,8 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
 
     if (strcmp(fname, "member") == 0 && nargs >= 2 && !is_user_proc(fname)) {
         /* member(T, k): succeed returning k (long) if k is a key; else fail */
-        IcnNode *targ = n->children[1];
-        IcnNode *karg = n->children[2];
+        EXPR_t *targ = n->children[1];
+        EXPR_t *karg = n->children[2];
         char trelay[64], krelay[64];
         snprintf(trelay, sizeof trelay, "icn_%d_mtr", id);
         snprintf(krelay, sizeof krelay, "icn_%d_mkr", id);
@@ -2708,7 +2709,7 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
          * Strategy: snapshot keySet().toArray() into Object[] static at start;
          * use int index static to iterate. One-shot keys (no deletion during iteration).
          */
-        IcnNode *targ = n->children[1];
+        EXPR_t *targ = n->children[1];
         char trelay[64]; snprintf(trelay, sizeof trelay, "icn_%d_ktr", id);
         char t_fld[80];   snprintf(t_fld,   sizeof t_fld,   "icn_%d_ktbl",  id);
         char arr_fld[80]; snprintf(arr_fld,  sizeof arr_fld, "icn_%d_karr",  id);
@@ -2774,8 +2775,8 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
 
     /* --- repl(s, n) --- repeat string s n times */
     if (strcmp(fname, "repl") == 0 && nargs >= 2 && !is_user_proc(fname)) {
-        IcnNode *sarg = n->children[1];
-        IcnNode *narg = (nargs >= 2) ? n->children[2] : NULL;
+        EXPR_t *sarg = n->children[1];
+        EXPR_t *narg = (nargs >= 2) ? n->children[2] : NULL;
         char mid[64]; snprintf(mid, sizeof mid, "icn_%d_repl_mid", id);
         char after[64]; snprintf(after, sizeof after, "icn_%d_repl_after", id);
         Ports ap; strncpy(ap.γ, mid, 63); strncpy(ap.ω, ports.ω, 63);
@@ -2826,7 +2827,7 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
 
     /* --- reverse(s) --- */
     if (strcmp(fname, "reverse") == 0 && nargs >= 1 && !is_user_proc(fname)) {
-        IcnNode *sarg = n->children[1];
+        EXPR_t *sarg = n->children[1];
         char after[64]; snprintf(after, sizeof after, "icn_%d_rev_after", id);
         Ports ap; strncpy(ap.γ, after, 63); strncpy(ap.ω, ports.ω, 63);
         char sa[64], sb[64]; emit_jvm_icon_expr(sarg, ap, sa, sb);
@@ -2846,8 +2847,8 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
 
     /* --- left(s, n [, pad]) --- pad/truncate to width n, left-aligned */
     if (strcmp(fname, "left") == 0 && nargs >= 1 && !is_user_proc(fname)) {
-        IcnNode *sarg = n->children[1];
-        IcnNode *narg = (nargs >= 2) ? n->children[2] : NULL;
+        EXPR_t *sarg = n->children[1];
+        EXPR_t *narg = (nargs >= 2) ? n->children[2] : NULL;
         /* pad arg optional — use space if absent */
         char mid[64]; snprintf(mid, sizeof mid, "icn_%d_left_mid", id);
         char after[64]; snprintf(after, sizeof after, "icn_%d_left_after", id);
@@ -2855,8 +2856,8 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
         char sfld_left[64]; snprintf(sfld_left, sizeof sfld_left, "icn_%d_left_s", id);
         declare_static_str(sfld_left);
         /* &null coercions: left(&null,n) → left("",n); left(s,&null) → left(s,1) */
-        int sarg_is_null = (sarg && sarg->kind == ICN_VAR && strcmp(sarg->val.sval,"&null")==0);
-        int narg_is_null = (!narg || (narg->kind == ICN_VAR && strcmp(narg->val.sval,"&null")==0));
+        int sarg_is_null = (sarg && sarg->kind == E_VAR && strcmp(sarg->sval,"&null")==0);
+        int narg_is_null = (!narg || (narg->kind == E_VAR && strcmp(narg->sval,"&null")==0));
         int scratch_n = alloc_int_scratch();
         if (sarg_is_null && narg_is_null) {
             /* both null: left("", 1) */
@@ -2908,8 +2909,8 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
             J("    iload %d\n", scratch_n);
         }
         if (nargs >= 3) {
-            IcnNode *parg = n->children[3];
-            if (parg->kind == ICN_VAR && strcmp(parg->val.sval,"&null")==0) {
+            EXPR_t *parg = n->children[3];
+            if (parg->kind == E_VAR && strcmp(parg->sval,"&null")==0) {
                 JI("ldc", "\" \"");
             } else {
                 /* Use static field for pad arg to avoid dead-JGoto VerifyError */
@@ -2934,14 +2935,14 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
 
     /* --- right(s, n [, pad]) --- pad/truncate to width n, right-aligned */
     if (strcmp(fname, "right") == 0 && nargs >= 1 && !is_user_proc(fname)) {
-        IcnNode *sarg = n->children[1];
-        IcnNode *narg = (nargs >= 2) ? n->children[2] : NULL;
+        EXPR_t *sarg = n->children[1];
+        EXPR_t *narg = (nargs >= 2) ? n->children[2] : NULL;
         char mid[64]; snprintf(mid, sizeof mid, "icn_%d_right_mid", id);
         char after[64]; snprintf(after, sizeof after, "icn_%d_right_after", id);
         char sfld_right[64]; snprintf(sfld_right, sizeof sfld_right, "icn_%d_right_s", id);
         declare_static_str(sfld_right);
-        int sarg_is_null = (sarg && sarg->kind == ICN_VAR && strcmp(sarg->val.sval,"&null")==0);
-        int narg_is_null = (!narg || (narg->kind == ICN_VAR && strcmp(narg->val.sval,"&null")==0));
+        int sarg_is_null = (sarg && sarg->kind == E_VAR && strcmp(sarg->sval,"&null")==0);
+        int narg_is_null = (!narg || (narg->kind == E_VAR && strcmp(narg->sval,"&null")==0));
         int scratch_n = alloc_int_scratch();
         if (sarg_is_null && narg_is_null) {
             JL(a); JL(b);
@@ -2983,8 +2984,8 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
             get_str_field(sfld_right); J("    iload %d\n", scratch_n);
         }
         if (nargs >= 3) {
-            IcnNode *parg = n->children[3];
-            if (parg->kind == ICN_VAR && strcmp(parg->val.sval,"&null")==0) {
+            EXPR_t *parg = n->children[3];
+            if (parg->kind == E_VAR && strcmp(parg->sval,"&null")==0) {
                 JI("ldc", "\" \"");
             } else {
                 char mid2[64]; snprintf(mid2, sizeof mid2, "icn_%d_right_mid2", id);
@@ -3007,14 +3008,14 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
 
     /* --- center(s, n [, pad]) --- */
     if (strcmp(fname, "center") == 0 && nargs >= 1 && !is_user_proc(fname)) {
-        IcnNode *sarg = n->children[1];
-        IcnNode *narg = (nargs >= 2) ? n->children[2] : NULL;
+        EXPR_t *sarg = n->children[1];
+        EXPR_t *narg = (nargs >= 2) ? n->children[2] : NULL;
         char mid[64]; snprintf(mid, sizeof mid, "icn_%d_ctr_mid", id);
         char after[64]; snprintf(after, sizeof after, "icn_%d_ctr_after", id);
         char sfld_ctr[64]; snprintf(sfld_ctr, sizeof sfld_ctr, "icn_%d_ctr_s", id);
         declare_static_str(sfld_ctr);
-        int sarg_is_null = (sarg && sarg->kind == ICN_VAR && strcmp(sarg->val.sval,"&null")==0);
-        int narg_is_null = (!narg || (narg->kind == ICN_VAR && strcmp(narg->val.sval,"&null")==0));
+        int sarg_is_null = (sarg && sarg->kind == E_VAR && strcmp(sarg->sval,"&null")==0);
+        int narg_is_null = (!narg || (narg->kind == E_VAR && strcmp(narg->sval,"&null")==0));
         int scratch_n = alloc_int_scratch();
         if (sarg_is_null && narg_is_null) {
             JL(a); JL(b);
@@ -3056,8 +3057,8 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
             get_str_field(sfld_ctr); J("    iload %d\n", scratch_n);
         }
         if (nargs >= 3) {
-            IcnNode *parg = n->children[3];
-            if (parg->kind == ICN_VAR && strcmp(parg->val.sval,"&null")==0) {
+            EXPR_t *parg = n->children[3];
+            if (parg->kind == E_VAR && strcmp(parg->sval,"&null")==0) {
                 JI("ldc", "\" \"");
             } else {
                 char mid2[64]; snprintf(mid2, sizeof mid2, "icn_%d_ctr_mid2", id);
@@ -3080,7 +3081,7 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
 
     /* --- trim(s [, cs]) --- remove trailing chars in cs (default whitespace) */
     if (strcmp(fname, "trim") == 0 && nargs >= 1 && !is_user_proc(fname)) {
-        IcnNode *sarg = n->children[1];
+        EXPR_t *sarg = n->children[1];
         char after[64]; snprintf(after, sizeof after, "icn_%d_trim_after", id);
         if (nargs >= 2) {
             char mid[64]; snprintf(mid, sizeof mid, "icn_%d_trim_mid", id);
@@ -3113,7 +3114,7 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
 
     /* --- map(s) --- 1-arg form: lowercase s using default &ucase/&lcase tables */
     if (strcmp(fname, "map") == 0 && nargs == 1 && !is_user_proc(fname)) {
-        IcnNode *sarg = n->children[1];
+        EXPR_t *sarg = n->children[1];
         char after[64]; snprintf(after, sizeof after, "icn_%d_map1_after", id);
         Ports ap; strncpy(ap.γ, after, 63); strncpy(ap.ω, ports.ω, 63);
         char sa[64], sb[64]; emit_jvm_icon_expr(sarg, ap, sa, sb);
@@ -3130,9 +3131,9 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
 
     /* --- map(s, src, dst) --- translate chars in s: src[i]→dst[i] */
     if (strcmp(fname, "map") == 0 && nargs >= 3 && !is_user_proc(fname)) {
-        IcnNode *sarg   = n->children[1];
-        IcnNode *srcarg = n->children[2];
-        IcnNode *dstarg = n->children[3];
+        EXPR_t *sarg   = n->children[1];
+        EXPR_t *srcarg = n->children[2];
+        EXPR_t *dstarg = n->children[3];
         char mid1[64]; snprintf(mid1, sizeof mid1, "icn_%d_map_mid1", id);
         char mid2[64]; snprintf(mid2, sizeof mid2, "icn_%d_map_mid2", id);
         char after[64]; snprintf(after, sizeof after, "icn_%d_map_after", id);
@@ -3166,7 +3167,7 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
 
     /* --- char(i) --- integer → single-char String */
     if (strcmp(fname, "char") == 0 && nargs >= 1 && !is_user_proc(fname)) {
-        IcnNode *iarg = n->children[1];
+        EXPR_t *iarg = n->children[1];
         char after[64]; snprintf(after, sizeof after, "icn_%d_char_after", id);
         Ports ap; strncpy(ap.γ, after, 63); strncpy(ap.ω, ports.ω, 63);
         char ia[64], ib[64]; emit_jvm_icon_expr(iarg, ap, ia, ib);
@@ -3183,7 +3184,7 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
 
     /* --- ord(s) --- first char of string → long */
     if (strcmp(fname, "ord") == 0 && nargs >= 1 && !is_user_proc(fname)) {
-        IcnNode *sarg = n->children[1];
+        EXPR_t *sarg = n->children[1];
         char after[64]; snprintf(after, sizeof after, "icn_%d_ord_after", id);
         Ports ap; strncpy(ap.γ, after, 63); strncpy(ap.ω, ports.ω, 63);
         char sa[64], sb[64]; emit_jvm_icon_expr(sarg, ap, sa, sb);
@@ -3202,7 +3203,7 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
 
     /* --- type(x) --- returns "integer", "real", or "string" (compile-time constant) */
     if (strcmp(fname, "type") == 0 && nargs >= 1 && !is_user_proc(fname)) {
-        IcnNode *arg = n->children[1];
+        EXPR_t *arg = n->children[1];
         char after[64]; snprintf(after, sizeof after, "icn_%d_type_after", id);
         Ports ap; strncpy(ap.γ, after, 63); strncpy(ap.ω, ports.ω, 63);
         char aa[64], ab[64]; emit_jvm_icon_expr(arg, ap, aa, ab);
@@ -3226,7 +3227,7 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
 
     /* --- copy(x) --- shallow copy; strings/integers/reals are immutable → identity */
     if (strcmp(fname, "copy") == 0 && nargs >= 1 && !is_user_proc(fname)) {
-        IcnNode *arg = n->children[1];
+        EXPR_t *arg = n->children[1];
         char after[64]; snprintf(after, sizeof after, "icn_%d_copy_after", id);
         Ports ap; strncpy(ap.γ, after, 63); strncpy(ap.ω, ports.ω, 63);
         char aa[64], ab[64]; emit_jvm_icon_expr(arg, ap, aa, ab);
@@ -3240,7 +3241,7 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
 
     /* --- image(x) --- string representation of any value */
     if (strcmp(fname, "image") == 0 && nargs >= 1 && !is_user_proc(fname)) {
-        IcnNode *arg = n->children[1];
+        EXPR_t *arg = n->children[1];
         char after[64]; snprintf(after, sizeof after, "icn_%d_image_after", id);
         Ports ap; strncpy(ap.γ, after, 63); strncpy(ap.ω, ports.ω, 63);
         char aa[64], ab[64]; emit_jvm_icon_expr(arg, ap, aa, ab);
@@ -3260,7 +3261,7 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
 
     /* --- numeric(x) --- convert string to integer; fail if not numeric */
     if (strcmp(fname, "numeric") == 0 && nargs >= 1 && !is_user_proc(fname)) {
-        IcnNode *arg = n->children[1];
+        EXPR_t *arg = n->children[1];
         char after[64]; snprintf(after, sizeof after, "icn_%d_num_after", id);
         Ports ap; strncpy(ap.γ, after, 63); strncpy(ap.ω, ports.ω, 63);
         char aa[64], ab[64]; emit_jvm_icon_expr(arg, ap, aa, ab);
@@ -3288,7 +3289,7 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
 
     /* --- abs(x) --- absolute value; works for integer (long) and real (double) */
     if (strcmp(fname, "abs") == 0 && nargs >= 1 && !is_user_proc(fname)) {
-        IcnNode *arg = n->children[1];
+        EXPR_t *arg = n->children[1];
         char after[64]; snprintf(after, sizeof after, "icn_%d_abs_after", id);
         Ports ap; strncpy(ap.γ, after, 63); strncpy(ap.ω, ports.ω, 63);
         char aa[64], ab[64]; emit_jvm_icon_expr(arg, ap, aa, ab);
@@ -3368,7 +3369,7 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
 
     /* --- sqrt(x) --- square root; result is real */
     if (strcmp(fname, "sqrt") == 0 && nargs >= 1 && !is_user_proc(fname)) {
-        IcnNode *arg = n->children[1];
+        EXPR_t *arg = n->children[1];
         char after[64]; snprintf(after, sizeof after, "icn_%d_sqrt_after", id);
         Ports ap; strncpy(ap.γ, after, 63); strncpy(ap.ω, ports.ω, 63);
         char aa[64], ab[64]; emit_jvm_icon_expr(arg, ap, aa, ab);
@@ -3386,7 +3387,7 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
      * β (resume): cur += step, push cur → γ
      * seq never fails on its own (infinite); limit operator controls termination */
     if (strcmp(fname, "seq") == 0 && nargs >= 1 && !is_user_proc(fname)) {
-        IcnNode *startarg = n->children[1];
+        EXPR_t *startarg = n->children[1];
         char cur_fld[64];  snprintf(cur_fld,  sizeof cur_fld,  "icn_%d_seq_cur",  id);
         char step_fld[64]; snprintf(step_fld, sizeof step_fld, "icn_%d_seq_step", id);
         declare_static(cur_fld);
@@ -3749,7 +3750,7 @@ static void emit_jvm_icon_call(IcnNode *n, Ports ports, char *oα, char *oβ) {
  *
  * This matches JCON irgen.icn ir_MoveLabel + ir_IndirectGoto (§4.5).
  * ======================================================================= */
-static void emit_jvm_icon_alt(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_alt(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
@@ -3852,7 +3853,7 @@ static void emit_jvm_icon_alt(IcnNode *n, Ports ports, char *oα, char *oβ) {
  * Both operands promoted to double. Result = Math.pow(D,D) → double.
  * One-shot (β → ω) — pow is not a generator.
  * ======================================================================= */
-static void emit_jvm_icon_pow(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_pow(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
@@ -3865,8 +3866,8 @@ static void emit_jvm_icon_pow(IcnNode *n, Ports ports, char *oα, char *oβ) {
     declare_static_real(lstore);  /* D: left operand value */
     declare_static_real(rstore);  /* D: right operand value */
 
-    IcnNode *lchild = (n->nchildren > 0) ? n->children[0] : NULL;
-    IcnNode *rchild = (n->nchildren > 1) ? n->children[1] : NULL;
+    EXPR_t *lchild = (n->nchildren > 0) ? n->children[0] : NULL;
+    EXPR_t *rchild = (n->nchildren > 1) ? n->children[1] : NULL;
 
     Ports rp; strncpy(rp.γ, rrelay, 63); strncpy(rp.ω, ports.ω, 63);
     Ports lp; strncpy(lp.γ, lrelay, 63); strncpy(lp.ω, ports.ω, 63);
@@ -3905,7 +3906,7 @@ static void emit_jvm_icon_pow(IcnNode *n, Ports ports, char *oα, char *oβ) {
  * JVM discipline: operand stack EMPTY at every label boundary.
  * Values passed across labels go through static fields (lc, rc, bf).
  * ========================================================================= */
-static void emit_jvm_icon_binop(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_binop(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     char compute[64]; snprintf(compute, sizeof compute, "icn_%d_compute", id);
@@ -3932,10 +3933,10 @@ static void emit_jvm_icon_binop(IcnNode *n, Ports ports, char *oα, char *oβ) {
     Ports lp; strncpy(lp.γ, left_relay, 63); strncpy(lp.ω, ports.ω, 63);
     char la[64], lb[64]; emit_jvm_icon_expr(n->children[0], lp, la, lb);
 
-    IcnNode *lchild = n->children[0];
-    int left_is_value = (lchild->kind == ICN_VAR || lchild->kind == ICN_INT ||
-                         lchild->kind == ICN_REAL ||
-                         lchild->kind == ICN_STR || lchild->kind == ICN_CALL);
+    EXPR_t *lchild = n->children[0];
+    int left_is_value = (lchild->kind == E_VAR || lchild->kind == E_ILIT ||
+                         lchild->kind == E_FLIT ||
+                         lchild->kind == E_QLIT || lchild->kind == E_FNC);
 
     /* left_relay: value on stack → promote if needed → store to lc_field */
     JL(left_relay);
@@ -3965,20 +3966,20 @@ static void emit_jvm_icon_binop(IcnNode *n, Ports ports, char *oα, char *oβ) {
     else        { get_long(lc_field); get_long(rc_field); }
     if (is_dbl) {
         switch (n->kind) {
-            case ICN_ADD: JI("dadd",""); break;
-            case ICN_SUB: JI("dsub",""); break;
-            case ICN_MUL: JI("dmul",""); break;
-            case ICN_DIV: JI("ddiv",""); break;
-            case ICN_MOD: JI("drem",""); break;
+            case E_ADD: JI("dadd",""); break;
+            case E_SUB: JI("dsub",""); break;
+            case E_MPY: JI("dmul",""); break;
+            case E_DIV: JI("ddiv",""); break;
+            case E_MOD: JI("drem",""); break;
             default: break;
         }
     } else {
         switch (n->kind) {
-            case ICN_ADD: JI("ladd",""); break;
-            case ICN_SUB: JI("lsub",""); break;
-            case ICN_MUL: JI("lmul",""); break;
-            case ICN_DIV: JI("ldiv",""); break;
-            case ICN_MOD: JI("lrem",""); break;
+            case E_ADD: JI("ladd",""); break;
+            case E_SUB: JI("lsub",""); break;
+            case E_MPY: JI("lmul",""); break;
+            case E_DIV: JI("ldiv",""); break;
+            case E_MOD: JI("lrem",""); break;
             default: break;
         }
     }
@@ -3991,7 +3992,7 @@ static void emit_jvm_icon_binop(IcnNode *n, Ports ports, char *oα, char *oβ) {
  * JVM discipline: stack empty at all label boundaries.
  * lc_field = left cache, rc_field = right staging.
  * ======================================================================= */
-static void emit_jvm_icon_relop(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_relop(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     char chk[64];    snprintf(chk,    sizeof chk,    "icn_%d_check",  id);
@@ -4054,12 +4055,12 @@ static void emit_jvm_icon_relop(IcnNode *n, Ports ports, char *oα, char *oβ) {
         get_str_field(rc_field);
         JI("invokevirtual", "java/lang/String/compareTo(Ljava/lang/String;)I");
         switch (n->kind) {
-            case ICN_LT: jfail = "ifge"; break;
-            case ICN_LE: jfail = "ifgt"; break;
-            case ICN_GT: jfail = "ifle"; break;
-            case ICN_GE: jfail = "iflt"; break;
-            case ICN_EQ: jfail = "ifne"; break;
-            case ICN_NE: jfail = "ifeq"; break;
+            case E_LT: jfail = "ifge"; break;
+            case E_LE: jfail = "ifgt"; break;
+            case E_GT: jfail = "ifle"; break;
+            case E_GE: jfail = "iflt"; break;
+            case E_EQ: jfail = "ifne"; break;
+            case E_NE: jfail = "ifeq"; break;
             default:     jfail = "ifne"; break;
         }
         J("    %s %s\n", jfail, rb);
@@ -4074,12 +4075,12 @@ static void emit_jvm_icon_relop(IcnNode *n, Ports ports, char *oα, char *oβ) {
          * Use dcmpg for >/>= (NaN → +1 → treated as greater, safe fail for < case).
          * For = and ~=, dcmpl works (NaN yields -1 or 1, never 0 → correct). */
         switch (n->kind) {
-            case ICN_LT: JI("dcmpl",""); jfail = "ifge"; break;
-            case ICN_LE: JI("dcmpl",""); jfail = "ifgt"; break;
-            case ICN_GT: JI("dcmpg",""); jfail = "ifle"; break;
-            case ICN_GE: JI("dcmpg",""); jfail = "iflt"; break;
-            case ICN_EQ: JI("dcmpl",""); jfail = "ifne"; break;
-            case ICN_NE: JI("dcmpl",""); jfail = "ifeq"; break;
+            case E_LT: JI("dcmpl",""); jfail = "ifge"; break;
+            case E_LE: JI("dcmpl",""); jfail = "ifgt"; break;
+            case E_GT: JI("dcmpg",""); jfail = "ifle"; break;
+            case E_GE: JI("dcmpg",""); jfail = "iflt"; break;
+            case E_EQ: JI("dcmpl",""); jfail = "ifne"; break;
+            case E_NE: JI("dcmpl",""); jfail = "ifeq"; break;
             default:     JI("dcmpl",""); jfail = "ifne"; break;
         }
     } else {
@@ -4087,12 +4088,12 @@ static void emit_jvm_icon_relop(IcnNode *n, Ports ports, char *oα, char *oβ) {
         /* Integer path: lcmp leaves int on stack */
         JI("lcmp","");
         switch (n->kind) {
-            case ICN_LT: jfail = "ifge"; break;
-            case ICN_LE: jfail = "ifgt"; break;
-            case ICN_GT: jfail = "ifle"; break;
-            case ICN_GE: jfail = "iflt"; break;
-            case ICN_EQ: jfail = "ifne"; break;
-            case ICN_NE: jfail = "ifeq"; break;
+            case E_LT: jfail = "ifge"; break;
+            case E_LE: jfail = "ifgt"; break;
+            case E_GT: jfail = "ifle"; break;
+            case E_GE: jfail = "iflt"; break;
+            case E_EQ: jfail = "ifne"; break;
+            case E_NE: jfail = "ifeq"; break;
             default:     jfail = "ifne"; break;
         }
     }
@@ -4105,7 +4106,7 @@ static void emit_jvm_icon_relop(IcnNode *n, Ports ports, char *oα, char *oβ) {
 /* =========================================================================
  * ICN_TO — range generator inline counter (§4.4)
  * ======================================================================= */
-static void emit_jvm_icon_to(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_to(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64], code[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b); lbl_code(id,code,sizeof code);
     char init[64]; snprintf(init,sizeof init,"icn_%d_init",id);
@@ -4195,15 +4196,15 @@ static void emit_jvm_icon_to(IcnNode *n, Ports ports, char *oα, char *oβ) {
 /* =========================================================================
  * ICN_EVERY
  * ======================================================================= */
-static void emit_jvm_icon_every(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_every(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     /* pump_gen: arrived with NO value on stack — kick generator β for next value */
     char pump_gen[64]; snprintf(pump_gen, sizeof pump_gen, "icn_%d_pump", id);
     strncpy(oα,a,63); strncpy(oβ,b,63);
 
-    IcnNode *gen  = n->children[0];
-    IcnNode *body = (n->nchildren > 1) ? n->children[1] : NULL;
+    EXPR_t *gen  = n->children[0];
+    EXPR_t *body = (n->nchildren > 1) ? n->children[1] : NULL;
     char ga[64], gb[64];
 
     if (body) {
@@ -4243,13 +4244,13 @@ static void emit_jvm_icon_every(IcnNode *n, Ports ports, char *oα, char *oβ) {
 /* =========================================================================
  * ICN_WHILE
  * ======================================================================= */
-static void emit_jvm_icon_while(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_while(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
 
-    IcnNode *cond = n->children[0];
-    IcnNode *body = (n->nchildren > 1) ? n->children[1] : NULL;
+    EXPR_t *cond = n->children[0];
+    EXPR_t *body = (n->nchildren > 1) ? n->children[1] : NULL;
 
     char cond_ok[64];  snprintf(cond_ok,  sizeof cond_ok,  "icn_%d_condok", id);
     char loop_top[64]; snprintf(loop_top, sizeof loop_top, "icn_%d_top",    id);
@@ -4270,7 +4271,7 @@ static void emit_jvm_icon_while(IcnNode *n, Ports ports, char *oα, char *oβ) {
          * A failing child (e.g. `if` with no else) must NOT abort remaining
          * statements — it should fall through to the next child's α.
          * Only the last child's ω goes to loop_top (re-check condition). */
-        if (body->kind == ICN_SEQ_EXPR && body->nchildren >= 2) {
+        if (body->kind == E_SEQ_EXPR && body->nchildren >= 2) {
             int nc = body->nchildren;
             char (*cca)[64] = malloc(nc * 64);
             char (*ccb)[64] = malloc(nc * 64);
@@ -4325,7 +4326,7 @@ static void emit_jvm_icon_while(IcnNode *n, Ports ports, char *oα, char *oβ) {
     JL(b); JGoto(ports.ω);
 }
 
-static void emit_jvm_icon_until(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_until(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     /* until E do body end — loop while E FAILS; exit when E SUCCEEDS.
      * Byrd-box dual of while: cond.γ → ports.ω (cond succeeded → stop)
      *                         cond.ω → body.α  (cond failed → run body) */
@@ -4333,8 +4334,8 @@ static void emit_jvm_icon_until(IcnNode *n, Ports ports, char *oα, char *oβ) {
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
 
-    IcnNode *cond = n->children[0];
-    IcnNode *body = (n->nchildren > 1) ? n->children[1] : NULL;
+    EXPR_t *cond = n->children[0];
+    EXPR_t *body = (n->nchildren > 1) ? n->children[1] : NULL;
 
     char cond_ok[64];   snprintf(cond_ok,   sizeof cond_ok,   "icn_%d_condok",  id);
     char cond_fail[64]; snprintf(cond_fail, sizeof cond_fail, "icn_%d_cfail",   id);
@@ -4370,14 +4371,14 @@ static void emit_jvm_icon_until(IcnNode *n, Ports ports, char *oα, char *oβ) {
     JL(b); JGoto(ports.ω);
 }
 
-static void emit_jvm_icon_repeat(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_repeat(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     /* repeat body end — run body forever; break exits via ports.ω.
      * body.γ and body.ω both loop back to body.α. */
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
 
-    IcnNode *body = (n->nchildren > 0) ? n->children[0] : NULL;
+    EXPR_t *body = (n->nchildren > 0) ? n->children[0] : NULL;
 
     char loop_top[64]; snprintf(loop_top, sizeof loop_top, "icn_%d_top", id);
 
@@ -4402,30 +4403,30 @@ static void emit_jvm_icon_repeat(IcnNode *n, Ports ports, char *oα, char *oβ) 
 /* =========================================================================
  * String type predicate and concat emitter
  * ======================================================================= */
-static int expr_is_string(IcnNode *n) {
+static int expr_is_string(EXPR_t *n) {
     if (!n) return 0;
     switch (n->kind) {
-        case ICN_STR:    return 1;
-        case ICN_CSET:   return 1;  /* cset literal is a String */
-        case ICN_CONCAT: return 1;
-        case ICN_LCONCAT:return 1;  /* Tiny-ICON: ||| treated as string concat */
-        case ICN_BANG:
+        case E_QLIT:    return 1;
+        case E_CSET:   return 1;  /* cset literal is a String */
+        case E_CONCAT: return 1;
+        case E_LCONCAT:return 1;  /* Tiny-ICON: ||| treated as string concat */
+        case E_ITER:
             /* !E yields single-char Strings for string operands,
              * but longs for list operands */
             if (n->nchildren >= 1) return expr_is_list(n->children[0]) ? 0 : 1;
             return 1;
-        case ICN_AUGOP:  /* ||:= (TK_AUGCONCAT=36) yields String; arithmetic augops yield long */
-            if ((int)n->val.ival == TK_AUGCONCAT) return 1;
+        case E_AUGOP:  /* ||:= (TK_AUGCONCAT=36) yields String; arithmetic augops yield long */
+            if ((int)n->ival == TK_AUGCONCAT) return 1;
             /* String comparison augops yield String (the rhs) */
-            if ((int)n->val.ival == TK_AUGSEQ || (int)n->val.ival == TK_AUGSLT ||
-                (int)n->val.ival == TK_AUGSLE || (int)n->val.ival == TK_AUGSGT ||
-                (int)n->val.ival == TK_AUGSGE || (int)n->val.ival == TK_AUGSNE) return 1;
+            if ((int)n->ival == TK_AUGSEQ || (int)n->ival == TK_AUGSLT ||
+                (int)n->ival == TK_AUGSLE || (int)n->ival == TK_AUGSGT ||
+                (int)n->ival == TK_AUGSGE || (int)n->ival == TK_AUGSNE) return 1;
             return 0;
-        case ICN_CALL: {
+        case E_FNC: {
             if (n->nchildren >= 1) {
-                IcnNode *fn = n->children[0];
-                if (fn && fn->kind == ICN_VAR) {
-                    const char *fn_name = fn->val.sval;
+                EXPR_t *fn = n->children[0];
+                if (fn && fn->kind == E_VAR) {
+                    const char *fn_name = fn->sval;
                     /* write(args...) returns its last argument */
                     if (strcmp(fn_name, "write") == 0 && n->nchildren >= 2)
                         return expr_is_string(n->children[n->nchildren - 1]);
@@ -4462,17 +4463,17 @@ static int expr_is_string(IcnNode *n) {
             }
             return 0;
         }
-        case ICN_ASSIGN: {
+        case E_ASSIGN: {
             /* Assignment returns the RHS value */
             if (n->nchildren >= 2) return expr_is_string(n->children[1]);
             return 0;
         }
-        case ICN_SCAN: {
-            /* Scan result type = body result type */
-            if (n->nchildren >= 2) return expr_is_string(n->children[1]);
-            return 0;
+        case E_MATCH: {
+            /* E_MATCH covers =E pattern match and E?body scan.
+             * Both yield a substring — return 1 (string). */
+            return 1;
         }
-        case ICN_IF: {
+        case E_IF: {
             /* if/then/else: result type = then-branch type, BUT only if it matches
              * the else-branch type (or there is no else). When branches differ in
              * width (mixed: one String, one long), emit_jvm_icon_if drains both and pushes
@@ -4486,35 +4487,35 @@ static int expr_is_string(IcnNode *n) {
             if (n->nchildren >= 2) return expr_is_string(n->children[1]);
             return 0;
         }
-        case ICN_CASE: {
+        case E_CASE: {
             /* case: result type = first result branch type (children[2] if exists) */
             if (n->nchildren >= 3) return expr_is_string(n->children[2]);
             return 0;
         }
-        case ICN_ALT: {
+        case E_GENALT: {
             /* ALT is string-typed if all alternatives are strings */
             if (n->nchildren == 0) return 0;
             for (int i = 0; i < n->nchildren; i++)
                 if (!expr_is_string(n->children[i])) return 0;
             return 1;
         }
-        case ICN_AND: {
+        case E_SEQ: {
             /* AND chain result type = last child's type */
             if (n->nchildren >= 1)
                 return expr_is_string(n->children[n->nchildren - 1]);
             return 0;
         }
-        case ICN_LIMIT: {
+        case E_LIMIT: {
             /* E \ N yields same type as E */
             if (n->nchildren >= 1) return expr_is_string(n->children[0]);
             return 0;
         }
-        case ICN_SWAP: {
+        case E_SWAP: {
             /* :=: returns new lhs value — same type as children */
             if (n->nchildren >= 1) return expr_is_string(n->children[0]);
             return 0;
         }
-        case ICN_IDENTICAL: {
+        case E_IDENTICAL: {
             /* E1 === E2: result is lhs value pushed at γ.
              * String if either operand is string. */
             if (n->nchildren >= 2)
@@ -4523,23 +4524,23 @@ static int expr_is_string(IcnNode *n) {
             if (n->nchildren >= 1) return expr_is_string(n->children[0]);
             return 0;
         }
-        case ICN_LT: case ICN_LE: case ICN_GT: case ICN_GE: case ICN_EQ: case ICN_NE:
+        case E_LT: case E_LE: case E_GT: case E_GE: case E_EQ: case E_NE:
             /* Numeric relops yield long; string relops yield the rc String value */
             if (n->nchildren >= 2)
                 return expr_is_string(n->children[0]) ||
                        expr_is_string(n->children[1]);
             return 0;
-        case ICN_SUBSCRIPT:
+        case E_IDX:
             /* t[k] on a table: String if table has String default, else long */
             if (n->nchildren >= 1 && expr_is_table(n->children[0])) {
-                IcnNode *tbl = n->children[0];
-                if (tbl->kind == ICN_VAR) {
+                EXPR_t *tbl = n->children[0];
+                if (tbl->kind == E_VAR) {
                     char tvfld[128];
-                    int slot = locals_find(tbl->val.sval);
+                    int slot = locals_find(tbl->sval);
                     if (slot >= 0)
-                        var_field(tbl->val.sval, tvfld, sizeof tvfld);
+                        var_field(tbl->sval, tvfld, sizeof tvfld);
                     else
-                        snprintf(tvfld, sizeof tvfld, "icn_gvar_%s", tbl->val.sval);
+                        snprintf(tvfld, sizeof tvfld, "icn_gvar_%s", tbl->sval);
                     return tdflt_is_str(tvfld);
                 }
                 return 0;
@@ -4548,31 +4549,30 @@ static int expr_is_string(IcnNode *n) {
             if (n->nchildren >= 1 && expr_is_strlist(n->children[0])) return 1;
             if (n->nchildren >= 1 && expr_is_list(n->children[0]))    return 0;
             return 1;  /* s[i] always yields a single-char String */
-        case ICN_SECTION:
+        case E_SECTION:
             return 1;  /* s[i:j] always yields a String */
-        case ICN_SECTION_PLUS: case ICN_SECTION_MINUS:
+        case E_SECTION_PLUS: case E_SECTION_MINUS:
             return 1;  /* s[i+:n] / s[i-:n] are also String sections */
-        case ICN_MATCH:
-            return 1;  /* =E matches and returns a substring String */
-        case ICN_NONNULL: {
+        /* E_MATCH case handled above (line ~4471) */
+        case E_NONNULL: {
             /* \E: transparent passthrough — same type as child */
             if (n->nchildren >= 1) return expr_is_string(n->children[0]);
             return 0;
         }
-        case ICN_SEQ_EXPR: {
+        case E_SEQ_EXPR: {
             /* Result type is that of the last child */
             if (n->nchildren >= 1) return expr_is_string(n->children[n->nchildren-1]);
             return 0;
         }
-        case ICN_VAR: {
+        case E_VAR: {
             /* &subject keyword is always a String */
-            if (strcmp(n->val.sval, "&subject") == 0) return 1;
+            if (strcmp(n->sval, "&subject") == 0) return 1;
             /* Check if var's static field is typed 'A' (String) */
-            char fld[128]; var_field(n->val.sval, fld, sizeof fld);
+            char fld[128]; var_field(n->sval, fld, sizeof fld);
             for (int i = 0; i < nstatics; i++)
                 if (!strcmp(statics[i], fld) && static_types[i] == 'A') return 1;
             /* Also check global var */
-            char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", n->val.sval);
+            char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", n->sval);
             for (int i = 0; i < nstatics; i++)
                 if (!strcmp(statics[i], gname) && static_types[i] == 'A') return 1;
             return 0;
@@ -4586,15 +4586,15 @@ static int expr_is_string(IcnNode *n) {
  * (String, ArrayList list/strlist, table, or record object).
  * Used to decide pop vs pop2 in drains.
  * ======================================================================= */
-static int expr_is_obj(IcnNode *n) {
+static int expr_is_obj(EXPR_t *n) {
     if (!n) return 0;
     if (expr_is_string(n)) return 1;
     if (expr_is_list(n))   return 1;
     if (expr_is_table(n))  return 1;
     if (expr_is_record(n)) return 1;
     /* Built-in calls that return a list/table object */
-    if (n->kind == ICN_CALL && n->nchildren >= 1 && n->children[0]->kind == ICN_VAR) {
-        const char *fn = n->children[0]->val.sval;
+    if (n->kind == E_FNC && n->nchildren >= 1 && n->children[0]->kind == E_VAR) {
+        const char *fn = n->children[0]->sval;
         if (strcmp(fn, "list")  == 0) return 1;
         if (strcmp(fn, "table") == 0) return 1;
         if (strcmp(fn, "copy")  == 0) return 1;
@@ -4615,35 +4615,35 @@ static int expr_is_obj(IcnNode *n) {
 /* =========================================================================
  * List type predicate — returns 1 if node is known to produce an ArrayList
  * ======================================================================= */
-static int expr_is_strlist(IcnNode *n) {
+static int expr_is_strlist(EXPR_t *n) {
     if (!n) return 0;
-    if (n->kind == ICN_MAKELIST)
+    if (n->kind == E_MAKELIST)
         return (n->nchildren > 0 && expr_is_string(n->children[0]));
-    if (n->kind == ICN_VAR) {
-        char fld[128]; var_field(n->val.sval, fld, sizeof fld);
+    if (n->kind == E_VAR) {
+        char fld[128]; var_field(n->sval, fld, sizeof fld);
         for (int i = 0; i < nstatics; i++)
             if (!strcmp(statics[i], fld) && static_types[i] == 'S') return 1;
-        char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", n->val.sval);
+        char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", n->sval);
         for (int i = 0; i < nstatics; i++)
             if (!strcmp(statics[i], gname) && static_types[i] == 'S') return 1;
     }
     return 0;
 }
 
-static int expr_is_list(IcnNode *n) {
+static int expr_is_list(EXPR_t *n) {
     if (!n) return 0;
-    if (n->kind == ICN_MAKELIST) return 1;
-    if (n->kind == ICN_ASSIGN) {
+    if (n->kind == E_MAKELIST) return 1;
+    if (n->kind == E_ASSIGN) {
         /* Assignment returns the RHS value */
         if (n->nchildren >= 2) return expr_is_list(n->children[1]);
         return 0;
     }
-    if (n->kind == ICN_CALL) {
+    if (n->kind == E_FNC) {
         /* push(L,v) and put(L,v) return the list; list(n,x) returns a new list */
         if (n->nchildren >= 1) {
-            IcnNode *fn = n->children[0];
-            if (fn && fn->kind == ICN_VAR) {
-                const char *fname = fn->val.sval;
+            EXPR_t *fn = n->children[0];
+            if (fn && fn->kind == E_VAR) {
+                const char *fname = fn->sval;
                 if (strcmp(fname, "push") == 0 || strcmp(fname, "put") == 0 ||
                     strcmp(fname, "list") == 0 ||
                     strcmp(fname, "sort") == 0 || strcmp(fname, "sortf") == 0) return 1;
@@ -4651,29 +4651,29 @@ static int expr_is_list(IcnNode *n) {
         }
         return 0;
     }
-    if (n->kind == ICN_VAR) {
+    if (n->kind == E_VAR) {
         /* Check local/global var static type tag 'L'/'R'/'S' */
-        char fld[128]; var_field(n->val.sval, fld, sizeof fld);
+        char fld[128]; var_field(n->sval, fld, sizeof fld);
         for (int i = 0; i < nstatics; i++)
             if (!strcmp(statics[i], fld) && (static_types[i] == 'L' || static_types[i] == 'R' || static_types[i] == 'S')) return 1;
-        char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", n->val.sval);
+        char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", n->sval);
         for (int i = 0; i < nstatics; i++)
             if (!strcmp(statics[i], gname) && (static_types[i] == 'L' || static_types[i] == 'R' || static_types[i] == 'S')) return 1;
     }
     return 0;
 }
 
-static int expr_is_table(IcnNode *n) {
+static int expr_is_table(EXPR_t *n) {
     if (!n) return 0;
-    if (n->kind == ICN_ASSIGN) {
+    if (n->kind == E_ASSIGN) {
         if (n->nchildren >= 2) return expr_is_table(n->children[1]);
         return 0;
     }
-    if (n->kind == ICN_CALL) {
+    if (n->kind == E_FNC) {
         if (n->nchildren >= 1) {
-            IcnNode *fn = n->children[0];
-            if (fn && fn->kind == ICN_VAR) {
-                const char *fname = fn->val.sval;
+            EXPR_t *fn = n->children[0];
+            if (fn && fn->kind == E_VAR) {
+                const char *fname = fn->sval;
                 if (strcmp(fname, "table") == 0) return 1;
                 if (strcmp(fname, "insert") == 0) return 1;
                 if (strcmp(fname, "delete") == 0) return 1;
@@ -4681,11 +4681,11 @@ static int expr_is_table(IcnNode *n) {
         }
         return 0;
     }
-    if (n->kind == ICN_VAR) {
-        char fld[128]; var_field(n->val.sval, fld, sizeof fld);
+    if (n->kind == E_VAR) {
+        char fld[128]; var_field(n->sval, fld, sizeof fld);
         for (int i = 0; i < nstatics; i++)
             if (!strcmp(statics[i], fld) && static_types[i] == 'T') return 1;
-        char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", n->val.sval);
+        char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", n->sval);
         for (int i = 0; i < nstatics; i++)
             if (!strcmp(statics[i], gname) && static_types[i] == 'T') return 1;
     }
@@ -4699,7 +4699,7 @@ static int expr_is_table(IcnNode *n) {
  *
  * Stack discipline: EMPTY at every label. String refs passed via static fields.
  */
-static void emit_jvm_icon_concat(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_concat(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     char compute[64]; snprintf(compute, sizeof compute, "icn_%d_compute", id);
@@ -4721,10 +4721,10 @@ static void emit_jvm_icon_concat(IcnNode *n, Ports ports, char *oα, char *oβ) 
     Ports lp; strncpy(lp.γ, left_relay,  63); strncpy(lp.ω, ports.ω, 63);
     char la[64], lb[64]; emit_jvm_icon_expr(n->children[0], lp, la, lb);
 
-    IcnNode *lchild = n->children[0];
+    EXPR_t *lchild = n->children[0];
     /* left_is_value: true only for one-shot string producers (literals, vars, one-shot calls).
      * ICN_ALT is a generator — its β must be used to advance it, not restart from α. */
-    int left_is_value = expr_is_string(lchild) && lchild->kind != ICN_ALT;
+    int left_is_value = expr_is_string(lchild) && lchild->kind != E_GENALT;
 
     /* left_relay: String ref on stack → astore into lc_fld → lstore */
     JL(left_relay); put_str_field(lc_fld); JGoto(lstore);
@@ -4770,7 +4770,7 @@ static void emit_jvm_icon_concat(IcnNode *n, Ports ports, char *oα, char *oβ) 
  *
  * Save slots: per-scan static fields old_subject_N (String) and old_pos_N (I).
  * ======================================================================= */
-static void emit_jvm_icon_scan(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_scan(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
@@ -4787,8 +4787,8 @@ static void emit_jvm_icon_scan(IcnNode *n, Ports ports, char *oα, char *oβ) {
     declare_static_int("icn_pos");
 
     /* Child nodes */
-    IcnNode *expr_node = (n->nchildren >= 1) ? n->children[0] : NULL;
-    IcnNode *body_node = (n->nchildren >= 2) ? n->children[1] : NULL;
+    EXPR_t *expr_node = (n->nchildren >= 1) ? n->children[0] : NULL;
+    EXPR_t *body_node = (n->nchildren >= 2) ? n->children[1] : NULL;
 
     /* Label names for intermediate wiring */
     char setup[64], body_fail_restore[64], body_ok_restore[64], beta_restore[64];
@@ -4888,7 +4888,7 @@ static void emit_jvm_icon_scan(IcnNode *n, Ports ports, char *oα, char *oβ) {
  * Always succeeds (initial block failure is ignored — Icon spec).
  * β → ports.ω (one-shot; if called again after first, just succeeds silently).
  * ======================================================================= */
-static void emit_jvm_icon_initial(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_initial(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
@@ -4932,11 +4932,11 @@ static void emit_jvm_icon_initial(IcnNode *n, Ports ports, char *oα, char *oβ)
     JL(b); JGoto(ports.ω);
 }
 
-static void emit_jvm_icon_not(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_not(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
-    IcnNode *child = (n->nchildren >= 1) ? n->children[0] : NULL;
+    EXPR_t *child = (n->nchildren >= 1) ? n->children[0] : NULL;
     char child_ok[64];  snprintf(child_ok,  sizeof child_ok,  "icn_%d_cok",  id);
     char succeed[64];   snprintf(succeed,   sizeof succeed,   "icn_%d_succ", id);
     Ports cp;
@@ -4960,11 +4960,11 @@ static void emit_jvm_icon_not(IcnNode *n, Ports ports, char *oα, char *oβ) {
  * α: emit child; child.γ → ports.γ (value already on stack); child.ω → ports.ω
  * β: child.β (re-entry for generators)
  * ======================================================================= */
-static void emit_jvm_icon_nonnull(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_nonnull(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
-    IcnNode *child = (n->nchildren >= 1) ? n->children[0] : NULL;
+    EXPR_t *child = (n->nchildren >= 1) ? n->children[0] : NULL;
     Ports cp;
     strncpy(cp.γ, ports.γ, 63);  /* child success → caller success (value intact) */
     strncpy(cp.ω, ports.ω, 63);  /* child fail    → caller fail */
@@ -4981,11 +4981,11 @@ static void emit_jvm_icon_nonnull(IcnNode *n, Ports ports, char *oα, char *oβ)
  *                child.ω → push lconst_0, goto ports.γ (E failed → /E succeeds)
  * β: child.β
  * ======================================================================= */
-static void emit_jvm_icon_null(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_null(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
-    IcnNode *child = (n->nchildren >= 1) ? n->children[0] : NULL;
+    EXPR_t *child = (n->nchildren >= 1) ? n->children[0] : NULL;
     char child_ok[64]; snprintf(child_ok, sizeof child_ok, "icn_%d_cok", id);
     char succeed[64];  snprintf(succeed,  sizeof succeed,  "icn_%d_succ", id);
     Ports cp;
@@ -5007,11 +5007,11 @@ static void emit_jvm_icon_null(IcnNode *n, Ports ports, char *oα, char *oβ) {
 /* =========================================================================
  * ICN_RANDOM — ?E: random integer in 1..E via IcnRuntime.random(long)
  * ======================================================================= */
-static void emit_jvm_icon_random(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_random(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
-    IcnNode *child = (n->nchildren >= 1) ? n->children[0] : NULL;
+    EXPR_t *child = (n->nchildren >= 1) ? n->children[0] : NULL;
     char after[64]; snprintf(after, sizeof after, "icn_%d_rand", id);
     Ports cp; strncpy(cp.γ, after, 63); strncpy(cp.ω, ports.ω, 63);
     char ca[64], cb[64]; emit_jvm_icon_expr(child, cp, ca, cb);
@@ -5025,11 +5025,11 @@ static void emit_jvm_icon_random(IcnNode *n, Ports ports, char *oα, char *oβ) 
 /* =========================================================================
  * ICN_NEG — unary minus: -E
  * ======================================================================= */
-static void emit_jvm_icon_neg(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_neg(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
-    IcnNode *child = (n->nchildren >= 1) ? n->children[0] : NULL;
+    EXPR_t *child = (n->nchildren >= 1) ? n->children[0] : NULL;
     char negate[64]; snprintf(negate, sizeof negate, "icn_%d_neg", id);
     Ports cp; strncpy(cp.γ, negate, 63); strncpy(cp.ω, ports.ω, 63);
     char ca[64], cb[64]; emit_jvm_icon_expr(child, cp, ca, cb);
@@ -5052,14 +5052,14 @@ static void emit_jvm_icon_neg(IcnNode *n, Ports ports, char *oα, char *oβ) {
  *          step<0: if I_f < end_f -> ports.w; else push I_f -> ports.g
  *          step=0: -> ports.w
  * ======================================================================= */
-static void emit_jvm_icon_to_by(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_to_by(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
 
-    IcnNode *e1 = (n->nchildren > 0) ? n->children[0] : NULL;
-    IcnNode *e2 = (n->nchildren > 1) ? n->children[1] : NULL;
-    IcnNode *e3 = (n->nchildren > 2) ? n->children[2] : NULL;
+    EXPR_t *e1 = (n->nchildren > 0) ? n->children[0] : NULL;
+    EXPR_t *e2 = (n->nchildren > 1) ? n->children[1] : NULL;
+    EXPR_t *e3 = (n->nchildren > 2) ? n->children[2] : NULL;
 
     /* Determine if any operand is real → use double fields throughout */
     int is_dbl = expr_is_real(e1) || expr_is_real(e2) || expr_is_real(e3);
@@ -5165,7 +5165,7 @@ static void emit_jvm_icon_to_by(IcnNode *n, Ports ports, char *oα, char *oβ) {
  * Use String.compareTo() and compare result to 0.
  * Both operands are String refs on the stack.
  * ======================================================================= */
-static void emit_jvm_icon_strrelop(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_strrelop(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
@@ -5174,8 +5174,8 @@ static void emit_jvm_icon_strrelop(IcnNode *n, Ports ports, char *oα, char *oβ
     snprintf(rrelay,    sizeof rrelay,    "icn_%d_rrelay", id);
     snprintf(chk,       sizeof chk,       "icn_%d_chk",    id);
     snprintf(lstore_lbl,sizeof lstore_lbl,"icn_%d_lstore", id);
-    IcnNode *lhs = (n->nchildren > 0) ? n->children[0] : NULL;
-    IcnNode *rhs = (n->nchildren > 1) ? n->children[1] : NULL;
+    EXPR_t *lhs = (n->nchildren > 0) ? n->children[0] : NULL;
+    EXPR_t *rhs = (n->nchildren > 1) ? n->children[1] : NULL;
     Ports lp; strncpy(lp.γ, lrelay, 63); strncpy(lp.ω, ports.ω, 63);
     Ports rp; strncpy(rp.γ, rrelay, 63); strncpy(rp.ω, ports.ω, 63);
     char la[64], lb2[64], ra[64], rb2[64];
@@ -5198,12 +5198,12 @@ static void emit_jvm_icon_strrelop(IcnNode *n, Ports ports, char *oα, char *oβ
     JI("invokevirtual", "java/lang/String/compareTo(Ljava/lang/String;)I");
     const char *jfail;
     switch (n->kind) {
-        case ICN_SEQ: jfail = "ifne"; break;
-        case ICN_SNE: jfail = "ifeq"; break;
-        case ICN_SLT: jfail = "ifge"; break;
-        case ICN_SLE: jfail = "ifgt"; break;
-        case ICN_SGT: jfail = "ifle"; break;
-        case ICN_SGE: jfail = "iflt"; break;
+        case E_SSEQ: jfail = "ifne"; break;
+        case E_SNE: jfail = "ifeq"; break;
+        case E_SLT: jfail = "ifge"; break;
+        case E_SLE: jfail = "ifgt"; break;
+        case E_SGT: jfail = "ifle"; break;
+        case E_SGE: jfail = "iflt"; break;
         default:      jfail = "ifne"; break;
     }
     J("    %s %s\n", jfail, rb2);
@@ -5218,7 +5218,7 @@ static void emit_jvm_icon_strrelop(IcnNode *n, Ports ports, char *oα, char *oβ
  * ICN_BREAK — exit enclosing loop; optional value (ignored in our impl)
  * break jumps directly to the enclosing loop's ports.ω (exit path).
  * ======================================================================= */
-static void emit_jvm_icon_break(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_break(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
@@ -5232,7 +5232,7 @@ static void emit_jvm_icon_break(IcnNode *n, Ports ports, char *oα, char *oβ) {
  * ICN_NEXT — restart enclosing loop body (skip rest of current iteration)
  * next jumps to the loop's restart label (loop_top / cond re-eval).
  * ======================================================================= */
-static void emit_jvm_icon_next(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_next(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
@@ -5245,10 +5245,10 @@ static void emit_jvm_icon_next(IcnNode *n, Ports ports, char *oα, char *oβ) {
 /* =========================================================================
  * ICN_AUGOP — augmented assignment: lhs op:= rhs
  *   Semantics: lhs := lhs op rhs  (lhs must be a variable)
- *   node->val.ival encodes the augop token kind (TK_AUGPLUS etc.)
+ *   node->ival encodes the augop token kind (TK_AUGPLUS etc.)
  *   We: load lhs, eval rhs, apply op, store back, push result → ports.γ
  * ======================================================================= */
-static void emit_jvm_icon_augop(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_augop(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     if (n->nchildren < 2) {
         int id = next_uid(); char a[64], b[64];
         lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
@@ -5260,9 +5260,9 @@ static void emit_jvm_icon_augop(IcnNode *n, Ports ports, char *oα, char *oβ) {
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
 
-    IcnNode *lhs = n->children[0];
-    IcnNode *rhs = n->children[1];
-    long aug_kind = n->val.ival;
+    EXPR_t *lhs = n->children[0];
+    EXPR_t *rhs = n->children[1];
+    long aug_kind = n->ival;
 
     /* Eval rhs; on rhs fail → ports.ω */
     char rhs_ok[64]; snprintf(rhs_ok, sizeof rhs_ok, "icn_%d_rhsok", id);
@@ -5275,13 +5275,13 @@ static void emit_jvm_icon_augop(IcnNode *n, Ports ports, char *oα, char *oβ) {
     JL(rhs_ok);
     /* rhs value is on stack — String ref for ||:=, long for arithmetic ops.
      * Load lhs current value, apply op, store result back, push result. */
-    if (lhs && lhs->kind == ICN_VAR) {
+    if (lhs && lhs->kind == E_VAR) {
         char fld[128];
-        int is_local = (locals_find(lhs->val.sval) >= 0);
+        int is_local = (locals_find(lhs->sval) >= 0);
         if (is_local) {
-            var_field(lhs->val.sval, fld, sizeof fld);
+            var_field(lhs->sval, fld, sizeof fld);
         } else {
-            snprintf(fld, sizeof fld, "icn_gvar_%s", lhs->val.sval);
+            snprintf(fld, sizeof fld, "icn_gvar_%s", lhs->sval);
         }
 
         if ((int)aug_kind == TK_AUGCONCAT) {
@@ -5418,13 +5418,13 @@ static void emit_jvm_icon_augop(IcnNode *n, Ports ports, char *oα, char *oβ) {
  * on stack → γ; pos incremented before goto γ.  β → check (resume).
  * Result type: String (single char).  expr_is_string returns 1 for BANG.
  * ======================================================================= */
-static void emit_jvm_icon_bang(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_bang(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid();
     char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
 
-    IcnNode *child = (n->nchildren > 0) ? n->children[0] : NULL;
+    EXPR_t *child = (n->nchildren > 0) ? n->children[0] : NULL;
 
     /* --- LIST bang branch: !L iterates ArrayList by index --- */
     if (child && expr_is_list(child)) {
@@ -5528,12 +5528,12 @@ static void emit_jvm_icon_bang(IcnNode *n, Ports ports, char *oα, char *oβ) {
  * One-shot: α evals child (must be String), calls String.length(), converts
  * int→long via i2l, pushes long → ports.γ.  β → ports.ω (one-shot, no retry).
  * ======================================================================= */
-static void emit_jvm_icon_size(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_size(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
     char relay[64]; snprintf(relay, sizeof relay, "icn_%d_relay", id);
-    IcnNode *child = (n->nchildren > 0) ? n->children[0] : NULL;
+    EXPR_t *child = (n->nchildren > 0) ? n->children[0] : NULL;
     Ports cp; strncpy(cp.γ, relay, 63); strncpy(cp.ω, ports.ω, 63);
     char ca[64], cb[64]; emit_jvm_icon_expr(child, cp, ca, cb);
     JL(a); JGoto(ca);
@@ -5558,7 +5558,7 @@ static void emit_jvm_icon_size(IcnNode *n, Ports ports, char *oα, char *oβ) {
  *   - String refs left as-is (already Object)
  * Result: ArrayList ref on stack at ports.γ.
  * ======================================================================= */
-static void emit_jvm_icon_makelist(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_makelist(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
@@ -5637,20 +5637,20 @@ static void emit_jvm_icon_makelist(IcnNode *n, Ports ports, char *oα, char *oβ
  *
  * Assignment (p.x := v) is handled in ICN_ASSIGN by detecting ICN_FIELD lhs.
  * ======================================================================= */
-static void emit_jvm_icon_field(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_field(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
 
     if (n->nchildren < 2) { JL(a); JGoto(ports.ω); JL(b); JGoto(ports.ω); return; }
 
-    IcnNode *rec_expr  = n->children[0];
-    IcnNode *field_var = n->children[1];   /* ICN_VAR — field name */
-    const char *fname  = field_var->val.sval;
+    EXPR_t *rec_expr  = n->children[0];
+    EXPR_t *field_var = n->children[1];   /* ICN_VAR — field name */
+    const char *fname  = field_var->sval;
 
     /* Determine record type from expression (must be a variable) */
     const char *rtype = NULL;
-    if (rec_expr && rec_expr->kind == ICN_VAR) {
+    if (rec_expr && rec_expr->kind == E_VAR) {
         /* Walk record registry: find a type that has this field */
         for (int ri = 0; ri < nrec; ri++) {
             for (int fi = 0; fi < rec_nfields[ri]; fi++) {
@@ -5679,13 +5679,13 @@ static void emit_jvm_icon_field(IcnNode *n, Ports ports, char *oα, char *oβ) {
     /* Pop the long placeholder off stack */
     JI("pop2", "");
     /* Load the record object from its static field */
-    if (rec_expr && rec_expr->kind == ICN_VAR) {
+    if (rec_expr && rec_expr->kind == E_VAR) {
         char vfld[128];
-        int slot = locals_find(rec_expr->val.sval);
+        int slot = locals_find(rec_expr->sval);
         if (slot >= 0) {
-            var_field(rec_expr->val.sval, vfld, sizeof vfld);
+            var_field(rec_expr->sval, vfld, sizeof vfld);
         } else {
-            snprintf(vfld, sizeof vfld, "icn_gvar_%s", rec_expr->val.sval);
+            snprintf(vfld, sizeof vfld, "icn_gvar_%s", rec_expr->sval);
         }
         J("    getstatic %s/%s Ljava/lang/Object;\n", classname, vfld);
     }
@@ -5744,7 +5744,7 @@ static void emit_jvm_icon_record_class(const char *rec_name, int nfields,
     out = save;
 }
 
-static void emit_jvm_icon_limit(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_limit(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
@@ -5756,8 +5756,8 @@ static void emit_jvm_icon_limit(IcnNode *n, Ports ports, char *oα, char *oβ) {
     declare_static(cnt_fld);   /* long */
     declare_static(max_fld);   /* long */
 
-    IcnNode *expr  = (n->nchildren > 0) ? n->children[0] : NULL;
-    IcnNode *bound = (n->nchildren > 1) ? n->children[1] : NULL;
+    EXPR_t *expr  = (n->nchildren > 0) ? n->children[0] : NULL;
+    EXPR_t *bound = (n->nchildren > 1) ? n->children[1] : NULL;
 
     /* Relay labels */
     char n_relay[64]; snprintf(n_relay, sizeof n_relay, "icn_%d_limit_nrelay", id);
@@ -5842,7 +5842,7 @@ static void emit_jvm_icon_limit(IcnNode *n, Ports ports, char *oα, char *oβ) {
  * Children: [0]=string expr, [1]=index expr (long, 1-based)
  * Result type: String (single character)
  * ======================================================================= */
-static void emit_jvm_icon_subscript(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_subscript(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
@@ -5851,8 +5851,8 @@ static void emit_jvm_icon_subscript(IcnNode *n, Ports ports, char *oα, char *o�
         JL(a); JGoto(ports.ω); JL(b); JGoto(ports.ω); return;
     }
 
-    IcnNode *str_child = n->children[0];
-    IcnNode *idx_child = n->children[1];
+    EXPR_t *str_child = n->children[0];
+    EXPR_t *idx_child = n->children[1];
 
     /* -----------------------------------------------------------------------
      * TABLE SUBSCRIPT: t[k]
@@ -5903,13 +5903,13 @@ static void emit_jvm_icon_subscript(IcnNode *n, Ports ports, char *oα, char *o�
         J("    ifnonnull %s\n", got_val);
         /* null branch: load {varfld}_dflt (pre-declared by pre-pass if table(x) was used) */
         JI("pop", "");
-        if (str_child && str_child->kind == ICN_VAR) {
+        if (str_child && str_child->kind == E_VAR) {
             char tvfld[128];
-            int slot = locals_find(str_child->val.sval);
+            int slot = locals_find(str_child->sval);
             if (slot >= 0) {
-                var_field(str_child->val.sval, tvfld, sizeof tvfld);
+                var_field(str_child->sval, tvfld, sizeof tvfld);
             } else {
-                snprintf(tvfld, sizeof tvfld, "icn_gvar_%s", str_child->val.sval);
+                snprintf(tvfld, sizeof tvfld, "icn_gvar_%s", str_child->sval);
             }
             char vdflt[144]; snprintf(vdflt, sizeof vdflt, "%s_dflt", tvfld);
             int tbl_dflt_is_str = tdflt_is_str(tvfld);
@@ -5940,13 +5940,13 @@ static void emit_jvm_icon_subscript(IcnNode *n, Ports ports, char *oα, char *o�
         JGoto(ports.γ);
         JL(got_val);
         /* ts_got branch: value from HashMap.get — cast to correct type */
-        if (str_child && str_child->kind == ICN_VAR) {
+        if (str_child && str_child->kind == E_VAR) {
             char tvfld2[128];
-            int slot2 = locals_find(str_child->val.sval);
+            int slot2 = locals_find(str_child->sval);
             if (slot2 >= 0) {
-                var_field(str_child->val.sval, tvfld2, sizeof tvfld2);
+                var_field(str_child->sval, tvfld2, sizeof tvfld2);
             } else {
-                snprintf(tvfld2, sizeof tvfld2, "icn_gvar_%s", str_child->val.sval);
+                snprintf(tvfld2, sizeof tvfld2, "icn_gvar_%s", str_child->sval);
             }
             if (tdflt_is_str(tvfld2)) {
                 JI("checkcast", "java/lang/String");
@@ -6138,7 +6138,7 @@ static void emit_jvm_icon_subscript(IcnNode *n, Ports ports, char *oα, char *o�
  * Positive i: offset = i-1.  Negative i: offset = length+i.  0 → fail.
  * One-shot: β → ω.  Result is a String.
  * ======================================================================= */
-static void emit_jvm_icon_section(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_section(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
@@ -6146,9 +6146,9 @@ static void emit_jvm_icon_section(IcnNode *n, Ports ports, char *oα, char *oβ)
     if (n->nchildren < 3) {
         JL(a); JGoto(ports.ω); JL(b); JGoto(ports.ω); return;
     }
-    IcnNode *str_child = n->children[0];
-    IcnNode *lo_child  = n->children[1];
-    IcnNode *hi_child  = n->children[2];
+    EXPR_t *str_child = n->children[0];
+    EXPR_t *lo_child  = n->children[1];
+    EXPR_t *hi_child  = n->children[2];
 
     /* Per-site statics */
     char s_fld[64], lo_fld[64], hi_fld[64];
@@ -6286,7 +6286,7 @@ static void emit_jvm_icon_section(IcnNode *n, Ports ports, char *oα, char *oβ)
  * Wiring: identical to ICN_AND (ir_conjunction) — drain intermediates,
  * last child's γ/ω flow to ports.γ/ω.  β → last child's β.
  * ======================================================================= */
-static void emit_jvm_icon_seq_expr(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_seq_expr(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int nc = n->nchildren;
     if (nc == 0) { /* degenerate */
         int id = next_uid(); char a[64], b[64];
@@ -6347,31 +6347,31 @@ static void emit_jvm_icon_seq_expr(IcnNode *n, Ports ports, char *oα, char *oβ
  * Implementation: read both, write both crossed, using per-site temp statics.
  * Only handles VAR := VAR (the common case); other forms fall to UNIMPL.
  * ======================================================================= */
-static void emit_jvm_icon_swap(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_swap(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
 
     if (n->nchildren < 2 ||
-        !n->children[0] || n->children[0]->kind != ICN_VAR ||
-        !n->children[1] || n->children[1]->kind != ICN_VAR) {
+        !n->children[0] || n->children[0]->kind != E_VAR ||
+        !n->children[1] || n->children[1]->kind != E_VAR) {
         /* Degenerate/unsupported form — fail */
         JL(a); JGoto(ports.ω);
         JL(b); JGoto(ports.ω);
         return;
     }
 
-    IcnNode *lv = n->children[0];
-    IcnNode *rv = n->children[1];
+    EXPR_t *lv = n->children[0];
+    EXPR_t *rv = n->children[1];
 
     /* Determine field names for both sides */
     char lfld[128], rfld[128];
-    int lslot = locals_find(lv->val.sval);
-    int rslot = locals_find(rv->val.sval);
-    if (lslot >= 0) var_field(lv->val.sval, lfld, sizeof lfld);
-    else            snprintf(lfld, sizeof lfld, "icn_gvar_%s", lv->val.sval);
-    if (rslot >= 0) var_field(rv->val.sval, rfld, sizeof rfld);
-    else            snprintf(rfld, sizeof rfld, "icn_gvar_%s", rv->val.sval);
+    int lslot = locals_find(lv->sval);
+    int rslot = locals_find(rv->sval);
+    if (lslot >= 0) var_field(lv->sval, lfld, sizeof lfld);
+    else            snprintf(lfld, sizeof lfld, "icn_gvar_%s", lv->sval);
+    if (rslot >= 0) var_field(rv->sval, rfld, sizeof rfld);
+    else            snprintf(rfld, sizeof rfld, "icn_gvar_%s", rv->sval);
 
     /* Determine types from statics table — default long */
     int l_str = 0, l_dbl = 0, r_str = 0, r_dbl = 0;
@@ -6424,7 +6424,7 @@ static void emit_jvm_icon_swap(IcnNode *n, Ports ports, char *oα, char *oβ) {
  * ICN_IDENTICAL — E1 === E2  (same type and value)
  * For our unboxed representation: longs compare ==, strings compare .equals()
  * ======================================================================= */
-static void emit_jvm_icon_identical(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_identical(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
@@ -6474,7 +6474,7 @@ static void emit_jvm_icon_identical(IcnNode *n, Ports ports, char *oα, char *o�
  * Implemented as a call to icn_rt_match(subject, pos, pattern)
  * which returns new pos or -1 on failure.
  * ======================================================================= */
-static void emit_jvm_icon_match(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_match(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     int id = next_uid(); char a[64], b[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     strncpy(oα,a,63); strncpy(oβ,b,63);
@@ -6523,13 +6523,13 @@ static void emit_jvm_icon_match(IcnNode *n, Ports ports, char *oα, char *oβ) {
  * G4–G6: ICN_CSET_UNION/DIFF/INTER — binary cset ops
  * (M-G5-LOWER-ICON-FIX)
  * ======================================================================= */
-static void emit_jvm_icon_cset_complement(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_cset_complement(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     need_cset_builtins = 1;
     int id = next_uid(); char a[64], b[64], relay[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
     snprintf(relay, sizeof relay, "icn_%d_csc_relay", id);
     strncpy(oα,a,63); strncpy(oβ,b,63);
-    IcnNode *child = n->nchildren > 0 ? n->children[0] : NULL;
+    EXPR_t *child = n->nchildren > 0 ? n->children[0] : NULL;
     Ports cp; strncpy(cp.γ,relay,63); strncpy(cp.ω,ports.ω,63);
     char ca[64], cb[64]; emit_jvm_icon_expr(child, cp, ca, cb);
     JL(a); JGoto(ca);
@@ -6540,7 +6540,7 @@ static void emit_jvm_icon_cset_complement(IcnNode *n, Ports ports, char *oα, ch
     JGoto(ports.γ);
 }
 
-static void emit_jvm_icon_cset_binop(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_cset_binop(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     need_cset_builtins = 1;
     int id = next_uid(); char a[64], b[64], lstore[64], compute[64], lbfwd[64];
     lbl_α(id,a,sizeof a); lbl_β(id,b,sizeof b);
@@ -6553,8 +6553,8 @@ static void emit_jvm_icon_cset_binop(IcnNode *n, Ports ports, char *oα, char *o
     snprintf(lf, sizeof lf, "icn_cbo%d_lcs", id);
     snprintf(rf, sizeof rf, "icn_cbo%d_rcs", id);
     declare_static_str(lf); declare_static_str(rf);
-    IcnNode *rch = n->nchildren > 1 ? n->children[1] : NULL;
-    IcnNode *lch = n->nchildren > 0 ? n->children[0] : NULL;
+    EXPR_t *rch = n->nchildren > 1 ? n->children[1] : NULL;
+    EXPR_t *lch = n->nchildren > 0 ? n->children[0] : NULL;
     char ra[64], rb2[64];
     Ports rp; strncpy(rp.γ,compute,63); strncpy(rp.ω,lbfwd,63);
     emit_jvm_icon_expr(rch, rp, ra, rb2);
@@ -6574,9 +6574,9 @@ static void emit_jvm_icon_cset_binop(IcnNode *n, Ports ports, char *oα, char *o
     JI("getstatic", classname_buf_fld(lf, "Ljava/lang/String;"));
     JI("getstatic", classname_buf_fld(rf, "Ljava/lang/String;"));
     const char *sig =
-        (n->kind == ICN_CSET_UNION) ?
+        (n->kind == E_CSET_UNION) ?
             "icn_builtin_cset_union(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;" :
-        (n->kind == ICN_CSET_DIFF)  ?
+        (n->kind == E_CSET_DIFF)  ?
             "icn_builtin_cset_diff(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;"  :
             "icn_builtin_cset_inter(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;";
     JI("invokestatic", classname_buf(sig));
@@ -6586,22 +6586,22 @@ static void emit_jvm_icon_cset_binop(IcnNode *n, Ports ports, char *oα, char *o
 /* =========================================================================
  * Dispatch
  * ======================================================================= */
-static void emit_jvm_icon_expr(IcnNode *n, Ports ports, char *oα, char *oβ) {
+static void emit_jvm_icon_expr(EXPR_t *n, Ports ports, char *oα, char *oβ) {
     if (!n) { emit_jvm_icon_fail_node(NULL,ports,oα,oβ); return; }
     switch (n->kind) {
-        case ICN_INT:     emit_jvm_icon_int      (n,ports,oα,oβ); break;
-        case ICN_REAL:    emit_jvm_icon_real     (n,ports,oα,oβ); break;
-        case ICN_STR:     emit_jvm_icon_str      (n,ports,oα,oβ); break;
-        case ICN_CSET:    emit_jvm_icon_str      (n,ports,oα,oβ); break; /* cset = typed String */
-        case ICN_VAR:     emit_jvm_icon_var      (n,ports,oα,oβ); break;
-        case ICN_ASSIGN:  emit_jvm_icon_assign   (n,ports,oα,oβ); break;
-        case ICN_RETURN:  emit_jvm_icon_return   (n,ports,oα,oβ); break;
-        case ICN_SUSPEND: emit_jvm_icon_suspend  (n,ports,oα,oβ); break;
-        case ICN_FAIL:    emit_jvm_icon_fail_node(n,ports,oα,oβ); break;
-        case ICN_IF:      emit_jvm_icon_if       (n,ports,oα,oβ); break;
-        case ICN_CASE:    emit_jvm_icon_case     (n,ports,oα,oβ); break;
-        case ICN_ALT:     emit_jvm_icon_alt      (n,ports,oα,oβ); break;
-        case ICN_AND: {
+        case E_ILIT:     emit_jvm_icon_int      (n,ports,oα,oβ); break;
+        case E_FLIT:    emit_jvm_icon_real     (n,ports,oα,oβ); break;
+        case E_QLIT:     emit_jvm_icon_str      (n,ports,oα,oβ); break;
+        case E_CSET:    emit_jvm_icon_str      (n,ports,oα,oβ); break; /* cset = typed String */
+        case E_VAR:     emit_jvm_icon_var      (n,ports,oα,oβ); break;
+        case E_ASSIGN:  emit_jvm_icon_assign   (n,ports,oα,oβ); break;
+        case E_RETURN:  emit_jvm_icon_return   (n,ports,oα,oβ); break;
+        case E_SUSPEND: emit_jvm_icon_suspend  (n,ports,oα,oβ); break;
+        case E_FAIL:    emit_jvm_icon_fail_node(n,ports,oα,oβ); break;
+        case E_IF:      emit_jvm_icon_if       (n,ports,oα,oβ); break;
+        case E_CASE:    emit_jvm_icon_case     (n,ports,oα,oβ); break;
+        case E_GENALT:     emit_jvm_icon_alt      (n,ports,oα,oβ); break;
+        case E_SEQ: {
             /* n-ary conjunction: E1 & E2 & ... & En
              * irgen.icn ir_conjunction: Ei.γ → E(i+1).α; Ei.ω → E(i-1).β; β → En.β
              *
@@ -6669,49 +6669,49 @@ static void emit_jvm_icon_expr(IcnNode *n, Ports ports, char *oα, char *oβ) {
             free(cca); free(ccb); free(relay_g);
             break;
         }
-        case ICN_ADD: case ICN_SUB: case ICN_MUL: case ICN_DIV: case ICN_MOD:
+        case E_ADD: case E_SUB: case E_MPY: case E_DIV: case E_MOD:
                           emit_jvm_icon_binop    (n,ports,oα,oβ); break;
-        case ICN_POW:     emit_jvm_icon_pow      (n,ports,oα,oβ); break;
-        case ICN_CONCAT:  emit_jvm_icon_concat   (n,ports,oα,oβ); break;
-        case ICN_LCONCAT: emit_jvm_icon_concat   (n,ports,oα,oβ); break; /* Tiny-ICON: ||| = || */
-        case ICN_SWAP:    emit_jvm_icon_swap      (n,ports,oα,oβ); break;
-        case ICN_IDENTICAL: emit_jvm_icon_identical(n,ports,oα,oβ); break;
-        case ICN_MATCH:   emit_jvm_icon_match     (n,ports,oα,oβ); break;
-        case ICN_SECTION_PLUS:
-        case ICN_SECTION_MINUS:
+        case E_POW:     emit_jvm_icon_pow      (n,ports,oα,oβ); break;
+        case E_CONCAT:  emit_jvm_icon_concat   (n,ports,oα,oβ); break;
+        case E_LCONCAT: emit_jvm_icon_concat   (n,ports,oα,oβ); break; /* Tiny-ICON: ||| = || */
+        case E_SWAP:    emit_jvm_icon_swap      (n,ports,oα,oβ); break;
+        case E_IDENTICAL: emit_jvm_icon_identical(n,ports,oα,oβ); break;
+        case E_MATCH:   emit_jvm_icon_match     (n,ports,oα,oβ); break;
+        case E_SECTION_PLUS:
+        case E_SECTION_MINUS:
             /* M+:N / M-:N — emit as plain section for now (stub) */
             emit_jvm_icon_section(n,ports,oα,oβ); break;
-        case ICN_BANG_BINARY: emit_jvm_icon_call(n,ports,oα,oβ); break; /* stub */
+        case E_BANG_BINARY: emit_jvm_icon_call(n,ports,oα,oβ); break; /* stub */
         /* G3–G6: cset operations (M-G5-LOWER-ICON-FIX) */
-        case ICN_COMPLEMENT: emit_jvm_icon_cset_complement(n,ports,oα,oβ); break;
-        case ICN_CSET_UNION: emit_jvm_icon_cset_binop(n,ports,oα,oβ); break;
-        case ICN_CSET_DIFF:  emit_jvm_icon_cset_binop(n,ports,oα,oβ); break;
-        case ICN_CSET_INTER: emit_jvm_icon_cset_binop(n,ports,oα,oβ); break;
-        case ICN_SUBSCRIPT: emit_jvm_icon_subscript(n,ports,oα,oβ); break;
-        case ICN_SECTION:   emit_jvm_icon_section  (n,ports,oα,oβ); break;
-        case ICN_MAKELIST:  emit_jvm_icon_makelist (n,ports,oα,oβ); break;
-        case ICN_SEQ_EXPR: emit_jvm_icon_seq_expr (n,ports,oα,oβ); break;
-        case ICN_LT: case ICN_LE: case ICN_GT: case ICN_GE: case ICN_EQ: case ICN_NE:
+        case E_CSET_COMPL: emit_jvm_icon_cset_complement(n,ports,oα,oβ); break;
+        case E_CSET_UNION: emit_jvm_icon_cset_binop(n,ports,oα,oβ); break;
+        case E_CSET_DIFF:  emit_jvm_icon_cset_binop(n,ports,oα,oβ); break;
+        case E_CSET_INTER: emit_jvm_icon_cset_binop(n,ports,oα,oβ); break;
+        case E_IDX: emit_jvm_icon_subscript(n,ports,oα,oβ); break;
+        case E_SECTION:   emit_jvm_icon_section  (n,ports,oα,oβ); break;
+        case E_MAKELIST:  emit_jvm_icon_makelist (n,ports,oα,oβ); break;
+        case E_SEQ_EXPR: emit_jvm_icon_seq_expr (n,ports,oα,oβ); break;
+        case E_LT: case E_LE: case E_GT: case E_GE: case E_EQ: case E_NE:
                           emit_jvm_icon_relop    (n,ports,oα,oβ); break;
-        case ICN_TO:      emit_jvm_icon_to       (n,ports,oα,oβ); break;
-        case ICN_TO_BY:   emit_jvm_icon_to_by    (n,ports,oα,oβ); break;
-        case ICN_EVERY:   emit_jvm_icon_every    (n,ports,oα,oβ); break;
-        case ICN_WHILE:   emit_jvm_icon_while    (n,ports,oα,oβ); break;
-        case ICN_UNTIL:   emit_jvm_icon_until    (n,ports,oα,oβ); break;
-        case ICN_REPEAT:  emit_jvm_icon_repeat   (n,ports,oα,oβ); break;
-        case ICN_CALL:    emit_jvm_icon_call     (n,ports,oα,oβ); break;
-        case ICN_SCAN:    emit_jvm_icon_scan     (n,ports,oα,oβ); break;
-        case ICN_NOT:     emit_jvm_icon_not      (n,ports,oα,oβ); break;
-        case ICN_NONNULL: emit_jvm_icon_nonnull  (n,ports,oα,oβ); break;
-        case ICN_NULL:    emit_jvm_icon_null     (n,ports,oα,oβ); break;
-        case ICN_INITIAL: emit_jvm_icon_initial  (n,ports,oα,oβ); break;
-        case ICN_GLOBAL: {
+        case E_TO:      emit_jvm_icon_to       (n,ports,oα,oβ); break;
+        case E_TO_BY:   emit_jvm_icon_to_by    (n,ports,oα,oβ); break;
+        case E_EVERY:   emit_jvm_icon_every    (n,ports,oα,oβ); break;
+        case E_WHILE:   emit_jvm_icon_while    (n,ports,oα,oβ); break;
+        case E_UNTIL:   emit_jvm_icon_until    (n,ports,oα,oβ); break;
+        case E_REPEAT:  emit_jvm_icon_repeat   (n,ports,oα,oβ); break;
+        case E_FNC:    emit_jvm_icon_call     (n,ports,oα,oβ); break;
+        /* E_MATCH covers both =E pattern match and E?body scan (E_SCAN alias) */
+        case E_NOT:     emit_jvm_icon_not      (n,ports,oα,oβ); break;
+        case E_NONNULL: emit_jvm_icon_nonnull  (n,ports,oα,oβ); break;
+        case E_NULL:    emit_jvm_icon_null     (n,ports,oα,oβ); break;
+        case E_INITIAL: emit_jvm_icon_initial  (n,ports,oα,oβ); break;
+        case E_GLOBAL: {
             /* local 'global x,y;' decl inside proc body — declare icn_gvar_* fields,
                skip as a statement (no runtime effect beyond declaration). */
             for (int ci = 0; ci < n->nchildren; ci++) {
-                IcnNode *v = n->children[ci];
-                if (!v || v->kind != ICN_VAR) continue;
-                char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", v->val.sval);
+                EXPR_t *v = n->children[ci];
+                if (!v || v->kind != E_VAR) continue;
+                char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", v->sval);
                 /* Globals pre-tagged as 'A' (String) by pre-scan; declare accordingly */
                 int gtag = field_type_tag(gname);
                 if (gtag == 'A') declare_static_str(gname);
@@ -6724,13 +6724,13 @@ static void emit_jvm_icon_expr(IcnNode *n, Ports ports, char *oα, char *oβ) {
             JL(b2); JGoto(ports.ω);
             break;
         }
-        case ICN_NEG:     emit_jvm_icon_neg      (n,ports,oα,oβ); break;
+        case E_NEG:     emit_jvm_icon_neg      (n,ports,oα,oβ); break;
         /* G1: ICN_POS — identity, emit child unchanged */
-        case ICN_POS:     emit_jvm_icon_expr(n->children[0],ports,oα,oβ); break;
+        case E_PLS:     emit_jvm_icon_expr(n->children[0],ports,oα,oβ); break;
         /* G2: ICN_RANDOM — ?E: random integer 1..E via IcnRuntime.random() */
-        case ICN_RANDOM:  emit_jvm_icon_random   (n,ports,oα,oβ); break;
+        case E_RANDOM:  emit_jvm_icon_random   (n,ports,oα,oβ); break;
         /* G7: ICN_SCAN_AUGOP — stub-fail, unimplemented */
-        case ICN_SCAN_AUGOP: {
+        case E_SCAN_AUGOP: {
             int id = next_uid(); char a2[64], b2[64];
             lbl_α(id,a2,sizeof a2); lbl_β(id,b2,sizeof b2);
             strncpy(oα,a2,63); strncpy(oβ,b2,63);
@@ -6738,15 +6738,15 @@ static void emit_jvm_icon_expr(IcnNode *n, Ports ports, char *oα, char *oβ) {
             JL(b2); JGoto(ports.ω);
             break;
         }
-        case ICN_BREAK:   emit_jvm_icon_break    (n,ports,oα,oβ); break;
-        case ICN_NEXT:    emit_jvm_icon_next     (n,ports,oα,oβ); break;
-        case ICN_AUGOP:   emit_jvm_icon_augop    (n,ports,oα,oβ); break;
-        case ICN_BANG:    emit_jvm_icon_bang     (n,ports,oα,oβ); break;
-        case ICN_SIZE:    emit_jvm_icon_size     (n,ports,oα,oβ); break;
-        case ICN_LIMIT:   emit_jvm_icon_limit    (n,ports,oα,oβ); break;
-        case ICN_FIELD:   emit_jvm_icon_field    (n,ports,oα,oβ); break;
-        case ICN_SEQ: case ICN_SNE: case ICN_SLT:
-        case ICN_SLE: case ICN_SGT: case ICN_SGE:
+        case E_LOOP_BREAK:   emit_jvm_icon_break    (n,ports,oα,oβ); break;
+        case E_LOOP_NEXT:    emit_jvm_icon_next     (n,ports,oα,oβ); break;
+        case E_AUGOP:   emit_jvm_icon_augop    (n,ports,oα,oβ); break;
+        case E_ITER:    emit_jvm_icon_bang     (n,ports,oα,oβ); break;
+        case E_SIZE:    emit_jvm_icon_size     (n,ports,oα,oβ); break;
+        case E_LIMIT:   emit_jvm_icon_limit    (n,ports,oα,oβ); break;
+        case E_FIELD:   emit_jvm_icon_field    (n,ports,oα,oβ); break;
+        case E_SSEQ: case E_SNE: case E_SLT:
+        case E_SLE: case E_SGT: case E_SGE:
                           emit_jvm_icon_strrelop (n,ports,oα,oβ); break;
         default: {
             int id = next_uid(); char a2[64], b2[64];
@@ -6767,26 +6767,26 @@ static void emit_jvm_icon_expr(IcnNode *n, Ports ports, char *oα, char *oβ) {
  * assigned inside ICN_AND/ICN_ALT/ICN_WHILE sub-expressions are typed before
  * any drain-type query fires during emission.  Must be called after the locals
  * list is populated (so locals_find works) and before emit_jvm_icon_expr. */
-static void prepass_types(IcnNode *n) {
+static void prepass_types(EXPR_t *n) {
     if (!n) return;
-    if (n->kind == ICN_ASSIGN && n->nchildren >= 2) {
-        IcnNode *lhs = n->children[0];
-        IcnNode *rhs = n->children[1];
-        if (lhs && lhs->kind == ICN_VAR) {
-            int slot = locals_find(lhs->val.sval);
+    if (n->kind == E_ASSIGN && n->nchildren >= 2) {
+        EXPR_t *lhs = n->children[0];
+        EXPR_t *rhs = n->children[1];
+        if (lhs && lhs->kind == E_VAR) {
+            int slot = locals_find(lhs->sval);
             char fld[128];
-            if (slot >= 0) var_field(lhs->val.sval, fld, sizeof fld);
-            else           snprintf(fld, sizeof fld, "icn_gvar_%s", lhs->val.sval);
+            if (slot >= 0) var_field(lhs->sval, fld, sizeof fld);
+            else           snprintf(fld, sizeof fld, "icn_gvar_%s", lhs->sval);
             if (expr_is_string(rhs)) {
                 declare_static_str(fld);
                 /* dual-register under alternate name (local↔global) so loads
                  * inside every-body / nested scopes find the 'A' type tag
                  * regardless of which field name the emitter resolves. */
                 if (slot >= 0) {
-                    char gname2[80]; snprintf(gname2, sizeof gname2, "icn_gvar_%s", lhs->val.sval);
+                    char gname2[80]; snprintf(gname2, sizeof gname2, "icn_gvar_%s", lhs->sval);
                     declare_static_str(gname2);
                 } else {
-                    char fld2[128]; var_field(lhs->val.sval, fld2, sizeof fld2);
+                    char fld2[128]; var_field(lhs->sval, fld2, sizeof fld2);
                     declare_static_str(fld2);
                 }
             } else if (expr_is_strlist(rhs)) {
@@ -6794,10 +6794,10 @@ static void prepass_types(IcnNode *n) {
                 /* Also register under the alternate name so subscript emit finds it
                  * regardless of whether locals sees the var as local or global. */
                 if (slot >= 0) {
-                    char gname2[80]; snprintf(gname2, sizeof gname2, "icn_gvar_%s", lhs->val.sval);
+                    char gname2[80]; snprintf(gname2, sizeof gname2, "icn_gvar_%s", lhs->sval);
                     declare_static_strlist(gname2);
                 } else {
-                    char fld2[128]; var_field(lhs->val.sval, fld2, sizeof fld2);
+                    char fld2[128]; var_field(lhs->sval, fld2, sizeof fld2);
                     declare_static_strlist(fld2);
                 }
             } else if (expr_is_list(rhs)) {
@@ -6808,10 +6808,10 @@ static void prepass_types(IcnNode *n) {
             } else if (expr_is_table(rhs)) {
                 declare_static_table(fld);
                 /* Register dflt type so tdflt_is_str works during emission */
-                if (rhs && rhs->kind == ICN_CALL && rhs->nchildren >= 2) {
-                    IcnNode *fn = rhs->children[0];
-                    if (fn && fn->kind == ICN_VAR && strcmp(fn->val.sval, "table") == 0) {
-                        IcnNode *darg = rhs->children[1];
+                if (rhs && rhs->kind == E_FNC && rhs->nchildren >= 2) {
+                    EXPR_t *fn = rhs->children[0];
+                    if (fn && fn->kind == E_VAR && strcmp(fn->sval, "table") == 0) {
+                        EXPR_t *darg = rhs->children[1];
                         int dflt_is_str = expr_is_string(darg);
                         char vdflt[144]; snprintf(vdflt, sizeof vdflt, "%s_dflt", fld);
                         register_tdflt(fld, vdflt, dflt_is_str);
@@ -6823,10 +6823,10 @@ static void prepass_types(IcnNode *n) {
                 declare_static_obj(fld);
                 /* dual-register so both local and global field name resolve to 'O' */
                 if (slot >= 0) {
-                    char gname2[80]; snprintf(gname2, sizeof gname2, "icn_gvar_%s", lhs->val.sval);
+                    char gname2[80]; snprintf(gname2, sizeof gname2, "icn_gvar_%s", lhs->sval);
                     declare_static_obj(gname2);
                 } else {
-                    char fld2[128]; var_field(lhs->val.sval, fld2, sizeof fld2);
+                    char fld2[128]; var_field(lhs->sval, fld2, sizeof fld2);
                     declare_static_obj(fld2);
                 }
             }
@@ -6837,15 +6837,15 @@ static void prepass_types(IcnNode *n) {
         prepass_types(n->children[i]);
 }
 
-static void emit_jvm_icon_proc(IcnNode *proc, FILE *out_target) {
+static void emit_jvm_icon_proc(EXPR_t *proc, FILE *out_target) {
     FILE *save = out;
     /* Emit proc body to a temp buffer first (so we know locals count) */
     FILE *tmp = tmpfile();
     out = tmp;
 
-    const char *pname = proc->children[0]->val.sval;
+    const char *pname = proc->children[0]->sval;
     int is_main = (strcmp(pname, "main") == 0);
-    int np = (int)proc->val.ival;
+    int np = (int)proc->ival;
     int is_gen = !is_main && is_gen_proc(pname);
     int body_start = 1 + np;
     int nstmts = proc->nchildren - body_start;
@@ -6867,22 +6867,22 @@ static void emit_jvm_icon_proc(IcnNode *proc, FILE *out_target) {
     /* Register params as locals 0..np-1 */
     nparams = np;
     for (int i = 0; i < np; i++) {
-        IcnNode *pv = proc->children[1 + i];
-        if (pv && pv->kind == ICN_VAR) locals_add(pv->val.sval);
+        EXPR_t *pv = proc->children[1 + i];
+        if (pv && pv->kind == E_VAR) locals_add(pv->sval);
     }
     /* Scan for local declarations in body */
     for (int si = 0; si < nstmts; si++) {
-        IcnNode *s = proc->children[body_start + si];
-        if (s && s->kind == ICN_GLOBAL) {
+        EXPR_t *s = proc->children[body_start + si];
+        if (s && s->kind == E_GLOBAL) {
             for (int ci = 0; ci < s->nchildren; ci++) {
-                IcnNode *v = s->children[ci];
+                EXPR_t *v = s->children[ci];
                 /* Top-level globals (registered in global_names) must NOT
                  * be added to locals — they live as icn_gvar_* static fields
                  * shared across all procs.  Only proc-local var declarations
                  * that somehow have ICN_GLOBAL kind should be added. */
-                if (v && v->kind == ICN_VAR && locals_find(v->val.sval) < 0
-                        && !is_global(v->val.sval))
-                    locals_add(v->val.sval);
+                if (v && v->kind == E_VAR && locals_find(v->sval) < 0
+                        && !is_global(v->sval))
+                    locals_add(v->sval);
             }
         }
     }
@@ -6894,18 +6894,18 @@ static void emit_jvm_icon_proc(IcnNode *proc, FILE *out_target) {
      * icn_pv_<proc>_* fields instead of shared icn_gvar_* fields. */
     {
         #define IJ_IMPL_STACK 512
-        IcnNode *impl_stack[IJ_IMPL_STACK]; int impl_top = 0;
+        EXPR_t *impl_stack[IJ_IMPL_STACK]; int impl_top = 0;
         for (int si = 0; si < nstmts; si++)
             if (proc->children[body_start + si] && impl_top < IJ_IMPL_STACK)
                 impl_stack[impl_top++] = proc->children[body_start + si];
         while (impl_top > 0) {
-            IcnNode *cur = impl_stack[--impl_top];
+            EXPR_t *cur = impl_stack[--impl_top];
             if (!cur) continue;
             /* Register LHS of assignment or augop as local */
-            if ((cur->kind == ICN_ASSIGN || cur->kind == ICN_AUGOP) &&
+            if ((cur->kind == E_ASSIGN || cur->kind == E_AUGOP) &&
                 cur->nchildren >= 1 && cur->children[0] &&
-                cur->children[0]->kind == ICN_VAR) {
-                const char *vn = cur->children[0]->val.sval;
+                cur->children[0]->kind == E_VAR) {
+                const char *vn = cur->children[0]->sval;
                 if (!is_global(vn) && locals_find(vn) < 0)
                     locals_add(vn);
             }
@@ -6920,23 +6920,23 @@ static void emit_jvm_icon_proc(IcnNode *proc, FILE *out_target) {
      * Walk assignments left-to-right: declare the LHS var's static field type
      * before emit begins. */
     for (int si = 0; si < nstmts; si++) {
-        IcnNode *stmt = proc->children[body_start + si];
-        if (!stmt || stmt->kind != ICN_ASSIGN || stmt->nchildren < 2) continue;
-        IcnNode *lhs = stmt->children[0];
-        IcnNode *rhs = stmt->children[1];
-        if (!lhs || lhs->kind != ICN_VAR) continue;
-        int slot = locals_find(lhs->val.sval);
+        EXPR_t *stmt = proc->children[body_start + si];
+        if (!stmt || stmt->kind != E_ASSIGN || stmt->nchildren < 2) continue;
+        EXPR_t *lhs = stmt->children[0];
+        EXPR_t *rhs = stmt->children[1];
+        if (!lhs || lhs->kind != E_VAR) continue;
+        int slot = locals_find(lhs->sval);
         char fld[128];
-        if (slot >= 0) var_field(lhs->val.sval, fld, sizeof fld);
-        else           snprintf(fld, sizeof fld, "icn_gvar_%s", lhs->val.sval);
+        if (slot >= 0) var_field(lhs->sval, fld, sizeof fld);
+        else           snprintf(fld, sizeof fld, "icn_gvar_%s", lhs->sval);
         if (expr_is_string(rhs)) {
             declare_static_str(fld);
             /* dual-register under alternate name so every-body loads resolve correctly */
             if (slot >= 0) {
-                char gname2[80]; snprintf(gname2, sizeof gname2, "icn_gvar_%s", lhs->val.sval);
+                char gname2[80]; snprintf(gname2, sizeof gname2, "icn_gvar_%s", lhs->sval);
                 declare_static_str(gname2);
             } else {
-                char fld2[128]; var_field(lhs->val.sval, fld2, sizeof fld2);
+                char fld2[128]; var_field(lhs->sval, fld2, sizeof fld2);
                 declare_static_str(fld2);
             }
         } else if (expr_is_list(rhs)) {
@@ -6947,10 +6947,10 @@ static void emit_jvm_icon_proc(IcnNode *proc, FILE *out_target) {
         } else if (expr_is_table(rhs)) {
             declare_static_table(fld);
             /* Check if rhs is table(dflt) — if so, pre-declare {fld}_dflt */
-            if (rhs->kind == ICN_CALL && rhs->nchildren >= 1) {
-                IcnNode *fn = rhs->children[0];
-                if (fn && fn->kind == ICN_VAR &&
-                        strcmp(fn->val.sval, "table") == 0) {
+            if (rhs->kind == E_FNC && rhs->nchildren >= 1) {
+                EXPR_t *fn = rhs->children[0];
+                if (fn && fn->kind == E_VAR &&
+                        strcmp(fn->sval, "table") == 0) {
                     char vdflt[144]; snprintf(vdflt, sizeof vdflt, "%s_dflt", fld);
                     declare_static_obj(vdflt);
                 }
@@ -6962,19 +6962,19 @@ static void emit_jvm_icon_proc(IcnNode *proc, FILE *out_target) {
     }
     /* Pre-pass (augop): ||:= on a var marks it String even if := "" was not seen yet */
     for (int si = 0; si < nstmts; si++) {
-        IcnNode *stmt = proc->children[body_start + si];
+        EXPR_t *stmt = proc->children[body_start + si];
         if (!stmt) continue;
         /* Recursive walk: find ICN_AUGOP with TK_AUGCONCAT anywhere in subtree */
         #define IJ_AUGOP_STACK 256
-        IcnNode *aug_stk[IJ_AUGOP_STACK]; int aug_top = 0;
+        EXPR_t *aug_stk[IJ_AUGOP_STACK]; int aug_top = 0;
         aug_stk[aug_top++] = stmt;
         while (aug_top > 0) {
-            IcnNode *cur = aug_stk[--aug_top];
+            EXPR_t *cur = aug_stk[--aug_top];
             if (!cur) continue;
-            if (cur->kind == ICN_AUGOP && (int)cur->val.ival == (int)TK_AUGCONCAT &&
+            if (cur->kind == E_AUGOP && (int)cur->ival == (int)TK_AUGCONCAT &&
                 cur->nchildren >= 1 && cur->children[0] &&
-                cur->children[0]->kind == ICN_VAR) {
-                const char *vn = cur->children[0]->val.sval;
+                cur->children[0]->kind == E_VAR) {
+                const char *vn = cur->children[0]->sval;
                 int slot = locals_find(vn);
                 char fld[128];
                 if (slot >= 0) var_field(vn, fld, sizeof fld);
@@ -6991,20 +6991,20 @@ static void emit_jvm_icon_proc(IcnNode *proc, FILE *out_target) {
      * The every emitter emits body before gen, so the ICN_VAR for v in the body
      * would be emitted before the assign tags v as 'O'. Pre-tag here. */
     for (int si = 0; si < nstmts; si++) {
-        IcnNode *stmt = proc->children[body_start + si];
-        if (!stmt || stmt->kind != ICN_EVERY || stmt->nchildren < 1) continue;
-        IcnNode *gen = stmt->children[0];
-        if (!gen || gen->kind != ICN_ASSIGN || gen->nchildren < 2) continue;
-        IcnNode *lhs = gen->children[0];
-        IcnNode *rhs = gen->children[1];  /* should be ICN_BANG(!reclist) */
-        if (!lhs || lhs->kind != ICN_VAR) continue;
-        if (!rhs || rhs->kind != ICN_BANG || rhs->nchildren < 1) continue;
+        EXPR_t *stmt = proc->children[body_start + si];
+        if (!stmt || stmt->kind != E_EVERY || stmt->nchildren < 1) continue;
+        EXPR_t *gen = stmt->children[0];
+        if (!gen || gen->kind != E_ASSIGN || gen->nchildren < 2) continue;
+        EXPR_t *lhs = gen->children[0];
+        EXPR_t *rhs = gen->children[1];  /* should be ICN_BANG(!reclist) */
+        if (!lhs || lhs->kind != E_VAR) continue;
+        if (!rhs || rhs->kind != E_ITER || rhs->nchildren < 1) continue;
         if (!expr_is_record_list(rhs->children[0])) continue;
         /* lhs var is assigned a record from a record-list bang — tag as Object */
-        int slot = locals_find(lhs->val.sval);
+        int slot = locals_find(lhs->sval);
         char fld[128];
-        if (slot >= 0) var_field(lhs->val.sval, fld, sizeof fld);
-        else           snprintf(fld, sizeof fld, "icn_gvar_%s", lhs->val.sval);
+        if (slot >= 0) var_field(lhs->sval, fld, sizeof fld);
+        else           snprintf(fld, sizeof fld, "icn_gvar_%s", lhs->sval);
         declare_static_obj(fld);
     }
 
@@ -7024,14 +7024,14 @@ static void emit_jvm_icon_proc(IcnNode *proc, FILE *out_target) {
     char next_a[64]; strncpy(next_a, proc_done, 63);
 
     for (int i = nstmts-1; i >= 0; i--) {
-        IcnNode *stmt = proc->children[body_start + i];
-        if (!stmt || stmt->kind == ICN_GLOBAL) { strncpy(alphas[i], next_a, 63); continue; }
+        EXPR_t *stmt = proc->children[body_start + i];
+        if (!stmt || stmt->kind == E_GLOBAL) { strncpy(alphas[i], next_a, 63); continue; }
         /* ICN_EVERY / ICN_WHILE / ICN_UNTIL / ICN_REPEAT / ICN_SUSPEND never
          * fire ports.γ with a value on the stack — they yield via sret (suspend)
          * or exhaust via ω. Skip the drain to avoid VerifyError on empty stack. */
-        if (stmt->kind == ICN_EVERY || stmt->kind == ICN_WHILE ||
-            stmt->kind == ICN_UNTIL || stmt->kind == ICN_REPEAT ||
-            stmt->kind == ICN_SUSPEND) {
+        if (stmt->kind == E_EVERY || stmt->kind == E_WHILE ||
+            stmt->kind == E_UNTIL || stmt->kind == E_REPEAT ||
+            stmt->kind == E_SUSPEND) {
             Ports sp; strncpy(sp.γ, next_a, 63); strncpy(sp.ω, next_a, 63);
             char sa[64], sb[64]; emit_jvm_icon_expr(stmt, sp, sa, sb);
             strncpy(alphas[i], sa, 63);
@@ -7041,9 +7041,9 @@ static void emit_jvm_icon_proc(IcnNode *proc, FILE *out_target) {
         /* ICN_RETURN / ICN_SUSPEND / ICN_FAIL / ICN_BREAK / ICN_NEXT also never
          * fire ports.γ with a value on the stack — they jump directly to ret/done labels.
          * Skip drain to avoid dead pop2 VerifyError. */
-        if (stmt->kind == ICN_RETURN || stmt->kind == ICN_SUSPEND ||
-            stmt->kind == ICN_FAIL   || stmt->kind == ICN_BREAK   ||
-            stmt->kind == ICN_NEXT) {
+        if (stmt->kind == E_RETURN || stmt->kind == E_SUSPEND ||
+            stmt->kind == E_FAIL   || stmt->kind == E_LOOP_BREAK   ||
+            stmt->kind == E_LOOP_NEXT) {
             Ports sp; strncpy(sp.γ, next_a, 63); strncpy(sp.ω, next_a, 63);
             char sa[64], sb[64]; emit_jvm_icon_expr(stmt, sp, sa, sb);
             strncpy(alphas[i], sa, 63);
@@ -7052,15 +7052,15 @@ static void emit_jvm_icon_proc(IcnNode *proc, FILE *out_target) {
         }
         /* ICN_IF where ALL branches are non-value (fail/return/break/next/suspend)
          * never fires γ with a value — skip drain to avoid pop on empty stack. */
-        if (stmt->kind == ICN_IF) {
+        if (stmt->kind == E_IF) {
             int all_branches_novalue = 1;
             /* Check then-branch (children[1]) and else-branch (children[2] if present) */
             for (int bi = 1; bi < stmt->nchildren && bi <= 2; bi++) {
-                IcnNode *branch = stmt->children[bi];
+                EXPR_t *branch = stmt->children[bi];
                 if (!branch) continue;
                 IcnKind bk = branch->kind;
-                if (bk != ICN_FAIL && bk != ICN_RETURN && bk != ICN_SUSPEND &&
-                    bk != ICN_BREAK && bk != ICN_NEXT)
+                if (bk != E_FAIL && bk != E_RETURN && bk != E_SUSPEND &&
+                    bk != E_LOOP_BREAK && bk != E_LOOP_NEXT)
                     all_branches_novalue = 0;
             }
             if (all_branches_novalue) {
@@ -7154,8 +7154,8 @@ static void emit_jvm_icon_proc(IcnNode *proc, FILE *out_target) {
      * For non-generators, load here since there is no zero-init block. */
     if (!is_main && np > 0 && !(is_gen && total_susp > 0)) {
         for (int i = 0; i < np; i++) {
-            IcnNode *pv = proc->children[1 + i];
-            const char *pname2 = (pv && pv->kind == ICN_VAR) ? pv->val.sval : "";
+            EXPR_t *pv = proc->children[1 + i];
+            const char *pname2 = (pv && pv->kind == E_VAR) ? pv->sval : "";
             char argfield[64];    snprintf(argfield,    sizeof argfield,    "icn_arg_%d",     i);
             char argobjfield[64]; snprintf(argobjfield, sizeof argobjfield, "icn_arg_obj_%d", i);
             char argstrfield[64]; snprintf(argstrfield, sizeof argstrfield, "icn_arg_str_%d", i);
@@ -7194,8 +7194,8 @@ static void emit_jvm_icon_proc(IcnNode *proc, FILE *out_target) {
          * and only on fresh calls (not resume — param values persist in static fields). */
         if (np > 0) {
             for (int i = 0; i < np; i++) {
-                IcnNode *pv2 = proc->children[1 + i];
-                const char *pvname = (pv2 && pv2->kind == ICN_VAR) ? pv2->val.sval : "";
+                EXPR_t *pv2 = proc->children[1 + i];
+                const char *pvname = (pv2 && pv2->kind == E_VAR) ? pv2->sval : "";
                 char argfield[64];    snprintf(argfield,    sizeof argfield,    "icn_arg_%d",     i);
                 char argobjfield[64]; snprintf(argobjfield, sizeof argobjfield, "icn_arg_obj_%d", i);
                 char argstrfield[64]; snprintf(argstrfield, sizeof argstrfield, "icn_arg_str_%d", i);
@@ -7233,7 +7233,7 @@ static void emit_jvm_icon_proc(IcnNode *proc, FILE *out_target) {
 /* =========================================================================
  * emit_jvm_icon_file — entry point
  * ======================================================================= */
-void emit_jvm_icon_file(IcnNode **nodes, int count, FILE *fp, const char *filename, const char *outpath, ImportEntry *imports) {
+void emit_jvm_icon_file(EXPR_t **nodes, int count, FILE *fp, const char *filename, const char *outpath, ImportEntry *imports) {
     out = fp;
     imports = imports;
     uid = 0;
@@ -7253,15 +7253,15 @@ void emit_jvm_icon_file(IcnNode **nodes, int count, FILE *fp, const char *filena
      * assignment, same as local vars.  is_global(name) is the predicate. */
     nglobals = 0;
     for (int pi = 0; pi < count; pi++) {
-        IcnNode *nd = nodes[pi];
+        EXPR_t *nd = nodes[pi];
         if (!nd) continue;
-        if (nd->kind == ICN_RECORD)
-            register_record(nd->val.sval, nd);
-        if (nd->kind != ICN_GLOBAL) continue;
+        if (nd->kind == E_RECORD)
+            register_record(nd->sval, nd);
+        if (nd->kind != E_GLOBAL) continue;
         for (int ci = 0; ci < nd->nchildren; ci++) {
-            IcnNode *v = nd->children[ci];
-            if (!v || v->kind != ICN_VAR) continue;
-            register_global(v->val.sval);
+            EXPR_t *v = nd->children[ci];
+            if (!v || v->kind != E_VAR) continue;
+            register_global(v->sval);
         }
     }
 
@@ -7269,26 +7269,26 @@ void emit_jvm_icon_file(IcnNode **nodes, int count, FILE *fp, const char *filena
      * This ensures emit_jvm_icon_var uses Ljava/lang/String; even in helper procs
      * that are emitted before the assignment in main() is processed. */
     for (int pi = 0; pi < count; pi++) {
-        IcnNode *proc = nodes[pi];
-        if (!proc || proc->kind != ICN_PROC) continue;
-        int np = (int)proc->val.ival;
+        EXPR_t *proc = nodes[pi];
+        if (!proc || proc->kind != E_FNC) continue;
+        int np = (int)proc->ival;
         int body_start = 1 + np;
         for (int si = body_start; si < proc->nchildren; si++) {
-            IcnNode *s = proc->children[si];
-            if (!s || s->kind != ICN_ASSIGN || s->nchildren < 2) continue;
-            IcnNode *lhs = s->children[0];
-            IcnNode *rhs = s->children[1];
-            if (!lhs || lhs->kind != ICN_VAR) continue;
-            if (!is_global(lhs->val.sval)) continue;
+            EXPR_t *s = proc->children[si];
+            if (!s || s->kind != E_ASSIGN || s->nchildren < 2) continue;
+            EXPR_t *lhs = s->children[0];
+            EXPR_t *rhs = s->children[1];
+            if (!lhs || lhs->kind != E_VAR) continue;
+            if (!is_global(lhs->sval)) continue;
             /* If RHS is an import call, result is always String */
             int rhs_is_import_call = 0;
-            if (rhs && rhs->kind == ICN_CALL && rhs->nchildren >= 1) {
-                IcnNode *fn = rhs->children[0];
-                if (fn && fn->kind == ICN_VAR)
-                    rhs_is_import_call = (find_import(fn->val.sval) != NULL);
+            if (rhs && rhs->kind == E_FNC && rhs->nchildren >= 1) {
+                EXPR_t *fn = rhs->children[0];
+                if (fn && fn->kind == E_VAR)
+                    rhs_is_import_call = (find_import(fn->sval) != NULL);
             }
             if (rhs_is_import_call || expr_is_string(rhs)) {
-                char gname2[80]; snprintf(gname2, sizeof gname2, "icn_gvar_%s", lhs->val.sval);
+                char gname2[80]; snprintf(gname2, sizeof gname2, "icn_gvar_%s", lhs->sval);
                 declare_static_str(gname2);
             }
         }
@@ -7296,11 +7296,11 @@ void emit_jvm_icon_file(IcnNode **nodes, int count, FILE *fp, const char *filena
 
     /* Pass 1: register all user procs */
     for (int pi = 0; pi < count; pi++) {
-        IcnNode *proc = nodes[pi];
-        if (!proc || proc->kind != ICN_PROC || proc->nchildren < 1) continue;
-        const char *pname = proc->children[0]->val.sval;
+        EXPR_t *proc = nodes[pi];
+        if (!proc || proc->kind != E_FNC || proc->nchildren < 1) continue;
+        const char *pname = proc->children[0]->sval;
         if (strcmp(pname, "main") == 0) continue;
-        int np = (int)proc->val.ival;
+        int np = (int)proc->ival;
         int gen = 0;
         int body_start = 1 + np;
         for (int si = body_start; si < proc->nchildren; si++)
@@ -7311,33 +7311,33 @@ void emit_jvm_icon_file(IcnNode **nodes, int count, FILE *fp, const char *filena
          * so when the returned expr is a VAR we do a lightweight AST scan of the body
          * to check if that var is ever assigned from a string without touching statics. */
         for (int si = body_start; si < proc->nchildren; si++) {
-            IcnNode *stmt = proc->children[si];
-            if (stmt && stmt->kind == ICN_RETURN && stmt->nchildren > 0) {
-                IcnNode *ret_expr = stmt->children[0];
+            EXPR_t *stmt = proc->children[si];
+            if (stmt && stmt->kind == E_RETURN && stmt->nchildren > 0) {
+                EXPR_t *ret_expr = stmt->children[0];
                 /* Direct non-VAR check (works without statics) */
-                int is_str = (ret_expr->kind == ICN_STR    ||
-                              ret_expr->kind == ICN_CONCAT  ||
-                              ret_expr->kind == ICN_LCONCAT);
+                int is_str = (ret_expr->kind == E_QLIT    ||
+                              ret_expr->kind == E_CONCAT  ||
+                              ret_expr->kind == E_LCONCAT);
                 /* For VAR returns: scan body for string assignment to that var */
-                if (!is_str && ret_expr->kind == ICN_VAR) {
-                    const char *vname = ret_expr->val.sval;
+                if (!is_str && ret_expr->kind == E_VAR) {
+                    const char *vname = ret_expr->sval;
                     for (int sj = body_start; sj < proc->nchildren && !is_str; sj++) {
-                        IcnNode *s2 = proc->children[sj];
+                        EXPR_t *s2 = proc->children[sj];
                         if (!s2) continue;
                         /* var := str_literal  or  var := concat_expr */
-                        if (s2->kind == ICN_ASSIGN && s2->nchildren >= 2 &&
-                            s2->children[0] && s2->children[0]->kind == ICN_VAR &&
-                            strcmp(s2->children[0]->val.sval, vname) == 0) {
-                            IcnNode *rhs = s2->children[1];
-                            if (rhs && (rhs->kind == ICN_STR ||
-                                        rhs->kind == ICN_CONCAT ||
-                                        rhs->kind == ICN_LCONCAT)) is_str = 1;
+                        if (s2->kind == E_ASSIGN && s2->nchildren >= 2 &&
+                            s2->children[0] && s2->children[0]->kind == E_VAR &&
+                            strcmp(s2->children[0]->sval, vname) == 0) {
+                            EXPR_t *rhs = s2->children[1];
+                            if (rhs && (rhs->kind == E_QLIT ||
+                                        rhs->kind == E_CONCAT ||
+                                        rhs->kind == E_LCONCAT)) is_str = 1;
                         }
                         /* var ||:= anything  (ICN_AUGOP with TK_AUGCONCAT==36) */
-                        if (!is_str && s2->kind == ICN_AUGOP && s2->val.ival == (int)TK_AUGCONCAT &&
+                        if (!is_str && s2->kind == E_AUGOP && s2->ival == (int)TK_AUGCONCAT &&
                             s2->nchildren >= 1 &&
-                            s2->children[0] && s2->children[0]->kind == ICN_VAR &&
-                            strcmp(s2->children[0]->val.sval, vname) == 0) is_str = 1;
+                            s2->children[0] && s2->children[0]->kind == E_VAR &&
+                            strcmp(s2->children[0]->sval, vname) == 0) is_str = 1;
                     }
                 }
                 if (is_str) { mark_proc_returns_str(pname); break; }
@@ -7351,38 +7351,38 @@ void emit_jvm_icon_file(IcnNode **nodes, int count, FILE *fp, const char *filena
     {
         /* Helper: walk an AST node looking for ASSIGN(VAR, CALL(RecordType,...)) */
         /* We do a simple recursive scan of all proc bodies */
-        void scan_record_assigns(IcnNode *n, int is_proc_scope);
+        void scan_record_assigns(EXPR_t *n, int is_proc_scope);
         /* Inline recursive lambda not in C — use a stack-based worklist */
         #define MAX_SCAN_STACK 512
-        IcnNode *stack[MAX_SCAN_STACK]; int top = 0;
+        EXPR_t *stack[MAX_SCAN_STACK]; int top = 0;
         for (int pi = 0; pi < count; pi++) {
-            IcnNode *proc = nodes[pi];
-            if (!proc || proc->kind != ICN_PROC) continue;
+            EXPR_t *proc = nodes[pi];
+            if (!proc || proc->kind != E_FNC) continue;
             /* Set up locals context for this proc */
             locals_reset();
-            strncpy(cur_proc, proc->children[0]->val.sval, 63);
-            int np = (int)proc->val.ival;
+            strncpy(cur_proc, proc->children[0]->sval, 63);
+            int np = (int)proc->ival;
             for (int i = 1; i <= np; i++)
-                if (proc->children[i] && proc->children[i]->kind == ICN_VAR)
-                    locals_add(proc->children[i]->val.sval);
+                if (proc->children[i] && proc->children[i]->kind == E_VAR)
+                    locals_add(proc->children[i]->sval);
             /* Push all body nodes */
             top = 0;
             for (int i = 1 + np; i < proc->nchildren; i++)
                 if (top < MAX_SCAN_STACK) stack[top++] = proc->children[i];
             while (top > 0) {
-                IcnNode *cur = stack[--top];
+                EXPR_t *cur = stack[--top];
                 if (!cur) continue;
-                if (cur->kind == ICN_ASSIGN && cur->nchildren >= 2) {
-                    IcnNode *lhs = cur->children[0];
-                    IcnNode *rhs = cur->children[1];
-                    if (lhs && lhs->kind == ICN_VAR && expr_is_record(rhs)) {
+                if (cur->kind == E_ASSIGN && cur->nchildren >= 2) {
+                    EXPR_t *lhs = cur->children[0];
+                    EXPR_t *rhs = cur->children[1];
+                    if (lhs && lhs->kind == E_VAR && expr_is_record(rhs)) {
                         /* Pre-declare this var as Object */
-                        int slot = locals_find(lhs->val.sval);
+                        int slot = locals_find(lhs->sval);
                         if (slot >= 0) {
-                            char fld[128]; var_field(lhs->val.sval, fld, sizeof fld);
+                            char fld[128]; var_field(lhs->sval, fld, sizeof fld);
                             declare_static_obj(fld);
                         } else {
-                            char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", lhs->val.sval);
+                            char gname[80]; snprintf(gname, sizeof gname, "icn_gvar_%s", lhs->sval);
                             declare_static_obj(gname);
                         }
                     }
@@ -7401,29 +7401,29 @@ void emit_jvm_icon_file(IcnNode **nodes, int count, FILE *fp, const char *filena
      * emits getstatic Object (not J) even before the param-load code runs. */
     {
         #define MAX_SCAN_STACK2 512
-        IcnNode *stack2[MAX_SCAN_STACK2]; int top2 = 0;
+        EXPR_t *stack2[MAX_SCAN_STACK2]; int top2 = 0;
         for (int pi = 0; pi < count; pi++) {
-            IcnNode *proc = nodes[pi];
-            if (!proc || proc->kind != ICN_PROC) continue;
-            int np2 = (int)proc->val.ival;
+            EXPR_t *proc = nodes[pi];
+            if (!proc || proc->kind != E_FNC) continue;
+            int np2 = (int)proc->ival;
             top2 = 0;
             for (int i = 1 + np2; i < proc->nchildren; i++)
                 if (top2 < MAX_SCAN_STACK2) stack2[top2++] = proc->children[i];
             while (top2 > 0) {
-                IcnNode *cur = stack2[--top2];
+                EXPR_t *cur = stack2[--top2];
                 if (!cur) continue;
-                if (cur->kind == ICN_CALL && cur->nchildren >= 1
-                        && cur->children[0]->kind == ICN_VAR
-                        && is_user_proc(cur->children[0]->val.sval)) {
-                    const char *callee = cur->children[0]->val.sval;
+                if (cur->kind == E_FNC && cur->nchildren >= 1
+                        && cur->children[0]->kind == E_VAR
+                        && is_user_proc(cur->children[0]->sval)) {
+                    const char *callee = cur->children[0]->sval;
                     int na = cur->nchildren - 1;
                     /* Find callee proc node to get param names */
-                    IcnNode *callee_proc = NULL;
+                    EXPR_t *callee_proc = NULL;
                     for (int ci = 0; ci < count; ci++) {
-                        IcnNode *cp = nodes[ci];
-                        if (cp && cp->kind == ICN_PROC && cp->nchildren >= 1
-                                && cp->children[0]->kind == ICN_VAR
-                                && !strcmp(cp->children[0]->val.sval, callee)) {
+                        EXPR_t *cp = nodes[ci];
+                        if (cp && cp->kind == E_FNC && cp->nchildren >= 1
+                                && cp->children[0]->kind == E_VAR
+                                && !strcmp(cp->children[0]->sval, callee)) {
                             callee_proc = cp; break;
                         }
                     }
@@ -7434,14 +7434,14 @@ void emit_jvm_icon_file(IcnNode **nodes, int count, FILE *fp, const char *filena
                             declare_static_obj(argobjfield);
                             /* Also pre-declare callee param var field as Object */
                             if (callee_proc) {
-                                int cnp = (int)callee_proc->val.ival;
+                                int cnp = (int)callee_proc->ival;
                                 if (i < cnp) {
-                                    IcnNode *pv = callee_proc->children[1 + i];
-                                    if (pv && pv->kind == ICN_VAR) {
+                                    EXPR_t *pv = callee_proc->children[1 + i];
+                                    if (pv && pv->kind == E_VAR) {
                                         char saved_proc[64];
                                         strncpy(saved_proc, cur_proc, 63);
                                         strncpy(cur_proc, callee, 63);
-                                        char fld[128]; var_field(pv->val.sval, fld, sizeof fld);
+                                        char fld[128]; var_field(pv->sval, fld, sizeof fld);
                                         declare_static_obj(fld);
                                         strncpy(cur_proc, saved_proc, 63);
                                     }
@@ -7466,31 +7466,31 @@ void emit_jvm_icon_file(IcnNode **nodes, int count, FILE *fp, const char *filena
         #define MAX_SCAN_STACK3 512
         /* Three passes covers depth-3 call chains; fixpoint for deeper chains */
         for (int pass1d = 0; pass1d < 3; pass1d++) {
-        IcnNode *stack3[MAX_SCAN_STACK3]; int top3 = 0;
+        EXPR_t *stack3[MAX_SCAN_STACK3]; int top3 = 0;
         for (int pi = 0; pi < count; pi++) {
-            IcnNode *proc = nodes[pi];
-            if (!proc || proc->kind != ICN_PROC) continue;
-            int np3 = (int)proc->val.ival;
+            EXPR_t *proc = nodes[pi];
+            if (!proc || proc->kind != E_FNC) continue;
+            int np3 = (int)proc->ival;
             /* Set cur_proc so var_field() resolves correctly */
-            if (proc->children[0] && proc->children[0]->kind == ICN_VAR)
-                strncpy(cur_proc, proc->children[0]->val.sval, 63);
+            if (proc->children[0] && proc->children[0]->kind == E_VAR)
+                strncpy(cur_proc, proc->children[0]->sval, 63);
             top3 = 0;
             for (int i = 1 + np3; i < proc->nchildren; i++)
                 if (top3 < MAX_SCAN_STACK3) stack3[top3++] = proc->children[i];
             while (top3 > 0) {
-                IcnNode *cur = stack3[--top3];
+                EXPR_t *cur = stack3[--top3];
                 if (!cur) continue;
-                if (cur->kind == ICN_CALL && cur->nchildren >= 1
-                        && cur->children[0]->kind == ICN_VAR
-                        && is_user_proc(cur->children[0]->val.sval)) {
-                    const char *callee = cur->children[0]->val.sval;
+                if (cur->kind == E_FNC && cur->nchildren >= 1
+                        && cur->children[0]->kind == E_VAR
+                        && is_user_proc(cur->children[0]->sval)) {
+                    const char *callee = cur->children[0]->sval;
                     int na = cur->nchildren - 1;
-                    IcnNode *callee_proc = NULL;
+                    EXPR_t *callee_proc = NULL;
                     for (int ci = 0; ci < count; ci++) {
-                        IcnNode *cp = nodes[ci];
-                        if (cp && cp->kind == ICN_PROC && cp->nchildren >= 1
-                                && cp->children[0]->kind == ICN_VAR
-                                && !strcmp(cp->children[0]->val.sval, callee)) {
+                        EXPR_t *cp = nodes[ci];
+                        if (cp && cp->kind == E_FNC && cp->nchildren >= 1
+                                && cp->children[0]->kind == E_VAR
+                                && !strcmp(cp->children[0]->sval, callee)) {
                             callee_proc = cp; break;
                         }
                     }
@@ -7502,14 +7502,14 @@ void emit_jvm_icon_file(IcnNode **nodes, int count, FILE *fp, const char *filena
                             declare_static_str(argstrfield);
                             /* Pre-declare callee param var field as String */
                             if (callee_proc) {
-                                int cnp = (int)callee_proc->val.ival;
+                                int cnp = (int)callee_proc->ival;
                                 if (i < cnp) {
-                                    IcnNode *pv = callee_proc->children[1 + i];
-                                    if (pv && pv->kind == ICN_VAR) {
+                                    EXPR_t *pv = callee_proc->children[1 + i];
+                                    if (pv && pv->kind == E_VAR) {
                                         char saved_proc[64];
                                         strncpy(saved_proc, cur_proc, 63);
                                         strncpy(cur_proc, callee, 63);
-                                        char fld[128]; var_field(pv->val.sval, fld, sizeof fld);
+                                        char fld[128]; var_field(pv->sval, fld, sizeof fld);
                                         declare_static_str(fld);
                                         strncpy(cur_proc, saved_proc, 63);
                                     }
@@ -7533,55 +7533,55 @@ void emit_jvm_icon_file(IcnNode **nodes, int count, FILE *fp, const char *filena
      * set up each proc's local environment and run prepass_types on every
      * body statement, then re-check ICN_RETURN nodes. */
     for (int pi = 0; pi < count; pi++) {
-        IcnNode *proc = nodes[pi];
-        if (!proc || proc->kind != ICN_PROC || proc->nchildren < 1) continue;
-        const char *pname = proc->children[0]->val.sval;
+        EXPR_t *proc = nodes[pi];
+        if (!proc || proc->kind != E_FNC || proc->nchildren < 1) continue;
+        const char *pname = proc->children[0]->sval;
         if (strcmp(pname, "main") == 0) continue;
-        int np = (int)proc->val.ival;
+        int np = (int)proc->ival;
         int body_start = 1 + np;
         int nstmts = proc->nchildren - body_start;
         /* Set up locals context */
         locals_reset();
         strncpy(cur_proc, pname, 63);
         for (int i = 0; i < np; i++) {
-            IcnNode *pv = proc->children[1 + i];
-            if (pv && pv->kind == ICN_VAR) locals_add(pv->val.sval);
+            EXPR_t *pv = proc->children[1 + i];
+            if (pv && pv->kind == E_VAR) locals_add(pv->sval);
         }
         /* Scan local declarations */
         for (int si = 0; si < nstmts; si++) {
-            IcnNode *s = proc->children[body_start + si];
-            if (s && s->kind == ICN_GLOBAL) {
+            EXPR_t *s = proc->children[body_start + si];
+            if (s && s->kind == E_GLOBAL) {
                 for (int ci = 0; ci < s->nchildren; ci++) {
-                    IcnNode *v = s->children[ci];
-                    if (v && v->kind == ICN_VAR && locals_find(v->val.sval) < 0
-                            && !is_global(v->val.sval))
-                        locals_add(v->val.sval);
+                    EXPR_t *v = s->children[ci];
+                    if (v && v->kind == E_VAR && locals_find(v->sval) < 0
+                            && !is_global(v->sval))
+                        locals_add(v->sval);
                 }
             }
         }
         /* Run type pre-passes to populate statics */
         for (int si = 0; si < nstmts; si++) {
-            IcnNode *stmt = proc->children[body_start + si];
-            if (!stmt || stmt->kind != ICN_ASSIGN || stmt->nchildren < 2) continue;
-            IcnNode *lhs = stmt->children[0];
-            IcnNode *rhs = stmt->children[1];
-            if (!lhs || lhs->kind != ICN_VAR) continue;
-            int slot = locals_find(lhs->val.sval);
+            EXPR_t *stmt = proc->children[body_start + si];
+            if (!stmt || stmt->kind != E_ASSIGN || stmt->nchildren < 2) continue;
+            EXPR_t *lhs = stmt->children[0];
+            EXPR_t *rhs = stmt->children[1];
+            if (!lhs || lhs->kind != E_VAR) continue;
+            int slot = locals_find(lhs->sval);
             char fld[128];
-            if (slot >= 0) var_field(lhs->val.sval, fld, sizeof fld);
-            else           snprintf(fld, sizeof fld, "icn_gvar_%s", lhs->val.sval);
+            if (slot >= 0) var_field(lhs->sval, fld, sizeof fld);
+            else           snprintf(fld, sizeof fld, "icn_gvar_%s", lhs->sval);
             if (expr_is_string(rhs)) {
                 declare_static_str(fld);
-                if (slot >= 0) { char g[80]; snprintf(g,sizeof g,"icn_gvar_%s",lhs->val.sval); declare_static_str(g); }
-                else           { char f2[128]; var_field(lhs->val.sval,f2,sizeof f2); declare_static_str(f2); }
+                if (slot >= 0) { char g[80]; snprintf(g,sizeof g,"icn_gvar_%s",lhs->sval); declare_static_str(g); }
+                else           { char f2[128]; var_field(lhs->sval,f2,sizeof f2); declare_static_str(f2); }
             }
         }
         for (int si = 0; si < nstmts; si++)
             prepass_types(proc->children[body_start + si]);
         /* Now re-check: mark proc as string-returning if any return stmt yields String */
         for (int si = 0; si < nstmts; si++) {
-            IcnNode *stmt = proc->children[body_start + si];
-            if (stmt && stmt->kind == ICN_RETURN &&
+            EXPR_t *stmt = proc->children[body_start + si];
+            if (stmt && stmt->kind == E_RETURN &&
                 stmt->nchildren > 0 && expr_is_string(stmt->children[0])) {
                 mark_proc_returns_str(pname);
                 break;
@@ -7593,8 +7593,8 @@ void emit_jvm_icon_file(IcnNode **nodes, int count, FILE *fp, const char *filena
     FILE *body_buf = tmpfile();
     FILE *save = out;
     for (int pi = 0; pi < count; pi++) {
-        IcnNode *proc = nodes[pi];
-        if (!proc || proc->kind != ICN_PROC || proc->nchildren < 1) continue;
+        EXPR_t *proc = nodes[pi];
+        if (!proc || proc->kind != E_FNC || proc->nchildren < 1) continue;
         emit_jvm_icon_proc(proc, body_buf);
     }
 

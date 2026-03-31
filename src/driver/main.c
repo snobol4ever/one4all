@@ -24,6 +24,7 @@
 #include "icon_ast.h"
 #include "icon_parse.h"
 #include "icon_emit.h"
+#include "icon_lower.h"
 #include "../frontend/rebus/rebus.h"
 #include "../frontend/rebus/rebus_lower.h"
 #include <stdio.h>
@@ -43,9 +44,9 @@ void prolog_emit_net(Program *prog, FILE *f, const char *filename);
 void prolog_emit_wasm(Program *prog, FILE *f, const char *filename);
 void pl_linker_prescan(PlProgram *pl_prog);
 ImportEntry *icn_prescan_imports(const char *src);
-void emit_jvm_icon_file(IcnNode **nodes, int count, FILE *out,
+void emit_jvm_icon_file(EXPR_t **nodes, int count, FILE *out,
                   const char *filename, const char *outpath, ImportEntry *imports);
-void emit_wasm_icon_file(IcnNode **nodes, int count, FILE *out,
+void emit_wasm_icon_file(EXPR_t **nodes, int count, FILE *out,
                   const char *filename);
 
 static int asm_mode  = 0;
@@ -136,9 +137,14 @@ static int compile_one(const char *infile, const char *outpath, FILE *out) {
             fprintf(stderr, "scrip-cc: Icon parse error: %s\n", parser.errmsg);
             rc = 1; goto done;
         }
-        if (jvm_mode) emit_jvm_icon_file(procs, count, out, infile, outpath, imports);
-        else if (wasm_mode) emit_wasm_icon_file(procs, count, out, infile);
-        else { icn_emit_file(procs, count, out); }
+        {
+            int lcount = 0;
+            EXPR_t **lowered = icon_lower_file(procs, count, &lcount);
+            if (jvm_mode)       emit_jvm_icon_file(lowered, lcount, out, infile, outpath, imports);
+            else if (wasm_mode) emit_wasm_icon_file(lowered, lcount, out, infile);
+            else                { icn_emit_file(lowered, lcount, out); }
+            free(lowered);
+        }
         for (int i = 0; i < count; i++) icn_node_free(procs[i]);
         free(procs);
         goto done;
