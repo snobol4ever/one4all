@@ -156,6 +156,11 @@ static EXPR_t *lower_node(const IcnNode *n) {
     case ICN_MATCH:  return binary(E_MATCH,  n);  /* SHARED: E ? body */
     case ICN_SCAN_AUGOP: return binary(E_SCAN_AUGOP, n);  /* NEW */
 
+    /* ICN_SCAN — E ? body: string scanning (E is subject, body is expr).
+     * Maps to E_MATCH (NEW EKind added in M-G9-ICON-IR-WIRE). */
+    case ICN_SCAN:
+        return binary(E_MATCH, n);  /* NEW */
+
     /* ----- Control flow (NEW) -------------------------------------------- */
     case ICN_SEQ_EXPR: return nary(E_SEQ_EXPR, n);
 
@@ -258,14 +263,37 @@ static EXPR_t *lower_node(const IcnNode *n) {
         return leaf_sval(E_GLOBAL, n->val.sval);   /* NEW: global decl */
 
     /* ----- Procedure / call ---------------------------------------------- */
-    case ICN_PROC:
-        /* Procedure declaration: sval = name, children = params + body.
-         * Represented as E_FNC with sval = name; children lowered.
-         * SHARED: same representation as other frontends' top-level E_FNC. */
+    case ICN_PROC: {
+        /* Procedure declaration layout from icon_parse.c:
+         *   n->children[0]        = ICN_VAR (proc name)
+         *   n->children[1..np]    = ICN_VAR param nodes
+         *   n->children[np+1..]   = body statements
+         *   n->val.ival            = nparams
+         *
+         * Emitter (emit_x64_icon.c) expects E_FNC with:
+         *   e->sval               = proc name
+         *   e->ival               = nparams
+         *   e->children[0]->sval  = proc name  (E_VAR name node)
+         *   e->children[1..np]    = E_VAR param nodes
+         *   e->children[np+1..]   = lowered body statements
+         */
+        int np = (int)n->val.ival;
+        const char *pname = n->children[0]->val.sval;
         e = expr_new(E_FNC);
-        e->sval = intern(n->val.sval);
-        lower_children(e, n);
+        e->sval = intern(pname);
+        e->ival = np;
+        /* child[0]: name node */
+        EXPR_t *name_node = expr_new(E_VAR);
+        name_node->sval = intern(pname);
+        expr_add_child(e, name_node);
+        /* children[1..np]: param E_VAR nodes */
+        for (int i = 0; i < np; i++)
+            expr_add_child(e, lower_node(n->children[1 + i]));
+        /* children[np+1..]: body statements */
+        for (int i = np + 1; i < n->nchildren; i++)
+            expr_add_child(e, lower_node(n->children[i]));
         return e;
+    }
 
     case ICN_CALL:
         /* Function call: first child is callee (E_VAR or E_FNC),

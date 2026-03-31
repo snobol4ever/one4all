@@ -15,6 +15,7 @@
 #include "icon_ast.h"
 #include "icon_parse.h"
 #include "icon_emit.h"
+#include "icon_lower.h"
 #include "scrip_cc.h"          /* ExportEntry, ImportEntry */
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,7 +23,7 @@
 #include <ctype.h>
 
 /* Forward declaration for JVM emitter */
-void emit_jvm_icon_file(IcnNode **nodes, int count, FILE *out, const char *filename,
+void emit_jvm_icon_file(EXPR_t **nodes, int count, FILE *out, const char *filename,
                   const char *outpath, ImportEntry *imports);
 
 /* =========================================================================
@@ -135,9 +136,15 @@ int icn_main(int argc, char **argv) {
     if (output) { out_file = fopen(output, "w"); if (!out_file) { perror(output); return 1; } }
 
     if (do_jvm) {
-        emit_jvm_icon_file(procs, count, out_file, input, output, NULL);
+        int lcount = 0;
+        EXPR_t **lowered = icon_lower_file(procs, count, &lcount);
+        emit_jvm_icon_file(lowered, lcount, out_file, input, output, NULL);
+        free(lowered);
     } else {
-        icn_emit_file(procs, count, out_file);
+        int lcount = 0;
+        EXPR_t **lowered = icon_lower_file(procs, count, &lcount);
+        icn_emit_file(lowered, lcount, out_file);
+        free(lowered);
     }
 
     if (output) fclose(out_file);
