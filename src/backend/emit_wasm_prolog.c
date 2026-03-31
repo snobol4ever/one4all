@@ -323,6 +323,8 @@ static int        gt_site_total = 0;
  *   (param $trail i32) (result i32)
  *
  * ─────────────────────────────────────────────────────────────────────── */
+static int g_cut_scope = -1;  /* index of enclosing cut-scope block, or -1 if none */
+
 static void emit_goals(const EXPR_t *g, int env_idx, int in_disj_left);
 
 static void emit_pl_predicate(const EXPR_t *choice) {
