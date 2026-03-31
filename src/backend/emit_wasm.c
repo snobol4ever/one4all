@@ -666,6 +666,17 @@ static void emit_pattern_node(const EXPR_t *pat) {
         W("      ))\n");
         return;
     }
+    if (pat->kind == E_ALT) {
+        /* alternation: try left; if cursor==-1 restore and try right */
+        W("      ;; E_ALT: save cursor, try left, restore+try right on fail\n");
+        W("      (local.set $pat_save_cursor (local.get $pat_cursor))\n");
+        if (pat->nchildren >= 1) emit_pattern_node(pat->children[0]);
+        W("      (if (i32.lt_s (local.get $pat_cursor) (i32.const 0)) (then\n");
+        W("        (local.set $pat_cursor (local.get $pat_save_cursor))\n");
+        if (pat->nchildren >= 2) emit_pattern_node(pat->children[1]);
+        W("      ))\n");
+        return;
+    }
     /* fallback: evaluate as string expression, use sno_pat_search */
     WasmTy tp = emit_expr(pat);
     if (tp == TY_INT)   W("      (call $sno_int_to_str)\n");
@@ -883,6 +894,7 @@ static void emit_main_body(Program *prog) {
     W("    (local $pat_cursor i32)\n");
     W("    (local $pat_ndl_off i32)\n");
     W("    (local $pat_ndl_len i32)\n");
+    W("    (local $pat_save_cursor i32)\n");
 
     int closed[MAX_LABELS] = {0};
     closed[0] = 1;
