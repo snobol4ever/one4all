@@ -207,6 +207,13 @@ static int icon_gen_slot_addr(int slot) {
 /* Unique node counter (reset per procedure) */
 static int wasm_icon_ctr = 0;
 
+/* M-IW-P01: current procedure context — set by emit_wasm_icon_proc().
+ * Used by ICN_RETURN (to know whether to store into $icn_retval or jump
+ * to icn_prog_end) and ICN_VAR (to map param names → $icn_param{i}). */
+static char  icn_cur_proc_name[128] = "";   /* "" = not in a proc */
+static int   icn_cur_nparams = 0;
+static char  icn_cur_params[8][64];         /* param names, up to 8 */
+
 /* Fill buf with "iconN_<suffix>", return buf */
 static char *wfn(char *buf, size_t sz, int id, const char *suffix) {
     snprintf(buf, sz, "icon%d_%s", id, suffix);
@@ -1121,6 +1128,14 @@ void emit_wasm_icon_globals(FILE *out) {
         WI("  (global $icn_flt%d (mut f64) (f64.const 0))\n", i);
     WI("  ;; Icon generator state memory at 0x%x (%d slots × %d bytes)\n",
        ICON_GEN_STATE_BASE, ICON_GEN_MAX_SLOTS, ICON_GEN_SLOT_BYTES);
+    /* M-IW-P01: procedure call/return globals.
+     * Calling convention: caller stores args in $icn_param0..N before
+     * return_call to callee's _start.  Callee stores return value in
+     * $icn_retval before return_call to the call-site's esucc. */
+    WI("  ;; M-IW-P01: proc call/return globals\n");
+    WI("  (global $icn_retval (mut i64) (i64.const 0))\n");
+    for (int i = 0; i < 8; i++)
+        WI("  (global $icn_param%d (mut i64) (i64.const 0))\n", i);
 }
 
 /* emit_wasm_icon_str_globals() — emit one (offset,len) global pair per interned string.
@@ -1167,9 +1182,20 @@ static void emit_wasm_icon_proc(const IcnNode *proc) {
 
     WI("\n  ;; ── Procedure %s (%d params, %d stmts) ──\n", pname, nparams, nstmts);
 
-    /* Reset per-procedure state */
-    wasm_icon_ctr = 0;
+    /* Reset per-procedure state.
+     * icon_gen_slot_next: reset each proc — generator slots are per-proc.
+     * wasm_icon_ctr: NOT reset — node ids must be globally unique across all
+     *   procs so WAT func names like $icon0_start don't collide. (IW-5 fix.) */
     icon_gen_slot_next = 0;
+
+    /* M-IW-P01: set current-proc context for ICN_RETURN / ICN_VAR */
+    snprintf(icn_cur_proc_name, sizeof icn_cur_proc_name, "%s", pname);
+    icn_cur_nparams = (nparams < 8) ? nparams : 8;
+    for (int i = 0; i < icn_cur_nparams; i++) {
+        IcnNode *pnode = proc->children[1 + i];
+        const char *pn = (pnode && pnode->val.sval) ? pnode->val.sval : "";
+        snprintf(icn_cur_params[i], 64, "%s", pn);
+    }
 
     if (nstmts == 0) {
         /* Empty body: just emit a start→prog_end function */
