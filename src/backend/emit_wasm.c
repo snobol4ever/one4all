@@ -701,6 +701,70 @@ static void emit_pattern_node(const EXPR_t *pat) {
         W("      ))\n");
         return;
     }
+    /* E_FNC cursor-assertion / cursor-advance patterns: POS RPOS LEN TAB RTAB REM */
+    if (pat->kind == E_FNC && pat->sval) {
+        const char *fn = pat->sval;
+        /* REM — no arg: cursor = subj_len */
+        if (strcasecmp(fn, "REM") == 0) {
+            W("      ;; REM: cursor = subj_len\n");
+            W("      (local.set $pat_cursor (local.get $pat_subj_len))\n");
+            return;
+        }
+        /* One-arg cursor ops: POS RPOS LEN TAB RTAB */
+        if (pat->nchildren == 1 &&
+            (strcasecmp(fn,"POS")==0  || strcasecmp(fn,"RPOS")==0 ||
+             strcasecmp(fn,"LEN")==0  || strcasecmp(fn,"TAB")==0  ||
+             strcasecmp(fn,"RTAB")==0)) {
+            /* Evaluate arg → i32 n (arg is typically E_ILIT → TY_INT i64) */
+            W("      ;; %s: evaluate arg → $pat_n\n", fn);
+            WasmTy at = emit_expr(pat->children[0]);
+            if (at == TY_INT)   W("      (i32.wrap_i64)\n");
+            else if (at == TY_FLOAT) W("      (i32.trunc_f64_s)\n");
+            else /* STR */      W("      (call $sno_str_to_int) (i32.wrap_i64)\n");
+            W("      (local.set $pat_n)\n");
+            if (strcasecmp(fn, "POS") == 0) {
+                /* fail unless cursor == n */
+                W("      (if (i32.ne (local.get $pat_cursor) (local.get $pat_n)) (then\n");
+                W("        (local.set $pat_cursor (i32.const -1))\n");
+                W("      ))\n");
+            } else if (strcasecmp(fn, "RPOS") == 0) {
+                /* fail unless cursor == subj_len - n */
+                W("      (if (i32.ne (local.get $pat_cursor)\n");
+                W("              (i32.sub (local.get $pat_subj_len) (local.get $pat_n))) (then\n");
+                W("        (local.set $pat_cursor (i32.const -1))\n");
+                W("      ))\n");
+            } else if (strcasecmp(fn, "LEN") == 0) {
+                /* advance by n if cursor+n <= subj_len */
+                W("      (if (i32.gt_s\n");
+                W("            (i32.add (local.get $pat_cursor) (local.get $pat_n))\n");
+                W("            (local.get $pat_subj_len)) (then\n");
+                W("        (local.set $pat_cursor (i32.const -1))\n");
+                W("      ) (else\n");
+                W("        (local.set $pat_cursor\n");
+                W("          (i32.add (local.get $pat_cursor) (local.get $pat_n)))\n");
+                W("      ))\n");
+            } else if (strcasecmp(fn, "TAB") == 0) {
+                /* set cursor=n if cursor<=n and n<=subj_len, else fail */
+                W("      (if (i32.or\n");
+                W("            (i32.gt_s (local.get $pat_cursor) (local.get $pat_n))\n");
+                W("            (i32.gt_s (local.get $pat_n) (local.get $pat_subj_len))) (then\n");
+                W("        (local.set $pat_cursor (i32.const -1))\n");
+                W("      ) (else\n");
+                W("        (local.set $pat_cursor (local.get $pat_n))\n");
+                W("      ))\n");
+            } else { /* RTAB */
+                /* tgt = subj_len - n; set cursor=tgt if cursor<=tgt, else fail */
+                W("      (local.set $pat_n\n");
+                W("        (i32.sub (local.get $pat_subj_len) (local.get $pat_n)))\n");
+                W("      (if (i32.gt_s (local.get $pat_cursor) (local.get $pat_n)) (then\n");
+                W("        (local.set $pat_cursor (i32.const -1))\n");
+                W("      ) (else\n");
+                W("        (local.set $pat_cursor (local.get $pat_n))\n");
+                W("      ))\n");
+            }
+            return;
+        }
+    }
     /* E_FNC with sval ANY / NOTANY / SPAN / BREAK / BREAKX — character-class patterns */
     if (pat->kind == E_FNC && pat->sval && pat->nchildren == 1) {
         const char *fn = pat->sval;
@@ -942,6 +1006,7 @@ static void emit_main_body(Program *prog) {
     W("    (local $pat_ndl_off i32)\n");
     W("    (local $pat_ndl_len i32)\n");
     W("    (local $pat_save_cursor i32)\n");
+    W("    (local $pat_n i32)\n");
 
     int closed[MAX_LABELS] = {0};
     closed[0] = 1;
