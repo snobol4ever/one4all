@@ -506,6 +506,55 @@
   )
 
 
+  ;; ── sno_pat_search (hay_off i32, hay_len i32, ndl_off i32, ndl_len i32, start_cursor i32) → i32
+  ;; Cursor-based substring search. Searches haystack[start_cursor..] for needle.
+  ;; Returns the cursor position AFTER the match (start_cursor + match_pos + ndl_len),
+  ;; or -1 on failure. Empty needle matches at start_cursor, returning start_cursor.
+  ;; Used by emit_wasm.c pattern emitter for SEQ chaining.
+  (func $sno_pat_search (export "sno_pat_search")
+    (param $ho i32) (param $hl i32) (param $no i32) (param $nl i32) (param $cur i32)
+    (result i32)
+    (local $i i32) (local $j i32) (local $limit i32) (local $match i32)
+    (local $search_len i32)
+    ;; empty needle → match at cursor
+    (if (i32.eqz (local.get $nl)) (then (return (local.get $cur))))
+    ;; cursor past end → no match
+    (if (i32.ge_u (local.get $cur) (local.get $hl)) (then (return (i32.const -1))))
+    ;; search_len = haystack available from cursor
+    (local.set $search_len (i32.sub (local.get $hl) (local.get $cur)))
+    ;; needle longer than available → no match
+    (if (i32.gt_u (local.get $nl) (local.get $search_len)) (then (return (i32.const -1))))
+    ;; limit = number of start positions to try
+    (local.set $limit (i32.sub (local.get $search_len) (local.get $nl)))
+    (local.set $i (i32.const 0))
+    (block $outer_done
+      (loop $outer
+        (br_if $outer_done (i32.gt_u (local.get $i) (local.get $limit)))
+        (local.set $j (i32.const 0))
+        (local.set $match (i32.const 1))
+        (block $inner_done
+          (loop $inner
+            (br_if $inner_done (i32.ge_u (local.get $j) (local.get $nl)))
+            (if (i32.ne
+                  (i32.load8_u (i32.add (local.get $ho)
+                                        (i32.add (local.get $cur)
+                                                 (i32.add (local.get $i) (local.get $j)))))
+                  (i32.load8_u (i32.add (local.get $no) (local.get $j))))
+              (then
+                (local.set $match (i32.const 0))
+                (br $inner_done)))
+            (local.set $j (i32.add (local.get $j) (i32.const 1)))
+            (br $inner)))
+        ;; match found: return cursor + i + needle_len
+        (if (local.get $match)
+          (then
+            (return (i32.add (local.get $cur)
+                             (i32.add (local.get $i) (local.get $nl))))))
+        (local.set $i (i32.add (local.get $i) (i32.const 1)))
+        (br $outer)))
+    (i32.const -1)
+  )
+
   ;; ── sno_str_contains (hay_off i32, hay_len i32, ndl_off i32, ndl_len i32) → i32
   ;; Unanchored substring search. Returns 1 if needle found anywhere in haystack, 0 if not.
   ;; Empty needle always matches (returns 1).

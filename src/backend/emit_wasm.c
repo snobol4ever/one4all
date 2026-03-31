@@ -111,6 +111,7 @@ static void emit_runtime_imports(void) {
     W("  (import \"sno\" \"sno_str_to_float\" (func $sno_str_to_float (param i32 i32) (result f64)))\n");
     W("  (import \"sno\" \"sno_lgt\"          (func $sno_lgt          (param i32 i32 i32 i32) (result i32)))\n");
     W("  (import \"sno\" \"sno_str_contains\" (func $sno_str_contains (param i32 i32 i32 i32) (result i32)))\n");
+    W("  (import \"sno\" \"sno_pat_search\"   (func $sno_pat_search   (param i32 i32 i32 i32 i32) (result i32)))\n");
     W("  ;; String heap pointer: programs use sno_str_alloc from runtime\n");
     W("  ;; (global $str_ptr is internal to runtime; programs use sno_str_alloc)\n");
 }
@@ -631,6 +632,54 @@ static void emit_differ(const EXPR_t *e) {
     if (is_differ) W("      (i32.eqz)\n");    /* differ = not-equal */
 }
 
+/* ── Cursor-based pattern node emitter ───────────────────────────────────── */
+/* Emits WAT that searches for `pat` inside the subject string whose offset   */
+/* and length are in locals $pat_subj_off / $pat_subj_len, starting from the  */
+/* current value of local $pat_cursor.  On success $pat_cursor is updated to  */
+/* the position past the match.  On failure $pat_cursor is set to -1.         */
+/* Handles: E_QLIT (literal), E_SEQ (left then right, cursor threaded).       */
+static void emit_pattern_node(const EXPR_t *pat) {
+    if (!pat || pat->kind == E_NUL) {
+        /* empty pattern — always succeeds, cursor unchanged */
+        return;
+    }
+    if (pat->kind == E_QLIT) {
+        /* literal string search from current cursor */
+        int idx = strlit_intern(pat->sval ? pat->sval : "");
+        int off  = strlit_abs(idx);
+        int len  = str_lits[idx].len;
+        W("      ;; E_QLIT pattern node: sno_pat_search\n");
+        W("      (local.get $pat_subj_off) (local.get $pat_subj_len)\n");
+        W("      (i32.const %d) (i32.const %d)\n", off, len);
+        W("      (local.get $pat_cursor)\n");
+        W("      (call $sno_pat_search)\n");
+        W("      (local.set $pat_cursor)\n");
+        return;
+    }
+    if (pat->kind == E_SEQ) {
+        /* sequential: emit left then right, threading cursor */
+        W("      ;; E_SEQ pattern node: left then right\n");
+        if (pat->nchildren >= 1) emit_pattern_node(pat->children[0]);
+        /* only attempt right if left succeeded (cursor >= 0) */
+        W("      (if (i32.ge_s (local.get $pat_cursor) (i32.const 0)) (then\n");
+        if (pat->nchildren >= 2) emit_pattern_node(pat->children[1]);
+        W("      ))\n");
+        return;
+    }
+    /* fallback: evaluate as string expression, use sno_pat_search */
+    WasmTy tp = emit_expr(pat);
+    if (tp == TY_INT)   W("      (call $sno_int_to_str)\n");
+    if (tp == TY_FLOAT) W("      (call $sno_float_to_str)\n");
+    /* stack: (ndl_off ndl_len) — save to locals, then call */
+    W("      ;; fallback pattern via sno_pat_search\n");
+    W("      (local.set $pat_ndl_len) (local.set $pat_ndl_off)\n");
+    W("      (local.get $pat_subj_off) (local.get $pat_subj_len)\n");
+    W("      (local.get $pat_ndl_off)  (local.get $pat_ndl_len)\n");
+    W("      (local.get $pat_cursor)\n");
+    W("      (call $sno_pat_search)\n");
+    W("      (local.set $pat_cursor)\n");
+}
+
 /* ── Emit any subject expression as i32 success flag ─────────────────────── */
 /* Returns 1 (success) or 0 (failure) on the stack.                          */
 static void emit_subject_as_bool(const EXPR_t *e) {
@@ -828,6 +877,12 @@ static void emit_main_body(Program *prog) {
         W("    (local $indr_vo i32)\n");
         W("    (local $indr_vl i32)\n");
     }
+    /* Pattern-match cursor locals (used by emit_pattern_node) */
+    W("    (local $pat_subj_off i32)\n");
+    W("    (local $pat_subj_len i32)\n");
+    W("    (local $pat_cursor i32)\n");
+    W("    (local $pat_ndl_off i32)\n");
+    W("    (local $pat_ndl_len i32)\n");
 
     int closed[MAX_LABELS] = {0};
     closed[0] = 1;
@@ -967,19 +1022,21 @@ static void emit_main_body(Program *prog) {
             W("      (call $sno_var_set)\n");
             W("      (local.set $ok (i32.const 1))\n");
         } else if (has_subject && s->pattern && s->pattern->kind != E_NUL) {
-            /* Pattern-match statement: subject 'pattern'  :s/:f */
-            W("      ;; pattern match: subject ? pattern\n");
-            /* Evaluate subject — must be a string */
+            /* Pattern-match statement: subject pat  :s/:f
+               Use cursor-based emit_pattern_node() so SEQ can chain. */
+            W("      ;; pattern match: subject ? pattern (cursor-based)\n");
+            /* Evaluate subject — coerce to string, save in pat_subj locals */
             WasmTy ts = emit_expr(s->subject);
             if (ts == TY_INT)   W("      (call $sno_int_to_str)\n");
             if (ts == TY_FLOAT) W("      (call $sno_float_to_str)\n");
-            /* Evaluate pattern */
-            WasmTy tp = emit_expr(s->pattern);
-            if (tp == TY_INT)   W("      (call $sno_int_to_str)\n");
-            if (tp == TY_FLOAT) W("      (call $sno_float_to_str)\n");
-            /* Stack: (subj_off subj_len pat_off pat_len) */
-            W("      (call $sno_str_contains)\n");
-            W("      (local.set $ok)\n");
+            W("      (local.set $pat_subj_len)\n");
+            W("      (local.set $pat_subj_off)\n");
+            /* Initialise cursor to 0 (start of subject) */
+            W("      (local.set $pat_cursor (i32.const 0))\n");
+            /* Emit pattern tree — updates $pat_cursor, -1 on fail */
+            emit_pattern_node(s->pattern);
+            /* $ok = (cursor >= 0) */
+            W("      (local.set $ok (i32.ge_s (local.get $pat_cursor) (i32.const 0)))\n");
         } else if (has_subject) {
             W("      ;; subject eval\n");
             emit_subject_as_bool(s->subject);
