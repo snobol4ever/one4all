@@ -260,11 +260,9 @@ static void emit_pl_predicate(const EXPR_t *choice) {
         W("    ;; clause %d (env=%d n_args=%d n_vars=%d)\n",
           ci, env_idx, n_args, n_vars);
 
-        if (ci == 0)
-            W("    (if (i32.eq (global.get $%s_ci) (i32.const %d))\n", mname, ci);
-        else
-            W("    (else (if (i32.eq (global.get $%s_ci) (i32.const %d))\n", mname, ci);
-
+        /* Each clause: (if (i32.eq $ci N) (then ...) (else ...next...)) */
+        /* We open (if here; the else+close is emitted after body */
+        W("    (if (i32.eq (global.get $%s_ci) (i32.const %d))\n", mname, ci);
         W("      (then\n");
         W("        (local.set $tm (call $trail_mark))\n");
 
@@ -275,18 +273,12 @@ static void emit_pl_predicate(const EXPR_t *choice) {
 
             if ((harg->kind == E_FNC && harg->sval && harg->nchildren == 0) ||
                 (harg->kind == E_QLIT && harg->sval)) {
-                /* Ground atom: compare call arg against atom_id */
+                /* Ground atom head: $aN is a slot address — bind it to atom_id */
                 int atom_id = atom_intern(harg->sval);
-                W("        ;; head arg%d: match atom '%s' (id=%d)\n",
+                W("        ;; bind slot $a%d to atom '%s' (id=%d)\n",
                   ai, harg->sval, atom_id);
-                W("        (if (i32.ne (local.get $a%d) (i32.const %d))\n",
+                W("        (i32.store (local.get $a%d) (i32.const %d))\n",
                   ai, atom_id);
-                W("          (then\n");
-                W("            ;; mismatch → unwind, advance ci, return 0 (fail this clause)\n");
-                W("            (call $trail_unwind (local.get $tm))\n");
-                W("            (global.set $%s_ci (i32.const %d))\n",
-                  mname, ci + 1 < nclauses ? ci + 1 : nclauses);
-                W("            (i32.const 0) (return)))\n");
 
             } else if (harg->kind == E_VAR) {
                 /* Variable head arg: bind slot to call arg */
@@ -313,13 +305,17 @@ static void emit_pl_predicate(const EXPR_t *choice) {
         W("        (global.set $%s_ci (i32.const %d))\n",
           mname, ci + 1 < nclauses ? ci + 1 : nclauses);
         W("        (i32.const 1) (return)\n");
-        W("      )\n"); /* then */
-        W("    )"); /* if */
-        if (ci < nclauses - 1) W("\n");
+        W("      )\n"); /* close (then */
+        /* else branch opened below — remaining clauses emit inside it,
+         * or exhausted path if this is the last clause */
+        if (ci < nclauses - 1)
+            W("      (else\n");
     }
 
-    /* Close all else chains */
-    for (int ci = 1; ci < nclauses; ci++) W(")");
+    /* Close all else+if chains (one ')' per non-first clause) */
+    for (int ci = 1; ci < nclauses; ci++) W("      )\n"); /* close (else */
+    /* Close all (if parens */
+    for (int ci = 0; ci < nclauses; ci++) W("    )\n");
     W("\n");
 
     /* Exhausted: reset ci to 0, return 0 */
