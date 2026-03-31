@@ -83,22 +83,16 @@ static int icn_retcont_register(const char *fname) {
 }
 
 /* ── §1b  String literal intern table — shared via emit_wasm.h ───────────── */
-/* emit_wasm.c owns the table; we call through emit_wasm.h API.              */
-/* Thin aliases so inner functions keep their call-site names unchanged.      */
-static int  icn_strlit_intern(const char *s) { return emit_wasm_strlit_intern(s); }
-static int  icn_strlit_abs(int idx)          { return emit_wasm_strlit_abs(idx); }
-static void icn_emit_data_segment(void)      { emit_wasm_data_segment(); }
+/* emit_wasm.c owns the table; call emit_wasm_strlit_* directly.             */
 
 /* Pre-scan EXPR_t tree and intern every E_QLIT string. */
 static void icn_prescan_node(const EXPR_t *n) {
     if (!n) return;
     if (n->kind == E_QLIT && n->sval)
-        icn_strlit_intern(n->sval);
+        emit_wasm_strlit_intern(n->sval);
     for (int i = 0; i < n->nchildren; i++)
         icn_prescan_node(n->children[i]);
 }
-
-static void icn_strlit_reset(void) { emit_wasm_strlit_reset(); }
 
 /* ── §1c  Per-proc local variable table (M-IW-V01) ───────────────────────── */
 /* Local vars are emitted as per-proc globals: $icn_lv_PROC_VAR (mut i64).
@@ -715,8 +709,8 @@ static void emit_expr_wasm(const EXPR_t *n,
     /* ── String literal ──────────────────────────────────────────────────── */
     case E_QLIT: {
         const char *sv = n->sval ? n->sval : "";
-        int slit_idx = icn_strlit_intern(sv);
-        int abs_off  = icn_strlit_abs(slit_idx);
+        int slit_idx = emit_wasm_strlit_intern(sv);
+        int abs_off  = emit_wasm_strlit_abs(slit_idx);
         int slen     = emit_wasm_strlit_len(slit_idx);
         WI("  ;; E_QLIT \"%s\" (node %d) slit=%d offset=%d len=%d\n",
            sv, id, slit_idx, abs_off, slen);
@@ -880,7 +874,7 @@ static void emit_expr_wasm(const EXPR_t *n,
             int is_str = (arg_node && arg_node->kind == E_QLIT);
             int arg_slit = 0;
             if (is_str && arg_node->sval)
-                arg_slit = icn_strlit_intern(arg_node->sval);
+                arg_slit = emit_wasm_strlit_intern(arg_node->sval);
             emit_expr_wasm(arg_node, esucc_name, fail, e_start, e_resume);
             emit_icn_call_write(id, succ, fail, e_start, e_resume,
                                 e_id, is_str, arg_slit);
@@ -1239,7 +1233,7 @@ void emit_wasm_icon_file(EXPR_t **procs, int count, FILE *out,
     emit_wasm_icon_set_out(out);
 
     /* Prescan: intern all E_QLIT strings so globals declared before funcs */
-    icn_strlit_reset();
+    emit_wasm_strlit_reset();
     icn_retcont_reset();
     for (int i = 0; i < count; i++)
         icn_prescan_node(procs[i]);
@@ -1251,21 +1245,14 @@ void emit_wasm_icon_file(EXPR_t **procs, int count, FILE *out,
     WI("  (type $cont_t (func (result i32)))\n");
     WI("  ;; Memory imported from runtime module\n");
     WI("  (import \"sno\" \"memory\" (memory 3))  ;; page0=output/heap page1=str literals page2=gen state\n");
-    WI("  ;; Runtime function imports\n");
-    WI("  (import \"sno\" \"sno_output_str\"   (func $sno_output_str   (param i32 i32)))\n");
-    WI("  (import \"sno\" \"sno_output_int\"   (func $sno_output_int   (param i64)))\n");
-    WI("  (import \"sno\" \"sno_output_flush\" (func $sno_output_flush (result i32)))\n");
-    WI("  (import \"sno\" \"sno_str_alloc\"    (func $sno_str_alloc    (param i32) (result i32)))\n");
-    WI("  (import \"sno\" \"sno_str_concat\"   (func $sno_str_concat   (param i32 i32 i32 i32) (result i32 i32)))\n");
-    WI("  (import \"sno\" \"sno_str_eq\"       (func $sno_str_eq       (param i32 i32 i32 i32) (result i32)))\n");
-    WI("  (import \"sno\" \"sno_str_to_int\"   (func $sno_str_to_int   (param i32 i32) (result i64)))\n");
-    WI("  (import \"sno\" \"sno_int_to_str\"   (func $sno_int_to_str   (param i64) (result i32 i32)))\n");
-    WI("  (import \"sno\" \"sno_float_to_str\" (func $sno_float_to_str (param f64) (result i32 i32)))\n");
-    WI("  (import \"sno\" \"sno_pow\"          (func $sno_pow          (param f64 f64) (result f64)))\n");
+    WI("  ;; Memory + base runtime imports shared with SNOBOL4 (emit_wasm.h)\n");
+    emit_wasm_runtime_imports_sno_base(icon_wasm_out, 3,
+        "page0=output/heap page1=str literals page2=gen state");
+    /* Icon-specific: no additional sno-namespace imports beyond base set */
 
     emit_wasm_icon_globals(out);
     emit_wasm_icon_str_globals(out);
-    icn_emit_data_segment();
+    emit_wasm_data_segment();
 
     /* Emit all proc declarations (E_FNC with sval matching children[0]->sval) */
     for (int i = 0; i < count; i++) {
