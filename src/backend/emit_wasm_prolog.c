@@ -159,6 +159,7 @@ static void emit_pl_runtime_imports(void) {
     W("  (import \"pl\" \"cp_get_ci\"       (func $pl_cp_get_ci    (result i32)))\n");
     W("  (import \"pl\" \"cp_set_ci\"       (func $pl_cp_set_ci    (param i32)))\n");
     W("  (import \"pl\" \"cp_get_arg\"      (func $pl_cp_get_arg   (param i32) (result i32)))\n");
+    W("  (import \"pl\" \"cp_set_arg\"      (func $pl_cp_set_arg   (param i32 i32)))\n");
     W("  (import \"pl\" \"cp_get_trail_mark\" (func $pl_cp_get_trail_mark (result i32)))\n");
     W("  (import \"pl\" \"cp_pop\"          (func $pl_cp_pop))\n");
     /* Continuation type: (trail i32) → i32 — used by return_call_indirect for γ/ω */
@@ -395,6 +396,9 @@ static void emit_pl_predicate(const EXPR_t *choice) {
                 if (ht && ht->kind == E_VAR && (int)ht->ival >= 0) {
                     int addr = env_slot_addr(env_idx, (int)ht->ival);
                     W("      (i32.const %d) (call $pl_cons_tail (local.get $a%d)) (call $pl_var_bind)\n", addr, ai);
+                    /* Update CP frame arg[ai] to the tail so GT loop retry
+                     * passes the reduced list, not the original full list. */
+                    W("      (call $pl_cp_set_arg (i32.const %d) (i32.load (i32.const %d)))\n", ai, addr);
                 }
             }
         }

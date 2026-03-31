@@ -132,6 +132,15 @@
         (i32.add (i32.const 12) (i32.mul (local.get $n) (i32.const 4)))))
   )
 
+  ;; Write argument n (0..4) in top frame — used by beta to update list tail for retry
+  (func (export "cp_set_arg") (param $n i32) (param $val i32)
+    (i32.store
+      (i32.add
+        (i32.sub (global.get $cp_top) (i32.const 32))
+        (i32.add (i32.const 12) (i32.mul (local.get $n) (i32.const 4))))
+      (local.get $val))
+  )
+
   ;; Read trail_mark from top frame (used by retry to unwind bindings)
   (func (export "cp_get_trail_mark") (result i32)
     (i32.load
