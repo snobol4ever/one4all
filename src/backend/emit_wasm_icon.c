@@ -1310,11 +1310,9 @@ void emit_wasm_icon_file(EXPR_t **procs, int count, FILE *out,
 
     WI("  ;; M-IW-P01: continuation type for return_call_indirect\n");
     WI("  (type $cont_t (func (result i32)))\n");
-    WI("  ;; Memory imported from runtime module\n");
-    WI("  (import \"sno\" \"memory\" (memory 3))  ;; page0=output/heap page1=str literals page2=gen state\n");
     WI("  ;; Memory + base runtime imports shared with SNOBOL4 (emit_wasm.h)\n");
     emit_wasm_runtime_imports_sno_base(icon_wasm_out, 3,
-        "page0=output/heap page1=str literals page2=gen state");
+        "page0=output/heap page1=str literals page2=gen state page3=frame/retcont stack");
     /* Icon-specific: no additional sno-namespace imports beyond base set */
 
     emit_wasm_icon_globals(out);
