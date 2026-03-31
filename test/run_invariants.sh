@@ -227,7 +227,7 @@ run_snobol4_wasm() {
     echo "SKIP" > "$RESULTS/${cell}_status"; return
   fi
 
-  local DIRS="hello rung4 rung3 rung2 rung8 rung9 rungW01 rungW02 rungW03"
+  local DIRS="hello rung4 rung3 rung2 rung8 rung9 rungW01 rungW02 rungW03 rungW04 rungW05"
   for dir in $DIRS; do
     local full="$CORPUS/crosscheck/$dir"
     [[ -d "$full" ]] || continue
@@ -649,7 +649,7 @@ run_snocone_x86() {
   if [[ ! -f "$SC_RUNNER" ]]; then
     echo "SKIP" > "$RESULTS/${cell}_status"; return
   fi
-  local DIRS="rungA01 rungA02 rungA03 rungA04 rungA05 rungA06 rungA07 rungA08 rungA09 rungA10 rungA11 rungA12 rungA13 rungA14 rungA15 rungA16 rungB01 rungB02 rungB03"
+  local DIRS="rungA01 rungA02 rungA03 rungA04 rungA05 rungA06 rungA07 rungA08 rungA09 rungA10 rungA11 rungA12 rungA13 rungA14 rungA15 rungA16 rungB01 rungB02 rungB03 rungB04"
   local dir_args=()
   for d in $DIRS; do
     local full="$CORPUS/crosscheck/snocone/$d"
