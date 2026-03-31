@@ -92,19 +92,9 @@ static WasmTy emit_expr(const EXPR_t *e);
 /* Programs import all runtime functions from the "sno" namespace.           */
 /* The runtime module (sno_runtime.wasm) is pre-compiled once per session.   */
 static void emit_runtime_imports(void) {
-    W("  ;; Memory imported from runtime module\n");
-    W("  (import \"sno\" \"memory\" (memory 2))  ;; runtime exports 2 pages; data segment at 65536\n");
-    W("  ;; Runtime function imports\n");
-    W("  (import \"sno\" \"sno_output_str\"   (func $sno_output_str   (param i32 i32)))\n");
-    W("  (import \"sno\" \"sno_output_int\"   (func $sno_output_int   (param i64)))\n");
-    W("  (import \"sno\" \"sno_output_flush\" (func $sno_output_flush (result i32)))\n");
-    W("  (import \"sno\" \"sno_str_alloc\"    (func $sno_str_alloc    (param i32) (result i32)))\n");
-    W("  (import \"sno\" \"sno_str_concat\"   (func $sno_str_concat   (param i32 i32 i32 i32) (result i32 i32)))\n");
-    W("  (import \"sno\" \"sno_str_eq\"       (func $sno_str_eq       (param i32 i32 i32 i32) (result i32)))\n");
-    W("  (import \"sno\" \"sno_str_to_int\"   (func $sno_str_to_int   (param i32 i32) (result i64)))\n");
-    W("  (import \"sno\" \"sno_int_to_str\"   (func $sno_int_to_str   (param i64) (result i32 i32)))\n");
-    W("  (import \"sno\" \"sno_float_to_str\" (func $sno_float_to_str (param f64) (result i32 i32)))\n");
-    W("  (import \"sno\" \"sno_pow\"          (func $sno_pow          (param f64 f64) (result f64)))\n");
+    emit_wasm_runtime_imports_sno_base(wasm_out, 2,
+        "runtime exports 2 pages; data segment at 65536");
+    /* SNOBOL4-specific imports (pattern engine, builtins, string utilities) */
     W("  (import \"sno\" \"sno_size\"         (func $sno_size         (param i32 i32) (result i64)))\n");
     W("  (import \"sno\" \"sno_dupl\"         (func $sno_dupl         (param i32 i32 i64) (result i32 i32)))\n");
     W("  (import \"sno\" \"sno_replace\"      (func $sno_replace      (param i32 i32 i32 i32 i32 i32) (result i32 i32)))\n");
@@ -1277,6 +1267,22 @@ void emit_wasm_data_segment(void)            { emit_data_segment(); }
 void emit_wasm_strlit_reset(void) {
     for (int i = 0; i < str_nlit; i++) { free(str_lits[i].text); str_lits[i].text = NULL; }
     str_nlit = str_bytes = 0;
+}
+
+void emit_wasm_runtime_imports_sno_base(FILE *out, int npages, const char *page_comment) {
+    fprintf(out, "  ;; Memory imported from runtime module\n");
+    fprintf(out, "  (import \"sno\" \"memory\" (memory %d))  ;; %s\n", npages, page_comment ? page_comment : "");
+    fprintf(out, "  ;; Runtime function imports (base set — shared by SNOBOL4 and Icon)\n");
+    fprintf(out, "  (import \"sno\" \"sno_output_str\"   (func $sno_output_str   (param i32 i32)))\n");
+    fprintf(out, "  (import \"sno\" \"sno_output_int\"   (func $sno_output_int   (param i64)))\n");
+    fprintf(out, "  (import \"sno\" \"sno_output_flush\" (func $sno_output_flush (result i32)))\n");
+    fprintf(out, "  (import \"sno\" \"sno_str_alloc\"    (func $sno_str_alloc    (param i32) (result i32)))\n");
+    fprintf(out, "  (import \"sno\" \"sno_str_concat\"   (func $sno_str_concat   (param i32 i32 i32 i32) (result i32 i32)))\n");
+    fprintf(out, "  (import \"sno\" \"sno_str_eq\"       (func $sno_str_eq       (param i32 i32 i32 i32) (result i32)))\n");
+    fprintf(out, "  (import \"sno\" \"sno_str_to_int\"   (func $sno_str_to_int   (param i32 i32) (result i64)))\n");
+    fprintf(out, "  (import \"sno\" \"sno_int_to_str\"   (func $sno_int_to_str   (param i64) (result i32 i32)))\n");
+    fprintf(out, "  (import \"sno\" \"sno_float_to_str\" (func $sno_float_to_str (param f64) (result i32 i32)))\n");
+    fprintf(out, "  (import \"sno\" \"sno_pow\"          (func $sno_pow          (param f64 f64) (result f64)))\n");
 }
 
 /* ── Public entry point ───────────────────────────────────────────────────── */
