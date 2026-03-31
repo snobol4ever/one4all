@@ -1250,6 +1250,17 @@
     (i32.store (i32.add (local.get $slot_addr) (i32.const 4))  (local.get $vl))
   )
 
+  (func $sno_data_typename (export "sno_data_typename")
+    ;; (handle i32) → (name_off i32, name_len i32)
+    ;; Reads type_idx from handle+4, looks up data_reg[type_idx].{name_off,name_len}
+    (param $h i32) (result i32 i32)
+    (local $ti i32) (local $entry i32)
+    (local.set $ti    (i32.load (i32.add (local.get $h) (i32.const 4))))
+    (local.set $entry (i32.add (i32.const 294912) (i32.mul (local.get $ti) (i32.const 16))))
+    (i32.load               (local.get $entry))
+    (i32.load (i32.add (local.get $entry) (i32.const 4)))
+  )
+
   ;; sno_handle_type: return type tag from a handle (1=array,2=table,3=data, 0=not a handle)
   (func $sno_handle_type (export "sno_handle_type")
     (param $h i32) (result i32)

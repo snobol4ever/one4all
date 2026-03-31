@@ -126,12 +126,113 @@ static void emit_runtime_imports(void) {
     W("  (import \"sno\" \"sno_data_new\"         (func $sno_data_new         (param i32 i32) (result i32)))\n");
     W("  (import \"sno\" \"sno_data_get_field\"   (func $sno_data_get_field   (param i32 i32) (result i32 i32)))\n");
     W("  (import \"sno\" \"sno_data_set_field\"   (func $sno_data_set_field   (param i32 i32 i32 i32)))\n");
+    W("  (import \"sno\" \"sno_data_typename\"    (func $sno_data_typename    (param i32) (result i32 i32)))\n");
     W("  (import \"sno\" \"sno_handle_type\"      (func $sno_handle_type      (param i32) (result i32)))\n");
     W("  ;; String heap pointer: programs use sno_str_alloc from runtime\n");
     W("  ;; (global $str_ptr is internal to runtime; programs use sno_str_alloc)\n");
 }
 
 static int needs_indr = 0;  /* set during prescan if E_INDR found */
+
+/* ── DATA type registry (Part A — M-SW-C02) ──────────────────────────────── */
+/* Populated during prescan when E_FNC "data" is seen.                        */
+/* Used by emitter to recognise constructor calls and field get/set.          */
+#define MAX_DATA_TYPES  64
+#define MAX_DATA_FIELDS 32
+
+typedef struct {
+    char  *name;              /* type name, e.g. "NODE" */
+    int    name_lit;          /* strlit index for type name */
+    int    nfields;
+    char  *field_name[MAX_DATA_FIELDS];
+    int    field_lit[MAX_DATA_FIELDS];   /* strlit index per field */
+    int    field_names_lit;  /* strlit index of concatenated field-name pairs data */
+} DataType;
+
+static DataType data_types[MAX_DATA_TYPES];
+static int      data_ntype = 0;
+
+/* Register a DATA type from a "data(typename,f1,f2,...)" call in prescan. */
+static void parse_data_spec(const EXPR_t *e) {
+    /* Two calling conventions:
+     *   (a) data('typename(f1,f2,...)')  -- single quoted spec string
+     *   (b) data('typename','f1','f2')   -- separate args (less common)
+     * Detect (a) by '(' in children[0]->sval. */
+    if (e->nchildren < 1) return;
+    const EXPR_t *c0 = e->children[0];
+    if (!c0 || c0->kind != E_QLIT || !c0->sval) return;
+
+    const char *spec = c0->sval;
+    const char *paren = strchr(spec, '(');
+    char tname[256]; tname[0] = '\0';
+    char fbuf[512];  fbuf[0] = '\0';
+
+    if (paren) {
+        /* single-string: "typename(f1,f2,...)" */
+        size_t tl = (size_t)(paren - spec);
+        if (tl >= sizeof(tname)) tl = sizeof(tname)-1;
+        memcpy(tname, spec, tl); tname[tl] = '\0';
+        const char *cl = strchr(paren, ')');
+        size_t fl = cl ? (size_t)(cl-paren-1) : strlen(paren+1);
+        if (fl >= sizeof(fbuf)) fl = sizeof(fbuf)-1;
+        memcpy(fbuf, paren+1, fl); fbuf[fl] = '\0';
+    } else {
+        strncpy(tname, spec, sizeof(tname)-1); tname[sizeof(tname)-1] = '\0';
+    }
+
+    for (int i = 0; i < data_ntype; i++)
+        if (strcasecmp(data_types[i].name, tname) == 0) return;
+    if (data_ntype >= MAX_DATA_TYPES) return;
+    DataType *dt = &data_types[data_ntype++];
+    dt->name     = strdup(tname);
+    dt->name_lit = strlit_intern(tname);
+    dt->nfields  = 0;
+
+    if (paren) {
+        char *buf = strdup(fbuf);
+        char *tok = strtok(buf, ",");
+        while (tok && dt->nfields < MAX_DATA_FIELDS) {
+            while (*tok==' '||*tok=='\t') tok++;
+            char *end = tok+strlen(tok)-1;
+            while (end>tok&&(*end==' '||*end=='\t')) *end--='\0';
+            if (*tok) {
+                dt->field_name[dt->nfields] = strdup(tok);
+                dt->field_lit[dt->nfields]  = strlit_intern(tok);
+                dt->nfields++;
+            }
+            tok = strtok(NULL, ",");
+        }
+        free(buf);
+    } else {
+        for (int i = 1; i < e->nchildren && dt->nfields < MAX_DATA_FIELDS; i++) {
+            const EXPR_t *fn = e->children[i];
+            if (!fn || !fn->sval) continue;
+            dt->field_name[dt->nfields] = strdup(fn->sval);
+            dt->field_lit[dt->nfields]  = strlit_intern(fn->sval);
+            dt->nfields++;
+        }
+    }
+}
+
+/* Lookup helpers used by emitter dispatch. */
+static int data_type_by_name(const char *name) {
+    if (!name) return -1;
+    for (int i = 0; i < data_ntype; i++)
+        if (strcasecmp(data_types[i].name, name) == 0) return i;
+    return -1;
+}
+
+/* Returns type index of the type that owns field 'name', or -1. */
+static int data_field_owner(const char *name, int *field_idx_out) {
+    if (!name) return -1;
+    for (int i = 0; i < data_ntype; i++)
+        for (int j = 0; j < data_types[i].nfields; j++)
+            if (strcasecmp(data_types[i].field_name[j], name) == 0) {
+                if (field_idx_out) *field_idx_out = j;
+                return i;
+            }
+    return -1;
+}
 
 /* reserved names that are not user variables */
 static int is_keyword_name(const char *n) {
@@ -180,6 +281,8 @@ static void prescan_expr(const EXPR_t *e) {
     }
     if (e->kind == E_FNC && e->sval && strcasecmp(e->sval, "value") == 0)
         needs_indr = 1;  /* VALUE() needs sno_var_get */
+    if (e->kind == E_FNC && e->sval && strcasecmp(e->sval, "data") == 0)
+        parse_data_spec(e);  /* register DATA type for constructor/field dispatch */
     /* CAPT_COND/CAPT_IMM/CAPT_CUR: varname in children[1]->sval (binop shape) */
     if (e->kind == E_CAPT_COND || e->kind == E_CAPT_IMM || e->kind == E_CAPT_CUR) {
         /* Try sval first (legacy path), then children[1] (parser binop path) */
@@ -270,6 +373,47 @@ static void emit_var_indirect_funcs(void) {
         W("      (global.set $var_%s_len (local.get $vl))\n", var_names[i]);
         W("      (return)\n");
         W("    ))\n");
+    }
+    W("  )\n");
+}
+
+/* ── $sno_data_init — emitted WAT function that registers all DATA types ──── */
+static void emit_data_init_func(void) {
+    if (data_ntype == 0) return;
+
+    W("\n  ;; $sno_data_init — register DATA types at program start\n");
+    W("  (func $sno_data_init\n");
+    W("    (local $fp i32)\n");  /* field-names array pointer */
+    W("    (local $ti i32)\n");  /* type index (result of sno_data_define, discarded) */
+
+    for (int ti = 0; ti < data_ntype; ti++) {
+        DataType *dt = &data_types[ti];
+        int name_off = strlit_abs(dt->name_lit);
+        int name_len = str_lits[dt->name_lit].len;
+
+        W("    ;; DATA %s: %d field(s)\n", dt->name, dt->nfields);
+
+        if (dt->nfields > 0) {
+            /* Allocate field-name pairs array: nfields * 8 bytes */
+            W("    (local.set $fp (call $sno_str_alloc (i32.const %d)))\n",
+              dt->nfields * 8);
+            /* Write each field (off, len) pair */
+            for (int fi = 0; fi < dt->nfields; fi++) {
+                int foff = strlit_abs(dt->field_lit[fi]);
+                int flen = str_lits[dt->field_lit[fi]].len;
+                W("    (i32.store (i32.add (local.get $fp) (i32.const %d)) (i32.const %d))\n",
+                  fi * 8,     foff);
+                W("    (i32.store (i32.add (local.get $fp) (i32.const %d)) (i32.const %d))\n",
+                  fi * 8 + 4, flen);
+            }
+            W("    (local.set $ti (call $sno_data_define\n");
+            W("      (i32.const %d) (i32.const %d)\n", name_off, name_len);
+            W("      (i32.const %d) (local.get $fp)))\n", dt->nfields);
+        } else {
+            W("    (local.set $ti (call $sno_data_define\n");
+            W("      (i32.const %d) (i32.const %d)\n", name_off, name_len);
+            W("      (i32.const 0) (i32.const 0)))\n");
+        }
     }
     W("  )\n");
 }
@@ -880,15 +1024,31 @@ static WasmTy emit_wasm_expr(const EXPR_t *e) {
         /* DATATYPE(val) → string type name: "string", "integer", "real" */
         if (strcasecmp(fn, "datatype") == 0 && e->nchildren >= 1) {
             WasmTy tv = emit_wasm_expr(e->children[0]);
-            /* Drop the value — we only need its compile-time type */
-            if (tv == TY_STR)   { W("    (drop)\n    (drop)\n"); }
-            else if (tv == TY_INT)   { W("    (drop)\n"); }
-            else                     { W("    (drop)\n"); }
-            const char *tname = (tv == TY_INT) ? "integer"
-                               : (tv == TY_FLOAT) ? "real" : "string";
-            int ti = strlit_intern(tname);
-            W("    (i32.const %d) ;; datatype=%s\n", strlit_abs(ti), tname);
-            W("    (i32.const %d)\n", str_lits[ti].len);
+            /* For TY_STR, value might be a DATA object handle — check at runtime */
+            if (tv == TY_STR) {
+                /* Stack: (off i32) (len i32) */
+                W("    (local.set $proto_len)  ;; save len\n");
+                W("    (local.set $arr_ok)     ;; save off (= handle if DATA)\n");
+                W("    (block $datatype_done (result i32 i32)\n");
+                /* If sno_handle_type(off) == 3, it's a DATA object */
+                W("      (if (i32.eq (call $sno_handle_type (local.get $arr_ok)) (i32.const 3)) (then\n");
+                W("        (call $sno_data_typename (local.get $arr_ok))\n");
+                W("        (br $datatype_done)))\n");
+                /* Otherwise compile-time type = string */
+                {   int ti = strlit_intern("string");
+                    W("      (i32.const %d) (i32.const %d)\n", strlit_abs(ti), str_lits[ti].len); }
+                W("    ) ;; $datatype_done\n");
+            } else if (tv == TY_INT) {
+                W("    (drop)\n");
+                int ti = strlit_intern("integer");
+                W("    (i32.const %d) ;; datatype=integer\n", strlit_abs(ti));
+                W("    (i32.const %d)\n", str_lits[ti].len);
+            } else {
+                W("    (drop)\n");
+                int ti = strlit_intern("real");
+                W("    (i32.const %d) ;; datatype=real\n", strlit_abs(ti));
+                W("    (i32.const %d)\n", str_lits[ti].len);
+            }
             return TY_STR;
         }
         /* ITEM(arr, i) or ITEM(arr, i, j, ...) — programmatic subscript, same as arr<i> */
@@ -948,6 +1108,60 @@ static WasmTy emit_wasm_expr(const EXPR_t *e) {
               W("      (local.set $arr_ok (i32.const %d))))\n", strlit_abs(ei)); }
             W("    (local.get $arr_ok) (local.get $proto_len)\n");
             return TY_STR;
+        }
+        /* DATA declaration: data("typename", field1, ...) — handled at prescan/init, emit nothing */
+        if (strcasecmp(fn, "data") == 0) {
+            int idx = strlit_intern("");
+            W("    (i32.const %d)\n", strlit_abs(idx));
+            W("    (i32.const 0)\n");
+            return TY_STR;
+        }
+        /* DATA constructor: <TypeName>(arg1, arg2, ...) */
+        {   int dti = data_type_by_name(fn);
+            if (dti >= 0) {
+                DataType *dt = &data_types[dti];
+                /* Allocate DATA instance */
+                W("    (i32.const %d)  ;; type_idx for %s\n", dti, dt->name);
+                W("    (i32.const %d)  ;; nfields\n", dt->nfields);
+                W("    (call $sno_data_new)\n");
+                W("    (local.set $arr_h)\n");
+                /* Set each field from args (missing args → empty string) */
+                for (int fi = 0; fi < dt->nfields; fi++) {
+                    int empty_idx = strlit_intern("");
+                    if (fi < e->nchildren) {
+                        WasmTy at = emit_wasm_expr(e->children[fi]);
+                        if (at == TY_INT)   W("    (call $sno_int_to_str)\n");
+                        if (at == TY_FLOAT) W("    (call $sno_float_to_str)\n");
+                    } else {
+                        W("    (i32.const %d)\n", strlit_abs(empty_idx));
+                        W("    (i32.const 0)\n");
+                    }
+                    W("    (local.set $proto_len)  ;; field val_len\n");
+                    W("    (local.set $arr_ok)     ;; field val_off\n");
+                    W("    (local.get $arr_h)\n");
+                    W("    (i32.const %d)  ;; field index %d\n", fi, fi);
+                    W("    (local.get $arr_ok)\n");
+                    W("    (local.get $proto_len)\n");
+                    W("    (call $sno_data_set_field)\n");
+                }
+                /* Return handle as (i32, magic_len=32767) */
+                W("    (local.get $arr_h)\n");
+                W("    (i32.const 32767)  ;; MAGIC_HANDLE\n");
+                return TY_STR;
+            }
+        }
+        /* DATA field getter: <fieldname>(handle) — if fn matches a registered field */
+        {   int fi = -1;
+            int dti = data_field_owner(fn, &fi);
+            if (dti >= 0 && e->nchildren >= 1) {
+                /* Evaluate the handle argument */
+                WasmTy ht = emit_wasm_expr(e->children[0]);
+                (void)ht;
+                W("    (drop)  ;; drop magic_len, keep handle\n");
+                W("    (i32.const %d)  ;; field index\n", fi);
+                W("    (call $sno_data_get_field)\n");
+                return TY_STR;
+            }
         }
         /* Default: evaluate args, drop results, return empty string */
         for (int i = 0; i < e->nchildren; i++) {
@@ -1547,6 +1761,10 @@ static void emit_main_body(Program *prog) {
      */
     W("    (local.set $pc (i32.const %d)) ;; sentinel: sequential start\n", nlabels);
 
+    /* Call $sno_data_init to register DATA types before program execution */
+    if (data_ntype > 0)
+        W("    (call $sno_data_init)\n");
+
     W("    (block $exit\n");
     W("    (loop $dispatch\n");
 
@@ -1599,6 +1817,9 @@ static void emit_main_body(Program *prog) {
             } else if (s->subject->kind == E_FNC && s->subject->sval
                        && strcasecmp(s->subject->sval, "item") == 0) {
                 is_idxassign = 1;
+            } else if (s->subject->kind == E_FNC && s->subject->sval
+                       && data_field_owner(s->subject->sval, NULL) >= 0) {
+                is_idxassign = 1;  /* field(handle) = val */
             }
         }
 
@@ -1663,6 +1884,32 @@ static void emit_main_body(Program *prog) {
             W("      (call $sno_var_set)\n");
             W("      (local.set $ok (i32.const 1))\n");
         } else if (is_idxassign) {
+            /* field(handle) = val — DATA field setter */
+            if (s->subject->kind == E_FNC && s->subject->sval
+                && data_field_owner(s->subject->sval, NULL) >= 0) {
+                int fi = -1;
+                int dti = data_field_owner(s->subject->sval, &fi);
+                (void)dti;
+                W("      ;; %s(handle) = val (field setter)\n", s->subject->sval);
+                /* Evaluate handle argument */
+                const EXPR_t *h_e = s->subject->nchildren > 0 ? s->subject->children[0] : NULL;
+                if (h_e) { WasmTy ht = emit_wasm_expr(h_e); (void)ht; }
+                else     { W("      (i32.const 0) (i32.const 0)\n"); }
+                W("      (drop)  ;; drop magic_len, keep handle\n");
+                W("      (local.set $arr_h)\n");
+                /* Evaluate replacement value — coerce to string */
+                WasmTy vt = emit_wasm_expr(s->replacement);
+                if (vt == TY_INT)   W("      (call $sno_int_to_str)\n");
+                if (vt == TY_FLOAT) W("      (call $sno_float_to_str)\n");
+                W("      (local.set $proto_len)  ;; val_len\n");
+                W("      (local.set $arr_ok)     ;; val_off\n");
+                W("      (local.get $arr_h)\n");
+                W("      (i32.const %d)  ;; field index\n", fi);
+                W("      (local.get $arr_ok)\n");
+                W("      (local.get $proto_len)\n");
+                W("      (call $sno_data_set_field)\n");
+                W("      (local.set $ok (i32.const 1))\n");
+            } else {
             /* arr<i> = val  or  tbl<key> = val  or  arr<r,c> = val */
             const EXPR_t *arr_e  = s->subject->nchildren > 0 ? s->subject->children[0] : NULL;
             const EXPR_t *idx_e  = s->subject->nchildren > 1 ? s->subject->children[1] : NULL;
@@ -1746,6 +1993,7 @@ static void emit_main_body(Program *prog) {
                 W("        (local.set $ok)  ;; 1=ok, 0=OOB\n");
                 W("      ) ;; block $idxa_done\n");
             }
+            } /* end field-setter else */
         } else if (has_subject && s->pattern && s->pattern->kind != E_NUL) {
             /* Pattern-match statement: subject pat  :s/:f
                Use cursor-based emit_pattern_node() so SEQ can chain. */
@@ -1844,6 +2092,11 @@ void emit_wasm(Program *prog, FILE *out, const char *filename) {
     str_nlit = str_bytes = 0;
     var_table_reset();
     needs_indr = 0;
+    for (int i = 0; i < data_ntype; i++) {
+        free(data_types[i].name);
+        for (int j = 0; j < data_types[i].nfields; j++) free(data_types[i].field_name[j]);
+    }
+    data_ntype = 0;
 
     collect_labels(prog);
     prescan_prog(prog);
@@ -1855,6 +2108,7 @@ void emit_wasm(Program *prog, FILE *out, const char *filename) {
     emit_data_segment();
     emit_var_globals();
     emit_var_indirect_funcs();
+    emit_data_init_func();
 
     W("\n  (func (export \"main\") (result i32)\n");
     emit_main_body(prog);
