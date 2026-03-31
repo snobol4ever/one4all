@@ -42,4 +42,7 @@ void emit_wasm_data_segment(void);
 /* Reset the string table (called at start of each emit pass) */
 void emit_wasm_strlit_reset(void);
 
+/* Number of interned string literals (used to emit per-literal globals) */
+int  emit_wasm_strlit_count(void);
+
 #endif /* EMIT_WASM_H */

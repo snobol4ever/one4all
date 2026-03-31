@@ -1146,6 +1146,7 @@ void emit_wasm_set_out(FILE *f)              { wasm_out = f; }
 int  emit_wasm_strlit_intern(const char *s)  { return strlit_intern(s); }
 int  emit_wasm_strlit_abs(int idx)           { return strlit_abs(idx); }
 int  emit_wasm_strlit_len(int idx)           { return str_lits[idx].len; }
+int  emit_wasm_strlit_count(void)            { return str_nlit; }
 void emit_wasm_data_segment(void)            { emit_data_segment(); }
 void emit_wasm_strlit_reset(void) {
     for (int i = 0; i < str_nlit; i++) { free(str_lits[i].text); str_lits[i].text = NULL; }

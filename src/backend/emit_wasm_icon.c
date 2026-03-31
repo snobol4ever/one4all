@@ -32,6 +32,7 @@
 
 #include "icon_ast.h"
 #include "icon_emit.h"
+#include "emit_wasm.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -81,50 +82,12 @@ static int icn_retcont_register(const char *fname) {
     return idx;
 }
 
-/* ── §1b  String literal intern table ────────────────────────────────────── */
-#define ICN_STR_DATA_BASE  65536
-#define ICN_MAX_STRLITS    1024
-
-typedef struct { char *text; int len; int offset; } IcnStrLit;
-static IcnStrLit icn_str_lits[ICN_MAX_STRLITS];
-static int       icn_str_nlit  = 0;
-static int       icn_str_bytes = 0;
-
-static int icn_strlit_intern(const char *s) {
-    int len = s ? (int)strlen(s) : 0;
-    const char *t = s ? s : "";
-    for (int i = 0; i < icn_str_nlit; i++)
-        if (icn_str_lits[i].len == len &&
-            (len == 0 || memcmp(icn_str_lits[i].text, t, (size_t)len) == 0))
-            return i;
-    if (icn_str_nlit >= ICN_MAX_STRLITS) return 0;
-    int idx = icn_str_nlit++;
-    icn_str_lits[idx].text   = strdup(t);
-    icn_str_lits[idx].len    = len;
-    icn_str_lits[idx].offset = icn_str_bytes;
-    icn_str_bytes += len;
-    return idx;
-}
-
-static int icn_strlit_abs(int idx) {
-    return ICN_STR_DATA_BASE + icn_str_lits[idx].offset;
-}
-
-static void icn_emit_data_segment(void) {
-    if (icn_str_bytes == 0) return;
-    WI("\n  ;; Icon string literals at offset %d (page 1)\n", ICN_STR_DATA_BASE);
-    WI("  (data (i32.const %d) \"", ICN_STR_DATA_BASE);
-    for (int i = 0; i < icn_str_nlit; i++) {
-        const unsigned char *t = (const unsigned char *)icn_str_lits[i].text;
-        for (int j = 0; j < icn_str_lits[i].len; j++) {
-            unsigned char c = t[j];
-            if (c == '"' || c == '\\') WI("\\%02x", c);
-            else if (c < 32 || c > 126) WI("\\%02x", c);
-            else WI("%c", (char)c);
-        }
-    }
-    WI("\")\n");
-}
+/* ── §1b  String literal intern table — shared via emit_wasm.h ───────────── */
+/* emit_wasm.c owns the table; we call through emit_wasm.h API.              */
+/* Thin aliases so inner functions keep their call-site names unchanged.      */
+static int  icn_strlit_intern(const char *s) { return emit_wasm_strlit_intern(s); }
+static int  icn_strlit_abs(int idx)          { return emit_wasm_strlit_abs(idx); }
+static void icn_emit_data_segment(void)      { emit_wasm_data_segment(); }
 
 /* Pre-scan EXPR_t tree and intern every E_QLIT string. */
 static void icn_prescan_node(const EXPR_t *n) {
@@ -135,11 +98,7 @@ static void icn_prescan_node(const EXPR_t *n) {
         icn_prescan_node(n->children[i]);
 }
 
-static void icn_strlit_reset(void) {
-    for (int i = 0; i < icn_str_nlit; i++) { free(icn_str_lits[i].text); icn_str_lits[i].text = NULL; }
-    icn_str_nlit  = 0;
-    icn_str_bytes = 0;
-}
+static void icn_strlit_reset(void) { emit_wasm_strlit_reset(); }
 
 /* ── §1c  Per-proc local variable table (M-IW-V01) ───────────────────────── */
 /* Local vars are emitted as per-proc globals: $icn_lv_PROC_VAR (mut i64).
@@ -758,7 +717,7 @@ static void emit_expr_wasm(const EXPR_t *n,
         const char *sv = n->sval ? n->sval : "";
         int slit_idx = icn_strlit_intern(sv);
         int abs_off  = icn_strlit_abs(slit_idx);
-        int slen     = icn_str_lits[slit_idx].len;
+        int slen     = emit_wasm_strlit_len(slit_idx);
         WI("  ;; E_QLIT \"%s\" (node %d) slit=%d offset=%d len=%d\n",
            sv, id, slit_idx, abs_off, slen);
         WI("  (func $%s (result i32)\n", sa);
@@ -1156,9 +1115,10 @@ void emit_wasm_icon_globals(FILE *out) {
 
 void emit_wasm_icon_str_globals(FILE *out) {
     emit_wasm_icon_set_out(out);
-    if (icn_str_nlit == 0) return;
+    int nlit = emit_wasm_strlit_count();
+    if (nlit == 0) return;
     WI("  ;; Icon string literal (offset,len) globals\n");
-    for (int i = 0; i < icn_str_nlit; i++) {
+    for (int i = 0; i < nlit; i++) {
         WI("  (global $icn_strlit_off%d (mut i32) (i32.const 0))\n", i);
         WI("  (global $icn_strlit_len%d (mut i32) (i32.const 0))\n", i);
     }
