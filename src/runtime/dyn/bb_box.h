@@ -66,6 +66,8 @@ static const int β = 1;   /* backtrack re-entry */
  * shared across all boxes during a single match.  Cursor Δ is mutated
  * by each box as it matches forward; restored on backtrack.
  */
+/* Σ/Δ/Ω are defined (non-static) in stmt_exec.c.
+ * All bb_*.c files declare them extern here to resolve at link time. */
 extern const char *Σ;   /* subject string */
 extern int         Δ;   /* cursor */
 extern int         Ω;   /* subject length */

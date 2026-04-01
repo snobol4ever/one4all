@@ -118,9 +118,12 @@ typedef struct _PND {
 
 /* ── global match state ─────────────────────────────────────────────────── */
 /* Defined by the test driver or the generated main. Declared extern here. */
-extern const char *Σ;
-extern int         Δ;
-extern int         Ω;
+/* M-DYN-S1: defined here, referenced as extern in bb_*.c via bb_box.h.
+ * Non-static so they get external linkage for separate compilation of bb_*.c.
+ * Set by stmt_exec_dyn Phase 1; read by all box functions during Phase 3. */
+const char *Σ = NULL;
+int         Δ = 0;
+int         Ω = 0;
 
 /* ══════════════════════════════════════════════════════════════════════════
  * PRIMITIVE BOX IMPLEMENTATIONS

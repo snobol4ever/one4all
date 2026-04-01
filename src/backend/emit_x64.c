@@ -4278,6 +4278,220 @@ static void label_register(const char *lbl) {
 
 static void emit_prolog_choice(EXPR_t *choice);  /* defined at end of file */
 
+/* ── emit_pat_to_descr ────────────────────────────────────────────────────
+ * Walk pattern EXPR_t AST, emit straight-line NASM calls to
+ * snobol4_pattern.c constructors.  Result: DT_P DESCR_t in rax:rdx.
+ * Caller saves rax:rdx to desired slot after return.
+ *
+ * This is Phase 2 of the 5-phase executor — straight-line stack machine,
+ * no backtracking, FAIL→ω handled by caller checking rax.v == DT_FAIL.
+ *
+ * Calling convention: each constructor returns DESCR_t in rax:rdx.
+ * Binary constructors (pat_cat, pat_alt) take two DESCR_t args:
+ *   first  in rdi:rsi  (SysV arg1 lo:hi)
+ *   second in rdx:rcx  (SysV arg2 lo:hi)
+ * Unary constructors (pat_lit, pat_span, etc.) take char* in rdi.
+ * ──────────────────────────────────────────────────────────────────────── */
+static void emit_pat_to_descr(EXPR_t *e) {
+    if (!e) {
+        /* null → epsilon pattern */
+        A("    call    pat_epsilon\n");
+        return;
+    }
+    switch (e->kind) {
+    case E_QLIT: {
+        /* Literal string → pat_lit(char*) */
+        const char *lab = str_intern(e->sval ? e->sval : "");
+        A("    lea     rdi, [rel %s]\n", lab);
+        A("    call    pat_lit\n");
+        return;
+    }
+    case E_VAR: {
+        /* Variable in pattern context → pat_ref(name) for *VAR deferred */
+        const char *lab = str_intern(e->sval ? e->sval : "");
+        A("    lea     rdi, [rel %s]\n", lab);
+        A("    call    pat_ref\n");
+        return;
+    }
+    case E_CONCAT:
+    case E_SEQ: {
+        /* Sequence: pat_cat(left, right) */
+        if (!e->children[0] || !e->children[1]) {
+            A("    call    pat_epsilon\n"); return;
+        }
+        emit_pat_to_descr(e->children[0]);
+        A("    push    rdx\n");  /* save left.hi */
+        A("    push    rax\n");  /* save left.lo */
+        emit_pat_to_descr(e->children[1]);
+        A("    mov     rcx, rdx\n");  /* right.hi → arg2 hi */
+        A("    mov     rdx, rax\n");  /* right.lo → arg2 lo */
+        A("    pop     rdi\n");        /* left.lo  → arg1 lo */
+        A("    pop     rsi\n");        /* left.hi  → arg1 hi */
+        A("    call    pat_cat\n");
+        return;
+    }
+    case E_ALT: {
+        /* Alternation: pat_alt(left, right) */
+        if (!e->children[0] || !e->children[1]) {
+            A("    call    pat_epsilon\n"); return;
+        }
+        emit_pat_to_descr(e->children[0]);
+        A("    push    rdx\n");
+        A("    push    rax\n");
+        emit_pat_to_descr(e->children[1]);
+        A("    mov     rcx, rdx\n");
+        A("    mov     rdx, rax\n");
+        A("    pop     rdi\n");
+        A("    pop     rsi\n");
+        A("    call    pat_alt\n");
+        return;
+    }
+    case E_FNC: {
+        const char *fn = e->sval ? e->sval : "";
+        if (strcasecmp(fn, "ARB") == 0) {
+            A("    call    pat_arb\n"); return;
+        }
+        if (strcasecmp(fn, "REM") == 0) {
+            A("    call    pat_rem\n"); return;
+        }
+        if (strcasecmp(fn, "FAIL") == 0) {
+            A("    call    pat_fail\n"); return;
+        }
+        if (strcasecmp(fn, "FENCE") == 0 && e->nchildren == 0) {
+            A("    call    pat_fence\n"); return;
+        }
+        if (strcasecmp(fn, "SUCCEED") == 0) {
+            A("    call    pat_succeed\n"); return;
+        }
+        if (strcasecmp(fn, "ABORT") == 0) {
+            A("    call    pat_abort\n"); return;
+        }
+        if (strcasecmp(fn, "BAL") == 0) {
+            A("    call    pat_bal\n"); return;
+        }
+        /* Functions with one argument: evaluate arg, extract char* or int64 */
+        EXPR_t *arg = (e->nchildren > 0) ? e->children[0] : NULL;
+        if (strcasecmp(fn, "LIT") == 0 || strcasecmp(fn, "SPAN") == 0 ||
+            strcasecmp(fn, "BREAK") == 0 || strcasecmp(fn, "ANY") == 0 ||
+            strcasecmp(fn, "NOTANY") == 0) {
+            /* Evaluate arg as string expression → char* in rdi */
+            if (arg) {
+                emit_expr(arg, -32);
+                A("    mov     rdi, [rbp-32]\n");
+                A("    mov     rsi, [rbp-24]\n");
+                A("    call    stmt_strval\n");  /* → char* in rax */
+                A("    mov     rdi, rax\n");
+            }
+            if      (strcasecmp(fn, "SPAN") == 0)    A("    call    pat_span\n");
+            else if (strcasecmp(fn, "BREAK") == 0)   A("    call    pat_break_\n");
+            else if (strcasecmp(fn, "ANY") == 0)     A("    call    pat_any_cs\n");
+            else if (strcasecmp(fn, "NOTANY") == 0)  A("    call    pat_notany\n");
+            else                                      A("    call    pat_lit\n");
+            return;
+        }
+        if (strcasecmp(fn, "LEN") == 0 || strcasecmp(fn, "POS") == 0 ||
+            strcasecmp(fn, "RPOS") == 0 || strcasecmp(fn, "TAB") == 0 ||
+            strcasecmp(fn, "RTAB") == 0) {
+            /* Evaluate arg as integer → int64 in rdi */
+            if (arg) {
+                emit_expr(arg, -32);
+                A("    mov     rdi, [rbp-32]\n");
+                A("    mov     rsi, [rbp-24]\n");
+                A("    call    stmt_intval\n");   /* → int64 in rax */
+                A("    mov     rdi, rax\n");
+            } else {
+                A("    xor     edi, edi\n");
+            }
+            if      (strcasecmp(fn, "LEN") == 0)   A("    call    pat_len\n");
+            else if (strcasecmp(fn, "POS") == 0)   A("    call    pat_pos\n");
+            else if (strcasecmp(fn, "RPOS") == 0)  A("    call    pat_rpos\n");
+            else if (strcasecmp(fn, "TAB") == 0)   A("    call    pat_tab\n");
+            else                                    A("    call    pat_rtab\n");
+            return;
+        }
+        if (strcasecmp(fn, "ARBNO") == 0 && arg) {
+            emit_pat_to_descr(arg);
+            A("    mov     rdi, rax\n");
+            A("    mov     rsi, rdx\n");
+            A("    call    pat_arbno\n");
+            return;
+        }
+        if (strcasecmp(fn, "FENCE") == 0 && arg) {
+            emit_pat_to_descr(arg);
+            A("    mov     rdi, rax\n");
+            A("    mov     rsi, rdx\n");
+            A("    call    pat_fence_p\n");
+            return;
+        }
+        /* Unknown function in pattern context — evaluate as expression,
+         * result should be DT_P or DT_S (will be handled by stmt_exec_dyn) */
+        emit_expr(e, -32);
+        A("    mov     rax, [rbp-32]\n");
+        A("    mov     rdx, [rbp-24]\n");
+        return;
+    }
+    case E_CAPT_IMM: {
+        /* pat $ var — pat_assign_imm(child_DT_P, var_name_DT_N) */
+        EXPR_t *child = (e->nchildren > 0) ? e->children[0] : NULL;
+        EXPR_t *varnd = (e->nchildren > 1) ? e->children[1] : NULL;
+        if (child) emit_pat_to_descr(child);
+        A("    push    rdx\n");
+        A("    push    rax\n");
+        /* var as DT_N name descriptor */
+        if (varnd && varnd->sval) {
+            const char *vlab = str_intern(varnd->sval);
+            A("    mov     rdi, 9\n");           /* DT_N */
+            A("    lea     rsi, [rel %s]\n", vlab);
+        } else {
+            A("    xor     edi, edi\n");
+            A("    xor     esi, esi\n");
+        }
+        A("    pop     rdx\n");   /* child.lo → arg1.lo wait — need correct order */
+        /* SysV: pat_assign_imm(DESCR_t child, DESCR_t var)
+         * child in rdi:rsi, var in rdx:rcx */
+        /* Redo: child was in rax:rdx before push */
+        /* Actually: push rax(lo) push rdx(hi), var built in rdi:rsi */
+        /* Then: pop rcx(child.hi) pop rdi(child.lo), mov rsi=rcx, rdx=var.lo, rcx=var.hi */
+        /* Simpler: use temp slots */
+        A("    pop     rcx\n");   /* child.hi */
+        /* Now rdi=var.lo(9), rsi=var.ptr, rcx=child.hi, rax not saved... */
+        /* Use [rbp-48/40] temp */
+        /* This needs a cleaner approach — use emit_expr for the whole E_CAPT_IMM */
+        /* Fall through to generic expression eval */
+        emit_expr(e, -32);
+        A("    mov     rax, [rbp-32]\n");
+        A("    mov     rdx, [rbp-24]\n");
+        return;
+    }
+    case E_CAPT_COND: {
+        /* pat . var — pat_assign_cond(child_DT_P, var_name_DT_N) */
+        emit_expr(e, -32);
+        A("    mov     rax, [rbp-32]\n");
+        A("    mov     rdx, [rbp-24]\n");
+        return;
+    }
+    case E_DEFER:
+    case E_INDR: {
+        /* *VAR or $VAR — pat_ref(varname) */
+        EXPR_t *child = (e->nchildren > 0) ? e->children[0] : NULL;
+        if (child && child->sval) {
+            const char *vlab = str_intern(child->sval);
+            A("    lea     rdi, [rel %s]\n", vlab);
+            A("    call    pat_ref\n");
+        } else {
+            A("    call    pat_epsilon\n");
+        }
+        return;
+    }
+    default:
+        /* Fallback: evaluate as expression (handles E_VAR holding DT_P, etc.) */
+        emit_expr(e, -32);
+        A("    mov     rax, [rbp-32]\n");
+        A("    mov     rdx, [rbp-24]\n");
+        return;
+    }
+}
+
 static void emit_program(Program *prog) {
     if (!prog || !prog->head) { emit_null_program(); return; }
 
@@ -4564,6 +4778,14 @@ static void emit_program(Program *prog) {
     A("    extern  stmt_any_var, stmt_notany_var, stmt_any_ptr\n");
     A("    extern  stmt_break_ptr, stmt_span_ptr\n");
     A("    extern  stmt_at_capture\n");
+    /* M-DYN-S1: 5-phase dynamic execution */
+    A("    extern  stmt_exec_dyn\n");
+    A("    extern  pat_lit, pat_cat, pat_alt, pat_span, pat_break_\n");
+    A("    extern  pat_any_cs, pat_notany, pat_len, pat_pos, pat_rpos\n");
+    A("    extern  pat_tab, pat_rtab, pat_arb, pat_arbno, pat_rem\n");
+    A("    extern  pat_fence, pat_fence_p, pat_fail, pat_succeed\n");
+    A("    extern  pat_abort, pat_bal, pat_ref, pat_ref_val\n");
+    A("    extern  pat_assign_imm, pat_assign_cond, pat_epsilon\n");
     A("    extern  kw_anchor\n");
     A("    extern  stmt_aref, stmt_aset, stmt_field_set\n");
     A("    extern  stmt_aref2, stmt_aset2\n");
@@ -5135,190 +5357,82 @@ static void emit_program(Program *prog) {
             continue;
         }
 
-        /* Case 2: pattern-match statement
+        /* Case 2: pattern-match statement — M-DYN-S1
          * subject pattern [= replacement] :S(L)F(L)
          *
-         * Four-port Byrd box execution (Proebsting):
-         *   α = entry, β = resume, γ = succeed, ω = fail
+         * Five-phase execution via stmt_exec_dyn():
+         *   Phase 1: subject name or value
+         *   Phase 2: pattern expr → DT_P via emit_pat_to_descr()
+         *   Phase 3+4+5: inside stmt_exec_dyn
          *
-         *   1. Eval subject → DESCR_t, call stmt_setup_subject()
-         *      (copies string into subject_data[], sets subject_len_val, cursor=0)
-         *   2. jmp pat_N_α  — start the pattern
-         *   3. pat_N_γ:     — match succeeded
-         *      apply replacement (if any), emit_jmp S-target
-         *   4. pat_N_ω:     — match failed
-         *      emit_jmp F-target
-         *
-         * The Byrd box code is emitted inline via emit_pat_node().
+         * stmt_exec_dyn(subj_name, subj_var, pat, repl, has_repl)
+         *   rdi=subj_name  rsi=NULL  rdx=pat.lo  rcx=pat.hi
+         *   r8=repl_ptr    r9=has_repl
+         * Returns 1=:S  0=:F
          */
+        {
+        char dyn_done[64]; snprintf(dyn_done, sizeof dyn_done, "dyn_done_%d", uid);
 
-        /* Greek suffixes: internal Byrd box ports — not exportable as linker symbols.
-         * α=entry β=resume γ=succeed ω=fail  (Proebsting four-port model) */
-        char pat_α[64]; snprintf(pat_α, sizeof pat_α, "P_%d_α", uid);
-        char pat_β[64];  snprintf(pat_β,  sizeof pat_β,  "P_%d_β", uid);
-        char pat_γ[64]; snprintf(pat_γ, sizeof pat_γ, "P_%d_γ", uid);
-        char pat_ω[64]; snprintf(pat_ω, sizeof pat_ω, "P_%d_ω", uid);
+        /* -- Phase 1: subject name (rdi) --
+         * If subject is a named variable → pass its name string.
+         * Otherwise evaluate subject expression and pass by pointer.  */
+        A("    sub     rsp, 48\n");   /* repl slot [rsp+0/8], pat slot [rsp+16/24], subj slot [rsp+32/40] */
 
-        /* -- subject eval -- */
-        emit_expr(s->subject, -16);
-        /* stmt_setup_subject — copies into subject_data[], resets cursor=0.
-         * B-282: returns 1 if subject is FAILDESCR → fail the whole statement. */
-        A("    SUBJ_FROM16\n");
+        int subj_is_var = (s->subject && s->subject->kind == E_VAR && s->subject->sval);
+        if (subj_is_var) {
+            /* rdi = char* variable name */
+            const char *svlab = str_intern(s->subject->sval);
+            A("    lea     rdi, [rel %s]\n", svlab);
+            A("    xor     esi, esi\n");           /* rsi = NULL subj_var */
+        } else {
+            /* Evaluate subject expression → [rsp+32] */
+            emit_expr(s->subject, -16);
+            A("    mov     [rsp+32], rax\n");
+            A("    mov     [rsp+40], rdx\n");
+            A("    xor     edi, edi\n");           /* rdi = NULL subj_name */
+            A("    lea     rsi, [rsp+32]\n");       /* rsi = &subj_val */
+        }
+
+        /* -- Phase 2: pattern eval → DT_P in rax:rdx -- */
+        emit_pat_to_descr(s->pattern);
+        A("    mov     [rsp+16], rax\n");  /* save pat.lo */
+        A("    mov     [rsp+24], rdx\n");  /* save pat.hi */
+
+        /* -- Replacement: evaluate if present → [rsp+0/8] -- */
+        int has_repl = (s->has_eq && s->replacement &&
+                        s->replacement->kind != E_NUL) ? 1 : 0;
+        if (has_repl) {
+            /* Save rdi/rsi across replacement eval */
+            A("    push    rdi\n");
+            A("    push    rsi\n");
+            emit_expr(s->replacement, -16);
+            A("    mov     [rsp+16], rax\n");   /* repl.lo (rsp shifted by 2 pushes) */
+            A("    mov     [rsp+24], rdx\n");   /* repl.hi */
+            A("    pop     rsi\n");
+            A("    pop     rdi\n");
+        }
+
+        /* -- Call stmt_exec_dyn -- */
+        /* rdx:rcx = pat (already saved; reload) */
+        A("    mov     rdx, [rsp+16]\n");   /* pat.lo */
+        A("    mov     rcx, [rsp+24]\n");   /* pat.hi */
+        if (has_repl) {
+            A("    lea     r8, [rsp+0]\n");    /* repl ptr */
+        } else {
+            A("    xor     r8d, r8d\n");        /* NULL repl */
+        }
+        A("    mov     r9d, %d\n", has_repl);
+        /* rdi and rsi already set above */
+        A("    call    stmt_exec_dyn\n");
+        A("    add     rsp, 48\n");
+
+        /* -- Branch on result -- */
         A("    test    eax, eax\n");
-        A("    jnz     %s\n", pat_ω);
-
-        /* Unanchored scan: try pattern at positions 0..subject_len.
-         * scan_start_N tracks the current attempt start position.
-         * On ω: if scan_start < subject_len, advance and retry α.
-         * On γ: match succeeded from scan_start_N. */
-        char scan_start[64]; snprintf(scan_start, sizeof scan_start, "scan_start_%d", uid);
-        char scan_retry[64]; snprintf(scan_retry, sizeof scan_retry, "scan_retry_%d", uid);
-        /* Route scan_start and all pattern sub-node slots into per-box DATA when
-         * inside a user function body — they must be pre-registered in Pass 3
-         * under the same box context, otherwise var_register here is a no-op
-         * (bss section already emitted). */
-        if (cur_fn) box_ctx_begin(cur_fn->safe);
-        var_register(scan_start);
-        /* reset scan_start to 0 (subject_data cursor already 0 from SUBJ_FROM16) */
-        A("    mov     qword [%s], 0\n", scan_start);
-
-        /* -- scan retry entry: set cursor = scan_start, then try pattern -- */
-        A("%s:\n", scan_retry);
-        A("    mov     rax, [%s]\n", scan_start);
-        A("    mov     [cursor], rax\n");
-        A("    jmp     %s\n", pat_α);
-
-        /* -- Byrd box inline: α/β → γ/ω -- */
-        A("\n");
-        /* Collect capture varnames reachable from THIS statement's pattern —
-         * including captures inside named patterns called by this stmt.
-         * cap_vars[] is global (dry-run pre-registered all stmts + named bodies).
-         * We must not emit SET_CAPTURE for caps that belong to OTHER stmts' inline
-         * patterns but were never touched by this match. */
-        #define MAX_STMT_CAPS 64
-        const char *stmt_cap_names[MAX_STMT_CAPS];
-        int stmt_cap_count = 0;
-        {
-            /* Track which named-pattern indices we've already walked (cycle guard) */
-            int np_visited[128] = {0};
-            /* Iterative tree walk collecting E_CAPT_IMM / E_CAPT_COND right-child varnames.
-             * When we see E_VAR/E_INDR that refers to a named pattern, recurse
-             * into that named pattern's body too. */
-            EXPR_t *stk[512]; int top = 0;
-            if (s->pattern) stk[top++] = s->pattern;
-            while (top > 0) {
-                EXPR_t *e = stk[--top];
-                if (!e) continue;
-                if ((e->kind == E_CAPT_IMM || e->kind == E_CAPT_COND) &&
-                    e->children[1] && e->children[1]->sval &&
-                    stmt_cap_count < MAX_STMT_CAPS)
-                    stmt_cap_names[stmt_cap_count++] = e->children[1]->sval;
-                /* Follow named pattern references */
-                if (e->kind == E_VAR || e->kind == E_INDR) {
-                    const char *vn = e->sval ? e->sval
-                                   : (e->children[0] && e->children[0]->sval ? e->children[0]->sval : NULL);
-                    if (vn) {
-                        for (int ni = 0; ni < named_pat_count; ni++) {
-                            if (!np_visited[ni] && ni < 128 &&
-                                strcasecmp(named_pats[ni].varname, vn) == 0) {
-                                np_visited[ni] = 1;
-                                if (named_pats[ni].pat && top < 510)
-                                    stk[top++] = named_pats[ni].pat;
-                                break;
-                            }
-                        }
-                    }
-                }
-                for (int _i = 0; _i < e->nchildren && top < 510; _i++)
-                    if (e->children[_i]) stk[top++] = e->children[_i];
-            }
-        }
-        emit_pat_node(s->pattern,
-                      pat_α, pat_β,
-                      pat_γ, pat_ω,
-                      "cursor", "subject_data", "subject_len_val",
-                      0 /* depth */);
-        if (cur_fn) box_ctx_end();
-        A("\n");
-
-        /* -- γ: match succeeded -- */
-        asmL(pat_γ);
-        /* For ? stmts (no replacement): advance scan_start BEFORE SET_CAPTURE.
-         * SET_CAPTURE calls stmt_set_capture (C ABI), trashing rax.
-         * [cursor] memory is safe across the call, but we save it early to
-         * keep the advance adjacent to the match point and avoid confusion. */
-        if (!s->has_eq) {
-            A("    mov     rax, [cursor]\n");
-            A("    mov     [%s], rax\n", scan_start);
-        }
-        /* Materialise DOL/NAM captures — only those reachable from this stmt. */
-        for (int ci = 0; ci < cap_var_count; ci++) {
-            int found = 0;
-            for (int si = 0; si < stmt_cap_count; si++)
-                if (strcasecmp(cap_vars[ci].varname, stmt_cap_names[si]) == 0)
-                    { found = 1; break; }
-            if (!found) continue;
-            const char *vnlab = str_intern(cap_vars[ci].varname);
-            A("    SET_CAPTURE %s, %s, %s\n",
-              vnlab, cap_vars[ci].buf_sym, cap_vars[ci].len_sym);
-        }
-        #undef MAX_STMT_CAPS
-        if (s->has_eq && s->subject && s->subject->kind == E_VAR) {
-            /* apply replacement → subject variable (splice: prefix+repl+suffix) */
-            const char *vlab = str_intern(s->subject->sval);
-            if (!s->replacement || s->replacement->kind == E_NUL) {
-                /* null replacement: delete matched span — emit NULVCL */
-                A("    mov     qword [rbp-32], 1\n"); /* DT_SNUL */
-                A("    mov     qword [rbp-24], 0\n");
-            } else {
-                emit_expr(s->replacement, -32);
-            }
-            A("    APPLY_REPL_SPLICE  %s, %s\n", vlab, scan_start);
-        }
-        emit_jmp(tgt_s ? tgt_s : tgt_u, next_lbl);
-
-        /* -- ω: match failed at this scan_start position --
-         * When scan_fail_tgt is RETURN/FRETURN inside a user function, the
-         * conditional branches need a plain label — emit a local trampoline
-         * that routes through fn_NAME_γ/ω for frame teardown. */
-        asmL(pat_ω);
-        {
-            const char *scan_fail_tgt = tgt_f ? tgt_f : tgt_u;
-            const char *scan_fail;
-            char tramp[LBUF];
-            int need_tramp = (cur_fn && scan_fail_tgt
-                              && is_special_goto(scan_fail_tgt)
-                              && strcasecmp(scan_fail_tgt,"END") != 0);
-            if (need_tramp) {
-                static int tramp_uid = 0;
-                snprintf(tramp, sizeof tramp, "scan_fail_tramp_%d", tramp_uid++);
-                scan_fail = tramp;
-            } else if (scan_fail_tgt && is_special_goto(scan_fail_tgt)) {
-                /* Special goto at top level (e.g. END outside a function):
-                 * label_nasm() can't resolve it — use the known ASM label directly. */
-                if (strcasecmp(scan_fail_tgt, "END") == 0)
-                    scan_fail = "L_SNO_END";
-                else {
-                    /* RETURN/FRETURN outside a function — treat as END */
-                    scan_fail = "L_SNO_END";
-                }
-            } else {
-                scan_fail = scan_fail_tgt ? label_nasm(scan_fail_tgt) : next_lbl;
-            }
-            A("    cmp     qword [rel kw_anchor], 0\n");
-            A("    jne     %s\n", scan_fail);
-            A("    mov     rax, [%s]\n", scan_start);
-            A("    inc     rax\n");
-            A("    cmp     rax, [subject_len_val]\n");
-            A("    jg      %s\n", scan_fail);
-            A("    mov     [%s], rax\n", scan_start);
-            A("    jmp     %s\n", scan_retry);
-            if (need_tramp) {
-                A("%s:\n", tramp);
-                emit_jmp(scan_fail_tgt, next_lbl);
-            }
-        }
+        A("    jnz     %s\n", dyn_done);
         emit_jmp(tgt_f ? tgt_f : tgt_u, next_lbl);
+        A("%s:\n", dyn_done);
+        emit_jmp(tgt_s ? tgt_s : tgt_u, next_lbl);
+        }   /* end Case 2 */
 
         asmL(next_lbl);
     }

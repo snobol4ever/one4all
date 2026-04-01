@@ -110,7 +110,7 @@ echo -e "${BOLD}START   $START_HUMAN  run_invariants.sh${RESET}"
 ensure_sno4_archive() {
   local out="$RT_CACHE/libsno4rt_asm.a"
   local stamp_file="$RT_CACHE/stamp"
-  local cur_stamp; cur_stamp=$(md5sum "$RT/asm/snobol4_stmt_rt.c" 2>/dev/null | cut -d' ' -f1 || echo "x")
+  local cur_stamp; cur_stamp=$(md5sum "$RT/asm/snobol4_stmt_rt.c" "$RT/dyn/stmt_exec.c" "$RT/dyn/bb_lit.c" 2>/dev/null | md5sum | cut -d' ' -f1 || echo "x")
   if [[ -f "$out" && -f "$stamp_file" && "$(cat "$stamp_file" 2>/dev/null)" == "$cur_stamp" ]]; then
     return 0  # cache hit
   fi
@@ -123,7 +123,23 @@ ensure_sno4_archive() {
   gcc -O2 -c "$RT/mock/mock_engine.c"         -I"$RT/snobol4" -I"$RT" -I"$SCRIP_CC_INC" -w -o /tmp/rtbuild_sno_$$/mock_eng.o   || return 1
   gcc -O2 -c "$RT/asm/blk_alloc.c"            -I"$RT/asm"                               -w -o /tmp/rtbuild_sno_$$/blk_alloc.o  || return 1
   gcc -O2 -c "$RT/asm/blk_reloc.c"            -I"$RT/asm"                               -w -o /tmp/rtbuild_sno_$$/blk_reloc.o  || return 1
+  # M-DYN-S1: 5-phase dynamic executor and Byrd box C layer
+  local DYN="$RT/dyn"
+  local DYNFLAGS="-I$DYN -I$RT/snobol4 -I$RT -I$SCRIP_CC_INC -DDYN_ENGINE_LINKED"
+  gcc -O2 -c "$DYN/bb_lit.c"    $DYNFLAGS -w -o /tmp/rtbuild_sno_$$/bb_lit.o    || return 1
+  gcc -O2 -c "$DYN/bb_alt.c"    $DYNFLAGS -w -o /tmp/rtbuild_sno_$$/bb_alt.o    || return 1
+  gcc -O2 -c "$DYN/bb_seq.c"    $DYNFLAGS -w -o /tmp/rtbuild_sno_$$/bb_seq.o    || return 1
+  gcc -O2 -c "$DYN/bb_arbno.c"  $DYNFLAGS -w -o /tmp/rtbuild_sno_$$/bb_arbno.o  || return 1
+  gcc -O2 -c "$DYN/bb_pos.c"    $DYNFLAGS -w -o /tmp/rtbuild_sno_$$/bb_pos.o    || return 1
+  gcc -O2 -c "$DYN/bb_tab.c"    $DYNFLAGS -w -o /tmp/rtbuild_sno_$$/bb_tab.o    || return 1
+  gcc -O2 -c "$DYN/bb_fence.c"  $DYNFLAGS -w -o /tmp/rtbuild_sno_$$/bb_fence.o  || return 1
+  gcc -O2 -c "$DYN/stmt_exec.c" $DYNFLAGS -w -o /tmp/rtbuild_sno_$$/stmt_exec.o || return 1
+  gcc -O2 -c "$DYN/eval_code.c" $DYNFLAGS \
+      -I"$ROOT/src/frontend/snobol4" -I"$ROOT/src/ir" -I"$ROOT/src" \
+      -w -o /tmp/rtbuild_sno_$$/eval_code.o || return 1
   ar rcs "$out" /tmp/rtbuild_sno_$$/*.o
+  # Note: eval_code.c is NOT in the archive — it requires the frontend parser
+  # (parse_expr_from_str, snoc_parse) and must be linked separately when needed.
   echo "$cur_stamp" > "$stamp_file"
   rm -rf /tmp/rtbuild_sno_$$
   echo -e "${GREEN}  [cache] libsno4rt_asm.a ready${RESET}"
