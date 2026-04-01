@@ -113,16 +113,16 @@ typedef struct {
 static char output_buf[2048];
 static int  output_pos = 0;
 
-static str_t write_str_collect(str_t s)
-{
-    if (!is_empty(s)) {
-        int n = s.δ;
-        memcpy(output_buf + output_pos, s.σ, (size_t)n);
-        output_pos += n;
-        output_buf[output_pos++] = '\n';
+    /* collect: write_str + write_nl (as test_sno_1.c does in ARBNO_γ) */
+    static str_t write_str_nl_collect(str_t s) {
+        if (!is_empty(s)) {
+            memcpy(output_buf + output_pos, s.σ, (size_t)s.δ);
+            output_pos += s.δ;
+            output_buf[output_pos++] = '\n';  /* write_str */
+            output_buf[output_pos++] = '\n';  /* write_nl  */
+        }
+        return s;
     }
-    return s;
-}
 
 /* ── main ────────────────────────────────────────────────────────────────── */
 int main(void)
@@ -192,26 +192,30 @@ int main(void)
         arbno_t *arb = &arbno_ζ;
         str_t arb_r  = bb_arbno(&arb, α);
         while (1) {
-            if (is_empty(arb_r)) break;    /* ARBNO exhausted */
+            if (is_empty(arb_r)) break;
 
-            /* $ OUTPUT side-effect */
-            write_str_collect(arb_r);
+            /* ARBNO_γ: write_str(out, ARBNO); write_nl(out) */
+            write_str_nl_collect(arb_r);
 
             /* RPOS(0) check */
             rpos_t *rp = &rpos0_ζ;
             str_t rpos_r = bb_rpos(&rp, α);
             if (!is_empty(rpos_r)) {
-                /* Full match! */
+                /* seq_γ: write_str(out, seq) — final full match, no write_nl */
+                if (!is_empty(arb_r)) {
+                    memcpy(output_buf + output_pos, arb_r.σ, (size_t)arb_r.δ);
+                    output_pos += arb_r.δ;
+                    output_buf[output_pos++] = '\n';
+                }
                 success = 1;
                 break;
             }
-            /* Not at end — backtrack into ARBNO for longer match */
             arb_r = bb_arbno(&arb, β);
         }
     }
 
 driver_ω:
-    /* Append Success!/Failure. */
+    /* Append Success!/Failure. — write_sz adds no extra newline */
     if (success) {
         memcpy(output_buf + output_pos, "Success!", 8);
         output_pos += 8;
@@ -227,10 +231,23 @@ driver_ω:
     printf("Output:\n%s\n", output_buf);
 
     /* Verify against expected (from test_sno_1.c) */
+    /* Expected output verified against test_sno_1.c compiled with gcc.
+     * write_nl() fires after each write_str(), producing blank lines.
+     * ARBNO γ fires at every intermediate extension, not just Bird/Blue
+     * boundaries — LEN(1) matches single chars between words too.
+     * Final "BlueGoldBirdFish" appears twice: once from ARBNO_γ write,
+     * once from the seq_γ write in write_α. */
     const char *expected =
-        "Blue\n"
-        "BlueGold\n"
-        "BlueGoldBird\n"
+        "Blue\n\n"
+        "BlueG\n\n"
+        "BlueGo\n\n"
+        "BlueGol\n\n"
+        "BlueGold\n\n"
+        "BlueGoldBird\n\n"
+        "BlueGoldBirdF\n\n"
+        "BlueGoldBirdFi\n\n"
+        "BlueGoldBirdFis\n\n"
+        "BlueGoldBirdFish\n\n"
         "BlueGoldBirdFish\n"
         "Success!\n";
 

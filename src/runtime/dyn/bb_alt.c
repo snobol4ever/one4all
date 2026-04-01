@@ -2,51 +2,43 @@
  * bb_alt.c — ALT (alternation) Byrd Box (M-DYN-2)
  *
  * ALT(left, right): try left; if it fails, restore cursor and try right.
- * On backtrack (β): retry whichever child last succeeded.
+ * On backtrack (β): ask the child that succeeded to undo — if it can't, ALT ω's.
  *
- * Pattern:  'Bird' | 'Blue' | LEN(1)
- * SNOBOL4:  P1 | P2 | P3
+ * THE KEY RULE (from test_sno_1.c §alt_β):
+ *   ALT_β dispatches ONLY to the same child that last succeeded, asking it to β.
+ *   If that child ω's, ALT ω's. Period.
+ *   ALT_β NEVER advances to the next alternative — that is ARBNO's job.
+ *   "Try next alternative" happens only at ALT_α via the child_ω → alt_i++ path.
  *
- * Three-column layout — canonical form from test_sno_1.c §alt:
+ * Three-column layout:
  *
  *     LABEL:              ACTION                          GOTO
  *     ─────────────────────────────────────────────────────────
- *     alt_α:              ζ->alt_i = 1; (save cursor)    → left_α
- *     alt_β:              dispatch on ζ->alt_i           → left_β / right_β / ...
- *
- *     left_γ:             ζ->alt = left_result;          → alt_γ
- *     left_ω:             ζ->alt_i++; restore cursor;    → right_α
- *     right_γ:            ζ->alt = right_result;         → alt_γ
- *     right_ω:                                           → alt_ω
- *
- *     alt_γ:              return ζ->alt;
- *     alt_ω:              return empty;
- *
- * This supports exactly N alternatives (N=2 shown, generalises to N).
- * State ζ holds: saved cursor, alt_i (which branch is live), result.
- *
- * For the dynamic model: alt_t holds pointers to N child boxes.
- * Each child is called as child->fn(&child->ζ, α) or β.
+ *     ALT_α:              saved_Δ=Δ; alt_i=1;            → child[0]_α
+ *     ALT_β:              child[alt_i-1] β               → child_β_γ / ALT_ω
+ *     child_α_γ:          result=child_result;           → ALT_γ
+ *     child_α_ω:          alt_i++; Δ=saved_Δ;           → child[alt_i-1]_α / ALT_ω
+ *     child_β_γ:          result=child_result;           → ALT_γ
+ *     ALT_γ:              return result;
+ *     ALT_ω:              return empty;
  */
 
 #include "bb_box.h"
 #include <stdlib.h>
 
-/* ── child box reference ─────────────────────────────────────────────────── */
-typedef struct bb_child {
-    bb_box_fn  fn;     /* box function */
-    void      *ζ;      /* box state (allocated by box on α entry) */
-} bb_child_t;
-
-/* ── alt box state ───────────────────────────────────────────────────────── */
-#define BB_ALT_MAX 16   /* max alternatives in one ALT node */
+#define BB_ALT_MAX 16
 
 typedef struct {
-    int        n;                   /* number of alternatives */
-    bb_child_t children[BB_ALT_MAX];/* child boxes */
-    int        alt_i;               /* which child is currently live (1-based) */
-    int        saved_Δ;             /* cursor saved at α entry */
-    str_t      result;              /* result from whichever child succeeded */
+    bb_box_fn  fn;
+    void      *ζ;
+} bb_child_t;
+
+typedef struct {
+    int        n;
+    bb_child_t children[BB_ALT_MAX];
+    int        alt_i;       /* which child is currently live (1-based) */
+    int        saved_Δ;     /* cursor at ALT_α entry */
+    str_t      result;
 } alt_t;
 
 /* ── bb_alt ──────────────────────────────────────────────────────────────── */
@@ -58,31 +50,32 @@ str_t bb_alt(alt_t **ζζ, int entry)
     if (entry == β)                                     goto ALT_β;
 
     /*------------------------------------------------------------------------*/
-    str_t         ALT;
     str_t         child_result;
 
     ALT_α:        ζ->saved_Δ = Δ;
                   ζ->alt_i   = 1;
                   child_result = ζ->children[0].fn(&ζ->children[0].ζ, α);
-                  if (is_empty(child_result))           goto child_ω;
-                  else                                  goto child_γ;
+                  if (is_empty(child_result))           goto child_α_ω;
+                  else                                  goto child_α_γ;
 
-    ALT_β:        /* retry: backtrack into the child that last succeeded */
+    ALT_β:        /* ask the child that last succeeded to undo — never try next */
                   child_result = ζ->children[ζ->alt_i-1].fn(
                                      &ζ->children[ζ->alt_i-1].ζ, β);
-                  if (is_empty(child_result))           goto child_ω;
-                  else                                  goto child_γ;
+                  if (is_empty(child_result))           goto ALT_ω;
+                  else                                  goto child_β_γ;
 
-    child_γ:      ζ->result = child_result;             goto ALT_γ;
+    child_α_γ:    ζ->result = child_result;             goto ALT_γ;
 
-    child_ω:      /* this child exhausted — try next, or fail */
+    child_α_ω:    /* current child exhausted on α path — try next alternative */
                   ζ->alt_i++;
                   if (ζ->alt_i > ζ->n)                 goto ALT_ω;
-                  Δ = ζ->saved_Δ;   /* restore cursor before trying next */
+                  Δ = ζ->saved_Δ;
                   child_result = ζ->children[ζ->alt_i-1].fn(
                                      &ζ->children[ζ->alt_i-1].ζ, α);
-                  if (is_empty(child_result))           goto child_ω;
-                  else                                  goto child_γ;
+                  if (is_empty(child_result))           goto child_α_ω;
+                  else                                  goto child_α_γ;
+
+    child_β_γ:    ζ->result = child_result;             goto ALT_γ;
 
     /*------------------------------------------------------------------------*/
     ALT_γ:        return ζ->result;
