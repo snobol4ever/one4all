@@ -649,7 +649,7 @@ run_snocone_x86() {
   if [[ ! -f "$SC_RUNNER" ]]; then
     echo "SKIP" > "$RESULTS/${cell}_status"; return
   fi
-  local DIRS="rungA01 rungA02 rungA03 rungA04 rungA05 rungA06 rungA07 rungA08 rungA09 rungA10 rungA11 rungA12 rungA13 rungA14 rungA15 rungA16 rungB01 rungB02 rungB03 rungB04 rungB05 rungB06 rungB07 rungB08 rungB09 rungB10"
+  local DIRS="rungA01 rungA02 rungA03 rungA04 rungA05 rungA06 rungA07 rungA08 rungA09 rungA10 rungA11 rungA12 rungA13 rungA14 rungA15 rungA16 rungB01 rungB02 rungB03 rungB04 rungB05 rungB06 rungB07 rungB08 rungB09 rungB10 rungB11 rungB12"
   local dir_args=()
   for d in $DIRS; do
     local full="$CORPUS/crosscheck/snocone/$d"
