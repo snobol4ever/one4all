@@ -134,9 +134,8 @@ ensure_sno4_archive() {
   gcc -O2 -c "$DYN/bb_tab.c"    $DYNFLAGS -w -o /tmp/rtbuild_sno_$$/bb_tab.o    || return 1
   gcc -O2 -c "$DYN/bb_fence.c"  $DYNFLAGS -w -o /tmp/rtbuild_sno_$$/bb_fence.o  || return 1
   gcc -O2 -c "$DYN/stmt_exec.c" $DYNFLAGS -w -o /tmp/rtbuild_sno_$$/stmt_exec.o || return 1
-  gcc -O2 -c "$DYN/eval_code.c" $DYNFLAGS \
-      -I"$ROOT/src/frontend/snobol4" -I"$ROOT/src/ir" -I"$ROOT/src" \
-      -w -o /tmp/rtbuild_sno_$$/eval_code.o || return 1
+  # eval_code.c NOT compiled into archive: requires parse_expr_from_str + snoc_parse
+  # (frontend symbols). Link separately for CODE/EVAL tests. M-DYN-S1 fix.
   ar rcs "$out" /tmp/rtbuild_sno_$$/*.o
   # Note: eval_code.c is NOT in the archive — it requires the frontend parser
   # (parse_expr_from_str, snoc_parse) and must be linked separately when needed.

@@ -4374,12 +4374,13 @@ static void emit_pat_to_descr(EXPR_t *e) {
         if (strcasecmp(fn, "LIT") == 0 || strcasecmp(fn, "SPAN") == 0 ||
             strcasecmp(fn, "BREAK") == 0 || strcasecmp(fn, "ANY") == 0 ||
             strcasecmp(fn, "NOTANY") == 0) {
-            /* Evaluate arg as string expression → char* in rdi */
+            /* Evaluate arg → DESCR_t at [rbp-32/24], then VARVAL_fn(DESCR_t) → char* */
             if (arg) {
                 emit_expr(arg, -32);
+                /* VARVAL_fn(DESCR_t v) takes v in rdi:rsi, returns char* in rax */
                 A("    mov     rdi, [rbp-32]\n");
                 A("    mov     rsi, [rbp-24]\n");
-                A("    call    stmt_strval\n");  /* → char* in rax */
+                A("    call    VARVAL_fn\n");    /* → char* in rax */
                 A("    mov     rdi, rax\n");
             }
             if      (strcasecmp(fn, "SPAN") == 0)    A("    call    pat_span\n");
@@ -4395,9 +4396,10 @@ static void emit_pat_to_descr(EXPR_t *e) {
             /* Evaluate arg as integer → int64 in rdi */
             if (arg) {
                 emit_expr(arg, -32);
+                /* to_int(DESCR_t v) takes v in rdi:rsi, returns int64 in rax */
                 A("    mov     rdi, [rbp-32]\n");
                 A("    mov     rsi, [rbp-24]\n");
-                A("    call    stmt_intval\n");   /* → int64 in rax */
+                A("    call    to_int\n");        /* → int64 in rax */
                 A("    mov     rdi, rax\n");
             } else {
                 A("    xor     edi, edi\n");
@@ -4431,43 +4433,50 @@ static void emit_pat_to_descr(EXPR_t *e) {
         return;
     }
     case E_CAPT_IMM: {
-        /* pat $ var — pat_assign_imm(child_DT_P, var_name_DT_N) */
+        /* pat $ var — pat_assign_imm(child_DT_P, var_name_DT_N)
+         * SysV: pat_assign_imm(DESCR_t child, DESCR_t var)
+         *   child → rdi:rsi (lo:hi),  var → rdx:rcx (lo:hi)
+         * var is DT_N: lo=9, hi=char* varname */
         EXPR_t *child = (e->nchildren > 0) ? e->children[0] : NULL;
         EXPR_t *varnd = (e->nchildren > 1) ? e->children[1] : NULL;
+        /* build child DT_P → rax:rdx */
         if (child) emit_pat_to_descr(child);
-        A("    push    rdx\n");
-        A("    push    rax\n");
-        /* var as DT_N name descriptor */
+        /* child result: rax=lo, rdx=hi. Push hi first so pop rdi=lo, pop rsi=hi */
+        A("    push    rdx\n");   /* child.hi — popped into rsi */
+        A("    push    rax\n");   /* child.lo — popped into rdi */
+        /* build var descriptor: DT_S(1) + varname char* in rcx
+         * stmt_exec.c checks p->var.v == DT_S to extract varname */
         if (varnd && varnd->sval) {
             const char *vlab = str_intern(varnd->sval);
-            A("    mov     rdi, 9\n");           /* DT_N */
-            A("    lea     rsi, [rel %s]\n", vlab);
+            A("    mov     rdx, 1\n");             /* DT_S */
+            A("    lea     rcx, [rel %s]\n", vlab); /* varname ptr */
         } else {
-            A("    xor     edi, edi\n");
-            A("    xor     esi, esi\n");
+            A("    xor     edx, edx\n");
+            A("    xor     ecx, ecx\n");
         }
-        A("    pop     rdx\n");   /* child.lo → arg1.lo wait — need correct order */
-        /* SysV: pat_assign_imm(DESCR_t child, DESCR_t var)
-         * child in rdi:rsi, var in rdx:rcx */
-        /* Redo: child was in rax:rdx before push */
-        /* Actually: push rax(lo) push rdx(hi), var built in rdi:rsi */
-        /* Then: pop rcx(child.hi) pop rdi(child.lo), mov rsi=rcx, rdx=var.lo, rcx=var.hi */
-        /* Simpler: use temp slots */
-        A("    pop     rcx\n");   /* child.hi */
-        /* Now rdi=var.lo(9), rsi=var.ptr, rcx=child.hi, rax not saved... */
-        /* Use [rbp-48/40] temp */
-        /* This needs a cleaner approach — use emit_expr for the whole E_CAPT_IMM */
-        /* Fall through to generic expression eval */
-        emit_expr(e, -32);
-        A("    mov     rax, [rbp-32]\n");
-        A("    mov     rdx, [rbp-24]\n");
+        A("    pop     rdi\n");   /* child.lo */
+        A("    pop     rsi\n");   /* child.hi */
+        A("    call    pat_assign_imm\n");
         return;
     }
     case E_CAPT_COND: {
-        /* pat . var — pat_assign_cond(child_DT_P, var_name_DT_N) */
-        emit_expr(e, -32);
-        A("    mov     rax, [rbp-32]\n");
-        A("    mov     rdx, [rbp-24]\n");
+        /* pat . var — pat_assign_cond(child_DT_P, var_name_DT_S) — same ABI */
+        EXPR_t *child = (e->nchildren > 0) ? e->children[0] : NULL;
+        EXPR_t *varnd = (e->nchildren > 1) ? e->children[1] : NULL;
+        if (child) emit_pat_to_descr(child);
+        A("    push    rdx\n");   /* child.hi */
+        A("    push    rax\n");   /* child.lo */
+        if (varnd && varnd->sval) {
+            const char *vlab = str_intern(varnd->sval);
+            A("    mov     rdx, 1\n");             /* DT_S */
+            A("    lea     rcx, [rel %s]\n", vlab);
+        } else {
+            A("    xor     edx, edx\n");
+            A("    xor     ecx, ecx\n");
+        }
+        A("    pop     rdi\n");   /* child.lo */
+        A("    pop     rsi\n");   /* child.hi */
+        A("    call    pat_assign_cond\n");
         return;
     }
     case E_DEFER:
@@ -4762,6 +4771,7 @@ static void emit_program(Program *prog) {
     A("%%include \"snobol4_asm.mac\"\n");
     A("    global  main\n");
     A("    extern  stmt_init, stmt_strval, stmt_intval\n");
+    A("    extern  VARVAL_fn, to_int\n");
     A("    extern  stmt_realval, stmt_set_null, stmt_set_indirect, stmt_get_indirect, stmt_nreturn_deref\n");
     A("    extern  stmt_get, stmt_set, stmt_output, stmt_input\n");
     A("    extern  stmt_concat, stmt_is_fail, stmt_finish\n");
@@ -5393,10 +5403,17 @@ static void emit_program(Program *prog) {
             A("    lea     rsi, [rsp+32]\n");       /* rsi = &subj_val */
         }
 
-        /* -- Phase 2: pattern eval → DT_P in rax:rdx -- */
+        /* -- Phase 2: pattern eval → DT_P in rax:rdx --
+         * emit_pat_to_descr calls pat_lit/pat_span/etc which use rdi as their
+         * char* argument, clobbering the subject name loaded in Phase 1.
+         * Save rdi/rsi to the subject stack slot before pat build, restore after. */
+        A("    mov     [rsp+32], rdi\n");  /* save subj_name across pat build */
+        A("    mov     [rsp+40], rsi\n");  /* save subj_var  across pat build */
         emit_pat_to_descr(s->pattern);
         A("    mov     [rsp+16], rax\n");  /* save pat.lo */
         A("    mov     [rsp+24], rdx\n");  /* save pat.hi */
+        A("    mov     rdi, [rsp+32]\n");  /* restore subj_name */
+        A("    mov     rsi, [rsp+40]\n");  /* restore subj_var  */
 
         /* -- Replacement: evaluate if present → [rsp+0/8] -- */
         int has_repl = (s->has_eq && s->replacement &&
