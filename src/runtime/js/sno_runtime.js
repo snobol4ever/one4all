@@ -186,53 +186,56 @@ function _apply(name, args) {
 const _user_fns = {};
 
 /* -----------------------------------------------------------------------
- * Pattern matching — simple substring match for M-SJ-A01
- * Full Byrd-box dispatch in M-SJ-A02+
+ * Pattern matching — sno_engine.js (SJ-5, M-SJ-B01)
  * ----------------------------------------------------------------------- */
 
+const _engine = require(process.env.SNO_ENGINE ||
+    require('path').join(__dirname, 'sno_engine.js'));
+
+/* Inject vars hook so CAPT_IMM/CAPT_COND can write to _vars */
+_engine._set_vars_hook((v, text) => { _vars[v] = text; });
+
 /**
- * _match(subject, pattern) → true/false
- * pattern may be a string (literal) or a pattern descriptor object.
- * For M-SJ-A01: string patterns only.
+ * _match(subject, pat_node) → {matched,start,end} | null
+ * pat_node is a pattern tree built by PAT_* helpers (or a string literal).
+ * Used by pattern-match statements emitted by emit_js.c.
  */
-function _match(subject, pattern) {
-    if (pattern === null || pattern === undefined || pattern === _FAIL) return false;
-    if (typeof pattern === 'string') {
-        return subject.includes(pattern);
-    }
-    /* future: pattern object with .type / Byrd-box dispatch */
-    return false;
+function _match(subject, pat_node) {
+    if (pat_node === null || pat_node === undefined || pat_node === _FAIL)
+        return null;
+    return _engine.sno_search(_str(subject), pat_node);
 }
 
 /**
- * _replace(subject, replacement) → new string
- * For M-SJ-A01: replace first occurrence matched by _match.
- * Full implementation deferred to M-SJ-A02.
+ * _match_anchored(subject, pat_node) → {matched,start,end} | null
+ * Anchored at position 0 (for &ANCHOR / POS(0) patterns).
  */
-function _replace(subject, replacement) {
-    /* stub — returns subject with replacement appended */
-    return _str(replacement);
+function _match_anchored(subject, pat_node) {
+    if (pat_node === null || pat_node === undefined || pat_node === _FAIL)
+        return null;
+    return _engine.sno_match(_str(subject), pat_node);
 }
 
 /* -----------------------------------------------------------------------
  * Exports
  * ----------------------------------------------------------------------- */
 
+/* Re-export PAT_* builders so emitted code can use them */
+const {
+    PAT_lit, PAT_alt, PAT_seq, PAT_any, PAT_notany,
+    PAT_span, PAT_break, PAT_arb, PAT_rem,
+    PAT_len, PAT_pos, PAT_rpos, PAT_tab, PAT_rtab,
+    PAT_fence, PAT_succeed, PAT_fail, PAT_abort, PAT_bal,
+    PAT_arbno, PAT_capt_imm, PAT_capt_cond,
+} = _engine;
+
 module.exports = {
-    _vars,
-    _FAIL,
-    _is_fail,
-    _str,
-    _num,
-    _cat,
-    _add,
-    _sub,
-    _mul,
-    _div,
-    _pow,
-    _apply,
-    _kw,
-    _match,
-    _replace,
-    _user_fns,
+    _vars, _FAIL, _is_fail, _str, _num, _cat,
+    _add, _sub, _mul, _div, _pow, _apply, _kw,
+    _match, _match_anchored, _user_fns,
+    PAT_lit, PAT_alt, PAT_seq, PAT_any, PAT_notany,
+    PAT_span, PAT_break, PAT_arb, PAT_rem,
+    PAT_len, PAT_pos, PAT_rpos, PAT_tab, PAT_rtab,
+    PAT_fence, PAT_succeed, PAT_fail, PAT_abort, PAT_bal,
+    PAT_arbno, PAT_capt_imm, PAT_capt_cond,
 };
