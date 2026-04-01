@@ -382,7 +382,7 @@ typedef struct {
 /* forward declaration for recursion */
 static bb_node_t bb_build(_PND_t *p);
 
-/* forward-declared box functions (defined in dyn/*.c, linked separately) */
+/* forward-declared box functions (defined in dyn/ box files, linked separately) */
 extern spec_t bb_lit   (void **ζζ, int entry);
 extern spec_t bb_alt   (void **ζζ, int entry);
 extern spec_t bb_seq   (void **ζζ, int entry);
@@ -391,7 +391,7 @@ extern spec_t bb_pos   (void **ζζ, int entry);
 extern spec_t bb_rpos  (void **ζζ, int entry);
 
 /* lit_t / alt_t / seq_t / arbno_t / pos_t / rpos_t layouts
- * (mirror the structs in dyn/*.c — must match exactly) */
+ * mirror the structs in the dyn/ box files exactly */
 typedef struct { const char *lit; int len; }   _lit_t;
 typedef struct { int n; }                       _pos_t;
 typedef struct { int n; }                       _rpos_t;

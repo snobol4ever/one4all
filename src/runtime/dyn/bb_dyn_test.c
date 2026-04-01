@@ -43,7 +43,7 @@ typedef struct { int dummy; } len1_t;
 
 spec_t bb_len1(len1_t **ζζ, int entry)
 {
-    len1_t *ζ = *ζζ;
+    len1_t *ζ = *ζζ; (void)ζ;
     if (entry == α)                                     goto LEN1_α;
     if (entry == β)                                     goto LEN1_β;
 
@@ -184,13 +184,13 @@ int main(void)
 
     /* POS(0) */
     pos_t *pos0 = &pos0_ζ;
-    spec_t pos_r = bb_pos(&pos0, α);
+    spec_t pos_r = bb_pos((void **)&pos0, α);
     if (spec_is_empty(pos_r)) goto driver_ω;
 
     /* ARBNO loop: collect each γ, then check RPOS(0) */
     {
         arbno_t *arb = &arbno_ζ;
-        spec_t arb_r  = bb_arbno(&arb, α);
+        spec_t arb_r  = bb_arbno((void **)&arb, α);
         while (1) {
             if (spec_is_empty(arb_r)) break;
 
@@ -199,7 +199,7 @@ int main(void)
 
             /* RPOS(0) check */
             rpos_t *rp = &rpos0_ζ;
-            spec_t rpos_r = bb_rpos(&rp, α);
+            spec_t rpos_r = bb_rpos((void **)&rp, α);
             if (!spec_is_empty(rpos_r)) {
                 /* seq_γ: write_str(out, seq) — final full match, no write_nl */
                 if (!spec_is_empty(arb_r)) {
@@ -210,7 +210,7 @@ int main(void)
                 success = 1;
                 break;
             }
-            arb_r = bb_arbno(&arb, β);
+            arb_r = bb_arbno((void **)&arb, β);
         }
     }
 
