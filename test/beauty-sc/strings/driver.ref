@@ -1,0 +1,15 @@
+PASS: 1 Reverse
+PASS: 2 Reverse empty
+PASS: 3 TrimLeft
+PASS: 4 TrimLeft noop
+PASS: 5 TrimLeft all
+PASS: 6 TrimRight
+PASS: 7 Trim
+PASS: 8 Trim all
+PASS: 9 StartsWith hit
+PASS: 10 StartsWith miss
+PASS: 11 EndsWith hit
+PASS: 12 EndsWith miss
+PASS: 13 Split
+PASS: 14 Join
+PASS: 15 Split no-sep
