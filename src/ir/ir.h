@@ -61,6 +61,7 @@ typedef enum EKind {
     /* --- Arithmetic ------------------------------------------------------ */
 
     E_NEG,          /* Unary minus          (MNSR proc in SIL; was E_MNS)   */
+    E_UPLUS,        /* Unary plus — coerce to numeric (str→int)              */
     E_PLS,          /* Unary plus / numeric coerce  (PLS proc; '' → 0)      */
     E_ADD,          /* Addition                                              */
     E_SUB,          /* Subtraction                                           */
@@ -272,6 +273,7 @@ static const char * const ekind_name[E_KIND_COUNT] = {
     [E_INDR]         = "E_INDR",
     [E_DEFER]        = "E_DEFER",
     [E_NEG]          = "E_NEG",
+    [E_UPLUS]        = "E_UPLUS",
     [E_PLS]          = "E_PLS",
     [E_ADD]          = "E_ADD",
     [E_SUB]          = "E_SUB",

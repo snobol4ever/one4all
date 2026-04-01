@@ -3896,6 +3896,42 @@ static int emit_expr(EXPR_t *e, int rbp_off) {
         return 1;
     }
 
+    /* ---- unary plus — coerce to numeric ---- */
+    case E_UPLUS: {
+        const char *fnlab = str_intern("pos");
+        EXPR_t *operand = e->children[0];
+        if (!operand) goto fallback;
+        if (rbp_off == -32) {
+            if (operand->kind == E_ILIT) {
+                A("    CALL1_INT   %s, %ld\n", fnlab, (long)operand->ival);
+                return 1;
+            }
+            if (operand->kind == E_VAR) {
+                A("    CALL1_VAR   %s, %s\n", fnlab,
+                  str_intern(operand->sval));
+                return 1;
+            }
+            if (operand->kind == E_QLIT) {
+                A("    CALL1_STR   %s, %s\n", fnlab,
+                  str_intern(operand->sval));
+                return 1;
+            }
+        }
+        /* Generic 1-arg path */
+        A("    sub     rsp, 16\n");
+        emit_expr(operand, -32);
+        A("    STORE_ARG32 0\n");
+        A("    APPLY_FN_N  %s, 1\n", fnlab);
+        A("    add     rsp, 16\n");
+        if (rbp_off == -32 || rbp_off == -16) {
+            A("    STORE_RESULT\n");
+        } else {
+            A("    mov     [rbp%+d], rax\n", rbp_off);
+            A("    mov     [rbp%+d], rdx\n", rbp_off+8);
+        }
+        return 1;
+    }
+
     /* ---- E_CAPT_CUR: unary @VAR (cursor capture) or binary pat@VAR ---- */
     case E_CAPT_CUR: {
         if (e->nchildren >= 2 && e->children[0] && e->children[1]) {

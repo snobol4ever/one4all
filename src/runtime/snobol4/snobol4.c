@@ -189,6 +189,11 @@ static DESCR_t _b_neg(DESCR_t *a, int n) {
     return neg(a[0]);
 }
 
+static DESCR_t _b_pos(DESCR_t *a, int n) {
+    if (n < 1) return FAILDESCR;
+    return pos(a[0]);
+}
+
 static DESCR_t _b_INTEGER(DESCR_t *a, int n) {
     if (n < 1) return FAILDESCR;
     /* Succeed (returning int value) if arg is or converts to integer */
@@ -909,6 +914,7 @@ void SNO_INIT_fn(void) {
     register_fn("DIVIDE_fn",_b_div,      2, 2);
     register_fn("POWER_fn", _b_pow,      2, 2);
     register_fn("neg",      _b_neg,      1, 1);
+    register_fn("pos",      _b_pos,      1, 1);
     register_fn("INTEGER",  _b_INTEGER,  1, 1);
     register_fn("REAL",     _b_REAL,     1, 1);
     register_fn("SIZE",        _b_SIZE,     1, 1);
@@ -2187,6 +2193,14 @@ DESCR_t neg(DESCR_t a) {
     if (a.v == DT_I)  return INTVAL(-a.i);
     if (a.v == DT_R) return REALVAL(-a.r);
     return INTVAL(-to_int(a));
+}
+
+/* Unary + — coerce to numeric (identity on int/real, str→int otherwise) */
+DESCR_t pos(DESCR_t a) {
+    if (a.v == DT_FAIL) return FAILDESCR;
+    if (a.v == DT_I)  return a;
+    if (a.v == DT_R)  return a;
+    return INTVAL(to_int(a));
 }
 
 /* Numeric comparisons — return 1=success (true), 0=failure */

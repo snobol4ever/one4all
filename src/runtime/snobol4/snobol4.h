@@ -315,6 +315,7 @@ DESCR_t mul(DESCR_t a, DESCR_t b);
 DESCR_t DIVIDE_fn(DESCR_t a, DESCR_t b);
 DESCR_t POWER_fn(DESCR_t a, DESCR_t b);
 DESCR_t neg(DESCR_t a);
+DESCR_t pos(DESCR_t a);
 
 /* ============================================================
  * I/O

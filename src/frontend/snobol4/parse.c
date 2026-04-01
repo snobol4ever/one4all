@@ -233,7 +233,7 @@ static EXPR_t *parse_expr14(Lex *lx) {
         case T_TILDE:  uk=E_INDR; break;  /* ~ is NOT in scrip-cc.h so map to DEREF for now */
         case T_QMARK:  uk=E_CAPT_COND;  break;  /* unary ? = interrogation */
         case T_AMP:    uk=E_OPSYN;break;
-        case T_PLUS:   lex_next(lx); return parse_expr14(lx); /* unary + is identity */
+        case T_PLUS:   uk=E_UPLUS; break;  /* unary + = numeric coerce */
         case T_MINUS:  uk=E_NEG;   break;
         case T_STAR:   uk=E_DEFER; break;   /* *X = deferred pattern ref */
         case T_DOLLAR: uk=E_INDR; break;  /* $X = indirect reference */
