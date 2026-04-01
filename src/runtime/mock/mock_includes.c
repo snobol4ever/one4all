@@ -797,8 +797,10 @@ static DESCR_t _w_Insert(DESCR_t *a, int n) {
  * so that snocone (and any other mock-linked test) can link cleanly.
  * Added SC-13 2026-04-01 to fix DYN-8 cross-session regression.
  * ========================================================================= */
+#ifndef DYN_ENGINE_LINKED
 DESCR_t code_dyn(const char *src)      { (void)src; return FAILDESCR; }
 DESCR_t eval_expr_dyn(const char *src) { (void)src; return FAILDESCR; }
+#endif
 
 void inc_init_extra(void) {
     register_fn("icase",      _w_icase,      1, 1);

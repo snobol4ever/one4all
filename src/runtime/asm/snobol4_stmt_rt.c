@@ -99,8 +99,14 @@ void stmt_set_indirect(DESCR_t name_val, DESCR_t val) {
 
 /* ---- indirect read ($name → value of variable named by name_val) ---- */
 DESCR_t stmt_get_indirect(DESCR_t name_val) {
-    if (name_val.v != DT_S) return NULVCL;   /* guard: only strings are valid names */
-    const char *s = VARVAL_fn(name_val);
+    const char *s = NULL;
+    if (name_val.v == DT_S) {
+        s = VARVAL_fn(name_val);          /* $'literal' — string value is the name */
+    } else if (name_val.v == DT_N) {
+        s = name_val.s;                   /* $.var — DT_N.s is the variable name directly */
+    } else {
+        return NULVCL;
+    }
     if (!s || !*s) return NULVCL;
     return NV_GET_fn(s);
 }
