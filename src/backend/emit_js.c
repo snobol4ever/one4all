@@ -976,6 +976,7 @@ void js_emit(Program *prog, FILE *f) {
 
     int block_open = 0;
     int end_emitted = 0;  /* set when is_end block is written */
+    const char *current_label = "START";  /* track last opened label */
 
     for (STMT_t *s = prog->head; s; s = s->next) {
         /* Labeled stmt: close current block with fall-through to this label */
@@ -987,9 +988,10 @@ void js_emit(Program *prog, FILE *f) {
         /* Open new block */
         if (!block_open) {
             if (s->label) {
+                current_label = s->label;
                 J("goto_%s = function() {\n", jv(s->label));
             } else {
-                J("goto_%s = function() {\n", jv("START"));
+                J("goto_%s = function() {\n", jv(current_label));
             }
             block_open = 1;
         }
