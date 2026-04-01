@@ -11,16 +11,16 @@
  *
  *     LABEL:              ACTION                          GOTO
  *     ─────────────────────────────────────────────────────────
- *     seq_α:              seq = spec(Σ+Δ, 0);             → left_α
- *     seq_β:                                             → right_β
- *     left_γ:             seq = spec_cat(seq, left);          → right_α
- *     left_ω:                                            → seq_ω
- *     right_γ:            seq = spec_cat(seq, right);         → seq_γ
- *     right_ω:                                           → left_β
- *     seq_γ:              return seq;
- *     seq_ω:              return spec_empty;
+ *     seq_alpha:              seq = spec(Σ+Δ, 0);             → left_alpha
+ *     seq_beta:                                             → right_beta
+ *     left_gamma:             seq = spec_cat(seq, left);          → right_alpha
+ *     left_omega:                                            → seq_omega
+ *     right_gamma:            seq = spec_cat(seq, right);         → seq_gamma
+ *     right_omega:                                           → left_beta
+ *     seq_gamma:              return seq;
+ *     seq_omega:              return spec_empty;
  *
- * State ζ: the accumulated seq value, child states.
+ * State zeta: the accumulated seq value, child states.
  */
 
 #include "bb_box.h"
@@ -28,7 +28,7 @@
 
 /* forward from bb_alt.c */
 typedef struct bb_child bb_child_t;
-typedef struct { bb_box_fn fn; void *ζ; } bb_child2_t;
+typedef struct { bb_box_fn fn; void *zeta; } bb_child2_t;
 
 typedef struct {
     bb_child2_t left;
@@ -37,52 +37,52 @@ typedef struct {
 } seq_t;
 
 /* ── bb_seq ──────────────────────────────────────────────────────────────── */
-spec_t bb_seq(seq_t **ζζ, int entry)
+spec_t bb_seq(seq_t **zetazeta, int entry)
 {
-    seq_t *ζ = *ζζ;
+    seq_t *zeta = *zetazeta;
 
-    if (entry == α)                                     goto SEQ_α;
-    if (entry == β)                                     goto SEQ_β;
+    if (entry == alpha)                                     goto SEQ_alpha;
+    if (entry == beta)                                     goto SEQ_beta;
 
     /*------------------------------------------------------------------------*/
     spec_t         SEQ;
     spec_t         left_r;
     spec_t         right_r;
 
-    SEQ_α:        ζ->seq = spec(Σ+Δ, 0);
-                  left_r = ζ->left.fn(&ζ->left.ζ, α);
-                  if (spec_is_empty(left_r))                 goto left_ω;
-                  else                                  goto left_γ;
+    SEQ_alpha:        zeta->seq = spec(Σ+Δ, 0);
+                  left_r = zeta->left.fn(&zeta->left.zeta, alpha);
+                  if (spec_is_empty(left_r))                 goto left_omega;
+                  else                                  goto left_gamma;
 
-    SEQ_β:        right_r = ζ->right.fn(&ζ->right.ζ, β);
-                  if (spec_is_empty(right_r))                goto right_ω;
-                  else                                  goto right_γ;
+    SEQ_beta:        right_r = zeta->right.fn(&zeta->right.zeta, beta);
+                  if (spec_is_empty(right_r))                goto right_omega;
+                  else                                  goto right_gamma;
 
-    left_γ:       ζ->seq = spec_cat(ζ->seq, left_r);
-                  right_r = ζ->right.fn(&ζ->right.ζ, α);
-                  if (spec_is_empty(right_r))                goto right_ω;
-                  else                                  goto right_γ;
+    left_gamma:       zeta->seq = spec_cat(zeta->seq, left_r);
+                  right_r = zeta->right.fn(&zeta->right.zeta, alpha);
+                  if (spec_is_empty(right_r))                goto right_omega;
+                  else                                  goto right_gamma;
 
-    left_ω:                                             goto SEQ_ω;
+    left_omega:                                             goto SEQ_omega;
 
-    right_γ:      SEQ = spec_cat(ζ->seq, right_r);          goto SEQ_γ;
+    right_gamma:      SEQ = spec_cat(zeta->seq, right_r);          goto SEQ_gamma;
 
-    right_ω:      left_r = ζ->left.fn(&ζ->left.ζ, β);
-                  if (spec_is_empty(left_r))                 goto left_ω;
-                  else                                  goto left_γ;
+    right_omega:      left_r = zeta->left.fn(&zeta->left.zeta, beta);
+                  if (spec_is_empty(left_r))                 goto left_omega;
+                  else                                  goto left_gamma;
 
     /*------------------------------------------------------------------------*/
-    SEQ_γ:        return SEQ;
-    SEQ_ω:        return spec_empty;
+    SEQ_gamma:        return SEQ;
+    SEQ_omega:        return spec_empty;
 }
 
 /* ── bb_seq_new ──────────────────────────────────────────────────────────── */
 seq_t *bb_seq_new(bb_box_fn left_fn, bb_box_fn right_fn)
 {
-    seq_t *ζ = calloc(1, sizeof(seq_t));
-    ζ->left.fn  = left_fn;
-    ζ->left.ζ   = NULL;
-    ζ->right.fn = right_fn;
-    ζ->right.ζ  = NULL;
-    return ζ;
+    seq_t *zeta = calloc(1, sizeof(seq_t));
+    zeta->left.fn  = left_fn;
+    zeta->left.zeta   = NULL;
+    zeta->right.fn = right_fn;
+    zeta->right.zeta  = NULL;
+    return zeta;
 }

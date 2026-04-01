@@ -9,7 +9,7 @@
  * ------
  *   Phase 1: build_subject  — extract string from DESCR_t, set Σ/Δ/Ω
  *   Phase 2: build_pattern  — walk PATND_t tree → live bb box graph
- *   Phase 3: run_match      — drive root box α/β, collect captures
+ *   Phase 3: run_match      — drive root box alpha/beta, collect captures
  *   Phase 4: build_repl     — replacement value already as DESCR_t
  *   Phase 5: perform_repl   — splice into subject, NV_SET_fn, :S/:F
  *
@@ -24,7 +24,7 @@
  * CAPTURE HANDLING
  * ----------------
  *   XFNME (pat $ var) and XNME (pat . var) capture nodes wrap their child
- *   box in a bb_capture box that on γ writes the matched spec_t into the
+ *   box in a bb_capture box that on gamma writes the matched spec_t into the
  *   named variable via NV_SET_fn.
  *
  * RELATION TO STATIC PATH
@@ -45,7 +45,7 @@
 #ifdef STMT_EXEC_STANDALONE
 /* ── Standalone build: define the types that snobol4.h would provide ─── */
 #include <stdint.h>
-#include "bb_box.h"   /* spec_t, spec_empty, α, β, spec_is_empty, bb_box_fn */
+#include "bb_box.h"   /* spec_t, spec_empty, alpha, beta, spec_is_empty, bb_box_fn */
 
 /* Minimal DESCR_t for standalone use */
 typedef enum { DT_SNUL=0, DT_S=1, DT_P=3, DT_I=6, DT_FAIL=99 } DTYPE_t;
@@ -79,8 +79,8 @@ extern char   *VARVAL_fn(DESCR_t d);
 /* In the full-runtime build, include bb_box.h after snobol4.h.
  * bb_box.h now uses spec_t (not spec_t) so no collision with engine. */
 #include "bb_box.h"
-static const int α = 0;
-static const int β = 1;
+static const int alpha = 0;
+static const int beta = 1;
 
 #endif /* STMT_EXEC_STANDALONE */
 
@@ -126,226 +126,241 @@ extern int         Ω;
 /* ── LEN(n) box ─────────────────────────────────────────────────────────── */
 typedef struct { int n; } len_t;
 
-static spec_t bb_len(len_t **ζζ, int entry)
+static spec_t bb_len(len_t **zetazeta, int entry)
 {
-    len_t *ζ = *ζζ;
+    len_t *zeta = *zetazeta;
 
-    if (entry == α)                                     goto LEN_α;
-    if (entry == β)                                     goto LEN_β;
+    if (entry == alpha)                                     goto LEN_alpha;
+    if (entry == beta)                                     goto LEN_beta;
 
     spec_t         LEN;
 
-    LEN_α:        if (Δ + ζ->n > Ω)                    goto LEN_ω;
-                  LEN = spec(Σ+Δ, ζ->n); Δ += ζ->n;    goto LEN_γ;
-    LEN_β:        Δ -= ζ->n;                            goto LEN_ω;
+    LEN_alpha:        if (Δ + zeta->n > Ω)                    goto LEN_omega;
+                  LEN = spec(Σ+Δ, zeta->n); Δ += zeta->n;    goto LEN_gamma;
+    LEN_beta:        Δ -= zeta->n;                            goto LEN_omega;
 
-    LEN_γ:        return LEN;
-    LEN_ω:        return spec_empty;
+    LEN_gamma:        return LEN;
+    LEN_omega:        return spec_empty;
 }
 
 /* ── SPAN(chars) box ────────────────────────────────────────────────────── */
 typedef struct { const char *chars; } span_t;
 
-static spec_t bb_span(span_t **ζζ, int entry)
+static spec_t bb_span(span_t **zetazeta, int entry)
 {
-    span_t *ζ = *ζζ;
+    span_t *zeta = *zetazeta;
 
-    if (entry == α)                                     goto SPAN_α;
-    if (entry == β)                                     goto SPAN_β;
+    if (entry == alpha)                                     goto SPAN_alpha;
+    if (entry == beta)                                     goto SPAN_beta;
 
     spec_t         SPAN;
-    int           SPAN_δ;
+    int           SPAN_delta;
 
-    SPAN_α:       for (SPAN_δ = 0; Σ[Δ+SPAN_δ]; SPAN_δ++)
-                      if (!strchr(ζ->chars, Σ[Δ+SPAN_δ])) break;
-                  if (SPAN_δ <= 0)                      goto SPAN_ω;
-                  SPAN = spec(Σ+Δ, SPAN_δ); Δ += SPAN_δ; goto SPAN_γ;
-    SPAN_β:       { /* recover δ: walk back until chars mismatch */
+    SPAN_alpha:       for (SPAN_delta = 0; Σ[Δ+SPAN_delta]; SPAN_delta++)
+                      if (!strchr(zeta->chars, Σ[Δ+SPAN_delta])) break;
+                  if (SPAN_delta <= 0)                      goto SPAN_omega;
+                  SPAN = spec(Σ+Δ, SPAN_delta); Δ += SPAN_delta; goto SPAN_gamma;
+    SPAN_beta:       { /* recover delta: walk back until chars mismatch */
                     int d = 0;
                     /* saved in a local — re-scan from new Δ backwards */
                     /* Δ is already advanced; we must find how far we went.
-                     * Since SPAN is not re-entrant on β after partial match,
-                     * we encode δ in ζ->chars[0] field is not safe.
-                     * Use a simple approach: store δ in the unused high bits.
+                     * Since SPAN is not re-entrant on beta after partial match,
+                     * we encode delta in zeta->chars[0] field is not safe.
+                     * Use a simple approach: store delta in the unused high bits.
                      * For DYN-3 correctness: re-scan Σ at Δ backwards. */
                     /* Simpler: SPAN boxes are not backtracked past their
-                     * initial advance (SPAN succeeds once, fully). On β,
-                     * undo the full advance. We need to know SPAN_δ.
-                     * Store it in ζ->chars via a side-band int in the struct. */
+                     * initial advance (SPAN succeeds once, fully). On beta,
+                     * undo the full advance. We need to know SPAN_delta.
+                     * Store it in zeta->chars via a side-band int in the struct. */
                     (void)d;
-                    goto SPAN_ω; /* conservative: SPAN does not backtrack */
+                    goto SPAN_omega; /* conservative: SPAN does not backtrack */
                   }
 
-    SPAN_γ:       return SPAN;
-    SPAN_ω:       return spec_empty;
+    SPAN_gamma:       return SPAN;
+    SPAN_omega:       return spec_empty;
 }
 
 /* ── ANY(chars) box ─────────────────────────────────────────────────────── */
 typedef struct { const char *chars; } any_t;
 
-static spec_t bb_any(any_t **ζζ, int entry)
+static spec_t bb_any(any_t **zetazeta, int entry)
 {
-    any_t *ζ = *ζζ;
+    any_t *zeta = *zetazeta;
 
-    if (entry == α)                                     goto ANY_α;
-    if (entry == β)                                     goto ANY_β;
+    if (entry == alpha)                                     goto ANY_alpha;
+    if (entry == beta)                                     goto ANY_beta;
 
     spec_t         ANY;
 
-    ANY_α:        if (!Σ[Δ] || !strchr(ζ->chars, Σ[Δ])) goto ANY_ω;
-                  ANY = spec(Σ+Δ, 1); Δ += 1;           goto ANY_γ;
-    ANY_β:        Δ -= 1;                               goto ANY_ω;
+    ANY_alpha:        if (!Σ[Δ] || !strchr(zeta->chars, Σ[Δ])) goto ANY_omega;
+                  ANY = spec(Σ+Δ, 1); Δ += 1;           goto ANY_gamma;
+    ANY_beta:        Δ -= 1;                               goto ANY_omega;
 
-    ANY_γ:        return ANY;
-    ANY_ω:        return spec_empty;
+    ANY_gamma:        return ANY;
+    ANY_omega:        return spec_empty;
 }
 
 /* ── NOTANY(chars) box ──────────────────────────────────────────────────── */
 typedef struct { const char *chars; } notany_t;
 
-static spec_t bb_notany(notany_t **ζζ, int entry)
+static spec_t bb_notany(notany_t **zetazeta, int entry)
 {
-    notany_t *ζ = *ζζ;
+    notany_t *zeta = *zetazeta;
 
-    if (entry == α)                                     goto NOTANY_α;
-    if (entry == β)                                     goto NOTANY_β;
+    if (entry == alpha)                                     goto NOTANY_alpha;
+    if (entry == beta)                                     goto NOTANY_beta;
 
     spec_t         NOTANY;
 
-    NOTANY_α:     if (!Σ[Δ] || strchr(ζ->chars, Σ[Δ])) goto NOTANY_ω;
-                  NOTANY = spec(Σ+Δ, 1); Δ += 1;        goto NOTANY_γ;
-    NOTANY_β:     Δ -= 1;                               goto NOTANY_ω;
+    NOTANY_alpha:     if (!Σ[Δ] || strchr(zeta->chars, Σ[Δ])) goto NOTANY_omega;
+                  NOTANY = spec(Σ+Δ, 1); Δ += 1;        goto NOTANY_gamma;
+    NOTANY_beta:     Δ -= 1;                               goto NOTANY_omega;
 
-    NOTANY_γ:     return NOTANY;
-    NOTANY_ω:     return spec_empty;
+    NOTANY_gamma:     return NOTANY;
+    NOTANY_omega:     return spec_empty;
 }
 
 /* ── BREAK(chars) box ───────────────────────────────────────────────────── */
-typedef struct { const char *chars; int δ; } brk_t;
+typedef struct { const char *chars; int delta; } brk_t;
 
-static spec_t bb_brk(brk_t **ζζ, int entry)
+static spec_t bb_brk(brk_t **zetazeta, int entry)
 {
-    brk_t *ζ = *ζζ;
+    brk_t *zeta = *zetazeta;
 
-    if (entry == α)                                     goto BRK_α;
-    if (entry == β)                                     goto BRK_β;
+    if (entry == alpha)                                     goto BRK_alpha;
+    if (entry == beta)                                     goto BRK_beta;
 
     spec_t         BRK;
 
-    BRK_α:        for (ζ->δ = 0; Σ[Δ+ζ->δ]; ζ->δ++)
-                      if (strchr(ζ->chars, Σ[Δ+ζ->δ])) break;
-                  if (Δ + ζ->δ >= Ω)                   goto BRK_ω;
-                  BRK = spec(Σ+Δ, ζ->δ); Δ += ζ->δ;    goto BRK_γ;
-    BRK_β:        Δ -= ζ->δ;                            goto BRK_ω;
+    BRK_alpha:        for (zeta->delta = 0; Σ[Δ+zeta->delta]; zeta->delta++)
+                      if (strchr(zeta->chars, Σ[Δ+zeta->delta])) break;
+                  if (Δ + zeta->delta >= Ω)                   goto BRK_omega;
+                  BRK = spec(Σ+Δ, zeta->delta); Δ += zeta->delta;    goto BRK_gamma;
+    BRK_beta:        Δ -= zeta->delta;                            goto BRK_omega;
 
-    BRK_γ:        return BRK;
-    BRK_ω:        return spec_empty;
+    BRK_gamma:        return BRK;
+    BRK_omega:        return spec_empty;
 }
 
 /* ── ARB box (matches 0..n chars, backtracks one at a time) ─────────────── */
 typedef struct { int tried; } arb_t;
 
-static spec_t bb_arb(arb_t **ζζ, int entry)
+static spec_t bb_arb(arb_t **zetazeta, int entry)
 {
-    arb_t *ζ = *ζζ;
+    arb_t *zeta = *zetazeta;
 
-    if (entry == α)                                     goto ARB_α;
-    if (entry == β)                                     goto ARB_β;
+    if (entry == alpha)                                     goto ARB_alpha;
+    if (entry == beta)                                     goto ARB_beta;
 
     spec_t         ARB;
 
-    ARB_α:        ζ->tried = 0;
-                  ARB = spec(Σ+Δ, 0);                    goto ARB_γ;
-    ARB_β:        ζ->tried++;
-                  if (Δ + ζ->tried > Ω)                goto ARB_ω;
-                  ARB = spec(Σ+Δ, ζ->tried);
-                  Δ += ζ->tried;                        goto ARB_γ;
+    ARB_alpha:        zeta->tried = 0;
+                  ARB = spec(Σ+Δ, 0);                    goto ARB_gamma;
+    ARB_beta:        zeta->tried++;
+                  if (Δ + zeta->tried > Ω)                goto ARB_omega;
+                  ARB = spec(Σ+Δ, zeta->tried);
+                  Δ += zeta->tried;                        goto ARB_gamma;
 
-    ARB_γ:        return ARB;
-    ARB_ω:        return spec_empty;
+    ARB_gamma:        return ARB;
+    ARB_omega:        return spec_empty;
 }
 
 /* ── REM box (match rest of subject) ────────────────────────────────────── */
 typedef struct { int dummy; } rem_t;
 
-static spec_t bb_rem(rem_t **ζζ, int entry)
+static spec_t bb_rem(rem_t **zetazeta, int entry)
 {
-    (void)ζζ;
+    (void)zetazeta;
 
-    if (entry == α)                                     goto REM_α;
-    if (entry == β)                                     goto REM_β;
+    if (entry == alpha)                                     goto REM_alpha;
+    if (entry == beta)                                     goto REM_beta;
 
     spec_t         REM;
 
-    REM_α:        REM = spec(Σ+Δ, Ω-Δ); Δ = Ω;         goto REM_γ;
-    REM_β:                                              goto REM_ω;
+    REM_alpha:        REM = spec(Σ+Δ, Ω-Δ); Δ = Ω;         goto REM_gamma;
+    REM_beta:                                              goto REM_omega;
 
-    REM_γ:        return REM;
-    REM_ω:        return spec_empty;
+    REM_gamma:        return REM;
+    REM_omega:        return spec_empty;
 }
 
 /* ── SUCCEED box (always succeeds, infinite backtrack) ──────────────────── */
 typedef struct { int dummy; } succeed_t;
 
-static spec_t bb_succeed(succeed_t **ζζ, int entry)
+static spec_t bb_succeed(succeed_t **zetazeta, int entry)
 {
-    (void)ζζ; (void)entry;
-    return spec(Σ+Δ, 0);   /* always γ, zero-width */
+    (void)zetazeta; (void)entry;
+    return spec(Σ+Δ, 0);   /* always gamma, zero-width */
 }
 
 /* ── FAIL box ───────────────────────────────────────────────────────────── */
 typedef struct { int dummy; } fail_t;
 
-static spec_t bb_fail(fail_t **ζζ, int entry)
+static spec_t bb_fail(fail_t **zetazeta, int entry)
 {
-    (void)ζζ; (void)entry;
-    return spec_empty;   /* always ω */
+    (void)zetazeta; (void)entry;
+    return spec_empty;   /* always omega */
 }
 
 /* ── EPSILON box (zero-width success, no backtrack) ────────────────────── */
 typedef struct { int done; } eps_t;
 
-static spec_t bb_eps(eps_t **ζζ, int entry)
+static spec_t bb_eps(eps_t **zetazeta, int entry)
 {
-    eps_t *ζ = *ζζ;
+    eps_t *zeta = *zetazeta;
 
-    if (entry == α) { ζ->done = 0; goto EPS_α; }
-    if (entry == β)                              goto EPS_β;
+    if (entry == alpha) { zeta->done = 0; goto EPS_alpha; }
+    if (entry == beta)                              goto EPS_beta;
 
     spec_t EPS;
 
-    EPS_α:  if (ζ->done) goto EPS_ω;
-            ζ->done = 1;
-            EPS = spec(Σ+Δ, 0);                  goto EPS_γ;
-    EPS_β:                                       goto EPS_ω;
+    EPS_alpha:  if (zeta->done) goto EPS_omega;
+            zeta->done = 1;
+            EPS = spec(Σ+Δ, 0);                  goto EPS_gamma;
+    EPS_beta:                                       goto EPS_omega;
 
-    EPS_γ:  return EPS;
-    EPS_ω:  return spec_empty;
+    EPS_gamma:  return EPS;
+    EPS_omega:  return spec_empty;
 }
 
 /* ── DEFERRED VAR box — forward declared; defined after bb_build ────────── */
+/*
+ * DYN-4: *VAR resolved at match time (alpha port), not build time.
+ *
+ * Graph is built ONCE on first alpha (the code does not change between
+ * match attempts — only the cursor position and local state change).
+ * On every subsequent alpha, child_zeta is zeroed (fresh locals) and
+ * the existing child graph is re-driven.  No rebuild.
+ *
+ * child_fn / child_zeta are NULL until first alpha.
+ * child_zeta_size records how many bytes to zero for the reset.
+ * (We store size at build time via the bb_node_t.zeta_size field —
+ * see bb_build.  For now, using memset of a fixed MAX_BOX_STATE bytes
+ * is safe and simple.)
+ */
+#define DVAR_CHILD_STATE_MAX 4096   /* generous upper bound for any box state */
 typedef struct {
-    const char  *name;
-    bb_box_fn    child_fn;
-    void        *child_ζ;
+    const char  *name;        /* variable name — set at bb_build time */
+    bb_box_fn    child_fn;    /* set on first alpha, reused thereafter */
+    void        *child_zeta;  /* heap-allocated child state, zeroed per attempt */
 } deferred_var_t;
 /* bb_deferred_var() defined after bb_build (needs bb_node_t) */
-static spec_t bb_deferred_var(deferred_var_t **ζζ, int entry);
+static spec_t bb_deferred_var(deferred_var_t **zetazeta, int entry);
 
-/* ── CAPTURE box (wraps child; on γ writes capture to named variable) ───── */
+/* ── CAPTURE box (wraps child; on gamma writes capture to named variable) ───── */
 /*
  * DYN-4: XNME (pat . var) is a CONDITIONAL capture — only committed when
  * the entire enclosing pattern succeeds (Phase 5 gate).  XFNME (pat $ var)
- * is IMMEDIATE — written on every γ, even during backtracking.
+ * is IMMEDIATE — written on every gamma, even during backtracking.
  *
- * Implementation: both kinds write via NV_SET_fn on γ.  For XNME
+ * Implementation: both kinds write via NV_SET_fn on gamma.  For XNME
  * (immediate=0) the caller (stmt_exec_dyn) must pass the capture list
  * and commit only on overall success.  For DYN-4 we buffer XNME captures
  * in a small pending-capture list and flush it in Phase 5.
  */
 typedef struct {
     bb_box_fn    child_fn;
-    void        *child_ζ;
+    void        *child_zeta;
     const char  *varname;   /* NV_SET_fn target */
     int          immediate; /* 1=XFNME ($), 0=XNME (.) */
     /* For XNME: pending capture to be committed by Phase 5 */
@@ -353,42 +368,42 @@ typedef struct {
     int          has_pending;
 } capture_t;
 
-static spec_t bb_capture(capture_t **ζζ, int entry)
+static spec_t bb_capture(capture_t **zetazeta, int entry)
 {
-    capture_t *ζ = *ζζ;
+    capture_t *zeta = *zetazeta;
 
-    if (entry == α)                                     goto CAP_α;
-    if (entry == β)                                     goto CAP_β;
+    if (entry == alpha)                                     goto CAP_alpha;
+    if (entry == beta)                                     goto CAP_beta;
 
     spec_t         child_r;
 
-    CAP_α:        child_r = ζ->child_fn(&ζ->child_ζ, α);
-                  if (spec_is_empty(child_r))           goto CAP_ω;
-                                                        goto CAP_γ_core;
-    CAP_β:        child_r = ζ->child_fn(&ζ->child_ζ, β);
-                  if (spec_is_empty(child_r))           goto CAP_ω;
-                                                        goto CAP_γ_core;
+    CAP_alpha:        child_r = zeta->child_fn(&zeta->child_zeta, alpha);
+                      if (spec_is_empty(child_r)) { goto CAP_omega; }
+                      goto CAP_gamma_core;
+    CAP_beta:         child_r = zeta->child_fn(&zeta->child_zeta, beta);
+                      if (spec_is_empty(child_r)) { goto CAP_omega; }
+                      goto CAP_gamma_core;
 
-    CAP_γ_core:   if (ζ->varname && *ζ->varname) {
-                      if (ζ->immediate) {
-                          /* XFNME ($): immediate — write now on every γ */
-                          char *s = (char *)GC_MALLOC(child_r.δ + 1);
-                          memcpy(s, child_r.σ, (size_t)child_r.δ);
-                          s[child_r.δ] = '\0';
+    CAP_gamma_core:   if (zeta->varname && *zeta->varname) {
+                      if (zeta->immediate) {
+                          /* XFNME ($): immediate — write now on every gamma */
+                          char *s = (char *)GC_MALLOC(child_r.delta + 1);
+                          memcpy(s, child_r.sigma, (size_t)child_r.delta);
+                          s[child_r.delta] = '\0';
                           DESCR_t val;
                           val.v    = DT_S;
-                          val.slen = (uint32_t)child_r.δ;
+                          val.slen = (uint32_t)child_r.delta;
                           val.s    = s;
-                          NV_SET_fn(ζ->varname, val);
+                          NV_SET_fn(zeta->varname, val);
                       } else {
                           /* XNME (.): conditional — buffer, commit in Phase 5 */
-                          ζ->pending     = child_r;
-                          ζ->has_pending = 1;
+                          zeta->pending     = child_r;
+                          zeta->has_pending = 1;
                       }
                   }
                   return child_r;
 
-    CAP_ω:        ζ->has_pending = 0;   /* backtracked past — discard pending */
+    CAP_omega:        zeta->has_pending = 0;   /* backtracked past — discard pending */
                   return spec_empty;
 }
 
@@ -397,15 +412,15 @@ static spec_t bb_capture(capture_t **ζζ, int entry)
  * ══════════════════════════════════════════════════════════════════════════ */
 
 /*
- * Each build function allocates a typed state struct (ζ) and returns:
+ * Each build function allocates a typed state struct (zeta) and returns:
  *   fn  — the box function pointer
- *   *ζζ — the state pointer (passed to fn on first call)
+ *   *zetazeta — the state pointer (passed to fn on first call)
  *
  * We return through a small wrapper struct to keep the API clean.
  */
 typedef struct {
     bb_box_fn  fn;
-    void      *ζ;
+    void      *zeta;
 } bb_node_t;
 
 /* forward declaration for recursion */
@@ -416,12 +431,12 @@ static void register_capture(capture_t *c);
 static void flush_pending_captures(void);
 
 /* forward-declared box functions (defined in dyn/ box files, linked separately) */
-extern spec_t bb_lit   (void **ζζ, int entry);
-extern spec_t bb_alt   (void **ζζ, int entry);
-extern spec_t bb_seq   (void **ζζ, int entry);
-extern spec_t bb_arbno (void **ζζ, int entry);
-extern spec_t bb_pos   (void **ζζ, int entry);
-extern spec_t bb_rpos  (void **ζζ, int entry);
+extern spec_t bb_lit   (void **zetazeta, int entry);
+extern spec_t bb_alt   (void **zetazeta, int entry);
+extern spec_t bb_seq   (void **zetazeta, int entry);
+extern spec_t bb_arbno (void **zetazeta, int entry);
+extern spec_t bb_pos   (void **zetazeta, int entry);
+extern spec_t bb_rpos  (void **zetazeta, int entry);
 
 /* lit_t / alt_t / seq_t / arbno_t / pos_t / rpos_t layouts
  * mirror the structs in the dyn/ box files exactly */
@@ -430,7 +445,7 @@ typedef struct { int n; }                       _pos_t;
 typedef struct { int n; }                       _rpos_t;
 
 #define BB_ALT_MAX_S 16
-typedef struct { bb_box_fn fn; void *ζ; }       _bchild_t;
+typedef struct { bb_box_fn fn; void *zeta; }       _bchild_t;
 typedef struct {
     int       n;
     _bchild_t children[BB_ALT_MAX_S];
@@ -449,7 +464,7 @@ typedef struct {
 typedef struct { spec_t ARBNO; int saved_Δ; } _aframe_t;
 typedef struct {
     bb_box_fn  body_fn;
-    void      *body_ζ;
+    void      *body_zeta;
     int        ARBNO_i;
     _aframe_t  stack[ARBNO_MAX_S];
 } _arbno_t;
@@ -459,9 +474,9 @@ static bb_node_t bb_build(_PND_t *p)
     bb_node_t n = { NULL, NULL };
     if (!p) {
         /* null node → epsilon */
-        eps_t *ζ = calloc(1, sizeof(eps_t));
+        eps_t *zeta = calloc(1, sizeof(eps_t));
         n.fn = (bb_box_fn)bb_eps;
-        n.ζ  = ζ;
+        n.zeta  = zeta;
         return n;
     }
 
@@ -469,126 +484,126 @@ static bb_node_t bb_build(_PND_t *p)
 
     /* ── literal string ─────────────────────────────────────────────── */
     case _XCHR: {
-        _lit_t *ζ = calloc(1, sizeof(_lit_t));
-        ζ->lit = p->sval ? p->sval : "";
-        ζ->len = (int)strlen(ζ->lit);
+        _lit_t *zeta = calloc(1, sizeof(_lit_t));
+        zeta->lit = p->sval ? p->sval : "";
+        zeta->len = (int)strlen(zeta->lit);
         n.fn = (bb_box_fn)bb_lit;
-        n.ζ  = ζ;
+        n.zeta  = zeta;
         break;
     }
 
     /* ── POS(n) ─────────────────────────────────────────────────────── */
     case _XPOSI: {
-        _pos_t *ζ = calloc(1, sizeof(_pos_t));
-        ζ->n = (int)p->num;
+        _pos_t *zeta = calloc(1, sizeof(_pos_t));
+        zeta->n = (int)p->num;
         n.fn = (bb_box_fn)bb_pos;
-        n.ζ  = ζ;
+        n.zeta  = zeta;
         break;
     }
 
     /* ── RPOS(n) ────────────────────────────────────────────────────── */
     case _XRPSI: {
-        _rpos_t *ζ = calloc(1, sizeof(_rpos_t));
-        ζ->n = (int)p->num;
+        _rpos_t *zeta = calloc(1, sizeof(_rpos_t));
+        zeta->n = (int)p->num;
         n.fn = (bb_box_fn)bb_rpos;
-        n.ζ  = ζ;
+        n.zeta  = zeta;
         break;
     }
 
     /* ── LEN(n) ─────────────────────────────────────────────────────── */
     case _XLNTH: {
-        len_t *ζ = calloc(1, sizeof(len_t));
-        ζ->n = (int)p->num;
+        len_t *zeta = calloc(1, sizeof(len_t));
+        zeta->n = (int)p->num;
         n.fn = (bb_box_fn)bb_len;
-        n.ζ  = ζ;
+        n.zeta  = zeta;
         break;
     }
 
     /* ── SPAN(chars) ────────────────────────────────────────────────── */
     case _XSPNC: {
-        span_t *ζ = calloc(1, sizeof(span_t));
-        ζ->chars = p->sval ? p->sval : "";
+        span_t *zeta = calloc(1, sizeof(span_t));
+        zeta->chars = p->sval ? p->sval : "";
         n.fn = (bb_box_fn)bb_span;
-        n.ζ  = ζ;
+        n.zeta  = zeta;
         break;
     }
 
     /* ── BREAK(chars) ───────────────────────────────────────────────── */
     case _XBRKC: {
-        brk_t *ζ = calloc(1, sizeof(brk_t));
-        ζ->chars = p->sval ? p->sval : "";
+        brk_t *zeta = calloc(1, sizeof(brk_t));
+        zeta->chars = p->sval ? p->sval : "";
         n.fn = (bb_box_fn)bb_brk;
-        n.ζ  = ζ;
+        n.zeta  = zeta;
         break;
     }
 
     /* ── ANY(chars) ─────────────────────────────────────────────────── */
     case _XANYC: {
-        any_t *ζ = calloc(1, sizeof(any_t));
-        ζ->chars = p->sval ? p->sval : "";
+        any_t *zeta = calloc(1, sizeof(any_t));
+        zeta->chars = p->sval ? p->sval : "";
         n.fn = (bb_box_fn)bb_any;
-        n.ζ  = ζ;
+        n.zeta  = zeta;
         break;
     }
 
     /* ── NOTANY(chars) ──────────────────────────────────────────────── */
     case _XNNYC: {
-        notany_t *ζ = calloc(1, sizeof(notany_t));
-        ζ->chars = p->sval ? p->sval : "";
+        notany_t *zeta = calloc(1, sizeof(notany_t));
+        zeta->chars = p->sval ? p->sval : "";
         n.fn = (bb_box_fn)bb_notany;
-        n.ζ  = ζ;
+        n.zeta  = zeta;
         break;
     }
 
     /* ── ARB ────────────────────────────────────────────────────────── */
     case _XFARB: {
-        arb_t *ζ = calloc(1, sizeof(arb_t));
+        arb_t *zeta = calloc(1, sizeof(arb_t));
         n.fn = (bb_box_fn)bb_arb;
-        n.ζ  = ζ;
+        n.zeta  = zeta;
         break;
     }
 
     /* ── REM ────────────────────────────────────────────────────────── */
     case _XSTAR: {
-        rem_t *ζ = calloc(1, sizeof(rem_t));
+        rem_t *zeta = calloc(1, sizeof(rem_t));
         n.fn = (bb_box_fn)bb_rem;
-        n.ζ  = ζ;
+        n.zeta  = zeta;
         break;
     }
 
     /* ── SUCCEED ────────────────────────────────────────────────────── */
     case _XSUCF: {
-        succeed_t *ζ = calloc(1, sizeof(succeed_t));
+        succeed_t *zeta = calloc(1, sizeof(succeed_t));
         n.fn = (bb_box_fn)bb_succeed;
-        n.ζ  = ζ;
+        n.zeta  = zeta;
         break;
     }
 
     /* ── FAIL ───────────────────────────────────────────────────────── */
     case _XFAIL: {
-        fail_t *ζ = calloc(1, sizeof(fail_t));
+        fail_t *zeta = calloc(1, sizeof(fail_t));
         n.fn = (bb_box_fn)bb_fail;
-        n.ζ  = ζ;
+        n.zeta  = zeta;
         break;
     }
 
     /* ── EPSILON ────────────────────────────────────────────────────── */
     case _XEPS: {
-        eps_t *ζ = calloc(1, sizeof(eps_t));
+        eps_t *zeta = calloc(1, sizeof(eps_t));
         n.fn = (bb_box_fn)bb_eps;
-        n.ζ  = ζ;
+        n.zeta  = zeta;
         break;
     }
 
     /* ── CONCATENATION (left right) ─────────────────────────────────── */
     case _XCAT: {
-        _seq_t *ζ = calloc(1, sizeof(_seq_t));
+        _seq_t *zeta = calloc(1, sizeof(_seq_t));
         bb_node_t l = bb_build(p->left);
         bb_node_t r = bb_build(p->right);
-        ζ->left.fn  = l.fn; ζ->left.ζ  = l.ζ;
-        ζ->right.fn = r.fn; ζ->right.ζ = r.ζ;
+        zeta->left.fn  = l.fn; zeta->left.zeta  = l.zeta;
+        zeta->right.fn = r.fn; zeta->right.zeta = r.zeta;
         n.fn = (bb_box_fn)bb_seq;
-        n.ζ  = ζ;
+        n.zeta  = zeta;
         break;
     }
 
@@ -596,68 +611,68 @@ static bb_node_t bb_build(_PND_t *p)
     case _XOR: {
         /*
          * Flatten nested XOR into a single ALT with N children.
-         * This matches the test_sno_1.c alt_α/alt_β pattern exactly.
+         * This matches the test_sno_1.c alt_alpha/alt_beta pattern exactly.
          */
-        _alt_t *ζ = calloc(1, sizeof(_alt_t));
+        _alt_t *zeta = calloc(1, sizeof(_alt_t));
         /* collect all OR arms by walking right-spine */
         _PND_t *cur = p;
         int     nc  = 0;
         while (cur && cur->kind == _XOR && nc < BB_ALT_MAX_S - 1) {
             bb_node_t arm        = bb_build(cur->left);
-            ζ->children[nc].fn  = arm.fn;
-            ζ->children[nc].ζ   = arm.ζ;
+            zeta->children[nc].fn  = arm.fn;
+            zeta->children[nc].zeta   = arm.zeta;
             nc++;
             cur = cur->right;
         }
         /* last arm (rightmost non-OR node) */
         if (nc < BB_ALT_MAX_S) {
             bb_node_t arm        = bb_build(cur);
-            ζ->children[nc].fn  = arm.fn;
-            ζ->children[nc].ζ   = arm.ζ;
+            zeta->children[nc].fn  = arm.fn;
+            zeta->children[nc].zeta   = arm.zeta;
             nc++;
         }
-        ζ->n = nc;
+        zeta->n = nc;
         n.fn = (bb_box_fn)bb_alt;
-        n.ζ  = ζ;
+        n.zeta  = zeta;
         break;
     }
 
     /* ── ARBNO(body) ────────────────────────────────────────────────── */
     case _XARBN: {
-        _arbno_t *ζ = calloc(1, sizeof(_arbno_t));
+        _arbno_t *zeta = calloc(1, sizeof(_arbno_t));
         bb_node_t body  = bb_build(p->left);
-        ζ->body_fn = body.fn;
-        ζ->body_ζ  = body.ζ;
+        zeta->body_fn = body.fn;
+        zeta->body_zeta  = body.zeta;
         n.fn = (bb_box_fn)bb_arbno;
-        n.ζ  = ζ;
+        n.zeta  = zeta;
         break;
     }
 
     /* ── IMMEDIATE CAPTURE: pat $ var ───────────────────────────────── */
     case _XFNME: {
-        capture_t *ζ = calloc(1, sizeof(capture_t));
+        capture_t *zeta = calloc(1, sizeof(capture_t));
         bb_node_t child = bb_build(p->left);
-        ζ->child_fn  = child.fn;
-        ζ->child_ζ   = child.ζ;
-        ζ->varname   = (p->var.v == DT_S && p->var.s) ? p->var.s : NULL;
-        ζ->immediate = 1;
-        register_capture(ζ);
+        zeta->child_fn  = child.fn;
+        zeta->child_zeta   = child.zeta;
+        zeta->varname   = (p->var.v == DT_S && p->var.s) ? p->var.s : NULL;
+        zeta->immediate = 1;
+        register_capture(zeta);
         n.fn = (bb_box_fn)bb_capture;
-        n.ζ  = ζ;
+        n.zeta  = zeta;
         break;
     }
 
     /* ── CONDITIONAL CAPTURE: pat . var ─────────────────────────────── */
     case _XNME: {
-        capture_t *ζ = calloc(1, sizeof(capture_t));
+        capture_t *zeta = calloc(1, sizeof(capture_t));
         bb_node_t child = bb_build(p->left);
-        ζ->child_fn  = child.fn;
-        ζ->child_ζ   = child.ζ;
-        ζ->varname   = (p->var.v == DT_S && p->var.s) ? p->var.s : NULL;
-        ζ->immediate = 0;
-        register_capture(ζ);
+        zeta->child_fn  = child.fn;
+        zeta->child_zeta   = child.zeta;
+        zeta->varname   = (p->var.v == DT_S && p->var.s) ? p->var.s : NULL;
+        zeta->immediate = 0;
+        register_capture(zeta);
         n.fn = (bb_box_fn)bb_capture;
-        n.ζ  = ζ;
+        n.zeta  = zeta;
         break;
     }
 
@@ -666,27 +681,27 @@ static bb_node_t bb_build(_PND_t *p)
     /* ── VAR holding a pattern — resolved at match time ────────────── */
     case _XVAR: {
         /*
-         * DYN-4: defer NV_GET_fn to Phase 3 (α port of deferred_var_t).
+         * DYN-4: defer NV_GET_fn to Phase 3 (alpha port of deferred_var_t).
          * DYN-3 resolved here (Phase 2 / build time) — correct only for
          * non-mutating patterns.  DYN-4 is exact: *X always sees the
          * value X holds at the moment each match attempt begins.
          *
-         * Store only the variable name; the box fetches live at α.
+         * Store only the variable name; the box fetches live at alpha.
          */
         const char *name = (p->kind == _XDSAR) ? p->sval
                          : (p->var.v == DT_S)  ? p->var.s : NULL;
         if (name && *name) {
-            deferred_var_t *ζ = calloc(1, sizeof(deferred_var_t));
-            ζ->name     = name;
-            ζ->child_fn = NULL;
-            ζ->child_ζ  = NULL;
+            deferred_var_t *zeta = calloc(1, sizeof(deferred_var_t));
+            zeta->name     = name;
+            zeta->child_fn = NULL;
+            zeta->child_zeta  = NULL;
             n.fn = (bb_box_fn)bb_deferred_var;
-            n.ζ  = ζ;
+            n.zeta  = zeta;
         } else {
             /* no name — epsilon (degenerate, shouldn't arise) */
-            eps_t *ζ = calloc(1, sizeof(eps_t));
+            eps_t *zeta = calloc(1, sizeof(eps_t));
             n.fn = (bb_box_fn)bb_eps;
-            n.ζ  = ζ;
+            n.zeta  = zeta;
         }
         break;
     }
@@ -694,24 +709,24 @@ static bb_node_t bb_build(_PND_t *p)
     /* ── TAB(n) — advance cursor to absolute position n ─────────────── */
     case _XTB: {
         /* TAB(n): like POS but anchors to absolute tab stop.
-         * Implemented as: if (Δ <= n) Δ=n; else ω */
-        _pos_t *ζ = calloc(1, sizeof(_pos_t));
-        ζ->n = (int)p->num;
+         * Implemented as: if (Δ <= n) Δ=n; else omega */
+        _pos_t *zeta = calloc(1, sizeof(_pos_t));
+        zeta->n = (int)p->num;
         /* reuse POS box: POS(n) already checks Δ==n.
          * TAB is slightly different (allows Δ <= n, advances to n).
          * For DYN-3 correctness we use POS semantics; TAB optimisation
          * is M-DYN-4. */
         n.fn = (bb_box_fn)bb_pos;
-        n.ζ  = ζ;
+        n.zeta  = zeta;
         break;
     }
 
     /* ── RTAB(n) — advance to (Ω-n) from right ─────────────────────── */
     case _XRTB: {
-        _rpos_t *ζ = calloc(1, sizeof(_rpos_t));
-        ζ->n = (int)p->num;
+        _rpos_t *zeta = calloc(1, sizeof(_rpos_t));
+        zeta->n = (int)p->num;
         n.fn = (bb_box_fn)bb_rpos;
-        n.ζ  = ζ;
+        n.zeta  = zeta;
         break;
     }
 
@@ -726,9 +741,9 @@ static bb_node_t bb_build(_PND_t *p)
          * the static path).  Logged for tracking. */
         fprintf(stderr, "stmt_exec: unimplemented XKIND %d — using epsilon\n",
                 (int)p->kind);
-        eps_t *ζ = calloc(1, sizeof(eps_t));
+        eps_t *zeta = calloc(1, sizeof(eps_t));
         n.fn = (bb_box_fn)bb_eps;
-        n.ζ  = ζ;
+        n.zeta  = zeta;
         break;
     }
     } /* switch */
@@ -738,47 +753,66 @@ static bb_node_t bb_build(_PND_t *p)
 
 /* ── bb_deferred_var — defined here, after bb_build (needs bb_node_t) ───── */
 /*
- * DYN-4: *name resolved at Phase 3 match time (α port), not Phase 2.
- * Stores only the variable name; fetches live value on each α call.
+ * DYN-4: *name resolved at match time.  Graph built ONCE on first alpha;
+ * subsequent alpha calls zero child_zeta (fresh locals) and re-drive the
+ * same graph.  beta re-drives child with beta — no rebuild ever.
+ *
+ * Three-column layout:
+ *
+ *   DVAR_alpha:  if first time: NV_GET_fn → bb_build child graph    once
+ *                zero child_zeta                                fresh state
+ *                DVAR = child_fn(&child_zeta, alpha)            drive
+ *                if empty                                       goto DVAR_omega
+ *                                                               goto DVAR_gamma
+ *   DVAR_beta:   if no child                                    goto DVAR_omega
+ *                DVAR = child_fn(&child_zeta, beta)             backtrack
+ *                if empty                                       goto DVAR_omega
+ *                                                               goto DVAR_gamma
  */
-static spec_t bb_deferred_var(deferred_var_t **ζζ, int entry)
+static spec_t bb_deferred_var(deferred_var_t **zetazeta, int entry)
 {
-    deferred_var_t *ζ = *ζζ;
+    deferred_var_t *zeta = *zetazeta;
 
-    if (entry == α)                                     goto DVAR_α;
-    if (entry == β)                                     goto DVAR_β;
+    if (entry == alpha)                                 goto DVAR_alpha;
+    if (entry == beta)                                  goto DVAR_beta;
 
     spec_t          DVAR;
 
-    DVAR_α:         {
-                        DESCR_t val = NV_GET_fn(ζ->name);
+    DVAR_alpha:     if (!zeta->child_fn) {
+                        /* First alpha: resolve variable and build graph once */
+                        DESCR_t val = NV_GET_fn(zeta->name);
                         bb_node_t child;
                         if (val.v == DT_P && val.p) {
                             child = bb_build((_PND_t *)val.p);
                         } else if (val.v == DT_S && val.s) {
                             _lit_t *lz = calloc(1, sizeof(_lit_t));
-                            lz->lit = val.s;
-                            lz->len = (int)strlen(val.s);
-                            child.fn = (bb_box_fn)bb_lit;
-                            child.ζ  = lz;
+                            lz->lit    = val.s;
+                            lz->len    = (int)strlen(val.s);
+                            child.fn   = (bb_box_fn)bb_lit;
+                            child.zeta = lz;
                         } else {
-                            eps_t *ez = calloc(1, sizeof(eps_t));
-                            child.fn = (bb_box_fn)bb_eps;
-                            child.ζ  = ez;
+                            eps_t *ez  = calloc(1, sizeof(eps_t));
+                            child.fn   = (bb_box_fn)bb_eps;
+                            child.zeta = ez;
                         }
-                        ζ->child_fn = child.fn;
-                        ζ->child_ζ  = child.ζ;
-                        DVAR = ζ->child_fn(&ζ->child_ζ, α);
+                        zeta->child_fn   = child.fn;
+                        zeta->child_zeta = child.zeta;
+                    } else {
+                        /* Subsequent alpha: zero child state for fresh locals */
+                        if (zeta->child_zeta)
+                            memset(zeta->child_zeta, 0, DVAR_CHILD_STATE_MAX);
                     }
-                    if (spec_is_empty(DVAR))            goto DVAR_ω;
-                                                        goto DVAR_γ;
-    DVAR_β:         if (!ζ->child_fn)                  goto DVAR_ω;
-                    DVAR = ζ->child_fn(&ζ->child_ζ, β);
-                    if (spec_is_empty(DVAR))            goto DVAR_ω;
-                                                        goto DVAR_γ;
+                    DVAR = zeta->child_fn(&zeta->child_zeta, alpha);
+                    if (spec_is_empty(DVAR))            goto DVAR_omega;
+                    goto DVAR_gamma;
 
-    DVAR_γ:         return DVAR;
-    DVAR_ω:         return spec_empty;
+    DVAR_beta:      if (!zeta->child_fn)                goto DVAR_omega;
+                    DVAR = zeta->child_fn(&zeta->child_zeta, beta);
+                    if (spec_is_empty(DVAR))            goto DVAR_omega;
+                    goto DVAR_gamma;
+
+    DVAR_gamma:     return DVAR;
+    DVAR_omega:     return spec_empty;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -826,12 +860,12 @@ static void flush_pending_captures(void)
     for (int i = 0; i < g_capture_count; i++) {
         capture_t *c = g_capture_list[i];
         if (!c->immediate && c->has_pending && c->varname && *c->varname) {
-            char *s = (char *)GC_MALLOC(c->pending.δ + 1);
-            memcpy(s, c->pending.σ, (size_t)c->pending.δ);
-            s[c->pending.δ] = '\0';
+            char *s = (char *)GC_MALLOC(c->pending.delta + 1);
+            memcpy(s, c->pending.sigma, (size_t)c->pending.delta);
+            s[c->pending.delta] = '\0';
             DESCR_t val;
             val.v    = DT_S;
-            val.slen = (uint32_t)c->pending.δ;
+            val.slen = (uint32_t)c->pending.delta;
             val.s    = s;
             NV_SET_fn(c->varname, val);
         }
@@ -898,15 +932,15 @@ int stmt_exec_dyn(const char  *subj_name,
     if (pat.v == DT_P && pat.p) {
         root = bb_build((_PND_t *)pat.p);
     } else if (pat.v == DT_S && pat.s) {
-        _lit_t *lζ = calloc(1, sizeof(_lit_t));
-        lζ->lit = pat.s;
-        lζ->len = (int)strlen(pat.s);
+        _lit_t *lzeta = calloc(1, sizeof(_lit_t));
+        lzeta->lit = pat.s;
+        lzeta->len = (int)strlen(pat.s);
         root.fn = (bb_box_fn)bb_lit;
-        root.ζ  = lζ;
+        root.zeta  = lzeta;
     } else {
-        eps_t *eζ = calloc(1, sizeof(eps_t));
+        eps_t *ezeta = calloc(1, sizeof(eps_t));
         root.fn = (bb_box_fn)bb_eps;
-        root.ζ  = eζ;
+        root.zeta  = ezeta;
     }
 
     /* ── Phase 3: run match ─────────────────────────────────────────── */
@@ -922,7 +956,7 @@ int stmt_exec_dyn(const char  *subj_name,
 
     for (int scan = 0; scan <= scan_limit; scan++) {
         Δ = scan;
-        spec_t result = root.fn(&root.ζ, α);
+        spec_t result = root.fn(&root.zeta, alpha);
         if (!spec_is_empty(result)) {
             match_start = scan;
             match_end   = Δ;
