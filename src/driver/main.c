@@ -48,12 +48,14 @@ void emit_jvm_icon_file(EXPR_t **nodes, int count, FILE *out,
                   const char *filename, const char *outpath, ImportEntry *imports);
 void emit_wasm_icon_file(EXPR_t **nodes, int count, FILE *out,
                   const char *filename);
+void js_emit(Program *prog, FILE *f);
 
 static int asm_mode  = 0;
 static int dump_ir   = 0;
 static int jvm_mode  = 0;
 static int net_mode  = 0;
 static int wasm_mode = 0;
+static int js_mode   = 0;
 static int sc_mode   = 0;
 static int pl_mode   = 0;
 static int icn_mode  = 0;
@@ -96,6 +98,7 @@ static const char *backend_ext(void) {
     if (jvm_mode)  return ".j";
     if (net_mode)  return ".il";
     if (wasm_mode) return ".wat";
+    if (js_mode)   return ".js";
     return ".c";
 }
 
@@ -208,6 +211,7 @@ static int compile_one(const char *infile, const char *outpath, FILE *out) {
     else if (jvm_mode)  jvm_emit(prog, out, infile);
     else if (net_mode)  net_emit(prog, out, infile);
     else if (wasm_mode) emit_wasm(prog, out, infile);
+    else if (js_mode)   js_emit(prog, out);
     else                c_emit(prog, out);
 
 done:
@@ -234,6 +238,7 @@ int main(int argc, char *argv[]) {
         } else if (!strcmp(argv[i], "-icn"))         { icn_mode = 1;
         } else if (!strcmp(argv[i], "-net"))         { net_mode = 1;
         } else if (!strcmp(argv[i], "-wasm"))        { wasm_mode = 1;
+        } else if (!strcmp(argv[i], "-js"))          { js_mode = 1;
         } else if (!strcmp(argv[i], "-asm-body"))    { asm_mode = 1; asm_body_mode = 1;
         } else if (!strcmp(argv[i], "-pl"))          { pl_mode = 1;
         } else if (!strcmp(argv[i], "-sc"))          { sc_mode = 1;

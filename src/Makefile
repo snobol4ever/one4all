@@ -59,6 +59,9 @@ BACKEND_WASM = \
     backend/emit_wasm_icon.c \
     backend/emit_wasm_prolog.c
 
+BACKEND_JS = \
+    backend/emit_js.c
+
 IR = \
     ir/ir_print.c \
     ir/ir_verify.c \
@@ -72,7 +75,7 @@ FRONTEND_ICON = \
     frontend/icon/icon_lower.c \
     frontend/icon/icon_runtime.c
 
-SRCS = $(FRONTEND_SNO) $(FRONTEND_PROLOG) $(FRONTEND_SNOCONE) $(FRONTEND_REBUS) $(FRONTEND_ICON) $(BACKEND_C) $(BACKEND_X64) $(BACKEND_JVM) $(BACKEND_NET) $(BACKEND_WASM) $(IR) $(DRIVER)
+SRCS = $(FRONTEND_SNO) $(FRONTEND_PROLOG) $(FRONTEND_SNOCONE) $(FRONTEND_REBUS) $(FRONTEND_ICON) $(BACKEND_C) $(BACKEND_X64) $(BACKEND_JVM) $(BACKEND_NET) $(BACKEND_WASM) $(BACKEND_JS) $(IR) $(DRIVER)
 OBJS = $(SRCS:.c=.o)
 
 .PHONY: all clean
