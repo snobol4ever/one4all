@@ -41,19 +41,19 @@ int         Ω = 0;
  */
 typedef struct { int dummy; } len1_t;
 
-spec_t bb_len1(len1_t **zetazeta, int entry)
+spec_t bb_len1(len1_t **ζζ, int entry)
 {
-    len1_t *zeta = *zetazeta; (void)zeta;
-    if (entry == alpha)                                     goto LEN1_alpha;
-    if (entry == beta)                                     goto LEN1_beta;
+    len1_t *ζ = *ζζ; (void)ζ;
+    if (entry == α)                                     goto LEN1_α;
+    if (entry == β)                                     goto LEN1_β;
 
     spec_t         LEN1;
-    LEN1_alpha:       if (Δ+1 > Ω)                         goto LEN1_omega;
-                  LEN1 = spec(Σ+Δ,1); Δ+=1;             goto LEN1_gamma;
-    LEN1_beta:       Δ-=1;                                 goto LEN1_omega;
+    LEN1_α:       if (Δ+1 > Ω)                         goto LEN1_ω;
+                  LEN1 = spec(Σ+Δ,1); Δ+=1;             goto LEN1_γ;
+    LEN1_β:       Δ-=1;                                 goto LEN1_ω;
 
-    LEN1_gamma:       return LEN1;
-    LEN1_omega:       return spec_empty;
+    LEN1_γ:       return LEN1;
+    LEN1_ω:       return spec_empty;
 }
 
 /* ── build the pattern graph ─────────────────────────────────────────────── */
@@ -64,12 +64,12 @@ spec_t bb_len1(len1_t **zetazeta, int entry)
  */
 
 /* forward declarations */
-spec_t bb_lit  (void **zetazeta, int entry);
-spec_t bb_alt  (void **zetazeta, int entry);
-spec_t bb_seq  (void **zetazeta, int entry);
-spec_t bb_arbno(void **zetazeta, int entry);
-spec_t bb_pos  (void **zetazeta, int entry);
-spec_t bb_rpos (void **zetazeta, int entry);
+spec_t bb_lit  (void **ζζ, int entry);
+spec_t bb_alt  (void **ζζ, int entry);
+spec_t bb_seq  (void **ζζ, int entry);
+spec_t bb_arbno(void **ζζ, int entry);
+spec_t bb_pos  (void **ζζ, int entry);
+spec_t bb_rpos (void **ζζ, int entry);
 
 /* These are the actual types from the .c files */
 typedef struct { const char *lit; int len; }          lit_t;
@@ -78,7 +78,7 @@ typedef struct { int n; }                             rpos_t;
 
 /* ALT state (from bb_alt.c) */
 #define BB_ALT_MAX 16
-typedef struct { bb_box_fn fn; void *zeta; } bb_child2_t;
+typedef struct { bb_box_fn fn; void *ζ; } bb_child2_t;
 typedef struct {
     int         n;
     bb_child2_t children[BB_ALT_MAX];
@@ -99,25 +99,25 @@ typedef struct {
 typedef struct { spec_t ARBNO; int saved_Δ; } arbno_frame_t;
 typedef struct {
     bb_box_fn    body_fn;
-    void        *body_zeta;
+    void        *body_ζ;
     int          ARBNO_i;
     arbno_frame_t stack[ARBNO_STACK_MAX];
 } arbno_t;
 
 /*
  * The test builds the full pattern graph and runs it against the subject.
- * We verify by collecting all ARBNO_gamma results in a buffer and comparing.
+ * We verify by collecting all ARBNO_γ results in a buffer and comparing.
  */
 
 /* collected OUTPUT values */
 static char output_buf[2048];
 static int  output_pos = 0;
 
-    /* collect: write_str + write_nl (as test_sno_1.c does in ARBNO_gamma) */
+    /* collect: write_str + write_nl (as test_sno_1.c does in ARBNO_γ) */
     static spec_t write_str_nl_collect(spec_t s) {
         if (!spec_is_empty(s)) {
-            memcpy(output_buf + output_pos, s.sigma, (size_t)s.delta);
-            output_pos += s.delta;
+            memcpy(output_buf + output_pos, s.σ, (size_t)s.δ);
+            output_pos += s.δ;
             output_buf[output_pos++] = '\n';  /* write_str */
             output_buf[output_pos++] = '\n';  /* write_nl  */
         }
@@ -144,77 +144,77 @@ int main(void)
     Δ = 0;
 
     /* Build literals */
-    lit_t  bird_zeta = { "Bird", 4 };
-    lit_t  blue_zeta = { "Blue", 4 };
-    len1_t len1_zeta = { 0 };
-    pos_t  pos0_zeta = { 0 };
-    rpos_t rpos0_zeta = { 0 };
+    lit_t  bird_ζ = { "Bird", 4 };
+    lit_t  blue_ζ = { "Blue", 4 };
+    len1_t len1_ζ = { 0 };
+    pos_t  pos0_ζ = { 0 };
+    rpos_t rpos0_ζ = { 0 };
 
     /* Build ALT('Bird' | 'Blue' | LEN(1)) */
-    alt_t alt_zeta = {0};
-    alt_zeta.n = 3;
-    alt_zeta.children[0].fn = (bb_box_fn)bb_lit;    alt_zeta.children[0].zeta = &bird_zeta;
-    alt_zeta.children[1].fn = (bb_box_fn)bb_lit;    alt_zeta.children[1].zeta = &blue_zeta;
-    alt_zeta.children[2].fn = (bb_box_fn)bb_len1;   alt_zeta.children[2].zeta = &len1_zeta;
+    alt_t alt_ζ = {0};
+    alt_ζ.n = 3;
+    alt_ζ.children[0].fn = (bb_box_fn)bb_lit;    alt_ζ.children[0].ζ = &bird_ζ;
+    alt_ζ.children[1].fn = (bb_box_fn)bb_lit;    alt_ζ.children[1].ζ = &blue_ζ;
+    alt_ζ.children[2].fn = (bb_box_fn)bb_len1;   alt_ζ.children[2].ζ = &len1_ζ;
 
     /* Build ARBNO(alt) */
-    arbno_t arbno_zeta = {0};
-    arbno_zeta.body_fn = (bb_box_fn)bb_alt;
-    arbno_zeta.body_zeta  = &alt_zeta;
+    arbno_t arbno_ζ = {0};
+    arbno_ζ.body_fn = (bb_box_fn)bb_alt;
+    arbno_ζ.body_ζ  = &alt_ζ;
 
     /*
      * The full pattern is:
      *   SEQ(POS(0), SEQ(ARBNO(ALT(...)), RPOS(0)))
      *
      * But we drive it manually here to also collect the $ OUTPUT side-effect
-     * (ARBNO's gamma port). We replicate the test_sno_1.c structure directly.
+     * (ARBNO's γ port). We replicate the test_sno_1.c structure directly.
      */
 
     /*
      * Run: POS(0) then enter ARBNO loop, collecting intermediate results
-     * via write_str_collect each time ARBNO_gamma fires, then check RPOS(0).
+     * via write_str_collect each time ARBNO_γ fires, then check RPOS(0).
      * On success, write "Success!"; on failure, "Failure."
      *
      * We implement this as: run the full SEQ, with write_str side-effect
-     * inserted after each ARBNO gamma step.  To do this cleanly we inline the
+     * inserted after each ARBNO γ step.  To do this cleanly we inline the
      * driver loop here, matching test_sno_1.c's structure exactly.
      */
 
     int success = 0;
 
     /* POS(0) */
-    pos_t *pos0 = &pos0_zeta;
-    spec_t pos_r = bb_pos((void **)&pos0, alpha);
-    if (spec_is_empty(pos_r)) goto driver_omega;
+    pos_t *pos0 = &pos0_ζ;
+    spec_t pos_r = bb_pos((void **)&pos0, α);
+    if (spec_is_empty(pos_r)) goto driver_ω;
 
-    /* ARBNO loop: collect each gamma, then check RPOS(0) */
+    /* ARBNO loop: collect each γ, then check RPOS(0) */
     {
-        arbno_t *arb = &arbno_zeta;
-        spec_t arb_r  = bb_arbno((void **)&arb, alpha);
+        arbno_t *arb = &arbno_ζ;
+        spec_t arb_r  = bb_arbno((void **)&arb, α);
         while (1) {
             if (spec_is_empty(arb_r)) break;
 
-            /* ARBNO_gamma: write_str(out, ARBNO); write_nl(out) */
+            /* ARBNO_γ: write_str(out, ARBNO); write_nl(out) */
             write_str_nl_collect(arb_r);
 
             /* RPOS(0) check */
-            rpos_t *rp = &rpos0_zeta;
-            spec_t rpos_r = bb_rpos((void **)&rp, alpha);
+            rpos_t *rp = &rpos0_ζ;
+            spec_t rpos_r = bb_rpos((void **)&rp, α);
             if (!spec_is_empty(rpos_r)) {
-                /* seq_gamma: write_str(out, seq) — final full match, no write_nl */
+                /* seq_γ: write_str(out, seq) — final full match, no write_nl */
                 if (!spec_is_empty(arb_r)) {
-                    memcpy(output_buf + output_pos, arb_r.sigma, (size_t)arb_r.delta);
-                    output_pos += arb_r.delta;
+                    memcpy(output_buf + output_pos, arb_r.σ, (size_t)arb_r.δ);
+                    output_pos += arb_r.δ;
                     output_buf[output_pos++] = '\n';
                 }
                 success = 1;
                 break;
             }
-            arb_r = bb_arbno((void **)&arb, beta);
+            arb_r = bb_arbno((void **)&arb, β);
         }
     }
 
-driver_omega:
+driver_ω:
     /* Append Success!/Failure. — write_sz adds no extra newline */
     if (success) {
         memcpy(output_buf + output_pos, "Success!", 8);
@@ -233,10 +233,10 @@ driver_omega:
     /* Verify against expected (from test_sno_1.c) */
     /* Expected output verified against test_sno_1.c compiled with gcc.
      * write_nl() fires after each write_str(), producing blank lines.
-     * ARBNO gamma fires at every intermediate extension, not just Bird/Blue
+     * ARBNO γ fires at every intermediate extension, not just Bird/Blue
      * boundaries — LEN(1) matches single chars between words too.
-     * Final "BlueGoldBirdFish" appears twice: once from ARBNO_gamma write,
-     * once from the seq_gamma write in write_alpha. */
+     * Final "BlueGoldBirdFish" appears twice: once from ARBNO_γ write,
+     * once from the seq_γ write in write_α. */
     const char *expected =
         "Blue\n\n"
         "BlueG\n\n"

@@ -8,11 +8,11 @@
  *
  *     LABEL:              ACTION                          GOTO
  *     ─────────────────────────────────────────────────────────
- *     POS_alpha:              if (Δ != n)                    → POS_omega
- *                         POS = spec(Σ+Δ, 0);             → POS_gamma
- *     POS_beta:                                             → POS_omega   (no backtrack)
- *     POS_gamma:              return POS;
- *     POS_omega:              return spec_empty;
+ *     POS_α:              if (Δ != n)                    → POS_ω
+ *                         POS = spec(Σ+Δ, 0);             → POS_γ
+ *     POS_β:                                             → POS_ω   (no backtrack)
+ *     POS_γ:              return POS;
+ *     POS_ω:              return spec_empty;
  */
 
 #include "bb_box.h"
@@ -21,59 +21,59 @@
 /* ── POS ─────────────────────────────────────────────────────────────────── */
 typedef struct { int n; } pos_t;
 
-spec_t bb_pos(pos_t **zetazeta, int entry)
+spec_t bb_pos(pos_t **ζζ, int entry)
 {
-    pos_t *zeta = *zetazeta;
+    pos_t *ζ = *ζζ;
 
-    if (entry == alpha)                                     goto POS_alpha;
-    if (entry == beta)                                     goto POS_beta;
+    if (entry == α)                                     goto POS_α;
+    if (entry == β)                                     goto POS_β;
 
     /*------------------------------------------------------------------------*/
     spec_t         POS;
 
-    POS_alpha:        if (Δ != zeta->n)                        goto POS_omega;
-                  POS = spec(Σ+Δ, 0);                    goto POS_gamma;
+    POS_α:        if (Δ != ζ->n)                        goto POS_ω;
+                  POS = spec(Σ+Δ, 0);                    goto POS_γ;
 
-    POS_beta:                                              goto POS_omega;
+    POS_β:                                              goto POS_ω;
 
     /*------------------------------------------------------------------------*/
-    POS_gamma:        return POS;
-    POS_omega:        return spec_empty;
+    POS_γ:        return POS;
+    POS_ω:        return spec_empty;
 }
 
 pos_t *bb_pos_new(int n)
 {
-    pos_t *zeta = calloc(1, sizeof(pos_t));
-    zeta->n = n;
-    return zeta;
+    pos_t *ζ = calloc(1, sizeof(pos_t));
+    ζ->n = n;
+    return ζ;
 }
 
 /* ── RPOS ────────────────────────────────────────────────────────────────── */
 typedef struct { int n; } rpos_t;
 
-spec_t bb_rpos(rpos_t **zetazeta, int entry)
+spec_t bb_rpos(rpos_t **ζζ, int entry)
 {
-    rpos_t *zeta = *zetazeta;
+    rpos_t *ζ = *ζζ;
 
-    if (entry == alpha)                                     goto RPOS_alpha;
-    if (entry == beta)                                     goto RPOS_beta;
+    if (entry == α)                                     goto RPOS_α;
+    if (entry == β)                                     goto RPOS_β;
 
     /*------------------------------------------------------------------------*/
     spec_t         RPOS;
 
-    RPOS_alpha:       if (Δ != Ω - zeta->n)                   goto RPOS_omega;
-                  RPOS = spec(Σ+Δ, 0);                   goto RPOS_gamma;
+    RPOS_α:       if (Δ != Ω - ζ->n)                   goto RPOS_ω;
+                  RPOS = spec(Σ+Δ, 0);                   goto RPOS_γ;
 
-    RPOS_beta:                                             goto RPOS_omega;
+    RPOS_β:                                             goto RPOS_ω;
 
     /*------------------------------------------------------------------------*/
-    RPOS_gamma:       return RPOS;
-    RPOS_omega:       return spec_empty;
+    RPOS_γ:       return RPOS;
+    RPOS_ω:       return spec_empty;
 }
 
 rpos_t *bb_rpos_new(int n)
 {
-    rpos_t *zeta = calloc(1, sizeof(rpos_t));
-    zeta->n = n;
-    return zeta;
+    rpos_t *ζ = calloc(1, sizeof(rpos_t));
+    ζ->n = n;
+    return ζ;
 }

@@ -12,19 +12,19 @@
  *
  *     LABEL:              ACTION                          GOTO
  *     ─────────────────────────────────────────────────────────
- *     ARBNO_alpha:            zeta = &stack[ARBNO_i=0];
- *                         zeta->ARBNO = spec(Σ+Δ,0);         → alt_alpha    (body alpha)
- *     ARBNO_beta:            zeta = &stack[++ARBNO_i];
- *                         zeta->ARBNO = ARBNO;              → alt_alpha    (body alpha again)
- *     alt_gamma:              ARBNO = spec_cat(zeta->ARBNO, alt);    → ARBNO_gamma  (accumulated so far)
- *     alt_omega:              if (ARBNO_i <= 0)              → ARBNO_omega
- *                         ARBNO_i--; zeta = &stack[ARBNO_i];→ alt_beta    (backtrack into body)
+ *     ARBNO_α:            ζ = &stack[ARBNO_i=0];
+ *                         ζ->ARBNO = spec(Σ+Δ,0);         → alt_α    (body α)
+ *     ARBNO_β:            ζ = &stack[++ARBNO_i];
+ *                         ζ->ARBNO = ARBNO;              → alt_α    (body α again)
+ *     alt_γ:              ARBNO = spec_cat(ζ->ARBNO, alt);    → ARBNO_γ  (accumulated so far)
+ *     alt_ω:              if (ARBNO_i <= 0)              → ARBNO_ω
+ *                         ARBNO_i--; ζ = &stack[ARBNO_i];→ alt_β    (backtrack into body)
  *
- *     ARBNO_gamma:            return ARBNO;
- *     ARBNO_omega:            return spec_empty;
+ *     ARBNO_γ:            return ARBNO;
+ *     ARBNO_ω:            return spec_empty;
  *
  * The ARBNO stack records one entry per successful body match.
- * On beta, we walk back through the stack retrying each body iteration.
+ * On β, we walk back through the stack retrying each body iteration.
  *
  * Zero-advance guard (SNOBOL4 spec §3): if body matched zero chars,
  * ARBNO succeeds immediately at current position (prevents infinite loop).
@@ -43,68 +43,68 @@ typedef struct {
 
 typedef struct {
     bb_box_fn    body_fn;                    /* body box function */
-    void        *body_zeta;                     /* body box state */
+    void        *body_ζ;                     /* body box state */
     int          ARBNO_i;                    /* current stack depth */
     arbno_frame_t stack[ARBNO_STACK_MAX];    /* frame stack */
 } arbno_t;
 
 /* ── bb_arbno ────────────────────────────────────────────────────────────── */
-spec_t bb_arbno(arbno_t **zetazeta, int entry)
+spec_t bb_arbno(arbno_t **ζζ, int entry)
 {
-    arbno_t *zeta = *zetazeta;
+    arbno_t *ζ = *ζζ;
 
-    if (entry == alpha)                                     goto ARBNO_alpha;
-    if (entry == beta)                                     goto ARBNO_beta;
+    if (entry == α)                                     goto ARBNO_α;
+    if (entry == β)                                     goto ARBNO_β;
 
     /*------------------------------------------------------------------------*/
     spec_t             ARBNO;
     spec_t             body_r;
     arbno_frame_t    *frame;
 
-    ARBNO_alpha:      zeta->ARBNO_i          = 0;
-                  frame               = &zeta->stack[0];
+    ARBNO_α:      ζ->ARBNO_i          = 0;
+                  frame               = &ζ->stack[0];
                   frame->ARBNO        = spec(Σ+Δ, 0);
                   frame->saved_Δ      = Δ;
-                  body_r = zeta->body_fn(&zeta->body_zeta, alpha);
-                  if (spec_is_empty(body_r))                 goto body_omega;
-                  else                                  goto body_gamma;
+                  body_r = ζ->body_fn(&ζ->body_ζ, α);
+                  if (spec_is_empty(body_r))                 goto body_ω;
+                  else                                  goto body_γ;
 
-    ARBNO_beta:      zeta->ARBNO_i++;
-                  frame               = &zeta->stack[zeta->ARBNO_i];
-                  frame->ARBNO        = zeta->stack[zeta->ARBNO_i-1].ARBNO;
+    ARBNO_β:      ζ->ARBNO_i++;
+                  frame               = &ζ->stack[ζ->ARBNO_i];
+                  frame->ARBNO        = ζ->stack[ζ->ARBNO_i-1].ARBNO;
                   frame->saved_Δ      = Δ;
                   /* try to match body one more time */
-                  body_r = zeta->body_fn(&zeta->body_zeta, alpha);
-                  if (spec_is_empty(body_r))                 goto body_omega;
-                  else                                  goto body_gamma;
+                  body_r = ζ->body_fn(&ζ->body_ζ, α);
+                  if (spec_is_empty(body_r))                 goto body_ω;
+                  else                                  goto body_γ;
 
-    body_gamma:       frame  = &zeta->stack[zeta->ARBNO_i];
+    body_γ:       frame  = &ζ->stack[ζ->ARBNO_i];
                   /* zero-advance guard */
-                  if (Δ == frame->saved_Δ)              goto ARBNO_gamma_now;
+                  if (Δ == frame->saved_Δ)              goto ARBNO_γ_now;
                   ARBNO  = spec_cat(frame->ARBNO, body_r);
-                  zeta->stack[zeta->ARBNO_i].ARBNO = ARBNO;  goto ARBNO_gamma_now;
+                  ζ->stack[ζ->ARBNO_i].ARBNO = ARBNO;  goto ARBNO_γ_now;
 
-    ARBNO_gamma_now:  ARBNO  = zeta->stack[zeta->ARBNO_i].ARBNO; goto ARBNO_gamma;
+    ARBNO_γ_now:  ARBNO  = ζ->stack[ζ->ARBNO_i].ARBNO; goto ARBNO_γ;
 
-    body_omega:       if (zeta->ARBNO_i <= 0)                 goto ARBNO_omega;
-                  zeta->ARBNO_i--;
-                  frame  = &zeta->stack[zeta->ARBNO_i];
+    body_ω:       if (ζ->ARBNO_i <= 0)                 goto ARBNO_ω;
+                  ζ->ARBNO_i--;
+                  frame  = &ζ->stack[ζ->ARBNO_i];
                   /* restore cursor to before this failed iteration */
                   Δ      = frame->saved_Δ;
-                  body_r = zeta->body_fn(&zeta->body_zeta, beta);
-                  if (spec_is_empty(body_r))                 goto body_omega;
-                  else                                  goto body_gamma;
+                  body_r = ζ->body_fn(&ζ->body_ζ, β);
+                  if (spec_is_empty(body_r))                 goto body_ω;
+                  else                                  goto body_γ;
 
     /*------------------------------------------------------------------------*/
-    ARBNO_gamma:      return ARBNO;
-    ARBNO_omega:      return spec_empty;
+    ARBNO_γ:      return ARBNO;
+    ARBNO_ω:      return spec_empty;
 }
 
 /* ── bb_arbno_new ────────────────────────────────────────────────────────── */
 arbno_t *bb_arbno_new(bb_box_fn body_fn)
 {
-    arbno_t *zeta = calloc(1, sizeof(arbno_t));
-    zeta->body_fn = body_fn;
-    zeta->body_zeta  = NULL;
-    return zeta;
+    arbno_t *ζ = calloc(1, sizeof(arbno_t));
+    ζ->body_fn = body_fn;
+    ζ->body_ζ  = NULL;
+    return ζ;
 }
