@@ -107,7 +107,7 @@ typedef enum {
 typedef struct _PND {
     _XKIND_t     kind;
     int          materialising;
-    const char  *sval;          /* XCHR/XSPNC/XBRKC/XANYC/XNNYC/XDSAR */
+    const char  *STRVAL_fn;     /* XCHR/XSPNC/XBRKC/XANYC/XNNYC/XDSAR — matches PATND_t layout */
     int64_t      num;           /* XLNTH/XPOSI/XRPSI/XTB/XRTB */
     struct _PND *left;          /* XCAT/XOR/XARBN/XFNCE/XFNME/XNME */
     struct _PND *right;         /* XCAT/XOR */
@@ -606,7 +606,7 @@ static bb_node_t bb_build(_PND_t *p)
     /* ── literal string ─────────────────────────────────────────────── */
     case _XCHR: {
         _lit_t *ζ = calloc(1, sizeof(_lit_t));
-        ζ->lit = p->sval ? p->sval : "";
+        ζ->lit = p->STRVAL_fn ? p->STRVAL_fn : "";
         ζ->len = (int)strlen(ζ->lit);
         n.fn = (bb_box_fn)bb_lit;
         n.ζ  = ζ;
@@ -647,7 +647,7 @@ static bb_node_t bb_build(_PND_t *p)
     /* ── SPAN(chars) ────────────────────────────────────────────────── */
     case _XSPNC: {
         span_t *ζ = calloc(1, sizeof(span_t));
-        ζ->chars = p->sval ? p->sval : "";
+        ζ->chars = p->STRVAL_fn ? p->STRVAL_fn : "";
         n.fn = (bb_box_fn)bb_span;
         n.ζ  = ζ;
         n.ζ_size = sizeof(*ζ);
@@ -657,7 +657,7 @@ static bb_node_t bb_build(_PND_t *p)
     /* ── BREAK(chars) ───────────────────────────────────────────────── */
     case _XBRKC: {
         brk_t *ζ = calloc(1, sizeof(brk_t));
-        ζ->chars = p->sval ? p->sval : "";
+        ζ->chars = p->STRVAL_fn ? p->STRVAL_fn : "";
         n.fn = (bb_box_fn)bb_brk;
         n.ζ  = ζ;
         n.ζ_size = sizeof(*ζ);
@@ -667,7 +667,7 @@ static bb_node_t bb_build(_PND_t *p)
     /* ── ANY(chars) ─────────────────────────────────────────────────── */
     case _XANYC: {
         any_t *ζ = calloc(1, sizeof(any_t));
-        ζ->chars = p->sval ? p->sval : "";
+        ζ->chars = p->STRVAL_fn ? p->STRVAL_fn : "";
         n.fn = (bb_box_fn)bb_any;
         n.ζ  = ζ;
         n.ζ_size = sizeof(*ζ);
@@ -677,7 +677,7 @@ static bb_node_t bb_build(_PND_t *p)
     /* ── NOTANY(chars) ──────────────────────────────────────────────── */
     case _XNNYC: {
         notany_t *ζ = calloc(1, sizeof(notany_t));
-        ζ->chars = p->sval ? p->sval : "";
+        ζ->chars = p->STRVAL_fn ? p->STRVAL_fn : "";
         n.fn = (bb_box_fn)bb_notany;
         n.ζ  = ζ;
         n.ζ_size = sizeof(*ζ);
@@ -827,7 +827,7 @@ static bb_node_t bb_build(_PND_t *p)
          *
          * Store only the variable name; the box fetches live at α.
          */
-        const char *name = (p->kind == _XDSAR) ? p->sval
+        const char *name = (p->kind == _XDSAR) ? p->STRVAL_fn
                          : (p->var.v == DT_S)  ? p->var.s : NULL;
         if (name && *name) {
             deferred_var_t *ζ = calloc(1, sizeof(deferred_var_t));
@@ -980,8 +980,14 @@ static spec_t bb_deferred_var(deferred_var_t **ζζ, int entry)
 
                         /* Reset child match state for a clean α.
                          * If rebuilt, ζ is already fresh (calloc).
-                         * If reused, memset to 0 to clear prior match state. */
-                        if (!rebuilt && ζ->child_ζ && ζ->child_ζ_size)
+                         * If reused, memset to 0 to clear prior match state.
+                         *
+                         * DYN-12 FIX: do NOT memset bb_lit nodes — their lit/len
+                         * fields are configuration, not mutable match state.
+                         * Memset zeroes len, causing bb_lit to match everywhere
+                         * with δ=0. Only memset nodes whose child_fn is NOT bb_lit. */
+                        if (!rebuilt && ζ->child_ζ && ζ->child_ζ_size
+                                && ζ->child_fn != (bb_box_fn)bb_lit)
                             memset(ζ->child_ζ, 0, ζ->child_ζ_size);
                     }
                     if (!ζ->child_fn)                         goto DVAR_ω;
@@ -1043,16 +1049,21 @@ static void flush_pending_captures(void)
     for (int i = 0; i < g_capture_count; i++) {
         capture_t *c = g_capture_list[i];
         if (!c->immediate && c->has_pending && c->varname && *c->varname) {
-            char *s = (char *)GC_MALLOC(c->pending.δ + 1);
-            memcpy(s, c->pending.σ, (size_t)c->pending.δ);
-            s[c->pending.δ] = '\0';
+            /* Snapshot before clearing — NV_SET_fn may re-enter bb_capture
+             * (e.g. OUTPUT NV hook) and overwrite ζ->pending with δ=0. */
+            spec_t snap = c->pending;
+            c->has_pending = 0;   /* clear before NV_SET_fn to make re-entry a no-op */
+            char *s = (char *)GC_MALLOC(snap.δ + 1);
+            memcpy(s, snap.σ, (size_t)snap.δ);
+            s[snap.δ] = '\0';
             DESCR_t val;
             val.v    = DT_S;
-            val.slen = (uint32_t)c->pending.δ;
+            val.slen = (uint32_t)snap.δ;
             val.s    = s;
             NV_SET_fn(c->varname, val);
+        } else {
+            c->has_pending = 0;
         }
-        c->has_pending = 0;
     }
     g_capture_count = 0;
 }
@@ -1223,7 +1234,7 @@ int dyn_cache_test_run(const char *lit, int n_iters)
     static _PND_t node;
     node.kind         = _XCHR;
     node.materialising = 0;
-    node.sval         = lit;
+    node.STRVAL_fn         = lit;
     node.num          = 0;
     node.left = node.right = NULL;
     node.args = NULL;
@@ -1307,7 +1318,7 @@ int dyn_deferred_var_test(void)
     /* Build deferred_var_t for *T15_PAT */
     static _PND_t dsar_node;
     dsar_node.kind  = _XDSAR;
-    dsar_node.sval  = "T15_PAT";
+    dsar_node.STRVAL_fn  = "T15_PAT";
     dsar_node.left  = dsar_node.right = NULL;
     dsar_node.args  = NULL;
     dsar_node.nargs = 0;
