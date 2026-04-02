@@ -1502,7 +1502,7 @@ DESCR_t NV_GET_fn(const char *name) {
     _var_init();
     if (!name) return NULVCL;
     /* Special I/O variables */
-    if (strcmp(name, "INPUT") == 0) return input_read();
+    if (strcasecmp(name, "INPUT") == 0) return input_read();
     /* Channel-bound input variable? */
     _io_chan_setup();
     int ch = _io_chan_find_by_var(name);
@@ -1513,12 +1513,12 @@ DESCR_t NV_GET_fn(const char *name) {
         return STRVAL(GC_strdup(_io_chan[ch].buf));
     }
     /* Protected/unprotected keywords backed by C globals */
-    if (strcmp(name, "STCOUNT")  == 0) return INTVAL(kw_stcount);
-    if (strcmp(name, "STNO")     == 0) return INTVAL(kw_stcount);
-    if (strcmp(name, "STLIMIT")  == 0) return INTVAL(kw_stlimit);
-    if (strcmp(name, "ANCHOR")   == 0) return INTVAL(kw_anchor);
-    if (strcmp(name, "TRIM")     == 0) return INTVAL(kw_trim);
-    if (strcmp(name, "FULLSCAN") == 0) return INTVAL(kw_fullscan);
+    if (strcasecmp(name, "STCOUNT")  == 0) return INTVAL(kw_stcount);
+    if (strcasecmp(name, "STNO")     == 0) return INTVAL(kw_stcount);
+    if (strcasecmp(name, "STLIMIT")  == 0) return INTVAL(kw_stlimit);
+    if (strcasecmp(name, "ANCHOR")   == 0) return INTVAL(kw_anchor);
+    if (strcasecmp(name, "TRIM")     == 0) return INTVAL(kw_trim);
+    if (strcasecmp(name, "FULLSCAN") == 0) return INTVAL(kw_fullscan);
     unsigned h = _var_hash(name);
     for (NV_t *e = _var_buckets[h]; e; e = e->next)
         if (strcmp(e->name, name) == 0) return e->val;
@@ -1538,17 +1538,17 @@ void NV_SET_fn(const char *name, DESCR_t val) {
         return;
     }
     /* Special I/O variables */
-    if (strcmp(name, "OUTPUT") == 0) { output_val(val); return; }
-    if (strcmp(name, "TERMINAL") == 0) {
+    if (strcasecmp(name, "OUTPUT") == 0) { output_val(val); return; }
+    if (strcasecmp(name, "TERMINAL") == 0) {
         const char *s = (val.v == DT_S) ? (const char *)val.i : "";
         fprintf(stderr, "%s\n", s);
         return;
     }
     /* Unprotected keywords backed by C globals */
-    if (strcmp(name, "STLIMIT")  == 0) { kw_stlimit  = (val.v==DT_I)?val.i:(int64_t)to_real(val); return; }
-    if (strcmp(name, "ANCHOR")   == 0) { kw_anchor   = (val.v==DT_I)?val.i:(int64_t)to_real(val); return; }
-    if (strcmp(name, "TRIM")     == 0) { kw_trim     = (val.v==DT_I)?val.i:(int64_t)to_real(val); return; }
-    if (strcmp(name, "FULLSCAN") == 0) { kw_fullscan = (val.v==DT_I)?val.i:(int64_t)to_real(val); return; }
+    if (strcasecmp(name, "STLIMIT")  == 0) { kw_stlimit  = (val.v==DT_I)?val.i:(int64_t)to_real(val); return; }
+    if (strcasecmp(name, "ANCHOR")   == 0) { kw_anchor   = (val.v==DT_I)?val.i:(int64_t)to_real(val); return; }
+    if (strcasecmp(name, "TRIM")     == 0) { kw_trim     = (val.v==DT_I)?val.i:(int64_t)to_real(val); return; }
+    if (strcasecmp(name, "FULLSCAN") == 0) { kw_fullscan = (val.v==DT_I)?val.i:(int64_t)to_real(val); return; }
     unsigned h = _var_hash(name);
     for (NV_t *e = _var_buckets[h]; e; e = e->next) {
         if (strcmp(e->name, name) == 0) {

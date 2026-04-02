@@ -253,6 +253,23 @@ static DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                     DESCR_t repl_val = s->replacement ? interp_eval(s->replacement) : NULVCL;
                     if (IS_FAIL_fn(repl_val)) succeeded = 0;
                     else { NV_SET_fn(subj_name, repl_val); succeeded = 1; }
+                } else if (s->has_eq && s->subject && s->subject->kind == E_KW && s->subject->sval) {
+                    DESCR_t repl_val = s->replacement ? interp_eval(s->replacement) : NULVCL;
+                    if (IS_FAIL_fn(repl_val)) succeeded = 0;
+                    else { NV_SET_fn(s->subject->sval, repl_val); succeeded = 1; }
+                } else if (s->has_eq && s->subject && s->subject->kind == E_IDX &&
+                           s->subject->nchildren >= 2) {
+                    DESCR_t base = interp_eval(s->subject->children[0]);
+                    DESCR_t idx  = interp_eval(s->subject->children[1]);
+                    DESCR_t rv   = s->replacement ? interp_eval(s->replacement) : NULVCL;
+                    if (IS_FAIL_fn(base)||IS_FAIL_fn(idx)||IS_FAIL_fn(rv)) succeeded = 0;
+                    else {
+                        if (s->subject->nchildren == 3) {
+                            DESCR_t idx2 = interp_eval(s->subject->children[2]);
+                            subscript_set2(base, idx, idx2, rv);
+                        } else { subscript_set(base, idx, rv); }
+                        succeeded = 1;
+                    }
                 } else if (s->has_eq && s->subject && s->subject->kind == E_INDR) {
                     DESCR_t name_d = interp_eval(
                         s->subject->nchildren > 0 ? s->subject->children[0] : NULL);
@@ -345,6 +362,23 @@ static DESCR_t interp_eval(EXPR_t *e)
     case E_NEG:
         if (e->nchildren < 1) return FAILDESCR;
         return neg(interp_eval(e->children[0]));
+
+    case E_UPLUS: {
+        /* Unary + coerces operand to numeric (int or real) */
+        if (e->nchildren < 1) return FAILDESCR;
+        DESCR_t v = interp_eval(e->children[0]);
+        if (IS_FAIL_fn(v)) return FAILDESCR;
+        if (v.v == DT_I || v.v == DT_R) return v;
+        /* String → try integer, then real */
+        const char *s = VARVAL_fn(v);
+        if (!s || !*s) return INTVAL(0);
+        char *end = NULL;
+        long long iv = strtoll(s, &end, 10);
+        if (end && *end == '\0') return INTVAL(iv);
+        double dv = strtod(s, &end);
+        if (end && *end == '\0') return REALVAL(dv);
+        return INTVAL(0);
+    }
 
     case E_ADD: {
         if (e->nchildren < 2) return FAILDESCR;
@@ -538,8 +572,10 @@ static void execute_program(Program *prog)
     STMT_t *s = prog->head;
     int step_limit = 10000000;   /* guard against infinite loops in smoke tests */
 
+    int stno = 0;
     while (s && step_limit-- > 0) {
         if (s->is_end) break;
+        comm_stno(++stno);
 
         /* Skip Prolog/Icon nodes that sneak in via shared parser */
         if (s->subject && (s->subject->kind == E_CHOICE ||
@@ -593,6 +629,38 @@ static void execute_program(Program *prog)
                 succeeded = 0;
             } else {
                 NV_SET_fn(subj_name, repl_val);
+                succeeded = 1;
+            }
+
+        /* ── subscript assignment: A<i> = expr ─────────────────────── */
+        } else if (s->has_eq && s->subject &&
+                   s->subject->kind == E_IDX) {
+            EXPR_t *idx_e = s->subject;
+            if (idx_e->nchildren >= 2) {
+                DESCR_t base = interp_eval(idx_e->children[0]);
+                DESCR_t idx  = interp_eval(idx_e->children[1]);
+                DESCR_t repl_val = s->replacement ? interp_eval(s->replacement) : NULVCL;
+                if (IS_FAIL_fn(base) || IS_FAIL_fn(idx) || IS_FAIL_fn(repl_val)) {
+                    succeeded = 0;
+                } else {
+                    if (idx_e->nchildren == 3) {
+                        DESCR_t idx2 = interp_eval(idx_e->children[2]);
+                        subscript_set2(base, idx, idx2, repl_val);
+                    } else {
+                        subscript_set(base, idx, repl_val);
+                    }
+                    succeeded = 1;
+                }
+            } else { succeeded = 0; }
+
+        /* ── keyword assignment: &KW = expr ───────────────────────── */
+        } else if (s->has_eq && s->subject &&
+                   s->subject->kind == E_KW && s->subject->sval) {
+            DESCR_t repl_val = s->replacement ? interp_eval(s->replacement) : NULVCL;
+            if (IS_FAIL_fn(repl_val)) {
+                succeeded = 0;
+            } else {
+                NV_SET_fn(s->subject->sval, repl_val);
                 succeeded = 1;
             }
 
