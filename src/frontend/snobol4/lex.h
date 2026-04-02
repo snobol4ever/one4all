@@ -14,6 +14,10 @@ typedef enum {
     T_LANGLE, T_RANGLE,
     T_COLON, T_SGOTO, T_FGOTO,
     T_END,
+    /* Statement-structure tokens emitted by the one-pass lexer */
+    T_LABEL,     /* column-1 identifier; sval=name, ival=1 if END */
+    T_GOTO,      /* goto field string; sval=goto_str               */
+    T_STMT_END,  /* end of one logical statement                    */
     T_EOF, T_ERR
 } TokKind;
 
@@ -25,7 +29,8 @@ typedef struct {
     int         lineno;
 } Token;
 
-/* Lexer — struct exposed so parse.c can inject T_WS via peek slot */
+/* Lexer state.  src==NULL → drain token queue (main program stream).
+ * src!=NULL  → tokenise a string directly (goto-field parsing only). */
 typedef struct Lex {
     const char *src;
     int         pos;
@@ -40,7 +45,12 @@ Token lex_next(Lex *lx);
 Token lex_peek(Lex *lx);
 int   lex_at_end(Lex *lx);
 
-/* SnoLine — split source line (lex.c produces, parse.c consumes) */
+/* Checkpoint for speculative lookahead */
+typedef struct { int pos; Token peek; int peeked; } LexMark;
+static inline LexMark lex_mark(Lex *lx)             { LexMark m; m.pos=lx->pos; m.peek=lx->peek; m.peeked=lx->peeked; return m; }
+static inline void    lex_restore(Lex *lx, LexMark m){ lx->pos=m.pos; lx->peek=m.peek; lx->peeked=m.peeked; }
+
+/* SnoLine / LineArray kept for scrip-cc emitter path (not used by scrip-interp) */
 typedef struct SnoLine {
     char *label;
     char *body;
@@ -55,8 +65,3 @@ typedef struct {
 } LineArray;
 
 #endif /* LEX_H */
-
-/* Checkpoint for speculative lookahead — save and restore full lexer state */
-typedef struct { int pos; Token peek; int peeked; } LexMark;
-static inline LexMark lex_mark(Lex *lx) { LexMark m; m.pos=lx->pos; m.peek=lx->peek; m.peeked=lx->peeked; return m; }
-static inline void lex_restore(Lex *lx, LexMark m) { lx->pos=m.pos; lx->peek=m.peek; lx->peeked=m.peeked; }

@@ -796,7 +796,7 @@ static STMT_t *parse_body_field(const char *body, int lineno) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
- * Top-level: convert LineArray → Program
+ * Top-level: consume token stream → Program
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ── M-G4-SPLIT-SEQ-CONCAT: post-parse E_SEQ context fixup ──────────────────
@@ -832,94 +832,195 @@ static int repl_is_pat_tree(EXPR_t *e) {
     return 0;
 }
 
-Program *parse_program(LineArray *lines) {
+Program *parse_program_tokens(Lex *stream) {
     Program *prog = calloc(1, sizeof *prog);
+#define BODY_CAP 2048
 
-    for (int i=0; i<lines->n; i++) {
-        SnoLine *sl = &lines->a[i];
-        STMT_t *s;
+    while (1) {
+        Token t = lex_peek(stream);
+        if (t.kind == T_EOF) break;
 
-        /* ---- EXPORT / IMPORT control lines (LP-4) ----
-         * EXPORT appears as label="EXPORT", body=<name>
-         * IMPORT appears as label="IMPORT", body=<lang>.<name>
-         * These are not SNOBOL4 statements — consume and skip. */
-        if (sl->label && strcasecmp(sl->label, "EXPORT") == 0) {
-            if (sl->body && sl->body[0]) {
-                ExportEntry *e = calloc(1, sizeof *e);
-                e->name = strdup(sl->body);
-                /* uppercase the name to match SNOBOL4 convention */
-                for (char *p = e->name; *p; p++)
-                    *p = (char)toupper((unsigned char)*p);
-                e->next = prog->exports;
-                prog->exports = e;
+        char *label    = NULL;
+        char *goto_str = NULL;
+        int   is_end   = 0;
+        int   lineno   = t.lineno;
+
+        /* Optional label */
+        if (t.kind == T_LABEL) {
+            lex_next(stream);
+            label  = (char *)t.sval;
+            is_end = (int)t.ival;
+            lineno = t.lineno;
+            t = lex_peek(stream);
+        }
+
+        /* Consume empty statement */
+        if (t.kind == T_STMT_END) {
+            lex_next(stream);
+            if (label || is_end) {
+                STMT_t *s2 = stmt_new(); s2->lineno=lineno;
+                if (label) s2->label=strdup(label);
+                s2->is_end=is_end; s2->next=NULL;
+                if (!prog->head) prog->head=prog->tail=s2;
+                else { prog->tail->next=s2; prog->tail=s2; }
+                prog->nstmts++;
             }
             continue;
         }
-        if (sl->label && strcasecmp(sl->label, "IMPORT") == 0) {
-            if (sl->body && sl->body[0]) {
-                /* body formats:
-                 *   assembly.METHOD           — two-part (preferred, no lang prefix)
-                 *   lang.assembly.METHOD      — three-part (legacy, lang ignored)
-                 * Assembly name preserves case (CLR is case-sensitive).
-                 * METHOD is uppercased to match EXPORT convention.
-                 */
-                char *dot1 = strchr(sl->body, '.');
-                ImportEntry *e = calloc(1, sizeof *e);
+        if (t.kind == T_EOF) {
+            if (label || is_end) {
+                STMT_t *s2 = stmt_new(); s2->lineno=lineno;
+                if (label) s2->label=strdup(label);
+                s2->is_end=is_end; s2->next=NULL;
+                if (!prog->head) prog->head=prog->tail=s2;
+                else { prog->tail->next=s2; prog->tail=s2; }
+                prog->nstmts++;
+            }
+            break;
+        }
+
+        /* Collect body tokens */
+        Token body_toks[BODY_CAP]; int nbody = 0;
+        while (1) {
+            t = lex_peek(stream);
+            if (t.kind==T_GOTO||t.kind==T_STMT_END||t.kind==T_EOF) break;
+            if (nbody < BODY_CAP) body_toks[nbody++] = t;
+            lex_next(stream);
+        }
+        if (lex_peek(stream).kind == T_GOTO) {
+            goto_str = (char *)lex_peek(stream).sval;
+            lex_next(stream);
+        }
+        if (lex_peek(stream).kind == T_STMT_END) lex_next(stream);
+
+        /* EXPORT */
+        if (label && strcasecmp(label,"EXPORT")==0) {
+            if (nbody>0 && body_toks[0].sval) {
+                ExportEntry *e = calloc(1,sizeof*e);
+                e->name = strdup(body_toks[0].sval);
+                for (char *p=e->name;*p;p++) *p=(char)toupper((unsigned char)*p);
+                e->next=prog->exports; prog->exports=e;
+            }
+            continue;
+        }
+        /* IMPORT */
+        if (label && strcasecmp(label,"IMPORT")==0) {
+            char ibuf[512]; int ilen=0;
+            for (int i=0;i<nbody&&ilen<510;i++) {
+                if (body_toks[i].kind==T_DOT) { ibuf[ilen++]='.'; }
+                else if (body_toks[i].sval) { int l=(int)strlen(body_toks[i].sval); memcpy(ibuf+ilen,body_toks[i].sval,l); ilen+=l; }
+            }
+            ibuf[ilen]='\0';
+            if (ilen>0) {
+                ImportEntry *e=calloc(1,sizeof*e);
+                char *dot1=strchr(ibuf,'.');
                 if (dot1) {
-                    char *dot2 = strchr(dot1 + 1, '.');
-                    if (dot2) {
-                        /* three-part: lang . assembly . method — lang ignored */
-                        e->lang   = strndup(sl->body, (size_t)(dot1 - sl->body));
-                        e->name   = strndup(dot1 + 1, (size_t)(dot2 - dot1 - 1));
-                        e->method = strdup(dot2 + 1);
-                    } else {
-                        /* two-part: assembly . method */
-                        e->lang   = strdup("");
-                        e->name   = strndup(sl->body, (size_t)(dot1 - sl->body));
-                        e->method = strdup(dot1 + 1);
-                    }
-                    /* method name preserved verbatim — caller must match case */
-                } else {
-                    /* bare name: use as both assembly and method */
-                    e->lang   = strdup("");
-                    e->name   = strdup(sl->body);
-                    e->method = strdup(sl->body);
-                }
-                e->next = prog->imports;
-                prog->imports = e;
+                    char *dot2=strchr(dot1+1,'.');
+                    if (dot2) { e->lang=strndup(ibuf,(size_t)(dot1-ibuf)); e->name=strndup(dot1+1,(size_t)(dot2-dot1-1)); e->method=strdup(dot2+1); }
+                    else { e->lang=strdup(""); e->name=strndup(ibuf,(size_t)(dot1-ibuf)); e->method=strdup(dot1+1); }
+                } else { e->lang=strdup(""); e->name=strdup(ibuf); e->method=strdup(ibuf); }
+                e->next=prog->imports; prog->imports=e;
             }
             continue;
         }
-        /* ---- end EXPORT/IMPORT ---- */
 
-        if (sl->is_end) {
-            s = stmt_new();
-            s->label   = sl->label ? strdup(sl->label) : strdup("END");
-            s->is_end  = 1;
-            s->lineno  = sl->lineno;
-        } else {
-            s = parse_body_field(sl->body, sl->lineno);
-            if (!s) s = stmt_new();   /* label-only or blank line */
-            s->lineno = sl->lineno;
-            if (sl->label) s->label = strdup(sl->label);
-            s->go = parse_goto_field(sl->goto_str, sl->lineno);
-            /* M-G4-SPLIT-SEQ-CONCAT: fix value-context E_SEQ→E_CAT.
-             * s->subject is always value context.
-             * s->replacement is value context UNLESS it is a pattern expression
-             * (e.g. PAT = " the " ARB . OUTPUT ...) — guard with repl_is_pat_tree.
-             * s->pattern is pattern context — E_SEQ already correct, no action. */
+        /* Build STMT_t */
+        STMT_t *s = stmt_new();
+        s->lineno = lineno;
+        if (label) s->label = strdup(label);
+        s->go = parse_goto_field(goto_str, lineno);
+
+        if (is_end) {
+            if (!s->label) s->label = strdup("END");
+            s->is_end = 1;
+        } else if (nbody > 0) {
+            /* Reconstruct body string from token buffer */
+            char bbuf[8192]; int bpos=0;
+            for (int i=0;i<nbody&&bpos<8190;i++) {
+                Token *tk=&body_toks[i];
+                char tmp[256]; int tlen=0;
+                switch(tk->kind) {
+                    case T_WS:       tmp[tlen++]=' '; break;
+                    case T_IDENT: case T_END:
+                        if(tk->sval){int l=(int)strlen(tk->sval);if(l<250){memcpy(tmp,tk->sval,l);tlen=l;}} break;
+                    case T_KEYWORD:
+                        tmp[tlen++]='&';
+                        if(tk->sval){int l=(int)strlen(tk->sval);if(l<248){memcpy(tmp+1,tk->sval,l);tlen=l+1;}} break;
+                    case T_STR: {
+                        const char *sv=tk->sval?tk->sval:"";
+                        int has_sq=strchr(sv,'\'')!=NULL;
+                        char q=has_sq?'"':'\'';
+                        tmp[tlen++]=q;
+                        int l=(int)strlen(sv); if(l<250){memcpy(tmp+tlen,sv,l);tlen+=l;}
+                        tmp[tlen++]=q; break; }
+                    case T_INT:  tlen=snprintf(tmp,sizeof tmp,"%ld",tk->ival); break;
+                    case T_REAL: {
+                        if(tk->sval){int l=(int)strlen(tk->sval);if(l<250){memcpy(tmp,tk->sval,l);tlen=l;}}
+                        else { tlen=snprintf(tmp,sizeof tmp,"%g",tk->dval); }
+                        break; }
+                    case T_PLUS:tmp[tlen++]='+';break; case T_MINUS:tmp[tlen++]='-';break;
+                    case T_STAR:tmp[tlen++]='*';break; case T_SLASH:tmp[tlen++]='/';break;
+                    case T_PCT:tmp[tlen++]='%';break; case T_CARET:tmp[tlen++]='^';break;
+                    case T_BANG:tmp[tlen++]='!';break;
+                    case T_STARSTAR:tmp[tlen++]='*';tmp[tlen++]='*';break;
+                    case T_AMP:tmp[tlen++]='&';break; case T_AT:tmp[tlen++]='@';break;
+                    case T_TILDE:tmp[tlen++]='~';break; case T_DOLLAR:tmp[tlen++]='$';break;
+                    case T_DOT:tmp[tlen++]='.';break; case T_HASH:tmp[tlen++]='#';break;
+                    case T_PIPE:tmp[tlen++]='|';break; case T_EQ:tmp[tlen++]='=';break;
+                    case T_QMARK:tmp[tlen++]='?';break; case T_COMMA:tmp[tlen++]=',';break;
+                    case T_LPAREN:tmp[tlen++]='(';break; case T_RPAREN:tmp[tlen++]=')';break;
+                    case T_LBRACKET:tmp[tlen++]='[';break; case T_RBRACKET:tmp[tlen++]=']';break;
+                    case T_LANGLE:tmp[tlen++]='<';break; case T_RANGLE:tmp[tlen++]='>';break;
+                    default: break;
+                }
+                if (bpos+tlen<8190){memcpy(bbuf+bpos,tmp,tlen);bpos+=tlen;}
+            }
+            bbuf[bpos]='\0';
+            Lex blx={0};
+            lex_open_str(&blx, bbuf, bpos, lineno);
+            skip_ws(&blx);
+            s->subject = parse_expr14(&blx);
+            int have_ws=(lex_peek(&blx).kind==T_WS), have_q=0;
+            if (have_ws) {
+                lex_next(&blx); skip_ws(&blx);
+                if (lex_peek(&blx).kind==T_QMARK){have_q=1;lex_next(&blx);skip_ws(&blx);}
+            } else if (lex_peek(&blx).kind==T_QMARK){
+                have_q=1;lex_next(&blx);skip_ws(&blx);
+            }
+            if (have_ws||have_q) {
+                if (have_ws&&!have_q&&lex_peek(&blx).kind==T_EQ) {
+                    lex_next(&blx); s->has_eq=1; skip_ws(&blx);
+                    if (!lex_at_end(&blx)) s->replacement=parse_expr(&blx);
+                } else if (!lex_at_end(&blx)) {
+                    s->pattern=parse_expr3(&blx);
+                    if (lex_peek(&blx).kind==T_WS) {
+                        lex_next(&blx); skip_ws(&blx);
+                        if (lex_peek(&blx).kind==T_EQ) {
+                            lex_next(&blx); skip_ws(&blx); s->has_eq=1;
+                            if (!lex_at_end(&blx)) s->replacement=parse_expr(&blx);
+                        } else { blx.peek=(Token){T_WS,NULL,0,0,lineno}; blx.peeked=1; }
+                    }
+                }
+            }
             fixup_val_tree(s->subject);
             if (s->replacement && !repl_is_pat_tree(s->replacement))
                 fixup_val_tree(s->replacement);
         }
 
-        s->next = NULL;
-        if (!prog->head) prog->head = prog->tail = s;
-        else { prog->tail->next = s; prog->tail = s; }
+        s->next=NULL;
+        if (!prog->head) prog->head=prog->tail=s;
+        else { prog->tail->next=s; prog->tail=s; }
         prog->nstmts++;
     }
-
     return prog;
+}
+
+
+/* Stub: scrip-cc main.c still declares parse_program(LineArray*) */
+Program *parse_program(LineArray *lines) {
+    (void)lines;
+    fprintf(stderr,"parse_program(LineArray*): should not be called with one-pass lexer\n");
+    return calloc(1,sizeof(Program));
 }
 
 /* Public wrapper: parse a SNOBOL4 expression from a string.
