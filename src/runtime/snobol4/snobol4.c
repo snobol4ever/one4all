@@ -803,6 +803,7 @@ static DESCR_t _b_DATA(DESCR_t *a, int n) {
  * inside argument lists and are tokenised as IDENT rather than PAT_BUILTIN. */
 extern DESCR_t pat_span(const char *);
 extern DESCR_t pat_break_(const char *);
+extern DESCR_t pat_breakx(const char *);
 extern DESCR_t pat_any_cs(const char *);
 extern DESCR_t pat_notany(const char *);
 extern DESCR_t pat_len(int64_t);
@@ -822,6 +823,7 @@ extern DESCR_t pat_fence_p(DESCR_t);
 
 static DESCR_t _b_PAT_SPAN(DESCR_t *a, int n)    { return n>=1 ? pat_span(VARVAL_fn(a[0]))    : FAILDESCR; }
 static DESCR_t _b_PAT_BREAK(DESCR_t *a, int n)   { return n>=1 ? pat_break_(VARVAL_fn(a[0]))  : FAILDESCR; }
+static DESCR_t _b_PAT_BREAKX(DESCR_t *a, int n)  { return n>=1 ? pat_breakx(VARVAL_fn(a[0]))  : FAILDESCR; }
 static DESCR_t _b_PAT_ANY(DESCR_t *a, int n)     { return n>=1 ? pat_any_cs(VARVAL_fn(a[0]))  : FAILDESCR; }
 static DESCR_t _b_PAT_NOTANY(DESCR_t *a, int n)  { return n>=1 ? pat_notany(VARVAL_fn(a[0]))  : FAILDESCR; }
 static DESCR_t _b_PAT_LEN(DESCR_t *a, int n)     { return n>=1 ? pat_len(to_int(a[0]))   : FAILDESCR; }
@@ -991,6 +993,7 @@ void SNO_INIT_fn(void) {
     /* Pattern builtins callable via APPLY_fn (when inside arglist parens) */
     register_fn("SPAN",    _b_PAT_SPAN,    1, 1);
     register_fn("BREAK",   _b_PAT_BREAK,   1, 1);
+    register_fn("BREAKX",  _b_PAT_BREAKX,  1, 1);
     register_fn("ANY",     _b_PAT_ANY,     1, 1);
     register_fn("NOTANY",  _b_PAT_NOTANY,  1, 1);
     register_fn("LEN",     _b_PAT_LEN,     1, 1);
@@ -1000,7 +1003,7 @@ void SNO_INIT_fn(void) {
     register_fn("RTAB",    _b_PAT_RTAB,    1, 1);
     register_fn("ARB",     _b_PAT_ARB,     0, 0);
     register_fn("REM",     _b_PAT_REM,     0, 0);
-    register_fn("DT_FAIL",    _b_PAT_FAIL,    0, 0);
+    register_fn("FAIL",       _b_PAT_FAIL,    0, 0);
     register_fn("ABORT",   _b_PAT_ABORT,   0, 0);
     register_fn("SUCCEED", _b_PAT_SUCCEED, 0, 0);
     register_fn("BAL",     _b_PAT_BAL,     0, 0);

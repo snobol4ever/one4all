@@ -350,7 +350,15 @@ static DESCR_t interp_eval(EXPR_t *e)
     case E_NUL:    return NULVCL;
 
     case E_VAR:
-        if (e->sval && *e->sval) return NV_GET_fn(e->sval);
+        if (e->sval && *e->sval) {
+            DESCR_t _vr = NV_GET_fn(e->sval);
+            if (_vr.v != DT_SNUL) return _vr;
+            /* Zero-arg builtin (ARB, REM, FAIL, SUCCEED, etc.) stored as
+               function, not variable — try calling with no args. */
+            DESCR_t _fr = APPLY_fn(e->sval, NULL, 0);
+            if (_fr.v != DT_SNUL) return _fr;
+            return _vr; /* unset variable */
+        }
         return NULVCL;
 
     case E_KW: {
@@ -521,6 +529,12 @@ static DESCR_t interp_eval(EXPR_t *e)
         return subscript_get2(base, i1, i2);
     }
 
+    case E_DEFER: {
+        /* *var — indirect/deferred pattern ref: evaluate child to get descriptor */
+        if (e->nchildren < 1) return NULVCL;
+        return interp_eval(e->children[0]);
+    }
+
     case E_ALT: {
         /* child[0] | child[1] | ... — build pat_alt chain left-to-right */
         if (e->nchildren == 0) return NULVCL;
@@ -611,6 +625,11 @@ static void execute_program(Program *prog)
                 if (s->has_eq && s->replacement) {
                     repl_val = interp_eval(s->replacement);
                     has_repl = !IS_FAIL_fn(repl_val);
+                } else if (s->has_eq) {
+                    /* X ? PAT =   (empty replacement) — replace matched
+                     * portion with null string, advancing subject cursor */
+                    repl_val = NULVCL;
+                    has_repl = 1;
                 }
                 Σ = subj_name ? subj_name : "";
                 succeeded = exec_stmt(
