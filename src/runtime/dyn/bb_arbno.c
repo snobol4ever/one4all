@@ -8,15 +8,15 @@
 typedef struct { spec_t ARBNO; int saved_Δ; } arbno_frame_t;
 typedef struct { bb_box_fn body_fn; void *body_ζ; int ARBNO_i; arbno_frame_t stack[ARBNO_STACK_MAX]; } arbno_t;
 
-spec_t bb_arbno(arbno_t **ζζ, int entry)
+spec_t bb_arbno(void *zeta, int entry)
 {
-    arbno_t *ζ = *ζζ;
+    arbno_t *ζ = zeta;
     spec_t ARBNO; spec_t body_r; arbno_frame_t *frame;
     if (entry==α)                                                               goto ARBNO_α;
     if (entry==β)                                                               goto ARBNO_β;
     ARBNO_α:        ζ->ARBNO_i=0; frame=&ζ->stack[0];                           
                     frame->ARBNO=spec(Σ+Δ,0); frame->saved_Δ=Δ;                 
-    ARBNO_try:      body_r=ζ->body_fn(&ζ->body_ζ,α);                            
+    ARBNO_try:      body_r=ζ->body_fn(ζ->body_ζ,α);                             
                     if (spec_is_empty(body_r))                                  goto body_ω;
                                                                                 goto body_γ;
     ARBNO_β:        if (ζ->ARBNO_i<=0)                                          goto ARBNO_ω;

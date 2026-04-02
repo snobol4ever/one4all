@@ -5,9 +5,9 @@
 
 typedef struct { int fired; }  fence_t;
 
-spec_t bb_fence(fence_t **ζζ, int entry)
+spec_t bb_fence(void *zeta, int entry)
 {
-    fence_t *ζ = *ζζ;
+    fence_t *ζ = zeta;
     if (entry==α)                                                               goto FENCE_α;
     if (entry==β)                                                               goto FENCE_β;
     FENCE_α:        ζ->fired=1;                                                 goto FENCE_γ;

@@ -5,9 +5,9 @@
 
 typedef struct { int dummy; }  rem_t;
 
-spec_t bb_rem(rem_t **ζζ, int entry)
+spec_t bb_rem(void *zeta, int entry)
 {
-    (void)ζζ;
+    (void)zeta;
     spec_t REM;
     if (entry==α)                                                               goto REM_α;
     if (entry==β)                                                               goto REM_β;

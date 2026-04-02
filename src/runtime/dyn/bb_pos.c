@@ -5,9 +5,9 @@
 
 typedef struct { int n; }  pos_t;
 
-spec_t bb_pos(pos_t **ζζ, int entry)
+spec_t bb_pos(void *zeta, int entry)
 {
-    pos_t *ζ = *ζζ;
+    pos_t *ζ = zeta;
     spec_t POS;
     if (entry==α)                                                               goto POS_α;
     if (entry==β)                                                               goto POS_β;

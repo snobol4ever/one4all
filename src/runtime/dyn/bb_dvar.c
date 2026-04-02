@@ -7,9 +7,9 @@ extern DESCR_t (*NV_GET_fn)(const char*);
 extern bb_node_t bb_build(void*);
 typedef struct { const char *name; bb_box_fn child_fn; void *child_ζ; size_t child_ζ_size; } dvar_t;
 
-spec_t bb_deferred_var(dvar_t **ζζ, int entry)
+spec_t bb_deferred_var(void *zeta, int entry)
 {
-    dvar_t *ζ = *ζζ;
+    dvar_t *ζ = zeta;
     spec_t DVAR;
     if (entry==α)                                                               goto DVAR_α;
     if (entry==β)                                                               goto DVAR_β;
@@ -27,11 +27,11 @@ spec_t bb_deferred_var(dvar_t **ζζ, int entry)
                           &&ζ->child_fn!=(bb_box_fn)bb_lit)                     
                           memset(ζ->child_ζ,0,ζ->child_ζ_size); }               
                     if (!ζ->child_fn)                                           goto DVAR_ω;
-                    DVAR=ζ->child_fn(&ζ->child_ζ,α);                            
+                    DVAR=ζ->child_fn(ζ->child_ζ,α);                             
                     if (spec_is_empty(DVAR))                                    goto DVAR_ω;
                                                                                 goto DVAR_γ;
     DVAR_β:         if (!ζ->child_fn)                                           goto DVAR_ω;
-                    DVAR=ζ->child_fn(&ζ->child_ζ,β);                            
+                    DVAR=ζ->child_fn(ζ->child_ζ,β);                             
                     if (spec_is_empty(DVAR))                                    goto DVAR_ω;
                                                                                 goto DVAR_γ;
     DVAR_γ:                                                                     return DVAR;

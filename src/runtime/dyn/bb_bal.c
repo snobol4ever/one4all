@@ -6,9 +6,9 @@
 #include <stdio.h>
 typedef struct { int δ; int start; }  bal_t;
 
-spec_t bb_bal(bal_t **ζζ, int entry)
+spec_t bb_bal(void *zeta, int entry)
 {
-    (void)ζζ; (void)entry;
+    (void)zeta; (void)entry;
     fprintf(stderr,"bb_bal: unimplemented — ω\n");
     return spec_empty;
 }

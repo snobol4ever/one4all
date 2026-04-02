@@ -5,9 +5,9 @@
 
 typedef struct { const char *chars; }  notany_t;
 
-spec_t bb_notany(notany_t **ζζ, int entry)
+spec_t bb_notany(void *zeta, int entry)
 {
-    notany_t *ζ = *ζζ;
+    notany_t *ζ = zeta;
     spec_t NOTANY;
     if (entry==α)                                                               goto NOTANY_α;
     if (entry==β)                                                               goto NOTANY_β;

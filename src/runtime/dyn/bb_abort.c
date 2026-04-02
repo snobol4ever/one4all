@@ -5,9 +5,9 @@
 
 typedef struct { int dummy; }  abort_t;
 
-spec_t bb_abort(abort_t **ζζ, int entry)
+spec_t bb_abort(void *zeta, int entry)
 {
-    (void)ζζ; (void)entry;
+    (void)zeta; (void)entry;
     if (entry==α)                                                               goto ABORT_α;
     if (entry==β)                                                               goto ABORT_β;
     ABORT_α:                                                                    goto ABORT_ω;

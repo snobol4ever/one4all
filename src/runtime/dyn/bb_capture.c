@@ -1,4 +1,4 @@
-/* _XNME/_XFNME  CAPTURE     wrap child; $ writes on every γ; . buffers for Phase-5 commit */
+/* _XNME/_XFNME  CAPTURE     $ writes on every γ; . buffers for Phase-5 commit */
 #include "bb_box.h"
 #include <stdlib.h>
 #include <string.h>
@@ -10,16 +10,16 @@ typedef struct {
     int immediate; spec_t pending; int has_pending;
 } capture_t;
 
-spec_t bb_capture(capture_t **ζζ, int entry)
+spec_t bb_capture(void *zeta, int entry)
 {
-    capture_t *ζ = *ζζ;
+    capture_t *ζ = zeta;
     spec_t child_r;
     if (entry==α)                                                               goto CAP_α;
     if (entry==β)                                                               goto CAP_β;
-    CAP_α:          child_r=ζ->fn(&ζ->ζ,α);                                     
+    CAP_α:          child_r=ζ->fn(ζ->ζ,α);                                      
                     if (spec_is_empty(child_r))                                 goto CAP_ω;
                                                                                 goto CAP_γ_core;
-    CAP_β:          child_r=ζ->fn(&ζ->ζ,β);                                     
+    CAP_β:          child_r=ζ->fn(ζ->ζ,β);                                      
                     if (spec_is_empty(child_r))                                 goto CAP_ω;
                                                                                 goto CAP_γ_core;
     CAP_γ_core:     if (ζ->varname && *ζ->varname && ζ->immediate) {            

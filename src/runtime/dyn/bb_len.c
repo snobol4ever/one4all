@@ -5,9 +5,9 @@
 
 typedef struct { int n; }  len_t;
 
-spec_t bb_len(len_t **ζζ, int entry)
+spec_t bb_len(void *zeta, int entry)
 {
-    len_t *ζ = *ζζ;
+    len_t *ζ = zeta;
     spec_t LEN;
     if (entry==α)                                                               goto LEN_α;
     if (entry==β)                                                               goto LEN_β;

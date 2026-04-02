@@ -5,9 +5,9 @@
 
 typedef struct { int done; }  eps_t;
 
-spec_t bb_eps(eps_t **ζζ, int entry)
+spec_t bb_eps(void *zeta, int entry)
 {
-    eps_t *ζ = *ζζ;
+    eps_t *ζ = zeta;
     spec_t EPS;
     if (entry==α)   ζ->done=0;                                                  goto EPS_α;
     if (entry==β)                                                               goto EPS_β;

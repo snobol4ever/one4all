@@ -5,9 +5,9 @@
 
 typedef struct { int dummy; }  succeed_t;
 
-spec_t bb_succeed(succeed_t **ζζ, int entry)
+spec_t bb_succeed(void *zeta, int entry)
 {
-    (void)ζζ; (void)entry;
+    (void)zeta; (void)entry;
     return spec(Σ+Δ,0);
 }
 

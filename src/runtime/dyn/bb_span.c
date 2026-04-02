@@ -5,9 +5,9 @@
 
 typedef struct { const char *chars; int δ; }  span_t;
 
-spec_t bb_span(span_t **ζζ, int entry)
+spec_t bb_span(void *zeta, int entry)
 {
-    span_t *ζ = *ζζ;
+    span_t *ζ = zeta;
     spec_t SPAN;
     if (entry==α)                                                               goto SPAN_α;
     if (entry==β)                                                               goto SPAN_β;

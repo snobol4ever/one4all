@@ -6,9 +6,9 @@
 typedef struct { int done; const char *varname; }  atp_t;
 extern void (*NV_SET_fn)(const char*, DESCR_t);
 
-spec_t bb_atp(atp_t **ζζ, int entry)
+spec_t bb_atp(void *zeta, int entry)
 {
-    atp_t *ζ = *ζζ;
+    atp_t *ζ = zeta;
     spec_t ATP;
     if (entry==α)                                                               goto ATP_α;
     if (entry==β)                                                               goto ATP_β;

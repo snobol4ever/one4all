@@ -133,9 +133,9 @@ int         Ω = 0;
 /* ── LEN(n) box ─────────────────────────────────────────────────────────── */
 typedef struct { int n; } len_t;
 
-static spec_t bb_len(len_t **ζζ, int entry)
+static spec_t bb_len(void *zeta, int entry)
 {
-    len_t *ζ = *ζζ;
+    len_t *ζ = zeta;
 
     if (entry == α)                                     goto LEN_α;
     if (entry == β)                                     goto LEN_β;
@@ -153,9 +153,9 @@ static spec_t bb_len(len_t **ζζ, int entry)
 /* ── SPAN(chars) box ────────────────────────────────────────────────────── */
 typedef struct { const char *chars; int δ; } span_t;
 
-static spec_t bb_span(span_t **ζζ, int entry)
+static spec_t bb_span(void *zeta, int entry)
 {
-    span_t *ζ = *ζζ;
+    span_t *ζ = zeta;
 
     if (entry == α)                                     goto SPAN_α;
     if (entry == β)                                     goto SPAN_β;
@@ -174,9 +174,9 @@ static spec_t bb_span(span_t **ζζ, int entry)
 /* ── ANY(chars) box ─────────────────────────────────────────────────────── */
 typedef struct { const char *chars; } any_t;
 
-static spec_t bb_any(any_t **ζζ, int entry)
+static spec_t bb_any(void *zeta, int entry)
 {
-    any_t *ζ = *ζζ;
+    any_t *ζ = zeta;
 
     if (entry == α)                                     goto ANY_α;
     if (entry == β)                                     goto ANY_β;
@@ -194,9 +194,9 @@ static spec_t bb_any(any_t **ζζ, int entry)
 /* ── NOTANY(chars) box ──────────────────────────────────────────────────── */
 typedef struct { const char *chars; } notany_t;
 
-static spec_t bb_notany(notany_t **ζζ, int entry)
+static spec_t bb_notany(void *zeta, int entry)
 {
-    notany_t *ζ = *ζζ;
+    notany_t *ζ = zeta;
 
     if (entry == α)                                     goto NOTANY_α;
     if (entry == β)                                     goto NOTANY_β;
@@ -214,9 +214,9 @@ static spec_t bb_notany(notany_t **ζζ, int entry)
 /* ── BREAK(chars) box ───────────────────────────────────────────────────── */
 typedef struct { const char *chars; int δ; } brk_t;
 
-static spec_t bb_brk(brk_t **ζζ, int entry)
+static spec_t bb_brk(void *zeta, int entry)
 {
-    brk_t *ζ = *ζζ;
+    brk_t *ζ = zeta;
 
     if (entry == α)                                     goto BRK_α;
     if (entry == β)                                     goto BRK_β;
@@ -236,9 +236,9 @@ static spec_t bb_brk(brk_t **ζζ, int entry)
 /* ── BREAKX(chars) box — like BREAK but fails on zero advance ───────────── */
 typedef struct { const char *chars; int δ; } brkx_t;
 
-static spec_t bb_breakx(brkx_t **ζζ, int entry)
+static spec_t bb_breakx(void *zeta, int entry)
 {
-    brkx_t *ζ = *ζζ;
+    brkx_t *ζ = zeta;
 
     if (entry == α)                                     goto BRKX_α;
     if (entry == β)                                     goto BRKX_β;
@@ -259,9 +259,9 @@ static spec_t bb_breakx(brkx_t **ζζ, int entry)
 /* ── ARB box (matches 0..n chars, backtracks one at a time) ─────────────── */
 typedef struct { int tried; int start; } arb_t;
 
-static spec_t bb_arb(arb_t **ζζ, int entry)
+static spec_t bb_arb(void *zeta, int entry)
 {
-    arb_t *ζ = *ζζ;
+    arb_t *ζ = zeta;
 
     if (entry == α)                                     goto ARB_α;
     if (entry == β)                                     goto ARB_β;
@@ -284,7 +284,7 @@ static spec_t bb_arb(arb_t **ζζ, int entry)
 /* ── REM box (match rest of subject) ────────────────────────────────────── */
 typedef struct { int dummy; } rem_t;
 
-static spec_t bb_rem(rem_t **ζζ, int entry)
+static spec_t bb_rem(void *zeta, int entry)
 {
     (void)ζζ;
 
@@ -303,7 +303,7 @@ static spec_t bb_rem(rem_t **ζζ, int entry)
 /* ── SUCCEED box (always succeeds, infinite backtrack) ──────────────────── */
 typedef struct { int dummy; } succeed_t;
 
-static spec_t bb_succeed(succeed_t **ζζ, int entry)
+static spec_t bb_succeed(void *zeta, int entry)
 {
     (void)ζζ; (void)entry;
                                                               return spec(Σ+Δ, 0);   /* always γ, zero-width */
@@ -312,7 +312,7 @@ static spec_t bb_succeed(succeed_t **ζζ, int entry)
 /* ── FAIL box ───────────────────────────────────────────────────────────── */
 typedef struct { int dummy; } fail_t;
 
-static spec_t bb_fail(fail_t **ζζ, int entry)
+static spec_t bb_fail(void *zeta, int entry)
 {
     (void)ζζ; (void)entry;
                                                               return spec_empty;   /* always ω */
@@ -321,9 +321,9 @@ static spec_t bb_fail(fail_t **ζζ, int entry)
 /* ── EPSILON box (zero-width success, no backtrack) ────────────────────── */
 typedef struct { int done; } eps_t;
 
-static spec_t bb_eps(eps_t **ζζ, int entry)
+static spec_t bb_eps(void *zeta, int entry)
 {
-    eps_t *ζ = *ζζ;
+    eps_t *ζ = zeta;
 
     if (entry == α) { ζ->done = 0; goto EPS_α; }
     if (entry == β)                              goto EPS_β;
@@ -347,7 +347,7 @@ typedef struct {
     size_t       child_ζ_size; /* sizeof(*child_ζ) — set at first α; used for memset reset */
 } deferred_var_t;
 /* bb_deferred_var() defined after bb_build (needs bb_node_t) */
-static spec_t bb_deferred_var(deferred_var_t **ζζ, int entry);
+static spec_t bb_deferred_var(void *zeta, int entry);
 
 /* ── CAPTURE box (wraps child; on γ writes capture to named variable) ───── */
 /*
@@ -370,19 +370,19 @@ typedef struct {
     int          has_pending;
 } capture_t;
 
-static spec_t bb_capture(capture_t **ζζ, int entry)
+static spec_t bb_capture(void *zeta, int entry)
 {
-    capture_t *ζ = *ζζ;
+    capture_t *ζ = zeta;
 
     if (entry == α)                                     goto CAP_α;
     if (entry == β)                                     goto CAP_β;
 
     spec_t         child_r;
 
-    CAP_α:        child_r = ζ->child_fn(&ζ->child_ζ, α);
+    CAP_α:        child_r = ζ->child_fn(ζ->child_ζ, α);
                   if (spec_is_empty(child_r))                 goto CAP_ω;
                                                               goto CAP_γ_core;
-    CAP_β:        child_r = ζ->child_fn(&ζ->child_ζ, β);
+    CAP_β:        child_r = ζ->child_fn(ζ->child_ζ, β);
                   if (spec_is_empty(child_r))                 goto CAP_ω;
                                                               goto CAP_γ_core;
 
@@ -434,16 +434,16 @@ static void register_capture(capture_t *c);
 static void flush_pending_captures(void);
 
 /* forward-declared box functions (defined in dyn/ box files, linked separately) */
-extern spec_t bb_lit   (void **ζζ, int entry);
-extern spec_t bb_alt   (void **ζζ, int entry);
-extern spec_t bb_seq   (void **ζζ, int entry);
-extern spec_t bb_arbno (void **ζζ, int entry);
-extern spec_t bb_pos   (void **ζζ, int entry);
-extern spec_t bb_rpos  (void **ζζ, int entry);
-extern spec_t bb_tab   (void **ζζ, int entry);
-extern spec_t bb_rtab  (void **ζζ, int entry);
-extern spec_t bb_fence (void **ζζ, int entry);
-extern spec_t bb_abort (void **ζζ, int entry);
+extern spec_t bb_lit(void *zeta, int entry);
+extern spec_t bb_alt(void *zeta, int entry);
+extern spec_t bb_seq(void *zeta, int entry);
+extern spec_t bb_arbno(void *zeta, int entry);
+extern spec_t bb_pos(void *zeta, int entry);
+extern spec_t bb_rpos(void *zeta, int entry);
+extern spec_t bb_tab(void *zeta, int entry);
+extern spec_t bb_rtab(void *zeta, int entry);
+extern spec_t bb_fence(void *zeta, int entry);
+extern spec_t bb_abort(void *zeta, int entry);
 
 /* lit_t / alt_t / seq_t / arbno_t / pos_t / rpos_t / tab_t / fence_t layouts
  * mirror the structs in the dyn/ box files exactly */
@@ -585,9 +585,9 @@ void dyn_cache_stats(int *hits, int *misses)
  * On beta: fail — cursor-capture has no meaningful backtrack semantics. */
 typedef struct { int done; const char *varname; } atp_t;
 
-static spec_t bb_atp(atp_t **ζζ, int entry)
+static spec_t bb_atp(void *zeta, int entry)
 {
-    atp_t *ζ = *ζζ;
+    atp_t *ζ = zeta;
 
     if (entry == α) goto ATP_α;
                     goto ATP_β;
@@ -1006,9 +1006,9 @@ static bb_node_t bb_build(_PND_t *p)
  * β path: delegate to child_fn if built, else ω (can't backtrack a
  * not-yet-matched box).
  */
-static spec_t bb_deferred_var(deferred_var_t **ζζ, int entry)
+static spec_t bb_deferred_var(void *zeta, int entry)
 {
-    deferred_var_t *ζ = *ζζ;
+    deferred_var_t *ζ = zeta;
 
     if (entry == α)                                     goto DVAR_α;
     if (entry == β)                                     goto DVAR_β;
@@ -1066,12 +1066,12 @@ static spec_t bb_deferred_var(deferred_var_t **ζζ, int entry)
                             memset(ζ->child_ζ, 0, ζ->child_ζ_size);
                     }
                     if (!ζ->child_fn)                         goto DVAR_ω;
-                    DVAR = ζ->child_fn(&ζ->child_ζ, α);
+                    DVAR = ζ->child_fn(ζ->child_ζ, α);
                     if (spec_is_empty(DVAR))                  goto DVAR_ω;
                                                               goto DVAR_γ;
 
     DVAR_β:         if (!ζ->child_fn)                         goto DVAR_ω;
-                    DVAR = ζ->child_fn(&ζ->child_ζ, β);
+                    DVAR = ζ->child_fn(ζ->child_ζ, β);
                     if (spec_is_empty(DVAR))                  goto DVAR_ω;
                                                               goto DVAR_γ;
 
@@ -1225,7 +1225,7 @@ int stmt_exec_dyn(const char  *subj_name,
 
     for (int scan = 0; scan <= scan_limit; scan++) {
         Δ = scan;
-        spec_t result = root.fn(&root.ζ, α);
+        spec_t result = root.fn(root.ζ, α);
         if (!spec_is_empty(result)) {
             match_start = scan;
             match_end   = Δ;
@@ -1422,14 +1422,14 @@ int dyn_deferred_var_test(void)
     /* First alpha — will resolve via NV_GET_fn. Since test stub returns SNUL,
      * child becomes epsilon (always matches zero-width).  What we verify is
      * that the re-resolve branch runs without crash and returns a valid spec. */
-    spec_t r1 = dvar.fn(&dvar.ζ, α);
+    spec_t r1 = dvar.fn(dvar.ζ, α);
     /* epsilon matches → non-empty spec at position 0 */
     ok &= !spec_is_empty(r1) ? 1 : 0;   /* epsilon always succeeds */
 
     /* Second alpha on same box — re-resolve must run again (not skip) */
     /* Reset Δ */
     Δ = 0;
-    spec_t r2 = dvar.fn(&dvar.ζ, α);
+    spec_t r2 = dvar.fn(dvar.ζ, α);
     ok &= !spec_is_empty(r2) ? 1 : 0;
 
     printf("  deferred_var: r1=%s r2=%s (both non-empty = re-resolve ran)\n",

@@ -5,9 +5,9 @@
 
 typedef struct { const char *chars; int δ; }  brkx_t;
 
-spec_t bb_breakx(brkx_t **ζζ, int entry)
+spec_t bb_breakx(void *zeta, int entry)
 {
-    brkx_t *ζ = *ζζ;
+    brkx_t *ζ = zeta;
     spec_t BREAKX;
     if (entry==α)                                                               goto BREAKX_α;
     if (entry==β)                                                               goto BREAKX_β;

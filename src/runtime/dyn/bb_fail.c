@@ -5,9 +5,9 @@
 
 typedef struct { int dummy; }  fail_t;
 
-spec_t bb_fail(fail_t **ζζ, int entry)
+spec_t bb_fail(void *zeta, int entry)
 {
-    (void)ζζ; (void)entry;
+    (void)zeta; (void)entry;
     return spec_empty;
 }
 

@@ -5,9 +5,9 @@
 
 typedef struct { const char *lit; int len; }  lit_t;
 
-spec_t bb_lit(lit_t **ζζ, int entry)
+spec_t bb_lit(void *zeta, int entry)
 {
-    lit_t *ζ = *ζζ;
+    lit_t *ζ = zeta;
     spec_t LIT;
     if (entry==α)                                                               goto LIT_α;
     if (entry==β)                                                               goto LIT_β;

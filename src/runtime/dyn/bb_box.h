@@ -102,6 +102,6 @@ static inline void *bb_enter(void **ζζ, size_t size) {
  *   BoxName_λ:  if (is_empty(BoxName))            goto BoxName_ω;
  *               else                              goto BoxName_γ;
  */
-typedef spec_t (*bb_box_fn)(void **ζζ, int entry);
+typedef spec_t (*bb_box_fn)(void *zeta, int entry);
 
 #endif /* BB_BOX_H */

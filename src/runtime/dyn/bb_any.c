@@ -5,9 +5,9 @@
 
 typedef struct { const char *chars; }  any_t;
 
-spec_t bb_any(any_t **ζζ, int entry)
+spec_t bb_any(void *zeta, int entry)
 {
-    any_t *ζ = *ζζ;
+    any_t *ζ = zeta;
     spec_t ANY;
     if (entry==α)                                                               goto ANY_α;
     if (entry==β)                                                               goto ANY_β;

@@ -5,9 +5,9 @@
 
 typedef struct { int n; int advance; }  rtab_t;
 
-spec_t bb_rtab(rtab_t **ζζ, int entry)
+spec_t bb_rtab(void *zeta, int entry)
 {
-    rtab_t *ζ = *ζζ;
+    rtab_t *ζ = zeta;
     spec_t RTAB;
     if (entry==α)                                                               goto RTAB_α;
     if (entry==β)                                                               goto RTAB_β;
