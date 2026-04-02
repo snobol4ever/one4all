@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-typedef struct { int n; int adv; }  tab_t;
+typedef struct { int n; int advance; }  tab_t;
 
 spec_t bb_tab(void *zeta, int entry)
 {
@@ -12,8 +12,8 @@ spec_t bb_tab(void *zeta, int entry)
     if (entry==α)                                                               goto TAB_α;
     if (entry==β)                                                               goto TAB_β;
     TAB_α:          if (Δ > ζ->n)                                               goto TAB_ω;
-                    ζ->adv=ζ->n-Δ; TAB=spec(Σ+Δ,ζ->adv); Δ=ζ->n;                goto TAB_γ;
-    TAB_β:          Δ -= ζ->adv;                                                goto TAB_ω;
+                    ζ->advance=ζ->n-Δ; TAB=spec(Σ+Δ,ζ->advance); Δ=ζ->n;        goto TAB_γ;
+    TAB_β:          Δ -= ζ->advance;                                            goto TAB_ω;
     TAB_γ:                                                                      return TAB;
     TAB_ω:                                                                      return spec_empty;
 }

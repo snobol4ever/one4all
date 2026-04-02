@@ -5,8 +5,8 @@
 
 #pragma GCC diagnostic ignored "-Wmisleading-indentation"
 #define BB_ALT_MAX 16
-typedef struct { bb_box_fn fn; void *fz; } bb_altchild_t;
-typedef struct { int n; bb_altchild_t ch[BB_ALT_MAX]; int cur; int pos; spec_t res; } alt_t;
+typedef struct { bb_box_fn fn; void *state; } bb_altchild_t;
+typedef struct { int n; bb_altchild_t ch[BB_ALT_MAX]; int current; int position; spec_t result; } alt_t;
 
 spec_t bb_alt(void *zeta, int entry)
 {
@@ -14,22 +14,22 @@ spec_t bb_alt(void *zeta, int entry)
     spec_t cr;
     if (entry==α)                                                               goto ALT_α;
     if (entry==β)                                                               goto ALT_β;
-    ALT_α:          ζ->pos=Δ; ζ->cur=1;                                         
-                    cr=ζ->ch[0].fn(ζ->ch[0].fz,α);                              
+    ALT_α:          ζ->position=Δ; ζ->current=1;                                
+                    cr=ζ->ch[0].fn(ζ->ch[0].state,α);                           
                     if (spec_is_empty(cr))                                      goto child_α_ω;
                                                                                 goto child_α_γ;
-    ALT_β:          cr=ζ->ch[ζ->cur-1].fn(ζ->ch[ζ->cur-1].fz,β);                
+    ALT_β:          cr=ζ->ch[ζ->current-1].fn(ζ->ch[ζ->current-1].state,β);     
                     if (spec_is_empty(cr))                                      goto ALT_ω;
                                                                                 goto child_β_γ;
-    child_α_γ:      ζ->res=cr;                                                  goto ALT_γ;
-    child_α_ω:      ζ->cur++;                                                   
-                    if (ζ->cur > ζ->n)                                          goto ALT_ω;
-                    Δ=ζ->pos;                                                   
-                    cr=ζ->ch[ζ->cur-1].fn(ζ->ch[ζ->cur-1].fz,α);                
+    child_α_γ:      ζ->result=cr;                                               goto ALT_γ;
+    child_α_ω:      ζ->current++;                                               
+                    if (ζ->current > ζ->n)                                      goto ALT_ω;
+                    Δ=ζ->position;                                              
+                    cr=ζ->ch[ζ->current-1].fn(ζ->ch[ζ->current-1].state,α);     
                     if (spec_is_empty(cr))                                      goto child_α_ω;
                                                                                 goto child_α_γ;
-    child_β_γ:      ζ->res=cr;                                                  goto ALT_γ;
-    ALT_γ:                                                                      return ζ->res;
+    child_β_γ:      ζ->result=cr;                                               goto ALT_γ;
+    ALT_γ:                                                                      return ζ->result;
     ALT_ω:                                                                      return spec_empty;
 }
 

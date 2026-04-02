@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-typedef struct { int n; int adv; }  rtab_t;
+typedef struct { int n; int advance; }  rtab_t;
 
 spec_t bb_rtab(void *zeta, int entry)
 {
@@ -12,8 +12,8 @@ spec_t bb_rtab(void *zeta, int entry)
     if (entry==α)                                                               goto RTAB_α;
     if (entry==β)                                                               goto RTAB_β;
     RTAB_α:         if (Δ > Ω-ζ->n)                                             goto RTAB_ω;
-                    ζ->adv=(Ω-ζ->n)-Δ; RTAB=spec(Σ+Δ,ζ->adv); Δ=Ω-ζ->n;         goto RTAB_γ;
-    RTAB_β:         Δ -= ζ->adv;                                                goto RTAB_ω;
+                    ζ->advance=(Ω-ζ->n)-Δ; RTAB=spec(Σ+Δ,ζ->advance); Δ=Ω-ζ->n; goto RTAB_γ;
+    RTAB_β:         Δ -= ζ->advance;                                            goto RTAB_ω;
     RTAB_γ:                                                                     return RTAB;
     RTAB_ω:                                                                     return spec_empty;
 }

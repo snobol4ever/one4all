@@ -6,32 +6,32 @@
 extern void (*NV_SET_fn)(const char*, DESCR_t);
 extern void *GC_MALLOC(size_t);
 typedef struct {
-    bb_box_fn fn; void *fz; const char *var;
-    int imm; spec_t pend; int has_p;
+    bb_box_fn fn; void *state; const char *varname;
+    int immediate; spec_t pending; int has_pending;
 } capture_t;
 
 spec_t bb_capture(void *zeta, int entry)
 {
     capture_t *ζ = zeta;
-    spec_t child_r;
+    spec_t cr;
     if (entry==α)                                                               goto CAP_α;
     if (entry==β)                                                               goto CAP_β;
-    CAP_α:          child_r=ζ->fn(ζ->fz,α);                                     
-                    if (spec_is_empty(child_r))                                 goto CAP_ω;
+    CAP_α:          cr=ζ->fn(ζ->state,α);                                       
+                    if (spec_is_empty(cr))                                      goto CAP_ω;
                                                                                 goto CAP_γ_core;
-    CAP_β:          child_r=ζ->fn(ζ->fz,β);                                     
-                    if (spec_is_empty(child_r))                                 goto CAP_ω;
+    CAP_β:          cr=ζ->fn(ζ->state,β);                                       
+                    if (spec_is_empty(cr))                                      goto CAP_ω;
                                                                                 goto CAP_γ_core;
-    CAP_γ_core:     if (ζ->var && *ζ->var && ζ->imm) {                          
-                        char *s=GC_MALLOC(child_r.δ+1);                         
-                        memcpy(s,child_r.σ,(size_t)child_r.δ); s[child_r.δ]=0;  
-                        DESCR_t v={.v=DT_S,.slen=(uint32_t)child_r.δ,.s=s};     
-                        NV_SET_fn(ζ->var,v);                                    
-                    } else if (ζ->var && *ζ->var) {                             
-                        ζ->pend=child_r; ζ->has_p=1; }                          
-                                                                                return child_r;
-    CAP_ω:          ζ->has_p=0;                                                 return spec_empty;
+    CAP_γ_core:     if (ζ->varname && *ζ->varname && ζ->immediate) {            
+                        char *s=GC_MALLOC(cr.δ+1);                              
+                        memcpy(s,cr.σ,(size_t)cr.δ); s[cr.δ]=0;                 
+                        DESCR_t v={.v=DT_S,.slen=(uint32_t)cr.δ,.s=s};          
+                        NV_SET_fn(ζ->varname,v);                                
+                    } else if (ζ->varname && *ζ->varname) {                     
+                        ζ->pending=cr; ζ->has_pending=1; }                      
+                                                                                return cr;
+    CAP_ω:          ζ->has_pending=0;                                           return spec_empty;
 }
 
-capture_t *bb_capture_new(bb_box_fn fn, void *fz, const char *var, int imm)
-{ capture_t *ζ=calloc(1,sizeof(capture_t)); ζ->fn=fn; ζ->fz=fz; ζ->var=var; ζ->imm=imm; return ζ; }
+capture_t *bb_capture_new(bb_box_fn fn, void *state, const char *varname, int immediate)
+{ capture_t *ζ=calloc(1,sizeof(capture_t)); ζ->fn=fn; ζ->state=state; ζ->varname=varname; ζ->immediate=immediate; return ζ; }

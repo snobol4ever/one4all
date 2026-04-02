@@ -269,11 +269,11 @@ static spec_t bb_arb(void *zeta, int entry)
     spec_t         ARB;
 
     ARB_α:        ζ->n = 0;
-                  ζ->pos = Δ;
+                  ζ->position = Δ;
                   ARB = spec(Σ+Δ, 0);                         goto ARB_γ;
-    ARB_β:        ζ->n++;
-                  if (ζ->pos + ζ->n > Ω)                goto ARB_ω;
-                  Δ = ζ->pos;                /* restore to entry cursor */
+    ARB_β:        ζ->count++;
+                  if (ζ->position + ζ->n > Ω)                goto ARB_ω;
+                  Δ = ζ->position;                /* restore to entry cursor */
                   ARB = spec(Σ+Δ, ζ->n);
                   Δ += ζ->n;                              goto ARB_γ;
 
@@ -379,15 +379,15 @@ static spec_t bb_capture(void *zeta, int entry)
 
     spec_t         child_r;
 
-    CAP_α:        child_r = ζ->fn(ζ->fz, α);
+    CAP_α:        child_r = ζ->fn(ζ->state, α);
                   if (spec_is_empty(child_r))                 goto CAP_ω;
                                                               goto CAP_γ_core;
-    CAP_β:        child_r = ζ->fn(ζ->fz, β);
+    CAP_β:        child_r = ζ->fn(ζ->state, β);
                   if (spec_is_empty(child_r))                 goto CAP_ω;
                                                               goto CAP_γ_core;
 
-    CAP_γ_core:   if (ζ->var && *ζ->var) {
-                      if (ζ->imm) {
+    CAP_γ_core:   if (ζ->varname && *ζ->varname) {
+                      if (ζ->immediate) {
                           /* XFNME ($): immediate — write now on every γ */
                           char *s = (char *)GC_MALLOC(child_r.δ + 1);
                           memcpy(s, child_r.σ, (size_t)child_r.δ);
@@ -396,16 +396,16 @@ static spec_t bb_capture(void *zeta, int entry)
                           val.v    = DT_S;
                           val.slen = (uint32_t)child_r.δ;
                           val.s    = s;
-                          NV_SET_fn(ζ->var, val);
+                          NV_SET_fn(ζ->varname, val);
                       } else {
                           /* XNME (.): conditional — buffer, commit in Phase 5 */
-                          ζ->pend     = child_r;
-                          ζ->has_p = 1;
+                          ζ->pending     = child_r;
+                          ζ->has_pending = 1;
                       }
                   }
                                                               return child_r;
 
-    CAP_ω:        ζ->has_p = 0;   /* backtracked past — discard pending */
+    CAP_ω:        ζ->has_pending = 0;   /* backtracked past — discard pending */
                                                               return spec_empty;
 }
 
@@ -558,9 +558,9 @@ static void _cache_insert(_PND_t *key, bb_node_t node)
 static bb_node_t _cache_get_fresh(_dync_slot_t *slot)
 {
     bb_node_t n = slot->template;
-    if (n.ζ_size && n.fz) {
+    if (n.ζ_size && n.state) {
         void *fresh = calloc(1, n.ζ_size);
-        memcpy(fresh, n.fz, n.ζ_size);
+        memcpy(fresh, n.state, n.ζ_size);
         n.fz = fresh;
     }
     return n;
@@ -595,11 +595,11 @@ static spec_t bb_atp(void *zeta, int entry)
     spec_t ATP;
 
     ATP_α:  ζ->done = 1;   /* mark for β — no backtrack */
-            if (ζ->var && ζ->var[0]) {
+            if (ζ->varname && ζ->varname[0]) {
                 DESCR_t val;
                 val.v = DT_I;
                 val.i = (int64_t)Δ;
-                NV_SET_fn(ζ->var, val);
+                NV_SET_fn(ζ->varname, val);
             }
             ATP = spec(Σ + Δ, 0);       goto ATP_γ;
     ATP_β:                               goto ATP_ω;
@@ -784,8 +784,8 @@ static bb_node_t bb_build(_PND_t *p)
         _seq_t *ζ = calloc(1, sizeof(_seq_t));
         bb_node_t l = bb_build(p->left);
         bb_node_t r = bb_build(p->right);
-        ζ->left.fn  = l.fn; ζ->left.fz  = l.fz;
-        ζ->right.fn = r.fn; ζ->right.fz = r.fz;
+        ζ->left.fn  = l.fn; ζ->left.fz  = l.state;
+        ζ->right.fn = r.fn; ζ->right.fz = r.state;
         n.fn = (bb_box_fn)bb_seq;
         n.fz  = ζ;
         n.ζ_size = sizeof(*ζ);
@@ -805,7 +805,7 @@ static bb_node_t bb_build(_PND_t *p)
         while (cur && cur->kind == _XOR && nc < BB_ALT_MAX_S - 1) {
             bb_node_t arm        = bb_build(cur->left);
             ζ->ch[nc].fn  = arm.fn;
-            ζ->ch[nc].fz   = arm.fz;
+            ζ->ch[nc].fz   = arm.state;
             nc++;
             cur = cur->right;
         }
@@ -813,7 +813,7 @@ static bb_node_t bb_build(_PND_t *p)
         if (nc < BB_ALT_MAX_S) {
             bb_node_t arm        = bb_build(cur);
             ζ->ch[nc].fn  = arm.fn;
-            ζ->ch[nc].fz   = arm.fz;
+            ζ->ch[nc].fz   = arm.state;
             nc++;
         }
         ζ->n = nc;
@@ -828,7 +828,7 @@ static bb_node_t bb_build(_PND_t *p)
         _arbno_t *ζ = calloc(1, sizeof(_arbno_t));
         bb_node_t body  = bb_build(p->left);
         ζ->fn = body.fn;
-        ζ->fz  = body.fz;
+        ζ->child_state  = body.state;
         n.fn = (bb_box_fn)bb_arbno;
         n.fz  = ζ;
         n.ζ_size = sizeof(*ζ);
@@ -840,9 +840,9 @@ static bb_node_t bb_build(_PND_t *p)
         capture_t *ζ = calloc(1, sizeof(capture_t));
         bb_node_t child = bb_build(p->left);
         ζ->fn  = child.fn;
-        ζ->fz   = child.fz;
-        ζ->var   = (p->var.v == DT_S && p->var.s) ? p->var.s : NULL;
-        ζ->imm = 1;
+        ζ->child_state   = child.state;
+        ζ->varname   = (p->varname.v == DT_S && p->varname.s) ? p->varname.s : NULL;
+        ζ->immediate = 1;
         register_capture(ζ);
         n.fn = (bb_box_fn)bb_capture;
         n.fz  = ζ;
@@ -855,9 +855,9 @@ static bb_node_t bb_build(_PND_t *p)
         capture_t *ζ = calloc(1, sizeof(capture_t));
         bb_node_t child = bb_build(p->left);
         ζ->fn  = child.fn;
-        ζ->fz   = child.fz;
-        ζ->var   = (p->var.v == DT_S && p->var.s) ? p->var.s : NULL;
-        ζ->imm = 0;
+        ζ->child_state   = child.state;
+        ζ->varname   = (p->varname.v == DT_S && p->varname.s) ? p->varname.s : NULL;
+        ζ->immediate = 0;
         register_capture(ζ);
         n.fn = (bb_box_fn)bb_capture;
         n.fz  = ζ;
@@ -878,13 +878,13 @@ static bb_node_t bb_build(_PND_t *p)
          * Store only the variable name; the box fetches live at α.
          */
         const char *name = (p->kind == _XDSAR) ? p->STRVAL_fn
-                         : (p->var.v == DT_S)  ? p->var.s : NULL;
+                         : (p->varname.v == DT_S)  ? p->varname.s : NULL;
         if (name && *name) {
             deferred_var_t *ζ = calloc(1, sizeof(deferred_var_t));
             ζ->name     = name;
             ζ->fn = NULL;
-            ζ->fz  = NULL;
-            ζ->fz_size = 0;
+            ζ->child_state  = NULL;
+            ζ->child_state_size = 0;
             n.fn     = (bb_box_fn)bb_deferred_var;
             n.fz      = ζ;
             n.ζ_size = sizeof(deferred_var_t);
@@ -949,7 +949,7 @@ static bb_node_t bb_build(_PND_t *p)
             const char *varname = (p->nargs >= 1 && p->args[0].v == DT_S)
                                   ? p->args[0].s : "";
             atp_t *ζ = calloc(1, sizeof(atp_t));
-            ζ->var = varname;
+            ζ->varname = varname;
             n.fn     = (bb_box_fn)bb_atp;
             n.fz      = ζ;
             n.ζ_size = sizeof(atp_t);
@@ -1022,33 +1022,33 @@ static spec_t bb_deferred_var(void *zeta, int entry)
                         int rebuilt = 0;
 
                         if (val.v == DT_P && val.p) {
-                            if (val.p != ζ->fz || !ζ->fn) {
+                            if (val.p != ζ->child_state || !ζ->fn) {
                                 /* Value changed (or first call): rebuild */
                                 child = bb_build((_PND_t *)val.p);
                                 ζ->fn     = child.fn;
-                                ζ->fz      = child.fz;
-                                ζ->fz_size = child.ζ_size;
+                                ζ->child_state      = child.state;
+                                ζ->child_state_size = child.ζ_size;
                                 rebuilt = 1;
                             }
                         } else if (val.v == DT_S && val.s) {
                             /* String value: always treat as fresh literal.
                              * Compare pointer for stability (interned strings). */
-                            _lit_t *lz = (_lit_t *)ζ->fz;
+                            _lit_t *lz = (_lit_t *)ζ->state;
                             if (!lz || lz->lit != val.s) {
                                 lz = calloc(1, sizeof(_lit_t));
                                 lz->lit = val.s;
                                 lz->len = (int)strlen(val.s);
                                 ζ->fn     = (bb_box_fn)bb_lit;
-                                ζ->fz      = lz;
-                                ζ->fz_size = sizeof(_lit_t);
+                                ζ->child_state      = lz;
+                                ζ->child_state_size = sizeof(_lit_t);
                                 rebuilt = 1;
                             }
                         } else {
                             if (!ζ->fn) {
                                 eps_t *ez = calloc(1, sizeof(eps_t));
                                 ζ->fn     = (bb_box_fn)bb_eps;
-                                ζ->fz      = ez;
-                                ζ->fz_size = sizeof(eps_t);
+                                ζ->child_state      = ez;
+                                ζ->child_state_size = sizeof(eps_t);
                                 rebuilt = 1;
                             }
                         }
@@ -1061,17 +1061,17 @@ static spec_t bb_deferred_var(void *zeta, int entry)
                          * fields are configuration, not mutable match state.
                          * Memset zeroes len, causing bb_lit to match everywhere
                          * with δ=0. Only memset nodes whose child_fn is NOT bb_lit. */
-                        if (!rebuilt && ζ->fz && ζ->fz_size
+                        if (!rebuilt && ζ->state && ζ->child_state_size
                                 && ζ->fn != (bb_box_fn)bb_lit)
-                            memset(ζ->fz, 0, ζ->fz_size);
+                            memset(ζ->state, 0, ζ->child_state_size);
                     }
                     if (!ζ->fn)                         goto DVAR_ω;
-                    DVAR = ζ->fn(ζ->fz, α);
+                    DVAR = ζ->fn(ζ->state, α);
                     if (spec_is_empty(DVAR))                  goto DVAR_ω;
                                                               goto DVAR_γ;
 
     DVAR_β:         if (!ζ->fn)                         goto DVAR_ω;
-                    DVAR = ζ->fn(ζ->fz, β);
+                    DVAR = ζ->fn(ζ->state, β);
                     if (spec_is_empty(DVAR))                  goto DVAR_ω;
                                                               goto DVAR_γ;
 
@@ -1123,11 +1123,11 @@ static void flush_pending_captures(void)
 {
     for (int i = 0; i < g_capture_count; i++) {
         capture_t *c = g_capture_list[i];
-        if (!c->imm && c->has_p && c->var && *c->var) {
+        if (!c->immediate && c->has_pending && c->varname && *c->varname) {
             /* Snapshot before clearing — NV_SET_fn may re-enter bb_capture
-             * (e.g. OUTPUT NV hook) and overwrite ζ->pend with δ=0. */
-            spec_t snap = c->pend;
-            c->has_p = 0;   /* clear before NV_SET_fn to make re-entry a no-op */
+             * (e.g. OUTPUT NV hook) and overwrite ζ->pending with δ=0. */
+            spec_t snap = c->pending;
+            c->has_pending = 0;   /* clear before NV_SET_fn to make re-entry a no-op */
             char *s = (char *)GC_MALLOC(snap.δ + 1);
             memcpy(s, snap.σ, (size_t)snap.δ);
             s[snap.δ] = '\0';
@@ -1135,9 +1135,9 @@ static void flush_pending_captures(void)
             val.v    = DT_S;
             val.slen = (uint32_t)snap.δ;
             val.s    = s;
-            NV_SET_fn(c->var, val);
+            NV_SET_fn(c->varname, val);
         } else {
-            c->has_p = 0;
+            c->has_pending = 0;
         }
     }
     g_capture_count = 0;
@@ -1225,7 +1225,7 @@ int stmt_exec_dyn(const char  *subj_name,
 
     for (int scan = 0; scan <= scan_limit; scan++) {
         Δ = scan;
-        spec_t result = root.fn(root.fz, α);
+        spec_t result = root.fn(root.state, α);
         if (!spec_is_empty(result)) {
             match_start = scan;
             match_end   = Δ;
@@ -1422,14 +1422,14 @@ int dyn_deferred_var_test(void)
     /* First alpha — will resolve via NV_GET_fn. Since test stub returns SNUL,
      * child becomes epsilon (always matches zero-width).  What we verify is
      * that the re-resolve branch runs without crash and returns a valid spec. */
-    spec_t r1 = dvar.fn(dvar.fz, α);
+    spec_t r1 = dvar.fn(dvar.state, α);
     /* epsilon matches → non-empty spec at position 0 */
     ok &= !spec_is_empty(r1) ? 1 : 0;   /* epsilon always succeeds */
 
     /* Second alpha on same box — re-resolve must run again (not skip) */
     /* Reset Δ */
     Δ = 0;
-    spec_t r2 = dvar.fn(dvar.fz, α);
+    spec_t r2 = dvar.fn(dvar.state, α);
     ok &= !spec_is_empty(r2) ? 1 : 0;
 
     printf("  deferred_var: r1=%s r2=%s (both non-empty = re-resolve ran)\n",
