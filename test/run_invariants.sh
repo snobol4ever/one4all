@@ -131,8 +131,11 @@ ensure_sno4_archive() {
   gcc -O2 -c "$DYN/bb_seq.c"    $DYNFLAGS -w -o /tmp/rtbuild_sno_$$/bb_seq.o    || return 1
   gcc -O2 -c "$DYN/bb_arbno.c"  $DYNFLAGS -w -o /tmp/rtbuild_sno_$$/bb_arbno.o  || return 1
   gcc -O2 -c "$DYN/bb_pos.c"    $DYNFLAGS -w -o /tmp/rtbuild_sno_$$/bb_pos.o    || return 1
+  gcc -O2 -c "$DYN/bb_rpos.c"   $DYNFLAGS -w -o /tmp/rtbuild_sno_$$/bb_rpos.o   || return 1
   gcc -O2 -c "$DYN/bb_tab.c"    $DYNFLAGS -w -o /tmp/rtbuild_sno_$$/bb_tab.o    || return 1
+  gcc -O2 -c "$DYN/bb_rtab.c"   $DYNFLAGS -w -o /tmp/rtbuild_sno_$$/bb_rtab.o   || return 1
   gcc -O2 -c "$DYN/bb_fence.c"  $DYNFLAGS -w -o /tmp/rtbuild_sno_$$/bb_fence.o  || return 1
+  gcc -O2 -c "$DYN/bb_abort.c"  $DYNFLAGS -w -o /tmp/rtbuild_sno_$$/bb_abort.o  || return 1
   gcc -O2 -c "$DYN/stmt_exec.c" $DYNFLAGS -w -o /tmp/rtbuild_sno_$$/stmt_exec.o || return 1
   # eval_code.c NOT compiled into archive: requires parse_expr_from_str + snoc_parse
   # (frontend symbols). Link separately for CODE/EVAL tests. M-DYN-S1 fix.
