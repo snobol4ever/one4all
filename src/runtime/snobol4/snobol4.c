@@ -1752,7 +1752,8 @@ int STACK_DEPTH_fn(void) {
 
 typedef struct _FNCBLK_t {
     char   *name;
-    char   *spec;       /* full DEFINE_fn spec */
+    char   *spec;        /* full DEFINE_fn spec */
+    char   *entry_label; /* label where body starts (may differ from name for OPSYN) */
     FNCPTR_t fn;
     /* Parameter names */
     int     nparams;
@@ -1806,7 +1807,7 @@ static FNCBLK_t *_parse_define_spec(const char *spec) {
         if (comma) {
             *comma = '\0';
             fe->name = GC_strdup(s);
-            /* Locals follow the comma */
+            fe->entry_label = fe->name;
             char *lstr = GC_strdup(comma + 1);
             int nl = 0;
             char *tok = strtok(lstr, ",");
@@ -1822,6 +1823,7 @@ static FNCBLK_t *_parse_define_spec(const char *spec) {
             }
         } else {
             fe->name = GC_strdup(s);
+            fe->entry_label = fe->name;
         }
         fe->nparams = 0;
         fe->params  = NULL;
@@ -1830,6 +1832,7 @@ static FNCBLK_t *_parse_define_spec(const char *spec) {
 
     *paren = '\0';
     fe->name = GC_strdup(s);
+    fe->entry_label = fe->name; /* default: body label == function name */
 
     char *close = strchr(paren + 1, ')');
     char *locals_str = NULL;
@@ -1901,6 +1904,22 @@ void DEFINE_fn(const char *spec, FNCPTR_t fn) {
     _func_buckets[h] = fe;
 }
 
+/* DEFINE_fn_entry — like DEFINE_fn but sets a custom entry label.
+ * Used for define('fact2(n)', .fact2_entry) — the second arg names the label. */
+void DEFINE_fn_entry(const char *spec, FNCPTR_t fn, const char *entry_label) {
+    DEFINE_fn(spec, fn);
+    if (!entry_label) return;
+    _func_init();
+    FNCBLK_t *fe = _parse_define_spec(spec);
+    unsigned h = _func_hash(fe->name);
+    for (FNCBLK_t *e = _func_buckets[h]; e; e = e->next) {
+        if (strcasecmp(e->name, fe->name) == 0) {
+            e->entry_label = GC_strdup(entry_label);
+            return;
+        }
+    }
+}
+
 /* register_fn_alias — OPSYN support: make newname an alias for oldname.
  * Copies the FNCBLK_t entry for oldname into a new entry for newname,
  * so APPLY_fn(newname,...) dispatches identically to APPLY_fn(oldname,...).
@@ -1917,14 +1936,16 @@ void register_fn_alias(const char *newname, const char *oldname) {
     FNCBLK_t *fe = GC_malloc(sizeof(FNCBLK_t));
     fe->name    = GC_strdup(newname);
     if (old_entry) {
-        fe->spec    = old_entry->spec;
-        fe->fn      = old_entry->fn;
+        fe->spec        = old_entry->spec;
+        fe->entry_label = old_entry->entry_label; /* alias body is at original label */
+        fe->fn          = old_entry->fn;
         fe->nparams = old_entry->nparams;
         fe->params  = old_entry->params;
         fe->nlocals = old_entry->nlocals;
         fe->locals  = old_entry->locals;
     } else {
         fe->spec = GC_strdup(newname); fe->fn = NULL;
+        fe->entry_label = fe->name;
         fe->nparams = 0; fe->params = NULL;
         fe->nlocals = 0; fe->locals = NULL;
     }
@@ -1934,6 +1955,7 @@ void register_fn_alias(const char *newname, const char *oldname) {
     for (FNCBLK_t *e = _func_buckets[hn]; e; e = e->next) {
         if (strcasecmp(e->name, newname) == 0) {
             e->spec = fe->spec; e->fn = fe->fn;
+            e->entry_label = fe->entry_label;
             e->nparams = fe->nparams; e->params = fe->params;
             e->nlocals = fe->nlocals; e->locals = fe->locals;
             return;
@@ -2043,6 +2065,15 @@ const char *FUNC_LOCAL_fn(const char *fname, int i) {
     for (FNCBLK_t *e = _func_buckets[h]; e; e = e->next)
         if (strcasecmp(e->name, fname) == 0)
             return (i >= 0 && i < e->nlocals) ? e->locals[i] : NULL;
+    return NULL;
+}
+const char *FUNC_ENTRY_fn(const char *fname) {
+    _func_init();
+    if (!fname) return NULL;
+    unsigned h = _func_hash(fname);
+    for (FNCBLK_t *e = _func_buckets[h]; e; e = e->next)
+        if (strcasecmp(e->name, fname) == 0)
+            return e->entry_label ? e->entry_label : e->name;
     return NULL;
 }
 

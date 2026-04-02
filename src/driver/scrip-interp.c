@@ -134,14 +134,38 @@ static const char *define_spec_from_expr(EXPR_t *subj)
     return NULL;
 }
 
+/* ── Extract optional entry-label string from second arg of DEFINE ── */
+static const char *define_entry_from_expr(EXPR_t *subj)
+{
+    if (!subj || subj->kind != E_FNC) return NULL;
+    if (!subj->sval || strcasecmp(subj->sval, "DEFINE") != 0) return NULL;
+    if (subj->nchildren < 2 || !subj->children[1]) return NULL;
+    EXPR_t *arg2 = subj->children[1];
+    /* .label_name → E_NAME(E_VAR sval="label_name") or E_CAPT_COND_ASGN */
+    if (arg2->kind == E_NAME && arg2->nchildren == 1) {
+        EXPR_t *inner = arg2->children[0];
+        if (inner->kind == E_VAR && inner->sval) return inner->sval;
+    }
+    if (arg2->kind == E_CAPT_COND_ASGN && arg2->nchildren == 1) {
+        EXPR_t *inner = arg2->children[0];
+        if (inner->kind == E_VAR && inner->sval) return inner->sval;
+    }
+    if (arg2->kind == E_VAR && arg2->sval) return arg2->sval;
+    if (arg2->kind == E_QLIT && arg2->sval) return arg2->sval;
+    return NULL;
+}
+
 /* ── Pre-scan program and register all DEFINE'd functions ── */
 static void prescan_defines(Program *prog)
 {
     for (STMT_t *s = prog->head; s; s = s->next) {
         if (!s->subject) continue;
         const char *spec = define_spec_from_expr(s->subject);
-        if (spec && *spec)
-            DEFINE_fn(spec, NULL);   /* fn=NULL → user-defined, interpreter dispatches */
+        if (spec && *spec) {
+            const char *entry = define_entry_from_expr(s->subject);
+            if (entry) DEFINE_fn_entry(spec, NULL, entry);
+            else       DEFINE_fn(spec, NULL);
+        }
     }
 }
 
@@ -207,8 +231,11 @@ static DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
 
     int ret_kind = setjmp(fr->ret_env);
     if (ret_kind == 0) {
-        /* ── Find body label (try lowercase name then uppercase) ── */
-        STMT_t *body = label_lookup(fname);
+        /* ── Find body label: use entry_label (supports OPSYN aliases and
+         * alternate entry points), then fall back to fname/ufname ── */
+        const char *entry = FUNC_ENTRY_fn(fname);
+        STMT_t *body = entry ? label_lookup(entry) : NULL;
+        if (!body) body = label_lookup(fname);
         if (!body) body = label_lookup(ufname);
 
         if (body) {
@@ -551,16 +578,39 @@ static DESCR_t interp_eval(EXPR_t *e)
     case E_INDIRECT: {
         if (e->nchildren < 1) return FAILDESCR;
         EXPR_t *child = e->children[0];
-        /* $.var and $.var<idx> both parse as E_INDIRECT(E_CAPT_COND_ASGN(inner))
-         * with nchildren==1 (unary dot).
-         *
-         * Semantics confirmed from emitted x86 (.s oracle):
-         *   $.var      => NV_GET_fn("var")             (same as $'var')
-         *   $.var<idx> => subscript( NV_GET_fn("var"), idx )
-         *
-         * The unary dot uses the identifier name literally — not its value.
-         * When the inner expr under the dot is E_IDX(E_VAR"name", idx...),
-         * we resolve the variable by name then apply the subscript. */
+        /* $.var parses as E_INDIRECT(E_NAME(E_CAPT_COND_ASGN(E_VAR)))
+         * $.var<idx> parses as E_INDIRECT(E_NAME(E_CAPT_COND_ASGN(E_VAR, idx)))
+         * The E_NAME wrapper (from the dot-prefix parse) is unwrapped first.
+         * Semantics: the identifier name is used literally (not its value).
+         *   $.var      => NV_GET_fn("var")
+         *   $.var<idx> => subscript( NV_GET_fn("var"), idx ) */
+        /* $.var<idx> parses as E_INDIRECT(E_NAME(E_CAPT_COND_ASGN(E_VAR,idx)))
+         * — the E_NAME wrapper is from the dot-prefix parse. Unwrap it. */
+        if (child->kind == E_NAME && child->nchildren == 1)
+            child = child->children[0];
+
+        /* $.var plain lookup: E_NAME unwrap gives E_VAR directly */
+        if (child->kind == E_VAR && child->sval)
+            return NV_GET_fn(child->sval);
+
+        /* E_IDX after E_NAME unwrap: $.var<idx> subscript form
+         * children[0]=E_VAR "name", children[1]=index expr */
+        if (child->kind == E_IDX && child->nchildren >= 2
+                && child->children[0]->kind == E_VAR && child->children[0]->sval) {
+            const char *nm = child->children[0]->sval;
+            DESCR_t base = NV_GET_fn(nm);
+            if (IS_FAIL_fn(base)) return FAILDESCR;
+            if (child->nchildren == 2) {
+                DESCR_t idx = interp_eval(child->children[1]);
+                if (IS_FAIL_fn(idx)) return FAILDESCR;
+                return subscript_get(base, idx);
+            }
+            DESCR_t i1 = interp_eval(child->children[1]);
+            DESCR_t i2 = interp_eval(child->children[2]);
+            if (IS_FAIL_fn(i1) || IS_FAIL_fn(i2)) return FAILDESCR;
+            return subscript_get2(base, i1, i2);
+        }
+
         if (child->kind == E_CAPT_COND_ASGN && child->nchildren == 1) {
             EXPR_t *inner = child->children[0];
             /* $.var<idx> case: dot child is E_IDX whose base is E_VAR */
@@ -602,7 +652,11 @@ static DESCR_t interp_eval(EXPR_t *e)
         /* DEFINE('spec') — register user function; returns NULVCL (succeeds) */
         if (strcasecmp(e->sval, "DEFINE") == 0) {
             const char *spec = define_spec_from_expr(e);
-            if (spec && *spec) DEFINE_fn(spec, NULL);
+            if (spec && *spec) {
+                const char *entry = define_entry_from_expr(e);
+                if (entry) DEFINE_fn_entry(spec, NULL, entry);
+                else       DEFINE_fn(spec, NULL);
+            }
             return NULVCL;
         }
 
