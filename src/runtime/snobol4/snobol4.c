@@ -134,30 +134,30 @@ char alphabet[257];  /* all 256 ASCII chars */
  * Also INTEGER, SIZE_fn, REAL type/conversion builtins.
  * ============================================================ */
 
-static DESCR_t _b_GT(DESCR_t *a, int n) {
+static DESCR_t _GT_(DESCR_t *a, int n) {
     if (n < 2) return FAILDESCR;
     return gt(a[0], a[1]) ? NULVCL : FAILDESCR;
 }
-static DESCR_t _b_LT(DESCR_t *a, int n) {
+static DESCR_t _LT_(DESCR_t *a, int n) {
     if (n < 2) return FAILDESCR;
     return lt(a[0], a[1]) ? NULVCL : FAILDESCR;
 }
-static DESCR_t _b_GE(DESCR_t *a, int n) {
+static DESCR_t _GE_(DESCR_t *a, int n) {
     if (n < 2) return FAILDESCR;
     return ge(a[0], a[1]) ? NULVCL : FAILDESCR;
 }
-static DESCR_t _b_LE(DESCR_t *a, int n) {
+static DESCR_t _LE_(DESCR_t *a, int n) {
     if (n < 2) return FAILDESCR;
     return le(a[0], a[1]) ? NULVCL : FAILDESCR;
 }
-static DESCR_t _b_EQ(DESCR_t *a, int n) {
+static DESCR_t _EQ_(DESCR_t *a, int n) {
     if (n < 2) return FAILDESCR;
     /* Numeric equality: equal returns first arg, else fail */
     if (a[0].v == DT_I && a[1].v == DT_I)
         return (a[0].i == a[1].i) ? NULVCL : FAILDESCR;
     return (to_real(a[0]) == to_real(a[1])) ? NULVCL : FAILDESCR;
 }
-static DESCR_t _b_NE(DESCR_t *a, int n) {
+static DESCR_t _NE_(DESCR_t *a, int n) {
     if (n < 2) return FAILDESCR;
     if (a[0].v == DT_I && a[1].v == DT_I)
         return (a[0].i != a[1].i) ? NULVCL : FAILDESCR;
@@ -194,7 +194,7 @@ static DESCR_t _b_pos(DESCR_t *a, int n) {
     return pos(a[0]);
 }
 
-static DESCR_t _b_INTEGER(DESCR_t *a, int n) {
+static DESCR_t _INTEGER_(DESCR_t *a, int n) {
     if (n < 1) return FAILDESCR;
     /* Succeed (returning int value) if arg is or converts to integer */
     if (a[0].v == DT_I) return a[0];
@@ -205,7 +205,7 @@ static DESCR_t _b_INTEGER(DESCR_t *a, int n) {
     }
     return FAILDESCR;
 }
-static DESCR_t _b_REAL(DESCR_t *a, int n) {
+static DESCR_t _REAL_(DESCR_t *a, int n) {
     if (n < 1) return FAILDESCR;
     if (a[0].v == DT_R) return a[0];
     if (a[0].v == DT_I)  return (DESCR_t){ .v = DT_R, .r = (double)a[0].i };
@@ -216,7 +216,7 @@ static DESCR_t _b_REAL(DESCR_t *a, int n) {
     }
     return FAILDESCR;
 }
-static DESCR_t _b_SIZE(DESCR_t *a, int n) {
+static DESCR_t _SIZE_(DESCR_t *a, int n) {
     if (n < 1) return INTVAL(0);
     /* Binary string (e.g. &ALPHABET-derived): use slen field directly. */
     if (a[0].v == DT_S && a[0].slen) return INTVAL((int64_t)a[0].slen);
@@ -226,54 +226,54 @@ static DESCR_t _b_SIZE(DESCR_t *a, int n) {
 }
 
 /* Sprint 23: IDENT, DIFFER, HOST, ENDFILE, APPLY + string builtins as callable */
-static DESCR_t _b_IDENT(DESCR_t *a, int n) {
+static DESCR_t _IDENT_(DESCR_t *a, int n) {
     DESCR_t x = (n > 0) ? a[0] : NULVCL;
     DESCR_t y = (n > 1) ? a[1] : NULVCL;
     return ident(x, y) ? NULVCL : FAILDESCR;
 }
-static DESCR_t _b_DIFFER(DESCR_t *a, int n) {
+static DESCR_t _DIFFER_(DESCR_t *a, int n) {
     DESCR_t x = (n > 0) ? a[0] : NULVCL;
     DESCR_t y = (n > 1) ? a[1] : NULVCL;
     return differ(x, y) ? NULVCL : FAILDESCR;
 }
 /* Lexical string comparators — return first arg on success, FAILDESCR on failure */
-static DESCR_t _b_LGT(DESCR_t *a, int n) {
+static DESCR_t _LGT_(DESCR_t *a, int n) {
     if (n < 2) return FAILDESCR;
     const char *x = VARVAL_fn(a[0]); const char *y = VARVAL_fn(a[1]);
     if (!x) x = ""; if (!y) y = "";
     return strcmp(x, y) > 0 ? a[0] : FAILDESCR;
 }
-static DESCR_t _b_LLT(DESCR_t *a, int n) {
+static DESCR_t _LLT_(DESCR_t *a, int n) {
     if (n < 2) return FAILDESCR;
     const char *x = VARVAL_fn(a[0]); const char *y = VARVAL_fn(a[1]);
     if (!x) x = ""; if (!y) y = "";
     return strcmp(x, y) < 0 ? a[0] : FAILDESCR;
 }
-static DESCR_t _b_LGE(DESCR_t *a, int n) {
+static DESCR_t _LGE_(DESCR_t *a, int n) {
     if (n < 2) return FAILDESCR;
     const char *x = VARVAL_fn(a[0]); const char *y = VARVAL_fn(a[1]);
     if (!x) x = ""; if (!y) y = "";
     return strcmp(x, y) >= 0 ? a[0] : FAILDESCR;
 }
-static DESCR_t _b_LLE(DESCR_t *a, int n) {
+static DESCR_t _LLE_(DESCR_t *a, int n) {
     if (n < 2) return FAILDESCR;
     const char *x = VARVAL_fn(a[0]); const char *y = VARVAL_fn(a[1]);
     if (!x) x = ""; if (!y) y = "";
     return strcmp(x, y) <= 0 ? a[0] : FAILDESCR;
 }
-static DESCR_t _b_LEQ(DESCR_t *a, int n) {
+static DESCR_t _LEQ_(DESCR_t *a, int n) {
     if (n < 2) return FAILDESCR;
     const char *x = VARVAL_fn(a[0]); const char *y = VARVAL_fn(a[1]);
     if (!x) x = ""; if (!y) y = "";
     return strcmp(x, y) == 0 ? a[0] : FAILDESCR;
 }
-static DESCR_t _b_LNE(DESCR_t *a, int n) {
+static DESCR_t _LNE_(DESCR_t *a, int n) {
     if (n < 2) return FAILDESCR;
     const char *x = VARVAL_fn(a[0]); const char *y = VARVAL_fn(a[1]);
     if (!x) x = ""; if (!y) y = "";
     return strcmp(x, y) != 0 ? a[0] : FAILDESCR;
 }
-static DESCR_t _b_HOST(DESCR_t *a, int n) {
+static DESCR_t _HOST_(DESCR_t *a, int n) {
     /* HOST(0) = command args string, HOST(1) = PID, HOST(3) = argc */
     /* HOST(4, name) = getenv(name) — used by monitor preamble */
     if (n < 1) return NULVCL;
@@ -328,50 +328,50 @@ static void _io_chan_close(int ch) {
     _io_chan[ch].is_output = 0;
 }
 
-static DESCR_t _b_ENDFILE(DESCR_t *a, int n) {
+static DESCR_t _ENDFILE_(DESCR_t *a, int n) {
     if (n < 1) return NULVCL;
     int ch = (int)a[0].i;
     if (ch >= 0 && ch < IO_CHAN_MAX) _io_chan_close(ch);
     return NULVCL;
 }
-static DESCR_t _b_APPLY(DESCR_t *a, int n) {
+static DESCR_t _APPLY_(DESCR_t *a, int n) {
     if (n < 1) return NULVCL;
     const char *fname = VARVAL_fn(a[0]);
     return APPLY_fn(fname, a + 1, n - 1);
 }
-static DESCR_t _b_ARG(DESCR_t *a, int n);    /* defined after FNCBLK_t */
-static DESCR_t _b_LOCAL(DESCR_t *a, int n);  /* defined after FNCBLK_t */
-static DESCR_t _b_LPAD(DESCR_t *a, int n) {
+static DESCR_t _ARG_(DESCR_t *a, int n);    /* defined after FNCBLK_t */
+static DESCR_t _LOCAL_(DESCR_t *a, int n);  /* defined after FNCBLK_t */
+static DESCR_t _LPAD_(DESCR_t *a, int n) {
     if (n < 2) return n > 0 ? a[0] : NULVCL;
     return lpad_fn(a[0], a[1], n > 2 ? a[2] : STRVAL(" "));
 }
-static DESCR_t _b_RPAD(DESCR_t *a, int n) {
+static DESCR_t _RPAD_(DESCR_t *a, int n) {
     if (n < 2) return n > 0 ? a[0] : NULVCL;
     return rpad_fn(a[0], a[1], n > 2 ? a[2] : STRVAL(" "));
 }
-static DESCR_t _b_CHAR(DESCR_t *a, int n) {
+static DESCR_t _CHAR_(DESCR_t *a, int n) {
     if (n < 1) return NULVCL;
     return BCHAR_fn(a[0]);
 }
-static DESCR_t _b_DUPL(DESCR_t *a, int n) {
+static DESCR_t _DUPL_(DESCR_t *a, int n) {
     if (n < 2) return NULVCL;
     return DUPL_fn(a[0], a[1]);
 }
-static DESCR_t _b_REMDR(DESCR_t *a, int n) {
+static DESCR_t _REMDR_(DESCR_t *a, int n) {
     if (n < 2) return FAILDESCR;
     int64_t x = to_int(a[0]), y = to_int(a[1]);
     if (y == 0) return FAILDESCR;
     return INTVAL(x % y);
 }
-static DESCR_t _b_REPLACE(DESCR_t *a, int n) {
+static DESCR_t _REPLACE_(DESCR_t *a, int n) {
     if (n < 3) return NULVCL;
     return REPLACE_fn(a[0], a[1], a[2]);
 }
-static DESCR_t _b_TRIM(DESCR_t *a, int n) {
+static DESCR_t _TRIM_(DESCR_t *a, int n) {
     if (n < 1) return NULVCL;
     return TRIM_fn(a[0]);
 }
-static DESCR_t _b_SUBSTR(DESCR_t *a, int n) {
+static DESCR_t _SUBSTR_(DESCR_t *a, int n) {
     if (n < 2) return NULVCL;
     if (n < 3) {
         /* 2-arg SUBSTR(s, i): from position i to end of string */
@@ -380,15 +380,15 @@ static DESCR_t _b_SUBSTR(DESCR_t *a, int n) {
     }
     return SUBSTR_fn(a[0], a[1], a[2]);
 }
-static DESCR_t _b_REVERSE(DESCR_t *a, int n) {
+static DESCR_t _REVERSE_(DESCR_t *a, int n) {
     if (n < 1) return NULVCL;
     return REVERS_fn(a[0]);
 }
-static DESCR_t _b_DATATYPE(DESCR_t *a, int n) {
+static DESCR_t _DATATYPE_(DESCR_t *a, int n) {
     if (n < 1) return STRVAL("STRING");
     return STRVAL((char*)datatype(a[0]));
 }
-static DESCR_t _b_LCASE(DESCR_t *a, int n) {
+static DESCR_t _LCASE_(DESCR_t *a, int n) {
     if (n < 1) return NULVCL;
     const char *s = VARVAL_fn(a[0]);
     if (!s) return NULVCL;
@@ -396,7 +396,7 @@ static DESCR_t _b_LCASE(DESCR_t *a, int n) {
     for (int i = 0; r[i]; i++) r[i] = (char)tolower((unsigned char)r[i]);
     return STRVAL(r);
 }
-static DESCR_t _b_UCASE_fn(DESCR_t *a, int n) {
+static DESCR_t _UCASE__fn(DESCR_t *a, int n) {
     if (n < 1) return NULVCL;
     const char *s = VARVAL_fn(a[0]);
     if (!s) return NULVCL;
@@ -410,16 +410,16 @@ extern DESCR_t EVAL_fn(DESCR_t);
 extern DESCR_t code(const char *src);
 extern DESCR_t opsyn(DESCR_t, DESCR_t, DESCR_t);
 extern DESCR_t sort_fn(DESCR_t);
-static DESCR_t _b_EVAL(DESCR_t *a, int n)  { return EVAL_fn(n>0?a[0]:NULVCL); }
-static DESCR_t _b_CODE(DESCR_t *a, int n)  { return code(n>0?VARVAL_fn(a[0]):""); }
-static DESCR_t _b_OPSYN(DESCR_t *a, int n) {
+static DESCR_t _EVAL_(DESCR_t *a, int n)  { return EVAL_fn(n>0?a[0]:NULVCL); }
+static DESCR_t _CODE_(DESCR_t *a, int n)  { return code(n>0?VARVAL_fn(a[0]):""); }
+static DESCR_t _OPSYN_(DESCR_t *a, int n) {
     return opsyn(n>0?a[0]:NULVCL,n>1?a[1]:NULVCL,n>2?a[2]:NULVCL); }
-static DESCR_t _b_SORT(DESCR_t *a, int n)  { return sort_fn(n>0?a[0]:NULVCL); }
-static DESCR_t _b_INPUT(DESCR_t *a, int n);   /* defined near input_read below */
-static DESCR_t _b_OUTPUT(DESCR_t *a, int n);  /* defined near input_read below */
+static DESCR_t _SORT_(DESCR_t *a, int n)  { return sort_fn(n>0?a[0]:NULVCL); }
+static DESCR_t _INPUT_(DESCR_t *a, int n);   /* defined near input_read below */
+static DESCR_t _OUTPUT_(DESCR_t *a, int n);  /* defined near input_read below */
 
 /* ARRAY(n) or ARRAY('lo:hi') or ARRAY('lo:hi,lo2:hi2') */
-static DESCR_t _b_ARRAY(DESCR_t *a, int n) {
+static DESCR_t _ARRAY_(DESCR_t *a, int n) {
     if (n < 1) return FAILDESCR;
     const char *proto = VARVAL_fn(a[0]);
     if (proto && strchr(proto, ':')) {
@@ -445,13 +445,13 @@ static DESCR_t _b_ARRAY(DESCR_t *a, int n) {
 }
 
 /* TABLE(initial_size, increment) — both args optional */
-static DESCR_t _b_TABLE(DESCR_t *a, int n) {
+static DESCR_t _TABLE_(DESCR_t *a, int n) {
     (void)a; (void)n;
     return TABLE_VAL(table_new());
 }
 
 /* CONVERT(val, type) */
-static DESCR_t _b_CONVERT(DESCR_t *a, int n) {
+static DESCR_t _CONVERT_(DESCR_t *a, int n) {
     if (n < 2) return FAILDESCR;
     DESCR_t val  = a[0];
     const char *type = VARVAL_fn(a[1]);
@@ -467,7 +467,7 @@ static DESCR_t _b_CONVERT(DESCR_t *a, int n) {
 }
 
 /* COPY(array_or_table) — shallow copy */
-static DESCR_t _b_COPY(DESCR_t *a, int n) {
+static DESCR_t _COPY_(DESCR_t *a, int n) {
     if (n < 1) return FAILDESCR;
     DESCR_t v = a[0];
     if (v.v == DT_A) {
@@ -534,7 +534,7 @@ static DESCR_t _b_field_next(DESCR_t *a, int n) {
 
 /* DUMP builtin — dump all variables to stderr (implementation after var table) */
 static void var_dump(void);
-static DESCR_t _b_DUMP(DESCR_t *a, int n) {
+static DESCR_t _DUMP_(DESCR_t *a, int n) {
     (void)a; (void)n;
     var_dump();
     return NULVCL;
@@ -543,7 +543,7 @@ static DESCR_t _b_DUMP(DESCR_t *a, int n) {
 /* TRACE(varname, type [, label, fn]) — register variable for VALUE tracing.
  * Only 'VALUE' type supported; other types accepted but silently ignored.
  * Returns varname on success (SNOBOL4 spec). */
-static DESCR_t _b_TRACE(DESCR_t *a, int n) {
+static DESCR_t _TRACE_(DESCR_t *a, int n) {
     if (n < 1) return FAILDESCR;
     const char *varname = VARVAL_fn(a[0]);
     if (!varname || !*varname) return FAILDESCR;
@@ -557,7 +557,7 @@ static DESCR_t _b_TRACE(DESCR_t *a, int n) {
 
 /* STOPTR(varname [, type]) — remove variable from trace set.
  * Returns varname on success. */
-static DESCR_t _b_STOPTR(DESCR_t *a, int n) {
+static DESCR_t _STOPTR_(DESCR_t *a, int n) {
     if (n < 1) return FAILDESCR;
     const char *varname = VARVAL_fn(a[0]);
     if (!varname || !*varname) return FAILDESCR;
@@ -565,7 +565,7 @@ static DESCR_t _b_STOPTR(DESCR_t *a, int n) {
     return STRVAL(GC_strdup(varname));
 }
 
-/* Forward declarations needed by _b_DATA trampolines */
+/* Forward declarations needed by _DATA_ trampolines */
 static DATBLK_t *_udef_lookup(const char *name);
 
 /* ---- DT_DATA() builtin ----
@@ -580,7 +580,7 @@ typedef struct { char *typename; char *fieldname; } FieldClosure;
 static DESCR_t _data_ctor_fn(DESCR_t *args, int nargs) {
     /* Called as a registered FNCPTR_t; the closure is stored in a parallel table.
      * We use apply_closure which is not available, so we look up via type name. */
-    /* NOTE: This fn is never called directly — see _b_DATA registration below */
+    /* NOTE: This fn is never called directly — see _DATA_ registration below */
     (void)args; (void)nargs;
     return NULVCL;
 }
@@ -742,7 +742,7 @@ static DESCR_t (*_facc_fns[FIELD_ACCESSOR_MAX])(DESCR_t *, int) = {
     _facc_get_124, _facc_get_125, _facc_get_126, _facc_get_127,
 };
 
-static DESCR_t _b_DATA(DESCR_t *a, int n) {
+static DESCR_t _DATA_(DESCR_t *a, int n) {
     if (n < 1) return NULVCL;
     const char *spec = VARVAL_fn(a[0]);
     if (!spec || !*spec) return NULVCL;
@@ -821,29 +821,29 @@ extern DESCR_t pat_arbno(DESCR_t);
 extern DESCR_t pat_fence(void);
 extern DESCR_t pat_fence_p(DESCR_t);
 
-static DESCR_t _b_PAT_SPAN(DESCR_t *a, int n)    { return n>=1 ? pat_span(VARVAL_fn(a[0]))    : FAILDESCR; }
-static DESCR_t _b_PAT_BREAK(DESCR_t *a, int n)   { return n>=1 ? pat_break_(VARVAL_fn(a[0]))  : FAILDESCR; }
-static DESCR_t _b_PAT_BREAKX(DESCR_t *a, int n)  { return n>=1 ? pat_breakx(VARVAL_fn(a[0]))  : FAILDESCR; }
-static DESCR_t _b_PAT_ANY(DESCR_t *a, int n)     { return n>=1 ? pat_any_cs(VARVAL_fn(a[0]))  : FAILDESCR; }
-static DESCR_t _b_PAT_NOTANY(DESCR_t *a, int n)  { return n>=1 ? pat_notany(VARVAL_fn(a[0]))  : FAILDESCR; }
-static DESCR_t _b_PAT_LEN(DESCR_t *a, int n)     { return n>=1 ? pat_len(to_int(a[0]))   : FAILDESCR; }
-static DESCR_t _b_PAT_POS(DESCR_t *a, int n)     { return n>=1 ? pat_pos(to_int(a[0]))   : FAILDESCR; }
-static DESCR_t _b_PAT_RPOS(DESCR_t *a, int n)    { return n>=1 ? pat_rpos(to_int(a[0]))  : FAILDESCR; }
-static DESCR_t _b_PAT_TAB(DESCR_t *a, int n)     { return n>=1 ? pat_tab(to_int(a[0]))   : FAILDESCR; }
-static DESCR_t _b_PAT_RTAB(DESCR_t *a, int n)    { return n>=1 ? pat_rtab(to_int(a[0]))  : FAILDESCR; }
-static DESCR_t _b_PAT_ARB(DESCR_t *a, int n)     { (void)a;(void)n; return pat_arb();     }
-static DESCR_t _b_PAT_REM(DESCR_t *a, int n)     { (void)a;(void)n; return pat_rem();     }
-static DESCR_t _b_PAT_FAIL(DESCR_t *a, int n)    { (void)a;(void)n; return pat_fail();    }
-static DESCR_t _b_PAT_ABORT(DESCR_t *a, int n)   { (void)a;(void)n; return pat_abort();   }
-static DESCR_t _b_PAT_SUCCEED(DESCR_t *a, int n) { (void)a;(void)n; return pat_succeed(); }
-static DESCR_t _b_PAT_BAL(DESCR_t *a, int n)     { (void)a;(void)n; return pat_bal();     }
-static DESCR_t _b_PAT_ARBNO(DESCR_t *a, int n)   { return n>=1 ? pat_arbno(a[0])  : FAILDESCR; }
-static DESCR_t _b_PAT_FENCE(DESCR_t *a, int n)   { return n>=1 ? pat_fence_p(a[0]) : pat_fence(); }
-static DESCR_t _b_PAT_ALT(DESCR_t *a, int n)     { return n>=2 ? pat_alt(a[0], a[1])  : (n>=1 ? a[0] : FAILDESCR); }
-static DESCR_t _b_PAT_CONCAT(DESCR_t *a, int n)  { return n>=2 ? pat_cat(a[0], a[1])  : (n>=1 ? a[0] : FAILDESCR); }
+static DESCR_t _PAT_SPAN_(DESCR_t *a, int n)    { return n>=1 ? pat_span(VARVAL_fn(a[0]))    : FAILDESCR; }
+static DESCR_t _PAT_BREAK_(DESCR_t *a, int n)   { return n>=1 ? pat_break_(VARVAL_fn(a[0]))  : FAILDESCR; }
+static DESCR_t _PAT_BREAKX_(DESCR_t *a, int n)  { return n>=1 ? pat_breakx(VARVAL_fn(a[0]))  : FAILDESCR; }
+static DESCR_t _PAT_ANY_(DESCR_t *a, int n)     { return n>=1 ? pat_any_cs(VARVAL_fn(a[0]))  : FAILDESCR; }
+static DESCR_t _PAT_NOTANY_(DESCR_t *a, int n)  { return n>=1 ? pat_notany(VARVAL_fn(a[0]))  : FAILDESCR; }
+static DESCR_t _PAT_LEN_(DESCR_t *a, int n)     { return n>=1 ? pat_len(to_int(a[0]))   : FAILDESCR; }
+static DESCR_t _PAT_POS_(DESCR_t *a, int n)     { return n>=1 ? pat_pos(to_int(a[0]))   : FAILDESCR; }
+static DESCR_t _PAT_RPOS_(DESCR_t *a, int n)    { return n>=1 ? pat_rpos(to_int(a[0]))  : FAILDESCR; }
+static DESCR_t _PAT_TAB_(DESCR_t *a, int n)     { return n>=1 ? pat_tab(to_int(a[0]))   : FAILDESCR; }
+static DESCR_t _PAT_RTAB_(DESCR_t *a, int n)    { return n>=1 ? pat_rtab(to_int(a[0]))  : FAILDESCR; }
+static DESCR_t _PAT_ARB_(DESCR_t *a, int n)     { (void)a;(void)n; return pat_arb();     }
+static DESCR_t _PAT_REM_(DESCR_t *a, int n)     { (void)a;(void)n; return pat_rem();     }
+static DESCR_t _PAT_FAIL_(DESCR_t *a, int n)    { (void)a;(void)n; return pat_fail();    }
+static DESCR_t _PAT_ABORT_(DESCR_t *a, int n)   { (void)a;(void)n; return pat_abort();   }
+static DESCR_t _PAT_SUCCEED_(DESCR_t *a, int n) { (void)a;(void)n; return pat_succeed(); }
+static DESCR_t _PAT_BAL_(DESCR_t *a, int n)     { (void)a;(void)n; return pat_bal();     }
+static DESCR_t _PAT_ARBNO_(DESCR_t *a, int n)   { return n>=1 ? pat_arbno(a[0])  : FAILDESCR; }
+static DESCR_t _PAT_FENCE_(DESCR_t *a, int n)   { return n>=1 ? pat_fence_p(a[0]) : pat_fence(); }
+static DESCR_t _PAT_ALT_(DESCR_t *a, int n)     { return n>=2 ? pat_alt(a[0], a[1])  : (n>=1 ? a[0] : FAILDESCR); }
+static DESCR_t _PAT_CONCAT_(DESCR_t *a, int n)  { return n>=2 ? pat_cat(a[0], a[1])  : (n>=1 ? a[0] : FAILDESCR); }
 
 /* PROTOTYPE(array_or_table) — returns dimension string e.g. "1:3" or "1:3,1:2" */
-static DESCR_t _b_PROTOTYPE(DESCR_t *a, int n) {
+static DESCR_t _PROTOTYPE_(DESCR_t *a, int n) {
     if (n < 1) return FAILDESCR;
     DESCR_t v = a[0];
     if (v.v == DT_A && v.arr) {
@@ -856,8 +856,12 @@ static DESCR_t _b_PROTOTYPE(DESCR_t *a, int n) {
             snprintf(buf, sizeof(buf), "%d:%d,%d:%d",
                      arr->lo, arr->lo + rows - 1, 1, cols);
         } else {
-            /* 1D: return "lo:hi" — matches CSNOBOL4 PROTOTYPE behavior */
-            snprintf(buf, sizeof(buf), "%d:%d", arr->lo, arr->hi);
+            /* 1D: SPITBOL returns "N" for standard 1-based arrays,
+             * "lo:hi" only when lo != 1 */
+            if (arr->lo == 1)
+                snprintf(buf, sizeof(buf), "%d", arr->hi);
+            else
+                snprintf(buf, sizeof(buf), "%d:%d", arr->lo, arr->hi);
         }
         return STRVAL(GC_strdup(buf));
     }
@@ -869,7 +873,7 @@ static DESCR_t _b_PROTOTYPE(DESCR_t *a, int n) {
 }
 
 /* ITEM(arr, i1 [, i2, ...]) — programmatic subscript, equivalent to arr<i1,i2,...> */
-static DESCR_t _b_ITEM(DESCR_t *a, int n) {
+static DESCR_t _ITEM_(DESCR_t *a, int n) {
     if (n < 2) return FAILDESCR;
     DESCR_t arr = a[0];
     if (arr.v == DT_T) {
@@ -886,7 +890,7 @@ static DESCR_t _b_ITEM(DESCR_t *a, int n) {
 }
 
 /* VALUE(varname) — returns current value of named variable */
-static DESCR_t _b_VALUE(DESCR_t *a, int n) {
+static DESCR_t _VALUE_(DESCR_t *a, int n) {
     if (n < 1) return FAILDESCR;
     const char *name = VARVAL_fn(a[0]);
     if (!name) return FAILDESCR;
@@ -919,12 +923,12 @@ void SNO_INIT_fn(void) {
 
     /* Register numeric comparison builtins */
     extern void register_fn(const char *, DESCR_t (*)(DESCR_t*, int), int, int);
-    register_fn("GT",       _b_GT,       2, 2);
-    register_fn("LT",       _b_LT,       2, 2);
-    register_fn("GE",       _b_GE,       2, 2);
-    register_fn("LE",       _b_LE,       2, 2);
-    register_fn("EQ",       _b_EQ,       2, 2);
-    register_fn("NE",       _b_NE,       2, 2);
+    register_fn("GT",       _GT_,       2, 2);
+    register_fn("LT",       _LT_,       2, 2);
+    register_fn("GE",       _GE_,       2, 2);
+    register_fn("LE",       _LE_,       2, 2);
+    register_fn("EQ",       _EQ_,       2, 2);
+    register_fn("NE",       _NE_,       2, 2);
     /* Arithmetic operators — registered so APPLY_fn("add",...) works */
     register_fn("add",      _b_add,      2, 2);
     register_fn("sub",      _b_sub,      2, 2);
@@ -933,49 +937,49 @@ void SNO_INIT_fn(void) {
     register_fn("POWER_fn", _b_pow,      2, 2);
     register_fn("neg",      _b_neg,      1, 1);
     register_fn("__num_pos", _b_pos,      1, 1);
-    register_fn("INTEGER",  _b_INTEGER,  1, 1);
-    register_fn("REAL",     _b_REAL,     1, 1);
-    register_fn("SIZE",        _b_SIZE,     1, 1);
+    register_fn("INTEGER",  _INTEGER_,  1, 1);
+    register_fn("REAL",     _REAL_,     1, 1);
+    register_fn("SIZE",        _SIZE_,     1, 1);
     /* Sprint 23: string predicates and host interface */
-    register_fn("IDENT",    _b_IDENT,    0, 2);
-    register_fn("DIFFER",   _b_DIFFER,   0, 2);
-    register_fn("LGT",      _b_LGT,      2, 2);
-    register_fn("LLT",      _b_LLT,      2, 2);
-    register_fn("LGE",      _b_LGE,      2, 2);
-    register_fn("LLE",      _b_LLE,      2, 2);
-    register_fn("LEQ",      _b_LEQ,      2, 2);
-    register_fn("LNE",      _b_LNE,      2, 2);
-    register_fn("HOST",     _b_HOST,     1, 4);
-    register_fn("ENDFILE",  _b_ENDFILE,  1, 1);
-    register_fn("APPLY",    _b_APPLY,    1, 9);
-    register_fn("LPAD",     _b_LPAD,     2, 3);
-    register_fn("RPAD",     _b_RPAD,     2, 3);
-    register_fn("CHAR",     _b_CHAR,     1, 1);
-    register_fn("DUPL",        _b_DUPL,     2, 2);
-    register_fn("REPLACE",  _b_REPLACE,  3, 3);
-    register_fn("REMDR",    _b_REMDR,    2, 2);
-    register_fn("TRIM",        _b_TRIM,     1, 1);
-    register_fn("SUBSTR",      _b_SUBSTR,   2, 3);
-    register_fn("REVERSE",  _b_REVERSE,  1, 1);
-    register_fn("DATATYPE", _b_DATATYPE, 1, 1);
-    register_fn("LCASE",    _b_LCASE,    1, 1);
-    register_fn("UCASE",    _b_UCASE_fn, 1, 1);
-    register_fn("DATA",        _b_DATA,     1, 1);
-    register_fn("ARRAY",   _b_ARRAY,   1, 2);
-    register_fn("TABLE",   _b_TABLE,   0, 2);
-    register_fn("CONVERT", _b_CONVERT, 2, 2);
-    register_fn("PROTOTYPE", _b_PROTOTYPE, 1, 1);
-    register_fn("ITEM",    _b_ITEM,    2, 9);
-    register_fn("VALUE",   _b_VALUE,   1, 1);
-    register_fn("COPY",    _b_COPY,    1, 1);
-    register_fn("EVAL",  _b_EVAL,  1, 1);
-    register_fn("CODE",  _b_CODE,  1, 1);
-    register_fn("OPSYN", _b_OPSYN, 2, 3);
-    register_fn("ARG",   _b_ARG,   2, 2);
-    register_fn("LOCAL", _b_LOCAL, 2, 2);
-    register_fn("SORT",  _b_SORT,  1, 1);
-    register_fn("INPUT",  _b_INPUT,  1, 4);
-    register_fn("OUTPUT", _b_OUTPUT, 1, 4);
+    register_fn("IDENT",    _IDENT_,    0, 2);
+    register_fn("DIFFER",   _DIFFER_,   0, 2);
+    register_fn("LGT",      _LGT_,      2, 2);
+    register_fn("LLT",      _LLT_,      2, 2);
+    register_fn("LGE",      _LGE_,      2, 2);
+    register_fn("LLE",      _LLE_,      2, 2);
+    register_fn("LEQ",      _LEQ_,      2, 2);
+    register_fn("LNE",      _LNE_,      2, 2);
+    register_fn("HOST",     _HOST_,     1, 4);
+    register_fn("ENDFILE",  _ENDFILE_,  1, 1);
+    register_fn("APPLY",    _APPLY_,    1, 9);
+    register_fn("LPAD",     _LPAD_,     2, 3);
+    register_fn("RPAD",     _RPAD_,     2, 3);
+    register_fn("CHAR",     _CHAR_,     1, 1);
+    register_fn("DUPL",        _DUPL_,     2, 2);
+    register_fn("REPLACE",  _REPLACE_,  3, 3);
+    register_fn("REMDR",    _REMDR_,    2, 2);
+    register_fn("TRIM",        _TRIM_,     1, 1);
+    register_fn("SUBSTR",      _SUBSTR_,   2, 3);
+    register_fn("REVERSE",  _REVERSE_,  1, 1);
+    register_fn("DATATYPE", _DATATYPE_, 1, 1);
+    register_fn("LCASE",    _LCASE_,    1, 1);
+    register_fn("UCASE",    _UCASE__fn, 1, 1);
+    register_fn("DATA",        _DATA_,     1, 1);
+    register_fn("ARRAY",   _ARRAY_,   1, 2);
+    register_fn("TABLE",   _TABLE_,   0, 2);
+    register_fn("CONVERT", _CONVERT_, 2, 2);
+    register_fn("PROTOTYPE", _PROTOTYPE_, 1, 1);
+    register_fn("ITEM",    _ITEM_,    2, 9);
+    register_fn("VALUE",   _VALUE_,   1, 1);
+    register_fn("COPY",    _COPY_,    1, 1);
+    register_fn("EVAL",  _EVAL_,  1, 1);
+    register_fn("CODE",  _CODE_,  1, 1);
+    register_fn("OPSYN", _OPSYN_, 2, 3);
+    register_fn("ARG",   _ARG_,   2, 2);
+    register_fn("LOCAL", _LOCAL_, 2, 2);
+    register_fn("SORT",  _SORT_,  1, 1);
+    register_fn("INPUT",  _INPUT_,  1, 4);
+    register_fn("OUTPUT", _OUTPUT_, 1, 4);
     register_fn("nPush",    _b_nPush,    0, 0);
     register_fn("nInc",     _b_nInc,     0, 0);
     register_fn("nDec",     _b_nDec,     0, 0);
@@ -987,30 +991,30 @@ void SNO_INIT_fn(void) {
     register_fn("c",        _b_tree_c,      1, 1);
     register_fn("value",    _b_field_value, 1, 1);
     register_fn("next",     _b_field_next,  1, 1);
-    register_fn("DUMP",     _b_DUMP,        0, 1);
-    register_fn("TRACE",    _b_TRACE,       1, 4);
-    register_fn("STOPTR",   _b_STOPTR,      1, 2);
+    register_fn("DUMP",     _DUMP_,        0, 1);
+    register_fn("TRACE",    _TRACE_,       1, 4);
+    register_fn("STOPTR",   _STOPTR_,      1, 2);
     /* Pattern builtins callable via APPLY_fn (when inside arglist parens) */
-    register_fn("SPAN",    _b_PAT_SPAN,    1, 1);
-    register_fn("BREAK",   _b_PAT_BREAK,   1, 1);
-    register_fn("BREAKX",  _b_PAT_BREAKX,  1, 1);
-    register_fn("ANY",     _b_PAT_ANY,     1, 1);
-    register_fn("NOTANY",  _b_PAT_NOTANY,  1, 1);
-    register_fn("LEN",     _b_PAT_LEN,     1, 1);
-    register_fn("POS",     _b_PAT_POS,     1, 1);
-    register_fn("RPOS",    _b_PAT_RPOS,    1, 1);
-    register_fn("TAB",     _b_PAT_TAB,     1, 1);
-    register_fn("RTAB",    _b_PAT_RTAB,    1, 1);
-    register_fn("ARB",     _b_PAT_ARB,     0, 0);
-    register_fn("REM",     _b_PAT_REM,     0, 0);
-    register_fn("FAIL",       _b_PAT_FAIL,    0, 0);
-    register_fn("ABORT",   _b_PAT_ABORT,   0, 0);
-    register_fn("SUCCEED", _b_PAT_SUCCEED, 0, 0);
-    register_fn("BAL",     _b_PAT_BAL,     0, 0);
-    register_fn("ARBNO",   _b_PAT_ARBNO,   1, 1);
-    register_fn("FENCE",   _b_PAT_FENCE,   0, 1);
-    register_fn("ALT",     _b_PAT_ALT,     2, 2);
-    register_fn("CONCAT",  _b_PAT_CONCAT,  2, 2);
+    register_fn("SPAN",    _PAT_SPAN_,    1, 1);
+    register_fn("BREAK",   _PAT_BREAK_,   1, 1);
+    register_fn("BREAKX",  _PAT_BREAKX_,  1, 1);
+    register_fn("ANY",     _PAT_ANY_,     1, 1);
+    register_fn("NOTANY",  _PAT_NOTANY_,  1, 1);
+    register_fn("LEN",     _PAT_LEN_,     1, 1);
+    register_fn("POS",     _PAT_POS_,     1, 1);
+    register_fn("RPOS",    _PAT_RPOS_,    1, 1);
+    register_fn("TAB",     _PAT_TAB_,     1, 1);
+    register_fn("RTAB",    _PAT_RTAB_,    1, 1);
+    register_fn("ARB",     _PAT_ARB_,     0, 0);
+    register_fn("REM",     _PAT_REM_,     0, 0);
+    register_fn("FAIL",       _PAT_FAIL_,    0, 0);
+    register_fn("ABORT",   _PAT_ABORT_,   0, 0);
+    register_fn("SUCCEED", _PAT_SUCCEED_, 0, 0);
+    register_fn("BAL",     _PAT_BAL_,     0, 0);
+    register_fn("ARBNO",   _PAT_ARBNO_,   1, 1);
+    register_fn("FENCE",   _PAT_FENCE_,   0, 1);
+    register_fn("ALT",     _PAT_ALT_,     2, 2);
+    register_fn("CONCAT",  _PAT_CONCAT_,  2, 2);
     /* Sprint 23: pre-INIT_fn &ALPHABET-derived constants from global.sno
      * &ALPHABET is a 256-char binary string; POS(n) LEN(1) . var extracts char(n).
      * Since STRVAL uses strlen, &ALPHABET[0]=NUL causes all matches to fail.
@@ -1614,7 +1618,7 @@ void INDR_SET_fn(const char *name, DESCR_t val) {
     NV_SET_fn(target, val);
 }
 
-/* DUMP implementation — used by _b_DUMP above */
+/* DUMP implementation — used by _DUMP_ above */
 static void var_dump(void) {
     fprintf(stderr, "[DUMP start]\n");
     for (int i = 0; i < VAR_BUCKETS; i++) {
@@ -1922,7 +1926,7 @@ DESCR_t APPLY_fn(const char *name, DESCR_t *args, int nargs) {
 
 /* ARG(fname, n) — return uppercase name of nth parameter (1-based).
  * Fails if fname not found or n out of bounds. */
-static DESCR_t _b_ARG(DESCR_t *a, int n) {
+static DESCR_t _ARG_(DESCR_t *a, int n) {
     if (n < 2) return FAILDESCR;
     const char *fname = VARVAL_fn(a[0]);
     if (!fname) return FAILDESCR;
@@ -1944,7 +1948,7 @@ static DESCR_t _b_ARG(DESCR_t *a, int n) {
 
 /* LOCAL(fname, n) — return uppercase name of nth local variable (1-based).
  * Fails if fname not found or n out of bounds. */
-static DESCR_t _b_LOCAL(DESCR_t *a, int n) {
+static DESCR_t _LOCAL_(DESCR_t *a, int n) {
     if (n < 2) return FAILDESCR;
     const char *fname = VARVAL_fn(a[0]);
     if (!fname) return FAILDESCR;
@@ -1973,7 +1977,7 @@ int FNCEX_fn(const char *name) {
     return 0;
 }
 
-/* Source-case param/local accessors for scrip-interp (avoids uppercase issue in _b_ARG) */
+/* Source-case param/local accessors for scrip-interp (avoids uppercase issue in _ARG_) */
 int FUNC_NPARAMS_fn(const char *fname) {
     _func_init();
     if (!fname) return 0;
@@ -2362,7 +2366,7 @@ static const char *_io_varname(DESCR_t d) {
 /* INPUT(varname, channel, options_or_fname [, fname4])
  * 3-arg: INPUT(.rdInput, 8, "file.txt[-opts]")
  * 4-arg: INPUT(.rdInput, 8, "", "file.txt")  */
-static DESCR_t _b_INPUT(DESCR_t *a, int n) {
+static DESCR_t _INPUT_(DESCR_t *a, int n) {
     _io_chan_setup();
     char fname_buf[4096];
     const char *fname = NULL;
@@ -2397,7 +2401,7 @@ static DESCR_t _b_INPUT(DESCR_t *a, int n) {
 
 /* OUTPUT(varname, channel, fname)
  * 3-arg: OUTPUT(.wrOutput, 8, "file.txt") */
-static DESCR_t _b_OUTPUT(DESCR_t *a, int n) {
+static DESCR_t _OUTPUT_(DESCR_t *a, int n) {
     _io_chan_setup();
     char fname_buf[4096];
     const char *fname = NULL;

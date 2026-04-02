@@ -469,6 +469,14 @@ static DESCR_t interp_eval(EXPR_t *e)
         EXPR_t *lv = e->children[0];
         if (lv && lv->kind == E_VAR && lv->sval)
             NV_SET_fn(lv->sval, val);
+        else if (lv && lv->kind == E_FNC && lv->sval && lv->nchildren >= 1) {
+            /* DATA field setter: fname(obj) = val
+             * Evaluate the first argument; if it's a DT_DATA instance,
+             * dispatch through FIELD_SET_fn using the function name as field name. */
+            DESCR_t obj = interp_eval(lv->children[0]);
+            if (!IS_FAIL_fn(obj))
+                FIELD_SET_fn(obj, lv->sval, val);
+        }
         else if (lv && lv->kind == E_INDIRECT && lv->nchildren > 0) {
             EXPR_t *ichild = lv->children[0];
             const char *nm = NULL;
@@ -818,6 +826,19 @@ static void execute_program(Program *prog)
                     NV_SET_fn(nm, repl_val);
                     succeeded = 1;
                 }
+            }
+
+        /* ── DATA field setter: fname(obj) = expr ─────────────────── */
+        } else if (s->has_eq && s->subject &&
+                   s->subject->kind == E_FNC && s->subject->sval &&
+                   s->subject->nchildren >= 1) {
+            DESCR_t obj = interp_eval(s->subject->children[0]);
+            DESCR_t repl_val = s->replacement ? interp_eval(s->replacement) : NULVCL;
+            if (IS_FAIL_fn(obj) || IS_FAIL_fn(repl_val)) {
+                succeeded = 0;
+            } else {
+                FIELD_SET_fn(obj, s->subject->sval, repl_val);
+                succeeded = 1;
             }
 
         /* ── expression-only (side effects, e.g. bare function call) ─ */
