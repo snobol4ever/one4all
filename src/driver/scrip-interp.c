@@ -18,6 +18,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
+#include <setjmp.h>
 #include <gc.h>
 
 /* ── frontend ─────────────────────────────────────────────────────────── */
@@ -86,6 +88,229 @@ static STMT_t *label_lookup(const char *name)
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
+ * call_stack — RETURN/FRETURN longjmp infrastructure
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+#define CALL_STACK_MAX 256
+
+typedef struct {
+    jmp_buf  ret_env;
+    char     fname[128];    /* uppercase — also the return-value variable */
+    char   **saved_names;
+    DESCR_t *saved_vals;
+    int      nsaved;
+} CallFrame;
+
+static CallFrame  call_stack[CALL_STACK_MAX];
+static int        call_depth = 0;
+
+/* The program being interpreted (set in main before execute_program) */
+static Program *g_prog = NULL;
+
+/* ── Extract DEFINE spec string from E_FNC("DEFINE",...) subject node ── */
+static const char *define_spec_from_expr(EXPR_t *subj)
+{
+    if (!subj || subj->kind != E_FNC) return NULL;
+    if (!subj->sval || strcasecmp(subj->sval, "DEFINE") != 0) return NULL;
+    if (subj->nchildren < 1 || !subj->children[0]) return NULL;
+    EXPR_t *arg = subj->children[0];
+    if (arg->kind == E_QLIT) return arg->sval;
+    if (arg->kind == E_CONCAT) {
+        static char flatbuf[1024];
+        size_t pos = 0;
+        flatbuf[0] = '\0';
+        for (int i = 0; i < arg->nchildren && pos < sizeof(flatbuf)-1; i++) {
+            EXPR_t *c = arg->children[i];
+            if (c && c->kind == E_QLIT && c->sval) {
+                size_t clen = strlen(c->sval);
+                if (pos + clen >= sizeof(flatbuf)-1) break;
+                memcpy(flatbuf + pos, c->sval, clen);
+                pos += clen;
+            }
+        }
+        flatbuf[pos] = '\0';
+        return pos ? flatbuf : NULL;
+    }
+    return NULL;
+}
+
+/* ── Pre-scan program and register all DEFINE'd functions ── */
+static void prescan_defines(Program *prog)
+{
+    for (STMT_t *s = prog->head; s; s = s->next) {
+        if (!s->subject) continue;
+        const char *spec = define_spec_from_expr(s->subject);
+        if (spec && *spec)
+            DEFINE_fn(spec, NULL);   /* fn=NULL → user-defined, interpreter dispatches */
+    }
+}
+
+/* ── call_user_function — forward decl (needs interp_eval, declared below) ── */
+static DESCR_t interp_eval(EXPR_t *e);  /* forward */
+
+static DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
+{
+    if (call_depth >= CALL_STACK_MAX) return FAILDESCR;
+
+    /* ── Gather param and local names via source-case accessors ── */
+    int np = FUNC_NPARAMS_fn(fname);
+    int nl = FUNC_NLOCALS_fn(fname);
+    char *pnames[64]; if (np > 64) np = 64;
+    char *lnames[64]; if (nl > 64) nl = 64;
+    for (int i = 0; i < np; i++) {
+        const char *p = FUNC_PARAM_fn(fname, i);
+        pnames[i] = p ? GC_strdup(p) : GC_strdup("");
+    }
+    for (int i = 0; i < nl; i++) {
+        const char *l = FUNC_LOCAL_fn(fname, i);
+        lnames[i] = l ? GC_strdup(l) : GC_strdup("");
+    }
+
+    /* fname as uppercase (NV store is case-insensitive but uppercase is canonical) */
+    char ufname[128];
+    {
+        size_t flen = strlen(fname);
+        if (flen >= sizeof(ufname)) flen = sizeof(ufname)-1;
+        for (size_t i = 0; i <= flen; i++)
+            ufname[i] = (char)toupper((unsigned char)fname[i]);
+    }
+
+    /* ── Save current values of fname-var, params, locals ── */
+    int nsaved = 1 + np + nl;
+    char   **snames = GC_malloc((size_t)nsaved * sizeof(char *));
+    DESCR_t *svals  = GC_malloc((size_t)nsaved * sizeof(DESCR_t));
+    /* Save/clear the return-value slot using source-case fname.
+     * NV store is case-sensitive: function body writes "double" not "DOUBLE". */
+    snames[0] = GC_strdup(fname);
+    svals[0]  = NV_GET_fn(fname);
+    NV_SET_fn(fname, NULVCL);                              /* clear return slot */
+    for (int i = 0; i < np; i++) {
+        snames[1+i] = pnames[i];
+        svals[1+i]  = NV_GET_fn(pnames[i]);
+        NV_SET_fn(pnames[i], (i < nargs) ? args[i] : NULVCL);
+    }
+    for (int i = 0; i < nl; i++) {
+        snames[1+np+i] = lnames[i];
+        svals[1+np+i]  = NV_GET_fn(lnames[i]);
+        NV_SET_fn(lnames[i], NULVCL);
+    }
+
+    /* ── Push call frame ── */
+    CallFrame *fr = &call_stack[call_depth++];
+    strncpy(fr->fname, fname, sizeof(fr->fname)-1);
+    fr->fname[sizeof(fr->fname)-1] = '\0';
+    fr->saved_names = snames;
+    fr->saved_vals  = svals;
+    fr->nsaved      = nsaved;
+
+    DESCR_t retval = NULVCL;
+
+    int ret_kind = setjmp(fr->ret_env);
+    if (ret_kind == 0) {
+        /* ── Find body label (try lowercase name then uppercase) ── */
+        STMT_t *body = label_lookup(fname);
+        if (!body) body = label_lookup(ufname);
+
+        if (body) {
+            STMT_t *s = body;
+            int step_limit = 5000000;
+            while (s && step_limit-- > 0) {
+                if (s->is_end) break;
+                if (s->subject && (s->subject->kind == E_CHOICE ||
+                                   s->subject->kind == E_UNIFY  ||
+                                   s->subject->kind == E_CLAUSE)) {
+                    s = s->next; continue;
+                }
+
+                DESCR_t     subj_val  = NULVCL;
+                const char *subj_name = NULL;
+                if (s->subject) {
+                    if (s->subject->kind == E_VAR && s->subject->sval) {
+                        subj_name = s->subject->sval;
+                        subj_val  = NV_GET_fn(subj_name);
+                    } else {
+                        subj_val = interp_eval(s->subject);
+                    }
+                }
+
+                int succeeded = 1;
+                if (s->pattern) {
+                    DESCR_t pat_d = interp_eval(s->pattern);
+                    if (IS_FAIL_fn(pat_d)) {
+                        succeeded = 0;
+                    } else {
+                        DESCR_t repl_val; int has_repl = 0;
+                        if (s->has_eq && s->replacement) {
+                            repl_val = interp_eval(s->replacement);
+                            has_repl = !IS_FAIL_fn(repl_val);
+                        }
+                        Σ = subj_name ? subj_name : "";
+                        succeeded = stmt_exec_dyn(subj_name,
+                            subj_name ? NULL : &subj_val,
+                            pat_d, has_repl ? &repl_val : NULL, has_repl);
+                    }
+                } else if (s->has_eq && subj_name) {
+                    DESCR_t repl_val = s->replacement ? interp_eval(s->replacement) : NULVCL;
+                    if (IS_FAIL_fn(repl_val)) succeeded = 0;
+                    else { NV_SET_fn(subj_name, repl_val); succeeded = 1; }
+                } else if (s->has_eq && s->subject && s->subject->kind == E_INDR) {
+                    DESCR_t name_d = interp_eval(
+                        s->subject->nchildren > 0 ? s->subject->children[0] : NULL);
+                    const char *nm = VARVAL_fn(name_d);
+                    if (!nm || !*nm) { succeeded = 0; }
+                    else {
+                        DESCR_t repl_val = s->replacement ? interp_eval(s->replacement) : NULVCL;
+                        if (IS_FAIL_fn(repl_val)) succeeded = 0;
+                        else { NV_SET_fn(nm, repl_val); succeeded = 1; }
+                    }
+                } else if (s->subject && !s->pattern && !s->has_eq) {
+                    if (IS_FAIL_fn(subj_val)) succeeded = 0;
+                }
+
+                const char *target = NULL;
+                if (s->go) {
+                    if (s->go->uncond && *s->go->uncond)
+                        target = s->go->uncond;
+                    else if (succeeded && s->go->onsuccess && *s->go->onsuccess)
+                        target = s->go->onsuccess;
+                    else if (!succeeded && s->go->onfailure && *s->go->onfailure)
+                        target = s->go->onfailure;
+                }
+
+                if (target) {
+                    if (strcasecmp(target, "END") == 0) break;
+                    if (strcasecmp(target, "RETURN") == 0) {
+                        retval = NV_GET_fn(fr->fname);
+                        goto fn_done;
+                    }
+                    if (strcasecmp(target, "FRETURN") == 0) {
+                        retval = FAILDESCR;
+                        goto fn_done;
+                    }
+                    STMT_t *dest = label_lookup(target);
+                    if (dest) { s = dest; continue; }
+                    break;
+                }
+                s = s->next;
+            }
+        }
+        /* fell off body without RETURN — return function's name variable */
+        retval = NV_GET_fn(fr->fname);
+    } else if (ret_kind == 1) {
+        retval = NV_GET_fn(fr->fname);
+    } else {
+        retval = FAILDESCR;
+    }
+
+fn_done:
+    /* ── Restore saved variables and pop frame ── */
+    for (int i = 0; i < nsaved; i++)
+        NV_SET_fn(snames[i], svals[i]);
+    call_depth--;
+    return retval;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
  * eval_node_interp — thin wrapper; reuses eval_node from eval_code.c
  * via eval_expr_dyn (we call it by re-parsing for non-trivial exprs,
  * but for the common case we use NV_GET_fn / NV_SET_fn directly).
@@ -95,8 +320,7 @@ static STMT_t *label_lookup(const char *name)
  * exposing eval_node (which is static in eval_code.c).
  * ══════════════════════════════════════════════════════════════════════════ */
 
-/* Forward declaration */
-static DESCR_t interp_eval(EXPR_t *e);
+/* Forward declaration (also declared above for call_user_function) */
 
 static DESCR_t interp_eval(EXPR_t *e)
 {
@@ -197,6 +421,14 @@ static DESCR_t interp_eval(EXPR_t *e)
 
     case E_FNC: {
         if (!e->sval || !*e->sval) return FAILDESCR;
+
+        /* DEFINE('spec') — register user function; returns NULVCL (succeeds) */
+        if (strcasecmp(e->sval, "DEFINE") == 0) {
+            const char *spec = define_spec_from_expr(e);
+            if (spec && *spec) DEFINE_fn(spec, NULL);
+            return NULVCL;
+        }
+
         int nargs = e->nchildren;
         DESCR_t *args = nargs > 0
             ? (DESCR_t *)alloca((size_t)nargs * sizeof(DESCR_t))
@@ -205,6 +437,38 @@ static DESCR_t interp_eval(EXPR_t *e)
             args[i] = interp_eval(e->children[i]);
             if (IS_FAIL_fn(args[i])) return FAILDESCR;
         }
+
+        /* Check user-defined FIRST — APPLY_fn returns NULVCL for both
+         * unknown names and fn==NULL user functions, so we can't distinguish
+         * after the fact. Route to interpreter if FNCEX_fn says it's registered
+         * with fn==NULL (user-defined), otherwise try builtins. */
+        if (FNCEX_fn(e->sval)) {
+            /* May be user-defined (fn==NULL) or a builtin (fn!=NULL).
+             * APPLY_fn routes fn!=NULL to the C function; fn==NULL returns NULVCL.
+             * We call APPLY_fn first; if it returns NULVCL we try call_user_function.
+             * This correctly handles builtins that happen to be registered via FNCEX. */
+            DESCR_t bres = APPLY_fn(e->sval, args, nargs);
+            if (IS_FAIL_fn(bres)) return FAILDESCR;
+            /* NULVCL could mean: builtin returned null, OR fn==NULL user func.
+             * Distinguish: check whether the body label exists in the program. */
+            if (bres.v != DT_SNUL)  /* non-null result → builtin returned a value */
+                return bres;
+            /* NULVCL: could be user func or builtin returning null.
+             * Try user dispatch; if no body label found it falls back to NULVCL. */
+            STMT_t *body = label_lookup(e->sval);
+            if (!body) {
+                /* Try uppercase */
+                char ufn[128];
+                size_t fl = strlen(e->sval);
+                if (fl >= sizeof(ufn)) fl = sizeof(ufn)-1;
+                for (size_t i = 0; i <= fl; i++) ufn[i] = (char)toupper((unsigned char)e->sval[i]);
+                body = label_lookup(ufn);
+            }
+            if (body)
+                return call_user_function(e->sval, args, nargs);
+            return bres;  /* builtin returned NULVCL legitimately */
+        }
+        /* Not registered at all — try APPLY_fn for late-registered builtins */
         return APPLY_fn(e->sval, args, nargs);
     }
 
@@ -269,6 +533,7 @@ static DESCR_t interp_eval(EXPR_t *e)
 static void execute_program(Program *prog)
 {
     label_table_build(prog);
+    prescan_defines(prog);
 
     STMT_t *s = prog->head;
     int step_limit = 10000000;   /* guard against infinite loops in smoke tests */
@@ -368,6 +633,8 @@ static void execute_program(Program *prog)
         if (target) {
             /* Check for END pseudo-label */
             if (strcasecmp(target, "END") == 0) break;
+            /* RETURN/FRETURN at top-level (outside a call) → treat as END */
+            if (strcasecmp(target, "RETURN") == 0 || strcasecmp(target, "FRETURN") == 0) break;
             STMT_t *dest = label_lookup(target);
             if (dest) { s = dest; continue; }
             /* Unknown label — treat as program end */
@@ -404,6 +671,7 @@ int main(int argc, char **argv)
     }
 
     stmt_init();
+    g_prog = prog;
     execute_program(prog);
     return 0;
 }

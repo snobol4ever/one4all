@@ -264,6 +264,11 @@ void    DEFINE_fn(const char *spec, FNCPTR_t fn);  /* DEFINE_fn('name(a,b)local1
 void    register_fn_alias(const char *newname, const char *oldname); /* OPSYN alias */
 DESCR_t  APPLY_fn(const char *name, DESCR_t *args, int nargs);  /* APPLY(name,...) */
 int     FNCEX_fn(const char *name);
+// Source-case param/local accessors (scrip-interp; NV store is case-sensitive)
+int         FUNC_NPARAMS_fn(const char *fname);
+int         FUNC_NLOCALS_fn(const char *fname);
+const char *FUNC_PARAM_fn(const char *fname, int i);
+const char *FUNC_LOCAL_fn(const char *fname, int i);
 
 /* ============================================================
  * GOTO / label runtime

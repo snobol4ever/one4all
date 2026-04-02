@@ -1951,6 +1951,42 @@ int FNCEX_fn(const char *name) {
     return 0;
 }
 
+/* Source-case param/local accessors for scrip-interp (avoids uppercase issue in _b_ARG) */
+int FUNC_NPARAMS_fn(const char *fname) {
+    _func_init();
+    if (!fname) return 0;
+    unsigned h = _func_hash(fname);
+    for (FNCBLK_t *e = _func_buckets[h]; e; e = e->next)
+        if (strcasecmp(e->name, fname) == 0) return e->nparams;
+    return 0;
+}
+int FUNC_NLOCALS_fn(const char *fname) {
+    _func_init();
+    if (!fname) return 0;
+    unsigned h = _func_hash(fname);
+    for (FNCBLK_t *e = _func_buckets[h]; e; e = e->next)
+        if (strcasecmp(e->name, fname) == 0) return e->nlocals;
+    return 0;
+}
+const char *FUNC_PARAM_fn(const char *fname, int i) {
+    _func_init();
+    if (!fname) return NULL;
+    unsigned h = _func_hash(fname);
+    for (FNCBLK_t *e = _func_buckets[h]; e; e = e->next)
+        if (strcasecmp(e->name, fname) == 0)
+            return (i >= 0 && i < e->nparams) ? e->params[i] : NULL;
+    return NULL;
+}
+const char *FUNC_LOCAL_fn(const char *fname, int i) {
+    _func_init();
+    if (!fname) return NULL;
+    unsigned h = _func_hash(fname);
+    for (FNCBLK_t *e = _func_buckets[h]; e; e = e->next)
+        if (strcasecmp(e->name, fname) == 0)
+            return (i >= 0 && i < e->nlocals) ? e->locals[i] : NULL;
+    return NULL;
+}
+
 /* ============================================================
  * Builtin string functions
  * ============================================================ */
