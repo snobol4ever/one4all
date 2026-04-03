@@ -139,10 +139,14 @@ static void test_231(void) {
     EXPECT_EQ_INT("real kind", toks[0].kind, T_REAL);
     EXPECT_EQ_DOUBLE("real val", toks[0].dval, 3.14);
 
-    /* real — leading dot */
+    /* leading dot: .5 is NOT a real in SNOBOL4 — ELEMTB has no dot entry.
+     * SPITBOL rejects .5 as syntax error (missing operand).
+     * . is the naming operator; .5 = unary-dot applied to integer 5.
+     * Lexer correctly emits T_DOT then T_INT(5). */
     n = lex_str_tokens(".5", toks, 16);
-    EXPECT_EQ_INT("leading-dot kind", toks[0].kind, T_REAL);
-    EXPECT_EQ_DOUBLE("leading-dot val", toks[0].dval, 0.5);
+    EXPECT_EQ_INT("leading-dot is T_DOT", toks[0].kind, T_DOT);
+    EXPECT_EQ_INT("leading-dot next is T_INT", toks[1].kind, T_INT);
+    EXPECT_EQ_INT("leading-dot T_INT val",  (int)toks[1].ival, 5);
 
     /* real — exponent */
     n = lex_str_tokens("1E3", toks, 16);
@@ -178,10 +182,12 @@ static void test_232(void) {
     EXPECT_EQ_INT("empty kind", toks[0].kind, T_STR);
     EXPECT_EQ_STR("empty val",  toks[0].sval, "");
 
-    /* doubled-quote escape inside single-quote: 'it''s' → it's */
+    /* 'it''s' is TWO tokens: 'it' then identifier s then 'empty'
+     * Doubled-quote escape is NOT valid SNOBOL4 (SQLITB: FOR(SQUOTE) STOP).
+     * SPITBOL rejects it as a syntax error. First token is just 'it'. */
     n = lex_str_tokens("'it''s'", toks, 16);
-    EXPECT_EQ_INT("escape kind", toks[0].kind, T_STR);
-    EXPECT_EQ_STR("escape val",  toks[0].sval, "it's");
+    EXPECT_EQ_INT("no-escape kind", toks[0].kind, T_STR);
+    EXPECT_EQ_STR("no-escape val",  toks[0].sval, "it");
 
     (void)n;
 }

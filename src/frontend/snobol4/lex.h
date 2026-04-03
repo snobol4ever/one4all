@@ -38,12 +38,20 @@ typedef struct Lex {
     int         lineno;
     Token       peek;
     int         peeked;
+    /* M-LEX-1: flex scanner state (NULL when using queue path) */
+    void       *_scanner;  /* yyscan_t — opaque flex handle */
+    void       *_extra;    /* FlexExtra* — token scratch storage */
 } Lex;
 
 void  lex_open_str(Lex *lx, const char *s, int len, int lineno);
 Token lex_next(Lex *lx);
 Token lex_peek(Lex *lx);
 int   lex_at_end(Lex *lx);
+
+/* M-LEX-1: flex body tokeniser — called by lex.c, defined in lex.yy.c */
+void  flex_lex_open   (Lex *lx);
+Token flex_lex_next   (Lex *lx);
+void  flex_lex_destroy(Lex *lx);
 
 /* Checkpoint for speculative lookahead */
 typedef struct { int pos; Token peek; int peeked; } LexMark;
