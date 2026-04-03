@@ -62,6 +62,9 @@ IDCONT  [A-Za-z0-9_.\x80-\xFF]
 ALNUM   [A-Za-z0-9_]
 EXP     [eE][+-]?{DIGIT}+
 WS      [ \t]
+CONT    \n[+.][ \t]*
+W       ({WS}|{CONT})+
+G       ({WS}|{CONT})*
 
 %%
 
@@ -126,10 +129,12 @@ WS      [ \t]
 <BODY_START>.           { yyless(0); BEGIN(BODY); }
 
     /* ---- BODY: statement body ----
-     * T_CONCAT: spaces followed by an atom-start char (lookahead) — concatenation.
-     * Binary ops embed their own surrounding spaces: [ \t]+ OP [ \t]+.
-     * Unary ops have no preceding space.
-     * Keywords &NAME before bare & to avoid prefix collision. */
+     * W (White) = mandatory whitespace + optional continuations (\n[+.] ws*)
+     * G (Gray)  = optional whitespace + optional continuations
+     * Design mirrors beauty.sno: every symbol has W or G on each side.
+     * T_CONCAT is the ONLY token returned for whitespace alone. */
+
+    /* Add G to definitions if not present — defined above as ({WS}|{CONT})* */
 
 <BODY>\n               { lineno++; BEGIN(INITIAL); return T_STMT_END; }
 <BODY>";"              { depth=0; return T_STMT_END; }
@@ -137,39 +142,47 @@ WS      [ \t]
 
 <BODY>&{ALPHA}{ALNUM}* { strbuf[0]='\0'; strncat(strbuf,yytext+1,sizeof(strbuf)-1); return T_KEYWORD; }
 
-    /* T_CONCAT: spaces followed by an atom-starting character */
-<BODY>[ \t]+/[A-Za-z\x80-\xFF0-9\'"(]  { if(depth==0) return T_CONCAT; }
+    /* T_CONCAT: White before atom-starting char — the only whitespace-only token */
+<BODY>{W}/[A-Za-z\x80-\xFF0-9'\"(]  { for(int _i=0;_i<yyleng;_i++) if(yytext[_i]=='\n') lineno++; if(depth==0) return T_CONCAT; }
 
-    /* Binary ops: [ \t]+ OP [ \t]+ — longer than T_CONCAT rule, wins by length */
-<BODY>[ \t]+"**"[ \t]+  { return T_EXPONENTIATION;  }
-<BODY>[ \t]+"^"[ \t]+   { return T_EXPONENTIATION;  }
-<BODY>[ \t]+"!"[ \t]+   { return T_EXPONENTIATION;  }
-<BODY>[ \t]+"+"[ \t]+   { return T_ADDITION;        }
-<BODY>[ \t]+"-"[ \t]+   { return T_SUBTRACTION;     }
-<BODY>[ \t]+"*"[ \t]+   { return T_MULTIPLICATION;  }
-<BODY>[ \t]+"/"[ \t]+   { return T_DIVISION;        }
-<BODY>[ \t]+"$"[ \t]+   { return T_IMMEDIATE_ASSIGN;}
-<BODY>[ \t]+"."[ \t]+   { return T_COND_ASSIGN;     }
-<BODY>[ \t]+"|"[ \t]+   { return T_ALTERNATION;     }
-<BODY>[ \t]+"="[ \t]+   { return T_ASSIGNMENT;      }
-<BODY>[ \t]+"?"[ \t]+   { return T_MATCH;           }
-<BODY>[ \t]+"&"[ \t]+   { return T_AMPERSAND;       }
-<BODY>[ \t]+"@"[ \t]+   { return T_AT_SIGN;         }
-<BODY>[ \t]+"#"[ \t]+   { return T_POUND;           }
-<BODY>[ \t]+"%"[ \t]+   { return T_PERCENT;         }
-<BODY>[ \t]+"~"[ \t]+   { return T_TILDE;           }
-<BODY>[ \t]+              { /* spaces before ) ] > , : ; \n — discard */ }
+    /* Binary ops: White OP White — mandatory space distinguishes from unary */
+<BODY>{W}"**"{W}  { for(int _i=0;_i<yyleng;_i++) if(yytext[_i]=='\n') lineno++; return T_EXPONENTIATION;  }
+<BODY>{W}"^"{W}   { for(int _i=0;_i<yyleng;_i++) if(yytext[_i]=='\n') lineno++; return T_EXPONENTIATION;  }
+<BODY>{W}"!"{W}   { for(int _i=0;_i<yyleng;_i++) if(yytext[_i]=='\n') lineno++; return T_EXPONENTIATION;  }
+<BODY>{W}"+"{W}   { for(int _i=0;_i<yyleng;_i++) if(yytext[_i]=='\n') lineno++; return T_ADDITION;        }
+<BODY>{W}"-"{W}   { for(int _i=0;_i<yyleng;_i++) if(yytext[_i]=='\n') lineno++; return T_SUBTRACTION;     }
+<BODY>{W}"*"{W}   { for(int _i=0;_i<yyleng;_i++) if(yytext[_i]=='\n') lineno++; return T_MULTIPLICATION;  }
+<BODY>{W}"/"{W}   { for(int _i=0;_i<yyleng;_i++) if(yytext[_i]=='\n') lineno++; return T_DIVISION;        }
+<BODY>{W}"$"{W}   { for(int _i=0;_i<yyleng;_i++) if(yytext[_i]=='\n') lineno++; return T_IMMEDIATE_ASSIGN;}
+<BODY>{W}"."{W}   { for(int _i=0;_i<yyleng;_i++) if(yytext[_i]=='\n') lineno++; return T_COND_ASSIGN;     }
+<BODY>{W}"|"{W}   { for(int _i=0;_i<yyleng;_i++) if(yytext[_i]=='\n') lineno++; return T_ALTERNATION;     }
+<BODY>{W}"="{W}   { for(int _i=0;_i<yyleng;_i++) if(yytext[_i]=='\n') lineno++; return T_ASSIGNMENT;      }
+<BODY>{W}"?"{W}   { for(int _i=0;_i<yyleng;_i++) if(yytext[_i]=='\n') lineno++; return T_MATCH;           }
+<BODY>{W}"&"{W}   { for(int _i=0;_i<yyleng;_i++) if(yytext[_i]=='\n') lineno++; return T_AMPERSAND;       }
+<BODY>{W}"@"{W}   { for(int _i=0;_i<yyleng;_i++) if(yytext[_i]=='\n') lineno++; return T_AT_SIGN;         }
+<BODY>{W}"#"{W}   { for(int _i=0;_i<yyleng;_i++) if(yytext[_i]=='\n') lineno++; return T_POUND;           }
+<BODY>{W}"%"{W}   { for(int _i=0;_i<yyleng;_i++) if(yytext[_i]=='\n') lineno++; return T_PERCENT;         }
+<BODY>{W}"~"{W}   { for(int _i=0;_i<yyleng;_i++) if(yytext[_i]=='\n') lineno++; return T_TILDE;           }
 
-    /* Atoms: no leading space (T_CONCAT already emitted if needed) */
-<BODY>{ALPHA}{IDCONT}*/"("  { strbuf[0]='\0'; strncat(strbuf,yytext,sizeof(strbuf)-1); return strcasecmp(strbuf,"END")==0?T_FUNCTION:T_FUNCTION; }
+    /* Structural: open absorbs trailing Gray; close absorbs leading Gray */
+<BODY>"("  { depth++; return T_LPAREN; }
+<BODY>"["  { depth++; return T_LBRACK; }
+<BODY>"<"  { depth++; return T_LANGLE; }
+<BODY>")"  { depth--; return T_RPAREN; }
+<BODY>"]"  { depth--; return T_RBRACK; }
+<BODY>">"  { depth--; return T_RANGLE; }
+<BODY>","  { return T_COMMA; }
+
+    /* Atoms: arrive bare (T_CONCAT or Gray already consumed leading space) */
+<BODY>{ALPHA}{IDCONT}*/"("  { strbuf[0]='\0'; strncat(strbuf,yytext,sizeof(strbuf)-1); return T_FUNCTION; }
 <BODY>{ALPHA}{IDCONT}*      { strbuf[0]='\0'; strncat(strbuf,yytext,sizeof(strbuf)-1); return strcasecmp(strbuf,"END")==0?T_END:T_IDENT; }
 <BODY>{DIGIT}+"."{DIGIT}+{EXP}? |
 <BODY>{DIGIT}+{EXP}         { strbuf[0]='\0'; strncat(strbuf,yytext,sizeof(strbuf)-1); return T_REAL; }
-<BODY>{DIGIT}+              { strbuf[0]='\0'; strncat(strbuf,yytext,sizeof(strbuf)-1); return T_INT; }
-<BODY>\'                   { strpos=0; BEGIN(STR1); }
-<BODY>\"                   { strpos=0; BEGIN(STR2); }
+<BODY>{DIGIT}+                { strbuf[0]='\0'; strncat(strbuf,yytext,sizeof(strbuf)-1); return T_INT;  }
+<BODY>\'                       { strpos=0; BEGIN(STR1); }
+<BODY>\"                       { strpos=0; BEGIN(STR2); }
 
-    /* Unary ops: no leading space */
+    /* Unary ops: arrive bare (no leading space) */
 <BODY>"**"   { return T_EXPONENTIATION;  }
 <BODY>"^"    { return T_EXPONENTIATION;  }
 <BODY>"+"    { return T_UN_PLUS;         }
@@ -188,15 +201,9 @@ WS      [ \t]
 <BODY>"?"    { return T_UN_QUESTION_MARK;}
 <BODY>"&"    { return T_UN_AMPERSAND;    }
 
-    /* Structural */
-<BODY>","    { return T_COMMA;   }
-<BODY>"("    { depth++; return T_LPAREN;  }
-<BODY>")"    { depth--; return T_RPAREN;  }
-<BODY>"["    { depth++; return T_LBRACK;  }
-<BODY>"]"    { depth--; return T_RBRACK;  }
-<BODY>"<"    { depth++; return T_LANGLE;  }
-<BODY>">"    { depth--; return T_RANGLE;  }
+<BODY>{WS}+  { /* discard horizontal whitespace not consumed by op rules */ }
 <BODY>.      { sno_error(lineno,"unexpected char '%s'",yytext); }
+
 
     /* ---- STR1: single-quoted string ---- */
 
@@ -237,23 +244,37 @@ WS      [ \t]
     sno_error(lineno,"unterminated string"); lineno++; BEGIN(BODY);
 }
 
-    /* ---- GT: goto field ---- */
+    /* ---- GT: goto field — proper tokens, no T_GOTO blob ---- */
+    /* DYN-59: T_GOTO eliminated. GT state emits real tokens so the grammar
+     * can parse opt_goto with real BNF rules instead of re-lexing a blob.
+     * Tokens emitted from GT: T_GOTO_S, T_GOTO_F, T_IDENT, T_FUNCTION,
+     * T_LPAREN, T_RPAREN, T_LANGLE, T_RANGLE, T_STR, T_STMT_END. */
 
-<GT>[ \t]+              { /* skip leading/trailing ws */ }
-<GT>[^ \t\n;]+          {
+<GT>[ \t]+              { /* skip whitespace in goto field */ }
+<GT>[Ss]/"("            { return T_GOTO_S; }
+<GT>[Ss]/"<"            { return T_GOTO_S; }
+<GT>[Ff]/"("            { return T_GOTO_F; }
+<GT>[Ff]/"<"            { return T_GOTO_F; }
+<GT>"("                 { return T_GOTO_LPAREN; }
+<GT>")"                 { return T_GOTO_RPAREN; }
+<GT>"<"                 { return T_GOTO_LPAREN; }
+<GT>">"                 { return T_GOTO_RPAREN; }
+<GT>"$"                 { return T_UN_DOLLAR_SIGN; }
+<GT>[A-Za-z][A-Za-z0-9_.]* {
     strbuf[0]='\0'; strncat(strbuf, yytext, sizeof(strbuf)-1);
-    return T_GOTO;
+    return T_IDENT;
 }
-<GT>";"                 {
-    /* semicolon after goto: end statement, next is col-1 */
-    depth = 0;
-    BEGIN(BODY);   /* next char after ; is NOT col-1, it's inline */
-    return T_STMT_END;
+<GT>\'[^\'\n]*\'    {
+    /* quoted label: strip quotes */
+    int len = yyleng - 2;
+    if (len < 0) len = 0;
+    if (len >= (int)sizeof(strbuf)) len = sizeof(strbuf)-1;
+    memcpy(strbuf, yytext+1, len); strbuf[len]='\0';
+    return T_STR;
 }
-<GT>\n                  {
-    lineno++; BEGIN(INITIAL);
-    return T_STMT_END;
-}
+<GT>";"                 { depth=0; BEGIN(INITIAL); return T_STMT_END; }
+<GT>\n                  { lineno++; BEGIN(INITIAL); return T_STMT_END; }
+<GT>.                   { /* ignore unknown chars in goto field */ }
 
     /* ---- SKIP: comment or unknown CTL line ---- */
 
@@ -340,7 +361,7 @@ Token flex_lex_next(Lex *lx) {
 
         case T_IDENT: case T_END: case T_KEYWORD:
         case T_FUNCTION:
-        case T_GOTO:
+        case T_GOTO_S: case T_GOTO_F:
             t.sval = intern(strbuf);
             return t;
 

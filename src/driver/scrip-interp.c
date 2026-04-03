@@ -170,7 +170,8 @@ static void prescan_defines(Program *prog)
 }
 
 /* ── call_user_function — forward decl (needs interp_eval, declared below) ── */
-static DESCR_t interp_eval(EXPR_t *e);  /* forward */
+static DESCR_t interp_eval(EXPR_t *e);      /* forward */
+static DESCR_t interp_eval_pat(EXPR_t *e);  /* forward — pattern context */
 
 /* DYN-57: E_FNC names that always yield a pattern value.
  * Mirrors PAT_FNC_NAMES in SJ-17 (sno-interp.js ec6c0b3).
@@ -312,7 +313,7 @@ static DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
 
                 int succeeded = 1;
                 if (s->pattern) {
-                    DESCR_t pat_d = interp_eval(s->pattern);
+                    DESCR_t pat_d = interp_eval_pat(s->pattern);
                     if (IS_FAIL_fn(pat_d)) {
                         succeeded = 0;
                     } else {
@@ -585,21 +586,16 @@ static DESCR_t interp_eval(EXPR_t *e)
     case E_CAT:
     case E_SEQ: {
         if (e->nchildren == 0) return NULVCL;
-        /* DYN-54 fix: if any child is pattern-bearing, use pat_cat chain
-         * instead of string CONCAT_fn.  E_CAT is always string context;
-         * E_SEQ may be pattern context when it contains captures/ARB/etc. */
-        int pat_ctx = (e->kind == E_SEQ) && _expr_is_pat(e);
+        /* DYN-59: interp_eval is always STRING context. Pattern context uses
+         * interp_eval_pat() which overrides E_SEQ/E_CAT to call pat_cat.
+         * Removed pat_ctx/_expr_is_pat heuristic (wrong layer — DYN-59). */
         DESCR_t acc = interp_eval(e->children[0]);
         if (IS_FAIL_fn(acc)) return FAILDESCR;
         for (int i = 1; i < e->nchildren; i++) {
             DESCR_t nxt = interp_eval(e->children[i]);
             if (IS_FAIL_fn(nxt)) return FAILDESCR;
-            if (pat_ctx) {
-                acc = pat_cat(acc, nxt);
-            } else {
-                acc = CONCAT_fn(acc, nxt);
-                if (IS_FAIL_fn(acc)) return FAILDESCR;
-            }
+            acc = CONCAT_fn(acc, nxt);
+            if (IS_FAIL_fn(acc)) return FAILDESCR;
         }
         return acc;
     }
@@ -988,6 +984,42 @@ static DESCR_t interp_eval(EXPR_t *e)
 
     default:
         return NULVCL;
+    }
+}
+
+
+/* -- DYN-59: interp_eval_pat -- evaluate expr in PATTERN context ----------
+ * Like interp_eval but E_SEQ/E_CAT use pat_cat (not CONCAT_fn) and
+ * zero-arg pattern keywords in E_VAR go through APPLY_fn first.
+ * Called at the pattern call site: interp_eval_pat(s->pattern).
+ * ----------------------------------------------------------------------- */
+static DESCR_t interp_eval_pat(EXPR_t *e)
+{
+    if (!e) return NULVCL;
+    switch (e->kind) {
+    case E_SEQ:
+    case E_CAT: {
+        if (e->nchildren == 0) return NULVCL;
+        DESCR_t acc = interp_eval_pat(e->children[0]);
+        if (IS_FAIL_fn(acc)) return FAILDESCR;
+        for (int i = 1; i < e->nchildren; i++) {
+            DESCR_t nxt = interp_eval_pat(e->children[i]);
+            if (IS_FAIL_fn(nxt)) return FAILDESCR;
+            acc = pat_cat(acc, nxt);
+        }
+        return acc;
+    }
+    case E_VAR:
+        if (e->sval && *e->sval) {
+            if (_is_pat_fnc_name(e->sval)) {
+                DESCR_t _fr = APPLY_fn(e->sval, NULL, 0);
+                if (!IS_FAIL_fn(_fr)) return _fr;
+            }
+            return interp_eval(e);
+        }
+        return NULVCL;
+    default:
+        return interp_eval(e);
     }
 }
 

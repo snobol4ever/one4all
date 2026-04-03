@@ -46,7 +46,7 @@
 #ifdef STMT_EXEC_STANDALONE
 /* ── Standalone build: define the types that snobol4.h would provide ─── */
 #include <stdint.h>
-#include "../boxes/bb_box.h"   /* spec_t, spec_empty, α, β, spec_is_empty, bb_box_fn */
+#include "../boxes/shared/bb_box.h"   /* spec_t, spec_empty, α, β, spec_is_empty, bb_box_fn */
 
 /* Minimal DESCR_t for standalone use */
 typedef enum { DT_SNUL=0, DT_S=1, DT_P=3, DT_I=6, DT_FAIL=99 } DTYPE_t;
@@ -79,7 +79,7 @@ extern char   *VARVAL_fn(DESCR_t d);
 
 /* In the full-runtime build, include bb_box.h after snobol4.h.
  * bb_box.h now uses spec_t (not spec_t) so no collision with engine. */
-#include "../boxes/bb_box.h"
+#include "../boxes/shared/bb_box.h"
 /* bb_box.h already defines α/β — only define here if not already defined */
 #ifndef BB_ALPHA_DEFINED
 static const int α = 0;
