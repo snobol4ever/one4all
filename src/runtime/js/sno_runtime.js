@@ -41,13 +41,23 @@ const _vars = new Proxy(_store, {
         if (typeof k === 'string') k = k.toUpperCase();
         if (k in o) return o[k];
         if (k === 'INPUT') {
-            /* synchronous readline — only works in Node.js */
+            /* Synchronous line-at-a-time read from stdin — Node.js only.
+             * Read one byte at a time to avoid consuming beyond the newline.
+             * _stdin_buf holds leftover bytes from previous reads (shouldn't
+             * occur with byte-at-a-time, but kept for safety). */
             try {
                 const fs = require('fs');
-                const buf = Buffer.alloc(4096);
-                const n = fs.readSync(0, buf, 0, 4095, null);
-                if (n <= 0) return _FAIL;
-                return buf.slice(0, n).toString().replace(/\r?\n$/, '');
+                const oneByte = Buffer.alloc(1);
+                const chars = [];
+                while (true) {
+                    const n = fs.readSync(0, oneByte, 0, 1, null);
+                    if (n <= 0) break;              // EOF
+                    const ch = oneByte[0];
+                    if (ch === 10) break;           // newline — end of line
+                    if (ch !== 13) chars.push(ch);  // skip CR
+                }
+                if (chars.length === 0) return _FAIL;  // EOF with no data
+                return Buffer.from(chars).toString();
             } catch(e) { return _FAIL; }
         }
         return null; /* unset variable = SNOBOL4 null */

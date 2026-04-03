@@ -122,6 +122,7 @@ function ζλ(ζ) {
 /* ── Pending conditional captures ────────────────────────────────────────── */
 // Array of {v, text} — committed on overall match success
 let _pending_cond = [];
+let _cc_stack = [];      // per-CAPT_COND snapshot stack (pushed at proceed, popped at concede/recede)
 
 /* ── The engine ──────────────────────────────────────────────────────────── */
 /*
@@ -136,6 +137,7 @@ function engine(S, Π, anchorStart) {
 
     for (const startPos of startPositions) {
         _pending_cond = [];
+        _cc_stack = [];
         const result = engine_ζ(S, n, Π, startPos);
         if (result !== null) {
             // commit conditional captures
@@ -489,6 +491,10 @@ function engine_ζ(S, n, Π, startPos) {
 
         /* ── CAPT_COND (.) ──────────────────────────────────────────────── */
         case 'CAPT_COND/proceed':
+            // Push snapshot of _pending_cond depth onto _cc_stack.
+            // At succeed time, truncate back to this depth before pushing the new capture.
+            // This discards stale pushes from earlier ARB retries within the same CAPT_COND.
+            _cc_stack.push(_pending_cond.length);
             Ω.push(ζ);
             ζ = ζ_down_to(ζ, ζ[4].p);
             action = 'proceed';
@@ -496,6 +502,9 @@ function engine_ζ(S, n, Π, startPos) {
         case 'CAPT_COND/succeed': {
             const v    = ζ[4].v;
             const text = S.slice(ζ[1], ζ[3]);
+            // Pop snapshot — succeed is final for this CAPT_COND (no concede/recede follows).
+            const snap = _cc_stack.length ? _cc_stack.pop() : 0;
+            _pending_cond.length = snap;           // discard stale ARB-retry pushes
             _pending_cond.push({v, text});         // deferred until overall success
             ζ = ζ_up(ζ);
             action = 'succeed';
@@ -503,8 +512,13 @@ function engine_ζ(S, n, Π, startPos) {
         }
         case 'CAPT_COND/concede':
         case 'CAPT_COND/recede':
-            if (Ω.length) { ζ = Ω.pop(); action = 'recede'; }
-            else return null;
+            if (Ω.length) {
+                const saved = Ω.pop();
+                const snap = _cc_stack.length ? _cc_stack[_cc_stack.length-1] : 0;
+                _pending_cond.length = snap;       // restore _pending_cond to pre-proceed depth
+                _cc_stack.pop();                   // retire this CAPT_COND's snapshot
+                ζ = saved; action = 'recede';
+            } else return null;
             break;
 
         /* ── fallback: generic fail/recede ──────────────────────────────── */
