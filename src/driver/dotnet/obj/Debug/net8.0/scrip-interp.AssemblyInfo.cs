@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("scrip-interp")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0577741b76325ed2a535952155fa851501c4d840")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c7d4d5d779c65baf683bbb36ccb13f76b9bc0651")]
 [assembly: System.Reflection.AssemblyProductAttribute("scrip-interp")]
 [assembly: System.Reflection.AssemblyTitleAttribute("scrip-interp")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

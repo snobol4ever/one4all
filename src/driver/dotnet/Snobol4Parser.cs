@@ -113,6 +113,9 @@ public static class Snobol4Parser
 
     private static (string body, string? u, string? s, string? f) ExtractGotos(string line)
     {
+        // SNOBOL4 goto: :(U)  |  :S(X)  |  :F(Y)  |  :S(X)F(Y)  |  :F(Y)S(X)
+        // Colon prefixes only the first tag; the second is bare S or F.
+        // We scan right-to-left for (label) groups, matching both :TAG and bare TAG.
         string? gU = null, gS = null, gF = null;
         var work = line;
         bool progress = true;
@@ -124,14 +127,41 @@ public static class Snobol4Parser
             int close = w.LastIndexOf(')');
             int open  = w.LastIndexOf('(', close);
             if (open <= 0) break;
-            var inner = w[(open + 1)..close].Trim().ToUpperInvariant();
+            var inner  = w[(open + 1)..close].Trim().ToUpperInvariant();
             var before = w[..open].TrimEnd();
-            if (before.EndsWith(":S", StringComparison.OrdinalIgnoreCase))
+            // Colon-prefixed tags (highest priority)
+            if (before.EndsWith(":S", StringComparison.OrdinalIgnoreCase) && gS == null)
                 { gS = inner; work = before[..^2].TrimEnd(); progress = true; }
-            else if (before.EndsWith(":F", StringComparison.OrdinalIgnoreCase))
+            else if (before.EndsWith(":F", StringComparison.OrdinalIgnoreCase) && gF == null)
                 { gF = inner; work = before[..^2].TrimEnd(); progress = true; }
-            else if (before.EndsWith(':'))
+            else if (before.EndsWith(':') && gU == null)
                 { gU = inner; work = before[..^1].TrimEnd(); progress = true; }
+            // Bare S/F (second tag in a combined :S(X)F(Y) or :F(Y)S(X))
+            // Accept bare S or F only when the before-text ends with the letter
+            // immediately preceded by ) — meaning the prior (label) was already consumed.
+            else if (before.EndsWith("S", StringComparison.OrdinalIgnoreCase) && gS == null
+                     && before.Length >= 2 && (before[^2] == ')'
+                         || before.TrimEnd().EndsWith("S", StringComparison.OrdinalIgnoreCase)))
+            {
+                // Confirm the S is a bare goto tag: preceded by ) or by end-of-body whitespace
+                var trimBefore = before.TrimEnd();
+                if (trimBefore.Length > 0 && (trimBefore[^1] == 'S' || trimBefore[^1] == 's'))
+                {
+                    var candidate = trimBefore[..^1].TrimEnd();
+                    if (candidate.EndsWith(')') || gF != null || gU != null)
+                    { gS = inner; work = candidate; progress = true; }
+                }
+            }
+            else if (before.EndsWith("F", StringComparison.OrdinalIgnoreCase) && gF == null)
+            {
+                var trimBefore = before.TrimEnd();
+                if (trimBefore.Length > 0 && (trimBefore[^1] == 'F' || trimBefore[^1] == 'f'))
+                {
+                    var candidate = trimBefore[..^1].TrimEnd();
+                    if (candidate.EndsWith(')') || gS != null || gU != null)
+                    { gF = inner; work = candidate; progress = true; }
+                }
+            }
         }
         return (work, gU, gS, gF);
     }
@@ -166,14 +196,22 @@ public static class Snobol4Parser
         var cur    = new System.Text.StringBuilder();
         int depth  = 0; bool inStr = false; char strCh = '\'';
         void Push() { if (cur.Length > 0) { tokens.Add(cur.ToString()); cur.Clear(); } }
-        foreach (char c in s)
+        var chars = s.ToCharArray();
+        int ci = 0;
+        while (ci < chars.Length)
         {
-            if (inStr) { cur.Append(c); if (c == strCh) inStr = false; continue; }
-            if (c == '\'' || c == '"') { inStr = true; strCh = c; cur.Append(c); continue; }
-            if (c == '(' || c == '<') { depth++; cur.Append(c); continue; }
-            if (c == ')' || c == '>') { depth--; cur.Append(c); continue; }
-            if ((c == ' ' || c == '\t') && depth == 0) { Push(); continue; }
-            cur.Append(c);
+            char c = chars[ci];
+            if (inStr) { cur.Append(c); if (c == strCh) inStr = false; ci++; continue; }
+            if (c == '\'' || c == '"') { inStr = true; strCh = c; cur.Append(c); ci++; continue; }
+            if (c == '(' || c == '<') { depth++; cur.Append(c); ci++; continue; }
+            if (c == ')' || c == '>') { depth--; cur.Append(c); ci++; continue; }
+            if ((c == ' ' || c == '\t') && depth == 0) { Push(); ci++; continue; }
+            // Treat ** as a single token
+            if (c == '*' && ci + 1 < chars.Length && chars[ci + 1] == '*' && depth == 0)
+            {
+                Push(); cur.Append("**"); Push(); ci += 2; continue;
+            }
+            cur.Append(c); ci++;
         }
         Push();
         return tokens;
@@ -258,7 +296,7 @@ public static class Snobol4Parser
     private static IrNode ParsePower(List<string> toks, ref int pos)
     {
         var left = ParseCatSequence(toks, ref pos);
-        if (pos < toks.Count && toks[pos] == "^")
+        if (pos < toks.Count && (toks[pos] == "^" || toks[pos] == "**"))
         {
             pos++;
             var right = ParsePower(toks, ref pos); // right-associative
@@ -269,7 +307,7 @@ public static class Snobol4Parser
 
     // Juxtaposition (space concat): adjacent non-operator atoms → E_CAT chain
     private static bool IsOperatorToken(string t) =>
-        t == "+" || t == "-" || t == "*" || t == "/" || t == "^";
+        t == "+" || t == "-" || t == "*" || t == "/" || t == "^" || t == "**";
 
     // Capture operator tokens: ". V" "@V" "$ V" are binary in pattern context
     private static bool IsCaptureOp(string t, out IrKind kind)

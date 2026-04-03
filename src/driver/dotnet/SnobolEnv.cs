@@ -1,3 +1,4 @@
+using System.Linq;
 // SnobolEnv.cs — Variable store and builtin function dispatch
 //
 // Mirrors the NV store (snobol4.c) and the SNOBOL4 builtin table.
@@ -76,13 +77,16 @@ public sealed class SnobolEnv
     // Predefined system variables
     public SnobolEnv()
     {
-        Set("&ANCHOR",  SnobolVal.Of(0L));
-        Set("&TRIM",    SnobolVal.Of(0L));
-        Set("&FULLSCAN",SnobolVal.Of(0L));
-        Set("&STCOUNT", SnobolVal.Of(0L));
-        Set("&STLIMIT", SnobolVal.Of(50000L));
-        Set("OUTPUT",   SnobolVal.Null);
-        Set("INPUT",    SnobolVal.Null);
+        Set("&ANCHOR",   SnobolVal.Of(0L));
+        Set("&TRIM",     SnobolVal.Of(0L));
+        Set("&FULLSCAN", SnobolVal.Of(0L));
+        Set("&STCOUNT",  SnobolVal.Of(0L));
+        Set("&STLIMIT",  SnobolVal.Of(50000L));
+        Set("&ALPHABET", SnobolVal.Of(new string(Enumerable.Range(0, 256).Select(i => (char)i).ToArray())));
+        Set("&UCASE",    SnobolVal.Of("ABCDEFGHIJKLMNOPQRSTUVWXYZ"));
+        Set("&LCASE",    SnobolVal.Of("abcdefghijklmnopqrstuvwxyz"));
+        Set("OUTPUT",    SnobolVal.Null);
+        Set("INPUT",     SnobolVal.Null);
     }
 
     public SnobolVal Get(string name) =>
