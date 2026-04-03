@@ -569,9 +569,6 @@ static DESCR_t interp_eval(EXPR_t *e)
          * instead of string CONCAT_fn.  E_CAT is always string context;
          * E_SEQ may be pattern context when it contains captures/ARB/etc. */
         int pat_ctx = (e->kind == E_SEQ) && _expr_is_pat(e);
-                e->nchildren, pat_ctx,
-                e->nchildren>0?e->children[0]->kind:-1,
-                e->nchildren>1?e->children[1]->kind:-1);
         DESCR_t acc = interp_eval(e->children[0]);
         if (IS_FAIL_fn(acc)) return FAILDESCR;
         for (int i = 1; i < e->nchildren; i++) {
@@ -889,6 +886,85 @@ static DESCR_t interp_eval(EXPR_t *e)
     case E_LEQ: STRREL(==);
     case E_LNE: STRREL(!=);
 #undef STRREL
+
+    /* ── Zero-argument pattern primitives ────────────────────────────────
+     * These IR nodes are emitted directly by the SNOBOL4 parser for
+     * bare keywords like ARB, REM, FAIL, SUCCEED, FENCE, ABORT, BAL.
+     * Without these cases they fell through to default→NULVCL (DT_S=0),
+     * so pat_ctx was satisfied but interp_eval returned DT_S not DT_P.
+     * Fix: DYN-55. */
+    case E_ARB:     return pat_arb();
+    case E_REM:     return pat_rem();
+    case E_FAIL:    return pat_fail();
+    case E_SUCCEED: return pat_succeed();
+    case E_FENCE:   return pat_fence();
+    case E_ABORT:   return pat_abort();
+    case E_BAL:     return pat_bal();
+
+    /* ── One-argument pattern primitives ─────────────────────────────────
+     * POS(n), RPOS(n), TAB(n), RTAB(n), LEN(n) take integer args.
+     * ANY(s), NOTANY(s), SPAN(s), BREAK(s), BREAKX(s) take string args. */
+    case E_POS: {
+        if (e->nchildren < 1) return pat_pos(0);
+        DESCR_t a = interp_eval(e->children[0]);
+        return pat_pos((int64_t)(a.v==DT_I ? a.i : (int64_t)(a.v==DT_R ? (int64_t)a.r : 0)));
+    }
+    case E_RPOS: {
+        if (e->nchildren < 1) return pat_rpos(0);
+        DESCR_t a = interp_eval(e->children[0]);
+        return pat_rpos((int64_t)(a.v==DT_I ? a.i : (int64_t)(a.v==DT_R ? (int64_t)a.r : 0)));
+    }
+    case E_TAB: {
+        if (e->nchildren < 1) return pat_tab(0);
+        DESCR_t a = interp_eval(e->children[0]);
+        return pat_tab((int64_t)(a.v==DT_I ? a.i : (int64_t)(a.v==DT_R ? (int64_t)a.r : 0)));
+    }
+    case E_RTAB: {
+        if (e->nchildren < 1) return pat_rtab(0);
+        DESCR_t a = interp_eval(e->children[0]);
+        return pat_rtab((int64_t)(a.v==DT_I ? a.i : (int64_t)(a.v==DT_R ? (int64_t)a.r : 0)));
+    }
+    case E_LEN: {
+        if (e->nchildren < 1) return pat_len(0);
+        DESCR_t a = interp_eval(e->children[0]);
+        return pat_len((int64_t)(a.v==DT_I ? a.i : (int64_t)(a.v==DT_R ? (int64_t)a.r : 0)));
+    }
+    case E_ANY: {
+        if (e->nchildren < 1) return pat_any_cs("");
+        DESCR_t a = interp_eval(e->children[0]);
+        const char *s = (a.v==DT_S||a.v==DT_N) && a.s ? a.s : "";
+        return pat_any_cs(s);
+    }
+    case E_NOTANY: {
+        if (e->nchildren < 1) return pat_notany("");
+        DESCR_t a = interp_eval(e->children[0]);
+        const char *s = (a.v==DT_S||a.v==DT_N) && a.s ? a.s : "";
+        return pat_notany(s);
+    }
+    case E_SPAN: {
+        if (e->nchildren < 1) return pat_span("");
+        DESCR_t a = interp_eval(e->children[0]);
+        const char *s = (a.v==DT_S||a.v==DT_N) && a.s ? a.s : "";
+        return pat_span(s);
+    }
+    case E_BREAK: {
+        if (e->nchildren < 1) return pat_break_("");
+        DESCR_t a = interp_eval(e->children[0]);
+        const char *s = (a.v==DT_S||a.v==DT_N) && a.s ? a.s : "";
+        return pat_break_(s);
+    }
+    case E_BREAKX: {
+        extern DESCR_t pat_breakx(const char *);
+        if (e->nchildren < 1) return pat_breakx("");
+        DESCR_t a = interp_eval(e->children[0]);
+        const char *s = (a.v==DT_S||a.v==DT_N) && a.s ? a.s : "";
+        return pat_breakx(s);
+    }
+    case E_ARBNO: {
+        if (e->nchildren < 1) return pat_arb(); /* degenerate */
+        DESCR_t inner = interp_eval(e->children[0]);
+        return pat_arbno(inner);
+    }
 
     default:
         return NULVCL;
