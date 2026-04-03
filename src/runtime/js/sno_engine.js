@@ -381,7 +381,16 @@ function engine_ζ(S, n, Π, startPos) {
             action = 'concede';
             break;
 
-        /* ── ABORT ──────────────────────────────────────────────────────── */
+        /* ── PRED ───────────────────────────────────────────────────────── */
+        /* Zero-width predicate: call fn(), succeed if non-fail, concede if fail */
+        case 'PRED/proceed': {
+            const v = ζ[4].fn();
+            ζ = ζ_up(ζ);
+            action = (v && v._sno_fail) ? 'concede' : 'succeed';
+            break;
+        }
+
+
         case 'ABORT/proceed':
             return null;
 
@@ -536,6 +545,7 @@ function PAT_rtab(n)      { return {__pat:1,t:'RTAB',n}; }
 function PAT_fence()      { return {__pat:1,t:'FENCE'}; }
 function PAT_succeed()    { return {__pat:1,t:'SUCCEED'}; }
 function PAT_fail()       { return {__pat:1,t:'FAIL'}; }
+function PAT_pred(fn)     { return {__pat:1,t:'PRED',fn}; }
 function PAT_abort()      { return {__pat:1,t:'ABORT'}; }
 function PAT_bal()        { return {__pat:1,t:'BAL'}; }
 function PAT_arbno(p)     { return {__pat:1,t:'ARBNO',p}; }
@@ -552,7 +562,7 @@ module.exports = {
     PAT_lit, PAT_alt, PAT_seq, PAT_any, PAT_notany,
     PAT_span, PAT_break, PAT_arb, PAT_rem,
     PAT_len, PAT_pos, PAT_rpos, PAT_tab, PAT_rtab,
-    PAT_fence, PAT_succeed, PAT_fail, PAT_abort, PAT_bal,
+    PAT_fence, PAT_succeed, PAT_fail, PAT_pred, PAT_abort, PAT_bal,
     PAT_arbno, PAT_capt_imm, PAT_capt_cond, PAT_capt_cursor,
     _set_vars_hook: (fn) => { _vars_set = fn; },
 };

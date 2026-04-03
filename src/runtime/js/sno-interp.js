@@ -31,7 +31,7 @@ const { sno_search, sno_match,
         PAT_lit, PAT_alt, PAT_seq, PAT_any, PAT_notany,
         PAT_span, PAT_break, PAT_arb, PAT_rem,
         PAT_len, PAT_pos, PAT_rpos, PAT_tab, PAT_rtab,
-        PAT_fence, PAT_succeed, PAT_fail, PAT_abort, PAT_bal,
+        PAT_fence, PAT_succeed, PAT_fail, PAT_pred, PAT_abort, PAT_bal,
         PAT_arbno, PAT_capt_imm, PAT_capt_cond, PAT_capt_cursor,
         _set_vars_hook } = sno_eng;
 
@@ -534,7 +534,7 @@ class Parser {
   _is_cat_start(k) {
     switch(k) {
       case T_AT:case T_PLUS:case T_MINUS:case T_HASH:case T_SLASH:case T_PCT:
-      case T_CARET:case T_BANG:case T_STARSTAR:case T_DOT:case T_TILDE:
+      case T_CARET:case T_BANG:case T_STARSTAR:case T_STAR:case T_DOT:case T_TILDE:
       case T_EQ:case T_QMARK:case T_AMP:case T_PIPE:
       case T_COMMA:case T_RPAREN:case T_RBRACKET:case T_RANGLE:
       case T_COLON:case T_GOTO_SEP:case T_STMT_SEP:case T_NEWLINE:
@@ -705,8 +705,26 @@ class Parser {
     if(have_ws||have_qmark) {
       if(have_ws&&!have_qmark&&this.lx.peek().kind===T_EQ) {
         this.lx.next(); s.has_eq=true; this.skip_ws();
-        if(!this._at_end()) s.replacement=this._expr();
-        if(s.replacement&&!this._is_pat(s.replacement)) this._fixup_val(s.replacement);
+        if(!this._at_end()) {
+          const rhs=this._expr();
+          /* S = P R form: if rhs is a multi-child SEQ/CAT and subject exists,
+           * the last child is the replacement and prior children are the pattern.
+           * Only split when the first child is a function call (pattern predicate like eq/ne/gt).
+           * Literals and variable references as first child = value concat, don't split. */
+          if(s.subject && rhs && (rhs.kind===E_SEQ||rhs.kind===E_CAT) && rhs.children.length>=2
+             && rhs.children[0].kind===E_FNC) {
+            const kids=rhs.children;
+            const patKids=kids.slice(0,-1);
+            const replKid=kids[kids.length-1];
+            if(patKids.length===1){ s.pattern=patKids[0]; }
+            else { const p=expr_new(rhs.kind); p.children=patKids; s.pattern=p; }
+            s.replacement=replKid;
+            if(!this._is_pat(s.replacement)) this._fixup_val(s.replacement);
+          } else {
+            s.replacement=rhs;
+            if(s.replacement&&!this._is_pat(s.replacement)) this._fixup_val(s.replacement);
+          }
+        }
       } else if(!this._at_end()) {
         s.pattern=this._e3();
         if(this.lx.peek().kind===T_WS) {
@@ -760,7 +778,7 @@ function define_fn(spec, entry) {
   const fname=m[1].toUpperCase();
   const params=m[2].split(',').map(s=>s.trim()).filter(Boolean).map(s=>s.toUpperCase());
   const locals=(m[3]||'').split(',').map(s=>s.trim()).filter(Boolean).map(s=>s.toUpperCase());
-  func_table[fname]={params, locals, entry: entry||fname};
+  func_table[fname]={fname, params, locals, entry: entry||fname};
 }
 
 /* Control-flow signals (thrown as exceptions) */
@@ -840,6 +858,7 @@ function interp_eval(e) {
     case E_CAPT_IMMED_ASGN: return interp_eval(e.children[0]);
     case E_NAME:            return e.children[0]?.sval||null;
     case E_INTERROGATE:     { const v=interp_eval(e.children[0]); return _is_fail(v)?_FAIL:null; }
+    case E_ALT:             return _build_pat(e);  /* pattern stored as value */
     default:
       process.stderr.write(`sno-interp: unhandled expr ${e.kind}\n`);
       return _FAIL;
@@ -941,7 +960,12 @@ function _build_pat(e) {
         case 'FENCE':  return PAT_fence();
         case 'ABORT':  return PAT_abort();
         case 'BAL':    return PAT_bal();
-        default: { const v=_call(e.sval,e.children); return _is_fail(v)?_FAIL:PAT_lit(_str(v)); }
+        default: {
+          /* Generic function in pattern position: predicate — succeeds if fn returns
+           * non-fail (zero-width match), fails otherwise. Evaluated lazily at match time. */
+          const sval=e.sval, ch=e.children;
+          return PAT_pred(() => _call(sval, ch));
+        }
       }
     }
     default: { const v=interp_eval(e); return _is_fail(v)?_FAIL:PAT_lit(_str(v)); }
@@ -972,6 +996,27 @@ function _call(fname, arg_exprs) {
                       if(t==='INTEGER') { const n=Math.trunc(_num(v)); return isFinite(n)?n:_FAIL; }
                       if(t==='REAL')    { const n=parseFloat(_str(v??'')); return isFinite(n)?_real_result(n):_FAIL; }
                       if(t==='STRING')  return _str(v);
+                      if(t==='ARRAY' && v instanceof Map) {
+                        /* TABLE → ARRAY: 2-column array [key, value] rows */
+                        const entries=[...v.entries()];
+                        const arr=Object.create(null);
+                        arr.__sno_array=true; arr.__dims=[{lo:1,hi:entries.length},{lo:1,hi:2}];
+                        arr.__defval=null; arr.__proto_str=`${entries.length},2`;
+                        for(let i=0;i<entries.length;i++){
+                          arr[`${i+1},1`]=entries[i][0]; arr[`${i+1},2`]=entries[i][1];
+                        }
+                        return arr;
+                      }
+                      if(t==='TABLE' && v&&v.__sno_array) {
+                        /* ARRAY → TABLE: expects 2-column array, col1=key col2=value */
+                        const tbl=new Map(); tbl.__sno_table=true;
+                        const d=v.__dims; if(!d||d.length<2) return _FAIL;
+                        for(let i=d[0].lo;i<=d[0].hi;i++){
+                          const k=v[`${i},1`]??null, val=v[`${i},2`]??null;
+                          if(k!==null) tbl.set(_str(k),val);
+                        }
+                        return tbl;
+                      }
                       return _FAIL; }
     case 'IDENT':   return _str(args[0]??'')===_str(args[1]??'')?args[0]:_FAIL;
     case 'DIFFER':  return _str(args[0]??'')!==_str(args[1]??'')?args[0]:_FAIL;
@@ -1059,7 +1104,14 @@ function _call(fname, arg_exprs) {
     case 'LLE': return _str(args[0]??'') <= _str(args[1]??'') ? args[0] : _FAIL;
     case 'LEQ': return _str(args[0]??'') === _str(args[1]??'') ? args[0] : _FAIL;
     case 'LNE': return _str(args[0]??'') !== _str(args[1]??'') ? args[0] : _FAIL;
-    case 'OPSYN': case 'SETEXIT': case 'STOPTR': case 'TRACE': case 'SPITBOL': return null;
+    case 'OPSYN': {
+      /* OPSYN(.dest, 'src') — alias dest → src's func_table entry */
+      const dest=(_str(args[0]??'')).toUpperCase();
+      const src =(_str(args[1]??'')).toUpperCase();
+      if(dest && src && func_table[src]) func_table[dest]=func_table[src];
+      return dest||null;
+    }
+    case 'SETEXIT': case 'STOPTR': case 'TRACE': case 'SPITBOL': return null;
     case 'INPUT':   {
       try {
         const buf=Buffer.alloc(4096);
@@ -1096,19 +1148,23 @@ function _call(fname, arg_exprs) {
 function _call_user(fname, fd, args) {
   if(call_stack.length>=CALL_MAX){process.stderr.write('sno-interp: stack overflow\n');return _FAIL;}
 
-  /* Save and clear params + locals + function name var */
+  /* The return-value variable is the DEFINITION name (fd.fname), not the call-site name.
+   * For OPSYN aliases, fd.fname='DOUBLE' while fname='TRIPLE'. The body assigns _vars['DOUBLE']. */
+  const retvar = (fd.fname||fname);
+
+  /* Save and clear: definition name var + call-site name var (if different) + params + locals */
   const saved={};
-  const all=[fname,...(fd.params||[]),...(fd.locals||[])];
+  const all=[retvar,...(fname!==retvar?[fname]:[]),...(fd.params||[]),...(fd.locals||[])];
   for(const n of all) { saved[n]=_vars[n]??null; _vars[n]=null; }
   /* Bind args to params */
   for(let i=0;i<(fd.params||[]).length;i++) _vars[fd.params[i]]=args[i]??null;
 
-  call_stack.push({fname});
+  call_stack.push({fname: retvar});
   let ret=_FAIL;
   try {
-    const body=label_lookup(fd.entry)||label_lookup(fname);
+    const body=label_lookup(fd.entry)||label_lookup(retvar);
     if(body) _exec_from(body);
-    ret=_vars[fname]??null;
+    ret=_vars[retvar]??null;
   } catch(ex) {
     if(ex instanceof SnoReturn)  ret=ex.v;
     else if(ex instanceof SnoFReturn) ret=_FAIL;
