@@ -1977,8 +1977,10 @@ static void sno4_stmt_commit(void *param,Token lbl,EXPR_t *subj,EXPR_t *pat,int 
         pat  = orig->children[1];
     }
     /* S=PR split: if subj is E_SEQ with first child a bare name, split into
-     * subject=first_child, pattern=rest. Grammar puts everything in opt_subject. */
-    if(!pat && subj && (subj->kind==E_SEQ) && subj->nchildren>=2) {
+     * subject=first_child, pattern=rest. Grammar puts everything in opt_subject.
+     * DYN-56: do NOT split when has_eq — `A = expr\n+ continuation` puts the
+     * whole RHS in subj; splitting would misparse it as a pattern match. */
+    if(!pat && !has_eq && subj && (subj->kind==E_SEQ) && subj->nchildren>=2) {
         EXPR_t *first = subj->children[0];
         if(first->kind==E_VAR || first->kind==E_KEYWORD) {
             int nc = subj->nchildren - 1;

@@ -470,6 +470,19 @@ static DESCR_t interp_eval(EXPR_t *e)
 
     case E_VAR:
         if (e->sval && *e->sval) {
+            /* DYN-56: bare pattern keyword names must resolve to patterns even
+             * when not yet assigned in NV store.  Intercept before NV_GET_fn
+             * so that `ARB . WHO` in a continuation segment gets DT_P, not
+             * DT_SNUL (which would make pat_cat treat it as a string). */
+            { const char *_n = e->sval;
+              if      (strcasecmp(_n,"ARB")    ==0) return pat_arb();
+              else if (strcasecmp(_n,"REM")    ==0) return pat_rem();
+              else if (strcasecmp(_n,"FAIL")   ==0) return pat_fail();
+              else if (strcasecmp(_n,"SUCCEED")==0) return pat_succeed();
+              else if (strcasecmp(_n,"FENCE")  ==0) return pat_fence();
+              else if (strcasecmp(_n,"ABORT")  ==0) return pat_abort();
+              else if (strcasecmp(_n,"BAL")    ==0) return pat_bal();
+            }
             DESCR_t _vr = NV_GET_fn(e->sval);
             if (_vr.v != DT_SNUL) return _vr;
             /* Zero-arg builtin (ARB, REM, FAIL, SUCCEED, etc.) stored as
@@ -565,16 +578,12 @@ static DESCR_t interp_eval(EXPR_t *e)
     case E_CAT:
     case E_SEQ: {
         if (e->nchildren == 0) return NULVCL;
-        /* DYN-54 fix: if any child is pattern-bearing, use pat_cat chain
-         * instead of string CONCAT_fn.  E_CAT is always string context;
-         * E_SEQ may be pattern context when it contains captures/ARB/etc. */
-        int pat_ctx = (e->kind == E_SEQ) && _expr_is_pat(e);
         DESCR_t acc = interp_eval(e->children[0]);
         if (IS_FAIL_fn(acc)) return FAILDESCR;
         for (int i = 1; i < e->nchildren; i++) {
             DESCR_t nxt = interp_eval(e->children[i]);
             if (IS_FAIL_fn(nxt)) return FAILDESCR;
-            if (pat_ctx) {
+            if (e->kind == E_SEQ && (acc.v == DT_P || nxt.v == DT_P)) {
                 acc = pat_cat(acc, nxt);
             } else {
                 acc = CONCAT_fn(acc, nxt);
