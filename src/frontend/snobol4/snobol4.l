@@ -84,33 +84,34 @@ WS      [ \t]
     BEGIN(LABEL);
 }
 
-    /* ---- LABEL: read rest of label ---- */
+    /* ---- LABEL: IDCONT chars only — stops at first non-label char ---- */
 
-<LABEL>[^ \t\n]+        {
+<LABEL>[A-Za-z0-9_.\x80-\xFF]+  {
     int take = yyleng < (int)sizeof(strbuf)-strpos-1
                ? yyleng : (int)sizeof(strbuf)-strpos-1;
     memcpy(strbuf+strpos, yytext, take); strpos += take;
-    strbuf[strpos] = '\0';
-    const char *sv = intern(strbuf);
-    BEGIN(BODY); depth = 0;
-    return T_LABEL;   /* sval set via yyextra trick — see flex_lex_next */
 }
 
 <LABEL>[ \t]            {
     strbuf[strpos] = '\0';
-    const char *sv = intern(strbuf);
     BEGIN(BODY); depth = 0;
     return T_LABEL;
 }
 
 <LABEL>\n               {
-    /* label-only line */
     strbuf[strpos] = '\0';
     lineno++;
     BEGIN(INITIAL);
     return T_LABEL;
-    /* STMT_END emitted next call via INITIAL newline path — actually
-       parse.y handles label-only via T_STMT_END; emit it now */
+    /* parse.y sees T_LABEL then T_STMT_END from next INITIAL newline */
+}
+
+<LABEL>.                {
+    /* non-IDCONT char immediately after label (no space) — put back, emit label */
+    yyless(0);
+    strbuf[strpos] = '\0';
+    BEGIN(BODY); depth = 0;
+    return T_LABEL;
 }
 
     /* ---- BODY: statement body ---- */
