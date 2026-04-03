@@ -136,7 +136,7 @@ WS      [ \t]
 <BODY>&{ALPHA}{ALNUM}* { strbuf[0]='\0'; strncat(strbuf,yytext+1,sizeof(strbuf)-1); return T_KEYWORD; }
 
     /* T_CONCAT: spaces followed by an atom-starting character */
-<BODY>[ \t]+/[A-Za-z\x80-\xFF0-9\'"(]  { return T_CONCAT; }
+<BODY>[ \t]+/[A-Za-z\x80-\xFF0-9\'"(]  { if(depth==0) return T_CONCAT; }
 
     /* Binary ops: [ \t]+ OP [ \t]+ — longer than T_CONCAT rule, wins by length */
 <BODY>[ \t]+"**"[ \t]+  { return T_EXPONENTIATION;  }
@@ -337,6 +337,7 @@ Token flex_lex_next(Lex *lx) {
             return t;
 
         case T_IDENT: case T_END: case T_KEYWORD:
+        case T_FUNCTION:
         case T_GOTO:
             t.sval = intern(strbuf);
             return t;

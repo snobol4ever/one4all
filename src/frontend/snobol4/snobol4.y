@@ -1,4 +1,4 @@
-%code requires { #include "scrip_cc.h" #include "snobol4.h" }
+%code requires { #include "scrip_cc.h" #include "snobol4.h" #include "lex.h" }
 %code {
 #include <stdio.h>
 #include <stdlib.h>
@@ -44,7 +44,7 @@ static EXPR_t  *parse_expr(Lex*);
 top        : program                                                                                { }
            ;
 program    : program stmt | stmt                                                                    ;
-stmt       : opt_label opt_subject opt_repl opt_goto TK_STMT_END                      { sno4_stmt_commit(yyparse_param,$1,$2,($3!=NULL),$3,$4); }
+stmt       : opt_label opt_subject opt_repl opt_goto TK_STMT_END                      { sno4_stmt_commit(yyparse_param,$1,$2,NULL,($3!=NULL),$3,$4); }
            ;
 opt_label  : TK_LABEL                                                                              { $$=$1; }
            | /* empty */                                                                           { $$.sval=NULL;$$.ival=0;$$.lineno=0;$$.kind=0; }
@@ -192,7 +192,7 @@ static char *goto_label(Lex *lx){
     Token t=lex_peek(lx); TokKind open=t.kind,close;
     if(open==T_LPAREN) close=T_RPAREN; else if(open==T_LANGLE) close=T_RANGLE; else return NULL;
     lex_next(lx); t=lex_peek(lx); char *label=NULL;
-    if(t.kind==T_IDENT||t.kind==T_KEYWORD||t.kind==T_END){lex_next(lx);label=(char*)t.sval;}
+    if(t.kind==T_IDENT||t.kind==T_FUNCTION||t.kind==T_KEYWORD||t.kind==T_END){lex_next(lx);label=(char*)t.sval;}
     else if(t.kind==T_UN_DOLLAR_SIGN){
         lex_next(lx);
         if(lex_peek(lx).kind==T_LPAREN){
@@ -215,7 +215,7 @@ static SnoGoto *goto_field(const char *gs,int lineno){
     Lex lx={0};lex_open_str(&lx,gs,(int)strlen(gs),lineno);SnoGoto *g=sgoto_new();
     while(!lex_at_end(&lx)){
         Token t=lex_peek(&lx);
-        if(t.kind==T_IDENT&&t.sval){
+        if((t.kind==T_IDENT||t.kind==T_FUNCTION)&&t.sval){
             if(strcasecmp(t.sval,"S")==0){lex_next(&lx);g->onsuccess=goto_label(&lx);continue;}
             if(strcasecmp(t.sval,"F")==0){lex_next(&lx);g->onfailure=goto_label(&lx);continue;}
         }
@@ -245,6 +245,29 @@ static void sno4_stmt_commit(void *param,Token lbl,EXPR_t *subj,EXPR_t *pat,int 
     }
     STMT_t *s=stmt_new();s->lineno=lbl.lineno;
     if(lbl.sval){s->label=strdup(lbl.sval);s->is_end=lbl.ival||(strcasecmp(lbl.sval,"END")==0);}
+    /* S=PR split: E_SCAN(subj, pat) from "X ? PAT" binary match operator */
+    if(!pat && subj && subj->kind==E_SCAN && subj->nchildren==2) {
+        EXPR_t *orig = subj;
+        subj = orig->children[0];
+        pat  = orig->children[1];
+    }
+    /* S=PR split: if subj is E_SEQ with first child a bare name, split into
+     * subject=first_child, pattern=rest. Grammar puts everything in opt_subject. */
+    if(!pat && subj && (subj->kind==E_SEQ||subj->kind==E_CAT) && subj->nchildren>=2) {
+        EXPR_t *first = subj->children[0];
+        if(first->kind==E_VAR || first->kind==E_KEYWORD) {
+            int nc = subj->nchildren - 1;
+            EXPR_t *rest;
+            if(nc == 1) {
+                rest = subj->children[1];
+            } else {
+                rest = expr_new(E_SEQ);
+                for(int i=1;i<subj->nchildren;i++) expr_add_child(rest,subj->children[i]);
+            }
+            subj = first;
+            pat  = rest;
+        }
+    }
     s->subject=subj; s->pattern=pat;
     if(s->subject) fixup_val(s->subject);
     if(has_eq){s->has_eq=1;s->replacement=repl;if(repl&&!is_pat(repl))fixup_val(repl);}

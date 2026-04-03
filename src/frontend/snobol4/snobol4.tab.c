@@ -182,7 +182,7 @@ typedef enum yysymbol_kind_t yysymbol_kind_t;
 
 
 /* Unqualified %code blocks.  */
-#line 2 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 2 "src/frontend/snobol4/snobol4.y"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -197,7 +197,7 @@ static char    *goto_label(Lex*);
 static SnoGoto *goto_field(const char*,int);
 static EXPR_t  *parse_expr(Lex*);
 
-#line 201 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 201 "src/frontend/snobol4/snobol4.tab.c"
 
 #ifdef short
 # undef short
@@ -1244,445 +1244,445 @@ yyreduce:
   switch (yyn)
     {
   case 2: /* top: program  */
-#line 44 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 44 "src/frontend/snobol4/snobol4.y"
                                                                                                     { }
-#line 1250 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1250 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 5: /* stmt: opt_label opt_subject opt_repl opt_goto TK_STMT_END  */
-#line 47 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
-                                                                                      { sno4_stmt_commit(yyparse_param,(yyvsp[-4].tok),(yyvsp[-3].expr),((yyvsp[-2].expr)!=NULL),(yyvsp[-2].expr),(yyvsp[-1].tok)); }
-#line 1256 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 47 "src/frontend/snobol4/snobol4.y"
+                                                                                      { sno4_stmt_commit(yyparse_param,(yyvsp[-4].tok),(yyvsp[-3].expr),NULL,((yyvsp[-2].expr)!=NULL),(yyvsp[-2].expr),(yyvsp[-1].tok)); }
+#line 1256 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 6: /* opt_label: TK_LABEL  */
-#line 49 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 49 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.tok)=(yyvsp[0].tok); }
-#line 1262 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1262 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 7: /* opt_label: %empty  */
-#line 50 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 50 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.tok).sval=NULL;(yyval.tok).ival=0;(yyval.tok).lineno=0;(yyval.tok).kind=0; }
-#line 1268 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1268 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 8: /* opt_subject: expr3  */
-#line 52 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 52 "src/frontend/snobol4/snobol4.y"
                                                                                                   { (yyval.expr)=(yyvsp[0].expr); }
-#line 1274 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1274 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 9: /* opt_subject: %empty  */
-#line 53 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 53 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=NULL; }
-#line 1280 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1280 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 10: /* opt_repl: TK_ASSIGNMENT expr0  */
-#line 58 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 58 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=(yyvsp[0].expr); }
-#line 1286 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1286 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 11: /* opt_repl: %empty  */
-#line 59 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 59 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=NULL; }
-#line 1292 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1292 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 12: /* opt_goto: TK_GOTO  */
-#line 61 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 61 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.tok)=(yyvsp[0].tok); }
-#line 1298 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1298 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 13: /* opt_goto: %empty  */
-#line 62 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 62 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.tok).sval=NULL;(yyval.tok).ival=0;(yyval.tok).lineno=0;(yyval.tok).kind=0; }
-#line 1304 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1304 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 14: /* expr0: expr2 TK_ASSIGNMENT expr0  */
-#line 66 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 66 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=expr_binary(E_ASSIGN,          (yyvsp[-2].expr),(yyvsp[0].expr)); }
-#line 1310 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1310 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 15: /* expr0: expr2 TK_MATCH expr0  */
-#line 67 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 67 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=expr_binary(E_SCAN,            (yyvsp[-2].expr),(yyvsp[0].expr)); }
-#line 1316 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1316 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 16: /* expr0: expr2  */
-#line 68 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 68 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=(yyvsp[0].expr); }
-#line 1322 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1322 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 17: /* expr2: expr2 TK_AMPERSAND expr3  */
-#line 70 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 70 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=expr_binary(E_OPSYN,           (yyvsp[-2].expr),(yyvsp[0].expr)); }
-#line 1328 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1328 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 18: /* expr2: expr3  */
-#line 71 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 71 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=(yyvsp[0].expr); }
-#line 1334 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1334 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 19: /* expr3: expr3 TK_ALTERNATION expr4  */
-#line 73 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 73 "src/frontend/snobol4/snobol4.y"
                                                                                                    { if((yyvsp[-2].expr)->kind==E_ALT){expr_add_child((yyvsp[-2].expr),(yyvsp[0].expr));(yyval.expr)=(yyvsp[-2].expr);}else{EXPR_t*a=expr_new(E_ALT);expr_add_child(a,(yyvsp[-2].expr));expr_add_child(a,(yyvsp[0].expr));(yyval.expr)=a;} }
-#line 1340 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1340 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 20: /* expr3: expr4  */
-#line 74 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 74 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=(yyvsp[0].expr); }
-#line 1346 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1346 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 21: /* expr4: expr4 TK_CONCAT expr5  */
-#line 76 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 76 "src/frontend/snobol4/snobol4.y"
                                                                                                              { if((yyvsp[-2].expr)->kind==E_SEQ){expr_add_child((yyvsp[-2].expr),(yyvsp[0].expr));(yyval.expr)=(yyvsp[-2].expr);}else{EXPR_t*s=expr_new(E_SEQ);expr_add_child(s,(yyvsp[-2].expr));expr_add_child(s,(yyvsp[0].expr));(yyval.expr)=s;} }
-#line 1352 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1352 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 22: /* expr4: expr5  */
-#line 77 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 77 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=(yyvsp[0].expr); }
-#line 1358 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1358 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 23: /* expr5: expr5 TK_AT_SIGN expr6  */
-#line 79 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 79 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=expr_binary(E_CAPT_CURSOR,     (yyvsp[-2].expr),(yyvsp[0].expr)); }
-#line 1364 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1364 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 24: /* expr5: expr6  */
-#line 80 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 80 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=(yyvsp[0].expr); }
-#line 1370 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1370 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 25: /* expr6: expr6 TK_ADDITION expr7  */
-#line 82 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 82 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=expr_binary(E_ADD,             (yyvsp[-2].expr),(yyvsp[0].expr)); }
-#line 1376 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1376 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 26: /* expr6: expr6 TK_SUBTRACTION expr7  */
-#line 83 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 83 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=expr_binary(E_SUB,             (yyvsp[-2].expr),(yyvsp[0].expr)); }
-#line 1382 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1382 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 27: /* expr6: expr7  */
-#line 84 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 84 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=(yyvsp[0].expr); }
-#line 1388 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1388 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 28: /* expr7: expr7 TK_POUND expr8  */
-#line 86 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 86 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=expr_binary(E_MUL,             (yyvsp[-2].expr),(yyvsp[0].expr)); }
-#line 1394 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1394 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 29: /* expr7: expr8  */
-#line 87 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 87 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=(yyvsp[0].expr); }
-#line 1400 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1400 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 30: /* expr8: expr8 TK_DIVISION expr9  */
-#line 89 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 89 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=expr_binary(E_DIV,             (yyvsp[-2].expr),(yyvsp[0].expr)); }
-#line 1406 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1406 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 31: /* expr8: expr9  */
-#line 90 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 90 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=(yyvsp[0].expr); }
-#line 1412 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1412 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 32: /* expr9: expr9 TK_MULTIPLICATION expr10  */
-#line 92 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 92 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=expr_binary(E_MUL,             (yyvsp[-2].expr),(yyvsp[0].expr)); }
-#line 1418 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1418 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 33: /* expr9: expr10  */
-#line 93 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 93 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=(yyvsp[0].expr); }
-#line 1424 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1424 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 34: /* expr10: expr10 TK_PERCENT expr11  */
-#line 95 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 95 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=expr_binary(E_DIV,             (yyvsp[-2].expr),(yyvsp[0].expr)); }
-#line 1430 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1430 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 35: /* expr10: expr11  */
-#line 96 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 96 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=(yyvsp[0].expr); }
-#line 1436 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1436 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 36: /* expr11: expr12 TK_EXPONENTIATION expr11  */
-#line 98 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 98 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=expr_binary(E_POW,             (yyvsp[-2].expr),(yyvsp[0].expr)); }
-#line 1442 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1442 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 37: /* expr11: expr12  */
-#line 99 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 99 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=(yyvsp[0].expr); }
-#line 1448 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1448 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 38: /* expr12: expr12 TK_IMMEDIATE_ASSIGN expr13  */
-#line 101 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 101 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=expr_binary(E_CAPT_IMMED_ASGN,(yyvsp[-2].expr),(yyvsp[0].expr)); }
-#line 1454 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1454 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 39: /* expr12: expr12 TK_COND_ASSIGN expr13  */
-#line 102 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 102 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=expr_binary(E_CAPT_COND_ASGN, (yyvsp[-2].expr),(yyvsp[0].expr)); }
-#line 1460 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1460 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 40: /* expr12: expr13  */
-#line 103 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 103 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=(yyvsp[0].expr); }
-#line 1466 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1466 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 41: /* expr13: expr14 TK_TILDE expr13  */
-#line 105 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 105 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=expr_binary(E_CAPT_COND_ASGN, (yyvsp[-2].expr),(yyvsp[0].expr)); }
-#line 1472 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1472 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 42: /* expr13: expr14  */
-#line 106 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 106 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=(yyvsp[0].expr); }
-#line 1478 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1478 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 43: /* expr14: TK_UN_AT_SIGN expr14  */
-#line 108 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 108 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=expr_unary(E_CAPT_CURSOR,     (yyvsp[0].expr)); }
-#line 1484 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1484 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 44: /* expr14: TK_UN_TILDE expr14  */
-#line 109 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 109 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=expr_unary(E_INDIRECT,        (yyvsp[0].expr)); }
-#line 1490 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1490 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 45: /* expr14: TK_UN_QUESTION_MARK expr14  */
-#line 110 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 110 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=expr_unary(E_INTERROGATE,     (yyvsp[0].expr)); }
-#line 1496 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1496 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 46: /* expr14: TK_UN_AMPERSAND expr14  */
-#line 111 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 111 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=expr_unary(E_OPSYN,           (yyvsp[0].expr)); }
-#line 1502 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1502 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 47: /* expr14: TK_UN_PLUS expr14  */
-#line 112 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 112 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=expr_unary(E_PLS,             (yyvsp[0].expr)); }
-#line 1508 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1508 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 48: /* expr14: TK_UN_MINUS expr14  */
-#line 113 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 113 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=expr_unary(E_MNS,             (yyvsp[0].expr)); }
-#line 1514 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1514 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 49: /* expr14: TK_UN_ASTERISK expr14  */
-#line 114 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 114 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=expr_unary(E_DEFER,           (yyvsp[0].expr)); }
-#line 1520 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1520 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 50: /* expr14: TK_UN_DOLLAR_SIGN expr14  */
-#line 115 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 115 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=expr_unary(E_INDIRECT,        (yyvsp[0].expr)); }
-#line 1526 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1526 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 51: /* expr14: TK_UN_PERIOD expr14  */
-#line 116 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 116 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=expr_unary(E_NAME,            (yyvsp[0].expr)); }
-#line 1532 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1532 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 52: /* expr14: TK_UN_EXCLAMATION expr14  */
-#line 117 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 117 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=expr_unary(E_POW,             (yyvsp[0].expr)); }
-#line 1538 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1538 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 53: /* expr14: TK_UN_PERCENT expr14  */
-#line 118 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 118 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=expr_unary(E_DIV,             (yyvsp[0].expr)); }
-#line 1544 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1544 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 54: /* expr14: TK_UN_SLASH expr14  */
-#line 119 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 119 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=expr_unary(E_DIV,             (yyvsp[0].expr)); }
-#line 1550 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1550 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 55: /* expr14: TK_UN_POUND expr14  */
-#line 120 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 120 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=expr_unary(E_MUL,             (yyvsp[0].expr)); }
-#line 1556 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1556 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 56: /* expr14: TK_UN_EQUAL expr14  */
-#line 121 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 121 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=expr_unary(E_ASSIGN,          (yyvsp[0].expr)); }
-#line 1562 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1562 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 57: /* expr14: TK_UN_VERTICAL_BAR expr14  */
-#line 122 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 122 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=expr_unary(E_ALT,             (yyvsp[0].expr)); }
-#line 1568 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1568 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 58: /* expr14: expr15  */
-#line 123 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 123 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=(yyvsp[0].expr); }
-#line 1574 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1574 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 59: /* expr15: expr15 TK_LBRACK exprlist TK_RBRACK  */
-#line 125 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 125 "src/frontend/snobol4/snobol4.y"
                                                                                                   { EXPR_t*i=expr_new(E_IDX);expr_add_child(i,(yyvsp[-3].expr));for(int j=0;j<(yyvsp[-1].expr)->nchildren;j++)expr_add_child(i,(yyvsp[-1].expr)->children[j]);free((yyvsp[-1].expr)->children);free((yyvsp[-1].expr));(yyval.expr)=i; }
-#line 1580 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1580 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 60: /* expr15: expr15 TK_LANGLE exprlist TK_RANGLE  */
-#line 126 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 126 "src/frontend/snobol4/snobol4.y"
                                                                                                   { EXPR_t*i=expr_new(E_IDX);expr_add_child(i,(yyvsp[-3].expr));for(int j=0;j<(yyvsp[-1].expr)->nchildren;j++)expr_add_child(i,(yyvsp[-1].expr)->children[j]);free((yyvsp[-1].expr)->children);free((yyvsp[-1].expr));(yyval.expr)=i; }
-#line 1586 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1586 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 61: /* expr15: expr17  */
-#line 127 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 127 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=(yyvsp[0].expr); }
-#line 1592 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1592 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 62: /* exprlist: exprlist_ne  */
-#line 129 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 129 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=(yyvsp[0].expr); }
-#line 1598 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1598 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 63: /* exprlist: %empty  */
-#line 130 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 130 "src/frontend/snobol4/snobol4.y"
                                                                                                    { (yyval.expr)=expr_new(E_NUL); }
-#line 1604 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1604 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 64: /* exprlist_ne: exprlist_ne TK_COMMA expr0  */
-#line 132 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 132 "src/frontend/snobol4/snobol4.y"
                                                                                                    { expr_add_child((yyvsp[-2].expr),(yyvsp[0].expr));(yyval.expr)=(yyvsp[-2].expr); }
-#line 1610 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1610 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 65: /* exprlist_ne: exprlist_ne TK_COMMA  */
-#line 133 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 133 "src/frontend/snobol4/snobol4.y"
                                                                                                    { expr_add_child((yyvsp[-1].expr),expr_new(E_NUL));(yyval.expr)=(yyvsp[-1].expr); }
-#line 1616 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1616 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 66: /* exprlist_ne: expr0  */
-#line 134 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 134 "src/frontend/snobol4/snobol4.y"
                                                                                                    { EXPR_t*l=expr_new(E_NUL);expr_add_child(l,(yyvsp[0].expr));(yyval.expr)=l; }
-#line 1622 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1622 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 67: /* expr17: TK_LPAREN expr0 TK_RPAREN  */
-#line 136 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 136 "src/frontend/snobol4/snobol4.y"
                                                                                                   { (yyval.expr)=(yyvsp[-1].expr); }
-#line 1628 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1628 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 68: /* expr17: TK_LPAREN expr0 TK_COMMA exprlist_ne TK_RPAREN  */
-#line 137 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 137 "src/frontend/snobol4/snobol4.y"
                                                                                                   { EXPR_t*a=expr_new(E_ALT);expr_add_child(a,(yyvsp[-3].expr));for(int i=0;i<(yyvsp[-1].expr)->nchildren;i++)expr_add_child(a,(yyvsp[-1].expr)->children[i]);free((yyvsp[-1].expr)->children);free((yyvsp[-1].expr));(yyval.expr)=a; }
-#line 1634 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1634 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 69: /* expr17: TK_LPAREN TK_RPAREN  */
-#line 138 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 138 "src/frontend/snobol4/snobol4.y"
                                                                                                   { (yyval.expr)=expr_new(E_NUL); }
-#line 1640 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1640 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 70: /* expr17: TK_FUNCTION TK_LPAREN exprlist TK_RPAREN  */
-#line 139 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 139 "src/frontend/snobol4/snobol4.y"
                                                                                                   { EXPR_t*e=expr_new(E_FNC);e->sval=(char*)(yyvsp[-3].tok).sval;for(int i=0;i<(yyvsp[-1].expr)->nchildren;i++)expr_add_child(e,(yyvsp[-1].expr)->children[i]);free((yyvsp[-1].expr)->children);free((yyvsp[-1].expr));(yyval.expr)=e; }
-#line 1646 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1646 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 71: /* expr17: TK_IDENT  */
-#line 140 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 140 "src/frontend/snobol4/snobol4.y"
                                                                                                    { EXPR_t*e=expr_new(E_VAR);    e->sval=(char*)(yyvsp[0].tok).sval;(yyval.expr)=e; }
-#line 1652 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1652 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 72: /* expr17: TK_END  */
-#line 141 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 141 "src/frontend/snobol4/snobol4.y"
                                                                                                    { EXPR_t*e=expr_new(E_VAR);    e->sval=(char*)(yyvsp[0].tok).sval;(yyval.expr)=e; }
-#line 1658 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1658 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 73: /* expr17: TK_KEYWORD  */
-#line 142 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 142 "src/frontend/snobol4/snobol4.y"
                                                                                                    { EXPR_t*e=expr_new(E_KEYWORD);e->sval=(char*)(yyvsp[0].tok).sval;(yyval.expr)=e; }
-#line 1664 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1664 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 74: /* expr17: TK_STR  */
-#line 143 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 143 "src/frontend/snobol4/snobol4.y"
                                                                                                    { EXPR_t*e=expr_new(E_QLIT);   e->sval=(char*)(yyvsp[0].tok).sval;(yyval.expr)=e; }
-#line 1670 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1670 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 75: /* expr17: TK_INT  */
-#line 144 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 144 "src/frontend/snobol4/snobol4.y"
                                                                                                    { EXPR_t*e=expr_new(E_ILIT);   e->ival=(yyvsp[0].tok).ival;(yyval.expr)=e; }
-#line 1676 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1676 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
   case 76: /* expr17: TK_REAL  */
-#line 145 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 145 "src/frontend/snobol4/snobol4.y"
                                                                                                    { EXPR_t*e=expr_new(E_FLIT);   e->dval=(yyvsp[0].tok).dval;(yyval.expr)=e; }
-#line 1682 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1682 "src/frontend/snobol4/snobol4.tab.c"
     break;
 
 
-#line 1686 "/home/claude/one4all/src/frontend/snobol4/snobol4.tab.c"
+#line 1686 "src/frontend/snobol4/snobol4.tab.c"
 
       default: break;
     }
@@ -1875,7 +1875,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 147 "/home/claude/one4all/src/frontend/snobol4/snobol4.y"
+#line 147 "src/frontend/snobol4/snobol4.y"
 
 int snobol4_lex(YYSTYPE *yylval_param, void *yyparse_param) {
     (void)yyparse_param; Token t=lex_next(g_lx); yylval_param->tok=t;
@@ -1924,7 +1924,7 @@ static char *goto_label(Lex *lx){
     Token t=lex_peek(lx); TokKind open=t.kind,close;
     if(open==T_LPAREN) close=T_RPAREN; else if(open==T_LANGLE) close=T_RANGLE; else return NULL;
     lex_next(lx); t=lex_peek(lx); char *label=NULL;
-    if(t.kind==T_IDENT||t.kind==T_KEYWORD||t.kind==T_END){lex_next(lx);label=(char*)t.sval;}
+    if(t.kind==T_IDENT||t.kind==T_FUNCTION||t.kind==T_KEYWORD||t.kind==T_END){lex_next(lx);label=(char*)t.sval;}
     else if(t.kind==T_UN_DOLLAR_SIGN){
         lex_next(lx);
         if(lex_peek(lx).kind==T_LPAREN){
@@ -1947,7 +1947,7 @@ static SnoGoto *goto_field(const char *gs,int lineno){
     Lex lx={0};lex_open_str(&lx,gs,(int)strlen(gs),lineno);SnoGoto *g=sgoto_new();
     while(!lex_at_end(&lx)){
         Token t=lex_peek(&lx);
-        if(t.kind==T_IDENT&&t.sval){
+        if((t.kind==T_IDENT||t.kind==T_FUNCTION)&&t.sval){
             if(strcasecmp(t.sval,"S")==0){lex_next(&lx);g->onsuccess=goto_label(&lx);continue;}
             if(strcasecmp(t.sval,"F")==0){lex_next(&lx);g->onfailure=goto_label(&lx);continue;}
         }
@@ -1977,6 +1977,29 @@ static void sno4_stmt_commit(void *param,Token lbl,EXPR_t *subj,EXPR_t *pat,int 
     }
     STMT_t *s=stmt_new();s->lineno=lbl.lineno;
     if(lbl.sval){s->label=strdup(lbl.sval);s->is_end=lbl.ival||(strcasecmp(lbl.sval,"END")==0);}
+    /* S=PR split: E_SCAN(subj, pat) from "X ? PAT" binary match operator */
+    if(!pat && subj && subj->kind==E_SCAN && subj->nchildren==2) {
+        EXPR_t *orig = subj;
+        subj = orig->children[0];
+        pat  = orig->children[1];
+    }
+    /* S=PR split: if subj is E_SEQ with first child a bare name, split into
+     * subject=first_child, pattern=rest. Grammar puts everything in opt_subject. */
+    if(!pat && subj && (subj->kind==E_SEQ||subj->kind==E_CAT) && subj->nchildren>=2) {
+        EXPR_t *first = subj->children[0];
+        if(first->kind==E_VAR || first->kind==E_KEYWORD) {
+            int nc = subj->nchildren - 1;
+            EXPR_t *rest;
+            if(nc == 1) {
+                rest = subj->children[1];
+            } else {
+                rest = expr_new(E_SEQ);
+                for(int i=1;i<subj->nchildren;i++) expr_add_child(rest,subj->children[i]);
+            }
+            subj = first;
+            pat  = rest;
+        }
+    }
     s->subject=subj; s->pattern=pat;
     if(s->subject) fixup_val(s->subject);
     if(has_eq){s->has_eq=1;s->replacement=repl;if(repl&&!is_pat(repl))fixup_val(repl);}
