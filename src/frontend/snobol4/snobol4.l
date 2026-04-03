@@ -39,7 +39,8 @@ int   n_inc = 0;
 static int   lineno = 1;
 static char  strbuf[65536];
 static int   strpos;
-static int   depth;   /* paren depth in BODY for ':' detection */
+static int   depth;      /* paren depth in BODY for ':' detection */
+
 
 static Token mktok(TokKind k, const char *sv, long iv, double dv) {
     Token t; t.kind=k; t.sval=sv; t.ival=iv; t.dval=dv; t.lineno=lineno;
@@ -114,74 +115,79 @@ WS      [ \t]
     return T_LABEL;
 }
 
-    /* ---- BODY: statement body ---- */
 
-<BODY>[ \t]+            { /* discard whitespace */ }
+    /* ---- BODY: statement body ----
+     * T_CONCAT: spaces followed by an atom-start char (lookahead) — concatenation.
+     * Binary ops embed their own surrounding spaces: [ \t]+ OP [ \t]+.
+     * Unary ops have no preceding space.
+     * Keywords &NAME before bare & to avoid prefix collision. */
 
-<BODY>\n                {
-    lineno++; BEGIN(INITIAL);
-    return T_STMT_END;
-}
+<BODY>\n               { lineno++; BEGIN(INITIAL); return T_STMT_END; }
+<BODY>";"              { depth=0; return T_STMT_END; }
+<BODY>":"              { if(depth==0) BEGIN(GT); }
 
-<BODY>";"               {
-    /* inline semicolon: end statement, next char is col-1 of next stmt */
-    depth = 0;
-    return T_STMT_END;
-}
+<BODY>&{ALPHA}{ALNUM}* { strbuf[0]='\0'; strncat(strbuf,yytext+1,sizeof(strbuf)-1); return T_KEYWORD; }
 
-<BODY>":"               {
-    if (depth == 0) { BEGIN(GT); }
-    /* else: colon inside parens not used in SNOBOL4 */
-}
+    /* T_CONCAT: spaces followed by an atom-starting character */
+<BODY>[ \t]+/[A-Za-z\x80-\xFF0-9\'"(]  { return T_CONCAT; }
 
-<BODY>&{ALPHA}{ALNUM}*  {
-    strbuf[0]='\0'; strncat(strbuf, yytext+1, sizeof(strbuf)-1);
-    return T_KEYWORD;
-}
-<BODY>"&"               { return T_AMP; }
+    /* Binary ops: [ \t]+ OP [ \t]+ — longer than T_CONCAT rule, wins by length */
+<BODY>[ \t]+"**"[ \t]+  { return T_EXPONENTIATION;  }
+<BODY>[ \t]+"^"[ \t]+   { return T_EXPONENTIATION;  }
+<BODY>[ \t]+"!"[ \t]+   { return T_EXPONENTIATION;  }
+<BODY>[ \t]+"+"[ \t]+   { return T_ADDITION;        }
+<BODY>[ \t]+"-"[ \t]+   { return T_SUBTRACTION;     }
+<BODY>[ \t]+"*"[ \t]+   { return T_MULTIPLICATION;  }
+<BODY>[ \t]+"/"[ \t]+   { return T_DIVISION;        }
+<BODY>[ \t]+"$"[ \t]+   { return T_IMMEDIATE_ASSIGN;}
+<BODY>[ \t]+"."[ \t]+   { return T_COND_ASSIGN;     }
+<BODY>[ \t]+"|"[ \t]+   { return T_ALTERNATION;     }
+<BODY>[ \t]+"="[ \t]+   { return T_ASSIGNMENT;      }
+<BODY>[ \t]+"?"[ \t]+   { return T_MATCH;           }
+<BODY>[ \t]+"&"[ \t]+   { return T_AMPERSAND;       }
+<BODY>[ \t]+"@"[ \t]+   { return T_AT_SIGN;         }
+<BODY>[ \t]+"#"[ \t]+   { return T_POUND;           }
+<BODY>[ \t]+"%"[ \t]+   { return T_PERCENT;         }
+<BODY>[ \t]+"~"[ \t]+   { return T_TILDE;           }
+<BODY>[ \t]+              { /* spaces before ) ] > , : ; \n — discard */ }
 
-<BODY>{ALPHA}{IDCONT}*  {
-    strbuf[0]='\0'; strncat(strbuf, yytext, sizeof(strbuf)-1);
-    return strcasecmp(strbuf,"END")==0 ? T_END : T_IDENT;
-}
-
+    /* Atoms: no leading space (T_CONCAT already emitted if needed) */
+<BODY>{ALPHA}{IDCONT}*/"("  { strbuf[0]='\0'; strncat(strbuf,yytext,sizeof(strbuf)-1); return strcasecmp(strbuf,"END")==0?T_FUNCTION:T_FUNCTION; }
+<BODY>{ALPHA}{IDCONT}*      { strbuf[0]='\0'; strncat(strbuf,yytext,sizeof(strbuf)-1); return strcasecmp(strbuf,"END")==0?T_END:T_IDENT; }
 <BODY>{DIGIT}+"."{DIGIT}+{EXP}? |
-<BODY>{DIGIT}+{EXP}             {
-    strbuf[0]='\0'; strncat(strbuf, yytext, sizeof(strbuf)-1);
-    return T_REAL;
-}
-<BODY>{DIGIT}+                  {
-    strbuf[0]='\0'; strncat(strbuf, yytext, sizeof(strbuf)-1);
-    return T_INT;
-}
+<BODY>{DIGIT}+{EXP}         { strbuf[0]='\0'; strncat(strbuf,yytext,sizeof(strbuf)-1); return T_REAL; }
+<BODY>{DIGIT}+              { strbuf[0]='\0'; strncat(strbuf,yytext,sizeof(strbuf)-1); return T_INT; }
+<BODY>\'                   { strpos=0; BEGIN(STR1); }
+<BODY>\"                   { strpos=0; BEGIN(STR2); }
 
-<BODY>\'                { strpos=0; BEGIN(STR1); }
-<BODY>\"                { strpos=0; BEGIN(STR2); }
+    /* Unary ops: no leading space */
+<BODY>"**"   { return T_EXPONENTIATION;  }
+<BODY>"^"    { return T_EXPONENTIATION;  }
+<BODY>"+"    { return T_UN_PLUS;         }
+<BODY>"-"    { return T_UN_MINUS;        }
+<BODY>"*"    { return T_UN_ASTERISK;     }
+<BODY>"/"    { return T_UN_SLASH;        }
+<BODY>"%"    { return T_UN_PERCENT;      }
+<BODY>"@"    { return T_UN_AT_SIGN;      }
+<BODY>"~"    { return T_UN_TILDE;        }
+<BODY>"$"    { return T_UN_DOLLAR_SIGN;  }
+<BODY>"."    { return T_UN_PERIOD;       }
+<BODY>"!"    { return T_UN_EXCLAMATION;  }
+<BODY>"#"    { return T_UN_POUND;        }
+<BODY>"|"    { return T_UN_VERTICAL_BAR; }
+<BODY>"="    { return T_UN_EQUAL;        }
+<BODY>"?"    { return T_UN_QUESTION_MARK;}
+<BODY>"&"    { return T_UN_AMPERSAND;    }
 
-<BODY>"**"              { return T_STARSTAR; }
-<BODY>"+"               { return T_PLUS;     }
-<BODY>"-"               { return T_MINUS;    }
-<BODY>"*"               { return T_STAR;     }
-<BODY>"/"               { return T_SLASH;    }
-<BODY>"%"               { return T_PCT;      }
-<BODY>"^"               { return T_CARET;    }
-<BODY>"!"               { return T_BANG;     }
-<BODY>"@"               { return T_AT;       }
-<BODY>"~"               { return T_TILDE;    }
-<BODY>"$"               { return T_DOLLAR;   }
-<BODY>"."               { return T_DOT;      }
-<BODY>"#"               { return T_HASH;     }
-<BODY>"|"               { return T_PIPE;     }
-<BODY>"="               { return T_EQ;       }
-<BODY>"?"               { return T_QMARK;    }
-<BODY>","               { return T_COMMA;    }
-<BODY>"("               { depth++; return T_LPAREN;   }
-<BODY>")"               { depth--; return T_RPAREN;   }
-<BODY>"["               { depth++; return T_LBRACKET; }
-<BODY>"]"               { depth--; return T_RBRACKET; }
-<BODY>"<"               { depth++; return T_LANGLE;   }
-<BODY>">"               { depth--; return T_RANGLE;   }
-<BODY>.                 { sno_error(lineno,"unexpected char '%s'",yytext); }
+    /* Structural */
+<BODY>","    { return T_COMMA;   }
+<BODY>"("    { depth++; return T_LPAREN;  }
+<BODY>")"    { depth--; return T_RPAREN;  }
+<BODY>"["    { depth++; return T_LBRACK;  }
+<BODY>"]"    { depth--; return T_RBRACK;  }
+<BODY>"<"    { depth++; return T_LANGLE;  }
+<BODY>">"    { depth--; return T_RANGLE;  }
+<BODY>.      { sno_error(lineno,"unexpected char '%s'",yytext); }
 
     /* ---- STR1: single-quoted string ---- */
 
