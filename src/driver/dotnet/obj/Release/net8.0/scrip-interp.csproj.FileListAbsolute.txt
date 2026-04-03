@@ -18,3 +18,8 @@
 /home/claude/one4all/src/driver/dotnet/obj/Release/net8.0/scrip-interp.pdb
 /home/claude/one4all/src/driver/dotnet/obj/Release/net8.0/scrip-interp.genruntimeconfig.cache
 /home/claude/one4all/src/driver/dotnet/obj/Release/net8.0/ref/scrip-interp.dll
+/tmp/sni/scrip-interp
+/tmp/sni/scrip-interp.deps.json
+/tmp/sni/scrip-interp.runtimeconfig.json
+/tmp/sni/scrip-interp.dll
+/tmp/sni/scrip-interp.pdb

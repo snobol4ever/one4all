@@ -15,7 +15,7 @@ public sealed class PatternBuilder
     private readonly Action<string, string>   _setVar;
     private readonly Func<string, string>     _getStringVar;
     private readonly Func<string, IByrdBox?>  _getPatternVar;
-    private readonly Func<IrNode, SnobolVal>  _evalNode;
+    private readonly Func<IrNode, DESCR>  _evalNode;
 
     private readonly List<bb_capture> _captures = new();
     public IReadOnlyList<bb_capture> Captures => _captures;
@@ -24,7 +24,7 @@ public sealed class PatternBuilder
         Action<string, string>   setVar,
         Func<string, string>     getStringVar,
         Func<string, IByrdBox?>  getPatternVar,
-        Func<IrNode, SnobolVal>  evalNode)
+        Func<IrNode, DESCR>  evalNode)
     {
         _setVar        = setVar;
         _getStringVar  = getStringVar;

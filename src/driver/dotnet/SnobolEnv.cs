@@ -13,10 +13,10 @@ namespace ScripInterp;
 
 public enum DType { Null, String, Int, Real, Fail }
 
-public sealed class SnobolVal
+public sealed class DESCR
 {
-    public static readonly SnobolVal Null = new(DType.Null, "", 0, 0.0);
-    public static readonly SnobolVal Fail = new(DType.Fail, "", 0, 0.0);
+    public static readonly DESCR Null = new(DType.Null, "", 0, 0.0);
+    public static readonly DESCR Fail = new(DType.Fail, "", 0, 0.0);
 
     public DType  Type   { get; }
     public string Str    { get; }
@@ -26,12 +26,12 @@ public sealed class SnobolVal
     public bool IsFail => Type == DType.Fail;
     public bool IsNull => Type == DType.Null;
 
-    private SnobolVal(DType t, string s, long i, double r)
+    private DESCR(DType t, string s, long i, double r)
     { Type = t; Str = s; Int = i; Real = r; }
 
-    public static SnobolVal Of(string s) => new(DType.String, s, 0, 0.0);
-    public static SnobolVal Of(long   i) => new(DType.Int,    i.ToString(), i, 0.0);
-    public static SnobolVal Of(double r)
+    public static DESCR Of(string s) => new(DType.String, s, 0, 0.0);
+    public static DESCR Of(long   i) => new(DType.Int,    i.ToString(), i, 0.0);
+    public static DESCR Of(double r)
     {
         // SNOBOL4 real format: strip trailing zeros after decimal, keep point
         // 1.0 → "1."   0.5 → ".5"   1.5 → "1.5"   0.0 → "0."
@@ -71,7 +71,7 @@ public sealed class SnobolVal
 
 public sealed class SnobolEnv
 {
-    private readonly Dictionary<string, SnobolVal> _vars =
+    private readonly Dictionary<string, DESCR> _vars =
         new(StringComparer.OrdinalIgnoreCase);
 
     // Pattern variable store: name → IR node (set when RHS of assignment is a pattern expression)
@@ -92,43 +92,43 @@ public sealed class SnobolEnv
     private const long TAG_MASK  = 0x7000_0000L;
     private const long IDX_MASK  = 0x0FFF_FFFFL;
 
-    private readonly List<SnobolVal?[]>                          _arrays = new();
-    private readonly List<Dictionary<string, SnobolVal>>         _tables = new();
+    private readonly List<DESCR?[]>                          _arrays = new();
+    private readonly List<Dictionary<string, DESCR>>         _tables = new();
 
     // ARRAY(n) — 1-indexed numeric array; ARRAY(n,v) with default
-    public SnobolVal ArrayCreate(SnobolVal[] args)
+    public DESCR ArrayCreate(DESCR[] args)
     {
         int size = args.Length >= 1 ? (int)args[0].ToInt() : 0;
-        if (size < 1) return SnobolVal.Fail;
-        var arr = new SnobolVal?[size];
+        if (size < 1) return DESCR.Fail;
+        var arr = new DESCR?[size];
         if (args.Length >= 2)
         {
             var def = args[1];
             for (int i = 0; i < arr.Length; i++) arr[i] = def;
         }
         _arrays.Add(arr);
-        return SnobolVal.Of(TAG_ARRAY | (long)(_arrays.Count - 1));
+        return DESCR.Of(TAG_ARRAY | (long)(_arrays.Count - 1));
     }
 
-    public SnobolVal TableCreate()
+    public DESCR TableCreate()
     {
-        _tables.Add(new Dictionary<string, SnobolVal>(StringComparer.Ordinal));
-        return SnobolVal.Of(TAG_TABLE | (long)(_tables.Count - 1));
+        _tables.Add(new Dictionary<string, DESCR>(StringComparer.Ordinal));
+        return DESCR.Of(TAG_TABLE | (long)(_tables.Count - 1));
     }
 
-    public bool IsArray(SnobolVal v)  => v.Type == DType.Int && (v.Int & TAG_MASK) == TAG_ARRAY && (v.Int & IDX_MASK) < _arrays.Count && (v.Int & IDX_MASK) >= 0;
-    public bool IsTable(SnobolVal v)  => v.Type == DType.Int && (v.Int & TAG_MASK) == TAG_TABLE && (v.Int & IDX_MASK) < _tables.Count;
+    public bool IsArray(DESCR v)  => v.Type == DType.Int && (v.Int & TAG_MASK) == TAG_ARRAY && (v.Int & IDX_MASK) < _arrays.Count && (v.Int & IDX_MASK) >= 0;
+    public bool IsTable(DESCR v)  => v.Type == DType.Int && (v.Int & TAG_MASK) == TAG_TABLE && (v.Int & IDX_MASK) < _tables.Count;
 
-    public SnobolVal ArrayGet(SnobolVal handle, long idx)
+    public DESCR ArrayGet(DESCR handle, long idx)
     {
-        if (!IsArray(handle)) return SnobolVal.Null;
+        if (!IsArray(handle)) return DESCR.Null;
         var arr = _arrays[(int)(handle.Int & IDX_MASK)];
         int i = (int)idx - 1;   // SNOBOL4 is 1-based
-        if (i < 0 || i >= arr.Length) return SnobolVal.Null;
-        return arr[i] ?? SnobolVal.Null;
+        if (i < 0 || i >= arr.Length) return DESCR.Null;
+        return arr[i] ?? DESCR.Null;
     }
 
-    public void ArraySet(SnobolVal handle, long idx, SnobolVal val)
+    public void ArraySet(DESCR handle, long idx, DESCR val)
     {
         if (!IsArray(handle)) return;
         var arr = _arrays[(int)(handle.Int & IDX_MASK)];
@@ -136,14 +136,14 @@ public sealed class SnobolEnv
         if (i >= 0 && i < arr.Length) arr[i] = val;
     }
 
-    public SnobolVal TableGet(SnobolVal handle, string key)
+    public DESCR TableGet(DESCR handle, string key)
     {
-        if (!IsTable(handle)) return SnobolVal.Null;
+        if (!IsTable(handle)) return DESCR.Null;
         var tbl = _tables[(int)(handle.Int & IDX_MASK)];
-        return tbl.TryGetValue(key, out var v) ? v : SnobolVal.Null;
+        return tbl.TryGetValue(key, out var v) ? v : DESCR.Null;
     }
 
-    public void TableSet(SnobolVal handle, string key, SnobolVal val)
+    public void TableSet(DESCR handle, string key, DESCR val)
     {
         if (!IsTable(handle)) return;
         _tables[(int)(handle.Int & IDX_MASK)][key] = val;
@@ -156,7 +156,7 @@ public sealed class SnobolEnv
         new(StringComparer.OrdinalIgnoreCase);
 
     // Instances: handle → field values
-    private readonly List<(string TypeName, SnobolVal[] Fields)> _dataObjs = new();
+    private readonly List<(string TypeName, DESCR[] Fields)> _dataObjs = new();
 
     public void DataDefine(string spec)
     {
@@ -171,35 +171,35 @@ public sealed class SnobolEnv
 
     public bool IsDataType(string name) => _dataTypes.ContainsKey(name);
 
-    private SnobolVal DataBuiltin(string spec)
+    private DESCR DataBuiltin(string spec)
     {
         DataDefine(spec);
-        return SnobolVal.Null;
+        return DESCR.Null;
     }
 
-    public SnobolVal DataCreate(string typeName, SnobolVal[] args)
+    public DESCR DataCreate(string typeName, DESCR[] args)
     {
-        if (!_dataTypes.TryGetValue(typeName, out var def)) return SnobolVal.Fail;
-        var fields = new SnobolVal[def.Fields.Length];
+        if (!_dataTypes.TryGetValue(typeName, out var def)) return DESCR.Fail;
+        var fields = new DESCR[def.Fields.Length];
         for (int i = 0; i < fields.Length; i++)
-            fields[i] = i < args.Length ? args[i] : SnobolVal.Null;
+            fields[i] = i < args.Length ? args[i] : DESCR.Null;
         _dataObjs.Add((typeName, fields));
-        return SnobolVal.Of(TAG_DATA | (long)(_dataObjs.Count - 1));
+        return DESCR.Of(TAG_DATA | (long)(_dataObjs.Count - 1));
     }
 
-    public bool IsDataObj(SnobolVal v) => v.Type == DType.Int && (v.Int & TAG_MASK) == TAG_DATA && (v.Int & IDX_MASK) < _dataObjs.Count;
+    public bool IsDataObj(DESCR v) => v.Type == DType.Int && (v.Int & TAG_MASK) == TAG_DATA && (v.Int & IDX_MASK) < _dataObjs.Count;
 
-    public SnobolVal DataGetField(SnobolVal handle, string fieldName)
+    public DESCR DataGetField(DESCR handle, string fieldName)
     {
-        if (!IsDataObj(handle)) return SnobolVal.Null;
+        if (!IsDataObj(handle)) return DESCR.Null;
         var (typeName, fields) = _dataObjs[(int)(handle.Int & IDX_MASK)];
-        if (!_dataTypes.TryGetValue(typeName, out var def)) return SnobolVal.Null;
+        if (!_dataTypes.TryGetValue(typeName, out var def)) return DESCR.Null;
         int fi = Array.IndexOf(def.Fields, fieldName);
         if (fi < 0) fi = Array.FindIndex(def.Fields, f => string.Equals(f, fieldName, StringComparison.OrdinalIgnoreCase));
-        return fi >= 0 ? fields[fi] : SnobolVal.Null;
+        return fi >= 0 ? fields[fi] : DESCR.Null;
     }
 
-    public void DataSetField(SnobolVal handle, string fieldName, SnobolVal val)
+    public void DataSetField(DESCR handle, string fieldName, DESCR val)
     {
         if (!IsDataObj(handle)) return;
         var (typeName, fields) = _dataObjs[(int)(handle.Int & IDX_MASK)];
@@ -211,22 +211,22 @@ public sealed class SnobolEnv
     // Predefined system variables
     public SnobolEnv()
     {
-        Set("&ANCHOR",   SnobolVal.Of(0L));
-        Set("&TRIM",     SnobolVal.Of(0L));
-        Set("&FULLSCAN", SnobolVal.Of(0L));
-        Set("&STCOUNT",  SnobolVal.Of(0L));
-        Set("&STLIMIT",  SnobolVal.Of(50000L));
-        Set("&ALPHABET", SnobolVal.Of(new string(Enumerable.Range(0, 256).Select(i => (char)i).ToArray())));
-        Set("&UCASE",    SnobolVal.Of("ABCDEFGHIJKLMNOPQRSTUVWXYZ"));
-        Set("&LCASE",    SnobolVal.Of("abcdefghijklmnopqrstuvwxyz"));
-        Set("OUTPUT",    SnobolVal.Null);
-        Set("INPUT",     SnobolVal.Null);
+        Set("&ANCHOR",   DESCR.Of(0L));
+        Set("&TRIM",     DESCR.Of(0L));
+        Set("&FULLSCAN", DESCR.Of(0L));
+        Set("&STCOUNT",  DESCR.Of(0L));
+        Set("&STLIMIT",  DESCR.Of(50000L));
+        Set("&ALPHABET", DESCR.Of(new string(Enumerable.Range(0, 256).Select(i => (char)i).ToArray())));
+        Set("&UCASE",    DESCR.Of("ABCDEFGHIJKLMNOPQRSTUVWXYZ"));
+        Set("&LCASE",    DESCR.Of("abcdefghijklmnopqrstuvwxyz"));
+        Set("OUTPUT",    DESCR.Null);
+        Set("INPUT",     DESCR.Null);
     }
 
-    public SnobolVal Get(string name) =>
-        _vars.TryGetValue(name, out var v) ? v : SnobolVal.Null;
+    public DESCR Get(string name) =>
+        _vars.TryGetValue(name, out var v) ? v : DESCR.Null;
 
-    public void Set(string name, SnobolVal val) =>
+    public void Set(string name, DESCR val) =>
         _vars[name.ToUpperInvariant()] = val;
 
     // User-defined functions: name → (paramNames, localNames, bodyLabel)
@@ -254,25 +254,25 @@ public sealed class SnobolEnv
 
     // ── Builtin dispatch ─────────────────────────────────────────────────────
 
-    public SnobolVal CallBuiltin(string name, SnobolVal[] args)
+    public DESCR CallBuiltin(string name, DESCR[] args)
     {
         return name.ToUpperInvariant() switch
         {
-            "SIZE"    => args.Length >= 1 ? SnobolVal.Of((long)args[0].ToString().Length) : SnobolVal.Of(0L),
+            "SIZE"    => args.Length >= 1 ? DESCR.Of((long)args[0].ToString().Length) : DESCR.Of(0L),
             "DUPL"    => Dupl(args),
             "SUBSTR"  => Substr(args),
             "REPLACE" => Replace(args),
-            "TRIM"    => args.Length >= 1 ? SnobolVal.Of(args[0].ToString().TrimEnd()) : SnobolVal.Null,
-            "LTRIM"   => args.Length >= 1 ? SnobolVal.Of(args[0].ToString().TrimStart()) : SnobolVal.Null,
+            "TRIM"    => args.Length >= 1 ? DESCR.Of(args[0].ToString().TrimEnd()) : DESCR.Null,
+            "LTRIM"   => args.Length >= 1 ? DESCR.Of(args[0].ToString().TrimStart()) : DESCR.Null,
             "LPAD"    => Lpad(args, false),
             "RPAD"    => Lpad(args, true),
             "CONVERT" => Convert_(args),
-            "INTEGER" => args.Length >= 1 && long.TryParse(args[0].ToString(), out var iv) ? SnobolVal.Of(iv) : SnobolVal.Fail,
-            "REAL"    => args.Length >= 1 && double.TryParse(args[0].ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var rv) ? SnobolVal.Of(rv) : SnobolVal.Fail,
-            "STRING"  => args.Length >= 1 ? SnobolVal.Of(args[0].ToString()) : SnobolVal.Null,
-            "DATA"    => args.Length >= 1 ? DataBuiltin(args[0].ToString()) : SnobolVal.Fail,
-            "IDENT"   => (args.Length >= 2 && args[0].ToString() == args[1].ToString()) ? SnobolVal.Null : SnobolVal.Fail,
-            "DIFFER"  => (args.Length >= 2 && args[0].ToString() != args[1].ToString()) ? SnobolVal.Null : SnobolVal.Fail,
+            "INTEGER" => args.Length >= 1 && long.TryParse(args[0].ToString(), out var iv) ? DESCR.Of(iv) : DESCR.Fail,
+            "REAL"    => args.Length >= 1 && double.TryParse(args[0].ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var rv) ? DESCR.Of(rv) : DESCR.Fail,
+            "STRING"  => args.Length >= 1 ? DESCR.Of(args[0].ToString()) : DESCR.Null,
+            "DATA"    => args.Length >= 1 ? DataBuiltin(args[0].ToString()) : DESCR.Fail,
+            "IDENT"   => (args.Length >= 2 && args[0].ToString() == args[1].ToString()) ? DESCR.Null : DESCR.Fail,
+            "DIFFER"  => (args.Length >= 2 && args[0].ToString() != args[1].ToString()) ? DESCR.Null : DESCR.Fail,
             // Numeric predicates — strict: both must be numeric, else Fail
             "LT"      => NumCmp(args, (a,b) => a < b),
             "LE"      => NumCmp(args, (a,b) => a <= b),
@@ -287,118 +287,118 @@ public sealed class SnobolEnv
             "LGE"     => LexCmp(args, c => c >= 0),
             "LEQ"     => LexCmp(args, c => c == 0),
             "LNE"     => LexCmp(args, c => c != 0),
-            "REMDR"   => args.Length >= 2 ? SnobolVal.Of(args[0].ToInt() % Math.Max(1, args[1].ToInt())) : SnobolVal.Fail,
-            "ABS"     => args.Length >= 1 ? SnobolVal.Of(Math.Abs(args[0].ToInt())) : SnobolVal.Fail,
-            "MAX"     => args.Length >= 2 ? SnobolVal.Of(Math.Max(args[0].ToInt(), args[1].ToInt())) : SnobolVal.Fail,
-            "MIN"     => args.Length >= 2 ? SnobolVal.Of(Math.Min(args[0].ToInt(), args[1].ToInt())) : SnobolVal.Fail,
-            "CHAR"    => args.Length >= 1 ? SnobolVal.Of(((char)(int)args[0].ToInt()).ToString()) : SnobolVal.Fail,
-            "ORD"     => args.Length >= 1 && args[0].ToString().Length > 0 ? SnobolVal.Of((long)args[0].ToString()[0]) : SnobolVal.Fail,
-            "REVERSE" => args.Length >= 1 ? SnobolVal.Of(new string(args[0].ToString().Reverse().ToArray())) : SnobolVal.Null,
-            "UPPER"   => args.Length >= 1 ? SnobolVal.Of(args[0].ToString().ToUpperInvariant()) : SnobolVal.Null,
-            "UCASE"   => args.Length >= 1 ? SnobolVal.Of(args[0].ToString().ToUpperInvariant()) : SnobolVal.Null,
-            "LOWER"   => args.Length >= 1 ? SnobolVal.Of(args[0].ToString().ToLowerInvariant()) : SnobolVal.Null,
-            "LCASE"   => args.Length >= 1 ? SnobolVal.Of(args[0].ToString().ToLowerInvariant()) : SnobolVal.Null,
-            "ARRAY"   => args.Length >= 1 ? this.ArrayCreate(args) : SnobolVal.Fail,
+            "REMDR"   => args.Length >= 2 ? DESCR.Of(args[0].ToInt() % Math.Max(1, args[1].ToInt())) : DESCR.Fail,
+            "ABS"     => args.Length >= 1 ? DESCR.Of(Math.Abs(args[0].ToInt())) : DESCR.Fail,
+            "MAX"     => args.Length >= 2 ? DESCR.Of(Math.Max(args[0].ToInt(), args[1].ToInt())) : DESCR.Fail,
+            "MIN"     => args.Length >= 2 ? DESCR.Of(Math.Min(args[0].ToInt(), args[1].ToInt())) : DESCR.Fail,
+            "CHAR"    => args.Length >= 1 ? DESCR.Of(((char)(int)args[0].ToInt()).ToString()) : DESCR.Fail,
+            "ORD"     => args.Length >= 1 && args[0].ToString().Length > 0 ? DESCR.Of((long)args[0].ToString()[0]) : DESCR.Fail,
+            "REVERSE" => args.Length >= 1 ? DESCR.Of(new string(args[0].ToString().Reverse().ToArray())) : DESCR.Null,
+            "UPPER"   => args.Length >= 1 ? DESCR.Of(args[0].ToString().ToUpperInvariant()) : DESCR.Null,
+            "UCASE"   => args.Length >= 1 ? DESCR.Of(args[0].ToString().ToUpperInvariant()) : DESCR.Null,
+            "LOWER"   => args.Length >= 1 ? DESCR.Of(args[0].ToString().ToLowerInvariant()) : DESCR.Null,
+            "LCASE"   => args.Length >= 1 ? DESCR.Of(args[0].ToString().ToLowerInvariant()) : DESCR.Null,
+            "ARRAY"   => args.Length >= 1 ? this.ArrayCreate(args) : DESCR.Fail,
             "TABLE"   => this.TableCreate(),
-            "PROTOTYPE" => args.Length >= 1 ? DataType(args[0]) : SnobolVal.Fail,
-            "DATATYPE"  => args.Length >= 1 ? DataType(args[0]) : SnobolVal.Fail,
-            "TYPE"      => args.Length >= 1 ? DataType(args[0]) : SnobolVal.Fail,
-            "APPLY"   => SnobolVal.Fail,  // stub
-            "EVAL"    => SnobolVal.Fail,  // stub — M-NET-INTERP-B03
-            _         => SnobolVal.Fail
+            "PROTOTYPE" => args.Length >= 1 ? DataType(args[0]) : DESCR.Fail,
+            "DATATYPE"  => args.Length >= 1 ? DataType(args[0]) : DESCR.Fail,
+            "TYPE"      => args.Length >= 1 ? DataType(args[0]) : DESCR.Fail,
+            "APPLY"   => DESCR.Fail,  // stub
+            "EVAL"    => DESCR.Fail,  // stub — M-NET-INTERP-B03
+            _         => DESCR.Fail
         };
     }
 
     // DATATYPE: returns the SNOBOL4 type name — DATA objects use their type name, not "INT"
-    private SnobolVal DataType(SnobolVal v)
+    private DESCR DataType(DESCR v)
     {
-        if (v.IsNull) return SnobolVal.Of("STRING");
-        if (v.IsFail) return SnobolVal.Fail;
-        if (IsTable(v)) return SnobolVal.Of("TABLE");
-        if (IsArray(v)) return SnobolVal.Of("ARRAY");
-        if (IsDataObj(v)) return SnobolVal.Of(_dataObjs[(int)v.Int].TypeName.ToUpperInvariant());
+        if (v.IsNull) return DESCR.Of("STRING");
+        if (v.IsFail) return DESCR.Fail;
+        if (IsTable(v)) return DESCR.Of("TABLE");
+        if (IsArray(v)) return DESCR.Of("ARRAY");
+        if (IsDataObj(v)) return DESCR.Of(_dataObjs[(int)v.Int].TypeName.ToUpperInvariant());
         return v.Type switch
         {
-            DType.Int    => SnobolVal.Of("INTEGER"),
-            DType.Real   => SnobolVal.Of("REAL"),
-            DType.String => SnobolVal.Of("STRING"),
-            _            => SnobolVal.Of("STRING")
+            DType.Int    => DESCR.Of("INTEGER"),
+            DType.Real   => DESCR.Of("REAL"),
+            DType.String => DESCR.Of("STRING"),
+            _            => DESCR.Of("STRING")
         };
     }
 
-    private static SnobolVal Dupl(SnobolVal[] args)
+    private static DESCR Dupl(DESCR[] args)
     {
-        if (args.Length < 2) return SnobolVal.Null;
+        if (args.Length < 2) return DESCR.Null;
         var s = args[0].ToString();
         var n = (int)args[1].ToInt();
-        if (n <= 0) return SnobolVal.Of("");
-        return SnobolVal.Of(string.Concat(Enumerable.Repeat(s, n)));
+        if (n <= 0) return DESCR.Of("");
+        return DESCR.Of(string.Concat(Enumerable.Repeat(s, n)));
     }
 
-    private static SnobolVal Substr(SnobolVal[] args)
+    private static DESCR Substr(DESCR[] args)
     {
-        if (args.Length < 2) return SnobolVal.Fail;
+        if (args.Length < 2) return DESCR.Fail;
         var s   = args[0].ToString();
         var pos = (int)args[1].ToInt() - 1;  // SNOBOL4 is 1-based
-        if (pos < 0 || pos > s.Length) return SnobolVal.Fail;
+        if (pos < 0 || pos > s.Length) return DESCR.Fail;
         if (args.Length >= 3)
         {
             var len = (int)args[2].ToInt();
-            if (pos + len > s.Length) return SnobolVal.Fail;
-            return SnobolVal.Of(s.Substring(pos, len));
+            if (pos + len > s.Length) return DESCR.Fail;
+            return DESCR.Of(s.Substring(pos, len));
         }
-        return SnobolVal.Of(s[pos..]);
+        return DESCR.Of(s[pos..]);
     }
 
-    private static SnobolVal Replace(SnobolVal[] args)
+    private static DESCR Replace(DESCR[] args)
     {
-        if (args.Length < 3) return SnobolVal.Fail;
+        if (args.Length < 3) return DESCR.Fail;
         var s   = args[0].ToString();
         var from = args[1].ToString();
         var to   = args[2].ToString();
-        if (from.Length != to.Length) return SnobolVal.Fail;
+        if (from.Length != to.Length) return DESCR.Fail;
         var result = new System.Text.StringBuilder(s.Length);
         foreach (char c in s)
         {
             int idx = from.IndexOf(c);
             result.Append(idx >= 0 ? to[idx] : c);
         }
-        return SnobolVal.Of(result.ToString());
+        return DESCR.Of(result.ToString());
     }
 
-    private static SnobolVal Lpad(SnobolVal[] args, bool right)
+    private static DESCR Lpad(DESCR[] args, bool right)
     {
-        if (args.Length < 2) return SnobolVal.Fail;
+        if (args.Length < 2) return DESCR.Fail;
         var s = args[0].ToString();
         var n = (int)args[1].ToInt();
         var ch = args.Length >= 3 ? args[2].ToString() : " ";
         var pad = ch.Length > 0 ? ch[0] : ' ';
-        return SnobolVal.Of(right ? s.PadRight(n, pad) : s.PadLeft(n, pad));
+        return DESCR.Of(right ? s.PadRight(n, pad) : s.PadLeft(n, pad));
     }
 
-    private static SnobolVal Convert_(SnobolVal[] args)
+    private static DESCR Convert_(DESCR[] args)
     {
-        if (args.Length < 2) return SnobolVal.Fail;
+        if (args.Length < 2) return DESCR.Fail;
         var val  = args[0];
         var type = args[1].ToString().ToUpperInvariant();
         return type switch
         {
             "INTEGER" => val.Type == DType.Real
-                ? SnobolVal.Of((long)val.Real)
-                : long.TryParse(val.ToString(), out var iv) ? SnobolVal.Of(iv) : SnobolVal.Fail,
+                ? DESCR.Of((long)val.Real)
+                : long.TryParse(val.ToString(), out var iv) ? DESCR.Of(iv) : DESCR.Fail,
             "REAL"    => val.Type == DType.Real
                 ? val
                 : double.TryParse(val.ToString(), System.Globalization.NumberStyles.Float,
-                    System.Globalization.CultureInfo.InvariantCulture, out var rv) ? SnobolVal.Of(rv) : SnobolVal.Fail,
-            "STRING"  => SnobolVal.Of(val.ToString()),
-            _         => SnobolVal.Fail
+                    System.Globalization.CultureInfo.InvariantCulture, out var rv) ? DESCR.Of(rv) : DESCR.Fail,
+            "STRING"  => DESCR.Of(val.ToString()),
+            _         => DESCR.Fail
         };
     }
 
     // Numeric comparison — both args must be numeric (Int or Real), else Fail
-    private static SnobolVal NumCmp(SnobolVal[] args, Func<double,double,bool> pred)
+    private static DESCR NumCmp(DESCR[] args, Func<double,double,bool> pred)
     {
-        if (args.Length < 2) return SnobolVal.Fail;
+        if (args.Length < 2) return DESCR.Fail;
         var a = args[0]; var b = args[1];
         bool aNum = a.Type == DType.Int || a.Type == DType.Real;
         bool bNum = b.Type == DType.Int || b.Type == DType.Real;
@@ -407,17 +407,17 @@ public sealed class SnobolEnv
             System.Globalization.CultureInfo.InvariantCulture, out _)) aNum = true;
         if (!bNum && double.TryParse(b.ToString(), System.Globalization.NumberStyles.Float,
             System.Globalization.CultureInfo.InvariantCulture, out _)) bNum = true;
-        if (!aNum || !bNum) return SnobolVal.Fail;
+        if (!aNum || !bNum) return DESCR.Fail;
         double av = a.Type == DType.Real ? a.Real : (double)a.ToInt();
         double bv = b.Type == DType.Real ? b.Real : (double)b.ToInt();
-        return pred(av, bv) ? args[0] : SnobolVal.Fail;
+        return pred(av, bv) ? args[0] : DESCR.Fail;
     }
 
     // Lexical comparison — compare as strings, return first arg on success
-    private static SnobolVal LexCmp(SnobolVal[] args, Func<int,bool> pred)
+    private static DESCR LexCmp(DESCR[] args, Func<int,bool> pred)
     {
-        if (args.Length < 2) return SnobolVal.Fail;
+        if (args.Length < 2) return DESCR.Fail;
         int cmp = string.Compare(args[0].ToString(), args[1].ToString(), StringComparison.Ordinal);
-        return pred(cmp) ? args[0] : SnobolVal.Fail;
+        return pred(cmp) ? args[0] : DESCR.Fail;
     }
 }

@@ -4,10 +4,10 @@
 // Mirrors execute_program() + interp_eval() in scrip-interp.c
 // and stmt_exec_dyn() in src/runtime/dyn/stmt_exec.c
 //
-// Phase 1: resolve subject → SnobolVal (Σ)
+// Phase 1: resolve subject → DESCR (Σ)
 // Phase 2: PatternBuilder walks IrNode pattern subtree → IByrdBox graph
 // Phase 3: ByrdBoxExecutor.Run() — scan loop (Δ cursor)
-// Phase 4: evaluate replacement IrNode subtree → SnobolVal
+// Phase 4: evaluate replacement IrNode subtree → DESCR
 // Phase 5: splice into subject, commit captures, :S/:F branch
 //
 // AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6
@@ -28,7 +28,7 @@ public sealed class Executor
     private Dictionary<string,int>? _labels;
 
     // Exception types for RETURN / FRETURN / NRETURN
-    private sealed class ReturnException  : Exception { public SnobolVal Value; public ReturnException(SnobolVal v) : base() { Value = v; } }
+    private sealed class ReturnException  : Exception { public DESCR Value; public ReturnException(DESCR v) : base() { Value = v; } }
     private sealed class FReturnException : Exception { public FReturnException() : base() { } }
     private sealed class NReturnException : Exception { public string VarName; public NReturnException(string n) : base() { VarName = n; } }
 
@@ -37,7 +37,7 @@ public sealed class Executor
     {
         public required string     FuncName   { get; init; }
         public required string[]   SavedNames { get; init; }
-        public required SnobolVal[] SavedVals  { get; init; }
+        public required DESCR[] SavedVals  { get; init; }
     }
     private readonly Stack<CallFrame> _callStack = new();
 
@@ -91,7 +91,7 @@ public sealed class Executor
 
         // ── Phase 1: resolve subject ─────────────────────────────────────────
         string?   subjName = null;
-        SnobolVal subjVal  = SnobolVal.Null;
+        DESCR subjVal  = DESCR.Null;
 
         if (stmt.Subject != null)
         {
@@ -109,7 +109,7 @@ public sealed class Executor
         // ── Assignment only (no pattern) ─────────────────────────────────────
         if (stmt.Pattern == null && stmt.HasEq)
         {
-            var replVal = stmt.Replacement != null ? EvalNode(stmt.Replacement) : SnobolVal.Null;
+            var replVal = stmt.Replacement != null ? EvalNode(stmt.Replacement) : DESCR.Null;
             if (replVal.IsFail) return false;
 
             if (subjName == "OUTPUT")
@@ -148,7 +148,7 @@ public sealed class Executor
                 var baseNode = stmt.Subject.Children[0];
                 var idxVal   = EvalNode(stmt.Subject.Children[1]);
 
-                SnobolVal container;
+                DESCR container;
                 if (baseNode.Kind == IrKind.E_VAR)
                     container = _env.Get(baseNode.SVal!);
                 else if (baseNode.Kind == IrKind.E_INDIRECT)
@@ -171,18 +171,18 @@ public sealed class Executor
         {
             // Phase 2: build box graph
             var builder = new PatternBuilder(
-                setVar:        (n, v) => _env.Set(n, SnobolVal.Of(v)),
+                setVar:        (n, v) => _env.Set(n, DESCR.Of(v)),
                 getStringVar:  n      => _env.Get(n).ToString(),
                 getPatternVar: n      => {
                     var patIr = _env.GetPattern(n);
                     if (patIr == null) return null;
                     var inner = new PatternBuilder(
-                        setVar:        (vn, v) => _env.Set(vn, SnobolVal.Of(v)),
+                        setVar:        (vn, v) => _env.Set(vn, DESCR.Of(v)),
                         getStringVar:  vn      => _env.Get(vn).ToString(),
                         getPatternVar: vn      => {
                             var pi = _env.GetPattern(vn);
                             return pi == null ? null : new PatternBuilder(
-                                (vn2, v2) => _env.Set(vn2, SnobolVal.Of(v2)),
+                                (vn2, v2) => _env.Set(vn2, DESCR.Of(v2)),
                                 vn2 => _env.Get(vn2).ToString(),
                                 _ => null,
                                 EvalNode).Build(pi);
@@ -207,10 +207,10 @@ public sealed class Executor
             if (!result.Success) return false;
 
             // Phase 4: evaluate replacement
-            SnobolVal? replVal = null;
+            DESCR? replVal = null;
             if (stmt.HasEq)
             {
-                var rv = stmt.Replacement != null ? EvalNode(stmt.Replacement) : SnobolVal.Of("");
+                var rv = stmt.Replacement != null ? EvalNode(stmt.Replacement) : DESCR.Of("");
                 if (rv.IsFail) return false;
                 replVal = rv;
             }
@@ -221,7 +221,7 @@ public sealed class Executor
                 var newSubj = subject[..result.MatchStart]
                             + replVal.ToString()
                             + subject[(result.MatchStart + result.MatchLength)..];
-                _env.Set(subjName, SnobolVal.Of(newSubj));
+                _env.Set(subjName, DESCR.Of(newSubj));
             }
 
             return true;
@@ -234,16 +234,16 @@ public sealed class Executor
 
     // ── Expression evaluator ─────────────────────────────────────────────────
 
-    public SnobolVal EvalNode(IrNode? n)
+    public DESCR EvalNode(IrNode? n)
     {
-        if (n == null) return SnobolVal.Null;
+        if (n == null) return DESCR.Null;
 
         return n.Kind switch
         {
-            IrKind.E_QLIT    => SnobolVal.Of(n.SVal ?? ""),
-            IrKind.E_ILIT    => SnobolVal.Of(n.IVal),
-            IrKind.E_FLIT    => SnobolVal.Of(n.DVal),
-            IrKind.E_NUL     => SnobolVal.Null,
+            IrKind.E_QLIT    => DESCR.Of(n.SVal ?? ""),
+            IrKind.E_ILIT    => DESCR.Of(n.IVal),
+            IrKind.E_FLIT    => DESCR.Of(n.DVal),
+            IrKind.E_NUL     => DESCR.Null,
 
             IrKind.E_VAR     => EvalVar(n.SVal!),
             IrKind.E_KEYWORD => _env.Get("&" + n.SVal!),
@@ -268,32 +268,32 @@ public sealed class Executor
             IrKind.E_ASSIGN  => EvalAssign(n),
 
             // Captures in value context — evaluate inner expression only
-            IrKind.E_CAPT_COND_ASGN  => n.Children.Length > 0 ? EvalNode(n.Children[0]) : SnobolVal.Null,
-            IrKind.E_CAPT_IMMED_ASGN => n.Children.Length > 0 ? EvalNode(n.Children[0]) : SnobolVal.Null,
-            IrKind.E_CAPT_CURSOR     => SnobolVal.Null,
-            IrKind.E_DEFER           => n.Children.Length > 0 ? EvalNode(n.Children[0]) : SnobolVal.Null,
+            IrKind.E_CAPT_COND_ASGN  => n.Children.Length > 0 ? EvalNode(n.Children[0]) : DESCR.Null,
+            IrKind.E_CAPT_IMMED_ASGN => n.Children.Length > 0 ? EvalNode(n.Children[0]) : DESCR.Null,
+            IrKind.E_CAPT_CURSOR     => DESCR.Null,
+            IrKind.E_DEFER           => n.Children.Length > 0 ? EvalNode(n.Children[0]) : DESCR.Null,
 
             // ALT in value context — evaluate left (shouldn't normally appear)
-            IrKind.E_ALT     => n.Children.Length > 0 ? EvalNode(n.Children[0]) : SnobolVal.Null,
+            IrKind.E_ALT     => n.Children.Length > 0 ? EvalNode(n.Children[0]) : DESCR.Null,
 
-            IrKind.E_NAME    => n.Children.Length > 0 ? EvalNode(n.Children[0]) : SnobolVal.Null,
+            IrKind.E_NAME    => n.Children.Length > 0 ? EvalNode(n.Children[0]) : DESCR.Null,
 
-            _ => SnobolVal.Null
+            _ => DESCR.Null
         };
     }
 
-    private SnobolVal EvalVar(string name)
+    private DESCR EvalVar(string name)
     {
-        if (name == "OUTPUT") return SnobolVal.Null;
+        if (name == "OUTPUT") return DESCR.Null;
         if (name == "INPUT")
         {
             var line = _input.ReadLine();
-            return line == null ? SnobolVal.Fail : SnobolVal.Of(line);
+            return line == null ? DESCR.Fail : DESCR.Of(line);
         }
         return _env.Get(name);
     }
 
-    private SnobolVal EvalCat(IrNode n)
+    private DESCR EvalCat(IrNode n)
     {
         // n-ary: right-recursive tree, flatten and concat
         var sb = new System.Text.StringBuilder();
@@ -306,15 +306,15 @@ public sealed class Executor
             else sb.Append(EvalNode(node).ToString());
         }
         Collect(n);
-        return SnobolVal.Of(sb.ToString());
+        return DESCR.Of(sb.ToString());
     }
 
-    private SnobolVal Arith(IrNode n, char op)
+    private DESCR Arith(IrNode n, char op)
     {
-        if (n.Children.Length < 2) return SnobolVal.Fail;
+        if (n.Children.Length < 2) return DESCR.Fail;
         var a = EvalNode(n.Children[0]);
         var b = EvalNode(n.Children[1]);
-        if (a.IsFail || b.IsFail) return SnobolVal.Fail;
+        if (a.IsFail || b.IsFail) return DESCR.Fail;
         bool useReal = a.Type == DType.Real || b.Type == DType.Real;
         if (useReal)
         {
@@ -322,13 +322,13 @@ public sealed class Executor
             double bv = b.Type == DType.Real ? b.Real : b.ToInt();
             return op switch
             {
-                '+' => SnobolVal.Of(av + bv),
-                '-' => SnobolVal.Of(av - bv),
-                '*' => SnobolVal.Of(av * bv),
-                '/' => bv == 0 ? SnobolVal.Fail : SnobolVal.Of(av / bv),
-                '^' => SnobolVal.Of(Math.Pow(av, bv)),
-                '%' => bv == 0 ? SnobolVal.Fail : SnobolVal.Of(av % bv),
-                _   => SnobolVal.Fail
+                '+' => DESCR.Of(av + bv),
+                '-' => DESCR.Of(av - bv),
+                '*' => DESCR.Of(av * bv),
+                '/' => bv == 0 ? DESCR.Fail : DESCR.Of(av / bv),
+                '^' => DESCR.Of(Math.Pow(av, bv)),
+                '%' => bv == 0 ? DESCR.Fail : DESCR.Of(av % bv),
+                _   => DESCR.Fail
             };
         }
         else
@@ -336,26 +336,26 @@ public sealed class Executor
             long av = a.ToInt(), bv = b.ToInt();
             return op switch
             {
-                '+' => SnobolVal.Of(av + bv),
-                '-' => SnobolVal.Of(av - bv),
-                '*' => SnobolVal.Of(av * bv),
-                '/' => bv == 0 ? SnobolVal.Fail : SnobolVal.Of(av / bv),
-                '^' => SnobolVal.Of((long)Math.Pow(av, bv)),
-                '%' => bv == 0 ? SnobolVal.Fail : SnobolVal.Of(av % bv),
-                _   => SnobolVal.Fail
+                '+' => DESCR.Of(av + bv),
+                '-' => DESCR.Of(av - bv),
+                '*' => DESCR.Of(av * bv),
+                '/' => bv == 0 ? DESCR.Fail : DESCR.Of(av / bv),
+                '^' => DESCR.Of((long)Math.Pow(av, bv)),
+                '%' => bv == 0 ? DESCR.Fail : DESCR.Of(av % bv),
+                _   => DESCR.Fail
             };
         }
     }
 
-    private SnobolVal Negate(IrNode n)
+    private DESCR Negate(IrNode n)
     {
-        if (n.Children.Length == 0) return SnobolVal.Fail;
+        if (n.Children.Length == 0) return DESCR.Fail;
         var v = EvalNode(n.Children[0]);
-        if (v.IsFail) return SnobolVal.Fail;
-        return v.Type == DType.Real ? SnobolVal.Of(-v.Real) : SnobolVal.Of(-v.ToInt());
+        if (v.IsFail) return DESCR.Fail;
+        return v.Type == DType.Real ? DESCR.Of(-v.Real) : DESCR.Of(-v.ToInt());
     }
 
-    private SnobolVal EvalFnc(IrNode n)
+    private DESCR EvalFnc(IrNode n)
     {
         var name = n.SVal?.ToUpperInvariant() ?? "";
         var args = n.Children;
@@ -366,13 +366,13 @@ public sealed class Executor
             var entry = args.Length >= 2 ? EvalNode(args[1]).ToString() : null;
             if (!string.IsNullOrEmpty(spec))
                 _env.DefineFunc(spec, string.IsNullOrEmpty(entry) ? null : entry);
-            return SnobolVal.Null;
+            return DESCR.Null;
         }
 
         if (name == "OUTPUT")
         {
             if (args.Length >= 1) _output.WriteLine(EvalNode(args[0]).ToString());
-            return SnobolVal.Null;
+            return DESCR.Null;
         }
 
         var funcDef = _env.GetFunc(name);
@@ -397,15 +397,15 @@ public sealed class Executor
         return _env.CallBuiltin(name, evalArgs);
     }
 
-    private SnobolVal EvalIdx(IrNode n)
+    private DESCR EvalIdx(IrNode n)
     {
         // Children[0] = base var, [1..] = indices
-        if (n.Children.Length < 2) return SnobolVal.Null;
+        if (n.Children.Length < 2) return DESCR.Null;
         var baseNode = n.Children[0];
         var idxVal   = EvalNode(n.Children[1]);
 
         // Resolve base — may be a direct var, indirect ($var), or a handle
-        SnobolVal baseVal;
+        DESCR baseVal;
         string?   baseName = null;
         if (baseNode.Kind == IrKind.E_VAR)
         {
@@ -425,12 +425,12 @@ public sealed class Executor
         if (_env.IsArray(baseVal))   return _env.ArrayGet(baseVal, idxVal.ToInt());
         if (_env.IsTable(baseVal))   return _env.TableGet(baseVal, idxVal.ToString());
         if (_env.IsDataObj(baseVal)) return _env.DataGetField(baseVal, idxVal.ToString());
-        return SnobolVal.Null;
+        return DESCR.Null;
     }
 
-    private SnobolVal EvalAssign(IrNode n)
+    private DESCR EvalAssign(IrNode n)
     {
-        if (n.Children.Length < 2) return SnobolVal.Null;
+        if (n.Children.Length < 2) return DESCR.Null;
         var val = EvalNode(n.Children[1]);
         var target = n.Children[0];
         if (target.Kind == IrKind.E_VAR) _env.Set(target.SVal!, val);
@@ -439,26 +439,26 @@ public sealed class Executor
 
     // ── User function call ────────────────────────────────────────────────────
 
-    private SnobolVal CallUserFunc(string name, SnobolEnv.FuncDef def, SnobolVal[] args)
+    private DESCR CallUserFunc(string name, SnobolEnv.FuncDef def, DESCR[] args)
     {
-        if (_callStack.Count > 256) return SnobolVal.Fail;
+        if (_callStack.Count > 256) return DESCR.Fail;
 
         var allNames = new[] { name }.Concat(def.Params).Concat(def.Locals).ToArray();
         var saved    = allNames.Select(n => _env.Get(n)).ToArray();
 
-        _env.Set(name, SnobolVal.Null);
+        _env.Set(name, DESCR.Null);
         for (int i = 0; i < def.Params.Length; i++)
-            _env.Set(def.Params[i], i < args.Length ? args[i] : SnobolVal.Null);
+            _env.Set(def.Params[i], i < args.Length ? args[i] : DESCR.Null);
         foreach (var loc in def.Locals)
-            _env.Set(loc, SnobolVal.Null);
+            _env.Set(loc, DESCR.Null);
 
         _callStack.Push(new CallFrame { FuncName = name, SavedNames = allNames, SavedVals = saved });
 
-        SnobolVal retval = SnobolVal.Null;
+        DESCR retval = DESCR.Null;
         try   { retval = RunBody(def.BodyLabel); }
         catch (ReturnException rx)  { retval = rx.Value; }
-        catch (FReturnException)    { retval = SnobolVal.Fail; }
-        catch (NReturnException nx) { retval = SnobolVal.Of(nx.VarName); }
+        catch (FReturnException)    { retval = DESCR.Fail; }
+        catch (NReturnException nx) { retval = DESCR.Of(nx.VarName); }
         finally
         {
             var frame = _callStack.Pop();
@@ -468,10 +468,10 @@ public sealed class Executor
         return retval;
     }
 
-    private SnobolVal RunBody(string entryLabel)
+    private DESCR RunBody(string entryLabel)
     {
-        if (_program == null || _labels == null) return SnobolVal.Null;
-        if (!_labels.TryGetValue(entryLabel, out int pc)) return SnobolVal.Null;
+        if (_program == null || _labels == null) return DESCR.Null;
+        if (!_labels.TryGetValue(entryLabel, out int pc)) return DESCR.Null;
 
         int limit = 1_000_000;
         while (pc < _program.Length && limit-- > 0)
