@@ -14,15 +14,15 @@ public sealed class bb_interr : IByrdBox
 
     public bb_interr(IByrdBox child) { _child = child; }
 
-    public Spec Alpha(MatchState ms)
+    public Spec α(MatchState ms)
     {
         int saved = ms.Cursor;
-        var cr = _child.Alpha(ms);
+        var cr = _child.α(ms);
         ms.Cursor = saved;                            // always restore cursor
 
         if (cr.IsFail) return Spec.Fail;              // child_ω → INT_ω
         return Spec.ZeroWidth(ms.Cursor);             // child_γ → INT_γ (zero-width)
     }
 
-    public Spec Beta(MatchState ms) => Spec.Fail;    // INT_ω
+    public Spec β(MatchState ms) => Spec.Fail;    // INT_ω
 }

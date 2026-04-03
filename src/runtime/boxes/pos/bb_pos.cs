@@ -11,11 +11,11 @@ public sealed class bb_pos : IByrdBox
     private readonly int _n;
     public bb_pos(int n) { _n = n; }
 
-    public Spec Alpha(MatchState ms)
+    public Spec α(MatchState ms)
     {
         if (ms.Cursor != _n) return Spec.Fail;
         return Spec.ZeroWidth(ms.Cursor);
     }
 
-    public Spec Beta(MatchState ms) => Spec.Fail;
+    public Spec β(MatchState ms) => Spec.Fail;
 }

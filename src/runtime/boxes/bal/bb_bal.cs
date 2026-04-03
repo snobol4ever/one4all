@@ -14,7 +14,7 @@ public sealed class bb_bal : IByrdBox
 {
     private int _matchedLen;
 
-    public Spec Alpha(MatchState ms)
+    public Spec α(MatchState ms)
     {
         int pos   = ms.Cursor;
         int depth = 0;
@@ -45,7 +45,7 @@ public sealed class bb_bal : IByrdBox
         return result;
     }
 
-    public Spec Beta(MatchState ms)
+    public Spec β(MatchState ms)
     {
         ms.Cursor -= _matchedLen;
         return Spec.Fail;

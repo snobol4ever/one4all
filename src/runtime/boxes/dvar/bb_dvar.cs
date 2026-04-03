@@ -22,17 +22,17 @@ public sealed class bb_dvar : IByrdBox
 
     public bb_dvar(string varname) { _varname = varname ?? ""; }
 
-    public Spec Alpha(MatchState ms)
+    public Spec α(MatchState ms)
     {
         RebuildChild();
         if (_child == null) return Spec.Fail;
-        return _child.Alpha(ms);
+        return _child.α(ms);
     }
 
-    public Spec Beta(MatchState ms)
+    public Spec β(MatchState ms)
     {
         if (_child == null) return Spec.Fail;
-        return _child.Beta(ms);
+        return _child.β(ms);
     }
 
     private void RebuildChild()

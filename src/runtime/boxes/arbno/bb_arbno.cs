@@ -26,7 +26,7 @@ public sealed class bb_arbno : IByrdBox
 
     public bb_arbno(IByrdBox body) { _body = body; }
 
-    public Spec Alpha(MatchState ms)
+    public Spec α(MatchState ms)
     {
         _depth = 0;
         _matchedStack[0] = Spec.ZeroWidth(ms.Cursor);
@@ -35,7 +35,7 @@ public sealed class bb_arbno : IByrdBox
         while (true)
         {
             int startHere = ms.Cursor;
-            var br = _body.Alpha(ms);
+            var br = _body.α(ms);
 
             if (br.IsFail)
             {
@@ -65,7 +65,7 @@ public sealed class bb_arbno : IByrdBox
         }
     }
 
-    public Spec Beta(MatchState ms)
+    public Spec β(MatchState ms)
     {
         if (_depth <= 0) return Spec.Fail;           // ARBNO_ω
         _depth--;

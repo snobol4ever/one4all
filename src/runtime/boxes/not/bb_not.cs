@@ -14,15 +14,15 @@ public sealed class bb_not : IByrdBox
 
     public bb_not(IByrdBox child) { _child = child; }
 
-    public Spec Alpha(MatchState ms)
+    public Spec α(MatchState ms)
     {
         int saved = ms.Cursor;
-        var cr = _child.Alpha(ms);
+        var cr = _child.α(ms);
         ms.Cursor = saved;                            // always restore
 
         if (!cr.IsFail) return Spec.Fail;             // child_γ → NOT_ω
         return Spec.ZeroWidth(ms.Cursor);             // child_ω → NOT_γ
     }
 
-    public Spec Beta(MatchState ms) => Spec.Fail;    // NOT_ω
+    public Spec β(MatchState ms) => Spec.Fail;    // NOT_ω
 }

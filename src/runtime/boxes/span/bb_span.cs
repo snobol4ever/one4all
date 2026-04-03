@@ -14,7 +14,7 @@ public sealed class bb_span : IByrdBox
 
     public bb_span(string chars) { _chars = chars ?? ""; }
 
-    public Spec Alpha(MatchState ms)
+    public Spec α(MatchState ms)
     {
         _count = 0;
         while (ms.CharInSet(ms.Cursor + _count, _chars)) _count++;
@@ -24,7 +24,7 @@ public sealed class bb_span : IByrdBox
         return result;
     }
 
-    public Spec Beta(MatchState ms)
+    public Spec β(MatchState ms)
     {
         ms.Cursor -= _count;
         return Spec.Fail;

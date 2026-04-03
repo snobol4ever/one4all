@@ -15,7 +15,7 @@ public sealed class bb_breakx : IByrdBox
 
     public bb_breakx(string chars) { _chars = chars ?? ""; }
 
-    public Spec Alpha(MatchState ms)
+    public Spec α(MatchState ms)
     {
         _count = 0;
         while (ms.Cursor + _count < ms.Length &&
@@ -28,7 +28,7 @@ public sealed class bb_breakx : IByrdBox
         return result;
     }
 
-    public Spec Beta(MatchState ms)
+    public Spec β(MatchState ms)
     {
         ms.Cursor -= _count;
         return Spec.Fail;

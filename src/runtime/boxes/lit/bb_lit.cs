@@ -19,7 +19,7 @@ public sealed class bb_lit : IByrdBox
         _len = _lit.Length;
     }
 
-    public Spec Alpha(MatchState ms)
+    public Spec α(MatchState ms)
     {
         if (ms.Cursor + _len > ms.Length)             return Spec.Fail;
         if (!ms.MatchesAt(ms.Cursor, _lit))            return Spec.Fail;
@@ -28,7 +28,7 @@ public sealed class bb_lit : IByrdBox
         return result;                                 // γ
     }
 
-    public Spec Beta(MatchState ms)
+    public Spec β(MatchState ms)
     {
         ms.Cursor -= _len;
         return Spec.Fail;                              // ω

@@ -25,38 +25,38 @@ public sealed class bb_seq : IByrdBox
         _right = right;
     }
 
-    public Spec Alpha(MatchState ms)
+    public Spec α(MatchState ms)
     {
         _matched = Spec.ZeroWidth(ms.Cursor);
-        return TryLeft(ms, fromAlpha: true);
+        return TryLeft(ms, fromα: true);
     }
 
-    public Spec Beta(MatchState ms)
+    public Spec β(MatchState ms)
     {
-        return TryRight(ms, fromAlpha: false);
+        return TryRight(ms, fromα: false);
     }
 
     // ── internal state machine ──────────────────────────────────────────
 
-    private Spec TryLeft(MatchState ms, bool fromAlpha)
+    private Spec TryLeft(MatchState ms, bool fromα)
     {
-        var lr = fromAlpha ? _left.Alpha(ms) : _left.Beta(ms);
+        var lr = fromα ? _left.α(ms) : _left.β(ms);
         if (lr.IsFail) return Spec.Fail;                    // left_ω → SEQ_ω
         // left_γ
         _matched = _matched.Cat(lr);
-        return TryRight(ms, fromAlpha: true);
+        return TryRight(ms, fromα: true);
     }
 
-    private Spec TryRight(MatchState ms, bool fromAlpha)
+    private Spec TryRight(MatchState ms, bool fromα)
     {
         while (true)
         {
-            var rr = fromAlpha ? _right.Alpha(ms) : _right.Beta(ms);
+            var rr = fromα ? _right.α(ms) : _right.β(ms);
             if (!rr.IsFail)
                 return _matched.Cat(rr);                    // right_γ → SEQ_γ
 
             // right_ω → retry left with β
-            var lr = _left.Beta(ms);
+            var lr = _left.β(ms);
             if (lr.IsFail) return Spec.Fail;                // left_ω → SEQ_ω
             _matched = _matched.Cat(lr);
             fromAlpha = true;                               // left_γ → retry right.α

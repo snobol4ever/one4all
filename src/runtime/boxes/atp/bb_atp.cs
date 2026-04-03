@@ -15,12 +15,12 @@ public sealed class bb_atp : IByrdBox
 
     public bb_atp(string varname) { _varname = varname ?? ""; }
 
-    public Spec Alpha(MatchState ms)
+    public Spec α(MatchState ms)
     {
         if (!string.IsNullOrEmpty(_varname))
             SetVar?.Invoke(_varname, ms.Cursor.ToString());
         return Spec.ZeroWidth(ms.Cursor);             // ATP_γ
     }
 
-    public Spec Beta(MatchState ms) => Spec.Fail;    // ATP_ω
+    public Spec β(MatchState ms) => Spec.Fail;    // ATP_ω
 }

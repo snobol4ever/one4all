@@ -10,12 +10,12 @@ public sealed class bb_eps : IByrdBox
 {
     private bool _done;
 
-    public Spec Alpha(MatchState ms)
+    public Spec α(MatchState ms)
     {
         if (_done) return Spec.Fail;
         _done = true;
         return Spec.ZeroWidth(ms.Cursor);
     }
 
-    public Spec Beta(MatchState ms) => Spec.Fail;
+    public Spec β(MatchState ms) => Spec.Fail;
 }

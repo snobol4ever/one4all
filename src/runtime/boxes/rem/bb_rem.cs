@@ -8,12 +8,12 @@ namespace Snobol4.Runtime.Boxes;
 
 public sealed class bb_rem : IByrdBox
 {
-    public Spec Alpha(MatchState ms)
+    public Spec α(MatchState ms)
     {
         var result = Spec.Of(ms.Cursor, ms.Length - ms.Cursor);
         ms.Cursor  = ms.Length;
         return result;
     }
 
-    public Spec Beta(MatchState ms) => Spec.Fail;
+    public Spec β(MatchState ms) => Spec.Fail;
 }

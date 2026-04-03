@@ -3,7 +3,7 @@
 // Defines:
 //   Spec        — valuetype (mirrors spec_t: start/length, Fail sentinel)
 //   MatchState  — class (mirrors C globals Σ/Δ/Ω: subject string + cursor)
-//   IByrdBox    — interface (Alpha/Beta entry ports)
+//   IByrdBox    — interface (α/β entry ports)
 //
 // Assemble as part of boxes.dll:
 //   ilasm /dll /output:boxes.dll bb_box.il bb_executor.il bb_lit.il ...
@@ -212,9 +212,9 @@
 {
   .method public virtual abstract instance
           valuetype Snobol4.Runtime.Boxes.Spec
-          Alpha(class Snobol4.Runtime.Boxes.MatchState ms) cil managed {}
+          α(class Snobol4.Runtime.Boxes.MatchState ms) cil managed {}
 
   .method public virtual abstract instance
           valuetype Snobol4.Runtime.Boxes.Spec
-          Beta(class Snobol4.Runtime.Boxes.MatchState ms) cil managed {}
+          β(class Snobol4.Runtime.Boxes.MatchState ms) cil managed {}
 }

@@ -128,12 +128,12 @@
     ldloc.2
     stloc      4
 
-    // r = _root.Alpha(ms)
+    // r = _root.α(ms)
     ldarg.0
     ldfld      class Snobol4.Runtime.Boxes.IByrdBox Snobol4.Runtime.Boxes.ByrdBoxExecutor::_root
     ldarg.1
     callvirt   instance valuetype Snobol4.Runtime.Boxes.Spec
-               Snobol4.Runtime.Boxes.IByrdBox::Alpha(class Snobol4.Runtime.Boxes.MatchState)
+               Snobol4.Runtime.Boxes.IByrdBox::α(class Snobol4.Runtime.Boxes.MatchState)
     stloc.3
 
     // if !r.IsFail → success
@@ -156,12 +156,12 @@
     ret
 
   RUN_TRY_BETA:
-    // r = _root.Beta(ms)
+    // r = _root.β(ms)
     ldarg.0
     ldfld      class Snobol4.Runtime.Boxes.IByrdBox Snobol4.Runtime.Boxes.ByrdBoxExecutor::_root
     ldarg.1
     callvirt   instance valuetype Snobol4.Runtime.Boxes.Spec
-               Snobol4.Runtime.Boxes.IByrdBox::Beta(class Snobol4.Runtime.Boxes.MatchState)
+               Snobol4.Runtime.Boxes.IByrdBox::β(class Snobol4.Runtime.Boxes.MatchState)
     stloc.3
 
     ldloca.s   V_r

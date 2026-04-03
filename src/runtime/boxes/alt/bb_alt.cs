@@ -21,13 +21,13 @@ public sealed class bb_alt : IByrdBox
         _children = children ?? [];
     }
 
-    public Spec Alpha(MatchState ms)
+    public Spec α(MatchState ms)
     {
         _savedPos = ms.Cursor;
         for (int i = 0; i < _children.Length; i++)
         {
             ms.Cursor = _savedPos;                   // restore for each arm
-            var cr = _children[i].Alpha(ms);
+            var cr = _children[i].α(ms);
             if (!cr.IsFail)
             {
                 _current = i;
@@ -39,10 +39,10 @@ public sealed class bb_alt : IByrdBox
         return Spec.Fail;                            // ALT_ω
     }
 
-    public Spec Beta(MatchState ms)
+    public Spec β(MatchState ms)
     {
         // β retries the same child only (mirrors bb_alt.c ALT_β)
-        var cr = _children[_current].Beta(ms);
+        var cr = _children[_current].β(ms);
         if (!cr.IsFail) return cr;                   // child_β_γ → ALT_γ
         return Spec.Fail;                            // ALT_ω
     }

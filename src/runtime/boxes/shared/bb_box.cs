@@ -73,6 +73,6 @@ public sealed class MatchState
 
 public interface IByrdBox
 {
-    Spec Alpha(MatchState ms);   // α port — fresh entry
-    Spec Beta(MatchState ms);    // β port — backtrack
+    Spec α(MatchState ms);   // α port — fresh entry
+    Spec β(MatchState ms);    // β port — backtrack
 }

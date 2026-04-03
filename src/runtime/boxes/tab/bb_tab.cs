@@ -13,7 +13,7 @@ public sealed class bb_tab : IByrdBox
 
     public bb_tab(int n) { _n = n; }
 
-    public Spec Alpha(MatchState ms)
+    public Spec α(MatchState ms)
     {
         if (ms.Cursor > _n) return Spec.Fail;
         _advance = _n - ms.Cursor;
@@ -22,7 +22,7 @@ public sealed class bb_tab : IByrdBox
         return result;
     }
 
-    public Spec Beta(MatchState ms)
+    public Spec β(MatchState ms)
     {
         ms.Cursor -= _advance;
         return Spec.Fail;

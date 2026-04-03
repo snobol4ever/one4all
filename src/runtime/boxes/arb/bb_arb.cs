@@ -12,7 +12,7 @@ public sealed class bb_arb : IByrdBox
     private int _count;
     private int _start;
 
-    public Spec Alpha(MatchState ms)
+    public Spec α(MatchState ms)
     {
         _count = 0;
         _start = ms.Cursor;
@@ -20,7 +20,7 @@ public sealed class bb_arb : IByrdBox
         return Spec.ZeroWidth(ms.Cursor);
     }
 
-    public Spec Beta(MatchState ms)
+    public Spec β(MatchState ms)
     {
         _count++;
         if (_start + _count > ms.Length) return Spec.Fail;

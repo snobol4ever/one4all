@@ -11,7 +11,7 @@ public sealed class bb_len : IByrdBox
     private readonly int _n;
     public bb_len(int n) { _n = n; }
 
-    public Spec Alpha(MatchState ms)
+    public Spec α(MatchState ms)
     {
         if (ms.Cursor + _n > ms.Length)  return Spec.Fail;
         var result = Spec.Of(ms.Cursor, _n);
@@ -19,7 +19,7 @@ public sealed class bb_len : IByrdBox
         return result;
     }
 
-    public Spec Beta(MatchState ms)
+    public Spec β(MatchState ms)
     {
         ms.Cursor -= _n;
         return Spec.Fail;

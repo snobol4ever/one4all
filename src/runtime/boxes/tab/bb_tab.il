@@ -16,7 +16,7 @@
     ret
   }
   .method public virtual instance valuetype Snobol4.Runtime.Boxes.Spec
-          Alpha(class Snobol4.Runtime.Boxes.MatchState ms) cil managed
+          α(class Snobol4.Runtime.Boxes.MatchState ms) cil managed
   {
     .maxstack 3
     .locals init (valuetype Snobol4.Runtime.Boxes.Spec V_r)
@@ -49,7 +49,7 @@
     ret
   }
   .method public virtual instance valuetype Snobol4.Runtime.Boxes.Spec
-          Beta(class Snobol4.Runtime.Boxes.MatchState ms) cil managed
+          β(class Snobol4.Runtime.Boxes.MatchState ms) cil managed
   {
     .maxstack 3
     ldarg.1
@@ -80,7 +80,7 @@
     ret
   }
   .method public virtual instance valuetype Snobol4.Runtime.Boxes.Spec
-          Alpha(class Snobol4.Runtime.Boxes.MatchState ms) cil managed
+          α(class Snobol4.Runtime.Boxes.MatchState ms) cil managed
   {
     .maxstack 4
     .locals init (int32 V_target, valuetype Snobol4.Runtime.Boxes.Spec V_r)
@@ -116,7 +116,7 @@
     ret
   }
   .method public virtual instance valuetype Snobol4.Runtime.Boxes.Spec
-          Beta(class Snobol4.Runtime.Boxes.MatchState ms) cil managed
+          β(class Snobol4.Runtime.Boxes.MatchState ms) cil managed
   {
     .maxstack 3
     ldarg.1

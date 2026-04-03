@@ -29,9 +29,9 @@
     ret
   }
 
-  // ── Alpha ───────────────────────────────────────────────────────────────
+  // ── α ───────────────────────────────────────────────────────────────
   .method public virtual instance valuetype Snobol4.Runtime.Boxes.Spec
-          Alpha(class Snobol4.Runtime.Boxes.MatchState ms) cil managed
+          α(class Snobol4.Runtime.Boxes.MatchState ms) cil managed
   {
     .maxstack 4
     .locals init (valuetype Snobol4.Runtime.Boxes.Spec V_lr,
@@ -46,12 +46,12 @@
     ldc.i4.0
     stfld      int32 Snobol4.Runtime.Boxes.BbSeq::_mLen
 
-    // lr = _left.Alpha(ms)
+    // lr = _left.α(ms)
     ldarg.0
     ldfld      class Snobol4.Runtime.Boxes.IByrdBox Snobol4.Runtime.Boxes.BbSeq::_left
     ldarg.1
     callvirt   instance valuetype Snobol4.Runtime.Boxes.Spec
-               Snobol4.Runtime.Boxes.IByrdBox::Alpha(class Snobol4.Runtime.Boxes.MatchState)
+               Snobol4.Runtime.Boxes.IByrdBox::α(class Snobol4.Runtime.Boxes.MatchState)
     stloc.0
     ldloca.s   V_lr
     call       instance bool Snobol4.Runtime.Boxes.Spec::get_IsFail()
@@ -67,29 +67,29 @@
     stfld      int32 Snobol4.Runtime.Boxes.BbSeq::_mLen
 
   SEQ_A_TRY_RIGHT:
-    // rr = _right.Alpha(ms)
+    // rr = _right.α(ms)
     ldarg.0
     ldfld      class Snobol4.Runtime.Boxes.IByrdBox Snobol4.Runtime.Boxes.BbSeq::_right
     ldarg.1
     callvirt   instance valuetype Snobol4.Runtime.Boxes.Spec
-               Snobol4.Runtime.Boxes.IByrdBox::Alpha(class Snobol4.Runtime.Boxes.MatchState)
+               Snobol4.Runtime.Boxes.IByrdBox::α(class Snobol4.Runtime.Boxes.MatchState)
     stloc.1
     ldloca.s   V_rr
     call       instance bool Snobol4.Runtime.Boxes.Spec::get_IsFail()
     brfalse    SEQ_A_GAMMA
 
-    // right_ω → left.Beta (inline — no cross-method branch)
+    // right_ω → left.β (inline — no cross-method branch)
   SEQ_A_LEFT_BETA:
     ldarg.0
     ldfld      class Snobol4.Runtime.Boxes.IByrdBox Snobol4.Runtime.Boxes.BbSeq::_left
     ldarg.1
     callvirt   instance valuetype Snobol4.Runtime.Boxes.Spec
-               Snobol4.Runtime.Boxes.IByrdBox::Beta(class Snobol4.Runtime.Boxes.MatchState)
+               Snobol4.Runtime.Boxes.IByrdBox::β(class Snobol4.Runtime.Boxes.MatchState)
     stloc.0
     ldloca.s   V_lr
     call       instance bool Snobol4.Runtime.Boxes.Spec::get_IsFail()
     brtrue     SEQ_A_OMEGA
-    // left_γ from beta: re-accumulate and retry right.Alpha
+    // left_γ from beta: re-accumulate and retry right.α
     ldarg.0
     ldarg.0
     ldfld      int32 Snobol4.Runtime.Boxes.BbSeq::_mLen
@@ -116,9 +116,9 @@
     ret
   }
 
-  // ── Beta ────────────────────────────────────────────────────────────────
+  // ── β ────────────────────────────────────────────────────────────────
   .method public virtual instance valuetype Snobol4.Runtime.Boxes.Spec
-          Beta(class Snobol4.Runtime.Boxes.MatchState ms) cil managed
+          β(class Snobol4.Runtime.Boxes.MatchState ms) cil managed
   {
     .maxstack 4
     .locals init (valuetype Snobol4.Runtime.Boxes.Spec V_rr,
@@ -129,7 +129,7 @@
     ldfld      class Snobol4.Runtime.Boxes.IByrdBox Snobol4.Runtime.Boxes.BbSeq::_right
     ldarg.1
     callvirt   instance valuetype Snobol4.Runtime.Boxes.Spec
-               Snobol4.Runtime.Boxes.IByrdBox::Beta(class Snobol4.Runtime.Boxes.MatchState)
+               Snobol4.Runtime.Boxes.IByrdBox::β(class Snobol4.Runtime.Boxes.MatchState)
     stloc.0
     ldloca.s   V_rr
     call       instance bool Snobol4.Runtime.Boxes.Spec::get_IsFail()
@@ -140,7 +140,7 @@
     ldfld      class Snobol4.Runtime.Boxes.IByrdBox Snobol4.Runtime.Boxes.BbSeq::_left
     ldarg.1
     callvirt   instance valuetype Snobol4.Runtime.Boxes.Spec
-               Snobol4.Runtime.Boxes.IByrdBox::Beta(class Snobol4.Runtime.Boxes.MatchState)
+               Snobol4.Runtime.Boxes.IByrdBox::β(class Snobol4.Runtime.Boxes.MatchState)
     stloc.1
     ldloca.s   V_lr
     call       instance bool Snobol4.Runtime.Boxes.Spec::get_IsFail()
@@ -152,12 +152,12 @@
     ldfld      int32 Snobol4.Runtime.Boxes.Spec::Length
     add
     stfld      int32 Snobol4.Runtime.Boxes.BbSeq::_mLen
-    // retry right.Alpha
+    // retry right.α
     ldarg.0
     ldfld      class Snobol4.Runtime.Boxes.IByrdBox Snobol4.Runtime.Boxes.BbSeq::_right
     ldarg.1
     callvirt   instance valuetype Snobol4.Runtime.Boxes.Spec
-               Snobol4.Runtime.Boxes.IByrdBox::Alpha(class Snobol4.Runtime.Boxes.MatchState)
+               Snobol4.Runtime.Boxes.IByrdBox::α(class Snobol4.Runtime.Boxes.MatchState)
     stloc.0
     ldloca.s   V_rr
     call       instance bool Snobol4.Runtime.Boxes.Spec::get_IsFail()

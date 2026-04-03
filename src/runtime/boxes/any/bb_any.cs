@@ -11,7 +11,7 @@ public sealed class bb_any : IByrdBox
     private readonly string _chars;
     public bb_any(string chars) { _chars = chars ?? ""; }
 
-    public Spec Alpha(MatchState ms)
+    public Spec α(MatchState ms)
     {
         if (ms.Cursor >= ms.Length)           return Spec.Fail;
         if (!ms.CharInSet(ms.Cursor, _chars)) return Spec.Fail;
@@ -20,7 +20,7 @@ public sealed class bb_any : IByrdBox
         return result;
     }
 
-    public Spec Beta(MatchState ms)
+    public Spec β(MatchState ms)
     {
         ms.Cursor--;
         return Spec.Fail;
