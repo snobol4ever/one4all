@@ -207,6 +207,11 @@ public class Interpreter {
                     try {
                         String line = in.readLine();
                         if (line == null) return DESCR.FAIL;
+                        DESCR trimVal = nvGet("TRIM");
+                        boolean doTrim = (trimVal.type == VType.INT && trimVal.ival != 0)
+                                      || (trimVal.type == VType.STR && !trimVal.toSnoStr().equals("0")
+                                          && !trimVal.toSnoStr().isEmpty());
+                        if (doTrim) line = line.stripTrailing();
                         return DESCR.str(line);
                     } catch (IOException ex) { return DESCR.FAIL; }
                 }
@@ -570,7 +575,13 @@ public class Interpreter {
             case "INPUT": {
                 try {
                     String line = in.readLine();
-                    return line != null ? DESCR.str(line) : DESCR.FAIL;
+                    if (line == null) return DESCR.FAIL;
+                    DESCR trimVal = nvGet("TRIM");
+                    boolean doTrim = (trimVal.type == VType.INT && trimVal.ival != 0)
+                                  || (trimVal.type == VType.STR && !trimVal.toSnoStr().equals("0")
+                                      && !trimVal.toSnoStr().isEmpty());
+                    if (doTrim) line = line.stripTrailing();
+                    return DESCR.str(line);
                 } catch (IOException ex) { return DESCR.FAIL; }
             }
 
@@ -722,6 +733,7 @@ public class Interpreter {
                     DESCR anchorVal = nvGet("ANCHOR");
                     if (anchorVal.type == VType.INT && anchorVal.ival != 0) anchor = true;
                     bb_box.MatchState pms = new bb_box.MatchState(sv);
+                    final PatternBuilder.VarGetter ufVg = nm2 -> nvGet(nm2).toSnoStr();
                     PatternBuilder pb = new PatternBuilder(
                         pms,
                         (nm, v) -> nvSet(nm, DESCR.str(v)),
@@ -733,12 +745,12 @@ public class Interpreter {
                                     (n, v) -> nvSet(n, DESCR.str(v)),
                                     (n, v) -> nvSet(n, DESCR.intv((long) v)),
                                     (vn, pms3) -> new bb_lit(pms3, nvGet(vn).toSnoStr()),
-                                    nm2 -> nvGet(nm2).toSnoStr());
+                                    ufVg);
                                 return inner.build(d.patNode);
                             }
                             return new bb_lit(pms2, d.toSnoStr());
                         },
-                        nm -> nvGet(nm).toSnoStr()
+                        ufVg
                     );
                     bb_box root = pb.build(s.pattern);
                     // hasEq + null replacement = delete (replace with "")

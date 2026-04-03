@@ -10,15 +10,20 @@ package driver.jvm;
  */
 class bb_len extends bb_box {
     private final int n;
+    private final java.util.function.IntSupplier dyn;
 
-    public bb_len(MatchState ms, int n) { super(ms); this.n=n; }
+    public bb_len(MatchState ms, int n)                           { super(ms); this.n=n;  this.dyn=null; }
+    public bb_len(MatchState ms, java.util.function.IntSupplier s) { super(ms); this.n=0;  this.dyn=s; }
+
+    private int val() { return dyn != null ? dyn.getAsInt() : n; }
 
     @Override public Spec alpha() {
-        if (ms.delta + n > ms.omega) return null;
-        Spec r = new Spec(ms.delta, n);
-        ms.delta += n;
+        int v = val();
+        if (ms.delta + v > ms.omega) return null;
+        Spec r = new Spec(ms.delta, v);
+        ms.delta += v;
         return r;
     }
 
-    @Override public Spec beta() { ms.delta -= n; return null; }
+    @Override public Spec beta() { ms.delta -= val(); return null; }
 }

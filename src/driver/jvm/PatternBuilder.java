@@ -151,15 +151,15 @@ class PatternBuilder {
                     case "BREAKX":
                         return new bb_breakx(ms, strArg(args, 0));
                     case "LEN":
-                        return new bb_len(ms, intArg(args, 0));
+                        return new bb_len(ms, dynIntArg(args, 0));
                     case "POS":
-                        return new bb_pos(ms, intArg(args, 0));
+                        return new bb_pos(ms, dynIntArg(args, 0));
                     case "RPOS":
-                        return new bb_rpos(ms, intArg(args, 0));
+                        return new bb_rpos(ms, dynIntArg(args, 0));
                     case "TAB":
-                        return new bb_tab(ms, intArg(args, 0));
+                        return new bb_tab(ms, dynIntArg(args, 0));
                     case "RTAB":
-                        return new bb_rtab(ms, intArg(args, 0));
+                        return new bb_rtab(ms, dynIntArg(args, 0));
                     case "ARBNO": {
                         bb_box body = args.isEmpty() ? new bb_eps(ms) : build(args.get(0));
                         return new bb_arbno(ms, body);
@@ -237,19 +237,41 @@ class PatternBuilder {
         return "";
     }
 
-    /** Extract integer argument from arg list (literal only). */
+    /** Extract integer argument — static version (literal int only). */
     private int intArg(List<Parser.ExprNode> args, int idx) {
         if (idx >= args.size()) return 0;
         Parser.ExprNode a = args.get(idx);
         if (a.kind == Parser.EKind.E_ILIT) return (int) a.ival;
-        if (a.kind == Parser.EKind.E_VAR && a.sval != null && varGetter != null) {
-            String v = varGetter.get(a.sval);
-            try { return Integer.parseInt(v.trim()); } catch (NumberFormatException ex) {}
-        }
         if (a.sval != null) {
             try { return Integer.parseInt(a.sval.trim()); } catch (NumberFormatException ex) {}
         }
         return 0;
+    }
+
+    /** Extract integer argument — dynamic version.
+     *  Returns an IntSupplier so POS/LEN/TAB/RPOS/RTAB re-evaluate at match time
+     *  when the argument is a variable name.
+     */
+    private java.util.function.IntSupplier dynIntArg(List<Parser.ExprNode> args, int idx) {
+        if (idx >= args.size()) return () -> 0;
+        Parser.ExprNode a = args.get(idx);
+        if (a.kind == Parser.EKind.E_ILIT) {
+            int v = (int) a.ival;
+            return () -> v;
+        }
+        if (a.kind == Parser.EKind.E_VAR && a.sval != null && varGetter != null) {
+            final String nm = a.sval;
+            final VarGetter vg = varGetter;
+            return () -> {
+                String s = vg.get(nm);
+                try { return Integer.parseInt(s.trim()); } catch (NumberFormatException ex) { return 0; }
+            };
+        }
+        if (a.sval != null) {
+            try { int v = Integer.parseInt(a.sval.trim()); return () -> v; }
+            catch (NumberFormatException ex) {}
+        }
+        return () -> 0;
     }
 
     /** Extract capture variable name from a capture node.

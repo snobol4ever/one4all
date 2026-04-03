@@ -10,11 +10,15 @@ package driver.jvm;
  */
 class bb_rpos extends bb_box {
     private final int n;
+    private final java.util.function.IntSupplier dyn;
 
-    public bb_rpos(MatchState ms, int n) { super(ms); this.n=n; }
+    public bb_rpos(MatchState ms, int n)                           { super(ms); this.n=n;  this.dyn=null; }
+    public bb_rpos(MatchState ms, java.util.function.IntSupplier s) { super(ms); this.n=0;  this.dyn=s; }
+
+    private int val() { return dyn != null ? dyn.getAsInt() : n; }
 
     @Override public Spec alpha() {
-        if (ms.delta != ms.omega - n) return null;
+        if (ms.delta != ms.omega - val()) return null;
         return new Spec(ms.delta, 0);
     }
 

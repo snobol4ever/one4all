@@ -10,12 +10,16 @@ package driver.jvm;
  */
 class bb_rtab extends bb_box {
     private final int n;
+    private final java.util.function.IntSupplier dyn;
     private int       advance;
 
-    public bb_rtab(MatchState ms, int n) { super(ms); this.n=n; }
+    public bb_rtab(MatchState ms, int n)                           { super(ms); this.n=n;  this.dyn=null; }
+    public bb_rtab(MatchState ms, java.util.function.IntSupplier s) { super(ms); this.n=0;  this.dyn=s; }
+
+    private int val() { return dyn != null ? dyn.getAsInt() : n; }
 
     @Override public Spec alpha() {
-        int target = ms.omega - n;
+        int target = ms.omega - val();
         if (ms.delta > target) return null;
         advance = target - ms.delta;
         Spec r = new Spec(ms.delta, advance);

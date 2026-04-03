@@ -10,11 +10,16 @@ package driver.jvm;
  */
 class bb_pos extends bb_box {
     private final int n;
+    private final java.util.function.IntSupplier dyn; // non-null → dynamic arg
 
-    public bb_pos(MatchState ms, int n) { super(ms); this.n=n; }
+    public bb_pos(MatchState ms, int n)                          { super(ms); this.n=n;  this.dyn=null; }
+    public bb_pos(MatchState ms, java.util.function.IntSupplier s) { super(ms); this.n=0;  this.dyn=s; }
+
+    private int val() { return dyn != null ? dyn.getAsInt() : n; }
 
     @Override public Spec alpha() {
-        if (ms.delta != n) return null;
+        int v = val();
+        if (ms.delta != v) return null;
         return new Spec(ms.delta, 0);
     }
 
