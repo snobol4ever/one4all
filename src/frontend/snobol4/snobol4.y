@@ -73,7 +73,7 @@ expr2      : expr2 TK_AMPERSAND  expr3                                          
 expr3      : expr3 TK_ALTERNATION expr4                                                            { if($1->kind==E_ALT){expr_add_child($1,$3);$$=$1;}else{EXPR_t*a=expr_new(E_ALT);expr_add_child(a,$1);expr_add_child(a,$3);$$=a;} }
            | expr4                                                                                 { $$=$1; }
            ;
-expr4      : expr4 TK_CONCAT expr5                                                                           { if($1->kind==E_SEQ){expr_add_child($1,$2);$$=$1;}else{EXPR_t*s=expr_new(E_SEQ);expr_add_child(s,$1);expr_add_child(s,$2);$$=s;} }
+expr4      : expr4 TK_CONCAT expr5                                                                           { if($1->kind==E_SEQ){expr_add_child($1,$3);$$=$1;}else{EXPR_t*s=expr_new(E_SEQ);expr_add_child(s,$1);expr_add_child(s,$3);$$=s;} }
            | expr5                                                                                 { $$=$1; }
            ;
 expr5      : expr5 TK_AT_SIGN    expr6                                                             { $$=expr_binary(E_CAPT_CURSOR,     $1,$3); }

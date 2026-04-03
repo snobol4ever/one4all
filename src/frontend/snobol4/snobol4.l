@@ -52,7 +52,7 @@ static Token mktok(TokKind k, const char *sv, long iv, double dv) {
 %option reentrant noyywrap never-interactive stack
 %option extra-type="void *"
 
-%x LABEL BODY GT STR1 STR2 SKIP INCL
+%x LABEL BODY BODY_START GT STR1 STR2 SKIP INCL
 
 DIGIT   [0-9]
 ALPHA   [A-Za-z\x80-\xFF]
@@ -67,7 +67,7 @@ WS      [ \t]
 
 <INITIAL>\n             { lineno++; /* blank line */ }
 <INITIAL>[*!|;]         { BEGIN(SKIP); }
-<INITIAL>[ \t]          { BEGIN(BODY); depth=0; }
+<INITIAL>[ \t]          { BEGIN(BODY_START); depth=0; }
 
 <INITIAL>"-"            {
     /* CTL line: check for INCLUDE/COPY */
@@ -76,7 +76,7 @@ WS      [ \t]
 
 <INITIAL>[+.]           {
     /* continuation: discard, stay in BODY (don't emit STMT_END) */
-    BEGIN(BODY);
+    BEGIN(BODY_START);
 }
 
 <INITIAL>[^ \t\n*!|;+.\-] {
@@ -95,7 +95,7 @@ WS      [ \t]
 
 <LABEL>[ \t]            {
     strbuf[strpos] = '\0';
-    BEGIN(BODY); depth = 0;
+    BEGIN(BODY_START); depth = 0;
     return T_LABEL;
 }
 
@@ -111,10 +111,17 @@ WS      [ \t]
     /* non-IDCONT char immediately after label (no space) — put back, emit label */
     yyless(0);
     strbuf[strpos] = '\0';
-    BEGIN(BODY); depth = 0;
+    BEGIN(BODY_START); depth = 0;
     return T_LABEL;
 }
 
+
+    /* ---- BODY_START: leading whitespace before first atom — never T_CONCAT ---- */
+
+<BODY_START>[ \t]+      { /* discard leading whitespace — not concatenation */ }
+<BODY_START>\n          { lineno++; BEGIN(INITIAL); return T_STMT_END; }
+<BODY_START>";"         { depth=0; return T_STMT_END; }
+<BODY_START>.           { yyless(0); BEGIN(BODY); }
 
     /* ---- BODY: statement body ----
      * T_CONCAT: spaces followed by an atom-start char (lookahead) — concatenation.
