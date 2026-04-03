@@ -132,10 +132,46 @@ public sealed class PatternBuilder
         Collect(n);
         if (parts.Count == 0) return new BbEps();
         if (parts.Count == 1) return BuildNode(parts[0]);
-        // Right-fold
-        IByrdBox right = BuildNode(parts[^1]);
-        for (int i = parts.Count - 2; i >= 0; i--)
-            right = new BbSeq(BuildNode(parts[i]), right);
+
+        // Build left-to-right as a list of IByrdBox, handling capture wrapping:
+        // When a part is E_CAPT_COND_ASGN or E_CAPT_IMMED_ASGN, it wraps the
+        // immediately preceding box (its left sibling in the pattern sequence).
+        var boxes = new List<IByrdBox>();
+        foreach (var part in parts)
+        {
+            bool isCond  = part.Kind == IrKind.E_CAPT_COND_ASGN;
+            bool isImmed = part.Kind == IrKind.E_CAPT_IMMED_ASGN;
+            if ((isCond || isImmed) && boxes.Count > 0)
+            {
+                // Pop the last box — this is what the capture matches over
+                var prev    = boxes[^1];
+                boxes.RemoveAt(boxes.Count - 1);
+                var varName = part.Children.Length > 0 && part.Children[0].Kind == IrKind.E_VAR
+                            ? part.Children[0].SVal!
+                            : (part.SVal ?? "");
+                var cap = new BbCapture(prev, varName, immediate: isImmed) { SetVar = _setVar };
+                _captures.Add(cap);
+                boxes.Add(cap);
+            }
+            else if (part.Kind == IrKind.E_CAPT_CURSOR)
+            {
+                // @var — cursor capture wraps Eps (records position, not span)
+                var varName = part.Children.Length > 0 && part.Children[0].Kind == IrKind.E_VAR
+                            ? part.Children[0].SVal!
+                            : (part.SVal ?? "");
+                boxes.Add(new BbAtp(varName) { SetVar = _setVar });
+            }
+            else
+            {
+                boxes.Add(BuildNode(part));
+            }
+        }
+
+        if (boxes.Count == 1) return boxes[0];
+        // Right-fold into BbSeq chain
+        IByrdBox right = boxes[^1];
+        for (int i = boxes.Count - 2; i >= 0; i--)
+            right = new BbSeq(boxes[i], right);
         return right;
     }
 

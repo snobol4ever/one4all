@@ -157,9 +157,9 @@ public sealed class Executor
 
             // Phase 4: evaluate replacement
             SnobolVal? replVal = null;
-            if (stmt.HasEq && stmt.Replacement != null)
+            if (stmt.HasEq)
             {
-                var rv = EvalNode(stmt.Replacement);
+                var rv = stmt.Replacement != null ? EvalNode(stmt.Replacement) : SnobolVal.Of("");
                 if (rv.IsFail) return false;
                 replVal = rv;
             }

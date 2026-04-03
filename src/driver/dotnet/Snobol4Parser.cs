@@ -271,11 +271,29 @@ public static class Snobol4Parser
     private static bool IsOperatorToken(string t) =>
         t == "+" || t == "-" || t == "*" || t == "/" || t == "^";
 
+    // Capture operator tokens: ". V" "@V" "$ V" are binary in pattern context
+    private static bool IsCaptureOp(string t, out IrKind kind)
+    {
+        if (t == ".")  { kind = IrKind.E_CAPT_COND_ASGN;  return true; }
+        if (t == "@")  { kind = IrKind.E_CAPT_CURSOR;      return true; }
+        if (t == "$")  { kind = IrKind.E_CAPT_IMMED_ASGN;  return true; }
+        kind = default; return false;
+    }
+
     private static IrNode ParseCatSequence(List<string> toks, ref int pos)
     {
         var parts = new List<IrNode>();
         while (pos < toks.Count && !IsOperatorToken(toks[pos]))
         {
+            // Lone "." "@" "$" token followed by a variable — binary capture operator
+            if (IsCaptureOp(toks[pos], out var capKind) &&
+                pos + 1 < toks.Count && !IsOperatorToken(toks[pos + 1]))
+            {
+                var varName = toks[pos + 1].TrimStart('@', '.', '$').ToUpperInvariant();
+                parts.Add(IrNode.Nary(capKind, IrNode.Var(varName)));
+                pos += 2;
+                continue;
+            }
             parts.Add(ParseAtom(toks[pos]));
             pos++;
         }
