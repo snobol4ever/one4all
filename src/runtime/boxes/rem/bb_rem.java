@@ -1,4 +1,4 @@
-package driver.jvm;
+package bb;
 
 /**
  * bb_rem.java — REM: match entire remainder; no backtrack
@@ -7,7 +7,7 @@ package driver.jvm;
  *   REM_α:  REM=spec(Σ+Δ, Ω-Δ); Δ=Ω;  goto REM_γ;
  *   REM_β:                              goto REM_ω;
  */
-class bb_rem extends bb_box {
+public class bb_rem extends bb_box {
 
     public bb_rem(MatchState ms) { super(ms); }
 

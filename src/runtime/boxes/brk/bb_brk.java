@@ -1,4 +1,4 @@
-package driver.jvm;
+package bb;
 
 /**
  * bb_brk.java — BRK (BREAK): scan to first char in set (zero-width possible)
@@ -9,7 +9,7 @@ package driver.jvm;
  *           BRK=spec(Σ+Δ,δ); Δ+=δ;     goto BRK_γ;
  *   BRK_β:  Δ-=δ;                       goto BRK_ω;
  */
-class bb_brk extends bb_box {
+public class bb_brk extends bb_box {
     private final String chars;
     private int          delta;
 

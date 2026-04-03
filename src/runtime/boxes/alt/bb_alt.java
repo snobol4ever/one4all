@@ -1,4 +1,4 @@
-package driver.jvm;
+package bb;
 
 /**
  * bb_alt.java — ALT: alternation; try each child on α; β retries same child
@@ -18,7 +18,7 @@ package driver.jvm;
  *   ALT_γ:                                             return result;
  *   ALT_ω:                                             return spec_empty;
  */
-class bb_alt extends bb_box {
+public class bb_alt extends bb_box {
     private final bb_box[] children;
     private final int     n;
     private int           current;   /* 1-based index of active child */

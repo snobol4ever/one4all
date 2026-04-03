@@ -1,7 +1,0 @@
-.interface public bb_executor$var_store
-.super java/lang/Object
-.inner interface public static abstract var_store inner bb_executor$var_store outer bb_executor
-.method public abstract get(Ljava/lang/String;)Ljava/lang/String;
-.end method
-.method public abstract set(Ljava/lang/String;Ljava/lang/String;)V
-.end method

@@ -1,4 +1,4 @@
-package driver.jvm;
+package bb;
 
 /**
  * bb_dvar.java — DVAR: *VAR — re-resolve live variable value on every α
@@ -13,7 +13,7 @@ package driver.jvm;
  *            DVAR = child(α);  if empty → DVAR_ω;  else → DVAR_γ;
  *   DVAR_β:  DVAR = child(β);  if empty → DVAR_ω;  else → DVAR_γ;
  */
-class bb_dvar extends bb_box {
+public class bb_dvar extends bb_box {
 
     /** Callback to resolve variable → current bb_box (handles DT_P and DT_S) */
     public interface BoxResolver {

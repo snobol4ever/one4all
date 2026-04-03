@@ -1,4 +1,4 @@
-package driver.jvm;
+package bb;
 
 /**
  * bb_abort.java — ABORT: always ω on both ports — force match failure entirely
@@ -8,7 +8,7 @@ package driver.jvm;
  * abandon the entire match and take the :F branch immediately.
  * The executor checks for this via the AbortException.
  */
-class bb_abort extends bb_box {
+public class bb_abort extends bb_box {
 
     /** Thrown by bb_abort to signal immediate match termination */
     public static final class AbortException extends RuntimeException {

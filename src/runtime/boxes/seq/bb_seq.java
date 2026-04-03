@@ -1,4 +1,4 @@
-package driver.jvm;
+package bb;
 
 /**
  * bb_seq.java — SEQ: concatenation; left then right; β retries right then left
@@ -16,7 +16,7 @@ package driver.jvm;
  *   SEQ_γ:                                         return SEQ;
  *   SEQ_ω:                                         return spec_empty;
  */
-class bb_seq extends bb_box {
+public class bb_seq extends bb_box {
     private final bb_box left, right;
     private int matchedStart, matchedLen;  /* accumulated span */
 

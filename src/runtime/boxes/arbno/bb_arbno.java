@@ -1,4 +1,4 @@
-package driver.jvm;
+package bb;
 
 /**
  * bb_arbno.java — ARBNO: zero-or-more greedy; zero-advance guard; β unwinds stack
@@ -18,7 +18,7 @@ package driver.jvm;
  *   ARBNO_γ:                                       return ARBNO;
  *   ARBNO_ω:                                       return spec_empty;
  */
-class bb_arbno extends bb_box {
+public class bb_arbno extends bb_box {
     private static final int MAX_DEPTH = 64;
 
     private final bb_box body;

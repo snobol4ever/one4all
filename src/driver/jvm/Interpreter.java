@@ -1,7 +1,101 @@
 package driver.jvm;
 
+
+import bb.bb_box;
+import bb.bb_executor;
+import bb.bb_dvar;
+import bb.bb_capture;
+import bb.bb_atp;
+import bb.bb_abort;
+import bb.bb_lit;
+import bb.bb_alt;
+import bb.bb_seq;
+import bb.bb_arb;
+import bb.bb_rem;
+import bb.bb_fail;
+import bb.bb_succeed;
+import bb.bb_fence;
+import bb.bb_eps;
+import bb.bb_arbno;
+import bb.bb_any;
+import bb.bb_notany;
+import bb.bb_span;
+import bb.bb_brk;
+import bb.bb_breakx;
+import bb.bb_len;
+import bb.bb_pos;
+import bb.bb_rpos;
+import bb.bb_tab;
+import bb.bb_rtab;
+import bb.bb_interr;
+import bb.bb_bal;
+import bb.bb_not;
+import bb.bb_atp;
+import bb.bb_dvar;
 import java.io.*;
+import bb.bb_box;
+import bb.bb_executor;
+import bb.bb_dvar;
+import bb.bb_capture;
+import bb.bb_atp;
+import bb.bb_abort;
+import bb.bb_lit;
+import bb.bb_alt;
+import bb.bb_seq;
+import bb.bb_arb;
+import bb.bb_rem;
+import bb.bb_fail;
+import bb.bb_succeed;
+import bb.bb_fence;
+import bb.bb_eps;
+import bb.bb_arbno;
+import bb.bb_any;
+import bb.bb_notany;
+import bb.bb_span;
+import bb.bb_brk;
+import bb.bb_breakx;
+import bb.bb_len;
+import bb.bb_pos;
+import bb.bb_rpos;
+import bb.bb_tab;
+import bb.bb_rtab;
+import bb.bb_interr;
+import bb.bb_bal;
+import bb.bb_not;
+import bb.bb_atp;
+import bb.bb_dvar;
 import java.util.*;
+import bb.bb_box;
+import bb.bb_executor;
+import bb.bb_dvar;
+import bb.bb_capture;
+import bb.bb_atp;
+import bb.bb_abort;
+import bb.bb_lit;
+import bb.bb_alt;
+import bb.bb_seq;
+import bb.bb_arb;
+import bb.bb_rem;
+import bb.bb_fail;
+import bb.bb_succeed;
+import bb.bb_fence;
+import bb.bb_eps;
+import bb.bb_arbno;
+import bb.bb_any;
+import bb.bb_notany;
+import bb.bb_span;
+import bb.bb_brk;
+import bb.bb_breakx;
+import bb.bb_len;
+import bb.bb_pos;
+import bb.bb_rpos;
+import bb.bb_tab;
+import bb.bb_rtab;
+import bb.bb_interr;
+import bb.bb_bal;
+import bb.bb_not;
+import bb.bb_atp;
+import bb.bb_dvar;
 import java.util.Arrays;
 
 /**
@@ -732,7 +826,7 @@ public class Interpreter {
                     boolean anchor = false;
                     DESCR anchorVal = nvGet("ANCHOR");
                     if (anchorVal.type == VType.INT && anchorVal.ival != 0) anchor = true;
-                    bb_box.MatchState pms = new bb_box.MatchState(sv);
+                    bb.bb_box.MatchState pms = new bb.bb_box.MatchState(sv);
                     final PatternBuilder.VarGetter ufVg = nm2 -> nvGet(nm2).toSnoStr();
                     // sharedDeferred: inner PatternBuilders for PAT-valued vars share
                     // the same list so their .var captures are committed on outer :S
@@ -767,7 +861,7 @@ public class Interpreter {
                     } else if (s.hasEq) {
                         replStr = ""; // bare = deletes matched portion
                     }
-                    bb_executor ex = new bb_executor(new bb_executor.VarStore() {
+                    bb_executor ex = new bb_executor(new bb.bb_executor.VarStore() {
                         public String get(String n) { return nvGet(n).toSnoStr(); }
                         public void   set(String n, String v) { nvSet(n, DESCR.str(v)); }
                     });
@@ -775,7 +869,7 @@ public class Interpreter {
                     try {
                         succeeded = ex.exec(subjName, sv, pms, root,
                                             hasRepl, replStr != null ? replStr : "", anchor);
-                    } catch (bb_abort.AbortException ae) { succeeded = false; }
+                    } catch (bb.bb_abort.AbortException ae) { succeeded = false; }
                 } else if (s.hasEq && subjName != null) {
                     DESCR replVal = s.replacement != null ? eval(s.replacement) : DESCR.NUL;
                     if (replVal.isFail()) succeeded = false;
@@ -876,7 +970,7 @@ public class Interpreter {
                 DESCR anchorVal = nvGet("ANCHOR");
                 if (anchorVal.type == VType.INT && anchorVal.ival != 0) anchor = true;
 
-                bb_box.MatchState pms = new bb_box.MatchState(sv);
+                bb.bb_box.MatchState pms = new bb.bb_box.MatchState(sv);
                 final java.util.List<bb_capture> sharedDeferred2 = new java.util.ArrayList<>();
                 final PatternBuilder.VarGetter ufVg2 = nm2 -> nvGet(nm2).toSnoStr();
 
@@ -920,7 +1014,7 @@ public class Interpreter {
                 }
 
                 bb_executor ex = new bb_executor(
-                    new bb_executor.VarStore() {
+                    new bb.bb_executor.VarStore() {
                         public String get(String n) { return nvGet(n).toSnoStr(); }
                         public void   set(String n, String v) { nvSet(n, DESCR.str(v)); }
                     }
@@ -931,7 +1025,7 @@ public class Interpreter {
                     succeeded = ex.exec(subjName, sv, pms, root,
                                         replStr != null, replStr != null ? replStr : "",
                                         anchor);
-                } catch (bb_abort.AbortException ae) {
+                } catch (bb.bb_abort.AbortException ae) {
                     succeeded = false;
                 }
             }

@@ -1,10 +1,10 @@
-package driver.jvm;
+package bb;
 
 /**
  * bb_fail.java — FAIL: always ω — force backtrack
  * Port of bb_fail.c / bb_fail.s
  */
-class bb_fail extends bb_box {
+public class bb_fail extends bb_box {
 
     public bb_fail(MatchState ms) { super(ms); }
 

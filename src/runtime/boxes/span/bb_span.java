@@ -1,4 +1,4 @@
-package driver.jvm;
+package bb;
 
 /**
  * bb_span.java — SPAN: longest prefix of chars in set (≥1 char required)
@@ -9,7 +9,7 @@ package driver.jvm;
  *            SPAN=spec(Σ+Δ,δ); Δ+=δ;     goto SPAN_γ;
  *   SPAN_β:  Δ-=δ;                        goto SPAN_ω;
  */
-class bb_span extends bb_box {
+public class bb_span extends bb_box {
     private final String chars;
     private int          delta;   /* saved match length */
 

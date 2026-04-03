@@ -1,4 +1,4 @@
-package driver.jvm;
+package bb;
 
 /**
  * bb_any.java — ANY: match one char if in set
@@ -8,7 +8,7 @@ package driver.jvm;
  *           ANY=spec(Σ+Δ,1); Δ++;                goto ANY_γ;
  *   ANY_β:  Δ--;                                 goto ANY_ω;
  */
-class bb_any extends bb_box {
+public class bb_any extends bb_box {
     private final String chars;
 
     public bb_any(MatchState ms, String chars) { super(ms); this.chars=chars; }

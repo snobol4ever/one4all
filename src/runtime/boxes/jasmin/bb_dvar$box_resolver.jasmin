@@ -1,5 +1,0 @@
-.interface public bb_dvar$box_resolver
-.super java/lang/Object
-.inner interface public static abstract box_resolver inner bb_dvar$box_resolver outer bb_dvar
-.method public abstract resolve(Ljava/lang/String;Lbb_box$matchstate;)Lbb_box;
-.end method

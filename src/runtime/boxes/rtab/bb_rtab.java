@@ -1,4 +1,4 @@
-package driver.jvm;
+package bb;
 
 /**
  * bb_rtab.java — RTAB: advance cursor TO position Ω-n
@@ -8,7 +8,7 @@ package driver.jvm;
  *            advance=(Ω-n)-Δ; RTAB=spec(Σ+Δ,advance); Δ=Ω-n;  goto RTAB_γ;
  *   RTAB_β:  Δ -= advance;                              goto RTAB_ω;
  */
-class bb_rtab extends bb_box {
+public class bb_rtab extends bb_box {
     private final int n;
     private final java.util.function.IntSupplier dyn;
     private int       advance;

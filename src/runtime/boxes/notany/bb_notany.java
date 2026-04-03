@@ -1,4 +1,4 @@
-package driver.jvm;
+package bb;
 
 /**
  * bb_notany.java — NOTANY: match one char if NOT in set
@@ -8,7 +8,7 @@ package driver.jvm;
  *              NOTANY=spec(Σ+Δ,1); Δ++;               goto NOTANY_γ;
  *   NOTANY_β:  Δ--;                                   goto NOTANY_ω;
  */
-class bb_notany extends bb_box {
+public class bb_notany extends bb_box {
     private final String chars;
 
     public bb_notany(MatchState ms, String chars) { super(ms); this.chars=chars; }

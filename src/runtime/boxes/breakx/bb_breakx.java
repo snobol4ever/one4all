@@ -1,4 +1,4 @@
-package driver.jvm;
+package bb;
 
 /**
  * bb_breakx.java — BREAKX: like BRK but fails on zero advance
@@ -9,7 +9,7 @@ package driver.jvm;
  *              BREAKX=spec(Σ+Δ,δ); Δ+=δ;       goto BREAKX_γ;
  *   BREAKX_β:  Δ-=δ;                            goto BREAKX_ω;
  */
-class bb_breakx extends bb_box {
+public class bb_breakx extends bb_box {
     private final String chars;
     private int          delta;
 

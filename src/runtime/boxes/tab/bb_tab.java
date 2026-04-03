@@ -1,4 +1,4 @@
-package driver.jvm;
+package bb;
 
 /**
  * bb_tab.java — TAB: advance cursor TO absolute position n
@@ -8,7 +8,7 @@ package driver.jvm;
  *           advance=n-Δ; TAB=spec(Σ+Δ,advance); Δ=n;  goto TAB_γ;
  *   TAB_β:  Δ -= advance;                   goto TAB_ω;
  */
-class bb_tab extends bb_box {
+public class bb_tab extends bb_box {
     private final int n;
     private final java.util.function.IntSupplier dyn;
     private int       advance;

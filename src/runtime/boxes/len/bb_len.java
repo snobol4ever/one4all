@@ -1,4 +1,4 @@
-package driver.jvm;
+package bb;
 
 /**
  * bb_len.java — LEN: match exactly n characters
@@ -8,7 +8,7 @@ package driver.jvm;
  *           LEN=spec(Σ+Δ,n); Δ+=n;  goto LEN_γ;
  *   LEN_β:  Δ-=n;                   goto LEN_ω;
  */
-class bb_len extends bb_box {
+public class bb_len extends bb_box {
     private final int n;
     private final java.util.function.IntSupplier dyn;
 

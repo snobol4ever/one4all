@@ -1,4 +1,4 @@
-package driver.jvm;
+package bb;
 
 /**
  * bb_rpos.java — RPOS: assert cursor == Ω-n (zero-width)
@@ -8,7 +8,7 @@ package driver.jvm;
  *            RPOS=spec(Σ+Δ,0); goto RPOS_γ;
  *   RPOS_β:                    goto RPOS_ω;
  */
-class bb_rpos extends bb_box {
+public class bb_rpos extends bb_box {
     private final int n;
     private final java.util.function.IntSupplier dyn;
 

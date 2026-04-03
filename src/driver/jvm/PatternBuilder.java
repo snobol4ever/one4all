@@ -1,5 +1,37 @@
 package driver.jvm;
 
+
+import bb.bb_box;
+import bb.bb_executor;
+import bb.bb_dvar;
+import bb.bb_capture;
+import bb.bb_atp;
+import bb.bb_abort;
+import bb.bb_lit;
+import bb.bb_alt;
+import bb.bb_seq;
+import bb.bb_arb;
+import bb.bb_rem;
+import bb.bb_fail;
+import bb.bb_succeed;
+import bb.bb_fence;
+import bb.bb_eps;
+import bb.bb_arbno;
+import bb.bb_any;
+import bb.bb_notany;
+import bb.bb_span;
+import bb.bb_brk;
+import bb.bb_breakx;
+import bb.bb_len;
+import bb.bb_pos;
+import bb.bb_rpos;
+import bb.bb_tab;
+import bb.bb_rtab;
+import bb.bb_interr;
+import bb.bb_bal;
+import bb.bb_not;
+import bb.bb_atp;
+import bb.bb_dvar;
 import java.util.List;
 
 /**
@@ -52,10 +84,10 @@ class PatternBuilder {
         String get(String name);
     }
 
-    private final bb_box.MatchState ms;
+    private final bb.bb_box.MatchState ms;
     private final VarSetter         varSetter;
     private final IntSetter         intSetter;
-    private final bb_dvar.BoxResolver varResolver;
+    private final bb.bb_dvar.BoxResolver varResolver;
     private final VarGetter         varGetter;
     /** Deferred (.var) captures registered for Phase-5 commit.
      *  May be shared with inner PatternBuilders (for PAT-valued variable expansion)
@@ -63,20 +95,20 @@ class PatternBuilder {
      */
     private final java.util.List<bb_capture> deferred;
 
-    PatternBuilder(bb_box.MatchState ms, VarSetter varSetter, IntSetter intSetter,
-                   bb_dvar.BoxResolver varResolver) {
+    PatternBuilder(bb.bb_box.MatchState ms, VarSetter varSetter, IntSetter intSetter,
+                   bb.bb_dvar.BoxResolver varResolver) {
         this(ms, varSetter, intSetter, varResolver, null, null);
     }
 
-    PatternBuilder(bb_box.MatchState ms, VarSetter varSetter, IntSetter intSetter,
-                   bb_dvar.BoxResolver varResolver, VarGetter varGetter) {
+    PatternBuilder(bb.bb_box.MatchState ms, VarSetter varSetter, IntSetter intSetter,
+                   bb.bb_dvar.BoxResolver varResolver, VarGetter varGetter) {
         this(ms, varSetter, intSetter, varResolver, varGetter, null);
     }
 
     /** Constructor with shared external deferred list — inner builders use this
      *  so their .var captures are visible to the outer executor. */
-    PatternBuilder(bb_box.MatchState ms, VarSetter varSetter, IntSetter intSetter,
-                   bb_dvar.BoxResolver varResolver, VarGetter varGetter,
+    PatternBuilder(bb.bb_box.MatchState ms, VarSetter varSetter, IntSetter intSetter,
+                   bb.bb_dvar.BoxResolver varResolver, VarGetter varGetter,
                    java.util.List<bb_capture> sharedDeferred) {
         this.ms          = ms;
         this.varSetter   = varSetter;
@@ -187,14 +219,14 @@ class PatternBuilder {
                 // $var — immediate assign on every gamma
                 String varName = captureVarName(e);
                 bb_box child   = e.children.size() > 0 ? build(e.children.get(0)) : new bb_eps(ms);
-                bb_capture.VarSetter vs = (n, v) -> varSetter.set(n, v);
+                bb.bb_capture.VarSetter vs = (n, v) -> varSetter.set(n, v);
                 return new bb_capture(ms, child, varName, true, vs);
             }
             case E_CAPT_COND_ASGN: {
                 // .var — deferred assign on :S
                 String varName = captureVarName(e);
                 bb_box child   = e.children.size() > 0 ? build(e.children.get(0)) : new bb_eps(ms);
-                bb_capture.VarSetter vs = (n, v) -> varSetter.set(n, v);
+                bb.bb_capture.VarSetter vs = (n, v) -> varSetter.set(n, v);
                 bb_capture cap = new bb_capture(ms, child, varName, false, vs);
                 deferred.add(cap);
                 return cap;
@@ -202,7 +234,7 @@ class PatternBuilder {
             case E_CAPT_CURSOR: {
                 // @var — write cursor position as integer
                 String varName = captureVarName(e);
-                bb_atp.IntSetter is = (n, v) -> intSetter.set(n, v);
+                bb.bb_atp.IntSetter is = (n, v) -> intSetter.set(n, v);
                 return new bb_atp(ms, varName, is);
             }
 

@@ -1,4 +1,4 @@
-package driver.jvm;
+package bb;
 
 /**
  * bb_bal.java — BAL: match a balanced parenthesised string
@@ -19,7 +19,7 @@ package driver.jvm;
  *           goto BAL_ω;
  *   BAL_β:  Δ -= len;  goto BAL_ω;
  */
-class bb_bal extends bb_box {
+public class bb_bal extends bb_box {
     private int len;   /* saved match length for β restore */
 
     public bb_bal(MatchState ms) { super(ms); }

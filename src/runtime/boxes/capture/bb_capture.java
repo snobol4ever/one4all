@@ -1,4 +1,4 @@
-package driver.jvm;
+package bb;
 
 /**
  * bb_capture.java — CAPTURE: wrap child; $ writes on every γ; . buffers for Phase-5 commit
@@ -14,7 +14,7 @@ package driver.jvm;
  * The executor calls commitPending() after overall match success to flush
  * deferred (.) captures — mirroring match.clj commit-pending! and stmt_exec.c.
  */
-class bb_capture extends bb_box {
+public class bb_capture extends bb_box {
 
     /** Callback interface for variable assignment (NV_SET_fn equivalent) */
     public interface VarSetter {

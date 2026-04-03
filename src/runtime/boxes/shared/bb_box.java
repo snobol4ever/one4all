@@ -1,4 +1,4 @@
-package driver.jvm;
+package bb;
 
 /**
  * bb_box.java — JVM Byrd Box Runtime
@@ -15,7 +15,7 @@ package driver.jvm;
  *
  * Canonical three-column layout preserved in comments for each box.
  */
-abstract class bb_box {
+public abstract class bb_box {
 
     /* ── Entry port constants (mirrors bb_box.h α=0, β=1) ─────────────── */
     public static final int ALPHA = 0;

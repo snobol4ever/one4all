@@ -1,4 +1,4 @@
-package driver.jvm;
+package bb;
 
 /**
  * bb_fence.java — FENCE: succeed once; β cuts (no retry)
@@ -9,7 +9,7 @@ package driver.jvm;
  *   FENCE_γ:  return spec(Σ+Δ,0);
  *   FENCE_ω:  return spec_empty;
  */
-class bb_fence extends bb_box {
+public class bb_fence extends bb_box {
 
     public bb_fence(MatchState ms) { super(ms); }
 

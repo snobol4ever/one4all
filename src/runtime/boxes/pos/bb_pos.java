@@ -1,4 +1,4 @@
-package driver.jvm;
+package bb;
 
 /**
  * bb_pos.java — POS: assert cursor == n (zero-width)
@@ -8,7 +8,7 @@ package driver.jvm;
  *           POS=spec(Σ+Δ,0); goto POS_γ;
  *   POS_β:                   goto POS_ω;
  */
-class bb_pos extends bb_box {
+public class bb_pos extends bb_box {
     private final int n;
     private final java.util.function.IntSupplier dyn; // non-null → dynamic arg
 

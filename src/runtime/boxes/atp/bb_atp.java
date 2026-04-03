@@ -1,4 +1,4 @@
-package driver.jvm;
+package bb;
 
 /**
  * bb_atp.java — ATP: @var — write cursor position Δ as integer into varname
@@ -8,7 +8,7 @@ package driver.jvm;
  *           ATP=spec(Σ+Δ,0);                    goto ATP_γ;
  *   ATP_β:                                      goto ATP_ω;
  */
-class bb_atp extends bb_box {
+public class bb_atp extends bb_box {
 
     public interface IntSetter { void set(String varname, int value); }
 

@@ -1,4 +1,4 @@
-package driver.jvm;
+package bb;
 
 /**
  * bb_lit.java — LIT: literal string match
@@ -12,7 +12,7 @@ package driver.jvm;
  *   LIT_γ:                                       return LIT;
  *   LIT_ω:                                       return spec_empty;
  */
-class bb_lit extends bb_box {
+public class bb_lit extends bb_box {
     private final String lit;
     private final int    len;
 

@@ -1,10 +1,10 @@
-package driver.jvm;
+package bb;
 
 /**
  * bb_succeed.java — SUCCEED: always γ zero-width; outer scan loop retries
  * Port of bb_succeed.c / bb_succeed.s
  */
-class bb_succeed extends bb_box {
+public class bb_succeed extends bb_box {
 
     public bb_succeed(MatchState ms) { super(ms); }
 

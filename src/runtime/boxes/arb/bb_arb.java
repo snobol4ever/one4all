@@ -1,4 +1,4 @@
-package driver.jvm;
+package bb;
 
 /**
  * bb_arb.java — ARB: match 0..n chars lazily; β extends by 1
@@ -11,7 +11,7 @@ package driver.jvm;
  *   ARB_γ:                                              return ARB;
  *   ARB_ω:                                              return spec_empty;
  */
-class bb_arb extends bb_box {
+public class bb_arb extends bb_box {
     private int count;
     private int start;
 

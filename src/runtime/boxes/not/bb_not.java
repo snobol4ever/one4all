@@ -1,4 +1,4 @@
-package driver.jvm;
+package bb;
 
 /**
  * bb_not.java — NOT: \X — succeed iff X fails; β always ω
@@ -15,7 +15,7 @@ package driver.jvm;
  *   NOT_γ:  return spec(Σ+Δ,0);
  *   NOT_ω:  return spec_empty;
  */
-class bb_not extends bb_box {
+public class bb_not extends bb_box {
     private final bb_box child;
     private int         start;
 

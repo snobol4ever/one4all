@@ -1,4 +1,4 @@
-package driver.jvm;
+package bb;
 
 /**
  * bb_eps.java — EPS: zero-width success once; done flag prevents double-γ
@@ -8,7 +8,7 @@ package driver.jvm;
  *           done=1; EPS=spec(Σ+Δ,0); goto EPS_γ;
  *   EPS_β:                    goto EPS_ω;
  */
-class bb_eps extends bb_box {
+public class bb_eps extends bb_box {
     private boolean done;
 
     public bb_eps(MatchState ms) { super(ms); }

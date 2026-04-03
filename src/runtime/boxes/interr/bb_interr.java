@@ -1,4 +1,4 @@
-package driver.jvm;
+package bb;
 
 /**
  * bb_interr.java — INTERR: ?X — succeed zero-width if X succeeds; ω if X fails
@@ -14,7 +14,7 @@ package driver.jvm;
  *   INT_γ:  return spec(Σ+Δ,0);
  *   INT_ω:  return spec_empty;
  */
-class bb_interr extends bb_box {
+public class bb_interr extends bb_box {
     private final bb_box child;
     private int         start;
 

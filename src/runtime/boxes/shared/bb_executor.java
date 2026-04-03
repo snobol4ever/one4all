@@ -1,4 +1,4 @@
-package driver.jvm;
+package bb;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,7 +25,7 @@ import java.util.List;
  *
  * Returns SUCCESS (true → :S branch) or FAILURE (false → :F branch).
  */
-class bb_executor {
+public class bb_executor {
 
     public interface VarStore {
         String get(String name);
