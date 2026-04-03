@@ -27,7 +27,7 @@
 
 %{
 #include "scrip_cc.h"
-#include "lex.h"
+#include "snobol4_lexer.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
