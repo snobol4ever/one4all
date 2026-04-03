@@ -3,10 +3,11 @@
 
 #include <stdio.h>
 
-/* Token kinds */
+/* Token kinds.
+ * Whitespace is never returned — grey and white both suppressed by lex.l.
+ * Unary vs binary distinction is resolved by grammar position in parse.y. */
 typedef enum {
     T_IDENT, T_INT, T_REAL, T_STR, T_KEYWORD,
-    T_WS,
     T_PLUS, T_MINUS, T_STAR, T_SLASH, T_PCT,
     T_CARET, T_BANG, T_STARSTAR,
     T_AMP, T_AT, T_TILDE, T_DOLLAR, T_DOT,
@@ -16,11 +17,12 @@ typedef enum {
     T_LANGLE, T_RANGLE,
     T_COLON, T_SGOTO, T_FGOTO,
     T_END,
-    /* Statement-structure tokens emitted by the one-pass lexer */
-    T_LABEL,     /* column-1 identifier; sval=name, ival=1 if END */
-    T_GOTO,      /* goto field string; sval=goto_str               */
-    T_STMT_END,  /* end of one logical statement                    */
-    T_EOF, T_ERR
+    /* Statement-structure tokens from the one-pass flex lexer */
+    T_LABEL,     /* column-1 identifier; sval=name, ival=1 if END label */
+    T_GOTO,      /* goto field string; sval=raw goto text                */
+    T_STMT_END,  /* logical-line boundary                                */
+    T_EOF, T_ERR,
+    T_WS         /* never returned; kept so old references compile       */
 } TokKind;
 
 typedef struct {
@@ -31,36 +33,29 @@ typedef struct {
     int         lineno;
 } Token;
 
-/* Lexer state.  src==NULL → drain token queue (main program stream).
- * src!=NULL  → tokenise a string directly (goto-field parsing only). */
+/* Lexer handle — wraps a flex scanner.
+ * lex_open_str opens the flex scanner over an in-memory string via fmemopen.
+ * There is one tokenizer: lex.l. */
 typedef struct Lex {
-    const char *src;
-    int         pos;
-    int         len;
-    int         lineno;
-    Token       peek;
-    int         peeked;
-    /* M-LEX-1: flex scanner state (NULL when using queue path) */
-    void       *_scanner;  /* yyscan_t — opaque flex handle */
-    void       *_extra;    /* FlexExtra* — token scratch storage */
+    int    lineno;
+    Token  peek;
+    int    peeked;
+    void  *_scanner;   /* yyscan_t  */
+    void  *_extra;     /* FlexExtra* */
 } Lex;
 
 void  lex_open_str(Lex *lx, const char *s, int len, int lineno);
-Token lex_next(Lex *lx);
-Token lex_peek(Lex *lx);
-int   lex_at_end(Lex *lx);
+Token lex_next    (Lex *lx);
+Token lex_peek    (Lex *lx);
+int   lex_at_end  (Lex *lx);
+void  lex_destroy (Lex *lx);
 
-/* M-LEX-1: flex one-pass lexer — called by lex.c, defined in lex.yy.c */
+/* flex one-pass entry points (defined in lex.yy.c) */
 void  flex_lex_open   (Lex *lx, FILE *f, const char *fname);
 Token flex_lex_next   (Lex *lx);
 void  flex_lex_destroy(Lex *lx);
 
-/* Checkpoint for speculative lookahead */
-typedef struct { int pos; Token peek; int peeked; } LexMark;
-static inline LexMark lex_mark(Lex *lx)             { LexMark m; m.pos=lx->pos; m.peek=lx->peek; m.peeked=lx->peeked; return m; }
-static inline void    lex_restore(Lex *lx, LexMark m){ lx->pos=m.pos; lx->peek=m.peek; lx->peeked=m.peeked; }
-
-/* SnoLine / LineArray kept for scrip-cc emitter path (not used by scrip-interp) */
+/* SnoLine / LineArray — scrip-cc emitter path (not used by scrip-interp) */
 typedef struct SnoLine {
     char *label;
     char *body;

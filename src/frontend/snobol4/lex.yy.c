@@ -1,5 +1,6 @@
+#line 2 "lex.yy.c"
 
-#line 3 "lex.yy.c"
+#line 4 "lex.yy.c"
 
 #define  YY_INT_ALIGNED short int
 
@@ -536,9 +537,9 @@ static void emit_logical_to_pending(FlexExtra *ex);
 static void emit_stmt_seg(FlexExtra *ex, const char *s, int len, int ln, int first);
 static void tokenise_body_pending(FlexExtra *ex, const char *s, int len, int ln);
 
-#line 540 "lex.yy.c"
+#line 541 "lex.yy.c"
 
-#line 542 "lex.yy.c"
+#line 543 "lex.yy.c"
 
 #define INITIAL 0
 #define BODY 1
@@ -812,7 +813,7 @@ YY_DECL
 
 #line 92 "lex.l"
     /* ── comment lines ───────────────────────────────────────── */
-#line 816 "lex.yy.c"
+#line 817 "lex.yy.c"
 
 	while ( /*CONSTCOND*/1 )		/* loops until end-of-file is reached */
 		{
@@ -1011,7 +1012,7 @@ YY_RULE_SETUP
 #line 190 "lex.l"
 ECHO;
 	YY_BREAK
-#line 1015 "lex.yy.c"
+#line 1016 "lex.yy.c"
 
 	case YY_END_OF_BUFFER:
 		{
@@ -2308,15 +2309,16 @@ static void emit_stmt_seg(FlexExtra *ex,
     }
 }
 
+
 static void tokenise_body_pending(FlexExtra *ex,
                                    const char *s, int len, int ln) {
     int pos = 0;
     while (pos < len) {
         unsigned char ch = (unsigned char)s[pos];
-        /* whitespace */
+        /* whitespace — silently consumed; grammar resolves unary/binary */
         if (ch==' '||ch=='\t') {
             while (pos<len&&((unsigned char)s[pos]==' '||(unsigned char)s[pos]=='\t')) pos++;
-            pq_push(ex, make_tok(T_WS,NULL,0,0,ln)); continue;
+            continue;
         }
         /* single-quoted string */
         if (ch=='\'') {
@@ -2360,9 +2362,10 @@ static void tokenise_body_pending(FlexExtra *ex,
             }
             char b[64]; int bl=pos-st<63?pos-st:63;
             memcpy(b,s+st,bl); b[bl]='\0';
-            pq_push(ex, make_tok(T_INT,NULL,atol(b),0,ln)); continue;
+            pq_push(ex, make_tok(T_INT,NULL,atol(b),0,ln));
+            continue;
         }
-        /* &KEYWORD */
+        /* &KEYWORD or bare & */
         if (ch=='&') {
             pos++;
             int st=pos;
@@ -2383,25 +2386,26 @@ static void tokenise_body_pending(FlexExtra *ex,
         if (ch=='*'&&pos+1<len&&s[pos+1]=='*') {
             pos+=2; pq_push(ex, make_tok(T_STARSTAR,NULL,0,0,ln)); continue;
         }
-        /* single-char ops */
-        TokKind k;
-        switch(ch) {
-            case '+': k=T_PLUS;     break; case '-': k=T_MINUS;    break;
-            case '*': k=T_STAR;     break; case '/': k=T_SLASH;    break;
-            case '%': k=T_PCT;      break; case '^': k=T_CARET;    break;
-            case '!': k=T_BANG;     break; case '@': k=T_AT;       break;
-            case '~': k=T_TILDE;    break; case '$': k=T_DOLLAR;   break;
-            case '.': k=T_DOT;      break; case '#': k=T_HASH;     break;
-            case '|': k=T_PIPE;     break; case '=': k=T_EQ;       break;
-            case '?': k=T_QMARK;    break; case ',': k=T_COMMA;    break;
-            case '(': k=T_LPAREN;   break; case ')': k=T_RPAREN;   break;
-            case '[': k=T_LBRACKET; break; case ']': k=T_RBRACKET; break;
-            case '<': k=T_LANGLE;   break; case '>': k=T_RANGLE;   break;
-            default:
-                sno_error(ln,"unexpected char '%c'",ch); pos++; continue;
+        /* all other operators — one token kind; grammar resolves unary/binary */
+        {
+            TokKind k;
+            switch(ch) {
+                case '+': k=T_PLUS;     break; case '-': k=T_MINUS;    break;
+                case '*': k=T_STAR;     break; case '/': k=T_SLASH;    break;
+                case '%': k=T_PCT;      break; case '^': k=T_CARET;    break;
+                case '!': k=T_BANG;     break; case '@': k=T_AT;       break;
+                case '~': k=T_TILDE;    break; case '$': k=T_DOLLAR;   break;
+                case '.': k=T_DOT;      break; case '#': k=T_HASH;     break;
+                case '|': k=T_PIPE;     break; case '=': k=T_EQ;       break;
+                case '?': k=T_QMARK;    break; case ',': k=T_COMMA;    break;
+                case '(': k=T_LPAREN;   break; case ')': k=T_RPAREN;   break;
+                case '[': k=T_LBRACKET; break; case ']': k=T_RBRACKET; break;
+                case '<': k=T_LANGLE;   break; case '>': k=T_RANGLE;   break;
+                default:  sno_error(ln,"unexpected char '%c'",ch); pos++; continue;
+            }
+            pos++;
+            pq_push(ex, make_tok(k,NULL,0,0,ln));
         }
-        pos++;
-        pq_push(ex, make_tok(k,NULL,0,0,ln));
     }
 }
 
@@ -2459,88 +2463,50 @@ void sno_error(int lineno, const char *fmt, ...) {
     fputc('\n', stderr);
 }
 
-/* ── lex_open_str: str-slice path for body/goto sub-parsing in parse.c ─── */
+/* ── lex_open_str: tokenise a sub-string using the body tokeniser ────────── */
+/* Pre-populates the pending queue via tokenise_body_pending — same tokenizer,
+ * no new flex scanner, no fmemopen. flex_lex_next drains the queue then
+ * returns T_EOF. */
 
 void lex_open_str(Lex *lx, const char *s, int len, int lineno) {
     memset(lx, 0, sizeof *lx);
-    lx->src = s; lx->pos = 0; lx->len = len; lx->lineno = lineno;
-}
-
-/* raw_next_str: minimal tokeniser for in-memory body/goto strings */
-static Token raw_next_str(Lex *lx) {
-    const char *s = lx->src;
-    int pos = lx->pos, len = lx->len, ln = lx->lineno;
-#define EMIT(k,sv,iv,dv) do { lx->pos=pos; return (Token){k,sv,iv,dv,ln}; } while(0)
-    if (pos >= len) EMIT(T_EOF, NULL, 0, 0.0);
-    if (s[pos]==' '||s[pos]=='\t') {
-        while (pos<len&&(s[pos]==' '||s[pos]=='\t')) pos++;
-        EMIT(T_WS," ",0,0.0);
-    }
-    if (s[pos]=='\''||s[pos]=='"') {
-        char q=s[pos++]; int st=pos;
-        while (pos<len&&s[pos]!=q) pos++;
-        const char *sv=intern_n(s+st,pos-st);
-        if (pos<len) pos++;
-        EMIT(T_STR,sv,0,0.0);
-    }
-    if (isdigit((unsigned char)s[pos])) {
-        int st=pos,real=0;
-        while (pos<len&&isdigit((unsigned char)s[pos])) pos++;
-        if (pos<len&&s[pos]=='.'){real=1;pos++;while(pos<len&&isdigit((unsigned char)s[pos]))pos++;}
-        if (pos<len&&(s[pos]=='e'||s[pos]=='E')){real=1;pos++;
-            if(pos<len&&(s[pos]=='+'||s[pos]=='-'))pos++;
-            while(pos<len&&isdigit((unsigned char)s[pos]))pos++;}
-        const char *sv=intern_n(s+st,pos-st);
-        if (real) EMIT(T_REAL,sv,0,atof(sv)); else EMIT(T_INT,sv,atol(sv),0.0);
-    }
-    if (s[pos]=='&') {
-        int st=++pos;
-        while (pos<len&&(isalnum((unsigned char)s[pos])||s[pos]=='_')) pos++;
-        EMIT(T_KEYWORD,intern_n(s+st,pos-st),0,0.0);
-    }
-    if (isalpha((unsigned char)s[pos])||s[pos]=='_') {
-        int st=pos;
-        while (pos<len&&(isalnum((unsigned char)s[pos])||s[pos]=='_'||s[pos]=='.')) pos++;
-        const char *sv=intern_n(s+st,pos-st);
-        if (strcmp(sv,"END")==0) EMIT(T_END,sv,0,0.0);
-        EMIT(T_IDENT,sv,0,0.0);
-    }
-    char c=s[pos++];
-    if (c=='*'&&pos<len&&s[pos]=='*'){pos++;EMIT(T_STARSTAR,"**",0,0.0);}
-    if (c==':'&&pos<len&&(s[pos]=='S'||s[pos]=='s')){pos++;EMIT(T_SGOTO,":S",0,0.0);}
-    if (c==':'&&pos<len&&(s[pos]=='F'||s[pos]=='f')){pos++;EMIT(T_FGOTO,":F",0,0.0);}
-    static const struct{char c;TokKind k;} ops[]={
-        {'+',T_PLUS},{'-',T_MINUS},{'*',T_STAR},{'/',T_SLASH},{'%',T_PCT},
-        {'^',T_CARET},{'!',T_BANG},{'&',T_AMP},{'@',T_AT},{'~',T_TILDE},
-        {'$',T_DOLLAR},{'.', T_DOT},{'#',T_HASH},{'|',T_PIPE},{'=',T_EQ},
-        {'?',T_QMARK},{',',T_COMMA},{'(',T_LPAREN},{')',T_RPAREN},
-        {'[',T_LBRACKET},{']',T_RBRACKET},{'<',T_LANGLE},{'>',T_RANGLE},
-        {':',T_COLON},{0,T_ERR}};
-    for (int i=0;ops[i].c;i++) if (ops[i].c==c) EMIT(ops[i].k,intern_n(&c,1),0,0.0);
-    EMIT(T_ERR,NULL,0,0.0);
-#undef EMIT
+    lx->lineno = lineno;
+    FlexExtra *ex = calloc(1, sizeof(FlexExtra));
+    ex->logical_lineno = lineno;
+    lx->_extra   = ex;
+    lx->_scanner = NULL;   /* no scanner — queue-only mode */
+    tokenise_body_pending(ex, s, len, lineno);
+    /* Append EOF sentinel so flex_lex_next knows when to stop */
+    pq_push(ex, make_tok(T_EOF, NULL, 0, 0, lineno));
 }
 
 /* ── lex_next / lex_peek / lex_at_end ───────────────────────────────────── */
 
 Token lex_next(Lex *lx) {
     if (lx->peeked) { lx->peeked=0; return lx->peek; }
-    if (lx->src)       return raw_next_str(lx);
-    if (lx->_scanner)  return flex_lex_next(lx);
-    return (Token){T_EOF,NULL,0,0.0,lx->lineno};
+    if (lx->_scanner) return flex_lex_next(lx);
+    /* queue-only mode: _extra holds pre-tokenized pq */
+    if (lx->_extra) {
+        FlexExtra *ex = (FlexExtra *)lx->_extra;
+        if (!pq_empty(ex)) return pq_pop(ex);
+    }
+    return (Token){T_EOF,NULL,0,0,lx->lineno};
 }
 
 Token lex_peek(Lex *lx) {
     if (!lx->peeked) {
-        lx->peek = lx->src      ? raw_next_str(lx) :
-                   lx->_scanner ? flex_lex_next(lx) :
-                   (Token){T_EOF,NULL,0,0.0,lx->lineno};
-        lx->peeked=1;
+        lx->peek = lex_next(lx);
+        lx->peeked = 1;
     }
     return lx->peek;
 }
 
 int lex_at_end(Lex *lx) { return lex_peek(lx).kind==T_EOF; }
+
+void lex_destroy(Lex *lx) {
+    if (lx->_scanner) flex_lex_destroy(lx);
+    else if (lx->_extra) { free(lx->_extra); lx->_extra = NULL; }
+}
 
 /* ── sno_parse ──────────────────────────────────────────────────────────── */
 
