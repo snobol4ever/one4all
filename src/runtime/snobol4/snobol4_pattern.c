@@ -961,23 +961,26 @@ int match_pattern(DESCR_t pat, const char *subject) {
     MatchCtx mat_ctx; memset(&mat_ctx, 0, sizeof(mat_ctx)); mat_ctx.subject = subject;
     Pattern *root = materialise(sp, &mat_ctx);
 
-    /* SNOBOL4 unanchored MATCH_fn: try each starting position */
+    /* SNOBOL4 unanchored MATCH_fn: try each starting position.
+     * Reuse mat_ctx (not a fresh ctx) so captures[] registered during
+     * materialise() survive into apply_captures() on success.
+     * Reset only captures[i].start/end between attempts. */
     if (kw_anchor) {
-        /* &ANCHOR=1: anchored at position 0 only */
-        MatchCtx ctx; memset(&ctx, 0, sizeof(ctx)); ctx.subject = subject;
-        int r = try_match_at_root(root, subject, slen, 0, &ctx);
+        for (int i = 0; i < mat_ctx.ncaptures; i++)
+            mat_ctx.captures[i].start = mat_ctx.captures[i].end = -1;
+        int r = try_match_at_root(root, subject, slen, 0, &mat_ctx);
         pattern_free_all(&mat_ctx.pl);
         return r >= 0;
     }
 
     for (int start = 0; start <= slen; start++) {
-        MatchCtx ctx; memset(&ctx, 0, sizeof(ctx)); ctx.subject = subject;
-        int r = try_match_at_root(root, subject, slen, start, &ctx);
+        for (int i = 0; i < mat_ctx.ncaptures; i++)
+            mat_ctx.captures[i].start = mat_ctx.captures[i].end = -1;
+        int r = try_match_at_root(root, subject, slen, start, &mat_ctx);
         if (r >= 0) {
             pattern_free_all(&mat_ctx.pl);
             return 1;
         }
-        /* Don't scan past end for patterns that consume nothing */
         if (start == slen) break;
     }
     pattern_free_all(&mat_ctx.pl);
@@ -1042,20 +1045,21 @@ int match_and_replace(DESCR_t *subject, DESCR_t pat, DESCR_t replacement) {
     MatchCtx mat_ctx; memset(&mat_ctx, 0, sizeof(mat_ctx)); mat_ctx.subject = s;
     Pattern *mat_root = materialise(sp, &mat_ctx);
 
-    /* Try each starting position */
+    /* Try each starting position — reuse mat_ctx so captures[] are visible */
     int match_start = -1, match_end = -1;
     for (int start = 0; start <= slen; start++) {
-        MatchCtx ctx; memset(&ctx, 0, sizeof(ctx)); ctx.subject = s;
-        ctx.scan_start = start;
+        for (int i = 0; i < mat_ctx.ncaptures; i++)
+            mat_ctx.captures[i].start = mat_ctx.captures[i].end = -1;
+        mat_ctx.scan_start = start;
         EngineOpts opts;
-        opts.cap_fn    = (ctx.ncaptures > 0) ? capture_callback : NULL;
-        opts.cap_data  = &ctx;
+        opts.cap_fn    = (mat_ctx.ncaptures > 0) ? capture_callback : NULL;
+        opts.cap_data  = &mat_ctx;
         opts.var_fn    = var_resolve_callback;
-        opts.var_data  = &ctx;
+        opts.var_data  = &mat_ctx;
         opts.scan_start = start;
         MatchResult mr = engine_match_ex(mat_root, s + start, slen - start, &opts);
         if (mr.matched) {
-            apply_captures(&ctx);
+            apply_captures(&mat_ctx);
             match_start = start;
             match_end   = start + mr.end;
             pattern_free_all(&mat_ctx.pl);
