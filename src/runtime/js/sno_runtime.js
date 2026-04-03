@@ -33,7 +33,7 @@ const _vars = new Proxy(_store, {
         if (typeof k === 'string') k = k.toUpperCase();
         o[k] = v;
         if (k === 'OUTPUT') {
-            process.stdout.write(String(v === null ? '' : v) + '\n');
+            process.stdout.write(_str(v) + '\n');
         }
         return true;
     },
@@ -72,40 +72,40 @@ function _str(v) {
         s = s.replace(/^-0\.(\d)/, '-.$1');  /* -0.5 → -.5 but -0. stays -0. */
         return s;
     }
-    if (typeof v === 'object') return '';  /* DATA/ARRAY/TABLE objects stringify as '' */
-    if (typeof v === 'string' && v.indexOf('.') >= 0 && isFinite(Number(v))) {
-        /* real-literal string (e.g. "1.0" from E_FLIT or _real_result) — format as SNOBOL4 real */
-        const n = Number(v);
-        let s = String(n);
+    if (_is_real(v)) {
+        /* tagged real — format as SNOBOL4 real: 1.0→"1.", 0.5→".5" */
+        let s = String(v.v);
         if (s.indexOf('.') < 0 && s.indexOf('e') < 0) s += '.';
         s = s.replace(/(\.\d*?)0+$/, '$1');
         s = s.replace(/^0\.(\d)/, '.$1');
         s = s.replace(/^-0\.(\d)/, '-.$1');
         return s;
     }
-    return String(v);
+    if (typeof v === 'object') return '';  /* DATA/ARRAY/TABLE objects stringify as '' */
+    return String(v);  /* plain strings (including '1.0' quoted literals) unchanged */
 }
 
 /** Coerce to number; throws if not numeric */
 function _num(v) {
     if (v === null || v === undefined || v === '') return 0;
+    if (_is_real(v)) return v.v;
     const n = Number(v);
     if (!isFinite(n)) throw new Error('SNOBOL4 type error: not a number: ' + String(v));
     return n;
 }
 
-/* Return true if value is an integer (not a real string like "3.") */
+/* Return true if value is an integer (not real) */
 function _is_int(v) {
-    if (typeof v === 'string') {
-        /* real literal strings contain a dot: "3.", "1.5" etc. */
-        return v.indexOf('.') < 0 && v.indexOf('e') < 0 && v.indexOf('E') < 0;
-    }
+    if (v === null || v === undefined) return true;   /* SNOBOL4 null = integer 0 */
+    if (_is_real(v)) return false;                    /* tagged real object */
+    if (typeof v === 'string') return true;           /* plain strings are integer-convertible */
     return typeof v === 'number' && Number.isInteger(v);
 }
 
 /* Return true if value looks numeric */
 function _is_numeric(v) {
     if (v === null || v === undefined || v === '') return false;
+    if (_is_real(v)) return true;
     return isFinite(Number(v));
 }
 
@@ -119,10 +119,11 @@ function _int_if_possible(n) {
 
 /* When either operand is real, tag result as real string so _str() formats it with '.'.
  * This preserves SNOBOL4 real type through whole-number results (e.g. 2.0+3.0=5.) */
-function _real_result(r) {
-    if (Number.isInteger(r)) return r + '.0';  /* tag as real string */
-    return r;
-}
+/* Real-typed value wrapper — produced only by arithmetic, never by quoted literals.
+ * Keeps real type visible to _is_int/_str/_num without dot-sniffing quoted strings. */
+function _mkreal(r) { return Object.freeze({ _r: 1, v: r }); }
+function _is_real(v) { return v !== null && typeof v === 'object' && v._r === 1; }
+function _real_result(r) { return _mkreal(typeof r === 'number' ? r : Number(r)); }
 
 function _add(a, b) {
     if (a === _FAIL || b === _FAIL) return _FAIL;
@@ -321,7 +322,7 @@ const {
 
 module.exports = {
     _vars, _FAIL, _is_fail, _str, _num, _cat,
-    _add, _sub, _mul, _div, _pow, _apply, _kw, _is_int, _real_result,
+    _add, _sub, _mul, _div, _pow, _apply, _kw, _is_int, _is_real, _real_result,
     _match, _match_anchored, _user_fns,
     PAT_lit, PAT_alt, PAT_seq, PAT_any, PAT_notany,
     PAT_span, PAT_break, PAT_arb, PAT_rem,

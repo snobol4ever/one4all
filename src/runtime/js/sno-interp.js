@@ -36,7 +36,7 @@ const { sno_search, sno_match,
         _set_vars_hook } = sno_eng;
 
 const { _FAIL, _is_fail, _str, _num, _add, _sub, _mul, _div, _pow,
-        _vars, _kw, _is_int, _real_result } = sno_rt;
+        _vars, _kw, _is_int, _is_real, _real_result } = sno_rt;
 
 _set_vars_hook((v, text) => { _vars[v] = text; });
 
@@ -100,7 +100,7 @@ const T_GOTO_SEP=35;  /* ':' at depth-0 — body/goto separator                *
 const T_STMT_SEP=36;  /* ';' at depth-0 — multi-statement separator           */
 
 function tok(kind, sval, ival, dval, lineno) {
-  return { kind, sval:sval||null, ival:ival||0, dval:dval||0.0, lineno };
+  return { kind, sval:(sval!=null?sval:null), ival:ival||0, dval:dval||0.0, lineno };
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -780,7 +780,7 @@ function interp_eval(e) {
   switch(e.kind) {
     case E_QLIT:    return e.sval;
     case E_ILIT:    return e.ival;
-    case E_FLIT:    return e.sval; /* string like "1.0" preserves real-ness for _is_int() */
+    case E_FLIT:    return _real_result(parseFloat(e.sval)); /* tagged real */
     case E_NUL:     return null;
     case E_VAR:     { const v=_vars[e.sval]; return v===undefined?null:v; }
     case E_KEYWORD: { const v=_vars['&'+e.sval.toUpperCase()]; return v===undefined?null:v; }
@@ -796,7 +796,7 @@ function interp_eval(e) {
                   if(_is_fail(a)||_is_fail(b)) return _FAIL;
                   const an=_num(a),bn=_num(b); return bn===0?_FAIL:an%bn; }
     case E_POW: { const a=interp_eval(e.children[0]),b=interp_eval(e.children[1]);
-                  if(_is_fail(a)||_is_fail(b)) return _FAIL; return Math.pow(_num(a),_num(b)); }
+                  if(_is_fail(a)||_is_fail(b)) return _FAIL; return _pow(a,b); }
     case E_MNS: { const a=interp_eval(e.children[0]); if(_is_fail(a)) return _FAIL;
                   const r=-_num(a); return _is_int(a)?r:_real_result(r); }
     case E_PLS: { const a=interp_eval(e.children[0]); if(_is_fail(a)) return _FAIL;
