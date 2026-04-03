@@ -519,29 +519,29 @@ function engine_ζ(S, n, Π, startPos) {
 let _vars_set = (v, text) => { /* stub — overridden by runtime */ };
 
 /* ── Pattern builder helpers (used by emitted code) ─────────────────────── */
-function PAT_lit(s)       { return s; }
-function PAT_alt(...args) { return {t:'ALT',  ap:args}; }
-function PAT_seq(...args) { return {t:'SEQ',  ap:args}; }
-function PAT_any(cs)      { return {t:'ANY',  cs}; }
-function PAT_notany(cs)   { return {t:'NOTANY',cs}; }
-function PAT_span(cs)     { return {t:'SPAN', cs}; }
-function PAT_break(cs)    { return {t:'BREAK',cs}; }
-function PAT_arb()        { return {t:'ARB'}; }
-function PAT_rem()        { return {t:'REM'}; }
-function PAT_len(n)       { return {t:'LEN', n}; }
-function PAT_pos(n)       { return {t:'POS', n}; }
-function PAT_rpos(n)      { return {t:'RPOS',n}; }
-function PAT_tab(n)       { return {t:'TAB', n}; }
-function PAT_rtab(n)      { return {t:'RTAB',n}; }
-function PAT_fence()      { return {t:'FENCE'}; }
-function PAT_succeed()    { return {t:'SUCCEED'}; }
-function PAT_fail()       { return {t:'FAIL'}; }
-function PAT_abort()      { return {t:'ABORT'}; }
-function PAT_bal()        { return {t:'BAL'}; }
-function PAT_arbno(p)     { return {t:'ARBNO',p}; }
-function PAT_capt_imm(p,v){ return {t:'CAPT_IMM', p, v}; }
-function PAT_capt_cond(p,v){ return {t:'CAPT_COND',p, v}; }
-function PAT_capt_cursor(v){ return {t:'CAPT_CURSOR', v}; }
+function PAT_lit(s)       { return s; }  /* string — __pat not needed, checked by typeof */
+function PAT_alt(...args) { return {__pat:1,t:'ALT',  ap:args}; }
+function PAT_seq(...args) { return {__pat:1,t:'SEQ',  ap:args}; }
+function PAT_any(cs)      { return {__pat:1,t:'ANY',  cs}; }
+function PAT_notany(cs)   { return {__pat:1,t:'NOTANY',cs}; }
+function PAT_span(cs)     { return {__pat:1,t:'SPAN', cs}; }
+function PAT_break(cs)    { return {__pat:1,t:'BREAK',cs}; }
+function PAT_arb()        { return {__pat:1,t:'ARB'}; }
+function PAT_rem()        { return {__pat:1,t:'REM'}; }
+function PAT_len(n)       { return {__pat:1,t:'LEN', n}; }
+function PAT_pos(n)       { return {__pat:1,t:'POS', n}; }
+function PAT_rpos(n)      { return {__pat:1,t:'RPOS',n}; }
+function PAT_tab(n)       { return {__pat:1,t:'TAB', n}; }
+function PAT_rtab(n)      { return {__pat:1,t:'RTAB',n}; }
+function PAT_fence()      { return {__pat:1,t:'FENCE'}; }
+function PAT_succeed()    { return {__pat:1,t:'SUCCEED'}; }
+function PAT_fail()       { return {__pat:1,t:'FAIL'}; }
+function PAT_abort()      { return {__pat:1,t:'ABORT'}; }
+function PAT_bal()        { return {__pat:1,t:'BAL'}; }
+function PAT_arbno(p)     { return {__pat:1,t:'ARBNO',p}; }
+function PAT_capt_imm(p,v){ return {__pat:1,t:'CAPT_IMM', p, v}; }
+function PAT_capt_cond(p,v){ return {__pat:1,t:'CAPT_COND',p, v}; }
+function PAT_capt_cursor(v){ return {__pat:1,t:'CAPT_CURSOR', v}; }
 
 /* ── Public search/match API ─────────────────────────────────────────────── */
 function sno_search(S, Π) { return engine(S, Π, false); }

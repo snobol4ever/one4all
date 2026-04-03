@@ -64,15 +64,25 @@ function _str(v) {
     if (v === _FAIL) return '';
     if (typeof v === 'number') {
         if (Number.isInteger(v)) return String(v);
-        /* SNOBOL4 real format: always has decimal point; 1.0→"1.", 0.5→".5" */
+        /* SNOBOL4 real format: always has decimal point; 1.0→"1.", 0.5→".5", 0.0→"0." */
         let s = String(v);
         if (s.indexOf('.') < 0 && s.indexOf('e') < 0) s += '.';
         s = s.replace(/(\.\d*?)0+$/, '$1');
-        s = s.replace(/^0\./, '.');
-        s = s.replace(/^-0\./, '-.');
+        s = s.replace(/^0\.(\d)/, '.$1');    /* 0.5 → .5 but 0. stays 0. */
+        s = s.replace(/^-0\.(\d)/, '-.$1');  /* -0.5 → -.5 but -0. stays -0. */
         return s;
     }
     if (typeof v === 'object') return '';  /* DATA/ARRAY/TABLE objects stringify as '' */
+    if (typeof v === 'string' && v.indexOf('.') >= 0 && isFinite(Number(v))) {
+        /* real-literal string (e.g. "1.0" from E_FLIT or _real_result) — format as SNOBOL4 real */
+        const n = Number(v);
+        let s = String(n);
+        if (s.indexOf('.') < 0 && s.indexOf('e') < 0) s += '.';
+        s = s.replace(/(\.\d*?)0+$/, '$1');
+        s = s.replace(/^0\.(\d)/, '.$1');
+        s = s.replace(/^-0\.(\d)/, '-.$1');
+        return s;
+    }
     return String(v);
 }
 
@@ -107,34 +117,43 @@ function _int_if_possible(n) {
     return Number.isInteger(n) ? n : n;
 }
 
+/* When either operand is real, tag result as real string so _str() formats it with '.'.
+ * This preserves SNOBOL4 real type through whole-number results (e.g. 2.0+3.0=5.) */
+function _real_result(r) {
+    if (Number.isInteger(r)) return r + '.0';  /* tag as real string */
+    return r;
+}
+
 function _add(a, b) {
     if (a === _FAIL || b === _FAIL) return _FAIL;
     const an = _num(a), bn = _num(b);
     const r = an + bn;
-    return (_is_int(a) && _is_int(b)) ? Math.trunc(r) : r;
+    return (_is_int(a) && _is_int(b)) ? Math.trunc(r) : _real_result(r);
 }
 function _sub(a, b) {
     if (a === _FAIL || b === _FAIL) return _FAIL;
     const an = _num(a), bn = _num(b);
     const r = an - bn;
-    return (_is_int(a) && _is_int(b)) ? Math.trunc(r) : r;
+    return (_is_int(a) && _is_int(b)) ? Math.trunc(r) : _real_result(r);
 }
 function _mul(a, b) {
     if (a === _FAIL || b === _FAIL) return _FAIL;
     const an = _num(a), bn = _num(b);
     const r = an * bn;
-    return (_is_int(a) && _is_int(b)) ? Math.trunc(r) : r;
+    return (_is_int(a) && _is_int(b)) ? Math.trunc(r) : _real_result(r);
 }
 function _div(a, b) {
     if (a === _FAIL || b === _FAIL) return _FAIL;
     const an = _num(a), bn = _num(b);
     if (bn === 0) throw new Error('SNOBOL4: division by zero');
     if (_is_int(a) && _is_int(b)) return Math.trunc(an / bn);
-    return an / bn;
+    return _real_result(an / bn);
 }
 function _pow(a, b) {
     if (a === _FAIL || b === _FAIL) return _FAIL;
-    return _int_if_possible(Math.pow(_num(a), _num(b)));
+    const r = Math.pow(_num(a), _num(b));
+    if (_is_int(a) && _is_int(b)) return r;  /* int ** int → int (may be non-integer JS num) */
+    return _real_result(r);  /* real base or real exponent → real result */
 }
 function _uplus(a)  { return _num(a); }
 
@@ -302,7 +321,7 @@ const {
 
 module.exports = {
     _vars, _FAIL, _is_fail, _str, _num, _cat,
-    _add, _sub, _mul, _div, _pow, _apply, _kw,
+    _add, _sub, _mul, _div, _pow, _apply, _kw, _is_int, _real_result,
     _match, _match_anchored, _user_fns,
     PAT_lit, PAT_alt, PAT_seq, PAT_any, PAT_notany,
     PAT_span, PAT_break, PAT_arb, PAT_rem,

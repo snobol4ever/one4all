@@ -36,7 +36,7 @@ const { sno_search, sno_match,
         _set_vars_hook } = sno_eng;
 
 const { _FAIL, _is_fail, _str, _num, _add, _sub, _mul, _div, _pow,
-        _vars, _kw } = sno_rt;
+        _vars, _kw, _is_int, _real_result } = sno_rt;
 
 _set_vars_hook((v, text) => { _vars[v] = text; });
 
@@ -265,7 +265,7 @@ class Lexer {
             while (this.pos < len && src[this.pos] >= '0' && src[this.pos] <= '9')
               { s += src[this.pos]; this._adv(); }
           }
-          return tok(T_REAL, null, 0, parseFloat(s), ln);
+          return tok(T_REAL, s, 0, parseFloat(s), ln);  /* sval=raw string preserves float marker */
         }
         return tok(T_INT, null, parseInt(s,10), 0, ln);
       }
@@ -399,7 +399,7 @@ class Parser {
       return inner;
     }
     if (t.kind===T_STR)     { this.lx.next(); return expr_leaf(E_QLIT, t.sval); }
-    if (t.kind===T_REAL)    { this.lx.next(); return expr_dval(E_FLIT, t.dval); }
+    if (t.kind===T_REAL)    { this.lx.next(); return expr_leaf(E_FLIT, t.sval); } /* sval="1.0" preserves real */
     if (t.kind===T_INT)     { this.lx.next(); return expr_ival(E_ILIT, t.ival); }
     if (t.kind===T_KEYWORD) { this.lx.next(); return expr_leaf(E_KEYWORD, t.sval); }
     if (t.kind===T_END)     { this.lx.next(); return expr_leaf(E_VAR, t.sval); }
@@ -780,7 +780,7 @@ function interp_eval(e) {
   switch(e.kind) {
     case E_QLIT:    return e.sval;
     case E_ILIT:    return e.ival;
-    case E_FLIT:    return e.dval;
+    case E_FLIT:    return e.sval; /* string like "1.0" preserves real-ness for _is_int() */
     case E_NUL:     return null;
     case E_VAR:     { const v=_vars[e.sval]; return v===undefined?null:v; }
     case E_KEYWORD: { const v=_vars['&'+e.sval.toUpperCase()]; return v===undefined?null:v; }
@@ -797,8 +797,10 @@ function interp_eval(e) {
                   const an=_num(a),bn=_num(b); return bn===0?_FAIL:an%bn; }
     case E_POW: { const a=interp_eval(e.children[0]),b=interp_eval(e.children[1]);
                   if(_is_fail(a)||_is_fail(b)) return _FAIL; return Math.pow(_num(a),_num(b)); }
-    case E_MNS: { const a=interp_eval(e.children[0]); if(_is_fail(a)) return _FAIL; return -_num(a); }
-    case E_PLS: { const a=interp_eval(e.children[0]); if(_is_fail(a)) return _FAIL; return _num(a); }
+    case E_MNS: { const a=interp_eval(e.children[0]); if(_is_fail(a)) return _FAIL;
+                  const r=-_num(a); return _is_int(a)?r:_real_result(r); }
+    case E_PLS: { const a=interp_eval(e.children[0]); if(_is_fail(a)) return _FAIL;
+                  const r=_num(a); return _is_int(a)?r:_real_result(r); }
     case E_SEQ:  /* fall through — E_SEQ in value context = string concat */
     case E_CAT: {
       let s='';
@@ -871,7 +873,7 @@ function _build_pat(e) {
   switch(e.kind) {
     case E_QLIT:   return PAT_lit(e.sval);
     case E_ILIT:   return PAT_lit(String(e.ival));
-    case E_FLIT:   return PAT_lit(String(e.dval));
+    case E_FLIT:   return PAT_lit(_str(e.sval));
     case E_VAR:    {
       /* Bare pattern keywords (no parens) parse as E_VAR — dispatch to constructors */
       switch(e.sval.toUpperCase()) {
@@ -883,7 +885,11 @@ function _build_pat(e) {
         case 'REM':     return PAT_rem();
         case 'BAL':     return PAT_bal();
       }
-      const v=_vars[e.sval]; return _is_fail(v)?_FAIL:PAT_lit(_str(v??''));
+      const v=_vars[e.sval];
+      if (_is_fail(v)) return _FAIL;
+      /* pattern-value variable: if stored value is a PAT object, return directly */
+      if (v !== null && v !== undefined && (typeof v === 'object' && v.__pat)) return v;
+      return PAT_lit(_str(v??''));
     }
     case E_ALT:    return PAT_alt(...e.children.map(_build_pat));
     case E_SEQ:    return PAT_seq(...e.children.map(_build_pat));
