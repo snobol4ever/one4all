@@ -124,7 +124,7 @@ public sealed class SnobolEnv
         if (!IsArray(handle)) return DESCR.Null;
         var arr = _arrays[(int)(handle.Int & IDX_MASK)];
         int i = (int)idx - 1;   // SNOBOL4 is 1-based
-        if (i < 0 || i >= arr.Length) return DESCR.Null;
+        if (i < 0 || i >= arr.Length) return DESCR.Fail;
         return arr[i] ?? DESCR.Null;
     }
 
@@ -215,6 +215,7 @@ public sealed class SnobolEnv
         Set("&TRIM",     DESCR.Of(0L));
         Set("&FULLSCAN", DESCR.Of(0L));
         Set("&STCOUNT",  DESCR.Of(0L));
+        Set("&STNO",     DESCR.Of(0L));
         Set("&STLIMIT",  DESCR.Of(50000L));
         Set("&ALPHABET", DESCR.Of(new string(Enumerable.Range(0, 256).Select(i => (char)i).ToArray())));
         Set("&UCASE",    DESCR.Of("ABCDEFGHIJKLMNOPQRSTUVWXYZ"));
@@ -229,6 +230,14 @@ public sealed class SnobolEnv
     public void Set(string name, DESCR val) =>
         _vars[name.ToUpperInvariant()] = val;
 
+    public void IncrStcount()
+    {
+        var v = Get("&STCOUNT");
+        _vars["&STCOUNT"] = DESCR.Of(v.Type == DType.Int ? v.Int + 1 : 1L);
+        var v2 = Get("&STNO");
+        _vars["&STNO"] = DESCR.Of(v2.Type == DType.Int ? v2.Int + 1 : 1L);
+    }
+
     // User-defined functions: name → (paramNames, localNames, bodyLabel)
     public sealed record FuncDef(string[] Params, string[] Locals, string BodyLabel);
     private readonly Dictionary<string, FuncDef> _funcs =
@@ -236,16 +245,15 @@ public sealed class SnobolEnv
 
     public void DefineFunc(string spec, string? entryLabel = null)
     {
-        // spec: "FUNCNAME(p1,p2,p3:l1,l2)"
+        // spec: "FUNCNAME(p1,p2,p3)l1,l2,l3"  (locals after closing paren)
         var paren = spec.IndexOf('(');
         if (paren < 0) { _funcs[spec.ToUpperInvariant()] = new FuncDef(Array.Empty<string>(), Array.Empty<string>(), (entryLabel ?? spec).ToUpperInvariant()); return; }
-        var name  = spec[..paren].Trim().ToUpperInvariant();
-        var inner = spec[(paren+1)..spec.LastIndexOf(')')].Trim();
-        var colonIdx = inner.IndexOf(':');
-        string paramStr = colonIdx >= 0 ? inner[..colonIdx] : inner;
-        string localStr = colonIdx >= 0 ? inner[(colonIdx+1)..] : "";
-        var pars  = paramStr.Split(',').Select(p => p.Trim().ToUpperInvariant()).Where(p => p.Length > 0).ToArray();
-        var locs  = localStr.Split(',').Select(l => l.Trim().ToUpperInvariant()).Where(l => l.Length > 0).ToArray();
+        var name     = spec[..paren].Trim().ToUpperInvariant();
+        var closeParen = spec.LastIndexOf(')');
+        var inner    = spec[(paren+1)..closeParen].Trim();
+        var localStr = closeParen < spec.Length - 1 ? spec[(closeParen+1)..].TrimStart(',').Trim() : "";
+        var pars = inner.Split(',').Select(p => p.Trim().ToUpperInvariant()).Where(p => p.Length > 0).ToArray();
+        var locs = localStr.Split(',').Select(l => l.Trim().ToUpperInvariant()).Where(l => l.Length > 0).ToArray();
         _funcs[name] = new FuncDef(pars, locs, (entryLabel ?? name).ToUpperInvariant());
     }
 

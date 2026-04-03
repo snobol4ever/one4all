@@ -65,6 +65,7 @@ public sealed class Executor
             if (stmt.IsEnd) break;
 
             bool succeeded = ExecStmt(stmt, out string? gotoOverride);
+            _env.IncrStcount();
 
             string? target = gotoOverride
                 ?? stmt.Go?.Uncond
@@ -261,7 +262,7 @@ public sealed class Executor
             IrKind.E_POW     => Arith(n, '^'),
             IrKind.E_MOD     => Arith(n, '%'),
             IrKind.E_MNS     => Negate(n),
-            IrKind.E_PLS     => EvalNode(n.Children[0]),
+            IrKind.E_PLS     => CoerceNumeric(EvalNode(n.Children[0])),
 
             IrKind.E_FNC     => EvalFnc(n),
             IrKind.E_IDX     => EvalIdx(n),
@@ -288,7 +289,10 @@ public sealed class Executor
         if (name == "INPUT")
         {
             var line = _input.ReadLine();
-            return line == null ? DESCR.Fail : DESCR.Of(line);
+            if (line == null) return DESCR.Fail;
+            var trim = _env.Get("&TRIM");
+            if (trim.Type == DType.Int && trim.Int != 0) line = line.TrimEnd();
+            return DESCR.Of(line);
         }
         return _env.Get(name);
     }
@@ -353,6 +357,17 @@ public sealed class Executor
         var v = EvalNode(n.Children[0]);
         if (v.IsFail) return DESCR.Fail;
         return v.Type == DType.Real ? DESCR.Of(-v.Real) : DESCR.Of(-v.ToInt());
+    }
+
+    private static DESCR CoerceNumeric(DESCR v)
+    {
+        if (v.IsFail || v.Type != DType.String) return v;
+        var s = v.Str ?? "";
+        if (long.TryParse(s, out var i)) return DESCR.Of(i);
+        if (double.TryParse(s, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var d))
+            return DESCR.Of(d);
+        return v;
     }
 
     private DESCR EvalFnc(IrNode n)

@@ -25,7 +25,41 @@ public static class Snobol4Parser
     public static IrStmt[] ParseSource(string source)
     {
         var logicalLines = SplitLogicalLines(source);
-        return logicalLines.Select(ll => ParseBody(ll.label, ll.body)).ToArray();
+        var expanded = new List<(string? label, string body)>();
+        foreach (var (lbl, body) in logicalLines)
+        {
+            var parts = SplitSemicolons(body);
+            if (parts.Count == 0)
+            {
+                // Empty body — keep label-only entry so label table is populated
+                expanded.Add((lbl, ""));
+                continue;
+            }
+            for (int i = 0; i < parts.Count; i++)
+                expanded.Add((i == 0 ? lbl : null, parts[i]));
+        }
+        return expanded.Select(ll => ParseBody(ll.label, ll.body)).ToArray();
+    }
+
+    private static List<string> SplitSemicolons(string s)
+    {
+        var parts = new List<string>();
+        int depth = 0; bool inQ = false; char qc = '\0'; int start = 0;
+        for (int i = 0; i < s.Length; i++)
+        {
+            char c = s[i];
+            if (inQ) { if (c == qc) inQ = false; continue; }
+            if (c == '\'' || c == '"') { inQ = true; qc = c; continue; }
+            if (c == '(' || c == '<') depth++;
+            else if (c == ')' || c == '>') depth--;
+            else if (c == ';' && depth == 0)
+            {
+                parts.Add(s[start..i].Trim());
+                start = i + 1;
+            }
+        }
+        parts.Add(s[start..].Trim());
+        return parts.Where(p => p.Length > 0).ToList();
     }
 
     // ── Logical line splitter ─────────────────────────────────────────────────
@@ -114,8 +148,7 @@ public static class Snobol4Parser
     private static (string body, string? u, string? s, string? f) ExtractGotos(string line)
     {
         // SNOBOL4 goto: :(U)  |  :S(X)  |  :F(Y)  |  :S(X)F(Y)  |  :F(Y)S(X)
-        // Colon prefixes only the first tag; the second is bare S or F.
-        // We scan right-to-left for (label) groups, matching both :TAG and bare TAG.
+        // Scan right-to-left, skipping over quoted strings, to find (label) groups.
         string? gU = null, gS = null, gF = null;
         var work = line;
         bool progress = true;
@@ -124,26 +157,23 @@ public static class Snobol4Parser
             progress = false;
             var w = work.TrimEnd();
             if (!w.EndsWith(')')) break;
-            int close = w.LastIndexOf(')');
-            int open  = w.LastIndexOf('(', close);
+
+            // Find the matching '(' for the final ')' — scan right-to-left skipping quotes
+            int close = w.Length - 1; // index of final ')'
+            int open  = FindMatchingOpenParen(w, close);
             if (open <= 0) break;
+
             var inner  = w[(open + 1)..close].Trim().ToUpperInvariant();
             var before = w[..open].TrimEnd();
-            // Colon-prefixed tags (highest priority)
+
             if (before.EndsWith(":S", StringComparison.OrdinalIgnoreCase) && gS == null)
                 { gS = inner; work = before[..^2].TrimEnd(); progress = true; }
             else if (before.EndsWith(":F", StringComparison.OrdinalIgnoreCase) && gF == null)
                 { gF = inner; work = before[..^2].TrimEnd(); progress = true; }
             else if (before.EndsWith(':') && gU == null)
                 { gU = inner; work = before[..^1].TrimEnd(); progress = true; }
-            // Bare S/F (second tag in a combined :S(X)F(Y) or :F(Y)S(X))
-            // Accept bare S or F only when the before-text ends with the letter
-            // immediately preceded by ) — meaning the prior (label) was already consumed.
-            else if (before.EndsWith("S", StringComparison.OrdinalIgnoreCase) && gS == null
-                     && before.Length >= 2 && (before[^2] == ')'
-                         || before.TrimEnd().EndsWith("S", StringComparison.OrdinalIgnoreCase)))
+            else if (before.EndsWith("S", StringComparison.OrdinalIgnoreCase) && gS == null)
             {
-                // Confirm the S is a bare goto tag: preceded by ) or by end-of-body whitespace
                 var trimBefore = before.TrimEnd();
                 if (trimBefore.Length > 0 && (trimBefore[^1] == 'S' || trimBefore[^1] == 's'))
                 {
@@ -164,6 +194,27 @@ public static class Snobol4Parser
             }
         }
         return (work, gU, gS, gF);
+    }
+
+    // Find the '(' that matches the ')' at closeIdx, scanning left respecting quoted strings.
+    private static int FindMatchingOpenParen(string s, int closeIdx)
+    {
+        int depth = 0;
+        var quoted = new bool[s.Length];
+        bool q = false; char qch = '\0';
+        for (int i = 0; i < s.Length; i++)
+        {
+            if (q) { quoted[i] = true; if (s[i] == qch) q = false; continue; }
+            if (s[i] == '\'' || s[i] == '"') { q = true; qch = s[i]; }
+        }
+        // Scan right-to-left from closeIdx
+        for (int i = closeIdx; i >= 0; i--)
+        {
+            if (quoted[i]) continue;
+            if (s[i] == ')') depth++;
+            else if (s[i] == '(') { depth--; if (depth == 0) return i; }
+        }
+        return -1;
     }
 
     // ── Statement body splitter ───────────────────────────────────────────────
@@ -407,6 +458,8 @@ public static class Snobol4Parser
             }
             if (argNodes.Length == 1 && name == "-")
                 return IrNode.Nary(IrKind.E_MNS, argNodes[0]);
+            if (argNodes.Length == 1 && name == "+")
+                return IrNode.Nary(IrKind.E_PLS, argNodes[0]);
 
             // Map known SNOBOL4 pattern builtins to their IrKind
             IrKind? pk = name switch
