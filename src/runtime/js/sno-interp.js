@@ -817,7 +817,7 @@ function interp_eval(e) {
       const name=_str(v); const r=_vars[name]; return r===undefined?null:r;
     }
     case E_DEFER: { const v=interp_eval(e.children[0]); return _is_fail(v)?_FAIL:v; }
-    case E_FNC:   return _call(e.sval, e.children);
+    case E_FNC:   { const _r=_call(e.sval, e.children); return (_r&&_r.__nameref)?(_vars[_r.__nameref]??null):_r; }
     case E_IDX: {
       const base=interp_eval(e.children[0]); if(_is_fail(base)) return _FAIL;
       const idx=interp_eval(e.children[1]);  if(_is_fail(idx))  return _FAIL;
@@ -859,6 +859,9 @@ function _assign(lhs, val) {
     if(Array.isArray(base))  { base[_num(idx)-1]=val; return; }
   }
   if(lhs.kind===E_FNC) {
+    /* First check if this is a user fn returning a nameref (NRETURN) */
+    const _r=_call(lhs.sval, lhs.children);
+    if(_r && _r.__nameref) { _vars[_r.__nameref]=val; return; }
     /* DATA field setter: field(obj) = val */
     const fn=lhs.sval.toUpperCase(); const fd=func_table[fn];
     if(fd&&fd.__data_field&&lhs.children.length>0) {
@@ -966,8 +969,8 @@ function _call(fname, arg_exprs) {
     case 'REAL':    { const n=parseFloat(_str(args[0]??'')); return isFinite(n)?_real_result(n):_FAIL; }
     case 'STRING':  return _str(args[0]??'');
     case 'CONVERT': { const v=args[0],t=_str(args[1]??'').toUpperCase();
-                      if(t==='INTEGER') return Math.trunc(_num(v));
-                      if(t==='REAL')    return parseFloat(_str(v??''));
+                      if(t==='INTEGER') { const n=Math.trunc(_num(v)); return isFinite(n)?n:_FAIL; }
+                      if(t==='REAL')    { const n=parseFloat(_str(v??'')); return isFinite(n)?_real_result(n):_FAIL; }
                       if(t==='STRING')  return _str(v);
                       return _FAIL; }
     case 'IDENT':   return _str(args[0]??'')===_str(args[1]??'')?args[0]:_FAIL;
@@ -1045,8 +1048,9 @@ function _call(fname, arg_exprs) {
       if (v === null || v === undefined) return 'STRING';
       if (v && v.__sno_array) return 'ARRAY';
       if (v instanceof Map)   return 'TABLE';
+      if (_is_real(v))        return 'REAL';
       if (typeof v === 'object' && v.__datatype) return v.__datatype;
-      if (typeof v === 'number') return Number.isInteger(v) ? 'INTEGER' : 'REAL';
+      if (typeof v === 'number') return 'INTEGER';
       return 'STRING';
     }
     case 'LGT': return _str(args[0]??'') >  _str(args[1]??'') ? args[0] : _FAIL;
@@ -1108,7 +1112,7 @@ function _call_user(fname, fd, args) {
   } catch(ex) {
     if(ex instanceof SnoReturn)  ret=ex.v;
     else if(ex instanceof SnoFReturn) ret=_FAIL;
-    else if(ex instanceof SnoNReturn) ret=ex.v;
+    else if(ex instanceof SnoNReturn) { call_stack.pop(); for(const [n,v] of Object.entries(saved)) _vars[n]=v; return {__nameref:ex.v}; }
     else throw ex;
   } finally {
     call_stack.pop();
