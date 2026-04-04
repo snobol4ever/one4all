@@ -31,17 +31,17 @@
  *
  * A syntab (syntax table) is a finite-state scanner step:
  *   chrs[256]   — maps each input byte to an index into the actions[] array.
- *                 Index 0 means AC_CONTIN (fast-path: no action, keep scanning).
+ *                 Index 0 means ACT_CONTIN (fast-path: no action, keep scanning).
  *   actions[]   — parallel array; each entry says what to do when chrs[c] fires.
  *   put         — integer token code written to the global STYPE on a trigger.
- *   act         — AC_CONTIN / AC_STOP / AC_STOPSH / AC_ERROR / AC_GOTO.
- *   go          — pointer to next syntab when act == AC_GOTO (table chain).
+ *   act         — ACT_CONTIN / ACT_STOP / ACT_STOPSH / ACT_ERROR / ACT_GOTO.
+ *   go          — pointer to next syntab when act == ACT_GOTO (table chain).
  *
  * stream(sp1, sp2, tp) scans sp2 byte-by-byte through table tp, fills sp1
  * with the consumed prefix, shrinks sp2 to the remainder, sets STYPE.
  * ========================================================================= */
 
-typedef enum { AC_CONTIN=0, AC_STOP, AC_STOPSH, AC_ERROR, AC_GOTO } action_t;
+typedef enum { ACT_CONTIN=0, ACT_STOP, ACT_STOPSH, ACT_ERROR, ACT_GOTO } action_t;
 /*            consume+continue  consume+stop  stop(no consume)  error  chain→go */
 typedef struct syntab syntab_t;
 typedef struct { int put; action_t act; syntab_t *go; } acts_t;
@@ -61,7 +61,7 @@ static int STYPE;
  *   tp    = table  — the syntab to drive (IBLKTB, FRWDTB, BIOPTB, etc.)
  *
  * A "spec" (specifier) is a (ptr, len) pair — SIL's SPEC type, two words.
- * Returns ST_STOP (AC_STOP hit), ST_EOS (input exhausted), ST_ERROR (AC_ERROR).
+ * Returns ST_STOP (ACT_STOP hit), ST_EOS (input exhausted), ST_ERROR (ACT_ERROR).
  * Sets STYPE to the put-code of the triggering action.
  * ========================================================================= */
 
@@ -77,16 +77,16 @@ static stream_ret_t stream(spec_t *sp1, spec_t *sp2, syntab_t *tp) {
 
     for (; len > 0; cp++, len--) {
         unsigned aindex = tp->chrs[*cp];
-        if (aindex == 0) continue;          /* AC_CONTIN fast path */
+        if (aindex == 0) continue;          /* ACT_CONTIN fast path */
         acts_t *ap = tp->actions + (aindex - 1);
         if (ap->put) put = ap->put;
         switch (ap->act) {
-        case AC_CONTIN: break;
-        case AC_STOP:   cp++; len--;        /* accept char */
+        case ACT_CONTIN: break;
+        case ACT_STOP:   cp++; len--;        /* accept char */
             /* FALLTHROUGH */
-        case AC_STOPSH: ret = ST_STOP; goto done;
-        case AC_ERROR:  STYPE = 0; return ST_ERROR;
-        case AC_GOTO:   tp = ap->go; break;
+        case ACT_STOPSH: ret = ST_STOP; goto done;
+        case ACT_ERROR:  STYPE = 0; return ST_ERROR;
+        case ACT_GOTO:   tp = ap->go; break;
         }
     }
     ret = ST_EOS;
@@ -186,7 +186,7 @@ done:
  *
  * Each table implements one step of the SIL STREAM instruction.
  * The 256-byte chrs[] array maps ASCII byte values to 1-based action indices.
- * chrs[c] == 0  → AC_CONTIN fast path (no entry in actions[], just keep going).
+ * chrs[c] == 0  → ACT_CONTIN fast path (no entry in actions[], just keep going).
  * chrs[c] == N  → actions[N-1] is the entry to fire.
  *
  * Table naming convention (SIL):
@@ -204,14 +204,14 @@ done:
  * Stops on blank or ';' (end-of-statement).  Errors on any other char. ---- */
 syntab_t LBLXTB;  /* forward — LBLTB_actions[0].go references it */
 static acts_t LBLTB_actions[] = {
-    {0, AC_GOTO, &LBLXTB},
-    {0, AC_STOPSH, NULL},
-    {0, AC_ERROR, NULL},
+    {0, ACT_GOTO, &LBLXTB},
+    {0, ACT_STOPSH, NULL},
+    {0, ACT_ERROR, NULL},
 };
 /* LBLXTB: continuation of label scan — same as LBLTB but accepts digits too.
  * SIL transitions LBLTB→LBLXTB after the first alphanumeric char. Here merged. */
 static acts_t LBLXTB_actions[] = {
-    {0, AC_STOPSH, NULL},
+    {0, ACT_STOPSH, NULL},
 };
 syntab_t LBLXTB = { "LBLXTB", {
      0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  0,  0,  0,  0,  0,  0,
@@ -256,10 +256,10 @@ syntab_t LBLTB = { "LBLTB", {
  * (char is NOT consumed — it stays as the start of the next field).
  * "Card" = punch-card terminology from SNOBOL4's batch origins. ---- */
 static acts_t CARDTB_actions[] = {
-    {CMTTYP, AC_STOPSH, NULL},
-    {CTLTYP, AC_STOPSH, NULL},
-    {CNTTYP, AC_STOPSH, NULL},
-    {NEWTYP, AC_STOPSH, NULL},
+    {CMTTYP, ACT_STOPSH, NULL},
+    {CTLTYP, ACT_STOPSH, NULL},
+    {CNTTYP, ACT_STOPSH, NULL},
+    {NEWTYP, ACT_STOPSH, NULL},
 };
 syntab_t CARDTB = { "CARDTB", {
      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
@@ -281,20 +281,20 @@ syntab_t CARDTB = { "CARDTB", {
 }, CARDTB_actions };
 
 /* ---- FRWDTB: forward scan — skips transparent chars (space=0x20, tab=0x09
- * have chrs[]=0 → AC_CONTIN fast-path) and stops on the next field delimiter.
+ * have chrs[]=0 → ACT_CONTIN fast-path) and stops on the next field delimiter.
  * (v311.sil:2215 "STREAM XSP,TEXTSP,FRWDTB — Break for next nonblank") ---- */
 /* ---- IBLKTB: inter-field blank scanner — expects a leading space/tab,
- * chains via AC_GOTO to FRWDTB on the first non-blank, fires EOSTYP on ';'.
+ * chains via ACT_GOTO to FRWDTB on the first non-blank, fires EOSTYP on ';'.
  * Returns ST_ERROR when there is NO leading blank (BINOP's no-blank / BINOP1 path).
  * (v311.sil:2242 "STREAM XSP,TEXTSP,IBLKTB — Break out nonblank from blank") ---- */
 static acts_t FRWDTB_actions[] = {
-    {EQTYP, AC_STOP, NULL},
-    {RPTYP, AC_STOP, NULL},
-    {RBTYP, AC_STOP, NULL},
-    {CMATYP, AC_STOP, NULL},
-    {CLNTYP, AC_STOP, NULL},
-    {EOSTYP, AC_STOP, NULL},
-    {NBTYP, AC_STOPSH, NULL},
+    {EQTYP, ACT_STOP, NULL},
+    {RPTYP, ACT_STOP, NULL},
+    {RBTYP, ACT_STOP, NULL},
+    {CMATYP, ACT_STOP, NULL},
+    {CLNTYP, ACT_STOP, NULL},
+    {EOSTYP, ACT_STOP, NULL},
+    {NBTYP, ACT_STOPSH, NULL},
 };
 syntab_t FRWDTB = { "FRWDTB", {
      7,  7,  7,  7,  7,  7,  7,  7,  7,  0,  7,  7,  7,  7,  7,  7,
@@ -316,9 +316,9 @@ syntab_t FRWDTB = { "FRWDTB", {
 }, FRWDTB_actions };
 
 static acts_t IBLKTB_actions[] = {
-    {0, AC_GOTO, &FRWDTB},
-    {EOSTYP, AC_STOP, NULL},
-    {0, AC_ERROR, NULL},
+    {0, ACT_GOTO, &FRWDTB},
+    {EOSTYP, ACT_STOP, NULL},
+    {0, ACT_ERROR, NULL},
 };
 syntab_t IBLKTB = { "IBLKTB", {
      3,  3,  3,  3,  3,  3,  3,  3,  3,  1,  3,  3,  3,  3,  3,  3,
@@ -344,12 +344,12 @@ syntab_t IBLKTB = { "IBLKTB", {
  * sub-scanner.  SIL then does "SELBRA STYPE,(ELEILT,ELEVBL,ELENST,ELEFNC,ELEFLT,ELEARY)"
  * to branch on the resulting STYPE. ---- */
 static acts_t ELEMTB_actions[] = {
-    {ILITYP, AC_GOTO, NULL},
-    {VARTYP, AC_GOTO, NULL},
-    {QLITYP, AC_GOTO, NULL},
-    {QLITYP, AC_GOTO, NULL},
-    {NSTTYP, AC_STOP, NULL},
-    {0, AC_ERROR, NULL},
+    {ILITYP, ACT_GOTO, NULL},
+    {VARTYP, ACT_GOTO, NULL},
+    {QLITYP, ACT_GOTO, NULL},
+    {QLITYP, ACT_GOTO, NULL},
+    {NSTTYP, ACT_STOP, NULL},
+    {0, ACT_ERROR, NULL},
 };
 /* Forward declarations for goto targets wired in init_tables() */
 syntab_t VARTB, INTGTB, SQLITB, DQLITB;
@@ -374,14 +374,14 @@ syntab_t ELEMTB = { "ELEMTB", {
 }, ELEMTB_actions };
 
 /* ---- VARTB: variable / function-name scanner (v311.sil:ELEVBL branch)
- * Entered after ELEMTB fires AC_GOTO for a letter.  Accumulates alphanumeric
+ * Entered after ELEMTB fires ACT_GOTO for a letter.  Accumulates alphanumeric
  * chars (chrs[]=0 fast-path).  Stops on the first non-identifier char and
  * classifies it: plain variable, function call IDENT(, or array ref IDENT<. ---- */
 static acts_t VARTB_actions[] = {
-    {VARTYP, AC_STOPSH, NULL},
-    {FNCTYP, AC_STOP, NULL},
-    {ARYTYP, AC_STOP, NULL},
-    {0, AC_ERROR, NULL},
+    {VARTYP, ACT_STOPSH, NULL},
+    {FNCTYP, ACT_STOP, NULL},
+    {ARYTYP, ACT_STOP, NULL},
+    {0, ACT_ERROR, NULL},
 };
 syntab_t VARTB = { "VARTB", {
      4,  4,  4,  4,  4,  4,  4,  4,  4,  1,  4,  4,  4,  4,  4,  4,
@@ -403,16 +403,16 @@ syntab_t VARTB = { "VARTB", {
 }, VARTB_actions };
 
 /* ---- INTGTB: integer digit accumulator (v311.sil:ELEILT branch)
- * Entered after ELEMTB fires AC_GOTO for a digit.  Continues on digits,
+ * Entered after ELEMTB fires ACT_GOTO for a digit.  Continues on digits,
  * stops on terminators, chains to FLITB on '.', chains to EXPTB on 'e'/'E'. ---- */
 syntab_t FLITB;  /* forward — INTGTB references FLITB before it is defined */
 static acts_t INTGTB_actions[] = {
-    {ILITYP, AC_STOPSH, NULL},
-    {FLITYP, AC_GOTO, NULL},
-    {FLITYP, AC_GOTO, NULL},
-    {0, AC_ERROR, NULL},
+    {ILITYP, ACT_STOPSH, NULL},
+    {FLITYP, ACT_GOTO, NULL},
+    {FLITYP, ACT_GOTO, NULL},
+    {0, ACT_ERROR, NULL},
 };
-syntab_t EXPTB, EXPBTB; /* forward declarations — used by INTGTB/FLITB AC_GOTO */
+syntab_t EXPTB, EXPBTB; /* forward declarations — used by INTGTB/FLITB ACT_GOTO */
 syntab_t INTGTB = { "INTGTB", {
      4,  4,  4,  4,  4,  4,  4,  4,  4,  1,  4,  4,  4,  4,  4,  4,
      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
@@ -436,9 +436,9 @@ syntab_t INTGTB = { "INTGTB", {
  * Entered after INTGTB sees '.'.  Continues on digits, stops on terminators,
  * chains to EXPTB on 'e'/'E' (scientific notation exponent). ---- */
 static acts_t FLITB_actions[] = {
-    {0, AC_STOPSH, NULL},
-    {0, AC_GOTO, NULL},
-    {0, AC_ERROR, NULL},
+    {0, ACT_STOPSH, NULL},
+    {0, ACT_GOTO, NULL},
+    {0, ACT_ERROR, NULL},
 };
 syntab_t FLITB = { "FLITB", {
      3,  3,  3,  3,  3,  3,  3,  3,  3,  1,  3,  3,  3,  3,  3,  3,
@@ -463,8 +463,8 @@ syntab_t FLITB = { "FLITB", {
  * EXPTB: entered after 'e'/'E' in a float; accepts optional '+'/'-' then chains to EXPBTB.
  * EXPBTB: accumulates exponent digits, stops on any token terminator. ---- */
 static acts_t EXPBTB_actions[] = {
-    {0, AC_STOPSH, NULL},
-    {0, AC_ERROR, NULL},
+    {0, ACT_STOPSH, NULL},
+    {0, ACT_ERROR, NULL},
 };
 syntab_t EXPBTB = { "EXPBTB", {
      2,  2,  2,  2,  2,  2,  2,  2,  2,  1,  2,  2,  2,  2,  2,  2,
@@ -485,8 +485,8 @@ syntab_t EXPBTB = { "EXPBTB", {
      2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
 }, EXPBTB_actions };
 static acts_t EXPTB_actions[] = {
-    {0, AC_GOTO, NULL},
-    {0, AC_ERROR, NULL},
+    {0, ACT_GOTO, NULL},
+    {0, ACT_ERROR, NULL},
 };
 syntab_t EXPTB = { "EXPTB", {
      2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
@@ -510,9 +510,9 @@ syntab_t EXPTB = { "EXPTB", {
 /* ---- SQLITB / DQLITB: string literal body scanners
  * SQLITB: scans body of a single-quoted string '...'; stops on matching '.
  * DQLITB: scans body of a double-quoted string "..."; stops on matching ".
- * Both accept ALL other bytes including spaces and operators (AC_CONTIN). ---- */
+ * Both accept ALL other bytes including spaces and operators (ACT_CONTIN). ---- */
 static acts_t SQLITB_actions[] = {
-    {0, AC_STOP, NULL},
+    {0, ACT_STOP, NULL},
 };
 syntab_t SQLITB = { "SQLITB", {
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
@@ -533,7 +533,7 @@ syntab_t SQLITB = { "SQLITB", {
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
 }, SQLITB_actions };
 static acts_t DQLITB_actions[] = {
-    {0, AC_STOP, NULL},
+    {0, ACT_STOP, NULL},
 };
 syntab_t DQLITB = { "DQLITB", {
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
@@ -556,8 +556,8 @@ syntab_t DQLITB = { "DQLITB", {
 
 /* ---- UNOPTB: unary prefix operator scanner (v311.sil:2510 "STREAM XSP,TEXTSP,UNOPTB")
  * Entered by ELEMNT's UNOP loop before the element itself.
- * Each operator char fires AC_STOPSH (does NOT consume the char — leaves it for re-use)
- * and puts its operator code into STYPE.  All are AC_STOPSH because the operator
+ * Each operator char fires ACT_STOPSH (does NOT consume the char — leaves it for re-use)
+ * and puts its operator code into STYPE.  All are ACT_STOPSH because the operator
  * IS the single-char token; the char must not be consumed into XSP here. ---- */
 /* UOP_* aliases match the *FN defines above — same numeric values, kept separate
  * only for readability inside the UNOPTB_actions table. */
@@ -578,8 +578,8 @@ syntab_t DQLITB = { "DQLITB", {
 
 syntab_t NBLKTB;
 static acts_t NBLKTB_actions[] = {
-    {0, AC_ERROR, NULL},
-    {0, AC_STOPSH, NULL},
+    {0, ACT_ERROR, NULL},
+    {0, ACT_STOPSH, NULL},
 };
 syntab_t NBLKTB = { "NBLKTB", {
      2,  2,  2,  2,  2,  2,  2,  2,  2,  1,  2,  2,  2,  2,  2,  2,
@@ -601,21 +601,21 @@ syntab_t NBLKTB = { "NBLKTB", {
 }, NBLKTB_actions };
 
 static acts_t UNOPTB_actions[] = {
-    {PLSFN, AC_GOTO, &NBLKTB},
-    {MNSFN, AC_GOTO, &NBLKTB},
-    {DOTFN, AC_GOTO, &NBLKTB},
-    {INDFN, AC_GOTO, &NBLKTB},
-    {STRFN, AC_GOTO, &NBLKTB},
-    {SLHFN, AC_GOTO, &NBLKTB},
-    {PRFN, AC_GOTO, &NBLKTB},
-    {ATFN, AC_GOTO, &NBLKTB},
-    {PDFN, AC_GOTO, &NBLKTB},
-    {KEYFN, AC_GOTO, &NBLKTB},
-    {NEGFN, AC_GOTO, &NBLKTB},
-    {BARFN, AC_GOTO, &NBLKTB},
-    {QUESFN, AC_GOTO, &NBLKTB},
-    {AROWFN, AC_GOTO, &NBLKTB},
-    {0, AC_ERROR, NULL},
+    {PLSFN, ACT_GOTO, &NBLKTB},
+    {MNSFN, ACT_GOTO, &NBLKTB},
+    {DOTFN, ACT_GOTO, &NBLKTB},
+    {INDFN, ACT_GOTO, &NBLKTB},
+    {STRFN, ACT_GOTO, &NBLKTB},
+    {SLHFN, ACT_GOTO, &NBLKTB},
+    {PRFN, ACT_GOTO, &NBLKTB},
+    {ATFN, ACT_GOTO, &NBLKTB},
+    {PDFN, ACT_GOTO, &NBLKTB},
+    {KEYFN, ACT_GOTO, &NBLKTB},
+    {NEGFN, ACT_GOTO, &NBLKTB},
+    {BARFN, ACT_GOTO, &NBLKTB},
+    {QUESFN, ACT_GOTO, &NBLKTB},
+    {AROWFN, ACT_GOTO, &NBLKTB},
+    {0, ACT_ERROR, NULL},
 };
 syntab_t UNOPTB = { "UNOPTB", {
     15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
@@ -642,25 +642,25 @@ extern syntab_t TBLKTB, STARTB;
 /* ---- BIOPTB: binary operator scanner — SNOBOL4 mode
  * (v311.sil:1567 "STREAM XSP,TEXTSP,BIOPTB,BINCON")
  * Called by BINOP() AFTER the leading blank has been consumed by IBLKTB.
- * Each entry: set STYPE to the operator function code, then AC_GOTO to TBLKTB
+ * Each entry: set STYPE to the operator function code, then ACT_GOTO to TBLKTB
  * (which must consume the mandatory trailing blank that follows every binary op).
  * Special case: '*' goes to STARTB instead of TBLKTB to handle '**' vs '*'.  ---- */
 static acts_t BIOPTB_actions[] = {
-    {ADDFN, AC_GOTO, &TBLKTB},
-    {SUBFN, AC_GOTO, &TBLKTB},
-    {NAMFN, AC_GOTO, &TBLKTB},
-    {DOLFN, AC_GOTO, &TBLKTB},
-    {MPYFN, AC_GOTO, &STARTB},
-    {DIVFN, AC_GOTO, &TBLKTB},
-    {BIATFN, AC_GOTO, &TBLKTB},
-    {BIPDFN, AC_GOTO, &TBLKTB},
-    {BIPRFN, AC_GOTO, &TBLKTB},
-    {EXPFN, AC_GOTO, &TBLKTB},
-    {ORFN, AC_GOTO, &TBLKTB},
-    {BIAMFN, AC_GOTO, &TBLKTB},
-    {BINGFN, AC_GOTO, &TBLKTB},
-    {BIQSFN, AC_GOTO, &TBLKTB},
-    {0, AC_ERROR, NULL},
+    {ADDFN, ACT_GOTO, &TBLKTB},
+    {SUBFN, ACT_GOTO, &TBLKTB},
+    {NAMFN, ACT_GOTO, &TBLKTB},
+    {DOLFN, ACT_GOTO, &TBLKTB},
+    {MPYFN, ACT_GOTO, &STARTB},
+    {DIVFN, ACT_GOTO, &TBLKTB},
+    {BIATFN, ACT_GOTO, &TBLKTB},
+    {BIPDFN, ACT_GOTO, &TBLKTB},
+    {BIPRFN, ACT_GOTO, &TBLKTB},
+    {EXPFN, ACT_GOTO, &TBLKTB},
+    {ORFN, ACT_GOTO, &TBLKTB},
+    {BIAMFN, ACT_GOTO, &TBLKTB},
+    {BINGFN, ACT_GOTO, &TBLKTB},
+    {BIQSFN, ACT_GOTO, &TBLKTB},
+    {0, ACT_ERROR, NULL},
 };
 
 /* STARTB: disambiguate '*' (multiply) from '**' (exponentiation)
@@ -668,9 +668,9 @@ static acts_t BIOPTB_actions[] = {
  * Peeks at the next char: if it is another '*' consume it and set EXPFN;
  * if it is a blank/tab consume it and keep STYPE=MPYFN (already set). ---- */
 static acts_t STARTB_actions[] = {
-    {0, AC_STOP, NULL},
-    {EXPFN, AC_GOTO, &TBLKTB},
-    {0, AC_ERROR, NULL},
+    {0, ACT_STOP, NULL},
+    {EXPFN, ACT_GOTO, &TBLKTB},
+    {0, ACT_ERROR, NULL},
 };
 syntab_t STARTB = { "STARTB", {
      3,  3,  3,  3,  3,  3,  3,  3,  3,  1,  3,  3,  3,  3,  3,  3,
@@ -695,8 +695,8 @@ syntab_t STARTB = { "STARTB", {
  * (v311.sil: every BIOPTB action goes to TBLKTB after setting STYPE)
  * Consumes exactly one space or tab (the mandatory post-operator blank), then stops.  ---- */
 static acts_t TBLKTB_actions[] = {
-    {0, AC_STOP, NULL},
-    {0, AC_ERROR, NULL},
+    {0, ACT_STOP, NULL},
+    {0, ACT_ERROR, NULL},
 };
 syntab_t TBLKTB = { "TBLKTB", {
      2,  2,  2,  2,  2,  2,  2,  2,  2,  1,  2,  2,  2,  2,  2,  2,
@@ -742,9 +742,9 @@ syntab_t BIOPTB = { "BIOPTB", {
  * GOTSTB: sub-scanner after 'S' — expects '(' (label in parens) or '<' (direct address).
  * GOTFTB: sub-scanner after 'F' — same but for failure branch. ---- */
 static acts_t GOTSTB_actions[] = {
-    {SGOTYP, AC_STOP, NULL},
-    {STOTYP, AC_STOP, NULL},
-    {0, AC_ERROR, NULL},
+    {SGOTYP, ACT_STOP, NULL},
+    {STOTYP, ACT_STOP, NULL},
+    {0, ACT_ERROR, NULL},
 };
 syntab_t GOTSTB = { "GOTSTB", {
      3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
@@ -765,9 +765,9 @@ syntab_t GOTSTB = { "GOTSTB", {
      3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
 }, GOTSTB_actions };
 static acts_t GOTFTB_actions[] = {
-    {FGOTYP, AC_STOP, NULL},
-    {FTOTYP, AC_STOP, NULL},
-    {0, AC_ERROR, NULL},
+    {FGOTYP, ACT_STOP, NULL},
+    {FTOTYP, ACT_STOP, NULL},
+    {0, ACT_ERROR, NULL},
 };
 syntab_t GOTFTB = { "GOTFTB", {
      3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
@@ -788,11 +788,11 @@ syntab_t GOTFTB = { "GOTFTB", {
      3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
 }, GOTFTB_actions };
 static acts_t GOTOTB_actions[] = {
-    {0, AC_GOTO, &GOTSTB},
-    {0, AC_GOTO, &GOTFTB},
-    {UGOTYP, AC_STOP, NULL},
-    {UTOTYP, AC_STOP, NULL},
-    {0, AC_ERROR, NULL},
+    {0, ACT_GOTO, &GOTSTB},
+    {0, ACT_GOTO, &GOTFTB},
+    {UGOTYP, ACT_STOP, NULL},
+    {UTOTYP, ACT_STOP, NULL},
+    {0, ACT_ERROR, NULL},
 };
 syntab_t GOTOTB = { "GOTOTB", {
      5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,
@@ -904,7 +904,7 @@ static void FORWRD(void) {
 
 /* FORBLK — "Procedure to get to nonblank" (v311.sil:2241)
  * Like FORWRD but starts with IBLKTB to skip the mandatory inter-field blank.
- * IBLKTB chains to FRWDTB on the first non-blank char (AC_GOTO).
+ * IBLKTB chains to FRWDTB on the first non-blank char (ACT_GOTO).
  * Returns ST_ERROR if the current position is NOT a blank (no inter-field gap);
  * that condition is the BINOP1 / no-blank path in BINOP(). */
 static void FORBLK(void) {
@@ -1148,7 +1148,7 @@ static NODE *ELEMNT(void) {
        - LETTER  → VARTB final STYPE = VARTYP/FNCTYP/ARYTYP
        - NUMBER  → INTGTB final STYPE = ILITYP or FLITYP
        - QUOTE   → SQLITB/DQLITB final STYPE = 0 (just stopped)
-       - LPAREN  → AC_STOP, elem_stype = NSTTYP
+       - LPAREN  → ACT_STOP, elem_stype = NSTTYP
        SIL's SELBRA STYPE,(,ELEILT,ELEVBL,ELENST,ELEFNC,ELEFLT,ELEARY)
        works because ELEMTB put-codes go into STYPE before the GOTO. */
     unsigned char first = XSP.len > 0 ? (unsigned char)XSP.ptr[0] : 0;
@@ -1167,7 +1167,7 @@ static NODE *ELEMNT(void) {
 
     case ILITYP: {  /* ELEILT: integer — STREAM consumed digits via INTGTB */
         /* XSP holds the digit string; STYPE may be FLITYP if it became real */
-        /* INTGTB's AC_GOTO to FLITB already consumed the fraction */
+        /* INTGTB's ACT_GOTO to FLITB already consumed the fraction */
         int final_type = STYPE; /* may be ILITYP or FLITYP */
         char buf[64]; memcpy(buf, XSP.ptr, XSP.len < 63 ? XSP.len : 63);
         buf[XSP.len < 63 ? XSP.len : 63] = '\0';
@@ -1228,8 +1228,8 @@ static NODE *ELEMNT(void) {
     }
 
     case NSTTYP: {  /* ELENST: parenthesized expression — SIL v311.sil:2003 */
-        /* '(' was AC_STOP consumed by ELEMTB. TEXTSP points at inner content.
-         * EXPR() parses inside; ')' hit via FRWDTB (AC_STOP) consumed automatically.
+        /* '(' was ACT_STOP consumed by ELEMTB. TEXTSP points at inner content.
+         * EXPR() parses inside; ')' hit via FRWDTB (ACT_STOP) consumed automatically.
          * Call FORWRD() to advance past residual and set BRTYPE=RPTYP for caller. */
         atom = EXPR();
         FORWRD();
