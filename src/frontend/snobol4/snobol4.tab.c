@@ -2053,5 +2053,23 @@ Program *parse_program_tokens(Lex *stream){
 }
 Program *parse_program(LineArray *lines){(void)lines;return calloc(1,sizeof(Program));}
 EXPR_t *parse_expr_from_str(const char *src){
-    if(!src||!*src) return NULL;Lex lx={0};lex_open_str(&lx,src,(int)strlen(src),0);return parse_expr(&lx);
+    /* DYN-79: wrap src as a labelled statement so the full program parser
+     * accepts it cleanly.  "         <src>\n" — 9 leading spaces (no label),
+     * expression as body, newline to trigger T_STMT_END.
+     * lex_open_str pushes BODY state, skipping the col-1 dispatch, so the
+     * parser never sees the statement structure it needs.  Use flex_lex_open
+     * with fmemopen instead so INITIAL state fires and the statement is
+     * parsed correctly. */
+    if(!src||!*src) return NULL;
+    size_t n=strlen(src);
+    char *buf=malloc(n+12);
+    if(!buf) return NULL;
+    /* 9 spaces + src + newline + NUL */
+    memset(buf,' ',9); memcpy(buf+9,src,n); buf[9+n]='\n'; buf[9+n+1]='\0';
+    FILE *f=fmemopen(buf,(size_t)(9+n+1),"r");
+    if(!f){free(buf);return NULL;}
+    Lex lx={0}; flex_lex_open(&lx,f,"<eval>");
+    Program *prog=calloc(1,sizeof*prog);PP p={prog,NULL};g_lx=&lx;snobol4_parse(&p);
+    fclose(f); free(buf);
+    return prog->head?prog->head->subject:NULL;
 }

@@ -420,10 +420,6 @@ static spec_t bb_usercall(void *zeta, int entry)
  * On γ: call func to get DT_N ptr, store ptr + pending spec for conditional flush.
  * Conditional (.): flushes on overall match success via flush_pending_callcaps(). */
 #define MAX_CALLCAPS 256
-typedef struct callcap_s callcap_t;
-static callcap_t *g_callcap_list[MAX_CALLCAPS];
-static int        g_callcap_count = 0;
-static int        g_callcap_gen   = 0;   /* DYN-76: per-statement generation — replaces registered flag */
 
 typedef struct callcap_s {
     bb_box_fn    child_fn;
@@ -438,6 +434,28 @@ typedef struct callcap_s {
     int          registered;
     int          last_gen;      /* DYN-76: generation at last CC_α registration */
 } callcap_t;
+
+/* DYN-79: per-firing event record.  A single callcap_t box (e.g. the *Push()
+ * inside "constant . *Push()") can fire multiple times for different spans
+ * (e.g. matching "1" and "2" in "*constant addop *constant").  Each firing
+ * is a distinct event with its own spec snapshot.  We queue events here
+ * rather than storing state on the shared callcap_t struct. */
+typedef struct {
+    const char *fnc_name;
+    DESCR_t    *fnc_args;
+    int         fnc_nargs;
+    spec_t      pending;
+    int         has_pending;    /* 1 = live event, 0 = stale (backtracked) */
+    callcap_t  *owner;          /* back-pointer for dedup keying */
+} cc_event_t;
+
+static cc_event_t  g_cc_events[MAX_CALLCAPS];
+static int         g_cc_event_count = 0;
+
+/* g_callcap_list kept for DVAR save/restore bookkeeping */
+static callcap_t *g_callcap_list[MAX_CALLCAPS];
+static int        g_callcap_count = 0;
+static int        g_callcap_gen   = 0;   /* DYN-76: per-statement generation */
 
 static spec_t bb_callcap(void *zeta, int entry)
 {
@@ -473,12 +491,22 @@ static spec_t bb_callcap(void *zeta, int entry)
                    *cell = val;
                }
            } else {
-               /* . — buffer spec; defer hook call to flush_pending_callcaps.
-                * DYN-77: do NOT call g_user_call_hook here — Push() has side
-                * effects (stk[0]++) that must only fire on committed matches. */
+               /* . — push a firing event; do NOT call hook yet (side-effect safety).
+                * DYN-79: each CC_γ firing gets its own event record so that
+                * a box reused for multiple spans (e.g. *Push() matching "1"
+                * then "2") produces two distinct events in order. */
+               if (g_cc_event_count < MAX_CALLCAPS) {
+                   cc_event_t *ev = &g_cc_events[g_cc_event_count++];
+                   ev->fnc_name   = ζ->fnc_name;
+                   ev->fnc_args   = ζ->fnc_args;
+                   ev->fnc_nargs  = ζ->fnc_nargs;
+                   ev->pending    = child_r;
+                   ev->has_pending = 1;
+                   ev->owner      = ζ;
+               }
+               /* Keep ζ->pending/has_pending for DVAR save/restore compat */
                ζ->pending     = child_r;
                ζ->has_pending = 1;
-               /* resolved_ptr unused for deferred path — cleared for safety */
                ζ->resolved_ptr = NULL;
            }
            return child_r;
@@ -488,16 +516,32 @@ static spec_t bb_callcap(void *zeta, int entry)
            return spec_empty;
 }
 
+/* DYN-79: remove stale (has_pending=0) events from the event queue.
+ * Live events (has_pending=1) are always kept, even if the same owner
+ * fired multiple times (e.g. *Push() capturing "1" then "2"). */
+static void dedup_callcaps(void) {
+    int out = 0;
+    for (int i = 0; i < g_cc_event_count; i++) {
+        if (!g_cc_events[i].has_pending) {
+            /* Stale — drop only if a later event has the same owner */
+            int has_later = 0;
+            for (int j = i + 1; j < g_cc_event_count; j++)
+                if (g_cc_events[j].owner == g_cc_events[i].owner) { has_later = 1; break; }
+            if (has_later) continue;
+        }
+        g_cc_events[out++] = g_cc_events[i];
+    }
+    g_cc_event_count = out;
+}
+
 static void flush_pending_callcaps(void) {
-    for (int i = 0; i < g_callcap_count; i++) {
-        callcap_t *c = g_callcap_list[i];
-        if (!c->immediate && c->has_pending) {
-            spec_t snap = c->pending;
-            c->has_pending = 0;
-            /* DYN-77: call hook at commit time (not match time) to get lvalue.
-             * Push() fires stk[0]++ here (committed match only, not backtracks). */
-            DESCR_t name_d = (g_user_call_hook && c->fnc_name)
-                ? g_user_call_hook(c->fnc_name, c->fnc_args, c->fnc_nargs)
+    for (int i = 0; i < g_cc_event_count; i++) {
+        cc_event_t *ev = &g_cc_events[i];
+        if (ev->has_pending) {
+            spec_t snap = ev->pending;
+            ev->has_pending = 0;
+            DESCR_t name_d = (g_user_call_hook && ev->fnc_name)
+                ? g_user_call_hook(ev->fnc_name, ev->fnc_args, ev->fnc_nargs)
                 : NULVCL;
             DESCR_t *cell = (name_d.v == DT_N && name_d.ptr) ? (DESCR_t*)name_d.ptr : NULL;
             if (cell) {
@@ -506,12 +550,15 @@ static void flush_pending_callcaps(void) {
                 DESCR_t val = { .v = DT_S, .slen = (uint32_t)snap.δ, .s = s };
                 *cell = val;
             }
-        } else {
-            c->has_pending = 0;
         }
-        c->registered = 0;
     }
-    g_callcap_count = 0;
+    /* Also clear ζ->has_pending on all registered boxes */
+    for (int i = 0; i < g_callcap_count; i++) {
+        g_callcap_list[i]->has_pending = 0;
+        g_callcap_list[i]->registered  = 0;
+    }
+    g_callcap_count    = 0;
+    g_cc_event_count   = 0;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════ */
@@ -991,12 +1038,17 @@ static spec_t bb_deferred_var(void *zeta, int entry)
                      * Snapshot outer registrations, run child with fresh scope,
                      * then merge inner callcaps after outer ones on success. */
                     int   dvar_cc_save = g_callcap_count;
+                    int   dvar_ev_save = g_cc_event_count;
                     callcap_t *dvar_cc_snap[MAX_CALLCAPS];
+                    cc_event_t dvar_ev_snap[MAX_CALLCAPS];
                     for (int _ci = 0; _ci < dvar_cc_save; _ci++) {
                         dvar_cc_snap[_ci] = g_callcap_list[_ci];
                         g_callcap_list[_ci]->registered = 0;
                     }
-                    g_callcap_count = 0;
+                    for (int _ci = 0; _ci < dvar_ev_save; _ci++)
+                        dvar_ev_snap[_ci] = g_cc_events[_ci];
+                    g_callcap_count  = 0;
+                    g_cc_event_count = 0;
                     DVAR = ζ->child_fn(ζ->child_state, α);
                     g_dvar_depth--;
                     if (spec_is_empty(DVAR)) {
@@ -1008,14 +1060,21 @@ static spec_t bb_deferred_var(void *zeta, int entry)
                             g_callcap_list[_ci] = dvar_cc_snap[_ci];
                             g_callcap_list[_ci]->registered = 1;
                         }
+                        g_cc_event_count = dvar_ev_save;
+                        for (int _ci = 0; _ci < dvar_ev_save; _ci++)
+                            g_cc_events[_ci] = dvar_ev_snap[_ci];
                         goto DVAR_ω;
                     }
                     /* Success: restore outer first, then append inner */
                     {
                         int inner_count = g_callcap_count;
+                        int inner_ev    = g_cc_event_count;
                         callcap_t *inner_snap[MAX_CALLCAPS];
+                        cc_event_t inner_ev_snap[MAX_CALLCAPS];
                         for (int _ci = 0; _ci < inner_count; _ci++)
                             inner_snap[_ci] = g_callcap_list[_ci];
+                        for (int _ci = 0; _ci < inner_ev; _ci++)
+                            inner_ev_snap[_ci] = g_cc_events[_ci];
                         g_callcap_count = dvar_cc_save;
                         for (int _ci = 0; _ci < dvar_cc_save; _ci++) {
                             g_callcap_list[_ci] = dvar_cc_snap[_ci];
@@ -1023,6 +1082,12 @@ static spec_t bb_deferred_var(void *zeta, int entry)
                         }
                         for (int _ci = 0; _ci < inner_count && g_callcap_count < MAX_CALLCAPS; _ci++)
                             g_callcap_list[g_callcap_count++] = inner_snap[_ci];
+                        /* Merge events: outer first, then inner */
+                        g_cc_event_count = dvar_ev_save;
+                        for (int _ci = 0; _ci < dvar_ev_save; _ci++)
+                            g_cc_events[_ci] = dvar_ev_snap[_ci];
+                        for (int _ci = 0; _ci < inner_ev && g_cc_event_count < MAX_CALLCAPS; _ci++)
+                            g_cc_events[g_cc_event_count++] = inner_ev_snap[_ci];
                     }
                     goto DVAR_γ;
 
@@ -1127,9 +1192,10 @@ int exec_stmt(const char  *subj_name,
                   int          has_repl)
 {
     /* reset capture registry for this statement */
-    g_capture_count = 0;
-    g_callcap_count = 0;   /* DYN-69: callcap (pat . *func()) registry */
-    g_callcap_gen++;       /* DYN-76: new generation — allows cached callcaps to re-register */
+    g_capture_count  = 0;
+    g_callcap_count  = 0;   /* DYN-69: callcap (pat . *func()) registry */
+    g_cc_event_count = 0;   /* DYN-79: per-firing event queue */
+    g_callcap_gen++;        /* DYN-76: new generation — allows cached callcaps to re-register */
 
     /* ── Phase 1: build subject ─────────────────────────────────────── */
     /*
@@ -1213,6 +1279,7 @@ Phase4:
 
     /* Flush XNME (.) conditional captures — overall match succeeded */
     flush_pending_captures();
+    dedup_callcaps();           /* DYN-79: remove stale backtrack entries, fix ordering */
     flush_pending_callcaps();   /* DYN-69: callcap (pat . *func()) targets */
 
     if (!has_repl || !repl)                                   goto Success;
