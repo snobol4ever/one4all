@@ -19,15 +19,33 @@ public static class Snobol4Parser
 {
     // ── Public entry ─────────────────────────────────────────────────────────
 
-    public static IrStmt[] ParseFile(string path) =>
-        ParseSource(File.ReadAllText(path));
+    public static IrStmt[] ParseFile(string path)
+    {
+        var dir = Path.GetDirectoryName(Path.GetFullPath(path)) ?? ".";
+        return ParseSource(File.ReadAllText(path), dir);
+    }
 
-    public static IrStmt[] ParseSource(string source)
+    public static IrStmt[] ParseSource(string source, string? baseDir = null)
     {
         var logicalLines = SplitLogicalLines(source);
         var expanded = new List<(string? label, string body)>();
         foreach (var (lbl, body) in logicalLines)
         {
+            // Handle -include directive
+            var trimmed = body.Trim();
+            if (trimmed.StartsWith("-include", StringComparison.OrdinalIgnoreCase) && lbl == null)
+            {
+                var rest = trimmed[8..].Trim().Trim('\'', '"');
+                var inclPath = baseDir != null ? Path.Combine(baseDir, rest) : rest;
+                if (File.Exists(inclPath))
+                {
+                    var inclDir = Path.GetDirectoryName(Path.GetFullPath(inclPath)) ?? baseDir ?? ".";
+                    var inclLines = SplitLogicalLines(File.ReadAllText(inclPath));
+                    foreach (var il in inclLines) expanded.Add(il);
+                }
+                continue;
+            }
+
             var parts = SplitSemicolons(body);
             if (parts.Count == 0)
             {
@@ -416,8 +434,19 @@ public static class Snobol4Parser
                                IrNode.Var(src[1..].ToUpperInvariant()));
 
         // $expr — indirect reference (or immediate capture in pattern context — handled by executor)
+        // Handle $expr<idx> / $expr[idx] — subscript wraps the whole indirect
         if (src.StartsWith('$') && src.Length > 1)
-            return IrNode.Nary(IrKind.E_INDIRECT, ParseAtom(src[1..]));
+        {
+            var inner = src[1..];
+            var (baseStr, idxStr, idxClose) = StripTrailingSubscript(inner);
+            var indNode = IrNode.Nary(IrKind.E_INDIRECT, ParseAtom(baseStr));
+            if (idxStr != null)
+            {
+                var idxNodes = SplitTopLevel(idxStr, ',').Select(a => ParseExpr(a.Trim())).ToArray();
+                return new IrNode(IrKind.E_IDX) { Children = new[] { indNode }.Concat(idxNodes).ToArray() };
+            }
+            return indNode;
+        }
 
         // *expr — deferred pattern
         if (src.StartsWith('*') && src.Length > 1 && !char.IsDigit(src[1]))
@@ -545,6 +574,23 @@ public static class Snobol4Parser
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    // Returns (baseStr, idxStr, closeChar) — idxStr is null if no trailing subscript
+    private static (string base_, string? idx, char close) StripTrailingSubscript(string src)
+    {
+        if (src.Length < 3) return (src, null, '>');
+        char last = src[^1];
+        if (last != '>' && last != ']') return (src, null, last);
+        char open = last == '>' ? '<' : '[';
+        // Find matching open bracket at top level
+        int depth = 0;
+        for (int i = src.Length - 1; i >= 0; i--)
+        {
+            if (src[i] == last)  depth++;
+            else if (src[i] == open) { depth--; if (depth == 0 && i > 0) return (src[..i], src[(i+1)..^1], last); }
+        }
+        return (src, null, last);
+    }
 
     private static List<string> SplitTopLevel(string s, char sep)
     {

@@ -323,6 +323,8 @@ public sealed class SnobolEnv
         return name.ToUpperInvariant() switch
         {
             "SIZE"    => args.Length >= 1 ? DESCR.Of((long)args[0].ToString().Length) : DESCR.Of(0L),
+            "ARG"     => ArgOrLocal(args, local: false),
+            "LOCAL"   => ArgOrLocal(args, local: true),
             "DUPL"    => Dupl(args),
             "SUBSTR"  => Substr(args),
             "REPLACE" => Replace(args),
@@ -433,6 +435,17 @@ public sealed class SnobolEnv
         if (IsTable(container) && indexArgs.Length >= 1)
         { TableSet(container, indexArgs[0].ToString(), val); return val; }
         return DESCR.Fail;
+    }
+
+    private DESCR ArgOrLocal(DESCR[] args, bool local)
+    {
+        if (args.Length < 2) return DESCR.Fail;
+        var funcName = args[0].ToString().ToUpperInvariant().TrimStart('.');
+        if (!_funcs.TryGetValue(funcName, out var def)) return DESCR.Fail;
+        var n = (int)args[1].ToInt();
+        var names = local ? def.Locals : def.Params;
+        if (n < 1 || n > names.Length) return DESCR.Fail;
+        return DESCR.Of(names[n - 1].ToUpperInvariant());
     }
 
     private static DESCR Dupl(DESCR[] args)

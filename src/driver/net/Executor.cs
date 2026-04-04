@@ -289,7 +289,9 @@ public sealed class Executor
             IrKind.E_ASSIGN  => EvalAssign(n),
 
             // Captures in value context — evaluate inner expression only
-            IrKind.E_CAPT_COND_ASGN  => n.Children.Length > 0 ? EvalNode(n.Children[0]) : DESCR.Null,
+            IrKind.E_CAPT_COND_ASGN  => n.Children.Length > 0
+                ? DESCR.Of(n.Children[0].SVal ?? EvalNode(n.Children[0]).ToString())
+                : DESCR.Null,
             IrKind.E_CAPT_IMMED_ASGN => n.Children.Length > 0 ? EvalNode(n.Children[0]) : DESCR.Null,
             IrKind.E_CAPT_CURSOR     => DESCR.Null,
             IrKind.E_DEFER           => n.Children.Length > 0 ? EvalNode(n.Children[0]) : DESCR.Null,
@@ -414,10 +416,12 @@ public sealed class Executor
         if (funcDef != null)
         {
             var evaledArgs = args.Select(EvalNode).ToArray();
+            if (evaledArgs.Any(a => a.IsFail)) return DESCR.Fail;
             return CallUserFunc(name, funcDef, evaledArgs);
         }
 
         var evalArgs = args.Select(EvalNode).ToArray();
+        if (evalArgs.Any(a => a.IsFail)) return DESCR.Fail;
 
         // DATA field accessor: real(X) where X is a data object
         if (evalArgs.Length == 1 && _env.IsDataObj(evalArgs[0]))

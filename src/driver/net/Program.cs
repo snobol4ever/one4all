@@ -29,7 +29,8 @@ try
 {
     var program = Snobol4Parser.ParseFile(path);
     var env     = new SnobolEnv();
-    var exec    = new Executor(env);
+    var stdin   = new StreamReader(Console.OpenStandardInput());
+    var exec    = new Executor(env, input: stdin);
     exec.Run(program);
     return 0;
 }
