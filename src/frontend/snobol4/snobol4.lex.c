@@ -1156,7 +1156,7 @@ YY_RULE_SETUP
 case 13:
 YY_RULE_SETUP
 #line 129 "snobol4.l"
-{ return T_STMT_END; }
+{ BEGIN(INITIAL); return T_STMT_END; }
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
@@ -1178,7 +1178,7 @@ YY_RULE_SETUP
 case 16:
 YY_RULE_SETUP
 #line 141 "snobol4.l"
-{ return T_STMT_END; }
+{ BEGIN(INITIAL); return T_STMT_END; }
 	YY_BREAK
 case 17:
 /* rule 17 can match eol */

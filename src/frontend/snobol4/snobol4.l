@@ -125,7 +125,7 @@ G       ({WS}|{CONT})*
 
 <BODY_START>[ \t]+      { /* discard leading whitespace — not concatenation */ }
 <BODY_START>\n          { lineno++; BEGIN(INITIAL); return T_STMT_END; }
-<BODY_START>";"         { return T_STMT_END; }
+<BODY_START>";"         { BEGIN(INITIAL); return T_STMT_END; }
 <BODY_START>.           { yyless(0); BEGIN(BODY); }
 
     /* ---- BODY: statement body ----
@@ -137,7 +137,7 @@ G       ({WS}|{CONT})*
     /* Add G to definitions if not present — defined above as ({WS}|{CONT})* */
 
 <BODY>\n               { lineno++; BEGIN(INITIAL); return T_STMT_END; }
-<BODY>";"              { return T_STMT_END; }
+<BODY>";"              { BEGIN(INITIAL); return T_STMT_END; }
 <BODY>{G}":"  { for(int _i=0;_i<yyleng;_i++) if(yytext[_i]=='\n') lineno++; BEGIN(GT); }
 
 <BODY>&{ALPHA}{ALNUM}* { strbuf[0]='\0'; strncat(strbuf,yytext+1,sizeof(strbuf)-1); return T_KEYWORD; }
