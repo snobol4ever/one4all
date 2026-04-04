@@ -562,12 +562,10 @@ public class Interpreter {
             }
 
             case E_DEFER:
-                // *X — deferred expression (eval X, then eval result as code)
+                // *X — freeze child ExprNode as a PAT descriptor (unevaluated expression).
+                // EVAL(pat) will re-evaluate it later.  This matches SIL DT_E semantics.
                 if (!e.children.isEmpty()) {
-                    DESCR v = eval(e.children.get(0));
-                    if (v.isFail()) return DESCR.FAIL;
-                    // Simple case: v is a variable name — dereference it
-                    return nvGet(v.toSnoStr());
+                    return DESCR.pat(e.children.get(0));
                 }
                 return DESCR.FAIL;
 
@@ -1135,6 +1133,23 @@ public class Interpreter {
                 return DESCR.NUL;
             }
 
+            // EVAL(deferred-expr) -- re-evaluate a frozen PAT descriptor
+            case "EVAL": {
+                if (a0.isFail()) return DESCR.FAIL;
+                if (a0.type == VType.PAT && a0.patNode != null) {
+                    return eval(a0.patNode);
+                }
+                return a0;
+            }
+
+            // APPLY(funcname-or-nameref, arg1, arg2, ...)
+            case "APPLY": {
+                if (args.isEmpty()) return DESCR.FAIL;
+                String fn = a0.toSnoStr().trim().toUpperCase();
+                if (fn.isEmpty()) return DESCR.FAIL;
+                List<DESCR> fnArgs = args.subList(1, args.size());
+                return callBuiltin(fn, fnArgs);
+            }
 
             default: {
                 // Check user-defined function table
