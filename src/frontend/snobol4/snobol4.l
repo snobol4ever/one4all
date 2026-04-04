@@ -54,7 +54,7 @@ static Token mktok(int k, const char *sv, long iv, double dv) {
 %option reentrant noyywrap never-interactive stack
 %option extra-type="void *"
 
-%x LABEL BODY BODY_START GT STR1 STR2 SKIP INCL
+%x LABEL LABEL_DONE BODY BODY_START GT STR1 STR2 SKIP INCL
 
 DIGIT   [0-9]
 ALPHA   [A-Za-z\x80-\xFF]
@@ -150,10 +150,18 @@ G       ({WS}|{CONT})*
 <LABEL>\n               {
     strbuf[strpos] = '\0';
     lineno++;
-    BEGIN(INITIAL);
+    BEGIN(LABEL_DONE);
     return T_LABEL;
-    /* parse.y sees T_LABEL then T_STMT_END from next INITIAL newline */
+    /* LABEL_DONE emits T_STMT_END before any body on the next line,
+     * preventing the next line's body from being absorbed into this stmt. */
 }
+
+    /* ---- LABEL_DONE: after a label-only line (label ended with \n) ----
+     * Must emit T_STMT_END, then re-dispatch at col-1 for the next line. */
+<LABEL_DONE>[ \t]          { BEGIN(INITIAL); return T_STMT_END; }
+<LABEL_DONE>\n             { lineno++; /* blank line after label-only line */ BEGIN(INITIAL); return T_STMT_END; }
+<LABEL_DONE>[*!|;]         { BEGIN(INITIAL); return T_STMT_END; }
+<LABEL_DONE>[^ \t\n*!|;]  { yyless(0); BEGIN(INITIAL); return T_STMT_END; }
 
 <LABEL>.                {
     /* non-IDCONT char immediately after label (no space) — put back, emit label */

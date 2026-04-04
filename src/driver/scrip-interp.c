@@ -446,7 +446,7 @@ static DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                 }
 
                 if (target) {
-                    if (strcasecmp(target, "END") == 0) break;
+                        if (strcasecmp(target, "END") == 0) break;
                     if (strcasecmp(target, "RETURN") == 0) {
                         retval = NV_GET_fn(fr->fname);
                         goto fn_done;
@@ -814,26 +814,15 @@ static DESCR_t interp_eval(EXPR_t *e)
             if (IS_FAIL_fn(args[i])) return FAILDESCR;
         }
 
-        /* Check user-defined FIRST — APPLY_fn returns NULVCL for both
-         * unknown names and fn==NULL user functions, so we can't distinguish
-         * after the fact. Route to interpreter if FNCEX_fn says it's registered
-         * with fn==NULL (user-defined), otherwise try builtins. */
-        if (FNCEX_fn(e->sval)) {
-            /* May be user-defined (fn==NULL) or a builtin (fn!=NULL).
-             * APPLY_fn routes fn!=NULL to the C function; fn==NULL returns NULVCL.
-             * We call APPLY_fn first; if it returns NULVCL we try call_user_function.
-             * This correctly handles builtins that happen to be registered via FNCEX. */
-            DESCR_t bres = APPLY_fn(e->sval, args, nargs);
-            if (IS_FAIL_fn(bres)) return FAILDESCR;
-            /* NULVCL could mean: builtin returned null, OR fn==NULL user func.
-             * Distinguish: check whether the body label exists in the program. */
-            if (bres.v != DT_SNUL)  /* non-null result → builtin returned a value */
-                return bres;
-            /* NULVCL: could be user func or builtin returning null.
-             * Try user dispatch; if no body label found it falls back to NULVCL. */
+        /* DYN-70 fix: check for user-defined body label BEFORE calling APPLY_fn.
+         * APPLY_fn internally dispatches user functions via call_user_function,
+         * so calling APPLY_fn then call_user_function again causes double execution.
+         * Rule: if a body label exists in the program → user-defined → skip APPLY_fn.
+         * Builtins never have a body label; user functions always do (prescan_defines). */
+        {
+            /* Resolve body: try as-is, uppercase, then entry_label (OPSYN aliases) */
             STMT_t *body = label_lookup(e->sval);
             if (!body) {
-                /* Try uppercase */
                 char ufn[128];
                 size_t fl = strlen(e->sval);
                 if (fl >= sizeof(ufn)) fl = sizeof(ufn)-1;
@@ -841,19 +830,21 @@ static DESCR_t interp_eval(EXPR_t *e)
                 body = label_lookup(ufn);
             }
             if (!body) {
-                /* Try entry_label — needed for OPSYN aliases where label != alias name */
                 const char *el = FUNC_ENTRY_fn(e->sval);
                 if (el) body = label_lookup(el);
             }
             if (body) {
+                /* User-defined function — call interpreter directly, never via APPLY_fn */
                 DESCR_t r = call_user_function(e->sval, args, nargs);
-                /* NRETURN: dereference name descriptor in value context */
-                if (r.v == DT_N && r.ptr) return *(DESCR_t*)r.ptr;
+                if (r.v == DT_N && r.ptr) return *(DESCR_t*)r.ptr;  /* NRETURN deref */
                 return r;
             }
-            return bres;  /* builtin returned NULVCL legitimately */
         }
-        /* Not registered at all — try APPLY_fn for late-registered builtins */
+        /* No body label → builtin or unknown. APPLY_fn handles both. */
+        if (FNCEX_fn(e->sval)) {
+            DESCR_t bres = APPLY_fn(e->sval, args, nargs);
+            return bres;
+        }
         return APPLY_fn(e->sval, args, nargs);
     }
 
