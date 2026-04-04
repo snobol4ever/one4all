@@ -141,8 +141,12 @@ function engine(S, Π, anchorStart) {
         const result = engine_ζ(S, n, Π, startPos);
         if (result !== null) {
             // commit conditional captures
-            for (const {v, text} of _pending_cond)
-                _vars_set(v, text);
+            for (const {v, text} of _pending_cond) {
+                if (v && v.__dcall)
+                    _dcall_hook(v.__dcall, v.__exprs, text);
+                else
+                    _vars_set(v, text);
+            }
             return result;
         }
     }
@@ -392,6 +396,27 @@ function engine_ζ(S, n, Π, startPos) {
             break;
         }
 
+        /* ── DEFERRED ───────────────────────────────────────────────────── */
+        /* Dynamic pattern: call fn() at match time, descend into result pattern.
+         * Used for *factor, *expr, *term — recursive grammar patterns. */
+        case 'DEFERRED/proceed': {
+            const dynPat = ζ[4].fn();
+            if (!dynPat || (dynPat && dynPat._sno_fail)) {
+                ζ = ζ_up(ζ);
+                action = 'concede';
+            } else {
+                ζ = ζ_down_to(ζ, dynPat);
+                action = 'proceed';
+            }
+            break;
+        }
+        case 'DEFERRED/concede':
+        case 'DEFERRED/recede': {
+            ζ = ζ_up(ζ);
+            action = 'concede';
+            break;
+        }
+
 
         case 'ABORT/proceed':
             return null;
@@ -478,7 +503,10 @@ function engine_ζ(S, n, Π, startPos) {
         case 'CAPT_IMM/succeed': {
             const v    = ζ[4].v;
             const text = S.slice(ζ[1], ζ[3]);   // Δ to δ
-            _vars_set(v, text);                   // immediate, unconditional
+            if (v && v.__dcall)
+                _dcall_hook(v.__dcall, v.__exprs, text);
+            else
+                _vars_set(v, text);                   // immediate, unconditional
             ζ = ζ_up(ζ);
             action = 'succeed';
             break;
@@ -543,6 +571,7 @@ function engine_ζ(S, n, Π, startPos) {
 
 /* ── Variable set hook (injected by sno_runtime.js) ─────────────────────── */
 let _vars_set = (v, text) => { /* stub — overridden by runtime */ };
+let _dcall_hook = (fname, exprs, text) => { /* stub — overridden by interp */ };
 
 /* ── Pattern builder helpers (used by emitted code) ─────────────────────── */
 function PAT_lit(s)       { return s; }  /* string — __pat not needed, checked by typeof */
@@ -563,6 +592,7 @@ function PAT_fence()      { return {__pat:1,t:'FENCE'}; }
 function PAT_succeed()    { return {__pat:1,t:'SUCCEED'}; }
 function PAT_fail()       { return {__pat:1,t:'FAIL'}; }
 function PAT_pred(fn)     { return {__pat:1,t:'PRED',fn}; }
+function PAT_deferred(fn) { return {__pat:1,t:'DEFERRED',fn}; }
 function PAT_abort()      { return {__pat:1,t:'ABORT'}; }
 function PAT_bal()        { return {__pat:1,t:'BAL'}; }
 function PAT_arbno(p)     { return {__pat:1,t:'ARBNO',p}; }
@@ -579,7 +609,8 @@ module.exports = {
     PAT_lit, PAT_alt, PAT_seq, PAT_any, PAT_notany,
     PAT_span, PAT_break, PAT_arb, PAT_rem,
     PAT_len, PAT_pos, PAT_rpos, PAT_tab, PAT_rtab,
-    PAT_fence, PAT_succeed, PAT_fail, PAT_pred, PAT_abort, PAT_bal,
+    PAT_fence, PAT_succeed, PAT_fail, PAT_pred, PAT_deferred, PAT_abort, PAT_bal,
     PAT_arbno, PAT_capt_imm, PAT_capt_cond, PAT_capt_cursor,
     _set_vars_hook: (fn) => { _vars_set = fn; },
+    _set_dcall_hook: (fn) => { _dcall_hook = fn; },
 };

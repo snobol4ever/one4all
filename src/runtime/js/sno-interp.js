@@ -33,12 +33,18 @@ const { sno_search, sno_match,
         PAT_len, PAT_pos, PAT_rpos, PAT_tab, PAT_rtab,
         PAT_fence, PAT_succeed, PAT_fail, PAT_pred, PAT_abort, PAT_bal,
         PAT_arbno, PAT_capt_imm, PAT_capt_cond, PAT_capt_cursor,
-        _set_vars_hook } = sno_eng;
+        PAT_deferred,
+        _set_vars_hook, _set_dcall_hook } = sno_eng;
 
 const { _FAIL, _is_fail, _str, _num, _add, _sub, _mul, _div, _pow,
         _vars, _kw, _is_int, _is_real, _real_result } = sno_rt;
 
 _set_vars_hook((v, text) => { _vars[v] = text; });
+_set_dcall_hook((fname, exprs, text) => {
+    /* Deferred capture target *f(text) — synthesise a literal arg and call */
+    const litExpr = {kind: E_QLIT, sval: text, children: []};
+    _call(fname, exprs.length ? exprs : [litExpr]);
+});
 
 /* Initialise SNOBOL4 keyword variables so &ALPHABET etc. resolve correctly */
 {
@@ -1045,8 +1051,21 @@ function _build_pat(e) {
     case E_SPAN:   return PAT_span(_str(interp_eval(e.children[0])));
     case E_BREAK:
     case E_BREAKX: return PAT_break(_str(interp_eval(e.children[0])));
-    case E_CAPT_COND_ASGN:  return PAT_capt_cond(_build_pat(e.children[0]), e.children[1]?.sval||'');
-    case E_CAPT_IMMED_ASGN: return PAT_capt_imm(_build_pat(e.children[0]),  e.children[1]?.sval||'');
+    case E_CAPT_COND_ASGN: {
+      const p = _build_pat(e.children[0]);
+      const tgt = e.children[1];
+      /* If target is E_DEFER(E_FNC(f)), store callable descriptor */
+      if (tgt && tgt.kind === E_DEFER && tgt.children[0]?.kind === E_FNC)
+        return PAT_capt_cond(p, {__dcall: tgt.children[0].sval, __exprs: tgt.children[0].children});
+      return PAT_capt_cond(p, tgt?.sval || '');
+    }
+    case E_CAPT_IMMED_ASGN: {
+      const p = _build_pat(e.children[0]);
+      const tgt = e.children[1];
+      if (tgt && tgt.kind === E_DEFER && tgt.children[0]?.kind === E_FNC)
+        return PAT_capt_imm(p, {__dcall: tgt.children[0].sval, __exprs: tgt.children[0].children});
+      return PAT_capt_imm(p, tgt?.sval || '');
+    }
     case E_CAPT_CURSOR: {
       /* Binary form: P @ V — match P then capture cursor into V.
        * Unary form (prefix @V from _e14): children[0] is the variable E_VAR/E_NAME.
@@ -1089,6 +1108,26 @@ function _build_pat(e) {
           return PAT_pred(() => _call(sval, ch));
         }
       }
+    }
+    case E_DEFER: {
+      /* *expr in pattern position.
+       * *f()  → dynamic sub-pattern: call f() at match time, descend into result.
+       * *VAR  → evaluate immediately (value fixed at build time). */
+      const inner = e.children[0];
+      if (inner.kind === E_FNC) {
+        const sval = inner.sval, ch = inner.children;
+        return PAT_deferred(() => {
+          const result = _call(sval, ch);
+          if (_is_fail(result)) return null;
+          if (result && result.__pat) return result;
+          return PAT_lit(_str(result ?? ''));
+        });
+      }
+      /* General case: evaluate inner expression now */
+      const v = interp_eval(inner);
+      if (_is_fail(v)) return _FAIL;
+      if (v && v.__pat) return v;
+      return PAT_lit(_str(v ?? ''));
     }
     default: { const v=interp_eval(e); return _is_fail(v)?_FAIL:PAT_lit(_str(v)); }
   }
