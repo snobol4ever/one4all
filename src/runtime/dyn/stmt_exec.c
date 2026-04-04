@@ -460,22 +460,26 @@ static spec_t bb_callcap(void *zeta, int entry)
            goto CC_γ_core;
 
     CC_γ_core: {
-           /* Call the function NOW to get the DT_N lvalue pointer */
-           DESCR_t name_d = (g_user_call_hook && ζ->fnc_name)
-               ? g_user_call_hook(ζ->fnc_name, ζ->fnc_args, ζ->fnc_nargs)
-               : NULVCL;
-           DESCR_t *cell = (name_d.v == DT_N && name_d.ptr) ? (DESCR_t*)name_d.ptr : NULL;
-           if (ζ->immediate && cell) {
-               /* $ — write immediately */
-               char *s = (char *)GC_MALLOC(child_r.δ + 1);
-               memcpy(s, child_r.σ, (size_t)child_r.δ); s[child_r.δ] = '\0';
-               DESCR_t val = { .v = DT_S, .slen = (uint32_t)child_r.δ, .s = s };
-               *cell = val;
-           } else if (!ζ->immediate) {
-               /* . — buffer for conditional flush */
-               ζ->pending      = child_r;
-               ζ->resolved_ptr = cell;
-               ζ->has_pending  = 1;
+           if (ζ->immediate) {
+               /* $ — call NOW, write immediately */
+               DESCR_t name_d = (g_user_call_hook && ζ->fnc_name)
+                   ? g_user_call_hook(ζ->fnc_name, ζ->fnc_args, ζ->fnc_nargs)
+                   : NULVCL;
+               DESCR_t *cell = (name_d.v == DT_N && name_d.ptr) ? (DESCR_t*)name_d.ptr : NULL;
+               if (cell) {
+                   char *s = (char *)GC_MALLOC(child_r.δ + 1);
+                   memcpy(s, child_r.σ, (size_t)child_r.δ); s[child_r.δ] = '\0';
+                   DESCR_t val = { .v = DT_S, .slen = (uint32_t)child_r.δ, .s = s };
+                   *cell = val;
+               }
+           } else {
+               /* . — buffer spec; defer hook call to flush_pending_callcaps.
+                * DYN-77: do NOT call g_user_call_hook here — Push() has side
+                * effects (stk[0]++) that must only fire on committed matches. */
+               ζ->pending     = child_r;
+               ζ->has_pending = 1;
+               /* resolved_ptr unused for deferred path — cleared for safety */
+               ζ->resolved_ptr = NULL;
            }
            return child_r;
     }
@@ -487,13 +491,21 @@ static spec_t bb_callcap(void *zeta, int entry)
 static void flush_pending_callcaps(void) {
     for (int i = 0; i < g_callcap_count; i++) {
         callcap_t *c = g_callcap_list[i];
-        if (!c->immediate && c->has_pending && c->resolved_ptr) {
+        if (!c->immediate && c->has_pending) {
             spec_t snap = c->pending;
             c->has_pending = 0;
-            char *s = (char *)GC_MALLOC(snap.δ + 1);
-            memcpy(s, snap.σ, (size_t)snap.δ); s[snap.δ] = '\0';
-            DESCR_t val = { .v = DT_S, .slen = (uint32_t)snap.δ, .s = s };
-            *c->resolved_ptr = val;
+            /* DYN-77: call hook at commit time (not match time) to get lvalue.
+             * Push() fires stk[0]++ here (committed match only, not backtracks). */
+            DESCR_t name_d = (g_user_call_hook && c->fnc_name)
+                ? g_user_call_hook(c->fnc_name, c->fnc_args, c->fnc_nargs)
+                : NULVCL;
+            DESCR_t *cell = (name_d.v == DT_N && name_d.ptr) ? (DESCR_t*)name_d.ptr : NULL;
+            if (cell) {
+                char *s = (char *)GC_MALLOC(snap.δ + 1);
+                memcpy(s, snap.σ, (size_t)snap.δ); s[snap.δ] = '\0';
+                DESCR_t val = { .v = DT_S, .slen = (uint32_t)snap.δ, .s = s };
+                *cell = val;
+            }
         } else {
             c->has_pending = 0;
         }
