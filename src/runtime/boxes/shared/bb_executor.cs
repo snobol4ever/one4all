@@ -55,7 +55,7 @@ public sealed class ByrdBoxExecutor
             int matchStart = pos;
 
             // Try α entry
-            var r = _root.Alpha(ms);
+            var r = _root.α(ms);
 
             if (!r.IsFail)
             {
@@ -67,7 +67,7 @@ public sealed class ByrdBoxExecutor
             // α failed — try β backtrack chain within this start position
             while (true)
             {
-                r = _root.Beta(ms);
+                r = _root.β(ms);
                 if (!r.IsFail)
                 {
                     CommitCaptures();

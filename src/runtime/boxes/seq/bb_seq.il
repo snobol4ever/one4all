@@ -1,4 +1,6 @@
 // bb_seq.il — SEQ: left then right; β retries right then left
+// State: _mStart (fixed at α entry), _mLen (left-match length, RESET on each new left result)
+// Fix: mLen is stored as the left span only; gamma emits mStart+(mLen+rr.Length)
 // AUTHORS: Lon Jones Cherryholmes · Jeffrey Cooper M.D. · Claude Sonnet 4.6
 
 .assembly extern mscorlib {}
@@ -29,7 +31,6 @@
     ret
   }
 
-  // ── α ───────────────────────────────────────────────────────────────
   .method public virtual instance valuetype Snobol4.Runtime.Boxes.Spec
           Alpha(class Snobol4.Runtime.Boxes.MatchState ms) cil managed
   {
@@ -37,16 +38,11 @@
     .locals init (valuetype Snobol4.Runtime.Boxes.Spec V_lr,
                   valuetype Snobol4.Runtime.Boxes.Spec V_rr)
 
-    // _mStart = cursor; _mLen = 0
     ldarg.0
     ldarg.1
     ldfld      int32 Snobol4.Runtime.Boxes.MatchState::Cursor
     stfld      int32 Snobol4.Runtime.Boxes.bb_seq::_mStart
-    ldarg.0
-    ldc.i4.0
-    stfld      int32 Snobol4.Runtime.Boxes.bb_seq::_mLen
 
-    // lr = _left.α(ms)
     ldarg.0
     ldfld      class Snobol4.Runtime.Boxes.IByrdBox Snobol4.Runtime.Boxes.bb_seq::_left
     ldarg.1
@@ -57,17 +53,12 @@
     call       instance bool Snobol4.Runtime.Boxes.Spec::get_IsFail()
     brtrue     SEQ_A_OMEGA
 
-    // left_γ: accumulate
     ldarg.0
-    ldarg.0
-    ldfld      int32 Snobol4.Runtime.Boxes.bb_seq::_mLen
     ldloca.s   V_lr
     ldfld      int32 Snobol4.Runtime.Boxes.Spec::Length
-    add
     stfld      int32 Snobol4.Runtime.Boxes.bb_seq::_mLen
 
   SEQ_A_TRY_RIGHT:
-    // rr = _right.α(ms)
     ldarg.0
     ldfld      class Snobol4.Runtime.Boxes.IByrdBox Snobol4.Runtime.Boxes.bb_seq::_right
     ldarg.1
@@ -78,7 +69,6 @@
     call       instance bool Snobol4.Runtime.Boxes.Spec::get_IsFail()
     brfalse    SEQ_A_GAMMA
 
-    // right_ω → left.β (inline — no cross-method branch)
   SEQ_A_LEFT_BETA:
     ldarg.0
     ldfld      class Snobol4.Runtime.Boxes.IByrdBox Snobol4.Runtime.Boxes.bb_seq::_left
@@ -89,13 +79,9 @@
     ldloca.s   V_lr
     call       instance bool Snobol4.Runtime.Boxes.Spec::get_IsFail()
     brtrue     SEQ_A_OMEGA
-    // left_γ from β: re-accumulate and retry right.α
     ldarg.0
-    ldarg.0
-    ldfld      int32 Snobol4.Runtime.Boxes.bb_seq::_mLen
     ldloca.s   V_lr
     ldfld      int32 Snobol4.Runtime.Boxes.Spec::Length
-    add
     stfld      int32 Snobol4.Runtime.Boxes.bb_seq::_mLen
     br         SEQ_A_TRY_RIGHT
 
@@ -116,7 +102,6 @@
     ret
   }
 
-  // ── β ────────────────────────────────────────────────────────────────
   .method public virtual instance valuetype Snobol4.Runtime.Boxes.Spec
           Beta(class Snobol4.Runtime.Boxes.MatchState ms) cil managed
   {
@@ -124,7 +109,7 @@
     .locals init (valuetype Snobol4.Runtime.Boxes.Spec V_rr,
                   valuetype Snobol4.Runtime.Boxes.Spec V_lr)
 
-  SEQ_B_TRY_RIGHT:
+  SEQ_B_TRY_RIGHT_BETA:
     ldarg.0
     ldfld      class Snobol4.Runtime.Boxes.IByrdBox Snobol4.Runtime.Boxes.bb_seq::_right
     ldarg.1
@@ -146,13 +131,9 @@
     call       instance bool Snobol4.Runtime.Boxes.Spec::get_IsFail()
     brtrue     SEQ_B_OMEGA
     ldarg.0
-    ldarg.0
-    ldfld      int32 Snobol4.Runtime.Boxes.bb_seq::_mLen
     ldloca.s   V_lr
     ldfld      int32 Snobol4.Runtime.Boxes.Spec::Length
-    add
     stfld      int32 Snobol4.Runtime.Boxes.bb_seq::_mLen
-    // retry right.α
     ldarg.0
     ldfld      class Snobol4.Runtime.Boxes.IByrdBox Snobol4.Runtime.Boxes.bb_seq::_right
     ldarg.1

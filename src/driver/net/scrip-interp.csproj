@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>scrip-interp</AssemblyName>
+    <RootNamespace>ScripInterp</RootNamespace>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- D-177: Most box types emitted at runtime via BoxFactory (Reflection.Emit).
+         bb_capture/atp/dvar/lit kept as compiled C# — typed public properties
+         (SetVar, GetStringVar, GetPatternVar) accessed by name from PatternBuilder.
+         bb_lit kept because bb_dvar.RebuildChild does newobj bb_lit at runtime. -->
+    <Compile Include="../../runtime/boxes/shared/bb_box.cs" />
+    <Compile Include="../../runtime/boxes/shared/bb_executor.cs" />
+    <Compile Include="../../runtime/boxes/capture/bb_capture.cs" />
+    <Compile Include="../../runtime/boxes/atp/bb_atp.cs" />
+    <Compile Include="../../runtime/boxes/dvar/bb_dvar.cs" />
+    <Compile Include="../../runtime/boxes/lit/bb_lit.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Pidgin" Version="3.3.0" />
+  </ItemGroup>
+</Project>
