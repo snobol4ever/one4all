@@ -423,6 +423,7 @@ static spec_t bb_usercall(void *zeta, int entry)
 typedef struct callcap_s callcap_t;
 static callcap_t *g_callcap_list[MAX_CALLCAPS];
 static int        g_callcap_count = 0;
+static int        g_callcap_gen   = 0;   /* DYN-76: per-statement generation — replaces registered flag */
 
 typedef struct callcap_s {
     bb_box_fn    child_fn;
@@ -435,6 +436,7 @@ typedef struct callcap_s {
     DESCR_t     *resolved_ptr;  /* set at match time; used at flush */
     int          has_pending;
     int          registered;
+    int          last_gen;      /* DYN-76: generation at last CC_α registration */
 } callcap_t;
 
 static spec_t bb_callcap(void *zeta, int entry)
@@ -918,12 +920,7 @@ static spec_t bb_deferred_var(void *zeta, int entry)
     spec_t          DVAR;
 
     DVAR_α:         {
-                        /* Recursion guard: global depth cap only.
-                         * DYN-75: removed per-node in_progress flag — it blocked
-                         * right-recursive grammars (term = *factor mulop *term)
-                         * where the recursive *term fires AFTER consuming input.
-                         * The global depth cap (DVAR_MAX_DEPTH=64) handles
-                         * genuinely infinite mutual recursion. */
+                        /* Recursion guard: global depth cap only. */
                         if (g_dvar_depth >= DVAR_MAX_DEPTH)
                                                               goto DVAR_ω;
                         g_dvar_depth++;
@@ -978,10 +975,44 @@ static spec_t bb_deferred_var(void *zeta, int entry)
                             memset(ζ->child_state, 0, ζ->child_size);
                     }
                     if (!ζ->child_fn) { g_dvar_depth--; goto DVAR_ω; }
+                    /* DYN-76: scoped callcap save/restore for recursive DVAR.
+                     * Snapshot outer registrations, run child with fresh scope,
+                     * then merge inner callcaps after outer ones on success. */
+                    int   dvar_cc_save = g_callcap_count;
+                    callcap_t *dvar_cc_snap[MAX_CALLCAPS];
+                    for (int _ci = 0; _ci < dvar_cc_save; _ci++) {
+                        dvar_cc_snap[_ci] = g_callcap_list[_ci];
+                        g_callcap_list[_ci]->registered = 0;
+                    }
+                    g_callcap_count = 0;
                     DVAR = ζ->child_fn(ζ->child_state, α);
                     g_dvar_depth--;
-                    if (spec_is_empty(DVAR))                  goto DVAR_ω;
-                                                              goto DVAR_γ;
+                    if (spec_is_empty(DVAR)) {
+                        /* Failure: discard inner, restore outer */
+                        for (int _ci = 0; _ci < g_callcap_count; _ci++)
+                            g_callcap_list[_ci]->registered = 0;
+                        g_callcap_count = dvar_cc_save;
+                        for (int _ci = 0; _ci < dvar_cc_save; _ci++) {
+                            g_callcap_list[_ci] = dvar_cc_snap[_ci];
+                            g_callcap_list[_ci]->registered = 1;
+                        }
+                        goto DVAR_ω;
+                    }
+                    /* Success: restore outer first, then append inner */
+                    {
+                        int inner_count = g_callcap_count;
+                        callcap_t *inner_snap[MAX_CALLCAPS];
+                        for (int _ci = 0; _ci < inner_count; _ci++)
+                            inner_snap[_ci] = g_callcap_list[_ci];
+                        g_callcap_count = dvar_cc_save;
+                        for (int _ci = 0; _ci < dvar_cc_save; _ci++) {
+                            g_callcap_list[_ci] = dvar_cc_snap[_ci];
+                            g_callcap_list[_ci]->registered = 1;
+                        }
+                        for (int _ci = 0; _ci < inner_count && g_callcap_count < MAX_CALLCAPS; _ci++)
+                            g_callcap_list[g_callcap_count++] = inner_snap[_ci];
+                    }
+                    goto DVAR_γ;
 
     DVAR_β:         if (!ζ->child_fn)                         goto DVAR_ω;
                     DVAR = ζ->child_fn(ζ->child_state, β);
@@ -1086,6 +1117,7 @@ int exec_stmt(const char  *subj_name,
     /* reset capture registry for this statement */
     g_capture_count = 0;
     g_callcap_count = 0;   /* DYN-69: callcap (pat . *func()) registry */
+    g_callcap_gen++;       /* DYN-76: new generation — allows cached callcaps to re-register */
 
     /* ── Phase 1: build subject ─────────────────────────────────────── */
     /*

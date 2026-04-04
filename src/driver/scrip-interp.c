@@ -1257,8 +1257,15 @@ static DESCR_t interp_eval_pat(EXPR_t *e)
              * cycle detection at match time. */
             if (child->kind == E_VAR && child->sval)
                 return pat_ref(child->sval);
-            /* Non-VAR child: evaluate and return stored pattern */
-            DESCR_t r = interp_eval(child);
+            /* Non-VAR, non-FNC child: if it contains no pattern-only nodes,
+             * it is a pure value expression — freeze as DT_E for EVAL() to
+             * thaw later.  E.g. *('abc' 'def') or *'str' → DT_E, not STRING.
+             * If it IS a pattern tree (E_ALT etc.) evaluate in pat context. */
+            if (!_expr_is_pat(child)) {
+                DESCR_t d; d.v = DT_E; d.ptr = child; d.slen = 0;
+                return d;
+            }
+            DESCR_t r = interp_eval_pat(child);
             if (r.v == DT_N && r.ptr) r = *(DESCR_t*)r.ptr;
             return r;
         }

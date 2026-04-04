@@ -83,6 +83,14 @@ DESCR_t eval_node(EXPR_t *e)
 
     switch (e->kind) {
 
+    /* ── deferred expression — thaw in value context ─────────────────── */
+    case E_DEFER:
+        /* *expr stores E_DEFER{child=inner_expr} as DT_E.
+         * EVAL_fn calls eval_node(expr.ptr) where ptr = the E_DEFER node.
+         * Recurse into the child to evaluate in value context. */
+        if (e->nchildren < 1) return NULVCL;
+        return eval_node(e->children[0]);
+
     /* ── literals ────────────────────────────────────────────────────── */
     case E_ILIT:
         return INTVAL(e->ival);
