@@ -886,12 +886,9 @@ static DESCR_t interp_eval(EXPR_t *e)
          * *complex_expr: freeze as DT_E for EVAL() to thaw later. */
         if (e->nchildren < 1) return NULVCL;
         EXPR_t *child = e->children[0];
-        if (child->kind == E_VAR && child->sval) {
-            DESCR_t *cell = NV_PTR_fn(child->sval);
-            DESCR_t r = cell ? *cell : NULVCL;
-            if (r.v == DT_N && r.ptr) r = *(DESCR_t*)r.ptr;
-            return r;
-        }
+        /* NOTE: E_DEFER(E_VAR) in value context must produce DT_E (frozen for EVAL).
+         * Immediate resolution of *var belongs only in interp_eval_pat. Do NOT add
+         * an E_VAR fast-path here — it regresses 086_define_locals, 1010/1013/1015/1016/1018. */
         if (child->kind == E_FNC && child->sval) {
             /* *func(args) — build deferred XATP pattern node (same as interp_eval_pat) */
             int na = child->nchildren;
