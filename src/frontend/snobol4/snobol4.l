@@ -37,6 +37,7 @@
 void sno_error(int, const char *, ...);
 char *inc_dirs[64];
 int   n_inc = 0;
+int   sno_nerrors = 0;
 
 static int   lineno = 1;
 static char  strbuf[65536];
@@ -324,6 +325,11 @@ void sno_error(int ln, const char *fmt, ...) {
     fprintf(stderr,"snobol4:%d: error: ",ln);
     va_start(ap,fmt); vfprintf(stderr,fmt,ap); va_end(ap);
     fputc('\n',stderr);
+    sno_nerrors++;
+}
+
+void sno_add_include_dir(const char *d) {
+    if (n_inc < 64) inc_dirs[n_inc++] = (char *)d;
 }
 
 /* Lex wraps a single reentrant scanner + strbuf pointer for sval. */
@@ -422,4 +428,4 @@ Program *sno_parse(FILE *f, const char *fname) {
     return prog;
 }
 
-void sno_reset(void) {}
+void sno_reset(void) { sno_nerrors = 0; n_inc = 0; }

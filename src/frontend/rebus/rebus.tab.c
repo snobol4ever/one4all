@@ -63,8 +63,16 @@
 /* Pull parsers.  */
 #define YYPULL 1
 
-
-
+/* Substitute the type names.  */
+#define YYSTYPE         REBUS_YYSTYPE
+/* Substitute the variable and function names.  */
+#define yyparse         rebus_yyparse
+#define yylex           rebus_yylex
+#define yyerror         rebus_yyerror
+#define yydebug         rebus_yydebug
+#define yynerrs         rebus_yynerrs
+#define yylval          rebus_yylval
+#define yychar          rebus_yychar
 
 /* First part of user prologue.  */
 #line 1 "rebus.y"
@@ -167,9 +175,10 @@ static void stal_push(STAL *s, RStmt *v) {
 
 extern int  yylex(void);
 extern void yyerror(const char *);
-extern int  yylineno;
+extern int  rebus_yylineno;
+#define yylineno rebus_yylineno
 
-#line 173 "rebus.tab.c"
+#line 182 "rebus.tab.c"
 
 # ifndef YY_CAST
 #  ifdef __cplusplus
@@ -594,7 +603,7 @@ void free (void *); /* INFRINGES ON USER NAME SPACE */
 
 #if (! defined yyoverflow \
      && (! defined __cplusplus \
-         || (defined YYSTYPE_IS_TRIVIAL && YYSTYPE_IS_TRIVIAL)))
+         || (defined REBUS_YYSTYPE_IS_TRIVIAL && REBUS_YYSTYPE_IS_TRIVIAL)))
 
 /* A type that is properly aligned for any stack member.  */
 union yyalloc
@@ -715,30 +724,30 @@ static const yytype_int8 yytranslate[] =
       66,    67,    68,    69,    70,    71,    72
 };
 
-#if YYDEBUG
+#if REBUS_YYDEBUG
 /* YYRLINE[YYN] -- Source line where rule number YYN was defined.  */
 static const yytype_int16 yyrline[] =
 {
-       0,   186,   186,   190,   191,   203,   204,   208,   209,   215,
-     216,   224,   246,   269,   270,   274,   275,   279,   280,   281,
-     287,   288,   292,   293,   294,   301,   308,   316,   317,   321,
-     322,   330,   331,   332,   333,   334,   335,   336,   337,   338,
-     339,   340,   341,   342,   346,   351,   355,   359,   363,   371,
-     386,   391,   399,   410,   421,   431,   442,   452,   462,   476,
-     486,   487,   492,   496,   503,   526,   531,   532,   533,   534,
-     535,   536,   541,   542,   547,   548,   549,   554,   555,   556,
-     557,   558,   559,   560,   561,   562,   563,   564,   565,   566,
-     571,   572,   573,   578,   579,   580,   581,   586,   587,   588,
-     593,   594,   595,   596,   597,   598,   599,   600,   604,   605,
-     610,   611,   628,   638,   652,   656,   664,   665,   666,   667,
-     668,   669,   675,   680,   681,   686,   687,   691,   692,   693
+       0,   189,   189,   193,   194,   206,   207,   211,   212,   218,
+     219,   227,   249,   272,   273,   277,   278,   282,   283,   284,
+     290,   291,   295,   296,   297,   304,   311,   319,   320,   324,
+     325,   333,   334,   335,   336,   337,   338,   339,   340,   341,
+     342,   343,   344,   345,   349,   354,   358,   362,   366,   374,
+     389,   394,   402,   413,   424,   434,   445,   455,   465,   479,
+     489,   490,   495,   499,   506,   529,   534,   535,   536,   537,
+     538,   539,   544,   545,   550,   551,   552,   557,   558,   559,
+     560,   561,   562,   563,   564,   565,   566,   567,   568,   569,
+     574,   575,   576,   581,   582,   583,   584,   589,   590,   591,
+     596,   597,   598,   599,   600,   601,   602,   603,   607,   608,
+     613,   614,   631,   641,   655,   659,   667,   668,   669,   670,
+     671,   672,   678,   683,   684,   689,   690,   694,   695,   696
 };
 #endif
 
 /** Accessing symbol of state STATE.  */
 #define YY_ACCESSING_SYMBOL(State) YY_CAST (yysymbol_kind_t, yystos[State])
 
-#if YYDEBUG || 0
+#if REBUS_YYDEBUG || 0
 /* The user-facing name of the symbol whose (internal) number is
    YYSYMBOL.  No bounds checking.  */
 static const char *yysymbol_name (yysymbol_kind_t yysymbol) YY_ATTRIBUTE_UNUSED;
@@ -1005,7 +1014,7 @@ static const yytype_int8 yyr2[] =
 enum { YYENOMEM = -2 };
 
 #define yyerrok         (yyerrstatus = 0)
-#define yyclearin       (yychar = YYEMPTY)
+#define yyclearin       (yychar = REBUS_YYEMPTY)
 
 #define YYACCEPT        goto yyacceptlab
 #define YYABORT         goto yyabortlab
@@ -1017,7 +1026,7 @@ enum { YYENOMEM = -2 };
 
 #define YYBACKUP(Token, Value)                                    \
   do                                                              \
-    if (yychar == YYEMPTY)                                        \
+    if (yychar == REBUS_YYEMPTY)                                        \
       {                                                           \
         yychar = (Token);                                         \
         yylval = (Value);                                         \
@@ -1033,12 +1042,12 @@ enum { YYENOMEM = -2 };
   while (0)
 
 /* Backward compatibility with an undocumented macro.
-   Use YYerror or YYUNDEF. */
-#define YYERRCODE YYUNDEF
+   Use REBUS_YYerror or REBUS_YYUNDEF. */
+#define YYERRCODE REBUS_YYUNDEF
 
 
 /* Enable debugging if requested.  */
-#if YYDEBUG
+#if REBUS_YYDEBUG
 
 # ifndef YYFPRINTF
 #  include <stdio.h> /* INFRINGES ON USER NAME SPACE */
@@ -1156,12 +1165,12 @@ do {                                    \
 /* Nonzero means print parse trace.  It is left uninitialized so that
    multiple parsers can coexist.  */
 int yydebug;
-#else /* !YYDEBUG */
+#else /* !REBUS_YYDEBUG */
 # define YYDPRINTF(Args) ((void) 0)
 # define YY_SYMBOL_PRINT(Title, Kind, Value, Location)
 # define YY_STACK_PRINT(Bottom, Top)
 # define YY_REDUCE_PRINT(Rule)
-#endif /* !YYDEBUG */
+#endif /* !REBUS_YYDEBUG */
 
 
 /* YYINITDEPTH -- initial size of the parser's stacks.  */
@@ -1261,7 +1270,7 @@ yyparse (void)
 
   YYDPRINTF ((stderr, "Starting parse\n"));
 
-  yychar = YYEMPTY; /* Cause a token to be read.  */
+  yychar = REBUS_YYEMPTY; /* Cause a token to be read.  */
 
   goto yysetstate;
 
@@ -1371,25 +1380,25 @@ yybackup:
   /* Not known => get a lookahead token if don't already have one.  */
 
   /* YYCHAR is either empty, or end-of-input, or a valid lookahead.  */
-  if (yychar == YYEMPTY)
+  if (yychar == REBUS_YYEMPTY)
     {
       YYDPRINTF ((stderr, "Reading a token\n"));
       yychar = yylex ();
     }
 
-  if (yychar <= YYEOF)
+  if (yychar <= REBUS_YYEOF)
     {
-      yychar = YYEOF;
+      yychar = REBUS_YYEOF;
       yytoken = YYSYMBOL_YYEOF;
       YYDPRINTF ((stderr, "Now at end of input.\n"));
     }
-  else if (yychar == YYerror)
+  else if (yychar == REBUS_YYerror)
     {
       /* The scanner already issued an error message, process directly
          to error recovery.  But do not keep the error token as
          lookahead, it is too special and may lead us to an endless
          loop in error recovery. */
-      yychar = YYUNDEF;
+      yychar = REBUS_YYUNDEF;
       yytoken = YYSYMBOL_YYerror;
       goto yyerrlab1;
     }
@@ -1426,7 +1435,7 @@ yybackup:
   YY_IGNORE_MAYBE_UNINITIALIZED_END
 
   /* Discard the shifted token.  */
-  yychar = YYEMPTY;
+  yychar = REBUS_YYEMPTY;
   goto yynewstate;
 
 
@@ -1462,13 +1471,13 @@ yyreduce:
   switch (yyn)
     {
   case 2: /* program: decl_list  */
-#line 186 "rebus.y"
+#line 189 "rebus.y"
                             { /* rebus_parsed_program already set */ }
-#line 1468 "rebus.tab.c"
+#line 1477 "rebus.tab.c"
     break;
 
   case 4: /* decl_list: decl_list decl  */
-#line 191 "rebus.y"
+#line 194 "rebus.y"
                             {
             if ((yyvsp[0].decl)) {
                 (yyvsp[0].decl)->next = NULL;
@@ -1481,35 +1490,35 @@ yyreduce:
                 prog->ndecls++;
             }
         }
-#line 1485 "rebus.tab.c"
+#line 1494 "rebus.tab.c"
     break;
 
   case 5: /* decl_list: decl_list ';'  */
-#line 203 "rebus.y"
+#line 206 "rebus.y"
                             { /* empty statement at top level */ }
-#line 1491 "rebus.tab.c"
+#line 1500 "rebus.tab.c"
     break;
 
   case 6: /* decl_list: decl_list error ';'  */
-#line 204 "rebus.y"
+#line 207 "rebus.y"
                             { yyerrok; }
-#line 1497 "rebus.tab.c"
+#line 1506 "rebus.tab.c"
     break;
 
   case 7: /* decl: function_decl  */
-#line 208 "rebus.y"
+#line 211 "rebus.y"
                             { (yyval.decl) = (yyvsp[0].decl); }
-#line 1503 "rebus.tab.c"
+#line 1512 "rebus.tab.c"
     break;
 
   case 8: /* decl: record_decl  */
-#line 209 "rebus.y"
+#line 212 "rebus.y"
                             { (yyval.decl) = (yyvsp[0].decl); }
-#line 1509 "rebus.tab.c"
+#line 1518 "rebus.tab.c"
     break;
 
   case 11: /* record_decl: T_RECORD T_IDENT '(' opt_idlist ')' opt_semi  */
-#line 225 "rebus.y"
+#line 228 "rebus.y"
         {
             RDecl *d   = rdecl_new(RD_RECORD, yylineno);
             d->name    = (yyvsp[-4].sval);
@@ -1519,11 +1528,11 @@ yyreduce:
             free(sl);
             (yyval.decl) = d;
         }
-#line 1523 "rebus.tab.c"
+#line 1532 "rebus.tab.c"
     break;
 
   case 12: /* function_decl: T_FUNCTION T_IDENT '(' opt_params ')' opt_semi opt_locals opt_initial stmt_list T_END  */
-#line 251 "rebus.y"
+#line 254 "rebus.y"
         {
             RDecl *d    = rdecl_new(RD_FUNCTION, yylineno);
             d->name     = (yyvsp[-8].sval);
@@ -1539,77 +1548,77 @@ yyreduce:
             d->body     = (yyvsp[-1].stmt);
             (yyval.decl) = d;
         }
-#line 1543 "rebus.tab.c"
+#line 1552 "rebus.tab.c"
     break;
 
   case 13: /* opt_params: %empty  */
-#line 269 "rebus.y"
+#line 272 "rebus.y"
                     { (yyval.sal) = (void*)sal_new(); }
-#line 1549 "rebus.tab.c"
+#line 1558 "rebus.tab.c"
     break;
 
   case 14: /* opt_params: idlist_ne  */
-#line 270 "rebus.y"
+#line 273 "rebus.y"
                     { (yyval.sal) = (yyvsp[0].sal); }
-#line 1555 "rebus.tab.c"
+#line 1564 "rebus.tab.c"
     break;
 
   case 15: /* opt_locals: %empty  */
-#line 274 "rebus.y"
+#line 277 "rebus.y"
                                { (yyval.sal) = (void*)sal_new(); }
-#line 1561 "rebus.tab.c"
+#line 1570 "rebus.tab.c"
     break;
 
   case 16: /* opt_locals: T_LOCAL idlist_ne ';'  */
-#line 275 "rebus.y"
+#line 278 "rebus.y"
                               { (yyval.sal) = (yyvsp[-1].sal); }
-#line 1567 "rebus.tab.c"
+#line 1576 "rebus.tab.c"
     break;
 
   case 17: /* opt_initial: %empty  */
-#line 279 "rebus.y"
+#line 282 "rebus.y"
                                { (yyval.stmt) = NULL; }
-#line 1573 "rebus.tab.c"
+#line 1582 "rebus.tab.c"
     break;
 
   case 18: /* opt_initial: T_INITIAL compound_stmt  */
-#line 280 "rebus.y"
+#line 283 "rebus.y"
                                             { (yyval.stmt) = (yyvsp[0].stmt); }
-#line 1579 "rebus.tab.c"
+#line 1588 "rebus.tab.c"
     break;
 
   case 19: /* opt_initial: T_INITIAL stmt ';'  */
-#line 281 "rebus.y"
+#line 284 "rebus.y"
                                             { (yyval.stmt) = (yyvsp[-1].stmt); }
-#line 1585 "rebus.tab.c"
+#line 1594 "rebus.tab.c"
     break;
 
   case 20: /* stmt_list: %empty  */
-#line 287 "rebus.y"
+#line 290 "rebus.y"
                     { (yyval.stmt) = NULL; }
-#line 1591 "rebus.tab.c"
+#line 1600 "rebus.tab.c"
     break;
 
   case 21: /* stmt_list: stmt_list_ne  */
-#line 288 "rebus.y"
+#line 291 "rebus.y"
                     { (yyval.stmt) = (yyvsp[0].stmt); }
-#line 1597 "rebus.tab.c"
+#line 1606 "rebus.tab.c"
     break;
 
   case 22: /* stmt_list_ne: stmt ';'  */
-#line 292 "rebus.y"
+#line 295 "rebus.y"
                                 { (yyval.stmt) = (yyvsp[-1].stmt); }
-#line 1603 "rebus.tab.c"
+#line 1612 "rebus.tab.c"
     break;
 
   case 23: /* stmt_list_ne: compound_stmt  */
-#line 293 "rebus.y"
+#line 296 "rebus.y"
                                 { (yyval.stmt) = (yyvsp[0].stmt); }
-#line 1609 "rebus.tab.c"
+#line 1618 "rebus.tab.c"
     break;
 
   case 24: /* stmt_list_ne: stmt_list_ne stmt ';'  */
-#line 294 "rebus.y"
+#line 297 "rebus.y"
                                 {
             if (!(yyvsp[-2].stmt)) { (yyval.stmt) = (yyvsp[-1].stmt); }
             else {
@@ -1617,11 +1626,11 @@ yyreduce:
                 t->next = (yyvsp[-1].stmt); (yyval.stmt) = (yyvsp[-2].stmt);
             }
         }
-#line 1621 "rebus.tab.c"
+#line 1630 "rebus.tab.c"
     break;
 
   case 25: /* stmt_list_ne: stmt_list_ne compound_stmt  */
-#line 301 "rebus.y"
+#line 304 "rebus.y"
                                  {
             if (!(yyvsp[-1].stmt)) { (yyval.stmt) = (yyvsp[0].stmt); }
             else {
@@ -1629,164 +1638,164 @@ yyreduce:
                 t->next = (yyvsp[0].stmt); (yyval.stmt) = (yyvsp[-1].stmt);
             }
         }
-#line 1633 "rebus.tab.c"
+#line 1642 "rebus.tab.c"
     break;
 
   case 26: /* stmt_list_ne: stmt_list_ne error ';'  */
-#line 308 "rebus.y"
+#line 311 "rebus.y"
                                 { yyerrok; (yyval.stmt) = (yyvsp[-2].stmt); }
-#line 1639 "rebus.tab.c"
+#line 1648 "rebus.tab.c"
     break;
 
   case 27: /* idlist_ne: T_IDENT  */
-#line 316 "rebus.y"
+#line 319 "rebus.y"
                             { SAL *s = sal_new(); sal_push(s, (yyvsp[0].sval)); (yyval.sal) = s; }
-#line 1645 "rebus.tab.c"
+#line 1654 "rebus.tab.c"
     break;
 
   case 28: /* idlist_ne: idlist_ne ',' T_IDENT  */
-#line 317 "rebus.y"
+#line 320 "rebus.y"
                             { sal_push((yyvsp[-2].sal), (yyvsp[0].sval)); (yyval.sal) = (yyvsp[-2].sal); }
-#line 1651 "rebus.tab.c"
+#line 1660 "rebus.tab.c"
     break;
 
   case 29: /* opt_idlist: %empty  */
-#line 321 "rebus.y"
+#line 324 "rebus.y"
                     { (yyval.sal) = sal_new(); }
-#line 1657 "rebus.tab.c"
+#line 1666 "rebus.tab.c"
     break;
 
   case 30: /* opt_idlist: idlist_ne  */
-#line 322 "rebus.y"
+#line 325 "rebus.y"
                     { (yyval.sal) = (yyvsp[0].sal); }
-#line 1663 "rebus.tab.c"
+#line 1672 "rebus.tab.c"
     break;
 
   case 31: /* stmt: expr_as_stmt  */
-#line 330 "rebus.y"
+#line 333 "rebus.y"
                             { (yyval.stmt) = (yyvsp[0].stmt); }
-#line 1669 "rebus.tab.c"
+#line 1678 "rebus.tab.c"
     break;
 
   case 32: /* stmt: if_stmt  */
-#line 331 "rebus.y"
+#line 334 "rebus.y"
                             { (yyval.stmt) = (yyvsp[0].stmt); }
-#line 1675 "rebus.tab.c"
+#line 1684 "rebus.tab.c"
     break;
 
   case 33: /* stmt: unless_stmt  */
-#line 332 "rebus.y"
+#line 335 "rebus.y"
                             { (yyval.stmt) = (yyvsp[0].stmt); }
-#line 1681 "rebus.tab.c"
+#line 1690 "rebus.tab.c"
     break;
 
   case 34: /* stmt: while_stmt  */
-#line 333 "rebus.y"
+#line 336 "rebus.y"
                             { (yyval.stmt) = (yyvsp[0].stmt); }
-#line 1687 "rebus.tab.c"
+#line 1696 "rebus.tab.c"
     break;
 
   case 35: /* stmt: until_stmt  */
-#line 334 "rebus.y"
+#line 337 "rebus.y"
                             { (yyval.stmt) = (yyvsp[0].stmt); }
-#line 1693 "rebus.tab.c"
+#line 1702 "rebus.tab.c"
     break;
 
   case 36: /* stmt: repeat_stmt  */
-#line 335 "rebus.y"
+#line 338 "rebus.y"
                             { (yyval.stmt) = (yyvsp[0].stmt); }
-#line 1699 "rebus.tab.c"
+#line 1708 "rebus.tab.c"
     break;
 
   case 37: /* stmt: for_stmt  */
-#line 336 "rebus.y"
+#line 339 "rebus.y"
                             { (yyval.stmt) = (yyvsp[0].stmt); }
-#line 1705 "rebus.tab.c"
+#line 1714 "rebus.tab.c"
     break;
 
   case 38: /* stmt: case_stmt  */
-#line 337 "rebus.y"
+#line 340 "rebus.y"
                             { (yyval.stmt) = (yyvsp[0].stmt); }
-#line 1711 "rebus.tab.c"
+#line 1720 "rebus.tab.c"
     break;
 
   case 39: /* stmt: T_EXIT  */
-#line 338 "rebus.y"
+#line 341 "rebus.y"
                             { (yyval.stmt) = rstmt_new(RS_EXIT,   yylineno); }
-#line 1717 "rebus.tab.c"
+#line 1726 "rebus.tab.c"
     break;
 
   case 40: /* stmt: T_NEXT  */
-#line 339 "rebus.y"
+#line 342 "rebus.y"
                             { (yyval.stmt) = rstmt_new(RS_NEXT,   yylineno); }
-#line 1723 "rebus.tab.c"
+#line 1732 "rebus.tab.c"
     break;
 
   case 41: /* stmt: T_FAIL  */
-#line 340 "rebus.y"
+#line 343 "rebus.y"
                             { (yyval.stmt) = rstmt_new(RS_FAIL,   yylineno); }
-#line 1729 "rebus.tab.c"
+#line 1738 "rebus.tab.c"
     break;
 
   case 42: /* stmt: T_STOP  */
-#line 341 "rebus.y"
+#line 344 "rebus.y"
                             { (yyval.stmt) = rstmt_new(RS_STOP,   yylineno); }
-#line 1735 "rebus.tab.c"
+#line 1744 "rebus.tab.c"
     break;
 
   case 43: /* stmt: T_RETURN opt_expr  */
-#line 342 "rebus.y"
+#line 345 "rebus.y"
                             {
             RStmt *s = rstmt_new(RS_RETURN, yylineno);
             s->retval = (yyvsp[0].expr); (yyval.stmt) = s;
         }
-#line 1744 "rebus.tab.c"
+#line 1753 "rebus.tab.c"
     break;
 
   case 44: /* stmt: compound_stmt  */
-#line 346 "rebus.y"
+#line 349 "rebus.y"
                             { (yyval.stmt) = (yyvsp[0].stmt); }
-#line 1750 "rebus.tab.c"
+#line 1759 "rebus.tab.c"
     break;
 
   case 45: /* expr_as_stmt: expr  */
-#line 351 "rebus.y"
+#line 354 "rebus.y"
                                     {
             RStmt *s = rstmt_new(RS_EXPR, (yyvsp[0].expr)->lineno);
             s->expr = (yyvsp[0].expr); (yyval.stmt) = s;
         }
-#line 1759 "rebus.tab.c"
+#line 1768 "rebus.tab.c"
     break;
 
   case 46: /* expr_as_stmt: expr '?' pat_expr  */
-#line 355 "rebus.y"
+#line 358 "rebus.y"
                                     {
             RStmt *s = rstmt_new(RS_MATCH, (yyvsp[-2].expr)->lineno);
             s->expr = (yyvsp[-2].expr); s->pat = (yyvsp[0].expr); (yyval.stmt) = s;
         }
-#line 1768 "rebus.tab.c"
+#line 1777 "rebus.tab.c"
     break;
 
   case 47: /* expr_as_stmt: expr '?' pat_expr T_ARROW expr  */
-#line 359 "rebus.y"
+#line 362 "rebus.y"
                                      {
             RStmt *s = rstmt_new(RS_REPLACE, (yyvsp[-4].expr)->lineno);
             s->expr = (yyvsp[-4].expr); s->pat = (yyvsp[-2].expr); s->repl = (yyvsp[0].expr); (yyval.stmt) = s;
         }
-#line 1777 "rebus.tab.c"
+#line 1786 "rebus.tab.c"
     break;
 
   case 48: /* expr_as_stmt: expr T_QUESTMINUS pat_expr  */
-#line 363 "rebus.y"
+#line 366 "rebus.y"
                                     {
             RStmt *s = rstmt_new(RS_REPLN, (yyvsp[-2].expr)->lineno);
             s->expr = (yyvsp[-2].expr); s->pat = (yyvsp[0].expr); (yyval.stmt) = s;
         }
-#line 1786 "rebus.tab.c"
+#line 1795 "rebus.tab.c"
     break;
 
   case 49: /* compound_stmt: '{' stmt_list '}'  */
-#line 371 "rebus.y"
+#line 374 "rebus.y"
                             {
             /* collect the linked-list into a RS_COMPOUND */
             RStmt *s = rstmt_new(RS_COMPOUND, yylineno);
@@ -1798,17 +1807,17 @@ yyreduce:
             for (int i = 0; i < n; i++) { s->stmts[i] = t; t = t->next; }
             (yyval.stmt) = s;
         }
-#line 1802 "rebus.tab.c"
+#line 1811 "rebus.tab.c"
     break;
 
   case 50: /* stmt_body: stmt  */
-#line 386 "rebus.y"
+#line 389 "rebus.y"
                     { (yyval.stmt) = (yyvsp[0].stmt); }
-#line 1808 "rebus.tab.c"
+#line 1817 "rebus.tab.c"
     break;
 
   case 51: /* if_stmt: T_IF stmt T_THEN opt_semi stmt_body  */
-#line 392 "rebus.y"
+#line 395 "rebus.y"
         {
             RStmt *s = rstmt_new(RS_IF, yylineno);
             s->body  = (yyvsp[-3].stmt);
@@ -1816,11 +1825,11 @@ yyreduce:
             s->repl  = NULL;
             (yyval.stmt) = s;
         }
-#line 1820 "rebus.tab.c"
+#line 1829 "rebus.tab.c"
     break;
 
   case 52: /* if_stmt: T_IF stmt T_THEN opt_semi stmt_body T_ELSE opt_semi stmt_body  */
-#line 400 "rebus.y"
+#line 403 "rebus.y"
         {
             RStmt *s = rstmt_new(RS_IF, yylineno);
             s->body  = (yyvsp[-6].stmt);
@@ -1828,54 +1837,54 @@ yyreduce:
             s->repl  = (RExpr*)(yyvsp[0].stmt);
             (yyval.stmt) = s;
         }
-#line 1832 "rebus.tab.c"
+#line 1841 "rebus.tab.c"
     break;
 
   case 53: /* unless_stmt: T_UNLESS stmt T_THEN opt_semi stmt_body  */
-#line 411 "rebus.y"
+#line 414 "rebus.y"
         {
             RStmt *s = rstmt_new(RS_UNLESS, yylineno);
             s->body  = (yyvsp[-3].stmt);
             s->alt   = (yyvsp[0].stmt);
             (yyval.stmt) = s;
         }
-#line 1843 "rebus.tab.c"
+#line 1852 "rebus.tab.c"
     break;
 
   case 54: /* while_stmt: T_WHILE stmt T_DO opt_semi stmt_body  */
-#line 422 "rebus.y"
+#line 425 "rebus.y"
         {
             RStmt *s = rstmt_new(RS_WHILE, yylineno);
             s->body  = (yyvsp[-3].stmt);
             s->alt   = (yyvsp[0].stmt);
             (yyval.stmt) = s;
         }
-#line 1854 "rebus.tab.c"
+#line 1863 "rebus.tab.c"
     break;
 
   case 55: /* until_stmt: T_UNTIL stmt T_DO opt_semi stmt_body  */
-#line 432 "rebus.y"
+#line 435 "rebus.y"
         {
             RStmt *s = rstmt_new(RS_UNTIL, yylineno);
             s->body  = (yyvsp[-3].stmt);
             s->alt   = (yyvsp[0].stmt);
             (yyval.stmt) = s;
         }
-#line 1865 "rebus.tab.c"
+#line 1874 "rebus.tab.c"
     break;
 
   case 56: /* repeat_stmt: T_REPEAT opt_semi stmt_body  */
-#line 443 "rebus.y"
+#line 446 "rebus.y"
         {
             RStmt *s = rstmt_new(RS_REPEAT, yylineno);
             s->alt   = (yyvsp[0].stmt);
             (yyval.stmt) = s;
         }
-#line 1875 "rebus.tab.c"
+#line 1884 "rebus.tab.c"
     break;
 
   case 57: /* for_stmt: T_FOR T_IDENT T_FROM expr T_TO expr T_DO opt_semi stmt_body  */
-#line 453 "rebus.y"
+#line 456 "rebus.y"
         {
             RStmt *s    = rstmt_new(RS_FOR, yylineno);
             s->for_var  = (yyvsp[-7].sval);
@@ -1885,11 +1894,11 @@ yyreduce:
             s->alt      = (yyvsp[0].stmt);
             (yyval.stmt) = s;
         }
-#line 1889 "rebus.tab.c"
+#line 1898 "rebus.tab.c"
     break;
 
   case 58: /* for_stmt: T_FOR T_IDENT T_FROM expr T_TO expr T_BY expr T_DO opt_semi stmt_body  */
-#line 463 "rebus.y"
+#line 466 "rebus.y"
         {
             RStmt *s    = rstmt_new(RS_FOR, yylineno);
             s->for_var  = (yyvsp[-9].sval);
@@ -1899,345 +1908,345 @@ yyreduce:
             s->alt      = (yyvsp[0].stmt);
             (yyval.stmt) = s;
         }
-#line 1903 "rebus.tab.c"
+#line 1912 "rebus.tab.c"
     break;
 
   case 59: /* case_stmt: T_CASE expr T_OF '{' caselist '}'  */
-#line 477 "rebus.y"
+#line 480 "rebus.y"
         {
             RStmt *s      = rstmt_new(RS_CASE, yylineno);
             s->case_expr  = (yyvsp[-4].expr);
             s->cases      = (yyvsp[-1].rcase);
             (yyval.stmt) = s;
         }
-#line 1914 "rebus.tab.c"
+#line 1923 "rebus.tab.c"
     break;
 
   case 60: /* caselist: caseclause  */
-#line 486 "rebus.y"
+#line 489 "rebus.y"
                             { (yyval.rcase) = (yyvsp[0].rcase); }
-#line 1920 "rebus.tab.c"
+#line 1929 "rebus.tab.c"
     break;
 
   case 61: /* caselist: caselist ';' caseclause  */
-#line 487 "rebus.y"
+#line 490 "rebus.y"
                               {
             /* append $3 to end of $1 */
             RCase *c = (yyvsp[-2].rcase); while (c->next) c = c->next;
             c->next = (yyvsp[0].rcase); (yyval.rcase) = (yyvsp[-2].rcase);
         }
-#line 1930 "rebus.tab.c"
+#line 1939 "rebus.tab.c"
     break;
 
   case 62: /* caselist: caselist ';'  */
-#line 492 "rebus.y"
+#line 495 "rebus.y"
                             { (yyval.rcase) = (yyvsp[-1].rcase); }
-#line 1936 "rebus.tab.c"
+#line 1945 "rebus.tab.c"
     break;
 
   case 63: /* caseclause: expr ':' stmt_body  */
-#line 497 "rebus.y"
+#line 500 "rebus.y"
         {
             RCase *c  = rcase_new(yylineno);
             c->guard  = (yyvsp[-2].expr);
             c->body   = (yyvsp[0].stmt);
             (yyval.rcase) = c;
         }
-#line 1947 "rebus.tab.c"
+#line 1956 "rebus.tab.c"
     break;
 
   case 64: /* caseclause: T_DEFAULT ':' stmt_body  */
-#line 504 "rebus.y"
+#line 507 "rebus.y"
         {
             RCase *c     = rcase_new(yylineno);
             c->is_default = 1;
             c->body       = (yyvsp[0].stmt);
             (yyval.rcase) = c;
         }
-#line 1958 "rebus.tab.c"
+#line 1967 "rebus.tab.c"
     break;
 
   case 65: /* expr: assign_expr  */
-#line 526 "rebus.y"
+#line 529 "rebus.y"
                             { (yyval.expr) = (yyvsp[0].expr); }
-#line 1964 "rebus.tab.c"
+#line 1973 "rebus.tab.c"
     break;
 
   case 66: /* assign_expr: alt_expr  */
-#line 531 "rebus.y"
+#line 534 "rebus.y"
                                             { (yyval.expr) = (yyvsp[0].expr); }
-#line 1970 "rebus.tab.c"
+#line 1979 "rebus.tab.c"
     break;
 
   case 67: /* assign_expr: alt_expr T_ASSIGN assign_expr  */
-#line 532 "rebus.y"
+#line 535 "rebus.y"
                                             { (yyval.expr) = rbinop(RE_ASSIGN,    (yyvsp[-2].expr), (yyvsp[0].expr), yylineno); }
-#line 1976 "rebus.tab.c"
+#line 1985 "rebus.tab.c"
     break;
 
   case 68: /* assign_expr: alt_expr T_EXCHANGE assign_expr  */
-#line 533 "rebus.y"
+#line 536 "rebus.y"
                                             { (yyval.expr) = rbinop(RE_EXCHANGE,  (yyvsp[-2].expr), (yyvsp[0].expr), yylineno); }
-#line 1982 "rebus.tab.c"
+#line 1991 "rebus.tab.c"
     break;
 
   case 69: /* assign_expr: alt_expr T_ADDASSIGN assign_expr  */
-#line 534 "rebus.y"
+#line 537 "rebus.y"
                                             { (yyval.expr) = rbinop(RE_ADDASSIGN, (yyvsp[-2].expr), (yyvsp[0].expr), yylineno); }
-#line 1988 "rebus.tab.c"
+#line 1997 "rebus.tab.c"
     break;
 
   case 70: /* assign_expr: alt_expr T_SUBASSIGN assign_expr  */
-#line 535 "rebus.y"
+#line 538 "rebus.y"
                                             { (yyval.expr) = rbinop(RE_SUBASSIGN, (yyvsp[-2].expr), (yyvsp[0].expr), yylineno); }
-#line 1994 "rebus.tab.c"
+#line 2003 "rebus.tab.c"
     break;
 
   case 71: /* assign_expr: alt_expr T_CATASSIGN assign_expr  */
-#line 536 "rebus.y"
+#line 539 "rebus.y"
                                             { (yyval.expr) = rbinop(RE_CATASSIGN, (yyvsp[-2].expr), (yyvsp[0].expr), yylineno); }
-#line 2000 "rebus.tab.c"
+#line 2009 "rebus.tab.c"
     break;
 
   case 72: /* alt_expr: cat_expr  */
-#line 541 "rebus.y"
+#line 544 "rebus.y"
                                             { (yyval.expr) = (yyvsp[0].expr); }
-#line 2006 "rebus.tab.c"
+#line 2015 "rebus.tab.c"
     break;
 
   case 73: /* alt_expr: alt_expr '|' cat_expr  */
-#line 542 "rebus.y"
+#line 545 "rebus.y"
                                             { (yyval.expr) = rbinop(RE_ALT,    (yyvsp[-2].expr), (yyvsp[0].expr), yylineno); }
-#line 2012 "rebus.tab.c"
+#line 2021 "rebus.tab.c"
     break;
 
   case 74: /* cat_expr: cmp_expr  */
-#line 547 "rebus.y"
+#line 550 "rebus.y"
                                             { (yyval.expr) = (yyvsp[0].expr); }
-#line 2018 "rebus.tab.c"
+#line 2027 "rebus.tab.c"
     break;
 
   case 75: /* cat_expr: cat_expr T_STRCAT cmp_expr  */
-#line 548 "rebus.y"
+#line 551 "rebus.y"
                                             { (yyval.expr) = rbinop(RE_STRCAT, (yyvsp[-2].expr), (yyvsp[0].expr), yylineno); }
-#line 2024 "rebus.tab.c"
+#line 2033 "rebus.tab.c"
     break;
 
   case 76: /* cat_expr: cat_expr '&' cmp_expr  */
-#line 549 "rebus.y"
+#line 552 "rebus.y"
                                             { (yyval.expr) = rbinop(RE_PATCAT, (yyvsp[-2].expr), (yyvsp[0].expr), yylineno); }
-#line 2030 "rebus.tab.c"
+#line 2039 "rebus.tab.c"
     break;
 
   case 77: /* cmp_expr: add_expr  */
-#line 554 "rebus.y"
+#line 557 "rebus.y"
                                             { (yyval.expr) = (yyvsp[0].expr); }
-#line 2036 "rebus.tab.c"
+#line 2045 "rebus.tab.c"
     break;
 
   case 78: /* cmp_expr: cmp_expr '=' add_expr  */
-#line 555 "rebus.y"
+#line 558 "rebus.y"
                                             { (yyval.expr) = rbinop(RE_EQ,  (yyvsp[-2].expr), (yyvsp[0].expr), yylineno); }
-#line 2042 "rebus.tab.c"
+#line 2051 "rebus.tab.c"
     break;
 
   case 79: /* cmp_expr: cmp_expr T_NE add_expr  */
-#line 556 "rebus.y"
+#line 559 "rebus.y"
                                             { (yyval.expr) = rbinop(RE_NE,  (yyvsp[-2].expr), (yyvsp[0].expr), yylineno); }
-#line 2048 "rebus.tab.c"
+#line 2057 "rebus.tab.c"
     break;
 
   case 80: /* cmp_expr: cmp_expr '<' add_expr  */
-#line 557 "rebus.y"
+#line 560 "rebus.y"
                                             { (yyval.expr) = rbinop(RE_LT,  (yyvsp[-2].expr), (yyvsp[0].expr), yylineno); }
-#line 2054 "rebus.tab.c"
+#line 2063 "rebus.tab.c"
     break;
 
   case 81: /* cmp_expr: cmp_expr T_LE add_expr  */
-#line 558 "rebus.y"
+#line 561 "rebus.y"
                                             { (yyval.expr) = rbinop(RE_LE,  (yyvsp[-2].expr), (yyvsp[0].expr), yylineno); }
-#line 2060 "rebus.tab.c"
+#line 2069 "rebus.tab.c"
     break;
 
   case 82: /* cmp_expr: cmp_expr '>' add_expr  */
-#line 559 "rebus.y"
+#line 562 "rebus.y"
                                             { (yyval.expr) = rbinop(RE_GT,  (yyvsp[-2].expr), (yyvsp[0].expr), yylineno); }
-#line 2066 "rebus.tab.c"
+#line 2075 "rebus.tab.c"
     break;
 
   case 83: /* cmp_expr: cmp_expr T_GE add_expr  */
-#line 560 "rebus.y"
+#line 563 "rebus.y"
                                             { (yyval.expr) = rbinop(RE_GE,  (yyvsp[-2].expr), (yyvsp[0].expr), yylineno); }
-#line 2072 "rebus.tab.c"
+#line 2081 "rebus.tab.c"
     break;
 
   case 84: /* cmp_expr: cmp_expr T_SEQ add_expr  */
-#line 561 "rebus.y"
+#line 564 "rebus.y"
                                             { (yyval.expr) = rbinop(RE_SEQ, (yyvsp[-2].expr), (yyvsp[0].expr), yylineno); }
-#line 2078 "rebus.tab.c"
+#line 2087 "rebus.tab.c"
     break;
 
   case 85: /* cmp_expr: cmp_expr T_SNE add_expr  */
-#line 562 "rebus.y"
+#line 565 "rebus.y"
                                             { (yyval.expr) = rbinop(RE_SNE, (yyvsp[-2].expr), (yyvsp[0].expr), yylineno); }
-#line 2084 "rebus.tab.c"
+#line 2093 "rebus.tab.c"
     break;
 
   case 86: /* cmp_expr: cmp_expr T_SLT add_expr  */
-#line 563 "rebus.y"
+#line 566 "rebus.y"
                                             { (yyval.expr) = rbinop(RE_SLT, (yyvsp[-2].expr), (yyvsp[0].expr), yylineno); }
-#line 2090 "rebus.tab.c"
+#line 2099 "rebus.tab.c"
     break;
 
   case 87: /* cmp_expr: cmp_expr T_SLE add_expr  */
-#line 564 "rebus.y"
+#line 567 "rebus.y"
                                             { (yyval.expr) = rbinop(RE_SLE, (yyvsp[-2].expr), (yyvsp[0].expr), yylineno); }
-#line 2096 "rebus.tab.c"
+#line 2105 "rebus.tab.c"
     break;
 
   case 88: /* cmp_expr: cmp_expr T_SGT add_expr  */
-#line 565 "rebus.y"
+#line 568 "rebus.y"
                                             { (yyval.expr) = rbinop(RE_SGT, (yyvsp[-2].expr), (yyvsp[0].expr), yylineno); }
-#line 2102 "rebus.tab.c"
+#line 2111 "rebus.tab.c"
     break;
 
   case 89: /* cmp_expr: cmp_expr T_SGE add_expr  */
-#line 566 "rebus.y"
+#line 569 "rebus.y"
                                             { (yyval.expr) = rbinop(RE_SGE, (yyvsp[-2].expr), (yyvsp[0].expr), yylineno); }
-#line 2108 "rebus.tab.c"
+#line 2117 "rebus.tab.c"
     break;
 
   case 90: /* add_expr: mul_expr  */
-#line 571 "rebus.y"
+#line 574 "rebus.y"
                                             { (yyval.expr) = (yyvsp[0].expr); }
-#line 2114 "rebus.tab.c"
+#line 2123 "rebus.tab.c"
     break;
 
   case 91: /* add_expr: add_expr '+' mul_expr  */
-#line 572 "rebus.y"
+#line 575 "rebus.y"
                                             { (yyval.expr) = rbinop(RE_ADD, (yyvsp[-2].expr), (yyvsp[0].expr), yylineno); }
-#line 2120 "rebus.tab.c"
+#line 2129 "rebus.tab.c"
     break;
 
   case 92: /* add_expr: add_expr '-' mul_expr  */
-#line 573 "rebus.y"
+#line 576 "rebus.y"
                                             { (yyval.expr) = rbinop(RE_SUB, (yyvsp[-2].expr), (yyvsp[0].expr), yylineno); }
-#line 2126 "rebus.tab.c"
+#line 2135 "rebus.tab.c"
     break;
 
   case 93: /* mul_expr: pow_expr  */
-#line 578 "rebus.y"
+#line 581 "rebus.y"
                                             { (yyval.expr) = (yyvsp[0].expr); }
-#line 2132 "rebus.tab.c"
+#line 2141 "rebus.tab.c"
     break;
 
   case 94: /* mul_expr: mul_expr '*' pow_expr  */
-#line 579 "rebus.y"
+#line 582 "rebus.y"
                                             { (yyval.expr) = rbinop(RE_MUL, (yyvsp[-2].expr), (yyvsp[0].expr), yylineno); }
-#line 2138 "rebus.tab.c"
+#line 2147 "rebus.tab.c"
     break;
 
   case 95: /* mul_expr: mul_expr '/' pow_expr  */
-#line 580 "rebus.y"
+#line 583 "rebus.y"
                                             { (yyval.expr) = rbinop(RE_DIV, (yyvsp[-2].expr), (yyvsp[0].expr), yylineno); }
-#line 2144 "rebus.tab.c"
+#line 2153 "rebus.tab.c"
     break;
 
   case 96: /* mul_expr: mul_expr '%' pow_expr  */
-#line 581 "rebus.y"
+#line 584 "rebus.y"
                                             { (yyval.expr) = rbinop(RE_MOD, (yyvsp[-2].expr), (yyvsp[0].expr), yylineno); }
-#line 2150 "rebus.tab.c"
+#line 2159 "rebus.tab.c"
     break;
 
   case 97: /* pow_expr: unary_expr  */
-#line 586 "rebus.y"
+#line 589 "rebus.y"
                                             { (yyval.expr) = (yyvsp[0].expr); }
-#line 2156 "rebus.tab.c"
+#line 2165 "rebus.tab.c"
     break;
 
   case 98: /* pow_expr: unary_expr '^' pow_expr  */
-#line 587 "rebus.y"
+#line 590 "rebus.y"
                                             { (yyval.expr) = rbinop(RE_POW, (yyvsp[-2].expr), (yyvsp[0].expr), yylineno); }
-#line 2162 "rebus.tab.c"
+#line 2171 "rebus.tab.c"
     break;
 
   case 99: /* pow_expr: unary_expr T_STARSTAR pow_expr  */
-#line 588 "rebus.y"
+#line 591 "rebus.y"
                                             { (yyval.expr) = rbinop(RE_POW, (yyvsp[-2].expr), (yyvsp[0].expr), yylineno); }
-#line 2168 "rebus.tab.c"
+#line 2177 "rebus.tab.c"
     break;
 
   case 100: /* unary_expr: postfix_expr  */
-#line 593 "rebus.y"
+#line 596 "rebus.y"
                                             { (yyval.expr) = (yyvsp[0].expr); }
-#line 2174 "rebus.tab.c"
+#line 2183 "rebus.tab.c"
     break;
 
   case 101: /* unary_expr: '-' unary_expr  */
-#line 594 "rebus.y"
+#line 597 "rebus.y"
                                             { (yyval.expr) = rbinop(RE_NEG,   NULL, (yyvsp[0].expr), yylineno); }
-#line 2180 "rebus.tab.c"
+#line 2189 "rebus.tab.c"
     break;
 
   case 102: /* unary_expr: '+' unary_expr  */
-#line 595 "rebus.y"
+#line 598 "rebus.y"
                                             { (yyval.expr) = rbinop(RE_POS,   NULL, (yyvsp[0].expr), yylineno); }
-#line 2186 "rebus.tab.c"
+#line 2195 "rebus.tab.c"
     break;
 
   case 103: /* unary_expr: '~' unary_expr  */
-#line 596 "rebus.y"
+#line 599 "rebus.y"
                                            { (yyval.expr) = rbinop(RE_NOT,   NULL, (yyvsp[0].expr), yylineno); }
-#line 2192 "rebus.tab.c"
+#line 2201 "rebus.tab.c"
     break;
 
   case 104: /* unary_expr: '\\' unary_expr  */
-#line 597 "rebus.y"
+#line 600 "rebus.y"
                                            { (yyval.expr) = rbinop(RE_NOT,   NULL, (yyvsp[0].expr), yylineno); }
-#line 2198 "rebus.tab.c"
+#line 2207 "rebus.tab.c"
     break;
 
   case 105: /* unary_expr: '/' unary_expr  */
-#line 598 "rebus.y"
+#line 601 "rebus.y"
                                            { (yyval.expr) = rbinop(RE_VALUE, NULL, (yyvsp[0].expr), yylineno); }
-#line 2204 "rebus.tab.c"
+#line 2213 "rebus.tab.c"
     break;
 
   case 106: /* unary_expr: '!' unary_expr  */
-#line 599 "rebus.y"
+#line 602 "rebus.y"
                                            { (yyval.expr) = rbinop(RE_BANG,  NULL, (yyvsp[0].expr), yylineno); }
-#line 2210 "rebus.tab.c"
+#line 2219 "rebus.tab.c"
     break;
 
   case 107: /* unary_expr: '@' T_IDENT  */
-#line 600 "rebus.y"
+#line 603 "rebus.y"
                                             {
             RExpr *e = rexpr_new(RE_CURSOR, yylineno);
             e->sval = (yyvsp[0].sval); (yyval.expr) = e;
         }
-#line 2219 "rebus.tab.c"
+#line 2228 "rebus.tab.c"
     break;
 
   case 108: /* unary_expr: '$' unary_expr  */
-#line 604 "rebus.y"
+#line 607 "rebus.y"
                                            { (yyval.expr) = rbinop(RE_DEREF,  NULL, (yyvsp[0].expr), yylineno); }
-#line 2225 "rebus.tab.c"
+#line 2234 "rebus.tab.c"
     break;
 
   case 109: /* unary_expr: '.' unary_expr  */
-#line 605 "rebus.y"
+#line 608 "rebus.y"
                                            { (yyval.expr) = rbinop(RE_COND,   NULL, (yyvsp[0].expr), yylineno); }
-#line 2231 "rebus.tab.c"
+#line 2240 "rebus.tab.c"
     break;
 
   case 110: /* postfix_expr: primary  */
-#line 610 "rebus.y"
+#line 613 "rebus.y"
                                             { (yyval.expr) = (yyvsp[0].expr); }
-#line 2237 "rebus.tab.c"
+#line 2246 "rebus.tab.c"
     break;
 
   case 111: /* postfix_expr: postfix_expr '(' arglist ')'  */
-#line 612 "rebus.y"
+#line 615 "rebus.y"
         {
             /* function call or pattern constructor */
             EAL *al = (yyvsp[-1].eal);
@@ -2254,11 +2263,11 @@ yyreduce:
             free(al);
             (yyval.expr) = e;
         }
-#line 2258 "rebus.tab.c"
+#line 2267 "rebus.tab.c"
     break;
 
   case 112: /* postfix_expr: postfix_expr '[' arglist ']'  */
-#line 629 "rebus.y"
+#line 632 "rebus.y"
         {
             EAL *al = (yyvsp[-1].eal);
             RExpr *e = rexpr_new(RE_SUB_IDX, (yyvsp[-3].expr)->lineno);
@@ -2268,11 +2277,11 @@ yyreduce:
             free(al);
             (yyval.expr) = e;
         }
-#line 2272 "rebus.tab.c"
+#line 2281 "rebus.tab.c"
     break;
 
   case 113: /* postfix_expr: postfix_expr '[' expr T_PLUSCOLON expr ']'  */
-#line 639 "rebus.y"
+#line 642 "rebus.y"
         {
             /* a[i +: n]  — substring starting at i, length n */
             RExpr *range = rexpr_new(RE_RANGE, (yyvsp[-3].expr)->lineno);
@@ -2285,111 +2294,111 @@ yyreduce:
             e->nargs = 1;
             (yyval.expr) = e;
         }
-#line 2289 "rebus.tab.c"
+#line 2298 "rebus.tab.c"
     break;
 
   case 114: /* postfix_expr: postfix_expr '.' primary  */
-#line 653 "rebus.y"
+#line 656 "rebus.y"
         {
             (yyval.expr) = rbinop(RE_COND, (yyvsp[-2].expr), (yyvsp[0].expr), yylineno);
         }
-#line 2297 "rebus.tab.c"
+#line 2306 "rebus.tab.c"
     break;
 
   case 115: /* postfix_expr: postfix_expr '$' primary  */
-#line 657 "rebus.y"
+#line 660 "rebus.y"
         {
             (yyval.expr) = rbinop(RE_IMM, (yyvsp[-2].expr), (yyvsp[0].expr), yylineno);
         }
-#line 2305 "rebus.tab.c"
+#line 2314 "rebus.tab.c"
     break;
 
   case 116: /* primary: T_STR  */
-#line 664 "rebus.y"
+#line 667 "rebus.y"
                     { RExpr *e = rexpr_new(RE_STR,     yylineno); e->sval = (yyvsp[0].sval); (yyval.expr) = e; }
-#line 2311 "rebus.tab.c"
+#line 2320 "rebus.tab.c"
     break;
 
   case 117: /* primary: T_INT  */
-#line 665 "rebus.y"
+#line 668 "rebus.y"
                     { RExpr *e = rexpr_new(RE_INT,     yylineno); e->ival = (yyvsp[0].ival); (yyval.expr) = e; }
-#line 2317 "rebus.tab.c"
+#line 2326 "rebus.tab.c"
     break;
 
   case 118: /* primary: T_REAL  */
-#line 666 "rebus.y"
+#line 669 "rebus.y"
                     { RExpr *e = rexpr_new(RE_REAL,    yylineno); e->dval = (yyvsp[0].dval); (yyval.expr) = e; }
-#line 2323 "rebus.tab.c"
+#line 2332 "rebus.tab.c"
     break;
 
   case 119: /* primary: T_KEYWORD  */
-#line 667 "rebus.y"
+#line 670 "rebus.y"
                     { RExpr *e = rexpr_new(RE_KEYWORD, yylineno); e->sval = (yyvsp[0].sval); (yyval.expr) = e; }
-#line 2329 "rebus.tab.c"
+#line 2338 "rebus.tab.c"
     break;
 
   case 120: /* primary: T_IDENT  */
-#line 668 "rebus.y"
+#line 671 "rebus.y"
                     { RExpr *e = rexpr_new(RE_VAR,     yylineno); e->sval = (yyvsp[0].sval); (yyval.expr) = e; }
-#line 2335 "rebus.tab.c"
+#line 2344 "rebus.tab.c"
     break;
 
   case 121: /* primary: '(' expr ')'  */
-#line 669 "rebus.y"
+#line 672 "rebus.y"
                     { (yyval.expr) = (yyvsp[-1].expr); }
-#line 2341 "rebus.tab.c"
+#line 2350 "rebus.tab.c"
     break;
 
   case 122: /* pat_expr: expr  */
-#line 675 "rebus.y"
+#line 678 "rebus.y"
                 { (yyval.expr) = (yyvsp[0].expr); }
-#line 2347 "rebus.tab.c"
+#line 2356 "rebus.tab.c"
     break;
 
   case 123: /* opt_expr: %empty  */
-#line 680 "rebus.y"
+#line 683 "rebus.y"
                     { (yyval.expr) = NULL; }
-#line 2353 "rebus.tab.c"
+#line 2362 "rebus.tab.c"
     break;
 
   case 124: /* opt_expr: expr  */
-#line 681 "rebus.y"
+#line 684 "rebus.y"
                     { (yyval.expr) = (yyvsp[0].expr); }
-#line 2359 "rebus.tab.c"
+#line 2368 "rebus.tab.c"
     break;
 
   case 125: /* arglist: %empty  */
-#line 686 "rebus.y"
+#line 689 "rebus.y"
                     { (yyval.eal) = eal_new(); }
-#line 2365 "rebus.tab.c"
+#line 2374 "rebus.tab.c"
     break;
 
   case 126: /* arglist: arglist_ne  */
-#line 687 "rebus.y"
+#line 690 "rebus.y"
                     { (yyval.eal) = (yyvsp[0].eal); }
-#line 2371 "rebus.tab.c"
+#line 2380 "rebus.tab.c"
     break;
 
   case 127: /* arglist_ne: expr  */
-#line 691 "rebus.y"
+#line 694 "rebus.y"
                                 { EAL *al = eal_new(); eal_push(al, (yyvsp[0].expr)); (yyval.eal) = al; }
-#line 2377 "rebus.tab.c"
+#line 2386 "rebus.tab.c"
     break;
 
   case 128: /* arglist_ne: arglist_ne ',' expr  */
-#line 692 "rebus.y"
+#line 695 "rebus.y"
                                 { eal_push((yyvsp[-2].eal), (yyvsp[0].expr)); (yyval.eal) = (yyvsp[-2].eal); }
-#line 2383 "rebus.tab.c"
+#line 2392 "rebus.tab.c"
     break;
 
   case 129: /* arglist_ne: arglist_ne ','  */
-#line 693 "rebus.y"
+#line 696 "rebus.y"
                                 { eal_push((yyvsp[-1].eal), NULL); (yyval.eal) = (yyvsp[-1].eal); }
-#line 2389 "rebus.tab.c"
+#line 2398 "rebus.tab.c"
     break;
 
 
-#line 2393 "rebus.tab.c"
+#line 2402 "rebus.tab.c"
 
       default: break;
     }
@@ -2431,7 +2440,7 @@ yyreduce:
 yyerrlab:
   /* Make sure we have latest lookahead translation.  See comments at
      user semantic actions for why this is necessary.  */
-  yytoken = yychar == YYEMPTY ? YYSYMBOL_YYEMPTY : YYTRANSLATE (yychar);
+  yytoken = yychar == REBUS_YYEMPTY ? YYSYMBOL_YYEMPTY : YYTRANSLATE (yychar);
   /* If not already recovering from an error, report this error.  */
   if (!yyerrstatus)
     {
@@ -2444,17 +2453,17 @@ yyerrlab:
       /* If just tried and failed to reuse lookahead token after an
          error, discard it.  */
 
-      if (yychar <= YYEOF)
+      if (yychar <= REBUS_YYEOF)
         {
           /* Return failure if at end of input.  */
-          if (yychar == YYEOF)
+          if (yychar == REBUS_YYEOF)
             YYABORT;
         }
       else
         {
           yydestruct ("Error: discarding",
                       yytoken, &yylval);
-          yychar = YYEMPTY;
+          yychar = REBUS_YYEMPTY;
         }
     }
 
@@ -2556,7 +2565,7 @@ yyexhaustedlab:
 | yyreturnlab -- parsing is finished, clean up and return.  |
 `----------------------------------------------------------*/
 yyreturnlab:
-  if (yychar != YYEMPTY)
+  if (yychar != REBUS_YYEMPTY)
     {
       /* Make sure we have latest lookahead translation.  See comments at
          user semantic actions for why this is necessary.  */
@@ -2582,7 +2591,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 696 "rebus.y"
+#line 699 "rebus.y"
 
 
 void rebus_parse_init(void) {

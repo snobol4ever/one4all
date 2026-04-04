@@ -35,25 +35,33 @@
    especially those whose name start with YY_ or yy_.  They are
    private implementation details that can be changed or removed.  */
 
-#ifndef YY_YY_REBUS_TAB_H_INCLUDED
-# define YY_YY_REBUS_TAB_H_INCLUDED
+#ifndef YY_REBUS_YY_REBUS_TAB_H_INCLUDED
+# define YY_REBUS_YY_REBUS_TAB_H_INCLUDED
 /* Debug traces.  */
-#ifndef YYDEBUG
-# define YYDEBUG 0
-#endif
+#ifndef REBUS_YYDEBUG
+# if defined YYDEBUG
 #if YYDEBUG
-extern int yydebug;
+#   define REBUS_YYDEBUG 1
+#  else
+#   define REBUS_YYDEBUG 0
+#  endif
+# else /* ! defined YYDEBUG */
+#  define REBUS_YYDEBUG 0
+# endif /* ! defined YYDEBUG */
+#endif  /* ! defined REBUS_YYDEBUG */
+#if REBUS_YYDEBUG
+extern int rebus_yydebug;
 #endif
 
 /* Token kinds.  */
-#ifndef YYTOKENTYPE
-# define YYTOKENTYPE
-  enum yytokentype
+#ifndef REBUS_YYTOKENTYPE
+# define REBUS_YYTOKENTYPE
+  enum rebus_yytokentype
   {
-    YYEMPTY = -2,
-    YYEOF = 0,                     /* "end of file"  */
-    YYerror = 256,                 /* error  */
-    YYUNDEF = 257,                 /* "invalid token"  */
+    REBUS_YYEMPTY = -2,
+    REBUS_YYEOF = 0,               /* "end of file"  */
+    REBUS_YYerror = 256,           /* error  */
+    REBUS_YYUNDEF = 257,           /* "invalid token"  */
     T_IDENT = 258,                 /* T_IDENT  */
     T_STR = 259,                   /* T_STR  */
     T_KEYWORD = 260,               /* T_KEYWORD  */
@@ -114,14 +122,14 @@ extern int yydebug;
     UDOLLAR = 315,                 /* UDOLLAR  */
     UDOT = 316                     /* UDOT  */
   };
-  typedef enum yytokentype yytoken_kind_t;
+  typedef enum rebus_yytokentype rebus_yytoken_kind_t;
 #endif
 
 /* Value type.  */
-#if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
-union YYSTYPE
+#if ! defined REBUS_YYSTYPE && ! defined REBUS_YYSTYPE_IS_DECLARED
+union REBUS_YYSTYPE
 {
-#line 103 "rebus.y"
+#line 106 "rebus.y"
 
     char       *sval;
     long        ival;
@@ -134,19 +142,19 @@ union YYSTYPE
     void       *eal;    /* EAL* */
     void       *stal;   /* STAL* */
 
-#line 138 "rebus.tab.h"
+#line 146 "rebus.tab.h"
 
 };
-typedef union YYSTYPE YYSTYPE;
-# define YYSTYPE_IS_TRIVIAL 1
-# define YYSTYPE_IS_DECLARED 1
+typedef union REBUS_YYSTYPE REBUS_YYSTYPE;
+# define REBUS_YYSTYPE_IS_TRIVIAL 1
+# define REBUS_YYSTYPE_IS_DECLARED 1
 #endif
 
 
-extern YYSTYPE yylval;
+extern REBUS_YYSTYPE rebus_yylval;
 
 
-int yyparse (void);
+int rebus_yyparse (void);
 
 
-#endif /* !YY_YY_REBUS_TAB_H_INCLUDED  */
+#endif /* !YY_REBUS_YY_REBUS_TAB_H_INCLUDED  */

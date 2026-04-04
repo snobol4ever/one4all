@@ -97,8 +97,11 @@ static void stal_push(STAL *s, RStmt *v) {
 
 extern int  yylex(void);
 extern void yyerror(const char *);
-extern int  yylineno;
+extern int  rebus_yylineno;
+#define yylineno rebus_yylineno
 %}
+
+%define api.prefix {rebus_yy}
 
 %union {
     char       *sval;

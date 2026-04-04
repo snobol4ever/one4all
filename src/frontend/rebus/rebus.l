@@ -9,6 +9,8 @@
 #include <ctype.h>
 #include "rebus.h"
 #include "rebus.tab.h"
+#define yylval rebus_yylval
+#define yylineno rebus_yylineno
 
 int   rebus_nerrors  = 0;
 char *rebus_filename = (char *)"<stdin>";
@@ -106,7 +108,7 @@ static int needs_semi(int tok) {
 }
 %}
 
-%option noyywrap never-interactive yylineno
+%option noyywrap never-interactive yylineno prefix="rebus_yy"
 
 ALPHA   [A-Za-z_\x80-\xff]
 IDENT   {ALPHA}([A-Za-z0-9_.\x80-\xff])*
@@ -184,9 +186,9 @@ WS      [ \t]+
 
 %%
 
-void yyerror(const char *msg) { rebus_error(yylineno,"%s",msg); }
+void rebus_yyerror(const char *msg) { rebus_error(yylineno,"%s",msg); }
 
-extern int   yyparse(void);
+extern int   rebus_yyparse(void);
 extern void  rebus_parse_init(void);
 RProgram    *rebus_parsed_program = NULL;
 
@@ -199,7 +201,7 @@ RProgram *rebus_parse(FILE *f, const char *filename) {
     load_file(f);
     yy_switch_to_buffer(yy_create_buffer(NULL,YY_BUF_SIZE));
     rebus_parse_init();
-    yyparse();
+    rebus_yyparse();
     free(rbuf); rbuf=NULL;
     return rebus_parsed_program;
 }
