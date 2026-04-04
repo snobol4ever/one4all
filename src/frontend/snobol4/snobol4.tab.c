@@ -1425,7 +1425,7 @@ yyreduce:
 
   case 29: /* expr2: expr2 T_AMPERSAND expr3  */
 #line 95 "snobol4.y"
-                                                                                                  { (yyval.expr)=expr_binary(E_OPSYN,           (yyvsp[-2].expr),(yyvsp[0].expr)); }
+                                                                                                  { EXPR_t*_e=expr_binary(E_OPSYN,(yyvsp[-2].expr),(yyvsp[0].expr)); _e->sval=strdup("&"); (yyval.expr)=_e; }
 #line 1430 "snobol4.tab.c"
     break;
 
@@ -1461,7 +1461,7 @@ yyreduce:
 
   case 35: /* expr5: expr5 T_AT_SIGN expr6  */
 #line 104 "snobol4.y"
-                                                                                                  { (yyval.expr)=expr_binary(E_OPSYN,           (yyvsp[-2].expr),(yyvsp[0].expr)); }
+                                                                                                  { EXPR_t*_e=expr_binary(E_OPSYN,(yyvsp[-2].expr),(yyvsp[0].expr)); _e->sval=strdup("@"); (yyval.expr)=_e; }
 #line 1466 "snobol4.tab.c"
     break;
 
@@ -1599,7 +1599,7 @@ yyreduce:
 
   case 58: /* expr14: T_UN_AMPERSAND expr14  */
 #line 136 "snobol4.y"
-                                                                                                  { (yyval.expr)=expr_unary(E_OPSYN,           (yyvsp[0].expr)); }
+                                                                                                  { EXPR_t*_e=expr_unary(E_OPSYN,(yyvsp[0].expr)); _e->sval=strdup("&"); (yyval.expr)=_e; }
 #line 1604 "snobol4.tab.c"
     break;
 
@@ -1665,7 +1665,7 @@ yyreduce:
 
   case 69: /* expr14: T_UN_VERTICAL_BAR expr14  */
 #line 147 "snobol4.y"
-                                                                                                  { (yyval.expr)=expr_unary(E_ALT,             (yyvsp[0].expr)); }
+                                                                                                  { EXPR_t*_e=expr_unary(E_OPSYN,(yyvsp[0].expr)); _e->sval=strdup("|"); (yyval.expr)=_e; }
 #line 1670 "snobol4.tab.c"
     break;
 

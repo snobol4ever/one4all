@@ -547,6 +547,26 @@ static DESCR_t interp_eval(EXPR_t *e)
         return INTVAL(0);
     }
 
+    case E_OPSYN: {
+        /* OPSYN operator: sval holds the operator symbol ("@", "&").
+         * Dispatch via APPLY_fn — OPSYN registration aliased the symbol
+         * to the target function via register_fn_alias. */
+        if (!e->sval) return FAILDESCR;
+        if (e->nchildren == 2) {
+            DESCR_t l = interp_eval(e->children[0]);
+            DESCR_t r = interp_eval(e->children[1]);
+            if (IS_FAIL_fn(l) || IS_FAIL_fn(r)) return FAILDESCR;
+            DESCR_t args[2] = { l, r };
+            return APPLY_fn(e->sval, args, 2);
+        } else if (e->nchildren == 1) {
+            DESCR_t v = interp_eval(e->children[0]);
+            if (IS_FAIL_fn(v)) return FAILDESCR;
+            DESCR_t args[1] = { v };
+            return APPLY_fn(e->sval, args, 1);
+        }
+        return FAILDESCR;
+    }
+
     case E_ADD: {
         if (e->nchildren < 2) return FAILDESCR;
         DESCR_t l = interp_eval(e->children[0]);

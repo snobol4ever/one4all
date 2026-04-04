@@ -92,7 +92,7 @@ expr0      : expr2 T_ASSIGNMENT expr0                                           
            | expr2 T_MATCH      expr0                                                             { $$=expr_binary(E_SCAN,            $1,$3); }
            | expr2                                                                                 { $$=$1; }
            ;
-expr2      : expr2 T_AMPERSAND  expr3                                                             { $$=expr_binary(E_OPSYN,           $1,$3); }
+expr2      : expr2 T_AMPERSAND  expr3                                                             { EXPR_t*_e=expr_binary(E_OPSYN,$1,$3); _e->sval=strdup("&"); $$=_e; }
            | expr3                                                                                 { $$=$1; }
            ;
 expr3      : expr3 T_ALTERNATION expr4                                                            { if($1->kind==E_ALT){expr_add_child($1,$3);$$=$1;}else{EXPR_t*a=expr_new(E_ALT);expr_add_child(a,$1);expr_add_child(a,$3);$$=a;} }
@@ -101,7 +101,7 @@ expr3      : expr3 T_ALTERNATION expr4                                          
 expr4      : expr4 T_CONCAT expr5                                                                           { if($1->kind==E_SEQ){expr_add_child($1,$3);$$=$1;}else{EXPR_t*s=expr_new(E_SEQ);expr_add_child(s,$1);expr_add_child(s,$3);$$=s;} }
            | expr5                                                                                 { $$=$1; }
            ;
-expr5      : expr5 T_AT_SIGN    expr6                                                             { $$=expr_binary(E_OPSYN,           $1,$3); }
+expr5      : expr5 T_AT_SIGN    expr6                                                             { EXPR_t*_e=expr_binary(E_OPSYN,$1,$3); _e->sval=strdup("@"); $$=_e; }
            | expr6                                                                                 { $$=$1; }
            ;
 expr6      : expr6 T_ADDITION   expr7                                                             { $$=expr_binary(E_ADD,             $1,$3); }
@@ -133,7 +133,7 @@ expr13     : expr14 T_TILDE     expr13                                          
 expr14     : T_UN_AT_SIGN      expr14                                                             { $$=expr_unary(E_CAPT_CURSOR,     $2); }
            | T_UN_TILDE        expr14                                                             { $$=expr_unary(E_INDIRECT,        $2); }
            | T_UN_QUESTION_MARK expr14                                                            { $$=expr_unary(E_INTERROGATE,     $2); }
-           | T_UN_AMPERSAND    expr14                                                             { $$=expr_unary(E_OPSYN,           $2); }
+           | T_UN_AMPERSAND    expr14                                                             { EXPR_t*_e=expr_unary(E_OPSYN,$2); _e->sval=strdup("&"); $$=_e; }
            | T_UN_PLUS         expr14                                                             { $$=expr_unary(E_PLS,             $2); }
            | T_UN_MINUS        expr14                                                             { $$=expr_unary(E_MNS,             $2); }
            | T_UN_ASTERISK     expr14                                                             { $$=expr_unary(E_DEFER,           $2); }
@@ -144,7 +144,7 @@ expr14     : T_UN_AT_SIGN      expr14                                           
            | T_UN_SLASH        expr14                                                             { $$=expr_unary(E_DIV,             $2); }  /* user-definable */
            | T_UN_POUND        expr14                                                             { $$=expr_unary(E_MUL,             $2); }  /* user-definable */
            | T_UN_EQUAL        expr14                                                             { $$=expr_unary(E_ASSIGN,          $2); }  /* user-definable */
-           | T_UN_VERTICAL_BAR expr14                                                             { $$=expr_unary(E_ALT,             $2); }  /* user-definable */
+           | T_UN_VERTICAL_BAR expr14                                                             { EXPR_t*_e=expr_unary(E_OPSYN,$2); _e->sval=strdup("|"); $$=_e; }  /* user-definable */
            | expr15                                                                                { $$=$1; }
            ;
 expr15     : expr15 T_LBRACK exprlist T_RBRACK                                                  { EXPR_t*i=expr_new(E_IDX);expr_add_child(i,$1);for(int j=0;j<$3->nchildren;j++)expr_add_child(i,$3->children[j]);free($3->children);free($3);$$=i; }
