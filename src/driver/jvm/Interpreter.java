@@ -275,6 +275,10 @@ public class Interpreter {
     }
 
     private final Map<String,FuncDef> funcTable = new HashMap<>();
+    /** OPSYN operator table: operator symbol → aliased function name, keyed by symbol+arity e.g. "@2", "|1" */
+    private final Map<String,String> opsynTable = new HashMap<>();
+    /** Set by callUserFunc on NRETURN: the variable name the function returned a reference to. */
+    private String lastNreturnName = null;
     /** DATA type field registry: typename → field names (uppercase). */
     private final Map<String,String[]> dataTypes = new HashMap<>();
 
@@ -333,6 +337,7 @@ public class Interpreter {
         nv.put("MAXLNGTH", DESCR.intv(5000));
         nv.put("STLIMIT",  DESCR.intv(1000000));
         nv.put("STCOUNT",  DESCR.intv(0));
+        nv.put("STNO",     DESCR.intv(0));
         // Standard character-set keywords
         nv.put("LCASE",    DESCR.str("abcdefghijklmnopqrstuvwxyz"));
         nv.put("UCASE",    DESCR.str("ABCDEFGHIJKLMNOPQRSTUVWXYZ"));
@@ -444,6 +449,14 @@ public class Interpreter {
             }
 
             case E_ALT: {
+                // Unary | may be OPSYN'd to a function (e.g. opsyn('|', .size, 1))
+                if (e.children.size() == 1) {
+                    String opFn = opsynTable.get("|1");
+                    if (opFn != null) {
+                        DESCR arg = eval(e.children.get(0));
+                        return callBuiltin(opFn, java.util.Arrays.asList(arg));
+                    }
+                }
                 // Pattern alternation stored as a pattern-valued DESCR
                 return DESCR.pat(e);
             }
@@ -536,8 +549,17 @@ public class Interpreter {
                 return DESCR.FAIL;
             }
 
-            case E_CAPT_CURSOR:
+            case E_CAPT_CURSOR: {
+                // Check if @ has been OPSYN'd to a binary function
+                String opKey = "@2";
+                String opFn  = opsynTable.get(opKey);
+                if (opFn != null && e.children.size() >= 2) {
+                    DESCR l = eval(e.children.get(0));
+                    DESCR r = eval(e.children.get(1));
+                    return callBuiltin(opFn, java.util.Arrays.asList(l, r));
+                }
                 return DESCR.NUL; // cursor capture — pattern context only
+            }
 
             case E_DEFER:
                 // *X — deferred expression (eval X, then eval result as code)
@@ -675,7 +697,7 @@ public class Interpreter {
                 break;
             }
             case E_FNC: {
-                if (lv.sval == null || lv.children.isEmpty()) break;
+                if (lv.sval == null) break;
                 String fld = lv.sval.toUpperCase();
                 // ITEM(arr/tbl, key...) as lvalue
                 if (fld.equals("ITEM") && lv.children.size() >= 2) {
@@ -696,13 +718,29 @@ public class Interpreter {
                     }
                     break;
                 }
+                // NRETURN lvalue: call function, if it set lastNreturnName, assign there
+                FuncDef nrFd = funcTable.get(fld);
+                if (nrFd != null) {
+                    lastNreturnName = null;
+                    java.util.List<DESCR> nrArgs = new java.util.ArrayList<>();
+                    for (int _i = 1; _i < lv.children.size(); _i++)
+                        nrArgs.add(eval(lv.children.get(_i)));
+                    callUserFunc(nrFd, nrArgs);
+                    if (lastNreturnName != null && !lastNreturnName.isEmpty()) {
+                        nvSet(lastNreturnName, val);
+                        lastNreturnName = null;
+                        break;
+                    }
+                }
                 // DATA field setter: x(P) = val
-                DESCR obj = eval(lv.children.get(0));
-                if (obj.type == VType.DAT) {
-                    DATA d = obj.asDat();
-                    if (d != null) {
-                        for (int i = 0; i < d.fields.length; i++) {
-                            if (d.fields[i].equalsIgnoreCase(fld)) { d.vals[i] = val; break; }
+                if (!lv.children.isEmpty()) {
+                    DESCR obj = eval(lv.children.get(0));
+                    if (obj.type == VType.DAT) {
+                        DATA d = obj.asDat();
+                        if (d != null) {
+                            for (int i = 0; i < d.fields.length; i++) {
+                                if (d.fields[i].equalsIgnoreCase(fld)) { d.vals[i] = val; break; }
+                            }
                         }
                     }
                 }
@@ -1048,6 +1086,28 @@ public class Interpreter {
                 return DESCR.intv(lv % rv);
             }
 
+            // OPSYN(dest, src) or OPSYN(sym, .func, arity) — alias or operator binding
+            case "OPSYN": {
+                String dest = a0.toSnoStr().trim().toUpperCase();
+                String src  = a1.toSnoStr().trim().toUpperCase();
+                // 3-arg form: opsyn(op_symbol, .funcname, arity) — bind operator to function
+                if (args.size() >= 3) {
+                    int arity = (int) toDouble(args.get(2));
+                    String key = dest + arity;
+                    opsynTable.put(key, src);
+                } else if (!dest.isEmpty() && !src.isEmpty()) {
+                    FuncDef srcFd = funcTable.get(src);
+                    if (srcFd != null) {
+                        // Alias preserves srcFd.name so body variable (e.g. "FACT") works correctly
+                        // but register under dest so it's callable as dest
+                        funcTable.put(dest, srcFd);
+                    } else {
+                        funcTable.put(dest, new FuncDef("__OPSYN__" + src, new String[0], new String[0], "__BUILTIN__"));
+                    }
+                }
+                return DESCR.NUL;
+            }
+
             // DEFINE('name(p1,p2)local1,local2', 'entryLabel')
             case "DEFINE": {
                 String spec = a0.toSnoStr().trim();
@@ -1080,6 +1140,11 @@ public class Interpreter {
                 // Check user-defined function table
                 FuncDef fd = funcTable.get(name);
                 if (fd != null) {
+                    // OPSYN alias to a builtin: fd.name encodes the real builtin name
+                    if (fd.entryLabel.equals("__BUILTIN__") && fd.name.startsWith("__OPSYN__")) {
+                        String realName = fd.name.substring("__OPSYN__".length());
+                        return callBuiltin(realName, args);
+                    }
                     return callUserFunc(fd, args);
                 }
                 // Unknown function — return NUL
@@ -1154,10 +1219,6 @@ public class Interpreter {
             while (pc < programStmts.length && limit-- > 0) {
                 Parser.StmtNode s = programStmts[pc];
                 if (s.isEnd) break;
-
-                // Increment &STCOUNT
-                DESCR stcount = nvGet("STCOUNT");
-                nv.put("STCOUNT", DESCR.intv((stcount.type == VType.INT ? stcount.ival : 0) + 1));
 
                 // Phase 1
                 String  subjName = null;
@@ -1272,7 +1333,14 @@ public class Interpreter {
                         if (target.equalsIgnoreCase("FRETURN")) {
                             freturn = true; break;
                         }
-                        if (target.equalsIgnoreCase("NRETURN")) break; // treat as RETURN for now
+                        if (target.equalsIgnoreCase("NRETURN")) {
+                            // NRETURN: fd.name var holds a name (string) — dereference it
+                            DESCR nameD = nvGet(fd.name);
+                            String pointedAt = nameD.toSnoStr().trim().toUpperCase();
+                            lastNreturnName = pointedAt;  // side-channel for lvalue assign
+                            retVal = pointedAt.isEmpty() ? DESCR.NUL : nvGet(pointedAt);
+                            break;
+                        }
                         int dest = labelLookup(target);
                         if (dest >= 0) { pc = dest; continue; }
                     }
@@ -1314,9 +1382,10 @@ public class Interpreter {
 
             if (s.isEnd) break;
 
-            // Increment &STCOUNT
+            // Increment &STCOUNT, update &STNO
             DESCR stcount = nvGet("STCOUNT");
             nv.put("STCOUNT", DESCR.intv((stcount.type == VType.INT ? stcount.ival : 0) + 1));
+            nv.put("STNO",    DESCR.intv(s.lineno));
 
             // ── Phase 1: resolve subject ──────────────────────────────────────
             String  subjName = null;
