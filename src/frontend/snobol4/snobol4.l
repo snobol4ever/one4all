@@ -138,6 +138,7 @@ G       ({WS}|{CONT})*
 
 <BODY>\n               { lineno++; BEGIN(INITIAL); return T_STMT_END; }
 <BODY>";"              { BEGIN(INITIAL); return T_STMT_END; }
+<BODY>{W}";"           { BEGIN(INITIAL); return T_STMT_END; }
 <BODY>{G}":"  { for(int _i=0;_i<yyleng;_i++) if(yytext[_i]=='\n') lineno++; BEGIN(GT); }
 
 <BODY>&{ALPHA}{ALNUM}* { strbuf[0]='\0'; strncat(strbuf,yytext+1,sizeof(strbuf)-1); return T_KEYWORD; }
