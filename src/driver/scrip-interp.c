@@ -350,7 +350,10 @@ static DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                             pat_d, has_repl ? &repl_val : NULL, has_repl);
                     }
                 } else if (s->has_eq && subj_name) {
-                    DESCR_t repl_val = s->replacement ? interp_eval(s->replacement) : NULVCL;
+                    DESCR_t repl_val = s->replacement ?
+                        (_expr_is_pat(s->replacement) ? interp_eval_pat(s->replacement)
+                                                      : interp_eval(s->replacement))
+                        : NULVCL;
                     if (IS_FAIL_fn(repl_val)) succeeded = 0;
                     else {
                         /* NRETURN lvalue write-through: subj_name may be a zero-param
@@ -1197,6 +1200,20 @@ static DESCR_t interp_eval_pat(EXPR_t *e)
         }
         return acc;
     }
+    case E_ALT: {
+        /* pattern alternation: p1 | p2 | ... — each child evaluated in
+         * pattern context so that E_DEFER(E_VAR) children become XDSAR
+         * nodes rather than frozen DT_E values. */
+        if (e->nchildren == 0) return pat_epsilon();
+        DESCR_t acc = interp_eval_pat(e->children[0]);
+        if (IS_FAIL_fn(acc)) return FAILDESCR;
+        for (int i = 1; i < e->nchildren; i++) {
+            DESCR_t nxt = interp_eval_pat(e->children[i]);
+            if (IS_FAIL_fn(nxt)) return FAILDESCR;
+            acc = pat_alt(acc, nxt);
+        }
+        return acc;
+    }
     case E_VAR:
         if (e->sval && *e->sval) {
             if (_is_pat_fnc_name(e->sval)) {
@@ -1230,7 +1247,17 @@ static DESCR_t interp_eval_pat(EXPR_t *e)
                 }
                 return pat_user_call(child->sval, av, na);
             }
-            /* *var — evaluate child to get stored pattern */
+            /* *var — build XDSAR deferred-ref node so the variable is
+             * resolved at MATCH time (not now).  This is required for
+             * self-/mutually-recursive patterns like:
+             *   factor = addop *factor . *Unary() | *primary
+             * where *factor must not be resolved while factor is still
+             * being assigned.  pat_ref() creates an XDSAR node; the
+             * materialise() path in snobol4_pattern.c resolves it with
+             * cycle detection at match time. */
+            if (child->kind == E_VAR && child->sval)
+                return pat_ref(child->sval);
+            /* Non-VAR child: evaluate and return stored pattern */
             DESCR_t r = interp_eval(child);
             if (r.v == DT_N && r.ptr) r = *(DESCR_t*)r.ptr;
             return r;
@@ -1309,8 +1336,14 @@ static void execute_program(Program *prog)
 
         /* ── pure assignment (direct or null) ─────────────────────── */
         } else if (s->has_eq && subj_name) {
-            /* X = expr  OR  X =  (null assign, no replacement node) */
-            DESCR_t repl_val = s->replacement ? interp_eval(s->replacement) : NULVCL;
+            /* X = expr  OR  X =  (null assign, no replacement node).
+             * If the RHS is a pattern expression (contains *, |, pattern
+             * builtins), evaluate in pattern context so that E_DEFER(E_VAR)
+             * children become XDSAR nodes rather than frozen DT_E values. */
+            DESCR_t repl_val = s->replacement ?
+                (_expr_is_pat(s->replacement) ? interp_eval_pat(s->replacement)
+                                              : interp_eval(s->replacement))
+                : NULVCL;
             if (IS_FAIL_fn(repl_val)) {
                 succeeded = 0;
             } else {

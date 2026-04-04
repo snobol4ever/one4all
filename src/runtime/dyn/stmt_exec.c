@@ -918,10 +918,15 @@ static spec_t bb_deferred_var(void *zeta, int entry)
     spec_t          DVAR;
 
     DVAR_α:         {
-                        /* Recursion guards: per-node in_progress + global depth cap */
-                        if (ζ->in_progress || g_dvar_depth >= DVAR_MAX_DEPTH)
+                        /* Recursion guard: global depth cap only.
+                         * DYN-75: removed per-node in_progress flag — it blocked
+                         * right-recursive grammars (term = *factor mulop *term)
+                         * where the recursive *term fires AFTER consuming input.
+                         * The global depth cap (DVAR_MAX_DEPTH=64) handles
+                         * genuinely infinite mutual recursion. */
+                        if (g_dvar_depth >= DVAR_MAX_DEPTH)
                                                               goto DVAR_ω;
-                        ζ->in_progress = 1; g_dvar_depth++;
+                        g_dvar_depth++;
 
                         /* Re-resolve on every α: live NV lookup */
                         DESCR_t val = NV_GET_fn(ζ->name);
@@ -972,9 +977,9 @@ static spec_t bb_deferred_var(void *zeta, int entry)
                                 && ζ->child_fn != (bb_box_fn)bb_lit)
                             memset(ζ->child_state, 0, ζ->child_size);
                     }
-                    if (!ζ->child_fn) { ζ->in_progress=0; g_dvar_depth--; goto DVAR_ω; }
+                    if (!ζ->child_fn) { g_dvar_depth--; goto DVAR_ω; }
                     DVAR = ζ->child_fn(ζ->child_state, α);
-                    ζ->in_progress = 0; g_dvar_depth--;
+                    g_dvar_depth--;
                     if (spec_is_empty(DVAR))                  goto DVAR_ω;
                                                               goto DVAR_γ;
 

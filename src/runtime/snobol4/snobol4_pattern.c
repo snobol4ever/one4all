@@ -662,14 +662,22 @@ static Pattern *materialise(PATND_t *sp, MatchCtx *ctx) {
         DESCR_t v = NV_GET_fn(sp->STRVAL_fn);
         if (v.v == DT_P) {
             /* Cycle detection: track variable names being materialised.
-             * Recursive patterns (e.g. snoExpr14 = '|' *snoExpr14 rest)
-             * must not expand infinitely. Return epsilon on a cycle. */
+             * Recursive patterns (e.g. term = *factor addop *term . *Binary())
+             * must not expand infinitely at materialise time.
+             * On a cycle, emit T_VARREF instead of epsilon — the engine
+             * re-resolves the variable lazily at each PROCEED, so right-recursive
+             * grammars work correctly: predecessor nodes consume input first,
+             * then T_VARREF fires when the recursive alternative is actually tried. */
             #define MAT_MAX_DEPTH 64
             static __thread const char *_mat_stack[MAT_MAX_DEPTH];
             static __thread int _mat_top = 0;
             for (int _i = 0; _i < _mat_top; _i++) {
-                if (_mat_stack[_i] == sp->STRVAL_fn || strcmp(_mat_stack[_i], sp->STRVAL_fn) == 0) {
-                    return make_epsilon(&ctx->pl); /* cycle: return epsilon */
+                if (_mat_stack[_i] == sp->STRVAL_fn ||
+                        strcmp(_mat_stack[_i], sp->STRVAL_fn) == 0) {
+                    /* cycle: emit T_VARREF for lazy engine-level resolution */
+                    p->type = T_VARREF;
+                    p->s    = sp->STRVAL_fn;
+                    return p;
                 }
             }
             if (_mat_top < MAT_MAX_DEPTH) _mat_stack[_mat_top++] = sp->STRVAL_fn;
