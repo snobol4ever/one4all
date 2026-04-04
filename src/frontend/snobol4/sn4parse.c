@@ -202,10 +202,17 @@ done:
 /* ---- LBLTB: label field scanner (v311.sil:1613 "STREAM XSP,TEXTSP,LBLTB")
  * Accepts alphanumeric chars (columns 1+) as label text.
  * Stops on blank or ';' (end-of-statement).  Errors on any other char. ---- */
-static acts_t LBLTB_actions[3];
+syntab_t LBLXTB;  /* forward — LBLTB_actions[0].go references it */
+static acts_t LBLTB_actions[] = {
+    {0, AC_GOTO, &LBLXTB},
+    {0, AC_STOPSH, NULL},
+    {0, AC_ERROR, NULL},
+};
 /* LBLXTB: continuation of label scan — same as LBLTB but accepts digits too.
  * SIL transitions LBLTB→LBLXTB after the first alphanumeric char. Here merged. */
-static acts_t LBLXTB_actions[1];
+static acts_t LBLXTB_actions[] = {
+    {0, AC_STOPSH, NULL},
+};
 syntab_t LBLXTB = { "LBLXTB", {
      0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  0,  0,  0,  0,  0,  0,
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
@@ -222,33 +229,38 @@ syntab_t LBLXTB = { "LBLXTB", {
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
 }, LBLXTB_actions };
 
 syntab_t LBLTB = { "LBLTB", {
-     3, 3, 3, 3, 3, 3, 3, 3, 3, 2, 3, 3, 3, 3, 3, 3,
-     3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-     2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 2, 3, 3, 3, 3,
-     3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3, 3, 1,  /* 0x5F '_' → 1 (alphanumeric, SNOBOL4+) */
-     3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3, 3, 3,
-     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  2,  3,  3,  3,  3,  3,  3,
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
+     2,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
+     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  3,  2,  3,  3,  3,  3,
+     3,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
+     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  3,  3,  3,  3,  3,
+     3,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
+     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  3,  3,  3,  3,  3,
+     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
+     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
+     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
+     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
+     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
+     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
+     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
+     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
 }, LBLTB_actions };
 
 /* ---- CARDTB: card (line) type scanner (v311.sil:1033 "STREAM XSP,TEXTSP,CARDTB")
  * First char of each source line determines card type.  All stops are STOPSH
  * (char is NOT consumed — it stays as the start of the next field).
  * "Card" = punch-card terminology from SNOBOL4's batch origins. ---- */
-static acts_t CARDTB_actions[4];
+static acts_t CARDTB_actions[] = {
+    {CMTTYP, AC_STOPSH, NULL},
+    {CTLTYP, AC_STOPSH, NULL},
+    {CNTTYP, AC_STOPSH, NULL},
+    {NEWTYP, AC_STOPSH, NULL},
+};
 syntab_t CARDTB = { "CARDTB", {
      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
@@ -265,7 +277,7 @@ syntab_t CARDTB = { "CARDTB", {
      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
-     4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4
+     4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
 }, CARDTB_actions };
 
 /* ---- FRWDTB: forward scan — skips transparent chars (space=0x20, tab=0x09
@@ -275,102 +287,131 @@ syntab_t CARDTB = { "CARDTB", {
  * chains via AC_GOTO to FRWDTB on the first non-blank, fires EOSTYP on ';'.
  * Returns ST_ERROR when there is NO leading blank (BINOP's no-blank / BINOP1 path).
  * (v311.sil:2242 "STREAM XSP,TEXTSP,IBLKTB — Break out nonblank from blank") ---- */
-static acts_t FRWDTB_actions[7];
+static acts_t FRWDTB_actions[] = {
+    {EQTYP, AC_STOP, NULL},
+    {RPTYP, AC_STOP, NULL},
+    {RBTYP, AC_STOP, NULL},
+    {CMATYP, AC_STOP, NULL},
+    {CLNTYP, AC_STOP, NULL},
+    {EOSTYP, AC_STOP, NULL},
+    {NBTYP, AC_STOPSH, NULL},
+};
 syntab_t FRWDTB = { "FRWDTB", {
-     7, 7, 7, 7, 7, 7, 7, 7, 7, 0, 7, 7, 7, 7, 7, 7,
-     7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-     0, 7, 7, 7, 7, 7, 7, 7, 7, 2, 7, 7, 4, 7, 7, 7,
-     7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 5, 6, 7, 1, 3, 7,
-     7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-     7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 3, 7, 1,
-     7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-     7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-     7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-     7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-     7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-     7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-     7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-     7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-     7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-     7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+     7,  7,  7,  7,  7,  7,  7,  7,  7,  0,  7,  7,  7,  7,  7,  7,
+     7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
+     0,  7,  7,  7,  7,  7,  7,  7,  7,  2,  7,  7,  4,  7,  7,  7,
+     7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  5,  6,  7,  1,  3,  7,
+     7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
+     7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  3,  7,  1,
+     7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
+     7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
+     7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
+     7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
+     7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
+     7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
+     7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
+     7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
+     7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
+     7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
 }, FRWDTB_actions };
 
-static acts_t IBLKTB_actions[3];
+static acts_t IBLKTB_actions[] = {
+    {0, AC_GOTO, &FRWDTB},
+    {EOSTYP, AC_STOP, NULL},
+    {0, AC_ERROR, NULL},
+};
 syntab_t IBLKTB = { "IBLKTB", {
-     3, 3, 3, 3, 3, 3, 3, 3, 3, 1, 3, 3, 3, 3, 3, 3,
-     3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-     1, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-     3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 2, 3, 3, 3, 3,
-     3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-     3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-     3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-     3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-     3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-     3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-     3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-     3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-     3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-     3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-     3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-     3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  1,  3,  3,  3,  3,  3,  3,
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
+     1,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  2,  3,  3,  3,  3,
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
 }, IBLKTB_actions };
 
 /* ---- ELEMTB: element type dispatch (v311.sil:1926 "STREAM XSP,TEXTSP,ELEMTB")
  * Classifies the first character of a token and chains to the appropriate
  * sub-scanner.  SIL then does "SELBRA STYPE,(ELEILT,ELEVBL,ELENST,ELEFNC,ELEFLT,ELEARY)"
  * to branch on the resulting STYPE. ---- */
-static acts_t ELEMTB_actions[6];
+static acts_t ELEMTB_actions[] = {
+    {ILITYP, AC_GOTO, NULL},
+    {VARTYP, AC_GOTO, NULL},
+    {QLITYP, AC_GOTO, NULL},
+    {QLITYP, AC_GOTO, NULL},
+    {NSTTYP, AC_STOP, NULL},
+    {0, AC_ERROR, NULL},
+};
 /* Forward declarations for goto targets wired in init_tables() */
 syntab_t VARTB, INTGTB, SQLITB, DQLITB;
 
 syntab_t ELEMTB = { "ELEMTB", {
-     6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
-     6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
-     6, 6, 4, 6, 6, 6, 6, 3, 5, 6, 6, 6, 6, 6, 6, 6,
-     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 6, 6, 6, 6, 6, 6,
-     6, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-     2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 6, 6, 6, 6, 6,
-     6, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-     2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 6, 6, 6, 6, 6,
-     2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-     2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-     2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-     2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-     2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-     2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-     2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-     2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+     6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,
+     6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,
+     6,  6,  4,  6,  6,  6,  6,  3,  5,  6,  6,  6,  6,  6,  6,  6,
+     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  6,  6,  6,  6,  6,  6,
+     6,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  6,  6,  6,  6,  6,
+     6,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  6,  6,  6,  6,  6,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
 }, ELEMTB_actions };
 
 /* ---- VARTB: variable / function-name scanner (v311.sil:ELEVBL branch)
  * Entered after ELEMTB fires AC_GOTO for a letter.  Accumulates alphanumeric
  * chars (chrs[]=0 fast-path).  Stops on the first non-identifier char and
  * classifies it: plain variable, function call IDENT(, or array ref IDENT<. ---- */
-static acts_t VARTB_actions[4];
+static acts_t VARTB_actions[] = {
+    {VARTYP, AC_STOPSH, NULL},
+    {FNCTYP, AC_STOP, NULL},
+    {ARYTYP, AC_STOP, NULL},
+    {0, AC_ERROR, NULL},
+};
 syntab_t VARTB = { "VARTB", {
-     4, 4, 4, 4, 4, 4, 4, 4, 4, 1, 4, 4, 4, 4, 4, 4,
-     4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-     1, 4, 4, 4, 4, 4, 4, 4, 2, 1, 4, 4, 1, 4, 0, 4,
-     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 1, 3, 4, 1, 4,
-     4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 4, 1, 4, 0,
-     4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 4, 4, 4, 4,
-     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+     4,  4,  4,  4,  4,  4,  4,  4,  4,  1,  4,  4,  4,  4,  4,  4,
+     4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
+     1,  4,  4,  4,  4,  4,  4,  4,  2,  1,  4,  4,  1,  4,  0,  4,
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  4,  1,  3,  4,  1,  4,
+     4,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  3,  4,  1,  4,  0,
+     4,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  4,  4,  4,  4,  4,
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
 }, VARTB_actions };
 
 /* ---- INTGTB: integer digit accumulator (v311.sil:ELEILT branch)
  * Entered after ELEMTB fires AC_GOTO for a digit.  Continues on digits,
  * stops on terminators, chains to FLITB on '.', chains to EXPTB on 'e'/'E'. ---- */
 syntab_t FLITB;  /* forward — INTGTB references FLITB before it is defined */
-static acts_t INTGTB_actions[4];
+static acts_t INTGTB_actions[] = {
+    {ILITYP, AC_STOPSH, NULL},
+    {FLITYP, AC_GOTO, NULL},
+    {FLITYP, AC_GOTO, NULL},
+    {0, AC_ERROR, NULL},
+};
 syntab_t EXPTB, EXPBTB; /* forward declarations — used by INTGTB/FLITB AC_GOTO */
 syntab_t INTGTB = { "INTGTB", {
      4,  4,  4,  4,  4,  4,  4,  4,  4,  1,  4,  4,  4,  4,  4,  4,
@@ -388,13 +429,17 @@ syntab_t INTGTB = { "INTGTB", {
      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
-     4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4
+     4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
 }, INTGTB_actions };
 
 /* ---- FLITB: floating-point fraction digit accumulator
  * Entered after INTGTB sees '.'.  Continues on digits, stops on terminators,
  * chains to EXPTB on 'e'/'E' (scientific notation exponent). ---- */
-static acts_t FLITB_actions[3];
+static acts_t FLITB_actions[] = {
+    {0, AC_STOPSH, NULL},
+    {0, AC_GOTO, NULL},
+    {0, AC_ERROR, NULL},
+};
 syntab_t FLITB = { "FLITB", {
      3,  3,  3,  3,  3,  3,  3,  3,  3,  1,  3,  3,  3,  3,  3,  3,
      3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
@@ -411,13 +456,16 @@ syntab_t FLITB = { "FLITB", {
      3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
      3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
      3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
-     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
 }, FLITB_actions };
 
 /* ---- EXPTB / EXPBTB: exponent sign and digit scanners
  * EXPTB: entered after 'e'/'E' in a float; accepts optional '+'/'-' then chains to EXPBTB.
  * EXPBTB: accumulates exponent digits, stops on any token terminator. ---- */
-static acts_t EXPBTB_actions[2];
+static acts_t EXPBTB_actions[] = {
+    {0, AC_STOPSH, NULL},
+    {0, AC_ERROR, NULL},
+};
 syntab_t EXPBTB = { "EXPBTB", {
      2,  2,  2,  2,  2,  2,  2,  2,  2,  1,  2,  2,  2,  2,  2,  2,
      2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
@@ -434,9 +482,12 @@ syntab_t EXPBTB = { "EXPBTB", {
      2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
      2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
      2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
-     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
 }, EXPBTB_actions };
-static acts_t EXPTB_actions[2];
+static acts_t EXPTB_actions[] = {
+    {0, AC_GOTO, NULL},
+    {0, AC_ERROR, NULL},
+};
 syntab_t EXPTB = { "EXPTB", {
      2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
      2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
@@ -453,14 +504,16 @@ syntab_t EXPTB = { "EXPTB", {
      2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
      2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
      2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
-     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
 }, EXPTB_actions };
 
 /* ---- SQLITB / DQLITB: string literal body scanners
  * SQLITB: scans body of a single-quoted string '...'; stops on matching '.
  * DQLITB: scans body of a double-quoted string "..."; stops on matching ".
  * Both accept ALL other bytes including spaces and operators (AC_CONTIN). ---- */
-static acts_t SQLITB_actions[1];
+static acts_t SQLITB_actions[] = {
+    {0, AC_STOP, NULL},
+};
 syntab_t SQLITB = { "SQLITB", {
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
@@ -477,9 +530,11 @@ syntab_t SQLITB = { "SQLITB", {
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
 }, SQLITB_actions };
-static acts_t DQLITB_actions[1];
+static acts_t DQLITB_actions[] = {
+    {0, AC_STOP, NULL},
+};
 syntab_t DQLITB = { "DQLITB", {
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
@@ -496,7 +551,7 @@ syntab_t DQLITB = { "DQLITB", {
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
 }, DQLITB_actions };
 
 /* ---- UNOPTB: unary prefix operator scanner (v311.sil:2510 "STREAM XSP,TEXTSP,UNOPTB")
@@ -521,7 +576,47 @@ syntab_t DQLITB = { "DQLITB", {
 #define UOP_QUE  313  /* = QUESFN: ?X interrogation/test      */
 #define UOP_ARW  314  /* = AROWFN: ^X user-definable          */
 
-static acts_t UNOPTB_actions[15];
+syntab_t NBLKTB;
+static acts_t NBLKTB_actions[] = {
+    {0, AC_ERROR, NULL},
+    {0, AC_STOPSH, NULL},
+};
+syntab_t NBLKTB = { "NBLKTB", {
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  1,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     1,  2,  2,  2,  2,  2,  2,  2,  2,  1,  2,  2,  1,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  1,  2,  2,  1,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  1,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+}, NBLKTB_actions };
+
+static acts_t UNOPTB_actions[] = {
+    {PLSFN, AC_GOTO, &NBLKTB},
+    {MNSFN, AC_GOTO, &NBLKTB},
+    {DOTFN, AC_GOTO, &NBLKTB},
+    {INDFN, AC_GOTO, &NBLKTB},
+    {STRFN, AC_GOTO, &NBLKTB},
+    {SLHFN, AC_GOTO, &NBLKTB},
+    {PRFN, AC_GOTO, &NBLKTB},
+    {ATFN, AC_GOTO, &NBLKTB},
+    {PDFN, AC_GOTO, &NBLKTB},
+    {KEYFN, AC_GOTO, &NBLKTB},
+    {NEGFN, AC_GOTO, &NBLKTB},
+    {BARFN, AC_GOTO, &NBLKTB},
+    {QUESFN, AC_GOTO, &NBLKTB},
+    {AROWFN, AC_GOTO, &NBLKTB},
+    {0, AC_ERROR, NULL},
+};
 syntab_t UNOPTB = { "UNOPTB", {
     15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
     15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
@@ -550,72 +645,95 @@ extern syntab_t TBLKTB, STARTB;
  * Each entry: set STYPE to the operator function code, then AC_GOTO to TBLKTB
  * (which must consume the mandatory trailing blank that follows every binary op).
  * Special case: '*' goes to STARTB instead of TBLKTB to handle '**' vs '*'.  ---- */
-static acts_t BIOPTB_actions[15];
+static acts_t BIOPTB_actions[] = {
+    {ADDFN, AC_GOTO, &TBLKTB},
+    {SUBFN, AC_GOTO, &TBLKTB},
+    {NAMFN, AC_GOTO, &TBLKTB},
+    {DOLFN, AC_GOTO, &TBLKTB},
+    {MPYFN, AC_GOTO, &STARTB},
+    {DIVFN, AC_GOTO, &TBLKTB},
+    {BIATFN, AC_GOTO, &TBLKTB},
+    {BIPDFN, AC_GOTO, &TBLKTB},
+    {BIPRFN, AC_GOTO, &TBLKTB},
+    {EXPFN, AC_GOTO, &TBLKTB},
+    {ORFN, AC_GOTO, &TBLKTB},
+    {BIAMFN, AC_GOTO, &TBLKTB},
+    {BINGFN, AC_GOTO, &TBLKTB},
+    {BIQSFN, AC_GOTO, &TBLKTB},
+    {0, AC_ERROR, NULL},
+};
 
 /* STARTB: disambiguate '*' (multiply) from '**' (exponentiation)
  * (v311.sil: BIOPTB action[4] goes here after consuming the first '*')
  * Peeks at the next char: if it is another '*' consume it and set EXPFN;
  * if it is a blank/tab consume it and keep STYPE=MPYFN (already set). ---- */
-static acts_t STARTB_actions[3];
+static acts_t STARTB_actions[] = {
+    {0, AC_STOP, NULL},
+    {EXPFN, AC_GOTO, &TBLKTB},
+    {0, AC_ERROR, NULL},
+};
 syntab_t STARTB = { "STARTB", {
-     3, 3, 3, 3, 3, 3, 3, 3, 3, 1, 3, 3, 3, 3, 3, 3,
-     3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-     1, 3, 3, 3, 3, 3, 3, 3, 3, 3, 2, 3, 3, 3, 3, 3,
-     3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-     3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-     3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-     3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-     3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-     3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-     3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-     3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-     3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-     3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-     3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-     3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-     3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  1,  3,  3,  3,  3,  3,  3,
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
+     1,  3,  3,  3,  3,  3,  3,  3,  3,  3,  2,  3,  3,  3,  3,  3,
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
 }, STARTB_actions };
 
 /* TBLKTB: trailing blank consumer — every binary operator must be followed by a blank.
  * (v311.sil: every BIOPTB action goes to TBLKTB after setting STYPE)
  * Consumes exactly one space or tab (the mandatory post-operator blank), then stops.  ---- */
-static acts_t TBLKTB_actions[2];
+static acts_t TBLKTB_actions[] = {
+    {0, AC_STOP, NULL},
+    {0, AC_ERROR, NULL},
+};
 syntab_t TBLKTB = { "TBLKTB", {
-     2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2,
-     2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-     1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-     2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-     2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-     2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-     2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-     2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-     2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-     2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-     2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-     2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-     2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-     2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-     2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-     2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  1,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     1,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
+     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
 }, TBLKTB_actions };
 
 syntab_t BIOPTB = { "BIOPTB", {
-    15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,
-    15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,
-    15,11,15, 8, 4, 9,12,15,15,15, 5, 1,15, 2, 3, 6,
-    15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,14,
-     7,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,
-    15,15,15,15,15,15,15,15,15,15,15,15,13,15,10,15,
-    15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,
-    15,15,15,15,15,15,15,15,15,15,15,15,11,15,13,15,
-    15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,
-    15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,
-    15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,
-    15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,
-    15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,
-    15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,
-    15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,
-    15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,
+    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+    15, 11, 15,  8,  4,  9, 12, 15, 15, 15,  5,  1, 15,  2,  3,  6,
+    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 14,
+     7, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 13, 15, 10, 15,
+    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 11, 15, 13, 15,
+    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
 }, BIOPTB_actions };
 
 /* ---- GOTOTB: goto field top-level scanner (v311.sil:1730 "STREAM XSP,TEXTSP,GOTOTB")
@@ -623,7 +741,11 @@ syntab_t BIOPTB = { "BIOPTB", {
  *   :( or :< → unconditional;  :S → success (chains to GOTSTB);  :F → failure (chains to GOTFTB).
  * GOTSTB: sub-scanner after 'S' — expects '(' (label in parens) or '<' (direct address).
  * GOTFTB: sub-scanner after 'F' — same but for failure branch. ---- */
-static acts_t GOTSTB_actions[3];
+static acts_t GOTSTB_actions[] = {
+    {SGOTYP, AC_STOP, NULL},
+    {STOTYP, AC_STOP, NULL},
+    {0, AC_ERROR, NULL},
+};
 syntab_t GOTSTB = { "GOTSTB", {
      3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
      3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
@@ -640,9 +762,13 @@ syntab_t GOTSTB = { "GOTSTB", {
      3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
      3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
      3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
-     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
 }, GOTSTB_actions };
-static acts_t GOTFTB_actions[3];
+static acts_t GOTFTB_actions[] = {
+    {FGOTYP, AC_STOP, NULL},
+    {FTOTYP, AC_STOP, NULL},
+    {0, AC_ERROR, NULL},
+};
 syntab_t GOTFTB = { "GOTFTB", {
      3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
      3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
@@ -659,9 +785,15 @@ syntab_t GOTFTB = { "GOTFTB", {
      3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
      3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
      3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
-     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
 }, GOTFTB_actions };
-static acts_t GOTOTB_actions[5];
+static acts_t GOTOTB_actions[] = {
+    {0, AC_GOTO, &GOTSTB},
+    {0, AC_GOTO, &GOTFTB},
+    {UGOTYP, AC_STOP, NULL},
+    {UTOTYP, AC_STOP, NULL},
+    {0, AC_ERROR, NULL},
+};
 syntab_t GOTOTB = { "GOTOTB", {
      5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,
      5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,
@@ -678,410 +810,21 @@ syntab_t GOTOTB = { "GOTOTB", {
      5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,
      5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,
      5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,
-     5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5
+     5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,
 }, GOTOTB_actions };
-
-/* =========================================================================
- * Stub declarations for tables in syn_init.h not used by sn4parse.
- * SBIPTB/BBIOPTB/BSBIPTB = SPITBOL/BLOCKS operator variants.
- * EOSTB/NBLKTB/NUMBTB/NUMCTB/SPANTB/BRKTB/VARATB/VARBTB = unused here.
- * All declared so init_tables() (verbatim syn_init.h) compiles cleanly.
- * ========================================================================= */
-#define BIBDFN  BIPDFN   /* BLOCKS binary dot — alias */
-#define BIBRFN  BIPRFN   /* BLOCKS binary % — alias */
-#define LPTYP   8        /* left-paren type (VARBTB) */
-#define DIMTYP  9        /* dimension separator (NUMBTB/NUMCTB) */
-static acts_t SBIPTB_actions[16], BBIOPTB_actions[15], BSBIPTB_actions[16];
-static acts_t EOSTB_actions[1],   NBLKTB_actions[2];
-static acts_t NUMBTB_actions[4],  NUMCTB_actions[3];
-static acts_t SPANTB_actions[3],  BRKTB_actions[3];
-static acts_t VARATB_actions[4],  VARBTB_actions[4];
-static syntab_t SBIPTB, BBIOPTB, BSBIPTB;
-static syntab_t EOSTB;
-syntab_t NBLKTB = { "NBLKTB", {
-     2,  2,  2,  2,  2,  2,  2,  2,  2,  1,  2,  2,  2,  2,  2,  2,
-     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
-     1,  2,  2,  2,  2,  2,  2,  2,  2,  1,  2,  2,  1,  2,  2,  2,
-     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  1,  2,  2,  1,  2,
-     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
-     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  1,  2,  2,
-     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
-     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
-     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
-     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
-     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
-     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
-     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
-     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
-     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
-     2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
-}, NBLKTB_actions };
-static syntab_t NUMBTB, NUMCTB;
-static syntab_t SPANTB, BRKTB;
-static syntab_t VARATB, VARBTB;
 
 /* Wire up forward-declared goto targets in action tables.
  * These cannot be static initialisers because C does not allow forward references
  * to syntab_t objects in struct literals.  Called once from main() before parsing. */
 static void init_tables(void) {
-    /* init_tables: verbatim from snobol4-2.3.3/syn_init.h */
-    BIOPTB_actions[0].put = ADDFN;
-    BIOPTB_actions[0].act = AC_GOTO;
-    BIOPTB_actions[0].go  = &TBLKTB;
-    BIOPTB_actions[1].put = SUBFN;
-    BIOPTB_actions[1].act = AC_GOTO;
-    BIOPTB_actions[1].go  = &TBLKTB;
-    BIOPTB_actions[2].put = NAMFN;
-    BIOPTB_actions[2].act = AC_GOTO;
-    BIOPTB_actions[2].go  = &TBLKTB;
-    BIOPTB_actions[3].put = DOLFN;
-    BIOPTB_actions[3].act = AC_GOTO;
-    BIOPTB_actions[3].go  = &TBLKTB;
-    BIOPTB_actions[4].put = MPYFN;
-    BIOPTB_actions[4].act = AC_GOTO;
-    BIOPTB_actions[4].go  = &STARTB;
-    BIOPTB_actions[5].put = DIVFN;
-    BIOPTB_actions[5].act = AC_GOTO;
-    BIOPTB_actions[5].go  = &TBLKTB;
-    BIOPTB_actions[6].put = BIATFN;
-    BIOPTB_actions[6].act = AC_GOTO;
-    BIOPTB_actions[6].go  = &TBLKTB;
-    BIOPTB_actions[7].put = BIPDFN;
-    BIOPTB_actions[7].act = AC_GOTO;
-    BIOPTB_actions[7].go  = &TBLKTB;
-    BIOPTB_actions[8].put = BIPRFN;
-    BIOPTB_actions[8].act = AC_GOTO;
-    BIOPTB_actions[8].go  = &TBLKTB;
-    BIOPTB_actions[9].put = EXPFN;
-    BIOPTB_actions[9].act = AC_GOTO;
-    BIOPTB_actions[9].go  = &TBLKTB;
-    BIOPTB_actions[10].put = ORFN;
-    BIOPTB_actions[10].act = AC_GOTO;
-    BIOPTB_actions[10].go  = &TBLKTB;
-    BIOPTB_actions[11].put = BIAMFN;
-    BIOPTB_actions[11].act = AC_GOTO;
-    BIOPTB_actions[11].go  = &TBLKTB;
-    BIOPTB_actions[12].put = BINGFN;
-    BIOPTB_actions[12].act = AC_GOTO;
-    BIOPTB_actions[12].go  = &TBLKTB;
-    BIOPTB_actions[13].put = BIQSFN;
-    BIOPTB_actions[13].act = AC_GOTO;
-    BIOPTB_actions[13].go  = &TBLKTB;
-    BIOPTB_actions[14].act = AC_ERROR;
-    SBIPTB_actions[0].put = ADDFN;
-    SBIPTB_actions[0].act = AC_GOTO;
-    SBIPTB_actions[0].go  = &TBLKTB;
-    SBIPTB_actions[1].put = SUBFN;
-    SBIPTB_actions[1].act = AC_GOTO;
-    SBIPTB_actions[1].go  = &TBLKTB;
-    SBIPTB_actions[2].put = NAMFN;
-    SBIPTB_actions[2].act = AC_GOTO;
-    SBIPTB_actions[2].go  = &TBLKTB;
-    SBIPTB_actions[3].put = DOLFN;
-    SBIPTB_actions[3].act = AC_GOTO;
-    SBIPTB_actions[3].go  = &TBLKTB;
-    SBIPTB_actions[4].put = MPYFN;
-    SBIPTB_actions[4].act = AC_GOTO;
-    SBIPTB_actions[4].go  = &STARTB;
-    SBIPTB_actions[5].put = DIVFN;
-    SBIPTB_actions[5].act = AC_GOTO;
-    SBIPTB_actions[5].go  = &TBLKTB;
-    SBIPTB_actions[6].put = BIATFN;
-    SBIPTB_actions[6].act = AC_GOTO;
-    SBIPTB_actions[6].go  = &TBLKTB;
-    SBIPTB_actions[7].put = BIPDFN;
-    SBIPTB_actions[7].act = AC_GOTO;
-    SBIPTB_actions[7].go  = &TBLKTB;
-    SBIPTB_actions[8].put = BIPRFN;
-    SBIPTB_actions[8].act = AC_GOTO;
-    SBIPTB_actions[8].go  = &TBLKTB;
-    SBIPTB_actions[9].put = EXPFN;
-    SBIPTB_actions[9].act = AC_GOTO;
-    SBIPTB_actions[9].go  = &TBLKTB;
-    SBIPTB_actions[10].put = ORFN;
-    SBIPTB_actions[10].act = AC_GOTO;
-    SBIPTB_actions[10].go  = &TBLKTB;
-    SBIPTB_actions[11].put = BIAMFN;
-    SBIPTB_actions[11].act = AC_GOTO;
-    SBIPTB_actions[11].go  = &TBLKTB;
-    SBIPTB_actions[12].put = BINGFN;
-    SBIPTB_actions[12].act = AC_GOTO;
-    SBIPTB_actions[12].go  = &TBLKTB;
-    SBIPTB_actions[13].put = BISNFN;
-    SBIPTB_actions[13].act = AC_GOTO;
-    SBIPTB_actions[13].go  = &TBLKTB;
-    SBIPTB_actions[14].put = BIEQFN;
-    SBIPTB_actions[14].act = AC_GOTO;
-    SBIPTB_actions[14].go  = &TBLKTB;
-    SBIPTB_actions[15].act = AC_ERROR;
-    BBIOPTB_actions[0].put = ADDFN;
-    BBIOPTB_actions[0].act = AC_GOTO;
-    BBIOPTB_actions[0].go  = &TBLKTB;
-    BBIOPTB_actions[1].put = SUBFN;
-    BBIOPTB_actions[1].act = AC_GOTO;
-    BBIOPTB_actions[1].go  = &TBLKTB;
-    BBIOPTB_actions[2].put = NAMFN;
-    BBIOPTB_actions[2].act = AC_GOTO;
-    BBIOPTB_actions[2].go  = &TBLKTB;
-    BBIOPTB_actions[3].put = DOLFN;
-    BBIOPTB_actions[3].act = AC_GOTO;
-    BBIOPTB_actions[3].go  = &TBLKTB;
-    BBIOPTB_actions[4].put = MPYFN;
-    BBIOPTB_actions[4].act = AC_GOTO;
-    BBIOPTB_actions[4].go  = &STARTB;
-    BBIOPTB_actions[5].put = DIVFN;
-    BBIOPTB_actions[5].act = AC_GOTO;
-    BBIOPTB_actions[5].go  = &TBLKTB;
-    BBIOPTB_actions[6].put = BIATFN;
-    BBIOPTB_actions[6].act = AC_GOTO;
-    BBIOPTB_actions[6].go  = &TBLKTB;
-    BBIOPTB_actions[7].put = BIBDFN;
-    BBIOPTB_actions[7].act = AC_GOTO;
-    BBIOPTB_actions[7].go  = &TBLKTB;
-    BBIOPTB_actions[8].put = BIBRFN;
-    BBIOPTB_actions[8].act = AC_GOTO;
-    BBIOPTB_actions[8].go  = &TBLKTB;
-    BBIOPTB_actions[9].put = EXPFN;
-    BBIOPTB_actions[9].act = AC_GOTO;
-    BBIOPTB_actions[9].go  = &TBLKTB;
-    BBIOPTB_actions[10].put = ORFN;
-    BBIOPTB_actions[10].act = AC_GOTO;
-    BBIOPTB_actions[10].go  = &TBLKTB;
-    BBIOPTB_actions[11].put = BIAMFN;
-    BBIOPTB_actions[11].act = AC_GOTO;
-    BBIOPTB_actions[11].go  = &TBLKTB;
-    BBIOPTB_actions[12].put = BINGFN;
-    BBIOPTB_actions[12].act = AC_GOTO;
-    BBIOPTB_actions[12].go  = &TBLKTB;
-    BBIOPTB_actions[13].put = BIQSFN;
-    BBIOPTB_actions[13].act = AC_GOTO;
-    BBIOPTB_actions[13].go  = &TBLKTB;
-    BBIOPTB_actions[14].act = AC_ERROR;
-    BSBIPTB_actions[0].put = ADDFN;
-    BSBIPTB_actions[0].act = AC_GOTO;
-    BSBIPTB_actions[0].go  = &TBLKTB;
-    BSBIPTB_actions[1].put = SUBFN;
-    BSBIPTB_actions[1].act = AC_GOTO;
-    BSBIPTB_actions[1].go  = &TBLKTB;
-    BSBIPTB_actions[2].put = NAMFN;
-    BSBIPTB_actions[2].act = AC_GOTO;
-    BSBIPTB_actions[2].go  = &TBLKTB;
-    BSBIPTB_actions[3].put = DOLFN;
-    BSBIPTB_actions[3].act = AC_GOTO;
-    BSBIPTB_actions[3].go  = &TBLKTB;
-    BSBIPTB_actions[4].put = MPYFN;
-    BSBIPTB_actions[4].act = AC_GOTO;
-    BSBIPTB_actions[4].go  = &STARTB;
-    BSBIPTB_actions[5].put = DIVFN;
-    BSBIPTB_actions[5].act = AC_GOTO;
-    BSBIPTB_actions[5].go  = &TBLKTB;
-    BSBIPTB_actions[6].put = BIATFN;
-    BSBIPTB_actions[6].act = AC_GOTO;
-    BSBIPTB_actions[6].go  = &TBLKTB;
-    BSBIPTB_actions[7].put = BIBDFN;
-    BSBIPTB_actions[7].act = AC_GOTO;
-    BSBIPTB_actions[7].go  = &TBLKTB;
-    BSBIPTB_actions[8].put = BIBRFN;
-    BSBIPTB_actions[8].act = AC_GOTO;
-    BSBIPTB_actions[8].go  = &TBLKTB;
-    BSBIPTB_actions[9].put = EXPFN;
-    BSBIPTB_actions[9].act = AC_GOTO;
-    BSBIPTB_actions[9].go  = &TBLKTB;
-    BSBIPTB_actions[10].put = ORFN;
-    BSBIPTB_actions[10].act = AC_GOTO;
-    BSBIPTB_actions[10].go  = &TBLKTB;
-    BSBIPTB_actions[11].put = BIAMFN;
-    BSBIPTB_actions[11].act = AC_GOTO;
-    BSBIPTB_actions[11].go  = &TBLKTB;
-    BSBIPTB_actions[12].put = BINGFN;
-    BSBIPTB_actions[12].act = AC_GOTO;
-    BSBIPTB_actions[12].go  = &TBLKTB;
-    BSBIPTB_actions[13].put = BISNFN;
-    BSBIPTB_actions[13].act = AC_GOTO;
-    BSBIPTB_actions[13].go  = &TBLKTB;
-    BSBIPTB_actions[14].put = BIEQFN;
-    BSBIPTB_actions[14].act = AC_GOTO;
-    BSBIPTB_actions[14].go  = &TBLKTB;
-    BSBIPTB_actions[15].act = AC_ERROR;
-    CARDTB_actions[0].put = CMTTYP;
-    CARDTB_actions[0].act = AC_STOPSH;
-    CARDTB_actions[1].put = CTLTYP;
-    CARDTB_actions[1].act = AC_STOPSH;
-    CARDTB_actions[2].put = CNTTYP;
-    CARDTB_actions[2].act = AC_STOPSH;
-    CARDTB_actions[3].put = NEWTYP;
-    CARDTB_actions[3].act = AC_STOPSH;
-    DQLITB_actions[0].act = AC_STOP;
-    ELEMTB_actions[0].put = ILITYP;
-    ELEMTB_actions[0].act = AC_GOTO;
     ELEMTB_actions[0].go  = &INTGTB;
-    ELEMTB_actions[1].put = VARTYP;
-    ELEMTB_actions[1].act = AC_GOTO;
     ELEMTB_actions[1].go  = &VARTB;
-    ELEMTB_actions[2].put = QLITYP;
-    ELEMTB_actions[2].act = AC_GOTO;
     ELEMTB_actions[2].go  = &SQLITB;
-    ELEMTB_actions[3].put = QLITYP;
-    ELEMTB_actions[3].act = AC_GOTO;
     ELEMTB_actions[3].go  = &DQLITB;
-    ELEMTB_actions[4].put = NSTTYP;
-    ELEMTB_actions[4].act = AC_STOP;
-    ELEMTB_actions[5].act = AC_ERROR;
-    EOSTB_actions[0].act = AC_STOP;
-    EXPTB_actions[0].act = AC_GOTO;
-    EXPTB_actions[0].go  = &EXPBTB;
-    EXPTB_actions[1].act = AC_ERROR;
-    EXPBTB_actions[0].act = AC_STOPSH;
-    EXPBTB_actions[1].act = AC_ERROR;
-    FLITB_actions[0].act = AC_STOPSH;
-    FLITB_actions[1].act = AC_GOTO;
-    FLITB_actions[1].go  = &EXPTB;
-    FLITB_actions[2].act = AC_ERROR;
-    FRWDTB_actions[0].put = EQTYP;
-    FRWDTB_actions[0].act = AC_STOP;
-    FRWDTB_actions[1].put = RPTYP;
-    FRWDTB_actions[1].act = AC_STOP;
-    FRWDTB_actions[2].put = RBTYP;
-    FRWDTB_actions[2].act = AC_STOP;
-    FRWDTB_actions[3].put = CMATYP;
-    FRWDTB_actions[3].act = AC_STOP;
-    FRWDTB_actions[4].put = CLNTYP;
-    FRWDTB_actions[4].act = AC_STOP;
-    FRWDTB_actions[5].put = EOSTYP;
-    FRWDTB_actions[5].act = AC_STOP;
-    FRWDTB_actions[6].put = NBTYP;
-    FRWDTB_actions[6].act = AC_STOPSH;
-    GOTFTB_actions[0].put = FGOTYP;
-    GOTFTB_actions[0].act = AC_STOP;
-    GOTFTB_actions[1].put = FTOTYP;
-    GOTFTB_actions[1].act = AC_STOP;
-    GOTFTB_actions[2].act = AC_ERROR;
-    GOTOTB_actions[0].act = AC_GOTO;
-    GOTOTB_actions[0].go  = &GOTSTB;
-    GOTOTB_actions[1].act = AC_GOTO;
-    GOTOTB_actions[1].go  = &GOTFTB;
-    GOTOTB_actions[2].put = UGOTYP;
-    GOTOTB_actions[2].act = AC_STOP;
-    GOTOTB_actions[3].put = UTOTYP;
-    GOTOTB_actions[3].act = AC_STOP;
-    GOTOTB_actions[4].act = AC_ERROR;
-    GOTSTB_actions[0].put = SGOTYP;
-    GOTSTB_actions[0].act = AC_STOP;
-    GOTSTB_actions[1].put = STOTYP;
-    GOTSTB_actions[1].act = AC_STOP;
-    GOTSTB_actions[2].act = AC_ERROR;
-    IBLKTB_actions[0].act = AC_GOTO;
-    IBLKTB_actions[0].go  = &FRWDTB;
-    IBLKTB_actions[1].put = EOSTYP;
-    IBLKTB_actions[1].act = AC_STOP;
-    IBLKTB_actions[2].act = AC_ERROR;
-    INTGTB_actions[0].put = ILITYP;
-    INTGTB_actions[0].act = AC_STOPSH;
-    INTGTB_actions[1].put = FLITYP;
-    INTGTB_actions[1].act = AC_GOTO;
     INTGTB_actions[1].go  = &FLITB;
-    INTGTB_actions[2].put = FLITYP;
-    INTGTB_actions[2].act = AC_GOTO;
     INTGTB_actions[2].go  = &EXPTB;
-    INTGTB_actions[3].act = AC_ERROR;
-    LBLTB_actions[0].act = AC_GOTO;
-    LBLTB_actions[0].go  = &LBLXTB;
-    LBLTB_actions[1].act = AC_STOPSH;
-    LBLTB_actions[2].act = AC_ERROR;
-    LBLXTB_actions[0].act = AC_STOPSH;
-    NBLKTB_actions[0].act = AC_ERROR;
-    NBLKTB_actions[1].act = AC_STOPSH;
-    NUMBTB_actions[0].act = AC_GOTO;
-    NUMBTB_actions[0].go  = &NUMCTB;
-    NUMBTB_actions[1].put = CMATYP;
-    NUMBTB_actions[1].act = AC_STOPSH;
-    NUMBTB_actions[2].put = DIMTYP;
-    NUMBTB_actions[2].act = AC_STOPSH;
-    NUMBTB_actions[3].act = AC_ERROR;
-    NUMCTB_actions[0].put = CMATYP;
-    NUMCTB_actions[0].act = AC_STOPSH;
-    NUMCTB_actions[1].put = DIMTYP;
-    NUMCTB_actions[1].act = AC_STOPSH;
-    NUMCTB_actions[2].act = AC_ERROR;
-    SPANTB_actions[0].act = AC_STOP;
-    SPANTB_actions[1].act = AC_STOPSH;
-    SPANTB_actions[2].act = AC_ERROR;
-    BRKTB_actions[0].act = AC_STOP;
-    BRKTB_actions[1].act = AC_STOPSH;
-    BRKTB_actions[2].act = AC_ERROR;
-    SQLITB_actions[0].act = AC_STOP;
-    STARTB_actions[0].act = AC_STOP;
-    STARTB_actions[1].put = EXPFN;
-    STARTB_actions[1].act = AC_GOTO;
-    STARTB_actions[1].go  = &TBLKTB;
-    STARTB_actions[2].act = AC_ERROR;
-    TBLKTB_actions[0].act = AC_STOP;
-    TBLKTB_actions[1].act = AC_ERROR;
-    UNOPTB_actions[0].put = PLSFN;
-    UNOPTB_actions[0].act = AC_GOTO;
-    UNOPTB_actions[0].go  = &NBLKTB;
-    UNOPTB_actions[1].put = MNSFN;
-    UNOPTB_actions[1].act = AC_GOTO;
-    UNOPTB_actions[1].go  = &NBLKTB;
-    UNOPTB_actions[2].put = DOTFN;
-    UNOPTB_actions[2].act = AC_GOTO;
-    UNOPTB_actions[2].go  = &NBLKTB;
-    UNOPTB_actions[3].put = INDFN;
-    UNOPTB_actions[3].act = AC_GOTO;
-    UNOPTB_actions[3].go  = &NBLKTB;
-    UNOPTB_actions[4].put = STRFN;
-    UNOPTB_actions[4].act = AC_GOTO;
-    UNOPTB_actions[4].go  = &NBLKTB;
-    UNOPTB_actions[5].put = SLHFN;
-    UNOPTB_actions[5].act = AC_GOTO;
-    UNOPTB_actions[5].go  = &NBLKTB;
-    UNOPTB_actions[6].put = PRFN;
-    UNOPTB_actions[6].act = AC_GOTO;
-    UNOPTB_actions[6].go  = &NBLKTB;
-    UNOPTB_actions[7].put = ATFN;
-    UNOPTB_actions[7].act = AC_GOTO;
-    UNOPTB_actions[7].go  = &NBLKTB;
-    UNOPTB_actions[8].put = PDFN;
-    UNOPTB_actions[8].act = AC_GOTO;
-    UNOPTB_actions[8].go  = &NBLKTB;
-    UNOPTB_actions[9].put = KEYFN;
-    UNOPTB_actions[9].act = AC_GOTO;
-    UNOPTB_actions[9].go  = &NBLKTB;
-    UNOPTB_actions[10].put = NEGFN;
-    UNOPTB_actions[10].act = AC_GOTO;
-    UNOPTB_actions[10].go  = &NBLKTB;
-    UNOPTB_actions[11].put = BARFN;
-    UNOPTB_actions[11].act = AC_GOTO;
-    UNOPTB_actions[11].go  = &NBLKTB;
-    UNOPTB_actions[12].put = QUESFN;
-    UNOPTB_actions[12].act = AC_GOTO;
-    UNOPTB_actions[12].go  = &NBLKTB;
-    UNOPTB_actions[13].put = AROWFN;
-    UNOPTB_actions[13].act = AC_GOTO;
-    UNOPTB_actions[13].go  = &NBLKTB;
-    UNOPTB_actions[14].act = AC_ERROR;
-    VARATB_actions[0].act = AC_GOTO;
-    VARATB_actions[0].go  = &VARBTB;
-    VARATB_actions[1].put = CMATYP;
-    VARATB_actions[1].act = AC_STOPSH;
-    VARATB_actions[2].put = RPTYP;
-    VARATB_actions[2].act = AC_STOPSH;
-    VARATB_actions[3].act = AC_ERROR;
-    VARBTB_actions[0].put = LPTYP;
-    VARBTB_actions[0].act = AC_STOPSH;
-    VARBTB_actions[1].put = CMATYP;
-    VARBTB_actions[1].act = AC_STOPSH;
-    VARBTB_actions[2].put = RPTYP;
-    VARBTB_actions[2].act = AC_STOPSH;
-    VARBTB_actions[3].act = AC_ERROR;
-    VARTB_actions[0].put = VARTYP;
-    VARTB_actions[0].act = AC_STOPSH;
-    VARTB_actions[1].put = FNCTYP;
-    VARTB_actions[1].act = AC_STOP;
-    VARTB_actions[2].put = ARYTYP;
-    VARTB_actions[2].act = AC_STOP;
-    VARTB_actions[3].act = AC_ERROR;
-
+    FLITB_actions[1].go   = &EXPTB;
+    EXPTB_actions[0].go   = &EXPBTB;
 }
 
 /* =========================================================================
@@ -1376,9 +1119,8 @@ static NODE *ELEMNT(void) {
         spec_t saved = TEXTSP;
         spec_t tok;
         stream_ret_t r = stream(&tok, &TEXTSP, &UNOPTB);
-        if (r == ST_ERROR || r == ST_EOS) { TEXTSP = saved; break; }
+        if (r == ST_ERROR) { TEXTSP = saved; break; }
         int uop = STYPE;
-
         static const char *uop_names[] = {
             "?","UOP_PLS","UOP_MNS","UOP_DOT","UOP_IND","UOP_STR",
             "UOP_SLH","UOP_PCT","UOP_AT","UOP_PD","UOP_KEY",
@@ -1460,34 +1202,23 @@ static NODE *ELEMNT(void) {
         if (final == FNCTYP || final == ARYTYP) len--;
         atom = node_new(final, p, len);
 
-        if (final == FNCTYP) {   /* ELEFNC: function call — v311.sil:1989 */
-            /* SIL: RCALL ELEXND,EXPR,,RTN1 — evaluate first arg.
-             * EXPR sets BRTYPE via BINOP->FORWRD when it hits ) or ,.
-             * AEQLC BRTYPE,RPTYP,,ELEMN3 — if ), done.
-             * AEQLC BRTYPE,CMATYP,ELECMA — if ,, loop for next arg.
-             * No FORWRD/FORBLK here — EXPR consumes its own delimiter. */
+        if (final == FNCTYP) {   /* ELEFNC: function call */
+            /* SIL ELEMN2: RCALL EXELND,EXPR; FORWRD to get delimiter */
             while (!g_error) {
-                NODE *arg = EXPR();   /* EXPR sets BRTYPE on exit */
-                if (g_error) break;
-                if (BRTYPE == RPTYP || BRTYPE == 0 || BRTYPE == EOSTYP) {
-                    /* RPTYP: ) — done (SIL ELEMN3). Also handle EOS for zero-arg. */
-                    if (arg && arg->stype != 0) node_add(atom, arg);
-                    break;
-                }
+                NODE *arg = EXPR();
                 node_add(atom, arg);
-                if (BRTYPE == CMATYP) continue;   /* comma — next arg */
+                FORWRD();  /* FORWRD via FRWDTB sets BRTYPE to actual delimiter */
+                if (BRTYPE == RPTYP) break;
+                if (BRTYPE == CMATYP) continue;
                 sil_error("ELEMNT: expected ) or , in arg list, got BRTYPE=%d", BRTYPE);
                 break;
             }
-        } else if (final == ARYTYP) {  /* ELEARY: array subscript — v311.sil:2032 */
+        } else if (final == ARYTYP) {  /* ELEARY: array subscript */
             while (!g_error) {
                 NODE *sub = EXPR();
-                if (g_error) break;
-                if (BRTYPE == RBTYP || BRTYPE == 0 || BRTYPE == EOSTYP) {
-                    if (sub && sub->stype != 0) node_add(atom, sub);
-                    break;
-                }
                 node_add(atom, sub);
+                FORWRD();
+                if (BRTYPE == RBTYP) break;
                 if (BRTYPE == CMATYP) continue;
                 sil_error("ELEMNT: expected > or , in subscript, got BRTYPE=%d", BRTYPE);
                 break;
@@ -1496,12 +1227,13 @@ static NODE *ELEMNT(void) {
         break;
     }
 
-    case NSTTYP: {  /* ELENST: parenthesized expression — SIL v311.sil:1977 */
-        /* SIL: PUSH ELEMND; RCALL ELEXND,EXPR,,RTN1; POP ELEMND
-         * AEQLC BRTYPE,RPTYP,,ELEMN1 — EXPR sets BRTYPE=RPTYP on the closing ).
-         * No FORWRD needed — EXPR->BINOP->FORWRD already consumed the ). */
+    case NSTTYP: {  /* ELENST: parenthesized expression — SIL v311.sil:2003 */
+        /* '(' was AC_STOP consumed by ELEMTB. TEXTSP points at inner content.
+         * EXPR() parses inside; ')' hit via FRWDTB (AC_STOP) consumed automatically.
+         * Call FORWRD() to advance past residual and set BRTYPE=RPTYP for caller. */
         atom = EXPR();
-        /* BRTYPE is already RPTYP (set by EXPR via BINOP->FORWRD on closing )) */
+        FORWRD();
+        BRTYPE = RPTYP;
         break;
     }
 
@@ -1699,7 +1431,7 @@ static STMT *CMPILE(void) {
         /* CMPSB1: after subject */
         if (BRTYPE == EQTYP) goto CMPFRM;   /* = replacement */
         if (BRTYPE == CLNTYP) goto CMPGO;   /* : goto */
-        if (BRTYPE == EOSTYP || BRTYPE == 0) return s;  /* bare invoke (0=ST_EOS) */
+        if (BRTYPE == EOSTYP) return s;     /* bare invoke */
 
         /* Otherwise: pattern field follows */
         /* CMPAT2: RCALL PATND,EXPR */
