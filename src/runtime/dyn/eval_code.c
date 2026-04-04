@@ -54,7 +54,7 @@
 #include "snobol4.h"
 
 /* ── frontend (parse_expr_from_str, sno_parse) ──────────────────────── */
-#include "../../frontend/snobol4/lex.h"
+#include "../../frontend/snobol4/snobol4.h"
 #include "../../frontend/snobol4/scrip_cc.h"
 
 /* parse_expr_from_str declared in parse.c, exposed via scrip_cc.h context */
