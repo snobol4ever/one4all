@@ -28,6 +28,10 @@
 #include "../frontend/snobol4/CMPILE.h"
 extern Program *sno_parse(FILE *f, const char *filename);
 
+/* ir_print_node — from src/ir/ir_print.c (linked via Makefile) */
+extern void ir_print_node   (const EXPR_t *e, FILE *f);
+extern void ir_print_node_nl(const EXPR_t *e, FILE *f);
+
 /* ── runtime ──────────────────────────────────────────────────────────── */
 #include "../runtime/snobol4/snobol4.h"
 #include "../runtime/snobol4/sil_macros.h"   /* SIL macro translations — both RT and SM axes */
@@ -1629,19 +1633,52 @@ static Program *cmpile_lower(CMPILE_t *cl)
     return prog;
 }
 
+/* ── ir_print_stmt — print one STMT_t as IR sexp for comparison sweep ──────
+ * Emits: (STMT [:lbl L] [:subj EXPR] [:pat EXPR] [:repl EXPR] [:go*])
+ * Used by --dump-ir-cmpile and --dump-ir-bison.
+ * ir_print_node() is from src/ir/ir_print.c — linked via Makefile.
+ * ----------------------------------------------------------------------- */
+static void ir_print_stmt(STMT_t *st, FILE *f) {
+    fprintf(f, "(STMT");
+    if (st->label)       fprintf(f, " :lbl %s", st->label);
+    if (st->has_eq)      fprintf(f, " :eq");
+    if (st->is_end)      fprintf(f, " :end");
+    if (st->subject)   { fprintf(f, " :subj ");  ir_print_node(st->subject,     f); }
+    if (st->pattern)   { fprintf(f, " :pat ");   ir_print_node(st->pattern,     f); }
+    if (st->replacement){fprintf(f, " :repl ");  ir_print_node(st->replacement, f); }
+    if (st->go) {
+        SnoGoto *g = st->go;
+        if (g->uncond)    fprintf(f, " :go %s",  g->uncond);
+        if (g->onsuccess) fprintf(f, " :goS %s", g->onsuccess);
+        if (g->onfailure) fprintf(f, " :goF %s", g->onfailure);
+    }
+    fprintf(f, ")\n");
+}
+
+/* Dump a full Program* as IR sexp — one line per statement. */
+static void ir_dump_program(Program *prog, FILE *f) {
+    if (!prog) { fprintf(f, "(NULL-PROGRAM)\n"); return; }
+    for (STMT_t *st = prog->head; st; st = st->next)
+        ir_print_stmt(st, f);
+}
+
 int main(int argc, char **argv)
 {
     /* ── flag parsing ─────────────────────────────────────────────────── */
     int dump_parse      = 0;   /* --dump-parse      : pretty S-expression dump */
     int dump_parse_flat = 0;   /* --dump-parse-flat : one-liner per stmt       */
+    int dump_ir_cmpile  = 0;   /* --dump-ir-cmpile  : IR sexp via CMPILE path  */
+    int dump_ir_bison   = 0;   /* --dump-ir-bison   : IR sexp via Bison path   */
     int argi = 1;
     while (argi < argc && argv[argi][0] == '-' && argv[argi][1] == '-') {
         if      (strcmp(argv[argi], "--dump-parse")      == 0) { dump_parse      = 1; argi++; }
         else if (strcmp(argv[argi], "--dump-parse-flat") == 0) { dump_parse_flat = 1; argi++; }
+        else if (strcmp(argv[argi], "--dump-ir-cmpile")  == 0) { dump_ir_cmpile  = 1; argi++; }
+        else if (strcmp(argv[argi], "--dump-ir-bison")   == 0) { dump_ir_bison   = 1; argi++; }
         else break;
     }
     if (argi >= argc) {
-        fprintf(stderr, "usage: scrip-interp [--dump-parse|--dump-parse-flat] <file.sno>\n");
+        fprintf(stderr, "usage: scrip-interp [--dump-parse|--dump-parse-flat|--dump-ir-cmpile|--dump-ir-bison] <file.sno>\n");
         return 1;
     }
     const char *input_path = argv[argi];
@@ -1735,6 +1772,32 @@ int main(int argc, char **argv)
         for (CMPILE_t *s = cl; s; s = s->next)
             cmpile_print(s, stdout, oneline, idx++);
         cmpile_free(cl);
+        return 0;
+    }
+
+    /* ── --dump-ir-cmpile : CMPILE → cmpile_lower → IR sexp ─────────────
+     * Produces the same STMT_t/EXPR_t Program* the live execution path uses.
+     * Output is one (STMT ...) line per statement — suitable for diff. */
+    if (dump_ir_cmpile) {
+        Program *cprog = cmpile_lower(cl);
+        cmpile_free(cl);
+        ir_dump_program(cprog, stdout);
+        return 0;
+    }
+
+    /* ── --dump-ir-bison : sno_parse (Bison/Flex) → IR sexp ─────────────
+     * Runs the old proven Bison/Flex parser on the same file.
+     * File was already fclose()'d after cmpile_file() — re-open it. */
+    if (dump_ir_bison) {
+        cmpile_free(cl);
+        FILE *f2 = fopen(input_path, "r");
+        if (!f2) {
+            fprintf(stderr, "scrip-interp: cannot re-open '%s' for bison dump\n", input_path);
+            return 1;
+        }
+        Program *bprog = sno_parse(f2, input_path);
+        fclose(f2);
+        ir_dump_program(bprog, stdout);
         return 0;
     }
 

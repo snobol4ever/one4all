@@ -37,6 +37,7 @@ scrip-interp:
 	    b=$$(basename $$f .c); \
 	    $(CC) $(CBASE) -c $$f -o $(OBJ)/$$b.o; \
 	done
+	$(CC) $(CBASE) -I$(SRC)/frontend/snobol4 -DIR_DEFINE_NAMES -c $(SRC)/ir/ir_print.c  -o $(OBJ)/ir_print.o
 	$(CC) $(CRT)   -c $(SRC)/driver/scrip-interp.c           -o $(OBJ)/scrip_interp_driver.o
 	$(CC) $(OBJ)/*.o $(LIBS) -o scrip-interp
 	@echo "Built: scrip-interp"
