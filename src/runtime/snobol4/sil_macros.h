@@ -107,6 +107,7 @@
 #define IS_CODE(d)   ((d).v == DT_C)
 #define IS_ARR(d)    ((d).v == DT_A)
 #define IS_TBL(d)    ((d).v == DT_T)
+#define IS_DATA(d)   ((d).v == DT_DATA)
 #define IS_FAIL(d)   ((d).v == DT_FAIL)
 #define IS_NULL(d)   ((d).v == DT_SNUL)
 
@@ -284,5 +285,27 @@ DESCR_t EXPEVL_fn(DESCR_t expr_d);  /* SIL EXPEVL: execute EXPRESSION, return by
 
 /* CONVE_fn — declared here for RT-7 implementors */
 DESCR_t CONVE_fn(DESCR_t str_d);    /* SIL CONVE: string → DT_E EXPRESSION */
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * GROUP 6 — DT_N (NAME) discriminators
+ *
+ * Our DT_N descriptors use slen to distinguish two sub-forms:
+ *   NAMEPTR (slen=1): interior pointer — d.ptr is live DESCR_t* cell.
+ *   NAMEVAL (slen=0): name string     — d.s   is variable name (GC-stable).
+ *
+ * Use these macros everywhere instead of open-coding the slen test.
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+/* IS_NAMEPTR(d) — true if d is DT_N with interior pointer (slen=1) */
+#define IS_NAMEPTR(d)  ((d).v == DT_N && (d).slen == 1 && (d).ptr)
+
+/* IS_NAMEVAL(d) — true if d is DT_N with name string (slen=0) */
+#define IS_NAMEVAL(d)  ((d).v == DT_N && (d).slen == 0 && (d).s)
+
+/* NAME_DEREF_PTR(d) — dereference NAMEPTR; caller must guard with IS_NAMEPTR */
+#define NAME_DEREF_PTR(d)  (*(DESCR_t *)(d).ptr)
+
+/* NAME_DEREF_VAL(d, nv_get) — dereference NAMEVAL via store lookup */
+#define NAME_DEREF_VAL(d, nv_get)  ((nv_get)((d).s))
 
 #endif /* SIL_MACROS_H */

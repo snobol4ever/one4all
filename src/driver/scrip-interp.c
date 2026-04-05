@@ -178,21 +178,21 @@ static DESCR_t  interp_eval_pat(EXPR_t *e);  /* forward — pattern context */
 static DESCR_t *interp_eval_ref(EXPR_t *e);  /* forward — lvalue → DESCR_t* (SIL NAME ptr) */
 
 /* NAME_DEREF: dereference a DT_N.
- * slen=1 -> NAMEPTR (interior ptr, dereference directly).
- * slen=0 -> NAMEVAL (name string, look up in NV store). */
+ * IS_NAMEPTR (slen=1) -> interior ptr, dereference directly.
+ * IS_NAMEVAL (slen=0) -> name string, look up in NV store. */
 static inline DESCR_t NAME_DEREF(DESCR_t d) {
-    if (d.v == DT_N) {
-        if (d.slen) return *(DESCR_t*)d.ptr;   /* NAMEPTR: interior pointer */
-        if (d.s)    return NV_GET_fn(d.s);      /* NAMEVAL: name string */
+    if (IS_NAME(d)) {
+        if (IS_NAMEPTR(d)) return NAME_DEREF_PTR(d);
+        if (IS_NAMEVAL(d)) return NV_GET_fn(d.s);
     }
     return d;
 }
 /* NAME_SET: write val through a DT_N lvalue.
- * slen=1 -> NAMEPTR; slen=0 -> NAMEVAL. */
+ * IS_NAMEPTR -> interior ptr; IS_NAMEVAL -> NV store. */
 static inline int NAME_SET(DESCR_t nd, DESCR_t val) {
-    if (nd.v == DT_N) {
-        if (nd.slen) { *(DESCR_t*)nd.ptr = val; return 1; }  /* NAMEPTR */
-        if (nd.s)    { NV_SET_fn(nd.s, val);    return 1; }  /* NAMEVAL */
+    if (IS_NAME(nd)) {
+        if (IS_NAMEPTR(nd)) { NAME_DEREF_PTR(nd) = val; return 1; }
+        if (IS_NAMEVAL(nd)) { NV_SET_fn(nd.s, val);     return 1; }
     }
     return 0;
 }
@@ -424,7 +424,7 @@ static DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                     /* NRETURN lvalue assign: ref_a() = val  (zero-arg fn call as lvalue)
                      * Call the function; if result is DT_N write through to named variable. */
                     DESCR_t fres = call_user_function(s->subject->sval, NULL, 0);
-                    if (fres.v == DT_N) {
+                    if (IS_NAME(fres)) {
                         DESCR_t rv = s->replacement ? interp_eval(s->replacement) : NULVCL;
                         if (IS_FAIL_fn(rv)) succeeded = 0;
                         else { succeeded = NAME_SET(fres, rv) ? 1 : 0; }
@@ -438,7 +438,7 @@ static DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                         DESCR_t ind_val = ichild ? interp_eval(ichild) : NULVCL;
                         /* If it's already a DT_N (e.g. $Push where Push = .stk[1]),
                          * write directly through the pointer — SIL ASGNVV semantics */
-                        if (ind_val.v == DT_N && ind_val.ptr) {
+                        if (IS_NAMEPTR(ind_val)) {
                             *(DESCR_t*)ind_val.ptr = repl_val; succeeded = 1;
                         } else {
                             /* Otherwise treat as string variable name */
@@ -447,8 +447,8 @@ static DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                             else {
                                 /* If the named variable itself holds a DT_N, write through */
                                 DESCR_t named = NV_GET_fn(nm);
-                                if (named.v == DT_N && named.ptr) {
-                                    *(DESCR_t*)named.ptr = repl_val; succeeded = 1;
+                                if (IS_NAMEPTR(named)) {
+                                    NAME_DEREF_PTR(named) = repl_val; succeeded = 1;
                                 } else {
                                     NV_SET_fn(nm, repl_val); succeeded = 1;
                                 }
@@ -534,11 +534,11 @@ static DESCR_t interp_eval(EXPR_t *e)
     case E_VAR:
         if (e->sval && *e->sval) {
             DESCR_t _vr = NV_GET_fn(e->sval);
-            if (_vr.v != DT_SNUL) return _vr;
+            if (!IS_NULL(_vr)) return _vr;
             /* Zero-arg builtin (ARB, REM, FAIL, SUCCEED, etc.) stored as
                function, not variable — try calling with no args. */
             DESCR_t _fr = APPLY_fn(e->sval, NULL, 0);
-            if (_fr.v != DT_SNUL) return _fr;
+            if (!IS_NULL(_fr)) return _fr;
             return _vr; /* unset variable */
         }
         return NULVCL;
@@ -582,7 +582,7 @@ static DESCR_t interp_eval(EXPR_t *e)
         if (e->nchildren < 1) return FAILDESCR;
         DESCR_t v = interp_eval(e->children[0]);
         if (IS_FAIL_fn(v)) return FAILDESCR;
-        if (v.v == DT_I || v.v == DT_R) return v;
+        if (IS_INT(v) || IS_REAL(v)) return v;
         /* String → try integer, then real */
         const char *s = VARVAL_fn(v);
         if (!s || !*s) return INTVAL(0);
@@ -664,7 +664,7 @@ static DESCR_t interp_eval(EXPR_t *e)
         for (int i = 1; i < e->nchildren; i++) {
             DESCR_t nxt = interp_eval(e->children[i]);
             if (IS_FAIL_fn(nxt)) return FAILDESCR;
-            if (acc.v == DT_P || nxt.v == DT_P)
+            if (IS_PAT(acc) || IS_PAT(nxt))
                 acc = pat_cat(acc, nxt);   /* pattern concat if either side is DT_P */
             else
                 acc = CONCAT_fn(acc, nxt); /* string concat otherwise */
@@ -759,21 +759,16 @@ static DESCR_t interp_eval(EXPR_t *e)
             if (had_name_wrap)
                 return NV_GET_fn(child->sval);          /* $.var — literal name */
             /* $X — evaluate X's runtime value, use it as the variable name.
-             * DT_N discrimination: NAMEPTR has slen=1 (.ptr = live DESCR_t*);
-             *                      NAMEVAL has slen=0 (.s   = variable name string).
+             * IS_NAMEPTR (slen=1, .ptr = live DESCR_t*) vs IS_NAMEVAL (slen=0, .s = name).
              * Do NOT use ptr!=NULL — for NAMEVAL .s and .ptr alias the same union. */
             DESCR_t _xv = NV_GET_fn(child->sval);
-            if (_xv.v == DT_N && _xv.slen == 1 && _xv.ptr)
-                return *(DESCR_t*)_xv.ptr;              /* NAMEPTR — interior pointer */
-            if (_xv.v == DT_N && _xv.slen == 0 && _xv.s)
-                return NV_GET_fn(_xv.s);                /* NAMEVAL — look up by name */
+            if (IS_NAMEPTR(_xv)) return NAME_DEREF_PTR(_xv);
+            if (IS_NAMEVAL(_xv)) return NV_GET_fn(_xv.s);
             const char *_xnm = VARVAL_fn(_xv);
             if (!_xnm || !*_xnm) return NULVCL;
             DESCR_t _xnamed = NV_GET_fn(_xnm);
-            if (_xnamed.v == DT_N && _xnamed.slen == 1 && _xnamed.ptr)
-                return *(DESCR_t*)_xnamed.ptr;
-            if (_xnamed.v == DT_N && _xnamed.slen == 0 && _xnamed.s)
-                return NV_GET_fn(_xnamed.s);
+            if (IS_NAMEPTR(_xnamed)) return NAME_DEREF_PTR(_xnamed);
+            if (IS_NAMEVAL(_xnamed)) return NV_GET_fn(_xnamed.s);
             return _xnamed;
         }
 
@@ -822,14 +817,13 @@ static DESCR_t interp_eval(EXPR_t *e)
              * evaluate the inner var and use its string value as the lookup key. */
             if (inner->kind == E_VAR && inner->sval) {
                 DESCR_t xval = NV_GET_fn(inner->sval);
-                /* DT_N: NAMEPTR (slen=1) vs NAMEVAL (slen=0) — .ptr/.s alias same union */
-                if (xval.v == DT_N && xval.slen == 1 && xval.ptr) return *(DESCR_t*)xval.ptr;
-                if (xval.v == DT_N && xval.slen == 0 && xval.s)   return NV_GET_fn(xval.s);
+                if (IS_NAMEPTR(xval)) return NAME_DEREF_PTR(xval);
+                if (IS_NAMEVAL(xval)) return NV_GET_fn(xval.s);
                 const char *nm2 = VARVAL_fn(xval);
                 if (!nm2 || !*nm2) return NULVCL;
                 DESCR_t named = NV_GET_fn(nm2);
-                if (named.v == DT_N && named.slen == 1 && named.ptr) return *(DESCR_t*)named.ptr;
-                if (named.v == DT_N && named.slen == 0 && named.s)   return NV_GET_fn(named.s);
+                if (IS_NAMEPTR(named)) return NAME_DEREF_PTR(named);
+                if (IS_NAMEVAL(named)) return NV_GET_fn(named.s);
                 return named;
             }
             /* fallback: evaluate inner directly */
@@ -837,21 +831,20 @@ static DESCR_t interp_eval(EXPR_t *e)
             const char *nm2 = VARVAL_fn(nd);
             if (!nm2 || !*nm2) return NULVCL;
             DESCR_t named2 = NV_GET_fn(nm2);
-            if (named2.v == DT_N && named2.slen == 1 && named2.ptr) return *(DESCR_t*)named2.ptr;
-            if (named2.v == DT_N && named2.slen == 0 && named2.s)   return NV_GET_fn(named2.s);
+            if (IS_NAMEPTR(named2)) return NAME_DEREF_PTR(named2);
+            if (IS_NAMEVAL(named2)) return NV_GET_fn(named2.s);
             return named2;
         }
         /* $expr — indirect through runtime string/name value */
         DESCR_t nd = interp_eval(child);
-        /* DT_N: discriminate NAMEPTR (slen=1) from NAMEVAL (slen=0) */
-        if (nd.v == DT_N && nd.slen == 1 && nd.ptr) return *(DESCR_t*)nd.ptr;
-        if (nd.v == DT_N && nd.slen == 0 && nd.s)   return NV_GET_fn(nd.s);
+        if (IS_NAMEPTR(nd)) return NAME_DEREF_PTR(nd);
+        if (IS_NAMEVAL(nd)) return NV_GET_fn(nd.s);
         const char *nm = VARVAL_fn(nd);
         if (!nm || !*nm) return NULVCL;
         /* The named variable might also be a DT_N — dereference one more level */
         DESCR_t named = NV_GET_fn(nm);
-        if (named.v == DT_N && named.slen == 1 && named.ptr) return *(DESCR_t*)named.ptr;
-        if (named.v == DT_N && named.slen == 0 && named.s)   return NV_GET_fn(named.s);
+        if (IS_NAMEPTR(named)) return NAME_DEREF_PTR(named);
+        if (IS_NAMEVAL(named)) return NV_GET_fn(named.s);
         return named;
     }
 
@@ -900,7 +893,7 @@ static DESCR_t interp_eval(EXPR_t *e)
             if (body) {
                 /* User-defined function — call interpreter directly, never via APPLY_fn */
                 DESCR_t r = call_user_function(e->sval, args, nargs);
-                if (r.v == DT_N) return NAME_DEREF(r);  /* NRETURN: slen discriminates NAMEPTR/NAMEVAL */
+                if (IS_NAME(r)) return NAME_DEREF(r);  /* NRETURN: IS_NAMEPTR/IS_NAMEVAL via NAME_DEREF */
                 return r;
             }
         }
@@ -1013,7 +1006,7 @@ static DESCR_t interp_eval(EXPR_t *e)
             DESCR_t *av = na > 0 ? GC_malloc(na * sizeof(DESCR_t)) : NULL;
             for (int i = 0; i < na; i++) av[i] = interp_eval(fnc->children[i]);
             DESCR_t name_d = call_user_function(fnc->sval, av, na);
-            if (name_d.v == DT_N && name_d.ptr)
+            if (IS_NAME(name_d) && name_d.ptr)
                 return pat_assign_imm(pat, name_d);
             const char *nm2 = VARVAL_fn(name_d);
             return nm2 ? pat_assign_imm(pat, STRVAL((char*)nm2)) : pat;
@@ -1190,10 +1183,10 @@ static DESCR_t *interp_eval_ref(EXPR_t *e)
         if (IS_FAIL_fn(base)) return NULL;
         DESCR_t idx  = interp_eval(e->children[1]);
         if (IS_FAIL_fn(idx)) return NULL;
-        if (base.v == DT_A) {
+        if (IS_ARR(base)) {
             return array_ptr(base.arr, (int)to_int(idx));
         }
-        if (base.v == DT_T) {
+        if (IS_TBL(base)) {
             return table_ptr(base.tbl, idx);
         }
         return NULL;
@@ -1221,8 +1214,8 @@ static DESCR_t *interp_eval_ref(EXPR_t *e)
     case E_INDIRECT: {
         /* $expr — evaluate expr to get name string, then return that var's cell */
         DESCR_t name_d = interp_eval(e->nchildren >= 1 ? e->children[0] : NULL);
-        const char *nm = (name_d.v == DT_N && name_d.ptr)
-            ? VARVAL_fn(*(DESCR_t*)name_d.ptr)
+        const char *nm = IS_NAMEPTR(name_d)
+            ? VARVAL_fn(NAME_DEREF_PTR(name_d))
             : VARVAL_fn(name_d);
         if (!nm || !*nm) return NULL;
         return NV_PTR_fn(nm);
@@ -1320,7 +1313,7 @@ static DESCR_t interp_eval_pat(EXPR_t *e)
                 return d;
             }
             DESCR_t r = interp_eval_pat(child);
-            if (r.v == DT_N && r.ptr) r = *(DESCR_t*)r.ptr;
+            if (IS_NAMEPTR(r)) r = NAME_DEREF_PTR(r);
             return r;
         }
 

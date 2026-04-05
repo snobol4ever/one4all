@@ -155,13 +155,13 @@ static DESCR_t _LE_(DESCR_t *a, int n) {
 static DESCR_t _EQ_(DESCR_t *a, int n) {
     if (n < 2) return FAILDESCR;
     /* Numeric equality: equal returns first arg, else fail */
-    if (a[0].v == DT_I && a[1].v == DT_I)
+    if (IS_INT(a[0]) && IS_INT(a[1]))
         return (a[0].i == a[1].i) ? NULVCL : FAILDESCR;
     return (to_real(a[0]) == to_real(a[1])) ? NULVCL : FAILDESCR;
 }
 static DESCR_t _NE_(DESCR_t *a, int n) {
     if (n < 2) return FAILDESCR;
-    if (a[0].v == DT_I && a[1].v == DT_I)
+    if (IS_INT(a[0]) && IS_INT(a[1]))
         return (a[0].i != a[1].i) ? NULVCL : FAILDESCR;
     return (to_real(a[0]) != to_real(a[1])) ? NULVCL : FAILDESCR;
 }
@@ -198,9 +198,8 @@ static DESCR_t _b_pos(DESCR_t *a, int n) {
 
 static DESCR_t _INTEGER_(DESCR_t *a, int n) {
     if (n < 1) return FAILDESCR;
-    /* Succeed (returning int value) if arg is or converts to integer */
-    if (a[0].v == DT_I) return a[0];
-    if (a[0].v == DT_S && a[0].s) {
+    if (IS_INT(a[0])) return a[0];
+    if (IS_STR(a[0]) && a[0].s) {
         char *end;
         long long v = strtoll(a[0].s, &end, 10);
         if (end != a[0].s && *end == '\0') return INTVAL(v);
@@ -209,19 +208,19 @@ static DESCR_t _INTEGER_(DESCR_t *a, int n) {
 }
 static DESCR_t _REAL_(DESCR_t *a, int n) {
     if (n < 1) return FAILDESCR;
-    if (a[0].v == DT_R) return a[0];
-    if (a[0].v == DT_I)  return (DESCR_t){ .v = DT_R, .r = (double)a[0].i };
-    if (a[0].v == DT_S && a[0].s) {
+    if (IS_REAL(a[0])) return a[0];
+    if (IS_INT(a[0]))  return REALVAL((double)a[0].i);
+    if (IS_STR(a[0]) && a[0].s) {
         char *end;
         double v = strtod(a[0].s, &end);
-        if (end != a[0].s && *end == '\0') return (DESCR_t){ .v = DT_R, .r = v };
+        if (end != a[0].s && *end == '\0') return REALVAL(v);
     }
     return FAILDESCR;
 }
 static DESCR_t _SIZE_(DESCR_t *a, int n) {
     if (n < 1) return INTVAL(0);
     /* Binary string (e.g. &ALPHABET-derived): use slen field directly. */
-    if (a[0].v == DT_S && a[0].slen) return INTVAL((int64_t)a[0].slen);
+    if (IS_STR(a[0]) && a[0].slen) return INTVAL((int64_t)a[0].slen);
     /* Normal case: convert to string, measure with strlen. */
     const char *s = VARVAL_fn(a[0]);
     return INTVAL((int64_t)(s ? strlen(s) : 0));
@@ -469,9 +468,9 @@ static DESCR_t _CONVERT_(DESCR_t *a, int n) {
     if (!type) return FAILDESCR;
     if (strcasecmp(type, "STRING")  == 0) { const char *s = VARVAL_fn(val); return s ? STRVAL(s) : NULVCL; }
     if (strcasecmp(type, "INTEGER") == 0) return INTVAL((int64_t)to_int(val));
-    if (strcasecmp(type, "REAL")    == 0) return (DESCR_t){ .v = DT_R, .r = to_real(val) };
+    if (strcasecmp(type, "REAL")    == 0) return REALVAL(to_real(val));
     if (strcasecmp(type, "ARRAY")   == 0) {
-        if (val.v == DT_A) return val;
+        if (IS_ARR(val)) return val;
         return FAILDESCR;
     }
     return FAILDESCR;
@@ -481,7 +480,7 @@ static DESCR_t _CONVERT_(DESCR_t *a, int n) {
 static DESCR_t _COPY_(DESCR_t *a, int n) {
     if (n < 1) return FAILDESCR;
     DESCR_t v = a[0];
-    if (v.v == DT_A) {
+    if (IS_ARR(v)) {
         int sz = v.arr->hi - v.arr->lo + 1;
         ARBLK_t *copy = array_new(v.arr->lo, v.arr->hi);
         for (int i = 0; i < sz; i++) copy->data[i] = v.arr->data[i];
@@ -669,14 +668,14 @@ static DESCR_t _make_fget(int slot, DESCR_t obj) {
     if (slot < 0 || slot >= _facc_n) return FAILDESCR;
     int tidx = _facc_slots[slot].tidx;
     int fidx = _facc_slots[slot].fidx;
-    if (obj.v != DT_DATA || !obj.u) return FAILDESCR;  /* error 041: wrong datatype */
+    if (!IS_DATA(obj) || !obj.u) return FAILDESCR;  /* error 041: wrong datatype */
     if (fidx < 0 || fidx >= obj.u->type->nfields) return FAILDESCR;
     return obj.u->fields[fidx];
 }
 static void _make_fset(int slot, DESCR_t obj, DESCR_t val) {
     if (slot < 0 || slot >= _facc_n) return;
     int fidx = _facc_slots[slot].fidx;
-    if (obj.v != DT_DATA || !obj.u) return;
+    if (!IS_DATA(obj) || !obj.u) return;
     if (fidx < 0 || fidx >= obj.u->type->nfields) return;
     obj.u->fields[fidx] = val;
 }
@@ -861,24 +860,18 @@ static DESCR_t _PAT_CONCAT_(DESCR_t *a, int n)  { return n>=2 ? pat_cat(a[0], a[
 static DESCR_t _PROTOTYPE_(DESCR_t *a, int n) {
     if (n < 1) return FAILDESCR;
     DESCR_t v = a[0];
-    if (v.v == DT_A && v.arr) {
+    if (IS_ARR(v) && v.arr) {
         ARBLK_t *arr = v.arr;
         char buf[128];
         if (arr->ndim > 1) {
-            /* 2D: ndim repurposed as cols count; rows span lo..hi.
-             * lo2 is not stored separately — only cols=hi2-lo2+1.
-             * SPITBOL returns "R,C" for standard 1-based arrays,
-             * "lo:hi,C" only when row lo != 1 (col lo always 1). */
             int rows = arr->hi - arr->lo + 1;
-            int cols = arr->ndim;  /* stored as cols count */
+            int cols = arr->ndim;
             if (arr->lo == 1)
                 snprintf(buf, sizeof(buf), "%d,%d", rows, cols);
             else
                 snprintf(buf, sizeof(buf), "%d:%d,%d",
                          arr->lo, arr->hi, cols);
         } else {
-            /* 1D: SPITBOL returns "N" for standard 1-based arrays,
-             * "lo:hi" only when lo != 1 */
             if (arr->lo == 1)
                 snprintf(buf, sizeof(buf), "%d", arr->hi);
             else
@@ -886,7 +879,7 @@ static DESCR_t _PROTOTYPE_(DESCR_t *a, int n) {
         }
         return STRVAL(GC_strdup(buf));
     }
-    if (v.v == DT_T) {
+    if (IS_TBL(v)) {
         /* TABLE prototype returns empty string per SNOBOL4 */
         return STRVAL("");
     }
@@ -897,11 +890,11 @@ static DESCR_t _PROTOTYPE_(DESCR_t *a, int n) {
 static DESCR_t _ITEM_(DESCR_t *a, int n) {
     if (n < 2) return FAILDESCR;
     DESCR_t arr = a[0];
-    if (arr.v == DT_T) {
+    if (IS_TBL(arr)) {
         const char *k = VARVAL_fn(a[1]);
         return table_get(arr.tbl, k ? k : "");
     }
-    if (arr.v == DT_A) {
+    if (IS_ARR(arr)) {
         int i = (int)to_int(a[1]);
         if (n == 2) return array_get(arr.arr, i);
         int j = (int)to_int(a[2]);
@@ -1114,9 +1107,9 @@ char *STRCONCAT_fn(const char *a, const char *b) {
  * If either operand is a PATTERN, build a pattern concatenation instead of
  * string concatenation (blank-juxtaposition of patterns = pattern cat). */
 DESCR_t CONCAT_fn(DESCR_t a, DESCR_t b) {
-    if (a.v == DT_FAIL) return FAILDESCR;
-    if (b.v == DT_FAIL) return FAILDESCR;
-    if (a.v == DT_P || b.v == DT_P)
+    if (IS_FAIL(a)) return FAILDESCR;
+    if (IS_FAIL(b)) return FAILDESCR;
+    if (IS_PAT(a) || IS_PAT(b))
         return pat_cat(a, b);
     const char *sa = VARVAL_fn(a);
     const char *sb = VARVAL_fn(b);
@@ -1509,8 +1502,8 @@ DESCR_t DATCON_fn(const char *typename, ...) {
     va_start(ap, typename);
     for (int i = 0; i < t->nfields; i++) {
         DESCR_t v = va_arg(ap, DESCR_t);
-        /* sentinel check: if type == DT_SNUL and s == NULL, stop */
-        if (v.v == DT_SNUL && v.s == NULL) break;
+        /* sentinel check: IS_NULL with null pointer = true sentinel */
+        if (IS_NULL(v) && v.s == NULL) break;
         u->fields[i] = v;
     }
     va_end(ap);
@@ -1519,7 +1512,7 @@ DESCR_t DATCON_fn(const char *typename, ...) {
 }
 
 DESCR_t FIELD_GET_fn(DESCR_t obj, const char *field) {
-    if (obj.v != DT_DATA || !obj.u) return NULVCL;
+    if (!IS_DATA(obj) || !obj.u) return NULVCL;
     DATBLK_t *t = obj.u->type;
     for (int i = 0; i < t->nfields; i++)
         if (strcasecmp(t->fields[i], field) == 0)
@@ -1528,7 +1521,7 @@ DESCR_t FIELD_GET_fn(DESCR_t obj, const char *field) {
 }
 
 void FIELD_SET_fn(DESCR_t obj, const char *field, DESCR_t val) {
-    if (obj.v != DT_DATA || !obj.u) return;
+    if (!IS_DATA(obj) || !obj.u) return;
     DATBLK_t *t = obj.u->type;
     for (int i = 0; i < t->nfields; i++)
         if (strcasecmp(t->fields[i], field) == 0) {
@@ -1625,7 +1618,7 @@ void NV_SET_fn(const char *name, DESCR_t val) {
     /* Special I/O variables */
     if (strcasecmp(name, "OUTPUT") == 0) { output_val(val); return; }
     if (strcasecmp(name, "TERMINAL") == 0) {
-        const char *s = (val.v == DT_S) ? (const char *)val.i : "";
+        const char *s = IS_STR(val) ? val.s : "";
         fprintf(stderr, "%s\n", s);
         return;
     }
@@ -1694,7 +1687,7 @@ const char *NV_name_from_ptr(const DESCR_t *ptr) {
 void NV_SYNC_fn(void) {
     for (int _ri = 0; _ri < _var_reg_n; _ri++) {
         DESCR_t v = NV_GET_fn(_var_reg[_ri].name);
-        if (v.v != DT_SNUL && v.v != 0)
+        if (!IS_NULL(v) && v.v != 0)
             *_var_reg[_ri].ptr = v;
     }
 }
@@ -1745,7 +1738,7 @@ DESCR_t NAME_fn(const char *varname) {
  * (caller should use NV_SET_fn for ordinary variables). */
 int ASGNIC_fn(const char *kw_name, DESCR_t val) {
     if (!kw_name) return 0;
-    int64_t iv = (val.v == DT_I) ? val.i : (int64_t)to_real(val);
+    int64_t iv = IS_INT(val) ? val.i : (int64_t)to_real(val);
     if (strcasecmp(kw_name, "STLIMIT")  == 0) { kw_stlimit  = iv; return 1; }
     if (strcasecmp(kw_name, "ANCHOR")   == 0) { kw_anchor   = iv; return 1; }
     if (strcasecmp(kw_name, "TRIM")     == 0) { kw_trim     = iv; return 1; }
@@ -1775,7 +1768,7 @@ static void var_dump(void) {
                 case 9: tname="DT_FAIL"; break;
                 default: tname="OTHER"; break;
             }
-            if (e->val.v == DT_S) {
+            if (IS_STR(e->val)) {
                 const char *s = e->val.s ? e->val.s : "(null)";
                 int len = (int)strlen(s);
                 fprintf(stderr, "  %s = STR(%.*s)\n", e->name, len > 40 ? 40 : len, s);
@@ -2228,9 +2221,9 @@ DESCR_t DUPL_fn(DESCR_t s, DESCR_t n) {
 DESCR_t REPLACE_fn(DESCR_t s, DESCR_t from, DESCR_t to) {
     /* REPLACE(s, from, to): for each char in from, map to corresponding char in to.
      * Like tr command. Uses descr_slen() to support binary strings (e.g. &ALPHABET). */
-    const char *sp   = s.v == DT_S ? s.s : VARVAL_fn(s);
-    const char *fp   = from.v == DT_S ? from.s : VARVAL_fn(from);
-    const char *tp   = to.v == DT_S ? to.s : VARVAL_fn(to);
+    const char *sp   = IS_STR(s)    ? s.s    : VARVAL_fn(s);
+    const char *fp   = IS_STR(from) ? from.s : VARVAL_fn(from);
+    const char *tp   = IS_STR(to)   ? to.s   : VARVAL_fn(to);
     size_t slen_val  = descr_slen(s);
     /* Build translation table: identity by default */
     unsigned char xlat[256];
@@ -2245,8 +2238,8 @@ DESCR_t REPLACE_fn(DESCR_t s, DESCR_t from, DESCR_t to) {
      * binary_mode: from/to/subject is a binary string (slen>0) — preserve NULs
      * in result so positional alignment is maintained (&ALPHABET use-case).
      * Normal mode: drop NUL-mapped chars (traditional SNOBOL4 REPLACE). */
-    int binary_mode = (from.v == DT_S && from.slen) || (to.v == DT_S && to.slen)
-                   || (s.v == DT_S && s.slen);
+    int binary_mode = (IS_STR(from) && from.slen) || (IS_STR(to) && to.slen)
+                   || (IS_STR(s) && s.slen);
     char *r = GC_malloc(slen_val + 1);
     size_t rlen = 0;
     for (size_t i = 0; i < slen_val; i++) {
@@ -2331,25 +2324,25 @@ DESCR_t BCHAR_fn(DESCR_t n) {
 
 DESCR_t INTGER_fn(DESCR_t v) {
     /* INTEGER(v): convert to integer, fail if not possible */
-    if (v.v == DT_I) return v;
-    if (v.v == DT_R) return INTVAL((int64_t)v.r);
-    if (v.v == DT_S || v.v == DT_SNUL) {
+    if (IS_INT(v))  return v;
+    if (IS_REAL(v)) return INTVAL((int64_t)v.r);
+    if (IS_STR(v)) {
         const char *s = v.s ? v.s : "";
         while (*s == ' ') s++;
-        if (!*s) return NULVCL;  /* fail */
+        if (!*s) return NULVCL;
         char *end;
         long long iv = strtoll(s, &end, 10);
         while (*end == ' ') end++;
-        if (*end) return NULVCL;  /* fail — not a pure integer */
+        if (*end) return NULVCL;
         return INTVAL((int64_t)iv);
     }
     return NULVCL;
 }
 
 DESCR_t real_fn(DESCR_t v) {
-    if (v.v == DT_R) return v;
-    if (v.v == DT_I)  return REALVAL((double)v.i);
-    if (v.v == DT_S || v.v == DT_SNUL) {
+    if (IS_REAL(v)) return v;
+    if (IS_INT(v))  return REALVAL((double)v.i);
+    if (IS_STR(v)) {
         const char *s = v.s ? v.s : "";
         while (*s == ' ') s++;
         if (!*s) return NULVCL;
@@ -2375,7 +2368,7 @@ DESCR_t string_fn(DESCR_t v) {
  * (possibly with leading/trailing spaces and optional sign).
  * Returns the value unchanged if it does not look like a pure integer. */
 static DESCR_t coerce_numeric(DESCR_t v) {
-    if (v.v == DT_S) {
+    if (IS_STR(v)) {
         const char *s = v.s ? v.s : "";
         while (*s == ' ') s++;
         if (*s == '+' || *s == '-') s++;
@@ -2391,38 +2384,37 @@ static DESCR_t coerce_numeric(DESCR_t v) {
 }
 
 DESCR_t add(DESCR_t a, DESCR_t b) {
-    if (a.v == DT_FAIL || b.v == DT_FAIL) return FAILDESCR;
-    if (a.v == DT_SNUL) a = INTVAL(0);
-    if (b.v == DT_SNUL) b = INTVAL(0);
+    if (IS_FAIL(a) || IS_FAIL(b)) return FAILDESCR;
+    if (IS_NULL(a)) a = INTVAL(0);
+    if (IS_NULL(b)) b = INTVAL(0);
     a = coerce_numeric(a); b = coerce_numeric(b);
-    if (a.v == DT_I && b.v == DT_I)
+    if (IS_INT(a) && IS_INT(b))
         return INTVAL(a.i + b.i);
     return REALVAL(to_real(a) + to_real(b));
 }
 
 DESCR_t sub(DESCR_t a, DESCR_t b) {
-    if (a.v == DT_FAIL || b.v == DT_FAIL) return FAILDESCR;
-    if (a.v == DT_SNUL) a = INTVAL(0);
-    if (b.v == DT_SNUL) b = INTVAL(0);
+    if (IS_FAIL(a) || IS_FAIL(b)) return FAILDESCR;
+    if (IS_NULL(a)) a = INTVAL(0);
+    if (IS_NULL(b)) b = INTVAL(0);
     a = coerce_numeric(a); b = coerce_numeric(b);
-    if (a.v == DT_I && b.v == DT_I)
+    if (IS_INT(a) && IS_INT(b))
         return INTVAL(a.i - b.i);
     return REALVAL(to_real(a) - to_real(b));
 }
 
 DESCR_t mul(DESCR_t a, DESCR_t b) {
-    if (a.v == DT_FAIL || b.v == DT_FAIL) return FAILDESCR;
+    if (IS_FAIL(a) || IS_FAIL(b)) return FAILDESCR;
     a = coerce_numeric(a); b = coerce_numeric(b);
-    if (a.v == DT_I && b.v == DT_I)
+    if (IS_INT(a) && IS_INT(b))
         return INTVAL(a.i * b.i);
     return REALVAL(to_real(a) * to_real(b));
 }
 
 DESCR_t DIVIDE_fn(DESCR_t a, DESCR_t b) {
-    if (a.v == DT_FAIL || b.v == DT_FAIL) return FAILDESCR;
-    /* SNOBOL4 / is real division; integer / integer = integer in SNOBOL4 */
-    if (a.v == DT_I && b.v == DT_I) {
-        if (b.i == 0) return NULVCL;  /* division error */
+    if (IS_FAIL(a) || IS_FAIL(b)) return FAILDESCR;
+    if (IS_INT(a) && IS_INT(b)) {
+        if (b.i == 0) return NULVCL;
         return INTVAL(a.i / b.i);
     }
     double denom = to_real(b);
@@ -2431,9 +2423,8 @@ DESCR_t DIVIDE_fn(DESCR_t a, DESCR_t b) {
 }
 
 DESCR_t POWER_fn(DESCR_t a, DESCR_t b) {
-    if (a.v == DT_FAIL || b.v == DT_FAIL) return FAILDESCR;
-    /* Integer ** non-negative integer → integer result */
-    if (a.v == DT_I && b.v == DT_I && b.i >= 0) {
+    if (IS_FAIL(a) || IS_FAIL(b)) return FAILDESCR;
+    if (IS_INT(a) && IS_INT(b) && b.i >= 0) {
         int64_t base = a.i, exp = b.i, result = 1;
         while (exp-- > 0) result *= base;
         return INTVAL(result);
@@ -2442,49 +2433,48 @@ DESCR_t POWER_fn(DESCR_t a, DESCR_t b) {
 }
 
 DESCR_t neg(DESCR_t a) {
-    if (a.v == DT_FAIL) return FAILDESCR;
-    if (a.v == DT_I)  return INTVAL(-a.i);
-    if (a.v == DT_R) return REALVAL(-a.r);
+    if (IS_FAIL(a)) return FAILDESCR;
+    if (IS_INT(a))  return INTVAL(-a.i);
+    if (IS_REAL(a)) return REALVAL(-a.r);
     return INTVAL(-to_int(a));
 }
 
 /* Unary + — coerce to numeric (identity on int/real, str→int otherwise) */
 DESCR_t pos(DESCR_t a) {
-    if (a.v == DT_FAIL) return FAILDESCR;
-    if (a.v == DT_I)  return a;
-    if (a.v == DT_R)  return a;
+    if (IS_FAIL(a))  return FAILDESCR;
+    if (IS_INT(a))   return a;
+    if (IS_REAL(a))  return a;
     return INTVAL(to_int(a));
 }
 
 /* Numeric comparisons — return 1=success (true), 0=failure */
 int eq(DESCR_t a, DESCR_t b) {
-    if (a.v == DT_I && b.v == DT_I) return a.i == b.i;
+    if (IS_INT(a) && IS_INT(b)) return a.i == b.i;
     return to_real(a) == to_real(b);
 }
 int ne(DESCR_t a, DESCR_t b) { return !eq(a, b); }
 int lt(DESCR_t a, DESCR_t b) {
-    if (a.v == DT_I && b.v == DT_I) return a.i < b.i;
+    if (IS_INT(a) && IS_INT(b)) return a.i < b.i;
     return to_real(a) < to_real(b);
 }
 int le(DESCR_t a, DESCR_t b) {
-    if (a.v == DT_I && b.v == DT_I) return a.i <= b.i;
+    if (IS_INT(a) && IS_INT(b)) return a.i <= b.i;
     return to_real(a) <= to_real(b);
 }
 int gt(DESCR_t a, DESCR_t b) {
-    if (a.v == DT_I && b.v == DT_I) return a.i > b.i;
+    if (IS_INT(a) && IS_INT(b)) return a.i > b.i;
     return to_real(a) > to_real(b);
 }
 int ge(DESCR_t a, DESCR_t b) {
-    if (a.v == DT_I && b.v == DT_I) return a.i >= b.i;
+    if (IS_INT(a) && IS_INT(b)) return a.i >= b.i;
     return to_real(a) >= to_real(b);
 }
 
 /* IDENT: succeed if a and b are identical (same type and value) */
 int ident(DESCR_t a, DESCR_t b) {
     if (a.v != b.v) {
-        /* "" and NULL are identical */
-        int a_null = (a.v == DT_SNUL || (a.v == DT_S && descr_slen(a) == 0));
-        int b_null = (b.v == DT_SNUL || (b.v == DT_S && descr_slen(b) == 0));
+        int a_null = (IS_NULL(a) || (IS_STR(a) && descr_slen(a) == 0));
+        int b_null = (IS_NULL(b) || (IS_STR(b) && descr_slen(b) == 0));
         if (a_null && b_null) return 1;
         return 0;
     }
@@ -2549,8 +2539,7 @@ static const char *_io_extract_fname(const char *opts_str, char *buf, size_t buf
 
 /* Get the variable name from a descriptor (handles NAME/indirect form) */
 static const char *_io_varname(DESCR_t d) {
-    /* a[0] is passed as .varname — it may be a string holding the var name */
-    if (d.v == DT_S) return (const char *)d.i;
+    if (IS_STR(d)) return d.s;
     return NULL;
 }
 
@@ -2567,7 +2556,7 @@ static DESCR_t _INPUT_(DESCR_t *a, int n) {
         fname = _io_extract_fname(VARVAL_fn(a[2]), fname_buf, sizeof(fname_buf));
     }
     /* channel number */
-    int ch = (n >= 2 && a[1].v == DT_I) ? (int)a[1].i : -1;
+    int ch = (n >= 2 && IS_INT(a[1])) ? (int)a[1].i : -1;
     /* fallback: no channel / no fname → reset global stdin */
     if (!fname || !fname[0]) {
         if (_input_fp && _input_fp != stdin) fclose(_input_fp);
@@ -2604,7 +2593,7 @@ static DESCR_t _OUTPUT_(DESCR_t *a, int n) {
         /* 1-arg degenerate: OUTPUT(expr) — not a channel association, ignore */
         return NULVCL;
     }
-    int ch = (n >= 2 && a[1].v == DT_I) ? (int)a[1].i : -1;
+    int ch = (n >= 2 && IS_INT(a[1])) ? (int)a[1].i : -1;
     if (!fname || !fname[0]) return FAILDESCR;
     FILE *f = fopen(fname, "w");
     if (!f) return FAILDESCR;
@@ -2626,7 +2615,7 @@ static DESCR_t _OUTPUT_(DESCR_t *a, int n) {
    Full implementation requires a label dispatch table. */
 void indirect_goto(const char *varname) {
     DESCR_t v = NV_GET_fn(varname);
-    const char *lbl = (v.v == DT_S) ? v.s : "(nil)";
+    const char *lbl = IS_STR(v) ? v.s : "(nil)";
     fprintf(stderr, "indirect_goto: var=%s label=%s (not implemented)\n",
             varname, lbl);
 }
