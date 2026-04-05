@@ -957,6 +957,7 @@ void SNO_INIT_fn(void) {
     register_fn("POWER_fn", _b_pow,      2, 2);
     register_fn("neg",      _b_neg,      1, 1);
     register_fn("__num_pos", _b_pos,      1, 1);
+    register_fn("PLS",       _b_pos,      1, 1);  /* SIL PLS — unary + coerces to numeric */
     register_fn("INTEGER",  _INTEGER_,  1, 1);
     register_fn("REAL",     _REAL_,     1, 1);
     register_fn("SIZE",        _SIZE_,     1, 1);

@@ -82,10 +82,17 @@ G       ({WS}|{CONT})*
         char iname[4096]; int fi=(int)(q2-q1-1);
         if(fi>=(int)sizeof iname)fi=(int)sizeof iname-1;
         memcpy(iname,q1+1,fi);iname[fi]='\0';
+        char rpath[4096]; rpath[0]='\0';
         FILE *inc=fopen(iname,"r");
-        if(!inc){char p[4096];for(int i=0;i<n_inc&&!inc;i++){snprintf(p,sizeof p,"%s/%s",inc_dirs[i],iname);inc=fopen(p,"r");}}
+        if(inc){snprintf(rpath,sizeof rpath,"%s",iname);}
+        if(!inc){char p[4096];for(int i=0;i<n_inc&&!inc;i++){snprintf(p,sizeof p,"%s/%s",inc_dirs[i],iname);if((inc=fopen(p,"r")))snprintf(rpath,sizeof rpath,"%s",p);}}
         if(!inc)sno_error(lineno,"cannot open include '%s'",iname);
-        else yypush_buffer_state(yy_create_buffer(inc,YY_BUF_SIZE,yyscanner),yyscanner);
+        else {
+            /* add resolved file's directory so its own -INCLUDEs resolve */
+            char *sl=strrchr(rpath,'/');
+            if(sl){char *d=strndup(rpath,(size_t)(sl-rpath));sno_add_include_dir(d);}
+            yypush_buffer_state(yy_create_buffer(inc,YY_BUF_SIZE,yyscanner),yyscanner);
+        }
     }
     /* stay in INITIAL — next char is first char of included file */
 }
@@ -97,10 +104,16 @@ G       ({WS}|{CONT})*
         char iname[4096]; int fi=(int)(q2-q1-1);
         if(fi>=(int)sizeof iname)fi=(int)sizeof iname-1;
         memcpy(iname,q1+1,fi);iname[fi]='\0';
+        char rpath[4096]; rpath[0]='\0';
         FILE *inc=fopen(iname,"r");
-        if(!inc){char p[4096];for(int i=0;i<n_inc&&!inc;i++){snprintf(p,sizeof p,"%s/%s",inc_dirs[i],iname);inc=fopen(p,"r");}}
+        if(inc){snprintf(rpath,sizeof rpath,"%s",iname);}
+        if(!inc){char p[4096];for(int i=0;i<n_inc&&!inc;i++){snprintf(p,sizeof p,"%s/%s",inc_dirs[i],iname);if((inc=fopen(p,"r")))snprintf(rpath,sizeof rpath,"%s",p);}}
         if(!inc)sno_error(lineno,"cannot open include '%s'",iname);
-        else yypush_buffer_state(yy_create_buffer(inc,YY_BUF_SIZE,yyscanner),yyscanner);
+        else {
+            char *sl=strrchr(rpath,'/');
+            if(sl){char *d=strndup(rpath,(size_t)(sl-rpath));sno_add_include_dir(d);}
+            yypush_buffer_state(yy_create_buffer(inc,YY_BUF_SIZE,yyscanner),yyscanner);
+        }
     }
 }
 <INITIAL>"-"[Cc][Oo][Pp][Yy][ \t]+'[^'\n]+'[^\n]*\n  {
@@ -111,10 +124,16 @@ G       ({WS}|{CONT})*
         char iname[4096]; int fi=(int)(q2-q1-1);
         if(fi>=(int)sizeof iname)fi=(int)sizeof iname-1;
         memcpy(iname,q1+1,fi);iname[fi]='\0';
+        char rpath[4096]; rpath[0]='\0';
         FILE *inc=fopen(iname,"r");
-        if(!inc){char p[4096];for(int i=0;i<n_inc&&!inc;i++){snprintf(p,sizeof p,"%s/%s",inc_dirs[i],iname);inc=fopen(p,"r");}}
+        if(inc){snprintf(rpath,sizeof rpath,"%s",iname);}
+        if(!inc){char p[4096];for(int i=0;i<n_inc&&!inc;i++){snprintf(p,sizeof p,"%s/%s",inc_dirs[i],iname);if((inc=fopen(p,"r")))snprintf(rpath,sizeof rpath,"%s",p);}}
         if(!inc)sno_error(lineno,"cannot open include '%s'",iname);
-        else yypush_buffer_state(yy_create_buffer(inc,YY_BUF_SIZE,yyscanner),yyscanner);
+        else {
+            char *sl=strrchr(rpath,'/');
+            if(sl){char *d=strndup(rpath,(size_t)(sl-rpath));sno_add_include_dir(d);}
+            yypush_buffer_state(yy_create_buffer(inc,YY_BUF_SIZE,yyscanner),yyscanner);
+        }
     }
 }
 <INITIAL>"-"[^\n]*\n    {
