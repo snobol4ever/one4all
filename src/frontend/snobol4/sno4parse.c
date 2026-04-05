@@ -1501,9 +1501,25 @@ static NODE *expr_prec_continue(NODE *left, int min_prec) {
      * We use a flat n-ary CAT node: accumulate all juxtaposed elements into one. */
 #define CATFN_PREC 10
     for (;;) {
-        /* SPITBOL P2C: postfix [] subscript on any expression — e.g. f(g(x)[i]).
+        /* SPITBOL P2C: postfix [] subscript on any expression — e.g. f(g(x)[i])
+         * and chained subscripts T['n']['!'].
          * '[' hits FRWDTB action NBTYP (STOPSH) so BRTYPE=1 after FORWRD.
-         * Check TEXTSP directly: if next non-consumed char is '[', treat as subscript. */
+         * After ELEARY closes on ']', TEXTSP.len may be 0 even though more text follows
+         * (the stream exhausted the current segment at the closing ']').
+         * In that case, call FORWRD() speculatively; if it stops on '[' (NBTYP),
+         * fire the postfix handler. If it stops on a field sep, save/restore. */
+        /* After ELEARY closes on ']', TEXTSP.len==0 (stream segment exhausted).
+         * Call FORWRD() to advance to the next token.
+         * If it fires NBTYP on '[' → chained subscript: fall through to '[' check.
+         * Any other result → expression is done (field sep or EOS): break now.
+         * Do NOT fall through to BINOP after this FORWRD — that would double-advance. */
+        if (TEXTSP.len == 0 && BRTYPE == RBTYP) {
+            FORWRD();
+            if (!(TEXTSP.len > 0 && *TEXTSP.ptr == '[')) {
+                break;  /* field separator or EOS: expression complete */
+            }
+            /* else: TEXTSP.ptr == '[', fall through to postfix handler below */
+        }
         if (TEXTSP.len > 0 && *TEXTSP.ptr == '[') {
             /* consume '[' */
             TEXTSP.ptr++; TEXTSP.len--;
@@ -1655,6 +1671,41 @@ static STMT *CMPILE(void) {
     if (BRTYPE != EOSTYP) {
         s->subject = ELEMNT();
         if (g_error) return s;
+
+        /* Chained postfix [] subscript on subject: T['n']['!'] = ...
+         * CMPILE calls ELEMNT() (not EXPR()), so expr_prec_continue never runs.
+         * After ELEARY closes on ']', TEXTSP.len==0 and BRTYPE==RBTYP.
+         * Advance with FORWRD(); if it stops on '[' (NBTYP), consume chained subscripts.
+         * Stop as soon as FORWRD gives anything other than NBTYP+'['. */
+        while (!g_error) {
+            if (TEXTSP.len == 0 && BRTYPE == RBTYP) {
+                FORWRD();  /* advance past the spent segment */
+            }
+            if (!(TEXTSP.len > 0 && *TEXTSP.ptr == '['))
+                break;  /* no chained subscript — done */
+            /* consume '[' */
+            TEXTSP.ptr++; TEXTSP.len--;
+            NODE *idx = node_new(ARYTYP, "IDX", -1);
+            node_add(idx, s->subject);
+            FORWRD();  /* position to first subscript index */
+            while (!g_error) {
+                if (BRTYPE == RBTYP) break;
+                if (BRTYPE == CMATYP) {
+                    node_add(idx, node_new(0, "NULL", -1));
+                    FORWRD();
+                    continue;
+                }
+                NODE *sub = EXPR();
+                node_add(idx, sub);
+                FORWRD();
+                if (BRTYPE == RBTYP) break;
+                if (BRTYPE == CMATYP) { FORWRD(); continue; }
+                sil_error("ELEMNT: expected ] in chained subscript, got BRTYPE=%d", BRTYPE);
+                break;
+            }
+            s->subject = idx;
+            /* TEXTSP.len==0 after closing ']'; loop continues → FORWRD() peeks next */
+        }
 
         /* Check for END label */
         if (s->subject && s->subject->stype == VARTYP &&
