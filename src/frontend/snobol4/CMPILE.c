@@ -1651,6 +1651,33 @@ static CMPND_t *expr_prec_continue(CMPND_t *left, int min_prec) {
             continue;
         }
 
+        /* Pre-load continuation card if current input exhausted.
+         * FORBLK skips the blank(s) and positions TEXTSP at the first token of
+         * the continuation line.  Since the blank has already been consumed,
+         * we cannot call BINOP (which expects a leading blank).  Instead emit
+         * CATFN directly — juxtaposition across a continuation boundary.
+         *
+         * CRITICAL: check min_prec BEFORE calling FORBLK.  If this call-frame
+         * has min_prec > CATFN_PREC (e.g. right-arm of NAMFN/DOLFN, next_min=99),
+         * we cannot consume the continuation here — just break and let the OUTER
+         * frame's TEXTSP.len==0 guard call FORBLK instead.  Calling FORBLK and
+         * then restoring TEXTSP would discard the line from g_io_linebuf. */
+        if (TEXTSP.len == 0) {
+            if (CATFN_PREC < min_prec) break;   /* inner frame: let outer handle */
+            FORBLK();
+            if (BRTYPE == EOSTYP || TEXTSP.len == 0) break;  /* new stmt or EOF */
+            CMPND_t *right = expr_prec(CATFN_PREC + 1);
+            if (!right) break;
+            if (left->stype == CATFN) {
+                cmpnd_add(left, right);
+            } else {
+                CMPND_t *cat = cmpnd_new(CATFN, "CAT", -1);
+                cmpnd_add(cat, left);
+                cmpnd_add(cat, right);
+                left = cat;
+            }
+            continue;
+        }
         spec_t saved = TEXTSP;
         int op = BINOP();
         if (!op) { TEXTSP = saved; break; }     /* no operator → done */
