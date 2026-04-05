@@ -1690,11 +1690,39 @@ int main(int argc, char **argv)
      * cmpile_lower() wiring for execution is RT-105 step 2 — requires
      * cmpnd_to_expr() coverage audit before it can replace sno_parse().
      * ----------------------------------------------------------------- */
-    if (dump_parse || dump_parse_flat) {
-        cmpile_init();
+    cmpile_init();
+    /* Mirror the same include dirs used by sno_add_include_dir above */
+    {
+        char dirbuf2[4096];
+        strncpy(dirbuf2, input_path, sizeof dirbuf2 - 1);
+        dirbuf2[sizeof dirbuf2 - 1] = '\0';
+        char *sl2 = strrchr(dirbuf2, '/');
+        if (sl2) { *sl2 = '\0'; cmpile_add_include(dirbuf2); }
+        else      { cmpile_add_include("."); }
+        const char *sno_lib2 = getenv("SNO_LIB");
+        if (sno_lib2 && *sno_lib2) cmpile_add_include(sno_lib2);
+        /* corpus root auto-detect */
+        char walk2[4096];
+        strncpy(walk2, input_path, sizeof walk2 - 1);
+        walk2[sizeof walk2 - 1] = '\0';
+        char *p2 = strrchr(walk2, '/');
+        while (p2) {
+            *p2 = '\0';
+            char probe2[4096];
+            snprintf(probe2, sizeof probe2, "%s/lib", walk2);
+            struct stat st2;
+            if (stat(probe2, &st2) == 0 && S_ISDIR(st2.st_mode)) {
+                cmpile_add_include(walk2);
+                break;
+            }
+            p2 = strrchr(walk2, '/');
+        }
         cmpile_add_include(".");
-        CMPILE_t *cl = cmpile_file(f, input_path);
-        fclose(f);
+    }
+    CMPILE_t *cl = cmpile_file(f, input_path);
+    fclose(f);
+
+    if (dump_parse || dump_parse_flat) {
         int oneline = dump_parse_flat ? 1 : 0;
         int idx = 0;
         for (CMPILE_t *s = cl; s; s = s->next)
@@ -1703,8 +1731,8 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    Program *prog = sno_parse(f, input_path);
-    fclose(f);
+    Program *prog = cmpile_lower(cl);
+    cmpile_free(cl);
 
     if (!prog || !prog->head) {
         fprintf(stderr, "scrip-interp: parse failed for '%s'\n", input_path);

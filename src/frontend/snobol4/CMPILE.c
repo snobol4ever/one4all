@@ -963,10 +963,17 @@ static char *resolve_include_path(const char *base_path, const char *incname);
 /* io_read_raw — read one raw physical line into buf (max bufsz), strip CRLF.
  * Returns length > 0 on success, 0 on EOF/error. */
 static int io_read_raw(FILE *f, char *buf, int bufsz) {
-    if (!fgets(buf, bufsz, f)) return 0;
+    if (!fgets(buf, bufsz, f)) return -1;  /* true EOF/error → -1 */
     int len = (int)strlen(buf);
     while (len > 0 && (buf[len-1]=='\n' || buf[len-1]=='\r')) buf[--len] = '\0';
-    return len;
+    /* Strip non-ASCII bytes (>0x7F) — SNOBOL4 is a 7-bit punch-card system.
+     * UTF-8 multi-byte sequences (e.g. em-dash U+2014 = E2 80 94) in comments
+     * or string literals would otherwise reach ELEMNT and trigger sil_error. */
+    int out = 0;
+    for (int i = 0; i < len; i++)
+        if ((unsigned char)buf[i] <= 0x7F) buf[out++] = buf[i];
+    buf[out] = '\0';
+    return out;  /* 0 = blank line (valid), -1 = EOF */
 }
 
 /* forrun — implements SIL FORRUN: read next physical card and dispatch NEWCRD.
@@ -2016,16 +2023,22 @@ static void compile_one_stmt(void) {
  * CSNOBOL4 reference: snobol4.c FORRUN (line 1850) + NEWCRD (line 1927).
  * ========================================================================= */
 static int forrun(void) {
+    /* If a line is already buffered as pending, don't read another — caller
+     * must drain the pending line first.  Returning 1 here causes FORWRD to
+     * set BRTYPE=EOSTYP, which is correct: the pending line is a new stmt. */
+    if (g_pending_len > 0) return 1;
 retry:
     if (!g_io_file || g_io_eof) return 1;
 
     char rawline[IO_LINEBUF_SZ];
     int len = io_read_raw(g_io_file, rawline, sizeof rawline);
-    if (len == 0) {
+    if (len < 0) {
         g_io_eof = 1;
         return 1;   /* EOF */
     }
     g_io_lineno++;
+
+    if (len == 0) goto retry;  /* blank line — skip, same as comment */
 
     /* CARDTB: determine card type */
     spec_t card = { rawline, len };
@@ -2209,8 +2222,10 @@ static void cmpile_file_internal(FILE *f, const char *base_path, compile_state_t
 
     while (!st->done && !g_io_eof) {
         int len = io_read_raw(f, rawline, sizeof rawline);
-        if (len == 0) break;
+        if (len < 0) break;
         g_io_lineno++;
+
+        if (len == 0) continue;  /* blank line — skip, do not call CARDTB on empty spec */
 
         spec_t card = { rawline, len };
         spec_t tok;
