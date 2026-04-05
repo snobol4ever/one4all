@@ -172,7 +172,14 @@ void NAM_commit(int cookie)
         if (e->dt == DT_K) {
             if (e->varname) ASGNIC_fn(e->varname, val);
         } else if (e->dt == DT_E) {
-            fprintf(stderr, "nmd: NAMEXN (DT_E) not yet implemented\n");
+            /* EXPEVL: thaw EXPRESSION, assign result by name */
+            extern DESCR_t EVAL_fn(DESCR_t);
+            DESCR_t expr_d = { .v = DT_E, .ptr = e->var_ptr, .slen = 0, .s = NULL };
+            DESCR_t val = EVAL_fn(expr_d);
+            if (!IS_FAIL_fn(val)) {
+                if (e->varname && e->varname[0])
+                    NV_SET_fn(e->varname, val);
+            }
         } else {
             if (e->var_ptr)
                 *e->var_ptr = val;

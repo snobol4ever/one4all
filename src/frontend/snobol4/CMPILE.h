@@ -103,3 +103,4 @@ struct EXPR_t *cmpnd_to_expr(CMPND_t *n);
 void cmpile_print(CMPILE_t *s, FILE *out, int oneline, int idx);
 
 #endif /* CMPILE_H */
+CMPND_t *cmpile_eval_expr(const char *src);

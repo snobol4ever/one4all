@@ -352,9 +352,10 @@ static DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                             pat_d, has_repl ? &repl_val : NULL, has_repl);
                     }
                 } else if (s->has_eq && subj_name) {
-                    DESCR_t repl_val = s->replacement ?
-                        (_expr_is_pat(s->replacement) ? interp_eval_pat(s->replacement)
-                                                      : interp_eval(s->replacement))
+                    /* Plain assignment: X = expr  — always value context.
+                     * *expr produces DT_E EXPRESSION (RUNTIME-6), not pattern. */
+                    DESCR_t repl_val = s->replacement
+                        ? interp_eval(s->replacement)
                         : NULVCL;
                     if (IS_FAIL_fn(repl_val)) succeeded = 0;
                     else {
@@ -934,24 +935,14 @@ static DESCR_t interp_eval(EXPR_t *e)
          * *complex_expr: freeze as DT_E for EVAL() to thaw later. */
         if (e->nchildren < 1) return NULVCL;
         EXPR_t *child = e->children[0];
-        /* NOTE: E_DEFER(E_VAR) in value context must produce DT_E (frozen for EVAL).
-         * Immediate resolution of *var belongs only in interp_eval_pat. Do NOT add
-         * an E_VAR fast-path here — it regresses 086_define_locals, 1010/1013/1015/1016/1018. */
-        if (child->kind == E_FNC && child->sval) {
-            /* *func(args) — build deferred XATP pattern node (same as interp_eval_pat) */
-            int na = child->nchildren;
-            DESCR_t *av = NULL;
-            if (na > 0) {
-                av = GC_malloc(na * sizeof(DESCR_t));
-                for (int i = 0; i < na; i++) av[i] = interp_eval(child->children[i]);
-            }
-            return pat_user_call(child->sval, av, na);
-        }
-        /* Complex expression — freeze as DT_E for EVAL */
+        /* RUNTIME-6: *X in value context ALWAYS produces DT_E (EXPRESSION).
+         * The child EXPR_t* is frozen; EVAL() thaws and executes it.
+         * interp_eval_pat handles the pattern-context path (*var, *func). */
         DESCR_t d;
         d.v    = DT_E;
         d.ptr  = child;
         d.slen = 0;
+        d.s    = NULL;
         return d;
     }
 
@@ -1267,7 +1258,11 @@ static DESCR_t interp_eval_pat(EXPR_t *e)
                 DESCR_t _fr = APPLY_fn(e->sval, NULL, 0);
                 if (!IS_FAIL_fn(_fr)) return _fr;
             }
-            return interp_eval(e);
+            DESCR_t _v = interp_eval(e);
+            /* If variable holds DT_E (EXPRESSION), thaw it via PATVAL_fn
+             * which calls EVAL_fn → eval_node → pattern or value result. */
+            if (_v.v == DT_E) return PATVAL_fn(_v);
+            return _v;
         }
         return NULVCL;
     case E_DEFER:
@@ -1391,12 +1386,9 @@ static void execute_program(Program *prog)
         /* ── pure assignment (direct or null) ─────────────────────── */
         } else if (s->has_eq && subj_name) {
             /* X = expr  OR  X =  (null assign, no replacement node).
-             * If the RHS is a pattern expression (contains *, |, pattern
-             * builtins), evaluate in pattern context so that E_DEFER(E_VAR)
-             * children become XDSAR nodes rather than frozen DT_E values. */
-            DESCR_t repl_val = s->replacement ?
-                (_expr_is_pat(s->replacement) ? interp_eval_pat(s->replacement)
-                                              : interp_eval(s->replacement))
+             * Always value context — *expr produces DT_E (RUNTIME-6). */
+            DESCR_t repl_val = s->replacement
+                ? interp_eval(s->replacement)
                 : NULVCL;
             if (IS_FAIL_fn(repl_val)) {
                 succeeded = 0;

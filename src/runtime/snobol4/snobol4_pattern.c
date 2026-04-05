@@ -193,6 +193,11 @@ DESCR_t pat_epsilon(void) {
 /* pat_to_patnd: coerce a DESCR_t to a PATND_t*, handling string literals.
  * Returns NULL if the value cannot be represented as a pattern. */
 static PATND_t *pat_to_patnd(DESCR_t v) {
+    if (v.v == DT_E) {
+        /* EXPRESSION: thaw via PATVAL_fn which calls EVAL_fn → eval_node */
+        v = PATVAL_fn(v);
+        if (v.v == DT_FAIL) return NULL;
+    }
     PATND_t *p = spat_of(v);
     if (!p && v.v == DT_S && v.s && v.s[0]) p = spat_of(pat_lit(v.s));
     return p;

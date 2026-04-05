@@ -1761,15 +1761,51 @@ static CMPND_t *expr_prec_continue(CMPND_t *left, int min_prec) {
             if (CATFN_PREC < min_prec) break;   /* inner frame: let outer handle */
             FORBLK();
             if (BRTYPE == EOSTYP || TEXTSP.len == 0) break;  /* new stmt or EOF */
-            CMPND_t *right = expr_prec(CATFN_PREC + 1);
-            if (!right) break;
-            if (left->stype == CATFN) {
-                cmpnd_add(left, right);
+            /* Continuation card may start with a binary operator (e.g. '|', '+').
+             * Probe BIOPTB before calling ELEMNT — ELEMTB fires ACT_ERROR on
+             * operator characters.  SIL resumes the BINOP loop across continuations. */
+            spec_t saved_cont = TEXTSP;
+            spec_t op_tok2;
+            stream_ret_t or2_ = stream(&op_tok2, &TEXTSP, &BIOPTB);
+            int cont_op = 0;
+            if ((or2_ == ST_STOP || or2_ == ST_EOS) && STYPE != 0) cont_op = STYPE;
+            if (cont_op && cont_op != CATFN) {
+                /* Continuation opens with an explicit binary operator */
+                int prec = op_prec(cont_op);
+                if (prec < min_prec) { TEXTSP = saved_cont; break; }
+                int next_min2 = (cont_op == NAMFN || cont_op == DOLFN)
+                    ? 99 : op_right_assoc(cont_op) ? prec : prec + 1;
+                FORWRD();
+                CMPND_t *right = expr_prec(next_min2);
+                CMPND_t *binop = cmpnd_new(cont_op, fn_name(cont_op), -1);
+                if ((cont_op == NAMFN || cont_op == DOLFN)
+                        && left->stype == CATFN && left->nchildren >= 2) {
+                    CMPND_t *new_cat = cmpnd_new(CATFN, "CAT", -1);
+                    for (int _ci = 0; _ci < left->nchildren - 1; _ci++)
+                        cmpnd_add(new_cat, left->children[_ci]);
+                    CMPND_t *last2 = left->children[left->nchildren - 1];
+                    cmpnd_add(binop, last2);
+                    cmpnd_add(binop, right);
+                    left = new_cat;
+                    cmpnd_add(left, binop);
+                } else {
+                    cmpnd_add(binop, left);
+                    cmpnd_add(binop, right);
+                    left = binop;
+                }
             } else {
-                CMPND_t *cat = cmpnd_new(CATFN, "CAT", -1);
-                cmpnd_add(cat, left);
-                cmpnd_add(cat, right);
-                left = cat;
+                /* No recognised binary op — treat as juxtaposition */
+                TEXTSP = saved_cont;
+                CMPND_t *right = expr_prec(CATFN_PREC + 1);
+                if (!right) break;
+                if (left->stype == CATFN) {
+                    cmpnd_add(left, right);
+                } else {
+                    CMPND_t *cat = cmpnd_new(CATFN, "CAT", -1);
+                    cmpnd_add(cat, left);
+                    cmpnd_add(cat, right);
+                    left = cat;
+                }
             }
             continue;
         }
@@ -2549,4 +2585,27 @@ void cmpile_free(CMPILE_t *s) {
         free(s);
         s = next;
     }
+}
+
+/* cmpile_eval_expr — parse a string as a SNOBOL4 expression via CMPILE's
+ * EXPR() entry point (the SIL CONVEX/CONVE path).  Returns the root CMPND_t*
+ * of the parsed expression, or NULL on error.  Caller owns the node tree.
+ *
+ * This is the canonical expression-only entry used by EVAL() and CONVE:
+ *   init_tables → TEXTSP=src → FORWRD → EXPR() → CMPND_t*
+ *
+ * Replaces parse_expr_from_str (bison path) for all runtime EVAL work.
+ */
+CMPND_t *cmpile_eval_expr(const char *src) {
+    if (!src || !*src) return NULL;
+    init_tables();
+    g_error = 0;
+    TEXTSP.ptr = src; TEXTSP.len = (int)strlen(src);
+    XSP.ptr    = src; XSP.len   = 0;
+    BRTYPE = 0; STYPE = 0;
+    FORWRD();
+    if (g_error) return NULL;
+    CMPND_t *n = EXPR();
+    if (g_error) return NULL;
+    return n;
 }

@@ -1201,6 +1201,8 @@ const char *datatype(DESCR_t v) {
         case DT_A:       return "ARRAY";
         case DT_T:       return "TABLE";
         case DT_C:       return "CODE";
+        case DT_E:       return "EXPRESSION";
+        case DT_N:       return "NAME";
         default:         return "STRING";
     }
 }

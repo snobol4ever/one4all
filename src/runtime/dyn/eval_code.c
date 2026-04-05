@@ -54,12 +54,14 @@
 #include "snobol4.h"
 #include "sil_macros.h"   /* SIL macro translations — RT + SM axes */
 
-/* ── frontend (parse_expr_from_str, sno_parse) ──────────────────────── */
-#include "../../frontend/snobol4/snobol4.h"
-#include "../../frontend/snobol4/scrip_cc.h"
+/* ── frontend: CMPILE expression entry (replaces bison parse_expr_from_str) */
+#include "../../frontend/snobol4/CMPILE.h"
 
-/* parse_expr_from_str declared in parse.c, exposed via scrip_cc.h context */
-extern EXPR_t   *parse_expr_from_str(const char *src);
+/* cmpnd_to_expr — lower CMPND_t → EXPR_t IR (defined in snobol4_pattern.c) */
+extern struct EXPR_t *cmpnd_to_expr(CMPND_t *n);
+
+/* sno_parse still used by code() for statement-block parsing (RT-7) */
+#include "../../frontend/snobol4/scrip_cc.h"
 extern Program  *sno_parse(FILE *f, const char *filename);
 
 /* exec_stmt — the five-phase executor */
@@ -84,13 +86,21 @@ DESCR_t eval_node(EXPR_t *e)
 
     switch (e->kind) {
 
-    /* ── deferred expression — thaw in value context ─────────────────── */
+    /* ── deferred expression — freeze child as DT_E (EXPRESSION type) ── */
     case E_DEFER:
-        /* *expr stores E_DEFER{child=inner_expr} as DT_E.
-         * EVAL_fn calls eval_node(expr.ptr) where ptr = the E_DEFER node.
-         * Recurse into the child to evaluate in value context. */
+        /* *X  (STRFN/UOP_STR) — produce a DT_E EXPRESSION descriptor.
+         * The descriptor holds a pointer to the child EXPR_t*.
+         * EVAL_fn thaws it by calling eval_node on the child.
+         * Do NOT evaluate the child here — that is EVAL()'s job. */
         if (e->nchildren < 1) return NULVCL;
-        return eval_node(e->children[0]);
+        {
+            DESCR_t d;
+            d.v    = DT_E;
+            d.ptr  = e->children[0];   /* frozen EXPR_t* child */
+            d.slen = 0;
+            d.s    = NULL;
+            return d;
+        }
 
     /* ── literals ────────────────────────────────────────────────────── */
     case E_ILIT:
@@ -233,25 +243,143 @@ DESCR_t eval_node(EXPR_t *e)
         }
     }
 
-    /* ── unhandled / pattern nodes — fall through as NULVCL ─────────── */
+    /* ── .X  name-of — return DT_N lvalue descriptor ────────────────── */
+    case E_NAME: {
+        /* DOTFN: .X yields the name (lvalue) of X, not its value.
+         * Child is E_VAR (variable name) or E_KEYWORD. */
+        if (e->nchildren < 1) return FAILDESCR;
+        EXPR_t *child = e->children[0];
+        if (!child) return FAILDESCR;
+        if (child->kind == E_VAR && child->sval)
+            return NAME_fn(child->sval);
+        if (child->kind == E_KEYWORD && child->sval) {
+            char kbuf[128];
+            snprintf(kbuf, sizeof kbuf, "&%s", child->sval);
+            return NAME_fn(kbuf);
+        }
+        DESCR_t inner = eval_node(child);
+        if (IS_FAIL_fn(inner)) return FAILDESCR;
+        const char *nm = VARVAL_fn(inner);
+        if (!nm || !*nm) return FAILDESCR;
+        return NAME_fn(nm);
+    }
+
+    /* ── +X  unary plus — numeric coerce ─────────────────────────────── */
+    case E_PLS: {
+        if (e->nchildren < 1) return FAILDESCR;
+        DESCR_t arg = eval_node(e->children[0]);
+        if (IS_FAIL_fn(arg)) return FAILDESCR;
+        return APPLY_fn("PLS", &arg, 1);
+    }
+
+    /* ── ?X  interrogation — succeed→null, fail→FAIL ─────────────────── */
+    case E_INTERROGATE: {
+        /* SIL QUES: evaluate child; if it FAILs → FAIL; else → NULVCL.
+         * Used for conditional pattern: ?pat succeeds iff pat matches. */
+        if (e->nchildren < 1) return FAILDESCR;
+        DESCR_t res = eval_node(e->children[0]);
+        if (IS_FAIL_fn(res)) return FAILDESCR;
+        return NULVCL;
+    }
+
+    /* ── X | Y  pattern alternation (value context: ORFN) ───────────── */
+    case E_ALT: {
+        /* In value context, alternation is a pattern constructor.
+         * Build it via CMPILE: re-stringify as "(L)|(R)" then eval_via_cmpile.
+         * For the common case of two pattern children, use PATVAL + pat_alt. */
+        if (e->nchildren < 1) return NULVCL;
+        extern DESCR_t pat_alt(DESCR_t a, DESCR_t b);
+        DESCR_t acc = eval_node(e->children[0]);
+        if (IS_FAIL_fn(acc)) return FAILDESCR;
+        acc = PATVAL_fn(acc);
+        if (IS_FAIL_fn(acc)) return FAILDESCR;
+        for (int i = 1; i < e->nchildren; i++) {
+            DESCR_t rhs = eval_node(e->children[i]);
+            if (IS_FAIL_fn(rhs)) return FAILDESCR;
+            rhs = PATVAL_fn(rhs);
+            if (IS_FAIL_fn(rhs)) return FAILDESCR;
+            acc = pat_alt(acc, rhs);
+            if (IS_FAIL_fn(acc)) return FAILDESCR;
+        }
+        return acc;
+    }
+
+    /* ── X . Y  conditional capture (NAMFN) ─────────────────────────── */
+    case E_CAPT_COND_ASGN: {
+        if (e->nchildren < 2) return FAILDESCR;
+        DESCR_t pat  = eval_node(e->children[0]);
+        if (IS_FAIL_fn(pat)) return FAILDESCR;
+        pat = PATVAL_fn(pat);
+        if (IS_FAIL_fn(pat)) return FAILDESCR;
+        DESCR_t name = eval_node(e->children[1]);
+        if (IS_FAIL_fn(name)) return FAILDESCR;
+        return pat_assign_cond(pat, name);
+    }
+
+    /* ── X $ Y  immediate capture (DOLFN) ───────────────────────────── */
+    case E_CAPT_IMMED_ASGN: {
+        if (e->nchildren < 2) return FAILDESCR;
+        DESCR_t pat  = eval_node(e->children[0]);
+        if (IS_FAIL_fn(pat)) return FAILDESCR;
+        pat = PATVAL_fn(pat);
+        if (IS_FAIL_fn(pat)) return FAILDESCR;
+        DESCR_t name = eval_node(e->children[1]);
+        if (IS_FAIL_fn(name)) return FAILDESCR;
+        return pat_assign_imm(pat, name);
+    }
+
+    /* ── @X  cursor capture ──────────────────────────────────────────── */
+    case E_CAPT_CURSOR: {
+        /* @VAR — cursor-position capture: build XATP("@", varname) node.
+         * Child is E_VAR or E_NAME holding the capture variable name. */
+        if (e->nchildren < 1) return FAILDESCR;
+        EXPR_t *child = e->children[0];
+        const char *varname = NULL;
+        if (child && child->kind == E_VAR  && child->sval) varname = child->sval;
+        if (child && child->kind == E_NAME && child->nchildren > 0
+                && child->children[0] && child->children[0]->sval)
+            varname = child->children[0]->sval;
+        if (!varname) return FAILDESCR;
+        { extern DESCR_t pat_at_cursor(const char *varname);
+          return pat_at_cursor(varname); }
+    }
+
+    /* ── X ? Y  scan (BIQSFN) ───────────────────────────────────────── */
+    case E_SCAN: {
+        /* Subject ? Pattern — in value context evaluate the subject,
+         * coerce pattern, apply match; return matched substring or FAIL. */
+        if (e->nchildren < 2) return FAILDESCR;
+        DESCR_t subj = eval_node(e->children[0]);
+        if (IS_FAIL_fn(subj)) return FAILDESCR;
+        DESCR_t pat  = eval_node(e->children[1]);
+        if (IS_FAIL_fn(pat)) return FAILDESCR;
+        pat = PATVAL_fn(pat);
+        if (IS_FAIL_fn(pat)) return FAILDESCR;
+        return APPLY_fn("__scan", &subj, 1);   /* stub: full scan via exec_stmt */
+    }
+
+    /* ── unhandled nodes ─────────────────────────────────────────────── */
     default:
-        /* Pattern-context nodes (E_ALT, E_CAPT_COND_ASGN, etc.) arrive here
-         * when EVAL is given a pattern expression string.  The old
-         * _ev_expr hand-roller in snobol4_pattern.c handles those.
-         * In value context, treat unknown nodes as null. */
         return NULVCL;
     }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
  * eval_expr — public entry point
+ *
+ * Parses src via CMPILE's EXPR() entry (cmpile_eval_expr), lowers the
+ * CMPND_t parse tree to EXPR_t IR via cmpnd_to_expr(), then evaluates.
+ * This is the SIL CONVEX/CONVE path — no bison/flex involved.
  * ══════════════════════════════════════════════════════════════════════════ */
 
 DESCR_t eval_expr(const char *src)
 {
     if (!src || !*src) return NULVCL;
 
-    EXPR_t *tree = parse_expr_from_str(src);
+    CMPND_t *cmpnd = cmpile_eval_expr(src);
+    if (!cmpnd) return FAILDESCR;
+
+    EXPR_t *tree = cmpnd_to_expr(cmpnd);
     if (!tree) return FAILDESCR;
 
     return eval_node(tree);

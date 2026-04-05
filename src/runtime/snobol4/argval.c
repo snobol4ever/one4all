@@ -110,8 +110,15 @@ DESCR_t PATVAL_fn(DESCR_t d)
     if (d.v == DT_FAIL) return FAILDESCR;
     if (d.v == DT_P) return d;
     if (d.v == DT_E) {
-        /* RT-6 stub: EXPVAL not yet implemented */
-        return FAILDESCR;
+        /* EXPVAL: thaw EXPRESSION by calling EVAL_fn, then coerce to pattern.
+         * EVAL_fn on DT_E calls eval_node(ptr) which walks the frozen EXPR_t*. */
+        extern DESCR_t EVAL_fn(DESCR_t);
+        DESCR_t val = EVAL_fn(d);
+        if (IS_FAIL_fn(val)) return FAILDESCR;
+        if (val.v == DT_P) return val;
+        /* Result is a value — coerce to literal pattern */
+        d = val;
+        /* fall through to string coerce below */
     }
     /* Coerce to string then build literal pattern */
     DESCR_t s = VARVAL_d_fn(d);
