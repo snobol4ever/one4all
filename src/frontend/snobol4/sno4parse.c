@@ -2118,6 +2118,33 @@ static void compile_file(FILE *f, const char *base_path, compile_state_t *st) {
         g_stmt_lineno = g_io_lineno;
         compile_one_stmt();
 
+        /* P2F: semicolon statement separator — SPITBOL extension.
+         * ACT_STOP *consumes* the triggering char (stream.c:94: cp++; len--), so
+         * after FORWRD fires EOSTYP on ';', TEXTSP.ptr is already past the ';'.
+         * Remaining TEXTSP bytes are the next stmt(s) on the same physical line.
+         * Special case: ';*' is an inline comment — skip rest of line.
+         * CMPILE always runs LBLTB first; a leading space causes ST_STOP with
+         * XSP.len==0 → no label.  Prepend a space into g_io_linebuf so the
+         * semicolon-split statement is treated as indented (body-only, no label). */
+        while (!st->done && BRTYPE == EOSTYP && TEXTSP.len > 0) {
+            /* skip leading whitespace */
+            while (TEXTSP.len > 0 && (*TEXTSP.ptr == ' ' || *TEXTSP.ptr == '\t')) {
+                TEXTSP.ptr++; TEXTSP.len--;
+            }
+            if (TEXTSP.len == 0) break;
+            if (*TEXTSP.ptr == '*') break;       /* ;* inline comment — rest is comment */
+            int rem = (int)TEXTSP.len;
+            const char *src = TEXTSP.ptr;
+            if (rem + 2 <= (int)sizeof(g_io_linebuf)) {
+                g_io_linebuf[0] = ' ';
+                memcpy(g_io_linebuf + 1, src, rem);
+                g_io_linebuf[rem + 1] = '\0';
+                TEXTSP.ptr = g_io_linebuf;
+                TEXTSP.len = rem + 1;
+                compile_one_stmt();
+            } else break;
+        }
+
         /* Drain any pending lines that forrun() buffered during CMPILE */
         while (!st->done && g_pending_len > 0) {
             memcpy(g_io_linebuf, g_pending_buf, g_pending_len);
