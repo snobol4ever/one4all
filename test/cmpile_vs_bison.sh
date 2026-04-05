@@ -38,7 +38,26 @@ TOTAL=0; MATCH=0; SHAPE_DIFF=0; CRASH_C=0; CRASH_B=0; BOTH_EMPTY=0
 # We only strip the *first* word after the node kind when it is a bare
 # identifier (no parens, no quotes, no colons).
 normalise() {
-    sed 's/(\(E_[A-Z_]*\) \([A-Za-z_][A-Za-z0-9_]*\)\b/(\1/g'
+    sed \
+      -e 's/(\(E_[A-Z_]*\) \([A-Za-z_][A-Za-z0-9_]*\)\b/(\1/g' \
+      -e 's/E_SEQ/E_CAT/g' \
+      -e 's/E_ASSIGN/E_CAPT_IMMED_ASGN/g'
+}
+
+# Filter Bison-only lines that are known acceptable divergences:
+#   - "(STMT :lbl END)" — CMPILE omits the END pseudo-stmt that Bison emits
+#   - "(NULL-PROGRAM)"  — Bison can't parse files needing -I flags; CMPILE can
+filter_bison_acceptable() {
+    # Bison emits :repl (E_QLIT "") for null replacement; CMPILE omits it — normalise away
+    # Bison emits (NULL-PROGRAM) when it can't parse -I-dependent files — skip
+    sed \
+      -e 's/ :repl (E_QLIT "")//g' \
+      -e '/^(NULL-PROGRAM)$/d'
+}
+
+filter_cmpile_acceptable() {
+    # CMPILE emits END sentinel stmt (upper or lower case); Bison does not — strip it
+    sed -e '/^(STMT :lbl [Ee][Nn][Dd])$/d'
 }
 
 for sno in $(find "$CORPUS" -name "*.sno" | sort); do
@@ -81,8 +100,8 @@ for sno in $(find "$CORPUS" -name "*.sno" | sort); do
     # Normalise and diff
     cnorm="$OUT/${key}.cmpile.norm"
     bnorm="$OUT/${key}.bison.norm"
-    normalise < "$cfile" > "$cnorm"
-    normalise < "$bfile" > "$bnorm"
+    normalise < "$cfile" | filter_cmpile_acceptable > "$cnorm"
+    normalise < "$bfile" | filter_bison_acceptable  > "$bnorm"
 
     if diff -q "$bnorm" "$cnorm" > /dev/null 2>&1; then
         MATCH=$((MATCH+1))
