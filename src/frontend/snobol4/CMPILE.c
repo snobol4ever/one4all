@@ -38,6 +38,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <dirent.h>
+#include <stdint.h>
 
 /* =========================================================================
  * syntab / acts — from snobol4-2.3.3/include/syntab.h
@@ -345,9 +346,12 @@ syntab_t FRWDTB = { "FRWDTB", {
 }, FRWDTB_actions };
 
 static acts_t IBLKTB_actions[] = {
-    {0, ACT_GOTO, &FRWDTB},
-    {EOSTYP, ACT_STOP, NULL},
-    {0, ACT_ERROR, NULL},
+    {0,      ACT_GOTO,   &FRWDTB},  /* 0: space -> FRWDTB (skip blanks) */
+    {EOSTYP, ACT_STOP,   NULL},     /* 1: tab/space stop -> EOSTYP */
+    {EOSTYP, ACT_STOP,   NULL},     /* 2: ';' -> EOSTYP */
+    {NBTYP,  ACT_STOPSH, NULL},     /* 3: any non-blank token start — stop short,
+                                     *    BRTYPE=NBTYP, leave byte for ELEMTB
+                                     *    (ASCII A-Z a-z 0-9 ops + 0x80-0xFF UTF-8) */
 };
 syntab_t IBLKTB = { "IBLKTB", {
      3,  3,  3,  3,  3,  3,  3,  3,  3,  1,  3,  3,  3,  3,  3,  3,
@@ -394,15 +398,16 @@ syntab_t ELEMTB = { "ELEMTB", {
      2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  6,  6,  6,  6,  6,
      6,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
      2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  6,  6,  6,  6,  6,
-    /* 0x80-0xFF: P3A UTF-8 lead/continuation bytes → action 7 → UTF8TB */
-     7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
-     7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
-     7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
-     7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
-     7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
-     7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
-     7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
-     7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
+    /* 0x80-0xBF: bare UTF-8 continuation bytes — illegal identifier start (P3B) */
+     6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,
+     6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,
+     6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,
+     6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,
+    /* 0xC0-0xFF: UTF-8 lead bytes — valid identifier start → actions[7]=UTF8TB (chrs=8) */
+     8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,
+     8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,
+     8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,
+     8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,
 }, ELEMTB_actions };
 
 /* ---- VARTB: variable / function-name scanner (v311.sil:ELEVBL branch)
@@ -410,10 +415,12 @@ syntab_t ELEMTB = { "ELEMTB", {
  * chars (chrs[]=0 fast-path).  Stops on the first non-identifier char and
  * classifies it: plain variable, function call IDENT(, or array ref IDENT<. ---- */
 static acts_t VARTB_actions[] = {
-    {VARTYP, ACT_STOPSH, NULL},
-    {FNCTYP, ACT_STOP, NULL},
-    {ARYTYP, ACT_STOP, NULL},
-    {0, ACT_ERROR, NULL},
+    {VARTYP, ACT_STOPSH, NULL},  /* 0: non-ident ASCII — stop short */
+    {FNCTYP, ACT_STOP,   NULL},  /* 1: '(' — function call */
+    {ARYTYP, ACT_STOP,   NULL},  /* 2: '<' — array ref */
+    {0,      ACT_ERROR,  NULL},  /* 3: error */
+    {0,      ACT_ERROR,  NULL},  /* 4: gap */
+    {VARTYP, ACT_GOTO,   NULL},  /* 5: 0xC0-0xFF lead byte -> UTF8TB (P3B) */
 };
 syntab_t VARTB = { "VARTB", {
      4,  4,  4,  4,  4,  4,  4,  4,  4,  1,  4,  4,  4,  4,  4,  4,
@@ -424,14 +431,16 @@ syntab_t VARTB = { "VARTB", {
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  3,  4,  1,  4,  0,
      4,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  4,  4,  4,  4,  4,
+    /* 0x80-0xBF: UTF-8 continuation bytes in identifier body — ACT_CONTIN */
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+    /* 0xC0-0xFF: UTF-8 lead bytes in identifier body → actions[5]=UTF8TB (chrs=6, P3B) */
+     6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,
+     6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,
+     6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,
+     6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,
 }, VARTB_actions };
 
 /* ---- INTGTB: integer digit accumulator (v311.sil:ELEILT branch)
@@ -868,7 +877,7 @@ syntab_t GOTOTB = { "GOTOTB", {
  * Table authority: new table (not in CSNOBOL4 syn.c) — we own chrs[]. */
 static acts_t UTF8TB_actions[] = {
     {0,      ACT_CONTIN, NULL},   /* 0: continuation / lead — absorb */
-    {VARTYP, ACT_STOP,   NULL},   /* 1: ASCII byte — stop, emit VARTYP token */
+    {VARTYP, ACT_GOTO,   NULL},   /* 1: ASCII byte — stop, emit VARTYP token */
 };
 syntab_t UTF8TB = { "UTF8TB", {
     /* 0x00-0x7F: stop (ASCII ends sequence) → action 1 */
@@ -883,6 +892,77 @@ syntab_t UTF8TB = { "UTF8TB", {
     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 }, UTF8TB_actions };
 
+
+/* =========================================================================
+ * P3B — UTF-8 decoder and Unicode alpha-start validation
+ *
+ * utf8_decode_first(s, len, out_cp) — decode first codepoint from s[0..len-1]
+ *   Returns number of bytes consumed (1-4), or 0 on invalid sequence.
+ *   *out_cp receives the codepoint value.
+ *
+ * utf8_is_alpha_start(s, len) — returns 1 if first codepoint of s is a
+ *   Unicode letter (category L*), 0 otherwise.
+ *   ASCII bytes (0x00-0x7F) always return 0 here — caller handles them.
+ *
+ * Rule (per M-SN4PARSE-P3B):
+ *   1st identifier char: Unicode L* only. '_' excluded (reserved for
+ *     generated code). ASCII A-Z a-z handled by existing ELEMTB/VARTB.
+ *   nth identifier char: any Unicode alphanumeric, '.', '_' —
+ *     already handled by VARTB (all 0x80-0xFF are ACT_CONTIN there).
+ * ========================================================================= */
+
+#include "unicode_alpha_ranges.h"   /* AUTO-GENERATED — 657 L* ranges */
+
+/* Decode first UTF-8 codepoint from s[0..len-1].
+ * Returns bytes consumed (1-4), or 0 on invalid/truncated sequence. */
+static int utf8_decode_first(const unsigned char *s, int len, uint32_t *out_cp)
+{
+    if (len < 1) return 0;
+    unsigned char b0 = s[0];
+    if (b0 < 0x80) { *out_cp = b0; return 1; }
+    int nbytes;
+    uint32_t cp;
+    if      ((b0 & 0xE0) == 0xC0) { nbytes = 2; cp = b0 & 0x1F; }
+    else if ((b0 & 0xF0) == 0xE0) { nbytes = 3; cp = b0 & 0x0F; }
+    else if ((b0 & 0xF8) == 0xF0) { nbytes = 4; cp = b0 & 0x07; }
+    else return 0;  /* invalid lead byte or bare continuation */
+    if (len < nbytes) return 0;
+    for (int i = 1; i < nbytes; i++) {
+        if ((s[i] & 0xC0) != 0x80) return 0;  /* invalid continuation */
+        cp = (cp << 6) | (s[i] & 0x3F);
+    }
+    /* Overlong sequence check */
+    if (nbytes == 2 && cp < 0x0080) return 0;
+    if (nbytes == 3 && cp < 0x0800) return 0;
+    if (nbytes == 4 && cp < 0x10000) return 0;
+    *out_cp = cp;
+    return nbytes;
+}
+
+/* Binary search in unicode_alpha_ranges[].
+ * Returns 1 if cp is a Unicode letter (category L*). */
+static int unicode_is_alpha(uint32_t cp)
+{
+    int lo = 0, hi = UNICODE_ALPHA_RANGES_N - 1;
+    while (lo <= hi) {
+        int mid = (lo + hi) / 2;
+        if      (cp < unicode_alpha_ranges[mid][0]) hi = mid - 1;
+        else if (cp > unicode_alpha_ranges[mid][1]) lo = mid + 1;
+        else return 1;
+    }
+    return 0;
+}
+
+/* Returns 1 if first codepoint of s[0..len-1] is a Unicode L* letter.
+ * Returns 0 if invalid UTF-8, ASCII, or non-letter codepoint. */
+static int utf8_is_alpha_start(const unsigned char *s, int len)
+{
+    if (len < 1 || s[0] < 0x80) return 0;  /* ASCII handled by caller */
+    uint32_t cp = 0;
+    if (utf8_decode_first(s, len, &cp) == 0) return 0;
+    return unicode_is_alpha(cp);
+}
+
 /* Wire up forward-declared goto targets in action tables.
  * These cannot be static initialisers because C does not allow forward references
  * to syntab_t objects in struct literals.  Called once from main() before parsing. */
@@ -893,6 +973,10 @@ void init_tables(void) {
     ELEMTB_actions[3].go  = &DQLITB;
     /* P3A: wire UTF8TB for ELEMTB action index 7 (0x80-0xFF lead bytes) */
     ELEMTB_actions[7].go  = &UTF8TB;
+    /* P3B: UTF8TB action 1 chains to VARTB to finish identifier after UTF-8 sequence */
+    UTF8TB_actions[1].go  = &VARTB;
+    /* P3B: VARTB action 5 — lead byte in identifier body -> UTF8TB -> back to VARTB */
+    VARTB_actions[5].go   = &UTF8TB;
     INTGTB_actions[1].go  = &FLITB;
     INTGTB_actions[2].go  = &EXPTB;
     FLITB_actions[1].go   = &EXPTB;
@@ -1388,7 +1472,8 @@ static CMPND_t *ELEMNT(void) {
        works because ELEMTB put-codes go into STYPE before the GOTO. */
     unsigned char first = XSP.len > 0 ? (unsigned char)XSP.ptr[0] : 0;
     int is_digit  = (first >= '0' && first <= '9');
-    int is_letter = ((first >= 'A' && first <= 'Z') || (first >= 'a' && first <= 'z') || first == '_');
+    int is_letter = ((first >= 'A' && first <= 'Z') || (first >= 'a' && first <= 'z')
+                     || first == '_' || first >= 0x80);  /* P3B: UTF-8 lead bytes */
     int is_quote  = (first == 39 || first == 34);  /* 39=' 34=" */
     int is_lparen = (first == '(');
 
@@ -1431,6 +1516,16 @@ static CMPND_t *ELEMNT(void) {
 
     case VARTYP: {  /* ELEVBL: variable — STREAM via VARTB; STYPE = VARTYP/FNCTYP/ARYTYP */
         int final = STYPE;
+        /* P3B: UTF-8 identifier-start validation.
+         * If first byte is >= 0x80 (came via UTF8TB), decode the first codepoint
+         * and reject if not Unicode L* (letter). '_' excluded as first char
+         * (reserved for generated code). ASCII starts already validated by ELEMTB. */
+        if ((unsigned char)XSP.ptr[0] >= 0x80) {
+            if (!utf8_is_alpha_start((const unsigned char *)XSP.ptr, XSP.len)) {
+                sil_error("ELEMNT: non-alpha Unicode identifier start");
+                return NULL;
+            }
+        }
         const char *p = XSP.ptr;
         int len = XSP.len;
         /* strip trailing ( or < consumed by VARTB STOP */
