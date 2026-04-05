@@ -110,6 +110,13 @@ static inline int IS_DATA_fn(DESCR_t v)  { return v.v == DT_DATA; }
 /* Convert any value to string (GC-managed) */
 char *VARVAL_fn(DESCR_t v);
 
+/* ── RT-1: SIL-faithful INVOKE / ARGVAL (invoke.c) ── */
+DESCR_t INVOKE_fn(const char *name, DESCR_t *args, int nargs); /* SIL INVOKE */
+DESCR_t ARGVAL_fn(DESCR_t d);       /* SIL ARGVAL — evaluate one argument    */
+DESCR_t VARVAL_d_fn(DESCR_t d);     /* SIL VARVAL — coerce to STRING         */
+DESCR_t INTVAL_fn(DESCR_t d);       /* SIL INTVAL — coerce to INTEGER        */
+DESCR_t PATVAL_fn(DESCR_t d);       /* SIL PATVAL — coerce to PATTERN        */
+
 /* Convert any value to integer (0 on failure) */
 int64_t to_int(DESCR_t v);
 
