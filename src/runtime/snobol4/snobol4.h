@@ -260,6 +260,28 @@ DESCR_t  NAME_fn(const char *varname);
  * should fall back to NV_SET_fn for ordinary variables). */
 int      ASGNIC_fn(const char *kw_name, DESCR_t val);
 
+/* ── RT-4: SIL Naming List (§NMD) — nmd.c ──────────────────────────────── */
+/* NAM_push: record a conditional (.) capture during pattern match.
+ *   var    — NV variable name (DT_S target); NULL if ptr is used
+ *   ptr    — DT_N interior pointer target; NULL if var is used
+ *   dt     — DT_S / DT_K / DT_E (dispatch selector for commit)
+ *   s      — matched substring start (in subject buffer)
+ *   len    — matched substring length                                       */
+void    NAM_push(const char *var, DESCR_t *ptr, int dt,
+                 const char *s, int len);
+
+/* NAM_save: snapshot current naming-list top; returns opaque cookie.        */
+int     NAM_save(void);
+
+/* NAM_commit: on pattern success — assign all entries since cookie.
+ *   DT_K  → ASGNIC_fn (coerce to INTEGER per SIL NMDIC)
+ *   DT_E  → stub (NAMEXN / EXPEVL — implemented in RT-6)
+ *   else  → NV_SET_fn or interior-pointer write                             */
+void    NAM_commit(int cookie);
+
+/* NAM_discard: on pattern failure — restore top to cookie, nothing assigned.*/
+void    NAM_discard(int cookie);
+
 /* ============================================================
  * Counter stack (nPush/nInc/nDec/nTop/nPop)
  * ============================================================ */

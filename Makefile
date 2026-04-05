@@ -28,6 +28,7 @@ scrip-interp:
 	$(CC) $(CRT)   -c $(RT)/snobol4/snobol4_pattern.c        -o $(OBJ)/snobol4_pattern.o
 	$(CC) $(CRT)   -c $(RT)/snobol4/invoke.c                 -o $(OBJ)/invoke.o
 	$(CC) $(CRT)   -c $(RT)/snobol4/argval.c                 -o $(OBJ)/argval.o
+	$(CC) $(CRT)   -c $(RT)/snobol4/nmd.c                    -o $(OBJ)/nmd.o
 	$(CC) $(CRT)   -c $(RT)/dyn/stmt_exec.c                  -o $(OBJ)/stmt_exec.o
 	$(CC) $(CRT)   -c $(RT)/dyn/eval_code.c                  -o $(OBJ)/eval_code.o
 	$(CC) $(CRT)   -c $(RT)/asm/x86_stubs_interp.c           -o $(OBJ)/x86_stubs_interp.o

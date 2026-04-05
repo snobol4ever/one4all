@@ -182,26 +182,31 @@ static spec_t bb_capture(void *zeta, int entry)
                                                               goto CAP_γ_core;
 
     CAP_γ_core:   if (ζ->var_ptr || (ζ->varname && *ζ->varname)) {
-                      char *s = (char *)GC_MALLOC(child_r.δ + 1);
-                      memcpy(s, child_r.σ, (size_t)child_r.δ);
-                      s[child_r.δ] = '\0';
-                      DESCR_t val;
-                      val.v    = DT_S;
-                      val.slen = (uint32_t)child_r.δ;
-                      val.s    = s;
                       if (ζ->immediate) {
                           /* XFNME ($): immediate — write now on every γ */
+                          char *s = (char *)GC_MALLOC(child_r.δ + 1);
+                          memcpy(s, child_r.σ, (size_t)child_r.δ);
+                          s[child_r.δ] = '\0';
+                          DESCR_t val;
+                          val.v    = DT_S;
+                          val.slen = (uint32_t)child_r.δ;
+                          val.s    = s;
                           if (ζ->var_ptr)        *ζ->var_ptr = val;
                           else                   NV_SET_fn(ζ->varname, val);
                       } else {
-                          /* XNME (.): conditional — buffer, commit in Phase 5 */
+                          /* XNME (.): conditional — push onto NMD naming list.
+                           * NAM_discard(cookie) rolls back on scan failure;
+                           * NAM_commit(cookie) assigns all on overall success. */
+                          NAM_push(ζ->varname, ζ->var_ptr, DT_S,
+                                   child_r.σ, child_r.δ);
+                          /* Keep pending for scan-loop reset bookkeeping */
                           ζ->pending     = child_r;
                           ζ->has_pending = 1;
                       }
                   }
                                                               return child_r;
 
-    CAP_ω:        ζ->has_pending = 0;   /* backtracked past — discard pending */
+    CAP_ω:        ζ->has_pending = 0;   /* backtracked past — pending stale */
                                                               return spec_empty;
 }
 
@@ -1143,27 +1148,14 @@ static void register_capture(capture_t *c)
         g_capture_list[g_capture_count++] = c;
 }
 
-/* Flush all pending XNME captures (call after Phase 3 success) */
+/* Reset pending flags after Phase 3 success.
+ * RT-4: NAM_commit() now owns all conditional (.) capture writes.
+ * This function only clears has_pending bookkeeping so the scan-loop
+ * reset logic stays correct on subsequent statements. */
 static void flush_pending_captures(void)
 {
-    for (int i = 0; i < g_capture_count; i++) {
-        capture_t *c = g_capture_list[i];
-        if (!c->immediate && c->has_pending && (c->var_ptr || (c->varname && *c->varname))) {
-            spec_t snap = c->pending;
-            c->has_pending = 0;
-            char *s = (char *)GC_MALLOC(snap.δ + 1);
-            memcpy(s, snap.σ, (size_t)snap.δ);
-            s[snap.δ] = '\0';
-            DESCR_t val;
-            val.v    = DT_S;
-            val.slen = (uint32_t)snap.δ;
-            val.s    = s;
-            if (c->var_ptr)        *c->var_ptr = val;   /* DT_N NAME target */
-            else                   NV_SET_fn(c->varname, val);
-        } else {
-            c->has_pending = 0;
-        }
-    }
+    for (int i = 0; i < g_capture_count; i++)
+        g_capture_list[i]->has_pending = 0;
     g_capture_count = 0;
 }
 
@@ -1244,16 +1236,22 @@ int exec_stmt(const char  *subj_name,
      * DYN-4: honour kw_anchor (&ANCHOR keyword).
      * If non-zero, try only position 0 (anchored match).
      * Otherwise scan positions 0..Ω (unanchored).
+     *
+     * RT-4: save NAM cookie before each scan position so that conditional
+     * captures (.) pushed during a failed scan attempt are discarded and
+     * do not bleed into the next scan position or the failure path.
      */
     int match_start = -1;
     int match_end   = -1;
 
     int scan_limit = kw_anchor ? 0 : Ω;
+    int nam_cookie = NAM_save();   /* RT-4: NHEDCL baseline before all scans */
 
     for (int scan = 0; scan <= scan_limit; scan++) {
         /* reset stale pending captures from previous scan position */
         for (int i = 0; i < g_capture_count; i++)
             g_capture_list[i]->has_pending = 0;
+        NAM_discard(nam_cookie);   /* RT-4: roll back pushes from prior scan */
         Δ = scan;
         spec_t result = root.fn(root.ζ, α);
         if (!spec_is_empty(result)) {
@@ -1265,6 +1263,7 @@ int exec_stmt(const char  *subj_name,
     }
 
     /* match failed → :F */
+    NAM_discard(nam_cookie);       /* RT-4: discard any naming-list entries */
                                                               return 0;
 
 Phase4:
@@ -1279,7 +1278,8 @@ Phase4:
     if (has_repl && repl && !subj_name && !subj_var)          return 0;
 
     /* Flush XNME (.) conditional captures — overall match succeeded */
-    flush_pending_captures();
+    NAM_commit(nam_cookie);         /* RT-4: assign all naming-list entries (SIL NMD) */
+    flush_pending_captures();       /* legacy pending reset — keeps g_capture_list clean */
     dedup_callcaps();           /* DYN-79: remove stale backtrack entries, fix ordering */
     flush_pending_callcaps();   /* DYN-69: callcap (pat . *func()) targets */
 
