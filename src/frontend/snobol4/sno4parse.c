@@ -913,6 +913,62 @@ const char *g_include_paths[MAX_INCLUDE_PATHS];
 int         g_num_include_paths = 0;
 
 /* =========================================================================
+ * IO state for true streaming — mirrors SIL UNIT/TEXTSP/NEXTSP globals.
+ *
+ * CSNOBOL4 keeps TEXTSP = one physical line at a time.  FORWRD on ST_EOS
+ * calls FORRUN which calls IO_READ for the next physical card, runs CARDTB,
+ * dispatches NEWCRD:
+ *   CMTTYP (comment)      → skip, loop (FORRN0)
+ *   CNTTYP (continuation) → strip '+', RTN2 → re-drive FORWRD on remainder
+ *   CTLTYP (control -XXX) → handle -INCLUDE, then treat as comment
+ *   NEWTYP (new stmt)     → save as g_pending_*, return EOSTYP to FORWRD
+ *
+ * No pre-joining. No linebuf. This is what CSNOBOL4 does.
+ * ========================================================================= */
+#define IO_LINEBUF_SZ 4096
+
+static FILE       *g_io_file     = NULL;   /* current source file */
+static const char *g_io_path     = NULL;   /* path of current source file */
+static int         g_io_lineno   = 0;      /* physical line counter */
+static int         g_io_depth    = 0;      /* -INCLUDE nesting depth */
+
+/* Physical line buffer — TEXTSP.ptr points into here during CMPILE */
+static char g_io_linebuf[IO_LINEBUF_SZ];
+
+/* Pending line — a NEWTYP card read by FORRUN that belongs to the NEXT stmt */
+static char g_pending_buf[IO_LINEBUF_SZ];
+static int  g_pending_len  = 0;   /* >0 means a pending line is waiting */
+static int  g_pending_lineno = 0;
+
+/* g_stmt_lineno — physical line number of current statement's first card */
+static int  g_stmt_lineno  = 0;
+
+/* g_io_eof — set when the file (and all includes) are exhausted */
+static int  g_io_eof = 0;
+
+/* Forward declaration — resolve_include_path is defined later in the file */
+static char *resolve_include_path(const char *base_path, const char *incname);
+
+/* io_read_raw — read one raw physical line into buf (max bufsz), strip CRLF.
+ * Returns length > 0 on success, 0 on EOF/error. */
+static int io_read_raw(FILE *f, char *buf, int bufsz) {
+    if (!fgets(buf, bufsz, f)) return 0;
+    int len = (int)strlen(buf);
+    while (len > 0 && (buf[len-1]=='\n' || buf[len-1]=='\r')) buf[--len] = '\0';
+    return len;
+}
+
+/* forrun — implements SIL FORRUN: read next physical card and dispatch NEWCRD.
+ * Called by FORWRD/FORBLK when STREAM returns ST_EOS.
+ * Sets TEXTSP to the continuation content and returns:
+ *   2 → continuation card: TEXTSP is ready, caller (FORWRD) should re-drive STREAM
+ *   1 → new statement pending (saved in g_pending_*) or EOF: TEXTSP exhausted
+ *
+ * Mirrors CSNOBOL4 snobol4.c FORRUN/NEWCRD logic exactly.
+ */
+static int forrun(void);  /* forward decl — defined after CMPILE helpers */
+
+/* =========================================================================
  * FORWRD / FORBLK — inter-field scanning (v311.sil lines 2214, 2241)
  *
  * FORWRD: STREAM XSP,TEXTSP,FRWDTB → sets BRTYPE
@@ -920,25 +976,45 @@ int         g_num_include_paths = 0;
  * ========================================================================= */
 
 /* FORWRD — "Procedure to get to next character" (v311.sil:2214)
- * Streams TEXTSP through FRWDTB: skips transparent chars (space/tab, chrs[]=0),
- * stops on the first field delimiter and sets BRTYPE to that delimiter's STYPE.
- * Equivalent to SIL:  STREAM XSP,TEXTSP,FRWDTB  then  MOVD BRTYPE,STYPE. */
+ *
+ * SIL:  STREAM XSP,TEXTSP,FRWDTB,COMP3,FORRUN
+ *   ST_ERROR → COMP3  (sil_error)
+ *   ST_EOS   → FORRUN (fetch next physical card; if continuation, re-drive)
+ *   ST_STOP  → FORJRN (set BRTYPE=STYPE, return)
+ */
 static void FORWRD(void) {
-    stream_ret_t r = stream(&XSP, &TEXTSP, &FRWDTB); /* scan to next delimiter */
+retry:;
+    stream_ret_t r = stream(&XSP, &TEXTSP, &FRWDTB);
     if (r == ST_ERROR) { sil_error("FORWRD: scan error"); return; }
-    if (r == ST_EOS)   { BRTYPE = EOSTYP; return; }
-    BRTYPE = STYPE;  /* STYPE = EQTYP/CLNTYP/EOSTYP/NBTYP/RPTYP etc. */
+    if (r == ST_EOS) {
+        int fr = forrun();
+        if (fr == 2) goto retry;   /* continuation: TEXTSP loaded, re-drive */
+        BRTYPE = EOSTYP;            /* EOF or new-stmt pending */
+        return;
+    }
+    BRTYPE = STYPE;
 }
 
 /* FORBLK — "Procedure to get to nonblank" (v311.sil:2241)
- * Like FORWRD but starts with IBLKTB to skip the mandatory inter-field blank.
- * IBLKTB chains to FRWDTB on the first non-blank char (ACT_GOTO).
- * Returns ST_ERROR if the current position is NOT a blank (no inter-field gap);
- * that condition is the BINOP1 / no-blank path in BINOP(). */
+ *
+ * SIL:  STREAM XSP,TEXTSP,IBLKTB,RTN1,FORRUN,FORJRN
+ *   ST_ERROR → RTN1   (no blank at current pos — caller handles; NOT an error)
+ *   ST_EOS   → FORRUN (fetch next physical card; if continuation, re-drive)
+ *   ST_STOP  → FORJRN (set BRTYPE=STYPE, return normally)
+ *
+ * BINOP calls FORBLK and treats ST_ERROR (BRTYPE unchanged / 0) as "no blank → BINOP1".
+ */
 static void FORBLK(void) {
-    stream_ret_t r = stream(&XSP, &TEXTSP, &IBLKTB); /* skip blank, classify delimiter */
-    if (r == ST_ERROR || r == ST_EOS) { BRTYPE = EOSTYP; return; }
-    BRTYPE = STYPE;  /* FORJRN: "MOVD BRTYPE,STYPE" (v311.sil:2217) */
+retry:;
+    stream_ret_t r = stream(&XSP, &TEXTSP, &IBLKTB);
+    if (r == ST_ERROR) { /* RTN1: no blank here — leave BRTYPE as-is, caller decides */ return; }
+    if (r == ST_EOS) {
+        int fr = forrun();
+        if (fr == 2) goto retry;   /* continuation: re-drive */
+        BRTYPE = EOSTYP;
+        return;
+    }
+    BRTYPE = STYPE;  /* FORJRN */
 }
 
 /* =========================================================================
@@ -1208,10 +1284,19 @@ static NODE *ELEMNT(void) {
     if (unary_chain && !unary_nospace) FORWRD();
 
     /* --- STREAM XSP,TEXTSP,ELEMTB — classify element --- */
+    /* SIL: STREAM XSP,TEXTSP,ELEMTB,ELEICH,ELEILI
+     *   ST_ERROR → ELEICH (illegal character)
+     *   ST_EOS   → ELEILI: if STYPE==0 → ELEICH (error), else continue
+     *   ST_STOP  → fallthrough (normal) */
     stream_ret_t r = stream(&XSP, &TEXTSP, &ELEMTB);
     if (r == ST_ERROR) {
         sil_error("ELEMNT: illegal character");
         return NULL;
+    }
+    if (r == ST_EOS) {
+        /* ELEILI: AEQLC STYPE,0,,ELEICH */
+        if (STYPE == 0) { sil_error("ELEMNT: illegal character"); return NULL; }
+        /* else STYPE!=0: a table GOTO fired before EOS — continue with what we have */
     }
     int elem_stype = STYPE;
 
@@ -1535,8 +1620,12 @@ static STMT *CMPILE(void) {
     if (g_error) return NULL;
     STMT *s = calloc(1, sizeof *s);
 
-    /* CMPIL0: STREAM XSP,TEXTSP,LBLTB — break out label field */
-    stream(&XSP, &TEXTSP, &LBLTB);
+    /* CMPIL0: STREAM XSP,TEXTSP,LBLTB,CERR1 — break out label field
+     * ST_ERROR → CERR1 (label error); ST_EOS/ST_STOP → fallthrough */
+    {
+        stream_ret_t lr = stream(&XSP, &TEXTSP, &LBLTB);
+        if (lr == ST_ERROR) { sil_error("CMPILE: label error"); return s; }
+    }
     if (XSP.len > 0)
         s->label = xsp_dup();
 
@@ -1631,9 +1720,11 @@ CMPASP:  /* SUBJECT PATTERN = REPLACEMENT (= consumed; position to replacement) 
     return s;
 
 CMPGO: {
-    /* STREAM XSP,TEXTSP,GOTOTB — classify goto type */
+    /* STREAM XSP,TEXTSP,GOTOTB,CERR11,CERR12 — classify goto type
+     * ST_ERROR → CERR11 (bad goto), ST_EOS → CERR12 (bad goto), ST_STOP → ok */
     stream_ret_t r = stream(&XSP, &TEXTSP, &GOTOTB);
     if (r == ST_ERROR) { sil_error("CMPGO: bad goto"); return s; }
+    if (r == ST_EOS)   { sil_error("CMPGO: truncated goto"); return s; }
     int gotype = STYPE;
 
     /* CMPSGO / CMPFGO / CMPUGO */
@@ -1741,39 +1832,150 @@ static void print_stmt(STMT *s, int idx) {
 }
 
 /* =========================================================================
- * compile_state — shared mutable state threaded through compile_file()
- * (kept in a struct so recursive -INCLUDE calls share stmt list & counter) */
+ * compile_state — shared mutable state threaded through compile_file().
+ * No linebuf. No pre-joining. TEXTSP = one physical line. FORWRD calls
+ * forrun() on EOS to load the next card, exactly as CSNOBOL4 does. */
 typedef struct {
     STMT  *head;
     STMT  *tail;
     int    stmt_idx;
-    char   linebuf[65536];
-    int    linebuf_len;
-    int    stmt_lineno;
-    int    done;          /* set to 1 when END statement is seen */
+    int    done;   /* set to 1 when END statement is seen */
 } compile_state_t;
 
-/* flush_linebuf — compile one logical line and append to stmt list */
-static void flush_linebuf(compile_state_t *st) {
-    if (st->linebuf_len == 0) return;
+/* g_cst — pointer to the active compile_state (set by compile_file) */
+static compile_state_t *g_cst = NULL;
+
+/* compile_one_stmt — compile TEXTSP as one statement, append to g_cst.
+ * Called from compile_file after TEXTSP is set to a NEWTYP physical line. */
+static void compile_one_stmt(void) {
+    if (!g_cst || g_cst->done) return;
     g_error = 0;
-    TEXTSP.ptr = st->linebuf; TEXTSP.len = st->linebuf_len;
     STYPE = 0; BRTYPE = 0;
     STMT *s = CMPILE();
-    /* keep a local copy of the linebuf for error reporting before clearing */
-    int saved_len = st->linebuf_len;
-    char saved_buf[65536];
-    memcpy(saved_buf, st->linebuf, saved_len);
-    st->linebuf_len = 0;
-    if (!s) return;
+    if (!s) {
+        if (g_error)
+            fprintf(stderr, "line %d: %s\n", g_stmt_lineno, g_errmsg);
+        return;
+    }
     s->next = NULL;
-    if (!st->head) st->head = s; else st->tail->next = s;
-    st->tail = s;
+    if (!g_cst->head) g_cst->head = s; else g_cst->tail->next = s;
+    g_cst->tail = s;
     if (g_error)
-        fprintf(stderr, "line %d: %s\n  src: %.*s\n",
-                st->stmt_lineno, g_errmsg, saved_len, saved_buf);
-    print_stmt(s, ++st->stmt_idx);
-    if (s->is_end) st->done = 1;
+        fprintf(stderr, "line %d: %s\n", g_stmt_lineno, g_errmsg);
+    print_stmt(s, ++g_cst->stmt_idx);
+    if (s->is_end) g_cst->done = 1;
+}
+
+/* =========================================================================
+ * forrun() — SIL FORRUN: fetch next physical card, dispatch NEWCRD.
+ *
+ * Called by FORWRD/FORBLK when STREAM returns ST_EOS on TEXTSP.
+ * Returns:
+ *   2 → continuation: TEXTSP updated to post-'+' content; caller re-drives STREAM
+ *   1 → new stmt saved in g_pending_* (or EOF): caller sets BRTYPE=EOSTYP
+ *
+ * CSNOBOL4 reference: snobol4.c FORRUN (line 1850) + NEWCRD (line 1927).
+ * ========================================================================= */
+static int forrun(void) {
+retry:
+    if (!g_io_file || g_io_eof) return 1;
+
+    char rawline[IO_LINEBUF_SZ];
+    int len = io_read_raw(g_io_file, rawline, sizeof rawline);
+    if (len == 0) {
+        g_io_eof = 1;
+        return 1;   /* EOF */
+    }
+    g_io_lineno++;
+
+    /* CARDTB: determine card type */
+    spec_t card = { rawline, len };
+    spec_t tok;
+    stream(&tok, &card, &CARDTB);
+    int ctype = STYPE;
+
+    /* NEWCRD dispatch (v311.sil NEWCRD, snobol4.c NEWCRD) */
+    switch (ctype) {
+    case CMTTYP:   /* comment — skip, loop (FORRN0) */
+        goto retry;
+
+    case CTLTYP: { /* control card (-XXX) — handle -INCLUDE, then skip */
+        const char *p = rawline + 1;
+        while (*p == '-') p++;
+        const char *name_start = p;
+        while (*p && *p != ' ' && *p != '\t') p++;
+        int namelen = (int)(p - name_start);
+        if (namelen == 7 && strncasecmp(name_start, "INCLUDE", 7) == 0) {
+            while (*p == ' ' || *p == '\t') p++;
+            if (*p) {
+                char *incpath = resolve_include_path(g_io_path, p);
+                FILE *incf = fopen(incpath, "r");
+                if (!incf) { char *cr = strchr(incpath,'\r'); if(cr)*cr='\0'; incf=fopen(incpath,"r"); }
+                if (incf) {
+                    /* push IO state, recurse */
+                    FILE *save_file = g_io_file;
+                    const char *save_path = g_io_path;
+                    int save_lineno = g_io_lineno;
+                    int save_eof    = g_io_eof;
+                    int save_depth  = g_io_depth;
+                    g_io_file = incf; g_io_path = incpath;
+                    g_io_lineno = 0; g_io_eof = 0; g_io_depth++;
+                    /* run included file: compile_file equivalent via outer loop */
+                    /* We can't call compile_file here without restructuring;
+                     * instead: drain the included file by calling forrun until EOF,
+                     * compiling each NEWTYP statement as we go. */
+                    while (!g_io_eof && !(g_cst && g_cst->done)) {
+                        int fr2 = forrun();
+                        if (fr2 == 2) {
+                            /* continuation at top level — compile pending if any */
+                            /* (shouldn't happen at include-open boundary) */
+                        } else {
+                            /* fr2==1: new stmt in g_pending or EOF */
+                            if (g_pending_len > 0) {
+                                memcpy(g_io_linebuf, g_pending_buf, g_pending_len);
+                                g_io_linebuf[g_pending_len] = '\0';
+                                TEXTSP.ptr = g_io_linebuf;
+                                TEXTSP.len = g_pending_len;
+                                g_stmt_lineno = g_pending_lineno;
+                                g_pending_len = 0;
+                                compile_one_stmt();
+                            }
+                            if (g_io_eof) break;
+                        }
+                    }
+                    fclose(incf);
+                    free(incpath);
+                    g_io_file = save_file; g_io_path = save_path;
+                    g_io_lineno = save_lineno; g_io_eof = save_eof;
+                    g_io_depth = save_depth;
+                } else {
+                    fprintf(stderr, "sno4parse: cannot open include '%s': %s\n", incpath, strerror(errno));
+                    free(incpath);
+                }
+            }
+        }
+        goto retry;  /* skip control card, loop */
+    }
+
+    case CNTTYP: { /* continuation — strip '+', set TEXTSP, return 2 (re-drive) */
+        /* SIL CNTCRD: S_L(TEXTSP)--; S_O(TEXTSP)++;  (skip the '+') */
+        const char *p = rawline;
+        if (*p == '+') p++;   /* strip leading '+' */
+        int clen = len - (int)(p - rawline);
+        memcpy(g_io_linebuf, p, clen);
+        g_io_linebuf[clen] = '\0';
+        TEXTSP.ptr = g_io_linebuf;
+        TEXTSP.len = clen;
+        return 2;   /* RTN2 → BRANCH(FORWRD): caller re-drives STREAM */
+    }
+
+    default:      /* NEWTYP (new statement) — save as pending, return 1 */
+        memcpy(g_pending_buf, rawline, len);
+        g_pending_buf[len] = '\0';
+        g_pending_len = len;
+        g_pending_lineno = g_io_lineno;
+        return 1;   /* RTN3: FORRUN sets EOSCL, FORWRD sets BRTYPE=EOSTYP */
+    }
 }
 
 /* resolve_include_path — resolve 'filename' relative to base_path directory.
@@ -1839,116 +2041,107 @@ static char *resolve_include_path(const char *base_path, const char *incname) {
     return strdup(result);
 }
 
-/* compile_file — process one source file (or stdin), recursing for -INCLUDE.
- * base_path: path of this file (for resolving -INCLUDE), or NULL for stdin.
- * depth: recursion guard (max 16). */
-static void compile_file(FILE *f, const char *base_path,
-                         compile_state_t *st, int depth) {
-    if (depth > 16) {
-        fprintf(stderr, "sno4parse: -INCLUDE nesting too deep (>16), aborting\n");
-        return;
+/* compile_file — process one source file.
+ *
+ * TRUE STREAMING — mirrors CSNOBOL4 XLATNX (snobol4.c line 113).
+ * No pre-joining. No linebuf. TEXTSP = one physical line at a time.
+ * FORWRD calls forrun() on EOS to load continuations transparently.
+ */
+static void compile_file(FILE *f, const char *base_path, compile_state_t *st) {
+    g_io_file   = f;
+    g_io_path   = base_path;
+    g_io_lineno = 0;
+    g_io_eof    = 0;
+    g_cst       = st;
+
+    /* Drain any pending line left from a prior forrun() call (include re-entry) */
+    if (g_pending_len > 0) {
+        memcpy(g_io_linebuf, g_pending_buf, g_pending_len);
+        g_io_linebuf[g_pending_len] = '\0';
+        TEXTSP.ptr = g_io_linebuf;
+        TEXTSP.len = g_pending_len;
+        g_stmt_lineno = g_pending_lineno;
+        g_pending_len = 0;
+        compile_one_stmt();
     }
 
-    char rawline[4096];
-    int  lineno = 0;
+    char rawline[IO_LINEBUF_SZ];
 
-    while (!st->done && fgets(rawline, sizeof rawline, f)) {
-        lineno++;
-        int len = strlen(rawline);
-        while (len > 0 && (rawline[len-1]=='\n'||rawline[len-1]=='\r'))
-            rawline[--len] = '\0';
-        if (len == 0) continue;
+    while (!st->done && !g_io_eof) {
+        int len = io_read_raw(f, rawline, sizeof rawline);
+        if (len == 0) break;
+        g_io_lineno++;
 
-        /* CARDTB: determine card type */
         spec_t card = { rawline, len };
         spec_t tok;
         stream(&tok, &card, &CARDTB);
         int ctype = STYPE;
 
-        /* Comment: skip */
         if (ctype == CMTTYP) continue;
 
-        /* Control card (-XXX): handle -INCLUDE, skip others */
         if (ctype == CTLTYP) {
-            /* rawline starts with '-'; parse directive name */
-            const char *p = rawline + 1;   /* skip '-' */
-            while (*p == '-') p++;          /* some use '--' */
-            /* find directive name end */
-            const char *name_start = p;
+            const char *p = rawline + 1;
+            while (*p == '-') p++;
+            const char *ns = p;
             while (*p && *p != ' ' && *p != '\t') p++;
-            int namelen = (int)(p - name_start);
-
-            int is_include = (namelen == 7 &&
-                              strncasecmp(name_start, "INCLUDE", 7) == 0);
-            if (is_include) {
-                /* flush pending logical line before splicing include */
-                flush_linebuf(st);
-                if (st->done) break;
-
-                /* Extract filename argument: skip whitespace, then grab token */
+            int nlen = (int)(p - ns);
+            if (nlen == 7 && strncasecmp(ns, "INCLUDE", 7) == 0) {
                 while (*p == ' ' || *p == '\t') p++;
-                if (*p == '\0') {
-                    fprintf(stderr, "sno4parse: -INCLUDE missing filename at line %d of %s\n",
-                            lineno, base_path ? base_path : "<stdin>");
-                    continue;
+                if (*p) {
+                    char *incpath = resolve_include_path(base_path, p);
+                    FILE *incf = fopen(incpath, "r");
+                    if (!incf) { char *cr=strchr(incpath,'\r'); if(cr)*cr='\0'; incf=fopen(incpath,"r"); }
+                    if (incf) {
+                        FILE *sv_f=g_io_file; const char *sv_p=g_io_path;
+                        int sv_ln=g_io_lineno, sv_eof=g_io_eof, sv_dep=g_io_depth;
+                        g_io_depth++;
+                        compile_file(incf, incpath, st);
+                        fclose(incf); free(incpath);
+                        g_io_file=sv_f; g_io_path=sv_p;
+                        g_io_lineno=sv_ln; g_io_eof=sv_eof; g_io_depth=sv_dep;
+                    } else {
+                        fprintf(stderr,"sno4parse: cannot open include '%s': %s\n",incpath,strerror(errno));
+                        free(incpath);
+                    }
                 }
-
-                char *incpath = resolve_include_path(base_path, p);
-                FILE *incf = fopen(incpath, "r");
-                if (!incf) {
-                    /* Try stripping \r from path (CRLF files) */
-                    char *cr = strchr(incpath, '\r');
-                    if (cr) *cr = '\0';
-                    incf = fopen(incpath, "r");
-                }
-                if (!incf) {
-                    fprintf(stderr, "sno4parse: cannot open include '%s' (from %s line %d): %s\n",
-                            incpath, base_path ? base_path : "<stdin>", lineno, strerror(errno));
-                    free(incpath);
-                    continue;
-                }
-                compile_file(incf, incpath, st, depth + 1);
-                fclose(incf);
-                free(incpath);
-            }
-            /* All other control cards (-MODULE, -DEFINE, -EJECT, etc.): skip */
-            continue;
-        }
-
-        /* Continuation line */
-        if (ctype == CNTTYP) {
-            const char *p = rawline;
-            while (*p == ' ' || *p == '\t') p++;
-            if (*p == '+') p++;
-            int contlen = len - (int)(p - rawline);
-            if (st->linebuf_len + contlen < (int)sizeof(st->linebuf) - 1) {
-                memcpy(st->linebuf + st->linebuf_len, p, contlen);
-                st->linebuf_len += contlen;
             }
             continue;
         }
 
-        /* NEWTYP: flush pending logical line, start new one */
-        flush_linebuf(st);
-        if (st->done) break;
+        if (ctype == CNTTYP) continue;  /* continuation at top level — skip */
 
-        st->stmt_lineno = lineno;
-        if (len < (int)sizeof(st->linebuf) - 1) {
-            memcpy(st->linebuf, rawline, len);
-            st->linebuf_len = len;
+        /* NEWTYP: a real statement line */
+        memcpy(g_io_linebuf, rawline, len);
+        g_io_linebuf[len] = '\0';
+        TEXTSP.ptr = g_io_linebuf;
+        TEXTSP.len = len;
+        g_stmt_lineno = g_io_lineno;
+        compile_one_stmt();
+
+        /* Drain any pending lines that forrun() buffered during CMPILE */
+        while (!st->done && g_pending_len > 0) {
+            memcpy(g_io_linebuf, g_pending_buf, g_pending_len);
+            g_io_linebuf[g_pending_len] = '\0';
+            TEXTSP.ptr = g_io_linebuf;
+            TEXTSP.len = g_pending_len;
+            g_stmt_lineno = g_pending_lineno;
+            g_pending_len = 0;
+            compile_one_stmt();
         }
     }
 
-    /* Flush final logical line from this file (only if not already done) */
-    if (!st->done) flush_linebuf(st);
+    /* Drain final pending */
+    while (!st->done && g_pending_len > 0) {
+        memcpy(g_io_linebuf, g_pending_buf, g_pending_len);
+        g_io_linebuf[g_pending_len] = '\0';
+        TEXTSP.ptr = g_io_linebuf;
+        TEXTSP.len = g_pending_len;
+        g_stmt_lineno = g_pending_lineno;
+        g_pending_len = 0;
+        compile_one_stmt();
+    }
 }
 
-/* =========================================================================
- * main — read source lines, classify each with CARDTB, compile with CMPILE
- *
- * SIL equivalent: the outer read loop in XLATNX/FORRN0 (v311.sil:1033+).
- * NEWCRD (v311.sil:SELBRA STYPE,(,CMTCRD,CTLCRD,CNTCRD)) dispatches on
- * card type; we inline that logic with a simple switch on ctype. */
 
 int main(int argc, char **argv) {
     init_tables();
@@ -1983,12 +2176,12 @@ int main(int argc, char **argv) {
 
     if (n_input_files == 0) {
         /* stdin mode */
-        compile_file(stdin, NULL, &st, 0);
+        compile_file(stdin, NULL, &st);
     } else {
         for (int i = 0; i < n_input_files && !st.done; i++) {
             FILE *f = fopen(input_files[i], "r");
             if (!f) { perror(input_files[i]); continue; }
-            compile_file(f, input_files[i], &st, 0);
+            compile_file(f, input_files[i], &st);
             fclose(f);
         }
     }
