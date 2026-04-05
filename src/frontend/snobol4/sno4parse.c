@@ -25,6 +25,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include <errno.h>
+#include <unistd.h>
+#include <dirent.h>
 
 /* =========================================================================
  * syntab / acts — from snobol4-2.3.3/include/syntab.h
@@ -904,6 +907,11 @@ static void sil_error(const char *fmt, ...) {
     g_error = 1;
 }
 
+/* -I include search paths (populated from command-line -I flags) */
+#define MAX_INCLUDE_PATHS 64
+const char *g_include_paths[MAX_INCLUDE_PATHS];
+int         g_num_include_paths = 0;
+
 /* =========================================================================
  * FORWRD / FORBLK — inter-field scanning (v311.sil lines 2214, 2241)
  *
@@ -1431,6 +1439,7 @@ struct STMT {
     NODE *pattern;        /* pattern expression, or NULL if no pattern field */
     NODE *replacement;    /* replacement expression, or NULL (present when has_eq) */
     int   has_eq;         /* 1 if '=' was present in source (distinguishes assign from match) */
+    int   is_scan;        /* 1 if binary '?' scan operator was used (SUBJECT ? PATTERN) */
     char *go_s;           /* :S(label) success-goto target, or NULL */
     char *go_f;           /* :F(label) failure-goto target, or NULL */
     char *go_u;           /* :(label)  unconditional-goto target, or NULL */
@@ -1491,6 +1500,24 @@ static STMT *CMPILE(void) {
         if (BRTYPE == EQTYP) goto CMPFRM;   /* = replacement */
         if (BRTYPE == CLNTYP) goto CMPGO;   /* : goto */
         if (BRTYPE == EOSTYP) return s;     /* bare invoke */
+
+        /* NBTYP: FORBLK stopped short (STOPSH) before a non-blank.
+         * SIL [PLB32]: if char is '?' followed by space/tab/end → binary scan op.
+         * Consume the '?', set scan flag, fall through to pattern parse.
+         * CS source: v311.sil:1667-1675 */
+        if (BRTYPE == NBTYP) {
+            if (TEXTSP.len >= 1 && TEXTSP.ptr[0] == '?' &&
+                (TEXTSP.len == 1 || TEXTSP.ptr[1] == ' ' || TEXTSP.ptr[1] == '\t')) {
+                /* binary ? consumed — TEXTSP advances past it */
+                TEXTSP.ptr++; TEXTSP.len--;
+                s->is_scan = 1;   /* mark as ? scan statement */
+                FORBLK();         /* skip whitespace to pattern */
+                if (BRTYPE == EOSTYP || BRTYPE == 0) return s;
+                if (BRTYPE == CLNTYP) goto CMPGO;
+            } else {
+                /* NBTYP without ? — juxtaposition in pattern context, fall through */
+            }
+        }
 
         /* Otherwise: pattern field follows */
         /* CMPAT2: RCALL PATND,EXPR */
@@ -1620,12 +1647,216 @@ static void print_stmt(STMT *s, int idx) {
     if (s->is_end)      { printf("  END\n"); return; }
     if (s->label)         printf("  label:   %s\n", s->label);
     if (s->subject)     { printf("  subject:\n"); print_node(s->subject, 2); }
+    if (s->is_scan)       printf("  op:      ?\n");
     if (s->pattern)     { printf("  pattern:\n"); print_node(s->pattern, 2); }
     if (s->has_eq && s->replacement)
                         { printf("  replace:\n"); print_node(s->replacement, 2); }
     if (s->go_s)          printf("  :S(%s)\n", s->go_s);
     if (s->go_f)          printf("  :F(%s)\n", s->go_f);
     if (s->go_u)          printf("  :(%s)\n",  s->go_u);
+}
+
+/* =========================================================================
+ * compile_state — shared mutable state threaded through compile_file()
+ * (kept in a struct so recursive -INCLUDE calls share stmt list & counter) */
+typedef struct {
+    STMT  *head;
+    STMT  *tail;
+    int    stmt_idx;
+    char   linebuf[65536];
+    int    linebuf_len;
+    int    stmt_lineno;
+    int    done;          /* set to 1 when END statement is seen */
+} compile_state_t;
+
+/* flush_linebuf — compile one logical line and append to stmt list */
+static void flush_linebuf(compile_state_t *st) {
+    if (st->linebuf_len == 0) return;
+    g_error = 0;
+    TEXTSP.ptr = st->linebuf; TEXTSP.len = st->linebuf_len;
+    STYPE = 0; BRTYPE = 0;
+    STMT *s = CMPILE();
+    /* keep a local copy of the linebuf for error reporting before clearing */
+    int saved_len = st->linebuf_len;
+    char saved_buf[65536];
+    memcpy(saved_buf, st->linebuf, saved_len);
+    st->linebuf_len = 0;
+    if (!s) return;
+    s->next = NULL;
+    if (!st->head) st->head = s; else st->tail->next = s;
+    st->tail = s;
+    if (g_error)
+        fprintf(stderr, "line %d: %s\n  src: %.*s\n",
+                st->stmt_lineno, g_errmsg, saved_len, saved_buf);
+    print_stmt(s, ++st->stmt_idx);
+    if (s->is_end) st->done = 1;
+}
+
+/* resolve_include_path — resolve 'filename' relative to base_path directory.
+ * Returns malloc'd absolute path; caller frees.
+ * base_path is the path of the including file (e.g. "/home/claude/corpus/foo.sno"). */
+static char *resolve_include_path(const char *base_path, const char *incname) {
+    /* Strip quotes if present */
+    char name[1024];
+    int nlen = strlen(incname);
+    if (nlen >= 2 && (incname[0]=='\'' || incname[0]=='"') &&
+        incname[nlen-1] == incname[0]) {
+        nlen -= 2;
+        memcpy(name, incname+1, nlen);
+        name[nlen] = '\0';
+    } else {
+        memcpy(name, incname, nlen+1);
+    }
+    /* Strip trailing \r if present (CRLF files) */
+    { int l = strlen(name); while (l > 0 && name[l-1]=='\r') name[--l]='\0'; }
+
+    /* If already absolute, return as-is */
+    if (name[0] == '/') return strdup(name);
+
+    /* 1. Try relative to including file's directory */
+    char base[4096];
+    strncpy(base, base_path ? base_path : ".", sizeof(base)-1);
+    base[sizeof(base)-1] = '\0';
+    char *slash = strrchr(base, '/');
+    if (slash) { *slash = '\0'; }
+    else        { strcpy(base, "."); }
+
+    char result[4096];
+    snprintf(result, sizeof result, "%s/%s", base, name);
+    if (access(result, R_OK) == 0) return strdup(result);
+
+    /* 2. Search -I include paths in order */
+    extern const char *g_include_paths[];
+    extern int         g_num_include_paths;
+    for (int i = 0; i < g_num_include_paths; i++) {
+        snprintf(result, sizeof result, "%s/%s", g_include_paths[i], name);
+        if (access(result, R_OK) == 0) return strdup(result);
+        /* Case-insensitive fallback: scan directory for matching name */
+        {
+            DIR *d = opendir(g_include_paths[i]);
+            if (d) {
+                struct dirent *de;
+                while ((de = readdir(d)) != NULL) {
+                    if (strcasecmp(de->d_name, name) == 0) {
+                        snprintf(result, sizeof result, "%s/%s",
+                                 g_include_paths[i], de->d_name);
+                        closedir(d);
+                        return strdup(result);
+                    }
+                }
+                closedir(d);
+            }
+        }
+    }
+
+    /* 3. Not found anywhere — return the relative-to-base path so caller
+     *    can report a useful error message */
+    snprintf(result, sizeof result, "%s/%s", base, name);
+    return strdup(result);
+}
+
+/* compile_file — process one source file (or stdin), recursing for -INCLUDE.
+ * base_path: path of this file (for resolving -INCLUDE), or NULL for stdin.
+ * depth: recursion guard (max 16). */
+static void compile_file(FILE *f, const char *base_path,
+                         compile_state_t *st, int depth) {
+    if (depth > 16) {
+        fprintf(stderr, "sno4parse: -INCLUDE nesting too deep (>16), aborting\n");
+        return;
+    }
+
+    char rawline[4096];
+    int  lineno = 0;
+
+    while (!st->done && fgets(rawline, sizeof rawline, f)) {
+        lineno++;
+        int len = strlen(rawline);
+        while (len > 0 && (rawline[len-1]=='\n'||rawline[len-1]=='\r'))
+            rawline[--len] = '\0';
+        if (len == 0) continue;
+
+        /* CARDTB: determine card type */
+        spec_t card = { rawline, len };
+        spec_t tok;
+        stream(&tok, &card, &CARDTB);
+        int ctype = STYPE;
+
+        /* Comment: skip */
+        if (ctype == CMTTYP) continue;
+
+        /* Control card (-XXX): handle -INCLUDE, skip others */
+        if (ctype == CTLTYP) {
+            /* rawline starts with '-'; parse directive name */
+            const char *p = rawline + 1;   /* skip '-' */
+            while (*p == '-') p++;          /* some use '--' */
+            /* find directive name end */
+            const char *name_start = p;
+            while (*p && *p != ' ' && *p != '\t') p++;
+            int namelen = (int)(p - name_start);
+
+            int is_include = (namelen == 7 &&
+                              strncasecmp(name_start, "INCLUDE", 7) == 0);
+            if (is_include) {
+                /* flush pending logical line before splicing include */
+                flush_linebuf(st);
+                if (st->done) break;
+
+                /* Extract filename argument: skip whitespace, then grab token */
+                while (*p == ' ' || *p == '\t') p++;
+                if (*p == '\0') {
+                    fprintf(stderr, "sno4parse: -INCLUDE missing filename at line %d of %s\n",
+                            lineno, base_path ? base_path : "<stdin>");
+                    continue;
+                }
+
+                char *incpath = resolve_include_path(base_path, p);
+                FILE *incf = fopen(incpath, "r");
+                if (!incf) {
+                    /* Try stripping \r from path (CRLF files) */
+                    char *cr = strchr(incpath, '\r');
+                    if (cr) *cr = '\0';
+                    incf = fopen(incpath, "r");
+                }
+                if (!incf) {
+                    fprintf(stderr, "sno4parse: cannot open include '%s' (from %s line %d): %s\n",
+                            incpath, base_path ? base_path : "<stdin>", lineno, strerror(errno));
+                    free(incpath);
+                    continue;
+                }
+                compile_file(incf, incpath, st, depth + 1);
+                fclose(incf);
+                free(incpath);
+            }
+            /* All other control cards (-MODULE, -DEFINE, -EJECT, etc.): skip */
+            continue;
+        }
+
+        /* Continuation line */
+        if (ctype == CNTTYP) {
+            const char *p = rawline;
+            while (*p == ' ' || *p == '\t') p++;
+            if (*p == '+') p++;
+            int contlen = len - (int)(p - rawline);
+            if (st->linebuf_len + contlen < (int)sizeof(st->linebuf) - 1) {
+                memcpy(st->linebuf + st->linebuf_len, p, contlen);
+                st->linebuf_len += contlen;
+            }
+            continue;
+        }
+
+        /* NEWTYP: flush pending logical line, start new one */
+        flush_linebuf(st);
+        if (st->done) break;
+
+        st->stmt_lineno = lineno;
+        if (len < (int)sizeof(st->linebuf) - 1) {
+            memcpy(st->linebuf, rawline, len);
+            st->linebuf_len = len;
+        }
+    }
+
+    /* Flush final logical line from this file (only if not already done) */
+    if (!st->done) flush_linebuf(st);
 }
 
 /* =========================================================================
@@ -1639,91 +1870,45 @@ int main(int argc, char **argv) {
     init_tables();
     g_trace_stream = (getenv("SNO_TRACE") != NULL);
 
-    FILE *f = argc > 1 ? fopen(argv[1], "r") : stdin;
-    if (!f) { perror(argv[1]); return 1; }
+    /* Parse flags: -Ipath or -I path adds an include search directory.
+     * Remaining non-flag args are input files (processed in order).
+     * If no input files given, read from stdin. */
+    const char *input_files[256];
+    int n_input_files = 0;
 
-    char  rawline[4096];
-    static char linebuf[65536];
-    int  linebuf_len = 0;
-    int  lineno = 0;
-    int  stmt_lineno = 0;
-    int  stmt_idx = 0;
-    STMT *head = NULL, *tail = NULL;
-
-    while (fgets(rawline, sizeof rawline, f)) {
-        lineno++;
-        int len = strlen(rawline);
-        while (len > 0 && (rawline[len-1]=='\n'||rawline[len-1]=='\r')) rawline[--len]='\0';
-        if (len == 0) continue;
-
-        /* CARDTB: determine card type */
-        spec_t card = { rawline, len };
-        spec_t tok;
-        stream(&tok, &card, &CARDTB);
-        int ctype = STYPE;
-
-        if (ctype == CMTTYP || ctype == CTLTYP) continue;
-
-        if (ctype == CNTTYP) {
-            /* Continuation: skip leading whitespace and the '+', append rest */
-            const char *p = rawline;
-            while (*p == ' ' || *p == '\t') p++;
-            if (*p == '+') p++;
-            int contlen = len - (int)(p - rawline);
-            if (linebuf_len + contlen < (int)sizeof(linebuf) - 1) {
-                memcpy(linebuf + linebuf_len, p, contlen);
-                linebuf_len += contlen;
-            }
-            continue;
-        }
-
-        /* NEWTYP: flush any pending accumulated logical line */
-        if (linebuf_len > 0) {
-            g_error = 0;
-            TEXTSP.ptr = linebuf; TEXTSP.len = linebuf_len;
-            STYPE = 0; BRTYPE = 0;
-            STMT *s = CMPILE();
-            linebuf_len = 0;
-            if (s) {
-                s->next = NULL;
-                if (!head) head = s; else tail->next = s;
-                tail = s;
-                if (g_error)
-                    fprintf(stderr, "line %d: %s\n  src: %.*s\n",
-                            stmt_lineno, g_errmsg, (int)strlen(linebuf), linebuf);
-                print_stmt(s, ++stmt_idx);
-                if (s->is_end) goto done;
-            }
-        }
-
-        /* Start accumulating new logical line */
-        stmt_lineno = lineno;
-        if (len < (int)sizeof(linebuf) - 1) {
-            memcpy(linebuf, rawline, len);
-            linebuf_len = len;
+    for (int i = 1; i < argc; i++) {
+        if (strncmp(argv[i], "-I", 2) == 0) {
+            const char *path = argv[i] + 2;
+            if (*path == '\0' && i+1 < argc) path = argv[++i]; /* -I path */
+            if (g_num_include_paths < MAX_INCLUDE_PATHS)
+                g_include_paths[g_num_include_paths++] = path;
+        } else if (strcmp(argv[i], "--") == 0) {
+            /* everything after -- is an input file */
+            while (++i < argc && n_input_files < 256)
+                input_files[n_input_files++] = argv[i];
+            break;
+        } else if (argv[i][0] == '-' && argv[i][1] != '\0') {
+            fprintf(stderr, "sno4parse: unknown flag '%s' (use -Idir to add include path)\n", argv[i]);
+        } else {
+            if (n_input_files < 256) input_files[n_input_files++] = argv[i];
         }
     }
 
-    /* Flush final logical line */
-    if (linebuf_len > 0) {
-        g_error = 0;
-        TEXTSP.ptr = linebuf; TEXTSP.len = linebuf_len;
-        STYPE = 0; BRTYPE = 0;
-        STMT *s = CMPILE();
-        linebuf_len = 0;
-        if (s) {
-            s->next = NULL;
-            if (!head) head = s; else tail->next = s;
-            tail = s;
-            if (g_error)
-                fprintf(stderr, "line %d: %s\n  src: %.*s\n",
-                        stmt_lineno, g_errmsg, (int)strlen(linebuf), linebuf);
-            print_stmt(s, ++stmt_idx);
+    compile_state_t st;
+    memset(&st, 0, sizeof st);
+
+    if (n_input_files == 0) {
+        /* stdin mode */
+        compile_file(stdin, NULL, &st, 0);
+    } else {
+        for (int i = 0; i < n_input_files && !st.done; i++) {
+            FILE *f = fopen(input_files[i], "r");
+            if (!f) { perror(input_files[i]); continue; }
+            compile_file(f, input_files[i], &st, 0);
+            fclose(f);
         }
     }
-done:
 
-    if (f != stdin) fclose(f);
-    printf("=== %d statements ===\n", stmt_idx);
+    printf("=== %d statements ===\n", st.stmt_idx);
     return 0;
 }
