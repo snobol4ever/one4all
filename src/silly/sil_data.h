@@ -105,7 +105,7 @@ extern DESCR_t CONVSW;    /* GENVAR conversion switch                     */
 
 extern DESCR_t ARBSIZ;    /* node size for ARBNO(P) = 8*NODESZ            */
 extern DESCR_t CHARCL;    /* constant 1 (character length)                */
-extern DESCR_t CNDSIZ;    /* compiler node size = CNODSZS                 */
+extern DESCR_t CNDSIZ;    /* compiler node size = CNODSZ                 */
 extern DESCR_t CODELT;    /* object code excess = 200*DESCR               */
 extern DESCR_t DSCRTW;    /* constant 2*DESCR                             */
 extern DESCR_t EOSCL;     /* end-of-statement switch = EOSTYP             */

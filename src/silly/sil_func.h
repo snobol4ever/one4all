@@ -15,28 +15,28 @@
 
 #include "sil_types.h"
 
-SIL_result APPLY_fn(void);
-SIL_result ARG_fn(void);
-SIL_result LOCAL_fn(void);
-SIL_result FIELDS_fn(void);
-SIL_result CLEAR_fn(void);
-SIL_result CMA_fn(void);
-SIL_result COLECT_fn(void);
-SIL_result COPY_fn(void);
-SIL_result CNVRT_fn(void);
-SIL_result CODER_fn(void);
-SIL_result DATE_fn(void);
-SIL_result DT_fn(void);
-SIL_result DMP_fn(void);
-SIL_result DUMP_fn(void);
-SIL_result DUPL_fn(void);
-SIL_result OPSYN_fn(void);
-SIL_result RPLACE_fn(void);
-SIL_result REVERS_fn(void);
-SIL_result SIZE_fn(void);
-SIL_result SUBSTR_fn(void);
-SIL_result TIME_fn(void);
-SIL_result TRIM_fn(void);
-SIL_result VDIFFR_fn(void);
+Sil_result APPLY_fn(void);
+Sil_result ARG_fn(void);
+Sil_result LOCAL_fn(void);
+Sil_result FIELDS_fn(void);
+Sil_result CLEAR_fn(void);
+Sil_result CMA_fn(void);
+Sil_result COLECT_fn(void);
+Sil_result COPY_fn(void);
+Sil_result CNVRT_fn(void);
+Sil_result CODER_fn(void);
+Sil_result DATE_fn(void);
+Sil_result DT_fn(void);
+Sil_result DMP_fn(void);
+Sil_result DUMP_fn(void);
+Sil_result DUPL_fn(void);
+Sil_result OPSYN_fn(void);
+Sil_result RPLACE_fn(void);
+Sil_result REVERS_fn(void);
+Sil_result SIZE_fn(void);
+Sil_result SUBSTR_fn(void);
+Sil_result TIME_fn(void);
+Sil_result TRIM_fn(void);
+Sil_result VDIFFR_fn(void);
 
 #endif /* SIL_FUNC_H */

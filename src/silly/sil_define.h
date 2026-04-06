@@ -19,9 +19,9 @@
 #include "sil_types.h"
 
 /* DEFINE(P,E) — parse prototype and register function definition       */
-SIL_result DEFINE_fn(void);
+Sil_result DEFINE_fn(void);
 
 /* DEFFNC — invoke a defined function (called by INVOKE dispatch table) */
-SIL_result DEFFNC_fn(void);
+Sil_result DEFFNC_fn(void);
 
 #endif /* SIL_DEFINE_H */

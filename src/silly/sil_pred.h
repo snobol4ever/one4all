@@ -17,21 +17,21 @@
 
 #include "sil_types.h"
 
-SIL_result DIFFER_fn(void);
-SIL_result FUNCTN_fn(void);
-SIL_result IDENT_fn(void);
-SIL_result LABEL_fn(void);
-SIL_result LABELC_fn(void);
-SIL_result LEQ_fn(void);
-SIL_result LGE_fn(void);
-SIL_result LGT_fn(void);
-SIL_result LLE_fn(void);
-SIL_result LLT_fn(void);
-SIL_result LNE_fn(void);
-SIL_result NEG_fn(void);
-SIL_result QUES_fn(void);
-SIL_result CHAR_fn(void);
-SIL_result LPAD_fn(void);
-SIL_result RPAD_fn(void);
+Sil_result DIFFER_fn(void);
+Sil_result FUNCTN_fn(void);
+Sil_result IDENT_fn(void);
+Sil_result LABEL_fn(void);
+Sil_result LABELC_fn(void);
+Sil_result LEQ_fn(void);
+Sil_result LGE_fn(void);
+Sil_result LGT_fn(void);
+Sil_result LLE_fn(void);
+Sil_result LLT_fn(void);
+Sil_result LNE_fn(void);
+Sil_result NEG_fn(void);
+Sil_result QUES_fn(void);
+Sil_result CHAR_fn(void);
+Sil_result LPAD_fn(void);
+Sil_result RPAD_fn(void);
 
 #endif /* SIL_PRED_H */

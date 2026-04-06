@@ -30,12 +30,12 @@
 #include "sil_symtab.h"
 
 /* External stubs */
-extern SIL_result INVOKE_fn(void);
-extern SIL_result PUTIN_fn(DESCR_t zptr, DESCR_t wptr);
-extern SIL_result TRPHND_fn(DESCR_t atptr);
-extern SIL_result FENTR2_fn(DESCR_t name);
-extern SIL_result FNEXT2_fn(DESCR_t name);
-extern SIL_result INTERP_fn(void);   /* M19 — not yet built */
+extern Sil_result INVOKE_fn(void);
+extern Sil_result PUTIN_fn(DESCR_t zptr, DESCR_t wptr);
+extern Sil_result TRPHND_fn(DESCR_t atptr);
+extern Sil_result FENTR2_fn(DESCR_t name);
+extern Sil_result FNEXT2_fn(DESCR_t name);
+extern Sil_result INTERP_fn(void);   /* M19 — not yet built */
 
 /* STREAM/VARATB-based prototype parsing — not yet available */
 extern int STREAM_varatb(SPEC_t *res, SPEC_t *src, int *stype_out);
@@ -73,7 +73,7 @@ static inline int deql_fn(DESCR_t a, DESCR_t b)
  *
  * This covers the vast majority of real SNOBOL4 programs.
  */
-SIL_result DEFINE_fn(void)
+Sil_result DEFINE_fn(void)
 {
     /* Get prototype */
     if (VARVAL_fn() == FAIL) return FAIL;
@@ -182,7 +182,7 @@ SIL_result DEFINE_fn(void)
  * When M19 lands, replace this stub with the full translation following
  * v311.sil DEFFNC lines 4305–4470.
  */
-SIL_result DEFFNC_fn(void)
+Sil_result DEFFNC_fn(void)
 {
     /* TODO M19: full argument-binding save/restore + INTERP call */
     return FAIL;

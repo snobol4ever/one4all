@@ -24,7 +24,7 @@
 /* Platform / table stubs */
 /* STREAM_fn: scan TEXTSP using table tbl, set STYPE, advance TEXTSP.
  * Returns OK if a break was found, FAIL on end-of-input (calls err_fn). */
-extern SIL_result STREAM_fn(SPEC_t *res, SPEC_t *src,
+extern Sil_result STREAM_fn(SPEC_t *res, SPEC_t *src,
                               DESCR_t *tbl, int *stype_out);
 extern DESCR_t FRWDTB;    /* forward scan table (skip to nonblank)        */
 extern DESCR_t IBLKTB;    /* initial blank table (skip blanks)            */
@@ -34,11 +34,11 @@ extern DESCR_t LBLXTB;    /* control-card command scan table              */
 extern DESCR_t UNLSP;     /* "UNLIST" string specifier                    */
 extern DESCR_t LISTSP_d;  /* "LIST"   string specifier                    */
 extern DESCR_t EJCTSP;    /* "EJECT"  string specifier                    */
-extern SIL_result STREAD_fn(SPEC_t *sp, DESCR_t unit); /* platform read  */
+extern Sil_result STREAD_fn(SPEC_t *sp, DESCR_t unit); /* platform read  */
 extern void       STPRNT_fn(int32_t key, DESCR_t blk, SPEC_t *sp);
 extern void       XCALL_XRAISP(SPEC_t *sp);  /* uppercase in place       */
 extern void       XCALL_IO_PAD(SPEC_t *sp, int32_t width);
-extern SIL_result XCALL_IO_FILE(DESCR_t unit, SPEC_t *fname_out);
+extern Sil_result XCALL_IO_FILE(DESCR_t unit, SPEC_t *fname_out);
 extern void       XCALL_OUTPUT_ERR(void);     /* compiler error output    */
 
 #define GETDC_B(dst, base_d, off_i) \
@@ -59,7 +59,7 @@ static inline int sp_lexcmp(SPEC_t a, SPEC_t b)
 }
 
 static inline void SETLC_sp(SPEC_t *sp, int32_t n) { sp->l = n; }
-static SIL_result forrun(void);  /* forward */
+static Sil_result forrun(void);  /* forward */
 
 /* ── CODSKP — skip n items in object code ────────────────────────────── */
 /*
@@ -92,13 +92,13 @@ void CODSKP_fn(int32_t n)
  *   On break: set BRTYPE from STYPE, return OK.
  *   On run-out: read next card (FORRUN), then retry.
  */
-SIL_result FORWRD_fn(void)
+Sil_result FORWRD_fn(void)
 {
     SPEC_t xsp;
     int stype;
 
     while (1) {
-        SIL_result rc = STREAM_fn(&xsp, &TEXTSP, &FRWDTB, &stype);
+        Sil_result rc = STREAM_fn(&xsp, &TEXTSP, &FRWDTB, &stype);
         if (rc == OK) {
             SETAC(BRTYPE, stype);
             return OK;   /* FORJRN */
@@ -115,13 +115,13 @@ SIL_result FORWRD_fn(void)
  *   STREAM XSP,TEXTSP,IBLKTB,RTN1,FORRUN,FORJRN
  *   Reads blanks from TEXTSP until nonblank found.
  */
-SIL_result FORBLK_fn(void)
+Sil_result FORBLK_fn(void)
 {
     SPEC_t xsp;
     int stype;
 
     while (1) {
-        SIL_result rc = STREAM_fn(&xsp, &TEXTSP, &IBLKTB, &stype);
+        Sil_result rc = STREAM_fn(&xsp, &TEXTSP, &IBLKTB, &stype);
         if (rc == OK) {
             SETAC(BRTYPE, stype);
             return OK;
@@ -132,7 +132,7 @@ SIL_result FORBLK_fn(void)
 }
 
 /* forrun — internal: read a new card, handle listing, set BRTYPE=EOS on EOF */
-static SIL_result forrun(void)
+static Sil_result forrun(void)
 {
     /* Check for input stream */
     if (AEQLC(UNIT, 0)) {
@@ -149,7 +149,7 @@ static SIL_result forrun(void)
     TEXTSP = NEXTSP;
 
     /* Read new card */
-    SIL_result rc = STREAD_fn(&TEXTSP, UNIT);
+    Sil_result rc = STREAD_fn(&TEXTSP, UNIT);
     if (rc == FAIL) {
         /* EOF: try FILCHK */
         return FILCHK_fn();
@@ -179,7 +179,7 @@ static SIL_result forrun(void)
  *   Control  (STYPE=CTLTYP=3) → parse and execute control command.
  *   Continue (STYPE=CNTTYP=4) → delete leading '-', update listing.
  */
-SIL_result NEWCRD_fn(void)
+Sil_result NEWCRD_fn(void)
 {
     int32_t stype = D_A(STYPE);
 
@@ -249,7 +249,7 @@ SIL_result NEWCRD_fn(void)
  *   If INCSTK != 0: pop include stack, restore LNNOCL/FILENM, RTN2.
  *   Else: query I/O system for next file; RTN1 if none.
  */
-SIL_result FILCHK_fn(void)
+Sil_result FILCHK_fn(void)
 {
     if (!AEQLC(INCSTK, 0)) {
         /* Pop include stack */

@@ -38,14 +38,14 @@
 #include "sil_patval.h"
 
 /* External stubs resolved at link time */
-extern SIL_result INVOKE_fn(void);
-extern SIL_result INTVAL_fn(void);
-extern SIL_result XYARGS_fn(void);
-extern SIL_result PUTIN_fn(DESCR_t zptr, DESCR_t wptr);
+extern Sil_result INVOKE_fn(void);
+extern Sil_result INTVAL_fn(void);
+extern Sil_result XYARGS_fn(void);
+extern Sil_result PUTIN_fn(DESCR_t zptr, DESCR_t wptr);
 extern void       PUTOUT_fn(DESCR_t yptr, DESCR_t val);
-extern SIL_result TRPHND_fn(DESCR_t atptr);
-extern SIL_result VPXPTR_fn(void);
-extern SIL_result maknod_fn(DESCR_t *out, int32_t blk_off,
+extern Sil_result TRPHND_fn(DESCR_t atptr);
+extern Sil_result VPXPTR_fn(void);
+extern Sil_result maknod_fn(DESCR_t *out, int32_t blk_off,
                               int32_t len, int32_t alt,
                               int32_t fn_idx, int32_t arg_off);
 extern void       cpypat_fn(int32_t dst, int32_t src,
@@ -77,7 +77,7 @@ static inline int deql(DESCR_t a, DESCR_t b)
 }
 
 /* ── ASGN — X = Y ────────────────────────────────────────────────────── */
-SIL_result ASGN_fn(void)
+Sil_result ASGN_fn(void)
 {
     /* INCRA OCICL,DESCR; GETD XPTR,OCBSCL,OCICL */
     INCRA(OCICL, DESCR);
@@ -106,7 +106,7 @@ SIL_result ASGN_fn(void)
                 if (assoc) {
                     DESCR_t zptr; SETAC(zptr, assoc);
                     GETDC_B(zptr, YPTR, DESCR);
-                    SIL_result rc = PUTIN_fn(zptr, YPTR);
+                    Sil_result rc = PUTIN_fn(zptr, YPTR);
                     if (rc == OK) goto asgnvv;
                     /* FAIL from PUTIN: fall to ASGNV1 */
                 }
@@ -175,7 +175,7 @@ asgnvv:
 }
 
 /* ── CONCAT — X Y (concatenation) ───────────────────────────────────── */
-SIL_result CONCAT_fn(void)
+Sil_result CONCAT_fn(void)
 {
     /* RCALL ,XYARGS,,FAIL */
     if (XYARGS_fn() == FAIL) return FAIL;
@@ -301,7 +301,7 @@ SIL_result CONCAT_fn(void)
 }
 
 /* ── IND — $X (indirect reference) ──────────────────────────────────── */
-SIL_result IND_fn(void)
+Sil_result IND_fn(void)
 {
     if (ARGVAL_fn() == FAIL) return FAIL;
 
@@ -332,7 +332,7 @@ SIL_result IND_fn(void)
 }
 
 /* ── KEYWRD — &X (keyword reference) ────────────────────────────────── */
-SIL_result KEYWRD_fn(void)
+Sil_result KEYWRD_fn(void)
 {
     /* INCRA OCICL,DESCR; GETD XPTR,OCBSCL,OCICL */
     INCRA(OCICL, DESCR);
@@ -366,7 +366,7 @@ SIL_result KEYWRD_fn(void)
 }
 
 /* ── LIT — 'X' (literal push) ───────────────────────────────────────── */
-SIL_result LIT_fn(void)
+Sil_result LIT_fn(void)
 {
     /* INCRA OCICL,DESCR; GETD ZPTR,OCBSCL,OCICL; RTZPTR */
     INCRA(OCICL, DESCR);
@@ -376,7 +376,7 @@ SIL_result LIT_fn(void)
 }
 
 /* ── NAME — .X (unary name operator) ────────────────────────────────── */
-SIL_result NAME_fn(void)
+Sil_result NAME_fn(void)
 {
     /* INCRA OCICL,DESCR; GETD ZPTR,OCBSCL,OCICL */
     INCRA(OCICL, DESCR);
@@ -392,7 +392,7 @@ SIL_result NAME_fn(void)
 }
 
 /* ── STR — *X (unevaluated expression) ──────────────────────────────── */
-SIL_result STR_fn(void)
+Sil_result STR_fn(void)
 {
     /* SUM ZPTR,OCBSCL,OCICL — pointer to current code position */
     SUM(ZPTR, OCBSCL, OCICL);

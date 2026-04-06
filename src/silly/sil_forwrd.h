@@ -23,17 +23,17 @@ void CODSKP_fn(int32_t n);
 
 /* FORWRD — advance TEXTSP to next non-whitespace character.
  * Sets BRTYPE. Returns OK on success, FAIL on end-of-input. */
-SIL_result FORWRD_fn(void);
+Sil_result FORWRD_fn(void);
 
 /* FORBLK — advance TEXTSP past blanks to nonblank.
  * Alias for the FORBLK label in v311.sil (calls STREAM IBLKTB). */
-SIL_result FORBLK_fn(void);
+Sil_result FORBLK_fn(void);
 
 /* NEWCRD — process card type (comment/continue/control/normal).
  * Called by FORRUN after reading a new line. */
-SIL_result NEWCRD_fn(void);
+Sil_result NEWCRD_fn(void);
 
 /* FILCHK — handle EOF in compilation (include-stack pop or file change). */
-SIL_result FILCHK_fn(void);
+Sil_result FILCHK_fn(void);
 
 #endif /* SIL_FORWRD_H */

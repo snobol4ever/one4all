@@ -30,16 +30,16 @@
 #include "sil_symtab.h"
 
 /* M18d stubs */
-extern SIL_result ELEMNT_fn(DESCR_t *out);
-extern SIL_result EXPR_fn(DESCR_t *out);
-extern SIL_result EXPR1_fn(DESCR_t *out);
+extern Sil_result ELEMNT_fn(DESCR_t *out);
+extern Sil_result EXPR_fn(DESCR_t *out);
+extern Sil_result EXPR1_fn(DESCR_t *out);
 
 /* Stream tables (§24 data — stubs until translated) */
 extern DESCR_t LBLTB;    /* label scan table                             */
 extern DESCR_t GOTOTB;   /* goto field scan table                        */
 
 /* STREAM stub */
-extern SIL_result STREAM_fn(SPEC_t *res, SPEC_t *src,
+extern Sil_result STREAM_fn(SPEC_t *res, SPEC_t *src,
                               DESCR_t *tbl, int *stype_out);
 
 /* Error output */
@@ -73,7 +73,7 @@ static void cerr(const char *msg)
 }
 
 /* ── CMPILE — compile one statement ─────────────────────────────────── */
-SIL_result CMPILE_fn(void)
+Sil_result CMPILE_fn(void)
 {
     SETAC(BRTYPE, 0);
     MOVD(BOSCL, CMOFCL);
@@ -84,7 +84,7 @@ SIL_result CMPILE_fn(void)
     /* CMPIL0: scan label field */
     {
         SPEC_t xsp; int stype;
-        SIL_result rc = STREAM_fn(&xsp, &TEXTSP, &LBLTB, &stype);
+        Sil_result rc = STREAM_fn(&xsp, &TEXTSP, &LBLTB, &stype);
         if (rc == FAIL) { cerr(EMSG1); goto stmt_done; }
         SETAC(STYPE, stype);
 

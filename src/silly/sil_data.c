@@ -190,7 +190,7 @@ DESCR_t PRMPTR = D0;
 
 DESCR_t ARBSIZ = D0;    /* 8*NODESZ                                       */
 DESCR_t CHARCL = D(1, 0, 0);
-DESCR_t CNDSIZ = D0;    /* CNODSZS                                        */
+DESCR_t CNDSIZ = D0;    /* CNODSZ                                        */
 DESCR_t CODELT = D0;    /* 200*DESCR                                      */
 DESCR_t DSCRTW = D0;    /* 2*DESCR                                        */
 DESCR_t EOSCL  = D(EOSTYP, 0, 0);
@@ -479,7 +479,7 @@ void sil_data_init(void)
     /* Computed DESCR-valued constants — must be done at runtime          */
     /* because DESCR is a compile-time sizeof, not a macro constant       */
     ARBSIZ.a.i  = (int_t)(8 * NODESZ);
-    CNDSIZ.a.i  = (int_t)(CNODSZS);   CNDSIZ.v = B;
+    CNDSIZ.a.i  = (int_t)(CNODSZ);   CNDSIZ.v = B;
     CODELT.a.i  = (int_t)(200 * DESCR); CODELT.v = C;
     DSCRTW.a.i  = (int_t)(2 * DESCR);
     ESALIM.a.i  = (int_t)(ESASIZ * DESCR);

@@ -36,8 +36,8 @@
 #include "sil_symtab.h"
 
 /* External stubs resolved at link time */
-extern SIL_result EXPEVL_fn(void);
-extern SIL_result TRPHND_fn(DESCR_t atptr);
+extern Sil_result EXPEVL_fn(void);
+extern Sil_result TRPHND_fn(DESCR_t atptr);
 extern void       PUTOUT_fn(DESCR_t yptr, DESCR_t val);
 
 /* Arena block read helpers (mirror sil_scan.c) */
@@ -54,7 +54,7 @@ static inline void getspc(SPEC_t *sp, DESCR_t base, int32_t off)
 }
 
 /* ── NMD_fn ──────────────────────────────────────────────────────────── */
-SIL_result NMD_fn(void)
+Sil_result NMD_fn(void)
 {
     /* MOVD TCL,NHEDCL — start from saved head */
     MOVD(TCL, NHEDCL);
@@ -87,7 +87,7 @@ SIL_result NMD_fn(void)
         if (VEQLC(TVAL, E)) {
             /* NAMEXN: RCALL TVAL,EXPEVL,TVAL,(FAIL,NMD5,NEMO) */
             MOVD(XPTR, TVAL);   /* EXPEVL reads from XPTR in our impl */
-            SIL_result rc = EXPEVL_fn();
+            Sil_result rc = EXPEVL_fn();
             if (rc == FAIL) {
                 /* FAIL exit — skip this capture */
                 INCRA(TCL, DESCR + (int32_t)sizeof(SPEC_t));

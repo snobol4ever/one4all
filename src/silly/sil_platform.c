@@ -547,7 +547,6 @@ DESCR_t FALKY  = {.a={.i=0},.f=TTL|MARK,.v=0};
 /* Pattern-valued globals */
 DESCR_t PATND  = {.a={.i=0},.f=0,.v=P};
 DESCR_t FNCPL  = {.a={.i=0},.f=FNC,.v=0};
-int32_t FNCPL_off = 0;
 
 /* Trace data */
 DESCR_t TRCSP_d = {.a={.i=0},.f=0,.v=0};
@@ -1048,7 +1047,7 @@ static struct sil_syntab *lookup_tbl(const DESCR_t *d)
 }
 
 /* Rewrite STREAM_fn to use lookup_tbl instead of A2P directly */
-SIL_result STREAM_fn(SPEC_t *sp1, SPEC_t *sp2, DESCR_t *tbl_descr, int *stype_out)
+Sil_result STREAM_fn(SPEC_t *sp1, SPEC_t *sp2, DESCR_t *tbl_descr, int *stype_out)
 {
     struct sil_syntab *tp = lookup_tbl(tbl_descr);
     const unsigned char *cp  = (const unsigned char *)A2P(sp2->a) + sp2->o;
@@ -1200,7 +1199,7 @@ void XCALL_DATE(SPEC_t *sp)
 }
 
 /* STREAD_fn / STPRNT_fn — I/O primitives */
-SIL_result STREAD_fn(SPEC_t *dst, DESCR_t unit)
+Sil_result STREAD_fn(SPEC_t *dst, DESCR_t unit)
 {
     (void)unit;
     /* Read a line from stdin into arena */
@@ -1323,7 +1322,7 @@ DESCR_t ISPPTR = {{.i=0}, 0, 0};
 /* These match the exact extern declarations in the callers.              */
 
 /* maknod_fn — allocate an IR node */
-SIL_result maknod_fn(DESCR_t *out, int32_t blk_off, int32_t tag, int32_t extra)
+Sil_result maknod_fn(DESCR_t *out, int32_t blk_off, int32_t tag, int32_t extra)
 {
     (void)extra;
     int32_t off = D_A(FRSGPT);
@@ -1379,7 +1378,7 @@ int32_t stream_fn(SPEC_t *res, const SPEC_t *src, const DESCR_t *table)
 {
     SPEC_t s = *src;
     int stype = 0;
-    SIL_result rc = STREAM_fn(res, &s, (DESCR_t *)table, &stype);
+    Sil_result rc = STREAM_fn(res, &s, (DESCR_t *)table, &stype);
     return (rc == OK) ? stype : 0;
 }
 
@@ -1427,7 +1426,7 @@ DESCR_t CONTIN = {{.i=(int_t)AC_CONTIN}, 0, 0};
 DESCR_t STOPSH = {{.i=(int_t)AC_STOPSH}, 0, 0};
 
 /* DTREP_fn2/3 — format a DESCR as type-name string (stub) */
-SIL_result DTREP_fn2(DESCR_t *out, DESCR_t obj)
+Sil_result DTREP_fn2(DESCR_t *out, DESCR_t obj)
 {
     (void)obj;
     static char buf[] = "?";
@@ -1435,7 +1434,7 @@ SIL_result DTREP_fn2(DESCR_t *out, DESCR_t obj)
     return OK;
 }
 
-SIL_result DTREP_fn3(DESCR_t *out, DESCR_t obj)
+Sil_result DTREP_fn3(DESCR_t *out, DESCR_t obj)
 {
     (void)obj;
     static char buf[] = "?";
@@ -1444,7 +1443,7 @@ SIL_result DTREP_fn3(DESCR_t *out, DESCR_t obj)
 }
 
 /* LOAD2_fn — dynamic load stub */
-SIL_result LOAD2_fn(void) { return FAIL; }
+Sil_result LOAD2_fn(void) { return FAIL; }
 
 /* PSTACK_fn */
 void PSTACK_fn(DESCR_t *pos) { (void)pos; }
@@ -1460,10 +1459,10 @@ void PAD_fn(int32_t dir, SPEC_t *out, SPEC_t *subj, SPEC_t *pad)
 }
 
 /* KEYT_fn */
-SIL_result KEYT_fn(void) { return FAIL; }
+Sil_result KEYT_fn(void) { return FAIL; }
 
 /* ARGINT_fn */
-SIL_result ARGINT_fn(DESCR_t fn, DESCR_t n) { (void)fn; (void)n; return FAIL; }
+Sil_result ARGINT_fn(DESCR_t fn, DESCR_t n) { (void)fn; (void)n; return FAIL; }
 
 /* SHORTN_fn */
 void SHORTN_fn(SPEC_t *sp, int32_t n) { if (sp->l > n) sp->l = n; }

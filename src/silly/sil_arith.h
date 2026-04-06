@@ -24,7 +24,7 @@
  *   INTR1   — illegal data type                        → sil_error(ERR_TYPE)
  *   FAIL    — predicate failure or argument failure    → return FAIL
  *
- * Return convention: all entry points return SIL_result (OK=1, FAIL=0).
+ * Return convention: all entry points return Sil_result (OK=1, FAIL=0).
  * On OK the result is in ZPTR (binary ops, MNS) or ZPTR/XPTR (PLS/INTGER).
  * Comparison predicates return OK with ZPTR = NULVCL on success.
  * ARITH_fn is internal — called only by ADD_fn..REMDR_fn.
@@ -42,28 +42,28 @@
 /* ── Binary arithmetic and comparison entry points ───────────────────── */
 /* Each sets SCL and calls ARITH_fn. On return ZPTR holds the result.    */
 
-SIL_result ADD_fn(void);    /* XPTR + YPTR → ZPTR   (SCL=1)  */
-SIL_result DIV_fn(void);    /* XPTR / YPTR → ZPTR   (SCL=2)  */
-SIL_result EXPOP_fn(void);  /* XPTR ** YPTR → ZPTR  (SCL=3)  [PLB43] */
-SIL_result MPY_fn(void);    /* XPTR * YPTR → ZPTR   (SCL=4)  */
-SIL_result SUB_fn(void);    /* XPTR - YPTR → ZPTR   (SCL=5)  */
-SIL_result EQ_fn(void);     /* EQ(XPTR,YPTR)         (SCL=6)  */
-SIL_result GE_fn(void);     /* GE(XPTR,YPTR)         (SCL=7)  */
-SIL_result GT_fn(void);     /* GT(XPTR,YPTR)         (SCL=8)  */
-SIL_result LE_fn(void);     /* LE(XPTR,YPTR)         (SCL=9)  */
-SIL_result LT_fn(void);     /* LT(XPTR,YPTR)         (SCL=10) */
-SIL_result NE_fn(void);     /* NE(XPTR,YPTR)         (SCL=11) */
-SIL_result REMDR_fn(void);  /* REMDR(XPTR,YPTR)→ZPTR (SCL=12) */
+Sil_result ADD_fn(void);    /* XPTR + YPTR → ZPTR   (SCL=1)  */
+Sil_result DIV_fn(void);    /* XPTR / YPTR → ZPTR   (SCL=2)  */
+Sil_result EXPOP_fn(void);  /* XPTR ** YPTR → ZPTR  (SCL=3)  [PLB43] */
+Sil_result MPY_fn(void);    /* XPTR * YPTR → ZPTR   (SCL=4)  */
+Sil_result SUB_fn(void);    /* XPTR - YPTR → ZPTR   (SCL=5)  */
+Sil_result EQ_fn(void);     /* EQ(XPTR,YPTR)         (SCL=6)  */
+Sil_result GE_fn(void);     /* GE(XPTR,YPTR)         (SCL=7)  */
+Sil_result GT_fn(void);     /* GT(XPTR,YPTR)         (SCL=8)  */
+Sil_result LE_fn(void);     /* LE(XPTR,YPTR)         (SCL=9)  */
+Sil_result LT_fn(void);     /* LT(XPTR,YPTR)         (SCL=10) */
+Sil_result NE_fn(void);     /* NE(XPTR,YPTR)         (SCL=11) */
+Sil_result REMDR_fn(void);  /* REMDR(XPTR,YPTR)→ZPTR (SCL=12) */
 
 /* ── Standalone functions ─────────────────────────────────────────────── */
 
 /* INTEGER(X) — succeeds if X is (or converts to) INTEGER; result in XPTR */
-SIL_result INTGER_fn(void);
+Sil_result INTGER_fn(void);
 
 /* -X — unary negation; argument via ARGVAL, result in ZPTR */
-SIL_result MNS_fn(void);
+Sil_result MNS_fn(void);
 
 /* +X — unary plus; argument via ARGVAL, result in ZPTR */
-SIL_result PLS_fn(void);
+Sil_result PLS_fn(void);
 
 #endif /* SIL_ARITH_H */

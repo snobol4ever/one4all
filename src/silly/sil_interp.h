@@ -19,16 +19,16 @@
 
 #include "sil_types.h"
 
-SIL_result BASE_fn(void);
-SIL_result GOTG_fn(void);
-SIL_result GOTL_fn(void);
-SIL_result GOTO_fn(void);
-SIL_result INIT_fn(void);
-SIL_result INTERP_fn(void);
-SIL_result INVOKE_fn(void);
+Sil_result BASE_fn(void);
+Sil_result GOTG_fn(void);
+Sil_result GOTL_fn(void);
+Sil_result GOTO_fn(void);
+Sil_result INIT_fn(void);
+Sil_result INTERP_fn(void);
+Sil_result INVOKE_fn(void);
 
 /* Invoke-table entry: function pointer + argument count */
-typedef SIL_result (*invoke_fn_t)(void);
+typedef Sil_result (*invoke_fn_t)(void);
 void invoke_table_register(int32_t idx, invoke_fn_t fn, int32_t nargs);
 
 #endif /* SIL_INTERP_H */

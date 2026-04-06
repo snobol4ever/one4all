@@ -22,16 +22,16 @@
 #include "sil_argval.h"
 
 /* ── Forward declarations — later milestones ────────────────────────── */
-extern SIL_result INVOKE_fn(void);   /* §7 — dispatch function call      */
-extern SIL_result PUTIN_fn(void);    /* §15 — perform input association   */
-extern SIL_result CONVE_fn(void);    /* §19 — convert to EXPRESSION type  */
+extern Sil_result INVOKE_fn(void);   /* §7 — dispatch function call      */
+extern Sil_result PUTIN_fn(void);    /* §15 — perform input association   */
+extern Sil_result CONVE_fn(void);    /* §19 — convert to EXPRESSION type  */
 
 /* ── Internal helpers ────────────────────────────────────────────────── */
 
 /* Inline RLINT: truncate real DESCR to integer in-place.
  * v311.sil RLINT macro / snobol4.c L_INTRI.
  * Returns OK on success, FAIL on overflow/nan.                          */
-static SIL_result rlint(DESCR_t *dp)
+static Sil_result rlint(DESCR_t *dp)
 {
     dp->a.i = (int32_t)dp->a.f;
     dp->f   = 0;
@@ -67,7 +67,7 @@ static int check_input_assoc(const DESCR_t *dp)
  * ARGVAL_fn — evaluate one argument from object code stream
  * v311.sil ARGVAL (line 2679)
  * ════════════════════════════════════════════════════════════════════════ */
-SIL_result ARGVAL_fn(void)
+Sil_result ARGVAL_fn(void)
 {
     XPTR = oc_fetch();
 
@@ -99,7 +99,7 @@ argv1:
  * v311.sil EXPVAL (line 2699)
  * Saves/restores full interpreter state around sub-evaluation.
  * ════════════════════════════════════════════════════════════════════════ */
-SIL_result EXPVAL_fn(void)
+Sil_result EXPVAL_fn(void)
 {
     /* save interpreter state — mirrors SIL PUSH list */
     DESCR_t sv_ocbscl = OCBSCL, sv_ocicl = OCICL;
@@ -113,7 +113,7 @@ SIL_result EXPVAL_fn(void)
     SPEC_t  sv_txsp   = TXSP,   sv_xsp    = XSP;
 
     int scl_entry = SCL.a.i;   /* save entry indicator */
-    SIL_result rc;
+    Sil_result rc;
 
     /* set up new code base from XPTR */
     OCBSCL = XPTR;
@@ -207,7 +207,7 @@ SIL_result EXPVAL_fn(void)
  * EXPEVL_fn — expression value context (SCL=0 entry to EXPVAL)
  * v311.sil EXPEVL (line 2757)
  * ════════════════════════════════════════════════════════════════════════ */
-SIL_result EXPEVL_fn(void)
+Sil_result EXPEVL_fn(void)
 {
     SCL.a.i = 0;
     return EXPVAL_fn();
@@ -217,7 +217,7 @@ SIL_result EXPEVL_fn(void)
  * INTVAL_fn — evaluate argument, coerce to INTEGER
  * v311.sil INTVAL (line 2739)
  * ════════════════════════════════════════════════════════════════════════ */
-SIL_result INTVAL_fn(void)
+Sil_result INTVAL_fn(void)
 {
     XPTR = oc_fetch();
 
@@ -252,7 +252,7 @@ intv2:
  * PATVAL_fn — evaluate argument, coerce to PATTERN
  * v311.sil PATVAL (line 2797)
  * ════════════════════════════════════════════════════════════════════════ */
-SIL_result PATVAL_fn(void)
+Sil_result PATVAL_fn(void)
 {
     XPTR = oc_fetch();
 
@@ -310,7 +310,7 @@ patv3:
  * VARVAL_fn — evaluate argument, coerce to STRING
  * v311.sil VARVAL (line 2861)
  * ════════════════════════════════════════════════════════════════════════ */
-SIL_result VARVAL_fn(void)
+Sil_result VARVAL_fn(void)
 {
     XPTR = oc_fetch();
 
@@ -348,7 +348,7 @@ varv2:
  * VARVUP_fn — VARVAL with case-folding
  * v311.sil VARVUP (line 2900) [PLB28][PLB29]
  * ════════════════════════════════════════════════════════════════════════ */
-SIL_result VARVUP_fn(void)
+Sil_result VARVUP_fn(void)
 {
     if (VARVAL_fn() == FAIL) return FAIL;
     if (CASECL.a.i == 0) return OK;   /* case-sensitive: no fold */
@@ -359,7 +359,7 @@ SIL_result VARVUP_fn(void)
  * VPXPTR_fn — case-fold XPTR string to upper-case variable
  * v311.sil VPXPTR (line 2909) [PLB29]
  * ════════════════════════════════════════════════════════════════════════ */
-SIL_result VPXPTR_fn(void)
+Sil_result VPXPTR_fn(void)
 {
     LOCSP_fn(&SPECR1, &XPTR);
     if (SPECR1.l == 0) return OK;   /* null string: return unchanged */
@@ -397,7 +397,7 @@ SIL_result VPXPTR_fn(void)
  * XYARGS_fn — evaluate argument pair
  * v311.sil XYARGS (line 2916)
  * ════════════════════════════════════════════════════════════════════════ */
-SIL_result XYARGS_fn(void)
+Sil_result XYARGS_fn(void)
 {
     int pass = 0;   /* SCL: 0=first arg, 1=second arg */
 

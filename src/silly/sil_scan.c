@@ -37,12 +37,12 @@
 /* ── External stubs: runtime functions not yet implemented ───────────── */
 /* These are declared here so sil_scan.c compiles (-c); they will be     */
 /* resolved at link time when their milestone is complete.               */
-extern SIL_result NMD_fn(void);
-extern SIL_result INVOKE_fn(void);
-extern SIL_result PUTIN_fn(DESCR_t zptr, DESCR_t wptr);
+extern Sil_result NMD_fn(void);
+extern Sil_result INVOKE_fn(void);
+extern Sil_result PUTIN_fn(DESCR_t zptr, DESCR_t wptr);
 extern void       PUTOUT_fn(DESCR_t yptr, DESCR_t val);
-extern SIL_result TRPHND_fn(DESCR_t atptr);
-extern SIL_result maknod_fn(DESCR_t *out, int32_t blk_off,
+extern Sil_result TRPHND_fn(DESCR_t atptr);
+extern Sil_result maknod_fn(DESCR_t *out, int32_t blk_off,
                              int32_t len, int32_t alt,
                              int32_t fn_idx, int32_t arg_off);
 extern void       cpypat_fn(int32_t dst_off, int32_t src_off,
@@ -302,7 +302,7 @@ static void do_SCIN1A(void)
 }
 
 /* ── SCNR — inner scanning engine ───────────────────────────────────── */
-SIL_result SCNR_fn(void)
+Sil_result SCNR_fn(void)
 {
     Scan_ctx ctx;
     Scan_ctx *prev = scan_ctx_g;
@@ -416,7 +416,7 @@ scan_fail:
 }
 
 /* ── SCAN — top-level pattern match (no replacement) ────────────────── */
-SIL_result SCAN_fn(void)
+Sil_result SCAN_fn(void)
 {
     /* RCALL XPTR,ARGVAL,,FAIL */
     if (ARGVAL_fn() == FAIL) return FAIL;
@@ -476,7 +476,7 @@ SIL_result SCAN_fn(void)
 }
 
 /* ── SJSR — pattern match with replacement ───────────────────────────── */
-SIL_result SJSR_fn(void)
+Sil_result SJSR_fn(void)
 {
     /* INCRA OCICL,DESCR; GETD WPTR,OCBSCL,OCICL */
     INCRA(OCICL, DESCR);

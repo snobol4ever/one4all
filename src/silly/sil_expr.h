@@ -20,13 +20,13 @@
 
 #include "sil_types.h"
 
-SIL_result ELEMNT_fn(DESCR_t *out);   /* compile one element → tree node */
-SIL_result EXPR_fn(DESCR_t *out);     /* compile full expression → tree  */
-SIL_result EXPR1_fn(DESCR_t *out);    /* EXPR continuation entry         */
-SIL_result NULNOD_fn(DESCR_t *out);   /* build LIT(null) node            */
+Sil_result ELEMNT_fn(DESCR_t *out);   /* compile one element → tree node */
+Sil_result EXPR_fn(DESCR_t *out);     /* compile full expression → tree  */
+Sil_result EXPR1_fn(DESCR_t *out);    /* EXPR continuation entry         */
+Sil_result NULNOD_fn(DESCR_t *out);   /* build LIT(null) node            */
 void       ADDSIB_fn(DESCR_t node, DESCR_t sib);  /* add sibling         */
 void       INSERT_fn(DESCR_t node, DESCR_t above); /* insert node above  */
-SIL_result BINOP_fn(DESCR_t *out);    /* binary operator analysis        */
-SIL_result UNOP_fn(DESCR_t *out);     /* unary operator analysis         */
+Sil_result BINOP_fn(DESCR_t *out);    /* binary operator analysis        */
+Sil_result UNOP_fn(DESCR_t *out);     /* unary operator analysis         */
 
 #endif /* SIL_EXPR_H */

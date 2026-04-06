@@ -247,9 +247,7 @@ SPEC_t *DTREP_fn(DESCR_t *d)
 int32_t FINDEX_fn(DESCR_t *name_d)
 {
     /* LOCAPV F2PTR,FNCPL,F1PTR — look for function pair */
-    extern int32_t FNCPL_off;   /* arena offset of function pair list */
-
-    int32_t f2ptr = locapv_fn(FNCPL_off, name_d);
+    int32_t f2ptr = locapv_fn(D_A(FNCPL), name_d);
 
     if (f2ptr != 0) {
         /* Found — GETDC F2PTR,F2PTR,DESCR — get function descriptor */
@@ -263,9 +261,9 @@ int32_t FINDEX_fn(DESCR_t *name_d)
     D_A(NEXFCL) += 2 * DESCR;
 
     /* ACOMPC NEXFCL,FBLKSZ — check for end of current block */
-    if (D_A(NEXFCL) > FBKLSZ) {
-        /* FATBLK: allocate new function block */
-        int32_t new_blk = BLOCK_fn(FBKLSZ, 0);
+    if (D_A(NEXFCL) > FBLKSZ) {
+        /* FATBLK: allocate new function block — oracle: RCALL FBLOCK,BLOCK,FBLKRQ (type=B) */
+        int32_t new_blk = BLOCK_fn(FBLKSZ, B);
         D_A(FBLOCK) = new_blk;
         D_F(FBLOCK) |= FNC;   /* SETF FBLOCK,FNC */
         D_V(FBLOCK)  = 0;     /* SETVC FBLOCK,0 */
@@ -280,7 +278,7 @@ int32_t FINDEX_fn(DESCR_t *name_d)
     f2d.a.i = f2ptr;
     f2d.f   = 0;
     f2d.v   = 0;
-    FNCPL_off = AUGATL_fn(FNCPL_off, f2d, *name_d);
+    D_A(FNCPL) = AUGATL_fn(D_A(FNCPL), f2d, *name_d);
 
     /* PUTDC F2PTR,0,UNDFCL — insert undefined function marker */
     extern DESCR_t UNDFCL;

@@ -21,14 +21,14 @@
 
 #include "sil_types.h"
 
-SIL_result READ_fn(void);     /* INPUT(V,U,O,N)   */
-SIL_result PRINT_fn(void);    /* OUTPUT(V,U,O,N)  */
-SIL_result BKSPCE_fn(void);   /* BACKSPACE(U)     */
-SIL_result ENDFL_fn(void);    /* ENDFILE(U)       */
-SIL_result REWIND_fn(void);   /* REWIND(U)        */
-SIL_result SET_fn(void);      /* SET(U,O,W)       */
-SIL_result DETACH_fn(void);   /* DETACH(V)        */
-SIL_result PUTIN_fn(DESCR_t blk, DESCR_t var);   /* internal input  */
+Sil_result READ_fn(void);     /* INPUT(V,U,O,N)   */
+Sil_result PRINT_fn(void);    /* OUTPUT(V,U,O,N)  */
+Sil_result BKSPCE_fn(void);   /* BACKSPACE(U)     */
+Sil_result ENDFL_fn(void);    /* ENDFILE(U)       */
+Sil_result REWIND_fn(void);   /* REWIND(U)        */
+Sil_result SET_fn(void);      /* SET(U,O,W)       */
+Sil_result DETACH_fn(void);   /* DETACH(V)        */
+Sil_result PUTIN_fn(DESCR_t blk, DESCR_t var);   /* internal input  */
 void       PUTOUT_fn(DESCR_t blk, DESCR_t val);  /* internal output */
 
 #endif /* SIL_IO_H */

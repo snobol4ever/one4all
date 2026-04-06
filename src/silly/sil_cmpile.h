@@ -16,7 +16,7 @@
 
 /* CMPILE — compile one SNOBOL4 statement.
  * Exits: OK=normal, FAIL=END statement seen, 3=statement done (RTN3). */
-SIL_result CMPILE_fn(void);
+Sil_result CMPILE_fn(void);
 
 /* CDIAG — compiler diagnostic: emit error, insert ERROR function. */
 void CDIAG_fn(void);

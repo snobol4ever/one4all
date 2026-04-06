@@ -34,10 +34,10 @@ extern void       XCALL_SBREAL(DESCR_t *out, DESCR_t a, DESCR_t b);
 extern void       XCALL_io_flushall(void);
 extern void       XCALL_XECOMP(void);
 extern void       XCALL_OUTPUT_fmt(DESCR_t unit, const char *fmt, ...);
-extern SIL_result XCALL_IO_FILE(DESCR_t unit, SPEC_t *fname_out);
-extern SIL_result XCALL_GETPARM(SPEC_t *out);
+extern Sil_result XCALL_IO_FILE(DESCR_t unit, SPEC_t *fname_out);
+extern Sil_result XCALL_GETPARM(SPEC_t *out);
 extern void       XCALL_FREEPARM(SPEC_t *sp);
-extern SIL_result XCALL_GETPMPROTO(SPEC_t *out, int32_t idx);
+extern Sil_result XCALL_GETPMPROTO(SPEC_t *out, int32_t idx);
 extern void       XCALL_ZERBLK(DESCR_t *region, DESCR_t count);
 extern void       STPRNT_fn(int32_t key, DESCR_t blk, SPEC_t *sp);
 extern DESCR_t    PUNCH;
@@ -46,11 +46,11 @@ extern DESCR_t    CARDTB;
 extern DESCR_t    IBLKTB;
 extern DESCR_t    LBLTB;
 
-extern SIL_result LOAD2_fn(void);   /* LOAD internal entry */
-extern SIL_result STREAD_fn(SPEC_t *sp, DESCR_t unit);
-extern SIL_result STREAM_fn(SPEC_t *res, SPEC_t *src,
+extern Sil_result LOAD2_fn(void);   /* LOAD internal entry */
+extern Sil_result STREAD_fn(SPEC_t *sp, DESCR_t unit);
+extern Sil_result STREAM_fn(SPEC_t *res, SPEC_t *src,
                               DESCR_t *tbl, int *stype_out);
-static int32_t GENVAR_fn_from_descr(DESCR_t d);
+static int32_t genvar_from_descr(DESCR_t d);
 
 #define GETDC_B(dst, base_d, off_i) \
     memcpy(&(dst), (char*)A2P(D_A(base_d))+(off_i), sizeof(DESCR_t))
@@ -100,7 +100,7 @@ static void BEGIN_fn(void)
     while (D_A(INITB) < D_A(INITE)) {
         DESCR_t xptr, yptr, zptr;
         GETDC_B(xptr, INITB, 0);
-        int32_t off = GENVAR_fn_from_descr(xptr);
+        int32_t off = genvar_from_descr(xptr);
         if (off) { SETAC(yptr, off); SETVC(yptr, S); }
         GETDC_B(zptr, INITB, DESCR);
         PUTDC_B(zptr, 0, yptr);
@@ -190,7 +190,7 @@ static void compile_loop(void)
         NEWCRD_fn();
 
         /* Compile one statement */
-        SIL_result rc = CMPILE_fn();
+        Sil_result rc = CMPILE_fn();
 
         if (rc == FAIL) {
             /* END statement reached */
@@ -242,14 +242,14 @@ xlaend:
     SETAC(CNSLCL, 1);
 
     /* Run the interpreter */
-    SIL_result irc = INTERP_fn();
+    Sil_result irc = INTERP_fn();
     if ((int)irc != 0 && (int)irc != 5 && (int)irc != 6) MAIN1_fn();
     END_fn();
 }
 
 /* ── Stub for GENVAR from raw DESCR ─────────────────────────────────── */
 /* Used in BEGIN for INITB processing */
-static int32_t GENVAR_fn_from_descr(DESCR_t d)
+static int32_t genvar_from_descr(DESCR_t d)
 {
     if (D_V(d) != S) return 0;
     SPEC_t sp; sp.a = D_A(d); sp.l = 0; sp.o = 0; sp.v = S; sp.f = 0;

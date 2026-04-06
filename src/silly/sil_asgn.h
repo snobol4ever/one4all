@@ -20,12 +20,12 @@
 
 #include "sil_types.h"
 
-SIL_result ASGN_fn(void);    /* X = Y  — assignment                       */
-SIL_result CONCAT_fn(void);  /* X Y    — concatenation                    */
-SIL_result IND_fn(void);     /* $X     — indirect reference               */
-SIL_result KEYWRD_fn(void);  /* &X     — keyword reference                */
-SIL_result LIT_fn(void);     /* 'X'    — literal push                     */
-SIL_result NAME_fn(void);    /* .X     — unary name                       */
-SIL_result STR_fn(void);     /* *X     — unevaluated expression           */
+Sil_result ASGN_fn(void);    /* X = Y  — assignment                       */
+Sil_result CONCAT_fn(void);  /* X Y    — concatenation                    */
+Sil_result IND_fn(void);     /* $X     — indirect reference               */
+Sil_result KEYWRD_fn(void);  /* &X     — keyword reference                */
+Sil_result LIT_fn(void);     /* 'X'    — literal push                     */
+Sil_result NAME_fn(void);    /* .X     — unary name                       */
+Sil_result STR_fn(void);     /* *X     — unevaluated expression           */
 
 #endif /* SIL_ASGN_H */

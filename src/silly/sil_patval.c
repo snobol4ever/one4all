@@ -23,15 +23,15 @@
 #include "sil_patval.h"
 
 /* ── Forward declarations ────────────────────────────────────────────── */
-extern SIL_result INVOKE_fn(void);   /* §7 */
+extern Sil_result INVOKE_fn(void);   /* §7 */
 
 /* ── Error stubs ─────────────────────────────────────────────────────── */
 #include <stdio.h>
 #include <stdlib.h>
-static SIL_result intr1(void)  { fprintf(stderr,"sil_patval: illegal data type\n");  exit(1); }
-static SIL_result lenerr(void) { fprintf(stderr,"sil_patval: negative length\n");    exit(1); }
-static SIL_result nemo(void)   { fprintf(stderr,"sil_patval: variable not present\n"); exit(1); }
-static SIL_result noname(void) { fprintf(stderr,"sil_patval: null string\n");        exit(1); }
+static Sil_result intr1(void)  { fprintf(stderr,"sil_patval: illegal data type\n");  exit(1); }
+static Sil_result lenerr(void) { fprintf(stderr,"sil_patval: negative length\n");    exit(1); }
+static Sil_result nemo(void)   { fprintf(stderr,"sil_patval: variable not present\n"); exit(1); }
+static Sil_result noname(void) { fprintf(stderr,"sil_patval: null string\n");        exit(1); }
 
 /* ════════════════════════════════════════════════════════════════════════
  * Pattern node primitives — translated from lib/pat.c
@@ -156,7 +156,7 @@ static DESCR_t oc_fetch(void)
  * Evaluates argument via ARGVAL, coerces STRING/EXPR/INTEGER,
  * allocates LNODSZ block, calls maknod.
  * ════════════════════════════════════════════════════════════════════════ */
-static SIL_result charz_abnsnd(const DESCR_t *ycl, const DESCR_t *zcl)
+static Sil_result charz_abnsnd(const DESCR_t *ycl, const DESCR_t *zcl)
 {
     if (ARGVAL_fn() == FAIL) return FAIL;
 
@@ -186,7 +186,7 @@ static SIL_result charz_abnsnd(const DESCR_t *ycl, const DESCR_t *zcl)
  * v311.sil LPRTND (line ~3172)
  * Stack on entry: function-descriptor YCL
  * ════════════════════════════════════════════════════════════════════════ */
-static SIL_result lprtnd(const DESCR_t *ycl)
+static Sil_result lprtnd(const DESCR_t *ycl)
 {
     if (ARGVAL_fn() == FAIL) return FAIL;
 
@@ -221,26 +221,26 @@ patnod:
 /* ════════════════════════════════════════════════════════════════════════
  * Character-set pattern entry points
  * ════════════════════════════════════════════════════════════════════════ */
-SIL_result ANY_fn(void)    { return charz_abnsnd(&ANYCCL, &CHARCL); }
-SIL_result NOTANY_fn(void) { return charz_abnsnd(&NNYCCL, &CHARCL); }
-SIL_result SPAN_fn(void)   { return charz_abnsnd(&SPNCCL, &CHARCL); }
-SIL_result BREAK_fn(void)  { return charz_abnsnd(&BRKCCL, &ZEROCL); }
-SIL_result BREAKX_fn(void) { return charz_abnsnd(&BRXCCL, &ZEROCL); }
+Sil_result ANY_fn(void)    { return charz_abnsnd(&ANYCCL, &CHARCL); }
+Sil_result NOTANY_fn(void) { return charz_abnsnd(&NNYCCL, &CHARCL); }
+Sil_result SPAN_fn(void)   { return charz_abnsnd(&SPNCCL, &CHARCL); }
+Sil_result BREAK_fn(void)  { return charz_abnsnd(&BRKCCL, &ZEROCL); }
+Sil_result BREAKX_fn(void) { return charz_abnsnd(&BRXCCL, &ZEROCL); }
 
 /* ════════════════════════════════════════════════════════════════════════
  * Integer-argument pattern entry points
  * ════════════════════════════════════════════════════════════════════════ */
-SIL_result LEN_fn(void)  { return lprtnd(&LNTHCL); }
-SIL_result POS_fn(void)  { return lprtnd(&POSICL);  }
-SIL_result RPOS_fn(void) { return lprtnd(&RPSICL); }
-SIL_result RTAB_fn(void) { return lprtnd(&RTBCL);  }
-SIL_result TAB_fn(void)  { return lprtnd(&TBCL);   }
+Sil_result LEN_fn(void)  { return lprtnd(&LNTHCL); }
+Sil_result POS_fn(void)  { return lprtnd(&POSICL);  }
+Sil_result RPOS_fn(void) { return lprtnd(&RPSICL); }
+Sil_result RTAB_fn(void) { return lprtnd(&RTBCL);  }
+Sil_result TAB_fn(void)  { return lprtnd(&TBCL);   }
 
 /* ════════════════════════════════════════════════════════════════════════
  * ARBNO_fn — ARBNO(P)
  * v311.sil ARBNO (line ~3185)
  * ════════════════════════════════════════════════════════════════════════ */
-SIL_result ARBNO_fn(void)
+Sil_result ARBNO_fn(void)
 {
     if (PATVAL_fn() == FAIL) return FAIL;
 
@@ -287,7 +287,7 @@ SIL_result ARBNO_fn(void)
  * ATOP_fn — @X cursor capture
  * v311.sil ATOP (line ~3237)
  * ════════════════════════════════════════════════════════════════════════ */
-SIL_result ATOP_fn(void)
+Sil_result ATOP_fn(void)
 {
     YPTR = oc_fetch();
 
@@ -314,7 +314,7 @@ SIL_result ATOP_fn(void)
  * NAM_fn / DOL_fn — X.Y and X$Y value-assignment operators
  * v311.sil NAM/DOL (line ~3253)
  * ════════════════════════════════════════════════════════════════════════ */
-static SIL_result nam_dol(const DESCR_t *op_cl)
+static Sil_result nam_dol(const DESCR_t *op_cl)
 {
     /* get pattern for first argument */
     if (PATVAL_fn() == FAIL) return FAIL;
@@ -385,14 +385,14 @@ static SIL_result nam_dol(const DESCR_t *op_cl)
     return OK;
 }
 
-SIL_result NAM_fn(void) { return nam_dol(&ENMECL); }
-SIL_result DOL_fn(void) { return nam_dol(&ENMICL); }
+Sil_result NAM_fn(void) { return nam_dol(&ENMECL); }
+Sil_result DOL_fn(void) { return nam_dol(&ENMICL); }
 
 /* ════════════════════════════════════════════════════════════════════════
  * OR_fn — X | Y alternation
  * v311.sil OR (line ~3293)
  * ════════════════════════════════════════════════════════════════════════ */
-SIL_result OR_fn(void)
+Sil_result OR_fn(void)
 {
     /* get first argument, save; get second into YPTR */
     if (PATVAL_fn() == FAIL) return FAIL;

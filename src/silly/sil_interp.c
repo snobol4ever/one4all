@@ -74,7 +74,7 @@ static void usrint(void){ SETAC(ERRTYP, 34); }   /* user interrupt       */
  *   SUM OCBSCL,OCBSCL,OCICL   — advance base by offset
  *   SETAC OCICL,0              — zero offset
  */
-SIL_result BASE_fn(void)
+Sil_result BASE_fn(void)
 {
     SUM(OCBSCL, OCBSCL, OCICL);
     SETAC(OCICL, 0);
@@ -88,7 +88,7 @@ SIL_result BASE_fn(void)
  *   VEQLC OCBSCL,C,INTR4        — must be CODE type
  *   SETAC OCICL,0               — zero offset
  */
-SIL_result GOTG_fn(void)
+Sil_result GOTG_fn(void)
 {
     if (ARGVAL_fn() == FAIL) { intr5(); return FAIL; }
     if (!VEQLC(XPTR, C)) { intr4(); return FAIL; }
@@ -104,7 +104,7 @@ SIL_result GOTG_fn(void)
  *   RETCL(6=RETURN) FRETCL(4=FAIL) NRETCL(5=NRETURN) ABORCL SCNTCL CONTCL.
  *   Normal label: GETDC OCBSCL,XPTR,ATTRIB; SETAC OCICL,0.
  */
-SIL_result GOTL_fn(void)
+Sil_result GOTL_fn(void)
 {
     INCRA(OCICL, DESCR);
     GETD_B(XPTR, OCBSCL, OCICL);
@@ -172,7 +172,7 @@ restore_and_go:
  *   INCRA OCICL,DESCR
  *   GETD OCICL,OCBSCL,OCICL   — load new OCICL from object code
  */
-SIL_result GOTO_fn(void)
+Sil_result GOTO_fn(void)
 {
     INCRA(OCICL, DESCR);
     GETD_B(OCICL, OCBSCL, OCICL);
@@ -186,7 +186,7 @@ SIL_result GOTO_fn(void)
  *   Loads &STNO/FRTNCL/&LINE/&FILE from object code.
  *   Increments &STEXEC; checks &STLIMIT; checks &TRACE.
  */
-SIL_result INIT_fn(void)
+Sil_result INIT_fn(void)
 {
     MOVD(LSTNCL, STNOCL);
     MOVA(LSFLNM, FILENM);
@@ -232,7 +232,7 @@ SIL_result INIT_fn(void)
  *   If FNC: call INVOKE.
  *   INVOKE exits: 1-3=continue, 4=failure→FRTNCL, 5-6=nested return.
  */
-SIL_result INTERP_fn(void)
+Sil_result INTERP_fn(void)
 {
     while (1) {
         INCRA(OCICL, DESCR);
@@ -245,7 +245,7 @@ SIL_result INTERP_fn(void)
         }
 
         /* Call via INVOKE */
-        SIL_result rc = INVOKE_fn();
+        Sil_result rc = INVOKE_fn();
 
         switch ((int)rc) {
         case OK:   /* exits 1,2,3 — continue */
@@ -280,7 +280,7 @@ SIL_result INTERP_fn(void)
  * In C: the function pointer is stored in invoke_table[D_A(INCL)].
  * Argument count is in D_V(INCL); checked against D_V(XPTR).
  */
-SIL_result INVOKE_fn(void)
+Sil_result INVOKE_fn(void)
 {
     /* INCL already loaded by caller (from object code stream) */
     GETDC_B(XPTR, INCL, 0);   /* procedure descriptor */

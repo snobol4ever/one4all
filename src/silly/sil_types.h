@@ -182,7 +182,8 @@ typedef struct __attribute__((packed)) {
 #define CARDSZ   1024         /* Width of compiler input [PLB21][PLB57]     */
 #define STNOSZ   8            /* Length of statement number field           */
 #define DSTSZ   (2 * STNOSZ)  /* Space for left and right numbering         */
-#define CNODSZS (4 * DESCR)   /* Size of code node                          */
+#define CNODSZ  (4 * DESCR)   /* Size of code node                          */
+#define FBLKSZ  (10 * DESCR)  /* Size of function descriptor block          */
 #define DATSIZ   1000         /* Limit on number of defined data types      */
 #define EXTSIZ   10           /* Default allocation for tables              */
 #define NAMLSZ   20           /* Growth quantum for name list               */
@@ -245,7 +246,7 @@ typedef struct __attribute__((packed)) {
 #define XFNCE    35   /* FENCE                                              */
 #define XSUCF    36   /* SUCCEED                                            */
 
-/* ── SIL_result — return code for SIL procedure translation ───────────── */
+/* ── Sil_result — return code for SIL procedure translation ───────────── */
 /*
  * SIL procedures return via RRTURN with an exit number (1, 2, 3...).
  * In C each translates to a typed return. Most procedures have two
@@ -256,7 +257,7 @@ typedef struct __attribute__((packed)) {
 typedef enum {
     FAIL = 0,   /* SIL failure exit — :F branch taken, no result          */
     OK   = 1    /* SIL success exit — :S branch taken, result valid       */
-} SIL_result;
+} Sil_result;
 
 /* ── Convenience macros for DESCR_t access ───────────────────────────── */
 
