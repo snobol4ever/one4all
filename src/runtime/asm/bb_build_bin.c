@@ -142,6 +142,8 @@ extern int memcmp(const void *, const void *, size_t);
 
 /* forward declarations */
 extern spec_t bb_seq(void *zeta, int entry);
+extern spec_t bb_tab(void *zeta, int entry);
+extern spec_t bb_rtab(void *zeta, int entry);
 static bb_box_fn bb_build_binary_node(PATND_t *p);
 
 bb_box_fn bb_lit_emit_binary(const char *lit, int len)
@@ -561,6 +563,79 @@ typedef struct {
 /* Forward declaration for mutual recursion in XCAT */
 extern spec_t bb_seq(void *zeta, int entry);
 
+/*
+ * bb_tab_emit_binary(int n) — M-DYN-B4
+ *
+ * TAB(n) needs a runtime-mutable `advance` field written into ζ during α,
+ * then read back during β. We use the same trampoline strategy as XCAT:
+ *   1. calloc a heap tab_t, set ->n = n (->advance starts 0 from calloc).
+ *   2. Emit a 22-byte trampoline into bb_pool:
+ *        mov rdi, imm64(z)       ; bake ζ ptr
+ *        mov rax, imm64(bb_tab)  ; bake fn ptr
+ *        jmp rax                 ; tail call — esi/entry unchanged
+ * The trampoline is a self-contained bb_box_fn; caller's ζ is ignored.
+ * The heap tab_t persists for the lifetime of the pattern.
+ */
+static bb_box_fn bb_tab_emit_binary(int n)
+{
+#define TAB_TRAM_SIZE 32
+    tab_t *z = calloc(1, sizeof(tab_t));
+    if (!z) return NULL;
+    z->n = n;
+
+    bb_buf_t tbuf = bb_alloc(TAB_TRAM_SIZE);
+    if (!tbuf) { free(z); return NULL; }
+    bb_emit_mode = EMIT_BINARY;
+    bb_emit_begin(tbuf, TAB_TRAM_SIZE);
+
+    /* mov rdi, imm64(z) */
+    bb_emit_byte(0x48); bb_emit_byte(0xBF);
+    bb_emit_u64((uint64_t)(uintptr_t)z);
+    /* mov rax, imm64(bb_tab) */
+    bb_emit_byte(0x48); bb_emit_byte(0xB8);
+    bb_emit_u64((uint64_t)(uintptr_t)bb_tab);
+    /* jmp rax */
+    bb_emit_byte(0xFF); bb_emit_byte(0xE0);
+
+    int nb = bb_emit_end();
+    if (nb <= 0 || nb > TAB_TRAM_SIZE) { bb_free(tbuf, TAB_TRAM_SIZE); free(z); return NULL; }
+    bb_seal(tbuf, (size_t)nb);
+    return (bb_box_fn)tbuf;
+#undef TAB_TRAM_SIZE
+}
+
+/*
+ * bb_rtab_emit_binary(int n) — M-DYN-B4
+ * Same trampoline strategy as bb_tab_emit_binary, delegating to bb_rtab.
+ */
+static bb_box_fn bb_rtab_emit_binary(int n)
+{
+#define RTAB_TRAM_SIZE 32
+    rtab_t *z = calloc(1, sizeof(rtab_t));
+    if (!z) return NULL;
+    z->n = n;
+
+    bb_buf_t tbuf = bb_alloc(RTAB_TRAM_SIZE);
+    if (!tbuf) { free(z); return NULL; }
+    bb_emit_mode = EMIT_BINARY;
+    bb_emit_begin(tbuf, RTAB_TRAM_SIZE);
+
+    /* mov rdi, imm64(z) */
+    bb_emit_byte(0x48); bb_emit_byte(0xBF);
+    bb_emit_u64((uint64_t)(uintptr_t)z);
+    /* mov rax, imm64(bb_rtab) */
+    bb_emit_byte(0x48); bb_emit_byte(0xB8);
+    bb_emit_u64((uint64_t)(uintptr_t)bb_rtab);
+    /* jmp rax */
+    bb_emit_byte(0xFF); bb_emit_byte(0xE0);
+
+    int nb = bb_emit_end();
+    if (nb <= 0 || nb > RTAB_TRAM_SIZE) { bb_free(tbuf, RTAB_TRAM_SIZE); free(z); return NULL; }
+    bb_seal(tbuf, (size_t)nb);
+    return (bb_box_fn)tbuf;
+#undef RTAB_TRAM_SIZE
+}
+
 static bb_box_fn bb_build_binary_node(PATND_t *p)
 {
     if (!p) {
@@ -587,14 +662,13 @@ static bb_box_fn bb_build_binary_node(PATND_t *p)
     case XRPSI:
         return bb_rpos_emit_binary((int)p->num);
 
-    /* ── M-DYN-B3: TAB(n) — needs runtime-mutable advance field;
-     *   delegate to C path (advance computed at match time into ζ) ─── */
+    /* ── M-DYN-B4: TAB(n) — trampoline to heap tab_t + bb_tab ────── */
     case XTB:
-        return NULL;
+        return bb_tab_emit_binary((int)p->num);
 
-    /* ── M-DYN-B3: RTAB(n) — same reasoning as TAB ─────────────────── */
+    /* ── M-DYN-B4: RTAB(n) — trampoline to heap rtab_t + bb_rtab ── */
     case XRTB:
-        return NULL;
+        return bb_rtab_emit_binary((int)p->num);
 
     /* ── M-DYN-B3: XCAT — recursive hybrid seq ──────────────────────
      * Build left and right children as binary; wire into heap seq_t;
