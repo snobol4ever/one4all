@@ -119,6 +119,15 @@ DESCR_t ARGVAL_fn(DESCR_t d)
         return NULVCL;
     }
 
+    /* SIL ARGV2: keyword → read current value via NV_GET_fn.
+     * DT_K carries the keyword name in .s (same union field as DT_N NAMEVAL).
+     * DATATYPE() needs the pre-eval descriptor — but SIL ARGVAL resolves
+     * names to values before passing, so builtins see the value.
+     * Exception: DATATYPE uses MOVV (raw descriptor) not ARGVAL — tracked
+     * as a future fidelity item. For now, resolve so arithmetic works. */
+    if (d.v == DT_K && d.s)
+        return NV_GET_fn(d.s);
+
     /* &INPUT association check (ARGV1 / ARGV2 boundary) — stub for RT-5 */
     /* TODO RT-5: check input association table for DT_S variables */
 

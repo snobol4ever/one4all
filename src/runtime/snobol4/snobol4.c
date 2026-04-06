@@ -1136,6 +1136,17 @@ void SNO_INIT_fn(void) {
         NV_SET_fn("LCASE",  STRVAL(lcase));
         NV_SET_fn("digits", STRVAL("0123456789"));
     }
+    /* Register pattern-valued keywords as NV variables.
+     * SIL KVLIST (v311.sil ~10570): ARBPAT/BALPAT/FNCPAT/ABOPAT/FALPAT/REMPT/SUCPAT
+     * &ARB, &BAL, &FENCE, &ABORT, &FAIL, &REM, &SUCCEED are DT_P in the keyword table.
+     * NV_GET_fn("ARB") must return the pattern descriptor, not NULVCL. */
+    NV_SET_fn("ARB",     pat_arb());
+    NV_SET_fn("BAL",     pat_bal());
+    NV_SET_fn("FENCE",   pat_fence());
+    NV_SET_fn("ABORT",   pat_abort());
+    NV_SET_fn("FAIL",    pat_fail());
+    NV_SET_fn("REM",     pat_rem());
+    NV_SET_fn("SUCCEED", pat_succeed());
     monitor_ready = 1;  /* pre-init constants installed; monitor may now fire */
     /* Register tree DT_DATA type, then override field accessors.
      * DEFDAT_fn("tree(t,v,n,c)") installs coercing accessors for each
@@ -1278,6 +1289,8 @@ int64_t to_int(DESCR_t v) {
             if (!*s) return 0;
             return (int64_t)strtoll(s, NULL, 10);
         }
+        case DT_K:  /* SIL: keyword → dereference via NV_GET, then coerce */
+            return to_int(NV_GET_fn(v.s));
         default:
             sno_runtime_error(1, "Illegal data type");
             return 0;
@@ -1293,6 +1306,8 @@ double to_real(DESCR_t v) {
             const char *s = v.s ? v.s : "";
             return strtod(s, NULL);
         }
+        case DT_K:  /* SIL: keyword → dereference via NV_GET, then coerce */
+            return to_real(NV_GET_fn(v.s));
         default:
             sno_runtime_error(1, "Illegal data type");
             return 0.0;
@@ -1312,6 +1327,7 @@ const char *datatype(DESCR_t v) {
         case DT_C:       return "CODE";
         case DT_E:       return "EXPRESSION";
         case DT_N:       return "NAME";
+        case DT_K:       return "NAME";  /* SIL DTLIST: K → NAMESP, same as N */
         default:         return "STRING";
     }
 }

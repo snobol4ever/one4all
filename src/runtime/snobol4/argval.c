@@ -42,6 +42,7 @@ DESCR_t VARVAL_d_fn(DESCR_t d)
         else if (d.slen == 1 && d.ptr)  d = *(DESCR_t *)d.ptr;
         else return NULVCL;
     }
+    if (d.v == DT_K && d.s) d = NV_GET_fn(d.s);  /* keyword → value */
     if (d.v == DT_FAIL) return FAILDESCR;
     if (d.v == DT_S || d.v == DT_SNUL) return d;
     if (d.v == DT_I) {
@@ -74,6 +75,7 @@ DESCR_t INTVAL_fn(DESCR_t d)
         else if (d.slen == 1 && d.ptr)  d = *(DESCR_t *)d.ptr;
         else return FAILDESCR;
     }
+    if (d.v == DT_K && d.s) d = NV_GET_fn(d.s);  /* keyword → value */
     if (d.v == DT_FAIL) return FAILDESCR;
     if (d.v == DT_I)   return d;
     if (d.v == DT_R)   return INTVAL((int64_t)d.r);   /* RLINT */
@@ -107,6 +109,7 @@ DESCR_t PATVAL_fn(DESCR_t d)
         else if (d.slen == 1 && d.ptr)  d = *(DESCR_t *)d.ptr;
         else return FAILDESCR;
     }
+    if (d.v == DT_K && d.s) d = NV_GET_fn(d.s);  /* keyword → value */
     if (d.v == DT_FAIL) return FAILDESCR;
     if (d.v == DT_P) return d;
     if (d.v == DT_E) {
