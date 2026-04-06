@@ -583,6 +583,90 @@ typedef struct {
 extern spec_t bb_seq(void *zeta, int entry);
 extern spec_t bb_len(void *zeta, int entry);
 
+/* M-DYN-B8: char-set boxes */
+extern spec_t bb_span(void *zeta, int entry);
+extern spec_t bb_any(void *zeta, int entry);
+extern spec_t bb_brk(void *zeta, int entry);
+extern spec_t bb_notany(void *zeta, int entry);
+
+/*
+ * Char-set trampoline helper — SPAN/ANY/BREAK/NOTANY — M-DYN-B8
+ *
+ * All four take a heap struct whose first field is `const char *chars`
+ * (the character-set string, baked at pattern-build time) plus an optional
+ * int δ (runtime-mutable advance, written at match time).  Layout from bb_box.h:
+ *   span_t   = { const char *chars; int δ; }
+ *   any_t    = { const char *chars; }
+ *   notany_t = { const char *chars; }
+ *   brk_t    = { const char *chars; int δ; }
+ *
+ * Strategy: calloc the right struct, set ->chars = p->STRVAL_fn,
+ * emit 22-byte trampoline to the corresponding box function.
+ * chars pointer is into the PATND_t tree which lives for program lifetime.
+ */
+
+#define CHARSET_TRAM_SIZE 32
+
+/* span_t = { const char *chars; int delta; } — 16 bytes on x86-64 */
+typedef struct { const char *chars; int delta; } cset_span_t;
+typedef struct { const char *chars; }             cset_any_t;
+typedef struct { const char *chars; }             cset_notany_t;
+typedef struct { const char *chars; int delta; } cset_brk_t;
+
+static bb_box_fn charset_emit_trampoline(void *zeta, bb_box_fn target_fn)
+{
+    bb_buf_t tbuf = bb_alloc(CHARSET_TRAM_SIZE);
+    if (!tbuf) { free(zeta); return NULL; }
+    bb_emit_mode = EMIT_BINARY;
+    bb_emit_begin(tbuf, CHARSET_TRAM_SIZE);
+    /* mov rdi, imm64(zeta) */
+    bb_emit_byte(0x48); bb_emit_byte(0xBF);
+    bb_emit_u64((uint64_t)(uintptr_t)zeta);
+    /* mov rax, imm64(target_fn) */
+    bb_emit_byte(0x48); bb_emit_byte(0xB8);
+    bb_emit_u64((uint64_t)(uintptr_t)target_fn);
+    /* jmp rax */
+    bb_emit_byte(0xFF); bb_emit_byte(0xE0);
+    int nb = bb_emit_end();
+    if (nb <= 0 || nb > CHARSET_TRAM_SIZE) { bb_free(tbuf, CHARSET_TRAM_SIZE); free(zeta); return NULL; }
+    bb_seal(tbuf, (size_t)nb);
+    return (bb_box_fn)tbuf;
+}
+
+static bb_box_fn bb_span_emit_binary(const char *chars)
+{
+    cset_span_t *z = calloc(1, sizeof(cset_span_t));
+    if (!z) return NULL;
+    z->chars = chars;
+    return charset_emit_trampoline(z, bb_span);
+}
+
+static bb_box_fn bb_any_emit_binary(const char *chars)
+{
+    cset_any_t *z = calloc(1, sizeof(cset_any_t));
+    if (!z) return NULL;
+    z->chars = chars;
+    return charset_emit_trampoline(z, bb_any);
+}
+
+static bb_box_fn bb_notany_emit_binary(const char *chars)
+{
+    cset_notany_t *z = calloc(1, sizeof(cset_notany_t));
+    if (!z) return NULL;
+    z->chars = chars;
+    return charset_emit_trampoline(z, bb_notany);
+}
+
+static bb_box_fn bb_brk_emit_binary(const char *chars)
+{
+    cset_brk_t *z = calloc(1, sizeof(cset_brk_t));
+    if (!z) return NULL;
+    z->chars = chars;
+    return charset_emit_trampoline(z, bb_brk);
+}
+
+#undef CHARSET_TRAM_SIZE
+
 /*
  * bb_nme_emit_binary(PATND_t *p) — M-DYN-B7
  * bb_fnme_emit_binary(PATND_t *p) — M-DYN-B7
@@ -796,6 +880,22 @@ static bb_box_fn bb_build_binary_node(PATND_t *p)
     /* ── M-DYN-B2: epsilon ─────────────────────────────────────────── */
     case XEPS:
         return bb_eps_emit_binary();
+
+    /* ── M-DYN-B8: SPAN(chars) ─────────────────────────────────────── */
+    case XSPNC:
+        return bb_span_emit_binary(p->STRVAL_fn ? p->STRVAL_fn : "");
+
+    /* ── M-DYN-B8: ANY(chars) ──────────────────────────────────────── */
+    case XANYC:
+        return bb_any_emit_binary(p->STRVAL_fn ? p->STRVAL_fn : "");
+
+    /* ── M-DYN-B8: NOTANY(chars) ───────────────────────────────────── */
+    case XNNYC:
+        return bb_notany_emit_binary(p->STRVAL_fn ? p->STRVAL_fn : "");
+
+    /* ── M-DYN-B8: BREAK(chars) ────────────────────────────────────── */
+    case XBRKC:
+        return bb_brk_emit_binary(p->STRVAL_fn ? p->STRVAL_fn : "");
 
     /* ── M-DYN-B3: POS(n) ─────────────────────────────────────────── */
     case XPOSI:
