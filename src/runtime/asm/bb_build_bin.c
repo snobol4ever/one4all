@@ -667,6 +667,92 @@ static bb_box_fn bb_brk_emit_binary(const char *chars)
 
 #undef CHARSET_TRAM_SIZE
 
+/* M-DYN-B9: XOR (alternation) and XSTAR (REM) */
+extern spec_t bb_alt(void *zeta, int entry);
+extern spec_t bb_rem(void *zeta, int entry);
+
+/*
+ * bb_rem_emit_binary() — M-DYN-B9
+ * XSTAR = REM: matches the remainder of subject unconditionally.
+ * rem_t = { int dummy; } — no meaningful fields; bb_rem ignores ζ entirely.
+ * Simple trampoline: calloc rem_t, mov rdi,imm64(z); mov rax,imm64(bb_rem); jmp rax.
+ */
+static bb_box_fn bb_rem_emit_binary(void)
+{
+#define REM_TRAM_SIZE 32
+    rem_t *z = calloc(1, sizeof(rem_t));
+    if (!z) return NULL;
+    bb_buf_t tbuf = bb_alloc(REM_TRAM_SIZE);
+    if (!tbuf) { free(z); return NULL; }
+    bb_emit_mode = EMIT_BINARY;
+    bb_emit_begin(tbuf, REM_TRAM_SIZE);
+    bb_emit_byte(0x48); bb_emit_byte(0xBF);
+    bb_emit_u64((uint64_t)(uintptr_t)z);
+    bb_emit_byte(0x48); bb_emit_byte(0xB8);
+    bb_emit_u64((uint64_t)(uintptr_t)bb_rem);
+    bb_emit_byte(0xFF); bb_emit_byte(0xE0);
+    int nb = bb_emit_end();
+    if (nb <= 0 || nb > REM_TRAM_SIZE) { bb_free(tbuf, REM_TRAM_SIZE); free(z); return NULL; }
+    bb_seal(tbuf, (size_t)nb);
+    return (bb_box_fn)tbuf;
+#undef REM_TRAM_SIZE
+}
+
+/*
+ * bb_alt_emit_binary(PATND_t *p) — M-DYN-B9
+ * XOR = alternation: try each child in sequence.
+ * alt_t layout (from bb_alt.c):
+ *   { int n; bb_altchild_t children[16]; int current; int position; spec_t result; }
+ * where bb_altchild_t = { bb_box_fn fn; void *state; }
+ * current/position are runtime-mutable (reset on each α) — heap ζ correct.
+ * Strategy: recurse each child; if any returns NULL, fall back whole node.
+ * Populate heap alt_t children[], emit trampoline to bb_alt.
+ */
+#define BB_ALT_MAX_BIN 16
+typedef struct { bb_box_fn fn; void *state; } bin_altchild_t;
+typedef struct {
+    int            n;
+    bin_altchild_t children[BB_ALT_MAX_BIN];
+    int            current;
+    int            position;
+    spec_t         result;
+} bin_alt_t;
+
+static bb_box_fn bb_alt_emit_binary(PATND_t *p)
+{
+    int nc = p->nchildren;
+    if (nc == 0) return bb_eps_emit_binary();
+    if (nc == 1) return bb_build_binary_node(p->children[0]);
+    if (nc > BB_ALT_MAX_BIN) nc = BB_ALT_MAX_BIN;   /* cap at 16 — fallback for wider */
+
+    bin_alt_t *z = calloc(1, sizeof(bin_alt_t));
+    if (!z) return NULL;
+    z->n = nc;
+
+    for (int i = 0; i < nc; i++) {
+        bb_box_fn cfn = bb_build_binary_node(p->children[i]);
+        if (!cfn) { free(z); return NULL; }
+        z->children[i].fn    = cfn;
+        z->children[i].state = NULL;  /* binary leaf — no separate zeta */
+    }
+
+#define ALT_TRAM_SIZE 32
+    bb_buf_t tbuf = bb_alloc(ALT_TRAM_SIZE);
+    if (!tbuf) { free(z); return NULL; }
+    bb_emit_mode = EMIT_BINARY;
+    bb_emit_begin(tbuf, ALT_TRAM_SIZE);
+    bb_emit_byte(0x48); bb_emit_byte(0xBF);
+    bb_emit_u64((uint64_t)(uintptr_t)z);
+    bb_emit_byte(0x48); bb_emit_byte(0xB8);
+    bb_emit_u64((uint64_t)(uintptr_t)bb_alt);
+    bb_emit_byte(0xFF); bb_emit_byte(0xE0);
+    int nb = bb_emit_end();
+    if (nb <= 0 || nb > ALT_TRAM_SIZE) { bb_free(tbuf, ALT_TRAM_SIZE); free(z); return NULL; }
+    bb_seal(tbuf, (size_t)nb);
+    return (bb_box_fn)tbuf;
+#undef ALT_TRAM_SIZE
+}
+
 /*
  * bb_nme_emit_binary(PATND_t *p) — M-DYN-B7
  * bb_fnme_emit_binary(PATND_t *p) — M-DYN-B7
@@ -916,6 +1002,14 @@ static bb_box_fn bb_build_binary_node(PATND_t *p)
     /* ── M-DYN-B5: LEN(n) — trampoline to heap len_t + bb_len ─────── */
     case XLNTH:
         return bb_len_emit_binary((int)p->num);
+
+    /* ── M-DYN-B9: XSTAR — REM (match remainder) ───────────────────── */
+    case XSTAR:
+        return bb_rem_emit_binary();
+
+    /* ── M-DYN-B9: XOR — alternation ───────────────────────────────── */
+    case XOR:
+        return bb_alt_emit_binary(p);
 
     /* ── M-DYN-B7: XNME — pat . var  conditional capture ─────────── */
     case XNME:
