@@ -1252,6 +1252,21 @@ char *VARVAL_fn(DESCR_t v) {
     }
 }
 
+/* sno_runtime_error: GAP 4 runtime error infrastructure.
+ * Mirrors csnobol4: "\n** Error N in statement M\n   <msg>\n"
+ * If stmt executor armed g_sno_err_jmp, longjmps; else exit(1). */
+#include <setjmp.h>
+jmp_buf g_sno_err_jmp;
+int     g_sno_err_active = 0;
+int     g_sno_err_stmt   = 0;
+
+void sno_runtime_error(int code, const char *msg) {
+    fprintf(stderr, "\n** Error %d in statement %d\n   %s\n",
+            code, g_sno_err_stmt, msg ? msg : "");
+    if (g_sno_err_active) longjmp(g_sno_err_jmp, code);
+    exit(1);
+}
+
 int64_t to_int(DESCR_t v) {
     switch (v.v) {
         case DT_I:  return v.i;
@@ -1263,7 +1278,9 @@ int64_t to_int(DESCR_t v) {
             if (!*s) return 0;
             return (int64_t)strtoll(s, NULL, 10);
         }
-        default: return 0;
+        default:
+            sno_runtime_error(1, "Illegal data type");
+            return 0;
     }
 }
 
@@ -1276,7 +1293,9 @@ double to_real(DESCR_t v) {
             const char *s = v.s ? v.s : "";
             return strtod(s, NULL);
         }
-        default: return 0.0;
+        default:
+            sno_runtime_error(1, "Illegal data type");
+            return 0.0;
     }
 }
 

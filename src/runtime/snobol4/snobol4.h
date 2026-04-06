@@ -409,6 +409,13 @@ extern int64_t kw_code;      /* &CODE     - program exit code */
 extern int64_t kw_fnclevel;  /* &FNCLEVEL - function nesting depth */
 extern char    kw_rtntype[16]; /* &RTNTYPE  - RETURN/FRETURN/NRETURN */
 
+/* GAP 4 - runtime error infrastructure */
+#include <setjmp.h>
+void sno_runtime_error(int code, const char *msg);
+extern jmp_buf g_sno_err_jmp;
+extern int     g_sno_err_active;
+extern int     g_sno_err_stmt;
+
 /* Global character sets */
 extern char ucase[27];   /* &UCASE */
 extern char lcase[27];   /* &LCASE */
