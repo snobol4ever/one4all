@@ -1246,15 +1246,10 @@ static bb_box_fn bb_build_binary_node(PATND_t *p)
 {
     /* M-DYN-B0: all prior B1–B10 trampoline emitters are VOIDED.
      * New design: self-contained x86 code+data blobs (no C-function trampolines).
-     * This function is the rebuild target for M-DYN-B1+ (inline-blob ABI).
-     * All bb_*_emit_binary() functions remain compiled as skeletons.
+     * M-DYN-B1: inline blob dispatch ACTIVE. SCRIP_DYN_BLOBS_ENABLE gate removed.
+     * All bb_*_emit_binary() functions are live; SNO_BINARY_BOXES env var enables path.
      * Full design: BB-GEN-X86-BIN.md §Inline-Blob ABI.
-     * M-DYN-B0 gate: PASS=178, no trampoline paths active.
      */
-    (void)p;
-    return NULL;
-
-#ifdef SCRIP_DYN_BLOBS_ENABLE  /* gate: defined when M-DYN-B1+ inline blobs are wired */
     if (!p) {
         /* null → epsilon */
         return bb_eps_emit_binary();
@@ -1440,7 +1435,6 @@ static bb_box_fn bb_build_binary_node(PATND_t *p)
             fprintf(stderr, "BIN_MISS: kind=%d\n", (int)p->kind);
         return NULL;
     }
-#endif /* SCRIP_DYN_BLOBS_ENABLE */
 }
 
 /*
