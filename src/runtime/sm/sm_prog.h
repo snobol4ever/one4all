@@ -24,6 +24,7 @@ typedef enum {
     SM_JUMP_S,
     SM_JUMP_F,
     SM_HALT,
+    SM_STNO,       /* increment &STCOUNT/&STNO at each statement boundary */
 
     /* Values */
     SM_PUSH_LIT_S,
@@ -41,6 +42,7 @@ typedef enum {
     SM_DIV,
     SM_EXP,
     SM_CONCAT,
+    SM_COERCE_NUM, /* unary +: coerce top of stack to int or real */
     SM_NEG,
 
     /* Pattern construction */
@@ -73,6 +75,7 @@ typedef enum {
     SM_CALL,
     SM_RETURN,
     SM_FRETURN,
+    SM_NRETURN,
     SM_DEFINE,
 
     /* Type dispatch / indirect */

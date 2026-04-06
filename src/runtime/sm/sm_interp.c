@@ -18,6 +18,7 @@
 
 /* ── Pattern runtime (M-SCRIP-U4) ──────────────────────────────────────── */
 #include "../../runtime/snobol4/snobol4.h"   /* DESCR_t, PATND_t, DT_* */
+#include "../../runtime/snobol4/sil_macros.h" /* IS_NAMEPTR, NAME_DEREF_PTR, IS_NAMEVAL, etc. */
 
 /* Pattern constructors from snobol4_pattern.c */
 extern DESCR_t pat_lit(const char *s);
@@ -171,6 +172,13 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
         case SM_HALT:
             return 0;
 
+        case SM_STNO: {
+            extern void comm_stno(int n);
+            static int g_sm_stno = 0;
+            comm_stno(++g_sm_stno);
+            break;
+        }
+
         case SM_JUMP:
             st->pc = (int)ins->a[0].i;
             break;
@@ -258,6 +266,18 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
             DESCR_t result = CONCAT_fn(l, r);
             sm_push(st, result);
             st->last_ok = (result.v != DT_FAIL);
+            break;
+        }
+
+        case SM_COERCE_NUM: {
+            /* unary +: coerce string to int (or real if not integer) */
+            DESCR_t v = sm_pop(st);
+            if (v.v == DT_S) {
+                int64_t iv = to_int(v);
+                if (iv != 0 || (v.s && v.s[0] == '0')) { sm_push(st, INTVAL(iv)); }
+                else { double rv = to_real(v); sm_push(st, REALVAL(rv)); }
+            } else { sm_push(st, v); }
+            st->last_ok = 1;
             break;
         }
 
@@ -405,10 +425,22 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
 
             /* Special pseudo-calls handled inline */
             if (name && strcmp(name, "INDIR_GET") == 0) {
-                /* $expr: pop name string from value stack, look up variable, push its value */
+                /* $expr: pop descriptor from value stack, look up variable, push its value.
+                 * Three cases:
+                 *   DT_S "bal"  → $'bal' : look up variable named by string
+                 *   DT_N NAMEVAL("bal") → $.bal path: name-of-bal; $ deref = value of bal
+                 *   DT_N NAMEPTR(p)     → $ on interior ptr: deref pointer directly
+                 */
                 DESCR_t name_d = sm_pop(st);
-                const char *vname = VARVAL_fn(name_d);
-                DESCR_t val = (vname && *vname) ? NV_GET_fn(vname) : NULVCL;
+                DESCR_t val;
+                if (IS_NAMEPTR(name_d)) {
+                    val = NAME_DEREF_PTR(name_d);   /* interior ptr → value directly */
+                } else if (IS_NAMEVAL(name_d)) {
+                    val = NV_GET_fn(name_d.s);       /* name string → value of that var */
+                } else {
+                    const char *vname = VARVAL_fn(name_d);
+                    val = (vname && *vname) ? NV_GET_fn(vname) : NULVCL;
+                }
                 sm_push(st, val);
                 st->last_ok = 1;
                 break;
@@ -471,6 +503,9 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
             for (int k = nargs - 1; k >= 0; k--)
                 args[k] = sm_pop(st);
             DESCR_t result = INVOKE_fn(name, args, nargs);
+            /* NRETURN: user fn returned DT_N — dereference like tree-walk E_FNC */
+            if (IS_NAMEPTR(result))      result = NAME_DEREF_PTR(result);
+            else if (IS_NAMEVAL(result)) result = NV_GET_fn(result.s);
             sm_push(st, result);
             st->last_ok = (result.v != DT_FAIL);
             break;

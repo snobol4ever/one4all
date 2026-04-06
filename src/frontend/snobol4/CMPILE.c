@@ -600,22 +600,7 @@ syntab_t DQLITB = { "DQLITB", {
  * Each operator char fires ACT_STOPSH (does NOT consume the char — leaves it for re-use)
  * and puts its operator code into STYPE.  All are ACT_STOPSH because the operator
  * IS the single-char token; the char must not be consumed into XSP here. ---- */
-/* UOP_* aliases match the *FN defines above — same numeric values, kept separate
- * only for readability inside the UNOPTB_actions table. */
-#define UOP_PLS  301  /* = PLSFN:  +X unary plus              */
-#define UOP_MNS  302  /* = MNSFN:  -X unary minus             */
-#define UOP_DOT  303  /* = DOTFN:  .X name-of (lvalue)        */
-#define UOP_IND  304  /* = INDFN:  $X indirect reference      */
-#define UOP_STR  305  /* = STRFN:  *X unevaluated expression  */
-#define UOP_SLH  306  /* = SLHFN:  /X user-definable          */
-#define UOP_PCT  307  /* = PRFN:   %X user-definable          */
-#define UOP_AT   308  /* = ATFN:   @X scanner cursor position */
-#define UOP_PD   309  /* = PDFN:   #X user-definable          */
-#define UOP_KEY  310  /* = KEYFN:  &X keyword reference       */
-#define UOP_NEG  311  /* = NEGFN:  ~X not/negation            */
-#define UOP_BAR  312  /* = BARFN:  |X user-definable          */
-#define UOP_QUE  313  /* = QUESFN: ?X interrogation/test      */
-#define UOP_ARW  314  /* = AROWFN: ^X user-definable          */
+/* UOP_* aliases removed — use the SIL *FN constants directly (PLSFN=301 … AROWFN=314) */
 
 syntab_t NBLKTB;
 static acts_t NBLKTB_actions[] = {
@@ -1433,9 +1418,9 @@ static CMPND_t *ELEMNT(void) {
         }
         int uop = STYPE;
         static const char *uop_names[] = {
-            "?","UOP_PLS","UOP_MNS","UOP_DOT","UOP_IND","UOP_STR",
-            "UOP_SLH","UOP_PCT","UOP_AT","UOP_PD","UOP_KEY",
-            "UOP_NEG","UOP_BAR","UOP_QUE","UOP_ARW"
+            "?","PLSFN","MNSFN","DOTFN","INDFN","STRFN",
+            "SLHFN","PRFN","ATFN","PDFN","KEYFN",
+            "NEGFN","BARFN","QUESFN","AROWFN"
         };
         const char *nm = (uop >= 301 && uop <= 314)
                          ? uop_names[uop-300] : "UOP?";

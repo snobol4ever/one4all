@@ -129,8 +129,8 @@ static int emit_goto(SM_Program *p, LabelTable *lt,
         return sm_emit(p, SM_FRETURN);
     }
     if (strcmp(target, "NRETURN") == 0) {
-        /* NRETURN: semantics owned by call_user_function tree-walk; SM just needs to halt */
-        return sm_emit(p, SM_RETURN);
+        /* NRETURN: return DT_N from fn return var; ret_kind=2 in call_user_function */
+        return sm_emit(p, SM_NRETURN);
     }
 
     /* Emit the jump with a placeholder target (0) */
@@ -363,7 +363,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         return;
     case E_PLS:
         lower_expr(p, lt, e->nchildren > 0 ? e->children[0] : NULL);
-        /* unary plus = numeric coerce; nop for already-numeric */
+        sm_emit(p, SM_COERCE_NUM);   /* unary +: string→int or real */
         return;
 
     /* ── String concatenation ── */
@@ -484,6 +484,9 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
 
 static void lower_stmt(SM_Program *p, LabelTable *lt, const STMT_t *s)
 {
+    /* 0. Statement counter tick — increments &STCOUNT / &STNO */
+    sm_emit(p, SM_STNO);
+
     /* 1. Define label if present */
     if (s->label && s->label[0]) {
         int lbl_idx = sm_label(p);
