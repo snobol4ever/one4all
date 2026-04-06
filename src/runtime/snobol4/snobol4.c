@@ -517,6 +517,15 @@ static DESCR_t _CONVERT_(DESCR_t *a, int n) {
         if (!s || !*s) return FAILDESCR;
         return compile_to_expression(s);
     }
+    if (strcasecmp(type, "NAME") == 0) {
+        /* SIL: coerce X to string, wrap as DT_N NAMEVAL (variable name reference).
+         * Empty string → FAIL (SPITBOL verified: CONVERT("","NAME") returns STRING).
+         * Semantics: the returned NAME descriptor, when used as a subject, reads the
+         * named variable's value. CONVERT(42,"NAME") coerces 42→"42" first. */
+        const char *s = VARVAL_fn(val);
+        if (!s || !*s) return FAILDESCR;
+        return NAMEVAL(GC_strdup(s));
+    }
     if (strcasecmp(type, "NUMERIC")    == 0) {
         /* SIL CNV1/NUMSP: integer if pure-int string, real if float, fail otherwise */
         if (IS_INT(val)) return val;
@@ -524,7 +533,7 @@ static DESCR_t _CONVERT_(DESCR_t *a, int n) {
         if (IS_STR(val) || val.v == DT_SNUL) {
             const char *s = val.s ? val.s : "";
             while (*s == ' ') s++;
-            if (!*s) return FAILDESCR;
+            if (!*s) return INTVAL(0);  /* SIL SPCINT: empty string = 0 */
             /* Try integer first */
             char *end = NULL;
             long long iv = strtoll(s, &end, 10);
