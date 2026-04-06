@@ -16,6 +16,65 @@
 #include <string.h>
 #include <math.h>
 
+/* ── Pattern runtime (M-SCRIP-U4) ──────────────────────────────────────── */
+#include "../../runtime/snobol4/snobol4.h"   /* DESCR_t, PATND_t, DT_* */
+
+/* Pattern constructors from snobol4_pattern.c */
+extern DESCR_t pat_lit(const char *s);
+extern DESCR_t pat_span(const char *chars);
+extern DESCR_t pat_break_(const char *chars);
+extern DESCR_t pat_breakx(const char *chars);
+extern DESCR_t pat_any_cs(const char *chars);
+extern DESCR_t pat_notany(const char *chars);
+extern DESCR_t pat_len(int64_t n);
+extern DESCR_t pat_pos(int64_t n);
+extern DESCR_t pat_rpos(int64_t n);
+extern DESCR_t pat_tab(int64_t n);
+extern DESCR_t pat_rtab(int64_t n);
+extern DESCR_t pat_arb(void);
+extern DESCR_t pat_arbno(DESCR_t inner);
+extern DESCR_t pat_rem(void);
+extern DESCR_t pat_fence(void);
+extern DESCR_t pat_fail(void);
+extern DESCR_t pat_abort(void);
+extern DESCR_t pat_succeed(void);
+extern DESCR_t pat_bal(void);
+extern DESCR_t pat_epsilon(void);
+extern DESCR_t pat_cat(DESCR_t left, DESCR_t right);
+extern DESCR_t pat_alt(DESCR_t left, DESCR_t right);
+extern DESCR_t pat_ref(const char *name);         /* deferred *var ref */
+extern DESCR_t pat_assign_imm(DESCR_t child, DESCR_t var);
+extern DESCR_t pat_assign_cond(DESCR_t child, DESCR_t var);
+
+/* exec_stmt from stmt_exec.c */
+extern int exec_stmt(const char *subj_name, DESCR_t *subj_var,
+                     DESCR_t pat, DESCR_t *repl, int has_repl);
+
+/* VARVAL_fn / NV_GET_fn from snobol4.c */
+extern char    *VARVAL_fn(DESCR_t d);
+extern DESCR_t  NV_GET_fn(const char *name);
+
+/* ── Pat-stack (side stack for pattern construction) ───────────────────── */
+#define SM_PAT_STACK_MAX 128
+static DESCR_t g_pat_stack[SM_PAT_STACK_MAX];
+static int     g_pat_sp = 0;
+
+static void pat_push(DESCR_t d)
+{
+    if (g_pat_sp >= SM_PAT_STACK_MAX) {
+        fprintf(stderr, "sm_interp: pat-stack overflow\n"); abort();
+    }
+    g_pat_stack[g_pat_sp++] = d;
+}
+
+static DESCR_t pat_pop(void)
+{
+    if (g_pat_sp <= 0) {
+        fprintf(stderr, "sm_interp: pat-stack underflow\n"); abort();
+    }
+    return g_pat_stack[--g_pat_sp];
+}
+
 /* ── Stack helpers ──────────────────────────────────────────────────── */
 
 void sm_state_init(SM_State *st)
@@ -194,33 +253,135 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
             break;
         }
 
-        /* ── Pattern and statement ops (stubs — wired in U4) ───────── */
+        /* ── Pattern construction ops (M-SCRIP-U4) ─────────────────── */
 
-        case SM_PAT_LIT:
-        case SM_PAT_ANY:
-        case SM_PAT_NOTANY:
-        case SM_PAT_SPAN:
-        case SM_PAT_BREAK:
-        case SM_PAT_LEN:
-        case SM_PAT_POS:
-        case SM_PAT_RPOS:
-        case SM_PAT_TAB:
-        case SM_PAT_RTAB:
-        case SM_PAT_ARB:
-        case SM_PAT_REM:
-        case SM_PAT_BAL:
-        case SM_PAT_FENCE:
-        case SM_PAT_ABORT:
-        case SM_PAT_FAIL:
-        case SM_PAT_SUCCEED:
-        case SM_PAT_ALT:
-        case SM_PAT_CAT:
-        case SM_PAT_DEREF:
-        case SM_PAT_CAPTURE:
-        case SM_EXEC_STMT:
-            fprintf(stderr, "sm_interp: %s not yet wired (M-SCRIP-U4)\n",
-                    sm_opcode_name(ins->op));
-            return -1;
+        case SM_PAT_LIT: {
+            /* a[0].s = literal string */
+            pat_push(pat_lit(ins->a[0].s ? ins->a[0].s : ""));
+            break;
+        }
+        case SM_PAT_ANY: {
+            /* arg on value stack: charset string */
+            DESCR_t arg = sm_pop(st);
+            const char *cs = VARVAL_fn(arg);
+            pat_push(pat_any_cs(cs ? cs : ""));
+            break;
+        }
+        case SM_PAT_NOTANY: {
+            DESCR_t arg = sm_pop(st);
+            const char *cs = VARVAL_fn(arg);
+            pat_push(pat_notany(cs ? cs : ""));
+            break;
+        }
+        case SM_PAT_SPAN: {
+            DESCR_t arg = sm_pop(st);
+            const char *cs = VARVAL_fn(arg);
+            pat_push(pat_span(cs ? cs : ""));
+            break;
+        }
+        case SM_PAT_BREAK: {
+            DESCR_t arg = sm_pop(st);
+            const char *cs = VARVAL_fn(arg);
+            pat_push(pat_break_(cs ? cs : ""));
+            break;
+        }
+        case SM_PAT_LEN: {
+            DESCR_t arg = sm_pop(st);
+            int64_t n = (arg.v == DT_I) ? arg.i : 0;
+            pat_push(pat_len(n));
+            break;
+        }
+        case SM_PAT_POS: {
+            DESCR_t arg = sm_pop(st);
+            int64_t n = (arg.v == DT_I) ? arg.i : 0;
+            pat_push(pat_pos(n));
+            break;
+        }
+        case SM_PAT_RPOS: {
+            DESCR_t arg = sm_pop(st);
+            int64_t n = (arg.v == DT_I) ? arg.i : 0;
+            pat_push(pat_rpos(n));
+            break;
+        }
+        case SM_PAT_TAB: {
+            DESCR_t arg = sm_pop(st);
+            int64_t n = (arg.v == DT_I) ? arg.i : 0;
+            pat_push(pat_tab(n));
+            break;
+        }
+        case SM_PAT_RTAB: {
+            DESCR_t arg = sm_pop(st);
+            int64_t n = (arg.v == DT_I) ? arg.i : 0;
+            pat_push(pat_rtab(n));
+            break;
+        }
+        case SM_PAT_ARB:     pat_push(pat_arb());     break;
+        case SM_PAT_REM:     pat_push(pat_rem());     break;
+        case SM_PAT_FAIL:    pat_push(pat_fail());    break;
+        case SM_PAT_SUCCEED: pat_push(pat_succeed()); break;
+        case SM_PAT_FENCE:   pat_push(pat_fence());   break;
+        case SM_PAT_ABORT:   pat_push(pat_abort());   break;
+        case SM_PAT_BAL:     pat_push(pat_bal());     break;
+
+        case SM_PAT_CAT: {
+            /* pop right then left (left was pushed first) */
+            DESCR_t right = pat_pop();
+            DESCR_t left  = pat_pop();
+            pat_push(pat_cat(left, right));
+            break;
+        }
+        case SM_PAT_ALT: {
+            DESCR_t right = pat_pop();
+            DESCR_t left  = pat_pop();
+            pat_push(pat_alt(left, right));
+            break;
+        }
+        case SM_PAT_DEREF: {
+            /* value on value stack — coerce to pattern */
+            DESCR_t v = sm_pop(st);
+            if (v.v == DT_P) {
+                pat_push(v);                        /* already a pattern */
+            } else if (v.v == DT_S && v.s) {
+                pat_push(pat_lit(v.s));             /* string → literal */
+            } else {
+                /* variable name or other — deferred ref */
+                const char *name = VARVAL_fn(v);
+                pat_push(pat_ref(name ? name : ""));
+            }
+            break;
+        }
+        case SM_PAT_CAPTURE: {
+            /* a[0].s = variable name; child pat on pat-stack */
+            DESCR_t child = pat_pop();
+            DESCR_t var   = NV_GET_fn(ins->a[0].s ? ins->a[0].s : "");
+            pat_push(pat_assign_cond(child, var));
+            break;
+        }
+
+        case SM_EXEC_STMT: {
+            /*
+             * Stack at entry (top-of-stack = last pushed):
+             *   [subj_descr] [pat_on_pat_stack] [repl_or_zero]
+             *   a[0].s  = subject variable name (or NULL)
+             *   a[1].i  = has_repl flag
+             *
+             * The subject was pushed onto the value stack by sm_lower.
+             * The pattern was built on g_pat_stack by SM_PAT_* ops.
+             * The replacement (or INTVAL(0)) is on top of the value stack.
+             */
+            int has_repl = (int)ins->a[1].i;
+            DESCR_t repl   = sm_pop(st);    /* replacement or INTVAL(0) */
+            DESCR_t subj_d = sm_pop(st);    /* subject descriptor */
+            DESCR_t pat_d  = (g_pat_sp > 0) ? pat_pop() : pat_epsilon();
+
+            const char *sname = ins->a[0].s;   /* subject var name for write-back */
+
+            int ok = exec_stmt(sname, &subj_d, pat_d,
+                               has_repl ? &repl : NULL, has_repl);
+            st->last_ok = ok;
+            g_pat_sp = 0;   /* reset pat-stack after each statement */
+            break;
+        }
 
         /* ── Functions (stubs — wired in U3) ───────────────────────── */
 

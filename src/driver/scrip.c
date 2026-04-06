@@ -37,6 +37,11 @@ extern void ir_print_node_nl(const EXPR_t *e, FILE *f);
 #include "../runtime/snobol4/sil_macros.h"   /* SIL macro translations — both RT and SM axes */
 #include "../runtime/snobol4/runtime_shim.h"
 
+/* ── SM stack machine (M-SCRIP-U3) ───────────────────────────────────── */
+#include "../runtime/sm/sm_lower.h"
+#include "../runtime/sm/sm_interp.h"
+#include "../runtime/sm/sm_prog.h"
+
 /* pat_at_cursor not exposed in snobol4.h — forward-declare here */
 extern DESCR_t pat_at_cursor(const char *varname);
 
@@ -1737,18 +1742,21 @@ int main(int argc, char **argv)
     int dump_ir_bison   = 0;   /* --dump-ir-bison   : IR sexp via Bison path   */
     int mode_gen        = 1;   /* --gen (default): in-memory generative mode   */
     int mode_interp     = 0;   /* --interp: interpretive mode (correctness ref) */
+    int mode_hybrid     = 0;   /* --hybrid: SM-LOWER + SM dispatch (M-SCRIP-U3) */
     int argi = 1;
     while (argi < argc && argv[argi][0] == '-' && argv[argi][1] == '-') {
         if      (strcmp(argv[argi], "--dump-parse")      == 0) { dump_parse      = 1; argi++; }
         else if (strcmp(argv[argi], "--dump-parse-flat") == 0) { dump_parse_flat = 1; argi++; }
         else if (strcmp(argv[argi], "--dump-ir-cmpile")  == 0) { dump_ir_cmpile  = 1; argi++; }
         else if (strcmp(argv[argi], "--dump-ir-bison")   == 0) { dump_ir_bison   = 1; argi++; }
-        else if (strcmp(argv[argi], "--interp")          == 0) { mode_interp = 1; mode_gen = 0; argi++; }
-        else if (strcmp(argv[argi], "--gen")             == 0) { mode_gen    = 1; mode_interp = 0; argi++; }
+        else if (strcmp(argv[argi], "--interp")          == 0) { mode_interp = 1; mode_gen = 0; mode_hybrid = 0; argi++; }
+        else if (strcmp(argv[argi], "--gen")             == 0) { mode_gen    = 1; mode_interp = 0; mode_hybrid = 0; argi++; }
+        else if (strcmp(argv[argi], "--hybrid")          == 0) { mode_hybrid = 1; mode_interp = 0; mode_gen = 0; argi++; }
         else break;
     }
     /* M-SCRIP-U0: --gen stubs to --interp until M-SCRIP-U3 SM codegen is wired */
     (void)mode_gen;  /* suppress unused-variable warning during stub phase */
+    (void)mode_hybrid; /* wired below at execute_program dispatch */
     if (argi >= argc) {
         fprintf(stderr, "usage: scrip [--interp|--gen] [--dump-parse|--dump-parse-flat|--dump-ir-cmpile|--dump-ir-bison] <file.sno>\n");
         fprintf(stderr, "  --interp  interpretive mode (correctness reference)\n");
@@ -1912,7 +1920,21 @@ int main(int argc, char **argv)
         g_eval_pat_hook = _eval_pat_impl_fn;
     }
 
-    execute_program(prog);
+    if (mode_hybrid) {
+        /* M-SCRIP-U3: SM-LOWER path — IR → SM_Program → sm_interp_run */
+        SM_Program *sm = sm_lower(prog);
+        if (!sm) {
+            fprintf(stderr, "scrip: sm_lower failed\n");
+            return 1;
+        }
+        SM_State st;
+        sm_state_init(&st);
+        int rc = sm_interp_run(sm, &st);
+        sm_prog_free(sm);
+        if (rc < 0) return 1;
+    } else {
+        execute_program(prog);
+    }
     if (getenv("SNO_BINARY_BOXES")) {
         extern void bin_audit_print(void);
         bin_audit_print();

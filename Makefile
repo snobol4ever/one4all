@@ -42,6 +42,9 @@ scrip:
 	    $(CC) $(CBASE) -c $$f -o $(OBJ)/$$b.o; \
 	done
 	$(CC) $(CBASE) -I$(SRC)/frontend/snobol4 -DIR_DEFINE_NAMES -c $(SRC)/ir/ir_print.c  -o $(OBJ)/ir_print.o
+	$(CC) $(CRT)   -c $(RT)/sm/sm_prog.c                    -o $(OBJ)/sm_prog.o
+	$(CC) $(CRT)   -c $(RT)/sm/sm_interp.c                  -o $(OBJ)/sm_interp.o
+	$(CC) $(CRT)   -c $(RT)/sm/sm_lower.c                   -o $(OBJ)/sm_lower.o
 	$(CC) $(CRT)   -c $(SRC)/driver/scrip.c                  -o $(OBJ)/scrip_driver.o
 	$(CC) $(OBJ)/*.o $(LIBS) -o scrip
 	@echo "Built: scrip"
