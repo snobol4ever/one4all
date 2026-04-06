@@ -461,6 +461,15 @@ extern DESCR_t FCL;      /* real-number scratch (stats)                  */
 extern DESCR_t GCTTTL;   /* GC total time (&GCTIME)                      */
 extern DESCR_t SIGNCL;   /* terminating signal for SYSCUT [PLB47]        */
 extern DESCR_t FATLCL;   /* &FATAL flag (non-zero = fatal in progress)   */
+
+/* M21: sil_main */
+extern DESCR_t ABRTKY;   /* &ABORT  keyword descriptor                   */
+extern DESCR_t ARBKY;    /* &ARB    keyword descriptor                   */
+extern DESCR_t BALKY;    /* &BAL    keyword descriptor                   */
+extern DESCR_t FAILKY;   /* &FAIL   keyword descriptor                   */
+extern DESCR_t FNCEKY;   /* &FENCE  keyword descriptor                   */
+extern DESCR_t REMKY;    /* &REM    keyword descriptor                   */
+extern DESCR_t SUCCKY;   /* &SUCCEED keyword descriptor                  */
 /* Tree node field offsets — already #define'd in sil_types.h:
  *   FATHER=DESCR  LSON=2*DESCR  RSIB=3*DESCR  CODE=4*DESCR            */
 extern DESCR_t BOSCL;    /* offset of beginning of current statement     */
