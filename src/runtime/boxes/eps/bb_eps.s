@@ -1,38 +1,35 @@
-; bb_eps.s   _XEPS       zero-width success once; done flag prevents double-γ
-; spec_t  bb_eps(void *zeta, int entry)
-;   rdi = zeta (eps_t*)    esi = entry (0=α, 1=β)
+; bb_eps.s    _XEPS       zero-width success once; done flag prevents double-γ
+; ABI: rdi=ζ (eps_t*), esi=entry; r10/r11=scratch (no push/pop)
 ; eps_t: { int done @0 }
+; .data: Δ_ptr (qword &Δ), Σ_ptr (qword &Σ) — baked by emitter, rip-relative
 
 section .note.GNU-stack noalloc noexec nowrite progbits
-
-extern Σ, Δ, Ω
 
 section .text
 global bb_eps
 
-bb_eps:                                                                 ; rdi=zeta, esi=entry
-        push    rbx
-        mov     rbx, rdi                ; rbx = ζ (eps_t*)
+bb_eps:
+        mov     r10, rdi                ; r10 = ζ (eps_t*)
         cmp     esi, 0
-        je      .alpha_init
-        jmp     EPS_β
-.alpha_init:
-        mov     dword [rbx+0], 0        ; ζ->done = 0
-        jmp     EPS_α
-EPS_α:  cmp     dword [rbx+0], 0        ; if (ζ->done)
+        je      EPS_α
+        jmp     EPS_ω
+EPS_α:
+        mov     dword [r10], 0          ; ζ->done = 0  (reset on α entry)
+        cmp     dword [r10], 0
         jne     EPS_ω
-        mov     dword [rbx+0], 1        ; ζ->done = 1
-        ; EPS = spec(Σ+Δ, 0)
-        mov     rax, qword [rel Σ]
-        movsxd  rcx, dword [rel Δ]
-        add     rax, rcx                ; σ = Σ+Δ
-        xor     edx, edx                ; δ = 0
-        jmp     EPS_γ
-EPS_β:  jmp     EPS_ω
-EPS_γ:                                                                  ; return EPS (rax=σ, rdx=δ)
-        pop     rbx
+        mov     dword [r10], 1          ; ζ->done = 1
+        mov     r11, [rel eps_Σ_ptr]    ; r11 = &Σ (baked ptr-to-ptr)
+        mov     rax, [r11]              ; rax = Σ
+        mov     r11, [rel eps_Δ_ptr]    ; r11 = &Δ
+        movsxd  rcx, dword [r11]       ; rcx = Δ
+        add     rax, rcx               ; σ = Σ+Δ
+        xor     edx, edx               ; δ = 0
         ret
-EPS_ω:  xor     eax, eax                ; return spec_empty
+EPS_ω:
+        xor     eax, eax
         xor     edx, edx
-        pop     rbx
         ret
+
+section .data
+eps_Δ_ptr: dq 0          ; emitter bakes: absolute address of Δ global
+eps_Σ_ptr: dq 0          ; emitter bakes: absolute address of Σ global

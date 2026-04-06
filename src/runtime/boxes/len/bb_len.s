@@ -1,38 +1,44 @@
-; bb_len.s   _XLNTH      match exactly n characters
-; spec_t  bb_len(void *zeta, int entry)
-;   rdi = zeta (len_t*)    esi = entry
-; len_t: { int n @0 }
+; bb_len.s    _XLNTH      match exactly n characters (byte count)
+; len_t: { int n @0; int bspan @4 }   bspan = mutable, computed on α
+; .data: Δ_ptr, Ω_ptr, Σ_ptr
 
 section .note.GNU-stack noalloc noexec nowrite progbits
-
-extern Σ, Δ, Ω
 
 section .text
 global bb_len
 
 bb_len:
-        push    rbx
-        mov     rbx, rdi                ; rbx = ζ (len_t*)
+        mov     r10, rdi               ; r10 = ζ (len_t*)
         cmp     esi, 0
         je      LEN_α
         jmp     LEN_β
-LEN_α:  mov     eax, dword [rel Δ]      ; Δ
-        add     eax, dword [rbx+0]      ; Δ + ζ->n
-        cmp     eax, dword [rel Ω]      ; > Ω ?
+LEN_α:
+        mov     r11, [rel len_Δ_ptr]
+        mov     eax, dword [r11]        ; eax = Δ
+        add     eax, dword [r10]        ; eax = Δ + ζ->n
+        mov     r11, [rel len_Ω_ptr]
+        cmp     eax, dword [r11]        ; > Ω ?
         jg      LEN_ω
-        ; LEN = spec(Σ+Δ, ζ->n);  Δ += ζ->n
-        mov     rax, qword [rel Σ]
-        movsxd  rcx, dword [rel Δ]
-        add     rax, rcx                ; σ = Σ+Δ
-        mov     edx, dword [rbx+0]      ; δ = ζ->n
-        add     dword [rel Δ], edx      ; Δ += ζ->n
-        jmp     LEN_γ
-LEN_β:  mov     ecx, dword [rbx+0]      ; ζ->n
-        sub     dword [rel Δ], ecx      ; Δ -= ζ->n
+        mov     edx, dword [r10]        ; edx = ζ->n (= bspan for ASCII)
+        mov     dword [r10+4], edx      ; ζ->bspan = n
+        mov     r11, [rel len_Σ_ptr]
+        mov     rax, [r11]              ; rax = Σ
+        mov     r11, [rel len_Δ_ptr]
+        movsxd  rcx, dword [r11]
+        add     rax, rcx               ; σ = Σ+Δ
+        add     dword [r11], edx        ; Δ += n
+        ret
+LEN_β:
+        mov     edx, dword [r10+4]      ; ζ->bspan
+        mov     r11, [rel len_Δ_ptr]
+        sub     dword [r11], edx        ; Δ -= bspan
         jmp     LEN_ω
-LEN_γ:  pop     rbx
-        ret
-LEN_ω:  xor     eax, eax
+LEN_ω:
+        xor     eax, eax
         xor     edx, edx
-        pop     rbx
         ret
+
+section .data
+len_Δ_ptr: dq 0
+len_Ω_ptr: dq 0
+len_Σ_ptr: dq 0
