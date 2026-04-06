@@ -1,0 +1,405 @@
+/*
+ * sil_asgn.c — Assignment and core operations (v311.sil §17 lines 5828–6101)
+ *
+ * Faithful C translation of Phil Budne's CSNOBOL4 v311.sil §17.
+ * Covers: ASGN ASGNV ASGNVV ASGNVN ASGNV1 ASGNC ASGNCV ASGNVP ASGNIC
+ *         CONCAT CON4I CON4R CON5 CON5I CON5R CON7 CONVV CONVP CONPV CONPP
+ *         IND INDV
+ *         KEYWRD KEYN KEYV KEYC KEYT
+ *         LIT
+ *         NAME
+ *         STR
+ *
+ * Return conventions (SIL exits → C):
+ *   RTYPTR  → return OK, result in YPTR
+ *   RTZPTR  → return OK, result in ZPTR
+ *   RTXPTR  → return OK, result in XPTR (exit 3)
+ *   RTXNAM  → return OK, result in XPTR (exit 2, "by name")
+ *   FAIL    → return FAIL
+ *
+ * Since our callers read the result from wherever the proc says, we
+ * normalise: OK means result is in XPTR (callers adapt).  For procs
+ * that return via RTZPTR/RTYPTR we copy into XPTR before returning OK.
+ *
+ * Authors: Lon Jones Cherryholmes · Claude Sonnet 4.6
+ * Date:    2026-04-06
+ * Milestone: M10
+ */
+
+#include <string.h>
+
+#include "sil_types.h"
+#include "sil_data.h"
+#include "sil_asgn.h"
+#include "sil_arena.h"
+#include "sil_strings.h"
+#include "sil_symtab.h"
+#include "sil_argval.h"
+#include "sil_patval.h"
+
+/* External stubs resolved at link time */
+extern SIL_result INVOKE_fn(void);
+extern SIL_result INTVAL_fn(void);
+extern SIL_result XYARGS_fn(void);
+extern SIL_result PUTIN_fn(DESCR_t zptr, DESCR_t wptr);
+extern void       PUTOUT_fn(DESCR_t yptr, DESCR_t val);
+extern SIL_result TRPHND_fn(DESCR_t atptr);
+extern SIL_result VPXPTR_fn(void);
+extern SIL_result maknod_fn(DESCR_t *out, int32_t blk_off,
+                              int32_t len, int32_t alt,
+                              int32_t fn_idx, int32_t arg_off);
+extern void       cpypat_fn(int32_t dst, int32_t src,
+                              int32_t link, int32_t dbase,
+                              int32_t sbase, int32_t count);
+extern int32_t    lvalue_fn(int32_t pat_off);
+/* CODSKP_fn: declared in sil_symtab.h as void(int32_t) */
+
+/* Small operand stack for ASGN */
+static DESCR_t asgn_stk[16];
+static int     optop_asgn = 0;
+static inline void    opush_asgn(DESCR_t d) { asgn_stk[optop_asgn++] = d; }
+static inline DESCR_t opop_asgn(void)        { return asgn_stk[--optop_asgn]; }
+
+/* Arena helpers */
+#define GETD_B(dst, base_d, off_d) \
+    memcpy(&(dst), (char*)A2P(D_A(base_d)) + D_A(off_d), sizeof(DESCR_t))
+
+#define GETDC_B(dst, base_d, off_i) \
+    memcpy(&(dst), (char*)A2P(D_A(base_d)) + (off_i),    sizeof(DESCR_t))
+
+#define PUTDC_B(base_d, off_i, src) \
+    memcpy((char*)A2P(D_A(base_d)) + (off_i), &(src),    sizeof(DESCR_t))
+
+/* DEQL — full descriptor equality (A and V fields) */
+static inline int deql(DESCR_t a, DESCR_t b)
+{
+    return D_A(a) == D_A(b) && D_V(a) == D_V(b);
+}
+
+/* ── ASGN — X = Y ────────────────────────────────────────────────────── */
+SIL_result ASGN_fn(void)
+{
+    /* INCRA OCICL,DESCR; GETD XPTR,OCBSCL,OCICL */
+    INCRA(OCICL, DESCR);
+    GETD_B(XPTR, OCBSCL, OCICL);
+
+    /* TESTF XPTR,FNC,,ASGNC */
+    if (!TESTF(XPTR, FNC)) {
+        /* ASGNV: VEQLC XPTR,K,,ASGNIC */
+        if (VEQLC(XPTR, K)) {
+            /* ASGNIC: keyword subject — get integer value */
+            opush_asgn(XPTR);
+            if (INTVAL_fn() == FAIL) { optop_asgn--; return FAIL; }
+            XPTR = opop_asgn();
+            /* YPTR now holds int value; fall into ASGNVV */
+            goto asgnvv;
+        }
+        /* INCRA OCICL,DESCR; GETD YPTR */
+        INCRA(OCICL, DESCR);
+        GETD_B(YPTR, OCBSCL, OCICL);
+
+        /* TESTF YPTR,FNC,,ASGNCV */
+        if (!TESTF(YPTR, FNC)) {
+            /* ASGNVN: check &INPUT */
+            if (!AEQLC(INSW, 0)) {
+                int32_t assoc = locapv_fn(D_A(INATL), &YPTR);
+                if (assoc) {
+                    DESCR_t zptr; SETAC(zptr, assoc);
+                    GETDC_B(zptr, YPTR, DESCR);
+                    SIL_result rc = PUTIN_fn(zptr, YPTR);
+                    if (rc == OK) goto asgnvv;
+                    /* FAIL from PUTIN: fall to ASGNV1 */
+                }
+            }
+            /* ASGNV1: GETDC YPTR,YPTR,DESCR */
+            GETDC_B(YPTR, YPTR, DESCR);
+        } else {
+            /* ASGNCV: value side is function — evaluate */
+            opush_asgn(XPTR);
+            if (INVOKE_fn() == FAIL) {
+                XPTR = opop_asgn(); return FAIL;
+            }
+            /* ASGNVP: POP XPTR; BRANCH ASGNVN → ASGNV1 */
+            XPTR = opop_asgn();
+            GETDC_B(YPTR, YPTR, DESCR);   /* treat as ASGNV1 */
+        }
+    } else {
+        /* ASGNC: subject side is function — evaluate */
+        if (INVOKE_fn() == FAIL) return FAIL;
+        /* ASGNV: now XPTR holds evaluated subject; get object side */
+        if (VEQLC(XPTR, K)) {
+            opush_asgn(XPTR);
+            if (INTVAL_fn() == FAIL) { optop_asgn--; return FAIL; }
+            XPTR = opop_asgn();
+            goto asgnvv;
+        }
+        INCRA(OCICL, DESCR);
+        GETD_B(YPTR, OCBSCL, OCICL);
+        if (!TESTF(YPTR, FNC)) {
+            GETDC_B(YPTR, YPTR, DESCR);
+        } else {
+            opush_asgn(XPTR);
+            if (INVOKE_fn() == FAIL) { XPTR = opop_asgn(); return FAIL; }
+            XPTR = opop_asgn();
+            GETDC_B(YPTR, YPTR, DESCR);
+        }
+    }
+
+asgnvv:
+    /* PUTDC XPTR,DESCR,YPTR — perform assignment */
+    PUTDC_B(XPTR, DESCR, YPTR);
+
+    /* &OUTPUT check */
+    if (!AEQLC(OUTSW, 0)) {
+        int32_t assoc = locapv_fn(D_A(OUTATL), &XPTR);
+        if (assoc) {
+            DESCR_t zptr; SETAC(zptr, assoc);
+            GETDC_B(zptr, XPTR, DESCR);
+            PUTOUT_fn(zptr, YPTR);
+        }
+    }
+
+    /* ASGN1: &TRACE check [PLB32] */
+    if (!ACOMPC(TRAPCL, 0)) {
+        int32_t assoc = locapt_fn(D_A(TVALL), &XPTR);
+        if (assoc) {
+            DESCR_t save_yptr = YPTR;
+            SETAC(ATPTR, assoc);
+            TRPHND_fn(ATPTR);
+            MOVD(YPTR, save_yptr);
+        }
+    }
+    /* RTYPTR: return YPTR as value */
+    MOVD(XPTR, YPTR);
+    return OK;
+}
+
+/* ── CONCAT — X Y (concatenation) ───────────────────────────────────── */
+SIL_result CONCAT_fn(void)
+{
+    /* RCALL ,XYARGS,,FAIL */
+    if (XYARGS_fn() == FAIL) return FAIL;
+
+    /* DEQL XPTR,NULVCL,,RTYPTR — null first → return second */
+    if (deql(XPTR, NULVCL)) { MOVD(XPTR, YPTR); return OK; }
+    /* DEQL YPTR,NULVCL,,RTXPTR — null second → return first */
+    if (deql(YPTR, NULVCL)) { return OK; }
+
+    /* Coerce XPTR to string/pattern */
+    switch (D_V(XPTR)) {
+    case S: case P: break;
+    case I:
+        { SPEC_t zsp; INTSPC_fn(&zsp, &XPTR);
+          int32_t off = GENVAR_fn(&zsp);
+          if (!off) return FAIL;
+          SETAC(XPTR, off); SETVC(XPTR, S); }
+        break;
+    case R:
+        { REALST_fn(&REALSP, &XPTR);
+          int32_t off = GENVAR_fn(&REALSP);
+          if (!off) return FAIL;
+          SETAC(XPTR, off); SETVC(XPTR, S); }
+        break;
+    case E:
+        {
+            int32_t blk = BLOCK_fn(D_A(STARSZ), P);
+            if (!blk) return FAIL;
+            memcpy(A2P(blk), A2P(D_A(STRPAT)), (size_t)(D_A(STARSZ)));
+            PUTDC_B(XPTR, 4*DESCR, XPTR);
+            SETAC(XPTR, blk); SETVC(XPTR, P);
+        }
+        break;
+    default: return FAIL;
+    }
+
+    /* Coerce YPTR to string/pattern */
+    switch (D_V(YPTR)) {
+    case S: case P: break;
+    case I:
+        { SPEC_t zsp; INTSPC_fn(&zsp, &YPTR);
+          int32_t off = GENVAR_fn(&zsp);
+          if (!off) return FAIL;
+          SETAC(YPTR, off); SETVC(YPTR, S); }
+        break;
+    case R:
+        { REALST_fn(&REALSP, &YPTR);
+          int32_t off = GENVAR_fn(&REALSP);
+          if (!off) return FAIL;
+          SETAC(YPTR, off); SETVC(YPTR, S); }
+        break;
+    case E:
+        {
+            int32_t blk = BLOCK_fn(D_A(STARSZ), P);
+            if (!blk) return FAIL;
+            memcpy(A2P(blk), A2P(D_A(STRPAT)), (size_t)(D_A(STARSZ)));
+            PUTDC_B(YPTR, 4*DESCR, YPTR);
+            SETAC(YPTR, blk); SETVC(YPTR, P);
+        }
+        break;
+    default: return FAIL;
+    }
+
+    /* CON7: dispatch on type pair */
+    SETAV(DTCL, XPTR); MOVV(DTCL, YPTR);
+
+    /* STRING-STRING: CONVV */
+    if (deql(DTCL, VVDTP)) {
+        SPEC_t xsp, ysp;
+        LOCSP_fn(&xsp, &XPTR);
+        LOCSP_fn(&ysp, &YPTR);
+        int32_t xlen = xsp.l, ylen = ysp.l, total = xlen + ylen;
+        SETAC(XCL, total);
+        if (ACOMP(XCL, MLENCL) > 0) return FAIL;   /* INTR8 */
+        int32_t soff = CONVAR_fn(total);
+        if (!soff) return FAIL;
+        DESCR_t zd; SETAC(zd, soff); SETVC(zd, S);
+        SPEC_t tsp; LOCSP_fn(&tsp, &zd); tsp.l = 0;
+        APDSP_fn(&tsp, &xsp);
+        APDSP_fn(&tsp, &ysp);
+        /* GENVSZ: GNVARS with total length */
+        int32_t goff = GNVARS_fn((const char*)A2P(tsp.a) + tsp.o, total);
+        if (!goff) return FAIL;
+        SETAC(ZPTR, goff); SETVC(ZPTR, S);
+        MOVD(XPTR, ZPTR); return OK;
+    }
+
+    /* STRING-PATTERN (CONVP): wrap string in CHR node then concat */
+    if (deql(DTCL, VPDTP)) {
+        SPEC_t tsp; LOCSP_fn(&tsp, &XPTR);
+        int32_t tlen = tsp.l;
+        int32_t blk = BLOCK_fn(D_A(LNODSZ), P);
+        if (!blk) return FAIL;
+        maknod_fn(&XPTR, blk, tlen, 0, 4 /*CHR*/, D_A(XPTR));
+        /* fall into CONPP */
+    }
+
+    /* PATTERN-STRING (CONPV): wrap YPTR string in CHR node */
+    if (deql(DTCL, PVDTP)) {
+        SPEC_t tsp; LOCSP_fn(&tsp, &YPTR);
+        int32_t tlen = tsp.l;
+        int32_t blk = BLOCK_fn(D_A(LNODSZ), P);
+        if (!blk) return FAIL;
+        maknod_fn(&YPTR, blk, tlen, 0, 4 /*CHR*/, D_A(YPTR));
+        /* fall into CONPP */
+    }
+
+    /* PATTERN-PATTERN (CONPP): concatenate two patterns */
+    {
+        int32_t xsz = x_bksize(D_A(XPTR));
+        int32_t ysz = x_bksize(D_A(YPTR));
+        int32_t tot = xsz + ysz;
+        SETAC(TSIZ, tot); SETVC(TSIZ, P);
+        int32_t pblk = BLOCK_fn(tot, P);
+        if (!pblk) return FAIL;
+        SETAC(TPTR, pblk);
+        int32_t lv_y = lvalue_fn(D_A(YPTR));
+        cpypat_fn(pblk, D_A(XPTR), lv_y, 0, 0, xsz);
+        cpypat_fn(pblk, D_A(YPTR), 0,    xsz, 0, ysz);
+        SETAC(ZPTR, pblk); SETVC(ZPTR, P);
+        MOVD(XPTR, ZPTR); return OK;
+    }
+}
+
+/* ── IND — $X (indirect reference) ──────────────────────────────────── */
+SIL_result IND_fn(void)
+{
+    if (ARGVAL_fn() == FAIL) return FAIL;
+
+    switch (D_V(XPTR)) {
+    case N:  return OK;                       /* RTXNAM — return by name  */
+    case K:  return OK;                       /* KEYWORD is like NAME      */
+    case S:  break;                           /* INDV: string              */
+    case I:
+        /* GENVIX: RCALL XPTR,GNVARI,XPTR,RTXNAM */
+        {
+            int32_t off = GNVARI_fn(D_A(XPTR));
+            if (!off) return FAIL;
+            SETAC(XPTR, off); SETVC(XPTR, S);
+        }
+        break;
+    default: return FAIL;
+    }
+
+    /* INDV: string must be non-null */
+    if (AEQLC(XPTR, 0)) return FAIL;         /* NONAME */
+
+    /* AEQLC CASECL,0,VPXPTR,RTXNAM */
+    if (AEQLC(CASECL, 0)) {
+        return VPXPTR_fn();   /* case-fold then look up name */
+    }
+    /* RTXNAM — return XPTR (already set) */
+    return OK;
+}
+
+/* ── KEYWRD — &X (keyword reference) ────────────────────────────────── */
+SIL_result KEYWRD_fn(void)
+{
+    /* INCRA OCICL,DESCR; GETD XPTR,OCBSCL,OCICL */
+    INCRA(OCICL, DESCR);
+    GETD_B(XPTR, OCBSCL, OCICL);
+
+    /* TESTF XPTR,FNC,,KEYC */
+    if (TESTF(XPTR, FNC)) {
+        /* KEYC: evaluate computed keyword */
+        if (INVOKE_fn() == FAIL) return FAIL;
+    }
+
+    /* KEYN: look up on unprotected list */
+    {
+        int32_t assoc = locapv_fn(D_A(KNATL), &XPTR);
+        if (assoc) {
+            SETAC(XPTR, assoc);
+            SETVC(XPTR, K);   /* KEYWORD data type */
+            return OK;        /* RTXNAM */
+        }
+    }
+
+    /* KEYV: look up on protected list */
+    {
+        int32_t assoc = locapv_fn(D_A(KVATL), &XPTR);
+        if (!assoc) return FAIL;   /* UNKNKW */
+        SETAC(ATPTR, assoc);
+        GETDC_B(ZPTR, ATPTR, DESCR);
+        MOVD(XPTR, ZPTR);
+        return OK;   /* RTZPTR → normalised to XPTR */
+    }
+}
+
+/* ── LIT — 'X' (literal push) ───────────────────────────────────────── */
+SIL_result LIT_fn(void)
+{
+    /* INCRA OCICL,DESCR; GETD ZPTR,OCBSCL,OCICL; RTZPTR */
+    INCRA(OCICL, DESCR);
+    GETD_B(ZPTR, OCBSCL, OCICL);
+    MOVD(XPTR, ZPTR);
+    return OK;
+}
+
+/* ── NAME — .X (unary name operator) ────────────────────────────────── */
+SIL_result NAME_fn(void)
+{
+    /* INCRA OCICL,DESCR; GETD ZPTR,OCBSCL,OCICL */
+    INCRA(OCICL, DESCR);
+    GETD_B(ZPTR, OCBSCL, OCICL);
+
+    /* TESTF ZPTR,FNC,RTZPTR — if plain variable: return by name */
+    if (!TESTF(ZPTR, FNC)) {
+        MOVD(XPTR, ZPTR); return OK;
+    }
+    /* function: evaluate to get name */
+    if (INVOKE_fn() == FAIL) return FAIL;
+    MOVD(XPTR, ZPTR); return OK;
+}
+
+/* ── STR — *X (unevaluated expression) ──────────────────────────────── */
+SIL_result STR_fn(void)
+{
+    /* SUM ZPTR,OCBSCL,OCICL — pointer to current code position */
+    SUM(ZPTR, OCBSCL, OCICL);
+    /* RCALL ,CODSKP,(ONECL) — skip one nesting level */
+    CODSKP_fn(D_A(ONECL));
+    /* SETVC ZPTR,E — mark as EXPRESSION */
+    SETVC(ZPTR, E);
+    MOVD(XPTR, ZPTR);
+    return OK;
+}

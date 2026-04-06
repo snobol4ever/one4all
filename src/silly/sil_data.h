@@ -360,6 +360,12 @@ extern DESCR_t RTZPTR;   /* RTZPTR — return to caller with ZPTR           */
 /* Name-list sizing constants — NAMLSZ and SPDR are in sil_types.h */
 extern int32_t NMOVER;   /* current end of name list block (byte count)   */
 
+/* ── M10: sil_asgn globals ───────────────────────────────────────────── */
+extern DESCR_t KNATL;    /* unprotected keyword attribute list head       */
+extern DESCR_t KVATL;    /* protected keyword attribute list head         */
+extern SPEC_t  REALSP;   /* scratch SPEC for REAL→STRING conversion       */
+extern DESCR_t ZSPPTR;   /* pointer-to-ZSP scratch (mirrors XSPPTR)      */
+
 /* ── TRCBLK — trace function skeleton ───────────────────────────────── */
 
 extern DESCR_t TRCBLK[6];   /* trace block: [0]=fn descr, [1]=LIT1 fn,   */
