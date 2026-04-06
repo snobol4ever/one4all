@@ -140,8 +140,9 @@ static void emit_sub_int_global(const int *addr, int32_t val)
 /* forward declaration of memcmp for address capture */
 extern int memcmp(const void *, const void *, size_t);
 
-/* ── forward declarations ───────────────────────────────────────────────── */
-static bb_box_fn bb_build_binary_node(PATND_t *p);  /* M-DYN-B2 walk */
+/* forward declarations */
+extern spec_t bb_seq(void *zeta, int entry);
+static bb_box_fn bb_build_binary_node(PATND_t *p);
 
 bb_box_fn bb_lit_emit_binary(const char *lit, int len)
 {
@@ -412,6 +413,154 @@ bb_box_fn bb_eps_emit_binary(void)
  */
 #include "../snobol4/patnd.h"
 
+/* ── M-DYN-B3: bb_pos_emit_binary ──────────────────────────────────────── */
+/*
+ * Emits POS(n) as x86-64 binary.  n is baked as imm32.
+ * Mirrors bb_pos.s exactly:
+ *   POS_α: eax=Δ; cmp eax,n; jne → ω; rax=Σ+Δ; rdx=0; → γ
+ *   POS_β: → ω
+ *   POS_γ: ret
+ *   POS_ω: xor eax,eax; xor edx,edx; ret
+ * No ζ needed — n baked into imm32.
+ */
+bb_box_fn bb_pos_emit_binary(int n)
+{
+#define POS_BUF_SIZE 256
+    bb_buf_t buf = bb_alloc(POS_BUF_SIZE);
+    if (!buf) return NULL;
+
+    bb_emit_mode = EMIT_BINARY;
+    bb_emit_begin(buf, POS_BUF_SIZE);
+
+    bb_label_t lbl_α, lbl_β, lbl_γ, lbl_ω;
+    bb_label_init(&lbl_α, "POS_α");
+    bb_label_init(&lbl_β, "POS_β");
+    bb_label_init(&lbl_γ, "POS_γ");
+    bb_label_init(&lbl_ω, "POS_ω");
+
+    /* prologue: push rbx; cmp esi,0; je POS_α; jmp POS_β */
+    bb_emit_byte(0x53);                         /* push rbx */
+    bb_insn_cmp_esi_imm8(0);
+    bb_insn_je_rel8(&lbl_α);
+    bb_insn_jmp_rel32(&lbl_β);
+
+    /* POS_α: eax = Δ; cmp eax, n; jne POS_ω */
+    bb_label_define(&lbl_α);
+    emit_load_int_global(&Δ);               /* eax = Δ */
+    bb_emit_byte(0x3D); bb_emit_u32((uint32_t)n);  /* cmp eax, imm32(n) */
+    bb_insn_jne_rel32(&lbl_ω);
+
+    /* rax = Σ+Δ; rdx = 0 */
+    emit_load_ptr_global(&Σ);               /* rax = Σ */
+    bb_emit_byte(0x48); bb_emit_byte(0xB9);
+    bb_emit_u64((uint64_t)(uintptr_t)&Δ);  /* mov rcx, imm64(&Δ) */
+    bb_emit_byte(0x48); bb_emit_byte(0x63); bb_emit_byte(0x09); /* movsxd rcx,[rcx] */
+    bb_emit_byte(0x48); bb_emit_byte(0x8D); bb_emit_byte(0x04); bb_emit_byte(0x08); /* lea rax,[rax+rcx] */
+    bb_emit_byte(0x31); bb_emit_byte(0xD2); /* xor edx, edx */
+    bb_insn_jmp_rel32(&lbl_γ);
+
+    /* POS_β: → ω */
+    bb_label_define(&lbl_β);
+    bb_insn_jmp_rel32(&lbl_ω);
+
+    /* POS_γ: pop rbx; ret */
+    bb_label_define(&lbl_γ);
+    bb_emit_byte(0x5B);
+    bb_insn_ret();
+
+    /* POS_ω: xor eax,eax; xor edx,edx; pop rbx; ret */
+    bb_label_define(&lbl_ω);
+    bb_insn_xor_eax_eax();
+    bb_emit_byte(0x31); bb_emit_byte(0xD2);
+    bb_emit_byte(0x5B);
+    bb_insn_ret();
+
+    int nbytes = bb_emit_end();
+    if (nbytes <= 0 || nbytes > POS_BUF_SIZE) { bb_free(buf, POS_BUF_SIZE); return NULL; }
+    bb_seal(buf, (size_t)nbytes);
+    return (bb_box_fn)buf;
+#undef POS_BUF_SIZE
+}
+
+/* ── M-DYN-B3: bb_rpos_emit_binary ─────────────────────────────────────── */
+/*
+ * Emits RPOS(n) as x86-64 binary.  n baked as imm32.
+ * Mirrors bb_rpos.s:
+ *   RPOS_α: eax=Ω-n; cmp Δ,eax; jne → ω; rax=Σ+Δ; rdx=0; → γ
+ *   RPOS_β: → ω
+ */
+bb_box_fn bb_rpos_emit_binary(int n)
+{
+#define RPOS_BUF_SIZE 256
+    bb_buf_t buf = bb_alloc(RPOS_BUF_SIZE);
+    if (!buf) return NULL;
+
+    bb_emit_mode = EMIT_BINARY;
+    bb_emit_begin(buf, RPOS_BUF_SIZE);
+
+    bb_label_t lbl_α, lbl_β, lbl_γ, lbl_ω;
+    bb_label_init(&lbl_α, "RPOS_α");
+    bb_label_init(&lbl_β, "RPOS_β");
+    bb_label_init(&lbl_γ, "RPOS_γ");
+    bb_label_init(&lbl_ω, "RPOS_ω");
+
+    bb_emit_byte(0x53);
+    bb_insn_cmp_esi_imm8(0);
+    bb_insn_je_rel8(&lbl_α);
+    bb_insn_jmp_rel32(&lbl_β);
+
+    /* RPOS_α: eax = Ω; eax -= n; cmp Δ, eax; jne → ω */
+    bb_label_define(&lbl_α);
+    emit_load_int_global(&Ω);               /* eax = Ω */
+    bb_emit_byte(0x2D); bb_emit_u32((uint32_t)n);  /* sub eax, imm32(n)  → eax = Ω-n */
+    /* cmp [&Δ], eax  — load Δ into ecx, compare */
+    bb_emit_byte(0x89); bb_emit_byte(0xC1);  /* mov ecx, eax  (save Ω-n) */
+    emit_load_int_global(&Δ);               /* eax = Δ */
+    bb_emit_byte(0x39); bb_emit_byte(0xC8);  /* cmp eax, ecx  (Δ == Ω-n?) */
+    bb_insn_jne_rel32(&lbl_ω);
+
+    /* rax = Σ+Δ; rdx = 0 */
+    emit_load_ptr_global(&Σ);
+    bb_emit_byte(0x48); bb_emit_byte(0xB9);
+    bb_emit_u64((uint64_t)(uintptr_t)&Δ);
+    bb_emit_byte(0x48); bb_emit_byte(0x63); bb_emit_byte(0x09);
+    bb_emit_byte(0x48); bb_emit_byte(0x8D); bb_emit_byte(0x04); bb_emit_byte(0x08);
+    bb_emit_byte(0x31); bb_emit_byte(0xD2);
+    bb_insn_jmp_rel32(&lbl_γ);
+
+    bb_label_define(&lbl_β);
+    bb_insn_jmp_rel32(&lbl_ω);
+
+    bb_label_define(&lbl_γ);
+    bb_emit_byte(0x5B);
+    bb_insn_ret();
+
+    bb_label_define(&lbl_ω);
+    bb_insn_xor_eax_eax();
+    bb_emit_byte(0x31); bb_emit_byte(0xD2);
+    bb_emit_byte(0x5B);
+    bb_insn_ret();
+
+    int nbytes = bb_emit_end();
+    if (nbytes <= 0 || nbytes > RPOS_BUF_SIZE) { bb_free(buf, RPOS_BUF_SIZE); return NULL; }
+    bb_seal(buf, (size_t)nbytes);
+    return (bb_box_fn)buf;
+#undef RPOS_BUF_SIZE
+}
+
+/* ── seq_t / bchild_t — mirror of stmt_exec.c definitions ─────────────── */
+/* These must match the layouts used by bb_seq.s and bb_seq.c exactly.
+ * Kept local to bb_build_bin.c to avoid cross-file dependency. */
+typedef struct { bb_box_fn fn; void *state; } bin_bchild_t;
+typedef struct {
+    bin_bchild_t left;       /* @0: fn@0, state@8  */
+    bin_bchild_t right;      /* @16: fn@16, state@24 */
+    spec_t       matched;    /* @32: σ@32, δ@40    */
+} bin_seq_t;
+
+/* Forward declaration for mutual recursion in XCAT */
+extern spec_t bb_seq(void *zeta, int entry);
+
 static bb_box_fn bb_build_binary_node(PATND_t *p)
 {
     if (!p) {
@@ -419,12 +568,101 @@ static bb_box_fn bb_build_binary_node(PATND_t *p)
         return bb_eps_emit_binary();
     }
     switch (p->kind) {
+
+    /* ── M-DYN-B1: literal string ─────────────────────────────────── */
     case XCHR: {
         const char *lit = p->STRVAL_fn ? p->STRVAL_fn : "";
         return bb_lit_emit_binary(lit, (int)strlen(lit));
     }
+
+    /* ── M-DYN-B2: epsilon ─────────────────────────────────────────── */
     case XEPS:
         return bb_eps_emit_binary();
+
+    /* ── M-DYN-B3: POS(n) ─────────────────────────────────────────── */
+    case XPOSI:
+        return bb_pos_emit_binary((int)p->num);
+
+    /* ── M-DYN-B3: RPOS(n) ────────────────────────────────────────── */
+    case XRPSI:
+        return bb_rpos_emit_binary((int)p->num);
+
+    /* ── M-DYN-B3: TAB(n) — needs runtime-mutable advance field;
+     *   delegate to C path (advance computed at match time into ζ) ─── */
+    case XTB:
+        return NULL;
+
+    /* ── M-DYN-B3: RTAB(n) — same reasoning as TAB ─────────────────── */
+    case XRTB:
+        return NULL;
+
+    /* ── M-DYN-B3: XCAT — recursive hybrid seq ──────────────────────
+     * Build left and right children as binary; wire into heap seq_t;
+     * emit a tiny trampoline that bakes (bb_seq, ζ) as imm64 constants
+     * and tail-calls bb_seq(ζ, entry).  The trampoline is a self-contained
+     * bb_box_fn: caller passes any ζ (ignored), trampoline uses baked ζ.
+     *
+     * Trampoline layout (~22 bytes):
+     *   mov  rdi, imm64(seq_zeta)  ; baked ζ ptr
+     *   mov  rax, imm64(bb_seq)    ; baked fn ptr
+     *   jmp  rax                   ; tail call — esi/entry unchanged
+     *
+     * If any child returns NULL → fall back to C path for whole XCAT.
+     * ──────────────────────────────────────────────────────────────── */
+    case XCAT: {
+        if (p->nchildren == 0)
+            return bb_eps_emit_binary();
+        if (p->nchildren == 1)
+            return bb_build_binary_node(p->children[0]);
+
+        /* Fold right: seq(children[0], seq(children[1], ...)) */
+        bb_box_fn  right_fn    = bb_build_binary_node(p->children[p->nchildren - 1]);
+        if (!right_fn) return NULL;
+        void      *right_state = NULL;   /* binary leaves carry no ζ */
+
+        for (int i = p->nchildren - 2; i >= 0; i--) {
+            bb_box_fn left_fn = bb_build_binary_node(p->children[i]);
+            if (!left_fn) return NULL;
+
+            bin_seq_t *seq_zeta = calloc(1, sizeof(bin_seq_t));
+            if (!seq_zeta) return NULL;
+            seq_zeta->left.fn     = left_fn;
+            seq_zeta->left.state  = NULL;         /* binary leaf — no ζ */
+            seq_zeta->right.fn    = right_fn;
+            seq_zeta->right.state = right_state;
+
+            /* Emit trampoline: ignores caller's ζ; calls bb_seq(seq_zeta, entry) */
+#define TRAM_BUF_SIZE 64
+            bb_buf_t tbuf = bb_alloc(TRAM_BUF_SIZE);
+            if (!tbuf) { free(seq_zeta); return NULL; }
+            bb_emit_mode = EMIT_BINARY;
+            bb_emit_begin(tbuf, TRAM_BUF_SIZE);
+
+            /* mov rdi, imm64(seq_zeta) */
+            bb_emit_byte(0x48); bb_emit_byte(0xBF);
+            bb_emit_u64((uint64_t)(uintptr_t)seq_zeta);
+            /* mov rax, imm64(bb_seq) */
+            bb_emit_byte(0x48); bb_emit_byte(0xB8);
+            bb_emit_u64((uint64_t)(uintptr_t)bb_seq);
+            /* jmp rax  (tail call — esi/entry unchanged) */
+            bb_emit_byte(0xFF); bb_emit_byte(0xE0);
+
+            int tnbytes = bb_emit_end();
+            if (tnbytes <= 0 || tnbytes > TRAM_BUF_SIZE) {
+                bb_free(tbuf, TRAM_BUF_SIZE);
+                free(seq_zeta);
+                return NULL;
+            }
+            bb_seal(tbuf, (size_t)tnbytes);
+#undef TRAM_BUF_SIZE
+
+            right_fn    = (bb_box_fn)tbuf;  /* trampoline is the new right node */
+            right_state = NULL;
+        }
+        /* right_fn is now a self-contained trampoline for the whole tree */
+        return right_fn;
+    }
+
     default:
         /* Not yet implemented in binary path — signal fallback to C bb_build */
         return NULL;
