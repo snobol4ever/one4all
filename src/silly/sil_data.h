@@ -454,6 +454,13 @@ extern DESCR_t GOTSTB;   /* peek-ahead table for '<' and '['             */
 extern DESCR_t STNOKY;   /* &STNO keyword descriptor for trace           */
 extern DESCR_t STCTKY;   /* &STCOUNT keyword descriptor for trace        */
 extern DESCR_t FALKY;    /* &STFCOUNT keyword descriptor for trace       */
+
+/* M20/M21: sil_errors / sil_main */
+extern DESCR_t FCL;      /* real-number scratch (stats)                  */
+/* MSGNO already declared as const char *MSGNO[] in sil_data.h          */
+extern DESCR_t GCTTTL;   /* GC total time (&GCTIME)                      */
+extern DESCR_t SIGNCL;   /* terminating signal for SYSCUT [PLB47]        */
+extern DESCR_t FATLCL;   /* &FATAL flag (non-zero = fatal in progress)   */
 /* Tree node field offsets — already #define'd in sil_types.h:
  *   FATHER=DESCR  LSON=2*DESCR  RSIB=3*DESCR  CODE=4*DESCR            */
 extern DESCR_t BOSCL;    /* offset of beginning of current statement     */
