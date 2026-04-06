@@ -19,9 +19,9 @@ run_test() {
     [ ! -f "$ref" ] && return
     local got exp
     if [ -n "$input" ] && [ -f "$input" ]; then
-        got=$(SNO_LIB="$INC" timeout "$TIMEOUT" "$INTERP" "$sno" < "$input" 2>/dev/null || true)
+        got=$(SNO_LIB="$INC" timeout "$TIMEOUT" $INTERP "$sno" < "$input" 2>/dev/null || true)
     else
-        got=$(SNO_LIB="$INC" timeout "$TIMEOUT" "$INTERP" "$sno" 2>/dev/null || true)
+        got=$(SNO_LIB="$INC" timeout "$TIMEOUT" $INTERP "$sno" 2>/dev/null || true)
     fi
     if [ -n "$filter" ]; then
         got=$(printf '%s\n' "$got" | grep -v "$filter" || true)
