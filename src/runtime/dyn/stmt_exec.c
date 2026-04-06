@@ -78,6 +78,7 @@ extern DESCR_t (*g_user_call_hook)(const char *name, DESCR_t *args, int nargs);
  * Instead we redeclare bb_box.h's types manually here. */
 #include "../snobol4/snobol4.h"
 #include "../snobol4/sil_macros.h"   /* SIL macro translations — RT + SM axes */
+#include "../asm/bb_build_bin.h"     /* bb_lit_emit_binary — M-DYN-B1 */
 
 /* In the full-runtime build, include bb_box.h after snobol4.h.
  * bb_box.h now uses spec_t (not spec_t) so no collision with engine. */
@@ -1220,11 +1221,22 @@ int exec_stmt(const char  *subj_name,
     if (pat.v == DT_P && pat.p) {
         root = bb_build((PATND_t *)pat.p);
     } else if (pat.v == DT_S && pat.s) {
-        lit_t *lζ = calloc(1, sizeof(lit_t));
-        lζ->lit = pat.s;
-        lζ->len = (int)strlen(pat.s);
-        root.fn = (bb_box_fn)bb_lit;
-        root.ζ  = lζ;
+        int bin_done = 0;
+        if (getenv("SNO_BINARY_BOXES")) {
+            bb_box_fn bfn = bb_lit_emit_binary(pat.s, (int)strlen(pat.s));
+            if (bfn) {
+                root.fn  = bfn;
+                root.ζ   = NULL;
+                bin_done = 1;
+            }
+        }
+        if (!bin_done) {
+            lit_t *lζ = calloc(1, sizeof(lit_t));
+            lζ->lit = pat.s;
+            lζ->len = (int)strlen(pat.s);
+            root.fn = (bb_box_fn)bb_lit;
+            root.ζ  = lζ;
+        }
     } else {
         eps_t *eζ = calloc(1, sizeof(eps_t));
         root.fn = (bb_box_fn)bb_eps;

@@ -1809,6 +1809,12 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    /* Initialise binary box pool (M-DYN-B1) */
+    {
+        extern void bb_pool_init(void);
+        bb_pool_init();
+    }
+
     /* Initialise all builtins (GT, LT, SIZE, DATATYPE, etc.) registered in snobol4.c */
     extern void SNO_INIT_fn(void);
     SNO_INIT_fn();
