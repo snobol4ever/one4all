@@ -60,9 +60,10 @@
 /* cmpnd_to_expr — lower CMPND_t → EXPR_t IR (defined in snobol4_pattern.c) */
 extern struct EXPR_t *cmpnd_to_expr(CMPND_t *n);
 
-/* sno_parse still used by code() for statement-block parsing (RT-7) */
+/* scrip_cc.h provides Program, STMT_t, EXPR_t types used by exec_code() */
 #include "../../frontend/snobol4/scrip_cc.h"
-extern Program  *sno_parse(FILE *f, const char *filename);
+/* sno_parse retired — code() now uses cmpile_string + cmpile_lower (RT-121 fix) */
+extern Program *cmpile_lower(CMPILE_t *cl);
 
 /* exec_stmt — the five-phase executor */
 extern int exec_stmt(const char  *subj_name,
@@ -393,21 +394,14 @@ DESCR_t code(const char *src)
 {
     if (!src || !*src) return FAILDESCR;
 
-    /* Wrap the source string as a FILE* via fmemopen.
-     * fmemopen requires a non-const buffer; we duplicate first. */
-    size_t len = strlen(src);
-    char  *buf = malloc(len + 2);
-    if (!buf) return FAILDESCR;
-    memcpy(buf, src, len);
-    buf[len]   = '\n';   /* ensure trailing newline for parser */
-    buf[len+1] = '\0';
+    /* Use cmpile_string (CMPILE.c — the authoritative parser) then lower
+     * to Program* IR via cmpile_lower.  Replaces the broken fmemopen/sno_parse
+     * path which used the retired Bison parser (RT-121). */
+    CMPILE_t *cl = cmpile_string(src);
+    if (!cl) return FAILDESCR;
 
-    FILE *f = fmemopen(buf, len + 1, "r");
-    if (!f) { free(buf); return FAILDESCR; }
-
-    Program *prog = sno_parse(f, "<eval>");
-    fclose(f);
-    free(buf);
+    Program *prog = cmpile_lower(cl);
+    cmpile_free(cl);
 
     if (!prog || !prog->head) return FAILDESCR;
 

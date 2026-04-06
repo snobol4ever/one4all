@@ -1644,7 +1644,7 @@ static DESCR_t _usercall_hook(const char *name, DESCR_t *args, int nargs) {
  * Program* / STMT_t IR that execute_program() expects.
  * Bridge that makes CMPILE.c the authoritative top-level parser.
  * --------------------------------------------------------------------- */
-static Program *cmpile_lower(CMPILE_t *cl)
+Program *cmpile_lower(CMPILE_t *cl)
 {
     if (!cl) return NULL;
     Program *prog = GC_malloc(sizeof *prog);

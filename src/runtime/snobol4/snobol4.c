@@ -538,7 +538,29 @@ static DESCR_t _CONVERT_(DESCR_t *a, int n) {
     }
     if (strcasecmp(type, "ARRAY")   == 0) {
         if (IS_ARR(val)) return val;           /* idem */
-        return FAILDESCR;                      /* TABLE->ARRAY: FAIL (csnobol4 verified) */
+        if (IS_TBL(val) && val.tbl) {
+            /* SIL CNVTA: TABLE->ARRAY produces an N×2 2D array.
+             * A[i,1] = key descriptor, A[i,2] = value descriptor.
+             * Empty table (size==0) → FAIL (SIL ICNVTA fails if all null). */
+            TBBLK_t *tbl = val.tbl;
+            int n = tbl->size;
+            if (n == 0) return FAILDESCR;
+            ARBLK_t *a = array_new2d(1, n, 1, 2);
+            int row = 1;
+            for (int b = 0; b < TABLE_BUCKETS && row <= n; b++) {
+                for (TBPAIR_t *e = tbl->buckets[b]; e && row <= n; e = e->next) {
+                    /* key: use key_descr if set, else build string */
+                    DESCR_t kd = (e->key_descr.v != DT_SNUL)
+                                 ? e->key_descr
+                                 : STRVAL(e->key ? e->key : "");
+                    array_set2(a, row, 1, kd);
+                    array_set2(a, row, 2, e->val);
+                    row++;
+                }
+            }
+            return ARRAY_VAL(a);
+        }
+        return FAILDESCR;
     }
     if (strcasecmp(type, "TABLE")   == 0) {
         if (IS_TBL(val)) return val;           /* idem */
@@ -1411,6 +1433,12 @@ char *VARVAL_fn(DESCR_t v) {
             /* SIL VARVAL: keyword → dereference value, then stringify.
              * e.g. OUTPUT = &RTNTYPE, string concat with &TRIM, etc. */
             if (v.s) return VARVAL_fn(NV_GET_fn(v.s));
+            return GC_strdup("");
+        case DT_E:
+            /* SIL CNVRTS/DTREP: EXPRESSION stringifies to its type name. */
+            return GC_strdup("EXPRESSION");
+        case DT_C:
+            /* SIL CNVRTS/DTREP: CODE stringifies to "" (oracle: CONVERT(code,"STRING")=""). */
             return GC_strdup("");
         default:
             return GC_strdup("");
