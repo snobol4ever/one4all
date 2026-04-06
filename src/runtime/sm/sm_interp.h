@@ -24,6 +24,9 @@ typedef struct {
     int       sp;          /* stack pointer: stack[0..sp-1] are live */
     int       last_ok;     /* 1 = last operation succeeded, 0 = failed */
     int       pc;          /* program counter: index into SM_Program */
+    jmp_buf   err_jmp;     /* per-statement error recovery (SM_STNO arms it) */
+    int       err_fail_pc; /* pc to jump to on runtime error (-1 = halt) */
+    int       err_armed;   /* 1 if err_jmp is live */
 } SM_State;
 
 /*

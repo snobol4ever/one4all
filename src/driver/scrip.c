@@ -1935,9 +1935,30 @@ int main(int argc, char **argv)
         }
         SM_State st;
         sm_state_init(&st);
-        int rc = sm_interp_run(sm, &st);
+        /* Arm g_sno_err_jmp: sno_runtime_error longjmps here on error.
+         * We treat each error as statement failure: mark last_ok=0, advance pc,
+         * and re-enter the interp loop.  This mirrors execute_program's per-stmt
+         * setjmp pattern and prevents longjmp into an uninitialized jmp_buf. */
+        int hybrid_err;
+        while (1) {
+            hybrid_err = setjmp(g_sno_err_jmp);
+            if (hybrid_err != 0) {
+                /* runtime error fired mid-statement: mark fail, advance past
+                 * the current instruction and continue */
+                st.last_ok = 0;
+                st.sp = 0;  /* reset value stack — state is undefined after error */
+                if (st.pc < sm->count) st.pc++;  /* skip offending instruction */
+                /* drain to next SM_STNO boundary so we resume cleanly */
+                while (st.pc < sm->count &&
+                       sm->instrs[st.pc].op != SM_STNO &&
+                       sm->instrs[st.pc].op != SM_HALT)
+                    st.pc++;
+            }
+            int rc = sm_interp_run(sm, &st);
+            if (rc == 0 || rc < -1) break;  /* halted or fatal */
+            if (st.pc >= sm->count) break;
+        }
         sm_prog_free(sm);
-        if (rc < 0) return 1;
     } else {
         execute_program(prog);
     }

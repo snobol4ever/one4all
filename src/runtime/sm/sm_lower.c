@@ -70,7 +70,7 @@ static void lt_define(LabelTable *lt, const char *name, int instr_idx)
 static int lt_find(const LabelTable *lt, const char *name)
 {
     for (int i = 0; i < lt->nlabels; i++)
-        if (strcmp(lt->labels[i].name, name) == 0)
+        if (strcasecmp(lt->labels[i].name, name) == 0)
             return lt->labels[i].instr_idx;
     return -1;
 }
@@ -121,14 +121,14 @@ static int emit_goto(SM_Program *p, LabelTable *lt,
 {
     if (!target) return -1;
 
-    /* Special names */
-    if (strcmp(target, "RETURN") == 0) {
+    /* Special names (case-insensitive per SNOBOL4 spec) */
+    if (strcasecmp(target, "RETURN") == 0) {
         return sm_emit(p, SM_RETURN);
     }
-    if (strcmp(target, "FRETURN") == 0) {
+    if (strcasecmp(target, "FRETURN") == 0) {
         return sm_emit(p, SM_FRETURN);
     }
-    if (strcmp(target, "NRETURN") == 0) {
+    if (strcasecmp(target, "NRETURN") == 0) {
         /* NRETURN: return DT_N from fn return var; ret_kind=2 in call_user_function */
         return sm_emit(p, SM_NRETURN);
     }
