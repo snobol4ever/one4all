@@ -449,6 +449,11 @@ extern DESCR_t BIEQFN;   /* SPITBOL assignment operator descriptor       */
 extern DESCR_t BISNFN;   /* SPITBOL SCAN operator descriptor             */
 extern DESCR_t ELEMTB;   /* element scan table                           */
 extern DESCR_t GOTSTB;   /* peek-ahead table for '<' and '['             */
+
+/* M19: sil_interp */
+extern DESCR_t STNOKY;   /* &STNO keyword descriptor for trace           */
+extern DESCR_t STCTKY;   /* &STCOUNT keyword descriptor for trace        */
+extern DESCR_t FALKY;    /* &STFCOUNT keyword descriptor for trace       */
 /* Tree node field offsets — already #define'd in sil_types.h:
  *   FATHER=DESCR  LSON=2*DESCR  RSIB=3*DESCR  CODE=4*DESCR            */
 extern DESCR_t BOSCL;    /* offset of beginning of current statement     */
