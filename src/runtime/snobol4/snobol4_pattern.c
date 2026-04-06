@@ -1680,3 +1680,20 @@ DESCR_t pat_call(const char *name, DESCR_t arg) {
      * otherwise treat it as a literal string pattern. */
     return var_as_pattern(result);
 }
+
+/* compile_to_expression — SIL CONVE path: parse string → freeze as DT_E.
+ * Used by CONVERT(s,"EXPRESSION"). Does NOT evaluate — stores EXPR_t* as DT_E
+ * for later thaw by EVAL_fn. Returns FAILDESCR if parse fails. */
+DESCR_t compile_to_expression(const char *src) {
+    if (!src || !*src) return FAILDESCR;
+    CMPND_t *cmpnd = cmpile_eval_expr(src);
+    if (!cmpnd) return FAILDESCR;
+    EXPR_t *tree = cmpnd_to_expr(cmpnd);
+    if (!tree) return FAILDESCR;
+    DESCR_t d;
+    d.v    = DT_E;
+    d.ptr  = tree;
+    d.slen = 0;
+    d.s    = NULL;
+    return d;
+}

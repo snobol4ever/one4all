@@ -462,19 +462,77 @@ static DESCR_t _TABLE_(DESCR_t *a, int n) {
     return TABLE_VAL(table_new_args(init, inc));
 }
 
-/* CONVERT(val, type) */
+/* CONVERT(val, type) — matches csnobol4 CNVRT SIL procedure */
 static DESCR_t _CONVERT_(DESCR_t *a, int n) {
     if (n < 2) return FAILDESCR;
     DESCR_t val  = a[0];
     const char *type = VARVAL_fn(a[1]);
     if (!type) return FAILDESCR;
-    if (strcasecmp(type, "STRING")  == 0) { const char *s = VARVAL_fn(val); return s ? STRVAL(s) : NULVCL; }
-    if (strcasecmp(type, "INTEGER") == 0) return INTVAL((int64_t)to_int(val));
-    if (strcasecmp(type, "REAL")    == 0) return REALVAL(to_real(val));
+
+    /* Idem conversions and basic coercions */
+    if (strcasecmp(type, "STRING")  == 0) {
+        const char *s = VARVAL_fn(val);
+        return s ? STRVAL(GC_strdup(s)) : NULVCL;
+    }
+    if (strcasecmp(type, "INTEGER") == 0) {
+        /* Only STRING/INTEGER/REAL can coerce to INTEGER; others fail */
+        if (!IS_STR(val) && !IS_INT(val) && !IS_REAL(val)) return FAILDESCR;
+        return INTVAL((int64_t)to_int(val));
+    }
+    if (strcasecmp(type, "REAL")    == 0) {
+        if (!IS_STR(val) && !IS_INT(val) && !IS_REAL(val)) return FAILDESCR;
+        return REALVAL(to_real(val));
+    }
     if (strcasecmp(type, "ARRAY")   == 0) {
-        if (IS_ARR(val)) return val;
+        if (IS_ARR(val)) return val;           /* idem */
+        return FAILDESCR;                      /* TABLE->ARRAY: FAIL (csnobol4 verified) */
+    }
+    if (strcasecmp(type, "TABLE")   == 0) {
+        if (IS_TBL(val)) return val;           /* idem */
+        return FAILDESCR;                      /* ARRAY->TABLE: FAIL (csnobol4 verified) */
+    }
+    if (strcasecmp(type, "PATTERN") == 0) {
+        if (IS_PAT(val)) return val;           /* idem */
+        /* STRING->PATTERN: treat as literal string match pattern */
+        if (IS_STR(val) || val.v == DT_SNUL) {
+            const char *s = VARVAL_fn(val);
+            return s ? pat_lit(s) : FAILDESCR;
+        }
         return FAILDESCR;
     }
+    if (strcasecmp(type, "CODE")       == 0) {
+        /* Compile string to CODE block — SIL CODER/RECOMP path */
+        const char *s = VARVAL_fn(val);
+        if (!s || !*s) return FAILDESCR;
+        return code(s);
+    }
+    if (strcasecmp(type, "EXPRESSION") == 0) {
+        /* Compile string to EXPRESSION — SIL CONVE path: parse→DT_E, do not eval */
+        const char *s = VARVAL_fn(val);
+        if (!s || !*s) return FAILDESCR;
+        return compile_to_expression(s);
+    }
+    if (strcasecmp(type, "NUMERIC")    == 0) {
+        /* SIL CNV1/NUMSP: integer if pure-int string, real if float, fail otherwise */
+        if (IS_INT(val)) return val;
+        if (IS_REAL(val)) return val;
+        if (IS_STR(val) || val.v == DT_SNUL) {
+            const char *s = val.s ? val.s : "";
+            while (*s == ' ') s++;
+            if (!*s) return FAILDESCR;
+            /* Try integer first */
+            char *end = NULL;
+            long long iv = strtoll(s, &end, 10);
+            while (*end == ' ') end++;
+            if (*end == ' ') return INTVAL((int64_t)iv);
+            /* Try real */
+            double rv = strtod(s, &end);
+            while (*end == ' ') end++;
+            if (*end == ' ') return REALVAL(rv);
+        }
+        return FAILDESCR;
+    }
+    /* Unknown type name — FAIL (SIL also fails for unrecognised types) */
     return FAILDESCR;
 }
 

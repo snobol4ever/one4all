@@ -487,6 +487,7 @@ void   register_fn(const char *name, DESCR_t (*fn)(DESCR_t*, int), int min_args,
 void   define_spec(DESCR_t spec);
 DESCR_t apply_val(DESCR_t fnval, DESCR_t *args, int nargs);
 DESCR_t EVAL_fn(DESCR_t expr);
+DESCR_t compile_to_expression(const char *src); /* SIL CONVE: parse→DT_E, no eval */
 DESCR_t opsyn(DESCR_t newname, DESCR_t oldname, DESCR_t type);
 /* 2-arg convenience — type defaults to NULVCL */
 static inline DESCR_t opsyn2(DESCR_t a, DESCR_t b) { return opsyn(a, b, NULVCL); }
