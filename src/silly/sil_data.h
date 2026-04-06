@@ -388,6 +388,21 @@ extern DESCR_t ALCL;     /* ARG(F,N) entry indicator                     */
 #define BUFLEN  256         /* max dump line length                       */
 /* LNKFLD already defined in sil_types.h as (3*DESCR) */
 
+/* ── M13: sil_arrays globals ─────────────────────────────────────────── */
+extern DESCR_t DATSEG;   /* current data-type code (DATDEF)              */
+extern DESCR_t DATCL;    /* defined-data procedure descriptor            */
+extern DESCR_t FLDCL;    /* FIELD procedure descriptor                   */
+extern DESCR_t TWOCL;    /* constant 2                                   */
+extern DESCR_t SIZERR;   /* size-error descriptor                        */
+extern DESCR_t PROTER;   /* prototype error descriptor                   */
+extern DESCR_t ARGNER;   /* argument-number error descriptor             */
+extern DESCR_t NONARY;   /* non-array error descriptor                   */
+/* Sort scratch pointers */
+extern DESCR_t A4PTR, A5PTR, A6PTR, A7PTR;
+extern DESCR_t F1PTR, F2PTR;
+extern DESCR_t LPTR;
+/* DATSIZ, EXTSIZ, LPTYP already #define'd in sil_types.h */
+
 /* ── TRCBLK — trace function skeleton ───────────────────────────────── */
 
 extern DESCR_t TRCBLK[6];   /* trace block: [0]=fn descr, [1]=LIT1 fn,   */
