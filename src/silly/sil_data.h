@@ -418,8 +418,26 @@ extern DESCR_t ISPPTR;   /* pointer-to-IOSP scratch                      */
 #define UNITI   1        /* default input  unit number                   */
 #define UNITO   2        /* default output unit number                   */
 
-/* ── M17: sil_extern globals ─────────────────────────────────────────── */
-extern DESCR_t LODCL;    /* LOAD procedure descriptor (external fn)      */
+/* ── M18a/b/c/d: sil_compiler globals ───────────────────────────────── */
+/* Tree node field offsets — already #define'd in sil_types.h:
+ *   FATHER=DESCR  LSON=2*DESCR  RSIB=3*DESCR  CODE=4*DESCR            */
+extern DESCR_t BOSCL;    /* offset of beginning of current statement     */
+extern DESCR_t FRNCL;    /* failure return offset (INIT argument)        */
+extern DESCR_t OCLIM;    /* object code limit pointer                    */
+extern DESCR_t GOGOCL;   /* goto function for current statement          */
+extern DESCR_t GOTLCL;   /* GOTL function code descriptor                */
+extern DESCR_t GOTGCL;   /* GOTG function code descriptor                */
+extern DESCR_t SCANCL;   /* SCAN function code descriptor                */
+extern DESCR_t SJSRCL;   /* SJSR function code descriptor                */
+extern DESCR_t INITCL;   /* INIT function code descriptor                */
+extern DESCR_t CDIAG;    /* compiler diagnostic (error) label            */
+extern DESCR_t EMSGCL;   /* error message descriptor                     */
+/* Compiler tree node pointers */
+extern DESCR_t SUBJND;   /* subject node                                 */
+extern DESCR_t PATND;    /* pattern node                                 */
+extern DESCR_t EXOPND;   /* expression operand node                      */
+extern DESCR_t EXPRND;   /* expression node                              */
+extern DESCR_t GOTOND;   /* goto node                                    */
 extern DESCR_t TRATL;    /* trace attribute list head                    */
 extern DESCR_t VALTRS;   /* VALUE trace type string descriptor           */
 extern DESCR_t FUNTCL;   /* FUNCTION trace type constant                 */
