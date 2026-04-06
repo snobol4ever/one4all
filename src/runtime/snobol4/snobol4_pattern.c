@@ -113,30 +113,36 @@ DESCR_t pat_notany(const char *chars) {
 }
 
 DESCR_t pat_len(int64_t n) {
+    /* SIL SCLENR/LENERR: ERRTYP,14 — negative number in illegal context */
+    if (n < 0) { sno_runtime_error(14, NULL); return FAILDESCR; }
     PATND_t *p = spat_new(XLNTH);
     p->num = n;
     return spat_val(p);
 }
 
 DESCR_t pat_pos(int64_t n) {
+    if (n < 0) { sno_runtime_error(14, NULL); return FAILDESCR; }
     PATND_t *p = spat_new(XPOSI);
     p->num = n;
     return spat_val(p);
 }
 
 DESCR_t pat_rpos(int64_t n) {
+    if (n < 0) { sno_runtime_error(14, NULL); return FAILDESCR; }
     PATND_t *p = spat_new(XRPSI);
     p->num = n;
     return spat_val(p);
 }
 
 DESCR_t pat_tab(int64_t n) {
+    if (n < 0) { sno_runtime_error(14, NULL); return FAILDESCR; }
     PATND_t *p = spat_new(XTB);
     p->num = n;
     return spat_val(p);
 }
 
 DESCR_t pat_rtab(int64_t n) {
+    if (n < 0) { sno_runtime_error(14, NULL); return FAILDESCR; }
     PATND_t *p = spat_new(XRTB);
     p->num = n;
     return spat_val(p);

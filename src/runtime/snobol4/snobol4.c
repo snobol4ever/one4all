@@ -2898,22 +2898,34 @@ DESCR_t mul(DESCR_t a, DESCR_t b) {
 DESCR_t DIVIDE_fn(DESCR_t a, DESCR_t b) {
     if (IS_FAIL(a) || IS_FAIL(b)) return FAILDESCR;
     if (IS_INT(a) && IS_INT(b)) {
-        if (b.i == 0) return NULVCL;
+        if (b.i == 0) { sno_runtime_error(2, NULL); return FAILDESCR; }
         return INTVAL(a.i / b.i);
     }
     double denom = to_real(b);
-    if (denom == 0.0) return NULVCL;
+    if (denom == 0.0) { sno_runtime_error(2, NULL); return FAILDESCR; }
     return REALVAL(to_real(a) / denom);
 }
 
 DESCR_t POWER_fn(DESCR_t a, DESCR_t b) {
     if (IS_FAIL(a) || IS_FAIL(b)) return FAILDESCR;
-    if (IS_INT(a) && IS_INT(b) && b.i >= 0) {
-        int64_t base = a.i, exp = b.i, result = 1;
-        while (exp-- > 0) result *= base;
-        return INTVAL(result);
+    if (IS_INT(a) && IS_INT(b)) {
+        int64_t ix = a.i, iy = b.i;
+        /* csnobol4 expint: 0 ** negative = AERROR */
+        if (ix == 0 && iy < 0) { sno_runtime_error(2, NULL); return FAILDESCR; }
+        /* negative exponent on non-zero int → 0 (per csnobol4 expint) */
+        if (iy < 0) return INTVAL(0);
+        int64_t p = 1;
+        for (;;) {
+            if (iy & 1) p *= ix;
+            iy >>= 1;
+            if (iy == 0) break;
+            ix *= ix;
+        }
+        return INTVAL(p);
     }
-    return REALVAL(pow(to_real(a), to_real(b)));
+    double r = pow(to_real(a), to_real(b));
+    if (isinf(r) || isnan(r)) { sno_runtime_error(2, NULL); return FAILDESCR; }
+    return REALVAL(r);
 }
 
 DESCR_t neg(DESCR_t a) {
