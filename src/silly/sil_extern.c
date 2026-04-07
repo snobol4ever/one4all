@@ -40,6 +40,7 @@ static inline int deql(DESCR_t a, DESCR_t b)
     return D_A(a) == D_A(b) && D_V(a) == D_V(b);
 }
 
+/*====================================================================================================================*/
 static DESCR_t ext_stk[32];
 static int ext_top = 0;
 static inline void    ext_push(DESCR_t d) { ext_stk[ext_top++] = d; }
@@ -65,6 +66,7 @@ Sil_result UNLOAD_fn(void)
     MOVD(XPTR, NULVCL); return OK;
 }
 
+/*====================================================================================================================*/
 /* ── LNKFNC — invoke external function ──────────────────────────────── */
 /*
  * Coerces each argument to the declared type, then calls XCALL_LINK.

@@ -34,6 +34,7 @@ static inline char *sp_ptr(const SPEC_t *sp)
     return (char *)A2P(sp->a) + sp->o;
 }
 
+/*====================================================================================================================*/
 /* ════════════════════════════════════════════════════════════════════════
  * APDSP — append specifier STR to buffer specifier BASE
  * v311.sil APDSP macro → lib/str.c apdsp()
@@ -52,6 +53,7 @@ void APDSP_fn(SPEC_t *base, const SPEC_t *str)
     }
 }
 
+/*====================================================================================================================*/
 /* ════════════════════════════════════════════════════════════════════════
  * REMSP — remove leading match from specifier
  * v311.sil X_REMSP(A,B,C): A = B advanced past C.l bytes
@@ -64,6 +66,7 @@ void REMSP_fn(SPEC_t *dst, const SPEC_t *src, const SPEC_t *match)
     *dst = tmp;
 }
 
+/*====================================================================================================================*/
 /* ════════════════════════════════════════════════════════════════════════
  * TRIMSP — trim trailing blanks
  * v311.sil TRIMSP → lib/str.c trimsp()
@@ -77,6 +80,7 @@ void TRIMSP_fn(SPEC_t *dst, const SPEC_t *src)
     dst->l = len;
 }
 
+/*====================================================================================================================*/
 /* ════════════════════════════════════════════════════════════════════════
  * LEXCMP — lexicographic compare
  * v311.sil LEXCMP → lib/lexcmp.c lexcmp()
@@ -93,6 +97,7 @@ int LEXCMP_fn(const SPEC_t *a, const SPEC_t *b)
     return i - j;
 }
 
+/*====================================================================================================================*/
 /* ════════════════════════════════════════════════════════════════════════
  * SPCINT — parse integer from specifier
  * v311.sil SPCINT → lib/c99/spcint.c spcint()
@@ -105,7 +110,7 @@ Sil_result SPCINT_fn(DESCR_t *dp, const SPEC_t *sp)
     const char *cp = sp_ptr(sp);
     long val;
     char *end;
-    while (len > 0 && (*cp == ' '   || *cp == '\t')) { cp++; len--; } /* strip leading whitespace (SPITBOL-compatible, always) */
+    while (len > 0 && (*cp == ' '    || *cp == '\t')) { cp++; len--; } /* strip leading whitespace (SPITBOL-compatible, always) */
     if (len == 0) return FAIL;
     if (len > sizeof(buf) - 1) len = sizeof(buf) - 1;
     memcpy(buf, cp, len);
@@ -120,6 +125,7 @@ Sil_result SPCINT_fn(DESCR_t *dp, const SPEC_t *sp)
     return OK;
 }
 
+/*====================================================================================================================*/
 /* ════════════════════════════════════════════════════════════════════════
  * SPREAL — parse real from specifier
  * v311.sil SPREAL → lib/generic/spreal.c spreal()
@@ -133,7 +139,7 @@ Sil_result SPREAL_fn(DESCR_t *dp, const SPEC_t *sp)
     const char *cp = sp_ptr(sp);
     double d;
     char t;
-    while (len > 0 && (*cp == ' '   || *cp == '\t')) { cp++; len--; } /* strip leading whitespace */
+    while (len > 0 && (*cp == ' '    || *cp == '\t')) { cp++; len--; } /* strip leading whitespace */
     if (len == 0) {
         dp->a.f = 0.0f;
         dp->f = 0;
@@ -152,6 +158,7 @@ Sil_result SPREAL_fn(DESCR_t *dp, const SPEC_t *sp)
 #undef SPREAL_TC
 }
 
+/*====================================================================================================================*/
 /* ════════════════════════════════════════════════════════════════════════
  * REALST — format real DESCR to specifier (static buffer)
  * v311.sil REALST → lib/realst.c realst()
@@ -173,6 +180,7 @@ void REALST_fn(SPEC_t *sp, const DESCR_t *dp)
     sp->unused = 0;
 }
 
+/*====================================================================================================================*/
 /* ════════════════════════════════════════════════════════════════════════
  * INTSPC — format integer DESCR to specifier (static buffer)
  * v311.sil INTSPC → lib/c99/intspc.c intspc()
@@ -190,6 +198,7 @@ void INTSPC_fn(SPEC_t *sp, const DESCR_t *dp)
     sp->unused = 0;
 }
 
+/*====================================================================================================================*/
 /* ════════════════════════════════════════════════════════════════════════
  * LOCSP — build specifier from a STRING block DESCR_t
  * v311.sil X_LOCSP(A, B) — macros.h
@@ -209,6 +218,7 @@ void LOCSP_fn(SPEC_t *sp, const DESCR_t *dp)
     sp->unused = 0;
 }
 
+/*====================================================================================================================*/
 /* ════════════════════════════════════════════════════════════════════════
  * SUBSP — substring specifier
  * ════════════════════════════════════════════════════════════════════════ */

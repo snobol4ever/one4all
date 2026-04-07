@@ -174,6 +174,9 @@ def process_lines(raw_lines, width=DEFAULT_WIDTH, op_norm=True):
     pending_cmt = None
     in_block_cmt = False   # True when inside a /* ... */ spanning multiple lines
 
+    just_closed = False   # True after a function's closing brace, until next non-blank
+    seen_func   = False   # True once at least one function has been processed
+
     for line in lines:
         line = line.rstrip()
 
@@ -184,9 +187,7 @@ def process_lines(raw_lines, width=DEFAULT_WIDTH, op_norm=True):
                 in_block_cmt = False
             continue
         # Detect start of unclosed block comment on this line
-        stripped_check = line.lstrip()
         if '/*' in line:
-            # Check if /* is opened but not closed on this line
             tok = tokenize(line)
             for k, t in tok:
                 if k == 'bc' and not t.endswith('*/'):
@@ -195,6 +196,7 @@ def process_lines(raw_lines, width=DEFAULT_WIDTH, op_norm=True):
 
         if is_rule_line(line):
             pending_cmt = None
+            just_closed = False
             out.append(regen_rule(line, width))
             continue
 
@@ -205,6 +207,13 @@ def process_lines(raw_lines, width=DEFAULT_WIDTH, op_norm=True):
             depth += opens - closes
             if stripped == '{' and depth == 1:
                 in_func = True
+                just_closed = False
+
+            # Insert major rule before first non-blank content after a function closed
+            if just_closed and stripped:
+                out.append(make_rule('=', 0, width))
+                just_closed = False
+
             out.append(line)
             continue
 
@@ -213,7 +222,7 @@ def process_lines(raw_lines, width=DEFAULT_WIDTH, op_norm=True):
         depth += opens - closes
 
         if depth <= 0:
-            depth = 0; in_func = False
+            depth = 0; in_func = False; just_closed = True; seen_func = True
             if pending_cmt:
                 line = attach_comment(line, pending_cmt, width)
                 pending_cmt = None
@@ -343,7 +352,7 @@ def process_file(path, width, op_norm, dry_run, verify):
         return True
 
     before_obj = None; repo_root = None
-    if verify:
+    if verify and path.endswith('.c'):  # .h files produce PCH, not ELF — skip verify
         repo_root = find_repo_root(path)
         if repo_root:
             before_obj = compile_obj(path, repo_root)

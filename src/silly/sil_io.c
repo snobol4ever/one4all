@@ -85,6 +85,7 @@ Sil_result READ_fn(void)
     MOVD(XPTR, NULVCL); return OK;
 }
 
+/*====================================================================================================================*/
 /* ── PRINT — OUTPUT(V,U,O,N) ─────────────────────────────────────────── */
 Sil_result PRINT_fn(void)
 {
@@ -121,6 +122,7 @@ Sil_result PRINT_fn(void)
     MOVD(XPTR, NULVCL); return OK;
 }
 
+/*====================================================================================================================*/
 /* ── BKSPCE / ENDFL / REWIND / SET ──────────────────────────────────── */
 static Sil_result ioop(int32_t op)
 {
@@ -145,6 +147,7 @@ static Sil_result ioop(int32_t op)
     MOVD(XPTR, NULVCL); return OK;
 }
 
+/*====================================================================================================================*/
 Sil_result BKSPCE_fn(void) { return ioop(1); }
 Sil_result ENDFL_fn(void)  { return ioop(2); }
 Sil_result REWIND_fn(void) { return ioop(3); }
@@ -169,6 +172,7 @@ Sil_result DETACH_fn(void)
     MOVD(XPTR, NULVCL); return OK;
 }
 
+/*====================================================================================================================*/
 /* ── PUTIN — internal input procedure ───────────────────────────────── */
 Sil_result PUTIN_fn(DESCR_t blk, DESCR_t var)
 {
@@ -204,6 +208,7 @@ putin2:
     MOVD(XPTR, IO1PTR); return OK;
 }
 
+/*====================================================================================================================*/
 /* ── PUTOUT — internal output procedure ─────────────────────────────── */
 void PUTOUT_fn(DESCR_t blk, DESCR_t val)
 {

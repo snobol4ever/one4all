@@ -63,6 +63,7 @@ static inline int deql_fn(DESCR_t a, DESCR_t b)
     return D_A(a) == D_A(b) && D_V(a) == D_V(b);
 }
 
+/*====================================================================================================================*/
 /* ── DEFINE(P,E) ─────────────────────────────────────────────────────── */
 /*
  * Prototype parsing requires STREAM with VARATB character-class table
@@ -109,8 +110,8 @@ Sil_result DEFINE_fn(void)
         if (c == ':') { in_locals = 1; pos++; continue; }
         if (c == ',') { pos++; continue; }
         int32_t id_start = pos; /* read identifier */
-        while (pos < slen && src[pos] != ','   && src[pos] != ':'   &&
-               src[pos] != ')'   && src[pos] != ' ') pos++;
+        while (pos < slen && src[pos] != ','    && src[pos] != ':'    &&
+               src[pos] != ')'    && src[pos] != ' ') pos++;
         int32_t id_len = pos - id_start;
         if (id_len == 0) continue;
         SPEC_t id_sp; id_sp.a = XSP.a; id_sp.o = XSP.o + id_start;
@@ -143,6 +144,7 @@ Sil_result DEFINE_fn(void)
     MOVD(XPTR, NULVCL); return OK;
 }
 
+/*====================================================================================================================*/
 /* ── DEFFNC — invoke defined function ───────────────────────────────── */
 /*
  * Full implementation requires INTERP (M19) and the PUSH/POP operand-

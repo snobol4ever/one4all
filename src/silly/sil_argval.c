@@ -45,6 +45,7 @@ static Sil_result rlint(DESCR_t *dp)
     return OK;
 }
 
+/*====================================================================================================================*/
 /* Fetch next descriptor from object code stream (OCBSCL + OCICL).
  * Advances OCICL by DESCR first (mirrors INCRA OCICL,DESCR / GETD).    */
 static DESCR_t oc_fetch(void)
@@ -53,6 +54,7 @@ static DESCR_t oc_fetch(void)
     return *(DESCR_t *)A2P(OCBSCL.a.i + OCICL.a.i);
 }
 
+/*====================================================================================================================*/
 /* Dereference a name descriptor: get value at offset DESCR from block.
  * Mirrors SIL GETDC XPTR,XPTR,DESCR.                                   */
 static void deref_name(DESCR_t *dp)
@@ -60,6 +62,7 @@ static void deref_name(DESCR_t *dp)
     *dp = *(DESCR_t *)A2P(dp->a.i + DESCR);
 }
 
+/*====================================================================================================================*/
 /* Check input association list (INATL) for dp.
  * Mirrors SIL LOCAPV ZPTR,INATL,XPTR.
  * Returns 1 if found (ZPTR set), 0 if not.                             */
@@ -69,6 +72,7 @@ static int check_input_assoc(const DESCR_t *dp)
     return locapv_fn(P2A(&INATL), (DESCR_t *)dp) != 0;
 }
 
+/*====================================================================================================================*/
 /* ════════════════════════════════════════════════════════════════════════
  * ARGVAL_fn — evaluate one argument from object code stream
  * v311.sil ARGVAL (line 2679)
@@ -95,6 +99,7 @@ argv1:
     return OK;
 }
 
+/*====================================================================================================================*/
 /* ════════════════════════════════════════════════════════════════════════
  * EXPVAL_fn — evaluate unevaluated expression
  * v311.sil EXPVAL (line 2699)
@@ -189,6 +194,7 @@ Sil_result EXPVAL_fn(void)
     return rc;
 }
 
+/*====================================================================================================================*/
 /* ════════════════════════════════════════════════════════════════════════
  * EXPEVL_fn — expression value context (SCL=0 entry to EXPVAL)
  * v311.sil EXPEVL (line 2757)
@@ -199,6 +205,7 @@ Sil_result EXPEVL_fn(void)
     return EXPVAL_fn();
 }
 
+/*====================================================================================================================*/
 /* ════════════════════════════════════════════════════════════════════════
  * INTVAL_fn — evaluate argument, coerce to INTEGER
  * v311.sil INTVAL (line 2739)
@@ -231,6 +238,7 @@ intv2:
     return FAIL; /* INTR1 — caller handles type error */
 }
 
+/*====================================================================================================================*/
 /* ════════════════════════════════════════════════════════════════════════
  * PATVAL_fn — evaluate argument, coerce to PATTERN
  * v311.sil PATVAL (line 2797)
@@ -281,6 +289,7 @@ patv3:
     return FAIL; /* INTR1 */
 }
 
+/*====================================================================================================================*/
 /* ════════════════════════════════════════════════════════════════════════
  * VARVAL_fn — evaluate argument, coerce to STRING
  * v311.sil VARVAL (line 2861)
@@ -316,6 +325,7 @@ varv2:
     return FAIL; /* INTR1 — all other types (including R) are errors */
 }
 
+/*====================================================================================================================*/
 /* ════════════════════════════════════════════════════════════════════════
  * VARVUP_fn — VARVAL with case-folding
  * v311.sil VARVUP (line 2900) [PLB28][PLB29]
@@ -327,6 +337,7 @@ Sil_result VARVUP_fn(void)
     return VPXPTR_fn();
 }
 
+/*====================================================================================================================*/
 /* ════════════════════════════════════════════════════════════════════════
  * VPXPTR_fn — case-fold XPTR string to upper-case variable
  * v311.sil VPXPTR (line 2909) [PLB29]
@@ -344,7 +355,7 @@ Sil_result VPXPTR_fn(void)
     int raised = 0;
     for (int32_t i = 0; i < len; i++) {
         unsigned char c = (unsigned char)src[i];
-        if (c >= 'a'   && c <= 'z') { dst[i] = (char)(c - 32); raised++; }
+        if (c >= 'a'    && c <= 'z') { dst[i] = (char)(c - 32); raised++; }
         else dst[i] = (char)c;
     }
     if (!raised) return OK; /* no lower-case chars: return unchanged */
@@ -356,6 +367,7 @@ Sil_result VPXPTR_fn(void)
     return OK;
 }
 
+/*====================================================================================================================*/
 /* ════════════════════════════════════════════════════════════════════════
  * XYARGS_fn — evaluate argument pair
  * v311.sil XYARGS (line 2916)

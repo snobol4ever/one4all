@@ -63,6 +63,7 @@ static inline void addson(DESCR_t parent, DESCR_t son)
     PUTDC_B(son, T_FATHER, parent);
 }
 
+/*====================================================================================================================*/
 /* ADDSIB — add sib as right-sibling of node */
 void ADDSIB_fn(DESCR_t node, DESCR_t sib)
 {
@@ -70,6 +71,7 @@ void ADDSIB_fn(DESCR_t node, DESCR_t sib)
     PUTDC_B(sib, T_FATHER, node);
 }
 
+/*====================================================================================================================*/
 /* INSERT — insert 'above' as parent of 'node' (node becomes son) */
 void INSERT_fn(DESCR_t node, DESCR_t above)
 {
@@ -82,6 +84,7 @@ void INSERT_fn(DESCR_t node, DESCR_t above)
     }
 }
 
+/*====================================================================================================================*/
 /* alloc_node: allocate CNDSIZ block for one tree node */
 static Sil_result alloc_node(DESCR_t *out)
 {
@@ -92,6 +95,7 @@ static Sil_result alloc_node(DESCR_t *out)
     return OK;
 }
 
+/*====================================================================================================================*/
 /* ── NULNOD — build LIT(null-string) node ───────────────────────────── */
 Sil_result NULNOD_fn(DESCR_t *out)
 {
@@ -104,6 +108,7 @@ Sil_result NULNOD_fn(DESCR_t *out)
     return OK;
 }
 
+/*====================================================================================================================*/
 /* ── ELEARG — process argument list for function/array ref ──────────── */
 /*
  * v311.sil ELEARG line 2173:
@@ -129,6 +134,7 @@ static Sil_result elearg(DESCR_t fn_code)
     return OK;
 }
 
+/*====================================================================================================================*/
 /* ── ELEMNT — compile one element ────────────────────────────────────── */
 Sil_result ELEMNT_fn(DESCR_t *out)
 {
@@ -291,6 +297,7 @@ elem_exit:
     return OK;
 }
 
+/*====================================================================================================================*/
 /* ── EXPR — compile a full expression ───────────────────────────────── */
 Sil_result EXPR_fn(DESCR_t *out)
 {
@@ -301,6 +308,7 @@ Sil_result EXPR_fn(DESCR_t *out)
     return expr_continue(out);
 }
 
+/*====================================================================================================================*/
 /* ── EXPR1 — continuation entry (called with saved EXPRND) ──────────── */
 Sil_result EXPR1_fn(DESCR_t *out)
 {
@@ -320,6 +328,7 @@ do_expr7:
     return expr7(out);
 }
 
+/*====================================================================================================================*/
 static Sil_result expr_continue(DESCR_t *out)
 {
     while (1) {
@@ -386,6 +395,7 @@ expr11:
     return expr7(out);
 }
 
+/*====================================================================================================================*/
 static Sil_result expr7(DESCR_t *out)
 {
     if (AEQLC(EXPRND, 0)) { /* EXPR7: assemble result */
@@ -400,6 +410,7 @@ static Sil_result expr7(DESCR_t *out)
     return OK;
 }
 
+/*====================================================================================================================*/
 /* ── BINOP — binary operator analysis ───────────────────────────────── */
 Sil_result BINOP_fn(DESCR_t *out)
 {
@@ -420,6 +431,7 @@ Sil_result BINOP_fn(DESCR_t *out)
     return OK;
 }
 
+/*====================================================================================================================*/
 /* ── UNOP — unary operator analysis ─────────────────────────────────── */
 Sil_result UNOP_fn(DESCR_t *out)
 {
@@ -443,4 +455,5 @@ Sil_result UNOP_fn(DESCR_t *out)
     return OK;
 }
 
+/*====================================================================================================================*/
 /* end of sil_expr.c */

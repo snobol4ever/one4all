@@ -53,6 +53,7 @@ static inline void getspc(SPEC_t *sp, DESCR_t base, int32_t off)
     memcpy(sp, (char*)A2P(D_A(base)) + off, sizeof(SPEC_t));
 }
 
+/*====================================================================================================================*/
 /* ── NMD_fn ──────────────────────────────────────────────────────────── */
 Sil_result NMD_fn(void)
 {

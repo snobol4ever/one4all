@@ -59,6 +59,7 @@ static inline int sp_lexcmp(SPEC_t a, SPEC_t b)
     return LEXCMP_fn(&a, &b);
 }
 
+/*====================================================================================================================*/
 static inline void SETLC_sp(SPEC_t *sp, int32_t n) { sp->l = n; }
 static Sil_result forrun(void);  /* forward */
 
@@ -84,6 +85,7 @@ void CODSKP_fn(int32_t n)
     }
 }
 
+/*====================================================================================================================*/
 /* ── FORWRD — advance to next non-whitespace character ──────────────── */
 /*
  * v311.sil FORWRD line 2214:
@@ -106,6 +108,7 @@ Sil_result FORWRD_fn(void)
     }
 }
 
+/*====================================================================================================================*/
 /* ── FORBLK — advance past blanks to nonblank ───────────────────────── */
 /*
  * v311.sil FORBLK line 2241 (subentry of FORWRD):
@@ -127,6 +130,7 @@ Sil_result FORBLK_fn(void)
     }
 }
 
+/*====================================================================================================================*/
 /* forrun — internal: read a new card, handle listing, set BRTYPE=EOS on EOF */
 static Sil_result forrun(void)
 {
@@ -151,6 +155,7 @@ static Sil_result forrun(void)
     return NEWCRD_fn(); /* NEWCRD */
 }
 
+/*====================================================================================================================*/
 /* ── NEWCRD — process card image after type classification ───────────── */
 /*
  * v311.sil NEWCRD line 2272:
@@ -293,6 +298,7 @@ Sil_result NEWCRD_fn(void)
     return OK; /* RTN3 — normal card processed */
 }
 
+/*====================================================================================================================*/
 /* ── CTLADV — advance to quoted filename on control card ─────────────── */
 /*
  * v311.sil CTLADV line 2430:
@@ -319,6 +325,7 @@ Sil_result CTLADV_fn(SPEC_t *out)
     return OK; /* RTN3 */
 }
 
+/*====================================================================================================================*/
 /* ── FILCHK — handle EOF in compilation ─────────────────────────────── */
 /*
  * v311.sil FILCHK line 2350:
@@ -341,4 +348,5 @@ Sil_result FILCHK_fn(void)
     return OK; /* RTN1 — new file ready */
 }
 
+/*====================================================================================================================*/
 /* end of sil_forwrd.c */

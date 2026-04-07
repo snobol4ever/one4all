@@ -41,6 +41,7 @@ void FTLEND_fn(void)
     exit(D_A(RETCOD) ? D_A(RETCOD) : 1); /* ISTACK: reset system stack (no-op in C — stack is native)  Statistics omitted for brevity in this stub */
 }
 
+/*====================================================================================================================*/
 /* ── FTLTST — non-fatal test ─────────────────────────────────────────── */
 /*
  * v311.sil FTLTST line 10458:
@@ -64,6 +65,7 @@ void FTLTST_fn(void)
     if (XITHND_fn() == FAIL) { FTLEND_fn(); } /* Try SETEXIT handler */
 }
 
+/*====================================================================================================================*/
 /* ── FTLERR — check &FATALLIMIT ─────────────────────────────────────── */
 void FTLERR_fn(void)
 {
@@ -71,6 +73,7 @@ void FTLERR_fn(void)
     FTLTST_fn();
 }
 
+/*====================================================================================================================*/
 /* ── END — normal program end ────────────────────────────────────────── */
 void END_fn(void)
 {
@@ -93,6 +96,7 @@ void END_fn(void)
     exit(0);
 }
 
+/*====================================================================================================================*/
 /* ── SYSCUT — signal/interrupt cut ──────────────────────────────────── */
 void SYSCUT_fn(void)
 {
@@ -105,6 +109,7 @@ void SYSCUT_fn(void)
     exit(1);
 }
 
+/*====================================================================================================================*/
 /* ── Error entry points ──────────────────────────────────────────────── */
 #define ERR_FTLTST(n) do { SETAC(ERRTYP,(n)); FTLTST_fn(); } while(0)
 #define ERR_FTLERR(n) do { SETAC(ERRTYP,(n)); FTLERR_fn(); } while(0)

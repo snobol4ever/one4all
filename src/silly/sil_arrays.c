@@ -41,6 +41,7 @@ static inline int deql(DESCR_t a, DESCR_t b)
     return D_A(a) == D_A(b) && D_V(a) == D_V(b);
 }
 
+/*====================================================================================================================*/
 /* Operand stack */
 static DESCR_t ar_stk[32];
 static int ar_top = 0;
@@ -66,7 +67,7 @@ Sil_result ARRAY_fn(void)
         int32_t lo = 1, hi = 0; /* Read first integer */
         int32_t v = 0; int neg = 0;
         if (*p == '-') { neg = 1; p++; plen--; }
-        while (plen > 0 && *p >= '0'   && *p <= '9') {
+        while (plen > 0 && *p >= '0'    && *p <= '9') {
             v = v*10 + (*p - '0'); p++; plen--;
         }
         if (neg) v = -v;
@@ -74,7 +75,7 @@ Sil_result ARRAY_fn(void)
             lo = v; p++; plen--; /* lo:hi */
             v = 0; neg = 0;
             if (plen > 0 && *p == '-') { neg = 1; p++; plen--; }
-            while (plen > 0 && *p >= '0'   && *p <= '9') {
+            while (plen > 0 && *p >= '0'    && *p <= '9') {
                 v = v*10 + (*p - '0'); p++; plen--;
             }
             if (neg) v = -v;
@@ -118,6 +119,7 @@ Sil_result ARRAY_fn(void)
     MOVD(XPTR, ZPTR); return OK;
 }
 
+/*====================================================================================================================*/
 /* ── ASSOC / ASSOCE — TABLE(N,M) ────────────────────────────────────── */
 Sil_result ASSOCE_fn(DESCR_t size, DESCR_t ext)
 {
@@ -136,6 +138,7 @@ Sil_result ASSOCE_fn(DESCR_t size, DESCR_t ext)
     return OK;
 }
 
+/*====================================================================================================================*/
 Sil_result ASSOC_fn(void)
 {
     if (INTVAL_fn() == FAIL) return FAIL; /* Get N (table size) */
@@ -151,6 +154,7 @@ Sil_result ASSOC_fn(void)
     MOVD(XPTR, ZPTR); return OK;
 }
 
+/*====================================================================================================================*/
 /* ── ITEM — array/table reference ────────────────────────────────────── */
 Sil_result ITEM_fn(void)
 {
@@ -243,6 +247,7 @@ Sil_result ITEM_fn(void)
     return FAIL; /* NONARY */
 }
 
+/*====================================================================================================================*/
 /* ── PROTO(A) — PROTOTYPE ────────────────────────────────────────────── */
 Sil_result PROTO_fn(void)
 {
@@ -252,6 +257,7 @@ Sil_result PROTO_fn(void)
     MOVD(XPTR, ZPTR); return OK;
 }
 
+/*====================================================================================================================*/
 /* ── FREEZE(T) ───────────────────────────────────────────────────────── */
 Sil_result FREEZE_fn(void)
 {
@@ -263,6 +269,7 @@ Sil_result FREEZE_fn(void)
     MOVD(XPTR, NULVCL); return OK;
 }
 
+/*====================================================================================================================*/
 /* ── THAW(T) ─────────────────────────────────────────────────────────── */
 Sil_result THAW_fn(void)
 {
@@ -273,6 +280,7 @@ Sil_result THAW_fn(void)
     MOVD(XPTR, NULVCL); return OK;
 }
 
+/*====================================================================================================================*/
 /* ── DATDEF — DATA(P) ────────────────────────────────────────────────── */
 /* Complex: requires STREAM/VARATB, AUGATL, FINDEX, PSTACK.
  * Stubbed until those infrastructure pieces are in place. */
@@ -320,6 +328,7 @@ Sil_result DEFDAT_fn(void)
     MOVD(XPTR, ZPTR); return OK;
 }
 
+/*====================================================================================================================*/
 /* ── FIELD — field accessor ──────────────────────────────────────────── */
 Sil_result FIELD_fn(void)
 {
@@ -344,6 +353,7 @@ Sil_result FIELD_fn(void)
     return OK;
 }
 
+/*====================================================================================================================*/
 /* ── RSORT / SORT — stubs ────────────────────────────────────────────── */
 /* Shell-sort requires A4PTR..A7PTR, LPTR, NANCHK, RCOMP, INTRL etc.
  * Stubbed until M19+ infrastructure is in place.                        */

@@ -127,6 +127,7 @@ static inline int32_t x_getlth(int32_t len)
     return DESCR * (3 + ((len - 1) / CPD + 1));
 }
 
+/*====================================================================================================================*/
 /* X_BKSIZE: get total block size from title DESCR.
  * If STTL set: string block = DESCR*(4 + (v-1)/CPD + 1)
  * Otherwise:   generic block = v + DESCR                               */
@@ -138,4 +139,5 @@ static inline int32_t x_bksize(int32_t title_off)
     return D_V(*t) + DESCR;
 }
 
+/*====================================================================================================================*/
 #endif /* SIL_ARENA_H */

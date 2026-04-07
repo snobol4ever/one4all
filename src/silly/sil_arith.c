@@ -78,6 +78,7 @@ static int expint(DESCR_t *res, const DESCR_t *x, const DESCR_t *y)
     return 1;
 }
 
+/*====================================================================================================================*/
 /* ── Real exponentiation (from lib/generic/expops.c exreal) ─────────── */
 static int exreal(DESCR_t *res, const DESCR_t *x, const DESCR_t *y)
 {
@@ -90,6 +91,7 @@ static int exreal(DESCR_t *res, const DESCR_t *x, const DESCR_t *y)
     return 1;
 }
 
+/*====================================================================================================================*/
 /* ════════════════════════════════════════════════════════════════════════
  * ARITH_fn — shared dispatcher for all binary arithmetic/compare ops
  *
@@ -226,6 +228,7 @@ do_rr: /* ── REAL × REAL operations ── */
     return OK;
 }
 
+/*====================================================================================================================*/
 /* ── Entry point shims: set SCL, call ARITH_fn ───────────────────────── */
 Sil_result ADD_fn(void)   { SCL.a.i = 1;  return ARITH_fn(); }
 Sil_result DIV_fn(void)   { SCL.a.i = 2;  return ARITH_fn(); }
@@ -253,6 +256,7 @@ Sil_result INTGER_fn(void)
     return SPCINT_fn(&XPTR, &XSP);
 }
 
+/*====================================================================================================================*/
 /* ════════════════════════════════════════════════════════════════════════
  * MNS_fn — unary negation (-X)
  * v311.sil MNS (line ~3068)
@@ -286,6 +290,7 @@ Sil_result MNS_fn(void)
     return intr1();
 }
 
+/*====================================================================================================================*/
 /* ════════════════════════════════════════════════════════════════════════
  * PLS_fn — unary plus (+X)
  * v311.sil PLS (line ~3091)

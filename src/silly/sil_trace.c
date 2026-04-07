@@ -38,6 +38,7 @@ static inline int deql(DESCR_t a, DESCR_t b)
     return D_A(a) == D_A(b) && D_V(a) == D_V(b);
 }
 
+/*====================================================================================================================*/
 static inline void SETLC_sp(SPEC_t *sp, int32_t n) { sp->l = n; }
 static inline void SETSP_fn(SPEC_t *dst, SPEC_t *src) { *dst = *src; }
 
@@ -87,6 +88,7 @@ static Sil_result tracep(DESCR_t xptr, DESCR_t yptr, DESCR_t wptr, DESCR_t zptr)
     MOVD(XPTR, NULVCL); return OK;
 }
 
+/*====================================================================================================================*/
 /* ── TRACE(V,R,T,F) ──────────────────────────────────────────────────── */
 Sil_result TRACE_fn(void)
 {
@@ -115,6 +117,7 @@ Sil_result TRACE_fn(void)
     return FAIL; /* unknown type */
 }
 
+/*====================================================================================================================*/
 /* ── STOPTR(V,R) ─────────────────────────────────────────────────────── */
 Sil_result STOPTR_fn(void)
 {
@@ -153,6 +156,7 @@ Sil_result STOPTR_fn(void)
     MOVD(XPTR, NULVCL); return OK;
 }
 
+/*====================================================================================================================*/
 /* ── Shared trace message builder ────────────────────────────────────── */
 /* Appends "FILE:LINE Trace at STNO: " prefix to PROTSP */
 static void trace_prefix(void)
@@ -170,6 +174,7 @@ static void trace_prefix(void)
     APDSP_fn(&PROTSP, &SPCSP);
 }
 
+/*====================================================================================================================*/
 /* Append elapsed time suffix and print */
 static void trace_print(SPEC_t *buf)
 {
@@ -181,6 +186,7 @@ static void trace_print(SPEC_t *buf)
     STPRNT_fn(D_A(IOKEY), OUTBLK, buf);
 }
 
+/*====================================================================================================================*/
 /* ── FENTR — function call trace ─────────────────────────────────────── */
 Sil_result FENTR_fn(void)
 {
@@ -189,12 +195,14 @@ Sil_result FENTR_fn(void)
     return fentr_common();
 }
 
+/*====================================================================================================================*/
 Sil_result FENTR2_fn(DESCR_t name)
 {
     MOVD(WPTR, name);
     return fentr_common();
 }
 
+/*====================================================================================================================*/
 static Sil_result fentr_common(void)
 {
     trace_prefix();
@@ -229,6 +237,7 @@ static Sil_result fentr_common(void)
     return OK;
 }
 
+/*====================================================================================================================*/
 /* ── KEYTR — keyword trace ───────────────────────────────────────────── */
 Sil_result KEYTR_fn(void)
 {
@@ -249,6 +258,7 @@ Sil_result KEYTR_fn(void)
     return OK;
 }
 
+/*====================================================================================================================*/
 /* ── LABTR — label trace ─────────────────────────────────────────────── */
 Sil_result LABTR_fn(void)
 {
@@ -264,6 +274,7 @@ Sil_result LABTR_fn(void)
     return OK;
 }
 
+/*====================================================================================================================*/
 /* ── TRPHND — trace handler ──────────────────────────────────────────── */
 Sil_result TRPHND_fn(DESCR_t atptr)
 {
@@ -289,6 +300,7 @@ Sil_result TRPHND_fn(DESCR_t atptr)
     return OK;
 }
 
+/*====================================================================================================================*/
 /* ── VALTR — value trace ─────────────────────────────────────────────── */
 Sil_result VALTR_fn(void)
 {
@@ -296,12 +308,14 @@ Sil_result VALTR_fn(void)
     return valtr_common();
 }
 
+/*====================================================================================================================*/
 Sil_result FNEXTR_fn(void)
 {
     SETAC(FNVLCL, 0);
     return valtr_common();
 }
 
+/*====================================================================================================================*/
 Sil_result FNEXT2_fn(DESCR_t name)
 {
     SETAC(FNVLCL, 0);
@@ -309,6 +323,7 @@ Sil_result FNEXT2_fn(DESCR_t name)
     return valtr4();
 }
 
+/*====================================================================================================================*/
 static Sil_result valtr_common(void)
 {
     if (IND_fn() == FAIL) return FAIL;
@@ -318,6 +333,7 @@ static Sil_result valtr_common(void)
     return valtr4();
 }
 
+/*====================================================================================================================*/
 static Sil_result valtr4(void)
 {
     SETLC_sp(&TRACSP, 0);
@@ -390,6 +406,7 @@ vxovr:
     return OK;
 }
 
+/*====================================================================================================================*/
 /* ── SETEXIT(LBL) ────────────────────────────────────────────────────── */
 Sil_result SETEXIT_fn(void)
 {
@@ -404,6 +421,7 @@ Sil_result SETEXIT_fn(void)
     return OK;
 }
 
+/*====================================================================================================================*/
 /* ── XITHND — SETEXIT handler ────────────────────────────────────────── */
 Sil_result XITHND_fn(void)
 {
@@ -428,4 +446,5 @@ Sil_result XITHND_fn(void)
     return OK;
 }
 
+/*====================================================================================================================*/
 /* end of sil_trace.c */

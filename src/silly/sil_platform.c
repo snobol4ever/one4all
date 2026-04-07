@@ -915,6 +915,7 @@ static void init_actions(void)
     UNOPTB_actions[14] = (struct sil_acts){0, AC_ERROR, NULL};
 }
 
+/*====================================================================================================================*/
 /* Bind DESCR_t wrappers to their sil_syntab structs */
 
 /* Registry: map DESCR_t* → sil_syntab* for platform tables */
@@ -930,6 +931,7 @@ static void reg_tbl(DESCR_t *d, struct sil_syntab *st)
     d->a.i = -(int32_t)tbl_reg_n; /* negative = registry index */  /* Store index+1 in A field as negative sentinel so A2P is not called */
 }
 
+/*====================================================================================================================*/
 /* Override STREAM_fn to handle registry tables */
 /* (redefine STREAM_fn to dispatch via registry for negative A) */
 /* We patch the function by using a dispatch wrapper — rename the
@@ -985,6 +987,7 @@ void init_syntab(void)
     reg_tbl(&INTGTB, &INTGTB_st);
 }
 
+/*====================================================================================================================*/
 /* Lookup sil_syntab from a DESCR_t (handles registry-indexed tables) */
 static struct sil_syntab *lookup_tbl(const DESCR_t *d)
 {
@@ -996,6 +999,7 @@ static struct sil_syntab *lookup_tbl(const DESCR_t *d)
     return (struct sil_syntab *)A2P(a); /* fallback: A is a direct arena offset */
 }
 
+/*====================================================================================================================*/
 /* Rewrite STREAM_fn to use lookup_tbl instead of A2P directly */
 Sil_result STREAM_fn(SPEC_t *sp1, SPEC_t *sp2, DESCR_t *tbl_descr, int *stype_out)
 {
@@ -1036,6 +1040,7 @@ break_loop:
     }
 }
 
+/*====================================================================================================================*/
 /* clertb_fn/plugtb_fn defined below with DESCR_t interface */
 
 /* ── 8. XCALL STUBS ───────────────────────────────────────────────────── */
@@ -1052,16 +1057,19 @@ void XCALL_MSTIME(DESCR_t *res)
     *(real_t *)&res->a.i = (real_t)(tv.tv_sec * 1000.0 + tv.tv_usec / 1000.0);
 }
 
+/*====================================================================================================================*/
 void XCALL_ZERBLK(DESCR_t *dst, DESCR_t size)
 {
     void *p = A2P(D_A(*dst));
     memset(p, 0, (size_t)D_A(size));
 }
 
+/*====================================================================================================================*/
 void XCALL_GETPARM(SPEC_t *sp)
 {
     sp->a = 0; sp->o = 0; sp->l = 0; /* Return empty string — no argv support yet */
 }
+/*====================================================================================================================*/
 void XCALL_FREEPARM(SPEC_t *sp) { (void)sp; }
 
 void XCALL_GETPMPROTO(SPEC_t *sp, int32_t n) { (void)sp; (void)n; /* FAIL */ }
@@ -1075,6 +1083,7 @@ void XCALL_OUTPUT(int32_t unit, DESCR_t msg)
     fputc('\n', stdout);
 }
 
+/*====================================================================================================================*/
 void XCALL_OUTPUT_fmt(DESCR_t unit, const char *fmt, ...)
 {
     (void)unit;
@@ -1084,6 +1093,7 @@ void XCALL_OUTPUT_fmt(DESCR_t unit, const char *fmt, ...)
     va_end(ap);
 }
 
+/*====================================================================================================================*/
 void XCALL_chk_break(int x)  { (void)x; }
 
 /* I/O stubs */
@@ -1106,6 +1116,7 @@ void XCALL_XRAISP(SPEC_t *sp)
     int i;
     for (i = 0; i < sp->l; i++) p[i] = (unsigned char)toupper(p[i]);
 }
+/*====================================================================================================================*/
 void XCALL_REVERSE(SPEC_t *dst, SPEC_t *src)
 {
     int32_t off = D_A(FRSGPT); /* copy src reversed into dst — naive arena alloc */
@@ -1116,6 +1127,7 @@ void XCALL_REVERSE(SPEC_t *dst, SPEC_t *src)
     for (i = 0; i < src->l; i++) d[i] = *s--;
     dst->a = off; dst->o = 0; dst->l = src->l;
 }
+/*====================================================================================================================*/
 void XCALL_SBREAL(DESCR_t *res, DESCR_t a, DESCR_t b)
 {
     real_t ra = *(real_t*)&a.a.i;
@@ -1124,16 +1136,19 @@ void XCALL_SBREAL(DESCR_t *res, DESCR_t a, DESCR_t b)
     res->f = (uint8_t)R;
     *(real_t*)&res->a.i = rc;
 }
+/*====================================================================================================================*/
 void XCALL_RPLACE(SPEC_t *dst, SPEC_t *src, SPEC_t *rep)
 {
     (void)dst; (void)src; (void)rep; /* stub */
 }
+/*====================================================================================================================*/
 void XCALL_XSUBSTR(SPEC_t *res, SPEC_t *src, int32_t start, int32_t len)
 {
     *res = *src;
     res->o += start;
     res->l = len;
 }
+/*====================================================================================================================*/
 void XCALL_DATE(SPEC_t *sp)
 {
     time_t t = time(NULL);
@@ -1148,6 +1163,7 @@ void XCALL_DATE(SPEC_t *sp)
     sp->a = off; sp->o = 0; sp->l = 8;
 }
 
+/*====================================================================================================================*/
 /* STREAD_fn / STPRNT_fn — I/O primitives */
 Sil_result STREAD_fn(SPEC_t *dst, DESCR_t unit)
 {
@@ -1163,6 +1179,7 @@ Sil_result STREAD_fn(SPEC_t *dst, DESCR_t unit)
     return OK;
 }
 
+/*====================================================================================================================*/
 void STPRNT_fn(int32_t unit, DESCR_t rec, SPEC_t *sp)
 {
     (void)unit; (void)rec;
@@ -1171,12 +1188,14 @@ void STPRNT_fn(int32_t unit, DESCR_t rec, SPEC_t *sp)
     fputc('\n', f);
 }
 
+/*====================================================================================================================*/
 /* STREAM_fn wrapper for clertb/plugtb — expose enum for callers */
 void stream_fn_wrap(SPEC_t *sp1, SPEC_t *sp2, DESCR_t *tbl, int *st)
 {
     STREAM_fn(sp1, sp2, tbl, st);
 }
 
+/*====================================================================================================================*/
 /* removed duplicate */
 
 /* sil_error — fatal error handler */
@@ -1189,6 +1208,7 @@ void sil_error(int n)
     exit(1);
 }
 
+/*====================================================================================================================*/
 /* ── 9. REMAINING MISSING SYMBOLS ────────────────────────────────────── */
 
 /* INCL — include-file descriptor (DESCR_t, used as block pointer) */
@@ -1285,6 +1305,7 @@ Sil_result maknod_fn(DESCR_t *out, int32_t blk_off, int32_t tag, int32_t extra)
     return OK;
 }
 
+/*====================================================================================================================*/
 /* lvalue_fn — resolve pattern offset to its l-value offset */
 int32_t lvalue_fn(int32_t pat_off) { return pat_off; }
 
@@ -1294,6 +1315,7 @@ void cpypat_fn(int32_t dst_off, int32_t src_off, int32_t n)
     memcpy(A2P(dst_off), A2P(src_off), (size_t)(n > 0 ? n : NODESZ));
 }
 
+/*====================================================================================================================*/
 /* getbal_fn — balanced-string scanner (stub: return full spec) */
 int32_t getbal_fn(SPEC_t *sp, int32_t maxlen)
 {
@@ -1301,6 +1323,7 @@ int32_t getbal_fn(SPEC_t *sp, int32_t maxlen)
     return sp->l;
 }
 
+/*====================================================================================================================*/
 /* intspc_fn — format DESCR integer value into spec */
 void intspc_fn(SPEC_t *sp, DESCR_t dp)
 {
@@ -1311,6 +1334,7 @@ void intspc_fn(SPEC_t *sp, DESCR_t dp)
     sp->a = off; sp->o = 0; sp->l = len;
 }
 
+/*====================================================================================================================*/
 /* realst_fn — format DESCR real value into spec */
 void realst_fn(SPEC_t *sp, DESCR_t dp)
 {
@@ -1322,6 +1346,7 @@ void realst_fn(SPEC_t *sp, DESCR_t dp)
     sp->a = off; sp->o = 0; sp->l = len;
 }
 
+/*====================================================================================================================*/
 /* stream_fn — takes (res, src, table*) — wrapper for STREAM_fn */
 int32_t stream_fn(SPEC_t *res, const SPEC_t *src, const DESCR_t *table)
 {
@@ -1331,6 +1356,7 @@ int32_t stream_fn(SPEC_t *res, const SPEC_t *src, const DESCR_t *table)
     return (rc == OK) ? stype : 0;
 }
 
+/*====================================================================================================================*/
 /* clertb_fn — takes (table*, fill_DESCR) where fill identifies action */
 void clertb_fn(DESCR_t *tbl_descr, DESCR_t fill)
 {
@@ -1343,6 +1369,7 @@ void clertb_fn(DESCR_t *tbl_descr, DESCR_t fill)
     memset(tp->chrs, j, CHARSET);
 }
 
+/*====================================================================================================================*/
 /* plugtb_fn — takes (table*, sentinel_DESCR, chars_spec) */
 void plugtb_fn(DESCR_t *tbl_descr, DESCR_t sentinel, const SPEC_t *chars)
 {
@@ -1357,6 +1384,7 @@ void plugtb_fn(DESCR_t *tbl_descr, DESCR_t sentinel, const SPEC_t *chars)
     while (rem-- > 0) tp->chrs[*p++] = (unsigned char)j;
 }
 
+/*====================================================================================================================*/
 /* xany_fn — any() for pattern matching */
 int xany_fn(const SPEC_t *sp, const DESCR_t *dp)
 {
@@ -1369,6 +1397,7 @@ int xany_fn(const SPEC_t *sp, const DESCR_t *dp)
     return 0;
 }
 
+/*====================================================================================================================*/
 /* CONTIN / STOPSH as DESCR_t globals (action code in .a.i) */
 DESCR_t CONTIN = {{.i=(int_t)AC_CONTIN}, 0, 0};
 DESCR_t STOPSH = {{.i=(int_t)AC_STOPSH}, 0, 0};
@@ -1382,6 +1411,7 @@ Sil_result DTREP_fn2(DESCR_t *out, DESCR_t obj)
     return OK;
 }
 
+/*====================================================================================================================*/
 Sil_result DTREP_fn3(DESCR_t *out, DESCR_t obj)
 {
     (void)obj;
@@ -1390,6 +1420,7 @@ Sil_result DTREP_fn3(DESCR_t *out, DESCR_t obj)
     return OK;
 }
 
+/*====================================================================================================================*/
 /* LOAD2_fn — dynamic load stub */
 Sil_result LOAD2_fn(void) { return FAIL; }
 
@@ -1406,6 +1437,7 @@ void PAD_fn(int32_t dir, SPEC_t *out, SPEC_t *subj, SPEC_t *pad)
     *out = *subj; /* stub: return subject unchanged */
 }
 
+/*====================================================================================================================*/
 /* KEYT_fn */
 Sil_result KEYT_fn(void) { return FAIL; }
 

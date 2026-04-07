@@ -73,6 +73,7 @@ static inline const char *sp_bytes(const SPEC_t *sp)
     return (const char *)A2P(sp->a) + sp->o;
 }
 
+/*====================================================================================================================*/
 /* sp_setfrom_descr — fill a SPEC_t from a STRING DESCR (LOCSP) */
 static inline void sp_setfrom_descr(SPEC_t *sp, DESCR_t d)
 {
@@ -83,6 +84,7 @@ static inline void sp_setfrom_descr(SPEC_t *sp, DESCR_t d)
     sp->f = 0;
 }
 
+/*====================================================================================================================*/
 /* sp_copy — SETSP */
 static inline void sp_copy(SPEC_t *dst, SPEC_t src) { *dst = src; }
 
@@ -116,6 +118,7 @@ static inline void sp_remsp(SPEC_t *res, SPEC_t a, SPEC_t b)
     res->o = a.o + b.l;
 }
 
+/*====================================================================================================================*/
 /* sp_subsp — SUBSP(res, a, b): res = a capped at min(a.l, b.l).
  * Returns 1 if a.l >= b.l (no short), 0 if a.l < b.l (failure path). */
 static inline int sp_subsp(SPEC_t *res, SPEC_t a, SPEC_t b)
@@ -125,6 +128,7 @@ static inline int sp_subsp(SPEC_t *res, SPEC_t a, SPEC_t b)
     return a.l >= b.l;
 }
 
+/*====================================================================================================================*/
 /* sp_fshrtn — FSHRTN(sp, n): delete n leading chars */
 static inline void sp_fshrtn(SPEC_t *sp, int32_t n)
 {
@@ -132,12 +136,14 @@ static inline void sp_fshrtn(SPEC_t *sp, int32_t n)
     sp->l -= n;
 }
 
+/*====================================================================================================================*/
 /* sp_lexcmp — LEXCMP via LEXCMP_fn */
 static inline int sp_lexcmp(SPEC_t a, SPEC_t b)
 {
     return LEXCMP_fn(&a, &b);
 }
 
+/*====================================================================================================================*/
 /* ── Descriptor helpers ──────────────────────────────────────────────── */
 #define GETD_BLK(dst, base_d, off_d)  \
     memcpy(&(dst), (char*)A2P(D_A(base_d)) + D_A(off_d), sizeof(DESCR_t))
@@ -168,6 +174,7 @@ static inline void getac(DESCR_t *dst, DESCR_t base, int32_t off)
     memcpy(&D_A(*dst), p, sizeof(int32_t));
 }
 
+/*====================================================================================================================*/
 /* ── longjmp aliases ─────────────────────────────────────────────────── */
 #define GOTO_SALT   longjmp(scan_ctx_g->salt_jmp, 1)
 #define GOTO_SALF   longjmp(scan_ctx_g->salf_jmp, 1)
@@ -188,6 +195,7 @@ static void pdl_push3(DESCR_t d0, DESCR_t d1, DESCR_t d2)
     PUTDC_BLK(PDLPTR, 2*DESCR, d2);
 }
 
+/*====================================================================================================================*/
 /* ── Error handler (SCERST path) ─────────────────────────────────────── */
 static void scan_error(int32_t code)
 {
@@ -195,6 +203,7 @@ static void scan_error(int32_t code)
     GOTO_TSALF;
 }
 
+/*====================================================================================================================*/
 /* ── Forward declarations for sub-procedures ─────────────────────────── */
 static void do_ABNS(void);
 static void do_LPRRT(void);
@@ -284,6 +293,7 @@ static void do_SCIN2(void)
     }
 }
 
+/*====================================================================================================================*/
 static void do_SCIN(void)  { SETAC(UNSCCL, 0); do_SCIN1A(); }
 
 static void do_SCIN1A(void)
@@ -294,6 +304,7 @@ static void do_SCIN1A(void)
     do_SCIN2();
 }
 
+/*====================================================================================================================*/
 /* ── SCNR — inner scanning engine ───────────────────────────────────── */
 Sil_result SCNR_fn(void)
 {
@@ -383,6 +394,7 @@ scan_fail:
     return FAIL;
 }
 
+/*====================================================================================================================*/
 /* ── SCAN — top-level pattern match (no replacement) ────────────────── */
 Sil_result SCAN_fn(void)
 {
@@ -429,6 +441,7 @@ Sil_result SCAN_fn(void)
     return OK;
 }
 
+/*====================================================================================================================*/
 /* ── SJSR — pattern match with replacement ───────────────────────────── */
 Sil_result SJSR_fn(void)
 {
@@ -571,6 +584,7 @@ sjss_fail:
     return FAIL;
 }
 
+/*====================================================================================================================*/
 /* ════════════════════════════════════════════════════════════════════════
  * XPROC sub-procedures
  * ════════════════════════════════════════════════════════════════════════ */
@@ -664,6 +678,7 @@ span_path:
     }
 }
 
+/*====================================================================================================================*/
 /* LNTH/POSI/RPSI/RTB/TB — LEN/POS/RPOS/RTAB/TAB */
 static void do_LNTH(void) { SETAC(SCL, 1); do_LPRRT(); }
 static void do_POSI(void) { SETAC(SCL, 2); do_LPRRT(); }
@@ -732,6 +747,7 @@ lprrri:
     }
 }
 
+/*====================================================================================================================*/
 /* ARBN — ARBNO forward: accept empty match, save cursor */
 static void do_ARBN(void)
 {
@@ -740,6 +756,7 @@ static void do_ARBN(void)
     GOTO_SCOK;
 }
 
+/*====================================================================================================================*/
 /* ARBF — ARBNO backup */
 static void do_ARBF(void) { TMVAL = opop(); do_ONAR2(); }
 
@@ -749,6 +766,7 @@ static void do_ONAR2(void)
     GOTO_SALF;
 }
 
+/*====================================================================================================================*/
 /* EARB — ARBNO extension */
 static void do_EARB(void)
 {
@@ -760,6 +778,7 @@ static void do_EARB(void)
     GOTO_SCOK;
 }
 
+/*====================================================================================================================*/
 /* ONAR — ARBNO on-match (progress check) */
 static void do_ONAR(void)
 {
@@ -771,6 +790,7 @@ static void do_ONAR(void)
     opush(TVAL); DECRA(PDLPTR, 6*DESCR); do_ONAR2();
 }
 
+/*====================================================================================================================*/
 /* ONRF */
 static void do_ONRF(void)
 {
@@ -779,6 +799,7 @@ static void do_ONRF(void)
     opush(TVAL); DECRA(PDLPTR, 6*DESCR); do_ONAR2();
 }
 
+/*====================================================================================================================*/
 /* FARB — ARB forward */
 static void do_FARB(void)
 {
@@ -802,6 +823,7 @@ farb1:
     nval = 0; /* suppress unused warning path */
 }
 
+/*====================================================================================================================*/
 /* ATP — @X cursor capture */
 static void do_ATP(void)
 {
@@ -825,6 +847,7 @@ atp1:
     GOTO_TSCOK;
 }
 
+/*====================================================================================================================*/
 /* BAL */
 static void do_BAL(void)  { do_BAL_inner(); }
 static void do_BALF(void) { do_BAL_inner(); }
@@ -852,6 +875,7 @@ bal1:
     nval = 0;
 }
 
+/*====================================================================================================================*/
 /* BRKXF — BREAKX rematch */
 static void do_BRKXF(void)
 {
@@ -873,6 +897,7 @@ static void do_BRKXF(void)
     nval = 0;
 }
 
+/*====================================================================================================================*/
 /* CHR — match literal string */
 static void do_CHR(void)
 {
@@ -889,6 +914,7 @@ static void do_CHR(void)
     }
 }
 
+/*====================================================================================================================*/
 /* STAR — *X (expression-valued pattern) */
 static void do_STAR(void)
 {
@@ -939,6 +965,7 @@ starp:
     }
 }
 
+/*====================================================================================================================*/
 /* DSAR — backup for *X */
 static void do_DSAR(void)
 {
@@ -969,6 +996,7 @@ static void do_DSAR(void)
     }
 }
 
+/*====================================================================================================================*/
 /* FNCE — FENCE */
 static void do_FNCE(void)
 {
@@ -982,6 +1010,7 @@ static void do_FNCE(void)
     GOTO_SCOK;
 }
 
+/*====================================================================================================================*/
 /* NME — X . Y (push cursor, push PDL backup) */
 static void do_NME(void)
 {
@@ -996,6 +1025,7 @@ static void do_NME(void)
     GOTO_SCOK;
 }
 
+/*====================================================================================================================*/
 /* FNME — NME backup */
 static void do_FNME(void) { TVAL = opop(); do_FNME_inner(); }
 static void do_FNME_inner(void)
@@ -1004,6 +1034,7 @@ static void do_FNME_inner(void)
     GOTO_TSALF;
 }
 
+/*====================================================================================================================*/
 /* ENME — X . Y naming (conditional assignment at end of match) */
 static void do_ENME(void)
 {
@@ -1033,6 +1064,7 @@ static void do_ENME(void)
     do_ENME3();
 }
 
+/*====================================================================================================================*/
 static void do_ENME3(void)
 {
     INCRA(PDLPTR, 3*DESCR);
@@ -1046,12 +1078,14 @@ static void do_ENME3(void)
     GOTO_SCOK;
 }
 
+/*====================================================================================================================*/
 /* DNME — unravel X . Y */
 static void do_DNME(void)
 {
     D_A(NAMICL) -= DESCR + (int32_t)sizeof(SPEC_t);
     do_DNME1();
 }
+/*====================================================================================================================*/
 static void do_DNME1(void)
 {
     SETAV(VVAL, YCL);
@@ -1059,6 +1093,7 @@ static void do_DNME1(void)
     do_FNME_inner();
 }
 
+/*====================================================================================================================*/
 /* ENMI — X $ Y (immediate assignment) */
 static void do_ENMI(void)
 {
@@ -1095,6 +1130,7 @@ enmi3:
     do_ENME3();
 }
 
+/*====================================================================================================================*/
 /* SUCF — SUCCEED failure: reenter SCON */
 static void do_SUCF(void)
 {
@@ -1103,6 +1139,7 @@ static void do_SUCF(void)
     do_SCON();
 }
 
+/*====================================================================================================================*/
 /* SCON — advance head by 1, retry pattern */
 static void do_SCON(void)
 {
@@ -1123,6 +1160,7 @@ static void do_SCON(void)
     do_SCIN1A();
 }
 
+/*====================================================================================================================*/
 /* dispatch stubs for longjmp targets in table */
 static void do_FAIL_d(void)   { GOTO_FAIL; }
 static void do_SALF_d(void)   { GOTO_SALF; }

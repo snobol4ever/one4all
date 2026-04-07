@@ -63,6 +63,7 @@ static void maknod_fn(DESCR_t *d1, const DESCR_t *d2, const DESCR_t *d3,
     *d1 = *d2; /* last — d1 may alias d6 */
 }
 
+/*====================================================================================================================*/
 /* linkor_fn — link alternation chains.
  * v311.sil LINKOR d1,d2 / lib/pat.c linkor()
  * Walk the alternate-link chain at d1->a.i, find tail (zero link),
@@ -79,6 +80,7 @@ static void linkor_fn(const DESCR_t *d1, const DESCR_t *d2)
     ((DESCR_t *)A2P(a + 2*DESCR + i))->a.i = d2->a.i;
 }
 
+/*====================================================================================================================*/
 /* lvalue_fn — compute minimum match length across alternation chain.
  * v311.sil LVALUE d1,d2 / lib/pat.c lvalue()                          */
 static void lvalue_fn(DESCR_t *d1, const DESCR_t *d2)
@@ -94,6 +96,7 @@ static void lvalue_fn(DESCR_t *d1, const DESCR_t *d2)
     d1->a.i = i; d1->f = 0; d1->v = 0;
 }
 
+/*====================================================================================================================*/
 /* cpypat_fn — copy pattern block with offset fixup.
  * v311.sil CPYPAT d1,d2,d3,d4,d5,d6 / lib/pat.c cpypat()
  * d1=dest base, d2=src base, d3=src offset adjust,
@@ -133,6 +136,7 @@ static void cpypat_fn(DESCR_t *d1, const DESCR_t *d2, const DESCR_t *d3,
 #undef F2
 }
 
+/*====================================================================================================================*/
 /* ── Fetch next OC descriptor (used by ATOP/NAM/DOL) ────────────────── */
 static DESCR_t oc_fetch(void)
 {
@@ -140,6 +144,7 @@ static DESCR_t oc_fetch(void)
     return *(DESCR_t *)A2P(OCBSCL.a.i + OCICL.a.i);
 }
 
+/*====================================================================================================================*/
 /* ════════════════════════════════════════════════════════════════════════
  * CHARZ / ABNSND common path — character-set pattern node builder
  * v311.sil CHARZ/ABNSND (lines ~3143–3160)
@@ -168,6 +173,7 @@ static Sil_result charz_abnsnd(const DESCR_t *ycl, const DESCR_t *zcl)
     return OK; /* result in ZPTR */
 }
 
+/*====================================================================================================================*/
 /* ════════════════════════════════════════════════════════════════════════
  * LPRTND common path — integer-argument pattern functions
  * v311.sil LPRTND (line ~3172)
@@ -198,6 +204,7 @@ patnod:
     return OK;
 }
 
+/*====================================================================================================================*/
 /* ════════════════════════════════════════════════════════════════════════
  * Character-set pattern entry points
  * ════════════════════════════════════════════════════════════════════════ */
@@ -252,6 +259,7 @@ Sil_result ARBNO_fn(void)
     return OK; /* result in ZPTR */
 }
 
+/*====================================================================================================================*/
 /* ════════════════════════════════════════════════════════════════════════
  * ATOP_fn — @X cursor capture
  * v311.sil ATOP (line ~3237)
@@ -276,6 +284,7 @@ Sil_result ATOP_fn(void)
     return OK;
 }
 
+/*====================================================================================================================*/
 /* ════════════════════════════════════════════════════════════════════════
  * NAM_fn / DOL_fn — X.Y and X$Y value-assignment operators
  * v311.sil NAM/DOL (line ~3253)
@@ -331,6 +340,7 @@ static Sil_result nam_dol(const DESCR_t *op_cl)
     return OK;
 }
 
+/*====================================================================================================================*/
 Sil_result NAM_fn(void) { return nam_dol(&ENMECL); }
 Sil_result DOL_fn(void) { return nam_dol(&ENMICL); }
 
