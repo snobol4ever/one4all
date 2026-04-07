@@ -1,0 +1,9 @@
+*  096 - DATATYPE returns user type name
+*  Normalize DATATYPE() output to uppercase for oracle-stability across
+*  engines (CSNOBOL4 uppercase, SPITBOL/scrip-cc lowercase; -f/-F switches
+*  also affect case fold). User field values are untouched.
+        DATA('node(val,next)')
+        N = node('hello', '')
+        OUTPUT = REPLACE(DATATYPE(N), &LCASE, &UCASE)
+        OUTPUT = val(N)
+END

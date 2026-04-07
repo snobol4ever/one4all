@@ -1,0 +1,9 @@
+*  061 - Capture inside ARBNO
+        X = 'aaa'
+        N = 0
+LOOP    X POS(N) 'a' . V                                           :F(DONE)
+        OUTPUT = V
+        N = N + 1
+        :(LOOP)
+DONE
+END

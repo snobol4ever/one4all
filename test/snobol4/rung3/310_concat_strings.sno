@@ -1,0 +1,18 @@
+* 310_concat_strings.sno — string concatenation (juxtaposition)
+* Rung 3. 3 assertions.
+
+        differ('a' 'b', 'ab')                   :f(e001)
+        output = 'FAIL 310/001: two-string concat'      :(end)
+e001
+
+        differ('a' 'b' 'c', 'abc')                   :f(e002)
+        output = 'FAIL 310/002: three-string concat'    :(end)
+e002
+
+*       concatenation is left-associative
+        differ(('hello' ' ') 'world', 'hello world')                   :f(e003)
+        output = 'FAIL 310/003: left-associative concat' :(end)
+e003
+
+        output = 'PASS 310_concat_strings (3/3)'
+end

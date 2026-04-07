@@ -1,0 +1,10 @@
+*  075 - INTEGER succeeds on numeric string, fails on alpha
+        INTEGER('42')                                               :S(YES)F(NO)
+YES     OUTPUT = 'numeric'
+        :(NEXT)
+NO      OUTPUT = 'not numeric'
+NEXT    INTEGER('abc')                                              :S(YES2)F(NO2)
+YES2    OUTPUT = 'numeric'
+        :(END)
+NO2     OUTPUT = 'not numeric'
+END

@@ -1,0 +1,9 @@
+*  086 - Function with local variable
+        DEFINE('swap(a,b)tmp')                                      :(swap_end)
+swap    tmp = a
+        a = b
+        b = tmp
+        OUTPUT = a ' ' b                                            :(RETURN)
+swap_end
+        swap('hello', 'world')
+END

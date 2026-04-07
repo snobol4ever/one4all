@@ -1,0 +1,10 @@
+*  080 - EQ and NE numeric equality
+        EQ(42, 42)                                                  :S(YES)F(NO)
+YES     OUTPUT = '42 = 42'
+        :(NEXT)
+NO      OUTPUT = 'wrong'
+NEXT    NE(42, 99)                                                  :S(YES2)F(NO2)
+YES2    OUTPUT = '42 != 99'
+        :(END)
+NO2     OUTPUT = 'wrong'
+END

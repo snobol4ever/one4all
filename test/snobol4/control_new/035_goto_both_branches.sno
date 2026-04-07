@@ -1,0 +1,7 @@
+*  035 - Both S and F branches tested
+        X = 'abc'
+        X 'abc'                                                     :S(YES)
+        OUTPUT = 'no'
+        :(END)
+YES     OUTPUT = 'yes'
+END

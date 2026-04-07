@@ -1,0 +1,5 @@
+*  064 - Conditional value (? operator)
+        X = 'hello'
+        X 'hello'                                                   :F(END)
+        OUTPUT = 'found'
+END

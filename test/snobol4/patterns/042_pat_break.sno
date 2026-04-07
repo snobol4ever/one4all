@@ -1,0 +1,7 @@
+*  042 - BREAK matches up to (not including) char in set
+        X = 'hello world'
+        X BREAK(' ') . V                                            :S(YES)
+        OUTPUT = 'no space'
+        :(END)
+YES     OUTPUT = V
+END

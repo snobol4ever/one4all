@@ -1,0 +1,3 @@
+*  071 - Uppercase via &UCASE keyword
+        OUTPUT = &UCASE
+END

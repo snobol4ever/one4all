@@ -1,0 +1,7 @@
+*  041 - SPAN matches longest run of chars in set
+        X = '12345abc'
+        X SPAN('0123456789') . V                                    :S(YES)
+        OUTPUT = 'no digits'
+        :(END)
+YES     OUTPUT = V
+END

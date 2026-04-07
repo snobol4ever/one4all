@@ -1,0 +1,7 @@
+*  085 - Function with two arguments
+        DEFINE('add(a,b)')                                          :(add_end)
+add     add = a + b                                                :(RETURN)
+add_end
+        OUTPUT = add(3, 4)
+        OUTPUT = add(10, 32)
+END

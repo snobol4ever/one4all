@@ -1,0 +1,46 @@
+*  100 - Roman numeral converter (adapted from dotnet corpus)
+        DEFINE('roman(n)s,v,r,i')                                     :(roman_end)
+roman   s = ''
+        v = ARRAY(13)
+        v<1> = 1000
+        v<2> = 900
+        v<3> = 500
+        v<4> = 400
+        v<5> = 100
+        v<6> = 90
+        v<7> = 50
+        v<8> = 40
+        v<9> = 10
+        v<10> = 9
+        v<11> = 5
+        v<12> = 4
+        v<13> = 1
+        r = ARRAY(13)
+        r<1> = 'M'
+        r<2> = 'CM'
+        r<3> = 'D'
+        r<4> = 'CD'
+        r<5> = 'C'
+        r<6> = 'XC'
+        r<7> = 'L'
+        r<8> = 'XL'
+        r<9> = 'X'
+        r<10> = 'IX'
+        r<11> = 'V'
+        r<12> = 'IV'
+        r<13> = 'I'
+        i = 1
+RLOOP   GT(n, 0)                                                       :F(RDONE)
+        GE(n, v<i>)                                                    :F(RNEXT)
+        s = s r<i>
+        n = n - v<i>                                                   :(RLOOP)
+RNEXT   i = i + 1                                                      :(RLOOP)
+RDONE   roman = s                                                      :(RETURN)
+roman_end
+        OUTPUT = roman(1)
+        OUTPUT = roman(4)
+        OUTPUT = roman(9)
+        OUTPUT = roman(42)
+        OUTPUT = roman(1999)
+        OUTPUT = roman(2024)
+END

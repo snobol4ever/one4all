@@ -1,0 +1,15 @@
+* 312_concat_null.sno — null string is identity for concatenation
+* Rung 3. 2 assertions.
+
+        x = 'hello'
+
+        differ(x '', x)                   :f(e001)
+        output = 'FAIL 312/001: null right identity'    :(end)
+e001
+
+        differ('' x, x)                   :f(e002)
+        output = 'FAIL 312/002: null left identity'     :(end)
+e002
+
+        output = 'PASS 312_concat_null (2/2)'
+end

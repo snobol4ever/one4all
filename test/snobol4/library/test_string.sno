@@ -1,0 +1,47 @@
+*-----------------------------------------------------------------------------------
+* test_string.sno  --  crosscheck tests for library/string.sno
+*
+* Expected output:
+*   ****hi
+*   hi****
+*   hello
+*   hello
+*   hello
+*   hihihi
+*   contains ok
+*   startswith ok
+*   endswith ok
+*   no startswith ok
+*   3
+*   0
+*-----------------------------------------------------------------------------------
+-include 'lib/string.sno'
+
+        &TRIM = 1
+
+        OUTPUT = pad_left('hi', 6, '*')     ;* ****hi
+        OUTPUT = pad_right('hi', 6, '*')     ;* hi****
+        OUTPUT = ltrim('   hello')      ;* hello
+        OUTPUT = rtrim('hello   ')      ;* hello
+        OUTPUT = trimws('  hello  ')      ;* hello
+        OUTPUT = repeat('hi', 3)        ;* hihihi
+
+        contains('foobar', 'oba')       :F(bad_c1)
+        OUTPUT = 'contains ok'          :(c1)
+bad_c1  OUTPUT = 'FAIL: contains'
+c1
+        startswith('foobar', 'foo')     :F(bad_sw1)
+        OUTPUT = 'startswith ok'        :(sw1)
+bad_sw1 OUTPUT = 'FAIL: startswith'
+sw1
+        endswith('foobar', 'bar')       :F(bad_ew1)
+        OUTPUT = 'endswith ok'          :(ew1)
+bad_ew1 OUTPUT = 'FAIL: endswith'
+ew1
+        startswith('foobar', 'bar')     :S(bad_sw2)
+        OUTPUT = 'no startswith ok'     :(sw2)
+bad_sw2 OUTPUT = 'FAIL: startswith matched wrong'
+sw2
+        OUTPUT = index('foobar', 'oba') ;* 2  (f=1, o=2; oba starts at 2)
+        OUTPUT = index('foobar', 'xyz') ;* 0
+END

@@ -1,0 +1,6 @@
+*  077 - DIFFER succeeds when strings differ
+        DIFFER('abc', 'xyz')                                        :S(YES)F(NO)
+YES     OUTPUT = 'different'
+        :(END)
+NO      OUTPUT = 'same'
+END

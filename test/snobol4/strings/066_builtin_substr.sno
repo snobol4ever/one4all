@@ -1,0 +1,3 @@
+*  066 - SUBSTR extracts substring
+        OUTPUT = SUBSTR('hello world', 7, 5)
+END

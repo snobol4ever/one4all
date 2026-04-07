@@ -1,0 +1,10 @@
+*  076 - IDENT succeeds when strings are equal
+        IDENT('abc', 'abc')                                         :S(YES)F(NO)
+YES     OUTPUT = 'equal'
+        :(NEXT)
+NO      OUTPUT = 'not equal'
+NEXT    IDENT('abc', 'xyz')                                         :S(YES2)F(NO2)
+YES2    OUTPUT = 'equal'
+        :(END)
+NO2     OUTPUT = 'not equal'
+END

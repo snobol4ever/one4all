@@ -1,0 +1,3 @@
+*  074 - RPAD pads string on right
+        OUTPUT = SIZE(RPAD('hi', 6))
+END

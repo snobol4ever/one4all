@@ -1,0 +1,11 @@
+* greet_lib.sno — library that exports GREET
+* LP-4 acceptance test (M-LINK-NET-3)
+* Convention: exported symbol name matches file base → IMPORT SNOBOL4.GREET
+* Assembly produced: SNOBOL4_Greet_lib.dll  method: GREET
+EXPORT          GREET
+
+        DEFINE('GREET(NAME)')                          :(GREET_END)
+GREET   GREET = 'Hello, ' NAME                         :(RETURN)
+GREET_END
+
+END

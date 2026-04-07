@@ -1,0 +1,13 @@
+*     word4.sno - Record parsing using BREAKX instead of ARB.
+*     Tests: BREAKX(x) vs ARB -- BREAKX fails if no non-space chars present,
+*            while ARB succeeds with null. BREAKX is more precise for names.
+*     Input format: YYYY  Name  : Invention  (same as word3)
+*     For well-formed data, output matches word3.
+
+      PAT      =  POS(0) BREAK(' ') . WHEN (' ' SPAN(' '))
++                 BREAKX(' ') . WHO (' ' SPAN(' :'))
++                 REM . WHAT
+LOOP  LINE     =  INPUT                            :F(END)
+      LINE     ?  PAT                              :F(LOOP)
+      OUTPUT   =  WHO " invented the " WHAT " in " WHEN  :(LOOP)
+END

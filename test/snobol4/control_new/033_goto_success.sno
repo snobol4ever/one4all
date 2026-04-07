@@ -1,0 +1,7 @@
+*  033 - :S(label) fires on match success
+        X = 'hello world'
+        X 'hello'                                                   :S(FOUND)F(NOTFOUND)
+FOUND   OUTPUT = 'found'
+        :(END)
+NOTFOUND OUTPUT = 'not found'
+END

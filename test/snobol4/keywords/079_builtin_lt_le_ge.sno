@@ -1,0 +1,8 @@
+*  079 - LT, LE, GE comparisons
+        LT(3, 5)                                                    :S(A)F(END)
+A       OUTPUT = '3 < 5'
+        LE(5, 5)                                                    :S(B)F(END)
+B       OUTPUT = '5 <= 5'
+        GE(7, 5)                                                    :S(C)F(END)
+C       OUTPUT = '7 >= 5'
+END

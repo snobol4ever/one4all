@@ -1,0 +1,17 @@
+* 210_indirect_ref.sno — indirect variable reference via $ operator
+* Rung 2. 2 assertions.
+
+        bal = 'the real bal'
+
+*       $'name' looks up variable named by string
+        differ($'bal', bal)                   :f(e001)
+        output = 'FAIL 210/001: $string lookup'        :(end)
+e001
+
+*       $.var looks up variable whose name is in var
+        differ($.bal, bal)                   :f(e002)
+        output = 'FAIL 210/002: $.var lookup'          :(end)
+e002
+
+        output = 'PASS 210_indirect_ref (2/2)'
+end

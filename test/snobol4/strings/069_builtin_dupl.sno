@@ -1,0 +1,3 @@
+*  069 - DUPL repeats string N times
+        OUTPUT = DUPL('ab', 3)
+END

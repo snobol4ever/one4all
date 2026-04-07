@@ -1,0 +1,5 @@
+*  036 - Jump directly to END label
+        OUTPUT = 'one'
+        :(END)
+        OUTPUT = 'two'
+END

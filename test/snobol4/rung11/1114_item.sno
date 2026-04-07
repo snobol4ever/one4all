@@ -1,0 +1,46 @@
+* 1114_item.sno — ITEM: programmatic subscript equivalent to <> bracket syntax
+* Rung 11. 7 assertions.
+
+        aaa = array(10)
+
+*       ITEM assign on 1D
+        item(aaa, 1) = 5
+        differ(item(aaa, 1), 5)                   :f(e001)
+        output = 'FAIL 1114/001: item 1D assign/read'  :(end)
+e001
+
+*       ITEM and <> are equivalent reads
+        differ(aaa<1>, 5)                   :f(e002)
+        output = 'FAIL 1114/002: item == bracket read' :(end)
+e002
+
+        aaa<2> = 22
+        differ(item(aaa, 2), 22)                   :f(e003)
+        output = 'FAIL 1114/003: bracket assign, item read' :(end)
+e003
+
+*       4D array via ITEM
+        ama = array('2,2,2,2')
+        item(ama, 1,2,1,2) = 1212
+        differ(item(ama, 1,2,1,2), 1212)                   :f(e004)
+        output = 'FAIL 1114/004: item 4D assign/read'  :(end)
+e004
+
+        differ(ama<1,2,1,2>, 1212)                   :f(e005)
+        output = 'FAIL 1114/005: item 4D == bracket'   :(end)
+e005
+
+        ama<2,1,2,1> = 2121
+        differ(item(ama, 2,1,2,1), 2121)                   :f(e006)
+        output = 'FAIL 1114/006: bracket 4D assign, item read' :(end)
+e006
+
+*       ITEM on TABLE
+        tt = table()
+        item(tt, 'key') = 'val'
+        differ(item(tt, 'key'), 'val')                   :f(e007)
+        output = 'FAIL 1114/007: item on table'        :(end)
+e007
+
+        output = 'PASS 1114_item (7/7)'
+end

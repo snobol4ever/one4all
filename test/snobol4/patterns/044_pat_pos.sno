@@ -1,0 +1,7 @@
+*  044 - POS anchors match at cursor position
+        X = 'hello'
+        X POS(0) LEN(3) . V                                        :S(YES)
+        OUTPUT = 'fail'
+        :(END)
+YES     OUTPUT = V
+END

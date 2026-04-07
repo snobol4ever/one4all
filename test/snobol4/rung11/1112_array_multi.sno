@@ -1,0 +1,33 @@
+* 1112_array_multi.sno — multi-dimensional ARRAY and custom lower bounds
+* Rung 11. 5 assertions.
+
+*       2D array
+        c = array('2,2')
+        c<1,2> = '*'
+        differ(c<1,2>, '*')                   :f(e001)
+        output = 'FAIL 1112/001: 2D array assign/read' :(end)
+e001
+
+        differ(prototype(c), '2,2')                   :f(e002)
+        output = 'FAIL 1112/002: prototype of 2D array' :(end)
+e002
+
+*       custom lower bound: -1:1 means indices -1, 0, 1
+        d = array('-1:1,2')
+        d<-1,1> = 0
+        differ(d<-1,1>, 0)                   :f(e003)
+        output = 'FAIL 1112/003: custom lower bound assign/read' :(end)
+e003
+
+*       out of bounds below lower bound fails
+        d<-2,1>                    :f(e004)
+        output = 'FAIL 1112/004: below lower bound fails' :(end)
+e004
+
+*       out of bounds above upper bound fails
+        d<2,1>                     :f(e005)
+        output = 'FAIL 1112/005: above upper bound fails' :(end)
+e005
+
+        output = 'PASS 1112_array_multi (5/5)'
+end

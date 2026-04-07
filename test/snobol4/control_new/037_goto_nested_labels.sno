@@ -1,0 +1,8 @@
+*  037 - Multiple labels, multi-hop
+        :(A)
+        OUTPUT = 'skip'
+A       OUTPUT = 'a'
+        :(B)
+        OUTPUT = 'skip'
+B       OUTPUT = 'b'
+END

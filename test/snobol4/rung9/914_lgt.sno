@@ -1,0 +1,30 @@
+* 914_lgt.sno — LGT: lexicographic greater-than
+* Rung 9. 5 assertions.
+
+*       'abc' < 'xyz' lexicographically — LGT should fail
+        lgt('abc', 'xyz')          :f(e001)
+        output = 'FAIL 914/001: lgt(abc,xyz) should fail'   :(end)
+e001
+
+*       equal strings — LGT fails (strictly greater, not >=)
+        lgt('abc', 'abc')          :f(e002)
+        output = 'FAIL 914/002: lgt(abc,abc) should fail'   :(end)
+e002
+
+*       'xyz' > 'abc' — should succeed
+        lgt('xyz', 'abc')          :s(e003)
+        output = 'FAIL 914/003: lgt(xyz,abc) should succeed' :(end)
+e003
+
+*       null < any non-empty string
+        lgt('', 'abc')             :f(e004)
+        output = 'FAIL 914/004: lgt(null,abc) should fail'  :(end)
+e004
+
+*       any non-empty string > null
+        lgt('abc', '')             :s(e005)
+        output = 'FAIL 914/005: lgt(abc,null) should succeed' :(end)
+e005
+
+        output = 'PASS 914_lgt (5/5)'
+end

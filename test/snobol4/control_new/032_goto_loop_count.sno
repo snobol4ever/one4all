@@ -1,0 +1,7 @@
+*  032 - Loop 5 times using goto
+        N = 0
+LOOP    N = N + 1
+        GT(N, 5)                                                    :S(DONE)
+        :(LOOP)
+DONE    OUTPUT = N
+END

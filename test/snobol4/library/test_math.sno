@@ -1,0 +1,32 @@
+*-----------------------------------------------------------------------------------
+* test_math.sno  --  crosscheck tests for library/math.sno
+*
+* Expected output:
+*   7
+*   3
+*   3.5
+*   2.1
+*   42
+*   0
+*   1
+*   -1
+*   4
+*   25
+*   12
+*-----------------------------------------------------------------------------------
+-include 'lib/math.sno'
+
+        &TRIM = 1
+
+        OUTPUT = max(3, 7)              ;* 7
+        OUTPUT = min(3, 7)              ;* 3
+        OUTPUT = max(3.5, 2.1)          ;* 3.5
+        OUTPUT = min(3.5, 2.1)          ;* 2.1
+        OUTPUT = abs(-42)               ;* 42
+        OUTPUT = sign(0)                ;* 0
+        OUTPUT = sign(5)                ;* 1
+        OUTPUT = sign(-3)               ;* -1
+        OUTPUT = gcd(12, 8)             ;* 4
+        OUTPUT = gcd(100, 75)           ;* 25
+        OUTPUT = lcm(4, 6)              ;* 12
+END

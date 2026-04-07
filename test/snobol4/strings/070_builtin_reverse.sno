@@ -1,0 +1,3 @@
+*  070 - REVERSE reverses a string
+        OUTPUT = REVERSE('hello')
+END

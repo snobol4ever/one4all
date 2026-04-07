@@ -1,0 +1,8 @@
+*     fileinfo.sno - Count characters and lines read from stdin.
+*     Tests: SIZE(), integer accumulation, unanchored loop, END branch on EOF.
+
+         &TRIM    =  1
+NEXTL    CHARS    =  CHARS + SIZE(INPUT)                    :F(DONE)
+         LINES    =  LINES + 1                              :(NEXTL)
+DONE     OUTPUT   =  CHARS ' characters, ' LINES ' lines read'
+END

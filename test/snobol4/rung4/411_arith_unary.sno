@@ -1,0 +1,14 @@
+* 411_arith_unary.sno — unary minus and unary plus (numeric coerce)
+* Rung 4. 2 assertions.
+
+        differ(-5, 0 - 5)                   :f(e001)
+        output = 'FAIL 411/001: unary minus'           :(end)
+e001
+
+*       unary + converts string to numeric
+        differ(+'4', 4)                   :f(e002)
+        output = 'FAIL 411/002: unary plus string->int' :(end)
+e002
+
+        output = 'PASS 411_arith_unary (2/2)'
+end

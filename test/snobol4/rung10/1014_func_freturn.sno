@@ -1,0 +1,14 @@
+* 1014_func_freturn.sno — FRETURN: function failure causes statement to fail
+* Rung 10. 1 assertion.
+
+        define('always_fail()')                        :(af_end)
+always_fail                                            :(freturn)
+af_end
+
+*       call in subject position: statement fails, :f branch taken
+        always_fail()                                  :f(e001)
+        output = 'FAIL 1014/001: freturn should cause statement failure' :(end)
+e001
+
+        output = 'PASS 1014_func_freturn (1/1)'
+end

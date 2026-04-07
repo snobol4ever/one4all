@@ -1,0 +1,14 @@
+*     word2.sno - Fixed-column record parsing using TAB().
+*     Tests: POS(0), LEN(N), TAB(N), ARB, REM, capture to named variables.
+*     Input format: YYYY  Name              : Invention
+*                   0123  6                22  24
+*     Note: TAB(24) requires " :" to end before column 24.
+*     Name field retains padding spaces (compare word3/word4).
+
+      PAT      =  POS(0) LEN(4) . WHEN
++                 TAB(6) ARB . WHO " :"
++                 TAB(24) REM . WHAT
+LOOP  LINE     =  INPUT                            :F(END)
+      LINE     ?  PAT                              :F(LOOP)
+      OUTPUT   =  WHO " invented the " WHAT " in " WHEN  :(LOOP)
+END

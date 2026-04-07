@@ -1,0 +1,8 @@
+*  095 - DATA type: set field after creation (from dotnet TEST_Data_004)
+        DATA('point(x,y)')
+        P = point(10, 20)
+        OUTPUT = x(P)
+        OUTPUT = y(P)
+        x(P) = 99
+        OUTPUT = x(P)
+END

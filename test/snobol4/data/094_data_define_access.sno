@@ -1,0 +1,6 @@
+*  094 - DATA type: define, create, access fields (from dotnet)
+        DATA('complex(real,imag)')
+        X = complex(3, -2)
+        OUTPUT = real(X)
+        OUTPUT = imag(X)
+END

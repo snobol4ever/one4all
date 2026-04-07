@@ -1,0 +1,7 @@
+*  058 - Immediate capture with dot (.)
+        X = 'hello world'
+        X LEN(5) . V                                               :S(YES)
+        OUTPUT = 'fail'
+        :(END)
+YES     OUTPUT = V
+END

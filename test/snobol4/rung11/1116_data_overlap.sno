@@ -1,0 +1,29 @@
+* 1116_data_overlap.sno — DATA field name reuse: two types share an accessor name
+* Rung 11. 3 assertions.
+* When a field name is reused across DATA types, the accessor dispatches
+* by the runtime type of its argument.
+
+        data('node(val,lson,rson)')
+        data('clunk(value,lson)')
+
+*       node's rson accessor still works after clunk defines lson
+        a = node('x', 'y', 'z')
+        b = node()
+        lson(b) = a
+        differ(rson(lson(b)), 'z')                   :f(e001)
+        output = 'FAIL 1116/001: node.rson after clunk data def' :(end)
+e001
+
+*       value() (the built-in) still retrieves variable by name
+        differ(value('b'), b)                   :f(e002)
+        output = 'FAIL 1116/002: value() still works after clunk' :(end)
+e002
+
+*       clunk's own lson accessor works on a clunk instance
+        c = clunk('alpha', 'beta')
+        differ(lson(c), 'beta')                   :f(e003)
+        output = 'FAIL 1116/003: clunk.lson accessor'  :(end)
+e003
+
+        output = 'PASS 1116_data_overlap (3/3)'
+end

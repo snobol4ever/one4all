@@ -1,0 +1,12 @@
+*  098 - &ANCHOR=1 forces match at position 0
+        &ANCHOR = 1
+        X = 'hello world'
+        X 'hello'                                                   :S(YES)F(NO)
+YES     OUTPUT = 'anchored match ok'
+        X 'world'                                                   :S(YES2)F(NO2)
+YES2    OUTPUT = 'should not reach'
+        :(END)
+NO      OUTPUT = 'wrong'
+        :(END)
+NO2     OUTPUT = 'anchor prevented mid-string match'
+END

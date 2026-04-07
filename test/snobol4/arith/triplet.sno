@@ -1,0 +1,10 @@
+*     triplet.sno - Center input lines and add blank line every third.
+*     Tests: DUPL(), REMDR(), integer arithmetic, SIZE(), &TRIM.
+
+         &TRIM    =  1
+         N        =  0
+LOOP     S        =  INPUT                                  :F(END)
+         OUTPUT   =  DUPL(' ', (80 - SIZE(S)) / 2) S
+         N        =  REMDR(N + 1, 3)
+         OUTPUT   =  EQ(N, 0)                               :(LOOP)
+END
