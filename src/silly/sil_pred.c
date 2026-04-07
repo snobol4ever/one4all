@@ -57,8 +57,8 @@ static inline DESCR_t pred_pop(void)       { return pred_stk[--pred_top]; }
 RESULT_t DIFFER_fn(void)
 {
     if (XYARGS_fn() == FAIL) return FAIL;
-    if (deql(XPTR, YPTR)) { MOVD(XPTR, NULVCL); return OK; } /* DEQL XPTR,YPTR,RETNUL,FAIL — equal→null, differ→FAIL */
-    return FAIL;
+    if (deql(XPTR, YPTR)) return FAIL; /* DEQL XPTR,YPTR,RETNUL,FAIL — equal→FAIL, differ→RETNUL */
+    MOVD(XPTR, NULVCL); return OK;
 }
 
 /*====================================================================================================================*/
@@ -72,8 +72,8 @@ RESULT_t FUNCTN_fn(void)
         SETAC(XPTR, assoc);
         GETDC_B(XPTR, XPTR, DESCR); /* get function descriptor */
         GETDC_B(XPTR, XPTR, 0); /* get link descriptor     */
-        if (deql(XPTR, UNDFCL)) { MOVD(XPTR, NULVCL); return OK; } /* AEQL XPTR,UNDFCL,RETNUL,FAIL */
-        return FAIL;
+        if (deql(XPTR, UNDFCL)) return FAIL; /* AEQL XPTR,UNDFCL,RETNUL,FAIL — equal→FAIL (undefined), else RETNUL */
+        MOVD(XPTR, NULVCL); return OK;
     }
 }
 
@@ -82,8 +82,8 @@ RESULT_t FUNCTN_fn(void)
 RESULT_t IDENT_fn(void)
 {
     if (XYARGS_fn() == FAIL) return FAIL;
-    if (deql(XPTR, YPTR)) return FAIL; /* DEQL XPTR,YPTR,FAIL,RETNUL — equal→FAIL, differ→null */
-    MOVD(XPTR, NULVCL); return OK;
+    if (deql(XPTR, YPTR)) { MOVD(XPTR, NULVCL); return OK; } /* DEQL XPTR,YPTR,FAIL,RETNUL — equal→RETNUL */
+    return FAIL;
 }
 
 /*====================================================================================================================*/
@@ -93,8 +93,8 @@ RESULT_t LABEL_fn(void)
     if (VARVUP_fn() == FAIL) return FAIL;
     if (AEQLC(XPTR, 0)) return FAIL;
     GETDC_B(XPTR, XPTR, ATTRIB);
-    if (AEQLC(XPTR, 0)) { MOVD(XPTR, NULVCL); return OK; }
-    return FAIL;
+    if (AEQLC(XPTR, 0)) return FAIL; /* AEQLC XPTR,0,RETNUL,FAIL — zero→FAIL (not a label) */
+    MOVD(XPTR, NULVCL); return OK;
 }
 
 /*====================================================================================================================*/
@@ -104,8 +104,8 @@ RESULT_t LABELC_fn(void)
     if (VARVUP_fn() == FAIL) return FAIL;
     if (AEQLC(XPTR, 0)) return FAIL;
     GETDC_B(XPTR, XPTR, ATTRIB);
-    if (AEQLC(XPTR, 0)) return OK; /* RTXPTR — return CODE value */
-    return FAIL;
+    if (AEQLC(XPTR, 0)) return FAIL; /* AEQLC XPTR,0,RTXPTR,FAIL — zero→FAIL */
+    return OK; /* RTXPTR — return CODE value in XPTR */
 }
 
 /*====================================================================================================================*/
@@ -126,8 +126,8 @@ static int lex_eval2(void)
 RESULT_t LEQ_fn(void)
 {
     if (lex_eval2() == -2) return FAIL;
-    if (deql(XPTR, YPTR)) return FAIL;
-    MOVD(XPTR, NULVCL); return OK;
+    if (deql(XPTR, YPTR)) { MOVD(XPTR, NULVCL); return OK; } /* DEQL XPTR,YPTR,FAIL,RETNUL — equal→RETNUL */
+    return FAIL;
 }
 
 /*====================================================================================================================*/
@@ -135,8 +135,8 @@ RESULT_t LEQ_fn(void)
 RESULT_t LNE_fn(void)
 {
     if (lex_eval2() == -2) return FAIL;
-    if (deql(XPTR, YPTR)) { MOVD(XPTR, NULVCL); return OK; }
-    return FAIL;
+    if (deql(XPTR, YPTR)) return FAIL; /* DEQL XPTR,YPTR,RETNUL,FAIL — equal→FAIL */
+    MOVD(XPTR, NULVCL); return OK;
 }
 
 /*====================================================================================================================*/
@@ -223,7 +223,7 @@ RESULT_t CHAR_fn(void)
 {
     if (INTVAL_fn() == FAIL) return FAIL;
     MOVD(XCL, XPTR); /* INTVAL result → XCL */
-    if (ACOMPC(XCL, 0) <= 0) { SETAC(ERRTYP, ERR_NEGATIVE); return FAIL; } /* ACOMPC XCL,0,,,LENERR — must be > 0 */
+    if (ACOMPC(XCL, 0) < 0) { SETAC(ERRTYP, ERR_NEGATIVE); return FAIL; } /* < 0 → LENERR */
     if (ACOMPC(XCL, 256) >= 0) { SETAC(ERRTYP, ERR_ILLEGAL_ARG); return FAIL; } /* ACOMPC XCL,256,INTR30,INTR30 — must be < 256 */
     { /* RCALL XPTR,CONVAR,ONECL — allocate 1-char space */
         int32_t soff = CONVAR_fn(1);
