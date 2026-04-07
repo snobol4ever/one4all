@@ -30,8 +30,8 @@ public sealed class bb_capture : IByrdBox
         _immediate = immediate;
     }
 
-    public Spec α(MatchState ms) => TryChild(ms, α: true);
-    public Spec β(MatchState ms)  => TryChild(ms, α: false);
+    public Spec α(MatchState ms) => TryChild(ms, alpha: true);
+    public Spec β(MatchState ms)  => TryChild(ms, alpha: false);
 
     private Spec TryChild(MatchState ms, bool alpha)
     {
