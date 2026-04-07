@@ -61,6 +61,7 @@ extern void ir_print_node_nl(const EXPR_t *e, FILE *f);
 #include "../runtime/x86/sm_lower.h"
 #include "../runtime/x86/sm_interp.h"
 #include "../runtime/x86/sm_prog.h"
+#include "../runtime/x86/bb_build.h"  /* M-BB-LIVE-WIRE: bb_mode_t, g_bb_mode */
 
 /* pat_at_cursor not exposed in snobol4.h — forward-declare here */
 extern DESCR_t pat_at_cursor(const char *varname);
@@ -1839,9 +1840,12 @@ int main(int argc, char **argv)
 
     /* Suppress unused warnings for modes/targets not yet wired to codegen */
     (void)mode_jit_run;
-    (void)bb_driver; (void)bb_live;
+    (void)bb_driver;
     (void)target_x64; (void)target_jvm; (void)target_net;
     (void)target_js; (void)target_c;
+
+    /* M-BB-LIVE-WIRE: propagate BB mode to stmt_exec.c */
+    if (bb_live) g_bb_mode = BB_MODE_LIVE;
 
     if (argi >= argc) {
         fprintf(stderr,

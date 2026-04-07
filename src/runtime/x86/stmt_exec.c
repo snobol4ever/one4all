@@ -328,6 +328,9 @@ static cache_slot_t g_node_cache[DYNC_CACHE_CAP];
 static int          g_cache_hits   = 0;
 static int          g_cache_misses = 0;
 
+/* M-BB-LIVE-WIRE: Byrd Box mode — set by scrip.c before execute_program(). */
+bb_mode_t           g_bb_mode      = BB_MODE_DRIVER;
+
 /* M-DYN-B6: binary box coverage audit — printed when SNO_BINARY_BOXES set */
 static int          g_bin_hits     = 0;  /* bb_build_binary() returned non-NULL */
 static int          g_bin_misses   = 0;  /* bb_build_binary() returned NULL (C path) */
@@ -1283,7 +1286,7 @@ int exec_stmt(const char  *subj_name,
     bb_node_t root;
     if (pat.v == DT_P && pat.p) {
         int bin_done = 0;
-        if (getenv("SNO_BINARY_BOXES")) {
+        if (g_bb_mode == BB_MODE_LIVE) {
             /* M-DYN-B13: cache binary blobs keyed on PATND_t* — prevents
              * pool exhaustion on loop-heavy programs (1M+ iterations). */
             PATND_t *pp = (PATND_t *)pat.p;
@@ -1315,7 +1318,7 @@ int exec_stmt(const char  *subj_name,
         }
     } else if (pat.v == DT_S && pat.s) {
         int bin_done = 0;
-        if (getenv("SNO_BINARY_BOXES")) {
+        if (g_bb_mode == BB_MODE_LIVE) {
             bb_box_fn bfn = bb_lit_emit_binary(pat.s, (int)strlen(pat.s));
             if (bfn) {
                 root.fn  = bfn;
