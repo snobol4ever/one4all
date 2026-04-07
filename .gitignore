@@ -36,3 +36,18 @@ out/rt_cache/bins/
 out/rt_cache/libsnocone_rt.so
 out/rt_cache/snocone_rt_combined.o
 scrip-interp
+
+# Build artifacts — never commit
+src/runtime/sm/scrip_image_test
+src/runtime/sm/sm_interp_test
+src/runtime/boxes/shared/bin/
+src/runtime/boxes/shared/obj/
+src/runtime/boxes/jasmin/boxes.jar
+src/runtime/boxes/boxes.dll
+src/runtime/net/*.exe
+src/runtime/net/*.dll
+src/runtime/wasm/*.wasm
+*.o
+/scrip
+/scrip-cc
+/scrip-interp

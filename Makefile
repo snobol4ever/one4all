@@ -1,21 +1,23 @@
 # Makefile — one4all unified build
 #
-# Major targets:
-#   make all          — build scrip + scrip-cc
-#   make scrip        — interpreter/hybrid (--interp / --hybrid / --gen modes)
-#   make scrip-cc     — compiler driver (ASM / JVM / .NET / JS / WASM backends)
+# Primary targets:
+#   make scrip        — build the unified scrip x86 executable
+#   make all          — alias for scrip
 #   make setup        — install system packages + CSNOBOL4 + SPITBOL oracle
-#   make test         — run_interp_broad (--interp mode, PASS=178 gate)
-#   make test-hybrid  — run_interp_broad (--hybrid mode)
-#   make test-all     — both test passes back-to-back
+#   make test         — run corpus (--sm-run, PASS=178 gate)
+#   make test-ir      — run corpus (--ir-run mode)
+#   make test-all     — both passes back-to-back
 #   make monitor-ipc  — build test/monitor/monitor_ipc.so
 #   make clean        — remove build artefacts
 #   make distclean    — clean + remove /tmp caches
 #
-# Backend runner wrappers (compile+run a single .sno file):
-#   make run-asm SNO=file.sno   — ASM backend (nasm + link)
-#   make run-jvm SNO=file.sno   — JVM backend (jasmin + java)
-#   make run-net SNO=file.sno   — .NET backend (ilasm + mono)
+# Runner wrappers (run a single .sno file):
+#   make run SNO=file.sno              — default (--sm-run)
+#   make run-ir SNO=file.sno           — --ir-run (IR tree-walk)
+#   make run-jvm SNO=file.sno          — legacy JVM (until M-JITEM-JVM)
+#   make run-net SNO=file.sno          — legacy .NET (until M-JITEM-NET)
+#
+# Note: run-asm retired — replaced by: scrip --jit-emit --x64 (M-JITEM-X64)
 #
 # Prerequisites:
 #   apt-get install -y libgc-dev flex nasm build-essential libgmp-dev m4
@@ -34,22 +36,21 @@ CBASE   := -O0 -g $(WARN) -I$(SRC) -I$(RT)/snobol4 -I$(RT) -I$(BOXES)/shared
 CRT     := $(CBASE) -I$(RT)/dyn -DDYN_ENGINE_LINKED
 LIBS    := -lgc -lm
 
-# Backend runner defaults
-SNO          ?= $(error SNO is required — e.g. make run-asm SNO=prog.sno)
+# Runner defaults
+SNO          ?= $(error SNO is required — e.g. make run SNO=prog.sno)
 INC          ?= $(CORPUS)/programs/inc
-SCRIP_CC_BIN := $(ROOT)/scrip-cc
-JVM_CACHE    := /tmp/scrip_cc_jvm_cache
-NET_CACHE    := /tmp/scrip_cc_net_cache
+JVM_CACHE    := /tmp/scrip_jvm_cache
+NET_CACHE    := /tmp/scrip_net_cache
 JASMIN       := $(SRC)/backend/jasmin.jar
-RUNTIME_NET  := $(RT)/net
+SCRIP_CC_BIN := $(ROOT)/scrip-cc
 
-.PHONY: all scrip scrip-cc scrip-interp setup \
-        test test-hybrid test-all \
+.PHONY: all scrip scrip-interp scrip-cc setup \
+        test test-ir test-all \
         monitor-ipc \
-        run-asm run-jvm run-net \
+        run run-ir run-jvm run-net \
         clean distclean
 
-# ── Primary targets ───────────────────────────────────────────────────────────
+# ── Primary target ────────────────────────────────────────────────────────────
 
 all: scrip
 
@@ -71,8 +72,6 @@ scrip:
 	$(CC) $(CRT)   -c $(RT)/asm/bb_emit.c                    -o $(OBJ)/bb_emit.o
 	$(CC) $(CRT)   -c $(RT)/asm/bb_build_bin.c               -o $(OBJ)/bb_build_bin.o
 	$(CC) $(CRT)   -c $(RT)/asm/bb_flat.c                    -o $(OBJ)/bb_flat.o
-	$(CC) $(CRT)   -c $(RT)/asm/x86_stubs_interp.c           -o $(OBJ)/x86_stubs_interp.o
-	$(CC) $(CRT)   -c $(RT)/engine/engine.c                  -o $(OBJ)/engine.o
 	@for f in $$(find $(RT)/boxes -name 'bb_*.c' | grep -v 'bb_dvar\|bb_capture'); do \
 	    b=$$(basename $$f .c); \
 	    $(CC) $(CBASE) -c $$f -o $(OBJ)/$$b.o; \
@@ -86,15 +85,15 @@ scrip:
 	$(CC) $(OBJ)/*.o $(LIBS) -o scrip
 	@echo "Built: scrip"
 
-# backward-compat alias
+# backward-compat symlink
 scrip-interp: scrip
 	@ln -sf scrip scrip-interp
 
-# ── scrip-cc (compiler driver — all backends) ─────────────────────────────────
+# ── scrip-cc (legacy compiler driver — kept until all --jit-emit targets land)
 
 scrip-cc:
 	$(MAKE) -C $(SRC)
-	@echo "Built: scrip-cc"
+	@echo "Built: scrip-cc (legacy)"
 
 # ── monitor_ipc.so ────────────────────────────────────────────────────────────
 
@@ -114,30 +113,20 @@ setup:
 test: scrip
 	CORPUS=$(CORPUS) bash test/run_interp_broad.sh
 
-test-hybrid: scrip
-	INTERP="./scrip --hybrid" CORPUS=$(CORPUS) bash test/run_interp_broad.sh
+test-ir: scrip
+	INTERP="./scrip --ir-run" CORPUS=$(CORPUS) bash test/run_interp_broad.sh
 
-test-all: test test-hybrid
+test-all: test test-ir
 
-# ── Backend runners (compile + run a single .sno file) ────────────────────────
+# ── Runner wrappers ───────────────────────────────────────────────────────────
 
-run-asm: scrip-cc
-	@WORK=$$(mktemp -d /tmp/snobol4_asm_XXXXXX); \
-	trap 'rm -rf "$$WORK"' EXIT; \
-	gcc -O0 -g -c $(RT)/asm/snobol4_stmt_rt.c    -I$(RT)/snobol4 -I$(RT) -I$(SRC)/frontend/snobol4 -w -o $$WORK/stmt_rt.o; \
-	gcc -O0 -g -c $(RT)/snobol4/snobol4.c         -I$(RT)/snobol4 -I$(RT) -I$(SRC)/frontend/snobol4 -w -o $$WORK/snobol4.o; \
-	gcc -O0 -g -c $(RT)/mock/mock_includes.c       -I$(RT)/snobol4 -I$(RT) -I$(SRC)/frontend/snobol4 -w -o $$WORK/mock.o; \
-	gcc -O0 -g -c $(RT)/snobol4/snobol4_pattern.c -I$(RT)/snobol4 -I$(RT) -I$(SRC)/frontend/snobol4 -w -o $$WORK/pat.o; \
-	gcc -O0 -g -c $(RT)/engine/engine.c            -I$(RT)/snobol4 -I$(RT) -I$(SRC)/frontend/snobol4 -w -o $$WORK/eng.o; \
-	gcc -O0 -g -c $(RT)/asm/blk_alloc.c            -I$(RT)/asm -w -o $$WORK/blk_alloc.o; \
-	gcc -O0 -g -c $(RT)/asm/blk_reloc.c            -I$(RT)/asm -w -o $$WORK/blk_reloc.o; \
-	$(SCRIP_CC_BIN) -asm -I$(INC) $(SNO) > $$WORK/prog.s; \
-	nasm -f elf64 -I$(RT)/asm/ $$WORK/prog.s -o $$WORK/prog.o; \
-	gcc -no-pie $$WORK/prog.o $$WORK/stmt_rt.o $$WORK/snobol4.o $$WORK/mock.o \
-	    $$WORK/pat.o $$WORK/eng.o $$WORK/blk_alloc.o $$WORK/blk_reloc.o \
-	    -lgc -lm -o $$WORK/prog; \
-	$$WORK/prog
+run: scrip
+	./scrip $(SNO)
 
+run-ir: scrip
+	./scrip --ir-run $(SNO)
+
+# Legacy JVM runner — uses old scrip-cc text emitter until M-JITEM-JVM lands
 run-jvm: scrip-cc
 	@mkdir -p $(JVM_CACHE); \
 	base=$$(basename $(SNO) .sno); \
@@ -155,12 +144,9 @@ run-jvm: scrip-cc
 	fi; \
 	java -cp $(JVM_CACHE) $$classname
 
+# Legacy .NET runner — uses old scrip-cc text emitter until M-JITEM-NET lands
 run-net: scrip-cc
 	@mkdir -p $(NET_CACHE); \
-	for dll in snobol4lib.dll snobol4run.dll; do \
-	    src=$(RUNTIME_NET)/$$dll; dst=$(NET_CACHE)/$$dll; \
-	    [ -f $$src ] && { [ ! -f $$dst ] || ! diff -q $$src $$dst >/dev/null 2>&1; } && cp $$src $$dst || true; \
-	done; \
 	base=$$(basename $(SNO) .sno); \
 	hash=$$(echo $(SNO) | md5sum | cut -c1-8); \
 	key=$${base}_$${hash}; \
@@ -180,7 +166,6 @@ run-net: scrip-cc
 
 clean:
 	rm -rf $(OBJ) scrip scrip-interp
-	$(MAKE) -C $(SRC) clean
 
 distclean: clean
 	rm -rf $(JVM_CACHE) $(NET_CACHE) /tmp/snobol4_asm_* /tmp/scrip_cc_*
