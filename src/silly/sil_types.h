@@ -255,8 +255,10 @@ typedef struct __attribute__((packed)) {
  */
 
 typedef enum {
-    FAIL = 0,   /* SIL failure exit — :F branch taken, no result          */
-    OK   = 1    /* SIL success exit — :S branch taken, result valid       */
+    FAIL    = 0,  /* SIL failure exit — :F branch taken, no result        */
+    OK      = 1,  /* SIL success exit — :S branch taken, result valid     */
+    NRETURN = 5,  /* NRETURN — function returned by name (goto ATOP1 etc) */
+    VRETURN = 6   /* RETURN  — function returned by value (GOTL path)     */
 } Sil_result;
 
 /* ── Convenience macros for DESCR_t access ───────────────────────────── */

@@ -267,15 +267,14 @@ Sil_result ARBNO_fn(void)
 Sil_result ATOP_fn(void)
 {
     YPTR = oc_fetch();
-    if (!(D_F(YPTR) & FNC)) {
-        if (YPTR.v != E) return nemo(); /* not a function — must be EXPRESSION */
-    } else {
+    if (D_F(YPTR) & FNC) {
         switch (INVOKE_fn()) {
         case FAIL: return FAIL;
-        case OK: break; /* returned as name — value in YPTR */
-        default: break;
+        case NRETURN: break; /* name in YPTR, skip type check (oracle: goto ATOP1) */
+        default:
+            if (YPTR.v != E) return nemo();
+            break;
         }
-        if (YPTR.v != E) return nemo();
     }
     int32_t blk = BLOCK_fn(LNODSZ.a.i, P);
     if (blk == 0) return FAIL;
@@ -292,7 +291,6 @@ Sil_result ATOP_fn(void)
 static Sil_result nam_dol(const DESCR_t *op_cl)
 {
     if (PATVAL_fn() == FAIL) return FAIL; /* get pattern for first argument */
-    XPTR = XPTR; /* first arg in XPTR */
     YPTR = oc_fetch(); /* get second argument from OC stream */
     if (D_F(YPTR) & FNC) {
         DESCR_t saved_xptr = XPTR;

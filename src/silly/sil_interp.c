@@ -124,9 +124,9 @@ Sil_result GOTL_fn(void)
             MOVD(XPTR, save_x);
         }
     }
-    if (deql(XPTR, RETCL)) return 6; /* RETURN  */                                          /* Special label dispatch */
+    if (deql(XPTR, RETCL)) return VRETURN; /* RETURN  */                                          /* Special label dispatch */
     if (deql(XPTR, FRETCL)) return FAIL; /* FRETURN */
-    if (deql(XPTR, NRETCL)) return 5; /* NRETURN */
+    if (deql(XPTR, NRETCL)) return NRETURN; /* NRETURN */
     if (deql(XPTR, ABORCL)) {
         if (AEQLC(XOCBSC, 0)) { cnterr(); return FAIL; }
         MOVD(ERRTYP, XERRTY); MOVD(FILENM, XFILEN);
@@ -234,9 +234,9 @@ Sil_result INTERP_fn(void)
             }
             continue;
         case 5: /* NRETURN — caller handles */
-            return 5;
+            return NRETURN;
         case 6: /* RETURN — caller handles */
-            return 6;
+            return VRETURN;
         default:
             return rc;
         }
