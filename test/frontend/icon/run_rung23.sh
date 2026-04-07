@@ -8,7 +8,7 @@ for icn in "$RUNG_DIR"/rung23_table_*.icn; do
   [ -f "$icn" ] || continue
   base="${icn%.icn}"; exp="$base.expected"; [ -f "$exp" ] || continue
   ${1:-/tmp/scrip-cc} -jvm "$icn" -o /tmp/t23.j 2>/dev/null
-  timeout 30 java -jar src/backend/jvm/jasmin.jar /tmp/t23.j -d /tmp/ >/dev/null 2>&1
+  timeout 30 java -jar src/backend/jasmin.jar /tmp/t23.j -d /tmp/ >/dev/null 2>&1
   cls=$(grep -m1 '\.class' /tmp/t23.j | awk '{print $NF}')
   got=$(timeout 5 java -cp /tmp/ "$cls" 2>/dev/null); want=$(cat "$exp")
   if [ "$got" = "$want" ]; then PASS=$((PASS+1)); echo "PASS: $(basename $icn)"

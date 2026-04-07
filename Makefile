@@ -40,7 +40,7 @@ INC          ?= $(CORPUS)/programs/inc
 SCRIP_CC_BIN := $(ROOT)/scrip-cc
 JVM_CACHE    := /tmp/scrip_cc_jvm_cache
 NET_CACHE    := /tmp/scrip_cc_net_cache
-JASMIN       := $(SRC)/backend/jvm/jasmin.jar
+JASMIN       := $(SRC)/backend/jasmin.jar
 RUNTIME_NET  := $(RT)/net
 
 .PHONY: all scrip scrip-cc scrip-interp setup \

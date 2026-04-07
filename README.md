@@ -103,7 +103,7 @@ nasm -f elf64 prog.s -o prog.o && gcc prog.o -lgc -o prog && ./prog
 
 # JVM backend
 ./scrip-cc -jvm program.sno > prog.j
-java -jar src/backend/jvm/jasmin.jar prog.j -d .
+java -jar src/backend/jasmin.jar prog.j -d .
 java -cp . Prog
 
 # NET backend
@@ -151,11 +151,11 @@ bash test/crosscheck/run_crosscheck.sh
 STOP_ON_FAIL=0 bash test/crosscheck/run_crosscheck_asm_corpus.sh
 
 # JVM backend — full corpus
-JASMIN=src/backend/jvm/jasmin.jar
+JASMIN=src/backend/jasmin.jar
 bash test/crosscheck/run_crosscheck_jvm.sh
 
 # JVM backend — manual per-rung (e.g. patterns rung)
-JASMIN=src/backend/jvm/jasmin.jar
+JASMIN=src/backend/jasmin.jar
 PDIR=../corpus/crosscheck/patterns
 for sno in $PDIR/*.sno; do
   base=$(basename $sno .sno); TMPD=$(mktemp -d)

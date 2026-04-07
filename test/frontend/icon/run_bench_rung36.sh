@@ -8,7 +8,7 @@
 #   t54 sieve, t66 cxprimes, t70 sorting
 
 DRIVER="${1:-/tmp/scrip-cc}"
-JASMIN="$(dirname $0)/../../../src/backend/jvm/jasmin.jar"
+JASMIN="$(dirname $0)/../../../src/backend/jasmin.jar"
 CORPUS="$(dirname $0)/corpus/rung36_jcon"
 TMPJ=/tmp/icon_bench_$$.j
 

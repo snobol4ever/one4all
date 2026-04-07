@@ -9,7 +9,7 @@
 #
 # Environment overrides:
 #   SCRIP_CC        — path to scrip-cc binary       (default: ./scrip-cc)
-#   JASMIN       — path to jasmin.jar          (default: src/backend/jvm/jasmin.jar)
+#   JASMIN       — path to jasmin.jar          (default: src/backend/jasmin.jar)
 #   STOP_ON_FAIL — stop at first failure       (default: 0)
 #   TIMEOUT      — per-test timeout in seconds (default: 10)
 
@@ -18,7 +18,7 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 SCRIP_CC="${SCRIP_CC:-$ROOT/scrip-cc}"
-JASMIN="${JASMIN:-$ROOT/src/backend/jvm/jasmin.jar}"
+JASMIN="${JASMIN:-$ROOT/src/backend/jasmin.jar}"
 STOP_ON_FAIL="${STOP_ON_FAIL:-0}"
 TIMEOUT="${TIMEOUT:-10}"
 

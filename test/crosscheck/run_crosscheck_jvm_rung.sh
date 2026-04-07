@@ -10,7 +10,7 @@
 # Environment overrides:
 #   SCRIP_CC        — path to scrip-cc binary     (default: ./scrip-cc)
 #   INC          — SNOBOL4 include dir      (default: demo/inc)
-#   JASMIN       — path to jasmin.jar       (default: src/backend/jvm/jasmin.jar)
+#   JASMIN       — path to jasmin.jar       (default: src/backend/jasmin.jar)
 #   STOP_ON_FAIL — stop at first failure    (default: 0)
 
 set -uo pipefail
@@ -19,7 +19,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TINY="$(cd "$SCRIPT_DIR/../.." && pwd)"
 SCRIP_CC="${SCRIP_CC:-$TINY/scrip-cc}"
 INC="${INC:-$TINY/demo/inc}"
-JASMIN="${JASMIN:-$TINY/src/backend/jvm/jasmin.jar}"
+JASMIN="${JASMIN:-$TINY/src/backend/jasmin.jar}"
 STOP_ON_FAIL="${STOP_ON_FAIL:-0}"
 TIMEOUT=10
 

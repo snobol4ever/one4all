@@ -33,7 +33,7 @@ RT="$DIR/src/runtime"
 INC="${INC:-/home/claude/corpus/programs/inc}"
 MONO_PATH="${MONO_PATH:-$DIR/src/runtime/net}"
 NET_RT="$DIR/src/runtime/net"
-JASMIN="${JASMIN:-$DIR/src/backend/jvm/jasmin.jar}"
+JASMIN="${JASMIN:-$DIR/src/backend/jasmin.jar}"
 SO="$MDIR/monitor_ipc.so"
 SPL_SO="$X64_DIR/monitor_ipc_spitbol.so"
 

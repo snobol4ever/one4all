@@ -8,7 +8,7 @@ for icn in "$RUNG_DIR"/rung29_builtins_type_*.icn; do
   base="${icn%.icn}"; exp="$base.expected"; [ -f "$exp" ] || continue
   [ -f "$base.xfail" ] && { XFAIL=$((XFAIL+1)); echo "XFAIL: $(basename $icn)"; continue; }
   ${1:-/tmp/scrip-cc} -jvm "$icn" -o /tmp/t29.j 2>/dev/null
-  timeout 30 java -jar src/backend/jvm/jasmin.jar /tmp/t29.j -d /tmp/ 2>/dev/null
+  timeout 30 java -jar src/backend/jasmin.jar /tmp/t29.j -d /tmp/ 2>/dev/null
   cls=$(grep -m1 '\.class' /tmp/t29.j | awk '{print $NF}')
   stdin_f="$base.stdin"
   if [ -f "$stdin_f" ]; then

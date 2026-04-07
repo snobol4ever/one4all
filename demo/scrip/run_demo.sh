@@ -88,8 +88,8 @@ fi
 
 JASMIN="${JASMIN:-}"
 if [ -z "$JASMIN" ]; then
-    if [ -f "$SNOBOL4X/src/backend/jvm/jasmin.jar" ]; then
-        JASMIN="$SNOBOL4X/src/backend/jvm/jasmin.jar"
+    if [ -f "$SNOBOL4X/src/backend/jasmin.jar" ]; then
+        JASMIN="$SNOBOL4X/src/backend/jasmin.jar"
     fi
 fi
 

@@ -8,7 +8,7 @@ set -e
 
 REPO="$(cd "$(dirname "$0")/../../.." && pwd)"
 SCRIP_CC="${SCRIP_CC:-$REPO/scrip-cc}"
-JASMIN="${JASMIN:-$REPO/src/backend/jvm/jasmin.jar}"
+JASMIN="${JASMIN:-$REPO/src/backend/jasmin.jar}"
 BYRD="${BYRD:-$REPO/src/runtime/jvm/ByrdBoxLinkage.j}"
 OUT=./out ; mkdir -p "$OUT"
 

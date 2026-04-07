@@ -95,7 +95,7 @@ if [[ "$(cat "$stamp" 2>/dev/null)" != "$il_md5" ]] || [[ ! -f "$exe" ]]; then
 fi
 
 # ── Step 4: compile JVM ──────────────────────────────────────────────────
-JASMIN="${JASMIN:-$DIR/src/backend/jvm/jasmin.jar}"
+JASMIN="${JASMIN:-$DIR/src/backend/jasmin.jar}"
 JVM_CACHE="${JVM_CACHE:-/tmp/one4all_jvm_cache}"
 mkdir -p "$JVM_CACHE"
 jfile="$JVM_CACHE/${base}_${dh}.j"; jstamp="$JVM_CACHE/${base}_${dh}.jstamp"

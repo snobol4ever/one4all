@@ -9,9 +9,9 @@ for icn in "$RUNG_DIR"/rung31_sort_*.icn; do
   [ -f "$base.xfail" ] && { XFAIL=$((XFAIL+1)); echo "XFAIL: $(basename $icn)"; continue; }
   ${1:-/tmp/scrip-cc} -jvm "$icn" -o /tmp/t31.j 2>/dev/null
   # compile main class
-  timeout 30 java -jar src/backend/jvm/jasmin.jar /tmp/t31.j -d /tmp/ 2>/dev/null
+  timeout 30 java -jar src/backend/jasmin.jar /tmp/t31.j -d /tmp/ 2>/dev/null
   # compile any record inner classes
-  for rj in /tmp/*\$*.j; do [ -f "$rj" ] && timeout 30 java -jar src/backend/jvm/jasmin.jar "$rj" -d /tmp/ 2>/dev/null; done
+  for rj in /tmp/*\$*.j; do [ -f "$rj" ] && timeout 30 java -jar src/backend/jasmin.jar "$rj" -d /tmp/ 2>/dev/null; done
   cls=$(grep -m1 '\.class' /tmp/t31.j | awk '{print $NF}')
   got=$(timeout 5 java -cp /tmp/ "$cls" 2>/dev/null)
   want=$(cat "$exp")

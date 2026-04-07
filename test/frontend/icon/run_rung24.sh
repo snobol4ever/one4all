@@ -8,8 +8,8 @@ for icn in "$RUNG_DIR"/rung24_records_*.icn; do
   base="${icn%.icn}"; exp="$base.expected"; [ -f "$exp" ] || continue
   [ -f "$base.xfail" ] && { XFAIL=$((XFAIL+1)); echo "XFAIL: $(basename $icn)"; continue; }
   ${1:-/tmp/scrip-cc} -jvm "$icn" -o /tmp/t24.j 2>/dev/null
-  timeout 30 java -jar src/backend/jvm/jasmin.jar /tmp/t24.j -d /tmp/ 2>/dev/null
-  for rj in /tmp/*\$*.j; do [ -f "$rj" ] && timeout 30 java -jar src/backend/jvm/jasmin.jar "$rj" -d /tmp/ 2>/dev/null; done
+  timeout 30 java -jar src/backend/jasmin.jar /tmp/t24.j -d /tmp/ 2>/dev/null
+  for rj in /tmp/*\$*.j; do [ -f "$rj" ] && timeout 30 java -jar src/backend/jasmin.jar "$rj" -d /tmp/ 2>/dev/null; done
   cls=$(grep -m1 '\.class' /tmp/t24.j | awk '{print $NF}')
   got=$(timeout 5 java -cp /tmp/ "$cls" 2>/dev/null); want=$(cat "$exp")
   if [ "$got" = "$want" ]; then PASS=$((PASS+1)); echo "PASS: $(basename $icn)"

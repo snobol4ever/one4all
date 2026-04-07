@@ -2,7 +2,7 @@
 # run_rung13.sh — rung13_alt JVM corpus runner
 set -euo pipefail
 DRIVER="${1:-/tmp/scrip-cc}"
-JASMIN="$(dirname "$0")/../../../src/backend/jvm/jasmin.jar"
+JASMIN="$(dirname "$0")/../../../src/backend/jasmin.jar"
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 CORPUS="${CORPUS_REPO:-$(cd "$SCRIPT_DIR/../../.." && pwd)/corpus}/programs/icon"
 TMPDIR_OUT="$(mktemp -d)"

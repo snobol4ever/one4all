@@ -14,7 +14,7 @@
 # Environment overrides:
 #   SCRIP_CC      path to scrip-cc binary           (default: <root>/scrip-cc)
 #   CORPUS        path to corpus root               (default: <root>/../corpus)
-#   JASMIN        path to jasmin.jar                (default: <root>/src/backend/jvm/jasmin.jar)
+#   JASMIN        path to jasmin.jar                (default: <root>/src/backend/jasmin.jar)
 #   RT_CACHE      path to persistent archive cache  (default: <root>/out/rt_cache)
 #   TIMEOUT_X86   per-test timeout x86 (s)          (default: 5)
 #   TIMEOUT_JVM   per-test timeout JVM (s)          (default: 10)
@@ -31,7 +31,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIP_CC="${SCRIP_CC:-$ROOT/scrip-cc}"
 CORPUS="${CORPUS:-$(cd "$ROOT/../corpus" 2>/dev/null && pwd || echo "")}"
 export CORPUS_REPO="$CORPUS"   # rung scripts use CORPUS_REPO; M-G-INV-FAST-X86-FIX
-JASMIN="${JASMIN:-$ROOT/src/backend/jvm/jasmin.jar}"
+JASMIN="${JASMIN:-$ROOT/src/backend/jasmin.jar}"
 RT_CACHE="${RT_CACHE:-$ROOT/out/rt_cache}"
 RT="$ROOT/src/runtime"
 SCRIP_CC_INC="$ROOT/src/frontend/snobol4"

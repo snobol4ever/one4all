@@ -59,7 +59,7 @@ fi
 
 # ── Step 4: compile JVM ──────────────────────────────────────────────────
 SCRIP_CC_JVM="${SCRIP_CC_JVM:-$DIR/scrip-cc}"
-JASMIN="${JASMIN:-$DIR/src/backend/jvm/jasmin.jar}"
+JASMIN="${JASMIN:-$DIR/src/backend/jasmin.jar}"
 JVM_CACHE="${JVM_CACHE:-/tmp/one4all_jvm_cache}"
 mkdir -p "$JVM_CACHE"
 jfile="$JVM_CACHE/${base}_${dh}.j"; jstamp="$JVM_CACHE/${base}_${dh}.jstamp"

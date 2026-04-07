@@ -10,7 +10,7 @@ for icn in "$RUNG_DIR"/rung04_string_*.icn; do
   base="${icn%.icn}"; exp="$base.expected"; [ -f "$exp" ] || continue
   xfail_file="$base.xfail"
   $DRIVER -jvm "$icn" -o /tmp/t04_string.j 2>/dev/null
-  timeout 30 java -jar src/backend/jvm/jasmin.jar /tmp/t04_string.j -d /tmp/ >/dev/null 2>&1
+  timeout 30 java -jar src/backend/jasmin.jar /tmp/t04_string.j -d /tmp/ >/dev/null 2>&1
   cls=$(grep -m1 '\.class' /tmp/t04_string.j | awk '{print $NF}')
   got=$(timeout 5 java -cp /tmp/ "$cls" 2>/dev/null); want=$(cat "$exp")
   if [ -f "$xfail_file" ]; then
