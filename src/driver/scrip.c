@@ -1817,9 +1817,6 @@ int main(int argc, char **argv)
     if (!mode_ir_run && !mode_sm_run && !mode_jit_run && !mode_jit_emit)
         mode_sm_run = 1;
 
-    /* --jit-run implies --bb-live */
-    if (mode_jit_run) bb_live = 1;
-
     /* Default BB mode: --bb-driver unless --bb-live explicitly set */
     if (!bb_driver && !bb_live) bb_driver = 1;
 
@@ -1847,7 +1844,7 @@ int main(int argc, char **argv)
             "\n"
             "Byrd Box pattern mode (default: --bb-driver):\n"
             "  --bb-driver      pattern matching via driver/broker\n"
-            "  --bb-live        live-wired in exec memory (--jit-run/--jit-emit only)\n"
+            "  --bb-live        live-wired BB blobs in exec memory (requires M-DYN-B* blobs)\n"
             "\n"
             "Target (default: --x64):\n"
             "  --x64  --jvm  --net  --js  --c  --wasm\n"
