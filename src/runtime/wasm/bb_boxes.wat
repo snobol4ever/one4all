@@ -9,16 +9,16 @@
 ;;   Box functions receive the box_handle and read their state from the arena.
 ;;
 ;; Global match state (mirrors C globals Σ/Δ/Ω in stmt_exec.c):
-;;   $Σ   — subject string pointer (into linear memory)
-;;   $Δ   — cursor (mutable i32)
-;;   $Ω   — subject length (i32)
+;;   $sigma   — subject string pointer (into linear memory)
+;;   $delta   — cursor (mutable i32)
+;;   $omega   — subject length (i32)
 ;;
 ;; Port protocol:
 ;;   α(box_handle) → i32   — fresh entry: returns matched len ≥0, or -1 (ω/fail)
 ;;   β(box_handle) → i32   — backtrack: returns matched len ≥0, or -1 (ω/fail)
 ;;   A non-negative return means γ fired; -1 means ω fired.
-;;   The caller (scan loop) updates $Δ by adding the returned length.
-;;   (For boxes that set $Δ internally, return value is advisory.)
+;;   The caller (scan loop) updates $delta by adding the returned length.
+;;   (For boxes that set $delta internally, return value is advisory.)
 ;;
 ;; Arena layout (BOX_ARENA_BASE = 0x50000, 64KB):
 ;;   Each box entry: 32 bytes (padded).
@@ -46,9 +46,9 @@
   ;; CAPTURE_BASE   = 0x70000 (448KB) — pending capture list
 
   ;; ── Global match state (Σ/Δ/Ω — set by exec_stmt Phase 1) ───────────────
-  (global $Σ   (mut i32) (i32.const 0))   ;; subject string base pointer
-  (global $Δ   (mut i32) (i32.const 0))   ;; cursor
-  (global $Ω   (mut i32) (i32.const 0))   ;; subject length
+  (global $sigma   (mut i32) (i32.const 0))   ;; subject string base pointer
+  (global $delta   (mut i32) (i32.const 0))   ;; cursor
+  (global $omega   (mut i32) (i32.const 0))   ;; subject length
   (global $arena_ptr (mut i32) (i32.const 0x50000))
   (global $abort_flag (mut i32) (i32.const 0))
 
@@ -57,9 +57,9 @@
 
   ;; ── bb_set_subject — Phase 1 init ────────────────────────────────────────
   (func $bb_set_subject (export "bb_set_subject") (param $ptr i32) (param $len i32)
-    (global.set $Σ (local.get $ptr))
-    (global.set $Δ (i32.const 0))
-    (global.set $Ω (local.get $len))
+    (global.set $sigma (local.get $ptr))
+    (global.set $delta (i32.const 0))
+    (global.set $omega (local.get $len))
     ;; reset arena
     (global.set $arena_ptr (i32.const 0x50000))
     ;; reset pending captures
@@ -150,18 +150,18 @@
   (func $bb_lit_a (export "bb_lit_a") (param $h i32) (result i32)
     (local $len i32)
     (local.set $len (call $p1 (local.get $h)))
-    (if (i32.gt_u (i32.add (global.get $Δ) (local.get $len)) (global.get $Ω))
+    (if (i32.gt_u (i32.add (global.get $delta) (local.get $len)) (global.get $omega))
       (then (return (i32.const -1))))
     (if (i32.eqz (call $memcmp
-          (i32.add (global.get $Σ) (global.get $Δ))
+          (i32.add (global.get $sigma) (global.get $delta))
           (call $p0 (local.get $h))
           (local.get $len)))
       (then (return (i32.const -1))))
-    (global.set $Δ (i32.add (global.get $Δ) (local.get $len)))
+    (global.set $delta (i32.add (global.get $delta) (local.get $len)))
     (local.get $len)
   )
   (func $bb_lit_b (export "bb_lit_b") (param $h i32) (result i32)
-    (global.set $Δ (i32.sub (global.get $Δ) (call $p1 (local.get $h))))
+    (global.set $delta (i32.sub (global.get $delta) (call $p1 (local.get $h))))
     (i32.const -1)
   )
 
@@ -179,16 +179,16 @@
     (local.get $h)
   )
   (func $bb_any_a (export "bb_any_a") (param $h i32) (result i32)
-    (if (i32.ge_u (global.get $Δ) (global.get $Ω)) (then (return (i32.const -1))))
+    (if (i32.ge_u (global.get $delta) (global.get $omega)) (then (return (i32.const -1))))
     (if (i32.eqz (call $strchr
           (call $p0 (local.get $h))
-          (i32.load8_u (i32.add (global.get $Σ) (global.get $Δ)))))
+          (i32.load8_u (i32.add (global.get $sigma) (global.get $delta)))))
       (then (return (i32.const -1))))
-    (global.set $Δ (i32.add (global.get $Δ) (i32.const 1)))
+    (global.set $delta (i32.add (global.get $delta) (i32.const 1)))
     (i32.const 1)
   )
   (func $bb_any_b (export "bb_any_b") (param $h i32) (result i32)
-    (global.set $Δ (i32.sub (global.get $Δ) (i32.const 1)))
+    (global.set $delta (i32.sub (global.get $delta) (i32.const 1)))
     (i32.const -1)
   )
 
@@ -205,16 +205,16 @@
     (local.get $h)
   )
   (func $bb_notany_a (export "bb_notany_a") (param $h i32) (result i32)
-    (if (i32.ge_u (global.get $Δ) (global.get $Ω)) (then (return (i32.const -1))))
+    (if (i32.ge_u (global.get $delta) (global.get $omega)) (then (return (i32.const -1))))
     (if (call $strchr
           (call $p0 (local.get $h))
-          (i32.load8_u (i32.add (global.get $Σ) (global.get $Δ))))
+          (i32.load8_u (i32.add (global.get $sigma) (global.get $delta))))
       (then (return (i32.const -1))))
-    (global.set $Δ (i32.add (global.get $Δ) (i32.const 1)))
+    (global.set $delta (i32.add (global.get $delta) (i32.const 1)))
     (i32.const 1)
   )
   (func $bb_notany_b (export "bb_notany_b") (param $h i32) (result i32)
-    (global.set $Δ (i32.sub (global.get $Δ) (i32.const 1)))
+    (global.set $delta (i32.sub (global.get $delta) (i32.const 1)))
     (i32.const -1)
   )
 
@@ -234,13 +234,13 @@
   (func $bb_len_a (export "bb_len_a") (param $h i32) (result i32)
     (local $n i32)
     (local.set $n (call $p0 (local.get $h)))
-    (if (i32.gt_u (i32.add (global.get $Δ) (local.get $n)) (global.get $Ω))
+    (if (i32.gt_u (i32.add (global.get $delta) (local.get $n)) (global.get $omega))
       (then (return (i32.const -1))))
-    (global.set $Δ (i32.add (global.get $Δ) (local.get $n)))
+    (global.set $delta (i32.add (global.get $delta) (local.get $n)))
     (local.get $n)
   )
   (func $bb_len_b (export "bb_len_b") (param $h i32) (result i32)
-    (global.set $Δ (i32.sub (global.get $Δ) (call $p0 (local.get $h))))
+    (global.set $delta (i32.sub (global.get $delta) (call $p0 (local.get $h))))
     (i32.const -1)
   )
 
@@ -257,7 +257,7 @@
     (local.get $h)
   )
   (func $bb_pos_a (export "bb_pos_a") (param $h i32) (result i32)
-    (if (i32.ne (global.get $Δ) (call $p0 (local.get $h)))
+    (if (i32.ne (global.get $delta) (call $p0 (local.get $h)))
       (then (return (i32.const -1))))
     (i32.const 0)
   )
@@ -276,7 +276,7 @@
     (local.get $h)
   )
   (func $bb_rpos_a (export "bb_rpos_a") (param $h i32) (result i32)
-    (if (i32.ne (global.get $Δ) (i32.sub (global.get $Ω) (call $p0 (local.get $h))))
+    (if (i32.ne (global.get $delta) (i32.sub (global.get $omega) (call $p0 (local.get $h))))
       (then (return (i32.const -1))))
     (i32.const 0)
   )
@@ -300,14 +300,14 @@
   (func $bb_tab_a (export "bb_tab_a") (param $h i32) (result i32)
     (local $n i32) (local $adv i32)
     (local.set $n (call $p0 (local.get $h)))
-    (if (i32.gt_u (global.get $Δ) (local.get $n)) (then (return (i32.const -1))))
-    (local.set $adv (i32.sub (local.get $n) (global.get $Δ)))
+    (if (i32.gt_u (global.get $delta) (local.get $n)) (then (return (i32.const -1))))
+    (local.set $adv (i32.sub (local.get $n) (global.get $delta)))
     (call $set_s0 (local.get $h) (local.get $adv))
-    (global.set $Δ (local.get $n))
+    (global.set $delta (local.get $n))
     (local.get $adv)
   )
   (func $bb_tab_b (export "bb_tab_b") (param $h i32) (result i32)
-    (global.set $Δ (i32.sub (global.get $Δ) (call $s0 (local.get $h))))
+    (global.set $delta (i32.sub (global.get $delta) (call $s0 (local.get $h))))
     (i32.const -1)
   )
 
@@ -323,15 +323,15 @@
   )
   (func $bb_rtab_a (export "bb_rtab_a") (param $h i32) (result i32)
     (local $target i32) (local $adv i32)
-    (local.set $target (i32.sub (global.get $Ω) (call $p0 (local.get $h))))
-    (if (i32.gt_u (global.get $Δ) (local.get $target)) (then (return (i32.const -1))))
-    (local.set $adv (i32.sub (local.get $target) (global.get $Δ)))
+    (local.set $target (i32.sub (global.get $omega) (call $p0 (local.get $h))))
+    (if (i32.gt_u (global.get $delta) (local.get $target)) (then (return (i32.const -1))))
+    (local.set $adv (i32.sub (local.get $target) (global.get $delta)))
     (call $set_s0 (local.get $h) (local.get $adv))
-    (global.set $Δ (local.get $target))
+    (global.set $delta (local.get $target))
     (local.get $adv)
   )
   (func $bb_rtab_b (export "bb_rtab_b") (param $h i32) (result i32)
-    (global.set $Δ (i32.sub (global.get $Δ) (call $s0 (local.get $h))))
+    (global.set $delta (i32.sub (global.get $delta) (call $s0 (local.get $h))))
     (i32.const -1)
   )
 
@@ -346,8 +346,8 @@
   )
   (func $bb_rem_a (export "bb_rem_a") (param $h i32) (result i32)
     (local $adv i32)
-    (local.set $adv (i32.sub (global.get $Ω) (global.get $Δ)))
-    (global.set $Δ (global.get $Ω))
+    (local.set $adv (i32.sub (global.get $omega) (global.get $delta)))
+    (global.set $delta (global.get $omega))
     (local.get $adv)
   )
   (func $bb_rem_b (export "bb_rem_b") (param $h i32) (result i32)
@@ -370,19 +370,19 @@
     (local.set $d (i32.const 0))
     (block $done
       (loop $scan
-        (br_if $done (i32.ge_u (i32.add (global.get $Δ) (local.get $d)) (global.get $Ω)))
+        (br_if $done (i32.ge_u (i32.add (global.get $delta) (local.get $d)) (global.get $omega)))
         (br_if $done (i32.eqz (call $strchr
             (call $p0 (local.get $h))
-            (i32.load8_u (i32.add (i32.add (global.get $Σ) (global.get $Δ)) (local.get $d))))))
+            (i32.load8_u (i32.add (i32.add (global.get $sigma) (global.get $delta)) (local.get $d))))))
         (local.set $d (i32.add (local.get $d) (i32.const 1)))
         (br $scan)))
     (if (i32.le_s (local.get $d) (i32.const 0)) (then (return (i32.const -1))))
     (call $set_s0 (local.get $h) (local.get $d))
-    (global.set $Δ (i32.add (global.get $Δ) (local.get $d)))
+    (global.set $delta (i32.add (global.get $delta) (local.get $d)))
     (local.get $d)
   )
   (func $bb_span_b (export "bb_span_b") (param $h i32) (result i32)
-    (global.set $Δ (i32.sub (global.get $Δ) (call $s0 (local.get $h))))
+    (global.set $delta (i32.sub (global.get $delta) (call $s0 (local.get $h))))
     (i32.const -1)
   )
 
@@ -401,20 +401,20 @@
     (local.set $d (i32.const 0))
     (block $done
       (loop $scan
-        (br_if $done (i32.ge_u (i32.add (global.get $Δ) (local.get $d)) (global.get $Ω)))
+        (br_if $done (i32.ge_u (i32.add (global.get $delta) (local.get $d)) (global.get $omega)))
         (br_if $done (call $strchr
             (call $p0 (local.get $h))
-            (i32.load8_u (i32.add (i32.add (global.get $Σ) (global.get $Δ)) (local.get $d)))))
+            (i32.load8_u (i32.add (i32.add (global.get $sigma) (global.get $delta)) (local.get $d)))))
         (local.set $d (i32.add (local.get $d) (i32.const 1)))
         (br $scan)))
-    (if (i32.ge_u (i32.add (global.get $Δ) (local.get $d)) (global.get $Ω))
+    (if (i32.ge_u (i32.add (global.get $delta) (local.get $d)) (global.get $omega))
       (then (return (i32.const -1))))
     (call $set_s0 (local.get $h) (local.get $d))
-    (global.set $Δ (i32.add (global.get $Δ) (local.get $d)))
+    (global.set $delta (i32.add (global.get $delta) (local.get $d)))
     (local.get $d)
   )
   (func $bb_brk_b (export "bb_brk_b") (param $h i32) (result i32)
-    (global.set $Δ (i32.sub (global.get $Δ) (call $s0 (local.get $h))))
+    (global.set $delta (i32.sub (global.get $delta) (call $s0 (local.get $h))))
     (i32.const -1)
   )
 
@@ -433,22 +433,22 @@
     (local.set $d (i32.const 0))
     (block $done
       (loop $scan
-        (br_if $done (i32.ge_u (i32.add (global.get $Δ) (local.get $d)) (global.get $Ω)))
+        (br_if $done (i32.ge_u (i32.add (global.get $delta) (local.get $d)) (global.get $omega)))
         (br_if $done (call $strchr
             (call $p0 (local.get $h))
-            (i32.load8_u (i32.add (i32.add (global.get $Σ) (global.get $Δ)) (local.get $d)))))
+            (i32.load8_u (i32.add (i32.add (global.get $sigma) (global.get $delta)) (local.get $d)))))
         (local.set $d (i32.add (local.get $d) (i32.const 1)))
         (br $scan)))
     ;; fail if zero advance or reached end
     (if (i32.or (i32.eqz (local.get $d))
-                (i32.ge_u (i32.add (global.get $Δ) (local.get $d)) (global.get $Ω)))
+                (i32.ge_u (i32.add (global.get $delta) (local.get $d)) (global.get $omega)))
       (then (return (i32.const -1))))
     (call $set_s0 (local.get $h) (local.get $d))
-    (global.set $Δ (i32.add (global.get $Δ) (local.get $d)))
+    (global.set $delta (i32.add (global.get $delta) (local.get $d)))
     (local.get $d)
   )
   (func $bb_breakx_b (export "bb_breakx_b") (param $h i32) (result i32)
-    (global.set $Δ (i32.sub (global.get $Δ) (call $s0 (local.get $h))))
+    (global.set $delta (i32.sub (global.get $delta) (call $s0 (local.get $h))))
     (i32.const -1)
   )
 
@@ -464,7 +464,7 @@
   )
   (func $bb_arb_a (export "bb_arb_a") (param $h i32) (result i32)
     (call $set_s0 (local.get $h) (i32.const 0))
-    (call $set_s1 (local.get $h) (global.get $Δ))
+    (call $set_s1 (local.get $h) (global.get $delta))
     (i32.const 0)
   )
   (func $bb_arb_b (export "bb_arb_b") (param $h i32) (result i32)
@@ -472,9 +472,9 @@
     (local.set $count (i32.add (call $s0 (local.get $h)) (i32.const 1)))
     (local.set $start (call $s1 (local.get $h)))
     (call $set_s0 (local.get $h) (local.get $count))
-    (if (i32.gt_u (i32.add (local.get $start) (local.get $count)) (global.get $Ω))
+    (if (i32.gt_u (i32.add (local.get $start) (local.get $count)) (global.get $omega))
       (then (return (i32.const -1))))
-    (global.set $Δ (i32.add (local.get $start) (local.get $count)))
+    (global.set $delta (i32.add (local.get $start) (local.get $count)))
     (local.get $count)
   )
 
@@ -612,7 +612,7 @@
                                   (i32.mul (local.get $cnt) (i32.const 12))))
     (i32.store (local.get $cap_base) (i32.const 2))                      ;; type=ATP
     (i32.store (i32.add (local.get $cap_base) (i32.const 4)) (call $p0 (local.get $h)))  ;; varname_ptr
-    (i32.store (i32.add (local.get $cap_base) (i32.const 8)) (global.get $Δ))            ;; cursor value
+    (i32.store (i32.add (local.get $cap_base) (i32.const 8)) (global.get $delta))            ;; cursor value
     (i32.store (i32.const 0x70000) (i32.add (local.get $cnt) (i32.const 1)))
     (i32.const 0)
   )
@@ -635,8 +635,8 @@
   )
 
   ;; ── export cursor accessors for exec_stmt ────────────────────────────────
-  (func $get_cursor (export "get_cursor") (result i32) (global.get $Δ))
-  (func $set_cursor (export "set_cursor") (param $v i32) (global.set $Δ (local.get $v)))
-  (func $get_subject_len (export "get_subject_len") (result i32) (global.get $Ω))
+  (func $get_cursor (export "get_cursor") (result i32) (global.get $delta))
+  (func $set_cursor (export "set_cursor") (param $v i32) (global.set $delta (local.get $v)))
+  (func $get_subject_len (export "get_subject_len") (result i32) (global.get $omega))
 
 )
