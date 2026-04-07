@@ -53,10 +53,12 @@ RESULT_t READ_fn(void)
     io_push(XPTR);
     if (INTVAL_fn() == FAIL) { io_top--; return FAIL; } /* unit */
     io_push(XPTR);
-    if (VARVAL_fn() == FAIL) { io_top -= 2; return FAIL; } /* options */
-    MOVD(YPTR, io_pop()); /* unit */
-    XPTR = io_pop(); /* variable */
-    if (ACOMPC(YPTR, 0) == 0) SETAC(YPTR, UNITI); /* default unit? */
+    if (VARVAL_fn() == FAIL) { io_top -= 2; return FAIL; } /* options → XPTR */
+    MOVD(ZPTR, XPTR);       /* save options in ZPTR (oracle: RCALL ZPTR,VARVAL) */
+    MOVD(YPTR, io_pop());   /* unit */
+    XPTR = io_pop();        /* variable */
+    if (ACOMPC(YPTR, 0) == 0) SETAC(YPTR, UNITI); /* default unit → READ5 */
+    else if (ACOMPC(YPTR, 0) < 0) return FAIL;     /* negative unit → UNTERR */
     io_push(YPTR); io_push(ZPTR); /* unit, options */
     if (VARVAL_fn() == FAIL) { io_top -= 2; return FAIL; } /* optional filename */
     MOVD(TPTR, XPTR);
@@ -160,14 +162,14 @@ RESULT_t DETACH_fn(void)
     int32_t ai = locapv_fn(D_A(INATL), &XPTR); /* Clear input association */
     if (ai) {
         DESCR_t z; MOVD(z, ZEROCL);
-        memcpy((char*)A2P(D_A(INATL)) + ai + DESCR, &z, sizeof(DESCR_t));
-        memcpy((char*)A2P(D_A(INATL)) + ai + 2*DESCR, &z, sizeof(DESCR_t));
+        memcpy((char*)A2P(ai) + DESCR,   &z, sizeof(DESCR_t)); /* PUTDC ZPTR,DESCR,ZEROCL */
+        memcpy((char*)A2P(ai) + 2*DESCR, &z, sizeof(DESCR_t)); /* PUTDC ZPTR,2*DESCR,ZEROCL */
     }
     int32_t ao = locapv_fn(D_A(OUTATL), &XPTR); /* Clear output association */
     if (ao) {
         DESCR_t z; MOVD(z, ZEROCL);
-        memcpy((char*)A2P(D_A(OUTATL)) + ao + DESCR, &z, sizeof(DESCR_t));
-        memcpy((char*)A2P(D_A(OUTATL)) + ao + 2*DESCR, &z, sizeof(DESCR_t));
+        memcpy((char*)A2P(ao) + DESCR,   &z, sizeof(DESCR_t));
+        memcpy((char*)A2P(ao) + 2*DESCR, &z, sizeof(DESCR_t));
     }
     MOVD(XPTR, NULVCL); return OK;
 }
@@ -185,27 +187,28 @@ RESULT_t PUTIN_fn(DESCR_t blk, DESCR_t var)
         SETAC(IO4PTR, soff); SETVC(IO4PTR, S);
         LOCSP_fn(&IOSP, &IO4PTR);
     }
+    MOVD(XCL, IO1PTR); /* MOVD XCL,IO1PTR — save recl before STREAD clobbers IO1PTR */
     INCRA(RSTAT, 1);
     if (STREAD_fn(&IOSP, IO3PTR) == FAIL) return FAIL; /* STREAD — platform read into IOSP */
     if (!AEQLC(TRIMCL, 0)) TRIMSP_fn(&IOSP, &IOSP); /* TRIM if &TRIM set */
-    D_A(IO1PTR) = IOSP.l; /* Check &MAXLNGTH */
+    D_A(IO1PTR) = IOSP.l; /* GETLG IO1PTR,IOSP — get length */
     if (ACOMP(IO1PTR, MLENCL) > 0) return FAIL;
-    if (VEQLC(IO2PTR, K)) { /* Keyword variable? */
+    if (VEQLC(IO2PTR, K)) { /* Keyword variable? — PUTIN3 */
         if (SPCINT_fn(&IO1PTR, &IOSP) == FAIL) return FAIL;
         goto putin2;
     }
-    if (!AEQLC(XCL, VLRECL)) { /* Intern string */
-        int32_t off = GNVARS_fn((const char*)A2P(IOSP.a) + IOSP.o, IOSP.l); /* fixed recl: intern in-place */
+    if (AEQLC(XCL, VLRECL)) { /* AEQLC XCL,VLRECL,PUTIN4 — variable recl: use GENVAR (malloc buf) */
+        int32_t off = GENVAR_fn(&IOSP);
         if (!off) return FAIL;
         SETAC(IO1PTR, off); SETVC(IO1PTR, S);
-    } else {
-        int32_t off = GENVAR_fn(&IOSP);
+    } else { /* PUTIN4 / LHERE: fixed recl — intern with GNVARS */
+        int32_t off = GNVARS_fn((const char*)A2P(IOSP.a) + IOSP.o, IOSP.l);
         if (!off) return FAIL;
         SETAC(IO1PTR, off); SETVC(IO1PTR, S);
     }
 putin2:
-    PUTDC_B(IO2PTR, DESCR, IO1PTR);
-    MOVD(XPTR, IO1PTR); return OK;
+    PUTDC_B(IO2PTR, DESCR, IO1PTR); /* PUTDC IO2PTR,DESCR,IO1PTR */
+    MOVD(XPTR, IO1PTR); return OK;  /* RRTURN IO1PTR,2 */
 }
 
 /*====================================================================================================================*/
