@@ -775,11 +775,11 @@ static void do_ONAR2(void)
 /* EARB — ARBNO extension */
 static void do_EARB(void)
 {
-    TMVAL = opop();
-    PUTDC_BLK(PDLPTR, 0, TMVAL);
+    TMVAL = opop(); /* POP (TMVAL) — restore saved cursor position */
+    PUTDC_BLK(PDLPTR, DESCR, TMVAL);   /* PUTDC PDLPTR,DESCR,TMVAL  — old cursor → slot 1 */
     sp_getlg(&TMVAL, TXSP);
-    PUTDC_BLK(PDLPTR, DESCR, TMVAL);
-    PUTDC_BLK(PDLPTR, 2*DESCR, ZEROCL);
+    PUTDC_BLK(PDLPTR, 2*DESCR, TMVAL); /* PUTDC PDLPTR,2*DESCR,TMVAL — new cursor → slot 2 */
+    PUTDC_BLK(PDLPTR, 3*DESCR, ZEROCL);/* PUTDC PDLPTR,3*DESCR,ZEROCL */
     GOTO_SCOK;
 }
 
@@ -787,11 +787,12 @@ static void do_EARB(void)
 /* ONAR — ARBNO on-match (progress check) */
 static void do_ONAR(void)
 {
-    if (!AEQLC(FULLCL, 0)) GOTO_TSCOK;
+    if (AEQLC(FULLCL, 0)) GOTO_TSCOK; /* AEQLC FULLCL,0,TSCOK — fullscan off → succeed */
     SETAC(TVAL, 0);
-    getac(&TVAL, PDLPTR, -2*DESCR);
+    getac(&TVAL, PDLPTR, -2*DESCR);   /* GETAC TVAL,PDLPTR,-2*DESCR — old cursor */
     sp_getlg(&TMVAL, TXSP);
-    if (D_A(TVAL) >= D_A(TMVAL)) GOTO_TSCOK;
+    /* ACOMP TVAL,TMVAL,TSCOK,,TSCOK — branch TSCOK unless TVAL==TMVAL (no progress) */
+    if (D_A(TVAL) != D_A(TMVAL)) GOTO_TSCOK;
     opush(TVAL); DECRA(PDLPTR, 6*DESCR); do_ONAR2();
 }
 
@@ -809,23 +810,22 @@ static void do_ONRF(void)
 static void do_FARB(void)
 {
     int32_t nval;
-    if (!AEQLC(FULLCL, 0)) { nval = 0; }
+    if (AEQLC(FULLCL, 0)) { nval = 0; } /* AEQLC FULLCL,0,,FARB2: OFF→0 */
     else {
-        if (AEQLC(LENFCL, 0)) goto farb1;
-        nval = D_A(YCL);
+        if (AEQLC(LENFCL, 0)) goto farb1; /* FARB2: AEQLC LENFCL,0,FARB1 */
+        nval = D_A(YCL);                   /* SETAV NVAL,YCL */
     }
-    {
+    {   /* FARB3 */
         int32_t cur = TXSP.l;
+        /* ACOMP TVAL,MAXLEN,FARB1,FARB1 — both targets FARB1 when cur+nval >= MAXLEN */
         if (cur + nval >= D_A(MAXLEN)) goto farb1;
         sp_addlg_c(&TXSP, 1);
         { DESCR_t cv; sp_getlg(&cv, TXSP);
-          PUTDC_BLK(PDLPTR, DESCR, cv); }
+          PUTDC_BLK(PDLPTR, DESCR, cv); } /* PUTAC PDLPTR,2*DESCR,TVAL (our slot 1) */
         GOTO_SCOK;
     }
 farb1:
     DECRA(PDLPTR, 3*DESCR); GOTO_SALT;
-    return;
-    nval = 0; /* suppress unused warning path */
 }
 
 /*====================================================================================================================*/
@@ -839,13 +839,17 @@ atp1:
         if (EXPEVL_fn() == FAIL) GOTO_TSALF;
         goto atp1;
     }
-    { DESCR_t nv; sp_getlg(&nv, TXSP); D_V(nv) = I; PUTDC_BLK(XPTR, DESCR, nv); }
-    if (!AEQLC(OUTSW, 0)) {
+    { DESCR_t nv; sp_getlg(&nv, TXSP); D_V(nv) = I; PUTDC_BLK(XPTR, DESCR, nv); } /* assign cursor as value */
+    if (!AEQLC(OUTSW, 0)) { /* AEQLC OUTSW,0,,ATP2 */
         int32_t a = locapv_fn(D_A(OUTATL), &XPTR);
-        if (a) { DESCR_t yd; GETDC_BLK(yd, XPTR, DESCR);
-                 DESCR_t nv; GETDC_BLK(nv, XPTR, DESCR); PUTOUT_fn(yd, nv); }
+        if (a) {
+            DESCR_t zptr; SETAC(zptr, a);
+            DESCR_t assoc; GETDC_BLK(assoc, zptr, DESCR); /* GETDC ZPTR,ZPTR,DESCR */
+            DESCR_t nv;   GETDC_BLK(nv, XPTR, DESCR);     /* get NVAL from XPTR */
+            PUTOUT_fn(assoc, nv);
+        }
     }
-    if (!ACOMPC(TRAPCL, 0)) {
+    if (!ACOMPC(TRAPCL, 0)) { /* AEQLC TRAPCL,0,,TSCOK */
         int32_t a = locapt_fn(D_A(TVALL), &XPTR);
         if (a) { SETAC(ATPTR, a); TRPHND_fn(ATPTR); }
     }
@@ -860,10 +864,10 @@ static void do_BALF(void) { do_BAL_inner(); }
 static void do_BAL_inner(void)
 {
     int32_t nval;
-    if (!AEQLC(FULLCL, 0)) { nval = 0; }
+    if (AEQLC(FULLCL, 0)) { nval = 0; } /* BALF1: AEQLC FULLCL,0,,BALF4: OFF→0 */
     else {
-        if (AEQLC(LENFCL, 0)) goto bal1;
-        nval = D_A(YCL);
+        if (AEQLC(LENFCL, 0)) goto bal1; /* BALF4→BALF2: check lenfcl */
+        nval = D_A(YCL);                  /* SETAV NVAL,YCL */
     }
     {
         int32_t cur = TXSP.l;
@@ -876,8 +880,6 @@ static void do_BAL_inner(void)
     }
 bal1:
     DECRA(PDLPTR, 3*DESCR); GOTO_TSALF;
-    return;
-    nval = 0;
 }
 
 /*====================================================================================================================*/
@@ -1139,9 +1141,9 @@ enmi3:
 /* SUCF — SUCCEED failure: reenter SCON */
 static void do_SUCF(void)
 {
-    GETDC_BLK(XCL, PDLPTR, 0);
-    GETDC_BLK(YCL, PDLPTR, DESCR);
-    do_SCON();
+    GETDC_BLK(XCL, PDLPTR, 0);       /* GETDC XCL,PDLPTR,DESCR  (our slot 0) */
+    GETDC_BLK(YCL, PDLPTR, 2*DESCR); /* GETDC YCL,PDLPTR,2*DESCR (our slot 2) */
+    do_SCON(); /* BRANCH SUCE — re-enter SUCCEED path */
 }
 
 /*====================================================================================================================*/
