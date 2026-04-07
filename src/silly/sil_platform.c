@@ -656,6 +656,7 @@ DESCR_t BIOPTB  = {.a={.i=0},.f=0,.v=0};
 DESCR_t UNOPTB  = {.a={.i=0},.f=0,.v=0};
 DESCR_t BBIOPTB = {.a={.i=0},.f=0,.v=0};
 DESCR_t BSBIPTB = {.a={.i=0},.f=0,.v=0};
+DESCR_t INTGTB  = {.a={.i=0},.f=0,.v=0};  /* integer scan table */
 
 /* ── 7. INIT_SYNTAB — fills sil_syntab action arrays + DESCR A fields ── */
 
@@ -1032,6 +1033,7 @@ void init_syntab(void)
     reg_tbl(&BRKTB,   &BRKTB_st);
     reg_tbl(&BIOPTB,  &BIOPTB_st);
     reg_tbl(&UNOPTB,  &UNOPTB_st);
+    reg_tbl(&INTGTB,  &INTGTB_st);
 }
 
 /* Lookup sil_syntab from a DESCR_t (handles registry-indexed tables) */
@@ -1143,14 +1145,16 @@ void XCALL_chk_break(int x)  { (void)x; }
 void XCALL_IO_OPENI(DESCR_t u, SPEC_t *sp)  { (void)u; (void)sp; }
 void XCALL_IO_OPENO(DESCR_t u, SPEC_t *sp)  { (void)u; (void)sp; }
 void XCALL_IO_SEEK(DESCR_t u, DESCR_t n)    { (void)u; (void)n; }
-void XCALL_IO_PAD(DESCR_t u, DESCR_t c)     { (void)u; (void)c; }
-void XCALL_IO_FILE(DESCR_t u, SPEC_t *sp)   { (void)u; sp->l=0; }
+void XCALL_IO_PAD(SPEC_t *sp, int32_t w)    { (void)sp; (void)w; }
+Sil_result XCALL_IO_FILE(DESCR_t u, SPEC_t *sp) { (void)u; sp->l=0; return FAIL; }
 void XCALL_BKSPCE(DESCR_t u)  { (void)u; }
 void XCALL_ENFILE(DESCR_t u)  { (void)u; }
 void XCALL_REWIND(DESCR_t u)  { (void)u; }
 void XCALL_LINK(DESCR_t u, SPEC_t *sp)      { (void)u; (void)sp; }
 void XCALL_UNLOAD(DESCR_t u)  { (void)u; }
 void XCALL_RELSTRING(DESCR_t d) { (void)d; }
+/* XCALL_XINCLD: open an include file — stub returns FAIL (not yet implemented) */
+Sil_result XCALL_XINCLD(DESCR_t unit, SPEC_t *fname) { (void)unit; (void)fname; return FAIL; }
 void XCALL_XRAISP(SPEC_t *sp)
 {
     unsigned char *p = (unsigned char *)A2P(sp->a) + sp->o;

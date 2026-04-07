@@ -33,6 +33,9 @@ Sil_result FORBLK_fn(void);
  * Called by FORRUN after reading a new line. */
 Sil_result NEWCRD_fn(void);
 
+/* CTLADV — advance to quoted filename arg on a control card (line 2430). */
+Sil_result CTLADV_fn(SPEC_t *out);
+
 /* FILCHK — handle EOF in compilation (include-stack pop or file change). */
 Sil_result FILCHK_fn(void);
 

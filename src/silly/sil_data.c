@@ -472,6 +472,38 @@ const char DIGSP[]  = "DIGITS";
 /* Pair list pair lists (trace name strings) */
 const char TRLASP[] = "LABEL";
 
+/* ── Control-card command SPEC_t globals (v311.sil §24 STRING directives) */
+/* Each backed by a static char literal; .a/.l set in sil_data_init()     */
+static const char ctllit_UNLIST[]    = "UNLIST";
+static const char ctllit_LIST[]      = "LIST";
+static const char ctllit_EJECT[]     = "EJECT";
+static const char ctllit_ERRORS[]    = "ERRORS";
+static const char ctllit_NOERRORS[]  = "NOERRORS";
+static const char ctllit_CASE[]      = "CASE";
+static const char ctllit_INCLUDE[]   = "INCLUDE";
+static const char ctllit_COPY[]      = "COPY";
+static const char ctllit_PLUSOPS[]   = "PLUSOPS";
+static const char ctllit_EXECUTE[]   = "EXECUTE";
+static const char ctllit_NOEXECUTE[] = "NOEXECUTE";
+static const char ctllit_LINE[]      = "LINE";
+static const char ctllit_HIDE[]      = "HIDE";
+static const char ctllit_LEFT[]      = "LEFT";
+
+SPEC_t UNLSP_sp  = {0};
+SPEC_t LISTSP_sp = {0};
+SPEC_t EJCTSP_sp = {0};
+SPEC_t ERORSP_sp = {0};
+SPEC_t NERRSP_sp = {0};
+SPEC_t CASESP_sp = {0};
+SPEC_t INCLSP_sp = {0};
+SPEC_t COPYSP_sp = {0};
+SPEC_t SPITSP_sp = {0};
+SPEC_t EXECSP_sp = {0};
+SPEC_t NEXESP_sp = {0};
+SPEC_t LINESP_sp = {0};
+SPEC_t HIDESP_sp = {0};
+SPEC_t LEFTSP_sp = {0};
+
 /* ── sil_data_init: initialize computed constants and stacks ─────────── */
 
 void sil_data_init(void)
@@ -505,4 +537,22 @@ void sil_data_init(void)
     /* Stacks — allocate from arena (done by arena_init before us)       */
     /* pdl_stack and sil_stack are arena-allocated; set arena offsets     */
     /* Actual allocation is in arena_init(); we just record the pointers  */
+
+    /* Control-card command SPEC_t globals — backed by static literals   */
+#define INIT_SP(sp, lit) (sp).a = P2A(lit); (sp).o = 0; (sp).l = (int32_t)(sizeof(lit)-1)
+    INIT_SP(UNLSP_sp,  ctllit_UNLIST);
+    INIT_SP(LISTSP_sp, ctllit_LIST);
+    INIT_SP(EJCTSP_sp, ctllit_EJECT);
+    INIT_SP(ERORSP_sp, ctllit_ERRORS);
+    INIT_SP(NERRSP_sp, ctllit_NOERRORS);
+    INIT_SP(CASESP_sp, ctllit_CASE);
+    INIT_SP(INCLSP_sp, ctllit_INCLUDE);
+    INIT_SP(COPYSP_sp, ctllit_COPY);
+    INIT_SP(SPITSP_sp, ctllit_PLUSOPS);
+    INIT_SP(EXECSP_sp, ctllit_EXECUTE);
+    INIT_SP(NEXESP_sp, ctllit_NOEXECUTE);
+    INIT_SP(LINESP_sp, ctllit_LINE);
+    INIT_SP(HIDESP_sp, ctllit_HIDE);
+    INIT_SP(LEFTSP_sp, ctllit_LEFT);
+#undef INIT_SP
 }

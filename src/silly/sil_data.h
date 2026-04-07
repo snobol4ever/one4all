@@ -448,6 +448,7 @@ extern DESCR_t BISRFN;   /* SPITBOL SCAN+REPLACE operator descriptor     */
 extern DESCR_t BIEQFN;   /* SPITBOL assignment operator descriptor       */
 extern DESCR_t BISNFN;   /* SPITBOL SCAN operator descriptor             */
 extern DESCR_t ELEMTB;   /* element scan table                           */
+extern DESCR_t INTGTB;   /* integer scan table                           */
 extern DESCR_t GOTSTB;   /* peek-ahead table for '<' and '['             */
 
 /* M19: sil_interp */
@@ -661,6 +662,23 @@ extern const char CRDFSP[]; /* "(80A1)"      default output format        */
 extern const char OUTPSP[]; /* "(1X,132A1)"  standard print format        */
 extern const char ABORCL_s[],CONTSP_s[], SCNTSP_s[], FSSP[], KSP[];
 extern const char LSP[], RSP[], VESP[];
+
+/* ── Control-card command SPEC_t globals (v311.sil STRING directives) ── */
+/* Backed by static char literals; .a/.l filled by sil_data_init()       */
+extern SPEC_t UNLSP_sp;   /* "UNLIST"     */
+extern SPEC_t LISTSP_sp;  /* "LIST"       */
+extern SPEC_t EJCTSP_sp;  /* "EJECT"      */
+extern SPEC_t ERORSP_sp;  /* "ERRORS"     */
+extern SPEC_t NERRSP_sp;  /* "NOERRORS"   */
+extern SPEC_t CASESP_sp;  /* "CASE"       */
+extern SPEC_t INCLSP_sp;  /* "INCLUDE"    */
+extern SPEC_t COPYSP_sp;  /* "COPY"       */
+extern SPEC_t SPITSP_sp;  /* "PLUSOPS"    */
+extern SPEC_t EXECSP_sp;  /* "EXECUTE"    */
+extern SPEC_t NEXESP_sp;  /* "NOEXECUTE"  */
+extern SPEC_t LINESP_sp;  /* "LINE"       */
+extern SPEC_t HIDESP_sp;  /* "HIDE"       */
+extern SPEC_t LEFTSP_sp;  /* "LEFT"       */
 
 /* ── Initialization function ─────────────────────────────────────────── */
 
