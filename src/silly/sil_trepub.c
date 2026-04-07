@@ -49,77 +49,49 @@
 Sil_result TREPUB_fn(DESCR_t node)
 {
     MOVD(YPTR, node);
-
 trepu1:
-    /* Get code descriptor from node */
-    GETDC_B(XPTR, YPTR, T_CODE);
-
-    /* INCRA CMOFCL,DESCR; PUTD CMBSCL,CMOFCL,XPTR */
-    INCRA(CMOFCL, DESCR);
+    GETDC_B(XPTR, YPTR, T_CODE);                                                     /* Get code descriptor from node */
+    INCRA(CMOFCL, DESCR);                                              /* INCRA CMOFCL,DESCR; PUTD CMBSCL,CMOFCL,XPTR */
     PUTD_B(CMBSCL, CMOFCL, XPTR);
-
-    /* PCOMP ZPTR,OCLIM — check buffer limit */
-    SUM(ZPTR, CMBSCL, CMOFCL);
+    SUM(ZPTR, CMBSCL, CMOFCL);                                               /* PCOMP ZPTR,OCLIM — check buffer limit */
     if (D_A(ZPTR) < D_A(OCLIM)) {
         goto trepu4;
     }
-
-    /* TREPU5: buffer full — allocate new block */
-    {
+    {                                                                     /* TREPU5: buffer full — allocate new block */
         DESCR_t new_sz;
         SUM(new_sz, CMOFCL, CODELT);
         SETVC(new_sz, C);
-
         int32_t new_blk = BLOCK_fn(D_A(new_sz), C);
         if (!new_blk) return FAIL;
         SETAC(XCL, new_blk);
-
-        /* If there's a pending label, point it at the new block */
-        if (!AEQLC(LPTR, 0)) {
+        if (!AEQLC(LPTR, 0)) {                               /* If there's a pending label, point it at the new block */
             PUTDC_B(LPTR, ATTRIB, XCL);
         }
-
-        /* Move old code into new block */
-        memcpy(A2P(new_blk),
+        memcpy(A2P(new_blk),                                                          /* Move old code into new block */
                (char*)A2P(D_A(CMBSCL)),
                (size_t)D_A(CMOFCL));
-
-        /* Insert direct goto in old block: GOTG, LIT1, ptr-to-new */
-        PUTDC_B(CMBSCL, DESCR,     GOTGCL);
-        PUTDC_B(CMBSCL, 2*DESCR,   LIT1CL);
-        PUTDC_B(CMBSCL, 3*DESCR,   XCL);
+        PUTDC_B(CMBSCL, DESCR, GOTGCL);                    /* Insert direct goto in old block: GOTG, LIT1, ptr-to-new */
+        PUTDC_B(CMBSCL, 2*DESCR, LIT1CL);
+        PUTDC_B(CMBSCL, 3*DESCR, XCL);
         INCRA(CMBSCL, 3*DESCR);
-
-        /* SPLIT off old block */
-        SPLIT_fn(D_A(CMBSCL));
-
-        /* Switch to new block */
-        MOVD(CMBSCL, XCL);
+        SPLIT_fn(D_A(CMBSCL));                                                                 /* SPLIT off old block */
+        MOVD(CMBSCL, XCL);                                                                     /* Switch to new block */
         SUM(OCLIM, CMBSCL, new_sz);
         DECRA(OCLIM, 7*DESCR);
     }
-
 trepu4:
-    /* AEQLIC YPTR,LSON,0,,TREPU2 — has left son? */
-    if (!AEQLIC(YPTR, T_LSON, 0)) {
+    if (!AEQLIC(YPTR, T_LSON, 0)) {                                     /* AEQLIC YPTR,LSON,0,,TREPU2 — has left son? */
         GETDC_B(YPTR, YPTR, T_LSON);
         goto trepu1;
     }
-
-/* trepu2: */
-    /* AEQLIC YPTR,RSIB,0,,TREPU3 — has right sibling? */
-    if (!AEQLIC(YPTR, T_RSIB, 0)) {
+    if (!AEQLIC(YPTR, T_RSIB, 0)) {                       /* trepu2:  AEQLIC YPTR,RSIB,0,,TREPU3 — has right sibling? */
         GETDC_B(YPTR, YPTR, T_RSIB);
         goto trepu1;
     }
-
-/* trepu3: climb until we find a node with a right sibling */
-    while (1) {
-        /* AEQLIC YPTR,FATHER,0,,RTN1 — no father → done */
-        if (AEQLIC(YPTR, T_FATHER, 0)) return OK;
+    while (1) {                                            /* trepu3: climb until we find a node with a right sibling */
+        if (AEQLIC(YPTR, T_FATHER, 0)) return OK;                    /* AEQLIC YPTR,FATHER,0,,RTN1 — no father → done */
         GETDC_B(YPTR, YPTR, T_FATHER);
-        /* BRANCH TREPU2 — check for right sibling */
-        if (!AEQLIC(YPTR, T_RSIB, 0)) {
+        if (!AEQLIC(YPTR, T_RSIB, 0)) {                                    /* BRANCH TREPU2 — check for right sibling */
             GETDC_B(YPTR, YPTR, T_RSIB);
             goto trepu1;
         }
@@ -134,6 +106,6 @@ trepu4:
  */
 void ADDSON_fn(DESCR_t parent, DESCR_t son)
 {
-    PUTDC_B(parent, T_LSON,   son);
-    PUTDC_B(son,    T_FATHER, parent);
+    PUTDC_B(parent, T_LSON, son);
+    PUTDC_B(son, T_FATHER, parent);
 }

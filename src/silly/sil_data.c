@@ -508,39 +508,27 @@ SPEC_t LEFTSP_sp = {0};
 
 void sil_data_init(void)
 {
-    /* Computed DESCR-valued constants — must be done at runtime          */
-    /* because DESCR is a compile-time sizeof, not a macro constant       */
-    ARBSIZ.a.i  = (int_t)(8 * NODESZ);
-    CNDSIZ.a.i  = (int_t)(CNODSZ);   CNDSIZ.v = B;
-    CODELT.a.i  = (int_t)(200 * DESCR); CODELT.v = C;
-    DSCRTW.a.i  = (int_t)(2 * DESCR);
-    ESALIM.a.i  = (int_t)(ESASIZ * DESCR);
-    EXTVSL.a.i  = (int_t)(EXTSIZ * 2 * DESCR);
-    FBLKRQ.a.i  = (int_t)(FBKLSZ);    FBLKRQ.v = B;
-    INCLSZ.a.i  = (int_t)(4 * DESCR); INCLSZ.v = B;
-    IOBLSZ.a.i  = (int_t)(2 * DESCR); IOBLSZ.v = B;
-    LNODSZ.a.i  = (int_t)(NODESZ + DESCR); LNODSZ.v = P;
-    NODSIZ.a.i  = (int_t)(NODESZ);    NODSIZ.v = P;
-    SNODSZS.a.i = (int_t)(NODESZ);    SNODSZS.v = P;
-    OCALIM.a.i  = (int_t)(OCASIZ * DESCR); OCALIM.v = C;
-    STARSZ.a.i  = (int_t)(11 * DESCR); STARSZ.v = P;
-    COMDCT.a.i  = (int_t)(15 * DESCR);
-    SIZLMT.a.i  = (int_t)(0x7fffffff);
-
-    /* OBEND = OBLIST + DESCR*OBOFF (address arithmetic on OBLIST_arr)   */
-    OBEND.a.i   = P2A(&OBLIST_arr[0]) + (int_t)(DESCR * OBOFF);
-
-    /* OUTBLK = OUTPUT - DESCR  (pointer arithmetic on unit DESCRs)      */
-    OUTBLK.a.i  = P2A(&OUTPUT) - DESCR;
-    ERRBLK.a.i  = P2A(&PUNCH)  - DESCR;
-
-    /* Stacks — allocate from arena (done by arena_init before us)       */
-    /* pdl_stack and sil_stack are arena-allocated; set arena offsets     */
-    /* Actual allocation is in arena_init(); we just record the pointers  */
-
-    /* Control-card command SPEC_t globals — backed by static literals   */
-#define INIT_SP(sp, lit) (sp).a = P2A(lit); (sp).o = 0; (sp).l = (int32_t)(sizeof(lit)-1)
-    INIT_SP(UNLSP_sp,  ctllit_UNLIST);
+    ARBSIZ.a.i = (int_t)(8 * NODESZ);  /* Computed DESCR-valued constants — must be done at runtime  because DESCR is a compile-time sizeof, not a macro constant */
+    CNDSIZ.a.i = (int_t)(CNODSZ); CNDSIZ.v = B;
+    CODELT.a.i = (int_t)(200 * DESCR); CODELT.v = C;
+    DSCRTW.a.i = (int_t)(2 * DESCR);
+    ESALIM.a.i = (int_t)(ESASIZ * DESCR);
+    EXTVSL.a.i = (int_t)(EXTSIZ * 2 * DESCR);
+    FBLKRQ.a.i = (int_t)(FBKLSZ); FBLKRQ.v = B;
+    INCLSZ.a.i = (int_t)(4 * DESCR); INCLSZ.v = B;
+    IOBLSZ.a.i = (int_t)(2 * DESCR); IOBLSZ.v = B;
+    LNODSZ.a.i = (int_t)(NODESZ + DESCR); LNODSZ.v = P;
+    NODSIZ.a.i = (int_t)(NODESZ); NODSIZ.v = P;
+    SNODSZS.a.i = (int_t)(NODESZ); SNODSZS.v = P;
+    OCALIM.a.i = (int_t)(OCASIZ * DESCR); OCALIM.v = C;
+    STARSZ.a.i = (int_t)(11 * DESCR); STARSZ.v = P;
+    COMDCT.a.i = (int_t)(15 * DESCR);
+    SIZLMT.a.i = (int_t)(0x7fffffff);
+    OBEND.a.i = P2A(&OBLIST_arr[0]) + (int_t)(DESCR * OBOFF);  /* OBEND = OBLIST + DESCR*OBOFF (address arithmetic on OBLIST_arr) */
+    OUTBLK.a.i = P2A(&OUTPUT) - DESCR;                /* OUTBLK = OUTPUT - DESCR  (pointer arithmetic on unit DESCRs) */
+    ERRBLK.a.i = P2A(&PUNCH) - DESCR;
+#define INIT_SP(sp, lit) (sp).a = P2A(lit); (sp).o = 0; (sp).l = (int32_t)(sizeof(lit)-1)  /* Stacks — allocate from arena (done by arena_init before us)  pdl_stack and sil_stack are arena-allocated; set arena offsets  Actual allocation is in arena_init(); we just record the pointers  Control-card command SPEC_t globals — backed by static literals */
+    INIT_SP(UNLSP_sp, ctllit_UNLIST);
     INIT_SP(LISTSP_sp, ctllit_LIST);
     INIT_SP(EJCTSP_sp, ctllit_EJECT);
     INIT_SP(ERORSP_sp, ctllit_ERRORS);

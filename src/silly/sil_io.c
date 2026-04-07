@@ -49,50 +49,33 @@ static inline DESCR_t io_pop(void)        { return io_stk[--io_top]; }
 /* ── READ — INPUT(V,U,O,N) ───────────────────────────────────────────── */
 Sil_result READ_fn(void)
 {
-    /* IND — get variable */
-    if (IND_fn() == FAIL) return FAIL;
+    if (IND_fn() == FAIL) return FAIL;                                                          /* IND — get variable */
     io_push(XPTR);
-    /* unit */
-    if (INTVAL_fn() == FAIL) { io_top--; return FAIL; }
+    if (INTVAL_fn() == FAIL) { io_top--; return FAIL; }                                                       /* unit */
     io_push(XPTR);
-    /* options */
-    if (VARVAL_fn() == FAIL) { io_top -= 2; return FAIL; }
-    MOVD(YPTR, io_pop());   /* unit */
-    XPTR = io_pop();        /* variable */
-
-    /* default unit? */
-    if (ACOMPC(YPTR, 0) == 0) SETAC(YPTR, UNITI);
-
-    io_push(YPTR); io_push(ZPTR);  /* unit, options */
-
-    /* optional filename */
-    if (VARVAL_fn() == FAIL) { io_top -= 2; return FAIL; }
+    if (VARVAL_fn() == FAIL) { io_top -= 2; return FAIL; }                                                 /* options */
+    MOVD(YPTR, io_pop()); /* unit */
+    XPTR = io_pop(); /* variable */
+    if (ACOMPC(YPTR, 0) == 0) SETAC(YPTR, UNITI);                                                    /* default unit? */
+    io_push(YPTR); io_push(ZPTR); /* unit, options */
+    if (VARVAL_fn() == FAIL) { io_top -= 2; return FAIL; }                                       /* optional filename */
     MOVD(TPTR, XPTR);
     MOVD(ZPTR, io_pop()); MOVD(YPTR, io_pop()); /* opts, unit */
-
     LOCSP_fn(&XSP, &TPTR);
     LOCSP_fn(&ZSP, &ZPTR);
     MOVD(ZPTR, ZEROCL);
-
-    /* IO_OPENI — tell I/O about filename; fills ZPTR with recl */
-    if (XCALL_IO_OPENI(YPTR, &XSP, &ZSP, &ZPTR) == FAIL) return FAIL;
-
+    if (XCALL_IO_OPENI(YPTR, &XSP, &ZSP, &ZPTR) == FAIL) return FAIL;  /* IO_OPENI — tell I/O about filename; fills ZPTR with recl */
     if (ACOMPC(ZPTR, 0) == 0) {
-        /* defaulted length — check INSATL for stored default */
-        int32_t assoc = locapt_fn(D_A(INSATL), &YPTR);
+        int32_t assoc = locapt_fn(D_A(INSATL), &YPTR);          /* defaulted length — check INSATL for stored default */
         if (assoc) { SETAC(ZPTR, assoc); }
         else MOVD(ZPTR, DFLSIZ);
     }
-
-    /* Allocate I/O block */
-    int32_t ioblk = BLOCK_fn(D_A(IOBLSZ), B);
+    int32_t ioblk = BLOCK_fn(D_A(IOBLSZ), B);                                                   /* Allocate I/O block */
     if (!ioblk) return FAIL;
     SETAC(TPTR, ioblk);
-    PUTDC_B(TPTR, DESCR, YPTR);      /* unit */
-    PUTDC_B(TPTR, 2*DESCR, ZPTR);    /* format/recl */
-
-    /* Link into input attribute list */
-    int32_t assoc = locapv_fn(D_A(INATL), &XPTR);
+    PUTDC_B(TPTR, DESCR, YPTR); /* unit */
+    PUTDC_B(TPTR, 2*DESCR, ZPTR); /* format/recl */
+    int32_t assoc = locapv_fn(D_A(INATL), &XPTR);                                   /* Link into input attribute list */
     if (assoc) {
         SETAC(ZPTR, assoc);
         PUTDC_B(ZPTR, DESCR, TPTR);
@@ -114,26 +97,20 @@ Sil_result PRINT_fn(void)
     if (VARVAL_fn() == FAIL) { io_top -= 3; return FAIL; }
     MOVD(TPTR, XPTR);
     MOVD(ZPTR, io_pop()); MOVD(YPTR, io_pop()); XPTR = io_pop();
-
     LOCSP_fn(&XSP, &TPTR);
     LOCSP_fn(&ZSP, &ZPTR);
-
     if (XCALL_IO_OPENO(YPTR, &XSP, &ZSP) == FAIL) return FAIL;
-
     if (ACOMPC(YPTR, 0) == 0) SETAC(YPTR, UNITO);
-
     if (AEQLC(ZPTR, 0)) {
         int32_t assoc = locapt_fn(D_A(OTSATL), &YPTR);
         if (assoc) { SETAC(ZPTR, assoc); }
         else MOVD(ZPTR, DFLFST);
     }
-
     int32_t ioblk = BLOCK_fn(D_A(IOBLSZ), B);
     if (!ioblk) return FAIL;
     SETAC(TPTR, ioblk);
     PUTDC_B(TPTR, DESCR, YPTR);
     PUTDC_B(TPTR, 2*DESCR, ZPTR);
-
     int32_t assoc = locapv_fn(D_A(OUTATL), &XPTR);
     if (assoc) {
         SETAC(ZPTR, assoc);
@@ -151,8 +128,7 @@ static Sil_result ioop(int32_t op)
     if (INTVAL_fn() == FAIL) { io_top--; return FAIL; }
     MOVD(XCL, XPTR);
     SCL = io_pop();
-    if (ACOMPC(XCL, 0) <= 0) return FAIL;  /* UNTERR */
-
+    if (ACOMPC(XCL, 0) <= 0) return FAIL; /* UNTERR */
     switch (op) {
     case 1: XCALL_BKSPCE(XCL); break;
     case 2: XCALL_ENFILE(XCL); break;
@@ -178,15 +154,13 @@ Sil_result SET_fn(void)    { return ioop(4); }
 Sil_result DETACH_fn(void)
 {
     if (IND_fn() == FAIL) return FAIL;
-    /* Clear input association */
-    int32_t ai = locapv_fn(D_A(INATL), &XPTR);
+    int32_t ai = locapv_fn(D_A(INATL), &XPTR);                                             /* Clear input association */
     if (ai) {
         DESCR_t z; MOVD(z, ZEROCL);
         memcpy((char*)A2P(D_A(INATL)) + ai + DESCR, &z, sizeof(DESCR_t));
         memcpy((char*)A2P(D_A(INATL)) + ai + 2*DESCR, &z, sizeof(DESCR_t));
     }
-    /* Clear output association */
-    int32_t ao = locapv_fn(D_A(OUTATL), &XPTR);
+    int32_t ao = locapv_fn(D_A(OUTATL), &XPTR);                                           /* Clear output association */
     if (ao) {
         DESCR_t z; MOVD(z, ZEROCL);
         memcpy((char*)A2P(D_A(OUTATL)) + ao + DESCR, &z, sizeof(DESCR_t));
@@ -199,39 +173,25 @@ Sil_result DETACH_fn(void)
 Sil_result PUTIN_fn(DESCR_t blk, DESCR_t var)
 {
     MOVD(IO1PTR, blk); MOVD(IO2PTR, var);
-    GETDC_B(IO3PTR, IO1PTR, DESCR);        /* unit */
-    GETDC_B(IO1PTR, IO1PTR, 2*DESCR);      /* recl */
-
-    /* Pre-allocate if fixed record length */
-    if (!AEQLC(IO1PTR, VLRECL)) {
+    GETDC_B(IO3PTR, IO1PTR, DESCR); /* unit */
+    GETDC_B(IO1PTR, IO1PTR, 2*DESCR); /* recl */
+    if (!AEQLC(IO1PTR, VLRECL)) {                                              /* Pre-allocate if fixed record length */
         int32_t soff = CONVAR_fn(D_A(IO1PTR));
         if (!soff) return FAIL;
         SETAC(IO4PTR, soff); SETVC(IO4PTR, S);
         LOCSP_fn(&IOSP, &IO4PTR);
     }
-
     INCRA(RSTAT, 1);
-
-    /* STREAD — platform read into IOSP */
-    if (STREAD_fn(&IOSP, IO3PTR) == FAIL) return FAIL;
-
-    /* TRIM if &TRIM set */
-    if (!AEQLC(TRIMCL, 0)) TRIMSP_fn(&IOSP, &IOSP);
-
-    /* Check &MAXLNGTH */
-    D_A(IO1PTR) = IOSP.l;
+    if (STREAD_fn(&IOSP, IO3PTR) == FAIL) return FAIL;                            /* STREAD — platform read into IOSP */
+    if (!AEQLC(TRIMCL, 0)) TRIMSP_fn(&IOSP, &IOSP);                                              /* TRIM if &TRIM set */
+    D_A(IO1PTR) = IOSP.l;                                                                          /* Check &MAXLNGTH */
     if (ACOMP(IO1PTR, MLENCL) > 0) return FAIL;
-
-    /* Keyword variable? */
-    if (VEQLC(IO2PTR, K)) {
+    if (VEQLC(IO2PTR, K)) {                                                                      /* Keyword variable? */
         if (SPCINT_fn(&IO1PTR, &IOSP) == FAIL) return FAIL;
         goto putin2;
     }
-
-    /* Intern string */
-    if (!AEQLC(XCL, VLRECL)) {
-        /* fixed recl: intern in-place */
-        int32_t off = GNVARS_fn((const char*)A2P(IOSP.a) + IOSP.o, IOSP.l);
+    if (!AEQLC(XCL, VLRECL)) {                                                                       /* Intern string */
+        int32_t off = GNVARS_fn((const char*)A2P(IOSP.a) + IOSP.o, IOSP.l);            /* fixed recl: intern in-place */
         if (!off) return FAIL;
         SETAC(IO1PTR, off); SETVC(IO1PTR, S);
     } else {
@@ -239,7 +199,6 @@ Sil_result PUTIN_fn(DESCR_t blk, DESCR_t var)
         if (!off) return FAIL;
         SETAC(IO1PTR, off); SETVC(IO1PTR, S);
     }
-
 putin2:
     PUTDC_B(IO2PTR, DESCR, IO1PTR);
     MOVD(XPTR, IO1PTR); return OK;
@@ -249,7 +208,6 @@ putin2:
 void PUTOUT_fn(DESCR_t blk, DESCR_t val)
 {
     MOVD(IO1PTR, blk); MOVD(IO2PTR, val);
-
     switch (D_V(IO2PTR)) {
     case S:
         LOCSP_fn(&IOSP, &IO2PTR);
@@ -258,14 +216,11 @@ void PUTOUT_fn(DESCR_t blk, DESCR_t val)
         INTSPC_fn(&IOSP, &IO2PTR);
         break;
     default:
-        /* DTREP: get data-type representation string */
-        if (DTREP_fn2(&IO2PTR, IO2PTR) == FAIL) return;
-        /* GETSPC IOSP,IO2PTR,0 */
-        memcpy(&IOSP, A2P(D_A(IO2PTR)), sizeof(SPEC_t));
+        if (DTREP_fn2(&IO2PTR, IO2PTR) == FAIL) return;                 /* DTREP: get data-type representation string */
+        memcpy(&IOSP, A2P(D_A(IO2PTR)), sizeof(SPEC_t));                                      /* GETSPC IOSP,IO2PTR,0 */
         break;
     }
-
     STPRNT_fn(D_A(IOKEY), IO1PTR, &IOSP);
-    if (!AEQLC(IOKEY, 0)) return;  /* COMP6 error */
+    if (!AEQLC(IOKEY, 0)) return; /* COMP6 error */
     INCRA(WSTAT, 1);
 }

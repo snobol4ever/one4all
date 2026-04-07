@@ -36,12 +36,12 @@ static Sil_result rlint(DESCR_t *dp)
     /* RLINT macro: convert REAL to INTEGER, fail on overflow (INTR1).
      * Oracle: CLR_MATH_ERROR; cast; if MATH_ERROR → INTR1.
      * We check bounds explicitly — (float)(int32_t) round-trips safely
-     * only if value is within [-2^31, 2^31-1].                        */
+     * only if value is within [-2^31, 2^31-1]. */
     float f = dp->a.f;
-    if (f >= 2147483648.0f || f < -2147483648.0f) return FAIL;  /* INTR1 */
+    if (f >= 2147483648.0f || f < -2147483648.0f) return FAIL; /* INTR1 */
     dp->a.i = (int32_t)f;
-    dp->f   = 0;
-    dp->v   = I;
+    dp->f = 0;
+    dp->v = I;
     return OK;
 }
 
@@ -76,26 +76,21 @@ static int check_input_assoc(const DESCR_t *dp)
 Sil_result ARGVAL_fn(void)
 {
     XPTR = oc_fetch();
-
     if (D_F(XPTR) & FNC) {
-        /* function descriptor — call INVOKE */
-        switch (INVOKE_fn()) {
+        switch (INVOKE_fn()) {                                                   /* function descriptor — call INVOKE */
         case FAIL: return FAIL;
-        case OK:   goto argv1;   /* exit 2: name returned, dereference  */
-        default:   return OK;    /* exit 3: value returned directly      */
+        case OK: goto argv1; /* exit 2: name returned, dereference  */
+        default: return OK; /* exit 3: value returned directly      */
         }
     }
-
 argv1:
     if (check_input_assoc(&XPTR)) {
         ZPTR = *(DESCR_t *)A2P(ZPTR.a.i + DESCR);
-        /* RCALL XPTR,PUTIN,(ZPTR,XPTR),(FAIL,RTXNAM) */
-        switch (PUTIN_fn()) {
+        switch (PUTIN_fn()) {                                           /* RCALL XPTR,PUTIN,(ZPTR,XPTR),(FAIL,RTXNAM) */
         case FAIL: return FAIL;
-        default:   return OK;   /* RTXNAM: value in XPTR */
+        default: return OK; /* RTXNAM: value in XPTR */
         }
     }
-
     deref_name(&XPTR);
     return OK;
 }
@@ -107,32 +102,25 @@ argv1:
  * ════════════════════════════════════════════════════════════════════════ */
 Sil_result EXPVAL_fn(void)
 {
-    /* save interpreter state — mirrors SIL PUSH list */
-    DESCR_t sv_ocbscl = OCBSCL, sv_ocicl = OCICL;
+    DESCR_t sv_ocbscl = OCBSCL, sv_ocicl = OCICL;                   /* save interpreter state — mirrors SIL PUSH list */
     DESCR_t sv_patbcl = PATBCL, sv_paticl = PATICL;
-    DESCR_t sv_wptr   = WPTR,   sv_xcl    = XCL;
-    DESCR_t sv_ycl    = YCL,    sv_tcl    = TCL;
+    DESCR_t sv_wptr = WPTR, sv_xcl = XCL;
+    DESCR_t sv_ycl = YCL, sv_tcl = TCL;
     DESCR_t sv_maxlen = MAXLEN, sv_lenfcl = LENFCL;
     DESCR_t sv_pdlptr = PDLPTR, sv_pdlhed = PDLHED;
     DESCR_t sv_namicl = NAMICL, sv_nhedcl = NHEDCL;
-    SPEC_t  sv_headsp = HEADSP, sv_tsp    = TSP;
-    SPEC_t  sv_txsp   = TXSP,   sv_xsp    = XSP;
-
-    int scl_entry = SCL.a.i;   /* save entry indicator */
+    SPEC_t sv_headsp = HEADSP, sv_tsp = TSP;
+    SPEC_t sv_txsp = TXSP, sv_xsp = XSP;
+    int scl_entry = SCL.a.i; /* save entry indicator */
     Sil_result rc;
-
-    /* set up new code base from XPTR */
-    OCBSCL = XPTR;
+    OCBSCL = XPTR;                                                                  /* set up new code base from XPTR */
     OCICL.a.i = DESCR;
     PDLHED = PDLPTR;
     NHEDCL = NAMICL;
-
-    /* fetch first descriptor */
-    {
+    {                                                                                       /* fetch first descriptor */
         DESCR_t d = *(DESCR_t *)A2P(OCBSCL.a.i + OCICL.a.i);
         XPTR = d;
     }
-
     if (D_F(XPTR) & FNC) {
         int saved_scl = SCL.a.i;
         switch (INVOKE_fn()) {
@@ -140,11 +128,9 @@ Sil_result EXPVAL_fn(void)
             SCL.a.i = 1;
             break;
         case OK:
-            /* exit 2: came back as name */
-            SCL.a.i = saved_scl;
+            SCL.a.i = saved_scl;                                                         /* exit 2: came back as name */
             if (SCL.a.i == 0) {
-                /* EXPEVL entry: just get value */
-                deref_name(&XPTR);
+                deref_name(&XPTR);                                                    /* EXPEVL entry: just get value */
                 SCL.a.i = 2;
             } else {
                 ZPTR = XPTR;
@@ -152,8 +138,7 @@ Sil_result EXPVAL_fn(void)
             }
             break;
         default:
-            /* exit 3: value direct */
-            SCL.a.i = saved_scl;
+            SCL.a.i = saved_scl;                                                              /* exit 3: value direct */
             if (SCL.a.i == 0) {
                 SCL.a.i = 2;
             } else {
@@ -163,14 +148,12 @@ Sil_result EXPVAL_fn(void)
             break;
         }
     } else {
-        /* not a function */
-        if (scl_entry == 0) {
-            /* EXPEVL path */
-            if (INSW.a.i != 0 && check_input_assoc(&XPTR)) {
+        if (scl_entry == 0) {                                                                       /* not a function */
+            if (INSW.a.i != 0 && check_input_assoc(&XPTR)) {                                           /* EXPEVL path */
                 ZPTR = *(DESCR_t *)A2P(ZPTR.a.i + DESCR);
                 switch (PUTIN_fn()) {
                 case FAIL: SCL.a.i = 1; break;
-                default:   SCL.a.i = 2; break;
+                default: SCL.a.i = 2; break;
                 }
             } else {
                 deref_name(&XPTR);
@@ -181,7 +164,7 @@ Sil_result EXPVAL_fn(void)
                 ZPTR = *(DESCR_t *)A2P(ZPTR.a.i + DESCR);
                 switch (PUTIN_fn()) {
                 case FAIL: SCL.a.i = 1; break;
-                default:   SCL.a.i = 2; break;
+                default: SCL.a.i = 2; break;
                 }
             } else {
                 deref_name(&XPTR);
@@ -189,22 +172,19 @@ Sil_result EXPVAL_fn(void)
             }
         }
     }
-
-    /* restore interpreter state */
-    OCBSCL = sv_ocbscl; OCICL  = sv_ocicl;
+    OCBSCL = sv_ocbscl; OCICL = sv_ocicl;                                                /* restore interpreter state */
     PATBCL = sv_patbcl; PATICL = sv_paticl;
-    WPTR   = sv_wptr;   XCL    = sv_xcl;
-    YCL    = sv_ycl;    TCL    = sv_tcl;
+    WPTR = sv_wptr; XCL = sv_xcl;
+    YCL = sv_ycl; TCL = sv_tcl;
     MAXLEN = sv_maxlen; LENFCL = sv_lenfcl;
     PDLPTR = sv_pdlptr; PDLHED = sv_pdlhed;
     NAMICL = sv_namicl; NHEDCL = sv_nhedcl;
-    HEADSP = sv_headsp; TSP    = sv_tsp;
-    TXSP   = sv_txsp;   XSP    = sv_xsp;
-
+    HEADSP = sv_headsp; TSP = sv_tsp;
+    TXSP = sv_txsp; XSP = sv_xsp;
     switch (SCL.a.i) {
-    case 1:  rc = FAIL; break;
-    case 2:  rc = OK;   break;   /* result in XPTR */
-    default: rc = OK;   break;   /* result in ZPTR — caller checks */
+    case 1: rc = FAIL; break;
+    case 2: rc = OK; break; /* result in XPTR */
+    default: rc = OK; break; /* result in ZPTR — caller checks */
     }
     return rc;
 }
@@ -226,15 +206,13 @@ Sil_result EXPEVL_fn(void)
 Sil_result INTVAL_fn(void)
 {
     XPTR = oc_fetch();
-
     if (D_F(XPTR) & FNC) {
         switch (INVOKE_fn()) {
         case FAIL: return FAIL;
-        case OK:   goto intv1;
-        default:   goto intv2;
+        case OK: goto intv1;
+        default: goto intv2;
         }
     }
-
 intv1:
     if (check_input_assoc(&XPTR)) {
         ZPTR = *(DESCR_t *)A2P(ZPTR.a.i + DESCR);
@@ -242,7 +220,6 @@ intv1:
     } else {
         deref_name(&XPTR);
     }
-
 intv2:
     if (XPTR.v == I) return OK;
     if (XPTR.v == R) return rlint(&XPTR);
@@ -251,7 +228,7 @@ intv2:
         if (SPCINT_fn(&XPTR, &XSP) == OK) return OK;
         if (SPREAL_fn(&XPTR, &XSP) == OK) return rlint(&XPTR);
     }
-    return FAIL;   /* INTR1 — caller handles type error */
+    return FAIL; /* INTR1 — caller handles type error */
 }
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -261,55 +238,47 @@ intv2:
 Sil_result PATVAL_fn(void)
 {
     XPTR = oc_fetch();
-
     if (D_F(XPTR) & FNC) {
         switch (INVOKE_fn()) {
         case FAIL: return FAIL;
-        case OK:   goto patv1;
-        default:   goto patv3;
+        case OK: goto patv1;
+        default: goto patv3;
         }
     }
-
 patv1:
     if (check_input_assoc(&XPTR)) {
         ZPTR = *(DESCR_t *)A2P(ZPTR.a.i + DESCR);
         switch (PUTIN_fn()) {
         case FAIL: return FAIL;
-        default:   break;
+        default: break;
         }
     } else {
         deref_name(&XPTR);
     }
-
 patv3:
     if (XPTR.v == P || XPTR.v == S) return OK;
     if (XPTR.v == I) {
-        /* GENVIX: GNVARI → string */
-        int32_t off = GNVARI_fn(XPTR.a.i);
+        int32_t off = GNVARI_fn(XPTR.a.i);                                                 /* GENVIX: GNVARI → string */
         if (off == 0) return FAIL;
         XPTR.a.i = off; XPTR.f = 0; XPTR.v = S;
         return OK;
     }
     if (XPTR.v == R) {
-        /* PATVR: REALST → GENVAR */
-        REALST_fn(&XSP, &XPTR);
+        REALST_fn(&XSP, &XPTR);                                                             /* PATVR: REALST → GENVAR */
         int32_t off = GENVAR_fn(&XSP);
         if (off == 0) return FAIL;
         XPTR.a.i = off; XPTR.f = 0; XPTR.v = S;
         return OK;
     }
     if (XPTR.v == E) {
-        /* wrap in STARPT expression pattern node */
-        int32_t blk = BLOCK_fn(STARSZ.a.i, P);
+        int32_t blk = BLOCK_fn(STARSZ.a.i, P);                              /* wrap in STARPT expression pattern node */
         if (blk == 0) return FAIL;
-        /* copy STRPAT template into new block */
-        memcpy(A2P(blk), A2P(STRPAT.a.i), (size_t)STARSZ.a.i);
-        /* insert expression descriptor at offset 4*DESCR */
-        *(DESCR_t *)A2P(blk + 4 * DESCR) = XPTR;
+        memcpy(A2P(blk), A2P(STRPAT.a.i), (size_t)STARSZ.a.i);                 /* copy STRPAT template into new block */
+        *(DESCR_t *)A2P(blk + 4 * DESCR) = XPTR;                    /* insert expression descriptor at offset 4*DESCR */
         XPTR.a.i = blk; XPTR.f = 0; XPTR.v = P;
         return OK;
     }
-    return FAIL;   /* INTR1 */
+    return FAIL; /* INTR1 */
 }
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -319,35 +288,32 @@ patv3:
 Sil_result VARVAL_fn(void)
 {
     XPTR = oc_fetch();
-
     if (D_F(XPTR) & FNC) {
         switch (INVOKE_fn()) {
         case FAIL: return FAIL;
-        case OK:   goto varv1;
-        default:   goto varv2;
+        case OK: goto varv1;
+        default: goto varv2;
         }
     }
-
 varv1:
     if (check_input_assoc(&XPTR)) {
         ZPTR = *(DESCR_t *)A2P(ZPTR.a.i + DESCR);
         switch (PUTIN_fn()) {
         case FAIL: return FAIL;
-        default:   break;
+        default: break;
         }
     } else {
         deref_name(&XPTR);
     }
-
 varv2:
-    if (XPTR.v == S) return OK;                          /* VEQLC S → RTXNAM */
-    if (XPTR.v == I) {                                   /* VEQLC I → GENVIX */
+    if (XPTR.v == S) return OK; /* VEQLC S → RTXNAM */
+    if (XPTR.v == I) { /* VEQLC I → GENVIX */
         int32_t off = GNVARI_fn(XPTR.a.i);
         if (off == 0) return FAIL;
         XPTR.a.i = off; XPTR.f = 0; XPTR.v = S;
         return OK;
     }
-    return FAIL;   /* INTR1 — all other types (including R) are errors */
+    return FAIL; /* INTR1 — all other types (including R) are errors */
 }
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -357,7 +323,7 @@ varv2:
 Sil_result VARVUP_fn(void)
 {
     if (VARVAL_fn() == FAIL) return FAIL;
-    if (CASECL.a.i == 0) return OK;   /* case-sensitive: no fold */
+    if (CASECL.a.i == 0) return OK; /* case-sensitive: no fold */
     return VPXPTR_fn();
 }
 
@@ -368,32 +334,23 @@ Sil_result VARVUP_fn(void)
 Sil_result VPXPTR_fn(void)
 {
     LOCSP_fn(&SPECR1, &XPTR);
-    if (SPECR1.l == 0) return OK;   /* null string: return unchanged */
-
-    /* allocate scratch space at FRSGPT for upper-case copy */
-    int32_t len = SPECR1.l;
+    if (SPECR1.l == 0) return OK; /* null string: return unchanged */
+    int32_t len = SPECR1.l;                                   /* allocate scratch space at FRSGPT for upper-case copy */
     int32_t scratch = CONVAR_fn(len);
     if (scratch == 0) return FAIL;
-
     LOCSP_fn(&XSP, &FRSGPT);
-
-    /* copy and raise to upper-case */
-    const char *src = SP_PTR(&SPECR1);
+    const char *src = SP_PTR(&SPECR1);                                                /* copy and raise to upper-case */
     char *dst = SP_PTR(&XSP);
     int raised = 0;
     for (int32_t i = 0; i < len; i++) {
         unsigned char c = (unsigned char)src[i];
-        if (c >= 'a' && c <= 'z') { dst[i] = (char)(c - 32); raised++; }
+        if (c >= 'a'  && c <= 'z') { dst[i] = (char)(c - 32); raised++; }
         else dst[i] = (char)c;
     }
-    if (!raised) return OK;   /* no lower-case chars: return unchanged */
-
-    /* copy value and label fields from original */
-    *(DESCR_t *)A2P(scratch + DESCR)  = *(DESCR_t *)A2P(XPTR.a.i + DESCR);
+    if (!raised) return OK; /* no lower-case chars: return unchanged */
+    *(DESCR_t *)A2P(scratch + DESCR) = *(DESCR_t *)A2P(XPTR.a.i + DESCR);  /* copy value and label fields from original */
     *(DESCR_t *)A2P(scratch + ATTRIB) = *(DESCR_t *)A2P(XPTR.a.i + ATTRIB);
-
-    /* intern the upper-case string */
-    int32_t off = GNVARS_fn(dst, len);
+    int32_t off = GNVARS_fn(dst, len);                                                /* intern the upper-case string */
     if (off == 0) return FAIL;
     XPTR.a.i = off; XPTR.f = 0; XPTR.v = S;
     return OK;
@@ -405,24 +362,21 @@ Sil_result VPXPTR_fn(void)
  * ════════════════════════════════════════════════════════════════════════ */
 Sil_result XYARGS_fn(void)
 {
-    int pass = 0;   /* SCL: 0=first arg, 1=second arg */
-
+    int pass = 0; /* SCL: 0=first arg, 1=second arg */
 next_arg:
     OCICL.a.i += DESCR;
     YPTR = *(DESCR_t *)A2P(OCBSCL.a.i + OCICL.a.i);
-
     if (D_F(YPTR) & FNC) {
-        DESCR_t saved_scl  = SCL;
+        DESCR_t saved_scl = SCL;
         DESCR_t saved_xptr = XPTR;
         SCL.a.i = pass;
         switch (INVOKE_fn()) {
         case FAIL:
-            SCL  = saved_scl;
+            SCL = saved_scl;
             XPTR = saved_xptr;
             return FAIL;
         case OK:
-            /* exit 2: returned as name — dereference and continue */
-            SCL  = saved_scl;
+            SCL = saved_scl;                                   /* exit 2: returned as name — dereference and continue */
             XPTR = saved_xptr;
             if (INSW.a.i != 0 && check_input_assoc(&YPTR)) {
                 ZPTR = *(DESCR_t *)A2P(ZPTR.a.i + DESCR);
@@ -432,7 +386,7 @@ next_arg:
             }
             break;
         default:
-            SCL  = saved_scl;
+            SCL = saved_scl;
             XPTR = saved_xptr;
             break;
         }
@@ -444,13 +398,10 @@ next_arg:
             deref_name(&YPTR);
         }
     }
-
     if (pass != 0) {
-        /* second arg done — XPTR=first, YPTR=second, RTN2 */
-        return OK;
+        return OK;                                                 /* second arg done — XPTR=first, YPTR=second, RTN2 */
     }
-    /* first arg done → save in XPTR, fetch second */
-    XPTR = YPTR;
+    XPTR = YPTR;                                                       /* first arg done → save in XPTR, fetch second */
     pass = 1;
     goto next_arg;
 }

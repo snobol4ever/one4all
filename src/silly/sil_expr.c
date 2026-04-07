@@ -59,28 +59,26 @@ static Sil_result elearg(DESCR_t fn_code);
 /* ADDSON — set parent.lson=son; son.father=parent */
 static inline void addson(DESCR_t parent, DESCR_t son)
 {
-    PUTDC_B(parent, T_LSON,   son);
-    PUTDC_B(son,    T_FATHER, parent);
+    PUTDC_B(parent, T_LSON, son);
+    PUTDC_B(son, T_FATHER, parent);
 }
 
 /* ADDSIB — add sib as right-sibling of node */
 void ADDSIB_fn(DESCR_t node, DESCR_t sib)
 {
     PUTDC_B(node, T_RSIB, sib);
-    PUTDC_B(sib,  T_FATHER, node);
+    PUTDC_B(sib, T_FATHER, node);
 }
 
 /* INSERT — insert 'above' as parent of 'node' (node becomes son) */
 void INSERT_fn(DESCR_t node, DESCR_t above)
 {
     DESCR_t father; GETDC_B(father, node, T_FATHER);
-    /* above.lson = node */
-    PUTDC_B(above, T_LSON,   node);
-    PUTDC_B(node,  T_FATHER, above);
-    /* above.father = node's old father */
-    if (!AEQLIC(node, T_FATHER, 0)) {
-        PUTDC_B(above,  T_FATHER, father);
-        PUTDC_B(father, T_LSON,   above);
+    PUTDC_B(above, T_LSON, node);                                                                /* above.lson = node */
+    PUTDC_B(node, T_FATHER, above);
+    if (!AEQLIC(node, T_FATHER, 0)) {                                             /* above.father = node's old father */
+        PUTDC_B(above, T_FATHER, father);
+        PUTDC_B(father, T_LSON, above);
     }
 }
 
@@ -89,8 +87,7 @@ static Sil_result alloc_node(DESCR_t *out)
 {
     int32_t blk = BLOCK_fn(D_A(CNDSIZ), B);
     if (!blk) return FAIL;
-    /* zero the node */
-    memset(A2P(blk), 0, (size_t)D_A(CNDSIZ));
+    memset(A2P(blk), 0, (size_t)D_A(CNDSIZ));                                                        /* zero the node */
     SETAC(*out, blk); SETVC(*out, B);
     return OK;
 }
@@ -119,13 +116,10 @@ static Sil_result elearg(DESCR_t fn_code)
     DESCR_t fn_node;
     if (alloc_node(&fn_node) == FAIL) return FAIL;
     PUTDC_B(fn_node, T_CODE, fn_code);
-
     if (!AEQLC(ELEMND, 0)) addson(ELEMND, fn_node);
     addson(fn_node, ELEXND);
     MOVD(ELEMND, ELEXND);
-
-    /* Loop reading more args */
-    while (1) {
+    while (1) {                                                                             /* Loop reading more args */
         DESCR_t arg_nd;
         if (EXPR_fn(&arg_nd) == FAIL) return FAIL;
         ADDSIB_fn(ELEMND, arg_nd);
@@ -138,27 +132,19 @@ static Sil_result elearg(DESCR_t fn_code)
 /* ── ELEMNT — compile one element ────────────────────────────────────── */
 Sil_result ELEMNT_fn(DESCR_t *out)
 {
-    /* Get tree of unary operators */
-    if (UNOP_fn(&ELEMND) == FAIL) return FAIL;   /* RTN2 on error */
-
-    /* Break element from TEXTSP */
-    SPEC_t xsp; int stype;
+    if (UNOP_fn(&ELEMND) == FAIL) return FAIL; /* RTN2 on error */                     /* Get tree of unary operators */
+    SPEC_t xsp; int stype;                                                               /* Break element from TEXTSP */
     Sil_result rc = STREAM_fn(&xsp, &TEXTSP, &ELEMTB, &stype);
     SETAC(STYPE, stype);
-
     if (rc == FAIL) {
-        /* ELEILI / ELEICH */
-        if (stype == 0) { SETAC(EMSGCL, (intptr_t)ILCHAR); return FAIL; }
+        if (stype == 0) { SETAC(EMSGCL, (intptr_t)ILCHAR); return FAIL; }                          /* ELEILI / ELEICH */
         if (stype == QLITYP) {
-            /* quoted literal run-out — fall through */
-        } else {
+        } else {                                                             /* quoted literal run-out — fall through */
             SETAC(EMSGCL, (intptr_t)OPNLIT); return FAIL;
         }
     }
-
     if (alloc_node(&ELEXND) == FAIL) return FAIL;
     SETAC(ELEYND, 0);
-
     switch (stype) {
     case 0: /* ELEILT: integer literal */
         {
@@ -172,7 +158,6 @@ Sil_result ELEMNT_fn(DESCR_t *out)
             addson(ELEXND, ELEYND);
         }
         break;
-
     case 1: /* ELEVBL: variable */
         {
             int32_t voff = GENVUP_fn(&xsp);
@@ -181,7 +166,6 @@ Sil_result ELEMNT_fn(DESCR_t *out)
             PUTDC_B(ELEXND, T_CODE, XPTR);
         }
         break;
-
     case 2: /* ELENST: nested expression (e) */
         {
             DESCR_t nested;
@@ -189,8 +173,7 @@ Sil_result ELEMNT_fn(DESCR_t *out)
             if (AEQLC(BRTYPE, RPTYP)) {
                 MOVD(ELEXND, nested);
             } else if (AEQLC(BRTYPE, CMATYP) && !AEQLC(SPITCL, 0)) {
-                /* CMA selection list */
-                MOVD(ELEXND, nested);
+                MOVD(ELEXND, nested);                                                           /* CMA selection list */
                 if (elearg(CMACL) == FAIL) return FAIL;
                 if (!AEQLC(BRTYPE, RPTYP)) {
                     SETAC(EMSGCL, (intptr_t)ILLBRK); return FAIL;
@@ -200,47 +183,39 @@ Sil_result ELEMNT_fn(DESCR_t *out)
             }
         }
         break;
-
     case 3: /* ELEFNC: function call — XSP has name (minus trailing '(') */
         {
-            xsp.l--;  /* SHORTN XSP,1 */
+            xsp.l--; /* SHORTN XSP,1 */
             int32_t foff = GENVUP_fn(&xsp);
             if (!foff) return FAIL;
             SETAC(XPTR, foff); SETVC(XPTR, S);
             int32_t fcl_off = FINDEX_fn(&XPTR);
             if (!fcl_off) return FAIL;
             SETAC(XCL, fcl_off);
-
             PUTDC_B(ELEXND, T_CODE, XCL);
             if (!AEQLC(ELEMND, 0)) addson(ELEMND, ELEXND);
-
-            /* First argument */
-            DESCR_t arg1;
+            DESCR_t arg1;                                                                           /* First argument */
             if (EXPR_fn(&arg1) == FAIL) {
-                /* empty arg list ok */
-                if (!AEQLC(BRTYPE, RPTYP)) { SETAC(EMSGCL, (intptr_t)ILLBRK); return FAIL; }
+                if (!AEQLC(BRTYPE, RPTYP)) { SETAC(EMSGCL, (intptr_t)ILLBRK); return FAIL; }     /* empty arg list ok */
                 goto fn_pad;
             }
             MOVD(ELEMND, ELEXND); addson(ELEMND, arg1); MOVD(ELEMND, arg1);
             int32_t nargs = 1;
-
             while (AEQLC(BRTYPE, CMATYP)) {
                 DESCR_t argn;
                 if (EXPR_fn(&argn) == FAIL) { SETAC(EMSGCL, (intptr_t)ILLBRK); return FAIL; }
                 ADDSIB_fn(ELEMND, argn); MOVD(ELEMND, argn); nargs++;
             }
             if (!AEQLC(BRTYPE, RPTYP)) { SETAC(EMSGCL, (intptr_t)ILLBRK); return FAIL; }
-
-            /* Pad with null args if too few */
-fn_pad:     {
+fn_pad: {                                                                            /* Pad with null args if too few */
                 GETDC_B(XPTR, XCL, 0);
                 if (TESTF(XPTR, FNC)) {
                     int32_t expected = D_V(XCL);
                     while (nargs < expected) {
                         DESCR_t lit_nd, null_nd;
-                        if (alloc_node(&lit_nd)  == FAIL) return FAIL;
+                        if (alloc_node(&lit_nd) == FAIL) return FAIL;
                         if (alloc_node(&null_nd) == FAIL) return FAIL;
-                        PUTDC_B(lit_nd,  T_CODE, LITCL);
+                        PUTDC_B(lit_nd, T_CODE, LITCL);
                         PUTDC_B(null_nd, T_CODE, NULVCL);
                         addson(lit_nd, null_nd);
                         ADDSIB_fn(ELEMND, lit_nd); MOVD(ELEMND, lit_nd);
@@ -248,12 +223,10 @@ fn_pad:     {
                     }
                 }
             }
-            /* Climb to function node root */
-            while (!AEQLIC(ELEXND, T_FATHER, 0))
+            while (!AEQLIC(ELEXND, T_FATHER, 0))                                       /* Climb to function node root */
                 GETDC_B(ELEXND, ELEXND, T_FATHER);
         }
         goto elem_exit;
-
     case 4: /* ELEFLT: real literal */
         {
             DESCR_t rval;
@@ -266,26 +239,21 @@ fn_pad:     {
             addson(ELEXND, ELEYND);
         }
         break;
-
     case 5: /* ELEARY: array/table subscript */
         {
-            xsp.l--;  /* SHORTN XSP,1 — remove '[' */
+            xsp.l--; /* SHORTN XSP,1 — remove '[' */
             int32_t voff = GENVUP_fn(&xsp);
             if (!voff) return FAIL;
             SETAC(XPTR, voff); SETVC(XPTR, S);
             PUTDC_B(ELEXND, T_CODE, XPTR);
-
-            /* ELEAR2: build ITEM function node with args */
-            MOVD(ELEXND, ELEXND);
+            MOVD(ELEXND, ELEXND);                                       /* ELEAR2: build ITEM function node with args */
             if (elearg(ITEMCL) == FAIL) return FAIL;
             if (!AEQLC(BRTYPE, RBTYP)) { SETAC(EMSGCL, (intptr_t)ILLBRK); return FAIL; }
         }
         goto elem_exit;
-
     default: /* literal string (quoted) */
         {
-            /* Strip surrounding quotes */
-            xsp.o++; xsp.l -= 2;
+            xsp.o++; xsp.l -= 2;                                                          /* Strip surrounding quotes */
             int32_t soff = GENVAR_fn(&xsp);
             if (!soff) return FAIL;
             SETAC(XPTR, soff); SETVC(XPTR, S);
@@ -296,28 +264,21 @@ fn_pad:     {
         }
         break;
     }
-
-    /* ELEMN1: attach ELEXND to ELEMND (unary-op tree) */
-    if (AEQLC(ELEMND, 0)) {
+    if (AEQLC(ELEMND, 0)) {                                        /* ELEMN1: attach ELEXND to ELEMND (unary-op tree) */
         MOVD(ELEXND, ELEXND);
     } else {
         addson(ELEMND, ELEXND);
         MOVD(ELEXND, ELEMND);
     }
-
 elem_exit:
-    /* Climb to root of tree */
-    MOVD(ZPTR, ELEXND);
+    MOVD(ZPTR, ELEXND);                                                                      /* Climb to root of tree */
     while (!AEQLIC(ZPTR, T_FATHER, 0))
         GETDC_B(ZPTR, ZPTR, T_FATHER);
-
-    /* ELEM10: peek-ahead for '<' or '[' (ITEM subscription) */
-    {
+    {                                                        /* ELEM10: peek-ahead for '<' or '[' (ITEM subscription) */
         SPEC_t peek; int pstype;
         if (STREAM_fn(&peek, &TEXTSP, &GOTSTB, &pstype) == OK) {
             if (pstype != SGOTYP) {
-                /* Array reference on result */
-                SETAC(ELEMND, 0);
+                SETAC(ELEMND, 0);                                                        /* Array reference on result */
                 MOVD(ELEXND, ZPTR);
                 if (elearg(ITEMCL) == FAIL) return FAIL;
                 while (!AEQLIC(ELEXND, T_FATHER, 0))
@@ -326,7 +287,6 @@ elem_exit:
             }
         }
     }
-
     *out = ZPTR;
     return OK;
 }
@@ -335,8 +295,7 @@ elem_exit:
 Sil_result EXPR_fn(DESCR_t *out)
 {
     if (ELEMNT_fn(&EXELND) == FAIL) {
-        /* EXPNUL: return null node */
-        return NULNOD_fn(out);
+        return NULNOD_fn(out);                                                            /* EXPNUL: return null node */
     }
     SETAC(EXPRND, 0);
     return expr_continue(out);
@@ -347,11 +306,9 @@ Sil_result EXPR1_fn(DESCR_t *out)
 {
     DESCR_t saved = EXPRND;
     if (ELEMNT_fn(&EXELND) == FAIL) {
-        /* EXPR12: SPITBOL null-right-operand handling */
-        if (!AEQLC(SPITCL, 0) &&
+        if (!AEQLC(SPITCL, 0) &&                                       /* EXPR12: SPITBOL null-right-operand handling */
             (deql(EXOPND, BISRFN) || deql(EXOPND, BISNFN))) {
-            /* default null right operand */
-            if (NULNOD_fn(&EXELND) == FAIL) return FAIL;
+            if (NULNOD_fn(&EXELND) == FAIL) return FAIL;                                /* default null right operand */
             MOVD(EXPRND, saved);
             goto do_expr7;
         }
@@ -359,7 +316,6 @@ Sil_result EXPR1_fn(DESCR_t *out)
     }
     MOVD(EXPRND, saved);
     return expr_continue(out);
-
 do_expr7:
     return expr7(out);
 }
@@ -367,49 +323,36 @@ do_expr7:
 static Sil_result expr_continue(DESCR_t *out)
 {
     while (1) {
-        /* EXPR2: get binary operator */
-        DESCR_t op;
-        if (BINOP_fn(&op) == FAIL) break;  /* EXPR7 */
-
+        DESCR_t op;                                                                     /* EXPR2: get binary operator */
+        if (BINOP_fn(&op) == FAIL) break; /* EXPR7 */
         MOVD(EXOPCL, op);
-
-        /* SPITBOL: check for ASGNCL + SCAN-in-tree → convert to SJSR */
-        if (!AEQLC(SPITCL, 0) && deql(EXOPCL, ASGNCL) && !AEQLC(EXPRND, 0)) {
-            /* Walk up tree looking for BISNFN (SCAN) */
-            MOVD(EXOPND, EXPRND);
+        if (!AEQLC(SPITCL, 0) && deql(EXOPCL, ASGNCL) && !AEQLC(EXPRND, 0)) {  /* SPITBOL: check for ASGNCL + SCAN-in-tree → convert to SJSR */
+            MOVD(EXOPND, EXPRND);                                           /* Walk up tree looking for BISNFN (SCAN) */
             while (1) {
                 MOVD(EXEXND, EXOPND);
                 if (AEQLIC(EXEXND, T_FATHER, 0)) break;
                 GETDC_B(EXOPND, EXEXND, T_FATHER);
                 if (deql(EXOPND, BISNFN)) {
-                    /* Convert SCAN → SJSR */
-                    PUTAC_B(EXOPND, T_CODE, D_A(SJSRCL));
+                    PUTAC_B(EXOPND, T_CODE, D_A(SJSRCL));                                      /* Convert SCAN → SJSR */
                     ADDSIB_fn(EXPRND, EXELND);
                     MOVD(EXPRND, EXELND);
-                    /* Climb to top */
-                    while (!AEQLIC(EXPRND, T_FATHER, 0))
+                    while (!AEQLIC(EXPRND, T_FATHER, 0))                                              /* Climb to top */
                         GETDC_B(EXPRND, EXPRND, T_FATHER);
                     if (EXPR1_fn(out) == FAIL) return FAIL;
                     return OK;
                 }
             }
         }
-
-        /* EXPR14: allocate operator node */
-        if (alloc_node(&EXOPND) == FAIL) return FAIL;
+        if (alloc_node(&EXOPND) == FAIL) return FAIL;                               /* EXPR14: allocate operator node */
         PUTDC_B(EXOPND, T_CODE, EXOPCL);
-
         if (AEQLC(EXPRND, 0)) {
-            /* EXPR3: empty tree — compare precedences */
-            DESCR_t prec_op, prec_ex;
+            DESCR_t prec_op, prec_ex;                                      /* EXPR3: empty tree — compare precedences */
             GETDC_B(prec_op, EXOPCL, 2*DESCR); SETAV(prec_op, prec_op);
             GETDC_B(EXEXND, EXPRND, T_FATHER);
             GETDC_B(XPTR, EXEXND, T_CODE);
             GETDC_B(prec_ex, XPTR, 2*DESCR);
-
             if (ACOMP(prec_ex, prec_op) < 0) {
-                /* EXPR4: add current as sibling */
-                ADDSIB_fn(EXPRND, EXELND);
+                ADDSIB_fn(EXPRND, EXELND);                                           /* EXPR4: add current as sibling */
 expr5_loop:
                 while (!AEQLIC(EXPRND, T_FATHER, 0)) {
                     GETDC_B(EXPRND, EXPRND, T_FATHER);
@@ -427,7 +370,6 @@ expr11:
                 if (EXPR1_fn(out) == FAIL) return FAIL;
                 return OK;
             }
-
             ADDSIB_fn(EXPRND, EXOPND);
             MOVD(EXPRND, EXOPND);
             addson(EXPRND, EXELND);
@@ -435,29 +377,24 @@ expr11:
             if (EXPR1_fn(out) == FAIL) return FAIL;
             return OK;
         } else {
-            /* Non-empty tree */
-            addson(EXOPND, EXELND);
+            addson(EXOPND, EXELND);                                                                 /* Non-empty tree */
             MOVD(EXPRND, EXELND);
             if (EXPR1_fn(out) == FAIL) return FAIL;
             return OK;
         }
     }
-
     return expr7(out);
 }
 
 static Sil_result expr7(DESCR_t *out)
 {
-    /* EXPR7: assemble result */
-    if (AEQLC(EXPRND, 0)) {
-        /* EXPR10: add as sibling */
-        ADDSIB_fn(EXPRND, EXELND);
+    if (AEQLC(EXPRND, 0)) {                                                                 /* EXPR7: assemble result */
+        ADDSIB_fn(EXPRND, EXELND);                                                          /* EXPR10: add as sibling */
         MOVD(XPTR, EXPRND);
     } else {
         MOVD(XPTR, EXELND);
     }
-    /* EXPR9: climb to root */
-    while (!AEQLIC(XPTR, T_FATHER, 0))
+    while (!AEQLIC(XPTR, T_FATHER, 0))                                                        /* EXPR9: climb to root */
         GETDC_B(XPTR, XPTR, T_FATHER);
     *out = XPTR;
     return OK;
@@ -466,45 +403,36 @@ static Sil_result expr7(DESCR_t *out)
 /* ── BINOP — binary operator analysis ───────────────────────────────── */
 Sil_result BINOP_fn(DESCR_t *out)
 {
-    /* BINOP: STREAM BIOPTB */
-    if (FORBLK_fn() == FAIL) return FAIL;
-
+    if (FORBLK_fn() == FAIL) return FAIL;                                                     /* BINOP: STREAM BIOPTB */
     SPEC_t xsp; int stype;
     if (AEQLC(BRTYPE, EQTYP) && !AEQLC(SPITCL, 0)) {
-        /* SPITBOL assignment operator */
-        SETAC(STYPE, D_A(BIEQFN));
+        SETAC(STYPE, D_A(BIEQFN));                                                     /* SPITBOL assignment operator */
         *out = BIEQFN;
         return OK;
     }
-    if (AEQLC(BRTYPE, NBTYP)) return FAIL;   /* RTN2 — no operator */
-
+    if (AEQLC(BRTYPE, NBTYP)) return FAIL; /* RTN2 — no operator */
     Sil_result rc = STREAM_fn(&xsp, &TEXTSP, &BIOPTB, &stype);
     if (rc == FAIL) {
-        /* BINCON: concatenation */
-        *out = CONCL;
+        *out = CONCL;                                                                        /* BINCON: concatenation */
         return OK;
     }
-    MOVD(*out, STYPE);   /* STYPE holds the function descriptor */
+    MOVD(*out, STYPE); /* STYPE holds the function descriptor */
     return OK;
 }
 
 /* ── UNOP — unary operator analysis ─────────────────────────────────── */
 Sil_result UNOP_fn(DESCR_t *out)
 {
-    /* UNOP: FORWRD then STREAM UNOPTB */
-    if (FORWRD_fn() == FAIL) return FAIL;
+    if (FORWRD_fn() == FAIL) return FAIL;                                          /* UNOP: FORWRD then STREAM UNOPTB */
     SETAC(*out, 0);
-    if (!AEQLC(BRTYPE, NBTYP)) return OK;   /* RTN1 — no unary ops */
-
+    if (!AEQLC(BRTYPE, NBTYP)) return OK; /* RTN1 — no unary ops */
     SPEC_t xsp; int stype;
     while (1) {
         Sil_result rc = STREAM_fn(&xsp, &TEXTSP, &UNOPTB, &stype);
-        if (rc == FAIL) break;   /* RTXNAM — return current tree */
-
+        if (rc == FAIL) break; /* RTXNAM — return current tree */
         DESCR_t yptr;
         if (alloc_node(&yptr) == FAIL) return FAIL;
         PUTDC_B(yptr, T_CODE, STYPE);
-
         if (AEQLC(*out, 0)) {
             *out = yptr;
         } else {

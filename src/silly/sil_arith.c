@@ -53,9 +53,7 @@ static int expint(DESCR_t *res, const DESCR_t *x, const DESCR_t *y)
 {
     int32_t ix = x->a.i, iy = y->a.i;
     int32_t p;
-
     if (ix == 0 && iy < 0) return 0;
-
     if (iy < 0) {
         p = 0;
     } else {
@@ -103,67 +101,51 @@ static int exreal(DESCR_t *res, const DESCR_t *x, const DESCR_t *y)
  * ════════════════════════════════════════════════════════════════════════ */
 static Sil_result ARITH_fn(void)
 {
-    /* ── evaluate arguments (§8 XYARGS) ── */
-    if (XYARGS_fn() == FAIL) return FAIL;
-
-    /* ── build type-pair ── */
-    DTCL.a.i = XPTR.v;
-    DTCL.f   = 0;
-    DTCL.v   = YPTR.v;
-
-    /* ── type coercion: promote strings / convert int↔real ── */
-coerce:
-    /* INTEGER × INTEGER */
-    if (DTCL.a.i == I && DTCL.v == I) goto do_ii;
-    /* INTEGER × STRING  */
-    if (DTCL.a.i == I && DTCL.v == S) {
+    if (XYARGS_fn() == FAIL) return FAIL; /* ── evaluate arguments (§8 XYARGS) ── */
+    DTCL.a.i = XPTR.v; /* ── build type-pair ── */
+    DTCL.f = 0;
+    DTCL.v = YPTR.v;
+coerce: /* ── type coercion: promote strings / convert int↔real ── */
+    if (DTCL.a.i == I && DTCL.v == I) goto do_ii; /* INTEGER × INTEGER */
+    if (DTCL.a.i == I && DTCL.v == S) { /* INTEGER × STRING */
         LOCSP_fn(&YSP, &YPTR);
         if (SPCINT_fn(&YPTR, &YSP) == OK) { DTCL.v = I; goto do_ii; }
         if (SPREAL_fn(&YPTR, &YSP) == OK) { DTCL.v = R; goto do_ir; }
         return intr1();
     }
-    /* STRING × INTEGER  */
-    if (DTCL.a.i == S && DTCL.v == I) {
+    if (DTCL.a.i == S && DTCL.v == I) { /* STRING × INTEGER */
         LOCSP_fn(&XSP, &XPTR);
         if (SPCINT_fn(&XPTR, &XSP) == OK) { DTCL.a.i = I; goto do_ii; }
         if (SPREAL_fn(&XPTR, &XSP) == OK) { DTCL.a.i = R; goto do_ri; }
         return intr1();
     }
-    /* STRING × STRING   */
-    if (DTCL.a.i == S && DTCL.v == S) {
+    if (DTCL.a.i == S && DTCL.v == S) { /* STRING × STRING */
         LOCSP_fn(&XSP, &XPTR);
         if (SPCINT_fn(&XPTR, &XSP) == OK) { DTCL.a.i = I; goto coerce; }
         if (SPREAL_fn(&XPTR, &XSP) == OK) { DTCL.a.i = R; goto coerce; }
         return intr1();
     }
-    /* REAL × REAL       */
-    if (DTCL.a.i == R && DTCL.v == R) goto do_rr;
-    /* INTEGER × REAL    */
-    if (DTCL.a.i == I && DTCL.v == R) {
-do_ir:  YPTR.a.f = (real_t)YPTR.a.i; YPTR.f = 0; YPTR.v = R; goto do_rr;
+    if (DTCL.a.i == R && DTCL.v == R) goto do_rr; /* REAL × REAL */
+    if (DTCL.a.i == I && DTCL.v == R) { /* INTEGER × REAL */
+do_ir: YPTR.a.f = (real_t)YPTR.a.i; YPTR.f = 0; YPTR.v = R; goto do_rr;
     }
-    /* REAL × INTEGER    */
-    if (DTCL.a.i == R && DTCL.v == I) {
-do_ri:  XPTR.a.f = (real_t)XPTR.a.i; XPTR.f = 0; XPTR.v = R; goto do_rr;
+    if (DTCL.a.i == R && DTCL.v == I) { /* REAL × INTEGER */
+do_ri: XPTR.a.f = (real_t)XPTR.a.i; XPTR.f = 0; XPTR.v = R; goto do_rr;
     }
-    /* STRING × REAL     */
-    if (DTCL.a.i == S && DTCL.v == R) {
+    if (DTCL.a.i == S && DTCL.v == R) { /* STRING × REAL */
         LOCSP_fn(&XSP, &XPTR);
         if (SPCINT_fn(&XPTR, &XSP) == OK) goto do_ir;
         if (SPREAL_fn(&XPTR, &XSP) == OK) goto do_rr;
         return intr1();
     }
-    /* REAL × STRING     */
-    if (DTCL.a.i == R && DTCL.v == S) {
+    if (DTCL.a.i == R && DTCL.v == S) { /* REAL × STRING */
         LOCSP_fn(&YSP, &YPTR);
         if (SPCINT_fn(&YPTR, &YSP) == OK) goto do_ri;
         if (SPREAL_fn(&YPTR, &YSP) == OK) goto do_rr;
         return intr1();
     }
     return intr1();
-
-    /* ── INTEGER × INTEGER operations ── */
-do_ii:
+do_ii: /* ── INTEGER × INTEGER operations ── */
     switch (SCL.a.i) {
     case 1: /* ADD */
         CLR_MATH_ERROR();
@@ -189,12 +171,12 @@ do_ii:
         ZPTR = XPTR; ZPTR.a.i -= YPTR.a.i;
         if (MATH_ERROR()) return aerror();
         break;
-    case 6:  return (XPTR.a.i == YPTR.a.i) ? OK : FAIL;   /* EQ  */
-    case 7:  return (XPTR.a.i >= YPTR.a.i) ? OK : FAIL;   /* GE  */
-    case 8:  return (XPTR.a.i >  YPTR.a.i) ? OK : FAIL;   /* GT  */
-    case 9:  return (XPTR.a.i <= YPTR.a.i) ? OK : FAIL;   /* LE  */
-    case 10: return (XPTR.a.i <  YPTR.a.i) ? OK : FAIL;   /* LT  */
-    case 11: return (XPTR.a.i != YPTR.a.i) ? OK : FAIL;   /* NE  */
+    case 6: return (XPTR.a.i == YPTR.a.i) ? OK : FAIL; /* EQ  */
+    case 7: return (XPTR.a.i >= YPTR.a.i) ? OK : FAIL; /* GE  */
+    case 8: return (XPTR.a.i > YPTR.a.i) ? OK : FAIL; /* GT  */
+    case 9: return (XPTR.a.i <= YPTR.a.i) ? OK : FAIL; /* LE  */
+    case 10: return (XPTR.a.i < YPTR.a.i) ? OK : FAIL; /* LT  */
+    case 11: return (XPTR.a.i != YPTR.a.i) ? OK : FAIL; /* NE  */
     case 12: /* REMDR */
         if (YPTR.a.i == 0) return aerror();
         CLR_MATH_ERROR();
@@ -206,9 +188,7 @@ do_ii:
     }
     ARTHCL.a.i++;
     return OK;
-
-    /* ── REAL × REAL operations ── */
-do_rr:
+do_rr: /* ── REAL × REAL operations ── */
     switch (SCL.a.i) {
     case 1: /* ADD */
         CLR_MATH_ERROR();
@@ -233,13 +213,13 @@ do_rr:
         ZPTR = XPTR; ZPTR.a.f -= YPTR.a.f;
         if (RMATH_ERROR(ZPTR.a.f)) return aerror();
         break;
-    case 6:  return (XPTR.a.f == YPTR.a.f) ? OK : FAIL;   /* EQ  */
-    case 7:  return (XPTR.a.f >= YPTR.a.f) ? OK : FAIL;   /* GE  */
-    case 8:  return (XPTR.a.f >  YPTR.a.f) ? OK : FAIL;   /* GT  */
-    case 9:  return (XPTR.a.f <= YPTR.a.f) ? OK : FAIL;   /* LE  */
-    case 10: return (XPTR.a.f <  YPTR.a.f) ? OK : FAIL;   /* LT  */
-    case 11: return (XPTR.a.f != YPTR.a.f) ? OK : FAIL;   /* NE  */
-    case 12: return intr1();   /* REMDR undefined for REAL */
+    case 6: return (XPTR.a.f == YPTR.a.f) ? OK : FAIL; /* EQ  */
+    case 7: return (XPTR.a.f >= YPTR.a.f) ? OK : FAIL; /* GE  */
+    case 8: return (XPTR.a.f > YPTR.a.f) ? OK : FAIL; /* GT  */
+    case 9: return (XPTR.a.f <= YPTR.a.f) ? OK : FAIL; /* LE  */
+    case 10: return (XPTR.a.f < YPTR.a.f) ? OK : FAIL; /* LT  */
+    case 11: return (XPTR.a.f != YPTR.a.f) ? OK : FAIL; /* NE  */
+    case 12: return intr1(); /* REMDR undefined for REAL */
     default: return intr1();
     }
     ARTHCL.a.i++;
@@ -280,7 +260,6 @@ Sil_result INTGER_fn(void)
 Sil_result MNS_fn(void)
 {
     if (ARGVAL_fn() == FAIL) return FAIL;
-
     if (XPTR.v == I) {
         CLR_MATH_ERROR();
         ZPTR = XPTR; ZPTR.a.i = -ZPTR.a.i;
@@ -298,8 +277,7 @@ Sil_result MNS_fn(void)
             return OK;
         }
         if (SPREAL_fn(&XPTR, &XSP) == FAIL) return intr1();
-        /* fall through to REAL case */
-    }
+    } /* fall through to REAL case */
     if (XPTR.v == R) {
         ZPTR = XPTR; ZPTR.a.f = -ZPTR.a.f;
         ARTHCL.a.i++;
@@ -315,11 +293,8 @@ Sil_result MNS_fn(void)
 Sil_result PLS_fn(void)
 {
     if (ARGVAL_fn() == FAIL) return FAIL;
-
-    /* result goes in ZPTR (SIL uses ZPTR as output for ARGVAL here) */
-    ZPTR = XPTR;   /* ARGVAL leaves result in XPTR per §8 convention;
-                      PLS uses ZPTR as the output (SIL: RCALL ZPTR,ARGVAL) */
-
+    ZPTR = XPTR; /* ARGVAL leaves result in XPTR per §8 convention;
+                      result goes in ZPTR; PLS uses ZPTR as output (SIL: RCALL ZPTR,ARGVAL) */
     if (ZPTR.v == I || ZPTR.v == R) { ARTHCL.a.i++; return OK; }
     if (ZPTR.v == S) {
         LOCSP_fn(&XSP, &ZPTR);

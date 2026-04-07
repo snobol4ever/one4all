@@ -72,32 +72,22 @@ static void sighandler(int sig)
 static void BEGIN_fn(void)
 {
     XCALL_ISTACK();
-
     if (!AEQLC(BANRCL, 0)) {
         XCALL_OUTPUT_fmt(PUNCH, "SNOBOL4 (Version 3.11, May 19, 1975)\n");
         XCALL_OUTPUT_fmt(PUNCH, "    Bell Telephone Laboratories...\n\n");
     }
-
     XCALL_MSTIME(&TIMECL);
-
-    /* Allocate initial object code block */
-    {
+    {                                                                           /* Allocate initial object code block */
         int32_t blk = BLOCK_fn(D_A(OCALIM), C);
         if (!blk) { SETAC(ERRTYP, 20); FTLEND_fn(); }
         SETAC(SCBSCL, blk); MOVD(OCSVCL, SCBSCL);
-        /* RESETF SCBSCL,PTR */
-        D_F(SCBSCL) &= ~PTR;
+        D_F(SCBSCL) &= ~PTR;                                                                     /* RESETF SCBSCL,PTR */
     }
-
-    /* Convert initialisation specifier lists to string structures */
-    {
+    {                                                  /* Convert initialisation specifier lists to string structures */
         DESCR_t ycl; GETDC_B(ycl, INITLS, 0);
-        /* Walk INITLS — abbreviated for M21; sil_data_init() handles most */
-        (void)ycl;
+        (void)ycl;                                 /* Walk INITLS — abbreviated for M21; sil_data_init() handles most */
     }
-
-    /* INITB / INITE: convert remaining init block */
-    while (D_A(INITB) < D_A(INITE)) {
+    while (D_A(INITB) < D_A(INITE)) {                                  /* INITB / INITE: convert remaining init block */
         DESCR_t xptr, yptr, zptr;
         GETDC_B(xptr, INITB, 0);
         int32_t off = genvar_from_descr(xptr);
@@ -106,9 +96,7 @@ static void BEGIN_fn(void)
         PUTDC_B(zptr, 0, yptr);
         INCRA(INITB, 2*DESCR);
     }
-
-    /* Get command-line &PARM */
-    {
+    {                                                                                       /* Get command-line &PARM */
         SPEC_t psp;
         if (XCALL_GETPARM(&psp) == OK) {
             int32_t off = GENVAR_fn(&psp);
@@ -116,42 +104,32 @@ static void BEGIN_fn(void)
             XCALL_FREEPARM(&psp);
         }
     }
-
-    /* Install initial pattern keyword values */
-    PUTDC_B(ABRTKY, DESCR, ABOPAT);
-    PUTDC_B(ARBKY,  DESCR, ARBPAT);
-    PUTDC_B(BALKY,  DESCR, BALPAT);
+    PUTDC_B(ABRTKY, DESCR, ABOPAT);                                         /* Install initial pattern keyword values */
+    PUTDC_B(ARBKY, DESCR, ARBPAT);
+    PUTDC_B(BALKY, DESCR, BALPAT);
     PUTDC_B(FAILKY, DESCR, FALPAT);
     PUTDC_B(FNCEKY, DESCR, FNCPAT);
-    PUTDC_B(REMKY,  DESCR, REMPAT);
+    PUTDC_B(REMKY, DESCR, REMPAT);
     PUTDC_B(SUCCKY, DESCR, SUCPAT);
-
     SETAC(VARSYM, 0);
-
-    /* Allocate name-list buffer */
-    {
+    {                                                                                    /* Allocate name-list buffer */
         int32_t nb = BLOCK_fn(NMOVER, B);
         if (!nb) { SETAC(ERRTYP, 20); FTLEND_fn(); }
         SETAC(NBSPTR, nb);
     }
-
     MOVD(CMBSCL, SCBSCL);
     MOVD(UNIT, INPUT);
     MOVD(OCBSCL, CMBSCL);
     SUM(OCLIM, CMBSCL, OCALIM); DECRA(OCLIM, 7*DESCR);
     SETAC(INICOM, 1);
-
-    /* Get initial filename */
-    {
+    {                                                                                         /* Get initial filename */
         SPEC_t fsp;
         if (XCALL_IO_FILE(UNIT, &fsp) == OK) {
             int32_t off = GENVAR_fn(&fsp);
             if (off) { SETAC(FILENM, off); SETVC(FILENM, S); }
         }
     }
-
-    /* Auto-load external functions */
-    for (int32_t idx = 0; ; idx++) {
+    for (int32_t idx = 0; ; idx++) {                                                  /* Auto-load external functions */
         SPEC_t psp;
         if (XCALL_GETPMPROTO(&psp, idx) == FAIL) break;
         int32_t off = GENVAR_fn(&psp);
@@ -168,14 +146,10 @@ static void BEGIN_fn(void)
 static void compile_loop(void)
 {
     SPEC_t xsp; int stype;
-
     while (1) {
-        /* XLATRD: optionally print previous line */
-        if (!AEQLC(LISTCL, 0))
+        if (!AEQLC(LISTCL, 0))                                              /* XLATRD: optionally print previous line */
             STPRNT_fn(D_A(IOKEY), OUTBLK, &LNBFSP);
-
-        /* XLATRN: read a card */
-        TEXTSP = NEXTSP;
+        TEXTSP = NEXTSP;                                                                       /* XLATRN: read a card */
         if (STREAD_fn(&TEXTSP, UNIT) == FAIL) {
             FILCHK_fn();
             continue;
@@ -183,29 +157,20 @@ static void compile_loop(void)
         D_A(TMVAL) = TEXTSP.l + STNOSZ;
         LNBFSP.l = D_A(TMVAL);
         INCRA(LNNOCL, 1);
-
-        /* XLATNX: classify card */
-        if (STREAM_fn(&xsp, &TEXTSP, &CARDTB, &stype) == FAIL) continue;
+        if (STREAM_fn(&xsp, &TEXTSP, &CARDTB, &stype) == FAIL) continue;                     /* XLATNX: classify card */
         SETAC(STYPE, stype);
         NEWCRD_fn();
-
-        /* Compile one statement */
-        Sil_result rc = CMPILE_fn();
-
+        Sil_result rc = CMPILE_fn();                                                         /* Compile one statement */
         if (rc == FAIL) {
-            /* END statement reached */
-            INCRA(CMOFCL, DESCR);
+            INCRA(CMOFCL, DESCR);                                                            /* END statement reached */
             PUTD_B(CMBSCL, CMOFCL, ENDCL);
             if (!AEQLC(LISTCL, 0))
                 STPRNT_fn(D_A(IOKEY), OUTBLK, &LNBFSP);
             goto xlaend;
         }
-        /* rc == OK or RTN3: continue reading */
-    }
-
+    }                                                                           /* rc == OK or RTN3: continue reading */
 xlaend:
-    /* XLAEND: check compilation errors */
-    if (!AEQLC(ESAICL, 0)) {
+    if (!AEQLC(ESAICL, 0)) {                                                      /* XLAEND: check compilation errors */
         XCALL_OUTPUT_fmt(PUNCH, "ERRORS DETECTED IN SOURCE PROGRAM\n\n");
         if (!AEQLC(NERRCL, 0)) {
             SETAC(RETCOD, 1);
@@ -215,34 +180,22 @@ xlaend:
         if (!AEQLC(BANRCL, 0))
             XCALL_OUTPUT_fmt(PUNCH, "No errors detected in source program\n\n");
     }
-
-    /* XLATND: check if execute-only */
-    if (AEQLC(EXECCL, 0)) { END_fn(); return; }
-
-    /* Finalise compilation */
-    XCALL_XECOMP();
+    if (AEQLC(EXECCL, 0)) { END_fn(); return; }                                      /* XLATND: check if execute-only */
+    XCALL_XECOMP();                                                                           /* Finalise compilation */
     SETAC(UNIT, 0); SETAC(LPTR, 0); SETAC(OCLIM, 0); SETAC(LNNOCL, 0);
     XCALL_ZERBLK(&COMREG, COMDCT);
-
-    /* Split off unused object code */
-    {
+    {                                                                                 /* Split off unused object code */
         DESCR_t xcl; SUM(xcl, CMBSCL, CMOFCL);
         SPLIT_fn(D_A(xcl));
     }
-
     SETAC(LISTCL, 0); SETAC(COMPCL, 0);
-
-    /* Time the compiler */
-    {
+    {                                                                                            /* Time the compiler */
         DESCR_t et;
         XCALL_MSTIME(&et);
         XCALL_SBREAL(&TIMECL, et, TIMECL);
     }
-
     SETAC(CNSLCL, 1);
-
-    /* Run the interpreter */
-    Sil_result irc = INTERP_fn();
+    Sil_result irc = INTERP_fn();                                                              /* Run the interpreter */
     if ((int)irc != 0 && (int)irc != 5 && (int)irc != 6) MAIN1_fn();
     END_fn();
 }
@@ -260,23 +213,14 @@ static int32_t genvar_from_descr(DESCR_t d)
 int main(int argc, char *argv[])
 {
     (void)argc; (void)argv;
-
-    /* Install signal handlers */
-    signal(SIGINT,  sighandler);
+    signal(SIGINT, sighandler);                                                            /* Install signal handlers */
     signal(SIGTERM, sighandler);
 #ifdef SIGFPE
-    signal(SIGFPE,  sighandler);
+    signal(SIGFPE, sighandler);
 #endif
-
-    /* Initialise the arena */
-    arena_init();
-
-    /* Initialise all static data */
-    sil_data_init();
-
-    /* Run the interpreter */
-    BEGIN_fn();
+    arena_init();                                                                             /* Initialise the arena */
+    sil_data_init();                                                                    /* Initialise all static data */
+    BEGIN_fn();                                                                                /* Run the interpreter */
     compile_loop();
-
     return (int)D_A(RETCOD);
 }

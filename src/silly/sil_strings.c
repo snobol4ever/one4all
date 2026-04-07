@@ -42,11 +42,9 @@ void APDSP_fn(SPEC_t *base, const SPEC_t *str)
 {
     int32_t len = str->l;
     if (len <= 0) return;
-
     char *src = sp_ptr(str);
-    char *dst = sp_ptr(base) + base->l;   /* append after existing content */
+    char *dst = sp_ptr(base) + base->l; /* append after existing content */
     base->l += len;
-
     if (len >= 4)
         memcpy(dst, src, (size_t)len);
     else {
@@ -60,8 +58,7 @@ void APDSP_fn(SPEC_t *base, const SPEC_t *str)
  * ════════════════════════════════════════════════════════════════════════ */
 void REMSP_fn(SPEC_t *dst, const SPEC_t *src, const SPEC_t *match)
 {
-    /* copy all fields from src first (handles dst == src alias) */
-    SPEC_t tmp = *src;
+    SPEC_t tmp = *src;                                   /* copy all fields from src first (handles dst == src alias) */
     tmp.o += match->l;
     tmp.l -= match->l;
     *dst = tmp;
@@ -108,23 +105,18 @@ Sil_result SPCINT_fn(DESCR_t *dp, const SPEC_t *sp)
     const char *cp = sp_ptr(sp);
     long val;
     char *end;
-
-    /* strip leading whitespace (SPITBOL-compatible, always) */
-    while (len > 0 && (*cp == ' ' || *cp == '\t')) { cp++; len--; }
-
+    while (len > 0 && (*cp == ' '  || *cp == '\t')) { cp++; len--; }  /* strip leading whitespace (SPITBOL-compatible, always) */
     if (len == 0) return FAIL;
     if (len > sizeof(buf) - 1) len = sizeof(buf) - 1;
     memcpy(buf, cp, len);
     buf[len] = '\0';
-
     errno = 0;
     val = strtol(buf, &end, 10);
     if (*end != '\0') return FAIL;
     if (errno == ERANGE) return FAIL;
-
     dp->a.i = (int32_t)val;
-    dp->f   = 0;
-    dp->v   = I;
+    dp->f = 0;
+    dp->v = I;
     return OK;
 }
 
@@ -135,34 +127,27 @@ Sil_result SPCINT_fn(DESCR_t *dp, const SPEC_t *sp)
  * ════════════════════════════════════════════════════════════════════════ */
 Sil_result SPREAL_fn(DESCR_t *dp, const SPEC_t *sp)
 {
-    /* sentinel-terminate trick from lib/generic/spreal.c */
-#define SPREAL_TC  '|'
+#define SPREAL_TC '|'                                           /* sentinel-terminate trick from lib/generic/spreal.c */
     char buf[66];
     size_t len = (size_t)sp->l;
     const char *cp = sp_ptr(sp);
     double d;
     char t;
-
-    /* strip leading whitespace */
-    while (len > 0 && (*cp == ' ' || *cp == '\t')) { cp++; len--; }
-
+    while (len > 0 && (*cp == ' '  || *cp == '\t')) { cp++; len--; }                      /* strip leading whitespace */
     if (len == 0) {
         dp->a.f = 0.0f;
-        dp->f   = 0;
-        dp->v   = R;
+        dp->f = 0;
+        dp->v = R;
         return OK;
     }
-
     if (len > sizeof(buf) - 2) len = sizeof(buf) - 2;
     memcpy(buf, cp, len);
     buf[len++] = SPREAL_TC;
-    buf[len]   = '\0';
-
+    buf[len] = '\0';
     if (sscanf(buf, "%lf%c", &d, &t) != 2 || t != SPREAL_TC) return FAIL;
-
     dp->a.f = (real_t)d;
-    dp->f   = 0;
-    dp->v   = R;
+    dp->f = 0;
+    dp->v = R;
     return OK;
 #undef SPREAL_TC
 }
@@ -176,19 +161,15 @@ void REALST_fn(SPEC_t *sp, const DESCR_t *dp)
 {
     static char strbuf[64];
     char *bp;
-
     sprintf(strbuf, "%g", (double)dp->a.f);
-
-    /* ensure dot or exponent present (matching v311 behaviour) */
-    bp = strbuf;
+    bp = strbuf;                                          /* ensure dot or exponent present (matching v311 behaviour) */
     while (*bp && (isdigit((unsigned char)*bp) || *bp == '-')) bp++;
     if (*bp == '\0') { *bp++ = '.'; *bp = '\0'; }
-
-    sp->a    = (int32_t)(intptr_t)strbuf;   /* raw C ptr, not arena offset */
-    sp->f    = 0;
-    sp->v    = 0;
-    sp->o    = 0;
-    sp->l    = (int32_t)strlen(strbuf);
+    sp->a = (int32_t)(intptr_t)strbuf; /* raw C ptr, not arena offset */
+    sp->f = 0;
+    sp->v = 0;
+    sp->o = 0;
+    sp->l = (int32_t)strlen(strbuf);
     sp->unused = 0;
 }
 
@@ -200,14 +181,12 @@ void REALST_fn(SPEC_t *sp, const DESCR_t *dp)
 void INTSPC_fn(SPEC_t *sp, const DESCR_t *dp)
 {
     static char strbuf[32];
-
     sprintf(strbuf, "%d", dp->a.i);
-
-    sp->a    = (int32_t)(intptr_t)strbuf;   /* raw C ptr, not arena offset */
-    sp->f    = 0;
-    sp->v    = 0;
-    sp->o    = 0;
-    sp->l    = (int32_t)strlen(strbuf);
+    sp->a = (int32_t)(intptr_t)strbuf; /* raw C ptr, not arena offset */
+    sp->f = 0;
+    sp->v = 0;
+    sp->o = 0;
+    sp->l = (int32_t)strlen(strbuf);
     sp->unused = 0;
 }
 
@@ -221,13 +200,12 @@ void LOCSP_fn(SPEC_t *sp, const DESCR_t *dp)
         sp->l = 0;
         return;
     }
-    /* title DESCR's V field holds string byte length */
-    DESCR_t *title = (DESCR_t *)A2P(dp->a.i);
-    sp->a    = dp->a.i;
-    sp->f    = dp->f;
-    sp->v    = dp->v;
-    sp->o    = BCDFLD;
-    sp->l    = title->v;
+    DESCR_t *title = (DESCR_t *)A2P(dp->a.i);                       /* title DESCR's V field holds string byte length */
+    sp->a = dp->a.i;
+    sp->f = dp->f;
+    sp->v = dp->v;
+    sp->o = BCDFLD;
+    sp->l = title->v;
     sp->unused = 0;
 }
 
@@ -236,7 +214,7 @@ void LOCSP_fn(SPEC_t *sp, const DESCR_t *dp)
  * ════════════════════════════════════════════════════════════════════════ */
 void SUBSP_fn(SPEC_t *dst, const SPEC_t *src, int32_t off, int32_t len)
 {
-    *dst   = *src;
+    *dst = *src;
     dst->o = src->o + off;
     dst->l = len;
 }

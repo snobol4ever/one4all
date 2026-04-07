@@ -54,13 +54,13 @@ static void maknod_fn(DESCR_t *d1, const DESCR_t *d2, const DESCR_t *d3,
     int32_t a2 = d2->a.i;
     *(DESCR_t *)A2P(a2 + 1*DESCR) = *d5;
     ((DESCR_t *)A2P(a2 + 2*DESCR))->a.i = d4->a.i;
-    ((DESCR_t *)A2P(a2 + 2*DESCR))->f   = 0;
-    ((DESCR_t *)A2P(a2 + 2*DESCR))->v   = (int32_t)d3->a.i;
+    ((DESCR_t *)A2P(a2 + 2*DESCR))->f = 0;
+    ((DESCR_t *)A2P(a2 + 2*DESCR))->v = (int32_t)d3->a.i;
     ((DESCR_t *)A2P(a2 + 3*DESCR))->a.i = d3->a.i;
-    ((DESCR_t *)A2P(a2 + 3*DESCR))->f   = 0;
-    ((DESCR_t *)A2P(a2 + 3*DESCR))->v   = (int32_t)d3->a.i;
+    ((DESCR_t *)A2P(a2 + 3*DESCR))->f = 0;
+    ((DESCR_t *)A2P(a2 + 3*DESCR))->v = (int32_t)d3->a.i;
     if (d6) *(DESCR_t *)A2P(a2 + 4*DESCR) = *d6;
-    *d1 = *d2;   /* last — d1 may alias d6 */
+    *d1 = *d2; /* last — d1 may alias d6 */
 }
 
 /* linkor_fn — link alternation chains.
@@ -83,9 +83,9 @@ static void linkor_fn(const DESCR_t *d1, const DESCR_t *d2)
  * v311.sil LVALUE d1,d2 / lib/pat.c lvalue()                          */
 static void lvalue_fn(DESCR_t *d1, const DESCR_t *d2)
 {
-    int32_t a      = d2->a.i;
+    int32_t a = d2->a.i;
     int32_t offset = ((DESCR_t *)A2P(a + 2*DESCR))->a.i;
-    int32_t i      = ((DESCR_t *)A2P(a + 3*DESCR))->a.i;
+    int32_t i = ((DESCR_t *)A2P(a + 3*DESCR))->a.i;
     while (offset != 0) {
         int32_t j = ((DESCR_t *)A2P(a + offset + 3*DESCR))->a.i;
         if (j < i) i = j;
@@ -107,34 +107,27 @@ static void cpypat_fn(DESCR_t *d1, const DESCR_t *d2, const DESCR_t *d3,
     int32_t a3 = d3->a.i;
     int32_t a4 = d4->a.i;
     int32_t a5 = d5->a.i;
-
-#define F1(X) ((X) == 0 ? 0           : ((X) + a4))
-#define F2(X) ((X) == 0 ? a5          : ((X) + a4))
-
+#define F1(X) ((X) == 0 ? 0 : ((X) + a4))
+#define F2(X) ((X) == 0 ? a5 : ((X) + a4))
     do {
         int32_t v7 = ((DESCR_t *)A2P(r2 + 1*DESCR))->v;
         *(DESCR_t *)A2P(r1 + 1*DESCR) = *(DESCR_t *)A2P(r2 + 1*DESCR);
-
         int32_t a8 = ((DESCR_t *)A2P(r2 + 2*DESCR))->a.i;
         int32_t v8 = ((DESCR_t *)A2P(r2 + 2*DESCR))->v;
         ((DESCR_t *)A2P(r1 + 2*DESCR))->a.i = F1(a8);
-        ((DESCR_t *)A2P(r1 + 2*DESCR))->f   = 0;
-        ((DESCR_t *)A2P(r1 + 2*DESCR))->v   = F2(v8);
-
+        ((DESCR_t *)A2P(r1 + 2*DESCR))->f = 0;
+        ((DESCR_t *)A2P(r1 + 2*DESCR))->v = F2(v8);
         int32_t a9 = ((DESCR_t *)A2P(r2 + 3*DESCR))->a.i;
         int32_t v9 = ((DESCR_t *)A2P(r2 + 3*DESCR))->v;
         ((DESCR_t *)A2P(r1 + 3*DESCR))->a.i = a9 + a3;
-        ((DESCR_t *)A2P(r1 + 3*DESCR))->f   = 0;
-        ((DESCR_t *)A2P(r1 + 3*DESCR))->v   = v9 + a3;
-
+        ((DESCR_t *)A2P(r1 + 3*DESCR))->f = 0;
+        ((DESCR_t *)A2P(r1 + 3*DESCR))->v = v9 + a3;
         if (v7 == 3)
             *(DESCR_t *)A2P(r1 + 4*DESCR) = *(DESCR_t *)A2P(r2 + 4*DESCR);
-
         r1 += (v7 + 1) * DESCR;
         r2 += (v7 + 1) * DESCR;
         r3 -= (v7 + 1) * DESCR;
     } while (r3 > 0);
-
     d1->a.i = r1;
 #undef F1
 #undef F2
@@ -159,26 +152,20 @@ static DESCR_t oc_fetch(void)
 static Sil_result charz_abnsnd(const DESCR_t *ycl, const DESCR_t *zcl)
 {
     if (ARGVAL_fn() == FAIL) return FAIL;
-
-    /* coerce INTEGER → string via GNVARI */
-    if (XPTR.v == I) {
+    if (XPTR.v == I) {                                                          /* coerce INTEGER → string via GNVARI */
         int32_t off = GNVARI_fn(XPTR.a.i);
         if (off == 0) return FAIL;
         XPTR.a.i = off; XPTR.f = 0; XPTR.v = S;
     } else if (XPTR.v != S && XPTR.v != E) {
         return intr1();
     }
-
-    /* PATNOD: null string → NONAME error */
-    DESCR_t nulvcl = NULVCL;
+    DESCR_t nulvcl = NULVCL;                                                    /* PATNOD: null string → NONAME error */
     if (XPTR.a.i == nulvcl.a.i && XPTR.v == nulvcl.v) return noname();
-
-    /* allocate LNODSZ block and construct node */
-    int32_t blk = BLOCK_fn(LNODSZ.a.i, P);
+    int32_t blk = BLOCK_fn(LNODSZ.a.i, P);                                /* allocate LNODSZ block and construct node */
     if (blk == 0) return FAIL;
     TPTR.a.i = blk; TPTR.f = 0; TPTR.v = P;
     maknod_fn(&ZPTR, &TPTR, zcl, &ZEROCL, ycl, &XPTR);
-    return OK;   /* result in ZPTR */
+    return OK; /* result in ZPTR */
 }
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -189,9 +176,7 @@ static Sil_result charz_abnsnd(const DESCR_t *ycl, const DESCR_t *zcl)
 static Sil_result lprtnd(const DESCR_t *ycl)
 {
     if (ARGVAL_fn() == FAIL) return FAIL;
-
-    ZCL = ZEROCL;   /* default min length = 0 */
-
+    ZCL = ZEROCL; /* default min length = 0 */
     if (XPTR.v == E) goto patnod;
     if (XPTR.v == S) {
         LOCSP_fn(&ZSP, &XPTR);
@@ -199,18 +184,13 @@ static Sil_result lprtnd(const DESCR_t *ycl)
     } else if (XPTR.v != I) {
         return intr1();
     }
-
-    /* LPRTNI: check non-negative; if LEN, use value as min-length */
-    if (XPTR.a.i < 0) return lenerr();
-    if (XPTR.a.i == LNTHCL.a.i) ZCL.a.i = XPTR.a.i;   /* LEN: min = N */
-
+    if (XPTR.a.i < 0) return lenerr();                 /* LPRTNI: check non-negative; if LEN, use value as min-length */
+    if (XPTR.a.i == LNTHCL.a.i) ZCL.a.i = XPTR.a.i; /* LEN: min = N */
 patnod:
-    /* null string check — XPTR with zero arena offset and STRING type */
-    {
+    {                                              /* null string check — XPTR with zero arena offset and STRING type */
         DESCR_t nulvcl = NULVCL;
         if (XPTR.a.i == nulvcl.a.i && XPTR.v == nulvcl.v) return noname();
     }
-
     int32_t blk = BLOCK_fn(LNODSZ.a.i, P);
     if (blk == 0) return FAIL;
     TPTR.a.i = blk; TPTR.f = 0; TPTR.v = P;
@@ -243,9 +223,7 @@ Sil_result TAB_fn(void)  { return lprtnd(&TBCL);   }
 Sil_result ARBNO_fn(void)
 {
     if (PATVAL_fn() == FAIL) return FAIL;
-
-    /* coerce STRING → single-char pattern node */
-    if (XPTR.v == S) {
+    if (XPTR.v == S) {                                                    /* coerce STRING → single-char pattern node */
         LOCSP_fn(&TSP, &XPTR);
         TMVAL.a.i = TSP.l; TMVAL.f = 0; TMVAL.v = 0;
         int32_t blk = BLOCK_fn(LNODSZ.a.i, P);
@@ -255,32 +233,23 @@ Sil_result ARBNO_fn(void)
     } else if (XPTR.v != P) {
         return intr1();
     }
-
-    /* ARBP: compute sizes and assemble ARBNO block */
-    XSIZ.a.i = x_bksize(XPTR.a.i); XSIZ.f = 0; XSIZ.v = 0;
+    XSIZ.a.i = x_bksize(XPTR.a.i); XSIZ.f = 0; XSIZ.v = 0;            /* ARBP: compute sizes and assemble ARBNO block */
     TSIZ.a.i = XSIZ.a.i + ARBSIZ.a.i;
     TSIZ.f = 0; TSIZ.v = P;
-
     int32_t blk = BLOCK_fn(TSIZ.a.i, P);
     if (blk == 0) return FAIL;
     TPTR.a.i = blk; TPTR.f = 0; TPTR.v = P;
     ZPTR = TPTR;
-
-    /* copy ARHEAD, then pattern, then ARTAIL, then ARBACK */
-    TSIZ.a.i = x_bksize(ARHEAD.a.i); TSIZ.f = 0; TSIZ.v = 0;
+    TSIZ.a.i = x_bksize(ARHEAD.a.i); TSIZ.f = 0; TSIZ.v = 0;   /* copy ARHEAD, then pattern, then ARTAIL, then ARBACK */
     DESCR_t zero = ZEROCL;
     cpypat_fn(&TPTR, &ARHEAD, &zero, &zero, &zero, &TSIZ);
-
     ZSIZ.a.i = XSIZ.a.i + TSIZ.a.i;
     cpypat_fn(&TPTR, &XPTR, &zero, &TSIZ, &ZSIZ, &XSIZ);
-
     TSIZ.a.i = NODSIZ.a.i + NODSIZ.a.i;
     cpypat_fn(&TPTR, &ARTAIL, &zero, &ZSIZ, &zero, &TSIZ);
-
     ZSIZ.a.i = TSIZ.a.i + ZSIZ.a.i;
     cpypat_fn(&TPTR, &ARBACK, &zero, &ZSIZ, &TSIZ, &TSIZ);
-
-    return OK;   /* result in ZPTR */
+    return OK; /* result in ZPTR */
 }
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -290,19 +259,16 @@ Sil_result ARBNO_fn(void)
 Sil_result ATOP_fn(void)
 {
     YPTR = oc_fetch();
-
     if (!(D_F(YPTR) & FNC)) {
-        /* not a function — must be EXPRESSION */
-        if (YPTR.v != E) return nemo();
+        if (YPTR.v != E) return nemo();                                        /* not a function — must be EXPRESSION */
     } else {
         switch (INVOKE_fn()) {
         case FAIL: return FAIL;
-        case OK:   break;   /* returned as name — value in YPTR */
-        default:   break;
+        case OK: break; /* returned as name — value in YPTR */
+        default: break;
         }
         if (YPTR.v != E) return nemo();
     }
-
     int32_t blk = BLOCK_fn(LNODSZ.a.i, P);
     if (blk == 0) return FAIL;
     TPTR.a.i = blk; TPTR.f = 0; TPTR.v = P;
@@ -316,27 +282,20 @@ Sil_result ATOP_fn(void)
  * ════════════════════════════════════════════════════════════════════════ */
 static Sil_result nam_dol(const DESCR_t *op_cl)
 {
-    /* get pattern for first argument */
-    if (PATVAL_fn() == FAIL) return FAIL;
-    XPTR = XPTR;   /* first arg in XPTR */
-
-    /* get second argument from OC stream */
-    YPTR = oc_fetch();
-
+    if (PATVAL_fn() == FAIL) return FAIL;                                           /* get pattern for first argument */
+    XPTR = XPTR; /* first arg in XPTR */
+    YPTR = oc_fetch();                                                          /* get second argument from OC stream */
     if (D_F(YPTR) & FNC) {
         DESCR_t saved_xptr = XPTR;
         switch (INVOKE_fn()) {
         case FAIL: return FAIL;
-        case OK:   XPTR = saved_xptr; break;
-        default:   XPTR = saved_xptr; break;
+        case OK: XPTR = saved_xptr; break;
+        default: XPTR = saved_xptr; break;
         }
         if (YPTR.v != E) return nemo();
     }
-
-    /* NAM3: coerce STRING first-arg to pattern node if needed */
-    if (XPTR.v == S) {
-        /* NAMV: convert string to pattern */
-        LOCSP_fn(&TSP, &XPTR);
+    if (XPTR.v == S) {                                     /* NAM3: coerce STRING first-arg to pattern node if needed */
+        LOCSP_fn(&TSP, &XPTR);                                                     /* NAMV: convert string to pattern */
         TMVAL.a.i = TSP.l; TMVAL.f = 0; TMVAL.v = 0;
         int32_t blk = BLOCK_fn(LNODSZ.a.i, P);
         if (blk == 0) return FAIL;
@@ -345,43 +304,30 @@ static Sil_result nam_dol(const DESCR_t *op_cl)
     } else if (XPTR.v != P) {
         return intr1();
     }
-
-    /* NAMP: build the compound naming pattern */
-    int32_t blk;
-
-    /* allocate naming node (SNODSZ) */
-    blk = BLOCK_fn(SNODSZ.a.i, P);
+    int32_t blk;                                                           /* NAMP: build the compound naming pattern */
+    blk = BLOCK_fn(SNODSZ.a.i, P);                                                   /* allocate naming node (SNODSZ) */
     if (blk == 0) return FAIL;
     TPTR.a.i = blk; TPTR.f = 0; TPTR.v = P;
     maknod_fn(&WPTR, &TPTR, &ZEROCL, &ZEROCL, &NMECL, NULL);
-
-    /* allocate backup node (LNODSZ) */
-    blk = BLOCK_fn(LNODSZ.a.i, P);
+    blk = BLOCK_fn(LNODSZ.a.i, P);                                                   /* allocate backup node (LNODSZ) */
     if (blk == 0) return FAIL;
     TPTR.a.i = blk; TPTR.f = 0; TPTR.v = P;
     DESCR_t tval = *op_cl;
     maknod_fn(&YPTR, &TPTR, &ZEROCL, &ZEROCL, &tval, &YPTR);
-
-    /* compute sizes */
-    XSIZ.a.i = x_bksize(XPTR.a.i); XSIZ.f = 0; XSIZ.v = 0;
+    XSIZ.a.i = x_bksize(XPTR.a.i); XSIZ.f = 0; XSIZ.v = 0;                                           /* compute sizes */
     YSIZ.a.i = XSIZ.a.i + NODSIZ.a.i;
     TSIZ.a.i = x_bksize(YPTR.a.i); TSIZ.f = 0; TSIZ.v = 0;
     ZSIZ.a.i = YSIZ.a.i + TSIZ.a.i;
     ZSIZ.v = P;
-
-    /* allocate final block */
-    blk = BLOCK_fn(ZSIZ.a.i, P);
+    blk = BLOCK_fn(ZSIZ.a.i, P);                                                              /* allocate final block */
     if (blk == 0) return FAIL;
     TPTR.a.i = blk; TPTR.f = 0; TPTR.v = P;
     ZPTR = TPTR;
-
-    /* copy three sub-patterns with offset fixup */
-    lvalue_fn(&TVAL, &XPTR);
+    lvalue_fn(&TVAL, &XPTR);                                             /* copy three sub-patterns with offset fixup */
     DESCR_t nodsiz = NODSIZ;
     cpypat_fn(&TPTR, &WPTR, &TVAL, &ZEROCL, &nodsiz, &nodsiz);
     cpypat_fn(&TPTR, &XPTR, &ZEROCL, &nodsiz, &YSIZ, &XSIZ);
     cpypat_fn(&TPTR, &YPTR, &ZEROCL, &YSIZ, &ZEROCL, &TSIZ);
-
     return OK;
 }
 
@@ -394,15 +340,12 @@ Sil_result DOL_fn(void) { return nam_dol(&ENMICL); }
  * ════════════════════════════════════════════════════════════════════════ */
 Sil_result OR_fn(void)
 {
-    /* get first argument, save; get second into YPTR */
-    if (PATVAL_fn() == FAIL) return FAIL;
+    if (PATVAL_fn() == FAIL) return FAIL;                           /* get first argument, save; get second into YPTR */
     DESCR_t first = XPTR;
     if (PATVAL_fn() == FAIL) return FAIL;
     YPTR = XPTR;
     XPTR = first;
-
-    /* coerce STRING X to single-char pattern node */
-    if (XPTR.v == S) {
+    if (XPTR.v == S) {                                                 /* coerce STRING X to single-char pattern node */
         LOCSP_fn(&XSP, &XPTR);
         TMVAL.a.i = XSP.l; TMVAL.f = 0; TMVAL.v = 0;
         int32_t blkx = BLOCK_fn(LNODSZ.a.i, P);
@@ -410,9 +353,7 @@ Sil_result OR_fn(void)
         TPTR.a.i = blkx; TPTR.f = 0; TPTR.v = P;
         maknod_fn(&XPTR, &TPTR, &TMVAL, &ZEROCL, &CHRCL, &XPTR);
     }
-
-    /* coerce STRING Y to single-char pattern node */
-    if (YPTR.v == S) {
+    if (YPTR.v == S) {                                                 /* coerce STRING Y to single-char pattern node */
         LOCSP_fn(&YSP, &YPTR);
         TMVAL.a.i = YSP.l; TMVAL.f = 0; TMVAL.v = 0;
         int32_t blky = BLOCK_fn(LNODSZ.a.i, P);
@@ -420,23 +361,17 @@ Sil_result OR_fn(void)
         TPTR.a.i = blky; TPTR.f = 0; TPTR.v = P;
         maknod_fn(&YPTR, &TPTR, &TMVAL, &ZEROCL, &CHRCL, &YPTR);
     }
-
     if (XPTR.v != P || YPTR.v != P) return intr1();
-
-    /* ORPP: assemble alternation block */
-    XSIZ.a.i = x_bksize(XPTR.a.i); XSIZ.f = 0; XSIZ.v = 0;
+    XSIZ.a.i = x_bksize(XPTR.a.i); XSIZ.f = 0; XSIZ.v = 0;                        /* ORPP: assemble alternation block */
     YSIZ.a.i = x_bksize(YPTR.a.i); YSIZ.f = 0; YSIZ.v = 0;
     TSIZ.a.i = XSIZ.a.i + YSIZ.a.i; TSIZ.f = 0; TSIZ.v = P;
-
     int32_t blk = BLOCK_fn(TSIZ.a.i, P);
     if (blk == 0) return FAIL;
     TPTR.a.i = blk; TPTR.f = 0; TPTR.v = P;
     ZPTR = TPTR;
-
     DESCR_t zero = ZEROCL;
     cpypat_fn(&TPTR, &XPTR, &zero, &zero, &zero, &XSIZ);
     cpypat_fn(&TPTR, &YPTR, &zero, &XSIZ, &zero, &YSIZ);
     linkor_fn(&ZPTR, &XSIZ);
-
     return OK;
 }

@@ -67,8 +67,7 @@ static void cdiag_inner(void);
 /* ── CERR helpers — set EMSGCL then fall to CDIAG ───────────────────── */
 static void cerr(const char *msg)
 {
-    /* EMSGCL holds a pointer to the error string for CDIAG to print */
-    SETAC(EMSGCL, (int32_t)(intptr_t)msg);
+    SETAC(EMSGCL, (int32_t)(intptr_t)msg);           /* EMSGCL holds a pointer to the error string for CDIAG to print */
     cdiag_inner();
 }
 
@@ -77,33 +76,24 @@ Sil_result CMPILE_fn(void)
 {
     SETAC(BRTYPE, 0);
     MOVD(BOSCL, CMOFCL);
-
-    /* AEQLC HIDECL,0,CMPIL0 — increment statement number unless hidden */
-    if (!AEQLC(HIDECL, 0)) INCRA(CSTNCL, 1);
-
-    /* CMPIL0: scan label field */
-    {
+    if (!AEQLC(HIDECL, 0)) INCRA(CSTNCL, 1);      /* AEQLC HIDECL,0,CMPIL0 — increment statement number unless hidden */
+    {                                                                                     /* CMPIL0: scan label field */
         SPEC_t xsp; int stype;
         Sil_result rc = STREAM_fn(&xsp, &TEXTSP, &LBLTB, &stype);
         if (rc == FAIL) { cerr(EMSG1); goto stmt_done; }
         SETAC(STYPE, stype);
-
         if (xsp.l > 0) {
-            /* Label found */
-            INCRA(CMOFCL, DESCR);
+            INCRA(CMOFCL, DESCR);                                                                      /* Label found */
             PUTD_B(CMBSCL, CMOFCL, BASECL);
-
-            /* Check object-code limit */
-            DESCR_t zptr; SUM(zptr, CMBSCL, CMOFCL);
+            DESCR_t zptr; SUM(zptr, CMBSCL, CMOFCL);                                       /* Check object-code limit */
             if (D_A(zptr) >= D_A(OCLIM)) {
-                /* Spill: allocate new block, insert GOTG bridge */
-                DESCR_t new_sz; SUM(new_sz, CMOFCL, CODELT); SETVC(new_sz, C);
+                DESCR_t new_sz; SUM(new_sz, CMOFCL, CODELT); SETVC(new_sz, C);  /* Spill: allocate new block, insert GOTG bridge */
                 int32_t nb = BLOCK_fn(D_A(new_sz), C);
                 if (!nb) return FAIL;
                 SETAC(XCL, nb);
                 if (!AEQLC(LPTR, 0)) PUTDC_B(LPTR, ATTRIB, XCL);
                 memcpy(A2P(nb), (char*)A2P(D_A(CMBSCL)), (size_t)D_A(CMOFCL));
-                PUTDC_B(CMBSCL, DESCR,   GOTGCL);
+                PUTDC_B(CMBSCL, DESCR, GOTGCL);
                 PUTDC_B(CMBSCL, 2*DESCR, LIT1CL);
                 PUTDC_B(CMBSCL, 3*DESCR, XCL);
                 INCRA(CMBSCL, 3*DESCR);
@@ -111,138 +101,96 @@ Sil_result CMPILE_fn(void)
                 MOVD(CMBSCL, XCL);
                 SUM(OCLIM, CMBSCL, new_sz); DECRA(OCLIM, 7*DESCR);
             }
-
-            /* CMPILO: zero offsets */
-            SETAC(CMOFCL, 0); SETAC(BOSCL, 0);
-
-            /* GENVUP for label variable */
-            int32_t loff = GENVUP_fn(&xsp);
+            SETAC(CMOFCL, 0); SETAC(BOSCL, 0);                                                /* CMPILO: zero offsets */
+            int32_t loff = GENVUP_fn(&xsp);                                              /* GENVUP for label variable */
             if (!loff) { cerr(EMSG1); goto stmt_done; }
             SETAC(LPTR, loff); SETVC(LPTR, S);
-
-            /* CMPILC: check for previous definition */
-            if (!AEQLIC(LPTR, ATTRIB, 0)) {
+            if (!AEQLIC(LPTR, ATTRIB, 0)) {                                  /* CMPILC: check for previous definition */
                 if (!AEQLC(CNSLCL, 0)) { cerr(EMSG2); goto stmt_done; }
             }
             PUTDC_B(LPTR, ATTRIB, CMBSCL);
-
-            /* Check for END label */
-            if (deql_fn(LPTR, ENDPTR)) return FAIL;  /* RTN2 = END seen */
+            if (deql_fn(LPTR, ENDPTR)) return FAIL; /* RTN2 = END seen */                      /* Check for END label */
         }
     }
-
-    /* CMPILA: get to next character */
-    if (FORBLK_fn() == FAIL) { cerr(ILLEOS); goto stmt_done; }
-
-    /* EOS? → no subject */
-    if (AEQLC(BRTYPE, EOSTYP)) goto cmpngo;
-
-    /* Insert INIT at current offset */
-    INCRA(CMOFCL, DESCR);
+    if (FORBLK_fn() == FAIL) { cerr(ILLEOS); goto stmt_done; }                       /* CMPILA: get to next character */
+    if (AEQLC(BRTYPE, EOSTYP)) goto cmpngo;                                                      /* EOS? → no subject */
+    INCRA(CMOFCL, DESCR);                                                            /* Insert INIT at current offset */
     PUTD_B(CMBSCL, CMOFCL, INITCL);
     INCRA(CMOFCL, DESCR);
-    MOVD(FRNCL, CMOFCL);       /* save offset for failure position */
+    MOVD(FRNCL, CMOFCL); /* save offset for failure position */
     INCRA(CMOFCL, DESCR);
     PUTD_B(CMBSCL, CMOFCL, LNNOCL);
     INCRA(CMOFCL, DESCR);
     PUTD_B(CMBSCL, CMOFCL, FILENM);
-
     if (AEQLC(BRTYPE, NBTYP)) goto cmpsub;
     if (AEQLC(BRTYPE, CLNTYP)) { cerr(EMSG3); goto stmt_done; }
     goto cmpgo;
-
 cmpsub:
-    /* Compile subject */
-    if (ELEMNT_fn(&SUBJND) == FAIL) { cdiag_inner(); goto stmt_done; }
+    if (ELEMNT_fn(&SUBJND) == FAIL) { cdiag_inner(); goto stmt_done; }                             /* Compile subject */
     if (FORBLK_fn() == FAIL) { cerr(ILLBRK); goto stmt_done; }
-
     if (AEQLC(BRTYPE, NBTYP)) {
-        /* CMPSB1 */
-        if (AEQLC(BRTYPE, EQTYP)) goto cmpfrm;
-        /* Publish subject, check for goto */
-        if (TREPUB_fn(SUBJND) == FAIL) { cdiag_inner(); goto stmt_done; }
+        if (AEQLC(BRTYPE, EQTYP)) goto cmpfrm;                                                              /* CMPSB1 */
+        if (TREPUB_fn(SUBJND) == FAIL) { cdiag_inner(); goto stmt_done; }          /* Publish subject, check for goto */
         if (AEQLC(BRTYPE, CLNTYP)) goto cmpgo;
         if (AEQLC(BRTYPE, EOSTYP)) { cerr(ILLBRK); goto stmt_done; }
         goto cmpngo;
     }
-
-    /* Pattern: CMPAT2 */
-    if (EXPR_fn(&PATND) == FAIL) { cdiag_inner(); goto stmt_done; }
+    if (EXPR_fn(&PATND) == FAIL) { cdiag_inner(); goto stmt_done; }                                /* Pattern: CMPAT2 */
     if (AEQLC(BRTYPE, EQTYP)) goto cmpasp;
-
-    /* Emit SCAN + subject + pattern */
-    INCRA(CMOFCL, DESCR);
+    INCRA(CMOFCL, DESCR);                                                            /* Emit SCAN + subject + pattern */
     PUTD_B(CMBSCL, CMOFCL, SCANCL);
     if (TREPUB_fn(SUBJND) == FAIL) { cdiag_inner(); goto stmt_done; }
-    if (TREPUB_fn(PATND)  == FAIL) { cdiag_inner(); goto stmt_done; }
+    if (TREPUB_fn(PATND) == FAIL) { cdiag_inner(); goto stmt_done; }
     goto cmptgo;
-
 cmpfrm:
-    /* Assignment: compile object */
-    if (EXPR_fn(&FORMND) == FAIL) { cdiag_inner(); goto stmt_done; }
+    if (EXPR_fn(&FORMND) == FAIL) { cdiag_inner(); goto stmt_done; }                    /* Assignment: compile object */
     INCRA(CMOFCL, DESCR);
     PUTD_B(CMBSCL, CMOFCL, ASGNCL);
     if (TREPUB_fn(SUBJND) == FAIL) { cdiag_inner(); goto stmt_done; }
     goto cmpft;
-
 cmpasp:
-    /* Pattern replacement: compile object */
-    if (EXPR_fn(&FORMND) == FAIL) { cdiag_inner(); goto stmt_done; }
+    if (EXPR_fn(&FORMND) == FAIL) { cdiag_inner(); goto stmt_done; }           /* Pattern replacement: compile object */
     INCRA(CMOFCL, DESCR);
     PUTD_B(CMBSCL, CMOFCL, SJSRCL);
     if (TREPUB_fn(SUBJND) == FAIL) { cdiag_inner(); goto stmt_done; }
-    if (TREPUB_fn(PATND)  == FAIL) { cdiag_inner(); goto stmt_done; }
+    if (TREPUB_fn(PATND) == FAIL) { cdiag_inner(); goto stmt_done; }
 cmpft:
     if (TREPUB_fn(FORMND) == FAIL) { cdiag_inner(); goto stmt_done; }
-
 cmptgo:
     if (AEQLC(BRTYPE, EOSTYP)) goto cmpngo;
     if (!AEQLC(BRTYPE, CLNTYP)) { cerr(ILLBRK); goto stmt_done; }
     goto cmpgo;
-
 cmpngo:
-    /* No goto: fill in INIT failure arg, done */
-    SETVA(CSTNCL, CMOFCL);
+    SETVA(CSTNCL, CMOFCL);                                                 /* No goto: fill in INIT failure arg, done */
     PUTD_B(CMBSCL, FRNCL, CSTNCL);
     SETVC(CSTNCL, I);
     return RTN3;
-
 cmpgo:
-    /* Goto field */
-    if (FORWRD_fn() == FAIL) { cerr(ILLEOS); goto stmt_done; }
+    if (FORWRD_fn() == FAIL) { cerr(ILLEOS); goto stmt_done; }                                          /* Goto field */
     if (AEQLC(BRTYPE, EOSTYP)) goto cmpngo;
     if (AEQLC(BRTYPE, NBTYP)) { cerr(ILLBIN); goto stmt_done; }
-
     {
         SPEC_t xsp; int stype;
         if (STREAM_fn(&xsp, &TEXTSP, &GOTOTB, &stype) == FAIL) {
             cerr(ILLEOS); goto stmt_done;
         }
         SETAC(STYPE, stype);
-
-        /* Predict GOTL vs GOTG */
-        MOVD(GOGOCL, GOTLCL); SETAC(GOBRCL, RPTYP);
-        if (D_A(STYPE) == D_A(GTOCL)) {  /* direct goto */
+        MOVD(GOGOCL, GOTLCL); SETAC(GOBRCL, RPTYP);                                           /* Predict GOTL vs GOTG */
+        if (D_A(STYPE) == D_A(GTOCL)) { /* direct goto */
             MOVD(GOGOCL, GOTGCL); SETAC(GOBRCL, RBTYP);
         }
     }
-
-    /* CMPUGO: fill failure, compile goto expression */
-    SETVA(CSTNCL, CMOFCL);
+    SETVA(CSTNCL, CMOFCL);                                           /* CMPUGO: fill failure, compile goto expression */
     PUTD_B(CMBSCL, FRNCL, CSTNCL);
     SETVC(CSTNCL, I);
-
     if (EXPR_fn(&GOTOND) == FAIL) { cdiag_inner(); goto stmt_done; }
     if (!AEQLC(BRTYPE, D_A(GOBRCL))) { cerr(ILLBIN); goto stmt_done; }
-
     INCRA(CMOFCL, DESCR);
     PUTD_B(CMBSCL, CMOFCL, GOGOCL);
     if (TREPUB_fn(GOTOND) == FAIL) { cdiag_inner(); goto stmt_done; }
-
     if (FORWRD_fn() == FAIL) { cerr(ILLEOS); goto stmt_done; }
     if (!AEQLC(BRTYPE, EOSTYP)) { cerr(ILLBIN); goto stmt_done; }
     return RTN3;
-
 stmt_done:
     return OK;
 }
@@ -255,46 +203,36 @@ stmt_done:
  */
 static void cdiag_inner(void)
 {
-    /* Insert ERROR + statement number + line + file at statement start */
-    INCRA(BOSCL, DESCR); PUTD_B(CMBSCL, BOSCL, ERORCL);
+    INCRA(BOSCL, DESCR); PUTD_B(CMBSCL, BOSCL, ERORCL);  /* Insert ERROR + statement number + line + file at statement start */
     INCRA(BOSCL, DESCR); PUTD_B(CMBSCL, BOSCL, CSTNCL);
     INCRA(BOSCL, DESCR); PUTD_B(CMBSCL, BOSCL, LNNOCL);
     INCRA(BOSCL, DESCR); PUTD_B(CMBSCL, BOSCL, FILENM);
     MOVD(CMOFCL, BOSCL);
-
     INCRA(ESAICL, DESCR);
-    /* ACOMP ESAICL,ESALIM — excessive errors? */
-    if (ACOMP(ESAICL, ESALIM) >= 0) {
-        SETAC(ERRTYP, 17);  /* COMP9 → program error */
+    if (ACOMP(ESAICL, ESALIM) >= 0) {                                      /* ACOMP ESAICL,ESALIM — excessive errors? */
+        SETAC(ERRTYP, 17); /* COMP9 → program error */
         return;
     }
-
-    /* Build error pointer line ('^' under offending token) */
-    if (!AEQLC(COMPCL, 0)) {
+    if (!AEQLC(COMPCL, 0)) {                                  /* Build error pointer line ('^' under offending token) */
         int32_t off = (int32_t)(TEXTSP.o);
         if (off > CARDSZ) off = CARDSZ;
         char *dp = ERRBUF + STNOSZ;
-        char *sp = INBUF  + STNOSZ;
+        char *sp = INBUF + STNOSZ;
         int32_t len = off - STNOSZ;
         for (int32_t i = 0; i < len; i++)
             *dp++ = (sp[i] == '\t') ? '\t' : ' ';
         *dp++ = '^';
         ERRSP.l = len + 1;
     }
-
-    /* Print to stderr */
-    STPRNT_fn(D_A(IOKEY), ERRBLK, &LNBFSP);
+    STPRNT_fn(D_A(IOKEY), ERRBLK, &LNBFSP);                                                        /* Print to stderr */
     STPRNT_fn(D_A(IOKEY), ERRBLK, &ERRSP);
     if (!AEQLC(LISTCL, 0)) {
         STPRNT_fn(D_A(IOKEY), OUTBLK, &LNBFSP);
         STPRNT_fn(D_A(IOKEY), OUTBLK, &ERRSP);
     }
-
-    /* Build and print error message */
-    {
+    {                                                                                /* Build and print error message */
         SPEC_t tsp;
-        /* GETSPC TSP,EMSGCL,0 */
-        memcpy(&tsp, A2P(D_A(EMSGCL)), sizeof(SPEC_t));
+        memcpy(&tsp, A2P(D_A(EMSGCL)), sizeof(SPEC_t));                                        /* GETSPC TSP,EMSGCL,0 */
         SETLC_sp(&CERRSP, 0);
         LOCSP_fn(&XSP, &FILENM);
         APDSP_fn(&CERRSP, &XSP);
@@ -312,13 +250,9 @@ static void cdiag_inner(void)
         STPRNT_fn(D_A(IOKEY), ERRBLK, &CERRSP);
         STPRNT_fn(D_A(IOKEY), ERRBLK, &BLSP);
     }
-
-    /* Generate &ERRTEXT */
-    { int32_t off = GENVAR_fn(&CERRSP);
+    { int32_t off = GENVAR_fn(&CERRSP);                                                          /* Generate &ERRTEXT */
       if (off) { SETAC(ERRTXT, off); SETVC(ERRTXT, S); } }
-
-    /* Skip to end of statement if not at EOS */
-    if (!AEQLC(UNIT, 0) && !AEQLC(BRTYPE, EOSTYP)) {
+    if (!AEQLC(UNIT, 0) && !AEQLC(BRTYPE, EOSTYP)) {                        /* Skip to end of statement if not at EOS */
         SPEC_t xsp; int stype;
         STREAM_fn(&xsp, &TEXTSP, &EOSTB, &stype);
     }
