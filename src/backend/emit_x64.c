@@ -1,3 +1,4 @@
+/* LEGACY — sub-box text emitter; kept for reference; superseded by SM-based emit (see MILESTONE-SCRIP-X86-COMPLETION.md) */
 /*
  * emit_byrd_asm.c — x64 ASM Byrd box emitter for scrip-cc
  *

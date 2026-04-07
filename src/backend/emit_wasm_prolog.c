@@ -1,3 +1,4 @@
+/* LEGACY — sub-box text emitter; kept for reference; superseded by SM-based emit (see MILESTONE-SCRIP-X86-COMPLETION.md) */
 /*
  * emit_wasm_prolog.c — Prolog IR → WebAssembly text-format emitter
  *

@@ -1,3 +1,4 @@
+/* LEGACY — sub-box text emitter; kept for reference; superseded by SM-based emit (see MILESTONE-SCRIP-X86-COMPLETION.md) */
 /*
  * emit_js.c — SNOBOL4 → JavaScript emitter for scrip-cc
  *

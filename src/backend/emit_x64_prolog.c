@@ -1,3 +1,4 @@
+/* LEGACY — sub-box text emitter; kept for reference; superseded by SM-based emit (see MILESTONE-SCRIP-X86-COMPLETION.md) */
 /* =========================================================================
  * emit_x64_prolog.c — Prolog Byrd-Box x64 ASM emitter
  *

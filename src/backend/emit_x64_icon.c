@@ -1,3 +1,4 @@
+/* LEGACY — sub-box text emitter; kept for reference; superseded by SM-based emit (see MILESTONE-SCRIP-X86-COMPLETION.md) */
 /*
  * emit_x64_icon.c — Icon IR (EXPR_t) → x64 NASM emitter (M-G9-ICON-IR-WIRE)
  *

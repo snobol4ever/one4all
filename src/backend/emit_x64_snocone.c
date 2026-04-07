@@ -1,3 +1,4 @@
+/* LEGACY — sub-box text emitter; kept for reference; superseded by SM-based emit (see MILESTONE-SCRIP-X86-COMPLETION.md) */
 /*
  * emit_x64_snocone.c — Snocone → STMT_t/EXPR_t IR lowering  (SC-1)
  *

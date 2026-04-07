@@ -1,3 +1,4 @@
+/* LEGACY — sub-box text emitter; kept for reference; superseded by SM-based emit (see MILESTONE-SCRIP-X86-COMPLETION.md) */
 /* emit_cnode.c — CNODE_t IR build + measure + print phases */
 
 #include "scrip_cc.h"
