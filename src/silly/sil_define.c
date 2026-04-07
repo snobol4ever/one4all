@@ -133,13 +133,20 @@ Sil_result DEFINE_fn(void)
     SETAC(XPTR, blk);
     PUTDC_B(ZCL, 0, DEFCL); /* Update function descriptor ZCL */
     PUTDC_B(ZCL, DESCR, XPTR);
-    int32_t fill_idx = D_A(YCL_d) - 1; /* Fill definition block from stack (in reverse)  Block layout: [0]=title, [1]=entry label, [2]=fn name, [3..]=args+locals */
-    while (fill_idx >= 2) { /* Pop all args+locals+name */
+    /* Fill definition block from stack (reverse, matching DEF12 loop).
+     * Block body slots are 1-based: slot 1 = entry label, slot 2 = fn name,
+     * slots 3..YCL = args+locals (YCL already includes the +2).
+     * Oracle: SUM XPTR,XPTR,XCL (XPTR=blk+YCL*DESCR), then
+     *   DEF12: DECRA XPTR,DESCR / PUTDC XPTR,DESCR,YPTR
+     * i.e. writes to blk + fill_idx*DESCR for fill_idx = YCL..2.
+     */
+    int32_t fill_idx = D_A(YCL_d); /* start at YCL (= total count after +2) */
+    while (fill_idx >= 2) { /* Pop args+locals+fn name; stop before entry pt */
         DESCR_t v = def_pop();
         PUTDC_B(XPTR, fill_idx * DESCR, v);
         fill_idx--;
     }
-    DESCR_t entry_pt = def_pop(); /* [1] = entry point */
+    DESCR_t entry_pt = def_pop(); /* slot 1 = entry point */
     PUTDC_B(XPTR, DESCR, entry_pt);
     MOVD(XPTR, NULVCL); return OK;
 }
