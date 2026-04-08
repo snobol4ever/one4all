@@ -257,13 +257,12 @@ RESULT_t PATVAL_fn(void)
 patv1:
     if (check_input_assoc(&XPTR)) {
         ZPTR = *(DESCR_t *)A2P(ZPTR.a.i + DESCR);
-        switch (PUTIN_fn()) {
+        switch (PUTIN_fn()) { /* RCALL XPTR,PUTIN,(ZPTR,XPTR),(FAIL,RTXNAM) */
         case FAIL: return FAIL;
-        default: break;
+        default: return OK; /* RTXNAM: PUTIN success — value already usable, no coerce */
         }
-    } else {
-        deref_name(&XPTR);
     }
+    deref_name(&XPTR); /* PATV2: GETDC XPTR,XPTR,DESCR */
 patv3:
     if (XPTR.v == P || XPTR.v == S) return OK;
     if (XPTR.v == I) {
@@ -374,46 +373,40 @@ RESULT_t VPXPTR_fn(void)
  * ════════════════════════════════════════════════════════════════════════ */
 RESULT_t XYARGS_fn(void)
 {
-    int pass = 0; /* SCL: 0=first arg, 1=second arg */
-next_arg:
+    /* v311.sil XYARGS line 2916.
+     * SCL.a.i: 0=evaluating first arg, 1=evaluating second arg.
+     * XYC INVOKE exit map: case1=FAIL, case2(name)=XY4→XY1, default(value)=XY3.
+     * XY3: if SCL!=0 → RTN2 (NRETURN, second arg done); else SCL=1, XPTR=YPTR, loop.
+     * PUTIN exit: (ZPTR,YPTR),FAIL — success falls through to XY3.            */
+    SCL.a.i = 0;
+next_arg: /* XYN */
     OCICL.a.i += DESCR;
     YPTR = *(DESCR_t *)A2P(OCBSCL.a.i + OCICL.a.i);
-    if (D_F(YPTR) & FNC) {
-        DESCR_t saved_scl = SCL;
+    if (D_F(YPTR) & FNC) { /* XYC: PUSH(SCL,XPTR); INVOKE; case1=FAIL, case2=XY4, default=XY3 */
+        int32_t saved_scl = SCL.a.i;
         DESCR_t saved_xptr = XPTR;
-        SCL.a.i = pass;
         switch (INVOKE_fn()) {
         case FAIL:
-            SCL = saved_scl;
-            XPTR = saved_xptr;
+            SCL.a.i = saved_scl; XPTR = saved_xptr;
             return FAIL;
-        case OK:
-            SCL = saved_scl; /* exit 2: returned as name — dereference and continue */
-            XPTR = saved_xptr;
-            if (INSW.a.i != 0 && check_input_assoc(&YPTR)) {
-                ZPTR = *(DESCR_t *)A2P(ZPTR.a.i + DESCR);
-                if (PUTIN_fn() == FAIL) return FAIL;
-            } else {
-                deref_name(&YPTR);
-            }
-            break;
-        default:
-            SCL = saved_scl;
-            XPTR = saved_xptr;
-            break;
+        case OK: /* exit 2 = XY4: name returned → pop, then XY1 (input assoc path) */
+            SCL.a.i = saved_scl; XPTR = saved_xptr;
+            goto xy1;
+        default: /* value returned → pop, then XY3 */
+            SCL.a.i = saved_scl; XPTR = saved_xptr;
+            goto xy3;
         }
+    }
+xy1: /* XY1: check &INPUT association */
+    if (INSW.a.i != 0 && check_input_assoc(&YPTR)) {
+        ZPTR = *(DESCR_t *)A2P(ZPTR.a.i + DESCR);
+        if (PUTIN_fn() == FAIL) return FAIL; /* PUTIN exit: (ZPTR,YPTR),FAIL — success falls to XY3 */
     } else {
-        if (INSW.a.i != 0 && check_input_assoc(&YPTR)) {
-            ZPTR = *(DESCR_t *)A2P(ZPTR.a.i + DESCR);
-            if (PUTIN_fn() == FAIL) return FAIL;
-        } else {
-            deref_name(&YPTR);
-        }
+        deref_name(&YPTR); /* XY2: GETDC YPTR,YPTR,DESCR */
     }
-    if (pass != 0) {
-        return OK; /* second arg done — XPTR=first, YPTR=second, RTN2 */
-    }
-    XPTR = YPTR; /* first arg done → save in XPTR, fetch second */
-    pass = 1;
-    goto next_arg;
+xy3: /* XY3: AEQLC SCL,0,RTN2 → if SCL!=0 return NRETURN (second arg done) */
+    if (SCL.a.i != 0) return NRETURN; /* RTN2: XPTR=first arg, YPTR=second arg */
+    SCL.a.i = 1;
+    XPTR = YPTR; /* MOVD XPTR,YPTR — save first arg */
+    goto next_arg; /* fetch second arg */
 }
