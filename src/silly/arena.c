@@ -115,29 +115,36 @@ int32_t GENVAR_fn(const SPEC_t *sp)
     if (SP_LEN(sp) <= 0) /* LEQLC SPECR1,0 — null string → NULVCL */
         return 0;
     int32_t bin_idx = hash_spec(sp); /* LOCA1: VARID — compute bin index */
-    int32_t bin_head = OBLIST_arr[bin_idx].a.i; /* SUM BUKPTR,OBPTR,EQUVCL — find bin head  Track chain using bin index and offsets, avoid packed-member ptr */
-    int32_t cur = bin_head;
-    int32_t prev_off = -1; /* arena offset of previous LNKFLD .a slot */
-    int prev_is_bin = 1; /* 1 = prev is bin head, 0 = in-chain */
-    while (cur != 0) { /* LOCA2: walk the chain */
-        DESCR_t *title = (DESCR_t *)A2P(cur);
-        DESCR_t *lnk = (DESCR_t *)A2P(cur + LNKFLD);
-        if ((int32_t)lnk->v != bin_idx) { /* VCMPIC — compare ascension number (bin index) */
-            prev_is_bin = 0;
-            prev_off = cur + LNKFLD;
-            cur = lnk->a.i;
+    /* LOCA1: BUKPTR = bin slot; LSTPTR tracks previous link holder.
+     * Chain is sorted by bin_idx (V field of LNKFLD); within same bin by
+     * insertion order.  Oracle LOCA2:
+     *   V < bin_idx → continue (earlier bin, keep walking)
+     *   V > bin_idx → stop (overshot, insert here = LOCA5)
+     *   V == bin_idx → string compare; mismatch → continue, match → found */
+    int32_t bukptr = OBLIST_arr[bin_idx].a.i; /* LOCA2: BUKPTR = first chain entry */
+    int32_t lstptr_lnk; /* arena offset of LNKFLD.a slot in LSTPTR (previous) */
+    lstptr_lnk = P2A(&OBLIST_arr[bin_idx]); /* LSTPTR = bin slot itself initially */
+    while (bukptr != 0) { /* LOCA2 loop */
+        DESCR_t *lnk = (DESCR_t *)A2P(bukptr + LNKFLD);
+        int32_t lnk_v = (int32_t)lnk->v;
+        if (lnk_v < bin_idx) { /* earlier bin — keep walking */
+            lstptr_lnk = bukptr + LNKFLD;
+            bukptr = lnk->a.i;
             continue;
         }
-        const char *stored = (const char *)A2P(cur + BCDFLD); /* LOCSP + LEXCMP — compare strings */
+        if (lnk_v > bin_idx) break; /* overshot — LOCA5: insert before bukptr */
+        /* same bin — string compare */
+        DESCR_t *title = (DESCR_t *)A2P(bukptr);
         int32_t slen = (int32_t)title->v;
+        const char *stored = (const char *)A2P(bukptr + BCDFLD);
         if (slen == SP_LEN(sp) &&
             memcmp(stored, SP_PTR(sp), (size_t)slen) == 0) {
-            return cur; /* Found — return existing block */
+            return bukptr; /* Found */
         }
-        prev_is_bin = 0;
-        prev_off = cur + LNKFLD;
-        cur = lnk->a.i;
+        lstptr_lnk = bukptr + LNKFLD;
+        bukptr = lnk->a.i;
     }
+    /* LOCA5: bukptr = node we stopped at (0 = end of chain, or overshot node) */
     int32_t len = SP_LEN(sp); /* LOCA5: not found — allocate new STRING block */
     int32_t blk_sz = x_getlth(len);
     if (blk_sz > SIZLIM) {
@@ -171,11 +178,9 @@ retry_alloc: /* LOCA7: MOVD LCPTR,FRSGPT */
         memcpy(dst, SP_PTR(sp), (size_t)len);
         DESCR_t *lnk_slot = (DESCR_t *)A2P(lcptr + LNKFLD); /* LOCA6: PUTVC LCPTR,LNKFLD,bin_idx — ascension number */
         lnk_slot->v = (int_t)bin_idx;
-        lnk_slot->a.i = bin_head; /* PUTAC LCPTR,LNKFLD,prev_head — chain to previous head */
-        if (prev_is_bin) /* PUTAC LSTPTR,LNKFLD,LCPTR — link from previous */
-            OBLIST_arr[bin_idx].a.i = lcptr;
-        else
-            ((DESCR_t *)A2P(prev_off))->a.i = lcptr;
+        lnk_slot->a.i = bukptr; /* PUTAC LCPTR,LNKFLD,BUKPTR — chain to overshot/end node */
+        /* PUTAC LSTPTR,LNKFLD,LCPTR — link from previous (LSTPTR is bin slot or in-chain) */
+        ((DESCR_t *)A2P(lstptr_lnk))->a.i = lcptr;
         D_A(VARSYM) += 1; /* INCRA VARSYM,1 */
         return lcptr;
     }
