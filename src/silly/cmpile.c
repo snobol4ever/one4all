@@ -89,6 +89,7 @@ static void cerr(const char *msg)
 /* ── CMPILE — compile one statement ─────────────────────────────────── */
 RESULT_t CMPILE_fn(void)
 {
+    DESCR_t push_tmp = {{.i=0},0,0};  /* one-deep save for CMPILN goto-type (PUSH/POP) */
     SETAC(BRTYPE, 0);
     MOVD(BOSCL, CMOFCL);
     if (AEQLC(HIDECL, 0)) INCRA(CSTNCL, 1); /* AEQLC HIDECL,0,,CMPIL0 — if HIDECL!=0 skip; increment only when not hidden */
@@ -194,30 +195,138 @@ cmpngo:
     SETVC(CSTNCL, I);
     return RTN3;
 cmpgo:
-    if (FORWRD_fn() == FAIL) { cerr(ILLEOS); goto stmt_done; } /* Goto field */
+    /* CMPGO (v311.sil 1726): advance past whitespace to goto field */
+    if (FORWRD_fn() == FAIL) { cerr(ILLEOS); goto stmt_done; }
     if (AEQLC(BRTYPE, EOSTYP)) goto cmpngo;
-    if (AEQLC(BRTYPE, NBTYP)) { cerr(ILLBIN); goto stmt_done; }
+    if (!AEQLC(BRTYPE, NBTYP)) { cerr(EMSG14); goto stmt_done; } /* must be at a nonbreak char */
     {
         SPEC_t xsp; int stype;
         if (STREAM_fn(&xsp, &TEXTSP, &GOTOTB, &stype) == FAIL) {
-            cerr(ILLEOS); goto stmt_done;
+            cerr(EMSG14); goto stmt_done; /* ST_ERROR */
         }
+        /* STREAM ST_EOS path → cerr(ILLEOS) matches oracle CERR12 */
+        if (stype == 0) { cerr(ILLEOS); goto stmt_done; }
         SETAC(STYPE, stype);
-        MOVD(GOGOCL, GOTLCL); SETAC(GOBRCL, RPTYP); /* Predict GOTL vs GOTG */
-        if (D_A(STYPE) == D_A(GTOCL)) { /* direct goto */
-            MOVD(GOGOCL, GOTGCL); SETAC(GOBRCL, RBTYP);
-        }
     }
-    SETVA(CSTNCL, CMOFCL); /* CMPUGO: fill failure, compile goto expression */
+    /* CMPGG (v311.sil 1745): MOVD GOGOCL,GOTLCL + SETAC GOBRCL,RPTYP (predict GOTL) */
+    MOVD(GOGOCL, GOTLCL); SETAC(GOBRCL, RPTYP);
+    /* ACOMP STYPE,GTOCL,,CMPGG,CMPGG: if STYPE <= GTOCL(=FGOTYP=3) both cases → cmpgg */
+    if (D_A(STYPE) > D_A(GTOCL)) {
+        /* direct goto (UTOTYP=4 or STOTYP=5 or FTOTYP=6): use GOTGCL + RBTYP */
+        MOVD(GOGOCL, GOTGCL); SETAC(GOBRCL, RBTYP);
+    }
+    /* CMPGG SELBRA STYPE,(,CMPSGO,CMPFGO,,CMPSGO,CMPFGO):
+     * case 1 (UGOTYP): fall → cmpugo
+     * case 2 (SGOTYP): cmpsgo
+     * case 3 (FGOTYP): cmpfgo
+     * case 4 (UTOTYP): fall → cmpugo
+     * case 5 (STOTYP): cmpsgo
+     * case 6 (FTOTYP): cmpfgo */
+    switch (D_A(STYPE)) {
+    case SGOTYP: case STOTYP: goto cmpsgo;
+    case FGOTYP: case FTOTYP: goto cmpfgo;
+    default: break; /* UGOTYP, UTOTYP → fall through to cmpugo */
+    }
+cmpugo:
+    /* CMPUGO (v311.sil 1756): unconditional goto — fill failure offset, compile expr */
+    SETVA(CSTNCL, CMOFCL);
     PUTD_B(CMBSCL, FRNCL, CSTNCL);
     SETVC(CSTNCL, I);
     if (EXPR_fn(&GOTOND) == FAIL) { cdiag_inner(); goto stmt_done; }
-    if (!AEQLC(BRTYPE, D_A(GOBRCL))) { cerr(ILLBIN); goto stmt_done; }
+    if (D_A(BRTYPE) != D_A(GOBRCL)) { cerr(EMSG14); goto stmt_done; }
     INCRA(CMOFCL, DESCR);
     PUTD_B(CMBSCL, CMOFCL, GOGOCL);
     if (TREPUB_fn(GOTOND) == FAIL) { cdiag_inner(); goto stmt_done; }
     if (FORWRD_fn() == FAIL) { cerr(ILLEOS); goto stmt_done; }
-    if (!AEQLC(BRTYPE, EOSTYP)) { cerr(ILLBIN); goto stmt_done; }
+    if (AEQLC(BRTYPE, EOSTYP)) return RTN3;
+    cerr(EMSG14); goto stmt_done;
+cmpsgo:
+    /* CMPSGO (v311.sil 1768): compile success goto */
+    if (EXPR_fn(&SGOND) == FAIL) { cdiag_inner(); goto stmt_done; }
+    if (D_A(BRTYPE) != D_A(GOBRCL)) { cerr(EMSG14); goto stmt_done; }
+    INCRA(CMOFCL, DESCR);
+    PUTD_B(CMBSCL, CMOFCL, GOGOCL);
+    if (TREPUB_fn(SGOND) == FAIL) { cdiag_inner(); goto stmt_done; }
+    if (FORWRD_fn() == FAIL) { cerr(ILLEOS); goto stmt_done; }
+    if (!AEQLC(BRTYPE, EOSTYP)) goto cmpill;
+    /* EOS after :S(L) — no failure goto, fill failure offset and done */
+    SETVA(CSTNCL, CMOFCL);
+    PUTD_B(CMBSCL, FRNCL, CSTNCL);
+    SETVC(CSTNCL, I);
+    return RTN3;
+cmpill:
+    /* CMPILL (v311.sil 1785): after :S(L), found another goto field */
+    if (!AEQLC(BRTYPE, NBTYP)) { cerr(EMSG14); goto stmt_done; }
+    {
+        SPEC_t xsp; int stype;
+        if (STREAM_fn(&xsp, &TEXTSP, &GOTOTB, &stype) == FAIL) {
+            cerr(EMSG14); goto stmt_done;
+        }
+        if (stype == 0) { cerr(ILLEOS); goto stmt_done; }
+        SETAC(STYPE, stype);
+    }
+    /* AEQLC STYPE,FGOTYP,CMPFTC: if not FGOTYP → cmpftc */
+    if (!AEQLC(STYPE, FGOTYP)) goto cmpftc;
+    MOVD(GOGOCL, GOTLCL); SETAC(GOBRCL, RPTYP);
+    goto cmpugo;
+cmpftc:
+    /* CMPFTC (v311.sil 1796): verify failure goto type */
+    if (!AEQLC(STYPE, FTOTYP)) { cerr(EMSG14); goto stmt_done; }
+    MOVD(GOGOCL, GOTGCL); SETAC(GOBRCL, RBTYP);
+    goto cmpugo;
+cmpfgo:
+    /* CMPFGO (v311.sil 1801): compile failure goto */
+    if (EXPR_fn(&FGOND) == FAIL) { cdiag_inner(); goto stmt_done; }
+    if (D_A(BRTYPE) != D_A(GOBRCL)) { cerr(EMSG14); goto stmt_done; }
+    if (FORWRD_fn() == FAIL) { cerr(ILLEOS); goto stmt_done; }
+    if (!AEQLC(BRTYPE, EOSTYP)) goto cmpilm;
+    /* EOS after :F(L) only — insert GOTOCL + failure goto, done */
+    INCRA(CMOFCL, DESCR);
+    PUTD_B(CMBSCL, CMOFCL, GOTOCL);
+    INCRA(CMOFCL, DESCR);
+    MOVD(SRNCL, CMOFCL);            /* save slot for success offset backpatch */
+    SETVA(CSTNCL, CMOFCL);
+    PUTD_B(CMBSCL, FRNCL, CSTNCL);
+    SETVC(CSTNCL, I);
+    INCRA(CMOFCL, DESCR);
+    PUTD_B(CMBSCL, CMOFCL, GOGOCL);
+    if (TREPUB_fn(FGOND) == FAIL) { cdiag_inner(); goto stmt_done; }
+    PUTD_B(CMBSCL, SRNCL, CMOFCL); /* backpatch success offset */
+    return RTN3;
+cmpilm:
+    /* CMPILM (v311.sil 1820): after :F(L), found another goto field */
+    if (!AEQLC(BRTYPE, NBTYP)) { cerr(EMSG14); goto stmt_done; }
+    {
+        SPEC_t xsp; int stype;
+        if (STREAM_fn(&xsp, &TEXTSP, &GOTOTB, &stype) == FAIL) {
+            cerr(EMSG14); goto stmt_done;
+        }
+        if (stype == 0) { cerr(ILLEOS); goto stmt_done; }
+        SETAC(STYPE, stype);
+    }
+    if (!AEQLC(STYPE, SGOTYP)) goto cmpstc;
+    push_tmp = GOTLCL; SETAC(GOBRCL, RPTYP);
+    goto cmpiln;
+cmpstc:
+    /* CMPSTC (v311.sil 1831): verify success direct goto */
+    if (!AEQLC(STYPE, STOTYP)) { cerr(EMSG14); goto stmt_done; }
+    push_tmp = GOTGCL; SETAC(GOBRCL, RBTYP);
+cmpiln:
+    /* CMPILN (v311.sil 1834): compile success goto after :F(L) */
+    if (EXPR_fn(&SGOND) == FAIL) { cdiag_inner(); goto stmt_done; }
+    if (D_A(BRTYPE) != D_A(GOBRCL)) { cerr(EMSG14); goto stmt_done; }
+    if (FORWRD_fn() == FAIL) { cerr(ILLEOS); goto stmt_done; }
+    if (!AEQLC(BRTYPE, EOSTYP)) { cerr(EMSG14); goto stmt_done; }
+    INCRA(CMOFCL, DESCR);
+    WCL = push_tmp;
+    PUTD_B(CMBSCL, CMOFCL, WCL);
+    if (TREPUB_fn(SGOND) == FAIL) { cdiag_inner(); goto stmt_done; }
+    SETVA(CSTNCL, CMOFCL);
+    PUTD_B(CMBSCL, FRNCL, CSTNCL);
+    SETVC(CSTNCL, I);
+    INCRA(CMOFCL, DESCR);
+    PUTD_B(CMBSCL, CMOFCL, GOGOCL);
+    if (TREPUB_fn(FGOND) == FAIL) { cdiag_inner(); goto stmt_done; }
     return RTN3;
 stmt_done:
     return OK;
@@ -238,7 +347,7 @@ static void cdiag_inner(void)
     INCRA(BOSCL, DESCR); PUTD_B(CMBSCL, BOSCL, FILENM);
     MOVD(CMOFCL, BOSCL);
     INCRA(ESAICL, DESCR);
-    if (ACOMP(ESAICL, ESALIM) >= 0) { /* ACOMP ESAICL,ESALIM — excessive errors? */
+    if (ACOMP(ESAICL, ESALIM) > 0) { /* ACOMP ESAICL,ESALIM → COMP9 when > (strict) */
         SETAC(ERRTYP, 17); /* COMP9 → program error */
         return;
     }
@@ -285,7 +394,10 @@ static void cdiag_inner(void)
         STPRNT_fn(D_A(IOKEY), ERRBLK, &CERRSP);
         STPRNT_fn(D_A(IOKEY), ERRBLK, &BLSP);
     }
-    { int32_t off = GENVAR_fn(&CERRSP); /* Generate &ERRTEXT */
+    { /* Generate &ERRTEXT from EMSGCL (oracle: RCALL ERRTXT,GENVAR,EMSGCL [PLB49]) */
+      SPEC_t emsg_sp; memset(&emsg_sp, 0, sizeof(SPEC_t));
+      if (D_A(EMSGCL) != 0) memcpy(&emsg_sp, A2P(D_A(EMSGCL)), sizeof(SPEC_t));
+      int32_t off = GENVAR_fn(&emsg_sp);
       if (off) { SETAC(ERRTXT, off); SETVC(ERRTXT, S); } }
     if (!AEQLC(UNIT, 0) && !AEQLC(BRTYPE, EOSTYP)) { /* Skip to end of statement if not at EOS */
         SPEC_t xsp; int stype;

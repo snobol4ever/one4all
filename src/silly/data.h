@@ -491,6 +491,10 @@ extern DESCR_t PATND;    /* pattern node                                 */
 extern DESCR_t EXOPND;   /* expression operand node                      */
 extern DESCR_t EXPRND;   /* expression node                              */
 extern DESCR_t GOTOND;   /* goto node                                    */
+extern DESCR_t SGOND;    /* success goto node (v311.sil 11078)           */
+extern DESCR_t FGOND;    /* failure goto node (v311.sil 11072)           */
+extern DESCR_t SRNCL;    /* success return descriptor (v311.sil 11058)   */
+extern DESCR_t GOTOCL;   /* GOTO function DESCR FNC (v311.sil 10784)     */
 extern DESCR_t TRATL;    /* trace attribute list head                    */
 extern DESCR_t VALTRS;   /* VALUE trace type string descriptor           */
 extern DESCR_t FUNTCL;   /* FUNCTION trace type constant                 */

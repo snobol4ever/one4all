@@ -513,6 +513,9 @@ DESCR_t EXEXND = {.a={.i=0},.f=0,.v=0};
 DESCR_t FORMND = {.a={.i=0},.f=0,.v=0};
 DESCR_t SUBJND = {.a={.i=0},.f=0,.v=0};
 DESCR_t GOTOND = {.a={.i=0},.f=0,.v=0};
+DESCR_t SGOND  = {.a={.i=0},.f=0,.v=0};  /* success goto node  v311.sil 11078 */
+DESCR_t FGOND  = {.a={.i=0},.f=0,.v=0};  /* failure goto node  v311.sil 11072 */
+DESCR_t SRNCL  = {.a={.i=0},.f=0,.v=0};  /* success return     v311.sil 11058 */
 DESCR_t ELEMND = {.a={.i=0},.f=0,.v=0};
 DESCR_t ELEIND = {.a={.i=0},.f=0,.v=0};    /* ELIEXND/ELEXND */
 DESCR_t ELEYND = {.a={.i=0},.f=0,.v=0};
@@ -632,6 +635,7 @@ DESCR_t FRNCL  = {.a={.i=0},.f=0,.v=0};
 DESCR_t GOGOCL = {.a={.i=0},.f=0,.v=0};
 DESCR_t GOTLCL = {.a={.i=0},.f=0,.v=0};
 DESCR_t GOTGCL = {.a={.i=0},.f=0,.v=0};
+DESCR_t GOTOCL = {.a={.i=0},.f=0,.v=0};  /* GOTO fn DESCR FNC v311.sil 10784 */
 
 /* Sizes */
 DESCR_t TBSIZ  = {.a={.i=0},.f=0,.v=0};
