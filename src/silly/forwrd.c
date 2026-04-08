@@ -194,7 +194,7 @@ RESULT_t NEWCRD_fn(void)
                 APDSP_fn(&LNOSP, &TSP);
             }
         }
-        return OK; /* RTN2 — continue-card processed */
+        return FAIL; /* RTN2 — continue-card: proceed to CMPILE (oracle: falls through, not re-read) */
     }
     if (stype == CTLTYP) {
         /* CTLCRD: v311.sil line 2313
@@ -300,7 +300,7 @@ RESULT_t NEWCRD_fn(void)
             APDSP_fn(&LNOSP, &TSP);
         }
     }
-    return OK; /* RTN3 — normal card processed */
+    return FAIL; /* RTN3 — normal card: proceed to CMPILE (oracle: falls through, not re-read) */
 }
 
 /*====================================================================================================================*/

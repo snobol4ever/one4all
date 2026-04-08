@@ -216,20 +216,26 @@ int32_t GENVUP_fn(const SPEC_t *sp)
 {
     if (D_A(CASECL) == 0) /* AEQLC CASECL,0 — skip if case sensitive */
         return GENVAR_fn(sp);
-    int32_t len = SP_LEN(sp); /* Uppercase the string into a local buffer */
-    char buf[CARDSZ + 1];
+    /* HW-14: oracle uses SPECR1 global (arena-based). Uppercase into arena at FRSGPT.
+     * v311.sil: GETSPC SPECR1,AXPTR,0; XRAISP SPECR1; BRANCH GENVAR.
+     * snobol4.c: _SPEC(SPECR1) = _SPEC(AXPTR); RAISE1(SPECR1); BRANCH(GENVAR).
+     * Stack buf + P2A was wrong: P2A(stack_addr) = garbage arena offset. */
+    int32_t len = SP_LEN(sp);
+    if (len <= 0) return GENVAR_fn(sp);
     if (len > CARDSZ) len = CARDSZ;
-    const char *src = SP_PTR(sp);
+    /* Copy string into arena at FRSGPT, uppercase in place */
+    int32_t off = D_A(FRSGPT);
+    D_A(FRSGPT) += len;
+    const char *srcp = SP_PTR(sp);
+    char *dst = (char *)A2P(off);
     int32_t i;
     for (i = 0; i < len; i++)
-        buf[i] = (char)toupper((unsigned char)src[i]);
-    SPEC_t up;
-    memset(&up, 0, sizeof up);
-    up.l = len;
-    up.o = 0;
-    up.a = P2A(buf);
-    up.v = S;
-    return GENVAR_fn(&up);
+        dst[i] = (char)toupper((unsigned char)srcp[i]);
+    /* Build SPECR1 pointing at arena copy, call GENVAR */
+    SPECR1.a = off; SPECR1.o = 0; SPECR1.l = len; SPECR1.v = S; SPECR1.f = 0;
+    int32_t result = GENVAR_fn(&SPECR1);
+    D_A(FRSGPT) = off; /* release temp space */
+    return result;
 }
 
 /*====================================================================================================================*/

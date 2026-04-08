@@ -20,6 +20,8 @@
 
 #include <string.h>
 
+#include <stdio.h>
+#include <string.h>
 #include "types.h"
 #include "data.h"
 #include "cmpile.h"
@@ -65,9 +67,21 @@ static inline void PUTDC_B(DESCR_t base, int32_t off, DESCR_t src)
 static void cdiag_inner(void);
 
 /* ── CERR helpers — set EMSGCL then fall to CDIAG ───────────────────── */
+/* cerr: intern msg into arena as a SPEC_t, store arena offset in EMSGCL.
+ * Oracle: EMSGCL.a = address of static SPEC_t (csnobol4 is 32-bit so ptr fits).
+ * We intern into arena so A2P() in cdiag_inner works correctly on 64-bit. */
 static void cerr(const char *msg)
 {
-    SETAC(EMSGCL, (int32_t)(intptr_t)msg); /* EMSGCL holds a pointer to the error string for CDIAG to print */
+    int32_t slen = (int32_t)strlen(msg);
+    /* Allocate a SPEC_t-sized block + string body in arena */
+    int32_t blk = BLOCK_fn((int32_t)(sizeof(SPEC_t) + (size_t)slen), B);
+    if (blk) {
+        SPEC_t sp; sp.a = blk + (int32_t)sizeof(SPEC_t); sp.o = 0;
+        sp.l = slen; sp.v = S; sp.f = 0;
+        memcpy(A2P(blk), &sp, sizeof(SPEC_t));
+        memcpy(A2P(blk + (int32_t)sizeof(SPEC_t)), msg, (size_t)slen);
+        SETAC(EMSGCL, blk);
+    }
     cdiag_inner();
 }
 
@@ -241,7 +255,13 @@ static void cdiag_inner(void)
     }
     { /* Build and print error message */
         SPEC_t tsp;
-        memcpy(&tsp, A2P(D_A(EMSGCL)), sizeof(SPEC_t)); /* GETSPC TSP,EMSGCL,0 */
+        /* EMSGCL.a holds arena offset of a SPEC_t (set by cerr()).
+         * If zero (direct cdiag_inner() call with no prior cerr), use a blank spec. */
+        if (D_A(EMSGCL) == 0) {
+            tsp.a = 0; tsp.o = 0; tsp.l = 0; tsp.v = S; tsp.f = 0;
+        } else {
+            memcpy(&tsp, A2P(D_A(EMSGCL)), sizeof(SPEC_t)); /* GETSPC TSP,EMSGCL,0 */
+        }
         SETLC_sp(&CERRSP, 0);
         LOCSP_fn(&XSP, &FILENM);
         APDSP_fn(&CERRSP, &XSP);

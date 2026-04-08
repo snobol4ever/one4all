@@ -747,11 +747,11 @@ static void init_actions(void)
     CARDTB_actions[3] = (struct acts){NEWTYP, AC_STOPSH, NULL};
     IBLKTB_actions[0] = (struct acts){0, AC_GOTO, &FRWDTB_st}; /* IBLKTB: [0]=goto FRWDTB [1]=EOSTYP/STOP [2]=ERROR */
     IBLKTB_actions[1] = (struct acts){EOSTYP, AC_STOP, NULL};
-    IBLKTB_actions[2] = (struct acts){0, AC_ERROR, NULL};
+    IBLKTB_actions[2] = (struct acts){0, AC_STOPSH, NULL}; /* HW-8: non-blank→ST_STOP, not ST_ERROR */
     EOSTB_actions[0] = (struct acts){0, AC_STOP, NULL}; /* EOSTB: [0]=STOP */
     GOTSTB_actions[0] = (struct acts){SGOTYP, AC_STOP, NULL}; /* GOTSTB: [0]=SGOTYP/STOP [1]=STOTYP/STOP [2]=ERROR */
     GOTSTB_actions[1] = (struct acts){STOTYP, AC_STOP, NULL};
-    GOTSTB_actions[2] = (struct acts){0, AC_ERROR, NULL};
+    GOTSTB_actions[2] = (struct acts){0, AC_CONTIN, NULL}; /* HW-9: arg3=arg4 RTZPTR */
     GOTOTB_actions[0] = (struct acts){0, AC_GOTO, &GOTSTB_st}; /* GOTOTB: [0]=goto GOTSTB [1]=goto GOTFTB [2]=UGOTYP/STOP [3]=UTOTYP/STOP [4]=ERROR */
     GOTOTB_actions[1] = (struct acts){0, AC_GOTO, &GOTFTB_st};
     GOTOTB_actions[2] = (struct acts){UGOTYP, AC_STOP, NULL};
@@ -762,7 +762,7 @@ static void init_actions(void)
     GOTFTB_actions[2] = (struct acts){0, AC_ERROR, NULL};
     LBLTB_actions[0] = (struct acts){0, AC_GOTO, &LBLXTB_st}; /* LBLTB: [0]=goto LBLXTB [1]=STOPSH [2]=ERROR */
     LBLTB_actions[1] = (struct acts){0, AC_STOPSH, NULL};
-    LBLTB_actions[2] = (struct acts){0, AC_ERROR, NULL};
+    LBLTB_actions[2] = (struct acts){0, AC_CONTIN, NULL}; /* HW-10: COMP7/COMP7 same exit */
     LBLXTB_actions[0] = (struct acts){0, AC_STOPSH, NULL}; /* LBLXTB: [0]=STOPSH */
     NUMBTB_actions[0] = (struct acts){0, AC_GOTO, &NUMCTB_st}; /* NUMBTB: [0]=goto NUMCTB [1]=CMATYP/STOPSH [2]=DIMTYP/STOPSH [3]=ERROR */
     NUMBTB_actions[1] = (struct acts){CMATYP, AC_STOPSH, NULL};
@@ -834,7 +834,7 @@ static void init_actions(void)
     VARATB_actions[0] = (struct acts){0, AC_GOTO, &VARBTB_st}; /* VARATB / VARBTB */
     VARATB_actions[1] = (struct acts){CMATYP, AC_STOPSH, NULL};
     VARATB_actions[2] = (struct acts){RPTYP, AC_STOPSH, NULL};
-    VARATB_actions[3] = (struct acts){0, AC_ERROR, NULL};
+    VARATB_actions[3] = (struct acts){0, AC_CONTIN, NULL}; /* HW-11: arg3=arg4 PROTER */
     VARBTB_actions[0] = (struct acts){LPTYP, AC_STOPSH, NULL};
     VARBTB_actions[1] = (struct acts){CMATYP, AC_STOPSH, NULL};
     VARBTB_actions[2] = (struct acts){RPTYP, AC_STOPSH, NULL};
@@ -967,7 +967,7 @@ static void init_actions(void)
     BIOPTB_actions[11] = (struct acts){0, AC_GOTO, &TBLKTB_st}; /* BIAMFN & */
     BIOPTB_actions[12] = (struct acts){0, AC_GOTO, &TBLKTB_st}; /* BINGFN \ */
     BIOPTB_actions[13] = (struct acts){0, AC_GOTO, &TBLKTB_st}; /* BIQSFN ? */
-    BIOPTB_actions[14] = (struct acts){0, AC_ERROR, NULL};
+    BIOPTB_actions[14] = (struct acts){0, AC_CONTIN, NULL}; /* HW-4: arg3=arg4 in all STREAM calls */
     UNOPTB_actions[ 0] = (struct acts){0, AC_GOTO, &NBLKTB_st}; /* PLSFN  + */                  /* UNOPTB actions */
     UNOPTB_actions[ 1] = (struct acts){0, AC_GOTO, &NBLKTB_st}; /* MNSFN  - */
     UNOPTB_actions[ 2] = (struct acts){0, AC_GOTO, &NBLKTB_st}; /* DOTFN  . */
@@ -982,7 +982,7 @@ static void init_actions(void)
     UNOPTB_actions[11] = (struct acts){0, AC_GOTO, &NBLKTB_st}; /* BARFN  | */
     UNOPTB_actions[12] = (struct acts){0, AC_GOTO, &NBLKTB_st}; /* QUESFN ? */
     UNOPTB_actions[13] = (struct acts){0, AC_GOTO, &NBLKTB_st}; /* AROWFN ! */
-    UNOPTB_actions[14] = (struct acts){0, AC_ERROR, NULL};
+    UNOPTB_actions[14] = (struct acts){0, AC_CONTIN, NULL}; /* HW-3: non-op chars → ST_EOS, not error */
 
     /* SBIPTB */
     SBIPTB_actions[0].put = P2A(&ADDFN);
@@ -1030,7 +1030,7 @@ static void init_actions(void)
     SBIPTB_actions[14].put = P2A(&BIEQFN);
     SBIPTB_actions[14].act = AC_GOTO;
     SBIPTB_actions[14].go = &TBLKTB_st;
-    SBIPTB_actions[15].act = AC_ERROR;
+    SBIPTB_actions[15].act = AC_CONTIN; /* HW-5: arg3=arg4 in all STREAM calls */
     BSBIPTB_actions[0].put = P2A(&ADDFN);
     BSBIPTB_actions[0].act = AC_GOTO;
     BSBIPTB_actions[0].go = &TBLKTB_st;
@@ -1076,7 +1076,7 @@ static void init_actions(void)
     BSBIPTB_actions[14].put = P2A(&BIEQFN);
     BSBIPTB_actions[14].act = AC_GOTO;
     BSBIPTB_actions[14].go = &TBLKTB_st;
-    BSBIPTB_actions[15].act = AC_ERROR;
+    BSBIPTB_actions[15].act = AC_CONTIN; /* HW-7: arg3=arg4 */
     /* BBIOPTB */
     BBIOPTB_actions[0].put = P2A(&ADDFN);
     BBIOPTB_actions[0].act = AC_GOTO;
@@ -1120,7 +1120,7 @@ static void init_actions(void)
     BBIOPTB_actions[13].put = P2A(&BIQSFN);
     BBIOPTB_actions[13].act = AC_GOTO;
     BBIOPTB_actions[13].go = &TBLKTB_st;
-    BBIOPTB_actions[14].act = AC_ERROR;
+    BBIOPTB_actions[14].act = AC_CONTIN; /* HW-6: arg3=arg4 */
     /* BSBIPTB */
     BSBIPTB_actions[0].put = P2A(&ADDFN);
     BSBIPTB_actions[0].act = AC_GOTO;
@@ -1167,7 +1167,7 @@ static void init_actions(void)
     BSBIPTB_actions[14].put = P2A(&BIEQFN);
     BSBIPTB_actions[14].act = AC_GOTO;
     BSBIPTB_actions[14].go = &TBLKTB_st;
-    BSBIPTB_actions[15].act = AC_ERROR;
+    BSBIPTB_actions[15].act = AC_CONTIN; /* HW-7: arg3=arg4 */
 }
 
 /*====================================================================================================================*/
@@ -1280,8 +1280,12 @@ RESULT_t STREAM_fn(SPEC_t *sp1, SPEC_t *sp2, DESCR_t *tbl_descr, int *stype_out)
         }
     }
     {
-        int match = sp2->l - len;
-        *sp1 = *sp2; sp1->l = match; sp2->l = 0;
+        /* ST_EOS: no break found. sp2 (subject) is left intact — len==0 at exhaustion.
+         * Real stream.c: S_L(sp2) -= len (= 0), sp2 unchanged. sp1 gets zero-length prefix.
+         * HW-13: was "sp2->l = 0" which destroyed subject (TEXTSP consumed). */
+        int match = sp2->l - len; /* match==0 when exhausted */
+        *sp1 = *sp2; sp1->l = match;
+        /* do NOT modify sp2 on ST_EOS */
         D_A(STYPE) = put;
         if (stype_out) *stype_out = (int)put;
         return FAIL;
@@ -1321,14 +1325,15 @@ void XCALL_ZERBLK(DESCR_t *dst, DESCR_t size)
 }
 
 /*====================================================================================================================*/
-void XCALL_GETPARM(SPEC_t *sp)
+RESULT_t XCALL_GETPARM(SPEC_t *sp)
 {
-    sp->a = 0; sp->o = 0; sp->l = 0; /* Return empty string — no argv support yet */
+    sp->a = 0; sp->o = 0; sp->l = 0; /* No &PARM support yet */
+    return FAIL;
 }
 /*====================================================================================================================*/
 void XCALL_FREEPARM(SPEC_t *sp) { (void)sp; }
 
-void XCALL_GETPMPROTO(SPEC_t *sp, int32_t n) { (void)sp; (void)n; /* FAIL */ }
+RESULT_t XCALL_GETPMPROTO(SPEC_t *sp, int32_t n) { (void)sp; (void)n; return FAIL; }
 
 void XCALL_OUTPUT(int32_t unit, DESCR_t msg)
 {

@@ -13,6 +13,7 @@
  * Milestone: M21
  */
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
@@ -172,7 +173,7 @@ xlatnx:
           goto xlatrd; /* ST_EOS: blank card → re-read */
       }
     }
-    { RESULT_t nr = NEWCRD_fn(); if (nr == OK) goto xlatrd; } /* RTN1=re-read */
+    { RESULT_t nr = NEWCRD_fn(); if (nr == OK) goto xlatrd; } /* RTN1=reread; RTN2/RTN3(FAIL)=proceed to CMPILE */
     { /* CMPILE: RTN1=fatal(COMP3), RTN2=END reached(fall), RTN3=continue(XLATNX) */
         RESULT_t rc = CMPILE_fn();
         if (rc == FAIL) { /* RTN1: fatal compile error → COMP3 */
@@ -256,7 +257,12 @@ static int32_t genvar_from_descr(DESCR_t d)
 /* ── main ────────────────────────────────────────────────────────────── */
 int main(int argc, char *argv[])
 {
-    (void)argc; (void)argv;
+    if (argc >= 2) {
+        if (!freopen(argv[1], "r", stdin)) {
+            fprintf(stderr, "silly-snobol4: cannot open %s\n", argv[1]);
+            return 1;
+        }
+    }
     signal(SIGINT, sighandler); /* Install signal handlers */
     signal(SIGTERM, sighandler);
 #ifdef SIGFPE

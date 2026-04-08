@@ -555,4 +555,8 @@ void data_init(void)
     { static const char alph_lit[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
       ALPHSP.a = P2A(alph_lit); ALPHSP.o = 0;
       ALPHSP.l = (int32_t)(sizeof(alph_lit)-1); ALPHSP.v = S; }
+    /* Register all platform scan tables (CARDTB, IBLKTB, ELEMTB, etc.)
+     * Must be called after arena_init() sets arena_base. */
+    extern void init_syntab(void);
+    init_syntab();
 }
