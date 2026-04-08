@@ -70,6 +70,7 @@ typedef struct {
     jmp_buf salf_jmp;   /* SALF — non-length failure       */
     jmp_buf scok_jmp;   /* SCOK — successful match         */
     jmp_buf fail_jmp;   /* FAIL — global scan failure      */
+    int     rtnul_flag; /* set when RTNUL3 fires (case 3 → SCOK in STAR/DSAR) */
 } Scan_ctx;
 
 extern Scan_ctx *scan_ctx_g;   /* pointer to current innermost Scan_ctx */

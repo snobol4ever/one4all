@@ -211,7 +211,6 @@ static void do_SCIN(void);
 static void do_SCIN1A(void);
 static void do_SCIN2(void);
 static void do_ONAR2(void);
-static void do_BAL_inner(void);
 static void do_FNME_inner(void);
 static void do_ENME3(void);
 
@@ -280,7 +279,7 @@ static void do_SCIN2(void)
             DESCR_t cur; sp_getlg(&cur, TXSP);
             pdl_push3(XCL, cur, LENFCL);
         }
-        if (!AEQLC(FULLCL, 0)) { /* FULLSCAN: CHKVAL MAXLEN,YCL,TXSP,SALT */
+        if (AEQLC(FULLCL, 0)) { /* FULLSCAN OFF: CHKVAL MAXLEN,YCL,TXSP,SALT */
             int32_t cur = TXSP.l, res = D_A(YCL), mx = D_A(MAXLEN);
             if (cur + res > mx) GOTO_SALT;
         }
@@ -299,7 +298,15 @@ static void do_SCIN(void)  { SETAC(UNSCCL, 0); do_SCIN1A(); }
 static void do_SCIN1A(void)
 {
     MOVD(PATBCL, YPTR);
-    if (!AEQLC(UNSCCL, 0)) { SETAC(UNSCCL, 0); MOVD(PATBCL, YPTR); }
+    if (!AEQLC(UNSCCL, 0)) {
+        /* SC-8: UNSCCL≠0 → L_UNSC: SETAC UNSCCL,0; MOVD PATBCL,YPTR; then SALT3 */
+        SETAC(UNSCCL, 0);
+        MOVD(PATBCL, YPTR);
+        /* SALT3: if LENFCL!=0 → SALT1 (backtrack) */
+        if (!AEQLC(LENFCL, 0)) GOTO_SALT;
+        /* else fall to SALT2 — pop PDL frame then backtrack */
+        GOTO_SALF;
+    }
     SETAC(PATICL, 0);
     do_SCIN2();
 }
@@ -311,21 +318,22 @@ RESULT_t SCNR_fn(void)
     Scan_ctx ctx;
     Scan_ctx *prev = scan_ctx_g;
     scan_ctx_g = &ctx;
+    ctx.rtnul_flag = 0;
     D_A(MAXLEN) = XSP.l; /* GETLG MAXLEN,XSP */
     DESCR_t YSIZ_l; SETAC(YSIZ_l, lvalue_scalar(D_A(YPTR))); /* LVALUE YSIZ,YPTR  — min match length of pattern */
-    if (!AEQLC(FULLCL, 0)) { /* AEQLC FULLCL,0,SCNR1 — if fullscan off, check min vs max */
+    if (AEQLC(FULLCL, 0)) { /* AEQLC FULLCL,0,SCNR1 — fullscan OFF: check min vs max; ON: skip */
         if (D_A(YSIZ_l) > D_A(MAXLEN)) { scan_ctx_g = prev; return FAIL; }
     }
     sp_copy(&TXSP, XSP); sp_setlc(&TXSP, 0); /* SETSP TXSP,XSP; SETLC TXSP,0 */
     MOVD(PDLPTR, PDLHED);
     MOVD(NAMICL, NHEDCL);
-    if (AEQLC(ANCCL, 0)) { /* AEQLC ANCCL,0,SCNR3 — non-anchored? */
+    if (!AEQLC(ANCCL, 0)) { /* AEQLC ANCCL,0,SCNR3 — ANCCL!=0 → anchored (SCNR3) */
         sp_setlc(&HEADSP, 0); /* anchored — SCNR3 */
         { DESCR_t cur; DESCR_t lf; sp_getlg(&cur, TXSP);
           MOVD(lf, LENFCL); SETAC(LENFCL, 1);
           pdl_push3(SCFLCL, cur, lf); }
     } else {
-        if (!AEQLC(FULLCL, 0)) /* non-anchored — compute max advance count */
+        if (AEQLC(FULLCL, 0)) /* non-anchored — FULLCL==0: use MAXLEN direct */
             D_A(YSIZ_l) = D_A(MAXLEN);
         else
             D_A(YSIZ_l) = D_A(MAXLEN) - D_A(YSIZ_l);
@@ -425,17 +433,16 @@ RESULT_t SCAN_fn(void)
             SPEC_t TSP2;
             if (!sp_subsp(&TSP2, YSP, XSP)) return FAIL;
             if (sp_lexcmp(TSP2, YSP) == 0) return OK;
-            if (AEQLC(ANCCL, 0)) return FAIL;
+            if (!AEQLC(ANCCL, 0)) return FAIL; /* SC-1: ANCCL!=0 → anchored → stop sliding */
             sp_fshrtn(&XSP, 1);
         }
     }
     sp_setfrom_descr(&XSP, XPTR); /* Pattern case: run SCNR */
     if (SCNR_fn() == FAIL) return FAIL;
     if (NMD_fn() == FAIL) return FAIL;
-    if (sp_lcomp_lt(TXSP, HEADSP) || TXSP.l == HEADSP.l) /* LCOMP TXSP,HEADSP,SCANV1,SCANV1 */
-        sp_remsp(&XSP, TXSP, HEADSP);  /* SCANV1: REMSP XSP,TXSP,HEADSP */
-    else
-        sp_remsp(&XSP, HEADSP, TXSP);  /* SCANV2: REMSP XSP,HEADSP,TXSP */
+    /* SC-2: SIL LCOMP TXSP,HEADSP,SCANV1,SCANV1 — both exits → SCANV1.
+     * Always: REMSP XSP,TXSP,HEADSP */
+    sp_remsp(&XSP, TXSP, HEADSP);
     { /* RCALL YPTR,GENVAR,XSPPTR,RTYPTR */
         int32_t off = GENVAR_fn(&XSP);
         if (!off) return FAIL;
@@ -460,7 +467,18 @@ RESULT_t SJSR_fn(void)
         }
         GETDC_BLK(XPTR, WPTR, DESCR);
     } else {
-        if (INVOKE_fn() == FAIL) return FAIL;
+        /* SC-6: INVOKE returns: 1=FAIL, 2=SJSR1 (check INSW), 3=NEMO (error 8) */
+        RESULT_t inv_rc = INVOKE_fn();
+        if (inv_rc == FAIL) return FAIL;
+        if (inv_rc == NEMO) { scan_error(8); return FAIL; } /* case 3 → NEMO */
+        /* case 2 (OK/NAME) → fall to SJSR1: check INSW then read XPTR */
+        if (!AEQLC(INSW, 0)) {
+            int32_t assoc = locapv_fn(D_A(INATL), &WPTR);
+            if (assoc) {
+                GETDC_BLK(ZPTR, WPTR, DESCR);
+                PUTIN_fn(ZPTR, WPTR);
+            }
+        }
         GETDC_BLK(XPTR, WPTR, DESCR);
     }
     opush(WPTR); opush(XPTR);
@@ -485,7 +503,7 @@ RESULT_t SJSR_fn(void)
         for (;;) {
             if (!sp_subsp(&TSP2, YSP, XSP)) goto sjss_fail;
             if (sp_lexcmp(TSP2, YSP) != 0) { SETAC(NAMGCL, 0); break; }
-            if (AEQLC(ANCCL, 0)) goto sjss_fail;
+            if (!AEQLC(ANCCL, 0)) goto sjss_fail; /* SC-5: ANCCL!=0 → anchored → stop */
             sp_addlg(&HEADSP, ONECL);
             sp_fshrtn(&XSP, 1);
         }
@@ -630,11 +648,11 @@ abns1:
             MOVD(TBLBCS, XPTR);
         }
         sp_copy(&VSP, XSP); /* anyc3: set up VSP */
-        if (!AEQLC(FULLCL, 0)) {
+        if (AEQLC(FULLCL, 0)) { /* AEQLC FULLCL,0,,ANYC4: fullscan OFF → do VSP setup */
             sp_putlg(&VSP, MAXLEN);
             if (sp_lcomp_lt(VSP, TXSP)) GOTO_SALT;
-            /* CHKVAL MAXLEN,ZEROCL,XSP,,ANYC4,ANYC4 — skip ADDLG if cur >= MAXLEN */
-            if (TXSP.l < D_A(MAXLEN))
+            /* CHKVAL MAXLEN,ZEROCL,XSP,,ANYC4,ANYC4 — skip ADDLG if XSP.l <= MAXLEN */
+            if (XSP.l > D_A(MAXLEN))
                 sp_addlg_c(&VSP, 1);
         }
         sp_remsp(&YSP, VSP, TXSP);
@@ -722,9 +740,9 @@ lprrri:
         if (scl == 2) {
             if (n < 0) scan_error(SCAN_ERR_NEGATIVE); /* POS */
             if (n > D_A(MAXLEN)) GOTO_TSALT;
-            if (n < TXSP.l) GOTO_TSALF;
-            if (n > TXSP.l) GOTO_TSALT;
-            GOTO_TSCOK;
+            if (n == TXSP.l) GOTO_TSCOK;
+            if (n > TXSP.l) GOTO_TSALF; /* SC-11: n>cur → TSALF (not TSALT) */
+            GOTO_SALT;                   /* SC-11: n<cur → SALT (not TSALF) */
         }
         if (scl == 3) {
             if (n < 0) scan_error(SCAN_ERR_NEGATIVE); /* RPOS */
@@ -737,9 +755,9 @@ lprrri:
             if (n < 0) scan_error(SCAN_ERR_NEGATIVE); /* RTAB */
             int32_t desired = XSP.l - n;
             if (TXSP.l > desired) GOTO_TSALT;
-            if (!AEQLC(FULLCL, 0)) {
+            if (AEQLC(FULLCL, 0)) { /* FULLCL==0: check residual; !=0: skip to RTBII */
                 int32_t resid = D_A(YCL);
-                if (D_A(MAXLEN) - resid > desired) GOTO_TSALT;
+                if (D_A(MAXLEN) - resid < desired) GOTO_TSALT;
             }
             { DESCR_t dv; SETAC(dv, desired); sp_putlg(&TXSP, dv); }
             GOTO_TSCOK;
@@ -787,7 +805,7 @@ static void do_EARB(void)
 /* ONAR — ARBNO on-match (progress check) */
 static void do_ONAR(void)
 {
-    if (AEQLC(FULLCL, 0)) GOTO_TSCOK; /* AEQLC FULLCL,0,TSCOK — fullscan off → succeed */
+    if (!AEQLC(FULLCL, 0)) GOTO_TSCOK; /* AEQLC FULLCL,0,,TSCOK: fullscan ON → succeed */
     SETAC(TVAL, 0);
     getac(&TVAL, PDLPTR, -2*DESCR);   /* GETAC TVAL,PDLPTR,-2*DESCR — old cursor */
     sp_getlg(&TMVAL, TXSP);
@@ -810,18 +828,17 @@ static void do_ONRF(void)
 static void do_FARB(void)
 {
     int32_t nval;
-    if (AEQLC(FULLCL, 0)) { nval = 0; } /* AEQLC FULLCL,0,,FARB2: OFF→0 */
-    else {
-        if (AEQLC(LENFCL, 0)) goto farb1; /* FARB2: AEQLC LENFCL,0,FARB1 */
-        nval = D_A(YCL);                   /* SETAV NVAL,YCL */
-    }
+    if (!AEQLC(FULLCL, 0)) { nval = 0; goto farb3; } /* FARB: FULLCL!=0 → nval=0 → FARB3 */
+    /* FARB2: FULLCL==0 */
+    if (AEQLC(LENFCL, 0)) goto farb1;
+    nval = D_A(YCL);
+farb3:
     {   /* FARB3 */
         int32_t cur = TXSP.l;
-        /* ACOMP TVAL,MAXLEN,FARB1,FARB1 — both targets FARB1 when cur+nval >= MAXLEN */
         if (cur + nval >= D_A(MAXLEN)) goto farb1;
         sp_addlg_c(&TXSP, 1);
         { DESCR_t cv; sp_getlg(&cv, TXSP);
-          PUTDC_BLK(PDLPTR, DESCR, cv); } /* PUTAC PDLPTR,2*DESCR,TVAL (our slot 1) */
+          PUTDC_BLK(PDLPTR, 2*DESCR, cv); } /* SC-15 fix: slot 2*DESCR not DESCR */
         GOTO_SCOK;
     }
 farb1:
@@ -849,37 +866,75 @@ atp1:
             PUTOUT_fn(assoc, nv);
         }
     }
-    if (ACOMPC(TRAPCL, 0) <= 0) { /* AEQLC TRAPCL,0,,TSCOK */
+    if (ACOMPC(TRAPCL, 0) > 0) { /* SC-16+17: TRAPCL>0 → save full scan state, call TRPHND, restore */
         int32_t a = locapt_fn(D_A(TVALL), &XPTR);
-        if (a) { SETAC(ATPTR, a); TRPHND_fn(ATPTR); }
+        if (a) {
+            SETAC(ATPTR, a);
+            /* SC-17: save all scan globals oracle pushes before TRPHND */
+            DESCR_t sv_PATBCL=PATBCL, sv_PATICL=PATICL, sv_WPTR=WPTR;
+            DESCR_t sv_XCL=XCL, sv_YCL=YCL, sv_MAXLEN=MAXLEN;
+            DESCR_t sv_LENFCL=LENFCL, sv_PDLPTR=PDLPTR, sv_PDLHED=PDLHED;
+            DESCR_t sv_NAMICL=NAMICL, sv_NHEDCL=NHEDCL;
+            SPEC_t  sv_HEADSP=HEADSP, sv_TSP=TSP, sv_TXSP=TXSP, sv_XSP=XSP;
+            MOVD(PDLHED, PDLPTR); MOVD(NHEDCL, NAMICL);
+            TRPHND_fn(ATPTR);
+            XSP=sv_XSP; TXSP=sv_TXSP; TSP=sv_TSP; HEADSP=sv_HEADSP;
+            NHEDCL=sv_NHEDCL; NAMICL=sv_NAMICL; PDLHED=sv_PDLHED;
+            PDLPTR=sv_PDLPTR; LENFCL=sv_LENFCL; MAXLEN=sv_MAXLEN;
+            YCL=sv_YCL; XCL=sv_XCL; WPTR=sv_WPTR;
+            PATICL=sv_PATICL; PATBCL=sv_PATBCL;
+        }
     }
     GOTO_TSCOK;
 }
 
 /*====================================================================================================================*/
 /* BAL */
-static void do_BAL(void)  { do_BAL_inner(); }
-static void do_BALF(void) { do_BAL_inner(); }
-
-static void do_BAL_inner(void)
+static void do_BAL(void)
 {
+    /* BAL entry: BALF1 — always enters here */
     int32_t nval;
-    if (AEQLC(FULLCL, 0)) { nval = 0; } /* BALF1: AEQLC FULLCL,0,,BALF4: OFF→0 */
-    else {
-        if (AEQLC(LENFCL, 0)) goto bal1; /* BALF4→BALF2: check lenfcl */
-        nval = D_A(YCL);                  /* SETAV NVAL,YCL */
-    }
+    if (!AEQLC(FULLCL, 0)) { nval = 0; } /* FULLCL!=0 → nval=0 → BALF2 */
+    else { nval = D_A(YCL); }             /* FULLCL==0 → BALF4: nval=YCL → BALF2 */
     {
-        int32_t cur = TXSP.l;
-        int32_t avail = D_A(MAXLEN) - cur - nval;
-        if (avail <= 0) goto bal1;
-        int32_t got = getbal_fn(&TXSP, avail);
-        if (got < 0) goto bal1;
-        { DESCR_t cv; sp_getlg(&cv, TXSP); PUTDC_BLK(PDLPTR, DESCR, cv); }
+        int32_t tval = TXSP.l + nval;
+        if (tval >= D_A(MAXLEN)) goto bal1;
+        int32_t avail = D_A(MAXLEN) - tval;
+        if (!getbal_fn(&TXSP, avail)) goto bal1;
+        { DESCR_t cv; sp_getlg(&cv, TXSP);
+          PUTDC_BLK(PDLPTR, 2*DESCR, cv); } /* SC-20 fix: slot 2*DESCR */
         GOTO_SCOK;
     }
 bal1:
-    DECRA(PDLPTR, 3*DESCR); GOTO_TSALF;
+    DECRA(PDLPTR, 3*DESCR);
+    /* SC-21: PDL underflow check */
+    if (D_A(PDLPTR) < D_A(PDLHED)) scan_error(SCAN_ERR_ILLEGAL_TYPE); /* INTR13 */
+    GOTO_TSALF;
+}
+
+static void do_BALF(void)
+{
+    /* BALF entry: check FULLCL first */
+    int32_t nval;
+    if (!AEQLC(FULLCL, 0)) { nval = 0; goto balf2; } /* FULLCL!=0 → nval=0 → BALF2 */
+    /* FULLCL==0 → BALF3: check LENFCL */
+    if (!AEQLC(LENFCL, 0)) goto balf1; /* LENFCL!=0 → BAL1 path */
+    /* LENFCL==0 → BALF1 (re-enter as BAL) */
+    nval = D_A(YCL);
+balf2:
+    {
+        int32_t tval = TXSP.l + nval;
+        if (tval >= D_A(MAXLEN)) goto balf1;
+        int32_t avail = D_A(MAXLEN) - tval;
+        if (!getbal_fn(&TXSP, avail)) goto balf1;
+        { DESCR_t cv; sp_getlg(&cv, TXSP);
+          PUTDC_BLK(PDLPTR, 2*DESCR, cv); }
+        GOTO_SCOK;
+    }
+balf1:
+    DECRA(PDLPTR, 3*DESCR);
+    if (D_A(PDLPTR) < D_A(PDLHED)) scan_error(SCAN_ERR_ILLEGAL_TYPE);
+    GOTO_TSALF;
 }
 
 /*====================================================================================================================*/
@@ -890,11 +945,11 @@ static void do_BRKXF(void)
     DECRA(PATICL, DESCR);
     DECRA(PDLPTR, 3*DESCR);
     int32_t nval;
-    if (!AEQLC(FULLCL, 0)) { nval = 0; }
-    else {
-        if (AEQLC(LENFCL, 0)) GOTO_SALT;
-        nval = D_A(YCL);
-    }
+    if (!AEQLC(FULLCL, 0)) { nval = 0; goto brkxf3; } /* FULLCL!=0→nval=0→BRXF3 */
+    /* FULLCL==0 → BRXF1 */
+    if (!AEQLC(LENFCL, 0)) GOTO_SALT; /* SC-22: LENFCL!=0→SALT (oracle BRXF1) */
+    nval = D_A(YCL); /* LENFCL==0: nval=YCL → BRXF3 */
+brkxf3:
     { int32_t cur = TXSP.l;
       if (cur + nval > D_A(MAXLEN)) GOTO_SALT; }
     GETDC_BLK(XCL, PDLPTR, DESCR); /* GETDC XCL,PDLPTR,DESCR — cursor lock */
@@ -949,26 +1004,31 @@ chr2:
     }
 starp:
     {
-        int32_t nval = AEQLC(FULLCL, 0) ? 0 : D_A(YCL); /* AEQLC FULLCL,0,,STARP1: OFF->0, ON->YCL */
+        int32_t nval = !AEQLC(FULLCL, 0) ? 0 : D_A(YCL); /* FULLCL!=0→nval=0; ==0→nval=YCL */
         nval = D_A(MAXLEN) - nval;
-        if (nval <= 0) GOTO_TSALT;
+        if (nval < 0) GOTO_TSALT;
         int32_t lv = lvalue_scalar(D_A(YPTR));
-        if (lv > nval) GOTO_TSALT;
+        if (AEQLC(FULLCL, 0)) { /* SC-24: only check size when fullscan OFF */
+            if (lv > nval) GOTO_TSALT;
+        }
         { DESCR_t _cur; sp_getlg(&_cur, TXSP); pdl_push3(SCFLCL, _cur, LENFCL); }
         opush(MAXLEN); opush(PATBCL); opush(PATICL); opush(XCL); opush(YCL);
         { DESCR_t mv; SETAC(mv, nval); MOVD(MAXLEN, mv); }
-        { /* nested SCNR */
+        { /* nested SCIN — SC-25: handle case 3 (RTNUL3→SCOK) */
             Scan_ctx inner; Scan_ctx *prev = scan_ctx_g; scan_ctx_g = &inner;
             int rc = setjmp(inner.fail_jmp);
+            int rtnul = 0;
             if (!rc) { do_SCIN(); }
+            rtnul = (inner.rtnul_flag); /* set by do_RTNUL3 if reachable */
             scan_ctx_g = prev;
             YCL=opop(); XCL=opop(); PATICL=opop(); PATBCL=opop(); MAXLEN=opop();
+            if (rtnul) GOTO_SCOK; /* SC-25: case 3 → SCOK */
             if (rc) {
                 if (AEQLC(LENFCL, 0)) GOTO_TSALT;
                 GOTO_SALF;
             }
         }
-        GOTO_TSCOK;
+        GOTO_SCOK; /* SC-26: oracle → SCOK not TSCOK */
     }
 }
 
@@ -979,11 +1039,12 @@ static void do_DSAR(void)
     INCRA(PATICL, DESCR);
     GETD_BLK(YPTR, PATBCL, PATICL);
     if (D_V(YPTR) != P) {
-        if (AEQLC(LENFCL, 0)) { GOTO_TSALT; }
+        /* S or I type: oracle → STARP3: if LENFCL!=0→TSALT; else SALF */
+        if (!AEQLC(LENFCL, 0)) { GOTO_TSALT; } /* SC-27: !=0→TSALT */
         GOTO_SALF;
     }
     {
-        int32_t nval = AEQLC(FULLCL, 0) ? 0 : D_A(YCL); /* AEQLC FULLCL,0,,STARP1: OFF->0, ON->YCL */
+        int32_t nval = !AEQLC(FULLCL, 0) ? 0 : D_A(YCL); /* SC-28: FULLCL!=0→0; ==0→YCL */
         nval = D_A(MAXLEN) - nval;
         opush(MAXLEN); opush(PATBCL); opush(PATICL); opush(XCL); opush(YCL);
         { DESCR_t mv; SETAC(mv, nval); MOVD(MAXLEN, mv); }
@@ -991,10 +1052,14 @@ static void do_DSAR(void)
         {
             Scan_ctx inner; Scan_ctx *prev = scan_ctx_g; scan_ctx_g = &inner;
             int rc = setjmp(inner.fail_jmp);
+            int rtnul = 0;
             if (!rc) { do_SCIN1A(); }
+            rtnul = inner.rtnul_flag;
             scan_ctx_g = prev;
             YCL=opop(); XCL=opop(); PATICL=opop(); PATBCL=opop(); MAXLEN=opop();
-            if (rc) {
+            if (rtnul) GOTO_SCOK; /* SC-29: case 3→RTNUL3→SCOK */
+            if (rc == 2) GOTO_SCOK; /* SC-29: case 2 (STARP2) = success */
+            if (rc) {  /* case 1 = fail */
                 if (AEQLC(LENFCL, 0)) { GOTO_TSALT; }
                 GOTO_SALF;
             }
@@ -1010,9 +1075,9 @@ static void do_FNCE(void)
     INCRA(PDLPTR, 3*DESCR);
     if (D_A(PDLPTR) >= D_A(PDLEND)) GOTO_FAIL;
     { DESCR_t cv; sp_getlg(&cv, TXSP);
-      PUTDC_BLK(PDLPTR, 0, FNCFCL);
-      PUTDC_BLK(PDLPTR, DESCR, cv);
-      PUTDC_BLK(PDLPTR, 2*DESCR, LENFCL); }
+      PUTDC_BLK(PDLPTR, DESCR,   FNCFCL);  /* slot 1 */
+      PUTDC_BLK(PDLPTR, 2*DESCR, cv);       /* slot 2 */
+      PUTDC_BLK(PDLPTR, 3*DESCR, LENFCL); } /* slot 3 */
     SETAC(LENFCL, 1);
     GOTO_SCOK;
 }
@@ -1024,9 +1089,9 @@ static void do_NME(void)
     INCRA(PDLPTR, 3*DESCR);
     if (D_A(PDLPTR) >= D_A(PDLEND)) GOTO_FAIL;
     { DESCR_t cv; sp_getlg(&cv, TXSP);
-      PUTDC_BLK(PDLPTR, 0, FNMECL);
-      PUTDC_BLK(PDLPTR, DESCR, cv);
-      PUTDC_BLK(PDLPTR, 2*DESCR, LENFCL);
+      PUTDC_BLK(PDLPTR, DESCR,   FNMECL);  /* SC-30: slot 1 */
+      PUTDC_BLK(PDLPTR, 2*DESCR, cv);
+      PUTDC_BLK(PDLPTR, 3*DESCR, LENFCL);
       opush(cv); }
     SETAC(LENFCL, 1);
     GOTO_SCOK;
@@ -1078,9 +1143,9 @@ static void do_ENME3(void)
     if (D_A(PDLPTR) >= D_A(PDLEND)) GOTO_FAIL;
     { DESCR_t cv; sp_getlg(&cv, TXSP);
       MOVV(cv, YCL);
-      PUTDC_BLK(PDLPTR, 0, DNMECL);
-      PUTDC_BLK(PDLPTR, DESCR, cv);
-      PUTDC_BLK(PDLPTR, 2*DESCR, LENFCL); }
+      PUTDC_BLK(PDLPTR, DESCR,   DNMECL);  /* SC-30: slot 1 */
+      PUTDC_BLK(PDLPTR, 2*DESCR, cv);
+      PUTDC_BLK(PDLPTR, 3*DESCR, LENFCL); }
     SETAC(LENFCL, 1);
     GOTO_SCOK;
 }
@@ -1141,8 +1206,8 @@ enmi3:
 /* SUCF — SUCCEED failure: reenter SCON */
 static void do_SUCF(void)
 {
-    GETDC_BLK(XCL, PDLPTR, 0);       /* GETDC XCL,PDLPTR,DESCR  (our slot 0) */
-    GETDC_BLK(YCL, PDLPTR, 2*DESCR); /* GETDC YCL,PDLPTR,2*DESCR (our slot 2) */
+    GETDC_BLK(XCL, PDLPTR, DESCR);    /* SC-31: slot 1 (oracle: D_A(PDLPTR)+DESCR) */
+    GETDC_BLK(YCL, PDLPTR, 2*DESCR);
     do_SCON(); /* BRANCH SUCE — re-enter SUCCEED path */
 }
 
@@ -1170,6 +1235,11 @@ static void do_SCON(void)
 static void do_FAIL_d(void)   { GOTO_FAIL; }
 static void do_SALF_d(void)   { GOTO_SALF; }
 static void do_SCOK_d(void)   { GOTO_SCOK; }
-static void do_RTNUL3(void)   { GOTO_SCOK; }
+static void do_RTNUL3(void)
+{
+    /* RTNUL3: signals case-3 (SCOK) back to STAR/DSAR nested invocation */
+    if (scan_ctx_g) scan_ctx_g->rtnul_flag = 1;
+    GOTO_FAIL; /* surface via fail_jmp so setjmp in caller sees rc!=0 */
+}
 
 /* end of scan.c */
