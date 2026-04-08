@@ -386,26 +386,48 @@ int32_t GC_fn(int32_t required)
         }
     }
     { /* ── Pass 2 (GCLAD): compute forward (compacted) addresses ───────── */
+        /* Oracle: CPYCL advances ONLY for live (marked) blocks.
+         * Dead blocks do NOT advance CPYCL — that is the compaction.
+         * MVSGPT = position of first dead block (compression frontier). */
         int32_t cpycl = D_A(HDSGPT);
         int32_t ttlcl = D_A(HDSGPT);
-        D_A(MVSGPT) = D_A(HDSGPT); /* compression barrier */
+        D_A(MVSGPT) = D_A(FRSGPT); /* default: no compaction needed */
+        int found_dead = 0;
         while (ttlcl != D_A(FRSGPT)) {
             int32_t bkdx = x_bksize(ttlcl);
             DESCR_t *t = (DESCR_t *)A2P(ttlcl);
-            if (!(t->f & MARK)) {
-            } else { /* unmarked: skip (will be compacted away)  update MVSGPT to last unmarked region start */
-                if (cpycl < ttlcl) /* marked: record forward address in title.a */
-                    D_A(MVSGPT) = ttlcl;
-            }
-            if (t->f & MARK) { /* GCLAD7: record target position in title A field */
-                t->a.i = cpycl;
-                cpycl += bkdx;
+            if (t->f & MARK) {
+                t->a.i = cpycl; /* GCLAD4: record compacted destination */
+                cpycl += bkdx;  /* advance CPYCL only for live blocks */
             } else {
-                cpycl += bkdx;
+                if (!found_dead) { D_A(MVSGPT) = ttlcl; found_dead = 1; } /* GCLAD7: first dead = frontier */
+                /* dead: do NOT advance cpycl */
             }
             ttlcl += bkdx;
         }
-        D_A(CPYCL) = cpycl; /* Store compression barrier */
+        D_A(CPYCL) = cpycl;
+    }
+    { /* ── GCBB: compact OBLIST chains — remove dead strings ────────────── */
+        /* Oracle GCBB1-GCBB5: for each bin chain, unlink unmarked entries. */
+        int32_t bi;
+        D_A(NODPCL) = 1;
+        for (bi = 0; bi < OBSIZ; bi++) {
+            int32_t st2ptr = P2A(&OBLIST_arr[bi]); /* previous LNKFLD holder = bin slot itself */
+            int32_t st1ptr = OBLIST_arr[bi].a.i;
+            while (st1ptr != 0) {
+                DESCR_t *ent = (DESCR_t *)A2P(st1ptr);
+                int32_t next = ((DESCR_t *)A2P(st1ptr + LNKFLD))->a.i;
+                if (ent->f & MARK) {
+                    /* live: update st2 link to compacted address of st1 */
+                    int32_t new_addr = ent->a.i; /* forward addr set in GCLAD */
+                    ((DESCR_t *)A2P(st2ptr + LNKFLD))->a.i = new_addr;
+                    st2ptr = st1ptr;
+                }
+                /* dead: simply skip — st2ptr stays, st2's link will be patched next iter or at GCBB5 */
+                st1ptr = next;
+            }
+            ((DESCR_t *)A2P(st2ptr + LNKFLD))->a.i = 0; /* GCBB5: terminate chain */
+        }
     }
     { /* ── Pass 3 (GCLAP): update PTR descriptors to new addresses ─────── */
         int32_t ttlcl = D_A(HDSGPT);
