@@ -239,6 +239,13 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
         case SM_STORE_VAR: {
             const char *name = ins->a[0].s;
             DESCR_t val = sm_pop(st);
+            /* SNOBOL4 semantics: if RHS evaluated to FAIL, the statement fails
+             * and no assignment occurs. Without this guard, OUTPUT = DIFFER(X,Y)
+             * would call output_val(FAILDESCR) and print a spurious blank line. */
+            if (val.v == DT_FAIL) {
+                st->last_ok = 0;
+                break;
+            }
             NV_SET_fn(name, val);
             /* leave last_ok unchanged — assignment always succeeds */
             break;
