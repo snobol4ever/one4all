@@ -128,12 +128,12 @@ int32_t GENVAR_fn(const SPEC_t *sp)
     while (bukptr != 0) { /* LOCA2 loop */
         DESCR_t *lnk = (DESCR_t *)A2P(bukptr + LNKFLD);
         int32_t lnk_v = (int32_t)lnk->v;
-        if (lnk_v < bin_idx) { /* earlier bin — keep walking */
+        if (lnk_v < bin_idx) { /* oracle: V < EQUVCL → LOCA2 (continue walking) */
             lstptr_lnk = bukptr + LNKFLD;
             bukptr = lnk->a.i;
             continue;
         }
-        if (lnk_v > bin_idx) break; /* overshot — LOCA5: insert before bukptr */
+        if (lnk_v > bin_idx) break; /* oracle: V > EQUVCL → LOCA5 (insert here) */
         /* same bin — string compare */
         DESCR_t *title = (DESCR_t *)A2P(bukptr);
         int32_t slen = (int32_t)title->v;
