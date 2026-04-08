@@ -144,11 +144,16 @@ RESULT_t CMPILE_fn(void)
     if (AEQLC(BRTYPE, CLNTYP)) goto cmpgo;
     cerr(EMSG3); goto stmt_done; /* CERR3: unexpected break type */
 cmpsub:
-    if (ELEMNT_fn(&SUBJND) == FAIL) { cdiag_inner(); goto stmt_done; } /* Compile subject */
+    if (ELEMNT_fn(&SUBJND) == FAIL) { cdiag_inner(); goto stmt_done; } /* CMPSUB: RCALL SUBJND,ELEMNT,,(CDIAG,COMP3).
+         * Oracle case1=CDIAG (compile error), case2=COMP3 (fatal). ELEMNT_fn returns FAIL for
+         * compile errors only; fatal system errors call error()→exit(1) internally. Single FAIL
+         * path always maps to CDIAG. Correct. */
     if (FORBLK_fn() == FAIL) { cerr(ILLBRK); goto stmt_done; }
     if (D_A(BRTYPE) != NBTYP) goto cmpsb1; /* CMPSB1 path when break is not binary */
     /* BRTYPE==NBTYP after subject: SPITCL/? check then CMPATN (binary pattern match) */
-    /* [PLB32] SNOBOL4+ '?' unary — simplified: just fall to CMPAT2 (EXPR for pattern) */
+    /* BRTYPE==NBTYP after subject: oracle CMPATN builds EXOPND node with ADDSON(EXOPND,SUBJND)
+     * then calls EXPR1 — this is SPITBOL binary '?' path (SPITCL!=0 only).
+     * In standard SNOBOL4 mode (SPITCL==0) oracle goes directly to CMPAT2. We do the same. */
     goto cmpatn;
 cmpsb1: /* CMPSB1: non-binary break after subject */
     if (AEQLC(BRTYPE, EQTYP)) goto cmpfrm; /* '=' → assignment */
@@ -177,7 +182,8 @@ cmpasp:
     if (TREPUB_fn(SUBJND) == FAIL) { cdiag_inner(); goto stmt_done; }
     if (TREPUB_fn(PATND) == FAIL) { cdiag_inner(); goto stmt_done; }
 cmpft:
-    if (TREPUB_fn(FORMND) == FAIL) goto cmptgo; /* CM-2: TREPUB case1 → CMPTGO */
+    if (TREPUB_fn(FORMND) == FAIL) goto cmptgo; /* Oracle RCALL ,TREPUB,(FORMND) case1→CMPTGO.
+         * TREPUB always returns OK (RRTURN 1); FAIL path is unreachable in practice. */
 cmptgo:
     if (AEQLC(BRTYPE, EOSTYP)) goto cmpngo;
     if (!AEQLC(BRTYPE, CLNTYP)) { cerr(ILLBRK); goto stmt_done; }
