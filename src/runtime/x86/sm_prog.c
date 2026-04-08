@@ -45,7 +45,7 @@ int sm_emit_s(SM_Program *p, sm_opcode_t op, const char *s)
 {
     int idx = _grow(p);
     p->instrs[idx].op   = op;
-    p->instrs[idx].a[0].s = s;
+    p->instrs[idx].a[0].s = s ? strdup(s) : NULL;
     return idx;
 }
 
@@ -78,7 +78,7 @@ int sm_emit_si(SM_Program *p, sm_opcode_t op, const char *s, int64_t i)
 {
     int idx = _grow(p);
     p->instrs[idx].op      = op;
-    p->instrs[idx].a[0].s  = s;
+    p->instrs[idx].a[0].s  = s ? strdup(s) : NULL;
     p->instrs[idx].a[1].i  = i;
     return idx;
 }

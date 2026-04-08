@@ -2628,7 +2628,9 @@ DESCR_t APPLY_fn(const char *name, DESCR_t *args, int nargs) {
     unsigned h = _func_hash(name);
     for (FNCBLK_t *e = _func_buckets[h]; e; e = e->next) {
         if (strcasecmp(e->name, name) == 0) {
-            if (e->fn) return e->fn(args, nargs);
+            if (e->fn) {
+                return e->fn(args, nargs);
+            }
             /* fn==NULL: SNOBOL4-defined function — call via interpreter hook */
             if (g_user_call_hook) return g_user_call_hook(name, args, nargs);
             return NULVCL;

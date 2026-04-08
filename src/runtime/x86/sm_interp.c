@@ -229,9 +229,8 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
             /* Push a frozen DT_E expression descriptor (for *expr / EVAL()) */
             DESCR_t d;
             d.v    = DT_E;
-            d.ptr  = ins->a[0].ptr;
             d.slen = 0;
-            d.s    = NULL;
+            d.ptr  = ins->a[0].ptr;   /* ptr and s share a union — set ptr last */
             sm_push(st, d);
             st->last_ok = 1;
             break;
