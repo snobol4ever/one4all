@@ -340,10 +340,11 @@ RESULT_t APPLY_fn(void)
     SETAC(XPTR, assoc);
     GETDC_B(INCL, XPTR, DESCR);
     D_V(INCL) = D_A(XCL); /* SETVA INCL,XCL — insert actual arg count */
-    if (INVOKE_fn() == FAIL) return FAIL;
-    MOVD(ZPTR, XPTR); /* oracle: RCALL ZPTR,INVOKE — result returned via RTZPTR */
-    MOVD(XPTR, ZPTR);
-    return OK;
+    switch (INVOKE_fn()) {
+    case FAIL: return FAIL;        /* exit 1: FAIL */
+    case NEMO: MOVD(XPTR, ZPTR); return OK; /* exit 3: RTZPTR — value in ZPTR */
+    default:   MOVD(XPTR, ZPTR); return OK; /* exit 2: RTXNAM — name in ZPTR → XPTR */
+    }
 }
 
 /*====================================================================================================================*/
