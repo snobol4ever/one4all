@@ -44,7 +44,7 @@ SPEC_t DPSP = {0};
 
 /* ── Interpreter registers ───────────────────────────────────────────── */
 
-DESCR_t OCBSCL = D0, OCICL = D0, OCBSVC = D0;
+DESCR_t OCBSCL = D0, OCICL = D0;
 DESCR_t CMBSCL = D0, CMOFCL = D0;
 DESCR_t PATBCL = D0, PATICL = D0;
 DESCR_t FRTNCL = D0, OCSVCL = D0;
@@ -132,13 +132,13 @@ DESCR_t UCASVL   = D0;            /* &UCASE [PLB18]                      */
 DESCR_t PARMVL   = D(0, 0, S);   /* &PARM [PLB39]                       */
 DESCR_t DIGSVL   = D0;            /* &DIGITS [PLB105]                    */
 DESCR_t EXN2CL   = D(0, 0, I);   /* &STEXEC [PLB107]                    */
-DESCR_t GCTTLL   = D0;            /* &GCTIME [PLB107]                    */
+DESCR_t GCTTTL   = D0;            /* &GCTIME [PLB107]                    */
 DESCR_t FATLCL   = D(0, 0, I);   /* &FATAL [PLB128]                     */
 
 /* ── Real-valued keywords ────────────────────────────────────────────── */
 
 real_t PI_val    = 3.14159265358979323846f;   /* &PI [PLB106]            */
-real_t GCTTLL_val = 0.0f;                      /* GC total time           */
+real_t GCTTTL_val = 0.0f;                      /* GC total time           */
 real_t RZERCL    = 0.0f;                       /* real zero [PLB104]      */
 real_t R1MCL     = 1.0e6f;                     /* 1e6 [PLB107]            */
 
@@ -180,7 +180,7 @@ DESCR_t BUKPTR = D0, LSTPTR = D0, LCPTR = D0;
 
 DESCR_t STNOCL = D0, LNNOCL = D0, FILENM = D0, CSTNCL = D0;
 DESCR_t STYPE = D0, BRTYPE = D0;
-DESCR_t FBLOCK = D0, NEXFCL = D0, NXFCLS = D0;
+DESCR_t FBLOCK = D0, NEXFCL = D0;
 DESCR_t FNLIST = D0, ICLBLK = D0;
 DESCR_t INITB = D0, INITE = D0, INITLS = D0;
 DESCR_t PRMPTR = D0;
@@ -208,7 +208,7 @@ DESCR_t ONECL  = D(1, 0, 0);
 DESCR_t OUTBLK = D0;    /* set in data_init to &OUTPUT - DESCR        */
 DESCR_t ERRBLK = D0;    /* set in data_init to &PUNCH  - DESCR        */
 DESCR_t SIZLMT = D(0x7fffffff, 0, 0);
-DESCR_t SNODSZS = D0;   /* NODESZ                                         */
+/* SNODSZ: defined in platform.c */
 DESCR_t STARSZ = D0;    /* 11*DESCR                                       */
 DESCR_t ZEROCL = D0;
 DESCR_t TRSKELS = D0;
@@ -246,7 +246,7 @@ DESCR_t VVDTP = D(S, 0, S);    /* STRING-STRING   */
 /* A field = function pointer (set at runtime by register calls)        */
 /* V field = argument count                                              */
 
-DESCR_t ANYCL  = D(0, FNC, 3);   DESCR_t ASGNCL = D(0, FNC, 2);
+/* ANYCCL: defined in platform.c */  DESCR_t ASGNCL = D(0, FNC, 2);
 DESCR_t ATOPCL = D(0, FNC, 3);   DESCR_t BASECL = D(0, FNC, 0);
 DESCR_t BRKCCL = D(0, FNC, 3);   DESCR_t BRXCCL = D(0, FNC, 3);
 DESCR_t BRXFCL = D(0, FNC, 2);   DESCR_t CHRCL  = D(0, FNC, 3);
@@ -256,10 +256,10 @@ DESCR_t ENDCL  = D(0, FNC, 0);   DESCR_t ENMECL = D(0, FNC, 3);
 DESCR_t ENMICL = D(0, FNC, 3);   DESCR_t ERORCL = D(0, FNC, 1);
 DESCR_t FNCFCL = D(0, FNC, 2);   DESCR_t LITFN  = D(0, FNC, 1);
 DESCR_t LIT1CL = D(0, FNC, 1);   DESCR_t NMECL  = D(0, FNC, 3);
-DESCR_t NNYCL  = D(0, FNC, 3);   DESCR_t SCONCL = D(0, FNC, 2);
-DESCR_t SCOKCL = D(0, FNC, 2);   DESCR_t SALICL = D(0, FNC, 2);
-DESCR_t STARCCL = D(0, FNC, 3);  DESCR_t DSARCL = D(0, FNC, 3);
-DESCR_t FNCECL = D(0, FNC, 2);   DESCR_t SUCCCL = D(0, FNC, 2);
+/* NNYCCL: defined in platform.c */ DESCR_t SCONCL = D(0, FNC, 2);
+DESCR_t SCOKCL = D(0, FNC, 2);   /* SALICL: no oracle counterpart — removed */
+/* STARCCL, DSARCL: no oracle counterpart — removed */
+/* FNCECL, SUCCCL: no oracle counterpart — removed */
 DESCR_t ABORCL = D0;              DESCR_t CONTCL = D0;
 DESCR_t SCNTCL = D0;              DESCR_t FRETCL = D0;
 DESCR_t ENDPTR = D0;              DESCR_t EXTPTR = D0;
@@ -279,7 +279,7 @@ DESCR_t TRCBLK[6] = {
 
 /* ── Primitive patterns (arena offsets — filled by data_init) ────── */
 
-DESCR_t ARBBACK = D0;    /* ARBAK arena offset */
+/* ARBACK: defined in platform.c */
 DESCR_t ARHEAD  = D0;    /* ARHED arena offset */
 DESCR_t ARTAIL  = D0;    /* ARTAL arena offset */
 DESCR_t STRPAT  = D0;    /* STARPT arena offset */
@@ -523,7 +523,7 @@ void data_init(void)
     IOBLSZ.a.i = (int_t)(2 * DESCR); IOBLSZ.v = B;
     LNODSZ.a.i = (int_t)(NODESZ + DESCR); LNODSZ.v = P;
     NODSIZ.a.i = (int_t)(NODESZ); NODSIZ.v = P;
-    SNODSZS.a.i = (int_t)(NODESZ); SNODSZS.v = P;
+    SNODSZ.a.i = (int_t)(NODESZ); SNODSZ.v = P;
     OCALIM.a.i = (int_t)(OCASIZ * DESCR); OCALIM.v = C;
     STARSZ.a.i = (int_t)(11 * DESCR); STARSZ.v = P;
     COMDCT.a.i = (int_t)(15 * DESCR);

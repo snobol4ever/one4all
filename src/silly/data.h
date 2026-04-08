@@ -42,7 +42,7 @@ extern SPEC_t DPSP;                                  /* DTREP output spec  */
 
 extern DESCR_t OCBSCL;    /* object code block base                       */
 extern DESCR_t OCICL;     /* object code index (current offset)           */
-extern DESCR_t OCBSVC;    /* saved object code base (EXPVAL)              */
+/* OCBSCL/OCICL: see data.c line 47 */
 extern DESCR_t CMBSCL;    /* compiler output block base                   */
 extern DESCR_t CMOFCL;    /* compiler output offset                       */
 extern DESCR_t PATBCL;    /* pattern code block base                      */
@@ -123,7 +123,6 @@ extern DESCR_t ONECL;     /* constant 1                                   */
 extern DESCR_t OUTBLK;    /* pointer to OUTPUT block                      */
 extern DESCR_t ERRBLK;    /* pointer to PUNCH (stderr) block [PLB8]       */
 extern DESCR_t SIZLMT;    /* limit on size of data object = SIZLIM        */
-extern DESCR_t SNODSZS;   /* small pattern node = NODESZ                  */
 extern DESCR_t SNODSZ;    /* small pattern node size (NODESZ, type P)     */
 extern DESCR_t ARBACK;    /* ARBAK pattern (ARB backup node)               */
 /* Pattern function descriptor constants */
@@ -201,7 +200,7 @@ extern DESCR_t STYPE;     /* scanner token type                           */
 extern DESCR_t BRTYPE;    /* break type from STREAM                       */
 extern DESCR_t FBLOCK;    /* function block pointer                       */
 extern DESCR_t NEXFCL;    /* next function position                       */
-extern DESCR_t NXFCLS;    /* next function slot                           */
+/* NEXFCL: see FBLOCK line */
 extern DESCR_t FNLIST;    /* function pair list pointer                   */
 extern DESCR_t ICLBLK;    /* miscellaneous data block                     */
 extern DESCR_t INITB;     /* initialization data pointer                  */
@@ -254,13 +253,13 @@ extern DESCR_t UCASVL;    /* &UCASE        [PLB18]                        */
 extern DESCR_t PARMVL;    /* &PARM         [PLB39]                        */
 extern DESCR_t DIGSVL;    /* &DIGITS       [PLB105]                       */
 extern DESCR_t EXN2CL;    /* &STEXEC       [PLB107]                       */
-extern DESCR_t GCTTLL;    /* &GCTIME       [PLB107]                       */
+extern DESCR_t GCTTTL;    /* &GCTIME       [PLB107]                       */
 extern DESCR_t FATLCL;    /* &FATAL        [PLB128]                       */
 
 /* ── Real-valued keywords ────────────────────────────────────────────── */
 
 extern real_t  PI_val;    /* &PI = 3.14159... [PLB106] — real_t PI_val    */
-extern real_t  GCTTLL_val;/* &GCTIME accumulator (real)                   */
+extern real_t  GCTTTL_val;/* &GCTIME accumulator (real)                   */
 extern real_t  RZERCL;    /* real constant 0.0 [PLB104]                   */
 extern real_t  R1MCL;     /* real constant 1e6 [PLB107]                   */
 
@@ -327,16 +326,16 @@ extern DESCR_t NULVCL;    /* null/empty value descriptor — v=S, a=0      */
 /* ── Function descriptors (FNC bit set) ──────────────────────────────── */
 /* Named after their SIL names, used by INVOKE dispatch                  */
 
-extern DESCR_t ANYCL;  extern DESCR_t ASGNCL;  extern DESCR_t ATOPCL;
+extern DESCR_t ANYCCL; extern DESCR_t ASGNCL;  extern DESCR_t ATOPCL;
 extern DESCR_t BASECL; extern DESCR_t BRKCCL;  extern DESCR_t BRXCCL;
 extern DESCR_t BRXFCL; extern DESCR_t CHRCL;   extern DESCR_t CMACL;
 extern DESCR_t CONCL;  extern DESCR_t DNMECL;  extern DESCR_t DNMICL;
 extern DESCR_t ENDCL;  extern DESCR_t ENMECL;  extern DESCR_t ENMICL;
 extern DESCR_t ERORCL; extern DESCR_t FNCFCL;  extern DESCR_t LITFN;
-extern DESCR_t LIT1CL; extern DESCR_t NMECL;   extern DESCR_t NNYCL;
-extern DESCR_t SCONCL; extern DESCR_t SCOKCL;  extern DESCR_t SALICL;
-extern DESCR_t STARCCL;extern DESCR_t DSARCL;  extern DESCR_t FNCECL;
-extern DESCR_t SUCCCL; extern DESCR_t ABORCL;  extern DESCR_t CONTCL;
+extern DESCR_t LIT1CL; extern DESCR_t NMECL;   extern DESCR_t NNYCCL;
+extern DESCR_t SCONCL; extern DESCR_t SCOKCL;
+/* SALICL, STARCCL, DSARCL, FNCECL, SUCCCL: no oracle counterpart — removed */
+extern DESCR_t ABORCL;  extern DESCR_t CONTCL;
 extern DESCR_t SCNTCL; extern DESCR_t FRETCL;  extern DESCR_t ENDPTR;
 extern DESCR_t EXTPTR; extern DESCR_t NRETCL;  extern DESCR_t RETCL;
 extern DESCR_t EFFCL;
@@ -521,7 +520,7 @@ extern DESCR_t TRCBLK[6];   /* trace block: [0]=fn descr, [1]=LIT1 fn,   */
 
 /* ── Primitive patterns (arena offsets stored in named DESCRs) ───────── */
 
-extern DESCR_t ARBBACK;   /* ARBAK pattern (backup ARB)                   */
+extern DESCR_t ARBACK;    /* ARBAK pattern (backup ARB)                   */
 extern DESCR_t ARHEAD;    /* ARHED pattern (ARB head)                     */
 extern DESCR_t ARTAIL;    /* ARTAL pattern (ARB tail)                     */
 extern DESCR_t STRPAT;    /* STARPT pattern (unevaluated expression)      */
