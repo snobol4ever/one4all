@@ -65,12 +65,18 @@ void FTERST_fn(void)
     /* Get message specifier from MSGNO[ERRTYP] and intern as &ERRTEXT */
     {
         int32_t ety = D_A(ERRTYP);
-        if (MSGNO[ety]) {
-            SPEC_t tsp; tsp.a = 0; tsp.o = 0; tsp.l = (int32_t)strlen(MSGNO[ety]);
-            /* point into static string — arena base 0 is invalid; use GENVAR via literal */
-            int32_t off = GENVAR_fn(&tsp);
+        const char *msg = (ety >= 0 && MSGNO[ety]) ? MSGNO[ety] : "";
+        SPEC_t tsp;
+        /* Point TSP at the static string via arena — copy into arena first */
+        int32_t slen = (int32_t)strlen(msg);
+        int32_t sblk = BLOCK_fn(slen + STNOSZ, B);
+        if (sblk) {
+            memcpy((char*)A2P(sblk) + STNOSZ, msg, (size_t)slen);
+            TSP.a = sblk + STNOSZ; TSP.o = 0; TSP.l = slen;
+            int32_t off = GENVAR_fn(&TSP);
             if (off) { SETAC(ERRTXT, off); }
         }
+        (void)tsp;
     }
     /* Keyword trace if &TRACE set */
     if (D_A(TRAPCL) > 0) {
@@ -150,8 +156,10 @@ void SYSCUT_fn(void)
                      (char*)A2P(D_A(FILENM)),
                      (int)D_A(LNNOCL), (int)D_A(SIGNCL),
                      (int)D_A(STNOCL), (int)D_A(LVLCL));
-    if (!AEQLC(CUTNO, 0)) { SETAC(CUTNO, 1); SETAC(RETCOD, 1); FTLEND_fn(); }
-    exit(1);
+    if (!AEQLC(CUTNO, 0)) { exit(1); }  /* ENDALL: already cut once → hard exit */
+    SETAC(CUTNO, 1);
+    SETAC(RETCOD, 1);
+    FTLEND_fn();
 }
 
 /*====================================================================================================================*/

@@ -162,8 +162,14 @@ xlatrn:
     INCRA(LNNOCL, 1);
 xlatnx:
     /* XLATNX: classify card type */
-    if (STREAM_fn(&xsp, &TEXTSP, &CARDTB, &stype) == FAIL) goto xlatrd; /* COMP3=fatal; ST_EOS=blank→re-read */
-    SETAC(STYPE, stype);
+    { int st2;
+      RESULT_t crc = STREAM_fn(&xsp, &TEXTSP, &CARDTB, &st2);
+      SETAC(STYPE, st2);
+      if (crc == FAIL) {
+          if (st2 == 0) { extern void COMP3_fn(void); COMP3_fn(); return; } /* ST_ERROR */
+          goto xlatrd; /* ST_EOS: blank card → re-read */
+      }
+    }
     { RESULT_t nr = NEWCRD_fn(); if (nr == OK) goto xlatrd; } /* RTN1=re-read */
     { /* CMPILE: RTN1=fatal(COMP3), RTN2=END reached(fall), RTN3=continue(XLATNX) */
         RESULT_t rc = CMPILE_fn();
@@ -201,10 +207,11 @@ xlatnx:
 xlaend:
     if (!AEQLC(ESAICL, 0)) { /* XLAEND: check compilation errors */
         XCALL_OUTPUT_fmt(PUNCH, "ERRORS DETECTED IN SOURCE PROGRAM\n\n");
-        if (AEQLC(NERRCL, 0)) { /* NERRCL==0 means -NOERROR NOT set → abort */
+        if (!AEQLC(NERRCL, 0)) { /* -NOERROR set: abort with RETCOD=1 → FTLEN2 */
             SETAC(RETCOD, 1);
-            FTLEND_fn();
+            FTLEND_fn(); return;
         }
+        /* NERRCL==0 (-NOERROR NOT set): continue to XLATND (execute anyway) */
     } else {
         if (!AEQLC(BANRCL, 0))
             XCALL_OUTPUT_fmt(PUNCH, "No errors detected in source program\n\n");
@@ -225,7 +232,11 @@ xlaend:
     }
     SETAC(CNSLCL, 1);
     RESULT_t irc = INTERP_fn(); /* Run the interpreter */
-    if ((int)irc != 0 && (int)irc != 5 && (int)irc != 6) MAIN1_fn();
+    /* Oracle: INTERP case 1,2,3 → MAIN1 (error); 4/5/6 = RETURN/NRETURN/FRETURN → normal */
+    switch ((int)irc) {
+    case 1: case 2: case 3: MAIN1_fn(); break;
+    default: break; /* 4=RETURN, 5=NRETURN, 6=FRETURN — normal top-level exit */
+    }
     END_fn();
 }
 
