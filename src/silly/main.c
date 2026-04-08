@@ -92,7 +92,8 @@ static void BEGIN_fn(void)
         DESCR_t xptr, yptr, zptr;
         GETDC_B(xptr, INITB, 0);
         int32_t off = genvar_from_descr(xptr);
-        if (off) { SETAC(yptr, off); SETVC(yptr, S); }
+        if (!off) { SETAC(ERRTYP, 20); FTLEND_fn(); } /* GENVAR fail → fatal, per oracle RTYPTR */
+        SETAC(yptr, off); SETVC(yptr, S);
         GETDC_B(zptr, INITB, DESCR);
         PUTDC_B(zptr, 0, yptr);
         INCRA(INITB, 2*DESCR);
