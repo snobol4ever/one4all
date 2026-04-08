@@ -102,7 +102,7 @@ RESULT_t CMPILE_fn(void)
             INCRA(CMOFCL, DESCR);
             PUTD_B(CMBSCL, CMOFCL, BASECL);
             SUM(CMBSCL, CMBSCL, CMOFCL); /* advance CMBSCL to the BASECL slot */
-            if (D_A(CMBSCL) >= D_A(OCLIM)) {
+            if (D_A(CMBSCL) >= D_A(OCLIM)) { /* PCOMP CMBSCL,OCLIM,,,CMPILO: oracle D_PTR<; ours D_A>=; inverted same. */
                 /* Spill: write GOTG bridge at current CMBSCL, allocate new block.
                  * Oracle: BLOCK(XCL); D(CMBSCL)=GOTGCL; D(CMBSCL+DESCR)=LIT1CL;
                  *         D(CMBSCL+2*DESCR)=XCL; CMBSCL=XCL;
