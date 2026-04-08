@@ -13,13 +13,33 @@ import re
 FUNC_START = re.compile(r'^([A-Z][A-Z0-9_]*)\s*\(ret_t\s+\w+\)\s*\{')
 RETURN_STMT = re.compile(r'^(\s*)(RETURN\s*\()(\d+)\)')
 
-def inject(src_path, dst_path):
+def load_procs(proc_h_path):
+    """Load the whitelist of top-level SIL procedure names from proc.h."""
+    import re
+    procs = set()
+    try:
+        with open(proc_h_path) as f:
+            for line in f:
+                m = re.match(r'^extern int ([A-Z][A-Z0-9_]*)\(', line)
+                if m:
+                    procs.add(m.group(1))
+    except FileNotFoundError:
+        pass
+    return procs
+
+def inject(src_path, dst_path, proc_h_path=None):
     with open(src_path) as f:
         lines = f.readlines()
 
+    whitelist = load_procs(proc_h_path) if proc_h_path else None
+
     out = []
     out.append('/* injected by inject_snobol4.py */\n')
-    out.append('#include "mon_hooks.h"\n\n')
+    out.append('#include "mon_hooks.h"\n')
+    out.append('#include <stdlib.h>\n')
+    out.append('static void __attribute__((constructor)) mon_init(void) {\n')
+    out.append('    mon_open(getenv("MON_EVT"), getenv("MON_ACK"));\n')
+    out.append('}\n\n')
 
     i = 0
     cur_fn = None
@@ -34,11 +54,25 @@ def inject(src_path, dst_path):
             m = FUNC_START.match(line)
             if m:
                 cur_fn = m.group(1)
+                # Whitelist check: only instrument top-level SIL procedures
+                if whitelist and cur_fn not in whitelist:
+                    cur_fn = None  # treat as non-function, copy verbatim
+                    out.append(line)
+                    i += 1
+                    continue
                 out.append(line)
-                out.append(f'    mon_enter("{cur_fn}");\n')
                 depth = line.count('{') - line.count('}')
                 injected += 1
                 i += 1
+                # Scan forward past the ENTRY(name) line, then insert mon_enter
+                while i < len(lines):
+                    entry_line = lines[i]
+                    out.append(entry_line)
+                    depth += entry_line.count('{') - entry_line.count('}')
+                    i += 1
+                    if re.match(r'\s*ENTRY\s*\(', entry_line):
+                        out.append(f'    mon_enter("{cur_fn}");\n')
+                        break
                 continue
 
         if cur_fn is not None:
@@ -68,7 +102,8 @@ def inject(src_path, dst_path):
     print(f"inject_snobol4.py: {injected} functions instrumented -> {dst_path}")
 
 if __name__ == '__main__':
-    if len(sys.argv) != 3:
-        print(f"Usage: {sys.argv[0]} <snobol4.c> <snobol4-injected.c>")
+    if len(sys.argv) < 3 or len(sys.argv) > 4:
+        print(f"Usage: {sys.argv[0]} <snobol4.c> <snobol4-injected.c> [proc.h]")
         sys.exit(1)
-    inject(sys.argv[1], sys.argv[2])
+    proc_h = sys.argv[3] if len(sys.argv) > 3 else None
+    inject(sys.argv[1], sys.argv[2], proc_h)

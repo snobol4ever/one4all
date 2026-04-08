@@ -23,15 +23,18 @@ import signal
 TIMEOUT_DEFAULT = 10   # seconds of FIFO silence → infinite loop declared
 
 def open_fifos(csn_evt, csn_ack, sly_evt, sly_ack):
-    """Open all four FIFOs. Order matters: open evt read-side before ack write-side
-    so participant open(O_WRONLY) on evt unblocks, then we open ack write-side
-    so participant open(O_RDONLY) on ack unblocks."""
-    # evt FIFOs: we read, participants write (open O_WRONLY blocks until we open O_RDONLY)
-    csn_ef = open(csn_evt, 'r')
-    sly_ef = open(sly_evt, 'r')
-    # ack FIFOs: we write, participants read (open O_RDONLY blocks until we open O_WRONLY)
-    csn_af = open(csn_ack, 'w')
-    sly_af = open(sly_ack, 'w')
+    """Open all four FIFOs using O_RDWR to avoid blocking on open().
+    O_RDWR on a FIFO opens without waiting for the other side.
+    This lets the controller open all 4 FIFOs instantly, then participants
+    can open their sides and the actual reads/writes proceed normally."""
+    import os
+    def open_rw(path, mode):
+        fd = os.open(path, os.O_RDWR)
+        return os.fdopen(fd, mode)
+    csn_ef = open_rw(csn_evt, 'r')
+    sly_ef = open_rw(sly_evt, 'r')
+    csn_af = open_rw(csn_ack, 'w')
+    sly_af = open_rw(sly_ack, 'w')
     return csn_ef, csn_af, sly_ef, sly_af
 
 
@@ -40,7 +43,7 @@ def send_ack(f, code):
     f.flush()
 
 
-def run(csn_evt, csn_ack, sly_evt, sly_ack, timeout):
+def run(csn_evt, csn_ack, sly_evt, sly_ack, timeout, filter_fns=None):
     try:
         csn_ef, csn_af, sly_ef, sly_af = open_fifos(csn_evt, csn_ack, sly_evt, sly_ack)
     except Exception as e:
@@ -93,6 +96,14 @@ def run(csn_evt, csn_ack, sly_evt, sly_ack, timeout):
             line = line.rstrip('\n')
             last_event[name] = line
             last_time[name] = now
+            # Filter: if filter_fns set and this is a CSN event for unknown fn, skip it
+            if filter_fns and name == 'csn':
+                parts = line.split()
+                fn_name = parts[1] if len(parts) >= 2 else ''
+                if fn_name not in filter_fns:
+                    send_ack(csn_af, 'G')  # auto-ack, don't wait for sly
+                    print(f"SKIP   {line}", flush=True)
+                    continue
             pending[name] = line
 
         # If both have a pending event, compare and ack
@@ -136,5 +147,10 @@ if __name__ == '__main__':
     ap.add_argument('sly_evt')
     ap.add_argument('sly_ack')
     ap.add_argument('--timeout', type=float, default=TIMEOUT_DEFAULT)
+    ap.add_argument('--filter-fns', help='File with one function name per line; skip CSN events not in this set')
     args = ap.parse_args()
-    sys.exit(run(args.csn_evt, args.csn_ack, args.sly_evt, args.sly_ack, args.timeout))
+    filter_fns = None
+    if args.filter_fns:
+        with open(args.filter_fns) as ff:
+            filter_fns = set(l.strip() for l in ff if l.strip())
+    sys.exit(run(args.csn_evt, args.csn_ack, args.sly_evt, args.sly_ack, args.timeout, filter_fns))
