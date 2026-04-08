@@ -16,6 +16,7 @@
 #include "arena.h"
 #include "strings.h"
 #include "symtab.h"
+#include "errors.h" /* ARGNER_fn, INTR1_fn, LENERR_fn */
 
 /* External stubs — use signatures from headers where declared */
 extern RESULT_t INVOKE_fn(void);
@@ -259,9 +260,10 @@ RESULT_t TIME_fn(void)
 RESULT_t COLECT_fn(void)
 {
     if (INTVAL_fn() == FAIL) return FAIL;
-    if (ACOMPC(XPTR, 0) < 0) { SETAC(ERRTYP, 14); return FAIL; } /* ACOMPC XPTR,0,,,LENERR — <0 only */
-    if (GC_fn(D_A(XPTR)) < 0) return FAIL;
-    SETVC(ZPTR, I);
+    if (ACOMPC(XPTR, 0) < 0) { LENERR_fn(); return FAIL; }
+    int32_t free_space = GC_fn(D_A(XPTR));
+    if (free_space < 0) return FAIL;
+    SETAC(ZPTR, free_space); SETVC(ZPTR, I);  /* FN-3: load result into ZPTR */
     MOVD(XPTR, ZPTR); return OK;
 }
 
@@ -272,7 +274,7 @@ RESULT_t COPY_fn(void)
     if (ARGVAL_fn() == FAIL) return FAIL;
     switch (D_V(XPTR)) { /* types that cannot be copied */
     case S: case I: case R: case N: case K: case E: case T:
-        return FAIL;
+        INTR1_fn(); return FAIL;
     default: break;
     }
     int32_t sz = x_bksize(D_A(XPTR));
@@ -331,7 +333,7 @@ RESULT_t APPLY_fn(void)
 {
     SETAV(XCL, INCL);
     DECRA(XCL, 1);
-    if (ACOMPC(XCL, 1) < 0) { SETAC(ERRTYP, 10); return FAIL; }
+    if (ACOMPC(XCL, 1) < 0) { ARGNER_fn(); return FAIL; }
     fn_push(XCL);
     if (VARVUP_fn() == FAIL) { fn_top--; return FAIL; }
     XCL = fn_pop();

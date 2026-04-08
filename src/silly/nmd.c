@@ -34,6 +34,7 @@
 #include "arena.h"
 #include "strings.h"
 #include "symtab.h"
+#include "errors.h" /* INTR1_fn, INTR8_fn, INTR13_fn */
 
 /* External stubs resolved at link time */
 extern RESULT_t EXPEVL_fn(void);
@@ -59,41 +60,30 @@ RESULT_t NMD_fn(void)
 {
     MOVD(TCL, NHEDCL); /* MOVD TCL,NHEDCL — start from saved head */
     for (;;) {
-        if (ACOMP(TCL, NAMICL) >= 0) /* NMD1: ACOMP TCL,NAMICL — past end? → RTN2 (return OK) */
-            return OK;
+        if (ACOMP(TCL, NAMICL) == 0) return OK;          /* NMD1: == NAMICL → RTN2 */
+        if (ACOMP(TCL, NAMICL) > 0)  { INTR13_fn(); return FAIL; } /* > NAMICL → INTR13 */
         SUM(TPTR, NBSPTR, TCL); /* SUM TPTR,NBSPTR,TCL — entry address */
         getspc(&TSP, TPTR, DESCR); /* GETSPC TSP,TPTR,DESCR — captured substring */
         GETDC_B(TVAL, TPTR, DESCR + (int32_t)sizeof(SPEC_t)); /* GETDC TVAL,TPTR,DESCR+SPEC — target variable */
         D_A(XCL) = TSP.l; /* GETLG XCL,TSP — get length */
-        if (ACOMP(XCL, MLENCL) > 0) { /* ACOMP XCL,MLENCL,INTR8 — check &MAXLNGTH */
-            INCRA(TCL, DESCR + (int32_t)sizeof(SPEC_t)); /* INTR8: string overflow — treat as non-fatal, skip entry */
-            continue;
-        }
+        if (ACOMP(XCL, MLENCL) > 0) { INTR8_fn(); return FAIL; } /* INTR8 — string too long */
         if (VEQLC(TVAL, E)) { /* VEQLC TVAL,E,,NAMEXN — EXPRESSION target? */
-            MOVD(XPTR, TVAL); /* EXPEVL reads from XPTR in our impl */  /* NAMEXN: RCALL TVAL,EXPEVL,TVAL,(FAIL,NMD5,NEMO) */
+            /* NAMEXN: PUSH(TVAL); EXPEVL(TVAL); case1→FAIL, case2→NMD5, case3→NEMO */
+            MOVD(XPTR, TVAL);
             RESULT_t rc = EXPEVL_fn();
-            if (rc == FAIL) {
-                INCRA(TCL, DESCR + (int32_t)sizeof(SPEC_t)); /* FAIL exit — skip this capture */
-                continue;
-            }
-            MOVD(TVAL, XPTR); /* XPTR now holds evaluated result; fall into NMD5 */
+            if (rc == FAIL) return FAIL;
+            if (rc == NEMO) return NEMO;
+            MOVD(TVAL, XPTR); /* case2: evaluated result → fall into NMD5 */
         }
 nmd5:
         if (VEQLC(TVAL, K)) { /* VEQLC TVAL,K,,NMDIC — KEYWORD target? */
-            /* NMDIC: SPCINT VVAL,TSP,INTR1,NMD4
-             * Convert captured substring to integer for keyword assign */
-            if (SPCINT_fn(&VVAL, &TSP) == FAIL) {
-                INCRA(TCL, DESCR + (int32_t)sizeof(SPEC_t)); /* INTR1: illegal data type — skip */
-                continue;
-            }
+            /* NMDIC: SPCINT VVAL,TSP,INTR1,NMD4 */
+            if (SPCINT_fn(&VVAL, &TSP) == FAIL) { INTR1_fn(); return FAIL; }
             goto nmd4;
         }
         { /* Normal string target: RCALL VVAL,GENVAR,(TSPPTR) */
             int32_t off = GENVAR_fn(&TSP);
-            if (!off) {
-                INCRA(TCL, DESCR + (int32_t)sizeof(SPEC_t));
-                continue;
-            }
+            if (!off) return FAIL;
             SETAC(VVAL, off);
             SETVC(VVAL, S);
         }
@@ -102,15 +92,15 @@ nmd4:
         if (!AEQLC(OUTSW, 0)) { /* AEQLC OUTSW,0,,NMD3 — check &OUTPUT */
             int32_t assoc = locapv_fn(D_A(OUTATL), &TVAL);
             if (assoc) {
-                DESCR_t zptr; SETAC(zptr, assoc); SETVC(zptr, S);
-                GETDC_B(zptr, TVAL, DESCR);
+                DESCR_t zptr; SETAC(zptr, assoc);
+                GETDC_B(zptr, zptr, DESCR); /* NMD-5 fix: read block from ATL entry */
                 PUTOUT_fn(zptr, VVAL);
             }
         }
-        if (ACOMPC(TRAPCL, 0) <= 0) { /* NMD3: ACOMPC TRAPCL,0,,NMD2,NMD2 — skip trace if <=0 */
+        if (ACOMPC(TRAPCL, 0) > 0) { /* NMD3: trace if TRAPCL > 0 */
             int32_t assoc = locapt_fn(D_A(TVALL), &TVAL);
             if (assoc) {
-                DESCR_t save_TCL = TCL, save_NAMICL = NAMICL, /* PUSH (TCL,NAMICL,NHEDCL); trace; POP */
+                DESCR_t save_TCL = TCL, save_NAMICL = NAMICL,
                         save_NHEDCL = NHEDCL;
                 MOVD(NHEDCL, NAMICL);
                 SETAC(ATPTR, assoc);
@@ -120,8 +110,7 @@ nmd4:
                 MOVD(NHEDCL, save_NHEDCL);
             }
         }
-        INCRA(TCL, DESCR + (int32_t)sizeof(SPEC_t)); /* NMD2: INCRA TCL,DESCR+SPEC — advance to next entry */
-        continue; /* BRANCH NMD1 — loop */
-        (void) && nmd5; /* Suppress unused-label warning — nmd5 is jumped to from NAMEXN */
+        INCRA(TCL, DESCR + (int32_t)sizeof(SPEC_t)); /* NMD2: advance to next entry */
+        (void) && nmd5; /* suppress unused-label warning */
     }
 }

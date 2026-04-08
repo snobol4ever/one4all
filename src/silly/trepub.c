@@ -54,7 +54,7 @@ trepu1:
     INCRA(CMOFCL, DESCR); /* INCRA CMOFCL,DESCR; PUTD CMBSCL,CMOFCL,XPTR */
     PUTD_B(CMBSCL, CMOFCL, XPTR);
     SUM(ZPTR, CMBSCL, CMOFCL); /* PCOMP ZPTR,OCLIM — check buffer limit */
-    if (D_A(ZPTR) < D_A(OCLIM)) {
+    if (D_A(ZPTR) <= D_A(OCLIM)) { /* TR-A: oracle uses >, so spill only when ZPTR > OCLIM */
         goto trepu4;
     }
     { /* TREPU5: buffer full — allocate new block */

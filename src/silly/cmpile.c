@@ -110,7 +110,7 @@ RESULT_t CMPILE_fn(void)
             if (!loff) { cerr(EMSG1); goto stmt_done; }
             SETAC(LPTR, loff); SETVC(LPTR, S);
             if (!AEQLIC(LPTR, ATTRIB, 0)) { /* CMPILC: check for previous definition */
-                if (!AEQLC(CNSLCL, 0)) { cerr(EMSG2); goto stmt_done; }
+                if (AEQLC(CNSLCL, 0)) { cerr(EMSG2); goto stmt_done; }  /* CM-1: duplicate label, CNSLCL==0 → error */
             }
             PUTDC_B(LPTR, ATTRIB, CMBSCL);
             if (deql_fn(LPTR, ENDPTR)) return FAIL; /* RTN2 = END seen */                      /* Check for END label */
@@ -163,7 +163,7 @@ cmpasp:
     if (TREPUB_fn(SUBJND) == FAIL) { cdiag_inner(); goto stmt_done; }
     if (TREPUB_fn(PATND) == FAIL) { cdiag_inner(); goto stmt_done; }
 cmpft:
-    TREPUB_fn(FORMND); /* CMPFT: TREPUB(FORMND) — result (ok or fail) always joins CMPTGO */
+    if (TREPUB_fn(FORMND) == FAIL) goto cmptgo; /* CM-2: TREPUB case1 → CMPTGO */
 cmptgo:
     if (AEQLC(BRTYPE, EOSTYP)) goto cmpngo;
     if (!AEQLC(BRTYPE, CLNTYP)) { cerr(ILLBRK); goto stmt_done; }

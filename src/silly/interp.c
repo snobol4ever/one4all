@@ -33,6 +33,7 @@
 #include "argval.h"
 #include "trace.h"
 #include "symtab.h"   /* locapt_fn */
+#include "errors.h"   /* INTR4_fn, INTR5_fn, ARGNER_fn, etc. */
 
 static inline int deql(DESCR_t a, DESCR_t b)
     { return D_A(a)==D_A(b) && D_V(a)==D_V(b); }
@@ -61,13 +62,12 @@ void invoke_table_register(int32_t idx, invoke_fn_t fn, int32_t nargs)
 }
 
 /*====================================================================================================================*/
-/* ── Error stubs (§23 error targets) ────────────────────────────────── */
-static void intr4(void) { SETAC(ERRTYP, 4);  }   /* bad CODE type        */
-static void intr5(void) { SETAC(ERRTYP, 5);  }   /* bad goto value       */
-static void cnterr(void){ SETAC(ERRTYP, 99); }   /* CONTINUE outside hdlr*/
-static void cfterr(void){ SETAC(ERRTYP, 98); }   /* SCONTINUE outside    */
-static void exex(void)  { SETAC(ERRTYP, 33); }   /* &STLIMIT exceeded    */
-static void usrint(void){ SETAC(ERRTYP, 34); }   /* user interrupt       */
+/* ── Aliases for error targets used in §7 ───────────────────────────── */
+#define intr4()   INTR4_fn()
+#define intr5()   INTR5_fn()
+#define cnterr()  CNTERR_fn()
+#define cfterr()  CFTERR_fn()
+#define exex()    EXEX_fn()
 
 /* ── BASE ────────────────────────────────────────────────────────────── */
 /*
@@ -111,8 +111,11 @@ RESULT_t GOTL_fn(void)
 {
     INCRA(OCICL, DESCR);
     GETD_B(XPTR, OCBSCL, OCICL);
-    if (TESTF(XPTR, FNC)) { /* Evaluate if function */
-        if (INVOKE_fn() == FAIL) { intr5(); return FAIL; }
+    if (TESTF(XPTR, FNC)) { /* GOTLC: computed label — evaluate */
+        RESULT_t rc = INVOKE_fn();
+        if (rc == FAIL)   { intr5(); return FAIL; } /* case1: FAIL → INTR5 */
+        if (rc == NEMO)   { intr4(); return FAIL; } /* case3: name → INTR4 */
+        /* case2: success — fall through, check type */
         if (!VEQLC(XPTR, S)) { intr4(); return FAIL; }
     }
     if (D_A(TRAPCL) > 0) { /* Label trace */
@@ -134,12 +137,12 @@ RESULT_t GOTL_fn(void)
         SETAC(ERRTYP, 255); return FAIL; /* FTLEND path — fatal termination */
     }
     if (deql(XPTR, SCNTCL)) {
-        if (AEQLC(FATLCL, 0)) { cfterr(); return FAIL; }
+        if (!AEQLC(FATLCL, 0)) { cfterr(); return FAIL; }  /* IP-3: FATLCL!=0 → CFTERR */
         MOVD(FRTNCL, XOCICL);
         goto restore_and_go;
     }
     if (deql(XPTR, CONTCL)) {
-        if (AEQLC(FATLCL, 0)) { cfterr(); return FAIL; }
+        if (!AEQLC(FATLCL, 0)) { cfterr(); return FAIL; }  /* IP-3: FATLCL!=0 → CFTERR */
         MOVD(FRTNCL, XFRTNC);
 restore_and_go:
         if (AEQLC(XOCBSC, 0)) { cnterr(); return FAIL; }
@@ -148,7 +151,8 @@ restore_and_go:
         MOVD(STNOCL, XSTNOC); MOVD(LSFLNM, XLSFLN);
         MOVD(LSLNCL, XLSLNC); MOVD(LSTNCL, XLNNOC);
         SETAC(XOCBSC, 0);
-        if (!AEQLC(ERRTYP, 0)) MOVD(ERRTYP, XERRTY);
+        if (AEQLC(ERRTYP, 0)) return OK;   /* IP-4: ERRTYP==0 → END0 (clean exit) */
+        MOVD(ERRTYP, XERRTY);
         return FAIL;
     }
     GETDC_B(OCBSCL, XPTR, ATTRIB); /* Normal label: get code base from ATTRIB field */
@@ -184,17 +188,17 @@ RESULT_t INIT_fn(void)
     MOVD(LSTNCL, STNOCL);
     MOVA(LSFLNM, FILENM);
     MOVA(LSLNCL, LNNOCL);
-    if (!AEQLC(UINTCL, 0)) { usrint(); return FAIL; } /* Check user interrupt */
+    if (!AEQLC(UINTCL, 0)) { USRINT_fn(); return FAIL; } /* Check user interrupt */
     INCRA(OCICL, DESCR); GETD_B(XCL, OCBSCL, OCICL); /* Load statement number, failure offset, line, file from object code */
     MOVA(STNOCL, XCL);
     SETAV(FRTNCL, XCL);
     INCRA(OCICL, DESCR); GETD_B(LNNOCL, OCBSCL, OCICL);
     INCRA(OCICL, DESCR); GETD_B(FILENM, OCBSCL, OCICL);
     INCRA(EXN2CL, 1); /* &STEXEC */
-    if (D_A(EXLMCL) >= 0) { /* Check &STLIMIT (oracle: ACOMPC EXLMCL,0,,,RTNUL3 then ACOMP EXNOCL,EXLMCL,EXEX,EXEX) */
-        if (D_A(EXNOCL) >= D_A(EXLMCL)) { exex(); return FAIL; }
-        INCRA(EXNOCL, 1); /* &STCOUNT */
-    }
+    if (D_A(EXLMCL) < 0) goto init_done; /* &STLIMIT < 0 means unlimited */
+    if (D_A(EXNOCL) >= D_A(EXLMCL)) { exex(); return FAIL; }
+    INCRA(EXNOCL, 1); /* &STCOUNT */
+init_done:
     if (D_A(TRAPCL) > 0) { /* &TRACE checks */
         int32_t assoc = locapt_fn(D_A(TKEYL), &STNOKY); /* Check for breakpoint  XCALLC chk_break — stub */
         if (assoc) { SETAC(ATPTR, assoc); TRPHND_fn(ATPTR); }

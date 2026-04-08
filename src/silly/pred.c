@@ -22,6 +22,7 @@
 #include "arena.h"
 #include "strings.h"
 #include "symtab.h"
+#include "errors.h" /* LENERR_fn, INTR8_fn, INTR30_fn */
 
 /* External stubs */
 extern RESULT_t XYARGS_fn(void);
@@ -223,8 +224,8 @@ RESULT_t CHAR_fn(void)
 {
     if (INTVAL_fn() == FAIL) return FAIL;
     MOVD(XCL, XPTR); /* INTVAL result → XCL */
-    if (ACOMPC(XCL, 0) < 0) { SETAC(ERRTYP, ERR_NEGATIVE); return FAIL; } /* < 0 → LENERR */
-    if (ACOMPC(XCL, 256) >= 0) { SETAC(ERRTYP, ERR_ILLEGAL_ARG); return FAIL; } /* ACOMPC XCL,256,INTR30,INTR30 — must be < 256 */
+    if (ACOMPC(XCL, 0) < 0) { LENERR_fn(); return FAIL; }       /* < 0 → LENERR */
+    if (ACOMPC(XCL, 256) >= 0) { INTR30_fn(); return FAIL; }    /* >= 256 → INTR30 */
     { /* RCALL XPTR,CONVAR,ONECL — allocate 1-char space */
         int32_t soff = CONVAR_fn(1);
         if (!soff) return FAIL;
@@ -260,8 +261,8 @@ static RESULT_t rpad_common(void)
     if (VARVAL_fn() == FAIL) { pred_top -= 3; return FAIL; } /* Get pad character */
     MOVD(WPTR, XPTR);
     ZPTR = pred_pop(); XPTR = pred_pop(); SCL = pred_pop();
-    if (ACOMP(ZPTR, MLENCL) > 0) { SETAC(ERRTYP, 8); return FAIL; } /* ACOMP ZPTR,MLENCL,INTR8 */
-    if (ACOMP(ZEROCL, ZPTR) > 0) { SETAC(ERRTYP, ERR_NEGATIVE); return FAIL; } /* ACOMP ZEROCL,ZPTR,LENERR — negative length */
+    if (ACOMP(ZPTR, MLENCL) > 0) { INTR8_fn(); return FAIL; }    /* INTR8 — too long */
+    if (ACOMP(ZEROCL, ZPTR) > 0) { LENERR_fn(); return FAIL; }   /* LENERR — negative length */
     LOCSP_fn(&VSP, &WPTR); /* pad character spec */
     LOCSP_fn(&XSP, &XPTR); /* subject string spec */
     D_A(YPTR) = XSP.l; /* GETLG YPTR,XSP */
