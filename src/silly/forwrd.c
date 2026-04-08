@@ -117,16 +117,27 @@ RESULT_t FORWRD_fn(void)
  */
 RESULT_t FORBLK_fn(void)
 {
+    /* v311.sil: STREAM XSP,TEXTSP,IBLKTB,RTN1,FORRUN,FORJRN
+     * IBLKTB matches EOS characters (AC_STOP/EOSTYP) and skips blanks (AC_CONTIN).
+     * STREAM returns:
+     *   OK   + stype=EOSTYP  → EOS delimiter consumed → FORJRN: call forrun, loop
+     *   FAIL + stype=0       → input exhausted (nonblank found) → return to CMPILE
+     * CMPILE then calls ELEMNT to parse the nonblank element. FORBLK itself never
+     * calls ELEMNT — it only skips inter-block whitespace/EOS chars.
+     */
     SPEC_t xsp;
     int stype;
     while (1) {
         RESULT_t rc = STREAM_fn(&xsp, &TEXTSP, &IBLKTB, &stype);
         if (rc == OK) {
+            /* EOS char found (FORJRN): read next card and loop */
             SETAC(BRTYPE, stype);
-            return OK;
+            rc = forrun();
+            if (rc == FAIL) return FAIL;
+            continue;
         }
-        rc = forrun();
-        if (rc == FAIL) return FAIL;
+        /* FAIL: input exhausted = nonblank content at TEXTSP → return to caller */
+        return OK;  /* RTN2 to CMPILE — proceed to ELEMNT */
     }
 }
 

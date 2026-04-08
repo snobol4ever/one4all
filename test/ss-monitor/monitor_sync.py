@@ -96,13 +96,14 @@ def run(csn_evt, csn_ack, sly_evt, sly_ack, timeout, filter_fns=None):
             line = line.rstrip('\n')
             last_event[name] = line
             last_time[name] = now
-            # Filter: if filter_fns set and this is a CSN event for unknown fn, skip it
-            if filter_fns and name == 'csn':
+            # Filter: if filter_fns set and event fn not in shared whitelist, skip it
+            if filter_fns:
                 parts = line.split()
                 fn_name = parts[1] if len(parts) >= 2 else ''
                 if fn_name not in filter_fns:
-                    send_ack(csn_af, 'G')  # auto-ack, don't wait for sly
-                    print(f"SKIP   {line}", flush=True)
+                    af = csn_af if name == 'csn' else sly_af
+                    send_ack(af, 'G')  # auto-ack this side
+                    print(f"SKIP   [{name}] {line}", flush=True)
                     continue
             pending[name] = line
 
