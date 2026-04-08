@@ -353,24 +353,13 @@ static void h_pat_capture(void)
 
 static void h_pat_capture_fn(void)
 {
-    /* . *func() — a[0].s = function name.
-     * Pass DT_E var with synthetic E_FNC so XNME materialise fires call_fn. */
+    /* . *func() or $ *func() — a[0].s = function name.
+     * Use pat_assign_callcap → XCALLCAP, handled by bb_build/bb_callcap.
+     * The old DT_E/pat_assign_cond approach only worked via materialise()
+     * which is not used in the byrd-box (--sm-run / --jit-emit) path. */
     DESCR_t child  = jit_pat_pop();
     const char *fname = CUR_INS->a[0].s ? CUR_INS->a[0].s : "";
-    EXPR_t *efnc = GC_malloc(sizeof(EXPR_t));
-    memset(efnc, 0, sizeof(EXPR_t));
-    efnc->kind = E_FNC;
-    efnc->sval = GC_strdup(fname);
-    DESCR_t var;
-    var.v   = DT_E;
-    var.ptr = efnc;
-    var.slen = 0;
-    var.s   = NULL;
-    int kind = (int)CUR_INS->a[1].i;
-    if (kind == 1)
-        jit_pat_push(pat_assign_imm(child, var));
-    else
-        jit_pat_push(pat_assign_cond(child, var));
+    jit_pat_push(pat_assign_callcap(child, fname, NULL, 0));
 }
 
 static void h_exec_stmt(void)

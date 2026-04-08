@@ -554,16 +554,19 @@ static spec_t bb_callcap(void *zeta, int entry)
 
     CC_γ_core: {
            if (ζ->immediate) {
-               /* $ — call NOW, write immediately */
-               DESCR_t name_d = (g_user_call_hook && ζ->fnc_name)
-                   ? g_user_call_hook(ζ->fnc_name, ζ->fnc_args, ζ->fnc_nargs)
-                   : NULVCL;
-               DESCR_t *cell = (name_d.v == DT_N && name_d.ptr) ? (DESCR_t*)name_d.ptr : NULL;
-               if (cell) {
-                   char *s = (char *)GC_MALLOC(child_r.δ + 1);
-                   memcpy(s, child_r.σ, (size_t)child_r.δ); s[child_r.δ] = '\0';
-                   DESCR_t val = { .v = DT_S, .slen = (uint32_t)child_r.δ, .s = s };
-                   *cell = val;
+               /* $ — call NOW, write immediately, passing matched text as arg[0] */
+               if (g_user_call_hook && ζ->fnc_name) {
+                   int total = 1 + ζ->fnc_nargs;
+                   DESCR_t *args = (DESCR_t *)GC_MALLOC((size_t)total * sizeof(DESCR_t));
+                   char *buf = (char *)GC_MALLOC((size_t)child_r.δ + 1);
+                   if (child_r.σ && child_r.δ > 0) memcpy(buf, child_r.σ, (size_t)child_r.δ);
+                   buf[child_r.δ] = '\0';
+                   args[0].v = DT_S; args[0].slen = (uint32_t)child_r.δ;
+                   args[0].s = buf;  args[0].ptr  = NULL;
+                   for (int _j = 0; _j < ζ->fnc_nargs; _j++) args[_j+1] = ζ->fnc_args[_j];
+                   DESCR_t name_d = g_user_call_hook(ζ->fnc_name, args, total);
+                   DESCR_t *cell = (name_d.v == DT_N && name_d.ptr) ? (DESCR_t*)name_d.ptr : NULL;
+                   if (cell) *cell = args[0];
                }
            } else {
                /* . — push a firing event; do NOT call hook yet (side-effect safety).
@@ -633,16 +636,26 @@ static void flush_pending_callcaps(void) {
         if (ev->has_pending) {
             spec_t snap = ev->pending;
             ev->has_pending = 0;
-            DESCR_t name_d = (g_user_call_hook && ev->fnc_name)
-                ? g_user_call_hook(ev->fnc_name, ev->fnc_args, ev->fnc_nargs)
-                : NULVCL;
+            if (!g_user_call_hook || !ev->fnc_name) continue;
+            /* Build arg list: matched text prepended as arg[0], then any
+             * static args.  This matches deferred_call_with_text_fn semantics:
+             * 'constant . *Push()' calls Push(matched_text) so Push's 'x'
+             * parameter receives the captured string. */
+            int total = 1 + ev->fnc_nargs;
+            DESCR_t *args = (DESCR_t *)GC_MALLOC((size_t)total * sizeof(DESCR_t));
+            char *buf = (char *)GC_MALLOC((size_t)snap.δ + 1);
+            if (snap.σ && snap.δ > 0) memcpy(buf, snap.σ, (size_t)snap.δ);
+            buf[snap.δ] = '\0';
+            args[0].v    = DT_S;
+            args[0].slen = (uint32_t)snap.δ;
+            args[0].s    = buf;
+            args[0].ptr  = NULL;
+            for (int j = 0; j < ev->fnc_nargs; j++) args[j+1] = ev->fnc_args[j];
+            DESCR_t name_d = g_user_call_hook(ev->fnc_name, args, total);
+            /* If func returns DT_N (nreturn lvalue), write matched text into
+             * the named cell — handles the 'Push = .cell; $Push = x' pattern. */
             DESCR_t *cell = (name_d.v == DT_N && name_d.ptr) ? (DESCR_t*)name_d.ptr : NULL;
-            if (cell) {
-                char *s = (char *)GC_MALLOC(snap.δ + 1);
-                memcpy(s, snap.σ, (size_t)snap.δ); s[snap.δ] = '\0';
-                DESCR_t val = { .v = DT_S, .slen = (uint32_t)snap.δ, .s = s };
-                *cell = val;
-            }
+            if (cell) *cell = args[0];
         }
     }
     /* Also clear ζ->has_pending on all registered boxes */

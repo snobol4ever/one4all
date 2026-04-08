@@ -426,27 +426,16 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
         }
 
         case SM_PAT_CAPTURE_FN: {
-            /* . *func() — a[0].s = function name.
-             * Pass a DT_E descriptor as 'var' to pat_assign_cond so the
-             * XNME materialise case (snobol4_pattern.c) detects it and wires
-             * deferred_call_with_text_fn to call func(matched_substring). */
+            /* . *func() or $ *func() — a[0].s = function name, a[1].i = 0(cond)/1(imm).
+             * Use pat_assign_callcap → XCALLCAP node, handled by bb_build/bb_callcap
+             * in the byrd-box path.  bb_callcap calls g_user_call_hook(fname, args, 0)
+             * at match time (deferred for '.', immediate for '$'), which fires the
+             * SNOBOL4 function as a side effect.
+             * The old DT_E/pat_assign_cond approach only worked via the snobol4_pattern.c
+             * materialise() path, which --sm-run does not use. */
             DESCR_t child = pat_pop();
             const char *fname = ins->a[0].s ? ins->a[0].s : "";
-            /* Build a minimal frozen E_FNC EXPR_t to carry the function name */
-            EXPR_t *efnc = GC_malloc(sizeof(EXPR_t));
-            memset(efnc, 0, sizeof(EXPR_t));
-            efnc->kind  = E_FNC;
-            efnc->sval  = GC_strdup(fname);
-            DESCR_t var;
-            var.v   = DT_E;
-            var.ptr = efnc;
-            var.slen = 0;
-            var.s   = NULL;
-            int kind = (int)ins->a[1].i;
-            if (kind == 1)
-                pat_push(pat_assign_imm(child, var));
-            else
-                pat_push(pat_assign_cond(child, var));
+            pat_push(pat_assign_callcap(child, fname, NULL, 0));
             break;
         }
 
