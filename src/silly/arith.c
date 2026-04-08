@@ -175,12 +175,12 @@ do_ii: /* ── INTEGER × INTEGER operations ── */
         ZPTR = XPTR; ZPTR.a.i -= YPTR.a.i;
         if (MATH_ERROR()) return aerror();
         break;
-    case 6: return (XPTR.a.i == YPTR.a.i) ? OK : FAIL; /* EQ  */
-    case 7: return (XPTR.a.i >= YPTR.a.i) ? OK : FAIL; /* GE  */
-    case 8: return (XPTR.a.i > YPTR.a.i) ? OK : FAIL; /* GT  */
-    case 9: return (XPTR.a.i <= YPTR.a.i) ? OK : FAIL; /* LE  */
-    case 10: return (XPTR.a.i < YPTR.a.i) ? OK : FAIL; /* LT  */
-    case 11: return (XPTR.a.i != YPTR.a.i) ? OK : FAIL; /* NE  */
+    case 6: if (XPTR.a.i != YPTR.a.i) return FAIL; XPTR = NULVCL; return OK; /* EQ  */
+    case 7: if (XPTR.a.i <  YPTR.a.i) return FAIL; XPTR = NULVCL; return OK; /* GE  */
+    case 8: if (XPTR.a.i <= YPTR.a.i) return FAIL; XPTR = NULVCL; return OK; /* GT  */
+    case 9: if (XPTR.a.i >  YPTR.a.i) return FAIL; XPTR = NULVCL; return OK; /* LE  */
+    case 10: if (XPTR.a.i >= YPTR.a.i) return FAIL; XPTR = NULVCL; return OK; /* LT  */
+    case 11: if (XPTR.a.i == YPTR.a.i) return FAIL; XPTR = NULVCL; return OK; /* NE  */
     case 12: /* REMDR */
         if (YPTR.a.i == 0) return aerror();
         CLR_MATH_ERROR();
@@ -191,6 +191,7 @@ do_ii: /* ── INTEGER × INTEGER operations ── */
     default: return intr1();
     }
     ARTHCL.a.i++;
+    XPTR = ZPTR; /* ARTN: RTZPTR — result in XPTR for callers (oracle: RRTURN ZPTR,3) */
     return OK;
 do_rr: /* ── REAL × REAL operations ── */
     switch (SCL.a.i) {
@@ -217,16 +218,17 @@ do_rr: /* ── REAL × REAL operations ── */
         ZPTR = XPTR; ZPTR.a.f -= YPTR.a.f;
         if (RMATH_ERROR(ZPTR.a.f)) return aerror();
         break;
-    case 6: return (XPTR.a.f == YPTR.a.f) ? OK : FAIL; /* EQ  */
-    case 7: return (XPTR.a.f >= YPTR.a.f) ? OK : FAIL; /* GE  */
-    case 8: return (XPTR.a.f > YPTR.a.f) ? OK : FAIL; /* GT  */
-    case 9: return (XPTR.a.f <= YPTR.a.f) ? OK : FAIL; /* LE  */
-    case 10: return (XPTR.a.f < YPTR.a.f) ? OK : FAIL; /* LT  */
-    case 11: return (XPTR.a.f != YPTR.a.f) ? OK : FAIL; /* NE  */
+    case 6: if (XPTR.a.f != YPTR.a.f) return FAIL; XPTR = NULVCL; return OK; /* EQ  */
+    case 7: if (XPTR.a.f <  YPTR.a.f) return FAIL; XPTR = NULVCL; return OK; /* GE  */
+    case 8: if (XPTR.a.f <= YPTR.a.f) return FAIL; XPTR = NULVCL; return OK; /* GT  */
+    case 9: if (XPTR.a.f >  YPTR.a.f) return FAIL; XPTR = NULVCL; return OK; /* LE  */
+    case 10: if (XPTR.a.f >= YPTR.a.f) return FAIL; XPTR = NULVCL; return OK; /* LT  */
+    case 11: if (XPTR.a.f == YPTR.a.f) return FAIL; XPTR = NULVCL; return OK; /* NE  */
     case 12: return intr1(); /* REMDR undefined for REAL */
     default: return intr1();
     }
     ARTHCL.a.i++;
+    XPTR = ZPTR; /* ARTN: result in XPTR */
     return OK;
 }
 
@@ -252,10 +254,11 @@ RESULT_t REMDR_fn(void) { SCL.a.i = 12; return ARITH_fn(); }
 RESULT_t INTGER_fn(void)
 {
     if (ARGVAL_fn() == FAIL) return FAIL;
-    if (XPTR.v == I) return OK;
+    if (XPTR.v == I) { XPTR = NULVCL; return OK; } /* already integer — RETNUL */
     if (XPTR.v != S) return FAIL;
     LOCSP_fn(&XSP, &XPTR);
-    return SPCINT_fn(&XPTR, &XSP);
+    if (SPCINT_fn(&XPTR, &XSP) == OK) { XPTR = NULVCL; return OK; } /* converted — RETNUL */
+    return FAIL;
 }
 
 /*====================================================================================================================*/
@@ -271,6 +274,7 @@ RESULT_t MNS_fn(void)
         ZPTR = XPTR; ZPTR.a.i = -ZPTR.a.i;
         if (MATH_ERROR()) return aerror();
         ARTHCL.a.i++;
+        XPTR = ZPTR;
         return OK;
     }
     if (XPTR.v == S) {
@@ -280,6 +284,7 @@ RESULT_t MNS_fn(void)
             ZPTR = XPTR; ZPTR.a.i = -ZPTR.a.i;
             if (MATH_ERROR()) return aerror();
             ARTHCL.a.i++;
+            XPTR = ZPTR;
             return OK;
         }
         if (SPREAL_fn(&XPTR, &XSP) == FAIL) return intr1();
@@ -287,6 +292,7 @@ RESULT_t MNS_fn(void)
     if (XPTR.v == R) {
         ZPTR = XPTR; ZPTR.a.f = -ZPTR.a.f;
         ARTHCL.a.i++;
+        XPTR = ZPTR;
         return OK;
     }
     return intr1();
@@ -300,13 +306,12 @@ RESULT_t MNS_fn(void)
 RESULT_t PLS_fn(void)
 {
     if (ARGVAL_fn() == FAIL) return FAIL;
-    ZPTR = XPTR; /* ARGVAL leaves result in XPTR per §8 convention;
-                      result goes in ZPTR; PLS uses ZPTR as output (SIL: RCALL ZPTR,ARGVAL) */
-    if (ZPTR.v == I || ZPTR.v == R) { ARTHCL.a.i++; return OK; }
+    ZPTR = XPTR; /* oracle: RCALL ZPTR,ARGVAL — result initially in ZPTR */
+    if (ZPTR.v == I || ZPTR.v == R) { ARTHCL.a.i++; XPTR = ZPTR; return OK; }
     if (ZPTR.v == S) {
         LOCSP_fn(&XSP, &ZPTR);
-        if (SPCINT_fn(&ZPTR, &XSP) == OK) { ARTHCL.a.i++; return OK; }
-        if (SPREAL_fn(&ZPTR, &XSP) == OK) { ARTHCL.a.i++; return OK; }
+        if (SPCINT_fn(&ZPTR, &XSP) == OK) { ARTHCL.a.i++; XPTR = ZPTR; return OK; }
+        if (SPREAL_fn(&ZPTR, &XSP) == OK) { ARTHCL.a.i++; XPTR = ZPTR; return OK; }
         return intr1();
     }
     return intr1();
