@@ -57,6 +57,15 @@ int sm_emit_i(SM_Program *p, sm_opcode_t op, int64_t i)
     return idx;
 }
 
+int sm_emit_ptr(SM_Program *p, sm_opcode_t op, void *ptr)
+{
+    int idx = _grow(p);
+    p->instrs[idx].op        = op;
+    p->instrs[idx].a[0].ptr  = ptr;
+    return idx;
+}
+
+
 int sm_emit_f(SM_Program *p, sm_opcode_t op, double f)
 {
     int idx = _grow(p);

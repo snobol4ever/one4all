@@ -177,6 +177,7 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
             extern void comm_stno(int n);
             static int g_sm_stno = 0;
             comm_stno(++g_sm_stno);
+            st->sp = 0;   /* reset value stack at each statement boundary */
             break;
         }
 
@@ -221,6 +222,18 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
             const char *name = ins->a[0].s;
             DESCR_t val = NV_GET_fn(name);
             sm_push(st, val);
+            break;
+        }
+
+        case SM_PUSH_EXPR: {
+            /* Push a frozen DT_E expression descriptor (for *expr / EVAL()) */
+            DESCR_t d;
+            d.v    = DT_E;
+            d.ptr  = ins->a[0].ptr;
+            d.slen = 0;
+            d.s    = NULL;
+            sm_push(st, d);
+            st->last_ok = 1;
             break;
         }
 

@@ -335,8 +335,9 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         sm_emit_si(p, SM_CALL, "INDIR_GET", 1);
         return;
     case E_DEFER:
-        lower_expr(p, lt, e->nchildren > 0 ? e->children[0] : NULL);
-        sm_emit(p, SM_PAT_DEREF);
+        /* *expr in value context — freeze as DT_E for EVAL() to thaw.
+         * SM_PUSH_EXPR bakes the EXPR_t* pointer into the instruction. */
+        sm_emit_ptr(p, SM_PUSH_EXPR, (void *)(e->nchildren > 0 ? e->children[0] : NULL));
         return;
 
     /* ── Arithmetic ── */
@@ -468,6 +469,13 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         lower_expr(p, lt, e->nchildren > 0 ? e->children[0] : NULL);
         sm_emit_i(p, SM_PUSH_LIT_I, 0);   /* no replacement */
         sm_emit(p, SM_EXEC_STMT);
+        return;
+
+    /* ── OPSYN operator & / @ / | — dispatch via APPLY_fn(sval, args, n) ── */
+    case E_OPSYN:
+        for (int i = 0; i < e->nchildren; i++)
+            lower_expr(p, lt, e->children[i]);
+        sm_emit_si(p, SM_CALL, e->sval ? e->sval : "&", (int64_t)e->nchildren);
         return;
 
     /* ── Swap :=: ── */
