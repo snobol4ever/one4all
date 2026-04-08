@@ -16,6 +16,7 @@
 #include "strings.h"
 #include "symtab.h"
 #include "asgn.h"   /* IND_fn */
+#include "errors.h" /* INTR30_fn, INTR4_fn */
 
 extern RESULT_t INVOKE_fn(void);
 extern RESULT_t KEYT_fn(void);       /* KEYWRD internal lookup    */
@@ -110,13 +111,13 @@ RESULT_t TRACE_fn(void)
         GETDC_B(YPTR, YPTR, DESCR);
         return tracep(XPTR, YPTR, WPTR, ZPTR);
     }
-    if (deql(YPTR, FUNTCL)) { /* FUNCTION type */
+    if (deql(YPTR, FUNTCL) || deql(YPTR, EFFCL)) { /* FUNCTION or EFFECT type → TRACF */
         MOVD(YPTR, TFNCLP);
         if (tracep(XPTR, YPTR, WPTR, ZPTR) == FAIL) return FAIL;
         MOVD(YPTR, TFNRLP);
         return tracep(XPTR, YPTR, WPTR, ZPTR);
     }
-    return FAIL; /* unknown type */
+    INTR30_fn(); return FAIL; /* unknown type */
 }
 
 /*====================================================================================================================*/
@@ -133,7 +134,7 @@ RESULT_t STOPTR_fn(void)
     if (assoc) {
         SETAC(yptr2, assoc);
         GETDC_B(yptr2, yptr2, DESCR);
-    } else if (deql(YPTR, FUNTCL)) {
+    } else if (deql(YPTR, FUNTCL) || deql(YPTR, EFFCL)) {
         /* FUNCTION: stop CALL trace, then RETURN trace.
          * Oracle calls STOPTP for CALL first; STOPTP FAILs if not found → abort. */
         for (int i = 0; i < 2; i++) {
@@ -147,7 +148,7 @@ RESULT_t STOPTR_fn(void)
         }
         MOVD(XPTR, NULVCL); return OK;
     } else {
-        return FAIL;
+        INTR30_fn(); return FAIL; /* unknown trace type */
     }
     GETDC_B(yptr2, yptr2, 0);
     int32_t found = locapt_fn(D_A(yptr2), &XPTR);
@@ -430,10 +431,10 @@ vxovr:
 /* ── SETEXIT(LBL) ────────────────────────────────────────────────────── */
 RESULT_t SETEXIT_fn(void)
 {
-    if (VARVUP_fn() == FAIL) return FAIL;
+    if (VARVUP_fn() == FAIL) { INTR30_fn(); return FAIL; }
     if (!AEQLC(XPTR, 0)) {
         GETDC_B(YPTR, XPTR, ATTRIB);
-        if (AEQLC(YPTR, 0)) return FAIL;
+        if (AEQLC(YPTR, 0)) { INTR30_fn(); return FAIL; }
     }
     MOVD(YPTR, XITPTR);
     MOVD(XITPTR, XPTR);
@@ -456,7 +457,7 @@ RESULT_t XITHND_fn(void)
     MOVD(XFRTNC, FRTNCL);
     MOVD(XOCICL, OCICL);
     GETDC_B(OCBSCL, XITPTR, ATTRIB);
-    if (AEQLC(OCBSCL, 0)) return FAIL;
+    if (AEQLC(OCBSCL, 0)) { INTR4_fn(); return FAIL; }
     SETAC(FRTNCL, 0);
     SETAC(XITPTR, 0);
     MOVD(LSTNCL, STNOCL);

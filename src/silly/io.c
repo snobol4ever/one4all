@@ -22,6 +22,7 @@
 #include "strings.h"
 #include "symtab.h"
 #include "asgn.h"   /* IND_fn */
+#include "errors.h" /* UNTERR_fn, LENERR_fn, COMP6_fn */
 
 /* Platform I/O stubs — resolved by platform.c */
 extern RESULT_t XCALL_IO_OPENI(DESCR_t unit, SPEC_t *fname,
@@ -31,7 +32,7 @@ extern RESULT_t XCALL_IO_SEEK(DESCR_t unit, DESCR_t off, DESCR_t whence);
 extern RESULT_t STREAD_fn(SPEC_t *sp, DESCR_t unit);   /* reads into sp */
 extern void       STPRNT_fn(int32_t key, DESCR_t blk, SPEC_t *sp);
 extern void       XCALL_BKSPCE(DESCR_t unit);
-extern void       XCALL_ENFILE(DESCR_t unit);
+extern int        XCALL_ENFILE(DESCR_t unit);  /* returns 0 on error (COMP6) */
 extern void       XCALL_REWIND(DESCR_t unit);
 /* AUGATL_fn declared in symtab.h as int32_t(int32_t, DESCR_t, DESCR_t) */
 extern RESULT_t DTREP_fn2(DESCR_t *out, DESCR_t obj);
@@ -57,8 +58,8 @@ RESULT_t READ_fn(void)
     MOVD(ZPTR, XPTR);       /* save options in ZPTR (oracle: RCALL ZPTR,VARVAL) */
     MOVD(YPTR, io_pop());   /* unit */
     XPTR = io_pop();        /* variable */
-    if (ACOMPC(YPTR, 0) == 0) SETAC(YPTR, UNITI); /* default unit → READ5 */
-    else if (ACOMPC(YPTR, 0) < 0) return FAIL;     /* negative unit → UNTERR */
+    if (ACOMPC(YPTR, 0) == 0) SETAC(YPTR, UNITI);  /* default unit → READ5 */
+    else if (ACOMPC(YPTR, 0) < 0) { UNTERR_fn(); return FAIL; } /* negative unit */
     io_push(YPTR); io_push(ZPTR); /* unit, options */
     if (VARVAL_fn() == FAIL) { io_top -= 2; return FAIL; } /* optional filename */
     MOVD(TPTR, XPTR);
@@ -66,7 +67,8 @@ RESULT_t READ_fn(void)
     LOCSP_fn(&XSP, &TPTR);
     LOCSP_fn(&ZSP, &ZPTR);
     MOVD(ZPTR, ZEROCL);
-    if (XCALL_IO_OPENI(YPTR, &XSP, &ZSP, &ZPTR) == FAIL) return FAIL; /* IO_OPENI — tell I/O about filename; fills ZPTR with recl */
+    if (XCALL_IO_OPENI(YPTR, &XSP, &ZSP, &ZPTR) == FAIL) return FAIL; /* IO_OPENI — fills ZPTR with recl */
+    if (ACOMPC(ZPTR, 0) < 0) { LENERR_fn(); return FAIL; }            /* negative recl → LENERR */
     if (ACOMPC(ZPTR, 0) == 0) {
         int32_t assoc = locapt_fn(D_A(INSATL), &YPTR); /* defaulted length — check INSATL for stored default */
         if (assoc) { SETAC(ZPTR, assoc); }
@@ -103,6 +105,7 @@ RESULT_t PRINT_fn(void)
     LOCSP_fn(&XSP, &TPTR);
     LOCSP_fn(&ZSP, &ZPTR);
     if (XCALL_IO_OPENO(YPTR, &XSP, &ZSP) == FAIL) return FAIL;
+    if (ACOMPC(YPTR, 0) < 0) { UNTERR_fn(); return FAIL; }  /* negative unit → UNTERR */
     if (ACOMPC(YPTR, 0) == 0) SETAC(YPTR, UNITO);
     if (AEQLC(ZPTR, 0)) {
         int32_t assoc = locapt_fn(D_A(OTSATL), &YPTR);
@@ -132,10 +135,10 @@ static RESULT_t ioop(int32_t op)
     if (INTVAL_fn() == FAIL) { io_top--; return FAIL; }
     MOVD(XCL, XPTR);
     SCL = io_pop();
-    if (ACOMPC(XCL, 0) <= 0) return FAIL; /* UNTERR */
+    if (ACOMPC(XCL, 0) <= 0) { UNTERR_fn(); return FAIL; } /* UNTERR */
     switch (op) {
     case 1: XCALL_BKSPCE(XCL); break;
-    case 2: XCALL_ENFILE(XCL); break;
+    case 2: if (!XCALL_ENFILE(XCL)) { COMP6_fn(); return FAIL; } break;
     case 3: XCALL_REWIND(XCL); break;
     case 4:
         io_push(XCL);
@@ -229,6 +232,6 @@ void PUTOUT_fn(DESCR_t blk, DESCR_t val)
         break;
     }
     STPRNT_fn(D_A(IOKEY), IO1PTR, &IOSP);
-    if (!AEQLC(IOKEY, 0)) return; /* COMP6 error */
+    if (AEQLC(IOKEY, 0)) { COMP6_fn(); return; }  /* write error → COMP6 */
     INCRA(WSTAT, 1);
 }

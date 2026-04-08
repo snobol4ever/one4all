@@ -36,6 +36,7 @@
 #include "symtab.h"
 #include "argval.h"
 #include "patval.h"
+#include "errors.h" /* INTR1_fn */
 
 /* External stubs resolved at link time */
 extern RESULT_t INVOKE_fn(void);
@@ -97,7 +98,7 @@ RESULT_t ASGN_fn(void)
                 int32_t assoc = locapv_fn(D_A(INATL), &YPTR);
                 if (assoc) {
                     DESCR_t zptr; SETAC(zptr, assoc);
-                    GETDC_B(zptr, YPTR, DESCR);
+                    GETDC_B(zptr, zptr, DESCR);
                     RESULT_t rc = PUTIN_fn(zptr, YPTR);
                     if (rc == OK) goto asgnvv;
                 } /* FAIL from PUTIN: fall to ASGNV1 */
@@ -117,7 +118,7 @@ RESULT_t ASGN_fn(void)
                 int32_t ia = locapv_fn(D_A(INATL), &YPTR);
                 if (ia) {
                     DESCR_t zptr; SETAC(zptr, ia);
-                    GETDC_B(zptr, YPTR, DESCR);
+                    GETDC_B(zptr, zptr, DESCR);
                     RESULT_t pr = PUTIN_fn(zptr, YPTR);
                     if (pr == OK) goto asgnvv;
                 }
@@ -153,7 +154,7 @@ RESULT_t ASGN_fn(void)
                 int32_t ia = locapv_fn(D_A(INATL), &YPTR);
                 if (ia) {
                     DESCR_t zptr; SETAC(zptr, ia);
-                    GETDC_B(zptr, YPTR, DESCR);
+                    GETDC_B(zptr, zptr, DESCR);
                     RESULT_t pr = PUTIN_fn(zptr, YPTR);
                     if (pr == OK) goto asgnvv;
                 }
@@ -167,7 +168,7 @@ asgnvv:
         int32_t assoc = locapv_fn(D_A(OUTATL), &XPTR);
         if (assoc) {
             DESCR_t zptr; SETAC(zptr, assoc);
-            GETDC_B(zptr, XPTR, DESCR);
+            GETDC_B(zptr, zptr, DESCR);
             PUTOUT_fn(zptr, YPTR);
         }
     }
@@ -308,13 +309,11 @@ RESULT_t IND_fn(void)
             SETAC(XPTR, off); SETVC(XPTR, S);
         }
         break;
-    default: return FAIL;
+    default: INTR1_fn(); return FAIL; /* illegal data type */
     }
-    if (AEQLC(XPTR, 0)) return FAIL; /* NONAME */                                    /* INDV: string must be non-null */
-    if (AEQLC(CASECL, 0)) { /* AEQLC CASECL,0,VPXPTR,RTXNAM */
-        return VPXPTR_fn(); /* case-fold then look up name */
-    }
-    return OK; /* RTXNAM — return XPTR (already set) */
+    if (AEQLC(XPTR, 0)) return FAIL; /* NONAME */
+    if (AEQLC(CASECL, 0)) return OK;       /* CASECL==0 → RTXNAM (no folding) */
+    return VPXPTR_fn();                     /* CASECL!=0 → fold then look up */
 }
 
 /*====================================================================================================================*/
@@ -324,7 +323,12 @@ RESULT_t KEYWRD_fn(void)
     INCRA(OCICL, DESCR); /* INCRA OCICL,DESCR; GETD XPTR,OCBSCL,OCICL */
     GETD_B(XPTR, OCBSCL, OCICL);
     if (TESTF(XPTR, FNC)) { /* TESTF XPTR,FNC,,KEYC */
-        if (INVOKE_fn() == FAIL) return FAIL; /* KEYC: evaluate computed keyword */
+        opush_asgn(XPTR);
+        RESULT_t rc = INVOKE_fn();
+        if (rc == FAIL) { optop_asgn--; return FAIL; }
+        if (rc == NEMO) { optop_asgn--; return NEMO; }
+        /* case2: INVOKE succeeded, result in XPTR → fall to KEYN */
+        (void)opop_asgn(); /* discard saved — result already in XPTR */
     }
     { /* KEYN: look up on unprotected list */
         int32_t assoc = locapv_fn(D_A(KNATL), &XPTR);

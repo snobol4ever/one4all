@@ -1355,7 +1355,7 @@ void XCALL_IO_SEEK(DESCR_t u, DESCR_t n)    { (void)u; (void)n; }
 void XCALL_IO_PAD(SPEC_t *sp, int32_t w)    { (void)sp; (void)w; }
 RESULT_t XCALL_IO_FILE(DESCR_t u, SPEC_t *sp) { (void)u; sp->l=0; return FAIL; }
 void XCALL_BKSPCE(DESCR_t u)  { (void)u; }
-void XCALL_ENFILE(DESCR_t u)  { (void)u; }
+int  XCALL_ENFILE(DESCR_t u)  { (void)u; return 1; } /* stub: always succeeds */
 void XCALL_REWIND(DESCR_t u)  { (void)u; }
 void XCALL_LINK(DESCR_t u, SPEC_t *sp)      { (void)u; (void)sp; }
 void XCALL_UNLOAD(DESCR_t u)  { (void)u; }
