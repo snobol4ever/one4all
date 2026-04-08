@@ -148,33 +148,60 @@ static void BEGIN_fn(void)
 static void compile_loop(void)
 {
     SPEC_t xsp; int stype;
-    while (1) {
-        if (!AEQLC(LISTCL, 0)) /* XLATRD: optionally print previous line */
-            STPRNT_fn(D_A(IOKEY), OUTBLK, &LNBFSP);
-        TEXTSP = NEXTSP; /* XLATRN: read a card */
-        if (STREAD_fn(&TEXTSP, UNIT) == FAIL) {
-            FILCHK_fn();
-            continue;
+xlatrd:
+    if (!AEQLC(LISTCL, 0)) /* XLATRD: optionally print previous line */
+        STPRNT_fn(D_A(IOKEY), OUTBLK, &LNBFSP);
+xlatrn:
+    TEXTSP = NEXTSP; /* XLATRN: read a card */
+    if (STREAD_fn(&TEXTSP, UNIT) == FAIL) {
+        FILCHK_fn(); /* XLATIN */
+        goto xlatrn;
+    }
+    D_A(TMVAL) = TEXTSP.l + STNOSZ;
+    LNBFSP.l = D_A(TMVAL);
+    INCRA(LNNOCL, 1);
+xlatnx:
+    /* XLATNX: classify card type */
+    if (STREAM_fn(&xsp, &TEXTSP, &CARDTB, &stype) == FAIL) goto xlatrd; /* COMP3=fatal; ST_EOS=blank→re-read */
+    SETAC(STYPE, stype);
+    { RESULT_t nr = NEWCRD_fn(); if (nr == OK) goto xlatrd; } /* RTN1=re-read */
+    { /* CMPILE: RTN1=fatal(COMP3), RTN2=END reached(fall), RTN3=continue(XLATNX) */
+        RESULT_t rc = CMPILE_fn();
+        if (rc == FAIL) { /* RTN1: fatal compile error → COMP3 */
+            extern void COMP3_fn(void); COMP3_fn(); return;
         }
-        D_A(TMVAL) = TEXTSP.l + STNOSZ;
-        LNBFSP.l = D_A(TMVAL);
-        INCRA(LNNOCL, 1);
-        if (STREAM_fn(&xsp, &TEXTSP, &CARDTB, &stype) == FAIL) continue; /* XLATNX: classify card */
-        SETAC(STYPE, stype);
-        NEWCRD_fn();
-        RESULT_t rc = CMPILE_fn(); /* Compile one statement */
-        if (rc == FAIL) {
-            INCRA(CMOFCL, DESCR); /* END statement reached */
-            PUTD_B(CMBSCL, CMOFCL, ENDCL);
-            if (!AEQLC(LISTCL, 0))
-                STPRNT_fn(D_A(IOKEY), OUTBLK, &LNBFSP);
-            goto xlaend;
-        }
-    } /* rc == OK or RTN3: continue reading */
+        if (rc == NRETURN) goto xlatnx; /* RTN3: statement compiled, read more */
+        /* RTN2: END statement — fall through to XLATP */
+    }
+    /* XLATP: insert END function, optionally print last line */
+    INCRA(CMOFCL, DESCR);
+    PUTD_B(CMBSCL, CMOFCL, ENDCL);
+    if (!AEQLC(LISTCL, 0))
+        STPRNT_fn(D_A(IOKEY), OUTBLK, &LNBFSP);
+    if (AEQLC(STYPE, EOSTYP)) goto xlaend;
+    /* Stream past any trailing blanks on END card */
+    if (STREAM_fn(&xsp, &TEXTSP, &IBLKTB, &stype) == FAIL) goto xlaend; /* ST_EOS or error → done */
+    SETAC(STYPE, stype);
+    if (AEQLC(STYPE, EOSTYP)) goto xlaend;
+    if (!AEQLC(STYPE, NBTYP)) { extern void COMP7_fn(void); COMP7_fn(); goto xlaend; }
+    /* Parse optional END label */
+    if (STREAM_fn(&xsp, &TEXTSP, &LBLTB, &stype) == FAIL) { extern void COMP7_fn(void); COMP7_fn(); goto xlaend; }
+    SETAC(STYPE, stype);
+    { int32_t xptr = GENVUP_fn(&xsp);
+      if (!xptr) { extern void COMP7_fn(void); COMP7_fn(); goto xlaend; }
+      SETAC(XPTR, xptr);
+      DESCR_t attr; memcpy(&attr, A2P(xptr + ATTRIB), sizeof attr);
+      if (!attr.a.i) { extern void COMP7_fn(void); COMP7_fn(); goto xlaend; }
+      memcpy(&OCBSCL, &attr, sizeof attr); /* GETDC OCBSCL,XPTR,ATTRIB */
+    }
+    if (AEQLC(STYPE, EOSTYP)) goto xlaend;
+    /* XLATP: second IBLKTB stream — check for trailing junk */
+    if (STREAM_fn(&xsp, &TEXTSP, &IBLKTB, &stype) != FAIL)
+        { extern void COMP7_fn(void); COMP7_fn(); } /* trailing junk = error */
 xlaend:
     if (!AEQLC(ESAICL, 0)) { /* XLAEND: check compilation errors */
         XCALL_OUTPUT_fmt(PUNCH, "ERRORS DETECTED IN SOURCE PROGRAM\n\n");
-        if (!AEQLC(NERRCL, 0)) {
+        if (AEQLC(NERRCL, 0)) { /* NERRCL==0 means -NOERROR NOT set → abort */
             SETAC(RETCOD, 1);
             FTLEND_fn();
         }
