@@ -140,14 +140,17 @@ RESULT_t DEFINE_fn(void)
      *   DEF12: DECRA XPTR,DESCR / PUTDC XPTR,DESCR,YPTR
      * i.e. writes to blk + fill_idx*DESCR for fill_idx = YCL..2.
      */
-    int32_t fill_idx = D_A(YCL_d); /* start at YCL (= total count after +2) */
-    while (fill_idx >= 2) { /* Pop args+locals+fn name; stop before entry pt */
+    /* Oracle DEF12: XPTR starts at blk + YCL*DESCR; loop:
+     *   DECRA XPTR,DESCR  → XPTR = blk + (fill_idx-1)*DESCR
+     *   PUTDC XPTR,DESCR  → writes at blk + (fill_idx-1)*DESCR + DESCR = blk + fill_idx*DESCR
+     *   fill_idx-- until 0
+     * So top-of-stack → slot YCL, bottom-of-stack → slot 1. */
+    int32_t fill_idx = D_A(YCL_d); /* start at YCL */
+    while (fill_idx >= 1) {
         DESCR_t v = def_pop();
-        PUTDC_B(XPTR, fill_idx * DESCR, v);
+        PUTDC_B(XPTR, fill_idx * DESCR, v); /* slot fill_idx = blk + fill_idx*DESCR */
         fill_idx--;
     }
-    DESCR_t entry_pt = def_pop(); /* slot 1 = entry point */
-    PUTDC_B(XPTR, DESCR, entry_pt);
     MOVD(XPTR, NULVCL); return OK;
 }
 
