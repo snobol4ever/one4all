@@ -103,7 +103,9 @@ static int exreal(DESCR_t *res, const DESCR_t *x, const DESCR_t *y)
  * ════════════════════════════════════════════════════════════════════════ */
 static RESULT_t ARITH_fn(void)
 {
+    int32_t saved_scl = SCL.a.i; /* oracle: PUSH SCL before XYARGS — XYARGS clobbers SCL */
     if (XYARGS_fn() == FAIL) return FAIL; /* ── evaluate arguments (§8 XYARGS) ── */
+    SCL.a.i = saved_scl; /* oracle: POP SCL */
     DTCL.a.i = XPTR.v; /* ── build type-pair ── */
     DTCL.f = 0;
     DTCL.v = YPTR.v;
