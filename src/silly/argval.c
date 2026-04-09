@@ -254,12 +254,12 @@ intv1:
 intv2:
     if (XPTR.v == I) return OK;   /* VEQLC I → RTXNAM */
     if (XPTR.v == R) return rlint(&XPTR); /* VEQLC R → INTRI */
-    if (XPTR.v != S) return FAIL; /* INTR1 */
+    if (XPTR.v != S) { INTR1_fn(); return FAIL; } /* INTR1 — illegal data type */
 intv_str: /* INTV: LOCSP + SPCINT + SPREAL + RLINT */
     LOCSP_fn(&XSP, &XPTR);
     if (SPCINT_fn(&XPTR, &XSP) == OK) return OK;
     if (SPREAL_fn(&XPTR, &XSP) == OK) return rlint(&XPTR);
-    return FAIL; /* INTR1 */
+    { INTR1_fn(); return FAIL; } /* INTR1 — not numeric string */
 }
 
 /*====================================================================================================================*/
@@ -310,7 +310,7 @@ patv3:
         XPTR.a.i = blk; XPTR.f = 0; XPTR.v = P;
         return OK;
     }
-    return FAIL; /* INTR1 */
+    { INTR1_fn(); return FAIL; } /* INTR1 — illegal data type */
 }
 
 /*====================================================================================================================*/
@@ -346,7 +346,7 @@ varv2:
         XPTR.a.i = off; XPTR.f = 0; XPTR.v = S;
         return OK;
     }
-    return FAIL; /* INTR1 — all other types (including R) are errors */
+    { INTR1_fn(); return FAIL; } /* INTR1 — all other types (R, E, P, etc.) illegal */
 }
 
 /*====================================================================================================================*/
