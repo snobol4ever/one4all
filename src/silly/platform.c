@@ -1266,7 +1266,8 @@ void init_syntab(void)
     /* DTEND: single DESCR, A=EFFCL ptr [v311.sil line 11990] */
     DTEND.a.i = P2A(&EFFCL);
     /* Trace/literal fn DESCRs: fn-ptr fills (LABTR_fn etc are defined in trace.c/asgn.c) */
-    extern RESULT_t LABTR_fn(void), VALTR_fn(void), LIT_fn(void), KEYTR_fn(void);
+    extern RESULT_t LABTR_fn(void), VALTR_fn(void), LIT_fn(void), KEYTR_fn(void), INIT_fn(void);
+    INITFN.a.i  = P2A(&INIT_fn);
     KEYTFN.a.i = P2A(&KEYTR_fn); LABTFN.a.i = P2A(&LABTR_fn); LITFN.a.i = P2A(&LIT_fn); VLTRFN.a.i = P2A(&VALTR_fn);
     PRMTBL[1].a.i = P2A(&DTLIST);
     PRMTBL[2].a.i = P2A(&FNLIST);
@@ -1844,6 +1845,7 @@ DESCR_t SPNCFN = {.a={.i=XSPNC},  .f=0, .v=3}; /* SPAN(cset)           */
 DESCR_t TBFN   = {.a={.i=XTB},    .f=0, .v=3}; /* TAB(n)               */
 DESCR_t FNCFFN = {.a={.i=XRTNL3}, .f=0, .v=2}; /* FENCE failure        */
 /* Trace/literal fn DESCRs (a=fn-ptr filled at init, flag=0) */
+DESCR_t INITFN  = {.a={.i=0}, .f=0, .v=1}; /* stmt init   (INIT_fn)    */
 DESCR_t KEYTFN = {.a={.i=0}, .f=0, .v=2}; /* keyword trace (KEYTR_fn) */
 DESCR_t LABTFN = {.a={.i=0}, .f=0, .v=2}; /* label trace (LABTR_fn)   */
 
