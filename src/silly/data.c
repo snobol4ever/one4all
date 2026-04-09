@@ -290,7 +290,9 @@ DESCR_t STRPAT  = D0;    /* STARPT arena offset */
 
 /* ── Permanent block table ────────────────────────────────────────────── */
 
-DESCR_t PRMTBL[22];          /* filled in data_init                  */
+DESCR_t PRMTBL[8];          /* filled in data_init                  */
+DESCR_t FTABLE  = D0;    /* procedure descriptor table header    */
+DESCR_t OPTBL   = D0;    /* operator procedure descriptor table   */
 
 /* ── Stack pointers (set in data_init after arena allocation) ────── */
 

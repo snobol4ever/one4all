@@ -595,7 +595,7 @@ DESCR_t ETMCL  = {.a={.i=0},.f=0,.v=0};
 DESCR_t UNSCL  = {.a={.i=0},.f=0,.v=0};
 DESCR_t SCFLCL = {.a={.i=0},.f=0,.v=0};
 DESCR_t DFLFST = {.a={.i=0},.f=0,.v=0};
-DESCR_t PRMTBL2[22];   /* second copy of PRMTBL for GENVAR */
+DESCR_t PRMTBL2[8];   /* second copy of PRMTBL for GENVAR */
 DESCR_t ODPSIZ = {.a={.i=0},.f=0,.v=0};
 DESCR_t INTSIZ = {.a={.i=0},.f=0,.v=0};
 DESCR_t DTARSZ = {.a={.i=0},.f=0,.v=0};
@@ -1261,6 +1261,15 @@ void init_syntab(void)
         }
     }
 
+    /* PRMTBL: header + 7 live-block root ptrs [v311.sil §24 line 11997] */
+    PRMTBL[0].a.i = P2A(PRMTBL); PRMTBL[0].f = TTL|MARK;
+    PRMTBL[1].a.i = P2A(&DTLIST);
+    PRMTBL[2].a.i = P2A(&FNLIST);
+    PRMTBL[3].a.i = P2A(&FTABLE);
+    PRMTBL[4].a.i = P2A(&ICLBLK);
+    PRMTBL[5].a.i = P2A(&KNLIST);
+    PRMTBL[6].a.i = P2A(&KVLIST);
+    PRMTBL[7].a.i = P2A(&OPTBL);
     /* Trace pair-list self-ptrs [v311.sil §24: each DESCR X,TTL+MARK,2*DESCR] */
     TVALPL[0].a.i = P2A(TVALPL);
     TLABPL[0].a.i = P2A(TLABPL);

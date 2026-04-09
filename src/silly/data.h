@@ -566,7 +566,9 @@ extern DESCR_t STRPAT;    /* STARPT pattern (unevaluated expression)      */
 
 /* ── Permanent block pointer table (for GC root marking) ─────────────── */
 
-extern DESCR_t PRMTBL[22];  /* PRMTBL array — all live block roots       */
+extern DESCR_t PRMTBL[8];  /* PRMTBL array — all live block roots       */
+extern DESCR_t FTABLE;     /* procedure descriptor table (stub)            */
+extern DESCR_t OPTBL;      /* operator procedure descriptor table (stub)   */
 
 /* ── Static stacks (arena-allocated in data_init) ───────────────── */
 /* Pointers set by data_init(); actual storage is in arena           */
