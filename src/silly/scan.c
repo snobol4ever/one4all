@@ -950,22 +950,20 @@ balf1:
 /* BRKXF — BREAKX rematch */
 static void do_BRKXF(void)
 {
-    GETDC_BLK(PATICL, PDLPTR, DESCR);
+    GETDC_BLK(PATICL, PDLPTR, 2*DESCR); /* SIL: GETDC PATICL,PDLPTR,2*DESCR */
     DECRA(PATICL, DESCR);
     DECRA(PDLPTR, 3*DESCR);
     int32_t nval;
-    if (!AEQLC(FULLCL, 0)) { nval = 0; goto brkxf3; } /* FULLCL!=0→nval=0→BRXF3 */
-    /* FULLCL==0 → BRXF1 */
-    if (!AEQLC(LENFCL, 0)) GOTO_SALT; /* SC-22: LENFCL!=0→SALT (oracle BRXF1) */
-    nval = D_A(YCL); /* LENFCL==0: nval=YCL → BRXF3 */
+    if (D_A(FULLCL) == 0) goto brxf1;   /* AEQLC FULLCL,0,,BRXF1 */
+    nval = 0; goto brkxf3;               /* FULLCL!=0: SETAC NVAL,0 */
+brxf1:
+    if (D_A(LENFCL) != 0) GOTO_SALT;    /* BRXF1: AEQLC LENFCL,0,SALT, */
+    nval = D_V(YCL);                     /* SETAV NVAL,YCL */
 brkxf3:
-    { int32_t cur = TXSP.l;
-      if (cur + nval > D_A(MAXLEN)) GOTO_SALT; }
-    GETDC_BLK(XCL, PDLPTR, DESCR); /* GETDC XCL,PDLPTR,DESCR — cursor lock */
-    sp_addlg_c(&TXSP, 1);
+    if (TXSP.l + nval >= D_A(MAXLEN)) GOTO_SALT; /* CHKVAL MAXLEN,NVAL,TXSP,SALT,SALT: >= */
+    GETDC_BLK(XCL, PDLPTR, DESCR);      /* GETDC XCL,PDLPTR,DESCR */
+    sp_addlg_c(&TXSP, 1);               /* ADDLG TXSP,ONECL */
     do_BRKX();
-    return;
-    nval = 0;
 }
 
 /*====================================================================================================================*/
