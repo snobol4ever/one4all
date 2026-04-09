@@ -1965,48 +1965,37 @@ int main(int argc, char **argv)
     struct timespec _t0, _t1, _t2, _t3;
     if (opt_bench) clock_gettime(CLOCK_MONOTONIC, &_t0);
 
-    CMPILE_t *cl = cmpile_file(f, input_path);
-    fclose(f);
-
-    if (opt_bench) clock_gettime(CLOCK_MONOTONIC, &_t1);
-
-    if (dump_parse || dump_parse_flat) {
-        int oneline = dump_parse_flat ? 1 : 0;
-        int idx = 0;
-        for (CMPILE_t *s = cl; s; s = s->next)
-            cmpile_print(s, stdout, oneline, idx++);
-        cmpile_free(cl);
-        return 0;
-    }
-
-    /* ── --dump-ir : CMPILE → cmpile_lower → IR sexp ───────────────────
-     * Produces the same STMT_t/EXPR_t Program* the live execution path uses.
-     * Output is one (STMT ...) line per statement — suitable for diff. */
-    if (dump_ir) {
+    /* ── parse ──────────────────────────────────────────────────────────────
+     * --dump-parse / --dump-parse-flat / --dump-ir  →  CMPILE (hand-written)
+     * everything else (--ir-run, --sm-run, --dump-ir-bison)  →  sno_parse (Bison/Flex)
+     * sno_parse is the proven path: PASS=190 baseline. */
+    Program *prog = NULL;
+    if (dump_parse || dump_parse_flat || dump_ir) {
+        CMPILE_t *cl = cmpile_file(f, input_path);
+        fclose(f);
+        if (opt_bench) clock_gettime(CLOCK_MONOTONIC, &_t1);
+        if (dump_parse || dump_parse_flat) {
+            int oneline = dump_parse_flat ? 1 : 0;
+            int idx = 0;
+            for (CMPILE_t *s = cl; s; s = s->next)
+                cmpile_print(s, stdout, oneline, idx++);
+            cmpile_free(cl);
+            return 0;
+        }
+        /* dump_ir */
         Program *cprog = cmpile_lower(cl);
         cmpile_free(cl);
         ir_dump_program(cprog, stdout);
         return 0;
-    }
-
-    /* ── --dump-ir-bison : sno_parse (Bison/Flex) → IR sexp ─────────────
-     * Runs the old proven Bison/Flex parser on the same file.
-     * File was already fclose()'d after cmpile_file() — re-open it. */
-    if (dump_ir_bison) {
-        cmpile_free(cl);
+    } else {
+        fclose(f);
+        if (opt_bench) clock_gettime(CLOCK_MONOTONIC, &_t1);
         FILE *f2 = fopen(input_path, "r");
-        if (!f2) {
-            fprintf(stderr, "scrip: cannot re-open '%s' for bison dump\n", input_path);
-            return 1;
-        }
-        Program *bprog = sno_parse(f2, input_path);
+        if (!f2) { fprintf(stderr, "scrip: cannot re-open '%s'\n", input_path); return 1; }
+        prog = sno_parse(f2, input_path);
         fclose(f2);
-        ir_dump_program(bprog, stdout);
-        return 0;
+        if (dump_ir_bison) { ir_dump_program(prog, stdout); return 0; }
     }
-
-    Program *prog = cmpile_lower(cl);
-    cmpile_free(cl);
 
     if (opt_bench) clock_gettime(CLOCK_MONOTONIC, &_t2);
 
