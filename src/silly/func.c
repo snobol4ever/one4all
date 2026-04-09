@@ -379,3 +379,8 @@ RESULT_t CODER_fn(void) { return FAIL; }
 /* ── OPSYN(F1,F2,N) — stub ───────────────────────────────────────────
  * Requires operator-table streams (BIOPTB, UNOPTB etc.) not yet built. */
 RESULT_t OPSYN_fn(void) { return FAIL; }
+
+/* ── CONVE — convert value to EXPRESSION type ────────────────────────
+ * v311.sil §19 CONVE (used by EVAL_fn in argval.c).
+ * Requires compiler re-entry. Stubbed until M19. */
+RESULT_t CONVE_fn(void) { return FAIL; }

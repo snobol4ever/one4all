@@ -49,6 +49,14 @@
  */
 RESULT_t ARGVAL_fn(void);
 
+/* ── EVAL — SNOBOL4 EVAL() built-in ─────────────────────────────────── */
+/*
+ * v311.sil EVAL (line 2754):
+ *   ARGVAL → if EXPRESSION: EXPEVL. If I/R: idempotent. If S: parse/convert.
+ *   Returns OK (result in XPTR) or FAIL.
+ */
+RESULT_t EVAL_fn(void);
+
 /* ── EXPVAL — evaluate unevaluated expression ────────────────────────── */
 /*
  * v311.sil EXPVAL (line 2699):

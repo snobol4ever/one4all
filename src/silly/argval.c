@@ -199,6 +199,31 @@ RESULT_t EXPEVL_fn(void)
 
 /*====================================================================================================================*/
 /* ════════════════════════════════════════════════════════════════════════
+ * EVAL_fn — SNOBOL4 EVAL() built-in (v311.sil EVAL line 2754)
+ *   ARGVAL → if EXPRESSION: EXPEVL (SCL=0,EXPVJ2). Else if I/R: return OK.
+ *   If S: LOCSP; if empty→OK; SPCINT→OK; SPREAL→OK; CONVE→EXPRESSION→EXPEVL.
+ *   Otherwise INTR1 (illegal type).
+ * ════════════════════════════════════════════════════════════════════════ */
+RESULT_t EVAL_fn(void)
+{
+    if (ARGVAL_fn() == FAIL) return FAIL;
+    if (XPTR.v == E) goto eval1;          /* EXPRESSION: evaluate it */
+    if (XPTR.v == I) return OK;           /* INTEGER: idempotent */
+    if (XPTR.v == R) return OK;           /* REAL: idempotent */
+    if (XPTR.v != S) return FAIL;         /* not STRING: INTR1 */
+    LOCSP_fn(&XSP, &XPTR);
+    if (XSP.l == 0) return OK;            /* empty string: idempotent (LEQLC XSP,0→RTXPTR) */
+    if (SPCINT_fn(&XPTR, &XSP) == OK) return OK;
+    if (SPREAL_fn(&XPTR, &XSP) == OK) return OK;
+    ZPTR = XPTR;
+    if (CONVE_fn() == FAIL) return FAIL;  /* convert to EXPRESSION */
+eval1:
+    SCL.a.i = 0;                          /* EVAL1: set entry indicator = EXPEVL */
+    return EXPVAL_fn();                   /* BRANCH EXPVJ2 — re-enter EXPVAL state machine */
+}
+
+/*====================================================================================================================*/
+/* ════════════════════════════════════════════════════════════════════════
  * INTVAL_fn — evaluate argument, coerce to INTEGER
  * v311.sil INTVAL (line 2739)
  * ════════════════════════════════════════════════════════════════════════ */
