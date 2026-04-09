@@ -222,14 +222,22 @@ RESULT_t NEWCRD_fn(void)
          */
         TEXTSP.o++; TEXTSP.l--; /* FSHRTN TEXTSP,1 */
         SPEC_t xsp; int st2;
-        if (STREAM_fn(&xsp, &TEXTSP, &FRWDTB, &st2) == FAIL) goto cmtclr;
+        /* oracle: STREAM FRWDTB ST_ERROR→COMP3; ST_EOS→CMTCRD */
+        if (STREAM_fn(&xsp, &TEXTSP, &FRWDTB, &st2) == FAIL) {
+            if (st2 == 0) { extern void COMP3_fn(void); COMP3_fn(); return FAIL; }
+            goto cmtclr;
+        }
         if (st2 != NBTYP) goto cmtclr;
         if (STREAM_fn(&xsp, &TEXTSP, &LBLXTB, &st2) == FAIL) goto cmtclr;
         XCALL_XRAISP(&xsp);
         if (LEXCMP_fn(&xsp, &UNLSP_sp) == 0) { SETAC(LISTCL, 0); goto cmtret1; } /* LEXCMP chain — compare xsp against each command string */
         if (LEXCMP_fn(&xsp, &LISTSP_sp) == 0) {
             SETAC(LISTCL, 1); SETAC(HIDECL, 0); /* LIST: turn on listing, clear HIDE, check for LEFT/RIGHT */
-            if (STREAM_fn(&xsp, &TEXTSP, &FRWDTB, &st2) == FAIL) goto cmtclr;
+            /* oracle: STREAM FRWDTB ST_ERROR→COMP3; ST_EOS→CMTCLR */
+            if (STREAM_fn(&xsp, &TEXTSP, &FRWDTB, &st2) == FAIL) {
+                if (st2 == 0) { extern void COMP3_fn(void); COMP3_fn(); return FAIL; }
+                goto cmtclr;
+            }
             if (st2 != NBTYP) goto cmtclr;
             if (STREAM_fn(&xsp, &TEXTSP, &LBLXTB, &st2) == FAIL) goto cmtclr;
             XCALL_XRAISP(&xsp);
@@ -243,9 +251,13 @@ RESULT_t NEWCRD_fn(void)
         }
         if (LEXCMP_fn(&xsp, &ERORSP_sp) == 0) { SETAC(NERRCL, 0); goto cmtclr; }
         if (LEXCMP_fn(&xsp, &NERRSP_sp) == 0) { SETAC(NERRCL, 1); goto cmtclr; }
-        if (LEXCMP_fn(&xsp, &HIDESP_sp) == 0) { SETAC(HIDECL, 1); goto cmtret1; }
+        if (LEXCMP_fn(&xsp, &HIDESP_sp) == 0) { SETAC(HIDECL, 1); SETAC(LISTCL, 0); goto cmtret1; } /* HIDE falls through to UNLIST: both HIDECL=1 and LISTCL=0 */
         if (LEXCMP_fn(&xsp, &CASESP_sp) == 0) {
-            if (STREAM_fn(&xsp, &TEXTSP, &FRWDTB, &st2) == FAIL) goto case1; /* -CASE [n]: optional integer → CASECL */
+            /* oracle: STREAM FRWDTB ST_ERROR→COMP3; ST_EOS→CASE1 */
+            if (STREAM_fn(&xsp, &TEXTSP, &FRWDTB, &st2) == FAIL) {
+                if (st2 == 0) { extern void COMP3_fn(void); COMP3_fn(); return FAIL; }
+                goto case1;
+            }
             if (st2 != NBTYP) goto case1;
             if (STREAM_fn(&xsp, &TEXTSP, &ELEMTB, &st2) == FAIL) goto case1;
             if (st2 == ILITYP) { SPCINT_fn(&CASECL, &xsp); goto cmtclr; }
@@ -253,8 +265,8 @@ RESULT_t NEWCRD_fn(void)
         }
         if (LEXCMP_fn(&xsp, &INCLSP_sp) == 0 ||
             LEXCMP_fn(&xsp, &COPYSP_sp) == 0) {
-            RESULT_t ictmp = CTLADV_fn(&xsp); /* INCLUDE / COPY filename */
-            if (ictmp == FAIL) { SETAC(ERRTYP, 29); return FAIL; }
+            RESULT_t ictmp = CTLADV_fn(&xsp); /* INCLUDE / COPY: oracle case1(RTN1)|case2(RTN2) → COMP10 */
+            if (ictmp != OK) { SETAC(ERRTYP, 29); return FAIL; } /* RTN1 or RTN2 → COMP10 */
             if (XCALL_XINCLD(UNIT, &xsp) == FAIL) { SETAC(ERRTYP, 30); return FAIL; }
             TRIMSP_fn(&xsp, &xsp);
             int32_t iblk = BLOCK_fn((int32_t)(4*DESCR), B);
@@ -271,7 +283,11 @@ RESULT_t NEWCRD_fn(void)
             goto cmtclr;
         }
         if (LEXCMP_fn(&xsp, &SPITSP_sp) == 0) {
-            if (STREAM_fn(&xsp, &TEXTSP, &FRWDTB, &st2) == FAIL) goto plsop2; /* PLUSOPS [n] */
+            /* oracle: STREAM FRWDTB ST_ERROR→COMP3; ST_EOS→PLSOP2 */
+            if (STREAM_fn(&xsp, &TEXTSP, &FRWDTB, &st2) == FAIL) {
+                if (st2 == 0) { extern void COMP3_fn(void); COMP3_fn(); return FAIL; }
+                goto plsop2;
+            }
             if (st2 != NBTYP) goto plsop2;
             if (STREAM_fn(&xsp, &TEXTSP, &INTGTB, &st2) == FAIL) goto plsop1;
             if (st2 == ILITYP) { plsop1: SPCINT_fn(&SPITCL, &xsp); goto cmtclr; }
@@ -280,17 +296,18 @@ RESULT_t NEWCRD_fn(void)
         if (LEXCMP_fn(&xsp, &EXECSP_sp) == 0) { SETAC(EXECCL, 1); goto cmtclr; }
         if (LEXCMP_fn(&xsp, &NEXESP_sp) == 0) { SETAC(EXECCL, 0); goto cmtclr; }
         if (LEXCMP_fn(&xsp, &LINESP_sp) == 0) {
-            if (STREAM_fn(&xsp, &TEXTSP, &FRWDTB, &st2) == FAIL) goto comp12; /* -LINE lineno ["filenm"] */
+            if (STREAM_fn(&xsp, &TEXTSP, &FRWDTB, &st2) == FAIL) { if (st2 == 0) { extern void COMP3_fn(void); COMP3_fn(); return FAIL; } goto cmtclr; } /* oracle: ST_ERROR→COMP3; ST_EOS→CMTCLR */
             if (st2 != NBTYP) goto comp12;
             if (STREAM_fn(&xsp, &TEXTSP, &INTGTB, &st2) == FAIL) goto comp12;
             if (st2 != ILITYP) goto comp12;
             if (SPCINT_fn(&LNNOCL, &xsp) == FAIL) goto comp12;
             DECRA(LNNOCL, 1);
             RESULT_t ltmp = CTLADV_fn(&xsp);
-            if (ltmp != FAIL) {
+            if (ltmp == OK) { /* RTN3: quoted filename present */
                 int32_t fvar2 = GENVAR_fn(&xsp);
                 if (fvar2) { SETAC(FILENM, fvar2); SETVC(FILENM, S); }
-            }
+            } else if (ltmp == NRETURN) { goto comp12; } /* RTN2: non-quoted → COMP12 */
+            /* RTN1 (FAIL): no filename arg → cmtclr (OK, keep existing filename) */
             goto cmtclr;
             comp12: SETAC(ERRTYP, 31); return FAIL;
         }
@@ -337,13 +354,14 @@ RESULT_t NEWCRD_fn(void)
  */
 RESULT_t CTLADV_fn(SPEC_t *out)
 {
+    /* oracle: RTN1=no-arg(FAIL), RTN2=non-quoted(NRETURN), RTN3=quoted+stripped(OK) */
     SPEC_t xsp; int st2;
-    if (STREAM_fn(&xsp, &TEXTSP, &FRWDTB, &st2) == FAIL) return FAIL; /* RTN1 */
+    if (STREAM_fn(&xsp, &TEXTSP, &FRWDTB, &st2) == FAIL) return FAIL; /* RTN1: no nonblank */
     if (st2 != NBTYP) return FAIL; /* RTN1 */
     if (STREAM_fn(&xsp, &TEXTSP, &ELEMTB, &st2) == FAIL) {
-        *out = xsp; return OK; /* RTN2 */
+        *out = xsp; return NRETURN; /* RTN2: EOS mid-token */
     }
-    if (st2 != QLITYP) { *out = xsp; return OK; } /* RTN2 */
+    if (st2 != QLITYP) { *out = xsp; return NRETURN; } /* RTN2: not quoted */
     xsp.o++; xsp.l--; /* FSHRTN: remove leading quote  */
     xsp.l--; /* SHORTN: remove trailing quote */
     *out = xsp;
