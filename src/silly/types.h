@@ -297,7 +297,7 @@ typedef enum {
 #define DECRA(d, n)      (D_A(d) -= (int32_t)(n))
 #define SETAC(d, n)      (D_A(d)  = (int32_t)(n))
 #define SETVC(d, n)      (D_V(d)  = (int32_t)(n))
-#define SETAV(dst, src)  (D_A(dst) = D_A(src))
+#define SETAV(dst, src)  (D_A(dst) = D_V(src), D_F(dst) = 0, D_V(dst) = 0)
 #define SETVA(dst, src)  (D_A(dst) = D_V(src))
 #define MOVV(dst, src)   (D_V(dst) = D_V(src))
 #define MOVA(dst, src)   (D_A(dst) = D_A(src))
