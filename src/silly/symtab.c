@@ -145,15 +145,17 @@ SPEC_t *DTREP_fn(DESCR_t *d)
     if ((int32_t)d->v == T) { /* VEQLC A2PTR,T — TABLE? */
         DESCR_t *tbl = (DESCR_t *)A2P(d->a.i); /* DTABLE: compute size and extent */
         int32_t tsz = (int32_t)tbl->v;
-        int32_t a1ptr = ((DESCR_t *)A2P(d->a.i + tsz))->a.i;
-        int32_t a2ptr = ((DESCR_t *)A2P(d->a.i + tsz - DESCR))->a.i;
-        while (a1ptr != 1) { /* Walk to find item count (DTABL1 loop) */
-            a2ptr += a1ptr; /* SUM */
-            a2ptr -= 2 * DESCR;
-            a1ptr = ((DESCR_t *)A2P(a1ptr + a2ptr))->a.i;
+        int32_t a1ptr = ((DESCR_t *)A2P(d->a.i + tsz))->a.i;     /* GETD A1PTR,A2PTR,A3PTR */
+        int32_t a2ptr_base = ((DESCR_t *)A2P(d->a.i + tsz - DESCR))->a.i; /* GETD A2PTR,A2PTR,A3PTR (fixed base) */
+        int32_t a3ptr = a2ptr_base; /* A3PTR = accumulator, starts == A2PTR */
+        while (a1ptr != 1) { /* DTABL1: AEQLC A1PTR,1,,DTABL2 */
+            a3ptr += a2ptr_base;    /* SUM A3PTR,A3PTR,A2PTR — A2PTR is fixed */
+            a3ptr -= 2 * DESCR;     /* DECRA A3PTR,2*DESCR */
+            a1ptr = ((DESCR_t *)A2P(a1ptr + a2ptr_base))->a.i; /* GETD A1PTR,A1PTR,A2PTR */
         }
-        int32_t count = (a2ptr - DESCR) / (2 * DESCR);
-        int32_t extent = (a2ptr - 2 * DESCR) / (2 * DESCR);
+        /* DTABL2: DECRA A3PTR,DESCR; DECRA A2PTR,2*DESCR; DIVIDE both by DSCRTW */
+        int32_t count  = (a3ptr - DESCR)     / (2 * DESCR);
+        int32_t extent = (a2ptr_base - 2 * DESCR) / (2 * DESCR);
         static char dtrep_buf2[64];
         int n = snprintf(dtrep_buf2, sizeof dtrep_buf2,
                          "TABLE(%d,%d)", (int)count, (int)extent);
