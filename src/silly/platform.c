@@ -1330,8 +1330,8 @@ void init_syntab(void)
         }
     }
 
-    /* PRMTBL: header + 7 live-block root ptrs [v311.sil §24 line 11997] */
-    PRMTBL[0].a.i = P2A(PRMTBL); PRMTBL[0].f = TTL|MARK;
+    /* PRMTBL: header + 18 GC roots [v311.sil §24 lines 11997+12005] */
+    PRMTBL[0].a.i = P2A(PRMTBL); PRMTBL[0].f = TTL|MARK; PRMTBL[0].v = 18*DESCR;
     /* DTEND: single DESCR, A=EFFCL ptr [v311.sil line 11990] */
     DTEND.a.i = P2A(&EFFCL);
     /* Trace/literal fn DESCRs: fn-ptr fills (LABTR_fn etc are defined in trace.c/asgn.c) */
