@@ -441,9 +441,13 @@ RESULT_t SCAN_fn(void)
     sp_setfrom_descr(&XSP, XPTR); /* Pattern case: run SCNR */
     if (SCNR_fn() == FAIL) return FAIL;
     if (NMD_fn() == FAIL) return FAIL;
-    /* SC-2: SIL LCOMP TXSP,HEADSP,SCANV1,SCANV1 — both exits → SCANV1.
-     * Always: REMSP XSP,TXSP,HEADSP */
-    sp_remsp(&XSP, TXSP, HEADSP);
+    /* SC-2: SIL LCOMP TXSP,HEADSP,SCANV1,SCANV1 — both exits go to SCANV1.
+     * SCANV1: REMSP XSP,TXSP,HEADSP; SCANV2: (fall-through) REMSP XSP,HEADSP,TXSP.
+     * If TXSP.l >= HEADSP.l → SCANV1 direction; else → SCANV2 direction. */
+    if (TXSP.l >= HEADSP.l)
+        sp_remsp(&XSP, TXSP, HEADSP);   /* SCANV1: matched region minus head prefix */
+    else
+        sp_remsp(&XSP, HEADSP, TXSP);   /* SCANV2: head minus match (negative-length case) */
     { /* RCALL YPTR,GENVAR,XSPPTR,RTYPTR */
         int32_t off = GENVAR_fn(&XSP);
         if (!off) return FAIL;
