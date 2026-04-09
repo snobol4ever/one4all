@@ -463,30 +463,33 @@ RESULT_t SJSR_fn(void)
     INCRA(OCICL, DESCR); /* INCRA OCICL,DESCR; GETD WPTR,OCBSCL,OCICL */
     GETD_BLK(WPTR, OCBSCL, OCICL);
     if (!TESTF(WPTR, FNC)) {
-        if (!AEQLC(INSW, 0)) { /* SJSR1 */
+        if (!AEQLC(INSW, 0)) { /* SJSR1: check &INPUT association */
             int32_t assoc = locapv_fn(D_A(INATL), &WPTR);
             if (assoc) {
-                GETDC_BLK(ZPTR, WPTR, DESCR); /* approx — needs GETDC */
-                PUTIN_fn(ZPTR, WPTR); /* ignore fail for now  */
+                GETDC_BLK(ZPTR, WPTR, DESCR);
+                if (PUTIN_fn(ZPTR, WPTR) == FAIL) return FAIL; /* SJSR1: (FAIL,SJSR1B) — FAIL→FAIL */
+                goto sjsr1b; /* exit2 → SJSR1B: XPTR set by PUTIN, skip GETDC */
             }
         }
-        GETDC_BLK(XPTR, WPTR, DESCR);
+        GETDC_BLK(XPTR, WPTR, DESCR); /* SJSR1A: get value from variable */
     } else {
         /* SC-6: INVOKE returns: 1=FAIL, 2=SJSR1 (check INSW), 3=NEMO (error 8) */
         INCL = XPTR;
         RESULT_t inv_rc = INVOKE_fn();
         if (inv_rc == FAIL) return FAIL;
         if (inv_rc == NEMO) { scan_error(8); return FAIL; } /* case 3 → NEMO */
-        /* case 2 (OK/NAME) → fall to SJSR1: check INSW then read XPTR */
+        /* case 2 (OK/NAME) → SJSR1: check &INPUT association */
         if (!AEQLC(INSW, 0)) {
             int32_t assoc = locapv_fn(D_A(INATL), &WPTR);
             if (assoc) {
                 GETDC_BLK(ZPTR, WPTR, DESCR);
-                PUTIN_fn(ZPTR, WPTR);
+                if (PUTIN_fn(ZPTR, WPTR) == FAIL) return FAIL; /* (FAIL,SJSR1B) */
+                goto sjsr1b; /* exit2 → SJSR1B: skip GETDC */
             }
         }
-        GETDC_BLK(XPTR, WPTR, DESCR);
+        GETDC_BLK(XPTR, WPTR, DESCR); /* SJSR1A */
     }
+sjsr1b:
     opush(WPTR); opush(XPTR);
     if (PATVAL_fn() == FAIL) { optop -= 2; return FAIL; }
     XPTR = opop(); WPTR = opop();
