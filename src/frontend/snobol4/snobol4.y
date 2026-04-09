@@ -85,6 +85,7 @@ goto_label_expr
            | T_GOTO_LPAREN T_FUNCTION T_GOTO_RPAREN           { $$=sgoto_new(); $$->uncond=strdup($2.sval); }
            | T_GOTO_LPAREN T_UN_DOLLAR_SIGN T_IDENT T_GOTO_RPAREN { $$=sgoto_new(); char buf[512]; snprintf(buf,sizeof buf,"$%s",$3.sval); $$->uncond=strdup(buf); }
            | T_GOTO_LPAREN T_UN_DOLLAR_SIGN T_GOTO_LPAREN goto_expr T_GOTO_RPAREN T_GOTO_RPAREN { $$=sgoto_new(); $$->computed_uncond_expr=($4); }
+           | T_GOTO_LPAREN T_UN_DOLLAR_SIGN T_STR T_GOTO_RPAREN { $$=sgoto_new(); EXPR_t*e=expr_new(E_QLIT); e->sval=strdup($3.sval); $$->computed_uncond_expr=e; }
            ;
 
 opt_goto   : goto_label_expr                                  { $$=$1; }

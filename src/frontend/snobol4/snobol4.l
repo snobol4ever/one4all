@@ -154,7 +154,7 @@ G       ({WS}|{CONT})*
 
     /* ---- LABEL: IDCONT chars only — stops at first non-label char ---- */
 
-<LABEL>[A-Za-z0-9_.\x80-\xFF]+  {
+<LABEL>[^ \t\n]+  {
     int take = yyleng < (int)sizeof(strbuf)-strpos-1
                ? yyleng : (int)sizeof(strbuf)-strpos-1;
     memcpy(strbuf+strpos, yytext, take); strpos += take;

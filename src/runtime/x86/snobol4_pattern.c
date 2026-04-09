@@ -222,7 +222,12 @@ static PATND_t *pat_to_patnd(DESCR_t v) {
             }
             const char *fname = frozen->sval ? frozen->sval : "";
             DESCR_t pv = pat_user_call(fname, args, nargs);
-            return spat_of(pv);
+            if (IS_FAIL_fn(pv)) return NULL;
+            /* If function returned a real pattern, use it directly */
+            PATND_t *pp = spat_of(pv);
+            if (pp) return pp;
+            /* Otherwise coerce non-pattern result to literal string pattern */
+            v = pv;  /* fall through to coercion below */
         }
         if (frozen && frozen->kind == E_VAR && frozen->sval) {
             /* *varname — deferred variable reference, resolved at match time via XVAR.
@@ -237,7 +242,10 @@ static PATND_t *pat_to_patnd(DESCR_t v) {
         if (v.v == DT_FAIL) return NULL;
     }
     PATND_t *p = spat_of(v);
-    if (!p && v.v == DT_S && v.s && v.s[0]) p = spat_of(pat_lit(v.s));
+    if (!p && v.v == DT_S) p = (v.s && v.s[0]) ? spat_of(pat_lit(v.s)) : spat_of(pat_lit(""));
+    if (!p && v.v == DT_I) { char buf[32]; snprintf(buf,sizeof buf,"%lld",(long long)v.i); p = spat_of(pat_lit(buf)); }
+    if (!p && v.v == DT_R) { char buf[64]; snprintf(buf,sizeof buf,"%.14g",v.r); p = spat_of(pat_lit(buf)); }
+    if (!p && v.v == DT_SNUL) p = spat_of(pat_lit(""));
     return p;
 }
 
