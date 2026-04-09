@@ -127,11 +127,11 @@ expr12     : expr12 T_IMMEDIATE_ASSIGN expr13                                   
            | expr12 T_COND_ASSIGN      expr13                                                     { $$=expr_binary(E_CAPT_COND_ASGN, $1,$3); }
            | expr13                                                                                { $$=$1; }
            ;
-expr13     : expr14 T_TILDE     expr13                                                            { $$=expr_binary(E_CAPT_COND_ASGN, $1,$3); }
+expr13     : expr14 T_TILDE     expr13                                                            { EXPR_t*_e=expr_binary(E_OPSYN,$1,$3); _e->sval=strdup("~"); $$=_e; }
            | expr14                                                                                { $$=$1; }
            ;
 expr14     : T_UN_AT_SIGN      expr14                                                             { $$=expr_unary(E_CAPT_CURSOR,     $2); }
-           | T_UN_TILDE        expr14                                                             { $$=expr_unary(E_INDIRECT,        $2); }
+           | T_UN_TILDE        expr14                                                             { $$=expr_unary(E_NOT,             $2); }
            | T_UN_QUESTION_MARK expr14                                                            { $$=expr_unary(E_INTERROGATE,     $2); }
            | T_UN_AMPERSAND    expr14                                                             { EXPR_t*_e=expr_unary(E_OPSYN,$2); _e->sval=strdup("&"); $$=_e; }
            | T_UN_PLUS         expr14                                                             { $$=expr_unary(E_PLS,             $2); }

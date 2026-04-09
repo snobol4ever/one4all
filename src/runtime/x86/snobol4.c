@@ -1389,7 +1389,8 @@ void SNO_INIT_fn(void) {
         _ch[0] = (char)11; _ch[1] = '\0'; NV_SET_fn("vt", STRVAL(_ch));
         _ch = GC_malloc_atomic(2);
         _ch[0] = (char)8;  _ch[1] = '\0'; NV_SET_fn("bs", STRVAL(_ch));
-        NV_SET_fn("nul", STRVAL(""));  /* char(0) = empty in string context */
+        { char *_nul = GC_malloc_atomic(2); _nul[0] = '\0'; _nul[1] = '\0';
+          NV_SET_fn("nul", BSTRVAL(_nul, 1)); }  /* char(0): len=1 for SIZE() */
         /* epsilon = the always-succeeds zero-MATCH_fn pattern.
          * USER CONTRACT (Lon, Session 47): epsilon is NEVER assigned by user code.
          * It is the pattern equivalent of NULL (empty string).

@@ -1569,7 +1569,7 @@ yyreduce:
 
   case 54: /* expr13: expr14 T_TILDE expr13  */
 #line 130 "snobol4.y"
-                                                                                                  { (yyval.expr)=expr_binary(E_CAPT_COND_ASGN, (yyvsp[-2].expr),(yyvsp[0].expr)); }
+                                                                                                  { EXPR_t*_e=expr_binary(E_OPSYN,(yyvsp[-2].expr),(yyvsp[0].expr)); _e->sval=strdup("~"); (yyval.expr)=_e; }
 #line 1574 "snobol4.tab.c"
     break;
 
@@ -1587,7 +1587,7 @@ yyreduce:
 
   case 57: /* expr14: T_UN_TILDE expr14  */
 #line 134 "snobol4.y"
-                                                                                                  { (yyval.expr)=expr_unary(E_INDIRECT,        (yyvsp[0].expr)); }
+                                                                                                  { (yyval.expr)=expr_unary(E_NOT,             (yyvsp[0].expr)); }
 #line 1592 "snobol4.tab.c"
     break;
 
