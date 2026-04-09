@@ -1742,3 +1742,11 @@ int deql_fn(DESCR_t a, DESCR_t b)
 {
     return (D_A(a) == D_A(b) && a.f == b.f && a.v == b.v);
 }
+
+/* ── Trace pair lists — 3-slot each (header + 2 zero slots) [v311.sil §24] */
+/* A-field (self-ptr) filled by data_init(); F=TTL|MARK; V=2*DESCR          */
+DESCR_t TVALPL[3] = { {.a={.i=0},.f=TTL|MARK,.v=2*DESCR}, {0}, {0} };
+DESCR_t TLABPL[3] = { {.a={.i=0},.f=TTL|MARK,.v=2*DESCR}, {0}, {0} };
+DESCR_t TFENPL[3] = { {.a={.i=0},.f=TTL|MARK,.v=2*DESCR}, {0}, {0} };
+DESCR_t TFEXPL[3] = { {.a={.i=0},.f=TTL|MARK,.v=2*DESCR}, {0}, {0} };
+DESCR_t TKEYPL[3] = { {.a={.i=0},.f=TTL|MARK,.v=2*DESCR}, {0}, {0} };

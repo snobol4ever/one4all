@@ -284,11 +284,11 @@ extern DESCR_t OTLIST;    /* output association pair list                 */
 extern DESCR_t OTSATL;    /* output block list                            */
 extern DESCR_t INSATL;    /* input block list                             */
 extern DESCR_t TRLIST;    /* trace type pair list                         */
-extern DESCR_t TVALPL;    /* value trace pair list                        */
-extern DESCR_t TLABPL;    /* label trace pair list                        */
-extern DESCR_t TFENPL;    /* call trace pair list                         */
-extern DESCR_t TFEXPL;    /* return trace pair list                       */
-extern DESCR_t TKEYPL;    /* keyword trace pair list                      */
+extern DESCR_t TVALPL[3];    /* value trace pair list                        */
+extern DESCR_t TLABPL[3];    /* label trace pair list                        */
+extern DESCR_t TFENPL[3];    /* call trace pair list                         */
+extern DESCR_t TFEXPL[3];    /* return trace pair list                       */
+extern DESCR_t TKEYPL[3];    /* keyword trace pair list                      */
 extern DESCR_t INATL;     /* input attribute list                         */
 extern DESCR_t OUTATL;    /* output attribute list                        */
 extern DESCR_t TVALL;     /* value trace list head                        */
