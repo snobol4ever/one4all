@@ -90,17 +90,20 @@ RESULT_t BASE_fn(void)
  *   VEQLC OCBSCL,C,INTR4        — must be CODE type
  *   SETAC OCICL,0               — zero offset
  */
+/* v311.sil 2533-2538 verified (SS-BLOCK): ARGVAL→OCBSCL, VEQLC OCBSCL,C,INTR4, SETAC OCICL,0 → RTNUL3.
+ * ARGVAL_fn writes to XPTR; VEQLC tests XPTR before MOVD — same value, semantically identical to SIL. */
 RESULT_t GOTG_fn(void)
 {
-    if (ARGVAL_fn() == FAIL) { intr5(); return FAIL; }
-    if (!VEQLC(XPTR, C)) { intr4(); return FAIL; }
-    MOVD(OCBSCL, XPTR);
+    if (ARGVAL_fn() == FAIL) { intr5(); return FAIL; } /* RCALL OCBSCL,ARGVAL,,INTR5 */
+    if (!VEQLC(XPTR, C)) { intr4(); return FAIL; }     /* VEQLC OCBSCL,C,INTR4 — XPTR holds result */
+    MOVD(OCBSCL, XPTR);                                /* now install into OCBSCL */
     SETAC(OCICL, 0);
     return OK; /* RTNUL3 */
 }
 
 /*====================================================================================================================*/
 /* ── GOTL — label goto :(X) ──────────────────────────────────────────── */
+/* v311.sil 2541-2607 verified (SS-BLOCK): INCRA/GETD/TESTF/trace/special-labels/GETDC. All paths match. */
 /*
  * v311.sil GOTL line 2541:
  *   Reads label variable from object code. Handles special labels:
@@ -182,6 +185,7 @@ RESULT_t GOTO_fn(void)
  *   Updates &LASTNO/&LASTFILE/&LASTLINE.
  *   Loads &STNO/FRTNCL/&LINE/&FILE from object code.
  *   Increments &STEXEC; checks &STLIMIT; checks &TRACE.
+ *   v311.sil 2616-2644 verified (SS-BLOCK). All paths match snobol4.c.
  */
 RESULT_t INIT_fn(void)
 {

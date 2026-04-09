@@ -459,24 +459,26 @@ RESULT_t BINOP_fn(DESCR_t *out)
 
 /*====================================================================================================================*/
 /* ── UNOP — unary operator analysis ─────────────────────────────────── */
+/* v311.sil 2506-2518: FORWRD→SETAC XPTR,0→AEQLC BRTYPE,NBTYP,RTN1→loop{STREAM/BLOCK/PUTDC/AEQLC/ADDSON/MOVD} */
+/* *out plays the role of XPTR; last allocated yptr IS the root (right-spine chain). Verified SS-BLOCK. */
 RESULT_t UNOP_fn(DESCR_t *out)
 {
-    if (FORWRD_fn() == FAIL) return FAIL; /* UNOP: FORWRD then STREAM UNOPTB */
-    SETAC(*out, 0);
-    if (!AEQLC(BRTYPE, NBTYP)) return OK; /* RTN1 — no unary ops */
+    if (FORWRD_fn() == FAIL) return FAIL; /* RCALL ,FORWRD,,COMP3 */
+    SETAC(*out, 0);                       /* SETAC XPTR,0 */
+    if (!AEQLC(BRTYPE, NBTYP)) return OK; /* AEQLC BRTYPE,NBTYP,RTN1 — no unary ops */
     SPEC_t xsp; int stype;
-    while (1) {
+    while (1) {                           /* UNOPA: */
         RESULT_t rc = STREAM_fn(&xsp, &TEXTSP, &UNOPTB, &stype);
-        if (rc == FAIL) break; /* RTXNAM — return current tree */
+        if (rc == FAIL) break;            /* STREAM fail → RTXNAM */
         DESCR_t yptr;
-        if (alloc_node(&yptr) == FAIL) return FAIL;
-        PUTDC_B(yptr, T_CODE, STYPE);
-        if (AEQLC(*out, 0)) {
-            *out = yptr;
+        if (alloc_node(&yptr) == FAIL) return FAIL; /* RCALL YPTR,BLOCK,CNDSIZ */
+        PUTDC_B(yptr, T_CODE, STYPE);     /* PUTDC YPTR,CODE,STYPE */
+        if (AEQLC(*out, 0)) {             /* AEQLC XPTR,0,,UNOPB */
+            *out = yptr;                  /* tree was empty: root = yptr */
         } else {
-            addson(*out, yptr);
+            addson(*out, yptr);           /* ADDSON XPTR,YPTR */
         }
-        MOVD(*out, yptr);
+        MOVD(*out, yptr);                 /* UNOPB: MOVD XPTR,YPTR */
     }
     return OK;
 }
