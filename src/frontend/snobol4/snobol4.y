@@ -45,7 +45,7 @@ static EXPR_t  *parse_expr(Lex*);
 %%
 top        : program                                                                                { }
            ;
-program    : program stmt | stmt                                                                    ;
+program    : program stmt | stmt | /* empty */                                                     ;
 stmt       : opt_label opt_subject opt_repl opt_goto T_STMT_END                      { sno4_stmt_commit_go(yyparse_param,$1,$2,NULL,($3!=NULL),$3,$4); }
            | opt_label expr2 T_MATCH opt_pattern opt_repl opt_goto T_STMT_END        { EXPR_t*sc=expr_binary(E_SCAN,$2,$4); sno4_stmt_commit_go(yyparse_param,$1,sc,NULL,($5!=NULL),$5,$6); }
            ;

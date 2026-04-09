@@ -181,6 +181,7 @@ G       ({WS}|{CONT})*
 <LABEL_DONE>\n             { lineno++; /* blank line after label-only line */ BEGIN(INITIAL); return T_STMT_END; }
 <LABEL_DONE>[*!|;]         { BEGIN(INITIAL); return T_STMT_END; }
 <LABEL_DONE>[^ \t\n*!|;]  { yyless(0); BEGIN(INITIAL); return T_STMT_END; }
+<LABEL_DONE><<EOF>>        { BEGIN(INITIAL); return T_STMT_END; }
 
 <LABEL>.                {
     /* non-IDCONT char immediately after label (no space) — put back, emit label */
