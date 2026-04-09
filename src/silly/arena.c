@@ -411,9 +411,8 @@ int32_t GC_fn(int32_t required)
                                 val.v == NULVCL.v);
                 int32_t att = ((DESCR_t *)A2P(st1ptr + ATTRIB))->a.i;
                 if (nonnull || att != 0) {
-                    /* GCBA4: D(D_A(GCBLK)+DESCR) = D(ST1PTR) — copy full DESCR */
-                    DESCR_t st1d; SETAC(st1d, st1ptr); /* ST1PTR as arena-offset DESCR */
-                    *((DESCR_t *)A2P(D_A(GCBLK) + DESCR)) = st1d;
+                    /* GCBA4: D(D_A(GCBLK)+DESCR) = D(ST1PTR) — copy full DESCR at ST1PTR */
+                    *((DESCR_t *)A2P(D_A(GCBLK) + DESCR)) = *((DESCR_t *)A2P(st1ptr));
                     GCM_fn(D_A(GCBLK));
                 }
             }
