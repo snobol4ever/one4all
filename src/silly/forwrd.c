@@ -101,10 +101,12 @@ RESULT_t FORWRD_fn(void)
         RESULT_t rc = STREAM_fn(&xsp, &TEXTSP, &FRWDTB, &stype);
         if (rc == OK) {
             SETAC(BRTYPE, stype);
-            return OK; /* FORJRN */
+            return OK; /* FORJRN: break found */
         }
-        rc = forrun(); /* FORRUN: read next card */
-        if (rc == FAIL) return FAIL; /* COMP1/COMP3 */
+        /* Oracle: ST_ERROR (stype==0) → COMP3 (fatal); ST_EOS → FORRUN */
+        if (stype == 0) { extern void COMP3_fn(void); COMP3_fn(); return FAIL; }
+        rc = forrun(); /* ST_EOS → FORRUN: read next card */
+        if (rc == FAIL) return FAIL;
     }
 }
 
@@ -138,6 +140,7 @@ RESULT_t FORBLK_fn(void)
             if (rc == FAIL) return FAIL;
             continue;
         }
+        SETAC(BRTYPE, stype);           /* FORJRN: oracle MOVD BRTYPE,STYPE */
         return OK;                      /* ST_STOP/NBTYP → FORJRN: nonblank found */
     }
 }
