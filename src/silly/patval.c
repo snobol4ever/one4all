@@ -301,10 +301,8 @@ static RESULT_t nam_dol(const DESCR_t *op_cl)
         int rc = INVOKE_fn();
         XPTR = saved_xptr; /* NAM4: restore first argument */
         if (rc == FAIL) return FAIL;
-        if (rc == OK) goto nam3; /* OK = exit 2: name result → restore XPTR (oracle: NAM4), join NAM3 */
-        if (YPTR.v != E) return nemo(); /* OK path: only EXPRESSION valid */
+        if (YPTR.v != E) return nemo(); /* VEQLC YPTR,E,NEMO — verify EXPRESSION */
     }
-nam3:;
     if (XPTR.v == S) { /* NAM3: coerce STRING first-arg to pattern node if needed */
         LOCSP_fn(&TSP, &XPTR); /* NAMV: convert string to pattern */
         TMVAL.a.i = TSP.l; TMVAL.f = 0; TMVAL.v = 0;
