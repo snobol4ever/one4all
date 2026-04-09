@@ -1267,6 +1267,9 @@ void init_syntab(void)
     DTEND.a.i = P2A(&EFFCL);
     /* Trace/literal fn DESCRs: fn-ptr fills (LABTR_fn etc are defined in trace.c/asgn.c) */
     extern RESULT_t LABTR_fn(void), VALTR_fn(void), LIT_fn(void), KEYTR_fn(void), INIT_fn(void), GOTO_fn(void);
+    extern RESULT_t GOTG_fn(void), GOTL_fn(void), FENTR_fn(void), FNEXTR_fn(void);
+    FNTRFN.a.i  = P2A(&FENTR_fn);  FXTRFN.a.i = P2A(&FNEXTR_fn);
+    GOTGFN.a.i  = P2A(&GOTG_fn);   GOTLFN.a.i = P2A(&GOTL_fn);
     GOTOFN.a.i  = P2A(&GOTO_fn);
     INITFN.a.i  = P2A(&INIT_fn);
     KEYTFN.a.i = P2A(&KEYTR_fn); LABTFN.a.i = P2A(&LABTR_fn); LITFN.a.i = P2A(&LIT_fn); VLTRFN.a.i = P2A(&VALTR_fn);
@@ -1846,6 +1849,10 @@ DESCR_t SPNCFN = {.a={.i=XSPNC},  .f=0, .v=3}; /* SPAN(cset)           */
 DESCR_t TBFN   = {.a={.i=XTB},    .f=0, .v=3}; /* TAB(n)               */
 DESCR_t FNCFFN = {.a={.i=XRTNL3}, .f=0, .v=2}; /* FENCE failure        */
 /* Trace/literal fn DESCRs (a=fn-ptr filled at init, flag=0) */
+DESCR_t FNTRFN  = {.a={.i=0}, .f=0, .v=2}; /* call trace  (FENTR_fn)   */
+DESCR_t FXTRFN  = {.a={.i=0}, .f=0, .v=2}; /* return trace(FNEXTR_fn)  */
+DESCR_t GOTGFN  = {.a={.i=0}, .f=0, .v=1}; /* :<X> goto   (GOTG_fn)    */
+DESCR_t GOTLFN  = {.a={.i=0}, .f=0, .v=1}; /* :(L) goto   (GOTL_fn)    */
 DESCR_t GOTOFN  = {.a={.i=0}, .f=0, .v=1}; /* goto handler (GOTO_fn)   */
 DESCR_t INITFN  = {.a={.i=0}, .f=0, .v=1}; /* stmt init   (INIT_fn)    */
 DESCR_t KEYTFN = {.a={.i=0}, .f=0, .v=2}; /* keyword trace (KEYTR_fn) */
