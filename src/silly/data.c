@@ -457,6 +457,13 @@ const char TRMSP[]  = "TRIM";        const char UCNMSP[] = "UCASE";
 const char UNLDSP[] = "UNLOAD";      const char VALSP[]  = "VALUE";
 const char VDIFSP[] = "VDIFFER";     const char ANCHSP[] = "ANCHOR";
 const char ABNDSP[] = "ABEND";       const char FILESP[] = "FILE";
+/* Missing STRING blocks from v311.sil §24 lines 11783-11920 */
+const char ABORSP[]="ABORT";    const char ANYSP[]="ANY";       const char APLYSP[]="APPLY";
+const char ARBSP[]="ARB";      const char ARBNSP[]="ARBNO";    const char ARGSP[]="ARG";
+const char BACKSP[]="BACKSPACE"; const char BALSP[]="BAL";      const char BRKSP[]="BREAK";
+const char BRKXSP[]="BREAKX";  const char CASESP[]="CASE";     const char CHARSP[]="CHAR";
+const char REMSP[]="REM";      const char STPTSP[]="STOPTR";   const char BLOKSP[]="BLOCK";
+const char BLKSSP[]="BLOCKS";  const char BKGNSP[]="FILL";     const char NOBLSP[]="NOBLOCKS";
 const char LINESP[] = "LINE";        const char LSFNSP[] = "LASTFILE";
 const char LSLNSP[] = "LASTLINE";    const char ALNMSP[] = "ALPHABET";
 /* v311.sil line 10883: ALPHSP SPEC ALPHA,0,0,0,ALPHSZ  (alphabet string specifier)   */
