@@ -352,8 +352,8 @@ RESULT_t SCNR_fn(void)
     do_SCIN();
     goto scan_fail; /* do_SCIN never returns normally — it loops via do_SCIN2 forever  and exits only via longjmp. Silence the no-return warning: */
 scan_ok:
-    SETAV(PATICL, XCL); /* SCOK: SETAV PATICL,XCL; AEQLC PATICL,0 → SCIN2 else RTN2 */
-    if (AEQLC(PATICL, 0)) {
+    SETAV(PATICL, XCL); /* SCOK: SETAV PATICL,XCL; if PATICL==0 → RTN2 (return); else → SCIN2 (continue) */
+    if (!AEQLC(PATICL, 0)) {
         if (setjmp(ctx.fail_jmp)) goto scan_fail; /* re-enter dispatch loop — reinstate setjmps first */
         if (setjmp(ctx.scok_jmp)) goto scan_ok;
         if (setjmp(ctx.salt_jmp)) goto scan_alt;
@@ -1224,8 +1224,12 @@ static void do_SUCF(void)
 /* SCON — advance head by 1, retry pattern */
 static void do_SCON(void)
 {
-    if (AEQLC(FULLCL, 0)) GOTO_FAIL;  /* AEQLC FULLCL,0,FAIL — fullscan OFF → fail */
-    if (AEQLC(LENFCL, 0)) GOTO_FAIL;  /* AEQLC LENFCL,0,FAIL */
+    /* SCON: if FULLCL!=0 (fullscan ON) → skip LENFCL check (SCON1).
+     * If FULLCL==0 (fullscan OFF) and LENFCL!=0 (length failure set) → FAIL. */
+    if (AEQLC(FULLCL, 0)) {        /* fullscan OFF → check LENFCL */
+        if (!AEQLC(LENFCL, 0)) GOTO_FAIL;  /* LENFCL!=0 → fail */
+    }
+    /* SCON1: */
     TMVAL = opop(); /* YSIZ */
     YPTR  = opop(); /* YPTR */
     DECRA(TMVAL, 1);
