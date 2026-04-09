@@ -357,8 +357,9 @@ varv2:
 RESULT_t VARVUP_fn(void)
 {
     if (VARVAL_fn() == FAIL) return FAIL;
-    if (CASECL.a.i == 0) return OK; /* case-sensitive: no fold */
-    return VPXPTR_fn();
+    /* SIL: AEQLC CASECL,0,RTXNAM,VPXPTR — CASECL==0 → done (no fold); CASECL!=0 → VPXPTR (fold). */
+    if (CASECL.a.i != 0) return VPXPTR_fn();
+    return OK; /* RTXNAM */
 }
 
 /*====================================================================================================================*/
