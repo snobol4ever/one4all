@@ -1263,6 +1263,8 @@ void init_syntab(void)
 
     /* PRMTBL: header + 7 live-block root ptrs [v311.sil §24 line 11997] */
     PRMTBL[0].a.i = P2A(PRMTBL); PRMTBL[0].f = TTL|MARK;
+    /* DTEND: single DESCR, A=EFFCL ptr [v311.sil line 11990] */
+    DTEND.a.i = P2A(&EFFCL);
     PRMTBL[1].a.i = P2A(&DTLIST);
     PRMTBL[2].a.i = P2A(&FNLIST);
     PRMTBL[3].a.i = P2A(&FTABLE);
