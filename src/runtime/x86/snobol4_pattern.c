@@ -211,7 +211,8 @@ extern DESCR_t eval_node(EXPR_t *e);
 static PATND_t *pat_to_patnd(DESCR_t v) {
     if (v.v == DT_E) {
         EXPR_t *frozen = (EXPR_t *)v.ptr;
-        if (frozen && frozen->kind == E_FNC) {
+        if (!frozen) return NULL;   /* null DT_E — propagate failure (do not epsilon) */
+        if (frozen->kind == E_FNC) {
             /* *func(args...) — side-effect call deferred to match time via XATP */
             int nargs = frozen->nchildren;
             DESCR_t *args = NULL;
@@ -229,7 +230,7 @@ static PATND_t *pat_to_patnd(DESCR_t v) {
             /* Otherwise coerce non-pattern result to literal string pattern */
             v = pv;  /* fall through to coercion below */
         }
-        if (frozen && frozen->kind == E_VAR && frozen->sval) {
+        if (frozen->kind == E_VAR && frozen->sval) {
             /* *varname — deferred variable reference, resolved at match time via XVAR.
              * This is the recursive grammar case: factor = ... *factor ...
              * The variable may not exist yet at construction time. */
@@ -240,6 +241,12 @@ static PATND_t *pat_to_patnd(DESCR_t v) {
         /* Other frozen expression: thaw via PATVAL_fn → pattern value */
         v = PATVAL_fn(v);
         if (v.v == DT_FAIL) return NULL;
+    }
+    /* DT_N (NAME) — deref to actual value, then fall through to coercion */
+    if (v.v == DT_N) {
+        if (v.slen == 1 && v.ptr) v = *(DESCR_t *)v.ptr;          /* NAMEPTR */
+        else if (v.slen == 0 && v.s) v = NV_GET_fn(v.s);           /* NAMEVAL */
+        else v = NULVCL;
     }
     PATND_t *p = spat_of(v);
     if (!p && v.v == DT_S) p = (v.s && v.s[0]) ? spat_of(pat_lit(v.s)) : spat_of(pat_lit(""));

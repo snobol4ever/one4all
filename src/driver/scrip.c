@@ -1360,7 +1360,13 @@ static DESCR_t interp_eval_pat(EXPR_t *e)
                 if (!IS_FAIL_fn(_fr)) return _fr;
             }
             DESCR_t _v = interp_eval(e);
-            /* PATVAL coerce: DT_I/DT_R → literal; DT_E → thaw; DT_P/DT_S → pass. */
+            /* PATVAL coerce: DT_N → deref; DT_E(null) → epsilon; DT_I/DT_R → literal; DT_E → thaw; DT_P/DT_S → pass. */
+            if (_v.v == DT_N) {
+                if (_v.slen == 1 && _v.ptr) _v = *(DESCR_t *)_v.ptr;
+                else if (_v.slen == 0 && _v.s) _v = NV_GET_fn(_v.s);
+                else _v = NULVCL;
+            }
+            if (_v.v == DT_E && !_v.ptr) return NULVCL;  /* null frozen expr → unset var */
             if (_v.v == DT_E || _v.v == DT_I || _v.v == DT_R) return PATVAL_fn(_v);
             return _v;
         }
