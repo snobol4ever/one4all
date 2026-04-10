@@ -127,7 +127,7 @@ RESULT_t STOPTR_fn(void)
     if (IND_fn() == FAIL) return FAIL;
     tr_push(XPTR);
     if (VARVUP_fn() == FAIL) { tr_top--; return FAIL; }
-    MOVD(YPTR, XPTR); XPTR = tr_pop();
+    XPTR = tr_pop();
     if (deql(YPTR, NULVCL)) MOVD(YPTR, VALTRS);
     int32_t assoc = locapv_fn(D_A(TRATL), &YPTR);
     DESCR_t yptr2;
