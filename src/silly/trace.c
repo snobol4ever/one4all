@@ -113,9 +113,9 @@ RESULT_t TRACE_fn(void)
     }
     if (deql(YPTR, FUNTCL) || deql(YPTR, EFFCL)) { /* FUNCTION or EFFECT type → TRACF */
         MOVD(YPTR, TFNCLP);
-        if (tracep(XPTR, YPTR, WPTR, ZPTR) == FAIL) return FAIL;
+        if (tracep(XPTR, YPTR, WPTR, ZPTR) == FAIL) { INTR10_fn(); return FAIL; } /* RCALL TRACEP,,(INTR10,INTR10) */
         MOVD(YPTR, TFNRLP);
-        return tracep(XPTR, YPTR, WPTR, ZPTR);
+        return tracep(XPTR, YPTR, WPTR, ZPTR); /* BRANCH TRACEP — tail call */
     }
     INTR30_fn(); return FAIL; /* unknown type */
 }
