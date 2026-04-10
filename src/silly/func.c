@@ -293,7 +293,7 @@ RESULT_t CLEAR_fn(void)
     if (ARGVAL_fn() == FAIL) return FAIL;
     SETAC(DMPPTR, OBPTR.a.i + LNKFLD - DESCR); /* OBLIST-DESCR = OBSTRT[0] - DESCR */    /* Walk every bin in OBLIST, null every variable */
     while (1) {
-        if (D_A(DMPPTR) >= D_A(OBEND)) { MOVD(XPTR, NULVCL); return OK; } /* PCOMP DMPPTR,OBEND,RETNUL */
+        if (D_A(DMPPTR) > D_A(OBEND)) { MOVD(XPTR, NULVCL); return OK; } /* PCOMP DMPPTR,OBEND,RETNUL */
         INCRA(DMPPTR, DESCR);
         MOVD(YPTR, DMPPTR);
         while (1) { /* Walk chain */
@@ -350,13 +350,88 @@ RESULT_t APPLY_fn(void)
 }
 
 /*====================================================================================================================*/
-/* ── ARG(F,N) / LOCAL(F,N) / FIELDS(F,N) — stubs ─────────────────────
- * These require detailed knowledge of function definition block layout
- * (DEFFNC block, MULTC, GETSIZ for defined vs external).
- * Stubbed: return FAIL until the interpreter's INVOKE path is in place. */
-RESULT_t ARG_fn(void)    { return FAIL; }
-RESULT_t LOCAL_fn(void)  { return FAIL; }
-RESULT_t FIELDS_fn(void) { return FAIL; }
+/* ── ARG2 — shared body for ARG/LOCAL/FIELDS/ARGINT ─────────────────── */
+/* SIL ARG2 (line 6368): entered with XPTR=fn-name, XCL=arg-number,
+ * stack holding (ZCL=proc-type-check, ALCL=entry-indicator).
+ * ARG: PUSH(ONECL,DEFCL)  → ZCL=ONECL, ALCL=DEFCL
+ * LOCAL: PUSH(ONECL,ZEROCL,DEFCL) → extra ALCL=DEFCL pop after ARG4
+ * FIELDS: PUSH(ZEROCL,ZEROCL,DATCL) → ZCL=ZEROCL, ALCL=DATCL */
+static RESULT_t arg2(void)
+{
+    int32_t assoc = locapv_fn(D_A(FNCPL), &XPTR);
+    if (!assoc) { INTR30_fn(); return FAIL; }
+    SETAC(XPTR, assoc);
+    GETDC_B(XPTR, XPTR, DESCR);   /* get function descriptor */
+    GETDC_B(YCL,  XPTR, 0);       /* get procedure descriptor */
+    GETDC_B(XPTR, XPTR, DESCR);   /* get definition block */
+    ZCL  = fn_pop();               /* restore proc-type-check indicator */
+    ALCL = fn_pop();               /* restore entry indicator */
+    if (D_A(YCL) != D_A(ZCL)) { INTR30_fn(); return FAIL; } /* AEQL YCL,ZCL,INTR30 */
+    D_A(XCL) *= DESCR;            /* MULTC XCL,XCL,DESCR — offset in units */
+    D_A(XCL) += 2*DESCR;          /* INCRA XCL,2*DESCR — skip prototype */
+    D_A(YCL)  = D_V(YCL);        /* SETAV YCL,YCL — arg count from V-field */
+    D_A(YCL) *= DESCR;            /* MULTC YCL,YCL,DESCR */
+    if (D_A(ALCL) == 0) {
+        /* ARG4: defined function path */
+        D_A(ZCL) = D_V(*(DESCR_t*)A2P(D_A(XPTR))); /* GETSIZ ZCL,XPTR */
+        ALCL = fn_pop();          /* restore entry indicator (LOCAL's extra push) */
+        if (D_A(ALCL) != 0)
+            D_A(XCL) += D_A(YCL); /* SUM XCL,XCL,YCL — skip formal args for LOCAL */
+    } else {
+        /* Non-ARG4: INCRA YCL,2*DESCR; MOVD ZCL,YCL */
+        D_A(YCL) += 2*DESCR;
+        MOVD(ZCL, YCL);
+    }
+    /* ARG5 */
+    if (D_A(XCL) > D_A(ZCL)) return FAIL; /* ACOMP XCL,ZCL,FAIL */
+    GETD_B(ZPTR, XPTR, XCL);      /* GETD ZPTR,XPTR,XCL — get the descriptor */
+    MOVD(XPTR, ZPTR);
+    return OK;                     /* RTZPTR */
+}
+
+/*====================================================================================================================*/
+/* ── ARG(F,N) ────────────────────────────────────────────────────────── */
+RESULT_t ARG_fn(void)
+{
+    fn_push(D_A(ONECL) ? ONECL : ONECL); /* PUSH(ONECL,DEFCL) */
+    fn_push(DEFCL);
+    /* ARG1: VARVUP → XPTR; INTVAL → XCL; verify XCL > 0 */
+    if (VARVUP_fn() == FAIL) { fn_top -= 2; return FAIL; }
+    fn_push(XPTR);
+    if (INTVAL_fn() == FAIL) { fn_top -= 3; return FAIL; }
+    MOVD(XCL, XPTR);
+    if (ACOMP(ZEROCL, XCL) >= 0) { fn_top -= 3; return FAIL; } /* must be > 0 */
+    XPTR = fn_pop();
+    return arg2();
+}
+
+/*====================================================================================================================*/
+/* ── LOCAL(F,N) ──────────────────────────────────────────────────────── */
+RESULT_t LOCAL_fn(void)
+{
+    fn_push(ONECL); fn_push(ZEROCL); fn_push(DEFCL); /* PUSH(ONECL,ZEROCL,DEFCL) */
+    if (VARVUP_fn() == FAIL) { fn_top -= 3; return FAIL; }
+    fn_push(XPTR);
+    if (INTVAL_fn() == FAIL) { fn_top -= 4; return FAIL; }
+    MOVD(XCL, XPTR);
+    if (ACOMP(ZEROCL, XCL) >= 0) { fn_top -= 4; return FAIL; }
+    XPTR = fn_pop();
+    return arg2();
+}
+
+/*====================================================================================================================*/
+/* ── FIELDS(F,N) ─────────────────────────────────────────────────────── */
+RESULT_t FIELDS_fn(void)
+{
+    fn_push(ZEROCL); fn_push(ZEROCL); fn_push(DATCL); /* PUSH(ZEROCL,ZEROCL,DATCL) */
+    if (VARVUP_fn() == FAIL) { fn_top -= 3; return FAIL; }
+    fn_push(XPTR);
+    if (INTVAL_fn() == FAIL) { fn_top -= 4; return FAIL; }
+    MOVD(XCL, XPTR);
+    if (ACOMP(ZEROCL, XCL) >= 0) { fn_top -= 4; return FAIL; }
+    XPTR = fn_pop();
+    return arg2();
+}
 
 /* ── DMP(N) / DUMP() — stub ──────────────────────────────────────────
  * Full implementation needs STPRNT, DTREP, formatted I/O.
