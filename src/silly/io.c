@@ -22,6 +22,7 @@
 #include "strings.h"
 #include "symtab.h"
 #include "asgn.h"   /* IND_fn */
+#include "errors.h"
 #include "errors.h" /* UNTERR_fn, LENERR_fn, COMP6_fn */
 
 /* Platform I/O stubs — resolved by platform.c */
@@ -195,7 +196,7 @@ RESULT_t PUTIN_fn(DESCR_t blk, DESCR_t var)
     if (STREAD_fn(&IOSP, IO3PTR) == FAIL) return FAIL; /* STREAD — platform read into IOSP */
     if (!AEQLC(TRIMCL, 0)) TRIMSP_fn(&IOSP, &IOSP); /* TRIM if &TRIM set */
     D_A(IO1PTR) = IOSP.l; /* GETLG IO1PTR,IOSP — get length */
-    if (ACOMP(IO1PTR, MLENCL) > 0) return FAIL;
+    if (ACOMP(IO1PTR, MLENCL) > 0) { INTR8_fn(); return FAIL; } /* INTR8 — exceeded &MAXLNGTH */
     if (VEQLC(IO2PTR, K)) { /* Keyword variable? — PUTIN3 */
         if (SPCINT_fn(&IO1PTR, &IOSP) == FAIL) return FAIL;
         goto putin2;
