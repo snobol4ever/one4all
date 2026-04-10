@@ -112,6 +112,23 @@ void comm_var(const char *name, DESCR_t val) {
     mon_send("VALUE", name, s ? s : "(undef)");
 }
 
+void comm_call(const char *fname) {
+    if (monitor_fd < 0) return;
+    if (!monitor_ready) return;
+    if (!fname || !*fname) return;
+    if (kw_ftrace <= 0 && !trace_registered(fname)) return;
+    mon_send("CALL", fname, "");
+}
+
+void comm_return(const char *fname, DESCR_t retval) {
+    if (monitor_fd < 0) return;
+    if (!monitor_ready) return;
+    if (!fname || !*fname) return;
+    if (kw_ftrace <= 0 && !trace_registered(fname)) return;
+    const char *s = VARVAL_fn(retval);
+    mon_send("RETURN", fname, s ? s : "(fail)");
+}
+
 /* ============================================================
  * Runtime initialization
  * ============================================================ */

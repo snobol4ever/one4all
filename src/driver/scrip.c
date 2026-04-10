@@ -360,6 +360,8 @@ static DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
 
     DESCR_t retval = NULVCL;
 
+    comm_call(fname);   /* T-2: FUNCTION trace CALL event */
+
     int ret_kind = setjmp(fr->ret_env);
     if (ret_kind == 0) {
         /* ── Find body label: use entry_label (supports OPSYN aliases and
@@ -584,6 +586,7 @@ static DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
     }
 
 fn_done:
+    comm_return(fname, retval);  /* T-2: FUNCTION trace RETURN event */
     /* ── Restore saved variables and pop frame ── */
     for (int i = 0; i < nsaved; i++)
         NV_SET_fn(snames[i], svals[i]);

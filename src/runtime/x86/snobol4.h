@@ -393,6 +393,8 @@ void   output_str(const char *s);   /* OUTPUT = 'string' */
 extern int monitor_fd;
 void comm_stno(int n);
 void comm_var(const char *name, DESCR_t val);
+void comm_call(const char *fname);
+void comm_return(const char *fname, DESCR_t retval);
 
 /* ============================================================
  * SNOBOL4 keywords (&KEYWORD)
