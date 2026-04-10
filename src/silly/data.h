@@ -110,7 +110,7 @@ extern DESCR_t CODELT;    /* object code excess = 200*DESCR               */
 extern DESCR_t DSCRTW;    /* constant 2*DESCR                             */
 extern DESCR_t EOSCL;     /* end-of-statement switch = EOSTYP             */
 extern DESCR_t ESALIM;    /* bound on compilation errors = ESASIZ*DESCR   */
-extern DESCR_t EXTVSL;    /* [V3.11] = EXTSIZ*2*DESCR                     */
+extern DESCR_t EXTVAL;    /* [V3.11] = EXTSIZ*2*DESCR                     */
 extern DESCR_t FBLKRQ;    /* function block quantum = FBLKSZ              */
 extern DESCR_t GOBRCL;    /* goto break character switch                  */
 extern DESCR_t GTOCL;     /* goto decision switch = FGOTYP                */

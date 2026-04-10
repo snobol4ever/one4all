@@ -198,7 +198,7 @@ DESCR_t CODELT = D0;    /* 200*DESCR                                      */
 DESCR_t DSCRTW = D0;    /* 2*DESCR                                        */
 DESCR_t EOSCL  = D(EOSTYP, 0, 0);
 DESCR_t ESALIM = D0;    /* ESASIZ*DESCR                                   */
-DESCR_t EXTVSL = D0;    /* EXTSIZ*2*DESCR                                 */
+DESCR_t EXTVAL = D0;    /* EXTSIZ*2*DESCR                                 */
 DESCR_t FBLKRQ = D0;    /* FBLKSZ                                         */
 DESCR_t GOBRCL = D0;
 DESCR_t GTOCL  = D(FGOTYP, 0, 0);
@@ -542,7 +542,7 @@ void data_init(void)
     CODELT.a.i = (int_t)(200 * DESCR); CODELT.v = C;
     DSCRTW.a.i = (int_t)(2 * DESCR);
     ESALIM.a.i = (int_t)(ESASIZ * DESCR);
-    EXTVSL.a.i = (int_t)(EXTSIZ * 2 * DESCR);
+    EXTVAL.a.i = (int_t)(EXTSIZ * 2 * DESCR);
     FBLKRQ.a.i = (int_t)(FBLKSZ); FBLKRQ.v = B;
     INCLSZ.a.i = (int_t)(4 * DESCR); INCLSZ.v = B;
     IOBLSZ.a.i = (int_t)(2 * DESCR); IOBLSZ.v = B;
