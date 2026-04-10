@@ -604,7 +604,7 @@ sjsrv1:
             }
         }
         if (ACOMPC(TRAPCL, 0) <= 0) {
-            int32_t assoc = locapt_fn(D_A(TVALL), &WPTR);
+            int32_t assoc = locapt_fn(D_A(TVALL[0]), &WPTR);
             if (assoc) {
                 SETAC(ATPTR, assoc);
                 TRPHND_fn(ATPTR);
@@ -881,7 +881,7 @@ atp1:
         }
     }
     if (ACOMPC(TRAPCL, 0) > 0) { /* SC-16+17: TRAPCL>0 → save full scan state, call TRPHND, restore */
-        int32_t a = locapt_fn(D_A(TVALL), &XPTR);
+        int32_t a = locapt_fn(D_A(TVALL[0]), &XPTR);
         if (a) {
             SETAC(ATPTR, a);
             /* SC-17: save all scan globals oracle pushes before TRPHND */
@@ -1218,7 +1218,7 @@ enmi3:
         if (a) { DESCR_t zd; GETDC_BLK(zd, YPTR, DESCR); PUTOUT_fn(zd, VVAL); }
     }
     if (ACOMPC(TRAPCL, 0) > 0) { /* ACOMPC TRAPCL,0,,ENMI2,ENMI2: TRAPCL>0 → trace */
-        int32_t a = locapt_fn(D_A(TVALL), &YPTR);
+        int32_t a = locapt_fn(D_A(TVALL[0]), &YPTR);
         if (a) { SETAC(ATPTR, a); TRPHND_fn(ATPTR); }
     }
     /* ENMI2: INCRA PDLPTR,3*DESCR; slot1=DNMICL; then ENME3 tail (slots 2+3) */

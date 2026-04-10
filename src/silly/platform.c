@@ -626,7 +626,7 @@ DESCR_t TKLIST = {.a={.i=0},.f=0,.v=0};
 DESCR_t TRATL  = {.a={.i=0},.f=0,.v=0};
 DESCR_t TRATLEND = {.a={.i=0},.f=0,.v=0};
 DESCR_t VALTRLIST = {.a={.i=0},.f=0,.v=0};
-DESCR_t VALTRS = {.a={.i=0},.f=0,.v=0};
+/* VALTRS[3]: now defined in data.c */
 
 /* Compiler fixed-up globals (aliases/extras) */
 DESCR_t OCSVCLX = {.a={.i=0},.f=0,.v=0};
@@ -766,8 +766,7 @@ DESCR_t TLABL[2] = { {.a={.i=0},.f=0,.v=0}, {.a={.i=0},.f=FNC,.v=1} };
 DESCR_t TFENTL[2] = { {.a={.i=0},.f=0,.v=0}, {.a={.i=0},.f=FNC,.v=2} };
 /* TFEXTL[2]: [0]=return trace list head, [1]=default return trace fn — SIL 10954-10955 */
 DESCR_t TFEXTL[2] = { {.a={.i=0},.f=0,.v=0}, {.a={.i=0},.f=FNC,.v=2} };
-DESCR_t TFNCLP = {.a={.i=0},.f=0,.v=0};
-DESCR_t TFNRLP = {.a={.i=0},.f=0,.v=0};
+/* TFNCLP[2] / TFNRLP[14]: now defined in data.c */
 DESCR_t ERRMSG = {.a={.i=0},.f=0,.v=0};
 DESCR_t EMSGCL = {.a={.i=0},.f=0,.v=0};
 DESCR_t LNTHCL = {.a={.i=0},.f=FNC,.v=3};  /* SIL: DESCR LNTHFN,FNC,3 */

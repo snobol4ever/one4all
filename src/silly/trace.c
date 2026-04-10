@@ -104,7 +104,7 @@ RESULT_t TRACE_fn(void)
     if (VARVUP_fn() == FAIL) { tr_top -= 3; return FAIL; }
     MOVD(ZPTR, XPTR);
     MOVD(WPTR, tr_pop()); MOVD(YPTR, tr_pop()); XPTR = tr_pop();
-    if (deql(YPTR, NULVCL)) MOVD(YPTR, VALTRS); /* Default type → VALUE */
+    if (deql(YPTR, NULVCL)) MOVD(YPTR, VALTRS[0]); /* Default type → VALUE */
     int32_t assoc = locapv_fn(D_A(TRATL), &YPTR); /* Look up trace type in TRATL */
     if (assoc) {
         SETAC(YPTR, assoc);
@@ -112,9 +112,9 @@ RESULT_t TRACE_fn(void)
         return tracep(XPTR, YPTR, WPTR, ZPTR);
     }
     if (deql(YPTR, FUNTCL) || deql(YPTR, EFFCL)) { /* FUNCTION or EFFECT type → TRACF */
-        MOVD(YPTR, TFNCLP);
+        MOVD(YPTR, TFNCLP[0]);
         if (tracep(XPTR, YPTR, WPTR, ZPTR) == FAIL) { INTR10_fn(); return FAIL; } /* RCALL TRACEP,,(INTR10,INTR10) */
-        MOVD(YPTR, TFNRLP);
+        MOVD(YPTR, TFNRLP[0]);
         return tracep(XPTR, YPTR, WPTR, ZPTR); /* BRANCH TRACEP — tail call */
     }
     INTR30_fn(); return FAIL; /* unknown type */
@@ -128,7 +128,7 @@ RESULT_t STOPTR_fn(void)
     tr_push(XPTR);
     if (VARVUP_fn() == FAIL) { tr_top--; return FAIL; }
     XPTR = tr_pop();
-    if (deql(YPTR, NULVCL)) MOVD(YPTR, VALTRS);
+    if (deql(YPTR, NULVCL)) MOVD(YPTR, VALTRS[0]);
     int32_t assoc = locapv_fn(D_A(TRATL), &YPTR);
     DESCR_t yptr2;
     if (assoc) {
@@ -138,7 +138,7 @@ RESULT_t STOPTR_fn(void)
         /* FUNCTION: stop CALL trace, then RETURN trace.
          * Oracle calls STOPTP for CALL first; STOPTP FAILs if not found → abort. */
         for (int i = 0; i < 2; i++) {
-            DESCR_t lp = (i == 0) ? TFNCLP : TFNRLP;
+            DESCR_t lp = (i == 0) ? TFNCLP[0] : TFNRLP[0];
             DESCR_t yptr2b; GETDC_B(yptr2b, lp, 0);
             int32_t found = locapt_fn(D_A(yptr2b), &XPTR);
             if (!found) return FAIL; /* STOPTP: LOCAPT YPTR,YPTR,XPTR,FAIL */
@@ -216,7 +216,7 @@ static RESULT_t fentr_common(void)
     APDSP_fn(&PROTSP, &TRCLSP);          /* " Call of " */
     LOCSP_fn(&XSP, &WPTR);
     D_A(TCL) = XSP.l;
-    if (D_A(TCL) >= BUFLEN) { XCALL_OUTPUT(D_A(OUTPUT), "***PRINT REQUEST TOO LONG***\n"); return OK; } /* ACOMPC >= */
+    if (D_A(TCL) >= BUFLEN) { XCALL_OUTPUT(D_A(OUTPUT[0]), "***PRINT REQUEST TOO LONG***\n"); return OK; } /* ACOMPC >= */
     APDSP_fn(&PROTSP, &XSP);
     APDSP_fn(&PROTSP, &LPRNSP);
     SETAC(WCL, 0);
@@ -231,7 +231,7 @@ static RESULT_t fentr_common(void)
             LOCSP_fn(&vsp, &ZPTR);
             D_A(SCL) = vsp.l;
             SUM(TCL, TCL, SCL);
-            if (D_A(TCL) >= BUFLEN) { XCALL_OUTPUT(D_A(OUTPUT), "***PRINT REQUEST TOO LONG***\n"); return OK; }
+            if (D_A(TCL) >= BUFLEN) { XCALL_OUTPUT(D_A(OUTPUT[0]), "***PRINT REQUEST TOO LONG***\n"); return OK; }
             APDSP_fn(&PROTSP, &QTSP);
             APDSP_fn(&PROTSP, &vsp);
             APDSP_fn(&PROTSP, &QTSP);
@@ -244,7 +244,7 @@ static RESULT_t fentr_common(void)
         }
         D_A(SCL) = vsp.l;
         SUM(TCL, TCL, SCL);
-        if (D_A(TCL) >= BUFLEN) { XCALL_OUTPUT(D_A(OUTPUT), "***PRINT REQUEST TOO LONG***\n"); return OK; }
+        if (D_A(TCL) >= BUFLEN) { XCALL_OUTPUT(D_A(OUTPUT[0]), "***PRINT REQUEST TOO LONG***\n"); return OK; }
         APDSP_fn(&PROTSP, &vsp);
         APDSP_fn(&PROTSP, &CMASP);
     }
@@ -433,7 +433,7 @@ append_value:
     trace_print(&TRACSP);
     return OK;
 vxovr:
-    XCALL_OUTPUT(D_A(OUTPUT), "***PRINT REQUEST TOO LONG***\n");
+    XCALL_OUTPUT(D_A(OUTPUT[0]), "***PRINT REQUEST TOO LONG***\n");
     return OK;
 }
 

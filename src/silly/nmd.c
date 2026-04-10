@@ -98,7 +98,7 @@ nmd4:
             }
         }
         if (ACOMPC(TRAPCL, 0) > 0) { /* NMD3: trace if TRAPCL > 0 */
-            int32_t assoc = locapt_fn(D_A(TVALL), &TVAL);
+            int32_t assoc = locapt_fn(D_A(TVALL[0]), &TVAL);
             if (assoc) {
                 DESCR_t save_TCL = TCL, save_NAMICL = NAMICL,
                         save_NHEDCL = NHEDCL;

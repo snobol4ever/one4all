@@ -176,7 +176,7 @@ asgnvv:
         }
     }
     if (ACOMPC(TRAPCL, 0) <= 0) { /* ASGN1: ACOMPC TRAPCL,0,,RTYPTR — skip trace if <=0 [PLB32] */
-        int32_t assoc = locapt_fn(D_A(TVALL), &XPTR);
+        int32_t assoc = locapt_fn(D_A(TVALL[0]), &XPTR);
         if (assoc) {
             DESCR_t save_yptr = YPTR;
             SETAC(ATPTR, assoc);

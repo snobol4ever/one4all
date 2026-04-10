@@ -122,7 +122,7 @@ RESULT_t GOTL_fn(void)
         if (!VEQLC(XPTR, S)) { intr4(); return FAIL; }
     }
     if (D_A(TRAPCL) > 0) { /* Label trace */
-        int32_t assoc = locapt_fn(D_A(TLABL), &XPTR);
+        int32_t assoc = locapt_fn(D_A(TLABL[0]), &XPTR);
         if (assoc) {
             DESCR_t save_x = XPTR;
             SETAC(ATPTR, assoc);
@@ -206,10 +206,10 @@ init_done:
     if (D_A(TRAPCL) > 0) { /* &TRACE checks */
         int32_t assoc;
         if (chk_break(0)) { /* XCALLC chk_break,(0),INIT1 [PLB113] */
-            assoc = locapt_fn(D_A(TKEYL), &STNOKY);
+            assoc = locapt_fn(D_A(TKEYL[0]), &STNOKY);
             if (assoc) { SETAC(ATPTR, assoc); TRPHND_fn(ATPTR); }
         }
-        assoc = locapt_fn(D_A(TKEYL), &STCTKY);
+        assoc = locapt_fn(D_A(TKEYL[0]), &STCTKY);
         if (assoc) { SETAC(ATPTR, assoc); TRPHND_fn(ATPTR); }
     }
     return OK; /* RTNUL3 */
@@ -245,7 +245,7 @@ RESULT_t INTERP_fn(void)
         MOVD(OCICL, FRTNCL);
         INCRA(FALCL, 1); /* &STFCOUNT */
         if (D_A(TRAPCL) > 0) {
-            int32_t assoc = locapt_fn(D_A(TKEYL), &FALKY);
+            int32_t assoc = locapt_fn(D_A(TKEYL[0]), &FALKY);
             if (assoc) { SETAC(ATPTR, assoc); TRPHND_fn(ATPTR); }
         }
         /* continue loop (BRANCH INTRP0) */

@@ -28,7 +28,7 @@ extern DESCR_t GCTTTL;
 /* TRPHND_fn: DESCR_t (by value) — declared in trace.h */
 /* MSGNO: const char*[] — declared in data.h */
 extern int32_t  locapt_fn(int32_t tbl, DESCR_t *key); /* assoc lookup   */
-extern DESCR_t  TKEYL;   /* keyword trace list                           */
+extern DESCR_t  TKEYL[2]; /* keyword trace list head+default             */
 extern DESCR_t  ERRTKY;  /* error keyword descriptor                     */
 extern DESCR_t  UINTCL;  /* user interrupt condition flag                */
 
@@ -80,7 +80,7 @@ void FTERST_fn(void)
     }
     /* Keyword trace if &TRACE set */
     if (D_A(TRAPCL) > 0) {
-        int32_t atptr = locapt_fn(D_A(TKEYL), &ERRTKY);
+        int32_t atptr = locapt_fn(D_A(TKEYL[0]), &ERRTKY);
         if (atptr) {
             DESCR_t saved_scercl = SCERCL;
             DESCR_t atd; SETAC(atd, atptr);

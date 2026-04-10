@@ -267,13 +267,14 @@ extern DESCR_t   R1MCL;    /* real constant 1e6  [PLB107]                  */
 
 /* ── I/O units ───────────────────────────────────────────────────────── */
 
-extern DESCR_t INPUT;     /* INPUT  unit descriptor (UNITI)               */
-extern DESCR_t OUTPUT;    /* OUTPUT unit descriptor (UNITO)               */
-extern DESCR_t PUNCH;     /* PUNCH  unit descriptor (UNITP)               */
-extern DESCR_t TERMIN;    /* TERMINAL input unit (UNITT) [PLB36]          */
-extern DESCR_t UNIT;      /* current active input unit                    */
-extern DESCR_t DFLSIZ;    /* default input size = VLRECL [PLB129]         */
-extern DESCR_t IOKEY;     /* I/O error key                                */
+extern DESCR_t INPUT;       /* INPUT  unit descriptor (UNITI) — 1 slot   */
+extern DESCR_t OUTPUT[2];   /* OUTPUT unit + format ptr (UNITO) — 2 slots */
+extern DESCR_t PUNCH;       /* PUNCH  unit descriptor (UNITP)             */
+extern DESCR_t PCHFST;      /* PUNCH format string ptr (CRDFSP)           */
+extern DESCR_t TERMIN[2];   /* TERMINAL unit + length (UNITT) — 2 slots  */
+extern DESCR_t UNIT;        /* current active input unit                   */
+extern DESCR_t DFLSIZ;      /* default input size = VLRECL [PLB129]       */
+extern DESCR_t IOKEY;       /* I/O error key                               */
 
 /* ── Pair lists ──────────────────────────────────────────────────────── */
 
@@ -282,9 +283,10 @@ extern DESCR_t KNLIST;    /* writable keyword pair list (KNLIST header)   */
 extern DESCR_t KVLIST;    /* protected keyword pair list (KVLIST header)  */
 extern DESCR_t INLIST;    /* input association pair list [PLB36]          */
 extern DESCR_t OTLIST;    /* output association pair list                 */
-extern DESCR_t OTSATL;    /* output block list                            */
-extern DESCR_t INSATL;    /* input block list                             */
-extern DESCR_t TRLIST;    /* trace type pair list                         */
+extern DESCR_t OTSATL;    /* output block list (self-ref TTL header)      */
+extern DESCR_t INSATL;    /* input block list  (self-ref TTL header)      */
+extern DESCR_t TRLIST[2]; /* trace type pair list (header + TVALL slot)  */
+extern DESCR_t VALTRS[3]; /* VALUE/LABEL/TRLASP trace string ptrs        */
 /* Scan function-code descriptors (v311.sil §24 — flag=0, v=arity, a=opcode)  */
 extern DESCR_t SUCFFN;    /* SUCCEED scan fn (opcode XSUCF=36)            */
 extern DESCR_t SALFFN;    /* SALF scan fn   (opcode XSALF=28)             */
@@ -364,7 +366,8 @@ extern DESCR_t BRXFCL; extern DESCR_t CHRCL;   extern DESCR_t CMACL;
 extern DESCR_t CONCL;  extern DESCR_t DNMECL;  extern DESCR_t DNMICL;
 extern DESCR_t ENDCL;  extern DESCR_t ENMECL;  extern DESCR_t ENMICL;
 extern DESCR_t ERORCL; extern DESCR_t FNCFCL;  extern DESCR_t LITFN;
-extern DESCR_t LIT1CL; extern DESCR_t NMECL;   extern DESCR_t NNYCCL;
+extern DESCR_t LIT1CL[4]; extern DESCR_t NMECL;   extern DESCR_t NNYCCL;
+extern DESCR_t ATRHD;  extern DESCR_t ATPRCL[3]; extern DESCR_t ATEXCL;
 extern DESCR_t SCONCL; extern DESCR_t SCOKCL;
 /* SALICL, STARCCL, DSARCL, FNCECL, SUCCCL: no oracle counterpart — removed */
 extern DESCR_t ABORCL;  extern DESCR_t CONTCL;
@@ -446,8 +449,10 @@ extern SPEC_t  IOSP;     /* I/O string specifier                         */
 extern DESCR_t DFLFST;   /* default output format                        */
 /* VLRECL already #define'd in types.h as 0 */
 extern DESCR_t ISPPTR;   /* pointer-to-IOSP scratch                      */
-#define UNITI   1        /* default input  unit number                   */
-#define UNITO   2        /* default output unit number                   */
+#define UNITI   5        /* INPUT  unit number (stdin)                   */
+#define UNITO   6        /* OUTPUT unit number (stdout)                  */
+#define UNITP   7        /* PUNCH/diagnostic unit number (stderr)        */
+#define UNITT   8        /* TERMINAL input unit number                   */
 
 /* ── M18a/b/c/d: compiler globals ───────────────────────────────── */
 /* M18b: forwrd */
@@ -532,10 +537,10 @@ extern DESCR_t FGOND;    /* failure goto node (v311.sil 11072)           */
 extern DESCR_t SRNCL;    /* success return descriptor (v311.sil 11058)   */
 extern DESCR_t GOTOCL;   /* GOTO function DESCR FNC (v311.sil 10784)     */
 extern DESCR_t TRATL;    /* trace attribute list head                    */
-extern DESCR_t VALTRS;   /* VALUE trace type string descriptor           */
+/* VALTRS: see pair lists section above (VALTRS[3]) */
 extern DESCR_t FUNTCL;   /* FUNCTION trace type constant                 */
-extern DESCR_t TFNCLP;   /* CALL trace list pair-list pointer            */
-extern DESCR_t TFNRLP;   /* RETURN trace list pair-list pointer          */
+extern DESCR_t TFNCLP[2];  /* CALL trace list pair-list (TFENTL/TRFRSP)   */
+extern DESCR_t TFNRLP[14]; /* RETURN+etc trace list pairs [PLB115]        */
 extern SPEC_t  TRACSP;   /* value-trace output buffer specifier          */
 extern SPEC_t  COLSP;    /* ":" specifier                                */
 extern SPEC_t  TRSTSP;   /* " Trace at statement " specifier            */

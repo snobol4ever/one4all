@@ -114,7 +114,7 @@ RESULT_t CMPILE_fn(void)
                 if (!nb) return FAIL;
                 SETAC(XCL, nb);
                 *((DESCR_t *)A2P(D_A(CMBSCL)))            = GOTGCL;
-                *((DESCR_t *)A2P(D_A(CMBSCL) + DESCR))   = LIT1CL;
+                *((DESCR_t *)A2P(D_A(CMBSCL) + DESCR))   = LIT1CL[0];
                 *((DESCR_t *)A2P(D_A(CMBSCL) + 2*DESCR)) = XCL;
                 MOVD(CMBSCL, XCL);
                 SUM(OCLIM, CMBSCL, CODELT); DECRA(OCLIM, 7*DESCR);

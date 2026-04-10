@@ -145,12 +145,19 @@ DESCR_t R1MCL    = {.a={.f=1.0e6f},.f=0, .v=R}; /* 1e6 [PLB107]        */
 
 /* ── I/O units ───────────────────────────────────────────────────────── */
 
-DESCR_t INPUT  = D(0, 0, I);   /* INPUT  unit (UNITI — set in BEGIN)    */
-DESCR_t OUTPUT = D(0, 0, I);   /* OUTPUT unit (UNITO — set in BEGIN)    */
-DESCR_t PUNCH  = D(0, 0, I);   /* PUNCH  unit (UNITP — set in BEGIN)    */
-DESCR_t TERMIN = D(0, 0, I);   /* TERMINAL unit [PLB36]                 */
+/* SIL OUTPUT: DESCR UNITO,0,I / DESCR OUTPSP,0,0 — 2-slot block */
+DESCR_t OUTPUT[2] = { D(UNITO, 0, I), D0 };  /* [1].a=OUTPSP set in data_init */
+/* SIL PUNCH: DESCR UNITP,0,I — 1-slot */
+DESCR_t PUNCH  = D(UNITP, 0, I);
+/* SIL PCHFST: DESCR CRDFSP,0,0 — 1-slot, .a set in data_init */
+DESCR_t PCHFST = D0;
+/* SIL INPUT: DESCR UNITI,0,I — 1-slot */
+DESCR_t INPUT  = D(UNITI, 0, I);
+/* SIL DFLSIZ: DESCR VLRECL,0,I — 1-slot; VLRECL=0 so .a=0 is correct */
+DESCR_t DFLSIZ = D(VLRECL, 0, I);
+/* SIL TERMIN: DESCR UNITT,0,I / DESCR VLRECL,0,I — 2-slot block */
+DESCR_t TERMIN[2] = { D(UNITT, 0, I), D(VLRECL, 0, I) };
 DESCR_t UNIT   = D0;            /* current active unit                   */
-DESCR_t DFLSIZ = D(0, 0, I);   /* default input size = VLRECL [PLB129]  */
 DESCR_t IOKEY  = D0;
 
 /* ── Counters ────────────────────────────────────────────────────────── */
@@ -210,8 +217,20 @@ DESCR_t NODSIZ = D0;    /* NODESZ                                         */
 DESCR_t OCALIM = D0;    /* OCASIZ*DESCR                                   */
 DESCR_t ONECL  = D(1, 0, 0);
 DESCR_t TWOCL  = D(2*8, 0, B);  /* v311.sil 11149: 2*DESCR,0,B — block-size constant */
-DESCR_t OUTBLK = D0;    /* set in data_init to &OUTPUT - DESCR        */
+DESCR_t OUTBLK = D0;    /* set in data_init to &OUTPUT[0] - DESCR     */
 DESCR_t ERRBLK = D0;    /* set in data_init to &PUNCH  - DESCR        */
+/* SIL OTSATL: DESCR OTSATL,TTL+MARK,4*DESCR — output unit table header (self-ref) */
+DESCR_t OTSATL = D(0, TTL|MARK, 0); /* .a and .v set in data_init */
+/* SIL INSATL: DESCR INSATL,TTL+MARK,2*DESCR — input unit table header (self-ref) */
+DESCR_t INSATL = D(0, TTL|MARK, 0); /* .a and .v set in data_init */
+/* SIL INLIST (line 10612): DESCR INLIST,TTL+MARK,4*DESCR — input assoc list [PLB36] */
+DESCR_t INLIST = D(0, TTL|MARK, 0); /* .a and .v set in data_init */
+/* SIL OTLIST (line 10617): DESCR OTLIST,TTL+MARK,4*DESCR — output assoc list */
+DESCR_t OTLIST = D(0, TTL|MARK, 0); /* .a and .v set in data_init */
+/* SIL TRLIST: DESCR TRLIST,TTL+MARK,20*DESCR / DESCR TVALL,0,0 — trace type list */
+DESCR_t TRLIST[2] = { D(0, TTL|MARK, 0), D0 }; /* [0] self-ref header, [0].a+.v and [1].a in data_init */
+/* SIL VALTRS: DESCR VALSP,0,0 / DESCR TLABL,0,0 / DESCR TRLASP,0,0 — 3 slots */
+DESCR_t VALTRS[3] = { D0, D0, D0 }; /* all .a fields set in data_init */
 DESCR_t SIZLMT = D(0x7fffffff, 0, 0);
 /* SNODSZ: defined in platform.c */
 DESCR_t STARSZ = D0;    /* 11*DESCR                                       */
@@ -261,7 +280,19 @@ DESCR_t DNMECL = D(0, FNC, 2);   DESCR_t DNMICL = D(0, FNC, 2);
 DESCR_t ENDCL  = D(0, FNC, 0);   DESCR_t ENMECL = D(0, FNC, 3);
 DESCR_t ENMICL = D(0, FNC, 3);   DESCR_t ERORCL = D(0, FNC, 1);
 DESCR_t FNCFCL = D(0, FNC, 2);   DESCR_t LITFN  = D(0, 0, 1);
-DESCR_t LIT1CL = D(0, FNC, 1);   DESCR_t NMECL  = D(0, FNC, 2);  /* SIL: DESCR NMEFN,FNC,2 */
+/* LIT1CL: 4-slot block per SIL oracle (E3.7.1 / V3.7):
+ *   [0] DESCR LITFN,FNC,1   — literal fn descriptor
+ *   [1] DESCR 0,0,0         — variable to be traced
+ *   [2] DESCR LITFN,FNC,1   — literal fn descriptor (2nd)
+ *   [3] DESCR 0,0,0         — tag supplied for trace
+ * .a fields [0] and [2] set to P2A(&LITFN) in data_init */
+DESCR_t LIT1CL[4] = {
+    D(0, FNC, 1),    /* [0] literal fn descriptor — .a filled in data_init */
+    D0,              /* [1] variable to be traced */
+    D(0, FNC, 1),    /* [2] literal fn descriptor — .a filled in data_init */
+    D0               /* [3] tag supplied for trace */
+};
+DESCR_t NMECL  = D(0, FNC, 2);  /* SIL: DESCR NMEFN,FNC,2 */
 /* NNYCCL: defined in platform.c */ DESCR_t SCONCL = D(0, FNC, 2);
 DESCR_t SCOKCL = D(0, FNC, 2);   /* SALICL: no oracle counterpart — removed */
 /* STARCCL, DSARCL: no oracle counterpart — removed */
@@ -282,6 +313,41 @@ DESCR_t TRCBLK[6] = {
     D(0, FNC, 1),               /* [4] LIT1CL — literal fn             */
     D0                          /* [5] tag for trace                    */
 };
+
+/* ── TFNCLP — CALL trace pair-list (2 slots per SIL line 10638) ─── */
+/* SIL: TFNCLP DESCR TFENTL,0,0 / DESCR TRFRSP,0,0
+ * .a fields filled in data_init (pointer values) */
+DESCR_t TFNCLP[2] = { D0, D0 };
+
+/* ── TFNRLP — RETURN/KEYWORD/VALUE/LABEL trace pair-list (14 slots) */
+/* SIL lines 10640–10655 [PLB115]: pairs of (trace-list-head, string-literal)
+ * for RETURN, KEYWORD, VALUE, LABEL, CALL, RETURN, KEYWORD traces
+ * .a fields all filled in data_init */
+DESCR_t TFNRLP[14] = {
+    D0, D0,   /* [0-1]  TFEXTL / RETSP   — RETURN  */
+    D0, D0,   /* [2-3]  TKEYL  / TRKYSP  — KEYWORD */
+    D0, D0,   /* [4-5]  TVALL  / VEESP   — VALUE 'V' */
+    D0, D0,   /* [6-7]  TLABL  / LSP     — LABEL 'L' */
+    D0, D0,   /* [8-9]  TFENTL / CSP     — CALL  'C' */
+    D0, D0,   /* [10-11] TFEXTL / RSP    — RETURN 'R' */
+    D0, D0    /* [12-13] TKEYL / KSP     — KEYWORD 'K' */
+};
+
+/* ── ATRHD / ATPRCL / ATEXCL — TABLE→ARRAY conversion skeleton ──── */
+/* SIL lines 10663–10670:
+ *   ATRHD  DESCR ATPRCL-DESCR,0,0   — array header (A = ATPRCL-DESCR offset)
+ *   ATPRCL DESCR 0,0,0              — prototype slot [0]
+ *          DESCR 2,0,0              — dimensionality [1]
+ *          DESCR 1,0,2              — 1:2 second dimension [2]
+ *   ATEXCL DESCR 1,0,0              — 1:n first dimension
+ * .a of ATRHD set in data_init */
+DESCR_t ATRHD  = D0;           /* .a = P2A(ATPRCL) - DESCR — set in data_init */
+DESCR_t ATPRCL[3] = {
+    D0,              /* [0] prototype */
+    D(2, 0, 0),      /* [1] dimensionality = 2 */
+    D(1, 0, 2)       /* [2] 1:2 second dimension */
+};
+DESCR_t ATEXCL = D(1, 0, 0);   /* 1:n first dimension */
 
 /* ── Primitive patterns (arena offsets — filled by data_init) ────── */
 
@@ -554,11 +620,47 @@ void data_init(void)
     STARSZ.a.i = (int_t)(11 * DESCR); STARSZ.v = P;
     COMDCT.a.i = (int_t)(15 * DESCR);
     COMREG.a.i = P2A(&ELEMND);   /* SIL: COMREG DESCR ELEMND,0,0 — A=ELEMND */
+    TRCBLK[0].a.i = P2A(TRCBLK); /* SIL: TRCBLK[0].a = self (block header self-ref) */
     TRSKEL.a.i = P2A(TRCBLK);    /* SIL: TRSKEL DESCR TRCBLK,0,0 — A=TRCBLK */
+    /* LIT1CL: .a slots [0] and [2] = P2A(&LITFN) */
+    LIT1CL[0].a.i = P2A(&LITFN);
+    LIT1CL[2].a.i = P2A(&LITFN);
+    /* TFNCLP: [0].a=TFENTL, [1].a=TRFRSP */
+    TFNCLP[0].a.i = P2A(TFENTL);
+    TFNCLP[1].a.i = P2A(TRFRSP);
+    /* TFNRLP: 7 pairs per SIL [PLB115] */
+    TFNRLP[0].a.i  = P2A(TFEXTL);  TFNRLP[1].a.i  = P2A(RETSP);
+    TFNRLP[2].a.i  = P2A(TKEYL);   TFNRLP[3].a.i  = P2A(TRKYSP);
+    TFNRLP[4].a.i  = P2A(TVALL);   TFNRLP[5].a.i  = P2A(VEESP);
+    TFNRLP[6].a.i  = P2A(TLABL);   TFNRLP[7].a.i  = P2A(LSP);
+    TFNRLP[8].a.i  = P2A(TFENTL);  TFNRLP[9].a.i  = P2A(CSP);
+    TFNRLP[10].a.i = P2A(TFEXTL);  TFNRLP[11].a.i = P2A(RSP);
+    TFNRLP[12].a.i = P2A(TKEYL);   TFNRLP[13].a.i = P2A(KSP);
+    /* ATRHD: .a = P2A(ATPRCL) - DESCR (points one slot before prototype) */
+    ATRHD.a.i = P2A(ATPRCL) - DESCR;
     SIZLMT.a.i = (int_t)(0x7fffffff);
     /* OBEND and OBPTR set by arena_init() — OBLIST now lives in arena */
-    OUTBLK.a.i = P2A(&OUTPUT) - DESCR; /* OUTBLK = OUTPUT - DESCR  (pointer arithmetic on unit DESCRs) */
+    OUTBLK.a.i = P2A(OUTPUT) - DESCR;  /* OUTPUT is now array; OUTBLK = &OUTPUT[0] - DESCR */
     ERRBLK.a.i = P2A(&PUNCH) - DESCR;
+    /* OTSATL: self-ref table header, body = 4*DESCR */
+    OTSATL.a.i = P2A(&OTSATL); OTSATL.v = (int_t)(4 * DESCR);
+    /* INSATL: self-ref table header, body = 2*DESCR */
+    INSATL.a.i = P2A(&INSATL); INSATL.v = (int_t)(2 * DESCR);
+    /* INLIST: self-ref table header, body = 4*DESCR [PLB36] */
+    INLIST.a.i = P2A(&INLIST); INLIST.v = (int_t)(4 * DESCR);
+    /* OTLIST: self-ref table header, body = 4*DESCR */
+    OTLIST.a.i = P2A(&OTLIST); OTLIST.v = (int_t)(4 * DESCR);
+    /* OUTPUT[1].a = OUTPSP string pointer */
+    OUTPUT[1].a.i = P2A(OUTPSP);
+    /* PCHFST.a = CRDFSP string pointer */
+    PCHFST.a.i = P2A(CRDFSP);
+    /* TRLIST: self-ref header + TVALL slot */
+    TRLIST[0].a.i = P2A(TRLIST); TRLIST[0].v = (int_t)(20 * DESCR);
+    TRLIST[1].a.i = P2A(TVALL);
+    /* VALTRS: VALSP / TLABL / TRLASP */
+    VALTRS[0].a.i = P2A(VALSP);
+    VALTRS[1].a.i = P2A(TLABL);
+    VALTRS[2].a.i = P2A(TRLASP);
     OPTBL.a.i  = P2A(&OPTBL);          /* OPTBL: self-referential table header (oracle: A=OPTBL) */
     OPTBL.f    = TTL|MARK;              /* oracle: F=TTL+MARK */
     OPTBL.v    = 0;                     /* oracle V=OPTBND-OPTBL-DESCR; Silly: non-contiguous, use 0 */
