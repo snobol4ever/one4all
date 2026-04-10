@@ -1316,10 +1316,10 @@ int exec_stmt(const char  *subj_name,
     int         subj_len = 0;
 
     if (subj_var) {
-        char *sv = VARVAL_fn(*subj_var);
-        if (sv) {
-            subj_str = sv;
-            subj_len = (int)strlen(sv);
+        DESCR_t sv_d = VARVAL_d_fn(*subj_var);
+        if (sv_d.v == DT_S || sv_d.v == DT_SNUL) {
+            subj_str = sv_d.s ? sv_d.s : "";
+            subj_len = (int)descr_slen(sv_d);  /* binary-safe: honours .slen for embedded-NUL strings */
         }
     }
 
