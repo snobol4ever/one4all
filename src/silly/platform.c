@@ -686,7 +686,7 @@ DESCR_t STNOKY = {.a={.i=0},.f=TTL|MARK,.v=0};
 DESCR_t FALKY  = {.a={.i=0},.f=TTL|MARK,.v=0};
 
 /* Pattern-valued globals */
-DESCR_t PATND  = {.a={.i=0},.f=0,.v=P};
+DESCR_t PATND  = {.a={.i=0},.f=0,.v=0};   /* SIL: DESCR 0,0,0 — node type set at runtime */
 DESCR_t FNCPL  = {.a={.i=0},.f=FNC,.v=0};
 
 /* Trace data */
@@ -699,7 +699,7 @@ DESCR_t TRCBLK2[6];   /* working copy */
 
 /* DEFCL / FUNTCL */
 DESCR_t DEFCL  = {.a={.i=0},.f=FNC,.v=0};
-DESCR_t FUNTCL = {.a={.i=0},.f=FNC,.v=0};
+DESCR_t FUNTCL = {.a={.i=0},.f=0,.v=0};   /* SIL: DESCR 0,0,0 — zero init, filled at runtime */
 DESCR_t FRNCL  = {.a={.i=0},.f=0,.v=0};
 /* GOBRCL in data.c */
 DESCR_t GOGOCL = {.a={.i=0},.f=0,.v=0};
@@ -742,23 +742,27 @@ DESCR_t XLNNOC = {.a={.i=0},.f=0,.v=0};
 DESCR_t XLSFLN = {.a={.i=0},.f=0,.v=0};
 DESCR_t XLSLNC = {.a={.i=0},.f=0,.v=0};
 DESCR_t XITNDT = {.a={.i=0},.f=0,.v=0};
-DESCR_t XITPTR = {.a={.i=0},.f=0,.v=0};
+DESCR_t XITPTR = {.a={.i=0},.f=0,.v=S};   /* SIL: DESCR 0,0,S — string-type pointer, A=0=null */
 DESCR_t XFRTNC = {.a={.i=0},.f=0,.v=0};
 DESCR_t XERRTY = {.a={.i=0},.f=0,.v=0};
 
 /* INATLM / OTSAT etc. (I/O block lists) */
-DESCR_t INATL  = {.a={.i=0},.f=TTL|MARK,.v=0};
-DESCR_t INSATL = {.a={.i=0},.f=TTL|MARK,.v=0};
-DESCR_t OTSATL = {.a={.i=0},.f=TTL|MARK,.v=0};
-DESCR_t OUTATL = {.a={.i=0},.f=TTL|MARK,.v=0};
-DESCR_t KNATL  = {.a={.i=0},.f=TTL|MARK,.v=0};
-DESCR_t KVATL  = {.a={.i=0},.f=TTL|MARK,.v=0};
-DESCR_t DTATL  = {.a={.i=0},.f=TTL|MARK,.v=0};
+DESCR_t INATL  = {.a={.i=0},.f=0,.v=0};         /* SIL: DESCR INLIST,0,0  — A set at runtime */
+DESCR_t INSATL = {.a={.i=0},.f=TTL|MARK,.v=0};  /* SIL: DESCR INSATL,TTL+MARK,2*DESCR */
+DESCR_t OTSATL = {.a={.i=0},.f=TTL|MARK,.v=0};  /* SIL: DESCR OTSATL,TTL+MARK,4*DESCR */
+DESCR_t OUTATL = {.a={.i=0},.f=0,.v=0};         /* SIL: DESCR OTLIST,0,0  — A set at runtime */
+DESCR_t KNATL  = {.a={.i=0},.f=0,.v=0};          /* SIL: DESCR KNLIST,0,0 */
+DESCR_t KVATL  = {.a={.i=0},.f=0,.v=0};          /* SIL: DESCR KVLIST,0,0 */
+DESCR_t DTATL  = {.a={.i=0},.f=0,.v=0};          /* SIL: DESCR DTLIST,0,0 */
 DESCR_t DTLIST = {.a={.i=0},.f=TTL|MARK,.v=0};
 DESCR_t TRLVLIST = {.a={.i=0},.f=0,.v=0};
 DESCR_t TKRL   = {.a={.i=0},.f=0,.v=0};
 DESCR_t TKEYL  = {.a={.i=0},.f=0,.v=0};
 DESCR_t TLABL  = {.a={.i=0},.f=0,.v=0};
+/* TFENTL[2]: [0]=call trace list head, [1]=default call trace fn — SIL 10952-10953 */
+DESCR_t TFENTL[2] = { {.a={.i=0},.f=0,.v=0}, {.a={.i=0},.f=FNC,.v=2} };
+/* TFEXTL[2]: [0]=return trace list head, [1]=default return trace fn — SIL 10954-10955 */
+DESCR_t TFEXTL[2] = { {.a={.i=0},.f=0,.v=0}, {.a={.i=0},.f=FNC,.v=2} };
 DESCR_t TFNCLP = {.a={.i=0},.f=0,.v=0};
 DESCR_t TFNRLP = {.a={.i=0},.f=0,.v=0};
 DESCR_t ERRMSG = {.a={.i=0},.f=0,.v=0};

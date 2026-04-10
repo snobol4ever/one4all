@@ -323,8 +323,8 @@ extern DESCR_t INATL;     /* input attribute list                         */
 extern DESCR_t OUTATL;    /* output attribute list                        */
 extern DESCR_t TVALL;     /* value trace list head                        */
 extern DESCR_t TLABL;     /* label trace list head                        */
-extern DESCR_t TFENTL;    /* call trace list head                         */
-extern DESCR_t TFEXTL;    /* return trace list head                       */
+extern DESCR_t TFENTL[2]; /* call trace list head+default — SIL 10952-10953 */
+extern DESCR_t TFEXTL[2]; /* return trace list head+default — SIL 10954-10955 */
 extern DESCR_t TKEYL;     /* keyword trace list head                      */
 extern DESCR_t ATPTR;     /* attribute trace pointer                      */
 
