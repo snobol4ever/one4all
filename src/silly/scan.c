@@ -1150,17 +1150,24 @@ static void do_ENME(void)
 }
 
 /*====================================================================================================================*/
+/* enme3_tail — writes PDL slots 2+3, sets LENFCL=1, GOTO_SCOK.
+ * Caller must have already written slot1 (DNMECL or DNMICL). */
+static void enme3_tail(void)
+{
+    DESCR_t cv; sp_getlg(&cv, TXSP);
+    MOVV(cv, YCL);
+    PUTDC_BLK(PDLPTR, 2*DESCR, cv);
+    PUTDC_BLK(PDLPTR, 3*DESCR, LENFCL);
+    SETAC(LENFCL, 1);
+    GOTO_SCOK;
+}
+
 static void do_ENME3(void)
 {
     INCRA(PDLPTR, 3*DESCR);
     if (D_A(PDLPTR) > D_A(PDLEND)) scan_error(SCAN_ERR_ILLEGAL_TYPE); /* ACOMP > not >= */
-    { DESCR_t cv; sp_getlg(&cv, TXSP);
-      MOVV(cv, YCL);
-      PUTDC_BLK(PDLPTR, DESCR,   DNMECL);  /* SC-30: slot 1 */
-      PUTDC_BLK(PDLPTR, 2*DESCR, cv);
-      PUTDC_BLK(PDLPTR, 3*DESCR, LENFCL); }
-    SETAC(LENFCL, 1);
-    GOTO_SCOK;
+    PUTDC_BLK(PDLPTR, DESCR, DNMECL);  /* slot 1 for X . Y */
+    enme3_tail();
 }
 
 /*====================================================================================================================*/
@@ -1208,11 +1215,15 @@ enmi3:
         int32_t a = locapv_fn(D_A(OUTATL), &YPTR);
         if (a) { DESCR_t zd; GETDC_BLK(zd, YPTR, DESCR); PUTOUT_fn(zd, VVAL); }
     }
-    if (ACOMPC(TRAPCL, 0) <= 0) {
+    if (ACOMPC(TRAPCL, 0) > 0) { /* ACOMPC TRAPCL,0,,ENMI2,ENMI2: TRAPCL>0 → trace */
         int32_t a = locapt_fn(D_A(TVALL), &YPTR);
         if (a) { SETAC(ATPTR, a); TRPHND_fn(ATPTR); }
     }
-    do_ENME3();
+    /* ENMI2: INCRA PDLPTR,3*DESCR; slot1=DNMICL; then ENME3 tail (slots 2+3) */
+    INCRA(PDLPTR, 3*DESCR);
+    if (D_A(PDLPTR) > D_A(PDLEND)) scan_error(SCAN_ERR_ILLEGAL_TYPE);
+    PUTDC_BLK(PDLPTR, DESCR, DNMICL);  /* ENMI2: slot 1 = DNMICL (not DNMECL) */
+    enme3_tail();
 }
 
 /*====================================================================================================================*/
