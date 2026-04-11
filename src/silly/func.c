@@ -493,8 +493,8 @@ L_DMPA:
     LOCSP_fn(&YSP, &yptr);
 
     /* GETLG YCL,YSP; ACOMPC YCL,BUFLEN,DMPOVR,DMPOVR */
-    { DESCR_t ycl; ycl.a.i = YSP.l; ycl.f = 0; ycl.v = 0;
-      if (ycl.a.i >= BUFLEN) goto L_DMPOVR; }
+    DESCR_t ycl; ycl.a.i = YSP.l; ycl.f = 0; ycl.v = 0; /* YCL = name len */
+    if (ycl.a.i >= BUFLEN) goto L_DMPOVR;
 
     APDSP_fn(&DMPSP, &YSP);                    /* APDSP DMPSP,YSP */
     APDSP_fn(&DMPSP, &BLEQSP);                 /* APDSP DMPSP,BLEQSP */
@@ -508,11 +508,9 @@ L_DMPA:
       else     YSP.l = 0; }
 
 L_DMPX: {
-    DESCR_t xcl, ycl2;
-    xcl.a.i = YSP.l; xcl.f = 0; xcl.v = 0;   /* GETLG XCL,YSP */
-    /* YCL is already set from above — but regenerate from DMPSP */
-    ycl2.a.i = DMPSP.l + xcl.a.i;             /* SUM YCL,YCL,XCL */
-    if (ycl2.a.i > BUFLEN) goto L_DMPOVR;     /* ACOMPC YCL,BUFLEN,DMPOVR */
+    DESCR_t xcl; xcl.a.i = YSP.l; xcl.f = 0; xcl.v = 0; /* GETLG XCL,YSP */
+    ycl.a.i += xcl.a.i;                        /* SUM YCL,YCL,XCL — running total */
+    if (ycl.a.i > BUFLEN) goto L_DMPOVR;       /* ACOMPC YCL,BUFLEN,DMPOVR */
     APDSP_fn(&DMPSP, &YSP);                    /* APDSP DMPSP,YSP */
     /* VEQLC XPTR,T,DMPRT — table? */
     if (XPTR.v != T) goto L_DMPRT;
@@ -529,10 +527,9 @@ L_DMPRT:
 L_DMPV: {
     SPEC_t ysp2;
     LOCSP_fn(&ysp2, &XPTR);                    /* LOCSP YSP,XPTR */
-    DESCR_t xcl, ycl2;
-    xcl.a.i = ysp2.l;
-    ycl2.a.i = DMPSP.l + xcl.a.i;
-    if (ycl2.a.i > BUFLEN) goto L_DMPOVR;
+    DESCR_t xcl; xcl.a.i = ysp2.l; xcl.f = 0; xcl.v = 0;
+    ycl.a.i += xcl.a.i;                        /* SUM YCL,YCL,XCL — running total */
+    if (ycl.a.i > BUFLEN) goto L_DMPOVR;
     APDSP_fn(&DMPSP, &QTSP);                   /* APDSP DMPSP,QTSP */
     APDSP_fn(&DMPSP, &ysp2);                   /* APDSP DMPSP,YSP */
     APDSP_fn(&DMPSP, &QTSP);                   /* APDSP DMPSP,QTSP */
