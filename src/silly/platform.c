@@ -1573,8 +1573,9 @@ void XCALL_MSTIME(DESCR_t *res)
 {
     struct timeval tv;
     gettimeofday(&tv, NULL);
-    res->f = (uint8_t)R; /* return milliseconds as real_t */
-    *(real_t *)&res->a.i = (real_t)(tv.tv_sec * 1000.0 + tv.tv_usec / 1000.0);
+    res->f = 0;           /* flags byte — cleared; TIME_fn sets .v=R via SETVC */
+    res->v = 0;           /* type code — cleared; TIME_fn sets via SETVC */
+    res->a.f = (real_t)(tv.tv_sec * 1000.0 + tv.tv_usec / 1000.0); /* milliseconds as real */
 }
 
 /*====================================================================================================================*/
@@ -1652,11 +1653,12 @@ void XCALL_REVERSE(SPEC_t *dst, SPEC_t *src)
 /*====================================================================================================================*/
 void XCALL_SBREAL(DESCR_t *res, DESCR_t a, DESCR_t b)
 {
-    real_t ra = *(real_t*)&a.a.i;
-    real_t rb = *(real_t*)&b.a.i;
+    real_t ra = a.a.f;
+    real_t rb = b.a.f;
     real_t rc = ra - rb;
-    res->f = (uint8_t)R;
-    *(real_t*)&res->a.i = rc;
+    res->f = 0;           /* flags byte — cleared; caller sets .v via SETVC */
+    res->v = 0;
+    res->a.f = rc;
 }
 /*====================================================================================================================*/
 void XCALL_RPLACE(SPEC_t *dst, SPEC_t *src, SPEC_t *rep)
