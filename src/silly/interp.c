@@ -35,6 +35,8 @@
 #include "symtab.h"   /* locapt_fn */
 #include "errors.h"   /* INTR4_fn, INTR5_fn, ARGNER_fn, etc. */
 
+extern int chk_break(int x);   /* platform.c [PLB113] */
+
 static inline int deql(DESCR_t a, DESCR_t b)
     { return D_A(a)==D_A(b) && D_V(a)==D_V(b); }
 

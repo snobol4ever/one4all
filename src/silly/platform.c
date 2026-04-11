@@ -646,7 +646,6 @@ SPEC_t  COLSP   = {0};
 SPEC_t  BLNSP   = {0};
 SPEC_t  BLEQSP  = {0};
 SPEC_t  DMPSP   = {0};  /* SIL: DMPSP — dump output buffer specifier */
-static const char FRZNSTR[] = " - FROZEN";
 SPEC_t  FRZNSP  = {0};  /* SIL: FRZNSP STRING ' - FROZEN' [PLB34] */
 SPEC_t  BLSP    = {0};
 SPEC_t  EQLSP   = {0};
@@ -2049,19 +2048,19 @@ DESCR_t ABORFN = {.a={.i=XRTNL3}, .f=0, .v=3}; /* ABORT (rtnl3)        */
 DESCR_t FAILPT[4] = {
     {.a={.i=0}, .f=TTL|MARK, .v=3*DESCR},  /* [0] hdr: self-ptr filled at init */
     {.a={.i=0}, .f=FNC,      .v=2},         /* [1] SALFFN ptr filled at init    */
-    {0}, {0}
+    {.a={.i=0},.f=0,.v=0}, {.a={.i=0},.f=0,.v=0}
 };
 /* FNCEPT — FENCE: 3*DESCR body (4 slots total)                              */
 DESCR_t FNCEPT[4] = {
     {.a={.i=0}, .f=TTL|MARK, .v=3*DESCR},  /* [0] hdr: self-ptr filled at init */
     {.a={.i=0}, .f=FNC,      .v=2},         /* [1] FNCEFN ptr filled at init    */
-    {0}, {0}
+    {.a={.i=0},.f=0,.v=0}, {.a={.i=0},.f=0,.v=0}
 };
 /* REMPT — RTAB: 4*DESCR body (5 slots total); slot[4].v=I (integer type)    */
 DESCR_t REMPT[5] = {
     {.a={.i=0}, .f=TTL|MARK, .v=4*DESCR},  /* [0] hdr: self-ptr filled at init */
     {.a={.i=0}, .f=FNC,      .v=3},         /* [1] RTBFN ptr filled at init     */
-    {0}, {0},
+    {.a={.i=0},.f=0,.v=0}, {.a={.i=0},.f=0,.v=0},
     {.a={.i=0}, .f=0,        .v=I}          /* [4] integer-type slot            */
 };
 /* STARPT — * expression: 11*DESCR body (12 slots total)                     */
@@ -2071,28 +2070,28 @@ DESCR_t STARPT[12] = {
     {.a={.i=0}, .f=FNC,      .v=3},         /* [1]  STARFN ptr at init          */
     {.a={.i=0}, .f=0,        .v=4*DESCR},   /* [2]  nval offset = 4*DESCR       */
     {.a={.i=1}, .f=0,        .v=0},          /* [3]  counter = 1                 */
-    {0},                                     /* [4]  (zero)                      */
+    {.a={.i=0},.f=0,.v=0},                                     /* [4]  (zero)                      */
     {.a={.i=0}, .f=FNC,      .v=2},         /* [5]  SCOKFN ptr at init          */
     {.a={.i=7*DESCR}, .f=0,  .v=0},          /* [6]  success-link: A=7*DESCR     */
-    {0},                                     /* [7]  (zero)                      */
+    {.a={.i=0},.f=0,.v=0},                                     /* [7]  (zero)                      */
     {.a={.i=0}, .f=FNC,      .v=3},         /* [8]  DSARFN ptr at init          */
     {.a={.i=0}, .f=0,        .v=4*DESCR},   /* [9]  nval offset = 4*DESCR       */
-    {0}, {0}                                 /* [10][11] (zero)                  */
+    {.a={.i=0},.f=0,.v=0}, {.a={.i=0},.f=0,.v=0}                                 /* [10][11] (zero)                  */
 };
 /* SUCCPT — SUCCEED: 3*DESCR body (4 slots total)                            */
 DESCR_t SUCCPT[4] = {
     {.a={.i=0}, .f=TTL|MARK, .v=3*DESCR},  /* [0] hdr: self-ptr filled at init */
     {.a={.i=0}, .f=FNC,      .v=2},         /* [1] SUCFFN ptr filled at init    */
-    {0}, {0}
+    {.a={.i=0},.f=0,.v=0}, {.a={.i=0},.f=0,.v=0}
 };
 
 /* ── Trace pair lists — 3-slot each (header + 2 zero slots) [v311.sil §24] */
 /* A-field (self-ptr) filled by init_syntab(); F=TTL|MARK; V=2*DESCR        */
-DESCR_t TVALPL[3] = { {.a={.i=0},.f=TTL|MARK,.v=2*DESCR}, {0}, {0} };
-DESCR_t TLABPL[3] = { {.a={.i=0},.f=TTL|MARK,.v=2*DESCR}, {0}, {0} };
-DESCR_t TFENPL[3] = { {.a={.i=0},.f=TTL|MARK,.v=2*DESCR}, {0}, {0} };
-DESCR_t TFEXPL[3] = { {.a={.i=0},.f=TTL|MARK,.v=2*DESCR}, {0}, {0} };
-DESCR_t TKEYPL[3] = { {.a={.i=0},.f=TTL|MARK,.v=2*DESCR}, {0}, {0} };
+DESCR_t TVALPL[3] = { {.a={.i=0},.f=TTL|MARK,.v=2*DESCR}, {.a={.i=0},.f=0,.v=0}, {.a={.i=0},.f=0,.v=0} };
+DESCR_t TLABPL[3] = { {.a={.i=0},.f=TTL|MARK,.v=2*DESCR}, {.a={.i=0},.f=0,.v=0}, {.a={.i=0},.f=0,.v=0} };
+DESCR_t TFENPL[3] = { {.a={.i=0},.f=TTL|MARK,.v=2*DESCR}, {.a={.i=0},.f=0,.v=0}, {.a={.i=0},.f=0,.v=0} };
+DESCR_t TFEXPL[3] = { {.a={.i=0},.f=TTL|MARK,.v=2*DESCR}, {.a={.i=0},.f=0,.v=0}, {.a={.i=0},.f=0,.v=0} };
+DESCR_t TKEYPL[3] = { {.a={.i=0},.f=TTL|MARK,.v=2*DESCR}, {.a={.i=0},.f=0,.v=0}, {.a={.i=0},.f=0,.v=0} };
 
 /* VALBLK — value-type discriminator: 6*DESCR body (7 slots) [v311.sil §24 line 12141] */
 /* [1].v=S (STRING=1), [3].v=N (NAME=9), [5].v=K (KEYWORD=10); evens are 0-offsets   */
@@ -2112,23 +2111,23 @@ DESCR_t BALPT[10] = {
     {.a={.i=0}, .f=TTL|MARK, .v=9*DESCR},  /* [0] hdr: self-ptr at init        */
     {.a={.i=0}, .f=FNC,      .v=2},         /* [1] SCOKFN ptr at init           */
     {.a={.i=0}, .f=0,        .v=3*DESCR},   /* [2] nval offset V=3*DESCR        */
-    {0},                                     /* [3] zero                         */
+    {.a={.i=0},.f=0,.v=0},                                     /* [3] zero                         */
     {.a={.i=0}, .f=FNC,      .v=2},         /* [4] BALFN ptr at init            */
     {.a={.i=6*DESCR}, .f=0,  .v=0},         /* [5] link A=6*DESCR               */
-    {0},                                     /* [6] zero                         */
+    {.a={.i=0},.f=0,.v=0},                                     /* [6] zero                         */
     {.a={.i=0}, .f=FNC,      .v=2},         /* [7] BALFFN ptr at init           */
     {.a={.i=6*DESCR}, .f=0,  .v=0},         /* [8] link A=6*DESCR               */
-    {0}                                      /* [9] zero                         */
+    {.a={.i=0},.f=0,.v=0}                                      /* [9] zero                         */
 };
 /* ARTAL — ARB tail: 6*DESCR body (7 slots) [v311.sil line 12072]           */
 DESCR_t ARTAL[7] = {
     {.a={.i=0}, .f=TTL|MARK, .v=6*DESCR},  /* [0] hdr: self-ptr at init        */
     {.a={.i=0}, .f=FNC,      .v=2},         /* [1] EARBFN ptr at init           */
     {.a={.i=0}, .f=0,        .v=3*DESCR},   /* [2] nval V=3*DESCR               */
-    {0},                                     /* [3] zero                         */
+    {.a={.i=0},.f=0,.v=0},                                     /* [3] zero                         */
     {.a={.i=0}, .f=FNC,      .v=2},         /* [4] SCOKFN ptr at init           */
     {.a={.i=6*DESCR}, .f=0,  .v=0},         /* [5] link A=6*DESCR               */
-    {0}                                      /* [6] zero                         */
+    {.a={.i=0},.f=0,.v=0}                                      /* [6] zero                         */
 };
 /* ARHED — ARB head: 12*DESCR body (13 slots) [v311.sil line 12058]         */
 /* slot[8]: A=9*DESCR, V=12*DESCR (both set per oracle)                     */
@@ -2136,28 +2135,28 @@ DESCR_t ARHED[13] = {
     {.a={.i=0}, .f=TTL|MARK, .v=12*DESCR}, /* [0]  hdr: self-ptr at init       */
     {.a={.i=0}, .f=FNC,      .v=2},         /* [1]  SCOKFN ptr at init          */
     {.a={.i=0}, .f=0,        .v=3*DESCR},   /* [2]  V=3*DESCR                   */
-    {0},                                     /* [3]  zero                        */
+    {.a={.i=0},.f=0,.v=0},                                     /* [3]  zero                        */
     {.a={.i=0}, .f=FNC,      .v=2},         /* [4]  SCOKFN ptr at init          */
     {.a={.i=6*DESCR}, .f=0,  .v=0},         /* [5]  A=6*DESCR                   */
-    {0},                                     /* [6]  zero                        */
+    {.a={.i=0},.f=0,.v=0},                                     /* [6]  zero                        */
     {.a={.i=0}, .f=FNC,      .v=2},         /* [7]  ARBNFN ptr at init          */
     {.a={.i=9*DESCR}, .f=0,  .v=12*DESCR},  /* [8]  A=9*DESCR, V=12*DESCR       */
-    {0},                                     /* [9]  zero                        */
+    {.a={.i=0},.f=0,.v=0},                                     /* [9]  zero                        */
     {.a={.i=0}, .f=FNC,      .v=2},         /* [10] ARBFFN ptr at init          */
-    {0}, {0}                                 /* [11][12] zero                    */
+    {.a={.i=0},.f=0,.v=0}, {.a={.i=0},.f=0,.v=0}                                 /* [11][12] zero                    */
 };
 /* ARBPT — ARB: 9*DESCR body (10 slots) [v311.sil line 12047]               */
 DESCR_t ARBPT[10] = {
     {.a={.i=0}, .f=TTL|MARK, .v=9*DESCR},  /* [0] hdr: self-ptr at init        */
     {.a={.i=0}, .f=FNC,      .v=2},         /* [1] SCOKFN ptr at init           */
     {.a={.i=0}, .f=0,        .v=3*DESCR},   /* [2] V=3*DESCR                    */
-    {0},                                     /* [3] zero                         */
+    {.a={.i=0},.f=0,.v=0},                                     /* [3] zero                         */
     {.a={.i=0}, .f=FNC,      .v=2},         /* [4] SCOKFN ptr at init           */
     {.a={.i=6*DESCR}, .f=0,  .v=0},         /* [5] A=6*DESCR                    */
-    {0},                                     /* [6] zero                         */
+    {.a={.i=0},.f=0,.v=0},                                     /* [6] zero                         */
     {.a={.i=0}, .f=FNC,      .v=2},         /* [7] FARBFN ptr at init           */
     {.a={.i=6*DESCR}, .f=0,  .v=0},         /* [8] A=6*DESCR                    */
-    {0}                                      /* [9] zero                         */
+    {.a={.i=0},.f=0,.v=0}                                      /* [9] zero                         */
 };
 /* ARBAK — ARBNO back: 6*DESCR body (7 slots) [v311.sil line 12039]         */
 /* slot[2]: A=3*DESCR (link), not V */
@@ -2165,13 +2164,13 @@ DESCR_t ARBAK[7] = {
     {.a={.i=0}, .f=TTL|MARK, .v=6*DESCR},  /* [0] hdr: self-ptr at init        */
     {.a={.i=0}, .f=FNC,      .v=2},         /* [1] ONARFN ptr at init           */
     {.a={.i=3*DESCR}, .f=0,  .v=0},         /* [2] A=3*DESCR                    */
-    {0},                                     /* [3] zero                         */
+    {.a={.i=0},.f=0,.v=0},                                     /* [3] zero                         */
     {.a={.i=0}, .f=FNC,      .v=2},         /* [4] ONRFFN ptr at init           */
-    {0}, {0}                                 /* [5][6] zero                      */
+    {.a={.i=0},.f=0,.v=0}, {.a={.i=0},.f=0,.v=0}                                 /* [5][6] zero                      */
 };
 /* ABORPT — ABORT: 3*DESCR body (4 slots) [v311.sil line 12034]             */
 DESCR_t ABORPT[4] = {
     {.a={.i=0}, .f=TTL|MARK, .v=3*DESCR},  /* [0] hdr: self-ptr at init        */
     {.a={.i=0}, .f=FNC,      .v=2},         /* [1] ABORFN ptr at init           */
-    {0}, {0}
+    {.a={.i=0},.f=0,.v=0}, {.a={.i=0},.f=0,.v=0}
 };

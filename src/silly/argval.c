@@ -18,6 +18,7 @@
 #include "data.h"
 #include "arena.h"
 #include "strings.h"
+#include "errors.h"
 #include "symtab.h"
 #include "argval.h"
 
