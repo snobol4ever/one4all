@@ -76,6 +76,9 @@ static int trace_registered(const char *name) {
     return 0;
 }
 
+/* Exported for scrip.c set_and_trace() — same semantics as trace_registered. */
+int trace_is_active(const char *name) { return trace_registered(name); }
+
 int64_t kw_stcount = 0;
 
 static void mon_send(const char *kind, const char *name, const char *value) {

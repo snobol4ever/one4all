@@ -233,6 +233,15 @@ static inline int NAME_SET(DESCR_t nd, DESCR_t val) {
     return 0;
 }
 
+/* T-0: set_and_trace — NV_SET_fn + VALUE trace hook for monitor.
+ * Use at every plain-variable assignment site in the --ir-run path.
+ * Keywords (&STLIMIT etc.) excluded: trace_is_active only fires on
+ * names registered via TRACE(var,'VALUE'), never on &-keywords. */
+static inline void set_and_trace(const char *name, DESCR_t val) {
+    NV_SET_fn(name, val);
+    /* comm_var already called by NV_SET_fn — no extra call needed */
+}
+
 /* DYN-57: E_FNC names that always yield a pattern value.
  * Mirrors PAT_FNC_NAMES in SJ-17 (sno-interp.js ec6c0b3).
  * Scoped to _expr_is_pat only — do NOT intercept E_VAR (breaks 210_indirect_ref)
@@ -330,7 +339,11 @@ static DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
      * NV store is case-sensitive: function body writes "fact" not "FACT". */
     snames[0] = GC_strdup(retname);
     svals[0]  = NV_GET_fn(retname);
-    NV_SET_fn(retname, NULVCL);                            /* clear return slot */
+    NV_SET_fn(retname, STRVAL(""));    /* BUG-QIZE: clear return slot to empty string,
+                                        * not NULVCL, so DIFFER(retvar) fails on entry.
+                                        * SPITBOL treats cleared retname as "" (zero-length
+                                        * string); NULVCL has a type tag that makes DIFFER
+                                        * succeed (non-null) → divergence on Qize body. */
     for (int i = 0; i < np; i++) {
         snames[1+i] = pnames[i];
         /* If this param name aliases retname (e.g. DEFINE('f(f)')), the NV cell
@@ -798,7 +811,7 @@ static DESCR_t interp_eval(EXPR_t *e)
         if (IS_FAIL_fn(val)) return FAILDESCR;
         EXPR_t *lv = e->children[0];
         if (lv && lv->kind == E_VAR && lv->sval)
-            NV_SET_fn(lv->sval, val);
+            NV_SET_fn(lv->sval, val);  /* inner expr assign: no trace (stmt-level already traced) */
         else if (lv && lv->kind == E_IDX && lv->nchildren >= 2) {
             /* arr<i> = val  or  arr<i,j> = val */
             DESCR_t base = interp_eval(lv->children[0]);
@@ -847,7 +860,7 @@ static DESCR_t interp_eval(EXPR_t *e)
                     && ichild->children[0]->kind == E_VAR && ichild->children[0]->sval)
                 nm = ichild->children[0]->sval;
             else { DESCR_t nd = interp_eval(ichild); nm = VARVAL_fn(nd); }
-            if (nm && *nm) NV_SET_fn(nm, val);
+            if (nm && *nm) NV_SET_fn(nm, val);  /* inner expr: no trace */
         }
         return val;
     }

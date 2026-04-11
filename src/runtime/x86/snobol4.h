@@ -395,6 +395,7 @@ void comm_stno(int n);
 void comm_var(const char *name, DESCR_t val);
 void comm_call(const char *fname);
 void comm_return(const char *fname, DESCR_t retval);
+int  trace_is_active(const char *name);   /* 1 if name is VALUE-traced */
 
 /* ============================================================
  * SNOBOL4 keywords (&KEYWORD)
