@@ -370,6 +370,7 @@ extern DESCR_t ENDCL;  extern DESCR_t ENMECL;  extern DESCR_t ENMICL;
 extern DESCR_t ERORCL; extern DESCR_t FNCFCL;  extern DESCR_t LITFN;
 extern DESCR_t LIT1CL[4]; extern DESCR_t NMECL;   extern DESCR_t NNYCCL;
 extern DESCR_t ATRHD;  extern DESCR_t ATPRCL[3]; extern DESCR_t ATEXCL;
+extern DESCR_t FRDSCL; /* v311.sil 11131: 4*DESCR — array heading copy size */
 extern DESCR_t SCONCL; extern DESCR_t SCOKCL;
 /* SALICL, STARCCL, DSARCL, FNCECL, SUCCCL: no oracle counterpart — removed */
 extern DESCR_t ABORCL;  extern DESCR_t CONTCL;

@@ -356,6 +356,7 @@ DESCR_t ATPRCL[3] = {
     D(1, 0, 2)       /* [2] 1:2 second dimension */
 };
 DESCR_t ATEXCL = D(1, 0, 0);   /* 1:n first dimension */
+DESCR_t FRDSCL = D(4*DESCR, 0, 0); /* v311.sil 11131: DESCR 4*DESCR,0,0 — array heading copy size */
 
 /* ── Primitive patterns (arena offsets — filled by data_init) ────── */
 
