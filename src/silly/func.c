@@ -555,8 +555,9 @@ RESULT_t DMK_fn(void)
 
     /* GETSIZ XCL,KNLIST — XCL.a = KNLIST.v (size of pair list in bytes) */
     DESCR_t xcl;
-    xcl.a.i = KNLIST.v;
-    xcl.f   = 0; xcl.v = 0;
+    { DESCR_t *kn = (DESCR_t *)A2P(KNLIST.a.i);  /* GETSIZ: deref KNLIST.a */
+      xcl.a.i = kn->v; }                          /* then read v-field (size) */
+    xcl.f = 0; xcl.v = 0;
 
 L_DMPK1: {
     /* GETD XPTR,KNLIST,XCL — get name entry at offset XCL */
