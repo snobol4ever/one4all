@@ -131,7 +131,8 @@ DESCR_t LVLCL    = D(0, 0, I);   /* &FNCLEVEL                           */
 DESCR_t LCASVL   = D0;            /* &LCASE [PLB18]                      */
 DESCR_t UCASVL   = D0;            /* &UCASE [PLB18]                      */
 DESCR_t PARMVL   = D(0, 0, S);   /* &PARM [PLB39]                       */
-DESCR_t DIGSVL   = D0;            /* &DIGITS [PLB105]                    */
+/* SIL: DIGSVL DESCR 0,0,0 — &DIGITS value cell [PLB105] */
+DESCR_t DIGSVL   = D0;            /* &DIGITS [PLB105] — D0 = 0,0,0 correct */
 DESCR_t EXN2CL   = D(0, 0, I);   /* &STEXEC [PLB107]                    */
 /* SIL: GCTTTL REAL 0.0 — real-typed DESCR slot [PLB92][PLB107] */
 DESCR_t GCTTTL   = {.a={.f=0.0f}, .f=0, .v=R};
@@ -141,7 +142,8 @@ DESCR_t FATLCL   = D(0, 0, I);   /* &FATAL [PLB128]                     */
 
 /* ── Real-valued keywords ────────────────────────────────────────────── */
 
-real_t PI_val    = 3.14159265358979323846f;   /* &PI [PLB106]            */
+/* SIL: digsvl+2  REAL 3.14159... — &PI value cell [PLB106] */
+DESCR_t PIVCL    = {.a={.f=3.14159265358979323846f}, .f=0, .v=R};
 DESCR_t RZERCL   = {.a={.f=0.0f},  .f=0, .v=R}; /* real zero [PLB104]  */
 DESCR_t R1MCL    = {.a={.f=1.0e6f},.f=0, .v=R}; /* 1e6 [PLB107]        */
 

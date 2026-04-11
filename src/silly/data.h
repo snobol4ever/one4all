@@ -261,7 +261,7 @@ extern DESCR_t FATLCL;    /* &FATAL        [PLB128]                       */
 
 /* ── Real-valued keywords ────────────────────────────────────────────── */
 
-extern real_t  PI_val;    /* &PI = 3.14159... [PLB106] — real_t PI_val    */
+extern DESCR_t PIVCL;     /* &PI value cell (REAL 3.14159...) [PLB106]    */
 extern DESCR_t   RZERCL;   /* real constant 0.0  [PLB104]                  */
 extern DESCR_t   R1MCL;    /* real constant 1e6  [PLB107]                  */
 
