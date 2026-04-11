@@ -16,6 +16,7 @@
 #include "types.h"
 
 RESULT_t APPLY_fn(void);
+RESULT_t ARGINT_fn(void);
 RESULT_t ARG_fn(void);
 RESULT_t LOCAL_fn(void);
 RESULT_t FIELDS_fn(void);

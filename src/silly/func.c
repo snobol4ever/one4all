@@ -390,10 +390,22 @@ static RESULT_t arg2(void)
 }
 
 /*====================================================================================================================*/
+/* ── ARGINT — alternate ARG entry used for CALL tracing (SIL 6349) ───── */
+/* POP(XPTR,XCL); PUSH(ONECL,DEFCL); BRANCH ARG2                         */
+RESULT_t ARGINT_fn(void)
+{
+    XPTR = fn_pop(); /* POP XPTR */
+    XCL  = fn_pop(); /* POP XCL  */
+    fn_push(ONECL);  /* PUSH(ONECL,DEFCL) */
+    fn_push(DEFCL);
+    return arg2();   /* BRANCH ARG2 */
+}
+
+/*====================================================================================================================*/
 /* ── ARG(F,N) ────────────────────────────────────────────────────────── */
 RESULT_t ARG_fn(void)
 {
-    fn_push(D_A(ONECL) ? ONECL : ONECL); /* PUSH(ONECL,DEFCL) */
+    fn_push(ONECL); /* PUSH(ONECL,DEFCL) */
     fn_push(DEFCL);
     /* ARG1: VARVUP → XPTR; INTVAL → XCL; verify XCL > 0 */
     if (VARVUP_fn() == FAIL) { fn_top -= 2; return FAIL; }
