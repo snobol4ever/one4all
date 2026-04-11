@@ -438,6 +438,18 @@ static DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                     DESCR_t repl_val = s->replacement
                         ? interp_eval(s->replacement)
                         : NULVCL;
+                    /* BP-1: if the RHS was a NRETURN function call, interp_eval
+                     * NAME_DEREFs the DT_N (value context). But we want to store the
+                     * DT_N itself so the caller can later use $nm for indirect assign.
+                     * kw_rtntype is set by call_user_function before it returns and
+                     * is still valid here (no nested call between interp_eval return
+                     * and this check). Re-fetch from the function's return variable. */
+                    if (strcasecmp(kw_rtntype, "NRETURN") == 0
+                            && s->replacement && s->replacement->kind == E_FNC
+                            && s->replacement->sval) {
+                        DESCR_t raw = NV_GET_fn(s->replacement->sval);
+                        if (IS_NAME(raw)) repl_val = raw;
+                    }
                     if (IS_FAIL_fn(repl_val)) succeeded = 0;
                     else {
                         /* NRETURN lvalue write-through: subj_name may be a zero-param
@@ -1036,7 +1048,7 @@ static DESCR_t interp_eval(EXPR_t *e)
             if (body) {
                 /* User-defined function — call interpreter directly, never via APPLY_fn */
                 DESCR_t r = call_user_function(e->sval, args, nargs);
-                if (IS_NAME(r)) return NAME_DEREF(r);  /* NRETURN: IS_NAMEPTR/IS_NAMEVAL via NAME_DEREF */
+                if (IS_NAME(r)) return NAME_DEREF(r);
                 return r;
             }
         }
