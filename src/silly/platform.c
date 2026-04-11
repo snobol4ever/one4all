@@ -717,6 +717,7 @@ DESCR_t GOGOCL = {.a={.i=0},.f=0,.v=0};
 DESCR_t GOTLCL = {.a={.i=0},.f=FNC,.v=1};  /* SIL: DESCR GOTLFN,FNC,1 */
 DESCR_t GOTGCL = {.a={.i=0},.f=FNC,.v=1};  /* SIL: DESCR GOTGFN,FNC,1 */
 DESCR_t GOTOCL = {.a={.i=0},.f=FNC,.v=1};  /* SIL: DESCR GOTOFN,FNC,1 */
+DESCR_t LODCL  = {.a={.i=0},.f=FNC,.v=0};  /* SIL: DESCR LNKFNC,FNC,0 — .a patched in data_init */
 
 /* Sizes */
 DESCR_t TBSIZ  = {.a={.i=0},.f=0,.v=0};
@@ -1645,9 +1646,12 @@ RESULT_t XCALL_IO_FILE(DESCR_t u, SPEC_t *sp) { (void)u; sp->l=0; return FAIL; }
 void XCALL_BKSPCE(DESCR_t u)  { (void)u; }
 int  XCALL_ENFILE(DESCR_t u)  { (void)u; return 1; } /* stub: always succeeds */
 void XCALL_REWIND(DESCR_t u)  { (void)u; }
-void XCALL_LINK(DESCR_t u, SPEC_t *sp)      { (void)u; (void)sp; }
-void XCALL_UNLOAD(DESCR_t u)  { (void)u; }
-void XCALL_RELSTRING(DESCR_t d) { (void)d; }
+RESULT_t XCALL_LOAD(DESCR_t *entry_out, SPEC_t *fn_sp, SPEC_t *lib_sp)
+    { (void)fn_sp; (void)lib_sp; *entry_out = ZEROCL; return FAIL; }
+RESULT_t XCALL_LINK(DESCR_t *result, DESCR_t *arg_base, int32_t nargs, DESCR_t entry)
+    { (void)result; (void)arg_base; (void)nargs; (void)entry; return FAIL; }
+void XCALL_UNLOAD(SPEC_t *fn_sp) { (void)fn_sp; }
+RESULT_t XCALL_RELSTRING(DESCR_t d) { (void)d; return OK; }
 /* XCALL_XINCLD: open an include file — stub returns FAIL (not yet implemented) */
 RESULT_t XCALL_XINCLD(DESCR_t unit, SPEC_t *fname) { (void)unit; (void)fname; return FAIL; }
 void XCALL_XRAISP(SPEC_t *sp)

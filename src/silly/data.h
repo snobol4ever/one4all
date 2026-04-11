@@ -540,6 +540,7 @@ extern DESCR_t SGOND;    /* success goto node (v311.sil 11078)           */
 extern DESCR_t FGOND;    /* failure goto node (v311.sil 11072)           */
 extern DESCR_t SRNCL;    /* success return descriptor (v311.sil 11058)   */
 extern DESCR_t GOTOCL;   /* GOTO function DESCR FNC (v311.sil 10784)     */
+extern DESCR_t LODCL;    /* LNKFNC function DESCR FNC (v311.sil 10853)   */
 extern DESCR_t TRATL;    /* trace attribute list head                    */
 /* VALTRS: see pair lists section above (VALTRS[3]) */
 extern DESCR_t FUNTCL;   /* FUNCTION trace type constant                 */

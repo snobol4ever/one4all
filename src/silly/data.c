@@ -713,6 +713,9 @@ void data_init(void)
       FRZNSP.l = (int32_t)(sizeof(frzn_lit)-1); }
     /* Register all platform scan tables (CARDTB, IBLKTB, ELEMTB, etc.)
      * Must be called after arena_init() sets arena_base. */
+    /* LODCL: procedure descriptor for LNKFNC (external function linkage) */
+    { extern RESULT_t LNKFNC_fn(void);
+      LODCL.a.i = P2A(LNKFNC_fn); }
     extern void init_syntab(void);
     init_syntab();
 }

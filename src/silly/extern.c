@@ -17,6 +17,7 @@
 #include "data.h"
 #include "extern.h"
 #include "argval.h"
+#include "symtab.h"
 #include "arena.h"
 #include "strings.h"
 #include "symtab.h"
@@ -47,11 +48,139 @@ static inline void    ext_push(DESCR_t d) { ext_stk[ext_top++] = d; }
 static inline DESCR_t ext_pop(void)        { return ext_stk[--ext_top]; }
 
 /* ── LOAD(P,L) ───────────────────────────────────────────────────────── */
-/*
- * Requires STREAM/VARATB for prototype parsing — stubbed until M15+
- * infrastructure (STREAM) is available.
- */
-RESULT_t LOAD_fn(void) { return FAIL; }
+/* v311.sil §13 lines 4475–4548  ·  snobol4.c LOAD()/LOAD2() lines 5666–5792 */
+extern RESULT_t STREAM_fn(SPEC_t *res, SPEC_t *src, DESCR_t *tbl, int *stype_out);
+extern DESCR_t  VARATB;
+extern DESCR_t  PROTER;   /* prototype error label — treated as FAIL here */
+
+static int spec_eq_rparen(SPEC_t *sp)
+{
+    /* LEXCMP TSP,RPRNSP — single char ')' comparison */
+    extern SPEC_t RPRNSP;
+    if (sp->l != RPRNSP.l) return 0;
+    const char *a = (const char *)A2P(sp->a)  + sp->o;
+    const char *b = (const char *)A2P(RPRNSP.a) + RPRNSP.o;
+    return memcmp(a, b, (size_t)sp->l) == 0;
+}
+
+RESULT_t LOAD_fn(void)
+{
+    /* RCALL XPTR,VARVAL,,FAIL — get prototype string */
+    if (VARVAL_fn() == FAIL) return FAIL;
+    ext_push(XPTR);                             /* PUSH XPTR */
+    /* RCALL WPTR,VARVAL,,FAIL — get library name */
+    if (VARVAL_fn() == FAIL) { ext_pop(); return FAIL; }
+    XPTR = ext_pop();                           /* POP XPTR */
+
+    /* LOAD2: */
+    SPEC_t VSP, XSP, YSP, ZSP, TSP;
+    LOCSP_fn(&VSP, &WPTR);                      /* LOCSP VSP,WPTR */
+    LOCSP_fn(&XSP, &XPTR);                      /* LOCSP XSP,XPTR */
+
+    int stype = 0;
+    /* STREAM YSP,XSP,VARATB,PROTER,PROTER — get function name */
+    if (STREAM_fn(&YSP, &XSP, &VARATB, &stype) != OK) return FAIL;
+    if (stype == 0 /* ST_ERROR */ || stype == 2 /* ST_EOS */) return FAIL;
+
+    /* AEQLC STYPE,LPTYP,PROTER — verify left parenthesis */
+    if (stype != LPTYP) return FAIL;
+
+    /* RCALL XPTR,GENVUP,YSPPTR — generate var for function name */
+    { SPEC_t tmp = YSP;
+      int32_t r = GENVUP_fn(&tmp); if (!r) return FAIL;
+      XPTR.a.i = r; XPTR.f = 0; XPTR.v = S; }
+    /* RCALL ZCL,FINDEX,XPTR — find function slot */
+    DESCR_t ZCL; ZCL.a.i = FINDEX_fn(&XPTR); ZCL.f = 0; ZCL.v = 0;
+    DESCR_t YCL = ZEROCL;                       /* MOVD YCL,ZEROCL — arg count = 0 */
+
+    /* LOAD4 loop: parse argument types */
+L_LOAD4:
+    XSP.l--; XSP.o++;                           /* FSHRTN XSP,1 */
+    stype = 0;
+    if (STREAM_fn(&ZSP, &XSP, &VARATB, &stype) != OK) goto L_LOAD1;
+    if (stype == 2 /* ST_EOS */) return FAIL;   /* PROTER */
+
+    /* SELBRA STYPE,(PROTER,,LOAD6) — stype==1→PROTER, stype==3→LOAD6, else fall */
+    if (stype == 1) return FAIL;
+    if (stype == 3) goto L_LOAD6;
+
+    /* Mid-arg type: GENVUP + LOCAPV */
+    { SPEC_t tmp = ZSP;
+      int32_t r = GENVUP_fn(&tmp); if (!r) return FAIL;
+      XPTR.a.i = r; XPTR.f = 0; XPTR.v = S; }
+    { int32_t pair = locapv_fn(D_A(DTATL), &XPTR);
+      if (!pair) goto L_LOAD9;
+      memcpy(&XPTR, A2P(pair + DESCR), sizeof(DESCR_t)); }
+    ext_push(XPTR);                             /* PUSH XPTR */
+L_LOAD10:
+    YCL.a.i++;                                  /* INCRA YCL,1 */
+    goto L_LOAD4;
+
+L_LOAD6:
+    YCL.a.i++;                                  /* INCRA YCL,1 */
+    { SPEC_t tmp = ZSP;
+      int32_t r = GENVAR_fn(&tmp); if (!r) return FAIL;
+      XPTR.a.i = r; XPTR.f = 0; XPTR.v = S; }
+    { int32_t pair = locapv_fn(D_A(DTATL), &XPTR);
+      if (!pair) goto L_LOAD11;
+      memcpy(&XPTR, A2P(pair + DESCR), sizeof(DESCR_t)); }
+    ext_push(XPTR);                             /* PUSH XPTR */
+
+L_LOAD13:
+    XSP.l--; XSP.o++;                           /* FSHRTN XSP,1 — delete ')' */
+    { SPEC_t tmp = XSP;
+      int32_t r = GENVAR_fn(&tmp); if (!r) return FAIL;
+      XPTR.a.i = r; XPTR.f = 0; XPTR.v = S; }
+    { int32_t pair = locapv_fn(D_A(DTATL), &XPTR);
+      if (!pair) goto L_LOAD7;
+      memcpy(&XPTR, A2P(pair + DESCR), sizeof(DESCR_t)); }
+    ext_push(XPTR);                             /* PUSH XPTR */
+
+L_LOAD8:
+    /* SETVA LODCL,YCL — store arg count in LODCL.v */
+    LODCL.v = YCL.a.i;
+    YCL.a.i++;                                  /* INCRA YCL,1 */
+    DESCR_t XCL;
+    XCL.a.i = YCL.a.i * DESCR;                 /* MULTC XCL,YCL,DESCR */
+    XCL.f = 0; XCL.v = 0;
+    XCL.a.i += DESCR;                           /* INCRA XCL,DESCR */
+    XCL.v = B;                                  /* SETVC XCL,B */
+    /* RCALL ZPTR,BLOCK,XCL — allocate definition block */
+    { int32_t ba = BLOCK_fn(XCL.a.i, B);
+      if (!ba) return FAIL;
+      ZPTR.a.i = ba; ZPTR.f = 0; ZPTR.v = B; }
+    /* SUM XPTR,ZPTR,XCL — pointer to end of block */
+    XPTR.a.i = ZPTR.a.i + XCL.a.i; XPTR.f = 0; XPTR.v = 0;
+
+L_LOAD12:
+    XPTR.a.i -= DESCR;                          /* DECRA XPTR,DESCR */
+    { DESCR_t yptr = ext_pop();                 /* POP YPTR */
+      memcpy(A2P(XPTR.a.i + DESCR), &yptr, sizeof(DESCR_t)); } /* PUTDC XPTR,DESCR,YPTR */
+    YCL.a.i--;                                  /* DECRA YCL,1 */
+    if (YCL.a.i > 0) goto L_LOAD12;            /* ACOMPC YCL,0,LOAD12 */
+
+    /* LOAD YPTR,YSP,VSP,FAIL — call platform to load the symbol */
+    if (XCALL_LOAD(&YPTR, &YSP, &VSP) != OK) return FAIL;
+    memcpy(A2P(XPTR.a.i),        &YPTR, sizeof(DESCR_t)); /* PUTDC XPTR,0,YPTR */
+    memcpy(A2P(ZCL.a.i),         &LODCL, sizeof(DESCR_t)); /* PUTDC ZCL,0,LODCL */
+    memcpy(A2P(ZCL.a.i + DESCR), &ZPTR,  sizeof(DESCR_t)); /* PUTDC ZCL,DESCR,ZPTR */
+    MOVD(XPTR, NULVCL); return OK;              /* BRANCH RETNUL */
+
+L_LOAD7:
+    ext_push(ZEROCL); goto L_LOAD8;            /* unspecified return type */
+L_LOAD9:
+    ext_push(ZEROCL); goto L_LOAD10;           /* unspecified arg type (mid) */
+L_LOAD11:
+    ext_push(ZEROCL); goto L_LOAD13;           /* unspecified arg type (last) */
+
+L_LOAD1:
+    /* ST_ERROR from STREAM — check if we hit ')' (single-arg no-type case) */
+    ext_push(ZEROCL);
+    TSP = XSP; TSP.l = 1;                      /* SETSP TSP,XSP / SETLC TSP,1 */
+    YCL.a.i++;
+    if (spec_eq_rparen(&TSP)) goto L_LOAD13;
+    goto L_LOAD4;
+}
 
 /* ── UNLOAD(F) ───────────────────────────────────────────────────────── */
 RESULT_t UNLOAD_fn(void)
