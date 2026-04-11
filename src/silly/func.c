@@ -291,7 +291,7 @@ RESULT_t COPY_fn(void)
 RESULT_t CLEAR_fn(void)
 {
     if (ARGVAL_fn() == FAIL) return FAIL;
-    SETAC(DMPPTR, OBPTR.a.i + LNKFLD - DESCR); /* OBLIST-DESCR = OBSTRT[0] - DESCR */    /* Walk every bin in OBLIST, null every variable */
+    SETAC(DMPPTR, D_A(OBPTR) - DESCR); /* SETAC DMPPTR,OBLIST-DESCR — OBPTR.a=OBLIST */
     while (1) {
         if (D_A(DMPPTR) > D_A(OBEND)) { MOVD(XPTR, NULVCL); return OK; } /* PCOMP DMPPTR,OBEND,RETNUL */
         INCRA(DMPPTR, DESCR);
