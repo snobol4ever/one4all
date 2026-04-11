@@ -590,9 +590,183 @@ L_DMPK1: {
 RESULT_t CNVRT_fn(void) { return FAIL; }
 RESULT_t CODER_fn(void) { return FAIL; }
 
-/* ── OPSYN(F1,F2,N) — stub ───────────────────────────────────────────
- * Requires operator-table streams (BIOPTB, UNOPTB etc.) not yet built. */
-RESULT_t OPSYN_fn(void) { return FAIL; }
+/* ── OPSYN(F1,F2,N) ─────────────────────────────────────────────────
+ * v311.sil §19 lines 6805–6927  ·  snobol4.c OPSYN() lines 9348–9534
+ *
+ * OPSYN(object, image, type)
+ *   type=0: function synonym  — copy image's proc-descriptor pair into object's slot
+ *   type=1: unary  operator synonym
+ *   type=2: binary operator synonym
+ *
+ * Infrastructure: FINDEX_fn, STREAM_fn, BIOPTB/UNOPTB/SBIPTB/BBIOPTB/BSBIPTB all live.
+ */
+extern RESULT_t VARVUP_fn(void);
+extern RESULT_t STREAM_fn(SPEC_t *res, SPEC_t *src, DESCR_t *tbl, int *stype_out);
+extern DESCR_t  BIOPTB, SBIPTB, UNOPTB, BBIOPTB, BSBIPTB;
+extern DESCR_t  STYPE;       /* scanner: put value after STREAM */
+extern SPEC_t   EQLSP;       /* "=" spec — used as max-length gate for binary ops */
+extern SPEC_t   LPRNSP;      /* "(" spec — appended when probing unary op table   */
+
+/* spec_eq: lexicographic equality of two SPECs (= LEXEQ macro from csnobol4) */
+static int spec_eq(SPEC_t a, SPEC_t b) {
+    if (a.l != b.l) return 0;
+    if (a.l == 0)   return 1;
+    const char *pa = (const char *)A2P(a.a) + a.o;
+    const char *pb = (const char *)A2P(b.a) + b.o;
+    return memcmp(pa, pb, (size_t)a.l) == 0;
+}
+
+/* copy_fslot: OPPD — copy two-DESCR proc-descriptor pair from src slot to dst slot */
+static void copy_fslot(int32_t dst_off, int32_t src_off)
+{
+    DESCR_t d0, d1;
+    memcpy(&d0, A2P(src_off),          sizeof(DESCR_t));
+    memcpy(&d1, A2P(src_off + DESCR),  sizeof(DESCR_t));
+    memcpy(A2P(dst_off),         &d0, sizeof(DESCR_t));
+    memcpy(A2P(dst_off + DESCR), &d1, sizeof(DESCR_t));
+}
+
+RESULT_t OPSYN_fn(void)
+{
+    /* RCALL XPTR,VARVUP,,FAIL / PUSH / RCALL YPTR,VARVUP,,FAIL / PUSH / RCALL ZPTR,INTVAL,,FAIL / POP */
+    if (VARVUP_fn() == FAIL) return FAIL;
+    fn_push(XPTR);
+    if (VARVUP_fn() == FAIL) { fn_top--; return FAIL; }
+    fn_push(XPTR);                          /* XPTR now holds image (YPTR's value) */
+    if (INTVAL_fn() == FAIL) { fn_top -= 2; return FAIL; }
+    MOVD(ZPTR, XPTR);                       /* ZPTR = type indicator */
+    YPTR = fn_pop();                        /* image name descriptor */
+    XPTR = fn_pop();                        /* object name descriptor */
+
+    /* AEQLC XPTR,0,,NONAME — object may not be null */
+    if (D_A(XPTR) == 0) { NONAME_fn(); return FAIL; }
+
+    int32_t n = D_A(ZPTR);
+
+    if (n != 1 && n != 2 && n != 0) { INTR30_fn(); return FAIL; } /* AEQLC ZPTR,0,INTR30 */
+
+    /* ── N=0: function synonym ───────────────────────────────────── */
+    if (n == 0) {
+        /* FINDEX object → get/create its function descriptor slot */
+        int32_t xslot = FINDEX_fn(&XPTR);  /* RCALL XPTR,FINDEX,XPTR */
+        /* UNBF: FINDEX image */
+        int32_t yslot = FINDEX_fn(&YPTR);  /* RCALL YPTR,FINDEX,YPTR */
+        /* OPPD: copy image slot → object slot */
+        copy_fslot(xslot, yslot);
+        MOVD(XPTR, NULVCL); return OK;     /* BRANCH RETNUL */
+    }
+
+    /* Helper: probe an operator table for a 1-char name + suffix appended to PROTSP.
+     * Returns arena offset of the matching STYPE entry, or 0 if not found (EOS/ERROR). */
+
+    /* ── N=1: unary operator synonym ─────────────────────────────── */
+    if (n == 1) {
+        /* UNYOP: LOCSP XSP,XPTR; LEQLC XSP,1,UNAF — length must be 1 */
+        SPEC_t xsp; LOCSP_fn(&xsp, &XPTR);
+        if (xsp.l != 1) goto L_UNAF;           /* length != 1 → FINDEX path */
+
+        /* Build ZSP = PROTSP + XSP + LPRNSP, then STREAM against UNOPTB */
+        {   SPEC_t zsp = PROTSP; zsp.l = 0;
+            APDSP_fn(&zsp, &xsp);
+            APDSP_fn(&zsp, &LPRNSP);
+            int stype; SPEC_t tsp;
+            if (STREAM_fn(&tsp, &zsp, &UNOPTB, &stype) == FAIL) goto L_UNAF;
+            MOVD(XPTR, STYPE);                  /* MOVD XPTR,STYPE */
+        }
+        /* UNCF: probe image the same way */
+L_UNCF: {
+            SPEC_t ysp; LOCSP_fn(&ysp, &YPTR);
+            if (ysp.l != 1) goto L_UNBF;
+            SPEC_t zsp = PROTSP; zsp.l = 0;
+            APDSP_fn(&zsp, &ysp);
+            APDSP_fn(&zsp, &LPRNSP);
+            int stype; SPEC_t tsp;
+            if (STREAM_fn(&tsp, &zsp, &UNOPTB, &stype) == FAIL) goto L_UNBF;
+            MOVD(YPTR, STYPE);
+            goto L_OPPD;
+        }
+L_UNBF: /* image not found as operator — FINDEX it as a function */
+        {   int32_t yslot = FINDEX_fn(&YPTR);
+            int32_t xslot = D_A(XPTR);         /* XPTR already has the op slot offset */
+            copy_fslot(xslot, yslot);
+            MOVD(XPTR, NULVCL); return OK;
+        }
+L_UNAF: /* object not an operator — FINDEX it */
+        {   int32_t xslot = FINDEX_fn(&XPTR);
+            XPTR.a.i = xslot;                  /* XPTR.a = slot offset for UNCF */
+            goto L_UNCF;
+        }
+    }
+
+    /* ── N=2: binary operator synonym ────────────────────────────── */
+    /* BNYOP: LOCSP XSP,XPTR; check len <= EQLSP.l */
+    {
+        SPEC_t xsp; LOCSP_fn(&xsp, &XPTR);
+        if ((int32_t)xsp.l > (int32_t)EQLSP.l) goto L_BNAF;
+
+        /* Build ZSP = PROTSP + XSP + BLSP, select table by SPITCL/BLOKCL */
+        SPEC_t zsp = PROTSP; zsp.l = 0;
+        APDSP_fn(&zsp, &xsp);
+        APDSP_fn(&zsp, &BLSP);
+
+        DESCR_t *optb;
+        if (D_A(SPITCL) != 0)
+            optb = (D_A(BLOKCL) != 0) ? &BSBIPTB : &SBIPTB;
+        else
+            optb = (D_A(BLOKCL) != 0) ? &BBIOPTB : &BIOPTB;
+
+        {   int stype; SPEC_t tsp;
+            if (STREAM_fn(&tsp, &zsp, optb, &stype) == FAIL || zsp.l != 0) goto L_BNAF;
+        }
+        MOVD(XPTR, STYPE);
+
+        /* BNCF: probe image */
+L_BNCF: {
+            SPEC_t ysp; LOCSP_fn(&ysp, &YPTR);
+            if ((int32_t)ysp.l > (int32_t)EQLSP.l) goto L_BNBF2;
+            SPEC_t zsp2 = PROTSP; zsp2.l = 0;
+            APDSP_fn(&zsp2, &ysp);
+            APDSP_fn(&zsp2, &BLSP);
+            DESCR_t *optb2;
+            if (D_A(SPITCL) != 0)
+                optb2 = (D_A(BLOKCL) != 0) ? &BSBIPTB : &SBIPTB;
+            else
+                optb2 = (D_A(BLOKCL) != 0) ? &BBIOPTB : &BIOPTB;
+            int stype; SPEC_t tsp;
+            if (STREAM_fn(&tsp, &zsp2, optb2, &stype) == FAIL || zsp2.l != 0) goto L_BNBF2;
+            MOVD(YPTR, STYPE);
+            goto L_OPPD;
+        }
+L_BNBF2: /* BNBF: image not in binary op table — try unary FINDEX path */
+        if (spec_eq(YSP, BLSP)) {
+            /* BNCN: image is blank → concatenation */
+            MOVD(YPTR, CONCL);
+            goto L_OPPD;
+        }
+        {   int32_t yslot = FINDEX_fn(&YPTR);
+            int32_t xslot = D_A(XPTR);
+            copy_fslot(xslot, yslot);
+            MOVD(XPTR, NULVCL); return OK;
+        }
+L_BNAF: /* object not in binary op table */
+        if (spec_eq(xsp, BLSP)) {
+            /* BNCN path: object is blank → concatenation */
+            MOVD(XPTR, CONCL);
+            goto L_BNCF;
+        }
+        {   int32_t xslot = FINDEX_fn(&XPTR);
+            XPTR.a.i = xslot;
+            goto L_BNCF;
+        }
+    }
+
+L_OPPD: /* copy image proc-descriptor pair → object slot */
+    {   int32_t xslot = D_A(XPTR);
+        int32_t yslot = D_A(YPTR);
+        copy_fslot(xslot, yslot);
+        MOVD(XPTR, NULVCL); return OK;     /* BRANCH RETNUL */
+    }
+}
 
 /* ── CONVE — convert value to EXPRESSION type ────────────────────────
  * v311.sil §19 CONVE (used by EVAL_fn in argval.c).
