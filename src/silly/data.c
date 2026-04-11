@@ -192,7 +192,7 @@ DESCR_t BUKPTR = {.a={.i=0},.f=PTR,.v=S}, /* SIL: DESCR 0,PTR,S */
 
 /* ── Compiler working storage ────────────────────────────────────────── */
 
-DESCR_t STNOCL = D0, LNNOCL = D0, FILENM = D0, CSTNCL = D(0, 0, I);
+DESCR_t STNOCL = D(0, 0, I), LNNOCL = D(0, 0, I), FILENM = D(0, 0, S), CSTNCL = D(0, 0, I);
 DESCR_t STYPE = D0, BRTYPE = D0;
 DESCR_t FBLOCK = D0, NEXFCL = D0;
 DESCR_t FNLIST = D0;
