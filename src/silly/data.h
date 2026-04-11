@@ -697,6 +697,7 @@ extern const char LNESP[],  LOADSP[], LOCSP[],  LPADSP[], LTSP[];
 extern const char MAXLSP[], MAXISP[], NAMESP[], NESP[],   NNYSP[];
 extern const char NRETSP[], NUMSP[],  OPSNSP[], OUTSP[],  PARMSP[];
 extern const char PATSP[],  PISP[],   POSSP[],  PRTSP[],  RLSP[];
+extern const char ARRSP[],  ASSCSP[];                                /* DTLIST type names */
 extern const char REMSP_s[],REMDSP[], RETSP[],  REVRSP[], REWNSP[];
 extern const char RPLCSP[], RPOSSP[], RPADSP[], RSRTSP[], RTABSP[];
 extern const char RTYPSP[], SETSP[],  SETXSP[], SCNTSP[], SIZESP[];

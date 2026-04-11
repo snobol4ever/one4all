@@ -1396,6 +1396,28 @@ void init_syntab(void)
     TKEYPL[0].a.i = P2A(TKEYPL);
     VALBLK[0].a.i = P2A(VALBLK);
 
+    /* DTLIST [v311.sil line 10482]: type pair list — header + 10 pairs (no BLOCKS — §20 skipped).
+     * Each pair: [type-code DESCR (.v=type)] + [name-spec DESCR (.a=strptr)].
+     * Build in arena so DTATL/locapt_fn can walk it. */
+    {
+        int32_t dtblk = BLOCK_fn(20 * DESCR, 0); /* 10 pairs × 2 DESCRs */
+        DESCR_t *dt = (DESCR_t *)A2P(dtblk + DESCR); /* body after title */
+        dt[ 0].v=S;  dt[ 1].a.i=P2A(VARSP);
+        dt[ 2].v=I;  dt[ 3].a.i=P2A(INTGSP);
+        dt[ 4].v=P;  dt[ 5].a.i=P2A(PATSP);
+        dt[ 6].v=A;  dt[ 7].a.i=P2A(ARRSP);
+        dt[ 8].v=R;  dt[ 9].a.i=P2A(RLSP);
+        dt[10].v=C;  dt[11].a.i=P2A(CODESP);
+        dt[12].v=N;  dt[13].a.i=P2A(NAMESP);
+        dt[14].v=K;  dt[15].a.i=P2A(NAMESP);
+        dt[16].v=E;  dt[17].a.i=P2A(EXPSP);
+        dt[18].v=T;  dt[19].a.i=P2A(ASSCSP);
+        DTLIST.a.i = dtblk;
+        DTLIST.f   = TTL | MARK;
+        DTLIST.v   = 20 * DESCR;
+        DTATL.a.i  = dtblk;
+    }
+
     /* INITLS [v311.sil line 11399]: DESCR INITLS,TTL+MARK,8*DESCR + 8 sublist ptrs.
      * Allocate 8-slot arena block; fill with pointers to the 8 runtime lists.
      * Order: DTLIST FNLIST INLIST KNLIST KVLIST OTLIST OTSATL TRLIST */

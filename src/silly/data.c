@@ -517,6 +517,7 @@ const char OUTSP[]  = "OUTPUT";      const char PARMSP[] = "PARM";
 const char PATSP[]  = "PATTERN";     const char PISP[]   = "PI";
 const char POSSP[]  = "POS";         const char PRTSP[]  = "PROTOTYPE";
 const char RLSP[]   = "REAL";        const char REMSP_s[] = "REM";
+const char ARRSP[]  = "ARRAY";       const char ASSCSP[] = "TABLE";       /* DTLIST type names */
 const char REMDSP[] = "REMDR";       const char RETSP[]  = "RETURN";
 const char REVRSP[] = "REVERSE";     const char REWNSP[] = "REWIND";
 const char RPLCSP[] = "REPLACE";     const char RPOSSP[] = "RPOS";
