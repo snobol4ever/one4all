@@ -26,6 +26,8 @@
 #include <string.h>
 #include <stdarg.h>
 #include <ctype.h>
+/* PRETTY_OUT required by emit_c.h before inclusion */
+#define PRETTY_OUT out
 #include "emit_c.h"
 
 /* -----------------------------------------------------------------------
