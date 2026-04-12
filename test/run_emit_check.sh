@@ -22,12 +22,12 @@
 #   (combine with spaces: CELLS="snobol4_x86 icon_x86")
 #   Omit CELLS or CELLS="" → all backends (cross-session shared gate)
 #
-# Environment: SCRIP_CC (default: <root>/scrip-cc), JOBS (default: nproc), CELLS
+# Environment: SCRIP_CC (default: <root>/scrip), JOBS (default: nproc), CELLS
 
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SCRIP_CC="${SCRIP_CC:-$ROOT/scrip-cc}"
+SCRIP_CC="${SCRIP_CC:-$ROOT/scrip}"
 export SCRIP_CC
 JOBS="${JOBS:-$(nproc 2>/dev/null || echo 4)}"
 # Source locations: post-corpus-migration (M-G0-CORPUS-AUDIT) sources live in the
@@ -93,7 +93,7 @@ _need() {
     exit 2
   fi
 }
-_need "scrip-cc" "$([[ -x "$SCRIP_CC" && -s "$SCRIP_CC" ]] && echo 1 || echo 0)"
+_need "scrip" "$([[ -x "$SCRIP_CC" && -s "$SCRIP_CC" ]] && echo 1 || echo 0)"
 _need "gcc"      "$(command -v gcc  &>/dev/null && echo 1 || echo 0)"
 echo -e "${GREEN}  [tools] all required tools present ✓${RESET}"
 

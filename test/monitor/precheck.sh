@@ -85,7 +85,7 @@ echo ""
 echo "── Section 2: File paths ──────────────────────────────"
 
 for f in \
-    "$DIR/scrip-cc" \
+    "$DIR/scrip" \
     "$SO" \
     "$SPL_SO" \
     "$JASMIN" \
@@ -106,20 +106,20 @@ done
 echo ""
 echo "── Section 3: scrip-cc sanity ────────────────────────────"
 
-if "$DIR/scrip-cc" -asm "$NULL_SNO" > "$TMP/scrip-cc_null.s" 2>/dev/null && [[ -s "$TMP/scrip-cc_null.s" ]]; then
-    green "scrip-cc -asm null.sno produces output"
+if "$DIR/scrip" -asm "$NULL_SNO" > "$TMP/scrip-cc_null.s" 2>/dev/null && [[ -s "$TMP/scrip-cc_null.s" ]]; then
+    green "scrip -asm null.sno produces output"
 else
-    red   "scrip-cc -asm null.sno failed or empty output"
+    red   "scrip -asm null.sno failed or empty output"
 fi
-if "$DIR/scrip-cc" -jvm "$NULL_SNO" > "$TMP/scrip-cc_null.j" 2>/dev/null && [[ -s "$TMP/scrip-cc_null.j" ]]; then
-    green "scrip-cc -jvm null.sno produces output"
+if "$DIR/scrip" -jvm "$NULL_SNO" > "$TMP/scrip-cc_null.j" 2>/dev/null && [[ -s "$TMP/scrip-cc_null.j" ]]; then
+    green "scrip -jvm null.sno produces output"
 else
-    red   "scrip-cc -jvm null.sno failed or empty output"
+    red   "scrip -jvm null.sno failed or empty output"
 fi
-if "$DIR/scrip-cc" -net "$NULL_SNO" > "$TMP/scrip-cc_null.il" 2>/dev/null && [[ -s "$TMP/scrip-cc_null.il" ]]; then
-    green "scrip-cc -net null.sno produces output"
+if "$DIR/scrip" -net "$NULL_SNO" > "$TMP/scrip-cc_null.il" 2>/dev/null && [[ -s "$TMP/scrip-cc_null.il" ]]; then
+    green "scrip -net null.sno produces output"
 else
-    red   "scrip-cc -net null.sno failed or empty output"
+    red   "scrip -net null.sno failed or empty output"
 fi
 
 echo ""
@@ -146,7 +146,7 @@ else
 fi
 
 # ── 4c: ASM null ────────────────────────────────────────────────────────
-"$DIR/scrip-cc" -asm "$NULL_SNO" > "$TMP/null.s" 2>/dev/null
+"$DIR/scrip" -asm "$NULL_SNO" > "$TMP/null.s" 2>/dev/null
 gcc -O0 -g -c "$RT/x86/snobol4_stmt_rt.c"    -I"$RT/x86" -I"$RT" -I"$DIR/src/frontend/snobol4" -w -o "$TMP/stmt_rt.o" 2>/dev/null
 gcc -O0 -g -c "$RT/x86/snobol4.c"         -I"$RT/x86" -I"$RT" -I"$DIR/src/frontend/snobol4" -w -o "$TMP/snobol4.o" 2>/dev/null
 gcc -O0 -g -c "$RT/mock/mock_includes.c"       -I"$RT/x86" -I"$RT" -I"$DIR/src/frontend/snobol4" -w -o "$TMP/mock.o" 2>/dev/null
@@ -164,7 +164,7 @@ else
 fi
 
 # ── 4d: NET null ────────────────────────────────────────────────────────
-"$DIR/scrip-cc" -net "$NULL_SNO" > "$TMP/null.il" 2>/dev/null
+"$DIR/scrip" -net "$NULL_SNO" > "$TMP/null.il" 2>/dev/null
 cp "$NET_RT/snobol4lib.dll" "$NET_RT/snobol4run.dll" "$TMP/" 2>/dev/null
 ilasm "$TMP/null.il" /output:"$TMP/null.exe" >/dev/null 2>&1
 MONO_PATH="$NET_RT" mono "$TMP/null.exe" < /dev/null > "$TMP/net_null.out" 2>"$TMP/net_null.err"
@@ -176,7 +176,7 @@ else
 fi
 
 # ── 4e: JVM null ────────────────────────────────────────────────────────
-"$DIR/scrip-cc" -jvm "$NULL_SNO" > "$TMP/null.j" 2>/dev/null
+"$DIR/scrip" -jvm "$NULL_SNO" > "$TMP/null.j" 2>/dev/null
 jcn=$(grep '\.class' "$TMP/null.j" | head -1 | awk '{print $NF}')
 java -jar "$JASMIN" "$TMP/null.j" -d "$TMP" >/dev/null 2>&1
 java -cp "$TMP" "$jcn" < /dev/null > "$TMP/jvm_null.out" 2>"$TMP/jvm_null.err"
@@ -219,7 +219,7 @@ fi
 
 # ── 5c: ASM IPC ─────────────────────────────────────────────────────────
 # Rebuild ASM binary from hello.sno (section 4 left prog_asm as null program)
-"$DIR/scrip-cc" -asm "$HELLO_SNO" > "$TMP/hello.s" 2>/dev/null
+"$DIR/scrip" -asm "$HELLO_SNO" > "$TMP/hello.s" 2>/dev/null
 nasm -f elf64 -I"$RT/x86/" "$TMP/hello.s" -o "$TMP/hello_asm.o" 2>/dev/null
 gcc -no-pie "$TMP/hello_asm.o" "$TMP/stmt_rt.o" "$TMP/snobol4.o" "$TMP/mock.o" \
     "$TMP/pat.o" "$TMP/eng.o" -lgc -lm -o "$TMP/prog_asm_hello" 2>/dev/null
@@ -235,7 +235,7 @@ else
 fi
 
 # ── 5d: NET IPC ─────────────────────────────────────────────────────────
-"$DIR/scrip-cc" -net "$HELLO_SNO" > "$TMP/hello.il" 2>/dev/null
+"$DIR/scrip" -net "$HELLO_SNO" > "$TMP/hello.il" 2>/dev/null
 cp "$NET_RT/snobol4lib.dll" "$NET_RT/snobol4run.dll" "$TMP/" 2>/dev/null
 ilasm "$TMP/hello.il" /output:"$TMP/hello_net.exe" >/dev/null 2>&1
 npid=$(fifo_drain "$TMP/net.fifo" "$TMP/net.trace")
@@ -251,7 +251,7 @@ else
 fi
 
 # ── 5e: JVM IPC ─────────────────────────────────────────────────────────
-"$DIR/scrip-cc" -jvm "$HELLO_SNO" > "$TMP/hello.j" 2>/dev/null
+"$DIR/scrip" -jvm "$HELLO_SNO" > "$TMP/hello.j" 2>/dev/null
 jcn_h=$(grep '\.class' "$TMP/hello.j" | head -1 | awk '{print $NF}')
 java -jar "$JASMIN" "$TMP/hello.j" -d "$TMP" >/dev/null 2>&1
 jpid=$(fifo_drain "$TMP/jvm.fifo" "$TMP/jvm.trace")

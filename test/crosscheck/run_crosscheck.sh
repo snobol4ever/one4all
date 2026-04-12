@@ -5,7 +5,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TINY="$(cd "$SCRIPT_DIR/../.." && pwd)"
 CORPUS="${CORPUS:-$(cd "$TINY/../../corpus/crosscheck" 2>/dev/null && pwd || echo /home/claude/corpus/crosscheck)}"
-SCRIP_CC="$TINY/scrip-cc"
+SCRIP_CC="$TINY/scrip"
 RT="$TINY/src/runtime"
 SCRIP_CC_INC="$TINY/src/frontend/snobol4"
 FILTER="${FILTER:-}"
@@ -73,7 +73,7 @@ summary() {
 }
 
 echo "=== one4all crosscheck ==="
-echo "scrip-cc: $SCRIP_CC"; echo ""
+echo "scrip: $SCRIP_CC"; echo ""
 
 for dir in output assign concat arith_new control_new patterns capture strings keywords functions data; do
     full="$CORPUS/$dir"; [[ -d "$full" ]] || continue

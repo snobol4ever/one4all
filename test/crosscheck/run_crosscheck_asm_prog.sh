@@ -6,7 +6,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TINY="$(cd "$SCRIPT_DIR/../.." && pwd)"
 CORPUS="${CORPUS:-/home/claude/corpus/crosscheck/beauty}"
-SCRIP_CC="$TINY/scrip-cc"
+SCRIP_CC="$TINY/scrip"
 RT="$TINY/src/runtime"
 INC="${INC:-$TINY/demo/inc}"
 BEAUTY="${BEAUTY:-$TINY/demo/beauty.sno}"

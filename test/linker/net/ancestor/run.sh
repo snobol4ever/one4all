@@ -5,7 +5,7 @@
 # Expected output: ann
 set -e
 
-SCRIP_CC=../../../../src/driver/scrip-cc
+SCRIP_CC=../../../../src/driver/scrip
 RUNTIME=../../../../src/runtime/net
 OUT=./out
 mkdir -p "$OUT"

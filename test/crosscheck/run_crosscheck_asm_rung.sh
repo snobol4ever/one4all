@@ -14,7 +14,7 @@
 #       /home/claude/corpus/crosscheck/output
 #
 # Environment overrides:
-#   SCRIP_CC   — path to scrip-cc binary     (default: ./scrip-cc)
+#   SCRIP_CC   — path to scrip-cc binary     (default: ./scrip)
 #   INC     — SNOBOL4 include dir      (default: demo/inc)
 #   STOP_ON_FAIL=1  — stop at first failure (default: 0 = keep going)
 
@@ -22,7 +22,7 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TINY="$(cd "$SCRIPT_DIR/../.." && pwd)"
-SCRIP_CC="${SCRIP_CC:-$TINY/scrip-cc}"
+SCRIP_CC="${SCRIP_CC:-$TINY/scrip}"
 RT="$TINY/src/runtime"
 INC="${INC:-$TINY/demo/inc}"
 STOP_ON_FAIL="${STOP_ON_FAIL:-0}"

@@ -29,7 +29,7 @@
 
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SCRIP_CC="$ROOT/scrip-cc"
+SCRIP_CC="$ROOT/scrip"
 CORPUS="${CORPUS:-$(cd "$ROOT/../corpus" 2>/dev/null && pwd || echo "")}"
 BASELINE="$ROOT/test/emit_baseline"
 
@@ -56,10 +56,10 @@ if [[ $SKIP_VERIFY -eq 0 ]]; then
   echo -e "${BOLD}VERIFY — build + corpus path${RESET}"
 
   if [[ ! -x "$SCRIP_CC" ]]; then
-    info "scrip-cc not built — building now..."
-    (cd "$ROOT/src" && make -j4 -s) && ok "scrip-cc built" || { fail "build failed"; exit 1; }
+    info "scrip not built — building now..."
+    (cd "$ROOT/src" && make -j4 -s) && ok "scrip built" || { fail "build failed"; exit 1; }
   else
-    ok "scrip-cc exists: $SCRIP_CC"
+    ok "scrip exists: $SCRIP_CC"
   fi
 
   if [[ -z "$CORPUS" || ! -d "$CORPUS/crosscheck" ]]; then
@@ -118,7 +118,7 @@ if [[ $SKIP_FIX -eq 0 && $ONLY_BASELINE -eq 0 ]]; then
   # Try to build with ASan for better crash diagnosis
   info "Building with AddressSanitizer for crash diagnosis..."
   ASAN_BIN="$ROOT/scrip-cc_asan"
-  if (cd "$ROOT/src" && make -j4 -s CFLAGS="-Wall -Wno-unused-function -g -O0 -I. -Ifrontend/snobol4 -Ifrontend/snocone -Ifrontend/prolog -Ifrontend/icon -Ibackend -Ibackend/x64 -fsanitize=address,undefined" 2>/dev/null && cp "$ROOT/scrip-cc" "$ASAN_BIN") 2>/dev/null; then
+  if (cd "$ROOT/src" && make -j4 -s CFLAGS="-Wall -Wno-unused-function -g -O0 -I. -Ifrontend/snobol4 -Ifrontend/snocone -Ifrontend/prolog -Ifrontend/icon -Ibackend -Ibackend/x64 -fsanitize=address,undefined" 2>/dev/null && cp "$ROOT/scrip" "$ASAN_BIN") 2>/dev/null; then
     ok "ASan binary: $ASAN_BIN"
     info "Running crash pair under ASan..."
     ASAN_OPTIONS=abort_on_error=0 "$ASAN_BIN" -asm "$F013" "$F014" > /dev/null 2>&1 || true

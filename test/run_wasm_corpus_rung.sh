@@ -19,7 +19,7 @@
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SCRIP_CC="${SCRIP_CC:-$ROOT/scrip-cc}"
+SCRIP_CC="${SCRIP_CC:-$ROOT/scrip}"
 CORPUS="${CORPUS:-$(cd "$ROOT/../corpus" 2>/dev/null && pwd || echo "")}"
 RUNNER="$ROOT/test/wasm/run_wasm.js"
 WORK="${WORK:-/tmp/wasm_rung_$$}"
@@ -33,7 +33,7 @@ die() { echo -e "${RED}ERROR${RESET}: $*" >&2; exit 2; }
 [[ $# -ge 1 ]] || die "usage: $0 <rung_dir_name>"
 RUNG_NAME="$1"
 
-command -v "$SCRIP_CC"  &>/dev/null || die "scrip-cc not found at $SCRIP_CC — run SESSION_SETUP.sh"
+command -v "$SCRIP_CC"  &>/dev/null || die "scrip not found at $SCRIP_CC — run SESSION_SETUP.sh"
 command -v wat2wasm     &>/dev/null || die "wat2wasm not found — run SESSION_SETUP.sh"
 command -v node         &>/dev/null || die "node not found — run SESSION_SETUP.sh"
 [[ -f "$RUNNER" ]]                  || die "run_wasm.js not found at $RUNNER"

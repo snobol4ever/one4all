@@ -2,12 +2,12 @@
 # run_icon_x64_rung.sh — Icon x64 corpus ladder driver
 #
 # Usage:  bash run_icon_x64_rung.sh <corpus-dir> [dir2 ...]
-# Env:    SCRIP_CC (default: ./scrip-cc)  STOP_ON_FAIL=1
+# Env:    SCRIP_CC (default: ./scrip)  STOP_ON_FAIL=1
 
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-SCRIP_CC="${SCRIP_CC:-$ROOT/scrip-cc}"
+SCRIP_CC="${SCRIP_CC:-$ROOT/scrip}"
 RT="$ROOT/src/frontend/icon/icon_runtime.c"
 STOP_ON_FAIL="${STOP_ON_FAIL:-0}"
 

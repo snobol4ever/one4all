@@ -4,7 +4,7 @@
 # Used by run_rung01.sh / run_rung03.sh (old-format rung scripts).
 set -e
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-SCRIP_CC="${SCRIP_CC:-$ROOT/scrip-cc}"
+SCRIP_CC="${SCRIP_CC:-$ROOT/scrip}"
 RT="$ROOT/src/runtime"
 ICN_INC="$ROOT/src/frontend/icon"
 icn="$1"

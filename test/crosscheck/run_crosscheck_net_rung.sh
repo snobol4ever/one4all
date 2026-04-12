@@ -19,7 +19,7 @@
 #       /path/to/corpus/output
 #
 # Environment overrides:
-#   SCRIP_CC        — path to scrip-cc binary  (default: ./scrip-cc)
+#   SCRIP_CC        — path to scrip-cc binary  (default: ./scrip)
 #   STOP_ON_FAIL — 1 = stop at first failure (default: 0)
 #   CACHE_DIR    — where to cache .il/.exe (default: /tmp/one4all_net_cache)
 
@@ -27,7 +27,7 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TINY="$(cd "$SCRIPT_DIR/../.." && pwd)"
-SCRIP_CC="${SCRIP_CC:-$TINY/scrip-cc}"
+SCRIP_CC="${SCRIP_CC:-$TINY/scrip}"
 STOP_ON_FAIL="${STOP_ON_FAIL:-0}"
 CACHE_DIR="${CACHE_DIR:-/tmp/one4all_net_cache}"
 mkdir -p "$CACHE_DIR"

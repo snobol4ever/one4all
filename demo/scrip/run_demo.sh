@@ -76,14 +76,14 @@ done
 # ── Auto-detect snobol4ever tools ─────────────────────────────────────────────
 SCRIP_CC="${SCRIP_CC:-}"
 if [ -z "$SCRIP_CC" ]; then
-    if [ -x "$SNOBOL4X/scrip-cc" ]; then SCRIP_CC="$SNOBOL4X/scrip-cc"
-    elif command -v scrip-cc &>/dev/null; then SCRIP_CC="scrip-cc"; fi
+    if [ -x "$SNOBOL4X/scrip" ]; then SCRIP_CC="$SNOBOL4X/scrip"
+    elif command -v scrip-cc &>/dev/null; then SCRIP_CC="scrip"; fi
 fi
 
 SCRIP_CC="${SCRIP_CC:-}"
 if [ -z "$SCRIP_CC" ]; then
-    if [ -x "/tmp/scrip-cc" ]; then SCRIP_CC="/tmp/scrip-cc"
-    elif command -v scrip-cc &>/dev/null; then SCRIP_CC="scrip-cc"; fi
+    if [ -x "/tmp/scrip" ]; then SCRIP_CC="/tmp/scrip"
+    elif command -v scrip-cc &>/dev/null; then SCRIP_CC="scrip"; fi
 fi
 
 JASMIN="${JASMIN:-}"

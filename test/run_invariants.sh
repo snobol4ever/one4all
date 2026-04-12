@@ -12,7 +12,7 @@
 #   bash test/run_invariants.sh [--serial] [--verbose]
 #
 # Environment overrides:
-#   SCRIP_CC      path to scrip-cc binary           (default: <root>/scrip-cc)
+#   SCRIP_CC      path to scrip-cc binary           (default: <root>/scrip)
 #   CORPUS        path to corpus root               (default: <root>/../corpus)
 #   JASMIN        path to jasmin.jar                (default: <root>/src/backend/jasmin.jar)
 #   RT_CACHE      path to persistent archive cache  (default: <root>/out/rt_cache)
@@ -28,7 +28,7 @@ set -uo pipefail
 
 # ── Config ────────────────────────────────────────────────────────────────────
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SCRIP_CC="${SCRIP_CC:-$ROOT/scrip-cc}"
+SCRIP_CC="${SCRIP_CC:-$ROOT/scrip}"
 CORPUS="${CORPUS:-$(cd "$ROOT/../corpus" 2>/dev/null && pwd || echo "")}"
 export CORPUS_REPO="$CORPUS"   # rung scripts use CORPUS_REPO; M-G-INV-FAST-X86-FIX
 JASMIN="${JASMIN:-$ROOT/src/backend/jasmin.jar}"
@@ -80,7 +80,7 @@ _need() {
     exit 2
   fi
 }
-_need "scrip-cc"    "$([[ -x "$SCRIP_CC" && -s "$SCRIP_CC" ]] && echo 1 || echo 0)"
+_need "scrip"    "$([[ -x "$SCRIP_CC" && -s "$SCRIP_CC" ]] && echo 1 || echo 0)"
 
 # Determine which tool families are needed based on requested cells.
 # If no cells given, all cells run → all tools required.

@@ -8,7 +8,7 @@ SNO="${1:?Usage: snobol4-asm <file.sno>}"
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RT="$DIR/src/runtime"
 INC="${INC:-/home/claude/corpus/programs/inc}"
-SCRIP_CC="${SCRIP_CC:-$DIR/scrip-cc}"
+SCRIP_CC="${SCRIP_CC:-$DIR/scrip}"
 WORK=$(mktemp -d /tmp/snobol4_asm_XXXXXX)
 trap 'rm -rf "$WORK"' EXIT
 

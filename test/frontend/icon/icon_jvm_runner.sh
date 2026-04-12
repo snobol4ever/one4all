@@ -4,7 +4,7 @@
 # Used by old-format rung scripts (run_rung01.sh, run_rung03.sh).
 set -e
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-SCRIP_CC="${SCRIP_CC:-$ROOT/scrip-cc}"
+SCRIP_CC="${SCRIP_CC:-$ROOT/scrip}"
 JASMIN="${JASMIN:-$ROOT/src/backend/jasmin.jar}"
 icn="$1"
 base=$(mktemp /tmp/icon_jvm_XXXXXX)

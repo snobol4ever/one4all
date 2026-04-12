@@ -35,7 +35,7 @@ for src in "$RT/x86/snobol4_stmt_rt.c" "$RT/x86/snobol4.c" \
         -I"$DIR/src/frontend/snobol4" -w \
         -o "$TMP/$(basename "$src" .c).o" 2>/dev/null
 done
-"$DIR/scrip-cc" -asm "$SNO" > "$TMP/prog.s" 2>/dev/null
+"$DIR/scrip" -asm "$SNO" > "$TMP/prog.s" 2>/dev/null
 nasm -f elf64 -I"$RT/x86/" "$TMP/prog.s" -o "$TMP/prog.o" 2>/dev/null
 gcc -no-pie "$TMP/prog.o" \
     "$TMP/snobol4_stmt_rt.o" "$TMP/snobol4.o" "$TMP/mock_includes.o" \
@@ -43,7 +43,7 @@ gcc -no-pie "$TMP/prog.o" \
     -lgc -lm -o "$TMP/prog_asm" 2>/dev/null
 
 # ── Step 3: compile NET ──────────────────────────────────────────────────
-SCRIP_CC_NET="${SCRIP_CC_NET:-$DIR/scrip-cc}"
+SCRIP_CC_NET="${SCRIP_CC_NET:-$DIR/scrip}"
 NET_CACHE="${NET_CACHE:-/tmp/one4all_net_cache}"
 mkdir -p "$NET_CACHE"
 for dll in snobol4lib.dll snobol4run.dll; do
@@ -58,7 +58,7 @@ if [[ "$(cat "$stamp" 2>/dev/null)" != "$il_md5" ]] || [[ ! -f "$exe" ]]; then
 fi
 
 # ── Step 4: compile JVM ──────────────────────────────────────────────────
-SCRIP_CC_JVM="${SCRIP_CC_JVM:-$DIR/scrip-cc}"
+SCRIP_CC_JVM="${SCRIP_CC_JVM:-$DIR/scrip}"
 JASMIN="${JASMIN:-$DIR/src/backend/jasmin.jar}"
 JVM_CACHE="${JVM_CACHE:-/tmp/one4all_jvm_cache}"
 mkdir -p "$JVM_CACHE"

@@ -15,7 +15,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TINY="$(cd "$SCRIPT_DIR/../.." && pwd)"
 CORPUS="${CORPUS:-$(cd "$TINY/../corpus/crosscheck" && pwd)}"
-SCRIP_CC="$TINY/scrip-cc"
+SCRIP_CC="$TINY/scrip"
 RT="$TINY/src/runtime"
 SCRIP_CC_INC="$TINY/src/frontend/snobol4"
 STOP_ON_FAIL="${STOP_ON_FAIL:-0}"

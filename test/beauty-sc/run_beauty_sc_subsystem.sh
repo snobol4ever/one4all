@@ -13,7 +13,7 @@
 #
 # Environment:
 #   CORPUS       — path to corpus root (required)
-#   SCRIP_CC     — path to scrip-cc binary (default: ./scrip-cc)
+#   SCRIP_CC     — path to scrip-cc binary (default: ./scrip)
 #   STOP_ON_FAIL — 1 to stop at first fail (default: 0)
 #
 # Must be run from one4all root.
@@ -22,7 +22,7 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TINY="$(cd "$SCRIPT_DIR/../.." && pwd)"
-SCRIP_CC="${SCRIP_CC:-$TINY/scrip-cc}"
+SCRIP_CC="${SCRIP_CC:-$TINY/scrip}"
 RT="$TINY/src/runtime"
 CORPUS="${CORPUS:-}"
 
