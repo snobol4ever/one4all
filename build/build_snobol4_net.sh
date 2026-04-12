@@ -5,7 +5,7 @@
 set -euo pipefail
 
 SNO="${1:?Usage: build_snobol4_net.sh <file.sno>}"
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIP_CC="${SCRIP_CC_NET:-/home/claude/scrip-cc_net}"
 NET_CACHE="${NET_CACHE:-/tmp/scrip_cc_net_cache}"
 RUNTIME_NET="$DIR/src/runtime/net"

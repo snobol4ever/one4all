@@ -5,7 +5,7 @@
 set -euo pipefail
 
 SNO="${1:?Usage: build_snobol4_x86.sh <file.sno>}"
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RT="$DIR/src/runtime"
 INC="${INC:-/home/claude/corpus/programs/inc}"
 SCRIP_CC="${SCRIP_CC:-$DIR/scrip}"
