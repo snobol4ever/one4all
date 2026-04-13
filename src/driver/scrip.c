@@ -52,7 +52,7 @@ extern Program *sno_parse(FILE *f, const char *filename);
 #include "../frontend/prolog/term.h"            /* Term — needed by Prolog globals block */
 #include "../frontend/prolog/prolog_runtime.h"  /* Trail — needed by Prolog globals block */
 #include "../frontend/prolog/prolog_builtin.h"  /* interp_exec_pl_builtin declaration */
-#include "../frontend/prolog/pl_broker.h"       /* pl_box_choice, pl_exec_goal — S-BB-7 */
+#include "../frontend/prolog/pl_broker.h"       /* pl_box_choice, pl_box_* — S-BB-7; pl_exec_goal removed U-11 */
 #include "../frontend/icon/icon_driver.h"
 #include "../frontend/icon/icon_lex.h"    /* IcnTkKind — TK_AUG* for E_AUGOP in unified interp */
 
@@ -2052,14 +2052,14 @@ static DESCR_t interp_eval(EXPR_t *e)
     case E_CHOICE: {
         /* Drive clause selection via the Byrd box broker.
          * pl_box_choice builds the full OR/CAT/head-unify box tree.
-         * pl_exec_goal drives α — OR-box retries β internally per clause.
+         * bb_broker drives α (BB_ONCE) — OR-box retries β internally per clause.
          * g_pl_env holds the caller's arg Term** array (arity slots).
          * Returns INTVAL(1) on first solution (γ), FAILDESCR on ω. */
         if (!g_pl_active) return NULVCL;
         int arity = 0;
         if (e->sval) { const char *sl = strrchr(e->sval, '/'); if (sl) arity = atoi(sl+1); }
         bb_node_t root = pl_box_choice(e, g_pl_env, arity);
-        int ok = pl_exec_goal(root);
+        int ok = bb_broker(root, BB_ONCE, NULL, NULL);
         return ok ? INTVAL(1) : FAILDESCR;
     }
 
@@ -2606,7 +2606,7 @@ int interp_exec_pl_builtin(EXPR_t *goal, Term **env) {
 
 /*---- pl_execute_program_unified — entry point ----*/
 /* S-BB-7: top-level dispatch now routes main/0 through the Byrd box broker.
- * pl_box_choice(main_choice, NULL, 0) builds the OR-box; pl_exec_goal() drives it.
+ * pl_box_choice(main_choice, NULL, 0) builds the OR-box; bb_broker(BB_ONCE) drives it.
  * The old interp_eval(main_choice) call is removed from the top-level entry.
  * Body goals within clauses still use the old interp_eval path until S-BB-8. */
 static void pl_execute_program_unified(Program *prog) {
@@ -2623,7 +2623,7 @@ static void pl_execute_program_unified(Program *prog) {
     g_pl_env      = NULL;
     g_pl_active   = 1;
     /* S-1C-3 restored: main/0 dispatches through interp_eval() — the ONE interpreter.
-     * E_CHOICE case in interp_eval uses pl_box_choice+pl_exec_goal for backtracking. */
+     * E_CHOICE case in interp_eval uses pl_box_choice+bb_broker(BB_ONCE) for backtracking. */
     EXPR_t *main_choice = pl_pred_table_lookup(&g_pl_pred_table, "main/0");
     if (main_choice) {
         interp_eval(main_choice);

@@ -5,6 +5,7 @@
  *         Leaf boxes (pl_box_true/fail/builtin) added S-BB-2.
  *         CAT / OR / CUT boxes added S-BB-3 through S-BB-6.
  *         Routing real interp_eval calls through broker: S-BB-7/S-BB-8.
+ *         U-11: pl_exec_goal removed — callers use bb_broker(BB_ONCE) directly.
  *
  * Reuses bb_box_fn ABI from bb_box.h unchanged:
  *   entry α (0): first call  — attempt goal
@@ -25,18 +26,6 @@
  * ω is FAILDESCR.  spec_t is no longer used by Prolog boxes.
  *--------------------------------------------------------------------------------------------------------------------*/
 static inline DESCR_t pl_gamma(void) { return NULVCL; }
-
-/*======================================================================================================================
- * pl_exec_goal — top-level broker entry point  (S-BB-1)
- *
- * Calls root.fn(root.ζ, α).
- * Returns 1 on γ (goal succeeded), 0 on ω (goal failed).
- *
- * No scan loop — Prolog is not positional.  Retry is the OR-box's job (S-BB-5).
- *====================================================================================================================*/
-int pl_exec_goal(bb_node_t root) {
-    return bb_broker(root, BB_ONCE, NULL, NULL);
-}
 
 /*======================================================================================================================
  * S-BB-2 — Leaf boxes

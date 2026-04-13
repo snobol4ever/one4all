@@ -4,7 +4,7 @@
  * pl_broker.h — Prolog Byrd Box Broker (GOAL-PROLOG-BB-BYRD, GOAL-UNIFIED-BROKER U-8)
  *
  * U-8: Pl_GoalBox → bb_node_t (unified with SNOBOL4 / Icon boxes).
- *      pl_exec_goal now calls bb_broker(root, BB_ONCE, NULL, NULL).
+ *      U-11: pl_exec_goal removed — callers use bb_broker(root, BB_ONCE, NULL, NULL) directly.
  *
  * All Prolog goal boxes share the universal Byrd box signature:
  *   DESCR_t (*bb_box_fn)(void *zeta, int entry)
@@ -26,16 +26,8 @@
 #include "frontend/prolog/prolog_builtin.h" /* interp_exec_pl_builtin */
 
 /*----------------------------------------------------------------------------------------------------------------------
- * pl_exec_goal — top-level broker entry point
- *
- * Calls bb_broker(root, BB_ONCE, NULL, NULL).
- * Returns 1 if γ (success), 0 if ω (failure).
- * No scan loop — Prolog is not positional; retry is the OR-box's job.
- *--------------------------------------------------------------------------------------------------------------------*/
-int pl_exec_goal(bb_node_t root);
-
-/*----------------------------------------------------------------------------------------------------------------------
  * Leaf box constructors (U-8: return bb_node_t, was Pl_GoalBox)
+ * U-11: pl_exec_goal removed — callers use bb_broker(root, BB_ONCE, NULL, NULL) directly.
  *--------------------------------------------------------------------------------------------------------------------*/
 
 /* pl_box_true — γ on α, ω on β (succeed exactly once) */

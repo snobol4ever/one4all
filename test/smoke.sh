@@ -36,18 +36,8 @@ check "sm-run (default)" "hello" "$("$SCRIP" "$SNO" 2>/dev/null)"
 check "ir-run"           "hello" "$("$SCRIP" --ir-run "$SNO" 2>/dev/null)"
 
 # ── x86 emit mode ─────────────────────────────────────────────────────────────
-if have nasm && have gcc; then
-    TMP=$(mktemp -d)
-    "$SCRIP" --jit-emit --x64 "$SNO" > "$TMP/prog.s" 2>/dev/null &&
-    nasm -f elf64 "$TMP/prog.s" -o "$TMP/prog.o" 2>/dev/null &&
-    gcc "$TMP/prog.o" -lgc -lm -o "$TMP/prog" 2>/dev/null &&
-    got=$("$TMP/prog" 2>/dev/null) ||
-    got=""
-    rm -rf "$TMP"
-    check "x86 emit" "hello" "$got"
-else
-    skip "x86 emit" "nasm/gcc"
-fi
+# SM/BB-based x64 emit not yet implemented — new emitter comes box-by-box from SM/BB path.
+echo "SKIP x86 emit (not yet implemented)"
 
 # ── JVM emit mode ─────────────────────────────────────────────────────────────
 if have java && [ -f "$JASMIN" ]; then

@@ -10,7 +10,7 @@
  *   BB_PUMP (Icon):    call root.fn(ζ,α); on γ: body_fn(val,arg); β-loop until ω.
  *
  *   BB_ONCE (Prolog):  call root.fn(ζ,α) once; on γ: body_fn(val,arg) once; done.
- *                      Mirrors pl_exec_goal in pl_broker.c exactly.
+ *                      OR-box handles retry internally. pl_exec_goal removed U-11.
  *
  * Value type: DESCR_t throughout.
  * During migration (before U-5), SNOBOL4 callers use descr_from_spec() to wrap spec_t
@@ -70,8 +70,9 @@ int bb_broker(bb_node_t root, BrokerMode mode,
     }
 
     /*--------------------------------------------------------------------------------------------------------------------------
-     * BB_ONCE — Prolog goal: α once, OR-box handles retry internally
-     * Mirrors pl_exec_goal. body_fn called at most once.
+     * BB_ONCE — Prolog goal: α once, OR-box handles retry internally.
+     * U-11: pl_exec_goal removed; callers use bb_broker(root, BB_ONCE, NULL, NULL) directly.
+     * body_fn called at most once.
      *--------------------------------------------------------------------------------------------------------------------------*/
     case BB_ONCE: {
         DESCR_t val = fn(root.ζ, α);
