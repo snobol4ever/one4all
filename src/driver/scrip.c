@@ -200,7 +200,6 @@ static void icn_gen_push(EXPR_t *n, long v, const char *sv) { if(icn_gen_depth<I
 static void icn_gen_pop(void)               { if(icn_gen_depth>0)icn_gen_depth--; }
 static int  icn_gen_lookup(EXPR_t *n, long *out) { for(int i=icn_gen_depth-1;i>=0;i--) if(icn_gen_stack[i].node==n){*out=icn_gen_stack[i].cur;return 1;} return 0; }
 static int  icn_gen_lookup_sv(EXPR_t *n, long *out, const char **sv) { for(int i=icn_gen_depth-1;i>=0;i--) if(icn_gen_stack[i].node==n){*out=icn_gen_stack[i].cur;*sv=icn_gen_stack[i].sval;return 1;} return 0; }
-static int  icn_gen_active(EXPR_t *n)            { for(int i=0;i<icn_gen_depth;i++) if(icn_gen_stack[i].node==n) return 1; return 0; }
 
 /* Icon scan state globals */
 #define ICN_SCAN_STACK_MAX 16
@@ -250,17 +249,6 @@ static int icn_has_suspend(EXPR_t *e) {
     for (int i = 0; i < e->nchildren; i++) if (icn_has_suspend(e->children[i])) return 1;
     return 0;
 }
-static int icn_has_suspend_call(EXPR_t *e) {
-    if (!e) return 0;
-    if (e->kind == E_FNC && e->nchildren >= 1 && e->children[0] && e->children[0]->sval) {
-        const char *fn = e->children[0]->sval;
-        for (int i = 0; i < icn_proc_count; i++)
-            if (strcmp(icn_proc_table[i].name, fn) == 0 && icn_has_suspend(icn_proc_table[i].proc))
-                return 1;
-    }
-    for (int i = 0; i < e->nchildren; i++) if (icn_has_suspend_call(e->children[i])) return 1;
-    return 0;
-}
 
 static DESCR_t icn_call_proc(EXPR_t *proc, DESCR_t *args, int nargs); /* forward */
 static DESCR_t  interp_eval(EXPR_t *e); /* forward — needed by icn_drive + trampoline */
@@ -297,108 +285,6 @@ static void icn_coro_trampoline(void) {
     swapcontext(&ce->gen_ctx, &ce->caller_ctx);
 }
 
-/* icn_drive: drive generators embedded in e, re-executing root each tick.
- * Returns tick count. Mirrors icn_exec_driven in icon_interp.c but uses DESCR_t. */
-static int icn_drive(EXPR_t *root, EXPR_t *e) {
-    if (!e) return 0;
-    if (icn_gen_active(e)) return 0;
-    if (e->kind == E_TO && e->nchildren >= 2) {
-        int ticks = 0;
-        /* Both lo and hi may be generators — collect all values, cross-product. */
-        EXPR_t *lo_node = e->children[0];
-        EXPR_t *hi_node = e->children[1];
-        long lo_vals[256]; int nlo = 0;
-        long hi_vals[256]; int nhi = 0;
-        /* Collect lo values */
-        if (lo_node->kind == E_TO && lo_node->nchildren >= 2) {
-            DESCR_t llo = interp_eval(lo_node->children[0]);
-            DESCR_t lhi = interp_eval(lo_node->children[1]);
-            if (!IS_FAIL_fn(llo) && !IS_FAIL_fn(lhi))
-                for (long v = llo.i; v <= lhi.i && nlo < 256; v++) lo_vals[nlo++] = v;
-        } else {
-            DESCR_t lo_d = interp_eval(lo_node);
-            if (!IS_FAIL_fn(lo_d)) lo_vals[nlo++] = lo_d.i;
-        }
-        /* Collect hi values */
-        if (hi_node->kind == E_TO && hi_node->nchildren >= 2) {
-            DESCR_t hlo = interp_eval(hi_node->children[0]);
-            DESCR_t hhi = interp_eval(hi_node->children[1]);
-            if (!IS_FAIL_fn(hlo) && !IS_FAIL_fn(hhi))
-                for (long v = hlo.i; v <= hhi.i && nhi < 256; v++) hi_vals[nhi++] = v;
-        } else {
-            DESCR_t hi_d = interp_eval(hi_node);
-            if (!IS_FAIL_fn(hi_d)) hi_vals[nhi++] = hi_d.i;
-        }
-        if (nlo == 0 || nhi == 0) return 0;
-        /* Cross-product: for each lo tick, for each hi tick, iterate lo..hi */
-        for (int li = 0; li < nlo && !icn_returning; li++) {
-            long lo = lo_vals[li];
-            for (int hi_idx = 0; hi_idx < nhi && !icn_returning; hi_idx++) {
-                long hi = hi_vals[hi_idx];
-                for (long i = lo; i <= hi && !icn_returning; i++) {
-                    icn_gen_push(e, i, NULL);
-                    int inner = icn_drive(root, root);
-                    if (!inner) interp_eval(root);
-                    icn_gen_pop(); ticks++;
-                    if (icn_returning) break;
-                }
-            }
-        }
-        return ticks;
-    }
-    if (e->kind == E_TO_BY && e->nchildren >= 3) {
-        DESCR_t lo_d=interp_eval(e->children[0]);
-        DESCR_t hi_d=interp_eval(e->children[1]);
-        DESCR_t st_d=interp_eval(e->children[2]);
-        if(IS_FAIL_fn(lo_d)||IS_FAIL_fn(hi_d)||IS_FAIL_fn(st_d)) return 0;
-        long lo=lo_d.i,hi=hi_d.i,st=st_d.i?st_d.i:1; int ticks=0;
-        if(st>0){for(long i=lo;i<=hi&&!icn_returning;i+=st){icn_gen_push(e,i,NULL);int inner=icn_drive(root,root);if(!inner)interp_eval(root);icn_gen_pop();ticks++;if(icn_returning)break;}}
-        else    {for(long i=lo;i>=hi&&!icn_returning;i+=st){icn_gen_push(e,i,NULL);int inner=icn_drive(root,root);if(!inner)interp_eval(root);icn_gen_pop();ticks++;if(icn_returning)break;}}
-        return ticks;
-    }
-    /* S-6: E_ITERATE (!str) — generate each character of a string */
-    if (e->kind == E_ITERATE && e->nchildren >= 1) {
-        DESCR_t sv_d = interp_eval(e->children[0]);
-        if (IS_FAIL_fn(sv_d) || !IS_STR_fn(sv_d)) return 0;
-        const char *str = sv_d.s ? sv_d.s : "";
-        long len = (long)strlen(str); int ticks = 0;
-        for (long i = 0; i < len && !icn_returning; i++) {
-            icn_gen_push(e, i, str);
-            int inner = icn_drive(root, root);
-            if (!inner) interp_eval(root);
-            icn_gen_pop(); ticks++;
-            if (icn_returning) break;
-        }
-        return ticks;
-    }
-    /* S-7: find(pat,str) as generator — successive 1-based positions.
-     * ICN_CALL nodes have sval=NULL; name lives in children[0]->sval. */
-    if (e->kind == E_FNC && e->nchildren>=3
-        && e->children[0] && e->children[0]->sval
-        && strcmp(e->children[0]->sval,"find")==0) {
-        DESCR_t s1 = interp_eval(e->children[1]);
-        DESCR_t s2 = interp_eval(e->children[2]);
-        if (IS_FAIL_fn(s1)||IS_FAIL_fn(s2)) return 0;
-        const char *needle = VARVAL_fn(s1), *hay = VARVAL_fn(s2);
-        if (!needle||!hay) return 0;
-        int nlen=(int)strlen(needle), ticks=0;
-        const char *p = hay;
-        while (!icn_returning) {
-            char *hit = strstr(p, needle);
-            if (!hit) break;
-            long pos1 = (long)(hit - hay) + 1;  /* 1-based */
-            icn_gen_push(e, pos1, NULL);
-            int inner = icn_drive(root, root);
-            if (!inner) interp_eval(root);
-            icn_gen_pop(); ticks++;
-            if (icn_returning) break;
-            p = hit + (nlen > 0 ? nlen : 1);    /* advance past this match */
-        }
-        return ticks;
-    }
-    for(int i=0;i<e->nchildren;i++){int t=icn_drive(root,e->children[i]);if(t>0)return t;}
-    return 0;
-}
 
 /* icn_interp_eval: thin delegator — all Icon evaluation now in interp_eval. */
 static DESCR_t icn_interp_eval(EXPR_t *root, EXPR_t *e) {
@@ -570,8 +456,13 @@ icn_gen_t icn_eval_gen(EXPR_t *e) {
                 wrapped_every_ctx_t *wc = GC_malloc(sizeof(*wc));
                 wc->gen_node = gen_node; wc->outer = e; wc->body = NULL;
                 wc->ret = &icn_returning; wc->brk = &icn_loop_break;
-                wc->is_str = (gen_node->kind == E_ITERATE) ? 1 :
-                             (gen_node->kind == E_FNC)      ? 2 : 0;
+                /* is_str: 0=integer(E_TO/E_TO_BY), 1=string(E_ITERATE), 2=proc-coro(fallback) */
+                int sub_is_proc = (gen_node->kind == E_FNC
+                                   && gen_node->nchildren >= 1
+                                   && gen_node->children[0]
+                                   && gen_node->children[0]->sval
+                                   && strcmp(gen_node->children[0]->sval, "find") != 0);
+                wc->is_str = (gen_node->kind == E_ITERATE) ? 1 : sub_is_proc ? 2 : 0;
                 /* Encode sub-gen in zeta field of a special sentinel */
                 /* Use a two-field struct: first field = sub icn_gen_t */
                 typedef struct { icn_gen_t sub; wrapped_every_ctx_t *wc; } wrap_sentinel_t;
