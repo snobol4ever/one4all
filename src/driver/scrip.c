@@ -202,8 +202,10 @@ typedef struct { Pl_PredEntry *buckets[PL_PRED_TABLE_SIZE_FWD]; } Pl_PredTable;
 Term    *pl_unified_term_from_expr(EXPR_t *e, Term **env); /* forward */
 Term   **pl_env_new(int n); /* forward */
 static EXPR_t  *pl_pred_table_lookup(Pl_PredTable *pt, const char *key); /* forward */
+static void     pl_pred_table_insert(Pl_PredTable *pt, const char *key, EXPR_t *choice); /* forward U-14 */
 static int      is_pl_user_call(EXPR_t *goal); /* forward */
 int             interp_exec_pl_builtin(EXPR_t *goal, Term **env); /* forward — defined in pl_ block */
+static void     polyglot_init(Program *prog); /* forward U-14 */
 
 /* ── Prolog global execution state ──────────────────────────────────────────
  * Initialised by pl_execute_program_unified() at program start. */
@@ -757,22 +759,8 @@ static DESCR_t icn_call_proc(EXPR_t *proc, DESCR_t *args, int nargs) {
 /* icn_execute_program_unified: entry point for Icon via unified interpreter.
  * Replaces icon_execute_program. Builds proc table, calls main/0. */
 static void icn_execute_program_unified(Program *prog) {
-    icn_proc_count = 0;
-    icn_env = NULL; icn_env_n = 0; icn_returning = 0;
-    icn_gen_depth = 0;
-    icn_scan_subj = NULL; icn_scan_pos = 0; icn_scan_depth = 0;
-    icn_loop_break = 0; g_lang = 1; g_icn_root = NULL;
-
-    /* Build procedure table from STMT_t subjects */
-    for (STMT_t *st = prog->head; st; st = st->next) {
-        EXPR_t *proc = st->subject;
-        if (!proc || proc->kind != E_FNC || proc->nchildren < 1) continue;
-        const char *name = proc->children[0]->sval;
-        if (!name || icn_proc_count >= ICN_PROC_MAX) continue;
-        icn_proc_table[icn_proc_count].name = name;
-        icn_proc_table[icn_proc_count].proc = proc;
-        icn_proc_count++;
-    }
+    polyglot_init(prog);   /* U-14: one pass, all three runtime tables */
+    g_lang = 1;            /* Icon top-level mode */
 
     /* Find and call main */
     for (int i = 0; i < icn_proc_count; i++) {
@@ -850,7 +838,63 @@ static void prescan_defines(Program *prog)
     }
 }
 
-/* ── call_user_function — forward decl (needs interp_eval, declared below) ── */
+/* ══════════════════════════════════════════════════════════════════════════
+ * polyglot_init — one pass, all three runtime tables  (U-14)
+ *
+ * Replaces the three separate init sequences that lived in execute_program,
+ * icn_execute_program_unified, and pl_execute_program_unified.
+ * Safe to call for single-language Programs — the lang-tagged tables are
+ * simply empty when no statements of that language are present.
+ * ══════════════════════════════════════════════════════════════════════════ */
+static void polyglot_init(Program *prog)
+{
+    if (!prog) return;
+
+    /* ── SNO: label table + DEFINE prescan ─────────────────────────── */
+    label_table_build(prog);
+    prescan_defines(prog);
+
+    /* ── ICN: proc table ────────────────────────────────────────────── */
+    icn_proc_count = 0;
+    icn_env = NULL; icn_env_n = 0; icn_returning = 0;
+    icn_gen_depth = 0;
+    icn_scan_subj = NULL; icn_scan_pos = 0; icn_scan_depth = 0;
+    icn_loop_break = 0; g_icn_root = NULL;
+
+    /* ── PL: pred table + trail ─────────────────────────────────────── */
+    prolog_atom_init();
+    memset(&g_pl_pred_table, 0, sizeof g_pl_pred_table);
+    trail_init(&g_pl_trail);
+    g_pl_cut_flag = 0;
+    g_pl_env      = NULL;
+    g_pl_active   = 0;
+
+    /* ── Single pass: populate ICN proc table and PL pred table ─────── */
+    for (STMT_t *s = prog->head; s; s = s->next) {
+        if (!s->subject) continue;
+        if (s->lang == LANG_ICN) {
+            /* Icon: collect E_FNC procedure definitions */
+            EXPR_t *proc = s->subject;
+            if (proc->kind == E_FNC && proc->nchildren >= 1 && proc->children[0]) {
+                const char *name = proc->children[0]->sval;
+                if (name && icn_proc_count < ICN_PROC_MAX) {
+                    icn_proc_table[icn_proc_count].name = name;
+                    icn_proc_table[icn_proc_count].proc = proc;
+                    icn_proc_count++;
+                }
+            }
+        } else if (s->lang == LANG_PL) {
+            /* Prolog: collect E_CHOICE / E_CLAUSE predicate definitions */
+            EXPR_t *subj = s->subject;
+            if ((subj->kind == E_CHOICE || subj->kind == E_CLAUSE) && subj->sval) {
+                pl_pred_table_insert(&g_pl_pred_table, subj->sval, subj);
+                g_pl_active = 1;
+            }
+        }
+    }
+}
+
+
 static DESCR_t  interp_eval(EXPR_t *e);      /* forward */
 static DESCR_t  interp_eval_pat(EXPR_t *e);  /* forward — pattern context */
 static DESCR_t *interp_eval_ref(EXPR_t *e);  /* forward — lvalue → DESCR_t* (SIL NAME ptr) */
@@ -2611,16 +2655,7 @@ int interp_exec_pl_builtin(EXPR_t *goal, Term **env) {
  * Body goals within clauses still use the old interp_eval path until S-BB-8. */
 static void pl_execute_program_unified(Program *prog) {
     if (!prog) return;
-    prolog_atom_init();
-    memset(&g_pl_pred_table, 0, sizeof g_pl_pred_table);
-    for (STMT_t *s = prog->head; s; s = s->next) {
-        EXPR_t *subj = s->subject;
-        if (subj && (subj->kind==E_CHOICE||subj->kind==E_CLAUSE) && subj->sval)
-            pl_pred_table_insert(&g_pl_pred_table, subj->sval, subj);
-    }
-    trail_init(&g_pl_trail);
-    g_pl_cut_flag = 0;
-    g_pl_env      = NULL;
+    polyglot_init(prog);   /* U-14: one pass, all three runtime tables */
     g_pl_active   = 1;
     /* S-1C-3 restored: main/0 dispatches through interp_eval() — the ONE interpreter.
      * E_CHOICE case in interp_eval uses pl_box_choice+bb_broker(BB_ONCE) for backtracking. */
@@ -2636,9 +2671,8 @@ static void pl_execute_program_unified(Program *prog) {
 
 static void execute_program(Program *prog)
 {
-    label_table_build(prog);
+    polyglot_init(prog);   /* U-14: one pass, all three runtime tables */
     g_lang = 0;  /* SNOBOL4 mode */
-    prescan_defines(prog);
 
     STMT_t *s = prog->head;
     /* No hardcoded step_limit — &STLIMIT (kw_stlimit) governs via comm_stno().
