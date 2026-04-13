@@ -470,34 +470,25 @@ def emit_snippet(out_dir, test_name, scalars, subexprs, expr_vals,
         f"* ── SSA temps (innermost first, each with fail branch) ──",
     ]
 
-    # Temp assignments with fail gotos
-    for temp, rhs, orig in chain:
-        lines.append(f"        {temp} = ({rhs})   :F(SNBf_{temp})")
-
-    lines.append(f"* ── asserts ──")
-
-    # Assert block using temps
+    # Interleaved: assign then assert immediately, one pair per sub-expression
     for n, (temp, rhs, orig) in enumerate(chain, 1):
         entry = expr_vals.get(orig)
-        if entry is None: continue
-        kind, val = entry
-        if kind == '__TYPE__':
-            lines.append(f"        SNBassert(DATATYPE({temp}), '{val}', {n})")
-        else:
-            safe_val = val.replace("'", "''")
-            lines.append(f"        SNBassert({temp}, '{safe_val}', {n})")
+        lines.append(f"        {temp} = ({rhs})   :F(SNBf{n})")
+        if entry is not None:
+            kind, val = entry
+            if kind == '__TYPE__':
+                lines.append(f"        SNBassert(DATATYPE({temp}), '{val}', {n})")
+            else:
+                safe_val = val.replace("'", "''")
+                lines.append(f"        SNBassert({temp}, '{safe_val}', {n})")
 
-    lines.append(f"        OUTPUT = 'PASS'   :(SNBend)")
+    lines.append("        OUTPUT = 'PASS'   :(SNBend)")
 
-    # Fail labels at bottom
-    lines.append(f"* ── fail labels ──")
-    for temp, rhs, orig in chain:
-        short = orig[:40].replace("'", "")
-        lines.append(
-            f"SNBf_{temp}   OUTPUT = 'FAIL {temp} FAILED [{short}]'   :(SNBend)"
-        )
+    # Compact fail labels — position number is the diagnosis
+    for n in range(1, len(chain) + 1):
+        lines.append(f"SNBf{n}  OUTPUT = 'FAIL {n}'   :(SNBend)")
 
-    lines += [f"SNBend", "END"]
+    lines += ["SNBend", "END"]
 
     sno = '\n'.join(lines) + '\n'
     Path(out_dir, f'{test_name}.sno').write_text(sno)
