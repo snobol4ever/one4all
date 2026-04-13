@@ -75,6 +75,15 @@ typedef enum {
     /* Statement execution */
     SM_EXEC_STMT,
 
+    /* Byrd box broker modes — U-16
+     * SM_BB_PUMP: pops bb_node_t* from value stack; calls bb_broker(root,BB_PUMP,body_fn,arg);
+     *             pushes tick count as DT_I.  For Icon 'every' / generator loops.
+     * SM_BB_ONCE: pops bb_node_t* from value stack; calls bb_broker(root,BB_ONCE,NULL,NULL);
+     *             sets st->last_ok.  For Prolog goal dispatch.
+     * Note: BB_SCAN is already wired via SM_EXEC_STMT → exec_stmt → bb_broker(BB_SCAN). */
+    SM_BB_PUMP,
+    SM_BB_ONCE,
+
     /* Functions */
     SM_CALL,
     SM_RETURN,

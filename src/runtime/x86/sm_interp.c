@@ -464,6 +464,22 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
             break;
         }
 
+        /* ── U-16: Byrd box broker opcode stubs ─────────────────────── */
+        /* SM_BB_PUMP and SM_BB_ONCE are not yet lowered to by sm_lower.   */
+        /* Stubs exist so the opcode enum is complete and sm_interp won't  */
+        /* fall through to the default error handler if they ever appear.  */
+        case SM_BB_PUMP:
+            /* Future: pop bb_node_t*, call bb_broker(BB_PUMP,body_fn,arg),
+             * push tick count. Wired by U-18 (sm_lower Icon/Prolog nodes). */
+            st->last_ok = 0;
+            break;
+
+        case SM_BB_ONCE:
+            /* Future: pop bb_node_t*, call bb_broker(BB_ONCE,NULL,NULL),
+             * set st->last_ok. Wired by U-18 (sm_lower Icon/Prolog nodes). */
+            st->last_ok = 0;
+            break;
+
         /* ── Functions (stubs — wired in U3) ───────────────────────── */
 
         case SM_CALL: {
