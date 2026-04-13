@@ -1,377 +1,456 @@
 /*
- * prolog_interp.c -- Prolog IR interpreter
+ * prolog_interp.c — Prolog IR interpreter (Byrd box four-port model)
  *
- * One-to-one mirror of prolog_emit.c.
- * Each function corresponds to its emit_* counterpart:
- *   pl_term_from_expr  <-> emit_term_val
- *   pl_eval_arith      <-> emit_arith_expr
- *   pl_exec_goal       <-> emit_goal
- *   pl_exec_body       <-> emit_body
- *   pl_exec_clause     <-> emit_clause
- *   pl_exec_choice     <-> emit_choice
- *   pl_execute_program <-> pl_emit (top-level)
+ * Direct C-execution mirror of prolog_emit.c.  Every emit_* function has
+ * a matching pl_interp_* function with identical structure; instead of
+ * emitting C text with goto labels we execute the same control flow
+ * directly in C using recursive calls and integer return codes.
+ *
+ * Four-port model (Byrd 1980 / Proebsting 1996):
+ *   α  entry        — initial call, try clause 0
+ *   β  retry        — re-entry after backtrack, try clause N
+ *   γ  succeed      — departure on success  → return clause_idx >= 0
+ *   ω  fail         — all clauses exhausted → return -1
+ *
+ * Resumable predicate call convention (mirrors emit_choice's _r functions):
+ *   pl_call(pt, key, arity, args, trail, start)
+ *     start == 0   → α (fresh call)
+ *     start == N   → β (retry from clause N)
+ *     returns >= 0 → γ (success; caller passes returns+1 on next retry)
+ *     returns -1   → ω (all clauses exhausted / predicate not found)
+ *
+ * Body goal execution (mirrors emit_goal / emit_body):
+ *   pl_exec_goal(goal, env, pred_table, trail, cut_flag*)
+ *     returns 1 → γ   returns 0 → ω
+ *
+ * Entry point: pl_execute_program(prog)
  */
-
-#include "prolog_interp.h"
-#include "prolog_atom.h"
-#include "prolog_runtime.h"
-#include "term.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-/* =========================================================================
- * Predicate table
- * ========================================================================= */
-#define PL_MAX_PREDS 512
-typedef struct { const char *key; EXPR_t *choice; } PlPred;
-static PlPred pl_preds[PL_MAX_PREDS];
-static int    pl_npreds = 0;
-static Trail  pl_trail;
+#include "scrip_cc.h"
+#include "prolog_interp.h"
+#include "prolog_runtime.h"
+/* unify() declared in prolog_runtime.h */
+#include "prolog_atom.h"
+#include "prolog_builtin.h"
+#include "term.h"
 
-static EXPR_t *pl_lookup(const char *key) {
-    for (int i = 0; i < pl_npreds; i++)
-        if (strcmp(pl_preds[i].key, key) == 0) return pl_preds[i].choice;
+/*===========================================================================
+ * Predicate table — maps "functor/arity" → E_CHOICE*
+ *=========================================================================*/
+#define PRED_TABLE_SIZE 256
+typedef struct PredEntry { const char *key; EXPR_t *choice; struct PredEntry *next; } PredEntry;
+typedef struct { PredEntry *buckets[PRED_TABLE_SIZE]; } PredTable;
+
+static unsigned pred_hash(const char *s) {
+    unsigned h = 5381;
+    while (*s) h = h * 33 ^ (unsigned char)*s++;
+    return h % PRED_TABLE_SIZE;
+}
+static void pred_table_insert(PredTable *pt, const char *key, EXPR_t *choice) {
+    unsigned h = pred_hash(key);
+    PredEntry *e = malloc(sizeof(PredEntry));
+    e->key = key; e->choice = choice; e->next = pt->buckets[h]; pt->buckets[h] = e;
+}
+static EXPR_t *pred_table_lookup(PredTable *pt, const char *key) {
+    for (PredEntry *e = pt->buckets[pred_hash(key)]; e; e = e->next)
+        if (strcmp(e->key, key) == 0) return e->choice;
     return NULL;
 }
-static void pl_register(const char *key, EXPR_t *choice) {
-    if (pl_npreds < PL_MAX_PREDS) {
-        pl_preds[pl_npreds].key = key;
-        pl_preds[pl_npreds].choice = choice;
-        pl_npreds++;
-    }
+
+/*===========================================================================
+ * Variable environment
+ *=========================================================================*/
+static Term **env_new(int n) {
+    if (n <= 0) return NULL;
+    Term **env = malloc(n * sizeof(Term *));
+    for (int i = 0; i < n; i++) env[i] = term_new_var(i);
+    return env;
 }
 
-/* Forward declarations */
-static int pl_exec_goal(EXPR_t *goal, Term **env, int n_vars);
-static int pl_exec_body(EXPR_t **goals, int ngoals, Term **env, int n_vars);
-static int pl_exec_choice(EXPR_t *choice, Term **call_args, int arity);
+/*===========================================================================
+ * Forward declarations
+ *=========================================================================*/
+static int pl_exec_goal(EXPR_t *goal, Term **env, PredTable *pt,
+                        Trail *trail, int *cut_flag);
+static int pl_exec_body(EXPR_t **goals, int ngoals, Term **env,
+                        PredTable *pt, Trail *trail, int *cut_flag);
+static int pl_call(PredTable *pt, const char *key, int arity,
+                   Term **args, Trail *trail, int start);
 
-/* =========================================================================
- * pl_term_from_expr -- mirror of emit_term_val
- * Converts a lowered EXPR_t term node to a runtime Term*.
- * ========================================================================= */
-static Term *pl_term_from_expr(EXPR_t *e, Term **env, int n_vars) {
+/*===========================================================================
+ * pl_term_from_expr — mirrors emit_term_val()
+ *=========================================================================*/
+static Term *pl_term_from_expr(EXPR_t *e, Term **env) {
     if (!e) return term_new_atom(prolog_atom_intern("[]"));
     switch (e->kind) {
-        case E_QLIT:
-            return term_new_atom(prolog_atom_intern(e->sval ? e->sval : ""));
-        case E_ILIT:
-            return term_new_int((long)e->ival);
-        case E_FLIT:
-            return term_new_float(e->dval);
-        case E_VAR: {
-            int slot = (int)e->ival;
-            if (slot < 0 || slot >= n_vars) return term_new_var(-1);
-            if (!env[slot]) env[slot] = term_new_var(slot);
-            return env[slot];
-        }
+        case E_QLIT: return term_new_atom(prolog_atom_intern(e->sval ? e->sval : ""));
+        case E_ILIT: return term_new_int((long)e->ival);
+        case E_FLIT: return term_new_float(e->dval);
+        case E_VAR:  return (env && e->ival >= 0) ? env[e->ival] : term_new_var(e->ival);
         case E_FNC: {
             int arity = e->nchildren;
-            if (arity == 0)
-                return term_new_atom(prolog_atom_intern(e->sval ? e->sval : "f"));
+            int atom  = prolog_atom_intern(e->sval ? e->sval : "f");
+            if (arity == 0) return term_new_atom(atom);
             Term **args = malloc(arity * sizeof(Term *));
-            for (int i = 0; i < arity; i++)
-                args[i] = pl_term_from_expr(e->children[i], env, n_vars);
-            int fid = prolog_atom_intern(e->sval ? e->sval : "f");
-            Term *t = term_new_compound(fid, arity, args);
+            for (int i = 0; i < arity; i++) args[i] = pl_term_from_expr(e->children[i], env);
+            Term *t = term_new_compound(atom, arity, args);
             free(args);
             return t;
         }
-        default:
-            return term_new_atom(prolog_atom_intern("?"));
+        default: return term_new_atom(prolog_atom_intern("?"));
     }
 }
 
-/* =========================================================================
- * pl_eval_arith -- mirror of emit_arith_expr
- * Evaluates an arithmetic EXPR_t to a C long.
- * ========================================================================= */
-static long pl_eval_arith(EXPR_t *e, Term **env, int n_vars) {
+/*===========================================================================
+ * pl_eval_arith_expr — mirrors emit_arith_expr()
+ *=========================================================================*/
+static long pl_eval_arith_expr(EXPR_t *e, Term **env) {
     if (!e) return 0;
     switch (e->kind) {
         case E_ILIT: return (long)e->ival;
         case E_FLIT: return (long)e->dval;
-        case E_VAR: {
-            int slot = (int)e->ival;
-            if (slot < 0 || slot >= n_vars || !env[slot]) return 0;
-            Term *t = term_deref(env[slot]);
+        case E_VAR: { Term *t = term_deref(env && e->ival >= 0 ? env[e->ival] : NULL);
+                      return (t && t->tag == TT_INT) ? t->ival : 0; }
+        case E_ADD:  return pl_eval_arith_expr(e->children[0], env) + pl_eval_arith_expr(e->children[1], env);
+        case E_SUB:  return pl_eval_arith_expr(e->children[0], env) - pl_eval_arith_expr(e->children[1], env);
+        case E_MUL:  return pl_eval_arith_expr(e->children[0], env) * pl_eval_arith_expr(e->children[1], env);
+        case E_DIV:  { long d = pl_eval_arith_expr(e->children[1], env);
+                       return d ? pl_eval_arith_expr(e->children[0], env) / d : 0; }
+        case E_MOD:  { long d = pl_eval_arith_expr(e->children[1], env);
+                       return d ? pl_eval_arith_expr(e->children[0], env) % d : 0; }
+        case E_FNC: {
+            const char *fn = e->sval ? e->sval : "";
+            if (strcmp(fn,"mod")==0 && e->nchildren==2) { long d=pl_eval_arith_expr(e->children[1],env); return d?pl_eval_arith_expr(e->children[0],env)%d:0; }
+            if (strcmp(fn,"abs")==0 && e->nchildren==1) { long v=pl_eval_arith_expr(e->children[0],env); return v<0?-v:v; }
+            if (strcmp(fn,"max")==0 && e->nchildren==2) { long a=pl_eval_arith_expr(e->children[0],env),b=pl_eval_arith_expr(e->children[1],env); return a>b?a:b; }
+            if (strcmp(fn,"min")==0 && e->nchildren==2) { long a=pl_eval_arith_expr(e->children[0],env),b=pl_eval_arith_expr(e->children[1],env); return a<b?a:b; }
+            if (strcmp(fn,"rem")==0 && e->nchildren==2) { long d=pl_eval_arith_expr(e->children[1],env); return d?pl_eval_arith_expr(e->children[0],env)%d:0; }
+            /* named var: deref */
+            Term *t = term_deref(pl_term_from_expr(e, env));
             return (t && t->tag == TT_INT) ? t->ival : 0;
-        }
-        case E_ADD: return pl_eval_arith(e->children[0],env,n_vars)
-                         + pl_eval_arith(e->children[1],env,n_vars);
-        case E_SUB: return pl_eval_arith(e->children[0],env,n_vars)
-                         - pl_eval_arith(e->children[1],env,n_vars);
-        case E_MUL: return pl_eval_arith(e->children[0],env,n_vars)
-                         * pl_eval_arith(e->children[1],env,n_vars);
-        case E_DIV: {
-            long d = pl_eval_arith(e->children[1],env,n_vars);
-            return d ? pl_eval_arith(e->children[0],env,n_vars) / d : 0;
         }
         default: return 0;
     }
 }
 
-/* =========================================================================
- * pl_write_term -- runtime write/1 (mirror of pl_write in emitter runtime)
- * ========================================================================= */
-static void pl_write_term(Term *t) {
-    if (!t) { printf("[]"); return; }
-    t = term_deref(t);
-    if (!t) { printf("_"); return; }
-    switch (t->tag) {
-        case TT_ATOM:     printf("%s", prolog_atom_name(t->atom_id)); break;
-        case TT_INT:      printf("%ld", t->ival); break;
-        case TT_FLOAT:    printf("%g", t->fval); break;
-        case TT_VAR:      printf("_G%d", t->var_slot); break;
-        case TT_COMPOUND:
-            printf("%s(", prolog_atom_name(t->compound.functor));
-            for (int i = 0; i < t->compound.arity; i++) {
-                if (i) printf(",");
-                pl_write_term(t->compound.args[i]);
-            }
-            printf(")");
-            break;
-        default: printf("?"); break;
-    }
-}
-
-/* =========================================================================
- * pl_exec_goal -- mirror of emit_goal
- *
- * Returns: 1 = success (gamma), 0 = failure (omega), 2 = cut signal
- * ========================================================================= */
-static int pl_exec_goal(EXPR_t *goal, Term **env, int n_vars) {
-    if (!goal) return 1;
-
-    /* E_UNIFY -- mirror of emit_goal E_UNIFY case */
-    if (goal->kind == E_UNIFY && goal->nchildren == 2) {
-        Term *t1 = pl_term_from_expr(goal->children[0], env, n_vars);
-        Term *t2 = pl_term_from_expr(goal->children[1], env, n_vars);
-        int mark = trail_mark(&pl_trail);
-        if (!unify(t1, t2, &pl_trail)) { trail_unwind(&pl_trail, mark); return 0; }
-        return 1;
-    }
-
-    /* E_CUT -- seal beta, signal cut upward (return 2) */
-    if (goal->kind == E_CUT)          return 2;
-    if (goal->kind == E_TRAIL_MARK)   return 1;
-    if (goal->kind == E_TRAIL_UNWIND) return 1;
-
-    if (goal->kind != E_FNC) return 1;
-
-    const char *fn = goal->sval ? goal->sval : "true";
-    int arity = goal->nchildren;
-
-    /* Builtins -- mirror of emit_goal E_FNC cases in order */
-
-    if (strcmp(fn,"true")==0 && arity==0) return 1;
-    if (strcmp(fn,"fail")==0 && arity==0) return 0;
-    if (strcmp(fn,"halt")==0 && arity==0) { exit(0); }
-    if (strcmp(fn,"halt")==0 && arity==1) {
-        exit((int)pl_eval_arith(goal->children[0], env, n_vars));
-    }
-    if (strcmp(fn,"nl")==0 && arity==0) { putchar('\n'); return 1; }
-    if (strcmp(fn,"write")==0 && arity==1) {
-        pl_write_term(pl_term_from_expr(goal->children[0], env, n_vars));
-        return 1;
-    }
-    if (strcmp(fn,"writeln")==0 && arity==1) {
-        pl_write_term(pl_term_from_expr(goal->children[0], env, n_vars));
-        putchar('\n'); return 1;
-    }
-
-    /* is/2 -- arithmetic evaluation, mirror of emit_goal is/2 */
-    if (strcmp(fn,"is")==0 && arity==2) {
-        Term *result = term_new_int(pl_eval_arith(goal->children[1], env, n_vars));
-        Term *lhs    = pl_term_from_expr(goal->children[0], env, n_vars);
-        int mark = trail_mark(&pl_trail);
-        if (!unify(lhs, result, &pl_trail)) { trail_unwind(&pl_trail, mark); return 0; }
-        return 1;
-    }
-
-    /* Comparison operators -- mirror of emit_goal cmp table */
-    {
-        struct { const char *name; int op; } cmps[] = {
-            {"<",1},{">",2},{"=<",3},{">=",4},{"=:=",5},{"=\\=",6},{NULL,0}
-        };
-        for (int i = 0; cmps[i].name; i++) {
-            if (strcmp(fn, cmps[i].name)==0 && arity==2) {
-                long a = pl_eval_arith(goal->children[0], env, n_vars);
-                long b = pl_eval_arith(goal->children[1], env, n_vars);
-                switch (cmps[i].op) {
-                    case 1: return a <  b;
-                    case 2: return a >  b;
-                    case 3: return a <= b;
-                    case 4: return a >= b;
-                    case 5: return a == b;
-                    case 6: return a != b;
-                }
-            }
-        }
-    }
-
-    /* =/2 structural unification */
-    if (strcmp(fn,"=")==0 && arity==2) {
-        Term *t1 = pl_term_from_expr(goal->children[0], env, n_vars);
-        Term *t2 = pl_term_from_expr(goal->children[1], env, n_vars);
-        int mark = trail_mark(&pl_trail);
-        if (!unify(t1, t2, &pl_trail)) { trail_unwind(&pl_trail, mark); return 0; }
-        return 1;
-    }
-
-    /* \=/2 not unifiable */
-    if (strcmp(fn,"\\=")==0 && arity==2) {
-        Term *t1 = pl_term_from_expr(goal->children[0], env, n_vars);
-        Term *t2 = pl_term_from_expr(goal->children[1], env, n_vars);
-        int mark = trail_mark(&pl_trail);
-        int r = unify(t1, t2, &pl_trail);
-        trail_unwind(&pl_trail, mark);
-        return !r;
-    }
-
-    /* Type tests -- mirror of emit_goal tests table */
-    {
-        struct { const char *name; TermTag tag; int invert; } tests[] = {
-            {"var",      TT_VAR,      0},
-            {"nonvar",   TT_VAR,      1},
-            {"atom",     TT_ATOM,     0},
-            {"integer",  TT_INT,      0},
-            {"float",    TT_FLOAT,    0},
-            {"compound", TT_COMPOUND, 0},
-            {NULL,       TT_ATOM,     0}
-        };
-        for (int i = 0; tests[i].name; i++) {
-            if (strcmp(fn, tests[i].name)==0 && arity==1) {
-                Term *t = term_deref(pl_term_from_expr(goal->children[0], env, n_vars));
-                int match = t && t->tag == tests[i].tag;
-                return tests[i].invert ? !match : match;
-            }
-        }
-    }
-
-    /* ,/2 conjunction -- mirror of emit_goal comma case */
-    if (strcmp(fn,",")==0 && arity==2) {
-        int r = pl_exec_goal(goal->children[0], env, n_vars);
-        if (r == 0) return 0;
-        if (r == 2) return 2;
-        return pl_exec_goal(goal->children[1], env, n_vars);
-    }
-
-    /* not/1, \+/1 -- negation as failure */
-    if ((strcmp(fn,"not")==0 || strcmp(fn,"\\+")==0) && arity==1) {
-        int mark = trail_mark(&pl_trail);
-        int r = pl_exec_goal(goal->children[0], env, n_vars);
-        trail_unwind(&pl_trail, mark);
-        return (r == 0) ? 1 : 0;
-    }
-
-    /* User-defined predicate */
-    char key[128];
-    snprintf(key, sizeof key, "%s/%d", fn, arity);
-    EXPR_t *ch = pl_lookup(key);
-    if (ch) {
-        Term **gargs = malloc((arity + 1) * sizeof(Term *));
-        for (int i = 0; i < arity; i++)
-            gargs[i] = pl_term_from_expr(goal->children[i], env, n_vars);
-        int r = pl_exec_choice(ch, gargs, arity);
-        free(gargs);
-        return r;
-    }
-
-    fprintf(stderr, "prolog: undefined predicate %s/%d\n", fn, arity);
-    return 0;
-}
-
-/* =========================================================================
- * pl_exec_body -- mirror of emit_body
- * Execute goals left-to-right; propagate cut (return 2).
- * ========================================================================= */
-static int pl_exec_body(EXPR_t **goals, int ngoals, Term **env, int n_vars) {
-    for (int i = 0; i < ngoals; i++) {
-        int r = pl_exec_goal(goals[i], env, n_vars);
-        if (r != 1) return r;   /* 0=fail, 2=cut */
-    }
+/*===========================================================================
+ * is_user_call — mirrors emit.c's is_user_call()
+ *=========================================================================*/
+static int is_user_call(EXPR_t *goal) {
+    if (!goal || goal->kind != E_FNC || !goal->sval) return 0;
+    static const char *builtins[] = {
+        "true","fail","halt","nl","write","writeln","print","tab","is",
+        "<",">","=<",">=","=:=","=\\=","=","\\=","==","\\==",
+        "@<","@>","@=<","@>=",
+        "var","nonvar","atom","integer","float","compound","atomic","callable","is_list",
+        "functor","arg","=..","\\+","not",",",";","->",
+        NULL
+    };
+    for (int i = 0; builtins[i]; i++) if (strcmp(goal->sval, builtins[i]) == 0) return 0;
     return 1;
 }
 
-/* =========================================================================
- * pl_exec_clause -- mirror of emit_clause
- *
- * Unifies call args with head args, then executes body.
- * cut_out is set to 1 if body contained a cut.
- * Returns 1=success, 0=fail.
- * ========================================================================= */
-static int pl_exec_clause(EXPR_t *ec, Term **call_args, int arity, int *cut_out) {
-    int n_vars = (int)ec->ival;
-    int n_args = (int)ec->dval;
+/*===========================================================================
+ * pl_exec_goal — mirrors emit_goal()
+ * Returns 1 (γ) or 0 (ω).
+ *=========================================================================*/
+static int pl_exec_goal(EXPR_t *goal, Term **env, PredTable *pt,
+                        Trail *trail, int *cut_flag) {
+    if (!goal) return 1;
 
-    Term **env = calloc(n_vars, sizeof(Term *));
-    for (int i = 0; i < n_vars; i++)
-        env[i] = term_new_var(i);
+    switch (goal->kind) {
 
-    int clause_mark = trail_mark(&pl_trail);
+        case E_UNIFY: {
+            Term *t1 = pl_term_from_expr(goal->children[0], env);
+            Term *t2 = pl_term_from_expr(goal->children[1], env);
+            int mark = trail_mark(trail);
+            if (!unify(t1, t2, trail)) { trail_unwind(trail, mark); return 0; }
+            return 1;
+        }
 
-    /* Unify head args -- mirror of emit_clause head unification loop */
-    for (int i = 0; i < arity && i < n_args; i++) {
-        int mu = trail_mark(&pl_trail);
-        Term *head = pl_term_from_expr(ec->children[i], env, n_vars);
-        if (!unify(call_args[i], head, &pl_trail)) {
-            trail_unwind(&pl_trail, mu);
-            trail_unwind(&pl_trail, clause_mark);
-            free(env);
+        case E_CUT:
+            if (cut_flag) *cut_flag = 1;
+            return 1;
+
+        case E_TRAIL_MARK:
+        case E_TRAIL_UNWIND:
+            return 1;
+
+        case E_FNC: {
+            const char *fn = goal->sval ? goal->sval : "true";
+            int arity = goal->nchildren;
+
+            if (strcmp(fn,"true")==0 && arity==0) return 1;
+            if (strcmp(fn,"fail")==0 && arity==0) return 0;
+            if (strcmp(fn,"halt")==0 && arity==0) exit(0);
+            if (strcmp(fn,"halt")==0 && arity==1) {
+                Term *t = term_deref(pl_term_from_expr(goal->children[0], env));
+                exit(t && t->tag==TT_INT ? (int)t->ival : 0);
+            }
+            if (strcmp(fn,"nl")==0 && arity==0) { putchar('\n'); return 1; }
+            if (strcmp(fn,"write")==0 && arity==1) {
+                pl_write(pl_term_from_expr(goal->children[0], env)); return 1;
+            }
+            if (strcmp(fn,"writeln")==0 && arity==1) {
+                pl_write(pl_term_from_expr(goal->children[0], env)); putchar('\n'); return 1;
+            }
+            if (strcmp(fn,"print")==0 && arity==1) {
+                pl_write(pl_term_from_expr(goal->children[0], env)); return 1;
+            }
+            if (strcmp(fn,"tab")==0 && arity==1) {
+                Term *t = term_deref(pl_term_from_expr(goal->children[0], env));
+                long n = (t && t->tag==TT_INT) ? t->ival : 0;
+                for (long i=0;i<n;i++) putchar(' ');
+                return 1;
+            }
+            if (strcmp(fn,"is")==0 && arity==2) {
+                long val = pl_eval_arith_expr(goal->children[1], env);
+                Term *lhs = pl_term_from_expr(goal->children[0], env);
+                int mark = trail_mark(trail);
+                if (!unify(lhs, term_new_int(val), trail)) { trail_unwind(trail, mark); return 0; }
+                return 1;
+            }
+            /* arithmetic comparisons */
+            {
+                struct { const char *n; int op; } cmps[] = {
+                    {"<",0},{">",1},{"=<",2},{">=",3},{"=:=",4},{"=\\=",5},{NULL,0}
+                };
+                for (int ci=0; cmps[ci].n; ci++) {
+                    if (strcmp(fn,cmps[ci].n)==0 && arity==2) {
+                        long a=pl_eval_arith_expr(goal->children[0],env);
+                        long b=pl_eval_arith_expr(goal->children[1],env);
+                        switch(cmps[ci].op){case 0:return a<b;case 1:return a>b;case 2:return a<=b;case 3:return a>=b;case 4:return a==b;case 5:return a!=b;}
+                    }
+                }
+            }
+            if (strcmp(fn,"=")==0 && arity==2) {
+                int mark=trail_mark(trail);
+                if (!unify(pl_term_from_expr(goal->children[0],env), pl_term_from_expr(goal->children[1],env), trail)) { trail_unwind(trail,mark); return 0; }
+                return 1;
+            }
+            if (strcmp(fn,"\\=")==0 && arity==2) {
+                int mark=trail_mark(trail);
+                int ok=unify(pl_term_from_expr(goal->children[0],env), pl_term_from_expr(goal->children[1],env), trail);
+                trail_unwind(trail,mark); return !ok;
+            }
+            if (strcmp(fn,"==")==0 && arity==2) {
+                Term *t1=term_deref(pl_term_from_expr(goal->children[0],env));
+                Term *t2=term_deref(pl_term_from_expr(goal->children[1],env));
+                if (!t1||!t2) return t1==t2;
+                if (t1->tag!=t2->tag) return 0;
+                if (t1->tag==TT_ATOM) return t1->atom_id==t2->atom_id;
+                if (t1->tag==TT_INT)  return t1->ival==t2->ival;
+                if (t1->tag==TT_VAR)  return t1==t2;
+                return 0;
+            }
+            if (strcmp(fn,"\\==")==0 && arity==2) {
+                Term *t1=term_deref(pl_term_from_expr(goal->children[0],env));
+                Term *t2=term_deref(pl_term_from_expr(goal->children[1],env));
+                if (!t1||!t2) return t1!=t2;
+                if (t1->tag!=t2->tag) return 1;
+                if (t1->tag==TT_ATOM) return t1->atom_id!=t2->atom_id;
+                if (t1->tag==TT_INT)  return t1->ival!=t2->ival;
+                if (t1->tag==TT_VAR)  return t1!=t2;
+                return 1;
+            }
+            /* type tests */
+            if (arity==1) {
+                Term *t=term_deref(pl_term_from_expr(goal->children[0],env));
+                if (strcmp(fn,"var"     )==0) return !t||t->tag==TT_VAR;
+                if (strcmp(fn,"nonvar"  )==0) return  t&&t->tag!=TT_VAR;
+                if (strcmp(fn,"atom"    )==0) return  t&&t->tag==TT_ATOM;
+                if (strcmp(fn,"integer" )==0) return  t&&t->tag==TT_INT;
+                if (strcmp(fn,"float"   )==0) return  t&&t->tag==TT_FLOAT;
+                if (strcmp(fn,"compound")==0) return  t&&t->tag==TT_COMPOUND;
+                if (strcmp(fn,"atomic"  )==0) return  t&&(t->tag==TT_ATOM||t->tag==TT_INT||t->tag==TT_FLOAT);
+                if (strcmp(fn,"callable")==0) return  t&&(t->tag==TT_ATOM||t->tag==TT_COMPOUND);
+                if (strcmp(fn,"is_list" )==0) {
+                    int nil=prolog_atom_intern("[]"), dot=prolog_atom_intern(".");
+                    for (Term *c=t;;) {
+                        c=term_deref(c); if (!c) return 0;
+                        if (c->tag==TT_ATOM&&c->atom_id==nil) return 1;
+                        if (c->tag!=TT_COMPOUND||c->compound.arity!=2||c->compound.functor!=dot) return 0;
+                        c=c->compound.args[1];
+                    }
+                }
+            }
+            /* ,/2 conjunction */
+            if (strcmp(fn,",")==0 && arity==2) {
+                EXPR_t *flat[256]; int nflat=0;
+                for (EXPR_t *c=goal; c&&c->kind==E_FNC&&c->sval&&strcmp(c->sval,",")==0&&c->nchildren==2; c=c->children[1])
+                    if (nflat<255) flat[nflat++]=c->children[0];
+                /* last non-comma node */
+                EXPR_t *cur=goal;
+                while (cur&&cur->kind==E_FNC&&cur->sval&&strcmp(cur->sval,",")==0&&cur->nchildren==2) cur=cur->children[1];
+                if (cur&&nflat<256) flat[nflat++]=cur;
+                return pl_exec_body(flat, nflat, env, pt, trail, cut_flag);
+            }
+            /* ;/2 disjunction */
+            if (strcmp(fn,";")==0 && arity==2) {
+                EXPR_t *left=goal->children[0], *right=goal->children[1];
+                if (left&&left->kind==E_FNC&&left->sval&&strcmp(left->sval,"->")==0&&left->nchildren==2) {
+                    /* (Cond -> Then ; Else) */
+                    Trail save=*trail; int mark=trail_mark(trail); int cut2=0;
+                    if (pl_exec_goal(left->children[0],env,pt,trail,&cut2))
+                        return pl_exec_goal(left->children[1],env,pt,trail,cut_flag);
+                    trail_unwind(trail,mark); *trail=save;
+                    return pl_exec_goal(right,env,pt,trail,cut_flag);
+                }
+                { Trail save=*trail; int mark=trail_mark(trail); int cut2=0;
+                  if (pl_exec_goal(left,env,pt,trail,&cut2)) return 1;
+                  trail_unwind(trail,mark); *trail=save;
+                  return pl_exec_goal(right,env,pt,trail,cut_flag); }
+            }
+            /* ->/2 if-then */
+            if (strcmp(fn,"->")==0 && arity==2) {
+                int cut2=0;
+                if (!pl_exec_goal(goal->children[0],env,pt,trail,&cut2)) return 0;
+                return pl_exec_goal(goal->children[1],env,pt,trail,cut_flag);
+            }
+            /* \+/1 negation-as-failure */
+            if ((strcmp(fn,"\\+")==0||strcmp(fn,"not")==0) && arity==1) {
+                Trail save=*trail; int mark=trail_mark(trail); int cut2=0;
+                int ok=pl_exec_goal(goal->children[0],env,pt,trail,&cut2);
+                trail_unwind(trail,mark); *trail=save;
+                return !ok;
+            }
+            /* functor/3 */
+            if (strcmp(fn,"functor")==0 && arity==3) {
+                int mark=trail_mark(trail);
+                if (!pl_functor(pl_term_from_expr(goal->children[0],env),
+                                pl_term_from_expr(goal->children[1],env),
+                                pl_term_from_expr(goal->children[2],env), trail))
+                { trail_unwind(trail,mark); return 0; }
+                return 1;
+            }
+            /* arg/3 */
+            if (strcmp(fn,"arg")==0 && arity==3) {
+                int mark=trail_mark(trail);
+                if (!pl_arg(pl_term_from_expr(goal->children[0],env),
+                            pl_term_from_expr(goal->children[1],env),
+                            pl_term_from_expr(goal->children[2],env), trail))
+                { trail_unwind(trail,mark); return 0; }
+                return 1;
+            }
+            /* =../2 univ */
+            if (strcmp(fn,"=..")==0 && arity==2) {
+                int mark=trail_mark(trail);
+                if (!pl_univ(pl_term_from_expr(goal->children[0],env),
+                             pl_term_from_expr(goal->children[1],env), trail))
+                { trail_unwind(trail,mark); return 0; }
+                return 1;
+            }
+            /* user-defined call */
+            if (is_user_call(goal)) {
+                char key[256]; snprintf(key,sizeof key,"%s/%d",fn,arity);
+                Term **args=malloc(arity*sizeof(Term*));
+                for (int i=0;i<arity;i++) args[i]=pl_term_from_expr(goal->children[i],env);
+                int mark=trail_mark(trail);
+                int r=pl_call(pt,key,arity,args,trail,0);
+                free(args);
+                if (r<0) { trail_unwind(trail,mark); return 0; }
+                return 1;
+            }
+            fprintf(stderr,"prolog: undefined predicate %s/%d\n",fn,arity);
             return 0;
+        }
+
+        default: return 1;
+    }
+}
+
+/*===========================================================================
+ * pl_exec_body — mirrors emit_body() Proebsting retry chain
+ *=========================================================================*/
+static int pl_exec_body(EXPR_t **goals, int ngoals, Term **env,
+                        PredTable *pt, Trail *trail, int *cut_flag) {
+    if (ngoals==0) return 1;
+    EXPR_t *g=goals[0];
+
+    if (is_user_call(g)) {
+        const char *fn=g->sval; int arity=g->nchildren;
+        char key[256]; snprintf(key,sizeof key,"%s/%d",fn,arity);
+        Term **args=malloc(arity*sizeof(Term*));
+        for (int i=0;i<arity;i++) args[i]=pl_term_from_expr(g->children[i],env);
+        int mark=trail_mark(trail), start=0;
+        for (;;) {
+            trail_unwind(trail,mark);
+            int r=pl_call(pt,key,arity,args,trail,start);
+            if (r<0) { free(args); return 0; }
+            start=r+1;
+            if (cut_flag&&*cut_flag) { free(args); return 1; }
+            int cut2=0;
+            int ok=pl_exec_body(goals+1,ngoals-1,env,pt,trail,&cut2);
+            if (cut2) { if (cut_flag)*cut_flag=1; free(args); return ok; }
+            if (ok) { free(args); return 1; }
         }
     }
 
-    /* Execute body */
-    int nbody = ec->nchildren - n_args;
-    int r = (nbody > 0)
-        ? pl_exec_body(ec->children + n_args, nbody, env, n_vars)
-        : 1;
-
-    if (r == 2) { *cut_out = 1; r = 1; }   /* cut: succeed, seal beta */
-    if (!r) trail_unwind(&pl_trail, clause_mark);
-    free(env);
-    return r;
+    if (!pl_exec_goal(g,env,pt,trail,cut_flag)) return 0;
+    if (cut_flag&&*cut_flag) return 1;
+    return pl_exec_body(goals+1,ngoals-1,env,pt,trail,cut_flag);
 }
 
-/* =========================================================================
- * pl_exec_choice -- mirror of emit_choice
- *
- * Tries each E_CLAUSE child in order (alpha/beta).
- * Returns 1 on first success (gamma), 0 if all exhausted (omega).
- * Cut seals beta immediately.
- * ========================================================================= */
-static int pl_exec_choice(EXPR_t *choice, Term **call_args, int arity) {
-    int cut = 0;
-    for (int ci = 0; ci < choice->nchildren && !cut; ci++) {
-        EXPR_t *clause = choice->children[ci];
-        if (clause->kind != E_CLAUSE) continue;
-        int mark = trail_mark(&pl_trail);
-        int r = pl_exec_clause(clause, call_args, arity, &cut);
-        if (r) return 1;                    /* gamma */
-        trail_unwind(&pl_trail, mark);      /* beta: restore, try next */
+/*===========================================================================
+ * pl_exec_clause — mirrors emit_clause()
+ *=========================================================================*/
+static int pl_exec_clause(EXPR_t *ec, int n_args, Term **call_args,
+                          PredTable *pt, Trail *trail, int *cut_flag) {
+    if (!ec||ec->kind!=E_CLAUSE) return 0;
+    int n_vars=(int)ec->ival;
+    Term **env=env_new(n_vars);
+    int head_mark=trail_mark(trail);
+    for (int i=0;i<n_args&&i<ec->nchildren;i++) {
+        Term *head_arg=pl_term_from_expr(ec->children[i],env);
+        if (!unify(call_args[i],head_arg,trail)) {
+            trail_unwind(trail,head_mark); free(env); return 0;
+        }
     }
-    return 0;                               /* omega */
+    int nbody=ec->nchildren-n_args;
+    EXPR_t **body=ec->children+n_args;
+    int ok = nbody==0 ? 1 : pl_exec_body(body,nbody,env,pt,trail,cut_flag);
+    free(env);
+    return ok;
 }
 
-/* =========================================================================
- * pl_execute_program -- top-level entry point (mirror of pl_emit top level)
- * ========================================================================= */
+/*===========================================================================
+ * pl_call — resumable four-port predicate dispatcher (mirrors _r functions)
+ *   returns clause_idx >= 0 on γ,  -1 on ω
+ *=========================================================================*/
+static int pl_call(PredTable *pt, const char *key, int arity,
+                   Term **args, Trail *trail, int start) {
+    EXPR_t *choice=pred_table_lookup(pt,key);
+    if (!choice) { fprintf(stderr,"prolog: undefined predicate %s\n",key); return -1; }
+    int nclauses=choice->nchildren, cut_flag=0;
+    int mark=trail_mark(trail);
+    for (int ci=start;ci<nclauses;ci++) {
+        if (cut_flag) return -1;
+        if (ci>start) trail_unwind(trail,mark);
+        EXPR_t *ec=choice->children[ci]; if (!ec) continue;
+        int clause_cut=0;
+        if (pl_exec_clause(ec,arity,args,pt,trail,&clause_cut)) return ci;
+        if (clause_cut) cut_flag=1;
+    }
+    trail_unwind(trail,mark);
+    return -1;
+}
+
+/*===========================================================================
+ * pl_execute_program — entry point
+ *=========================================================================*/
 void pl_execute_program(Program *prog) {
+    if (!prog) return;
     prolog_atom_init();
-    trail_init(&pl_trail);
-    pl_npreds = 0;
-
-    /* Build predicate table: one E_CHOICE per STMT_t subject */
-    for (STMT_t *st = prog->head; st; st = st->next)
-        if (st->subject && st->subject->kind == E_CHOICE)
-            pl_register(st->subject->sval, st->subject);
-
-    /* Call main/0 */
-    EXPR_t *main_ch = pl_lookup("main/0");
-    if (main_ch) { pl_exec_choice(main_ch, NULL, 0); return; }
-    fprintf(stderr, "prolog: no main/0 predicate\n");
+    PredTable pt; memset(&pt,0,sizeof pt);
+    for (STMT_t *s=prog->head;s;s=s->next) {
+        EXPR_t *subj=s->subject;
+        if (subj&&(subj->kind==E_CHOICE||subj->kind==E_CLAUSE)&&subj->sval)
+            pred_table_insert(&pt,subj->sval,subj);
+    }
+    Trail trail; trail_init(&trail);
+    pl_call(&pt,"main/0",0,NULL,&trail,0);
 }
