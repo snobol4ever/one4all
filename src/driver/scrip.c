@@ -930,6 +930,13 @@ static DESCR_t interp_eval(EXPR_t *e)
 
     case E_VAR:
         if (e->sval && *e->sval) {
+            /* Icon: &keyword lowered as E_VAR("&name") — dispatch to keyword logic */
+            if (e->sval[0] == '&' && e->sval[1]) {
+                const char *kw = e->sval + 1;
+                if (strcmp(kw,"subject")==0) return icn_scan_subj ? STRVAL(icn_scan_subj) : NULVCL;
+                if (strcmp(kw,"pos")    ==0) return INTVAL(icn_scan_pos);
+                return NV_GET_fn(kw);
+            }
             DESCR_t _vr = NV_GET_fn(e->sval);
             if (!IS_NULL(_vr)) return _vr;
             /* Zero-arg builtin (ARB, REM, FAIL, SUCCEED, etc.) stored as
