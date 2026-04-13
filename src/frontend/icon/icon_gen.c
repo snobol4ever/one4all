@@ -1,12 +1,12 @@
 /*============================================================================================================================
- * icon_gen.c — Icon Value-Generator Byrd Box Broker + Box Implementations (GOAL-ICN-BROKER, GOAL-UNIFIED-BROKER U-7)
+ * icon_gen.c — Icon Value-Generator Byrd Box Implementations (GOAL-ICN-BROKER, GOAL-UNIFIED-BROKER U-7/U-10)
  *
- * U-7: icn_broker is now a thin wrapper around bb_broker(..., BB_PUMP, ...).
- *      icn_gen_t → bb_node_t; icn_box_fn → bb_box_fn throughout.
+ * U-7:  icn_gen_t → bb_node_t; icn_box_fn → bb_box_fn throughout.
+ * U-10: icn_broker removed — all call sites use bb_broker(..., BB_PUMP, ...) directly.
  *
  * Architecture mirrors SNOBOL4's exec_stmt Phase 3 broker loop (stmt_exec.c):
  *   Phase 3 (SNOBOL4):  root.fn(ζ,α) → body → root.fn(ζ,β) → … → ω
- *   icn_broker (Icon):  gen.fn(ζ,α)  → body → gen.fn(ζ,β)  → … → ω  (via bb_broker BB_PUMP)
+ *   Icon generators:    gen.fn(ζ,α)   → body → gen.fn(ζ,β)  → … → ω  (bb_broker BB_PUMP)
  *
  * Value type: DESCR_t (not spec_t).  Failure sentinel: FAILDESCR / IS_FAIL_fn().
  *============================================================================================================================*/
@@ -17,16 +17,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ucontext.h>
-
-/*============================================================================================================================
- * U-7: icn_broker — thin wrapper around bb_broker(gen, BB_PUMP, body_fn, arg)
- *
- * Kept for backward compatibility with existing call sites in icon_gen.c unit tests.
- * New call sites should use bb_broker directly with BB_PUMP mode.
- *============================================================================================================================*/
-int icn_broker(bb_node_t gen, void (*body_fn)(DESCR_t val, void *arg), void *arg) {
-    return bb_broker(gen, BB_PUMP, body_fn, arg);
-}
 
 /*============================================================================================================================
  * B-3: icn_bb_to — E_TO Byrd box  (i to j)
@@ -171,7 +161,7 @@ int main(void) {
         s->value = (DESCR_t){ .v = DT_I, .i = 42 };
         bb_node_t gen = { const_box_fn, s, 0 };
         long vals[8]; collector_t c = { vals, 0, 8 };
-        int ticks = icn_broker(gen, collect_int, &c);
+        int ticks = bb_broker(gen, BB_PUMP, collect_int, &c);
         ASSERT(ticks == 1, "B-2: ticks==1");
         ASSERT(c.n == 1 && vals[0] == 42, "B-2: value==42");
         free(s);
@@ -183,7 +173,7 @@ int main(void) {
         s->lo = 1; s->hi = 5;
         bb_node_t gen = { icn_bb_to, s, 0 };
         long vals[8]; collector_t c = { vals, 0, 8 };
-        int ticks = icn_broker(gen, collect_int, &c);
+        int ticks = bb_broker(gen, BB_PUMP, collect_int, &c);
         ASSERT(ticks == 5, "B-3: ticks==5");
         ASSERT(c.n==5 && vals[0]==1 && vals[4]==5, "B-3: values 1..5");
         free(s);
@@ -195,7 +185,7 @@ int main(void) {
         s->lo = 1; s->hi = 10; s->step = 2;
         bb_node_t gen = { icn_bb_to_by, s, 0 };
         long vals[8]; collector_t c = { vals, 0, 8 };
-        int ticks = icn_broker(gen, collect_int, &c);
+        int ticks = bb_broker(gen, BB_PUMP, collect_int, &c);
         ASSERT(ticks == 5, "B-4: ticks==5");
         ASSERT(vals[0]==1 && vals[1]==3 && vals[4]==9, "B-4: values 1,3,5,7,9");
         free(s);
@@ -208,7 +198,7 @@ int main(void) {
         bb_node_t gen = { icn_bb_iterate, s, 0 };
         char got[4] = {0};
         str_collector_t sc = { got, 0, 3 };
-        icn_broker(gen, collect_str, &sc);
+        bb_broker(gen, BB_PUMP, collect_str, &sc);
         ASSERT(strcmp(got, "abc") == 0, "B-5: iterate abc");
         free(s);
     }
@@ -219,7 +209,7 @@ int main(void) {
         s->needle = "is"; s->hay = "this is it"; s->nlen = 2; s->next = s->hay;
         bb_node_t gen = { icn_bb_find, s, 0 };
         long vals[8]; collector_t c = { vals, 0, 8 };
-        int ticks = icn_broker(gen, collect_int, &c);
+        int ticks = bb_broker(gen, BB_PUMP, collect_int, &c);
         ASSERT(ticks == 2, "B-7: find ticks==2");
         ASSERT(vals[0]==3 && vals[1]==6, "B-7: find positions 3,6");
         free(s);

@@ -8,7 +8,6 @@
  *                      Mirrors Phase 3 of stmt_exec.c exactly.
  *
  *   BB_PUMP (Icon):    call root.fn(ζ,α); on γ: body_fn(val,arg); β-loop until ω.
- *                      Mirrors icn_broker in icon_gen.c exactly.
  *
  *   BB_ONCE (Prolog):  call root.fn(ζ,α) once; on γ: body_fn(val,arg) once; done.
  *                      Mirrors pl_exec_goal in pl_broker.c exactly.
@@ -54,7 +53,7 @@ int bb_broker(bb_node_t root, BrokerMode mode,
 
     /*--------------------------------------------------------------------------------------------------------------------------
      * BB_PUMP — Icon generator: pump all values until ω
-     * Mirrors icn_broker. body_fn called once per value.
+     * body_fn called once per value.
      *--------------------------------------------------------------------------------------------------------------------------*/
     case BB_PUMP: {
         DESCR_t val = fn(root.ζ, α);

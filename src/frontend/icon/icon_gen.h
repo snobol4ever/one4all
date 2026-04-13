@@ -42,12 +42,6 @@ static inline void *icn_gen_enter(void **pp, size_t size) {
 #define ICN_ENTER(ref, T)  ((T *)icn_gen_enter((void **)(ref), sizeof(T)))
 
 /*----------------------------------------------------------------------------------------------------------------------------
- * icn_broker — thin wrapper around bb_broker(gen, BB_PUMP, body_fn, arg).
- * Declared here; implemented in icon_gen.c (U-7).
- *--------------------------------------------------------------------------------------------------------------------------*/
-int icn_broker(bb_node_t gen, void (*body_fn)(DESCR_t val, void *arg), void *arg);
-
-/*----------------------------------------------------------------------------------------------------------------------------
  * Box state types — allocated by icn_eval_gen (in scrip.c) and passed as zeta
  *--------------------------------------------------------------------------------------------------------------------------*/
 typedef struct { long lo; long hi; long cur; }                                        icn_to_state_t;
