@@ -185,6 +185,9 @@ static IcnProcEntry icn_proc_table[ICN_PROC_MAX];
 static int          icn_proc_count = 0;
 static int          icn_returning  = 0;     /* 1 = Icon return in progress */
 static DESCR_t      icn_return_val;         /* value being returned */
+
+/* B-9: E_EVERY body callback for icn_broker */
+typedef struct { EXPR_t *body; int *ret; int *brk; } every_ctx_t;
 static EXPR_t      *g_icn_root     = NULL;  /* current Icon drive root */
 
 /* Generator substitution stack for E_EVERY/E_TO β re-entry (DESCR_t version).
@@ -401,6 +404,14 @@ static int icn_drive(EXPR_t *root, EXPR_t *e) {
 static DESCR_t icn_interp_eval(EXPR_t *root, EXPR_t *e) {
     g_icn_root = root;
     return interp_eval(e);
+}
+
+/* B-9: body callback for icn_broker driving E_EVERY */
+static void icn_every_body_cb(DESCR_t val, void *arg) {
+    (void)val;
+    every_ctx_t *c = (every_ctx_t *)arg;
+    if (*c->ret || *c->brk) return;
+    if (c->body) interp_eval(c->body);
 }
 
 /*----------------------------------------------------------------------------------------------------------------------------
@@ -2030,19 +2041,11 @@ static DESCR_t interp_eval(EXPR_t *e)
         if (e->nchildren < 1) return NULVCL;
         EXPR_t *gen  = e->children[0];
         EXPR_t *body = (e->nchildren > 1) ? e->children[1] : NULL;
-        /* S-11: if gen tree contains a suspend-based generator proc call,
-         * loop calling interp_eval(gen) until FAILDESCR. */
-        int has_gen = icn_has_suspend_call(gen);
-        if (has_gen) {
-            while (!icn_returning && !icn_loop_break) {
-                DESCR_t v = interp_eval(gen);
-                if (IS_FAIL_fn(v)) break;
-                if (body) interp_eval(body);
-            }
-            return NULVCL;
-        }
-        int ticks = icn_drive(gen, gen);
-        if (!ticks) interp_eval(gen);
+        /* B-9: route all E_EVERY through icn_broker via icn_eval_gen. */
+        typedef struct { EXPR_t *body; int *ret; int *brk; } every_ctx_t;
+        every_ctx_t ctx = { body, &icn_returning, &icn_loop_break };
+        icn_gen_t g = icn_eval_gen(gen);
+        icn_broker(g, icn_every_body_cb, &ctx);
         return NULVCL;
     }
 
