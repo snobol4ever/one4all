@@ -459,6 +459,57 @@ static void do_procedure(CfState *st) {
 }
 
 /* -------------------------------------------------------------------------
+ * do_struct — handle "struct name { field, field, ... }"
+ *
+ * Lowers to:  DATA('name,field1,field2,...')
+ * which defines constructor name() and accessor functions field1(), field2(), etc.
+ * Mirrors SNOBOL4 DATA() built-in convention.
+ * ---------------------------------------------------------------------- */
+static void do_struct(CfState *st) {
+    skip_nl(st);
+    if (cur(st)->kind != SNOCONE_IDENT) {
+        fprintf(stderr, "%s: expected struct name\n", st->filename);
+        st->nerrors++; return;
+    }
+    char *sname = strdup(cur(st)->text);
+    advance(st);
+
+    /* Read field list: { field, field, ... } */
+    char fields_buf[512] = "";
+    skip_nl(st);
+    if (cur(st)->kind == SNOCONE_LBRACE) {
+        advance(st); /* consume { */
+        skip_nl(st);
+        while (cur(st)->kind != SNOCONE_RBRACE && cur(st)->kind != SNOCONE_EOF) {
+            if (cur(st)->kind == SNOCONE_COMMA) { advance(st); skip_nl(st); continue; }
+            if (cur(st)->kind == SNOCONE_IDENT) {
+                if (strlen(fields_buf) > 0)
+                    strncat(fields_buf, ",", sizeof fields_buf - strlen(fields_buf) - 1);
+                strncat(fields_buf, cur(st)->text, sizeof fields_buf - strlen(fields_buf) - 1);
+                advance(st);
+            } else break;
+            skip_nl(st);
+        }
+        if (cur(st)->kind == SNOCONE_RBRACE) advance(st);
+    }
+
+    /* Emit: DATA('name(field1,field2,...)') — parenthesized SNOBOL4 convention */
+    char data_buf[600];
+    if (strlen(fields_buf) > 0) snprintf(data_buf, sizeof data_buf, "%s(%s)", sname, fields_buf);
+    else                        snprintf(data_buf, sizeof data_buf, "%s()", sname);
+    EXPR_t *arg = expr_new(E_QLIT);
+    arg->sval = strdup(data_buf);
+    EXPR_t *call = expr_new(E_FNC);
+    call->sval = strdup("DATA");
+    expr_add_child(call, arg);
+    STMT_t *s = stmt_new();
+    s->subject = call;
+    prog_append(st, s);
+
+    free(sname);
+}
+
+/* -------------------------------------------------------------------------
  * do_stmt — dispatch on current clause type
  * ---------------------------------------------------------------------- */
 static void do_stmt(CfState *st) {
@@ -610,6 +661,13 @@ static void do_stmt(CfState *st) {
     if (k == SNOCONE_KW_PROCEDURE) {
         advance(st);
         do_procedure(st);
+        return;
+    }
+
+    /* ---- struct name { field, ... } ---- */
+    if (k == SNOCONE_KW_STRUCT) {
+        advance(st);
+        do_struct(st);
         return;
     }
 

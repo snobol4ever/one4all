@@ -2938,6 +2938,7 @@ static int _label_exists_fn(const char *name) {
 /* S-10: forward declarations so _usercall_hook can call them */
 static DESCR_t _builtin_IDENT(DESCR_t *args, int nargs);
 static DESCR_t _builtin_DIFFER(DESCR_t *args, int nargs);
+static DESCR_t _builtin_DATA(DESCR_t *args, int nargs);
 
 /* _usercall_hook: calls user functions via call_user_function;
  * for pure builtins (FNCEX_fn && no body label) uses APPLY_fn directly
@@ -2947,6 +2948,7 @@ static DESCR_t _usercall_hook(const char *name, DESCR_t *args, int nargs) {
      * in pattern context correctly fail/succeed via bb_usercall -> g_user_call_hook. */
     if (strcasecmp(name, "IDENT") == 0)  return _builtin_IDENT(args, nargs);
     if (strcasecmp(name, "DIFFER") == 0) return _builtin_DIFFER(args, nargs);
+    if (strcasecmp(name, "DATA") == 0)   return _builtin_DATA(args, nargs);
     /* Check for a body label (user-defined function) */
     const char *_entry = FUNC_ENTRY_fn(name);
     STMT_t *_body = _entry ? label_lookup(_entry) : NULL;
@@ -3047,6 +3049,20 @@ static DESCR_t _builtin_CODE(DESCR_t *args, int nargs) {
     const char *s = VARVAL_fn(args[0]);
     if (!s || !*s) return FAILDESCR;
     return code(s);
+}
+
+/* ── SC-1: DATA() builtin for Snocone struct lowering ────────────────────────
+ * DATA('name(field1,field2,...)') — register a user-defined type.
+ * Calls DEFDAT_fn to register the type + field accessor functions.
+ * The constructor name() is registered via register_fn so interp_eval
+ * can dispatch it through APPLY_fn → _builtin_DATA_constructor.
+ * Returns null string on success (matches SNOBOL4 DATA() convention). */
+static DESCR_t _builtin_DATA(DESCR_t *args, int nargs) {
+    if (nargs < 1) return FAILDESCR;
+    const char *spec = VARVAL_fn(args[0]);
+    if (!spec || !*spec) return FAILDESCR;
+    DEFDAT_fn(spec);
+    return NULVCL;
 }
 
 int main(int argc, char **argv)
@@ -3283,6 +3299,7 @@ int main(int argc, char **argv)
     register_fn("DIFFER", _builtin_DIFFER, 1, 2);
     register_fn("EVAL",   _builtin_EVAL,   1, 1);
     register_fn("CODE",   _builtin_CODE,   1, 1);
+    register_fn("DATA",   _builtin_DATA,   1, 1);
 
     /* Wire user-function dispatch hook (wrapper defined above main) */
     extern DESCR_t (*g_user_call_hook)(const char *, DESCR_t *, int);
