@@ -59,7 +59,10 @@
 extern Program *sno_parse(FILE *f, const char *filename);
 #include "../frontend/snocone/snocone_driver.h"
 #include "../frontend/prolog/prolog_driver.h"
-#include "../frontend/prolog/prolog_interp.h"
+#include "../frontend/prolog/prolog_runtime.h"
+#include "../frontend/prolog/prolog_atom.h"
+#include "../frontend/prolog/prolog_builtin.h"
+#include "../frontend/prolog/term.h"
 #include "../frontend/icon/icon_driver.h"
 #include "../frontend/icon/icon_interp.h"
 #include "../frontend/icon/icon_lex.h"    /* IcnTkKind — TK_AUG* for E_AUGOP in unified interp */
@@ -2029,6 +2032,502 @@ static DESCR_t interp_eval_pat(EXPR_t *e)
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
+ * pl_execute_program_unified — Prolog IR interpreter (Phase 1B)
+ * All logic moved from prolog_interp.c into scrip.c.
+ * prolog_interp.c and prolog_interp.h are deleted after this.
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+/*---- Predicate table ----*/
+#define PL_PRED_TABLE_SIZE 256
+typedef struct Pl_PredEntry { const char *key; EXPR_t *choice; struct Pl_PredEntry *next; } Pl_PredEntry;
+typedef struct { Pl_PredEntry *buckets[PL_PRED_TABLE_SIZE]; } Pl_PredTable;
+
+static unsigned pl_pred_hash(const char *s) {
+    unsigned h = 5381;
+    while (*s) h = h * 33 ^ (unsigned char)*s++;
+    return h % PL_PRED_TABLE_SIZE;
+}
+static void pl_pred_table_insert(Pl_PredTable *pt, const char *key, EXPR_t *choice) {
+    unsigned h = pl_pred_hash(key);
+    Pl_PredEntry *e = malloc(sizeof(Pl_PredEntry));
+    e->key = key; e->choice = choice; e->next = pt->buckets[h]; pt->buckets[h] = e;
+}
+static EXPR_t *pl_pred_table_lookup(Pl_PredTable *pt, const char *key) {
+    for (Pl_PredEntry *e = pt->buckets[pl_pred_hash(key)]; e; e = e->next)
+        if (strcmp(e->key, key) == 0) return e->choice;
+    return NULL;
+}
+
+/*---- Choice point stack ----*/
+#define PL_CP_STACK_MAX 4096
+typedef struct {
+    jmp_buf     jb;
+    Pl_PredTable *pt;
+    const char *key;
+    int         arity;
+    Trail      *trail;
+    int         trail_mark;
+    int         next_clause;
+    int         cut;
+} Pl_ChoicePoint;
+static Pl_ChoicePoint pl_cp_stack[PL_CP_STACK_MAX];
+static int            pl_cp_top = 0;
+
+static Term **pl_env_new(int n) {
+    if (n <= 0) return NULL;
+    Term **env = malloc(n * sizeof(Term *));
+    for (int i = 0; i < n; i++) env[i] = term_new_var(i);
+    return env;
+}
+
+/*---- Continuation type ----*/
+typedef struct Pl_Cont Pl_Cont;
+struct Pl_Cont { int (*fn)(Pl_Cont *self); };
+static int pl_cont_done_fn(Pl_Cont *self) { (void)self; return 1; }
+static Pl_Cont pl_cont_done_val = { pl_cont_done_fn };
+static Pl_Cont *pl_cont_done = &pl_cont_done_val;
+
+/*---- Forward declarations ----*/
+static Term *pl_unified_term_from_expr(EXPR_t *e, Term **env);
+static Term *pl_unified_deep_copy(Term *t);
+static int pl_unified_exec_goal(EXPR_t *goal, Term **env, Pl_PredTable *pt, Trail *trail, int *cut_flag);
+static int pl_unified_exec_body(EXPR_t **goals, int ngoals, Term **env, Pl_PredTable *pt, Trail *trail, int *cut_flag);
+static int pl_unified_exec_body_k(EXPR_t **goals, int ngoals, Term **env, Pl_PredTable *pt, Trail *trail, int *cut_flag, Pl_Cont *cont);
+static int pl_unified_call(Pl_PredTable *pt, const char *key, int arity, Term **args, Trail *trail, int start);
+static int pl_unified_exec_clause(EXPR_t *ec, int n_args, Term **call_args, Pl_PredTable *pt, Trail *trail, int *cut_flag);
+
+/*---- findall support ----*/
+typedef struct {
+    Pl_Cont     base;
+    EXPR_t     *tmpl_expr;
+    Term      **env;
+    Term      **solutions;
+    int         nsol;
+    int         sol_cap;
+} Pl_Findall_cont;
+
+static int pl_findall_cont_fn(Pl_Cont *self) {
+    Pl_Findall_cont *fc = (Pl_Findall_cont *)self;
+    Term *snap = pl_unified_deep_copy(pl_unified_term_from_expr(fc->tmpl_expr, fc->env));
+    if (fc->nsol >= fc->sol_cap) {
+        fc->sol_cap = fc->sol_cap ? fc->sol_cap * 2 : 8;
+        fc->solutions = realloc(fc->solutions, fc->sol_cap * sizeof(Term *));
+    }
+    fc->solutions[fc->nsol++] = snap;
+    return 0;
+}
+
+/*---- pl_unified_term_from_expr ----*/
+static Term *pl_unified_term_from_expr(EXPR_t *e, Term **env) {
+    if (!e) return term_new_atom(prolog_atom_intern("[]"));
+    switch (e->kind) {
+        case E_QLIT: return term_new_atom(prolog_atom_intern(e->sval ? e->sval : ""));
+        case E_ILIT: return term_new_int((long)e->ival);
+        case E_FLIT: return term_new_float(e->dval);
+        case E_VAR:  return (env && e->ival >= 0) ? env[e->ival] : term_new_var(e->ival);
+        case E_ADD: case E_SUB: case E_MUL: case E_DIV: case E_MOD: {
+            /* arithmetic ops used as terms (e.g. K-V): wrap as compound */
+            const char *op = e->kind==E_ADD?"+":e->kind==E_SUB?"-":e->kind==E_MUL?"*":e->kind==E_DIV?"/":"%";
+            int atom = prolog_atom_intern(op);
+            Term *args2[2]; args2[0]=pl_unified_term_from_expr(e->children[0],env); args2[1]=pl_unified_term_from_expr(e->children[1],env);
+            return term_new_compound(atom, 2, args2);
+        }
+        case E_FNC: {
+            int arity = e->nchildren;
+            int atom  = prolog_atom_intern(e->sval ? e->sval : "f");
+            if (arity == 0) return term_new_atom(atom);
+            Term **args = malloc(arity * sizeof(Term *));
+            for (int i = 0; i < arity; i++) args[i] = pl_unified_term_from_expr(e->children[i], env);
+            Term *t = term_new_compound(atom, arity, args);
+            free(args);
+            return t;
+        }
+        default: return term_new_atom(prolog_atom_intern("?"));
+    }
+}
+
+/*---- pl_unified_deep_copy ----*/
+static Term *pl_unified_deep_copy(Term *t) {
+    t = term_deref(t);
+    if (!t || t->tag == TT_VAR) return term_new_atom(prolog_atom_intern("_"));
+    if (t->tag == TT_ATOM)  return term_new_atom(t->atom_id);
+    if (t->tag == TT_INT)   return term_new_int(t->ival);
+    if (t->tag == TT_FLOAT) return term_new_float(t->fval);
+    if (t->tag == TT_COMPOUND) {
+        Term **args = malloc(t->compound.arity * sizeof(Term *));
+        for (int i = 0; i < t->compound.arity; i++) args[i] = pl_unified_deep_copy(t->compound.args[i]);
+        Term *r = term_new_compound(t->compound.functor, t->compound.arity, args);
+        free(args);
+        return r;
+    }
+    return term_new_atom(prolog_atom_intern("_"));
+}
+
+/*---- pl_unified_eval_arith ----*/
+static long pl_unified_eval_arith(EXPR_t *e, Term **env) {
+    if (!e) return 0;
+    switch (e->kind) {
+        case E_ILIT: return (long)e->ival;
+        case E_FLIT: return (long)e->dval;
+        case E_VAR: { Term *t = term_deref(env && e->ival >= 0 ? env[e->ival] : NULL);
+                      return (t && t->tag == TT_INT) ? t->ival : 0; }
+        case E_ADD: return pl_unified_eval_arith(e->children[0],env) + pl_unified_eval_arith(e->children[1],env);
+        case E_SUB: return pl_unified_eval_arith(e->children[0],env) - pl_unified_eval_arith(e->children[1],env);
+        case E_MUL: return pl_unified_eval_arith(e->children[0],env) * pl_unified_eval_arith(e->children[1],env);
+        case E_DIV: { long d=pl_unified_eval_arith(e->children[1],env); return d?pl_unified_eval_arith(e->children[0],env)/d:0; }
+        case E_MOD: { long d=pl_unified_eval_arith(e->children[1],env); return d?pl_unified_eval_arith(e->children[0],env)%d:0; }
+        case E_FNC: {
+            const char *fn = e->sval ? e->sval : "";
+            if (strcmp(fn,"mod")==0&&e->nchildren==2){long d=pl_unified_eval_arith(e->children[1],env);return d?pl_unified_eval_arith(e->children[0],env)%d:0;}
+            if (strcmp(fn,"abs")==0&&e->nchildren==1){long v=pl_unified_eval_arith(e->children[0],env);return v<0?-v:v;}
+            if (strcmp(fn,"max")==0&&e->nchildren==2){long a=pl_unified_eval_arith(e->children[0],env),b=pl_unified_eval_arith(e->children[1],env);return a>b?a:b;}
+            if (strcmp(fn,"min")==0&&e->nchildren==2){long a=pl_unified_eval_arith(e->children[0],env),b=pl_unified_eval_arith(e->children[1],env);return a<b?a:b;}
+            if (strcmp(fn,"rem")==0&&e->nchildren==2){long d=pl_unified_eval_arith(e->children[1],env);return d?pl_unified_eval_arith(e->children[0],env)%d:0;}
+            Term *t=term_deref(pl_unified_term_from_expr(e,env));
+            return (t&&t->tag==TT_INT)?t->ival:0;
+        }
+        default: return 0;
+    }
+}
+
+/*---- is_pl_user_call ----*/
+static int is_pl_user_call(EXPR_t *goal) {
+    if (!goal || goal->kind != E_FNC || !goal->sval) return 0;
+    static const char *builtins[] = {
+        "true","fail","halt","nl","write","writeln","print","tab","is",
+        "<",">","=<",">=","=:=","=\\=","=","\\=","==","\\==",
+        "@<","@>","@=<","@>=",
+        "var","nonvar","atom","integer","float","compound","atomic","callable","is_list",
+        "functor","arg","=..","\\+","not",",",";","->","findall",
+        "assert","assertz","asserta","retract","retractall","abolish",
+        NULL
+    };
+    for (int i = 0; builtins[i]; i++) if (strcmp(goal->sval, builtins[i]) == 0) return 0;
+    return 1;
+}
+
+/*---- pl_unified_exec_goal ----*/
+static int pl_unified_exec_goal(EXPR_t *goal, Term **env, Pl_PredTable *pt, Trail *trail, int *cut_flag) {
+    if (!goal) return 1;
+    switch (goal->kind) {
+        case E_UNIFY: {
+            Term *t1=pl_unified_term_from_expr(goal->children[0],env);
+            Term *t2=pl_unified_term_from_expr(goal->children[1],env);
+            int mark=trail_mark(trail);
+            if (!unify(t1,t2,trail)){trail_unwind(trail,mark);return 0;}
+            return 1;
+        }
+        case E_CUT: if (cut_flag) *cut_flag=1; return 1;
+        case E_TRAIL_MARK: case E_TRAIL_UNWIND: return 1;
+        case E_FNC: {
+            const char *fn = goal->sval ? goal->sval : "true";
+            int arity = goal->nchildren;
+            if (strcmp(fn,"true")==0&&arity==0) return 1;
+            if (strcmp(fn,"fail")==0&&arity==0) return 0;
+            if (strcmp(fn,"halt")==0&&arity==0) exit(0);
+            if (strcmp(fn,"halt")==0&&arity==1){Term *t=term_deref(pl_unified_term_from_expr(goal->children[0],env));exit(t&&t->tag==TT_INT?(int)t->ival:0);}
+            if (strcmp(fn,"nl")==0&&arity==0){putchar('\n');return 1;}
+            if (strcmp(fn,"write")==0&&arity==1){pl_write(pl_unified_term_from_expr(goal->children[0],env));return 1;}
+            if (strcmp(fn,"writeln")==0&&arity==1){pl_write(pl_unified_term_from_expr(goal->children[0],env));putchar('\n');return 1;}
+            if (strcmp(fn,"print")==0&&arity==1){pl_write(pl_unified_term_from_expr(goal->children[0],env));return 1;}
+            if (strcmp(fn,"tab")==0&&arity==1){
+                Term *t=term_deref(pl_unified_term_from_expr(goal->children[0],env));
+                long n=(t&&t->tag==TT_INT)?t->ival:0;
+                for(long i=0;i<n;i++) putchar(' ');
+                return 1;
+            }
+            if (strcmp(fn,"is")==0&&arity==2){
+                long val=pl_unified_eval_arith(goal->children[1],env);
+                Term *lhs=pl_unified_term_from_expr(goal->children[0],env);
+                int mark=trail_mark(trail);
+                if(!unify(lhs,term_new_int(val),trail)){trail_unwind(trail,mark);return 0;}
+                return 1;
+            }
+            /* arithmetic comparisons */
+            { struct{const char *n;int op;}cmps[]={{"<",0},{">",1},{"=<",2},{">=",3},{"=:=",4},{"=\\=",5},{NULL,0}};
+              for(int ci=0;cmps[ci].n;ci++) if(strcmp(fn,cmps[ci].n)==0&&arity==2){
+                  long a=pl_unified_eval_arith(goal->children[0],env),b=pl_unified_eval_arith(goal->children[1],env);
+                  switch(cmps[ci].op){case 0:return a<b;case 1:return a>b;case 2:return a<=b;case 3:return a>=b;case 4:return a==b;case 5:return a!=b;}
+              }
+            }
+            if (strcmp(fn,"=")==0&&arity==2){
+                int mark=trail_mark(trail);
+                if(!unify(pl_unified_term_from_expr(goal->children[0],env),pl_unified_term_from_expr(goal->children[1],env),trail)){trail_unwind(trail,mark);return 0;}
+                return 1;
+            }
+            if (strcmp(fn,"\\=")==0&&arity==2){
+                int mark=trail_mark(trail);
+                int ok=unify(pl_unified_term_from_expr(goal->children[0],env),pl_unified_term_from_expr(goal->children[1],env),trail);
+                trail_unwind(trail,mark);return !ok;
+            }
+            if (strcmp(fn,"==")==0&&arity==2){
+                Term *t1=term_deref(pl_unified_term_from_expr(goal->children[0],env));
+                Term *t2=term_deref(pl_unified_term_from_expr(goal->children[1],env));
+                if(!t1||!t2)return t1==t2;
+                if(t1->tag!=t2->tag)return 0;
+                if(t1->tag==TT_ATOM)return t1->atom_id==t2->atom_id;
+                if(t1->tag==TT_INT) return t1->ival==t2->ival;
+                if(t1->tag==TT_VAR) return t1==t2;
+                return 0;
+            }
+            if (strcmp(fn,"\\==")==0&&arity==2){
+                Term *t1=term_deref(pl_unified_term_from_expr(goal->children[0],env));
+                Term *t2=term_deref(pl_unified_term_from_expr(goal->children[1],env));
+                if(!t1||!t2)return t1!=t2;
+                if(t1->tag!=t2->tag)return 1;
+                if(t1->tag==TT_ATOM)return t1->atom_id!=t2->atom_id;
+                if(t1->tag==TT_INT) return t1->ival!=t2->ival;
+                if(t1->tag==TT_VAR) return t1!=t2;
+                return 1;
+            }
+            /* type tests */
+            if (arity==1){
+                Term *t=term_deref(pl_unified_term_from_expr(goal->children[0],env));
+                if(strcmp(fn,"var"     )==0)return !t||t->tag==TT_VAR;
+                if(strcmp(fn,"nonvar"  )==0)return  t&&t->tag!=TT_VAR;
+                if(strcmp(fn,"atom"    )==0)return  t&&t->tag==TT_ATOM;
+                if(strcmp(fn,"integer" )==0)return  t&&t->tag==TT_INT;
+                if(strcmp(fn,"float"   )==0)return  t&&t->tag==TT_FLOAT;
+                if(strcmp(fn,"compound")==0)return  t&&t->tag==TT_COMPOUND;
+                if(strcmp(fn,"atomic"  )==0)return  t&&(t->tag==TT_ATOM||t->tag==TT_INT||t->tag==TT_FLOAT);
+                if(strcmp(fn,"callable")==0)return  t&&(t->tag==TT_ATOM||t->tag==TT_COMPOUND);
+                if(strcmp(fn,"is_list" )==0){
+                    int nil=prolog_atom_intern("[]"),dot=prolog_atom_intern(".");
+                    for(Term *c=t;;){c=term_deref(c);if(!c)return 0;if(c->tag==TT_ATOM&&c->atom_id==nil)return 1;if(c->tag!=TT_COMPOUND||c->compound.arity!=2||c->compound.functor!=dot)return 0;c=c->compound.args[1];}
+                }
+            }
+            /* ,/N conjunction — thread through cont via exec_body */
+            if (strcmp(fn,",")==0){
+                return pl_unified_exec_body(goal->children,goal->nchildren,env,pt,trail,cut_flag);
+            }
+            /* ;/N disjunction */
+            if (strcmp(fn,";")==0&&arity>=2){
+                EXPR_t *left=goal->children[0],*right=goal->children[1];
+                if(left&&left->kind==E_FNC&&left->sval&&strcmp(left->sval,"->")==0&&left->nchildren>=2){
+                    Trail save=*trail;int mark=trail_mark(trail);int cut2=0;
+                    if(pl_unified_exec_goal(left->children[0],env,pt,trail,&cut2)){
+                        return pl_unified_exec_body(left->children+1,left->nchildren-1,env,pt,trail,cut_flag);
+                    }
+                    trail_unwind(trail,mark);*trail=save;
+                    return pl_unified_exec_goal(right,env,pt,trail,cut_flag);
+                }
+                {Trail save=*trail;int mark=trail_mark(trail);int cut2=0;
+                 if(pl_unified_exec_goal(left,env,pt,trail,&cut2))return 1;
+                 trail_unwind(trail,mark);*trail=save;
+                 return pl_unified_exec_goal(right,env,pt,trail,cut_flag);}
+            }
+            /* ->/N if-then */
+            if (strcmp(fn,"->")==0&&arity>=2){
+                int cut2=0;
+                if(!pl_unified_exec_goal(goal->children[0],env,pt,trail,&cut2))return 0;
+                return pl_unified_exec_body(goal->children+1,goal->nchildren-1,env,pt,trail,cut_flag);
+            }
+            /* \+/not */
+            if ((strcmp(fn,"\\+")==0||strcmp(fn,"not")==0)&&arity==1){
+                Trail save=*trail;int mark=trail_mark(trail);int cut2=0;
+                int ok=pl_unified_exec_goal(goal->children[0],env,pt,trail,&cut2);
+                trail_unwind(trail,mark);*trail=save;return !ok;
+            }
+            /* functor/3 */
+            if (strcmp(fn,"functor")==0&&arity==3){
+                int mark=trail_mark(trail);
+                if(!pl_functor(pl_unified_term_from_expr(goal->children[0],env),pl_unified_term_from_expr(goal->children[1],env),pl_unified_term_from_expr(goal->children[2],env),trail)){trail_unwind(trail,mark);return 0;}
+                return 1;
+            }
+            /* arg/3 */
+            if (strcmp(fn,"arg")==0&&arity==3){
+                int mark=trail_mark(trail);
+                if(!pl_arg(pl_unified_term_from_expr(goal->children[0],env),pl_unified_term_from_expr(goal->children[1],env),pl_unified_term_from_expr(goal->children[2],env),trail)){trail_unwind(trail,mark);return 0;}
+                return 1;
+            }
+            /* =../2 */
+            if (strcmp(fn,"=..")==0&&arity==2){
+                int mark=trail_mark(trail);
+                if(!pl_univ(pl_unified_term_from_expr(goal->children[0],env),pl_unified_term_from_expr(goal->children[1],env),trail)){trail_unwind(trail,mark);return 0;}
+                return 1;
+            }
+            /* assert/assertz/asserta — dynamic predicate addition */
+            if ((strcmp(fn,"assert")==0||strcmp(fn,"assertz")==0||strcmp(fn,"asserta")==0)&&arity==1){
+                /* no dynamic pred support yet — succeed silently */
+                return 1;
+            }
+            /* retract/retractall/abolish — dynamic predicate removal */
+            if ((strcmp(fn,"retract")==0||strcmp(fn,"retractall")==0||strcmp(fn,"abolish")==0)&&arity==1){
+                return 1;
+            }
+            /* findall/3 */
+            if (strcmp(fn,"findall")==0&&arity==3){
+                EXPR_t *tmpl_expr=goal->children[0];
+                EXPR_t *goal_expr=goal->children[1];
+                EXPR_t *list_expr=goal->children[2];
+                Pl_Findall_cont fc;
+                fc.base.fn=pl_findall_cont_fn;
+                fc.tmpl_expr=tmpl_expr;
+                fc.env=env;
+                fc.solutions=NULL; fc.nsol=0; fc.sol_cap=0;
+                Trail fa_trail; trail_init(&fa_trail);
+                int saved_cp=pl_cp_top; int cut2=0;
+                /* flatten conjunction into goals array for proper cont threading */
+                if (goal_expr&&goal_expr->kind==E_FNC&&goal_expr->sval&&strcmp(goal_expr->sval,",")==0) {
+                    pl_unified_exec_body_k(goal_expr->children,goal_expr->nchildren,env,pt,&fa_trail,&cut2,(Pl_Cont*)&fc);
+                } else {
+                    EXPR_t *goals1[1]; goals1[0]=goal_expr;
+                    pl_unified_exec_body_k(goals1,1,env,pt,&fa_trail,&cut2,(Pl_Cont*)&fc);
+                }
+                pl_cp_top=saved_cp;
+                int nil_id=prolog_atom_intern("[]"),dot_id=prolog_atom_intern(".");
+                Term *lst=term_new_atom(nil_id);
+                for(int i=fc.nsol-1;i>=0;i--){Term *a2[2];a2[0]=fc.solutions[i];a2[1]=lst;lst=term_new_compound(dot_id,2,a2);}
+                free(fc.solutions);
+                Term *list_term=pl_unified_term_from_expr(list_expr,env);
+                int u_mark=trail_mark(trail);
+                if(!unify(list_term,lst,trail)){trail_unwind(trail,u_mark);return 0;}
+                return 1;
+            }
+            /* user-defined */
+            if (is_pl_user_call(goal)){
+                char key[256]; snprintf(key,sizeof key,"%s/%d",fn,arity);
+                Term **args=malloc(arity*sizeof(Term*));
+                for(int i=0;i<arity;i++) args[i]=pl_unified_term_from_expr(goal->children[i],env);
+                int mark=trail_mark(trail);
+                int r=pl_unified_call(pt,key,arity,args,trail,0);
+                free(args);
+                if(r<0){trail_unwind(trail,mark);return 0;}
+                return 1;
+            }
+            fprintf(stderr,"prolog: undefined predicate %s/%d\n",fn,arity);
+            return 0;
+        }
+        default: return 1;
+    }
+}
+
+/*---- pl_unified_exec_clause ----*/
+static int pl_unified_exec_clause(EXPR_t *ec, int n_args, Term **call_args, Pl_PredTable *pt, Trail *trail, int *cut_flag) {
+    if(!ec||ec->kind!=E_CLAUSE)return 0;
+    int n_vars=(int)ec->ival;
+    Term **env=pl_env_new(n_vars);
+    int head_mark=trail_mark(trail);
+    for(int i=0;i<n_args&&i<ec->nchildren;i++){
+        Term *ha=pl_unified_term_from_expr(ec->children[i],env);
+        if(!unify(call_args[i],ha,trail)){trail_unwind(trail,head_mark);free(env);return 0;}
+    }
+    int nbody=ec->nchildren-n_args;
+    EXPR_t **body=ec->children+n_args;
+    int ok=nbody==0?1:pl_unified_exec_body(body,nbody,env,pt,trail,cut_flag);
+    free(env);
+    return ok;
+}
+
+/*---- pl_unified_call ----*/
+static int pl_unified_call(Pl_PredTable *pt, const char *key, int arity, Term **args, Trail *trail, int start) {
+    EXPR_t *choice=pl_pred_table_lookup(pt,key);
+    if(!choice){fprintf(stderr,"prolog: undefined predicate %s\n",key);return -1;}
+    int nclauses=choice->nchildren;
+    int mark=trail_mark(trail);
+    for(int ci=start;ci<nclauses;ci++){
+        if(ci>start)trail_unwind(trail,mark);
+        EXPR_t *ec=choice->children[ci];if(!ec)continue;
+        int clause_cut=0;
+        if(pl_unified_exec_clause(ec,arity,args,pt,trail,&clause_cut))return ci;
+        if(clause_cut)break;
+    }
+    trail_unwind(trail,mark);
+    return -1;
+}
+
+/*---- Body continuation ----*/
+typedef struct {
+    Pl_Cont      base;
+    EXPR_t     **goals;
+    int          ngoals;
+    Term       **env;
+    Pl_PredTable *pt;
+    Trail       *trail;
+    int         *cut_flag;
+    Pl_Cont     *next;
+} Pl_Body_cont;
+
+static int pl_body_cont_fn(Pl_Cont *self) {
+    Pl_Body_cont *bc=(Pl_Body_cont *)self;
+    return pl_unified_exec_body_k(bc->goals,bc->ngoals,bc->env,bc->pt,bc->trail,bc->cut_flag,bc->next);
+}
+
+/*---- pl_unified_exec_body_k ----*/
+static int pl_unified_exec_body_k(EXPR_t **goals, int ngoals, Term **env, Pl_PredTable *pt, Trail *trail, int *cut_flag, Pl_Cont *cont) {
+    if(ngoals==0)return cont->fn(cont);
+    EXPR_t *g=goals[0];
+
+    if(is_pl_user_call(g)){
+        const char *fn=g->sval; int arity=g->nchildren;
+        char key[256]; snprintf(key,sizeof key,"%s/%d",fn,arity);
+        EXPR_t *choice=pl_pred_table_lookup(pt,key);
+        if(!choice){fprintf(stderr,"prolog: undefined predicate %s\n",key);return 0;}
+        int nclauses=choice->nchildren;
+        if(pl_cp_top>=PL_CP_STACK_MAX){fprintf(stderr,"prolog: CP stack overflow\n");return 0;}
+        Pl_ChoicePoint *cp=&pl_cp_stack[pl_cp_top++];
+        cp->pt=pt; cp->key=key; cp->arity=arity; cp->trail=trail;
+        cp->trail_mark=trail_mark(trail); cp->next_clause=0; cp->cut=0;
+        setjmp(cp->jb);
+        int result=0;
+        while(!cp->cut&&cp->next_clause<nclauses){
+            int ci=cp->next_clause;
+            trail_unwind(trail,cp->trail_mark);
+            Term **args=malloc(arity*sizeof(Term*));
+            for(int i=0;i<arity;i++) args[i]=pl_unified_term_from_expr(g->children[i],env);
+            cp->next_clause=ci+1;
+            EXPR_t *ec=choice->children[ci];
+            if(!ec||ec->kind!=E_CLAUSE){free(args);continue;}
+            int n_vars=(int)ec->ival;
+            Term **cenv=pl_env_new(n_vars);
+            int head_mark=trail_mark(trail); int head_ok=1;
+            for(int i=0;i<arity&&i<ec->nchildren;i++){
+                Term *ha=pl_unified_term_from_expr(ec->children[i],cenv);
+                if(!unify(args[i],ha,trail)){head_ok=0;break;}
+            }
+            free(args);
+            if(!head_ok){trail_unwind(trail,head_mark);free(cenv);continue;}
+            Pl_Body_cont suffix_bc;
+            suffix_bc.base.fn=pl_body_cont_fn;
+            suffix_bc.goals=goals+1; suffix_bc.ngoals=ngoals-1;
+            suffix_bc.env=env; suffix_bc.pt=pt; suffix_bc.trail=trail;
+            suffix_bc.cut_flag=cut_flag; suffix_bc.next=cont;
+            int nbody=ec->nchildren-arity;
+            EXPR_t **body=ec->children+arity;
+            int clause_cut=0; int ok;
+            if(nbody==0) ok=suffix_bc.base.fn(&suffix_bc.base);
+            else ok=pl_unified_exec_body_k(body,nbody,cenv,pt,trail,&clause_cut,&suffix_bc.base);
+            free(cenv);
+            if(clause_cut){if(cut_flag)*cut_flag=1;result=ok;break;}
+            if(ok){result=1;break;}
+        }
+        pl_cp_top--;
+        return result;
+    }
+    /* deterministic goal */
+    if(!pl_unified_exec_goal(g,env,pt,trail,cut_flag))return 0;
+    return pl_unified_exec_body_k(goals+1,ngoals-1,env,pt,trail,cut_flag,cont);
+}
+
+static int pl_unified_exec_body(EXPR_t **goals, int ngoals, Term **env, Pl_PredTable *pt, Trail *trail, int *cut_flag) {
+    return pl_unified_exec_body_k(goals,ngoals,env,pt,trail,cut_flag,pl_cont_done);
+}
+
+/*---- pl_execute_program_unified — entry point (replaces pl_execute_program) ----*/
+static void pl_execute_program_unified(Program *prog) {
+    if (!prog) return;
+    prolog_atom_init();
+    Pl_PredTable pt; memset(&pt,0,sizeof pt);
+    for(STMT_t *s=prog->head;s;s=s->next){
+        EXPR_t *subj=s->subject;
+        if(subj&&(subj->kind==E_CHOICE||subj->kind==E_CLAUSE)&&subj->sval)
+            pl_pred_table_insert(&pt,subj->sval,subj);
+    }
+    Trail trail; trail_init(&trail);
+    pl_unified_call(&pt,"main/0",0,NULL,&trail,0);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
  * execute_program — full-program executor with label-table goto resolution
  * ══════════════════════════════════════════════════════════════════════════ */
 
@@ -2806,7 +3305,7 @@ int main(int argc, char **argv)
         }
         sm_prog_free(sm);
     } else if (lang_prolog) {
-        pl_execute_program(prog);
+        pl_execute_program_unified(prog);
     } else if (lang_icon) {
         icn_execute_program_unified(prog);   /* unified IR interpreter — one interp_eval */
     } else {
