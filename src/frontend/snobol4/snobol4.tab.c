@@ -2154,29 +2154,52 @@ EXPR_t *parse_expr_from_str(const char *src){
 }
 
 /* parse_expr_pat_from_str — parse a bare expression string using the bison
- * parser by wrapping it as a pattern slot: "_SNO4PAT_ src"
- * The bison grammar parses the RHS as a pattern EXPR_t in pattern context.
- * Returns EXPR_t* (shared IR) or NULL on parse failure.
- * Used by _eval_str_impl_fn in scrip.c to replace the CMPILE path. */
+ * parser. Passes src directly — no dummy prefix. Bison puts a bare expr
+ * in s->subject; pattern-context exprs (with $ @ *) also land in subject.
+ * Returns s->pattern if set (scan-split case), else s->subject.
+ * No CMPILE/CMPND_t bridge — all kinds are valid EKind values.
+ * Used by _eval_str_impl_fn in scrip.c and snobol4_pattern.c. */
 EXPR_t *parse_expr_pat_from_str(const char *src) {
     if (!src || !*src) return NULL;
-    /* Wrap as "_SNO_DUMMY_ <src>" — bison sees a subject (_SNO_DUMMY_)
-     * followed by a pattern expression (src), placing src in s->pattern.
-     * This is the only way to get the bison parser to parse a bare
-     * expression string; parse_expr_from_str returns subject only and
-     * fails on standalone pattern expressions. */
-    char buf[8192];
-    int n = snprintf(buf, sizeof buf, "_SNO_DUMMY_ %s", src);
-    if (n <= 0 || n >= (int)sizeof buf) return NULL;
+    /* Append \n so the BODY-state lexer emits T_STMT_END before EOF.
+     * Without it bison never reduces the stmt rule and prog->head stays NULL. */
+    int slen = (int)strlen(src);
+    char *buf = malloc(slen + 2);
+    if (!buf) return NULL;
+    memcpy(buf, src, slen);
+    buf[slen]   = '\n';
+    buf[slen+1] = '\0';
     Lex lx = {0};
-    lex_open_str(&lx, buf, n, 0);
+    lex_open_str(&lx, buf, slen + 1, 0);
     Program *prog = calloc(1, sizeof *prog);
     PP p = {prog, NULL};
     g_lx = &lx;
     snobol4_parse(&p);
+    free(buf);
     if (!prog->head) return NULL;
     STMT_t *s = prog->head;
-    /* Pattern slot has our expression; subject is the dummy var */
+    /* Return pattern slot if the scan-split fired, else subject has the expr */
     if (s->pattern) return s->pattern;
-    return NULL;
+    return s->subject;
+}
+
+/* sno_parse_string — parse a multi-statement SNOBOL4 string via bison.
+ * Appends \n so the BODY-state lexer emits T_STMT_END before EOF.
+ * Returns a Program* (caller owns). Used by code() in eval_code.c (S-3). */
+Program *sno_parse_string(const char *src) {
+    if (!src) return calloc(1, sizeof(Program));
+    int slen = (int)strlen(src);
+    char *buf = malloc(slen + 2);
+    if (!buf) return calloc(1, sizeof(Program));
+    memcpy(buf, src, slen);
+    buf[slen]   = '\n';
+    buf[slen+1] = '\0';
+    Lex lx = {0};
+    lex_open_str(&lx, buf, slen + 1, 0);
+    Program *prog = calloc(1, sizeof *prog);
+    PP p = {prog, NULL};
+    g_lx = &lx;
+    snobol4_parse(&p);
+    free(buf);
+    return prog;
 }

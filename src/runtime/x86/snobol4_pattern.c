@@ -21,7 +21,7 @@
 #include "engine.h"
 #include "../../ir/ir.h"         /* ir.h first — sets EXPR_T_DEFINED so scrip_cc.h skips its own EXPR_t */
 #include "../../frontend/snobol4/scrip_cc.h"
-#include "../../frontend/snobol4/CMPILE.c"
+/* CMPILE.c removed — bison/flex path via scrip_cc.h (GOAL-REMOVE-CMPILE S-4) */
 
 /* Hook for scrip.c to route EVAL(string) through interp_eval_pat.
  * When set, EVAL_fn calls this instead of CONVE_fn→EXPVAL_fn for string args.
@@ -1543,131 +1543,6 @@ static DESCR_t _ev_expr(SnoEvalCtx *e) {
     return left;
 }
 
-/* cmpnd_to_expr — lower CMPND_t (CMPILE parse node) to EXPR_t (shared IR).
- * Uses SIL stype constants directly — no integer guessing.
- * CMPILE.c is #included above so CMPND_t, stype defines are in this TU. */
-
-EXPR_t *cmpnd_to_expr(CMPND_t *n) {
-    if (!n || n->stype == 0) return NULL;
-
-    /* Transparent wrapper: parenthesised sub-expression — unwrap */
-    if (n->stype == NSTTYP)
-        return n->nchildren == 1 ? cmpnd_to_expr(n->children[0]) : NULL;
-
-    /* Implicit concatenation: VARTYP root with >1 child */
-    if (n->stype == VARTYP && n->nchildren > 0) {
-        EXPR_t *e = GC_MALLOC(sizeof *e);
-        e->kind = E_CAT;
-        e->children = GC_MALLOC(n->nchildren * sizeof(EXPR_t*));
-        e->nchildren = n->nchildren;
-        for (int i = 0; i < n->nchildren; i++)
-            e->children[i] = cmpnd_to_expr(n->children[i]);
-        return e;
-    }
-
-    EXPR_t *e = GC_MALLOC(sizeof *e);
-
-    /* Map SIL stype → EKind using named constants */
-    switch (n->stype) {
-        /* Literals */
-        case QLITYP: e->kind = E_QLIT;    e->sval = n->text ? strdup(n->text) : NULL; break;
-        case ILITYP: e->kind = E_ILIT;    e->ival = (long)n->ival; break;
-        case FLITYP: e->kind = E_FLIT;    e->dval = n->fval; break;
-        /* References */
-        case VARTYP: e->kind = E_VAR;     e->sval = n->text ? strdup(n->text) : NULL; break;
-        case FNCTYP: e->kind = E_FNC;     e->sval = n->text ? strdup(n->text) : NULL; break;
-        case ARYTYP:
-            /* CMPILE ARYTYP: text = array/table name, children = subscript exprs.
-             * E_IDX expects children[0]=base, children[1..]=subscripts.
-             * Prepend a synthetic E_VAR node for the base name. */
-            e->kind = E_IDX;
-            e->sval = n->text ? strdup(n->text) : NULL;
-            {
-                int nc = n->nchildren;
-                e->children = GC_MALLOC((size_t)(nc + 1) * sizeof(EXPR_t *));
-                e->nchildren = nc + 1;
-                EXPR_t *base_var = GC_MALLOC(sizeof *base_var);
-                base_var->kind = E_VAR;
-                base_var->sval = n->text ? strdup(n->text) : NULL;
-                e->children[0] = base_var;
-                for (int i = 0; i < nc; i++)
-                    e->children[i + 1] = cmpnd_to_expr(n->children[i]);
-            }
-            return e;
-        case KEYFN:
-            /* CMPILE emits KEYFN node as: stype=KEYFN, text="UOP_KEY",
-             * child[0] = VARTYP node with the keyword name (e.g. "STNO").
-             * E_KEYWORD needs the keyword name, not the operator label. */
-            e->kind = E_KEYWORD;
-            if (n->nchildren > 0 && n->children[0] && n->children[0]->text)
-                e->sval = strdup(n->children[0]->text);
-            else
-                e->sval = n->text ? strdup(n->text) : NULL;
-            /* child already consumed — don't re-recurse it below */
-            return e;
-        /* Concatenation */
-        case CATFN:  e->kind = E_CAT;     break;
-        /* Binary arithmetic */
-        case ADDFN:  e->kind = E_ADD;     break;
-        case SUBFN:  e->kind = E_SUB;     break;
-        case MPYFN:  e->kind = E_MUL;     break;
-        case DIVFN:  e->kind = E_DIV;     break;
-        case EXPFN:  e->kind = E_POW;     break;
-        /* Pattern / capture binary */
-        case ORFN:   e->kind = E_ALT;     break;
-        case NAMFN:  e->kind = E_CAPT_COND_ASGN;  break;
-        case DOLFN:  e->kind = E_CAPT_IMMED_ASGN; break;
-        case BIQSFN: e->kind = E_SCAN;    break;
-        case BIEQFN: e->kind = E_ASSIGN;  break;  /* P2D: chained assignment */
-        /* Unary */
-        case PLSFN:  e->kind = E_PLS;     break;
-        case MNSFN:  e->kind = E_MNS;     break;
-        case DOTFN:  e->kind = E_NAME;    break;
-        case INDFN:  e->kind = E_INDIRECT; break;
-        case STRFN:  e->kind = E_DEFER;   break;
-        case ATFN:   e->kind = E_CAPT_CURSOR; break;
-        case QUESFN: e->kind = E_INTERROGATE; break;
-        case NEGFN:  e->kind = E_MNS;     break; /* ~X negation → unary minus */
-        /* Alternative eval list */
-        case SELTYP: e->kind = E_ALT;     break;
-        /* User-definable — treat as opaque function call */
-        case BIATFN: case BIPDFN: case BIPRFN:
-        case BIAMFN: case BINGFN:
-        case BARFN:  case AROWFN:  /* unary user-definable: | ^ */
-            e->kind = E_OPSYN; e->sval = n->text ? strdup(n->text) : NULL; break;
-        default:
-            e->kind = E_VAR; e->sval = n->text ? strdup(n->text) : NULL; break;
-    }
-
-    /* Recurse into children */
-    if (n->nchildren > 0) {
-        e->children = GC_MALLOC(n->nchildren * sizeof(EXPR_t*));
-        e->nchildren = n->nchildren;
-        for (int i = 0; i < n->nchildren; i++)
-            e->children[i] = cmpnd_to_expr(n->children[i]);
-    }
-    return e;
-}
-
-/* eval_via_cmpile — parse expression string via CMPILE, lower to EXPR_t,
- * evaluate via eval_node().  Used by EVAL() for string-valued arguments.
- * CMPILE globals (TEXTSP, BRTYPE, STYPE, g_error, FORWRD) are in this TU
- * via #include "../../frontend/snobol4/CMPILE.c". */
-static DESCR_t eval_via_cmpile(const char *s) {
-    init_tables();
-    g_error = 0;
-    TEXTSP.ptr = s; TEXTSP.len = (int)strlen(s);
-    XSP.ptr = s; XSP.len = 0;
-    BRTYPE = 0; STYPE = 0;
-    FORWRD();
-    if (g_error) return FAILDESCR;
-    CMPND_t *n = EXPR();
-    if (!n || g_error) return FAILDESCR;
-    EXPR_t *e = cmpnd_to_expr(n);
-    if (!e) return FAILDESCR;
-    return eval_node(e);
-}
-
 DESCR_t EVAL_fn(DESCR_t expr) {
     /* RT-8: SIL EVAL — full type dispatch matching SIL EVAL/EVAL1.
     fprintf(stderr, "EVAL_fn: v=%d s=%s\n", (int)expr.v,
@@ -1826,9 +1701,7 @@ DESCR_t pat_call(const char *name, DESCR_t arg) {
  * for later thaw by EVAL_fn. Returns FAILDESCR if parse fails. */
 DESCR_t compile_to_expression(const char *src) {
     if (!src || !*src) return FAILDESCR;
-    CMPND_t *cmpnd = cmpile_eval_expr(src);
-    if (!cmpnd) return FAILDESCR;
-    EXPR_t *tree = cmpnd_to_expr(cmpnd);
+    EXPR_t *tree = parse_expr_pat_from_str(src);
     if (!tree) return FAILDESCR;
 
     DESCR_t d;
