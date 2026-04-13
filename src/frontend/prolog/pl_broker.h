@@ -20,7 +20,7 @@
 
 #include "runtime/x86/bb_box.h"   /* spec_t, bb_box_fn, α, β, spec_empty, spec_is_empty */
 #include "frontend/prolog/prolog_runtime.h"
-#include "scrip_cc.h"              /* EXPR_t — needed for pl_box_builtin */
+#include "frontend/snobol4/scrip_cc.h" /* EXPR_t — needed for pl_box_builtin */
 #include "frontend/prolog/prolog_builtin.h" /* interp_exec_pl_builtin */
 
 /*----------------------------------------------------------------------------------------------------------------------
@@ -47,15 +47,6 @@ int pl_exec_goal(Pl_GoalBox root);
  * Leaf box constructors
  *--------------------------------------------------------------------------------------------------------------------*/
 
-/* pl_box_true — γ on α, ω on β (succeed exactly once) */
-Pl_GoalBox pl_box_true(void);
-
-/* pl_box_fail — ω on α and β (always fail) */
-Pl_GoalBox pl_box_fail(void);
-
-/* pl_box_builtin — defined in S-BB-2; declared here for forward ref */
-/* Signature finalised when interp_exec_pl_builtin linkage is resolved. */
-
 /*----------------------------------------------------------------------------------------------------------------------
  * S-BB-2 Leaf box constructors
  *--------------------------------------------------------------------------------------------------------------------*/
@@ -68,5 +59,44 @@ Pl_GoalBox pl_box_fail(void);
 
 /* pl_box_builtin — α calls interp_exec_pl_builtin(goal, env); β returns ω */
 Pl_GoalBox pl_box_builtin(EXPR_t *goal, Term **env);
+
+/*----------------------------------------------------------------------------------------------------------------------
+ * S-BB-3 CAT box constructors
+ *--------------------------------------------------------------------------------------------------------------------*/
+
+/* pl_box_cat — AND-box: left γ → right α; right ω → left β; mirrors bb_seq */
+Pl_GoalBox pl_box_cat(Pl_GoalBox left, Pl_GoalBox right);
+
+/* pl_box_cat_list — fold goals[0..n-1] into a left-associative CAT chain.
+ * n==0 → pl_box_true(), n==1 → goals[0], n>=2 → nested pl_box_cat(). */
+Pl_GoalBox pl_box_cat_list(Pl_GoalBox *goals, int n);
+
+/*----------------------------------------------------------------------------------------------------------------------
+ * S-BB-4 — pl_box_clause: one Horn clause as a Byrd box
+ *
+ * Builds head-unify box CAT'd with body goal boxes.
+ * ec           — E_CLAUSE IR node (children[0..arity-1]=head, [arity..]=body)
+ * caller_args  — live Term* array for the arity caller arguments
+ * arity        — number of head arguments
+ *--------------------------------------------------------------------------------------------------------------------*/
+Pl_GoalBox pl_box_clause(EXPR_t *ec, Term **caller_args, int arity);
+
+/*----------------------------------------------------------------------------------------------------------------------
+ * S-BB-5 — OR-box constructors
+ *--------------------------------------------------------------------------------------------------------------------*/
+
+/* pl_box_choice — OR-box over all E_CLAUSE children of an E_CHOICE node.
+ * caller_args[0..arity-1] are the live Term* arguments from the call site. */
+Pl_GoalBox pl_box_choice(EXPR_t *choice_node, Term **caller_args, int arity);
+
+/* pl_box_choice_call — build an OR-box for an E_FNC user-predicate call goal.
+ * Looks up the predicate in g_pl_pred_table; builds caller args from goal->children + env. */
+Pl_GoalBox pl_box_choice_call(EXPR_t *goal, Term **env);
+
+/*----------------------------------------------------------------------------------------------------------------------
+ * S-BB-6 — pl_box_cut: FENCE analog for Prolog cut
+ * α: set g_pl_cut_flag=1, return γ.  β: return ω.
+ *--------------------------------------------------------------------------------------------------------------------*/
+Pl_GoalBox pl_box_cut(void);
 
 #endif /* PL_BROKER_H */

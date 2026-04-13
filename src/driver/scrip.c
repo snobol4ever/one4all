@@ -63,6 +63,7 @@ extern Program *sno_parse(FILE *f, const char *filename);
 #include "../frontend/prolog/prolog_runtime.h"
 #include "../frontend/prolog/prolog_atom.h"
 #include "../frontend/prolog/prolog_builtin.h"
+#include "../frontend/prolog/pl_broker.h"     /* pl_box_choice, pl_exec_goal — S-BB-7 */
 #include "../frontend/prolog/term.h"
 #include "../frontend/icon/icon_driver.h"
 #include "../frontend/icon/icon_lex.h"    /* IcnTkKind — TK_AUG* for E_AUGOP in unified interp */
@@ -252,8 +253,8 @@ static int icn_has_suspend(EXPR_t *e) {
 
 static DESCR_t icn_call_proc(EXPR_t *proc, DESCR_t *args, int nargs); /* forward */
 static DESCR_t  interp_eval(EXPR_t *e); /* forward — needed by icn_drive + trampoline */
-static Term    *pl_unified_term_from_expr(EXPR_t *e, Term **env); /* forward */
-static Term   **pl_env_new(int n); /* forward */
+Term    *pl_unified_term_from_expr(EXPR_t *e, Term **env); /* forward */
+Term   **pl_env_new(int n); /* forward */
 static EXPR_t  *pl_pred_table_lookup(Pl_PredTable *pt, const char *key); /* forward */
 static int      is_pl_user_call(EXPR_t *goal); /* forward */
 int             interp_exec_pl_builtin(EXPR_t *goal, Term **env); /* forward — defined below, declared in prolog_builtin.h */
@@ -261,8 +262,8 @@ int             interp_exec_pl_builtin(EXPR_t *goal, Term **env); /* forward —
 /* ── Prolog global execution state ─────────────────────────────────────────
  * Initialised by pl_execute_program_unified() at program start. */
 static Pl_PredTable g_pl_pred_table;
-static Trail        g_pl_trail;
-static int          g_pl_cut_flag = 0;
+       Trail        g_pl_trail;        /* non-static: used by pl_broker.c (pl_interp.h) */
+       int          g_pl_cut_flag = 0; /* non-static: used by pl_broker.c (pl_interp.h) */
 static Term       **g_pl_env      = NULL;
 static int          g_pl_active   = 0;
 
@@ -2417,6 +2418,11 @@ static EXPR_t *pl_pred_table_lookup(Pl_PredTable *pt, const char *key) {
     return NULL;
 }
 
+/* pl_pred_table_lookup_global — non-static wrapper for pl_broker.c (pl_interp.h) */
+EXPR_t *pl_pred_table_lookup_global(const char *key) {
+    return pl_pred_table_lookup(&g_pl_pred_table, key);
+}
+
 /*---- Choice point stack ----*/
 #define PL_CP_STACK_MAX 4096
 typedef struct {
@@ -2432,7 +2438,7 @@ typedef struct {
 static Pl_ChoicePoint pl_cp_stack[PL_CP_STACK_MAX];
 static int            pl_cp_top = 0;
 
-static Term **pl_env_new(int n) {
+Term **pl_env_new(int n) {
     if (n <= 0) return NULL;
     Term **env = malloc(n * sizeof(Term *));
     for (int i = 0; i < n; i++) env[i] = term_new_var(i);
@@ -2441,7 +2447,7 @@ static Term **pl_env_new(int n) {
 
 /*---- Continuation type ----*/
 /*---- Forward declarations ----*/
-static Term *pl_unified_term_from_expr(EXPR_t *e, Term **env);
+Term *pl_unified_term_from_expr(EXPR_t *e, Term **env);
 static Term *pl_unified_deep_copy(Term *t);
 int          interp_exec_pl_builtin(EXPR_t *goal, Term **env); /* non-static — also declared in prolog_builtin.h */
 static int   pl_exec_body(EXPR_t **goals, int ngoals, Term **env);
@@ -2449,7 +2455,7 @@ static int   pl_exec_body(EXPR_t **goals, int ngoals, Term **env);
 
 
 /*---- pl_unified_term_from_expr ----*/
-static Term *pl_unified_term_from_expr(EXPR_t *e, Term **env) {
+Term *pl_unified_term_from_expr(EXPR_t *e, Term **env) {
     if (!e) return term_new_atom(prolog_atom_intern("[]"));
     switch (e->kind) {
         case E_QLIT: return term_new_atom(prolog_atom_intern(e->sval ? e->sval : ""));
@@ -2907,10 +2913,10 @@ int interp_exec_pl_builtin(EXPR_t *goal, Term **env) {
 
 
 /*---- pl_execute_program_unified — entry point ----*/
-/* S-1C-3: calls interp_eval() on the main/0 E_CHOICE node directly.
- * pl_unified_call no longer drives top-level execution.
- * User-defined predicate calls within body goals still go through
- * pl_unified_exec_goal → pl_unified_call (S-1C-4 will eliminate those). */
+/* S-BB-7: top-level dispatch now routes main/0 through the Byrd box broker.
+ * pl_box_choice(main_choice, NULL, 0) builds the OR-box; pl_exec_goal() drives it.
+ * The old interp_eval(main_choice) call is removed from the top-level entry.
+ * Body goals within clauses still use the old interp_eval path until S-BB-8. */
 static void pl_execute_program_unified(Program *prog) {
     if (!prog) return;
     prolog_atom_init();
@@ -2924,10 +2930,11 @@ static void pl_execute_program_unified(Program *prog) {
     g_pl_cut_flag = 0;
     g_pl_env      = NULL;
     g_pl_active   = 1;
-    /* Find main/0 E_CHOICE node and dispatch through interp_eval */
+    /* S-BB-7: route main/0 through the Byrd box broker instead of interp_eval */
     EXPR_t *main_choice = pl_pred_table_lookup(&g_pl_pred_table, "main/0");
     if (main_choice) {
-        interp_eval(main_choice);
+        Pl_GoalBox root = pl_box_choice(main_choice, NULL, 0);
+        pl_exec_goal(root);
     } else {
         fprintf(stderr, "prolog: no main/0 predicate\n");
     }
