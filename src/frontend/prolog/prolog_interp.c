@@ -29,6 +29,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <setjmp.h>
 
 #include "scrip_cc.h"
 #include "prolog_interp.h"
@@ -62,8 +63,26 @@ static EXPR_t *pred_table_lookup(PredTable *pt, const char *key) {
 }
 
 /*===========================================================================
- * Variable environment
+ * Choice point stack — enables recursive backtracking (β re-entry)
+ * Each user call pushes a CP; on failure we longjmp back and try next clause.
  *=========================================================================*/
+#define CP_STACK_MAX 4096
+typedef struct {
+    jmp_buf     jb;           /* longjmp target for β re-entry              */
+    PredTable  *pt;
+    const char *key;
+    int         arity;
+    Term      **args;         /* live arg pointers (from caller's env slots) */
+    Trail      *trail;
+    int         trail_mark;   /* trail position at α entry                  */
+    int         next_clause;  /* which clause to try on β                   */
+    int         cut;          /* 1 = cut fired, no more β allowed            */
+} ChoicePoint;
+
+static ChoicePoint cp_stack[CP_STACK_MAX];
+static int         cp_top = 0;   /* index of next free slot                 */
+
+
 static Term **env_new(int n) {
     if (n <= 0) return NULL;
     Term **env = malloc(n * sizeof(Term *));
@@ -278,25 +297,20 @@ static int pl_exec_goal(EXPR_t *goal, Term **env, PredTable *pt,
                     }
                 }
             }
-            /* ,/2 conjunction */
-            if (strcmp(fn,",")==0 && arity==2) {
-                EXPR_t *flat[256]; int nflat=0;
-                for (EXPR_t *c=goal; c&&c->kind==E_FNC&&c->sval&&strcmp(c->sval,",")==0&&c->nchildren==2; c=c->children[1])
-                    if (nflat<255) flat[nflat++]=c->children[0];
-                /* last non-comma node */
-                EXPR_t *cur=goal;
-                while (cur&&cur->kind==E_FNC&&cur->sval&&strcmp(cur->sval,",")==0&&cur->nchildren==2) cur=cur->children[1];
-                if (cur&&nflat<256) flat[nflat++]=cur;
-                return pl_exec_body(flat, nflat, env, pt, trail, cut_flag);
+            /* ,/N conjunction — lowerer flattens right-spine to n-ary E_FNC(",") */
+            if (strcmp(fn,",")==0) {
+                return pl_exec_body(goal->children, goal->nchildren, env, pt, trail, cut_flag);
             }
-            /* ;/2 disjunction */
-            if (strcmp(fn,";")==0 && arity==2) {
+            /* ;/N disjunction — lowerer may flatten but we only need children[0]/[1] */
+            if (strcmp(fn,";")==0 && arity>=2) {
                 EXPR_t *left=goal->children[0], *right=goal->children[1];
-                if (left&&left->kind==E_FNC&&left->sval&&strcmp(left->sval,"->")==0&&left->nchildren==2) {
+                if (left&&left->kind==E_FNC&&left->sval&&strcmp(left->sval,"->")==0&&left->nchildren>=2) {
                     /* (Cond -> Then ; Else) */
                     Trail save=*trail; int mark=trail_mark(trail); int cut2=0;
-                    if (pl_exec_goal(left->children[0],env,pt,trail,&cut2))
-                        return pl_exec_goal(left->children[1],env,pt,trail,cut_flag);
+                    if (pl_exec_goal(left->children[0],env,pt,trail,&cut2)) {
+                        int nthen=left->nchildren-1;
+                        return pl_exec_body(left->children+1,nthen,env,pt,trail,cut_flag);
+                    }
                     trail_unwind(trail,mark); *trail=save;
                     return pl_exec_goal(right,env,pt,trail,cut_flag);
                 }
@@ -305,11 +319,12 @@ static int pl_exec_goal(EXPR_t *goal, Term **env, PredTable *pt,
                   trail_unwind(trail,mark); *trail=save;
                   return pl_exec_goal(right,env,pt,trail,cut_flag); }
             }
-            /* ->/2 if-then */
-            if (strcmp(fn,"->")==0 && arity==2) {
+            /* ->/N if-then — children[0]=Cond, children[1..]=Then goals */
+            if (strcmp(fn,"->")==0 && arity>=2) {
                 int cut2=0;
                 if (!pl_exec_goal(goal->children[0],env,pt,trail,&cut2)) return 0;
-                return pl_exec_goal(goal->children[1],env,pt,trail,cut_flag);
+                int nthen=goal->nchildren-1;
+                return pl_exec_body(goal->children+1,nthen,env,pt,trail,cut_flag);
             }
             /* \+/1 negation-as-failure */
             if ((strcmp(fn,"\\+")==0||strcmp(fn,"not")==0) && arity==1) {
@@ -374,24 +389,26 @@ static int pl_exec_body(EXPR_t **goals, int ngoals, Term **env,
     if (is_user_call(g)) {
         const char *fn=g->sval; int arity=g->nchildren;
         char key[256]; snprintf(key,sizeof key,"%s/%d",fn,arity);
-        Term **args=malloc(arity*sizeof(Term*));
-        for (int i=0;i<arity;i++) args[i]=pl_term_from_expr(g->children[i],env);
         int mark=trail_mark(trail), start=0;
         for (;;) {
             trail_unwind(trail,mark);
+            /* Rebuild args from env each retry — trail unwind resets bound vars */
+            Term **args=malloc(arity*sizeof(Term*));
+            for (int i=0;i<arity;i++) args[i]=pl_term_from_expr(g->children[i],env);
             int r=pl_call(pt,key,arity,args,trail,start);
-            if (r<0) { free(args); return 0; }
+            free(args);
+            if (r<0) return 0;
             start=r+1;
-            if (cut_flag&&*cut_flag) { free(args); return 1; }
             int cut2=0;
             int ok=pl_exec_body(goals+1,ngoals-1,env,pt,trail,&cut2);
-            if (cut2) { if (cut_flag)*cut_flag=1; free(args); return ok; }
-            if (ok) { free(args); return 1; }
+            if (cut2) { if (cut_flag)*cut_flag=1; return ok; }
+            if (ok) return 1;
+            /* rest failed — loop back, trail_unwind resets bindings, retry */
         }
     }
 
     if (!pl_exec_goal(g,env,pt,trail,cut_flag)) return 0;
-    if (cut_flag&&*cut_flag) return 1;
+    /* cut_flag may now be set — continue body; cut stops retry not forward exec */
     return pl_exec_body(goals+1,ngoals-1,env,pt,trail,cut_flag);
 }
 
@@ -425,15 +442,14 @@ static int pl_call(PredTable *pt, const char *key, int arity,
                    Term **args, Trail *trail, int start) {
     EXPR_t *choice=pred_table_lookup(pt,key);
     if (!choice) { fprintf(stderr,"prolog: undefined predicate %s\n",key); return -1; }
-    int nclauses=choice->nchildren, cut_flag=0;
+    int nclauses=choice->nchildren;
     int mark=trail_mark(trail);
     for (int ci=start;ci<nclauses;ci++) {
-        if (cut_flag) return -1;
         if (ci>start) trail_unwind(trail,mark);
         EXPR_t *ec=choice->children[ci]; if (!ec) continue;
-        int clause_cut=0;
+        int clause_cut=0;  /* cut is LOCAL to this predicate call — never escapes */
         if (pl_exec_clause(ec,arity,args,pt,trail,&clause_cut)) return ci;
-        if (clause_cut) cut_flag=1;
+        if (clause_cut) break;  /* cut: stop trying further clauses, but don't propagate */
     }
     trail_unwind(trail,mark);
     return -1;
