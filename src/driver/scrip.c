@@ -2718,19 +2718,9 @@ static void execute_program(Program *prog)
 
         /* ── U-15: per-statement dispatch by st->lang ─────────────── */
         if (s->lang == LANG_ICN) {
-            /* Icon statement: evaluate in Icon context, restore SNOBOL4 state */
-            if (s->subject) {
-                DESCR_t *sv_env = icn_env;
-                int      sv_n   = icn_env_n;
-                int      sv_ret = icn_returning;
-                icn_env       = NULL;
-                icn_env_n     = 0;
-                icn_returning = 0;
-                icn_interp_eval(s->subject, s->subject);
-                icn_env       = sv_env;
-                icn_env_n     = sv_n;
-                icn_returning = sv_ret;
-            }
+            /* Icon STMT_t nodes are procedure definitions — already registered
+             * in icn_proc_table by polyglot_init.  Skip inline; main() is
+             * called once after the SNO/PL statement loop completes. */
             s = s->next; continue;
         }
         if (s->lang == LANG_PL) {
@@ -2967,6 +2957,19 @@ static void execute_program(Program *prog)
         }
 
         s = s->next;
+    }
+
+    /* ── U-15: post-loop Icon dispatch ────────────────────────────────────
+     * Icon procedure definitions were skipped inline (they're registered in
+     * icn_proc_table by polyglot_init).  If the polyglot program has Icon
+     * sections, call main/0 now — mirroring icn_execute_program_unified. */
+    if (icn_proc_count > 0) {
+        for (int _i = 0; _i < icn_proc_count; _i++) {
+            if (strcmp(icn_proc_table[_i].name, "main") == 0) {
+                icn_call_proc(icn_proc_table[_i].proc, NULL, 0);
+                break;
+            }
+        }
     }
 }
 
