@@ -166,6 +166,8 @@ static DESCR_t     *icn_env        = NULL;  /* current Icon frame slot array */
 static int          icn_env_n      = 0;     /* slot count */
 static int          icn_returning  = 0;     /* 1 = Icon return in progress */
 static DESCR_t      icn_return_val;         /* value being returned */
+static int          g_lang         = 0;     /* 0=SNOBOL4 1=Icon */
+static EXPR_t      *g_icn_root     = NULL;  /* current Icon drive root */
 
 /* Generator substitution stack for E_EVERY/E_TO β re-entry (DESCR_t version).
  * Mirrors icn_exec_driven logic but uses DESCR_t instead of IcnVal. */
@@ -230,6 +232,31 @@ static int icn_drive(EXPR_t *root, EXPR_t *e) {
             if (!inner) icn_interp_eval(root, root);
             icn_gen_pop(); ticks++;
             if (icn_returning) break;
+        }
+        return ticks;
+    }
+    /* S-7: find(pat,str) as generator — successive 1-based positions.
+     * ICN_CALL nodes have sval=NULL; name lives in children[0]->sval. */
+    if (e->kind == E_FNC && e->nchildren>=3
+        && e->children[0] && e->children[0]->sval
+        && strcmp(e->children[0]->sval,"find")==0) {
+        DESCR_t s1 = icn_interp_eval(root, e->children[1]);
+        DESCR_t s2 = icn_interp_eval(root, e->children[2]);
+        if (IS_FAIL_fn(s1)||IS_FAIL_fn(s2)) return 0;
+        const char *needle = VARVAL_fn(s1), *hay = VARVAL_fn(s2);
+        if (!needle||!hay) return 0;
+        int nlen=(int)strlen(needle), ticks=0;
+        const char *p = hay;
+        while (!icn_returning) {
+            char *hit = strstr(p, needle);
+            if (!hit) break;
+            long pos1 = (long)(hit - hay) + 1;  /* 1-based */
+            icn_gen_push(e, pos1, NULL);
+            int inner = icn_drive(root, root);
+            if (!inner) icn_interp_eval(root, root);
+            icn_gen_pop(); ticks++;
+            if (icn_returning) break;
+            p = hit + (nlen > 0 ? nlen : 1);    /* advance past this match */
         }
         return ticks;
     }
@@ -585,8 +612,9 @@ static DESCR_t icn_interp_eval(EXPR_t *root, EXPR_t *e) {
             icn_scan_pos+=nl; return INTVAL(icn_scan_pos);
         }
 
-        /* find(pat,str) — first match only in scalar context (S-7 adds generator) */
+        /* find(pat,str) — generator via icn_drive; scalar fallback for non-driven context */
         if (!strcmp(fn,"find") && nargs >= 2) {
+            long pos1; if (icn_gen_lookup(e, &pos1)) return INTVAL(pos1);
             DESCR_t s1 = icn_interp_eval(root, e->children[1]);
             DESCR_t s2 = icn_interp_eval(root, e->children[2]);
             const char *needle=VARVAL_fn(s1), *hay=VARVAL_fn(s2);
@@ -711,7 +739,7 @@ static void icn_execute_program_unified(Program *prog) {
     icn_env = NULL; icn_env_n = 0; icn_returning = 0;
     icn_gen_depth = 0;
     icn_scan_subj = NULL; icn_scan_pos = 0; icn_scan_depth = 0;
-    icn_loop_break = 0;
+    icn_loop_break = 0; g_lang = 1; g_icn_root = NULL;
 
     /* Build procedure table from STMT_t subjects */
     for (STMT_t *st = prog->head; st; st = st->next) {
@@ -2162,6 +2190,7 @@ static DESCR_t interp_eval_pat(EXPR_t *e)
 static void execute_program(Program *prog)
 {
     label_table_build(prog);
+    g_lang = 0;  /* SNOBOL4 mode */
     prescan_defines(prog);
 
     STMT_t *s = prog->head;
