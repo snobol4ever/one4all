@@ -3356,26 +3356,14 @@ static void execute_program(Program *prog)
      * For single-section .scrip (g_polyglot=0), fall through to legacy dispatch.
      */
     if (g_polyglot && g_registry.nmod > 0) {
-        /* U-23: two-pass polyglot dispatch.
-         * Pass 1 (non-SNO): run ICN and PL modules in source order so they
-         *   write NV values before SNO reads them.
-         * Pass 2 (SNO): already done by the main loop above (the first SNO
-         *   section ran before this point — it reads NV values set in pass 1
-         *   only if it appears after ICN/PL in source order, which is the
-         *   idiomatic .scrip layout for cross-section reads).
-         *
-         * For the canonical layout (ICN/PL first, SNO last) the main loop
-         * runs the SNO section AFTER pass 1 completes because execute_program
-         * is called after polyglot_init which populates the registry but does
-         * not execute anything. The SNO main loop runs to is_end then falls
-         * through here for pass 1 (ICN/PL).
-         *
-         * Only ICN and PL need to be dispatched here; SNO already ran. */
+        fprintf(stderr, "DBG U-23: nmod=%d\n", g_registry.nmod);
+        /* U-23: two-pass dispatch. SNO already ran; dispatch ICN/PL in registry order. */
         for (int _mi = 0; _mi < g_registry.nmod; _mi++) {
             ScripModule *_m = &g_registry.mods[_mi];
             if (_m->lang == LANG_ICN || _m->lang == LANG_RAKU) {
                 int _pend = _m->icn_proc_start + _m->icn_proc_count;
                 int _found = 0;
+                g_lang = 1;   /* OE-7: Icon top-level mode required for icn_call_proc */
                 for (int _pi = _m->icn_proc_start; _pi < _pend && _pi < icn_proc_count; _pi++) {
                     if (strcmp(icn_proc_table[_pi].name, "main") == 0)
                         { icn_call_proc(icn_proc_table[_pi].proc, NULL, 0); _found=1; break; }
@@ -3384,6 +3372,7 @@ static void execute_program(Program *prog)
                     for (int _pi=0; _pi<icn_proc_count; _pi++)
                         if (strcmp(icn_proc_table[_pi].name,"main")==0)
                             { icn_call_proc(icn_proc_table[_pi].proc,NULL,0); break; }
+                g_lang = 0;
             } else if (_m->lang == LANG_PL) {
                 EXPR_t *pl_main = pl_pred_table_lookup(&g_pl_pred_table, "main/0");
                 if (pl_main) {
@@ -3413,6 +3402,30 @@ static void execute_program(Program *prog)
             interp_eval(pl_main);
             g_pl_active = sv_pl;
         }
+    }
+}
+
+/*============================================================================================================================
+ * polyglot_execute — OE-7: ONE top-level entry point for all languages.
+ *
+ * For polyglot programs: calls execute_program (which runs all SNO stmts and
+ * the U-23 registry walk for ICN/PL).  Ensures g_lang=1 is set for each ICN
+ * module dispatch (the U-23 block in execute_program was missing this).
+ *
+ * For single-language programs: routes to the appropriate legacy entry point.
+ * OE-8 will retire the legacy entry points entirely.
+ *============================================================================================================================*/
+static void polyglot_execute(Program *prog) {
+    if (!prog) return;
+    /* polyglot_init is called inside execute_program / legacy paths — do not call twice */
+    if (g_registry.nmod > 0 || g_polyglot) {
+        execute_program(prog);   /* runs SNO + U-23 ICN/PL registry dispatch */
+    } else if (icn_proc_count > 0) {
+        icn_execute_program_unified(prog);
+    } else {
+        EXPR_t *mc = NULL;
+        /* Probe for Prolog main before calling polyglot_init side effects */
+        pl_execute_program_unified(prog);
     }
 }
 
@@ -4164,7 +4177,7 @@ int main(int argc, char **argv)
     } else if (lang_icon) {
         icn_execute_program_unified(prog);   /* unified IR interpreter — one interp_eval */
     } else if (lang_polyglot) {
-        execute_program(prog);   /* U-13: polyglot — SNO path for now; U-15 adds per-stmt dispatch */
+        polyglot_execute(prog);   /* OE-7: unified entry point, all modules in registry order */
     } else {
         execute_program(prog);
     }
