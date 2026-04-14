@@ -62,7 +62,13 @@ extern DESCR_t  NV_GET_fn(const char *name);
 
 /* OE-10: Icon/Prolog BB opcode support */
 #include "bb_broker.h"
+#include <setjmp.h>
 extern bb_node_t icn_eval_gen(EXPR_t *e);   /* scrip.c — builds a drivable bb_node_t */
+
+/* IM-4: SM step-limit for in-process sync monitor */
+int      g_sm_step_limit = 0;
+int      g_sm_steps_done = 0;
+jmp_buf  g_sm_step_jmp;
 
 /* OE-10: body_fn for BB_PUMP — print each generated Icon value to stdout */
 static void pump_print(DESCR_t val, void *arg) {
@@ -191,6 +197,9 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
             static int g_sm_stno = 0;
             comm_stno(++g_sm_stno);
             st->sp = 0;   /* reset value stack at each statement boundary */
+            /* IM-4: step-limit */
+            if (g_sm_step_limit > 0 && g_sm_steps_done++ >= g_sm_step_limit)
+                longjmp(g_sm_step_jmp, 1);
             break;
         }
 
@@ -650,4 +659,16 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
         }
     }
     return 0;  /* fell off end = implicit HALT */
+}
+
+/* IM-4: sm_interp_run_steps — run at most n statements then return */
+int sm_interp_run_steps(SM_Program *prog, SM_State *st, int n) {
+    g_sm_step_limit = n;
+    g_sm_steps_done = 0;
+    int rc = 0;
+    if (setjmp(g_sm_step_jmp) == 0)
+        rc = sm_interp_run(prog, st);
+    g_sm_step_limit = 0;
+    g_sm_steps_done = 0;
+    return rc;
 }

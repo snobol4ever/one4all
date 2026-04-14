@@ -12,6 +12,7 @@
 #ifndef SM_INTERP_H
 #define SM_INTERP_H
 
+#include <setjmp.h>
 #include "sm_prog.h"
 #include "snobol4.h"
 
@@ -36,6 +37,12 @@ typedef struct {
  * call only after SNO_INIT_fn() has run.
  */
 int sm_interp_run(SM_Program *prog, SM_State *st);
+int sm_interp_run_steps(SM_Program *prog, SM_State *st, int n);  /* IM-4 */
+
+/* IM-4: SM step-limit globals */
+extern int     g_sm_step_limit;
+extern int     g_sm_steps_done;
+extern jmp_buf g_sm_step_jmp;
 
 /* Initialise a fresh SM_State (stack empty, pc=0, last_ok=1) */
 void sm_state_init(SM_State *st);
