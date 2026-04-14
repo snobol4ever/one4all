@@ -6,6 +6,7 @@ CFLAGS = -Wall -Wno-unused-function -g -O0 \
          -I frontend/prolog \
          -I frontend/icon \
          -I frontend/rebus \
+         -I frontend/raku \
          -I runtime/x86
 
 FRONTEND_SNO = \
@@ -71,11 +72,18 @@ RUNTIME_X86 = \
     runtime/x86/sm_codegen.c \
     runtime/x86/sm_image.c
 
+FRONTEND_RAKU = \
+    frontend/raku/raku.tab.c \
+    frontend/raku/raku.lex.c \
+    frontend/raku/raku_ast.c \
+    frontend/raku/raku_driver.c \
+    frontend/raku/raku_lower.c
+
 DRIVER = \
     driver/scrip.c
 
 SRCS = $(FRONTEND_SNO) $(FRONTEND_PROLOG) $(FRONTEND_SNOCONE) $(FRONTEND_REBUS) \
-       $(FRONTEND_ICON) $(IR) $(RUNTIME_X86) $(DRIVER)
+       $(FRONTEND_ICON) $(FRONTEND_RAKU) $(IR) $(RUNTIME_X86) $(DRIVER)
 OBJS = $(SRCS:.c=.o)
 
 .PHONY: all clean
