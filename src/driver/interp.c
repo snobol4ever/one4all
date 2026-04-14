@@ -659,6 +659,40 @@ fn_done:
  * exposing eval_node (which is static in eval_code.c).
  * ══════════════════════════════════════════════════════════════════════════ */
 
+/* icn_call_builtin — call a builtin E_FNC with pre-resolved args array.
+ * Used by icn_bb_fnc_gen to avoid re-evaluating generator children.
+ * Dispatches write/writes/upto/find/any/many/upto/tab/move/match by name.
+ * For user procs, calls icn_call_proc directly. */
+DESCR_t icn_call_builtin(EXPR_t *call, DESCR_t *args, int nargs) {
+    if (!call || call->nchildren < 1 || !call->children[0]) return NULVCL;
+    const char *fn = call->children[0]->sval;
+    if (!fn) return NULVCL;
+    DESCR_t a0 = nargs > 0 ? args[0] : NULVCL;
+    DESCR_t a1 = nargs > 1 ? args[1] : NULVCL;
+    /* write(v) */
+    if (!strcmp(fn, "write")) {
+        if (IS_FAIL_fn(a0)) return FAILDESCR;
+        if (IS_INT_fn(a0))       printf("%lld\n", (long long)a0.i);
+        else if (IS_REAL_fn(a0)) printf("%g\n", a0.r);
+        else { const char *s = VARVAL_fn(a0); printf("%s\n", s ? s : ""); }
+        return a0;
+    }
+    /* writes(v) */
+    if (!strcmp(fn, "writes")) {
+        if (IS_INT_fn(a0))       printf("%lld", (long long)a0.i);
+        else if (IS_REAL_fn(a0)) printf("%g", a0.r);
+        else { const char *s = VARVAL_fn(a0); printf("%s", s ? s : ""); }
+        return a0;
+    }
+    /* User proc — call directly with resolved args */
+    for (int i = 0; i < icn_proc_count; i++) {
+        if (!strcmp(icn_proc_table[i].name, fn))
+            return icn_call_proc(icn_proc_table[i].proc, args, nargs);
+    }
+    /* Fallback: re-evaluate whole call (args ignored — last resort) */
+    return interp_eval(call);
+}
+
 /* Forward declaration (also declared above for call_user_function) */
 
 DESCR_t interp_eval(EXPR_t *e)
@@ -1010,33 +1044,42 @@ DESCR_t interp_eval(EXPR_t *e)
 
             return NULVCL;
         }
-        case E_ALT: {
-            /* Icon value alternation: expr1 | expr2 — return left if not fail, else right */
+        case E_ALT:
+        case E_ALTERNATE: {
+            /* Icon value alternation: expr1 | expr2 | ... — return leftmost non-fail */
             if (e->nchildren < 1) return FAILDESCR;
-            DESCR_t left = interp_eval(e->children[0]);
-            if (!IS_FAIL_fn(left)) return left;
-            if (e->nchildren < 2) return FAILDESCR;
-            return interp_eval(e->children[1]);
+            for (int i = 0; i < e->nchildren; i++) {
+                DESCR_t v = interp_eval(e->children[i]);
+                if (!IS_FAIL_fn(v)) return v;
+            }
+            return FAILDESCR;
         }
         case E_EVERY: {
             if (e->nchildren < 1) return NULVCL;
             EXPR_t *gen  = e->children[0];
             EXPR_t *body = (e->nchildren > 1) ? e->children[1] : NULL;
-            EXPR_t *saved_root = ICN_CUR.body_root;
-            /* When there is no explicit do-body, the generator expression itself
-             * is what gets re-evaluated each tick (e.g. every write(upto(4))). */
-            ICN_CUR.body_root = body ? body : gen;
-            int ticks = icn_drive(gen);
-            if (!ticks) interp_eval(gen);
-            ICN_CUR.body_root = saved_root;
+            /* IC-2a: icn_eval_gen + BB_PUMP — all goal-directed ops through Byrd boxes.
+             * When body==NULL, the box's own side-effects ARE the work (e.g. every write(1 to 5)).
+             * When body!=NULL, box produces a value; body runs separately each tick. */
+            bb_node_t box = icn_eval_gen(gen);
+            DESCR_t val = box.fn(box.ζ, α);
+            while (!IS_FAIL_fn(val) && !ICN_CUR.returning && !ICN_CUR.loop_break) {
+                if (body) {
+                    icn_gen_push(gen, val.v == DT_I ? val.i : 0, val.v == DT_I ? NULL : val.s);
+                    interp_eval(body);
+                    icn_gen_pop();
+                }
+                if (ICN_CUR.returning || ICN_CUR.loop_break) break;
+                val = box.fn(box.ζ, β);
+            }
+            ICN_CUR.loop_break = 0;
             return NULVCL;
         }
         case E_WHILE: {
             int saved_brk = ICN_CUR.loop_break; ICN_CUR.loop_break = 0;
-            while (!ICN_CUR.returning && !ICN_CUR.loop_break && !ICN_CUR.suspending &&
+            while (!ICN_CUR.returning && !ICN_CUR.loop_break &&
                    !IS_FAIL_fn(interp_eval(e->children[0]))) {
                 if (e->nchildren > 1) interp_eval(e->children[1]);
-                if (ICN_CUR.suspending) break;
             }
             ICN_CUR.loop_break = saved_brk;
             return NULVCL;
@@ -1939,14 +1982,18 @@ DESCR_t interp_eval(EXPR_t *e)
         if (e->nchildren < 1) return NULVCL;
         EXPR_t *gen  = e->children[0];
         EXPR_t *body = (e->nchildren > 1) ? e->children[1] : NULL;
-        /* General generator path: set body_root so icn_drive / icn_drive_fnc
-         * can find the every-body. No E_TO fast-path — nested generators like
-         * (1 to 2) to (2 to 3) require icn_drive for correct re-evaluation. */
-        EXPR_t *saved_root = ICN_CUR.body_root;
-        if (body) ICN_CUR.body_root = body;
-        int ticks = icn_drive(gen);
-        if (!ticks) interp_eval(gen);
-        ICN_CUR.body_root = saved_root;
+        EXPR_t *do_expr = body ? body : gen;
+        /* IC-2a: icn_eval_gen + BB_PUMP — all goal-directed ops through Byrd boxes */
+        bb_node_t box = icn_eval_gen(gen);
+        DESCR_t val = box.fn(box.ζ, α);
+        while (!IS_FAIL_fn(val) && !ICN_CUR.returning && !ICN_CUR.loop_break) {
+            icn_gen_push(gen, val.v == DT_I ? val.i : 0, val.v == DT_I ? NULL : val.s);
+            interp_eval(do_expr);
+            icn_gen_pop();
+            if (ICN_CUR.returning || ICN_CUR.loop_break) break;
+            val = box.fn(box.ζ, β);
+        }
+        ICN_CUR.loop_break = 0;
         return NULVCL;
     }
 

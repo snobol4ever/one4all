@@ -98,16 +98,75 @@ int icn_drive(EXPR_t *e) {
     if (icn_gen_active(e)) return 0;
     EXPR_t *root = ICN_CUR.body_root;
     if (e->kind == E_TO && e->nchildren >= 2) {
-        DESCR_t lo_d = interp_eval(e->children[0]);
-        DESCR_t hi_d = interp_eval(e->children[1]);
-        if (IS_FAIL_fn(lo_d)||IS_FAIL_fn(hi_d)) return 0;
-        long lo=lo_d.i, hi=hi_d.i; int ticks=0;
-        for(long i=lo;i<=hi&&!ICN_CUR.returning;i++){
-            icn_gen_push(e,i,NULL);
-            int inner=icn_drive(root);
-            if(!inner) interp_eval(ICN_CUR.body_root);
-            icn_gen_pop(); ticks++;
-            if(ICN_CUR.returning) break;
+        /* For scalar children: evaluate directly.
+         * For generator children (e.g. (1 to 2) to (2 to 3)): drive each child
+         * as a generator, iterating the cross-product of (lo_seq × hi_seq),
+         * and for each (lo,hi) pair produce the inner lo..hi sequence. */
+        EXPR_t *lo_expr = e->children[0];
+        EXPR_t *hi_expr = e->children[1];
+        int is_lo_gen = (lo_expr->kind == E_TO || lo_expr->kind == E_TO_BY || lo_expr->kind == E_ALTERNATE);
+        int is_hi_gen = (hi_expr->kind == E_TO || hi_expr->kind == E_TO_BY || hi_expr->kind == E_ALTERNATE);
+        int ticks = 0;
+
+        if (!is_lo_gen && !is_hi_gen) {
+            /* Fast path: both scalars */
+            DESCR_t lo_d = interp_eval(lo_expr);
+            DESCR_t hi_d = interp_eval(hi_expr);
+            if (IS_FAIL_fn(lo_d)||IS_FAIL_fn(hi_d)) return 0;
+            long lo=lo_d.i, hi=hi_d.i;
+            for (long i=lo; i<=hi && !ICN_CUR.returning; i++) {
+                icn_gen_push(e, i, NULL);
+                int inner = icn_drive(root);
+                if (!inner) interp_eval(ICN_CUR.body_root);
+                icn_gen_pop(); ticks++;
+                if (ICN_CUR.returning) break;
+            }
+        } else {
+            /* General path: drive lo_expr as generator (or scalar once) */
+            /* Collect lo values */
+            long lo_vals[256]; int nlo = 0;
+            if (!is_lo_gen) {
+                DESCR_t d = interp_eval(lo_expr);
+                if (!IS_FAIL_fn(d)) lo_vals[nlo++] = d.i;
+            } else {
+                /* Drive lo_expr collecting all values */
+                EXPR_t *saved_root = ICN_CUR.body_root;
+                /* Use icn_gen_push/pop trick: temporarily drive lo_expr inline */
+                /* Simple approach: evaluate lo as E_TO sequence manually */
+                if (lo_expr->kind == E_TO && lo_expr->nchildren >= 2) {
+                    DESCR_t a = interp_eval(lo_expr->children[0]);
+                    DESCR_t b = interp_eval(lo_expr->children[1]);
+                    if (!IS_FAIL_fn(a) && !IS_FAIL_fn(b))
+                        for (long v = a.i; v <= b.i && nlo < 256; v++) lo_vals[nlo++] = v;
+                }
+                ICN_CUR.body_root = saved_root;
+            }
+            /* Collect hi values */
+            long hi_vals[256]; int nhi = 0;
+            if (!is_hi_gen) {
+                DESCR_t d = interp_eval(hi_expr);
+                if (!IS_FAIL_fn(d)) hi_vals[nhi++] = d.i;
+            } else {
+                if (hi_expr->kind == E_TO && hi_expr->nchildren >= 2) {
+                    DESCR_t a = interp_eval(hi_expr->children[0]);
+                    DESCR_t b = interp_eval(hi_expr->children[1]);
+                    if (!IS_FAIL_fn(a) && !IS_FAIL_fn(b))
+                        for (long v = a.i; v <= b.i && nhi < 256; v++) hi_vals[nhi++] = v;
+                }
+            }
+            /* Cross-product: for each lo, for each hi, iterate lo..hi */
+            for (int li = 0; li < nlo && !ICN_CUR.returning; li++) {
+                for (int hi2 = 0; hi2 < nhi && !ICN_CUR.returning; hi2++) {
+                    long lo = lo_vals[li], hi = hi_vals[hi2];
+                    for (long i = lo; i <= hi && !ICN_CUR.returning; i++) {
+                        icn_gen_push(e, i, NULL);
+                        int inner = icn_drive(root);
+                        if (!inner) interp_eval(ICN_CUR.body_root);
+                        icn_gen_pop(); ticks++;
+                        if (ICN_CUR.returning) break;
+                    }
+                }
+            }
         }
         return ticks;
     }
@@ -286,7 +345,9 @@ DESCR_t icn_call_proc(EXPR_t *proc, DESCR_t *args, int nargs) {
         ICN_CUR.body_root = st;   /* OE-2: drive root for this statement */
         result = interp_eval(st);
     }
+    /* Icon semantics: explicit return → return the value; fall off end → fail. */
     if (ICN_CUR.returning) result = ICN_CUR.return_val;
+    else result = FAILDESCR;
 
     /* Pop frame — restores caller's ICN_CUR automatically */
     icn_frame_depth--;
@@ -314,6 +375,38 @@ static DESCR_t icn_oneshot_box(void *zeta, int entry) {
     return FAILDESCR;
 }
 
+
+/*----------------------------------------------------------------------------------------------------------------------------
+ * icn_bb_fnc_gen — composite box: pump arg-generator, call builtin with substituted arg each tick.
+ *
+ * Evaluates all non-generative args eagerly at setup. On each tick:
+ *   1. Pump arg_box to get current gen value v.
+ *   2. Substitute v into args[gen_idx].
+ *   3. Call interp_eval_fnc_with_args(call, args, nargs) — re-invokes the builtin
+ *      with pre-resolved args, skipping re-evaluation of all children.
+ *
+ * This mirrors how x64/JVM emitters propagate generator context into function args:
+ * the generator value is on the stack; the builtin call pops it as its argument.
+ *--------------------------------------------------------------------------------------------------------------------------*/
+#define ICN_FNC_GEN_ARGS 8
+typedef struct {
+    bb_node_t   arg_box;
+    EXPR_t     *call;       /* the E_FNC node */
+    int         gen_idx;    /* which arg (0-based) is the generator */
+    int         nargs;
+    DESCR_t     args[ICN_FNC_GEN_ARGS];  /* pre-evaluated; args[gen_idx] filled each tick */
+} icn_fnc_gen_state_t;
+
+/* Forward declaration — defined in interp.c */
+extern DESCR_t icn_call_builtin(EXPR_t *call, DESCR_t *args, int nargs);
+
+static DESCR_t icn_bb_fnc_gen(void *zeta, int entry) {
+    icn_fnc_gen_state_t *z = (icn_fnc_gen_state_t *)zeta;
+    DESCR_t v = z->arg_box.fn(z->arg_box.ζ, entry);
+    if (IS_FAIL_fn(v)) return FAILDESCR;
+    z->args[z->gen_idx] = v;
+    return icn_call_builtin(z->call, z->args, z->nargs);
+}
 /* Coroutine trampoline for E_FNC user-proc wrapper.
  * icn_bb_suspend calls this via makecontext; it reads from icn_coro_stage. */
 typedef struct {
@@ -394,6 +487,27 @@ bb_node_t icn_eval_gen(EXPR_t *e) {
             icn_coro_stage.args  = args;
             icn_coro_stage.nargs = nargs;
             return (bb_node_t){ icn_bb_suspend, ss, 0 };
+        }
+        /* ── Builtin E_FNC with generative arg — icn_bb_fnc_gen ─────────── */
+        /* Find first argument that is itself a generator expression.
+         * Pre-evaluate all non-generative args; the gen arg is filled each tick. */
+        for (int j = 0; j < nargs && j < ICN_FNC_GEN_ARGS; j++) {
+            EXPR_t *arg = e->children[1+j];
+            if (!arg) continue;
+            EKind k = arg->kind;
+            if (k == E_TO || k == E_TO_BY || k == E_ITERATE || k == E_ALTERNATE || k == E_FNC) {
+                icn_fnc_gen_state_t *fg = calloc(1, sizeof(*fg));
+                fg->arg_box = icn_eval_gen(arg);
+                fg->call    = e;
+                fg->gen_idx = j;
+                fg->nargs   = nargs;
+                /* Pre-evaluate all other args */
+                for (int k2 = 0; k2 < nargs && k2 < ICN_FNC_GEN_ARGS; k2++) {
+                    if (k2 == j) continue;
+                    fg->args[k2] = interp_eval(e->children[1+k2]);
+                }
+                return (bb_node_t){ icn_bb_fnc_gen, fg, 0 };
+            }
         }
     }
 
