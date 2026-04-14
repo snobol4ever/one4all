@@ -2237,6 +2237,32 @@ void NV_CLEAR_fn(void) {
     }
 }
 
+/* IM-1: nv_reset / nv_snapshot / nv_restore -------------------------------- */
+
+void nv_reset(void) { NV_CLEAR_fn(); }
+
+int nv_snapshot(NvPair **out) {
+    _var_init();
+    int count = 0;
+    for (int i = 0; i < VAR_BUCKETS; i++)
+        for (NV_t *e = _var_buckets[i]; e; e = e->next)
+            if (!IS_NULL(e->val)) count++;
+    if (count == 0) { *out = NULL; return 0; }
+    NvPair *pairs = malloc((size_t)count * sizeof(NvPair));
+    if (!pairs) { *out = NULL; return 0; }
+    int idx = 0;
+    for (int i = 0; i < VAR_BUCKETS; i++)
+        for (NV_t *e = _var_buckets[i]; e; e = e->next)
+            if (!IS_NULL(e->val)) { pairs[idx].name = e->name; pairs[idx].val = e->val; idx++; }
+    *out = pairs;
+    return count;
+}
+
+void nv_restore(const NvPair *pairs, int n) {
+    nv_reset();
+    for (int i = 0; i < n; i++) NV_SET_fn(pairs[i].name, pairs[i].val);
+}
+
 void NV_SYNC_fn(void) {
     for (int _ri = 0; _ri < _var_reg_n; _ri++) {
         DESCR_t v = NV_GET_fn(_var_reg[_ri].name);

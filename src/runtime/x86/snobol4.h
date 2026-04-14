@@ -206,6 +206,12 @@ DESCR_t  NV_SET_fn(const char *name, DESCR_t val);  /* RT-5: returns val for emb
 void    NV_REG_fn(const char *name, DESCR_t *ptr);
 void    NV_SYNC_fn(void);
 void    NV_CLEAR_fn(void);      /* reset all non-keyword NV vars to null */
+
+/* IM-1: NV snapshot/restore for in-process sync monitor */
+typedef struct { const char *name; DESCR_t val; } NvPair;
+void    nv_reset(void);                          /* clear all variables */
+int     nv_snapshot(NvPair **out);               /* returns count; caller frees *out */
+void    nv_restore(const NvPair *pairs, int n);  /* replay via NV_SET_fn */
 DESCR_t  INDR_GET_fn(const char *name);  /* $name */
 void    INDR_SET_fn(const char *name, DESCR_t val);
 
