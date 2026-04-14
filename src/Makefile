@@ -82,6 +82,7 @@ PL_RUNTIME = \
     runtime/interp/pl_runtime.c
 
 DRIVER = \
+    driver/interp.c \
     driver/scrip.c
 
 SRCS = $(FRONTEND_SNO) $(FRONTEND_PROLOG) $(FRONTEND_SNOCONE) $(FRONTEND_REBUS) \
