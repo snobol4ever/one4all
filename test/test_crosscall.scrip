@@ -1,0 +1,22 @@
+```SNOBOL4
+*  test_crosscall.scrip — GOAL-UNIFIED-BROKER U-22
+*  Proof: SNOBOL4 source calls an Icon procedure by name via _usercall_hook
+*  cross-language fallback (U-22).
+*
+*  SNO calls double(21) — defined in the Icon section below.
+*  Expected: CROSSCALL: 42
+        &TRIM = 1
+        result = double(21)
+        OUTPUT = 'CROSSCALL: ' result
+END
+```
+
+```Icon
+#  test_crosscall.scrip — Icon section
+#  Defines double(n): returns n+n.
+#  Called from SNOBOL4 section above via U-22 cross-call hook.
+procedure double(n)
+    n2 := n + n;
+    return n2;
+end
+```

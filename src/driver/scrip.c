@@ -1098,11 +1098,14 @@ static void polyglot_init(Program *prog)
         if (!s->subject) continue;
 
         if (s->lang == LANG_ICN) {
-            /* Icon: collect E_FNC procedure definitions */
+            /* Icon: collect E_FNC procedure definitions.
+             * icon_lower stores proc name in proc->sval (and also children[0]->sval).
+             * Use proc->sval as the authoritative source. */
             EXPR_t *proc = s->subject;
-            if (proc->kind == E_FNC && proc->nchildren >= 1 && proc->children[0]) {
-                const char *name = proc->children[0]->sval;
-                if (name && icn_proc_count < ICN_PROC_MAX) {
+            if (proc->kind == E_FNC && proc->sval && *proc->sval) {
+                const char *name = proc->sval;
+                printf("DBG: registering ICN proc '%s'\n", name);
+                if (icn_proc_count < ICN_PROC_MAX) {
                     icn_proc_table[icn_proc_count].name = name;
                     icn_proc_table[icn_proc_count].proc = proc;
                     icn_proc_count++;
@@ -1991,6 +1994,31 @@ static DESCR_t interp_eval(EXPR_t *e)
                 DESCR_t r = call_user_function(e->sval, args, nargs);
                 if (IS_NAME(r)) return NAME_DEREF(r);
                 return r;
+            }
+        }
+        /* ── U-22: cross-language fallback in value-context E_FNC ────────────
+         * SNO body lookup above found nothing.  Try Icon proc table, then
+         * Prolog pred table, before falling through to builtins/APPLY_fn. */
+        {
+            /* Try Icon proc table (case-sensitive) */
+            for (int _ci = 0; _ci < icn_proc_count; _ci++) {
+                if (strcmp(icn_proc_table[_ci].name, e->sval) == 0)
+                    return icn_call_proc(icn_proc_table[_ci].proc, args, nargs);
+            }
+            /* Try Prolog pred table: "name/arity" key */
+            if (g_pl_active) {
+                char _pk[256];
+                snprintf(_pk, sizeof _pk, "%s/%d", e->sval, nargs);
+                EXPR_t *_choice = pl_pred_table_lookup(&g_pl_pred_table, _pk);
+                if (_choice) {
+                    Term **_pl_args = (nargs > 0) ? pl_env_new(nargs) : NULL;
+                    Term **_saved   = g_pl_env;
+                    g_pl_env = _pl_args;
+                    bb_node_t _root = pl_box_choice(_choice, g_pl_env, nargs);
+                    int _ok = bb_broker(_root, BB_ONCE, NULL, NULL);
+                    g_pl_env = _saved;
+                    return _ok ? INTVAL(1) : FAILDESCR;
+                }
             }
         }
         /* IDENT/DIFFER: per SPITBOL spec, arguments must have SAME data type AND value.
@@ -3260,7 +3288,9 @@ static DESCR_t _builtin_DATA(DESCR_t *args, int nargs);
 
 /* _usercall_hook: calls user functions via call_user_function;
  * for pure builtins (FNCEX_fn && no body label) uses APPLY_fn directly
- * so FAILDESCR propagates correctly (DYN-74: fixes *ident(1,2) in EVAL). */
+ * so FAILDESCR propagates correctly (DYN-74: fixes *ident(1,2) in EVAL).
+ * U-22: cross-call extension — if name not found in SNO label table,
+ * try icn_proc_table (BB_PUMP one-shot) then g_pl_pred_table (BB_ONCE). */
 static DESCR_t _usercall_hook(const char *name, DESCR_t *args, int nargs) {
     /* S-10 fix: handle scrip.c-only predicates directly so *IDENT(x)/*DIFFER(x)
      * in pattern context correctly fail/succeed via bb_usercall -> g_user_call_hook. */
@@ -3280,6 +3310,45 @@ static DESCR_t _usercall_hook(const char *name, DESCR_t *args, int nargs) {
     }
     /* Pure builtin (no body) AND registered as builtin: use APPLY_fn for correct failure */
     if (!_body && FNCEX_fn(name)) return APPLY_fn(name, args, nargs);
+
+    /* ── U-22: cross-language fallback ────────────────────────────────
+     * Name not found in SNO label/builtin tables.  Try Icon, then Prolog.
+     * This lets SNOBOL4 source call Icon procedures and Prolog predicates
+     * by name, the same way the linker resolves an undefined symbol. */
+    if (!_body) {
+        /* Try Icon proc table (case-sensitive — Icon is case-sensitive) */
+        for (int _i = 0; _i < icn_proc_count; _i++) {
+            if (strcmp(icn_proc_table[_i].name, name) == 0) {
+                /* Call as one-shot: drive the Icon proc and return its value.
+                 * icn_call_proc returns FAILDESCR if the procedure fails. */
+                return icn_call_proc(icn_proc_table[_i].proc, args, nargs);
+            }
+        }
+        /* Try Prolog pred table: name/arity key, e.g. "color/1" */
+        if (g_pl_active) {
+            char pl_key[256];
+            snprintf(pl_key, sizeof pl_key, "%s/%d", name, nargs);
+            EXPR_t *choice = pl_pred_table_lookup(&g_pl_pred_table, pl_key);
+            if (choice) {
+                /* Set up Prolog arg Term** from DESCR_t args, drive BB_ONCE */
+                Term **pl_args = (nargs > 0) ? pl_env_new(nargs) : NULL;
+                for (int _i = 0; _i < nargs; _i++)
+                    pl_args[_i] = pl_unified_term_from_expr(
+                        /* wrap DESCR_t as a literal EXPR_t leaf */
+                        (args[_i].type == DT_S)
+                            ? &(EXPR_t){ .kind = E_QLIT, .sval = (char*)args[_i].s }
+                            : &(EXPR_t){ .kind = E_ILIT, .ival = (long)args[_i].s },
+                        NULL);
+                Term **saved_env = g_pl_env;
+                g_pl_env = pl_args;
+                bb_node_t root = pl_box_choice(choice, g_pl_env, nargs);
+                int ok = bb_broker(root, BB_ONCE, NULL, NULL);
+                g_pl_env = saved_env;
+                return ok ? INTVAL(1) : FAILDESCR;
+            }
+        }
+    }
+
     /* User-defined (has body) OR unknown: call_user_function handles both */
     return call_user_function(name, args, nargs);
 }
