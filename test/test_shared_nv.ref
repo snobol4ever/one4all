@@ -1,0 +1,6 @@
+SNO: SHARED_VAL=hello
+SNO: COUNTER=0
+ICN reads SHARED_VAL: hello
+ICN: COUNTER now 42
+PL reads SHARED_VAL: hello
+PL sets MSG=from_prolog

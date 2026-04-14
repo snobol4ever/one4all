@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <gc.h>
 
 /* -------------------------------------------------------------------------
  * Well-known atom IDs (definitions — declared extern in term.h)
@@ -48,7 +49,8 @@ static unsigned int ht_hash(const char *s) {
 static void ht_grow(int new_size) {
     HEntry *old = ht;
     int     old_size = ht_size;
-    ht = calloc(new_size, sizeof(HEntry));
+    ht = GC_malloc(new_size * sizeof(HEntry));
+    memset(ht, 0, new_size * sizeof(HEntry));
     ht_size = new_size;
     ht_used = 0;
     for (int i = 0; i < old_size; i++) {
@@ -58,7 +60,7 @@ static void ht_grow(int new_size) {
         ht[h] = old[i];
         ht_used++;
     }
-    free(old);
+    /* old is GC-managed, no free needed */
 }
 
 /* -------------------------------------------------------------------------
@@ -70,11 +72,13 @@ int prolog_atom_intern(const char *name) {
     /* Lazy init */
     if (!ht) {
         ht_size = HT_INIT_SIZE;
-        ht = calloc(ht_size, sizeof(HEntry));
+        ht = GC_malloc(ht_size * sizeof(HEntry));
+        memset(ht, 0, ht_size * sizeof(HEntry));
     }
     if (!atom_names) {
         atom_cap  = ATOM_INIT_CAP;
-        atom_names = malloc(atom_cap * sizeof(char *));
+        atom_names = GC_malloc(atom_cap * sizeof(char *));
+        memset(atom_names, 0, atom_cap * sizeof(char *));
     }
 
     /* Lookup */
@@ -93,11 +97,13 @@ int prolog_atom_intern(const char *name) {
     }
 
     if (atom_len >= atom_cap) {
+        int old_cap = atom_cap;
         atom_cap *= 2;
-        atom_names = realloc(atom_names, atom_cap * sizeof(char *));
+        atom_names = GC_realloc(atom_names, atom_cap * sizeof(char *));
+        memset(atom_names + old_cap, 0, (atom_cap - old_cap) * sizeof(char *));
     }
 
-    char *copy = strdup(name);
+    char *copy = GC_strdup(name);
     int   id   = atom_len++;
     atom_names[id] = copy;
     ht[h].key = copy;
@@ -137,14 +143,16 @@ void prolog_atom_init(void) {
 #include <stddef.h>
 
 Term *term_new_atom(int atom_id) {
-    Term *t = calloc(1, sizeof(Term));
+    Term *t = GC_malloc(sizeof(Term));
+    memset(t, 0, sizeof(Term));
     t->tag     = TT_ATOM;
     t->atom_id = atom_id;
     return t;
 }
 
 Term *term_new_var(int var_slot) {
-    Term *t = calloc(1, sizeof(Term));
+    Term *t = GC_malloc(sizeof(Term));
+    memset(t, 0, sizeof(Term));
     t->tag        = TT_VAR;
     t->var_slot   = var_slot;
     t->saved_slot = var_slot;   /* preserved across bind() / trail_unwind() */
@@ -152,12 +160,13 @@ Term *term_new_var(int var_slot) {
 }
 
 Term *term_new_compound(int functor, int arity, Term **args) {
-    Term *t = calloc(1, sizeof(Term));
+    Term *t = GC_malloc(sizeof(Term));
+    memset(t, 0, sizeof(Term));
     t->tag              = TT_COMPOUND;
     t->compound.functor = functor;
     t->compound.arity   = arity;
     if (arity > 0 && args) {
-        t->compound.args = malloc(arity * sizeof(Term *));
+        t->compound.args = GC_malloc(arity * sizeof(Term *));
         memcpy(t->compound.args, args, arity * sizeof(Term *));
     } else {
         t->compound.args = NULL;
@@ -166,14 +175,16 @@ Term *term_new_compound(int functor, int arity, Term **args) {
 }
 
 Term *term_new_int(long ival) {
-    Term *t = calloc(1, sizeof(Term));
+    Term *t = GC_malloc(sizeof(Term));
+    memset(t, 0, sizeof(Term));
     t->tag  = TT_INT;
     t->ival = ival;
     return t;
 }
 
 Term *term_new_float(double fval) {
-    Term *t = calloc(1, sizeof(Term));
+    Term *t = GC_malloc(sizeof(Term));
+    memset(t, 0, sizeof(Term));
     t->tag  = TT_FLOAT;
     t->fval = fval;
     return t;

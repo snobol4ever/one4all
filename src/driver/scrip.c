@@ -48,6 +48,7 @@ extern Program *sno_parse(FILE *f, const char *filename);
 #include "../frontend/prolog/prolog_driver.h"
 #include "../frontend/prolog/term.h"            /* Term — needed by Prolog globals block */
 #include "../frontend/prolog/prolog_runtime.h"  /* Trail — needed by Prolog globals block */
+#include "../frontend/prolog/prolog_atom.h"     /* prolog_atom_name — U-23: 64-bit ptr, must be declared */
 #include "../frontend/prolog/prolog_builtin.h"  /* interp_exec_pl_builtin declaration */
 #include "../frontend/prolog/pl_broker.h"       /* pl_box_choice, pl_box_* — S-BB-7; pl_exec_goal removed U-11 */
 #include "../frontend/icon/icon_driver.h"

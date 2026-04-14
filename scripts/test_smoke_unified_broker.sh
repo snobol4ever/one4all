@@ -221,6 +221,27 @@ else
     echo "  SKIP cross_lang.scrip (file not found)"
 fi
 
+# ── Shared NV store (U-23) ───────────────────────────────────────────────────
+echo "=== Shared NV store (U-23) ==="
+
+SHARED="$ROOT/test/test_shared_nv.scrip"
+SREF="$ROOT/test/test_shared_nv.ref"
+if [ -f "$SHARED" ] && [ -f "$SREF" ]; then
+    actual=$(timeout "$TIMEOUT" "$SCRIP" --ir-run "$SHARED" < /dev/null 2>/dev/null)
+    expected=$(cat "$SREF")
+    if [ "$actual" = "$expected" ]; then
+        echo "  PASS test_shared_nv.scrip (SNO+ICN+PL shared NV store)"
+        PASS=$((PASS+1))
+    else
+        echo "  FAIL test_shared_nv.scrip"
+        printf "       exp: %s\n" "$(printf '%s' "$expected" | head -6)"
+        printf "       got: %s\n" "$(printf '%s' "$actual"   | head -6)"
+        FAIL=$((FAIL+1))
+    fi
+else
+    echo "  SKIP test_shared_nv.scrip (file not found)"
+fi
+
 # ── Result ───────────────────────────────────────────────────────────────────
 echo ""
 echo "PASS=$PASS FAIL=$FAIL"

@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <gc.h>
 
 /* =========================================================================
  * Trail
@@ -26,7 +27,7 @@
 #define TRAIL_INIT_CAP 64
 
 void trail_init(Trail *t) {
-    t->stack    = malloc(TRAIL_INIT_CAP * sizeof(Term *));
+    t->stack    = GC_malloc(TRAIL_INIT_CAP * sizeof(Term *));
     t->top      = 0;
     t->capacity = TRAIL_INIT_CAP;
 }
@@ -34,7 +35,7 @@ void trail_init(Trail *t) {
 void trail_push(Trail *t, Term *term) {
     if (t->top >= t->capacity) {
         t->capacity *= 2;
-        t->stack = realloc(t->stack, t->capacity * sizeof(Term *));
+        t->stack = GC_realloc(t->stack, t->capacity * sizeof(Term *));
     }
     t->stack[t->top++] = term;
 }
