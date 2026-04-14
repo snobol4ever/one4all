@@ -75,11 +75,14 @@ FRONTEND_RAKU = \
     frontend/raku/raku.lex.c \
     frontend/raku/raku_driver.c
 
+ICN_RUNTIME = \
+    runtime/interp/icn_runtime.c
+
 DRIVER = \
     driver/scrip.c
 
 SRCS = $(FRONTEND_SNO) $(FRONTEND_PROLOG) $(FRONTEND_SNOCONE) $(FRONTEND_REBUS) \
-       $(FRONTEND_ICON) $(FRONTEND_RAKU) $(IR) $(RUNTIME_X86) $(DRIVER)
+       $(FRONTEND_ICON) $(FRONTEND_RAKU) $(ICN_RUNTIME) $(IR) $(RUNTIME_X86) $(DRIVER)
 OBJS = $(SRCS:.c=.o)
 
 .PHONY: all clean

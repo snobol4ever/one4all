@@ -1,0 +1,351 @@
+/*
+ * icn_runtime.c — Icon interpreter runtime
+ *
+ * FI-4: extracted from src/driver/scrip.c.
+ * IcnFrame stack, icn_gen_*, icn_scan_*, icn_global_*, icn_proc_table,
+ * icn_call_proc, icn_drive, icn_eval_gen, icn_oneshot_box, icn_scope_*.
+ *
+ * interp_eval() stays in scrip.c — referenced via extern.
+ *
+ * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6 (FI-4, 2026-04-14)
+ */
+#include "icn_runtime.h"
+#include "../../ir/ir.h"
+#include "../../frontend/snobol4/scrip_cc.h"
+#include "../../runtime/x86/bb_broker.h"
+#include "../../frontend/icon/icon_gen.h"
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+
+/* interp_eval lives in scrip.c */
+extern DESCR_t interp_eval(EXPR_t *e);
+
+/* ── Icon unified interpreter state ────────────────────────────────────────
+ * Icon procedures use slot-indexed locals (e->ival on E_VAR nodes).
+ * When interp_eval is running inside an Icon procedure call, icn_env points
+ * to the current frame's slot array. E_VAR case checks icn_env first.
+ * ICN_CUR.env_n is the slot count. Both are NULL/0 when in SNOBOL4 context.
+ *
+ * Icon procedure table: built from Program* at execute_program time.
+ * Each entry maps procname → the E_FNC node (from STMT_t subject).
+ * ────────────────────────────────────────────────────────────────────────── */
+IcnProcEntry icn_proc_table[ICN_PROC_MAX];
+int          icn_proc_count = 0;
+int          g_lang         = 0;     /* 0=SNOBOL4 1=Icon */
+EXPR_t      *g_icn_root     = NULL;  /* current Icon drive root */
+
+/* OE-1: IcnFrame — per-call context for Icon procedure invocations.
+ * Replaces the flat globals icn_env/ICN_CUR.env_n/ICN_CUR.returning/ICN_CUR.return_val/
+ * icn_gen_stack/icn_gen_depth/ICN_CUR.loop_break with a pushed/popped frame stack.
+ * ICN_CUR refers to the active frame (frame_depth must be >0 in Icon context). */
+IcnFrame icn_frame_stack[ICN_FRAME_MAX];
+int      icn_frame_depth = 0;
+
+/* Convenience helpers that mirror the old flat-global helpers */
+void icn_gen_push(EXPR_t *n, long v, const char *sv) {
+    IcnFrame *f = &ICN_CUR;
+    if (f->gen_depth < ICN_GEN_MAX) { f->gen[f->gen_depth].node=n; f->gen[f->gen_depth].cur=v; f->gen[f->gen_depth].sval=sv; f->gen_depth++; }
+}
+void icn_gen_pop(void) { if (ICN_CUR.gen_depth > 0) ICN_CUR.gen_depth--; }
+int  icn_gen_lookup(EXPR_t *n, long *out) {
+    IcnFrame *f = &ICN_CUR;
+    for (int i=f->gen_depth-1;i>=0;i--) if(f->gen[i].node==n){*out=f->gen[i].cur;return 1;} return 0;
+}
+int  icn_gen_lookup_sv(EXPR_t *n, long *out, const char **sv) {
+    IcnFrame *f = &ICN_CUR;
+    for (int i=f->gen_depth-1;i>=0;i--) if(f->gen[i].node==n){*out=f->gen[i].cur;*sv=f->gen[i].sval;return 1;} return 0;
+}
+int  icn_gen_active(EXPR_t *n) {
+    IcnFrame *f = &ICN_CUR;
+    for (int i=0;i<f->gen_depth;i++) if(f->gen[i].node==n) return 1; return 0;
+}
+
+/* Icon scan state globals (not per-frame: scan nesting is within one call) */
+const char *icn_scan_subj  = NULL;
+int         icn_scan_pos   = 0;
+IcnScanEntry icn_scan_stack[ICN_SCAN_STACK_MAX];
+int         icn_scan_depth = 0;
+
+/* U-23: Icon global variable names -- bridge to SNO NV store.
+ * Names declared `global X` in an Icon block are stored here.
+ * icn_scope_patch skips slot assignment for these; E_VAR read/write
+ * calls NV_GET_fn / NV_SET_fn instead of icn_env[slot]. */
+const char *icn_global_names[ICN_GLOBAL_MAX];
+int         icn_global_count = 0;
+int icn_is_global(const char *name) {
+    for (int i = 0; i < icn_global_count; i++)
+        if (icn_global_names[i] && strcmp(icn_global_names[i], name) == 0) return 1;
+    return 0;
+}
+void icn_global_register(const char *name) {
+    if (!name || icn_is_global(name) || icn_global_count >= ICN_GLOBAL_MAX) return;
+    icn_global_names[icn_global_count++] = name;
+}
+
+int icn_drive(EXPR_t *e) {
+    if (!e) return 0;
+    if (icn_gen_active(e)) return 0;
+    EXPR_t *root = ICN_CUR.body_root;
+    if (e->kind == E_TO && e->nchildren >= 2) {
+        DESCR_t lo_d = interp_eval(e->children[0]);
+        DESCR_t hi_d = interp_eval(e->children[1]);
+        if (IS_FAIL_fn(lo_d)||IS_FAIL_fn(hi_d)) return 0;
+        long lo=lo_d.i, hi=hi_d.i; int ticks=0;
+        for(long i=lo;i<=hi&&!ICN_CUR.returning;i++){
+            icn_gen_push(e,i,NULL);
+            int inner=icn_drive(root);
+            if(!inner) interp_eval(ICN_CUR.body_root);
+            icn_gen_pop(); ticks++;
+            if(ICN_CUR.returning) break;
+        }
+        return ticks;
+    }
+    if (e->kind == E_TO_BY && e->nchildren >= 3) {
+        DESCR_t lo_d=interp_eval(e->children[0]);
+        DESCR_t hi_d=interp_eval(e->children[1]);
+        DESCR_t st_d=interp_eval(e->children[2]);
+        if(IS_FAIL_fn(lo_d)||IS_FAIL_fn(hi_d)||IS_FAIL_fn(st_d)) return 0;
+        long lo=lo_d.i,hi=hi_d.i,st=st_d.i?st_d.i:1; int ticks=0;
+        if(st>0){for(long i=lo;i<=hi&&!ICN_CUR.returning;i+=st){icn_gen_push(e,i,NULL);int inner=icn_drive(root);if(!inner)interp_eval(ICN_CUR.body_root);icn_gen_pop();ticks++;if(ICN_CUR.returning)break;}}
+        else    {for(long i=lo;i>=hi&&!ICN_CUR.returning;i+=st){icn_gen_push(e,i,NULL);int inner=icn_drive(root);if(!inner)interp_eval(ICN_CUR.body_root);icn_gen_pop();ticks++;if(ICN_CUR.returning)break;}}
+        return ticks;
+    }
+    /* S-6: E_ITERATE (!str) — generate each character of a string */
+    if (e->kind == E_ITERATE && e->nchildren >= 1) {
+        DESCR_t sv_d = interp_eval(e->children[0]);
+        if (IS_FAIL_fn(sv_d) || !IS_STR_fn(sv_d)) return 0;
+        const char *str = sv_d.s ? sv_d.s : "";
+        long len = (long)strlen(str); int ticks = 0;
+        for (long i = 0; i < len && !ICN_CUR.returning; i++) {
+            icn_gen_push(e, i, str);
+            int inner = icn_drive(root);
+            if (!inner) interp_eval(ICN_CUR.body_root);
+            icn_gen_pop(); ticks++;
+            if (ICN_CUR.returning) break;
+        }
+        return ticks;
+    }
+    /* S-7: find(pat,str) as generator — successive 1-based positions. */
+    if (e->kind == E_FNC && e->nchildren>=3
+        && e->children[0] && e->children[0]->sval
+        && strcmp(e->children[0]->sval,"find")==0) {
+        DESCR_t s1 = interp_eval(e->children[1]);
+        DESCR_t s2 = interp_eval(e->children[2]);
+        if (IS_FAIL_fn(s1)||IS_FAIL_fn(s2)) return 0;
+        const char *needle = VARVAL_fn(s1), *hay = VARVAL_fn(s2);
+        if (!needle||!hay) return 0;
+        int nlen=(int)strlen(needle), ticks=0;
+        const char *p = hay;
+        while (!ICN_CUR.returning) {
+            char *hit = strstr(p, needle);
+            if (!hit) break;
+            long pos1 = (long)(hit - hay) + 1;
+            icn_gen_push(e, pos1, NULL);
+            int inner = icn_drive(root);
+            if (!inner) interp_eval(ICN_CUR.body_root);
+            icn_gen_pop(); ticks++;
+            if (ICN_CUR.returning) break;
+            p = hit + (nlen > 0 ? nlen : 1);
+        }
+        return ticks;
+    }
+    for(int i=0;i<e->nchildren;i++){int t=icn_drive(e->children[i]);if(t>0)return t;}
+    return 0;
+}
+
+
+/* icn_scope_add/patch: mirror of scope_add/scope_patch in icon_interp.c.
+ * Assigns slot indices to E_VAR nodes by name, in-place on the AST. */
+
+int icn_scope_add(IcnScope *sc, const char *name) {
+    if (!name) return -1;
+    for (int i=0;i<sc->n;i++) if(strcmp(sc->e[i].name,name)==0) return sc->e[i].slot;
+    if (sc->n >= ICN_SLOT_MAX) return -1;
+    int slot = sc->n;
+    sc->e[sc->n].name=name; sc->e[sc->n].slot=slot; sc->n++;
+    return slot;
+}
+int icn_scope_get(IcnScope *sc, const char *name) {
+    if (!name) return -1;
+    for (int i=0;i<sc->n;i++) if(strcmp(sc->e[i].name,name)==0) return sc->e[i].slot;
+    return -1;
+}
+void icn_scope_patch(IcnScope *sc, EXPR_t *e) {
+    if (!e) return;
+    if (e->kind == E_GLOBAL) {
+        for (int i=0;i<e->nchildren;i++)
+            if(e->children[i]&&e->children[i]->sval) icn_scope_add(sc, e->children[i]->sval);
+        return;
+    }
+    if (e->kind == E_VAR && e->sval) {
+        /* U-23: globals bridge to SNO NV store — skip slot, preserve sval, set ival=-1 */
+        if (icn_is_global(e->sval)) { e->ival = -1; }
+        else { int s = icn_scope_add(sc, e->sval); if (s >= 0) e->ival = s; }
+    }
+    for (int i=0;i<e->nchildren;i++) icn_scope_patch(sc, e->children[i]);
+}
+
+/* icn_call_proc: call an Icon procedure node (E_FNC with body children).
+ * Mirrors icn_call() in icon_interp.c exactly, but uses DESCR_t and icn_env. */
+DESCR_t icn_call_proc(EXPR_t *proc, DESCR_t *args, int nargs) {
+    int nparams = (int)proc->ival;
+    int body_start = 1 + nparams;
+    int nbody = proc->nchildren - body_start;
+
+    /* Build name→slot scope: params first, then locals from E_GLOBAL decls */
+    IcnScope sc; sc.n = 0;
+    for (int i = 0; i < nparams && i < ICN_SLOT_MAX; i++) {
+        EXPR_t *pn = proc->children[1+i];
+        if (pn && pn->sval) icn_scope_add(&sc, pn->sval);
+    }
+    for (int i = 0; i < nbody; i++) {
+        EXPR_t *st = proc->children[body_start+i];
+        if (st && st->kind == E_GLOBAL)
+            for (int j = 0; j < st->nchildren; j++)
+                if (st->children[j] && st->children[j]->sval)
+                    icn_scope_add(&sc, st->children[j]->sval);
+    }
+    /* Patch E_VAR.ival with slot indices throughout body.
+     * scope_patch also adds any undeclared vars it encounters to sc,
+     * so sc.n after patching is the true slot count. */
+    for (int i = 0; i < nbody; i++)
+        icn_scope_patch(&sc, proc->children[body_start+i]);
+
+    /* nslots = total slots assigned (params + locals + any undeclared vars) */
+    int nslots = sc.n > 0 ? sc.n : (nparams > 0 ? nparams : ICN_SLOT_MAX);
+    if (nslots > ICN_SLOT_MAX) nslots = ICN_SLOT_MAX;
+
+    /* Push a fresh IcnFrame for this call */
+    if (icn_frame_depth >= ICN_FRAME_MAX) return FAILDESCR;
+    IcnFrame *f = &icn_frame_stack[icn_frame_depth++];
+    memset(f, 0, sizeof *f);
+    f->env_n = nslots;
+    for (int i = 0; i < nparams && i < nargs && i < ICN_SLOT_MAX; i++)
+        f->env[i] = args[i];
+
+    /* Execute body statements */
+    DESCR_t result = NULVCL;
+    for (int i = 0; i < nbody && !ICN_CUR.returning; i++) {
+        EXPR_t *st = proc->children[body_start+i];
+        if (!st || st->kind == E_GLOBAL) continue;
+        ICN_CUR.body_root = st;   /* OE-2: drive root for this statement */
+        result = interp_eval(st);
+    }
+    if (ICN_CUR.returning) result = ICN_CUR.return_val;
+
+    /* Pop frame — restores caller's ICN_CUR automatically */
+    icn_frame_depth--;
+    return result;
+}
+
+/*============================================================================================================================
+ * icn_eval_gen — U-17 (B-8): walk Icon IR node, return a drivable bb_node_t.
+ *
+ * Dispatch:
+ *   E_TO        → icn_bb_to      (icn_to_state_t:    lo/hi/cur)
+ *   E_TO_BY     → icn_bb_to_by   (icn_to_by_state_t: lo/hi/step/cur)
+ *   E_ITERATE   → icn_bb_iterate  (icn_iterate_state_t: str/len/pos)
+ *   E_FNC (user proc) → icn_bb_suspend (coroutine wrapping icn_call_proc)
+ *   fallback    → one-shot box returning interp_eval(e)
+ *
+ * Visible here: interp_eval, icn_call_proc, icn_proc_table, icn_proc_count.
+ *============================================================================================================================*/
+
+/* One-shot fallback box state — holds a pre-evaluated DESCR_t, fires γ once then ω. */
+typedef struct { DESCR_t val; int fired; } icn_oneshot_state_t;
+static DESCR_t icn_oneshot_box(void *zeta, int entry) {
+    icn_oneshot_state_t *z = (icn_oneshot_state_t *)zeta;
+    if (entry == α && !z->fired && !IS_FAIL_fn(z->val)) { z->fired = 1; return z->val; }
+    return FAILDESCR;
+}
+
+/* Coroutine trampoline for E_FNC user-proc wrapper.
+ * icn_bb_suspend calls this via makecontext; it reads from icn_coro_stage. */
+typedef struct {
+    icn_suspend_state_t *ss;
+    EXPR_t              *proc;
+    DESCR_t             *args;
+    int                  nargs;
+} Icn_coro_stage_t;
+static Icn_coro_stage_t icn_coro_stage;   /* staging area — set before makecontext */
+
+static void icn_proc_trampoline(void) {
+    Icn_coro_stage_t st = icn_coro_stage;        /* copy before first yield */
+    DESCR_t result = icn_call_proc(st.proc, st.args, st.nargs);
+    /* proc finished — store final value if not fail, mark exhausted, yield back */
+    st.ss->yielded   = IS_FAIL_fn(result) ? FAILDESCR : result;
+    st.ss->exhausted = 1;
+    swapcontext(&st.ss->gen_ctx, &st.ss->caller_ctx);
+}
+
+bb_node_t icn_eval_gen(EXPR_t *e) {
+    if (!e) {
+        icn_oneshot_state_t *z = calloc(1, sizeof(*z));
+        z->val = FAILDESCR; z->fired = 1;   /* immediately ω */
+        return (bb_node_t){ icn_oneshot_box, z, 0 };
+    }
+
+    /* ── E_TO: (lo to hi) ────────────────────────────────────────────────── */
+    if (e->kind == E_TO && e->nchildren >= 2) {
+        DESCR_t lo_d = interp_eval(e->children[0]);
+        DESCR_t hi_d = interp_eval(e->children[1]);
+        icn_to_state_t *z = calloc(1, sizeof(*z));
+        z->lo = IS_FAIL_fn(lo_d) ? 0 : lo_d.i;
+        z->hi = IS_FAIL_fn(hi_d) ? 0 : hi_d.i;
+        return (bb_node_t){ icn_bb_to, z, 0 };
+    }
+
+    /* ── E_TO_BY: (lo to hi by step) ─────────────────────────────────────── */
+    if (e->kind == E_TO_BY && e->nchildren >= 3) {
+        DESCR_t lo_d   = interp_eval(e->children[0]);
+        DESCR_t hi_d   = interp_eval(e->children[1]);
+        DESCR_t step_d = interp_eval(e->children[2]);
+        icn_to_by_state_t *z = calloc(1, sizeof(*z));
+        z->lo   = IS_FAIL_fn(lo_d)   ? 0 : lo_d.i;
+        z->hi   = IS_FAIL_fn(hi_d)   ? 0 : hi_d.i;
+        z->step = IS_FAIL_fn(step_d) ? 1 : step_d.i;
+        return (bb_node_t){ icn_bb_to_by, z, 0 };
+    }
+
+    /* ── E_ITERATE: (!str) ───────────────────────────────────────────────── */
+    if (e->kind == E_ITERATE && e->nchildren >= 1) {
+        DESCR_t sv = interp_eval(e->children[0]);
+        icn_iterate_state_t *z = calloc(1, sizeof(*z));
+        if (!IS_FAIL_fn(sv) && sv.s) {
+            z->str = sv.s;
+            z->len = sv.slen > 0 ? sv.slen : (long)strlen(sv.s);
+        }
+        return (bb_node_t){ icn_bb_iterate, z, 0 };
+    }
+
+    /* ── E_FNC user proc — coroutine wrapper ─────────────────────────────── */
+    if (e->kind == E_FNC && e->nchildren >= 1 && e->children[0] && e->children[0]->sval) {
+        const char *fn = e->children[0]->sval;
+        int nargs = e->nchildren - 1;
+        for (int i = 0; i < icn_proc_count; i++) {
+            if (strcmp(icn_proc_table[i].name, fn) != 0) continue;
+            /* Build args array */
+            DESCR_t *args = nargs > 0 ? calloc(nargs, sizeof(DESCR_t)) : NULL;
+            for (int j = 0; j < nargs; j++)
+                args[j] = interp_eval(e->children[1+j]);
+            /* Allocate suspend state + stack */
+            icn_suspend_state_t *ss = calloc(1, sizeof(*ss));
+            ss->stack       = malloc(256 * 1024);
+            ss->trampoline  = icn_proc_trampoline;
+            ss->trampoline_arg = NULL;   /* unused — trampoline reads icn_coro_stage */
+            /* Stage the call parameters before makecontext */
+            icn_coro_stage.ss    = ss;
+            icn_coro_stage.proc  = icn_proc_table[i].proc;
+            icn_coro_stage.args  = args;
+            icn_coro_stage.nargs = nargs;
+            return (bb_node_t){ icn_bb_suspend, ss, 0 };
+        }
+    }
+
+    /* ── Fallback: one-shot box wrapping interp_eval ─────────────────────── */
+    icn_oneshot_state_t *z = calloc(1, sizeof(*z));
+    z->val = interp_eval(e);
+    return (bb_node_t){ icn_oneshot_box, z, 0 };
+}
+
