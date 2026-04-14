@@ -37,6 +37,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ucontext.h>
 #include <sys/stat.h>
 #include <ctype.h>
 #include <setjmp.h>
@@ -54,6 +55,7 @@ extern Program *sno_parse(FILE *f, const char *filename);
 #include "../frontend/prolog/prolog_builtin.h"  /* interp_exec_pl_builtin declaration */
 #include "../frontend/prolog/pl_broker.h"       /* pl_box_choice, pl_box_* — S-BB-7; pl_exec_goal removed U-11 */
 #include "../frontend/icon/icon_driver.h"
+#include "../frontend/icon/icon_gen.h"    /* icn_bb_to/by/iterate/suspend, state types — U-17 */
 #include "../frontend/icon/icon_lex.h"    /* IcnTkKind — TK_AUG* for E_AUGOP in unified interp */
 
 /* ir_print_node — from src/ir/ir_print.c (linked via Makefile) */
@@ -754,6 +756,116 @@ static DESCR_t icn_call_proc(EXPR_t *proc, DESCR_t *args, int nargs) {
     icn_env_n     = saved_n;
     icn_returning = saved_ret;
     return result;
+}
+
+/*============================================================================================================================
+ * icn_eval_gen — U-17 (B-8): walk Icon IR node, return a drivable bb_node_t.
+ *
+ * Dispatch:
+ *   E_TO        → icn_bb_to      (icn_to_state_t:    lo/hi/cur)
+ *   E_TO_BY     → icn_bb_to_by   (icn_to_by_state_t: lo/hi/step/cur)
+ *   E_ITERATE   → icn_bb_iterate  (icn_iterate_state_t: str/len/pos)
+ *   E_FNC (user proc) → icn_bb_suspend (coroutine wrapping icn_call_proc)
+ *   fallback    → one-shot box returning icn_interp_eval(e,e)
+ *
+ * Visible here: icn_interp_eval, icn_call_proc, icn_proc_table, icn_proc_count.
+ *============================================================================================================================*/
+
+/* One-shot fallback box state — holds a pre-evaluated DESCR_t, fires γ once then ω. */
+typedef struct { DESCR_t val; int fired; } icn_oneshot_state_t;
+static DESCR_t icn_oneshot_box(void *zeta, int entry) {
+    icn_oneshot_state_t *z = (icn_oneshot_state_t *)zeta;
+    if (entry == α && !z->fired && !IS_FAIL_fn(z->val)) { z->fired = 1; return z->val; }
+    return FAILDESCR;
+}
+
+/* Coroutine trampoline for E_FNC user-proc wrapper.
+ * icn_bb_suspend calls this via makecontext; it reads from icn_coro_stage. */
+typedef struct {
+    icn_suspend_state_t *ss;
+    EXPR_t              *proc;
+    DESCR_t             *args;
+    int                  nargs;
+} Icn_coro_stage_t;
+static Icn_coro_stage_t icn_coro_stage;   /* staging area — set before makecontext */
+
+static void icn_proc_trampoline(void) {
+    Icn_coro_stage_t st = icn_coro_stage;        /* copy before first yield */
+    DESCR_t result = icn_call_proc(st.proc, st.args, st.nargs);
+    /* proc finished — store final value if not fail, mark exhausted, yield back */
+    st.ss->yielded   = IS_FAIL_fn(result) ? FAILDESCR : result;
+    st.ss->exhausted = 1;
+    swapcontext(&st.ss->gen_ctx, &st.ss->caller_ctx);
+}
+
+bb_node_t icn_eval_gen(EXPR_t *e) {
+    if (!e) {
+        icn_oneshot_state_t *z = calloc(1, sizeof(*z));
+        z->val = FAILDESCR; z->fired = 1;   /* immediately ω */
+        return (bb_node_t){ icn_oneshot_box, z, 0 };
+    }
+
+    /* ── E_TO: (lo to hi) ────────────────────────────────────────────────── */
+    if (e->kind == E_TO && e->nchildren >= 2) {
+        DESCR_t lo_d = icn_interp_eval(e, e->children[0]);
+        DESCR_t hi_d = icn_interp_eval(e, e->children[1]);
+        icn_to_state_t *z = calloc(1, sizeof(*z));
+        z->lo = IS_FAIL_fn(lo_d) ? 0 : lo_d.i;
+        z->hi = IS_FAIL_fn(hi_d) ? 0 : hi_d.i;
+        return (bb_node_t){ icn_bb_to, z, 0 };
+    }
+
+    /* ── E_TO_BY: (lo to hi by step) ─────────────────────────────────────── */
+    if (e->kind == E_TO_BY && e->nchildren >= 3) {
+        DESCR_t lo_d   = icn_interp_eval(e, e->children[0]);
+        DESCR_t hi_d   = icn_interp_eval(e, e->children[1]);
+        DESCR_t step_d = icn_interp_eval(e, e->children[2]);
+        icn_to_by_state_t *z = calloc(1, sizeof(*z));
+        z->lo   = IS_FAIL_fn(lo_d)   ? 0 : lo_d.i;
+        z->hi   = IS_FAIL_fn(hi_d)   ? 0 : hi_d.i;
+        z->step = IS_FAIL_fn(step_d) ? 1 : step_d.i;
+        return (bb_node_t){ icn_bb_to_by, z, 0 };
+    }
+
+    /* ── E_ITERATE: (!str) ───────────────────────────────────────────────── */
+    if (e->kind == E_ITERATE && e->nchildren >= 1) {
+        DESCR_t sv = icn_interp_eval(e, e->children[0]);
+        icn_iterate_state_t *z = calloc(1, sizeof(*z));
+        if (!IS_FAIL_fn(sv) && sv.s) {
+            z->str = sv.s;
+            z->len = sv.slen > 0 ? sv.slen : (long)strlen(sv.s);
+        }
+        return (bb_node_t){ icn_bb_iterate, z, 0 };
+    }
+
+    /* ── E_FNC user proc — coroutine wrapper ─────────────────────────────── */
+    if (e->kind == E_FNC && e->nchildren >= 1 && e->children[0] && e->children[0]->sval) {
+        const char *fn = e->children[0]->sval;
+        int nargs = e->nchildren - 1;
+        for (int i = 0; i < icn_proc_count; i++) {
+            if (strcmp(icn_proc_table[i].name, fn) != 0) continue;
+            /* Build args array */
+            DESCR_t *args = nargs > 0 ? calloc(nargs, sizeof(DESCR_t)) : NULL;
+            for (int j = 0; j < nargs; j++)
+                args[j] = icn_interp_eval(e, e->children[1+j]);
+            /* Allocate suspend state + stack */
+            icn_suspend_state_t *ss = calloc(1, sizeof(*ss));
+            ss->stack       = malloc(256 * 1024);
+            ss->trampoline  = icn_proc_trampoline;
+            ss->trampoline_arg = NULL;   /* unused — trampoline reads icn_coro_stage */
+            /* Stage the call parameters before makecontext */
+            icn_coro_stage.ss    = ss;
+            icn_coro_stage.proc  = icn_proc_table[i].proc;
+            icn_coro_stage.args  = args;
+            icn_coro_stage.nargs = nargs;
+            return (bb_node_t){ icn_bb_suspend, ss, 0 };
+        }
+    }
+
+    /* ── Fallback: one-shot box wrapping icn_interp_eval ─────────────────── */
+    icn_oneshot_state_t *z = calloc(1, sizeof(*z));
+    z->val = icn_interp_eval(e, e);
+    return (bb_node_t){ icn_oneshot_box, z, 0 };
 }
 
 /* icn_execute_program_unified: entry point for Icon via unified interpreter.
