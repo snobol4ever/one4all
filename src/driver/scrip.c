@@ -381,7 +381,7 @@ int main(int argc, char **argv)
         label_table_build(prog);
         prescan_defines(prog);
         g_sno_err_active = 1;
-        int div_stmt = sync_monitor_run(prog, 1 /* verbose */);
+        int div_stmt = sync_monitor_run(prog, 1 /* verbose */, input_path);
         if (div_stmt != 0) {
             fprintf(stderr, "scrip --monitor: DIVERGE at stmt %d\n", div_stmt);
             return 1;

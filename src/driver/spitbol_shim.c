@@ -27,12 +27,10 @@
 #include <string.h>
 
 /*---------------------------------------------------------------------------
- * hshte — end-of-hash-table pointer.
- * Exported from sbl.asm ("global hshte") but absent from the C extern list
- * in osint.h. We declare it ourselves — it is a word-sized global that holds
- * the address one-past the last hash bucket, set during SPITBOL initialisation.
+ * hshte is not exported from sbl.asm. We use 'state' (end of static area)
+ * as the upper bound for the hash table walk — the table lies in [hshtb,state).
+ * 'state' IS exported and declared in osint.h extern list.
  *-------------------------------------------------------------------------*/
-extern word hshte;
 
 /*===========================================================================
  * 1. Per-statement hook — replaces zyspl() in osint/syspl.c
@@ -144,7 +142,7 @@ spl_nv_snapshot(SplNvPair **out)
      * Each bucket is one word — a pointer to the head vrblk of the chain
      * (or 0 if the bucket is empty).                                      */
     word  *bucket     = GET_MIN_VALUE(hshtb, word *);
-    word  *bucket_end = &hshte;         /* hshte IS the end pointer value  */
+    word  *bucket_end = GET_MIN_VALUE(state, word *);  /* state = end of static area >= hshte */
 
     /* Conservative upper bound: count vrblks first so we allocate once.   */
     int cap  = 64;
@@ -231,4 +229,100 @@ spl_nv_snapshot_free(SplNvPair *pairs, int n)
         free(pairs[i].val_str);
     }
     free(pairs);
+}
+
+/*===========================================================================
+ * 3. zysej() override — intercept SPITBOL's exit() call.
+ *
+ * In step mode the step hook longjmps out before zysej is reached.
+ * But if SPITBOL completes in fewer than step_limit statements zysej fires.
+ * We longjmp back to spitbol_run_steps() instead of calling exit().
+ *
+ * This definition shadows sysej.o in libspitbol.a because the shim object
+ * is linked before the archive on the command line.
+ *=========================================================================*/
+#include <setjmp.h>
+
+jmp_buf  g_spl_exit_jmp;
+int      g_spl_exit_armed = 0;
+volatile int g_spl_exit_code = 0;
+
+
+/* close_all — stub for in-process use (was in sysej.c alongside zysej).
+ * In step mode we do not need real file cleanup. */
+struct chfcb;   /* forward decl — full def in spitblks.h via port.h */
+void close_all(struct chfcb *chb) { (void)chb; }
+
+int
+zysej(void)
+{
+    g_spl_exit_code = WB(int);
+    if (g_spl_exit_armed) {
+        g_spl_exit_armed = 0;
+        longjmp(g_spl_exit_jmp, 1);
+    }
+    exit(g_spl_exit_code);
+}
+
+/*===========================================================================
+ * 4. spitbol_run_steps() — run SPITBOL to statement N, fill SplNvPair out.
+ *
+ * SPITBOL is not re-entrant: each call re-initialises globals and re-parses.
+ * O(N^2) for N statements — acceptable for small diagnostic programs.
+ *
+ * The step hook longjmps out at statement N; zysej longjmps out if SPITBOL
+ * finishes in fewer statements.
+ *
+ * Returns count of SplNvPairs (caller frees *out_pairs), or -1 on error.
+ *=========================================================================*/
+int spitbol_main(int argc, char **argv);  /* renamed via -Dmain=spitbol_main */
+
+static int   g_spl_step_target = 0;
+static jmp_buf g_spl_step_jmp;
+static int   g_spl_jumped = 0;   /* which longjmp fired */
+
+static void
+spl_inner_hook(int stno, void *arg)
+{
+    (void)arg;
+    if (stno >= g_spl_step_target) {
+        g_spl_jumped = 1;
+        longjmp(g_spl_step_jmp, 1);
+    }
+}
+
+int
+spitbol_run_steps(const char *sno_path, int step_limit,
+                  SplNvPair **out_pairs, int *out_count)
+{
+    *out_pairs = NULL;
+    *out_count = 0;
+
+    g_spl_step_target = step_limit;
+    g_spl_stno        = 0;
+    g_spl_step_hook   = spl_inner_hook;
+    g_spl_step_arg    = NULL;
+    g_spl_jumped      = 0;
+
+    /* Arm the exit intercept BEFORE setting the step jmp. */
+    g_spl_exit_armed  = 1;
+
+    /* argv: ["sbl", "-b", path]  (-b suppresses banner) */
+    char *spargv[4] = { (char *)"sbl", (char *)"-b", (char *)sno_path, NULL };
+
+    if (setjmp(g_spl_step_jmp) == 0) {
+        if (setjmp(g_spl_exit_jmp) == 0) {
+            spitbol_main(3, spargv);
+        }
+        /* landed from zysej (program finished early) */
+    }
+    /* landed from step hook OR zysej */
+
+    g_spl_exit_armed = 0;
+    g_spl_step_hook  = NULL;
+
+    int n = spl_nv_snapshot(out_pairs);
+    if (n < 0) { *out_pairs = NULL; *out_count = 0; return -1; }
+    *out_count = n;
+    return n;
 }

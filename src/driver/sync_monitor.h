@@ -74,6 +74,16 @@ void exec_snapshot_free(ExecSnapshot *s);
 struct Program_s;   /* forward decl — scrip_cc.h typedef'd as Program */
 typedef struct Program_s Program_im6_fwd;
 /* Use void* to avoid pulling in scrip_cc.h here; sync_monitor.c casts. */
-int sync_monitor_run(void *prog, int verbose);
+int sync_monitor_run(void *prog, int verbose, const char *sno_path);
+
+/* IM-15: SPITBOL in-process executor types and interface.
+ * SplNvPair — heap-allocated name/value from SPITBOL's vrblk hash table. */
+typedef struct { char *name; char *val_str; } SplNvPair;
+
+/* Run SPITBOL on sno_path to exactly step_limit statements, snapshot vars.
+ * Returns count written to *out_pairs (caller frees), or -1 on error. */
+int  spitbol_run_steps(const char *sno_path, int step_limit,
+                       SplNvPair **out_pairs, int *out_count);
+void spl_nv_snapshot_free(SplNvPair *pairs, int n);
 
 #endif /* SYNC_MONITOR_H */

@@ -35,6 +35,12 @@ WARN    := -w
 CBASE   := -O0 -g $(WARN) -I$(SRC) -I$(RT)/x86 -I$(RT) -I$(RT)/x86
 CRT     := $(CBASE) -I$(RT)/x86 -DDYN_ENGINE_LINKED
 LIBS    := -lgc -lm
+X64     := $(ROOT)/../x64
+SPL_A   := $(X64)/libspitbol.a
+# SPITBOL shim compile flags (matches build_spitbol_archive.sh)
+SPL_CC  := $(CC) -Dm64 -DEXTFUN=1 -m64 -no-pie -fPIC \
+           -mfpmath=sse -mlong-double-64 -ffloat-store \
+           -DENGINE=1 -I$(X64)/osint -w
 
 # Runner defaults
 SNO          ?= $(error SNO is required — e.g. make run SNO=prog.sno)
@@ -115,9 +121,10 @@ scrip:
 	$(CC) $(CRT)   -c $(RT)/x86/sm_codegen.c -o $(OBJ)/sm_codegen.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp.c  -o $(OBJ)/interp.o
 	$(CC) $(CRT)   -c $(SRC)/driver/sync_monitor.c -o $(OBJ)/sync_monitor.o
+	$(SPL_CC)          -c $(SRC)/driver/spitbol_shim.c -o /tmp/spl_shim.o
 	$(CC) $(CRT)   -c $(SRC)/driver/polyglot.c -o $(OBJ)/polyglot.o
 	$(CC) $(CRT)   -c $(SRC)/driver/scrip.c  -o $(OBJ)/scrip_driver.o
-	$(CC) $(OBJ)/*.o $(LIBS) -o scrip
+	$(CC) -m64 -no-pie /tmp/spl_shim.o $(OBJ)/*.o $(SPL_A) $(LIBS) -o scrip
 	@echo "Built: scrip"
 
 # backward-compat symlink

@@ -23,6 +23,8 @@
 #include "frontend/snobol4/scrip_cc.h"  /* Program, STMT_t */
 #include "frontend/prolog/term.h"        /* IM-11: Term, TT_REF, term_deref */
 #include "frontend/prolog/prolog_atom.h" /* IM-11: prolog_atom_name */
+/* IM-15: SPITBOL in-process executor (spitbol_shim.c) */
+/* SplNvPair + spitbol_run_steps declared in sync_monitor.h */
 
 /*------------------------------------------------------------------------
  * exec_snapshot_take — capture current mutable state
@@ -266,7 +268,7 @@ static int snap_diff(const ExecSnapshot *a, const char *a_name,
  *
  * verbose: 0=silent on agreement, 1=print per-stmt progress, 2=full diff.
  *----------------------------------------------------------------------*/
-int sync_monitor_run(void *prog_arg, int verbose) {
+int sync_monitor_run(void *prog_arg, int verbose, const char *sno_path) {
     Program *prog = (Program *)prog_arg;
     /* ── Build SM_Program once ── */
     SM_Program *sm_prog = sm_lower(prog);
@@ -303,6 +305,8 @@ int sync_monitor_run(void *prog_arg, int verbose) {
         ExecSnapshot ir_snap  = {0};
         ExecSnapshot sm_snap  = {0};
         ExecSnapshot jit_snap = {0};
+        SplNvPair   *spl_pairs = NULL;
+        int          spl_count = 0;
 
         /* ── IR run to step n ── */
         exec_snapshot_restore(&baseline);
@@ -330,12 +334,37 @@ int sync_monitor_run(void *prog_arg, int verbose) {
         label_path_append(&sm_path,  lbl_n);
         label_path_append(&jit_path, lbl_n);
 
+        /* ── SPITBOL run to step n (IM-15) ── */
+        if (sno_path) {
+            exec_snapshot_restore(&baseline);
+            spitbol_run_steps(sno_path, n, &spl_pairs, &spl_count);
+        }
+
         /* ── Compare ── */
         int ir_sm      = snap_diff(&ir_snap, "IR", &sm_snap,  "SM",  0);
         int ir_jit     = snap_diff(&ir_snap, "IR", &jit_snap, "JIT", 0);
         int ok_diverge = (sm_snap.last_ok != jit_snap.last_ok);
+        /* IM-15: compare SPITBOL NV snapshot against IR NV snapshot */
+        int ir_spl = 0;
+        if (sno_path && spl_pairs) {
+            for (int si = 0; si < spl_count; si++) {
+                /* find matching name in ir_snap.nv_pairs */
+                int found = 0;
+                for (int ii = 0; ii < ir_snap.nv_count; ii++) {
+                    if (strcmp(ir_snap.nv_pairs[ii].name, spl_pairs[si].name) == 0) {
+                        found = 1;
+                        char ir_buf[256];
+                        const char *iv = VARVAL_fn(ir_snap.nv_pairs[ii].val);
+                        if (!iv) iv = "";
+                        if (strcmp(iv, spl_pairs[si].val_str) != 0)
+                            ir_spl++;
+                        break;
+                    }
+                }
+            }
+        }
 
-        if (ir_sm || ir_jit || ok_diverge) {
+        if (ir_sm || ir_jit || ok_diverge || ir_spl) {
             /* IM-8: rich diverge header — stmt, label, line */
             const char *hdr_lbl = ir_labels[n] ? ir_labels[n] : "-";
             int lineno = 0;
@@ -389,6 +418,22 @@ int sync_monitor_run(void *prog_arg, int verbose) {
             if (ok_diverge && !ir_sm && !ir_jit)
                 fprintf(stderr, "  SM last_ok=%d vs JIT last_ok=%d (NV agrees)\n",
                         sm_snap.last_ok, jit_snap.last_ok);
+            /* IM-15: SPITBOL divergence report */
+            if (ir_spl) {
+                fprintf(stderr, "  IR vs SPL (%d var(s) differ):\n", ir_spl);
+                for (int si = 0; si < spl_count; si++) {
+                    for (int ii = 0; ii < ir_snap.nv_count; ii++) {
+                        if (strcmp(ir_snap.nv_pairs[ii].name, spl_pairs[si].name) == 0) {
+                            const char *iv = VARVAL_fn(ir_snap.nv_pairs[ii].val);
+                            if (!iv) iv = "";
+                            if (strcmp(iv, spl_pairs[si].val_str) != 0)
+                                fprintf(stderr, "    %-16s  IR=%-20s  SPL=%s\n",
+                                        spl_pairs[si].name, iv, spl_pairs[si].val_str);
+                            break;
+                        }
+                    }
+                }
+            }
             diverge_at = n;
             exec_snapshot_free(&ir_snap);
             exec_snapshot_free(&sm_snap);
@@ -397,11 +442,12 @@ int sync_monitor_run(void *prog_arg, int verbose) {
         }
 
         if (verbose >= 1)
-            fprintf(stderr, "  stmt %4d/%d: IR=SM=JIT agree\n", n, nstmts);
+            fprintf(stderr, "  stmt %4d/%d: IR=SM=JIT=SPL agree\n", n, nstmts);
 
         exec_snapshot_free(&ir_snap);
         exec_snapshot_free(&sm_snap);
         exec_snapshot_free(&jit_snap);
+        spl_nv_snapshot_free(spl_pairs, spl_count); spl_pairs = NULL;
     }
 
     if (!diverge_at && verbose >= 1)

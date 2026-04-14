@@ -78,6 +78,7 @@ done
 # err.asm  — error message table
 ASM_OBJS=""
 for asm in sbl.asm err.asm; do
+    # (int.asm assembled separately — lives in x64/ root not bootstrap/)
     src="$X64/bootstrap/$asm"
     if [ ! -f "$src" ]; then
         echo "FAIL  missing $src"
@@ -89,6 +90,12 @@ for asm in sbl.asm err.asm; do
     nasm -f elf64 -d m64 "$src" -o "$obj"
     ASM_OBJS="$ASM_OBJS $obj"
 done
+
+# ── assemble int.asm (register globals — lives in x64/ root) ──────────────
+INT_OBJ="$BUILD/int_reg.o"
+echo "  ASM int.asm"
+nasm -f elf64 -d m64 "$X64/int.asm" -o "$INT_OBJ"
+ASM_OBJS="$ASM_OBJS $INT_OBJ"
 
 # ── archive ───────────────────────────────────────────────────────────────────
 echo "  AR  $OUT"
