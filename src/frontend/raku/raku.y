@@ -154,6 +154,7 @@ static void add_proc(EXPR_t *e) {
 %token KW_MY KW_SAY KW_PRINT KW_IF KW_ELSE KW_ELSIF KW_WHILE KW_FOR
 %token KW_SUB KW_GATHER KW_TAKE KW_RETURN
 %token KW_GIVEN KW_WHEN KW_DEFAULT
+%token KW_EXISTS KW_DELETE
 
 %token OP_RANGE OP_RANGE_EX
 %token OP_ARROW
@@ -244,6 +245,12 @@ stmt
     | VAR_HASH '{' expr '}' '=' expr ';'
         { EXPR_t *c=make_call("hash_set");
           expr_add_child(c,var_node($1)); expr_add_child(c,$3); expr_add_child(c,$6); $$=c; }
+    | KW_DELETE VAR_HASH '<' IDENT '>' ';'
+        { EXPR_t *c=make_call("hash_delete");
+          expr_add_child(c,var_node($2)); expr_add_child(c,leaf_sval(E_QLIT,$4)); $$=c; }
+    | KW_DELETE VAR_HASH '{' expr '}' ';'
+        { EXPR_t *c=make_call("hash_delete");
+          expr_add_child(c,var_node($2)); expr_add_child(c,$4); $$=c; }
     | expr ';'          { $$=$1; }
     | if_stmt           { $$=$1; }
     | while_stmt        { $$=$1; }
@@ -418,12 +425,17 @@ atom
     | LIT_INTERP_STR  { $$=lower_interp_str($1); }
     | VAR_SCALAR      { $$=var_node($1); }
     | VAR_ARRAY       { $$=var_node($1); }
+    | VAR_HASH        { $$=var_node($1); }
     | VAR_ARRAY '[' expr ']'
         { EXPR_t *c=make_call("arr_get"); expr_add_child(c,var_node($1)); expr_add_child(c,$3); $$=c; }
     | VAR_HASH '<' IDENT '>'
         { EXPR_t *c=make_call("hash_get"); expr_add_child(c,var_node($1)); expr_add_child(c,leaf_sval(E_QLIT,$3)); $$=c; }
     | VAR_HASH '{' expr '}'
         { EXPR_t *c=make_call("hash_get"); expr_add_child(c,var_node($1)); expr_add_child(c,$3); $$=c; }
+    | KW_EXISTS VAR_HASH '<' IDENT '>'
+        { EXPR_t *c=make_call("hash_exists"); expr_add_child(c,var_node($2)); expr_add_child(c,leaf_sval(E_QLIT,$4)); $$=c; }
+    | KW_EXISTS VAR_HASH '{' expr '}'
+        { EXPR_t *c=make_call("hash_exists"); expr_add_child(c,var_node($2)); expr_add_child(c,$4); $$=c; }
     | IDENT           { $$=var_node($1); }
     | '(' expr ')'    { $$=$2; }
     ;

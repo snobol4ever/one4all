@@ -60,6 +60,8 @@ WS       [ \t\r]
 "gather"        { return KW_GATHER; }
 "take"          { return KW_TAKE; }
 "return"        { return KW_RETURN; }
+"exists"        { return KW_EXISTS; }
+"delete"        { return KW_DELETE; }
 "True"          { raku_yylval.ival = 1; return LIT_INT; }
 "False"         { raku_yylval.ival = 0; return LIT_INT; }
 "eq"            { return OP_SEQ; }

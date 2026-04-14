@@ -94,7 +94,8 @@ done
 # ── assemble int.asm (register globals — lives in x64/ root) ──────────────
 INT_OBJ="$BUILD/int_reg.o"
 echo "  ASM int.asm"
-nasm -f elf64 -d m64 "$X64/int.asm" -o "$INT_OBJ"
+# Must cd into $X64 so nasm resolves %include "int.h" relative to source
+( cd "$X64" && nasm -f elf64 -d m64 int.asm -o "$INT_OBJ" )
 ASM_OBJS="$ASM_OBJS $INT_OBJ"
 
 # ── archive ───────────────────────────────────────────────────────────────────

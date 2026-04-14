@@ -881,8 +881,10 @@ DESCR_t interp_eval(EXPR_t *e)
             if ((!strcmp(fn,"hash_set") && nargs == 3) ||
                 (!strcmp(fn,"hash_get") && nargs == 2) ||
                 (!strcmp(fn,"hash_exists") && nargs == 2) ||
+                (!strcmp(fn,"hash_delete") && nargs == 2) ||
                 (!strcmp(fn,"hash_keys") && nargs == 1) ||
-                (!strcmp(fn,"hash_values") && nargs == 1)) {
+                (!strcmp(fn,"hash_values") && nargs == 1) ||
+                (!strcmp(fn,"hash_pairs") && nargs == 1)) {
                 DESCR_t hd = interp_eval(e->children[1]);
                 const char *hs = (hd.v==DT_S||hd.v==DT_SNUL) ? (hd.s?hd.s:"") : "";
                 if (!strcmp(fn,"hash_set")) {
@@ -955,6 +957,51 @@ DESCR_t interp_eval(EXPR_t *e)
                         }
                         if (!end) break; p=end+1;
                     }
+                    return STRVAL(out);
+                }
+                if (!strcmp(fn,"hash_pairs")) {
+                    if (!*hs) { char *e2=GC_malloc(1); e2[0]='\0'; return STRVAL(e2); }
+                    char *out=GC_malloc(strlen(hs)*2+4); out[0]='\0';
+                    const char *p=hs;
+                    while (*p) {
+                        const char *sep=strchr(p,HK); const char *end=strchr(p,HS);
+                        if (!sep) break;
+                        if (out[0]) { size_t ol=strlen(out); out[ol]='\x01'; out[ol+1]='\0'; }
+                        size_t kl=(size_t)(sep-p);
+                        const char *vs=sep+1;
+                        size_t vl=end?(size_t)(end-vs):strlen(vs);
+                        size_t ol=strlen(out);
+                        memcpy(out+ol,p,kl); ol+=kl;
+                        out[ol++]=':';
+                        memcpy(out+ol,vs,vl); ol+=vl;
+                        out[ol]='\0';
+                        if (!end) break; p=end+1;
+                    }
+                    return STRVAL(out);
+                }
+                if (!strcmp(fn,"hash_delete")) {
+                    DESCR_t kd = interp_eval(e->children[2]);
+                    char kb[64];
+                    const char *ks = IS_INT_fn(kd)  ? (snprintf(kb,sizeof kb,"%lld",(long long)kd.i),kb)
+                                   : IS_REAL_fn(kd) ? (snprintf(kb,sizeof kb,"%g",kd.r),kb)
+                                   : (kd.s&&*kd.s?kd.s:"");
+                    size_t kl=strlen(ks);
+                    char *out=GC_malloc(strlen(hs)+2); out[0]='\0';
+                    const char *p=hs;
+                    while (*p) {
+                        const char *sep=strchr(p,HK); const char *end=strchr(p,HS);
+                        if (!sep) break;
+                        size_t pkl=(size_t)(sep-p);
+                        if (pkl!=kl || memcmp(p,ks,kl)!=0) {
+                            if (out[0]) { size_t ol=strlen(out); out[ol]=HS; out[ol+1]='\0'; }
+                            size_t plen=end?(size_t)(end-p):strlen(p);
+                            strncat(out,p,plen);
+                        }
+                        if (!end) break; p=end+1;
+                    }
+                    if (e->children[1]->kind==E_VAR && e->children[1]->ival>=0 &&
+                        e->children[1]->ival<ICN_CUR.env_n && icn_frame_depth>0)
+                        ICN_CUR.env[e->children[1]->ival] = STRVAL(out);
                     return STRVAL(out);
                 }
             }
