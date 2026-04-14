@@ -344,6 +344,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
     case E_FLIT:
         sm_emit_f(p, SM_PUSH_LIT_F, e->dval);
         return;
+    case E_NULL:
     case E_NUL:
         sm_emit(p, SM_PUSH_NULL);
         return;
@@ -553,12 +554,6 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
      * Prolog nodes     → SM_PUSH_EXPR + SM_BB_ONCE.
      * ══════════════════════════════════════════════════════════════════════ */
 
-    /* ── Null / void values ─────────────────────────────────────────────── */
-    case E_NULL:
-    case E_NULV:
-        sm_emit(p, SM_PUSH_NULL);
-        return;
-
     /* ── Sequential expression list: eval all, leave last on stack ─────── */
     case E_SEQ_EXPR:
         if (e->nchildren == 0) { sm_emit(p, SM_PUSH_NULL); return; }
@@ -660,33 +655,6 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         return;
     }
 
-    /* ── alternation: try left, if fail try right ───────────────────────── */
-    case E_OR: {
-        if (e->nchildren < 1) { sm_emit(p, SM_PUSH_NULL); return; }
-        lower_expr(p, lt, e->children[0]);
-        int js = sm_emit_i(p, SM_JUMP_S, 0);   /* left succeeded → done */
-        sm_emit(p, SM_POP);
-        if (e->nchildren > 1) lower_expr(p, lt, e->children[1]);
-        else sm_emit(p, SM_PUSH_NULL);
-        int end_lbl = sm_label(p);
-        sm_patch_jump(p, js, end_lbl);
-        return;
-    }
-
-    /* ── Icon := assignment (same semantics as E_ASSIGN) ───────────────── */
-    case E_ASGN:
-        lower_expr(p, lt, e->nchildren > 1 ? e->children[1] : NULL);
-        if (e->nchildren > 0 && e->children[0]) {
-            const EXPR_t *lhs = e->children[0];
-            if (lhs->kind == E_VAR || lhs->kind == E_KEYWORD)
-                sm_emit_s(p, SM_STORE_VAR, lhs->sval ? lhs->sval : "");
-            else {
-                lower_expr(p, lt, lhs);
-                sm_emit_si(p, SM_CALL, "ASGN", 2);
-            }
-        }
-        return;
-
     /* ── augmented assignment (+=, -=, ||=, etc.) ──────────────────────── */
     case E_AUGOP:
         lower_expr(p, lt, e->nchildren > 0 ? e->children[0] : NULL);
@@ -746,9 +714,6 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
     /* ── declarative / init nodes — no runtime action at expression level ─ */
     case E_GLOBAL:
     case E_INITIAL:
-    case E_VART:
-    case E_NAM:
-    case E_ARY:
         sm_emit(p, SM_PUSH_NULL);
         return;
 
@@ -763,16 +728,10 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
     case E_TO:
     case E_TO_BY:
     case E_SUSPEND:
-    case E_ALT_GEN:
-    case E_STAR:
-    case E_BANG:
     case E_BANG_BINARY:
     case E_LCONCAT:
     case E_LIMIT:
     case E_RANDOM:
-    case E_EXPOP:
-    case E_DOL:
-    case E_ATP:
     case E_SECTION:
     case E_SECTION_MINUS:
     case E_SECTION_PLUS:

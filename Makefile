@@ -101,6 +101,13 @@ scrip:
 	$(CC) $(CBASE) -I$(SRC)/frontend/snobol4 -I$(SRC)/frontend/raku -c $(SRC)/frontend/raku/raku.tab.c    -o $(OBJ)/raku.tab.o
 	$(CC) $(CBASE) -I$(SRC)/frontend/snobol4 -I$(SRC)/frontend/raku -c $(SRC)/frontend/raku/raku.lex.c    -o $(OBJ)/raku.lex.o
 	$(CC) $(CBASE) -I$(SRC)/frontend/snobol4 -I$(SRC)/frontend/raku -c $(SRC)/frontend/raku/raku_driver.c -o $(OBJ)/raku_driver.o
+	$(CC) $(CBASE) -I$(SRC)/frontend/snobol4 -c $(SRC)/frontend/rebus/rebus.tab.c    -o $(OBJ)/rebus.tab.o
+	$(CC) $(CBASE) -I$(SRC)/frontend/snobol4 -c $(SRC)/frontend/rebus/lex.rebus.c    -o $(OBJ)/lex.rebus.o
+	$(CC) $(CBASE) -I$(SRC)/frontend/snobol4 -c $(SRC)/frontend/rebus/rebus_lower.c  -o $(OBJ)/rebus_lower.o
+	$(CC) $(CBASE) -I$(SRC)/frontend/snobol4 -c $(SRC)/frontend/rebus/rebus_emit.c   -o $(OBJ)/rebus_emit.o
+	$(CC) $(CBASE) -I$(SRC)/frontend/snobol4 -c $(SRC)/frontend/rebus/rebus_print.c  -o $(OBJ)/rebus_print.o
+	$(CC) $(CRT)   -c $(SRC)/runtime/interp/icn_runtime.c -o $(OBJ)/icn_runtime.o
+	$(CC) $(CRT)   -c $(SRC)/runtime/interp/pl_runtime.c  -o $(OBJ)/pl_runtime.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_prog.c    -o $(OBJ)/sm_prog.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_interp.c  -o $(OBJ)/sm_interp.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_lower.c   -o $(OBJ)/sm_lower.o
