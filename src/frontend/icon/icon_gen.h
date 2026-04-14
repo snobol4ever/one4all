@@ -105,14 +105,71 @@ typedef struct {
 } icn_alternate_state_t;
 
 /*----------------------------------------------------------------------------------------------------------------------------
- * icn_eval_gen — walk an EXPR_t tree and return a bb_node_t.
- * Declared here; implemented in scrip.c (B-8) where interp_eval and proc tables are visible.
- * Uses EXPR_t* — callers must have ir.h in scope.
+ * Forward declaration of EXPR_t needed by IC-2b state structs below.
+ * When ir.h is already included this is a harmless redundant typedef.
  *--------------------------------------------------------------------------------------------------------------------------*/
 #ifndef EXPR_T_DEFINED
 #define EXPR_T_DEFINED
-typedef struct EXPR_t EXPR_t;  /* minimal forward when ir.h not yet included */
+typedef struct EXPR_t EXPR_t;
 #endif
+
+/*----------------------------------------------------------------------------------------------------------------------------
+ * icn_bb_limit — E_LIMIT Byrd box  (gen \ N)   IC-2b
+ *
+ * Drives inner generator, yields each value, stops after N ticks.
+ * State: gen (inner box), max (limit count), count (ticks so far).
+ *--------------------------------------------------------------------------------------------------------------------------*/
+typedef struct {
+    bb_node_t gen;
+    long      max;
+    long      count;
+} icn_limit_state_t;
+DESCR_t icn_bb_limit(void *zeta, int entry);
+
+/*----------------------------------------------------------------------------------------------------------------------------
+ * icn_bb_every — E_EVERY Byrd box  (every gen [do body])   IC-2b
+ *
+ * Drives inner generator to exhaustion; evaluates body EXPR_t* per tick.
+ * body may be NULL (bare "every gen" — just drives gen to exhaustion for side effects).
+ * Yields body result (or gen value if no body) per tick.
+ * State: gen (inner box), body (EXPR_t*), started flag.
+ *--------------------------------------------------------------------------------------------------------------------------*/
+typedef struct {
+    bb_node_t  gen;
+    EXPR_t    *body;   /* may be NULL */
+    int        started;
+} icn_every_state_t;
+DESCR_t icn_bb_every(void *zeta, int entry);
+
+/*----------------------------------------------------------------------------------------------------------------------------
+ * icn_bb_bang_binary — E_BANG_BINARY Byrd box  (E1 ! E2)   IC-2b
+ *
+ * Invoke E1 (a procedure EXPR_t*) with successive values from E2 (a generator).
+ * E1 is re-evaluated for each value produced by E2.
+ * State: proc_expr (E_FNC EXPR_t*), arg_box (generator for E2), current arg DESCR_t.
+ *--------------------------------------------------------------------------------------------------------------------------*/
+typedef struct {
+    EXPR_t   *proc_expr;   /* E1 — the callable */
+    bb_node_t arg_box;     /* E2 — the argument generator */
+    DESCR_t   cur_arg;     /* current argument value */
+} icn_bang_binary_state_t;
+DESCR_t icn_bb_bang_binary(void *zeta, int entry);
+
+/*----------------------------------------------------------------------------------------------------------------------------
+ * icn_bb_seq_expr — E_SEQ_EXPR Byrd box  (E1; E2; …; En)   IC-2b
+ *
+ * Evaluates each child in order; result = last child.
+ * If last child is a generator, its values are forwarded.
+ * State: children array, count, last-child box.
+ *--------------------------------------------------------------------------------------------------------------------------*/
+typedef struct {
+    EXPR_t   **children;   /* pointer into the E_SEQ_EXPR EXPR_t children array */
+    int        n;
+    bb_node_t  last_box;   /* generator box for last child (may be oneshot) */
+    int        started;
+} icn_seq_state_t;
+DESCR_t icn_bb_seq_expr(void *zeta, int entry);
+
 bb_node_t icn_eval_gen(EXPR_t *e);
 
 #endif /* ICON_GEN_H */

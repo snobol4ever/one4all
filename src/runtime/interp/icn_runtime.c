@@ -555,6 +555,39 @@ bb_node_t icn_eval_gen(EXPR_t *e) {
         }
     }
 
+    /* ── IC-2b: E_LIMIT  (gen \ N) ──────────────────────────────────────── */
+    if (e->kind == E_LIMIT && e->nchildren >= 2) {
+        icn_limit_state_t *z = calloc(1, sizeof(*z));
+        z->gen = icn_eval_gen(e->children[0]);
+        DESCR_t nd = interp_eval(e->children[1]);
+        z->max = IS_INT_fn(nd) ? nd.i : 0;
+        return (bb_node_t){ icn_bb_limit, z, 0 };
+    }
+
+    /* ── IC-2b: E_EVERY  (every gen [do body]) ──────────────────────────── */
+    if (e->kind == E_EVERY && e->nchildren >= 1) {
+        icn_every_state_t *z = calloc(1, sizeof(*z));
+        z->gen  = icn_eval_gen(e->children[0]);
+        z->body = (e->nchildren >= 2) ? e->children[1] : NULL;
+        return (bb_node_t){ icn_bb_every, z, 0 };
+    }
+
+    /* ── IC-2b: E_BANG_BINARY  (E1 ! E2) ────────────────────────────────── */
+    if (e->kind == E_BANG_BINARY && e->nchildren >= 2) {
+        icn_bang_binary_state_t *z = calloc(1, sizeof(*z));
+        z->proc_expr = e->children[0];
+        z->arg_box   = icn_eval_gen(e->children[1]);
+        return (bb_node_t){ icn_bb_bang_binary, z, 0 };
+    }
+
+    /* ── IC-2b: E_SEQ_EXPR  ((E1; E2; …; En)) ───────────────────────────── */
+    if (e->kind == E_SEQ_EXPR && e->nchildren >= 1) {
+        icn_seq_state_t *z = calloc(1, sizeof(*z));
+        z->children = e->children;
+        z->n        = e->nchildren;
+        return (bb_node_t){ icn_bb_seq_expr, z, 0 };
+    }
+
     /* ── Fallback: one-shot box wrapping interp_eval ─────────────────────── */
     icn_oneshot_state_t *z = calloc(1, sizeof(*z));
     z->val = interp_eval(e);
@@ -664,4 +697,95 @@ int icn_drive_fnc(EXPR_t *e) {
 
     icn_frame_depth--;
     return ticks;
+}
+
+/*============================================================================================================================
+ * IC-2b: Four missing GDE ops as BB boxes.
+ * Live here (not icon_gen.c) because they need interp_eval / icn_scan_*.
+ * E_SCAN is intentionally absent: it is the same IR node as SNOBOL4 matching,
+ * already handled correctly by the oneshot fallback in icn_eval_gen.
+ *============================================================================================================================*/
+
+/*----------------------------------------------------------------------------------------------------------------------------
+ * icn_bb_limit — E_LIMIT  (gen \ N)
+ * α: pump inner gen α; count=1; return value if count<=max.
+ * β: if count>=max → ω; pump inner gen β; if ω → ω; count++; return value.
+ *--------------------------------------------------------------------------------------------------------------------------*/
+DESCR_t icn_bb_limit(void *zeta, int entry) {
+    icn_limit_state_t *z = (icn_limit_state_t *)zeta;
+    if (z->max <= 0) return FAILDESCR;
+    DESCR_t v;
+    if (entry == α) {
+        z->count = 0;
+        v = z->gen.fn(z->gen.ζ, α);
+    } else {
+        if (z->count >= z->max) return FAILDESCR;
+        v = z->gen.fn(z->gen.ζ, β);
+    }
+    if (IS_FAIL_fn(v)) return FAILDESCR;
+    z->count++;
+    if (z->count > z->max) return FAILDESCR;
+    return v;
+}
+
+/*----------------------------------------------------------------------------------------------------------------------------
+ * icn_bb_every — E_EVERY  (every gen [do body])
+ * α: pump gen α → if γ eval body → return gen value.
+ * β: pump gen β → if ω → ω → if γ eval body → return gen value.
+ * body may be NULL (bare "every gen" for side effects).
+ *--------------------------------------------------------------------------------------------------------------------------*/
+DESCR_t icn_bb_every(void *zeta, int entry) {
+    icn_every_state_t *z = (icn_every_state_t *)zeta;
+    DESCR_t v = (entry == α)
+        ? z->gen.fn(z->gen.ζ, α)
+        : z->gen.fn(z->gen.ζ, β);
+    if (IS_FAIL_fn(v)) return FAILDESCR;
+    if (z->body) interp_eval(z->body);
+    return v;
+}
+
+/*----------------------------------------------------------------------------------------------------------------------------
+ * icn_bb_bang_binary — E_BANG_BINARY  (E1 ! E2)
+ * Call procedure/expression E1 with each successive value from E2 generator.
+ * α: pump E2 α → call E1(arg). β: pump E2 β → call E1(arg).
+ * If E1 fails on an arg, skip to next (goal-directed).
+ *--------------------------------------------------------------------------------------------------------------------------*/
+DESCR_t icn_bb_bang_binary(void *zeta, int entry) {
+    icn_bang_binary_state_t *z = (icn_bang_binary_state_t *)zeta;
+    int is_first = (entry == α);
+    for (;;) {
+        DESCR_t arg = z->arg_box.fn(z->arg_box.ζ, is_first ? α : β);
+        is_first = 0;
+        if (IS_FAIL_fn(arg)) return FAILDESCR;
+        z->cur_arg = arg;
+        if (!z->proc_expr) return FAILDESCR;
+        /* Inject arg as result of first argument child via drive passthrough */
+        if (z->proc_expr->nchildren >= 2 && z->proc_expr->children[1]) {
+            icn_drive_node = z->proc_expr->children[1];
+            icn_drive_val  = arg;
+        }
+        DESCR_t result = interp_eval(z->proc_expr);
+        icn_drive_node = NULL;
+        if (!IS_FAIL_fn(result)) return result;
+        /* E1 failed — try next E2 value */
+    }
+}
+
+/*----------------------------------------------------------------------------------------------------------------------------
+ * icn_bb_seq_expr — E_SEQ_EXPR  ((E1; E2; …; En))
+ * α: eval E1..E(n-1) for side effects; build last_box from En; pump last_box α.
+ * β: pump last_box β.
+ *--------------------------------------------------------------------------------------------------------------------------*/
+DESCR_t icn_bb_seq_expr(void *zeta, int entry) {
+    icn_seq_state_t *z = (icn_seq_state_t *)zeta;
+    if (entry == α) {
+        for (int i = 0; i < z->n - 1; i++)
+            if (z->children[i]) interp_eval(z->children[i]);
+        if (z->n <= 0 || !z->children[z->n - 1]) return FAILDESCR;
+        z->last_box = icn_eval_gen(z->children[z->n - 1]);
+        z->started  = 1;
+        return z->last_box.fn(z->last_box.ζ, α);
+    }
+    if (!z->started) return FAILDESCR;
+    return z->last_box.fn(z->last_box.ζ, β);
 }
