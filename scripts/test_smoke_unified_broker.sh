@@ -251,6 +251,26 @@ echo "$RAKU_OUT" | grep -E "^PASS|^FAIL|^SKIP" | sed 's/^/  /'
 PASS=$((PASS + RAKU_PASS))
 FAIL=$((FAIL + RAKU_FAIL))
 
+# ── OE-12: --sm-run polyglot smoke test ──────────────────────────────────────
+echo "=== --sm-run polyglot (OE-12) ==="
+SMRUN_FILE="$ROOT/test/test_shared_nv.scrip"
+SMRUN_REF="$ROOT/test/test_shared_nv.ref"
+if [ -f "$SMRUN_FILE" ] && [ -f "$SMRUN_REF" ]; then
+    actual=$(timeout 8 "$SCRIP" --sm-run "$SMRUN_FILE" 2>/dev/null)
+    expected=$(cat "$SMRUN_REF")
+    if [ "$actual" = "$expected" ]; then
+        echo "  PASS --sm-run test_shared_nv.scrip (polyglot routes to polyglot_execute)"
+        PASS=$((PASS+1))
+    else
+        echo "  FAIL --sm-run test_shared_nv.scrip"
+        printf "       exp: %s\n" "$(printf '%s' "$expected" | head -6)"
+        printf "       got: %s\n" "$(printf '%s' "$actual"   | head -6)"
+        FAIL=$((FAIL+1))
+    fi
+else
+    echo "  SKIP --sm-run polyglot test (file not found)"
+fi
+
 # ── Result ───────────────────────────────────────────────────────────────────
 echo ""
 echo "PASS=$PASS FAIL=$FAIL"
