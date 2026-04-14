@@ -1339,6 +1339,88 @@ static DESCR_t interp_eval(EXPR_t *e)
                     return icn_call_proc(icn_proc_table[i].proc,args,nargs);
                 }
             }
+            /* RK-14: array builtins — arrays stored as \x01-separated strings */
+            if (!strcmp(fn,"push") && nargs == 2) {
+                DESCR_t arr = interp_eval(e->children[1]);
+                DESCR_t val = interp_eval(e->children[2]);
+                char vbuf[64]; const char *vs;
+                if (IS_INT_fn(val))       { snprintf(vbuf,sizeof vbuf,"%lld",(long long)val.i); vs=vbuf; }
+                else if (IS_REAL_fn(val)) { snprintf(vbuf,sizeof vbuf,"%g",val.r); vs=vbuf; }
+                else vs = (val.s && *val.s) ? val.s : "";
+                const char *as = (arr.v==DT_S||arr.v==DT_SNUL) ? (arr.s?arr.s:"") : "";
+                size_t al=strlen(as), vl=strlen(vs);
+                char *buf;
+                if (al == 0) { buf=GC_malloc(vl+1); memcpy(buf,vs,vl+1); }
+                else { buf=GC_malloc(al+1+vl+1); memcpy(buf,as,al); buf[al]='\x01'; memcpy(buf+al+1,vs,vl+1); }
+                if (e->children[1]->kind==E_VAR && e->children[1]->ival>=0 &&
+                    e->children[1]->ival<ICN_CUR.env_n && icn_frame_depth>0)
+                    ICN_CUR.env[e->children[1]->ival] = STRVAL(buf);
+                return STRVAL(buf);
+            }
+            if (!strcmp(fn,"elems") && nargs == 1) {
+                DESCR_t arr = interp_eval(e->children[1]);
+                const char *as = (arr.v==DT_S||arr.v==DT_SNUL) ? (arr.s?arr.s:"") : "";
+                if (!*as) return INTVAL(0);
+                long cnt = 1;
+                for (const char *p=as; *p; p++) if (*p=='\x01') cnt++;
+                return INTVAL(cnt);
+            }
+            if (!strcmp(fn,"pop") && nargs == 1) {
+                DESCR_t arr = interp_eval(e->children[1]);
+                const char *as = (arr.v==DT_S||arr.v==DT_SNUL) ? (arr.s?arr.s:"") : "";
+                if (!*as) return FAILDESCR;
+                char *buf = GC_malloc(strlen(as)+1); strcpy(buf, as);
+                char *last = strrchr(buf, '\x01');
+                char *popped;
+                if (last) { popped=GC_malloc(strlen(last+1)+1); strcpy(popped,last+1); *last='\0'; }
+                else       { popped=GC_malloc(strlen(buf)+1);   strcpy(popped,buf);    buf[0]='\0'; }
+                if (e->children[1]->kind==E_VAR && e->children[1]->ival>=0 &&
+                    e->children[1]->ival<ICN_CUR.env_n && icn_frame_depth>0)
+                    ICN_CUR.env[e->children[1]->ival] = STRVAL(buf);
+                return STRVAL(popped);
+            }
+            if (!strcmp(fn,"arr_get") && nargs == 2) {
+                DESCR_t arr = interp_eval(e->children[1]);
+                DESCR_t idx = interp_eval(e->children[2]);
+                const char *as = (arr.v==DT_S||arr.v==DT_SNUL) ? (arr.s?arr.s:"") : "";
+                long i = IS_INT_fn(idx) ? idx.i : 0;
+                long cur = 0; const char *seg = as;
+                while (cur < i) {
+                    const char *nx = strchr(seg, '\x01');
+                    if (!nx) return FAILDESCR;
+                    seg = nx+1; cur++;
+                }
+                const char *end = strchr(seg, '\x01');
+                size_t len = end ? (size_t)(end-seg) : strlen(seg);
+                char *out = GC_malloc(len+1); memcpy(out,seg,len); out[len]='\0';
+                return STRVAL(out);
+            }
+            if (!strcmp(fn,"arr_set") && nargs == 3) {
+                DESCR_t arr = interp_eval(e->children[1]);
+                DESCR_t idx = interp_eval(e->children[2]);
+                DESCR_t val = interp_eval(e->children[3]);
+                const char *as = (arr.v==DT_S||arr.v==DT_SNUL) ? (arr.s?arr.s:"") : "";
+                long target = IS_INT_fn(idx) ? idx.i : 0;
+                char vbuf[64]; const char *vs;
+                if (IS_INT_fn(val)) { snprintf(vbuf,sizeof vbuf,"%lld",(long long)val.i); vs=vbuf; }
+                else vs = (val.s && *val.s) ? val.s : "";
+                char *out = GC_malloc(strlen(as)+strlen(vs)+64);
+                out[0]='\0'; long cur=0; const char *seg=as;
+                while (*seg || cur <= target) {
+                    const char *end2 = strchr(seg, '\x01');
+                    size_t slen = end2 ? (size_t)(end2-seg) : strlen(seg);
+                    if (out[0]) strcat(out,"\x01");
+                    if (cur==target) strcat(out,vs);
+                    else             strncat(out,seg,slen);
+                    seg = end2 ? end2+1 : seg+slen;
+                    cur++;
+                    if (!end2 && cur > target) break;
+                }
+                if (e->children[1]->kind==E_VAR && e->children[1]->ival>=0 &&
+                    e->children[1]->ival<ICN_CUR.env_n && icn_frame_depth>0)
+                    ICN_CUR.env[e->children[1]->ival] = STRVAL(out);
+                return STRVAL(out);
+            }
             return NULVCL;
         }
         default: break;
@@ -1406,6 +1488,17 @@ static DESCR_t interp_eval(EXPR_t *e)
         if (e->nchildren < 1) return FAILDESCR;
         return neg(interp_eval(e->children[0]));
 
+    /* OE-5: E_RETURN for Icon/Raku return statements */
+    case E_RETURN: {
+        if (icn_frame_depth > 0) {
+            ICN_CUR.return_val = (e->nchildren > 0)
+                ? interp_eval(e->children[0]) : NULVCL;
+            ICN_CUR.returning = 1;
+            return ICN_CUR.return_val;
+        }
+        return (e->nchildren > 0) ? interp_eval(e->children[0]) : NULVCL;
+    }
+
     case E_PLS: {
         /* Unary + coerces operand to numeric (int or real) */
         if (e->nchildren < 1) return FAILDESCR;
@@ -1470,6 +1563,15 @@ static DESCR_t interp_eval(EXPR_t *e)
         DESCR_t r = interp_eval(e->children[1]);
         if (IS_FAIL_fn(l) || IS_FAIL_fn(r)) return FAILDESCR;
         return DIVIDE_fn(l, r);
+    }
+    case E_MOD: {
+        if (e->nchildren < 2) return FAILDESCR;
+        DESCR_t l = interp_eval(e->children[0]);
+        DESCR_t r = interp_eval(e->children[1]);
+        if (IS_FAIL_fn(l) || IS_FAIL_fn(r)) return FAILDESCR;
+        long li = IS_INT_fn(l) ? l.i : (long)l.r;
+        long ri = IS_INT_fn(r) ? r.i : (long)r.r;
+        return ri ? INTVAL(li % ri) : FAILDESCR;
     }
     case E_POW: {
         if (e->nchildren < 2) return FAILDESCR;
