@@ -107,6 +107,7 @@ scrip:
 	$(CC) $(CRT)   -c $(RT)/x86/sm_image.c   -o $(OBJ)/sm_image.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_codegen.c -o $(OBJ)/sm_codegen.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp.c  -o $(OBJ)/interp.o
+	$(CC) $(CRT)   -c $(SRC)/driver/polyglot.c -o $(OBJ)/polyglot.o
 	$(CC) $(CRT)   -c $(SRC)/driver/scrip.c  -o $(OBJ)/scrip_driver.o
 	$(CC) $(OBJ)/*.o $(LIBS) -o scrip
 	@echo "Built: scrip"

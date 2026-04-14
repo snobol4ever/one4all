@@ -41,7 +41,8 @@ typedef struct {
     int          main_mod;
 } ScripModuleRegistry;
 extern ScripModuleRegistry g_registry;
-void polyglot_init(Program *prog);   /* defined in scrip.c until FI-7 */
+/* polyglot_init declared in polyglot.h — forward ref for execute_program */
+void polyglot_init(Program *prog);
 
 /* ── Label table ───────────────────────────────────────────────────────── */
 extern int label_count;     /* needed by polyglot_init for sno_label_start */
