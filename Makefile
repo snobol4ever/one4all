@@ -35,12 +35,6 @@ WARN    := -w
 CBASE   := -O0 -g $(WARN) -I$(SRC) -I$(RT)/x86 -I$(RT) -I$(RT)/x86
 CRT     := $(CBASE) -I$(RT)/x86 -DDYN_ENGINE_LINKED
 LIBS    := -lgc -lm
-X64     := $(ROOT)/../x64
-SPL_A   := $(X64)/libspitbol.a
-# SPITBOL shim compile flags (matches build_spitbol_archive.sh)
-SPL_CC  := $(CC) -Dm64 -DEXTFUN=1 -m64 -no-pie -fPIC \
-           -mfpmath=sse -mlong-double-64 -ffloat-store \
-           -DENGINE=1 -I$(X64)/osint -w
 
 # Runner defaults
 SNO          ?= $(error SNO is required — e.g. make run SNO=prog.sno)
@@ -121,15 +115,33 @@ scrip:
 	$(CC) $(CRT)   -c $(RT)/x86/sm_codegen.c -o $(OBJ)/sm_codegen.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp.c  -o $(OBJ)/interp.o
 	$(CC) $(CRT)   -c $(SRC)/driver/sync_monitor.c -o $(OBJ)/sync_monitor.o
-	$(SPL_CC)          -c $(SRC)/driver/spitbol_shim.c -o /tmp/spl_shim.o
 	$(CC) $(CRT)   -c $(SRC)/driver/polyglot.c -o $(OBJ)/polyglot.o
 	$(CC) $(CRT)   -c $(SRC)/driver/scrip.c  -o $(OBJ)/scrip_driver.o
-	$(CC) -m64 -no-pie /tmp/spl_shim.o $(OBJ)/*.o $(SPL_A) $(LIBS) -o scrip
+	$(CC) -m64 -no-pie $(OBJ)/*.o $(LIBS) -o scrip
 	@echo "Built: scrip"
 
 # backward-compat symlink
 scrip-interp: scrip
 	@ln -sf scrip scrip-interp
+
+# ── scrip-monitor: scrip with CSNOBOL4 4th executor linked in (IM-15b) ───────
+# Build: make scrip-monitor CSN_A=/home/claude/csnobol4/libcsnobol4.a
+# Requires: bash scripts/build_csnobol4_archive.sh first
+CSN_A   ?= /home/claude/csnobol4/libcsnobol4.a
+CSN_INC ?= /home/claude/csnobol4
+
+scrip-monitor:
+	mkdir -p $(OBJ)
+	$(MAKE) -f Makefile _scrip_objs
+	$(CC) $(CRT) -DWITH_CSNOBOL4=1 -I$(CSN_INC) \
+	      -c $(SRC)/driver/csnobol4_shim.c -o $(OBJ)/csnobol4_shim.o
+	$(CC) $(CRT) -DWITH_CSNOBOL4=1 \
+	      -c $(SRC)/driver/sync_monitor.c -o $(OBJ)/sync_monitor_csn.o
+	$(CC) -m64 -no-pie \
+	      $(OBJ)/csnobol4_shim.o $(OBJ)/sync_monitor_csn.o \
+	      $(filter-out $(OBJ)/sync_monitor.o, $(wildcard $(OBJ)/*.o)) \
+	      $(CSN_A) $(LIBS) -o scrip-monitor
+	@echo "Built: scrip-monitor (with CSNOBOL4 4th executor)"
 
 # ── monitor_ipc.so ────────────────────────────────────────────────────────────
 

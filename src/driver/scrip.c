@@ -19,11 +19,11 @@
  *   --dump-ir        print IR after frontend
  *   --dump-sm        print SM_Program after lowering
  *   --dump-bb        print BB-GRAPH for each statement
- *   --trace          MONITOR trace output (for two-way diff vs SPITBOL)
+ *   --trace          MONITOR trace output (for two-way diff vs CSNOBOL4)
  *   --bench          print wall-clock time after execution
  *
  * Frontend inferred from extension:
- *   .sno=SNOBOL4  .icn=Icon  .pl=Prolog  .sc=Snocone  .reb=Rebus  .spt=SPITBOL
+ *   .sno=SNOBOL4  .icn=Icon  .pl=Prolog  .sc=Snocone  .reb=Rebus
  *
  * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6
  * SPRINT:  M-SCRIP-U0
@@ -182,14 +182,14 @@ int main(int argc, char **argv)
             "  --dump-ir        print IR after frontend\n"
             "  --dump-sm        print SM_Program after lowering\n"
             "  --dump-bb        print BB-GRAPH for each statement\n"
-            "  --trace          MONITOR trace output (diff vs SPITBOL)\n"
+            "  --trace          MONITOR trace output (diff vs CSNOBOL4)\n"
             "  --bench          print wall-clock time after execution\n"
             "  --dump-parse     dump CMPILE parse tree\n"
             "  --dump-parse-flat  dump CMPILE parse tree (one line)\n"
             "  --dump-ir-bison  dump IR via old Bison/Flex parser\n"
             "\n"
             "Frontend inferred from file extension:\n"
-            "  .sno=SNOBOL4  .spt=SPITBOL  .icn=Icon  .pl=Prolog  .sc=Snocone  .reb=Rebus\n"
+            "  .sno=SNOBOL4  .icn=Icon  .pl=Prolog  .sc=Snocone  .reb=Rebus\n"
         );
         return 1;
     }

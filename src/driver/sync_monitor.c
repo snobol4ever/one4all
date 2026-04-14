@@ -23,8 +23,20 @@
 #include "frontend/snobol4/scrip_cc.h"  /* Program, STMT_t */
 #include "frontend/prolog/term.h"        /* IM-11: Term, TT_REF, term_deref */
 #include "frontend/prolog/prolog_atom.h" /* IM-11: prolog_atom_name */
-/* IM-15: SPITBOL in-process executor (spitbol_shim.c) */
-/* SplNvPair + spitbol_run_steps declared in sync_monitor.h */
+/* IM-15b: CSNOBOL4 in-process executor.
+ * When WITH_CSNOBOL4 is defined (scrip-monitor build), csnobol4_shim.c
+ * provides real implementations. Otherwise inline stubs keep normal builds
+ * free of any CSNOBOL4 dependency. */
+#ifdef WITH_CSNOBOL4
+/* CsnNvPair + csnobol4_run_steps + csn_nv_snapshot_free from csnobol4_shim.c */
+#else
+/* Inline stubs — normal scrip build has no CSNOBOL4 dependency */
+typedef struct { char *name; char *val_str; } CsnNvPair;
+static int  csnobol4_run_steps(const char *p, int n, CsnNvPair **o, int *c)
+    { (void)p;(void)n; *o=NULL;*c=0; return -1; }
+static void csn_nv_snapshot_free(CsnNvPair *pairs, int n)
+    { (void)pairs;(void)n; }
+#endif
 
 /*------------------------------------------------------------------------
  * exec_snapshot_take — capture current mutable state
@@ -305,8 +317,8 @@ int sync_monitor_run(void *prog_arg, int verbose, const char *sno_path) {
         ExecSnapshot ir_snap  = {0};
         ExecSnapshot sm_snap  = {0};
         ExecSnapshot jit_snap = {0};
-        SplNvPair   *spl_pairs = NULL;
-        int          spl_count = 0;
+        CsnNvPair   *csn_pairs = NULL;
+        int          csn_count = 0;
 
         /* ── IR run to step n ── */
         exec_snapshot_restore(&baseline);
@@ -334,37 +346,36 @@ int sync_monitor_run(void *prog_arg, int verbose, const char *sno_path) {
         label_path_append(&sm_path,  lbl_n);
         label_path_append(&jit_path, lbl_n);
 
-        /* ── SPITBOL run to step n (IM-15) ── */
+        /* ── CSNOBOL4 run to step n (IM-15b — stub, not yet wired) ── */
         if (sno_path) {
             exec_snapshot_restore(&baseline);
-            spitbol_run_steps(sno_path, n, &spl_pairs, &spl_count);
+            csnobol4_run_steps(sno_path, n, &csn_pairs, &csn_count);
         }
 
         /* ── Compare ── */
         int ir_sm      = snap_diff(&ir_snap, "IR", &sm_snap,  "SM",  0);
         int ir_jit     = snap_diff(&ir_snap, "IR", &jit_snap, "JIT", 0);
         int ok_diverge = (sm_snap.last_ok != jit_snap.last_ok);
-        /* IM-15: compare SPITBOL NV snapshot against IR NV snapshot */
-        int ir_spl = 0;
-        if (sno_path && spl_pairs) {
-            for (int si = 0; si < spl_count; si++) {
-                /* find matching name in ir_snap.nv_pairs */
+        /* IM-15b: compare CSNOBOL4 NV snapshot against IR NV snapshot (stub) */
+        int ir_csn = 0;
+        if (sno_path && csn_pairs) {
+            for (int si = 0; si < csn_count; si++) {
                 int found = 0;
                 for (int ii = 0; ii < ir_snap.nv_count; ii++) {
-                    if (strcmp(ir_snap.nv_pairs[ii].name, spl_pairs[si].name) == 0) {
+                    if (strcmp(ir_snap.nv_pairs[ii].name, csn_pairs[si].name) == 0) {
                         found = 1;
-                        char ir_buf[256];
                         const char *iv = VARVAL_fn(ir_snap.nv_pairs[ii].val);
                         if (!iv) iv = "";
-                        if (strcmp(iv, spl_pairs[si].val_str) != 0)
-                            ir_spl++;
+                        if (strcmp(iv, csn_pairs[si].val_str) != 0)
+                            ir_csn++;
                         break;
                     }
                 }
+                (void)found;
             }
         }
 
-        if (ir_sm || ir_jit || ok_diverge || ir_spl) {
+        if (ir_sm || ir_jit || ok_diverge || ir_csn) {
             /* IM-8: rich diverge header — stmt, label, line */
             const char *hdr_lbl = ir_labels[n] ? ir_labels[n] : "-";
             int lineno = 0;
@@ -418,17 +429,17 @@ int sync_monitor_run(void *prog_arg, int verbose, const char *sno_path) {
             if (ok_diverge && !ir_sm && !ir_jit)
                 fprintf(stderr, "  SM last_ok=%d vs JIT last_ok=%d (NV agrees)\n",
                         sm_snap.last_ok, jit_snap.last_ok);
-            /* IM-15: SPITBOL divergence report */
-            if (ir_spl) {
-                fprintf(stderr, "  IR vs SPL (%d var(s) differ):\n", ir_spl);
-                for (int si = 0; si < spl_count; si++) {
+            /* IM-15b: CSNOBOL4 divergence report (stub — csn_pairs empty until wired) */
+            if (ir_csn) {
+                fprintf(stderr, "  IR vs CSN (%d var(s) differ):\n", ir_csn);
+                for (int si = 0; si < csn_count; si++) {
                     for (int ii = 0; ii < ir_snap.nv_count; ii++) {
-                        if (strcmp(ir_snap.nv_pairs[ii].name, spl_pairs[si].name) == 0) {
+                        if (strcmp(ir_snap.nv_pairs[ii].name, csn_pairs[si].name) == 0) {
                             const char *iv = VARVAL_fn(ir_snap.nv_pairs[ii].val);
                             if (!iv) iv = "";
-                            if (strcmp(iv, spl_pairs[si].val_str) != 0)
-                                fprintf(stderr, "    %-16s  IR=%-20s  SPL=%s\n",
-                                        spl_pairs[si].name, iv, spl_pairs[si].val_str);
+                            if (strcmp(iv, csn_pairs[si].val_str) != 0)
+                                fprintf(stderr, "    %-16s  IR=%-20s  CSN=%s\n",
+                                        csn_pairs[si].name, iv, csn_pairs[si].val_str);
                             break;
                         }
                     }
@@ -442,12 +453,12 @@ int sync_monitor_run(void *prog_arg, int verbose, const char *sno_path) {
         }
 
         if (verbose >= 1)
-            fprintf(stderr, "  stmt %4d/%d: IR=SM=JIT=SPL agree\n", n, nstmts);
+            fprintf(stderr, "  stmt %4d/%d: IR=SM=JIT agree\n", n, nstmts);
 
         exec_snapshot_free(&ir_snap);
         exec_snapshot_free(&sm_snap);
         exec_snapshot_free(&jit_snap);
-        spl_nv_snapshot_free(spl_pairs, spl_count); spl_pairs = NULL;
+        csn_nv_snapshot_free(csn_pairs, csn_count); csn_pairs = NULL;
     }
 
     if (!diverge_at && verbose >= 1)
