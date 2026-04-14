@@ -305,17 +305,28 @@ static EXPR_t *lower_node(const RakuNode *n) {
 
     /*-- sub name(params) body  →  E_FNC matching icon_lower layout -------
      * Layout (must match icn_call_proc in scrip.c):
-     *   e->sval=name, e->ival=nparams(0), children[0]=E_VAR name-node,
-     *   children[1..]: body statements directly (NOT wrapped in E_SEQ_EXPR). */
+     *   e->sval=name, e->ival=nparams, children[0]=E_VAR name-node,
+     *   children[1..np]=E_VAR param nodes, children[np+1..]=body stmts.
+     * RK-8: wire params so icn_call_proc populates the frame correctly. */
     case RK_SUBDEF: {
         const char *sname = n->sval ? n->sval : "<anon>";
         e = fnc_node(sname);
-        e->ival = 0;   /* nparams: Phase 1 — no param wiring yet */
+        int np = n->children ? n->children->count : 0;
+        e->ival = np;
         /* children[0]: name node */
         EXPR_t *sname_node = expr_new(E_VAR);
         sname_node->sval = intern(sname);
         expr_add_child(e, sname_node);
-        /* children[1..]: body statements directly */
+        /* children[1..np]: param E_VAR nodes (names for scope patching) */
+        if (n->children) {
+            for (int i = 0; i < np; i++) {
+                RakuNode *pn = n->children->items[i];
+                EXPR_t *pe = expr_new(E_VAR);
+                pe->sval = intern(strip_sigil(pn->sval ? pn->sval : ""));
+                expr_add_child(e, pe);
+            }
+        }
+        /* children[np+1..]: body statements directly */
         lower_block_children(e, n->right);
         return e;
     }

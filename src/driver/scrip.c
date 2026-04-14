@@ -400,7 +400,7 @@ static DESCR_t icn_interp_eval(EXPR_t *root, EXPR_t *e) {
         return INTVAL(-v.i);
     }
 
-    case E_ADD: case E_SUB: case E_MUL: case E_DIV:
+    case E_ADD: case E_SUB: case E_MUL: case E_DIV: case E_MOD:
     case E_LT:  case E_LE:  case E_GT:  case E_GE:
     case E_EQ:  case E_NE: {
         if (e->nchildren < 2) return FAILDESCR;
@@ -413,6 +413,7 @@ static DESCR_t icn_interp_eval(EXPR_t *root, EXPR_t *e) {
             case E_SUB: return INTVAL(li-ri);
             case E_MUL: return INTVAL(li*ri);
             case E_DIV: return ri?INTVAL(li/ri):FAILDESCR;
+            case E_MOD: return ri?INTVAL(li%ri):FAILDESCR;
             case E_LT:  return li< ri?r:FAILDESCR;
             case E_LE:  return li<=ri?r:FAILDESCR;
             case E_GT:  return li> ri?r:FAILDESCR;
@@ -428,8 +429,15 @@ static DESCR_t icn_interp_eval(EXPR_t *root, EXPR_t *e) {
         DESCR_t l = icn_interp_eval(root, e->children[0]);
         DESCR_t r = icn_interp_eval(root, e->children[1]);
         if (IS_FAIL_fn(l)||IS_FAIL_fn(r)) return FAILDESCR;
-        const char *ls = VARVAL_fn(l), *rs = VARVAL_fn(r);
-        if (!ls) ls=""; if (!rs) rs="";
+        /* Use .s directly for DT_S to avoid VARVAL_fn static-buffer aliasing (RK-8 fix) */
+        char _lbuf[64], _rbuf[64];
+        const char *ls, *rs;
+        if (l.v==DT_S||l.v==DT_SNUL) { ls=l.s?l.s:""; }
+        else if (IS_INT_fn(l)) { snprintf(_lbuf,sizeof _lbuf,"%lld",(long long)l.i); ls=_lbuf; }
+        else { ls=VARVAL_fn(l); if(!ls) ls=""; }
+        if (r.v==DT_S||r.v==DT_SNUL) { rs=r.s?r.s:""; }
+        else if (IS_INT_fn(r)) { snprintf(_rbuf,sizeof _rbuf,"%lld",(long long)r.i); rs=_rbuf; }
+        else { rs=VARVAL_fn(r); if(!rs) rs=""; }
         size_t ll=strlen(ls), rl=strlen(rs);
         char *buf = GC_malloc(ll+rl+1);
         memcpy(buf,ls,ll); memcpy(buf+ll,rs,rl); buf[ll+rl]='\0';
@@ -572,8 +580,10 @@ static DESCR_t icn_interp_eval(EXPR_t *root, EXPR_t *e) {
         DESCR_t l = icn_interp_eval(root, e->children[0]);
         DESCR_t r = icn_interp_eval(root, e->children[1]);
         if (IS_FAIL_fn(l)||IS_FAIL_fn(r)) return FAILDESCR;
-        const char *ls = IS_INT_fn(l)?NULL:VARVAL_fn(l);
-        const char *rs = IS_INT_fn(r)?NULL:VARVAL_fn(r);
+        /* Use .s directly for DT_S to avoid VARVAL_fn static-buffer aliasing
+         * when both operands are string variables (RK-8 fix). */
+        const char *ls = (l.v==DT_S||l.v==DT_SNUL) ? l.s : (IS_INT_fn(l)?NULL:VARVAL_fn(l));
+        const char *rs = (r.v==DT_S||r.v==DT_SNUL) ? r.s : (IS_INT_fn(r)?NULL:VARVAL_fn(r));
         if (!ls) ls=""; if (!rs) rs="";
         int cmp = strcmp(ls, rs);
         int ok;

@@ -1,0 +1,5 @@
+hello world
+eq literal ok
+ne vars ok
+helloworld
+concat eq ok
