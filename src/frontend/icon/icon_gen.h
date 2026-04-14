@@ -67,6 +67,42 @@ DESCR_t icn_bb_to_by(void *zeta, int entry);
 DESCR_t icn_bb_iterate(void *zeta, int entry);
 DESCR_t icn_bb_suspend(void *zeta, int entry);
 DESCR_t icn_bb_find(void *zeta, int entry);
+DESCR_t icn_bb_binop_gen(void *zeta, int entry);
+DESCR_t icn_bb_alternate(void *zeta, int entry);
+
+/*----------------------------------------------------------------------------------------------------------------------------
+ * icn_bb_binop_gen — generative binary operator box (IC-2a)
+ *
+ * Handles arithmetic and relational ops where one or both operands are generators.
+ * JCON irgen.icn §4.3: funcs-set ops — right.failure → left.resume (goal-directed retry).
+ * Relational ops (LT/GT/LE/GE/EQ/NE): on comparison failure → resume right (not left).
+ *--------------------------------------------------------------------------------------------------------------------------*/
+typedef enum {
+    ICN_BINOP_ADD, ICN_BINOP_SUB, ICN_BINOP_MUL, ICN_BINOP_DIV, ICN_BINOP_MOD,
+    ICN_BINOP_LT, ICN_BINOP_LE, ICN_BINOP_GT, ICN_BINOP_GE, ICN_BINOP_EQ, ICN_BINOP_NE,
+    ICN_BINOP_CONCAT,  /* || string concatenation */
+} IcnBinopKind;
+
+typedef struct {
+    bb_node_t    left;          /* left operand generator (may be oneshot) */
+    bb_node_t    right;         /* right operand generator (may be oneshot) */
+    IcnBinopKind op;
+    int          is_relop;      /* 1 = relational: failure retries right, not left */
+    DESCR_t      left_val;      /* current left value */
+    DESCR_t      right_val;     /* current right value */
+    int          phase;         /* 0=need left, 1=need right, 2=have both */
+} icn_binop_gen_state_t;
+
+/*----------------------------------------------------------------------------------------------------------------------------
+ * icn_bb_alternate — E_ALTERNATE Byrd box (IC-2a)
+ *
+ * JCON irgen.icn ir_a_Alt: try left until ω, then switch to right.
+ * Binary variant: which=0 → pumping left; which=1 → pumping right.
+ *--------------------------------------------------------------------------------------------------------------------------*/
+typedef struct {
+    bb_node_t gen[2];
+    int       which;   /* 0 = left active, 1 = right active */
+} icn_alternate_state_t;
 
 /*----------------------------------------------------------------------------------------------------------------------------
  * icn_eval_gen — walk an EXPR_t tree and return a bb_node_t.

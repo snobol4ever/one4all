@@ -35,8 +35,8 @@
    especially those whose name start with YY_ or yy_.  They are
    private implementation details that can be changed or removed.  */
 
-#ifndef YY_RAKU_YY_RAKU_TAB_H_INCLUDED
-# define YY_RAKU_YY_RAKU_TAB_H_INCLUDED
+#ifndef YY_RAKU_YY_FRONTEND_RAKU_RAKU_TAB_H_INCLUDED
+# define YY_RAKU_YY_FRONTEND_RAKU_RAKU_TAB_H_INCLUDED
 /* Debug traces.  */
 #ifndef RAKU_YYDEBUG
 # if defined YYDEBUG
@@ -53,7 +53,7 @@
 extern int raku_yydebug;
 #endif
 /* "%code requires" blocks.  */
-#line 3 "raku.y"
+#line 3 "frontend/raku/raku.y"
 
 /*
  * raku.y — Tiny-Raku Bison grammar
@@ -71,7 +71,7 @@ typedef struct ExprList {
     int      cap;
 } ExprList;
 
-#line 75 "raku.tab.h"
+#line 75 "frontend/raku/raku.tab.h"
 
 /* Token kinds.  */
 #ifndef RAKU_YYTOKENTYPE
@@ -105,20 +105,22 @@ typedef struct ExprList {
     KW_GIVEN = 278,                /* KW_GIVEN  */
     KW_WHEN = 279,                 /* KW_WHEN  */
     KW_DEFAULT = 280,              /* KW_DEFAULT  */
-    OP_RANGE = 281,                /* OP_RANGE  */
-    OP_RANGE_EX = 282,             /* OP_RANGE_EX  */
-    OP_ARROW = 283,                /* OP_ARROW  */
-    OP_EQ = 284,                   /* OP_EQ  */
-    OP_NE = 285,                   /* OP_NE  */
-    OP_LE = 286,                   /* OP_LE  */
-    OP_GE = 287,                   /* OP_GE  */
-    OP_SEQ = 288,                  /* OP_SEQ  */
-    OP_SNE = 289,                  /* OP_SNE  */
-    OP_AND = 290,                  /* OP_AND  */
-    OP_OR = 291,                   /* OP_OR  */
-    OP_BIND = 292,                 /* OP_BIND  */
-    OP_DIV = 293,                  /* OP_DIV  */
-    UMINUS = 294                   /* UMINUS  */
+    KW_EXISTS = 281,               /* KW_EXISTS  */
+    KW_DELETE = 282,               /* KW_DELETE  */
+    OP_RANGE = 283,                /* OP_RANGE  */
+    OP_RANGE_EX = 284,             /* OP_RANGE_EX  */
+    OP_ARROW = 285,                /* OP_ARROW  */
+    OP_EQ = 286,                   /* OP_EQ  */
+    OP_NE = 287,                   /* OP_NE  */
+    OP_LE = 288,                   /* OP_LE  */
+    OP_GE = 289,                   /* OP_GE  */
+    OP_SEQ = 290,                  /* OP_SEQ  */
+    OP_SNE = 291,                  /* OP_SNE  */
+    OP_AND = 292,                  /* OP_AND  */
+    OP_OR = 293,                   /* OP_OR  */
+    OP_BIND = 294,                 /* OP_BIND  */
+    OP_DIV = 295,                  /* OP_DIV  */
+    UMINUS = 296                   /* UMINUS  */
   };
   typedef enum raku_yytokentype raku_yytoken_kind_t;
 #endif
@@ -127,7 +129,7 @@ typedef struct ExprList {
 #if ! defined RAKU_YYSTYPE && ! defined RAKU_YYSTYPE_IS_DECLARED
 union RAKU_YYSTYPE
 {
-#line 141 "raku.y"
+#line 141 "frontend/raku/raku.y"
 
     long      ival;
     double    dval;
@@ -135,7 +137,7 @@ union RAKU_YYSTYPE
     EXPR_t   *node;
     ExprList *list;
 
-#line 139 "raku.tab.h"
+#line 141 "frontend/raku/raku.tab.h"
 
 };
 typedef union RAKU_YYSTYPE RAKU_YYSTYPE;
@@ -150,4 +152,4 @@ extern RAKU_YYSTYPE raku_yylval;
 int raku_yyparse (void);
 
 
-#endif /* !YY_RAKU_YY_RAKU_TAB_H_INCLUDED  */
+#endif /* !YY_RAKU_YY_FRONTEND_RAKU_RAKU_TAB_H_INCLUDED  */

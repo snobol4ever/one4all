@@ -124,6 +124,118 @@ DESCR_t icn_bb_find(void *zeta, int entry) {
     return (DESCR_t){ .v = DT_I, .i = pos1 };
 }
 
+/*============================================================================================================================
+ * icn_bb_binop_gen — IC-2a: generative binary operator Byrd box
+ *
+ * Protocol (JCON irgen.icn §4.3, funcs-set):
+ *   α: pump left α → get left_val; pump right α → get right_val; apply op.
+ *   β (arithmetic):  resume right β; if right ω → resume left β, reset right α.
+ *   β (relational):  resume right β; if right ω → resume left β, reset right α.
+ *   On relational comparison failure: retry right β (goal-directed).
+ *
+ * left/right are bb_node_t generators (may be oneshot wrappers for scalar operands).
+ *============================================================================================================================*/
+
+static DESCR_t icn_binop_apply(IcnBinopKind op, DESCR_t lv, DESCR_t rv, int *rel_fail) {
+    *rel_fail = 0;
+    if (IS_FAIL_fn(lv) || IS_FAIL_fn(rv)) return FAILDESCR;
+    long li = IS_INT_fn(lv) ? lv.i : (long)lv.r;
+    long ri = IS_INT_fn(rv) ? rv.i : (long)rv.r;
+    switch (op) {
+        case ICN_BINOP_ADD:    return INTVAL(li + ri);
+        case ICN_BINOP_SUB:    return INTVAL(li - ri);
+        case ICN_BINOP_MUL:    return INTVAL(li * ri);
+        case ICN_BINOP_DIV:    return ri ? INTVAL(li / ri) : FAILDESCR;
+        case ICN_BINOP_MOD:    return ri ? INTVAL(li % ri) : FAILDESCR;
+        case ICN_BINOP_LT:     *rel_fail = !(li <  ri); return *rel_fail ? FAILDESCR : INTVAL(ri);
+        case ICN_BINOP_LE:     *rel_fail = !(li <= ri); return *rel_fail ? FAILDESCR : INTVAL(ri);
+        case ICN_BINOP_GT:     *rel_fail = !(li >  ri); return *rel_fail ? FAILDESCR : INTVAL(ri);
+        case ICN_BINOP_GE:     *rel_fail = !(li >= ri); return *rel_fail ? FAILDESCR : INTVAL(ri);
+        case ICN_BINOP_EQ:     *rel_fail = !(li == ri); return *rel_fail ? FAILDESCR : INTVAL(ri);
+        case ICN_BINOP_NE:     *rel_fail = !(li != ri); return *rel_fail ? FAILDESCR : INTVAL(ri);
+        case ICN_BINOP_CONCAT: {
+            /* String concatenation — use static buffer (adequate for test suite) */
+            const char *ls = lv.s ? lv.s : "", *rs = rv.s ? rv.s : "";
+            size_t ll = lv.slen > 0 ? (size_t)lv.slen : strlen(ls);
+            size_t rl = rv.slen > 0 ? (size_t)rv.slen : strlen(rs);
+            char *buf = malloc(ll + rl + 1);
+            memcpy(buf, ls, ll); memcpy(buf + ll, rs, rl); buf[ll + rl] = '\0';
+            return (DESCR_t){ .v = DT_S, .slen = (int)(ll + rl), .s = buf };
+        }
+        default: return FAILDESCR;
+    }
+}
+
+DESCR_t icn_bb_binop_gen(void *zeta, int entry) {
+    icn_binop_gen_state_t *z = (icn_binop_gen_state_t *)zeta;
+
+    if (entry == α) {
+        /* Fresh: pump left α, then right α */
+        z->left_val  = z->left.fn(z->left.ζ, α);
+        if (IS_FAIL_fn(z->left_val)) return FAILDESCR;
+        z->right_val = z->right.fn(z->right.ζ, α);
+        if (IS_FAIL_fn(z->right_val)) return FAILDESCR;
+        z->phase = 2;
+    } else {
+        /* β: try to advance right first */
+        for (;;) {
+            DESCR_t rv = z->right.fn(z->right.ζ, β);
+            if (!IS_FAIL_fn(rv)) { z->right_val = rv; break; }
+            /* right exhausted — advance left, reset right */
+            DESCR_t lv = z->left.fn(z->left.ζ, β);
+            if (IS_FAIL_fn(lv)) return FAILDESCR;   /* both exhausted */
+            z->left_val  = lv;
+            z->right_val = z->right.fn(z->right.ζ, α);
+            if (!IS_FAIL_fn(z->right_val)) break;
+            /* right empty on reset — try next left */
+        }
+    }
+
+    /* Apply op; for relational failure, retry right (goal-directed) */
+    for (;;) {
+        int rel_fail = 0;
+        DESCR_t result = icn_binop_apply(z->op, z->left_val, z->right_val, &rel_fail);
+        if (!IS_FAIL_fn(result)) return result;
+        if (!rel_fail) return FAILDESCR;   /* arithmetic error (div by zero etc.) */
+        /* Relational failure: retry right β (JCON §4.3 goal-directed) */
+        DESCR_t rv = z->right.fn(z->right.ζ, β);
+        if (!IS_FAIL_fn(rv)) { z->right_val = rv; continue; }
+        /* right exhausted — advance left, reset right */
+        DESCR_t lv = z->left.fn(z->left.ζ, β);
+        if (IS_FAIL_fn(lv)) return FAILDESCR;
+        z->left_val  = lv;
+        z->right_val = z->right.fn(z->right.ζ, α);
+        if (IS_FAIL_fn(z->right_val)) return FAILDESCR;
+    }
+}
+
+/*============================================================================================================================
+ * icn_bb_alternate — IC-2a: E_ALTERNATE Byrd box
+ *
+ * JCON irgen.icn ir_a_Alt (binary case):
+ *   α: pump gen[0] α; if γ → return. If ω → switch which=1, pump gen[1] α.
+ *   β: pump current gen β; if ω and which==0 → switch to gen[1] α.
+ *============================================================================================================================*/
+
+DESCR_t icn_bb_alternate(void *zeta, int entry) {
+    icn_alternate_state_t *z = (icn_alternate_state_t *)zeta;
+    if (entry == α) {
+        z->which = 0;
+        DESCR_t v = z->gen[0].fn(z->gen[0].ζ, α);
+        if (!IS_FAIL_fn(v)) return v;
+        z->which = 1;
+        return z->gen[1].fn(z->gen[1].ζ, α);
+    }
+    /* β */
+    DESCR_t v = z->gen[z->which].fn(z->gen[z->which].ζ, β);
+    if (!IS_FAIL_fn(v)) return v;
+    if (z->which == 0) {
+        z->which = 1;
+        return z->gen[1].fn(z->gen[1].ζ, α);
+    }
+    return FAILDESCR;
+}
+
 /* icn_eval_gen — implemented in scrip.c where interp_eval and proc tables are visible. */
 
 /*============================================================================================================================
