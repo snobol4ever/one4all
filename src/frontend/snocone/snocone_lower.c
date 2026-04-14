@@ -167,13 +167,19 @@ static int lower_token(const ScPToken *tok, ExprStack *s,
         EXPR_t *e = expr_binary(E_CAT, l, r);
         es_push(s, e); return 0;
     }
-    case SNOCONE_PERIOD: {
-        /* . conditional capture: expr . var → E_CAPT_COND_ASGN(left=expr, right=var) */
-        EXPR_t *var  = es_pop(s);
-        EXPR_t *expr = es_pop(s);
-        EXPR_t *e    = expr_binary(E_CAPT_COND_ASGN, expr, var);
-        es_push(s, e); return 0;
-    }
+    case SNOCONE_PERIOD:
+        if (tok->is_unary) {
+            /* unary . = name reference: .var → E_NAME(E_VAR("var")) */
+            EXPR_t *var = es_pop(s);
+            EXPR_t *e   = expr_unary(E_NAME, var);
+            es_push(s, e); return 0;
+        } else {
+            /* binary . = conditional capture: expr . var → E_CAPT_COND_ASGN */
+            EXPR_t *var  = es_pop(s);
+            EXPR_t *expr = es_pop(s);
+            EXPR_t *e    = expr_binary(E_CAPT_COND_ASGN, expr, var);
+            es_push(s, e); return 0;
+        }
     case SNOCONE_DOLLAR:
         if (tok->is_unary) {
             /* unary $ = indirect lvalue (E_INDIRECT used as assignment target) */
@@ -204,9 +210,9 @@ static int lower_token(const ScPToken *tok, ExprStack *s,
         es_push(s, e); return 0;
     }
     case SNOCONE_TILDE: {
-        /* ~ logical negation → NOT(expr) */
+        /* ~ logical negation → E_NOT(expr) — uses interp_eval E_NOT, not APPLY_fn("NOT") */
         EXPR_t *operand = es_pop(s);
-        es_push(s, make_fnc1("NOT", operand));
+        es_push(s, expr_unary(E_NOT, operand));
         return 0;
     }
     case SNOCONE_QUESTION:

@@ -3592,6 +3592,15 @@ static DESCR_t _usercall_hook(const char *name, DESCR_t *args, int nargs) {
     if (strcasecmp(name, "IDENT") == 0)  return _builtin_IDENT(args, nargs);
     if (strcasecmp(name, "DIFFER") == 0) return _builtin_DIFFER(args, nargs);
     if (strcasecmp(name, "DATA") == 0)   return _builtin_DATA(args, nargs);
+    /* SC-1: DATA constructor/field-accessor dispatch via sc_dat registry.
+     * Must precede label lookup so struct names shadow any same-named labels. */
+    {
+        ScDatType *_dt = sc_dat_find_type(name);
+        if (_dt) return sc_dat_construct(_dt, args, nargs);
+        int _fi = 0;
+        ScDatType *_ft = sc_dat_find_field(name, &_fi);
+        if (_ft && nargs >= 1) return sc_dat_field_get(name, args[0]);
+    }
     /* Check for a body label (user-defined function) */
     const char *_entry = FUNC_ENTRY_fn(name);
     STMT_t *_body = _entry ? label_lookup(_entry) : NULL;
@@ -3812,10 +3821,9 @@ static DESCR_t sc_dat_construct(ScDatType *t, DESCR_t *args, int nargs) {
     for (int i = 0; i < t->nfields; i++)
         inst->fields[i] = (i < nargs) ? args[i] : NULVCL;
     DESCR_t r;
-    r.v   = DT_DATA;
-    r.u   = inst;
-    r.s   = NULL;
+    r.v    = DT_DATA;
     r.slen = 0;
+    r.u    = inst;   /* must be last union write — .s/.u share storage */
     return r;
 }
 
