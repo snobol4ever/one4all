@@ -466,6 +466,50 @@ bb_node_t icn_eval_gen(EXPR_t *e) {
         return (bb_node_t){ icn_bb_iterate, z, 0 };
     }
 
+    /* ── E_ALTERNATE: (left | right) ────────────────────────────────────── */
+    if (e->kind == E_ALTERNATE && e->nchildren >= 2) {
+        icn_alternate_state_t *z = calloc(1, sizeof(*z));
+        z->gen[0] = icn_eval_gen(e->children[0]);
+        z->gen[1] = icn_eval_gen(e->children[1]);
+        z->which  = 0;
+        return (bb_node_t){ icn_bb_alternate, z, 0 };
+    }
+
+    /* ── Arithmetic / relational binop with generative operand(s) ─────────
+     * Detects when either child is a generator kind.  Non-generator children
+     * are wrapped as oneshot boxes by the recursive icn_eval_gen call.      */
+    {
+        static const struct { EKind ek; IcnBinopKind bk; int is_rel; } binop_map[] = {
+            { E_ADD, ICN_BINOP_ADD, 0 }, { E_SUB, ICN_BINOP_SUB, 0 },
+            { E_MUL, ICN_BINOP_MUL, 0 }, { E_DIV, ICN_BINOP_DIV, 0 },
+            { E_MOD, ICN_BINOP_MOD, 0 },
+            { E_LT,  ICN_BINOP_LT,  1 }, { E_LE,  ICN_BINOP_LE,  1 },
+            { E_GT,  ICN_BINOP_GT,  1 }, { E_GE,  ICN_BINOP_GE,  1 },
+            { E_EQ,  ICN_BINOP_EQ,  1 }, { E_NE,  ICN_BINOP_NE,  1 },
+        };
+        for (int mi = 0; mi < (int)(sizeof binop_map/sizeof binop_map[0]); mi++) {
+            if (e->kind != binop_map[mi].ek) continue;
+            if (e->nchildren < 2) break;
+            EXPR_t *lc = e->children[0], *rc = e->children[1];
+            /* Only use binop_gen box when at least one child is a generator */
+            static const EKind gen_kinds[] = {
+                E_TO, E_TO_BY, E_ITERATE, E_ALTERNATE, E_FNC, E_SUSPEND
+            };
+            int l_gen = 0, r_gen = 0;
+            for (int g = 0; g < 6; g++) {
+                if (lc && lc->kind == gen_kinds[g]) l_gen = 1;
+                if (rc && rc->kind == gen_kinds[g]) r_gen = 1;
+            }
+            if (!l_gen && !r_gen) break;   /* scalar — let interp_eval handle it */
+            icn_binop_gen_state_t *z = calloc(1, sizeof(*z));
+            z->left     = icn_eval_gen(lc);
+            z->right    = icn_eval_gen(rc);
+            z->op       = binop_map[mi].bk;
+            z->is_relop = binop_map[mi].is_rel;
+            return (bb_node_t){ icn_bb_binop_gen, z, 0 };
+        }
+    }
+
     /* ── E_FNC user proc — coroutine wrapper ─────────────────────────────── */
     if (e->kind == E_FNC && e->nchildren >= 1 && e->children[0] && e->children[0]->sval) {
         const char *fn = e->children[0]->sval;

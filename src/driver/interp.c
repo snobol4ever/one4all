@@ -2046,8 +2046,31 @@ DESCR_t interp_eval(EXPR_t *e)
     case E_AUGOP: {
         if (e->nchildren < 2) return NULVCL;
         EXPR_t *lhs = e->children[0];
+        EXPR_t *rhs = e->children[1];
         DESCR_t lv = interp_eval(lhs);
-        DESCR_t rv = interp_eval(e->children[1]);
+        /* Drive RHS through icn_eval_gen if it is a generator expression
+         * (handles sum +:= 1 to 5, result ||:= !s, etc.)                */
+        DESCR_t rv = FAILDESCR;
+        {
+            static const EKind gen_kinds[] = {
+                E_TO, E_TO_BY, E_ITERATE, E_ALTERNATE, E_FNC, E_SUSPEND
+            };
+            int rhs_is_gen = 0;
+            for (int _g = 0; _g < 6; _g++)
+                if (rhs && rhs->kind == gen_kinds[_g]) { rhs_is_gen = 1; break; }
+            if (rhs_is_gen) {
+                /* Collect the last value produced by the RHS generator */
+                bb_node_t rbox = icn_eval_gen(rhs);
+                DESCR_t tick = rbox.fn(rbox.ζ, α);
+                while (!IS_FAIL_fn(tick)) {
+                    rv = tick;
+                    tick = rbox.fn(rbox.ζ, β);
+                }
+                /* If generator produced nothing, use FAILDESCR (already set) */
+            } else {
+                rv = interp_eval(rhs);
+            }
+        }
         if (IS_FAIL_fn(lv)||IS_FAIL_fn(rv)) return FAILDESCR;
         long li=IS_INT_fn(lv)?lv.i:(long)lv.r, ri=IS_INT_fn(rv)?rv.i:(long)rv.r;
         DESCR_t result = NULVCL;
