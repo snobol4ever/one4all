@@ -532,7 +532,19 @@ bb_node_t pl_box_choice_call(EXPR_t *goal, Term **env) {
     EXPR_t *choice = pl_pred_table_lookup_global(key);
     if (!choice) return pl_box_fail();
     Term **caller_args = arity ? malloc(arity * sizeof(Term *)) : NULL;
-    for (int i = 0; i < arity; i++)
-        caller_args[i] = pl_unified_term_from_expr(goal->children[i], env);
+    /* Wildcard fix (PL-10): anonymous _ has E_VAR ival==-1.
+     * pl_unified_term_from_expr returns term_new_var(-1) for these, but
+     * bind() skips trail_push for slot==-1, so trail_unwind() cannot reset
+     * the binding between clauses and the OR-box stops after clause 1.
+     * Fix: give each wildcard a unique positive slot so bind() trails it
+     * and trail_unwind() resets it properly on each retry. */
+    static int g_wildcard_slot = 100000;
+    for (int i = 0; i < arity; i++) {
+        EXPR_t *ch = goal->children[i];
+        if (ch && ch->kind == E_VAR && (int)ch->ival == -1)
+            caller_args[i] = term_new_var(g_wildcard_slot++);
+        else
+            caller_args[i] = pl_unified_term_from_expr(ch, env);
+    }
     return pl_box_choice(choice, caller_args, arity);
 }
