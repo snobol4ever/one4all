@@ -1081,6 +1081,61 @@ DESCR_t interp_eval(EXPR_t *e)
 #undef HS
 #undef HK
 
+            /* ── IC-3: Icon table builtins (DT_T native hash table) ────────
+             * table()         → new empty table (default value = &null)
+             * insert(T,k,v)   → set T[k]=v, return T
+             * delete(T,k)     → remove T[k], return T
+             * member(T,k)     → return T[k] if present, else fail
+             * key(T)          → generator: yields each key (via every)     */
+            if (!strcmp(fn,"table") && nargs <= 2) {
+                TBBLK_t *tbl = (nargs == 2)
+                    ? table_new_args((int)to_int(interp_eval(e->children[1])),
+                                     (int)to_int(interp_eval(e->children[2])))
+                    : table_new();
+                DESCR_t d; d.v = DT_T; d.tbl = tbl; d.s = NULL; d.slen = 0;
+                return d;
+            }
+            if (!strcmp(fn,"insert") && nargs >= 2) {
+                DESCR_t td = interp_eval(e->children[1]);
+                if (td.v != DT_T) return FAILDESCR;
+                DESCR_t kd = interp_eval(e->children[2]);
+                DESCR_t vd = (nargs >= 3) ? interp_eval(e->children[3]) : NULVCL;
+                char kb[64]; const char *ks;
+                if (IS_INT_fn(kd))       { snprintf(kb,sizeof kb,"%lld",(long long)kd.i); ks=kb; }
+                else if (IS_REAL_fn(kd)) { snprintf(kb,sizeof kb,"%g",kd.r); ks=kb; }
+                else                     { ks = VARVAL_fn(kd); if (!ks) ks=""; }
+                table_set_descr(td.tbl, ks, kd, vd);
+                return td;
+            }
+            if (!strcmp(fn,"delete") && nargs == 2) {
+                DESCR_t td = interp_eval(e->children[1]);
+                if (td.v != DT_T) return FAILDESCR;
+                DESCR_t kd = interp_eval(e->children[2]);
+                char kb[64]; const char *ks;
+                if (IS_INT_fn(kd))       { snprintf(kb,sizeof kb,"%lld",(long long)kd.i); ks=kb; }
+                else if (IS_REAL_fn(kd)) { snprintf(kb,sizeof kb,"%g",kd.r); ks=kb; }
+                else                     { ks = VARVAL_fn(kd); if (!ks) ks=""; }
+                /* walk bucket, unlink matching entry */
+                unsigned h = 0; { const char *p=ks; while(*p) h=(h*31u+(unsigned char)*p++)&0xFF; }
+                TBPAIR_t **pp = &td.tbl->buckets[h];
+                while (*pp) {
+                    if (strcmp((*pp)->key, ks)==0) { TBPAIR_t *del=*pp; *pp=del->next; td.tbl->size--; break; }
+                    pp = &(*pp)->next;
+                }
+                return td;
+            }
+            if (!strcmp(fn,"member") && nargs == 2) {
+                DESCR_t td = interp_eval(e->children[1]);
+                if (td.v != DT_T) return FAILDESCR;
+                DESCR_t kd = interp_eval(e->children[2]);
+                char kb[64]; const char *ks;
+                if (IS_INT_fn(kd))       { snprintf(kb,sizeof kb,"%lld",(long long)kd.i); ks=kb; }
+                else if (IS_REAL_fn(kd)) { snprintf(kb,sizeof kb,"%g",kd.r); ks=kb; }
+                else                     { ks = VARVAL_fn(kd); if (!ks) ks=""; }
+                if (!table_has(td.tbl, ks)) return FAILDESCR;
+                return table_get(td.tbl, ks);
+            }
+
             return NULVCL;
         }
         case E_ALT:
@@ -1785,10 +1840,12 @@ DESCR_t interp_eval(EXPR_t *e)
 
     case E_SIZE: {
         /* *E — size of string, list, or table.
-         * String: number of characters.  List/table (SOH-delimited): element count. */
+         * String: number of characters.  List/table (SOH-delimited): element count.
+         * DT_T: native table → tbl->size. */
         if (e->nchildren < 1) return INTVAL(0);
         DESCR_t v = interp_eval(e->children[0]);
         if (IS_FAIL_fn(v)) return FAILDESCR;
+        if (v.v == DT_T) return INTVAL(v.tbl ? v.tbl->size : 0);
         if (IS_INT_fn(v)) return INTVAL(0);   /* integer has no size */
         if (IS_REAL_fn(v)) return INTVAL(0);
         /* String: count chars, or SOH-delimited elements for arrays */
@@ -2276,6 +2333,16 @@ DESCR_t interp_eval(EXPR_t *e)
     }
 
     case E_ITERATE: {
+        /* IC-3: DT_T table — return first value (oneshot; every uses icn_bb_tbl_iterate) */
+        if (e->nchildren >= 1) {
+            DESCR_t sv = interp_eval(e->children[0]);
+            if (sv.v == DT_T && sv.tbl) {
+                for (int bi = 0; bi < TABLE_BUCKETS; bi++) {
+                    if (sv.tbl->buckets[bi]) return sv.tbl->buckets[bi]->val;
+                }
+                return FAILDESCR;
+            }
+        }
         long cur; const char *str;
         if (icn_gen_lookup_sv(e, &cur, &str) && str) {
             char *ch = GC_malloc(2); ch[0] = str[cur]; ch[1] = '\0';

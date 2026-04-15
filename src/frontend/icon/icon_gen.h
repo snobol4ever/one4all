@@ -20,6 +20,7 @@
 #include <string.h>
 #include <ucontext.h>
 #include "../../runtime/x86/bb_broker.h"   /* bb_box_fn, bb_node_t, BrokerMode, bb_broker, DESCR_t, FAILDESCR, IS_FAIL_fn, α/β */
+#include "../../runtime/x86/snobol4.h"     /* TBBLK_t, TBPAIR_t, table_new, table_get, table_set, TABLE_BUCKETS */
 
 /*----------------------------------------------------------------------------------------------------------------------------
  * ICN_FAIL_GEN — a generator that immediately fires ω.  Used as a sentinel / no-op.
@@ -60,6 +61,7 @@ typedef struct {
 DESCR_t icn_bb_to_nested(void *zeta, int entry);
 typedef struct { long lo; long hi; long step; long cur; }                             icn_to_by_state_t;
 typedef struct { const char *str; long len; long pos; char ch[2]; }                  icn_iterate_state_t;
+typedef struct { TBBLK_t *tbl; int bucket; TBPAIR_t *entry; }                        icn_tbl_iterate_state_t;
 typedef struct { const char *needle; const char *hay; int nlen; const char *next; }  icn_find_state_t;
 typedef struct {
     ucontext_t  gen_ctx;
@@ -79,6 +81,7 @@ typedef struct {
 DESCR_t icn_bb_to(void *zeta, int entry);
 DESCR_t icn_bb_to_by(void *zeta, int entry);
 DESCR_t icn_bb_iterate(void *zeta, int entry);
+DESCR_t icn_bb_tbl_iterate(void *zeta, int entry);
 DESCR_t icn_bb_suspend(void *zeta, int entry);
 DESCR_t icn_bb_find(void *zeta, int entry);
 DESCR_t icn_bb_binop_gen(void *zeta, int entry);

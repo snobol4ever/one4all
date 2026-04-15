@@ -638,6 +638,14 @@ bb_node_t icn_eval_gen(EXPR_t *e) {
     if (e->kind == E_ITERATE && e->nchildren >= 1) {
         DESCR_t sv = interp_eval(e->children[0]);
         const char *loopvar = e->sval;
+        /* IC-3: DT_T table iteration — !T yields each value */
+        if (sv.v == DT_T) {
+            icn_tbl_iterate_state_t *z = calloc(1, sizeof(*z));
+            z->tbl = sv.tbl;
+            z->bucket = 0;
+            z->entry = NULL;
+            return (bb_node_t){ icn_bb_tbl_iterate, z, 0 };
+        }
         if (!IS_FAIL_fn(sv) && sv.s && (loopvar || strchr(sv.s, '\x01'))) {
             /* Raku array mode: route to icn_bb_raku_array */
             icn_raku_array_state_t *z = calloc(1, sizeof(*z));

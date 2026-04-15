@@ -106,6 +106,30 @@ DESCR_t icn_bb_iterate(void *zeta, int entry) {
 }
 
 /*============================================================================================================================
+ * B-5b: icn_bb_tbl_iterate — E_ITERATE Byrd box for DT_T tables  (!T yields values)
+ *
+ * State: tbl, bucket (0..TABLE_BUCKETS-1), entry (current TBPAIR_t*).
+ *   α: bucket=0, entry=tbl->buckets[0].
+ *   β: advance to next entry (or next non-empty bucket).
+ *   ω: all buckets exhausted.
+ *   γ: return entry->val.
+ *============================================================================================================================*/
+
+DESCR_t icn_bb_tbl_iterate(void *zeta, int entry) {
+    icn_tbl_iterate_state_t *z = (icn_tbl_iterate_state_t *)zeta;
+    if (!z->tbl) return FAILDESCR;
+    if (entry == α) { z->bucket = 0; z->entry = z->tbl->buckets[0]; }
+    else if (z->entry) { z->entry = z->entry->next; }
+    /* advance past empty buckets */
+    while (!z->entry && z->bucket < TABLE_BUCKETS - 1) {
+        z->bucket++;
+        z->entry = z->tbl->buckets[z->bucket];
+    }
+    if (!z->entry) return FAILDESCR;
+    return z->entry->val;
+}
+
+/*============================================================================================================================
  * B-6: icn_bb_suspend — E_SUSPEND Byrd box (coroutine wrapper)
  *
  * Wraps existing ucontext coroutine machinery from scrip.c.
