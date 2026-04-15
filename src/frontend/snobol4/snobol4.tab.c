@@ -1844,7 +1844,7 @@ yyreduce:
 
   case 93: /* expr17: T_IDENT  */
 #line 198 "snobol4.y"
-                                                                                                  { EKind _k=pat_prim_kind((yyvsp[0].tok).sval);EXPR_t*e=expr_new(_k);e->sval=(char*)(yyvsp[0].tok).sval;(yyval.expr)=e; }
+                                                                                                  { EXPR_t*e=expr_new(E_VAR);e->sval=(char*)(yyvsp[0].tok).sval;(yyval.expr)=e; }
 #line 1849 "snobol4.tab.c"
     break;
 

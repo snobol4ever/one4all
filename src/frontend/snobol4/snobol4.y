@@ -195,7 +195,7 @@ expr17     : T_LPAREN expr0 T_RPAREN                                            
            | T_LPAREN expr0 T_COMMA exprlist_ne T_RPAREN                                       { EXPR_t*a=expr_new(E_ALT);expr_add_child(a,$2);for(int i=0;i<$4->nchildren;i++)expr_add_child(a,$4->children[i]);free($4->children);free($4);$$=a; }
            | T_LPAREN T_RPAREN                                                                  { $$=expr_new(E_NUL); }
            | T_FUNCTION T_LPAREN exprlist T_RPAREN                                             { EKind _k=pat_prim_kind($1.sval);EXPR_t*e=expr_new(_k==E_VAR?E_FNC:_k);if(_k==E_VAR)e->sval=(char*)$1.sval;for(int i=0;i<$3->nchildren;i++)expr_add_child(e,$3->children[i]);free($3->children);free($3);$$=e; }
-           | T_IDENT                                                                              { EKind _k=pat_prim_kind($1.sval);EXPR_t*e=expr_new(_k);e->sval=(char*)$1.sval;$$=e; }
+           | T_IDENT                                                                              { EXPR_t*e=expr_new(E_VAR);e->sval=(char*)$1.sval;$$=e; }
            | T_END                                                                                { EXPR_t*e=expr_new(E_VAR);    e->sval=(char*)$1.sval;$$=e; }
            | T_KEYWORD                                                                            { EXPR_t*e=expr_new(E_KEYWORD);e->sval=(char*)$1.sval;$$=e; }
            | T_STR                                                                                { EXPR_t*e=expr_new(E_QLIT);   e->sval=(char*)$1.sval;$$=e; }

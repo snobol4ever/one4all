@@ -20,6 +20,7 @@
 #include "frontend/snobol4/scrip_cc.h"
 extern Program *sno_parse(FILE *f, const char *filename);
 extern Program *sno_parse_string(const char *src);
+extern int64_t kw_case;   /* &CASE: 0=fold, 1=sensitive; default 1 matches SPITBOL */
 #include "frontend/prolog/prolog_driver.h"
 #include "frontend/prolog/prolog_atom.h"
 #include "frontend/icon/icon_driver.h"
@@ -74,6 +75,7 @@ void polyglot_init(Program *prog, uint32_t lang_mask)
     /* ── SNO: label table + DEFINE prescan — always required ────────── */
     label_table_build(prog);
     prescan_defines(prog);
+    kw_case = 1;   /* default case-sensitive, matching SPITBOL oracle (&CASE=1) */
 
     /* ── ICN: proc table — only when Icon or Raku stmts present ─────── */
     if (lang_mask & ((1u << LANG_ICN) | (1u << LANG_RAKU))) {
