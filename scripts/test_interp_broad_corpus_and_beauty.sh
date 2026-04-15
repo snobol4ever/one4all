@@ -5,7 +5,7 @@
 
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-INTERP="${INTERP:-$HERE/scrip}"
+INTERP="${INTERP:-$HERE/../scrip}"
 CORPUS="/home/claude/corpus"
 TIMEOUT="${TIMEOUT:-10}"
 INC="$CORPUS/programs/snobol4/demo/inc"
