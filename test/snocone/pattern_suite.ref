@@ -1,0 +1,21 @@
+ARB-1 cap=
+ARB-2 pre=hello 
+ARB-3 all=end
+SPAN-1 run=aaa
+SPAN-2 word=abc
+SPAN-3 unexpected SUCCEED
+BREAK-1 word=hello
+BREAK-2 seg=foo
+BREAK-3 b=||
+BREAK-4 FAIL expected
+ANY-1 v=h
+ANY-2 FAIL expected
+ANY-3 c=a
+LEN-1 chunk=abc
+LEN-2 z=||
+LEN-3 one=x
+LEN-4 FAIL expected
+COMBO-1 k2=key
+COMBO-2 word=abc
+COMBO-3 d=1 rest=ab
+COMBO-4 aa=aa bb=bb
