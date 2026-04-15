@@ -69,6 +69,10 @@ WS       [ \t\r]
 "map"           { return KW_MAP; }
 "grep"          { return KW_GREP; }
 "sort"          { return KW_SORT; }
+"try"           { return KW_TRY; }
+"catch"         { return KW_CATCH; }
+"CATCH"         { return KW_CATCH; }
+"die"           { return KW_DIE; }
 "True"          { raku_yylval.ival = 1; return LIT_INT; }
 "False"         { raku_yylval.ival = 0; return LIT_INT; }
 "eq"            { return OP_SEQ; }

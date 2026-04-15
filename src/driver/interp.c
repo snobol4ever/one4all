@@ -68,6 +68,9 @@ extern int         Δ;
 
 #include "interp.h"
 
+/* ── RK-25: Raku exception global ─────────────────────────────────────── */
+char g_raku_exception[512] = "";   /* set by raku_die, read by raku_try */
+
 static void stmt_init(void) {}
 
 /* ── eval_code.c ─────────────────────────────────────────────────────── */
@@ -1248,6 +1251,47 @@ DESCR_t interp_eval(EXPR_t *e)
                     const char *s = VARVAL_fn(sd); if (!s) s = "";
                     return INTVAL((long)strlen(s));
                 }
+            }
+
+            /* ── RK-25: Raku try/CATCH/die exception handling ───────────────
+             * raku_die(msg)         — store msg in g_raku_exception, return FAILDESCR
+             * raku_try(body)        — eval body; if FAIL, clear exception, return NULVCL
+             * raku_try(body, catch) — eval body; if FAIL, eval catch block, return result */
+            if (!strcmp(fn,"raku_die") && nargs >= 1) {
+                DESCR_t md = interp_eval(e->children[1]);
+                const char *msg = VARVAL_fn(md); if (!msg) msg = "Died";
+                extern char g_raku_exception[512];
+                snprintf(g_raku_exception, sizeof g_raku_exception, "%s", msg);
+                return FAILDESCR;
+            }
+            if (!strcmp(fn,"raku_try") && (nargs == 1 || nargs == 2)) {
+                extern char g_raku_exception[512];
+                g_raku_exception[0] = '\0';
+                DESCR_t r = interp_eval(e->children[1]);   /* try body */
+                int body_failed = IS_FAIL_fn(r);
+                int real_die    = (g_raku_exception[0] != '\0'); /* only raku_die sets this */
+                if (!body_failed) { g_raku_exception[0]='\0'; return r; } /* success */
+                /* body failed */
+                if (nargs == 2 && real_die) {
+                    /* CATCH block: only fires on explicit die, not on fall-off-end */
+                    EXPR_t *catch_blk = e->children[2];
+                    int _sl2 = -1;
+                    EXPR_t *_stk2[64]; int _sn2=0; _stk2[_sn2++]=catch_blk;
+                    while (_sn2>0 && _sl2<0) {
+                        EXPR_t *_n=_stk2[--_sn2]; if(!_n) continue;
+                        if(_n->kind==E_VAR && _n->sval &&
+                           (strcmp(_n->sval,"$!")==0||strcmp(_n->sval,"!")==0))
+                            _sl2=(int)_n->ival;
+                        for(int _ci=0;_ci<_n->nchildren&&_sn2<62;_ci++) _stk2[_sn2++]=_n->children[_ci];
+                    }
+                    DESCR_t exc_d = STRVAL(GC_strdup(g_raku_exception));
+                    if (_sl2 >= 0 && _sl2 < ICN_CUR.env_n) ICN_CUR.env[_sl2] = exc_d;
+                    else NV_SET_fn("$!", exc_d);
+                    g_raku_exception[0] = '\0';
+                    return interp_eval(catch_blk);
+                }
+                g_raku_exception[0] = '\0';
+                return NULVCL;   /* swallow failure (no CATCH, or non-die failure) */
             }
 
             /* ── RK-24: Raku map/grep/sort higher-order list ops ────────────

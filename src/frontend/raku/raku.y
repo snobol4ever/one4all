@@ -156,6 +156,7 @@ static void add_proc(EXPR_t *e) {
 %token KW_GIVEN KW_WHEN KW_DEFAULT
 %token KW_EXISTS KW_DELETE KW_UNLESS KW_UNTIL KW_REPEAT
 %token KW_MAP KW_GREP KW_SORT
+%token KW_TRY KW_CATCH KW_DIE
 
 %token OP_RANGE OP_RANGE_EX
 %token OP_ARROW
@@ -267,11 +268,18 @@ stmt
     | KW_DELETE VAR_HASH '{' expr '}' ';'
         { EXPR_t *c=make_call("hash_delete");
           expr_add_child(c,var_node($2)); expr_add_child(c,$4); $$=c; }
-    | expr ';'          { $$=$1; }
+    | expr ';' { $$=$1; }
     | if_stmt           { $$=$1; }
     | while_stmt        { $$=$1; }
     | for_stmt          { $$=$1; }
     | given_stmt        { $$=$1; }
+    /* RK-25: try/CATCH as block-level stmts (no trailing semicolon) */
+    | KW_TRY block
+        { EXPR_t *c=make_call("raku_try");
+          expr_add_child(c,$2); $$=c; }
+    | KW_TRY block KW_CATCH block
+        { EXPR_t *c=make_call("raku_try");
+          expr_add_child(c,$2); expr_add_child(c,$4); $$=c; }
     | unless_stmt       { $$=$1; }
     | until_stmt        { $$=$1; }
     | repeat_stmt       { $$=$1; }
@@ -491,6 +499,10 @@ call_expr
           $$=e; }
     | IDENT '(' ')'  { $$=make_call($1); }
     /* RK-24: map/grep/sort higher-order list ops */
+    /* RK-25: die as expr (try/CATCH are stmt-level) */
+    | KW_DIE expr
+        { EXPR_t *c=make_call("raku_die");
+          expr_add_child(c,$2); $$=c; }
     | KW_MAP closure expr
         { EXPR_t *c=make_call("raku_map");
           expr_add_child(c,$2); expr_add_child(c,$3); $$=c; }
