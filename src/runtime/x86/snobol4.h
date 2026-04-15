@@ -452,11 +452,6 @@ DESCR_t pat_assign_callcap(DESCR_t child, const char *fnc_name, DESCR_t *args, i
 DESCR_t var_as_pattern(DESCR_t v);
 DESCR_t pat_user_call(const char *name, DESCR_t *args, int nargs);
 
-/* Pattern matching */
-int  match_pattern(DESCR_t pat, const char *subject);
-int  match_pattern_at(DESCR_t pat, const char *subject, int subj_len, int cursor);
-int  match_and_replace(DESCR_t *subject, DESCR_t pat, DESCR_t replacement);
-
 /* ============================================================
  * Array/Table/TREEBLK_t DESCR_t-level API (snobol4_pattern.c)
  * ============================================================ */
@@ -508,12 +503,6 @@ const char *setexit_label_get(void);
 /* TABLE_VAL macro */
 #define TABLE_VAL(tbl_) ((DESCR_t){ .v = DT_T, .tbl = (tbl_) })
 #define ARRAY_VAL(a_)   ((DESCR_t){ .v = DT_A, .arr = (a_)   })
-
-/* ============================================================
- * Pattern matching interface (matches engine_runtime.h)
- * ============================================================ */
-
-#include "engine_runtime.h"
 
 #endif /* SNOBOL4_H */
 void indirect_goto(const char *varname);

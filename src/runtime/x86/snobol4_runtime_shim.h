@@ -139,30 +139,6 @@ static inline DESCR_t _snoc_pat_imm(DESCR_t child, const char *var) {
 #define pat_cond(child, var)    _snoc_pat_cond(child, var)
 #define pat_imm(child, var)     _snoc_pat_imm(child, var)
 
-/* ---- Match / REPLACE_fn ---- */
-typedef struct {
-    int    failed;
-    DESCR_t subject_saved;  /* saved subject before MATCH_fn, for replacement */
-    DESCR_t pattern;
-} SnoMatch;
-
-static inline SnoMatch _snoc_match(DESCR_t *subj, DESCR_t pat) {
-    SnoMatch m; m.failed = 1;
-    if (!subj) return m;
-    m.subject_saved = *subj;
-    m.pattern = pat;
-    const char *s = VARVAL_fn(*subj);
-    m.failed = !match_pattern(pat, s ? s : "");
-    return m;
-}
-static inline void _snoc_replace(DESCR_t *subj, SnoMatch *m, DESCR_t repl) {
-    if (!subj || !m || m->failed) return;
-    *subj = m->subject_saved;  /* restore to pre-MATCH_fn state */
-    match_and_replace(subj, m->pattern, repl);
-}
-#define MATCH_fn(subj, pat)           _snoc_match(subj, pat)
-#define REPLACE_fn(subj, m, repl)     _snoc_replace(subj, m, repl)
-
 /* ---- Runtime INIT_fn / finish ---- */
 static inline void INIT_fn(void)    { SNO_INIT_fn(); extern void inc_init(void); inc_init(); }
 static inline void finish(void)  { }

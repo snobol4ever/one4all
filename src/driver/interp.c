@@ -1213,8 +1213,8 @@ DESCR_t interp_eval(EXPR_t *e)
                 DESCR_t pd = interp_eval(e->children[2]);
                 const char *subj = VARVAL_fn(sd); if (!subj) subj = "";
                 if (pd.v == DT_P) {
-                    extern int match_pattern(DESCR_t pat, const char *subject);
-                    return match_pattern(pd, subj) ? INTVAL(1) : FAILDESCR;
+                    extern int exec_stmt(const char *, DESCR_t *, DESCR_t, DESCR_t *, int);
+                    return exec_stmt(NULL, &sd, pd, NULL, 0) ? INTVAL(1) : FAILDESCR;
                 }
                 const char *needle = VARVAL_fn(pd); if (!needle) needle = "";
                 return strstr(subj, needle) ? INTVAL(1) : FAILDESCR;
