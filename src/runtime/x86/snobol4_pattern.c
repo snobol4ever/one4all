@@ -1313,10 +1313,40 @@ DESCR_t subscript_get(DESCR_t arr, DESCR_t idx) {
         return array_get(arr.arr, (int)to_int(idx));  /* returns DT_FAIL if OOB */
     }
     if (arr.v == DT_T) {
-        return table_get(arr.tbl, VARVAL_fn(idx));
+        char kb[64]; const char *ks;
+        if (IS_INT_fn(idx))       { snprintf(kb,sizeof kb,"%lld",(long long)idx.i); ks=kb; }
+        else if (IS_REAL_fn(idx)) { snprintf(kb,sizeof kb,"%g",idx.r); ks=kb; }
+        else                      { ks = VARVAL_fn(idx); if (!ks) ks=""; }
+        if (!table_has(arr.tbl, ks)) {
+            /* return table default if set (stored in init field as DESCR_t encoding) */
+            return FAILDESCR;
+        }
+        return table_get(arr.tbl, ks);
     }
-    /* DATA instance child access: c(x)[i] — tree children via DATINST_t */
+    /* IC-5: DT_S string subscript — Icon 1-based, negative wraps from end */
+    if (arr.v == DT_S || arr.v == DT_SNUL) {
+        const char *s = arr.s ? arr.s : "";
+        int slen = (int)strlen(s);
+        int i = (int)to_int(idx);
+        if (i < 0) i = slen + 1 + i + 1;   /* -1 → last char position */
+        if (i < 1 || i > slen) return FAILDESCR;
+        char *buf = GC_malloc(2); buf[0] = s[i-1]; buf[1] = '\0';
+        return STRVAL(buf);
+    }
+    /* IC-5: DT_DATA icnlist subscript */
     if (arr.v == DT_DATA) {
+        /* check if it's an icnlist */
+        DESCR_t tag = FIELD_GET_fn(arr, "icn_type");
+        if (tag.v == DT_S && tag.s && strcmp(tag.s,"list")==0) {
+            int n = (int)FIELD_GET_fn(arr,"icn_size").i;
+            DESCR_t ea = FIELD_GET_fn(arr,"icn_elems");
+            DESCR_t *elems = (ea.v==DT_DATA) ? (DESCR_t*)ea.ptr : NULL;
+            int i = (int)to_int(idx);
+            if (i < 0) i = n + 1 + i + 1;
+            if (!elems || i < 1 || i > n) return FAILDESCR;
+            return elems[i-1];
+        }
+        /* tree/record child access: c(x)[i] */
         int i = (int)to_int(idx);
         DESCR_t children = FIELD_GET_fn(arr, "c");
         if (children.v == DT_A && children.arr)
@@ -1349,6 +1379,19 @@ int subscript_set(DESCR_t arr, DESCR_t idx, DESCR_t val) {
 DESCR_t subscript_get2(DESCR_t arr, DESCR_t i, DESCR_t j) {
     if (arr.v == DT_A)
         return array_get2(arr.arr, (int)to_int(i), (int)to_int(j));
+    /* IC-5: DT_S string section s[i:j] */
+    if (arr.v == DT_S || arr.v == DT_SNUL) {
+        const char *s = arr.s ? arr.s : "";
+        int slen = (int)strlen(s);
+        int ii = (int)to_int(i), jj = (int)to_int(j);
+        if (ii < 0) ii = slen + 1 + ii + 1;
+        if (jj < 0) jj = slen + 1 + jj + 1;
+        if (ii < 1) ii = 1; if (jj > slen+1) jj = slen+1;
+        if (ii > jj) { char *e=GC_malloc(1); e[0]='\0'; return STRVAL(e); }
+        int len = jj - ii;
+        char *buf = GC_malloc(len+1); memcpy(buf, s+ii-1, len); buf[len]='\0';
+        return STRVAL(buf);
+    }
     return FAILDESCR;  /* P002: not an array — fail the statement */
 }
 

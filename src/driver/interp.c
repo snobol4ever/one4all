@@ -1307,6 +1307,238 @@ DESCR_t interp_eval(EXPR_t *e)
                 return table_get(td.tbl, ks);
             }
 
+            /* ── IC-5: key(T) — generator yielding each key of a table ───── */
+            if (!strcmp(fn,"key") && nargs == 1) {
+                DESCR_t td = interp_eval(e->children[1]);
+                if (td.v != DT_T || !td.tbl) return FAILDESCR;
+                /* oneshot: return first key; every uses icn_bb_tbl_iterate for keys */
+                for (int _bi = 0; _bi < TABLE_BUCKETS; _bi++)
+                    if (td.tbl->buckets[_bi])
+                        return td.tbl->buckets[_bi]->key_descr;
+                return FAILDESCR;
+            }
+
+            /* ── IC-5: integer(x), real(x), string(x), numeric(x) ──────────*/
+            if (!strcmp(fn,"integer") && nargs == 1) {
+                DESCR_t av = interp_eval(e->children[1]);
+                if (IS_INT_fn(av)) return av;
+                if (IS_REAL_fn(av)) return INTVAL((long long)av.r);
+                const char *s = VARVAL_fn(av); if (!s) return FAILDESCR;
+                char *end; long long iv = strtoll(s, &end, 10);
+                if (end != s && (*end=='\0'||*end==' ')) return INTVAL(iv);
+                /* try real→int */
+                double rv = strtod(s, &end);
+                if (end != s && (*end=='\0'||*end==' ')) return INTVAL((long long)rv);
+                return FAILDESCR;
+            }
+            if (!strcmp(fn,"real") && nargs == 1) {
+                DESCR_t av = interp_eval(e->children[1]);
+                if (IS_REAL_fn(av)) return av;
+                if (IS_INT_fn(av)) return REALVAL((double)av.i);
+                const char *s = VARVAL_fn(av); if (!s) return FAILDESCR;
+                char *end; double rv = strtod(s, &end);
+                if (end != s && (*end=='\0'||*end==' ')) return REALVAL(rv);
+                return FAILDESCR;
+            }
+            if (!strcmp(fn,"string") && nargs == 1) {
+                DESCR_t av = interp_eval(e->children[1]);
+                if (IS_STR_fn(av)) return av;
+                char *buf = GC_malloc(64);
+                if (IS_INT_fn(av))       snprintf(buf,64,"%lld",(long long)av.i);
+                else if (IS_REAL_fn(av)) { icn_real_str(av.r,buf,64); }
+                else return NULVCL;
+                return STRVAL(buf);
+            }
+            if (!strcmp(fn,"numeric") && nargs == 1) {
+                DESCR_t av = interp_eval(e->children[1]);
+                if (IS_INT_fn(av)||IS_REAL_fn(av)) return av;
+                const char *s = VARVAL_fn(av); if (!s||!*s) return FAILDESCR;
+                char *end; long long iv = strtoll(s, &end, 10);
+                if (end!=s && (*end=='\0'||*end==' ')) return INTVAL(iv);
+                double rv = strtod(s, &end);
+                if (end!=s && (*end=='\0'||*end==' ')) return REALVAL(rv);
+                return FAILDESCR;
+            }
+
+            /* ── IC-5: Icon list builtins: push/pull/put/get ───────────────
+             * Icon lists stored as DT_DATA with type name "icnlist" and a
+             * DT_A array field "elems".  We use a simple GC array of DESCR_t. */
+            if ((!strcmp(fn,"push")||!strcmp(fn,"put")||!strcmp(fn,"get")||!strcmp(fn,"pull")) && nargs >= 1) {
+                DESCR_t ld = interp_eval(e->children[1]);
+                /* push(L, v) — prepend */
+                if (!strcmp(fn,"push") && nargs == 2) {
+                    DESCR_t vd = interp_eval(e->children[2]);
+                    if (ld.v != DT_DATA) return FAILDESCR;
+                    DESCR_t ea = FIELD_GET_fn(ld,"icn_elems");
+                    int n = (ea.v==DT_I) ? (int)ea.i : 0;
+                    DESCR_t *old = (ea.v==DT_DATA) ? (DESCR_t*)ea.ptr : NULL;
+                    DESCR_t *nb = GC_malloc((n+1)*sizeof(DESCR_t));
+                    nb[0] = vd;
+                    if (old) memcpy(nb+1,old,n*sizeof(DESCR_t));
+                    FIELD_SET_fn(ld,"icn_elems",(DESCR_t){.v=DT_DATA,.ptr=nb});
+                    FIELD_SET_fn(ld,"icn_size",INTVAL(n+1));
+                    return ld;
+                }
+                /* put(L, v) — append */
+                if (!strcmp(fn,"put") && nargs == 2) {
+                    DESCR_t vd = interp_eval(e->children[2]);
+                    if (ld.v != DT_DATA) return FAILDESCR;
+                    DESCR_t ea = FIELD_GET_fn(ld,"icn_elems");
+                    int n = (ea.v==DT_I) ? (int)ea.i : 0;
+                    DESCR_t *old = (ea.v==DT_DATA) ? (DESCR_t*)ea.ptr : NULL;
+                    DESCR_t *nb = GC_malloc((n+1)*sizeof(DESCR_t));
+                    if (old) memcpy(nb,old,n*sizeof(DESCR_t));
+                    nb[n] = vd;
+                    FIELD_SET_fn(ld,"icn_elems",(DESCR_t){.v=DT_DATA,.ptr=nb});
+                    FIELD_SET_fn(ld,"icn_size",INTVAL(n+1));
+                    return ld;
+                }
+                /* get(L) — remove and return first element */
+                if (!strcmp(fn,"get") && nargs == 1) {
+                    if (ld.v != DT_DATA) return FAILDESCR;
+                    DESCR_t ea = FIELD_GET_fn(ld,"icn_elems");
+                    int n = (int)FIELD_GET_fn(ld,"icn_size").i;
+                    DESCR_t *arr = (ea.v==DT_DATA) ? (DESCR_t*)ea.ptr : NULL;
+                    if (!arr || n <= 0) return FAILDESCR;
+                    DESCR_t ret = arr[0];
+                    FIELD_SET_fn(ld,"icn_elems",(DESCR_t){.v=DT_DATA,.ptr=arr+1});
+                    FIELD_SET_fn(ld,"icn_size",INTVAL(n-1));
+                    /* write back to var if possible */
+                    if (e->children[1]->kind==E_VAR) {
+                        int sl=(int)e->children[1]->ival;
+                        if(sl>=0&&sl<ICN_CUR.env_n) ICN_CUR.env[sl]=ld;
+                    }
+                    return ret;
+                }
+                /* pull(L) — remove and return last element */
+                if (!strcmp(fn,"pull") && nargs == 1) {
+                    if (ld.v != DT_DATA) return FAILDESCR;
+                    DESCR_t ea = FIELD_GET_fn(ld,"icn_elems");
+                    int n = (int)FIELD_GET_fn(ld,"icn_size").i;
+                    DESCR_t *arr = (ea.v==DT_DATA) ? (DESCR_t*)ea.ptr : NULL;
+                    if (!arr || n <= 0) return FAILDESCR;
+                    DESCR_t ret = arr[n-1];
+                    FIELD_SET_fn(ld,"icn_size",INTVAL(n-1));
+                    if (e->children[1]->kind==E_VAR) {
+                        int sl=(int)e->children[1]->ival;
+                        if(sl>=0&&sl<ICN_CUR.env_n) ICN_CUR.env[sl]=ld;
+                    }
+                    return ret;
+                }
+            }
+
+            /* ── IC-5: char(n), ord(s) ──────────────────────────────────── */
+            if (!strcmp(fn,"char") && nargs == 1) {
+                DESCR_t av = interp_eval(e->children[1]);
+                int n = (int)(IS_INT_fn(av) ? av.i : (long long)strtol(VARVAL_fn(av)?VARVAL_fn(av):"0",NULL,10));
+                char *buf = GC_malloc(2); buf[0]=(char)(n&0xFF); buf[1]='\0';
+                return STRVAL(buf);
+            }
+            if (!strcmp(fn,"ord") && nargs == 1) {
+                DESCR_t av = interp_eval(e->children[1]);
+                const char *s = VARVAL_fn(av); if (!s||!*s) return FAILDESCR;
+                return INTVAL((unsigned char)s[0]);
+            }
+
+            /* ── IC-5: left/right/center/repl/reverse/map/trim ─────────── */
+            if (!strcmp(fn,"left") && nargs >= 2) {
+                DESCR_t sv=interp_eval(e->children[1]); const char *s=VARVAL_fn(sv); if(!s)s="";
+                int n=(int)to_int(interp_eval(e->children[2])); if(n<0)n=0;
+                const char *fill=" "; if(nargs>=3){DESCR_t fd=interp_eval(e->children[3]);const char*fs=VARVAL_fn(fd);if(fs&&*fs)fill=fs;}
+                char *buf=GC_malloc(n+1); int sl=(int)strlen(s);
+                for(int i=0;i<n;i++) buf[i]=(i<sl)?s[i]:fill[0]; buf[n]='\0';
+                return STRVAL(buf);
+            }
+            if (!strcmp(fn,"right") && nargs >= 2) {
+                DESCR_t sv=interp_eval(e->children[1]); const char *s=VARVAL_fn(sv); if(!s)s="";
+                int n=(int)to_int(interp_eval(e->children[2])); if(n<0)n=0;
+                const char *fill=" "; if(nargs>=3){DESCR_t fd=interp_eval(e->children[3]);const char*fs=VARVAL_fn(fd);if(fs&&*fs)fill=fs;}
+                int sl=(int)strlen(s); char *buf=GC_malloc(n+1);
+                int pad=n-sl; if(pad<0)pad=0;
+                for(int i=0;i<pad;i++) buf[i]=fill[0];
+                for(int i=0;i<n-pad;i++) buf[pad+i]=s[sl-(n-pad)+i];
+                buf[n]='\0'; return STRVAL(buf);
+            }
+            if (!strcmp(fn,"center") && nargs >= 2) {
+                DESCR_t sv=interp_eval(e->children[1]); const char *s=VARVAL_fn(sv); if(!s)s="";
+                int n=(int)to_int(interp_eval(e->children[2])); if(n<0)n=0;
+                const char *fill=" "; if(nargs>=3){DESCR_t fd=interp_eval(e->children[3]);const char*fs=VARVAL_fn(fd);if(fs&&*fs)fill=fs;}
+                int sl=(int)strlen(s); char *buf=GC_malloc(n+1);
+                int lpad=(n-sl)/2; if(lpad<0)lpad=0;
+                int rpad=n-sl-lpad; if(rpad<0)rpad=0;
+                for(int i=0;i<lpad;i++) buf[i]=fill[0];
+                for(int i=0;i<sl&&lpad+i<n;i++) buf[lpad+i]=s[i];
+                for(int i=0;i<rpad;i++) buf[lpad+sl+i]=fill[0];
+                buf[n]='\0'; return STRVAL(buf);
+            }
+            if (!strcmp(fn,"repl") && nargs == 2) {
+                DESCR_t sv=interp_eval(e->children[1]); const char *s=VARVAL_fn(sv); if(!s)s="";
+                int n=(int)to_int(interp_eval(e->children[2])); if(n<0)n=0;
+                int sl=(int)strlen(s); char *buf=GC_malloc(sl*n+1); buf[0]='\0';
+                for(int i=0;i<n;i++) memcpy(buf+i*sl,s,sl); buf[sl*n]='\0';
+                return STRVAL(buf);
+            }
+            if (!strcmp(fn,"reverse") && nargs == 1) {
+                DESCR_t sv=interp_eval(e->children[1]); const char *s=VARVAL_fn(sv); if(!s)s="";
+                int sl=(int)strlen(s); char *buf=GC_malloc(sl+1);
+                for(int i=0;i<sl;i++) buf[i]=s[sl-1-i]; buf[sl]='\0';
+                return STRVAL(buf);
+            }
+            if (!strcmp(fn,"map") && nargs == 3) {
+                DESCR_t sv=interp_eval(e->children[1]); const char *s=VARVAL_fn(sv); if(!s)s="";
+                DESCR_t fv=interp_eval(e->children[2]); const char *from=VARVAL_fn(fv); if(!from)from="";
+                DESCR_t tv=interp_eval(e->children[3]); const char *to=VARVAL_fn(tv); if(!to)to="";
+                int sl=(int)strlen(s); char *buf=GC_malloc(sl+1);
+                int fl=(int)strlen(from),tl=(int)strlen(to);
+                for(int i=0;i<sl;i++){
+                    char c=s[i]; int found=0;
+                    for(int j=0;j<fl;j++) if(from[j]==c){buf[i]=(j<tl)?to[j]:'\0';found=1;break;}
+                    if(!found) buf[i]=c;
+                }
+                buf[sl]='\0'; return STRVAL(buf);
+            }
+            if (!strcmp(fn,"trim") && nargs == 1) {
+                DESCR_t sv=interp_eval(e->children[1]); const char *s=VARVAL_fn(sv); if(!s)s="";
+                int sl=(int)strlen(s); while(sl>0&&isspace((unsigned char)s[sl-1]))sl--;
+                char *buf=GC_malloc(sl+1); memcpy(buf,s,sl); buf[sl]='\0';
+                return STRVAL(buf);
+            }
+
+            /* ── IC-5: type(x), image(x), copy(x) ──────────────────────── */
+            if (!strcmp(fn,"type") && nargs == 1) {
+                DESCR_t av = interp_eval(e->children[1]);
+                const char *t;
+                if (IS_INT_fn(av))       t="integer";
+                else if (IS_REAL_fn(av)) t="real";
+                else if (av.v==DT_T)     t="table";
+                else if (av.v==DT_A)     t="list";
+                else if (av.v==DT_DATA)  {
+                    /* check if icnlist tag */
+                    DESCR_t tag = FIELD_GET_fn(av,"icn_type");
+                    t = (tag.v==DT_S && tag.s) ? tag.s : "record";
+                }
+                else t="string";
+                return STRVAL(t);
+            }
+            if (!strcmp(fn,"image") && nargs == 1) {
+                DESCR_t av = interp_eval(e->children[1]);
+                char *buf = GC_malloc(128);
+                if (IS_INT_fn(av))       snprintf(buf,128,"%lld",(long long)av.i);
+                else if (IS_REAL_fn(av)) icn_real_str(av.r,buf,128);
+                else if (av.v==DT_T)     snprintf(buf,128,"table(%d)",av.tbl?av.tbl->size:0);
+                else if (av.v==DT_DATA)  snprintf(buf,128,"record");
+                else { const char *s=VARVAL_fn(av); snprintf(buf,128,"\"%s\"",s?s:""); }
+                return STRVAL(buf);
+            }
+            if (!strcmp(fn,"copy") && nargs == 1) {
+                /* shallow copy — for our purposes return same value */
+                return interp_eval(e->children[1]);
+            }
+
+            /* ── IC-5: swap(L, k) is actually handled as E_SWAP op ─────── */
+            /* ── IC-5: size *L for DT_DATA lists ──────────────────────────
+             * E_SIZE is handled below; nothing to add in E_FNC.           */
+
             return NULVCL;
         }
         case E_ALT:
@@ -2043,6 +2275,12 @@ DESCR_t interp_eval(EXPR_t *e)
         DESCR_t v = interp_eval(e->children[0]);
         if (IS_FAIL_fn(v)) return FAILDESCR;
         if (v.v == DT_T) return INTVAL(v.tbl ? v.tbl->size : 0);
+        /* IC-5: DT_DATA icnlist */
+        if (v.v == DT_DATA) {
+            DESCR_t tag = FIELD_GET_fn(v,"icn_type");
+            if (tag.v==DT_S && tag.s && strcmp(tag.s,"list")==0)
+                return INTVAL((int)FIELD_GET_fn(v,"icn_size").i);
+        }
         if (IS_INT_fn(v)) return INTVAL(0);   /* integer has no size */
         if (IS_REAL_fn(v)) return INTVAL(0);
         /* String: count chars, or SOH-delimited elements for arrays */
@@ -2539,6 +2777,17 @@ DESCR_t interp_eval(EXPR_t *e)
                 }
                 return FAILDESCR;
             }
+            /* IC-5: DT_DATA icnlist — !L returns first element (every drives the rest) */
+            if (sv.v == DT_DATA) {
+                DESCR_t tag = FIELD_GET_fn(sv,"icn_type");
+                if (tag.v==DT_S && tag.s && strcmp(tag.s,"list")==0) {
+                    int n=(int)FIELD_GET_fn(sv,"icn_size").i;
+                    DESCR_t ea=FIELD_GET_fn(sv,"icn_elems");
+                    DESCR_t *elems=(ea.v==DT_DATA)?(DESCR_t*)ea.ptr:NULL;
+                    if(!elems||n<=0) return FAILDESCR;
+                    return elems[0];
+                }
+            }
         }
         long cur; const char *str;
         if (icn_gen_lookup_sv(e, &cur, &str) && str) {
@@ -2562,6 +2811,103 @@ DESCR_t interp_eval(EXPR_t *e)
         }
         return val;
     }
+
+    /* ── IC-5: E_SWAP — x :=: y  (swap two lvalues) ───────────────────── */
+    case E_SWAP: {
+        if (e->nchildren < 2 || icn_frame_depth <= 0) return NULVCL;
+        EXPR_t *lhs = e->children[0], *rhs = e->children[1];
+        DESCR_t lv = interp_eval(lhs), rv = interp_eval(rhs);
+        /* write rv→lhs slot, lv→rhs slot */
+        if (lhs && lhs->kind == E_VAR) {
+            int sl=(int)lhs->ival;
+            if (sl>=0&&sl<ICN_CUR.env_n) ICN_CUR.env[sl]=rv;
+            else if (sl<0&&lhs->sval) NV_SET_fn(lhs->sval,rv);
+        }
+        if (rhs && rhs->kind == E_VAR) {
+            int sl=(int)rhs->ival;
+            if (sl>=0&&sl<ICN_CUR.env_n) ICN_CUR.env[sl]=lv;
+            else if (sl<0&&rhs->sval) NV_SET_fn(rhs->sval,lv);
+        }
+        return rv;
+    }
+
+    /* ── IC-5: E_LCONCAT — s1 ||| s2  (list concatenation = string concat alias) */
+    case E_LCONCAT: {
+        if (e->nchildren < 2) return NULVCL;
+        DESCR_t a = interp_eval(e->children[0]);
+        DESCR_t b = interp_eval(e->children[1]);
+        /* For string operands, behave like string concat */
+        char ab[64], bb[64];
+        const char *as = IS_INT_fn(a)?(snprintf(ab,64,"%lld",(long long)a.i),ab):IS_REAL_fn(a)?(icn_real_str(a.r,ab,64),ab):VARVAL_fn(a);
+        const char *bs = IS_INT_fn(b)?(snprintf(bb,64,"%lld",(long long)b.i),bb):IS_REAL_fn(b)?(icn_real_str(b.r,bb,64),bb):VARVAL_fn(b);
+        if (!as) as=""; if (!bs) bs="";
+        size_t al=strlen(as),bl=strlen(bs);
+        char *buf=GC_malloc(al+bl+1); memcpy(buf,as,al); memcpy(buf+al,bs,bl); buf[al+bl]='\0';
+        return STRVAL(buf);
+    }
+
+    /* ── IC-5: E_MAKELIST — [e1,e2,...] list constructor ───────────────── */
+    case E_MAKELIST: {
+        int n = e->nchildren;
+        /* Register icnlist type once if needed, using a global flag */
+        static int icnlist_registered = 0;
+        if (!icnlist_registered) { DEFDAT_fn("icnlist(icn_elems,icn_size,icn_type)"); icnlist_registered=1; }
+        DESCR_t *elems = GC_malloc((n>0?n:1)*sizeof(DESCR_t));
+        for (int i = 0; i < n; i++) elems[i] = interp_eval(e->children[i]);
+        DESCR_t eptr; eptr.v=DT_DATA; eptr.slen=0; eptr.ptr=(void*)elems;
+        DESCR_t ld = DATCON_fn("icnlist", eptr, INTVAL(n), STRVAL("list"));
+        return ld;
+    }
+
+    /* ── IC-5: E_SECTION — s[i:j] string section ───────────────────────── */
+    case E_SECTION: {
+        if (e->nchildren < 3) return NULVCL;
+        DESCR_t sd = interp_eval(e->children[0]);
+        const char *s = VARVAL_fn(sd); if (!s) s="";
+        int slen = (int)strlen(s);
+        int i = (int)to_int(interp_eval(e->children[1]));
+        int j = (int)to_int(interp_eval(e->children[2]));
+        /* Icon 1-based, negative wraps: -1 = slen+1 */
+        if (i < 0) i = slen + 1 + i + 1;
+        if (j < 0) j = slen + 1 + j + 1;
+        if (i < 1) i = 1; if (j > slen+1) j = slen+1;
+        if (i > j) { char *e2=GC_malloc(1); e2[0]='\0'; return STRVAL(e2); }
+        int len = j - i;
+        char *buf = GC_malloc(len+1); memcpy(buf, s+i-1, len); buf[len]='\0';
+        return STRVAL(buf);
+    }
+
+    /* ── IC-5: E_INITIAL — once-only block per procedure invocation ─────── */
+    case E_INITIAL: {
+        /* Use the proc node pointer as key: store "ran" flag as NV with address-derived name.
+         * We tag the EXPR_t node itself with ival=1 after first run. */
+        if (e->ival != 0) return NULVCL;   /* already ran */
+        e->ival = 1;   /* mark ran — persists since EXPR_t is GC-allocated once */
+        for (int i = 0; i < e->nchildren; i++) interp_eval(e->children[i]);
+        return NULVCL;
+    }
+
+    /* ── IC-5: E_RECORD — register record type ──────────────────────────── */
+    case E_RECORD: {
+        /* e->sval = type name; children = field name E_VAR nodes.
+         * Build spec string "typename(f1,f2,...)" and call DEFDAT_fn. */
+        if (!e->sval) return NULVCL;
+        char spec[256]; int pos=0;
+        pos += snprintf(spec+pos, sizeof(spec)-pos, "%s(", e->sval);
+        for (int i = 0; i < e->nchildren && pos < (int)sizeof(spec)-2; i++) {
+            if (i > 0) spec[pos++]=',';
+            const char *fn2 = (e->children[i] && e->children[i]->sval) ? e->children[i]->sval : "";
+            pos += snprintf(spec+pos, sizeof(spec)-pos, "%s", fn2);
+        }
+        if (pos < (int)sizeof(spec)-1) spec[pos++]=')';
+        spec[pos]='\0';
+        DEFDAT_fn(spec);
+        return NULVCL;
+    }
+
+    /* ── IC-5: E_GLOBAL (declaration, skip at eval time) ───────────────── */
+    case E_GLOBAL:
+        return NULVCL;
 
     default:
         return NULVCL;

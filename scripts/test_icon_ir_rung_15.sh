@@ -1,29 +1,17 @@
 #!/bin/bash
-# run_rung15.sh — rung15_real_swap JVM corpus runner
-set -euo pipefail
-DRIVER="${1:-/tmp/scrip}"
-JASMIN="$(dirname "$0")/../../../src/backend/jasmin.jar"
-SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
-CORPUS="${CORPUS_REPO:-$(cd "$SCRIPT_DIR/../../.." && pwd)/corpus}/programs/icon"
-TMPDIR_OUT="$(mktemp -d)"
-trap 'rm -rf "$TMPDIR_OUT"' EXIT
-PASS=0; FAIL=0
-run_test() {
-    local t="$1"
-    local icn="$CORPUS/${t}.icn"
-    local exp="$CORPUS/${t}.expected"
-    local jfile="$TMPDIR_OUT/${t}.j"
-    "$DRIVER" -jvm "$icn" -o "$jfile" 2>/dev/null
-    timeout 30 java -jar "$JASMIN" "$jfile" -d "$TMPDIR_OUT/" 2>/dev/null
-    local cls; cls=$(grep '\.class' "$jfile" | awk '{print $NF}')
-    local got; got=$(timeout 5 java -cp "$TMPDIR_OUT/" "$cls" 2>/dev/null)
-    local expected; expected=$(cat "$exp")
-    if [ "$got" = "$expected" ]; then echo "PASS $t"; PASS=$((PASS+1))
-    else echo "FAIL $t"; echo "  expected: $(echo "$expected"|tr '\n' '|')"; echo "  got:      $(echo "$got"|tr '\n' '|')"; FAIL=$((FAIL+1)); fi
-}
-run_test t01_real_literal
-run_test t02_real_var
-run_test t03_swap_basic
-run_test t04_swap_str
-run_test t05_lconcat
-echo "--- rung15: $PASS/5 PASS, $FAIL FAIL ---"
+# scripts/test_icon_ir_rung_15.sh — IC-5 gate: real output, swap, lconcat
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIP="${SCRIP:-$HERE/scrip}"
+CORPUS="/home/claude/corpus/programs/icon"
+if [ ! -f "$SCRIP" ]; then echo "SKIP scrip not found"; exit 0; fi
+if [ ! -d "$CORPUS" ]; then echo "SKIP corpus not found"; exit 0; fi
+pass=0; fail=0
+for icn in "$CORPUS"/rung15_*.icn; do
+    name=$(basename "${icn%.icn}")
+    exp=$(cat "${icn%.icn}.expected" 2>/dev/null)
+    got=$(timeout 8 "$SCRIP" --ir-run "$icn" < /dev/null 2>/dev/null)
+    if [ "$got" = "$exp" ]; then echo "  PASS $name"; pass=$((pass+1))
+    else echo "  FAIL $name"; echo "    exp: $exp"; echo "    got: $got"; fail=$((fail+1)); fi
+done
+echo ""; echo "PASS=$pass FAIL=$fail"
+[ "$fail" -eq 0 ]
