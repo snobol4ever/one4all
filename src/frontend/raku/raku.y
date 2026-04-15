@@ -318,9 +318,11 @@ for_stmt
               /* range case: lo=children[0], hi=children[1] */
               $$ = make_for_range(iter->children[0], iter->children[1], vname, $5);
           } else {
-              EXPR_t *gen=(iter->kind==E_VAR)?expr_unary(E_ITERATE,iter):iter;
-              /* RK-16: store loop-variable name in gen->sval so icn_drive can bind it */
-              gen->sval = (char *)vname;
+              /* Always wrap in E_ITERATE so loopvar goes on the wrapper node.
+               * RK-16/RK-21: gen->sval = loopvar name for icn_drive / E_EVERY binding. */
+              const char *vn = intern(strip_sigil($4));
+              EXPR_t *gen = expr_unary(E_ITERATE, iter);
+              gen->sval = (char *)vn;
               $$=expr_binary(E_EVERY,gen,$5);
           } }
     | KW_FOR expr block
@@ -399,7 +401,29 @@ block
 
 expr
     : VAR_SCALAR '=' expr  { $$=expr_binary(E_ASSIGN,var_node($1),$3); }
-    | KW_GATHER block      { $$=expr_unary(E_ITERATE,$2); }
+    | KW_GATHER block      {
+          /* RK-21: gather { block } → anonymous coroutine sub + call.
+           * 1. Build E_FNC def with SUB_TAG (like sub_decl) named __gather_N.
+           * 2. add_proc() so it lands in the proc table.
+           * 3. Return a call E_FNC (no SUB_TAG) so icn_eval_gen wraps it as
+           *    icn_bb_suspend — a BB_PUMP coroutine collecting E_SUSPEND (take) values. */
+          static int gather_seq = 0;
+          char gname[32]; snprintf(gname, sizeof gname, "__gather_%d", gather_seq++);
+          /* Build the def node */
+          EXPR_t *def = leaf_sval(E_FNC, gname); def->ival = (long)0 | SUB_TAG;
+          EXPR_t *dn  = expr_new(E_VAR); dn->sval = intern(gname);
+          expr_add_child(def, dn);
+          /* Splice block children into def */
+          EXPR_t *blk = $2;
+          for (int i = 0; i < blk->nchildren; i++) expr_add_child(def, blk->children[i]);
+          def->ival &= ~SUB_TAG;   /* strip sentinel — restore real nparams (0) for icn_call_proc */
+          add_proc(def);
+          /* Build the call node (no SUB_TAG) */
+          EXPR_t *call = leaf_sval(E_FNC, gname);
+          EXPR_t *cn   = expr_new(E_VAR); cn->sval = intern(gname);
+          expr_add_child(call, cn);
+          $$ = call;
+      }
     | cmp_expr             { $$=$1; }
     ;
 

@@ -153,6 +153,10 @@ DESCR_t icn_bb_suspend(void *zeta, int entry) {
         z->gen_ctx.uc_stack.ss_sp   = z->stack;
         z->gen_ctx.uc_stack.ss_size = 256 * 1024;
         z->gen_ctx.uc_link          = NULL;
+        /* RK-21: if using gather trampoline, pass ss via the static staging pointer
+         * (makecontext cannot pass pointer args portably on x86-64). */
+        if (z->trampoline == icn_gather_trampoline)
+            icn_gather_trampoline_ss = z;
         makecontext(&z->gen_ctx, z->trampoline, 0);
         swapcontext(&z->caller_ctx, &z->gen_ctx);
     } else if (!z->exhausted) {

@@ -1188,11 +1188,31 @@ DESCR_t interp_eval(EXPR_t *e)
             /* When body==NULL, the box's own side-effects ARE the work (e.g. every write(1 to 5)).
              * When body!=NULL, box produces a value; body runs separately each tick. */
             bb_node_t box = icn_eval_gen(gen);
+            /* RK-21: save caller frame depth before pumping — icn_bb_suspend (gather coroutine)
+             * leaves its frame on the stack during suspend, so icn_frame_depth increases by 1
+             * after box.fn(α). Binding must target the CALLER's frame, not ICN_CUR. */
+            int caller_depth = icn_frame_depth;
             DESCR_t val = box.fn(box.ζ, α);
             while (!IS_FAIL_fn(val) && !ICN_CUR.returning && !ICN_CUR.loop_break) {
+                /* RK-21: bind loop variable into the CALLER's frame (depth saved before pump). */
+                if (gen->sval && *gen->sval && caller_depth >= 1) {
+                    IcnFrame *cf = &icn_frame_stack[caller_depth - 1];
+                    int slot = icn_scope_get(&cf->sc, gen->sval);
+                    if (slot >= 0 && slot < cf->env_n)
+                        cf->env[slot] = val;
+                    else
+                        NV_SET_fn(gen->sval, val);
+                }
                 if (body) {
                     icn_gen_push(gen, val.v == DT_I ? val.i : 0, val.v == DT_I ? NULL : val.s);
+                    /* RK-21: if a coroutine (gather) frame is suspended on the stack,
+                     * step icn_frame_depth back to caller_depth so ICN_CUR is the caller's
+                     * frame during body execution. The coroutine frame is preserved at
+                     * icn_frame_stack[caller_depth] and restored after body runs. */
+                    int saved_depth = icn_frame_depth;
+                    icn_frame_depth = caller_depth;
                     interp_eval(body);
+                    icn_frame_depth = saved_depth;
                     icn_gen_pop();
                 }
                 if (ICN_CUR.returning || ICN_CUR.loop_break) break;

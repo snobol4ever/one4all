@@ -297,7 +297,7 @@ void icn_scope_patch(IcnScope *sc, EXPR_t *e) {
     if (e->kind == E_VAR && e->sval) {
         /* U-23: globals bridge to SNO NV store — skip slot, preserve sval, set ival=-1 */
         if (icn_is_global(e->sval)) { e->ival = -1; }
-        else { int s = icn_scope_add(sc, e->sval); if (s >= 0) e->ival = s; }
+        else { int s = icn_scope_add(sc, e->sval); if (s >= 0) e->ival = s; else e->ival = -1; }
     }
     for (int i=0;i<e->nchildren;i++) icn_scope_patch(sc, e->children[i]);
 }
@@ -500,6 +500,21 @@ static void icn_proc_trampoline(void) {
     swapcontext(&st.ss->gen_ctx, &st.ss->caller_ctx);
 }
 
+/* RK-21: gather trampoline — reads proc from ss->gather_proc, not icn_coro_stage.
+ * This avoids the race where icn_coro_stage is overwritten between icn_eval_gen
+ * and the first α call to icn_bb_suspend. The ss pointer is passed via a
+ * thread-local-style static (safe: single-threaded, called only from makecontext). */
+icn_suspend_state_t *icn_gather_trampoline_ss = NULL;
+void icn_gather_trampoline(void) {
+    icn_suspend_state_t *ss = icn_gather_trampoline_ss;
+    icn_active_ss = ss;
+    DESCR_t result = icn_call_proc(ss->gather_proc, NULL, 0);
+    icn_active_ss = NULL;
+    ss->yielded   = IS_FAIL_fn(result) ? FAILDESCR : result;
+    ss->exhausted = 1;
+    swapcontext(&ss->gen_ctx, &ss->caller_ctx);
+}
+
 /*============================================================================================================================
  * RK-18a: icn_bb_raku_array — Raku @array Byrd box  (for @arr -> $x)
  *
@@ -636,6 +651,27 @@ bb_node_t icn_eval_gen(EXPR_t *e) {
 
     /* ── E_ITERATE: (!str) / Raku for @arr -> $x ────────────────────────── */
     if (e->kind == E_ITERATE && e->nchildren >= 1) {
+        /* RK-21: if child is an E_FNC call matching a user proc, treat as gather
+         * coroutine — build icn_bb_suspend box exactly like the E_FNC proc path. */
+        EXPR_t *child = e->children[0];
+        if (child && child->kind == E_FNC && child->nchildren >= 1 && child->children[0]) {
+            const char *fn = child->children[0]->sval;
+            if (fn) {
+                int pi;
+                for (pi = 0; pi < icn_proc_count; pi++)
+                    if (strcmp(icn_proc_table[pi].name, fn) == 0) break;
+                if (pi < icn_proc_count) {
+                    /* RK-21: Build gather coroutine — store proc in ss->gather_proc so
+                     * icn_gather_trampoline can read it at makecontext time, bypassing
+                     * the icn_coro_stage global which may be overwritten before first α. */
+                    icn_suspend_state_t *ss = calloc(1, sizeof(*ss));
+                    ss->stack        = malloc(256 * 1024);
+                    ss->trampoline   = icn_gather_trampoline;
+                    ss->gather_proc  = icn_proc_table[pi].proc;
+                    return (bb_node_t){ icn_bb_suspend, ss, 0 };
+                }
+            }
+        }
         DESCR_t sv = interp_eval(e->children[0]);
         const char *loopvar = e->sval;
         /* IC-3: DT_T table iteration — !T yields each value */

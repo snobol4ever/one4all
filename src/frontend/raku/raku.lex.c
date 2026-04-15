@@ -1,3 +1,6 @@
+#line 2 "raku.lex.c"
+
+#line 4 "raku.lex.c"
 
 #define  YY_INT_ALIGNED short int
 
@@ -844,6 +847,8 @@ int yy_flex_debug = 0;
 #define YY_MORE_ADJ 0
 #define YY_RESTORE_YY_MORE_OFFSET
 char *yytext;
+#line 1 "raku.l"
+#line 2 "raku.l"
 /*
  * raku.l — Tiny-Raku flex lexer
  *
@@ -869,7 +874,10 @@ void raku_lex_error(const char *msg) {
     fprintf(stderr, "raku lex error line %d: %s\n", raku_yylineno, msg);
 }
 int raku_get_lineno(void) { return raku_yylineno; }
+#line 878 "raku.lex.c"
 #define YY_NO_INPUT 1
+
+#line 881 "raku.lex.c"
 
 #define INITIAL 0
 #define STR_DQ 1
@@ -1086,6 +1094,10 @@ YY_DECL
 		}
 
 	{
+#line 41 "raku.l"
+
+
+#line 1101 "raku.lex.c"
 
 	while ( /*CONSTCOND*/1 )		/* loops until end-of-file is reached */
 		{
@@ -1154,265 +1166,329 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
+#line 43 "raku.l"
 { /* skip whitespace */ }
 	YY_BREAK
 case 2:
 /* rule 2 can match eol */
 YY_RULE_SETUP
+#line 44 "raku.l"
 { /* raku_yylineno auto-incremented by %option yylineno */ }
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
+#line 45 "raku.l"
 { /* single-line comment */ }
 	YY_BREAK
 /* ── Keywords ───────────────────────────────────────────────── */
 case 4:
 YY_RULE_SETUP
+#line 48 "raku.l"
 { return KW_MY; }
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
+#line 49 "raku.l"
 { return KW_SAY; }
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
+#line 50 "raku.l"
 { return KW_PRINT; }
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
+#line 51 "raku.l"
 { return KW_IF; }
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
+#line 52 "raku.l"
 { return KW_ELSE; }
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
+#line 53 "raku.l"
 { return KW_ELSIF; }
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
+#line 54 "raku.l"
 { return KW_WHILE; }
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
+#line 55 "raku.l"
 { return KW_FOR; }
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
+#line 56 "raku.l"
 { return KW_GIVEN; }
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
+#line 57 "raku.l"
 { return KW_WHEN; }
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
+#line 58 "raku.l"
 { return KW_DEFAULT; }
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
+#line 59 "raku.l"
 { return KW_SUB; }
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
+#line 60 "raku.l"
 { return KW_GATHER; }
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
+#line 61 "raku.l"
 { return KW_TAKE; }
 	YY_BREAK
 case 18:
 YY_RULE_SETUP
+#line 62 "raku.l"
 { return KW_RETURN; }
 	YY_BREAK
 case 19:
 YY_RULE_SETUP
+#line 63 "raku.l"
 { return KW_EXISTS; }
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
+#line 64 "raku.l"
 { return KW_DELETE; }
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
+#line 65 "raku.l"
 { return KW_UNLESS; }
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
+#line 66 "raku.l"
 { return KW_UNTIL; }
 	YY_BREAK
 case 23:
 YY_RULE_SETUP
+#line 67 "raku.l"
 { return KW_REPEAT; }
 	YY_BREAK
 case 24:
 YY_RULE_SETUP
+#line 68 "raku.l"
 { raku_yylval.ival = 1; return LIT_INT; }
 	YY_BREAK
 case 25:
 YY_RULE_SETUP
+#line 69 "raku.l"
 { raku_yylval.ival = 0; return LIT_INT; }
 	YY_BREAK
 case 26:
 YY_RULE_SETUP
+#line 70 "raku.l"
 { return OP_SEQ; }
 	YY_BREAK
 case 27:
 YY_RULE_SETUP
+#line 71 "raku.l"
 { return OP_SNE; }
 	YY_BREAK
 case 28:
 YY_RULE_SETUP
+#line 72 "raku.l"
 { return OP_DIV; }
 	YY_BREAK
 /* ── Operators (longest first) ───────────────────────────────── */
 case 29:
 YY_RULE_SETUP
+#line 75 "raku.l"
 { return OP_RANGE_EX; }
 	YY_BREAK
 case 30:
 YY_RULE_SETUP
+#line 76 "raku.l"
 { return OP_RANGE; }
 	YY_BREAK
 case 31:
 YY_RULE_SETUP
+#line 77 "raku.l"
 { return OP_ARROW; }
 	YY_BREAK
 case 32:
 YY_RULE_SETUP
+#line 78 "raku.l"
 { return OP_EQ; }
 	YY_BREAK
 case 33:
 YY_RULE_SETUP
+#line 79 "raku.l"
 { return OP_NE; }
 	YY_BREAK
 case 34:
 YY_RULE_SETUP
+#line 80 "raku.l"
 { return OP_LE; }
 	YY_BREAK
 case 35:
 YY_RULE_SETUP
+#line 81 "raku.l"
 { return OP_GE; }
 	YY_BREAK
 case 36:
 YY_RULE_SETUP
+#line 82 "raku.l"
 { return OP_AND; }
 	YY_BREAK
 case 37:
 YY_RULE_SETUP
+#line 83 "raku.l"
 { return OP_OR; }
 	YY_BREAK
 case 38:
 YY_RULE_SETUP
+#line 84 "raku.l"
 { return OP_BIND; }
 	YY_BREAK
 case 39:
 YY_RULE_SETUP
+#line 85 "raku.l"
 { return '+'; }
 	YY_BREAK
 case 40:
 YY_RULE_SETUP
+#line 86 "raku.l"
 { return '-'; }
 	YY_BREAK
 case 41:
 YY_RULE_SETUP
+#line 87 "raku.l"
 { return '*'; }
 	YY_BREAK
 case 42:
 YY_RULE_SETUP
+#line 88 "raku.l"
 { return '/'; }
 	YY_BREAK
 case 43:
 YY_RULE_SETUP
+#line 89 "raku.l"
 { return '%'; }
 	YY_BREAK
 case 44:
 YY_RULE_SETUP
+#line 90 "raku.l"
 { return '~'; }
 	YY_BREAK
 case 45:
 YY_RULE_SETUP
+#line 91 "raku.l"
 { return '<'; }
 	YY_BREAK
 case 46:
 YY_RULE_SETUP
+#line 92 "raku.l"
 { return '>'; }
 	YY_BREAK
 case 47:
 YY_RULE_SETUP
+#line 93 "raku.l"
 { return '!'; }
 	YY_BREAK
 case 48:
 YY_RULE_SETUP
+#line 94 "raku.l"
 { return '='; }
 	YY_BREAK
 /* ── Punctuation ─────────────────────────────────────────────── */
 case 49:
 YY_RULE_SETUP
+#line 97 "raku.l"
 { return '{'; }
 	YY_BREAK
 case 50:
 YY_RULE_SETUP
+#line 98 "raku.l"
 { return '}'; }
 	YY_BREAK
 case 51:
 YY_RULE_SETUP
+#line 99 "raku.l"
 { return '('; }
 	YY_BREAK
 case 52:
 YY_RULE_SETUP
+#line 100 "raku.l"
 { return ')'; }
 	YY_BREAK
 case 53:
 YY_RULE_SETUP
+#line 101 "raku.l"
 { return '['; }
 	YY_BREAK
 case 54:
 YY_RULE_SETUP
+#line 102 "raku.l"
 { return ']'; }
 	YY_BREAK
 case 55:
 YY_RULE_SETUP
+#line 103 "raku.l"
 { return ';'; }
 	YY_BREAK
 case 56:
 YY_RULE_SETUP
+#line 104 "raku.l"
 { return ','; }
 	YY_BREAK
 /* ── Numeric literals ────────────────────────────────────────── */
 case 57:
 YY_RULE_SETUP
+#line 107 "raku.l"
 { raku_yylval.dval = atof(yytext); return LIT_FLOAT; }
 	YY_BREAK
 case 58:
 YY_RULE_SETUP
+#line 108 "raku.l"
 { raku_yylval.dval = atof(yytext); return LIT_FLOAT; }
 	YY_BREAK
 case 59:
 YY_RULE_SETUP
+#line 109 "raku.l"
 { raku_yylval.ival = atol(yytext); return LIT_INT; }
 	YY_BREAK
 /* ── Sigil variables ─────────────────────────────────────────── */
 case 60:
 YY_RULE_SETUP
+#line 112 "raku.l"
 { raku_yylval.sval = strdup("$_"); return VAR_SCALAR; }
 	YY_BREAK
 case 61:
 YY_RULE_SETUP
+#line 113 "raku.l"
 { raku_yylval.sval = strdup(yytext); return VAR_SCALAR; }
 	YY_BREAK
 case 62:
 YY_RULE_SETUP
+#line 114 "raku.l"
 { raku_yylval.sval = strdup(yytext); return VAR_ARRAY; }
 	YY_BREAK
 case 63:
 YY_RULE_SETUP
+#line 115 "raku.l"
 { raku_yylval.sval = strdup(yytext); return VAR_HASH; }
 	YY_BREAK
 /* ── Identifiers (bare words — sub names, builtins) ─────────── */
 case 64:
 YY_RULE_SETUP
+#line 118 "raku.l"
 { raku_yylval.sval = strdup(yytext); return IDENT; }
 	YY_BREAK
 /* ── Double-quoted string: flat literal or interpolated ──────── */
@@ -1420,10 +1496,12 @@ YY_RULE_SETUP
 /* The lowerer splits on $var boundaries into an E_CAT chain.    */
 case 65:
 YY_RULE_SETUP
+#line 123 "raku.l"
 { raku_strpos = 0; BEGIN(STR_DQ); }
 	YY_BREAK
 case 66:
 YY_RULE_SETUP
+#line 124 "raku.l"
 {
     raku_strbuf[raku_strpos] = '\0';
     raku_yylval.sval = strdup(raku_strbuf);
@@ -1435,36 +1513,44 @@ YY_RULE_SETUP
 	YY_BREAK
 case 67:
 YY_RULE_SETUP
+#line 132 "raku.l"
 { raku_strbuf[raku_strpos++] = '\n'; }
 	YY_BREAK
 case 68:
 YY_RULE_SETUP
+#line 133 "raku.l"
 { raku_strbuf[raku_strpos++] = '\t'; }
 	YY_BREAK
 case 69:
 YY_RULE_SETUP
+#line 134 "raku.l"
 { raku_strbuf[raku_strpos++] = '\\'; }
 	YY_BREAK
 case 70:
 YY_RULE_SETUP
+#line 135 "raku.l"
 { raku_strbuf[raku_strpos++] = '"'; }
 	YY_BREAK
 case 71:
 /* rule 71 can match eol */
 YY_RULE_SETUP
+#line 136 "raku.l"
 { raku_strbuf[raku_strpos++] = '\n'; }
 	YY_BREAK
 case 72:
 YY_RULE_SETUP
+#line 137 "raku.l"
 { raku_strbuf[raku_strpos++] = yytext[0]; }
 	YY_BREAK
 /* ── Single-quoted string (strictly literal) ─────────────────── */
 case 73:
 YY_RULE_SETUP
+#line 140 "raku.l"
 { raku_strpos = 0; BEGIN(STR_SQ); }
 	YY_BREAK
 case 74:
 YY_RULE_SETUP
+#line 141 "raku.l"
 {
     raku_strbuf[raku_strpos] = '\0';
     raku_yylval.sval = strdup(raku_strbuf);
@@ -1474,23 +1560,28 @@ YY_RULE_SETUP
 	YY_BREAK
 case 75:
 YY_RULE_SETUP
+#line 147 "raku.l"
 { raku_strbuf[raku_strpos++] = '\''; }
 	YY_BREAK
 case 76:
 YY_RULE_SETUP
+#line 148 "raku.l"
 { raku_strbuf[raku_strpos++] = '\\'; }
 	YY_BREAK
 case 77:
 /* rule 77 can match eol */
 YY_RULE_SETUP
+#line 149 "raku.l"
 { raku_strbuf[raku_strpos++] = '\n'; }
 	YY_BREAK
 case 78:
 YY_RULE_SETUP
+#line 150 "raku.l"
 { raku_strbuf[raku_strpos++] = yytext[0]; }
 	YY_BREAK
 case 79:
 YY_RULE_SETUP
+#line 152 "raku.l"
 {
     char buf[64];
     snprintf(buf, sizeof buf, "unexpected char '%c'", yytext[0]);
@@ -1499,8 +1590,10 @@ YY_RULE_SETUP
 	YY_BREAK
 case 80:
 YY_RULE_SETUP
+#line 158 "raku.l"
 ECHO;
 	YY_BREAK
+#line 1597 "raku.lex.c"
 case YY_STATE_EOF(INITIAL):
 case YY_STATE_EOF(STR_DQ):
 case YY_STATE_EOF(STR_SQ):
@@ -2477,4 +2570,7 @@ void yyfree (void * ptr )
 }
 
 #define YYTABLES_NAME "yytables"
+
+#line 158 "raku.l"
+
 

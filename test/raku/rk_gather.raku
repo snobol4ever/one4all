@@ -1,9 +1,7 @@
-# rk_gather.raku — gather/take as BB_PUMP generator
+# rk_gather.raku — RK-21: gather/take as BB_PUMP coroutine
 sub main() {
-    my $i = 1;
-    while ($i <= 5) {
-        say('item: ' ~ $i);
-        $i = $i + 1;
+    for gather { take(10); take(20); take(30); } -> $v {
+        say($v);
     }
     say('done');
 }

@@ -73,6 +73,8 @@ typedef struct {
     int         yielded_returned;   /* 1 after final return value has been delivered */
     void      (*trampoline)(void);
     void       *trampoline_arg;
+    /* RK-21: gather coroutine — proc stored here so trampoline doesn't need icn_coro_stage */
+    struct EXPR_t *gather_proc;
 } icn_suspend_state_t;
 
 /*----------------------------------------------------------------------------------------------------------------------------
@@ -188,5 +190,9 @@ typedef struct {
 DESCR_t icn_bb_seq_expr(void *zeta, int entry);
 
 bb_node_t icn_eval_gen(EXPR_t *e);
+
+/* RK-21: gather coroutine trampoline — defined in icn_runtime.c, referenced in icon_gen.c */
+extern void icn_gather_trampoline(void);
+extern icn_suspend_state_t *icn_gather_trampoline_ss;
 
 #endif /* ICON_GEN_H */
