@@ -41,6 +41,50 @@ int           g_pl_cut_flag = 0;
 Term        **g_pl_env      = NULL;
 int           g_pl_active   = 0;
 
+/* =========================================================================
+ * nb_setval / nb_getval — global non-backtrackable store (PL-10)
+ * ======================================================================= */
+#define PL_NB_STORE_SIZE 64
+typedef struct { char *key; Term *val; } Pl_NbEntry;
+static Pl_NbEntry g_pl_nb_store[PL_NB_STORE_SIZE];
+static int        g_pl_nb_count = 0;
+
+static void pl_nb_setval(const char *key, Term *val) {
+    for (int i = 0; i < g_pl_nb_count; i++) {
+        if (strcmp(g_pl_nb_store[i].key, key) == 0) {
+            g_pl_nb_store[i].val = val; return;
+        }
+    }
+    if (g_pl_nb_count < PL_NB_STORE_SIZE) {
+        g_pl_nb_store[g_pl_nb_count].key = strdup(key);
+        g_pl_nb_store[g_pl_nb_count].val = val;
+        g_pl_nb_count++;
+    }
+}
+
+static Term *pl_nb_getval(const char *key) {
+    for (int i = 0; i < g_pl_nb_count; i++)
+        if (strcmp(g_pl_nb_store[i].key, key) == 0)
+            return g_pl_nb_store[i].val;
+    return NULL;
+}
+
+/* =========================================================================
+ * throw/catch — exception mechanism (PL-10)
+ * A stack of catch frames; throw() longjmps to the innermost matching one.
+ * ======================================================================= */
+#define PL_CATCH_STACK_MAX 64
+typedef struct {
+    jmp_buf  jb;
+    Term    *catcher;   /* the Catcher pattern term */
+    Term   **env;       /* env at catch site */
+    int      trail_mark;
+} Pl_CatchFrame;
+
+static Pl_CatchFrame g_pl_catch_stack[PL_CATCH_STACK_MAX];
+static int           g_pl_catch_top  = 0;
+static Term         *g_pl_exception  = NULL; /* pending exception term */
+
 #define PL_PRED_TABLE_SIZE PL_PRED_TABLE_SIZE_FWD
 
 unsigned pl_pred_hash(const char *s) {
@@ -288,6 +332,8 @@ int is_pl_user_call(EXPR_t *goal) {
         "assert","assertz","asserta","retract","retractall","abolish",
         "nv_get","nv_set",
         "term_string","number_codes","number_chars","char_code","upcase_atom","downcase_atom",
+        "copy_term","atomic_list_concat","concat_atom","string_to_atom",
+        "nb_setval","nb_getval","aggregate_all","throw","catch",
         NULL
     };
     for (int i = 0; builtins[i]; i++) if (strcmp(goal->sval, builtins[i]) == 0) return 0;
@@ -328,6 +374,53 @@ static int term_order_cmp(Term *a, Term *b) {
         }
         default: return 0;
     }
+}
+
+/* =========================================================================
+ * copy_term helper — deep-copy a term, replacing variables with fresh ones
+ * Uses a simple var-mapping array: old_var[i] → new_var[i]
+ * ======================================================================= */
+#define COPY_TERM_MAX_VARS 256
+typedef struct { Term *orig; Term *copy; } CopyVarMap;
+
+static Term *copy_term_rec(Term *t, CopyVarMap *map, int *nmap) {
+    t = term_deref(t);
+    if (!t) {
+        /* unbound variable — create or reuse fresh var */
+        Term *fresh = term_new_var(-1);
+        return fresh;
+    }
+    switch (t->tag) {
+        case TT_VAR: {
+            /* unbound — look up or create a fresh copy */
+            for (int i = 0; i < *nmap; i++)
+                if (map[i].orig == t) return map[i].copy;
+            Term *fresh = term_new_var(-1);
+            if (*nmap < COPY_TERM_MAX_VARS) {
+                map[*nmap].orig = t; map[*nmap].copy = fresh; (*nmap)++;
+            }
+            return fresh;
+        }
+        case TT_ATOM:  return term_new_atom(t->atom_id);
+        case TT_INT:   return term_new_int(t->ival);
+        case TT_FLOAT: return term_new_float(t->fval);
+        case TT_COMPOUND: {
+            int ar = t->compound.arity;
+            Term **args = malloc(ar * sizeof(Term *));
+            for (int i = 0; i < ar; i++)
+                args[i] = copy_term_rec(t->compound.args[i], map, nmap);
+            Term *r = term_new_compound(t->compound.functor, ar, args);
+            free(args);
+            return r;
+        }
+        default: return t;
+    }
+}
+
+static Term *pl_copy_term(Term *t) {
+    CopyVarMap map[COPY_TERM_MAX_VARS];
+    int nmap = 0;
+    return copy_term_rec(t, map, &nmap);
 }
 
 /*---- interp_exec_pl_builtin — execute one Prolog builtin goal ----*/
@@ -1062,6 +1155,227 @@ int interp_exec_pl_builtin(EXPR_t *goal, Term **env) {
                     if (!uok) trail_unwind(utrail, umark);
                     if (uargs) free(uargs);
                     return uok;
+                }
+            }
+            /* ---- copy_term/2 (PL-10) ---- */
+            if (strcmp(fn,"copy_term")==0&&arity==2) {
+                Term *orig = pl_unified_term_from_expr(goal->children[0],env);
+                Term *dest = pl_unified_term_from_expr(goal->children[1],env);
+                Term *copy = pl_copy_term(orig);
+                int mark = trail_mark(trail);
+                if (!unify(dest, copy, trail)) { trail_unwind(trail,mark); return 0; }
+                return 1;
+            }
+            /* ---- atomic_list_concat/2 and /3 (PL-10) ---- */
+            if ((strcmp(fn,"atomic_list_concat")==0||strcmp(fn,"concat_atom")==0)&&(arity==2||arity==3)) {
+                Term *lst = term_deref(pl_unified_term_from_expr(goal->children[0],env));
+                int nil_id = prolog_atom_intern("[]"), dot_id = prolog_atom_intern(".");
+                const char *sep = "";
+                char sepbuf[64]; sepbuf[0]='\0';
+                if (arity==3) {
+                    Term *sv = term_deref(pl_unified_term_from_expr(goal->children[1],env));
+                    if (sv && sv->tag==TT_ATOM) sep=prolog_atom_name(sv->atom_id);
+                    else if (sv && sv->tag==TT_INT) { snprintf(sepbuf,sizeof sepbuf,"%ld",sv->ival); sep=sepbuf; }
+                }
+                /* build result string from list */
+                char buf[4096]; int pos=0; int first=1;
+                for (Term *cur=lst; cur; cur=term_deref(cur->compound.args[1])) {
+                    cur = term_deref(cur);
+                    if (!cur) break;
+                    if (cur->tag==TT_ATOM && cur->atom_id==nil_id) break;
+                    if (cur->tag!=TT_COMPOUND || cur->compound.arity!=2) break;
+                    Term *hd = term_deref(cur->compound.args[0]);
+                    const char *s = NULL; char tmp[64];
+                    if (hd && hd->tag==TT_ATOM) s=prolog_atom_name(hd->atom_id);
+                    else if (hd && hd->tag==TT_INT) { snprintf(tmp,sizeof tmp,"%ld",hd->ival); s=tmp; }
+                    else if (hd && hd->tag==TT_FLOAT) { snprintf(tmp,sizeof tmp,"%g",hd->fval); s=tmp; }
+                    if (!s) s="";
+                    if (!first && sep[0]) { int sl=(int)strlen(sep); if(pos+sl<(int)sizeof buf-1){memcpy(buf+pos,sep,sl);pos+=sl;} }
+                    first=0;
+                    int sl=(int)strlen(s); if(pos+sl<(int)sizeof buf-1){memcpy(buf+pos,s,sl);pos+=sl;}
+                }
+                buf[pos]='\0';
+                Term *res = term_new_atom(prolog_atom_intern(buf));
+                Term *out = pl_unified_term_from_expr(goal->children[arity==3?2:1],env);
+                int mark = trail_mark(trail);
+                if (!unify(out,res,trail)){trail_unwind(trail,mark);return 0;}
+                return 1;
+            }
+            /* ---- string_to_atom/2 (PL-10) ---- */
+            if (strcmp(fn,"string_to_atom")==0&&arity==2) {
+                Term *a0 = term_deref(pl_unified_term_from_expr(goal->children[0],env));
+                Term *a1 = pl_unified_term_from_expr(goal->children[1],env);
+                /* mode +,? : convert string/atom arg0 to atom arg1 */
+                if (a0 && (a0->tag==TT_ATOM||a0->tag==TT_INT||a0->tag==TT_FLOAT)) {
+                    const char *s=NULL; char tmp[64];
+                    if(a0->tag==TT_ATOM) s=prolog_atom_name(a0->atom_id);
+                    else if(a0->tag==TT_INT){snprintf(tmp,sizeof tmp,"%ld",a0->ival);s=tmp;}
+                    else{snprintf(tmp,sizeof tmp,"%g",a0->fval);s=tmp;}
+                    Term *res=term_new_atom(prolog_atom_intern(s));
+                    int mark=trail_mark(trail);
+                    if(!unify(a1,res,trail)){trail_unwind(trail,mark);return 0;}
+                    return 1;
+                }
+                /* mode ?,+ : arg1 is the atom, unify with arg0 */
+                Term *a1d = term_deref(a1);
+                if (a1d && a1d->tag==TT_ATOM) {
+                    int mark=trail_mark(trail);
+                    if(!unify(a0,a1d,trail)){trail_unwind(trail,mark);return 0;}
+                    return 1;
+                }
+                return 0;
+            }
+            /* ---- nb_setval/2, nb_getval/2 (PL-10) ---- */
+            if (strcmp(fn,"nb_setval")==0&&arity==2) {
+                Term *key = term_deref(pl_unified_term_from_expr(goal->children[0],env));
+                Term *val = pl_unified_term_from_expr(goal->children[1],env);
+                if (!key || key->tag!=TT_ATOM) return 0;
+                pl_nb_setval(prolog_atom_name(key->atom_id), val);
+                return 1;
+            }
+            if (strcmp(fn,"nb_getval")==0&&arity==2) {
+                Term *key = term_deref(pl_unified_term_from_expr(goal->children[0],env));
+                Term *out = pl_unified_term_from_expr(goal->children[1],env);
+                if (!key || key->tag!=TT_ATOM) return 0;
+                Term *val = pl_nb_getval(prolog_atom_name(key->atom_id));
+                if (!val) return 0;
+                int mark=trail_mark(trail);
+                if(!unify(out,val,trail)){trail_unwind(trail,mark);return 0;}
+                return 1;
+            }
+            /* ---- aggregate_all/3 (PL-10) ---- */
+            /* aggregate_all(+Template, :Goal, -Result)
+             * Template: count | sum(Var) | max(Var) | min(Var)
+             * Uses same α/β broker loop as findall. */
+            if (strcmp(fn,"aggregate_all")==0&&arity==3) {
+                Term   *tmpl_t    = term_deref(pl_unified_term_from_expr(goal->children[0],env));
+                EXPR_t *goal_expr = goal->children[1];
+                Term   *result_out= pl_unified_term_from_expr(goal->children[2],env);
+                /* classify template */
+                int is_count=0, is_sum=0, is_max=0, is_min=0;
+                EXPR_t *val_expr = NULL;
+                if (tmpl_t && tmpl_t->tag==TT_ATOM) {
+                    const char *tn=prolog_atom_name(tmpl_t->atom_id);
+                    if (strcmp(tn,"count")==0) is_count=1;
+                } else if (tmpl_t && tmpl_t->tag==TT_COMPOUND && tmpl_t->compound.arity==1) {
+                    const char *fn2=prolog_atom_name(tmpl_t->compound.functor);
+                    /* val_expr is the IR child of sum(Expr)/max(Expr)/min(Expr) */
+                    if (goal->children[0] && goal->children[0]->nchildren>0)
+                        val_expr = goal->children[0]->children[0];
+                    if (strcmp(fn2,"sum")==0) is_sum=1;
+                    else if (strcmp(fn2,"max")==0) is_max=1;
+                    else if (strcmp(fn2,"min")==0) is_min=1;
+                }
+                /* Use findall machinery: collect all snapshots, then aggregate.
+                 * This correctly handles anonymous _ vars in the goal. */
+                Trail ag_trail; trail_init(&ag_trail);
+                Trail saved_global_trail = g_pl_trail;
+                g_pl_trail = ag_trail;
+                long ag_count=0, ag_sum=0, ag_best=0; int ag_best_set=0;
+                /* Use goal children[0] (the template IR expr) as snapshot template.
+                 * For count, snapshot a dummy atom; for sum/max/min, snapshot val_expr. */
+                EXPR_t *snap_expr = (is_count || !val_expr) ? NULL : val_expr;
+                bb_node_t goal_box = pl_box_goal_from_ir(goal_expr, env);
+                DESCR_t ag_r = goal_box.fn(goal_box.ζ, α);
+                while (!IS_FAIL_fn(ag_r)) {
+                    ag_count++;
+                    if ((is_sum||is_max||is_min) && snap_expr) {
+                        Term *vt = term_deref(pl_unified_term_from_expr(snap_expr, env));
+                        long v=0;
+                        if (vt && vt->tag==TT_INT)   v=vt->ival;
+                        else if (vt && vt->tag==TT_FLOAT) v=(long)vt->fval;
+                        if (is_sum) ag_sum += v;
+                        if (!ag_best_set || (is_max && v>ag_best) || (is_min && v<ag_best)) {
+                            ag_best=v; ag_best_set=1;
+                        }
+                    }
+                    ag_r = goal_box.fn(goal_box.ζ, β);
+                }
+                g_pl_trail = saved_global_trail;
+                /* build result term */
+                Term *res = NULL;
+                if (is_count) res = term_new_int(ag_count);
+                else if (is_sum) res = term_new_int(ag_sum);
+                else if ((is_max||is_min) && ag_best_set) res = term_new_int(ag_best);
+                else if (is_max||is_min) return 0; /* no solutions */
+                else res = term_new_int(ag_count); /* fallback */
+                int mark = trail_mark(trail);
+                if (!unify(result_out, res, trail)) { trail_unwind(trail,mark); return 0; }
+                return 1;
+            }
+            /* ---- throw/1 (PL-10) ---- */
+            if (strcmp(fn,"throw")==0&&arity==1) {
+                Term *exc = pl_unified_term_from_expr(goal->children[0],env);
+                g_pl_exception = exc;
+                /* unwind to innermost catch frame that matches */
+                while (g_pl_catch_top > 0) {
+                    int ci = g_pl_catch_top - 1;
+                    Pl_CatchFrame *cf = &g_pl_catch_stack[ci];
+                    /* try to unify catcher pattern with exception */
+                    Trail tmptrail; trail_init(&tmptrail);
+                    int tmmark = trail_mark(&tmptrail);
+                    int matched = unify(cf->catcher, exc, &tmptrail);
+                    trail_unwind(&tmptrail, tmmark);
+                    if (matched) {
+                        longjmp(cf->jb, 1);
+                    }
+                    g_pl_catch_top--;
+                }
+                /* uncaught exception — print and exit */
+                fprintf(stderr,"ERROR: Unhandled exception: ");
+                pl_write(exc); fprintf(stderr,"\n");
+                exit(1);
+            }
+            /* ---- catch/3 (PL-10) ---- */
+            if (strcmp(fn,"catch")==0&&arity==3) {
+                EXPR_t *goal_e   = goal->children[0];
+                Term   *catcher  = pl_unified_term_from_expr(goal->children[1],env);
+                EXPR_t *recovery = goal->children[2];
+                if (g_pl_catch_top >= PL_CATCH_STACK_MAX) return 0;
+                Pl_CatchFrame *cf = &g_pl_catch_stack[g_pl_catch_top];
+                cf->catcher    = catcher;
+                cf->env        = env;
+                cf->trail_mark = trail_mark(trail);
+                g_pl_catch_top++;
+                int threw = setjmp(cf->jb);
+                if (!threw) {
+                    /* run the goal */
+                    int ok;
+                    if (is_pl_user_call(goal_e)) {
+                        char ukey[256];
+                        snprintf(ukey,sizeof ukey,"%s/%d",
+                                 goal_e->sval?goal_e->sval:"",goal_e->nchildren);
+                        EXPR_t *uch=pl_pred_table_lookup(&g_pl_pred_table,ukey);
+                        if (uch) {
+                            int ua=goal_e->nchildren;
+                            Term **uenv=ua?pl_env_new(ua):NULL;
+                            for(int ui=0;ui<ua;ui++)
+                                uenv[ui]=pl_unified_term_from_expr(goal_e->children[ui],env);
+                            Term **sv=g_pl_env; g_pl_env=uenv;
+                            DESCR_t rd=interp_eval(uch); g_pl_env=sv;
+                            if(uenv)free(uenv);
+                            ok=!IS_FAIL_fn(rd);
+                        } else ok=0;
+                    } else {
+                        ok = interp_exec_pl_builtin(goal_e, env);
+                    }
+                    /* goal completed without throw — pop catch frame */
+                    if (g_pl_catch_top>0 && &g_pl_catch_stack[g_pl_catch_top-1]==cf)
+                        g_pl_catch_top--;
+                    return ok;
+                } else {
+                    /* exception was thrown and matched this frame */
+                    /* g_pl_catch_top already decremented by throw */
+                    trail_unwind(trail, cf->trail_mark);
+                    /* unify exception with catcher var in current env */
+                    Term *exc = g_pl_exception;
+                    g_pl_exception = NULL;
+                    /* bind catcher pattern */
+                    int mark2=trail_mark(trail);
+                    unify(catcher, exc, trail);
+                    /* run recovery goal */
+                    int rok = interp_exec_pl_builtin(recovery, env);
+                    return rok;
                 }
             }
             fprintf(stderr,"prolog: undefined predicate %s/%d\n",fn,arity);

@@ -323,6 +323,8 @@ static int pl_is_builtin_goal(EXPR_t *g) {
         "numbervars","char_type",
         "nv_get","nv_set",
         "term_string","number_codes","number_chars","char_code","upcase_atom","downcase_atom",
+        "copy_term","atomic_list_concat","concat_atom","string_to_atom",
+        "nb_setval","nb_getval","aggregate_all","throw","catch",
         NULL
     };
     for (int i = 0; builtins[i]; i++)
