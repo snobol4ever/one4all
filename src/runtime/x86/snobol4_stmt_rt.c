@@ -535,6 +535,14 @@ void stmt_apply_replacement_splice(const char *varname, DESCR_t repl,
     NV_SET_fn(varname, STRVAL(out));
 }
 
+
+/* SN-6: match_pattern_at stub — engine.c removed; DT_P cursor match returns fail.
+ * Literal string matching still works via the VARVAL_fn path below. */
+static int match_pattern_at(DESCR_t pat, const char *subj, int subj_len, int cursor) {
+    (void)pat; (void)subj; (void)subj_len; (void)cursor;
+    return -1;  /* no match — DT_P engine path unavailable */
+}
+
 /* stmt_match_var: dynamic variable pattern/string match.
  *
  * If the variable holds a DT_P (pattern) descriptor, dispatch through
