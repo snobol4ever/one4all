@@ -1,0 +1,8 @@
+match World ok
+match Hello ok
+no match xyz ok
+var content match ok
+empty no match ok
+start match ok
+end match ok
+5

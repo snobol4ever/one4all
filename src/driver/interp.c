@@ -1205,6 +1205,20 @@ DESCR_t interp_eval(EXPR_t *e)
                 }
                 return INTVAL(best);
             }
+            if (!strcmp(fn,"raku_match") && nargs == 2) {
+                /* RK-23: $s ~~ /pattern/ — substring search (literal regex subset).
+                 * Returns INTVAL(1) on match, FAILDESCR on no match.
+                 * If pattern evaluates to DT_P, dispatch through match_pattern. */
+                DESCR_t sd = interp_eval(e->children[1]);
+                DESCR_t pd = interp_eval(e->children[2]);
+                const char *subj = VARVAL_fn(sd); if (!subj) subj = "";
+                if (pd.v == DT_P) {
+                    extern int match_pattern(DESCR_t pat, const char *subject);
+                    return match_pattern(pd, subj) ? INTVAL(1) : FAILDESCR;
+                }
+                const char *needle = VARVAL_fn(pd); if (!needle) needle = "";
+                return strstr(subj, needle) ? INTVAL(1) : FAILDESCR;
+            }
             if (!strcmp(fn,"raku_uc") || (!strcmp(fn,"uc") && nargs == 1)) {
                 DESCR_t sd = interp_eval(e->children[1]);
                 const char *s = VARVAL_fn(sd); if (!s) s = "";

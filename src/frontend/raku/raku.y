@@ -148,7 +148,7 @@ static void add_proc(EXPR_t *e) {
 
 %token <ival> LIT_INT
 %token <dval> LIT_FLOAT
-%token <sval> LIT_STR LIT_INTERP_STR
+%token <sval> LIT_STR LIT_INTERP_STR LIT_REGEX
 %token <sval> VAR_SCALAR VAR_ARRAY VAR_HASH IDENT
 
 %token KW_MY KW_SAY KW_PRINT KW_IF KW_ELSE KW_ELSIF KW_WHILE KW_FOR
@@ -162,6 +162,7 @@ static void add_proc(EXPR_t *e) {
 %token OP_SEQ OP_SNE
 %token OP_AND OP_OR
 %token OP_BIND
+%token OP_SMATCH
 %token OP_DIV
 
 %type <node> stmt expr atom range_expr cmp_expr add_expr
@@ -438,6 +439,12 @@ cmp_expr
     | add_expr OP_GE  add_expr  { $$=expr_binary(E_GE,$1,$3); }
     | add_expr OP_SEQ add_expr  { $$=expr_binary(E_LEQ,$1,$3); }
     | add_expr OP_SNE add_expr  { $$=expr_binary(E_LNE,$1,$3); }
+    | add_expr OP_SMATCH LIT_REGEX
+        { /* RK-23: $s ~~ /pattern/ — emit make_call("raku_match", subj, pat_str) */
+          EXPR_t *c = make_call("raku_match");
+          expr_add_child(c, $1);
+          expr_add_child(c, leaf_sval(E_QLIT, $3));
+          $$ = c; }
     | range_expr               { $$=$1; }
     ;
 

@@ -86,44 +86,46 @@ typedef struct ExprList {
     LIT_FLOAT = 259,               /* LIT_FLOAT  */
     LIT_STR = 260,                 /* LIT_STR  */
     LIT_INTERP_STR = 261,          /* LIT_INTERP_STR  */
-    VAR_SCALAR = 262,              /* VAR_SCALAR  */
-    VAR_ARRAY = 263,               /* VAR_ARRAY  */
-    VAR_HASH = 264,                /* VAR_HASH  */
-    IDENT = 265,                   /* IDENT  */
-    KW_MY = 266,                   /* KW_MY  */
-    KW_SAY = 267,                  /* KW_SAY  */
-    KW_PRINT = 268,                /* KW_PRINT  */
-    KW_IF = 269,                   /* KW_IF  */
-    KW_ELSE = 270,                 /* KW_ELSE  */
-    KW_ELSIF = 271,                /* KW_ELSIF  */
-    KW_WHILE = 272,                /* KW_WHILE  */
-    KW_FOR = 273,                  /* KW_FOR  */
-    KW_SUB = 274,                  /* KW_SUB  */
-    KW_GATHER = 275,               /* KW_GATHER  */
-    KW_TAKE = 276,                 /* KW_TAKE  */
-    KW_RETURN = 277,               /* KW_RETURN  */
-    KW_GIVEN = 278,                /* KW_GIVEN  */
-    KW_WHEN = 279,                 /* KW_WHEN  */
-    KW_DEFAULT = 280,              /* KW_DEFAULT  */
-    KW_EXISTS = 281,               /* KW_EXISTS  */
-    KW_DELETE = 282,               /* KW_DELETE  */
-    KW_UNLESS = 283,               /* KW_UNLESS  */
-    KW_UNTIL = 284,                /* KW_UNTIL  */
-    KW_REPEAT = 285,               /* KW_REPEAT  */
-    OP_RANGE = 286,                /* OP_RANGE  */
-    OP_RANGE_EX = 287,             /* OP_RANGE_EX  */
-    OP_ARROW = 288,                /* OP_ARROW  */
-    OP_EQ = 289,                   /* OP_EQ  */
-    OP_NE = 290,                   /* OP_NE  */
-    OP_LE = 291,                   /* OP_LE  */
-    OP_GE = 292,                   /* OP_GE  */
-    OP_SEQ = 293,                  /* OP_SEQ  */
-    OP_SNE = 294,                  /* OP_SNE  */
-    OP_AND = 295,                  /* OP_AND  */
-    OP_OR = 296,                   /* OP_OR  */
-    OP_BIND = 297,                 /* OP_BIND  */
-    OP_DIV = 298,                  /* OP_DIV  */
-    UMINUS = 299                   /* UMINUS  */
+    LIT_REGEX = 262,               /* LIT_REGEX  */
+    VAR_SCALAR = 263,              /* VAR_SCALAR  */
+    VAR_ARRAY = 264,               /* VAR_ARRAY  */
+    VAR_HASH = 265,                /* VAR_HASH  */
+    IDENT = 266,                   /* IDENT  */
+    KW_MY = 267,                   /* KW_MY  */
+    KW_SAY = 268,                  /* KW_SAY  */
+    KW_PRINT = 269,                /* KW_PRINT  */
+    KW_IF = 270,                   /* KW_IF  */
+    KW_ELSE = 271,                 /* KW_ELSE  */
+    KW_ELSIF = 272,                /* KW_ELSIF  */
+    KW_WHILE = 273,                /* KW_WHILE  */
+    KW_FOR = 274,                  /* KW_FOR  */
+    KW_SUB = 275,                  /* KW_SUB  */
+    KW_GATHER = 276,               /* KW_GATHER  */
+    KW_TAKE = 277,                 /* KW_TAKE  */
+    KW_RETURN = 278,               /* KW_RETURN  */
+    KW_GIVEN = 279,                /* KW_GIVEN  */
+    KW_WHEN = 280,                 /* KW_WHEN  */
+    KW_DEFAULT = 281,              /* KW_DEFAULT  */
+    KW_EXISTS = 282,               /* KW_EXISTS  */
+    KW_DELETE = 283,               /* KW_DELETE  */
+    KW_UNLESS = 284,               /* KW_UNLESS  */
+    KW_UNTIL = 285,                /* KW_UNTIL  */
+    KW_REPEAT = 286,               /* KW_REPEAT  */
+    OP_RANGE = 287,                /* OP_RANGE  */
+    OP_RANGE_EX = 288,             /* OP_RANGE_EX  */
+    OP_ARROW = 289,                /* OP_ARROW  */
+    OP_EQ = 290,                   /* OP_EQ  */
+    OP_NE = 291,                   /* OP_NE  */
+    OP_LE = 292,                   /* OP_LE  */
+    OP_GE = 293,                   /* OP_GE  */
+    OP_SEQ = 294,                  /* OP_SEQ  */
+    OP_SNE = 295,                  /* OP_SNE  */
+    OP_AND = 296,                  /* OP_AND  */
+    OP_OR = 297,                   /* OP_OR  */
+    OP_BIND = 298,                 /* OP_BIND  */
+    OP_SMATCH = 299,               /* OP_SMATCH  */
+    OP_DIV = 300,                  /* OP_DIV  */
+    UMINUS = 301                   /* UMINUS  */
   };
   typedef enum raku_yytokentype raku_yytoken_kind_t;
 #endif
@@ -140,7 +142,7 @@ union RAKU_YYSTYPE
     EXPR_t   *node;
     ExprList *list;
 
-#line 144 "raku.tab.h"
+#line 146 "raku.tab.h"
 
 };
 typedef union RAKU_YYSTYPE RAKU_YYSTYPE;
