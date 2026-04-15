@@ -238,6 +238,7 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
 
         case SM_PUSH_NULL:
             sm_push(st, NULVCL);
+            st->last_ok = 1;    /* null is a valid (non-fail) result */
             break;
 
         case SM_PUSH_VAR: {

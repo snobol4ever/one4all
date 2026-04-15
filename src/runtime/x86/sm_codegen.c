@@ -214,7 +214,7 @@ static void h_push_lit_s(void)
 }
 static void h_push_lit_i(void) { PUSH(INTVAL(CUR_INS->a[0].i)); }
 static void h_push_lit_f(void) { PUSH(REALVAL(CUR_INS->a[0].f)); }
-static void h_push_null(void)  { PUSH(NULVCL); }
+static void h_push_null(void)  { PUSH(NULVCL); STATE->last_ok = 1; }
 
 static void h_push_var(void)
 {
