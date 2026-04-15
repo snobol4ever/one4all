@@ -102,5 +102,6 @@ void    icn_scope_patch(IcnScope *sc, EXPR_t *e);
 
 DESCR_t icn_call_proc(EXPR_t *proc, DESCR_t *args, int nargs);
 bb_node_t icn_eval_gen(EXPR_t *e);
+int       icn_is_gen(EXPR_t *e);
 
 #endif /* DRIVER_ICN_RUNTIME_H */

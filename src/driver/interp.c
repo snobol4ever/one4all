@@ -1997,8 +1997,31 @@ DESCR_t interp_eval(EXPR_t *e)
         if (e->nchildren < 1) return NULVCL;
         EXPR_t *gen  = e->children[0];
         EXPR_t *body = (e->nchildren > 1) ? e->children[1] : NULL;
+        /* IC-2a: icn_eval_gen + BB_PUMP — all goal-directed ops through Byrd boxes.
+         * Special case: if gen is E_ASSIGN or E_AUGOP with a generative RHS,
+         * drive the inner generator and re-evaluate gen each tick so that
+         * variable reads (lhs, lv) are fresh.  e.g.:
+         *   every total := total + (1 to n)   -- E_ASSIGN wrapping E_ADD(var, E_TO)
+         *   every total +:= (1 to n)           -- E_AUGOP with E_TO rhs              */
+        if ((gen->kind == E_ASSIGN || gen->kind == E_AUGOP) &&
+            gen->nchildren >= 2 && icn_is_gen(gen->children[1])) {
+            bb_node_t rbox = icn_eval_gen(gen->children[1]);
+            DESCR_t tick = rbox.fn(rbox.ζ, α);
+            while (!IS_FAIL_fn(tick) && !ICN_CUR.returning && !ICN_CUR.loop_break) {
+                /* Inject the generator tick value via drive passthrough,
+                 * then re-evaluate gen (the assign/augop) so it reads fresh lhs. */
+                icn_drive_node = gen->children[1];
+                icn_drive_val  = tick;
+                interp_eval(gen);
+                icn_drive_node = NULL;
+                if (body) interp_eval(body);
+                if (ICN_CUR.returning || ICN_CUR.loop_break) break;
+                tick = rbox.fn(rbox.ζ, β);
+            }
+            ICN_CUR.loop_break = 0;
+            return NULVCL;
+        }
         EXPR_t *do_expr = body ? body : gen;
-        /* IC-2a: icn_eval_gen + BB_PUMP — all goal-directed ops through Byrd boxes */
         bb_node_t box = icn_eval_gen(gen);
         DESCR_t val = box.fn(box.ζ, α);
         while (!IS_FAIL_fn(val) && !ICN_CUR.returning && !ICN_CUR.loop_break) {
@@ -2100,55 +2123,55 @@ DESCR_t interp_eval(EXPR_t *e)
         if (e->nchildren < 2) return NULVCL;
         EXPR_t *lhs = e->children[0];
         EXPR_t *rhs = e->children[1];
-        DESCR_t lv = interp_eval(lhs);
-        /* Drive RHS through icn_eval_gen if it is a generator expression
-         * (handles sum +:= 1 to 5, result ||:= !s, etc.)                */
-        DESCR_t rv = FAILDESCR;
-        {
-            static const EKind gen_kinds[] = {
-                E_TO, E_TO_BY, E_ITERATE, E_ALTERNATE, E_FNC, E_SUSPEND
-            };
-            int rhs_is_gen = 0;
-            for (int _g = 0; _g < 6; _g++)
-                if (rhs && rhs->kind == gen_kinds[_g]) { rhs_is_gen = 1; break; }
-            if (rhs_is_gen) {
-                /* Collect the last value produced by the RHS generator */
-                bb_node_t rbox = icn_eval_gen(rhs);
-                DESCR_t tick = rbox.fn(rbox.ζ, α);
-                while (!IS_FAIL_fn(tick)) {
-                    rv = tick;
-                    tick = rbox.fn(rbox.ζ, β);
-                }
-                /* If generator produced nothing, use FAILDESCR (already set) */
-            } else {
-                rv = interp_eval(rhs);
+        /* Helper lambda: apply augop to (lv, rv), write back to lhs slot, return result */
+        #define AUGOP_APPLY(lv_, rv_) do { \
+            DESCR_t _lv = (lv_), _rv = (rv_); \
+            if (IS_FAIL_fn(_lv)||IS_FAIL_fn(_rv)) break; \
+            long _li = IS_INT_fn(_lv)?_lv.i:(long)_lv.r; \
+            long _ri = IS_INT_fn(_rv)?_rv.i:(long)_rv.r; \
+            DESCR_t _res = NULVCL; \
+            switch((IcnTkKind)e->ival){ \
+                case TK_AUGPLUS:   _res=INTVAL(_li+_ri); break; \
+                case TK_AUGMINUS:  _res=INTVAL(_li-_ri); break; \
+                case TK_AUGSTAR:   _res=INTVAL(_li*_ri); break; \
+                case TK_AUGSLASH:  _res=_ri?INTVAL(_li/_ri):FAILDESCR; break; \
+                case TK_AUGMOD:    _res=_ri?INTVAL(_li%_ri):FAILDESCR; break; \
+                case TK_AUGCONCAT: { \
+                    const char *_ls=VARVAL_fn(_lv),*_rs=VARVAL_fn(_rv); \
+                    if(!_ls)_ls="";if(!_rs)_rs=""; \
+                    size_t _ll=strlen(_ls),_rl=strlen(_rs); \
+                    char *_buf=GC_malloc(_ll+_rl+1); \
+                    memcpy(_buf,_ls,_ll);memcpy(_buf+_ll,_rs,_rl);_buf[_ll+_rl]='\0'; \
+                    _res=STRVAL(_buf); break; \
+                } \
+                default: _res=INTVAL(_li+_ri); break; \
+            } \
+            if (!IS_FAIL_fn(_res) && lhs->kind == E_VAR && icn_frame_depth > 0) { \
+                int _slot=(int)lhs->ival; \
+                if(_slot>=0&&_slot<ICN_CUR.env_n) ICN_CUR.env[_slot]=_res; \
+            } \
+            _augop_result = _res; \
+        } while(0)
+
+        /* If RHS is a generator: apply augop once per tick, re-reading lhs each time.
+         * This implements  every sum +:= (1 to 5)  →  sum=1,3,6,10,15
+         * and  every result ||:= !s  →  result="x","xy"  */
+        DESCR_t _augop_result = NULVCL;
+        if (rhs && icn_is_gen(rhs)) {
+            bb_node_t rbox = icn_eval_gen(rhs);
+            DESCR_t tick = rbox.fn(rbox.ζ, α);
+            while (!IS_FAIL_fn(tick) && !ICN_CUR.loop_break && !ICN_CUR.returning) {
+                DESCR_t cur_lv = interp_eval(lhs);   /* re-read lhs each tick */
+                AUGOP_APPLY(cur_lv, tick);
+                tick = rbox.fn(rbox.ζ, β);
             }
+        } else {
+            DESCR_t lv = interp_eval(lhs);
+            DESCR_t rv = interp_eval(rhs);
+            AUGOP_APPLY(lv, rv);
         }
-        if (IS_FAIL_fn(lv)||IS_FAIL_fn(rv)) return FAILDESCR;
-        long li=IS_INT_fn(lv)?lv.i:(long)lv.r, ri=IS_INT_fn(rv)?rv.i:(long)rv.r;
-        DESCR_t result = NULVCL;
-        switch((IcnTkKind)e->ival){
-            case TK_AUGPLUS:   result=INTVAL(li+ri); break;
-            case TK_AUGMINUS:  result=INTVAL(li-ri); break;
-            case TK_AUGSTAR:   result=INTVAL(li*ri); break;
-            case TK_AUGSLASH:  result=ri?INTVAL(li/ri):FAILDESCR; break;
-            case TK_AUGMOD:    result=ri?INTVAL(li%ri):FAILDESCR; break;
-            case TK_AUGCONCAT: {
-                const char *ls=VARVAL_fn(lv),*rs=VARVAL_fn(rv);
-                if(!ls)ls="";if(!rs)rs="";
-                size_t ll=strlen(ls),rl=strlen(rs);
-                char *buf=GC_malloc(ll+rl+1);
-                memcpy(buf,ls,ll);memcpy(buf+ll,rs,rl);buf[ll+rl]='\0';
-                result=STRVAL(buf); break;
-            }
-            default: result=INTVAL(li+ri); break;
-        }
-        if (IS_FAIL_fn(result)) return FAILDESCR;
-        if (lhs->kind == E_VAR && icn_frame_depth > 0) {
-            int slot=(int)lhs->ival;
-            if(slot>=0&&slot<ICN_CUR.env_n) ICN_CUR.env[slot]=result;
-        }
-        return result;
+        #undef AUGOP_APPLY
+        return _augop_result;
     }
 
     case E_LOOP_BREAK: {

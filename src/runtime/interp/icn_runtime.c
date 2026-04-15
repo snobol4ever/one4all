@@ -402,7 +402,7 @@ DESCR_t icn_call_proc(EXPR_t *proc, DESCR_t *args, int nargs) {
  * E_LIMIT, E_EVERY, E_BANG_BINARY, E_SEQ_EXPR, or any arithmetic/relational
  * binop whose children are generative).  Used by icn_eval_gen to decide
  * whether a builtin's argument needs the icn_bb_fnc_gen path. */
-static int icn_is_gen(EXPR_t *e) {
+int icn_is_gen(EXPR_t *e) {
     if (!e) return 0;
     switch (e->kind) {
         case E_TO: case E_TO_BY: case E_ITERATE: case E_ALTERNATE:
@@ -417,8 +417,7 @@ static int icn_is_gen(EXPR_t *e) {
         case E_ADD: case E_SUB: case E_MUL: case E_DIV: case E_MOD:
         case E_LT:  case E_LE:  case E_GT:  case E_GE:
         case E_EQ:  case E_NE:
-        case E_LCONCAT:
-            for (int i = 0; i < e->nchildren; i++)
+        case E_LCONCAT:            for (int i = 0; i < e->nchildren; i++)
                 if (icn_is_gen(e->children[i])) return 1;
             return 0;
         default:
@@ -432,6 +431,19 @@ static DESCR_t icn_oneshot_box(void *zeta, int entry) {
     icn_oneshot_state_t *z = (icn_oneshot_state_t *)zeta;
     if (entry == α && !z->fired && !IS_FAIL_fn(z->val)) { z->fired = 1; return z->val; }
     return FAILDESCR;
+}
+
+/* Lazy-eval box — re-evaluates an EXPR_t node every time it is pumped α.
+ * Used for E_VAR (and other mutable scalar expressions) inside binop_gen,
+ * so that  total + (1 to n)  reads the *current* value of `total` each tick
+ * rather than capturing it once at setup time.
+ * β always returns FAILDESCR (scalar — one value per pump). */
+typedef struct { EXPR_t *expr; } icn_lazy_state_t;
+static DESCR_t icn_lazy_box(void *zeta, int entry) {
+    if (entry != α) return FAILDESCR;
+    icn_lazy_state_t *z = (icn_lazy_state_t *)zeta;
+    DESCR_t v = interp_eval(z->expr);
+    return IS_FAIL_fn(v) ? FAILDESCR : v;
 }
 
 
@@ -698,6 +710,15 @@ bb_node_t icn_eval_gen(EXPR_t *e) {
         z->children = e->children;
         z->n        = e->nchildren;
         return (bb_node_t){ icn_bb_seq_expr, z, 0 };
+    }
+
+    /* ── E_VAR / E_INTLIT / scalar literals — lazy box (re-evaluates each α pump)
+     * This ensures that  total + (1 to n)  reads the current value of `total`
+     * on every tick rather than capturing it once at binop_gen setup time.   */
+    if (e->kind == E_VAR || e->kind == E_ILIT || e->kind == E_FLIT || e->kind == E_QLIT) {
+        icn_lazy_state_t *z = calloc(1, sizeof(*z));
+        z->expr = e;
+        return (bb_node_t){ icn_lazy_box, z, 0 };
     }
 
     /* ── Fallback: one-shot box wrapping interp_eval ─────────────────────── */
