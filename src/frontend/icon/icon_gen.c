@@ -54,12 +54,14 @@ DESCR_t icn_bb_to_by(void *zeta, int entry) {
 }
 
 /*============================================================================================================================
- * B-5: icn_bb_iterate — E_ITERATE Byrd box  (!str)
+ * B-5: icn_bb_iterate — E_ITERATE Byrd box  (!str, Icon char iteration)
  *
  * State: str, len, pos.
  *   α: pos = 0.
  *   β: pos++.
  *   if pos >= len → ω; else return single-char string at pos (γ).
+ *
+ * Raku @array iteration uses icn_bb_raku_array (icn_runtime.c) instead.
  *============================================================================================================================*/
 
 DESCR_t icn_bb_iterate(void *zeta, int entry) {

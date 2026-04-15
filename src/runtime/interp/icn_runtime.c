@@ -458,6 +458,47 @@ static void icn_proc_trampoline(void) {
     swapcontext(&st.ss->gen_ctx, &st.ss->caller_ctx);
 }
 
+/*============================================================================================================================
+ * RK-18a: icn_bb_raku_array — Raku @array Byrd box  (for @arr -> $x)
+ *
+ * Handles SOH-delimited array strings with loop variable binding.
+ * Defined here (not icon_gen.c) to access ICN_CUR, icn_scope_get, NV_SET_fn.
+ *
+ * State: pre-split elems[], nelem, elem_idx, loopvar name.
+ *   α: elem_idx = 0.
+ *   β: elem_idx++.
+ *   ω: elem_idx >= nelem.
+ *   γ: bind loopvar, return element value.
+ *============================================================================================================================*/
+#define ICN_RAKU_ARRAY_MAX 1024
+typedef struct {
+    char       *elems[ICN_RAKU_ARRAY_MAX];
+    int         nelem;
+    int         elem_idx;
+    const char *loopvar;
+} icn_raku_array_state_t;
+
+static DESCR_t icn_bb_raku_array(void *zeta, int entry) {
+    icn_raku_array_state_t *z = (icn_raku_array_state_t *)zeta;
+    if (entry == α) z->elem_idx = 0;
+    else            z->elem_idx++;
+    if (z->elem_idx >= z->nelem) return FAILDESCR;
+    const char *p = z->elems[z->elem_idx];
+    /* coerce to int if purely numeric */
+    char *end;
+    long iv = strtol(p, &end, 10);
+    DESCR_t val = (end != p && *end == '\0') ? INTVAL(iv) : STRVAL(p);
+    /* bind loop variable to frame slot or NV */
+    if (z->loopvar && *z->loopvar) {
+        int slot = icn_scope_get(&ICN_CUR.sc, z->loopvar);
+        if (slot >= 0 && slot < ICN_CUR.env_n)
+            ICN_CUR.env[slot] = val;
+        else
+            NV_SET_fn(z->loopvar, val);
+    }
+    return val;
+}
+
 bb_node_t icn_eval_gen(EXPR_t *e) {
     if (!e) {
         icn_oneshot_state_t *z = calloc(1, sizeof(*z));
@@ -487,9 +528,27 @@ bb_node_t icn_eval_gen(EXPR_t *e) {
         return (bb_node_t){ icn_bb_to_by, z, 0 };
     }
 
-    /* ── E_ITERATE: (!str) ───────────────────────────────────────────────── */
+    /* ── E_ITERATE: (!str) / Raku for @arr -> $x ────────────────────────── */
     if (e->kind == E_ITERATE && e->nchildren >= 1) {
         DESCR_t sv = interp_eval(e->children[0]);
+        const char *loopvar = e->sval;
+        if (!IS_FAIL_fn(sv) && sv.s && (loopvar || strchr(sv.s, '\x01'))) {
+            /* Raku array mode: route to icn_bb_raku_array */
+            icn_raku_array_state_t *z = calloc(1, sizeof(*z));
+            z->loopvar = loopvar;
+            char *copy = GC_malloc(strlen(sv.s) + 1);
+            strcpy(copy, sv.s);
+            char *p = copy;
+            while (z->nelem < ICN_RAKU_ARRAY_MAX) {
+                z->elems[z->nelem++] = p;
+                char *sep = strchr(p, '\x01');
+                if (!sep) break;
+                *sep = '\0';
+                p = sep + 1;
+            }
+            return (bb_node_t){ icn_bb_raku_array, z, 0 };
+        }
+        /* Icon char mode */
         icn_iterate_state_t *z = calloc(1, sizeof(*z));
         if (!IS_FAIL_fn(sv) && sv.s) {
             z->str = sv.s;
