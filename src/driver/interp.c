@@ -1149,6 +1149,93 @@ DESCR_t interp_eval(EXPR_t *e)
 #undef HS
 #undef HK
 
+            /* ── RK-22: Raku string op builtins ────────────────────────────
+             * substr($s, $start [, $len])  — 0-based; maps to SNOBOL4 SUBSTR (1-based)
+             * index($s, $needle [, $pos])  — 0-based pos of first match, -1 if not found
+             * rindex($s, $needle [, $pos]) — 0-based pos of last match, -1 if not found
+             * uc($s)   — uppercase via REPLACE(s, &lcase, &ucase)
+             * lc($s)   — lowercase via REPLACE(s, &ucase, &lcase)
+             * trim($s) — strip leading+trailing whitespace (Raku semantics)
+             * chars($s) / length($s) — number of chars                     */
+            if (!strcmp(fn,"raku_substr") || (!strcmp(fn,"substr") && nargs >= 2)) {
+                DESCR_t sd = interp_eval(e->children[1]);
+                DESCR_t id = interp_eval(e->children[2]);
+                const char *s = VARVAL_fn(sd); if (!s) s = "";
+                long slen = (long)strlen(s);
+                long start = IS_INT_fn(id) ? id.i : 0;
+                if (start < 0) start = slen + start;
+                if (start < 0) start = 0;
+                if (start > slen) start = slen;
+                long len = slen - start;
+                if (nargs >= 3) {
+                    DESCR_t ld = interp_eval(e->children[3]);
+                    len = IS_INT_fn(ld) ? ld.i : len;
+                    if (len < 0) len = 0;
+                    if (start + len > slen) len = slen - start;
+                }
+                char *out = GC_malloc((size_t)len + 1);
+                memcpy(out, s + start, (size_t)len); out[len] = '\0';
+                return STRVAL(out);
+            }
+            if (!strcmp(fn,"raku_index") || (!strcmp(fn,"index") && nargs >= 2)) {
+                DESCR_t sd = interp_eval(e->children[1]);
+                DESCR_t nd = interp_eval(e->children[2]);
+                const char *s = VARVAL_fn(sd); if (!s) s = "";
+                const char *needle = VARVAL_fn(nd); if (!needle) needle = "";
+                long from = 0;
+                if (nargs >= 3) { DESCR_t pd = interp_eval(e->children[3]); from = IS_INT_fn(pd)?pd.i:0; }
+                if (from < 0) from = 0;
+                if (*needle == '\0') return INTVAL(from);
+                const char *found = strstr(s + from, needle);
+                return found ? INTVAL((long)(found - s)) : INTVAL(-1);
+            }
+            if (!strcmp(fn,"raku_rindex") || (!strcmp(fn,"rindex") && nargs >= 2)) {
+                DESCR_t sd = interp_eval(e->children[1]);
+                DESCR_t nd = interp_eval(e->children[2]);
+                const char *s = VARVAL_fn(sd); if (!s) s = "";
+                const char *needle = VARVAL_fn(nd); if (!needle) needle = "";
+                long slen = (long)strlen(s);
+                long from = slen;
+                if (nargs >= 3) { DESCR_t pd = interp_eval(e->children[3]); from = IS_INT_fn(pd)?pd.i:slen; }
+                size_t nlen = strlen(needle);
+                if (nlen == 0) return INTVAL(from < slen ? from : slen);
+                long best = -1;
+                for (long i = 0; i <= from - (long)nlen; i++) {
+                    if (memcmp(s + i, needle, nlen) == 0) best = i;
+                }
+                return INTVAL(best);
+            }
+            if (!strcmp(fn,"raku_uc") || (!strcmp(fn,"uc") && nargs == 1)) {
+                DESCR_t sd = interp_eval(e->children[1]);
+                const char *s = VARVAL_fn(sd); if (!s) s = "";
+                char *out = GC_strdup(s);
+                for (char *p = out; *p; p++) *p = (char)toupper((unsigned char)*p);
+                return STRVAL(out);
+            }
+            if (!strcmp(fn,"raku_lc") || (!strcmp(fn,"lc") && nargs == 1)) {
+                DESCR_t sd = interp_eval(e->children[1]);
+                const char *s = VARVAL_fn(sd); if (!s) s = "";
+                char *out = GC_strdup(s);
+                for (char *p = out; *p; p++) *p = (char)tolower((unsigned char)*p);
+                return STRVAL(out);
+            }
+            if (!strcmp(fn,"raku_trim") || (!strcmp(fn,"trim") && nargs == 1)) {
+                DESCR_t sd = interp_eval(e->children[1]);
+                const char *s = VARVAL_fn(sd); if (!s) s = "";
+                while (*s == ' ' || *s == '\t' || *s == '\n' || *s == '\r') s++;
+                size_t len = strlen(s);
+                while (len > 0 && (s[len-1]==' '||s[len-1]=='\t'||s[len-1]=='\n'||s[len-1]=='\r')) len--;
+                char *out = GC_malloc(len + 1); memcpy(out, s, len); out[len] = '\0';
+                return STRVAL(out);
+            }
+            if (!strcmp(fn,"chars") || !strcmp(fn,"length")) {
+                if (nargs == 1) {
+                    DESCR_t sd = interp_eval(e->children[1]);
+                    const char *s = VARVAL_fn(sd); if (!s) s = "";
+                    return INTVAL((long)strlen(s));
+                }
+            }
+
             /* ── IC-3: Icon table builtins (DT_T native hash table) ────────
              * table()         → new empty table (default value = &null)
              * insert(T,k,v)   → set T[k]=v, return T
