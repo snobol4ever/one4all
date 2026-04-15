@@ -642,6 +642,14 @@ bb_node_t icn_eval_gen(EXPR_t *e) {
         DESCR_t lo_d   = interp_eval(e->children[0]);
         DESCR_t hi_d   = interp_eval(e->children[1]);
         DESCR_t step_d = interp_eval(e->children[2]);
+        int any_real = IS_REAL_fn(lo_d) || IS_REAL_fn(hi_d) || IS_REAL_fn(step_d);
+        if (any_real) {
+            icn_to_by_real_state_t *z = calloc(1, sizeof(*z));
+            z->lo   = IS_REAL_fn(lo_d)   ? lo_d.r   : (double)(IS_FAIL_fn(lo_d)   ? 0 : lo_d.i);
+            z->hi   = IS_REAL_fn(hi_d)   ? hi_d.r   : (double)(IS_FAIL_fn(hi_d)   ? 0 : hi_d.i);
+            z->step = IS_REAL_fn(step_d) ? step_d.r : (double)(IS_FAIL_fn(step_d) ? 1 : step_d.i);
+            return (bb_node_t){ icn_bb_to_by_real, z, 0 };
+        }
         icn_to_by_state_t *z = calloc(1, sizeof(*z));
         z->lo   = IS_FAIL_fn(lo_d)   ? 0 : lo_d.i;
         z->hi   = IS_FAIL_fn(hi_d)   ? 0 : hi_d.i;

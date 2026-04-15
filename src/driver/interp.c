@@ -693,6 +693,15 @@ static EXPR_t *icn_find_leaf_gen(EXPR_t *e) {
     return NULL;
 }
 
+/* icn_real_str — format a real for Icon output: always has decimal point or exponent.
+ * Icon uses %.15g precision but ensures at least one digit after the point. */
+static const char *icn_real_str(double r, char *buf, int bufsz) {
+    snprintf(buf, bufsz, "%.15g", r);
+    if (!strchr(buf, '.') && !strchr(buf, 'e') && !strchr(buf, 'E') && !strchr(buf, 'n') && !strchr(buf, 'N'))
+        strncat(buf, ".0", bufsz - strlen(buf) - 1);
+    return buf;
+}
+
 /* icn_call_builtin — call a builtin E_FNC with pre-resolved args array.
  * Used by icn_bb_fnc_gen to avoid re-evaluating generator children.
  * Dispatches write/writes/upto/find/any/many/upto/tab/move/match by name.
@@ -707,14 +716,14 @@ DESCR_t icn_call_builtin(EXPR_t *call, DESCR_t *args, int nargs) {
     if (!strcmp(fn, "write")) {
         if (IS_FAIL_fn(a0)) return FAILDESCR;
         if (IS_INT_fn(a0))       printf("%lld\n", (long long)a0.i);
-        else if (IS_REAL_fn(a0)) printf("%g\n", a0.r);
+        else if (IS_REAL_fn(a0)) { char _rb[64]; printf("%s\n", icn_real_str(a0.r,_rb,sizeof _rb)); }
         else { const char *s = VARVAL_fn(a0); printf("%s\n", s ? s : ""); }
         return a0;
     }
     /* writes(v) */
     if (!strcmp(fn, "writes")) {
         if (IS_INT_fn(a0))       printf("%lld", (long long)a0.i);
-        else if (IS_REAL_fn(a0)) printf("%g", a0.r);
+        else if (IS_REAL_fn(a0)) { char _rb[64]; printf("%s", icn_real_str(a0.r,_rb,sizeof _rb)); }
         else { const char *s = VARVAL_fn(a0); printf("%s", s ? s : ""); }
         return a0;
     }
@@ -791,7 +800,7 @@ DESCR_t interp_eval(EXPR_t *e)
                 DESCR_t a = interp_eval(e->children[1]);
                 if (IS_FAIL_fn(a)) return FAILDESCR;
                 if (IS_INT_fn(a)) printf("%lld\n",(long long)a.i);
-                else if (IS_REAL_fn(a)) printf("%g\n",a.r);
+                else if (IS_REAL_fn(a)) { char _rb[64]; printf("%s\n",icn_real_str(a.r,_rb,sizeof _rb)); }
                 else { const char *s=VARVAL_fn(a); printf("%s\n",s?s:""); }
                 return a;
             }
@@ -799,7 +808,7 @@ DESCR_t interp_eval(EXPR_t *e)
                 if (nargs == 0) return NULVCL;
                 DESCR_t a = interp_eval(e->children[1]);
                 if (IS_INT_fn(a)) printf("%lld",(long long)a.i);
-                else if (IS_REAL_fn(a)) printf("%g",a.r);
+                else if (IS_REAL_fn(a)) { char _rb[64]; printf("%s",icn_real_str(a.r,_rb,sizeof _rb)); }
                 else { const char *s=VARVAL_fn(a); printf("%s",s?s:""); }
                 return a;
             }
@@ -1442,7 +1451,10 @@ DESCR_t interp_eval(EXPR_t *e)
         DESCR_t l = interp_eval(e->children[0]);
         DESCR_t r = interp_eval(e->children[1]);
         if (IS_FAIL_fn(l) || IS_FAIL_fn(r)) return FAILDESCR;
-        return POWER_fn(l, r);
+        /* Icon: ^ always returns real */
+        double base = IS_REAL_fn(l) ? l.r : (double)l.i;
+        double exp  = IS_REAL_fn(r) ? r.r : (double)r.i;
+        return (DESCR_t){ .v = DT_R, .r = pow(base, exp) };
     }
 
     case E_CAT:

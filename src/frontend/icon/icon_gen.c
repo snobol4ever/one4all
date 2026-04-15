@@ -84,15 +84,22 @@ DESCR_t icn_bb_to_by(void *zeta, int entry) {
     return (DESCR_t){ .v = DT_I, .i = z->cur };
 }
 
+/* icn_bb_to_by_real — E_TO_BY with real (float) step/bounds */
+DESCR_t icn_bb_to_by_real(void *zeta, int entry) {
+    icn_to_by_real_state_t *z = (icn_to_by_real_state_t *)zeta;
+    if (entry == α) z->cur = z->lo;
+    else            z->cur += z->step;
+    double step = z->step != 0.0 ? z->step : 1.0;
+    if (step > 0.0 && z->cur > z->hi + 1e-10) return FAILDESCR;
+    if (step < 0.0 && z->cur < z->hi - 1e-10) return FAILDESCR;
+    return (DESCR_t){ .v = DT_R, .r = z->cur };
+}
+
 /*============================================================================================================================
  * B-5: icn_bb_iterate — E_ITERATE Byrd box  (!str, Icon char iteration)
  *
  * State: str, len, pos.
- *   α: pos = 0.
- *   β: pos++.
- *   if pos >= len → ω; else return single-char string at pos (γ).
- *
- * Raku @array iteration uses icn_bb_raku_array (icn_runtime.c) instead.
+ *   α: pos = 0.  β: pos++.  ω: pos >= len.  γ: single-char string at pos.
  *============================================================================================================================*/
 
 DESCR_t icn_bb_iterate(void *zeta, int entry) {
