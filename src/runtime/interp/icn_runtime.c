@@ -397,6 +397,35 @@ DESCR_t icn_call_proc(EXPR_t *proc, DESCR_t *args, int nargs) {
  * Visible here: interp_eval, icn_call_proc, icn_proc_table, icn_proc_count.
  *============================================================================================================================*/
 
+/* icn_is_gen — recursively test whether an expression subtree contains any
+ * generator node (E_TO, E_TO_BY, E_ITERATE, E_ALTERNATE, E_FNC, E_SUSPEND,
+ * E_LIMIT, E_EVERY, E_BANG_BINARY, E_SEQ_EXPR, or any arithmetic/relational
+ * binop whose children are generative).  Used by icn_eval_gen to decide
+ * whether a builtin's argument needs the icn_bb_fnc_gen path. */
+static int icn_is_gen(EXPR_t *e) {
+    if (!e) return 0;
+    switch (e->kind) {
+        case E_TO: case E_TO_BY: case E_ITERATE: case E_ALTERNATE:
+        case E_SUSPEND: case E_LIMIT: case E_EVERY:
+        case E_BANG_BINARY: case E_SEQ_EXPR:
+            return 1;
+        case E_FNC:
+            /* User proc → generator (may return or suspend).
+             * Builtin with generative arg → also generative. */
+            return 1;
+        /* Arithmetic / relational binops are generative if any child is */
+        case E_ADD: case E_SUB: case E_MUL: case E_DIV: case E_MOD:
+        case E_LT:  case E_LE:  case E_GT:  case E_GE:
+        case E_EQ:  case E_NE:
+        case E_LCONCAT:
+            for (int i = 0; i < e->nchildren; i++)
+                if (icn_is_gen(e->children[i])) return 1;
+            return 0;
+        default:
+            return 0;
+    }
+}
+
 /* One-shot fallback box state — holds a pre-evaluated DESCR_t, fires γ once then ω. */
 typedef struct { DESCR_t val; int fired; } icn_oneshot_state_t;
 static DESCR_t icn_oneshot_box(void *zeta, int entry) {
@@ -582,15 +611,8 @@ bb_node_t icn_eval_gen(EXPR_t *e) {
             if (e->kind != binop_map[mi].ek) continue;
             if (e->nchildren < 2) break;
             EXPR_t *lc = e->children[0], *rc = e->children[1];
-            /* Only use binop_gen box when at least one child is a generator */
-            static const EKind gen_kinds[] = {
-                E_TO, E_TO_BY, E_ITERATE, E_ALTERNATE, E_FNC, E_SUSPEND
-            };
-            int l_gen = 0, r_gen = 0;
-            for (int g = 0; g < 6; g++) {
-                if (lc && lc->kind == gen_kinds[g]) l_gen = 1;
-                if (rc && rc->kind == gen_kinds[g]) r_gen = 1;
-            }
+            int l_gen = icn_is_gen(lc);
+            int r_gen = icn_is_gen(rc);
             if (!l_gen && !r_gen) break;   /* scalar — let interp_eval handle it */
             icn_binop_gen_state_t *z = calloc(1, sizeof(*z));
             z->left     = icn_eval_gen(lc);
@@ -629,8 +651,7 @@ bb_node_t icn_eval_gen(EXPR_t *e) {
         for (int j = 0; j < nargs && j < ICN_FNC_GEN_ARGS; j++) {
             EXPR_t *arg = e->children[1+j];
             if (!arg) continue;
-            EKind k = arg->kind;
-            if (k == E_TO || k == E_TO_BY || k == E_ITERATE || k == E_ALTERNATE || k == E_FNC) {
+            if (icn_is_gen(arg)) {
                 icn_fnc_gen_state_t *fg = calloc(1, sizeof(*fg));
                 fg->arg_box = icn_eval_gen(arg);
                 fg->call    = e;

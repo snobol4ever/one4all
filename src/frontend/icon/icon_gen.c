@@ -89,7 +89,8 @@ DESCR_t icn_bb_iterate(void *zeta, int entry) {
 
 DESCR_t icn_bb_suspend(void *zeta, int entry) {
     icn_suspend_state_t *z = (icn_suspend_state_t *)zeta;
-    if (z->exhausted) return FAILDESCR;
+    /* exhausted+yielded_returned: truly done, return ω */
+    if (z->exhausted && z->yielded_returned) return FAILDESCR;
     if (entry == α && !z->started) {
         /* First α: set up and enter the coroutine */
         z->started = 1;
@@ -99,11 +100,17 @@ DESCR_t icn_bb_suspend(void *zeta, int entry) {
         z->gen_ctx.uc_link          = NULL;
         makecontext(&z->gen_ctx, z->trampoline, 0);
         swapcontext(&z->caller_ctx, &z->gen_ctx);
-    } else {
-        /* β or α-after-started: resume */
+    } else if (!z->exhausted) {
+        /* β or α-after-started: resume only if not exhausted */
         swapcontext(&z->caller_ctx, &z->gen_ctx);
+    } else {
+        /* exhausted but not yet returned — fall through to return yielded */
     }
-    if (z->exhausted) return FAILDESCR;
+    if (z->exhausted) {
+        if (IS_FAIL_fn(z->yielded)) return FAILDESCR;   /* proc failed — ω immediately */
+        z->yielded_returned = 1;
+        return z->yielded;
+    }
     return z->yielded;
 }
 

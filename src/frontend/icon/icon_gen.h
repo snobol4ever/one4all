@@ -55,6 +55,7 @@ typedef struct {
     DESCR_t     yielded;
     int         exhausted;
     int         started;
+    int         yielded_returned;   /* 1 after final return value has been delivered */
     void      (*trampoline)(void);
     void       *trampoline_arg;
 } icn_suspend_state_t;
