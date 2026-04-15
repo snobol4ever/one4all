@@ -1783,6 +1783,27 @@ DESCR_t interp_eval(EXPR_t *e)
         return FAILDESCR;
     }
 
+    case E_SIZE: {
+        /* *E — size of string, list, or table.
+         * String: number of characters.  List/table (SOH-delimited): element count. */
+        if (e->nchildren < 1) return INTVAL(0);
+        DESCR_t v = interp_eval(e->children[0]);
+        if (IS_FAIL_fn(v)) return FAILDESCR;
+        if (IS_INT_fn(v)) return INTVAL(0);   /* integer has no size */
+        if (IS_REAL_fn(v)) return INTVAL(0);
+        /* String: count chars, or SOH-delimited elements for arrays */
+        const char *s = VARVAL_fn(v);
+        if (!s) return INTVAL(0);
+        /* If string contains SOH (\x01) it is a Raku/Icon array — count elements */
+        if (strchr(s, '\x01')) {
+            long n = 1;
+            for (const char *p = s; *p; p++) if (*p == '\x01') n++;
+            return INTVAL(n);
+        }
+        long len = v.slen > 0 ? v.slen : (long)strlen(s);
+        return INTVAL(len);
+    }
+
     case E_ALT: {
         /* child[0] | child[1] | ... — build pat_alt chain left-to-right */
         if (e->nchildren == 0) return NULVCL;
