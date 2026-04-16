@@ -432,7 +432,19 @@ static void h_call(void)
             DESCR_t j = POP(), i = POP(), base = POP();
             DESCR_t r = subscript_get2(base, i, j);
             PUSH(r); STATE->last_ok = (r.v != DT_FAIL);
-        } else { PUSH(FAILDESCR); STATE->last_ok = 0; }
+        } else {
+            /* N-dim (nargs >= 4): sm_lower pushed base first, then indices.
+             * Stack top→bot: idx[n-1]...idx[0], base. Pop n items. */
+            int n = nargs;
+            DESCR_t raw[32];
+            for (int k = 0; k < n; k++) raw[k] = POP();
+            /* raw[0]=last_idx, raw[n-2]=first_idx, raw[n-1]=base */
+            DESCR_t base = raw[n-1];
+            DESCR_t fargs[32]; fargs[0] = base;
+            for (int k = 0; k < n-1; k++) fargs[k+1] = raw[n-2-k];
+            DESCR_t r = INVOKE_fn("ITEM", fargs, n);
+            PUSH(r); STATE->last_ok = (r.v != DT_FAIL);
+        }
         return;
     }
     if (name && strcmp(name, "IDX_SET") == 0) {
@@ -442,7 +454,18 @@ static void h_call(void)
         } else if (nargs == 4) {
             DESCR_t j = POP(), i = POP(), base = POP(), val = POP();
             STATE->last_ok = subscript_set2(base, i, j, val); PUSH(val);
-        } else { STATE->last_ok = 0; }
+        } else {
+            /* N-dim (nargs >= 5): sm_lower pushed rhs, base, then indices.
+             * Stack top→bot: idx[n-1]...idx[0], base, rhs(val). ndim=nargs-2. */
+            int ndim = nargs - 2;
+            DESCR_t idx[32];
+            for (int k = ndim - 1; k >= 0; k--) idx[k] = POP();
+            DESCR_t base = POP(), val = POP();
+            DESCR_t fargs[32]; fargs[0] = val; fargs[1] = base;
+            for (int k = 0; k < ndim; k++) fargs[k+2] = idx[k];
+            DESCR_t r = INVOKE_fn("ITEM_SET", fargs, ndim + 2);
+            STATE->last_ok = (r.v != DT_FAIL); PUSH(val);
+        }
         return;
     }
 

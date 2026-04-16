@@ -550,7 +550,12 @@ static DESCR_t _ARRAY_(DESCR_t *a, int n) {
         const char *comma = strchr(proto, ',');
         if (comma) {
             sscanf(proto,  "%d:%d", &lo, &hi);
-            sscanf(comma+1, "%d:%d", &lo2, &hi2);
+            if (strchr(comma+1, ':')) {
+                sscanf(comma+1, "%d:%d", &lo2, &hi2);
+            } else {
+                lo2 = 1; hi2 = atoi(comma+1);   /* "N" → 1:N */
+                if (hi2 < 1) hi2 = 1;
+            }
             return ARRAY_VAL(array_new2d(lo, hi, lo2, hi2));
         }
         sscanf(proto, "%d:%d", &lo, &hi);

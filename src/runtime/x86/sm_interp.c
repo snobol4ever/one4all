@@ -623,7 +623,23 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
                     DESCR_t r = subscript_get2(base, i, j);
                     sm_push(st, r);
                     st->last_ok = (r.v != DT_FAIL);
-                } else { sm_push(st, FAILDESCR); st->last_ok = 0; }
+                } else {
+                    /* N-dim (nargs >= 4): sm_lower pushed children[0]=base first,
+                     * then indices. Stack top→bot: idx[ndim-1]...idx[0], base.
+                     * nargs == nchildren == 1+ndim_indices.
+                     * Pop nargs items: indices top-first, then base. */
+                    int n = nargs; /* total stack items = 1 base + (n-1) indices */
+                    DESCR_t raw[32];
+                    for (int k = 0; k < n; k++) raw[k] = sm_pop(st);
+                    /* raw[0]=last_idx, raw[n-2]=first_idx, raw[n-1]=base */
+                    DESCR_t base = raw[n-1];
+                    /* fargs[0]=base, fargs[1..n-1]=indices in original order */
+                    DESCR_t fargs[32]; fargs[0] = base;
+                    for (int k = 0; k < n-1; k++) fargs[k+1] = raw[n-2-k];
+                    DESCR_t r = INVOKE_fn("ITEM", fargs, n);
+                    sm_push(st, r);
+                    st->last_ok = (r.v != DT_FAIL);
+                }
                 break;
             }
             if (name && strcmp(name, "IDX_SET") == 0) {
@@ -642,7 +658,22 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
                     DESCR_t val  = sm_pop(st);
                     st->last_ok = subscript_set2(base, i, j, val);
                     sm_push(st, val);
-                } else { st->last_ok = 0; }
+                } else {
+                    /* N-dim (nargs >= 5): sm_lower pushed rhs, base, then indices.
+                     * Stack top→bot: idx[n-1]...idx[0], base, rhs(val).
+                     * ndim = nargs - 2 indices. Pop: indices top-first, then base, then val. */
+                    int ndim = nargs - 2;
+                    DESCR_t idx[32];
+                    for (int k = ndim - 1; k >= 0; k--) idx[k] = sm_pop(st); /* idx[0]=first, idx[ndim-1]=last in original order */
+                    DESCR_t base = sm_pop(st);
+                    DESCR_t val  = sm_pop(st);
+                    /* ITEM_SET: args[0]=val, args[1]=base, args[2..2+ndim-1]=indices */
+                    DESCR_t fargs[32]; fargs[0] = val; fargs[1] = base;
+                    for (int k = 0; k < ndim; k++) fargs[k+2] = idx[k];
+                    DESCR_t r = INVOKE_fn("ITEM_SET", fargs, ndim + 2);
+                    st->last_ok = (r.v != DT_FAIL);
+                    sm_push(st, val);
+                }
                 break;
             }
 
