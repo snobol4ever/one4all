@@ -790,8 +790,17 @@ DESCR_t EVAL_fn(DESCR_t expr) {
 DESCR_t opsyn(DESCR_t newname, DESCR_t oldname, DESCR_t type) {
     (void)type;
     const char *nm  = VARVAL_fn(newname);
-    const char *old = VARVAL_fn(oldname);
-    if (!nm || !old) return FAILDESCR;
+    /* oldname is typically .dupl — a NAMEPTR (DT_N, slen=1, ptr→NV cell).
+     * VARVAL_fn dereferences to the cell's value, not the name. Extract name: */
+    const char *old = NULL;
+    if (oldname.v == DT_N) {
+        if (oldname.slen == 0 && oldname.s && *oldname.s)
+            old = oldname.s;                          /* NAMEVAL: name is in .s */
+        else if (oldname.slen == 1 && oldname.ptr)
+            old = NV_name_from_ptr((const DESCR_t *)oldname.ptr); /* NAMEPTR */
+    }
+    if (!old) old = VARVAL_fn(oldname);               /* fallback: string value */
+    if (!nm || !old || !*old) return FAILDESCR;
     register_fn_alias(nm, old);
     return NULVCL;
 }
