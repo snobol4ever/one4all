@@ -636,7 +636,24 @@ static DESCR_t _CONVERT_(DESCR_t *a, int n) {
     }
     if (strcasecmp(type, "TABLE")   == 0) {
         if (IS_TBL(val)) return val;           /* idem */
-        return FAILDESCR;                      /* ARRAY->TABLE: FAIL (csnobol4 verified) */
+        if (IS_ARR(val) && val.arr) {
+            /* ARRAY->TABLE: N×2 array (from prior TABLE->ARRAY) → new table.
+             * Row i: col1=key descriptor, col2=value. Skip null keys. */
+            ARBLK_t *a = val.arr;
+            int rows = a->hi - a->lo + 1;
+            int cols = a->hi2 - a->lo2 + 1;
+            if (cols != 2) return FAILDESCR;   /* must be N×2 */
+            TBBLK_t *tbl = table_new_args(rows > 0 ? rows : 10, 10);
+            for (int i = a->lo; i <= a->hi; i++) {
+                DESCR_t kd = array_get2(a, i, a->lo2);      /* key descriptor */
+                DESCR_t vd = array_get2(a, i, a->lo2 + 1);  /* value */
+                const char *key = VARVAL_fn(kd);
+                if (!key) continue;                           /* skip null keys */
+                table_set_descr(tbl, key, kd, vd);
+            }
+            return TABLE_VAL(tbl);
+        }
+        return FAILDESCR;
     }
     if (strcasecmp(type, "PATTERN") == 0) {
         if (IS_PAT(val)) return val;           /* idem */

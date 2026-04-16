@@ -388,11 +388,30 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         sm_emit_s(p, SM_PUSH_VAR, kup);
         return;
     }
-    case E_INDIRECT:
-        /* $expr — eval name-string, look up variable → push value on value stack */
-        lower_expr(p, lt, e->nchildren > 0 ? e->children[0] : NULL);
+    case E_INDIRECT: {
+        /* $expr — eval name-string, look up variable → push value on value stack.
+         * Special case: $.var<idx> parses as E_INDIRECT(E_IDX(E_NAME(E_VAR("v")),idx...))
+         * Lower as: push var value directly + IDX, bypassing INDIR_GET. */
+        EXPR_t *ch = e->nchildren > 0 ? e->children[0] : NULL;
+        /* $.var<idx> => E_INDIRECT(E_NAME(E_IDX(E_VAR("v"), idx...)))
+         * Push var value directly, then indices, then call IDX. */
+        if (ch && ch->kind == E_NAME && ch->nchildren == 1) {
+            EXPR_t *inner = ch->children[0];
+            if (inner && inner->kind == E_IDX && inner->nchildren >= 2
+                    && inner->children[0] && inner->children[0]->kind == E_VAR
+                    && inner->children[0]->sval) {
+                const char *vn = inner->children[0]->sval;
+                sm_emit_s(p, SM_PUSH_VAR, vn);
+                for (int i = 1; i < inner->nchildren; i++)
+                    lower_expr(p, lt, inner->children[i]);
+                sm_emit_si(p, SM_CALL, "IDX", (int64_t)inner->nchildren);
+                return;
+            }
+        }
+        lower_expr(p, lt, ch);
         sm_emit_si(p, SM_CALL, "INDIR_GET", 1);
         return;
+    }
     case E_DEFER:
         /* *expr in value context — freeze as DT_E for EVAL() to thaw.
          * SM_PUSH_EXPR bakes the EXPR_t* pointer into the instruction. */
