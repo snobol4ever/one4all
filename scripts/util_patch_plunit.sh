@@ -1,11 +1,19 @@
 #!/usr/bin/env bash
-# util_patch_plunit.sh — patch corpus/programs/prolog/plunit.pl to add
-# determinism cuts that prevent double-run when a later suite fails mid-run.
+# util_patch_plunit.sh — patch corpus/programs/prolog/plunit.pl:
 #
-# Root cause: pj_run_list/pj_run_suite/pj_run_tests leave choice points;
-# backtracking re-enters earlier suites. Cuts make each step deterministic.
+# Fix 1 (determinism cuts): pj_run_list/pj_run_suite/pj_run_tests leave choice
+#   points; backtracking re-enters earlier suites when a later suite fails.
+#   Fix: ! after pj_run_suite in pj_run_list, after pj_suite_verdict in
+#   pj_run_suite, after pj_run_one in pj_run_tests (body position, not head).
 #
-# Idempotent — checks for already-patched sentinel before applying.
+# Fix 2 (=@= undefined): test_bips/length gen_list uses =@= (structural
+#   equivalence up to variable renaming). Not defined → pj_do_true crashes.
+#   Fix: add X =@= Y using copy_term + ==.
+#
+# Fix 3 (pj_run_suite must not fail): wrap pj_run_suite call in pj_run_list
+#   with (... -> true ; true) so a failing suite doesn't abort the list walk.
+#
+# Idempotent — checks for PATCHED:v2 sentinel before applying.
 # After patching, commits corpus repo.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -14,46 +22,66 @@ PLUNIT=$CORPUS/programs/prolog/plunit.pl
 
 [ -f "$PLUNIT" ] || { echo "ERROR: $PLUNIT not found"; exit 1; }
 
-# Sentinel: already patched?
-if grep -q 'PATCHED:determinism-cuts' "$PLUNIT"; then
-    echo "SKIP: plunit.pl already patched"
+if grep -q 'PATCHED:v2' "$PLUNIT"; then
+    echo "SKIP: plunit.pl already patched (v2)"
     exit 0
 fi
 
 echo "Patching $PLUNIT ..."
 
-# We use Python for reliable multi-line sed-equivalent
 python3 - "$PLUNIT" << 'PYEOF'
-import sys, re
+import sys
 
 path = sys.argv[1]
 src = open(path).read()
 
-# 1. pj_run_list/2 — add cut after pj_run_suite succeeds
+# Remove any previous patch sentinel
+src = src.replace('/* PATCHED:determinism-cuts */\n', '')
+
+# Fix 1a: pj_run_list — use (pj_run_suite(H) -> true ; true) so a failing
+#   suite never aborts the walk, then cut to prevent choice-point re-entry.
+src = src.replace(
+    'pj_run_list([H|T]) :- pj_run_suite(H), !, pj_run_list(T).',
+    'pj_run_list([H|T]) :- ( pj_run_suite(H) -> true ; true ), !, pj_run_list(T).'
+)
+# Also handle the original unpatched form:
 src = src.replace(
     'pj_run_list([H|T]) :- pj_run_suite(H), pj_run_list(T).',
-    'pj_run_list([H|T]) :- pj_run_suite(H), !, pj_run_list(T).'
+    'pj_run_list([H|T]) :- ( pj_run_suite(H) -> true ; true ), !, pj_run_list(T).'
 )
 
-# 2. pj_run_suite/1 — add cut after pj_suite_verdict
-old = 'pj_suite_verdict(Suite, SF).'
-new = 'pj_suite_verdict(Suite, SF), !.'
-src = src.replace(old, new, 1)  # only first occurrence (the call site)
+# Fix 1b: pj_run_suite — cut after verdict (body position)
+src = src.replace(
+    '    pj_suite_verdict(Suite, SF), !.',
+    '    pj_suite_verdict(Suite, SF), !.'
+)
+# Handle unpatched form:
+src = src.replace(
+    '    pj_suite_verdict(Suite, SF).',
+    '    pj_suite_verdict(Suite, SF), !.'
+)
 
-# 3. pj_run_tests/2 — add cut after pj_run_one succeeds
+# Fix 1c: pj_run_tests — cut after pj_run_one (body position)
+src = src.replace(
+    'pj_run_tests(Suite, [t(N,O,G)|Rest]) :-\n    pj_run_one(Suite,N,O,G), !, pj_run_tests(Suite,Rest).',
+    'pj_run_tests(Suite, [t(N,O,G)|Rest]) :-\n    pj_run_one(Suite,N,O,G), !, pj_run_tests(Suite,Rest).'
+)
 src = src.replace(
     'pj_run_tests(Suite, [t(N,O,G)|Rest]) :-\n    pj_run_one(Suite,N,O,G), pj_run_tests(Suite,Rest).',
     'pj_run_tests(Suite, [t(N,O,G)|Rest]) :-\n    pj_run_one(Suite,N,O,G), !, pj_run_tests(Suite,Rest).'
 )
 
-# 4. pj_suite_verdict/2 — add cut inside the if-then-else to prevent backtrack
+# Fix 2: add =@= (structural equivalence up to variable renaming)
+# Insert after the stdlib section (after the last pj_insert line)
+stdlib_anchor = 'pj_insert(X,[H|T],[H|R]) :- pj_insert(X,T,R).'
+assert '=@=' not in src, "=@= already defined"
 src = src.replace(
-    'pj_suite_verdict(Suite, SF) :-\n    ( SF =:= 0 -> format(\'PASS ~w~n\',[Suite]) ; format(\'FAIL ~w~n\',[Suite]) ).',
-    'pj_suite_verdict(Suite, SF) :- !\n    ( SF =:= 0 -> format(\'PASS ~w~n\',[Suite]) ; format(\'FAIL ~w~n\',[Suite]) ).'
+    stdlib_anchor,
+    stdlib_anchor + '\nX =@= Y :- copy_term(X, X1), copy_term(Y, Y1), numbervars(X1,0,N), numbervars(Y1,0,N), X1 == Y1.'
 )
 
-# Add sentinel comment at top
-src = '/* PATCHED:determinism-cuts */\n' + src
+# Sentinel v2
+src = '/* PATCHED:v2 */\n' + src
 
 open(path, 'w').write(src)
 print("OK")
@@ -64,5 +92,5 @@ cd "$CORPUS"
 git config user.name "LCherryholmes"
 git config user.email "lcherryh@yahoo.com"
 git add programs/prolog/plunit.pl
-git commit -m "PL-12: plunit.pl determinism cuts — prevent double-run on backtrack"
+git commit -m "PL-12: plunit.pl v2 — determinism cuts + =@= + safe suite walk"
 echo "DONE"
