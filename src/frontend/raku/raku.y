@@ -174,6 +174,7 @@ const char *raku_meth_lookup(const char *classname, const char *methname) {
 %token <dval> LIT_FLOAT
 %token <sval> LIT_STR LIT_INTERP_STR LIT_REGEX
 %token <sval> VAR_SCALAR VAR_ARRAY VAR_HASH VAR_TWIGIL IDENT
+%token <ival> VAR_CAPTURE
 
 %token KW_MY KW_SAY KW_PRINT KW_IF KW_ELSE KW_ELSIF KW_WHILE KW_FOR
 %token KW_SUB KW_GATHER KW_TAKE KW_RETURN
@@ -672,6 +673,11 @@ atom
     | VAR_SCALAR      { $$=var_node($1); }
     | VAR_ARRAY       { $$=var_node($1); }
     | VAR_HASH        { $$=var_node($1); }
+    | VAR_CAPTURE
+        { /* RK-34: $0/$1 positional capture — raku_capture(n) */
+          EXPR_t *c=make_call("raku_capture");
+          EXPR_t *idx=expr_new(E_ILIT); idx->ival=$1;
+          expr_add_child(c,idx); $$=c; }
     | VAR_ARRAY '[' expr ']'
         { EXPR_t *c=make_call("arr_get"); expr_add_child(c,var_node($1)); expr_add_child(c,$3); $$=c; }
     | VAR_HASH '<' IDENT '>'

@@ -71,6 +71,8 @@ extern int         Δ;
 
 /* ── RK-25: Raku exception global ─────────────────────────────────────── */
 char g_raku_exception[512] = "";   /* set by raku_die, read by raku_try */
+static Raku_match g_raku_match;        /* last regex match result */
+static const char *g_raku_subject = ""; /* subject of last match */
 
 static void stmt_init(void) {}
 
@@ -1306,9 +1308,10 @@ DESCR_t interp_eval(EXPR_t *e)
                 const char *pat = VARVAL_fn(pd); if (!pat) pat = "";
                 { Raku_nfa *nfa = raku_nfa_build(pat);
                   if (!nfa) return FAILDESCR;
-                  int hit = raku_nfa_match(nfa, subj);
+                  raku_nfa_exec(nfa, subj, &g_raku_match);
+                  g_raku_subject = subj;
                   raku_nfa_free(nfa);
-                  return hit ? INTVAL(1) : FAILDESCR;
+                  return g_raku_match.matched ? INTVAL(1) : FAILDESCR;
                 }
             }
             if (!strcmp(fn,"raku_nfa_compile") && nargs == 1) {
@@ -1321,6 +1324,21 @@ DESCR_t interp_eval(EXPR_t *e)
                   raku_nfa_free(nfa);
                 }
                 return INTVAL(0);
+            }
+            if (!strcmp(fn,"raku_capture") && nargs == 1) {
+                /* RK-34: $N positional capture from last ~~ match */
+                DESCR_t nd = interp_eval(e->children[1]);
+                int n = (int)(IS_INT_fn(nd) ? nd.i : 0);
+                if (!g_raku_match.matched || n < 0 || n >= g_raku_match.ngroups
+                    || g_raku_match.group_start[n] < 0) return STRVAL(GC_strdup(""));
+                int gs = g_raku_match.group_start[n];
+                int ge = g_raku_match.group_end[n];
+                if (ge < gs) return STRVAL(GC_strdup(""));
+                int len = ge - gs;
+                char *out = GC_malloc(len + 1);
+                memcpy(out, g_raku_subject + gs, (size_t)len);
+                out[len] = '\0';
+                return STRVAL(out);
             }
             if (!strcmp(fn,"raku_uc") || (!strcmp(fn,"uc") && nargs == 1)) {
                 DESCR_t sd = interp_eval(e->children[1]);

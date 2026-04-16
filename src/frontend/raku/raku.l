@@ -125,6 +125,7 @@ WS       [ \t\r]
 
     /* ── Sigil variables ─────────────────────────────────────────── */
 "$_"            { raku_yylval.sval = strdup("$_"); return VAR_SCALAR; }
+"$"[0-9]+       { raku_yylval.ival = atoi(yytext+1); return VAR_CAPTURE; }
     /* RK-26: twigils $.field / $!field → VAR_TWIGIL (fieldname, no sigil) */
 "$."{ALPHA}{ALNUM}*  { raku_yylval.sval = strdup(yytext+2); return VAR_TWIGIL; }
 "$!"{ALPHA}{ALNUM}*  { raku_yylval.sval = strdup(yytext+2); return VAR_TWIGIL; }
