@@ -1,0 +1,132 @@
+*------------------------------------------------------------------------------
+* treebank.sno — Penn Treebank S-expression parser
+* ENG 685, Lon Cherryholmes Sr.
+*
+* Direct translation of Python assignment3.py treebank pattern.
+* Captures into globals tag/wrd; side-effects read globals directly.
+* group is a global pattern variable; *group defers to it recursively.
+*------------------------------------------------------------------------------
+
+-INCLUDE 'global.sno'
+-INCLUDE 'stack.sno'
+
+               &TRIM      = 1
+               &ANCHOR    = 0
+               &FULLSCAN  = 1
+               NL         = CHAR(10)
+               SPC        = ' '
+               SPCNL      = SPC NL
+               tag        =
+               wrd        =
+
+               DATA('cell(hd,tl)')
+               stk        =
+
+*--- Side-effect procedures (read globals tag/wrd directly) ------------------
+
+               DEFINE('do_push_list()')                                        :(do_push_list_end)
+do_push_list   stk            =  cell(cell(tag,), stk)
+               do_push_list   =  .dummy                                        :(NRETURN)
+do_push_list_end
+
+               DEFINE('do_push_item()')                                        :(do_push_item_end)
+do_push_item   hd(stk)        =  cell(wrd, hd(stk))
+               do_push_item   =  .dummy                                        :(NRETURN)
+do_push_item_end
+
+               DEFINE('do_push_bank()')                                        :(do_push_bank_end)
+do_push_bank   stk            =  cell(cell('BANK',), stk)
+               do_push_bank   =  .dummy                                        :(NRETURN)
+do_push_bank_end
+
+               DEFINE('do_push_root()')                                        :(do_push_root_end)
+do_push_root   stk            =  cell(cell('ROOT',), stk)
+               do_push_root   =  .dummy                                        :(NRETURN)
+do_push_root_end
+
+               DEFINE('do_pop_list()p,n,i,a')                                 :(do_pop_list_end)
+do_pop_list    p              =  hd(stk)
+               n              =  0
+dpl_cnt        DIFFER(p)                                                       :F(dpl_bld)
+               n              =  n + 1
+               p              =  tl(p)                                         :(dpl_cnt)
+dpl_bld        a              =  ARRAY('1:' n)
+               p              =  hd(stk)
+               i              =  n + 1
+dpl_fill       i              =  GT(i, 1) i - 1                               :F(dpl_mk)
+               a[i]           =  hd(p)
+               p              =  tl(p)                                         :(dpl_fill)
+dpl_mk         stk            =  tl(stk)
+               hd(stk)        =  cell(a, hd(stk))
+               do_pop_list    =  .dummy                                        :(NRETURN)
+do_pop_list_end
+
+               DEFINE('do_pop_final()p,n,i,a')                                :(do_pop_final_end)
+do_pop_final   p              =  hd(stk)
+               n              =  0
+dpf_cnt        DIFFER(p)                                                       :F(dpf_bld)
+               n              =  n + 1
+               p              =  tl(p)                                         :(dpf_cnt)
+dpf_bld        a              =  ARRAY('1:' n)
+               p              =  hd(stk)
+               i              =  n + 1
+dpf_fill       i              =  GT(i, 1) i - 1                               :F(dpf_mk)
+               a[i]           =  hd(p)
+               p              =  tl(p)                                         :(dpf_fill)
+dpf_mk         stk            =  tl(stk)
+               bank           =  a
+               do_pop_final   =  .dummy                                        :(NRETURN)
+do_pop_final_end
+
+*--- print_node ---------------------------------------------------------------
+
+               DEFINE('print_node(a,depth)i,ch,dta')                         :(print_node_end)
+print_node     dta            =  REPLACE(DATATYPE(a), &LCASE, &UCASE)
+               IDENT(dta, 'STRING')                                            :S(pn_leaf)
+               OUTPUT         =  DUPL('  ', depth) '(' a[1]
+               i              =  1
+pn_lp          i              =  i + 1
+               ch             =  a[i]                                          :F(pn_cl)
+               dummy          =  print_node(ch, depth + 1)                    :(pn_lp)
+pn_cl          OUTPUT         =  DUPL('  ', depth) ')'                        :(RETURN)
+pn_leaf        OUTPUT         =  DUPL('  ', depth) a                          :(RETURN)
+print_node_end
+
+*--- word and delim ----------------------------------------------------------
+
+               WBRKS          =  '( )' NL
+               word           =  NOTANY(WBRKS) BREAK(WBRKS)
+               delim          =  SPAN(SPCNL)
+
+*--- group — global pattern variable; *group defers recursively --------------
+
+               group          =  '(' word . tag *do_push_list()
++                                ARBNO(delim (*group | word . wrd *do_push_item()))
++                                *do_pop_list() ')'
+
+*--- THE PATTERN -------------------------------------------------------------
+
+               treebank       =  POS(0)
++                                *do_push_bank()
++                                ARBNO(*do_push_root() ARBNO(*group) *do_pop_list() delim)
++                                *do_pop_final()
++                                RPOS(0)
+
+*--- Main --------------------------------------------------------------------
+
+               buf            =  ''
+rdloop         line           =  INPUT                                         :F(scan)
+               buf            =  buf SPC line                                  :(rdloop)
+
+scan           buf            =  buf SPC
+               buf             treebank                                        :F(parse_err)
+
+               dt             =  REPLACE(DATATYPE(bank), &LCASE, &UCASE)
+               IDENT(dt, 'ARRAY')                                              :F(END)
+               i              =  1
+print_lp       i              =  i + 1
+               r              =  bank[i]                                       :F(END)
+               dummy          =  print_node(r, 0)                              :(print_lp)
+
+parse_err      OUTPUT         =  '*** parse error near: ' SUBSTR(buf, 1, 40)
+END
