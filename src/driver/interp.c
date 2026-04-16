@@ -2498,7 +2498,12 @@ DESCR_t interp_eval(EXPR_t *e)
         DESCR_t l = interp_eval(e->children[0]);
         DESCR_t r = interp_eval(e->children[1]);
         if (IS_FAIL_fn(l) || IS_FAIL_fn(r)) return FAILDESCR;
-        /* Icon: ^ always returns real regardless of operand types */
+        /* SNOBOL4: int**int with non-negative exponent → integer; any real operand → real */
+        if (IS_INT_fn(l) && IS_INT_fn(r) && r.i >= 0) {
+            long base = l.i, result = 1; int exp = (int)r.i;
+            for (int k = 0; k < exp; k++) result *= base;
+            return INTVAL(result);
+        }
         double base = IS_REAL_fn(l) ? l.r : (double)l.i;
         double exp  = IS_REAL_fn(r) ? r.r : (double)r.i;
         return (DESCR_t){ .v = DT_R, .r = pow(base, exp) };

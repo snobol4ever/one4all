@@ -598,7 +598,7 @@ static spec_t bb_callcap(void *zeta, int entry)
                    if (child_r.σ && child_r.δ > 0) memcpy(buf, child_r.σ, (size_t)child_r.δ);
                    buf[child_r.δ] = '\0';
                    args[0].v = DT_S; args[0].slen = (uint32_t)child_r.δ;
-                   args[0].s = buf;  args[0].ptr  = NULL;
+                   args[0].s = buf;  /* do NOT set .ptr — shares union with .s */
                    for (int _j = 0; _j < ζ->fnc_nargs; _j++) args[_j+1] = ζ->fnc_args[_j];
                    DESCR_t name_d = g_user_call_hook(ζ->fnc_name, args, total);
                    DESCR_t *cell = (name_d.v == DT_N && name_d.ptr) ? (DESCR_t*)name_d.ptr : NULL;
@@ -684,7 +684,7 @@ static void flush_pending_callcaps(void) {
             args[0].v    = DT_S;
             args[0].slen = (uint32_t)snap.δ;
             args[0].s    = buf;
-            args[0].ptr  = NULL;
+            /* NOTE: do NOT set args[0].ptr — .s and .ptr share the same union */
             for (int j = 0; j < ev->fnc_nargs; j++) args[j+1] = ev->fnc_args[j];
             DESCR_t name_d = g_user_call_hook(ev->fnc_name, args, total);
             /* If func returns DT_N (nreturn lvalue), write matched text into
