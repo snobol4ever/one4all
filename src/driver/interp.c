@@ -1314,6 +1314,83 @@ DESCR_t interp_eval(EXPR_t *e)
                   return g_raku_match.matched ? INTVAL(1) : FAILDESCR;
                 }
             }
+            if (!strcmp(fn,"raku_match_global") && nargs == 2) {
+                /* RK-37: $s ~~ m:g/pat/ -- collect all non-overlapping matches */
+                /* Returns SOH-delimited list of full-match strings for for-loop */
+                DESCR_t sd = interp_eval(e->children[1]);
+                DESCR_t pd = interp_eval(e->children[2]);
+                const char *subj = VARVAL_fn(sd); if (!subj) subj = "";
+                const char *pat  = VARVAL_fn(pd); if (!pat)  pat  = "";
+                Raku_nfa *nfa = raku_nfa_build(pat);
+                if (!nfa) return STRVAL(GC_strdup(""));
+                int slen = (int)strlen(subj);
+                /* collect all matches into a SOH-delimited array string */
+                char *out = GC_malloc(slen * 4 + 4); out[0] = '\0';
+                int pos = 0, count = 0;
+                while (pos <= slen) {
+                    Raku_match m;
+                    /* build a temporary subject slice via exec on offset */
+                    raku_nfa_exec(nfa, subj + pos, &m);
+                    if (!m.matched) break;
+                    int mlen = m.full_end - m.full_start;
+                    if (count > 0) { int ol=strlen(out); out[ol]='\x01'; out[ol+1]='\0'; }
+                    strncat(out, subj + pos + m.full_start, (size_t)mlen);
+                    /* also update g_raku_match for last match captures */
+                    g_raku_match = m;
+                    g_raku_match.full_start += pos;
+                    g_raku_match.full_end   += pos;
+                    for (int g=0;g<m.ngroups;g++) {
+                        if (m.group_start[g]>=0) g_raku_match.group_start[g]+=pos;
+                        if (m.group_end[g]>=0)   g_raku_match.group_end[g]+=pos;
+                    }
+                    g_raku_subject = subj;
+                    pos += m.full_start + (mlen > 0 ? mlen : 1);
+                    count++;
+                }
+                raku_nfa_free(nfa);
+                return count > 0 ? STRVAL(out) : FAILDESCR;
+            }
+            if (!strcmp(fn,"raku_subst") && nargs == 2) {
+                /* RK-37: $s ~~ s/pat/repl/[g] -- substitution */
+                /* tok format: "pat\x01repl\x01flag" where flag=g or - */
+                DESCR_t sd = interp_eval(e->children[1]);
+                DESCR_t td = interp_eval(e->children[2]);
+                const char *subj = VARVAL_fn(sd); if (!subj) subj = "";
+                const char *tok  = VARVAL_fn(td); if (!tok)  tok  = "";
+                /* split tok on \x01 */
+                const char *sep1 = strchr(tok, '\x01');
+                if (!sep1) return sd;
+                const char *sep2 = strchr(sep1+1, '\x01');
+                if (!sep2) return sd;
+                int plen = (int)(sep1-tok);
+                int rlen = (int)(sep2-(sep1+1));
+                char *pat  = GC_malloc(plen+1); memcpy(pat, tok, plen); pat[plen]='\0';
+                char *repl = GC_malloc(rlen+1); memcpy(repl, sep1+1, rlen); repl[rlen]='\0';
+                int global = (*(sep2+1)=='g');
+                Raku_nfa *nfa = raku_nfa_build(pat);
+                if (!nfa) return sd;
+                int slen=(int)strlen(subj);
+                char *res = GC_malloc(slen*4+rlen*8+4); res[0]='\0';
+                int pos=0, did_one=0;
+                while (pos<=slen) {
+                    Raku_match m; raku_nfa_exec(nfa, subj+pos, &m);
+                    if (!m.matched) { strncat(res, subj+pos, (size_t)(slen-pos)); break; }
+                    /* copy pre-match */
+                    strncat(res, subj+pos, (size_t)m.full_start);
+                    /* copy replacement (TODO: $0/$<n> expansion in repl) */
+                    strcat(res, repl);
+                    g_raku_match=m; g_raku_subject=subj;
+                    int advance=m.full_start+(m.full_end-m.full_start>0?m.full_end-m.full_start:1);
+                    pos+=advance; did_one=1;
+                    if (!global) { strncat(res, subj+pos, (size_t)(slen-pos)); break; }
+                }
+                raku_nfa_free(nfa);
+                /* update the subject variable in the frame if it was a VAR */
+                if (e->children[1]->kind==E_VAR && e->children[1]->ival>=0 &&
+                    e->children[1]->ival<ICN_CUR.env_n && icn_frame_depth>0)
+                    ICN_CUR.env[e->children[1]->ival] = STRVAL(res);
+                return did_one ? STRVAL(res) : sd;
+            }
             if (!strcmp(fn,"raku_nfa_compile") && nargs == 1) {
                 /* RK-32: compile pattern string -> NFA, print state count, return 0 */
                 DESCR_t pd = interp_eval(e->children[1]);

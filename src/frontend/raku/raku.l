@@ -20,7 +20,9 @@
 static char raku_strbuf[65536];
 static int  raku_strpos;
 
-static int raku_after_smatch = 0;
+static int raku_after_smatch  = 0;
+static int raku_match_global   = 0;
+static char *raku_subst_pat    = NULL;
 void raku_lex_error(const char *msg) {
     fprintf(stderr, "raku lex error line %d: %s\n", raku_yylineno, msg);
 }
@@ -31,7 +33,7 @@ int raku_get_lineno(void) { return raku_yylineno; }
 %option prefix="raku_yy"
 %option yylineno
 
-%x STR_DQ STR_SQ STR_RE
+%x STR_DQ STR_SQ STR_RE STR_SUBST_PAT STR_SUBST_REPL
 
 DIGIT    [0-9]
 ALPHA    [A-Za-z_]
@@ -173,11 +175,39 @@ WS       [ \t\r]
 <STR_SQ>.      { raku_strbuf[raku_strpos++] = yytext[0]; }
 
     /* ── Regex literal /pattern/ ─────────────────────────────────── */
+    /* ── s/pat/repl/[g] substitution literal ─────────────────────── */
+"s/"            { if (raku_after_smatch) { raku_after_smatch=0; raku_strpos=0; BEGIN(STR_SUBST_PAT); } else { yyless(1); return 's'; } }
+<STR_SUBST_PAT>"/"  {
+    /* end of pattern: stash it and start reading replacement */
+    raku_strbuf[raku_strpos]='\0';
+    raku_subst_pat = strdup(raku_strbuf);
+    raku_strpos=0; BEGIN(STR_SUBST_REPL);
+}
+<STR_SUBST_PAT>"\\/"  { raku_strbuf[raku_strpos++]='/'; }
+<STR_SUBST_PAT>.       { raku_strbuf[raku_strpos++]=yytext[0]; }
+<STR_SUBST_REPL>"/"[g]? {
+    /* end of replacement: build combined token "pat\x01repl\x01flags" */
+    raku_strbuf[raku_strpos]='\0';
+    int global = (yytext[1]=='g');
+    size_t plen=strlen(raku_subst_pat), rlen=raku_strpos;
+    char *tok = malloc(plen+rlen+4);
+    memcpy(tok, raku_subst_pat, plen); tok[plen]='\x01';
+    memcpy(tok+plen+1, raku_strbuf, rlen); tok[plen+1+rlen]='\x01';
+    tok[plen+2+rlen] = global ? 'g' : '-'; tok[plen+3+rlen]='\0';
+    free(raku_subst_pat); raku_subst_pat=NULL;
+    raku_yylval.sval = tok;
+    BEGIN(INITIAL); return LIT_SUBST;
+}
+<STR_SUBST_REPL>"\\/"  { raku_strbuf[raku_strpos++]='/'; }
+<STR_SUBST_REPL>.       { raku_strbuf[raku_strpos++]=yytext[0]; }
+    /* ── m:g/pat/ global match ─────────────────────────────────────── */
+"m:g/"          { if (raku_after_smatch) { raku_after_smatch=0; raku_strpos=0; BEGIN(STR_RE); raku_match_global=1; } else { yyless(3); return IDENT; } }
 "/"             { if (raku_after_smatch) { raku_after_smatch=0; raku_strpos=0; BEGIN(STR_RE); } else { return '/'; } }
 <STR_RE>"/"    {
     raku_strbuf[raku_strpos] = '\0';
     raku_yylval.sval = strdup(raku_strbuf);
     BEGIN(INITIAL);
+    if (raku_match_global) { raku_match_global=0; return LIT_MATCH_GLOBAL; }
     return LIT_REGEX;
 }
 <STR_RE>"\\/"  { raku_strbuf[raku_strpos++] = '/'; }

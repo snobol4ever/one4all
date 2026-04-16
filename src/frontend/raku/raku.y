@@ -172,7 +172,7 @@ const char *raku_meth_lookup(const char *classname, const char *methname) {
 
 %token <ival> LIT_INT
 %token <dval> LIT_FLOAT
-%token <sval> LIT_STR LIT_INTERP_STR LIT_REGEX
+%token <sval> LIT_STR LIT_INTERP_STR LIT_REGEX LIT_MATCH_GLOBAL LIT_SUBST
 %token <sval> VAR_SCALAR VAR_ARRAY VAR_HASH VAR_TWIGIL IDENT
 %token <ival> VAR_CAPTURE
 %token <sval> VAR_NAMED_CAPTURE
@@ -567,8 +567,20 @@ cmp_expr
     | add_expr OP_SEQ add_expr  { $$=expr_binary(E_LEQ,$1,$3); }
     | add_expr OP_SNE add_expr  { $$=expr_binary(E_LNE,$1,$3); }
     | add_expr OP_SMATCH LIT_REGEX
-        { /* RK-23: $s ~~ /pattern/ — emit make_call("raku_match", subj, pat_str) */
+        { /* RK-23: $s ~~ /pattern/ */
           EXPR_t *c = make_call("raku_match");
+          expr_add_child(c, $1);
+          expr_add_child(c, leaf_sval(E_QLIT, $3));
+          $$ = c; }
+    | add_expr OP_SMATCH LIT_MATCH_GLOBAL
+        { /* RK-37: $s ~~ m:g/pat/ — global match, returns SOH-sep match list */
+          EXPR_t *c = make_call("raku_match_global");
+          expr_add_child(c, $1);
+          expr_add_child(c, leaf_sval(E_QLIT, $3));
+          $$ = c; }
+    | add_expr OP_SMATCH LIT_SUBST
+        { /* RK-37: $s ~~ s/pat/repl/[g] — substitution */
+          EXPR_t *c = make_call("raku_subst");
           expr_add_child(c, $1);
           expr_add_child(c, leaf_sval(E_QLIT, $3));
           $$ = c; }
