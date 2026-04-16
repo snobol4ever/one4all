@@ -426,7 +426,16 @@ static DESCR_t _ENDFILE_(DESCR_t *a, int n) {
 }
 static DESCR_t _APPLY_(DESCR_t *a, int n) {
     if (n < 1) return NULVCL;
-    const char *fname = VARVAL_fn(a[0]);
+    /* a[0] may be a NAMEPTR (DT_N, slen=1) — .eq, .trim, etc.
+     * VARVAL_fn dereferences to the cell value, not the name. Extract name: */
+    const char *fname = NULL;
+    if (a[0].v == DT_N) {
+        if (a[0].slen == 0 && a[0].s && *a[0].s)
+            fname = a[0].s;                           /* NAMEVAL: name in .s */
+        else if (a[0].slen == 1 && a[0].ptr)
+            fname = NV_name_from_ptr((const DESCR_t *)a[0].ptr); /* NAMEPTR */
+    }
+    if (!fname) fname = VARVAL_fn(a[0]);              /* fallback: string value */
     return APPLY_fn(fname, a + 1, n - 1);
 }
 static DESCR_t _ARG_(DESCR_t *a, int n);    /* defined after FNCBLK_t */
