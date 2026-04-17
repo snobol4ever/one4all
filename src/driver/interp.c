@@ -3060,6 +3060,18 @@ DESCR_t interp_eval(EXPR_t *e)
             for (int i = 0; i < na; i++) av[i] = interp_eval(fnc->children[i]);
             return pat_assign_callcap(pat, fnc->sval, av, na);
         }
+        /* Snocone *fn() lowers as E_INDIRECT(E_FNC(...)) — same semantics as
+         * E_DEFER(E_FNC(...)): call fn at flush time to get lvalue, assign then.
+         * SC-26: route this through pat_assign_callcap so it joins the unified
+         * NAM list and fires in left-to-right order after preceding captures. */
+        if (tgt->kind == E_INDIRECT && tgt->nchildren == 1
+                && tgt->children[0]->kind == E_FNC && tgt->children[0]->sval) {
+            EXPR_t *fnc = tgt->children[0];
+            int na = fnc->nchildren;
+            DESCR_t *av = na > 0 ? GC_malloc(na * sizeof(DESCR_t)) : NULL;
+            for (int i = 0; i < na; i++) av[i] = interp_eval(fnc->children[i]);
+            return pat_assign_callcap(pat, fnc->sval, av, na);
+        }
         const char *nm = tgt->sval;
         if (!nm && tgt->kind == E_INDIRECT && tgt->nchildren > 0) {
             /* REM . $'$B' — target is E_INDIRECT(E_QLIT "$B").

@@ -238,6 +238,11 @@ int      ASGNIC_fn(const char *kw_name, DESCR_t val);
  *   len    — matched substring length                                       */
 void    NAM_push(const char *var, DESCR_t *ptr, int dt,
                  const char *s, int len);
+/* NAM_push_callcap: record a deferred XCALLCAP (pat . *fn()) call.
+ *   Appended to the same ordered list as NAM_push so that captures and
+ *   callcaps flush in left-to-right pattern order at NAM_commit time.    */
+void    NAM_push_callcap(const char *fnc_name, DESCR_t *fnc_args, int fnc_nargs,
+                         const char *matched_text, int matched_len);
 
 /* NAM_save: snapshot current naming-list top; returns opaque cookie.        */
 int     NAM_save(void);

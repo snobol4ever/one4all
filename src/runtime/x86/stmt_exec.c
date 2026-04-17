@@ -605,18 +605,10 @@ static spec_t bb_callcap(void *zeta, int entry)
                    if (cell) *cell = args[0];
                }
            } else {
-               /* . — push a firing event; do NOT call hook yet (side-effect safety).
-                * DYN-79: each CC_γ firing gets its own event record so that
-                * a box reused for multiple spans (e.g. *Push() matching "1"
-                * then "2") produces two distinct events in order. */
-               if (g_cc_event_count >= g_cc_event_cap) cc_events_grow();
-               cc_event_t *ev = &g_cc_events[g_cc_event_count++];
-               ev->fnc_name   = ζ->fnc_name;
-               ev->fnc_args   = ζ->fnc_args;
-               ev->fnc_nargs  = ζ->fnc_nargs;
-               ev->pending    = child_r;
-               ev->has_pending = 1;
-               ev->owner      = ζ;
+               /* . — queue into unified NAM list so captures and callcaps
+                * flush in left-to-right pattern order at NAM_commit (SC-26). */
+               NAM_push_callcap(ζ->fnc_name, ζ->fnc_args, ζ->fnc_nargs,
+                                child_r.σ, (int)child_r.δ);
                /* Keep ζ->pending/has_pending for DVAR save/restore compat */
                ζ->pending     = child_r;
                ζ->has_pending = 1;
@@ -1516,11 +1508,12 @@ Phase4:
      */
     if (has_repl && repl && !subj_name && !subj_var)          return 0;
 
-    /* Flush XNME (.) conditional captures — overall match succeeded */
-    NAM_commit(nam_cookie);         /* RT-4: assign all naming-list entries (SIL NMD) */
+    /* Flush all conditional captures and deferred callcaps in left-to-right
+     * pattern order — SC-26 fix: unified list in NAM_commit ensures captures
+     * (tag, wrd) are assigned before the callcaps (push_list, push_item) that
+     * read them. */
+    NAM_commit(nam_cookie);         /* RT-4 + SC-26: assign captures, fire callcaps */
     flush_pending_captures();       /* legacy pending reset — keeps g_capture_list clean */
-    dedup_callcaps();           /* DYN-79: remove stale backtrack entries, fix ordering */
-    flush_pending_callcaps();   /* DYN-69: callcap (pat . *func()) targets */
 
     if (!has_repl || !repl)                                   goto Success;
 
