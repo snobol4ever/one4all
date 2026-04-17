@@ -220,13 +220,17 @@ void NAM_commit(int cookie)
     NamFrame_t *f = nam_stack;
 
     /* Walk oldest→newest; assign each capture entry, fire each callcap.
-     * Last-write-wins for captures: skip if a later entry targets the same var. */
+     * Last-write-wins for captures: skip if a later entry targets the same var
+     * AND no callcap intervenes.  When a callcap lies between two writes to the
+     * same variable (ARBNO with per-iteration side-effects), we must write the
+     * early value so the callcap reads it correctly. */
     for (NamEntry_t *e = f->head; e; e = e->next) {
 
         if (e->kind == NAM_KIND_CAPTURE) {
             /* Check if a later entry in the list has the same target        */
             int has_later = 0;
             for (NamEntry_t *f2 = e->next; f2; f2 = f2->next) {
+                if (f2->kind == NAM_KIND_CALLCAP) break;   /* callcap intervenes — must write now */
                 if (f2->kind != NAM_KIND_CAPTURE) continue;
                 if (e->var_ptr && f2->var_ptr == e->var_ptr) { has_later=1; break; }
                 if (!e->var_ptr && e->varname && f2->varname &&
