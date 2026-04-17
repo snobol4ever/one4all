@@ -258,22 +258,15 @@ void NAM_commit(int cookie)
             /* NAM_KIND_CALLCAP — fire the function now */
             if (!g_user_call_hook || !e->fnc_name) continue;
 
-            int     total = 1 + e->fnc_nargs;
-            DESCR_t *args = (DESCR_t *)GC_MALLOC((size_t)total * sizeof(DESCR_t));
-            char    *buf  = (char *)GC_MALLOC((size_t)e->cc_slen + 1);
-            if (e->cc_substr && e->cc_slen > 0)
-                memcpy(buf, e->cc_substr, (size_t)e->cc_slen);
-            buf[e->cc_slen] = '\0';
-            args[0].v    = DT_S;
-            args[0].slen = (uint32_t)e->cc_slen;
-            args[0].s    = buf;
-            for (int j = 0; j < e->fnc_nargs; j++) args[j+1] = e->fnc_args[j];
-
-            DESCR_t name_d = g_user_call_hook(e->fnc_name, args, total);
-            /* If func returns DT_N (nreturn lvalue), write matched text     */
+            /* Pass only the explicit static args — do NOT prepend matched text.
+             * SNOBOL4 spec: *fn(a,b) in pattern receives exactly the listed args.
+             * Prepending the captured substring as args[0] was wrong: it shifted
+             * all explicit args by 1, so param[0] got "" (epsilon match) instead
+             * of the intended first argument.  CSNOBOL4 confirms no prepend. */
+            DESCR_t name_d = g_user_call_hook(e->fnc_name, e->fnc_args, e->fnc_nargs);
             DESCR_t *cell = (name_d.v == DT_N && name_d.ptr)
                             ? (DESCR_t *)name_d.ptr : NULL;
-            if (cell) *cell = args[0];
+            if (cell) *cell = name_d;
         }
     }
 

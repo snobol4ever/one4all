@@ -666,25 +666,13 @@ static void flush_pending_callcaps(void) {
             spec_t snap = ev->pending;
             ev->has_pending = 0;
             if (!g_user_call_hook || !ev->fnc_name) continue;
-            /* Build arg list: matched text prepended as arg[0], then any
-             * static args.  This matches deferred_call_with_text_fn semantics:
-             * 'constant . *Push()' calls Push(matched_text) so Push's 'x'
-             * parameter receives the captured string. */
-            int total = 1 + ev->fnc_nargs;
-            DESCR_t *args = (DESCR_t *)GC_MALLOC((size_t)total * sizeof(DESCR_t));
-            char *buf = (char *)GC_MALLOC((size_t)snap.δ + 1);
-            if (snap.σ && snap.δ > 0) memcpy(buf, snap.σ, (size_t)snap.δ);
-            buf[snap.δ] = '\0';
-            args[0].v    = DT_S;
-            args[0].slen = (uint32_t)snap.δ;
-            args[0].s    = buf;
-            /* NOTE: do NOT set args[0].ptr — .s and .ptr share the same union */
-            for (int j = 0; j < ev->fnc_nargs; j++) args[j+1] = ev->fnc_args[j];
-            DESCR_t name_d = g_user_call_hook(ev->fnc_name, args, total);
-            /* If func returns DT_N (nreturn lvalue), write matched text into
-             * the named cell — handles the 'Push = .cell; $Push = x' pattern. */
+            /* Pass only the explicit static args — do NOT prepend matched text.
+             * SNOBOL4 spec: *fn(a,b) receives exactly the listed args.
+             * Prepending captured text as args[0] was wrong (shifted all args by 1).
+             * CSNOBOL4 confirms: 'pat . *fn(X,Y)' -> fn receives (X, Y), not (matched,X,Y). */
+            DESCR_t name_d = g_user_call_hook(ev->fnc_name, ev->fnc_args, ev->fnc_nargs);
             DESCR_t *cell = (name_d.v == DT_N && name_d.ptr) ? (DESCR_t*)name_d.ptr : NULL;
-            if (cell) *cell = args[0];
+            if (cell) *cell = name_d;
         }
     }
     /* Also clear ζ->has_pending on all registered boxes */
