@@ -136,6 +136,8 @@ extern spec_t bb_tab(void *zeta, int entry);
 extern spec_t bb_rtab(void *zeta, int entry);
 extern spec_t bb_fence(void *zeta, int entry);
 extern spec_t bb_abort(void *zeta, int entry);
+extern DESCR_t bb_bal(void *zeta, int entry);
+extern bal_t  *bb_bal_new(void);
 extern spec_t bb_alt(void *zeta, int entry);
 extern spec_t bb_seq(void *zeta, int entry);
 extern spec_t bb_arbno(void *zeta, int entry);
@@ -1080,8 +1082,16 @@ bb_node_t bb_build(PATND_t *p)
         break;
     }
 
-    /* ── BAL / unimplemented: epsilon stub (logged) ─────────────────────── */
-    case XBAL:
+    /* ── BAL ────────────────────────────────────────────────────────────── */
+    case XBAL: {
+        bal_t *ζ = bb_bal_new();
+        n.fn     = (bb_box_fn)bb_bal;
+        n.ζ      = ζ;
+        n.ζ_size = sizeof(*ζ);
+        break;
+    }
+
+    /* ── unimplemented: epsilon stub (logged) ────────────────────────── */
     default: {
         fprintf(stderr, "stmt_exec: unimplemented XKIND %d — using epsilon\n",
                 (int)p->kind);

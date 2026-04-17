@@ -135,6 +135,7 @@ typedef struct { int n; int advance; }                tab_t;
 typedef struct { int n; int advance; }                rtab_t;
 typedef struct { int fired; }                          fence_t;
 typedef struct { int dummy; }                          abort_t;
+typedef struct { int δ; }                              bal_t;
 typedef struct { int done; const char *varname; }     atp_t;
 /* deferred_var_t needs bb_node_t — defined above */
 

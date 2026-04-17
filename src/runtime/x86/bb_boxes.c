@@ -384,15 +384,36 @@ eps_t *bb_eps_new(void)
 { return calloc(1,sizeof(eps_t)); }
 
 /* ───── bal ───── */
-/* _XBAL     BAL         balanced parens — STUB; M-DYN-BAL pending */
-
-typedef struct { int δ; int start; }  bal_t;
+/* _XBAL     BAL         balanced parens — matches a "balanced" string:
+ * zero or more chars that are not ( or ), or a ( followed by a BAL string
+ * followed by ), all concatenated.  Equivalent to the SNOBOL4 primitive BAL.
+ * On α: scan from Δ consuming the maximal balanced prefix (may be zero-width).
+ * On β: undo the match and fail (no shorter alternative — BAL is deterministic). */
 
 DESCR_t bb_bal(void *zeta, int entry)
 {
-    (void)zeta; (void)entry;
-    fprintf(stderr,"bb_bal: unimplemented — ω\n");
-    return FAILDESCR;
+    bal_t *ζ = zeta;
+    spec_t BAL;
+    if (entry==α)                                                               goto BAL_α;
+    if (entry==β)                                                               goto BAL_β;
+    BAL_α: {
+        int pos = Δ;
+        int depth = 0;
+        while (pos < Σlen) {
+            char c = Σ[pos];
+            if (c == '(') { depth++; pos++; }
+            else if (c == ')') {
+                if (depth == 0) break;   /* unmatched ')' stops scan */
+                depth--; pos++;
+                if (depth == 0) break;   /* consumed one balanced group — stop */
+            } else { pos++; }
+        }
+        ζ->δ = pos - Δ;
+        BAL = spec(Σ+Δ, ζ->δ); Δ += ζ->δ;                                     goto BAL_γ;
+    }
+    BAL_β:          Δ -= ζ->δ;                                                 goto BAL_ω;
+    BAL_γ:                                                                      return descr_from_spec(BAL);
+    BAL_ω:                                                                      return FAILDESCR;
 }
 
 bal_t *bb_bal_new(void)
