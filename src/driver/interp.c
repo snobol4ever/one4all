@@ -2613,8 +2613,20 @@ DESCR_t interp_eval(EXPR_t *e)
             if (IS_FAIL_fn(nxt)) return FAILDESCR;
             if (in_pat_mode || IS_PAT(nxt)) {
                 if (!in_pat_mode) {
-                    /* First pattern seen mid-concat: re-eval this child in pat ctx */
+                    /* First pattern seen mid-concat: re-eval this child in pat ctx
+                     * AND re-accumulate children[0..i-1] in pat ctx so that any
+                     * *var / *func among them become XDSAR/XATP nodes rather
+                     * than frozen DT_E (which pat_cat can't concat).  Without
+                     * this, "expr = *term integer" produces DT_E for *term in
+                     * value ctx, then hits pat_cat when integer (DT_P) arrives. */
                     nxt = interp_eval_pat(e->children[i]);
+                    acc = interp_eval_pat(e->children[0]);
+                    if (IS_FAIL_fn(acc)) return FAILDESCR;
+                    for (int j = 1; j < i; j++) {
+                        DESCR_t pj = interp_eval_pat(e->children[j]);
+                        if (IS_FAIL_fn(pj)) return FAILDESCR;
+                        acc = pat_cat(acc, pj);
+                    }
                     in_pat_mode = 1;
                 }
                 acc = pat_cat(acc, nxt);
@@ -3034,11 +3046,16 @@ DESCR_t interp_eval(EXPR_t *e)
     }
 
     case E_ALT: {
-        /* child[0] | child[1] | ... — build pat_alt chain left-to-right */
+        /* child[0] | child[1] | ... — build pat_alt chain left-to-right.
+         * Pattern alternation is inherently a pattern operation, so every
+         * child should be evaluated in pattern context so that *var/*func
+         * children become XDSAR/XATP nodes rather than frozen DT_E (which
+         * silently coerces to pat_lit of the NAME string — wrong and
+         * confusing). */
         if (e->nchildren == 0) return NULVCL;
-        DESCR_t acc = interp_eval(e->children[0]);
+        DESCR_t acc = interp_eval_pat(e->children[0]);
         for (int i = 1; i < e->nchildren; i++)
-            acc = pat_alt(acc, interp_eval(e->children[i]));
+            acc = pat_alt(acc, interp_eval_pat(e->children[i]));
         return acc;
     }
     case E_CAPT_COND_ASGN: {
