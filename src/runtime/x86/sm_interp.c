@@ -261,6 +261,9 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
             const char *name = ins->a[0].s;
             DESCR_t val = NV_GET_fn(name);
             sm_push(st, val);
+            /* SN-6: keyword reads (e.g. INPUT at EOF) return FAILDESCR.
+             * Update last_ok so the statement's :F branch fires correctly. */
+            st->last_ok = (val.v != DT_FAIL);
             break;
         }
 
@@ -289,7 +292,12 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
              * embedded assignment X = (A = B) leaves B's value on stack for X. */
             DESCR_t stored = NV_SET_fn(name, val);
             sm_push(st, stored);
-            /* leave last_ok unchanged — assignment always succeeds */
+            /* SN-6: successful assignment sets last_ok=1 so a prior failure
+             * (e.g. EQ in previous statement) does not bleed into this statement's
+             * :F branch. "Leave last_ok unchanged" was wrong — it caused
+             * last_ok=0 from EQ failure to persist across the loop-back goto,
+             * making INPUT's :F(END) fire even when INPUT succeeded. */
+            st->last_ok = 1;
             break;
         }
 
@@ -306,6 +314,14 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
         case SM_EXP: {
             DESCR_t r = sm_pop(st);
             DESCR_t l = sm_pop(st);
+            /* SN-6: propagate FAIL from operands (e.g. CHARS + SIZE(INPUT) when
+             * INPUT hits EOF — SIZE swallows the FAIL and returns 0, so we must
+             * catch it here before arithmetic runs). */
+            if (l.v == DT_FAIL || r.v == DT_FAIL) {
+                sm_push(st, FAILDESCR);
+                st->last_ok = 0;
+                break;
+            }
             /* coerce strings to numeric if needed */
             if (l.v == DT_S) l = INTVAL(to_int(l));
             if (r.v == DT_S) r = INTVAL(to_int(r));
@@ -717,9 +733,22 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
             DESCR_t args[32];
             for (int k = nargs - 1; k >= 0; k--)
                 args[k] = sm_pop(st);
+            /* SN-6: SNOBOL4 semantics — if any argument is FAIL, the call fails
+             * without invoking the function. This is what allows
+             * CHARS + SIZE(INPUT) :F(DONE) to branch when INPUT hits EOF:
+             * INPUT returns FAILDESCR → SIZE receives it → SIZE would swallow it,
+             * but we catch it here before the call. */
+            for (int k = 0; k < nargs; k++) {
+                if (args[k].v == DT_FAIL) {
+                    sm_push(st, FAILDESCR);
+                    st->last_ok = 0;
+                    goto sm_call_done;
+                }
+            }
             /* DATA field accessor/mutator/constructor: when first arg is a DATA
              * instance (or name ends in _SET with second arg DT_DATA), give
              * DATA field dispatch priority over same-named builtins (e.g. 'real'). */
+            {
             DESCR_t result = FAILDESCR;
             int _data_first = (nargs >= 1 && args[0].v == DT_DATA);
             int _data_set   = (nargs >= 2 && args[1].v == DT_DATA && name &&
@@ -734,6 +763,8 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
             else if (IS_NAMEVAL(result)) result = NV_GET_fn(result.s);
             sm_push(st, result);
             st->last_ok = (result.v != DT_FAIL);
+            }
+            sm_call_done:
             break;
         }
 
