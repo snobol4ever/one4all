@@ -25,6 +25,7 @@ FAILURES=""
 run_test() {
     local label="$1" sno="$2" ref="$3" input="${4:-}" filter="${5:-}"
     [ ! -f "$ref" ] && return
+    [ ! -f "$sno" ] && return
     local got exp
     if [ -n "$input" ] && [ -f "$input" ]; then
         got=$(SNO_LIB="$INC" timeout "$TIMEOUT" $INTERP "$sno" < "$input" 2>/dev/null || true)

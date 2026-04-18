@@ -309,6 +309,9 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
             /* coerce strings to numeric if needed */
             if (l.v == DT_S) l = INTVAL(to_int(l));
             if (r.v == DT_S) r = INTVAL(to_int(r));
+            /* coerce SNUL (unset/empty) to integer 0 — matches SPITBOL & --ir-run */
+            if (l.v == DT_SNUL) l = INTVAL(0);
+            if (r.v == DT_SNUL) r = INTVAL(0);
             DESCR_t result = sm_arith(l, r, ins->op);
             sm_push(st, result);
             st->last_ok = (result.v != DT_FAIL);
