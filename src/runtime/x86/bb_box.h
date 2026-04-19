@@ -34,6 +34,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include "descr.h"   /* DESCR_t, DTYPE_t, FAILDESCR, IS_FAIL_fn — U-5 */
+#include "name_t.h"  /* NAME_t, NameKind_t, name_commit_value — SN-21 */
 
 /* ── str_t — the universal value type ──────────────────────────────────── */
 /*
@@ -139,33 +140,39 @@ typedef struct { int δ; }                              bal_t;
 typedef struct { int done; const char *varname; }     atp_t;
 /* deferred_var_t needs bb_node_t — defined above */
 
-/* capture_t — full definition exposed so stmt_exec.c dispatcher can allocate
- * and fill the state struct in-place (mirrors pattern used for other box
- * states above). SN-20 session 17: single source; same struct used in all
- * three modes.
- *   varname   — DT_S target (write via NV_SET_fn; fires OUTPUT/PUNCH hooks)
- *   var_ptr   — DT_N target (write directly through ptr; SIL NAME semantics)
- *   immediate — 1 for XFNME ($): write on every γ; 0 for XNME (.): defer via NAM_push
- *   nam_handle — opaque NAM list node pushed in γ; popped on β/ω (self-unwind) */
-typedef struct capture_s {
+/* cap_t — SN-21c unified capture state.
+ *
+ * Replaces the pre-SN-21c capture_t.  One struct, one box (bb_cap) handles
+ * both XNME (.) and XFNME ($) for plain-variable and DT_N pointer targets.
+ * The {varname, var_ptr} pair is subsumed by NAME_t (kind ∈ {NM_VAR, NM_PTR});
+ * bb_callcap still owns the NM_CALL case until SN-21d collapses it.
+ *
+ *   fn / state  — child box
+ *   immediate   — 1 for XFNME ($): write at γ via name_commit_value
+ *                 0 for XNME (.): push at γ via NAME_push; commit at NAM_commit
+ *   name        — unified lvalue descriptor (NM_VAR or NM_PTR in SN-21c)
+ *   nam_handle  — NAME_push handle (NULL if none); popped on β/ω (self-unwind)
+ *   pending / has_pending / registered — kept for pre-SN-21e bookkeeping so
+ *                 clear_pending_flags() and the capture-registry hooks stay
+ *                 correct across statements. */
+typedef struct cap_s {
     bb_box_fn    fn;
     void        *state;
-    const char  *varname;
-    DESCR_t     *var_ptr;
     int          immediate;
+    NAME_t       name;
+    void        *nam_handle;
     spec_t       pending;
     int          has_pending;
     int          registered;
-    void        *nam_handle;
-} capture_t;
+} cap_t;
 
 /* External box-function + helper declarations — all live in bb_boxes.c
  * (single source across --ir-run, --sm-run, --jit-run). Callers: stmt_exec.c
  * bb_build dispatcher, bb_build.c JIT emitter. DESCR_t visible via descr.h above. */
 
-extern DESCR_t bb_capture(void *zeta, int entry);
-extern capture_t *bb_capture_new(bb_box_fn child_fn, void *child_state,
-                                 const char *varname, DESCR_t *var_ptr, int immediate);
+extern DESCR_t bb_cap(void *zeta, int entry);
+extern cap_t *bb_cap_new(bb_box_fn child_fn, void *child_state,
+                         const char *varname, DESCR_t *var_ptr, int immediate);
 extern void      flush_pending_captures(void);
 extern void      reset_capture_registry(void);
 extern void      clear_pending_flags(void);

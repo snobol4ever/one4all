@@ -147,10 +147,10 @@ extern DESCR_t bb_rtab(void *zeta, int entry);
 
 /* M-DYN-B7: capture box — unified in bb_boxes.c (SN-20 session 17).
  * Single source across all three modes; no _exported wrapper needed. */
-extern DESCR_t bb_capture(void *zeta, int entry);
+extern DESCR_t bb_cap(void *zeta, int entry);
 
-/* capture_t + bb_capture_new canonical declarations come from bb_box.h
- * (SN-20 session 17 unification — single source across all three modes). */
+/* cap_t + bb_cap_new canonical declarations come from bb_box.h
+ * (SN-21c: bb_capture → bb_cap port). */
 
 /* M-DYN-B10: exported shims for static box functions in stmt_exec.c */
 extern DESCR_t bb_callcap_exported(void *zeta, int entry);
@@ -819,12 +819,12 @@ static bb_box_fn bb_breakx_emit_binary(const char *chars)
  * bb_fnme_emit_binary(PATND_t *p) — M-DYN-B7
  *
  * XNME (pat . var) and XFNME (pat $ var) wrap a child pattern in a
- * capture_t. The child is built recursively; if it can't go binary the
+ * cap_t. The child is built recursively; if it can't go binary the
  * whole node falls back.
  *
  * Strategy: same trampoline as TAB/LEN —
- *   alloc heap capture_t via bb_capture_new(),
- *   emit 22-byte trampoline: mov rdi,imm64(z); mov rax,imm64(bb_capture); jmp rax
+ *   alloc heap cap_t via bb_cap_new(),
+ *   emit 22-byte trampoline: mov rdi,imm64(z); mov rax,imm64(bb_cap); jmp rax
  */
 static bb_box_fn bb_nme_emit_binary(PATND_t *p)
 {
@@ -840,7 +840,7 @@ static bb_box_fn bb_nme_emit_binary(PATND_t *p)
     void       *var_ptr = (p->var.v == DT_N && p->var.slen == 1 && p->var.ptr)
                           ? (void *)p->var.ptr : NULL;
 
-    capture_t *z = bb_capture_new(child_fn, NULL, varname, (DESCR_t*)var_ptr, 0 /*immediate=0*/);
+    cap_t *z = bb_cap_new(child_fn, NULL, varname, (DESCR_t*)var_ptr, 0 /*immediate=0*/);
     if (!z) return NULL;
 
 #define NME_TRAM_SIZE 32
@@ -852,9 +852,9 @@ static bb_box_fn bb_nme_emit_binary(PATND_t *p)
     /* mov rdi, imm64(z) */
     bb_emit_byte(0x48); bb_emit_byte(0xBF);
     bb_emit_u64((uint64_t)(uintptr_t)z);
-    /* mov rax, imm64(bb_capture) */
+    /* mov rax, imm64(bb_cap) */
     bb_emit_byte(0x48); bb_emit_byte(0xB8);
-    bb_emit_u64((uint64_t)(uintptr_t)bb_capture);
+    bb_emit_u64((uint64_t)(uintptr_t)bb_cap);
     /* jmp rax */
     bb_emit_byte(0xFF); bb_emit_byte(0xE0);
 
@@ -877,7 +877,7 @@ static bb_box_fn bb_fnme_emit_binary(PATND_t *p)
     void       *var_ptr = (p->var.v == DT_N && p->var.slen == 1 && p->var.ptr)
                           ? (void *)p->var.ptr : NULL;
 
-    capture_t *z = bb_capture_new(child_fn, NULL, varname, (DESCR_t*)var_ptr, 1 /*immediate=1*/);
+    cap_t *z = bb_cap_new(child_fn, NULL, varname, (DESCR_t*)var_ptr, 1 /*immediate=1*/);
     if (!z) return NULL;
 
 #define FNME_TRAM_SIZE 32
@@ -889,7 +889,7 @@ static bb_box_fn bb_fnme_emit_binary(PATND_t *p)
     bb_emit_byte(0x48); bb_emit_byte(0xBF);
     bb_emit_u64((uint64_t)(uintptr_t)z);
     bb_emit_byte(0x48); bb_emit_byte(0xB8);
-    bb_emit_u64((uint64_t)(uintptr_t)bb_capture);
+    bb_emit_u64((uint64_t)(uintptr_t)bb_cap);
     bb_emit_byte(0xFF); bb_emit_byte(0xE0);
 
     int nb = bb_emit_end();

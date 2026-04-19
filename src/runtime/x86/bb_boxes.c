@@ -513,16 +513,25 @@ interr_t *bb_interr_new(bb_box_fn fn, void *state)
  * No external combinator-level NAM_mark / NAM_rollback_to required — the
  * box is symmetric in its own right.
  *
- * capture_t definition now in bb_box.h so the stmt_exec.c dispatcher can
+ * cap_t definition now in bb_box.h so the stmt_exec.c dispatcher can
  * allocate state directly (mirrors other box struct exposure pattern).
  */
 
-/* forward decl — used in bb_capture body below */
-static void register_capture(capture_t *c);
+/* forward decl — used in bb_cap body below */
+static void register_capture(cap_t *c);
 
-DESCR_t bb_capture(void *zeta, int entry)
+/* SN-21c: bb_cap — unified (.) / ($) capture box.
+ *
+ * State is cap_t with an embedded NAME_t; immediate ($) writes route through
+ * name_commit_value, deferred (.) writes push via NAME_push at γ and are
+ * popped by NAME_pop on β / ω so the flat NAM stack self-unwinds.
+ *
+ * Registry (g_capture_list) and has_pending bookkeeping are retained until
+ * SN-21e cleanup — they keep statement-boundary resets correct regardless
+ * of whether a box ever completed its γ/β/ω handshake. */
+DESCR_t bb_cap(void *zeta, int entry)
 {
-    capture_t *ζ = zeta;
+    cap_t *ζ = zeta;
     spec_t cr;
 
     if (entry == α)                                                             goto CAP_α;
@@ -535,44 +544,44 @@ DESCR_t bb_capture(void *zeta, int entry)
 
     CAP_β:       /* SN-20: undo our prior push before retrying. If retry
                   * succeeds, CAP_γ_core re-pushes with a fresh handle. */
-                 if (ζ->nam_handle) { NAM_pop_one(ζ->nam_handle); ζ->nam_handle = NULL; }
+                 if (ζ->nam_handle) { NAME_pop(ζ->nam_handle); ζ->nam_handle = NULL; }
                  cr = spec_from_descr(ζ->fn(ζ->state, β));
                  if (spec_is_empty(cr))                                         goto CAP_ω;
                                                                                 goto CAP_γ_core;
 
-    CAP_γ_core:  if (ζ->var_ptr || (ζ->varname && *ζ->varname)) {
-                     if (ζ->immediate) {
-                         /* XFNME ($): immediate — write now on every γ */
-                         char *s = (char *)GC_MALLOC(cr.δ + 1);
-                         memcpy(s, cr.σ, (size_t)cr.δ);
-                         s[cr.δ] = '\0';
-                         DESCR_t val = { .v = DT_S, .slen = (uint32_t)cr.δ, .s = s };
-                         if (ζ->var_ptr) *ζ->var_ptr = val;
-                         else            NV_SET_fn(ζ->varname, val);
-                     } else {
-                         /* XNME (.): conditional — push onto NMD naming list.
-                          * SN-20: save handle so CAP_β/CAP_ω can self-unwind. */
-                         ζ->nam_handle  = NAM_push(ζ->varname, ζ->var_ptr, DT_S, cr.σ, cr.δ);
-                         ζ->pending     = cr;
-                         ζ->has_pending = 1;
-                     }
+    CAP_γ_core:  if (ζ->immediate) {
+                     /* XFNME ($): commit now on every γ, through the one
+                      * dispatcher that knows about every NameKind_t. */
+                     char *s = (char *)GC_MALLOC(cr.δ + 1);
+                     if (cr.σ && cr.δ > 0) memcpy(s, cr.σ, (size_t)cr.δ);
+                     s[cr.δ] = '\0';
+                     DESCR_t val = { .v = DT_S, .slen = (uint32_t)cr.δ, .s = s };
+                     name_commit_value(&ζ->name, val);
+                 } else {
+                     /* XNME (.): push the lvalue + matched substring onto the
+                      * flat NAM stack.  Statement-level NAM_commit walks the
+                      * slots at full-match success and calls name_commit_value
+                      * on each.  Save handle so CAP_β / CAP_ω self-unwind. */
+                     ζ->nam_handle  = NAME_push(&ζ->name, cr.σ, (int)cr.δ);
+                     ζ->pending     = cr;
+                     ζ->has_pending = 1;
                  }
                                                                                 return descr_from_spec(cr);
 
     CAP_ω:       /* SN-20: pop our push on failure exit. */
-                 if (ζ->nam_handle) { NAM_pop_one(ζ->nam_handle); ζ->nam_handle = NULL; }
+                 if (ζ->nam_handle) { NAME_pop(ζ->nam_handle); ζ->nam_handle = NULL; }
                  ζ->has_pending = 0;                                            return FAILDESCR;
 }
 
 /* Capture registry (moved from stmt_exec.c — used by exec_stmt for Phase-5 reset).
  * MAX_CAPTURES raised from 64 to 256 to match stmt_exec.c's original value. */
 #define MAX_CAPTURES 256
-static capture_t *g_capture_list[MAX_CAPTURES];
-static int        g_capture_count = 0;
+static cap_t *g_capture_list[MAX_CAPTURES];
+static int    g_capture_count = 0;
 
-/* Called from bb_capture CAP_α whenever a conditional (.) capture fires.
+/* Called from bb_cap CAP_α whenever a conditional (.) capture fires.
  * Also callable from bb_build for eager registration if desired. */
-static void register_capture(capture_t *c)
+static void register_capture(cap_t *c)
 {
     for (int i = 0; i < g_capture_count; i++)
         if (g_capture_list[i] == c) return;
@@ -608,18 +617,22 @@ void clear_pending_flags(void)
 }
 
 /* Unified constructor — external linkage; called from stmt_exec.c bb_build
- * dispatcher and from bb_build.c JIT emitter. Signature matches the
- * capture_t_bin mirror in bb_build.c (var_ptr is void* there, DESCR_t* here). */
-capture_t *bb_capture_new(bb_box_fn child_fn, void *child_state,
-                          const char *varname, DESCR_t *var_ptr, int immediate)
+ * dispatcher and from bb_build.c JIT emitter.  Signature matches the
+ * cap_t_bin mirror in bb_build.c (var_ptr is void* there, DESCR_t* here).
+ * Builds the embedded NAME_t via name_init_as_{ptr,var} so no call site
+ * constructs a NAME_t by hand. */
+cap_t *bb_cap_new(bb_box_fn child_fn, void *child_state,
+                  const char *varname, DESCR_t *var_ptr, int immediate)
 {
-    capture_t *ζ = calloc(1, sizeof(capture_t));
+    cap_t *ζ = calloc(1, sizeof(cap_t));
     if (!ζ) return NULL;
     ζ->fn        = child_fn;
     ζ->state     = child_state;
-    ζ->varname   = varname;
-    ζ->var_ptr   = var_ptr;
     ζ->immediate = immediate;
+    if (var_ptr)            name_init_as_ptr(&ζ->name, var_ptr);
+    else if (varname)       name_init_as_var(&ζ->name, varname);
+    /* else: name.kind==NM_VAR, var_name==NULL — name_commit_value / push are
+     * safe no-ops on empty names (mirrors previous varname==NULL behaviour). */
     return ζ;
 }
 
