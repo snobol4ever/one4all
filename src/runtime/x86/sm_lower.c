@@ -110,9 +110,12 @@ static int lt_resolve(LabelTable *lt, SM_Program *p)
         const char *name = lt->patches[i].target_name;
         int target = lt_find(lt, name);
         if (target < 0) {
-            fprintf(stderr, "sm_lower: unresolved label '%s'\n", name);
+            /* SNOBOL4 convention: goto an undefined label = Error 24.
+             * Patch to last instruction (SM_HALT) so execution terminates
+             * cleanly rather than jumping to pc=0 and re-running the program. */
+            fprintf(stderr, "sm_lower: undefined label '%s' treated as Error 24 (halt)\n", name);
+            target = (p->count > 0) ? p->count - 1 : 0;
             ok = -1;
-            continue;
         }
         sm_patch_jump(p, lt->patches[i].jump_instr_idx, target);
     }
@@ -1051,10 +1054,8 @@ SM_Program *sm_lower(const Program *prog)
         sm_emit(p, SM_HALT);
 
     /* Second pass: resolve all forward label references */
-    if (lt_resolve(&lt, p) < 0) {
-        fprintf(stderr, "sm_lower: label resolution failed\n");
-        /* Return program anyway; unresolved jumps go to 0 (safe) */
-    }
+    /* Unresolved labels are patched to HALT (Error 24) by lt_resolve */
+    lt_resolve(&lt, p);
 
     lt_free(&lt);
     return p;

@@ -593,7 +593,7 @@ static DESCR_t _ARRAY_(DESCR_t *a, int n) {
     if (n < 1) return FAILDESCR;
     const char *proto = VARVAL_fn(a[0]);
     if (proto && strchr(proto, ':')) {
-        /* Parse "lo:hi" or "lo:hi,lo2:hi2" */
+        /* Explicit "lo:hi" or "lo:hi,lo2:hi2" — proto_bare=0 */
         int lo = 1, hi = 1, lo2 = 1, hi2 = 1;
         const char *comma = strchr(proto, ',');
         if (comma) {
@@ -601,26 +601,33 @@ static DESCR_t _ARRAY_(DESCR_t *a, int n) {
             if (strchr(comma+1, ':')) {
                 sscanf(comma+1, "%d:%d", &lo2, &hi2);
             } else {
-                lo2 = 1; hi2 = atoi(comma+1);   /* "N" → 1:N */
+                lo2 = 1; hi2 = atoi(comma+1);
                 if (hi2 < 1) hi2 = 1;
             }
-            return ARRAY_VAL(array_new2d(lo, hi, lo2, hi2));
+            ARBLK_t *arr2d = array_new2d(lo, hi, lo2, hi2);
+            arr2d->proto_bare = 0;
+            return ARRAY_VAL(arr2d);
         }
         sscanf(proto, "%d:%d", &lo, &hi);
-        return ARRAY_VAL(array_new(lo, hi));
+        ARBLK_t *arr1d = array_new(lo, hi);
+        arr1d->proto_bare = 0;
+        return ARRAY_VAL(arr1d);
     }
     if (proto && strchr(proto, ',')) {
-        /* Parse "R,C" or "R,C,..." — multi-dim without explicit bounds.
-         * Only 2D supported in runtime; first two dimensions used. */
+        /* Bare "R,C" form — proto_bare=1 */
         int r = 1, c = 1;
         sscanf(proto, "%d,%d", &r, &c);
         if (r < 1) r = 1;
         if (c < 1) c = 1;
-        return ARRAY_VAL(array_new2d(1, r, 1, c));
+        ARBLK_t *arrrc = array_new2d(1, r, 1, c);
+        arrrc->proto_bare = 1;
+        return ARRAY_VAL(arrrc);
     }
+    /* Bare integer "N" form — proto_bare=1 */
     int sz = (int)to_int(a[0]);
     if (sz < 1) return FAILDESCR;
     ARBLK_t *arr = array_new(1, sz);
+    arr->proto_bare = 1;
     /* Optional second arg: initial fill value */
     if (n >= 2) {
         for (int i = 0; i < sz; i++) arr->data[i] = a[1];
@@ -666,6 +673,7 @@ static DESCR_t _CONVERT_(DESCR_t *a, int n) {
             int n = tbl->size;
             if (n == 0) return FAILDESCR;
             ARBLK_t *a = array_new2d(1, n, 1, 2);
+            a->proto_bare = 1;  /* TABLE->ARRAY yields "N,2" bare form per SPITBOL */
             int row = 1;
             for (int b = 0; b < TABLE_BUCKETS && row <= n; b++) {
                 for (TBPAIR_t *e = tbl->buckets[b]; e && row <= n; e = e->next) {
@@ -766,6 +774,7 @@ static DESCR_t _COPY_(DESCR_t *a, int n) {
         if (!v.arr) return v;
         int sz = v.arr->hi - v.arr->lo + 1;
         ARBLK_t *copy = array_new(v.arr->lo, v.arr->hi);
+        copy->proto_bare = v.arr->proto_bare;  /* preserve original prototype form */
         for (int i = 0; i < sz; i++) copy->data[i] = v.arr->data[i];
         return ARRAY_VAL(copy);
     }
@@ -1294,15 +1303,16 @@ static DESCR_t _PROTOTYPE_(DESCR_t *a, int n) {
         char buf[128];
         if (arr->ndim > 1) {
             int cols = arr->hi2 - arr->lo2 + 1;
-            /* 2D: "lo1:hi1,lo2:hi2" or "rows,cols" when both lo=1 */
-            if (arr->lo == 1 && arr->lo2 == 1)
+            /* 2D: preserve original form via proto_bare */
+            if (arr->proto_bare)
                 snprintf(buf, sizeof(buf), "%d,%d",
                          arr->hi - arr->lo + 1, cols);
             else
                 snprintf(buf, sizeof(buf), "%d:%d,%d:%d",
                          arr->lo, arr->hi, arr->lo2, arr->hi2);
         } else {
-            if (arr->lo == 1)
+            /* 1D: preserve original form via proto_bare */
+            if (arr->proto_bare)
                 snprintf(buf, sizeof(buf), "%d", arr->hi);
             else
                 snprintf(buf, sizeof(buf), "%d:%d", arr->lo, arr->hi);
@@ -1613,14 +1623,14 @@ char *VARVAL_fn(DESCR_t v) {
             char buf[128];
             if (arr->ndim > 1) {
                 int cols = arr->hi2 - arr->lo2 + 1;
-                if (arr->lo == 1 && arr->lo2 == 1)
+                if (arr->proto_bare)
                     snprintf(buf, sizeof(buf), "ARRAY('%d,%d')",
                              arr->hi - arr->lo + 1, cols);
                 else
                     snprintf(buf, sizeof(buf), "ARRAY('%d:%d,%d:%d')",
                              arr->lo, arr->hi, arr->lo2, arr->hi2);
             } else {
-                if (arr->lo == 1)
+                if (arr->proto_bare)
                     snprintf(buf, sizeof(buf), "ARRAY('%d')", arr->hi);
                 else
                     snprintf(buf, sizeof(buf), "ARRAY('%d:%d')", arr->lo, arr->hi);

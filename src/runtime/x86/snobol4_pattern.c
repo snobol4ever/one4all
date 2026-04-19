@@ -424,14 +424,17 @@ DESCR_t array_create(DESCR_t spec) {
     const char *s = VARVAL_fn(spec);
     int lo = 1, hi = 1;
     const char *colon = strchr(s, ':');
+    int bare = 0;
     if (colon) {
         lo = atoi(s);
         hi = atoi(colon + 1);
     } else {
         hi = atoi(s);
+        bare = 1;
     }
     if (hi < lo) hi = lo;
     ARBLK_t *a = array_new(lo, hi);
+    a->proto_bare = bare;
     DESCR_t v;
     v.v = DT_A;
     v.arr    = a;
@@ -901,11 +904,12 @@ DESCR_t sort_fn(DESCR_t arr) {
 
     /* Build 2D array[1..n, 1..2]: col1=key_descr (preserves type), col2=val */
     ARBLK_t *a = GC_malloc(sizeof(ARBLK_t));
-    a->lo   = 1;
-    a->hi   = n;
-    a->ndim = 2;   /* 2 columns */
-    a->lo2  = 1;
-    a->hi2  = 2;   /* cols 1..2 */
+    a->lo         = 1;
+    a->hi         = n;
+    a->ndim       = 2;   /* 2 columns */
+    a->lo2        = 1;
+    a->hi2        = 2;   /* cols 1..2 */
+    a->proto_bare = 1;   /* SORT yields "N,2" bare form per SPITBOL */
     a->data = GC_malloc(n * 2 * sizeof(DESCR_t));
     for (int i = 0; i < n; i++) {
         a->data[i * 2 + 0] = key_descrs[order[i]];  /* preserve integer/string type */

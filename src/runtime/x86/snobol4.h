@@ -135,6 +135,7 @@ typedef struct _ARBLK_t {
     int     lo, hi;      /* ARRAY('lo:hi') bounds, dim 1 */
     int     ndim;        /* number of dimensions (1 or 2) */
     int     lo2, hi2;   /* dim 2 bounds (ndim==2 only); cols = hi2-lo2+1 */
+    int     proto_bare;  /* 1 if created with bare "N" or "R,C" form; 0 if explicit "lo:hi" */
     DESCR_t *data;        /* lo..hi, 0-based offset by lo */
 } ARBLK_t;
 
