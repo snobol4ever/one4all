@@ -388,6 +388,16 @@ static void lower_pat_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
             p->instrs[idx].a[2].s = sm_pat_capture_fn_arg_names(ch);
             return;
         }
+        /* SN-6: *var — emit SM_PAT_REFNAME so the name (not the current value)
+         * reaches bb_deferred_var at match time.  Self-recursive patterns like
+         *   primary = integer | '(' *primary ')'
+         * need the XDSAR ref built from NAME, not from PRIMARY's in-progress
+         * value at pattern-build time.  Mirrors --ir-run's pat_ref(child->sval)
+         * branch in interp_eval_pat E_DEFER. */
+        if (ch && ch->kind == E_VAR && ch->sval) {
+            sm_emit_s(p, SM_PAT_REFNAME, ch->sval);
+            return;
+        }
         lower_expr(p, lt, ch);
         sm_emit(p, SM_PAT_DEREF);
         return;

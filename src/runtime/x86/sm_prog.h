@@ -71,6 +71,13 @@ typedef enum {
     SM_PAT_ALT,
     SM_PAT_CAT,
     SM_PAT_DEREF,
+    SM_PAT_REFNAME,     /* *var in pattern context — a[0].s = var name; push pat_ref(name)
+                         * onto pat-stack.  Unlike SM_PUSH_VAR + SM_PAT_DEREF which fetches
+                         * the variable's CURRENT value at pattern-build time (wrong for
+                         * self-recursive patterns like primary = ... | '(' *primary ')'),
+                         * this opcode preserves the name and defers lookup to match time
+                         * via XDSAR / bb_deferred_var.  Mirrors the --ir-run pat_ref(name)
+                         * path in interp_eval_pat's E_DEFER(E_VAR) case.  SN-6 fix. */
     SM_PAT_CAPTURE,
     SM_PAT_CAPTURE_FN,  /* . *func() — a[0].s=funcname; calls func(matched_text) at match time */
     SM_PAT_USERCALL,    /* bare *func() — a[0].s=funcname; a[2].s = '\t'-separated arg names (or NULL)

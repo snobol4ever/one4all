@@ -466,6 +466,14 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
             }
             break;
         }
+        case SM_PAT_REFNAME: {
+            /* SN-6: *var in pattern context — build XDSAR from the NAME,
+             * never fetching the variable's current value at build time.
+             * Required for self-recursive patterns. */
+            const char *name = ins->a[0].s ? ins->a[0].s : "";
+            pat_push(pat_ref(name));
+            break;
+        }
         case SM_PAT_CAPTURE: {
             /* a[0].s = variable name; a[1].i = 0=cond 1=imm 2=cursor
              * pat_assign_cond/imm expects a NAME descriptor (DT_N). */

@@ -138,7 +138,7 @@ static const char *opnames[SM_OPCODE_COUNT] = {
     "SM_PAT_LEN","SM_PAT_POS","SM_PAT_RPOS","SM_PAT_TAB","SM_PAT_RTAB",
     "SM_PAT_ARB","SM_PAT_ARBNO","SM_PAT_REM","SM_PAT_BAL","SM_PAT_FENCE","SM_PAT_FENCE1","SM_PAT_ABORT",
     "SM_PAT_FAIL","SM_PAT_SUCCEED","SM_PAT_EPS","SM_PAT_ALT","SM_PAT_CAT",
-    "SM_PAT_DEREF","SM_PAT_CAPTURE",
+    "SM_PAT_DEREF","SM_PAT_REFNAME","SM_PAT_CAPTURE",
     "SM_PAT_CAPTURE_FN",
     "SM_PAT_USERCALL",
     "SM_EXEC_STMT",
@@ -201,6 +201,7 @@ void sm_prog_print(const SM_Program *p, FILE *out)
             /* string + int */
             case SM_PUSH_VAR: case SM_STORE_VAR:
             case SM_PAT_CAPTURE: case SM_PAT_DEREF:
+            case SM_PAT_REFNAME:
                 if (in->a[0].s) fprintf(out, " s=\"%s\"", in->a[0].s);
                 break;
             case SM_PAT_CAPTURE_FN:

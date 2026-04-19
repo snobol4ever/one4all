@@ -358,6 +358,15 @@ static void h_pat_deref(void)
     }
 }
 
+static void h_pat_refname(void)
+{
+    /* SN-6: *var in pattern context — build XDSAR from the NAME,
+     * never fetching variable's current value at build time.
+     * Mirrors sm_interp.c case SM_PAT_REFNAME. */
+    const char *name = CUR_INS->a[0].s ? CUR_INS->a[0].s : "";
+    jit_pat_push(pat_ref(name));
+}
+
 static void h_pat_capture(void)
 {
     DESCR_t child  = jit_pat_pop();
@@ -593,6 +602,7 @@ static void init_handler_table(void)
     g_handlers[SM_PAT_ALT]     = h_pat_alt;
     g_handlers[SM_PAT_CAT]     = h_pat_cat;
     g_handlers[SM_PAT_DEREF]   = h_pat_deref;
+    g_handlers[SM_PAT_REFNAME] = h_pat_refname;
     g_handlers[SM_PAT_CAPTURE]    = h_pat_capture;
     g_handlers[SM_PAT_CAPTURE_FN] = h_pat_capture_fn;
     g_handlers[SM_PAT_USERCALL]   = h_pat_usercall;
