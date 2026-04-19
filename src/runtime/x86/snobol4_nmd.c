@@ -202,6 +202,28 @@ void NAME_pop(void *handle)
 }
 
 /*===========================================================================*/
+/* NAME_pop_top — SN-23d: drop topmost live slot of the active ctx            */
+/*                                                                            */
+/* Pure LIFO pop.  Every bb_cap γ pushes; its own β/ω pops the top.  The      */
+/* box self-unwind invariant (SN-22d) guarantees that when a box reaches     */
+/* β/ω, every peer/child γ-push made after its own γ has already been popped */
+/* by its owning box — so the top IS this box's own push.  No handle needed. */
+/*===========================================================================*/
+
+void NAME_pop_top(void)
+{
+    NAME_ctx_t *ctx = g_ctx_current;
+    if (ctx->top <= 0) return;
+    NAME_entry_t *es = ctx_entries(ctx);
+    /* Skip any tombstones at the top (defensive — post-SN-22d there should */
+    /* be none, but keep the invariant consistent with NAME_pop's trailer). */
+    while (ctx->top > 0 && !es[ctx->top - 1].live) ctx->top--;
+    if (ctx->top <= 0) return;
+    es[ctx->top - 1].live = 0;
+    ctx->top--;
+}
+
+/*===========================================================================*/
 /* NAME_top — current stack depth                                             */
 /*===========================================================================*/
 

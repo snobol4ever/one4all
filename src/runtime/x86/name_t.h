@@ -134,6 +134,7 @@ void name_init_as_call(NAME_t *nm,
 
 void *NAME_push      (const NAME_t *nm, const char *substr, int slen);
 void  NAME_pop       (void *handle);
+void  NAME_pop_top   (void);             /* SN-23d: drop topmost live slot  */
 
 int   NAME_top       (void);             /* current stack depth              */
 void  NAME_pop_above (int saved_top);    /* drop slots [saved_top..top)      */

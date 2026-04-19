@@ -154,16 +154,17 @@ typedef struct { int done; const char *varname; }     atp_t;
  *                   commit at NAME_commit via name_commit_value
  *   name        — unified lvalue descriptor (NM_VAR / NM_PTR / NM_CALL
  *                   / NM_IDX reserved)
- *   nam_handle  — NAME_push handle (NULL if none); popped on β/ω (self-unwind)
  *   pending / has_pending / registered — kept for statement-level
  *                 bookkeeping so clear_pending_flags() and the
- *                 capture-registry hooks stay correct across statements. */
+ *                 capture-registry hooks stay correct across statements.
+ *
+ * SN-23d: nam_handle field deleted — bb_cap β/ω now drops the top of the
+ * current NAM ctx via NAME_pop_top (pure LIFO; no handle required). */
 typedef struct cap_s {
     bb_box_fn    fn;
     void        *state;
     int          immediate;
     NAME_t       name;
-    void        *nam_handle;
     spec_t       pending;
     int          has_pending;
     int          registered;

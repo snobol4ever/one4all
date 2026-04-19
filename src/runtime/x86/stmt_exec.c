@@ -392,7 +392,6 @@ typedef struct {
     DESCR_t    *args;
     int         nargs;
     int         done;
-    void       *nam_handle;   /* SN-20: pop on backtrack */
 } usercall_t;
 
 /* SN-17d (Porter FAIL-propagation fix):

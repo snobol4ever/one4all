@@ -536,9 +536,19 @@ DESCR_t bb_cap(void *zeta, int entry)
                  if (spec_is_empty(cr))                                         goto CAP_ω;
                                                                                 goto CAP_γ_core;
 
-    CAP_β:       /* SN-20: undo our prior push before retrying. If retry
-                  * succeeds, CAP_γ_core re-pushes with a fresh handle. */
-                 if (ζ->nam_handle) { NAME_pop(ζ->nam_handle); ζ->nam_handle = NULL; }
+    CAP_β:       /* SN-23d: bare LIFO pop.  Box self-unwind invariant (SN-22d)
+                  * guarantees the top of the current NAM ctx is our own γ
+                  * push — every intervening peer/child γ push has already
+                  * been popped by its own β/ω.  No handle needed.
+                  *
+                  * KNOWN LIMITATION (to be fixed): relying on has_pending as
+                  * the guard inherits stale values from the M-DYN-OPT cache
+                  * template when cap_t is cached.  SN-23d alone does NOT
+                  * close SN-6c — needs has_pending reset at α or cache fix. */
+                 if (!ζ->immediate && ζ->has_pending) {
+                     NAME_pop_top();
+                     ζ->has_pending = 0;
+                 }
                  cr = spec_from_descr(ζ->fn(ζ->state, β));
                  if (spec_is_empty(cr))                                         goto CAP_ω;
                                                                                 goto CAP_γ_core;
@@ -553,18 +563,21 @@ DESCR_t bb_cap(void *zeta, int entry)
                      name_commit_value(&ζ->name, val);
                  } else {
                      /* XNME (.): push the lvalue + matched substring onto the
-                      * flat NAM stack.  Statement-level NAME_commit walks the
-                      * slots at full-match success and calls name_commit_value
-                      * on each.  Save handle so CAP_β / CAP_ω self-unwind. */
-                     ζ->nam_handle  = NAME_push(&ζ->name, cr.σ, (int)cr.δ);
+                      * NAM ctx.  Statement-level NAME_commit walks the slots
+                      * at full-match success and calls name_commit_value on
+                      * each.  SN-23d: discard handle — CAP_β / CAP_ω drop
+                      * the top via NAME_pop_top (pure LIFO). */
+                     (void) NAME_push(&ζ->name, cr.σ, (int)cr.δ);
                      ζ->pending     = cr;
                      ζ->has_pending = 1;
                  }
                                                                                 return descr_from_spec(cr);
 
-    CAP_ω:       /* SN-20: pop our push on failure exit. */
-                 if (ζ->nam_handle) { NAME_pop(ζ->nam_handle); ζ->nam_handle = NULL; }
-                 ζ->has_pending = 0;                                            return FAILDESCR;
+    CAP_ω:       /* SN-23d: bare LIFO pop on failure exit (if we pushed). */
+                 if (!ζ->immediate && ζ->has_pending) {
+                     NAME_pop_top();
+                     ζ->has_pending = 0;
+                 }                                                              return FAILDESCR;
 }
 
 /* Capture registry (moved from stmt_exec.c — used by exec_stmt for Phase-5 reset).
