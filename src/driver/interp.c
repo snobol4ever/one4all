@@ -4139,6 +4139,14 @@ void execute_program(Program *prog)
                     subj_val = NV_GET_fn(subj_name);
                 } else if (!subj_name)
                     subj_val = interp_eval(s->subject);
+            } else if (s->subject->kind == E_FNC && s->has_eq && !s->pattern) {
+                /* SN-6 fix: fn() = val / fn(args) = val — LHS-as-fn assignment.
+                 * The dedicated branches below (ITEM/FIELD setter at ~L4251,
+                 * NRETURN lvalue-assign at ~L4281) call the function exactly
+                 * once to obtain the assignment target.  Evaluating it here
+                 * would be a spurious second call with visible side effects
+                 * (e.g. Push() = 'hello' fired Push twice, corrupting
+                 * stk[0] counter in expr_eval.sno). */
             } else {
                 subj_val = interp_eval(s->subject);
             }
