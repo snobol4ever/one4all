@@ -173,6 +173,16 @@ typedef struct cap_s {
 extern DESCR_t bb_cap(void *zeta, int entry);
 extern cap_t *bb_cap_new(bb_box_fn child_fn, void *child_state,
                          const char *varname, DESCR_t *var_ptr, int immediate);
+/* SN-21d: NM_CALL constructor for `pat . *fn(args)` and `pat $ *fn(args)`.
+ * Builds the embedded NAME_t via name_init_as_call.  Deferred (.) firings push
+ * an NM_CALL entry onto the flat NAM stack; NAM_commit runs them through
+ * name_commit_value, which invokes g_user_call_hook and writes matched text
+ * into the returned DT_N cell. */
+extern cap_t *bb_cap_new_call(bb_box_fn child_fn, void *child_state,
+                              const char *fnc_name,
+                              DESCR_t *fnc_args, int fnc_nargs,
+                              char **fnc_arg_names, int fnc_n_arg_names,
+                              int immediate);
 extern void      flush_pending_captures(void);
 extern void      reset_capture_registry(void);
 extern void      clear_pending_flags(void);

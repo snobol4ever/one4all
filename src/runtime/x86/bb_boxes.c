@@ -636,6 +636,39 @@ cap_t *bb_cap_new(bb_box_fn child_fn, void *child_state,
     return ζ;
 }
 
+/* SN-21d: NM_CALL constructor for `pat . *fn(args)` (XCALLCAP).
+ *
+ * Same bb_cap state machine as NM_VAR / NM_PTR — the only difference is the
+ * embedded NAME_t's kind, which routes the commit through name_commit_value's
+ * NM_CALL branch.  No separate box function, no separate registry, no
+ * per-firing cc_event bookkeeping: the flat NAM stack already supplies all of
+ * that via NAME_push / NAME_pop γ / β / ω self-unwinding.
+ *
+ * Deferred (.) flow at commit time:
+ *   NAM_commit walks live slots → name_commit_value(NM_CALL) →
+ *   g_user_call_hook(fnc_name, args, nargs) → DT_N cell → store matched text.
+ *
+ * Immediate ($) flow at γ:
+ *   name_commit_value(NM_CALL, matched_text) — fires the hook on every γ.
+ *   (SPITBOL semantics: immediate assignment fires on every γ, even if the
+ *   outer match later fails.) */
+cap_t *bb_cap_new_call(bb_box_fn child_fn, void *child_state,
+                       const char *fnc_name,
+                       DESCR_t *fnc_args, int fnc_nargs,
+                       char **fnc_arg_names, int fnc_n_arg_names,
+                       int immediate)
+{
+    cap_t *ζ = calloc(1, sizeof(cap_t));
+    if (!ζ) return NULL;
+    ζ->fn        = child_fn;
+    ζ->state     = child_state;
+    ζ->immediate = immediate;
+    name_init_as_call(&ζ->name, fnc_name,
+                      fnc_args, fnc_nargs,
+                      fnc_arg_names, fnc_n_arg_names);
+    return ζ;
+}
+
 /* ───── atp ───── */
 /* _XATP     ATP         @var — write cursor Δ as DT_I into varname; no backtrack */
 

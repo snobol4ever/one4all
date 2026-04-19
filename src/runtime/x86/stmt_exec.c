@@ -926,18 +926,17 @@ bb_node_t bb_build(PATND_t *p)
 
     /* ── CALLCAP: pat . *func() — deferred-function capture target ─── */
     case XCALLCAP: {
-        callcap_t *ζ = calloc(1, sizeof(callcap_t));
         bb_node_t child = bb_build(p->nchildren > 0 ? p->children[0] : NULL);
-        ζ->child_fn    = child.fn;
-        ζ->child_state = child.ζ;
-        ζ->fnc_name    = p->STRVAL_fn;
-        ζ->fnc_args    = p->args;
-        ζ->fnc_nargs   = p->nargs;
-        ζ->immediate   = 0;
-        /* TL-2: propagate arg names for flush-time resolution (see CC_γ_core). */
-        ζ->fnc_arg_names   = p->arg_names;
-        ζ->fnc_n_arg_names = p->n_arg_names;
-        n.fn = bb_callcap;
+        /* SN-21d: single bb_cap box with NM_CALL NAME_t.  Deferred (.) flow
+         * pushes an NM_CALL entry on γ; NAM_commit fires it via
+         * name_commit_value → g_user_call_hook.  TL-2 arg-name deferred
+         * resolution is handled inside name_commit_value. */
+        cap_t *ζ = bb_cap_new_call(child.fn, child.ζ,
+                                    p->STRVAL_fn,
+                                    p->args, p->nargs,
+                                    p->arg_names, p->n_arg_names,
+                                    0 /*immediate=0: . not $*/);
+        n.fn = bb_cap;
         n.ζ  = ζ;
         n.ζ_size = sizeof(*ζ);
         break;

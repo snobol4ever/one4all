@@ -1205,14 +1205,10 @@ static bb_box_fn bb_arbn_emit_binary(PATND_t *p)
 }
 
 /* ── M-DYN-B10: XCALLCAP — pat . *func() deferred-function capture ─────────
- * bb_callcap_exported(ζ, entry): registers in g_callcap_list on α, delegates
- * to child, queues a cc_event on γ. Side effects are handled by the C box
- * exactly as the C path does — we only change how the ζ is constructed.
- *
- * Child is built recursively in binary. If child fails → C fallback.
- * The callcap_t struct in stmt_exec.c has many fields; bb_callcap_new()
- * (the exported ctor) zeros them all via calloc inside — correct defaults.
- */
+ * SN-21d: single bb_cap box with NM_CALL NAME_t.  Child is built recursively
+ * in binary; if child fails → C fallback.  Trampoline points at bb_cap
+ * (not the old bb_callcap_exported) — same state machine as XNME / XFNME,
+ * kind dispatch happens inside name_commit_value at commit time. */
 static bb_box_fn bb_callcap_emit_binary(PATND_t *p)
 {
 #define CALLCAP_TRAM_SIZE 32
@@ -1221,10 +1217,11 @@ static bb_box_fn bb_callcap_emit_binary(PATND_t *p)
     bb_box_fn child_fn = bb_build_binary_node(child_p);
     if (!child_fn) return NULL;
 
-    void *z = bb_callcap_new_named(child_fn, NULL,
-                                    p->STRVAL_fn, (void *)p->args,
-                                    p->nargs, 0 /* immediate=0: . not $ */,
-                                    p->arg_names, p->n_arg_names);
+    cap_t *z = bb_cap_new_call(child_fn, NULL,
+                               p->STRVAL_fn,
+                               (DESCR_t *)p->args, p->nargs,
+                               p->arg_names, p->n_arg_names,
+                               0 /* immediate=0: . not $ */);
     if (!z) return NULL;
 
     bb_buf_t tbuf = bb_alloc(CALLCAP_TRAM_SIZE);
@@ -1235,9 +1232,9 @@ static bb_box_fn bb_callcap_emit_binary(PATND_t *p)
     /* mov rdi, imm64(z) */
     bb_emit_byte(0x48); bb_emit_byte(0xBF);
     bb_emit_u64((uint64_t)(uintptr_t)z);
-    /* mov rax, imm64(bb_callcap_exported) */
+    /* mov rax, imm64(bb_cap) */
     bb_emit_byte(0x48); bb_emit_byte(0xB8);
-    bb_emit_u64((uint64_t)(uintptr_t)bb_callcap_exported);
+    bb_emit_u64((uint64_t)(uintptr_t)bb_cap);
     /* jmp rax */
     bb_emit_byte(0xFF); bb_emit_byte(0xE0);
 
