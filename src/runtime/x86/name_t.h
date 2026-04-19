@@ -124,17 +124,15 @@ void name_init_as_call(NAME_t *nm,
 /* call NAME_pop.  The stack rolls and unrolls itself through the γ/β/ω     */
 /* cascade — no separate commit/discard bureaucracy.                         */
 /*                                                                            */
-/* SN-23d added NAME_pop_top() for the handle-free LIFO drop used by bb_cap  */
-/* (γ's push handle isn't threaded through to β/ω).                          */
+/* SN-23h collapsed pop to a single handle-free form matching the SIL's     */
+/* DNME ("decrement NAMICL").  NAME_push returns an opaque handle for       */
+/* backward source compatibility but every caller discards it — the box    */
+/* self-unwind invariant (SN-22d) guarantees pops are always LIFO.          */
 /*                                                                            */
-/* SN-23e removed NAME_top / NAME_pop_above / NAME_save / NAME_discard —    */
-/* all callers were rewired to ctx_enter/leave or LIFO pop_top in SN-23a..d. */
-/*                                                                            */
-/* Handles are opaque pointers; pass to NAME_pop exactly once.              */
+/* SN-23e removed NAME_top / NAME_pop_above / NAME_save / NAME_discard.     */
 /*---------------------------------------------------------------------------*/
 
 void *NAME_push      (const NAME_t *nm, const char *substr, int slen);
-void  NAME_pop       (void *handle);
-void  NAME_pop_top   (void);             /* SN-23d: drop topmost live slot  */
+void  NAME_pop       (void);             /* SN-23h: drop topmost live slot  */
 
 #endif /* NAME_T_H */

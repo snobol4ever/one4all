@@ -1,31 +1,40 @@
 /*
  * snobol4_nmd.c — SIL Naming List (§NMD)
  *
- * ARCHITECTURE (SN-23e — collapsed API: push + pop + commit + ctx-brackets):
+ * ARCHITECTURE (SN-23h — minimum API, SIL-matching five-op surface):
  *
  *   The NAM stack is owned by a NAME_ctx_t, not by a file-scope global.
- *   A static root ctx (g_root_ctx) wraps the original entries array and
- *   top counter; g_ctx_current points at the active ctx.  All ops route
- *   through g_ctx_current.  Nested matches (EVAL-inside-match, recursive
- *   patterns with their own scan frame) each create a child ctx via
- *   NAME_ctx_enter, so inner captures can never leak into the outer.
+ *   A static root ctx (g_root_ctx) wraps the entries array and top
+ *   counter; g_ctx_current points at the active ctx.  All ops route
+ *   through g_ctx_current.  Nested matches (EVAL-inside-match) create
+ *   a child ctx via NAME_ctx_enter, so inner captures can never leak
+ *   into the outer.
  *
  *     ctx.entries: [ 0 | 1 | 2 | ... | top-1 ]    grows right
  *
- *   Complete public API — five ops, period:
+ *   Complete public API — THREE core ops + TWO ctx brackets.  This is
+ *   the minimum SIL's NMD gets by with (DNME = decrement NAMICL, NMD =
+ *   walk NHEDCL..NAMICL, and the NHEDCL push/pop the trace handler
+ *   does to isolate a nested match):
  *
- *     NAME_push(nm, substr, slen)   — append slot; return handle (index).
- *                                     Every box γ calls this on match.
- *     NAME_pop(handle)              — drop that specific slot (LIFO by index).
- *     NAME_pop_top()                — drop whatever's on top (handle-free; used
- *                                     by bb_cap where the push handle is not
- *                                     threaded through to β/ω).
- *     NAME_commit()                 — walk the active ctx oldest→newest,
+ *     NAME_push(nm, substr, slen)   — append slot (SIL: write at
+ *                                     NBSPTR+NAMICL; INCRA NAMICL).
+ *                                     Returns a handle for backward
+ *                                     source compatibility but callers
+ *                                     discard it — every pop is LIFO.
+ *     NAME_pop()                    — decrement top (SIL: DECRA NAMICL).
+ *                                     Handle-free.  Every box γ push has
+ *                                     a matching β/ω pop on the same box;
+ *                                     the SN-22d self-unwind invariant
+ *                                     guarantees top == this box's push.
+ *     NAME_commit()                 — walk active ctx oldest→newest,
  *                                     fire each live slot via
- *                                     name_commit_value, then reset top=0.
- *                                     Called once, on outer match success.
- *     NAME_ctx_enter(ctx) / NAME_ctx_leave()
- *                                   — bracket a nested scan / EVAL frame.
+ *                                     name_commit_value, reset top=0.
+ *                                     (SIL: NMD walks NHEDCL..NAMICL.)
+ *     NAME_ctx_enter(ctx)
+ *     NAME_ctx_leave()              — bracket a nested scan / EVAL frame.
+ *                                     (SIL: PUSH/POP NHEDCL in trace
+ *                                     handler; MOVD NHEDCL,NAMICL.)
  *
  * EVERY box γ push has a matching β/ω pop — boxes own and self-unwind
  * their own slots.  There is never "leftover" pushed state once a box
@@ -50,10 +59,15 @@
  *              Zero live callers since SN-21d — bb_cap's CAP_α builds
  *              its NM_CALL NAME_t via name_init_as_call directly.
  *              API surface: 8 → 6 entries.
+ *   SN-23h   — deleted handle-based NAME_pop; renamed NAME_pop_top →
+ *              NAME_pop.  The handle argument was dead on arrival:
+ *              every call site in bb_boxes.c already popped the top.
+ *              API surface: 6 → 5 entries — matches the SIL's NMD
+ *              semantics exactly (DNME is bare "decrement NAMICL").
  *
  * AUTHORS: Lon Jones Cherryholmes · Claude Opus 4.7
  * DATE:    2026-04-19
- * SPRINT:  SN-23f
+ * SPRINT:  SN-23h
  */
 
 #include <stdio.h>
@@ -129,7 +143,6 @@ static const char *dup_substr(const char *s, int len)
  * ctx is undefined — but in practice every box γ pushes and its own β/ω
  * pops within the same dynamic extent, so the active ctx matches. */
 static inline void *idx_to_handle(int i) { return (void *)(intptr_t)(i + 1); }
-static inline int   handle_to_idx(void *h) { return h ? (int)(intptr_t)h - 1 : -1; }
 
 /*===========================================================================*/
 /* NAME_ctx_enter / NAME_ctx_leave (SN-23a)                                   */
@@ -186,43 +199,24 @@ void *NAME_push(const NAME_t *nm, const char *substr, int slen)
 }
 
 /*===========================================================================*/
-/* NAME_pop — primary pop                                                     */
+/* NAME_pop — drop topmost live slot of the active ctx.                      */
 /*                                                                            */
-/* Drop the slot.  LIFO case (handle is top-1) is O(1).  Non-LIFO pops mark  */
-/* a tombstone; trailing tombstones are collapsed on every pop so top       */
-/* always refers to a live slot.                                              */
-/*===========================================================================*/
-
-void NAME_pop(void *handle)
-{
-    NAME_ctx_t *ctx = g_ctx_current;
-    int idx = handle_to_idx(handle);
-    if (idx < 0 || idx >= ctx->top) return;
-
-    NAME_entry_t *es = ctx_entries(ctx);
-    NAME_entry_t *e  = &es[idx];
-    if (!e->live) return;
-    e->live = 0;
-
-    while (ctx->top > 0 && !es[ctx->top - 1].live) ctx->top--;
-}
-
-/*===========================================================================*/
-/* NAME_pop_top — SN-23d: drop topmost live slot of the active ctx            */
+/* Pure LIFO pop, matching the SIL's DNME: "decrement NAMICL by one slot".  */
+/* Every bb_cap γ pushes; its own β/ω pops the top.  The box self-unwind    */
+/* invariant (SN-22d) guarantees that when a box reaches β/ω, every peer   */
+/* or child γ-push made after its own γ has already been popped by its      */
+/* owning box — so the top IS this box's own push.  No handle needed.       */
 /*                                                                            */
-/* Pure LIFO pop.  Every bb_cap γ pushes; its own β/ω pops the top.  The      */
-/* box self-unwind invariant (SN-22d) guarantees that when a box reaches     */
-/* β/ω, every peer/child γ-push made after its own γ has already been popped */
-/* by its owning box — so the top IS this box's own push.  No handle needed. */
+/* The while-loop trailer skips any live=0 tombstones at the top.  After    */
+/* SN-23h (handle-based NAME_pop deleted) there should be no tombstones at  */
+/* all, but keep the loop for robustness against future non-LIFO pushers.   */
 /*===========================================================================*/
 
-void NAME_pop_top(void)
+void NAME_pop(void)
 {
     NAME_ctx_t *ctx = g_ctx_current;
     if (ctx->top <= 0) return;
     NAME_entry_t *es = ctx_entries(ctx);
-    /* Skip any tombstones at the top (defensive — post-SN-22d there should */
-    /* be none, but keep the invariant consistent with NAME_pop's trailer). */
     while (ctx->top > 0 && !es[ctx->top - 1].live) ctx->top--;
     if (ctx->top <= 0) return;
     es[ctx->top - 1].live = 0;

@@ -552,7 +552,7 @@ DESCR_t bb_cap(void *zeta, int entry)
                   * template when cap_t is cached.  SN-23d alone does NOT
                   * close SN-6c — needs has_pending reset at α or cache fix. */
                  if (!ζ->immediate && ζ->has_pending) {
-                     NAME_pop_top();
+                     NAME_pop();
                      ζ->has_pending = 0;
                  }
                  cr = spec_from_descr(ζ->fn(ζ->state, β));
@@ -571,8 +571,8 @@ DESCR_t bb_cap(void *zeta, int entry)
                      /* XNME (.): push the lvalue + matched substring onto the
                       * NAM ctx.  Statement-level NAME_commit walks the slots
                       * at full-match success and calls name_commit_value on
-                      * each.  SN-23d: discard handle — CAP_β / CAP_ω drop
-                      * the top via NAME_pop_top (pure LIFO). */
+                      * each.  SN-23d/h: discard handle — CAP_β / CAP_ω drop
+                      * the top via NAME_pop (pure LIFO, matches SIL DNME). */
                      (void) NAME_push(&ζ->name, cr.σ, (int)cr.δ);
                      ζ->pending     = cr;
                      ζ->has_pending = 1;
@@ -581,7 +581,7 @@ DESCR_t bb_cap(void *zeta, int entry)
 
     CAP_ω:       /* SN-23d: bare LIFO pop on failure exit (if we pushed). */
                  if (!ζ->immediate && ζ->has_pending) {
-                     NAME_pop_top();
+                     NAME_pop();
                      ζ->has_pending = 0;
                  }                                                              return FAILDESCR;
 }

@@ -232,10 +232,11 @@ int      ASGNIC_fn(const char *kw_name, DESCR_t val);
 
 /* ── RT-4 / SN-20 / SN-21: SIL Naming List (§NMD) — snobol4_nmd.c ─────────── */
 
-/* SN-20: box-owned self-unwind. Every box that pushed a NAM entry calls
- * NAME_pop(handle) on its β retry / ω failure path to undo its push.
- * Safe if handle is NULL or the entry's frame has already been popped.   */
-void    NAME_pop(void *handle);
+/* SN-23h: handle-free LIFO pop matching the SIL's DNME (decrement NAMICL).
+ * Every box that pushed a NAM entry calls NAME_pop() on its β retry / ω
+ * failure path to undo its push.  The box self-unwind invariant (SN-22d)
+ * guarantees the top of the stack IS this box's own push when β/ω runs.  */
+void    NAME_pop(void);
 
 /* NAME_commit: on pattern success — assign all live entries in the active
  * ctx through name_commit_value (DT_E thaw / NV_SET_fn / interior-pointer
@@ -257,8 +258,8 @@ typedef struct NAME_ctx_s {
 } NAME_ctx_t;
 
 /* NAME_ctx_enter: push ctx onto the ctx chain; subsequent NAME_push /
- * NAME_pop / NAME_pop_top / NAME_commit operate on ctx.  The ctx struct
- * is populated in place — caller owns the storage.                        */
+ * NAME_pop / NAME_commit operate on ctx.  The ctx struct is populated
+ * in place — caller owns the storage.                                     */
 void    NAME_ctx_enter(NAME_ctx_t *ctx);
 
 /* NAME_ctx_leave: restore parent ctx.  No-op if current ctx is the root. */
