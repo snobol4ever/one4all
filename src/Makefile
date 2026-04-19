@@ -55,6 +55,7 @@ RUNTIME_X86 = \
     runtime/x86/snobol4_nmd.c \
     runtime/x86/snobol4_pattern.c \
     runtime/x86/snobol4_stmt_rt.c \
+    runtime/x86/name_t.c \
     runtime/x86/stmt_exec.c \
     runtime/x86/bb_boxes.c \
     runtime/x86/bb_broker.c \
