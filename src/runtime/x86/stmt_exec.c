@@ -1186,10 +1186,23 @@ int exec_stmt(const char  *subj_name,
     typedef struct { int start; int end; } scan_result_t;
     scan_result_t scan_res = { -1, -1 };
 
-    /* RT-4: reset stale pending captures before the scan sweep */
+    /* RT-4: reset stale pending captures before the scan sweep.
+     * SN-22d: the NAME_save()/NAME_discard(cookie) pair that used to live
+     * here (a save then immediate discard to the saved depth — literally a
+     * no-op) has been deleted.  Likewise the NAME_discard(cookie) on the
+     * :F path.  Both relied on "just in case" reasoning that SN-20 made
+     * obsolete: box self-unwind guarantees every γ-push has a matching
+     * β/ω-pop by the time BB_SCAN returns, whether the overall pattern
+     * succeeded or failed.  bb_seq walks right β then left β on failure;
+     * bb_alt walks each arm's β on next-arm switch; bb_arbno walks body
+     * β on each depth retry; bb_cap pops its NAM handle on its own β/ω
+     * paths.  So g_top is already at the pre-scan level on BB_SCAN
+     * return.  We still save nam_cookie because NAME_commit() below
+     * needs the lower bound — on a nested exec_stmt (EVAL inside an
+     * outer pattern's match), we must only commit entries pushed during
+     * THIS match, not the outer match's in-progress pushes. */
     clear_pending_flags();
     int nam_cookie = NAME_save();
-    NAME_discard(nam_cookie);
 
     int saved_Ω = Ω;
     if (kw_anchor) Ω = 0;   /* clamp: bb_broker BB_SCAN tries 0..Ω */
@@ -1202,8 +1215,8 @@ int exec_stmt(const char  *subj_name,
                                                               goto Phase4;
     }
 
-    /* match failed → :F */
-    NAME_discard(nam_cookie);
+    /* match failed → :F  (SN-22d: no NAME_discard needed — box self-unwind
+     * has already restored g_top to its pre-scan level) */
                                                               return 0;
 
 Phase4:
