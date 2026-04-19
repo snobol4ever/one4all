@@ -133,14 +133,16 @@ static void nam_append(NamEntry_t *e)
 
 /*---------------------------------------------------------------------------*/
 /* NAM_push — record one XNME (.) conditional capture                        */
+/* Returns opaque handle (the appended entry) — caller stores and later      */
+/* passes to NAM_pop_one on backtrack (box-owned self-unwinding, SN-20).     */
 /*---------------------------------------------------------------------------*/
 
-void NAM_push(const char *var, DESCR_t *ptr, int dt,
-              const char *s, int len)
+void *NAM_push(const char *var, DESCR_t *ptr, int dt,
+               const char *s, int len)
 {
     if (!nam_stack) {
         fprintf(stderr, "nmd: NAM_push with no active frame — ignored\n");
-        return;
+        return NULL;
     }
 
     NamEntry_t *e = GC_MALLOC(sizeof(NamEntry_t));
@@ -168,28 +170,30 @@ void NAM_push(const char *var, DESCR_t *ptr, int dt,
     e->cc_slen   = 0;
 
     nam_append(e);
+    return (void *)e;
 }
 
 /*---------------------------------------------------------------------------*/
 /* NAM_push_callcap — record one XCALLCAP (pat . *fn()) deferred call        */
 /* Called from bb_callcap CC_γ_core instead of g_cc_events push.             */
+/* Returns handle (opaque) for self-unwinding pop on backtrack (SN-20).      */
 /*---------------------------------------------------------------------------*/
 
-void NAM_push_callcap(const char *fnc_name, DESCR_t *fnc_args, int fnc_nargs,
-                      const char *matched_text, int matched_len)
+void *NAM_push_callcap(const char *fnc_name, DESCR_t *fnc_args, int fnc_nargs,
+                       const char *matched_text, int matched_len)
 {
-    NAM_push_callcap_named(fnc_name, fnc_args, fnc_nargs, NULL, 0,
-                            matched_text, matched_len);
+    return NAM_push_callcap_named(fnc_name, fnc_args, fnc_nargs, NULL, 0,
+                                   matched_text, matched_len);
 }
 
-void NAM_push_callcap_named(const char *fnc_name,
-                             DESCR_t *fnc_args, int fnc_nargs,
-                             char **fnc_arg_names, int fnc_n_arg_names,
-                             const char *matched_text, int matched_len)
+void *NAM_push_callcap_named(const char *fnc_name,
+                              DESCR_t *fnc_args, int fnc_nargs,
+                              char **fnc_arg_names, int fnc_n_arg_names,
+                              const char *matched_text, int matched_len)
 {
     if (!nam_stack) {
         fprintf(stderr, "nmd: NAM_push_callcap with no active frame — ignored\n");
-        return;
+        return NULL;
     }
 
     NamEntry_t *e = GC_MALLOC(sizeof(NamEntry_t));
@@ -219,6 +223,42 @@ void NAM_push_callcap_named(const char *fnc_name,
     e->slen    = 0;
 
     nam_append(e);
+    return (void *)e;
+}
+
+/*---------------------------------------------------------------------------*/
+/* NAM_pop_one — SN-20: self-unwinding pop for box-owned entries              */
+/*                                                                            */
+/* Called by bb_capture / bb_callcap / bb_usercall on their β retry or ω     */
+/* failure path to remove exactly the entry that this box's prior γ path      */
+/* pushed. Handle is the NamEntry_t* returned by NAM_push / NAM_push_callcap. */
+/*                                                                            */
+/* Safe if handle is NULL (box never pushed — epsilon γ, or frame missing).  */
+/* Safe if the frame the entry belonged to has been popped (commit/discard   */
+/* already released it — no-op).                                              */
+/*                                                                            */
+/* Since entries are appended at the tail, pop is O(k) from head in the      */
+/* worst case (k = list length). In practice k is tiny (a handful of         */
+/* captures per statement), so no performance concern.                        */
+/*---------------------------------------------------------------------------*/
+
+void NAM_pop_one(void *handle)
+{
+    if (!handle || !nam_stack) return;
+    NamEntry_t *target = (NamEntry_t *)handle;
+
+    /* Walk current frame. If target not found here, the entry belonged to a
+     * frame that has been popped (commit/discard) — nothing to do. */
+    NamEntry_t *prev = NULL;
+    for (NamEntry_t *e = nam_stack->head; e; prev = e, e = e->next) {
+        if (e == target) {
+            if (prev) prev->next = e->next;
+            else      nam_stack->head = e->next;
+            if (nam_stack->tail == e) nam_stack->tail = prev;
+            e->next = NULL;
+            return;
+        }
+    }
 }
 
 /*---------------------------------------------------------------------------*/
@@ -365,23 +405,12 @@ void *NAM_mark(void)
 
 void NAM_rollback_to(void *mark)
 {
-    if (!mark || !nam_stack) return;
-    NamMark_t  *m = (NamMark_t *)mark;
-    /* Frame-identity guard: if the marked frame is no longer the current   */
-    /* top-of-stack, the frame was popped (committed/discarded) since the   */
-    /* mark was taken. Any entries we would have rolled back are gone with  */
-    /* the frame — nothing to do. Writing into m->tail->next would corrupt  */
-    /* GC-reclaimed memory (observed claws5 'Aborted' crash).               */
-    if (m->frame != nam_stack) return;
-    if (m->tail == NULL) {
-        /* frame was empty at mark time — clear everything appended since  */
-        nam_stack->head = NULL;
-        nam_stack->tail = NULL;
-        return;
-    }
-    /* Trim the list after m->tail. GC will reclaim the dangling nodes.     */
-    m->tail->next   = NULL;
-    nam_stack->tail = m->tail;
+    /* SN-20: self-unwinding NAM — every box that pushes owns its own pop on
+     * backtrack. Combinator-level rollback is redundant and would double-pop
+     * (the box already removed its entry in its β/ω path). No-op by design.
+     * Kept as an exported symbol so existing call sites in bb_alt / bb_arbno
+     * link cleanly during the transition; safe to delete once cleaned up. */
+    (void)mark;
 }
 
 /*---------------------------------------------------------------------------*/

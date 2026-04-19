@@ -502,6 +502,7 @@ interr_t *bb_interr_new(bb_box_fn fn, void *state)
 typedef struct {
     bb_box_fn fn; void *state; const char *varname;
     int immediate; spec_t pending; int has_pending;
+    void *nam_handle;   /* SN-20: entry pushed in prior γ; popped on β/ω */
 } capture_t;
 
 DESCR_t bb_capture(void *zeta, int entry)
@@ -513,7 +514,10 @@ DESCR_t bb_capture(void *zeta, int entry)
     CAP_α:          cr=spec_from_descr(ζ->fn(ζ->state,α));                                       
                     if (spec_is_empty(cr))                                      goto CAP_ω;
                                                                                 goto CAP_γ_core;
-    CAP_β:          cr=spec_from_descr(ζ->fn(ζ->state,β));                                       
+    CAP_β:          /* SN-20: undo our prior push before retrying. If the
+                     * retry also succeeds, CAP_γ_core re-pushes fresh. */
+                    if (ζ->nam_handle) { NAM_pop_one(ζ->nam_handle); ζ->nam_handle = NULL; }
+                    cr=spec_from_descr(ζ->fn(ζ->state,β));
                     if (spec_is_empty(cr))                                      goto CAP_ω;
                                                                                 goto CAP_γ_core;
     CAP_γ_core:     if (ζ->varname && *ζ->varname && ζ->immediate) {            
@@ -522,14 +526,14 @@ DESCR_t bb_capture(void *zeta, int entry)
                         DESCR_t v={.v=DT_S,.slen=(uint32_t)cr.δ,.s=s};          
                         NV_SET_fn(ζ->varname,v);                                
                     } else if (ζ->varname && *ζ->varname) {                     
-                        /* XNME (.): conditional — push onto NMD naming list.   
-                         * NAM_commit() will write at overall match success;     
-                         * NAM_discard() rolls back on failure.                  
-                         * Mirrors stmt_exec.c bb_capture CAP_γ_core (.)-path. */
-                        NAM_push(ζ->varname, NULL, DT_S, cr.σ, cr.δ);          
+                        /* XNME (.): conditional — push onto NMD naming list.
+                         * SN-20: save handle so we can pop on β/ω symmetrically. */
+                        ζ->nam_handle = NAM_push(ζ->varname, NULL, DT_S, cr.σ, cr.δ);
                         ζ->pending=cr; ζ->has_pending=1; }                      
                                                                                 return descr_from_spec(cr);
-    CAP_ω:          ζ->has_pending=0;                                           return FAILDESCR;
+    CAP_ω:          /* SN-20: pop our push on failure exit. */
+                    if (ζ->nam_handle) { NAM_pop_one(ζ->nam_handle); ζ->nam_handle = NULL; }
+                    ζ->has_pending=0;                                           return FAILDESCR;
 }
 
 /* ───── atp ───── */

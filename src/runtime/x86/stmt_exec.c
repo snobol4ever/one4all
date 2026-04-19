@@ -480,6 +480,7 @@ typedef struct {
     DESCR_t    *args;
     int         nargs;
     int         done;
+    void       *nam_handle;   /* SN-20: pop on backtrack */
 } usercall_t;
 
 /* SN-17 fix (Porter Bug #1d root cause):
@@ -502,12 +503,17 @@ static DESCR_t bb_usercall(void *zeta, int entry)
                     goto UC_β;
 
     UC_α:  ζ->done = 1;
-           NAM_push_callcap(ζ->name, ζ->args, ζ->nargs, NULL, 0);
+           /* SN-20: store handle so UC_ω (failure exit) can pop symmetrically.
+            * bare *fn() has no β retry semantics — UC_β just fails outright — so
+            * the only pop we need is on UC_ω. */
+           ζ->nam_handle = NAM_push_callcap(ζ->name, ζ->args, ζ->nargs, NULL, 0);
            UC = spec(Σ + Δ, 0);           goto UC_γ;
     UC_β:                                  goto UC_ω;
 
     UC_γ:                                  return descr_from_spec(UC);
-    UC_ω:                                  return FAILDESCR;
+    UC_ω:  /* SN-20: pop our deferred registration if this box never reached commit. */
+           if (ζ->nam_handle) { NAM_pop_one(ζ->nam_handle); ζ->nam_handle = NULL; }
+                                           return FAILDESCR;
 }
 
 /* ── CALLCAP box — call func at match time to get DT_N lvalue, capture into it ─
@@ -533,6 +539,7 @@ typedef struct callcap_s {
      * resolves in CC_γ_core's immediate branch directly. */
     char       **fnc_arg_names;
     int          fnc_n_arg_names;
+    void        *nam_handle;    /* SN-20: handle to our NAM_push_callcap entry */
 } callcap_t;
 
 /* DYN-79: per-firing event record.  A single callcap_t box (e.g. the *Push()
@@ -604,7 +611,10 @@ static DESCR_t bb_callcap(void *zeta, int entry)
            if (spec_is_empty(child_r)) goto CC_ω;
            goto CC_γ_core;
 
-    CC_β:  child_r = spec_from_descr(ζ->child_fn(ζ->child_state, β));
+    CC_β:  /* SN-20: undo our prior push before retry. If retry succeeds,
+            * CC_γ_core will re-push with a fresh handle for the new spec. */
+           if (ζ->nam_handle) { NAM_pop_one(ζ->nam_handle); ζ->nam_handle = NULL; }
+           child_r = spec_from_descr(ζ->child_fn(ζ->child_state, β));
            if (spec_is_empty(child_r)) goto CC_ω;
            goto CC_γ_core;
 
@@ -647,8 +657,9 @@ static DESCR_t bb_callcap(void *zeta, int entry)
                /* . — queue into unified NAM list so captures and callcaps
                 * flush in left-to-right pattern order at NAM_commit (SC-26).
                 * TL-2: pass arg_names through; NAM_commit will resolve via
-                * NV_GET_fn after in-order earlier . captures have written. */
-               NAM_push_callcap_named(ζ->fnc_name,
+                * NV_GET_fn after in-order earlier . captures have written.
+                * SN-20: store handle so CC_β/CC_ω can self-unwind. */
+               ζ->nam_handle = NAM_push_callcap_named(ζ->fnc_name,
                                        ζ->fnc_args, ζ->fnc_nargs,
                                        ζ->fnc_arg_names, ζ->fnc_n_arg_names,
                                        child_r.σ, (int)child_r.δ);
@@ -660,7 +671,10 @@ static DESCR_t bb_callcap(void *zeta, int entry)
            return descr_from_spec(child_r);
     }
 
-    CC_ω:  ζ->has_pending = 0;
+    CC_ω:  /* SN-20: pop our deferred registration if we pushed one and the
+            * outer match is abandoning us. */
+           if (ζ->nam_handle) { NAM_pop_one(ζ->nam_handle); ζ->nam_handle = NULL; }
+           ζ->has_pending = 0;
            return FAILDESCR;
 }
 
