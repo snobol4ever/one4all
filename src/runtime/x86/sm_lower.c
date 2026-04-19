@@ -373,11 +373,25 @@ static void lower_pat_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         }
         return;
 
-    /* Deferred pattern reference: *VAR */
-    case E_DEFER:
-        lower_expr(p, lt, e->nchildren > 0 ? e->children[0] : NULL);
+    /* Deferred pattern reference: *VAR   or   bare *FN() in pattern context */
+    case E_DEFER: {
+        EXPR_t *ch = e->nchildren > 0 ? e->children[0] : NULL;
+        /* SN-17a: bare *fn() in a pattern — emit SM_PAT_USERCALL so the engine
+         * invokes fn at match time and the call's FAIL propagates as pattern FAIL.
+         * Without this, E_FNC falls through to lower_expr → SM_CALL → SM_PAT_DEREF
+         * which evaluates fn ONCE at build time and treats the return as a pattern,
+         * skipping the per-position sweep SPITBOL performs. */
+        if (ch && ch->kind == E_FNC && ch->sval) {
+            int idx = sm_emit_s(p, SM_PAT_USERCALL, ch->sval);
+            /* TL-2-style arg-name stash: if every arg is a plain E_VAR, record
+             * names for flush-time resolution.  NULL = legacy eager-eval. */
+            p->instrs[idx].a[2].s = sm_pat_capture_fn_arg_names(ch);
+            return;
+        }
+        lower_expr(p, lt, ch);
         sm_emit(p, SM_PAT_DEREF);
         return;
+    }
 
     /* Function call in pattern context → eval as value, then deref as pat */
     case E_FNC:

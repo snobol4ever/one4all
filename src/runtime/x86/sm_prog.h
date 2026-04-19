@@ -73,6 +73,10 @@ typedef enum {
     SM_PAT_DEREF,
     SM_PAT_CAPTURE,
     SM_PAT_CAPTURE_FN,  /* . *func() — a[0].s=funcname; calls func(matched_text) at match time */
+    SM_PAT_USERCALL,    /* bare *func() — a[0].s=funcname; a[2].s = '\t'-separated arg names (or NULL)
+                         * Builds XATP deferred-usercall pattern via pat_user_call; at match time
+                         * the engine invokes func() per position and the call's FAIL propagates
+                         * as pattern FAIL.  SN-17a. */
 
     /* Statement execution */
     SM_EXEC_STMT,

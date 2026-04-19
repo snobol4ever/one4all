@@ -51,7 +51,8 @@ extern DESCR_t pat_alt(DESCR_t left, DESCR_t right);
 extern DESCR_t pat_ref(const char *name);         /* deferred *var ref */
 extern DESCR_t pat_assign_imm(DESCR_t child, DESCR_t var);
 extern DESCR_t pat_assign_cond(DESCR_t child, DESCR_t var);
-extern DESCR_t pat_at_cursor(const char *varname);  
+extern DESCR_t pat_at_cursor(const char *varname);
+/* pat_user_call, pat_assign_callcap, pat_assign_callcap_named come from snobol4.h */
 
 /* exec_stmt from stmt_exec.c */
 extern int exec_stmt(const char *subj_name, DESCR_t *subj_var,
@@ -517,6 +518,19 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
             } else {
                 pat_push(pat_assign_callcap(child, fname, NULL, 0));
             }
+            break;
+        }
+
+        case SM_PAT_USERCALL: {
+            /* SN-17a: bare *func() in pattern context.
+             * a[0].s = function name; a[2].s = '\t'-separated arg names (or NULL).
+             * No child pattern is popped — bare *fn() wraps nothing.
+             * Build XATP deferred-usercall node via pat_user_call so the engine
+             * invokes func() per position at match time; func's FAIL propagates
+             * as pattern FAIL.  Currently args are NULL/0 — the named-args path
+             * (a[2].s) will be wired in SN-17d when FAIL propagation lands. */
+            const char *fname = ins->a[0].s ? ins->a[0].s : "";
+            pat_push(pat_user_call(fname, NULL, 0));
             break;
         }
 

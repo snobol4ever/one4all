@@ -407,6 +407,17 @@ static void h_pat_capture_fn(void)
     }
 }
 
+static void h_pat_usercall(void)
+{
+    /* SN-17a: bare *func() in pattern context.
+     * a[0].s = function name; a[2].s = '\t'-separated arg names (or NULL).
+     * No child pattern is popped — bare *fn() wraps nothing.
+     * Build XATP deferred-usercall node so the match engine invokes func()
+     * per position; func's FAIL propagates as pattern FAIL (landing in SN-17d). */
+    const char *fname = CUR_INS->a[0].s ? CUR_INS->a[0].s : "";
+    jit_pat_push(pat_user_call(fname, NULL, 0));
+}
+
 static void h_exec_stmt(void)
 {
     int has_repl   = (int)CUR_INS->a[1].i;
@@ -584,6 +595,7 @@ static void init_handler_table(void)
     g_handlers[SM_PAT_DEREF]   = h_pat_deref;
     g_handlers[SM_PAT_CAPTURE]    = h_pat_capture;
     g_handlers[SM_PAT_CAPTURE_FN] = h_pat_capture_fn;
+    g_handlers[SM_PAT_USERCALL]   = h_pat_usercall;
     g_handlers[SM_PAT_BOXVAL]  = h_pat_boxval;
 
     g_handlers[SM_EXEC_STMT]   = h_exec_stmt;
