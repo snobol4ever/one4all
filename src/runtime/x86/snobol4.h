@@ -262,6 +262,21 @@ void    NAME_commit(int cookie);
 /* NAME_discard: mid-scan reset — clear entries since cookie.                 */
 void    NAME_discard(int cookie);
 
+/* ── SN-23a: per-context NAM stack (dormant until SN-23b..c adopt it) ───── */
+
+/* Opaque handle; full struct lives in snobol4_nmd.c.  Callers allocate
+ * the struct (typically stack-local, zero-init) and pass its address to
+ * NAME_ctx_enter; NAME_ctx_leave restores the parent context. */
+typedef struct NAME_ctx_s NAME_ctx_t;
+
+/* NAME_ctx_enter: push ctx onto the ctx chain; subsequent NAME_push /
+ * NAME_pop / NAME_top / NAME_pop_above / NAME_commit operate on ctx.
+ * The ctx struct is populated in place — caller owns the storage.        */
+void    NAME_ctx_enter(NAME_ctx_t *ctx);
+
+/* NAME_ctx_leave: restore parent ctx.  No-op if current ctx is the root. */
+void    NAME_ctx_leave(void);
+
 /* ============================================================
  * Counter stack (nPush/nInc/nDec/nTop/nPop)
  * ============================================================ */
