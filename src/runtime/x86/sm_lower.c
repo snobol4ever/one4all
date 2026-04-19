@@ -316,14 +316,22 @@ static void lower_pat_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
                     && var_expr->children[0]
                     && var_expr->children[0]->kind == E_FNC
                     && var_expr->children[0]->sval) {
-                int idx = sm_emit_s(p, SM_PAT_CAPTURE_FN,
-                                    var_expr->children[0]->sval);
-                p->instrs[idx].a[1].i = 0;  /* conditional */
-                /* TL-2: if every arg is a plain E_VAR, stash the names in a[2].s
-                 * as '\t'-separated so they can be resolved at flush time.
-                 * Leave a[2].s NULL for the general (arbitrary expression) case
-                 * so the runtime falls back to the legacy eager-eval path. */
-                p->instrs[idx].a[2].s = sm_pat_capture_fn_arg_names(var_expr->children[0]);
+                const EXPR_t *fnc = var_expr->children[0];
+                const char *namelist = sm_pat_capture_fn_arg_names(fnc);
+                if (namelist || fnc->nchildren == 0) {
+                    /* TL-2 name-stash path (all args are plain E_VAR, or no args). */
+                    int idx = sm_emit_s(p, SM_PAT_CAPTURE_FN, fnc->sval);
+                    p->instrs[idx].a[1].i = 0;  /* conditional */
+                    p->instrs[idx].a[2].s = namelist;
+                } else {
+                    /* SN-8a: args-on-stack path — eager-eval each arg, then
+                     * SM_PAT_CAPTURE_FN_ARGS pops them and calls pat_assign_callcap. */
+                    for (int i = 0; i < fnc->nchildren; i++)
+                        lower_expr(p, lt, fnc->children[i]);
+                    int idx = sm_emit_s(p, SM_PAT_CAPTURE_FN_ARGS, fnc->sval);
+                    p->instrs[idx].a[1].i = 0;              /* conditional */
+                    p->instrs[idx].a[2].i = fnc->nchildren; /* nargs */
+                }
             } else {
                 int idx = sm_emit_s(p, SM_PAT_CAPTURE, var_expr->sval);
                 p->instrs[idx].a[1].i = 0;  /* conditional */
@@ -341,10 +349,20 @@ static void lower_pat_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
                     && var_expr->children[0]
                     && var_expr->children[0]->kind == E_FNC
                     && var_expr->children[0]->sval) {
-                int idx = sm_emit_s(p, SM_PAT_CAPTURE_FN,
-                                    var_expr->children[0]->sval);
-                p->instrs[idx].a[1].i = 1;  /* immediate */
-                p->instrs[idx].a[2].s = sm_pat_capture_fn_arg_names(var_expr->children[0]);
+                const EXPR_t *fnc = var_expr->children[0];
+                const char *namelist = sm_pat_capture_fn_arg_names(fnc);
+                if (namelist || fnc->nchildren == 0) {
+                    int idx = sm_emit_s(p, SM_PAT_CAPTURE_FN, fnc->sval);
+                    p->instrs[idx].a[1].i = 1;  /* immediate */
+                    p->instrs[idx].a[2].s = namelist;
+                } else {
+                    /* SN-8a: args-on-stack path for $ *fn(args). */
+                    for (int i = 0; i < fnc->nchildren; i++)
+                        lower_expr(p, lt, fnc->children[i]);
+                    int idx = sm_emit_s(p, SM_PAT_CAPTURE_FN_ARGS, fnc->sval);
+                    p->instrs[idx].a[1].i = 1;              /* immediate */
+                    p->instrs[idx].a[2].i = fnc->nchildren; /* nargs */
+                }
             } else {
                 int idx = sm_emit_s(p, SM_PAT_CAPTURE, var_expr->sval);
                 p->instrs[idx].a[1].i = 1;  /* immediate */
@@ -382,10 +400,20 @@ static void lower_pat_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
          * which evaluates fn ONCE at build time and treats the return as a pattern,
          * skipping the per-position sweep SPITBOL performs. */
         if (ch && ch->kind == E_FNC && ch->sval) {
-            int idx = sm_emit_s(p, SM_PAT_USERCALL, ch->sval);
-            /* TL-2-style arg-name stash: if every arg is a plain E_VAR, record
-             * names for flush-time resolution.  NULL = legacy eager-eval. */
-            p->instrs[idx].a[2].s = sm_pat_capture_fn_arg_names(ch);
+            const char *namelist = sm_pat_capture_fn_arg_names(ch);
+            if (namelist || ch->nchildren == 0) {
+                /* TL-2 name-stash path (all args are plain E_VAR, or no args). */
+                int idx = sm_emit_s(p, SM_PAT_USERCALL, ch->sval);
+                p->instrs[idx].a[2].s = namelist;
+            } else {
+                /* SN-8a: args-on-stack path for bare *fn(args) when any arg is not
+                 * a plain E_VAR (literal, nested expr, etc.).  Eager-eval args,
+                 * SM_PAT_USERCALL_ARGS pops them and calls pat_user_call. */
+                for (int i = 0; i < ch->nchildren; i++)
+                    lower_expr(p, lt, ch->children[i]);
+                int idx = sm_emit_s(p, SM_PAT_USERCALL_ARGS, ch->sval);
+                p->instrs[idx].a[1].i = ch->nchildren;  /* nargs */
+            }
             return;
         }
         /* SN-6: *var — emit SM_PAT_REFNAME so the name (not the current value)

@@ -529,16 +529,57 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
             break;
         }
 
+        case SM_PAT_CAPTURE_FN_ARGS: {
+            /* SN-8a: . *func(args) / $ *func(args) — args-on-stack form.
+             * a[0].s = fname, a[1].i = kind (0=cond, 1=imm), a[2].i = nargs.
+             * The nargs values were lowered in order 0..nargs-1 onto the value stack
+             * (last-pushed = last arg).  Pop them into positions nargs-1..0 to
+             * reconstruct original argument order.  Then pop the child pattern and
+             * build pat_assign_callcap(child, fname, values, nargs). */
+            int nargs = (int)ins->a[2].i;
+            DESCR_t *argv = nargs > 0
+                ? (DESCR_t *)GC_MALLOC((size_t)nargs * sizeof(DESCR_t))
+                : NULL;
+            for (int i = nargs - 1; i >= 0; i--) argv[i] = sm_pop(st);
+            DESCR_t child = pat_pop();
+            const char *fname = ins->a[0].s ? ins->a[0].s : "";
+            (void)ins->a[1].i;  /* kind: pat_assign_callcap handles cond/imm via the
+                                 * NM_CALL NameKind_t; the cond-vs-imm distinction is
+                                 * carried by the NAM flavour, not the args.  The legacy
+                                 * SM_PAT_CAPTURE_FN path also ignores kind here
+                                 * (pat_assign_callcap is the same call). */
+            pat_push(pat_assign_callcap(child, fname, argv, nargs));
+            break;
+        }
+
         case SM_PAT_USERCALL: {
             /* SN-17a: bare *func() in pattern context.
              * a[0].s = function name; a[2].s = '\t'-separated arg names (or NULL).
              * No child pattern is popped — bare *fn() wraps nothing.
              * Build XATP deferred-usercall node via pat_user_call so the engine
              * invokes func() per position at match time; func's FAIL propagates
-             * as pattern FAIL.  Currently args are NULL/0 — the named-args path
-             * (a[2].s) will be wired in SN-17d when FAIL propagation lands. */
+             * as pattern FAIL.  The named-args (a[2].s) path is not yet consumed
+             * — when every arg is a plain E_VAR it is currently routed through
+             * the all-E_VAR stash but the downstream XATP node is not yet wired
+             * to resolve names at match time.  SN-8a fixes the non-E_VAR case
+             * via SM_PAT_USERCALL_ARGS (args-on-stack). */
             const char *fname = ins->a[0].s ? ins->a[0].s : "";
             pat_push(pat_user_call(fname, NULL, 0));
+            break;
+        }
+
+        case SM_PAT_USERCALL_ARGS: {
+            /* SN-8a: bare *func(args) in pattern context — args-on-stack form.
+             * a[0].s = fname, a[1].i = nargs.  Pop nargs values (last-pushed = last
+             * arg), build XATP deferred-usercall with the evaluated args.
+             * No child pattern is popped — bare *fn() wraps nothing. */
+            int nargs = (int)ins->a[1].i;
+            DESCR_t *argv = nargs > 0
+                ? (DESCR_t *)GC_MALLOC((size_t)nargs * sizeof(DESCR_t))
+                : NULL;
+            for (int i = nargs - 1; i >= 0; i--) argv[i] = sm_pop(st);
+            const char *fname = ins->a[0].s ? ins->a[0].s : "";
+            pat_push(pat_user_call(fname, argv, nargs));
             break;
         }
 

@@ -416,6 +416,24 @@ static void h_pat_capture_fn(void)
     }
 }
 
+static void h_pat_capture_fn_args(void)
+{
+    /* SN-8a: . *func(args) / $ *func(args) — args-on-stack form.
+     * a[0].s = fname, a[1].i = kind, a[2].i = nargs.  Args were pushed in
+     * order 0..nargs-1 onto the value stack; pop into positions nargs-1..0
+     * to reconstruct original order.  Then pop child pattern and build
+     * pat_assign_callcap(child, fname, values, nargs). */
+    int nargs = (int)CUR_INS->a[2].i;
+    DESCR_t *argv = nargs > 0
+        ? (DESCR_t *)GC_MALLOC((size_t)nargs * sizeof(DESCR_t))
+        : NULL;
+    for (int i = nargs - 1; i >= 0; i--) argv[i] = POP();
+    DESCR_t child = jit_pat_pop();
+    const char *fname = CUR_INS->a[0].s ? CUR_INS->a[0].s : "";
+    (void)CUR_INS->a[1].i;  /* kind carried via NM_CALL NameKind_t, not args */
+    jit_pat_push(pat_assign_callcap(child, fname, argv, nargs));
+}
+
 static void h_pat_usercall(void)
 {
     /* SN-17a: bare *func() in pattern context.
@@ -425,6 +443,21 @@ static void h_pat_usercall(void)
      * per position; func's FAIL propagates as pattern FAIL (landing in SN-17d). */
     const char *fname = CUR_INS->a[0].s ? CUR_INS->a[0].s : "";
     jit_pat_push(pat_user_call(fname, NULL, 0));
+}
+
+static void h_pat_usercall_args(void)
+{
+    /* SN-8a: bare *func(args) in pattern context — args-on-stack form.
+     * a[0].s = fname, a[1].i = nargs.  Pop nargs values (last-pushed = last
+     * arg), build XATP deferred-usercall with the evaluated args.
+     * No child pattern is popped — bare *fn() wraps nothing. */
+    int nargs = (int)CUR_INS->a[1].i;
+    DESCR_t *argv = nargs > 0
+        ? (DESCR_t *)GC_MALLOC((size_t)nargs * sizeof(DESCR_t))
+        : NULL;
+    for (int i = nargs - 1; i >= 0; i--) argv[i] = POP();
+    const char *fname = CUR_INS->a[0].s ? CUR_INS->a[0].s : "";
+    jit_pat_push(pat_user_call(fname, argv, nargs));
 }
 
 static void h_exec_stmt(void)
@@ -605,7 +638,9 @@ static void init_handler_table(void)
     g_handlers[SM_PAT_REFNAME] = h_pat_refname;
     g_handlers[SM_PAT_CAPTURE]    = h_pat_capture;
     g_handlers[SM_PAT_CAPTURE_FN] = h_pat_capture_fn;
+    g_handlers[SM_PAT_CAPTURE_FN_ARGS] = h_pat_capture_fn_args;
     g_handlers[SM_PAT_USERCALL]   = h_pat_usercall;
+    g_handlers[SM_PAT_USERCALL_ARGS] = h_pat_usercall_args;
     g_handlers[SM_PAT_BOXVAL]  = h_pat_boxval;
 
     g_handlers[SM_EXEC_STMT]   = h_exec_stmt;

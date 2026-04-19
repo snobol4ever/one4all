@@ -80,10 +80,23 @@ typedef enum {
                          * path in interp_eval_pat's E_DEFER(E_VAR) case.  SN-6 fix. */
     SM_PAT_CAPTURE,
     SM_PAT_CAPTURE_FN,  /* . *func() — a[0].s=funcname; calls func(matched_text) at match time */
+    SM_PAT_CAPTURE_FN_ARGS, /* . *func(args) / $ *func(args) — args-are-values form.
+                         * a[0].s = funcname, a[1].i = kind (0=cond, 1=imm), a[2].i = nargs.
+                         * The nargs values were pushed onto the value stack by preceding
+                         * lower_expr calls; handler pops them (last-pushed = last arg) and
+                         * calls pat_assign_callcap(child, fname, values, nargs).  SN-8a.
+                         * Emitted when any arg is not a plain E_VAR (E_QLIT literal, nested
+                         * expression, etc.) — the TL-2 name-stash path handles the all-E_VAR
+                         * case in SM_PAT_CAPTURE_FN. */
     SM_PAT_USERCALL,    /* bare *func() — a[0].s=funcname; a[2].s = '\t'-separated arg names (or NULL)
                          * Builds XATP deferred-usercall pattern via pat_user_call; at match time
                          * the engine invokes func() per position and the call's FAIL propagates
                          * as pattern FAIL.  SN-17a. */
+    SM_PAT_USERCALL_ARGS, /* bare *func(args) — args-are-values form.
+                         * a[0].s = funcname, a[1].i = nargs.  The nargs values were pushed
+                         * onto the value stack; handler pops them and calls
+                         * pat_user_call(fname, values, nargs).  SN-8a.
+                         * Emitted when any arg is not a plain E_VAR. */
 
     /* Statement execution */
     SM_EXEC_STMT,

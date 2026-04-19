@@ -140,7 +140,9 @@ static const char *opnames[SM_OPCODE_COUNT] = {
     "SM_PAT_FAIL","SM_PAT_SUCCEED","SM_PAT_EPS","SM_PAT_ALT","SM_PAT_CAT",
     "SM_PAT_DEREF","SM_PAT_REFNAME","SM_PAT_CAPTURE",
     "SM_PAT_CAPTURE_FN",
+    "SM_PAT_CAPTURE_FN_ARGS",
     "SM_PAT_USERCALL",
+    "SM_PAT_USERCALL_ARGS",
     "SM_EXEC_STMT",
     "SM_BB_PUMP","SM_BB_ONCE",
     "SM_CALL","SM_RETURN","SM_FRETURN","SM_NRETURN","SM_DEFINE",
@@ -211,10 +213,21 @@ void sm_prog_print(const SM_Program *p, FILE *out)
                 fprintf(out, " kind=%lld", (long long)in->a[1].i);
                 if (in->a[2].s) fprintf(out, " args=\"%s\"", in->a[2].s);
                 break;
+            case SM_PAT_CAPTURE_FN_ARGS:
+                /* SN-8a: a[0].s = fname, a[1].i = kind, a[2].i = nargs (values on stack) */
+                if (in->a[0].s) fprintf(out, " s=\"%s\"", in->a[0].s);
+                fprintf(out, " kind=%lld nargs=%lld",
+                    (long long)in->a[1].i, (long long)in->a[2].i);
+                break;
             case SM_PAT_USERCALL:
                 /* SN-17a: a[0].s = fname, a[2].s = optional '\t'-separated arg-var names */
                 if (in->a[0].s) fprintf(out, " s=\"%s\"", in->a[0].s);
                 if (in->a[2].s) fprintf(out, " args=\"%s\"", in->a[2].s);
+                break;
+            case SM_PAT_USERCALL_ARGS:
+                /* SN-8a: a[0].s = fname, a[1].i = nargs (values on stack) */
+                if (in->a[0].s) fprintf(out, " s=\"%s\"", in->a[0].s);
+                fprintf(out, " nargs=%lld", (long long)in->a[1].i);
                 break;
             case SM_CALL:
                 fprintf(out, " s=\"%s\" nargs=%lld",
