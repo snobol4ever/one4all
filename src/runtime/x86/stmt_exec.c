@@ -971,8 +971,13 @@ bb_node_t bb_build(PATND_t *p)
         bb_node_t child = bb_build(p->nchildren > 0 ? p->children[0] : NULL);
         ζ->fn  = child.fn;
         ζ->state = child.ζ;
-        ζ->varname   = (p->var.v == DT_S && p->var.s) ? p->var.s : NULL;
-        ζ->var_ptr   = (p->var.v == DT_N && p->var.ptr) ? (DESCR_t*)p->var.ptr : NULL;
+        /* SN-6 Bug #1d: DT_N with slen==0 carries name string in .s (NAMEVAL).
+         * Mirror of bb_build.c bb_fnme_emit_binary — preserve name so
+         * NAM_commit reaches NV_SET_fn() and fires I/O hooks (OUTPUT, PUNCH). */
+        ζ->varname   = (p->var.v == DT_S && p->var.s) ? p->var.s :
+                       (p->var.v == DT_N && p->var.slen == 0 && p->var.s) ? p->var.s : NULL;
+        ζ->var_ptr   = (p->var.v == DT_N && p->var.slen == 1 && p->var.ptr)
+                       ? (DESCR_t*)p->var.ptr : NULL;
         ζ->immediate = 1;
         register_capture(ζ);
         n.fn = bb_capture;
@@ -987,8 +992,15 @@ bb_node_t bb_build(PATND_t *p)
         bb_node_t child = bb_build(p->nchildren > 0 ? p->children[0] : NULL);
         ζ->fn  = child.fn;
         ζ->state = child.ζ;
-        ζ->varname   = (p->var.v == DT_S && p->var.s) ? p->var.s : NULL;
-        ζ->var_ptr   = (p->var.v == DT_N && p->var.ptr) ? (DESCR_t*)p->var.ptr : NULL;
+        /* SN-6 Bug #1d: DT_N with slen==0 carries name string in .s (NAMEVAL).
+         * Mirror of bb_build.c bb_nme_emit_binary — preserve name so
+         * NAM_commit reaches NV_SET_fn() and fires I/O hooks (OUTPUT, PUNCH).
+         * Without this, `S ? "x" ARB . OUTPUT` writes into a raw DESCR_t cell
+         * and no output appears under --sm-run (word1.sno). */
+        ζ->varname   = (p->var.v == DT_S && p->var.s) ? p->var.s :
+                       (p->var.v == DT_N && p->var.slen == 0 && p->var.s) ? p->var.s : NULL;
+        ζ->var_ptr   = (p->var.v == DT_N && p->var.slen == 1 && p->var.ptr)
+                       ? (DESCR_t*)p->var.ptr : NULL;
         ζ->immediate = 0;
         n.fn = bb_capture;
         n.ζ  = ζ;
