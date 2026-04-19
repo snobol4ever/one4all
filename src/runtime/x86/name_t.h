@@ -114,4 +114,24 @@ void name_init_as_call(NAME_t *nm,
                        DESCR_t *fnc_args, int fnc_nargs,
                        char **fnc_arg_names, int fnc_n_arg_names);
 
+/*---------------------------------------------------------------------------*/
+/* Flat NAME stack — primary API (SN-21b).                                    */
+/*                                                                            */
+/* Two primary ops: NAME_push / NAME_pop — every box γ push is matched by   */
+/* that box's own β/ω pop.  The stack unrolls itself as boxes backtrack.    */
+/*                                                                            */
+/* Two bracket ops: NAME_mark / NAME_commit_above / NAME_discard_above —    */
+/* used at the statement-pattern boundary and at EVAL (DT_E thaw) boundary  */
+/* to either fire or drop all entries pushed within the bracket.             */
+/*                                                                            */
+/* Handles are opaque pointers; pass to NAME_pop exactly once.              */
+/*---------------------------------------------------------------------------*/
+
+void *NAME_push(const NAME_t *nm, const char *substr, int slen);
+void  NAME_pop (void *handle);
+
+int   NAME_mark(void);
+void  NAME_commit_above (int mark);
+void  NAME_discard_above(int mark);
+
 #endif /* NAME_T_H */
