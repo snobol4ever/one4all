@@ -522,6 +522,11 @@ DESCR_t bb_capture(void *zeta, int entry)
                         DESCR_t v={.v=DT_S,.slen=(uint32_t)cr.δ,.s=s};          
                         NV_SET_fn(ζ->varname,v);                                
                     } else if (ζ->varname && *ζ->varname) {                     
+                        /* XNME (.): conditional — push onto NMD naming list.   
+                         * NAM_commit() will write at overall match success;     
+                         * NAM_discard() rolls back on failure.                  
+                         * Mirrors stmt_exec.c bb_capture CAP_γ_core (.)-path. */
+                        NAM_push(ζ->varname, NULL, DT_S, cr.σ, cr.δ);          
                         ζ->pending=cr; ζ->has_pending=1; }                      
                                                                                 return descr_from_spec(cr);
     CAP_ω:          ζ->has_pending=0;                                           return FAILDESCR;
