@@ -225,7 +225,15 @@ static void h_push_null(void)  { PUSH(NULVCL); STATE->last_ok = 1; }
 
 static void h_push_var(void)
 {
-    PUSH(NV_GET_fn(CUR_INS->a[0].s));
+    /* SN-9c-c: SN-6 parity with sm_interp.c:261-268.  Keyword reads (e.g.
+     * INPUT at EOF) return FAILDESCR; last_ok must reflect that so the
+     * statement's :F branch fires.  Without this, a prior iteration's
+     * last_ok=1 from a successful match bleeds across the loop-back goto
+     * and makes `LINE = INPUT :F(END)` never fire at EOF — the JIT-only
+     * failure mode of word1.sno / wordcount.sno. */
+    DESCR_t val = NV_GET_fn(CUR_INS->a[0].s);
+    PUSH(val);
+    STATE->last_ok = (val.v != DT_FAIL);
 }
 
 /* SN-9a: frozen DT_E descriptor for *expr / EVAL().  Mirrors sm_interp.c
@@ -283,6 +291,12 @@ static void h_store_var(void)
     if (val.v == DT_FAIL) { STATE->last_ok = 0; return; }
     DESCR_t stored = NV_SET_fn(CUR_INS->a[0].s, val);
     PUSH(stored);   /* match sm_interp: SM_STORE_VAR pushes result for chained assignment */
+    /* SN-9c-c: SN-6 parity with sm_interp.c:296-301.  Successful assignment
+     * sets last_ok=1 so a prior failure (e.g. pattern-match FAIL in the
+     * previous iteration) does not bleed into this statement's :F branch
+     * across a loop-back goto.  Root cause of JIT-only word1/wordcount
+     * premature termination. */
+    STATE->last_ok = 1;
 }
 
 static void h_pop(void) { POP(); }
