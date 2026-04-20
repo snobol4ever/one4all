@@ -64,7 +64,7 @@ done
 # ── Demo programs ─────────────────────────────────────────────────────────────
 run_test "demo_wordcount" "$DEMO/wordcount.sno" "$DEMO/wordcount.ref" "$DEMO/wordcount.input" ""
 run_test "demo_treebank"  "$DEMO/treebank.sno"  "$DEMO/treebank.ref"  "$DEMO/treebank.input"  ""
-run_test "demo_claws5"    "$DEMO/claws5.sno"    "$DEMO/claws5.ref"    "$DEMO/CLAWS5inTASA.dat" ""
+run_test "demo_claws5"    "$DEMO/claws5.sno"    "$DEMO/claws5.ref"    "$DEMO/claws5.input"     ""
 TIMEOUT=30 \
 run_test "demo_roman"     "$DEMO/roman.sno"     "$DEMO/roman.ref"     ""                       "^ms:"
 
