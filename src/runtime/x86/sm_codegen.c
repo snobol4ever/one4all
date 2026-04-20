@@ -304,8 +304,21 @@ static void h_pop(void) { POP(); }
 static void h_arith(void)
 {
     DESCR_t r = POP(), l = POP();
+    /* SN-9c-c-bis: full parity with sm_interp.c:321-331.  Three pieces JIT
+     * was missing: FAIL propagation (e.g. CHARS + SIZE(INPUT) at EOF) and
+     * DT_SNUL→INTVAL(0) coercion (unset variables read as null string).
+     * Without the SNUL coercion, `N + 1` with unset N left l.v=DT_SNUL,
+     * jit_arith fell through to the REALVAL branch, and the result
+     * propagated as DT_R — formatter then emitted `2.` instead of `2`. */
+    if (l.v == DT_FAIL || r.v == DT_FAIL) {
+        PUSH(FAILDESCR);
+        STATE->last_ok = 0;
+        return;
+    }
     if (l.v == DT_S) l = INTVAL(to_int_jit(l));
     if (r.v == DT_S) r = INTVAL(to_int_jit(r));
+    if (l.v == DT_SNUL) l = INTVAL(0);
+    if (r.v == DT_SNUL) r = INTVAL(0);
     DESCR_t result = jit_arith(l, r, CUR_INS->op);
     PUSH(result);
     STATE->last_ok = (result.v != DT_FAIL);
