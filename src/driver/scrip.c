@@ -129,11 +129,14 @@ int main(int argc, char **argv)
     int opt_trace          = 0;  /* --trace     : MONITOR trace output */
     int opt_bench          = 0;  /* --bench     : print wall-clock time after execution */
 
-    /* SN-19: case sensitivity. Default SNOBOL4 is case-INsensitive (lex fold
-     * to upper). --case-sensitive selects CSNOBOL4 -f-equivalent behavior,
-     * which the lexer uses to preserve identifier spelling. Required by the
-     * double-function trick (RULES.md: push_list vs Push_list). */
-    int opt_case_sensitive = 0;
+    /* SN-19/SN-31: case sensitivity.  one4all default is case-SENSITIVE
+     * — .sno / .inc corpus uses mixed-case identifiers (bSlash, semicolon,
+     * snoLine, Push_list) and we preserve source spelling verbatim.
+     * --case-sensitive is a no-op today (default matches); kept for
+     * script compatibility.  No flag wires back to classic fold-to-upper
+     * — if that mode ever needs revival, add --fold-case here and call
+     * sno_set_case_sensitive(0). */
+    int opt_case_sensitive = 1;
 
     int argi = 1;
     while (argi < argc && argv[argi][0] == '-' && argv[argi][1] == '-') {
@@ -200,7 +203,7 @@ int main(int argc, char **argv)
             "  --dump-ir-bison  dump IR via old Bison/Flex parser\n"
             "\n"
             "SNOBOL4 dialect options:\n"
-            "  --case-sensitive preserve identifier spelling (default: fold to upper — SNOBOL4 standard)\n"
+            "  --case-sensitive preserve identifier spelling (default; SN-31)\n"
             "\n"
             "Frontend inferred from file extension:\n"
             "  .sno=SNOBOL4  .icn=Icon  .pl=Prolog  .sc=Snocone  .reb=Rebus\n"

@@ -722,7 +722,13 @@ static int   strpos;
  * sno_set_case_sensitive(1), normally from a scrip CLI flag. Preserves
  * identifier spelling verbatim. Required for the double-function trick
  * (RULES.md: push_list vs Push_list).                                       */
-static int sno_fold_on = 1;  /* 1 = fold to upper (default SNOBOL4 behavior) */
+static int sno_fold_on = 0;  /* SN-31: case-sensitive is the one4all default.
+                              * Classic SNOBOL4 folds to upper; our .sno/.inc
+                              * corpus uses mixed-case identifiers (bSlash,
+                              * semicolon, snoLine, Push_list).  Ingress-at-lex
+                              * preserves source spelling.  Flip to 1 for
+                              * classic behavior via `scrip` (no flag is wired
+                              * back the other way today). */
 
 void sno_set_case_sensitive(int on) { sno_fold_on = on ? 0 : 1; }
 int  sno_get_case_sensitive(void)   { return sno_fold_on ? 0 : 1; }
