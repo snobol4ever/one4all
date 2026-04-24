@@ -916,14 +916,17 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
 
 static void lower_stmt(SM_Program *p, LabelTable *lt, const STMT_t *s)
 {
-    /* 0. Statement counter tick — increments &STCOUNT / &STNO */
-    sm_emit(p, SM_STNO);
-
-    /* 1. Define label if present */
+    /* 0. Define label BEFORE SM_STNO so backward branches land on the STNO.
+     * If SM_LABEL came after SM_STNO, a JUMP_S/JUMP_F targeting this label
+     * would skip the STNO on re-entry — causing sm_steps_done to under-count
+     * loop iterations and diverge from the IR step counter. (SN-26c-stmt153) */
     if (s->label && s->label[0]) {
         int lbl_idx = sm_label(p);
         lt_define(lt, s->label, lbl_idx);
     }
+
+    /* 1. Statement counter tick — increments &STCOUNT / &STNO */
+    sm_emit(p, SM_STNO);
 
     /* END statement → SM_HALT */
     if (s->is_end) {
