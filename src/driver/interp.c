@@ -2636,10 +2636,25 @@ DESCR_t interp_eval(EXPR_t *e)
          * SNOBOL4 rule: concatenation of pattern with anything yields pattern.
          * RT-112: once we detect a pattern operand, re-evaluate ALL remaining
          * children via interp_eval_pat so *var/*func become XDSAR/XATP nodes
-         * rather than frozen DT_E (which pat_cat cannot handle). */
-        DESCR_t acc = interp_eval(e->children[0]);
+         * rather than frozen DT_E (which pat_cat cannot handle).
+         * SN-26c-parseerr-g: pre-scan children for E_DEFER (i.e. *X).  In
+         * value context, interp_eval(E_DEFER) returns DT_E (frozen
+         * expression), which is NOT detected by IS_PAT(acc).  If E_DEFER is
+         * the FIRST child, the in_pat_mode promotion from the loop below
+         * never fires, and CONCAT_fn(DT_E, "B") produces garbage.  Beauty's
+         *   pat = *snoFunction $'(' *snoExprList $')'
+         * lowered to E_SEQ(E_DEFER, E_VAR, E_DEFER, E_VAR) is the canonical
+         * victim.  Fix: if any child is E_DEFER, we are building a pattern;
+         * use interp_eval_pat for child[0] and pat_cat for the rest. */
+        int has_defer = 0;
+        for (int j = 0; j < e->nchildren; j++) {
+            EXPR_t *cj = e->children[j];
+            if (cj && cj->kind == E_DEFER) { has_defer = 1; break; }
+        }
+        DESCR_t acc = has_defer ? interp_eval_pat(e->children[0])
+                                : interp_eval(e->children[0]);
         if (IS_FAIL_fn(acc)) return FAILDESCR;
-        int in_pat_mode = IS_PAT(acc);
+        int in_pat_mode = has_defer ? 1 : IS_PAT(acc);
         for (int i = 1; i < e->nchildren; i++) {
             DESCR_t nxt;
             if (in_pat_mode) {

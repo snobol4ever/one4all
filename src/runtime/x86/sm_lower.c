@@ -598,14 +598,34 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         sm_emit(p, SM_COERCE_NUM);   /* unary +: string→int or real */
         return;
 
-    /* ── String concatenation ── */
+    /* ── String concatenation (or pattern concatenation if any child is *X) ── */
     case E_CAT:
-    case E_SEQ:
-        for (int i = 0; i < e->nchildren; i++)
-            lower_expr(p, lt, e->children[i]);
-        for (int i = 1; i < e->nchildren; i++)
-            sm_emit(p, SM_CONCAT);
+    case E_SEQ: {
+        /* SN-26c-parseerr-g: parallel to interp.c E_SEQ fix.  In value
+         * context, E_DEFER lowers to SM_PUSH_EXPR (DT_E frozen expr).
+         * SM_CONCAT(DT_E, string) produces garbage that won't match.
+         * If any child is E_DEFER, this SEQ is building a pattern —
+         * lower as pattern and use SM_PAT_CAT.  Mirror in JIT (sm_codegen.c)
+         * is automatic since codegen reads the same SM ops. */
+        int has_defer = 0;
+        for (int j = 0; j < e->nchildren; j++) {
+            const EXPR_t *cj = e->children[j];
+            if (cj && cj->kind == E_DEFER) { has_defer = 1; break; }
+        }
+        if (has_defer) {
+            for (int i = 0; i < e->nchildren; i++)
+                lower_pat_expr(p, lt, e->children[i]);
+            for (int i = 1; i < e->nchildren; i++)
+                sm_emit(p, SM_PAT_CAT);
+            sm_emit(p, SM_PAT_BOXVAL);  /* bridge: pat-stack → value-stack DT_P */
+        } else {
+            for (int i = 0; i < e->nchildren; i++)
+                lower_expr(p, lt, e->children[i]);
+            for (int i = 1; i < e->nchildren; i++)
+                sm_emit(p, SM_CONCAT);
+        }
         return;
+    }
 
     /* ── Assignment ── */
     case E_ASSIGN:
