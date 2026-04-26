@@ -1763,6 +1763,26 @@ void SNO_INIT_fn(void) {
         const char *mon = getenv("MONITOR");
         if (mon && mon[0] == '1') monitor_fd = 2;
     }
+    /* SN-26-scrip-env-gate: SCRIP_FTRACE / SCRIP_TRACE env vars auto-activate
+     * the catch-all keyword counters at startup, so the user's .sno does not
+     * need to write `&FTRACE = N` / `&TRACE = N` to trigger tracing.  This is
+     * the "super automatic" sync-trace switch — set the env vars, run the
+     * unmodified program, and every CALL/RETURN/VALUE event emits on the
+     * monitor wire.  Empty / "0" / unset all leave the counters at 0 (off).
+     * Any positive integer turns the catch-all on; same semantics as the
+     * SNOBOL4-source-level keyword assignment. */
+    {
+        const char *ev_ftr = getenv("SCRIP_FTRACE");
+        if (ev_ftr && ev_ftr[0]) {
+            int64_t v = (int64_t)strtoll(ev_ftr, NULL, 10);
+            if (v > 0) kw_ftrace = v;
+        }
+        const char *ev_tr = getenv("SCRIP_TRACE");
+        if (ev_tr && ev_tr[0]) {
+            int64_t v = (int64_t)strtoll(ev_tr, NULL, 10);
+            if (v > 0) kw_trace = v;
+        }
+    }
 
     /* Register numeric comparison builtins */
     extern void register_fn(const char *, DESCR_t (*)(DESCR_t*, int), int, int);
