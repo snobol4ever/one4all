@@ -476,6 +476,30 @@ static DESCR_t bb_usercall(void *zeta, int entry)
                    }
                }
                DESCR_t r = g_user_call_hook(ζ->name, eff_args, n);
+               /* SN-26c-parseerr-h: detect NRETURN via &RTNTYPE.  When a user
+                * function returns via NRETURN, the descriptor `r` carries the
+                * fn's value (typically the same as RETURN would yield), but
+                * SPITBOL semantics for `*fn()` in pattern context treat an
+                * NRETURN-returning call as a side-effect-only EPSILON MATCH —
+                * success at the current cursor with zero characters consumed,
+                * REGARDLESS of the value's type or the subject contents.
+                *
+                * Beauty's parser is the canonical victim: every Push(...) call
+                * ends with `:(NRETURN)`.  Without this branch, the second and
+                * later Push() calls in `*Push(tok) *Push(tag) ...` cause an
+                * anchored-string-match against the cursor, which usually fails,
+                * which backtracks the alternation and discards Push's
+                * already-committed side effects on the parser-stack global.
+                *
+                * Failure shapes (FRETURN, fn = FAIL) still apply and are
+                * checked first.
+                *
+                * Note: kw_rtntype is set by call_user_function on every exit
+                * path and is read here BEFORE any nested call could clobber it
+                * (no allocation or function call between hook return and this
+                * check). */
+               extern char kw_rtntype[16];
+               int via_nreturn = (strcmp(kw_rtntype, "NRETURN") == 0);
                /* Two failure shapes to handle:
                 *   DT_FAIL (99)                        — FRETURN / explicit FAIL
                 *   DT_P wrapping XFAIL PATND node     — user wrote `fn = FAIL`
@@ -490,6 +514,17 @@ static DESCR_t bb_usercall(void *zeta, int entry)
                 * literal-string matches; pattern returns are matched as patterns. */
                if (IS_FAIL_fn(r))                         goto UC_ω;
                if (r.v == DT_P && r.p && r.p->kind == XFAIL) goto UC_ω;
+
+               /* SN-26c-parseerr-h: NRETURN → epsilon-match.  Side effects on
+                * globals already committed during the body's execution are
+                * preserved (bb_usercall has no rollback path that touches NV).
+                * The string-match branch below is ONLY for value-returning
+                * functions whose RTNTYPE is "RETURN" (or "FRETURN" handled
+                * above as failure). */
+               if (via_nreturn) {
+                   ζ->consumed = 0;
+                   UC = spec(Σ + Δ, 0);                     goto UC_γ;
+               }
 
                /* SN-26c-parseerr-e: match the return value against subject @ Δ. */
                if (r.v == DT_S || r.v == DT_SNUL) {

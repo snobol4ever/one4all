@@ -120,6 +120,9 @@ int name_commit_value(const NAME_t *nm, DESCR_t value)
                     case DT_FAIL: kind = "DT_FAIL"; break;
                 }
                 const char *str = (call_args[k].v == DT_S && call_args[k].s) ? call_args[k].s : "";
+                char numbuf[32]; numbuf[0] = '\0';
+                if (call_args[k].v == DT_I) snprintf(numbuf, sizeof numbuf, "%ld", (long)call_args[k].i);
+                else if (call_args[k].v == DT_R) snprintf(numbuf, sizeof numbuf, "%g", call_args[k].r);
                 const char *raw_kind = nm->fnc_args ? "?" : "(name)";
                 if (nm->fnc_args) { switch ((int)nm->fnc_args[k].v) {
                     case DT_SNUL: raw_kind = "DT_SNUL"; break;
@@ -131,8 +134,8 @@ int name_commit_value(const NAME_t *nm, DESCR_t value)
                     case DT_P:    raw_kind = "DT_P";    break;
                     case DT_FAIL: raw_kind = "DT_FAIL"; break;
                 } }
-                fprintf(stderr, "  arg[%d] raw v=%s   eff v=%s s=\"%s\"\n",
-                        k, raw_kind, kind, str);
+                fprintf(stderr, "  arg[%d] raw v=%s   eff v=%s s=\"%s\" num=%s\n",
+                        k, raw_kind, kind, str, numbuf);
             }
         }
         DESCR_t *cell  = (name_d.v == DT_N && name_d.ptr)
