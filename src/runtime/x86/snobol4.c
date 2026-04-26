@@ -457,23 +457,38 @@ void comm_var(const char *name, DESCR_t val) {
     }
     if (monitor_fd < 0) return;
     if (!monitor_ready) return;
-    if (!trace_registered(name)) return;
+    /* &TRACE catch-all: emit if kw_trace > 0 OR if name explicitly registered. */
+    if (kw_trace <= 0 && !trace_registered(name)) return;
     const char *s = VARVAL_fn(val);
     mon_send("VALUE", name, s ? s : "(undef)");
 }
 
 void comm_call(const char *fname) {
+    if (!fname || !*fname) return;
+    /* &FTRACE catch-all: emit SPITBOL-style stdout trace regardless of IPC wire.
+     * Format mirrors SPITBOL x64:  ****<stmt>*****  fname()
+     * Stmt count comes from kw_stcount; pad like SPITBOL's 5-char field. */
+    if (kw_ftrace > 0) {
+        fprintf(stdout, "****%-7lld  %s()\n",
+                (long long)kw_stcount, fname);
+        fflush(stdout);
+    }
     if (monitor_fd < 0) return;
     if (!monitor_ready) return;
-    if (!fname || !*fname) return;
     if (kw_ftrace <= 0 && !trace_registered(fname)) return;
     mon_send("CALL", fname, "");
 }
 
 void comm_return(const char *fname, DESCR_t retval) {
+    if (!fname || !*fname) return;
+    if (kw_ftrace > 0) {
+        const char *s = VARVAL_fn(retval);
+        fprintf(stdout, "****%-7lld  RETURN %s = '%s'\n",
+                (long long)kw_stcount, fname, s ? s : "");
+        fflush(stdout);
+    }
     if (monitor_fd < 0) return;
     if (!monitor_ready) return;
-    if (!fname || !*fname) return;
     if (kw_ftrace <= 0 && !trace_registered(fname)) return;
     const char *s = VARVAL_fn(retval);
     mon_send("RETURN", fname, s ? s : "(fail)");
@@ -491,6 +506,7 @@ int64_t kw_trim     = 1;
 int64_t kw_stlimit  = -1;
 int64_t kw_case     = 0;   /* &CASE: 0=fold to upper (default), non-0=sensitive */
 int64_t kw_ftrace   = 0;   /* &FTRACE   - function trace counter */
+int64_t kw_trace    = 0;   /* &TRACE    - variable trace counter (catch-all) */
 int64_t kw_errlimit = 0;   /* &ERRLIMIT - max compile errors before abort */
 int64_t kw_code     = 0;   /* &CODE     - program exit code (set before END) */
 int64_t kw_fnclevel = 0;   /* &FNCLEVEL - current function nesting depth */
@@ -2576,6 +2592,7 @@ DESCR_t NV_GET_fn(const char *name) {
     if (strcmp(name, "CASE")     == 0) return INTVAL(kw_case);
     if (strcmp(name, "MAXLNGTH") == 0) return INTVAL(kw_maxlngth);
     if (strcmp(name, "FTRACE")   == 0) return INTVAL(kw_ftrace);
+    if (strcmp(name, "TRACE")    == 0) return INTVAL(kw_trace);
     if (strcmp(name, "ERRLIMIT") == 0) return INTVAL(kw_errlimit);
     if (strcmp(name, "CODE")     == 0) return INTVAL(kw_code);
     if (strcmp(name, "FNCLEVEL") == 0) return INTVAL(kw_fnclevel);
@@ -2619,6 +2636,7 @@ DESCR_t NV_SET_fn(const char *name, DESCR_t val) {  /* RT-5: returns val for emb
     if (strcmp(name, "CASE")     == 0) { kw_case     = (val.v==DT_I)?val.i:(int64_t)to_real(val); return val; }  /* RT-5 */
     if (strcmp(name, "MAXLNGTH") == 0) { kw_maxlngth = (val.v==DT_I)?val.i:(int64_t)to_real(val); return val; }  /* RT-5 */
     if (strcmp(name, "FTRACE")   == 0) { kw_ftrace   = (val.v==DT_I)?val.i:(int64_t)to_real(val); return val; }  /* RT-5 */
+    if (strcmp(name, "TRACE")    == 0) { kw_trace    = (val.v==DT_I)?val.i:(int64_t)to_real(val); return val; }  /* &TRACE catch-all */
     if (strcmp(name, "ERRLIMIT") == 0) { kw_errlimit = (val.v==DT_I)?val.i:(int64_t)to_real(val); return val; }  /* RT-5 */
     if (strcmp(name, "CODE")     == 0) { kw_code     = (val.v==DT_I)?val.i:(int64_t)to_real(val); return val; }  /* RT-5 */
     /* &FNCLEVEL, &RTNTYPE, read-only/protected keywords: writes silently ignored
@@ -2687,6 +2705,7 @@ DESCR_t *NV_PTR_fn(const char *name) {
     if (strcmp(name, "CASE")     == 0) return NULL;
     if (strcmp(name, "MAXLNGTH") == 0) return NULL;
     if (strcmp(name, "FTRACE")   == 0) return NULL;
+    if (strcmp(name, "TRACE")    == 0) return NULL;
     if (strcmp(name, "ERRLIMIT") == 0) return NULL;
     if (strcmp(name, "CODE")     == 0) return NULL;
     if (strcmp(name, "FNCLEVEL") == 0) return NULL;
