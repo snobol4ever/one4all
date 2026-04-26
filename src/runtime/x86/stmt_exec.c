@@ -392,6 +392,7 @@ typedef struct {
     DESCR_t    *args;
     int         nargs;
     int         done;
+    int         consumed;     /* SN-26c-parseerr-e: chars consumed by fn-result match (for β retract) */
 } usercall_t;
 
 /* SN-17d (Porter FAIL-propagation fix):
@@ -453,19 +454,64 @@ static DESCR_t bb_usercall(void *zeta, int entry)
                    }
                    eff_args = thawed;
                }
+               /* SN-26c-parseerr-d trace: dump pre-thaw and post-thaw arg shapes */
+               if (getenv("ONE4ALL_USERCALL_TRACE")) {
+                   fprintf(stderr, "BB_USERCALL name=%s nargs=%d\n", ζ->name ? ζ->name : "(null)", n);
+                   for (int i = 0; i < n; i++) {
+                       const char *kind = "?";
+                       switch ((int)ζ->args[i].v) {
+                           case DT_SNUL: kind = "DT_SNUL"; break;
+                           case DT_S:    kind = "DT_S";    break;
+                           case DT_E:    kind = "DT_E";    break;
+                           case DT_I:    kind = "DT_I";    break;
+                           case DT_R:    kind = "DT_R";    break;
+                           case DT_N:    kind = "DT_N";    break;
+                           case DT_P:    kind = "DT_P";    break;
+                           case DT_FAIL: kind = "DT_FAIL"; break;
+                       }
+                       const char *raw_str = (ζ->args[i].v == DT_S && ζ->args[i].s) ? ζ->args[i].s : "";
+                       const char *eff_str = (eff_args[i].v == DT_S && eff_args[i].s) ? eff_args[i].s : "";
+                       fprintf(stderr, "  arg[%d] raw v=%s s=\"%s\" ptr=%p   eff v=%d s=\"%s\"\n",
+                               i, kind, raw_str, ζ->args[i].p, eff_args[i].v, eff_str);
+                   }
+               }
                DESCR_t r = g_user_call_hook(ζ->name, eff_args, n);
                /* Two failure shapes to handle:
                 *   DT_FAIL (99)                        — FRETURN / explicit FAIL
                 *   DT_P wrapping XFAIL PATND node     — user wrote `fn = FAIL`
                 *                                        and PATND_t for FAIL leaked
                 *                                        through (spec guard-idiom).
-                * Anything else (null string, number, string, ordinary pattern)
-                * counts as success — bare *fn() match is epsilon. */
+                * Anything else MUST be used as a pattern primitive — matching the
+                * function's return value against the subject at the current cursor.
+                * SN-17d previously made bare *fn() match epsilon unconditionally on
+                * non-FAIL; that was wrong (cf. SN-26c-parseerr-e).  SPITBOL semantics:
+                * `*fn()` evaluates the function at match time and uses the result as
+                * a pattern at the current cursor.  String returns become anchored
+                * literal-string matches; pattern returns are matched as patterns. */
                if (IS_FAIL_fn(r))                         goto UC_ω;
                if (r.v == DT_P && r.p && r.p->kind == XFAIL) goto UC_ω;
+
+               /* SN-26c-parseerr-e: match the return value against subject @ Δ. */
+               if (r.v == DT_S || r.v == DT_SNUL) {
+                   const char *rs = r.s ? r.s : "";
+                   int         rl = (int)strlen(rs);
+                   if (Δ + rl > Σlen)                              goto UC_ω;
+                   if (rl > 0 && memcmp(Σ + Δ, rs, (size_t)rl) != 0) goto UC_ω;
+                   ζ->consumed = rl;
+                   UC = spec(Σ + Δ, rl);
+                   Δ += rl;
+                                                                  goto UC_γ;
+               }
+               /* DT_P (pattern), DT_I (integer), DT_R (real), DT_N (name) ...
+                * not yet supported as bb_usercall return-as-pattern.  Fall through
+                * to epsilon match for backward-compat with the SN-17d guard idiom
+                * (`*g_m_gt_0()` returns DT_I 0 or 1; FAIL handled above; success
+                * was previously epsilon and corpus relies on that). */
+               ζ->consumed = 0;
            }
            UC = spec(Σ + Δ, 0);           goto UC_γ;
-    UC_β:                                  goto UC_ω;
+    UC_β:  Δ -= ζ->consumed;
+           ζ->consumed = 0;                goto UC_ω;
 
     UC_γ:                                  return descr_from_spec(UC);
     UC_ω:                                  return FAILDESCR;

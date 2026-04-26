@@ -4050,6 +4050,10 @@ DESCR_t interp_eval_pat(EXPR_t *e)
                         }
                     }
                 }
+                if (getenv("ONE4ALL_USERCALL_TRACE")) {
+                    fprintf(stderr, "PAT_USER_CALL_BUILD name=%s nargs=%d\n",
+                            child->sval, na);
+                }
                 return pat_user_call(child->sval, av, na);
             }
             /* *var — build XDSAR deferred-ref node so the variable is

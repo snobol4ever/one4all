@@ -7,6 +7,8 @@
  * actually becomes a store.
  */
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <gc.h>
 
@@ -97,6 +99,39 @@ void name_commit_value(const NAME_t *nm, DESCR_t value)
         }
 
         DESCR_t name_d = g_user_call_hook(nm->fnc_name, call_args, call_n);
+        if (getenv("ONE4ALL_USERCALL_TRACE")) {
+            fprintf(stderr, "NM_CALL name=%s nargs=%d arg_names=%s\n",
+                    nm->fnc_name ? nm->fnc_name : "(null)",
+                    call_n,
+                    (nm->fnc_arg_names && nm->fnc_n_arg_names > 0) ? "yes" : "no");
+            for (int k = 0; k < call_n; k++) {
+                const char *kind = "?";
+                switch ((int)call_args[k].v) {
+                    case DT_SNUL: kind = "DT_SNUL"; break;
+                    case DT_S:    kind = "DT_S";    break;
+                    case DT_E:    kind = "DT_E";    break;
+                    case DT_I:    kind = "DT_I";    break;
+                    case DT_R:    kind = "DT_R";    break;
+                    case DT_N:    kind = "DT_N";    break;
+                    case DT_P:    kind = "DT_P";    break;
+                    case DT_FAIL: kind = "DT_FAIL"; break;
+                }
+                const char *str = (call_args[k].v == DT_S && call_args[k].s) ? call_args[k].s : "";
+                const char *raw_kind = "?";
+                switch ((int)nm->fnc_args[k].v) {
+                    case DT_SNUL: raw_kind = "DT_SNUL"; break;
+                    case DT_S:    raw_kind = "DT_S";    break;
+                    case DT_E:    raw_kind = "DT_E";    break;
+                    case DT_I:    raw_kind = "DT_I";    break;
+                    case DT_R:    raw_kind = "DT_R";    break;
+                    case DT_N:    raw_kind = "DT_N";    break;
+                    case DT_P:    raw_kind = "DT_P";    break;
+                    case DT_FAIL: raw_kind = "DT_FAIL"; break;
+                }
+                fprintf(stderr, "  arg[%d] raw v=%s   eff v=%s s=\"%s\"\n",
+                        k, raw_kind, kind, str);
+            }
+        }
         DESCR_t *cell  = (name_d.v == DT_N && name_d.ptr)
                          ? (DESCR_t *)name_d.ptr : NULL;
         if (cell) *cell = value;
