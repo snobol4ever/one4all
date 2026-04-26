@@ -64,3 +64,5 @@ src/runtime/snobol4/test_runtime
 boxes.jar
 *.tst
 *.bin
+*.so
+scripts/monitor/*.so

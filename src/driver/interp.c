@@ -950,7 +950,12 @@ DESCR_t interp_eval(EXPR_t *e)
             if (lhs && lhs->kind == E_VAR) {
                 int slot = (int)lhs->ival;
                 if (slot >= 0 && slot < ICN_CUR.env_n) { ICN_CUR.env[slot] = val; return val; }
-                if (slot < 0 && lhs->sval && lhs->sval[0] != '&') NV_SET_fn(lhs->sval, val);
+                /* SS-MON: route through set_and_trace so VALUE traces fire on
+                 * plain `var = expr` (previously they fired only on pattern-
+                 * match replacement).  set_and_trace internally calls NV_SET_fn
+                 * AND comm_var.  &-keywords skipped here for parity with the
+                 * pattern-match path. */
+                if (slot < 0 && lhs->sval && lhs->sval[0] != '&') set_and_trace(lhs->sval, val);
             } else if (lhs && lhs->kind == E_IDX && lhs->nchildren >= 2) {
                 /* t["key"] := val  — subscript assignment in Icon frame */
                 DESCR_t base = interp_eval(lhs->children[0]);
