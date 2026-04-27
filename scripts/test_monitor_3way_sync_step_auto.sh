@@ -12,15 +12,16 @@
 #   1. NO source preprocessing.  The user's .sno runs unmodified.
 #      No inject_traces*.py step.
 #
-#   2. NO shared names file.  Each participant writes its own names
-#      sidecar (per-participant MONITOR_NAMES_OUT) at process exit;
-#      the controller resolves name_id -> string per participant via
-#      the 4-part spec NAME:READY:GO:NAMES.
+#   2. NO sidecar names file.  Per SN-26-bridge-coverage-e (streaming
+#      intern), each participant emits MWK_NAME_DEF records inline on
+#      the wire as new names are interned.  The controller builds a
+#      per-participant intern table from those wire records.  Spec is
+#      now NAME:READY:GO (3-part, no names path).
 #
-#   3. Env-var driven.  Each runtime reads MONITOR_BIN=1 +
-#      MONITOR_READY_PIPE + MONITOR_GO_PIPE + MONITOR_NAMES_OUT and
-#      activates its own catch-all trace.  scrip additionally honors
-#      SCRIP_TRACE=1 / SCRIP_FTRACE=1 for catch-all activation.
+#   3. Env-var driven.  Each runtime reads MONITOR_BIN=1 (scrip only) +
+#      MONITOR_READY_PIPE + MONITOR_GO_PIPE and activates its own
+#      catch-all trace.  scrip additionally honors SCRIP_TRACE=1 /
+#      SCRIP_FTRACE=1 for catch-all activation.
 #
 # CSNOBOL4 and SPITBOL participants require the SN-26-csn-bridge and
 # SN-26-spl-bridge runtime patches to fire on the wire — those landed
@@ -198,10 +199,16 @@ if [[ "$want_dot" = "1" ]]; then
     PIDS+=($!)
 fi
 
-# ── Launch controller using the new 4-part spec ────────────────────────
+# ── Launch controller using the SN-26-bridge-coverage-e 3-part spec ────
+# Names live on the wire (MWK_NAME_DEF records); no sidecar names path
+# in the spec.  The MONITOR_NAMES_OUT env vars set above are now ignored
+# by csn/spl/scr runtimes (per SN-26-e); they're left in the participant
+# launches as harmless legacy env so other runtimes (e.g. snobol4dotnet
+# 'dot' lane) that still honor them continue to work until their own -e
+# patches land.
 SPECS=()
 for p in "${PARTICIPANTS[@]}"; do
-    SPECS+=("$p:$TMP/$p.ready:$TMP/$p.go:$TMP/$p.names")
+    SPECS+=("$p:$TMP/$p.ready:$TMP/$p.go")
 done
 
 python3 "$MON_DIR/monitor_sync_bin.py" "${SPECS[@]}" > "$TMP/ctrl.out" 2>&1 &
