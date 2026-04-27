@@ -88,10 +88,10 @@ fi
 # scrip --ir-run: matches CSN -> 3 LABELs.
 if [ -x "$SCRIP" ]; then
     if run_one "scrip --ir-run"      "timeout 8 env MONITOR_BIN=1 \"$SCRIP\" --ir-run"   3; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); fi
-    # scrip --sm-run: matches SPL -> 4 LABELs (END counted).
-    if run_one "scrip --sm-run"      "timeout 8 env MONITOR_BIN=1 \"$SCRIP\" --sm-run"   4; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); fi
-    # scrip --jit-run: matches SPL -> 4 LABELs.
-    if run_one "scrip --jit-run"     "timeout 8 env MONITOR_BIN=1 \"$SCRIP\" --jit-run"  4; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); fi
+    # scrip --sm-run: matches SPL on blank-line counting (post -k: 1 blank + 3 stmts + END = 5 LABELs).
+    if run_one "scrip --sm-run"      "timeout 8 env MONITOR_BIN=1 \"$SCRIP\" --sm-run"   5; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); fi
+    # scrip --jit-run: same as sm-run (post -k).
+    if run_one "scrip --jit-run"     "timeout 8 env MONITOR_BIN=1 \"$SCRIP\" --jit-run"  5; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); fi
 else
     echo "SKIP scrip missing"
 fi

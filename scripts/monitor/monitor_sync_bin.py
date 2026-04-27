@@ -349,7 +349,6 @@ def run(participants):
         trail_n = int(os.environ.get('MONITOR_LAST_AGREE_TRAIL', '0') or '0')
     except ValueError:
         trail_n = 0
-    from collections import deque
     trail = deque(maxlen=trail_n) if trail_n > 0 else None
 
     diverged = False
