@@ -83,6 +83,7 @@ compile lib/bsd/popen.c              popen_pic.o
 compile lib/auxil/bufio_obj.c        bufio_obj_pic.o
 compile lib/compio_obj.c             compio_obj_pic.o
 compile lib/posix/memio_obj.c        memio_obj_pic.o
+compile monitor_ipc_runtime.c        monitor_ipc_runtime_pic.o
 ar rcs "$OUT" \
     isnobol4_pic.o main_pic.o data_pic.o data_init_pic.o syn_pic.o \
     bal_pic.o break_pic.o date_pic.o dump_pic.o dynamic_pic.o endex_pic.o \
@@ -96,7 +97,7 @@ ar rcs "$OUT" \
     execute_pic.o exp_pic.o file_pic.o findunit_pic.o host_pic.o log_pic.o \
     ord_pic.o rename_pic.o serv_pic.o sin_pic.o sqrt_pic.o sset_pic.o \
     sys_pic.o tan_pic.o bindresvport_pic.o popen_pic.o bufio_obj_pic.o \
-    compio_obj_pic.o memio_obj_pic.o
+    compio_obj_pic.o memio_obj_pic.o monitor_ipc_runtime_pic.o
 [ -f "$OUT" ] || { echo "FAIL  ar did not produce $OUT"; exit 1; }
 echo "OK    libcsnobol4.a built ($(du -sh "$OUT" | cut -f1))"
 echo "OK    archive: $OUT"
