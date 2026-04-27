@@ -2110,6 +2110,11 @@ static void sno4_stmt_commit_go(void *param,Token lbl,EXPR_t *subj,EXPR_t *pat,i
         e->next=pp->prog->imports;pp->prog->imports=e;return;
     }
     STMT_t *s=stmt_new();s->lineno=lbl.lineno;
+    /* SN-26-bridge-coverage-j: assign source stno at parse time so backward
+     * gotos report the correct stno (not a linear execution counter). 1-based.
+     * Increment nstmts FIRST, then read it — counts blank statements too
+     * (they go through this same commit_go path with empty subj/pat/repl). */
+    s->stno = ++pp->prog->nstmts;
     if(lbl.sval){s->label=strdup(lbl.sval);s->is_end=lbl.ival||(strcasecmp(lbl.sval,"END")==0);}
     /* S=PR split: E_SCAN(subj, pat) from "X ? PAT" binary match operator */
     if(!pat && subj && subj->kind==E_SCAN && subj->nchildren==2) {
@@ -2139,7 +2144,7 @@ static void sno4_stmt_commit_go(void *param,Token lbl,EXPR_t *subj,EXPR_t *pat,i
     if(has_eq){s->has_eq=1;s->replacement=repl;if(repl&&!is_pat(repl))fixup_val(repl);}
     s->go=go;
     if(!pp->prog->head) pp->prog->head=pp->prog->tail=s; else{pp->prog->tail->next=s;pp->prog->tail=s;}
-    pp->prog->nstmts++;
+    /* nstmts already incremented above when assigning s->stno (SN-26-bridge-coverage-j) */
 }
 static EXPR_t *parse_expr(Lex *lx){
     Program *prog=calloc(1,sizeof*prog);PP p={prog,NULL};g_lx=lx;snobol4_parse(&p);

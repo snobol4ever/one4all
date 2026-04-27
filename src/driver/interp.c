@@ -4212,7 +4212,10 @@ void execute_program(Program *prog)
          * for sync-step parity, advance stno locally, but do NOT call
          * comm_stno (which would bump &STCOUNT). */
         if (!s->label && !s->subject && !s->pattern && !s->replacement && !s->go) {
-            ++stno;
+            /* SN-26-bridge-coverage-j: use s->stno (source stno from parse)
+             * instead of a linear counter so backward gotos report the right
+             * stno. */
+            stno = s->stno;
             kw_stno = stno;
             g_sno_err_stmt = stno;
             /* Don't fire mon_emit_label_bin here — SPITBOL's bridge
@@ -4222,7 +4225,11 @@ void execute_program(Program *prog)
             continue;
         }
 
-        comm_stno(++stno);
+        /* SN-26-bridge-coverage-j: stno is the source statement number
+         * (set at parse time), not a linear execution counter — backward
+         * gotos must report the destination's source stno. */
+        stno = s->stno;
+        comm_stno(stno);
         kw_stno = stno;
 
         /* SN-26-bridge-coverage-f: fire MWK_LABEL on every statement entry. */

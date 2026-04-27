@@ -92,6 +92,12 @@ struct STMT_t {
     EXPR_t  *replacement;
     SnoGoto *go;
     int      lineno;
+    int      stno;    /* SN-26-bridge-coverage-j: source-statement number,
+                         1-based, sequential, including blank statements.
+                         Used as &STNO and emitted as MWK_LABEL payload.
+                         Must be set at parse time so backward gotos
+                         report the correct source stno (not a linear
+                         execution counter). */
     int      is_end;
     int      has_eq;
     int      lang;    /* LANG_SNO / LANG_ICN / LANG_PL / LANG_RAKU / LANG_SCRIP / LANG_REB (U-12) */
