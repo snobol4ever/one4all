@@ -3206,16 +3206,29 @@ DESCR_t interp_eval(EXPR_t *e)
              * SN-26c-parseerr-d: also defer E_VAR — when args are mixed
              * (e.g. E_QLIT + E_VAR) the all_vars fast path above doesn't
              * fire, and an E_VAR set by an earlier capture in the same
-             * pattern would otherwise be eagerly read here at build time. */
+             * pattern would otherwise be eagerly read here at build time.
+             * SN-26-bridge-coverage-t: also defer compound expressions —
+             * e.g. `*Reduce('[]', nTop() + 1)` — where the arg's top kind
+             * is E_ADD/E_SUB/etc but contains an E_FNC inside.  Eager
+             * interp_eval at build time would call nTop() before the
+             * pattern matches, violating SPITBOL's deferred-pattern
+             * semantics.  Wrap all args as DT_E; thaw at match time
+             * via EVAL_fn → EXPVAL_fn (name_t.c:97). */
             DESCR_t *av = na > 0 ? GC_malloc(na * sizeof(DESCR_t)) : NULL;
             for (int i = 0; i < na; i++) {
                 EXPR_t *arg = fnc->children[i];
-                if (arg && (arg->kind == E_FNC || arg->kind == E_VAR)) {
+                if (arg && arg->kind == E_QLIT) {
+                    /* Pure string literal — safe to evaluate eagerly,
+                     * idempotent under EVAL.  Avoids needless DT_E wrap. */
+                    av[i] = interp_eval(arg);
+                } else if (arg) {
+                    /* Any other expression kind — defer.  EXPVAL_fn at
+                     * thaw time handles all EXPR_t shapes. */
                     av[i].v = DT_E;
                     av[i].ptr = arg;
                     av[i].slen = 0;
                 } else {
-                    av[i] = interp_eval(arg);
+                    av[i] = NULVCL;
                 }
             }
             return pat_assign_callcap(pat, fnc->sval, av, na);
@@ -3239,16 +3252,20 @@ DESCR_t interp_eval(EXPR_t *e)
                 return pat_assign_callcap_named(pat, fnc->sval, NULL, 0, names, na);
             }
             /* SN-26c-parseerr-c: defer E_FNC sub-args.
-             * SN-26c-parseerr-d: also defer E_VAR (see twin site above). */
+             * SN-26c-parseerr-d: also defer E_VAR (see twin site above).
+             * SN-26-bridge-coverage-t: defer compound expressions too —
+             * see twin site above for full rationale. */
             DESCR_t *av = na > 0 ? GC_malloc(na * sizeof(DESCR_t)) : NULL;
             for (int i = 0; i < na; i++) {
                 EXPR_t *arg = fnc->children[i];
-                if (arg && (arg->kind == E_FNC || arg->kind == E_VAR)) {
+                if (arg && arg->kind == E_QLIT) {
+                    av[i] = interp_eval(arg);
+                } else if (arg) {
                     av[i].v = DT_E;
                     av[i].ptr = arg;
                     av[i].slen = 0;
                 } else {
-                    av[i] = interp_eval(arg);
+                    av[i] = NULVCL;
                 }
             }
             return pat_assign_callcap(pat, fnc->sval, av, na);
