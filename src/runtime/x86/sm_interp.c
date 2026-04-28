@@ -211,13 +211,19 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
 
         case SM_STNO: {
             extern void comm_stno(int n);
-            static int g_sm_stno = 0;
-            comm_stno(++g_sm_stno);
+            /* SN-32a-stno: source stno carried as operand by sm_lower so
+             * gotos and label-skips report &STNO correctly.  Linear
+             * counter `g_sm_stno` was wrong on every backward branch and
+             * after every `:(label)` jump that skipped intervening stmts.
+             * Mirrors the IR-side SN-26-bridge-coverage-j fix. */
+            int sm_stno = (int)ins->a[0].i;
+            comm_stno(sm_stno);
             /* SN-26-bridge-coverage-f: fire MWK_LABEL on every statement entry. */
             {
                 extern void mon_emit_label_bin(int64_t stno);
-                mon_emit_label_bin((int64_t)g_sm_stno);
+                mon_emit_label_bin((int64_t)sm_stno);
             }
+            kw_stno = sm_stno;
             st->sp = 0;   /* reset value stack at each statement boundary */
             /* SN-26c-stmt637 probe: trace each SM step -> source stmt number */
             {
@@ -229,7 +235,7 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
                 }
                 if (s_trace_on)
                     fprintf(stderr, "SMSTEP %d sm_stno=%d pc=%d\n",
-                            g_sm_steps_done + 1, g_sm_stno, st->pc);
+                            g_sm_steps_done + 1, sm_stno, st->pc);
             }
             /* IM-4: step-limit */
             if (g_sm_step_limit > 0 && g_sm_steps_done++ >= g_sm_step_limit)
@@ -788,12 +794,19 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
                     DESCR_t base = sm_pop(st);
                     DESCR_t val  = sm_pop(st);
                     st->last_ok = subscript_set(base, i, val);
+                    /* SN-32a-idxset: fire VALUE <lval> for symmetry with
+                     * SPITBOL's asnpb path on aggregate-element stores
+                     * (mirrors SN-26-bridge-coverage-g for the SM lowering). */
+                    { extern void comm_var(const char *, DESCR_t);
+                      comm_var("<lval>", val); }
                     sm_push(st, val);
                 } else if (nargs == 4) { /* 2D: children=3, nc+1=4 */
                     DESCR_t j    = sm_pop(st); DESCR_t i = sm_pop(st);
                     DESCR_t base = sm_pop(st);
                     DESCR_t val  = sm_pop(st);
                     st->last_ok = subscript_set2(base, i, j, val);
+                    { extern void comm_var(const char *, DESCR_t);
+                      comm_var("<lval>", val); }
                     sm_push(st, val);
                 } else {
                     /* N-dim (nargs >= 5): sm_lower pushed rhs, base, then indices.
@@ -809,6 +822,8 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
                     for (int k = 0; k < ndim; k++) fargs[k+2] = idx[k];
                     DESCR_t r = INVOKE_fn("ITEM_SET", fargs, ndim + 2);
                     st->last_ok = (r.v != DT_FAIL);
+                    { extern void comm_var(const char *, DESCR_t);
+                      comm_var("<lval>", val); }
                     sm_push(st, val);
                 }
                 break;

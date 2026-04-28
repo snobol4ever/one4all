@@ -200,13 +200,16 @@ static void h_return(void)   { g_jit_halted = 1; }
 static void h_freturn(void)  { g_jit_halted = 1; }
 static void h_nreturn(void)  { g_jit_halted = 1; }
 
-static int g_sm_stno_jit = 0;
 static void h_stno(void) {
-    comm_stno(++g_sm_stno_jit);
+    /* SN-32a-stno: source stno carried as operand by sm_lower (mirror of
+     * SM_STNO's interp-side fix in sm_interp.c). */
+    int sm_stno = (int)CUR_INS->a[0].i;
+    comm_stno(sm_stno);
+    kw_stno = sm_stno;
     /* SN-26-bridge-coverage-f: fire MWK_LABEL on every statement entry. */
     {
         extern void mon_emit_label_bin(int64_t stno);
-        mon_emit_label_bin((int64_t)g_sm_stno_jit);
+        mon_emit_label_bin((int64_t)sm_stno);
     }
     /* IM-5: step-limit — longjmp out when limit reached */
     if (g_jit_step_limit > 0 && g_jit_steps_done++ >= g_jit_step_limit)
@@ -662,12 +665,17 @@ static void h_call(void)
         return;
     }
     if (name && strcmp(name, "IDX_SET") == 0) {
+        extern void comm_var(const char *, DESCR_t);
         if (nargs == 3) {
             DESCR_t i = POP(), base = POP(), val = POP();
-            STATE->last_ok = subscript_set(base, i, val); PUSH(val);
+            STATE->last_ok = subscript_set(base, i, val);
+            comm_var("<lval>", val);   /* SN-32a-idxset: parity with SM/IR */
+            PUSH(val);
         } else if (nargs == 4) {
             DESCR_t j = POP(), i = POP(), base = POP(), val = POP();
-            STATE->last_ok = subscript_set2(base, i, j, val); PUSH(val);
+            STATE->last_ok = subscript_set2(base, i, j, val);
+            comm_var("<lval>", val);
+            PUSH(val);
         } else {
             /* N-dim (nargs >= 5): sm_lower pushed rhs, base, then indices.
              * Stack top→bot: idx[n-1]...idx[0], base, rhs(val). ndim=nargs-2. */
@@ -678,7 +686,9 @@ static void h_call(void)
             DESCR_t fargs[32]; fargs[0] = val; fargs[1] = base;
             for (int k = 0; k < ndim; k++) fargs[k+2] = idx[k];
             DESCR_t r = INVOKE_fn("ITEM_SET", fargs, ndim + 2);
-            STATE->last_ok = (r.v != DT_FAIL); PUSH(val);
+            STATE->last_ok = (r.v != DT_FAIL);
+            comm_var("<lval>", val);
+            PUSH(val);
         }
         return;
     }
@@ -944,7 +954,8 @@ int sm_jit_run_plain(SM_Program *prog, SM_State *st)
 int sm_jit_run_steps(SM_Program *prog, SM_State *st, int n) {
     g_jit_step_limit = n;
     g_jit_steps_done = 0;
-    g_sm_stno_jit    = 0;
+    /* SN-32a-stno: stno is carried as SM_STNO operand by sm_lower; no
+     * counter to reset here. */
     int rc = 0;
     if (setjmp(g_jit_step_jmp) == 0)
         rc = sm_jit_run(prog, st);

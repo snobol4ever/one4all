@@ -980,6 +980,21 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
 
 static void lower_stmt(SM_Program *p, LabelTable *lt, const STMT_t *s)
 {
+    /* SN-32a-blank: blank source line (no label/subject/pattern/replacement/
+     * goto).  Per the Green Book and SPITBOL's `stmgo` SIL: blank lines are
+     * empty stmts that bump &STNO but not &STCOUNT, and do not fire LABEL
+     * on the wire.  IR mirrors this in execute_program (interp.c).  SM
+     * achieves the same by emitting nothing — the next non-blank stmt's
+     * SM_STNO will fire with its own (later) source stno, which is
+     * exactly what an observer of &STNO would see.  Skipping the
+     * lowering also prevents `kw_stcount` from being bumped via
+     * comm_stno on what is by definition a non-executing line. */
+    if (!s->is_end
+        && (!s->label || !s->label[0])
+        && !s->subject && !s->pattern && !s->replacement && !s->go) {
+        return;
+    }
+
     /* 0. Define label BEFORE SM_STNO so backward branches land on the STNO.
      * If SM_LABEL came after SM_STNO, a JUMP_S/JUMP_F targeting this label
      * would skip the STNO on re-entry — causing sm_steps_done to under-count
@@ -989,8 +1004,12 @@ static void lower_stmt(SM_Program *p, LabelTable *lt, const STMT_t *s)
         lt_define(lt, s->label, lbl_idx);
     }
 
-    /* 1. Statement counter tick — increments &STCOUNT / &STNO */
-    sm_emit(p, SM_STNO);
+    /* 1. Statement counter tick — increments &STCOUNT / &STNO.
+     * SN-32a-stno: pass source stno as operand so sm_interp / sm_codegen
+     * can report `&STNO` correctly after backward gotos and label-skips.
+     * Mirrors the IR-side fix in SN-26-bridge-coverage-j (interp.c reads
+     * s->stno instead of incrementing a linear counter). */
+    sm_emit_i(p, SM_STNO, (int64_t)s->stno);
 
     /* END statement → SM_HALT */
     if (s->is_end) {
