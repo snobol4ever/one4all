@@ -213,6 +213,24 @@ WILDCARD_NAMES_PARTICIPANTS = set(
     if p.strip()
 )
 
+# MONITOR_SKIP_EXTRA_KEYWORD_VALUES=1 — opt-in workaround for the spl bridge's
+# missing VALUE emission on keyword assignments (& assignments such as
+# &FULLSCAN = 1).  When dot or csn emits a VALUE for a keyword, spl emits
+# nothing and advances directly to the next LABEL.  This produces a divergence
+# where one participant has VALUE-on-keyword and the other has LABEL/anything-else.
+#
+# When this flag is set and a divergence matches that pattern, the controller
+# acks only the VALUE-emitting side(s) with 'G', reads their next record, and
+# retries comparison.  Bounded by SKIP_MAX_PER_STEP to prevent unbounded read-
+# ahead.  Off by default — setting it is an explicit acknowledgment that one
+# side's bridge is incomplete.
+#
+# Long-term fix: SN-26-bridge-coverage extends the spl bridge to emit VALUE
+# for keyword stores (probably hooks zystt or the same fire-point as &x=v
+# scalar stores).  When that lands, this skip becomes a no-op.
+SKIP_EXTRA_KEYWORD_VALUES = os.environ.get('MONITOR_SKIP_EXTRA_KEYWORD_VALUES', '').strip() in ('1', 'true', 'yes', 'on')
+SKIP_MAX_PER_STEP = 4  # at most this many extra reads per side per comparison step
+
 
 def keys_match(a, b, a_name_wild=False, b_name_wild=False):
     """Compare two event_key tuples, with three principled wildcards:
@@ -476,6 +494,71 @@ def run(participants):
                 agree = False
                 break
 
+
+        # Opt-in skip — bounded read-ahead on the side(s) that emitted an
+        # "extra" VALUE for a keyword (& assignment).  See
+        # SKIP_EXTRA_KEYWORD_VALUES comment near the top of this file.
+        # Logic: while disagree AND any participant's current event is
+        # "VALUE on a name beginning with &", ack that participant only,
+        # read its next record, retry comparison.  Bounded to keep us
+        # from running ahead unboundedly if the spl gap turns out to be
+        # multi-record.
+        if not agree and SKIP_EXTRA_KEYWORD_VALUES:
+            skip_budget = {f['name']: SKIP_MAX_PER_STEP for f in fds}
+            while not agree:
+                # Identify participants whose current event is an extra
+                # keyword VALUE — i.e., kind == MWK_VALUE and the resolved
+                # name starts with '&'.  Only these get advanced.
+                advanced_any = False
+                for i, (f, ev) in enumerate(events):
+                    if ev is None or ev.kind != MWK_VALUE:
+                        continue
+                    nm = name_for_id(f['names'], ev.name_id)
+                    if not nm.startswith('&'):
+                        continue
+                    if skip_budget[f['name']] <= 0:
+                        continue
+                    # Ack just this participant, read its next record.
+                    try:
+                        os.write(f['gw'], b'G')
+                    except OSError:
+                        return 2
+                    try:
+                        new_ev = read_semantic_record(f, EVENT_TIMEOUT_S)
+                    except ValueError as e:
+                        print(f'[ctrl] PROTOCOL ERR while skipping kw-VALUE on {f["name"]}: {e}',
+                              file=sys.stderr)
+                        return 3
+                    if new_ev is None:
+                        # EOF on the skipping side mid-skip — let normal
+                        # divergence reporting handle it.
+                        events[i] = (f, None)
+                        break
+                    events[i] = (f, new_ev)
+                    if f['log_fp']:
+                        f['log_fp'].write(f'#{step}+ (kw-VALUE skipped) -> {fmt_event(new_ev, f["names"], stno=last_agreed_stno)}\n')
+                        f['log_fp'].flush()
+                    skip_budget[f['name']] -= 1
+                    advanced_any = True
+                if not advanced_any:
+                    break  # nothing further to absorb; surface the divergence
+                # Recompare with refreshed events.
+                oracle_f, oracle_ev = events[0]
+                oracle_key = event_key(oracle_ev, oracle_f['names'])
+                oracle_namewild = oracle_f['name'] in WILDCARD_NAMES_PARTICIPANTS
+                if oracle_ev is None:
+                    break
+                agree = True
+                for f, ev in events[1:]:
+                    if ev is None:
+                        agree = False
+                        break
+                    other_namewild = f['name'] in WILDCARD_NAMES_PARTICIPANTS
+                    if not keys_match(event_key(ev, f['names']), oracle_key,
+                                      a_name_wild=other_namewild,
+                                      b_name_wild=oracle_namewild):
+                        agree = False
+                        break
 
         if not agree:
             div_cols = {f['name']: fmt_event(ev, f['names'], stno=last_agreed_stno)
