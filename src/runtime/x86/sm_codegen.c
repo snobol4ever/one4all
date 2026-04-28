@@ -296,9 +296,25 @@ static void h_bb_once(void)
 static void h_store_var(void)
 {
     DESCR_t val = POP();
-    if (val.v == DT_FAIL) { STATE->last_ok = 0; return; }
-    DESCR_t stored = NV_SET_fn(CUR_INS->a[0].s, val);
-    PUSH(stored);   /* match sm_interp: SM_STORE_VAR pushes result for chained assignment */
+    if (val.v == DT_FAIL) {
+        /* SN-32c-store-fail: push FAILDESCR so enclosing calls (e.g.
+         * DIFFER(sno = Pop()) where Pop() FRETURNs) see a balanced
+         * stack.  Without the push, the enclosing SM_CALL pops a
+         * stale value, corrupting the arg and mis-setting last_ok.
+         * Mirrors SN-32b-store-fail fix in sm_interp.c. */
+        PUSH(FAILDESCR);
+        STATE->last_ok = 0;
+        return;
+    }
+    /* SN-32c-store-val: push `val` (the RHS value), NOT the return value of
+     * NV_SET_fn.  The IR path (interp.c E_ASSIGN, line 2844) always returns
+     * `val` regardless of what NV_SET_fn stores — NV_SET_fn's return value
+     * is unreliable for DT_DATA objects (returns SNUL on the second call
+     * for the same variable).  Pushing `val` ensures DIFFER(sno=Pop()) sees
+     * the actual DATA value, not a stripped SNUL.  Mirrors SN-32b-store-val
+     * fix in sm_interp.c. */
+    NV_SET_fn(CUR_INS->a[0].s, val);
+    PUSH(val);
     /* SN-9c-c: SN-6 parity with sm_interp.c:296-301.  Successful assignment
      * sets last_ok=1 so a prior failure (e.g. pattern-match FAIL in the
      * previous iteration) does not bleed into this statement's :F branch
