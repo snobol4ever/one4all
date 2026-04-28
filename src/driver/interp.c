@@ -2720,20 +2720,21 @@ DESCR_t interp_eval(EXPR_t *e)
             if (IS_FAIL_fn(nxt)) return FAILDESCR;
             if (in_pat_mode || IS_PAT(nxt)) {
                 if (!in_pat_mode) {
-                    /* First pattern seen mid-concat: re-eval this child in pat ctx
-                     * AND re-accumulate children[0..i-1] in pat ctx so that any
-                     * *var / *func among them become XDSAR/XATP nodes rather
-                     * than frozen DT_E (which pat_cat can't concat).  Without
-                     * this, "expr = *term integer" produces DT_E for *term in
-                     * value ctx, then hits pat_cat when integer (DT_P) arrives. */
-                    nxt = interp_eval_pat(e->children[i]);
-                    acc = interp_eval_pat(e->children[0]);
-                    if (IS_FAIL_fn(acc)) return FAILDESCR;
-                    for (int j = 1; j < i; j++) {
-                        DESCR_t pj = interp_eval_pat(e->children[j]);
-                        if (IS_FAIL_fn(pj)) return FAILDESCR;
-                        acc = pat_cat(acc, pj);
-                    }
+                    /* SN-26-bridge-coverage-u: First pattern seen mid-concat.
+                     * Do NOT re-evaluate `nxt` — interp_eval on pattern-shaped
+                     * children (E_ALT etc.) already returns DT_P with all inner
+                     * function calls fired exactly once.  Re-evaluating would
+                     * call those functions a second time (e.g. the canonical
+                     * `leader (upr(letter) | lwr(letter))` would call upr/lwr
+                     * twice each).  Keep `nxt` as-is and pat_cat will coerce
+                     * any non-pattern operands via pat_to_patnd.
+                     *
+                     * Earlier children (0..i-1) likewise don't need re-eval:
+                     * any E_DEFER among them is already caught by the has_defer
+                     * pre-scan above (which would have made in_pat_mode=1 from
+                     * the start), so all prior `acc` values are valid scalars
+                     * that pat_to_patnd will coerce to pat_lit.  pat_cat with
+                     * a string LHS and pattern RHS produces an XCAT correctly. */
                     in_pat_mode = 1;
                 }
                 acc = pat_cat(acc, nxt);
