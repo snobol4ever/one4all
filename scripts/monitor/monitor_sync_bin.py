@@ -467,48 +467,46 @@ def run(participants):
                 agree = False
                 break
 
+
         if not agree:
             div_cols = {f['name']: fmt_event(ev, f['names'], stno=last_agreed_stno)
                         for f, ev in events}
             pnames = [f['name'] for f in fds]
-            col_w = {p: len(p) for p in pnames}
-            for _s, _n, cols in trail:
-                for p in pnames:
-                    col_w[p] = max(col_w[p], len(cols.get(p, '')))
-            for p in pnames:
-                col_w[p] = max(col_w[p], len(div_cols.get(p, '')))
-            stno_strs = [str(n) for _, n, _ in trail if n is not None]
-            if last_agreed_stno is not None:
-                stno_strs.append(str(last_agreed_stno))
-            stno_w = max(4, max((len(s) for s in stno_strs), default=4))
-            step_w = max(4, len(str(step)))
+            all_rows = list(trail) + [(step, last_agreed_stno, div_cols)]
             def src(n):
                 if n is None or n not in stno_map: return ''
-                fn, ln, txt = stno_map[n]; return f'{fn}:{ln}  {txt}'
-            sep = '  '
-            def grid_row(s, n, cols, marker='  '):
-                sn = str(n) if n is not None else ''
-                parts = [f'{s:>{step_w}}', f'{sn:>{stno_w}}'] + \
-                        [f'{cols.get(p,""):<{col_w[p]}}' for p in pnames]
-                srctxt = src(n)
-                if srctxt: parts.append(srctxt)
-                return marker + sep.join(parts)
-            hdr = '  ' + sep.join([f'{"step":>{step_w}}', f'{"stno":>{stno_w}}'] +
-                                   [f'{p:<{col_w[p]}}' for p in pnames] + ['source'])
-            bar = '  ' + sep.join(['-'*step_w, '-'*stno_w] +
-                                   ['-'*col_w[p] for p in pnames] + ['------'])
-            print(f'[ctrl] DIVERGE step {step} — last {len(trail)} agreed + diverge:\n{hdr}\n{bar}',
-                  file=sys.stderr)
-            for tstep, tstno, cols in trail:
-                print(grid_row(tstep, tstno, cols), file=sys.stderr)
-            print(bar, file=sys.stderr)
-            print(grid_row(f'>{step}', last_agreed_stno, div_cols, marker=''), file=sys.stderr)
+                fn, ln, txt = stno_map[n]
+                return f'{fn}:{ln}  {txt}'
+            # Markdown table: | step | stno | p1 | p2 | ... | source |
+            def md_row(*cells):
+                return '| ' + ' | '.join(str(c) for c in cells) + ' |'
+            def md_sep(*widths):
+                return '| ' + ' | '.join('-'*max(w,3) for w in widths) + ' |'
+            col_w = {p: max(len(p), max((len(r[2].get(p,'')) for r in all_rows), default=0))
+                     for p in pnames}
+            src_w  = max(6, max((len(src(r[1])) for r in all_rows), default=6))
+            step_w = max(4, len(str(step)))
+            stno_w = max(4, max((len(str(r[1])) for r in all_rows if r[1] is not None), default=4))
+            def row_line(s, n, cols, divrow=False):
+                marker = '**>**' if divrow else ''
+                cells = [marker + str(s), str(n) if n is not None else '']
+                cells += [cols.get(p, '') for p in pnames]
+                cells += [src(n)]
+                return md_row(*cells)
+            hdrs = ['step', 'stno'] + pnames + ['source']
+            widths = [step_w, stno_w] + [col_w[p] for p in pnames] + [src_w]
+            out = [f'\n[ctrl] DIVERGE step {step} — last {len(trail)} agreed rows + diverge (>):\n']
+            out.append(md_row(*hdrs))
+            out.append(md_sep(*widths))
+            for i, (s, n, cols) in enumerate(all_rows):
+                divrow = (i == len(all_rows) - 1)
+                out.append(row_line(s, n, cols, divrow))
+            print('\n'.join(out), file=sys.stderr)
             for f, ev in events:
                 try: os.write(f['gw'], b'S')
                 except OSError: pass
             diverged = True
             break
-
         # Update last-agreed stno from LABEL records (stno is on the wire).
         if oracle_ev.kind == MWK_LABEL:
             if len(oracle_ev.value) == 8:
