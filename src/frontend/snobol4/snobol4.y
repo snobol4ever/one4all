@@ -244,7 +244,7 @@ static void sno4_stmt_commit_go(void *param,Token lbl,EXPR_t *subj,EXPR_t *pat,i
      * Increment nstmts FIRST, then read it — counts blank statements too
      * (they go through this same commit_go path with empty subj/pat/repl). */
     s->stno = ++pp->prog->nstmts;
-    if(lbl.sval){s->label=strdup(lbl.sval);s->is_end=lbl.ival||(strcasecmp(lbl.sval,"END")==0);}
+    if(lbl.sval){s->label=strdup(lbl.sval);s->is_end=lbl.ival||(strcmp(lbl.sval,"END")==0);}
     /* S=PR split: E_SCAN(subj, pat) from "X ? PAT" binary match operator */
     if(!pat && subj && subj->kind==E_SCAN && subj->nchildren==2) {
         EXPR_t *orig = subj;
