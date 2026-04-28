@@ -313,6 +313,39 @@ def fmt_event(ev, names_table, stno=None):
     return f'{prefix}{kn} {nm} = {fmt_value(ev.type, ev.value)}'
 
 
+import re as _re
+
+def _scan_sno(path, inc_dirs, out, visited=None):
+    if visited is None: visited = set()
+    real = os.path.realpath(path)
+    if real in visited: return
+    visited.add(real)
+    src_dir = os.path.dirname(os.path.abspath(path))
+    try: lines = open(path, encoding='utf-8', errors='replace').readlines()
+    except OSError: return
+    fname = os.path.basename(path)
+    for lineno, raw in enumerate(lines, 1):
+        t = raw.rstrip('\n')
+        if t.startswith('*') or t.startswith('+'): continue
+        if t.startswith('-'):
+            m = _re.search(r"""['"](.*?)['"]""", t)
+            if m and 'INCLUDE' in t[:10].upper():
+                for d in [src_dir] + list(inc_dirs):
+                    cand = os.path.join(d, m.group(1))
+                    if os.path.isfile(cand):
+                        _scan_sno(cand, inc_dirs, out, visited); break
+            continue
+        out['_n'] = out.get('_n', 0) + 1
+        out[out['_n']] = (fname, lineno, t.strip())
+
+def build_stno_map():
+    sno = os.environ.get('MONITOR_SNO_FILE', '').strip()
+    if not sno or not os.path.isfile(sno): return {}
+    dirs = [d for d in os.environ.get('MONITOR_INC_DIR', '').split(':') if d]
+    raw = {}; _scan_sno(sno, dirs, raw); raw.pop('_n', None)
+    return raw  # {int stno: (fname, lineno, stripped_text)}
+
+
 # ---------------------------------------------------------------------------
 # Open one FIFO pair (we read ready, write go).
 # ---------------------------------------------------------------------------
@@ -330,6 +363,10 @@ def open_pair(ready_path, go_path):
 
 def run(participants):
     """participants: list of (name, ready_path, go_path)."""
+    # Build stno->source map from MONITOR_SNO_FILE + MONITOR_INC_DIR env vars.
+    # Pure Python inline read; no sidecar files written; no subprocesses.
+    stno_map = build_stno_map()  # {int: (fname, lineno, text)} or {}
+
     # Optional per-participant wire log — one line per record.  Set
     # MONITOR_TRACE_LOG=/path/prefix and the controller will write
     # /path/prefix.<participant>.log with every record received from each
@@ -431,12 +468,8 @@ def run(participants):
                 break
 
         if not agree:
-            # Build per-participant col dict for the divergence row.
             div_cols = {f['name']: fmt_event(ev, f['names'], stno=last_agreed_stno)
                         for f, ev in events}
-            # Collect all rows: trail (agreed) + diverge row.
-            # trail entries are (step, stno, {pname: text}).
-            # Compute column widths across all rows.
             pnames = [f['name'] for f in fds]
             col_w = {p: len(p) for p in pnames}
             for _s, _n, cols in trail:
@@ -447,19 +480,23 @@ def run(participants):
             stno_strs = [str(n) for _, n, _ in trail if n is not None]
             if last_agreed_stno is not None:
                 stno_strs.append(str(last_agreed_stno))
-            stno_w  = max(4, max((len(s) for s in stno_strs), default=4))
-            step_w  = max(4, len(str(step)))
+            stno_w = max(4, max((len(s) for s in stno_strs), default=4))
+            step_w = max(4, len(str(step)))
+            def src(n):
+                if n is None or n not in stno_map: return ''
+                fn, ln, txt = stno_map[n]; return f'{fn}:{ln}  {txt}'
             sep = '  '
             def grid_row(s, n, cols, marker='  '):
                 sn = str(n) if n is not None else ''
-                return marker + sep.join(
-                    [f'{s:>{step_w}}', f'{sn:>{stno_w}}'] +
-                    [f'{cols.get(p,""):<{col_w[p]}}' for p in pnames])
-            hdr = '  ' + sep.join(
-                [f'{"step":>{step_w}}', f'{"stno":>{stno_w}}'] +
-                [f'{p:<{col_w[p]}}' for p in pnames])
+                parts = [f'{s:>{step_w}}', f'{sn:>{stno_w}}'] + \
+                        [f'{cols.get(p,""):<{col_w[p]}}' for p in pnames]
+                srctxt = src(n)
+                if srctxt: parts.append(srctxt)
+                return marker + sep.join(parts)
+            hdr = '  ' + sep.join([f'{"step":>{step_w}}', f'{"stno":>{stno_w}}'] +
+                                   [f'{p:<{col_w[p]}}' for p in pnames] + ['source'])
             bar = '  ' + sep.join(['-'*step_w, '-'*stno_w] +
-                                   ['-'*col_w[p] for p in pnames])
+                                   ['-'*col_w[p] for p in pnames] + ['------'])
             print(f'[ctrl] DIVERGE step {step} — last {len(trail)} agreed + diverge:\n{hdr}\n{bar}',
                   file=sys.stderr)
             for tstep, tstno, cols in trail:

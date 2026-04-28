@@ -216,6 +216,8 @@ for p in "${PARTICIPANTS[@]}"; do
     SPECS+=("$p:$TMP/$p.ready:$TMP/$p.go")
 done
 
+MONITOR_SNO_FILE="$SNO" \
+MONITOR_INC_DIR="$(dirname "$(realpath "$SNO")"):$INC" \
 python3 "$MON_DIR/monitor_sync_bin.py" "${SPECS[@]}" > "$TMP/ctrl.out" 2>&1 &
 CTRL_PID=$!
 
