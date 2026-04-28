@@ -308,6 +308,15 @@ def fmt_event(ev, names_table, stno=None):
         return f'{prefix}{kn}'
     if ev.kind == MWK_CALL:
         return f'{prefix}{kn} {nm}'
+    if ev.kind == MWK_RETURN:
+        # Payload is the rtntype string ("RETURN"/"FRETURN"/"NRETURN"), not the
+        # function result value.  Show as RETURN fname (KIND) to avoid confusion
+        # with value-assignment display.  Result was already on the preceding VALUE.
+        try:
+            kind_str = ev.value.decode('utf-8', errors='replace') if ev.value else 'RETURN'
+        except Exception:
+            kind_str = 'RETURN'
+        return f'{prefix}RETURN {nm} ({kind_str})'
     if ev.kind == MWK_LABEL:
         return f'{kn} stno={fmt_value(ev.type, ev.value)}'
     return f'{prefix}{kn} {nm} = {fmt_value(ev.type, ev.value)}'
