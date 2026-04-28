@@ -342,7 +342,11 @@ static void mon_at_exit(void) {
  * tag enums in their LOAD modules. */
 static uint8_t scrip_tag_to_wire(int v) {
     switch (v) {
-        case DT_SNUL:  return MWT_NULL;
+        /* SN-26-bridge-coverage-w: SPITBOL stores NULL as the global `nulls`
+         * empty scblk, so spl_block_to_wire reports it as MWT_STRING with
+         * vlen=0.  Match that here so wire-comparison sees equal types on
+         * empty/NULL values across both runtimes. */
+        case DT_SNUL:  return MWT_STRING;
         case DT_S:     return MWT_STRING;
         case DT_I:     return MWT_INTEGER;
         case DT_R:     return MWT_REAL;
@@ -2846,15 +2850,21 @@ DESCR_t NV_SET_fn(const char *name, DESCR_t val) {  /* RT-5: returns val for emb
     if (ch >= 0 && _io_chan[ch].is_output && _io_chan[ch].fp) {
         char *s = VARVAL_fn(val);
         fprintf(_io_chan[ch].fp, "%s\n", s ? s : "");
-        comm_var(name, val);
+        /* SN-26-bridge-coverage-q: I/O-association writes never store to a
+         * variable in SPITBOL — asg10 traps the assignment, writes via sysou,
+         * and exits without ever reaching the b_vrs store path that would
+         * fire sysmv.  Suppress comm_var here to match SPITBOL's silence on
+         * the wire for channel-bound output writes. */
         return val;  /* RT-5 */
     }
-    /* Special I/O variables */
-    if (strcmp(name, "OUTPUT") == 0) { output_val(val); comm_var(name, val); return val; }  /* RT-5 */
+    /* Special I/O variables — same rationale as channel-bound case above:
+     * SPITBOL's asg10 fully consumes OUTPUT/TERMINAL writes via the trap
+     * chain (trtou) without ever storing into a vrblk, so sysmv never fires.
+     * Match by suppressing comm_var on the scrip side. */
+    if (strcmp(name, "OUTPUT") == 0) { output_val(val); return val; }  /* RT-5 */
     if (strcmp(name, "TERMINAL") == 0) {
         const char *s = IS_STR(val) ? val.s : "";
         fprintf(stderr, "%s\n", s);
-        comm_var(name, val);
         return val;  /* RT-5 */
     }
     /* Unprotected keywords backed by C globals */

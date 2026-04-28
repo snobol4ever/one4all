@@ -748,6 +748,11 @@ static DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                             DESCR_t obj = interp_eval(s->subject->children[0]);
                             if (!IS_FAIL_fn(obj)) {
                                 FIELD_SET_fn(obj, s->subject->sval, rv);
+                                /* SN-26-bridge-coverage-v: SPITBOL fires sysmw
+                                 * (`<lval>` sentinel VALUE) on every aggregate
+                                 * element store, including DATA fields.  Mirror
+                                 * here for harness symmetry. */
+                                comm_var("<lval>", rv);
                                 succeeded = 1;
                             } else succeeded = 0;
                         }

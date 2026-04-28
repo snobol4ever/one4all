@@ -50,8 +50,22 @@ int name_commit_value(const NAME_t *nm, DESCR_t value)
         return 0;
 
     case NM_PTR:
-        if (nm->var_ptr)
+        if (nm->var_ptr) {
             *nm->var_ptr = value;
+            /* SN-26-bridge-coverage-v: SPITBOL's asinp (assign during pattern
+             * match) fires sysmv on every untrapped natural-var store —
+             * including writes through DT_N interior pointers (the NRETURN
+             * `.dummy` path).  Mirror that here so the wire emits the same
+             * VALUE record on both sides.  Use NV_name_from_ptr to recover
+             * the variable's name from its NV_t cell address; if recovery
+             * fails (true aggregate slot — array element, table pair value,
+             * etc.) emit the empty-name `<lval>` sentinel that comm_var
+             * already substitutes for unrecognised cells.  This matches
+             * SPITBOL's asnpa (real vrblk → sysmv → name) vs asnpb
+             * (aggregate → sysmw → `<lval>`) split. */
+            const char *recovered = NV_name_from_ptr(nm->var_ptr);
+            comm_var(recovered ? recovered : "<lval>", value);
+        }
         return 0;
 
     case NM_IDX:
@@ -144,6 +158,17 @@ int name_commit_value(const NAME_t *nm, DESCR_t value)
          * bb_cap's immediate ($) path can propagate failure into the pattern. */
         if (!cell) return -1;
         *cell = value;
+        /* SN-26-bridge-coverage-v: SPITBOL's asinp fires sysmv on the
+         * underlying natural-var store regardless of how the cell was
+         * obtained (direct .var or NRETURN .dummy via *fn()).  Recover the
+         * variable name from the cell address; if not a known NV cell,
+         * fall back to `<lval>` (asnpb path).  comm_var honors
+         * monitor_quiet_depth so call/exit-pass mechanism doesn't
+         * accidentally re-emit. */
+        {
+            const char *recovered = NV_name_from_ptr(cell);
+            comm_var(recovered ? recovered : "<lval>", value);
+        }
         return 0;
     }
     return 0;
