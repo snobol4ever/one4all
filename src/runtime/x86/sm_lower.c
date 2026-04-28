@@ -336,10 +336,20 @@ static void lower_pat_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
                      * (e.g. literal+var) the all_vars name-stash fast path
                      * doesn't fire, and an E_VAR set by an earlier capture in
                      * the same pattern would be eagerly read at build time
-                     * instead of at match time. */
+                     * instead of at match time.
+                     * SN-32b (SM/JIT parity with IR-side -t fix): defer all
+                     * non-E_QLIT args.  Compound expressions like `nTop()+1`
+                     * (E_ADD wrapping E_FNC) eagerly invoked via lower_expr
+                     * cause the inner function to fire at pattern-build time,
+                     * not at match time — same shape as SN-26-bridge-coverage-t
+                     * but on the SM lowering side.  Thaw at match time via
+                     * EVAL_fn → EXPVAL_fn (name_t.c:97) handles all EXPR_t
+                     * shapes including compound. */
                     for (int i = 0; i < fnc->nchildren; i++) {
                         EXPR_t *arg = fnc->children[i];
-                        if (arg && (arg->kind == E_FNC || arg->kind == E_VAR))
+                        if (arg && arg->kind == E_QLIT)
+                            lower_expr(p, lt, arg);   /* string lit — eager OK */
+                        else if (arg)
                             sm_emit_ptr(p, SM_PUSH_EXPR, (void *)arg);
                         else
                             lower_expr(p, lt, arg);
@@ -374,10 +384,13 @@ static void lower_pat_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
                 } else {
                     /* SN-8a: args-on-stack path for $ *fn(args).
                      * SN-26c-parseerr-c: defer E_FNC sub-args via SM_PUSH_EXPR.
-                     * SN-26c-parseerr-d: also defer E_VAR (see twin site). */
+                     * SN-26c-parseerr-d: also defer E_VAR (see twin site).
+                     * SN-32b: defer all non-E_QLIT args (mirrors -t fix on IR side). */
                     for (int i = 0; i < fnc->nchildren; i++) {
                         EXPR_t *arg = fnc->children[i];
-                        if (arg && (arg->kind == E_FNC || arg->kind == E_VAR))
+                        if (arg && arg->kind == E_QLIT)
+                            lower_expr(p, lt, arg);
+                        else if (arg)
                             sm_emit_ptr(p, SM_PUSH_EXPR, (void *)arg);
                         else
                             lower_expr(p, lt, arg);
@@ -423,34 +436,45 @@ static void lower_pat_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
          * which evaluates fn ONCE at build time and treats the return as a pattern,
          * skipping the per-position sweep SPITBOL performs. */
         if (ch && ch->kind == E_FNC && ch->sval) {
-            const char *namelist = sm_pat_capture_fn_arg_names(ch);
-            if (namelist || ch->nchildren == 0) {
-                /* TL-2 name-stash path (all args are plain E_VAR, or no args). */
+            if (ch->nchildren == 0) {
+                /* Bare *fn() — no args.  Use the namelist-less SM_PAT_USERCALL
+                 * since pat_user_call(fname, NULL, 0) is the correct call. */
                 int idx = sm_emit_s(p, SM_PAT_USERCALL, ch->sval);
-                p->instrs[idx].a[2].s = namelist;
+                p->instrs[idx].a[2].s = NULL;
             } else {
-                /* SN-8a: args-on-stack path for bare *fn(args) when any arg is not
-                 * a plain E_VAR (literal, nested expr, etc.).  Eager-eval args,
-                 * SM_PAT_USERCALL_ARGS pops them and calls pat_user_call.
+                /* SN-8a / SN-32b: args-on-stack path for bare *fn(args).
+                 *
+                 * IMPORTANT (SN-32b root-cause fix): the previous fast-path
+                 * `if (namelist) SM_PAT_USERCALL` was BROKEN.  It packed the
+                 * arg names into ins->a[2].s, but the SM_PAT_USERCALL handler
+                 * in sm_interp.c calls `pat_user_call(fname, NULL, 0)`,
+                 * silently discarding the args.  At match time bb_usercall
+                 * invokes the user function with zero args — so `*upr(tx)`
+                 * called upr() with no parameter, returning empty string,
+                 * before the real *upr(tx) call from a higher-level pattern
+                 * fired.  This was visible at step 2023 of the 2-way harness
+                 * on `beauty.sno < beauty.sno`: scrip-SM emitted `CALL upr`
+                 * inside upr's own body where SPITBOL emitted `VALUE upr=`.
+                 *
+                 * Fix: ALWAYS take the args-on-stack path when nchildren>0.
+                 * Defer non-E_QLIT args via SM_PUSH_EXPR so match-time
+                 * EVAL_fn thaw resolves variables in their captured state.
+                 * This mirrors the IR-side path at interp.c:4188-4208
+                 * exactly (SN-26c-parseerr-c/-d, SN-32b parity).
                  *
                  * SN-26c-parseerr-c (Bug B): when an arg is itself a function
-                 * call (E_FNC), DEFER it via SM_PUSH_EXPR so the inner call
+                 * call (E_FNC), DEFER via SM_PUSH_EXPR so the inner call
                  * evaluates at match time, not at pattern-build time.
-                 * Beauty's snoParse production has  ("'snoParse'" & 'nTop()')
-                 * which builds  EVAL("epsilon . *Reduce('snoParse', nTop())").
-                 * Per SPITBOL semantics, nTop() must fire at match time after
-                 * ARBNO has bumped the counter, not at pattern-build time
-                 * when the counter is just-pushed = 0.
+                 * SN-26c-parseerr-d: also defer E_VAR.
+                 * SN-32b: defer all non-E_QLIT args (mirrors IR -t fix).
                  *
                  * The match-time path (bb_usercall in stmt_exec.c) thaws each
-                 * DT_E via EVAL_fn before invoking the user function.
-                 *
-                 * SN-26c-parseerr-d: also defer E_VAR — for the same reason
-                 * as the COND/IMMED twin sites above (cursor-capture set in
-                 * the same pattern). */
+                 * DT_E via EVAL_fn before invoking the user function. */
                 for (int i = 0; i < ch->nchildren; i++) {
                     EXPR_t *arg = ch->children[i];
-                    if (arg && (arg->kind == E_FNC || arg->kind == E_VAR))
+                    if (arg && arg->kind == E_QLIT)
+                        lower_expr(p, lt, arg);
+                    else if (arg)
                         sm_emit_ptr(p, SM_PUSH_EXPR, (void *)arg);
                     else
                         lower_expr(p, lt, arg);
