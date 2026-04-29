@@ -65,7 +65,7 @@ run_expect_agree "icon: hello" \
 
 # --- Snocone ---
 run_expect_agree "snocone: fence" \
-    "${CORPUS:-/home/claude/corpus}/programs/snocone/demo/beauty/fence/driver.sc"
+    "${CORPUS:-/home/claude/corpus}/programs/snocone/demo/beauty/test/fence/driver.sc"
 
 # --- Prolog ---
 # SM does not yet support Prolog IR opcodes (E_CHOICE, E_UNIFY, etc.).

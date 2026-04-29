@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # run_beauty_sc_subsystem.sh — run Snocone BEAUTY subsystem tests via scrip --ir-run
 set -uo pipefail
-SCRIPT_DIR="${CORPUS:-/home/claude/corpus}/programs/snocone/demo/beauty"
+SCRIPT_DIR="${CORPUS:-/home/claude/corpus}/programs/snocone/demo/beauty/test"
 SCRIP="${SCRIP:-./scrip}"
 TIMEOUT="${TIMEOUT:-10}"
 STOP_ON_FAIL="${STOP_ON_FAIL:-0}"
