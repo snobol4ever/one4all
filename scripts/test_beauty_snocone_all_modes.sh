@@ -16,8 +16,8 @@ PASS=0; FAIL=0; SKIP=0
 
 run_one() {
     local subsys="$1" mode="$2"
-    local sc="$BEAUTY_DIR/$subsys/$subsys.sc"
-    local ref="$BEAUTY_DIR/$subsys/$subsys.ref"
+    local sc="$BEAUTY_DIR/$subsys.sc"
+    local ref="$BEAUTY_DIR/$subsys.ref"
     if [[ ! -f "$sc" ]]; then
         echo -e "${YELLOW}SKIP${RESET}  $subsys $mode (no $subsys.sc)"; SKIP=$((SKIP+1)); return
     fi

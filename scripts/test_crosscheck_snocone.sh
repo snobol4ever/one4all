@@ -65,8 +65,8 @@ rm -f "$T"
 # Beauty-sc subsystems
 BEAUTY=${CORPUS:-/home/claude/corpus}/programs/snocone/demo/beauty/test
 for subsys in assign fence global arith; do
-    f="$BEAUTY/$subsys/$subsys.sc"
-    ref="$BEAUTY/$subsys/$subsys.ref"
+    f="$BEAUTY/$subsys.sc"
+    ref="$BEAUTY/$subsys.ref"
     [ -f "$f" ] && xcheck "beauty_$subsys" "$f" "$ref"
 done
 

@@ -11,8 +11,8 @@ if [[ ! -x "$SCRIP" ]]; then echo "ERROR: scrip not found at $SCRIP" >&2; exit 1
 PASS=0; FAIL=0; SKIP=0
 run_subsystem() {
     local subsys="$1"
-    local driver_sc="$SCRIPT_DIR/$subsys/$subsys.sc"
-    local driver_ref="$SCRIPT_DIR/$subsys/$subsys.ref"
+    local driver_sc="$SCRIPT_DIR/$subsys.sc"
+    local driver_ref="$SCRIPT_DIR/$subsys.ref"
     echo "=== SCB: $subsys ==="
     if [[ ! -f "$driver_sc" ]]; then echo -e "${YELLOW}SKIP${RESET}  $subsys  (no $subsys.sc)"; SKIP=$((SKIP+1)); return; fi
     if [[ ! -f "$driver_ref" ]]; then echo -e "${YELLOW}SKIP${RESET}  $subsys  (no $subsys.ref)"; SKIP=$((SKIP+1)); return; fi
