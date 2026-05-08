@@ -259,6 +259,16 @@ typedef struct {
  * Safe to call with NULL (no-op) for programs with no user functions. */
 void scrip_rt_register_chunks(const rt_chunk_entry *tbl);
 
+/* EM-7c-capture: patch a heap cap_t's fn pointer to point to a baked child blob.
+ * Called from the emitted binary's preamble (before scrip_rt_init) once per
+ * XNME/XFNME blob whose child alpha address is only known at link time. */
+void scrip_rt_patch_cap_fn(void *cap_ptr, void *child_fn);
+
+/* EM-7c-arbno: allocate a fresh arbno_t for a baked ARBNO blob and store
+ * the pointer in *slot_ptr.  child_fn is the child blob's alpha entry.
+ * Called from the emitted binary's preamble before scrip_rt_init. */
+void scrip_rt_init_arbno(void **slot_ptr, void *child_fn);
+
 /* SM_PAT_CAPTURE_FN_ARGS / SM_PAT_USERCALL_ARGS runtime helpers were
  * REMOVED in EM-7-revert (session #72) along with the rest of the
  * brokered Phase-3 path. */

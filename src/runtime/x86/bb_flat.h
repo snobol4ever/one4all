@@ -88,4 +88,9 @@ void bb_flat_set_intern_str(const char *(*fn)(emitter_v *, const char *));
  */
 void bb_build_flat_text_reset(void);
 
+/* EM-7c-capture: install a callback that is invoked each time flat_emit_node
+ * emits an XNME/XFNME child sub-blob.  sm_codegen_x64_emit installs this
+ * to collect cap fixups for the startup preamble. */
+void bb_flat_set_cap_fixup_cb(void (*cb)(void *cap_ptr, const char *child_alpha_label));
+
 #endif /* BB_FLAT_H */

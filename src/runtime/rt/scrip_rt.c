@@ -244,6 +244,26 @@ void scrip_rt_register_chunks(const rt_chunk_entry *tbl)
     }
 }
 
+/* EM-7c-capture: patch a heap cap_t's fn pointer to the baked child blob.
+ * cap_ptr points to the cap_t; fn field is first (offset 0). */
+void scrip_rt_patch_cap_fn(void *cap_ptr, void *child_fn)
+{
+    if (!cap_ptr || !child_fn) return;
+    /* fn is the first field in cap_t — cast and set */
+    void **fn_slot = (void **)cap_ptr;
+    *fn_slot = child_fn;
+}
+
+/* EM-7c-arbno: allocate a fresh arbno_t for a baked ARBNO blob.
+ * bb_arbno_new is declared in bb_box.h via the opaque extern in bb_flat.c.
+ * Here we call it directly since libscrip_rt.so links bb_boxes.c. */
+extern void *bb_arbno_new(void *fn, void *state);  /* arbno_t* opaque */
+void scrip_rt_init_arbno(void **slot_ptr, void *child_fn)
+{
+    if (!slot_ptr || !child_fn) return;
+    *slot_ptr = bb_arbno_new(child_fn, NULL);
+}
+
 /* Look up a user function by name in the chunk registry.
  * Returns fn pointer or NULL if not found. */
 static void *chunk_reg_lookup(const char *name)

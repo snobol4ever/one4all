@@ -377,6 +377,32 @@ static int emit_chunk_registry(FILE *out, const SM_Program *prog)
     return n;
 }
 
+/* EM-7c-capture: cap fixup table.  Each entry pairs a heap cap_t pointer
+ * (baked as imm64 — valid in emitter process AND in the emitted binary
+ * since the binary calls into libscrip_rt which allocates the same heap
+ * objects) with the child's alpha label name.  Emitted as a sequence of
+ * scrip_rt_patch_cap_fn(cap_ptr, child_fn) calls in main's preamble. */
+#define MAX_CAP_FIXUPS 1024
+typedef struct {
+    void       *cap_ptr;      /* heap cap_t * from bb_cap_new — baked as imm64 */
+    char        child_label[128]; /* label like _pat_inv_0_cap0_child_alpha */
+} cap_fixup_t;
+
+static cap_fixup_t g_cap_fixups[MAX_CAP_FIXUPS];
+static int         g_cap_fixups_n = 0;
+
+static void cap_fixups_reset(void) { g_cap_fixups_n = 0; }
+
+static void cap_fixup_add(void *cap_ptr, const char *child_label)
+{
+    if (g_cap_fixups_n >= MAX_CAP_FIXUPS) return;
+    g_cap_fixups[g_cap_fixups_n].cap_ptr = cap_ptr;
+    snprintf(g_cap_fixups[g_cap_fixups_n].child_label,
+             sizeof(g_cap_fixups[0].child_label), "%s", child_label);
+    g_cap_fixups_n++;
+}
+
+
 static int emit_file_header(FILE *out, int count, int has_chunk_registry)
 {
     /* The .rodata section (string literals) and .data chunk registry (if any)
@@ -415,6 +441,53 @@ static int emit_file_header(FILE *out, int count, int has_chunk_registry)
                   "\txor     edi, edi\n"
                   "\tcall    scrip_rt_register_chunks@PLT\n",
                   out) == EOF) return -1;
+    }
+
+    /* EM-7c-capture: patch cap_t fn pointers to baked child blobs.
+     * If cap_ptr == (void*)1, it is a symbolic fixup: derive cap_data_lbl from
+     * child_label by replacing "_child_alpha" with "_data" and prepending ".L". */
+    for (int i = 0; i < g_cap_fixups_n; i++) {
+        const char *alpha = g_cap_fixups[i].child_label;  /* "_capN_child_alpha" */
+        if ((uintptr_t)g_cap_fixups[i].cap_ptr == 1) {
+            /* Symbolic cap fixup: reconstruct ".LcapN_data" from "_capN_child_alpha" */
+            char cap_lbl[128];
+            const char *p = alpha;
+            if (*p == '_') p++;
+            const char *underscore = strchr(p, '_');
+            int id_len = underscore ? (int)(underscore - p) : (int)strlen(p);
+            snprintf(cap_lbl, sizeof(cap_lbl), ".L%.*s_data", id_len, p);
+            if (fprintf(out,
+                    "\t# cap fixup %d (cap static): %s -> %s\n"
+                    "\tlea     rdi, [rip + %s]\n"
+                    "\tlea     rsi, [rip + %s]\n"
+                    "\tcall    scrip_rt_patch_cap_fn@PLT\n",
+                    i, cap_lbl, alpha, cap_lbl, alpha) < 0) return -1;
+        } else if ((uintptr_t)g_cap_fixups[i].cap_ptr == 2) {
+            /* Arbno fixup: reconstruct ".LarbnoN_slot" from "_arbnoN_child_alpha" */
+            char slot_lbl[128];
+            const char *p = alpha;
+            if (*p == '_') p++;
+            const char *underscore = strchr(p, '_');
+            int id_len = underscore ? (int)(underscore - p) : (int)strlen(p);
+            snprintf(slot_lbl, sizeof(slot_lbl), ".L%.*s_slot", id_len, p);
+            if (fprintf(out,
+                    "\t# arbno fixup %d: init %s -> %s\n"
+                    "\tlea     rdi, [rip + %s]\n"
+                    "\tlea     rsi, [rip + %s]\n"
+                    "\tcall    scrip_rt_init_arbno@PLT\n",
+                    i, slot_lbl, alpha, slot_lbl, alpha) < 0) return -1;
+        } else {
+            if (fprintf(out,
+                    "\t# cap fixup %d: cap_t@%p -> %s\n"
+                    "\tmovabs  rdi, %llu\n"
+                    "\tlea     rsi, [rip + %s]\n"
+                    "\tcall    scrip_rt_patch_cap_fn@PLT\n",
+                    i,
+                    g_cap_fixups[i].cap_ptr,
+                    alpha,
+                    (unsigned long long)(uintptr_t)g_cap_fixups[i].cap_ptr,
+                    alpha) < 0) return -1;
+        }
     }
 
     if (fputs("\t# scrip_rt_init(argc, argv) -- argc in edi, argv in rsi\n"
@@ -1075,33 +1148,19 @@ static SimVal make_pat_val(DESCR_t d, int is_variant)
 int flat_is_eligible_node(const PATND_t *p)
 {
     if (!p) return 1;
-    switch (p->kind) {
-    /* Mutable-ζ nodes: charset depends on a runtime string → variant */
-    case XSPNC: case XBRKC: case XANYC: case XNNYC:
-    /* Numeric nodes: depend on a runtime integer argument → variant */
-    case XLNTH: case XTB: case XRTB:
-    /* Position nodes: XPOSI/XRPSI always-invariant (no delta) but
-     * their PATND_t uses the num field, which is set at build time.
-     * We keep them invariant here — they have no mutable ζ. */
-    /* Deferred references: runtime variable look-ups → always variant */
-    case XDSAR:
-    /* Named captures via runtime function: XCALLCAP, XATP → variant  */
-    case XCALLCAP: case XATP:
-    /* FENCE fired-flag is mutable state → variant                     */
-    case XFNCE:
-        return 0;
-    default:
-        return 1;
-    }
+    /* XVAR: runtime DESCR_t as pattern node — graph unknown at emit time.
+     * All other kinds (XARBN, XNME, XFNME, XDSAR, XSPNC, etc.) are invariant:
+     * the BB graph structure is fixed at build time. */
+    return p->kind != XVAR;
 }
 
-/* ── patnd_is_fully_invariant: whole-tree check (replaces bb_flat's ─── */
-/* flat_is_eligible for use from the emitter)                            */
+/* ── patnd_is_fully_invariant: whole-tree check ──────────────────────── */
+/* Returns 0 only if the tree contains an XVAR node — the only kind
+ * whose BB graph cannot be baked at emit time (runtime DESCR_t as pattern). */
 int patnd_is_fully_invariant(const PATND_t *p)
 {
     if (!p) return 1;
     if (!flat_is_eligible_node(p)) return 0;
-    /* n>2 XCAT: n-ary chain label management not yet implemented in bb_flat */
     if (p->kind == XCAT && p->nchildren > 2) return 0;
     for (int i = 0; i < p->nchildren; i++)
         if (!patnd_is_fully_invariant(p->children[i])) return 0;
@@ -1185,9 +1244,8 @@ DESCR_t sm_phase2_to_patnd(const SM_Program *prog,
             simstack_push(&ss, make_pat_val(pat_bal(), 0));
             break;
         case SM_PAT_FENCE:
-            /* FENCE with no arg — push mutable-state node, variant */
-            simstack_push(&ss, make_pat_val(pat_fence(), 1));
-            has_variant = 1;
+            /* FENCE graph is fixed — not variant */
+            simstack_push(&ss, make_pat_val(pat_fence(), 0));
             break;
 
         /* ── leaf constructors: invariant literal ────────────────── */
@@ -1201,44 +1259,38 @@ DESCR_t sm_phase2_to_patnd(const SM_Program *prog,
         case SM_PAT_SPAN: {
             SimVal arg = simstack_pop(&ss);
             const char *cs = (arg.val.v == DT_S && arg.val.s) ? arg.val.s : "";
-            int v = arg.is_variant;
-            /* XSPNC is always variant in flat_is_eligible_node
-             * (mutable ζ-delta), so mark variant regardless */
-            simstack_push(&ss, make_pat_val(pat_span(cs), 1));
-            has_variant = 1;
-            (void)v;
+            /* invariant iff charset arg was a literal (not a variable) */
+            simstack_push(&ss, make_pat_val(pat_span(cs), arg.is_variant));
+            if (arg.is_variant) has_variant = 1;
             break;
         }
         case SM_PAT_BREAK: {
             SimVal arg = simstack_pop(&ss);
             const char *cs = (arg.val.v == DT_S && arg.val.s) ? arg.val.s : "";
-            simstack_push(&ss, make_pat_val(pat_break_(cs), 1));
-            has_variant = 1;
+            simstack_push(&ss, make_pat_val(pat_break_(cs), arg.is_variant));
+            if (arg.is_variant) has_variant = 1;
             break;
         }
         case SM_PAT_ANY: {
             SimVal arg = simstack_pop(&ss);
             const char *cs = (arg.val.v == DT_S && arg.val.s) ? arg.val.s : "";
-            simstack_push(&ss, make_pat_val(pat_any_cs(cs), 1));
-            has_variant = 1;
+            simstack_push(&ss, make_pat_val(pat_any_cs(cs), arg.is_variant));
+            if (arg.is_variant) has_variant = 1;
             break;
         }
         case SM_PAT_NOTANY: {
             SimVal arg = simstack_pop(&ss);
             const char *cs = (arg.val.v == DT_S && arg.val.s) ? arg.val.s : "";
-            simstack_push(&ss, make_pat_val(pat_notany(cs), 1));
-            has_variant = 1;
+            simstack_push(&ss, make_pat_val(pat_notany(cs), arg.is_variant));
+            if (arg.is_variant) has_variant = 1;
             break;
         }
         case SM_PAT_LEN: {
             SimVal arg = simstack_pop(&ss);
             int64_t n = (arg.val.v == DT_I) ? arg.val.i : 0;
-            int v = arg.is_variant;
-            /* XLNTH is variant (mutable ζ-delta), but the PATND_t is
-             * reconstructed accurately; mark variant for partition. */
-            simstack_push(&ss, make_pat_val(pat_len(n), 1));
-            has_variant = 1;
-            (void)v;
+            /* invariant iff n was a literal */
+            simstack_push(&ss, make_pat_val(pat_len(n), arg.is_variant));
+            if (arg.is_variant) has_variant = 1;
             break;
         }
         case SM_PAT_POS: {
@@ -1261,15 +1313,15 @@ DESCR_t sm_phase2_to_patnd(const SM_Program *prog,
         case SM_PAT_TAB: {
             SimVal arg = simstack_pop(&ss);
             int64_t n = (arg.val.v == DT_I) ? arg.val.i : 0;
-            simstack_push(&ss, make_pat_val(pat_tab(n), 1));
-            has_variant = 1;
+            simstack_push(&ss, make_pat_val(pat_tab(n), arg.is_variant));
+            if (arg.is_variant) has_variant = 1;
             break;
         }
         case SM_PAT_RTAB: {
             SimVal arg = simstack_pop(&ss);
             int64_t n = (arg.val.v == DT_I) ? arg.val.i : 0;
-            simstack_push(&ss, make_pat_val(pat_rtab(n), 1));
-            has_variant = 1;
+            simstack_push(&ss, make_pat_val(pat_rtab(n), arg.is_variant));
+            if (arg.is_variant) has_variant = 1;
             break;
         }
 
@@ -1284,10 +1336,9 @@ DESCR_t sm_phase2_to_patnd(const SM_Program *prog,
         }
         case SM_PAT_FENCE1: {
             SimVal inner = simstack_pop(&ss);
-            int v = inner.is_variant;
-            simstack_push(&ss, make_pat_val(pat_fence_p(inner.val), 1));
-            has_variant = 1;
-            (void)v;
+            /* FENCE graph is fixed — invariant iff child is invariant */
+            simstack_push(&ss, make_pat_val(pat_fence_p(inner.val), inner.is_variant));
+            if (inner.is_variant) has_variant = 1;
             break;
         }
 
@@ -1312,23 +1363,21 @@ DESCR_t sm_phase2_to_patnd(const SM_Program *prog,
         /* ── deref: runtime pattern variable lookup → always variant */
         case SM_PAT_DEREF: {
             SimVal arg = simstack_pop(&ss);
-            /* We don't know what pattern the variable holds at emit time.
-             * Build an XDSAR node using the name if it came from PUSH_VAR,
-             * otherwise a placeholder XEPS. */
+            /* XDSAR: *varname — graph is invariant; name baked into node.
+             * The variable's VALUE is read at match time, but the graph
+             * structure (one XDSAR node with a fixed name) is constant. */
             DESCR_t d;
-            if (!arg.is_variant && arg.val.v == DT_S && arg.val.s)
+            if (arg.val.v == DT_S && arg.val.s)
                 d = pat_ref(arg.val.s);
             else
-                d = pat_epsilon();   /* placeholder for variant deref */
-            simstack_push(&ss, make_pat_val(d, 1));
-            has_variant = 1;
+                d = pat_epsilon();   /* degenerate: no name */
+            simstack_push(&ss, make_pat_val(d, 0));  /* invariant */
             break;
         }
         case SM_PAT_REFNAME: {
-            /* *var — a[0].s = name; always XDSAR, always variant */
+            /* *varname — XDSAR node; graph is invariant (name baked in) */
             const char *name = ins->a[0].s ? ins->a[0].s : "";
-            simstack_push(&ss, make_pat_val(pat_ref(name), 1));
-            has_variant = 1;
+            simstack_push(&ss, make_pat_val(pat_ref(name), 0));
             break;
         }
 
@@ -1427,10 +1476,13 @@ static pattern_window_t g_pat_windows[MAX_PATTERN_WINDOWS];
 static int              g_pat_windows_n   = 0;
 static int              g_pat_windows_id  = 0;
 
+
+
 static void pattern_windows_reset(void)
 {
     g_pat_windows_n  = 0;
     g_pat_windows_id = 0;
+    cap_fixups_reset();
 }
 
 /* Find the index of the pattern window covering pc, or -1 if pc is not
@@ -1522,6 +1574,7 @@ static int emit_pattern_blobs(FILE *out)
     /* Reset internal label counters at the start of this emit run.
      * Within the run, IDs accumulate across patterns (no collisions). */
     bb_flat_set_intern_str(codegen_intern_str);  /* EM-7c-symbolic: route lits through strtab */
+    bb_flat_set_cap_fixup_cb(cap_fixup_add);     /* EM-7c-capture: collect XNME/XFNME fixups */
     bb_build_flat_text_reset();
 
     if (fputs(
