@@ -80,6 +80,10 @@ extern bb_node_t coro_eval(EXPR_t *e);   /* scrip.c — builds a drivable bb_nod
 extern bb_node_t coro_pump_proc_by_name(const char *name, DESCR_t *args, int nargs);
                                           /* CHUNKS-step12: name-driven Icon proc pump */
 
+/* CH-17f: Prolog name-driven BB_ONCE dispatch */
+#include "../../frontend/prolog/pl_broker.h"
+#include "../../runtime/interp/pl_runtime.h"
+
 /* IM-4: SM step-limit for in-process sync monitor */
 int      g_sm_step_limit = 0;
 int      g_sm_steps_done = 0;
@@ -753,6 +757,26 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
             EXPR_t *expr   = (EXPR_t *)expr_d.ptr;
             if (!expr) { st->last_ok = 0; break; }
             bb_node_t node = coro_eval(expr);
+            int ticks = bb_broker(node, BB_ONCE, NULL, NULL);
+            st->last_ok = (ticks > 0);
+            break;
+        }
+
+        /* CH-17f: Prolog goal dispatch by predicate key — replaces legacy
+         * lower_expr(E_CHOICE) + SM_BB_ONCE.  a[0].s = "name/arity" key,
+         * a[1].i = arity.  Looks up Pl_PredEntry; if entry_pc >= 0 AND the
+         * chunk body is filled (CH-17f body fill rung), uses pl_box_choice_pc;
+         * otherwise falls back to pl_box_choice (IR path — correct semantics).
+         * No EXPR_t* pushed or walked at the SM statement-dispatch layer. */
+        case SM_BB_ONCE_PROC: {
+            const char *key   = ins->a[0].s;
+            int         arity = (int)ins->a[1].i;
+            /* IR fallback: look up the E_CHOICE node and drive it.
+             * This is the correct path until chunk bodies are filled in
+             * a later CH-17f body-fill rung. */
+            EXPR_t *choice = key ? pl_pred_table_lookup_global(key) : NULL;
+            bb_node_t node = choice ? pl_box_choice(choice, g_pl_env, arity)
+                                    : pl_box_fail();
             int ticks = bb_broker(node, BB_ONCE, NULL, NULL);
             st->last_ok = (ticks > 0);
             break;

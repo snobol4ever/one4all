@@ -1300,11 +1300,27 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
 
     /* Prolog backtracking nodes */
     case E_CHOICE:
+        /* CH-17f: E_CHOICE in value context — emit SM_BB_ONCE_PROC by key.
+         * Mirrors the lower_stmt fix; no raw EXPR_t* pushed to SM stack. */
+        if (e->sval) {
+            const char *key = e->sval;
+            int arity = 0;
+            const char *sl = strrchr(key, '/');
+            if (sl) arity = atoi(sl + 1);
+            sm_emit_si(p, SM_BB_ONCE_PROC, key, (int64_t)arity);
+        } else {
+            emit_push_expr(p, e);
+            sm_emit(p, SM_BB_ONCE);
+        }
+        return;
     case E_CLAUSE:
     case E_CUT:
     case E_UNIFY:
     case E_TRAIL_MARK:
     case E_TRAIL_UNWIND:
+        /* These are children of E_CHOICE walked by the broker, never
+         * lowered standalone from sm_lower.  Keep legacy path as safety
+         * fallback; should be unreachable in practice. */
         emit_push_expr(p, e);
         sm_emit(p, SM_BB_ONCE);
         return;
@@ -1489,13 +1505,24 @@ static void lower_stmt(SM_Program *p, LabelTable *lt, const STMT_t *s)
         return;
     }
     if (s->lang == LANG_PL) {
-        /* Prolog statement: lower subject (E_CHOICE/E_CLAUSE tree),
-         * emit SM_BB_ONCE. bb_broker(BB_ONCE) finds one solution. */
-        if (s->subject)
-            lower_expr(p, lt, s->subject);
-        else
-            sm_emit(p, SM_PUSH_NULL);
-        sm_emit(p, SM_BB_ONCE);
+        /* CH-17f: Prolog statement — emit SM_BB_ONCE_PROC "name/arity", arity
+         * instead of the legacy lower_expr(E_CHOICE) + SM_BB_ONCE path that
+         * pushed a raw EXPR_t* and called coro_eval(E_CHOICE) at runtime.
+         * s->subject is always an E_CHOICE node whose sval = "name/arity". */
+        if (s->subject && s->subject->kind == E_CHOICE && s->subject->sval) {
+            const char *key = s->subject->sval;
+            int arity = 0;
+            const char *sl = strrchr(key, '/');
+            if (sl) arity = atoi(sl + 1);
+            sm_emit_si(p, SM_BB_ONCE_PROC, key, (int64_t)arity);
+        } else {
+            /* Fallback for non-E_CHOICE subjects (directives etc.) */
+            if (s->subject)
+                lower_expr(p, lt, s->subject);
+            else
+                sm_emit(p, SM_PUSH_NULL);
+            sm_emit(p, SM_BB_ONCE);
+        }
         goto emit_gotos;
     }
 

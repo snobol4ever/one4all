@@ -113,6 +113,15 @@ typedef enum {
      * Note: BB_SCAN is already wired via SM_EXEC_STMT → exec_stmt → bb_broker(BB_SCAN). */
     SM_BB_PUMP,
     SM_BB_ONCE,
+    /* CH-17f: Prolog goal dispatch identified by predicate key + arity.
+     * Replaces the legacy lower_expr(E_CHOICE) + SM_BB_ONCE wrapper that
+     * pushed a raw EXPR_t* and called coro_eval(E_CHOICE) at runtime.
+     * a[0].s = predicate key ("name/arity"), a[1].i = arity.
+     * Handler: pl_pred_entry_lookup(key) → if entry_pc >= 0 use
+     * pl_box_choice_pc; else fall back to pl_box_choice(IR).
+     * Drive via bb_broker(BB_ONCE); sets st->last_ok.
+     * No EXPR_t* is pushed or walked by this opcode at the SM layer. */
+    SM_BB_ONCE_PROC,
     /* CHUNKS-step12: BB pump for an Icon user-proc identified by name + nargs.
      * Replaces the synthesised E_FNC + emit_push_expr + SM_BB_PUMP wrapper
      * that sm_lower used to emit for the top-level call_main(). a[0].s = proc

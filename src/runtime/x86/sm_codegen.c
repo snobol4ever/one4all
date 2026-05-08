@@ -324,6 +324,22 @@ static void h_bb_once(void)
     STATE->last_ok = (ticks > 0);
 }
 
+/* CH-17f: Prolog name-driven BB_ONCE — mirror of SM_BB_ONCE_PROC handler
+ * in sm_interp.c.  No EXPR_t* pushed or walked at the SM layer.
+ * IR fallback path until chunk bodies are filled in a later rung. */
+#include "../../frontend/prolog/pl_broker.h"
+#include "../../runtime/interp/pl_runtime.h"
+static void h_bb_once_proc(void)
+{
+    const char   *key   = CUR_INS->a[0].s;
+    int           arity = (int)CUR_INS->a[1].i;
+    EXPR_t       *choice = key ? pl_pred_table_lookup_global(key) : NULL;
+    bb_node_t     node   = choice ? pl_box_choice(choice, g_pl_env, arity)
+                                  : pl_box_fail();
+    int ticks = bb_broker(node, BB_ONCE, NULL, NULL);
+    STATE->last_ok = (ticks > 0);
+}
+
 /* CHUNKS-step12: name-driven Icon proc BB pump — mirror of SM_BB_PUMP_PROC
  * handler in sm_interp.c. The synthesised E_FNC + emit_push_expr path is
  * gone; the lowerer emits SM_BB_PUMP_PROC "main", 0 directly. */
@@ -1142,6 +1158,9 @@ static void init_handler_table(void)
     /* SN-9b: BB broker — Icon (PUMP) and Prolog (ONCE) generator dispatch. */
     g_handlers[SM_BB_PUMP]      = h_bb_pump;
     g_handlers[SM_BB_ONCE]      = h_bb_once;
+    /* CH-17f: Prolog name-driven BB_ONCE dispatch — replaces the legacy
+     * lower_expr(E_CHOICE) + SM_BB_ONCE wrapper. */
+    g_handlers[SM_BB_ONCE_PROC] = h_bb_once_proc;
     /* CHUNKS-step12: name-driven Icon proc BB pump — replaces the synthesised
      * E_FNC + SM_PUSH_EXPR + SM_BB_PUMP wrapper for top-level call_main. */
     g_handlers[SM_BB_PUMP_PROC] = h_bb_pump_proc;
