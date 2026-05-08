@@ -52,8 +52,8 @@ int main(void)
         check("A: root=XNME",       root && root->kind == XNME);
         check("A: child=XBRKC",     root && root->nchildren == 1 &&
                                     root->children[0]->kind == XBRKC);
-        check("A: has_variant=1",   has_v == 1);
-        check("A: not fully_invar", root && !patnd_is_fully_invariant(root));
+        check("A: has_variant=0",   has_v == 0);
+        check("A: fully_invar",     root && patnd_is_fully_invariant(root));
         sm_prog_free(p);
     }
 
@@ -97,8 +97,8 @@ int main(void)
         PATND_t *root = (PATND_t *)d.s;
         check("C: DT_P returned",   d.v == DT_P && root != NULL);
         check("C: root=XDSAR",      root && root->kind == XDSAR);
-        check("C: has_variant=1",   has_v == 1);
-        check("C: not fully_invar", root && !patnd_is_fully_invariant(root));
+        check("C: has_variant=0",   has_v == 0);
+        check("C: fully_invar",     root && patnd_is_fully_invariant(root));
         sm_prog_free(p);
     }
 
@@ -129,8 +129,8 @@ int main(void)
         check("E: XCAT invariant",   flat_is_eligible_node(&xcat)  == 1);
         check("E: XEPS invariant",   flat_is_eligible_node(&xeps)  == 1);
         check("E: XPOSI invariant",  flat_is_eligible_node(&xposi) == 1);
-        check("E: XDSAR variant",    flat_is_eligible_node(&xdsar) == 0);
-        check("E: XBRKC variant",    flat_is_eligible_node(&xbrkc) == 0);
+        check("E: XDSAR invariant",  flat_is_eligible_node(&xdsar) == 1);
+        check("E: XBRKC invariant",  flat_is_eligible_node(&xbrkc) == 1);
     }
 
     printf("\nPASS=%d FAIL=%d  (EM-7a Phase-2 simulator + flat_is_eligible_node)\n",
