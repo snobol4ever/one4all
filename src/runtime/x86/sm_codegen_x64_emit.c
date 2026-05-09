@@ -1605,7 +1605,13 @@ static int emit_pattern_blobs(FILE *out)
 }
 
 /* SM_EXEC_STMT for a registered invariant pattern: emit the runtime call.
- * The value stack at this point holds [subj][repl_or_zero] (top = repl). */
+ * The value stack at this point holds [subj][repl_or_zero] (top = repl).
+ *
+ * EM-7c-s-file-beautify (2026-05-09): the first line consumes the pending
+ * .LpcN: pc-label via sm_line; the three follow-on lines route through
+ * emit_three_column_line so they render with 24-space col-1 padding
+ * (matching SM-side dispatch shape) rather than the tab-indented no-label
+ * fallback in sm_line. */
 static int emit_sm_exec_stmt_blob(FILE *out, const SM_Instr *ins, int pc, int win_idx)
 {
     pattern_window_t *w = &g_pat_windows[win_idx];
@@ -1613,38 +1619,52 @@ static int emit_sm_exec_stmt_blob(FILE *out, const SM_Instr *ins, int pc, int wi
     int has_repl      = (int)ins->a[1].i;
 
     /* Arg 0 (rdi) = blob_α = address of `_pat_inv_<id>_α`.
-     * GAS Intel syntax: `lea rdi, [rip + symbol]`. */
+     * GAS Intel syntax: `lea rdi, [rip + symbol]`.  This first line
+     * consumes the pending .LpcN: pc-label (sm_line routes through it). */
     char act[160];
     snprintf(act, sizeof(act),
-             "lea     rdi, [rip + _pat_inv_%d_α]", w->pat_id);
+             "rdi, [rip + _pat_inv_%d_α]", w->pat_id);
     char anno[80];
     snprintf(anno, sizeof(anno),
              "# blob entry α  (Phase-2 pc=%d..%d)",
              w->phase2_start, w->phase2_end - 1);
-    if (sm_line(out, "", act, anno) < 0) return -1;
+    /* Use emit_three_column_line to keep col 1 = pending .LpcN, col 2 = lea,
+     * col 3 = args + comment.  The pending label is consumed via the
+     * sm_emit_consume_pc_label path below. */
+    char lbl[32];
+    const char *pending = sm_emit_consume_pc_label();
+    if (pending && *pending) {
+        size_t n = strlen(pending);
+        if (n >= sizeof(lbl)) n = sizeof(lbl) - 1;
+        memcpy(lbl, pending, n);
+        lbl[n] = '\0';
+    } else {
+        lbl[0] = '\0';
+    }
+    if (emit_three_column_line(out, lbl, "lea", act, anno) != 0) return -1;
 
     /* Arg 1 (rsi) = subj_name — same .Lstr_N convention as SM_PUSH_VAR. */
     if (sname && *sname) {
-        char lbl[64];
-        strtab_label(lbl, sizeof(lbl), sname);
+        char lbl_str[64];
+        strtab_label(lbl_str, sizeof(lbl_str), sname);
         char act2[160];
-        snprintf(act2, sizeof(act2), "lea     rsi, [rip + %s]", lbl);
+        snprintf(act2, sizeof(act2), "rsi, [rip + %s]", lbl_str);
         char ann2[80];
         snprintf(ann2, sizeof(ann2), "# subj_name=%s", sname);
-        if (sm_line(out, "", act2, ann2) < 0) return -1;
+        if (emit_three_column_line(out, "", "lea", act2, ann2) != 0) return -1;
     } else {
-        if (sm_line(out, "", "xor     esi, esi", "# subj_name=NULL") < 0) return -1;
+        if (emit_three_column_line(out, "", "xor", "esi, esi", "# subj_name=NULL") != 0) return -1;
     }
 
     /* Arg 2 (edx) = has_repl flag */
     char act3[80];
-    snprintf(act3, sizeof(act3), "mov     edx, %d", has_repl);
+    snprintf(act3, sizeof(act3), "edx, %d", has_repl);
     char ann3[80];
     snprintf(ann3, sizeof(ann3), "# has_repl=%d", has_repl);
-    if (sm_line(out, "", act3, ann3) < 0) return -1;
+    if (emit_three_column_line(out, "", "mov", act3, ann3) != 0) return -1;
 
-    if (sm_line(out, "", "call    scrip_rt_match_blob@PLT",
-                "# EM-7c: Phase-3+5 against baked invariant blob") < 0) return -1;
+    if (emit_three_column_line(out, "", "call", "scrip_rt_match_blob@PLT",
+                               "# EM-7c: Phase-3+5 against baked invariant blob") != 0) return -1;
 
     (void)pc;
     return 0;

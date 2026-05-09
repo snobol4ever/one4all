@@ -71,6 +71,132 @@ void bb_flat_set_intern_str(const char *(*fn)(emitter_v *, const char *))
     g_flat_intern_str = fn;
 }
 
+/* ── EM-7c-s-file-beautify helpers (2026-05-09) ──────────────────────────────
+ *
+ * Minimal three-column emitters for the EV_TEXT-shaped data/text blocks that
+ * each box-kind path emits.  Goal: every line emitted from this file uses
+ * the same `%-24s%-16s %s\n` shape as SM-side; no tab-indented stragglers.
+ *
+ * Shape:  LABEL(24) / OPCODE(16) / ARGS+COMMENT(free).
+ *
+ * flat3c_*       — three-column line emitters routed through the emitter_v's
+ *                  fprintf_raw to keep TEXT-mode shape uniform.
+ * flat_data_*    — convenience wrappers for `.section .data` directives.
+ * flat_text_*    — convenience wrappers for `.section .text` / `.intel_syntax`.
+ * flat_box_call  — emits the four-line (lea / mov esi / call / test) sequence.
+ *
+ * All helpers are no-ops in BINARY mode (e->is_text == 0).  Callers gate on
+ * `e->is_text` already; the helpers stay safe for callers that don't.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+static void flat3c(emitter_v *e, const char *lbl, const char *act, const char *got)
+{
+    if (!e->is_text) return;
+    e->fprintf_raw(e, "%-24s%-16s %s\n",
+                   lbl ? lbl : "", act ? act : "", got ? got : "");
+}
+
+static void flat3c_action(emitter_v *e, const char *act, const char *args)
+{
+    flat3c(e, "", act, args ? args : "");
+}
+
+static void flat3c_label(emitter_v *e, const char *name)
+{
+    if (!e->is_text) return;
+    char buf[160]; snprintf(buf, sizeof(buf), "%s:", name);
+    flat3c(e, buf, "", "");
+}
+
+static void flat_data_section(emitter_v *e)   { flat3c(e, "", ".section", ".data"); }
+static void flat_text_section(emitter_v *e)   { flat3c(e, "", ".section", ".text"); }
+static void flat_intel_syntax(emitter_v *e)   { flat3c(e, "", ".intel_syntax", "noprefix"); }
+
+static void flat_data_string(emitter_v *e, const char *s)
+{
+    if (!e->is_text) return;
+    /* Build the escaped quoted form once.  We escape only " and \, and
+     * non-printables as \NNN — matches the assembler's expectation and
+     * mirrors flat_emit_charset_call's per-byte loop. */
+    char esc[1024];
+    size_t o = 0;
+    if (o < sizeof(esc)) esc[o++] = '"';
+    for (const char *cp = s ? s : ""; *cp && o + 5 < sizeof(esc); cp++) {
+        unsigned char c = (unsigned char)*cp;
+        if (c == '"' || c == '\\') { esc[o++] = '\\'; esc[o++] = (char)c; }
+        else if (c >= 32 && c < 127) { esc[o++] = (char)c; }
+        else { o += snprintf(esc + o, sizeof(esc) - o, "\\%03o", c); }
+    }
+    if (o + 1 < sizeof(esc)) esc[o++] = '"';
+    esc[o] = '\0';
+    flat3c(e, "", ".string", esc);
+}
+
+static void flat_data_quad(emitter_v *e, const char *arg)
+{
+    if (!e->is_text) return;
+    flat3c(e, "", ".quad", arg ? arg : "0");
+}
+
+static void flat_data_quad_int(emitter_v *e, long long v)
+{
+    if (!e->is_text) return;
+    char buf[32]; snprintf(buf, sizeof(buf), "%lld", v);
+    flat3c(e, "", ".quad", buf);
+}
+
+static void flat_data_long(emitter_v *e, long long v)
+{
+    if (!e->is_text) return;
+    char buf[32]; snprintf(buf, sizeof(buf), "%lld", v);
+    flat3c(e, "", ".long", buf);
+}
+
+static void flat_data_zero(emitter_v *e, int n)
+{
+    if (!e->is_text) return;
+    char buf[16]; snprintf(buf, sizeof(buf), "%d", n);
+    flat3c(e, "", ".zero", buf);
+}
+
+static void flat_globl(emitter_v *e, const char *name)
+{
+    if (!e->is_text) return;
+    flat3c(e, "", ".globl", name);
+}
+
+/* Emit the four-line box-call sequence: `lea rdi,[rip+ζ]` / `mov esi,mode` /
+ * `call fn@PLT` / `test rax,rax`.  No `;` separators; uniform three-column
+ * shape.  `ζ_lbl` may be either a `[rip + label]` form (text-mode static
+ * data) or a raw `qword ptr [rip + label]` for arbno's slot pointer. */
+static void flat_box_call(emitter_v *e, const char *rdi_load,
+                          const char *fn, int mode)
+{
+    if (!e->is_text) return;
+    flat3c_action(e, "lea", rdi_load);
+    char esi_arg[32]; snprintf(esi_arg, sizeof(esi_arg), "esi, %d", mode);
+    flat3c_action(e, "mov", esi_arg);
+    char call_arg[64]; snprintf(call_arg, sizeof(call_arg), "%s@PLT", fn);
+    flat3c_action(e, "call", call_arg);
+    flat3c_action(e, "test", "rax, rax");
+}
+
+/* Variant: arbno's box call uses a slot pointer dereference rather than
+ * lea+rip.  Same four-line shape, different first instruction. */
+static void flat_box_call_slot(emitter_v *e, const char *slot_lbl,
+                               const char *fn, int mode)
+{
+    if (!e->is_text) return;
+    char rdi_arg[160]; snprintf(rdi_arg, sizeof(rdi_arg),
+                                "rdi, qword ptr [rip + %s]", slot_lbl);
+    flat3c_action(e, "mov", rdi_arg);
+    char esi_arg[32]; snprintf(esi_arg, sizeof(esi_arg), "esi, %d", mode);
+    flat3c_action(e, "mov", esi_arg);
+    char call_arg[64]; snprintf(call_arg, sizeof(call_arg), "%s@PLT", fn);
+    flat3c_action(e, "call", call_arg);
+    flat3c_action(e, "test", "rax, rax");
+}
+
 /* ── forward declarations ────────────────────────────────────────────────── */
 static void flat_emit_node(emitter_v *e, PATND_t *p,
                            bb_label_t *lbl_succ, bb_label_t *lbl_fail,
@@ -260,26 +386,25 @@ static void flat_emit_charset_call(emitter_v *e, bb_box_fn c_fn,
         char zlbl[64], slbl[64];
         snprintf(zlbl, sizeof(zlbl), ".Lcs%d_z",     id);
         snprintf(slbl, sizeof(slbl), ".Lcs%d_chars", id);
-        EV_TEXT(e, "\t.section .data\n%s:\n\t.string \"", slbl);
-        /* Escape chars for asm string literal */
-        for (const char *cp = chars; *cp; cp++) {
-            unsigned char c = (unsigned char)*cp;
-            if (c == '"' || c == '\\') EV_TEXT(e, "\\%c", c);
-            else if (c >= 32 && c < 127) EV_TEXT(e, "%c", c);
-            else EV_TEXT(e, "\\%03o", c);
-        }
-        EV_TEXT(e, "\"\n%s:\n\t.quad %s\n\t.long 0\n\t.long 0\n"
-                   "\t.section .text\n\t.intel_syntax noprefix\n",
-                   zlbl, slbl);
-        EV_TEXT(e,
-            "\tlea     rdi, [rip + %s]\n\tmov     esi, 0\n", zlbl);
+        flat_data_section(e);
+        flat3c_label(e, slbl);
+        flat_data_string(e, chars);
+        flat3c_label(e, zlbl);
+        flat_data_quad(e, slbl);                  /* &chars */
+        flat_data_long(e, 0);                     /* delta */
+        flat_data_long(e, 0);                     /* padding */
+        flat_text_section(e);
+        flat_intel_syntax(e);
+        char rdi_arg[96]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", zlbl);
+        flat3c_action(e, "lea", rdi_arg);
+        flat3c_action(e, "mov", "esi, 0");
         ev_call_sym_plt(e, c_fn_name, (uint64_t)(uintptr_t)c_fn);
         ev_test_rax_rax(e);
         EV_JMP(e, lbl_succ, JMP_JNE);
         EV_JMP(e, lbl_fail, JMP_JMP);
         EV_LABEL(e, lbl_β);
-        EV_TEXT(e,
-            "\tlea     rdi, [rip + %s]\n\tmov     esi, 1\n", zlbl);
+        flat3c_action(e, "lea", rdi_arg);
+        flat3c_action(e, "mov", "esi, 1");
         ev_call_sym_plt(e, c_fn_name, (uint64_t)(uintptr_t)c_fn);
         ev_test_rax_rax(e);
         EV_JMP(e, lbl_succ, JMP_JNE);
@@ -370,16 +495,17 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
         if (e->is_text) {
             int id = g_flat_node_id++;
             char lbl[64]; snprintf(lbl, sizeof(lbl), ".Llen%d_z", id);
-            EV_TEXT(e, "\t.section .data\n%s:\n\t.long %d\n"
-                       "\t.section .text\n\t.intel_syntax noprefix\n",
-                       lbl, (int)p->num);
-            EV_TEXT(e,
-                "\tlea     rdi, [rip + %s]\n\tmov     esi, 0\n\tcall    bb_len@PLT\n\ttest    rax, rax\n", lbl);
+            flat_data_section(e);
+            flat3c_label(e, lbl);
+            flat_data_long(e, (long long)p->num);
+            flat_text_section(e);
+            flat_intel_syntax(e);
+            char rdi_arg[96]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", lbl);
+            flat_box_call(e, rdi_arg, "bb_len", 0);
             EV_JMP(e, lbl_succ, JMP_JNE);
             EV_JMP(e, lbl_fail, JMP_JMP);
             EV_LABEL(e, lbl_β);
-            EV_TEXT(e,
-                "\tlea     rdi, [rip + %s]\n\tmov     esi, 1\n\tcall    bb_len@PLT\n\ttest    rax, rax\n", lbl);
+            flat_box_call(e, rdi_arg, "bb_len", 1);
             EV_JMP(e, lbl_succ, JMP_JNE);
             EV_JMP(e, lbl_fail, JMP_JMP);
         } else {
@@ -392,16 +518,18 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
         if (e->is_text) {
             int id = g_flat_node_id++;
             char lbl[64]; snprintf(lbl, sizeof(lbl), ".Ltab%d_z", id);
-            EV_TEXT(e, "\t.section .data\n%s:\n\t.long %d\n\t.long 0\n"
-                       "\t.section .text\n\t.intel_syntax noprefix\n",
-                       lbl, (int)p->num);
-            EV_TEXT(e,
-                "\tlea     rdi, [rip + %s]\n\tmov     esi, 0\n\tcall    bb_tab@PLT\n\ttest    rax, rax\n", lbl);
+            flat_data_section(e);
+            flat3c_label(e, lbl);
+            flat_data_long(e, (long long)p->num);
+            flat_data_long(e, 0);
+            flat_text_section(e);
+            flat_intel_syntax(e);
+            char rdi_arg[96]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", lbl);
+            flat_box_call(e, rdi_arg, "bb_tab", 0);
             EV_JMP(e, lbl_succ, JMP_JNE);
             EV_JMP(e, lbl_fail, JMP_JMP);
             EV_LABEL(e, lbl_β);
-            EV_TEXT(e,
-                "\tlea     rdi, [rip + %s]\n\tmov     esi, 1\n\tcall    bb_tab@PLT\n\ttest    rax, rax\n", lbl);
+            flat_box_call(e, rdi_arg, "bb_tab", 1);
             EV_JMP(e, lbl_succ, JMP_JNE);
             EV_JMP(e, lbl_fail, JMP_JMP);
         } else {
@@ -414,16 +542,18 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
         if (e->is_text) {
             int id = g_flat_node_id++;
             char lbl[64]; snprintf(lbl, sizeof(lbl), ".Lrtab%d_z", id);
-            EV_TEXT(e, "\t.section .data\n%s:\n\t.long %d\n\t.long 0\n"
-                       "\t.section .text\n\t.intel_syntax noprefix\n",
-                       lbl, (int)p->num);
-            EV_TEXT(e,
-                "\tlea     rdi, [rip + %s]\n\tmov     esi, 0\n\tcall    bb_rtab@PLT\n\ttest    rax, rax\n", lbl);
+            flat_data_section(e);
+            flat3c_label(e, lbl);
+            flat_data_long(e, (long long)p->num);
+            flat_data_long(e, 0);
+            flat_text_section(e);
+            flat_intel_syntax(e);
+            char rdi_arg[96]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", lbl);
+            flat_box_call(e, rdi_arg, "bb_rtab", 0);
             EV_JMP(e, lbl_succ, JMP_JNE);
             EV_JMP(e, lbl_fail, JMP_JMP);
             EV_LABEL(e, lbl_β);
-            EV_TEXT(e,
-                "\tlea     rdi, [rip + %s]\n\tmov     esi, 1\n\tcall    bb_rtab@PLT\n\ttest    rax, rax\n", lbl);
+            flat_box_call(e, rdi_arg, "bb_rtab", 1);
             EV_JMP(e, lbl_succ, JMP_JNE);
             EV_JMP(e, lbl_fail, JMP_JMP);
         } else {
@@ -436,15 +566,17 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
         if (e->is_text) {
             int id = g_flat_node_id++;
             char lbl[64]; snprintf(lbl, sizeof(lbl), ".Lfence%d_z", id);
-            EV_TEXT(e, "\t.section .data\n%s:\n\t.long 0\n"
-                       "\t.section .text\n\t.intel_syntax noprefix\n", lbl);
-            EV_TEXT(e,
-                "\tlea     rdi, [rip + %s]\n\tmov     esi, 0\n\tcall    bb_fence@PLT\n\ttest    rax, rax\n", lbl);
+            flat_data_section(e);
+            flat3c_label(e, lbl);
+            flat_data_long(e, 0);
+            flat_text_section(e);
+            flat_intel_syntax(e);
+            char rdi_arg[96]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", lbl);
+            flat_box_call(e, rdi_arg, "bb_fence", 0);
             EV_JMP(e, lbl_succ, JMP_JNE);
             EV_JMP(e, lbl_fail, JMP_JMP);
             EV_LABEL(e, lbl_β);
-            EV_TEXT(e,
-                "\tlea     rdi, [rip + %s]\n\tmov     esi, 1\n\tcall    bb_fence@PLT\n\ttest    rax, rax\n", lbl);
+            flat_box_call(e, rdi_arg, "bb_fence", 1);
             EV_JMP(e, lbl_succ, JMP_JNE);
             EV_JMP(e, lbl_fail, JMP_JMP);
         } else {
@@ -457,15 +589,18 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
         if (e->is_text) {
             int id = g_flat_node_id++;
             char lbl[64]; snprintf(lbl, sizeof(lbl), ".Larb%d_z", id);
-            EV_TEXT(e, "\t.section .data\n%s:\n\t.long 0\n\t.long 0\n"
-                       "\t.section .text\n\t.intel_syntax noprefix\n", lbl);
-            EV_TEXT(e,
-                "\tlea     rdi, [rip + %s]\n\tmov     esi, 0\n\tcall    bb_arb@PLT\n\ttest    rax, rax\n", lbl);
+            flat_data_section(e);
+            flat3c_label(e, lbl);
+            flat_data_long(e, 0);
+            flat_data_long(e, 0);
+            flat_text_section(e);
+            flat_intel_syntax(e);
+            char rdi_arg[96]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", lbl);
+            flat_box_call(e, rdi_arg, "bb_arb", 0);
             EV_JMP(e, lbl_succ, JMP_JNE);
             EV_JMP(e, lbl_fail, JMP_JMP);
             EV_LABEL(e, lbl_β);
-            EV_TEXT(e,
-                "\tlea     rdi, [rip + %s]\n\tmov     esi, 1\n\tcall    bb_arb@PLT\n\ttest    rax, rax\n", lbl);
+            flat_box_call(e, rdi_arg, "bb_arb", 1);
             EV_JMP(e, lbl_succ, JMP_JNE);
             EV_JMP(e, lbl_fail, JMP_JMP);
         } else {
@@ -478,15 +613,17 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
         if (e->is_text) {
             int id = g_flat_node_id++;
             char lbl[64]; snprintf(lbl, sizeof(lbl), ".Lrem%d_z", id);
-            EV_TEXT(e, "\t.section .data\n%s:\n\t.long 0\n"
-                       "\t.section .text\n\t.intel_syntax noprefix\n", lbl);
-            EV_TEXT(e,
-                "\tlea     rdi, [rip + %s]\n\tmov     esi, 0\n\tcall    bb_rem@PLT\n\ttest    rax, rax\n", lbl);
+            flat_data_section(e);
+            flat3c_label(e, lbl);
+            flat_data_long(e, 0);
+            flat_text_section(e);
+            flat_intel_syntax(e);
+            char rdi_arg[96]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", lbl);
+            flat_box_call(e, rdi_arg, "bb_rem", 0);
             EV_JMP(e, lbl_succ, JMP_JNE);
             EV_JMP(e, lbl_fail, JMP_JMP);
             EV_LABEL(e, lbl_β);
-            EV_TEXT(e,
-                "\tlea     rdi, [rip + %s]\n\tmov     esi, 1\n\tcall    bb_rem@PLT\n\ttest    rax, rax\n", lbl);
+            flat_box_call(e, rdi_arg, "bb_rem", 1);
             EV_JMP(e, lbl_succ, JMP_JNE);
             EV_JMP(e, lbl_fail, JMP_JMP);
         } else {
@@ -502,16 +639,20 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
             snprintf(lbl,  sizeof(lbl),  ".Lbrkx%d_z",     id);
             snprintf(slbl, sizeof(slbl), ".Lbrkx%d_chars", id);
             const char *cs = p->STRVAL_fn ? p->STRVAL_fn : "";
-            EV_TEXT(e, "\t.section .data\n%s:\n\t.string \"%s\"\n%s:\n\t.quad %s\n\t.long 0\n"
-                       "\t.section .text\n\t.intel_syntax noprefix\n",
-                       slbl, cs, lbl, slbl);
-            EV_TEXT(e,
-                "\tlea     rdi, [rip + %s]\n\tmov     esi, 0\n\tcall    bb_breakx@PLT\n\ttest    rax, rax\n", lbl);
+            flat_data_section(e);
+            flat3c_label(e, slbl);
+            flat_data_string(e, cs);
+            flat3c_label(e, lbl);
+            flat_data_quad(e, slbl);                  /* &chars */
+            flat_data_long(e, 0);                     /* delta */
+            flat_text_section(e);
+            flat_intel_syntax(e);
+            char rdi_arg[96]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", lbl);
+            flat_box_call(e, rdi_arg, "bb_breakx", 0);
             EV_JMP(e, lbl_succ, JMP_JNE);
             EV_JMP(e, lbl_fail, JMP_JMP);
             EV_LABEL(e, lbl_β);
-            EV_TEXT(e,
-                "\tlea     rdi, [rip + %s]\n\tmov     esi, 1\n\tcall    bb_breakx@PLT\n\ttest    rax, rax\n", lbl);
+            flat_box_call(e, rdi_arg, "bb_breakx", 1);
             EV_JMP(e, lbl_succ, JMP_JNE);
             EV_JMP(e, lbl_fail, JMP_JMP);
         } else {
@@ -527,16 +668,21 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
             snprintf(lbl,  sizeof(lbl),  ".Latp%d_z",     id);
             snprintf(vlbl, sizeof(vlbl), ".Latp%d_vname", id);
             const char *vn = p->STRVAL_fn ? p->STRVAL_fn : "";
-            EV_TEXT(e, "\t.section .data\n%s:\n\t.string \"%s\"\n%s:\n\t.long 0\n\t.long 0\n\t.quad %s\n"
-                       "\t.section .text\n\t.intel_syntax noprefix\n",
-                       vlbl, vn, lbl, vlbl);
-            EV_TEXT(e,
-                "\tlea     rdi, [rip + %s]\n\tmov     esi, 0\n\tcall    bb_atp@PLT\n\ttest    rax, rax\n", lbl);
+            flat_data_section(e);
+            flat3c_label(e, vlbl);
+            flat_data_string(e, vn);
+            flat3c_label(e, lbl);
+            flat_data_long(e, 0);
+            flat_data_long(e, 0);
+            flat_data_quad(e, vlbl);
+            flat_text_section(e);
+            flat_intel_syntax(e);
+            char rdi_arg[96]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", lbl);
+            flat_box_call(e, rdi_arg, "bb_atp", 0);
             EV_JMP(e, lbl_succ, JMP_JNE);
             EV_JMP(e, lbl_fail, JMP_JMP);
             EV_LABEL(e, lbl_β);
-            EV_TEXT(e,
-                "\tlea     rdi, [rip + %s]\n\tmov     esi, 1\n\tcall    bb_atp@PLT\n\ttest    rax, rax\n", lbl);
+            flat_box_call(e, rdi_arg, "bb_atp", 1);
             EV_JMP(e, lbl_succ, JMP_JNE);
             EV_JMP(e, lbl_fail, JMP_JMP);
         } else {
@@ -552,22 +698,24 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
             snprintf(zlbl, sizeof(zlbl), ".Ldvar%d_z",    id);
             snprintf(slbl, sizeof(slbl), ".Ldvar%d_name", id);
             const char *vn = p->STRVAL_fn ? p->STRVAL_fn : "";
-            EV_TEXT(e, "\t.section .data\n%s:\n\t.string \"%s\"\n%s:\n"
-                       "\t.quad %s\n"        /* name */
-                       "\t.quad 0\n"         /* child_fn */
-                       "\t.quad 0\n"         /* child_state */
-                       "\t.quad 0\n"         /* child_size */
-                       "\t.long 0\n"         /* in_progress */
-                       "\t.long 0\n"         /* padding */
-                       "\t.section .text\n\t.intel_syntax noprefix\n",
-                       slbl, vn, zlbl, slbl);
-            EV_TEXT(e,
-                "\tlea     rdi, [rip + %s]\n\tmov     esi, 0\n\tcall    bb_deferred_var_exported@PLT\n\ttest    rax, rax\n", zlbl);
+            flat_data_section(e);
+            flat3c_label(e, slbl);
+            flat_data_string(e, vn);
+            flat3c_label(e, zlbl);
+            flat_data_quad(e, slbl);                 /* name */
+            flat_data_quad(e, "0");                  /* child_fn */
+            flat_data_quad(e, "0");                  /* child_state */
+            flat_data_quad(e, "0");                  /* child_size */
+            flat_data_long(e, 0);                    /* in_progress */
+            flat_data_long(e, 0);                    /* padding */
+            flat_text_section(e);
+            flat_intel_syntax(e);
+            char rdi_arg[96]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", zlbl);
+            flat_box_call(e, rdi_arg, "bb_deferred_var_exported", 0);
             EV_JMP(e, lbl_succ, JMP_JNE);
             EV_JMP(e, lbl_fail, JMP_JMP);
             EV_LABEL(e, lbl_β);
-            EV_TEXT(e,
-                "\tlea     rdi, [rip + %s]\n\tmov     esi, 1\n\tcall    bb_deferred_var_exported@PLT\n\ttest    rax, rax\n", zlbl);
+            flat_box_call(e, rdi_arg, "bb_deferred_var_exported", 1);
             EV_JMP(e, lbl_succ, JMP_JNE);
             EV_JMP(e, lbl_fail, JMP_JMP);
         } else {
@@ -586,14 +734,18 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
             snprintf(slot_lbl,  sizeof(slot_lbl),  ".Larbno%d_slot", child_id);
             snprintf(α_lbl, sizeof(α_lbl), "_arbno%d_child_α", child_id);
             /* Emit arbno_t* slot in .data (holds heap ptr after startup) */
-            EV_TEXT(e, "\t.section .data\n%s:\n\t.quad 0\n"
-                       "\t.section .text\n\t.intel_syntax noprefix\n", slot_lbl);
+            flat_data_section(e);
+            flat3c_label(e, slot_lbl);
+            flat_data_quad(e, "0");
+            flat_text_section(e);
+            flat_intel_syntax(e);
             /* Emit child sub-proc */
             bb_label_t cs, cf, cb;
             bb_label_initf(&cs, "_arbno%d_cs", child_id);
             bb_label_initf(&cf, "_arbno%d_cf", child_id);
             bb_label_initf(&cb, "_arbno%d_cb", child_id);
-            EV_TEXT(e, "\t.globl  %s\n%s:\n", α_lbl, α_lbl);
+            flat_globl(e, α_lbl);
+            flat3c_label(e, α_lbl);
             {   bb_insn_desc_t d = {BB_INSN_LEA_R10_SYM, ADDR_DELTA, 0, 0, SYM_DELTA};
                 e->emit_insn(e, &d);
             }
@@ -611,23 +763,12 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
             ev_mov_eax_imm32(e, 99); ev_xor_edx_edx(e); ev_ret(e);
             /* Register arbno startup fixup: flag=(void*)2 → scrip_rt_init_arbno */
             g_cap_fixup_cb((void*)(uintptr_t)2, α_lbl);
-            /* Emit arbno box call via slot pointer */
-            EV_TEXT(e,
-                "\t# XARBN arbno box (slot at %s)\n"
-                "\tmov     rdi, qword ptr [rip + %s]\n"
-                "\tmov     esi, 0\n"
-                "\tcall    bb_arbno@PLT\n"
-                "\ttest    rax, rax\n",
-                slot_lbl, slot_lbl);
+            /* Emit arbno box call via slot pointer (qword ptr deref, not lea+rip) */
+            flat_box_call_slot(e, slot_lbl, "bb_arbno", 0);
             EV_JMP(e, lbl_succ, JMP_JNE);
             EV_JMP(e, lbl_fail, JMP_JMP);
             EV_LABEL(e, lbl_β);
-            EV_TEXT(e,
-                "\tmov     rdi, qword ptr [rip + %s]\n"
-                "\tmov     esi, 1\n"
-                "\tcall    bb_arbno@PLT\n"
-                "\ttest    rax, rax\n",
-                slot_lbl);
+            flat_box_call_slot(e, slot_lbl, "bb_arbno", 1);
             EV_JMP(e, lbl_succ, JMP_JNE);
             EV_JMP(e, lbl_fail, JMP_JMP);
         } else {
@@ -666,32 +807,29 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
             snprintf(α_lbl, sizeof(α_lbl), "_cap%d_child_α", child_id);
 
             /* Emit varname string + static cap_t in .data */
-            EV_TEXT(e,
-                "\t.section .data\n"
-                "%s:\n\t.string \"%s\"\n"    /* varname string */
-                "%s:\n"                       /* cap_t label */
-                "\t.quad 0\n"                /* fn (patched at startup) */
-                "\t.quad 0\n"                /* state = NULL */
-                "\t.long %d\n"               /* immediate */
-                "\t.long 0\n"                /* padding */
-                "\t.long 0\n"                /* name.kind = NM_VAR = 0 */
-                "\t.long 0\n"                /* padding */
-                "\t.quad %s\n"               /* name.var_name = &varname_str */
-                "\t.zero 56\n"               /* rest of NAME_t */
-                "\t.zero 24\n"               /* pending + has_pending + registered */
-                "\t.section .text\n"
-                "\t.intel_syntax noprefix\n",
-                vname_lbl, vn,
-                cap_lbl,
-                immediate,
-                vname_lbl);
+            flat_data_section(e);
+            flat3c_label(e, vname_lbl);
+            flat_data_string(e, vn);
+            flat3c_label(e, cap_lbl);
+            flat_data_quad(e, "0");                       /* fn (patched at startup) */
+            flat_data_quad(e, "0");                       /* state = NULL */
+            flat_data_long(e, (long long)immediate);      /* immediate */
+            flat_data_long(e, 0);                         /* padding */
+            flat_data_long(e, 0);                         /* name.kind = NM_VAR = 0 */
+            flat_data_long(e, 0);                         /* padding */
+            flat_data_quad(e, vname_lbl);                 /* name.var_name = &varname_str */
+            flat_data_zero(e, 56);                        /* rest of NAME_t */
+            flat_data_zero(e, 24);                        /* pending + has_pending + registered */
+            flat_text_section(e);
+            flat_intel_syntax(e);
 
             /* Emit child as callable sub-proc in .text */
             bb_label_t cs, cf, cb;
             bb_label_initf(&cs, "_cap%d_cs", child_id);
             bb_label_initf(&cf, "_cap%d_cf", child_id);
             bb_label_initf(&cb, "_cap%d_cb", child_id);
-            EV_TEXT(e, "\t.globl  %s\n%s:\n", α_lbl, α_lbl);
+            flat_globl(e, α_lbl);
+            flat3c_label(e, α_lbl);
             {   bb_insn_desc_t d = {BB_INSN_LEA_R10_SYM, ADDR_DELTA, 0, 0, SYM_DELTA};
                 e->emit_insn(e, &d);
             }
@@ -734,22 +872,12 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
             }
 
             /* Emit cap box call using RIP-relative address for static cap_t */
-            EV_TEXT(e,
-                "\t# XNME/XFNME cap box (static cap_t at %s)\n"
-                "\tlea     rdi, [rip + %s]\n"
-                "\tmov     esi, 0\n"
-                "\tcall    bb_cap@PLT\n"
-                "\ttest    rax, rax\n",
-                cap_lbl, cap_lbl);
+            char rdi_arg[160]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", cap_lbl);
+            flat_box_call(e, rdi_arg, "bb_cap", 0);
             EV_JMP(e, lbl_succ, JMP_JNE);
             EV_JMP(e, lbl_fail, JMP_JMP);
             EV_LABEL(e, lbl_β);
-            EV_TEXT(e,
-                "\tlea     rdi, [rip + %s]\n"
-                "\tmov     esi, 1\n"
-                "\tcall    bb_cap@PLT\n"
-                "\ttest    rax, rax\n",
-                cap_lbl);
+            flat_box_call(e, rdi_arg, "bb_cap", 1);
             EV_JMP(e, lbl_succ, JMP_JNE);
             EV_JMP(e, lbl_fail, JMP_JMP);
         } else {

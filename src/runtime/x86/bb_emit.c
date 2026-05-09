@@ -281,8 +281,14 @@ void bb_text_comment(const char *fmt, ...)
 
 /* ── BB three-column line emission (EM-7c-bb-three-column) ──────────────────
  *
- *   LABEL:                   ; ACTION           ; GOTO
- *   col 1 (24 wide)          ; col 2 (16 wide)  ; col 3 (free)
+ *   LABEL:                  ACTION           GOTO
+ *   col 1 (24 wide)         col 2 (16 wide)  col 3 (free)
+ *
+ * EM-7c-s-file-beautify (2026-05-09): removed the literal `;` separators
+ * that the prior PARTIAL rung introduced.  The shape now matches SM-side
+ * (`emit_three_column_line` in sm_codegen_x64_emit.c, sm_line, and
+ * sm_emit_template's `render_call_line`) — one printf format
+ * `%-24s%-16s %s\n` shared across the entire `.s` file.
  *
  * NULL or empty args render as whitespace of the right column width.
  * Trailing whitespace is preserved (cheap; keeps every line the same
@@ -299,7 +305,7 @@ void bb3c_format(FILE *out, const char *label, const char *action, const char *g
     const char *L = label  ? label  : "";
     const char *A = action ? action : "";
     const char *G = goto_  ? goto_  : "";
-    fprintf(out, "%-24s ; %-16s ; %s\n", L, A, G);
+    fprintf(out, "%-24s%-16s %s\n", L, A, G);
 }
 
 void bb3c_text(const char *label, const char *action, const char *goto_)

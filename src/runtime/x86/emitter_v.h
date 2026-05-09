@@ -180,9 +180,13 @@ int        emitter_end       (emitter_v *e);
  * separator on x86 — empty fields parse as empty statements (legal).
  */
 
+/* EM-7c-s-file-beautify (2026-05-09): removed the literal `;` separators
+ * that the prior PARTIAL rung introduced.  Shape matches SM-side
+ * `emit_three_column_line` — one printf format shared across the
+ * entire `.s` file. */
 static inline void ev3c(emitter_v *e, const char *lbl, const char *act, const char *got)
 {
-    e->fprintf_raw(e, "%-24s ; %-16s ; %s\n",
+    e->fprintf_raw(e, "%-24s%-16s %s\n",
                    lbl ? lbl : "", act ? act : "", got ? got : "");
 }
 
