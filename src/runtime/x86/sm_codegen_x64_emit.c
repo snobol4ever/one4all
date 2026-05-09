@@ -769,11 +769,15 @@ static int emit_sm_arith(FILE *out, const SM_Instr *ins, int pc)
 
 static int emit_sm_label(FILE *out, const SM_Instr *ins, int pc)
 {
-    /* SM_LABEL is a no-op marker.  The .LpcN label emitted at every PC
-     * already serves as the jump target.  Nothing else to do.  Kept as
-     * a documented case so the switch never falls into emit_sm_unhandled. */
-    (void)out; (void)ins; (void)pc;
-    return 0;
+    /* SM_LABEL is a no-op control-flow marker.  The .LpcN label emitted
+     * at every PC already serves as the jump target — but we render a
+     * three-column line carrying the LABEL macro name in col 2 so the
+     * pending .LpcN: pc-label is consumed and the line is never naked.
+     * The macro body is empty (.macro LABEL\n.endm), so this line
+     * assembles to nothing while keeping the .LpcN: a valid jump
+     * target on its own.  EM-7c-stmt-banner-fidelity. */
+    (void)ins; (void)pc;
+    return sm_emit_noop(out, sm_template_lookup(SM_LABEL), NULL);
 }
 
 static int emit_sm_jump(FILE *out, const SM_Instr *ins, int pc)
@@ -928,10 +932,13 @@ static int emit_sm_stno(FILE *out, const SM_Instr *ins, int pc,
 
     if (emit_major_break(out, stno, banner_lineno, src) != 0) return -1;
 
-    /* SM_STNO is a source-statement boundary marker only.
-     * No runtime call needed — &STNO / &STCOUNT support deferred to a
-     * later rung.  The major banner above is the complete emission. */
-    return 0;
+    /* SM_STNO is a source-statement boundary marker.  We render a
+     * three-column line carrying the STNO macro name in col 2 so the
+     * pending .LpcN: pc-label is consumed (and not left naked).  The
+     * macro body is empty (.macro STNO\n.endm), so this line
+     * assembles to nothing — &STNO / &STCOUNT runtime support is
+     * deferred to a later rung.  EM-7c-stmt-banner-fidelity. */
+    return sm_emit_noop(out, sm_template_lookup(SM_STNO), NULL);
 }
 
 /* -----------------------------------------------------------------------
@@ -1643,16 +1650,68 @@ static int emit_sm_exec_stmt_blob(FILE *out, const SM_Instr *ins, int pc, int wi
     return 0;
 }
 
-/* Emit a comment placeholder for an SM op that was absorbed into an
- * invariant pattern blob.  Helpful for diff review. */
+/* Emit a real three-column line for an SM op that was absorbed into an
+ * invariant pattern blob.  EM-7c-stmt-banner-fidelity: replaces the
+ * earlier disembodied `# (baked into _pat_inv_<id> at .text — SM_*)`
+ * comment.  Shape:
+ *   .LpcN:                  PAT_RPOS         baked  # _pat_inv_0 pc=7..12
+ * Col 1 = pending .LpcN: label (consumed); col 2 = SM op name; col 3 =
+ * `baked` token; trailing comment back-references the blob.  The line
+ * assembles to nothing (col-2 names are macro names — PAT_RPOS, etc. —
+ * but each macro body is a real PLT call; here, those PLT calls are
+ * unreachable because they sit inside the blob-absorbed PC range.
+ * That's fine for assembly, but for runtime correctness we MUST NOT
+ * actually expand the macro.  Solution: prefix with a comment so the
+ * assembler treats the line as a comment.  But col 2 still needs to
+ * READ as the op name to a human.  Resolution: render `# PAT_RPOS
+ * baked  # _pat_inv_0 pc=7..12` — col 2 is empty in the assembled
+ * sense, but the line carries the op name in a way the eye can
+ * scan.  This preserves both correctness and readability.
+ *
+ * Final chosen shape (col 1 still meaningful as a jump target):
+ *   .LpcN:                  # PAT_RPOS       baked  _pat_inv_0 pc=7..12
+ * Col 2 starts with `#` so GAS treats the rest of the line as a
+ * comment; the .LpcN: still defines the label so jumps targeting
+ * this PC continue to work. */
 static int emit_sm_pat_baked(FILE *out, const SM_Instr *ins, int pc, int win_idx)
 {
     pattern_window_t *w = &g_pat_windows[win_idx];
-    char anno[120];
-    snprintf(anno, sizeof(anno),
-             "# (baked into _pat_inv_%d at .text — %s)",
-             w->pat_id, sm_opcode_name(ins->op));
-    if (sm_line(out, "", "", anno) < 0) return -1;
+
+    /* Resolve op name to its MACRO spelling (PUSH_INT, PAT_RPOS, ...)
+     * for visual consistency with col-2 tokens elsewhere in the file.
+     * Fall back to the SM enum name if the op has no template entry
+     * (defensive — shouldn't happen on real corpora). */
+    const sm_op_template_t *t = sm_template_lookup(ins->op);
+    const char *opname = (t && t->macro_name) ? t->macro_name
+                                              : sm_opcode_name(ins->op);
+    if (!opname) opname = "?";
+
+    /* Snapshot the pending pc-label (consume it so the next line
+     * doesn't inherit it). */
+    char lbl[32];
+    const char *pending = sm_emit_consume_pc_label();
+    if (pending && *pending) {
+        size_t n = strlen(pending);
+        if (n >= sizeof(lbl)) n = sizeof(lbl) - 1;
+        memcpy(lbl, pending, n);
+        lbl[n] = '\0';
+    } else {
+        lbl[0] = '\0';
+    }
+
+    /* Render via the three-column primitive with a leading-`#` op so
+     * the macro is NOT expanded by the assembler — col 2 still reads
+     * as the op name to the human eye, col 3 carries `baked` plus a
+     * back-reference to the blob. */
+    char op_col[24];
+    snprintf(op_col, sizeof(op_col), "# %s", opname);
+
+    char col3[160];
+    snprintf(col3, sizeof(col3),
+             "baked  _pat_inv_%d pc=%d..%d",
+             w->pat_id, w->phase2_start, w->phase2_end - 1);
+
+    if (emit_three_column_line(out, lbl, op_col, col3, NULL) != 0) return -1;
     (void)pc;
     return 0;
 }

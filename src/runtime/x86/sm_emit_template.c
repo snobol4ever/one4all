@@ -164,6 +164,15 @@ static const sm_op_template_t g_sm_templates[] = {
     /* Statement execution (variant pattern) */
     { SM_EXEC_STMT,    "EXEC_STMT_VARIANT",  "scrip_rt_match_variant",
       SM_TPL_EXEC_VAR, 0, 0 },
+
+    /* Statement-boundary / no-op markers (EM-7c-stmt-banner-fidelity).
+     * These opcodes carry no executable code but mark a position in
+     * the pc tape.  Rendering them as a real three-column line keeps
+     * the .LpcN: label out of the "naked" failure mode — col 2
+     * declares which marker executes here, even though the macro
+     * body is empty. */
+    { SM_LABEL,        "LABEL",        NULL,                    SM_TPL_NOOP,       0, 0 },
+    { SM_STNO,         "STNO",         NULL,                    SM_TPL_NOOP,       0, 0 },
 };
 
 #define G_SM_TEMPLATES_N (int)(sizeof(g_sm_templates) / sizeof(g_sm_templates[0]))
@@ -416,6 +425,16 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
         macro_line(out, "", ".endm", "");
         return 0;
 
+    case SM_TPL_NOOP:
+        /* NOOP shape: empty-bodied marker macro.  The macro name in col
+         * 2 of the per-call line declares "what executes here" so the
+         * .LpcN: label is never naked.  The macro body assembles to
+         * nothing; the .LpcN remains a valid jump target on its own. */
+        snprintf(macro_def, sizeof(macro_def), "%s", t->macro_name);
+        macro_line(out, "", ".macro", macro_def);
+        macro_line(out, "", ".endm", "");
+        return 0;
+
     case SM_TPL__COUNT:
         break;
     }
@@ -470,6 +489,7 @@ static int build_args_col(char *buf, int cap, const sm_op_template_t *t,
     switch (t->kind) {
     case SM_TPL_NULLARY:
     case SM_TPL_RET:
+    case SM_TPL_NOOP:
         n = snprintf(buf, cap, "");  /* no args */
         break;
     case SM_TPL_INT64:
@@ -716,6 +736,18 @@ int sm_emit_template(FILE *out, const sm_op_template_t *t,
 
 int sm_emit_nullary(FILE *out, const sm_op_template_t *t, const char *anno)
 {
+    sm_emit_args_t a = { 0 };
+    a.anno = anno;
+    return sm_emit_template(out, t, &a);
+}
+
+int sm_emit_noop(FILE *out, const sm_op_template_t *t, const char *anno)
+{
+    /* SM_TPL_NOOP: render exactly one three-column line carrying the
+     * macro name in col 2.  The pending .LpcN: pc-label is consumed
+     * (via render_call_line's normal label-pickup path) so the label
+     * is never naked.  Macro body is empty; the .s assembles cleanly
+     * because the macro expands to nothing. */
     sm_emit_args_t a = { 0 };
     a.anno = anno;
     return sm_emit_template(out, t, &a);

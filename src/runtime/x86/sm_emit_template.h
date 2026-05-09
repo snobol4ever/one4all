@@ -69,6 +69,11 @@ typedef enum {
     SM_TPL_RET,
     SM_TPL_RET_VAR,
     SM_TPL_UNHANDLED,
+    SM_TPL_NOOP,             /* no-arg, no-body marker (e.g. SM_LABEL, SM_STNO).
+                                 macro body is `.macro N\n.endm`; the per-call
+                                 line is one three-column line carrying the
+                                 macro name in col 2 so the .LpcN: prefix is
+                                 never naked. */
     SM_TPL__COUNT
 } sm_tpl_kind_t;
 
@@ -170,6 +175,12 @@ int sm_emit_ret        (FILE *out, const sm_op_template_t *t,
 int sm_emit_ret_var    (FILE *out, int kind, int cond, int pc,
                         const char *anno);
 int sm_emit_unhandled  (FILE *out, int op);
+
+/* SM_TPL_NOOP — emit a labelled three-column line carrying the macro
+ * name in col 2 with empty col 3.  Used by SM_LABEL and SM_STNO so
+ * the pending .LpcN: pc-label is consumed and never appears naked. */
+int sm_emit_noop       (FILE *out, const sm_op_template_t *t,
+                        const char *anno);
 
 /* The exec-stmt-variant + capture-fn shapes have unique arg layouts;
  * exposed as their own thin entries for dispatcher clarity. */
