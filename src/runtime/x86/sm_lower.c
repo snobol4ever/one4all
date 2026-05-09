@@ -57,7 +57,7 @@ static void emit_push_expr(SM_Program *p, const AST_t *e)
  * the same wave). */
 static int g_expression_body_lowering = 0;
 
-/* CHUNKS-step17b'' (CH-17b''): per-proc IcnScope active during chunk-body
+/* CHUNKS-step17b'' (CH-17b''): per-proc IcnScope active during expression-body
  * lowering.  Mirrors what coro_call's icn_scope_patch builds at runtime — but
  * built at lower-time and consulted (read-only) by the AST_VAR / AST_ASSIGN cases
  * in lower_expr so expressions emit SM_LOAD_FRAME slot / SM_STORE_FRAME slot for
@@ -67,7 +67,7 @@ static int g_expression_body_lowering = 0;
  * Built and torn down in the per-proc emission loop below; NULL outside that
  * loop.  AST_VAR / AST_ASSIGN consult it gated on g_expression_body_lowering so the
  * stmt-level lowering (which still walks IR via coro_call) is unaffected. */
-static IcnScope *g_chunk_scope = NULL;
+static IcnScope *g_expression_scope = NULL;
 
 /* Read-only mirror of coro_runtime.c's icn_scope_patch — walks the proc body's
  * AST_t tree and grows `sc` with non-global AST_VAR + AST_GLOBAL-decl names.  Does
@@ -76,7 +76,7 @@ static IcnScope *g_chunk_scope = NULL;
  * written next time it runs the IR path; both are safe because slot numbers
  * are deterministic — same scope-add order yields same slots).  This walker
  * gives us the same scope without committing to mutate IR at this time. */
-static void chunk_scope_walk(IcnScope *sc, AST_t *e) {
+static void expression_scope_walk(IcnScope *sc, AST_t *e) {
     if (!e) return;
     if (e->kind == AST_GLOBAL) {
         for (int i = 0; i < e->nchildren; i++)
@@ -95,7 +95,7 @@ static void chunk_scope_walk(IcnScope *sc, AST_t *e) {
             scope_add(sc, e->sval);
     }
     for (int i = 0; i < e->nchildren; i++)
-        chunk_scope_walk(sc, e->children[i]);
+        expression_scope_walk(sc, e->children[i]);
 }
 
 /* ── Label resolution table ─────────────────────────────────────────────── */
@@ -446,7 +446,7 @@ static void lower_pat_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
                      * SN-26c-parseerr-c: defer AST_FNC sub-args as compiled SM expressions.
                      * SN-26c-parseerr-d: also defer AST_VAR (see twin site).
                      * SN-32b: defer all non-AST_QLIT args (mirrors -t fix on IR side).
-                     * CHUNKS-step04: same chunk emission pattern as the . *fn site above
+                     * CHUNKS-step04: same expression emission pattern as the . *fn site above
                      * and Steps 2/3.  DT_E now carries entry_pc, not AST_t*. */
                     for (int i = 0; i < fnc->nchildren; i++) {
                         AST_t *arg = fnc->children[i];
@@ -620,12 +620,12 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
     /* ── References ── */
     case AST_VAR: {
         const char *vn = e->sval ? e->sval : "";
-        /* CHUNKS-step17b'' (CH-17b''): inside chunk-body lowering, consult the
+        /* CHUNKS-step17b'' (CH-17b''): inside expression-body lowering, consult the
          * per-proc scope: if `vn` resolved to a frame slot, emit SM_LOAD_FRAME.
          * Globals, keywords ('&'-prefixed), and unscoped names fall through
          * to SM_PUSH_VAR — same shape as the legacy emission outside expressions. */
-        if (g_expression_body_lowering && g_chunk_scope && vn[0] && vn[0] != '&') {
-            int slot = scope_get(g_chunk_scope, vn);
+        if (g_expression_body_lowering && g_expression_scope && vn[0] && vn[0] != '&') {
+            int slot = scope_get(g_expression_scope, vn);
             if (slot >= 0) {
                 sm_emit_i(p, SM_LOAD_FRAME, slot);
                 return;
@@ -772,11 +772,11 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
             const AST_t *lhs = e->children[0];
             if (lhs->kind == AST_VAR) {
                 const char *vn = lhs->sval ? lhs->sval : "";
-                /* CHUNKS-step17b'' (CH-17b''): inside chunk-body lowering,
+                /* CHUNKS-step17b'' (CH-17b''): inside expression-body lowering,
                  * consult per-proc scope.  Frame slot → SM_STORE_FRAME slot.
                  * Globals / keywords / unscoped names → SM_STORE_VAR (NV store). */
-                if (g_expression_body_lowering && g_chunk_scope && vn[0] && vn[0] != '&') {
-                    int slot = scope_get(g_chunk_scope, vn);
+                if (g_expression_body_lowering && g_expression_scope && vn[0] && vn[0] != '&') {
+                    int slot = scope_get(g_expression_scope, vn);
                     if (slot >= 0) {
                         sm_emit_i(p, SM_STORE_FRAME, slot);
                         return;
@@ -1738,7 +1738,7 @@ SM_Program *sm_lower(const CODE_t *prog)
      *     proc, an IcnScope is constructed mirroring coro_runtime.c's
      *     icn_scope_patch (params first, then AST_GLOBAL-decl names, then any
      *     non-global AST_VAR encountered in the body).  The scope is installed
-     *     via g_chunk_scope so lower_expr's AST_VAR / AST_ASSIGN cases emit
+     *     via g_expression_scope so lower_expr's AST_VAR / AST_ASSIGN cases emit
      *     SM_LOAD_FRAME / SM_STORE_FRAME for in-scope names, falling back to
      *     SM_PUSH_VAR / SM_STORE_VAR for globals / keywords / unscoped names.
      *     This mirrors what bb_eval_value does at runtime when frame_depth>0,
@@ -1769,7 +1769,7 @@ SM_Program *sm_lower(const CODE_t *prog)
          *   warning would only mislead.  Also gates the new frame-slot
          *   emission below on expression-body context.
          *
-         *   g_chunk_scope (CH-17b'') — per-proc IcnScope built fresh: params
+         *   g_expression_scope (CH-17b'') — per-proc IcnScope built fresh: params
          *   become slots 0..nparams-1; AST_GLOBAL-decl locals follow; any
          *   non-global AST_VAR encountered in the body extends the scope.
          *   The walker mirrors icn_scope_patch but without IR mutation. */
@@ -1781,17 +1781,17 @@ SM_Program *sm_lower(const CODE_t *prog)
              * down when this `if` block exits.  scope_add returns the same
              * slot for the same name, so re-adding params via the body walk
              * is safe.  Order matches icn_scope_patch (params, then E_GLOBALs
-             * via the AST_GLOBAL branch of chunk_scope_walk, then encountered
+             * via the AST_GLOBAL branch of expression_scope_walk, then encountered
              * E_VARs in tree-walk order). */
-            IcnScope chunk_sc; chunk_sc.n = 0;
+            IcnScope expression_sc; expression_sc.n = 0;
             for (int i = 0; i < nparams && i < FRAME_SLOT_MAX; i++) {
                 AST_t *pn = proc->children[1+i];
-                if (pn && pn->sval) scope_add(&chunk_sc, pn->sval);
+                if (pn && pn->sval) scope_add(&expression_sc, pn->sval);
             }
             for (int bi = body_start; bi < proc->nchildren; bi++)
-                chunk_scope_walk(&chunk_sc, proc->children[bi]);
+                expression_scope_walk(&expression_sc, proc->children[bi]);
 
-            g_chunk_scope          = &chunk_sc;
+            g_expression_scope          = &expression_sc;
             g_expression_body_lowering  = 1;
             for (int bi = body_start; bi < proc->nchildren; bi++) {
                 AST_t *body_expr = proc->children[bi];
@@ -1800,7 +1800,7 @@ SM_Program *sm_lower(const CODE_t *prog)
                 sm_emit(p, SM_VOID_POP);
             }
             g_expression_body_lowering  = 0;
-            g_chunk_scope          = NULL;
+            g_expression_scope          = NULL;
         }
 
         sm_emit(p, SM_RETURN);

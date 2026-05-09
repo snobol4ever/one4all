@@ -265,7 +265,7 @@ grep -qE '^\.Lpc[0-9]+:[[:space:]]+CALL_EXPRESSION[[:space:]]+\.Lpc' "$TMP/em5.s
 # `call \tgt` lives in the .macro CALL_EXPRESSION body; `ret` lives in RETURN.
 grep -qE 'call[[:space:]]+\\tgt' "$ROOT/sm_macros.s" || { echo "FAIL no 'call \\\\tgt' in CALL_EXPRESSION macro body"; exit 1; }
 grep -qE '^[[:space:]]+ret\b' "$ROOT/sm_macros.s" || { echo "FAIL no native ret in sm_macros.s"; exit 1; }
-echo "  PASS EM-5a chunk call/return  (chunk_A -> chunk_B; nested rc=13)"
+echo "  PASS EM-5a expression call/return  (expression_A -> expression_B; nested rc=13)"
 
 # -- Test 7b: EM-5 SM_PUSH_EXPRESSION descriptor round-trip ----------------------
 # PUSH_EXPRESSION (entry_pc=99, arity=2) then POP it; then PUSH_LIT_I 21 + HALT.

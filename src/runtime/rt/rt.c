@@ -228,19 +228,19 @@ static DESCR_t _rt_DIFFER(DESCR_t *a, int n)
  * the interpreter call stack.
  *============================================================================*/
 
-#define CHUNK_REG_MAX 256
+#define EXPRESSION_REG_MAX 256
 
 typedef struct { const char *name; void *fn; } ExpressionRegEntry;
-static ExpressionRegEntry g_expression_reg[CHUNK_REG_MAX];
-static int           g_chunk_reg_count = 0;
+static ExpressionRegEntry g_expression_reg[EXPRESSION_REG_MAX];
+static int           g_expression_reg_count = 0;
 
 void rt_register_expressions(const rt_expression_entry *tbl)
 {
     if (!tbl) return;
-    for (; tbl->name && g_chunk_reg_count < CHUNK_REG_MAX; tbl++) {
-        g_expression_reg[g_chunk_reg_count].name = tbl->name;
-        g_expression_reg[g_chunk_reg_count].fn   = tbl->fn;
-        g_chunk_reg_count++;
+    for (; tbl->name && g_expression_reg_count < EXPRESSION_REG_MAX; tbl++) {
+        g_expression_reg[g_expression_reg_count].name = tbl->name;
+        g_expression_reg[g_expression_reg_count].fn   = tbl->fn;
+        g_expression_reg_count++;
     }
 }
 
@@ -269,7 +269,7 @@ void rt_init_arbno(void **slot_ptr, void *child_fn)
 static void *chunk_reg_lookup(const char *name)
 {
     if (!name || !*name) return NULL;
-    for (int i = 0; i < g_chunk_reg_count; i++) {
+    for (int i = 0; i < g_expression_reg_count; i++) {
         if (strcmp(g_expression_reg[i].name, name) == 0)
             return g_expression_reg[i].fn;
     }

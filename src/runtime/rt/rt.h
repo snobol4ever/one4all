@@ -241,7 +241,7 @@ int rt_do_return(int kind, int cond);
  * set (SNOBOL4 function entry labels) and emits a .data table of
  * rt_expression_entry records in the .s file, terminated by {NULL, NULL}.
  * rt_register_expressions() is called from main() (before rt_init)
- * with a pointer to that table; it populates g_chunk_registry so that
+ * with a pointer to that table; it populates g_expression_registry so that
  * _rt_usercall can dispatch user-defined SNOBOL4 functions by direct
  * call/ret without touching the interpreter call stack.
  *
