@@ -100,6 +100,8 @@ out/libscrip_rt.so: $(RT_PIC_SRCS) $(RT)/rt/scrip_rt.h
 out/sm_codegen_x64_emit_test: $(RT)/x86/sm_codegen_x64_emit_test.c \
                                $(RT)/x86/sm_codegen_x64_emit.c \
                                $(RT)/x86/sm_codegen_x64_emit.h \
+                               $(RT)/x86/sm_emit_template.c \
+                               $(RT)/x86/sm_emit_template.h \
                                $(RT)/x86/sm_prog.c \
                                $(RT)/x86/sm_prog.h \
                                out/libscrip_rt.so
@@ -109,6 +111,7 @@ out/sm_codegen_x64_emit_test: $(RT)/x86/sm_codegen_x64_emit_test.c \
 	    -DDYN_ENGINE_LINKED \
 	    $(RT)/x86/sm_codegen_x64_emit_test.c \
 	    $(RT)/x86/sm_codegen_x64_emit.c \
+	    $(RT)/x86/sm_emit_template.c \
 	    $(RT)/x86/sm_prog.c \
 	    -Lout -lscrip_rt -lgc -lm \
 	    -Wl,-rpath,$(shell pwd)/out \
@@ -121,6 +124,8 @@ out/sm_codegen_x64_emit_test: $(RT)/x86/sm_codegen_x64_emit_test.c \
 out/sm_phase2_sim_test: $(RT)/x86/sm_phase2_sim_test.c \
                         $(RT)/x86/sm_codegen_x64_emit.c \
                         $(RT)/x86/sm_codegen_x64_emit.h \
+                        $(RT)/x86/sm_emit_template.c \
+                        $(RT)/x86/sm_emit_template.h \
                         $(RT)/x86/sm_prog.c \
                         $(RT)/x86/sm_prog.h \
                         out/libscrip_rt.so
@@ -130,6 +135,7 @@ out/sm_phase2_sim_test: $(RT)/x86/sm_phase2_sim_test.c \
 	    -DDYN_ENGINE_LINKED \
 	    $(RT)/x86/sm_phase2_sim_test.c \
 	    $(RT)/x86/sm_codegen_x64_emit.c \
+	    $(RT)/x86/sm_emit_template.c \
 	    $(RT)/x86/sm_prog.c \
 	    -Lout -lscrip_rt -lgc -lm \
 	    -Wl,-rpath,$(shell pwd)/out \
@@ -143,6 +149,8 @@ out/sm_phase2_sim_test: $(RT)/x86/sm_phase2_sim_test.c \
 out/bb_flat_text_test: $(RT)/x86/bb_flat_text_test.c \
                        $(RT)/x86/sm_codegen_x64_emit.c \
                        $(RT)/x86/sm_codegen_x64_emit.h \
+                       $(RT)/x86/sm_emit_template.c \
+                       $(RT)/x86/sm_emit_template.h \
                        $(RT)/x86/sm_prog.c \
                        $(RT)/x86/sm_prog.h \
                        out/libscrip_rt.so \
@@ -155,6 +163,7 @@ out/bb_flat_text_test: $(RT)/x86/bb_flat_text_test.c \
 	    -DDYN_ENGINE_LINKED \
 	    $(RT)/x86/bb_flat_text_test.c \
 	    $(RT)/x86/sm_codegen_x64_emit.c \
+	    $(RT)/x86/sm_emit_template.c \
 	    $(RT)/x86/sm_prog.c \
 	    -Lout -lscrip_rt -lgc -lm \
 	    -Wl,-rpath,$(shell pwd)/out \
@@ -228,6 +237,7 @@ scrip:
 	$(CC) $(CRT)   -c $(RT)/x86/sm_lower.c   -o $(OBJ)/sm_lower.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_image.c   -o $(OBJ)/sm_image.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_codegen.c -o $(OBJ)/sm_codegen.o
+	$(CC) $(CRT)   -c $(RT)/x86/sm_emit_template.c -o $(OBJ)/sm_emit_template.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_codegen_x64_emit.c -o $(OBJ)/sm_codegen_x64_emit.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_globals.c -o $(OBJ)/interp_globals.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_label.c   -o $(OBJ)/interp_label.o

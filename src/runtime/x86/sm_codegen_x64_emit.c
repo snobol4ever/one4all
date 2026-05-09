@@ -64,6 +64,7 @@
 #include "sm_prog.h"
 #include "snobol4.h"         /* DESCR_t, PATND_t, pat_* constructors (EM-7a) */
 #include "bb_flat.h"         /* bb_build_flat_text, bb_build_flat_text_reset (EM-7c) */
+#include "sm_emit_template.h" /* SM op template table (EM-7c-sm-macros, sess #87) */
 #include <string.h>
 
 /* -----------------------------------------------------------------------
@@ -644,20 +645,19 @@ static int emit_sm_halt(FILE *out, int pc)
 {
     (void)pc;
     /* SM_HALT: call scrip_rt_halt_tos() which safe-pops TOS as rc
-     * if it's DT_I, else uses 0.  This serves both the synthetic
-     * EM-2 test (PUSH_LIT_I 42 + HALT → rc=42) and real programs
-     * (HALT with non-int TOS → rc=0, matching the interpreter). */
-    return sm_line(out, "", "call    scrip_rt_halt_tos@PLT", "# SM_HALT");
+     * if it's DT_I, else uses 0.  Driven by the SM_HALT template
+     * (one source of truth with sm_macros.s). */
+    return sm_emit_nullary(out, sm_template_lookup(SM_HALT), "# SM_HALT");
 }
 
 static int emit_sm_push_lit_i(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    char act[80];
-    /* SM_PUSH_INT macro: movabs rdi,val / call scrip_rt_push_int */
-    snprintf(act, sizeof(act), "movabs  rdi, %" PRId64, ins->a[0].i);
-    if (sm_line(out, "", act, "") < 0) return -1;
-    return sm_line(out, "", "call    scrip_rt_push_int@PLT", "");
+    /* SM_PUSH_INT macro: movabs rdi,val / call scrip_rt_push_int.
+     * Template-driven; macro body in sm_emit_template.c shares ONE
+     * renderer with this per-call site (drift impossible). */
+    return sm_emit_int64(out, sm_template_lookup(SM_PUSH_LIT_I),
+                         ins->a[0].i, NULL);
 }
 
 /* EM-3 opcodes */
@@ -667,61 +667,51 @@ static int emit_sm_push_lit_s(FILE *out, const SM_Instr *ins, int pc)
     (void)pc;
     const char *s    = ins->a[0].s ? ins->a[0].s : "";
     int64_t     slen = ins->a[1].i;
-    char lbl[32], act[80], preview[STR_PREVIEW_MAX + 8], goto_col[STR_PREVIEW_MAX + 16];
+    char lbl[32], anno[STR_PREVIEW_MAX + 16], preview[STR_PREVIEW_MAX + 8];
     strtab_label(lbl, sizeof(lbl), s);
     render_str_preview(preview, sizeof(preview), s, (int)slen);
-    snprintf(goto_col, sizeof(goto_col), "# str=%s", preview);
-    /* RIP-relative LEA: PIC-correct, works in -no-pie and PIC binaries. */
-    snprintf(act, sizeof(act), "lea     rdi, [rip + %s]", lbl);
-    if (sm_line(out, "", act, goto_col) < 0) return -1;
-    snprintf(act, sizeof(act), "mov     esi, %d", (int)slen);
-    if (sm_line(out, "", act, "# slen") < 0) return -1;
-    return sm_line(out, "", "call    scrip_rt_push_str@PLT", "");
+    snprintf(anno, sizeof(anno), "# str=%s", preview);
+    return sm_emit_lbl_int32(out, sm_template_lookup(SM_PUSH_LIT_S),
+                             lbl, (int)slen, anno);
 }
 
 static int emit_sm_push_var(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     const char *name = ins->a[0].s ? ins->a[0].s : "";
-    char lbl[32], act[80], goto_col[80];
+    char lbl[32], anno[80];
     strtab_label(lbl, sizeof(lbl), name);
-    snprintf(act, sizeof(act), "lea     rdi, [rip + %s]", lbl);
-    snprintf(goto_col, sizeof(goto_col), "# var=%s", name);
-    if (sm_line(out, "", act, goto_col) < 0) return -1;
-    return sm_line(out, "", "call    scrip_rt_nv_get@PLT", "# SM_PUSH_VAR -> TOS");
+    snprintf(anno, sizeof(anno), "# var=%s", name);
+    return sm_emit_lbl(out, sm_template_lookup(SM_PUSH_VAR), lbl, anno);
 }
 
 static int emit_sm_store_var(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     const char *name = ins->a[0].s ? ins->a[0].s : "";
-    char lbl[32], act[80], goto_col[80];
+    char lbl[32], anno[80];
     strtab_label(lbl, sizeof(lbl), name);
-    snprintf(act, sizeof(act), "lea     rdi, [rip + %s]", lbl);
-    snprintf(goto_col, sizeof(goto_col), "# store -> %s", name);
-    if (sm_line(out, "", act, goto_col) < 0) return -1;
-    return sm_line(out, "", "call    scrip_rt_nv_set@PLT", "# SM_STORE_VAR pop TOS");
+    snprintf(anno, sizeof(anno), "# store -> %s", name);
+    return sm_emit_lbl(out, sm_template_lookup(SM_STORE_VAR), lbl, anno);
 }
 
 static int emit_sm_pop(FILE *out, int pc)
 {
     (void)pc;
-    /* SM_POP macro */
-    return sm_line(out, "", "call    scrip_rt_pop_void@PLT",
-                   "; SM_POP: discard TOS");
+    return sm_emit_nullary(out, sm_template_lookup(SM_POP),
+                           "# SM_POP: discard TOS");
 }
 
 static int emit_sm_arith(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    /* SM_ADD/SUB/MUL/DIV/MOD macros: mov edi,op / call scrip_rt_arith
-     * Opcode int values from sm_prog.h:
-     *   SM_ADD=17 SM_SUB=18 SM_MUL=19 SM_DIV=20 SM_MOD=22 */
-    char act[80];
-    snprintf(act, sizeof(act), "mov     edi, %d", (int)ins->op);
-    if (sm_line(out, "", act,
-                sm_opcode_name(ins->op)) < 0) return -1;
-    return sm_line(out, "", "call    scrip_rt_arith@PLT", "");
+    /* SM_ARITH op  --  the op enum is baked into the template's
+     * const_a; renderer reads it.  Annotation is the opcode mnemonic. */
+    const sm_op_template_t *t = sm_template_lookup(ins->op);
+    if (!t) return -1;
+    sm_emit_args_t a = { 0 };
+    a.anno = sm_opcode_name(ins->op);
+    return sm_emit_template(out, t, &a);
 }
 
 /* EM-4 opcodes: SM_LABEL + SM_JUMP / SM_JUMP_S / SM_JUMP_F */
@@ -738,38 +728,27 @@ static int emit_sm_label(FILE *out, const SM_Instr *ins, int pc)
 static int emit_sm_jump(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    /* SM_JUMP: unconditional direct jump to .Lpc<target>.  No runtime
-     * call -- pure inline x86.  Three-column: empty label / jmp action /
-     * target as comment for readability. */
-    char act[80];
-    char goto_col[64];
-    int  target = (int)ins->a[0].i;
-    snprintf(act,      sizeof(act),      "jmp     .Lpc%d", target);
-    snprintf(goto_col, sizeof(goto_col), "; SM_JUMP -> pc=%d", target);
-    return sm_line(out, "", act, goto_col);
+    int target = (int)ins->a[0].i;
+    char anno[64];
+    snprintf(anno, sizeof(anno), "# SM_JUMP -> pc=%d", target);
+    return sm_emit_pcref_jmp(out, sm_template_lookup(SM_JUMP),
+                             target, anno);
 }
 
 static int emit_sm_jump_cond(FILE *out, const SM_Instr *ins, int pc,
                              int take_when_ok)
 {
     /* Shared core for SM_JUMP_S (take_when_ok=1) and SM_JUMP_F (=0).
-     * Idiom:
-     *   call scrip_rt_last_ok@PLT  ; eax = last_ok (0 or 1)
-     *   test eax, eax
-     *   <jnz | jz> .Lpc<target>
-     */
+     * Each has its own template (the macro name encodes which one);
+     * we pick the right one and emit the per-call line. */
     (void)pc;
     int  target = (int)ins->a[0].i;
-    char act[80];
-    char goto_col[80];
-    if (sm_line(out, "", "call    scrip_rt_last_ok@PLT",
-                "; EM-4 conditional jump") < 0) return -1;
-    if (sm_line(out, "", "test    eax, eax", "") < 0) return -1;
-    snprintf(act, sizeof(act), "%s     .Lpc%d",
-             take_when_ok ? "jnz" : "jz", target);
-    snprintf(goto_col, sizeof(goto_col), "; %s -> pc=%d",
+    int  op_id  = take_when_ok ? SM_JUMP_S : SM_JUMP_F;
+    char anno[80];
+    snprintf(anno, sizeof(anno), "# %s -> pc=%d",
              take_when_ok ? "SM_JUMP_S" : "SM_JUMP_F", target);
-    return sm_line(out, "", act, goto_col);
+    return sm_emit_pcref_cond(out, sm_template_lookup(op_id),
+                              target, take_when_ok, anno);
 }
 
 static int emit_sm_jump_s(FILE *out, const SM_Instr *ins, int pc)
@@ -825,39 +804,23 @@ static int emit_sm_jump_f(FILE *out, const SM_Instr *ins, int pc)
 static int emit_sm_push_chunk(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    int64_t entry_pc = ins->a[0].i;
-    int64_t arity    = ins->a[1].i;
-    char act[80];
-    char goto_col[80];
-    snprintf(act, sizeof(act), "movabs  rdi, %" PRId64, entry_pc);
-    snprintf(goto_col, sizeof(goto_col), "; chunk entry_pc=%" PRId64, entry_pc);
-    if (sm_line(out, "", act, goto_col) < 0) return -1;
-    snprintf(act, sizeof(act), "mov     esi, %d", (int)arity);
-    snprintf(goto_col, sizeof(goto_col), "; arity=%d", (int)arity);
-    if (sm_line(out, "", act, goto_col) < 0) return -1;
-    return sm_line(out, "", "call    scrip_rt_push_chunk_descr@PLT",
-                   "; SM_PUSH_CHUNK -> DT_E on TOS");
+    return sm_emit_push_chunk(out, sm_template_lookup(SM_PUSH_CHUNK),
+                              ins->a[0].i, (int)ins->a[1].i);
 }
 
 static int emit_sm_call_chunk(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    int target = (int)ins->a[0].i;
-    char act[80];
-    char goto_col[80];
-    /* Baked direct call.  No runtime dispatch -- emit-time pc IS runtime pc. */
-    snprintf(act, sizeof(act), "call    .Lpc%d", target);
-    snprintf(goto_col, sizeof(goto_col), "; SM_CALL_CHUNK -> pc=%d", target);
-    return sm_line(out, "", act, goto_col);
+    return sm_emit_call_chunk(out, sm_template_lookup(SM_CALL_CHUNK),
+                              (int)ins->a[0].i);
 }
 
 static int emit_sm_return(FILE *out, int pc)
 {
     (void)pc;
     /* SM_RETURN: native return.  The chunk's last push left the result
-     * on the SM value stack inside libscrip_rt.so; the caller reads it
-     * after the call returns. */
-    return sm_line(out, "", "ret", "; SM_RETURN");
+     * on the SM value stack inside libscrip_rt.so. */
+    return sm_emit_ret(out, sm_template_lookup(SM_RETURN), "# SM_RETURN");
 }
 
 /* -----------------------------------------------------------------------
@@ -952,21 +915,23 @@ static int emit_sm_stno(FILE *out, const SM_Instr *ins, int pc,
 static int emit_sm_concat(FILE *out, int pc)
 {
     (void)pc;
-    return sm_line(out, "", "call    scrip_rt_concat@PLT", "# SM_CONCAT");
+    return sm_emit_nullary(out, sm_template_lookup(SM_CONCAT), "# SM_CONCAT");
 }
 
 /* SM_PUSH_NULL: push null (empty-string) descriptor; sets last_ok=1. */
 static int emit_sm_push_null(FILE *out, int pc)
 {
     (void)pc;
-    return sm_line(out, "", "call    scrip_rt_push_null@PLT", "# SM_PUSH_NULL");
+    return sm_emit_nullary(out, sm_template_lookup(SM_PUSH_NULL),
+                           "# SM_PUSH_NULL");
 }
 
 /* SM_COERCE_NUM: unary +; coerce string→int/real if needed. */
 static int emit_sm_coerce_num(FILE *out, int pc)
 {
     (void)pc;
-    return sm_line(out, "", "call    scrip_rt_coerce_num@PLT", "# SM_COERCE_NUM");
+    return sm_emit_nullary(out, sm_template_lookup(SM_COERCE_NUM),
+                           "# SM_COERCE_NUM");
 }
 
 /* SM_CALL: general function call.  All dispatch (pseudo-calls, builtins,
@@ -976,28 +941,20 @@ static int emit_sm_coerce_num(FILE *out, int pc)
 static int emit_sm_call(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    const char *name = ins->a[0].s ? ins->a[0].s : "";
+    const char *name  = ins->a[0].s ? ins->a[0].s : "";
     int         nargs = (int)ins->a[1].i;
-    char lbl[32], act[96], annot[80];
+    char lbl[32], anno[80];
     strtab_label(lbl, sizeof(lbl), name);
-    snprintf(act,   sizeof(act),   "lea     rdi, [rip + %s]", lbl);
-    snprintf(annot, sizeof(annot), "# fname=\"%s\"", name);
-    if (sm_line(out, "", act, annot) < 0) return -1;
-    snprintf(act,   sizeof(act),   "mov     esi, %d", nargs);
-    snprintf(annot, sizeof(annot), "# nargs=%d", nargs);
-    if (sm_line(out, "", act, annot) < 0) return -1;
-    return sm_line(out, "", "call    scrip_rt_call@PLT", "# SM_CALL");
+    snprintf(anno, sizeof(anno), "# SM_CALL fname=\"%s\" nargs=%d", name, nargs);
+    return sm_emit_lbl_int32(out, sm_template_lookup(SM_CALL),
+                             lbl, nargs, anno);
 }
 
 /* SM_RETURN_S / SM_RETURN_F / SM_FRETURN[_S/_F] / SM_NRETURN[_S/_F].
  *
- * Idiom:  call scrip_rt_do_return(kind, cond)  → eax = 1 if return fires.
- *         test eax, eax  → jz .skip<pc>  (if 0, fall through)
- *         ret
- *      .skip<pc>:        (next instruction)
- *
- * For unconditional plain SM_RETURN, emit_sm_return already handles it
- * (pure native ret).  This handler covers the 8 conditional variants. */
+ * Driven by the SM_RETURN_VARIANT template (one source of truth with
+ * sm_macros' SM_RETURN_VARIANT macro).  kind/cond computed from opcode.
+ * For unconditional plain SM_RETURN, emit_sm_return uses SM_RETURN. */
 static int emit_sm_return_variant(FILE *out, sm_opcode_t op, int pc)
 {
     int kind = 0;  /* RETURN */
@@ -1008,23 +965,7 @@ static int emit_sm_return_variant(FILE *out, sm_opcode_t op, int pc)
     if (op == SM_RETURN_S || op == SM_FRETURN_S || op == SM_NRETURN_S) cond = 1;
     if (op == SM_RETURN_F || op == SM_FRETURN_F || op == SM_NRETURN_F) cond = 2;
 
-    char act[96], annot[64];
-    snprintf(act,   sizeof(act),   "mov     edi, %d", kind);
-    snprintf(annot, sizeof(annot), "# kind=%d (0=RET 1=FRET 2=NRET)", kind);
-    if (sm_line(out, "", act, annot) < 0) return -1;
-    snprintf(act,   sizeof(act),   "mov     esi, %d", cond);
-    snprintf(annot, sizeof(annot), "# cond=%d (0=uncon 1=:S 2=:F)", cond);
-    if (sm_line(out, "", act, annot) < 0) return -1;
-    if (sm_line(out, "", "call    scrip_rt_do_return@PLT", sm_opcode_name(op)) < 0) return -1;
-    if (sm_line(out, "", "test    eax, eax",                "# fire?") < 0) return -1;
-    char skip_act[64];
-    snprintf(skip_act, sizeof(skip_act), "jz      .Lretskip_%d", pc);
-    if (sm_line(out, "", skip_act,        "# no-fire: fall through") < 0) return -1;
-    if (sm_line(out, "", "ret",                              "# fire: native return") < 0) return -1;
-    char lbl[64];
-    snprintf(lbl, sizeof(lbl), ".Lretskip_%d:", pc);
-    if (fprintf(out, "%s\n", lbl) < 0) return -1;
-    return 0;
+    return sm_emit_ret_var(out, kind, cond, pc, sm_opcode_name(op));
 }
 
 /* SM_PAT_CAPTURE_FN_ARGS / SM_PAT_USERCALL_ARGS emitters were removed
@@ -1692,198 +1633,145 @@ static int emit_sm_pat_baked(FILE *out, const SM_Instr *ins, int pc, int win_idx
  * ----------------------------------------------------------------------- */
 
 /* Helper: emit a no-arg PLT call that pushes a constant pattern node. */
-static int emit_pat_call_0(FILE *out, const char *fname, const char *anno)
+/* Helper: look up the strtab label for a string arg, or return NULL.
+ * Mirrors the EM-7-pre helpers' contract for empty/NULL strings:
+ * caller-side .Lstr_<n> if arg is non-empty, NULL otherwise. */
+static const char *pat_arg_label(char *lbl_buf, size_t lbl_buf_n,
+                                 const char *arg)
 {
-    char act[160];
-    snprintf(act, sizeof(act), "call    %s@PLT", fname);
-    return sm_line(out, "", act, anno ? anno : "");
+    if (!arg || !*arg) return NULL;
+    strtab_label(lbl_buf, lbl_buf_n, arg);
+    return lbl_buf;
 }
 
-/* Helper: emit a one-string-arg PLT call.  arg goes to rdi as
- * `lea rdi, [rip + <strtab_label>]` (or `xor edi, edi` for empty/null). */
-static int emit_pat_call_str(FILE *out, const char *fname, const char *arg,
-                              const char *anno)
-{
-    char lbl[64], act[160], anno_buf[128];
-    if (arg && *arg) {
-        strtab_label(lbl, sizeof(lbl), arg);
-        snprintf(act, sizeof(act), "lea     rdi, [rip + %s]", lbl);
-        snprintf(anno_buf, sizeof(anno_buf), "# arg=\"%.40s\"%s",
-                 arg, (strlen(arg) > 40) ? "..." : "");
-        if (sm_line(out, "", act, anno_buf) < 0) return -1;
-    } else {
-        if (sm_line(out, "", "xor     edi, edi", "# arg=NULL") < 0) return -1;
-    }
-    snprintf(act, sizeof(act), "call    %s@PLT", fname);
-    return sm_line(out, "", act, anno ? anno : "");
-}
-
-/* Helper: emit a string + int args call (for SM_PAT_CAPTURE).
- * arg0 (rdi) = varname, arg1 (esi) = kind. */
-static int emit_pat_call_str_int(FILE *out, const char *fname,
-                                  const char *arg0, int arg1,
-                                  const char *anno)
-{
-    char lbl[64], act[160], anno_buf[128];
-    if (arg0 && *arg0) {
-        strtab_label(lbl, sizeof(lbl), arg0);
-        snprintf(act, sizeof(act), "lea     rdi, [rip + %s]", lbl);
-        snprintf(anno_buf, sizeof(anno_buf), "# var=%s", arg0);
-        if (sm_line(out, "", act, anno_buf) < 0) return -1;
-    } else {
-        if (sm_line(out, "", "xor     edi, edi", "# var=NULL") < 0) return -1;
-    }
-    snprintf(act, sizeof(act), "mov     esi, %d", arg1);
-    snprintf(anno_buf, sizeof(anno_buf), "# kind=%d", arg1);
-    if (sm_line(out, "", act, anno_buf) < 0) return -1;
-    snprintf(act, sizeof(act), "call    %s@PLT", fname);
-    return sm_line(out, "", act, anno ? anno : "");
-}
-
-/* SM_PAT_LIT: a[0].s = literal string.  Calls scrip_rt_pat_lit(s). */
+/* SM_PAT_LIT: a[0].s = literal string.  Driven by SM_PAT_LIT template
+ * (LBLOPT shape — single source of truth with sm_macros). */
 static int emit_sm_pat_lit(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    return emit_pat_call_str(out, "scrip_rt_pat_lit",
-                              ins->a[0].s, "# SM_PAT_LIT");
+    char lbl[64], anno[128];
+    const char *l = pat_arg_label(lbl, sizeof(lbl), ins->a[0].s);
+    if (l) {
+        snprintf(anno, sizeof(anno), "# SM_PAT_LIT arg=\"%.40s\"%s",
+                 ins->a[0].s, (strlen(ins->a[0].s) > 40) ? "..." : "");
+    } else {
+        snprintf(anno, sizeof(anno), "# SM_PAT_LIT arg=NULL");
+    }
+    return sm_emit_lblopt(out, sm_template_lookup(SM_PAT_LIT), l, anno);
 }
 
-/* SM_PAT_REFNAME: a[0].s = var name.  Calls scrip_rt_pat_refname(name). */
+/* SM_PAT_REFNAME: a[0].s = var name. */
 static int emit_sm_pat_refname(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    return emit_pat_call_str(out, "scrip_rt_pat_refname",
-                              ins->a[0].s, "# SM_PAT_REFNAME");
+    char lbl[64], anno[128];
+    const char *l = pat_arg_label(lbl, sizeof(lbl), ins->a[0].s);
+    if (l) {
+        snprintf(anno, sizeof(anno), "# SM_PAT_REFNAME arg=\"%.40s\"%s",
+                 ins->a[0].s, (strlen(ins->a[0].s) > 40) ? "..." : "");
+    } else {
+        snprintf(anno, sizeof(anno), "# SM_PAT_REFNAME arg=NULL");
+    }
+    return sm_emit_lblopt(out, sm_template_lookup(SM_PAT_REFNAME), l, anno);
 }
 
 /* SM_PAT_CAPTURE: a[0].s = varname, a[1].i = kind (0/1/2). */
 static int emit_sm_pat_capture(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    return emit_pat_call_str_int(out, "scrip_rt_pat_capture",
-                                  ins->a[0].s, (int)ins->a[1].i,
-                                  "# SM_PAT_CAPTURE");
+    char lbl[64], anno[80];
+    const char *l = pat_arg_label(lbl, sizeof(lbl), ins->a[0].s);
+    int kind = (int)ins->a[1].i;
+    if (l) {
+        snprintf(anno, sizeof(anno), "# SM_PAT_CAPTURE var=%s kind=%d",
+                 ins->a[0].s, kind);
+    } else {
+        snprintf(anno, sizeof(anno), "# SM_PAT_CAPTURE var=NULL kind=%d", kind);
+    }
+    return sm_emit_lblopt_int32(out, sm_template_lookup(SM_PAT_CAPTURE),
+                                l, kind, anno);
 }
 
-/* SM_PAT_CAPTURE_FN: . *func() / $ *func() — a[0].s=fname, a[1].i=is_imm, a[2].s=namelist.
- * Calls scrip_rt_pat_capture_fn(fname, is_imm, namelist). */
+/* SM_PAT_CAPTURE_FN: . *func() / $ *func() — a[0].s=fname, a[1].i=is_imm,
+ *                    a[2].s=namelist.  LBLOPT3 shape. */
 static int emit_sm_pat_capture_fn(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    const char *fname    = ins->a[0].s ? ins->a[0].s : "";
-    int         is_imm   = (int)ins->a[1].i;
-    const char *namelist = ins->a[2].s ? ins->a[2].s : "";
-    char act[160], lbl[64], ann[128];
-    /* arg0 rdi = fname */
-    if (*fname) {
-        strtab_label(lbl, sizeof(lbl), fname);
-        snprintf(act, sizeof(act), "lea     rdi, [rip + %s]", lbl);
-        snprintf(ann, sizeof(ann),  "# fname=%s", fname);
-    } else {
-        snprintf(act, sizeof(act), "xor     edi, edi");
-        snprintf(ann, sizeof(ann),  "# fname=NULL");
-    }
-    if (sm_line(out, "", act, ann) < 0) return -1;
-    /* arg1 esi = is_imm */
-    snprintf(act, sizeof(act), "mov     esi, %d", is_imm);
-    if (sm_line(out, "", act, "# is_imm") < 0) return -1;
-    /* arg2 rdx = namelist */
-    if (namelist && *namelist) {
-        strtab_label(lbl, sizeof(lbl), namelist);
-        snprintf(act, sizeof(act), "lea     rdx, [rip + %s]", lbl);
-        if (sm_line(out, "", act, "# namelist") < 0) return -1;
-    } else {
-        if (sm_line(out, "", "xor     edx, edx", "# namelist=NULL") < 0) return -1;
-    }
-    return sm_line(out, "", "call    scrip_rt_pat_capture_fn@PLT", "# SM_PAT_CAPTURE_FN");
+    char fname_lbl[64], nl_lbl[64], anno[160];
+    const char *fl = pat_arg_label(fname_lbl, sizeof(fname_lbl), ins->a[0].s);
+    const char *nl = pat_arg_label(nl_lbl,    sizeof(nl_lbl),    ins->a[2].s);
+    int is_imm = (int)ins->a[1].i;
+    snprintf(anno, sizeof(anno),
+             "# SM_PAT_CAPTURE_FN fname=%s is_imm=%d namelist=%s",
+             fl ? ins->a[0].s : "(NULL)", is_imm,
+             nl ? ins->a[2].s : "(NULL)");
+    return sm_emit_capture_fn(out, sm_template_lookup(SM_PAT_CAPTURE_FN),
+                              fl, is_imm, nl, anno);
 }
 
-/* SM_PAT_CAPTURE_FN_ARGS: . *func(args) / $ *func(args) — args-on-stack form.
- * a[0].s=fname, a[1].i=is_imm, a[2].i=nargs.
- * Calls scrip_rt_pat_capture_fn_args(fname, is_imm, nargs). */
+/* SM_PAT_CAPTURE_FN_ARGS: a[0].s=fname, a[1].i=is_imm, a[2].i=nargs. */
 static int emit_sm_pat_capture_fn_args(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    const char *fname  = ins->a[0].s ? ins->a[0].s : "";
-    int         is_imm = (int)ins->a[1].i;
-    int         nargs  = (int)ins->a[2].i;
-    char act[160], lbl[64], ann[128];
-    if (*fname) {
-        strtab_label(lbl, sizeof(lbl), fname);
-        snprintf(act, sizeof(act), "lea     rdi, [rip + %s]", lbl);
-        snprintf(ann, sizeof(ann),  "# fname=%s", fname);
-    } else {
-        snprintf(act, sizeof(act), "xor     edi, edi");
-        snprintf(ann, sizeof(ann),  "# fname=NULL");
-    }
-    if (sm_line(out, "", act, ann) < 0) return -1;
-    snprintf(act, sizeof(act), "mov     esi, %d", is_imm);
-    if (sm_line(out, "", act, "# is_imm") < 0) return -1;
-    snprintf(act, sizeof(act), "mov     edx, %d", nargs);
-    snprintf(ann, sizeof(ann),  "# nargs=%d", nargs);
-    if (sm_line(out, "", act, ann) < 0) return -1;
-    return sm_line(out, "", "call    scrip_rt_pat_capture_fn_args@PLT",
-                   "# SM_PAT_CAPTURE_FN_ARGS");
+    char fname_lbl[64], anno[128];
+    const char *fl = pat_arg_label(fname_lbl, sizeof(fname_lbl), ins->a[0].s);
+    int is_imm = (int)ins->a[1].i;
+    int nargs  = (int)ins->a[2].i;
+    snprintf(anno, sizeof(anno),
+             "# SM_PAT_CAPTURE_FN_ARGS fname=%s is_imm=%d nargs=%d",
+             fl ? ins->a[0].s : "(NULL)", is_imm, nargs);
+    return sm_emit_capture_fn_args(out,
+                                   sm_template_lookup(SM_PAT_CAPTURE_FN_ARGS),
+                                   fl, is_imm, nargs, anno);
 }
 
-/* SM_PAT_USERCALL: bare *func() — a[0].s=fname.
- * Calls scrip_rt_pat_usercall(fname). */
+/* SM_PAT_USERCALL: bare *func() — a[0].s=fname. */
 static int emit_sm_pat_usercall(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    return emit_pat_call_str(out, "scrip_rt_pat_usercall",
-                              ins->a[0].s, "# SM_PAT_USERCALL");
+    char lbl[64], anno[128];
+    const char *l = pat_arg_label(lbl, sizeof(lbl), ins->a[0].s);
+    if (l) {
+        snprintf(anno, sizeof(anno), "# SM_PAT_USERCALL fname=\"%.40s\"%s",
+                 ins->a[0].s, (strlen(ins->a[0].s) > 40) ? "..." : "");
+    } else {
+        snprintf(anno, sizeof(anno), "# SM_PAT_USERCALL fname=NULL");
+    }
+    return sm_emit_lblopt(out, sm_template_lookup(SM_PAT_USERCALL), l, anno);
 }
 
-/* SM_PAT_USERCALL_ARGS: bare *func(args) — a[0].s=fname, a[1].i=nargs.
- * Calls scrip_rt_pat_usercall_args(fname, nargs). */
+/* SM_PAT_USERCALL_ARGS: a[0].s=fname, a[1].i=nargs. */
 static int emit_sm_pat_usercall_args(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    return emit_pat_call_str_int(out, "scrip_rt_pat_usercall_args",
-                                  ins->a[0].s, (int)ins->a[1].i,
-                                  "# SM_PAT_USERCALL_ARGS");
+    char lbl[64], anno[128];
+    const char *l = pat_arg_label(lbl, sizeof(lbl), ins->a[0].s);
+    int nargs = (int)ins->a[1].i;
+    if (l) {
+        snprintf(anno, sizeof(anno),
+                 "# SM_PAT_USERCALL_ARGS fname=\"%.40s\" nargs=%d",
+                 ins->a[0].s, nargs);
+    } else {
+        snprintf(anno, sizeof(anno),
+                 "# SM_PAT_USERCALL_ARGS fname=NULL nargs=%d", nargs);
+    }
+    return sm_emit_lblopt_int32(out, sm_template_lookup(SM_PAT_USERCALL_ARGS),
+                                l, nargs, anno);
 }
 
-/* SM_PAT_<no-arg-no-pop>: ARB / REM / FENCE / FAIL / ABORT / SUCCEED /
- * BAL / EPS — push a pre-built pattern node on the pat-stack.
- * SM_PAT_<value-stack-arg>: SPAN / BREAK / ANY / NOTANY (charset) and
- * LEN / POS / RPOS / TAB / RTAB (int) — runtime pops vstack itself.
- * SM_PAT_<pat-stack-arg>: ARBNO / FENCE1 / CAT / ALT / DEREF / BOXVAL.
- * All of these dispatch to a no-arg scrip_rt_pat_*() entry. */
+/* SM_PAT_<no-arg>: dispatch via template lookup.  Each NULLARY-shape
+ * pattern opcode (SPAN/BREAK/ANY/NOTANY/LEN/POS/RPOS/TAB/RTAB/ARB/
+ * ARBNO/REM/FENCE/FENCE1/FAIL/ABORT/SUCCEED/BAL/EPS/CAT/ALT/DEREF/
+ * BOXVAL) has its own template entry; sm_template_lookup picks the
+ * right one and sm_emit_nullary writes the macro call. */
 static int emit_sm_pat_noarg(FILE *out, sm_opcode_t op, int pc)
 {
     (void)pc;
-    const char *fname;
-    const char *anno;
-    switch (op) {
-    case SM_PAT_SPAN:    fname = "scrip_rt_pat_span";    anno = "# SM_PAT_SPAN";    break;
-    case SM_PAT_BREAK:   fname = "scrip_rt_pat_break";   anno = "# SM_PAT_BREAK";   break;
-    case SM_PAT_ANY:     fname = "scrip_rt_pat_any";     anno = "# SM_PAT_ANY";     break;
-    case SM_PAT_NOTANY:  fname = "scrip_rt_pat_notany";  anno = "# SM_PAT_NOTANY";  break;
-    case SM_PAT_LEN:     fname = "scrip_rt_pat_len";     anno = "# SM_PAT_LEN";     break;
-    case SM_PAT_POS:     fname = "scrip_rt_pat_pos";     anno = "# SM_PAT_POS";     break;
-    case SM_PAT_RPOS:    fname = "scrip_rt_pat_rpos";    anno = "# SM_PAT_RPOS";    break;
-    case SM_PAT_TAB:     fname = "scrip_rt_pat_tab";     anno = "# SM_PAT_TAB";     break;
-    case SM_PAT_RTAB:    fname = "scrip_rt_pat_rtab";    anno = "# SM_PAT_RTAB";    break;
-    case SM_PAT_ARB:     fname = "scrip_rt_pat_arb";     anno = "# SM_PAT_ARB";     break;
-    case SM_PAT_ARBNO:   fname = "scrip_rt_pat_arbno";   anno = "# SM_PAT_ARBNO";   break;
-    case SM_PAT_REM:     fname = "scrip_rt_pat_rem";     anno = "# SM_PAT_REM";     break;
-    case SM_PAT_FENCE:   fname = "scrip_rt_pat_fence";   anno = "# SM_PAT_FENCE";   break;
-    case SM_PAT_FENCE1:  fname = "scrip_rt_pat_fence1";  anno = "# SM_PAT_FENCE1";  break;
-    case SM_PAT_FAIL:    fname = "scrip_rt_pat_fail";    anno = "# SM_PAT_FAIL";    break;
-    case SM_PAT_ABORT:   fname = "scrip_rt_pat_abort";   anno = "# SM_PAT_ABORT";   break;
-    case SM_PAT_SUCCEED: fname = "scrip_rt_pat_succeed"; anno = "# SM_PAT_SUCCEED"; break;
-    case SM_PAT_BAL:     fname = "scrip_rt_pat_bal";     anno = "# SM_PAT_BAL";     break;
-    case SM_PAT_EPS:     fname = "scrip_rt_pat_eps";     anno = "# SM_PAT_EPS";     break;
-    case SM_PAT_CAT:     fname = "scrip_rt_pat_cat";     anno = "# SM_PAT_CAT";     break;
-    case SM_PAT_ALT:     fname = "scrip_rt_pat_alt";     anno = "# SM_PAT_ALT";     break;
-    case SM_PAT_DEREF:   fname = "scrip_rt_pat_deref";   anno = "# SM_PAT_DEREF";   break;
-    case SM_PAT_BOXVAL:  fname = "scrip_rt_pat_boxval";  anno = "# SM_PAT_BOXVAL";  break;
-    default:
-        return -1;  /* should not reach */
-    }
-    return emit_pat_call_0(out, fname, anno);
+    const sm_op_template_t *t = sm_template_lookup(op);
+    if (!t) return -1;
+    char anno[64];
+    snprintf(anno, sizeof(anno), "# %s", sm_opcode_name(op));
+    return sm_emit_nullary(out, t, anno);
 }
 
 /* SM_EXEC_STMT for a variant pattern: emit a scrip_rt_match_variant call.
@@ -1894,27 +1782,27 @@ static int emit_sm_exec_stmt_variant(FILE *out, const SM_Instr *ins, int pc)
     (void)pc;
     const char *sname = ins->a[0].s;
     int has_repl      = (int)ins->a[1].i;
-
-    /* Arg 0 (rdi): subj_name as RIP-relative .Lstr_N or NULL. */
-    if (sname && *sname) {
-        char lbl[64];
-        strtab_label(lbl, sizeof(lbl), sname);
-        char act[160], anno[80];
-        snprintf(act, sizeof(act), "lea     rdi, [rip + %s]", lbl);
-        snprintf(anno, sizeof(anno), "# subj_name=%s", sname);
-        if (sm_line(out, "", act, anno) < 0) return -1;
+    char lbl[64];
+    const char *l = pat_arg_label(lbl, sizeof(lbl), sname);
+    /* Annotation captures both the (optional) subject name and the
+     * has_repl flag for human readers.  The macro itself encodes the
+     * shape (LBLOPT for subj + int for has_repl). */
+    char anno[128];
+    if (l) {
+        snprintf(anno, sizeof(anno),
+                 "# SM_EXEC_STMT_VARIANT subj=%s has_repl=%d", sname, has_repl);
     } else {
-        if (sm_line(out, "", "xor     edi, edi", "# subj_name=NULL") < 0) return -1;
+        snprintf(anno, sizeof(anno),
+                 "# SM_EXEC_STMT_VARIANT subj=NULL has_repl=%d", has_repl);
     }
-
-    /* Arg 1 (esi): has_repl flag. */
-    char act2[80], ann2[80];
-    snprintf(act2, sizeof(act2), "mov     esi, %d", has_repl);
-    snprintf(ann2, sizeof(ann2), "# has_repl=%d", has_repl);
-    if (sm_line(out, "", act2, ann2) < 0) return -1;
-
-    return sm_line(out, "", "call    scrip_rt_match_variant@PLT",
-                    "# EM-7c-variant: build-then-exec_stmt");
+    /* Order: lbl then has_repl in template; sm_emit_exec_var packs
+     * them into args->lbl and args->i32_a.  But we need the
+     * annotation too, so go through sm_emit_template directly. */
+    sm_emit_args_t a = { 0 };
+    a.lbl   = l;
+    a.i32_a = has_repl;
+    a.anno  = anno;
+    return sm_emit_template(out, sm_template_lookup(SM_EXEC_STMT), &a);
 }
 
 
@@ -1925,11 +1813,16 @@ static int emit_sm_exec_stmt_variant(FILE *out, const SM_Instr *ins, int pc)
 static int emit_sm_unhandled(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    char act[80];
-    snprintf(act, sizeof(act), "mov     edi, %d", (int)ins->op);
-    if (sm_line(out, "", act,
-                sm_opcode_name(ins->op)) < 0) return -1;
-    return sm_line(out, "", "call    scrip_rt_unhandled_op@PLT", "");
+    /* SM_UNHANDLED template: trap with the opcode int as edi.  The
+     * macro's body matches what the legacy two-line emit produced
+     * (mov edi, op / call scrip_rt_unhandled_op@PLT), so bytes are
+     * identical -- single source of truth in g_tpl_unhandled. */
+    char anno[64];
+    snprintf(anno, sizeof(anno), "# %s", sm_opcode_name(ins->op));
+    sm_emit_args_t a = { 0 };
+    a.i32_a = (int)ins->op;
+    a.anno  = anno;
+    return sm_emit_template(out, sm_template_unhandled(), &a);
 }
 
 /* -----------------------------------------------------------------------
@@ -1940,6 +1833,13 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
 {
     assert(prog != NULL);
     assert(out  != NULL);
+
+    /* EM-7c-sm-macros (sess #87): emit the SM opcode macro library at
+     * the very top of the .s, generated from g_sm_templates[].  The same
+     * table drives every per-call emit later in this file, so the macro
+     * definition and the per-instruction emission cannot drift — they
+     * share one renderer.  See sm_emit_template.{h,c}. */
+    if (sm_emit_macro_library(out) != 0) return -1;
 
     /* EM-6: collect all string literals and variable names into the string
      * table, then emit them in .section .rodata before .text.  This makes

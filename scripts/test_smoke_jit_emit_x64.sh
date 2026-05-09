@@ -68,8 +68,12 @@ if [ "$RC" -ne 42 ]; then
     echo "FAIL em2_a expected rc=42 got rc=$RC"; exit 1
 fi
 # Asm-content sanity: PUSH_LIT_I and HALT emitter blocks both present.
-# asm-content sanity: check for key instruction sequences in new 3-col format
-grep -q "movabs  rdi, 42"             "$TMP/em2_a.s" || { echo "FAIL no literal-42 movabs"; exit 1; }
+# Post EM-7c-sm-macros: SM opcodes emit as macro calls.  The `movabs rdi, val`
+# instruction lives inside the .macro SM_PUSH_INT body (emitted at top of
+# every .s by sm_emit_macro_library); the call site reads `SM_PUSH_INT 42`.
+# Both are verified below — body proves the encoding; call-site proves the
+# dispatcher routed through the template.
+grep -qE '^[[:space:]]+SM_PUSH_INT[[:space:]]+42\b' "$TMP/em2_a.s" || { echo "FAIL no SM_PUSH_INT 42 macro call"; exit 1; }
 grep -q "scrip_rt_push_int@PLT"       "$TMP/em2_a.s" || { echo "FAIL no push_int call"; exit 1; }
 grep -q "scrip_rt_halt_tos@PLT"       "$TMP/em2_a.s" || { echo "FAIL no halt_tos call"; exit 1; }
 echo "  PASS PUSH_LIT_I+HALT  (rc=42; emit shape correct)"
@@ -98,6 +102,7 @@ CEOF
 gcc -O0 -g -w -I"$ROOT/src" -I"$ROOT/src/runtime/x86" -I"$ROOT/src/runtime" \
     "$TMP/unh.c" \
     "$ROOT/src/runtime/x86/sm_codegen_x64_emit.c" \
+    "$ROOT/src/runtime/x86/sm_emit_template.c" \
     "$ROOT/src/runtime/x86/sm_prog.c" \
     -L"$ROOT/out" -lscrip_rt -lgc -lm -Wl,-rpath,"$ROOT/out" \
     -o "$TMP/unh_emitter" 2> "$TMP/unh_build.err" || {
@@ -183,12 +188,18 @@ if [ "$RC" -ne 42 ]; then
     echo "FAIL em4a expected rc=42 got rc=$RC"; exit 1
 fi
 # Asm-shape sanity: forward jmp, JUMP_F (jz) and JUMP_S (jnz) all present.
-grep -q "jmp     .Lpc"   "$TMP/em4a.s" || { echo "FAIL no SM_JUMP jmp in em4a asm"; exit 1; }
-grep -q "SM_JUMP_F"      "$TMP/em4a.s" || { echo "FAIL no SM_JUMP_F marker"; exit 1; }
-grep -q "SM_JUMP_S"      "$TMP/em4a.s" || { echo "FAIL no SM_JUMP_S marker"; exit 1; }
+# Post EM-7c-sm-macros: the literal `jmp/jz/jnz \tgt` instructions live in
+# the .macro SM_JUMP / SM_JUMP_F / SM_JUMP_S bodies at the top of every .s;
+# the dispatcher emits `SM_JUMP .LpcN`, `SM_JUMP_F .LpcN`, `SM_JUMP_S .LpcN`
+# at the call sites.  Both forms are verified below.
+grep -qE '^[[:space:]]+SM_JUMP[[:space:]]+\.Lpc' "$TMP/em4a.s" || { echo "FAIL no SM_JUMP .LpcN call in em4a asm"; exit 1; }
+grep -qE '^[[:space:]]+SM_JUMP_F[[:space:]]+\.Lpc' "$TMP/em4a.s" || { echo "FAIL no SM_JUMP_F .LpcN call in em4a asm"; exit 1; }
+grep -qE '^[[:space:]]+SM_JUMP_S[[:space:]]+\.Lpc' "$TMP/em4a.s" || { echo "FAIL no SM_JUMP_S .LpcN call in em4a asm"; exit 1; }
 grep -q "scrip_rt_last_ok@PLT" "$TMP/em4a.s" || { echo "FAIL no last_ok call"; exit 1; }
-grep -qE 'jz +\.Lpc'     "$TMP/em4a.s" || { echo "FAIL no jz target in em4a"; exit 1; }
-grep -qE 'jnz +\.Lpc'    "$TMP/em4a.s" || { echo "FAIL no jnz target in em4a"; exit 1; }
+# Macro-body instructions: confirm the .macro definitions actually emitted
+# the conditional branches with \tgt as the target operand.
+grep -qE 'jz[[:space:]]+\\tgt'  "$TMP/em4a.s" || { echo "FAIL no 'jz \\\\tgt' in SM_JUMP_F macro body"; exit 1; }
+grep -qE 'jnz[[:space:]]+\\tgt' "$TMP/em4a.s" || { echo "FAIL no 'jnz \\\\tgt' in SM_JUMP_S macro body"; exit 1; }
 echo "  PASS EM-4a control flow (forward JUMP + JUMP_F not-taken + JUMP_S taken; rc=42)"
 
 # -- Test 6b: EM-4 conditional backward loop ------------------------------
@@ -217,7 +228,10 @@ if [ "$RC" -ne 0 ]; then
     echo "FAIL em4b expected rc=0 got rc=$RC"; exit 1
 fi
 # Asm-shape sanity: the backward jz must target the loop-top label (.Lpc1).
-grep -qE 'jz +\.Lpc1\b' "$TMP/em4b.s" || { echo "FAIL no backward jz to .Lpc1"; exit 1; }
+# Post EM-7c-sm-macros: the call site emits `SM_JUMP_F .Lpc1` (the dispatcher's
+# encoding of \"jump-to-pc-1-on-failure\"); the literal `jz \tgt` lives in the
+# .macro SM_JUMP_F body and resolves at assembly time.
+grep -qE '^[[:space:]]+SM_JUMP_F[[:space:]]+\.Lpc1\b' "$TMP/em4b.s" || { echo "FAIL no backward SM_JUMP_F .Lpc1 in em4b"; exit 1; }
 echo "  PASS EM-4b backward loop (JUMP_F backward x2, fallthrough; rc=0)"
 
 # -- Test 7a: EM-5 chunk call/return -- two chunks calling each other -------
@@ -237,9 +251,14 @@ if [ "$RC" -ne 13 ]; then
 fi
 # Asm-shape sanity: SM_RETURN bakes direct ret; SM_CALL_CHUNK bakes
 # direct call to a .LpcN target -- no PLT call for either opcode.
-grep -q "SM_RETURN"          "$TMP/em5.s" || { echo "FAIL no SM_RETURN marker in em5"; exit 1; }
-grep -q "SM_CALL_CHUNK"      "$TMP/em5.s" || { echo "FAIL no SM_CALL_CHUNK marker in em5"; exit 1; }
-grep -qE 'call +\.Lpc[0-9]+' "$TMP/em5.s" || { echo "FAIL no baked-direct call .LpcN in em5"; exit 1; }
+# Post EM-7c-sm-macros: SM_RETURN's `ret` and SM_CALL_CHUNK's `call \tgt`
+# live in the .macro bodies at the top of the file; the dispatcher emits
+# `SM_RETURN` (no args) and `SM_CALL_CHUNK .LpcN` at the call sites.
+grep -qE '^[[:space:]]+SM_RETURN\b'                "$TMP/em5.s" || { echo "FAIL no SM_RETURN call in em5"; exit 1; }
+grep -qE '^[[:space:]]+SM_CALL_CHUNK[[:space:]]+\.Lpc' "$TMP/em5.s" || { echo "FAIL no SM_CALL_CHUNK .LpcN call in em5"; exit 1; }
+# Macro-body instructions: confirm the templates emitted the right bytes.
+# `call \tgt` lives in the .macro SM_CALL_CHUNK body; `ret` lives in SM_RETURN.
+grep -qE 'call[[:space:]]+\\tgt' "$TMP/em5.s" || { echo "FAIL no 'call \\\\tgt' in SM_CALL_CHUNK macro body"; exit 1; }
 grep -qE '^[[:space:]]+ret\b' "$TMP/em5.s" || { echo "FAIL no native ret in em5"; exit 1; }
 echo "  PASS EM-5a chunk call/return  (chunk_A -> chunk_B; nested rc=13)"
 
