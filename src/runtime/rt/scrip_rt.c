@@ -123,7 +123,7 @@ static int     g_vtop    = 0;
  * Future rung (EM-7c-variant-bb-pool-emit, the architectural ideal): replace
  * the runtime PATND_t build with per-variant-node bb_pool emit driven by an
  * emit-time partition, so invariant subtrees of partly-variant patterns
- * resolve via linker-baked _pat_inv_<pid>_<sid>_alpha labels rather than being
+ * resolve via linker-baked _pat_inv_<pid>_<sid>_α labels rather than being
  * rebuilt into bb_pool at runtime. */
 #define PATSTACK_CAP 256
 static DESCR_t g_pat_stack[PATSTACK_CAP];
@@ -547,16 +547,16 @@ void scrip_rt_push_chunk_descr(int64_t entry_pc, int64_t arity)
  *
  * The mode-4 emitter bakes invariant pattern sub-trees as flat .text
  * chunks via bb_build_flat_text(), with externally-visible entry
- * symbols `_pat_inv_<id>_alpha` etc.  At runtime, the emitted binary
+ * symbols `_pat_inv_<id>_α` etc.  At runtime, the emitted binary
  * pushes the subject and replacement on the SM value stack and calls
- * scrip_rt_match_blob(blob_alpha, sname, has_repl).
+ * scrip_rt_match_blob(blob_α, sname, has_repl).
  *
  * Stack contract (top-of-stack first, top last popped):
  *   [repl_or_zero]    ← top
  *   [subj_descr]
  *
  * Parameters:
- *   blob_alpha   — address of `_pat_inv_<id>_alpha`
+ *   blob_α   — address of `_pat_inv_<id>_α`
  *   subj_name    — subject variable name for write-back, or NULL
  *   has_repl     — 1 if a replacement is present
  *
@@ -567,7 +567,7 @@ void scrip_rt_push_chunk_descr(int64_t entry_pc, int64_t arity)
 
 extern void scrip_rt_set_last_ok(int v);   /* defined below */
 
-void scrip_rt_match_blob(void *blob_alpha,
+void scrip_rt_match_blob(void *blob_α,
                          const char *subj_name,
                          int has_repl)
 {
@@ -576,7 +576,7 @@ void scrip_rt_match_blob(void *blob_alpha,
     DESCR_t repl = vstack_pop();
     DESCR_t subj = vstack_pop();
 
-    bb_box_fn root_fn = (bb_box_fn)blob_alpha;
+    bb_box_fn root_fn = (bb_box_fn)blob_α;
     int ok = exec_stmt_blob(subj_name,
                             &subj,
                             root_fn,

@@ -443,7 +443,7 @@ extern char     subject_data[65536];
 
 /* stmt_setup_subject: copy DESCR_t string value into subject_data flat buffer,
  * set subject_len_val, reset cursor to 0.
- * Called from ASM before jmp root_alpha for each pattern-match statement.
+ * Called from ASM before jmp root_α for each pattern-match statement.
  * Returns 0 on success, 1 if subject is FAIL/null (skip the match). */
 int stmt_setup_subject(DESCR_t subj) {
     /* B-282: if subject expression failed (FAILDESCR), fail the whole statement.

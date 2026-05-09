@@ -560,9 +560,9 @@ DESCR_t EXPVAL_fn(DESCR_t expr_d)
         if (!expr_d.ptr) return FAILDESCR;
 
         /* Save subject globals (SIL: WPTR/XCL/YCL/TCL) */
-        const char *save_sigma = Σ;
-        int         save_omega = Ω;
-        int         save_delta = Δ;
+        const char *save_Σ = Σ;
+        int         save_Ω = Ω;
+        int         save_Δ = Δ;
 
         /* Save NAM frame (SIL: NAMICL/NHEDCL) — push fresh ctx.
          * SN-23c: replaces NAME_save()/NAME_discard(cookie) with a child
@@ -581,9 +581,9 @@ DESCR_t EXPVAL_fn(DESCR_t expr_d)
         NAME_ctx_leave();
 
         /* Restore subject globals */
-        Σ = save_sigma;
-        Ω = save_omega;
-        Δ = save_delta;
+        Σ = save_Σ;
+        Ω = save_Ω;
+        Δ = save_Δ;
 
         return result;
     }

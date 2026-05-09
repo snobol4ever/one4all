@@ -47,10 +47,10 @@ bb_box_fn bb_build_flat(PATND_t *p);
  * Emits the same flat-globbed code as GAS text directives into `out`,
  * with externally-visible top-level labels:
  *
- *   <prefix>_alpha   (entry — forward attempt)
- *   <prefix>_beta    (re-entry — backtrack)
- *   <prefix>_gamma   (success exit)
- *   <prefix>_omega   (failure exit)
+ *   <prefix>_α       (entry — forward attempt)
+ *   <prefix>_β       (re-entry — backtrack)
+ *   <prefix>_γ       (success exit)
+ *   <prefix>_ω       (failure exit)
  *
  * `.global` directives are emitted for all four so the `.s` exposes
  * them to the assembler/linker.  The EM-7c emitter (variant-node
@@ -91,6 +91,6 @@ void bb_build_flat_text_reset(void);
 /* EM-7c-capture: install a callback that is invoked each time flat_emit_node
  * emits an XNME/XFNME child sub-blob.  sm_codegen_x64_emit installs this
  * to collect cap fixups for the startup preamble. */
-void bb_flat_set_cap_fixup_cb(void (*cb)(void *cap_ptr, const char *child_alpha_label));
+void bb_flat_set_cap_fixup_cb(void (*cb)(void *cap_ptr, const char *child_α_label));
 
 #endif /* BB_FLAT_H */

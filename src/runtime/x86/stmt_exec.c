@@ -382,11 +382,11 @@ void bin_audit_print(void)
 
 /* ── USERCALL box — *fn() bare pattern side-effect call ──────────────────────
  * Bug #1d fix: defer via NAME_push_callcap so the call fires at NAME_commit
- * (overall pattern success) rather than at match-time alpha.  Failed ARBNO
+ * (overall pattern success) rather than at match-time α.  Failed ARBNO
  * trials / ALT arms that include *fn() no longer fire the function — the NAM
  * rollback on backtrack discards the pending callcap entry before commit.
- * On alpha: record deferred call (epsilon match); succeed.
- * On beta: fail — no re-try semantics for side-effect calls. */
+ * On α: record deferred call (epsilon match); succeed.
+ * On β: fail — no re-try semantics for side-effect calls. */
 typedef struct {
     const char *name;
     DESCR_t    *args;
@@ -942,8 +942,8 @@ bb_node_t bb_build(PATND_t *p)
     case XATP: {
         /* XATP with STRVAL_fn=="@" is the cursor-capture operator built by
          * pat_at_cursor().  args[0].s holds the variable name.
-         * On alpha: write Δ as DT_I into varname, succeed (epsilon).
-         * On beta: fail (no backtrack). */
+         * On α: write Δ as DT_I into varname, succeed (epsilon).
+         * On β: fail (no backtrack). */
         if (p->STRVAL_fn && strcmp(p->STRVAL_fn, "@") == 0) {
             const char *varname = (p->nargs >= 1 && p->args[0].v == DT_S)
                                   ? p->args[0].s : "";
@@ -1481,7 +1481,7 @@ Success:
  *
  * The mode-4 emitter (sm_codegen_x64_emit.c) bakes invariant pattern
  * sub-trees as flat .text chunks via bb_build_flat_text.  At Phase-3
- * time it has a function pointer (the address of `_pat_inv_<id>_alpha`)
+ * time it has a function pointer (the address of `_pat_inv_<id>_α`)
  * but no PATND_t — the tree is gone, only the code remains.
  *
  * exec_stmt_blob() lets the emitted binary call into Phase-1+3+4+5
@@ -1492,7 +1492,7 @@ Success:
  *
  * Parameters: identical to exec_stmt, except pat is replaced by
  *   root_fn — the entry point of the baked invariant pattern blob
- *             (i.e. the address of the `_pat_inv_<id>_alpha` symbol).
+ *             (i.e. the address of the `_pat_inv_<id>_α` symbol).
  *
  * Returns 1 → :S, 0 → :F.
  * ══════════════════════════════════════════════════════════════════════════ */
@@ -1544,7 +1544,7 @@ int cache_test_run(const char *lit, int n_iters)
 /* ══════════════════════════════════════════════════════════════════════════
  * deferred_var_test — T15 gate helper
  *
- * Exercises bb_deferred_var re-resolution on every alpha.
+ * Exercises bb_deferred_var re-resolution on every α.
  * We simulate two consecutive statement executions where the variable
  * PAT holds different string values:
  *   Execution 1: PAT = "Bird"  →  subject "BlueBird"  should match
@@ -1639,14 +1639,14 @@ int deferred_var_test(void)
      * with Σ set to known subjects. */
     Σ = "BlueBird"; Ω = (int)strlen(Σ); Δ = 0;
 
-    /* First alpha — will resolve via NV_GET_fn. Since test stub returns SNUL,
+    /* First α — will resolve via NV_GET_fn. Since test stub returns SNUL,
      * child becomes epsilon (always matches zero-width).  What we verify is
      * that the re-resolve branch runs without crash and returns a valid spec. */
     spec_t r1 = spec_from_descr(dvar.fn(dvar.ζ, α));
     /* epsilon matches → non-empty spec at position 0 */
     ok &= !spec_is_empty(r1) ? 1 : 0;   /* epsilon always succeeds */
 
-    /* Second alpha on same box — re-resolve must run again (not skip) */
+    /* Second α on same box — re-resolve must run again (not skip) */
     /* Reset Δ */
     Δ = 0;
     spec_t r2 = spec_from_descr(dvar.fn(dvar.ζ, α));

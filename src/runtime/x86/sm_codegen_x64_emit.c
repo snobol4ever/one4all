@@ -18,8 +18,8 @@
  *
  *   emit_bb_box()    -- BB graph boxes (called per SM_PAT_* instruction)
  *                       One proc per box. Four local labels per proc:
- *                         .alpha (try), .beta (retry),
- *                         .gamma (success exit), .omega (failure exit)
+ *                         .α (try), .β (retry),
+ *                         .γ (success exit), .ω (failure exit)
  *                       Three-column law inside each port body.
  *                       Proven precedent: bb_emit.c + snobol4_asm.mac
  *                       (106/106 SPITBOL oracle).
@@ -380,12 +380,12 @@ static int emit_chunk_registry(FILE *out, const SM_Program *prog)
 /* EM-7c-capture: cap fixup table.  Each entry pairs a heap cap_t pointer
  * (baked as imm64 — valid in emitter process AND in the emitted binary
  * since the binary calls into libscrip_rt which allocates the same heap
- * objects) with the child's alpha label name.  Emitted as a sequence of
+ * objects) with the child's α label name.  Emitted as a sequence of
  * scrip_rt_patch_cap_fn(cap_ptr, child_fn) calls in main's preamble. */
 #define MAX_CAP_FIXUPS 1024
 typedef struct {
     void       *cap_ptr;      /* heap cap_t * from bb_cap_new — baked as imm64 */
-    char        child_label[128]; /* label like _pat_inv_0_cap0_child_alpha */
+    char        child_label[128]; /* label like _pat_inv_0_cap0_child_α */
 } cap_fixup_t;
 
 static cap_fixup_t g_cap_fixups[MAX_CAP_FIXUPS];
@@ -445,13 +445,13 @@ static int emit_file_header(FILE *out, int count, int has_chunk_registry)
 
     /* EM-7c-capture: patch cap_t fn pointers to baked child blobs.
      * If cap_ptr == (void*)1, it is a symbolic fixup: derive cap_data_lbl from
-     * child_label by replacing "_child_alpha" with "_data" and prepending ".L". */
+     * child_label by replacing "_child_α" with "_data" and prepending ".L". */
     for (int i = 0; i < g_cap_fixups_n; i++) {
-        const char *alpha = g_cap_fixups[i].child_label;  /* "_capN_child_alpha" */
+        const char *α = g_cap_fixups[i].child_label;  /* "_capN_child_α" */
         if ((uintptr_t)g_cap_fixups[i].cap_ptr == 1) {
-            /* Symbolic cap fixup: reconstruct ".LcapN_data" from "_capN_child_alpha" */
+            /* Symbolic cap fixup: reconstruct ".LcapN_data" from "_capN_child_α" */
             char cap_lbl[128];
-            const char *p = alpha;
+            const char *p = α;
             if (*p == '_') p++;
             const char *underscore = strchr(p, '_');
             int id_len = underscore ? (int)(underscore - p) : (int)strlen(p);
@@ -461,11 +461,11 @@ static int emit_file_header(FILE *out, int count, int has_chunk_registry)
                     "\tlea     rdi, [rip + %s]\n"
                     "\tlea     rsi, [rip + %s]\n"
                     "\tcall    scrip_rt_patch_cap_fn@PLT\n",
-                    i, cap_lbl, alpha, cap_lbl, alpha) < 0) return -1;
+                    i, cap_lbl, α, cap_lbl, α) < 0) return -1;
         } else if ((uintptr_t)g_cap_fixups[i].cap_ptr == 2) {
-            /* Arbno fixup: reconstruct ".LarbnoN_slot" from "_arbnoN_child_alpha" */
+            /* Arbno fixup: reconstruct ".LarbnoN_slot" from "_arbnoN_child_α" */
             char slot_lbl[128];
-            const char *p = alpha;
+            const char *p = α;
             if (*p == '_') p++;
             const char *underscore = strchr(p, '_');
             int id_len = underscore ? (int)(underscore - p) : (int)strlen(p);
@@ -475,7 +475,7 @@ static int emit_file_header(FILE *out, int count, int has_chunk_registry)
                     "\tlea     rdi, [rip + %s]\n"
                     "\tlea     rsi, [rip + %s]\n"
                     "\tcall    scrip_rt_init_arbno@PLT\n",
-                    i, slot_lbl, alpha, slot_lbl, alpha) < 0) return -1;
+                    i, slot_lbl, α, slot_lbl, α) < 0) return -1;
         } else {
             if (fprintf(out,
                     "\t# cap fixup %d: cap_t@%p -> %s\n"
@@ -484,9 +484,9 @@ static int emit_file_header(FILE *out, int count, int has_chunk_registry)
                     "\tcall    scrip_rt_patch_cap_fn@PLT\n",
                     i,
                     g_cap_fixups[i].cap_ptr,
-                    alpha,
+                    α,
                     (unsigned long long)(uintptr_t)g_cap_fixups[i].cap_ptr,
-                    alpha) < 0) return -1;
+                    α) < 0) return -1;
         }
     }
 
@@ -1450,7 +1450,7 @@ DESCR_t sm_phase2_to_patnd(const SM_Program *prog,
  *      - SM_PAT_* and value-stack pushes inside an invariant Phase-2
  *        window: emit a NOP comment (the pattern is already baked).
  *      - SM_EXEC_STMT for an invariant statement: emit a call to
- *        scrip_rt_match_blob(_pat_inv_<id>_alpha, sname, has_repl).
+ *        scrip_rt_match_blob(_pat_inv_<id>_α, sname, has_repl).
  *      - Variant patterns / non-pattern statements: unchanged
  *        (variant patterns fall through to emit_sm_unhandled until
  *        the variant-runtime-emitter rung lands).
@@ -1562,7 +1562,7 @@ static void pattern_windows_collect(const SM_Program *prog)
 /* Emit the .text-resident invariant pattern blobs.  Called after the
  * .rodata section and before the main `.text` instruction stream.
  * Each invariant pattern gets one labeled chunk with externally-visible
- * α/β/γ/ω labels (`_pat_inv_<id>_alpha` etc.). */
+ * α/β/γ/ω labels (`_pat_inv_<id>_α` etc.). */
 static int emit_pattern_blobs(FILE *out)
 {
     int n_invariant = 0;
@@ -1581,8 +1581,8 @@ static int emit_pattern_blobs(FILE *out)
         "\n"
         "# ============================================================================\n"
         "# EM-7c: invariant pattern blobs (baked from sm_phase2_to_patnd → bb_build_flat_text)\n"
-        "# Each block exposes _pat_inv_<id>_alpha / _beta / _gamma / _omega.\n"
-        "# scrip_rt_match_blob(blob_alpha, ...) drives Phase-3 against these blobs.\n"
+        "# Each block exposes _pat_inv_<id>_α / _β / _γ / _ω.\n"
+        "# scrip_rt_match_blob(blob_α, ...) drives Phase-3 against these blobs.\n"
         "# ============================================================================\n"
         "\t.intel_syntax noprefix\n"
         "\t.text\n",
@@ -1619,11 +1619,11 @@ static int emit_sm_exec_stmt_blob(FILE *out, const SM_Instr *ins, int pc, int wi
     const char *sname = ins->a[0].s;     /* subject NV name (or NULL) */
     int has_repl      = (int)ins->a[1].i;
 
-    /* Arg 0 (rdi) = blob_alpha = address of `_pat_inv_<id>_alpha`.
+    /* Arg 0 (rdi) = blob_α = address of `_pat_inv_<id>_α`.
      * GAS Intel syntax: `lea rdi, [rip + symbol]`. */
     char act[160];
     snprintf(act, sizeof(act),
-             "lea     rdi, [rip + _pat_inv_%d_alpha]", w->pat_id);
+             "lea     rdi, [rip + _pat_inv_%d_α]", w->pat_id);
     char anno[80];
     snprintf(anno, sizeof(anno),
              "# blob entry α  (Phase-2 pc=%d..%d)",

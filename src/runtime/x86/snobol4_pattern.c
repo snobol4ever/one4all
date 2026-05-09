@@ -843,8 +843,8 @@ DESCR_t EVAL_fn(DESCR_t expr) {
 
     /* String hook: if scrip.c has wired interp_eval_pat for string->pattern routing,
      * use it -- handles E_DEFER (*func), $ (cursor-assign), and all operators
-     * that eval_node in eval_code.c does not support (e.g. EVAL(omega) where
-     * omega contains *T8Trace(...) or $ tz). */
+     * that eval_node in eval_code.c does not support (e.g. EVAL(ω) where
+     * ω contains *T8Trace(...) or $ tz). */
     if (g_eval_str_hook) return g_eval_str_hook(s);
 
     /* General string: compile to DT_E (RT-7 CONVE_fn) then execute (RT-6) */

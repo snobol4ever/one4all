@@ -8,7 +8,7 @@
  *   1. bb_build_flat_text emits a .s file for a simple invariant
  *      pattern (pat_lit("hello")).
  *   2. The .s contains .global directives for the four top-level
- *      labels (_pat_inv_<pid>_<sid>_alpha/_beta/_gamma/_omega).
+ *      labels (_pat_inv_<pid>_<sid>_α/_β/_γ/_ω).
  *   3. The .s assembles cleanly via `gcc -c`.
  *
  * Runs as part of test_smoke_jit_emit_x64.sh (Test 12, EM-7b).
@@ -100,24 +100,24 @@ int main(int argc, char **argv) {
     buf[nread] = '\0';
     fclose(fr);
 
-    CHECK(strstr(buf, ".global _pat_inv_42_0_alpha") != NULL,
-          ".global _pat_inv_42_0_alpha missing");
-    CHECK(strstr(buf, ".global _pat_inv_42_0_beta")  != NULL,
-          ".global _pat_inv_42_0_beta missing");
-    CHECK(strstr(buf, ".global _pat_inv_42_0_gamma") != NULL,
-          ".global _pat_inv_42_0_gamma missing");
-    CHECK(strstr(buf, ".global _pat_inv_42_0_omega") != NULL,
-          ".global _pat_inv_42_0_omega missing");
+    CHECK(strstr(buf, ".global _pat_inv_42_0_α") != NULL,
+          ".global _pat_inv_42_0_α missing");
+    CHECK(strstr(buf, ".global _pat_inv_42_0_β")  != NULL,
+          ".global _pat_inv_42_0_β missing");
+    CHECK(strstr(buf, ".global _pat_inv_42_0_γ") != NULL,
+          ".global _pat_inv_42_0_γ missing");
+    CHECK(strstr(buf, ".global _pat_inv_42_0_ω") != NULL,
+          ".global _pat_inv_42_0_ω missing");
 
     /* ── 4. Verify each label is also DEFINED (not just declared) ── */
-    CHECK(strstr(buf, "_pat_inv_42_0_alpha:") != NULL,
-          "_pat_inv_42_0_alpha definition missing");
-    CHECK(strstr(buf, "_pat_inv_42_0_beta:")  != NULL,
-          "_pat_inv_42_0_beta definition missing");
-    CHECK(strstr(buf, "_pat_inv_42_0_gamma:") != NULL,
-          "_pat_inv_42_0_gamma definition missing");
-    CHECK(strstr(buf, "_pat_inv_42_0_omega:") != NULL,
-          "_pat_inv_42_0_omega definition missing");
+    CHECK(strstr(buf, "_pat_inv_42_0_α:") != NULL,
+          "_pat_inv_42_0_α definition missing");
+    CHECK(strstr(buf, "_pat_inv_42_0_β:")  != NULL,
+          "_pat_inv_42_0_β definition missing");
+    CHECK(strstr(buf, "_pat_inv_42_0_γ:") != NULL,
+          "_pat_inv_42_0_γ definition missing");
+    CHECK(strstr(buf, "_pat_inv_42_0_ω:") != NULL,
+          "_pat_inv_42_0_ω definition missing");
 
     /* ── 5. Verify readable-mnemonic emission (EM-7b'': no .byte walls) ── */
     /* EM-7c-symbolic: r10 now loaded via 'lea r10, [rip + Δ]' (symbolic). */

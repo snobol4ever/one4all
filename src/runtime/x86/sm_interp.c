@@ -1458,9 +1458,9 @@ DESCR_t sm_call_chunk(int entry_pc)
     /* Save NAM frame and subject globals */
     NAME_ctx_t chunk_ctx;
     NAME_ctx_enter(&chunk_ctx);
-    const char *save_sigma = Σ;
-    int         save_omega = Ω;
-    int         save_delta = Δ;
+    const char *save_Σ = Σ;
+    int         save_Ω = Ω;
+    int         save_Δ = Δ;
 
     /* Save outer err_jmp; install a local one so chunk errors don't escape */
     jmp_buf saved_err_jmp;
@@ -1478,7 +1478,7 @@ DESCR_t sm_call_chunk(int entry_pc)
     /* Restore outer err_jmp */
     memcpy(&g_sno_err_jmp, &saved_err_jmp, sizeof(jmp_buf));
 
-    Σ = save_sigma; Ω = save_omega; Δ = save_delta;
+    Σ = save_Σ; Ω = save_Ω; Δ = save_Δ;
     NAME_ctx_leave();
 
     return result;

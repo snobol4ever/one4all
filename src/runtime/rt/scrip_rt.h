@@ -131,13 +131,13 @@ void scrip_rt_push_chunk_descr(int64_t entry_pc, int64_t arity);
  * chunks (via bb_build_flat_text); at SM_EXEC_STMT, the emitted code
  * pushes [subj][repl_or_zero] on the value stack and calls this entry.
  *
- *   blob_alpha  — address of `_pat_inv_<id>_alpha` (the baked entry)
+ *   blob_α  — address of `_pat_inv_<id>_α` (the baked entry)
  *   subj_name   — subject NV name for write-back, or NULL
  *   has_repl    — 1 if a real replacement is on the stack, 0 if dummy
  *
  * Result lands on libscrip_rt's last-ok flag (SM_JUMP_S/F observe it).
  */
-void scrip_rt_match_blob(void *blob_alpha,
+void scrip_rt_match_blob(void *blob_α,
                          const char *subj_name,
                          int has_repl);
 
@@ -261,11 +261,11 @@ void scrip_rt_register_chunks(const rt_chunk_entry *tbl);
 
 /* EM-7c-capture: patch a heap cap_t's fn pointer to point to a baked child blob.
  * Called from the emitted binary's preamble (before scrip_rt_init) once per
- * XNME/XFNME blob whose child alpha address is only known at link time. */
+ * XNME/XFNME blob whose child α address is only known at link time. */
 void scrip_rt_patch_cap_fn(void *cap_ptr, void *child_fn);
 
 /* EM-7c-arbno: allocate a fresh arbno_t for a baked ARBNO blob and store
- * the pointer in *slot_ptr.  child_fn is the child blob's alpha entry.
+ * the pointer in *slot_ptr.  child_fn is the child blob's α entry.
  * Called from the emitted binary's preamble before scrip_rt_init. */
 void scrip_rt_init_arbno(void **slot_ptr, void *child_fn);
 
