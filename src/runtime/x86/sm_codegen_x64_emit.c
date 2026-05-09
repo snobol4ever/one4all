@@ -183,6 +183,7 @@ typedef struct {
 static StrEntry g_strtab[STRTAB_CAP];
 static int      g_strtab_n = 0;
 
+
 static void strtab_reset(void)
 {
     g_strtab_n = 0;
@@ -420,8 +421,6 @@ static int emit_file_header(FILE *out, int count, int has_chunk_registry)
         "# See archive/EMITTER-MODE4-ARCH.md for the full design.\n"
         "# -----------------------------------------------------------------------\n"
         "\t.intel_syntax noprefix\n"
-        "# Include SM opcode macro library (one macro per opcode group)\n"
-        "# .include \"sm_macros.s\"  # assembled separately; macros used by name below\n"
         "\t.globl  main\n"
         "\t.type   main, @function\n"
         "main:\n"
@@ -525,16 +524,20 @@ static int emit_file_footer(FILE *out)
 static int sm_line(FILE *out, const char *label, const char *action,
                    const char *goto_col)
 {
-    /* Col 1 (label): width 24; Col 2 (action): width 36; Col 3 (goto/#comment).
-     * GNU-as with .intel_syntax uses # for line comments; ; is stmt separator.
-     * goto_col that starts with ';' is a comment: replace with '#'. */
+    /* Three-column layout:  LABEL:  ACTION  GOTO/#comment
+     * Col 1 (label):  24 chars, left-aligned
+     * Col 2 (action): 36 chars, left-aligned
+     * Col 3 (goto/#comment): free width
+     *
+     * If label is NULL/empty, consume g_cur_pc_label (set once per
+     * instruction by set_cur_pc_label()) so the first sm_line call on
+     * an instruction automatically gets the .LpcN: column.  Subsequent
+     * calls within the same instruction have g_cur_pc_label already
+     * cleared and emit with no label column.
+     */
     const char *gc = "";
     char gc_buf[128] = "";
     if (goto_col && *goto_col) {
-        /* Determine if goto_col is a live jump (jmp/je/jne/ret/call) or a comment.
-         * Anything that is not an asm keyword gets prefixed with "# " to make
-         * it a comment. GNU-as .intel_syntax does not accept bare words after
-         * an instruction. */
         int is_asm = (strncmp(goto_col, "jmp", 3) == 0 ||
                       strncmp(goto_col, "je",  2) == 0 ||
                       strncmp(goto_col, "jne", 3) == 0 ||
@@ -553,8 +556,20 @@ static int sm_line(FILE *out, const char *label, const char *action,
             gc = gc_buf;
         }
     }
-    const char *lbl = (label && *label) ? label : "";
-    return fprintf(out, "%-24s%-36s%s\n", lbl, action, gc) < 0 ? -1 : 0;
+    /* Determine column-1 label. Explicit arg wins; else consume pending
+     * label from sm_emit_template's global (set by sm_emit_set_pc_label
+     * once per instruction at the top of the dispatch loop). */
+    const char *lbl;
+    if (label && *label) {
+        lbl = label;
+    } else {
+        lbl = sm_emit_consume_pc_label();   /* "" if no pending label */
+    }
+    const char *act = (action && *action) ? action : "";
+    if (lbl && *lbl)
+        return fprintf(out, "%-24s%-36s%s\n", lbl, act, gc) < 0 ? -1 : 0;
+    else
+        return fprintf(out, "\t%-35s%s\n", act, gc) < 0 ? -1 : 0;
 }
 
 /* -----------------------------------------------------------------------
@@ -1834,12 +1849,29 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
     assert(prog != NULL);
     assert(out  != NULL);
 
-    /* EM-7c-sm-macros (sess #87): emit the SM opcode macro library at
-     * the very top of the .s, generated from g_sm_templates[].  The same
-     * table drives every per-call emit later in this file, so the macro
-     * definition and the per-instruction emission cannot drift — they
-     * share one renderer.  See sm_emit_template.{h,c}. */
-    if (sm_emit_macro_library(out) != 0) return -1;
+    /* EM-7c-sm-macros (sess #87): the SM opcode macro library lives in
+     * a separate header file sm_macros.s; the emitted .s pulls it in via
+     * `.include "sm_macros.s"`.  This keeps every .s small (was ~200 lines
+     * of macro defs at the top of every file).  The header is generated
+     * from g_sm_templates[] -- the same table that drives every per-call
+     * emit later in this file -- so the macro definition and the
+     * per-instruction emission cannot drift; they share one renderer.
+     * See sm_emit_template.{h,c}.
+     *
+     * The header is written to the current working directory by default
+     * (GAS searches `.` for `.include` paths).  Callers that redirect the
+     * .s into a specific output directory should arrange to have
+     * sm_macros.s alongside it (or pre-write it once via
+     * sm_emit_macro_library_to_path()).  We always (re)write it here so a
+     * fresh emit run cannot pick up a stale header, and the
+     * write-then-include pair is atomic from the caller's perspective. */
+    if (sm_emit_macro_library_to_path("sm_macros.s") != 0) {
+        fprintf(stderr,
+                "sm_codegen_x64_emit: failed to write sm_macros.s "
+                "(working directory writable?)\n");
+        return -1;
+    }
+    if (fputs("\t.include \"sm_macros.s\"\n", out) == EOF) return -1;
 
     /* EM-6: collect all string literals and variable names into the string
      * table, then emit them in .section .rodata before .text.  This makes
@@ -1886,10 +1918,21 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
     for (int pc = 0; pc < prog->count; pc++) {
         const SM_Instr *ins = &prog->instrs[pc];
 
-        /* Per-PC label: .LpcN -- used by EM-4 control-flow jumps */
-        if (emit_pc_label(out, pc) != 0) {
-            if (sl_loaded) srclines_free(&sl);
-            return -1;
+        /* If the previous instruction did not consume its pending label
+         * (e.g. an SM_LABEL or SM_STNO that emits no opcode line), flush
+         * it now as a standalone label line so it remains a valid jump
+         * target.  Then set the label for this instruction. */
+        {
+            const char *leftover = sm_emit_consume_pc_label();
+            if (leftover && *leftover) {
+                if (fprintf(out, "%s\n", leftover) < 0) {
+                    if (sl_loaded) srclines_free(&sl);
+                    return -1;
+                }
+            }
+            char lbl[32];
+            snprintf(lbl, sizeof(lbl), ".Lpc%d:", pc);
+            sm_emit_set_pc_label(lbl);
         }
 
         /* EM-7c: pattern-window dispatch hook.  Two cases handled here
@@ -2035,6 +2078,17 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
         if (rc != 0) {
             if (sl_loaded) srclines_free(&sl);
             return -1;
+        }
+    }
+
+    /* Flush any final unused pending label (e.g. SM_LABEL at the very end). */
+    {
+        const char *leftover = sm_emit_consume_pc_label();
+        if (leftover && *leftover) {
+            if (fprintf(out, "%s\n", leftover) < 0) {
+                if (sl_loaded) srclines_free(&sl);
+                return -1;
+            }
         }
     }
 

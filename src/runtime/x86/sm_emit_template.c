@@ -31,6 +31,46 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* -----------------------------------------------------------------------
+ * Three-column label support.
+ *
+ * g_pending_pc_label is set by the dispatcher once per instruction.
+ * render_call_line consumes it (copies to args->label if args->label is
+ * NULL) and clears it so continuation lines within the same instruction
+ * (multi-line blobs) don't inherit it.
+ * ----------------------------------------------------------------------- */
+static char g_pending_pc_label[32] = "";  /* ".Lpc%d:"  set by sm_emit_set_pc_label */
+
+void sm_emit_set_pc_label(const char *lbl)
+{
+    if (lbl && *lbl) {
+        size_t n = strlen(lbl);
+        if (n >= sizeof(g_pending_pc_label)) n = sizeof(g_pending_pc_label) - 1;
+        memcpy(g_pending_pc_label, lbl, n);
+        g_pending_pc_label[n] = '\0';
+    } else {
+        g_pending_pc_label[0] = '\0';
+    }
+}
+
+/* Read + clear.  Used by callers that bypass render_call_line (e.g.
+ * sm_line in the codegen driver) but still want the column-1 label
+ * pickup behavior.  Returns "" when there's nothing pending. */
+const char *sm_emit_consume_pc_label(void)
+{
+    static char buf[32];
+    if (!g_pending_pc_label[0]) return "";
+    /* Copy out into a static buffer (so the caller can use it across
+     * subsequent sm_emit_* calls without aliasing into g_pending_pc_label). */
+    size_t n = strlen(g_pending_pc_label);
+    if (n >= sizeof(buf)) n = sizeof(buf) - 1;
+    memcpy(buf, g_pending_pc_label, n);
+    buf[n] = '\0';
+    g_pending_pc_label[0] = '\0';
+    return buf;
+}
+
+
 /* ---------------------------------------------------------------------
  * Template table
  *
@@ -360,145 +400,149 @@ static int write_anno(FILE *out, const char *anno)
     return fprintf(out, "  # %s\n", a) < 0 ? -1 : 0;
 }
 
-static int render_call_line(FILE *out, const sm_op_template_t *t,
-                            const sm_emit_args_t *args)
+/* Build the opcode+args string for column 2 into buf[cap].
+ * Returns 0 on success, -1 if buf is too small (truncation). */
+static int build_op_col(char *buf, int cap, const sm_op_template_t *t,
+                        const sm_emit_args_t *args)
 {
+    int n = 0;
     switch (t->kind) {
     case SM_TPL_NULLARY:
-        if (fprintf(out, "\t%s", t->macro_name) < 0) return -1;
-        return write_anno(out, args->anno);
-
+        n = snprintf(buf, cap, "%s", t->macro_name);
+        break;
     case SM_TPL_INT64:
-        if (fprintf(out, "\t%s %" PRId64, t->macro_name, args->i64) < 0) return -1;
-        return write_anno(out, args->anno);
-
+        n = snprintf(buf, cap, "%s %" PRId64, t->macro_name, args->i64);
+        break;
     case SM_TPL_LBL:
         if (!args->lbl) {
             fprintf(stderr, "sm_emit_template: SM_TPL_LBL got NULL lbl for %s\n",
                     t->macro_name);
             return -1;
         }
-        if (fprintf(out, "\t%s %s", t->macro_name, args->lbl) < 0) return -1;
-        return write_anno(out, args->anno);
-
+        n = snprintf(buf, cap, "%s %s", t->macro_name, args->lbl);
+        break;
     case SM_TPL_LBLOPT:
-        /* lbl may be NULL; macro's .ifnb handles both. */
-        if (args->lbl) {
-            if (fprintf(out, "\t%s %s", t->macro_name, args->lbl) < 0) return -1;
-        } else {
-            if (fprintf(out, "\t%s", t->macro_name) < 0) return -1;
-        }
-        return write_anno(out, args->anno);
-
+        if (args->lbl)
+            n = snprintf(buf, cap, "%s %s", t->macro_name, args->lbl);
+        else
+            n = snprintf(buf, cap, "%s", t->macro_name);
+        break;
     case SM_TPL_LBL_INT32:
         if (!args->lbl) {
             fprintf(stderr, "sm_emit_template: SM_TPL_LBL_INT32 got NULL lbl for %s\n",
                     t->macro_name);
             return -1;
         }
-        if (fprintf(out, "\t%s %s, %d", t->macro_name, args->lbl, args->i32_a) < 0)
-            return -1;
-        return write_anno(out, args->anno);
-
+        n = snprintf(buf, cap, "%s %s, %d", t->macro_name, args->lbl, args->i32_a);
+        break;
     case SM_TPL_LBLOPT_INT32:
-        /* lbl may be NULL; macro's .ifnb handles both. */
-        if (args->lbl) {
-            if (fprintf(out, "\t%s %d, %s", t->macro_name, args->i32_a, args->lbl) < 0)
-                return -1;
-        } else {
-            if (fprintf(out, "\t%s %d", t->macro_name, args->i32_a) < 0) return -1;
-        }
-        return write_anno(out, args->anno);
-
+        if (args->lbl)
+            n = snprintf(buf, cap, "%s %d, %s", t->macro_name, args->i32_a, args->lbl);
+        else
+            n = snprintf(buf, cap, "%s %d", t->macro_name, args->i32_a);
+        break;
     case SM_TPL_LBLOPT3:
-        /* args: is_imm, fname_lbl, namelist_lbl */
-        if (args->lbl && args->lbl_b) {
-            if (fprintf(out, "\t%s %d, %s, %s",
-                        t->macro_name, args->i32_a, args->lbl, args->lbl_b) < 0)
-                return -1;
-        } else if (args->lbl) {
-            if (fprintf(out, "\t%s %d, %s",
-                        t->macro_name, args->i32_a, args->lbl) < 0)
-                return -1;
-        } else if (args->lbl_b) {
-            if (fprintf(out, "\t%s %d, , %s",
-                        t->macro_name, args->i32_a, args->lbl_b) < 0)
-                return -1;
-        } else {
-            if (fprintf(out, "\t%s %d", t->macro_name, args->i32_a) < 0)
-                return -1;
-        }
-        return write_anno(out, args->anno);
-
+        if (args->lbl && args->lbl_b)
+            n = snprintf(buf, cap, "%s %d, %s, %s",
+                         t->macro_name, args->i32_a, args->lbl, args->lbl_b);
+        else if (args->lbl)
+            n = snprintf(buf, cap, "%s %d, %s",
+                         t->macro_name, args->i32_a, args->lbl);
+        else if (args->lbl_b)
+            n = snprintf(buf, cap, "%s %d, , %s",
+                         t->macro_name, args->i32_a, args->lbl_b);
+        else
+            n = snprintf(buf, cap, "%s %d", t->macro_name, args->i32_a);
+        break;
     case SM_TPL_LBLOPT_I_I:
-        /* args: is_imm, nargs, fname_lbl */
-        if (args->lbl) {
-            if (fprintf(out, "\t%s %d, %d, %s",
-                        t->macro_name, args->i32_a, args->i32_b, args->lbl) < 0)
-                return -1;
-        } else {
-            if (fprintf(out, "\t%s %d, %d",
-                        t->macro_name, args->i32_a, args->i32_b) < 0)
-                return -1;
-        }
-        return write_anno(out, args->anno);
-
+        if (args->lbl)
+            n = snprintf(buf, cap, "%s %d, %d, %s",
+                         t->macro_name, args->i32_a, args->i32_b, args->lbl);
+        else
+            n = snprintf(buf, cap, "%s %d, %d",
+                         t->macro_name, args->i32_a, args->i32_b);
+        break;
     case SM_TPL_EXEC_VAR:
-        /* args: has_repl, subj_lbl */
-        if (args->lbl) {
-            if (fprintf(out, "\t%s %d, %s",
-                        t->macro_name, args->i32_a, args->lbl) < 0)
-                return -1;
-        } else {
-            if (fprintf(out, "\t%s %d", t->macro_name, args->i32_a) < 0)
-                return -1;
-        }
-        return write_anno(out, args->anno);
-
+        if (args->lbl)
+            n = snprintf(buf, cap, "%s %d, %s",
+                         t->macro_name, args->i32_a, args->lbl);
+        else
+            n = snprintf(buf, cap, "%s %d", t->macro_name, args->i32_a);
+        break;
     case SM_TPL_ARITH:
-        /* SM_ARITH op   --  op is the SM_ADD..SM_MOD enum value */
-        if (fprintf(out, "\t%s %d", t->macro_name, t->const_a) < 0) return -1;
-        return write_anno(out, args->anno);
-
+        n = snprintf(buf, cap, "%s %d", t->macro_name, t->const_a);
+        break;
     case SM_TPL_PCREF_JMP:
-        if (fprintf(out, "\t%s .Lpc%d", t->macro_name, args->i32_a) < 0) return -1;
-        return write_anno(out, args->anno);
-
     case SM_TPL_PCREF_COND:
-        /* SM_JUMP_S / SM_JUMP_F  -- the macro name encodes which one;
-         * we just emit the target. */
-        if (fprintf(out, "\t%s .Lpc%d", t->macro_name, args->i32_a) < 0) return -1;
-        return write_anno(out, args->anno);
-
-    case SM_TPL_PUSH_CHUNK:
-        if (fprintf(out, "\t%s %" PRId64 ", %d",
-                    t->macro_name, args->i64, args->i32_a) < 0) return -1;
-        return write_anno(out, args->anno);
-
     case SM_TPL_CALL_CHUNK:
-        if (fprintf(out, "\t%s .Lpc%d", t->macro_name, args->i32_a) < 0) return -1;
-        return write_anno(out, args->anno);
-
+        n = snprintf(buf, cap, "%s .Lpc%d", t->macro_name, args->i32_a);
+        break;
+    case SM_TPL_PUSH_CHUNK:
+        n = snprintf(buf, cap, "%s %" PRId64 ", %d",
+                     t->macro_name, args->i64, args->i32_a);
+        break;
     case SM_TPL_RET:
-        if (fprintf(out, "\t%s", t->macro_name) < 0) return -1;
-        return write_anno(out, args->anno);
-
+        n = snprintf(buf, cap, "%s", t->macro_name);
+        break;
     case SM_TPL_RET_VAR:
-        if (fprintf(out, "\t%s %d, %d, %d",
-                    t->macro_name, args->i32_a, args->i32_b, args->pc) < 0)
-            return -1;
-        return write_anno(out, args->anno);
-
+        n = snprintf(buf, cap, "%s %d, %d, %d",
+                     t->macro_name, args->i32_a, args->i32_b, args->pc);
+        break;
     case SM_TPL_UNHANDLED:
-        if (fprintf(out, "\t%s %d", t->macro_name, args->i32_a) < 0) return -1;
-        return write_anno(out, args->anno);
-
+        n = snprintf(buf, cap, "%s %d", t->macro_name, args->i32_a);
+        break;
     case SM_TPL__COUNT:
         break;
+    default:
+        fprintf(stderr, "sm_emit_template: build_op_col: unknown kind %d\n",
+                (int)t->kind);
+        return -1;
     }
-    fprintf(stderr, "sm_emit_template: render_call_line: unknown kind %d\n",
-            (int)t->kind);
-    return -1;
+    return (n < 0 || n >= cap) ? -1 : 0;
+}
+
+static int render_call_line(FILE *out, const sm_op_template_t *t,
+                            const sm_emit_args_t *args)
+{
+    /* Three-column layout:  LABEL:       OPCODE args     # annotation
+     * Col 1 (label):  24 chars, left-aligned  -- from args->label or g_pending_pc_label
+     * Col 2 (opcode): 36 chars, left-aligned  -- macro name + args
+     * Col 3 (anno):   free width              -- # comment
+     *
+     * g_pending_pc_label is consumed (cleared) on the first call per
+     * instruction so that continuation lines (multi-line blob handlers)
+     * don't inherit the label.
+     */
+    char op[128];
+    if (build_op_col(op, sizeof(op), t, args) != 0) return -1;
+
+    /* Determine label: explicit args->label wins; else consume the pending one.
+     * Snapshot to a local buffer before clearing g_pending_pc_label, since
+     * lbl_col may otherwise alias into it. */
+    char lbl_buf[32];
+    const char *lbl_col;
+    if (args && args->label && *args->label) {
+        lbl_col = args->label;
+    } else if (g_pending_pc_label[0]) {
+        size_t n = strlen(g_pending_pc_label);
+        if (n >= sizeof(lbl_buf)) n = sizeof(lbl_buf) - 1;
+        memcpy(lbl_buf, g_pending_pc_label, n);
+        lbl_buf[n] = '\0';
+        lbl_col = lbl_buf;
+    } else {
+        lbl_col = "";
+    }
+    /* Consume pending label so next call on this instruction gets no label. */
+    g_pending_pc_label[0] = '\0';
+
+    if (lbl_col && *lbl_col) {
+        /* Three-column: label / opcode+args / annotation */
+        if (fprintf(out, "%-24s%-36s", lbl_col, op) < 0) return -1;
+    } else {
+        /* No label (macro library emission, test path, continuation lines) */
+        if (fprintf(out, "\t%-35s", op) < 0) return -1;
+    }
+    return write_anno(out, args ? args->anno : NULL);
 }
 
 /* ---------------------------------------------------------------------
@@ -560,6 +604,27 @@ int sm_emit_macro_library(FILE *out)
 
     if (fputs("# === END sm macro library ===\n\n", out) == EOF) return -1;
     return 0;
+}
+
+/* sm_emit_macro_library_to_path:
+ *
+ * Open `path` for writing and emit the macro library to it as a
+ * standalone GAS source file.  Used by the emitter driver to ship
+ * sm_macros.s once per emission run, alongside the .s output.
+ * The .s file pulls the macros in via `.include "sm_macros.s"`.
+ */
+int sm_emit_macro_library_to_path(const char *path)
+{
+    if (!path || !*path) return -1;
+    FILE *fp = fopen(path, "w");
+    if (!fp) {
+        fprintf(stderr, "sm_emit_macro_library_to_path: cannot open %s for writing\n",
+                path);
+        return -1;
+    }
+    int rc = sm_emit_macro_library(fp);
+    if (fclose(fp) != 0) return -1;
+    return rc;
 }
 
 /* Per-instruction generic dispatch (rarely called directly; convenience
