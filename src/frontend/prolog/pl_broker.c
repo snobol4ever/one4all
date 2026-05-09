@@ -561,9 +561,13 @@ typedef struct { int entry_pc; int fired; } pl_expression_t;
 
 static DESCR_t pl_chunk_fn(void *zeta, int entry) {
     extern DESCR_t sm_call_expression(int);
+    extern void *g_current_sm_prog;
     pl_expression_t *z = zeta;
     if (entry == β || z->fired) return FAILDESCR;
     z->fired = 1;
+    /* CH-17g-irrun-lowers: entry_pc may be resolved but SM freed.
+     * Only dispatch through SM when g_current_sm_prog is live. */
+    if (g_current_sm_prog == NULL) return FAILDESCR;
     DESCR_t r = sm_call_expression(z->entry_pc);
     return IS_FAIL_fn(r) ? FAILDESCR : NULVCL;
 }

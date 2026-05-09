@@ -1890,7 +1890,8 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                 g_pl_env = uargs;
                 /* CH-17e: prefer SM-expression path when entry_pc resolved */
                 Pl_PredEntry *_upe1 = pl_pred_entry_lookup(ukey);
-                bb_node_t uroot = (_upe1 && _upe1->entry_pc >= 0)
+                extern void *g_current_sm_prog;
+                bb_node_t uroot = (_upe1 && _upe1->entry_pc >= 0 && g_current_sm_prog != NULL)
                     ? pl_box_choice_pc(_upe1->entry_pc, g_pl_env, call_arity)
                     : pl_box_choice(uch, g_pl_env, call_arity);
                 int uok = bb_broker(uroot, BB_ONCE, NULL, NULL);
@@ -1969,7 +1970,8 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                         g_pl_env = uargs;
                         /* CH-17e: prefer SM-expression path when entry_pc resolved */
                         Pl_PredEntry *_upe2 = pl_pred_entry_lookup(ukey);
-                        bb_node_t uroot = (_upe2 && _upe2->entry_pc >= 0)
+                        extern void *g_current_sm_prog;
+                        bb_node_t uroot = (_upe2 && _upe2->entry_pc >= 0 && g_current_sm_prog != NULL)
                             ? pl_box_choice_pc(_upe2->entry_pc, g_pl_env, arity)
                             : pl_box_choice(uch, g_pl_env, arity);
                         uok = bb_broker(uroot, BB_ONCE, NULL, NULL);

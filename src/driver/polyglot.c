@@ -30,8 +30,15 @@ extern int64_t kw_case;   /* &CASE: 0=fold, 1=sensitive; default 1 matches SPITB
 #include "runtime/interp/pl_runtime.h"
 #include "driver/interp.h"
 #include "driver/polyglot.h"
+#include "runtime/x86/sm_lower.h"   /* CH-17g-irrun-lowers: sm_lower */
+#include "runtime/x86/sm_prog.h"    /* CH-17g-irrun-lowers: sm_prog_free */
+#include "driver/scrip_sm.h"        /* CH-17g-irrun-lowers: sm_resolve_irrun_entry_pcs */
 
 ScripModuleRegistry g_registry;   /* zero-initialised; nmod==0 for single-lang */
+
+/* CH-17g-irrun-lowers: set by scrip.c --ir-run non-SNO path to populate
+ * entry_pcs before proc_table_call dispatches.  Default 0. */
+int g_irrun_lowers = 0;
 
 
 
@@ -256,6 +263,11 @@ void polyglot_execute(CODE_t *prog) {
     int slang = prog->head ? prog->head->lang : LANG_SNO;
     uint32_t mask = polyglot_lang_mask(prog);
     polyglot_init(prog, mask);
+    /* CH-17g-irrun-lowers: if requested, run sm_lower to resolve entry_pcs
+     * in proc_table / g_pl_pred_table before dispatch.  Enabled by scrip.c
+     * for the --ir-run non-SNO path so proc_table_call sees entry_pc >= 0. */
+    if (g_irrun_lowers)
+        sm_resolve_irrun_entry_pcs(prog);
     if (slang == LANG_ICN) {
         g_lang = 1;
         for (int i = 0; i < proc_count; i++) {
@@ -294,7 +306,8 @@ void polyglot_execute(CODE_t *prog) {
         /* CH-17e: run main/0 via SM expression when entry_pc resolved */
         Pl_PredEntry *_main_pe = pl_pred_entry_lookup("main/0");
         AST_t *main_choice = pl_pred_table_lookup(&g_pl_pred_table, "main/0");
-        if (_main_pe && _main_pe->entry_pc >= 0) {
+        extern SM_Program *g_current_sm_prog;
+        if (_main_pe && _main_pe->entry_pc >= 0 && g_current_sm_prog != NULL) {
             extern DESCR_t sm_call_expression(int);
             sm_call_expression(_main_pe->entry_pc);
         } else if (main_choice) interp_eval(main_choice);

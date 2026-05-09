@@ -555,7 +555,11 @@ int main(int argc, char **argv)
         sm_run_with_recovery(sm, sm_jit_run);
         sm_prog_free(sm);
     } else if (has_non_sno) {
+        /* CH-17g-irrun-lowers: lower to SM to resolve entry_pcs before
+         * polyglot_execute dispatches through proc_table_call. */
+        g_irrun_lowers = 1;
         polyglot_execute(prog);
+        g_irrun_lowers = 0;
     } else {
         execute_program(prog);
     }

@@ -41,6 +41,14 @@
  * must be freed with sm_prog_free() after run completes. */
 SM_Program *sm_preamble(void *prog);
 
+/* CH-17g-irrun-lowers: run sm_lower + sm_resolve_proc_entry_pcs on prog
+ * (which must already have been initialised by polyglot_init) and then free
+ * the SM_Program.  After this call every proc_table[i].entry_pc and every
+ * g_pl_pred_table entry has a valid pc (>= 0) for procs that sm_lower
+ * emitted named expressions for; others remain -1.  Does NOT free the IR
+ * (polyglot_execute needs the IR alive for the BB engine). */
+void sm_resolve_irrun_entry_pcs(void *prog);
+
 /* Driver-mode runner signature: takes program + state, returns
  *   0  = normal halt
  *   1  = step-limit reached (resume)

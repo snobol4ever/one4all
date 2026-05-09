@@ -2792,7 +2792,8 @@ DESCR_t interp_eval(AST_t *e)
                     g_pl_env = _pl_args;
                     /* CH-17e: use SM-expression path when entry_pc is resolved */
                     Pl_PredEntry *_pe = pl_pred_entry_lookup(_pk);
-                    bb_node_t _root = (_pe && _pe->entry_pc >= 0)
+                    extern SM_Program *g_current_sm_prog;
+                    bb_node_t _root = (_pe && _pe->entry_pc >= 0 && g_current_sm_prog != NULL)
                         ? pl_box_choice_pc(_pe->entry_pc, g_pl_env, nargs)
                         : pl_box_choice(_choice, g_pl_env, nargs);
                     int _ok = bb_broker(_root, BB_ONCE, NULL, NULL);
@@ -3242,7 +3243,8 @@ DESCR_t interp_eval(AST_t *e)
         int arity = 0;
         if (e->sval) { const char *sl = strrchr(e->sval, '/'); if (sl) arity = atoi(sl+1); }
         Pl_PredEntry *_pe2 = e->sval ? pl_pred_entry_lookup(e->sval) : NULL;
-        bb_node_t root = (_pe2 && _pe2->entry_pc >= 0)
+        extern SM_Program *g_current_sm_prog;
+        bb_node_t root = (_pe2 && _pe2->entry_pc >= 0 && g_current_sm_prog != NULL)
             ? pl_box_choice_pc(_pe2->entry_pc, g_pl_env, arity)
             : pl_box_choice(e, g_pl_env, arity);
         int ok = bb_broker(root, BB_ONCE, NULL, NULL);

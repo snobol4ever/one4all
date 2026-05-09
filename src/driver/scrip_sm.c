@@ -68,8 +68,24 @@ static void sm_resolve_proc_entry_pcs(SM_Program *p)
                 pl_total, pl_resolved);
 }
 
-SM_Program *sm_preamble(void *prog_void)
+/* CH-17g-irrun-lowers: lower prog to SM, resolve entry_pcs, discard SM.
+ * Called by polyglot_execute when g_irrun_lowers is set, after polyglot_init
+ * has already populated proc_table / g_pl_pred_table.  The SM_Program is
+ * freed immediately — we only wanted the label table it built.  The IR is
+ * NOT freed (polyglot_execute's BB engine needs it alive). */
+void sm_resolve_irrun_entry_pcs(void *prog_void)
 {
+    CODE_t *prog = (CODE_t *)prog_void;
+    SM_Program *sm = sm_lower(prog);
+    if (!sm) {
+        fprintf(stderr, "scrip: sm_lower failed in irrun-lowers\n");
+        return;
+    }
+    sm_resolve_proc_entry_pcs(sm);
+    sm_prog_free(sm);
+}
+
+SM_Program *sm_preamble(void *prog_void){
     CODE_t *prog = (CODE_t *)prog_void;
     label_table_build(prog);
     prescan_defines(prog);

@@ -19,6 +19,12 @@
 extern int g_fi8_icn_init_count;
 extern int g_fi8_pl_init_count;
 
+/* CH-17g-irrun-lowers: when set, polyglot_execute runs sm_lower +
+ * sm_resolve_proc_entry_pcs after polyglot_init so entry_pcs are
+ * populated before proc_table_call dispatches.  Set by scrip.c for
+ * the --ir-run non-SNO path.  Default 0 (disabled). */
+extern int g_irrun_lowers;
+
 uint32_t polyglot_lang_mask(CODE_t *prog);
 void     polyglot_init   (CODE_t *prog, uint32_t lang_mask);
 void     polyglot_execute(CODE_t *prog);

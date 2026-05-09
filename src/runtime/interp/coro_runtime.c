@@ -594,7 +594,11 @@ DESCR_t sm_call_proc(int entry_pc, int nparams, DESCR_t *args, int nargs)
 DESCR_t proc_table_call(int pi, DESCR_t *args, int nargs)
 {
     if (pi < 0 || pi >= proc_count) return FAILDESCR;
-    if (proc_table[pi].entry_pc >= 0)
+    /* CH-17g-irrun-lowers: entry_pc may be resolved even under --ir-run (where
+     * sm_resolve_irrun_entry_pcs ran but the SM_Program was freed).  Only
+     * dispatch through sm_call_proc when g_current_sm_prog is live. */
+    extern SM_Program *g_current_sm_prog;
+    if (proc_table[pi].entry_pc >= 0 && g_current_sm_prog != NULL)
         return sm_call_proc(proc_table[pi].entry_pc, proc_table[pi].nparams, args, nargs);
     return coro_call(proc_table[pi].proc, args, nargs);
 }
