@@ -348,7 +348,14 @@ static int emit_three_column_line(FILE *out,
 
     const char *lbl = (label  && *label)  ? label  : "";
     const char *op  = (opcode && *opcode) ? opcode : "";
-    return fprintf(out, "%-24s%-16s %s\n", lbl, op, c3) < 0 ? -1 : 0;
+    /* EM-7c-no-trailing-ws (2026-05-09): build + right-trim. */
+    char line[768];
+    int n = snprintf(line, sizeof(line), "%-24s%-16s %s", lbl, op, c3);
+    if (n < 0) return -1;
+    if (n >= (int)sizeof(line)) n = (int)sizeof(line) - 1;
+    while (n > 0 && (line[n-1] == ' ' || line[n-1] == '\t')) n--;
+    line[n] = '\0';
+    return (fputs(line, out) < 0 || fputc('\n', out) == EOF) ? -1 : 0;
 }
 
 /* Emit .section .rodata with all interned strings as .Lstr_N: .string "..." */
@@ -602,10 +609,18 @@ static int sm_line(FILE *out, const char *label, const char *action,
         lbl = sm_emit_consume_pc_label();   /* "" if no pending label */
     }
     const char *act = (action && *action) ? action : "";
+    /* EM-7c-no-trailing-ws (2026-05-09): build + right-trim. */
+    char line[768];
+    int n;
     if (lbl && *lbl)
-        return fprintf(out, "%-24s%-16s %s\n", lbl, act, gc) < 0 ? -1 : 0;
+        n = snprintf(line, sizeof(line), "%-24s%-16s %s", lbl, act, gc);
     else
-        return fprintf(out, "\t%-15s %s\n", act, gc) < 0 ? -1 : 0;
+        n = snprintf(line, sizeof(line), "\t%-15s %s", act, gc);
+    if (n < 0) return -1;
+    if (n >= (int)sizeof(line)) n = (int)sizeof(line) - 1;
+    while (n > 0 && (line[n-1] == ' ' || line[n-1] == '\t')) n--;
+    line[n] = '\0';
+    return (fputs(line, out) < 0 || fputc('\n', out) == EOF) ? -1 : 0;
 }
 
 /* -----------------------------------------------------------------------
@@ -688,9 +703,8 @@ static void render_str_preview(char *dst, size_t cap,
 
 static int emit_pc_label(FILE *out, int pc)
 {
-    char lbl[32];
-    snprintf(lbl, sizeof(lbl), ".Lpc%d:", pc);
-    return fprintf(out, "%-24s\n", lbl) < 0 ? -1 : 0;
+    /* EM-7c-no-trailing-ws: bare label, no padding (no trailing spaces). */
+    return fprintf(out, ".Lpc%d:\n", pc) < 0 ? -1 : 0;
 }
 
 static int emit_sm_halt(FILE *out, int pc)

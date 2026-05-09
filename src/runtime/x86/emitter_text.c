@@ -30,25 +30,28 @@ typedef struct { FILE *out; int pos; } text_ctx_t;
 static FILE *outf(emitter_v *e) { FILE *f = CTX(e)->out; return f ? f : stdout; }
 
 /* ── three-column shorthands ──────────────────────────────────────────────── */
+/* EM-7c-bb-three-column-split (2026-05-09): take mnemonic and args separately,
+ * so col 2 holds ONLY the mnemonic and col 3 holds the operands.  The prior
+ * emit3c_action stuffed both into col 2 and overflowed the 16-wide field. */
 
-static void emit3c_action(emitter_v *e, const char *fmt, ...)
+static void emit3c_op(emitter_v *e, const char *mn, const char *fmt, ...)
 {
     char buf[256];
-    va_list ap;
-    va_start(ap, fmt);
-    vsnprintf(buf, sizeof(buf), fmt, ap);
-    va_end(ap);
-    bb3c_format(outf(e), "", buf, "");
+    if (fmt) {
+        va_list ap;
+        va_start(ap, fmt);
+        vsnprintf(buf, sizeof(buf), fmt, ap);
+        va_end(ap);
+    } else {
+        buf[0] = '\0';
+    }
+    bb3c_format(outf(e), "", mn ? mn : "", buf);
 }
 
-static void emit3c_goto(emitter_v *e, const char *fmt, ...)
+/* Goto-only: col 1 empty, col 2 = jmp/je/jne/..., col 3 = target. */
+static void emit3c_jmp(emitter_v *e, const char *mn, const char *target)
 {
-    char buf[256];
-    va_list ap;
-    va_start(ap, fmt);
-    vsnprintf(buf, sizeof(buf), fmt, ap);
-    va_end(ap);
-    bb3c_format(outf(e), "", "", buf);
+    bb3c_format(outf(e), "", mn ? mn : "", target ? target : "");
 }
 
 /* ── emit_insn: one three-column line per instruction (action column) ─────── */
@@ -61,48 +64,48 @@ static void text_emit_insn(emitter_v *e, const bb_insn_desc_t *d)
 
     switch (d->kind) {
     /* 64-bit reg ← imm64 */
-    case BB_INSN_MOV_R10_IMM64: emit3c_action(e,"mov     r10, 0x%llx",(unsigned long long)a0); CTX(e)->pos+=10; break;
-    case BB_INSN_MOV_RAX_IMM64: emit3c_action(e,"mov     rax, 0x%llx",(unsigned long long)a0); CTX(e)->pos+=10; break;
-    case BB_INSN_MOV_RDI_IMM64: emit3c_action(e,"mov     rdi, 0x%llx",(unsigned long long)a0); CTX(e)->pos+=10; break;
-    case BB_INSN_MOV_RSI_IMM64: emit3c_action(e,"mov     rsi, 0x%llx",(unsigned long long)a0); CTX(e)->pos+=10; break;
-    case BB_INSN_MOV_RDX_IMM64: emit3c_action(e,"mov     rdx, 0x%llx",(unsigned long long)a0); CTX(e)->pos+=10; break;
-    case BB_INSN_MOV_RCX_IMM64: emit3c_action(e,"mov     rcx, 0x%llx",(unsigned long long)a0); CTX(e)->pos+=10; break;
+    case BB_INSN_MOV_R10_IMM64: emit3c_op(e,"mov","r10, 0x%llx",(unsigned long long)a0); CTX(e)->pos+=10; break;
+    case BB_INSN_MOV_RAX_IMM64: emit3c_op(e,"mov","rax, 0x%llx",(unsigned long long)a0); CTX(e)->pos+=10; break;
+    case BB_INSN_MOV_RDI_IMM64: emit3c_op(e,"mov","rdi, 0x%llx",(unsigned long long)a0); CTX(e)->pos+=10; break;
+    case BB_INSN_MOV_RSI_IMM64: emit3c_op(e,"mov","rsi, 0x%llx",(unsigned long long)a0); CTX(e)->pos+=10; break;
+    case BB_INSN_MOV_RDX_IMM64: emit3c_op(e,"mov","rdx, 0x%llx",(unsigned long long)a0); CTX(e)->pos+=10; break;
+    case BB_INSN_MOV_RCX_IMM64: emit3c_op(e,"mov","rcx, 0x%llx",(unsigned long long)a0); CTX(e)->pos+=10; break;
     /* 32-bit reg ← imm32 */
-    case BB_INSN_MOV_ESI_IMM32: emit3c_action(e,"mov     esi, %u",  a1); CTX(e)->pos+=5; break;
-    case BB_INSN_MOV_EAX_IMM32: emit3c_action(e,"mov     eax, %u",  a1); CTX(e)->pos+=5; break;
-    case BB_INSN_ADD_EAX_IMM32: emit3c_action(e,"add     eax, %u",  a1); CTX(e)->pos+=5; break;
-    case BB_INSN_SUB_EAX_IMM32: emit3c_action(e,"sub     eax, %u",  a1); CTX(e)->pos+=5; break;
-    case BB_INSN_CMP_EAX_IMM32: emit3c_action(e,"cmp     eax, %u",  a1); CTX(e)->pos+=5; break;
-    case BB_INSN_CMP_ESI_IMM8:  emit3c_action(e,"cmp     esi, %u", (unsigned)a2); CTX(e)->pos+=3; break;
+    case BB_INSN_MOV_ESI_IMM32: emit3c_op(e,"mov","esi, %u",  a1); CTX(e)->pos+=5; break;
+    case BB_INSN_MOV_EAX_IMM32: emit3c_op(e,"mov","eax, %u",  a1); CTX(e)->pos+=5; break;
+    case BB_INSN_ADD_EAX_IMM32: emit3c_op(e,"add","eax, %u",  a1); CTX(e)->pos+=5; break;
+    case BB_INSN_SUB_EAX_IMM32: emit3c_op(e,"sub","eax, %u",  a1); CTX(e)->pos+=5; break;
+    case BB_INSN_CMP_EAX_IMM32: emit3c_op(e,"cmp","eax, %u",  a1); CTX(e)->pos+=5; break;
+    case BB_INSN_CMP_ESI_IMM8:  emit3c_op(e,"cmp","esi, %u", (unsigned)a2); CTX(e)->pos+=3; break;
     /* memory loads */
-    case BB_INSN_MOV_EAX_RCXMEM:   emit3c_action(e,"mov     eax, [rcx]"); CTX(e)->pos+=2; break;
-    case BB_INSN_MOV_RAX_RCXMEM:   emit3c_action(e,"mov     rax, [rcx]"); CTX(e)->pos+=3; break;
-    case BB_INSN_CMP_EAX_RCXMEM:   emit3c_action(e,"cmp     eax, [rcx]"); CTX(e)->pos+=2; break;
-    case BB_INSN_MOV_EAX_R10MEM:   emit3c_action(e,"mov     eax, [r10]"); CTX(e)->pos+=3; break;
-    case BB_INSN_MOV_R10MEM_EAX:   emit3c_action(e,"mov     [r10], eax"); CTX(e)->pos+=3; break;
+    case BB_INSN_MOV_EAX_RCXMEM:   emit3c_op(e,"mov","eax, [rcx]", NULL); CTX(e)->pos+=2; break;
+    case BB_INSN_MOV_RAX_RCXMEM:   emit3c_op(e,"mov","rax, [rcx]", NULL); CTX(e)->pos+=3; break;
+    case BB_INSN_CMP_EAX_RCXMEM:   emit3c_op(e,"cmp","eax, [rcx]", NULL); CTX(e)->pos+=2; break;
+    case BB_INSN_MOV_EAX_R10MEM:   emit3c_op(e,"mov","eax, [r10]", NULL); CTX(e)->pos+=3; break;
+    case BB_INSN_MOV_R10MEM_EAX:   emit3c_op(e,"mov","[r10], eax", NULL); CTX(e)->pos+=3; break;
     /* reg-reg */
-    case BB_INSN_MOV_ECX_EAX:      emit3c_action(e,"mov     ecx, eax"); CTX(e)->pos+=2; break;
-    case BB_INSN_MOV_RDI_RAX:      emit3c_action(e,"mov     rdi, rax"); CTX(e)->pos+=3; break;
-    case BB_INSN_MOV_RDX_RAX:      emit3c_action(e,"mov     rdx, rax"); CTX(e)->pos+=3; break;
-    case BB_INSN_CMP_EAX_ECX:      emit3c_action(e,"cmp     eax, ecx"); CTX(e)->pos+=2; break;
-    case BB_INSN_TEST_EAX_EAX:     emit3c_action(e,"test    eax, eax"); CTX(e)->pos+=2; break;
-    case BB_INSN_TEST_RAX_RAX:     emit3c_action(e,"test    rax, rax"); CTX(e)->pos+=3; break;
-    case BB_INSN_XOR_EDX_EDX:      emit3c_action(e,"xor     edx, edx"); CTX(e)->pos+=2; break;
-    case BB_INSN_MOVSXD_RCX_R10MEM:emit3c_action(e,"movsxd  rcx, dword ptr [r10]"); CTX(e)->pos+=3; break;
-    case BB_INSN_LEA_RAX_RAXRCX:   emit3c_action(e,"lea     rax, [rax+rcx]"); CTX(e)->pos+=4; break;
+    case BB_INSN_MOV_ECX_EAX:      emit3c_op(e,"mov","ecx, eax", NULL); CTX(e)->pos+=2; break;
+    case BB_INSN_MOV_RDI_RAX:      emit3c_op(e,"mov","rdi, rax", NULL); CTX(e)->pos+=3; break;
+    case BB_INSN_MOV_RDX_RAX:      emit3c_op(e,"mov","rdx, rax", NULL); CTX(e)->pos+=3; break;
+    case BB_INSN_CMP_EAX_ECX:      emit3c_op(e,"cmp","eax, ecx", NULL); CTX(e)->pos+=2; break;
+    case BB_INSN_TEST_EAX_EAX:     emit3c_op(e,"test","eax, eax", NULL); CTX(e)->pos+=2; break;
+    case BB_INSN_TEST_RAX_RAX:     emit3c_op(e,"test","rax, rax", NULL); CTX(e)->pos+=3; break;
+    case BB_INSN_XOR_EDX_EDX:      emit3c_op(e,"xor","edx, edx", NULL); CTX(e)->pos+=2; break;
+    case BB_INSN_MOVSXD_RCX_R10MEM:emit3c_op(e,"movsxd","rcx, dword ptr [r10]", NULL); CTX(e)->pos+=3; break;
+    case BB_INSN_LEA_RAX_RAXRCX:   emit3c_op(e,"lea","rax, [rax+rcx]", NULL); CTX(e)->pos+=4; break;
     /* control */
-    case BB_INSN_RET:      emit3c_action(e,"ret"); CTX(e)->pos+=1; break;
-    case BB_INSN_CALL_RAX: emit3c_action(e,"call    rax"); CTX(e)->pos+=2; break;
+    case BB_INSN_RET:      emit3c_op(e,"ret", NULL); CTX(e)->pos+=1; break;
+    case BB_INSN_CALL_RAX: emit3c_op(e,"call","rax", NULL); CTX(e)->pos+=2; break;
     /* EM-7c-symbolic: RIP-relative symbol load and PLT call */
     case BB_INSN_LEA_RCX_SYM:
-        emit3c_action(e,"lea     rcx, [rip + %s]", d->sym ? d->sym : "??sym??");
+        emit3c_op(e,"lea","rcx, [rip + %s]", d->sym ? d->sym : "??sym??");
         CTX(e)->pos += 7; break;
     case BB_INSN_CALL_SYM_PLT:
-        emit3c_action(e,"call    %s@PLT", d->sym ? d->sym : "??sym??");
+        emit3c_op(e,"call","%s@PLT", d->sym ? d->sym : "??sym??");
         CTX(e)->pos += 5; break;
     /* BB_INSN_LEA_R10_SYM: lea r10, [rip + sym]  (7 bytes) */
     case BB_INSN_LEA_R10_SYM:
-        emit3c_action(e,"lea     r10, [rip + %s]", d->sym ? d->sym : "??sym??");
+        emit3c_op(e,"lea","r10, [rip + %s]", d->sym ? d->sym : "??sym??");
         CTX(e)->pos += 7; break;
     }
 }
@@ -114,19 +117,18 @@ static void text_label_define(emitter_v *e, bb_label_t *lbl)
     bb3c_format(outf(e), lbuf, "", "");
 }
 
-/* ── emit_jmp: pure-goto line (cols 1+2 empty) ───────────────────────────── */
+/* ── emit_jmp: jump line (col 2 = jmp/je/..., col 3 = target) ────────────── */
 static void text_emit_jmp(emitter_v *e, bb_label_t *target, jmp_kind_t kind)
 {
     const char *mn[] = {"jmp","je","jne","jl","jge","jg"};
-    emit3c_goto(e, "%-7s %s", mn[(int)kind < 6 ? (int)kind : 0], target->name);
+    emit3c_jmp(e, mn[(int)kind < 6 ? (int)kind : 0], target->name);
     CTX(e)->pos += 6;
 }
 
-/* ── global_sym: directive line (action column) ──────────────────────────── */
+/* ── global_sym: directive line (col 2 = .global, col 3 = name) ──────────── */
 static void text_global_sym(emitter_v *e, const char *name)
 {
-    char buf[256]; snprintf(buf, sizeof(buf), ".global %s", name);
-    bb3c_format(outf(e), "", buf, "");
+    bb3c_format(outf(e), "", ".global", name ? name : "");
 }
 
 /* ── fprintf_raw ───────────────────────────────────────────────────────────── */

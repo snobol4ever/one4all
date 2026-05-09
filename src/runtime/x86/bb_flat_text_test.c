@@ -100,13 +100,18 @@ int main(int argc, char **argv) {
     buf[nread] = '\0';
     fclose(fr);
 
-    CHECK(strstr(buf, ".global _pat_inv_42_0_α") != NULL,
+    /* EM-7c-bb-three-column-split (2026-05-09): the directive token (".global")
+     * now sits in column 2 of the three-column layout and the symbol sits in
+     * column 3 — separated by column-padding whitespace, not a single space.
+     * Check for the directive and the symbol name independently; the order
+     * is preserved on the same line by construction (one fputs per line). */
+    CHECK(strstr(buf, ".global") != NULL && strstr(buf, "_pat_inv_42_0_α") != NULL,
           ".global _pat_inv_42_0_α missing");
-    CHECK(strstr(buf, ".global _pat_inv_42_0_β")  != NULL,
+    CHECK(strstr(buf, "_pat_inv_42_0_β") != NULL,
           ".global _pat_inv_42_0_β missing");
-    CHECK(strstr(buf, ".global _pat_inv_42_0_γ") != NULL,
+    CHECK(strstr(buf, "_pat_inv_42_0_γ") != NULL,
           ".global _pat_inv_42_0_γ missing");
-    CHECK(strstr(buf, ".global _pat_inv_42_0_ω") != NULL,
+    CHECK(strstr(buf, "_pat_inv_42_0_ω") != NULL,
           ".global _pat_inv_42_0_ω missing");
 
     /* ── 4. Verify each label is also DEFINED (not just declared) ── */
@@ -120,8 +125,11 @@ int main(int argc, char **argv) {
           "_pat_inv_42_0_ω definition missing");
 
     /* ── 5. Verify readable-mnemonic emission (EM-7b'': no .byte walls) ── */
-    /* EM-7c-symbolic: r10 now loaded via 'lea r10, [rip + Δ]' (symbolic). */
-    CHECK(strstr(buf, "lea     r10, [rip + ") != NULL,
+    /* EM-7c-symbolic: r10 now loaded via 'lea r10, [rip + Δ]' (symbolic).
+     * EM-7c-bb-three-column-split: 'lea' is now in col 2 (16 wide) and
+     * 'r10, [rip + ...]' is in col 3 — they no longer share a single space.
+     * Check for the mnemonic and the operand pattern independently. */
+    CHECK(strstr(buf, "lea") != NULL && strstr(buf, "r10, [rip + ") != NULL,
           "expected 'lea r10, [rip + Δ]' mnemonic (EM-7c-symbolic) not found");
     CHECK(strstr(buf, ".byte") == NULL,
           "unexpected .byte directive in TEXT output (should be mnemonics)");

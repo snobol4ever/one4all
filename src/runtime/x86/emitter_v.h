@@ -186,8 +186,15 @@ int        emitter_end       (emitter_v *e);
  * entire `.s` file. */
 static inline void ev3c(emitter_v *e, const char *lbl, const char *act, const char *got)
 {
-    e->fprintf_raw(e, "%-24s%-16s %s\n",
-                   lbl ? lbl : "", act ? act : "", got ? got : "");
+    /* EM-7c-no-trailing-ws (2026-05-09): build + right-trim before write. */
+    char line[768];
+    int n = snprintf(line, sizeof(line), "%-24s%-16s %s",
+                     lbl ? lbl : "", act ? act : "", got ? got : "");
+    if (n < 0) return;
+    if (n >= (int)sizeof(line)) n = (int)sizeof(line) - 1;
+    while (n > 0 && (line[n-1] == ' ' || line[n-1] == '\t')) n--;
+    line[n] = '\0';
+    e->fprintf_raw(e, "%s\n", line);
 }
 
 /* Action-only line (cols 1+3 empty). */
