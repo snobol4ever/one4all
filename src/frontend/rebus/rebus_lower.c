@@ -19,7 +19,7 @@
 #include "rebus.h"
 #include "rebus_lower.h"
 #include "../../frontend/snobol4/scrip_cc.h"
-#include "../ir/ast.h"
+#include "../ast/ast.h"
 
 #include <stdio.h>
 #include <stdlib.h>

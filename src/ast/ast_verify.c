@@ -242,7 +242,7 @@ int ir_verify_program(const CODE_t *prog, FILE *err) {
 /* -------------------------------------------------------------------------
  * Unit test — compiled when IR_VERIFY_TEST is defined.
  * Build: gcc -I src -I src/frontend/snobol4 -DIR_VERIFY_TEST \
- *             src/ir/ast_verify.c -o /tmp/ir_verify_test
+ *             src/ast/ast_verify.c -o /tmp/ir_verify_test
  * ---------------------------------------------------------------------- */
 #ifdef IR_VERIFY_TEST
 

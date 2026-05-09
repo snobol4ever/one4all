@@ -7,7 +7,7 @@
 #ifndef RAKU_BUILTINS_H
 #define RAKU_BUILTINS_H
 
-#include "../ir/ast.h"    /* AST_t */
+#include "../ast/ast.h"    /* AST_t */
 #include "snobol4.h"        /* DESCR_t — same header coro_value.h uses */
 
 /* Returns 1 if `call` named a Raku builtin and was handled (*out set).

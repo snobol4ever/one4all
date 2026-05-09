@@ -22,7 +22,7 @@
 #include "sm_prog.h"
 
 #include "../../frontend/snobol4/scrip_cc.h"
-#include "../ir/ast.h"
+#include "../ast/ast.h"
 #include "../../runtime/common/ast_clone.h"   /* RS-9b: ast_gc_clone */
 #include "../../runtime/interp/coro_runtime.h"  /* CH-17b: proc_table for expression skeletons */
 #include "../../runtime/interp/pl_runtime.h"    /* CH-17d: g_pl_pred_table for pred-expression skeletons */

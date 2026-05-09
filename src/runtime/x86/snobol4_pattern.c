@@ -18,7 +18,7 @@
 #include <string.h>
 #include <ctype.h>
 #include "snobol4.h"
-#include "../ir/ast.h"         /* ir.h first — sets EXPR_T_DEFINED so scrip_cc.h skips its own AST_t */
+#include "../ast/ast.h"         /* ir.h first — sets EXPR_T_DEFINED so scrip_cc.h skips its own AST_t */
 #include "../../frontend/snobol4/scrip_cc.h"
 /* CMPILE.c removed — bison/flex path via scrip_cc.h (GOAL-REMOVE-CMPILE S-4) */
 

@@ -197,7 +197,7 @@ scrip:
 	$(CC) $(CRT) -c $(RT)/x86/bb_boxes.c -o $(OBJ)/bb_boxes.o
 	$(CC) $(CRT) -c $(RT)/x86/bb_broker.c -o $(OBJ)/bb_broker.o
 	$(CC) $(CBASE) -I$(SRC)/frontend/snobol4 -DIR_DEFINE_NAMES \
-	    -c $(SRC)/ir/ast_print.c -o $(OBJ)/ast_print.o
+	    -c $(SRC)/ast/ast_print.c -o $(OBJ)/ast_print.o
 	$(CC) $(CBASE) -I$(SRC)/frontend/snobol4 -c $(SRC)/frontend/snocone/snocone_lex.c        -o $(OBJ)/snocone_lex.o
 	$(CC) $(CBASE) -I$(SRC)/frontend/snobol4 -c $(SRC)/frontend/snocone/snocone_parse.tab.c  -o $(OBJ)/snocone_parse.tab.o
 	$(CC) $(CBASE) -I$(SRC)/frontend/snobol4 -c $(SRC)/frontend/snocone/snocone_driver.c     -o $(OBJ)/snocone_driver.o

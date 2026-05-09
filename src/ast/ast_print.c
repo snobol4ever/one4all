@@ -165,7 +165,7 @@ void ir_print_node_nl(const AST_t *e, FILE *f) {
 /* -------------------------------------------------------------------------
  * Unit test — compiled when IR_PRINT_TEST is defined.
  * Build: gcc -I src -I src/frontend/snobol4 -DIR_PRINT_TEST \
- *             src/ir/ast_print.c -o /tmp/ir_print_test
+ *             src/ast/ast_print.c -o /tmp/ir_print_test
  * ---------------------------------------------------------------------- */
 #ifdef IR_PRINT_TEST
 

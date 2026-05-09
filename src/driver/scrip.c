@@ -56,7 +56,7 @@ extern CODE_t *sno_parse(FILE *f, const char *filename);
 #include "../frontend/icon/icon_gen.h"    /* coro_bb_to/by/iterate/suspend, state types — U-17 */
 #include "../frontend/icon/icon_lex.h"    /* IcnTkKind — TK_AUG* for AST_AUGOP in unified interp */
 
-/* ir_print_node — from src/ir/ast_print.c (linked via Makefile) */
+/* ir_print_node — from src/ast/ast_print.c (linked via Makefile) */
 extern void ir_print_node   (const AST_t *e, FILE *f);
 extern void ir_print_node_nl(const AST_t *e, FILE *f);
 

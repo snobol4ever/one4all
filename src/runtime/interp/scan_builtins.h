@@ -7,7 +7,7 @@
 #ifndef SCAN_BUILTINS_H
 #define SCAN_BUILTINS_H
 
-#include "../ir/ast.h"    /* AST_t */
+#include "../ast/ast.h"    /* AST_t */
 #include "snobol4.h"        /* DESCR_t */
 
 /* Returns 1 if `call` named a SCAN builtin and was handled (*out set).

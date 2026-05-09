@@ -32,7 +32,7 @@
  * scrip_cc.h defines a compatible subset when included standalone.
  * Both are guarded by EXPR_T_DEFINED to prevent double-definition.
  */
-#include "ir/ast.h"
+#include "ast/ast.h"
 
 /*
  * AST_t — unified n-ary expression node.

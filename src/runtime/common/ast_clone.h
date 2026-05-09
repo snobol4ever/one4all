@@ -10,7 +10,7 @@
  *   calloc/realloc in the parser. Safe to call after sm_lower returns.
  */
 
-#include "../ir/ast.h"
+#include "../ast/ast.h"
 #include "../../frontend/snobol4/scrip_cc.h"
 
 /* Deep-clone expr tree e into GC-managed memory.  Returns NULL if e==NULL. */

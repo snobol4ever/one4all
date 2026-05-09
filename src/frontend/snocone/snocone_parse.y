@@ -1136,7 +1136,7 @@ expr17      : T_CALL exprlist T_RPAREN
              * primitive directly is the canonical replacement.
              *
              * Lower to AST_VLIST n-ary node — IR kind already exists in
-             * src/ir/ast.h:83 with this exact semantics.  Mirrors
+             * src/ast/ast.h:83 with this exact semantics.  Mirrors
              * snobol4.y:195 byte-for-byte.  Distinct from AST_ALT
              * (pattern alternation, lazy at match time).
              *

@@ -8,7 +8,7 @@
  *
  * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6
  */
-#include "../../ir/ast.h"
+#include "../../ast/ast.h"
 #include "../snobol4/scrip_cc.h"
 
 typedef struct ExprList {
@@ -19,7 +19,7 @@ typedef struct ExprList {
 }
 
 %{
-#include "../../ir/ast.h"
+#include "../../ast/ast.h"
 #include "../snobol4/scrip_cc.h"
 #include "raku.tab.h"   /* pulls in ExprList from %code requires */
 #include <stdio.h>

@@ -270,7 +270,7 @@ DESCR_t _usercall_hook(const char *name, DESCR_t *args, int nargs) {
 /* ── ir_print_stmt — print one STMT_t as IR sexp for comparison sweep ──────
  * Emits: (STMT [:lbl L] [:subj EXPR] [:pat EXPR] [:repl EXPR] [:go*])
  * Used by --dump-ir and --dump-ir-bison.
- * ir_print_node() is from src/ir/ast_print.c — linked via Makefile.
+ * ir_print_node() is from src/ast/ast_print.c — linked via Makefile.
  * ----------------------------------------------------------------------- */
 static void ir_print_stmt(STMT_t *st, FILE *f) {
     fprintf(f, "(STMT");

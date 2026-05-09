@@ -22,7 +22,7 @@
 #ifndef CORO_VALUE_H
 #define CORO_VALUE_H
 
-#include "../ir/ast.h"
+#include "../ast/ast.h"
 #include "snobol4.h"      /* DESCR_t */
 
 DESCR_t bb_eval_value(AST_t *e);

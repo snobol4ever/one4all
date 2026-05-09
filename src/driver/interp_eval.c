@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>     /* getpid */
-#include "../ir/ast.h"   /* AST_KIND_COUNT */
+#include "../ast/ast.h"   /* AST_KIND_COUNT */
 
 /* RS-24 diag: per-kind hit counter for the Icon-frame switch in
  * interp_eval().  See the env-gated init block inside that function for
