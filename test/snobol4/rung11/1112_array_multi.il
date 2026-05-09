@@ -234,7 +234,7 @@
     ldstr      "1"
     call       string [snobol4lib]Snobol4Lib::sno_add(string, string)
     stsfld     string _112_array_multi::kw_stno
-    // unhandled E_FNC stub
+    // unhandled AST_FNC stub
     ldstr      ""
     ldstr      "2,2"
     call       int32 [snobol4lib]Snobol4Lib::sno_differ(string, string)

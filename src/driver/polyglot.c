@@ -140,16 +140,16 @@ void polyglot_init(CODE_t *prog, uint32_t lang_mask)
         if (!s->subject) continue;
 
         if (s->lang == LANG_ICN || s->lang == LANG_RAKU) {
-            /* Icon / Raku: collect E_FNC procedure definitions.
-             * raku_lower produces same E_FNC shape; share proc_table (RK-6). */
-            EXPR_t *proc = s->subject;
-            /* U-23: collect global variable names from E_GLOBAL decl stmts */
-            if (proc->kind == E_GLOBAL) {
+            /* Icon / Raku: collect AST_FNC procedure definitions.
+             * raku_lower produces same AST_FNC shape; share proc_table (RK-6). */
+            AST_t *proc = s->subject;
+            /* U-23: collect global variable names from AST_GLOBAL decl stmts */
+            if (proc->kind == AST_GLOBAL) {
                 for (int _gi = 0; _gi < proc->nchildren; _gi++)
                     if (proc->children[_gi] && proc->children[_gi]->sval)
                         global_register(proc->children[_gi]->sval);
             }
-            if (proc->kind == E_RECORD && proc->sval && *proc->sval) {
+            if (proc->kind == AST_RECORD && proc->sval && *proc->sval) {
                 /* IC-5: record type declaration — register before main() runs */
                 char spec[256]; int pos = 0;
                 pos += snprintf(spec+pos, sizeof(spec)-pos, "%s(", proc->sval);
@@ -163,7 +163,7 @@ void polyglot_init(CODE_t *prog, uint32_t lang_mask)
                 spec[pos] = '\0';
                 icn_record_register(spec);
             }
-            if (proc->kind == E_FNC && proc->sval && *proc->sval) {
+            if (proc->kind == AST_FNC && proc->sval && *proc->sval) {
                 const char *name = proc->sval;
 
                 if (proc_count < PROC_TABLE_MAX) {
@@ -178,15 +178,15 @@ void polyglot_init(CODE_t *prog, uint32_t lang_mask)
                         g_registry.main_mod = mod_idx;
                 }
             }
-            /* RK-26: evaluate E_RECORD immediately so class types are registered
+            /* RK-26: evaluate AST_RECORD immediately so class types are registered
              * in sc_dat_types before main() calls raku_new. */
-            if (proc->kind == E_RECORD) {
+            if (proc->kind == AST_RECORD) {
                 interp_eval(proc);
             }
         } else if (s->lang == LANG_PL) {
-            /* Prolog: collect E_CHOICE / E_CLAUSE predicate definitions */
-            EXPR_t *subj = s->subject;
-                if ((subj->kind == E_CHOICE || subj->kind == E_CLAUSE) && subj->sval) {
+            /* Prolog: collect AST_CHOICE / AST_CLAUSE predicate definitions */
+            AST_t *subj = s->subject;
+                if ((subj->kind == AST_CHOICE || subj->kind == AST_CLAUSE) && subj->sval) {
                 pl_pred_table_insert(&g_pl_pred_table, subj->sval, subj);
                 g_pl_active = 1;
                 /* Detect main module  (U-21) */
@@ -206,29 +206,29 @@ void polyglot_init(CODE_t *prog, uint32_t lang_mask)
 
 /*============================================================================================================================
  * pl_directive_max_var_slot — walk a lowered Prolog directive subject EXPR
- * and return the largest E_VAR ival found, or -1 if none.
+ * and return the largest AST_VAR ival found, or -1 if none.
  *
  * PL-12 (2026-04-30 #3): used by polyglot_execute's LANG_PL branch to size
  * a per-directive cenv. Without this, directives like
  *   :- assertz(test_g(hello)), test_g(G), write(G).
- * passed env=NULL to interp_exec_pl_builtin, which made every E_VAR read
+ * passed env=NULL to interp_exec_pl_builtin, which made every AST_VAR read
  * mint a fresh disconnected Term*var via pl_unified_term_from_expr —
  * unify could not thread bindings between conjuncts. The walk uses an
  * iterative explicit stack (no recursion) to avoid blowing C stack on
  * deeply nested goal trees built by the lowerer.
  *============================================================================================================================*/
-static int pl_directive_max_var_slot(EXPR_t *root)
+static int pl_directive_max_var_slot(AST_t *root)
 {
     if (!root) return -1;
     int max_slot = -1;
     enum { CAP = 512 };
-    EXPR_t *stk[CAP];
+    AST_t *stk[CAP];
     int top = 0;
     stk[top++] = root;
     while (top > 0) {
-        EXPR_t *e = stk[--top];
+        AST_t *e = stk[--top];
         if (!e) continue;
-        if (e->kind == E_VAR && (int)e->ival > max_slot) max_slot = (int)e->ival;
+        if (e->kind == AST_VAR && (int)e->ival > max_slot) max_slot = (int)e->ival;
         for (int i = 0; i < e->nchildren && top < CAP; i++)
             if (e->children[i]) stk[top++] = e->children[i];
     }
@@ -267,22 +267,22 @@ void polyglot_execute(CODE_t *prog) {
         fprintf(stderr, "icon: no main procedure\n");
     } else if (slang == LANG_PL) {
         g_pl_active = 1;
-        /* Execute non-E_CHOICE/E_CLAUSE LANG_PL stmts as directives before main/0.
+        /* Execute non-AST_CHOICE/AST_CLAUSE LANG_PL stmts as directives before main/0.
          * PL-12 (2026-04-30 #3): each directive gets a fresh cenv sized to its
-         * largest E_VAR slot. Without this, env=NULL caused
-         * pl_unified_term_from_expr to mint a fresh Term*var on every E_VAR
+         * largest AST_VAR slot. Without this, env=NULL caused
+         * pl_unified_term_from_expr to mint a fresh Term*var on every AST_VAR
          * read, so two references to the same logical variable G in
          *   :- assertz(test_g(hello)), test_g(G), write(G).
          * could not unify (the assertz callee bound a fresh var, the write
          * read another fresh var, both disconnected). The directive printed
          * `_G0` instead of `hello`. Walking the lowered EXPR for the max
-         * E_VAR ival and allocating cenv = pl_env_new(max+1) provides one
+         * AST_VAR ival and allocating cenv = pl_env_new(max+1) provides one
          * shared env for the whole directive body, so unify can thread
          * bindings the way it does for clause bodies. */
         for (STMT_t *_s = prog->head; _s; _s = _s->next) {
             if (_s->lang != LANG_PL) continue;
             if (!_s->subject) continue;
-            if (_s->subject->kind == E_CHOICE || _s->subject->kind == E_CLAUSE) continue;
+            if (_s->subject->kind == AST_CHOICE || _s->subject->kind == AST_CLAUSE) continue;
             int _max_slot = pl_directive_max_var_slot(_s->subject);
             Term **_dir_env = (_max_slot >= 0) ? pl_env_new(_max_slot + 1) : NULL;
             Term **_saved   = g_pl_env;
@@ -293,7 +293,7 @@ void polyglot_execute(CODE_t *prog) {
         }
         /* CH-17e: run main/0 via SM chunk when entry_pc resolved */
         Pl_PredEntry *_main_pe = pl_pred_entry_lookup("main/0");
-        EXPR_t *main_choice = pl_pred_table_lookup(&g_pl_pred_table, "main/0");
+        AST_t *main_choice = pl_pred_table_lookup(&g_pl_pred_table, "main/0");
         if (_main_pe && _main_pe->entry_pc >= 0) {
             extern DESCR_t sm_call_chunk(int);
             sm_call_chunk(_main_pe->entry_pc);

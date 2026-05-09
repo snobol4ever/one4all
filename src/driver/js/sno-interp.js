@@ -4,7 +4,7 @@
  *
  * Architecture:
  *   Lexer   — single-pass, character-stream, line-aware, emits field-boundary tokens
- *   Parser  — recursive-descent, pure token-driven, builds EXPR_t/STMT_t IR
+ *   Parser  — recursive-descent, pure token-driven, builds AST_t/STMT_t IR
  *   IR      — identical shape to scrip-cc: { kind, sval, ival, dval, children }
  *   Exec    — tree-walk over Program linked list, sno_engine.js for patterns
  *
@@ -42,7 +42,7 @@ const { _FAIL, _is_fail, _str, _num, _add, _sub, _mul, _div, _pow,
 _set_vars_hook((v, text) => { _vars[v] = text; });
 _set_dcall_hook((fname, exprs, text) => {
     /* Deferred capture target *f(text) — synthesise a literal arg and call */
-    const litExpr = {kind: E_QLIT, sval: text, children: []};
+    const litExpr = {kind: AST_QLIT, sval: text, children: []};
     _call(fname, exprs.length ? exprs : [litExpr]);
 });
 
@@ -61,36 +61,36 @@ _set_dcall_hook((fname, exprs, text) => {
 /* ═══════════════════════════════════════════════════════════════════════════
  * EKind string constants — identical to C enum names
  * ═══════════════════════════════════════════════════════════════════════════ */
-const E_QLIT='E_QLIT', E_ILIT='E_ILIT', E_FLIT='E_FLIT', E_NUL='E_NUL';
-const E_VAR='E_VAR', E_KEYWORD='E_KEYWORD', E_INDIRECT='E_INDIRECT', E_DEFER='E_DEFER';
-const E_INTERROGATE='E_INTERROGATE', E_NAME='E_NAME';
-const E_MNS='E_MNS', E_PLS='E_PLS';
-const E_ADD='E_ADD', E_SUB='E_SUB', E_MUL='E_MUL', E_DIV='E_DIV', E_MOD='E_MOD', E_POW='E_POW';
-const E_SEQ='E_SEQ', E_CAT='E_CAT', E_ALT='E_ALT', E_OPSYN='E_OPSYN';
-const E_ARB='E_ARB', E_ARBNO='E_ARBNO';
-const E_POS='E_POS', E_RPOS='E_RPOS';
-const E_ANY='E_ANY', E_NOTANY='E_NOTANY';
-const E_SPAN='E_SPAN', E_BREAK='E_BREAK', E_BREAKX='E_BREAKX';
-const E_LEN='E_LEN', E_TAB='E_TAB', E_RTAB='E_RTAB', E_REM='E_REM';
-const E_FAIL='E_FAIL', E_SUCCEED='E_SUCCEED', E_FENCE='E_FENCE', E_ABORT='E_ABORT', E_BAL='E_BAL';
-const E_CAPT_COND_ASGN='E_CAPT_COND_ASGN', E_CAPT_IMMED_ASGN='E_CAPT_IMMED_ASGN';
-const E_CAPT_CURSOR='E_CAPT_CURSOR';
-const E_FNC='E_FNC', E_IDX='E_IDX', E_ASSIGN='E_ASSIGN', E_SCAN='E_SCAN';
+const AST_QLIT='AST_QLIT', AST_ILIT='AST_ILIT', AST_FLIT='AST_FLIT', AST_NUL='AST_NUL';
+const AST_VAR='AST_VAR', AST_KEYWORD='AST_KEYWORD', AST_INDIRECT='AST_INDIRECT', AST_DEFER='AST_DEFER';
+const AST_INTERROGATE='AST_INTERROGATE', AST_NAME='AST_NAME';
+const AST_MNS='AST_MNS', AST_PLS='AST_PLS';
+const AST_ADD='AST_ADD', AST_SUB='AST_SUB', AST_MUL='AST_MUL', AST_DIV='AST_DIV', AST_MOD='AST_MOD', AST_POW='AST_POW';
+const AST_SEQ='AST_SEQ', AST_CAT='AST_CAT', AST_ALT='AST_ALT', AST_OPSYN='AST_OPSYN';
+const AST_ARB='AST_ARB', AST_ARBNO='AST_ARBNO';
+const AST_POS='AST_POS', AST_RPOS='AST_RPOS';
+const AST_ANY='AST_ANY', AST_NOTANY='AST_NOTANY';
+const AST_SPAN='AST_SPAN', AST_BREAK='AST_BREAK', AST_BREAKX='AST_BREAKX';
+const AST_LEN='AST_LEN', AST_TAB='AST_TAB', AST_RTAB='AST_RTAB', AST_REM='AST_REM';
+const AST_FAIL='AST_FAIL', AST_SUCCEED='AST_SUCCEED', AST_FENCE='AST_FENCE', AST_ABORT='AST_ABORT', AST_BAL='AST_BAL';
+const AST_CAPT_COND_ASGN='AST_CAPT_COND_ASGN', AST_CAPT_IMMED_ASGN='AST_CAPT_IMMED_ASGN';
+const AST_CAPT_CURSOR='AST_CAPT_CURSOR';
+const AST_FNC='AST_FNC', AST_IDX='AST_IDX', AST_ASSIGN='AST_ASSIGN', AST_SCAN='AST_SCAN';
 
 /* ── PAT_KINDS: E_* kinds that are pattern-only (never pure string values) ─ */
 /* Must be declared before Parser class and _expr_is_pat — both reference it.  */
 const PAT_KINDS = new Set([
-  E_ARB, E_ARBNO, E_CAPT_COND_ASGN, E_CAPT_IMMED_ASGN, E_CAPT_CURSOR, E_DEFER,
-  E_LEN, E_TAB, E_RTAB, E_POS, E_RPOS,
-  E_ANY, E_NOTANY, E_SPAN, E_BREAK, E_BREAKX, E_REM,
-  E_FAIL, E_SUCCEED, E_FENCE, E_ABORT, E_BAL,
+  AST_ARB, AST_ARBNO, AST_CAPT_COND_ASGN, AST_CAPT_IMMED_ASGN, AST_CAPT_CURSOR, AST_DEFER,
+  AST_LEN, AST_TAB, AST_RTAB, AST_POS, AST_RPOS,
+  AST_ANY, AST_NOTANY, AST_SPAN, AST_BREAK, AST_BREAKX, AST_REM,
+  AST_FAIL, AST_SUCCEED, AST_FENCE, AST_ABORT, AST_BAL,
 ]);
-/* E_FNC names that always return a pattern — used by _expr_is_pat/_is_pat     */
+/* AST_FNC names that always return a pattern — used by _expr_is_pat/_is_pat     */
 const PAT_FNC_NAMES = new Set([
   'ANY','NOTANY','SPAN','BREAK','BREAKX','LEN','POS','RPOS','TAB','RTAB',
   'ARB','ARBNO','REM','FAIL','SUCCEED','FENCE','ABORT','BAL',
 ]);
-/* E_FNC names that are predicates (return '' on success, FAIL on failure).
+/* AST_FNC names that are predicates (return '' on success, FAIL on failure).
  * In "X = guard(args) repl" form, these trigger guard_assign splitting. */
 const GUARD_FNC_NAMES = new Set([
   'EQ','NE','GT','LT','GE','LE','LGT','LLT','LGE','LLE','LEQ','LNE',
@@ -98,7 +98,7 @@ const GUARD_FNC_NAMES = new Set([
 ]);
 
 /* ═══════════════════════════════════════════════════════════════════════════
- * IR node constructors — same fields as C EXPR_t / STMT_t
+ * IR node constructors — same fields as C AST_t / STMT_t
  * ═══════════════════════════════════════════════════════════════════════════ */
 function expr_new(kind)          { return { kind, sval:null, ival:0, dval:0.0, children:[] }; }
 function expr_leaf(kind, sval)   { const e=expr_new(kind); e.sval=sval; return e; }
@@ -509,10 +509,10 @@ class Parser {
       const inner = this._e0();
       this.skip_ws();
       if (this.lx.peek().kind===T_COMMA) {
-        const alt=expr_new(E_ALT); if(inner) alt.children.push(inner);
+        const alt=expr_new(AST_ALT); if(inner) alt.children.push(inner);
         while(this.lx.peek().kind===T_COMMA) {
           this.lx.next(); this.skip_ws();
-          alt.children.push(this._e0()||expr_new(E_NUL)); this.skip_ws();
+          alt.children.push(this._e0()||expr_new(AST_NUL)); this.skip_ws();
         }
         if(this.lx.peek().kind===T_RPAREN) this.lx.next();
         return alt.children.length===1 ? alt.children[0] : alt;
@@ -520,21 +520,21 @@ class Parser {
       this.skip_ws(); if(this.lx.peek().kind===T_RPAREN) this.lx.next();
       return inner;
     }
-    if (t.kind===T_STR)     { this.lx.next(); return expr_leaf(E_QLIT, t.sval); }
-    if (t.kind===T_REAL)    { this.lx.next(); return expr_leaf(E_FLIT, t.sval); } /* sval="1.0" preserves real */
-    if (t.kind===T_INT)     { this.lx.next(); return expr_ival(E_ILIT, t.ival); }
-    if (t.kind===T_KEYWORD) { this.lx.next(); return expr_leaf(E_KEYWORD, t.sval); }
-    if (t.kind===T_END)     { this.lx.next(); return expr_leaf(E_VAR, t.sval); }
+    if (t.kind===T_STR)     { this.lx.next(); return expr_leaf(AST_QLIT, t.sval); }
+    if (t.kind===T_REAL)    { this.lx.next(); return expr_leaf(AST_FLIT, t.sval); } /* sval="1.0" preserves real */
+    if (t.kind===T_INT)     { this.lx.next(); return expr_ival(AST_ILIT, t.ival); }
+    if (t.kind===T_KEYWORD) { this.lx.next(); return expr_leaf(AST_KEYWORD, t.sval); }
+    if (t.kind===T_END)     { this.lx.next(); return expr_leaf(AST_VAR, t.sval); }
     if (t.kind===T_IDENT) {
       this.lx.next();
       if (this.lx.peek().kind===T_LPAREN) {
         this.lx.next();
-        const e=expr_leaf(E_FNC, t.sval);
+        const e=expr_leaf(AST_FNC, t.sval);
         this._arglist(e);
         if(this.lx.peek().kind===T_RPAREN) this.lx.next();
         return e;
       }
-      return expr_leaf(E_VAR, t.sval);
+      return expr_leaf(AST_VAR, t.sval);
     }
     return null;
   }
@@ -543,12 +543,12 @@ class Parser {
     this.skip_ws();
     const k=this.lx.peek().kind;
     if(k===T_RPAREN||k===T_RBRACKET||k===T_RANGLE||k===T_EOF) return;
-    node.children.push(this._e0()||expr_new(E_NUL));
+    node.children.push(this._e0()||expr_new(AST_NUL));
     while(this.lx.peek().kind===T_COMMA) {
       this.lx.next(); this.skip_ws();
       const k2=this.lx.peek().kind;
-      if(k2===T_RPAREN||k2===T_RBRACKET||k2===T_RANGLE||k2===T_EOF){node.children.push(expr_new(E_NUL));break;}
-      node.children.push(this._e0()||expr_new(E_NUL));
+      if(k2===T_RPAREN||k2===T_RBRACKET||k2===T_RANGLE||k2===T_EOF){node.children.push(expr_new(AST_NUL));break;}
+      node.children.push(this._e0()||expr_new(AST_NUL));
     }
     this.skip_ws();
   }
@@ -561,9 +561,9 @@ class Parser {
       const close=open===T_LBRACKET?T_RBRACKET:open===T_LANGLE?T_RANGLE:-1;
       if(close<0) break;
       this.lx.next();
-      const tmp=expr_new(E_NUL); this._arglist(tmp);
+      const tmp=expr_new(AST_NUL); this._arglist(tmp);
       if(this.lx.peek().kind===close) this.lx.next();
-      const idx=expr_new(E_IDX); idx.children=[e,...tmp.children]; e=idx;
+      const idx=expr_new(AST_IDX); idx.children=[e,...tmp.children]; e=idx;
     }
     return e;
   }
@@ -572,23 +572,23 @@ class Parser {
   _e14() {
     const t=this.lx.peek();
     /* Bare (unary) tokens only — binary tokens (T_BIN_*) never appear here */
-    const MAP={[T_AT]:E_CAPT_CURSOR,[T_TILDE]:E_INDIRECT,[T_QMARK]:E_INTERROGATE,
-               [T_AMP]:E_OPSYN,[T_PLUS]:E_PLS,[T_MINUS]:E_MNS,[T_STAR]:E_DEFER,
-               [T_DOLLAR]:E_INDIRECT,[T_DOT]:E_NAME,[T_BANG]:E_POW,
-               [T_PCT]:E_MOD,[T_SLASH]:E_DIV,[T_HASH]:E_MUL,[T_EQ]:E_ASSIGN,[T_PIPE]:E_ALT};
+    const MAP={[T_AT]:AST_CAPT_CURSOR,[T_TILDE]:AST_INDIRECT,[T_QMARK]:AST_INTERROGATE,
+               [T_AMP]:AST_OPSYN,[T_PLUS]:AST_PLS,[T_MINUS]:AST_MNS,[T_STAR]:AST_DEFER,
+               [T_DOLLAR]:AST_INDIRECT,[T_DOT]:AST_NAME,[T_BANG]:AST_POW,
+               [T_PCT]:AST_MOD,[T_SLASH]:AST_DIV,[T_HASH]:AST_MUL,[T_EQ]:AST_ASSIGN,[T_PIPE]:AST_ALT};
     const uk=MAP[t.kind];
     if(!uk) return this._e15();
     this.lx.next();
     const op=this._e14();
-    if(!op){this._err('expected operand after unary operator');return expr_new(E_NUL);}
+    if(!op){this._err('expected operand after unary operator');return expr_new(AST_NUL);}
     let e=expr_unary(uk, op);
     /* For $ and .: if inner parse consumed subscripts (e.g. $.a<2> parsed inner as
-     * E_IDX(E_NAME(a),2) giving E_INDIRECT(E_IDX(NAME(a),2)) = $(a<2>)), hoist them:
-     * E_INDIRECT(E_IDX(base,idx...)) -> E_IDX(E_INDIRECT(base), idx...) so $.a<2>=($a)<2>. */
-    if((uk===E_INDIRECT||uk===E_NAME) && e.children[0]&&e.children[0].kind===E_IDX) {
-      const inner=e.children[0];                    /* E_IDX(base, idxs...) */
-      const hoisted=expr_unary(uk, inner.children[0]); /* E_INDIRECT(base) */
-      const rehoisted=expr_new(E_IDX);
+     * AST_IDX(AST_NAME(a),2) giving AST_INDIRECT(AST_IDX(NAME(a),2)) = $(a<2>)), hoist them:
+     * AST_INDIRECT(AST_IDX(base,idx...)) -> AST_IDX(AST_INDIRECT(base), idx...) so $.a<2>=($a)<2>. */
+    if((uk===AST_INDIRECT||uk===AST_NAME) && e.children[0]&&e.children[0].kind===AST_IDX) {
+      const inner=e.children[0];                    /* AST_IDX(base, idxs...) */
+      const hoisted=expr_unary(uk, inner.children[0]); /* AST_INDIRECT(base) */
+      const rehoisted=expr_new(AST_IDX);
       rehoisted.children=[hoisted,...inner.children.slice(1)];
       e=rehoisted;
     }
@@ -601,7 +601,7 @@ class Parser {
     for(;;) {
       if(this.lx.peek().kind!==T_BIN_TILDE) break;
       this.lx.next();
-      l=expr_binary(E_CAPT_COND_ASGN, l, this._e13());
+      l=expr_binary(AST_CAPT_COND_ASGN, l, this._e13());
     }
     return l;
   }
@@ -613,7 +613,7 @@ class Parser {
       const k=this.lx.peek().kind;
       if(k!==T_BIN_DOLLAR && k!==T_BIN_DOT) break;
       this.lx.next();
-      l=expr_binary(k===T_BIN_DOLLAR?E_CAPT_IMMED_ASGN:E_CAPT_COND_ASGN, l, this._e13());
+      l=expr_binary(k===T_BIN_DOLLAR?AST_CAPT_IMMED_ASGN:AST_CAPT_COND_ASGN, l, this._e13());
     }
     return l;
   }
@@ -640,13 +640,13 @@ class Parser {
     return expr_binary(ek, l, this._rbin(nxt, ops));
   }
 
-  _e11() { return this._rbin(this._e12, {[T_BIN_CARET]:E_POW,[T_BIN_BANG]:E_POW,[T_BIN_STARSTAR]:E_POW}); }
-  _e10() { return this._lbin(this._e11, {[T_BIN_PCT]:E_MOD}); }
-  _e9()  { return this._lbin(this._e10, {[T_BIN_STAR]:E_MUL}); }
-  _e8()  { return this._lbin(this._e9,  {[T_BIN_SLASH]:E_DIV}); }
-  _e7()  { return this._lbin(this._e8,  {[T_BIN_HASH]:E_MUL}); }
-  _e6()  { return this._lbin(this._e7,  {[T_BIN_PLUS]:E_ADD,[T_BIN_MINUS]:E_SUB}); }
-  _e5()  { return this._lbin(this._e6,  {[T_BIN_AT]:E_CAPT_CURSOR}); }
+  _e11() { return this._rbin(this._e12, {[T_BIN_CARET]:AST_POW,[T_BIN_BANG]:AST_POW,[T_BIN_STARSTAR]:AST_POW}); }
+  _e10() { return this._lbin(this._e11, {[T_BIN_PCT]:AST_MOD}); }
+  _e9()  { return this._lbin(this._e10, {[T_BIN_STAR]:AST_MUL}); }
+  _e8()  { return this._lbin(this._e9,  {[T_BIN_SLASH]:AST_DIV}); }
+  _e7()  { return this._lbin(this._e8,  {[T_BIN_HASH]:AST_MUL}); }
+  _e6()  { return this._lbin(this._e7,  {[T_BIN_PLUS]:AST_ADD,[T_BIN_MINUS]:AST_SUB}); }
+  _e5()  { return this._lbin(this._e6,  {[T_BIN_AT]:AST_CAPT_CURSOR}); }
 
   /* ── expr4 — whitespace concatenation ──────────────────────────────── */
   _is_cat_start(k) {
@@ -683,47 +683,47 @@ class Parser {
       items.push(nxt);
     }
     if(items.length===1) return first;
-    const e=expr_new(E_SEQ); e.children=items; return e;
+    const e=expr_new(AST_SEQ); e.children=items; return e;
   }
 
   /* ── expr3 — | alternation (T_BIN_PIPE) ────────────────────────────── */
   _e3() {
     const first=this._e4(); if(!first) return null;
     if(this.lx.peek().kind!==T_BIN_PIPE) return first;
-    const e=expr_new(E_ALT); e.children=[first];
+    const e=expr_new(AST_ALT); e.children=[first];
     for(;;) {
       if(this.lx.peek().kind!==T_BIN_PIPE) break;
       this.lx.next();
-      e.children.push(this._e4()||expr_new(E_NUL));
+      e.children.push(this._e4()||expr_new(AST_NUL));
     }
     return e;
   }
 
   /* ── expr2 — & ──────────────────────────────────────────────────────── */
-  _e2() { return this._lbin(this._e3, {[T_BIN_AMP]:E_OPSYN}); }
+  _e2() { return this._lbin(this._e3, {[T_BIN_AMP]:AST_OPSYN}); }
 
   /* ── expr0 — = assignment, ? scan (right-assoc) ────────────────────── */
   _e0() {
     const l=this._e2(); if(!l) return null;
     const k=this.lx.peek().kind;
-    if(k===T_BIN_EQ)    {this.lx.next();return expr_binary(E_ASSIGN,l,this._e0());}
-    if(k===T_BIN_QMARK) {this.lx.next();return expr_binary(E_SCAN,  l,this._e0());}
+    if(k===T_BIN_EQ)    {this.lx.next();return expr_binary(AST_ASSIGN,l,this._e0());}
+    if(k===T_BIN_QMARK) {this.lx.next();return expr_binary(AST_SCAN,  l,this._e0());}
     return l;
   }
 
   _expr() { this.skip_ws(); return this._e0(); }
 
-  /* ── M-G4: value-context E_SEQ → E_CAT fixup ────────────────────────── */
+  /* ── M-G4: value-context AST_SEQ → AST_CAT fixup ────────────────────────── */
   _fixup_val(e) {
     if(!e) return;
-    if(e.kind===E_SEQ) e.kind=E_CAT;
+    if(e.kind===AST_SEQ) e.kind=AST_CAT;
     e.children.forEach(c=>this._fixup_val(c));
   }
   _is_pat(e) {
     if(!e) return false;
-    if([E_ARB,E_ARBNO,E_CAPT_COND_ASGN,E_CAPT_IMMED_ASGN,E_CAPT_CURSOR,E_DEFER].includes(e.kind)) return true;
-    /* E_FNC whose name is a pattern primitive (LEN, POS, TAB, ANY, etc.) */
-    if(e.kind===E_FNC && PAT_FNC_NAMES.has(e.sval.toUpperCase())) return true;
+    if([AST_ARB,AST_ARBNO,AST_CAPT_COND_ASGN,AST_CAPT_IMMED_ASGN,AST_CAPT_CURSOR,AST_DEFER].includes(e.kind)) return true;
+    /* AST_FNC whose name is a pattern primitive (LEN, POS, TAB, ANY, etc.) */
+    if(e.kind===AST_FNC && PAT_FNC_NAMES.has(e.sval.toUpperCase())) return true;
     return (e.children||[]).some(c=>this._is_pat(c));
   }
 
@@ -829,16 +829,16 @@ class Parser {
       if(!this._at_end()) {
         const rhs=this._expr();
         /* S = P R form: split only when leading fn is a known guard/predicate.
-         * Oracle (snobol4.y:216) handles the no-equals case via E_VAR first-child.
+         * Oracle (snobol4.y:216) handles the no-equals case via AST_VAR first-child.
          * For the T_BIN_EQ case: "X = guard(args) repl" where guard is a predicate fn. */
-        if(s.subject && rhs && (rhs.kind===E_SEQ||rhs.kind===E_CAT) && rhs.children.length>=2
-           && rhs.children[0].kind===E_FNC
+        if(s.subject && rhs && (rhs.kind===AST_SEQ||rhs.kind===AST_CAT) && rhs.children.length>=2
+           && rhs.children[0].kind===AST_FNC
            && GUARD_FNC_NAMES.has((rhs.children[0].sval||'').toUpperCase())) {
           const kids=rhs.children;
           s.pattern=kids[0];
           let replKid;
           if(kids.length===2){ replKid=kids[1]; }
-          else { const r=expr_new(E_SEQ); r.children=kids.slice(1); replKid=r; }
+          else { const r=expr_new(AST_SEQ); r.children=kids.slice(1); replKid=r; }
           s.replacement=replKid;
           s.guard_assign=true;
           if(!this._is_pat(s.replacement)) this._fixup_val(s.replacement);
@@ -929,33 +929,33 @@ function interp_eval(e) {
   if(!e) return null;
   if(e._val !== undefined) return e._val;  /* pre-evaluated (APPLY args) */
   switch(e.kind) {
-    case E_QLIT:    return e.sval;
-    case E_ILIT:    return e.ival;
-    case E_FLIT:    return _real_result(parseFloat(e.sval)); /* tagged real */
-    case E_NUL:     return null;
-    case E_VAR:     { const v=_vars[e.sval]; return v===undefined?null:v; }
-    case E_KEYWORD: { const v=_vars['&'+e.sval.toUpperCase()]; return v===undefined?null:v; }
-    case E_ADD: { const a=interp_eval(e.children[0]),b=interp_eval(e.children[1]);
+    case AST_QLIT:    return e.sval;
+    case AST_ILIT:    return e.ival;
+    case AST_FLIT:    return _real_result(parseFloat(e.sval)); /* tagged real */
+    case AST_NUL:     return null;
+    case AST_VAR:     { const v=_vars[e.sval]; return v===undefined?null:v; }
+    case AST_KEYWORD: { const v=_vars['&'+e.sval.toUpperCase()]; return v===undefined?null:v; }
+    case AST_ADD: { const a=interp_eval(e.children[0]),b=interp_eval(e.children[1]);
                   if(_is_fail(a)||_is_fail(b)) return _FAIL; return _add(a,b); }
-    case E_SUB: { const a=interp_eval(e.children[0]),b=interp_eval(e.children[1]);
+    case AST_SUB: { const a=interp_eval(e.children[0]),b=interp_eval(e.children[1]);
                   if(_is_fail(a)||_is_fail(b)) return _FAIL; return _sub(a,b); }
-    case E_MUL: { const a=interp_eval(e.children[0]),b=interp_eval(e.children[1]);
+    case AST_MUL: { const a=interp_eval(e.children[0]),b=interp_eval(e.children[1]);
                   if(_is_fail(a)||_is_fail(b)) return _FAIL; return _mul(a,b); }
-    case E_DIV: { const a=interp_eval(e.children[0]),b=interp_eval(e.children[1]);
+    case AST_DIV: { const a=interp_eval(e.children[0]),b=interp_eval(e.children[1]);
                   if(_is_fail(a)||_is_fail(b)) return _FAIL; return _div(a,b); }
-    case E_MOD: { const a=interp_eval(e.children[0]),b=interp_eval(e.children[1]);
+    case AST_MOD: { const a=interp_eval(e.children[0]),b=interp_eval(e.children[1]);
                   if(_is_fail(a)||_is_fail(b)) return _FAIL;
                   const an=_num(a),bn=_num(b); return bn===0?_FAIL:an%bn; }
-    case E_POW: { const a=interp_eval(e.children[0]),b=interp_eval(e.children[1]);
+    case AST_POW: { const a=interp_eval(e.children[0]),b=interp_eval(e.children[1]);
                   if(_is_fail(a)||_is_fail(b)) return _FAIL; return _pow(a,b); }
-    case E_MNS: { const a=interp_eval(e.children[0]); if(_is_fail(a)) return _FAIL;
+    case AST_MNS: { const a=interp_eval(e.children[0]); if(_is_fail(a)) return _FAIL;
                   const r=-_num(a); return _is_int(a)?r:_real_result(r); }
-    case E_PLS: { const a=interp_eval(e.children[0]); if(_is_fail(a)) return _FAIL;
+    case AST_PLS: { const a=interp_eval(e.children[0]); if(_is_fail(a)) return _FAIL;
                   const r=_num(a); return _is_int(a)?r:_real_result(r); }
-    case E_SEQ:  /* M-SJ-B07: E_SEQ with pattern children → pattern object */
+    case AST_SEQ:  /* M-SJ-B07: AST_SEQ with pattern children → pattern object */
       if (_expr_is_pat(e)) return _build_pat(e);
-      /* fall through — pure E_SEQ (no pattern nodes) = string concat */
-    case E_CAT: {
+      /* fall through — pure AST_SEQ (no pattern nodes) = string concat */
+    case AST_CAT: {
       /* Evaluate children eagerly; if any is a PAT object, switch to PAT_seq */
       const parts=[];
       for(const c of e.children){const v=interp_eval(c);if(_is_fail(v))return _FAIL;parts.push(v);}
@@ -965,18 +965,18 @@ function interp_eval(e) {
       }
       return parts.map(v=>_str(v??'')).join('');
     }
-    case E_ASSIGN: {
+    case AST_ASSIGN: {
       const rhs=interp_eval(e.children[1]);
       if(_is_fail(rhs)) return _FAIL;   /* fail propagates, no assignment */
       _assign(e.children[0], rhs); return rhs;
     }
-    case E_INDIRECT: {
+    case AST_INDIRECT: {
       const v=interp_eval(e.children[0]); if(_is_fail(v)) return _FAIL;
       const name=_str(v); const r=_vars[name]; return r===undefined?null:r;
     }
-    case E_DEFER: { const v=interp_eval(e.children[0]); return _is_fail(v)?_FAIL:v; }
-    case E_FNC:   { const _r=_call(e.sval, e.children); return (_r&&_r.__nameref)?(_vars[_r.__nameref]??null):_r; }
-    case E_IDX: {
+    case AST_DEFER: { const v=interp_eval(e.children[0]); return _is_fail(v)?_FAIL:v; }
+    case AST_FNC:   { const _r=_call(e.sval, e.children); return (_r&&_r.__nameref)?(_vars[_r.__nameref]??null):_r; }
+    case AST_IDX: {
       const base=interp_eval(e.children[0]); if(_is_fail(base)) return _FAIL;
       const idxs=e.children.slice(1).map(c=>{const v=interp_eval(c);return v;});
       if(idxs.some(_is_fail)) return _FAIL;
@@ -996,34 +996,34 @@ function interp_eval(e) {
       if(Array.isArray(base)) return base[_num(idxs[0])-1]??null;
       return null;
     }
-    case E_SCAN: {
+    case AST_SCAN: {
       const s=interp_eval(e.children[0]); if(_is_fail(s)) return _FAIL;
       const pat=_build_pat(e.children[1]); if(_is_fail(pat)) return _FAIL;
       const res=sno_search(_str(s),pat);
       return res?_str(s).slice(res.start,res.end):_FAIL;
     }
-    case E_CAPT_COND_ASGN:
-    case E_CAPT_IMMED_ASGN: return interp_eval(e.children[0]);
-    case E_CAPT_CURSOR: {
+    case AST_CAPT_COND_ASGN:
+    case AST_CAPT_IMMED_ASGN: return interp_eval(e.children[0]);
+    case AST_CAPT_CURSOR: {
       /* binary @ → check if OPSYN'd */
       if(e.children[1]!==undefined && opsyn_table['@'] && opsyn_table['@'].arity===2) {
         const a=interp_eval(e.children[0]), b=interp_eval(e.children[1]);
         if(_is_fail(a)||_is_fail(b)) return _FAIL;
         const fn=opsyn_table['@'].fn;
-        const ea=expr_new(E_NUL); ea._val=a;
-        const eb=expr_new(E_NUL); eb._val=b;
+        const ea=expr_new(AST_NUL); ea._val=a;
+        const eb=expr_new(AST_NUL); eb._val=b;
         return _call(fn,[ea,eb]);
       }
       return interp_eval(e.children[0]);  /* @V in expr ctx: eval V */
     }
-    case E_NAME:            return e.children[0]?.sval||null;
-    case E_INTERROGATE:     { const v=interp_eval(e.children[0]); return _is_fail(v)?_FAIL:null; }
-    case E_ALT: {
+    case AST_NAME:            return e.children[0]?.sval||null;
+    case AST_INTERROGATE:     { const v=interp_eval(e.children[0]); return _is_fail(v)?_FAIL:null; }
+    case AST_ALT: {
       /* unary | → check if OPSYN'd as unary op */
       if(e.children.length===1 && opsyn_table['|'] && opsyn_table['|'].arity===1) {
         const a=interp_eval(e.children[0]); if(_is_fail(a)) return _FAIL;
         const fn=opsyn_table['|'].fn;
-        const ea=expr_new(E_NUL); ea._val=a;
+        const ea=expr_new(AST_NUL); ea._val=a;
         return _call(fn,[ea]);
       }
       /* Build ALT pattern: evaluate each child as a value first.
@@ -1048,10 +1048,10 @@ function interp_eval(e) {
 /* ── _assign: write val into lvalue expression ──────────────────────────── */
 function _assign(lhs, val) {
   if(!lhs) return;
-  if(lhs.kind===E_VAR)     { _vars[lhs.sval]=val; return; }
-  if(lhs.kind===E_KEYWORD) { _vars['&'+lhs.sval.toUpperCase()]=val; return; }
-  if(lhs.kind===E_INDIRECT){ const n=_str(interp_eval(lhs.children[0])); _vars[n]=val; return; }
-  if(lhs.kind===E_IDX) {
+  if(lhs.kind===AST_VAR)     { _vars[lhs.sval]=val; return; }
+  if(lhs.kind===AST_KEYWORD) { _vars['&'+lhs.sval.toUpperCase()]=val; return; }
+  if(lhs.kind===AST_INDIRECT){ const n=_str(interp_eval(lhs.children[0])); _vars[n]=val; return; }
+  if(lhs.kind===AST_IDX) {
     const base=interp_eval(lhs.children[0]);
     const idxs=lhs.children.slice(1).map(c=>interp_eval(c));
     if(base && base.__sno_array) {
@@ -1061,7 +1061,7 @@ function _assign(lhs, val) {
     if(base instanceof Map)  { base.set(_str(idxs[0]),val); return; }
     if(Array.isArray(base))  { base[_num(idxs[0])-1]=val; return; }
   }
-  if(lhs.kind===E_FNC) {
+  if(lhs.kind===AST_FNC) {
     const fn=lhs.sval.toUpperCase();
     /* ITEM(arr, i1, ...) = val */
     if(fn==='ITEM') {
@@ -1086,25 +1086,25 @@ function _assign(lhs, val) {
 }
 
 /* ── _expr_is_pat: true if expr tree contains pattern-only nodes ─────────── */
-/* M-SJ-B07: used by interp_eval to route E_SEQ containing pattern nodes     */
+/* M-SJ-B07: used by interp_eval to route AST_SEQ containing pattern nodes     */
 /* to _build_pat instead of string concat.  PAT_KINDS declared at top.      */
 function _expr_is_pat(e) {
   if (!e) return false;
   if (PAT_KINDS.has(e.kind)) return true;
-  /* E_FNC whose name is a pattern primitive */
-  if (e.kind === E_FNC && PAT_FNC_NAMES.has(e.sval.toUpperCase())) return true;
+  /* AST_FNC whose name is a pattern primitive */
+  if (e.kind === AST_FNC && PAT_FNC_NAMES.has(e.sval.toUpperCase())) return true;
   return (e.children||[]).some(c => _expr_is_pat(c));
 }
 
-/* ── _build_pat: EXPR_t → PAT_* node for sno_engine.js ─────────────────── */
+/* ── _build_pat: AST_t → PAT_* node for sno_engine.js ─────────────────── */
 function _build_pat(e) {
   if(!e) return _FAIL;
   switch(e.kind) {
-    case E_QLIT:   return PAT_lit(e.sval);
-    case E_ILIT:   return PAT_lit(String(e.ival));
-    case E_FLIT:   return PAT_lit(_str(e.sval));
-    case E_VAR:    {
-      /* Bare pattern keywords (no parens) parse as E_VAR — dispatch to constructors */
+    case AST_QLIT:   return PAT_lit(e.sval);
+    case AST_ILIT:   return PAT_lit(String(e.ival));
+    case AST_FLIT:   return PAT_lit(_str(e.sval));
+    case AST_VAR:    {
+      /* Bare pattern keywords (no parens) parse as AST_VAR — dispatch to constructors */
       switch(e.sval.toUpperCase()) {
         case 'FAIL':    return PAT_fail();
         case 'SUCCEED': return PAT_succeed();
@@ -1120,45 +1120,45 @@ function _build_pat(e) {
       if (v !== null && v !== undefined && (typeof v === 'object' && v.__pat)) return v;
       return PAT_lit(_str(v??''));
     }
-    case E_ALT:    return PAT_alt(...e.children.map(_build_pat));
-    case E_SEQ:    return PAT_seq(...e.children.map(_build_pat));
-    case E_CAT:    return PAT_seq(...e.children.map(_build_pat));
-    case E_ARB:    return PAT_arb();
-    case E_ARBNO:  return PAT_arbno(_build_pat(e.children[0]));
-    case E_REM:    return PAT_rem();
-    case E_FAIL:   return PAT_fail();
-    case E_SUCCEED:return PAT_succeed();
-    case E_FENCE:  return PAT_fence();
-    case E_ABORT:  return PAT_abort();
-    case E_BAL:    return PAT_bal();
-    case E_LEN:    return PAT_len(_num(interp_eval(e.children[0])));
-    case E_POS:    return PAT_pos(_num(interp_eval(e.children[0])));
-    case E_RPOS:   return PAT_rpos(_num(interp_eval(e.children[0])));
-    case E_TAB:    return PAT_tab(_num(interp_eval(e.children[0])));
-    case E_RTAB:   return PAT_rtab(_num(interp_eval(e.children[0])));
-    case E_ANY:    return PAT_any(_str(interp_eval(e.children[0])));
-    case E_NOTANY: return PAT_notany(_str(interp_eval(e.children[0])));
-    case E_SPAN:   return PAT_span(_str(interp_eval(e.children[0])));
-    case E_BREAK:
-    case E_BREAKX: return PAT_break(_str(interp_eval(e.children[0])));
-    case E_CAPT_COND_ASGN: {
+    case AST_ALT:    return PAT_alt(...e.children.map(_build_pat));
+    case AST_SEQ:    return PAT_seq(...e.children.map(_build_pat));
+    case AST_CAT:    return PAT_seq(...e.children.map(_build_pat));
+    case AST_ARB:    return PAT_arb();
+    case AST_ARBNO:  return PAT_arbno(_build_pat(e.children[0]));
+    case AST_REM:    return PAT_rem();
+    case AST_FAIL:   return PAT_fail();
+    case AST_SUCCEED:return PAT_succeed();
+    case AST_FENCE:  return PAT_fence();
+    case AST_ABORT:  return PAT_abort();
+    case AST_BAL:    return PAT_bal();
+    case AST_LEN:    return PAT_len(_num(interp_eval(e.children[0])));
+    case AST_POS:    return PAT_pos(_num(interp_eval(e.children[0])));
+    case AST_RPOS:   return PAT_rpos(_num(interp_eval(e.children[0])));
+    case AST_TAB:    return PAT_tab(_num(interp_eval(e.children[0])));
+    case AST_RTAB:   return PAT_rtab(_num(interp_eval(e.children[0])));
+    case AST_ANY:    return PAT_any(_str(interp_eval(e.children[0])));
+    case AST_NOTANY: return PAT_notany(_str(interp_eval(e.children[0])));
+    case AST_SPAN:   return PAT_span(_str(interp_eval(e.children[0])));
+    case AST_BREAK:
+    case AST_BREAKX: return PAT_break(_str(interp_eval(e.children[0])));
+    case AST_CAPT_COND_ASGN: {
       const p = _build_pat(e.children[0]);
       const tgt = e.children[1];
-      /* If target is E_DEFER(E_FNC(f)), store callable descriptor */
-      if (tgt && tgt.kind === E_DEFER && tgt.children[0]?.kind === E_FNC)
+      /* If target is AST_DEFER(AST_FNC(f)), store callable descriptor */
+      if (tgt && tgt.kind === AST_DEFER && tgt.children[0]?.kind === AST_FNC)
         return PAT_capt_cond(p, {__dcall: tgt.children[0].sval, __exprs: tgt.children[0].children});
       return PAT_capt_cond(p, tgt?.sval || '');
     }
-    case E_CAPT_IMMED_ASGN: {
+    case AST_CAPT_IMMED_ASGN: {
       const p = _build_pat(e.children[0]);
       const tgt = e.children[1];
-      if (tgt && tgt.kind === E_DEFER && tgt.children[0]?.kind === E_FNC)
+      if (tgt && tgt.kind === AST_DEFER && tgt.children[0]?.kind === AST_FNC)
         return PAT_capt_imm(p, {__dcall: tgt.children[0].sval, __exprs: tgt.children[0].children});
       return PAT_capt_imm(p, tgt?.sval || '');
     }
-    case E_CAPT_CURSOR: {
+    case AST_CAPT_CURSOR: {
       /* Binary form: P @ V — match P then capture cursor into V.
-       * Unary form (prefix @V from _e14): children[0] is the variable E_VAR/E_NAME.
+       * Unary form (prefix @V from _e14): children[0] is the variable AST_VAR/AST_NAME.
        * Distinguish: if children[1] exists, it's binary (P @ V). */
       if (e.children[1] !== undefined) {
         const varname = e.children[1]?.sval || '';
@@ -1168,7 +1168,7 @@ function _build_pat(e) {
       const varname = e.children[0]?.sval || e.children[0]?.children?.[0]?.sval || '';
       return PAT_capt_cursor(varname);
     }
-    case E_FNC: {
+    case AST_FNC: {
       const fn=e.sval.toUpperCase();
       const a0=()=>_str(interp_eval(e.children[0]));
       const n0=()=>_num(interp_eval(e.children[0]));
@@ -1211,12 +1211,12 @@ function _build_pat(e) {
         }
       }
     }
-    case E_DEFER: {
+    case AST_DEFER: {
       /* *expr in pattern position.
        * *f()  → dynamic sub-pattern: call f() at match time, descend into result.
        * *VAR  → evaluate immediately (value fixed at build time). */
       const inner = e.children[0];
-      if (inner.kind === E_FNC) {
+      if (inner.kind === AST_FNC) {
         const sval = inner.sval, ch = inner.children;
         return PAT_deferred(() => {
           const result = _call(sval, ch);
@@ -1347,7 +1347,7 @@ function _call(fname, arg_exprs) {
         return {lo, hi};
       });
       const defval = args[1]??null;
-      /* Use a plain object with metadata so E_IDX can do bounds check */
+      /* Use a plain object with metadata so AST_IDX can do bounds check */
       const arr = Object.create(null);
       arr.__sno_array = true;
       arr.__dims = dims;
@@ -1371,7 +1371,7 @@ function _call(fname, arg_exprs) {
       const fn = _str(args[0]??'');
       if (!fn) return _FAIL;
       const fnargs = args.slice(1);
-      return _call(fn, fnargs.map(a=>{ const e=expr_new(E_NUL); e._val=a; return e; }));
+      return _call(fn, fnargs.map(a=>{ const e=expr_new(AST_NUL); e._val=a; return e; }));
     }
     case 'DATA': {
       const spec = _str(args[0]??'');
@@ -1514,7 +1514,7 @@ function _exec_from(start) {
 
     /* Evaluate subject */
     if(s.subject) {
-      if(s.subject.kind===E_VAR) {
+      if(s.subject.kind===AST_VAR) {
         subj_name=s.subject.sval;
         subj_val=_vars[subj_name]??null;
       } else {
@@ -1601,9 +1601,9 @@ function _exec_from(start) {
 function execute_program(prog) {
   /* Pre-scan DEFINE calls */
   for(let s=prog.head;s;s=s.next) {
-    if(s.subject?.kind===E_FNC && s.subject.sval?.toUpperCase()==='DEFINE' && s.subject.children.length>=1) {
+    if(s.subject?.kind===AST_FNC && s.subject.sval?.toUpperCase()==='DEFINE' && s.subject.children.length>=1) {
       const spec_e=s.subject.children[0];
-      if(spec_e.kind===E_QLIT) define_fn(spec_e.sval, s.subject.children[1]?.sval||null);
+      if(spec_e.kind===AST_QLIT) define_fn(spec_e.sval, s.subject.children[1]?.sval||null);
     }
   }
   try { _exec_from(prog.head); } catch(ex) {

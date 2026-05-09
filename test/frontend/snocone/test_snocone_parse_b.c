@@ -5,8 +5,8 @@
  *   ==  !=  <  >  <=  >=                  (numeric:  EQ NE LT GT LE GE)
  *   :==:  :!=:  :<:  :>:  :<=:  :>=:      (lexical:  LEQ LNE LLT LGT LLE LGE)
  *   ::  :!:                               (identity: IDENT DIFFER)
- * each lower to an E_FNC named call.  And the T_CALL call-form
- * lowers `EQ(2+2, 4)` to E_FNC("EQ", E_ADD(2,2), 4).  Plus the precedence
+ * each lower to an AST_FNC named call.  And the T_CALL call-form
+ * lowers `EQ(2+2, 4)` to AST_FNC("EQ", AST_ADD(2,2), 4).  Plus the precedence
  * relation: comparisons sit BELOW arithmetic add/sub, so
  * `a + b == c + d` parses as `(a + b) == (c + d)`.
  *
@@ -37,16 +37,16 @@
 Program *snocone_parse_program(const char *src, const char *filename);
 
 /* Mini IR printer — same format as parse_a so dumps are uniform. */
-static void dump_expr(const EXPR_t *e, FILE *out) {
+static void dump_expr(const AST_t *e, FILE *out) {
     if (!e) { fputs("<nil>", out); return; }
-    fputs(ekind_name[e->kind] ? ekind_name[e->kind] : "?", out);
+    fputs(ast_e_name[e->kind] ? ast_e_name[e->kind] : "?", out);
     switch (e->kind) {
-        case E_VAR:
-        case E_KEYWORD:
-        case E_QLIT:
+        case AST_VAR:
+        case AST_KEYWORD:
+        case AST_QLIT:
             fprintf(out, "(\"%s\")", e->sval ? e->sval : "");
             break;
-        case E_FNC:
+        case AST_FNC:
             /* function name AND children */
             fprintf(out, "(\"%s\"", e->sval ? e->sval : "");
             for (int i = 0; i < e->nchildren; i++) {
@@ -55,10 +55,10 @@ static void dump_expr(const EXPR_t *e, FILE *out) {
             }
             fputc(')', out);
             break;
-        case E_ILIT:
+        case AST_ILIT:
             fprintf(out, "(%lld)", e->ival);
             break;
-        case E_FLIT:
+        case AST_FLIT:
             fprintf(out, "(%g)", e->dval);
             break;
         default:
@@ -108,8 +108,8 @@ static void check(const char *label, int cond, const char *fmt, ...) {
     }
 }
 
-/* ---- shape checker: replacement is E_FNC("FNAME", lhs_kind, rhs_kind) ---- */
-static EXPR_t *parse_or_null(const char *src) {
+/* ---- shape checker: replacement is AST_FNC("FNAME", lhs_kind, rhs_kind) ---- */
+static AST_t *parse_or_null(const char *src) {
     Program *prog = snocone_parse_program(src, "<test>");
     if (!prog || !prog->head || !prog->head->replacement) return NULL;
     return prog->head->replacement;
@@ -118,14 +118,14 @@ static EXPR_t *parse_or_null(const char *src) {
 static void check_fnc_2arg(const char *src, const char *fname,
                             EKind expected_l, EKind expected_r) {
     printf("=== test: %s ===\n", src);
-    EXPR_t *r = parse_or_null(src);
+    AST_t *r = parse_or_null(src);
     char label[256];
     snprintf(label, sizeof label, "parses (%s)", src);
     check(label, r != NULL, "NULL");
     if (!r) return;
-    snprintf(label, sizeof label, "top is E_FNC (%s)", fname);
-    check(label, r->kind == E_FNC, "got kind=%d", (int)r->kind);
-    if (r->kind != E_FNC) return;
+    snprintf(label, sizeof label, "top is AST_FNC (%s)", fname);
+    check(label, r->kind == AST_FNC, "got kind=%d", (int)r->kind);
+    if (r->kind != AST_FNC) return;
     snprintf(label, sizeof label, "fname == \"%s\"", fname);
     check(label, r->sval && strcmp(r->sval, fname) == 0,
           "got '%s'", r->sval ? r->sval : "(nil)");
@@ -142,57 +142,57 @@ static void check_fnc_2arg(const char *src, const char *fname,
 
 /* ---- 1. Each of the 14 comparison/identity operators lowers correctly ---- */
 static void test_numeric_comparisons(void) {
-    check_fnc_2arg("X = A == B;",  "EQ",  E_VAR, E_VAR);
-    check_fnc_2arg("X = A != B;",  "NE",  E_VAR, E_VAR);
-    check_fnc_2arg("X = A < B;",   "LT",  E_VAR, E_VAR);
-    check_fnc_2arg("X = A > B;",   "GT",  E_VAR, E_VAR);
-    check_fnc_2arg("X = A <= B;",  "LE",  E_VAR, E_VAR);
-    check_fnc_2arg("X = A >= B;",  "GE",  E_VAR, E_VAR);
+    check_fnc_2arg("X = A == B;",  "EQ",  AST_VAR, AST_VAR);
+    check_fnc_2arg("X = A != B;",  "NE",  AST_VAR, AST_VAR);
+    check_fnc_2arg("X = A < B;",   "LT",  AST_VAR, AST_VAR);
+    check_fnc_2arg("X = A > B;",   "GT",  AST_VAR, AST_VAR);
+    check_fnc_2arg("X = A <= B;",  "LE",  AST_VAR, AST_VAR);
+    check_fnc_2arg("X = A >= B;",  "GE",  AST_VAR, AST_VAR);
 }
 
 static void test_lexical_comparisons(void) {
-    check_fnc_2arg("X = A :==: B;", "LEQ", E_VAR, E_VAR);
-    check_fnc_2arg("X = A :!=: B;", "LNE", E_VAR, E_VAR);
-    check_fnc_2arg("X = A :<: B;",  "LLT", E_VAR, E_VAR);
-    check_fnc_2arg("X = A :>: B;",  "LGT", E_VAR, E_VAR);
-    check_fnc_2arg("X = A :<=: B;", "LLE", E_VAR, E_VAR);
-    check_fnc_2arg("X = A :>=: B;", "LGE", E_VAR, E_VAR);
+    check_fnc_2arg("X = A :==: B;", "LEQ", AST_VAR, AST_VAR);
+    check_fnc_2arg("X = A :!=: B;", "LNE", AST_VAR, AST_VAR);
+    check_fnc_2arg("X = A :<: B;",  "LLT", AST_VAR, AST_VAR);
+    check_fnc_2arg("X = A :>: B;",  "LGT", AST_VAR, AST_VAR);
+    check_fnc_2arg("X = A :<=: B;", "LLE", AST_VAR, AST_VAR);
+    check_fnc_2arg("X = A :>=: B;", "LGE", AST_VAR, AST_VAR);
 }
 
 static void test_identity_comparisons(void) {
-    check_fnc_2arg("X = A :: B;",  "IDENT",  E_VAR, E_VAR);
-    check_fnc_2arg("X = A :!: B;", "DIFFER", E_VAR, E_VAR);
+    check_fnc_2arg("X = A :: B;",  "IDENT",  AST_VAR, AST_VAR);
+    check_fnc_2arg("X = A :!: B;", "DIFFER", AST_VAR, AST_VAR);
 }
 
 /* ---- 2. The headline gate from the goal file: OUTPUT = EQ(2+2, 4) ---- */
 static void test_function_call_form(void) {
     const char *src = "OUTPUT = EQ(2 + 2, 4);";
     printf("=== test: %s ===\n", src);
-    EXPR_t *r = parse_or_null(src);
+    AST_t *r = parse_or_null(src);
     check("parses", r != NULL, "NULL");
     if (!r) return;
-    check("top is E_FNC", r->kind == E_FNC, "got kind=%d", (int)r->kind);
-    if (r->kind != E_FNC) return;
+    check("top is AST_FNC", r->kind == AST_FNC, "got kind=%d", (int)r->kind);
+    if (r->kind != AST_FNC) return;
     check("fname == EQ",
           r->sval && strcmp(r->sval, "EQ") == 0,
           "got '%s'", r->sval ? r->sval : "(nil)");
     check("nchildren == 2", r->nchildren == 2, "got %d", r->nchildren);
     if (r->nchildren < 2) return;
-    EXPR_t *l = r->children[0];
-    EXPR_t *rt = r->children[1];
-    check("arg0 is E_ADD", l->kind == E_ADD, "got %d", (int)l->kind);
-    if (l->kind == E_ADD && l->nchildren == 2) {
-        check("arg0.left  is E_ILIT(2)",
-              l->children[0]->kind == E_ILIT && l->children[0]->ival == 2,
+    AST_t *l = r->children[0];
+    AST_t *rt = r->children[1];
+    check("arg0 is AST_ADD", l->kind == AST_ADD, "got %d", (int)l->kind);
+    if (l->kind == AST_ADD && l->nchildren == 2) {
+        check("arg0.left  is AST_ILIT(2)",
+              l->children[0]->kind == AST_ILIT && l->children[0]->ival == 2,
               "got kind=%d ival=%lld",
               (int)l->children[0]->kind, l->children[0]->ival);
-        check("arg0.right is E_ILIT(2)",
-              l->children[1]->kind == E_ILIT && l->children[1]->ival == 2,
+        check("arg0.right is AST_ILIT(2)",
+              l->children[1]->kind == AST_ILIT && l->children[1]->ival == 2,
               "got kind=%d ival=%lld",
               (int)l->children[1]->kind, l->children[1]->ival);
     }
-    check("arg1 is E_ILIT(4)",
-          rt->kind == E_ILIT && rt->ival == 4,
+    check("arg1 is AST_ILIT(4)",
+          rt->kind == AST_ILIT && rt->ival == 4,
           "got kind=%d ival=%lld", (int)rt->kind, rt->ival);
 }
 
@@ -200,19 +200,19 @@ static void test_function_call_form(void) {
 static void test_comparison_below_arithmetic(void) {
     const char *src = "X = A + B == C + D;";
     printf("=== test: %s ===\n", src);
-    EXPR_t *r = parse_or_null(src);
+    AST_t *r = parse_or_null(src);
     check("parses", r != NULL, "NULL");
     if (!r) return;
-    check("top is E_FNC(EQ)",
-          r->kind == E_FNC && r->sval && strcmp(r->sval, "EQ") == 0,
+    check("top is AST_FNC(EQ)",
+          r->kind == AST_FNC && r->sval && strcmp(r->sval, "EQ") == 0,
           "got kind=%d sval=%s",
           (int)r->kind, r->sval ? r->sval : "(nil)");
-    if (r->kind != E_FNC || r->nchildren != 2) return;
-    check("left  is E_ADD (a+b grouped under EQ)",
-          r->children[0]->kind == E_ADD,
+    if (r->kind != AST_FNC || r->nchildren != 2) return;
+    check("left  is AST_ADD (a+b grouped under EQ)",
+          r->children[0]->kind == AST_ADD,
           "got %d", (int)r->children[0]->kind);
-    check("right is E_ADD (c+d grouped under EQ)",
-          r->children[1]->kind == E_ADD,
+    check("right is AST_ADD (c+d grouped under EQ)",
+          r->children[1]->kind == AST_ADD,
           "got %d", (int)r->children[1]->kind);
 }
 
@@ -220,10 +220,10 @@ static void test_comparison_below_arithmetic(void) {
 static void test_zero_arg_call(void) {
     const char *src = "X = TIME();";
     printf("=== test: %s ===\n", src);
-    EXPR_t *r = parse_or_null(src);
+    AST_t *r = parse_or_null(src);
     check("parses", r != NULL, "NULL");
     if (!r) return;
-    check("top is E_FNC", r->kind == E_FNC, "got kind=%d", (int)r->kind);
+    check("top is AST_FNC", r->kind == AST_FNC, "got kind=%d", (int)r->kind);
     check("fname == TIME",
           r->sval && strcmp(r->sval, "TIME") == 0,
           "got '%s'", r->sval ? r->sval : "(nil)");
@@ -234,27 +234,27 @@ static void test_zero_arg_call(void) {
 static void test_three_arg_call(void) {
     const char *src = "X = SUBSTR(S, 1, 3);";
     printf("=== test: %s ===\n", src);
-    EXPR_t *r = parse_or_null(src);
+    AST_t *r = parse_or_null(src);
     check("parses", r != NULL, "NULL");
     if (!r) return;
-    check("top is E_FNC", r->kind == E_FNC, "got kind=%d", (int)r->kind);
+    check("top is AST_FNC", r->kind == AST_FNC, "got kind=%d", (int)r->kind);
     check("fname == SUBSTR",
           r->sval && strcmp(r->sval, "SUBSTR") == 0,
           "got '%s'", r->sval ? r->sval : "(nil)");
     check("nchildren == 3", r->nchildren == 3, "got %d", r->nchildren);
     if (r->nchildren < 3) return;
-    check("arg0 is E_VAR(S)",
-          r->children[0]->kind == E_VAR &&
+    check("arg0 is AST_VAR(S)",
+          r->children[0]->kind == AST_VAR &&
               strcmp(r->children[0]->sval, "S") == 0,
           "got kind=%d sval=%s",
           (int)r->children[0]->kind,
           r->children[0]->sval ? r->children[0]->sval : "(nil)");
-    check("arg1 is E_ILIT(1)",
-          r->children[1]->kind == E_ILIT && r->children[1]->ival == 1,
+    check("arg1 is AST_ILIT(1)",
+          r->children[1]->kind == AST_ILIT && r->children[1]->ival == 1,
           "got kind=%d ival=%lld",
           (int)r->children[1]->kind, r->children[1]->ival);
-    check("arg2 is E_ILIT(3)",
-          r->children[2]->kind == E_ILIT && r->children[2]->ival == 3,
+    check("arg2 is AST_ILIT(3)",
+          r->children[2]->kind == AST_ILIT && r->children[2]->ival == 3,
           "got kind=%d ival=%lld",
           (int)r->children[2]->kind, r->children[2]->ival);
 }
@@ -263,24 +263,24 @@ static void test_three_arg_call(void) {
 static void test_nested_call(void) {
     const char *src = "X = SIZE(TRIM(S));";
     printf("=== test: %s ===\n", src);
-    EXPR_t *r = parse_or_null(src);
+    AST_t *r = parse_or_null(src);
     check("parses", r != NULL, "NULL");
     if (!r) return;
-    check("outer is E_FNC(SIZE)",
-          r->kind == E_FNC && r->sval &&
+    check("outer is AST_FNC(SIZE)",
+          r->kind == AST_FNC && r->sval &&
               strcmp(r->sval, "SIZE") == 0,
           "got kind=%d sval=%s",
           (int)r->kind, r->sval ? r->sval : "(nil)");
-    if (r->kind != E_FNC || r->nchildren != 1) return;
-    EXPR_t *inner = r->children[0];
-    check("inner is E_FNC(TRIM)",
-          inner->kind == E_FNC && inner->sval &&
+    if (r->kind != AST_FNC || r->nchildren != 1) return;
+    AST_t *inner = r->children[0];
+    check("inner is AST_FNC(TRIM)",
+          inner->kind == AST_FNC && inner->sval &&
               strcmp(inner->sval, "TRIM") == 0,
           "got kind=%d sval=%s",
           (int)inner->kind, inner->sval ? inner->sval : "(nil)");
-    if (inner->kind != E_FNC || inner->nchildren != 1) return;
-    check("inner arg0 is E_VAR(S)",
-          inner->children[0]->kind == E_VAR &&
+    if (inner->kind != AST_FNC || inner->nchildren != 1) return;
+    check("inner arg0 is AST_VAR(S)",
+          inner->children[0]->kind == AST_VAR &&
               strcmp(inner->children[0]->sval, "S") == 0,
           "got kind=%d sval=%s",
           (int)inner->children[0]->kind,
@@ -294,24 +294,24 @@ static void test_comparison_chaining(void) {
      * EQ(EQ(a,b), c).  This is unusual code but the shape must be defined. */
     const char *src = "X = A == B == C;";
     printf("=== test: %s ===\n", src);
-    EXPR_t *r = parse_or_null(src);
+    AST_t *r = parse_or_null(src);
     check("parses", r != NULL, "NULL");
     if (!r) return;
     Program *prog = snocone_parse_program(src, "<test>");
     if (prog) dump_program(prog, stdout);
-    check("top is E_FNC(EQ)",
-          r->kind == E_FNC && r->sval && strcmp(r->sval, "EQ") == 0,
+    check("top is AST_FNC(EQ)",
+          r->kind == AST_FNC && r->sval && strcmp(r->sval, "EQ") == 0,
           "kind=%d sval=%s",
           (int)r->kind, r->sval ? r->sval : "(nil)");
-    if (r->kind != E_FNC || r->nchildren != 2) return;
-    check("left-associative: outer.left is E_FNC(EQ)",
-          r->children[0]->kind == E_FNC && r->children[0]->sval &&
+    if (r->kind != AST_FNC || r->nchildren != 2) return;
+    check("left-associative: outer.left is AST_FNC(EQ)",
+          r->children[0]->kind == AST_FNC && r->children[0]->sval &&
               strcmp(r->children[0]->sval, "EQ") == 0,
           "got kind=%d sval=%s",
           (int)r->children[0]->kind,
           r->children[0]->sval ? r->children[0]->sval : "(nil)");
-    check("outer.right is E_VAR(C)",
-          r->children[1]->kind == E_VAR &&
+    check("outer.right is AST_VAR(C)",
+          r->children[1]->kind == AST_VAR &&
               strcmp(r->children[1]->sval, "C") == 0,
           "got kind=%d sval=%s",
           (int)r->children[1]->kind,
@@ -326,20 +326,20 @@ static void test_comparison_chaining(void) {
 static void test_call_with_int_literal(void) {
     const char *src = "X = GT(A, 0);";
     printf("=== test: %s ===\n", src);
-    EXPR_t *r = parse_or_null(src);
+    AST_t *r = parse_or_null(src);
     check("parses", r != NULL, "NULL");
     if (!r) return;
-    check("top is E_FNC(GT)",
-          r->kind == E_FNC && r->sval && strcmp(r->sval, "GT") == 0,
+    check("top is AST_FNC(GT)",
+          r->kind == AST_FNC && r->sval && strcmp(r->sval, "GT") == 0,
           "kind=%d sval=%s",
           (int)r->kind, r->sval ? r->sval : "(nil)");
-    if (r->kind != E_FNC || r->nchildren != 2) return;
-    check("arg0 is E_VAR(A)",
-          r->children[0]->kind == E_VAR &&
+    if (r->kind != AST_FNC || r->nchildren != 2) return;
+    check("arg0 is AST_VAR(A)",
+          r->children[0]->kind == AST_VAR &&
               strcmp(r->children[0]->sval, "A") == 0,
           "got kind=%d", (int)r->children[0]->kind);
-    check("arg1 is E_ILIT(0)",
-          r->children[1]->kind == E_ILIT && r->children[1]->ival == 0,
+    check("arg1 is AST_ILIT(0)",
+          r->children[1]->kind == AST_ILIT && r->children[1]->ival == 0,
           "got kind=%d ival=%lld",
           (int)r->children[1]->kind, r->children[1]->ival);
 }

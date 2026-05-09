@@ -83,10 +83,10 @@ extern DESCR_t (*g_user_call_hook)(const char *name, DESCR_t *args, int nargs);
 #include "bb_build.h"
 #include "../x86/bb_flat.h"     /* bb_lit_emit_binary — M-DYN-B1 */
 
-/* SN-6b: DT_E thaw in bb_deferred_var needs EXPR_t + E_FNC/E_VAR kinds and
+/* SN-6b: DT_E thaw in bb_deferred_var needs AST_t + AST_FNC/AST_VAR kinds and
  * eval_node() for argument evaluation. Mirrors snobol4_pattern.c's pat_to_patnd. */
 #include "../../ir/ir.h"
-extern DESCR_t eval_node(EXPR_t *e);
+extern DESCR_t eval_node(AST_t *e);
 
 /* In the full-runtime build, include bb_box.h after snobol4.h.
  * bb_box.h now uses spec_t (not spec_t) so no collision with engine. */
@@ -1046,22 +1046,22 @@ static DESCR_t bb_deferred_var(void *zeta, int entry)
                          * the expr_eval `(1+2)*3 → 3` / `-3+10 → 10` bug.
                          *
                          * Template lifted verbatim from pat_to_patnd in
-                         * snobol4_pattern.c:220-253.  E_FNC → pat_user_call
+                         * snobol4_pattern.c:220-253.  AST_FNC → pat_user_call
                          * builds an XATP that fires at match time (deferred
-                         * side-effect call).  E_VAR → var_as_pattern builds
+                         * side-effect call).  AST_VAR → var_as_pattern builds
                          * an XVAR that re-resolves at match time (recursive
                          * grammar case: expr0 = *constant).  Anything else
                          * falls back to PATVAL_fn (strict thaw), which is
                          * equivalent to SPITBOL's PATVAL semantics.
                          * ──────────────────────────────────────────────── */
                         if (val.v == DT_E) {
-                            EXPR_t *frozen = (EXPR_t *)val.ptr;
+                            AST_t *frozen = (AST_t *)val.ptr;
                             if (!frozen) {
                                 /* null DT_E — propagate failure (do not epsilon) */
                                 g_dvar_depth--;
                                 goto DVAR_ω;
                             }
-                            if (frozen->kind == E_FNC) {
+                            if (frozen->kind == AST_FNC) {
                                 /* *func(args...) — build XATP via pat_user_call */
                                 int nargs = frozen->nchildren;
                                 DESCR_t *args = NULL;
@@ -1072,7 +1072,7 @@ static DESCR_t bb_deferred_var(void *zeta, int entry)
                                 }
                                 const char *fname = frozen->sval ? frozen->sval : "";
                                 val = pat_user_call(fname, args, nargs);
-                            } else if (frozen->kind == E_VAR && frozen->sval) {
+                            } else if (frozen->kind == AST_VAR && frozen->sval) {
                                 /* *varname — re-resolve directly via NV_GET_fn.
                                  * Going through var_as_pattern→XVAR would add
                                  * another layer of indirection (a nested

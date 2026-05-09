@@ -44,7 +44,7 @@ typedef struct {
  * (Forward-declared as typedef struct SmGenState in sm_prog.h.) */
 #define SM_GEN_LOCAL_MAX 8   /* CHUNKS-step14b: gen-local slots per chunk invocation;
                                 covers every Icon generator kind in CHUNKS-step15
-                                (E_TO 3 slots, E_TO_BY 4, E_LIMIT 2, etc.) */
+                                (AST_TO 3 slots, AST_TO_BY 4, AST_LIMIT 2, etc.) */
 struct SmGenState {
     int      entry_pc;   /* initial entry pc (for first call) */
     int      resume_pc;  /* pc to resume from (instruction after last SM_SUSPEND) */
@@ -111,7 +111,7 @@ DESCR_t sm_call_chunk(int entry_pc);
  *
  * bb_broker_drive_sm — drive an SM generator chunk across all its ticks.
  *   Analogous to bb_broker(root, BB_PUMP, body_fn, arg) but for SM chunks
- *   rather than EXPR_t-based bb_node_t generators.
+ *   rather than AST_t-based bb_node_t generators.
  *
  *   On each tick the interpreter runs until SM_SUSPEND (yield a value) or
  *   SM_RETURN / SM_HALT (generator exhausted).  body_fn is called once per

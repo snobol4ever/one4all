@@ -18,13 +18,13 @@
 #include <string.h>
 #include <ctype.h>
 #include "snobol4.h"
-#include "../../ir/ir.h"         /* ir.h first — sets EXPR_T_DEFINED so scrip_cc.h skips its own EXPR_t */
+#include "../../ir/ir.h"         /* ir.h first — sets EXPR_T_DEFINED so scrip_cc.h skips its own AST_t */
 #include "../../frontend/snobol4/scrip_cc.h"
 /* CMPILE.c removed — bison/flex path via scrip_cc.h (GOAL-REMOVE-CMPILE S-4) */
 
 /* Hook for scrip.c to route EVAL(string) through interp_eval_pat.
  * When set, EVAL_fn calls this instead of CONVE_fn→EXPVAL_fn for string args.
- * This handles E_DEFER (*func), $ (cursor-assign), and all other operators
+ * This handles AST_DEFER (*func), $ (cursor-assign), and all other operators
  * that eval_node in eval_code.c does not support. */
 DESCR_t (*g_eval_str_hook)(const char *s) = NULL;
 
@@ -207,28 +207,28 @@ DESCR_t pat_epsilon(void) {
 }
 
 /* Forward declaration — eval_node is defined in eval_code.c (separate TU) */
-extern DESCR_t eval_node(EXPR_t *e);
+extern DESCR_t eval_node(AST_t *e);
 
 /* pat_to_patnd: coerce a DESCR_t to a PATND_t*, handling string literals.
  * Returns NULL if the value cannot be represented as a pattern.
  *
  * DT_E split:
- *   E_FNC child  → *func()  side-effect pattern: build XATP via pat_user_call.
+ *   AST_FNC child  → *func()  side-effect pattern: build XATP via pat_user_call.
  *                  The function fires at MATCH_fn time (T_FUNC node), NOT now.
  *   anything else → PATVAL_fn: thaw the expression to a pattern value.
  */
 static PATND_t *pat_to_patnd(DESCR_t v) {
     if (v.v == DT_E) {
         /* CHUNKS-step02: chunk DT_E (slen==1) — dispatch via EXPVAL_fn which
-         * routes to sm_call_chunk.  Legacy EXPR_t* path (slen==0) follows below. */
+         * routes to sm_call_chunk.  Legacy AST_t* path (slen==0) follows below. */
         if (v.slen == 1) {
             v = EXPVAL_fn(v);
             /* Fall through to coerce result as pattern value */
             goto coerce;
         }
-        EXPR_t *frozen = (EXPR_t *)v.ptr;
+        AST_t *frozen = (AST_t *)v.ptr;
         if (!frozen) return NULL;   /* null DT_E — propagate failure (do not epsilon) */
-        if (frozen->kind == E_FNC) {
+        if (frozen->kind == AST_FNC) {
             /* *func(args...) — side-effect call deferred to match time via XATP */
             int nargs = frozen->nchildren;
             DESCR_t *args = NULL;
@@ -246,7 +246,7 @@ static PATND_t *pat_to_patnd(DESCR_t v) {
             /* Otherwise coerce non-pattern result to literal string pattern */
             v = pv;  /* fall through to coercion below */
         }
-        if (frozen->kind == E_VAR && frozen->sval) {
+        if (frozen->kind == AST_VAR && frozen->sval) {
             /* *varname — deferred variable reference, resolved at match time via XVAR.
              * This is the recursive grammar case: factor = ... *factor ...
              * The variable may not exist yet at construction time. */
@@ -792,7 +792,7 @@ DESCR_t EVAL_fn(DESCR_t expr) {
     fprintf(stderr, "EVAL_fn: v=%d s=%s\n", (int)expr.v,
             (expr.v==5||expr.v==0) && expr.s ? expr.s : "(non-str)");
      *
-     * DT_E  → EXPVAL_fn (execute frozen EXPR_t* with save/restore)
+     * DT_E  → EXPVAL_fn (execute frozen AST_t* with save/restore)
      * DT_I  → idempotent (return as-is)
      * DT_R  → idempotent (return as-is)
      * DT_P  → run pattern hook (existing behaviour)
@@ -842,7 +842,7 @@ DESCR_t EVAL_fn(DESCR_t expr) {
      * Fall through to CONVE_fn to parse and execute the full expression. */
 
     /* String hook: if scrip.c has wired interp_eval_pat for string->pattern routing,
-     * use it -- handles E_DEFER (*func), $ (cursor-assign), and all operators
+     * use it -- handles AST_DEFER (*func), $ (cursor-assign), and all operators
      * that eval_node in eval_code.c does not support (e.g. EVAL(ω) where
      * ω contains *T8Trace(...) or $ tz). */
     if (g_eval_str_hook) return g_eval_str_hook(s);
@@ -983,11 +983,11 @@ DESCR_t pat_call(const char *name, DESCR_t arg) {
 }
 
 /* compile_to_expression — SIL CONVE path: parse string → freeze as DT_E.
- * Used by CONVERT(s,"EXPRESSION"). Does NOT evaluate — stores EXPR_t* as DT_E
+ * Used by CONVERT(s,"EXPRESSION"). Does NOT evaluate — stores AST_t* as DT_E
  * for later thaw by EVAL_fn. Returns FAILDESCR if parse fails. */
 DESCR_t compile_to_expression(const char *src) {
     if (!src || !*src) return FAILDESCR;
-    EXPR_t *tree = parse_expr_pat_from_str(src);
+    AST_t *tree = parse_expr_pat_from_str(src);
     if (!tree) return FAILDESCR;
 
     DESCR_t d;

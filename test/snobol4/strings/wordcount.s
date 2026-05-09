@@ -146,7 +146,7 @@ scan_retry_5:
                             jmp         P_5_α
 
 
-; E_VART WPAT → CALL_PAT (runtime DT_P/DT_S dispatch)
+; AST_VART WPAT → CALL_PAT (runtime DT_P/DT_S dispatch)
 P_5_α:                      lea         rdi, [rel S_WPAT]
                             call        stmt_get
                             mov         [rpat0_t], rax

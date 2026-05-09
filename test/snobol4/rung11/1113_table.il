@@ -343,7 +343,7 @@
     ldstr      "1"
     call       string [snobol4lib]Snobol4Lib::sno_add(string, string)
     stsfld     string _113_table::kw_stno
-    // unhandled E_FNC stub
+    // unhandled AST_FNC stub
     ldstr      ""
     dup
     stloc      V_mon_val
@@ -358,7 +358,7 @@
     ldstr      "1"
     call       string [snobol4lib]Snobol4Lib::sno_add(string, string)
     stsfld     string _113_table::kw_stno
-    // unhandled E_FNC stub
+    // unhandled AST_FNC stub
     ldstr      ""
     ldstr      "2,2"
     call       int32 [snobol4lib]Snobol4Lib::sno_differ(string, string)
@@ -389,7 +389,7 @@
     ldstr      "1"
     call       string [snobol4lib]Snobol4Lib::sno_add(string, string)
     stsfld     string _113_table::kw_stno
-    // unhandled E_FNC stub
+    // unhandled AST_FNC stub
     ldstr      ""
     dup
     stloc      V_mon_val

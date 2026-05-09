@@ -88,7 +88,7 @@ P_2_α: ; DOL(V $  V)
                             DOL_SAVE    dol_entry_V, cursor, dol0_child_α ; DOL α — save entry cursor
 P_2_β:                      jmp         dol0_child_β ; DOL β
 
-; E_VART P → CALL_PAT (runtime DT_P/DT_S dispatch)
+; AST_VART P → CALL_PAT (runtime DT_P/DT_S dispatch)
 dol0_child_α:               lea         rdi, [rel S_P]
                             call        stmt_get
                             mov         [rpat1_t], rax

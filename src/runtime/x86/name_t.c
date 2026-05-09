@@ -96,7 +96,7 @@ int name_commit_value(const NAME_t *nm, DESCR_t value)
             call_args = resolved;
         } else {
             /* SN-26c-parseerr-c: thaw DT_E args at match time.  Args wrapped
-             * as DT_E by lowerer (E_FNC sub-args of *fn(args) patterns)
+             * as DT_E by lowerer (AST_FNC sub-args of *fn(args) patterns)
              * resolve here via EVAL_fn — counter values, etc., reflect
              * post-ARBNO state, not pattern-build-time state. */
             int have_dte = 0;

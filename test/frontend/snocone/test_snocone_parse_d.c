@@ -2,23 +2,23 @@
  * test_snocone_parse_d.c — GOAL-SNOCONE-LANG-SPACE LS-4.d acceptance test
  *
  * The LS-4.d gate: postfix subscripting `a[i, j]` parses and lowers to
- * E_IDX(subject, idx1, idx2, ...).  Mirrors the snobol4.y `expr15`
+ * AST_IDX(subject, idx1, idx2, ...).  Mirrors the snobol4.y `expr15`
  * shape exactly (snobol4.y:183) — same priority, same n-ary IR,
  * same left-recursive chaining for `a[i][j]`.
  *
- *   a[i]              →  E_IDX(E_VAR(a), E_VAR(i))
- *   a[i, j]           →  E_IDX(E_VAR(a), E_VAR(i), E_VAR(j))
- *   a[i][j]           →  E_IDX(E_IDX(E_VAR(a), E_VAR(i)), E_VAR(j))
- *   a[]               →  E_IDX(E_VAR(a))                  // empty list arm
- *   T['key']          →  E_IDX(E_VAR(T), E_QLIT(key))
- *   f(g(x))[i]        →  E_IDX(E_FNC(f, ...), E_VAR(i))   // call-then-subscript
- *   a[1 + 2, 3 * 4]   →  E_IDX(a, E_ADD(1,2), E_MUL(3,4)) // expressions in subscript
- *   a[i] += 1         →  E_ASSIGN(a[i], E_ADD(clone(a[i]), 1))
+ *   a[i]              →  AST_IDX(AST_VAR(a), AST_VAR(i))
+ *   a[i, j]           →  AST_IDX(AST_VAR(a), AST_VAR(i), AST_VAR(j))
+ *   a[i][j]           →  AST_IDX(AST_IDX(AST_VAR(a), AST_VAR(i)), AST_VAR(j))
+ *   a[]               →  AST_IDX(AST_VAR(a))                  // empty list arm
+ *   T['key']          →  AST_IDX(AST_VAR(T), AST_QLIT(key))
+ *   f(g(x))[i]        →  AST_IDX(AST_FNC(f, ...), AST_VAR(i))   // call-then-subscript
+ *   a[1 + 2, 3 * 4]   →  AST_IDX(a, AST_ADD(1,2), AST_MUL(3,4)) // expressions in subscript
+ *   a[i] += 1         →  AST_ASSIGN(a[i], AST_ADD(clone(a[i]), 1))
  *                                                          // compound-assign clones
  *
  * Goal-file gate per LS-4.d: "Parses `a[i, j]`."  This file verifies
  * that and the surrounding semantic shape — left-recursive chaining,
- * empty-list arm, expression children, integration with E_FNC call
+ * empty-list arm, expression children, integration with AST_FNC call
  * form, and clone-distinctness for compound-assigns whose LHS is a
  * subscript.
  *
@@ -45,16 +45,16 @@
 Program *snocone_parse_program(const char *src, const char *filename);
 
 /* Mini IR printer */
-static void dump_expr(const EXPR_t *e, FILE *out) {
+static void dump_expr(const AST_t *e, FILE *out) {
     if (!e) { fputs("<nil>", out); return; }
-    fputs(ekind_name[e->kind] ? ekind_name[e->kind] : "?", out);
+    fputs(ast_e_name[e->kind] ? ast_e_name[e->kind] : "?", out);
     switch (e->kind) {
-        case E_VAR:
-        case E_KEYWORD:
-        case E_QLIT:
+        case AST_VAR:
+        case AST_KEYWORD:
+        case AST_QLIT:
             fprintf(out, "(\"%s\")", e->sval ? e->sval : "");
             break;
-        case E_FNC:
+        case AST_FNC:
             fprintf(out, "(\"%s\"", e->sval ? e->sval : "");
             for (int i = 0; i < e->nchildren; i++) {
                 fputs(", ", out);
@@ -62,8 +62,8 @@ static void dump_expr(const EXPR_t *e, FILE *out) {
             }
             fputc(')', out);
             break;
-        case E_ILIT: fprintf(out, "(%lld)", e->ival); break;
-        case E_FLIT: fprintf(out, "(%g)",   e->dval); break;
+        case AST_ILIT: fprintf(out, "(%lld)", e->ival); break;
+        case AST_FLIT: fprintf(out, "(%g)",   e->dval); break;
         default:
             fputc('(', out);
             for (int i = 0; i < e->nchildren; i++) {
@@ -96,7 +96,7 @@ static void check(const char *label, int cond, const char *fmt, ...) {
     }
 }
 
-static EXPR_t *parse_or_null(const char *src) {
+static AST_t *parse_or_null(const char *src) {
     Program *prog = snocone_parse_program(src, "<test>");
     if (!prog || !prog->head || !prog->head->replacement) return NULL;
     return prog->head->replacement;
@@ -107,32 +107,32 @@ static EXPR_t *parse_or_null(const char *src) {
 /* ============================================================ */
 
 static void test_subscript_two_indices(void) {
-    /* Headline gate: X = a[i, j]; → E_IDX(a, i, j) */
+    /* Headline gate: X = a[i, j]; → AST_IDX(a, i, j) */
     const char *src = "X = a[i, j];";
     printf("=== test: %s ===\n", src);
     Program *prog = snocone_parse_program(src, "<test>");
     check("parses", prog != NULL, "NULL");
     if (!prog) return;
     dump_program(prog, stdout);
-    EXPR_t *r = prog->head ? prog->head->replacement : NULL;
-    check("top is E_IDX", r && r->kind == E_IDX,
+    AST_t *r = prog->head ? prog->head->replacement : NULL;
+    check("top is AST_IDX", r && r->kind == AST_IDX,
           "got kind=%d", r ? (int)r->kind : -1);
-    if (!r || r->kind != E_IDX) return;
+    if (!r || r->kind != AST_IDX) return;
     check("nchildren == 3 (subject + 2 indices)", r->nchildren == 3,
           "got %d", r->nchildren);
     if (r->nchildren != 3) return;
-    check("child[0] is E_VAR(a)",
-          r->children[0]->kind == E_VAR &&
+    check("child[0] is AST_VAR(a)",
+          r->children[0]->kind == AST_VAR &&
               strcmp(r->children[0]->sval, "a") == 0,
           "got kind=%d sval=%s",
           (int)r->children[0]->kind,
           r->children[0]->sval ? r->children[0]->sval : "(nil)");
-    check("child[1] is E_VAR(i)",
-          r->children[1]->kind == E_VAR &&
+    check("child[1] is AST_VAR(i)",
+          r->children[1]->kind == AST_VAR &&
               strcmp(r->children[1]->sval, "i") == 0,
           "got kind=%d", (int)r->children[1]->kind);
-    check("child[2] is E_VAR(j)",
-          r->children[2]->kind == E_VAR &&
+    check("child[2] is AST_VAR(j)",
+          r->children[2]->kind == AST_VAR &&
               strcmp(r->children[2]->sval, "j") == 0,
           "got kind=%d", (int)r->children[2]->kind);
 }
@@ -144,18 +144,18 @@ static void test_subscript_two_indices(void) {
 static void test_subscript_single_index(void) {
     const char *src = "X = a[i];";
     printf("=== test: %s ===\n", src);
-    EXPR_t *r = parse_or_null(src);
+    AST_t *r = parse_or_null(src);
     check("parses", r != NULL, "NULL");
     if (!r) return;
-    check("top is E_IDX", r->kind == E_IDX, "got kind=%d", (int)r->kind);
+    check("top is AST_IDX", r->kind == AST_IDX, "got kind=%d", (int)r->kind);
     check("nchildren == 2", r->nchildren == 2, "got %d", r->nchildren);
     if (r->nchildren < 2) return;
-    check("child[0] is E_VAR(a)",
-          r->children[0]->kind == E_VAR &&
+    check("child[0] is AST_VAR(a)",
+          r->children[0]->kind == AST_VAR &&
               strcmp(r->children[0]->sval, "a") == 0,
           "got kind=%d", (int)r->children[0]->kind);
-    check("child[1] is E_VAR(i)",
-          r->children[1]->kind == E_VAR,
+    check("child[1] is AST_VAR(i)",
+          r->children[1]->kind == AST_VAR,
           "got kind=%d", (int)r->children[1]->kind);
 }
 
@@ -165,18 +165,18 @@ static void test_subscript_single_index(void) {
 
 static void test_subscript_empty(void) {
     /* Empty subscript: a[] uses the empty arm of `exprlist`, yielding
-     * E_IDX(a) with just the subject and no index children. */
+     * AST_IDX(a) with just the subject and no index children. */
     const char *src = "X = a[];";
     printf("=== test: %s ===\n", src);
-    EXPR_t *r = parse_or_null(src);
+    AST_t *r = parse_or_null(src);
     check("parses", r != NULL, "NULL");
     if (!r) return;
-    check("top is E_IDX", r->kind == E_IDX, "got kind=%d", (int)r->kind);
+    check("top is AST_IDX", r->kind == AST_IDX, "got kind=%d", (int)r->kind);
     check("nchildren == 1 (just subject, no indices)",
           r->nchildren == 1, "got %d", r->nchildren);
     if (r->nchildren < 1) return;
-    check("child[0] is E_VAR(a)",
-          r->children[0]->kind == E_VAR &&
+    check("child[0] is AST_VAR(a)",
+          r->children[0]->kind == AST_VAR &&
               strcmp(r->children[0]->sval, "a") == 0,
           "got kind=%d", (int)r->children[0]->kind);
 }
@@ -186,67 +186,67 @@ static void test_subscript_empty(void) {
 /* ============================================================ */
 
 static void test_subscript_chained(void) {
-    /* Left-recursive: a[i][j] parses as E_IDX(E_IDX(a, i), j). */
+    /* Left-recursive: a[i][j] parses as AST_IDX(AST_IDX(a, i), j). */
     const char *src = "X = a[i][j];";
     printf("=== test: %s ===\n", src);
-    EXPR_t *r = parse_or_null(src);
+    AST_t *r = parse_or_null(src);
     check("parses", r != NULL, "NULL");
     if (!r) return;
-    check("top is E_IDX", r->kind == E_IDX, "got kind=%d", (int)r->kind);
+    check("top is AST_IDX", r->kind == AST_IDX, "got kind=%d", (int)r->kind);
     check("top nchildren == 2", r->nchildren == 2, "got %d", r->nchildren);
     if (r->nchildren < 2) return;
-    /* child[0] is the inner E_IDX(a, i) */
-    check("child[0] is E_IDX (inner)",
-          r->children[0]->kind == E_IDX,
+    /* child[0] is the inner AST_IDX(a, i) */
+    check("child[0] is AST_IDX (inner)",
+          r->children[0]->kind == AST_IDX,
           "got kind=%d", (int)r->children[0]->kind);
-    if (r->children[0]->kind != E_IDX) return;
+    if (r->children[0]->kind != AST_IDX) return;
     check("inner nchildren == 2", r->children[0]->nchildren == 2,
           "got %d", r->children[0]->nchildren);
-    check("inner.child[0] is E_VAR(a)",
-          r->children[0]->children[0]->kind == E_VAR &&
+    check("inner.child[0] is AST_VAR(a)",
+          r->children[0]->children[0]->kind == AST_VAR &&
               strcmp(r->children[0]->children[0]->sval, "a") == 0,
           "got kind=%d", (int)r->children[0]->children[0]->kind);
-    check("inner.child[1] is E_VAR(i)",
-          r->children[0]->children[1]->kind == E_VAR,
+    check("inner.child[1] is AST_VAR(i)",
+          r->children[0]->children[1]->kind == AST_VAR,
           "got kind=%d", (int)r->children[0]->children[1]->kind);
-    check("child[1] (outer index) is E_VAR(j)",
-          r->children[1]->kind == E_VAR &&
+    check("child[1] (outer index) is AST_VAR(j)",
+          r->children[1]->kind == AST_VAR &&
               strcmp(r->children[1]->sval, "j") == 0,
           "got kind=%d", (int)r->children[1]->kind);
 }
 
 static void test_subscript_chained_three(void) {
     /* Three-deep chaining: a[i][j][k] →
-     * E_IDX(E_IDX(E_IDX(a, i), j), k). */
+     * AST_IDX(AST_IDX(AST_IDX(a, i), j), k). */
     const char *src = "X = a[i][j][k];";
     printf("=== test: %s ===\n", src);
-    EXPR_t *r = parse_or_null(src);
+    AST_t *r = parse_or_null(src);
     check("parses", r != NULL, "NULL");
     if (!r) return;
-    check("top is E_IDX", r->kind == E_IDX, "got kind=%d", (int)r->kind);
-    if (r->kind != E_IDX) return;
-    check("top.child[1] is E_VAR(k)",
-          r->children[1]->kind == E_VAR &&
+    check("top is AST_IDX", r->kind == AST_IDX, "got kind=%d", (int)r->kind);
+    if (r->kind != AST_IDX) return;
+    check("top.child[1] is AST_VAR(k)",
+          r->children[1]->kind == AST_VAR &&
               strcmp(r->children[1]->sval, "k") == 0,
           "got kind=%d", (int)r->children[1]->kind);
-    /* Walk down: top.child[0] should be E_IDX(...,j) */
-    EXPR_t *l1 = r->children[0];
-    check("level-1 is E_IDX", l1->kind == E_IDX, "got %d", (int)l1->kind);
-    if (l1->kind != E_IDX) return;
-    check("level-1.child[1] is E_VAR(j)",
-          l1->children[1]->kind == E_VAR &&
+    /* Walk down: top.child[0] should be AST_IDX(...,j) */
+    AST_t *l1 = r->children[0];
+    check("level-1 is AST_IDX", l1->kind == AST_IDX, "got %d", (int)l1->kind);
+    if (l1->kind != AST_IDX) return;
+    check("level-1.child[1] is AST_VAR(j)",
+          l1->children[1]->kind == AST_VAR &&
               strcmp(l1->children[1]->sval, "j") == 0,
           "got kind=%d", (int)l1->children[1]->kind);
-    /* level-2 should be E_IDX(a, i) */
-    EXPR_t *l2 = l1->children[0];
-    check("level-2 is E_IDX", l2->kind == E_IDX, "got %d", (int)l2->kind);
-    if (l2->kind != E_IDX) return;
-    check("level-2.child[0] is E_VAR(a)",
-          l2->children[0]->kind == E_VAR &&
+    /* level-2 should be AST_IDX(a, i) */
+    AST_t *l2 = l1->children[0];
+    check("level-2 is AST_IDX", l2->kind == AST_IDX, "got %d", (int)l2->kind);
+    if (l2->kind != AST_IDX) return;
+    check("level-2.child[0] is AST_VAR(a)",
+          l2->children[0]->kind == AST_VAR &&
               strcmp(l2->children[0]->sval, "a") == 0,
           "got kind=%d", (int)l2->children[0]->kind);
-    check("level-2.child[1] is E_VAR(i)",
-          l2->children[1]->kind == E_VAR &&
+    check("level-2.child[1] is AST_VAR(i)",
+          l2->children[1]->kind == AST_VAR &&
               strcmp(l2->children[1]->sval, "i") == 0,
           "got kind=%d", (int)l2->children[1]->kind);
 }
@@ -258,17 +258,17 @@ static void test_subscript_chained_three(void) {
 static void test_subscript_string_key(void) {
     const char *src = "X = T['key'];";
     printf("=== test: %s ===\n", src);
-    EXPR_t *r = parse_or_null(src);
+    AST_t *r = parse_or_null(src);
     check("parses", r != NULL, "NULL");
     if (!r) return;
-    check("top is E_IDX", r->kind == E_IDX, "got %d", (int)r->kind);
+    check("top is AST_IDX", r->kind == AST_IDX, "got %d", (int)r->kind);
     if (r->nchildren < 2) return;
-    check("child[0] is E_VAR(T)",
-          r->children[0]->kind == E_VAR &&
+    check("child[0] is AST_VAR(T)",
+          r->children[0]->kind == AST_VAR &&
               strcmp(r->children[0]->sval, "T") == 0,
           "got kind=%d", (int)r->children[0]->kind);
-    check("child[1] is E_QLIT(key)",
-          r->children[1]->kind == E_QLIT &&
+    check("child[1] is AST_QLIT(key)",
+          r->children[1]->kind == AST_QLIT &&
               strcmp(r->children[1]->sval, "key") == 0,
           "got kind=%d sval=%s",
           (int)r->children[1]->kind,
@@ -282,17 +282,17 @@ static void test_subscript_string_key(void) {
 static void test_subscript_expr_children(void) {
     const char *src = "X = a[1 + 2, 3 * 4];";
     printf("=== test: %s ===\n", src);
-    EXPR_t *r = parse_or_null(src);
+    AST_t *r = parse_or_null(src);
     check("parses", r != NULL, "NULL");
     if (!r) return;
-    check("top is E_IDX", r->kind == E_IDX, "got %d", (int)r->kind);
+    check("top is AST_IDX", r->kind == AST_IDX, "got %d", (int)r->kind);
     check("nchildren == 3", r->nchildren == 3, "got %d", r->nchildren);
     if (r->nchildren != 3) return;
-    check("child[1] is E_ADD",
-          r->children[1]->kind == E_ADD,
+    check("child[1] is AST_ADD",
+          r->children[1]->kind == AST_ADD,
           "got kind=%d", (int)r->children[1]->kind);
-    check("child[2] is E_MUL",
-          r->children[2]->kind == E_MUL,
+    check("child[2] is AST_MUL",
+          r->children[2]->kind == AST_MUL,
           "got kind=%d", (int)r->children[2]->kind);
 }
 
@@ -301,23 +301,23 @@ static void test_subscript_expr_children(void) {
 /* ============================================================ */
 
 static void test_call_then_subscript(void) {
-    /* f(x)[i] should parse as E_IDX(E_FNC(f, x), i) — subscript binds
+    /* f(x)[i] should parse as AST_IDX(AST_FNC(f, x), i) — subscript binds
      * to the call result. */
     const char *src = "X = f(x)[i];";
     printf("=== test: %s ===\n", src);
-    EXPR_t *r = parse_or_null(src);
+    AST_t *r = parse_or_null(src);
     check("parses", r != NULL, "NULL");
     if (!r) return;
-    check("top is E_IDX", r->kind == E_IDX, "got %d", (int)r->kind);
+    check("top is AST_IDX", r->kind == AST_IDX, "got %d", (int)r->kind);
     if (r->nchildren < 2) return;
-    check("child[0] is E_FNC",
-          r->children[0]->kind == E_FNC &&
+    check("child[0] is AST_FNC",
+          r->children[0]->kind == AST_FNC &&
               strcmp(r->children[0]->sval, "f") == 0,
           "got kind=%d sval=%s",
           (int)r->children[0]->kind,
           r->children[0]->sval ? r->children[0]->sval : "(nil)");
-    check("child[1] is E_VAR(i)",
-          r->children[1]->kind == E_VAR,
+    check("child[1] is AST_VAR(i)",
+          r->children[1]->kind == AST_VAR,
           "got kind=%d", (int)r->children[1]->kind);
 }
 
@@ -329,16 +329,16 @@ static void test_paren_subscript(void) {
     /* (a + b)[i] — parens around expression, then subscript */
     const char *src = "X = (a + b)[i];";
     printf("=== test: %s ===\n", src);
-    EXPR_t *r = parse_or_null(src);
+    AST_t *r = parse_or_null(src);
     check("parses", r != NULL, "NULL");
     if (!r) return;
-    check("top is E_IDX", r->kind == E_IDX, "got %d", (int)r->kind);
+    check("top is AST_IDX", r->kind == AST_IDX, "got %d", (int)r->kind);
     if (r->nchildren < 2) return;
-    check("child[0] is E_ADD (the parenthesised expr)",
-          r->children[0]->kind == E_ADD,
+    check("child[0] is AST_ADD (the parenthesised expr)",
+          r->children[0]->kind == AST_ADD,
           "got kind=%d", (int)r->children[0]->kind);
-    check("child[1] is E_VAR(i)",
-          r->children[1]->kind == E_VAR,
+    check("child[1] is AST_VAR(i)",
+          r->children[1]->kind == AST_VAR,
           "got kind=%d", (int)r->children[1]->kind);
 }
 
@@ -346,7 +346,7 @@ static void test_paren_subscript(void) {
 /* 9. Compound-assign with subscript LHS — a[i] += 1             */
 /* ============================================================ */
 
-static int expr_deep_eq(const EXPR_t *a, const EXPR_t *b) {
+static int expr_deep_eq(const AST_t *a, const AST_t *b) {
     if (!a || !b) return a == b;
     if (a->kind != b->kind) return 0;
     if (a->ival != b->ival) return 0;
@@ -360,7 +360,7 @@ static int expr_deep_eq(const EXPR_t *a, const EXPR_t *b) {
     return 1;
 }
 
-static int expr_share_any_node(const EXPR_t *a, const EXPR_t *b) {
+static int expr_share_any_node(const AST_t *a, const AST_t *b) {
     if (!a || !b) return 0;
     if (a == b) return 1;
     for (int i = 0; i < a->nchildren; i++)
@@ -369,13 +369,13 @@ static int expr_share_any_node(const EXPR_t *a, const EXPR_t *b) {
 }
 
 static void test_compound_assign_subscript_lhs(void) {
-    /* a[i] += 1 should lower to E_ASSIGN(a[i], E_ADD(clone(a[i]), 1)).
-     * sc_append_stmt then unwraps the E_ASSIGN: subject = a[i],
-     * replacement = E_ADD(clone(a[i]), 1).  We verify:
+    /* a[i] += 1 should lower to AST_ASSIGN(a[i], AST_ADD(clone(a[i]), 1)).
+     * sc_append_stmt then unwraps the AST_ASSIGN: subject = a[i],
+     * replacement = AST_ADD(clone(a[i]), 1).  We verify:
      *   1. has_eq is set
-     *   2. subject is E_IDX(a, i)
-     *   3. replacement is E_ADD whose child[0] is also E_IDX(a, i)
-     *   4. The two E_IDX nodes are DIFFERENT pointers (clone, not alias)
+     *   2. subject is AST_IDX(a, i)
+     *   3. replacement is AST_ADD whose child[0] is also AST_IDX(a, i)
+     *   4. The two AST_IDX nodes are DIFFERENT pointers (clone, not alias)
      *   5. The deep tree shapes match
      */
     const char *src = "a[i] += 1;";
@@ -385,17 +385,17 @@ static void test_compound_assign_subscript_lhs(void) {
     if (!prog || !prog->head) return;
     STMT_t *s = prog->head;
     check("has_eq is set", s->has_eq == 1, "got %d", s->has_eq);
-    check("subject is E_IDX", s->subject && s->subject->kind == E_IDX,
+    check("subject is AST_IDX", s->subject && s->subject->kind == AST_IDX,
           "got kind=%d", s->subject ? (int)s->subject->kind : -1);
-    check("replacement is E_ADD",
-          s->replacement && s->replacement->kind == E_ADD,
+    check("replacement is AST_ADD",
+          s->replacement && s->replacement->kind == AST_ADD,
           "got kind=%d", s->replacement ? (int)s->replacement->kind : -1);
     if (!s->subject || !s->replacement ||
-        s->subject->kind != E_IDX || s->replacement->kind != E_ADD ||
+        s->subject->kind != AST_IDX || s->replacement->kind != AST_ADD ||
         s->replacement->nchildren < 2) return;
-    EXPR_t *clone = s->replacement->children[0];
-    check("RHS.child[0] is E_IDX (clone of LHS)",
-          clone->kind == E_IDX, "got kind=%d", (int)clone->kind);
+    AST_t *clone = s->replacement->children[0];
+    check("RHS.child[0] is AST_IDX (clone of LHS)",
+          clone->kind == AST_IDX, "got kind=%d", (int)clone->kind);
     check("LHS and clone are distinct pointers",
           s->subject != clone,
           "subject=%p clone=%p (aliasing — would double-free at cleanup)",
@@ -406,8 +406,8 @@ static void test_compound_assign_subscript_lhs(void) {
     check("LHS and clone share no nodes anywhere in tree",
           !expr_share_any_node(s->subject, clone),
           "node sharing detected (would corrupt cleanup)");
-    check("RHS.child[1] is E_ILIT(1)",
-          s->replacement->children[1]->kind == E_ILIT &&
+    check("RHS.child[1] is AST_ILIT(1)",
+          s->replacement->children[1]->kind == AST_ILIT &&
               s->replacement->children[1]->ival == 1,
           "got kind=%d ival=%lld",
           (int)s->replacement->children[1]->kind,
@@ -420,20 +420,20 @@ static void test_compound_assign_subscript_lhs(void) {
 
 static void test_subscript_in_concat(void) {
     /* a[i] b — subscript binds tighter than concat, so:
-     *   E_SEQ(E_IDX(a, i), E_VAR(b))
+     *   AST_SEQ(AST_IDX(a, i), AST_VAR(b))
      */
     const char *src = "X = a[i] b;";
     printf("=== test: %s ===\n", src);
-    EXPR_t *r = parse_or_null(src);
+    AST_t *r = parse_or_null(src);
     check("parses", r != NULL, "NULL");
     if (!r) return;
-    check("top is E_SEQ", r->kind == E_SEQ, "got %d", (int)r->kind);
+    check("top is AST_SEQ", r->kind == AST_SEQ, "got %d", (int)r->kind);
     if (r->nchildren < 2) return;
-    check("child[0] is E_IDX",
-          r->children[0]->kind == E_IDX,
+    check("child[0] is AST_IDX",
+          r->children[0]->kind == AST_IDX,
           "got kind=%d", (int)r->children[0]->kind);
-    check("child[1] is E_VAR(b)",
-          r->children[1]->kind == E_VAR &&
+    check("child[1] is AST_VAR(b)",
+          r->children[1]->kind == AST_VAR &&
               strcmp(r->children[1]->sval, "b") == 0,
           "got kind=%d", (int)r->children[1]->kind);
 }
@@ -446,16 +446,16 @@ static void test_subscript_in_arith(void) {
     /* a[i] + b[j] — both subscripts evaluate, then add. */
     const char *src = "X = a[i] + b[j];";
     printf("=== test: %s ===\n", src);
-    EXPR_t *r = parse_or_null(src);
+    AST_t *r = parse_or_null(src);
     check("parses", r != NULL, "NULL");
     if (!r) return;
-    check("top is E_ADD", r->kind == E_ADD, "got %d", (int)r->kind);
+    check("top is AST_ADD", r->kind == AST_ADD, "got %d", (int)r->kind);
     if (r->nchildren < 2) return;
-    check("LHS is E_IDX",
-          r->children[0]->kind == E_IDX,
+    check("LHS is AST_IDX",
+          r->children[0]->kind == AST_IDX,
           "got kind=%d", (int)r->children[0]->kind);
-    check("RHS is E_IDX",
-          r->children[1]->kind == E_IDX,
+    check("RHS is AST_IDX",
+          r->children[1]->kind == AST_IDX,
           "got kind=%d", (int)r->children[1]->kind);
 }
 
@@ -471,11 +471,11 @@ static void test_subscript_assign_lhs(void) {
     if (!prog || !prog->head) return;
     STMT_t *s = prog->head;
     check("has_eq is set", s->has_eq == 1, "got %d", s->has_eq);
-    check("subject is E_IDX",
-          s->subject && s->subject->kind == E_IDX,
+    check("subject is AST_IDX",
+          s->subject && s->subject->kind == AST_IDX,
           "got %d", s->subject ? (int)s->subject->kind : -1);
-    check("replacement is E_ILIT(5)",
-          s->replacement && s->replacement->kind == E_ILIT &&
+    check("replacement is AST_ILIT(5)",
+          s->replacement && s->replacement->kind == AST_ILIT &&
               s->replacement->ival == 5,
           "got %d", s->replacement ? (int)s->replacement->kind : -1);
 }
@@ -485,29 +485,29 @@ static void test_subscript_assign_lhs(void) {
 /* ============================================================ */
 
 static void test_nested_subscripts(void) {
-    /* a[b[c]] → E_IDX(a, E_IDX(b, c)) — the outer subscript has the
+    /* a[b[c]] → AST_IDX(a, AST_IDX(b, c)) — the outer subscript has the
      * inner subscript as its index expression. */
     const char *src = "X = a[b[c]];";
     printf("=== test: %s ===\n", src);
-    EXPR_t *r = parse_or_null(src);
+    AST_t *r = parse_or_null(src);
     check("parses", r != NULL, "NULL");
     if (!r) return;
-    check("top is E_IDX", r->kind == E_IDX, "got %d", (int)r->kind);
+    check("top is AST_IDX", r->kind == AST_IDX, "got %d", (int)r->kind);
     if (r->nchildren < 2) return;
-    check("child[0] is E_VAR(a)",
-          r->children[0]->kind == E_VAR &&
+    check("child[0] is AST_VAR(a)",
+          r->children[0]->kind == AST_VAR &&
               strcmp(r->children[0]->sval, "a") == 0,
           "got kind=%d", (int)r->children[0]->kind);
-    check("child[1] is E_IDX (inner b[c])",
-          r->children[1]->kind == E_IDX,
+    check("child[1] is AST_IDX (inner b[c])",
+          r->children[1]->kind == AST_IDX,
           "got kind=%d", (int)r->children[1]->kind);
-    if (r->children[1]->kind != E_IDX || r->children[1]->nchildren < 2) return;
-    check("inner.child[0] is E_VAR(b)",
-          r->children[1]->children[0]->kind == E_VAR &&
+    if (r->children[1]->kind != AST_IDX || r->children[1]->nchildren < 2) return;
+    check("inner.child[0] is AST_VAR(b)",
+          r->children[1]->children[0]->kind == AST_VAR &&
               strcmp(r->children[1]->children[0]->sval, "b") == 0,
           "got kind=%d", (int)r->children[1]->children[0]->kind);
-    check("inner.child[1] is E_VAR(c)",
-          r->children[1]->children[1]->kind == E_VAR &&
+    check("inner.child[1] is AST_VAR(c)",
+          r->children[1]->children[1]->kind == AST_VAR &&
               strcmp(r->children[1]->children[1]->sval, "c") == 0,
           "got kind=%d", (int)r->children[1]->children[1]->kind);
 }
@@ -517,20 +517,20 @@ static void test_nested_subscripts(void) {
 /* ============================================================ */
 
 static void test_subscript_below_exponent(void) {
-    /* a[i] ^ 2 → E_POW(E_IDX(a, i), 2).  Subscript at expr15
+    /* a[i] ^ 2 → AST_POW(AST_IDX(a, i), 2).  Subscript at expr15
      * binds tighter than exponent at expr11. */
     const char *src = "X = a[i] ^ 2;";
     printf("=== test: %s ===\n", src);
-    EXPR_t *r = parse_or_null(src);
+    AST_t *r = parse_or_null(src);
     check("parses", r != NULL, "NULL");
     if (!r) return;
-    check("top is E_POW", r->kind == E_POW, "got %d", (int)r->kind);
+    check("top is AST_POW", r->kind == AST_POW, "got %d", (int)r->kind);
     if (r->nchildren < 2) return;
-    check("LHS is E_IDX",
-          r->children[0]->kind == E_IDX,
+    check("LHS is AST_IDX",
+          r->children[0]->kind == AST_IDX,
           "got kind=%d", (int)r->children[0]->kind);
-    check("RHS is E_ILIT(2)",
-          r->children[1]->kind == E_ILIT && r->children[1]->ival == 2,
+    check("RHS is AST_ILIT(2)",
+          r->children[1]->kind == AST_ILIT && r->children[1]->ival == 2,
           "got kind=%d ival=%lld",
           (int)r->children[1]->kind, r->children[1]->ival);
 }

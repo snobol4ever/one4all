@@ -15,7 +15,7 @@
  * sm_lower — compile a SNOBOL4 IR CODE_t into a flat SM_Program.
  *
  * The caller owns the returned SM_Program and must free it with sm_prog_free().
- * The input CODE_t* and all EXPR_t trees must remain valid for the duration
+ * The input CODE_t* and all AST_t trees must remain valid for the duration
  * of this call (sm_lower does not deep-copy strings; it borrows sval pointers
  * that live in the GC heap or are interned).
  *

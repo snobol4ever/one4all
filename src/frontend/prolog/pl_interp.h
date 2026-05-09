@@ -14,7 +14,7 @@
 
 #include "term.h"
 #include "prolog_runtime.h"   /* Trail */
-#include "scrip_cc.h"         /* EXPR_t */
+#include "scrip_cc.h"         /* AST_t */
 
 /*----------------------------------------------------------------------------------------------------------------------
  * g_pl_trail — global Prolog trail (defined in scrip.c)
@@ -37,14 +37,14 @@ Term **pl_env_new(int n);
  * pl_unified_term_from_expr(e, env) — convert an IR term node to a live Term*
  * using env[] for variable slots.  Used in head-unify and body-arg building.
  *--------------------------------------------------------------------------------------------------------------------*/
-Term *pl_unified_term_from_expr(EXPR_t *e, Term **env);
+Term *pl_unified_term_from_expr(AST_t *e, Term **env);
 
 /*----------------------------------------------------------------------------------------------------------------------
  * pl_pred_table_lookup_global(key) — look up a predicate by "functor/arity" key
- * in the interpreter's global predicate table.  Returns the E_CHOICE node or NULL.
+ * in the interpreter's global predicate table.  Returns the AST_CHOICE node or NULL.
  * Wraps the static g_pl_pred_table + pl_pred_table_lookup in scrip.c.
  *--------------------------------------------------------------------------------------------------------------------*/
-EXPR_t *pl_pred_table_lookup_global(const char *key);
+AST_t *pl_pred_table_lookup_global(const char *key);
 
 #endif /* PL_INTERP_H */
 

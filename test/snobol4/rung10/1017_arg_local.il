@@ -243,14 +243,14 @@
 
     // --- jlab ---
   L_jlab:
-    // unhandled E_FNC stub
+    // unhandled AST_FNC stub
     ldstr      ""
     pop
     ldsfld     string _017_arg_local::kw_stno
     ldstr      "1"
     call       string [snobol4lib]Snobol4Lib::sno_add(string, string)
     stsfld     string _017_arg_local::kw_stno
-    // unhandled E_FNC stub
+    // unhandled AST_FNC stub
     ldstr      ""
     ldstr      "A"
     call       int32 [snobol4lib]Snobol4Lib::sno_differ(string, string)
@@ -281,7 +281,7 @@
     ldstr      "1"
     call       string [snobol4lib]Snobol4Lib::sno_add(string, string)
     stsfld     string _017_arg_local::kw_stno
-    // unhandled E_FNC stub
+    // unhandled AST_FNC stub
     ldstr      ""
     ldstr      "C"
     call       int32 [snobol4lib]Snobol4Lib::sno_differ(string, string)
@@ -312,7 +312,7 @@
     ldstr      "1"
     call       string [snobol4lib]Snobol4Lib::sno_add(string, string)
     stsfld     string _017_arg_local::kw_stno
-    // unhandled E_FNC stub
+    // unhandled AST_FNC stub
     ldstr      ""
     pop
     ldloc.0
@@ -339,7 +339,7 @@
     ldstr      "1"
     call       string [snobol4lib]Snobol4Lib::sno_add(string, string)
     stsfld     string _017_arg_local::kw_stno
-    // unhandled E_FNC stub
+    // unhandled AST_FNC stub
     ldstr      ""
     pop
     ldloc.0
@@ -366,7 +366,7 @@
     ldstr      "1"
     call       string [snobol4lib]Snobol4Lib::sno_add(string, string)
     stsfld     string _017_arg_local::kw_stno
-    // unhandled E_FNC stub
+    // unhandled AST_FNC stub
     ldstr      ""
     ldstr      "D"
     call       int32 [snobol4lib]Snobol4Lib::sno_differ(string, string)
@@ -397,7 +397,7 @@
     ldstr      "1"
     call       string [snobol4lib]Snobol4Lib::sno_add(string, string)
     stsfld     string _017_arg_local::kw_stno
-    // unhandled E_FNC stub
+    // unhandled AST_FNC stub
     ldstr      ""
     ldstr      "F"
     call       int32 [snobol4lib]Snobol4Lib::sno_differ(string, string)
@@ -428,7 +428,7 @@
     ldstr      "1"
     call       string [snobol4lib]Snobol4Lib::sno_add(string, string)
     stsfld     string _017_arg_local::kw_stno
-    // unhandled E_FNC stub
+    // unhandled AST_FNC stub
     ldstr      ""
     pop
     ldloc.0
@@ -455,7 +455,7 @@
     ldstr      "1"
     call       string [snobol4lib]Snobol4Lib::sno_add(string, string)
     stsfld     string _017_arg_local::kw_stno
-    // unhandled E_FNC stub
+    // unhandled AST_FNC stub
     ldstr      ""
     pop
     ldloc.0

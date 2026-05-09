@@ -6,7 +6,7 @@
  *                                                                  (tests 16–31)
  * Sub-step LS-4.i.3: `switch (e) { case v1: ... case v2: ... default: ... }`.
  *                                                                  (tests 32–45)
- * Sub-step LS-4.i.4: alt-eval `(a, b, c)` → E_VLIST + `()` → E_NUL.
+ * Sub-step LS-4.i.4: alt-eval `(a, b, c)` → AST_VLIST + `()` → AST_NUL.
  *                                                                  (tests 46–58)
  * Sub-step LS-4.i.5: `struct NAME { f1, f2, ... }` → DATA('NAME(f1,f2,...)').
  *                                                                  (tests 59–69)
@@ -949,13 +949,13 @@ static void test_continue_outside_loop_error(void) {
 /* (count_gotos_to is already defined above.) */
 
 /* Helper: count `IDENT(tmp_name, value) :S(target)` dispatch stmts in IR.
- * Identifies dispatch stmts by checking `subject->kind == E_FNC` with
+ * Identifies dispatch stmts by checking `subject->kind == AST_FNC` with
  * `subject->sval == "IDENT"` and presence of an onsuccess goto. */
 static int count_dispatch_stmts(STMT_t **stmts, int n) {
     int c = 0;
     for (int i = 0; i < n; i++) {
         if (stmts[i]->subject &&
-            stmts[i]->subject->kind == E_FNC &&
+            stmts[i]->subject->kind == AST_FNC &&
             stmts[i]->subject->sval &&
             strcmp(stmts[i]->subject->sval, "IDENT") == 0 &&
             stmts[i]->go && stmts[i]->go->onsuccess) c++;
@@ -1270,48 +1270,48 @@ static void test_case_outside_switch_error(void) {
 }
 
 /* =========================================================================
- * LS-4.i.4 — alt-eval `(a, b, c)` → E_VLIST  (tests 46–58)
+ * LS-4.i.4 — alt-eval `(a, b, c)` → AST_VLIST  (tests 46–58)
  *
  * Goal-file lowering shape:
  *
- *   (e1, e2, ..., en)   ->   E_VLIST(e1, e2, ..., en)
+ *   (e1, e2, ..., en)   ->   AST_VLIST(e1, e2, ..., en)
  *                            n-ary node, one child per comma-separated expr.
  *                            Goal-directed value-context disjunction —
  *                            evaluate left-to-right, value of first
  *                            non-failing child is value of whole; if all
  *                            fail, whole fails.
  *
- *   ()                  ->   E_NUL  (empty parens, mirrors snobol4.y:196)
+ *   ()                  ->   AST_NUL  (empty parens, mirrors snobol4.y:196)
  *   (e)                 ->   <e>    (single-expr grouping unchanged —
  *                                    LR(1) lookahead at T_RPAREN
  *                                    distinguishes from VLIST's T_COMMA)
  *
- * Distinct from E_ALT (pattern alternation, lazy at match time) — IR
- * comment at src/ir/ir.h:83-87 is explicit on this.  E_VLIST is the
+ * Distinct from AST_ALT (pattern alternation, lazy at match time) — IR
+ * comment at src/ir/ir.h:83-87 is explicit on this.  AST_VLIST is the
  * canonical replacement for Andrew Koenig's `||` operator (goal file
  * Q2) and the SPITBOL Manual Ch.15 footnote primitive.
  * ========================================================================= */
 
-/* True if expr is an E_VLIST with the given child count. */
-static int is_vlist(EXPR_t *e, int n) {
-    return e && e->kind == E_VLIST && e->nchildren == n;
+/* True if expr is an AST_VLIST with the given child count. */
+static int is_vlist(AST_t *e, int n) {
+    return e && e->kind == AST_VLIST && e->nchildren == n;
 }
 
-/* True if expr is the literal E_NUL kind (empty-parens result). */
-static int is_nul(EXPR_t *e) {
-    return e && e->kind == E_NUL;
+/* True if expr is the literal AST_NUL kind (empty-parens result). */
+static int is_nul(AST_t *e) {
+    return e && e->kind == AST_NUL;
 }
 
 /* True if expr is a bare variable reference with the given name. */
-static int is_var_named(EXPR_t *e, const char *name) {
-    return e && e->kind == E_VAR && e->sval && strcmp(e->sval, name) == 0;
+static int is_var_named(AST_t *e, const char *name) {
+    return e && e->kind == AST_VAR && e->sval && strcmp(e->sval, name) == 0;
 }
 
 /* =========================================================================
  * Test 46 — headline 3-arity alt-eval
  *   x = (a, b, c);
  *   Expected:
- *     stmt[0] assignment: x = E_VLIST(VAR a, VAR b, VAR c)
+ *     stmt[0] assignment: x = AST_VLIST(VAR a, VAR b, VAR c)
  * ========================================================================= */
 static void test_vlist_three_args(void) {
     Program *prog = snocone_parse_program("x = (a, b, c);", "test");
@@ -1322,8 +1322,8 @@ static void test_vlist_three_args(void) {
     ASSERT(n == 1, "expected 1 stmt, got %d", n);
     if (n >= 1) {
         ASSERT(is_assignment(stmts[0]), "stmt[0] should be assignment");
-        EXPR_t *rhs = stmts[0]->replacement;
-        ASSERT(is_vlist(rhs, 3), "RHS should be E_VLIST with 3 children, kind=%d nch=%d",
+        AST_t *rhs = stmts[0]->replacement;
+        ASSERT(is_vlist(rhs, 3), "RHS should be AST_VLIST with 3 children, kind=%d nch=%d",
                rhs ? rhs->kind : -1, rhs ? rhs->nchildren : -1);
         if (is_vlist(rhs, 3)) {
             ASSERT(is_var_named(rhs->children[0], "a"), "child[0] should be VAR a");
@@ -1345,8 +1345,8 @@ static void test_vlist_two_args(void) {
 
     int n; STMT_t **stmts = collect_stmts(prog, &n);
     if (n >= 1) {
-        EXPR_t *rhs = stmts[0]->replacement;
-        ASSERT(is_vlist(rhs, 2), "RHS should be E_VLIST with 2 children");
+        AST_t *rhs = stmts[0]->replacement;
+        ASSERT(is_vlist(rhs, 2), "RHS should be AST_VLIST with 2 children");
         if (is_vlist(rhs, 2)) {
             ASSERT(is_var_named(rhs->children[0], "a"), "child[0] should be VAR a");
             ASSERT(is_var_named(rhs->children[1], "b"), "child[1] should be VAR b");
@@ -1359,7 +1359,7 @@ static void test_vlist_two_args(void) {
  * Test 48 — single-expr grouping unchanged (regression guard)
  *   x = (a);
  *   The single-expr paren rule must STILL fire — RHS is bare VAR a, NOT
- *   a 1-arity E_VLIST.  This exercises the LR(1) lookahead path (T_RPAREN
+ *   a 1-arity AST_VLIST.  This exercises the LR(1) lookahead path (T_RPAREN
  *   after expr0 reduces to plain grouping).
  * ========================================================================= */
 static void test_paren_grouping_unchanged(void) {
@@ -1369,18 +1369,18 @@ static void test_paren_grouping_unchanged(void) {
 
     int n; STMT_t **stmts = collect_stmts(prog, &n);
     if (n >= 1) {
-        EXPR_t *rhs = stmts[0]->replacement;
+        AST_t *rhs = stmts[0]->replacement;
         ASSERT(is_var_named(rhs, "a"),
-               "RHS of x = (a) should be bare VAR a — not E_VLIST. kind=%d",
+               "RHS of x = (a) should be bare VAR a — not AST_VLIST. kind=%d",
                rhs ? rhs->kind : -1);
     }
     free(stmts);
 }
 
 /* =========================================================================
- * Test 49 — empty parens → E_NUL
+ * Test 49 — empty parens → AST_NUL
  *   x = ();
- *   Mirrors snobol4.y:196.  E_NUL is the canonical null/empty expression.
+ *   Mirrors snobol4.y:196.  AST_NUL is the canonical null/empty expression.
  * ========================================================================= */
 static void test_empty_parens(void) {
     Program *prog = snocone_parse_program("x = ();", "test");
@@ -1389,8 +1389,8 @@ static void test_empty_parens(void) {
 
     int n; STMT_t **stmts = collect_stmts(prog, &n);
     if (n >= 1) {
-        EXPR_t *rhs = stmts[0]->replacement;
-        ASSERT(is_nul(rhs), "RHS of x = () should be E_NUL, kind=%d",
+        AST_t *rhs = stmts[0]->replacement;
+        ASSERT(is_nul(rhs), "RHS of x = () should be AST_NUL, kind=%d",
                rhs ? rhs->kind : -1);
     }
     free(stmts);
@@ -1399,12 +1399,12 @@ static void test_empty_parens(void) {
 /* =========================================================================
  * Test 50 — SPITBOL Manual Ch.15 footnote example
  *   A = (LT(I,J) I, GT(I,J) J, "Same");
- *   The canonical alt-eval example.  RHS is E_VLIST(3) where each child
+ *   The canonical alt-eval example.  RHS is AST_VLIST(3) where each child
  *   is a complex sub-expression: child[0] is concat of LT call and I,
  *   child[1] is concat of GT call and J, child[2] is the string "Same".
  *
  *   Note the FSM lexer's W{OP}W envelope — `LT(I,J) I` lexes the gap
- *   between `)` and `I` as T_CONCAT, so that child becomes E_SEQ(call, I).
+ *   between `)` and `I` as T_CONCAT, so that child becomes AST_SEQ(call, I).
  * ========================================================================= */
 static void test_vlist_spitbol_manual_example(void) {
     Program *prog = snocone_parse_program(
@@ -1414,24 +1414,24 @@ static void test_vlist_spitbol_manual_example(void) {
 
     int n; STMT_t **stmts = collect_stmts(prog, &n);
     if (n >= 1) {
-        EXPR_t *rhs = stmts[0]->replacement;
-        ASSERT(is_vlist(rhs, 3), "RHS should be E_VLIST(3), kind=%d nch=%d",
+        AST_t *rhs = stmts[0]->replacement;
+        ASSERT(is_vlist(rhs, 3), "RHS should be AST_VLIST(3), kind=%d nch=%d",
                rhs ? rhs->kind : -1, rhs ? rhs->nchildren : -1);
         if (is_vlist(rhs, 3)) {
-            /* child[0]: LT(I,J) I — a concat: E_SEQ(E_FNC LT, E_VAR I) */
-            EXPR_t *c0 = rhs->children[0];
-            ASSERT(c0->kind == E_SEQ && c0->nchildren == 2,
-                   "child[0] should be E_SEQ(2), kind=%d nch=%d",
+            /* child[0]: LT(I,J) I — a concat: AST_SEQ(AST_FNC LT, AST_VAR I) */
+            AST_t *c0 = rhs->children[0];
+            ASSERT(c0->kind == AST_SEQ && c0->nchildren == 2,
+                   "child[0] should be AST_SEQ(2), kind=%d nch=%d",
                    c0->kind, c0->nchildren);
-            if (c0->kind == E_SEQ && c0->nchildren == 2) {
-                ASSERT(c0->children[0]->kind == E_FNC,
-                       "child[0].child[0] should be E_FNC (LT call)");
+            if (c0->kind == AST_SEQ && c0->nchildren == 2) {
+                ASSERT(c0->children[0]->kind == AST_FNC,
+                       "child[0].child[0] should be AST_FNC (LT call)");
                 ASSERT(is_var_named(c0->children[1], "I"),
                        "child[0].child[1] should be VAR I");
             }
             /* child[2]: "Same" — string literal */
-            EXPR_t *c2 = rhs->children[2];
-            ASSERT(c2->kind == E_QLIT && c2->sval &&
+            AST_t *c2 = rhs->children[2];
+            ASSERT(c2->kind == AST_QLIT && c2->sval &&
                    strcmp(c2->sval, "Same") == 0,
                    "child[2] should be QLIT \"Same\", kind=%d sval=%s",
                    c2->kind, c2->sval ? c2->sval : "(null)");
@@ -1443,10 +1443,10 @@ static void test_vlist_spitbol_manual_example(void) {
 /* =========================================================================
  * Test 51 — nested VLIST
  *   x = ((a, b), c);
- *   Outer is E_VLIST(2): children = [E_VLIST(2, a, b), VAR c].
+ *   Outer is AST_VLIST(2): children = [AST_VLIST(2, a, b), VAR c].
  *   Demonstrates that a VLIST is itself an expr0, so it can sit inside
- *   another VLIST without flattening.  (E_VLIST is NOT a left-recursive
- *   fold like E_SEQ/E_ALT — each paren-pair builds its own node.)
+ *   another VLIST without flattening.  (AST_VLIST is NOT a left-recursive
+ *   fold like AST_SEQ/AST_ALT — each paren-pair builds its own node.)
  * ========================================================================= */
 static void test_vlist_nested(void) {
     Program *prog = snocone_parse_program("x = ((a, b), c);", "test");
@@ -1455,12 +1455,12 @@ static void test_vlist_nested(void) {
 
     int n; STMT_t **stmts = collect_stmts(prog, &n);
     if (n >= 1) {
-        EXPR_t *rhs = stmts[0]->replacement;
-        ASSERT(is_vlist(rhs, 2), "outer RHS should be E_VLIST(2), nch=%d",
+        AST_t *rhs = stmts[0]->replacement;
+        ASSERT(is_vlist(rhs, 2), "outer RHS should be AST_VLIST(2), nch=%d",
                rhs ? rhs->nchildren : -1);
         if (is_vlist(rhs, 2)) {
             ASSERT(is_vlist(rhs->children[0], 2),
-                   "child[0] should be inner E_VLIST(2)");
+                   "child[0] should be inner AST_VLIST(2)");
             ASSERT(is_var_named(rhs->children[1], "c"),
                    "child[1] should be VAR c");
         }
@@ -1472,9 +1472,9 @@ static void test_vlist_nested(void) {
  * Test 52 — VLIST as if-condition
  *   if ((a, b)) y = 1;
  *   Per goal Q2: alt-eval is the canonical replacement for `||` in
- *   conditions.  The cond expr is E_VLIST(2); LS-4.f's emit-and-splice
+ *   conditions.  The cond expr is AST_VLIST(2); LS-4.f's emit-and-splice
  *   architecture lowers it to `<vlist> :F(_Lend_NNNN)` with the assignment
- *   in between.  We verify the cond stmt has E_VLIST as its subject.
+ *   in between.  We verify the cond stmt has AST_VLIST as its subject.
  * ========================================================================= */
 static void test_vlist_as_if_condition(void) {
     Program *prog = snocone_parse_program("if ((a, b)) y = 1;", "test");
@@ -1489,9 +1489,9 @@ static void test_vlist_as_if_condition(void) {
      */
     ASSERT(n == 3, "expected 3 stmts (cond, body, _Lend), got %d", n);
     if (n >= 1) {
-        EXPR_t *cond = stmts[0]->subject;
+        AST_t *cond = stmts[0]->subject;
         ASSERT(is_vlist(cond, 2),
-               "stmt[0] subject should be E_VLIST(2), kind=%d nch=%d",
+               "stmt[0] subject should be AST_VLIST(2), kind=%d nch=%d",
                cond ? cond->kind : -1, cond ? cond->nchildren : -1);
         ASSERT(stmts[0]->go != NULL,
                "stmt[0] should have an :F goto branch");
@@ -1510,7 +1510,7 @@ static void test_vlist_as_if_condition(void) {
  * Test 53 — VLIST inside arithmetic
  *   x = (a, b) + 1;
  *   VLIST yields a value, so it can be an operand of any binary operator.
- *   RHS is E_ADD(E_VLIST(2, a, b), 1).
+ *   RHS is AST_ADD(AST_VLIST(2, a, b), 1).
  * ========================================================================= */
 static void test_vlist_in_arithmetic(void) {
     Program *prog = snocone_parse_program("x = (a, b) + 1;", "test");
@@ -1519,13 +1519,13 @@ static void test_vlist_in_arithmetic(void) {
 
     int n; STMT_t **stmts = collect_stmts(prog, &n);
     if (n >= 1) {
-        EXPR_t *rhs = stmts[0]->replacement;
-        ASSERT(rhs && rhs->kind == E_ADD && rhs->nchildren == 2,
-               "RHS should be E_ADD(2), kind=%d", rhs ? rhs->kind : -1);
-        if (rhs && rhs->kind == E_ADD && rhs->nchildren == 2) {
+        AST_t *rhs = stmts[0]->replacement;
+        ASSERT(rhs && rhs->kind == AST_ADD && rhs->nchildren == 2,
+               "RHS should be AST_ADD(2), kind=%d", rhs ? rhs->kind : -1);
+        if (rhs && rhs->kind == AST_ADD && rhs->nchildren == 2) {
             ASSERT(is_vlist(rhs->children[0], 2),
-                   "ADD's left operand should be E_VLIST(2)");
-            ASSERT(rhs->children[1]->kind == E_ILIT &&
+                   "ADD's left operand should be AST_VLIST(2)");
+            ASSERT(rhs->children[1]->kind == AST_ILIT &&
                    rhs->children[1]->ival == 1,
                    "ADD's right operand should be ILIT 1");
         }
@@ -1534,11 +1534,11 @@ static void test_vlist_in_arithmetic(void) {
 }
 
 /* =========================================================================
- * Test 54 — VLIST distinct from E_ALT (pattern alternation)
+ * Test 54 — VLIST distinct from AST_ALT (pattern alternation)
  *   x = (a | b, c);
  *   Inside parens, `,` separates VLIST children; `|` (within one child)
- *   is pattern alternation and folds into E_ALT.  Result: outer is
- *   E_VLIST(2) where child[0] is E_ALT(a, b) and child[1] is VAR c.
+ *   is pattern alternation and folds into AST_ALT.  Result: outer is
+ *   AST_VLIST(2) where child[0] is AST_ALT(a, b) and child[1] is VAR c.
  *   This proves the IR distinction documented at src/ir/ir.h:82-87.
  * ========================================================================= */
 static void test_vlist_distinct_from_ealt(void) {
@@ -1548,13 +1548,13 @@ static void test_vlist_distinct_from_ealt(void) {
 
     int n; STMT_t **stmts = collect_stmts(prog, &n);
     if (n >= 1) {
-        EXPR_t *rhs = stmts[0]->replacement;
-        ASSERT(is_vlist(rhs, 2), "RHS should be E_VLIST(2), kind=%d nch=%d",
+        AST_t *rhs = stmts[0]->replacement;
+        ASSERT(is_vlist(rhs, 2), "RHS should be AST_VLIST(2), kind=%d nch=%d",
                rhs ? rhs->kind : -1, rhs ? rhs->nchildren : -1);
         if (is_vlist(rhs, 2)) {
-            EXPR_t *c0 = rhs->children[0];
-            ASSERT(c0->kind == E_ALT && c0->nchildren == 2,
-                   "child[0] should be E_ALT(2), kind=%d nch=%d",
+            AST_t *c0 = rhs->children[0];
+            ASSERT(c0->kind == AST_ALT && c0->nchildren == 2,
+                   "child[0] should be AST_ALT(2), kind=%d nch=%d",
                    c0->kind, c0->nchildren);
             ASSERT(is_var_named(rhs->children[1], "c"),
                    "child[1] should be VAR c");
@@ -1564,12 +1564,12 @@ static void test_vlist_distinct_from_ealt(void) {
 }
 
 /* =========================================================================
- * Test 55 — call (E_FNC) is NOT VLIST (regression guard)
+ * Test 55 — call (AST_FNC) is NOT VLIST (regression guard)
  *   x = f(a, b);
  *   The T_CALL T_LPAREN exprlist T_RPAREN rule (zero-space-after-IDENT)
  *   wins over the new T_LPAREN expr0 T_COMMA exprlist_ne T_RPAREN rule
  *   because the lexer emits T_CALL for `f(`, not T_IDENT then T_LPAREN.
- *   RHS is E_FNC("f", a, b), not E_VLIST.
+ *   RHS is AST_FNC("f", a, b), not AST_VLIST.
  * ========================================================================= */
 static void test_call_not_vlist(void) {
     Program *prog = snocone_parse_program("x = f(a, b);", "test");
@@ -1578,13 +1578,13 @@ static void test_call_not_vlist(void) {
 
     int n; STMT_t **stmts = collect_stmts(prog, &n);
     if (n >= 1) {
-        EXPR_t *rhs = stmts[0]->replacement;
-        ASSERT(rhs && rhs->kind == E_FNC,
-               "RHS should be E_FNC (call), kind=%d", rhs ? rhs->kind : -1);
+        AST_t *rhs = stmts[0]->replacement;
+        ASSERT(rhs && rhs->kind == AST_FNC,
+               "RHS should be AST_FNC (call), kind=%d", rhs ? rhs->kind : -1);
         ASSERT(rhs && rhs->sval && strcmp(rhs->sval, "f") == 0,
-               "E_FNC sval should be \"f\"");
+               "AST_FNC sval should be \"f\"");
         ASSERT(rhs && rhs->nchildren == 2,
-               "E_FNC should have 2 children");
+               "AST_FNC should have 2 children");
     }
     free(stmts);
 }
@@ -1608,7 +1608,7 @@ static void test_vlist_bare_statement(void) {
         ASSERT(is_bare_expr(stmts[0]),
                "stmt[0] should be bare expression (subject, no goto)");
         ASSERT(is_vlist(stmts[0]->subject, 2),
-               "subject should be E_VLIST(2), kind=%d",
+               "subject should be AST_VLIST(2), kind=%d",
                stmts[0]->subject ? stmts[0]->subject->kind : -1);
     }
     free(stmts);
@@ -1617,7 +1617,7 @@ static void test_vlist_bare_statement(void) {
 /* =========================================================================
  * Test 57 — VLIST inside while-condition
  *   while ((a, b)) y = 1;
- *   Same shape as Test 52 but for while: cond is E_VLIST(2), drives the
+ *   Same shape as Test 52 but for while: cond is AST_VLIST(2), drives the
  *   loop's :F-on-fail exit.  Per LS-4.f lowering: _Ltop, cond:F(_Lend),
  *   <body>, :(_Ltop), _Lend.
  * ========================================================================= */
@@ -1630,9 +1630,9 @@ static void test_vlist_as_while_condition(void) {
     /* Expected: _Ltop, cond:F(_Lend), body, :(_Ltop), _Lend */
     ASSERT(n == 5, "expected 5 stmts, got %d", n);
     if (n >= 2) {
-        EXPR_t *cond = stmts[1]->subject;
+        AST_t *cond = stmts[1]->subject;
         ASSERT(is_vlist(cond, 2),
-               "stmt[1] subject should be E_VLIST(2), kind=%d nch=%d",
+               "stmt[1] subject should be AST_VLIST(2), kind=%d nch=%d",
                cond ? cond->kind : -1, cond ? cond->nchildren : -1);
         ASSERT(stmts[1]->go != NULL,
                "stmt[1] should have an :F goto branch");
@@ -1654,16 +1654,16 @@ static void test_vlist_literals(void) {
 
     int n; STMT_t **stmts = collect_stmts(prog, &n);
     if (n >= 1) {
-        EXPR_t *rhs = stmts[0]->replacement;
-        ASSERT(is_vlist(rhs, 3), "RHS should be E_VLIST(3)");
+        AST_t *rhs = stmts[0]->replacement;
+        ASSERT(is_vlist(rhs, 3), "RHS should be AST_VLIST(3)");
         if (is_vlist(rhs, 3)) {
-            ASSERT(rhs->children[0]->kind == E_ILIT &&
+            ASSERT(rhs->children[0]->kind == AST_ILIT &&
                    rhs->children[0]->ival == 1,
                    "child[0] should be ILIT 1");
-            ASSERT(rhs->children[1]->kind == E_ILIT &&
+            ASSERT(rhs->children[1]->kind == AST_ILIT &&
                    rhs->children[1]->ival == 2,
                    "child[1] should be ILIT 2");
-            ASSERT(rhs->children[2]->kind == E_QLIT &&
+            ASSERT(rhs->children[2]->kind == AST_QLIT &&
                    rhs->children[2]->sval &&
                    strcmp(rhs->children[2]->sval, "three") == 0,
                    "child[2] should be QLIT \"three\"");
@@ -1677,7 +1677,7 @@ static void test_vlist_literals(void) {
  *
  * Lowering shape (single bare-expression statement, no goto, no label):
  *
- *     subject = E_FNC("DATA", E_QLIT("NAME(f1,f2,...)"))
+ *     subject = AST_FNC("DATA", AST_QLIT("NAME(f1,f2,...)"))
  *
  * Empty-fields case: `struct NAME { }` → `DATA('NAME()')`.
  *
@@ -1696,15 +1696,15 @@ static void test_vlist_literals(void) {
  * ========================================================================= */
 
 /* Helper: True if stmt is a bare DATA('SPEC') call — i.e. subject is
- * E_FNC named "DATA" with one E_QLIT child whose sval matches `expected`. */
+ * AST_FNC named "DATA" with one AST_QLIT child whose sval matches `expected`. */
 static int is_struct_data_call(STMT_t *s, const char *expected_spec) {
     if (!s || !is_bare_expr(s)) return 0;
-    EXPR_t *e = s->subject;
-    if (!e || e->kind != E_FNC) return 0;
+    AST_t *e = s->subject;
+    if (!e || e->kind != AST_FNC) return 0;
     if (!e->sval || strcmp(e->sval, "DATA") != 0) return 0;
     if (e->nchildren != 1) return 0;
-    EXPR_t *q = e->children[0];
-    if (!q || q->kind != E_QLIT) return 0;
+    AST_t *q = e->children[0];
+    if (!q || q->kind != AST_QLIT) return 0;
     if (!q->sval) return 0;
     return strcmp(q->sval, expected_spec) == 0;
 }
@@ -1880,10 +1880,10 @@ static void test_struct_followed_by_use(void) {
         ASSERT(is_assignment(stmts[1]),
                "stmt[1] should be assignment x = cons(1, 2)");
         if (is_assignment(stmts[1])) {
-            EXPR_t *rhs = stmts[1]->replacement;
-            ASSERT(rhs && rhs->kind == E_FNC && rhs->sval &&
+            AST_t *rhs = stmts[1]->replacement;
+            ASSERT(rhs && rhs->kind == AST_FNC && rhs->sval &&
                    strcmp(rhs->sval, "cons") == 0,
-                   "RHS should be E_FNC(\"cons\", ...)");
+                   "RHS should be AST_FNC(\"cons\", ...)");
             ASSERT(rhs && rhs->nchildren == 2,
                    "cons call should have 2 args");
         }
@@ -1980,7 +1980,7 @@ int main(void) {
     test_switch_inside_if();
     test_switch_with_user_label();
     test_case_outside_switch_error();
-    /* LS-4.i.4 — alt-eval (a, b, c) → E_VLIST */
+    /* LS-4.i.4 — alt-eval (a, b, c) → AST_VLIST */
     test_vlist_three_args();
     test_vlist_two_args();
     test_paren_grouping_unchanged();

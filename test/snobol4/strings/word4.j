@@ -184,7 +184,7 @@ Linp_ok_0:
 Jpat0_retry:
     iload 7
     istore 9
-    ; E_VART PAT → named pattern inline expansion
+    ; AST_VART PAT → named pattern inline expansion
     ldc "0"
     invokestatic java/lang/Integer/parseInt(Ljava/lang/String;)I
     istore 10

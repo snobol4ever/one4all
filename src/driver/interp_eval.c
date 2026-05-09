@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>     /* getpid */
-#include "../ir/ir.h"   /* E_KIND_COUNT */
+#include "../ir/ir.h"   /* AST_KIND_COUNT */
 
 /* RS-24 diag: per-kind hit counter for the Icon-frame switch in
  * interp_eval().  See the env-gated init block inside that function for
@@ -23,7 +23,7 @@ void rs24_diag_dump(void) {
     FILE *fp = fopen("/tmp/rs24_diag_hits.log", "a");
     if (!fp) return;
     fprintf(fp, "=== RS-24 Icon-frame switch hits (pid=%d) ===\n", (int)getpid());
-    for (int k = 0; k < (int)E_KIND_COUNT; k++) {
+    for (int k = 0; k < (int)AST_KIND_COUNT; k++) {
         if (rs24_diag_hits_ptr[k]) {
             fprintf(fp, "  kind=%-3d %-20s hits=%lu\n",
                     k, rs24_diag_kind_name(k), rs24_diag_hits_ptr[k]);
@@ -35,23 +35,23 @@ void rs24_diag_dump(void) {
  * For others we emit "?".  Keeps the diag focused. */
 static const char *rs24_diag_kind_name(int k) {
     switch (k) {
-    case E_VAR:        return "E_VAR";
-    case E_ASSIGN:     return "E_ASSIGN";
-    case E_FNC:        return "E_FNC";
-    case E_IF:         return "E_IF";
-    case E_WHILE:      return "E_WHILE";
-    case E_UNTIL:      return "E_UNTIL";
-    case E_REPEAT:     return "E_REPEAT";
-    case E_EVERY:      return "E_EVERY";
-    case E_SEQ:        return "E_SEQ";
-    case E_SEQ_EXPR:   return "E_SEQ_EXPR";
-    case E_ALT:        return "E_ALT";
-    case E_ALTERNATE:  return "E_ALTERNATE";
-    case E_REVASSIGN:  return "E_REVASSIGN";
-    case E_LOOP_NEXT:  return "E_LOOP_NEXT";
-    case E_SUSPEND:    return "E_SUSPEND";
-    case E_RETURN:     return "E_RETURN";
-    case E_PROC_FAIL:  return "E_PROC_FAIL";
+    case AST_VAR:        return "AST_VAR";
+    case AST_ASSIGN:     return "AST_ASSIGN";
+    case AST_FNC:        return "AST_FNC";
+    case AST_IF:         return "AST_IF";
+    case AST_WHILE:      return "AST_WHILE";
+    case AST_UNTIL:      return "AST_UNTIL";
+    case AST_REPEAT:     return "AST_REPEAT";
+    case AST_EVERY:      return "AST_EVERY";
+    case AST_SEQ:        return "AST_SEQ";
+    case AST_SEQ_EXPR:   return "AST_SEQ_EXPR";
+    case AST_ALT:        return "AST_ALT";
+    case AST_ALTERNATE:  return "AST_ALTERNATE";
+    case AST_REVASSIGN:  return "AST_REVASSIGN";
+    case AST_LOOP_NEXT:  return "AST_LOOP_NEXT";
+    case AST_SUSPEND:    return "AST_SUSPEND";
+    case AST_RETURN:     return "AST_RETURN";
+    case AST_PROC_FAIL:  return "AST_PROC_FAIL";
     default:           return "?";
     }
 }
@@ -88,9 +88,9 @@ trace_hook:
         comm_var(name, val);
 }
 
-/* DYN-57: E_FNC names that always yield a pattern value.
+/* DYN-57: AST_FNC names that always yield a pattern value.
  * Mirrors PAT_FNC_NAMES in SJ-17 (sno-interp.js ec6c0b3).
- * Scoped to _expr_is_pat only — do NOT intercept E_VAR (breaks 210_indirect_ref)
+ * Scoped to _expr_is_pat only — do NOT intercept AST_VAR (breaks 210_indirect_ref)
  * and do NOT touch S=PR split/has_eq guard (breaks 062_capture_replacement). */
 static const char *PAT_FNC_NAMES[] = {
     "ANY","NOTANY","SPAN","BREAK","BREAKX","LEN","POS","RPOS","TAB","RTAB",
@@ -106,19 +106,19 @@ int _is_pat_fnc_name(const char *s) {
 
 /* DYN-54: returns 1 if expr tree contains any pattern-only node.
  * Mirrors is_pat() in snobol4.y but accessible at eval time. */
-int _expr_is_pat(EXPR_t *e) {
+int _expr_is_pat(AST_t *e) {
     if (!e) return 0;
     switch (e->kind) {
-        case E_ARB: case E_ARBNO: case E_CAPT_COND_ASGN:
-        case E_CAPT_IMMED_ASGN: case E_CAPT_CURSOR: case E_DEFER:
+        case AST_ARB: case AST_ARBNO: case AST_CAPT_COND_ASGN:
+        case AST_CAPT_IMMED_ASGN: case AST_CAPT_CURSOR: case AST_DEFER:
             return 1;
         default: break;
     }
-    /* DYN-57: E_FNC whose name is a pattern primitive (LEN, POS, TAB, ARB, etc.) */
-    if (e->kind == E_FNC && _is_pat_fnc_name(e->sval)) return 1;
-    /* DYN-58: E_VAR whose name is a zero-arg pattern primitive (ARB, REM, FAIL, etc.)
-     * Only in _expr_is_pat — do NOT change the general E_VAR eval path (breaks 210). */
-    if (e->kind == E_VAR && _is_pat_fnc_name(e->sval)) return 1;
+    /* DYN-57: AST_FNC whose name is a pattern primitive (LEN, POS, TAB, ARB, etc.) */
+    if (e->kind == AST_FNC && _is_pat_fnc_name(e->sval)) return 1;
+    /* DYN-58: AST_VAR whose name is a zero-arg pattern primitive (ARB, REM, FAIL, etc.)
+     * Only in _expr_is_pat — do NOT change the general AST_VAR eval path (breaks 210). */
+    if (e->kind == AST_VAR && _is_pat_fnc_name(e->sval)) return 1;
     for (int i = 0; i < e->nchildren; i++)
         if (_expr_is_pat(e->children[i])) return 1;
     return 0;
@@ -149,34 +149,34 @@ DESCR_t *data_field_ptr(const char *fname, DESCR_t inst) {
  *
  * Returns 1 on success (cell written), 0 on FAIL (OOB) or if the LHS shape
  * is not handled here.  Caller should treat 0 as FAIL of the whole assign
- * unless the LHS kind is E_IDX (in which case caller falls back to
+ * unless the LHS kind is AST_IDX (in which case caller falls back to
  * subscript_set for list/table semantics).
  *
  * Only handles the simple case: lhs->children[0] is an addressable lvalue
- * (E_VAR / E_FIELD / E_NAME / E_INDIRECT) whose current value is a string.
+ * (AST_VAR / AST_FIELD / AST_NAME / AST_INDIRECT) whose current value is a string.
  * Nested patterns like `t[k][i:j] := v` are not (yet) supported. */
-int icn_string_section_assign(EXPR_t *lhs, DESCR_t val) {
+int icn_string_section_assign(AST_t *lhs, DESCR_t val) {
     if (!lhs) return 0;
     int kind = lhs->kind;
-    if (kind != E_SECTION && kind != E_SECTION_PLUS &&
-        kind != E_SECTION_MINUS && kind != E_IDX) return 0;
+    if (kind != AST_SECTION && kind != AST_SECTION_PLUS &&
+        kind != AST_SECTION_MINUS && kind != AST_IDX) return 0;
     if (lhs->nchildren < 2) return 0;
-    if (kind == E_SECTION && lhs->nchildren < 3) return 0;
+    if (kind == AST_SECTION && lhs->nchildren < 3) return 0;
 
     /* Get a pointer to the underlying cell (so we can write back).  Prefer
-     * local slot for E_VAR (when in an icon frame), falling back to NV via
-     * interp_eval_ref.  This mirrors the read-side logic in case E_VAR. */
-    EXPR_t *bch = lhs->children[0];
+     * local slot for AST_VAR (when in an icon frame), falling back to NV via
+     * interp_eval_ref.  This mirrors the read-side logic in case AST_VAR. */
+    AST_t *bch = lhs->children[0];
     DESCR_t *cell = NULL;
-    if (bch && bch->kind == E_VAR && frame_depth > 0) {
+    if (bch && bch->kind == AST_VAR && frame_depth > 0) {
         int sl = (int)bch->ival;
         if (sl >= 0 && sl < FRAME.env_n) cell = &FRAME.env[sl];
     }
     if (!cell) cell = interp_eval_ref(bch);
     if (!cell) return 0;
     DESCR_t base = *cell;
-    /* For E_IDX: only handle string base — list/table goes through subscript_set. */
-    if (kind == E_IDX) {
+    /* For AST_IDX: only handle string base — list/table goes through subscript_set. */
+    if (kind == AST_IDX) {
         if (base.v != DT_S && base.v != DT_SNUL) return 0;
     }
     const char *s = (base.v == DT_SNUL) ? "" : VARVAL_fn(base);
@@ -185,14 +185,14 @@ int icn_string_section_assign(EXPR_t *lhs, DESCR_t val) {
 
     /* Compute lo, hi (1-based section bounds, lo ≤ hi, range [lo, hi)). */
     int lo = 0, hi = 0;
-    if (kind == E_SECTION) {
+    if (kind == AST_SECTION) {
         int i = (int)to_int(interp_eval(lhs->children[1]));
         int j = (int)to_int(interp_eval(lhs->children[2]));
         if (i == 0) i = slen + 1; else if (i < 0) i = slen + 1 + i;
         if (j == 0) j = slen + 1; else if (j < 0) j = slen + 1 + j;
         if (i < 1 || i > slen+1 || j < 1 || j > slen+1) return 0;
         lo = i < j ? i : j; hi = i < j ? j : i;
-    } else if (kind == E_SECTION_PLUS) {
+    } else if (kind == AST_SECTION_PLUS) {
         int i = (int)to_int(interp_eval(lhs->children[1]));
         int n = (int)to_int(interp_eval(lhs->children[2]));
         if (i == 0) i = slen + 1; else if (i < 0) i = slen + 1 + i;
@@ -200,7 +200,7 @@ int icn_string_section_assign(EXPR_t *lhs, DESCR_t val) {
         if (n < 0) return 0;
         if (i + n > slen + 1) return 0;
         lo = i; hi = i + n;
-    } else if (kind == E_SECTION_MINUS) {
+    } else if (kind == AST_SECTION_MINUS) {
         int i = (int)to_int(interp_eval(lhs->children[1]));
         int n = (int)to_int(interp_eval(lhs->children[2]));
         if (i == 0) i = slen + 1; else if (i < 0) i = slen + 1 + i;
@@ -208,7 +208,7 @@ int icn_string_section_assign(EXPR_t *lhs, DESCR_t val) {
         if (n < 0) return 0;
         if (i - n < 1) return 0;
         lo = i - n; hi = i;
-    } else { /* E_IDX */
+    } else { /* AST_IDX */
         int i = (int)to_int(interp_eval(lhs->children[1]));
         if (i == 0) return 0;
         if (i < 0) i = slen + 1 + i;
@@ -229,9 +229,9 @@ int icn_string_section_assign(EXPR_t *lhs, DESCR_t val) {
     buf[newlen] = '\0';
 
     /* Write back to the cell.  If the base is a global variable, also route
-     * through set_and_trace so VALUE traces fire — mirrors E_ASSIGN. */
-    EXPR_t *base_expr = lhs->children[0];
-    if (base_expr && base_expr->kind == E_VAR && base_expr->sval &&
+     * through set_and_trace so VALUE traces fire — mirrors AST_ASSIGN. */
+    AST_t *base_expr = lhs->children[0];
+    if (base_expr && base_expr->kind == AST_VAR && base_expr->sval &&
         base_expr->sval[0] != '&' &&
         !(frame_depth > 0 && base_expr->ival >= 0 && base_expr->ival < FRAME.env_n))
     {
@@ -249,14 +249,14 @@ int icn_string_section_assign(EXPR_t *lhs, DESCR_t val) {
  * via eval_expr (we call it by re-parsing for non-trivial exprs,
  * but for the common case we use NV_GET_fn / NV_SET_fn directly).
  *
- * For the interpreter we need direct EXPR_t evaluation, not string
+ * For the interpreter we need direct AST_t evaluation, not string
  * re-parse.  We replicate the minimal logic needed here rather than
  * exposing eval_node (which is static in eval_code.c).
  * ══════════════════════════════════════════════════════════════════════════ */
 
 /* find_leaf_suspendable — walk an expr tree and return the first generator-kind node.
- * Used by E_EVERY special-case to find the raw E_TO (or similar) inside
- * compound exprs like E_ADD(E_VAR(total), E_TO(1,n)), so we can drive only
+ * Used by AST_EVERY special-case to find the raw AST_TO (or similar) inside
+ * compound exprs like AST_ADD(AST_VAR(total), AST_TO(1,n)), so we can drive only
  * the generator and inject via coro_drive_node, letting interp_eval re-read
  * mutable variables (e.g. frame locals) fresh each tick.
  *
@@ -277,9 +277,9 @@ const char *real_str(double r, char *buf, int bufsz) {
     return buf;
 }
 
-/* CH-17g-runtime-bridge-1 (2026-05-09): name-based EXPR_t-free Icon builtin
+/* CH-17g-runtime-bridge-1 (2026-05-09): name-based AST_t-free Icon builtin
  * dispatch.  Returns 1 if the call was handled (and writes the result to
- * *out), 0 otherwise.  The caller has no EXPR_t handle: only the function
+ * *out), 0 otherwise.  The caller has no AST_t handle: only the function
  * name and pre-evaluated args.
  *
  * This helper is the bridge that lets SM_CALL_FN in sm_interp.c dispatch
@@ -297,14 +297,14 @@ const char *real_str(double r, char *buf, int bufsz) {
  *
  * Scope today: write, writes.  Each branch is a copy of the same logic
  * in icn_call_builtin's body — kept in lockstep by having icn_call_builtin
- * delegate here.  Future rungs may extend coverage to other EXPR_t-free
+ * delegate here.  Future rungs may extend coverage to other AST_t-free
  * Icon builtins (integer, string, real, char, type, copy, list, table,
  * read, repl, upto, find, any, many, tab, move, match, …) — each kind
  * migrates by adding a branch here AND removing its branch from
- * icn_call_builtin's tail (or its current home in interp_eval's E_FNC
+ * icn_call_builtin's tail (or its current home in interp_eval's AST_FNC
  * switch) in the same commit.
  *
- * Builtins that need EXPR_t (Raku/SCAN dispatch helpers, mutators that
+ * Builtins that need AST_t (Raku/SCAN dispatch helpers, mutators that
  * write back through children[1]'s lvalue identity, generator builtins
  * that inspect children[i] structurally) are NOT covered here and remain
  * with icn_call_builtin / interp_eval.  Those become per-kind chunk
@@ -343,7 +343,7 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
     /* CH-17g-runtime-bridge-3 (2026-05-09): single-arg pure value-transforms.
      * Each branch is a verbatim copy of the equivalent in-eval branch, with
      * `interp_eval(e->children[i])` replaced by `args[i-1]` (already
-     * pre-evaluated by the SM_CALL_FN handler).  No EXPR_t access.
+     * pre-evaluated by the SM_CALL_FN handler).  No AST_t access.
      *
      * Builtins covered: integer, real, string, numeric, char, ord, type,
      * image (0 or 1 arg), copy, *e (size-of). */
@@ -495,7 +495,7 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
     }
     /* CH-17g-runtime-bridge-3 BATCH 2 (2026-05-09): multi-arg pure transforms.
      * Same constraints as batch 1 — verbatim port of in-eval branches with
-     * `interp_eval(e->children[i])` → `args[i-1]`.  All EXPR_t-free, no
+     * `interp_eval(e->children[i])` → `args[i-1]`.  All AST_t-free, no
      * write-back, no &pos/&subject mutation.  g_lang reads (in `trim`) are
      * safe because polyglot_execute sets g_lang=1 before any Icon proc runs,
      * regardless of --ir-run vs --sm-run path. */
@@ -788,11 +788,11 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
     return 0;
 }
 
-/* icn_call_builtin — call a builtin E_FNC with pre-resolved args array.
+/* icn_call_builtin — call a builtin AST_FNC with pre-resolved args array.
  * Used by coro_bb_fnc to avoid re-evaluating generator children.
  * Dispatches write/writes/upto/find/any/many/upto/tab/move/match by name.
  * For user procs, calls coro_call directly. */
-DESCR_t icn_call_builtin(EXPR_t *call, DESCR_t *args, int nargs) {
+DESCR_t icn_call_builtin(AST_t *call, DESCR_t *args, int nargs) {
     if (!call || call->nchildren < 1 || !call->children[0]) return NULVCL;
     const char *fn = call->children[0]->sval;
     if (!fn) return NULVCL;
@@ -814,7 +814,7 @@ DESCR_t icn_call_builtin(EXPR_t *call, DESCR_t *args, int nargs) {
         if (scan_try_call_builtin(call, args, nargs, &__sc_d)) return __sc_d;
     }
     /* CH-17g-runtime-bridge-1 (2026-05-09): delegate write/writes (and any
-     * future EXPR_t-free Icon builtins) to icn_try_call_builtin_by_name.
+     * future AST_t-free Icon builtins) to icn_try_call_builtin_by_name.
      * Pure refactor; behaviour identical to the inlined branches that lived
      * here previously. */
     {
@@ -829,7 +829,7 @@ DESCR_t icn_call_builtin(EXPR_t *call, DESCR_t *args, int nargs) {
             return proc_table_call(i, args, nargs);
     }
     /* RS-23-extra-prep2 (Option B′): smart fallback for the residual
-     * builtins still living in interp_eval's E_FNC switch (~40 names:
+     * builtins still living in interp_eval's AST_FNC switch (~40 names:
      * integer, string, real, char, type, copy, list, table, read, repl,
      * etc.).  The naive fallback `interp_eval(call)` re-walks
      * `call->children[1..]` from scratch, and if any arg has side effects
@@ -838,7 +838,7 @@ DESCR_t icn_call_builtin(EXPR_t *call, DESCR_t *args, int nargs) {
      * `n := integer(tab(0))` is the canonical regression.
      *
      * Fix: synthesize a shallow clone of `call` whose children[1..nargs]
-     * are literal leaves (E_QLIT/E_ILIT/E_FLIT/E_NUL) carrying the
+     * are literal leaves (AST_QLIT/AST_ILIT/AST_FLIT/AST_NUL) carrying the
      * already-evaluated descriptors.  When interp_eval recursively
      * evaluates those leaf nodes (interp_eval.c:1850-1853), it does so
      * idempotently — no scan_pos advance, no read() consumption.
@@ -846,12 +846,12 @@ DESCR_t icn_call_builtin(EXPR_t *call, DESCR_t *args, int nargs) {
      * Mutator-aware denylist: five builtins (`push`, `pop`, `arr_set`,
      * `hash_set`, `hash_delete`) write back through `e->children[1]` via
      * a `FRAME.env[children[1]->ival] = ...` assignment, and rely on
-     * `children[1]->kind == E_VAR` to identify the lvalue slot.
-     * Substituting an E_QLIT literal there destroys the lvalue identity
+     * `children[1]->kind == AST_VAR` to identify the lvalue slot.
+     * Substituting an AST_QLIT literal there destroys the lvalue identity
      * and silently drops the writeback (Raku rk_arrays / rk_hashes
      * regression in the original Option-B prototype, session 2026-05-05).
      * For these names we keep the original `interp_eval(call)` fallback,
-     * which preserves the E_VAR child.  The Icon-list cluster
+     * which preserves the AST_VAR child.  The Icon-list cluster
      * (push/put/get/pull at line 1180) and Icon-table mutators
      * (insert/delete) operate on heap objects via DT_DATA / DT_T and
      * mutate through the descriptor — not via children[]-writeback —
@@ -874,7 +874,7 @@ DESCR_t icn_call_builtin(EXPR_t *call, DESCR_t *args, int nargs) {
         /* Denylist: builtins whose first-arg lvalue identity would be
          * destroyed by literal substitution.  Keep this list in sync
          * with FRAME.env[children[1]->ival] writeback sites in this
-         * file's E_FNC switch. */
+         * file's AST_FNC switch. */
         int is_mutator =
             !strcmp(fn, "push")        ||
             !strcmp(fn, "pop")         ||
@@ -892,36 +892,36 @@ DESCR_t icn_call_builtin(EXPR_t *call, DESCR_t *args, int nargs) {
         }
         if (all_scalar) {
             /* Stack-allocate the shallow clone and the literal-leaf children.
-             * `interp_eval`'s E_FNC case reads call->nchildren and indexes
+             * `interp_eval`'s AST_FNC case reads call->nchildren and indexes
              * children[0]..children[nargs] (children[0] is the function-name
              * node, retained as-is).  Nothing in the current builtin
              * implementations stores call->children[i] beyond the call. */
-            EXPR_t   leafbufs[16];               /* covers all observed arities */
-            EXPR_t  *kidsbuf[16 + 1];            /* +1 for the name node */
-            EXPR_t **kids = kidsbuf;
-            EXPR_t  *leaves = leafbufs;
+            AST_t   leafbufs[16];               /* covers all observed arities */
+            AST_t  *kidsbuf[16 + 1];            /* +1 for the name node */
+            AST_t **kids = kidsbuf;
+            AST_t  *leaves = leafbufs;
             if (nargs > 16) {
-                kids   = (EXPR_t **)GC_malloc(sizeof(EXPR_t *) * (size_t)(nargs + 1));
-                leaves = (EXPR_t  *)GC_malloc(sizeof(EXPR_t  ) * (size_t)nargs);
+                kids   = (AST_t **)GC_malloc(sizeof(AST_t *) * (size_t)(nargs + 1));
+                leaves = (AST_t  *)GC_malloc(sizeof(AST_t  ) * (size_t)nargs);
             }
             kids[0] = call->children[0];        /* keep the function-name node */
             for (int _i = 0; _i < nargs; _i++) {
-                EXPR_t *L = &leaves[_i];
+                AST_t *L = &leaves[_i];
                 memset(L, 0, sizeof *L);
                 switch (args[_i].v) {
                     case DT_S:
-                        L->kind = E_QLIT;
+                        L->kind = AST_QLIT;
                         L->sval = args[_i].s;
                         break;
                     case DT_SNUL:
-                        L->kind = E_NUL;
+                        L->kind = AST_NUL;
                         break;
                     case DT_I:
-                        L->kind = E_ILIT;
+                        L->kind = AST_ILIT;
                         L->ival = args[_i].i;
                         break;
                     case DT_R:
-                        L->kind = E_FLIT;
+                        L->kind = AST_FLIT;
                         L->dval = args[_i].r;
                         break;
                     default:
@@ -930,7 +930,7 @@ DESCR_t icn_call_builtin(EXPR_t *call, DESCR_t *args, int nargs) {
                 }
                 kids[_i + 1] = L;
             }
-            EXPR_t clone;
+            AST_t clone;
             memset(&clone, 0, sizeof clone);
             clone.kind      = call->kind;
             clone.sval      = call->sval;
@@ -988,7 +988,7 @@ int kw_assign(const char *kw, DESCR_t val) {
 }
 
 /* IC-9 (session #26): probe variant of kw_assign — answers "would the
- * write succeed?" without performing it.  Used by atomic E_SWAP / E_REVSWAP
+ * write succeed?" without performing it.  Used by atomic AST_SWAP / AST_REVSWAP
  * to detect OOB-on-keyword cases where neither side should be written. */
 int icn_kw_can_assign(const char *kw, DESCR_t val) {
     if (!strcmp(kw, "pos")) {
@@ -1004,16 +1004,16 @@ int icn_kw_can_assign(const char *kw, DESCR_t val) {
     return 1;
 }
 
-DESCR_t interp_eval(EXPR_t *e)
+DESCR_t interp_eval(AST_t *e)
 {
     if (!e) return NULVCL;
     /* coro_drive_node injection: if this exact node is being driven as a generator
-     * (set by E_EVERY leaf-gen injection or coro_drive_fnc), return the staged value
-     * directly without recursing into children.  Covers E_TO, E_FNC, and any other
+     * (set by AST_EVERY leaf-gen injection or coro_drive_fnc), return the staged value
+     * directly without recursing into children.  Covers AST_TO, AST_FNC, and any other
      * node kind that find_leaf_suspendable or coro_drive_fnc selects as the leaf. */
     if (coro_drive_node && e == coro_drive_node) return coro_drive_val;
 
-    /* OE-5: Icon frame dispatch — E_VAR/E_ASSIGN/E_FNC differ between SNO and ICN.
+    /* OE-5: Icon frame dispatch — AST_VAR/AST_ASSIGN/AST_FNC differ between SNO and ICN.
      * All other EKinds fall through to the shared switch (already has Icon cases
      * from OE-3/OE-4). Guard: only active inside an Icon call frame. */
     if (frame_depth > 0) {
@@ -1025,7 +1025,7 @@ DESCR_t interp_eval(EXPR_t *e)
         {
             static int rs24_diag_init = 0;
             static int rs24_diag_on = 0;
-            static unsigned long rs24_diag_hits[E_KIND_COUNT];
+            static unsigned long rs24_diag_hits[AST_KIND_COUNT];
             if (!rs24_diag_init) {
                 rs24_diag_init = 1;
                 rs24_diag_on = (getenv("RS24_DIAG") != NULL);
@@ -1034,7 +1034,7 @@ DESCR_t interp_eval(EXPR_t *e)
                     atexit(rs24_diag_dump);
                 }
             }
-            if (rs24_diag_on && (unsigned)e->kind < (unsigned)E_KIND_COUNT) {
+            if (rs24_diag_on && (unsigned)e->kind < (unsigned)AST_KIND_COUNT) {
                 rs24_diag_hits[e->kind]++;
             }
             /* Expose pointer for the dumper. */
@@ -1042,7 +1042,7 @@ DESCR_t interp_eval(EXPR_t *e)
             rs24_diag_hits_ptr = rs24_diag_hits;
         }
         switch (e->kind) {
-        case E_VAR: {
+        case AST_VAR: {
             if (e->sval && e->sval[0] == '&') {
                 const char *kw = e->sval + 1;
                 if (!strcmp(kw,"subject")) return scan_subj ? STRVAL(scan_subj) : NULVCL;
@@ -1060,11 +1060,11 @@ DESCR_t interp_eval(EXPR_t *e)
             if (slot < 0 && e->sval && e->sval[0] != '&') return NV_GET_fn(e->sval);
             return NULVCL;
         }
-        case E_ASSIGN:
-            fprintf(stderr, "FATAL interp_eval icon-frame: E_ASSIGN unreachable in mode 1 (RS-24b)\n"); abort();
-        case E_REVASSIGN:
-            fprintf(stderr, "FATAL interp_eval icon-frame: E_REVASSIGN unreachable in mode 1 (RS-24b)\n"); abort();
-        case E_FNC: {
+        case AST_ASSIGN:
+            fprintf(stderr, "FATAL interp_eval icon-frame: AST_ASSIGN unreachable in mode 1 (RS-24b)\n"); abort();
+        case AST_REVASSIGN:
+            fprintf(stderr, "FATAL interp_eval icon-frame: AST_REVASSIGN unreachable in mode 1 (RS-24b)\n"); abort();
+        case AST_FNC: {
             /* Icon call nodes: sval=NULL, name in children[0]->sval */
             if (e->nchildren < 1) return NULVCL;
             const char *fn = e->children[0] ? e->children[0]->sval : NULL;
@@ -1274,7 +1274,7 @@ DESCR_t interp_eval(EXPR_t *e)
                 char *p=strstr(hay,needle);
                 return p?INTVAL((long long)(p-hay)+1):FAILDESCR;
             }
-            /* coro_drive_fnc passthrough: if this E_FNC node is currently being
+            /* coro_drive_fnc passthrough: if this AST_FNC node is currently being
              * driven by coro_drive_fnc, return the suspended value directly
              * instead of re-calling the procedure (which would recurse). */
             if (e == coro_drive_node) return coro_drive_val;
@@ -1299,7 +1299,7 @@ DESCR_t interp_eval(EXPR_t *e)
                 char *buf;
                 if (al == 0) { buf=GC_malloc(vl+1); memcpy(buf,vs,vl+1); }
                 else { buf=GC_malloc(al+1+vl+1); memcpy(buf,as,al); buf[al]='\x01'; memcpy(buf+al+1,vs,vl+1); }
-                if (e->children[1]->kind==E_VAR && e->children[1]->ival>=0 &&
+                if (e->children[1]->kind==AST_VAR && e->children[1]->ival>=0 &&
                     e->children[1]->ival<FRAME.env_n && frame_depth>0)
                     FRAME.env[e->children[1]->ival] = STRVAL(buf);
                 return STRVAL(buf);
@@ -1321,7 +1321,7 @@ DESCR_t interp_eval(EXPR_t *e)
                 char *popped;
                 if (last) { popped=GC_malloc(strlen(last+1)+1); strcpy(popped,last+1); *last='\0'; }
                 else       { popped=GC_malloc(strlen(buf)+1);   strcpy(popped,buf);    buf[0]='\0'; }
-                if (e->children[1]->kind==E_VAR && e->children[1]->ival>=0 &&
+                if (e->children[1]->kind==AST_VAR && e->children[1]->ival>=0 &&
                     e->children[1]->ival<FRAME.env_n && frame_depth>0)
                     FRAME.env[e->children[1]->ival] = STRVAL(buf);
                 return STRVAL(popped);
@@ -1363,7 +1363,7 @@ DESCR_t interp_eval(EXPR_t *e)
                     cur++;
                     if (!end2 && cur > target) break;
                 }
-                if (e->children[1]->kind==E_VAR && e->children[1]->ival>=0 &&
+                if (e->children[1]->kind==AST_VAR && e->children[1]->ival>=0 &&
                     e->children[1]->ival<FRAME.env_n && frame_depth>0)
                     FRAME.env[e->children[1]->ival] = STRVAL(out);
                 return STRVAL(out);
@@ -1410,7 +1410,7 @@ DESCR_t interp_eval(EXPR_t *e)
                     }
                     if (out[0]) { size_t ol=strlen(out); out[ol]=HS; out[ol+1]='\0'; }
                     strcat(out,ks); { size_t ol=strlen(out); out[ol]=HK; out[ol+1]='\0'; } strcat(out,vs);
-                    if (e->children[1]->kind==E_VAR && e->children[1]->ival>=0 &&
+                    if (e->children[1]->kind==AST_VAR && e->children[1]->ival>=0 &&
                         e->children[1]->ival<FRAME.env_n && frame_depth>0)
                         FRAME.env[e->children[1]->ival] = STRVAL(out);
                     return STRVAL(out);
@@ -1497,7 +1497,7 @@ DESCR_t interp_eval(EXPR_t *e)
                         }
                         if (!end) break; p=end+1;
                     }
-                    if (e->children[1]->kind==E_VAR && e->children[1]->ival>=0 &&
+                    if (e->children[1]->kind==AST_VAR && e->children[1]->ival>=0 &&
                         e->children[1]->ival<FRAME.env_n && frame_depth>0)
                         FRAME.env[e->children[1]->ival] = STRVAL(out);
                     return STRVAL(out);
@@ -1766,7 +1766,7 @@ DESCR_t interp_eval(EXPR_t *e)
                     FIELD_SET_fn(ld,"frame_elems",(DESCR_t){.v=DT_DATA,.ptr=arr+1});
                     FIELD_SET_fn(ld,"frame_size",INTVAL(n-1));
                     /* write back to var if possible */
-                    if (e->children[1]->kind==E_VAR) {
+                    if (e->children[1]->kind==AST_VAR) {
                         int sl=(int)e->children[1]->ival;
                         if(sl>=0&&sl<FRAME.env_n) FRAME.env[sl]=ld;
                     }
@@ -1781,7 +1781,7 @@ DESCR_t interp_eval(EXPR_t *e)
                     if (!arr || n <= 0) return FAILDESCR;
                     DESCR_t ret = arr[n-1];
                     FIELD_SET_fn(ld,"frame_size",INTVAL(n-1));
-                    if (e->children[1]->kind==E_VAR) {
+                    if (e->children[1]->kind==AST_VAR) {
                         int sl=(int)e->children[1]->ival;
                         if(sl>=0&&sl<FRAME.env_n) FRAME.env[sl]=ld;
                     }
@@ -2062,7 +2062,7 @@ DESCR_t interp_eval(EXPR_t *e)
                         DESCR_t ea = FIELD_GET_fn(src, "frame_elems");
                         int n = (int)FIELD_GET_fn(src, "frame_size").i;
                         DESCR_t *src_elems = (ea.v == DT_DATA) ? (DESCR_t *)ea.ptr : NULL;
-                        /* Build a fresh icnlist mirroring the E_MAKELIST shape. */
+                        /* Build a fresh icnlist mirroring the AST_MAKELIST shape. */
                         DESCR_t *new_elems = (DESCR_t *)GC_malloc((size_t)(n > 0 ? n : 1) * sizeof(DESCR_t));
                         if (src_elems && n > 0) memcpy(new_elems, src_elems, (size_t)n * sizeof(DESCR_t));
                         DESCR_t eptr; eptr.v = DT_DATA; eptr.slen = 0; eptr.ptr = (void *)new_elems;
@@ -2074,9 +2074,9 @@ DESCR_t interp_eval(EXPR_t *e)
                 return src;
             }
 
-            /* ── IC-5: swap(L, k) is actually handled as E_SWAP op ─────── */
+            /* ── IC-5: swap(L, k) is actually handled as AST_SWAP op ─────── */
             /* ── IC-5: size *L for DT_DATA lists ──────────────────────────
-             * E_SIZE is handled below; nothing to add in E_FNC.           */
+             * AST_SIZE is handled below; nothing to add in AST_FNC.           */
 
             /* ── IC-7: math builtins: abs, max, min, sqrt ──────────────── */
             if (!strcmp(fn,"abs") && nargs == 1) {
@@ -2112,7 +2112,7 @@ DESCR_t interp_eval(EXPR_t *e)
                 return REALVAL(sqrt(v));
             }
             /* seq(i) / seq(i,j) — generator: i, i+1, i+2, ... (up to j if given).
-             * Returns first value here; coro_eval handles E_FNC "seq" as a box. */
+             * Returns first value here; coro_eval handles AST_FNC "seq" as a box. */
             if (!strcmp(fn,"seq") && nargs >= 1) {
                 DESCR_t start = interp_eval(e->children[1]);
                 return IS_INT_fn(start) ? start : INTVAL(1);
@@ -2158,7 +2158,7 @@ DESCR_t interp_eval(EXPR_t *e)
             }
 
             /* ── IC-5: record constructor — Icon puts name in children[0]->sval,
-             * not in e->sval, so the shared E_FNC handler misses it.
+             * not in e->sval, so the shared AST_FNC handler misses it.
              * Look up fn in sc_dat registry; if found, construct instance. */
             {
                 ScDatType *_dt = sc_dat_find_type(fn);
@@ -2172,42 +2172,42 @@ DESCR_t interp_eval(EXPR_t *e)
 
             return NULVCL;
         }
-        case E_ALT:
-        case E_ALTERNATE:
-            fprintf(stderr, "FATAL interp_eval icon-frame: E_ALTERNATE unreachable in mode 1 (RS-24b)\n"); abort();
-        case E_EVERY:
-            fprintf(stderr, "FATAL interp_eval icon-frame: E_EVERY unreachable in mode 1 (RS-24b)\n"); abort();
-        case E_WHILE:
-            fprintf(stderr, "FATAL interp_eval icon-frame: E_WHILE unreachable in mode 1 (RS-24b)\n"); abort();
-        case E_UNTIL:
-            fprintf(stderr, "FATAL interp_eval icon-frame: E_UNTIL unreachable in mode 1 (RS-24b)\n"); abort();
-        case E_REPEAT:
-            fprintf(stderr, "FATAL interp_eval icon-frame: E_REPEAT unreachable in mode 1 (RS-24b)\n"); abort();
-        case E_SUSPEND:
-            fprintf(stderr, "FATAL interp_eval icon-frame: E_SUSPEND unreachable in mode 1 (RS-24b)\n"); abort();
-        case E_SEQ:
-            fprintf(stderr, "FATAL interp_eval icon-frame: E_SEQ unreachable in mode 1 (RS-24b)\n"); abort();
-        case E_SEQ_EXPR:
-            fprintf(stderr, "FATAL interp_eval icon-frame: E_SEQ_EXPR unreachable in mode 1 (RS-24b)\n"); abort();
-        case E_IF:
-            fprintf(stderr, "FATAL interp_eval icon-frame: E_IF unreachable in mode 1 (RS-24b)\n"); abort();
-        case E_LOOP_NEXT:
-            fprintf(stderr, "FATAL interp_eval icon-frame: E_LOOP_NEXT unreachable in mode 1 (RS-24b)\n"); abort();
-        case E_RETURN:
-            fprintf(stderr, "FATAL interp_eval icon-frame: E_RETURN unreachable in mode 1 (RS-24b)\n"); abort();
-        case E_PROC_FAIL:
-            fprintf(stderr, "FATAL interp_eval icon-frame: E_PROC_FAIL unreachable in mode 1 (RS-24b)\n"); abort();
+        case AST_ALT:
+        case AST_ALTERNATE:
+            fprintf(stderr, "FATAL interp_eval icon-frame: AST_ALTERNATE unreachable in mode 1 (RS-24b)\n"); abort();
+        case AST_EVERY:
+            fprintf(stderr, "FATAL interp_eval icon-frame: AST_EVERY unreachable in mode 1 (RS-24b)\n"); abort();
+        case AST_WHILE:
+            fprintf(stderr, "FATAL interp_eval icon-frame: AST_WHILE unreachable in mode 1 (RS-24b)\n"); abort();
+        case AST_UNTIL:
+            fprintf(stderr, "FATAL interp_eval icon-frame: AST_UNTIL unreachable in mode 1 (RS-24b)\n"); abort();
+        case AST_REPEAT:
+            fprintf(stderr, "FATAL interp_eval icon-frame: AST_REPEAT unreachable in mode 1 (RS-24b)\n"); abort();
+        case AST_SUSPEND:
+            fprintf(stderr, "FATAL interp_eval icon-frame: AST_SUSPEND unreachable in mode 1 (RS-24b)\n"); abort();
+        case AST_SEQ:
+            fprintf(stderr, "FATAL interp_eval icon-frame: AST_SEQ unreachable in mode 1 (RS-24b)\n"); abort();
+        case AST_SEQ_EXPR:
+            fprintf(stderr, "FATAL interp_eval icon-frame: AST_SEQ_EXPR unreachable in mode 1 (RS-24b)\n"); abort();
+        case AST_IF:
+            fprintf(stderr, "FATAL interp_eval icon-frame: AST_IF unreachable in mode 1 (RS-24b)\n"); abort();
+        case AST_LOOP_NEXT:
+            fprintf(stderr, "FATAL interp_eval icon-frame: AST_LOOP_NEXT unreachable in mode 1 (RS-24b)\n"); abort();
+        case AST_RETURN:
+            fprintf(stderr, "FATAL interp_eval icon-frame: AST_RETURN unreachable in mode 1 (RS-24b)\n"); abort();
+        case AST_PROC_FAIL:
+            fprintf(stderr, "FATAL interp_eval icon-frame: AST_PROC_FAIL unreachable in mode 1 (RS-24b)\n"); abort();
         default: break;
         }
     }
 
     switch (e->kind) {
-    case E_ILIT:   return INTVAL(e->ival);
-    case E_FLIT:   return REALVAL(e->dval);
-    case E_QLIT:   return e->sval ? STRVAL(e->sval) : NULVCL;
-    case E_NUL:    return NULVCL;
+    case AST_ILIT:   return INTVAL(e->ival);
+    case AST_FLIT:   return REALVAL(e->dval);
+    case AST_QLIT:   return e->sval ? STRVAL(e->sval) : NULVCL;
+    case AST_NUL:    return NULVCL;
 
-    case E_VAR:
+    case AST_VAR:
         if (e->sval && *e->sval) {
             /* IC-9: Icon scan-state keywords read in scan body outside any Icon proc frame.
              * When scan_depth > 0 and frame_depth == 0 (e.g. "str" ? body in main()),
@@ -2241,7 +2241,7 @@ DESCR_t interp_eval(EXPR_t *e)
         }
         return NULVCL;
 
-    case E_KEYWORD: {
+    case AST_KEYWORD: {
         if (!e->sval || !*e->sval) return NULVCL;
         /* Keywords are case-insensitive; NV stores them uppercase (e.g. "LCASE","UCASE").
          * Lexer strips '&' and preserves original case — uppercase before lookup. */
@@ -2252,7 +2252,7 @@ DESCR_t interp_eval(EXPR_t *e)
         return NV_GET_fn(uc);
     }
 
-    case E_INTERROGATE: {
+    case AST_INTERROGATE: {
         /* ?X — o$int: null string if X succeeds; fail if X fails */
         if (e->nchildren < 1) return FAILDESCR;
         DESCR_t v = interp_eval(e->children[0]);
@@ -2260,20 +2260,20 @@ DESCR_t interp_eval(EXPR_t *e)
         return NULVCL;
     }
 
-    case E_NAME: {
+    case AST_NAME: {
         /* .X — dot operator: delegate to NAME_fn (snobol4.c export).
          * NAME_fn returns NAMEVAL for keywords/IO vars (not addressable by ptr)
          * and NAMEPTR (interior ptr) for ordinary NV cells.
-         * BP-1: .field(x) — E_FNC child with one arg — must return NAMEPTR into
+         * BP-1: .field(x) — AST_FNC child with one arg — must return NAMEPTR into
          * the DATA struct field cell, not a name-table lookup. */
         if (e->nchildren < 1) return FAILDESCR;
-        EXPR_t *child = e->children[0];
-        if (child->kind == E_FNC && child->sval && child->nchildren == 1) {
+        AST_t *child = e->children[0];
+        if (child->kind == AST_FNC && child->sval && child->nchildren == 1) {
             DESCR_t inst = interp_eval(child->children[0]);
             DESCR_t *cell = data_field_ptr(child->sval, inst);
             if (cell) return NAMEPTR(cell);
         }
-        if ((child->kind == E_VAR || child->kind == E_KEYWORD)
+        if ((child->kind == AST_VAR || child->kind == AST_KEYWORD)
                 && child->sval)
             return NAME_fn(child->sval);
         DESCR_t *cell = interp_eval_ref(child);
@@ -2281,12 +2281,12 @@ DESCR_t interp_eval(EXPR_t *e)
         return FAILDESCR;
     }
 
-    case E_MNS:
+    case AST_MNS:
         if (e->nchildren < 1) return FAILDESCR;
         return neg(interp_eval(e->children[0]));
 
-    /* OE-5: E_RETURN for Icon/Raku return statements */
-    case E_RETURN: {
+    /* OE-5: AST_RETURN for Icon/Raku return statements */
+    case AST_RETURN: {
         if (frame_depth > 0) {
             FRAME.return_val = (e->nchildren > 0)
                 ? interp_eval(e->children[0]) : NULVCL;
@@ -2296,8 +2296,8 @@ DESCR_t interp_eval(EXPR_t *e)
         return (e->nchildren > 0) ? interp_eval(e->children[0]) : NULVCL;
     }
 
-    /* Icon/Raku fail-return — distinct from E_FAIL (SNOBOL4 FAIL pattern). */
-    case E_PROC_FAIL: {
+    /* Icon/Raku fail-return — distinct from AST_FAIL (SNOBOL4 FAIL pattern). */
+    case AST_PROC_FAIL: {
         if (frame_depth > 0) {
             FRAME.return_val = FAILDESCR;
             FRAME.returning  = 1;
@@ -2305,7 +2305,7 @@ DESCR_t interp_eval(EXPR_t *e)
         return FAILDESCR;
     }
 
-    case E_PLS: {
+    case AST_PLS: {
         /* Unary + coerces operand to numeric (int or real) */
         if (e->nchildren < 1) return FAILDESCR;
         DESCR_t v = interp_eval(e->children[0]);
@@ -2322,7 +2322,7 @@ DESCR_t interp_eval(EXPR_t *e)
         return INTVAL(0);
     }
 
-    case E_OPSYN: {
+    case AST_OPSYN: {
         /* OPSYN operator: sval holds the operator symbol ("@", "&").
          * Dispatch via APPLY_fn — OPSYN registration aliased the symbol
          * to the target function via register_fn_alias. */
@@ -2342,35 +2342,35 @@ DESCR_t interp_eval(EXPR_t *e)
         return FAILDESCR;
     }
 
-    case E_ADD: {
+    case AST_ADD: {
         if (e->nchildren < 2) return FAILDESCR;
         DESCR_t l = interp_eval(e->children[0]);
         DESCR_t r = interp_eval(e->children[1]);
         if (IS_FAIL_fn(l) || IS_FAIL_fn(r)) return FAILDESCR;
         return add(l, r);
     }
-    case E_SUB: {
+    case AST_SUB: {
         if (e->nchildren < 2) return FAILDESCR;
         DESCR_t l = interp_eval(e->children[0]);
         DESCR_t r = interp_eval(e->children[1]);
         if (IS_FAIL_fn(l) || IS_FAIL_fn(r)) return FAILDESCR;
         return sub(l, r);
     }
-    case E_MUL: {
+    case AST_MUL: {
         if (e->nchildren < 2) return FAILDESCR;
         DESCR_t l = interp_eval(e->children[0]);
         DESCR_t r = interp_eval(e->children[1]);
         if (IS_FAIL_fn(l) || IS_FAIL_fn(r)) return FAILDESCR;
         return mul(l, r);
     }
-    case E_DIV: {
+    case AST_DIV: {
         if (e->nchildren < 2) return FAILDESCR;
         DESCR_t l = interp_eval(e->children[0]);
         DESCR_t r = interp_eval(e->children[1]);
         if (IS_FAIL_fn(l) || IS_FAIL_fn(r)) return FAILDESCR;
         return DIVIDE_fn(l, r);
     }
-    case E_MOD: {
+    case AST_MOD: {
         if (e->nchildren < 2) return FAILDESCR;
         DESCR_t l = interp_eval(e->children[0]);
         DESCR_t r = interp_eval(e->children[1]);
@@ -2379,7 +2379,7 @@ DESCR_t interp_eval(EXPR_t *e)
         long ri = IS_INT_fn(r) ? r.i : (long)r.r;
         return ri ? INTVAL(li % ri) : FAILDESCR;
     }
-    case E_POW: {
+    case AST_POW: {
         if (e->nchildren < 2) return FAILDESCR;
         DESCR_t l = interp_eval(e->children[0]);
         DESCR_t r = interp_eval(e->children[1]);
@@ -2396,15 +2396,15 @@ DESCR_t interp_eval(EXPR_t *e)
         return (DESCR_t){ .v = DT_R, .r = pow(base, exp) };
     }
 
-    case E_CAT:
-    case E_SEQ: {
+    case AST_CAT:
+    case AST_SEQ: {
         if (e->nchildren == 0) return NULVCL;
-        /* IC-9 (2026-05-02): In Icon mode, E_SEQ is the & (conjunction) operator —
+        /* IC-9 (2026-05-02): In Icon mode, AST_SEQ is the & (conjunction) operator —
          * evaluate children left to right; if any fails, return FAILDESCR; return
          * the last child's value.  This is completely different from SNOBOL4's
-         * E_SEQ which is string/pattern concatenation.  Gate on g_lang==1 AND
-         * e->kind==E_SEQ so the E_CAT fall-through (||) is unaffected. */
-        if (g_lang == 1 && e->kind == E_SEQ) {
+         * AST_SEQ which is string/pattern concatenation.  Gate on g_lang==1 AND
+         * e->kind==AST_SEQ so the AST_CAT fall-through (||) is unaffected. */
+        if (g_lang == 1 && e->kind == AST_SEQ) {
             DESCR_t last = NULVCL;
             for (int ci = 0; ci < e->nchildren; ci++) {
                 last = interp_eval(e->children[ci]);
@@ -2421,19 +2421,19 @@ DESCR_t interp_eval(EXPR_t *e)
          * RT-112: once we detect a pattern operand, re-evaluate ALL remaining
          * children via interp_eval_pat so *var/*func become XDSAR/XATP nodes
          * rather than frozen DT_E (which pat_cat cannot handle).
-         * SN-26c-parseerr-g: pre-scan children for E_DEFER (i.e. *X).  In
-         * value context, interp_eval(E_DEFER) returns DT_E (frozen
-         * expression), which is NOT detected by IS_PAT(acc).  If E_DEFER is
+         * SN-26c-parseerr-g: pre-scan children for AST_DEFER (i.e. *X).  In
+         * value context, interp_eval(AST_DEFER) returns DT_E (frozen
+         * expression), which is NOT detected by IS_PAT(acc).  If AST_DEFER is
          * the FIRST child, the in_pat_mode promotion from the loop below
          * never fires, and CONCAT_fn(DT_E, "B") produces garbage.  Beauty's
          *   pat = *snoFunction $'(' *snoExprList $')'
-         * lowered to E_SEQ(E_DEFER, E_VAR, E_DEFER, E_VAR) is the canonical
-         * victim.  Fix: if any child is E_DEFER, we are building a pattern;
+         * lowered to AST_SEQ(AST_DEFER, AST_VAR, AST_DEFER, AST_VAR) is the canonical
+         * victim.  Fix: if any child is AST_DEFER, we are building a pattern;
          * use interp_eval_pat for child[0] and pat_cat for the rest. */
         int has_defer = 0;
         for (int j = 0; j < e->nchildren; j++) {
-            EXPR_t *cj = e->children[j];
-            if (cj && cj->kind == E_DEFER) { has_defer = 1; break; }
+            AST_t *cj = e->children[j];
+            if (cj && cj->kind == AST_DEFER) { has_defer = 1; break; }
         }
         DESCR_t acc = has_defer ? interp_eval_pat(e->children[0])
                                 : interp_eval(e->children[0]);
@@ -2451,7 +2451,7 @@ DESCR_t interp_eval(EXPR_t *e)
                 if (!in_pat_mode) {
                     /* SN-26-bridge-coverage-u: First pattern seen mid-concat.
                      * Do NOT re-evaluate `nxt` — interp_eval on pattern-shaped
-                     * children (E_ALT etc.) already returns DT_P with all inner
+                     * children (AST_ALT etc.) already returns DT_P with all inner
                      * function calls fired exactly once.  Re-evaluating would
                      * call those functions a second time (e.g. the canonical
                      * `leader (upr(letter) | lwr(letter))` would call upr/lwr
@@ -2459,7 +2459,7 @@ DESCR_t interp_eval(EXPR_t *e)
                      * any non-pattern operands via pat_to_patnd.
                      *
                      * Earlier children (0..i-1) likewise don't need re-eval:
-                     * any E_DEFER among them is already caught by the has_defer
+                     * any AST_DEFER among them is already caught by the has_defer
                      * pre-scan above (which would have made in_pat_mode=1 from
                      * the start), so all prior `acc` values are valid scalars
                      * that pat_to_patnd will coerce to pat_lit.  pat_cat with
@@ -2494,30 +2494,30 @@ DESCR_t interp_eval(EXPR_t *e)
         return acc;
     }
 
-    case E_ASSIGN: {
+    case AST_ASSIGN: {
         if (e->nchildren < 2) return FAILDESCR;
         DESCR_t val = interp_eval(e->children[1]);
         if (IS_FAIL_fn(val)) return FAILDESCR;
-        EXPR_t *lv = e->children[0];
+        AST_t *lv = e->children[0];
         /* IC-9: string-section / string-index lvalue. */
-        if (lv && (lv->kind == E_SECTION || lv->kind == E_SECTION_PLUS ||
-                   lv->kind == E_SECTION_MINUS)) {
+        if (lv && (lv->kind == AST_SECTION || lv->kind == AST_SECTION_PLUS ||
+                   lv->kind == AST_SECTION_MINUS)) {
             if (icn_string_section_assign(lv, val)) return val;
             return FAILDESCR;
         }
-        if (lv && lv->kind == E_IDX && lv->nchildren == 2) {
+        if (lv && lv->kind == AST_IDX && lv->nchildren == 2) {
             /* Try string-index first; if base is non-string, fall through to subscript_set. */
             if (icn_string_section_assign(lv, val)) return val;
             DESCR_t _b = interp_eval(lv->children[0]);
             if (_b.v == DT_S || _b.v == DT_SNUL) return FAILDESCR;
         }
-        if (lv && lv->kind == E_VAR && lv->sval && lv->sval[0] == '&' &&
+        if (lv && lv->kind == AST_VAR && lv->sval && lv->sval[0] == '&' &&
                 scan_depth > 0 && !frame_depth) {
             /* IC-9: Icon scan-state keyword write in scan body outside any Icon proc frame. */
             if (!kw_assign(lv->sval + 1, val)) return FAILDESCR;
-        } else if (lv && lv->kind == E_VAR && lv->sval)
+        } else if (lv && lv->kind == AST_VAR && lv->sval)
             NV_SET_fn(lv->sval, val);  /* inner expr assign: no trace (stmt-level already traced) */
-        else if (lv && lv->kind == E_IDX && lv->nchildren >= 2) {
+        else if (lv && lv->kind == AST_IDX && lv->nchildren >= 2) {
             /* arr<i> = val  or  arr<i,j> = val */
             DESCR_t base = interp_eval(lv->children[0]);
             if (!IS_FAIL_fn(base)) {
@@ -2533,7 +2533,7 @@ DESCR_t interp_eval(EXPR_t *e)
                 }
             }
         }
-        else if (lv && lv->kind == E_FNC && lv->sval && lv->nchildren >= 1) {
+        else if (lv && lv->kind == AST_FNC && lv->sval && lv->nchildren >= 1) {
             if (strcmp(lv->sval, "ITEM") == 0 && lv->nchildren >= 2) {  /* SN-19 */
                 /* ITEM(arr, i [,j]) = val — programmatic subscript setter */
                 DESCR_t base = interp_eval(lv->children[0]);
@@ -2558,11 +2558,11 @@ DESCR_t interp_eval(EXPR_t *e)
                     FIELD_SET_fn(obj, lv->sval, val);
             }
         }
-        else if (lv && lv->kind == E_INDIRECT && lv->nchildren > 0) {
-            EXPR_t *ichild = lv->children[0];
+        else if (lv && lv->kind == AST_INDIRECT && lv->nchildren > 0) {
+            AST_t *ichild = lv->children[0];
             const char *nm = NULL;
-            if (ichild->kind == E_CAPT_COND_ASGN && ichild->nchildren == 1
-                    && ichild->children[0]->kind == E_VAR && ichild->children[0]->sval)
+            if (ichild->kind == AST_CAPT_COND_ASGN && ichild->nchildren == 1
+                    && ichild->children[0]->kind == AST_VAR && ichild->children[0]->sval)
                 nm = ichild->children[0]->sval;
             else { DESCR_t nd = interp_eval(ichild); nm = VARVAL_fn(nd); }
             if (nm && *nm) {
@@ -2573,29 +2573,29 @@ DESCR_t interp_eval(EXPR_t *e)
         return val;
     }
 
-    case E_INDIRECT: {
+    case AST_INDIRECT: {
         if (e->nchildren < 1) return FAILDESCR;
-        EXPR_t *child = e->children[0];
-        /* $.var parses as E_INDIRECT(E_NAME(E_CAPT_COND_ASGN(E_VAR)))
-         * $.var<idx> parses as E_INDIRECT(E_NAME(E_CAPT_COND_ASGN(E_VAR, idx)))
-         * The E_NAME wrapper (from the dot-prefix parse) is unwrapped first.
+        AST_t *child = e->children[0];
+        /* $.var parses as AST_INDIRECT(AST_NAME(AST_CAPT_COND_ASGN(AST_VAR)))
+         * $.var<idx> parses as AST_INDIRECT(AST_NAME(AST_CAPT_COND_ASGN(AST_VAR, idx)))
+         * The AST_NAME wrapper (from the dot-prefix parse) is unwrapped first.
          * Semantics: the identifier name is used literally (not its value).
          *   $.var      => NV_GET_fn("var")
          *   $.var<idx> => subscript( NV_GET_fn("var"), idx ) */
-        /* $.var<idx> parses as E_INDIRECT(E_NAME(E_CAPT_COND_ASGN(E_VAR,idx)))
-         * — the E_NAME wrapper is from the dot-prefix parse. Unwrap it.
-         * $X (no dot) parses as E_INDIRECT(E_VAR("X")) — no E_NAME wrapper.
-         * Track whether we unwrapped an E_NAME to distinguish:
+        /* $.var<idx> parses as AST_INDIRECT(AST_NAME(AST_CAPT_COND_ASGN(AST_VAR,idx)))
+         * — the AST_NAME wrapper is from the dot-prefix parse. Unwrap it.
+         * $X (no dot) parses as AST_INDIRECT(AST_VAR("X")) — no AST_NAME wrapper.
+         * Track whether we unwrapped an AST_NAME to distinguish:
          *   $.var = literal name lookup (return var's value directly)
          *   $X    = runtime indirect (evaluate X, use its value as lookup name) */
         int had_name_wrap = 0;
-        if (child->kind == E_NAME && child->nchildren == 1) {
+        if (child->kind == AST_NAME && child->nchildren == 1) {
             child = child->children[0];
             had_name_wrap = 1;
         }
 
-        /* E_VAR child: $.var (had_name_wrap=1) vs $X (had_name_wrap=0) */
-        if (child->kind == E_VAR && child->sval) {
+        /* AST_VAR child: $.var (had_name_wrap=1) vs $X (had_name_wrap=0) */
+        if (child->kind == AST_VAR && child->sval) {
             if (had_name_wrap)
                 return NV_GET_fn(child->sval);          /* $.var — literal name */
             /* $X — evaluate X's runtime value, use it as the variable name.
@@ -2613,10 +2613,10 @@ DESCR_t interp_eval(EXPR_t *e)
             return _xnamed;
         }
 
-        /* E_IDX after E_NAME unwrap: $.var<idx> subscript form
-         * children[0]=E_VAR "name", children[1]=index expr */
-        if (child->kind == E_IDX && child->nchildren >= 2
-                && child->children[0]->kind == E_VAR && child->children[0]->sval) {
+        /* AST_IDX after AST_NAME unwrap: $.var<idx> subscript form
+         * children[0]=AST_VAR "name", children[1]=index expr */
+        if (child->kind == AST_IDX && child->nchildren >= 2
+                && child->children[0]->kind == AST_VAR && child->children[0]->sval) {
             const char *nm = child->children[0]->sval;
             DESCR_t base = NV_GET_fn(nm);
             if (IS_FAIL_fn(base)) return FAILDESCR;
@@ -2631,11 +2631,11 @@ DESCR_t interp_eval(EXPR_t *e)
             return subscript_get2(base, i1, i2);
         }
 
-        if (child->kind == E_CAPT_COND_ASGN && child->nchildren == 1) {
-            EXPR_t *inner = child->children[0];
-            /* $.var<idx> case: dot child is E_IDX whose base is E_VAR */
-            if (inner->kind == E_IDX && inner->nchildren >= 2
-                    && inner->children[0]->kind == E_VAR
+        if (child->kind == AST_CAPT_COND_ASGN && child->nchildren == 1) {
+            AST_t *inner = child->children[0];
+            /* $.var<idx> case: dot child is AST_IDX whose base is AST_VAR */
+            if (inner->kind == AST_IDX && inner->nchildren >= 2
+                    && inner->children[0]->kind == AST_VAR
                     && inner->children[0]->sval) {
                 const char *nm = inner->children[0]->sval;
                 DESCR_t base = NV_GET_fn(nm);
@@ -2650,13 +2650,13 @@ DESCR_t interp_eval(EXPR_t *e)
                 if (IS_FAIL_fn(i1) || IS_FAIL_fn(i2)) return FAILDESCR;
                 return subscript_get2(base, i1, i2);
             }
-            /* $.var case: dot child is plain E_VAR — but only if this is a
+            /* $.var case: dot child is plain AST_VAR — but only if this is a
              * literal $.var (direct name lookup). For $X (runtime indirect),
              * evaluate X's value and use THAT as the variable name.
              * Distinction: $.var uses the identifier literally; $X uses X's value.
-             * Since parser wraps both as E_CAPT_COND_ASGN(E_VAR), we must
+             * Since parser wraps both as AST_CAPT_COND_ASGN(AST_VAR), we must
              * evaluate the inner var and use its string value as the lookup key. */
-            if (inner->kind == E_VAR && inner->sval) {
+            if (inner->kind == AST_VAR && inner->sval) {
                 DESCR_t xval = NV_GET_fn(inner->sval);
                 if (IS_NAMEPTR(xval)) return NAME_DEREF_PTR(xval);
                 if (IS_NAMEVAL(xval)) return NV_GET_fn(xval.s);
@@ -2692,22 +2692,22 @@ DESCR_t interp_eval(EXPR_t *e)
         return named;
     }
 
-    case E_FNC: {
+    case AST_FNC: {
         if (!e->sval || !*e->sval) return FAILDESCR;
 
         /* SB-6.X: ARBNO(P)/FENCE(P) take a *pattern* arg.  When evaluated in
          * value context (e.g. RHS of  Pat = ARBNO(*Cmd) ), the default
          * arg-eval path below uses interp_eval (value context) on each child,
-         * which turns E_DEFER(E_VAR) into DT_E (frozen value-form expr).
+         * which turns AST_DEFER(AST_VAR) into DT_E (frozen value-form expr).
          * APPLY_fn(ARBNO, DT_E, ...) then materialises the DT_E by thawing
          * Cmd's *current* value as a literal — losing deferred-ref semantics
          * (XDSAR), so subsequent re-binds of Cmd are not seen and the
          * pattern even fails to match its own initial value.
          *
-         * Mirror the pat-context fix at interp_eval_pat E_FNC (above): when
+         * Mirror the pat-context fix at interp_eval_pat AST_FNC (above): when
          * the function name is ARBNO or FENCE, evaluate the first child in
-         * pattern context so E_DEFER(E_VAR) becomes a proper XDSAR ref node,
-         * then call pat_arbno/pat_fence_p directly.  All other E_FNC names
+         * pattern context so AST_DEFER(AST_VAR) becomes a proper XDSAR ref node,
+         * then call pat_arbno/pat_fence_p directly.  All other AST_FNC names
          * fall through to the value-context arg eval as before. */
         if (e->nchildren > 0) {
             if (strcmp(e->sval, "ARBNO") == 0) {
@@ -2772,7 +2772,7 @@ DESCR_t interp_eval(EXPR_t *e)
                 return r;
             }
         }
-        /* ── U-22: cross-language fallback in value-context E_FNC ────────────
+        /* ── U-22: cross-language fallback in value-context AST_FNC ────────────
          * SNO body lookup above found nothing.  Try Icon proc table, then
          * Prolog pred table, before falling through to builtins/APPLY_fn. */
         {
@@ -2785,7 +2785,7 @@ DESCR_t interp_eval(EXPR_t *e)
             if (g_pl_active) {
                 char _pk[256];
                 snprintf(_pk, sizeof _pk, "%s/%d", e->sval, nargs);
-                EXPR_t *_choice = pl_pred_table_lookup(&g_pl_pred_table, _pk);
+                AST_t *_choice = pl_pred_table_lookup(&g_pl_pred_table, _pk);
                 if (_choice) {
                     Term **_pl_args = (nargs > 0) ? pl_env_new(nargs) : NULL;
                     Term **_saved   = g_pl_env;
@@ -2868,7 +2868,7 @@ DESCR_t interp_eval(EXPR_t *e)
         return APPLY_fn(e->sval, args, nargs);
     }
 
-    case E_IDX: {
+    case AST_IDX: {
         if (e->nchildren < 2) return FAILDESCR;
         DESCR_t base = interp_eval(e->children[0]);
         if (IS_FAIL_fn(base)) return FAILDESCR;
@@ -2883,22 +2883,22 @@ DESCR_t interp_eval(EXPR_t *e)
         return subscript_get2(base, i1, i2);
     }
 
-    case E_DEFER: {
+    case AST_DEFER: {
         /* *expr — SIL *X operator. Three sub-cases:
          *
-         * *var  (E_VAR): deferred variable reference — fetch value NOW.
+         * *var  (AST_VAR): deferred variable reference — fetch value NOW.
          *   "term = *factor" stores factor's current pattern.
          *
-         * *func(args) (E_FNC): always builds a deferred T_FUNC/XATP pattern
+         * *func(args) (AST_FNC): always builds a deferred T_FUNC/XATP pattern
          *   node via pat_user_call — fires the function at match time.
          *   This applies in ALL contexts (RHS assignment, pattern expr, etc.).
          *   "addop = ANY('+-') . *Push()" — *Push() must be a pattern node.
          *
          * *complex_expr: freeze as DT_E for EVAL() to thaw later. */
         if (e->nchildren < 1) return NULVCL;
-        EXPR_t *child = e->children[0];
+        AST_t *child = e->children[0];
         /* RUNTIME-6: *X in value context ALWAYS produces DT_E (EXPRESSION).
-         * The child EXPR_t* is frozen; EVAL() thaws and executes it.
+         * The child AST_t* is frozen; EVAL() thaws and executes it.
          * interp_eval_pat handles the pattern-context path (*var, *func). */
         DESCR_t d;
         d.v    = DT_E;
@@ -2908,7 +2908,7 @@ DESCR_t interp_eval(EXPR_t *e)
         return d;
     }
 
-    case E_NOT: {
+    case AST_NOT: {
         /* \X — o$nta/b/c: succeed (null) iff X fails; fail if X succeeds.
          * Expression-context version; pattern-context uses bb_not. */
         if (e->nchildren < 1) return FAILDESCR;
@@ -2917,7 +2917,7 @@ DESCR_t interp_eval(EXPR_t *e)
         return FAILDESCR;
     }
 
-    case E_SIZE: {
+    case AST_SIZE: {
         /* *E — size of string, list, or table.
          * String: number of characters.  List/table (SOH-delimited): element count.
          * DT_T: native table → tbl->size. */
@@ -2946,7 +2946,7 @@ DESCR_t interp_eval(EXPR_t *e)
         return INTVAL(len);
     }
 
-    case E_ALT: {
+    case AST_ALT: {
         /* child[0] | child[1] | ... — build pat_alt chain left-to-right.
          * Pattern alternation is inherently a pattern operation, so every
          * child should be evaluated in pattern context so that *var/*func
@@ -2959,11 +2959,11 @@ DESCR_t interp_eval(EXPR_t *e)
             acc = pat_alt(acc, interp_eval_pat(e->children[i]));
         return acc;
     }
-    case E_VLIST: {
+    case AST_VLIST: {
         /* Goal-directed value-context disjunction.  Try children
          * left-to-right; return first non-failing value; fail if all fail.
          * SPITBOL `(a, b, c)` paren-list and Snocone `||`.
-         * Distinct from E_ALT (pattern alt is lazy/backtracking).
+         * Distinct from AST_ALT (pattern alt is lazy/backtracking).
          * Side effects of arm k happen iff arms 0..k-1 all failed. */
         if (e->nchildren == 0) return FAILDESCR;
         for (int i = 0; i < e->nchildren; i++) {
@@ -2972,58 +2972,58 @@ DESCR_t interp_eval(EXPR_t *e)
         }
         return FAILDESCR;
     }
-    case E_CAPT_COND_ASGN: {
+    case AST_CAPT_COND_ASGN: {
         /* pat . target — conditional assignment on match success.
          * target may be:
-         *   E_VAR "name"         → XNME node, assign to named var at flush
-         *   E_DEFER(E_FNC(...))  → XCALLCAP node: call func at match time to
+         *   AST_VAR "name"         → XNME node, assign to named var at flush
+         *   AST_DEFER(AST_FNC(...))  → XCALLCAP node: call func at match time to
          *                          get DT_N lvalue, write matched text at flush.
          *                          Function must NOT be called at build time. */
         if (e->nchildren < 2) return NULVCL;
         DESCR_t pat = interp_eval_pat(e->children[0]);
-        EXPR_t *tgt = e->children[1];
-        if (tgt->kind == E_DEFER && tgt->nchildren == 1
-                && tgt->children[0]->kind == E_FNC && tgt->children[0]->sval) {
+        AST_t *tgt = e->children[1];
+        if (tgt->kind == AST_DEFER && tgt->nchildren == 1
+                && tgt->children[0]->kind == AST_FNC && tgt->children[0]->sval) {
             /* Deferred-function target — build XCALLCAP, don't call now */
-            EXPR_t *fnc = tgt->children[0];
+            AST_t *fnc = tgt->children[0];
             int na = fnc->nchildren;
-            /* TL-2: when every arg is a plain E_VAR, store *names* and defer
+            /* TL-2: when every arg is a plain AST_VAR, store *names* and defer
              * lookup to flush time (NAME_commit).  This matches oracle semantics
              * where args are resolved AFTER earlier . captures in the same
              * pattern have written their variables. */
             int all_vars = (na > 0);
             for (int i = 0; i < na; i++) {
-                EXPR_t *c = fnc->children[i];
-                if (!c || c->kind != E_VAR || !c->sval) { all_vars = 0; break; }
+                AST_t *c = fnc->children[i];
+                if (!c || c->kind != AST_VAR || !c->sval) { all_vars = 0; break; }
             }
             if (all_vars) {
                 char **names = (char **)GC_malloc(na * sizeof(char *));
                 for (int i = 0; i < na; i++) names[i] = (char *)fnc->children[i]->sval;
                 return pat_assign_callcap_named(pat, fnc->sval, NULL, 0, names, na);
             }
-            /* SN-26c-parseerr-c: defer E_FNC sub-args via DT_E wrapping;
+            /* SN-26c-parseerr-c: defer AST_FNC sub-args via DT_E wrapping;
              * thaw at match time in name_commit_value(NM_CALL).
-             * SN-26c-parseerr-d: also defer E_VAR — when args are mixed
-             * (e.g. E_QLIT + E_VAR) the all_vars fast path above doesn't
-             * fire, and an E_VAR set by an earlier capture in the same
+             * SN-26c-parseerr-d: also defer AST_VAR — when args are mixed
+             * (e.g. AST_QLIT + AST_VAR) the all_vars fast path above doesn't
+             * fire, and an AST_VAR set by an earlier capture in the same
              * pattern would otherwise be eagerly read here at build time.
              * SN-26-bridge-coverage-t: also defer compound expressions —
              * e.g. `*Reduce('[]', nTop() + 1)` — where the arg's top kind
-             * is E_ADD/E_SUB/etc but contains an E_FNC inside.  Eager
+             * is AST_ADD/AST_SUB/etc but contains an AST_FNC inside.  Eager
              * interp_eval at build time would call nTop() before the
              * pattern matches, violating SPITBOL's deferred-pattern
              * semantics.  Wrap all args as DT_E; thaw at match time
              * via EVAL_fn → EXPVAL_fn (name_t.c:97). */
             DESCR_t *av = na > 0 ? GC_malloc(na * sizeof(DESCR_t)) : NULL;
             for (int i = 0; i < na; i++) {
-                EXPR_t *arg = fnc->children[i];
-                if (arg && arg->kind == E_QLIT) {
+                AST_t *arg = fnc->children[i];
+                if (arg && arg->kind == AST_QLIT) {
                     /* Pure string literal — safe to evaluate eagerly,
                      * idempotent under EVAL.  Avoids needless DT_E wrap. */
                     av[i] = interp_eval(arg);
                 } else if (arg) {
                     /* Any other expression kind — defer.  EXPVAL_fn at
-                     * thaw time handles all EXPR_t shapes. */
+                     * thaw time handles all AST_t shapes. */
                     av[i].v = DT_E;
                     av[i].ptr = arg;
                     av[i].slen = 0;
@@ -3033,32 +3033,32 @@ DESCR_t interp_eval(EXPR_t *e)
             }
             return pat_assign_callcap(pat, fnc->sval, av, na);
         }
-        /* Snocone *fn() lowers as E_INDIRECT(E_FNC(...)) — same semantics as
-         * E_DEFER(E_FNC(...)): call fn at flush time to get lvalue, assign then.
+        /* Snocone *fn() lowers as AST_INDIRECT(AST_FNC(...)) — same semantics as
+         * AST_DEFER(AST_FNC(...)): call fn at flush time to get lvalue, assign then.
          * SC-26: route this through pat_assign_callcap so it joins the unified
          * NAM list and fires in left-to-right order after preceding captures. */
-        if (tgt->kind == E_INDIRECT && tgt->nchildren == 1
-                && tgt->children[0]->kind == E_FNC && tgt->children[0]->sval) {
-            EXPR_t *fnc = tgt->children[0];
+        if (tgt->kind == AST_INDIRECT && tgt->nchildren == 1
+                && tgt->children[0]->kind == AST_FNC && tgt->children[0]->sval) {
+            AST_t *fnc = tgt->children[0];
             int na = fnc->nchildren;
             int all_vars = (na > 0);
             for (int i = 0; i < na; i++) {
-                EXPR_t *c = fnc->children[i];
-                if (!c || c->kind != E_VAR || !c->sval) { all_vars = 0; break; }
+                AST_t *c = fnc->children[i];
+                if (!c || c->kind != AST_VAR || !c->sval) { all_vars = 0; break; }
             }
             if (all_vars) {
                 char **names = (char **)GC_malloc(na * sizeof(char *));
                 for (int i = 0; i < na; i++) names[i] = (char *)fnc->children[i]->sval;
                 return pat_assign_callcap_named(pat, fnc->sval, NULL, 0, names, na);
             }
-            /* SN-26c-parseerr-c: defer E_FNC sub-args.
-             * SN-26c-parseerr-d: also defer E_VAR (see twin site above).
+            /* SN-26c-parseerr-c: defer AST_FNC sub-args.
+             * SN-26c-parseerr-d: also defer AST_VAR (see twin site above).
              * SN-26-bridge-coverage-t: defer compound expressions too —
              * see twin site above for full rationale. */
             DESCR_t *av = na > 0 ? GC_malloc(na * sizeof(DESCR_t)) : NULL;
             for (int i = 0; i < na; i++) {
-                EXPR_t *arg = fnc->children[i];
-                if (arg && arg->kind == E_QLIT) {
+                AST_t *arg = fnc->children[i];
+                if (arg && arg->kind == AST_QLIT) {
                     av[i] = interp_eval(arg);
                 } else if (arg) {
                     av[i].v = DT_E;
@@ -3071,12 +3071,12 @@ DESCR_t interp_eval(EXPR_t *e)
             return pat_assign_callcap(pat, fnc->sval, av, na);
         }
         const char *nm = tgt->sval;
-        if (!nm && tgt->kind == E_INDIRECT && tgt->nchildren > 0) {
-            /* REM . $'$B' — target is E_INDIRECT(E_QLIT "$B").
+        if (!nm && tgt->kind == AST_INDIRECT && tgt->nchildren > 0) {
+            /* REM . $'$B' — target is AST_INDIRECT(AST_QLIT "$B").
              * We need the *variable name* ("$B"), not the value of $'$B'.
              * The name is the evaluated string of the child expression. */
-            EXPR_t *ichild = tgt->children[0];
-            if (ichild->kind == E_QLIT || ichild->kind == E_VAR)
+            AST_t *ichild = tgt->children[0];
+            if (ichild->kind == AST_QLIT || ichild->kind == AST_VAR)
                 nm = ichild->sval;                     /* literal name: $'$B' or $.X */
             else {
                 DESCR_t nd = interp_eval(ichild);      /* runtime indirect: $X */
@@ -3085,37 +3085,37 @@ DESCR_t interp_eval(EXPR_t *e)
         }
         return nm ? pat_assign_cond(pat, STRVAL((char *)nm)) : pat;
     }
-    case E_CAPT_IMMED_ASGN: {
+    case AST_CAPT_IMMED_ASGN: {
         /* pat $ target — immediate assignment during match */
         if (e->nchildren < 2) return NULVCL;
         DESCR_t pat = interp_eval_pat(e->children[0]);
-        EXPR_t *tgt = e->children[1];
-        if (tgt->kind == E_DEFER && tgt->nchildren == 1
-                && tgt->children[0]->kind == E_FNC && tgt->children[0]->sval) {
+        AST_t *tgt = e->children[1];
+        if (tgt->kind == AST_DEFER && tgt->nchildren == 1
+                && tgt->children[0]->kind == AST_FNC && tgt->children[0]->sval) {
             /* SN-26c-parseerr-f: "pat $ *fn(args)" — deferred-call immediate capture.
-             * Mirror E_CAPT_COND_ASGN logic: build XCALLCAP with imm=1 so the
+             * Mirror AST_CAPT_COND_ASGN logic: build XCALLCAP with imm=1 so the
              * function is called at match time (not build time) with current arg
              * values.  This is critical when args are set by prior $ captures in
              * the same pattern (e.g. beauty's "SPAN $ tx $ *match(list, pattern)").
              * Calling fn eagerly at build time reads empty vars → fn returns fail
              * → match guard silently vanishes. */
-            EXPR_t *fnc = tgt->children[0];
+            AST_t *fnc = tgt->children[0];
             int na = fnc->nchildren;
             int all_vars = (na > 0);
             for (int i = 0; i < na; i++) {
-                EXPR_t *c = fnc->children[i];
-                if (!c || c->kind != E_VAR || !c->sval) { all_vars = 0; break; }
+                AST_t *c = fnc->children[i];
+                if (!c || c->kind != AST_VAR || !c->sval) { all_vars = 0; break; }
             }
             if (all_vars) {
                 char **names = (char **)GC_malloc(na * sizeof(char *));
                 for (int i = 0; i < na; i++) names[i] = (char *)fnc->children[i]->sval;
                 return pat_assign_callcap_named_imm(pat, fnc->sval, NULL, 0, names, na);
             }
-            /* Mixed args: defer E_VAR and E_FNC; evaluate literals eagerly. */
+            /* Mixed args: defer AST_VAR and AST_FNC; evaluate literals eagerly. */
             DESCR_t *av = na > 0 ? GC_malloc(na * sizeof(DESCR_t)) : NULL;
             for (int i = 0; i < na; i++) {
-                EXPR_t *arg = fnc->children[i];
-                if (arg && (arg->kind == E_FNC || arg->kind == E_VAR)) {
+                AST_t *arg = fnc->children[i];
+                if (arg && (arg->kind == AST_FNC || arg->kind == AST_VAR)) {
                     av[i].v = DT_E;
                     av[i].ptr = arg;
                     av[i].slen = 0;
@@ -3125,20 +3125,20 @@ DESCR_t interp_eval(EXPR_t *e)
             }
             return pat_assign_callcap_named_imm(pat, fnc->sval, av, na, NULL, 0);
         }
-        EXPR_t *tgt2 = e->children[1];
+        AST_t *tgt2 = e->children[1];
         const char *nm = tgt2->sval;
-        if (!nm && tgt2->kind == E_INDIRECT && tgt2->nchildren > 0) {
-            EXPR_t *ichild = tgt2->children[0];
-            if (ichild->kind == E_QLIT || ichild->kind == E_VAR)
+        if (!nm && tgt2->kind == AST_INDIRECT && tgt2->nchildren > 0) {
+            AST_t *ichild = tgt2->children[0];
+            if (ichild->kind == AST_QLIT || ichild->kind == AST_VAR)
                 nm = ichild->sval;
             else { DESCR_t nd = interp_eval(ichild); nm = VARVAL_fn(nd); }
         }
         return nm ? pat_assign_imm(pat, STRVAL((char *)nm)) : pat;
     }
-    case E_CAPT_CURSOR: {
+    case AST_CAPT_CURSOR: {
         /* Two forms:
-         *   unary:  @var         — E_CAPT_CURSOR(E_VAR)         nchildren==1
-         *   binary: pat @ var    — E_CAPT_CURSOR(pat, E_VAR)    nchildren==2
+         *   unary:  @var         — AST_CAPT_CURSOR(AST_VAR)         nchildren==1
+         *   binary: pat @ var    — AST_CAPT_CURSOR(pat, AST_VAR)    nchildren==2
          * Both write the cursor position into var as DT_I at match time. */
         if (e->nchildren == 1) {
             /* unary @var: epsilon left, cursor capture into var */
@@ -3169,12 +3169,12 @@ DESCR_t interp_eval(EXPR_t *e)
         if (!(lv op rv)) return FAILDESCR; \
         return r; \
     } while(0)
-    case E_LT: NUMREL(<);
-    case E_LE: NUMREL(<=);
-    case E_GT: NUMREL(>);
-    case E_GE: NUMREL(>=);
-    case E_EQ: NUMREL(==);
-    case E_NE: NUMREL(!=);
+    case AST_LT: NUMREL(<);
+    case AST_LE: NUMREL(<=);
+    case AST_GT: NUMREL(>);
+    case AST_GE: NUMREL(>=);
+    case AST_EQ: NUMREL(==);
+    case AST_NE: NUMREL(!=);
 #undef NUMREL
 
     /* ── Lexicographic (string) relational operators ───────────────────────
@@ -3192,20 +3192,20 @@ DESCR_t interp_eval(EXPR_t *e)
         if (!(cmp cmpop 0)) return FAILDESCR; \
         return r; \
     } while(0)
-    case E_LLT: STRREL(<);
-    case E_LLE: STRREL(<=);
-    case E_LGT: STRREL(>);
-    case E_LGE: STRREL(>=);
-    case E_LEQ: STRREL(==);
-    case E_LNE: STRREL(!=);
+    case AST_LLT: STRREL(<);
+    case AST_LLE: STRREL(<=);
+    case AST_LGT: STRREL(>);
+    case AST_LGE: STRREL(>=);
+    case AST_LEQ: STRREL(==);
+    case AST_LNE: STRREL(!=);
 #undef STRREL
 
     /* ── IC-8: Icon `===` deep-identity (non-generator path) ─────────────────
-     * The icon-frame E_IF at L2607 routes to coro_eval when is_suspendable(test)
+     * The icon-frame AST_IF at L2607 routes to coro_eval when is_suspendable(test)
      * is true (e.g. `if x === key(T)` where key(T) is a generator). The path
      * here handles plain `a === b` and `&null === x` evaluation in any context.
      * Returns rhs on identity (Icon goal-directed convention), FAILDESCR else. */
-    case E_IDENTICAL: {
+    case AST_IDENTICAL: {
         if (e->nchildren < 2) return FAILDESCR;
         DESCR_t l = interp_eval(e->children[0]);
         DESCR_t r = interp_eval(e->children[1]);
@@ -3215,9 +3215,9 @@ DESCR_t interp_eval(EXPR_t *e)
 
     /* ── Prolog IR nodes — S-1C-2/3 ──────────────────────────────────────────
      * Only reached when g_pl_active is set (Prolog program running).
-     * E_CHOICE drives clause selection via the Byrd box broker (pl_broker.c).
-     * E_UNIFY/E_CUT/E_TRAIL_* are leaf goal nodes evaluated inline. */
-    case E_UNIFY: {
+     * AST_CHOICE drives clause selection via the Byrd box broker (pl_broker.c).
+     * AST_UNIFY/AST_CUT/AST_TRAIL_* are leaf goal nodes evaluated inline. */
+    case AST_UNIFY: {
         if (!g_pl_active) return NULVCL;
         Term *t1 = pl_unified_term_from_expr(e->children[0], g_pl_env);
         Term *t2 = pl_unified_term_from_expr(e->children[1], g_pl_env);
@@ -3225,16 +3225,16 @@ DESCR_t interp_eval(EXPR_t *e)
         if (!unify(t1, t2, &g_pl_trail)) { trail_unwind(&g_pl_trail, mark); return FAILDESCR; }
         return INTVAL(1);
     }
-    case E_CUT:
+    case AST_CUT:
         if (g_pl_active) g_pl_cut_flag = 1;
         return INTVAL(1);
-    case E_TRAIL_MARK:
-    case E_TRAIL_UNWIND:
+    case AST_TRAIL_MARK:
+    case AST_TRAIL_UNWIND:
         return NULVCL;
-    case E_CLAUSE:
-        /* Clauses are iterated by E_CHOICE — never dispatched standalone. */
+    case AST_CLAUSE:
+        /* Clauses are iterated by AST_CHOICE — never dispatched standalone. */
         return NULVCL;
-    case E_CHOICE: {
+    case AST_CHOICE: {
         /* Drive clause selection via the Byrd box broker.
          * CH-17e: when entry_pc >= 0 (SM chunk lowered by CH-17d/f), use
          * pl_box_choice_pc; otherwise fall back to IR-walk pl_box_choice. */
@@ -3251,38 +3251,38 @@ DESCR_t interp_eval(EXPR_t *e)
 
     /* ── Icon EKinds — OE-3 ─── */
 
-    case E_CSET: return e->sval ? STRVAL(e->sval) : NULVCL;
+    case AST_CSET: return e->sval ? STRVAL(e->sval) : NULVCL;
 
-    case E_TO: case E_TO_BY: {
+    case AST_TO: case AST_TO_BY: {
         long cur;
         if (icn_frame_lookup(e, &cur)) return INTVAL(cur);
         if (e->nchildren < 1) return NULVCL;
         return interp_eval(e->children[0]);
     }
 
-    case E_EVERY: {
+    case AST_EVERY: {
         if (e->nchildren < 1) return NULVCL;
-        EXPR_t *gen  = e->children[0];
-        EXPR_t *body = (e->nchildren > 1) ? e->children[1] : NULL;
+        AST_t *gen  = e->children[0];
+        AST_t *body = (e->nchildren > 1) ? e->children[1] : NULL;
         /* IC-2a: coro_eval + BB_PUMP — all goal-directed ops through Byrd boxes.
-         * Special case: if gen is E_ASSIGN or E_AUGOP with a generative RHS,
+         * Special case: if gen is AST_ASSIGN or AST_AUGOP with a generative RHS,
          * drive the LEAF generator inside the RHS and re-evaluate gen each tick so
          * that mutable frame locals (e.g. `total`) are read fresh.  e.g.:
-         *   every total := total + (1 to n)   -- E_ASSIGN(E_VAR(total), E_ADD(E_VAR(total), E_TO(1,n)))
-         *   every total +:= (1 to n)           -- E_AUGOP with E_TO rhs
-         * We find the leaf generator node (e.g. E_TO), drive only that via coro_eval,
+         *   every total := total + (1 to n)   -- AST_ASSIGN(AST_VAR(total), AST_ADD(AST_VAR(total), AST_TO(1,n)))
+         *   every total +:= (1 to n)           -- AST_AUGOP with AST_TO rhs
+         * We find the leaf generator node (e.g. AST_TO), drive only that via coro_eval,
          * and inject each raw tick value via coro_drive_node passthrough.  interp_eval(gen)
          * then re-reads the current value of `total` from the frame slot each iteration. */
-        if ((gen->kind == E_ASSIGN) &&
+        if ((gen->kind == AST_ASSIGN) &&
             gen->nchildren >= 2 && is_suspendable(gen->children[1])) {
-            EXPR_t *leaf = find_leaf_suspendable(gen->children[1]);
+            AST_t *leaf = find_leaf_suspendable(gen->children[1]);
             if (!leaf) leaf = gen->children[1];   /* fallback: treat whole RHS as gen */
             bb_node_t rbox = coro_eval(leaf);
             DESCR_t tick = rbox.fn(rbox.ζ, α);
             while (!IS_FAIL_fn(tick) && !FRAME.returning && !FRAME.loop_break) {
                 /* Inject the raw generator tick value via drive passthrough,
                  * then re-evaluate gen (the assign/augop) — interp_eval re-reads
-                 * the current frame value of any E_VAR in the expression. */
+                 * the current frame value of any AST_VAR in the expression. */
                 coro_drive_node = leaf;
                 coro_drive_val  = tick;
                 interp_eval(gen);
@@ -3294,7 +3294,7 @@ DESCR_t interp_eval(EXPR_t *e)
             FRAME.loop_break = 0;
             return NULVCL;
         }
-        EXPR_t *do_expr = body ? body : gen;
+        AST_t *do_expr = body ? body : gen;
         bb_node_t box = coro_eval(gen);
         DESCR_t val = box.fn(box.ζ, α);
         while (!IS_FAIL_fn(val) && !FRAME.returning && !FRAME.loop_break) {
@@ -3308,7 +3308,7 @@ DESCR_t interp_eval(EXPR_t *e)
         return NULVCL;
     }
 
-    case E_WHILE: {
+    case AST_WHILE: {
         int saved_brk = FRAME.loop_break; FRAME.loop_break = 0;
         while (!FRAME.returning && !FRAME.loop_break && !FRAME.suspending &&
                !IS_FAIL_fn(interp_eval(e->children[0]))) {
@@ -3319,7 +3319,7 @@ DESCR_t interp_eval(EXPR_t *e)
         return NULVCL;
     }
 
-    case E_UNTIL: {
+    case AST_UNTIL: {
         int saved_brk = FRAME.loop_break; FRAME.loop_break = 0;
         while (!FRAME.returning && !FRAME.loop_break && !FRAME.suspending) {
             DESCR_t cv = (e->nchildren > 0) ? interp_eval(e->children[0]) : FAILDESCR;
@@ -3331,7 +3331,7 @@ DESCR_t interp_eval(EXPR_t *e)
         return NULVCL;
     }
 
-    case E_REPEAT: {
+    case AST_REPEAT: {
         int saved_brk = FRAME.loop_break; FRAME.loop_break = 0;
         while (!FRAME.returning && !FRAME.loop_break && !FRAME.suspending)
             if (e->nchildren > 0) { interp_eval(e->children[0]); if (FRAME.suspending) break; }
@@ -3339,14 +3339,14 @@ DESCR_t interp_eval(EXPR_t *e)
         return NULVCL;
     }
 
-    case E_SEQ_EXPR: {
+    case AST_SEQ_EXPR: {
         DESCR_t v = NULVCL;
         for (int i = 0; i < e->nchildren && !FRAME.returning; i++)
             v = interp_eval(e->children[i]);
         return v;
     }
 
-    case E_IF: {
+    case AST_IF: {
         if (e->nchildren < 1) return NULVCL;
         DESCR_t cv = interp_eval(e->children[0]);
         if (!IS_FAIL_fn(cv))
@@ -3354,33 +3354,33 @@ DESCR_t interp_eval(EXPR_t *e)
         return (e->nchildren > 2) ? interp_eval(e->children[2]) : FAILDESCR;
     }
 
-    case E_CASE: {
+    case AST_CASE: {
         /* Two layouts:
          *   Icon:  child[0]=topic, then pairs [val, body]..., optional trailing default_body
-         *   Raku:  child[0]=topic, then triples [cmpnode(E_ILIT|E_NUL), val, body]
-         * Detect by child[1]: if it's E_ILIT or E_NUL it's a Raku cmpnode (triples).
-         * Icon case values are always full expressions — never bare E_ILIT/E_NUL. */
+         *   Raku:  child[0]=topic, then triples [cmpnode(AST_ILIT|AST_NUL), val, body]
+         * Detect by child[1]: if it's AST_ILIT or AST_NUL it's a Raku cmpnode (triples).
+         * Icon case values are always full expressions — never bare AST_ILIT/AST_NUL. */
         if (e->nchildren < 1) return NULVCL;
         DESCR_t topic = interp_eval(e->children[0]);
         /* Detect layout by child count:
          *   Raku triples: nchildren = 1 + 3*N  (topic + N×[cmpnode,val,body])  → (nchildren-1) % 3 == 0
          *   Icon pairs:   nchildren = 1 + 2*N  or  1 + 2*N + 1 (with default)  → (nchildren-1) % 2 == 0 or 1
-         * Additionally verify child[1] is E_ILIT or E_NUL for Raku (cmpnode marker). */
+         * Additionally verify child[1] is AST_ILIT or AST_NUL for Raku (cmpnode marker). */
         int is_raku_layout = (e->nchildren >= 4 && (e->nchildren - 1) % 3 == 0 &&
-            e->children[1] && (e->children[1]->kind == E_ILIT || e->children[1]->kind == E_NUL));
+            e->children[1] && (e->children[1]->kind == AST_ILIT || e->children[1]->kind == AST_NUL));
         if (is_raku_layout) {
-            /* Raku: triples [cmpnode(E_ILIT), val, body] */
+            /* Raku: triples [cmpnode(AST_ILIT), val, body] */
             int i = 1;
             while (i + 2 < e->nchildren) {
-                EXPR_t *cmpnode = e->children[i];
-                EXPR_t *val     = e->children[i+1];
-                EXPR_t *body    = e->children[i+2];
+                AST_t *cmpnode = e->children[i];
+                AST_t *val     = e->children[i+1];
+                AST_t *body    = e->children[i+2];
                 i += 3;
-                if (cmpnode->kind == E_NUL) return interp_eval(body);
-                EXPR_e cmp = (EXPR_e)(cmpnode->ival);
+                if (cmpnode->kind == AST_NUL) return interp_eval(body);
+                AST_e cmp = (AST_e)(cmpnode->ival);
                 DESCR_t wval = interp_eval(val);
                 int match = 0;
-                if (cmp == E_LEQ) {
+                if (cmp == AST_LEQ) {
                     const char *ts = IS_STR_fn(topic)?topic.s:VARVAL_fn(topic);
                     const char *ws = IS_STR_fn(wval)?wval.s:VARVAL_fn(wval);
                     match = (ts && ws && strcmp(ts,ws)==0);
@@ -3390,7 +3390,7 @@ DESCR_t interp_eval(EXPR_t *e)
                 }
                 if (match) return interp_eval(body);
             }
-            if (i+1 < e->nchildren && e->children[i]->kind==E_NUL)
+            if (i+1 < e->nchildren && e->children[i]->kind==AST_NUL)
                 return interp_eval(e->children[i+1]);
             return NULVCL;
         }
@@ -3399,7 +3399,7 @@ DESCR_t interp_eval(EXPR_t *e)
         int i = 1;
         while (i + 1 < nc) {
             DESCR_t wval = interp_eval(e->children[i]);
-            EXPR_t *body = e->children[i+1];
+            AST_t *body = e->children[i+1];
             i += 2;
             int match;
             if (IS_INT_fn(topic) && IS_INT_fn(wval)) match = (topic.i == wval.i);
@@ -3414,7 +3414,7 @@ DESCR_t interp_eval(EXPR_t *e)
         return NULVCL;
     }
 
-    case E_NULL: {
+    case AST_NULL: {
         /* /E — succeeds (yields &null) iff E succeeds with the null value;
          * fails if E fails OR if E yields any non-null value.
          * Pre-IC-9 this was wrong: it returned NULVCL iff IS_FAIL_fn(v),
@@ -3431,10 +3431,10 @@ DESCR_t interp_eval(EXPR_t *e)
         return FAILDESCR;
     }
 
-    case E_NONNULL: {
+    case AST_NONNULL: {
         /* \E — succeeds (yields E) iff E succeeds with a non-null value;
          * fails if E fails OR if E yields the null value.  Mirror of
-         * E_NULL above.  Pre-IC-9 this missed the DT_SNUL case entirely
+         * AST_NULL above.  Pre-IC-9 this missed the DT_SNUL case entirely
          * — \&null returned &null (success) instead of failing. */
         if (e->nchildren < 1) return FAILDESCR;
         DESCR_t v = interp_eval(e->children[0]);
@@ -3444,7 +3444,7 @@ DESCR_t interp_eval(EXPR_t *e)
         return v;
     }
 
-    case E_RANDOM: {
+    case AST_RANDOM: {
         /* ?E — Icon random selector.  IC-9 (session 2026-04-30 #20):
          *   ?n  (integer)  → random integer in [1,n]; fails if n ≤ 0
          *   ?s  (string)   → random character of s; fails if s is empty
@@ -3514,10 +3514,10 @@ DESCR_t interp_eval(EXPR_t *e)
         return STRVAL(out);
     }
 
-    case E_AUGOP: {
+    case AST_AUGOP: {
         if (e->nchildren < 2) return NULVCL;
-        EXPR_t *lhs = e->children[0];
-        EXPR_t *rhs = e->children[1];
+        AST_t *lhs = e->children[0];
+        AST_t *rhs = e->children[1];
         /* Helper lambda: apply augop to (lv, rv), write back to lhs slot, return result */
         #define AUGOP_APPLY(lv_, rv_) do { \
             DESCR_t _lv = (lv_), _rv = (rv_); \
@@ -3566,17 +3566,17 @@ DESCR_t interp_eval(EXPR_t *e)
                 } \
                 default: _res=INTVAL(_li+_ri); break; \
             } \
-            if (!IS_FAIL_fn(_res) && lhs->kind == E_VAR) { \
+            if (!IS_FAIL_fn(_res) && lhs->kind == AST_VAR) { \
                 int _slot=(int)lhs->ival; \
                 if (frame_depth > 0 && _slot>=0 && _slot<FRAME.env_n) \
                     FRAME.env[_slot]=_res; \
                 else if (_slot < 0 && lhs->sval && lhs->sval[0] != '&') \
                     set_and_trace(lhs->sval, _res); \
-            } else if (!IS_FAIL_fn(_res) && lhs->kind == E_IDX && lhs->nchildren >= 2) { \
+            } else if (!IS_FAIL_fn(_res) && lhs->kind == AST_IDX && lhs->nchildren >= 2) { \
                 DESCR_t _base = interp_eval(lhs->children[0]); \
                 DESCR_t _idx  = interp_eval(lhs->children[1]); \
                 if (!IS_FAIL_fn(_base) && !IS_FAIL_fn(_idx)) subscript_set(_base, _idx, _res); \
-            } else if (!IS_FAIL_fn(_res) && lhs->kind == E_FIELD && lhs->sval && lhs->nchildren >= 1) { \
+            } else if (!IS_FAIL_fn(_res) && lhs->kind == AST_FIELD && lhs->sval && lhs->nchildren >= 1) { \
                 DESCR_t _obj = interp_eval(lhs->children[0]); \
                 if (!IS_FAIL_fn(_obj)) { DESCR_t *_cell = data_field_ptr(lhs->sval, _obj); if (_cell) *_cell = _res; } \
             } \
@@ -3589,11 +3589,11 @@ DESCR_t interp_eval(EXPR_t *e)
         DESCR_t _augop_result = NULVCL;
         /* IC-9: !container OP:= rhs  — bang-iterate as augmented-assign lvalue.
          * Walks every cell of the container, applies the augop in place, in one pass.
-         * Mirrors the E_ITERATE LHS branch in E_ASSIGN.  rhs evaluated once.
+         * Mirrors the AST_ITERATE LHS branch in AST_ASSIGN.  rhs evaluated once.
          *   !T +:= v  (table) — buckets walk, modify TBPAIR_t::val
          *   !L +:= v  (list)  — array walk, modify frame_elems[i]
          */
-        if (lhs && lhs->kind == E_ITERATE && lhs->nchildren >= 1) {
+        if (lhs && lhs->kind == AST_ITERATE && lhs->nchildren >= 1) {
             DESCR_t cv = interp_eval(lhs->children[0]);
             DESCR_t rv = interp_eval(rhs);
             if (!IS_FAIL_fn(cv) && !IS_FAIL_fn(rv)) {
@@ -3657,19 +3657,19 @@ DESCR_t interp_eval(EXPR_t *e)
         return _augop_result;
     }
 
-    case E_LOOP_BREAK: {
+    case AST_LOOP_BREAK: {
         FRAME.loop_break = 1;
         return (e->nchildren > 0) ? interp_eval(e->children[0]) : NULVCL;
     }
 
-    case E_SCAN: {
+    case AST_SCAN: {
         if (e->nchildren < 1) return FAILDESCR;
         /* ── SNOBOL4 context: `subj ? pat` as expression — run exec_stmt ──
          * When used inside ~(), EVAL(), or another expression in SNOBOL4 mode,
-         * E_SCAN must perform the actual pattern match (not just build a pattern
+         * AST_SCAN must perform the actual pattern match (not just build a pattern
          * descriptor as the Icon path does).  Without this, ~(s ? pat) always
          * fails because interp_eval_pat(pat) returns a DT_P descriptor which is
-         * non-fail, so E_NOT sees success and returns FAILDESCR unconditionally.
+         * non-fail, so AST_NOT sees success and returns FAILDESCR unconditionally.
          * Fix: evaluate subject as string, evaluate pattern in pat context,
          * run exec_stmt, return NULVCL on success or FAILDESCR on failure. */
         if (!frame_depth && !g_pl_active) {
@@ -3677,7 +3677,7 @@ DESCR_t interp_eval(EXPR_t *e)
             DESCR_t subj_d = interp_eval(e->children[0]);
             if (IS_FAIL_fn(subj_d)) return FAILDESCR;
             /* subject name for write-back */
-            const char *sname = (e->children[0]->kind == E_VAR) ? e->children[0]->sval : NULL;
+            const char *sname = (e->children[0]->kind == AST_VAR) ? e->children[0]->sval : NULL;
             DESCR_t pat_d = (e->nchildren >= 2) ? interp_eval_pat(e->children[1]) : pat_epsilon();
             if (IS_FAIL_fn(pat_d)) return FAILDESCR;
             int ok = exec_stmt(sname, sname ? NULL : &subj_d, pat_d, NULL, 0);
@@ -3702,7 +3702,7 @@ DESCR_t interp_eval(EXPR_t *e)
         return r;
     }
 
-    case E_ITERATE: {
+    case AST_ITERATE: {
         /* IC-3: DT_T table — return first value (oneshot; every uses coro_bb_tbl_iterate) */
         if (e->nchildren >= 1) {
             DESCR_t sv = interp_eval(e->children[0]);
@@ -3725,7 +3725,7 @@ DESCR_t interp_eval(EXPR_t *e)
                 /* IC-9 (2026-05-01): DT_DATA record — !R returns first field value.
                  * Mirrors the icnlist branch above: scalar context yields child 0,
                  * every-context drives the rest via coro_bb_record_iterate.  See
-                 * coro_eval E_ITERATE for the box. */
+                 * coro_eval AST_ITERATE for the box. */
                 if (sv.u && sv.u->type && sv.u->type->nfields > 0 && sv.u->fields) {
                     return sv.u->fields[0];
                 }
@@ -3739,8 +3739,8 @@ DESCR_t interp_eval(EXPR_t *e)
         return FAILDESCR;
     }
 
-    case E_SUSPEND: {
-        /* Icon suspend: yield a value to the driving coro_drive E_FNC loop.
+    case AST_SUSPEND: {
+        /* Icon suspend: yield a value to the driving coro_drive AST_FNC loop.
          * Signal by setting FRAME.suspending=1; coro_drive sees the flag,
          * runs the every-body, executes the do-clause, clears the flag, and
          * re-enters the procedure body loop.  For non-generator (bare call)
@@ -3754,7 +3754,7 @@ DESCR_t interp_eval(EXPR_t *e)
         return val;
     }
 
-    /* ── IC-5: E_SWAP — x :=: y  (swap two lvalues) ─────────────────────
+    /* ── IC-5: AST_SWAP — x :=: y  (swap two lvalues) ─────────────────────
      * IC-9 (session #26): left-to-right halt-on-keyword-OOB semantics.
      * Swap writes rv → lhs first, then lv → rhs.  If a keyword side
      * OOB-fails, stop immediately — don't perform later writes.
@@ -3763,13 +3763,13 @@ DESCR_t interp_eval(EXPR_t *e)
      * (My first attempt at "atomic all-or-nothing" was wrong; tracing
      * subjpos.expected lines 57/58 shows x :=: &pos with `x:=9, &pos:=3`
      * → x=3 (lhs write committed) &pos=3 (rhs write OOB-aborted).)        */
-    case E_SWAP: {
+    case AST_SWAP: {
         if (e->nchildren < 2 || frame_depth <= 0) return NULVCL;
-        EXPR_t *lhs = e->children[0], *rhs = e->children[1];
+        AST_t *lhs = e->children[0], *rhs = e->children[1];
         DESCR_t lv = interp_eval(lhs), rv = interp_eval(rhs);
         if (IS_FAIL_fn(lv) || IS_FAIL_fn(rv)) return FAILDESCR;
         /* Step 1: write rv → lhs.  Halt on keyword-OOB. */
-        if (lhs && lhs->kind == E_VAR) {
+        if (lhs && lhs->kind == AST_VAR) {
             if (lhs->sval && lhs->sval[0] == '&') {
                 if (!kw_assign(lhs->sval + 1, rv)) return FAILDESCR;
             } else {
@@ -3779,7 +3779,7 @@ DESCR_t interp_eval(EXPR_t *e)
             }
         }
         /* Step 2: write lv → rhs. */
-        if (rhs && rhs->kind == E_VAR) {
+        if (rhs && rhs->kind == AST_VAR) {
             if (rhs->sval && rhs->sval[0] == '&') {
                 if (!kw_assign(rhs->sval + 1, lv)) return FAILDESCR;
             } else {
@@ -3791,16 +3791,16 @@ DESCR_t interp_eval(EXPR_t *e)
         return rv;
     }
 
-    /* ── IC-9 session #26: E_REVSWAP — x <-> y  reversible value swap ────
+    /* ── IC-9 session #26: AST_REVSWAP — x <-> y  reversible value swap ────
      * Outside `every`, no driver backtracks; behaves identically to
-     * left-to-right halt-on-fail E_SWAP.  Inside `every`, coro_eval
+     * left-to-right halt-on-fail AST_SWAP.  Inside `every`, coro_eval
      * routes to coro_bb_revswap for snapshot + revert on β.                */
-    case E_REVSWAP: {
+    case AST_REVSWAP: {
         if (e->nchildren < 2 || frame_depth <= 0) return NULVCL;
-        EXPR_t *lhs = e->children[0], *rhs = e->children[1];
+        AST_t *lhs = e->children[0], *rhs = e->children[1];
         DESCR_t lv = interp_eval(lhs), rv = interp_eval(rhs);
         if (IS_FAIL_fn(lv) || IS_FAIL_fn(rv)) return FAILDESCR;
-        if (lhs && lhs->kind == E_VAR) {
+        if (lhs && lhs->kind == AST_VAR) {
             if (lhs->sval && lhs->sval[0] == '&') {
                 if (!kw_assign(lhs->sval + 1, rv)) return FAILDESCR;
             } else {
@@ -3809,7 +3809,7 @@ DESCR_t interp_eval(EXPR_t *e)
                 else if (sl<0&&lhs->sval) NV_SET_fn(lhs->sval,rv);
             }
         }
-        if (rhs && rhs->kind == E_VAR) {
+        if (rhs && rhs->kind == AST_VAR) {
             if (rhs->sval && rhs->sval[0] == '&') {
                 if (!kw_assign(rhs->sval + 1, lv)) return FAILDESCR;
             } else {
@@ -3821,8 +3821,8 @@ DESCR_t interp_eval(EXPR_t *e)
         return rv;
     }
 
-    /* ── IC-5: E_LCONCAT — s1 ||| s2  (list concatenation = string concat alias) */
-    case E_LCONCAT: {
+    /* ── IC-5: AST_LCONCAT — s1 ||| s2  (list concatenation = string concat alias) */
+    case AST_LCONCAT: {
         if (e->nchildren < 2) return NULVCL;
         DESCR_t a = interp_eval(e->children[0]);
         DESCR_t b = interp_eval(e->children[1]);
@@ -3836,8 +3836,8 @@ DESCR_t interp_eval(EXPR_t *e)
         return STRVAL(buf);
     }
 
-    /* ── IC-5: E_MAKELIST — [e1,e2,...] list constructor ───────────────── */
-    case E_MAKELIST: {
+    /* ── IC-5: AST_MAKELIST — [e1,e2,...] list constructor ───────────────── */
+    case AST_MAKELIST: {
         int n = e->nchildren;
         /* Register icnlist type once if needed, using a global flag */
         static int icnlist_registered = 0;
@@ -3849,13 +3849,13 @@ DESCR_t interp_eval(EXPR_t *e)
         return ld;
     }
 
-    /* ── IC-5: E_SECTION — s[i:j] string section ─────────────────────────
+    /* ── IC-5: AST_SECTION — s[i:j] string section ─────────────────────────
      * Icon position rules:
      *   p ≥ 1     → position p (1-based; position 1 is before first char)
      *   p == 0    → position past last char (= slen+1)
      *   p < 0     → position slen+1+p   (-1 → slen, -2 → slen-1, …)
      * Out-of-bounds (after normalization, p < 1 or p > slen+1) → fail. */
-    case E_SECTION: {
+    case AST_SECTION: {
         if (e->nchildren < 3) return NULVCL;
         DESCR_t sd = interp_eval(e->children[0]);
         const char *s = VARVAL_fn(sd); if (!s) s="";
@@ -3871,9 +3871,9 @@ DESCR_t interp_eval(EXPR_t *e)
         return STRVAL(buf);
     }
 
-    /* IC-9 (2026-05-01): E_SECTION_PLUS — s[i+:n] read.  Position i, length n.
+    /* IC-9 (2026-05-01): AST_SECTION_PLUS — s[i+:n] read.  Position i, length n.
      * Equivalent to s[i : i+n] with negative-position normalization on i. */
-    case E_SECTION_PLUS: {
+    case AST_SECTION_PLUS: {
         if (e->nchildren < 3) return NULVCL;
         DESCR_t sd = interp_eval(e->children[0]);
         const char *s = VARVAL_fn(sd); if (!s) s = "";
@@ -3892,9 +3892,9 @@ DESCR_t interp_eval(EXPR_t *e)
         return STRVAL(buf);
     }
 
-    /* IC-9 (2026-05-01): E_SECTION_MINUS — s[i-:n] read.  Position i, span n
+    /* IC-9 (2026-05-01): AST_SECTION_MINUS — s[i-:n] read.  Position i, span n
      * to the LEFT of i.  Equivalent to s[i-n : i] with negative-n flipping. */
-    case E_SECTION_MINUS: {
+    case AST_SECTION_MINUS: {
         if (e->nchildren < 3) return NULVCL;
         DESCR_t sd = interp_eval(e->children[0]);
         const char *s = VARVAL_fn(sd); if (!s) s = "";
@@ -3912,8 +3912,8 @@ DESCR_t interp_eval(EXPR_t *e)
         return STRVAL(buf);
     }
 
-    /* ── IC-5: E_INITIAL — once-only block; persists local values across calls ─ */
-    case E_INITIAL: {
+    /* ── IC-5: AST_INITIAL — once-only block; persists local values across calls ─ */
+    case AST_INITIAL: {
         /* Uses file-scope init_tab[] keyed on e->id.
          * First call: run block, snapshot assigned locals.
          * Subsequent calls: restore snapshot (updated at call exit by icn_init_update_snapshot). */
@@ -3928,10 +3928,10 @@ DESCR_t interp_eval(EXPR_t *e)
                 ent = &init_tab[icn_init_n++];
                 ent->id = e->id; ent->ns = 0;
                 for (int i = 0; i < e->nchildren && ent->ns < ICN_INIT_SLOTS; i++) {
-                    EXPR_t *ch = e->children[i];
-                    if (!ch || ch->kind != E_ASSIGN || ch->nchildren < 1) continue;
-                    EXPR_t *lhs = ch->children[0];
-                    if (!lhs || lhs->kind != E_VAR || !lhs->sval) continue;
+                    AST_t *ch = e->children[i];
+                    if (!ch || ch->kind != AST_ASSIGN || ch->nchildren < 1) continue;
+                    AST_t *lhs = ch->children[0];
+                    if (!lhs || lhs->kind != AST_VAR || !lhs->sval) continue;
                     IcnInitSlot *sl = &ent->s[ent->ns++];
                     strncpy(sl->nm, lhs->sval, 63); sl->nm[63] = '\0';
                     if (frame_depth > 0 && lhs->ival >= 0 && lhs->ival < FRAME.env_n)
@@ -3947,10 +3947,10 @@ DESCR_t interp_eval(EXPR_t *e)
                 int restored = 0;
                 if (frame_depth > 0) {
                     for (int i = 0; i < e->nchildren && !restored; i++) {
-                        EXPR_t *ch = e->children[i];
-                        if (!ch || ch->kind != E_ASSIGN || ch->nchildren < 1) continue;
-                        EXPR_t *lhs = ch->children[0];
-                        if (!lhs || lhs->kind != E_VAR || !lhs->sval) continue;
+                        AST_t *ch = e->children[i];
+                        if (!ch || ch->kind != AST_ASSIGN || ch->nchildren < 1) continue;
+                        AST_t *lhs = ch->children[0];
+                        if (!lhs || lhs->kind != AST_VAR || !lhs->sval) continue;
                         if (strcasecmp(lhs->sval, ent->s[si].nm) == 0
                             && lhs->ival >= 0 && lhs->ival < FRAME.env_n) {
                             FRAME.env[lhs->ival] = ent->s[si].val;
@@ -3964,12 +3964,12 @@ DESCR_t interp_eval(EXPR_t *e)
         return NULVCL;
     }
 
-    /* ── IC-5: E_RECORD — register record type ──────────────────────────── */
-    case E_RECORD: {
-        /* e->sval = type name; children = field name E_VAR nodes.
+    /* ── IC-5: AST_RECORD — register record type ──────────────────────────── */
+    case AST_RECORD: {
+        /* e->sval = type name; children = field name AST_VAR nodes.
          * Build spec string "typename(f1,f2,...)" and call DEFDAT_fn + sc_dat_register. */
         if (!e->sval) return NULVCL;
-        /* Only register once (EXPR_t node persists across calls) */
+        /* Only register once (AST_t node persists across calls) */
         if (e->ival != 0) return NULVCL;
         e->ival = 1;
         char spec[256]; int pos=0;
@@ -3986,8 +3986,8 @@ DESCR_t interp_eval(EXPR_t *e)
         return NULVCL;
     }
 
-    /* ── IC-5: E_FIELD — field access: obj.fieldname ────────────────────── */
-    case E_FIELD: {
+    /* ── IC-5: AST_FIELD — field access: obj.fieldname ────────────────────── */
+    case AST_FIELD: {
         /* e->sval = field name; child[0] = object expression */
         if (!e->sval || e->nchildren < 1) return NULVCL;
         DESCR_t obj = interp_eval(e->children[0]);
@@ -3997,8 +3997,8 @@ DESCR_t interp_eval(EXPR_t *e)
         return *cell;
     }
 
-    /* ── IC-5: E_GLOBAL (declaration, skip at eval time) ───────────────── */
-    case E_GLOBAL:
+    /* ── IC-5: AST_GLOBAL (declaration, skip at eval time) ───────────────── */
+    case AST_GLOBAL:
         return NULVCL;
 
     default:

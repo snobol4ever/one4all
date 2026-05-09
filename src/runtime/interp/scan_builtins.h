@@ -2,12 +2,12 @@
  * scan_builtins.h — RS-23-extra-prep: SCAN-context builtin dispatch.
  *
  * Single entry-point `scan_try_call_builtin` lifted out of interp_eval's
- * icn-frame E_FNC switch.  See scan_builtins.c for the rationale.
+ * icn-frame AST_FNC switch.  See scan_builtins.c for the rationale.
  *==========================================================================================================================*/
 #ifndef SCAN_BUILTINS_H
 #define SCAN_BUILTINS_H
 
-#include "../../ir/ir.h"    /* EXPR_t */
+#include "../../ir/ir.h"    /* AST_t */
 #include "snobol4.h"        /* DESCR_t */
 
 /* Returns 1 if `call` named a SCAN builtin and was handled (*out set).
@@ -23,6 +23,6 @@
  * (any/many/move/tab/match).  Inside-scan-only builtins fail when
  * scan_pos == 0 (no scan in flight) unless a string-arg overload is
  * provided. */
-int scan_try_call_builtin(EXPR_t *call, DESCR_t *args, int nargs, DESCR_t *out);
+int scan_try_call_builtin(AST_t *call, DESCR_t *args, int nargs, DESCR_t *out);
 
 #endif /* SCAN_BUILTINS_H */

@@ -2,24 +2,24 @@
  * prolog_lower.c — Prolog ClauseAST -> scrip-cc IR lowering
  *
  * Takes a PlProgram (list of PlClause) and produces a CODE_t* whose
- * STMT_t nodes carry the Prolog IR node kinds added to EXPR_e in scrip-cc.h.
+ * STMT_t nodes carry the Prolog IR node kinds added to AST_e in scrip-cc.h.
  *
  * Pipeline:
- *   1. Group clauses by functor/arity key -> one E_CHOICE per predicate
- *   2. For each PlClause -> one E_CLAUSE child of the E_CHOICE
- *   3. Lower each Term* in head args and body goals -> EXPR_t*
+ *   1. Group clauses by functor/arity key -> one AST_CHOICE per predicate
+ *   2. For each PlClause -> one AST_CLAUSE child of the AST_CHOICE
+ *   3. Lower each Term* in head args and body goals -> AST_t*
  *   4. Assign variable slots per clause (VarScope reused from parser)
- *   5. Emit E_TRAIL_MARK / E_TRAIL_UNWIND sentinels around each clause
+ *   5. Emit AST_TRAIL_MARK / AST_TRAIL_UNWIND sentinels around each clause
  *
- * Term -> EXPR_t lowering:
- *   TT_ATOM     -> E_QLIT  (sval = atom name)
- *   TT_INT      -> E_ILIT  (ival = value)
- *   TT_FLOAT    -> E_FLIT  (dval = value)
- *   TT_VAR      -> E_VAR  (sval = "_V<slot>", ival = slot)
- *   TT_COMPOUND -> E_FNC   (sval = functor name, children = lowered args)
- *                  special: =/2  -> E_UNIFY
- *                           is/2 -> E_FNC("is") with arithmetic rhs
- *                           !/0  -> E_CUT
+ * Term -> AST_t lowering:
+ *   TT_ATOM     -> AST_QLIT  (sval = atom name)
+ *   TT_INT      -> AST_ILIT  (ival = value)
+ *   TT_FLOAT    -> AST_FLIT  (dval = value)
+ *   TT_VAR      -> AST_VAR  (sval = "_V<slot>", ival = slot)
+ *   TT_COMPOUND -> AST_FNC   (sval = functor name, children = lowered args)
+ *                  special: =/2  -> AST_UNIFY
+ *                           is/2 -> AST_FNC("is") with arithmetic rhs
+ *                           !/0  -> AST_CUT
  *                           ,/2  -> flattened into body (done in parser)
  */
 
@@ -61,11 +61,11 @@ static PredKey key_of_head(Term *head) {
 }
 
 /* =========================================================================
- * Term -> EXPR_t lowering
+ * Term -> AST_t lowering
  * ======================================================================= */
 
-static EXPR_t *lower_term(Term *t);
-static EXPR_t *lower_clause(PlClause *cl, PredKey key);
+static AST_t *lower_term(Term *t);
+static AST_t *lower_clause(PlClause *cl, PredKey key);
 
 /* Walk the Term graph rooted at the head + each body goal of a clause.
  * Pass 1: find max named-var slot.  Pass 2: assign fresh distinct slots to
@@ -74,7 +74,7 @@ static EXPR_t *lower_clause(PlClause *cl, PredKey key);
  * Used both by lower_clause and by the plunit prescan, which builds an
  * assertz term whose Goal arg points back at the clause body Terms; the
  * prescan must run this BEFORE lowering the assertz term so anon vars in
- * the test body emit distinct E_VAR slots, not all aliased to slot 0. */
+ * the test body emit distinct AST_VAR slots, not all aliased to slot 0. */
 static void assign_clause_anon_slots(PlClause *cl) {
     if (!cl) return;
     Term *stk[512]; int top = 0;
@@ -107,7 +107,7 @@ static void assign_clause_anon_slots(PlClause *cl) {
     #undef PA_WALK_ASSIGN
 }
 
-/* Build functor/arity string like "foo/2" for E_CHOICE sval */
+/* Build functor/arity string like "foo/2" for AST_CHOICE sval */
 static char *pred_str(int functor, int arity) {
     const char *fn = prolog_atom_name(functor);
     if (!fn) fn = "?";
@@ -116,36 +116,36 @@ static char *pred_str(int functor, int arity) {
     return strdup(buf);
 }
 
-static EXPR_t *lower_term(Term *t) {
+static AST_t *lower_term(Term *t) {
     t = term_deref(t);
     if (!t) {
-        EXPR_t *e = expr_new(E_QLIT);
+        AST_t *e = expr_new(AST_QLIT);
         e->sval = strdup("[]");
         return e;
     }
 
     switch (t->tag) {
         case TT_ATOM: {
-            /* ! -> E_CUT */
-            if (t->atom_id == ATOM_CUT) return expr_new(E_CUT);
-            /* Atom in a goal position -> E_FNC/0 (nl, true, fail, halt, etc.) */
-            EXPR_t *e = expr_new(E_FNC);
+            /* ! -> AST_CUT */
+            if (t->atom_id == ATOM_CUT) return expr_new(AST_CUT);
+            /* Atom in a goal position -> AST_FNC/0 (nl, true, fail, halt, etc.) */
+            AST_t *e = expr_new(AST_FNC);
             const char *nm = prolog_atom_name(t->atom_id);
             e->sval = strdup(nm ? nm : "");
             return e;
         }
         case TT_INT: {
-            EXPR_t *e = expr_new(E_ILIT);
+            AST_t *e = expr_new(AST_ILIT);
             e->ival = t->ival;
             return e;
         }
         case TT_FLOAT: {
-            EXPR_t *e = expr_new(E_FLIT);
+            AST_t *e = expr_new(AST_FLIT);
             e->dval = t->fval;
             return e;
         }
         case TT_VAR: {
-            EXPR_t *e = expr_new(E_VAR);
+            AST_t *e = expr_new(AST_VAR);
             int slot = t->saved_slot;  /* -1 = anonymous wildcard */
             char buf[32];
             if (slot < 0) {
@@ -162,24 +162,24 @@ static EXPR_t *lower_term(Term *t) {
             if (!fn) fn = "?";
             int arity = t->compound.arity;
 
-            /* =/2 -> E_UNIFY */
+            /* =/2 -> AST_UNIFY */
             int eq_id = prolog_atom_intern("=");
             if (t->compound.functor == eq_id && arity == 2) {
-                EXPR_t *e = expr_new(E_UNIFY);
+                AST_t *e = expr_new(AST_UNIFY);
                 expr_add_child(e, lower_term(t->compound.args[0]));
                 expr_add_child(e, lower_term(t->compound.args[1]));
                 return e;
             }
 
             /* Arithmetic operators within is/2 rhs */
-            struct { const char *name; EXPR_e kind; } arith[] = {
-                { "+", E_ADD }, { "-", E_SUB }, { "*", E_MUL },
-                { "/", E_DIV }, { "//", E_DIV }, { NULL, 0 }
+            struct { const char *name; AST_e kind; } arith[] = {
+                { "+", AST_ADD }, { "-", AST_SUB }, { "*", AST_MUL },
+                { "/", AST_DIV }, { "//", AST_DIV }, { NULL, 0 }
             };
             if (arity == 2) {
                 for (int i = 0; arith[i].name; i++) {
                     if (strcmp(fn, arith[i].name) == 0) {
-                        EXPR_t *e = expr_new(arith[i].kind);
+                        AST_t *e = expr_new(arith[i].kind);
                         expr_add_child(e, lower_term(t->compound.args[0]));
                         expr_add_child(e, lower_term(t->compound.args[1]));
                         return e;
@@ -187,11 +187,11 @@ static EXPR_t *lower_term(Term *t) {
                 }
             }
 
-            /* ,/2 — conjunction: flatten right-spine into n-ary E_FNC(",")
-             * e.g. (A,(B,(C,D))) -> E_FNC(",") [A, B, C, D]  */
+            /* ,/2 — conjunction: flatten right-spine into n-ary AST_FNC(",")
+             * e.g. (A,(B,(C,D))) -> AST_FNC(",") [A, B, C, D]  */
             int comma_id = prolog_atom_intern(",");
             if (t->compound.functor == comma_id && arity == 2) {
-                EXPR_t *e = expr_new(E_FNC);
+                AST_t *e = expr_new(AST_FNC);
                 e->sval = strdup(",");
                 /* walk the right spine collecting all conjuncts */
                 Term *cur = t;
@@ -205,11 +205,11 @@ static EXPR_t *lower_term(Term *t) {
                 return e;
             }
 
-            /* ;/2 — disjunction: flatten right-spine into n-ary E_FNC(";")
-             * e.g. (A;(B;C)) -> E_FNC(";") [A, B, C]  */
+            /* ;/2 — disjunction: flatten right-spine into n-ary AST_FNC(";")
+             * e.g. (A;(B;C)) -> AST_FNC(";") [A, B, C]  */
             int semi_id = prolog_atom_intern(";");
             if (t->compound.functor == semi_id && arity == 2) {
-                EXPR_t *e = expr_new(E_FNC);
+                AST_t *e = expr_new(AST_FNC);
                 e->sval = strdup(";");
                 Term *cur = t;
                 while (cur && cur->tag == TT_COMPOUND &&
@@ -223,12 +223,12 @@ static EXPR_t *lower_term(Term *t) {
             }
 
             /* ->/2 — if-then: flatten Then-part into n-ary children.
-             * E_FNC("->") layout: children[0] = Cond, children[1..] = Then goals.
-             * (Then conjunction flattened, same as E_CLAUSE body goals.)
+             * AST_FNC("->") layout: children[0] = Cond, children[1..] = Then goals.
+             * (Then conjunction flattened, same as AST_CLAUSE body goals.)
              * Every then-step is visible at top level for the emitter. */
             int arrow_id = prolog_atom_intern("->");
             if (t->compound.functor == arrow_id && arity == 2) {
-                EXPR_t *e = expr_new(E_FNC);
+                AST_t *e = expr_new(AST_FNC);
                 e->sval = strdup("->");
                 /* children[0] = Cond */
                 expr_add_child(e, lower_term(t->compound.args[0]));
@@ -244,8 +244,8 @@ static EXPR_t *lower_term(Term *t) {
                 return e;
             }
 
-            /* General compound / goal -> E_FNC */
-            EXPR_t *e = expr_new(E_FNC);
+            /* General compound / goal -> AST_FNC */
+            AST_t *e = expr_new(AST_FNC);
             e->sval = strdup(fn);
             for (int i = 0; i < arity; i++)
                 expr_add_child(e, lower_term(t->compound.args[i]));
@@ -254,7 +254,7 @@ static EXPR_t *lower_term(Term *t) {
         case TT_REF:
             return lower_term(t->ref);
         default: {
-            EXPR_t *e = expr_new(E_QLIT);
+            AST_t *e = expr_new(AST_QLIT);
             e->sval = strdup("?");
             return e;
         }
@@ -262,20 +262,20 @@ static EXPR_t *lower_term(Term *t) {
 }
 
 /* =========================================================================
- * Lower one PlClause -> E_CLAUSE EXPR_t
+ * Lower one PlClause -> AST_CLAUSE AST_t
  *
- * E_CLAUSE layout:
+ * AST_CLAUSE layout:
  *   sval   = "functor/arity"
  *   ival   = n_vars (EnvLayout.n_vars)
  *   dval   = (double)n_args
  *   children[0..n_args-1]  = lowered head argument terms
  *   children[n_args..]     = lowered body goals
- *   (E_TRAIL_MARK and E_TRAIL_UNWIND are added as sentinel children
+ *   (AST_TRAIL_MARK and AST_TRAIL_UNWIND are added as sentinel children
  *    around the head-unify region by the emitter; lower just records
  *    ival = trail_mark_slot = n_vars)
  * ======================================================================= */
-static EXPR_t *lower_clause(PlClause *cl, PredKey key) {
-    EXPR_t *ec = expr_new(E_CLAUSE);
+static AST_t *lower_clause(PlClause *cl, PredKey key) {
+    AST_t *ec = expr_new(AST_CLAUSE);
     ec->sval = pred_str(key.functor, key.arity);
 
     /* Count distinct variable slots via full recursive Term walk */
@@ -315,7 +315,7 @@ static EXPR_t *lower_clause(PlClause *cl, PredKey key) {
     /* Pass 2: assign fresh slots to anonymous TT_VARs (saved_slot == -1).
      * Each distinct anon Term* gets its own slot starting at max_slot+1.
      * Without this, lower_term sees saved_slot==-1 for every "_" and emits
-     * a single shared E_VAR slot — which incorrectly aliases distinct anon
+     * a single shared AST_VAR slot — which incorrectly aliases distinct anon
      * vars in the same clause (e.g. assertz-synthesized plunit test bodies
      * containing multiple "_" placeholders). Idempotent: re-running on a
      * Term graph whose anon vars already got slots leaves them unchanged.
@@ -407,7 +407,7 @@ CODE_t *prolog_lower(PlProgram *pl_prog) {
     /* ---- Pass 1: collect all predicate keys in order of first appearance */
     #define MAX_PREDS 512
     PredKey  keys[MAX_PREDS];
-    EXPR_t  *choices[MAX_PREDS];   /* one E_CHOICE per predicate */
+    AST_t  *choices[MAX_PREDS];   /* one AST_CHOICE per predicate */
     int      nkeys = 0;
     int      clause_idx = 0;  /* tracks position for plunit_suite[] lookup */
 
@@ -481,19 +481,19 @@ CODE_t *prolog_lower(PlProgram *pl_prog) {
                 continue;
             }
             keys[nkeys] = k;
-            choices[nkeys] = expr_new(E_CHOICE);
+            choices[nkeys] = expr_new(AST_CHOICE);
             choices[nkeys]->sval = pred_str(k.functor, k.arity);
             found = nkeys++;
         }
 
         /* Lower this clause and append to the choice */
-        EXPR_t *ec = lower_clause(cl, k);
+        AST_t *ec = lower_clause(cl, k);
         expr_add_child(choices[found], ec);
     }
 
     /* ---- Pass 2: handle directives.
      * :- export(name/arity) or :- export(name) → prog->exports
-     * All other directives → plain E_FNC STMT_t nodes. */
+     * All other directives → plain AST_FNC STMT_t nodes. */
     for (PlClause *cl = pl_prog->head; cl; cl = cl->next) {
         if (!cl->head && cl->nbody > 0) {
             Term *goal = cl->body[0];
@@ -540,7 +540,7 @@ CODE_t *prolog_lower(PlProgram *pl_prog) {
         }
     }
 
-    /* ---- Pass 3: emit one STMT_t per E_CHOICE */
+    /* ---- Pass 3: emit one STMT_t per AST_CHOICE */
     for (int i = 0; i < nkeys; i++) {
         STMT_t *s = stmt_new();
         s->subject = choices[i];
@@ -558,31 +558,31 @@ CODE_t *prolog_lower(PlProgram *pl_prog) {
 /* =========================================================================
  * prolog_lower_pretty — IR dump for diagnostics
  * ======================================================================= */
-static void expr_dump(EXPR_t *e, int indent, FILE *out) {
+static void expr_dump(AST_t *e, int indent, FILE *out) {
     if (!e) { fprintf(out, "%*s<null>\n", indent, ""); return; }
     const char *kname = "?";
     switch (e->kind) {
-        case E_CHOICE:      kname = "E_CHOICE";      break;
-        case E_CLAUSE:      kname = "E_CLAUSE";      break;
-        case E_UNIFY:       kname = "E_UNIFY";       break;
-        case E_CUT:         kname = "E_CUT";         break;
-        case E_TRAIL_MARK:  kname = "E_TRAIL_MARK";  break;
-        case E_TRAIL_UNWIND:kname = "E_TRAIL_UNWIND";break;
-        case E_FNC:         kname = "E_FNC";         break;
-        case E_QLIT:        kname = "E_QLIT";        break;
-        case E_ILIT:        kname = "E_ILIT";        break;
-        case E_FLIT:        kname = "E_FLIT";        break;
-        case E_VAR:        kname = "E_VAR";        break;
-        case E_ADD:         kname = "E_ADD";         break;
-        case E_SUB:         kname = "E_SUB";         break;
-        case E_MUL:         kname = "E_MUL";         break;
-        case E_DIV:         kname = "E_DIV";         break;
+        case AST_CHOICE:      kname = "AST_CHOICE";      break;
+        case AST_CLAUSE:      kname = "AST_CLAUSE";      break;
+        case AST_UNIFY:       kname = "AST_UNIFY";       break;
+        case AST_CUT:         kname = "AST_CUT";         break;
+        case AST_TRAIL_MARK:  kname = "AST_TRAIL_MARK";  break;
+        case AST_TRAIL_UNWIND:kname = "AST_TRAIL_UNWIND";break;
+        case AST_FNC:         kname = "AST_FNC";         break;
+        case AST_QLIT:        kname = "AST_QLIT";        break;
+        case AST_ILIT:        kname = "AST_ILIT";        break;
+        case AST_FLIT:        kname = "AST_FLIT";        break;
+        case AST_VAR:        kname = "AST_VAR";        break;
+        case AST_ADD:         kname = "AST_ADD";         break;
+        case AST_SUB:         kname = "AST_SUB";         break;
+        case AST_MUL:         kname = "AST_MUL";         break;
+        case AST_DIV:         kname = "AST_DIV";         break;
         default: break;
     }
     fprintf(out, "%*s%s", indent, "", kname);
     if (e->sval) fprintf(out, "  sval=%s", e->sval);
     if (e->ival) fprintf(out, "  ival=%ld", e->ival);
-    if (e->kind == E_CLAUSE)
+    if (e->kind == AST_CLAUSE)
         fprintf(out, "  n_vars=%ld  n_args=%.0f", e->ival, e->dval);
     fprintf(out, "\n");
     for (int i = 0; i < e->nchildren; i++)
@@ -597,17 +597,17 @@ void prolog_lower_pretty(CODE_t *prog, FILE *out) {
 }
 
 /*============================================================================================================================
- * pl_assert_term — build an E_CLAUSE from a runtime Term* (for assertz/asserta).
+ * pl_assert_term — build an AST_CLAUSE from a runtime Term* (for assertz/asserta).
  *
  * Accepts:
  *   atom or compound f(a1..an)          → fact clause, no body
  *   ':-'(head, body)                    → rule clause
  *
- * Returns a heap-allocated E_CLAUSE ready to append to an E_CHOICE node.
+ * Returns a heap-allocated AST_CLAUSE ready to append to an AST_CHOICE node.
  * Also sets *key_out to the predicate key (functor atom_id, arity).
  * Returns NULL on error.
  *============================================================================================================================*/
-EXPR_t *pl_assert_term(Term *t, int *functor_out, int *arity_out) {
+AST_t *pl_assert_term(Term *t, int *functor_out, int *arity_out) {
     if (!t) return NULL;
     t = term_deref(t);
     if (!t) return NULL;

@@ -2,8 +2,8 @@
  * sc_lower_test.c -- Sprint SC2 quick-check tests
  *
  * M-SNOC-LOWER trigger:
- *   OUTPUT = 'hello'  ->  assignment STMT_t  with E_VART(OUTPUT) subject
- *                         and E_QLIT(hello) replacement  PASS
+ *   OUTPUT = 'hello'  ->  assignment STMT_t  with AST_VART(OUTPUT) subject
+ *                         and AST_QLIT(hello) replacement  PASS
  *
  * Build:
  *   gcc -I src/frontend/snocone -I src/frontend/snobol4 \
@@ -111,11 +111,11 @@ static void test_hello_assign(void) {
     ASSERT(st->subject != NULL,        "subject not NULL");
     ASSERT(st->replacement != NULL,    "replacement not NULL");
     if (st->subject)
-        ASSERT(st->subject->kind == E_VART, "subject kind == E_VART");
+        ASSERT(st->subject->kind == AST_VART, "subject kind == AST_VART");
     if (st->subject && st->subject->sval)
         ASSERT(strcmp(st->subject->sval, "OUTPUT") == 0, "subject name == OUTPUT");
     if (st->replacement)
-        ASSERT(st->replacement->kind == E_QLIT, "replacement kind == E_QLIT");
+        ASSERT(st->replacement->kind == AST_QLIT, "replacement kind == AST_QLIT");
     if (st->replacement && st->replacement->sval)
         ASSERT(strcmp(st->replacement->sval, "hello") == 0, "replacement value == hello");
     ASSERT(st->pattern == NULL,        "pattern == NULL");
@@ -131,11 +131,11 @@ static void test_arith_assign(void) {
     STMT_t *st = prog->head;
     ASSERT(st != NULL, "head stmt not NULL");
     if (!st || !st->replacement) return;
-    ASSERT(st->replacement->kind == E_ADD, "replacement kind == E_ADD");
+    ASSERT(st->replacement->kind == AST_ADD, "replacement kind == AST_ADD");
     if (st->replacement->left)
-        ASSERT(st->replacement->left->kind  == E_ILIT, "add left == E_ILIT");
+        ASSERT(st->replacement->left->kind  == AST_ILIT, "add left == AST_ILIT");
     if (st->replacement->right)
-        ASSERT(st->replacement->right->kind == E_ILIT, "add right == E_ILIT");
+        ASSERT(st->replacement->right->kind == AST_ILIT, "add right == AST_ILIT");
     if (st->replacement->left)  ASSERT(st->replacement->left->ival  == 1, "ival 1");
     if (st->replacement->right) ASSERT(st->replacement->right->ival == 2, "ival 2");
 }
@@ -150,7 +150,7 @@ static void test_fnc_call(void) {
     STMT_t *st = prog->head;
     ASSERT(st != NULL, "head stmt not NULL");
     if (!st || !st->replacement) return;
-    ASSERT(st->replacement->kind == E_FNC,  "replacement kind == E_FNC");
+    ASSERT(st->replacement->kind == AST_FNC,  "replacement kind == AST_FNC");
     if (st->replacement->sval)
         ASSERT(strcmp(st->replacement->sval, "GT") == 0, "fnc name == GT");
     ASSERT(st->replacement->nargs == 2, "fnc nargs == 2");
@@ -166,7 +166,7 @@ static void test_eq_op(void) {
     STMT_t *st = prog->head;
     ASSERT(st != NULL, "head stmt not NULL");
     if (!st || !st->replacement) return;
-    ASSERT(st->replacement->kind == E_FNC, "== maps to E_FNC");
+    ASSERT(st->replacement->kind == AST_FNC, "== maps to AST_FNC");
     if (st->replacement->sval)
         ASSERT(strcmp(st->replacement->sval, "EQ") == 0, "== maps to EQ");
 }
@@ -190,7 +190,7 @@ static void test_multi_stmt(void) {
 }
 
 /* ---------------------------------------------------------------------------
- * Test: p = 'a' || 'b'  -> E_OR
+ * Test: p = 'a' || 'b'  -> AST_OR
  * ------------------------------------------------------------------------- */
 static void test_or_expr(void) {
     Program *prog = pipeline("p = 'a' || 'b'");
@@ -199,11 +199,11 @@ static void test_or_expr(void) {
     STMT_t *st = prog->head;
     ASSERT(st != NULL, "head stmt not NULL");
     if (!st || !st->replacement) return;
-    ASSERT(st->replacement->kind == E_OR, "|| maps to E_OR");
+    ASSERT(st->replacement->kind == AST_OR, "|| maps to AST_OR");
 }
 
 /* ---------------------------------------------------------------------------
- * Test: s = 'hello' && ' world'  -> E_CONC
+ * Test: s = 'hello' && ' world'  -> AST_CONC
  * ------------------------------------------------------------------------- */
 static void test_concat_expr(void) {
     Program *prog = pipeline("s = 'hello' && ' world'");
@@ -212,7 +212,7 @@ static void test_concat_expr(void) {
     STMT_t *st = prog->head;
     ASSERT(st != NULL, "head stmt not NULL");
     if (!st || !st->replacement) return;
-    ASSERT(st->replacement->kind == E_CONC, "&& maps to E_CONC");
+    ASSERT(st->replacement->kind == AST_CONC, "&& maps to AST_CONC");
 }
 
 /* ---------------------------------------------------------------------------
@@ -225,13 +225,13 @@ static void test_percent_op(void) {
     STMT_t *st = prog->head;
     ASSERT(st != NULL, "head stmt not NULL");
     if (!st || !st->replacement) return;
-    ASSERT(st->replacement->kind == E_FNC, "% maps to E_FNC");
+    ASSERT(st->replacement->kind == AST_FNC, "% maps to AST_FNC");
     if (st->replacement->sval)
         ASSERT(strcmp(st->replacement->sval, "REMDR") == 0, "% maps to REMDR");
 }
 
 /* ---------------------------------------------------------------------------
- * Test: x = a[i]  -> E_IDX
+ * Test: x = a[i]  -> AST_IDX
  * ------------------------------------------------------------------------- */
 static void test_array_ref(void) {
     Program *prog = pipeline("x = a[i]");
@@ -240,12 +240,12 @@ static void test_array_ref(void) {
     STMT_t *st = prog->head;
     ASSERT(st != NULL, "head stmt not NULL");
     if (!st || !st->replacement) return;
-    ASSERT(st->replacement->kind == E_IDX,  "a[i] maps to E_IDX");
-    ASSERT(st->replacement->nargs == 1,     "E_IDX nargs == 1");
+    ASSERT(st->replacement->kind == AST_IDX,  "a[i] maps to AST_IDX");
+    ASSERT(st->replacement->nargs == 1,     "AST_IDX nargs == 1");
 }
 
 /* ---------------------------------------------------------------------------
- * Test: x = -y  -> E_MNS
+ * Test: x = -y  -> AST_MNS
  * ------------------------------------------------------------------------- */
 static void test_unary_minus(void) {
     Program *prog = pipeline("x = -y");
@@ -254,7 +254,7 @@ static void test_unary_minus(void) {
     STMT_t *st = prog->head;
     ASSERT(st != NULL, "head stmt not NULL");
     if (!st || !st->replacement) return;
-    ASSERT(st->replacement->kind == E_MNS, "unary - maps to E_MNS");
+    ASSERT(st->replacement->kind == AST_MNS, "unary - maps to AST_MNS");
 }
 
 /* ---------------------------------------------------------------------------

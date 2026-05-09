@@ -175,7 +175,7 @@
     ldstr      "1"
     call       string [snobol4lib]Snobol4Lib::sno_add(string, string)
     stsfld     string _90_define_entry_label::kw_stno
-    // unhandled E_FNC stub
+    // unhandled AST_FNC stub
     ldstr      ""
     pop
     ldsfld     string _90_define_entry_label::kw_stno

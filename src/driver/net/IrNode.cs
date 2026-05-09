@@ -2,12 +2,12 @@
 //
 // Mirrors:
 //   EKind     enum  → ir.h  (same names, same semantics)
-//   IrNode    class → EXPR_t struct in ir.h
+//   IrNode    class → AST_t struct in ir.h
 //   SnoGoto   class → removed RS-1; goto fields now flat in IrStmt / STMT_t
 //   IrStmt    class → STMT_t struct in scrip_cc.h
 //
 // This is the "one IR, three consumers" invariant:
-//   scrip-cc (C)        consumes EXPR_t / EKind from ir.h
+//   scrip-cc (C)        consumes AST_t / EKind from ir.h
 //   scrip-interp.c (C)  consumes same
 //   scrip-interp.cs     consumes IrNode / IrKind (this file)
 //
@@ -25,99 +25,99 @@ namespace ScripInterp;
 public enum IrKind
 {
     // Literals
-    E_QLIT,             // quoted string / pattern literal
-    E_ILIT,             // integer literal
-    E_FLIT,             // float literal
-    E_CSET,             // cset literal (Icon/Rebus)
-    E_NUL,              // null / empty value
+    AST_QLIT,             // quoted string / pattern literal
+    AST_ILIT,             // integer literal
+    AST_FLIT,             // float literal
+    AST_CSET,             // cset literal (Icon/Rebus)
+    AST_NUL,              // null / empty value
 
     // References
-    E_VAR,              // variable reference
-    E_KEYWORD,          // &IDENT keyword
-    E_INDIRECT,         // $expr indirect reference
-    E_DEFER,            // *expr deferred pattern ref
+    AST_VAR,              // variable reference
+    AST_KEYWORD,          // &IDENT keyword
+    AST_INDIRECT,         // $expr indirect reference
+    AST_DEFER,            // *expr deferred pattern ref
 
     // Arithmetic / operators
-    E_INTERROGATE,      // ?X interrogation
-    E_NAME,             // .X name reference
-    E_MNS,              // unary minus
-    E_PLS,              // unary plus / numeric coerce
-    E_ADD,
-    E_SUB,
-    E_MUL,
-    E_DIV,
-    E_MOD,
-    E_POW,
+    AST_INTERROGATE,      // ?X interrogation
+    AST_NAME,             // .X name reference
+    AST_MNS,              // unary minus
+    AST_PLS,              // unary plus / numeric coerce
+    AST_ADD,
+    AST_SUB,
+    AST_MUL,
+    AST_DIV,
+    AST_MOD,
+    AST_POW,
 
     // Sequence / alternation
-    E_SEQ,              // goal-directed concat (Byrd-box wiring)
-    E_CAT,              // pure value-context string concat
-    E_ALT,              // pattern alternation
-    E_OPSYN,            // & operator
+    AST_SEQ,              // goal-directed concat (Byrd-box wiring)
+    AST_CAT,              // pure value-context string concat
+    AST_ALT,              // pattern alternation
+    AST_OPSYN,            // & operator
 
     // Pattern primitives
-    E_ARB,
-    E_ARBNO,
-    E_POS,
-    E_RPOS,
-    E_ANY,
-    E_NOTANY,
-    E_SPAN,
-    E_BREAK,
-    E_BREAKX,
-    E_LEN,
-    E_TAB,
-    E_RTAB,
-    E_REM,
-    E_FAIL,
-    E_SUCCEED,
-    E_FENCE,
-    E_ABORT,
-    E_BAL,
+    AST_ARB,
+    AST_ARBNO,
+    AST_POS,
+    AST_RPOS,
+    AST_ANY,
+    AST_NOTANY,
+    AST_SPAN,
+    AST_BREAK,
+    AST_BREAKX,
+    AST_LEN,
+    AST_TAB,
+    AST_RTAB,
+    AST_REM,
+    AST_FAIL,
+    AST_SUCCEED,
+    AST_FENCE,
+    AST_ABORT,
+    AST_BAL,
 
     // Captures
-    E_CAPT_COND_ASGN,   // .var conditional capture
-    E_CAPT_IMMED_ASGN,  // $var immediate capture
-    E_CAPT_CURSOR,      // @var cursor capture
+    AST_CAPT_COND_ASGN,   // .var conditional capture
+    AST_CAPT_IMMED_ASGN,  // $var immediate capture
+    AST_CAPT_CURSOR,      // @var cursor capture
 
     // Call / access / assignment / scan
-    E_FNC,              // function call, n-ary
-    E_IDX,              // array/table subscript
-    E_ASSIGN,           // assignment
-    E_SCAN,             // E ? E scanning
-    E_SWAP,             // :=: swap
+    AST_FNC,              // function call, n-ary
+    AST_IDX,              // array/table subscript
+    AST_ASSIGN,           // assignment
+    AST_SCAN,             // E ? E scanning
+    AST_SWAP,             // :=: swap
 
     // Icon generators (present for enum completeness; not dispatched by SNOBOL4 interpreter)
-    E_SUSPEND, E_TO, E_TO_BY, E_LIMIT, E_ALTERNATE, E_ITERATE, E_MAKELIST,
+    AST_SUSPEND, AST_TO, AST_TO_BY, AST_LIMIT, AST_ALTERNATE, AST_ITERATE, AST_MAKELIST,
 
     // Prolog (present for completeness)
-    E_UNIFY, E_CLAUSE, E_CHOICE, E_CUT, E_TRAIL_MARK, E_TRAIL_UNWIND,
+    AST_UNIFY, AST_CLAUSE, AST_CHOICE, AST_CUT, AST_TRAIL_MARK, AST_TRAIL_UNWIND,
 
     // Icon numeric relational
-    E_LT, E_LE, E_GT, E_GE, E_EQ, E_NE,
+    AST_LT, AST_LE, AST_GT, AST_GE, AST_EQ, AST_NE,
 
     // Icon lexicographic relational
-    E_LLT, E_LLE, E_LGT, E_LGE, E_LEQ, E_LNE,
+    AST_LLT, AST_LLE, AST_LGT, AST_LGE, AST_LEQ, AST_LNE,
 
     // Icon cset operators
-    E_CSET_COMPL, E_CSET_UNION, E_CSET_DIFF, E_CSET_INTER, E_LCONCAT,
+    AST_CSET_COMPL, AST_CSET_UNION, AST_CSET_DIFF, AST_CSET_INTER, AST_LCONCAT,
 
     // Icon unary
-    E_NONNULL, E_NULL, E_NOT, E_SIZE, E_RANDOM, E_IDENTICAL, E_AUGOP,
+    AST_NONNULL, AST_NULL, AST_NOT, AST_SIZE, AST_RANDOM, AST_IDENTICAL, AST_AUGOP,
 
     // Icon control flow
-    E_SEQ_EXPR, E_EVERY, E_WHILE, E_UNTIL, E_REPEAT,
-    E_IF, E_CASE, E_RETURN, E_LOOP_BREAK, E_LOOP_NEXT,
-    E_BANG_BINARY,
+    AST_SEQ_EXPR, AST_EVERY, AST_WHILE, AST_UNTIL, AST_REPEAT,
+    AST_IF, AST_CASE, AST_RETURN, AST_LOOP_BREAK, AST_LOOP_NEXT,
+    AST_BANG_BINARY,
 }
 
-// ── IrNode — mirrors EXPR_t from ir.h ──────────────────────────────────────
+// ── IrNode — mirrors AST_t from ir.h ──────────────────────────────────────
 //
 // Fields:
 //   Kind      ← kind
-//   SVal      ← sval  (E_QLIT text; E_VAR/E_KEYWORD/E_FNC/E_IDX name)
-//   IVal      ← ival  (E_ILIT value)
-//   DVal      ← dval  (E_FLIT value; note: ir.h uses dval, not fval)
+//   SVal      ← sval  (AST_QLIT text; AST_VAR/AST_KEYWORD/AST_FNC/AST_IDX name)
+//   IVal      ← ival  (AST_ILIT value)
+//   DVal      ← dval  (AST_FLIT value; note: ir.h uses dval, not fval)
 //   Children  ← children[] / nchildren
 //   Id        ← id    (assigned at emit time; not needed by interpreter)
 
@@ -139,22 +139,22 @@ public sealed class IrNode
     // ── Leaf constructors ─────────────────────────────────────────────────
 
     public static IrNode QStr(string s)
-        => new(IrKind.E_QLIT)  { SVal = s };
+        => new(IrKind.AST_QLIT)  { SVal = s };
 
     public static IrNode Int(long v)
-        => new(IrKind.E_ILIT)  { IVal = v };
+        => new(IrKind.AST_ILIT)  { IVal = v };
 
     public static IrNode Float(double v)
-        => new(IrKind.E_FLIT)  { DVal = v };
+        => new(IrKind.AST_FLIT)  { DVal = v };
 
     public static IrNode Nul()
-        => new(IrKind.E_NUL);
+        => new(IrKind.AST_NUL);
 
     public static IrNode Var(string name)
-        => new(IrKind.E_VAR)   { SVal = name };
+        => new(IrKind.AST_VAR)   { SVal = name };
 
     public static IrNode Keyword(string name)
-        => new(IrKind.E_KEYWORD) { SVal = name };
+        => new(IrKind.AST_KEYWORD) { SVal = name };
 
     // ── N-ary constructor ─────────────────────────────────────────────────
 
@@ -168,18 +168,18 @@ public sealed class IrNode
 
     public bool IsLeaf     => Children.Length == 0;
     public bool IsPattern  => Kind is
-        IrKind.E_SEQ or IrKind.E_ALT or IrKind.E_ARB or IrKind.E_ARBNO or
-        IrKind.E_ANY or IrKind.E_NOTANY or IrKind.E_SPAN or IrKind.E_BREAK or
-        IrKind.E_BREAKX or IrKind.E_LEN or IrKind.E_TAB or IrKind.E_RTAB or
-        IrKind.E_REM or IrKind.E_FAIL or IrKind.E_SUCCEED or IrKind.E_FENCE or
-        IrKind.E_ABORT or IrKind.E_BAL or IrKind.E_POS or IrKind.E_RPOS or
-        IrKind.E_CAPT_COND_ASGN or IrKind.E_CAPT_IMMED_ASGN or
-        IrKind.E_CAPT_CURSOR or IrKind.E_DEFER or IrKind.E_QLIT;
+        IrKind.AST_SEQ or IrKind.AST_ALT or IrKind.AST_ARB or IrKind.AST_ARBNO or
+        IrKind.AST_ANY or IrKind.AST_NOTANY or IrKind.AST_SPAN or IrKind.AST_BREAK or
+        IrKind.AST_BREAKX or IrKind.AST_LEN or IrKind.AST_TAB or IrKind.AST_RTAB or
+        IrKind.AST_REM or IrKind.AST_FAIL or IrKind.AST_SUCCEED or IrKind.AST_FENCE or
+        IrKind.AST_ABORT or IrKind.AST_BAL or IrKind.AST_POS or IrKind.AST_RPOS or
+        IrKind.AST_CAPT_COND_ASGN or IrKind.AST_CAPT_IMMED_ASGN or
+        IrKind.AST_CAPT_CURSOR or IrKind.AST_DEFER or IrKind.AST_QLIT;
 
     public override string ToString() =>
         SVal != null ? $"{Kind}({SVal})" :
-        Kind == IrKind.E_ILIT ? $"E_ILIT({IVal})" :
-        Kind == IrKind.E_FLIT ? $"E_FLIT({DVal})" :
+        Kind == IrKind.AST_ILIT ? $"AST_ILIT({IVal})" :
+        Kind == IrKind.AST_FLIT ? $"AST_FLIT({DVal})" :
         $"{Kind}[{Children.Length}]";
 }
 
@@ -189,9 +189,9 @@ public sealed class IrNode
 //
 // Fields:
 //   Label       ← label
-//   Subject     ← subject   (EXPR_t*)
-//   Pattern     ← pattern   (EXPR_t*; null if no pattern)
-//   Replacement ← replacement (EXPR_t*; null if no replacement)
+//   Subject     ← subject   (AST_t*)
+//   Pattern     ← pattern   (AST_t*; null if no pattern)
+//   Replacement ← replacement (AST_t*; null if no replacement)
 //   GotoS       ← goto_s    (on success)
 //   GotoF       ← goto_f    (on failure)
 //   GotoU       ← goto_u    (unconditional)

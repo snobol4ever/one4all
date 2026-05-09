@@ -11,7 +11,7 @@ import java.util.*;
  *   - Same T_WS-gated binary operator rule (binary ops require WS on both sides)
  *   - Same statement structure: subject [WS pattern [WS = replacement]]
  *   - Same goto field parser: unconditional, S(label), F(label)
- *   - Same E_SEQ / E_CAT fixup logic
+ *   - Same AST_SEQ / AST_CAT fixup logic
  *
  * Output: StmtNode[] (program) and ExprNode (expressions).
  * Node kinds mirror IrKind / EKind from IrNode.cs / ir.h.
@@ -24,20 +24,20 @@ public class Parser {
 
     public enum EKind {
         // Literals
-        E_QLIT, E_ILIT, E_FLIT, E_NUL,
+        AST_QLIT, AST_ILIT, AST_FLIT, AST_NUL,
         // References
-        E_VAR, E_KEYWORD, E_INDIRECT, E_DEFER,
+        AST_VAR, AST_KEYWORD, AST_INDIRECT, AST_DEFER,
         // Operators
-        E_INTERROGATE, E_NAME, E_MNS, E_PLS,
-        E_ADD, E_SUB, E_MUL, E_DIV, E_MOD, E_POW,
+        AST_INTERROGATE, AST_NAME, AST_MNS, AST_PLS,
+        AST_ADD, AST_SUB, AST_MUL, AST_DIV, AST_MOD, AST_POW,
         // Sequence / alternation
-        E_SEQ, E_CAT, E_ALT, E_OPSYN,
-        // Pattern primitives (used as E_VAR nodes for bare keywords)
-        E_ARB, E_ARBNO, E_REM, E_FAIL, E_SUCCEED, E_FENCE, E_ABORT,
+        AST_SEQ, AST_CAT, AST_ALT, AST_OPSYN,
+        // Pattern primitives (used as AST_VAR nodes for bare keywords)
+        AST_ARB, AST_ARBNO, AST_REM, AST_FAIL, AST_SUCCEED, AST_FENCE, AST_ABORT,
         // Captures
-        E_CAPT_COND_ASGN, E_CAPT_IMMED_ASGN, E_CAPT_CURSOR,
+        AST_CAPT_COND_ASGN, AST_CAPT_IMMED_ASGN, AST_CAPT_CURSOR,
         // Call / access / assignment
-        E_FNC, E_IDX, E_ASSIGN, E_SCAN,
+        AST_FNC, AST_IDX, AST_ASSIGN, AST_SCAN,
     }
 
     // ── ExprNode ──────────────────────────────────────────────────────────────
@@ -59,8 +59,8 @@ public class Parser {
             StringBuilder sb = new StringBuilder("  ".repeat(depth));
             sb.append(kind.name());
             if (sval  != null)                  sb.append("(").append(sval).append(")");
-            if (kind == EKind.E_ILIT)           sb.append("(").append(ival).append(")");
-            if (kind == EKind.E_FLIT)           sb.append("(").append(dval).append(")");
+            if (kind == EKind.AST_ILIT)           sb.append("(").append(ival).append(")");
+            if (kind == EKind.AST_FLIT)           sb.append("(").append(dval).append(")");
             for (ExprNode c : children) {
                 sb.append("\n").append(c.prettyPrint(depth + 1));
             }
@@ -177,7 +177,7 @@ public class Parser {
         e.addChild(operand);
         return e;
     }
-    private static ExprNode nul() { return new ExprNode(EKind.E_NUL); }
+    private static ExprNode nul() { return new ExprNode(EKind.AST_NUL); }
 
     // ── expr17 — atom ─────────────────────────────────────────────────────────
 
@@ -211,7 +211,7 @@ public class Parser {
             ExprNode inner = parseExpr0();
             skipWs();
             if (peek().kind == Lexer.TokKind.T_COMMA) {
-                ExprNode alt = new ExprNode(EKind.E_ALT);
+                ExprNode alt = new ExprNode(EKind.AST_ALT);
                 alt.addChild(inner != null ? inner : nul());
                 while (peek().kind == Lexer.TokKind.T_COMMA) {
                     next(); skipWs();
@@ -231,7 +231,7 @@ public class Parser {
         // String literal
         if (t.kind == Lexer.TokKind.T_STR) {
             next();
-            ExprNode e = new ExprNode(EKind.E_QLIT);
+            ExprNode e = new ExprNode(EKind.AST_QLIT);
             e.sval = t.sval;
             return e;
         }
@@ -239,7 +239,7 @@ public class Parser {
         // Real literal
         if (t.kind == Lexer.TokKind.T_REAL) {
             next();
-            ExprNode e = new ExprNode(EKind.E_FLIT);
+            ExprNode e = new ExprNode(EKind.AST_FLIT);
             e.dval = t.dval;
             e.sval = t.sval;
             return e;
@@ -248,7 +248,7 @@ public class Parser {
         // Integer literal
         if (t.kind == Lexer.TokKind.T_INT) {
             next();
-            ExprNode e = new ExprNode(EKind.E_ILIT);
+            ExprNode e = new ExprNode(EKind.AST_ILIT);
             e.ival = t.ival;
             return e;
         }
@@ -256,7 +256,7 @@ public class Parser {
         // &KEYWORD
         if (t.kind == Lexer.TokKind.T_KEYWORD) {
             next();
-            ExprNode e = new ExprNode(EKind.E_KEYWORD);
+            ExprNode e = new ExprNode(EKind.AST_KEYWORD);
             e.sval = t.sval;
             return e;
         }
@@ -264,7 +264,7 @@ public class Parser {
         // T_END — treat like identifier "END"
         if (t.kind == Lexer.TokKind.T_END) {
             next();
-            ExprNode e = new ExprNode(EKind.E_VAR);
+            ExprNode e = new ExprNode(EKind.AST_VAR);
             e.sval = t.sval != null ? t.sval : "END";
             return e;
         }
@@ -274,13 +274,13 @@ public class Parser {
             next();
             if (peek().kind == Lexer.TokKind.T_LPAREN) {
                 next(); // consume '('
-                ExprNode e = new ExprNode(EKind.E_FNC);
+                ExprNode e = new ExprNode(EKind.AST_FNC);
                 e.sval = t.sval;
                 parseArglist(e);
                 if (peek().kind == Lexer.TokKind.T_RPAREN) next();
                 return e;
             }
-            ExprNode e = new ExprNode(EKind.E_VAR);
+            ExprNode e = new ExprNode(EKind.AST_VAR);
             e.sval = t.sval;
             return e;
         }
@@ -300,10 +300,10 @@ public class Parser {
             else if (open == Lexer.TokKind.T_LANGLE)   close = Lexer.TokKind.T_RANGLE;
             else break;
             next(); // consume open bracket
-            ExprNode tmp = new ExprNode(EKind.E_NUL);
+            ExprNode tmp = new ExprNode(EKind.AST_NUL);
             parseArglist(tmp);
             if (peek().kind == close) next();
-            ExprNode idx = new ExprNode(EKind.E_IDX);
+            ExprNode idx = new ExprNode(EKind.AST_IDX);
             idx.addChild(e);
             for (ExprNode c : tmp.children) idx.addChild(c);
             e = idx;
@@ -317,21 +317,21 @@ public class Parser {
         Lexer.Token t = peek();
         EKind uk;
         switch (t.kind) {
-            case T_AT:     uk = EKind.E_CAPT_CURSOR;    break;
-            case T_TILDE:  uk = EKind.E_CAPT_COND_ASGN; break; // unary ~ = conditional
-            case T_QMARK:  uk = EKind.E_INTERROGATE;    break;
-            case T_AMP:    uk = EKind.E_OPSYN;           break;
-            case T_PLUS:   uk = EKind.E_PLS;             break;
-            case T_MINUS:  uk = EKind.E_MNS;             break;
-            case T_STAR:   uk = EKind.E_DEFER;           break;
-            case T_DOLLAR: uk = EKind.E_INDIRECT;        break;
-            case T_DOT:    uk = EKind.E_NAME;            break;
-            case T_BANG:   uk = EKind.E_POW;             break;
-            case T_PCT:    uk = EKind.E_DIV;             break;
-            case T_SLASH:  uk = EKind.E_DIV;             break;
-            case T_HASH:   uk = EKind.E_MUL;             break;
-            case T_EQ:     uk = EKind.E_ASSIGN;          break;
-            case T_PIPE:   uk = EKind.E_ALT;             break;
+            case T_AT:     uk = EKind.AST_CAPT_CURSOR;    break;
+            case T_TILDE:  uk = EKind.AST_CAPT_COND_ASGN; break; // unary ~ = conditional
+            case T_QMARK:  uk = EKind.AST_INTERROGATE;    break;
+            case T_AMP:    uk = EKind.AST_OPSYN;           break;
+            case T_PLUS:   uk = EKind.AST_PLS;             break;
+            case T_MINUS:  uk = EKind.AST_MNS;             break;
+            case T_STAR:   uk = EKind.AST_DEFER;           break;
+            case T_DOLLAR: uk = EKind.AST_INDIRECT;        break;
+            case T_DOT:    uk = EKind.AST_NAME;            break;
+            case T_BANG:   uk = EKind.AST_POW;             break;
+            case T_PCT:    uk = EKind.AST_DIV;             break;
+            case T_SLASH:  uk = EKind.AST_DIV;             break;
+            case T_HASH:   uk = EKind.AST_MUL;             break;
+            case T_EQ:     uk = EKind.AST_ASSIGN;          break;
+            case T_PIPE:   uk = EKind.AST_ALT;             break;
             default:       return parseExpr15();
         }
         next();
@@ -355,7 +355,7 @@ public class Parser {
             if (peek().kind != Lexer.TokKind.T_TILDE) { restore(m); break; }
             next(); skipWs();
             ExprNode r = parseExpr13();
-            l = binop(EKind.E_CAPT_COND_ASGN, l, r);
+            l = binop(EKind.AST_CAPT_COND_ASGN, l, r);
         }
         return l;
     }
@@ -374,7 +374,7 @@ public class Parser {
                 next(); skipWs();
                 ExprNode r = parseExpr13();
                 EKind k = (op == Lexer.TokKind.T_DOLLAR)
-                        ? EKind.E_CAPT_IMMED_ASGN : EKind.E_CAPT_COND_ASGN;
+                        ? EKind.AST_CAPT_IMMED_ASGN : EKind.AST_CAPT_COND_ASGN;
                 l = binop(k, l, r);
             } else {
                 restore(m); break;
@@ -435,7 +435,7 @@ public class Parser {
     private ExprNode parseExpr11() {
         return parseRbin(this::parseExpr12,
             new Lexer.TokKind[]{ Lexer.TokKind.T_CARET, Lexer.TokKind.T_BANG, Lexer.TokKind.T_STARSTAR },
-            new EKind[]{ EKind.E_POW, EKind.E_POW, EKind.E_POW });
+            new EKind[]{ EKind.AST_POW, EKind.AST_POW, EKind.AST_POW });
     }
 
     // ── expr10 — % ────────────────────────────────────────────────────────────
@@ -443,7 +443,7 @@ public class Parser {
     private ExprNode parseExpr10() {
         return parseLbin(this::parseExpr11,
             new Lexer.TokKind[]{ Lexer.TokKind.T_PCT },
-            new EKind[]{ EKind.E_DIV });
+            new EKind[]{ EKind.AST_DIV });
     }
 
     // ── expr9 — * ─────────────────────────────────────────────────────────────
@@ -451,7 +451,7 @@ public class Parser {
     private ExprNode parseExpr9() {
         return parseLbin(this::parseExpr10,
             new Lexer.TokKind[]{ Lexer.TokKind.T_STAR },
-            new EKind[]{ EKind.E_MUL });
+            new EKind[]{ EKind.AST_MUL });
     }
 
     // ── expr8 — / ─────────────────────────────────────────────────────────────
@@ -459,7 +459,7 @@ public class Parser {
     private ExprNode parseExpr8() {
         return parseLbin(this::parseExpr9,
             new Lexer.TokKind[]{ Lexer.TokKind.T_SLASH },
-            new EKind[]{ EKind.E_DIV });
+            new EKind[]{ EKind.AST_DIV });
     }
 
     // ── expr7 — # ─────────────────────────────────────────────────────────────
@@ -467,7 +467,7 @@ public class Parser {
     private ExprNode parseExpr7() {
         return parseLbin(this::parseExpr8,
             new Lexer.TokKind[]{ Lexer.TokKind.T_HASH },
-            new EKind[]{ EKind.E_MUL });
+            new EKind[]{ EKind.AST_MUL });
     }
 
     // ── expr6 — + - ──────────────────────────────────────────────────────────
@@ -475,7 +475,7 @@ public class Parser {
     private ExprNode parseExpr6() {
         return parseLbin(this::parseExpr7,
             new Lexer.TokKind[]{ Lexer.TokKind.T_PLUS, Lexer.TokKind.T_MINUS },
-            new EKind[]{ EKind.E_ADD, EKind.E_SUB });
+            new EKind[]{ EKind.AST_ADD, EKind.AST_SUB });
     }
 
     // ── expr5 — @ ─────────────────────────────────────────────────────────────
@@ -483,7 +483,7 @@ public class Parser {
     private ExprNode parseExpr5() {
         return parseLbin(this::parseExpr6,
             new Lexer.TokKind[]{ Lexer.TokKind.T_AT },
-            new EKind[]{ EKind.E_CAPT_CURSOR });
+            new EKind[]{ EKind.AST_CAPT_CURSOR });
     }
 
     // ── expr4 — concatenation (whitespace-separated) ──────────────────────────
@@ -521,7 +521,7 @@ public class Parser {
 
         if (items.size() == 1) return first;
 
-        ExprNode e = new ExprNode(EKind.E_SEQ);
+        ExprNode e = new ExprNode(EKind.AST_SEQ);
         for (ExprNode item : items) e.addChild(item);
         return e;
     }
@@ -542,7 +542,7 @@ public class Parser {
         restore(m3check);
         if (!hasPipe) return first;
 
-        ExprNode e = new ExprNode(EKind.E_ALT);
+        ExprNode e = new ExprNode(EKind.AST_ALT);
         e.addChild(first);
         for (;;) {
             int m3 = mark();
@@ -561,7 +561,7 @@ public class Parser {
     private ExprNode parseExpr2() {
         return parseLbin(this::parseExpr3,
             new Lexer.TokKind[]{ Lexer.TokKind.T_AMP },
-            new EKind[]{ EKind.E_OPSYN });
+            new EKind[]{ EKind.AST_OPSYN });
     }
 
     // ── expr0 — = assignment, ? scan (right-assoc) ───────────────────────────
@@ -576,12 +576,12 @@ public class Parser {
         if (k == Lexer.TokKind.T_EQ) {
             next(); skipWs();
             ExprNode r = parseExpr0();
-            return binop(EKind.E_ASSIGN, l, r != null ? r : nul());
+            return binop(EKind.AST_ASSIGN, l, r != null ? r : nul());
         }
         if (k == Lexer.TokKind.T_QMARK) {
             next(); skipWs();
             ExprNode r = parseExpr0();
-            return binop(EKind.E_CAPT_COND_ASGN, l, r != null ? r : nul());
+            return binop(EKind.AST_CAPT_COND_ASGN, l, r != null ? r : nul());
         }
         restore(m0);
         return l;
@@ -674,11 +674,11 @@ public class Parser {
 
     }
 
-    // ── E_SEQ / E_CAT fixup (mirrors fixup_val_tree) ─────────────────────────
+    // ── AST_SEQ / AST_CAT fixup (mirrors fixup_val_tree) ─────────────────────────
 
     private static void fixupValTree(ExprNode e) {
         if (e == null) return;
-        if (e.kind == EKind.E_SEQ) e.kind = EKind.E_CAT;
+        if (e.kind == EKind.AST_SEQ) e.kind = EKind.AST_CAT;
         for (ExprNode c : e.children) fixupValTree(c);
     }
 
@@ -690,10 +690,10 @@ public class Parser {
     private static boolean replIsPatTree(ExprNode e) {
         if (e == null) return false;
         switch (e.kind) {
-            case E_ARB: case E_ARBNO:
-            case E_CAPT_COND_ASGN: case E_CAPT_IMMED_ASGN: case E_CAPT_CURSOR: case E_DEFER:
+            case AST_ARB: case AST_ARBNO:
+            case AST_CAPT_COND_ASGN: case AST_CAPT_IMMED_ASGN: case AST_CAPT_CURSOR: case AST_DEFER:
                 return true;
-            case E_FNC:
+            case AST_FNC:
                 if (e.sval != null && PAT_FNC_NAMES.contains(e.sval.toUpperCase())) return true;
                 break;
             default:
@@ -744,12 +744,12 @@ public class Parser {
                 bp.skipWs();
                 if (!bp.atEnd()) s.replacement = bp.parseExpr();
                 // S = P R split: `fact = eq(n,1) 1` → subject=fact, pattern=eq(n,1), replacement=1
-                // If rhs is a multi-child SEQ/CAT whose first child is E_FNC and the whole
+                // If rhs is a multi-child SEQ/CAT whose first child is AST_FNC and the whole
                 // rhs is not a pure pattern value, split: [0..n-2] → pattern, [n-1] → replacement.
                 if (s.subject != null && s.replacement != null
-                        && (s.replacement.kind == EKind.E_SEQ || s.replacement.kind == EKind.E_CAT)
+                        && (s.replacement.kind == EKind.AST_SEQ || s.replacement.kind == EKind.AST_CAT)
                         && s.replacement.children.size() >= 2
-                        && s.replacement.children.get(0).kind == EKind.E_FNC
+                        && s.replacement.children.get(0).kind == EKind.AST_FNC
                         && !replIsPatTree(s.replacement)) {
                     List<ExprNode> kids = s.replacement.children;
                     ExprNode replKid = kids.get(kids.size() - 1);
@@ -780,7 +780,7 @@ public class Parser {
             }
         }
 
-        // fixup E_SEQ → E_CAT in value-context trees
+        // fixup AST_SEQ → AST_CAT in value-context trees
         fixupValTree(s.subject);
         if (s.replacement != null && !replIsPatTree(s.replacement))
             fixupValTree(s.replacement);

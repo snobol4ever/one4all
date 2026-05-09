@@ -3,12 +3,12 @@
 #
 # Builds and runs test_snocone_parse_d, which verifies that the new
 # Bison-based Snocone parser handles the LS-4.d addition:
-#   * postfix subscript `a[i, j]` → E_IDX(a, i, j)  (n-ary)
-#   * left-recursive chaining: `a[i][j]` → E_IDX(E_IDX(a, i), j)
-#   * empty subscript: `a[]` → E_IDX(a)  (uses the empty-list arm)
-#   * string keys: `T['key']` → E_IDX(T, QLIT(key))
-#   * expression children: `a[1+2, 3*4]` → E_IDX(a, ADD(1,2), MUL(3,4))
-#   * call-then-subscript: `f(x)[i]` → E_IDX(FNC(f,x), i)
+#   * postfix subscript `a[i, j]` → AST_IDX(a, i, j)  (n-ary)
+#   * left-recursive chaining: `a[i][j]` → AST_IDX(AST_IDX(a, i), j)
+#   * empty subscript: `a[]` → AST_IDX(a)  (uses the empty-list arm)
+#   * string keys: `T['key']` → AST_IDX(T, QLIT(key))
+#   * expression children: `a[1+2, 3*4]` → AST_IDX(a, ADD(1,2), MUL(3,4))
+#   * call-then-subscript: `f(x)[i]` → AST_IDX(FNC(f,x), i)
 #   * the precedence relation: subscript at expr15 binds tighter than
 #     exponentiation at expr11, so `a[i] ^ 2` is `(a[i]) ^ 2`
 #   * compound-assigns with subscript LHS: `a[i] += 1` → distinct

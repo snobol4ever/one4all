@@ -148,7 +148,7 @@ WS       [ \t\r]
 
     /* ── Double-quoted string: flat literal or interpolated ──────── */
     /* If the buffer contains '$', emit LIT_INTERP_STR (RK-12).     */
-    /* The lowerer splits on $var boundaries into an E_CAT chain.    */
+    /* The lowerer splits on $var boundaries into an AST_CAT chain.    */
 "\""            { raku_strpos = 0; BEGIN(STR_DQ); }
 <STR_DQ>"\"" {
     raku_strbuf[raku_strpos] = '\0';

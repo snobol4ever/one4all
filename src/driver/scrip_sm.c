@@ -31,7 +31,7 @@ extern jmp_buf g_sno_err_jmp;
  * CH-17d for Prolog), the lookup returns a valid pc; otherwise -1.  CH-17a is
  * pure scaffolding — sm_lower does not yet emit named proc-body chunks for any
  * frontend, so every entry_pc remains -1 here.  Subsequent rungs flip producers,
- * then consumers, then delete the legacy EXPR_t* paths.
+ * then consumers, then delete the legacy AST_t* paths.
  *
  * Env var SCRIP_PROC_ENTRY_PCS=1 prints a summary line per resolved entry. */
 static void sm_resolve_proc_entry_pcs(SM_Program *p)
@@ -94,14 +94,14 @@ SM_Program *sm_preamble(void *prog_void)
     /* CH-17a: resolve entry_pcs for every proc / Prolog predicate.  Pure
      * scaffolding: today every entry resolves to -1 because sm_lower does not
      * yet emit named proc-body chunks (CH-17b/d will).  Consumers still use
-     * the legacy proc/EXPR_t* paths until CH-17c/e flip them. */
+     * the legacy proc/AST_t* paths until CH-17c/e flip them. */
     sm_resolve_proc_entry_pcs(sm);
 
     /* RS-9b: SM_Program is self-contained for SNOBOL4 — emit_push_expr
-     * GC-clones the EXPR_t subtrees so SM owns them.  Free the IR.
+     * GC-clones the AST_t subtrees so SM owns them.  Free the IR.
      *
      * RS-26: but for non-SNO frontends, BB drives the live IR — the proc/
-     * pred tables populated above hold EXPR_t* into prog that survive only
+     * pred tables populated above hold AST_t* into prog that survive only
      * if the IR survives.  Gate code_free on lang_mask: pure-SNO programs
      * still get the RS-9b behaviour; mixed or non-SNO programs keep the IR
      * alive for the duration of execution.

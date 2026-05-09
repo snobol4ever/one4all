@@ -51,55 +51,55 @@ public sealed class PatternBuilder
         return n.Kind switch
         {
             // Structural
-            IrKind.E_ALT  => BuildAlt(n),
-            IrKind.E_SEQ  => BuildSeq(n),
-            IrKind.E_CAT  => BuildSeq(n),   // CAT in pattern context = sequence
+            IrKind.AST_ALT  => BuildAlt(n),
+            IrKind.AST_SEQ  => BuildSeq(n),
+            IrKind.AST_CAT  => BuildSeq(n),   // CAT in pattern context = sequence
 
             // Literals
-            IrKind.E_QLIT => BoxFactory.CreateLit(n.SVal ?? ""),
-            IrKind.E_ILIT => BoxFactory.CreateLit(n.IVal.ToString()),
-            IrKind.E_FLIT => BoxFactory.CreateLit(n.DVal.ToString()),
+            IrKind.AST_QLIT => BoxFactory.CreateLit(n.SVal ?? ""),
+            IrKind.AST_ILIT => BoxFactory.CreateLit(n.IVal.ToString()),
+            IrKind.AST_FLIT => BoxFactory.CreateLit(n.DVal.ToString()),
 
             // Captures
-            IrKind.E_CAPT_COND_ASGN  => BuildCaptureCond(n),
-            IrKind.E_CAPT_IMMED_ASGN => BuildCaptureImm(n),
-            IrKind.E_CAPT_CURSOR      => BuildCaptCursor(n),
+            IrKind.AST_CAPT_COND_ASGN  => BuildCaptureCond(n),
+            IrKind.AST_CAPT_IMMED_ASGN => BuildCaptureImm(n),
+            IrKind.AST_CAPT_CURSOR      => BuildCaptCursor(n),
 
             // Deferred pattern
-            IrKind.E_DEFER => BuildDeferred(n),
+            IrKind.AST_DEFER => BuildDeferred(n),
 
             // Variable — resolve at build time
-            IrKind.E_VAR  => BuildVar(n.SVal!),
+            IrKind.AST_VAR  => BuildVar(n.SVal!),
 
             // Indirect $expr
-            IrKind.E_INDIRECT => BuildIndirect(n),
+            IrKind.AST_INDIRECT => BuildIndirect(n),
 
             // Nullary pattern primitives
-            IrKind.E_ARB     => BoxFactory.CreateArb(),
-            IrKind.E_REM     => BoxFactory.CreateRem(),
-            IrKind.E_FAIL    => BoxFactory.CreateFail(),
-            IrKind.E_SUCCEED => BoxFactory.CreateSucceed(),
-            IrKind.E_FENCE   => BoxFactory.CreateFence(),
-            IrKind.E_ABORT   => BoxFactory.CreateAbort(),
-            IrKind.E_BAL     => BoxFactory.CreateBal(),
+            IrKind.AST_ARB     => BoxFactory.CreateArb(),
+            IrKind.AST_REM     => BoxFactory.CreateRem(),
+            IrKind.AST_FAIL    => BoxFactory.CreateFail(),
+            IrKind.AST_SUCCEED => BoxFactory.CreateSucceed(),
+            IrKind.AST_FENCE   => BoxFactory.CreateFence(),
+            IrKind.AST_ABORT   => BoxFactory.CreateAbort(),
+            IrKind.AST_BAL     => BoxFactory.CreateBal(),
 
             // Unary pattern primitives — arg in Children[0]
-            IrKind.E_ANY     => BoxFactory.CreateAny(StrArg(n, 0)),
-            IrKind.E_NOTANY  => BoxFactory.CreateNotany(StrArg(n, 0)),
-            IrKind.E_SPAN    => BoxFactory.CreateSpan(StrArg(n, 0)),
-            IrKind.E_BREAK   => BoxFactory.CreateBrk(StrArg(n, 0)),
-            IrKind.E_BREAKX  => BoxFactory.CreateBreakx(StrArg(n, 0)),
-            IrKind.E_LEN     => BoxFactory.CreateLen(IntArg(n, 0)),
-            IrKind.E_TAB     => BoxFactory.CreateTab(IntArg(n, 0)),
-            IrKind.E_RTAB    => BoxFactory.CreateRtab(IntArg(n, 0)),
-            IrKind.E_POS     => BoxFactory.CreatePos(IntArg(n, 0)),
-            IrKind.E_RPOS    => BoxFactory.CreateRpos(IntArg(n, 0)),
-            IrKind.E_ARBNO   => n.Children.Length >= 1
+            IrKind.AST_ANY     => BoxFactory.CreateAny(StrArg(n, 0)),
+            IrKind.AST_NOTANY  => BoxFactory.CreateNotany(StrArg(n, 0)),
+            IrKind.AST_SPAN    => BoxFactory.CreateSpan(StrArg(n, 0)),
+            IrKind.AST_BREAK   => BoxFactory.CreateBrk(StrArg(n, 0)),
+            IrKind.AST_BREAKX  => BoxFactory.CreateBreakx(StrArg(n, 0)),
+            IrKind.AST_LEN     => BoxFactory.CreateLen(IntArg(n, 0)),
+            IrKind.AST_TAB     => BoxFactory.CreateTab(IntArg(n, 0)),
+            IrKind.AST_RTAB    => BoxFactory.CreateRtab(IntArg(n, 0)),
+            IrKind.AST_POS     => BoxFactory.CreatePos(IntArg(n, 0)),
+            IrKind.AST_RPOS    => BoxFactory.CreateRpos(IntArg(n, 0)),
+            IrKind.AST_ARBNO   => n.Children.Length >= 1
                                     ? BoxFactory.CreateArbno(BuildNode(n.Children[0]))
                                     : BoxFactory.CreateEps(),
 
             // Function call — may be a pattern builtin with dynamic args
-            IrKind.E_FNC  => BuildFncPattern(n),
+            IrKind.AST_FNC  => BuildFncPattern(n),
 
             _ => BoxFactory.CreateLit("")   // safe fallback
         };
@@ -112,7 +112,7 @@ public sealed class PatternBuilder
         var parts = new List<IrNode>();
         void Collect(IrNode x)
         {
-            if (x.Kind == IrKind.E_ALT)
+            if (x.Kind == IrKind.AST_ALT)
                 foreach (var c in x.Children) Collect(c);
             else
                 parts.Add(x);
@@ -128,7 +128,7 @@ public sealed class PatternBuilder
         var parts = new List<IrNode>();
         void Collect(IrNode x)
         {
-            if (x.Kind == IrKind.E_SEQ || x.Kind == IrKind.E_CAT)
+            if (x.Kind == IrKind.AST_SEQ || x.Kind == IrKind.AST_CAT)
                 foreach (var c in x.Children) Collect(c);
             else
                 parts.Add(x);
@@ -138,19 +138,19 @@ public sealed class PatternBuilder
         if (parts.Count == 1) return BuildNode(parts[0]);
 
         // Build left-to-right as a list of IByrdBox, handling capture wrapping:
-        // When a part is E_CAPT_COND_ASGN or E_CAPT_IMMED_ASGN, it wraps the
+        // When a part is AST_CAPT_COND_ASGN or AST_CAPT_IMMED_ASGN, it wraps the
         // immediately preceding box (its left sibling in the pattern sequence).
         var boxes = new List<IByrdBox>();
         foreach (var part in parts)
         {
-            bool isCond  = part.Kind == IrKind.E_CAPT_COND_ASGN;
-            bool isImmed = part.Kind == IrKind.E_CAPT_IMMED_ASGN;
+            bool isCond  = part.Kind == IrKind.AST_CAPT_COND_ASGN;
+            bool isImmed = part.Kind == IrKind.AST_CAPT_IMMED_ASGN;
             if ((isCond || isImmed) && boxes.Count > 0)
             {
                 // Pop the last box — this is what the capture matches over
                 var prev    = boxes[^1];
                 boxes.RemoveAt(boxes.Count - 1);
-                var varName = part.Children.Length > 0 && part.Children[0].Kind == IrKind.E_VAR
+                var varName = part.Children.Length > 0 && part.Children[0].Kind == IrKind.AST_VAR
                             ? part.Children[0].SVal!
                             : (part.SVal ?? "");
                 var cap = BoxFactory.CreateCapture(prev, varName, immediate: isImmed);
@@ -158,10 +158,10 @@ public sealed class PatternBuilder
                 _captures.Add(cap);
                 boxes.Add(cap);
             }
-            else if (part.Kind == IrKind.E_CAPT_CURSOR)
+            else if (part.Kind == IrKind.AST_CAPT_CURSOR)
             {
                 // @var — cursor capture wraps Eps (records position, not span)
-                var varName = part.Children.Length > 0 && part.Children[0].Kind == IrKind.E_VAR
+                var varName = part.Children.Length > 0 && part.Children[0].Kind == IrKind.AST_VAR
                             ? part.Children[0].SVal!
                             : (part.SVal ?? "");
                 { var _atp = BoxFactory.CreateAtp(varName); _atp.SetVar = _setVar; boxes.Add(_atp); }
@@ -185,11 +185,11 @@ public sealed class PatternBuilder
     private IByrdBox BuildCaptureCond(IrNode n)
     {
         // Children[0] = inner pattern node, SVal or Children[0] of inner = varname
-        // For E_CAPT_COND_ASGN the child is E_VAR(varname) — the inner pattern
+        // For AST_CAPT_COND_ASGN the child is AST_VAR(varname) — the inner pattern
         // is the surrounding context; here we wrap the previous box.
-        // When parser emits E_CAPT_COND_ASGN with one child E_VAR, the pattern
+        // When parser emits AST_CAPT_COND_ASGN with one child AST_VAR, the pattern
         // is the containing SEQ node's left sibling. For standalone .var, wrap Eps.
-        var varName = n.Children.Length > 0 && n.Children[0].Kind == IrKind.E_VAR
+        var varName = n.Children.Length > 0 && n.Children[0].Kind == IrKind.AST_VAR
                     ? n.Children[0].SVal!
                     : (n.SVal ?? "");
         var inner   = BoxFactory.CreateEps();
@@ -201,7 +201,7 @@ public sealed class PatternBuilder
 
     private IByrdBox BuildCaptureImm(IrNode n)
     {
-        var varName = n.Children.Length > 0 && n.Children[0].Kind == IrKind.E_VAR
+        var varName = n.Children.Length > 0 && n.Children[0].Kind == IrKind.AST_VAR
                     ? n.Children[0].SVal!
                     : (n.SVal ?? "");
         var inner   = BoxFactory.CreateEps();
@@ -212,7 +212,7 @@ public sealed class PatternBuilder
 
     private IByrdBox BuildCaptCursor(IrNode n)
     {
-        var varName = n.Children.Length > 0 && n.Children[0].Kind == IrKind.E_VAR
+        var varName = n.Children.Length > 0 && n.Children[0].Kind == IrKind.AST_VAR
                     ? n.Children[0].SVal!
                     : (n.SVal ?? "");
         var _atp2 = BoxFactory.CreateAtp(varName);
@@ -224,7 +224,7 @@ public sealed class PatternBuilder
 
     private IByrdBox BuildDeferred(IrNode n)
     {
-        if (n.Children.Length > 0 && n.Children[0].Kind == IrKind.E_VAR)
+        if (n.Children.Length > 0 && n.Children[0].Kind == IrKind.AST_VAR)
         {
             var name = n.Children[0].SVal!;
             var _dv = BoxFactory.CreateDvar(name);

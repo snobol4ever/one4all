@@ -37,7 +37,7 @@
 #include "snobol4.h"
 #include "sil_macros.h"
 #include "../../ir/ir.h"
-#include "../../frontend/snobol4/scrip_cc.h"  /* EXPR_t, E_FNC for SM_PAT_CAPTURE_FN */
+#include "../../frontend/snobol4/scrip_cc.h"  /* AST_t, AST_FNC for SM_PAT_CAPTURE_FN */
 #include "bb_broker.h"   /* SN-9b: SM_BB_PUMP / SM_BB_ONCE handlers */
 
 #include <stdio.h>
@@ -296,7 +296,7 @@ static void h_call_chunk(void)
  *
  * coro_eval and pump_print live in scrip.c / sm_interp.c — declared
  * extern here so the handler bodies are identical to the sm_interp cases. */
-extern bb_node_t coro_eval(EXPR_t *e);
+extern bb_node_t coro_eval(AST_t *e);
 static void jit_pump_print(DESCR_t val, void *arg)
 {
     (void)arg;
@@ -307,7 +307,7 @@ static void jit_pump_print(DESCR_t val, void *arg)
 static void h_bb_pump(void)
 {
     DESCR_t expr_d = POP();
-    EXPR_t *expr   = (EXPR_t *)expr_d.ptr;
+    AST_t *expr   = (AST_t *)expr_d.ptr;
     if (!expr) { STATE->last_ok = 0; return; }
     bb_node_t node = coro_eval(expr);
     int ticks = bb_broker(node, BB_PUMP, jit_pump_print, NULL);
@@ -317,7 +317,7 @@ static void h_bb_pump(void)
 static void h_bb_once(void)
 {
     DESCR_t expr_d = POP();
-    EXPR_t *expr   = (EXPR_t *)expr_d.ptr;
+    AST_t *expr   = (AST_t *)expr_d.ptr;
     if (!expr) { STATE->last_ok = 0; return; }
     bb_node_t node = coro_eval(expr);
     int ticks = bb_broker(node, BB_ONCE, NULL, NULL);
@@ -325,7 +325,7 @@ static void h_bb_once(void)
 }
 
 /* CH-17f: Prolog name-driven BB_ONCE — mirror of SM_BB_ONCE_PROC handler
- * in sm_interp.c.  No EXPR_t* pushed or walked at the SM layer.
+ * in sm_interp.c.  No AST_t* pushed or walked at the SM layer.
  * IR fallback path until chunk bodies are filled in a later rung. */
 #include "../../frontend/prolog/pl_broker.h"
 #include "../../runtime/interp/pl_runtime.h"
@@ -333,7 +333,7 @@ static void h_bb_once_proc(void)
 {
     const char   *key   = CUR_INS->a[0].s;
     int           arity = (int)CUR_INS->a[1].i;
-    EXPR_t       *choice = key ? pl_pred_table_lookup_global(key) : NULL;
+    AST_t       *choice = key ? pl_pred_table_lookup_global(key) : NULL;
     bb_node_t     node   = choice ? pl_box_choice(choice, g_pl_env, arity)
                                   : pl_box_fail();
     int ticks = bb_broker(node, BB_ONCE, NULL, NULL);
@@ -341,7 +341,7 @@ static void h_bb_once_proc(void)
 }
 
 /* CHUNKS-step12: name-driven Icon proc BB pump — mirror of SM_BB_PUMP_PROC
- * handler in sm_interp.c. The synthesised E_FNC + emit_push_expr path is
+ * handler in sm_interp.c. The synthesised AST_FNC + emit_push_expr path is
  * gone; the lowerer emits SM_BB_PUMP_PROC "main", 0 directly. */
 extern bb_node_t coro_pump_proc_by_name(const char *name, DESCR_t *args, int nargs);
 static void h_bb_pump_proc(void)
@@ -388,7 +388,7 @@ static void h_bb_pump_case(void)
         DESCR_t c = POP();
         body_pcs[k]  = (b.v == DT_E && b.slen == 1) ? (int)b.i : -1;
         val_pcs[k]   = (v.v == DT_E && v.slen == 1) ? (int)v.i : -1;
-        cmp_kinds[k] = (c.v == DT_I) ? (int)c.i : (int)E_EQ;
+        cmp_kinds[k] = (c.v == DT_I) ? (int)c.i : (int)AST_EQ;
     }
 
     DESCR_t topic_d = POP();
@@ -401,7 +401,7 @@ static void h_bb_pump_case(void)
         if (val_pcs[k] < 0 || body_pcs[k] < 0) continue;
         DESCR_t wval = sm_call_chunk(val_pcs[k]);
         int match = 0;
-        if ((EXPR_e)cmp_kinds[k] == E_LEQ) {
+        if ((AST_e)cmp_kinds[k] == AST_LEQ) {
             const char *ts = IS_STR_fn(topic) ? topic.s : VARVAL_fn(topic);
             const char *ws = IS_STR_fn(wval)  ? wval.s  : VARVAL_fn(wval);
             match = (ts && ws && strcmp(ts, ws) == 0);
@@ -467,7 +467,7 @@ static void h_store_var(void)
         return;
     }
     /* SN-32c-store-val: push `val` (the RHS value), NOT the return value of
-     * NV_SET_fn.  The IR path (interp.c E_ASSIGN, line 2844) always returns
+     * NV_SET_fn.  The IR path (interp.c AST_ASSIGN, line 2844) always returns
      * `val` regardless of what NV_SET_fn stores — NV_SET_fn's return value
      * is unreliable for DT_DATA objects (returns SNUL on the second call
      * for the same variable).  Pushing `val` ensures DIFFER(sno=Pop()) sees
@@ -646,7 +646,7 @@ static void h_pat_capture_fn(void)
 {
     /* . *func() or $ *func() — a[0].s = function name.
      * a[2].s (TL-2): optional '\t'-separated arg *names* for flush-time
-     * resolution — set when every arg of *func() is a plain E_VAR.
+     * resolution — set when every arg of *func() is a plain AST_VAR.
      * Use pat_assign_callcap → XCALLCAP, lowered to bb_cap with NM_CALL
      * NameKind_t (SN-21d).  The old DT_E/pat_assign_cond approach only
      * worked via materialise() which is not used in the byrd-box
@@ -1159,10 +1159,10 @@ static void init_handler_table(void)
     g_handlers[SM_BB_PUMP]      = h_bb_pump;
     g_handlers[SM_BB_ONCE]      = h_bb_once;
     /* CH-17f: Prolog name-driven BB_ONCE dispatch — replaces the legacy
-     * lower_expr(E_CHOICE) + SM_BB_ONCE wrapper. */
+     * lower_expr(AST_CHOICE) + SM_BB_ONCE wrapper. */
     g_handlers[SM_BB_ONCE_PROC] = h_bb_once_proc;
     /* CHUNKS-step12: name-driven Icon proc BB pump — replaces the synthesised
-     * E_FNC + SM_PUSH_EXPR + SM_BB_PUMP wrapper for top-level call_main. */
+     * AST_FNC + SM_PUSH_EXPR + SM_BB_PUMP wrapper for top-level call_main. */
     g_handlers[SM_BB_PUMP_PROC] = h_bb_pump_proc;
     g_handlers[SM_BB_PUMP_CASE] = h_bb_pump_case;
     g_handlers[SM_BB_PUMP_SM]   = h_bb_pump_sm;
@@ -1176,7 +1176,7 @@ static void init_handler_table(void)
     g_handlers[SM_STORE_FRAME]  = h_store_frame;   /* CHUNKS-step17b'': named FATAL — JIT gen is M5 */
     /* Opcodes still stubbed as h_unimpl — by design, not by omission:
      *   SM_JUMP_INDIR     — computed gotos `:($expr)`.  sm_lower emits
-     *     this from E_COMPUTED_GOTO, but the SNOBOL4 parser currently
+     *     this from AST_COMPUTED_GOTO, but the SNOBOL4 parser currently
      *     treats computed gotos as undefined labels (Error 24) in all
      *     three modes.  Not a JIT-specific gap; cross-mode issue tracked
      *     outside SN-9.

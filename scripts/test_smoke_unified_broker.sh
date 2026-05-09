@@ -112,7 +112,7 @@ procedure main()
 end
 EOF
 
-echo "  SKIP ICN: user proc suspend (E_FNC coroutine — post-U-17, wired in U-18)"
+echo "  SKIP ICN: user proc suspend (AST_FNC coroutine — post-U-17, wired in U-18)"
 
 file_test "ICN: palindrome" "$ROOT/test/icon/palindrome.icn" "$(printf 'yes\nno\nyes')"
 

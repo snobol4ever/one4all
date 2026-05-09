@@ -64,7 +64,7 @@ bb_node_t pl_box_fail(void) {
  * pl_box_builtin — α calls interp_exec_pl_builtin(); β returns ω
  * Builtins are deterministic (succeed or fail once; no retry).
  *--------------------------------------------------------------------------------------------------------------------*/
-typedef struct { EXPR_t *goal; Term **env; } pl_builtin_t;
+typedef struct { AST_t *goal; Term **env; } pl_builtin_t;
 
 static DESCR_t pl_builtin_fn(void *zeta, int entry) {
     pl_builtin_t *ζ = zeta;
@@ -75,7 +75,7 @@ static DESCR_t pl_builtin_fn(void *zeta, int entry) {
     return FAILDESCR;   /* β → ω: builtins have no retry */
 }
 
-bb_node_t pl_box_builtin(EXPR_t *goal, Term **env) {
+bb_node_t pl_box_builtin(AST_t *goal, Term **env) {
     pl_builtin_t *ζ = malloc(sizeof(pl_builtin_t));
     ζ->goal = goal;
     ζ->env  = env;
@@ -148,11 +148,11 @@ bb_node_t pl_box_cat_list(bb_node_t *goals, int n) {
 /*======================================================================================================================
  * S-BB-4 — pl_box_clause (one Horn clause as a Byrd box)
  *
- * Given one E_CLAUSE node and a caller arg-term array (caller_args[0..arity-1]),
+ * Given one AST_CLAUSE node and a caller arg-term array (caller_args[0..arity-1]),
  * builds:
  *   head_unify_box  CAT  body_goal_box_0  CAT  ...  CAT  body_goal_box_n
  *
- * E_CLAUSE layout (from prolog_lower.c):
+ * AST_CLAUSE layout (from prolog_lower.c):
  *   ec->ival        = n_vars  (EnvLayout.n_vars)
  *   ec->dval        = (double)arity
  *   ec->children[0..arity-1]   = head argument IR terms
@@ -167,22 +167,22 @@ bb_node_t pl_box_cat_list(bb_node_t *goals, int n) {
  *      (head unification is not re-entrant — β always fails)
  *
  * Body goal boxes:
- *   E_FNC builtin  → pl_box_builtin(goal, cenv)     [cenv captured at head-unify time]
- *   E_FNC user call → pl_box_choice_call(goal, cenv) [S-BB-5: forward-declared below]
- *   E_UNIFY        → pl_box_unify(goal, cenv)
- *   E_CUT          → pl_box_cut()
+ *   AST_FNC builtin  → pl_box_builtin(goal, cenv)     [cenv captured at head-unify time]
+ *   AST_FNC user call → pl_box_choice_call(goal, cenv) [S-BB-5: forward-declared below]
+ *   AST_UNIFY        → pl_box_unify(goal, cenv)
+ *   AST_CUT          → pl_box_cut()
  *   others         → pl_box_true() (safe no-op; refined in later steps)
  *
  * The head box and body boxes are chained with pl_box_cat_list.
  *====================================================================================================================*/
 
 /* Forward declaration for S-BB-5 user-call box (not yet implemented) */
-bb_node_t pl_box_choice_call(EXPR_t *goal, Term **env);   /* defined in S-BB-5 */
+bb_node_t pl_box_choice_call(AST_t *goal, Term **env);   /* defined in S-BB-5 */
 
 /*----------------------------------------------------------------------------------------------------------------------
- * pl_box_unify — E_UNIFY leaf box: α unifies children[0] and children[1] via trail; β undoes.
+ * pl_box_unify — AST_UNIFY leaf box: α unifies children[0] and children[1] via trail; β undoes.
  *--------------------------------------------------------------------------------------------------------------------*/
-typedef struct { EXPR_t *node; Term **env; int mark; int fired; } pl_unify_t;
+typedef struct { AST_t *node; Term **env; int mark; int fired; } pl_unify_t;
 
 static DESCR_t pl_unify_fn(void *zeta, int entry) {
     pl_unify_t *ζ = zeta;
@@ -201,7 +201,7 @@ static DESCR_t pl_unify_fn(void *zeta, int entry) {
     return FAILDESCR;
 }
 
-static bb_node_t pl_box_unify(EXPR_t *node, Term **env) {
+static bb_node_t pl_box_unify(AST_t *node, Term **env) {
     pl_unify_t *ζ = calloc(1, sizeof(pl_unify_t));
     ζ->node = node; ζ->env = env;
     return (bb_node_t){ pl_unify_fn, ζ, 0 };
@@ -213,7 +213,7 @@ static bb_node_t pl_box_unify(EXPR_t *node, Term **env) {
 typedef struct {
     Term   **caller_args;   /* caller's arg array (caller owns — we do not free) */
     int      arity;
-    EXPR_t  *ec;            /* the E_CLAUSE node (head args live in children[0..arity-1]) */
+    AST_t  *ec;            /* the AST_CLAUSE node (head args live in children[0..arity-1]) */
     Term   **cenv;          /* allocated on α, freed on β */
     int      n_vars;
     int      head_mark;     /* trail mark saved before head unification */
@@ -252,14 +252,14 @@ static DESCR_t pl_head_unify_fn(void *zeta, int entry) {
  * env is the clause's cenv (populated after head unification succeeds).
  * For user calls (S-BB-5), we forward to pl_box_choice_call.
  *--------------------------------------------------------------------------------------------------------------------*/
-static int pl_is_builtin_goal(EXPR_t *g);                              /* forward */
+static int pl_is_builtin_goal(AST_t *g);                              /* forward */
 static bb_node_t pl_box_alt(bb_node_t left, bb_node_t right);       /* forward */
 
-bb_node_t pl_box_goal_from_ir(EXPR_t *g, Term **env) {
+bb_node_t pl_box_goal_from_ir(AST_t *g, Term **env) {
     if (!g) return pl_box_true();
-    if (g->kind == E_CUT)   return pl_box_cut();
-    if (g->kind == E_UNIFY) return pl_box_unify(g, env);
-    if (g->kind == E_FNC) {
+    if (g->kind == AST_CUT)   return pl_box_cut();
+    if (g->kind == AST_UNIFY) return pl_box_unify(g, env);
+    if (g->kind == AST_FNC) {
         if (g->sval && strcmp(g->sval, "true") == 0) return pl_box_true();
         if (g->sval && strcmp(g->sval, "fail") == 0) return pl_box_fail();
         /* `,/N` — conjunction: lowerer produces n-ary node; fold into CAT chain */
@@ -274,8 +274,8 @@ bb_node_t pl_box_goal_from_ir(EXPR_t *g, Term **env) {
         /* `;/N` — disjunction or if-then-else; lowerer may produce n-ary node */
         if (g->sval && strcmp(g->sval, ";") == 0 && g->nchildren >= 2) {
             /* if-then-else: first child is (Cond -> Then), second is Else */
-            EXPR_t *lc = g->children[0];
-            if (lc && lc->kind == E_FNC && lc->sval &&
+            AST_t *lc = g->children[0];
+            if (lc && lc->kind == AST_FNC && lc->sval &&
                 strcmp(lc->sval, "->") == 0 && lc->nchildren >= 2) {
                 /* Build Cond CAT Then from n-ary -> node */
                 bb_node_t *then_goals = malloc(lc->nchildren * sizeof(bb_node_t));
@@ -308,8 +308,8 @@ bb_node_t pl_box_goal_from_ir(EXPR_t *g, Term **env) {
 }
 
 /* pl_is_builtin_goal — mirrors is_pl_user_call() logic (inverse) */
-static int pl_is_builtin_goal(EXPR_t *g) {
-    if (!g || g->kind != E_FNC || !g->sval) return 0;
+static int pl_is_builtin_goal(AST_t *g) {
+    if (!g || g->kind != AST_FNC || !g->sval) return 0;
     static const char *builtins[] = {
         "true","fail","halt","nl","write","writeln","print","writeq","write_canonical","tab","is",
         "<",">","=<",">=","=:=","=\\=","=","\\=","==","\\==",
@@ -336,7 +336,7 @@ static int pl_is_builtin_goal(EXPR_t *g) {
 
 /*----------------------------------------------------------------------------------------------------------------------
 /* Forward declaration — defined after pl_is_builtin_goal */
-bb_node_t pl_box_goal_from_ir(EXPR_t *g, Term **env);  /* forward */
+bb_node_t pl_box_goal_from_ir(AST_t *g, Term **env);  /* forward */
 
 /*----------------------------------------------------------------------------------------------------------------------
  * pl_box_deferred_env — wraps a body goal box whose env is not yet known at
@@ -347,7 +347,7 @@ bb_node_t pl_box_goal_from_ir(EXPR_t *g, Term **env);  /* forward */
  * the CAT chain calls head_box α before any body box.
  *--------------------------------------------------------------------------------------------------------------------*/
 typedef struct {
-    EXPR_t    *goal_node;   /* IR node for this body goal */
+    AST_t    *goal_node;   /* IR node for this body goal */
     Term    ***env_ptr;     /* &hζ->cenv — filled in by head-unify α */
     bb_node_t inner;       /* built lazily on first α */
     int        built;
@@ -364,7 +364,7 @@ static DESCR_t pl_deferred_env_fn(void *zeta, int entry) {
     return ζ->inner.fn(ζ->inner.ζ, β);
 }
 
-static bb_node_t pl_box_deferred_env(EXPR_t *goal_node, Term ***env_ptr) {
+static bb_node_t pl_box_deferred_env(AST_t *goal_node, Term ***env_ptr) {
     pl_deferred_env_t *ζ = calloc(1, sizeof(pl_deferred_env_t));
     ζ->goal_node = goal_node;
     ζ->env_ptr   = env_ptr;
@@ -378,8 +378,8 @@ static bb_node_t pl_box_deferred_env(EXPR_t *goal_node, Term ***env_ptr) {
  * Body goal boxes use pl_box_deferred_env so they resolve hζ->cenv at
  * call time (after head-unify α has allocated and populated cenv).
  *--------------------------------------------------------------------------------------------------------------------*/
-bb_node_t pl_box_clause(EXPR_t *ec, Term **caller_args, int arity) {
-    if (!ec || ec->kind != E_CLAUSE) return pl_box_fail();
+bb_node_t pl_box_clause(AST_t *ec, Term **caller_args, int arity) {
+    if (!ec || ec->kind != AST_CLAUSE) return pl_box_fail();
     int n_vars = (int)ec->ival;
     int nbody  = ec->nchildren - arity;
     if (nbody < 0) nbody = 0;
@@ -469,19 +469,19 @@ static bb_node_t pl_box_alt(bb_node_t left, bb_node_t right) {
 /*======================================================================================================================
  * pl_box_seq — conjunction (,/2) as a CAT-box alias
  * Conjunctions in the body are already handled by pl_box_cat_list in pl_box_clause,
- * but `,/2` appearing as an E_FNC goal node needs this explicit builder.
+ * but `,/2` appearing as an AST_FNC goal node needs this explicit builder.
  *====================================================================================================================*/
 /*======================================================================================================================
  * S-BB-5 — pl_box_choice and pl_box_choice_call (OR-box over predicate clauses)
  *
- * OR-box over all E_CLAUSE children of one E_CHOICE IR node.
+ * OR-box over all AST_CLAUSE children of one AST_CHOICE IR node.
  * State: { clauses[], nclause, ci, trail_mark, cur clause box }
  *   α: trail_mark(); try clause[0](α).
  *   β: retry cur clause(β); on ω → trail_unwind, ci++, try clause[ci](α).
  *   ci == nclause or g_pl_cut_flag: trail_unwind; return ω.
  *====================================================================================================================*/
 typedef struct {
-    EXPR_t    **clauses;
+    AST_t    **clauses;
     int         nclause;
     int         ci;
     int         trail_mark;
@@ -514,8 +514,8 @@ static DESCR_t pl_choice_fn(void *zeta, int entry) {
     g_pl_cur_cut_flag  = &ζ->cut;
 
     while (ζ->ci < ζ->nclause && !ζ->cut) {
-        EXPR_t *ec = ζ->clauses[ζ->ci];
-        if (!ec || ec->kind != E_CLAUSE) { ζ->ci++; continue; }
+        AST_t *ec = ζ->clauses[ζ->ci];
+        if (!ec || ec->kind != AST_CLAUSE) { ζ->ci++; continue; }
         trail_unwind(&g_pl_trail, ζ->trail_mark);
         ζ->cur        = pl_box_clause(ec, ζ->caller_args, ζ->arity);
         ζ->cur_active = 1;
@@ -536,8 +536,8 @@ static DESCR_t pl_choice_fn(void *zeta, int entry) {
     return FAILDESCR;
 }
 
-bb_node_t pl_box_choice(EXPR_t *choice_node, Term **caller_args, int arity) {
-    if (!choice_node || choice_node->kind != E_CHOICE) return pl_box_fail();
+bb_node_t pl_box_choice(AST_t *choice_node, Term **caller_args, int arity) {
+    if (!choice_node || choice_node->kind != AST_CHOICE) return pl_box_fail();
     pl_choice_t *ζ = calloc(1, sizeof(pl_choice_t));
     ζ->clauses     = choice_node->children;
     ζ->nclause     = choice_node->nchildren;
@@ -550,7 +550,7 @@ bb_node_t pl_box_choice(EXPR_t *choice_node, Term **caller_args, int arity) {
  *
  * When Pl_PredEntry.entry_pc >= 0 (chunk lowered by CH-17d/f), call the
  * chunk via sm_call_chunk(entry_pc) rather than walking the IR tree via
- * pl_box_choice(EXPR_t*).  The chunk body is SK-only (SM_RETURN) until
+ * pl_box_choice(AST_t*).  The chunk body is SK-only (SM_RETURN) until
  * CH-17f fills it; sm_call_chunk returns FAILDESCR on empty stack, which
  * is the correct "no solution" result for a skeleton-only predicate.
  *
@@ -577,15 +577,15 @@ bb_node_t pl_box_choice_pc(int entry_pc, Term **caller_args, int arity) {
     return (bb_node_t){ pl_chunk_fn, z, 0 };
 }
 
-bb_node_t pl_box_choice_call(EXPR_t *goal, Term **env) {
+bb_node_t pl_box_choice_call(AST_t *goal, Term **env) {
     if (!goal || !goal->sval) return pl_box_fail();
     int arity = goal->nchildren;
     char key[256];
     snprintf(key, sizeof key, "%s/%d", goal->sval, arity);
-    EXPR_t *choice = pl_pred_table_lookup_global(key);
+    AST_t *choice = pl_pred_table_lookup_global(key);
     if (!choice) return pl_box_fail();
     Term **caller_args = arity ? malloc(arity * sizeof(Term *)) : NULL;
-    /* Wildcard fix (PL-10): anonymous _ has E_VAR ival==-1.
+    /* Wildcard fix (PL-10): anonymous _ has AST_VAR ival==-1.
      * pl_unified_term_from_expr returns term_new_var(-1) for these, but
      * bind() skips trail_push for slot==-1, so trail_unwind() cannot reset
      * the binding between clauses and the OR-box stops after clause 1.
@@ -593,8 +593,8 @@ bb_node_t pl_box_choice_call(EXPR_t *goal, Term **env) {
      * and trail_unwind() resets it properly on each retry. */
     static int g_wildcard_slot = 100000;
     for (int i = 0; i < arity; i++) {
-        EXPR_t *ch = goal->children[i];
-        if (ch && ch->kind == E_VAR && (int)ch->ival == -1)
+        AST_t *ch = goal->children[i];
+        if (ch && ch->kind == AST_VAR && (int)ch->ival == -1)
             caller_args[i] = term_new_var(g_wildcard_slot++);
         else
             caller_args[i] = pl_unified_term_from_expr(ch, env);

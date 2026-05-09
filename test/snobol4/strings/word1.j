@@ -160,7 +160,7 @@ Linp_ok_0:
 Jpat0_retry:
     iload 7
     istore 9
-    ; E_VART PAT → named pattern inline expansion
+    ; AST_VART PAT → named pattern inline expansion
     aload 6
     iload 7
     ldc " the "

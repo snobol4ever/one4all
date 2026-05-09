@@ -161,7 +161,7 @@ Jpat0_retry:
     istore 9
     iload 7
     istore 10
-    ; E_VART P → named pattern inline expansion
+    ; AST_VART P → named pattern inline expansion
     iload 7
     istore 11
     aload 6

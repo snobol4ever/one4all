@@ -114,7 +114,7 @@ DESCR_t PATVAL_fn(DESCR_t d)
     if (d.v == DT_P) return d;
     if (d.v == DT_E) {
         /* EXPVAL: thaw EXPRESSION by calling EVAL_fn, then coerce to pattern.
-         * EVAL_fn on DT_E calls eval_node(ptr) which walks the frozen EXPR_t*. */
+         * EVAL_fn on DT_E calls eval_node(ptr) which walks the frozen AST_t*. */
         extern DESCR_t EVAL_fn(DESCR_t);
         DESCR_t val = EVAL_fn(d);
         if (IS_FAIL_fn(val)) return FAILDESCR;

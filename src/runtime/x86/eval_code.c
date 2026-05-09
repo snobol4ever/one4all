@@ -5,7 +5,7 @@
  * ----------
  *   DESCR_t     eval_expr(const char *src)
  *       Parse src as a SNOBOL4 expression via parse_expr_from_str(),
- *       walk the EXPR_t IR tree, evaluate to a DESCR_t.
+ *       walk the AST_t IR tree, evaluate to a DESCR_t.
  *       Returns FAILDESCR on parse or eval failure.
  *
  *   DESCR_t     code(const char *src)
@@ -23,7 +23,7 @@
  *   EVAL and CODE are not special.  They are the runtime doing what it
  *   always does with source that arrived late (ARCH-byrd-dynamic.md).
  *
- *   eval_expr: parse_expr_from_str → eval_node (recursive EXPR_t walk)
+ *   eval_expr: parse_expr_from_str → eval_node (recursive AST_t walk)
  *   code:      fmemopen → sno_parse → CODE_t* stored as DT_C
  *   exec_code: walk CODE_t stmts, call exec_stmt per stmt,
  *                     resolve gotos, return first branch target.
@@ -72,19 +72,19 @@ extern int         Ω;
 extern int         Δ;
 
 /* ══════════════════════════════════════════════════════════════════════════
- * eval_node — recursive EXPR_t → DESCR_t evaluator
+ * eval_node — recursive AST_t → DESCR_t evaluator
  * ══════════════════════════════════════════════════════════════════════════ */
 
-DESCR_t eval_node(EXPR_t *e)
+DESCR_t eval_node(AST_t *e)
 {
     if (!e) return NULVCL;
 
     switch (e->kind) {
 
     /* ── deferred expression — freeze child as DT_E (EXPRESSION type) ── */
-    case E_DEFER:
+    case AST_DEFER:
         /* *X  (STRFN/UOP_STR) — produce a DT_E EXPRESSION descriptor.
-         * The descriptor holds a pointer to the child EXPR_t*.
+         * The descriptor holds a pointer to the child AST_t*.
          * EVAL_fn thaws it by calling eval_node on the child.
          * Do NOT evaluate the child here — that is EVAL()'s job. */
         if (e->nchildren < 1) return NULVCL;
@@ -98,25 +98,25 @@ DESCR_t eval_node(EXPR_t *e)
         }
 
     /* ── literals ────────────────────────────────────────────────────── */
-    case E_ILIT:
+    case AST_ILIT:
         return INTVAL(e->ival);
 
-    case E_FLIT:
+    case AST_FLIT:
         return REALVAL(e->dval);
 
-    case E_QLIT:
+    case AST_QLIT:
         return e->sval ? STRVAL(e->sval) : NULVCL;
 
-    case E_NUL:
+    case AST_NUL:
         return NULVCL;
 
     /* ── variable / keyword reference ────────────────────────────────── */
-    case E_VAR:
+    case AST_VAR:
         if (e->sval && *e->sval)
             return NV_GET_fn(e->sval);
         return NULVCL;
 
-    case E_KEYWORD: {
+    case AST_KEYWORD: {
         /* &KEYWORD — prepend '&' for the NV table key */
         if (!e->sval || !*e->sval) return NULVCL;
         char kbuf[128];
@@ -125,40 +125,40 @@ DESCR_t eval_node(EXPR_t *e)
     }
 
     /* ── unary minus ─────────────────────────────────────────────────── */
-    case E_MNS:
+    case AST_MNS:
         if (e->nchildren < 1) return FAILDESCR;
         return neg(eval_node(e->children[0]));
 
     /* ── arithmetic ──────────────────────────────────────────────────── */
-    case E_ADD: {
+    case AST_ADD: {
         if (e->nchildren < 2) return FAILDESCR;
         DESCR_t l = eval_node(e->children[0]);
         DESCR_t r = eval_node(e->children[1]);
         if (IS_FAIL_fn(l) || IS_FAIL_fn(r)) return FAILDESCR;
         return add(l, r);
     }
-    case E_SUB: {
+    case AST_SUB: {
         if (e->nchildren < 2) return FAILDESCR;
         DESCR_t l = eval_node(e->children[0]);
         DESCR_t r = eval_node(e->children[1]);
         if (IS_FAIL_fn(l) || IS_FAIL_fn(r)) return FAILDESCR;
         return sub(l, r);
     }
-    case E_MUL: {
+    case AST_MUL: {
         if (e->nchildren < 2) return FAILDESCR;
         DESCR_t l = eval_node(e->children[0]);
         DESCR_t r = eval_node(e->children[1]);
         if (IS_FAIL_fn(l) || IS_FAIL_fn(r)) return FAILDESCR;
         return mul(l, r);
     }
-    case E_DIV: {
+    case AST_DIV: {
         if (e->nchildren < 2) return FAILDESCR;
         DESCR_t l = eval_node(e->children[0]);
         DESCR_t r = eval_node(e->children[1]);
         if (IS_FAIL_fn(l) || IS_FAIL_fn(r)) return FAILDESCR;
         return DIVIDE_fn(l, r);
     }
-    case E_POW: {
+    case AST_POW: {
         if (e->nchildren < 2) return FAILDESCR;
         DESCR_t l = eval_node(e->children[0]);
         DESCR_t r = eval_node(e->children[1]);
@@ -167,8 +167,8 @@ DESCR_t eval_node(EXPR_t *e)
     }
 
     /* ── string concatenation ────────────────────────────────────────── */
-    case E_CAT:
-    case E_SEQ: {
+    case AST_CAT:
+    case AST_SEQ: {
         /* S-9 fix: EVAL("LEN(1) LEN(1)") must return PATTERN not STRING.
          * In SNOBOL4, space-separated terms in an expression are concatenation.
          * When the accumulated value is a pattern, concatenation is pat_cat (pattern
@@ -192,15 +192,15 @@ DESCR_t eval_node(EXPR_t *e)
     }
 
     /* ── assignment: subject = replacement (value context → yield repl) */
-    case E_ASSIGN: {
+    case AST_ASSIGN: {
         if (e->nchildren < 2) return FAILDESCR;
-        /* left child is lvalue (E_VAR or E_INDIRECT) */
+        /* left child is lvalue (AST_VAR or AST_INDIRECT) */
         DESCR_t val = eval_node(e->children[1]);
         if (IS_FAIL_fn(val)) return FAILDESCR;
-        EXPR_t *lv = e->children[0];
-        if (lv && lv->kind == E_VAR && lv->sval)
+        AST_t *lv = e->children[0];
+        if (lv && lv->kind == AST_VAR && lv->sval)
             NV_SET_fn(lv->sval, val);
-        else if (lv && lv->kind == E_INDIRECT && lv->nchildren > 0) {
+        else if (lv && lv->kind == AST_INDIRECT && lv->nchildren > 0) {
             DESCR_t name_d = eval_node(lv->children[0]);
             const char *nm = VARVAL_fn(name_d);
             if (nm && *nm) {
@@ -212,7 +212,7 @@ DESCR_t eval_node(EXPR_t *e)
     }
 
     /* ── indirect reference $expr ────────────────────────────────────── */
-    case E_INDIRECT: {
+    case AST_INDIRECT: {
         if (e->nchildren < 1) return FAILDESCR;
         DESCR_t name_d = eval_node(e->children[0]);
         const char *nm = VARVAL_fn(name_d);
@@ -222,7 +222,7 @@ DESCR_t eval_node(EXPR_t *e)
     }
 
     /* ── function call ───────────────────────────────────────────────── */
-    case E_FNC: {
+    case AST_FNC: {
         if (!e->sval || !*e->sval) return FAILDESCR;
         int nargs = e->nchildren;
         DESCR_t *args = nargs > 0
@@ -236,7 +236,7 @@ DESCR_t eval_node(EXPR_t *e)
     }
 
     /* ── array/table subscript ───────────────────────────────────────── */
-    case E_IDX: {
+    case AST_IDX: {
         if (e->nchildren < 2) return FAILDESCR;
         DESCR_t base = eval_node(e->children[0]);
         if (IS_FAIL_fn(base)) return FAILDESCR;
@@ -253,15 +253,15 @@ DESCR_t eval_node(EXPR_t *e)
     }
 
     /* ── .X  name-of — return DT_N lvalue descriptor ────────────────── */
-    case E_NAME: {
+    case AST_NAME: {
         /* DOTFN: .X yields the name (lvalue) of X, not its value.
-         * Child is E_VAR (variable name) or E_KEYWORD. */
+         * Child is AST_VAR (variable name) or AST_KEYWORD. */
         if (e->nchildren < 1) return FAILDESCR;
-        EXPR_t *child = e->children[0];
+        AST_t *child = e->children[0];
         if (!child) return FAILDESCR;
-        if (child->kind == E_VAR && child->sval)
+        if (child->kind == AST_VAR && child->sval)
             return NAME_fn(child->sval);
-        if (child->kind == E_KEYWORD && child->sval) {
+        if (child->kind == AST_KEYWORD && child->sval) {
             char kbuf[128];
             snprintf(kbuf, sizeof kbuf, "&%s", child->sval);
             return NAME_fn(kbuf);
@@ -274,7 +274,7 @@ DESCR_t eval_node(EXPR_t *e)
     }
 
     /* ── +X  unary plus — numeric coerce ─────────────────────────────── */
-    case E_PLS: {
+    case AST_PLS: {
         if (e->nchildren < 1) return FAILDESCR;
         DESCR_t arg = eval_node(e->children[0]);
         if (IS_FAIL_fn(arg)) return FAILDESCR;
@@ -282,7 +282,7 @@ DESCR_t eval_node(EXPR_t *e)
     }
 
     /* ── ?X  interrogation — succeed→null, fail→FAIL ─────────────────── */
-    case E_INTERROGATE: {
+    case AST_INTERROGATE: {
         /* SIL QUES: evaluate child; if it FAILs → FAIL; else → NULVCL.
          * Used for conditional pattern: ?pat succeeds iff pat matches. */
         if (e->nchildren < 1) return FAILDESCR;
@@ -292,7 +292,7 @@ DESCR_t eval_node(EXPR_t *e)
     }
 
     /* ── X | Y  pattern alternation (value context: ORFN) ───────────── */
-    case E_ALT: {
+    case AST_ALT: {
         /* In value context, alternation is a pattern constructor.
          * Build it via CMPILE: re-stringify as "(L)|(R)" then eval_via_cmpile.
          * For the common case of two pattern children, use PATVAL + pat_alt. */
@@ -314,22 +314,22 @@ DESCR_t eval_node(EXPR_t *e)
     }
 
     /* ── X . Y  conditional capture (NAMFN) ─────────────────────────── */
-    case E_CAPT_COND_ASGN: {
+    case AST_CAPT_COND_ASGN: {
         if (e->nchildren < 2) return FAILDESCR;
         DESCR_t pat  = eval_node(e->children[0]);
         if (IS_FAIL_fn(pat)) return FAILDESCR;
         pat = PATVAL_fn(pat);
         if (IS_FAIL_fn(pat)) return FAILDESCR;
-        /* When capture target is E_INDIRECT (e.g. REM . $'$B'), resolve the
+        /* When capture target is AST_INDIRECT (e.g. REM . $'$B'), resolve the
          * variable name without dereferencing — return NAME_fn(resolved_name)
          * so bb_nme_emit_binary gets varname="$B", not the value of $B. */
         DESCR_t name;
-        EXPR_t *tgt = e->children[1];
-        if (tgt && tgt->kind == E_INDIRECT && tgt->nchildren > 0) {
-            EXPR_t *ic = tgt->children[0];
+        AST_t *tgt = e->children[1];
+        if (tgt && tgt->kind == AST_INDIRECT && tgt->nchildren > 0) {
+            AST_t *ic = tgt->children[0];
             const char *nm = NULL;
-            if (ic->kind == E_QLIT && ic->sval)        nm = ic->sval;
-            else if (ic->kind == E_VAR  && ic->sval) { DESCR_t xv = NV_GET_fn(ic->sval); nm = VARVAL_fn(xv); }
+            if (ic->kind == AST_QLIT && ic->sval)        nm = ic->sval;
+            else if (ic->kind == AST_VAR  && ic->sval) { DESCR_t xv = NV_GET_fn(ic->sval); nm = VARVAL_fn(xv); }
             else                                      { DESCR_t nd = eval_node(ic);        nm = VARVAL_fn(nd); }
             if (!nm) return FAILDESCR;
             char *fn = GC_strdup(nm); sno_fold_name(fn);  /* SN-19 */
@@ -342,20 +342,20 @@ DESCR_t eval_node(EXPR_t *e)
     }
 
     /* ── X $ Y  immediate capture (DOLFN) ───────────────────────────── */
-    case E_CAPT_IMMED_ASGN: {
+    case AST_CAPT_IMMED_ASGN: {
         if (e->nchildren < 2) return FAILDESCR;
         DESCR_t pat  = eval_node(e->children[0]);
         if (IS_FAIL_fn(pat)) return FAILDESCR;
         pat = PATVAL_fn(pat);
         if (IS_FAIL_fn(pat)) return FAILDESCR;
-        /* Same E_INDIRECT target resolution as E_CAPT_COND_ASGN above. */
+        /* Same AST_INDIRECT target resolution as AST_CAPT_COND_ASGN above. */
         DESCR_t name;
-        EXPR_t *tgt = e->children[1];
-        if (tgt && tgt->kind == E_INDIRECT && tgt->nchildren > 0) {
-            EXPR_t *ic = tgt->children[0];
+        AST_t *tgt = e->children[1];
+        if (tgt && tgt->kind == AST_INDIRECT && tgt->nchildren > 0) {
+            AST_t *ic = tgt->children[0];
             const char *nm = NULL;
-            if (ic->kind == E_QLIT && ic->sval)        nm = ic->sval;
-            else if (ic->kind == E_VAR  && ic->sval) { DESCR_t xv = NV_GET_fn(ic->sval); nm = VARVAL_fn(xv); }
+            if (ic->kind == AST_QLIT && ic->sval)        nm = ic->sval;
+            else if (ic->kind == AST_VAR  && ic->sval) { DESCR_t xv = NV_GET_fn(ic->sval); nm = VARVAL_fn(xv); }
             else                                      { DESCR_t nd = eval_node(ic);        nm = VARVAL_fn(nd); }
             if (!nm) return FAILDESCR;
             char *fn = GC_strdup(nm); sno_fold_name(fn);  /* SN-19 */
@@ -368,14 +368,14 @@ DESCR_t eval_node(EXPR_t *e)
     }
 
     /* ── @X  cursor capture ──────────────────────────────────────────── */
-    case E_CAPT_CURSOR: {
+    case AST_CAPT_CURSOR: {
         /* @VAR — cursor-position capture: build XATP("@", varname) node.
-         * Child is E_VAR or E_NAME holding the capture variable name. */
+         * Child is AST_VAR or AST_NAME holding the capture variable name. */
         if (e->nchildren < 1) return FAILDESCR;
-        EXPR_t *child = e->children[0];
+        AST_t *child = e->children[0];
         const char *varname = NULL;
-        if (child && child->kind == E_VAR  && child->sval) varname = child->sval;
-        if (child && child->kind == E_NAME && child->nchildren > 0
+        if (child && child->kind == AST_VAR  && child->sval) varname = child->sval;
+        if (child && child->kind == AST_NAME && child->nchildren > 0
                 && child->children[0] && child->children[0]->sval)
             varname = child->children[0]->sval;
         if (!varname) return FAILDESCR;
@@ -384,7 +384,7 @@ DESCR_t eval_node(EXPR_t *e)
     }
 
     /* ── X ? Y  scan (BIQSFN) ───────────────────────────────────────── */
-    case E_SCAN: {
+    case AST_SCAN: {
         /* Subject ? Pattern — in value context evaluate the subject,
          * coerce pattern, apply match; return matched substring or FAIL. */
         if (e->nchildren < 2) return FAILDESCR;
@@ -407,7 +407,7 @@ DESCR_t eval_node(EXPR_t *e)
  * eval_expr — public entry point
  *
  * Parses src via CMPILE's EXPR() entry (cmpile_eval_expr), lowers the
- * CMPND_t parse tree to EXPR_t IR via cmpnd_to_expr(), then evaluates.
+ * CMPND_t parse tree to AST_t IR via cmpnd_to_expr(), then evaluates.
  * This is the SIL CONVEX/CONVE path — no bison/flex involved.
  * ══════════════════════════════════════════════════════════════════════════ */
 
@@ -415,7 +415,7 @@ DESCR_t eval_expr(const char *src)
 {
     if (!src || !*src) return NULVCL;
 
-    EXPR_t *tree = parse_expr_pat_from_str(src);
+    AST_t *tree = parse_expr_pat_from_str(src);
     if (!tree) return FAILDESCR;
 
     return eval_node(tree);
@@ -474,7 +474,7 @@ const char *exec_code(DESCR_t code_block)
         const char *subj_name = NULL;
 
         if (s->subject) {
-            if (s->subject->kind == E_VAR && s->subject->sval) {
+            if (s->subject->kind == AST_VAR && s->subject->sval) {
                 /* Named variable lvalue */
                 subj_name = s->subject->sval;
                 subj_val  = NV_GET_fn(subj_name);
@@ -539,10 +539,10 @@ const char *exec_code(DESCR_t code_block)
  * RT-6: EXPVAL_fn — execute a DT_E EXPRESSION with full save/restore
  *
  * SIL EXPVAL: saves system state (NAM frame, subject globals), executes
- * the frozen EXPR_t* child via eval_node, then restores state on exit.
+ * the frozen AST_t* child via eval_node, then restores state on exit.
  * Fully re-entrant — nested EVAL() calls stack save frames correctly.
  *
- * DT_E holds ptr = frozen EXPR_t* (set by E_DEFER in eval_node above).
+ * DT_E holds ptr = frozen AST_t* (set by AST_DEFER in eval_node above).
  * ══════════════════════════════════════════════════════════════════════════ */
 
 DESCR_t EXPVAL_fn(DESCR_t expr_d)
@@ -556,7 +556,7 @@ DESCR_t EXPVAL_fn(DESCR_t expr_d)
             return sm_call_chunk(entry_pc);
         }
 
-        /* Legacy: Frozen EXPR_t* — thaw and evaluate with NAM frame isolation */
+        /* Legacy: Frozen AST_t* — thaw and evaluate with NAM frame isolation */
         if (!expr_d.ptr) return FAILDESCR;
 
         /* Save subject globals (SIL: WPTR/XCL/YCL/TCL) */
@@ -573,7 +573,7 @@ DESCR_t EXPVAL_fn(DESCR_t expr_d)
         NAME_ctx_t eval_ctx;
         NAME_ctx_enter(&eval_ctx);
 
-        DESCR_t result = eval_node((EXPR_t *)expr_d.ptr);
+        DESCR_t result = eval_node((AST_t *)expr_d.ptr);
 
         /* Restore NAM frame — tear down eval_ctx.  Captures inside an
          * EXPRESSION are local and do not propagate out (same semantics
@@ -603,7 +603,7 @@ DESCR_t EXPVAL_fn(DESCR_t expr_d)
  * RT-7: CONVE_fn — compile a string to a DT_E EXPRESSION descriptor
  *
  * SIL CONVE/CONVEX: parse the string as an expression via CMPILE,
- * lower to EXPR_t IR, wrap in a DT_E descriptor (frozen EXPR_t*).
+ * lower to AST_t IR, wrap in a DT_E descriptor (frozen AST_t*).
  * Returns FAILDESCR on parse failure.
  * ══════════════════════════════════════════════════════════════════════════ */
 
@@ -612,7 +612,7 @@ DESCR_t CONVE_fn(DESCR_t str_d)
     const char *s = VARVAL_fn(str_d);
     if (!s || !*s) return FAILDESCR;
 
-    EXPR_t *tree = parse_expr_pat_from_str(s);
+    AST_t *tree = parse_expr_pat_from_str(s);
     if (!tree) return FAILDESCR;
 
     DESCR_t d;

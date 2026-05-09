@@ -2,7 +2,7 @@
 //
 // Parses SNOBOL4 fixed-format source into IrStmt[] / IrNode trees.
 // IrStmt mirrors STMT_t from scrip_cc.h.
-// IrNode mirrors EXPR_t / EKind from ir.h.
+// IrNode mirrors AST_t / EKind from ir.h.
 //
 // Line structure:
 //   col 1 non-blank, non-* : label token, rest is body
@@ -315,7 +315,7 @@ public static class Snobol4Parser
         {
             IrNode result = ParseConcat(altParts[^1].Trim());
             for (int i = altParts.Count - 2; i >= 0; i--)
-                result = IrNode.Nary(IrKind.E_ALT, ParseConcat(altParts[i].Trim()), result);
+                result = IrNode.Nary(IrKind.AST_ALT, ParseConcat(altParts[i].Trim()), result);
             return result;
         }
         return ParseConcat(src);
@@ -343,14 +343,14 @@ public static class Snobol4Parser
 
     private static bool IsAddOp(string t, out IrKind kind)
     {
-        if (t == "+") { kind = IrKind.E_ADD; return true; }
-        if (t == "-") { kind = IrKind.E_SUB; return true; }
+        if (t == "+") { kind = IrKind.AST_ADD; return true; }
+        if (t == "-") { kind = IrKind.AST_SUB; return true; }
         kind = default; return false;
     }
     private static bool IsMulOp(string t, out IrKind kind)
     {
-        if (t == "*") { kind = IrKind.E_MUL; return true; }
-        if (t == "/") { kind = IrKind.E_DIV; return true; }
+        if (t == "*") { kind = IrKind.AST_MUL; return true; }
+        if (t == "/") { kind = IrKind.AST_DIV; return true; }
         kind = default; return false;
     }
 
@@ -385,21 +385,21 @@ public static class Snobol4Parser
         {
             pos++;
             var right = ParsePower(toks, ref pos); // right-associative
-            return IrNode.Nary(IrKind.E_POW, left, right);
+            return IrNode.Nary(IrKind.AST_POW, left, right);
         }
         return left;
     }
 
-    // Juxtaposition (space concat): adjacent non-operator atoms → E_CAT chain
+    // Juxtaposition (space concat): adjacent non-operator atoms → AST_CAT chain
     private static bool IsOperatorToken(string t) =>
         t == "+" || t == "-" || t == "*" || t == "/" || t == "^" || t == "**";
 
     // Capture operator tokens: ". V" "@V" "$ V" are binary in pattern context
     private static bool IsCaptureOp(string t, out IrKind kind)
     {
-        if (t == ".")  { kind = IrKind.E_CAPT_COND_ASGN;  return true; }
-        if (t == "@")  { kind = IrKind.E_CAPT_CURSOR;      return true; }
-        if (t == "$")  { kind = IrKind.E_CAPT_IMMED_ASGN;  return true; }
+        if (t == ".")  { kind = IrKind.AST_CAPT_COND_ASGN;  return true; }
+        if (t == "@")  { kind = IrKind.AST_CAPT_CURSOR;      return true; }
+        if (t == "$")  { kind = IrKind.AST_CAPT_IMMED_ASGN;  return true; }
         kind = default; return false;
     }
 
@@ -425,7 +425,7 @@ public static class Snobol4Parser
         // Right-associative concat
         IrNode result = parts[^1];
         for (int i = parts.Count - 2; i >= 0; i--)
-            result = IrNode.Nary(IrKind.E_CAT, parts[i], result);
+            result = IrNode.Nary(IrKind.AST_CAT, parts[i], result);
         return result;
     }
 
@@ -441,12 +441,12 @@ public static class Snobol4Parser
 
         // @var — cursor capture
         if (src.StartsWith('@') && src.Length > 1)
-            return IrNode.Nary(IrKind.E_CAPT_CURSOR,
+            return IrNode.Nary(IrKind.AST_CAPT_CURSOR,
                                IrNode.Var(src[1..].ToUpperInvariant()));
 
         // .var — conditional capture
         if (src.StartsWith('.') && src.Length > 1 && !char.IsDigit(src[1]))
-            return IrNode.Nary(IrKind.E_CAPT_COND_ASGN,
+            return IrNode.Nary(IrKind.AST_CAPT_COND_ASGN,
                                IrNode.Var(src[1..].ToUpperInvariant()));
 
         // $expr — indirect reference (or immediate capture in pattern context — handled by executor)
@@ -455,18 +455,18 @@ public static class Snobol4Parser
         {
             var inner = src[1..];
             var (baseStr, idxStr, idxClose) = StripTrailingSubscript(inner);
-            var indNode = IrNode.Nary(IrKind.E_INDIRECT, ParseAtom(baseStr));
+            var indNode = IrNode.Nary(IrKind.AST_INDIRECT, ParseAtom(baseStr));
             if (idxStr != null)
             {
                 var idxNodes = SplitTopLevel(idxStr, ',').Select(a => ParseExpr(a.Trim())).ToArray();
-                return new IrNode(IrKind.E_IDX) { Children = new[] { indNode }.Concat(idxNodes).ToArray() };
+                return new IrNode(IrKind.AST_IDX) { Children = new[] { indNode }.Concat(idxNodes).ToArray() };
             }
             return indNode;
         }
 
         // *expr — deferred pattern
         if (src.StartsWith('*') && src.Length > 1 && !char.IsDigit(src[1]))
-            return IrNode.Nary(IrKind.E_DEFER, ParseAtom(src[1..]));
+            return IrNode.Nary(IrKind.AST_DEFER, ParseAtom(src[1..]));
 
         // Unary minus / plus (only if followed by non-digit — otherwise it's a number)
         if (src == "-") return IrNode.QStr("-");
@@ -474,9 +474,9 @@ public static class Snobol4Parser
 
         // Unary +/- with operand attached (e.g. +'4', -X, -(expr))
         if (src.StartsWith('+') && src.Length > 1)
-            return IrNode.Nary(IrKind.E_PLS, ParseAtom(src[1..]));
+            return IrNode.Nary(IrKind.AST_PLS, ParseAtom(src[1..]));
         if (src.StartsWith('-') && src.Length > 1 && !char.IsDigit(src[1]))
-            return IrNode.Nary(IrKind.E_MNS, ParseAtom(src[1..]));
+            return IrNode.Nary(IrKind.AST_MNS, ParseAtom(src[1..]));
 
         // Parenthesised group
         if (src.StartsWith('(') && src.EndsWith(')') && src.Length >= 2)
@@ -500,46 +500,46 @@ public static class Snobol4Parser
             {
                 IrKind? bk = name switch
                 {
-                    "+" => IrKind.E_ADD, "-" => IrKind.E_SUB,
-                    "*" => IrKind.E_MUL, "/" => IrKind.E_DIV,
-                    "^" => IrKind.E_POW, "%" => IrKind.E_MOD,
+                    "+" => IrKind.AST_ADD, "-" => IrKind.AST_SUB,
+                    "*" => IrKind.AST_MUL, "/" => IrKind.AST_DIV,
+                    "^" => IrKind.AST_POW, "%" => IrKind.AST_MOD,
                     _   => null
                 };
                 if (bk != null) return IrNode.Nary(bk.Value, argNodes[0], argNodes[1]);
             }
             if (argNodes.Length == 1 && name == "-")
-                return IrNode.Nary(IrKind.E_MNS, argNodes[0]);
+                return IrNode.Nary(IrKind.AST_MNS, argNodes[0]);
             if (argNodes.Length == 1 && name == "+")
-                return IrNode.Nary(IrKind.E_PLS, argNodes[0]);
+                return IrNode.Nary(IrKind.AST_PLS, argNodes[0]);
 
             // Map known SNOBOL4 pattern builtins to their IrKind
             IrKind? pk = name switch
             {
-                "ARB"     => IrKind.E_ARB,
-                "REM"     => IrKind.E_REM,
-                "FAIL"    => IrKind.E_FAIL,
-                "SUCCEED" => IrKind.E_SUCCEED,
-                "FENCE"   => IrKind.E_FENCE,
-                "ABORT"   => IrKind.E_ABORT,
-                "BAL"     => IrKind.E_BAL,
+                "ARB"     => IrKind.AST_ARB,
+                "REM"     => IrKind.AST_REM,
+                "FAIL"    => IrKind.AST_FAIL,
+                "SUCCEED" => IrKind.AST_SUCCEED,
+                "FENCE"   => IrKind.AST_FENCE,
+                "ABORT"   => IrKind.AST_ABORT,
+                "BAL"     => IrKind.AST_BAL,
                 _         => null
             };
             if (pk != null && argNodes.Length == 0) return new IrNode(pk.Value);
 
             IrKind? pk1 = name switch
             {
-                "ANY"    => IrKind.E_ANY,    "NOTANY" => IrKind.E_NOTANY,
-                "SPAN"   => IrKind.E_SPAN,   "BREAK"  => IrKind.E_BREAK,
-                "BREAKX" => IrKind.E_BREAKX, "LEN"    => IrKind.E_LEN,
-                "TAB"    => IrKind.E_TAB,    "RTAB"   => IrKind.E_RTAB,
-                "POS"    => IrKind.E_POS,    "RPOS"   => IrKind.E_RPOS,
-                "ARBNO"  => IrKind.E_ARBNO,
+                "ANY"    => IrKind.AST_ANY,    "NOTANY" => IrKind.AST_NOTANY,
+                "SPAN"   => IrKind.AST_SPAN,   "BREAK"  => IrKind.AST_BREAK,
+                "BREAKX" => IrKind.AST_BREAKX, "LEN"    => IrKind.AST_LEN,
+                "TAB"    => IrKind.AST_TAB,    "RTAB"   => IrKind.AST_RTAB,
+                "POS"    => IrKind.AST_POS,    "RPOS"   => IrKind.AST_RPOS,
+                "ARBNO"  => IrKind.AST_ARBNO,
                 _        => null
             };
             if (pk1 != null && argNodes.Length == 1)
                 return IrNode.Nary(pk1.Value, argNodes[0]);
 
-            return new IrNode(IrKind.E_FNC) { SVal = name, Children = argNodes };
+            return new IrNode(IrKind.AST_FNC) { SVal = name, Children = argNodes };
         }
 
         // Array/table subscript: name<idx,...> or name[idx,...]
@@ -555,7 +555,7 @@ public static class Snobol4Parser
             var idxNodes = SplitTopLevel(inner, ',')
                            .Select(a => ParseExpr(a.Trim()))
                            .ToArray();
-            return new IrNode(IrKind.E_IDX)
+            return new IrNode(IrKind.AST_IDX)
                    { Children = new[] { baseNode }.Concat(idxNodes).ToArray() };
         }
 
@@ -566,10 +566,10 @@ public static class Snobol4Parser
         // Nullary pattern builtins (no parens)
         IrKind? nk = src.ToUpperInvariant() switch
         {
-            "ARB"     => IrKind.E_ARB,     "REM"     => IrKind.E_REM,
-            "FAIL"    => IrKind.E_FAIL,    "SUCCEED" => IrKind.E_SUCCEED,
-            "FENCE"   => IrKind.E_FENCE,   "ABORT"   => IrKind.E_ABORT,
-            "BAL"     => IrKind.E_BAL,
+            "ARB"     => IrKind.AST_ARB,     "REM"     => IrKind.AST_REM,
+            "FAIL"    => IrKind.AST_FAIL,    "SUCCEED" => IrKind.AST_SUCCEED,
+            "FENCE"   => IrKind.AST_FENCE,   "ABORT"   => IrKind.AST_ABORT,
+            "BAL"     => IrKind.AST_BAL,
             _         => null
         };
         if (nk != null) return new IrNode(nk.Value);

@@ -331,7 +331,7 @@ static void test_do_while_then_if(void) {
 /* =========================================================================
  * Test 12 — for: init/cond/step can be arbitrary expressions
  *   for (a = f(0); LT(a, n); a = a * 2) ;
- *   Parses without error; init is E_ASSIGN (a = call), step is E_ASSIGN (a = mul).
+ *   Parses without error; init is AST_ASSIGN (a = call), step is AST_ASSIGN (a = mul).
  * ========================================================================= */
 static void test_for_exprs(void) {
     Program *prog = snocone_parse_program(
@@ -342,16 +342,16 @@ static void test_for_exprs(void) {
     int n; STMT_t **stmts = collect_stmts(prog, &n);
     ASSERT(n == 6, "expected 6 stmts, got %d", n);
     if (n >= 1) {
-        /* init stmt: sc_append_stmt decomposes E_ASSIGN — subject is the LHS (E_VAR 'a'),
+        /* init stmt: sc_append_stmt decomposes AST_ASSIGN — subject is the LHS (AST_VAR 'a'),
          * replacement is the RHS.  has_eq==1 distinguishes from a bare subject. */
         ASSERT(stmts[0]->has_eq,
                "init should be decomposed assignment (has_eq=1), has_eq=%d", stmts[0]->has_eq);
     }
     if (n >= 4) {
         /* step stmt: emitted by sc_finalize_for directly (not via sc_append_stmt),
-         * so the E_ASSIGN node is NOT decomposed — subject holds the full E_ASSIGN expr. */
-        ASSERT(stmts[3]->subject && stmts[3]->subject->kind == E_ASSIGN,
-               "step subject should be E_ASSIGN (not decomposed), got kind=%d",
+         * so the AST_ASSIGN node is NOT decomposed — subject holds the full AST_ASSIGN expr. */
+        ASSERT(stmts[3]->subject && stmts[3]->subject->kind == AST_ASSIGN,
+               "step subject should be AST_ASSIGN (not decomposed), got kind=%d",
                stmts[3]->subject ? (int)stmts[3]->subject->kind : -1);
     }
     free(stmts);

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # test_icon_ir_rung_13_alt.sh — rung13 Icon alternation generator tests (IC-6)
-# Two fixes: E_ASSIGN generative box (alt_filter) + E_CAT cross-product (alt_nested)
+# Two fixes: AST_ASSIGN generative box (alt_filter) + AST_CAT cross-product (alt_nested)
 # Gate: PASS=2 FAIL=0 (no corpus required — tests are inline)
 # Authors: LCherryholmes · Claude Sonnet 4.6   DATE: 2026-04-16
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -27,7 +27,7 @@ icon() {
 
 echo "=== rung13: Icon alternation generators ==="
 
-# IC-6 fix 1: E_ASSIGN with generative RHS inside relop filter
+# IC-6 fix 1: AST_ASSIGN with generative RHS inside relop filter
 # icn_bb_assign_gen pumps RHS alt on each tick, writes to var, returns value to binop_gen
 icon "rung13_alt_filter" "$(printf '3\n4')" << 'EOF'
 procedure main()
@@ -35,8 +35,8 @@ procedure main()
 end
 EOF
 
-# IC-6 fix 2: E_CAT with both children generative → cross-product via icn_bb_binop_gen
-# ("a"|"b") || ("x"|"y") was intercepted by E_CAT one-side pump; now routes to cross-product
+# IC-6 fix 2: AST_CAT with both children generative → cross-product via icn_bb_binop_gen
+# ("a"|"b") || ("x"|"y") was intercepted by AST_CAT one-side pump; now routes to cross-product
 icon "rung13_alt_nested" "$(printf 'ax\nay\nbx\nby')" << 'EOF'
 procedure main()
   every write(("a"|"b") || ("x"|"y"));

@@ -15,13 +15,13 @@
 
 /* SN-3: shadow table for params/locals whose names collide with SPITBOL builtins
  * (e.g. LEN, ANY, SPAN — NV_SET_fn cannot override these in the SPITBOL NV store).
- * Checked in E_VAR and NV_SET before NV_GET_fn/NV_SET_fn. */
+ * Checked in AST_VAR and NV_SET before NV_GET_fn/NV_SET_fn. */
 
 
 CallFrame  call_stack[CALL_STACK_MAX];
 int        call_depth = 0;
 
-/* ── IC-5: E_INITIAL persistence — file-scope table keyed on EXPR_t node id ── */
+/* ── IC-5: AST_INITIAL persistence — file-scope table keyed on AST_t node id ── */
 IcnInitEnt init_tab[ICN_INIT_MAX];
 int        icn_init_n = 0;
 
@@ -199,7 +199,7 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
     fr->nshadow = 0;  /* SN-3: clear shadow table for this frame */
     /* SN-3: register params/locals whose names collide with SPITBOL builtins
      * (e.g. LEN, ANY, SPAN — NV_GET_fn returns the builtin descriptor, ignoring
-     * NV_SET_fn writes). Shadow table takes priority in E_VAR lookup. */
+     * NV_SET_fn writes). Shadow table takes priority in AST_VAR lookup. */
     for (int i = 0; i < np; i++)
         if (_is_pat_fnc_name(pnames[i]))
             shadow_set_cur(pnames[i], (i < nargs) ? args[i] : NULVCL);
@@ -243,9 +243,9 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
             STMT_t *s = body;
             while (s) {
                 if (s->is_end) break;
-                if (s->subject && (s->subject->kind == E_CHOICE ||
-                                   s->subject->kind == E_UNIFY  ||
-                                   s->subject->kind == E_CLAUSE)) {
+                if (s->subject && (s->subject->kind == AST_CHOICE ||
+                                   s->subject->kind == AST_UNIFY  ||
+                                   s->subject->kind == AST_CLAUSE)) {
                     s = s->next; continue;
                 }
                 /* SN-26-bridge-coverage-n: fire MWK_LABEL on every executed
@@ -253,7 +253,7 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                  * top-level execute_program loop.  SPITBOL's bridge fires
                  * LABEL via SIL's stmgo for every executed stmt regardless
                  * of nesting; scrip matches by emitting here.  Skipped for
-                 * non-statement IR nodes (E_CHOICE/E_UNIFY/E_CLAUSE) above. */
+                 * non-statement IR nodes (AST_CHOICE/AST_UNIFY/AST_CLAUSE) above. */
                 {
                     extern void mon_emit_label_bin(int64_t stno);
                     mon_emit_label_bin((int64_t)s->stno);
@@ -262,22 +262,22 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                 DESCR_t     subj_val  = NULVCL;
                 const char *subj_name = NULL;
                 if (s->subject) {
-                    if (s->subject->kind == E_VAR && s->subject->sval) {
+                    if (s->subject->kind == AST_VAR && s->subject->sval) {
                         subj_name = s->subject->sval;
                         /* Only read value when needed for pattern match */
                         if (s->pattern)
                             subj_val = NV_GET_fn(subj_name);
-                    } else if (s->subject->kind == E_INDIRECT && s->subject->nchildren > 0) {
+                    } else if (s->subject->kind == AST_INDIRECT && s->subject->nchildren > 0) {
                         /* $'$B' or $X as subject — resolve to variable name for write-back.
-                         * child is E_QLIT "$B" (literal) or E_VAR X (runtime indirect).
+                         * child is AST_QLIT "$B" (literal) or AST_VAR X (runtime indirect).
                          * SN-26-bridge-coverage-y: if the resolved value is a DT_N NAMEPTR
                          * (e.g. assign(name,...) where name was bound as `.snoBrackets`),
                          * recover the variable name from the NV cell pointer instead of
                          * letting VARVAL_fn read junk from the union's .s slot. */
-                        EXPR_t *ic = s->subject->children[0];
-                        if (ic->kind == E_QLIT && ic->sval) {
+                        AST_t *ic = s->subject->children[0];
+                        if (ic->kind == AST_QLIT && ic->sval) {
                             subj_name = ic->sval;  /* $'name' — literal name, use directly */
-                        } else if (ic->kind == E_VAR && ic->sval) {
+                        } else if (ic->kind == AST_VAR && ic->sval) {
                             DESCR_t xv = NV_GET_fn(ic->sval); /* $X — indirect */
                             if (IS_NAMEPTR(xv)) {
                                 const char *_rn = NV_name_from_ptr((const DESCR_t*)xv.ptr);
@@ -300,7 +300,7 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                             subj_val = NV_GET_fn(subj_name);
                         } else if (!subj_name)
                             subj_val = interp_eval(s->subject);
-                    } else if (s->subject->kind == E_FNC && s->has_eq && !s->pattern) {
+                    } else if (s->subject->kind == AST_FNC && s->has_eq && !s->pattern) {
                         /* SN-6 session 14: same guard as top-level execute_program
                          * loop (~L4142).  Dedicated branches below (ITEM/FIELD setter
                          * at ~L673, NRETURN lvalue-assign at ~L699) call the function
@@ -342,7 +342,7 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                      * is still valid here (no nested call between interp_eval return
                      * and this check). Re-fetch from the function's return variable. */
                     if (strcmp(kw_rtntype, "NRETURN") == 0      /* SN-19: literal uppercase */
-                            && s->replacement && s->replacement->kind == E_FNC
+                            && s->replacement && s->replacement->kind == AST_FNC
                             && s->replacement->sval) {
                         DESCR_t raw = NV_GET_fn(s->replacement->sval);
                         if (IS_NAME(raw)) repl_val = raw;
@@ -360,7 +360,7 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                             else { set_and_trace(subj_name, repl_val); succeeded = 1; }
                         } else { set_and_trace(subj_name, repl_val); succeeded = 1; }
                     }
-                } else if (s->has_eq && s->subject && s->subject->kind == E_KEYWORD && s->subject->sval) {
+                } else if (s->has_eq && s->subject && s->subject->kind == AST_KEYWORD && s->subject->sval) {
                     DESCR_t repl_val = s->replacement ? interp_eval(s->replacement) : NULVCL;
                     if (IS_FAIL_fn(repl_val)) succeeded = 0;
                     else {
@@ -371,7 +371,7 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                             NV_SET_fn(s->subject->sval, repl_val);
                         succeeded = 1;
                     }
-                } else if (s->has_eq && s->subject && s->subject->kind == E_IDX &&
+                } else if (s->has_eq && s->subject && s->subject->kind == AST_IDX &&
                            s->subject->nchildren >= 2) {
                     DESCR_t base = interp_eval(s->subject->children[0]);
                     DESCR_t idx  = interp_eval(s->subject->children[1]);
@@ -385,12 +385,12 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                         /* SN-26-bridge-coverage-g: fire VALUE record for subscript store
                          * inside user function body. */
                         { const char *base_nm = (s->subject->children[0] &&
-                                                 s->subject->children[0]->kind == E_VAR)
+                                                 s->subject->children[0]->kind == AST_VAR)
                                                ? s->subject->children[0]->sval : NULL;
                           if (base_nm) comm_var(base_nm, rv); }
                         succeeded = 1;
                     }
-                } else if (s->has_eq && s->subject && s->subject->kind == E_FNC &&
+                } else if (s->has_eq && s->subject && s->subject->kind == AST_FNC &&
                            s->subject->sval && s->subject->nchildren >= 1) {
                     /* ITEM(arr,i[,j]) = val  or  field(obj) = val at statement level */
                     DESCR_t rv = s->replacement ? interp_eval(s->replacement) : NULVCL;
@@ -421,7 +421,7 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                             } else succeeded = 0;
                         }
                     } else succeeded = 0;
-                } else if (s->has_eq && s->subject && s->subject->kind == E_FNC &&
+                } else if (s->has_eq && s->subject && s->subject->kind == AST_FNC &&
                            s->subject->sval && s->subject->nchildren == 0) {
                     /* NRETURN lvalue assign: ref_a() = val  (zero-arg fn call as lvalue)
                      * Call the function; if result is DT_N write through to named variable. */
@@ -431,8 +431,8 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                         if (IS_FAIL_fn(rv)) succeeded = 0;
                         else { succeeded = NAME_SET(fres, rv) ? 1 : 0; }
                     } else succeeded = 0;
-                } else if (s->has_eq && s->subject && s->subject->kind == E_INDIRECT) {
-                    EXPR_t *ichild = s->subject->nchildren > 0 ? s->subject->children[0] : NULL;
+                } else if (s->has_eq && s->subject && s->subject->kind == AST_INDIRECT) {
+                    AST_t *ichild = s->subject->nchildren > 0 ? s->subject->children[0] : NULL;
                     DESCR_t repl_val = s->replacement ? interp_eval(s->replacement) : NULVCL;
                     if (IS_FAIL_fn(repl_val)) { succeeded = 0; }
                     else {
@@ -507,7 +507,7 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
                     }
                     if (strcmp(target, "NRETURN") == 0) {  /* SN-19 */
                         /* NRETURN: return DT_N from fn return var as-is;
-                         * caller (E_FNC) applies NAME_DEREF (slen discriminates
+                         * caller (AST_FNC) applies NAME_DEREF (slen discriminates
                          * NAMEPTR from NAMEVAL). */
                         retval = fr->retval_set ? fr->retval_cell : NV_GET_fn(fr->fname);
                         strncpy(kw_rtntype, "NRETURN", sizeof(kw_rtntype)-1);

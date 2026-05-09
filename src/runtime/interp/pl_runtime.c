@@ -12,11 +12,11 @@
  * value-context evaluator introduced by RS-17.  No direct interp_eval
  * call site or extern declaration remains here.  bb_eval_value falls
  * through to interp_eval for the IR shapes a Prolog clause body
- * contains today (E_BLOCK / E_FNC / E_CHOICE / E_UNIFY / E_CUT / etc.) —
+ * contains today (AST_BLOCK / AST_FNC / AST_CHOICE / AST_UNIFY / AST_CUT / etc.) —
  * each gets handled inside the existing interp_eval Prolog dispatch,
  * which reads g_pl_env directly for variable resolution (clause-body
- * E_VAR is never reached because Prolog uses pl_unified_term_from_expr
- * for variable resolution at goal evaluation, not E_VAR-eval).
+ * AST_VAR is never reached because Prolog uses pl_unified_term_from_expr
+ * for variable resolution at goal evaluation, not AST_VAR-eval).
  *
  * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6 (FI-5, 2026-04-14)
  */
@@ -33,7 +33,7 @@
 
 /* pl_assert_term declared in prolog_lower.h but included here via forward decl
  * to avoid scrip_cc.h path issues from runtime/interp context. */
-extern EXPR_t *pl_assert_term(Term *t, int *functor_out, int *arity_out);
+extern AST_t *pl_assert_term(Term *t, int *functor_out, int *arity_out);
 #include "../../frontend/prolog/pl_broker.h"
 #include "../../runtime/x86/bb_broker.h"
 #include "coro_value.h"   /* RS-18: bb_eval_value — shared Icon/Prolog value-context evaluator */
@@ -146,19 +146,19 @@ unsigned pl_pred_hash(const char *s) {
     while (*s) h = h * 33 ^ (unsigned char)*s++;
     return h % PL_PRED_TABLE_SIZE;
 }
-void pl_pred_table_insert(Pl_PredTable *pt, const char *key, EXPR_t *choice) {
+void pl_pred_table_insert(Pl_PredTable *pt, const char *key, AST_t *choice) {
     unsigned h = pl_pred_hash(key);
     Pl_PredEntry *e = malloc(sizeof(Pl_PredEntry));
     e->key = key; e->choice = choice; e->entry_pc = -1; e->next = pt->buckets[h]; pt->buckets[h] = e;
 }
-EXPR_t *pl_pred_table_lookup(Pl_PredTable *pt, const char *key) {
+AST_t *pl_pred_table_lookup(Pl_PredTable *pt, const char *key) {
     for (Pl_PredEntry *e = pt->buckets[pl_pred_hash(key)]; e; e = e->next)
         if (strcmp(e->key, key) == 0) return e->choice;
     return NULL;
 }
 
 /* pl_pred_table_lookup_global — non-static wrapper for pl_broker.c (pl_interp.h) */
-EXPR_t *pl_pred_table_lookup_global(const char *key) {
+AST_t *pl_pred_table_lookup_global(const char *key) {
     return pl_pred_table_lookup(&g_pl_pred_table, key);
 }
 /* CH-17e: return full Pl_PredEntry* for entry_pc access */
@@ -169,13 +169,13 @@ Pl_PredEntry *pl_pred_entry_lookup(const char *key) {
 }
 
 /*----------------------------------------------------------------------------------------------------------------------------
- * pl_pred_table_get_or_create_choice — find or create the E_CHOICE node for key in the global pred table.
+ * pl_pred_table_get_or_create_choice — find or create the AST_CHOICE node for key in the global pred table.
  * key is "functor/arity" string (caller owns; we strdup internally if creating).
  *----------------------------------------------------------------------------------------------------------------------------*/
-static EXPR_t *pl_pred_table_get_or_create_choice(const char *key) {
-    EXPR_t *ch = pl_pred_table_lookup(&g_pl_pred_table, key);
+static AST_t *pl_pred_table_get_or_create_choice(const char *key) {
+    AST_t *ch = pl_pred_table_lookup(&g_pl_pred_table, key);
     if (ch) return ch;
-    ch = expr_new(E_CHOICE);
+    ch = expr_new(AST_CHOICE);
     ch->sval = strdup(key);
     pl_pred_table_insert(&g_pl_pred_table, ch->sval, ch);
     return ch;
@@ -187,14 +187,14 @@ static EXPR_t *pl_pred_table_get_or_create_choice(const char *key) {
  *----------------------------------------------------------------------------------------------------------------------------*/
 static int pl_assert_clause(Term *t, int end) {
     int functor_id = -1, arity = 0;
-    EXPR_t *ec = pl_assert_term(t, &functor_id, &arity);
+    AST_t *ec = pl_assert_term(t, &functor_id, &arity);
     if (!ec) return 0;
     /* Build key string "functor/arity" */
     const char *fname = prolog_atom_name(functor_id);
     if (!fname) return 0;
     char key[256];
     snprintf(key, sizeof key, "%s/%d", fname, arity);
-    EXPR_t *ch = pl_pred_table_get_or_create_choice(key);
+    AST_t *ch = pl_pred_table_get_or_create_choice(key);
     if (end) {
         /* assertz — append at end */
         expr_add_child(ch, ec);
@@ -202,7 +202,7 @@ static int pl_assert_clause(Term *t, int end) {
         /* asserta — prepend: shift existing children up, insert at [0] */
         expr_add_child(ch, ec);  /* grow array first */
         if (ch->nchildren > 1) {
-            memmove(&ch->children[1], &ch->children[0], (ch->nchildren - 1) * sizeof(EXPR_t *));
+            memmove(&ch->children[1], &ch->children[0], (ch->nchildren - 1) * sizeof(AST_t *));
             ch->children[0] = ec;
         }
     }
@@ -233,11 +233,11 @@ static int pl_retract_clause(Term *t) {
     }
     if (!fname) return 0;
     char key[256]; snprintf(key, sizeof key, "%s/%d", fname, arity);
-    EXPR_t *ch = pl_pred_table_lookup(&g_pl_pred_table, key);
+    AST_t *ch = pl_pred_table_lookup(&g_pl_pred_table, key);
     if (!ch || ch->nchildren == 0) return 0;
     /* Remove first clause */
     free(ch->children[0]);
-    memmove(&ch->children[0], &ch->children[1], (ch->nchildren - 1) * sizeof(EXPR_t *));
+    memmove(&ch->children[0], &ch->children[1], (ch->nchildren - 1) * sizeof(AST_t *));
     ch->nchildren--;
     return 1;
 }
@@ -263,7 +263,7 @@ static int pl_abolish_pred(Term *t) {
     }
     if (!fname) return 0;
     char key[256]; snprintf(key, sizeof key, "%s/%d", fname, arity);
-    EXPR_t *ch = pl_pred_table_lookup(&g_pl_pred_table, key);
+    AST_t *ch = pl_pred_table_lookup(&g_pl_pred_table, key);
     if (!ch) return 1;  /* already gone — succeed */
     ch->nchildren = 0;  /* remove all clauses */
     return 1;
@@ -293,28 +293,28 @@ Term **pl_env_new(int n) {
 
 /*---- Continuation type ----*/
 /*---- Forward declarations ----*/
-Term *pl_unified_term_from_expr(EXPR_t *e, Term **env);
+Term *pl_unified_term_from_expr(AST_t *e, Term **env);
 static Term *pl_unified_deep_copy(Term *t);
-int          interp_exec_pl_builtin(EXPR_t *goal, Term **env);
+int          interp_exec_pl_builtin(AST_t *goal, Term **env);
 
 
 
 /*---- pl_unified_term_from_expr ----*/
-Term *pl_unified_term_from_expr(EXPR_t *e, Term **env) {
+Term *pl_unified_term_from_expr(AST_t *e, Term **env) {
     if (!e) return term_new_atom(prolog_atom_intern("[]"));
     switch (e->kind) {
-        case E_QLIT: return term_new_atom(prolog_atom_intern(e->sval ? e->sval : ""));
-        case E_ILIT: return term_new_int((long)e->ival);
-        case E_FLIT: return term_new_float(e->dval);
-        case E_VAR:  return (env && e->ival >= 0) ? env[e->ival] : term_new_var(e->ival);
-        case E_ADD: case E_SUB: case E_MUL: case E_DIV: case E_MOD: {
+        case AST_QLIT: return term_new_atom(prolog_atom_intern(e->sval ? e->sval : ""));
+        case AST_ILIT: return term_new_int((long)e->ival);
+        case AST_FLIT: return term_new_float(e->dval);
+        case AST_VAR:  return (env && e->ival >= 0) ? env[e->ival] : term_new_var(e->ival);
+        case AST_ADD: case AST_SUB: case AST_MUL: case AST_DIV: case AST_MOD: {
             /* arithmetic ops used as terms (e.g. K-V): wrap as compound */
-            const char *op = e->kind==E_ADD?"+":e->kind==E_SUB?"-":e->kind==E_MUL?"*":e->kind==E_DIV?"/":"%";
+            const char *op = e->kind==AST_ADD?"+":e->kind==AST_SUB?"-":e->kind==AST_MUL?"*":e->kind==AST_DIV?"/":"%";
             int atom = prolog_atom_intern(op);
             Term *args2[2]; args2[0]=pl_unified_term_from_expr(e->children[0],env); args2[1]=pl_unified_term_from_expr(e->children[1],env);
             return term_new_compound(atom, 2, args2);
         }
-        case E_UNIFY: {
+        case AST_UNIFY: {
             /* =/2 used as a term (e.g. G = (X = 5), assertz(p(X = 5))): wrap as
              * compound. Without this, the default arm below silently produced
              * atom("?") and any later call(G) / catch(G,_,_) saw a literal
@@ -325,9 +325,9 @@ Term *pl_unified_term_from_expr(EXPR_t *e, Term **env) {
             args2[1] = e->nchildren > 1 ? pl_unified_term_from_expr(e->children[1], env) : term_new_atom(atom);
             return term_new_compound(atom, 2, args2);
         }
-        case E_CUT:  return term_new_atom(prolog_atom_intern("!"));
-        case E_NUL:  return term_new_atom(prolog_atom_intern("[]"));
-        case E_FNC: {
+        case AST_CUT:  return term_new_atom(prolog_atom_intern("!"));
+        case AST_NUL:  return term_new_atom(prolog_atom_intern("[]"));
+        case AST_FNC: {
             int arity = e->nchildren;
             int atom  = prolog_atom_intern(e->sval ? e->sval : "f");
             if (arity == 0) return term_new_atom(atom);
@@ -359,7 +359,7 @@ static Term *pl_unified_deep_copy(Term *t) {
 }
 
 /* F-3 RS-7: ISO mod — sign of divisor (floor division remainder).
- * Appears in E_MOD case and E_FNC "mod" case — unified here. */
+ * Appears in AST_MOD case and AST_FNC "mod" case — unified here. */
 static inline long pl_iso_mod(long n, long d) {
     if (!d) return 0;
     if (n == LONG_MIN && d == -1) return 0;
@@ -369,7 +369,7 @@ static inline long pl_iso_mod(long n, long d) {
 }
 
 /*---- pl_unified_eval_arith_term — float-aware, returns Term* ----*/
-static Term *pl_unified_eval_arith_term(EXPR_t *e, Term **env) {
+static Term *pl_unified_eval_arith_term(AST_t *e, Term **env) {
     if (!e) return term_new_int(0);
     /* helper macros */
 #define _EI(x) ({ Term *_t = pl_unified_eval_arith_term(x,env); (_t&&_t->tag==TT_INT)?_t->ival:(_t&&_t->tag==TT_FLOAT)?(long)_t->fval:0L; })
@@ -379,14 +379,14 @@ static Term *pl_unified_eval_arith_term(EXPR_t *e, Term **env) {
                        int _fl=(_la&&_la->tag==TT_FLOAT)||(_lb&&_lb->tag==TT_FLOAT); \
                        _fl?term_new_float(_ED(a) op _ED(b)):term_new_int(_EI(a) op _EI(b)); })
     switch (e->kind) {
-        case E_ILIT: return term_new_int((long)e->ival);
-        case E_FLIT: return term_new_float(e->dval);
-        case E_VAR: {
+        case AST_ILIT: return term_new_int((long)e->ival);
+        case AST_FLIT: return term_new_float(e->dval);
+        case AST_VAR: {
             Term *t = term_deref(env && e->ival >= 0 ? env[e->ival] : NULL);
             if (!t || t->tag == TT_VAR) { pl_throw_instantiation_error(); return NULL; }
             return t;
         }
-        case E_ADD: {
+        case AST_ADD: {
             Term *la=pl_unified_eval_arith_term(e->children[0],env);
             Term *lb=pl_unified_eval_arith_term(e->children[1],env);
             int fl=(la&&la->tag==TT_FLOAT)||(lb&&lb->tag==TT_FLOAT);
@@ -398,7 +398,7 @@ static Term *pl_unified_eval_arith_term(EXPR_t *e, Term **env) {
                 return term_new_float((double)a + (double)b);
             return term_new_int(r);
         }
-        case E_SUB: {
+        case AST_SUB: {
             Term *la=pl_unified_eval_arith_term(e->children[0],env);
             Term *lb=pl_unified_eval_arith_term(e->children[1],env);
             int fl=(la&&la->tag==TT_FLOAT)||(lb&&lb->tag==TT_FLOAT);
@@ -408,7 +408,7 @@ static Term *pl_unified_eval_arith_term(EXPR_t *e, Term **env) {
                 return term_new_float((double)a - (double)b);
             return term_new_int(r);
         }
-        case E_MUL: {
+        case AST_MUL: {
             Term *la=pl_unified_eval_arith_term(e->children[0],env);
             Term *lb=pl_unified_eval_arith_term(e->children[1],env);
             int fl=(la&&la->tag==TT_FLOAT)||(lb&&lb->tag==TT_FLOAT);
@@ -418,7 +418,7 @@ static Term *pl_unified_eval_arith_term(EXPR_t *e, Term **env) {
                 return term_new_float((double)a * (double)b);
             return term_new_int(r);
         }
-        case E_DIV: {
+        case AST_DIV: {
             Term *la=pl_unified_eval_arith_term(e->children[0],env);
             Term *lb=pl_unified_eval_arith_term(e->children[1],env);
             int fl=(la&&la->tag==TT_FLOAT)||(lb&&lb->tag==TT_FLOAT);
@@ -435,8 +435,8 @@ static Term *pl_unified_eval_arith_term(EXPR_t *e, Term **env) {
                 return term_new_int(n/d);
             }
         }
-        case E_MOD: return term_new_int(pl_iso_mod(_EI(e->children[0]), _EI(e->children[1])));
-        case E_FNC: {
+        case AST_MOD: return term_new_int(pl_iso_mod(_EI(e->children[0]), _EI(e->children[1])));
+        case AST_FNC: {
             const char *fn = e->sval ? e->sval : "";
             /* two-arg integer bitwise / misc */
             if (strcmp(fn,"/\\")==0&&e->nchildren==2) return term_new_int(_EI(e->children[0])&_EI(e->children[1]));
@@ -510,7 +510,7 @@ static Term *pl_unified_eval_arith_term(EXPR_t *e, Term **env) {
 }
 
 /*---- pl_unified_eval_arith — integer wrapper (kept for comparison callers) ----*/
-static long pl_unified_eval_arith(EXPR_t *e, Term **env) {
+static long pl_unified_eval_arith(AST_t *e, Term **env) {
     Term *t = pl_unified_eval_arith_term(e, env);
     if (!t) return 0;
     if (t->tag == TT_FLOAT) return (long)t->fval;
@@ -519,8 +519,8 @@ static long pl_unified_eval_arith(EXPR_t *e, Term **env) {
 }
 
 /*---- is_pl_user_call ----*/
-int is_pl_user_call(EXPR_t *goal) {
-    if (!goal || goal->kind != E_FNC || !goal->sval) return 0;
+int is_pl_user_call(AST_t *goal) {
+    if (!goal || goal->kind != AST_FNC || !goal->sval) return 0;
     static const char *builtins[] = {
         "true","fail","halt","nl","write","writeln","print","writeq","write_canonical","tab","is",
         "<",">","=<",">=","=:=","=\\=","=","\\=","==","\\==",
@@ -645,8 +645,8 @@ static Term *pl_copy_term(Term *t) {
  * Defect background (PL-12 fix #2 v3):
  * When `catch(G,_,_)`'s G is a runtime variable (e.g. plunit asserts test
  * goals into a clause and dispatches them via catch), the EXPR at the catch
- * call site has goal_e->kind == E_VAR. The previous fall-through dispatched
- * `interp_exec_pl_builtin(E_VAR, env)` which had no E_VAR case and returned
+ * call site has goal_e->kind == AST_VAR. The previous fall-through dispatched
+ * `interp_exec_pl_builtin(AST_VAR, env)` which had no AST_VAR case and returned
  * 1 (silent success) via the `default:` arm. The Var-bound goal never ran.
  * Same defect afflicts \+/1, once/1, not/1 (lines 681/689).
  *
@@ -657,28 +657,28 @@ static Term *pl_copy_term(Term *t) {
  * bb_broker's choice-point machinery interacted badly with the tenv slot
  * Term*s.
  *
- * v3 simplification: the synth EXPR's E_VAR slots store **the original Term**
+ * v3 simplification: the synth EXPR's AST_VAR slots store **the original Term**
  * (deref'd) directly. Dispatch goes through `interp_exec_pl_builtin(synth, tenv)`
  * — same routine the surrounding catch code already uses for non-Var goals.
- * No new bb_broker entry. When the synth E_VAR is resolved by
- * `pl_unified_term_from_expr(child=E_VAR, env=tenv)`, it returns `tenv[k]`
+ * No new bb_broker entry. When the synth AST_VAR is resolved by
+ * `pl_unified_term_from_expr(child=AST_VAR, env=tenv)`, it returns `tenv[k]`
  * which IS the original Term* from the goal. Bindings made on that Term
  * (TT_REF chained back to the caller's env vars) propagate naturally; on
  * caller's unify-stage uargs[k] is bound TT_REF -> tenv[k] which itself is
  * TT_REF -> caller_env[m], so the chain flows correctly.
  *
  * Only the kinds plunit-style goal Terms actually carry are handled:
- *   TT_VAR    -> E_VAR slot (deduped by pointer identity, X+X = one slot)
- *   TT_INT    -> E_ILIT
- *   TT_FLOAT  -> E_FLIT
- *   TT_ATOM   -> E_FNC nchildren=0 sval=name (true/fail/etc. handled there)
+ *   TT_VAR    -> AST_VAR slot (deduped by pointer identity, X+X = one slot)
+ *   TT_INT    -> AST_ILIT
+ *   TT_FLOAT  -> AST_FLIT
+ *   TT_ATOM   -> AST_FNC nchildren=0 sval=name (true/fail/etc. handled there)
  *   TT_COMPOUND with functor f arity n:
- *     `=` arity 2  -> E_UNIFY
- *     `+`/`-`/`*`/`/`/`mod` arity 2 -> E_ADD/E_SUB/E_MUL/E_DIV/E_MOD
+ *     `=` arity 2  -> AST_UNIFY
+ *     `+`/`-`/`*`/`/`/`mod` arity 2 -> AST_ADD/AST_SUB/AST_MUL/AST_DIV/AST_MOD
  *       (only when used inside is/2 RHS or similar arith-eval context;
  *       at goal level these aren't valid Prolog goals — but interp_exec_pl_builtin
  *       still recurses on children, so the kinds match what lower_term emits)
- *     anything else -> E_FNC sval=fn nchildren=n
+ *     anything else -> AST_FNC sval=fn nchildren=n
  *
  * Memory: synth EXPR allocated on heap, freed on exit. Var dedup via
  * pointer-identity scan of tenv (linear; fine for typical goal sizes <16).
@@ -686,21 +686,21 @@ static Term *pl_copy_term(Term *t) {
 
 #define PL_SYNTH_TENV_MAX 64
 
-static EXPR_t *pl_synth_new(EXPR_e k) {
-    EXPR_t *e = (EXPR_t *)calloc(1, sizeof(EXPR_t));
+static AST_t *pl_synth_new(AST_e k) {
+    AST_t *e = (AST_t *)calloc(1, sizeof(AST_t));
     e->kind = k;
     return e;
 }
 
-static void pl_synth_add_child(EXPR_t *e, EXPR_t *c) {
+static void pl_synth_add_child(AST_t *e, AST_t *c) {
     if (e->nchildren >= e->nalloc) {
         e->nalloc = e->nalloc ? e->nalloc * 2 : 4;
-        e->children = (EXPR_t **)realloc(e->children, e->nalloc * sizeof(EXPR_t *));
+        e->children = (AST_t **)realloc(e->children, e->nalloc * sizeof(AST_t *));
     }
     e->children[e->nchildren++] = c;
 }
 
-static void pl_synth_free(EXPR_t *e) {
+static void pl_synth_free(AST_t *e) {
     if (!e) return;
     for (int i = 0; i < e->nchildren; i++) pl_synth_free(e->children[i]);
     free(e->children);
@@ -716,33 +716,33 @@ static int pl_tenv_add_dedup(Term **tenv, int *pn, Term *v) {
     return (*pn)++;
 }
 
-static EXPR_t *pl_term_to_synth_expr(Term *t, Term **tenv, int *pn) {
+static AST_t *pl_term_to_synth_expr(Term *t, Term **tenv, int *pn) {
     t = term_deref(t);
     if (!t) {
-        EXPR_t *e = pl_synth_new(E_FNC);
+        AST_t *e = pl_synth_new(AST_FNC);
         e->sval = strdup("[]");
         return e;
     }
     switch (t->tag) {
         case TT_VAR: {
             int slot = pl_tenv_add_dedup(tenv, pn, t);
-            EXPR_t *e = pl_synth_new(E_VAR);
+            AST_t *e = pl_synth_new(AST_VAR);
             e->ival = slot >= 0 ? slot : 0;
             return e;
         }
         case TT_INT: {
-            EXPR_t *e = pl_synth_new(E_ILIT);
+            AST_t *e = pl_synth_new(AST_ILIT);
             e->ival = t->ival;
             return e;
         }
         case TT_FLOAT: {
-            EXPR_t *e = pl_synth_new(E_FLIT);
+            AST_t *e = pl_synth_new(AST_FLIT);
             e->dval = t->fval;
             return e;
         }
         case TT_ATOM: {
             const char *nm = prolog_atom_name(t->atom_id);
-            EXPR_t *e = pl_synth_new(E_FNC);
+            AST_t *e = pl_synth_new(AST_FNC);
             e->sval = strdup(nm ? nm : "");
             return e;
         }
@@ -750,33 +750,33 @@ static EXPR_t *pl_term_to_synth_expr(Term *t, Term **tenv, int *pn) {
             const char *fn = prolog_atom_name(t->compound.functor);
             if (!fn) fn = "?";
             int arity = t->compound.arity;
-            /* =/2 -> E_UNIFY */
+            /* =/2 -> AST_UNIFY */
             if (arity == 2 && strcmp(fn, "=") == 0) {
-                EXPR_t *e = pl_synth_new(E_UNIFY);
+                AST_t *e = pl_synth_new(AST_UNIFY);
                 pl_synth_add_child(e, pl_term_to_synth_expr(t->compound.args[0], tenv, pn));
                 pl_synth_add_child(e, pl_term_to_synth_expr(t->compound.args[1], tenv, pn));
                 return e;
             }
-            /* arith ops -> E_ADD etc. only meaningful inside is/2 RHS, but
+            /* arith ops -> AST_ADD etc. only meaningful inside is/2 RHS, but
              * interp_exec_pl_builtin only recurses on children of recognised
              * top-level goals — this is fine because is/2 calls
              * pl_unified_eval_arith_term which knows these kinds. */
             if (arity == 2) {
-                EXPR_e ak = E_KIND_COUNT;
-                if      (!strcmp(fn,"+"))   ak = E_ADD;
-                else if (!strcmp(fn,"-"))   ak = E_SUB;
-                else if (!strcmp(fn,"*"))   ak = E_MUL;
-                else if (!strcmp(fn,"/"))   ak = E_DIV;
-                else if (!strcmp(fn,"mod")) ak = E_MOD;
-                if (ak != E_KIND_COUNT) {
-                    EXPR_t *e = pl_synth_new(ak);
+                AST_e ak = AST_KIND_COUNT;
+                if      (!strcmp(fn,"+"))   ak = AST_ADD;
+                else if (!strcmp(fn,"-"))   ak = AST_SUB;
+                else if (!strcmp(fn,"*"))   ak = AST_MUL;
+                else if (!strcmp(fn,"/"))   ak = AST_DIV;
+                else if (!strcmp(fn,"mod")) ak = AST_MOD;
+                if (ak != AST_KIND_COUNT) {
+                    AST_t *e = pl_synth_new(ak);
                     pl_synth_add_child(e, pl_term_to_synth_expr(t->compound.args[0], tenv, pn));
                     pl_synth_add_child(e, pl_term_to_synth_expr(t->compound.args[1], tenv, pn));
                     return e;
                 }
             }
-            /* General compound -> E_FNC sval=fn */
-            EXPR_t *e = pl_synth_new(E_FNC);
+            /* General compound -> AST_FNC sval=fn */
+            AST_t *e = pl_synth_new(AST_FNC);
             e->sval = strdup(fn);
             for (int i = 0; i < arity; i++)
                 pl_synth_add_child(e, pl_term_to_synth_expr(t->compound.args[i], tenv, pn));
@@ -784,7 +784,7 @@ static EXPR_t *pl_term_to_synth_expr(Term *t, Term **tenv, int *pn) {
         }
     }
     /* unreachable */
-    return pl_synth_new(E_FNC);
+    return pl_synth_new(AST_FNC);
 }
 
 /* pl_invoke_var_goal — entry point.
@@ -794,7 +794,7 @@ static EXPR_t *pl_term_to_synth_expr(Term *t, Term **tenv, int *pn) {
  *
  * NOTE: caller_env is unused by this function — the bridge owns its tenv —
  * but is kept in the signature for future use (e.g. if we ever need to alias
- * synth E_VAR slots to specific caller_env[k] indices instead of via tenv
+ * synth AST_VAR slots to specific caller_env[k] indices instead of via tenv
  * Term*s). Today it's unused; tenv-by-Term*-identity already preserves the
  * caller's variable bindings via the deref chains. */
 static int pl_invoke_var_goal(Term *gt, Term **caller_env) {
@@ -810,7 +810,7 @@ static int pl_invoke_var_goal(Term *gt, Term **caller_env) {
     Term *tenv[PL_SYNTH_TENV_MAX];
     for (int i = 0; i < PL_SYNTH_TENV_MAX; i++) tenv[i] = NULL;
     int    tn = 0;
-    EXPR_t *synth = pl_term_to_synth_expr(gt, tenv, &tn);
+    AST_t *synth = pl_term_to_synth_expr(gt, tenv, &tn);
     int ok = interp_exec_pl_builtin(synth, tenv);
     pl_synth_free(synth);
     return ok;
@@ -819,27 +819,27 @@ static int pl_invoke_var_goal(Term *gt, Term **caller_env) {
 /*---- interp_exec_pl_builtin — execute one Prolog builtin goal ----*/
 /* Uses file-scope globals g_pl_trail, g_pl_cut_flag, g_pl_pred_table, g_pl_env.
  * Returns 1=success, 0=fail. Called by pl_box_builtin in pl_broker.c. */
-int interp_exec_pl_builtin(EXPR_t *goal, Term **env) {
+int interp_exec_pl_builtin(AST_t *goal, Term **env) {
     if (!goal) return 1;
     Trail *trail = &g_pl_trail;
     int *cut_flag = &g_pl_cut_flag;
     switch (goal->kind) {
-        case E_UNIFY: {
+        case AST_UNIFY: {
             Term *t1=pl_unified_term_from_expr(goal->children[0],env);
             Term *t2=pl_unified_term_from_expr(goal->children[1],env);
             int mark=trail_mark(trail);
             if (!unify(t1,t2,trail)){trail_unwind(trail,mark);return 0;}
             return 1;
         }
-        case E_CUT: if (cut_flag) *cut_flag=1; return 1;
-        case E_TRAIL_MARK: case E_TRAIL_UNWIND: return 1;
-        case E_FNC: {
+        case AST_CUT: if (cut_flag) *cut_flag=1; return 1;
+        case AST_TRAIL_MARK: case AST_TRAIL_UNWIND: return 1;
+        case AST_FNC: {
             const char *fn = goal->sval ? goal->sval : "true";
             int arity = goal->nchildren;
             /* ---- user-defined predicate dispatch (must come before builtin checks) ---- */
             if (is_pl_user_call(goal)) {
                 char ukey[256]; snprintf(ukey,sizeof ukey,"%s/%d",fn,arity);
-                EXPR_t *uch = pl_pred_table_lookup(&g_pl_pred_table, ukey);
+                AST_t *uch = pl_pred_table_lookup(&g_pl_pred_table, ukey);
                 if (uch) {
                     int ua = arity;
                     Term **uenv = ua ? pl_env_new(ua) : NULL;
@@ -945,11 +945,11 @@ int interp_exec_pl_builtin(EXPR_t *goal, Term **env) {
             /* ,/N conjunction — run each child goal in sequence */
             if (strcmp(fn,",")==0){
                 for(int i=0;i<goal->nchildren;i++){
-                    EXPR_t *g=goal->children[i];
+                    AST_t *g=goal->children[i];
                     if(!g) continue;
                     int ok = is_pl_user_call(g) ? ({
                         char key[256]; snprintf(key,sizeof key,"%s/%d",g->sval?g->sval:"",g->nchildren);
-                        EXPR_t *ch=pl_pred_table_lookup(&g_pl_pred_table,key);
+                        AST_t *ch=pl_pred_table_lookup(&g_pl_pred_table,key);
                         int r=0;
                         if(ch){ int ca=g->nchildren; Term **cargs=ca?malloc(ca*sizeof(Term*)):NULL;
                                  for(int a=0;a<ca;a++) cargs[a]=pl_unified_term_from_expr(g->children[a],env);
@@ -963,9 +963,9 @@ int interp_exec_pl_builtin(EXPR_t *goal, Term **env) {
             }
             /* ;/N disjunction */
             if (strcmp(fn,";")==0&&arity>=2){
-                EXPR_t *left=goal->children[0],*right=goal->children[1];
+                AST_t *left=goal->children[0],*right=goal->children[1];
                 /* if-then-else: (Cond -> Then ; Else) */
-                if(left&&left->kind==E_FNC&&left->sval&&strcmp(left->sval,"->")==0&&left->nchildren>=2){
+                if(left&&left->kind==AST_FNC&&left->sval&&strcmp(left->sval,"->")==0&&left->nchildren>=2){
                     int mark=trail_mark(trail); int cut2=0;
                     if(interp_exec_pl_builtin(left->children[0],env)){
                         for(int i=1;i<left->nchildren;i++) if(!interp_exec_pl_builtin(left->children[i],env)) return 0;
@@ -987,7 +987,7 @@ int interp_exec_pl_builtin(EXPR_t *goal, Term **env) {
                 return 1;
             }
             /* \+/not — PR-19b: var-goal arg dispatches via Term→EXPR bridge.
-             * Without this, child[0]->kind == E_VAR fell through to the
+             * Without this, child[0]->kind == AST_VAR fell through to the
              * `default: return 1;` arm of interp_exec_pl_builtin (silent
              * success), so `\+ Var` always returned 0 (negation of fake
              * success) and the inner goal never ran. Same defect as the
@@ -995,7 +995,7 @@ int interp_exec_pl_builtin(EXPR_t *goal, Term **env) {
             if ((strcmp(fn,"\\+")==0||strcmp(fn,"not")==0)&&arity==1){
                 int mark=trail_mark(trail);
                 int ok;
-                if (goal->children[0] && goal->children[0]->kind == E_VAR) {
+                if (goal->children[0] && goal->children[0]->kind == AST_VAR) {
                     Term *gt = pl_unified_term_from_expr(goal->children[0], env);
                     ok = pl_invoke_var_goal(gt, env);
                 } else {
@@ -1011,7 +1011,7 @@ int interp_exec_pl_builtin(EXPR_t *goal, Term **env) {
             if (strcmp(fn,"once")==0&&arity==1){
                 int mark=trail_mark(trail);
                 int ok;
-                if (goal->children[0] && goal->children[0]->kind == E_VAR) {
+                if (goal->children[0] && goal->children[0]->kind == AST_VAR) {
                     Term *gt = pl_unified_term_from_expr(goal->children[0], env);
                     ok = pl_invoke_var_goal(gt, env);
                 } else {
@@ -1026,7 +1026,7 @@ int interp_exec_pl_builtin(EXPR_t *goal, Term **env) {
              * call(G, A1, ...) — G is an atom or compound; build G(G_args..., A1...)
              *                    and dispatch the reconstructed compound.
              *
-             * When call's first child is E_VAR (goal_e->kind == E_VAR after
+             * When call's first child is AST_VAR (goal_e->kind == AST_VAR after
              * resolving child[0]), the deref'd Term becomes the goal or its
              * base.  Extra args (call/2, call/3, ...) are resolved and appended.
              *
@@ -1036,8 +1036,8 @@ int interp_exec_pl_builtin(EXPR_t *goal, Term **env) {
              * Then dispatch via pl_invoke_var_goal on the reconstructed Term.
              */
             if (strcmp(fn,"call")==0 && arity>=1) {
-                EXPR_t *g_expr = goal->children[0];
-                /* Resolve the goal arg to a Term (handles E_VAR and direct E_FNC) */
+                AST_t *g_expr = goal->children[0];
+                /* Resolve the goal arg to a Term (handles AST_VAR and direct AST_FNC) */
                 Term *g_term = pl_unified_term_from_expr(g_expr, env);
                 g_term = term_deref(g_term);
                 if (!g_term) return 0;
@@ -1083,7 +1083,7 @@ int interp_exec_pl_builtin(EXPR_t *goal, Term **env) {
                 Term *reconstructed = term_new_compound(fn_id, total_arity, rargs2);
                 free(rargs2);
 
-                /* Dispatch via bridge (reconstructed is a concrete Term, not E_VAR,
+                /* Dispatch via bridge (reconstructed is a concrete Term, not AST_VAR,
                  * so pl_invoke_var_goal handles it correctly via the TT_COMPOUND path) */
                 return pl_invoke_var_goal(reconstructed, env);
             }
@@ -1878,7 +1878,7 @@ int interp_exec_pl_builtin(EXPR_t *goal, Term **env) {
                 /* Build call: rfn(rargs..., s0, s1) — arity = rarity+2 */
                 int call_arity = rarity + 2;
                 char ukey[256]; snprintf(ukey, sizeof ukey, "%s/%d", rfn, call_arity);
-                EXPR_t *uch = pl_pred_table_lookup(&g_pl_pred_table, ukey);
+                AST_t *uch = pl_pred_table_lookup(&g_pl_pred_table, ukey);
                 if (!uch) return 0;
                 Term **uargs = pl_env_new(call_arity);
                 for (int ui = 0; ui < rarity; ui++) uargs[ui] = term_deref(rargs[ui]);
@@ -1901,22 +1901,22 @@ int interp_exec_pl_builtin(EXPR_t *goal, Term **env) {
             }
             /* findall/3 — collect ALL solutions via bb_broker retry loop */
             if (strcmp(fn,"findall")==0&&arity==3){
-                EXPR_t *tmpl_expr=goal->children[0];
-                EXPR_t *goal_expr=goal->children[1];
-                EXPR_t *list_expr=goal->children[2];
+                AST_t *tmpl_expr=goal->children[0];
+                AST_t *goal_expr=goal->children[1];
+                AST_t *list_expr=goal->children[2];
                 Term **solutions=NULL; int nsol=0,sol_cap=0;
                 /* Isolate in sub-trail so bindings don't leak to parent */
                 Trail fa_trail; trail_init(&fa_trail);
                 Trail saved_global_trail=g_pl_trail;  /* save by value — NOT pointer (self-alias bug) */
                 g_pl_trail=fa_trail;
                 /* Build a box for the goal and drive α/β to exhaustion.
-                 * PR-19d bridge: if goal_expr is E_VAR, deref to a Term and
+                 * PR-19d bridge: if goal_expr is AST_VAR, deref to a Term and
                  * build a synth EXPR so the goal can be retried across solutions.
                  * outer_env is kept for tmpl_expr/list_expr which belong to the
                  * static IR and must still resolve against the caller's env. */
-                EXPR_t *fa_synth = NULL; Term **fa_tenv = NULL;
+                AST_t *fa_synth = NULL; Term **fa_tenv = NULL;
                 Term **outer_env = env;
-                if (goal_expr && goal_expr->kind == E_VAR) {
+                if (goal_expr && goal_expr->kind == AST_VAR) {
                     Term *gt = term_deref(pl_unified_term_from_expr(goal_expr, env));
                     fa_tenv = (Term **)calloc(PL_SYNTH_TENV_MAX, sizeof(Term *));
                     int fa_tn = 0;
@@ -1953,7 +1953,7 @@ int interp_exec_pl_builtin(EXPR_t *goal, Term **env) {
             /* Look up user-defined predicate in global pred table (assertz/asserta support) */
             {
                 char ukey[256]; snprintf(ukey, sizeof ukey, "%s/%d", fn, arity);
-                EXPR_t *uch = pl_pred_table_lookup(&g_pl_pred_table, ukey);
+                AST_t *uch = pl_pred_table_lookup(&g_pl_pred_table, ukey);
                 if (uch) {
                     Term **uargs = (arity > 0) ? pl_env_new(arity) : NULL;
                     /* Unify call arguments into fresh env */
@@ -2072,11 +2072,11 @@ int interp_exec_pl_builtin(EXPR_t *goal, Term **env) {
              * Uses same α/β broker loop as findall. */
             if (strcmp(fn,"aggregate_all")==0&&arity==3) {
                 Term   *tmpl_t    = term_deref(pl_unified_term_from_expr(goal->children[0],env));
-                EXPR_t *goal_expr = goal->children[1];
+                AST_t *goal_expr = goal->children[1];
                 Term   *result_out= pl_unified_term_from_expr(goal->children[2],env);
                 /* classify template */
                 int is_count=0, is_sum=0, is_max=0, is_min=0;
-                EXPR_t *val_expr = NULL;
+                AST_t *val_expr = NULL;
                 if (tmpl_t && tmpl_t->tag==TT_ATOM) {
                     const char *tn=prolog_atom_name(tmpl_t->atom_id);
                     if (strcmp(tn,"count")==0) is_count=1;
@@ -2097,7 +2097,7 @@ int interp_exec_pl_builtin(EXPR_t *goal, Term **env) {
                 long ag_count=0, ag_sum=0, ag_best=0; int ag_best_set=0;
                 /* Use goal children[0] (the template IR expr) as snapshot template.
                  * For count, snapshot a dummy atom; for sum/max/min, snapshot val_expr. */
-                EXPR_t *snap_expr = (is_count || !val_expr) ? NULL : val_expr;
+                AST_t *snap_expr = (is_count || !val_expr) ? NULL : val_expr;
                 bb_node_t goal_box = pl_box_goal_from_ir(goal_expr, env);
                 DESCR_t ag_r = goal_box.fn(goal_box.ζ, α);
                 while (!IS_FAIL_fn(ag_r)) {
@@ -2151,9 +2151,9 @@ int interp_exec_pl_builtin(EXPR_t *goal, Term **env) {
             }
             /* ---- catch/3 (PL-10) ---- */
             if (strcmp(fn,"catch")==0&&arity==3) {
-                EXPR_t *goal_e   = goal->children[0];
+                AST_t *goal_e   = goal->children[0];
                 Term   *catcher  = pl_unified_term_from_expr(goal->children[1],env);
-                EXPR_t *recovery = goal->children[2];
+                AST_t *recovery = goal->children[2];
                 if (g_pl_catch_top >= PL_CATCH_STACK_MAX) return 0;
                 Pl_CatchFrame *cf = &g_pl_catch_stack[g_pl_catch_top];
                 cf->catcher    = catcher;
@@ -2164,24 +2164,24 @@ int interp_exec_pl_builtin(EXPR_t *goal, Term **env) {
                 if (!threw) {
                     /* run the goal */
                     int ok;
-                    /* PL-12 fix #2 v3: E_VAR-shaped goal (catch's first arg is a
+                    /* PL-12 fix #2 v3: AST_VAR-shaped goal (catch's first arg is a
                      * runtime variable bound to a callable Term, e.g. plunit
                      * pj_do_succeed(...) calling catch(Goal,_,...)). Without
                      * this branch the else-arm dispatched
-                     * interp_exec_pl_builtin(E_VAR, env) which fell through to
+                     * interp_exec_pl_builtin(AST_VAR, env) which fell through to
                      * `default: return 1;` — the silent-success defect that
                      * gates ~3-4 plunit suites. Bridge derefs the env-resolved
                      * Term and dispatches via Term->synth EXPR with tenv slots
                      * holding the original Term*s (preserving binding chains
                      * back to caller env). */
-                    if (goal_e && goal_e->kind == E_VAR) {
+                    if (goal_e && goal_e->kind == AST_VAR) {
                         Term *gt = pl_unified_term_from_expr(goal_e, env);
                         ok = pl_invoke_var_goal(gt, env);
                     } else if (is_pl_user_call(goal_e)) {
                         char ukey[256];
                         snprintf(ukey,sizeof ukey,"%s/%d",
                                  goal_e->sval?goal_e->sval:"",goal_e->nchildren);
-                        EXPR_t *uch=pl_pred_table_lookup(&g_pl_pred_table,ukey);
+                        AST_t *uch=pl_pred_table_lookup(&g_pl_pred_table,ukey);
                         if (uch && uch->nchildren > 0) {
                             int ua=goal_e->nchildren;
                             Term **uenv=ua?pl_env_new(ua):NULL;
@@ -2223,26 +2223,26 @@ int interp_exec_pl_builtin(EXPR_t *goal, Term **env) {
             /* setup_call_cleanup(+Setup, :Goal, +Cleanup)
              * Setup runs once. Goal runs (BB_ONCE here). Cleanup runs once
              * after Goal finishes (success or failure) or throws.
-             * E_VAR bridge applied to all three positions. */
+             * AST_VAR bridge applied to all three positions. */
             if (strcmp(fn,"setup_call_cleanup")==0&&arity==3) {
-                EXPR_t *setup_e    = goal->children[0];
-                EXPR_t *scc_goal_e = goal->children[1];
-                EXPR_t *cleanup_e  = goal->children[2];
-                /* Resolve E_VAR arms to synth EXPRs */
-                EXPR_t *s_synth=NULL; Term **s_tenv=NULL;
-                EXPR_t *g_synth=NULL; Term **g_tenv=NULL;
-                EXPR_t *c_synth=NULL; Term **c_tenv=NULL;
-                if (setup_e && setup_e->kind==E_VAR) {
+                AST_t *setup_e    = goal->children[0];
+                AST_t *scc_goal_e = goal->children[1];
+                AST_t *cleanup_e  = goal->children[2];
+                /* Resolve AST_VAR arms to synth EXPRs */
+                AST_t *s_synth=NULL; Term **s_tenv=NULL;
+                AST_t *g_synth=NULL; Term **g_tenv=NULL;
+                AST_t *c_synth=NULL; Term **c_tenv=NULL;
+                if (setup_e && setup_e->kind==AST_VAR) {
                     Term *gt=term_deref(pl_unified_term_from_expr(setup_e,env));
                     s_tenv=calloc(PL_SYNTH_TENV_MAX,sizeof(Term*)); int n=0;
                     s_synth=pl_term_to_synth_expr(gt,s_tenv,&n); setup_e=s_synth;
                 }
-                if (scc_goal_e && scc_goal_e->kind==E_VAR) {
+                if (scc_goal_e && scc_goal_e->kind==AST_VAR) {
                     Term *gt=term_deref(pl_unified_term_from_expr(scc_goal_e,env));
                     g_tenv=calloc(PL_SYNTH_TENV_MAX,sizeof(Term*)); int n=0;
                     g_synth=pl_term_to_synth_expr(gt,g_tenv,&n); scc_goal_e=g_synth;
                 }
-                if (cleanup_e && cleanup_e->kind==E_VAR) {
+                if (cleanup_e && cleanup_e->kind==AST_VAR) {
                     Term *gt=term_deref(pl_unified_term_from_expr(cleanup_e,env));
                     c_tenv=calloc(PL_SYNTH_TENV_MAX,sizeof(Term*)); int n=0;
                     c_synth=pl_term_to_synth_expr(gt,c_tenv,&n); cleanup_e=c_synth;

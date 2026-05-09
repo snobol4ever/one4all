@@ -1,28 +1,28 @@
 % coverage_net_gaps.pro — exercises Prolog IR nodes missing from prolog_emit_net.c
-% Covers: E_ADD E_SUB E_MPY E_DIV E_ILIT E_FLIT E_CUT E_TRAIL_MARK E_TRAIL_UNWIND E_UNIFY
-% (E_QLIT E_VART E_FNC E_CLAUSE E_CHOICE already handled in prolog_emit_net.c)
+% Covers: AST_ADD AST_SUB AST_MPY AST_DIV AST_ILIT AST_FLIT AST_CUT AST_TRAIL_MARK AST_TRAIL_UNWIND AST_UNIFY
+% (AST_QLIT AST_VART AST_FNC AST_CLAUSE AST_CHOICE already handled in prolog_emit_net.c)
 
 :- initialization(main, main).
 
-% E_ADD E_SUB E_MPY E_DIV — arithmetic via is/2
+% AST_ADD AST_SUB AST_MPY AST_DIV — arithmetic via is/2
 arith(X, Y, Sum, Diff, Prod, Quot) :-
     Sum  is X + Y,
     Diff is X - Y,
     Prod is X * Y,
     Quot is X / Y.
 
-% E_FLIT — float literal
+% AST_FLIT — float literal
 float_check(R) :-
     R is 3.14 * 2.0.
 
-% E_CUT — cut in clause
+% AST_CUT — cut in clause
 max(X, Y, X) :- X >= Y, !.
 max(_, Y, Y).
 
-% E_UNIFY — =/2 unification
+% AST_UNIFY — =/2 unification
 unify_test(X, X).
 
-% E_TRAIL_MARK / E_TRAIL_UNWIND — exercised by any backtracking predicate
+% AST_TRAIL_MARK / AST_TRAIL_UNWIND — exercised by any backtracking predicate
 member(X, [X|_]).
 member(X, [_|T]) :- member(X, T).
 

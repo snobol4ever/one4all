@@ -1091,4 +1091,4 @@ const char *sm_opcode_name(sm_opcode_t op)
  * Not exercised in EM-6 gate; safe stubs. */
 #include "../../driver/interp_private.h"
 int _is_pat_fnc_name(const char *s)  { (void)s; return 0; }
-int _expr_is_pat(EXPR_t *e)          { (void)e; return 0; }
+int _expr_is_pat(AST_t *e)          { (void)e; return 0; }

@@ -558,13 +558,13 @@ Jpat0_retry:
     if_icmpne Jpat0_tfail
     goto Jn1_seq_mid
 Jn1_seq_mid:
-    ; E_VART expr → named pattern inline expansion
+    ; AST_VART expr → named pattern inline expansion
     iload 7
     istore 11
     ; STUB: unhandled pattern node kind 8
     goto Jn7_seq_mid
 Jn7_seq_mid:
-    ; E_VART addop → named pattern inline expansion
+    ; AST_VART addop → named pattern inline expansion
     iload 7
     istore 12
     iload 7

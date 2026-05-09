@@ -1076,7 +1076,7 @@
     ldstr      "1"
     call       string [snobol4lib]Snobol4Lib::sno_add(string, string)
     stsfld     string Coverage_sno_nodes::kw_stno
-    // unhandled E_FNC stub
+    // unhandled AST_FNC stub
     ldstr      ""
     dup
     stloc      V_mon_val
@@ -1269,14 +1269,14 @@
     ldstr      "1"
     call       string [snobol4lib]Snobol4Lib::sno_add(string, string)
     stsfld     string Coverage_sno_nodes::kw_stno
-    // unhandled E_FNC stub
+    // unhandled AST_FNC stub
     ldstr      ""
     pop
     ldsfld     string Coverage_sno_nodes::kw_stno
     ldstr      "1"
     call       string [snobol4lib]Snobol4Lib::sno_add(string, string)
     stsfld     string Coverage_sno_nodes::kw_stno
-    // unhandled E_FNC stub
+    // unhandled AST_FNC stub
     ldstr      ""
     call       void [mscorlib]System.Console::WriteLine(string)
     ldc.i4.1

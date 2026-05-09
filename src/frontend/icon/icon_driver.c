@@ -5,7 +5,7 @@
  *
  * Pipeline (FI-2: direct IR, no intermediate AST):
  *   icn_lex_init() -> IcnLexer
- *   icn_parse_file() -> CODE_t*   (EXPR_t/STMT_t built inline)
+ *   icn_parse_file() -> CODE_t*   (AST_t/STMT_t built inline)
  *
  * Authors: Claude Sonnet 4.6 (FI-2, 2026-04-14)
  */

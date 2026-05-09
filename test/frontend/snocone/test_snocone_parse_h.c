@@ -72,16 +72,16 @@ static int is_bare_expr(STMT_t *s) { return s->subject && !s->go; }
 /* True if stmt is an assignment (subject + replacement, has_eq). */
 static int is_assignment(STMT_t *s) { return s->subject && s->replacement && s->has_eq; }
 
-/* True if expr is an E_FNC named call to `name`. */
-static int is_fnc_named(EXPR_t *e, const char *name) {
-    return e && e->kind == E_FNC && e->sval && strcmp(e->sval, name) == 0;
+/* True if expr is an AST_FNC named call to `name`. */
+static int is_fnc_named(AST_t *e, const char *name) {
+    return e && e->kind == AST_FNC && e->sval && strcmp(e->sval, name) == 0;
 }
 
 /* =========================================================================
  * Test 1 — minimal function
  *   function F() { }
  *   Expected:
- *     stmt[0] DEFINE('F()')         (bare-expr, E_FNC)
+ *     stmt[0] DEFINE('F()')         (bare-expr, AST_FNC)
  *     stmt[1] :(F_end)              (goto-uncond)
  *     stmt[2] F                     (label pad, entry point)
  *     stmt[3] F_end                 (label pad, skip target)
@@ -96,12 +96,12 @@ static void test_function_empty(void) {
     if (n >= 1) {
         ASSERT(is_bare_expr(stmts[0]), "stmt[0] should be bare-expr DEFINE call");
         ASSERT(is_fnc_named(stmts[0]->subject, "DEFINE"),
-               "stmt[0] subject should be E_FNC(\"DEFINE\")");
+               "stmt[0] subject should be AST_FNC(\"DEFINE\")");
         if (stmts[0]->subject && stmts[0]->subject->nchildren >= 1) {
-            EXPR_t *qarg = stmts[0]->subject->children[0];
-            ASSERT(qarg && qarg->kind == E_QLIT && qarg->sval &&
+            AST_t *qarg = stmts[0]->subject->children[0];
+            ASSERT(qarg && qarg->kind == AST_QLIT && qarg->sval &&
                    strcmp(qarg->sval, "F()") == 0,
-                   "DEFINE arg should be E_QLIT \"F()\", got %s",
+                   "DEFINE arg should be AST_QLIT \"F()\", got %s",
                    qarg && qarg->sval ? qarg->sval : "(null)");
         }
     }
@@ -145,9 +145,9 @@ static void test_function_one_arg_return_bare(void) {
     int n; STMT_t **stmts = collect_stmts(prog, &n);
     ASSERT(n == 6, "expected 6 stmts, got %d", n);
     if (n >= 1) {
-        EXPR_t *q = stmts[0]->subject && stmts[0]->subject->nchildren >= 1 ?
+        AST_t *q = stmts[0]->subject && stmts[0]->subject->nchildren >= 1 ?
                     stmts[0]->subject->children[0] : NULL;
-        ASSERT(q && q->kind == E_QLIT && q->sval &&
+        ASSERT(q && q->kind == AST_QLIT && q->sval &&
                strcmp(q->sval, "Double(n)") == 0,
                "DEFINE arg should be 'Double(n)'");
     }
@@ -190,9 +190,9 @@ static void test_function_return_value(void) {
         STMT_t *r = stmts[3];
         ASSERT(r->subject && r->replacement && r->has_eq,
                "return-stmt should be assignment-shaped");
-        ASSERT(r->subject->kind == E_VAR && r->subject->sval &&
+        ASSERT(r->subject->kind == AST_VAR && r->subject->sval &&
                strcmp(r->subject->sval, "F") == 0,
-               "return-stmt LHS should be E_VAR(F)");
+               "return-stmt LHS should be AST_VAR(F)");
         ASSERT(r->go && r->go->uncond &&
                strcmp(r->go->uncond, "RETURN") == 0,
                "return-stmt should have :(RETURN) goto");
@@ -254,9 +254,9 @@ static void test_function_two_args(void) {
     int n; STMT_t **stmts = collect_stmts(prog, &n);
     ASSERT(n == 6, "expected 6 stmts, got %d", n);
     if (n >= 1) {
-        EXPR_t *q = stmts[0]->subject && stmts[0]->subject->nchildren >= 1 ?
+        AST_t *q = stmts[0]->subject && stmts[0]->subject->nchildren >= 1 ?
                     stmts[0]->subject->children[0] : NULL;
-        ASSERT(q && q->kind == E_QLIT && q->sval &&
+        ASSERT(q && q->kind == AST_QLIT && q->sval &&
                strcmp(q->sval, "Add(a,b)") == 0,
                "DEFINE arg should be 'Add(a,b)', got '%s'",
                q && q->sval ? q->sval : "(null)");
@@ -277,9 +277,9 @@ static void test_function_three_args(void) {
     int n; STMT_t **stmts = collect_stmts(prog, &n);
     ASSERT(n == 6, "expected 6 stmts, got %d", n);
     if (n >= 1) {
-        EXPR_t *q = stmts[0]->subject && stmts[0]->subject->nchildren >= 1 ?
+        AST_t *q = stmts[0]->subject && stmts[0]->subject->nchildren >= 1 ?
                     stmts[0]->subject->children[0] : NULL;
-        ASSERT(q && q->kind == E_QLIT && q->sval &&
+        ASSERT(q && q->kind == AST_QLIT && q->sval &&
                strcmp(q->sval, "Sum3(a,b,c)") == 0,
                "DEFINE arg should be 'Sum3(a,b,c)', got '%s'",
                q && q->sval ? q->sval : "(null)");
@@ -348,7 +348,7 @@ static void test_function_multi_body_stmts(void) {
 /* =========================================================================
  * Test 10 — return-with-value uses correct enclosing function name
  *   function ABC(z) { return z * 2; }
- *   The return-stmt's subject should be E_VAR(ABC), NOT some other name.
+ *   The return-stmt's subject should be AST_VAR(ABC), NOT some other name.
  * ========================================================================= */
 static void test_function_return_correct_name(void) {
     Program *prog = snocone_parse_program(
@@ -360,7 +360,7 @@ static void test_function_return_correct_name(void) {
     ASSERT(n == 5, "expected 5 stmts, got %d", n);
     if (n >= 4) {
         STMT_t *r = stmts[3];
-        ASSERT(r->subject && r->subject->kind == E_VAR &&
+        ASSERT(r->subject && r->subject->kind == AST_VAR &&
                r->subject->sval && strcmp(r->subject->sval, "ABC") == 0,
                "return LHS should be ABC, got %s",
                r->subject && r->subject->sval ? r->subject->sval : "(null)");
@@ -473,7 +473,7 @@ static void test_function_with_while_inside(void) {
 }
 
 /* =========================================================================
- * Test 15 — DEFINE call's E_FNC has correct sval and one child
+ * Test 15 — DEFINE call's AST_FNC has correct sval and one child
  * ========================================================================= */
 static void test_define_call_shape(void) {
     Program *prog = snocone_parse_program("function Foo() { }", "test");
@@ -482,14 +482,14 @@ static void test_define_call_shape(void) {
 
     int n; STMT_t **stmts = collect_stmts(prog, &n);
     if (n >= 1) {
-        EXPR_t *def = stmts[0]->subject;
-        ASSERT(def && def->kind == E_FNC, "subject should be E_FNC");
+        AST_t *def = stmts[0]->subject;
+        ASSERT(def && def->kind == AST_FNC, "subject should be AST_FNC");
         ASSERT(def && def->sval && strcmp(def->sval, "DEFINE") == 0,
                "fnc name should be DEFINE");
         ASSERT(def && def->nchildren == 1, "fnc should have exactly 1 child");
         if (def && def->nchildren >= 1) {
-            EXPR_t *c = def->children[0];
-            ASSERT(c->kind == E_QLIT, "child should be E_QLIT");
+            AST_t *c = def->children[0];
+            ASSERT(c->kind == AST_QLIT, "child should be AST_QLIT");
             ASSERT(c->sval && strcmp(c->sval, "Foo()") == 0,
                    "child sval should be Foo()");
         }

@@ -9,7 +9,7 @@
 #   - Summary: MATCH / SHAPE-DIFF / CRASH-C / CRASH-B / BOTH-EMPTY
 #
 # Shape comparison note:
-#   ir_print_node() prints sval on E_IDX/E_FNC/etc. even when children carry
+#   ir_print_node() prints sval on AST_IDX/AST_FNC/etc. even when children carry
 #   the same name — this causes cosmetic "stk" label differences.  The sweep
 #   strips those with a normalisation pass before diffing, so only structural
 #   shape mismatches (wrong EKind, wrong child count, wrong tree depth) are
@@ -32,7 +32,7 @@ TOTAL=0; MATCH=0; SHAPE_DIFF=0; CRASH_C=0; CRASH_B=0; BOTH_EMPTY=0
 
 # Normalise ir_print_node output before diffing:
 # Remove the redundant sval label that ir_print_node emits on named interior
-# nodes (E_IDX, E_FNC, E_CAPT_* etc.) — e.g. "(E_IDX stk" → "(E_IDX".
+# nodes (AST_IDX, AST_FNC, AST_CAPT_* etc.) — e.g. "(AST_IDX stk" → "(AST_IDX".
 # This is a cosmetic artefact of ir_print_node printing e->sval when set,
 # regardless of whether children already encode the name.
 # We only strip the *first* word after the node kind when it is a bare
@@ -40,18 +40,18 @@ TOTAL=0; MATCH=0; SHAPE_DIFF=0; CRASH_C=0; CRASH_B=0; BOTH_EMPTY=0
 normalise() {
     sed \
       -e 's/(\(E_[A-Z_]*\) \([A-Za-z_][A-Za-z0-9_]*\)\b/(\1/g' \
-      -e 's/E_SEQ/E_CAT/g' \
-      -e 's/E_ASSIGN/E_CAPT_IMMED_ASGN/g'
+      -e 's/AST_SEQ/AST_CAT/g' \
+      -e 's/AST_ASSIGN/AST_CAPT_IMMED_ASGN/g'
 }
 
 # Filter Bison-only lines that are known acceptable divergences:
 #   - "(STMT :lbl END)" — CMPILE omits the END pseudo-stmt that Bison emits
 #   - "(NULL-PROGRAM)"  — Bison can't parse files needing -I flags; CMPILE can
 filter_bison_acceptable() {
-    # Bison emits :repl (E_QLIT "") for null replacement; CMPILE omits it — normalise away
+    # Bison emits :repl (AST_QLIT "") for null replacement; CMPILE omits it — normalise away
     # Bison emits (NULL-PROGRAM) when it can't parse -I-dependent files — skip
     sed \
-      -e 's/ :repl (E_QLIT "")//g' \
+      -e 's/ :repl (AST_QLIT "")//g' \
       -e '/^(NULL-PROGRAM)$/d'
 }
 

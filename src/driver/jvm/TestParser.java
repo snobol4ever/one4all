@@ -59,11 +59,11 @@ public class TestParser {
         {
             Parser.StmtNode[] s = parseStr("OUTPUT = 'hello'");
             ok(s.length >= 1 && s[0].subject != null
-               && s[0].subject.kind == Parser.EKind.E_VAR
+               && s[0].subject.kind == Parser.EKind.AST_VAR
                && "OUTPUT".equals(s[0].subject.sval)
                && s[0].hasEq
                && s[0].replacement != null
-               && s[0].replacement.kind == Parser.EKind.E_QLIT,
+               && s[0].replacement.kind == Parser.EKind.AST_QLIT,
                "assign OUTPUT = 'hello'");
         }
 
@@ -72,7 +72,7 @@ public class TestParser {
             Parser.StmtNode[] s = parseStr("X = 42");
             ok(s.length >= 1 && s[0].hasEq
                && s[0].replacement != null
-               && s[0].replacement.kind == Parser.EKind.E_ILIT
+               && s[0].replacement.kind == Parser.EKind.AST_ILIT
                && s[0].replacement.ival == 42L,
                "assign integer literal 42");
         }
@@ -86,7 +86,7 @@ public class TestParser {
             Parser.StmtNode[] stmts = p.parseProgram();
             ok(stmts.length >= 1 && stmts[0].subject != null
                && stmts[0].pattern != null
-               && stmts[0].pattern.kind == Parser.EKind.E_QLIT,
+               && stmts[0].pattern.kind == Parser.EKind.AST_QLIT,
                "pattern stmt S 'PAT'");
         }
 
@@ -119,40 +119,40 @@ public class TestParser {
             }
         }
 
-        // 5. E_ADD:  3 + 4
+        // 5. AST_ADD:  3 + 4
         {
             Lexer lx = new Lexer();
             lx.openBodyString("X = 3 + 4", 1);
             Parser p = new Parser(lx);
             Parser.StmtNode[] s = p.parseProgram();
             ok(s.length >= 1 && s[0].replacement != null
-               && s[0].replacement.kind == Parser.EKind.E_ADD
+               && s[0].replacement.kind == Parser.EKind.AST_ADD
                && s[0].replacement.children.size() == 2,
-               "E_ADD: X = 3 + 4");
+               "AST_ADD: X = 3 + 4");
         }
 
-        // 6. E_SEQ concatenation:  X = A B
+        // 6. AST_SEQ concatenation:  X = A B
         {
             Lexer lx = new Lexer();
             lx.openBodyString("X = A B", 1);
             Parser p = new Parser(lx);
             Parser.StmtNode[] s = p.parseProgram();
             ok(s.length >= 1 && s[0].replacement != null
-               && (s[0].replacement.kind == Parser.EKind.E_CAT
-                   || s[0].replacement.kind == Parser.EKind.E_SEQ),
-               "concat E_CAT: X = A B");
+               && (s[0].replacement.kind == Parser.EKind.AST_CAT
+                   || s[0].replacement.kind == Parser.EKind.AST_SEQ),
+               "concat AST_CAT: X = A B");
         }
 
-        // 7. E_ALT:  (A | B)
+        // 7. AST_ALT:  (A | B)
         {
             Lexer lx = new Lexer();
             lx.openBodyString("X = (A | B)", 1);
             Parser p = new Parser(lx);
             Parser.StmtNode[] s = p.parseProgram();
             ok(s.length >= 1 && s[0].replacement != null
-               && s[0].replacement.kind == Parser.EKind.E_ALT
+               && s[0].replacement.kind == Parser.EKind.AST_ALT
                && s[0].replacement.children.size() == 2,
-               "E_ALT: (A | B)");
+               "AST_ALT: (A | B)");
         }
 
         // 8. Indirect:  $VAR
@@ -162,8 +162,8 @@ public class TestParser {
             Parser p = new Parser(lx);
             Parser.StmtNode[] s = p.parseProgram();
             ok(s.length >= 1 && s[0].replacement != null
-               && s[0].replacement.kind == Parser.EKind.E_INDIRECT,
-               "E_INDIRECT: $VAR");
+               && s[0].replacement.kind == Parser.EKind.AST_INDIRECT,
+               "AST_INDIRECT: $VAR");
         }
 
         // 9. Keyword: &ANCHOR
@@ -173,9 +173,9 @@ public class TestParser {
             Parser p = new Parser(lx);
             Parser.StmtNode[] s = p.parseProgram();
             ok(s.length >= 1 && s[0].replacement != null
-               && s[0].replacement.kind == Parser.EKind.E_KEYWORD
+               && s[0].replacement.kind == Parser.EKind.AST_KEYWORD
                && "ANCHOR".equals(s[0].replacement.sval),
-               "E_KEYWORD: &ANCHOR");
+               "AST_KEYWORD: &ANCHOR");
         }
 
         // 10. Function call: SIZE(X)
@@ -185,9 +185,9 @@ public class TestParser {
             Parser p = new Parser(lx);
             Parser.StmtNode[] s = p.parseProgram();
             ok(s.length >= 1 && s[0].replacement != null
-               && s[0].replacement.kind == Parser.EKind.E_FNC
+               && s[0].replacement.kind == Parser.EKind.AST_FNC
                && "SIZE".equals(s[0].replacement.sval),
-               "E_FNC: SIZE(X)");
+               "AST_FNC: SIZE(X)");
         }
 
         // 11. Exponent:  2 ** 10
@@ -197,8 +197,8 @@ public class TestParser {
             Parser p = new Parser(lx);
             Parser.StmtNode[] s = p.parseProgram();
             ok(s.length >= 1 && s[0].replacement != null
-               && s[0].replacement.kind == Parser.EKind.E_POW,
-               "E_POW: 2 ** 10");
+               && s[0].replacement.kind == Parser.EKind.AST_POW,
+               "AST_POW: 2 ** 10");
         }
 
         // 12. Label parsed
@@ -223,7 +223,7 @@ public class TestParser {
             boolean sawEnd = false;
             for (Parser.StmtNode st : s) {
                 if (st.isEnd) { sawEnd = true; break; }
-                if (st.subject != null && st.subject.kind == Parser.EKind.E_VAR
+                if (st.subject != null && st.subject.kind == Parser.EKind.AST_VAR
                     && "END".equalsIgnoreCase(st.subject.sval)) { sawEnd = true; break; }
             }
             ok(sawEnd, "END statement recognized");

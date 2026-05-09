@@ -102,7 +102,7 @@ import java.util.Arrays;
  * Interpreter.java — SNOBOL4 tree-walk interpreter for the JVM.
  *
  * Mirrors scrip-interp.c exactly for non-pattern statements:
- *   Phase 1: resolve subject (E_VAR → var store, or eval)
+ *   Phase 1: resolve subject (AST_VAR → var store, or eval)
  *   Phase 5: assignment (has_eq) → eval replacement → NV_SET
  *   Goto: uncond / :S / :F → label dispatch
  *   OUTPUT: flush to PrintStream
@@ -375,12 +375,12 @@ public class Interpreter {
         if (e == null) return DESCR.NUL;
 
         switch (e.kind) {
-            case E_ILIT: return DESCR.intv(e.ival);
-            case E_FLIT: return DESCR.realv(e.dval);
-            case E_QLIT: return DESCR.str(e.sval != null ? e.sval : "");
-            case E_NUL:  return DESCR.NUL;
+            case AST_ILIT: return DESCR.intv(e.ival);
+            case AST_FLIT: return DESCR.realv(e.dval);
+            case AST_QLIT: return DESCR.str(e.sval != null ? e.sval : "");
+            case AST_NUL:  return DESCR.NUL;
 
-            case E_VAR: {
+            case AST_VAR: {
                 if (e.sval == null || e.sval.isEmpty()) return DESCR.NUL;
                 // INPUT association
                 if (e.sval.equalsIgnoreCase("INPUT")) {
@@ -398,45 +398,45 @@ public class Interpreter {
                 return nvGet(e.sval);
             }
 
-            case E_KEYWORD:
+            case AST_KEYWORD:
                 return nvGet(e.sval);
 
-            case E_INTERROGATE: {
+            case AST_INTERROGATE: {
                 if (e.children.isEmpty()) return DESCR.FAIL;
                 DESCR v = eval(e.children.get(0));
                 return v.isFail() ? DESCR.FAIL : DESCR.NUL;
             }
 
-            case E_NAME: {
+            case AST_NAME: {
                 if (e.children.isEmpty()) return DESCR.FAIL;
                 Parser.ExprNode child = e.children.get(0);
-                if (child.kind == Parser.EKind.E_VAR && child.sval != null)
+                if (child.kind == Parser.EKind.AST_VAR && child.sval != null)
                     return DESCR.str(child.sval);
                 return eval(child);
             }
 
-            case E_MNS: {
+            case AST_MNS: {
                 if (e.children.isEmpty()) return DESCR.FAIL;
                 DESCR v = eval(e.children.get(0));
                 if (v.isFail()) return DESCR.FAIL;
                 return neg(v);
             }
 
-            case E_PLS: {
+            case AST_PLS: {
                 if (e.children.isEmpty()) return DESCR.FAIL;
                 DESCR v = eval(e.children.get(0));
                 if (v.isFail()) return DESCR.FAIL;
                 return toNumeric(v);
             }
 
-            case E_ADD: return arith2(e, '+');
-            case E_SUB: return arith2(e, '-');
-            case E_MUL: return arith2(e, '*');
-            case E_DIV: return arith2(e, '/');
-            case E_POW: return arith2(e, '^');
+            case AST_ADD: return arith2(e, '+');
+            case AST_SUB: return arith2(e, '-');
+            case AST_MUL: return arith2(e, '*');
+            case AST_DIV: return arith2(e, '/');
+            case AST_POW: return arith2(e, '^');
 
-            case E_CAT:
-            case E_SEQ: {
+            case AST_CAT:
+            case AST_SEQ: {
                 if (e.children.isEmpty()) return DESCR.NUL;
                 DESCR acc = eval(e.children.get(0));
                 if (acc.isFail()) return DESCR.FAIL;
@@ -448,7 +448,7 @@ public class Interpreter {
                 return acc;
             }
 
-            case E_ALT: {
+            case AST_ALT: {
                 // Unary | may be OPSYN'd to a function (e.g. opsyn('|', .size, 1))
                 if (e.children.size() == 1) {
                     String opFn = opsynTable.get("|1");
@@ -461,20 +461,20 @@ public class Interpreter {
                 return DESCR.pat(e);
             }
 
-            case E_INDIRECT: {
+            case AST_INDIRECT: {
                 if (e.children.isEmpty()) return DESCR.FAIL;
                 Parser.ExprNode child = e.children.get(0);
-                // Unwrap E_NAME wrapper (from $.var parse)
-                if (child.kind == Parser.EKind.E_NAME && !child.children.isEmpty())
+                // Unwrap AST_NAME wrapper (from $.var parse)
+                if (child.kind == Parser.EKind.AST_NAME && !child.children.isEmpty())
                     child = child.children.get(0);
-                if (child.kind == Parser.EKind.E_VAR && child.sval != null)
+                if (child.kind == Parser.EKind.AST_VAR && child.sval != null)
                     return nvGet(child.sval);
                 DESCR nameVal = eval(child);
                 if (nameVal.isFail()) return DESCR.FAIL;
                 return nvGet(nameVal.toSnoStr());
             }
 
-            case E_ASSIGN: {
+            case AST_ASSIGN: {
                 if (e.children.size() < 2) return DESCR.FAIL;
                 DESCR val = eval(e.children.get(1));
                 if (val.isFail()) return DESCR.FAIL;
@@ -482,7 +482,7 @@ public class Interpreter {
                 return val;
             }
 
-            case E_FNC: {
+            case AST_FNC: {
                 if (e.sval == null) return DESCR.FAIL;
                 List<DESCR> args = new ArrayList<>();
                 for (Parser.ExprNode c : e.children) args.add(eval(c));
@@ -497,7 +497,7 @@ public class Interpreter {
                 return callBuiltin(fname, args);
             }
 
-            case E_IDX: {
+            case AST_IDX: {
                 // arr<i> or tbl['k']
                 if (e.children.size() < 2) return DESCR.FAIL;
                 DESCR base = eval(e.children.get(0));
@@ -534,13 +534,13 @@ public class Interpreter {
             }
 
             // Captures — used in pattern context; in value context just eval child
-            case E_CAPT_IMMED_ASGN:
-            case E_CAPT_COND_ASGN: {
+            case AST_CAPT_IMMED_ASGN:
+            case AST_CAPT_COND_ASGN: {
                 if (e.children.size() >= 2) {
                     DESCR v = eval(e.children.get(0));
                     if (!v.isFail()) {
                         Parser.ExprNode lv = e.children.get(1);
-                        if (lv.kind == Parser.EKind.E_VAR && lv.sval != null)
+                        if (lv.kind == Parser.EKind.AST_VAR && lv.sval != null)
                             nvSet(lv.sval, v);
                     }
                     return v.isFail() ? DESCR.FAIL : eval(e.children.get(0));
@@ -549,7 +549,7 @@ public class Interpreter {
                 return DESCR.FAIL;
             }
 
-            case E_CAPT_CURSOR: {
+            case AST_CAPT_CURSOR: {
                 // Check if @ has been OPSYN'd to a binary function
                 String opKey = "@2";
                 String opFn  = opsynTable.get(opKey);
@@ -561,7 +561,7 @@ public class Interpreter {
                 return DESCR.NUL; // cursor capture — pattern context only
             }
 
-            case E_DEFER:
+            case AST_DEFER:
                 // *X — freeze child ExprNode as a PAT descriptor (unevaluated expression).
                 // EVAL(pat) will re-evaluate it later.  This matches SIL DT_E semantics.
                 if (!e.children.isEmpty()) {
@@ -676,17 +676,17 @@ public class Interpreter {
     private void assignTo(Parser.ExprNode lv, DESCR val) {
         if (lv == null) return;
         switch (lv.kind) {
-            case E_VAR:
+            case AST_VAR:
                 if (lv.sval != null) nvSet(lv.sval, val);
                 break;
-            case E_KEYWORD:
+            case AST_KEYWORD:
                 if (lv.sval != null) nv.put(lv.sval.toUpperCase(), val);
                 break;
-            case E_INDIRECT: {
+            case AST_INDIRECT: {
                 Parser.ExprNode child = lv.children.isEmpty() ? null : lv.children.get(0);
-                if (child != null && child.kind == Parser.EKind.E_NAME && !child.children.isEmpty())
+                if (child != null && child.kind == Parser.EKind.AST_NAME && !child.children.isEmpty())
                     child = child.children.get(0);
-                if (child != null && child.kind == Parser.EKind.E_VAR && child.sval != null) {
+                if (child != null && child.kind == Parser.EKind.AST_VAR && child.sval != null) {
                     nvSet(child.sval, val);
                 } else if (child != null) {
                     DESCR nameVal = eval(child);
@@ -694,7 +694,7 @@ public class Interpreter {
                 }
                 break;
             }
-            case E_FNC: {
+            case AST_FNC: {
                 if (lv.sval == null) break;
                 String fld = lv.sval.toUpperCase();
                 // ITEM(arr/tbl, key...) as lvalue
@@ -744,7 +744,7 @@ public class Interpreter {
                 }
                 break;
             }
-            case E_IDX: {
+            case AST_IDX: {
                 if (lv.children.size() < 2) break;
                 DESCR base = eval(lv.children.get(0));
                 DESCR key  = eval(lv.children.get(1));
@@ -1239,7 +1239,7 @@ public class Interpreter {
                 String  subjName = null;
                 DESCR  subjVal  = DESCR.NUL;
                 if (s.subject != null) {
-                    if (s.subject.kind == Parser.EKind.E_VAR && s.subject.sval != null) {
+                    if (s.subject.kind == Parser.EKind.AST_VAR && s.subject.sval != null) {
                         subjName = s.subject.sval;
                         subjVal  = nvGet(subjName);
                     } else {
@@ -1306,22 +1306,22 @@ public class Interpreter {
                     if (replVal.isFail()) succeeded = false;
                     else { nvSet(subjName, replVal); succeeded = true; }
                 } else if (s.hasEq && s.subject != null
-                           && s.subject.kind == Parser.EKind.E_KEYWORD && s.subject.sval != null) {
+                           && s.subject.kind == Parser.EKind.AST_KEYWORD && s.subject.sval != null) {
                     DESCR replVal = s.replacement != null ? eval(s.replacement) : DESCR.NUL;
                     if (replVal.isFail()) succeeded = false;
                     else { nv.put(s.subject.sval.toUpperCase(), replVal); succeeded = true; }
                 } else if (s.hasEq && s.subject != null
-                           && s.subject.kind == Parser.EKind.E_FNC) {
+                           && s.subject.kind == Parser.EKind.AST_FNC) {
                     DESCR replVal = s.replacement != null ? eval(s.replacement) : DESCR.NUL;
                     if (replVal.isFail()) succeeded = false;
                     else { assignTo(s.subject, replVal); succeeded = true; }
                 } else if (s.hasEq && s.subject != null
-                           && s.subject.kind == Parser.EKind.E_IDX) {
+                           && s.subject.kind == Parser.EKind.AST_IDX) {
                     DESCR replVal = s.replacement != null ? eval(s.replacement) : DESCR.NUL;
                     if (replVal.isFail()) succeeded = false;
                     else { assignTo(s.subject, replVal); succeeded = true; }
                 } else if (s.hasEq && s.subject != null
-                           && s.subject.kind == Parser.EKind.E_FNC) {
+                           && s.subject.kind == Parser.EKind.AST_FNC) {
                     DESCR replVal = s.replacement != null ? eval(s.replacement) : DESCR.NUL;
                     if (replVal.isFail()) succeeded = false;
                     else { assignTo(s.subject, replVal); succeeded = true; }
@@ -1407,7 +1407,7 @@ public class Interpreter {
             DESCR  subjVal  = DESCR.NUL;
 
             if (s.subject != null) {
-                if (s.subject.kind == Parser.EKind.E_VAR && s.subject.sval != null) {
+                if (s.subject.kind == Parser.EKind.AST_VAR && s.subject.sval != null) {
                     subjName = s.subject.sval;
                     subjVal  = nvGet(subjName);
                 } else {
@@ -1495,17 +1495,17 @@ public class Interpreter {
                     succeeded = true;
                 }
             } else if (s.hasEq && s.subject != null
-                       && s.subject.kind == Parser.EKind.E_KEYWORD && s.subject.sval != null) {
+                       && s.subject.kind == Parser.EKind.AST_KEYWORD && s.subject.sval != null) {
                 DESCR replVal = s.replacement != null ? eval(s.replacement) : DESCR.NUL;
                 if (replVal.isFail()) succeeded = false;
                 else { nv.put(s.subject.sval.toUpperCase(), replVal); succeeded = true; }
             } else if (s.hasEq && s.subject != null
-                       && s.subject.kind == Parser.EKind.E_INDIRECT) {
+                       && s.subject.kind == Parser.EKind.AST_INDIRECT) {
                 Parser.ExprNode child = s.subject.children.isEmpty() ? null : s.subject.children.get(0);
-                if (child != null && child.kind == Parser.EKind.E_NAME && !child.children.isEmpty())
+                if (child != null && child.kind == Parser.EKind.AST_NAME && !child.children.isEmpty())
                     child = child.children.get(0);
                 String nm = null;
-                if (child != null && child.kind == Parser.EKind.E_VAR && child.sval != null) {
+                if (child != null && child.kind == Parser.EKind.AST_VAR && child.sval != null) {
                     nm = nvGet(child.sval).toSnoStr();
                 } else if (child != null) {
                     nm = eval(child).toSnoStr();
@@ -1518,7 +1518,7 @@ public class Interpreter {
                     else { nvSet(nm, replVal); succeeded = true; }
                 }
             } else if (s.hasEq && s.subject != null
-                       && s.subject.kind == Parser.EKind.E_IDX) {
+                       && s.subject.kind == Parser.EKind.AST_IDX) {
                 DESCR replVal = s.replacement != null ? eval(s.replacement) : DESCR.NUL;
                 if (replVal.isFail()) {
                     succeeded = false;
@@ -1527,7 +1527,7 @@ public class Interpreter {
                     succeeded = true;
                 }
             } else if (s.hasEq && s.subject != null
-                       && s.subject.kind == Parser.EKind.E_FNC) {
+                       && s.subject.kind == Parser.EKind.AST_FNC) {
                 DESCR replVal = s.replacement != null ? eval(s.replacement) : DESCR.NUL;
                 if (replVal.isFail()) succeeded = false;
                 else { assignTo(s.subject, replVal); succeeded = true; }

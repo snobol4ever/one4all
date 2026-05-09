@@ -96,7 +96,7 @@ public sealed class Executor
 
         if (stmt.Subject != null)
         {
-            if (stmt.Subject.Kind == IrKind.E_VAR)
+            if (stmt.Subject.Kind == IrKind.AST_VAR)
             {
                 subjName = stmt.Subject.SVal!;
                 subjVal  = _env.Get(subjName);
@@ -116,7 +116,7 @@ public sealed class Executor
             if (subjName == "OUTPUT")
             { _output.WriteLine(replVal.ToString()); return true; }
 
-            if (stmt.Subject?.Kind == IrKind.E_VAR)
+            if (stmt.Subject?.Kind == IrKind.AST_VAR)
             {
                 _env.Set(subjName!, replVal);
                 // Also store RHS IR as a pattern if it contains pattern nodes
@@ -125,10 +125,10 @@ public sealed class Executor
                 return true;
             }
 
-            if (stmt.Subject?.Kind == IrKind.E_KEYWORD)
+            if (stmt.Subject?.Kind == IrKind.AST_KEYWORD)
             { _env.Set("&" + stmt.Subject.SVal!, replVal); return true; }
 
-            if (stmt.Subject?.Kind == IrKind.E_INDIRECT)
+            if (stmt.Subject?.Kind == IrKind.AST_INDIRECT)
             {
                 var name = EvalNode(stmt.Subject.Children[0]).ToString();
                 if (string.IsNullOrEmpty(name)) return false;
@@ -136,7 +136,7 @@ public sealed class Executor
                 return true;
             }
             // DATA field setter via function LHS: x(P) = 99
-            if (stmt.Subject?.Kind == IrKind.E_FNC && stmt.Subject.Children.Length >= 1)
+            if (stmt.Subject?.Kind == IrKind.AST_FNC && stmt.Subject.Children.Length >= 1)
             {
                 var fieldName = stmt.Subject.SVal?.ToUpperInvariant() ?? "";
                 // ITEM(container, i1, i2, ...) as lvalue
@@ -151,15 +151,15 @@ public sealed class Executor
                 { _env.DataSetField(objVal, fieldName, replVal); return true; }
             }
             // Array/Table element assignment: A<idx> = val
-            if (stmt.Subject?.Kind == IrKind.E_IDX && stmt.Subject.Children.Length >= 2)
+            if (stmt.Subject?.Kind == IrKind.AST_IDX && stmt.Subject.Children.Length >= 2)
             {
                 var baseNode = stmt.Subject.Children[0];
                 var idxNodes = stmt.Subject.Children.Skip(1).ToArray();
 
                 DESCR container;
-                if (baseNode.Kind == IrKind.E_VAR)
+                if (baseNode.Kind == IrKind.AST_VAR)
                     container = _env.Get(baseNode.SVal!);
-                else if (baseNode.Kind == IrKind.E_INDIRECT)
+                else if (baseNode.Kind == IrKind.AST_INDIRECT)
                     container = _env.Get(EvalNode(baseNode.Children[0]).ToString());
                 else
                     container = EvalNode(baseNode);
@@ -261,45 +261,45 @@ public sealed class Executor
 
         return n.Kind switch
         {
-            IrKind.E_QLIT    => DESCR.Of(n.SVal ?? ""),
-            IrKind.E_ILIT    => DESCR.Of(n.IVal),
-            IrKind.E_FLIT    => DESCR.Of(n.DVal),
-            IrKind.E_NUL     => DESCR.Null,
+            IrKind.AST_QLIT    => DESCR.Of(n.SVal ?? ""),
+            IrKind.AST_ILIT    => DESCR.Of(n.IVal),
+            IrKind.AST_FLIT    => DESCR.Of(n.DVal),
+            IrKind.AST_NUL     => DESCR.Null,
 
-            IrKind.E_VAR     => EvalVar(n.SVal!),
-            IrKind.E_KEYWORD => _env.Get("&" + n.SVal!),
+            IrKind.AST_VAR     => EvalVar(n.SVal!),
+            IrKind.AST_KEYWORD => _env.Get("&" + n.SVal!),
 
-            IrKind.E_INDIRECT =>
+            IrKind.AST_INDIRECT =>
                 _env.Get(EvalNode(n.Children[0]).ToString()),
 
-            IrKind.E_CAT     => EvalCat(n),
-            IrKind.E_SEQ     => EvalCat(n),   // in value context, SEQ = CAT
+            IrKind.AST_CAT     => EvalCat(n),
+            IrKind.AST_SEQ     => EvalCat(n),   // in value context, SEQ = CAT
 
-            IrKind.E_ADD     => Arith(n, '+'),
-            IrKind.E_SUB     => Arith(n, '-'),
-            IrKind.E_MUL     => Arith(n, '*'),
-            IrKind.E_DIV     => Arith(n, '/'),
-            IrKind.E_POW     => Arith(n, '^'),
-            IrKind.E_MOD     => Arith(n, '%'),
-            IrKind.E_MNS     => Negate(n),
-            IrKind.E_PLS     => CoerceNumeric(EvalNode(n.Children[0])),
+            IrKind.AST_ADD     => Arith(n, '+'),
+            IrKind.AST_SUB     => Arith(n, '-'),
+            IrKind.AST_MUL     => Arith(n, '*'),
+            IrKind.AST_DIV     => Arith(n, '/'),
+            IrKind.AST_POW     => Arith(n, '^'),
+            IrKind.AST_MOD     => Arith(n, '%'),
+            IrKind.AST_MNS     => Negate(n),
+            IrKind.AST_PLS     => CoerceNumeric(EvalNode(n.Children[0])),
 
-            IrKind.E_FNC     => EvalFnc(n),
-            IrKind.E_IDX     => EvalIdx(n),
-            IrKind.E_ASSIGN  => EvalAssign(n),
+            IrKind.AST_FNC     => EvalFnc(n),
+            IrKind.AST_IDX     => EvalIdx(n),
+            IrKind.AST_ASSIGN  => EvalAssign(n),
 
             // Captures in value context — evaluate inner expression only
-            IrKind.E_CAPT_COND_ASGN  => n.Children.Length > 0
+            IrKind.AST_CAPT_COND_ASGN  => n.Children.Length > 0
                 ? DESCR.Of(n.Children[0].SVal ?? EvalNode(n.Children[0]).ToString())
                 : DESCR.Null,
-            IrKind.E_CAPT_IMMED_ASGN => n.Children.Length > 0 ? EvalNode(n.Children[0]) : DESCR.Null,
-            IrKind.E_CAPT_CURSOR     => DESCR.Null,
-            IrKind.E_DEFER           => n.Children.Length > 0 ? EvalNode(n.Children[0]) : DESCR.Null,
+            IrKind.AST_CAPT_IMMED_ASGN => n.Children.Length > 0 ? EvalNode(n.Children[0]) : DESCR.Null,
+            IrKind.AST_CAPT_CURSOR     => DESCR.Null,
+            IrKind.AST_DEFER           => n.Children.Length > 0 ? EvalNode(n.Children[0]) : DESCR.Null,
 
             // ALT in value context — evaluate left (shouldn't normally appear)
-            IrKind.E_ALT     => n.Children.Length > 0 ? EvalNode(n.Children[0]) : DESCR.Null,
+            IrKind.AST_ALT     => n.Children.Length > 0 ? EvalNode(n.Children[0]) : DESCR.Null,
 
-            IrKind.E_NAME    => n.Children.Length > 0 ? EvalNode(n.Children[0]) : DESCR.Null,
+            IrKind.AST_NAME    => n.Children.Length > 0 ? EvalNode(n.Children[0]) : DESCR.Null,
 
             _ => DESCR.Null
         };
@@ -325,7 +325,7 @@ public sealed class Executor
         var sb = new System.Text.StringBuilder();
         void Collect(IrNode node)
         {
-            if (node.Kind == IrKind.E_CAT || node.Kind == IrKind.E_SEQ)
+            if (node.Kind == IrKind.AST_CAT || node.Kind == IrKind.AST_SEQ)
             {
                 foreach (var c in node.Children) Collect(c);
             }
@@ -446,12 +446,12 @@ public sealed class Executor
         // Resolve base — may be a direct var, indirect ($var), or a handle
         DESCR baseVal;
         string?   baseName = null;
-        if (baseNode.Kind == IrKind.E_VAR)
+        if (baseNode.Kind == IrKind.AST_VAR)
         {
             baseName = baseNode.SVal!;
             baseVal  = _env.Get(baseName);
         }
-        else if (baseNode.Kind == IrKind.E_INDIRECT)
+        else if (baseNode.Kind == IrKind.AST_INDIRECT)
         {
             baseName = EvalNode(baseNode.Children[0]).ToString();
             baseVal  = _env.Get(baseName);
@@ -476,7 +476,7 @@ public sealed class Executor
         if (n.Children.Length < 2) return DESCR.Null;
         var val = EvalNode(n.Children[1]);
         var target = n.Children[0];
-        if (target.Kind == IrKind.E_VAR) _env.Set(target.SVal!, val);
+        if (target.Kind == IrKind.AST_VAR) _env.Set(target.SVal!, val);
         return val;
     }
 
@@ -564,7 +564,7 @@ public sealed class Executor
     {
         foreach (var stmt in program)
         {
-            if (stmt.Subject?.Kind == IrKind.E_FNC &&
+            if (stmt.Subject?.Kind == IrKind.AST_FNC &&
                 string.Equals(stmt.Subject.SVal, "DEFINE", StringComparison.OrdinalIgnoreCase))
             {
                 var args  = stmt.Subject.Children;
@@ -585,32 +585,32 @@ public sealed class Executor
     // Returns true if the IR node is a pattern expression (not a pure value expression)
     private static bool IsPatternNode(IrNode n) => n.Kind switch
     {
-        IrKind.E_ALT     => true,
-        IrKind.E_ARB     => true,
-        IrKind.E_REM     => true,
-        IrKind.E_FAIL    => true,
-        IrKind.E_SUCCEED => true,
-        IrKind.E_FENCE   => true,
-        IrKind.E_ABORT   => true,
-        IrKind.E_BAL     => true,
-        IrKind.E_ANY     => true,
-        IrKind.E_NOTANY  => true,
-        IrKind.E_SPAN    => true,
-        IrKind.E_BREAK   => true,
-        IrKind.E_BREAKX  => true,
-        IrKind.E_LEN     => true,
-        IrKind.E_TAB     => true,
-        IrKind.E_RTAB    => true,
-        IrKind.E_POS     => true,
-        IrKind.E_RPOS    => true,
-        IrKind.E_ARBNO   => true,
-        IrKind.E_DEFER   => true,
-        IrKind.E_SEQ     => n.Children.Any(IsPatternNode),
-        IrKind.E_CAT     => n.Children.Any(IsPatternNode),
+        IrKind.AST_ALT     => true,
+        IrKind.AST_ARB     => true,
+        IrKind.AST_REM     => true,
+        IrKind.AST_FAIL    => true,
+        IrKind.AST_SUCCEED => true,
+        IrKind.AST_FENCE   => true,
+        IrKind.AST_ABORT   => true,
+        IrKind.AST_BAL     => true,
+        IrKind.AST_ANY     => true,
+        IrKind.AST_NOTANY  => true,
+        IrKind.AST_SPAN    => true,
+        IrKind.AST_BREAK   => true,
+        IrKind.AST_BREAKX  => true,
+        IrKind.AST_LEN     => true,
+        IrKind.AST_TAB     => true,
+        IrKind.AST_RTAB    => true,
+        IrKind.AST_POS     => true,
+        IrKind.AST_RPOS    => true,
+        IrKind.AST_ARBNO   => true,
+        IrKind.AST_DEFER   => true,
+        IrKind.AST_SEQ     => n.Children.Any(IsPatternNode),
+        IrKind.AST_CAT     => n.Children.Any(IsPatternNode),
         // Parenthesised group containing a pattern
-        IrKind.E_CAPT_COND_ASGN  => true,
-        IrKind.E_CAPT_IMMED_ASGN => true,
-        IrKind.E_CAPT_CURSOR      => true,
+        IrKind.AST_CAPT_COND_ASGN  => true,
+        IrKind.AST_CAPT_IMMED_ASGN => true,
+        IrKind.AST_CAPT_CURSOR      => true,
         _                          => false
     };
 

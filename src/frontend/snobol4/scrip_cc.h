@@ -9,7 +9,7 @@
  * Statement structure:
  *   [label]  subject  [pattern]  [= replacement]  [: goto]
  *
- * subject, pattern, replacement are all EXPR_t*.
+ * subject, pattern, replacement are all AST_t*.
  * The emitter receives context when walking each field.
  */
 
@@ -20,35 +20,35 @@
 
 /* ---- expression node kinds — from shared IR ---- */
 /*
- * M-G1-IR-HEADER-WIRE: EXPR_e is now defined in ir/ir.h (the single source
+ * M-G1-IR-HEADER-WIRE: AST_e is now defined in ir/ir.h (the single source
  * of truth for all canonical node kinds).
  *
  * M-G3-ALIAS-CLEANUP: IR_COMPAT_ALIASES section removed — dead code,
- * never enabled. All code uses canonical EXPR_e names directly:
- * E_VAR, E_ALT, E_MNS, E_POW, E_CAPT_COND_ASGN, E_CAPT_IMMED_ASGN,
- * E_CAPT_CURSOR, E_NUL, E_ASSIGN, E_SCAN, E_ITERATE, E_ALTERNATE, E_IDX.
+ * never enabled. All code uses canonical AST_e names directly:
+ * AST_VAR, AST_ALT, AST_MNS, AST_POW, AST_CAPT_COND_ASGN, AST_CAPT_IMMED_ASGN,
+ * AST_CAPT_CURSOR, AST_NUL, AST_ASSIGN, AST_SCAN, AST_ITERATE, AST_ALTERNATE, AST_IDX.
  *
- * ir.h defines EXPR_t (with fval, nalloc, id) when included first.
+ * ir.h defines AST_t (with fval, nalloc, id) when included first.
  * scrip_cc.h defines a compatible subset when included standalone.
  * Both are guarded by EXPR_T_DEFINED to prevent double-definition.
  */
 #include "ir/ir.h"
 
 /*
- * EXPR_t — unified n-ary expression node.
+ * AST_t — unified n-ary expression node.
  *
  * All structural children live in the `children` array (realloc-grown via
  * expr_add_child).  Use the named accessor macros — never index children[]
  * directly in backends; the macros give NULL-safe bounds-checked access.
  *
  * Layout by kind:
- *   leaves  (E_QLIT/E_ILIT/E_FLIT/E_NUL/E_VAR/E_KEYWORD)     nchildren=0
- *   unary   (E_MNS/E_CAPT_CURSOR/E_INDIRECT/...)                nchildren=1
- *   binary  (E_ADD/E_SUB/E_MUL/E_DIV/E_POW/E_OPSYN/
- *            E_ASSIGN/E_CAPT_COND_ASGN/E_CAPT_IMMED_ASGN/E_IDX)      nchildren=2
- *   n-ary   (E_SEQ / E_CAT / E_ALT)                   nchildren>=0
- *   call    (E_FNC)                                       nchildren=nargs
- *   subscript (E_IDX)                                     children[0]=base, children[1..]=indices
+ *   leaves  (AST_QLIT/AST_ILIT/AST_FLIT/AST_NUL/AST_VAR/AST_KEYWORD)     nchildren=0
+ *   unary   (AST_MNS/AST_CAPT_CURSOR/AST_INDIRECT/...)                nchildren=1
+ *   binary  (AST_ADD/AST_SUB/AST_MUL/AST_DIV/AST_POW/AST_OPSYN/
+ *            AST_ASSIGN/AST_CAPT_COND_ASGN/AST_CAPT_IMMED_ASGN/AST_IDX)      nchildren=2
+ *   n-ary   (AST_SEQ / AST_CAT / AST_ALT)                   nchildren>=0
+ *   call    (AST_FNC)                                       nchildren=nargs
+ *   subscript (AST_IDX)                                     children[0]=base, children[1..]=indices
  *
  * Named accessors (NULL-safe):
  *   expr_left(e)    — children[0]
@@ -56,7 +56,7 @@
  *   expr_arg(e, i)  — children[i]
  *   expr_nargs(e)   — nchildren
  */
-/* EXPR_t is defined in ir/ir.h (included above) — ir.h is the sole owner.
+/* AST_t is defined in ir/ir.h (included above) — ir.h is the sole owner.
  * FI-0A: scrip_cc.h no longer carries a duplicate struct body. */
 
 /* NULL-safe named accessors */
@@ -77,16 +77,16 @@
 typedef struct STMT_t STMT_t;
 struct STMT_t {
     char    *label;
-    EXPR_t  *subject;
-    EXPR_t  *pattern;
-    EXPR_t  *replacement;
+    AST_t  *subject;
+    AST_t  *pattern;
+    AST_t  *replacement;
     /* goto fields (RS-1): flattened; set from parser goto_label_expr results */
     char    *goto_s;              /* :S(label) — on success */
     char    *goto_f;              /* :F(label) — on failure */
     char    *goto_u;              /* :(label)  — unconditional */
-    EXPR_t  *goto_s_expr;         /* :S(expr)  — computed success */
-    EXPR_t  *goto_f_expr;         /* :F(expr)  — computed failure */
-    EXPR_t  *goto_u_expr;         /* :(expr)   — computed unconditional */
+    AST_t  *goto_s_expr;         /* :S(expr)  — computed success */
+    AST_t  *goto_f_expr;         /* :F(expr)  — computed failure */
+    AST_t  *goto_u_expr;         /* :(expr)   — computed unconditional */
     int      lineno;
     int      stno;    /* SN-26-bridge-coverage-j: source-statement number,
                          1-based, sequential, including blank statements.
@@ -124,33 +124,33 @@ typedef struct {
 } CODE_t;
 
 /* CODE_t — the IR for a list of statements (what CODE operates on).
- * EXPR_t is the IR for one expression (what EVAL operates on).
+ * AST_t is the IR for one expression (what EVAL operates on).
  * See eval_code.c: eval_expr / code / exec_code.
  */
 
 /* ---- allocators ---- */
-static inline EXPR_t *expr_new(EXPR_e k) {
-    EXPR_t *e = calloc(1, sizeof *e); e->kind = k; return e;
+static inline AST_t *expr_new(AST_e k) {
+    AST_t *e = calloc(1, sizeof *e); e->kind = k; return e;
 }
 static inline STMT_t  *stmt_new(void)  { return calloc(1, sizeof(STMT_t)); }
 
 /* Append one child — the only way to grow a node's children array. */
-static inline void expr_add_child(EXPR_t *e, EXPR_t *child) {
+static inline void expr_add_child(AST_t *e, AST_t *child) {
     e->children = realloc(e->children,
-                          (size_t)(e->nchildren + 1) * sizeof(EXPR_t *));
+                          (size_t)(e->nchildren + 1) * sizeof(AST_t *));
     e->children[e->nchildren++] = child;
 }
 
 /* Convenience: build a unary node (one child). */
-static inline EXPR_t *expr_unary(EXPR_e k, EXPR_t *operand) {
-    EXPR_t *e = expr_new(k);
+static inline AST_t *expr_unary(AST_e k, AST_t *operand) {
+    AST_t *e = expr_new(k);
     expr_add_child(e, operand);
     return e;
 }
 
 /* Convenience: build a binary node (two children). */
-static inline EXPR_t *expr_binary(EXPR_e k, EXPR_t *left, EXPR_t *right) {
-    EXPR_t *e = expr_new(k);
+static inline AST_t *expr_binary(AST_e k, AST_t *left, AST_t *right) {
+    AST_t *e = expr_new(k);
     expr_add_child(e, left);
     expr_add_child(e, right);
     return e;
@@ -166,8 +166,8 @@ static inline char *intern_n(const char *s, int n) {
 void     sno_add_include_dir(const char *d);
 void     sno_reset(void);          /* reset per-file state between multi-file compilations */
 CODE_t *sno_parse(FILE *f, const char *filename);
-EXPR_t  *parse_expr_from_str(const char *src);
-EXPR_t  *parse_expr_pat_from_str(const char *src); /* bison: bare expr -> EXPR_t, pattern slot */
+AST_t  *parse_expr_from_str(const char *src);
+AST_t  *parse_expr_pat_from_str(const char *src); /* bison: bare expr -> AST_t, pattern slot */
 CODE_t *sno_parse_string(const char *src);         /* bison: multi-stmt string -> CODE_t* */
 void     c_emit(CODE_t *prog, FILE *out);
 

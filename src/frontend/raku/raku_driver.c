@@ -3,7 +3,7 @@
  *
  * FI-3: parse → CODE_t* directly, no intermediate RakuNode AST.
  * raku_compile() calls raku_parse_string() which runs the Bison parser;
- * grammar actions build EXPR_t/STMT_t inline and populate raku_prog_result.
+ * grammar actions build AST_t/STMT_t inline and populate raku_prog_result.
  *
  * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6
  */

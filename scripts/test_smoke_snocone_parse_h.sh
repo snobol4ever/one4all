@@ -7,7 +7,7 @@
 # Lowering shapes verified:
 #
 #   function NAME(args) { body }
-#       DEFINE('NAME(args)')   (bare-expr E_FNC)
+#       DEFINE('NAME(args)')   (bare-expr AST_FNC)
 #       :(NAME_end)            (skip-the-body uncond goto)
 #       NAME    <body>         (body stmts; entry-point label)
 #       NAME_end               (label pad)

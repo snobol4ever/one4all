@@ -14,7 +14,7 @@
 
 #include <stdint.h>
 #include <setjmp.h>
-#include "frontend/snobol4/scrip_cc.h"  /* EXPR_t, STMT_t, CODE_t, DESCR_t */
+#include "frontend/snobol4/scrip_cc.h"  /* AST_t, STMT_t, CODE_t, DESCR_t */
 
 /* ── Diagnostic flags (set in main, read by execute_program / sm_interp) ── */
 extern int g_opt_trace;
@@ -56,8 +56,8 @@ STMT_t *label_lookup(const char *name);
 void    prescan_defines(CODE_t *prog);
 
 /* ── Core interpreter entry points ────────────────────────────────────── */
-DESCR_t interp_eval    (EXPR_t *e);
-DESCR_t interp_eval_pat(EXPR_t *e);
+DESCR_t interp_eval    (AST_t *e);
+DESCR_t interp_eval_pat(AST_t *e);
 void    execute_program(CODE_t *prog);
 void    execute_program_steps(CODE_t *prog, int n);  /* IM-3: step-limited run */
 void    ir_dump_program(CODE_t *prog, FILE *f);

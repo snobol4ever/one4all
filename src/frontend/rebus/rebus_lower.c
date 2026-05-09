@@ -5,11 +5,11 @@
  * Authored: 2026-03-30, G-9 s19, Claude Sonnet 4.6
  *
  * Walks RProgram* (from rebus_parse()) and produces CODE_t*
- * (STMT_t list with EXPR_t nodes using EXPR_e values).
+ * (STMT_t list with AST_t nodes using AST_e values).
  *
  * Architecture per archive/doc/IR_LOWER_REBUS.md:
- *   - P-component (pattern) → SNOBOL4 EXPR_e pool
- *   - L-component (control) → Icon EXPR_e pool / label+goto STMT_t chains
+ *   - P-component (pattern) → SNOBOL4 AST_e pool
+ *   - L-component (control) → Icon AST_e pool / label+goto STMT_t chains
  *
  * Control-flow lowering uses the same label/goto STMT_t pattern as
  * snocone_control.c.  Each structured construct becomes labeled SNOBOL4-style
@@ -75,58 +75,58 @@ static void emit_goto(RebLow *L, const char *target) {
 }
 
 /* -------------------------------------------------------------------------
- * Expression lowering: RExpr* → EXPR_t*
+ * Expression lowering: RExpr* → AST_t*
  * ---------------------------------------------------------------------- */
 
-static EXPR_t *lower_expr(RebLow *L, RExpr *e);
+static AST_t *lower_expr(RebLow *L, RExpr *e);
 
-/* Build E_FNC node with given name and N children. */
-static EXPR_t *make_fnc(const char *name, int n, ...) {
-    EXPR_t *f = expr_new(E_FNC);
+/* Build AST_FNC node with given name and N children. */
+static AST_t *make_fnc(const char *name, int n, ...) {
+    AST_t *f = expr_new(AST_FNC);
     f->sval = strdup(name);
     va_list ap; va_start(ap, n);
     for (int i = 0; i < n; i++)
-        expr_add_child(f, va_arg(ap, EXPR_t *));
+        expr_add_child(f, va_arg(ap, AST_t *));
     va_end(ap);
     return f;
 }
 
-static EXPR_t *lower_expr(RebLow *L, RExpr *e) {
-    if (!e) { EXPR_t *n = expr_new(E_NUL); return n; }
+static AST_t *lower_expr(RebLow *L, RExpr *e) {
+    if (!e) { AST_t *n = expr_new(AST_NUL); return n; }
 
     switch (e->kind) {
 
     /* --- Literals --- */
-    case RE_STR:  { EXPR_t *x = expr_new(E_QLIT); x->sval = strdup(e->sval); return x; }
-    case RE_INT:  { EXPR_t *x = expr_new(E_ILIT); x->ival = e->ival;          return x; }
-    case RE_REAL: { EXPR_t *x = expr_new(E_FLIT); x->dval = e->dval;          return x; }
-    case RE_NULL: { return expr_new(E_NUL); }
+    case RE_STR:  { AST_t *x = expr_new(AST_QLIT); x->sval = strdup(e->sval); return x; }
+    case RE_INT:  { AST_t *x = expr_new(AST_ILIT); x->ival = e->ival;          return x; }
+    case RE_REAL: { AST_t *x = expr_new(AST_FLIT); x->dval = e->dval;          return x; }
+    case RE_NULL: { return expr_new(AST_NUL); }
 
     /* --- References --- */
-    case RE_VAR:     { EXPR_t *x = expr_new(E_VAR); x->sval = strdup(e->sval); return x; }
-    case RE_KEYWORD: { EXPR_t *x = expr_new(E_KEYWORD);  x->sval = strdup(e->sval); return x; }
+    case RE_VAR:     { AST_t *x = expr_new(AST_VAR); x->sval = strdup(e->sval); return x; }
+    case RE_KEYWORD: { AST_t *x = expr_new(AST_KEYWORD);  x->sval = strdup(e->sval); return x; }
 
     /* --- Unary arithmetic --- */
-    case RE_NEG:   return expr_unary(E_MNS, lower_expr(L, e->left));
+    case RE_NEG:   return expr_unary(AST_MNS, lower_expr(L, e->left));
     case RE_POS:   return lower_expr(L, e->left); /* identity — drop */
     case RE_NOT:   return make_fnc("DIFFER", 1, lower_expr(L, e->left));
     case RE_VALUE: return make_fnc("IDENT",  1, lower_expr(L, e->left));
 
     /* --- Icon generator bang --- */
-    case RE_BANG:   return expr_unary(E_ITERATE,  lower_expr(L, e->left));
+    case RE_BANG:   return expr_unary(AST_ITERATE,  lower_expr(L, e->left));
 
     /* --- Binary arithmetic --- */
-    case RE_ADD: return expr_binary(E_ADD,    lower_expr(L,e->left), lower_expr(L,e->right));
-    case RE_SUB: return expr_binary(E_SUB,    lower_expr(L,e->left), lower_expr(L,e->right));
-    case RE_MUL: return expr_binary(E_MUL,    lower_expr(L,e->left), lower_expr(L,e->right));
-    case RE_DIV: return expr_binary(E_DIV,    lower_expr(L,e->left), lower_expr(L,e->right));
-    case RE_POW: return expr_binary(E_POW,    lower_expr(L,e->left), lower_expr(L,e->right));
+    case RE_ADD: return expr_binary(AST_ADD,    lower_expr(L,e->left), lower_expr(L,e->right));
+    case RE_SUB: return expr_binary(AST_SUB,    lower_expr(L,e->left), lower_expr(L,e->right));
+    case RE_MUL: return expr_binary(AST_MUL,    lower_expr(L,e->left), lower_expr(L,e->right));
+    case RE_DIV: return expr_binary(AST_DIV,    lower_expr(L,e->left), lower_expr(L,e->right));
+    case RE_POW: return expr_binary(AST_POW,    lower_expr(L,e->left), lower_expr(L,e->right));
     case RE_MOD: return make_fnc("REMDR", 2,  lower_expr(L,e->left), lower_expr(L,e->right));
 
     /* --- String/pattern --- */
-    case RE_STRCAT: return expr_binary(E_CAT, lower_expr(L,e->left), lower_expr(L,e->right));
-    case RE_PATCAT: return expr_binary(E_CAT, lower_expr(L,e->left), lower_expr(L,e->right));
-    case RE_ALT:    return expr_binary(E_ALT,    lower_expr(L,e->left), lower_expr(L,e->right));
+    case RE_STRCAT: return expr_binary(AST_CAT, lower_expr(L,e->left), lower_expr(L,e->right));
+    case RE_PATCAT: return expr_binary(AST_CAT, lower_expr(L,e->left), lower_expr(L,e->right));
+    case RE_ALT:    return expr_binary(AST_ALT,    lower_expr(L,e->left), lower_expr(L,e->right));
 
     /* --- Comparison (SNOBOL4 pool) --- */
     case RE_EQ:  return make_fnc("EQ",     2, lower_expr(L,e->left), lower_expr(L,e->right));
@@ -144,57 +144,57 @@ static EXPR_t *lower_expr(RebLow *L, RExpr *e) {
 
     /* --- Assignment --- */
     case RE_ASSIGN:
-        return expr_binary(E_ASSIGN, lower_expr(L,e->left), lower_expr(L,e->right));
+        return expr_binary(AST_ASSIGN, lower_expr(L,e->left), lower_expr(L,e->right));
     case RE_EXCHANGE:
         return make_fnc("EXCHG", 2, lower_expr(L,e->left), lower_expr(L,e->right));
     case RE_ADDASSIGN:
-        return expr_binary(E_ASSIGN, lower_expr(L,e->left),
-               expr_binary(E_ADD, lower_expr(L,e->left), lower_expr(L,e->right)));
+        return expr_binary(AST_ASSIGN, lower_expr(L,e->left),
+               expr_binary(AST_ADD, lower_expr(L,e->left), lower_expr(L,e->right)));
     case RE_SUBASSIGN:
-        return expr_binary(E_ASSIGN, lower_expr(L,e->left),
-               expr_binary(E_SUB, lower_expr(L,e->left), lower_expr(L,e->right)));
+        return expr_binary(AST_ASSIGN, lower_expr(L,e->left),
+               expr_binary(AST_SUB, lower_expr(L,e->left), lower_expr(L,e->right)));
     case RE_CATASSIGN:
-        return expr_binary(E_ASSIGN, lower_expr(L,e->left),
-               expr_binary(E_CAT, lower_expr(L,e->left), lower_expr(L,e->right)));
+        return expr_binary(AST_ASSIGN, lower_expr(L,e->left),
+               expr_binary(AST_CAT, lower_expr(L,e->left), lower_expr(L,e->right)));
 
     /* --- Call / subscript --- */
     case RE_CALL: {
-        EXPR_t *f = expr_new(E_FNC);
+        AST_t *f = expr_new(AST_FNC);
         f->sval = strdup(e->sval);
         for (int i = 0; i < e->nargs; i++)
             expr_add_child(f, lower_expr(L, e->args[i]));
         return f;
     }
     case RE_SUB_IDX: {
-        EXPR_t *f = expr_new(E_IDX);
+        AST_t *f = expr_new(AST_IDX);
         expr_add_child(f, lower_expr(L, e->left));
         for (int i = 0; i < e->nargs; i++)
             expr_add_child(f, lower_expr(L, e->args[i]));
         return f;
     }
     case RE_RANGE:
-        return expr_binary(E_IDX, lower_expr(L,e->left), lower_expr(L,e->right));
+        return expr_binary(AST_IDX, lower_expr(L,e->left), lower_expr(L,e->right));
 
     /* --- Pattern captures (SNOBOL4 pool) --- */
-    case RE_COND:   return expr_binary(E_CAPT_COND_ASGN, lower_expr(L,e->left), lower_expr(L,e->right));
-    case RE_IMM:    return expr_binary(E_CAPT_IMMED_ASGN,  lower_expr(L,e->left), lower_expr(L,e->right));
-    case RE_CURSOR: { EXPR_t *x = expr_new(E_CAPT_CURSOR); x->sval = strdup(e->sval); return x; }
-    case RE_DEREF:  return expr_unary(E_INDIRECT, lower_expr(L, e->left));
-    case RE_PATOPT: return expr_unary(E_ARBNO, lower_expr(L, e->left)); /* ~pat → E_ARBNO */
+    case RE_COND:   return expr_binary(AST_CAPT_COND_ASGN, lower_expr(L,e->left), lower_expr(L,e->right));
+    case RE_IMM:    return expr_binary(AST_CAPT_IMMED_ASGN,  lower_expr(L,e->left), lower_expr(L,e->right));
+    case RE_CURSOR: { AST_t *x = expr_new(AST_CAPT_CURSOR); x->sval = strdup(e->sval); return x; }
+    case RE_DEREF:  return expr_unary(AST_INDIRECT, lower_expr(L, e->left));
+    case RE_PATOPT: return expr_unary(AST_ARBNO, lower_expr(L, e->left)); /* ~pat → AST_ARBNO */
 
     /* --- Augmented (generic) --- */
     case RE_AUG:
         /* Synthesize: lhs := lhs augop rhs */
         {
-            EXPR_e op;
+            AST_e op;
             switch (e->augop) {
-            case RE_ADD: op = E_ADD; break;
-            case RE_SUB: op = E_SUB; break;
-            case RE_MUL: op = E_MUL; break;
-            case RE_DIV: op = E_DIV; break;
-            default:     op = E_CAT; break;
+            case RE_ADD: op = AST_ADD; break;
+            case RE_SUB: op = AST_SUB; break;
+            case RE_MUL: op = AST_MUL; break;
+            case RE_DIV: op = AST_DIV; break;
+            default:     op = AST_CAT; break;
             }
-            return expr_binary(E_ASSIGN, lower_expr(L,e->left),
+            return expr_binary(AST_ASSIGN, lower_expr(L,e->left),
                    expr_binary(op, lower_expr(L,e->left), lower_expr(L,e->right)));
         }
 
@@ -205,9 +205,9 @@ static EXPR_t *lower_expr(RebLow *L, RExpr *e) {
         fprintf(stderr, "rebus_lower: unhandled REKind %d at line %d\n",
                 e->kind, e->lineno);
         L->nerrors++;
-        return expr_new(E_NUL);
+        return expr_new(AST_NUL);
     }
-    return expr_new(E_NUL);
+    return expr_new(AST_NUL);
 }
 
 /* -------------------------------------------------------------------------
@@ -227,7 +227,7 @@ static void lower_stmt(RebLow *L, RStmt *s) {
          * emit as a STMT_t with subject=lhs, has_eq=1, replacement=rhs.
          * This routes through the statement-level assignment path which
          * correctly handles OUTPUT, INPUT, and other SNOBOL4 keywords.
-         * Nested assignments (e.g. x := y := z) still go through E_ASSIGN. */
+         * Nested assignments (e.g. x := y := z) still go through AST_ASSIGN. */
         RExpr *ex = s->expr;
         if (ex && (ex->kind == RE_ASSIGN    ||
                    ex->kind == RE_ADDASSIGN ||
@@ -241,12 +241,12 @@ static void lower_stmt(RebLow *L, RStmt *s) {
                 st->has_eq      = 1;
             } else {
                 /* x +:= e  →  subject=x, has_eq=1, replacement=x+e */
-                EXPR_t *lhs = lower_expr(L, ex->left);
-                EXPR_t *rhs = lower_expr(L, ex->right);
-                EXPR_e   op  = (ex->kind == RE_ADDASSIGN) ? E_ADD :
-                              (ex->kind == RE_SUBASSIGN) ? E_SUB : E_CAT;
+                AST_t *lhs = lower_expr(L, ex->left);
+                AST_t *rhs = lower_expr(L, ex->right);
+                AST_e   op  = (ex->kind == RE_ADDASSIGN) ? AST_ADD :
+                              (ex->kind == RE_SUBASSIGN) ? AST_SUB : AST_CAT;
                 /* Need a fresh copy of lhs for the rhs operand */
-                EXPR_t *lhs2 = lower_expr(L, ex->left);
+                AST_t *lhs2 = lower_expr(L, ex->left);
                 st->subject     = lhs;
                 st->replacement = expr_binary(op, lhs2, rhs);
                 st->has_eq      = 1;
@@ -285,7 +285,7 @@ static void lower_stmt(RebLow *L, RStmt *s) {
         st->lineno      = s->lineno;
         st->subject     = lower_expr(L, s->expr);
         st->pattern     = lower_expr(L, s->pat);
-        st->replacement = expr_new(E_NUL);
+        st->replacement = expr_new(AST_NUL);
         emit(L, st);
         break;
     }
@@ -424,14 +424,14 @@ static void lower_stmt(RebLow *L, RStmt *s) {
         L->loop_end[L->loop_depth++] = l_end;
 
         /* id := e1 */
-        EXPR_t *var = expr_new(E_VAR); var->sval = strdup(s->for_var);
+        AST_t *var = expr_new(AST_VAR); var->sval = strdup(s->for_var);
         STMT_t *init = blank_stmt();
-        init->subject = expr_binary(E_ASSIGN, var, lower_expr(L, s->for_from));
+        init->subject = expr_binary(AST_ASSIGN, var, lower_expr(L, s->for_from));
         emit(L, init);
 
         /* L_top: GT(id, e2) :S(L_end) */
         emit_label(L, l_top);
-        EXPR_t *var2 = expr_new(E_VAR); var2->sval = strdup(s->for_var);
+        AST_t *var2 = expr_new(AST_VAR); var2->sval = strdup(s->for_var);
         STMT_t *test = blank_stmt();
         test->subject = make_fnc("GT", 2, var2, lower_expr(L, s->for_to));
         test->goto_s = strdup(l_end);
@@ -440,13 +440,13 @@ static void lower_stmt(RebLow *L, RStmt *s) {
         lower_stmt(L, s->body);
 
         /* id := id + step */
-        EXPR_t *var3 = expr_new(E_VAR); var3->sval = strdup(s->for_var);
-        EXPR_t *var4 = expr_new(E_VAR); var4->sval = strdup(s->for_var);
-        EXPR_t *step = s->for_by ? lower_expr(L, s->for_by)
-                                 : ({ EXPR_t *one = expr_new(E_ILIT); one->ival = 1; one; });
+        AST_t *var3 = expr_new(AST_VAR); var3->sval = strdup(s->for_var);
+        AST_t *var4 = expr_new(AST_VAR); var4->sval = strdup(s->for_var);
+        AST_t *step = s->for_by ? lower_expr(L, s->for_by)
+                                 : ({ AST_t *one = expr_new(AST_ILIT); one->ival = 1; one; });
         STMT_t *inc  = blank_stmt();
-        inc->subject = expr_binary(E_ASSIGN, var3,
-                       expr_binary(E_ADD, var4, step));
+        inc->subject = expr_binary(AST_ASSIGN, var3,
+                       expr_binary(AST_ADD, var4, step));
         emit(L, inc);
         emit_goto(L, l_top);
         emit_label(L, l_end);
@@ -470,9 +470,9 @@ static void lower_stmt(RebLow *L, RStmt *s) {
         /* Materialize case expr into a temp variable for repeated comparison */
         char tmpbuf[32];
         snprintf(tmpbuf, sizeof tmpbuf, "rb_case_%d", L->label_ctr);
-        EXPR_t *tmpvar = expr_new(E_VAR); tmpvar->sval = strdup(tmpbuf);
+        AST_t *tmpvar = expr_new(AST_VAR); tmpvar->sval = strdup(tmpbuf);
         STMT_t *assign = blank_stmt();
-        assign->subject = expr_binary(E_ASSIGN, tmpvar, lower_expr(L, s->case_expr));
+        assign->subject = expr_binary(AST_ASSIGN, tmpvar, lower_expr(L, s->case_expr));
         emit(L, assign);
 
         char *l_next = NULL;
@@ -484,7 +484,7 @@ static void lower_stmt(RebLow *L, RStmt *s) {
             } else {
                 char *l_match = newlab(L);
                 l_next = newlab(L);
-                EXPR_t *tv = expr_new(E_VAR); tv->sval = strdup(tmpbuf);
+                AST_t *tv = expr_new(AST_VAR); tv->sval = strdup(tmpbuf);
                 STMT_t *cst = blank_stmt();
                 cst->subject = make_fnc("IDENT", 2, tv, lower_expr(L, c->guard));
                 cst->goto_s = strdup(l_match);
@@ -505,7 +505,7 @@ static void lower_stmt(RebLow *L, RStmt *s) {
     case RS_RETURN: {
         if (s->retval && L->fname) {
             /* fname = retval */
-            EXPR_t *fn = expr_new(E_VAR); fn->sval = strdup(L->fname);
+            AST_t *fn = expr_new(AST_VAR); fn->sval = strdup(L->fname);
             STMT_t *assign = blank_stmt();
             assign->subject     = fn;
             assign->replacement = lower_expr(L, s->retval);
@@ -586,7 +586,7 @@ static void lower_decl(RebLow *L, RDecl *d) {
         }
         snprintf(buf + pos, sizeof buf - pos, ")");
         STMT_t *st = blank_stmt();
-        EXPR_t *arg = expr_new(E_QLIT); arg->sval = strdup(buf);
+        AST_t *arg = expr_new(AST_QLIT); arg->sval = strdup(buf);
         st->subject = make_fnc("DATA", 1, arg);
         emit(L, st);
         break;
@@ -611,7 +611,7 @@ static void lower_decl(RebLow *L, RDecl *d) {
 
         /* DEFINE call */
         STMT_t *def_st = blank_stmt();
-        EXPR_t *arg = expr_new(E_QLIT); arg->sval = strdup(buf);
+        AST_t *arg = expr_new(AST_QLIT); arg->sval = strdup(buf);
         def_st->subject = make_fnc("DEFINE", 1, arg);
         emit(L, def_st);
 
@@ -626,7 +626,7 @@ static void lower_decl(RebLow *L, RDecl *d) {
         if (d->initial) {
             char flagbuf[64];
             snprintf(flagbuf, sizeof flagbuf, "rb_init_%s", d->name);
-            EXPR_t *flag = expr_new(E_VAR); flag->sval = strdup(flagbuf);
+            AST_t *flag = expr_new(AST_VAR); flag->sval = strdup(flagbuf);
             char *l_done = newlab(L);
             STMT_t *chk = blank_stmt();
             chk->subject = flag;
@@ -634,10 +634,10 @@ static void lower_decl(RebLow *L, RDecl *d) {
             emit(L, chk);
             lower_stmt(L, d->initial);
             /* set flag */
-            EXPR_t *fv = expr_new(E_VAR); fv->sval = strdup(flagbuf);
-            EXPR_t *one = expr_new(E_ILIT); one->ival = 1;
+            AST_t *fv = expr_new(AST_VAR); fv->sval = strdup(flagbuf);
+            AST_t *one = expr_new(AST_ILIT); one->ival = 1;
             STMT_t *fst = blank_stmt();
-            fst->subject = expr_binary(E_ASSIGN, fv, one);
+            fst->subject = expr_binary(AST_ASSIGN, fv, one);
             emit(L, fst);
             emit_label(L, l_done); free(l_done);
         }
@@ -649,7 +649,7 @@ static void lower_decl(RebLow *L, RDecl *d) {
         free(L->fname);
         L->fname = saved_fname;
 
-        /* implicit :(RETURN) at end of function — goto pseudo-label, not E_FNC */
+        /* implicit :(RETURN) at end of function — goto pseudo-label, not AST_FNC */
         emit_goto(L, "RETURN");
 
         emit_label(L, l_end); free(l_end);

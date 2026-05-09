@@ -12,7 +12,7 @@
  *============================================================================================================================*/
 
 #include "icon_gen.h"
-#include "../../ir/ir.h"            /* EXPR_t, EXPR_e, E_TO, E_TO_BY, E_ITERATE, E_SUSPEND, E_FNC */
+#include "../../ir/ir.h"            /* AST_t, AST_e, AST_TO, AST_TO_BY, AST_ITERATE, AST_SUSPEND, AST_FNC */
 #include "../../runtime/common/coerce.h"  /* descr_to_str_icn (D-1/D-2 RS-6) */
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,7 +20,7 @@
 #include <ucontext.h>
 
 /*============================================================================================================================
- * B-3: coro_bb_to — E_TO Byrd box  (i to j)
+ * B-3: coro_bb_to — AST_TO Byrd box  (i to j)
  *
  * State: lo, hi, cur.
  *   α: cur = lo; if cur > hi → ω; else return integer cur (γ).
@@ -67,7 +67,7 @@ DESCR_t coro_bb_to_nested(void *zeta, int entry) {
 }
 
 /*============================================================================================================================
- * B-4: coro_bb_to_by — E_TO_BY Byrd box  (i to j by k)
+ * B-4: coro_bb_to_by — AST_TO_BY Byrd box  (i to j by k)
  *
  * State: lo, hi, step, cur.
  *   α: cur = lo.
@@ -85,7 +85,7 @@ DESCR_t coro_bb_to_by(void *zeta, int entry) {
     return (DESCR_t){ .v = DT_I, .i = z->cur };
 }
 
-/* coro_bb_to_by_real — E_TO_BY with real (float) step/bounds */
+/* coro_bb_to_by_real — AST_TO_BY with real (float) step/bounds */
 DESCR_t coro_bb_to_by_real(void *zeta, int entry) {
     icn_to_by_real_state_t *z = (icn_to_by_real_state_t *)zeta;
     if (entry == α) z->cur = z->lo;
@@ -97,7 +97,7 @@ DESCR_t coro_bb_to_by_real(void *zeta, int entry) {
 }
 
 /*============================================================================================================================
- * B-5: coro_bb_iterate — E_ITERATE Byrd box  (!str, Icon char iteration)
+ * B-5: coro_bb_iterate — AST_ITERATE Byrd box  (!str, Icon char iteration)
  *
  * State: str, len, pos.
  *   α: pos = 0.  β: pos++.  ω: pos >= len.  γ: single-char string at pos.
@@ -114,7 +114,7 @@ DESCR_t coro_bb_iterate(void *zeta, int entry) {
 }
 
 /*============================================================================================================================
- * B-5b: coro_bb_tbl_iterate — E_ITERATE Byrd box for DT_T tables  (!T yields values)
+ * B-5b: coro_bb_tbl_iterate — AST_ITERATE Byrd box for DT_T tables  (!T yields values)
  *
  * State: tbl, bucket (0..TABLE_BUCKETS-1), entry (current TBPAIR_t*).
  *   α: bucket=0, entry=tbl->buckets[0].
@@ -138,7 +138,7 @@ DESCR_t coro_bb_tbl_iterate(void *zeta, int entry) {
 }
 
 /*============================================================================================================================
- * IC-5: coro_bb_list_iterate — E_ITERATE Byrd box for DT_DATA icnlist  (!L yields elements)
+ * IC-5: coro_bb_list_iterate — AST_ITERATE Byrd box for DT_DATA icnlist  (!L yields elements)
  *   Holds the live list DT_DATA descriptor so it sees elements added by put() after box creation.
  *   α: reset pos=0, return elems[0].
  *   β: advance pos, return elems[pos].
@@ -158,7 +158,7 @@ DESCR_t coro_bb_list_iterate(void *zeta, int entry) {
 }
 
 /*============================================================================================================================
- * IC-9 (2026-05-01): coro_bb_record_iterate — E_ITERATE Byrd box for DT_DATA records (!R yields field values).
+ * IC-9 (2026-05-01): coro_bb_record_iterate — AST_ITERATE Byrd box for DT_DATA records (!R yields field values).
  *   Records are DT_DATA but NOT the icnlist shape (no "icn_type" tag of "list"); their structure lives in
  *   inst.u->type->nfields and inst.u->fields[i].  Iterates fields in declaration order.  Re-reads the live
  *   instance each tick so mutations made between ticks (rare; field-iteration usually one-pass) are visible.
@@ -196,7 +196,7 @@ DESCR_t coro_bb_tbl_key_iterate(void *zeta, int entry) {
 
 
 /*============================================================================================================================
- * B-6: coro_bb_suspend — E_SUSPEND Byrd box (coroutine wrapper)
+ * B-6: coro_bb_suspend — AST_SUSPEND Byrd box (coroutine wrapper)
  *
  * Wraps existing ucontext coroutine machinery from scrip.c.
  * The zeta pointer carries an opaque Icn_coro_entry* already set up by the caller.
@@ -447,7 +447,7 @@ DESCR_t coro_bb_binop(void *zeta, int entry) {
 }
 
 /*============================================================================================================================
- * coro_bb_alternate — IC-2a: E_ALTERNATE Byrd box
+ * coro_bb_alternate — IC-2a: AST_ALTERNATE Byrd box
  *
  * JCON irgen.icn ir_a_Alt (binary case):
  *   α: pump gen[0] α; if γ → return. If ω → switch which=1, pump gen[1] α.

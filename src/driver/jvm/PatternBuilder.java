@@ -42,30 +42,30 @@ import java.util.List;
  * The Interpreter supplies VarSetter/IntSetter callbacks for captures.
  *
  * EKind → bb_box mapping:
- *   E_QLIT / E_ILIT / E_FLIT  → bb_lit
- *   E_NUL                      → bb_lit("") zero-width
- *   E_ARB  / E_VAR "ARB"       → bb_arb
- *   E_REM  / E_VAR "REM"       → bb_rem
- *   E_FAIL / E_VAR "FAIL"      → bb_fail
- *   E_SUCCEED / E_VAR "SUCCEED"→ bb_succeed
- *   E_FENCE / E_VAR "FENCE"    → bb_fence
- *   E_ABORT / E_VAR "ABORT"    → bb_abort
- *   E_SEQ / E_CAT              → bb_seq chain (left-fold binary tree)
- *   E_ALT                      → bb_alt(children...)
- *   E_FNC ANY                  → bb_any
- *   E_FNC NOTANY               → bb_notany
- *   E_FNC SPAN                 → bb_span
- *   E_FNC BREAK                → bb_brk
- *   E_FNC BREAKX               → bb_breakx
- *   E_FNC LEN                  → bb_len
- *   E_FNC POS                  → bb_pos
- *   E_FNC RPOS                 → bb_rpos
- *   E_FNC TAB                  → bb_tab
- *   E_FNC RTAB                 → bb_rtab
- *   E_FNC ARBNO                → bb_arbno
- *   E_CAPT_IMMED_ASGN ($var)   → bb_capture(immediate=true)
- *   E_CAPT_COND_ASGN  (.var)   → bb_capture(immediate=false)
- *   E_CAPT_CURSOR     (@var)   → bb_atp
+ *   AST_QLIT / AST_ILIT / AST_FLIT  → bb_lit
+ *   AST_NUL                      → bb_lit("") zero-width
+ *   AST_ARB  / AST_VAR "ARB"       → bb_arb
+ *   AST_REM  / AST_VAR "REM"       → bb_rem
+ *   AST_FAIL / AST_VAR "FAIL"      → bb_fail
+ *   AST_SUCCEED / AST_VAR "SUCCEED"→ bb_succeed
+ *   AST_FENCE / AST_VAR "FENCE"    → bb_fence
+ *   AST_ABORT / AST_VAR "ABORT"    → bb_abort
+ *   AST_SEQ / AST_CAT              → bb_seq chain (left-fold binary tree)
+ *   AST_ALT                      → bb_alt(children...)
+ *   AST_FNC ANY                  → bb_any
+ *   AST_FNC NOTANY               → bb_notany
+ *   AST_FNC SPAN                 → bb_span
+ *   AST_FNC BREAK                → bb_brk
+ *   AST_FNC BREAKX               → bb_breakx
+ *   AST_FNC LEN                  → bb_len
+ *   AST_FNC POS                  → bb_pos
+ *   AST_FNC RPOS                 → bb_rpos
+ *   AST_FNC TAB                  → bb_tab
+ *   AST_FNC RTAB                 → bb_rtab
+ *   AST_FNC ARBNO                → bb_arbno
+ *   AST_CAPT_IMMED_ASGN ($var)   → bb_capture(immediate=true)
+ *   AST_CAPT_COND_ASGN  (.var)   → bb_capture(immediate=false)
+ *   AST_CAPT_CURSOR     (@var)   → bb_atp
  */
 class PatternBuilder {
 
@@ -141,27 +141,27 @@ class PatternBuilder {
         switch (e.kind) {
 
             // ── Literals ─────────────────────────────────────────────────────
-            case E_QLIT:
+            case AST_QLIT:
                 return new bb_lit(ms, e.sval != null ? e.sval : "");
-            case E_ILIT:
+            case AST_ILIT:
                 return new bb_lit(ms, e.sval != null ? e.sval :
                                       String.valueOf(e.ival));
-            case E_FLIT:
+            case AST_FLIT:
                 return new bb_lit(ms, e.sval != null ? e.sval :
                                       String.valueOf(e.dval));
-            case E_NUL:
+            case AST_NUL:
                 return new bb_lit(ms, "");
 
             // ── Bare pattern keyword nodes ────────────────────────────────────
-            case E_ARB:     return new bb_arb(ms);
-            case E_REM:     return new bb_rem(ms);
-            case E_FAIL:    return new bb_fail(ms);
-            case E_SUCCEED: return new bb_succeed(ms);
-            case E_FENCE:   return new bb_fence(ms);
-            case E_ABORT:   return new bb_abort(ms);
+            case AST_ARB:     return new bb_arb(ms);
+            case AST_REM:     return new bb_rem(ms);
+            case AST_FAIL:    return new bb_fail(ms);
+            case AST_SUCCEED: return new bb_succeed(ms);
+            case AST_FENCE:   return new bb_fence(ms);
+            case AST_ABORT:   return new bb_abort(ms);
 
-            // ── E_VAR: may be a bare keyword pattern or a pattern-valued var ──
-            case E_VAR: {
+            // ── AST_VAR: may be a bare keyword pattern or a pattern-valued var ──
+            case AST_VAR: {
                 String name = e.sval != null ? e.sval.toUpperCase() : "";
                 switch (name) {
                     case "ARB":     return new bb_arb(ms);
@@ -180,12 +180,12 @@ class PatternBuilder {
             }
 
             // ── Sequence / concatenation ──────────────────────────────────────
-            case E_SEQ:
-            case E_CAT:
+            case AST_SEQ:
+            case AST_CAT:
                 return buildSeqChain(e.children);
 
             // ── Alternation ───────────────────────────────────────────────────
-            case E_ALT: {
+            case AST_ALT: {
                 bb_box[] kids = e.children.stream()
                     .map(this::build)
                     .toArray(bb_box[]::new);
@@ -193,7 +193,7 @@ class PatternBuilder {
             }
 
             // ── Function calls: ANY NOTANY SPAN BREAK BREAKX LEN POS RPOS TAB RTAB ARBNO ──
-            case E_FNC: {
+            case AST_FNC: {
                 String fn = e.sval != null ? e.sval.toUpperCase() : "";
                 List<Parser.ExprNode> args = e.children;
                 switch (fn) {
@@ -251,14 +251,14 @@ class PatternBuilder {
             }
 
             // ── Captures ─────────────────────────────────────────────────────
-            case E_CAPT_IMMED_ASGN: {
+            case AST_CAPT_IMMED_ASGN: {
                 // $var — immediate assign on every γ
                 String varName = captureVarName(e);
                 bb_box child   = e.children.size() > 0 ? build(e.children.get(0)) : new bb_eps(ms);
                 bb.bb_capture.VarSetter vs = (n, v) -> varSetter.set(n, v);
                 return new bb_capture(ms, child, varName, true, vs);
             }
-            case E_CAPT_COND_ASGN: {
+            case AST_CAPT_COND_ASGN: {
                 // .var — deferred assign on :S
                 String varName = captureVarName(e);
                 bb_box child   = e.children.size() > 0 ? build(e.children.get(0)) : new bb_eps(ms);
@@ -267,7 +267,7 @@ class PatternBuilder {
                 deferred.add(cap);
                 return cap;
             }
-            case E_CAPT_CURSOR: {
+            case AST_CAPT_CURSOR: {
                 // @var — write cursor position as integer
                 String varName = captureVarName(e);
                 bb.bb_atp.IntSetter is = (n, v) -> intSetter.set(n, v);
@@ -275,16 +275,16 @@ class PatternBuilder {
             }
 
             // ── Interrogate (?pat) — succeed/fail inversion ───────────────────
-            case E_INTERROGATE: {
+            case AST_INTERROGATE: {
                 bb_box child = e.children.isEmpty() ? new bb_eps(ms) : build(e.children.get(0));
                 return new bb_interr(ms, child);
             }
 
-            // ── *var — indirect pattern dereference (E_DEFER) ────────────────
-            case E_DEFER: {
+            // ── *var — indirect pattern dereference (AST_DEFER) ────────────────
+            case AST_DEFER: {
                 if (e.children.isEmpty()) return new bb_fail(ms);
                 Parser.ExprNode inner = e.children.get(0);
-                String varName = (inner.kind == Parser.EKind.E_VAR && inner.sval != null)
+                String varName = (inner.kind == Parser.EKind.AST_VAR && inner.sval != null)
                                  ? inner.sval : "";
                 if (varName.isEmpty()) return new bb_fail(ms);
                 return new bb_dvar(ms, varName, varResolver);
@@ -321,7 +321,7 @@ class PatternBuilder {
     private int intArg(List<Parser.ExprNode> args, int idx) {
         if (idx >= args.size()) return 0;
         Parser.ExprNode a = args.get(idx);
-        if (a.kind == Parser.EKind.E_ILIT) return (int) a.ival;
+        if (a.kind == Parser.EKind.AST_ILIT) return (int) a.ival;
         if (a.sval != null) {
             try { return Integer.parseInt(a.sval.trim()); } catch (NumberFormatException ex) {}
         }
@@ -335,11 +335,11 @@ class PatternBuilder {
     private java.util.function.IntSupplier dynIntArg(List<Parser.ExprNode> args, int idx) {
         if (idx >= args.size()) return () -> 0;
         Parser.ExprNode a = args.get(idx);
-        if (a.kind == Parser.EKind.E_ILIT) {
+        if (a.kind == Parser.EKind.AST_ILIT) {
             int v = (int) a.ival;
             return () -> v;
         }
-        if (a.kind == Parser.EKind.E_VAR && a.sval != null && varGetter != null) {
+        if (a.kind == Parser.EKind.AST_VAR && a.sval != null && varGetter != null) {
             final String nm = a.sval;
             final VarGetter vg = varGetter;
             return () -> {
@@ -355,7 +355,7 @@ class PatternBuilder {
     }
 
     /** Extract capture variable name from a capture node.
-     *  Binary form: E_CAPT_COND_ASGN(left=patternChild, right=varNode)
+     *  Binary form: AST_CAPT_COND_ASGN(left=patternChild, right=varNode)
      *  The variable is always the LAST child (index 1 for binary nodes).
      */
     private String captureVarName(Parser.ExprNode e) {
@@ -364,7 +364,7 @@ class PatternBuilder {
         // Binary form: last child is the variable node
         if (!e.children.isEmpty()) {
             Parser.ExprNode last = e.children.get(e.children.size() - 1);
-            if (last.kind == Parser.EKind.E_VAR && last.sval != null) return last.sval;
+            if (last.kind == Parser.EKind.AST_VAR && last.sval != null) return last.sval;
         }
         return "";
     }

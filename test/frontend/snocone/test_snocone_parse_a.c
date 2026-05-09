@@ -4,7 +4,7 @@
  * The LS-4.a gate: parse `OUTPUT = 2 + 3;` and verify the resulting
  * Program* has the correct shape — one statement whose subject is
  * the variable OUTPUT and whose replacement is the IR tree
- * E_ADD(E_ILIT(2), E_ILIT(3)).
+ * AST_ADD(AST_ILIT(2), AST_ILIT(3)).
  *
  * No interpreter linking; pure parser-side verification.  When LS-4.j
  * lands, the same source will go through scrip --ir-run and produce
@@ -27,8 +27,8 @@
 #include <string.h>
 #include <stdarg.h>
 
-/* Pull in the shared IR (EXPR_t, Program, EKind, expr_*, stmt_new, etc.).
- * IR_DEFINE_NAMES requests the optional ekind_name[] table so we can
+/* Pull in the shared IR (AST_t, Program, EKind, expr_*, stmt_new, etc.).
+ * IR_DEFINE_NAMES requests the optional ast_e_name[] table so we can
  * print kind labels in the IR dump without linking ir_print.c. */
 #define IR_DEFINE_NAMES
 #include "scrip_cc.h"
@@ -38,19 +38,19 @@ Program *snocone_parse_program(const char *src, const char *filename);
 
 /* Mini IR printer — compact one-line tree dump for verification.
  * This avoids linking the runtime's heavyweight ir_print / ir_dump_program. */
-static void dump_expr(const EXPR_t *e, FILE *out) {
+static void dump_expr(const AST_t *e, FILE *out) {
     if (!e) { fputs("<nil>", out); return; }
-    fputs(ekind_name[e->kind] ? ekind_name[e->kind] : "?", out);
+    fputs(ast_e_name[e->kind] ? ast_e_name[e->kind] : "?", out);
     switch (e->kind) {
-        case E_VAR:
-        case E_KEYWORD:
-        case E_QLIT:
+        case AST_VAR:
+        case AST_KEYWORD:
+        case AST_QLIT:
             fprintf(out, "(\"%s\")", e->sval ? e->sval : "");
             break;
-        case E_ILIT:
+        case AST_ILIT:
             fprintf(out, "(%lld)", e->ival);
             break;
-        case E_FLIT:
+        case AST_FLIT:
             fprintf(out, "(%g)", e->dval);
             break;
         default:
@@ -123,45 +123,45 @@ static void test_assign_int_plus_int(void) {
 
     STMT_t *s = prog->head;
     check("has_eq",   s->has_eq == 1,        "expected has_eq=1, got %d", s->has_eq);
-    check("subject is E_VAR", s->subject && s->subject->kind == E_VAR,
-          "expected subject kind=E_VAR");
+    check("subject is AST_VAR", s->subject && s->subject->kind == AST_VAR,
+          "expected subject kind=AST_VAR");
     check("subject sval = OUTPUT",
           s->subject && s->subject->sval &&
               strcmp(s->subject->sval, "OUTPUT") == 0,
           "expected OUTPUT, got %s", s->subject ? s->subject->sval : "(nil)");
 
-    check("replacement is E_ADD",
-          s->replacement && s->replacement->kind == E_ADD,
-          "expected replacement kind=E_ADD");
-    if (s->replacement && s->replacement->kind == E_ADD &&
+    check("replacement is AST_ADD",
+          s->replacement && s->replacement->kind == AST_ADD,
+          "expected replacement kind=AST_ADD");
+    if (s->replacement && s->replacement->kind == AST_ADD &&
         s->replacement->nchildren == 2) {
-        EXPR_t *l = s->replacement->children[0];
-        EXPR_t *r = s->replacement->children[1];
-        check("E_ADD left = E_ILIT(2)",
-              l && l->kind == E_ILIT && l->ival == 2,
+        AST_t *l = s->replacement->children[0];
+        AST_t *r = s->replacement->children[1];
+        check("AST_ADD left = AST_ILIT(2)",
+              l && l->kind == AST_ILIT && l->ival == 2,
               "got kind=%d ival=%lld",
               l ? (int)l->kind : -1, l ? l->ival : -1LL);
-        check("E_ADD right = E_ILIT(3)",
-              r && r->kind == E_ILIT && r->ival == 3,
+        check("AST_ADD right = AST_ILIT(3)",
+              r && r->kind == AST_ILIT && r->ival == 3,
               "got kind=%d ival=%lld",
               r ? (int)r->kind : -1, r ? r->ival : -1LL);
     }
 }
 
 static void test_arith_precedence(void) {
-    /* a * b + c — should be E_ADD(E_MUL(a,b), c)  (LS-4.a precedence check) */
+    /* a * b + c — should be AST_ADD(AST_MUL(a,b), c)  (LS-4.a precedence check) */
     const char *src = "X = A * B + C;";
     printf("=== test: %s ===\n", src);
     Program *prog = snocone_parse_program(src, "<test>");
     check("parses", prog != NULL, "NULL");
     if (!prog || !prog->head || !prog->head->replacement) return;
-    EXPR_t *r = prog->head->replacement;
-    check("top is E_ADD", r->kind == E_ADD, "top kind=%d", (int)r->kind);
-    if (r->kind == E_ADD && r->nchildren == 2) {
-        check("left is E_MUL", r->children[0]->kind == E_MUL,
+    AST_t *r = prog->head->replacement;
+    check("top is AST_ADD", r->kind == AST_ADD, "top kind=%d", (int)r->kind);
+    if (r->kind == AST_ADD && r->nchildren == 2) {
+        check("left is AST_MUL", r->children[0]->kind == AST_MUL,
               "got %d", (int)r->children[0]->kind);
-        check("right is E_VAR(C)",
-              r->children[1]->kind == E_VAR &&
+        check("right is AST_VAR(C)",
+              r->children[1]->kind == AST_VAR &&
                   strcmp(r->children[1]->sval, "C") == 0,
               "got kind=%d sval=%s",
               (int)r->children[1]->kind,
@@ -170,36 +170,36 @@ static void test_arith_precedence(void) {
 }
 
 static void test_paren_overrides(void) {
-    /* a * (b + c) — should be E_MUL(a, E_ADD(b,c)) */
+    /* a * (b + c) — should be AST_MUL(a, AST_ADD(b,c)) */
     const char *src = "X = A * (B + C);";
     printf("=== test: %s ===\n", src);
     Program *prog = snocone_parse_program(src, "<test>");
     check("parses", prog != NULL, "NULL");
     if (!prog || !prog->head || !prog->head->replacement) return;
-    EXPR_t *r = prog->head->replacement;
-    check("top is E_MUL", r->kind == E_MUL, "top kind=%d", (int)r->kind);
-    if (r->kind == E_MUL && r->nchildren == 2) {
-        check("right is E_ADD", r->children[1]->kind == E_ADD,
+    AST_t *r = prog->head->replacement;
+    check("top is AST_MUL", r->kind == AST_MUL, "top kind=%d", (int)r->kind);
+    if (r->kind == AST_MUL && r->nchildren == 2) {
+        check("right is AST_ADD", r->children[1]->kind == AST_ADD,
               "got %d", (int)r->children[1]->kind);
     }
 }
 
 static void test_exponent_right_assoc(void) {
-    /* 2 ^ 3 ^ 2 — right assoc → E_POW(2, E_POW(3, 2)) */
+    /* 2 ^ 3 ^ 2 — right assoc → AST_POW(2, AST_POW(3, 2)) */
     const char *src = "X = 2 ^ 3 ^ 2;";
     printf("=== test: %s ===\n", src);
     Program *prog = snocone_parse_program(src, "<test>");
     check("parses", prog != NULL, "NULL");
     if (!prog || !prog->head || !prog->head->replacement) return;
-    EXPR_t *r = prog->head->replacement;
-    check("top is E_POW", r->kind == E_POW, "top kind=%d", (int)r->kind);
-    if (r->kind == E_POW && r->nchildren == 2) {
-        check("left is E_ILIT(2)",
-              r->children[0]->kind == E_ILIT && r->children[0]->ival == 2,
+    AST_t *r = prog->head->replacement;
+    check("top is AST_POW", r->kind == AST_POW, "top kind=%d", (int)r->kind);
+    if (r->kind == AST_POW && r->nchildren == 2) {
+        check("left is AST_ILIT(2)",
+              r->children[0]->kind == AST_ILIT && r->children[0]->ival == 2,
               "got kind=%d ival=%lld",
               (int)r->children[0]->kind, r->children[0]->ival);
-        check("right is E_POW (right-assoc)",
-              r->children[1]->kind == E_POW,
+        check("right is AST_POW (right-assoc)",
+              r->children[1]->kind == AST_POW,
               "got kind=%d", (int)r->children[1]->kind);
     }
 }
@@ -210,11 +210,11 @@ static void test_unary_minus(void) {
     Program *prog = snocone_parse_program(src, "<test>");
     check("parses", prog != NULL, "NULL");
     if (!prog || !prog->head || !prog->head->replacement) return;
-    EXPR_t *r = prog->head->replacement;
-    check("top is E_MNS", r->kind == E_MNS, "top kind=%d", (int)r->kind);
-    if (r->kind == E_MNS && r->nchildren == 1) {
-        check("child is E_ILIT(5)",
-              r->children[0]->kind == E_ILIT && r->children[0]->ival == 5,
+    AST_t *r = prog->head->replacement;
+    check("top is AST_MNS", r->kind == AST_MNS, "top kind=%d", (int)r->kind);
+    if (r->kind == AST_MNS && r->nchildren == 1) {
+        check("child is AST_ILIT(5)",
+              r->children[0]->kind == AST_ILIT && r->children[0]->ival == 5,
               "got kind=%d ival=%lld",
               (int)r->children[0]->kind, r->children[0]->ival);
     }
@@ -229,8 +229,8 @@ static void test_bare_expr_stmt(void) {
     if (!prog || !prog->head) return;
     check("has_eq=0", prog->head->has_eq == 0,
           "expected 0 got %d", prog->head->has_eq);
-    check("subject is E_ADD",
-          prog->head->subject && prog->head->subject->kind == E_ADD,
+    check("subject is AST_ADD",
+          prog->head->subject && prog->head->subject->kind == AST_ADD,
           "got kind=%d",
           prog->head->subject ? (int)prog->head->subject->kind : -1);
     check("replacement is NULL", prog->head->replacement == NULL,
@@ -252,9 +252,9 @@ static void test_string_literal(void) {
     Program *prog = snocone_parse_program(src, "<test>");
     check("parses", prog != NULL, "NULL");
     if (!prog || !prog->head || !prog->head->replacement) return;
-    EXPR_t *r = prog->head->replacement;
-    check("replacement is E_QLIT",
-          r->kind == E_QLIT, "got kind=%d", (int)r->kind);
+    AST_t *r = prog->head->replacement;
+    check("replacement is AST_QLIT",
+          r->kind == AST_QLIT, "got kind=%d", (int)r->kind);
     check("sval = hello",
           r->sval && strcmp(r->sval, "hello") == 0,
           "got '%s'", r->sval ? r->sval : "(nil)");
@@ -266,9 +266,9 @@ static void test_real_literal(void) {
     Program *prog = snocone_parse_program(src, "<test>");
     check("parses", prog != NULL, "NULL");
     if (!prog || !prog->head || !prog->head->replacement) return;
-    EXPR_t *r = prog->head->replacement;
-    check("replacement is E_FLIT",
-          r->kind == E_FLIT, "got kind=%d", (int)r->kind);
+    AST_t *r = prog->head->replacement;
+    check("replacement is AST_FLIT",
+          r->kind == AST_FLIT, "got kind=%d", (int)r->kind);
     check("dval ≈ 3.14",
           r->dval > 3.13 && r->dval < 3.15,
           "got %g", r->dval);

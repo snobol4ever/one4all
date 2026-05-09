@@ -9,14 +9,14 @@
 #include <gc/gc.h>
 
 /* ── expr_gc_clone ──────────────────────────────────────────────────────────
- * Deep-copy EXPR_t subtree rooted at e into GC-managed memory.
+ * Deep-copy AST_t subtree rooted at e into GC-managed memory.
  * Every field is copied; sval is GC_strdup'd; children[] is GC_malloc'd.
  * The clone is structurally identical but lives in GC heap — safe to keep
  * after the original calloc-based IR is freed. */
-EXPR_t *expr_gc_clone(const EXPR_t *e)
+AST_t *expr_gc_clone(const AST_t *e)
 {
     if (!e) return NULL;
-    EXPR_t *c = GC_malloc(sizeof(EXPR_t));
+    AST_t *c = GC_malloc(sizeof(AST_t));
     c->kind      = e->kind;
     c->ival      = e->ival;
     c->dval      = e->dval;
@@ -25,7 +25,7 @@ EXPR_t *expr_gc_clone(const EXPR_t *e)
     c->nalloc    = e->nchildren;
     c->sval      = e->sval ? GC_strdup(e->sval) : NULL;
     if (e->nchildren > 0) {
-        c->children = GC_malloc((size_t)e->nchildren * sizeof(EXPR_t *));
+        c->children = GC_malloc((size_t)e->nchildren * sizeof(AST_t *));
         for (int i = 0; i < e->nchildren; i++)
             c->children[i] = expr_gc_clone(e->children[i]);
     } else {
@@ -35,8 +35,8 @@ EXPR_t *expr_gc_clone(const EXPR_t *e)
 }
 
 /* ── expr_free (internal) ───────────────────────────────────────────────────
- * Free a calloc-based EXPR_t tree recursively. */
-static void expr_free(EXPR_t *e)
+ * Free a calloc-based AST_t tree recursively. */
+static void expr_free(AST_t *e)
 {
     if (!e) return;
     free(e->sval);
@@ -47,7 +47,7 @@ static void expr_free(EXPR_t *e)
 }
 
 /* ── stmt_free (internal) ───────────────────────────────────────────────────
- * Free one STMT_t and all its EXPR_t fields. */
+ * Free one STMT_t and all its AST_t fields. */
 static void stmt_free(STMT_t *s)
 {
     if (!s) return;
@@ -65,9 +65,9 @@ static void stmt_free(STMT_t *s)
 }
 
 /* ── code_free ──────────────────────────────────────────────────────────────
- * Free a CODE_t and all its STMT_t / EXPR_t nodes.
+ * Free a CODE_t and all its STMT_t / AST_t nodes.
  * Walks the linked list; frees exports/imports lists.
- * Call only after sm_lower() has consumed the program and any EXPR_t*
+ * Call only after sm_lower() has consumed the program and any AST_t*
  * pointers stored in SM_PUSH_EXPR have been cloned via expr_gc_clone(). */
 void code_free(CODE_t *prog)
 {

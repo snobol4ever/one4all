@@ -1,8 +1,8 @@
 /*
  * ir_verify.c — IR structural invariant checker
  *
- * Validates every node in an EXPR_t tree:
- *   1. kind is in range [0, E_KIND_COUNT)
+ * Validates every node in an AST_t tree:
+ *   1. kind is in range [0, AST_KIND_COUNT)
  *   2. nchildren satisfies the per-kind spec (min/max)
  *   3. No NULL child pointers where children are expected
  *   4. sval non-NULL for kinds that require a name/payload
@@ -21,7 +21,7 @@
  */
 
 #define IR_DEFINE_NAMES
-#include "scrip_cc.h"   /* → ir/ir.h (EXPR_e, EXPR_t, compat aliases, expr_e_name) */
+#include "scrip_cc.h"   /* → ir/ir.h (AST_e, AST_t, compat aliases, ast_e_name) */
 
 #include <stdio.h>
 #include <string.h>
@@ -52,83 +52,83 @@ typedef struct {
 #define ANY_KIND        { SPEC_ANY,   0,   0 }
 #define ANY_S           { SPEC_ANY,   0,   1 }
 
-static const KindSpec kind_spec[E_KIND_COUNT] = {
+static const KindSpec kind_spec[AST_KIND_COUNT] = {
     /* Literals */
-    [E_QLIT]       = EXACT_S(0),   /* sval = string text, no children */
-    [E_ILIT]       = EXACT(0),     /* ival = integer, no children */
-    [E_FLIT]       = EXACT(0),     /* dval = float, no children */
-    [E_CSET]       = EXACT_S(0),   /* sval = cset chars, no children */
-    [E_NUL]        = EXACT(0),     /* null/empty value, no children */
+    [AST_QLIT]       = EXACT_S(0),   /* sval = string text, no children */
+    [AST_ILIT]       = EXACT(0),     /* ival = integer, no children */
+    [AST_FLIT]       = EXACT(0),     /* dval = float, no children */
+    [AST_CSET]       = EXACT_S(0),   /* sval = cset chars, no children */
+    [AST_NUL]        = EXACT(0),     /* null/empty value, no children */
 
     /* References */
-    [E_VAR]        = ANY_S,        /* sval = name; children = (none or subscripts) */
-    [E_KEYWORD]         = EXACT_S(0),   /* sval = keyword name */
-    [E_INDIRECT]       = EXACT(1),     /* $expr — one child (the indirect expr) */
-    [E_DEFER]      = EXACT(1),     /* *expr — one child */
+    [AST_VAR]        = ANY_S,        /* sval = name; children = (none or subscripts) */
+    [AST_KEYWORD]         = EXACT_S(0),   /* sval = keyword name */
+    [AST_INDIRECT]       = EXACT(1),     /* $expr — one child (the indirect expr) */
+    [AST_DEFER]      = EXACT(1),     /* *expr — one child */
 
     /* Arithmetic — all binary except unaries */
-    [E_MNS]        = EXACT(1),
-    [E_PLS]        = EXACT(1),
-    [E_ADD]        = EXACT(2),
-    [E_SUB]        = EXACT(2),
-    [E_MUL]        = EXACT(2),
-    [E_DIV]        = EXACT(2),
-    [E_MOD]        = EXACT(2),
-    [E_POW]        = EXACT(2),
+    [AST_MNS]        = EXACT(1),
+    [AST_PLS]        = EXACT(1),
+    [AST_ADD]        = EXACT(2),
+    [AST_SUB]        = EXACT(2),
+    [AST_MUL]        = EXACT(2),
+    [AST_DIV]        = EXACT(2),
+    [AST_MOD]        = EXACT(2),
+    [AST_POW]        = EXACT(2),
 
     /* Sequence / alternation — n-ary, at least 2 */
-    [E_SEQ]        = MIN(2),
-    [E_ALT]        = MIN(2),
-    [E_OPSYN]      = EXACT(2),
+    [AST_SEQ]        = MIN(2),
+    [AST_ALT]        = MIN(2),
+    [AST_OPSYN]      = EXACT(2),
 
     /* Pattern primitives — leaves (no children) or 1 arg */
-    [E_ARB]        = EXACT(0),
-    [E_ARBNO]      = EXACT(1),     /* the sub-pattern */
-    [E_POS]        = EXACT(1),     /* POS(n) — one arg */
-    [E_RPOS]       = EXACT(1),
-    [E_ANY]        = EXACT(1),     /* ANY(S) */
-    [E_NOTANY]     = EXACT(1),
-    [E_SPAN]       = EXACT(1),
-    [E_BREAK]      = EXACT(1),
-    [E_BREAKX]     = EXACT(1),
-    [E_LEN]        = EXACT(1),
-    [E_TAB]        = EXACT(1),
-    [E_RTAB]       = EXACT(1),
-    [E_REM]        = EXACT(0),
-    [E_FAIL]       = EXACT(0),
-    [E_SUCCEED]    = EXACT(0),
-    [E_FENCE]      = ANY_KIND,     /* 0 = bare FENCE; 1 = FENCE(pat) */
-    [E_ABORT]      = EXACT(0),
-    [E_BAL]        = EXACT(0),
+    [AST_ARB]        = EXACT(0),
+    [AST_ARBNO]      = EXACT(1),     /* the sub-pattern */
+    [AST_POS]        = EXACT(1),     /* POS(n) — one arg */
+    [AST_RPOS]       = EXACT(1),
+    [AST_ANY]        = EXACT(1),     /* ANY(S) */
+    [AST_NOTANY]     = EXACT(1),
+    [AST_SPAN]       = EXACT(1),
+    [AST_BREAK]      = EXACT(1),
+    [AST_BREAKX]     = EXACT(1),
+    [AST_LEN]        = EXACT(1),
+    [AST_TAB]        = EXACT(1),
+    [AST_RTAB]       = EXACT(1),
+    [AST_REM]        = EXACT(0),
+    [AST_FAIL]       = EXACT(0),
+    [AST_SUCCEED]    = EXACT(0),
+    [AST_FENCE]      = ANY_KIND,     /* 0 = bare FENCE; 1 = FENCE(pat) */
+    [AST_ABORT]      = EXACT(0),
+    [AST_BAL]        = EXACT(0),
 
     /* Captures */
-    [E_CAPT_COND_ASGN]  = MIN_S(1),    /* sval = var name; child = sub-pattern */
-    [E_CAPT_IMMED_ASGN]   = MIN_S(1),
-    [E_CAPT_CURSOR]   = EXACT_S(0),  /* @var — sval = var name, no children */
+    [AST_CAPT_COND_ASGN]  = MIN_S(1),    /* sval = var name; child = sub-pattern */
+    [AST_CAPT_IMMED_ASGN]   = MIN_S(1),
+    [AST_CAPT_CURSOR]   = EXACT_S(0),  /* @var — sval = var name, no children */
 
     /* Call / access / assignment / scan / swap */
-    [E_FNC]        = ANY_S,        /* sval = function name; children = args */
-    [E_IDX]        = MIN(1),       /* children[0] = array/expr or name via sval */
-    [E_ASSIGN]     = EXACT(2),     /* lhs, rhs */
-    [E_SCAN]      = EXACT(2),     /* subject ? pattern */
-    [E_SWAP]       = EXACT(2),     /* lhs :=: rhs */
+    [AST_FNC]        = ANY_S,        /* sval = function name; children = args */
+    [AST_IDX]        = MIN(1),       /* children[0] = array/expr or name via sval */
+    [AST_ASSIGN]     = EXACT(2),     /* lhs, rhs */
+    [AST_SCAN]      = EXACT(2),     /* subject ? pattern */
+    [AST_SWAP]       = EXACT(2),     /* lhs :=: rhs */
 
     /* Icon generators / constructors */
-    [E_SUSPEND]    = EXACT(1),
-    [E_TO]         = EXACT(2),     /* i to j */
-    [E_TO_BY]      = EXACT(3),     /* i to j by k */
-    [E_LIMIT]      = EXACT(2),     /* E \ N */
-    [E_ALTERNATE]     = MIN(2),
-    [E_ITERATE]       = EXACT(1),     /* !E */
-    [E_MAKELIST]   = ANY_KIND,     /* [] is valid */
+    [AST_SUSPEND]    = EXACT(1),
+    [AST_TO]         = EXACT(2),     /* i to j */
+    [AST_TO_BY]      = EXACT(3),     /* i to j by k */
+    [AST_LIMIT]      = EXACT(2),     /* E \ N */
+    [AST_ALTERNATE]     = MIN(2),
+    [AST_ITERATE]       = EXACT(1),     /* !E */
+    [AST_MAKELIST]   = ANY_KIND,     /* [] is valid */
 
     /* Prolog */
-    [E_UNIFY]      = EXACT(2),
-    [E_CLAUSE]     = MIN(1),       /* head + body goals */
-    [E_CHOICE]     = MIN(1),       /* at least one clause */
-    [E_CUT]        = EXACT(0),
-    [E_TRAIL_MARK]   = EXACT(0),
-    [E_TRAIL_UNWIND] = EXACT(0),
+    [AST_UNIFY]      = EXACT(2),
+    [AST_CLAUSE]     = MIN(1),       /* head + body goals */
+    [AST_CHOICE]     = MIN(1),       /* at least one clause */
+    [AST_CUT]        = EXACT(0),
+    [AST_TRAIL_MARK]   = EXACT(0),
+    [AST_TRAIL_UNWIND] = EXACT(0),
 };
 
 /* -------------------------------------------------------------------------
@@ -150,7 +150,7 @@ static void violation(VerifyState *vs, const char *path, const char *msg) {
  * Core recursive checker
  * ---------------------------------------------------------------------- */
 
-static void verify_node(const EXPR_t *e, const char *path,
+static void verify_node(const AST_t *e, const char *path,
                         VerifyState *vs, int depth) {
     char child_path[512];
 
@@ -164,14 +164,14 @@ static void verify_node(const EXPR_t *e, const char *path,
     }
 
     /* 1. kind in range */
-    if ((int)e->kind < 0 || e->kind >= E_KIND_COUNT) {
+    if ((int)e->kind < 0 || e->kind >= AST_KIND_COUNT) {
         char msg[64];
         snprintf(msg, sizeof msg, "invalid kind %d", (int)e->kind);
         violation(vs, path, msg);
         return;   /* can't check further without a valid kind */
     }
 
-    const char *kname = expr_e_name[e->kind] ? expr_e_name[e->kind] : "?";
+    const char *kname = ast_e_name[e->kind] ? ast_e_name[e->kind] : "?";
     const KindSpec *spec = &kind_spec[e->kind];
 
     /* 2. sval required? */
@@ -209,7 +209,7 @@ static void verify_node(const EXPR_t *e, const char *path,
  * Public API
  * ---------------------------------------------------------------------- */
 
-int ir_verify_node(const EXPR_t *e, const char *path, FILE *err) {
+int ir_verify_node(const AST_t *e, const char *path, FILE *err) {
     VerifyState vs = { 0, err ? err : stderr };
     verify_node(e, path ? path : "root", &vs, 0);
     return vs.count;
@@ -249,84 +249,84 @@ int ir_verify_program(const CODE_t *prog, FILE *err) {
 #include <stdlib.h>
 #include <assert.h>
 
-static EXPR_t *mk(EXPR_e k) {
-    EXPR_t *e = calloc(1, sizeof *e);
+static AST_t *mk(AST_e k) {
+    AST_t *e = calloc(1, sizeof *e);
     e->kind = k;
     return e;
 }
-static void add_child(EXPR_t *parent, EXPR_t *child) {
+static void add_child(AST_t *parent, AST_t *child) {
     parent->children = realloc(parent->children,
-                               (size_t)(parent->nchildren + 1) * sizeof(EXPR_t *));
+                               (size_t)(parent->nchildren + 1) * sizeof(AST_t *));
     parent->children[parent->nchildren++] = child;
 }
 
 int main(void) {
     int failures = 0;
 
-    /* --- Test 1: valid E_ASSIGN(E_VAR, E_ILIT) --- */
+    /* --- Test 1: valid AST_ASSIGN(AST_VAR, AST_ILIT) --- */
     {
-        EXPR_t *a = mk(E_ASSIGN);
-        EXPR_t *v = mk(E_VAR);  v->sval = "x";
-        EXPR_t *n = mk(E_ILIT); n->ival = 1;
+        AST_t *a = mk(AST_ASSIGN);
+        AST_t *v = mk(AST_VAR);  v->sval = "x";
+        AST_t *n = mk(AST_ILIT); n->ival = 1;
         add_child(a, v);
         add_child(a, n);
         int errs = ir_verify_node(a, "test1", stderr);
         if (errs != 0) { fprintf(stderr, "FAIL test1: expected 0 violations, got %d\n", errs); failures++; }
-        else fprintf(stderr, "PASS test1: valid E_ASSIGN\n");
+        else fprintf(stderr, "PASS test1: valid AST_ASSIGN\n");
     }
 
-    /* --- Test 2: E_VAR missing sval --- */
+    /* --- Test 2: AST_VAR missing sval --- */
     {
-        EXPR_t *v = mk(E_VAR);  /* sval intentionally NULL */
+        AST_t *v = mk(AST_VAR);  /* sval intentionally NULL */
         int errs = ir_verify_node(v, "test2", NULL);  /* suppress output */
         if (errs != 1) { fprintf(stderr, "FAIL test2: expected 1 violation, got %d\n", errs); failures++; }
-        else fprintf(stderr, "PASS test2: E_VAR with NULL sval caught\n");
+        else fprintf(stderr, "PASS test2: AST_VAR with NULL sval caught\n");
     }
 
-    /* --- Test 3: E_ADD with wrong child count --- */
+    /* --- Test 3: AST_ADD with wrong child count --- */
     {
-        EXPR_t *a = mk(E_ADD);
-        EXPR_t *n = mk(E_ILIT);
+        AST_t *a = mk(AST_ADD);
+        AST_t *n = mk(AST_ILIT);
         add_child(a, n);  /* only 1 child, need 2 */
         int errs = ir_verify_node(a, "test3", NULL);
         if (errs != 1) { fprintf(stderr, "FAIL test3: expected 1 violation, got %d\n", errs); failures++; }
-        else fprintf(stderr, "PASS test3: E_ADD with 1 child caught\n");
+        else fprintf(stderr, "PASS test3: AST_ADD with 1 child caught\n");
     }
 
-    /* --- Test 4: E_SEQ with 2 valid children --- */
+    /* --- Test 4: AST_SEQ with 2 valid children --- */
     {
-        EXPR_t *s  = mk(E_SEQ);
-        EXPR_t *q1 = mk(E_QLIT); q1->sval = "hello";
-        EXPR_t *q2 = mk(E_QLIT); q2->sval = "world";
+        AST_t *s  = mk(AST_SEQ);
+        AST_t *q1 = mk(AST_QLIT); q1->sval = "hello";
+        AST_t *q2 = mk(AST_QLIT); q2->sval = "world";
         add_child(s, q1);
         add_child(s, q2);
         int errs = ir_verify_node(s, "test4", stderr);
         if (errs != 0) { fprintf(stderr, "FAIL test4: expected 0 violations, got %d\n", errs); failures++; }
-        else fprintf(stderr, "PASS test4: valid E_SEQ\n");
+        else fprintf(stderr, "PASS test4: valid AST_SEQ\n");
     }
 
-    /* --- Test 5: E_QLIT missing sval --- */
+    /* --- Test 5: AST_QLIT missing sval --- */
     {
-        EXPR_t *q = mk(E_QLIT);  /* sval intentionally NULL */
+        AST_t *q = mk(AST_QLIT);  /* sval intentionally NULL */
         int errs = ir_verify_node(q, "test5", NULL);
         if (errs != 1) { fprintf(stderr, "FAIL test5: expected 1 violation, got %d\n", errs); failures++; }
-        else fprintf(stderr, "PASS test5: E_QLIT with NULL sval caught\n");
+        else fprintf(stderr, "PASS test5: AST_QLIT with NULL sval caught\n");
     }
 
     /* --- Test 6: nested valid tree --- */
     {
-        EXPR_t *assign = mk(E_ASSIGN);
-        EXPR_t *lhs    = mk(E_VAR);  lhs->sval = "result";
-        EXPR_t *add    = mk(E_ADD);
-        EXPR_t *one    = mk(E_ILIT); one->ival = 1;
-        EXPR_t *two    = mk(E_ILIT); two->ival = 2;
+        AST_t *assign = mk(AST_ASSIGN);
+        AST_t *lhs    = mk(AST_VAR);  lhs->sval = "result";
+        AST_t *add    = mk(AST_ADD);
+        AST_t *one    = mk(AST_ILIT); one->ival = 1;
+        AST_t *two    = mk(AST_ILIT); two->ival = 2;
         add_child(add, one);
         add_child(add, two);
         add_child(assign, lhs);
         add_child(assign, add);
         int errs = ir_verify_node(assign, "test6", stderr);
         if (errs != 0) { fprintf(stderr, "FAIL test6: expected 0 violations, got %d\n", errs); failures++; }
-        else fprintf(stderr, "PASS test6: valid nested E_ASSIGN\n");
+        else fprintf(stderr, "PASS test6: valid nested AST_ASSIGN\n");
     }
 
     fprintf(stderr, "\n%s — %d failure(s)\n",

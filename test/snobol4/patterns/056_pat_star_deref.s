@@ -76,7 +76,7 @@ P_2_α: ; DOL(V $  V)
                             DOL_SAVE    dol_entry_V, cursor, dol0_child_α ; DOL α — save entry cursor
 P_2_β:                      jmp         dol0_child_β ; DOL β
 
-; E_INDR *PAT → inline LIT 'hello'
+; AST_INDR *PAT → inline LIT 'hello'
 dol0_child_α:               LIT_α       lit_str_1, 5, dol0_child_α_saved, cursor, subject_data, subject_len_val, dol0_γ, dol0_ω ; LIT α
 dol0_child_β:               LIT_β       dol0_child_α_saved, cursor, dol0_ω ; LIT β
 dol0_γ:                     DOL_CAPTURE dol_entry_V, cursor, cap_V_buf, cap_V_len, subject_data, P_2_γ ; DOL γ — capture span

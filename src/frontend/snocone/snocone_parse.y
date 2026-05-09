@@ -10,16 +10,16 @@
  *   * `;`-terminated statements
  *   * assignment (T_2EQUAL) + compound-assigns (+= -= *= /= ^=)
  *   * comparison/identity (==, !=, <, >, <=, >=, :==:, :!=:, :<:, :>:,
- *     :<=:, :>=:, ::, :!:) → E_FNC named calls
- *   * T_CALL call-form `EQ(2+2, 4)` → E_FNC("EQ", ...)
- *   * pattern match `?`              → E_SCAN
- *   * pattern alternation `|`        → E_ALT (n-ary fold)
- *   * synthetic concat T_CONCAT      → E_SEQ (n-ary fold)
+ *     :<=:, :>=:, ::, :!:) → AST_FNC named calls
+ *   * T_CALL call-form `EQ(2+2, 4)` → AST_FNC("EQ", ...)
+ *   * pattern match `?`              → AST_SCAN
+ *   * pattern alternation `|`        → AST_ALT (n-ary fold)
+ *   * synthetic concat T_CONCAT      → AST_SEQ (n-ary fold)
  *   * LS-4.cn (session-#7 cosmetic):
  *     - file rename snocone.y → snocone_parse.y (matches snocone_lex.{c,h})
  *     - public entry now returns CODE_t* (typedef alias of CODE_t)
- *       for symmetry with EXPR_t — the type EVAL operates on
- *   * LS-4.d (this rung): postfix subscript `a[i, j]` → E_IDX (n-ary,
+ *       for symmetry with AST_t — the type EVAL operates on
+ *   * LS-4.d (this rung): postfix subscript `a[i, j]` → AST_IDX (n-ary,
  *     left-recursive so `a[i][j]` chains)
  *
  * Everything else — more unaries, control flow, switch, break/continue,
@@ -28,7 +28,7 @@
  * Pipeline:
  *   snocone_lex.c  (threaded-code FSM lexer) -- sc_lex(yylval, st) -- IS yylex
  *   snocone_parse.y      (this file)               -- Bison grammar
- *   CODE_t        (STMT_t list, EXPR_t IR — alias of CODE_t)
+ *   CODE_t        (STMT_t list, AST_t IR — alias of CODE_t)
  *
  * Token-kind ownership (cleaned up session 2026-05-01, SB-6.H):
  *   Bison owns the token enum.  `enum sc_tokentype` lives in
@@ -40,17 +40,17 @@
  *   snocone_lex.c IS yylex (Bison's signature directly).
  *
  * IR construction follows snobol4.y line-for-line: leaf atoms are
- * E_VAR/E_KEYWORD/E_QLIT/E_ILIT/E_FLIT, arithmetic emits E_ADD/E_SUB/
- * E_MUL/E_DIV/E_POW/E_MNS/E_PLS via expr_binary/expr_unary helpers.
+ * AST_VAR/AST_KEYWORD/AST_QLIT/AST_ILIT/AST_FLIT, arithmetic emits AST_ADD/AST_SUB/
+ * AST_MUL/AST_DIV/AST_POW/AST_MNS/AST_PLS via expr_binary/expr_unary helpers.
  * Statement assembly mirrors snobol4's stmt_commit_go path: top-level
- * E_ASSIGN splits into subject + replacement; otherwise a bare expression
+ * AST_ASSIGN splits into subject + replacement; otherwise a bare expression
  * goes into the subject field.
  *
  * Public entry:
  *   CODE_t *snocone_parse_program(const char *src, const char *filename);
  *
  *   CODE_t is a typedef alias of CODE_t (added LS-4.cn for symmetry
- *   with EXPR_t).  The two names refer to the same type.
+ *   with AST_t).  The two names refer to the same type.
  *
  * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet
  * Commit identity: LCherryholmes / lcherryh@yahoo.com  (RULES.md)
@@ -120,7 +120,7 @@ typedef struct LoopFrame {
 /* Parser state — passed to sc_parse() via %parse-param.  Carries the
  * FSM lexer context (the single producer of tokens), the code under
  * construction, and a small error counter.  Uses CODE_t (typedef alias
- * of CODE_t) for symmetry with EXPR_t — Snocone's parser produces
+ * of CODE_t) for symmetry with AST_t — Snocone's parser produces
  * code, not just an expression. */
 typedef struct ScParseState {
     struct LexCtx *ctx;
@@ -171,12 +171,12 @@ int  sc_lex  (SC_STYPE *yylval, ScParseState *st);
 void sc_error(ScParseState *st, const char *msg);
 
 /* Helpers — defined after %% */
-static void     sc_append_stmt        (ScParseState *st, EXPR_t *top);
-static void     sc_split_subject_pattern(EXPR_t **subj_io, EXPR_t **pat_io); /* LS-4.l */
-static EXPR_t  *sc_int_literal        (const char *txt);
-static EXPR_t  *sc_real_literal       (const char *txt);
-static EXPR_t  *sc_str_literal        (const char *txt);
-static EXPR_t  *sc_clone_expr_simple  (EXPR_t *e);  /* LS-4.c — for compound-assigns */
+static void     sc_append_stmt        (ScParseState *st, AST_t *top);
+static void     sc_split_subject_pattern(AST_t **subj_io, AST_t **pat_io); /* LS-4.l */
+static AST_t  *sc_int_literal        (const char *txt);
+static AST_t  *sc_real_literal       (const char *txt);
+static AST_t  *sc_str_literal        (const char *txt);
+static AST_t  *sc_clone_expr_simple  (AST_t *e);  /* LS-4.c — for compound-assigns */
 
 /* LS-4.f — control-flow lowering helpers.
  * Architecture: control-flow head non-terminals (if_head, while_head)
@@ -191,14 +191,14 @@ static EXPR_t  *sc_clone_expr_simple  (EXPR_t *e);  /* LS-4.c — for compound-a
  * Bison's balanced if-else grammars.
  */
 struct IfHead {
-    EXPR_t *cond;          /* condition expression                              */
+    AST_t *cond;          /* condition expression                              */
     STMT_t *before_body;   /* st->code->tail snapshot at end of if_head reduction
                               (NULL if list was empty); body starts at
                               before_body->next or st->code->head if NULL.     */
     int     lineno;        /* lineno of if_head for the cond-stmt's lineno     */
 };
 struct WhileHead {
-    EXPR_t *cond;
+    AST_t *cond;
     STMT_t *before_body;
     int     lineno;
     /* LS-4.i.2 — synthetic labels owned by the head, allocated eagerly so
@@ -223,8 +223,8 @@ struct DoHead {
  * the loop-top label and cond-stmt are spliced. */
 struct ForHead {
     STMT_t *before_loop;   /* tail snapshot after init stmt appended */
-    EXPR_t *cond;          /* loop condition */
-    EXPR_t *step;          /* step expression (emitted at loop bottom) */
+    AST_t *cond;          /* loop condition */
+    AST_t *step;          /* step expression (emitted at loop bottom) */
     int     lineno;
     /* LS-4.i.2 — eager labels.  cont_label is "_Lcont_NNNN" — `continue;`
      * in a for-loop must execute the step expression before re-testing
@@ -307,10 +307,10 @@ struct FuncHead {
  */
 struct CaseEntry {
     char   *case_label;    /* "_Lcase_NNNN" or "_Ldefault_NNNN" — owned */
-    EXPR_t *value;         /* case value expression (still owned); NULL = default */
+    AST_t *value;         /* case value expression (still owned); NULL = default */
 };
 struct SwitchHead {
-    EXPR_t *disc;                  /* discriminant expression (consumed by tmp=disc) */
+    AST_t *disc;                  /* discriminant expression (consumed by tmp=disc) */
     char   *tmp_name;              /* "_Lswitch_t_NNNN" — synthetic var name */
     char   *end_label;             /* "_Lend_NNNN" — break target */
     char   *default_label;         /* "_Ldefault_NNNN" or strdup(end_label) if no default */
@@ -327,12 +327,12 @@ struct SwitchHead {
 };
 
 static char    *sc_label_new          (ScParseState *st, const char *prefix);
-static struct IfHead    *sc_if_head_new    (ScParseState *st, EXPR_t *cond);
-static struct WhileHead *sc_while_head_new (ScParseState *st, EXPR_t *cond);
+static struct IfHead    *sc_if_head_new    (ScParseState *st, AST_t *cond);
+static struct WhileHead *sc_while_head_new (ScParseState *st, AST_t *cond);
 static struct DoHead    *sc_do_head_new    (ScParseState *st);
-static struct ForHead   *sc_for_head_new   (ScParseState *st, EXPR_t *cond, EXPR_t *step);
+static struct ForHead   *sc_for_head_new   (ScParseState *st, AST_t *cond, AST_t *step);
 /* LS-4.h */
-static void     sc_append_return      (ScParseState *st, EXPR_t *retval);
+static void     sc_append_return      (ScParseState *st, AST_t *retval);
 static void     sc_append_freturn     (ScParseState *st);
 static void     sc_append_nreturn     (ScParseState *st);
 /* LS-4.h — forward decls for stmt-builder helpers used inside sc_func_head_new
@@ -344,7 +344,7 @@ static void     sc_append_chain       (ScParseState *st, STMT_t *chain_head, STM
 static void     sc_finalize_if_no_else(ScParseState *st, struct IfHead *h);
 static void     sc_finalize_if_else   (ScParseState *st, struct IfHead *h, STMT_t *before_else);
 static void     sc_finalize_while     (ScParseState *st, struct WhileHead *h);
-static void     sc_finalize_do_while  (ScParseState *st, struct DoHead *h, EXPR_t *cond);
+static void     sc_finalize_do_while  (ScParseState *st, struct DoHead *h, AST_t *cond);
 static void     sc_finalize_for       (ScParseState *st, struct ForHead *h);
 static struct FuncHead *sc_func_head_new(ScParseState *st, char *name, char *argstr);
 static void     sc_finalize_function  (ScParseState *st, struct FuncHead *h);
@@ -361,8 +361,8 @@ static LoopFrame *sc_loop_find_by_user_label(ScParseState *st, const char *name,
 static void     sc_append_break        (ScParseState *st, char *user_label /* NULL = innermost */);
 static void     sc_append_continue     (ScParseState *st, char *user_label /* NULL = innermost loop */);
 /* LS-4.i.3 — switch / case / default */
-static struct SwitchHead *sc_switch_head_new(ScParseState *st, EXPR_t *disc);
-static void     sc_switch_case_label   (ScParseState *st, EXPR_t *value);
+static struct SwitchHead *sc_switch_head_new(ScParseState *st, AST_t *disc);
+static void     sc_switch_case_label   (ScParseState *st, AST_t *value);
 static void     sc_switch_default_label(ScParseState *st);
 static void     sc_finalize_switch     (ScParseState *st, struct SwitchHead *h);
 /* LS-4.i.5 — struct NAME { f1, f2, ... } — Andrew's .sc line 162 record-decl.
@@ -382,7 +382,7 @@ static void     sc_emit_struct         (ScParseState *st, char *name, char *fiel
  * used at LS-4.a, but reserving the wider shape now avoids reshuffling
  * later (LS-4.b adds comparison sugar, LS-4.f adds control flow). */
 %union {
-    EXPR_t *expr;
+    AST_t *expr;
     char   *str;
     long    ival;
     double  dval;
@@ -417,7 +417,7 @@ static void     sc_emit_struct         (ScParseState *st, char *name, char *fiel
 %token T_2SLASH
 %token T_2CARET
 
-/* ---- Comparison / identity operators (LS-4.b) — all lower to E_FNC named calls ---- */
+/* ---- Comparison / identity operators (LS-4.b) — all lower to AST_FNC named calls ---- */
 %token T_EQ T_NE T_LT T_GT T_LE T_GE              /* numeric:  EQ NE LT GT LE GE  */
 %token T_LEQ T_LNE T_LLT T_LGT T_LLE T_LGE        /* lexical:  LEQ LNE LLT LGT LLE LGE */
 %token T_IDENT_OP T_DIFFER                        /* identity: IDENT DIFFER (Andrew's :: and :!:) */
@@ -431,9 +431,9 @@ static void     sc_emit_struct         (ScParseState *st, char *name, char *fiel
 %token T_PLUS_ASSIGN T_MINUS_ASSIGN T_STAR_ASSIGN T_SLASH_ASSIGN T_CARET_ASSIGN
 
 /* ---- Pattern operators (LS-4.c) ---- */
-%token T_2QUEST                                    /* `?` — pri 1, lowers to E_SCAN */
-%token T_2PIPE                              /* `|` — pri 3, lowers to E_ALT  */
-%token T_CONCAT                                   /* synthesised by FSM at value boundaries — pri 4, lowers to E_SEQ */
+%token T_2QUEST                                    /* `?` — pri 1, lowers to AST_SCAN */
+%token T_2PIPE                              /* `|` — pri 3, lowers to AST_ALT  */
+%token T_CONCAT                                   /* synthesised by FSM at value boundaries — pri 4, lowers to AST_SEQ */
 
 /* ---- Punctuation ---- */
 %token T_LPAREN
@@ -679,9 +679,9 @@ opt_head_sep
 
 /* LS-4.h — func_head: `function NAME ( arglist )` opt_head_sep.
  *
- * The function name is carried by T_IDENT.  The lexer's E_CALL state
+ * The function name is carried by T_IDENT.  The lexer's AST_CALL state
  * detects the `function name(...)` definition pattern (prev token is
- * T_DEFINE) and redirects to E_IDENT — so `name` arrives here as a
+ * T_DEFINE) and redirects to AST_IDENT — so `name` arrives here as a
  * plain identifier, not the T_CALL call-form token.  T_LPAREN follows
  * normally.  The arg list is zero or more comma-separated IDENT names,
  * returned as a single malloc'd string of the form "arg1,arg2,arg3".
@@ -797,14 +797,14 @@ block_stmt  : T_LBRACE stmt_list T_RBRACE      { /* statements already appended 
  *
  *   expr0  — assignment `=` + compound-assigns (+= -= *= /= ^=)   pri 0   right-assoc
  *   expr1  — pattern match `?`                                     pri 1   right-assoc
- *   expr3  — pattern alternation `|` (n-ary E_ALT)                 pri 3   right-assoc fold
- *   expr4  — concatenation T_CONCAT (n-ary E_SEQ)                  pri 4   right-assoc fold
+ *   expr3  — pattern alternation `|` (n-ary AST_ALT)                 pri 3   right-assoc fold
+ *   expr4  — concatenation T_CONCAT (n-ary AST_SEQ)                  pri 4   right-assoc fold
  *   expr5  — comparison/identity sugar (==, !=, <, >, <=, >=,      pri 6 (Andrew)
- *            :==:, :!=:, :<:, :>:, :<=:, :>=:, ::, :!:) → E_FNC    left-assoc
+ *            :==:, :!=:, :<:, :>:, :<=:, :>=:, ::, :!:) → AST_FNC    left-assoc
  *   expr6  — addition / subtraction                                pri 6/7 (SPITBOL/Andrew) left-assoc
  *   expr9  — multiplication / division                             pri 8/9 left-assoc
  *   expr11 — exponentiation                                        pri 11  right-assoc
- *   expr15 — postfix subscript `a[i,j]` → E_IDX (n-ary)             pri 15  left-assoc chain
+ *   expr15 — postfix subscript `a[i,j]` → AST_IDX (n-ary)             pri 15  left-assoc chain
  *   expr17 — atoms (literals, idents, keywords, parens, T_CALL,
  *            unary +/-)
  *
@@ -821,46 +821,46 @@ block_stmt  : T_LBRACE stmt_list T_RBRACE      { /* statements already appended 
  * parses as `a = (b = c)`.  Compound-assigns (`+=` `-=` `*=` `/=` `^=`)
  * are Snocone-only sugar (Andrew's .sc doesn't have them but the FSM
  * lexer already recognises them).  Each lowers to a clone-LHS pattern:
- *   `a += b`  →  E_ASSIGN(a, E_ADD(clone(a), b))
- * Restricted to "simple" (atomic) LHS — E_VAR, E_KEYWORD, E_IDX, and
+ *   `a += b`  →  AST_ASSIGN(a, AST_ADD(clone(a), b))
+ * Restricted to "simple" (atomic) LHS — AST_VAR, AST_KEYWORD, AST_IDX, and
  * leaf literals — via sc_clone_expr_simple's coverage; complex LHS
  * (e.g. `f(x) += 1`) gets a trap'd assertion at clone time.  This
  * matches typical compound-assign use (`count += step`, `total *= 2`).
  */
 expr0       : expr1 T_2EQUAL    expr0
-                                { $$ = expr_binary(E_ASSIGN, $1, $3); }
+                                { $$ = expr_binary(AST_ASSIGN, $1, $3); }
             | expr1 T_2EQUAL
                                 /* LS-6.c — empty replacement: `subj ? pat = ;` and
-                                 * `x = ;` both lower to E_ASSIGN(lhs, '').  This
+                                 * `x = ;` both lower to AST_ASSIGN(lhs, '').  This
                                  * matches SPITBOL's `opt_repl` rule in snobol4.y:77
-                                 * (T_2EQUAL with no expr → E_QLIT '').  Single
+                                 * (T_2EQUAL with no expr → AST_QLIT '').  Single
                                  * token lookahead distinguishes from the binary
                                  * assignment rule above: if next token can start
                                  * expr0 → shift (use binary form); else (T_SEMICOLON,
                                  * T_RPAREN, etc.) → reduce to empty-RHS form. */
-                                { EXPR_t *empty = expr_new(E_QLIT);
+                                { AST_t *empty = expr_new(AST_QLIT);
                                   empty->sval = strdup("");
-                                  $$ = expr_binary(E_ASSIGN, $1, empty); }
+                                  $$ = expr_binary(AST_ASSIGN, $1, empty); }
             | expr1 T_PLUS_ASSIGN   expr0
-                                { EXPR_t *cl = sc_clone_expr_simple($1);
-                                  EXPR_t *rhs = expr_binary(E_ADD, cl, $3);
-                                  $$ = expr_binary(E_ASSIGN, $1, rhs); }
+                                { AST_t *cl = sc_clone_expr_simple($1);
+                                  AST_t *rhs = expr_binary(AST_ADD, cl, $3);
+                                  $$ = expr_binary(AST_ASSIGN, $1, rhs); }
             | expr1 T_MINUS_ASSIGN  expr0
-                                { EXPR_t *cl = sc_clone_expr_simple($1);
-                                  EXPR_t *rhs = expr_binary(E_SUB, cl, $3);
-                                  $$ = expr_binary(E_ASSIGN, $1, rhs); }
+                                { AST_t *cl = sc_clone_expr_simple($1);
+                                  AST_t *rhs = expr_binary(AST_SUB, cl, $3);
+                                  $$ = expr_binary(AST_ASSIGN, $1, rhs); }
             | expr1 T_STAR_ASSIGN   expr0
-                                { EXPR_t *cl = sc_clone_expr_simple($1);
-                                  EXPR_t *rhs = expr_binary(E_MUL, cl, $3);
-                                  $$ = expr_binary(E_ASSIGN, $1, rhs); }
+                                { AST_t *cl = sc_clone_expr_simple($1);
+                                  AST_t *rhs = expr_binary(AST_MUL, cl, $3);
+                                  $$ = expr_binary(AST_ASSIGN, $1, rhs); }
             | expr1 T_SLASH_ASSIGN  expr0
-                                { EXPR_t *cl = sc_clone_expr_simple($1);
-                                  EXPR_t *rhs = expr_binary(E_DIV, cl, $3);
-                                  $$ = expr_binary(E_ASSIGN, $1, rhs); }
+                                { AST_t *cl = sc_clone_expr_simple($1);
+                                  AST_t *rhs = expr_binary(AST_DIV, cl, $3);
+                                  $$ = expr_binary(AST_ASSIGN, $1, rhs); }
             | expr1 T_CARET_ASSIGN  expr0
-                                { EXPR_t *cl = sc_clone_expr_simple($1);
-                                  EXPR_t *rhs = expr_binary(E_POW, cl, $3);
-                                  $$ = expr_binary(E_ASSIGN, $1, rhs); }
+                                { AST_t *cl = sc_clone_expr_simple($1);
+                                  AST_t *rhs = expr_binary(AST_POW, cl, $3);
+                                  $$ = expr_binary(AST_ASSIGN, $1, rhs); }
             | expr1
                                 { $$ = $1; }
             ;
@@ -868,14 +868,14 @@ expr0       : expr1 T_2EQUAL    expr0
 /* ---- Pattern-match tier (LS-4.c) ----
  *
  * SPITBOL `?` at priority 1, right-associative — `a ? b ? c` parses
- * as `a ? (b ? c)`.  Lowers to E_SCAN(subject, pattern), matching
+ * as `a ? (b ? c)`.  Lowers to AST_SCAN(subject, pattern), matching
  * snobol4.y's `expr0 : expr2 T_2QUEST expr0` shape (snobol4.y bundles
  * match alongside assignment at expr0; we pull it out to its own
  * level for clarity, but the IR shape is identical).  Right-assoc
  * is handled by the `expr1 T_2QUEST expr1` form on the right.
  */
 expr1       : expr3 T_2QUEST expr1
-                                { $$ = expr_binary(E_SCAN, $1, $3); }
+                                { $$ = expr_binary(AST_SCAN, $1, $3); }
             | expr3
                                 { $$ = $1; }
             ;
@@ -883,16 +883,16 @@ expr1       : expr3 T_2QUEST expr1
 /* ---- Pattern alternation tier (LS-4.c) ----
  *
  * SPITBOL `|` at priority 3, right-associative.  Folds into a flat
- * n-ary E_ALT — `a | b | c` produces a single E_ALT(a, b, c) rather
- * than a nested E_ALT(a, E_ALT(b, c)).  This matches snobol4.y:131's
- * shape exactly: when the LHS is already E_ALT we extend it with
- * expr_add_child; otherwise we create a fresh E_ALT containing both
+ * n-ary AST_ALT — `a | b | c` produces a single AST_ALT(a, b, c) rather
+ * than a nested AST_ALT(a, AST_ALT(b, c)).  This matches snobol4.y:131's
+ * shape exactly: when the LHS is already AST_ALT we extend it with
+ * expr_add_child; otherwise we create a fresh AST_ALT containing both
  * operands.  Bison's left-recursion drives the fold one operand at
  * a time, giving the n-ary collapse for free.
  */
 expr3       : expr3 T_2PIPE expr4
-                                { if ($1->kind == E_ALT) { expr_add_child($1, $3); $$ = $1; }
-                                  else { EXPR_t *a = expr_new(E_ALT);
+                                { if ($1->kind == AST_ALT) { expr_add_child($1, $3); $$ = $1; }
+                                  else { AST_t *a = expr_new(AST_ALT);
                                          expr_add_child(a, $1); expr_add_child(a, $3);
                                          $$ = a; } }
             | expr4
@@ -903,16 +903,16 @@ expr3       : expr3 T_2PIPE expr4
  *
  * SPITBOL space-as-concat at priority 4, right-associative per the
  * SPITBOL Manual but Bison left-recursion gives the same n-ary fold
- * via E_SEQ — same approach as snobol4.y:134.  The lexer emits
+ * via AST_SEQ — same approach as snobol4.y:134.  The lexer emits
  * synthetic T_CONCAT tokens at boundaries where prev-token can-end-expr
  * and next-token can-start-expr (the W{OP}W envelope pattern from
- * LS-3 / one4all 02db637d).  Folds into a flat n-ary E_SEQ; lowering
+ * LS-3 / one4all 02db637d).  Folds into a flat n-ary AST_SEQ; lowering
  * to runtime-side concatenation is the SNOBOL4 frontend's existing
- * E_SEQ semantics — no new IR kind needed.
+ * AST_SEQ semantics — no new IR kind needed.
  */
 expr4       : expr4 T_CONCAT expr5
-                                { if ($1->kind == E_SEQ) { expr_add_child($1, $3); $$ = $1; }
-                                  else { EXPR_t *s = expr_new(E_SEQ);
+                                { if ($1->kind == AST_SEQ) { expr_add_child($1, $3); $$ = $1; }
+                                  else { AST_t *s = expr_new(AST_SEQ);
                                          expr_add_child(s, $1); expr_add_child(s, $3);
                                          $$ = s; } }
             | expr5
@@ -922,7 +922,7 @@ expr4       : expr4 T_CONCAT expr5
 /* ---- Comparison / identity tier (LS-4.b) ----
  *
  * Andrew's `.sc` self-host puts all 14 comparison/identity operators
- * at one priority, function-style (fn=1).  Each lowers to an E_FNC
+ * at one priority, function-style (fn=1).  Each lowers to an AST_FNC
  * named call; the function name is the SPITBOL primitive's UPPERCASE
  * spelling (EQ, NE, LT, GT, LE, GE — numeric; LEQ, LNE, LLT, LGT,
  * LLE, LGE — lexical; IDENT, DIFFER — identity).  This places the
@@ -930,63 +930,63 @@ expr4       : expr4 T_CONCAT expr5
  * dispatch — no new SM opcodes, no new IR kinds.
  */
 expr5       : expr5 T_EQ        expr6
-                                { EXPR_t *e = expr_new(E_FNC); e->sval = strdup("EQ");
+                                { AST_t *e = expr_new(AST_FNC); e->sval = strdup("EQ");
                                   expr_add_child(e, $1); expr_add_child(e, $3); $$ = e; }
             | expr5 T_NE        expr6
-                                { EXPR_t *e = expr_new(E_FNC); e->sval = strdup("NE");
+                                { AST_t *e = expr_new(AST_FNC); e->sval = strdup("NE");
                                   expr_add_child(e, $1); expr_add_child(e, $3); $$ = e; }
             | expr5 T_LT        expr6
-                                { EXPR_t *e = expr_new(E_FNC); e->sval = strdup("LT");
+                                { AST_t *e = expr_new(AST_FNC); e->sval = strdup("LT");
                                   expr_add_child(e, $1); expr_add_child(e, $3); $$ = e; }
             | expr5 T_GT        expr6
-                                { EXPR_t *e = expr_new(E_FNC); e->sval = strdup("GT");
+                                { AST_t *e = expr_new(AST_FNC); e->sval = strdup("GT");
                                   expr_add_child(e, $1); expr_add_child(e, $3); $$ = e; }
             | expr5 T_LE        expr6
-                                { EXPR_t *e = expr_new(E_FNC); e->sval = strdup("LE");
+                                { AST_t *e = expr_new(AST_FNC); e->sval = strdup("LE");
                                   expr_add_child(e, $1); expr_add_child(e, $3); $$ = e; }
             | expr5 T_GE        expr6
-                                { EXPR_t *e = expr_new(E_FNC); e->sval = strdup("GE");
+                                { AST_t *e = expr_new(AST_FNC); e->sval = strdup("GE");
                                   expr_add_child(e, $1); expr_add_child(e, $3); $$ = e; }
             | expr5 T_LEQ       expr6
-                                { EXPR_t *e = expr_new(E_FNC); e->sval = strdup("LEQ");
+                                { AST_t *e = expr_new(AST_FNC); e->sval = strdup("LEQ");
                                   expr_add_child(e, $1); expr_add_child(e, $3); $$ = e; }
             | expr5 T_LNE       expr6
-                                { EXPR_t *e = expr_new(E_FNC); e->sval = strdup("LNE");
+                                { AST_t *e = expr_new(AST_FNC); e->sval = strdup("LNE");
                                   expr_add_child(e, $1); expr_add_child(e, $3); $$ = e; }
             | expr5 T_LLT       expr6
-                                { EXPR_t *e = expr_new(E_FNC); e->sval = strdup("LLT");
+                                { AST_t *e = expr_new(AST_FNC); e->sval = strdup("LLT");
                                   expr_add_child(e, $1); expr_add_child(e, $3); $$ = e; }
             | expr5 T_LGT       expr6
-                                { EXPR_t *e = expr_new(E_FNC); e->sval = strdup("LGT");
+                                { AST_t *e = expr_new(AST_FNC); e->sval = strdup("LGT");
                                   expr_add_child(e, $1); expr_add_child(e, $3); $$ = e; }
             | expr5 T_LLE       expr6
-                                { EXPR_t *e = expr_new(E_FNC); e->sval = strdup("LLE");
+                                { AST_t *e = expr_new(AST_FNC); e->sval = strdup("LLE");
                                   expr_add_child(e, $1); expr_add_child(e, $3); $$ = e; }
             | expr5 T_LGE       expr6
-                                { EXPR_t *e = expr_new(E_FNC); e->sval = strdup("LGE");
+                                { AST_t *e = expr_new(AST_FNC); e->sval = strdup("LGE");
                                   expr_add_child(e, $1); expr_add_child(e, $3); $$ = e; }
             | expr5 T_IDENT_OP  expr6
-                                { EXPR_t *e = expr_new(E_FNC); e->sval = strdup("IDENT");
+                                { AST_t *e = expr_new(AST_FNC); e->sval = strdup("IDENT");
                                   expr_add_child(e, $1); expr_add_child(e, $3); $$ = e; }
             | expr5 T_DIFFER    expr6
-                                { EXPR_t *e = expr_new(E_FNC); e->sval = strdup("DIFFER");
+                                { AST_t *e = expr_new(AST_FNC); e->sval = strdup("DIFFER");
                                   expr_add_child(e, $1); expr_add_child(e, $3); $$ = e; }
             | expr6
                                 { $$ = $1; }
             ;
 
 expr6       : expr6 T_2PLUS    expr9
-                                { $$ = expr_binary(E_ADD, $1, $3); }
+                                { $$ = expr_binary(AST_ADD, $1, $3); }
             | expr6 T_2MINUS expr9
-                                { $$ = expr_binary(E_SUB, $1, $3); }
+                                { $$ = expr_binary(AST_SUB, $1, $3); }
             | expr9
                                 { $$ = $1; }
             ;
 
 expr9       : expr9 T_2STAR expr11
-                                { $$ = expr_binary(E_MUL, $1, $3); }
+                                { $$ = expr_binary(AST_MUL, $1, $3); }
             | expr9 T_2SLASH       expr11
-                                { $$ = expr_binary(E_DIV, $1, $3); }
+                                { $$ = expr_binary(AST_DIV, $1, $3); }
             | expr11
                                 { $$ = $1; }
             ;
@@ -996,7 +996,7 @@ expr9       : expr9 T_2STAR expr11
  * so binary `.` and `$` pattern-binding ops sit between exponent and
  * subscript — matching snobol4.y:156-162.) */
 expr11      : expr12 T_2CARET expr11
-                                { $$ = expr_binary(E_POW, $1, $3); }
+                                { $$ = expr_binary(AST_POW, $1, $3); }
             | expr12
                                 { $$ = $1; }
             ;
@@ -1007,8 +1007,8 @@ expr11      : expr12 T_2CARET expr11
  * left-associative.  Mirrors snobol4.y:159-161 byte-for-byte (modulo
  * tier name — snobol4.y's expr13 is our expr15).
  *
- *   pat . var   →  E_CAPT_COND_ASGN(pat, var)   conditional-on-success
- *   pat $ var   →  E_CAPT_IMMED_ASGN(pat, var)  immediate (during match)
+ *   pat . var   →  AST_CAPT_COND_ASGN(pat, var)   conditional-on-success
+ *   pat $ var   →  AST_CAPT_IMMED_ASGN(pat, var)  immediate (during match)
  *
  * Examples (all SPITBOL Manual Ch.15 idioms):
  *   'ab' ? LEN(1) . X        → bind X='a' on overall match success
@@ -1024,32 +1024,32 @@ expr11      : expr12 T_2CARET expr11
  *
  * Left-associative chain — `pat . X $ Y` parses as `(pat . X) $ Y`.
  *
- * Note: the unary forms `.X` and `$X` (E_NAME and E_INDIRECT) live at
+ * Note: the unary forms `.X` and `$X` (AST_NAME and AST_INDIRECT) live at
  * expr17 — they are different tokens (T_1DOT/T_1DOLLAR, no leading
  * whitespace) emitted by the FSM lexer's W{OP}W envelope rule.  The
  * binary forms here use T_2DOT/T_2DOLLAR (whitespace-enveloped, two-
  * operand context).
  */
 expr12      : expr12 T_2DOLLAR expr15
-                                { $$ = expr_binary(E_CAPT_IMMED_ASGN, $1, $3); }
+                                { $$ = expr_binary(AST_CAPT_IMMED_ASGN, $1, $3); }
             | expr12 T_2DOT    expr15
-                                { $$ = expr_binary(E_CAPT_COND_ASGN,  $1, $3); }
+                                { $$ = expr_binary(AST_CAPT_COND_ASGN,  $1, $3); }
             | expr15
                                 { $$ = $1; }
             ;
 
 /* ---- Subscript tier (LS-4.d) --------------------------------------------
  *
- * Postfix subscript `a[i, j]` → E_IDX(a, i, j).  Mirrors snobol4.y's
+ * Postfix subscript `a[i, j]` → AST_IDX(a, i, j).  Mirrors snobol4.y's
  * `expr15` shape (snobol4.y:183) — same priority, same n-ary IR shape,
  * same left-recursive chaining so `a[i][j]` parses as
- *   E_IDX(E_IDX(a, i), j)
+ *   AST_IDX(AST_IDX(a, i), j)
  * and `a[i, j]` parses as the single n-ary
- *   E_IDX(a, i, j).
+ *   AST_IDX(a, i, j).
  *
  * The lexer always emits T_LBRACK for `[` regardless of preceding
  * whitespace (`a[i]` and `a [i]` both lex the same way — see
- * snocone_lex.c E_LBRACK rule).  No CONCAT injection between a value-
+ * snocone_lex.c AST_LBRACK rule).  No CONCAT injection between a value-
  * token and `[`.
  *
  * Empty subscript `a[]` is permitted at the lexer/grammar level (uses
@@ -1059,11 +1059,11 @@ expr12      : expr12 T_2DOLLAR expr15
  *
  * The `exprlist` non-terminal already exists from LS-4.b (function-call
  * arg lists); we reuse it.  Container-unpacking idiom matches the
- * T_CALL rule in expr17 — drain children into the E_IDX node, then
- * free the E_NUL temporary holder.
+ * T_CALL rule in expr17 — drain children into the AST_IDX node, then
+ * free the AST_NUL temporary holder.
  */
 expr15      : expr15 T_LBRACK exprlist T_RBRACK
-                                { EXPR_t *idx = expr_new(E_IDX);
+                                { AST_t *idx = expr_new(AST_IDX);
                                   expr_add_child(idx, $1);
                                   for (int i = 0; i < $3->nchildren; i++)
                                       expr_add_child(idx, $3->children[i]);
@@ -1076,20 +1076,20 @@ expr15      : expr15 T_LBRACK exprlist T_RBRACK
 /* ---- exprlist (LS-4.b) — for call-form argument lists ----
  *
  * Mirror snobol4.y's exprlist/exprlist_ne pair: a non-empty list
- * uses an E_NUL container as a temporary holder; the empty list
- * is just an E_NUL with no children.  Caller (T_CALL rule)
- * unpacks children into the E_FNC node and frees the container.
+ * uses an AST_NUL container as a temporary holder; the empty list
+ * is just an AST_NUL with no children.  Caller (T_CALL rule)
+ * unpacks children into the AST_FNC node and frees the container.
  */
 exprlist    : exprlist_ne
                                 { $$ = $1; }
             | /* empty */
-                                { $$ = expr_new(E_NUL); }
+                                { $$ = expr_new(AST_NUL); }
             ;
 
 exprlist_ne : exprlist_ne T_COMMA expr0
                                 { expr_add_child($1, $3); $$ = $1; }
             | expr0
-                                { EXPR_t *l = expr_new(E_NUL); expr_add_child(l, $1); $$ = l; }
+                                { AST_t *l = expr_new(AST_NUL); expr_add_child(l, $1); $$ = l; }
             ;
 
 /* Atomic tier — atoms, parens, signed unaries.  Unary applied here
@@ -1097,24 +1097,24 @@ exprlist_ne : exprlist_ne T_COMMA expr0
  * "all unaries are higher priority than any binary."  In LS-4.e the
  * full set of unaries (* . $ @ ~ ? &) joins this tier.
  *
- * LS-4.b adds T_CALL call-form: `EQ(2+2, 4)` → E_FNC("EQ", ...).
+ * LS-4.b adds T_CALL call-form: `EQ(2+2, 4)` → AST_FNC("EQ", ...).
  * The lexer has already classified the IDENT-followed-by-zero-space-(
  * as T_CALL (the "f(args) vs f (args)" disambiguation rule from
  * the goal); T_CALL atomically consumes the `(`, so the grammar
  * reads `T_CALL exprlist T_RPAREN` — no separate T_LPAREN. */
 expr17      : T_CALL exprlist T_RPAREN
-                                { EXPR_t *e = expr_new(E_FNC);
+                                { AST_t *e = expr_new(AST_FNC);
                                   e->sval = $1;             /* takes ownership */
                                   for (int i = 0; i < $2->nchildren; i++)
                                       expr_add_child(e, $2->children[i]);
                                   free($2->children); free($2);
                                   $$ = e; }
             | T_IDENT
-                                { EXPR_t *e = expr_new(E_VAR);
+                                { AST_t *e = expr_new(AST_VAR);
                                   e->sval = $1;             /* takes ownership */
                                   $$ = e; }
             | T_KEYWORD
-                                { EXPR_t *e = expr_new(E_KEYWORD);
+                                { AST_t *e = expr_new(AST_KEYWORD);
                                   e->sval = $1;
                                   $$ = e; }
             | T_INT
@@ -1135,9 +1135,9 @@ expr17      : T_CALL exprlist T_RPAREN
              * lowered to this form, so dropping `||` and exposing the
              * primitive directly is the canonical replacement.
              *
-             * Lower to E_VLIST n-ary node — IR kind already exists in
+             * Lower to AST_VLIST n-ary node — IR kind already exists in
              * src/ir/ir.h:83 with this exact semantics.  Mirrors
-             * snobol4.y:195 byte-for-byte.  Distinct from E_ALT
+             * snobol4.y:195 byte-for-byte.  Distinct from AST_ALT
              * (pattern alternation, lazy at match time).
              *
              * LR(1) lookahead disambiguates the two paren-rules cleanly:
@@ -1145,49 +1145,49 @@ expr17      : T_CALL exprlist T_RPAREN
              * — T_RPAREN reduces to plain grouping; T_COMMA shifts into
              * the VLIST production.  Zero shift/reduce conflicts.    */
             | T_LPAREN expr0 T_COMMA exprlist_ne T_RPAREN
-                                { EXPR_t *a = expr_new(E_VLIST);
+                                { AST_t *a = expr_new(AST_VLIST);
                                   expr_add_child(a, $2);
                                   for (int i = 0; i < $4->nchildren; i++)
                                       expr_add_child(a, $4->children[i]);
                                   free($4->children); free($4);
                                   $$ = a; }
-            /* Empty parens `()` — mirror snobol4.y:196.  Yields E_NUL,
+            /* Empty parens `()` — mirror snobol4.y:196.  Yields AST_NUL,
              * the canonical null/empty expression.  Same semantics as
              * SPITBOL `()` evaluating to the null string.             */
             | T_LPAREN T_RPAREN
-                                { $$ = expr_new(E_NUL); }
+                                { $$ = expr_new(AST_NUL); }
             | T_1PLUS  expr17
-                                { $$ = expr_unary(E_PLS, $2); }
+                                { $$ = expr_unary(AST_PLS, $2); }
             | T_1MINUS expr17
-                                { $$ = expr_unary(E_MNS, $2); }
+                                { $$ = expr_unary(AST_MNS, $2); }
             /* ---- LS-4.e: remaining SPITBOL unary operators ---- */
             /* *expr  — deferred evaluation / indirect pattern ref */
-            | T_1STAR   expr17  { $$ = expr_unary(E_DEFER,       $2); }
+            | T_1STAR   expr17  { $$ = expr_unary(AST_DEFER,       $2); }
             /* .expr  — name reference (returns name descriptor)   */
-            | T_1DOT    expr17  { $$ = expr_unary(E_NAME,        $2); }
+            | T_1DOT    expr17  { $$ = expr_unary(AST_NAME,        $2); }
             /* $expr  — indirect (variable indirection)            */
-            | T_1DOLLAR expr17  { $$ = expr_unary(E_INDIRECT,    $2); }
+            | T_1DOLLAR expr17  { $$ = expr_unary(AST_INDIRECT,    $2); }
             /* @expr  — cursor position capture                    */
-            | T_1AT     expr17  { $$ = expr_unary(E_CAPT_CURSOR, $2); }
+            | T_1AT     expr17  { $$ = expr_unary(AST_CAPT_CURSOR, $2); }
             /* ~expr  — negate success/failure (NOT)               */
-            | T_1TILDE  expr17  { $$ = expr_unary(E_NOT,         $2); }
+            | T_1TILDE  expr17  { $$ = expr_unary(AST_NOT,         $2); }
             /* ?expr  — interrogation (null if succeeds, fail if fails) */
-            | T_1QUEST  expr17  { $$ = expr_unary(E_INTERROGATE, $2); }
+            | T_1QUEST  expr17  { $$ = expr_unary(AST_INTERROGATE, $2); }
             /* &expr  — bare ampersand unary (OPSYN slot pri 2)    */
-            | T_1AMP    expr17  { EXPR_t *_e = expr_unary(E_OPSYN, $2);
+            | T_1AMP    expr17  { AST_t *_e = expr_unary(AST_OPSYN, $2);
                                   _e->sval = strdup("&"); $$ = _e; }
             /* OPSYN-slot unaries — user-definable via OPSYN       */
-            | T_1PERCENT expr17 { EXPR_t *_e = expr_unary(E_OPSYN, $2);
+            | T_1PERCENT expr17 { AST_t *_e = expr_unary(AST_OPSYN, $2);
                                   _e->sval = strdup("%"); $$ = _e; }
-            | T_1SLASH   expr17 { EXPR_t *_e = expr_unary(E_OPSYN, $2);
+            | T_1SLASH   expr17 { AST_t *_e = expr_unary(AST_OPSYN, $2);
                                   _e->sval = strdup("/"); $$ = _e; }
-            | T_1POUND   expr17 { EXPR_t *_e = expr_unary(E_OPSYN, $2);
+            | T_1POUND   expr17 { AST_t *_e = expr_unary(AST_OPSYN, $2);
                                   _e->sval = strdup("#"); $$ = _e; }
-            | T_1PIPE    expr17 { EXPR_t *_e = expr_unary(E_OPSYN, $2);
+            | T_1PIPE    expr17 { AST_t *_e = expr_unary(AST_OPSYN, $2);
                                   _e->sval = strdup("|"); $$ = _e; }
-            | T_1EQUAL   expr17 { EXPR_t *_e = expr_unary(E_OPSYN, $2);
+            | T_1EQUAL   expr17 { AST_t *_e = expr_unary(AST_OPSYN, $2);
                                   _e->sval = strdup("="); $$ = _e; }
-            | T_1BANG    expr17 { EXPR_t *_e = expr_unary(E_OPSYN, $2);
+            | T_1BANG    expr17 { AST_t *_e = expr_unary(AST_OPSYN, $2);
                                   _e->sval = strdup("!"); $$ = _e; }
             ;
 
@@ -1205,50 +1205,50 @@ void sc_error(ScParseState *st, const char *msg) {
 /* ---- Statement assembly ----
  *
  * For LS-4.a there are exactly two shapes:
- *   E_ASSIGN(lhs, rhs)         -> subject = lhs, replacement = rhs, has_eq = 1
+ *   AST_ASSIGN(lhs, rhs)         -> subject = lhs, replacement = rhs, has_eq = 1
  *   anything else              -> subject = expr (bare expression statement)
  *
- * Mirrors sno4_stmt_commit_go's split logic for the top-level E_ASSIGN
- * case (snobol4.y line ~250).  Pattern-match split (E_SCAN), label
+ * Mirrors sno4_stmt_commit_go's split logic for the top-level AST_ASSIGN
+ * case (snobol4.y line ~250).  Pattern-match split (AST_SCAN), label
  * handling, and goto-field assembly arrive in later LS-4.* steps.
  *
- * LS-4.l fence/match/semantic/trace fix: also split E_SCAN(subj, pat)
+ * LS-4.l fence/match/semantic/trace fix: also split AST_SCAN(subj, pat)
  * out of `s->subject` into separate `s->subject = subj` /
  * `s->pattern = pat` slots so the runtime's pattern-match engine
- * fires.  Without this split, the runtime would evaluate E_SCAN as a
+ * fires.  Without this split, the runtime would evaluate AST_SCAN as a
  * value (always succeeding) instead of doing the SNOBOL4 pattern
  * match.  Mirrors snobol4.y:248-270 byte-for-byte.
  *
  * Two split forms (mirror snobol4.y):
  *
- *   1. E_SCAN(subj, pat)
+ *   1. AST_SCAN(subj, pat)
  *        -> s->subject = subj, s->pattern = pat
  *      Comes from the binary `?` operator: `subj ? pat` and the
- *      replace form `subj ? pat = repl` (where E_ASSIGN's lhs is
- *      the E_SCAN).
+ *      replace form `subj ? pat = repl` (where AST_ASSIGN's lhs is
+ *      the AST_SCAN).
  *
- *   2. E_SEQ(name, rest...) where first child is a name-yielding
- *      atom (E_VAR / E_KEYWORD / E_QLIT / E_INDIRECT)
+ *   2. AST_SEQ(name, rest...) where first child is a name-yielding
+ *      atom (AST_VAR / AST_KEYWORD / AST_QLIT / AST_INDIRECT)
  *        -> s->subject = name, s->pattern = rest
  *      Comes from bare juxtaposition: in Snocone with space-as-
  *      concat, `s pat;` lexes as `IDENT(s) T_CONCAT IDENT(pat) ;`
- *      which lowers to E_SEQ(s, pat).  This is the SNOBOL4
+ *      which lowers to AST_SEQ(s, pat).  This is the SNOBOL4
  *      stmt-level "subject pattern" idiom and the runtime expects
  *      the same split.
  *
  * The split applies ONLY to the subject slot.  Replacement is left
- * unchanged: `result = subj ? pat` is E_ASSIGN(result, E_SCAN(subj,
- * pat)) and the replacement E_SCAN evaluates as a value (the
+ * unchanged: `result = subj ? pat` is AST_ASSIGN(result, AST_SCAN(subj,
+ * pat)) and the replacement AST_SCAN evaluates as a value (the
  * matched substring) — that path is correct as is, no split needed.
  */
-static void sc_split_subject_pattern(EXPR_t **subj_io, EXPR_t **pat_io) {
-    EXPR_t *subj = *subj_io;
+static void sc_split_subject_pattern(AST_t **subj_io, AST_t **pat_io) {
+    AST_t *subj = *subj_io;
     if (*pat_io || !subj) return;
 
-    /* Form 1: E_SCAN(subj, pat) */
-    if (subj->kind == E_SCAN && subj->nchildren == 2) {
-        EXPR_t *new_subj = subj->children[0];
-        EXPR_t *new_pat  = subj->children[1];
+    /* Form 1: AST_SCAN(subj, pat) */
+    if (subj->kind == AST_SCAN && subj->nchildren == 2) {
+        AST_t *new_subj = subj->children[0];
+        AST_t *new_pat  = subj->children[1];
         free(subj->children);
         free(subj);
         *subj_io = new_subj;
@@ -1256,21 +1256,21 @@ static void sc_split_subject_pattern(EXPR_t **subj_io, EXPR_t **pat_io) {
         return;
     }
 
-    /* Form 2: E_SEQ(name, rest...) where first child is name-like */
-    if (subj->kind == E_SEQ && subj->nchildren >= 2) {
-        EXPR_t *first = subj->children[0];
-        if (first->kind == E_VAR || first->kind == E_KEYWORD ||
-            first->kind == E_QLIT || first->kind == E_INDIRECT) {
+    /* Form 2: AST_SEQ(name, rest...) where first child is name-like */
+    if (subj->kind == AST_SEQ && subj->nchildren >= 2) {
+        AST_t *first = subj->children[0];
+        if (first->kind == AST_VAR || first->kind == AST_KEYWORD ||
+            first->kind == AST_QLIT || first->kind == AST_INDIRECT) {
             int nc = subj->nchildren - 1;
-            EXPR_t *rest;
+            AST_t *rest;
             if (nc == 1) {
                 rest = subj->children[1];
             } else {
-                rest = expr_new(E_SEQ);
+                rest = expr_new(AST_SEQ);
                 for (int i = 1; i < subj->nchildren; i++)
                     expr_add_child(rest, subj->children[i]);
             }
-            /* Detach the children we kept; free the now-empty E_SEQ shell. */
+            /* Detach the children we kept; free the now-empty AST_SEQ shell. */
             free(subj->children);
             free(subj);
             *subj_io = first;
@@ -1280,7 +1280,7 @@ static void sc_split_subject_pattern(EXPR_t **subj_io, EXPR_t **pat_io) {
     }
 }
 
-static void sc_append_stmt(ScParseState *st, EXPR_t *top) {
+static void sc_append_stmt(ScParseState *st, AST_t *top) {
     if (!top) return;
     /* LS-4.i.2 — a "real" stmt commit consumes any pending user labels:
      * label_decl already emitted a label-pad which chains forward by
@@ -1290,7 +1290,7 @@ static void sc_append_stmt(ScParseState *st, EXPR_t *top) {
     STMT_t *s = stmt_new();
     s->lineno = st->ctx ? st->ctx->line : 0;
     s->stno   = ++st->code->nstmts;
-    if (top->kind == E_ASSIGN && top->nchildren == 2) {
+    if (top->kind == AST_ASSIGN && top->nchildren == 2) {
         s->subject     = top->children[0];
         s->replacement = top->children[1];
         s->has_eq      = 1;
@@ -1299,9 +1299,9 @@ static void sc_append_stmt(ScParseState *st, EXPR_t *top) {
     } else {
         s->subject = top;
     }
-    /* LS-4.l: split E_SCAN/E_SEQ out of subject into subject+pattern.
-     * Applies after E_ASSIGN-split so `subj ? pat = repl` (which
-     * lowers to E_ASSIGN(E_SCAN(subj,pat), repl)) gets correctly
+    /* LS-4.l: split AST_SCAN/AST_SEQ out of subject into subject+pattern.
+     * Applies after AST_ASSIGN-split so `subj ? pat = repl` (which
+     * lowers to AST_ASSIGN(AST_SCAN(subj,pat), repl)) gets correctly
      * split into s->subject=subj, s->pattern=pat, s->replacement=repl. */
     sc_split_subject_pattern(&s->subject, &s->pattern);
     if (!st->code->head) st->code->head = st->code->tail = s;
@@ -1309,20 +1309,20 @@ static void sc_append_stmt(ScParseState *st, EXPR_t *top) {
 }
 
 /* ---- Literal builders ---- */
-static EXPR_t *sc_int_literal(const char *txt) {
-    EXPR_t *e = expr_new(E_ILIT);
+static AST_t *sc_int_literal(const char *txt) {
+    AST_t *e = expr_new(AST_ILIT);
     e->ival = strtol(txt, NULL, 10);
     return e;
 }
 
-static EXPR_t *sc_real_literal(const char *txt) {
-    EXPR_t *e = expr_new(E_FLIT);
+static AST_t *sc_real_literal(const char *txt) {
+    AST_t *e = expr_new(AST_FLIT);
     e->dval = strtod(txt, NULL);
     return e;
 }
 
-static EXPR_t *sc_str_literal(const char *txt) {
-    EXPR_t *e = expr_new(E_QLIT);
+static AST_t *sc_str_literal(const char *txt) {
+    AST_t *e = expr_new(AST_QLIT);
     e->sval = strdup(txt);
     return e;
 }
@@ -1330,23 +1330,23 @@ static EXPR_t *sc_str_literal(const char *txt) {
 /* sc_clone_expr_simple — shallow-recursive clone for compound-assign LHS.
  *
  * Compound-assigns (`a += b`, `a *= b`, etc.) lower to
- *   E_ASSIGN(a, E_BINOP(clone(a), b))
+ *   AST_ASSIGN(a, AST_BINOP(clone(a), b))
  * which means the LHS expression is referenced in two distinct subtrees
  * of the same IR.  The IR's tree representation requires distinct nodes
  * (children pointer arrays would otherwise alias and double-free at
  * cleanup), so we clone the LHS.
  *
  * Coverage: the kinds Snocone source can produce as a compound-assign
- * LHS at this point in the grammar — atomic E_VAR / E_KEYWORD / E_ILIT
- * / E_FLIT / E_QLIT, plus n-ary E_IDX / E_FNC for `a[i] += 1` and the
+ * LHS at this point in the grammar — atomic AST_VAR / AST_KEYWORD / AST_ILIT
+ * / AST_FLIT / AST_QLIT, plus n-ary AST_IDX / AST_FNC for `a[i] += 1` and the
  * (rare) `f(x) += 1`.  Anything else is a parse-time bug; we return NULL
  * to surface it loudly via the parse error path rather than silently
  * producing a malformed IR.  When LS-4.d adds subscripts and unaries,
  * extend the switch as needed.
  */
-static EXPR_t *sc_clone_expr_simple(EXPR_t *e) {
+static AST_t *sc_clone_expr_simple(AST_t *e) {
     if (!e) return NULL;
-    EXPR_t *c = expr_new(e->kind);
+    AST_t *c = expr_new(e->kind);
     /* Scalar fields — copied verbatim. */
     c->ival = e->ival;
     c->dval = e->dval;
@@ -1415,7 +1415,7 @@ static char *sc_label_new(ScParseState *st, const char *prefix) {
 }
 
 /* Snapshot helper: build an IfHead capturing cond and the current tail. */
-static struct IfHead *sc_if_head_new(ScParseState *st, EXPR_t *cond) {
+static struct IfHead *sc_if_head_new(ScParseState *st, AST_t *cond) {
     struct IfHead *h = calloc(1, sizeof *h);
     h->cond        = cond;
     h->before_body = st->code->tail;       /* may be NULL */
@@ -1423,7 +1423,7 @@ static struct IfHead *sc_if_head_new(ScParseState *st, EXPR_t *cond) {
     return h;
 }
 
-static struct WhileHead *sc_while_head_new(ScParseState *st, EXPR_t *cond) {
+static struct WhileHead *sc_while_head_new(ScParseState *st, AST_t *cond) {
     struct WhileHead *h = calloc(1, sizeof *h);
     h->cond        = cond;
     h->before_body = st->code->tail;
@@ -1459,7 +1459,7 @@ static struct DoHead *sc_do_head_new(ScParseState *st) {
  * by for_lead's action (which fired on T_FOR before init parsed).
  * We pass `from_stash=1` to sc_loop_push so it picks them up there
  * instead of from the (now-cleared) pending list. */
-static struct ForHead *sc_for_head_new(ScParseState *st, EXPR_t *cond, EXPR_t *step) {
+static struct ForHead *sc_for_head_new(ScParseState *st, AST_t *cond, AST_t *step) {
     struct ForHead *h = calloc(1, sizeof *h);
     h->before_loop = st->code->tail;
     h->cond        = cond;
@@ -1479,7 +1479,7 @@ static struct ForHead *sc_for_head_new(ScParseState *st, EXPR_t *cond, EXPR_t *s
  * cur_func_name on the head struct so sc_finalize_function can restore.
  *
  * Emits two STMT_t's:
- *   1. subject = E_FNC("DEFINE", E_QLIT("NAME(args)")), no goto
+ *   1. subject = AST_FNC("DEFINE", AST_QLIT("NAME(args)")), no goto
  *   2. subject = NULL, go.uncond = "NAME_end"  (a bare goto stmt)
  *
  * The body's stmts will then be appended via sc_append_stmt() in the
@@ -1505,9 +1505,9 @@ static struct FuncHead *sc_func_head_new(ScParseState *st, char *name, char *arg
     int slen = strlen(name) + 1 + strlen(argstr) + 2;     /* NAME(args) + NUL */
     char *defarg = malloc(slen);
     snprintf(defarg, slen, "%s(%s)", name, argstr);
-    EXPR_t *qarg = expr_new(E_QLIT);
+    AST_t *qarg = expr_new(AST_QLIT);
     qarg->sval   = defarg;
-    EXPR_t *def_call = expr_new(E_FNC);
+    AST_t *def_call = expr_new(AST_FNC);
     def_call->sval   = strdup("DEFINE");
     expr_add_child(def_call, qarg);
     sc_append_stmt(st, def_call);   /* appends as bare-expr stmt */
@@ -1571,14 +1571,14 @@ static void sc_finalize_function(ScParseState *st, struct FuncHead *h) {
  * (a top-level `:(RETURN)` is a runtime error or fallthrough,
  * depending on dialect).  We do not enforce structural validity here.
  */
-static void sc_append_return(ScParseState *st, EXPR_t *retval) {
+static void sc_append_return(ScParseState *st, AST_t *retval) {
     sc_pending_label_clear(st);
     STMT_t *s = stmt_new();
     s->lineno = st->ctx ? st->ctx->line : 0;
     s->stno   = ++st->code->nstmts;
     if (retval && st->cur_func_name) {
         /* fname = retval :(RETURN) */
-        EXPR_t *lhs = expr_new(E_VAR);
+        AST_t *lhs = expr_new(AST_VAR);
         lhs->sval   = strdup(st->cur_func_name);
         s->subject     = lhs;
         s->replacement = retval;
@@ -1626,12 +1626,12 @@ static STMT_t *sc_make_label_stmt(ScParseState *st, char *label) {
 /* Build a STMT whose subject is `cond` and whose go.onfailure points at
  * `fail_target`.  Takes ownership of both.
  *
- * LS-4.l fix — applies the same E_SCAN/E_SEQ split used by
+ * LS-4.l fix — applies the same AST_SCAN/AST_SEQ split used by
  * sc_append_stmt so `if (subj ? pat) {…}`, `while (subj ? pat) {…}`,
  * etc. drive the runtime's pattern-match engine instead of evaluating
- * E_SCAN as a value (which always succeeds and breaks the if/while
+ * AST_SCAN as a value (which always succeeds and breaks the if/while
  * failure-driven branch). */
-static STMT_t *sc_make_cond_fail_stmt(ScParseState *st, EXPR_t *cond, char *fail_target, int lineno) {
+static STMT_t *sc_make_cond_fail_stmt(ScParseState *st, AST_t *cond, char *fail_target, int lineno) {
     STMT_t *s = stmt_new();
     s->lineno = lineno;
     s->stno   = ++st->code->nstmts;
@@ -1820,11 +1820,11 @@ static void sc_finalize_while(ScParseState *st, struct WhileHead *h) {
 /* Build a STMT whose subject is `cond` and whose go.onsuccess points at
  * `succ_target`.  Takes ownership of both.
  *
- * LS-4.l fix — same E_SCAN/E_SEQ split as sc_make_cond_fail_stmt so
+ * LS-4.l fix — same AST_SCAN/AST_SEQ split as sc_make_cond_fail_stmt so
  * `do { ... } while (subj ? pat);` drives the pattern-match engine
- * (without the split, the cond evaluates E_SCAN as a value, always
+ * (without the split, the cond evaluates AST_SCAN as a value, always
  * succeeding, turning do/while into an infinite loop). */
-static STMT_t *sc_make_cond_succ_stmt(ScParseState *st, EXPR_t *cond, char *succ_target, int lineno) {
+static STMT_t *sc_make_cond_succ_stmt(ScParseState *st, AST_t *cond, char *succ_target, int lineno) {
     STMT_t *s = stmt_new();
     s->lineno  = lineno;
     s->stno    = ++st->code->nstmts;
@@ -1834,7 +1834,7 @@ static STMT_t *sc_make_cond_succ_stmt(ScParseState *st, EXPR_t *cond, char *succ
     return s;
 }
 
-static void sc_finalize_do_while(ScParseState *st, struct DoHead *h, EXPR_t *cond) {
+static void sc_finalize_do_while(ScParseState *st, struct DoHead *h, AST_t *cond) {
     /* LS-4.i.2 — eager labels.  Ltop is a fresh "_Ltop_NNNN"; cont_label
      * was allocated eagerly by sc_do_head_new for use by `continue;` stmts
      * inside the body.  For do/while, `continue` must re-evaluate cond,
@@ -2131,7 +2131,7 @@ static void sc_switch_cases_grow(struct SwitchHead *h) {
     }
 }
 
-static struct SwitchHead *sc_switch_head_new(ScParseState *st, EXPR_t *disc) {
+static struct SwitchHead *sc_switch_head_new(ScParseState *st, AST_t *disc) {
     struct SwitchHead *h = calloc(1, sizeof *h);
     h->disc          = disc;
     h->lineno        = st->ctx ? st->ctx->line : 0;
@@ -2146,10 +2146,10 @@ static struct SwitchHead *sc_switch_head_new(ScParseState *st, EXPR_t *disc) {
     h->default_label = sc_label_new(st, "_Ldefault");
     h->has_default   = 0;
     /* Emit `tmp = disc;` as a regular assignment statement — sc_append_stmt
-     * handles the E_ASSIGN-to-subject-and-replacement split. */
-    EXPR_t *lhs = expr_new(E_VAR);
+     * handles the AST_ASSIGN-to-subject-and-replacement split. */
+    AST_t *lhs = expr_new(AST_VAR);
     lhs->sval   = strdup(h->tmp_name);
-    EXPR_t *assign = expr_new(E_ASSIGN);
+    AST_t *assign = expr_new(AST_ASSIGN);
     expr_add_child(assign, lhs);
     expr_add_child(assign, disc);   /* takes ownership of disc */
     sc_append_stmt(st, assign);
@@ -2187,7 +2187,7 @@ static void sc_switch_emit_implicit_break(ScParseState *st, struct SwitchHead *h
     sc_append_chain(st, g, g);
 }
 
-static void sc_switch_case_label(ScParseState *st, EXPR_t *value) {
+static void sc_switch_case_label(ScParseState *st, AST_t *value) {
     struct SwitchHead *h = st->cur_switch;
     if (!h) {
         sc_error(st, "case label outside of switch");
@@ -2247,9 +2247,9 @@ static void sc_finalize_switch(ScParseState *st, struct SwitchHead *h) {
     STMT_t *chain_tail = NULL;
     for (int i = 0; i < h->cases_count; i++) {
         if (!h->cases[i].value) continue;   /* default entry — no probe */
-        EXPR_t *probe = expr_new(E_FNC);
+        AST_t *probe = expr_new(AST_FNC);
         probe->sval   = strdup("IDENT");
-        EXPR_t *tmp_ref = expr_new(E_VAR);
+        AST_t *tmp_ref = expr_new(AST_VAR);
         tmp_ref->sval   = strdup(h->tmp_name);
         expr_add_child(probe, tmp_ref);
         expr_add_child(probe, h->cases[i].value);   /* takes ownership */
@@ -2315,8 +2315,8 @@ static void sc_finalize_switch(ScParseState *st, struct SwitchHead *h) {
  *
  *  IR shape (mirrors sc_func_head_new's DEFINE-emission idiom):
  *
- *    EXPR_t  qarg     = E_QLIT  sval = "NAME(f1,f2,f3)"
- *    EXPR_t  data_call= E_FNC   sval = "DATA"   children = [ qarg ]
+ *    AST_t  qarg     = AST_QLIT  sval = "NAME(f1,f2,f3)"
+ *    AST_t  data_call= AST_FNC   sval = "DATA"   children = [ qarg ]
  *    STMT_t  bare-expr stmt with subject = data_call,  no goto, no label.
  *
  *  Empty-fields case: `struct NAME { }` lowers to `DATA('NAME()')`, which
@@ -2334,10 +2334,10 @@ static void sc_emit_struct(ScParseState *st, char *name, char *fields) {
     char *spec = malloc(slen);
     snprintf(spec, slen, "%s(%s)", name, fields);
 
-    EXPR_t *qarg = expr_new(E_QLIT);
+    AST_t *qarg = expr_new(AST_QLIT);
     qarg->sval   = spec;                                   /* takes ownership */
 
-    EXPR_t *data_call = expr_new(E_FNC);
+    AST_t *data_call = expr_new(AST_FNC);
     data_call->sval   = strdup("DATA");
     expr_add_child(data_call, qarg);
 
@@ -2352,7 +2352,7 @@ static void sc_emit_struct(ScParseState *st, char *name, char *fields) {
  *  freshly-allocated CODE_t ready for the IR/SM pipeline.
  *
  *  CODE_t is the typedef alias of CODE_t (added in LS-4.cn — session
- *  2026-04-30 #7 — for symmetry with EXPR_t).  Existing callers that
+ *  2026-04-30 #7 — for symmetry with AST_t).  Existing callers that
  *  declared the result as `CODE_t *` continue to work; the two names
  *  refer to the same type.
  *

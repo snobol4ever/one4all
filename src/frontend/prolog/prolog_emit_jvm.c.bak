@@ -1,7 +1,7 @@
 /*
  * prolog_emit_jvm.c — Prolog IR → Jasmin .j emitter
  *
- * Consumes E_CHOICE/E_CLAUSE/E_UNIFY/E_CUT/E_TRAIL_MARK/E_TRAIL_UNWIND
+ * Consumes AST_CHOICE/AST_CLAUSE/AST_UNIFY/AST_CUT/AST_TRAIL_MARK/AST_TRAIL_UNWIND
  * nodes produced by prolog_lower() and emits a Jasmin assembly file.
  *
  * Entry point: prolog_emit_jvm(Program *prog, FILE *out, const char *filename)
@@ -3089,12 +3089,12 @@ static void pj_emit_class_header(void) {
  * Forward declarations for goal/term emitters
  * ------------------------------------------------------------------------- */
 
-static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
+static void pj_emit_goal(AST_t *goal, const char *lbl_γ, const char *lbl_ω,
                          int trail_local, int *var_locals, int n_vars,
                          int cut_cs_seal, int cs_local_for_cut,
                          int *next_local, const char *lbl_cutγ);
-static void pj_emit_term(EXPR_t *term, int *var_locals, int n_vars);
-static void pj_emit_arith(EXPR_t *e, int *var_locals, int n_vars);
+static void pj_emit_term(AST_t *term, int *var_locals, int n_vars);
+static void pj_emit_arith(AST_t *e, int *var_locals, int n_vars);
 
 /* pj_arith_is_float — returns 1 if arithmetic expression produces a float result */
 /* pj_emit_dbl_const — emit a double constant onto the JVM stack as D.
@@ -3108,10 +3108,10 @@ static void pj_emit_dbl_const(double v) {
     JI("invokestatic", "java/lang/Double/longBitsToDouble(J)D");
 }
 
-static int pj_arith_is_float(EXPR_t *e) {
+static int pj_arith_is_float(AST_t *e) {
     if (!e) return 0;
-    if (e->kind == E_FLIT) return 1;
-    if (e->kind == E_FNC && e->sval) {
+    if (e->kind == AST_FLIT) return 1;
+    if (e->kind == AST_FNC && e->sval) {
         const char *fn = e->sval;
         /* these always produce float regardless of input */
         if (strcmp(fn,"sqrt")==0 || strcmp(fn,"sin")==0 || strcmp(fn,"cos")==0 ||
@@ -3146,10 +3146,10 @@ static int pj_callee_has_cut_no_last_ucall(const char *fn, int arity);
  * var_locals[slot] = JVM local index for that Prolog variable
  * ------------------------------------------------------------------------- */
 
-static void pj_emit_term(EXPR_t *e, int *var_locals, int n_vars) {
+static void pj_emit_term(AST_t *e, int *var_locals, int n_vars) {
     if (!e) { JI("aconst_null", ""); return; }
     switch (e->kind) {
-    case E_QLIT: {
+    case AST_QLIT: {
         /* atom — push atom term */
         pj_intern_atom(e->sval ? e->sval : "");
         pj_ldc_str(e->sval ? e->sval : "");
@@ -3157,17 +3157,17 @@ static void pj_emit_term(EXPR_t *e, int *var_locals, int n_vars) {
           pj_classname);
         break;
     }
-    case E_ILIT: {
+    case AST_ILIT: {
         J("    ldc2_w %ld\n", e->ival);
         J("    invokestatic %s/pj_term_int(J)[Ljava/lang/Object;\n", pj_classname);
         break;
     }
-    case E_FLIT: {
+    case AST_FLIT: {
         pj_emit_dbl_const(e->dval);   /* push double constant */
         J("    invokestatic %s/pj_term_float(D)[Ljava/lang/Object;\n", pj_classname);
         break;
     }
-    case E_VART: {
+    case AST_VART: {
         int slot = e->ival;
         if (slot >= 0 && slot < n_vars && var_locals) {
             J("    aload %d\n", var_locals[slot]);
@@ -3180,7 +3180,7 @@ static void pj_emit_term(EXPR_t *e, int *var_locals, int n_vars) {
         }
         break;
     }
-    case E_FNC: {
+    case AST_FNC: {
         /* compound term f(arg0, arg1, ...) — flat Object[] encoding:
          * [0]="compound", [1]=functor_string, [2..2+arity-1]=args */
         int arity = e->nchildren;
@@ -3213,12 +3213,12 @@ static void pj_emit_term(EXPR_t *e, int *var_locals, int n_vars) {
         }
         break;
     }
-    case E_ADD: case E_SUB: case E_MPY: case E_DIV: {
+    case AST_ADD: case AST_SUB: case AST_MPY: case AST_DIV: {
         /* Arithmetic op node in TERM position (e.g. write(X-Y), write(A+B)).
-         * Lowerer maps -/+/* to E_SUB/E_ADD/E_MPY unconditionally.
+         * Lowerer maps -/+/* to AST_SUB/AST_ADD/AST_MPY unconditionally.
          * In term position emit as compound so write/1 and unification work. */
-        const char *afn = (e->kind==E_ADD)?"+": (e->kind==E_SUB)?"-":
-                          (e->kind==E_MPY)?"*": "/";
+        const char *afn = (e->kind==AST_ADD)?"+": (e->kind==AST_SUB)?"-":
+                          (e->kind==AST_MPY)?"*": "/";
         int arity = e->nchildren;
         if (arity == 0) {
             J("    ldc \"%s\"\n", afn);
@@ -3251,18 +3251,18 @@ static void pj_emit_term(EXPR_t *e, int *var_locals, int n_vars) {
  * Leaves long on stack.
  * ------------------------------------------------------------------------- */
 
-static void pj_emit_arith(EXPR_t *e, int *var_locals, int n_vars) {
+static void pj_emit_arith(AST_t *e, int *var_locals, int n_vars) {
     if (!e) { JI("lconst_0", ""); return; }
     switch (e->kind) {
-    case E_ILIT:
+    case AST_ILIT:
         J("    ldc2_w %ld\n", e->ival);
         break;
-    case E_FLIT:
+    case AST_FLIT:
         /* float literal: push as double, convert to long bits */
         pj_emit_dbl_const(e->dval);
         JI("invokestatic", "java/lang/Double/doubleToRawLongBits(D)J");
         break;
-    case E_VART: {
+    case AST_VART: {
         int slot = e->ival;
         /* load var, deref; if float tag → parseDouble→bits, else parseLong */
         if (slot >= 0 && slot < n_vars && var_locals)
@@ -3297,7 +3297,7 @@ static void pj_emit_arith(EXPR_t *e, int *var_locals, int n_vars) {
         J("%s:\n", lbl_done);
         break;
     }
-    case E_ADD: {
+    case AST_ADD: {
         int lf = pj_arith_is_float(e->children[0]);
         int rf = pj_arith_is_float(e->children[1]);
         if (lf || rf) {
@@ -3315,7 +3315,7 @@ static void pj_emit_arith(EXPR_t *e, int *var_locals, int n_vars) {
         }
         break;
     }
-    case E_SUB: {
+    case AST_SUB: {
         int lf = pj_arith_is_float(e->children[0]);
         int rf = pj_arith_is_float(e->children[1]);
         if (lf || rf) {
@@ -3332,7 +3332,7 @@ static void pj_emit_arith(EXPR_t *e, int *var_locals, int n_vars) {
         }
         break;
     }
-    case E_MPY: {
+    case AST_MPY: {
         int lf = pj_arith_is_float(e->children[0]);
         int rf = pj_arith_is_float(e->children[1]);
         if (lf || rf) {
@@ -3349,7 +3349,7 @@ static void pj_emit_arith(EXPR_t *e, int *var_locals, int n_vars) {
         }
         break;
     }
-    case E_DIV: {
+    case AST_DIV: {
         int lf = pj_arith_is_float(e->children[0]);
         int rf = pj_arith_is_float(e->children[1]);
         if (lf || rf) {
@@ -3366,7 +3366,7 @@ static void pj_emit_arith(EXPR_t *e, int *var_locals, int n_vars) {
         }
         break;
     }
-    case E_FNC:
+    case AST_FNC:
         /* mod/2, rem/2, //2 (integer div) — not given dedicated opcodes by lowerer */
         if (e->sval && e->nchildren >= 2) {
             if (strcmp(e->sval, "mod") == 0 || strcmp(e->sval, "rem") == 0) {
@@ -3686,12 +3686,12 @@ static void pj_emit_arith(EXPR_t *e, int *var_locals, int n_vars) {
 
 /* pj_emit_stdlib_shim — always-emitted pure-Prolog stdlib predicates.
  * member/2 and memberchk/2 are general builtins, skipped if user defines them. */
-static void pj_emit_choice(EXPR_t *choice); /* forward decl */
+static void pj_emit_choice(AST_t *choice); /* forward decl */
 
 static int pj_prog_defines(Program *prog, const char *name, int arity) {
     char key[128]; snprintf(key, sizeof key, "%s/%d", name, arity);
     for (STMT_t *s = prog->head; s; s = s->next) {
-        if (!s->subject || s->subject->kind != E_CHOICE) continue;
+        if (!s->subject || s->subject->kind != AST_CHOICE) continue;
         if (s->subject->sval && strcmp(s->subject->sval, key) == 0)
             return 1;
     }
@@ -3705,7 +3705,7 @@ static void pj_emit_stdlib_pred(const char *src) {
     if (!lowered) return;
     for (STMT_t *s = lowered->head; s; s = s->next) {
         if (!s->subject) continue;
-        if (s->subject->kind == E_CHOICE)
+        if (s->subject->kind == AST_CHOICE)
             pj_emit_choice(s->subject);
     }
 }
@@ -3755,20 +3755,20 @@ static void pj_emit_gcd_helper(void) {
  * These must route their omega to lbl_pred_ω (next clause), not to the
  * clause's own alpha/retry label, to avoid infinite retry loops.
  * ------------------------------------------------------------------------- */
-static int pj_is_always_fail(EXPR_t *goal) {
-    if (!goal || goal->kind != E_FNC || !goal->sval) return 0;
+static int pj_is_always_fail(AST_t *goal) {
+    if (!goal || goal->kind != AST_FNC || !goal->sval) return 0;
     return (strcmp(goal->sval, "fail") == 0 || strcmp(goal->sval, "false") == 0)
            && goal->nchildren == 0;
 }
 
 /* -------------------------------------------------------------------------
- * pj_body_has_cut — recursive scan for E_CUT in a goal tree (walks E_FNC
+ * pj_body_has_cut — recursive scan for AST_CUT in a goal tree (walks AST_FNC
  * children for "," and ";" conjunction/disjunction nodes).
  * ------------------------------------------------------------------------- */
-static int pj_body_has_cut(EXPR_t *g) {
+static int pj_body_has_cut(AST_t *g) {
     if (!g) return 0;
-    if (g->kind == E_CUT) return 1;
-    if (g->kind == E_FNC) {
+    if (g->kind == AST_CUT) return 1;
+    if (g->kind == AST_FNC) {
         for (int i = 0; i < (int)g->nchildren; i++)
             if (pj_body_has_cut(g->children[i])) return 1;
     }
@@ -3778,8 +3778,8 @@ static int pj_body_has_cut(EXPR_t *g) {
 /* -------------------------------------------------------------------------
  * pj_is_user_call — true for user-defined predicates needing retry loop
  * ------------------------------------------------------------------------- */
-static int pj_is_user_call(EXPR_t *goal) {
-    if (!goal || goal->kind != E_FNC || !goal->sval) return 0;
+static int pj_is_user_call(AST_t *goal) {
+    if (!goal || goal->kind != AST_FNC || !goal->sval) return 0;
     const char *fn = goal->sval;
     static const char *builtins[] = {
         "true","fail","halt","nl","write","writeln","print","tab","is",
@@ -3821,10 +3821,10 @@ static int pj_is_user_call(EXPR_t *goal) {
 /* -------------------------------------------------------------------------
  * pj_count_ucalls — count total user calls in a body (each allocates 5 locals)
  * ------------------------------------------------------------------------- */
-static int pj_count_ucalls(EXPR_t **goals, int ngoals) {
+static int pj_count_ucalls(AST_t **goals, int ngoals) {
     int count = 0;
     for (int i = 0; i < ngoals; i++) {
-        EXPR_t *g = goals[i];
+        AST_t *g = goals[i];
         if (!g) continue;
         if (pj_is_user_call(g)) count++;
     }
@@ -3832,12 +3832,12 @@ static int pj_count_ucalls(EXPR_t **goals, int ngoals) {
 }
 
 /* pj_count_neq — count \=/2 goals in a body (each allocates 2 scratch locals) */
-static int pj_count_neq(EXPR_t **goals, int ngoals) {
+static int pj_count_neq(AST_t **goals, int ngoals) {
     int count = 0;
     for (int i = 0; i < ngoals; i++) {
-        EXPR_t *g = goals[i];
+        AST_t *g = goals[i];
         if (!g) continue;
-        if (g->kind == E_FNC && g->sval && strcmp(g->sval, "\\=") == 0 && g->nchildren == 2)
+        if (g->kind == AST_FNC && g->sval && strcmp(g->sval, "\\=") == 0 && g->nchildren == 2)
             count++;
     }
     return count;
@@ -3846,22 +3846,22 @@ static int pj_count_neq(EXPR_t **goals, int ngoals) {
 /* pj_count_disj_locals — extra JVM locals for plain disjunctions in a body.
  * Each plain ; allocates: 2 (local_cs+local_tmark) + 2*narms (ics+sco per arm)
  * + 2 (fresh_init + fresh_sub). Also recurse into arm bodies. */
-static int pj_count_disj_locals(EXPR_t **goals, int ngoals) {
+static int pj_count_disj_locals(AST_t **goals, int ngoals) {
     int total = 0;
     for (int i = 0; i < ngoals; i++) {
-        EXPR_t *g = goals[i];
-        if (!g || g->kind != E_FNC || !g->sval) continue;
+        AST_t *g = goals[i];
+        if (!g || g->kind != AST_FNC || !g->sval) continue;
         if (strcmp(g->sval, ";") == 0 && g->nchildren >= 2) {
-            if (g->children[0] && g->children[0]->kind == E_FNC &&
+            if (g->children[0] && g->children[0]->kind == AST_FNC &&
                 g->children[0]->sval && strcmp(g->children[0]->sval, "->") == 0)
                 continue; /* ITE handled separately */
             /* base cost: 2 + 2 + 2*narms locals at this disjunction level */
             total += 4 + 2 * g->nchildren;
             /* recurse into each arm — each arm may have user calls (5 locals each) */
             for (int ai = 0; ai < g->nchildren; ai++) {
-                EXPR_t *arm = g->children[ai];
+                AST_t *arm = g->children[ai];
                 if (!arm) continue;
-                if (arm->kind == E_FNC && arm->sval && strcmp(arm->sval, ",") == 0) {
+                if (arm->kind == AST_FNC && arm->sval && strcmp(arm->sval, ",") == 0) {
                     /* count user calls in conjunction arm */
                     total += 5 * pj_count_ucalls(arm->children, arm->nchildren);
                     total += pj_count_disj_locals(arm->children, arm->nchildren);
@@ -3878,10 +3878,10 @@ static int pj_count_disj_locals(EXPR_t **goals, int ngoals) {
 /* pj_term_stack_depth — compute max JVM stack slots needed to emit a term.
  * Compound: dup+idx+child leaves [arr,arr,idx,child]=4 per level before aastore.
  * Worst case per nesting level = 4 slots. */
-static int pj_term_stack_depth(EXPR_t *e) {
+static int pj_term_stack_depth(AST_t *e) {
     if (!e) return 1;
     switch (e->kind) {
-    case E_FNC:
+    case AST_FNC:
         if (e->nchildren == 0) return 2; /* ldc + invokestatic */
         {
             int max_child = 0;
@@ -3897,13 +3897,13 @@ static int pj_term_stack_depth(EXPR_t *e) {
 }
 
 /* pj_clause_stack_needed — max stack depth across all goals in a clause body */
-static int pj_clause_stack_needed(EXPR_t **goals, int ngoals) {
+static int pj_clause_stack_needed(AST_t **goals, int ngoals) {
     int max_s = 4; /* baseline for simple goals */
     for (int i = 0; i < ngoals; i++) {
-        EXPR_t *g = goals[i];
+        AST_t *g = goals[i];
         if (!g) continue;
         /* for goals with term arguments, stack depth = goal overhead + max arg depth */
-        if (g->kind == E_FNC || g->kind == E_UNIFY) {
+        if (g->kind == AST_FNC || g->kind == AST_UNIFY) {
             int nc = g->nchildren;
             for (int j = 0; j < nc; j++) {
                 int d = pj_term_stack_depth(g->children[j]);
@@ -3923,7 +3923,7 @@ static int pj_clause_stack_needed(EXPR_t **goals, int ngoals) {
  * ------------------------------------------------------------------------- */
 
 /* forward decl for pj_emit_body */
-static void pj_emit_body(EXPR_t **goals, int ngoals, const char *lbl_γ,
+static void pj_emit_body(AST_t **goals, int ngoals, const char *lbl_γ,
                          const char *lbl_ω, const char *lbl_outer_ω,
                          int trail_local,
                          int *var_locals, int n_vars, int *next_local,
@@ -3932,13 +3932,13 @@ static void pj_emit_body(EXPR_t **goals, int ngoals, const char *lbl_γ,
                          const char *lbl_pred_ω,
                          const char *lbl_cutγ);
 
-static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
+static void pj_emit_goal(AST_t *goal, const char *lbl_γ, const char *lbl_ω,
                          int trail_local, int *var_locals, int n_vars,
                          int cut_cs_seal, int cs_local_for_cut,
                          int *next_local, const char *lbl_cutγ) {
     if (!goal) { JI("goto", lbl_γ); return; }
 
-    if (goal->kind == E_CUT) {
+    if (goal->kind == AST_CUT) {
         /* cut: seal β by storing base[nclauses] into cs_local,
          * so the next dispatch hits default:omega.
          * -1 means no enclosing choice (should not happen in valid Prolog). */
@@ -3952,7 +3952,7 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
         return;
     }
 
-    if (goal->kind == E_UNIFY) {
+    if (goal->kind == AST_UNIFY) {
         /* =/2: unify children[0] and children[1] */
         pj_emit_term(goal->children[0], var_locals, n_vars);
         pj_emit_term(goal->children[1], var_locals, n_vars);
@@ -3962,7 +3962,7 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
         return;
     }
 
-    if (goal->kind == E_FNC) {
+    if (goal->kind == AST_FNC) {
         const char *fn = goal->sval ? goal->sval : "";
         int nargs = goal->nchildren;
 
@@ -4756,8 +4756,8 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
          * On success goto lbl_γ; on failure of all branches goto lbl_ω. */
         if (strcmp(fn, ";") == 0 && nargs >= 2) {
             /* check for (Cond -> Then) as first branch = if-then-else */
-            EXPR_t *first = goal->children[0];
-            if (first && first->kind == E_FNC && first->sval &&
+            AST_t *first = goal->children[0];
+            if (first && first->kind == AST_FNC && first->sval &&
                 strcmp(first->sval, "->") == 0 && first->nchildren >= 2) {
                 /* if-then-else: Cond -> Then ; Else1 ; Else2 ...
                  * -> is flat n-ary: children[0]=Cond, children[1..]=Then goals */
@@ -4825,8 +4825,8 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
                 int sco_disj = next_local_disj++;
                 JI("iconst_0", ""); J("    istore %d\n", ics_disj);
                 JI("iconst_0", ""); J("    istore %d\n", sco_disj);
-                EXPR_t *branch = goal->children[bi];
-                if (branch && branch->kind == E_FNC && branch->sval &&
+                AST_t *branch = goal->children[bi];
+                if (branch && branch->kind == AST_FNC && branch->sval &&
                     strcmp(branch->sval, ",") == 0) {
                     /* conjunction branch: pass children directly to pj_emit_body */
                     pj_emit_body(branch->children, branch->nchildren,
@@ -4951,8 +4951,8 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
             char h_ok[128], h_fail[128];
             snprintf(h_ok,   sizeof h_ok,   "nafh%d_ok",   uid);
             snprintf(h_fail, sizeof h_fail, "nafh%d_fail", uid);
-            EXPR_t *naf_inner = goal->children[0];
-            if (naf_inner && naf_inner->kind == E_FNC && naf_inner->sval
+            AST_t *naf_inner = goal->children[0];
+            if (naf_inner && naf_inner->kind == AST_FNC && naf_inner->sval
                     && strcmp(naf_inner->sval, ",") == 0 && naf_inner->nchildren >= 1) {
                 int h_ics = h_next++; int h_sco = h_next++;
                 J("    iconst_0\n"); J("    istore %d\n", h_ics);
@@ -5230,13 +5230,13 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
         }
         /* phrase/2 — phrase(NT, List) -> NT(List, [])\n         * phrase/3 — phrase(NT, List, Rest) -> NT(List, Rest)\n         * Rewrite into a direct NT/+2 call so the normal ucall retry loop\n         * handles backtracking correctly. */
         if (strcmp(fn, "phrase") == 0 && (nargs == 2 || nargs == 3)) {
-            EXPR_t *nt_expr  = goal->children[0];
-            EXPR_t *list_arg = goal->children[1];
-            EXPR_t *rest_arg = (nargs == 3) ? goal->children[2] : NULL;
+            AST_t *nt_expr  = goal->children[0];
+            AST_t *list_arg = goal->children[1];
+            AST_t *rest_arg = (nargs == 3) ? goal->children[2] : NULL;
 
             /* Variable NT: phrase(Var, List[, Rest]) — NT is unbound/runtime-determined.
              * Build a phrase/N term and dispatch via pj_call_goal at runtime. */
-            if (nt_expr->kind == E_VART) {
+            if (nt_expr->kind == AST_VART) {
                 int n_phrase = nargs; /* 2 or 3 */
                 /* build phrase(NT, List[, Rest]) as a compound term on stack */
                 J("    ldc %d\n", n_phrase + 2);
@@ -5268,11 +5268,11 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
             int nt_is_nil = (nt_expr->sval && strcmp(nt_expr->sval, "[]") == 0 &&
                              nt_expr->nchildren == 0);
             if (nt_is_nil) {
-                EXPR_t *rhs;
+                AST_t *rhs;
                 if (rest_arg) {
                     rhs = rest_arg;
                 } else {
-                    rhs = expr_new(E_QLIT);
+                    rhs = expr_new(AST_QLIT);
                     rhs->sval = strdup("[]");
                 }
                 /* emit: pj_unify(list_arg, rhs); ifeq omega; goto gamma */
@@ -5288,12 +5288,12 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
              * phrase([H|T], L0)       -> L0 = [H|L1], phrase(T, L1)
              * phrase([H|T], L0, L)    -> L0 = [H|L1], phrase(T, L1, L)
              * Allocate a fresh local for L1, extend var_locals so pj_emit_term
-             * can address it via an E_VART at index n_vars, then recurse. */
+             * can address it via an AST_VART at index n_vars, then recurse. */
             int nt_is_cons = (nt_expr->sval && strcmp(nt_expr->sval, ".") == 0 &&
                               nt_expr->nchildren == 2);
             if (nt_is_cons) {
-                EXPR_t *head_elem = nt_expr->children[0];
-                EXPR_t *tail_nt   = nt_expr->children[1];
+                AST_t *head_elem = nt_expr->children[0];
+                AST_t *tail_nt   = nt_expr->children[1];
                 int l1_local = *next_local; *next_local += 1;
                 J("    invokestatic %s/pj_term_var()[Ljava/lang/Object;\n", pj_classname);
                 J("    astore %d\n", l1_local);
@@ -5312,13 +5312,13 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
                 int *vl2 = malloc((n_vars + 1) * sizeof(int));
                 for (int i = 0; i < n_vars; i++) vl2[i] = var_locals ? var_locals[i] : 0;
                 vl2[n_vars] = l1_local;
-                /* build E_VART for L1 at index n_vars */
-                EXPR_t *l1_vart = expr_new(E_VART); l1_vart->ival = n_vars;
+                /* build AST_VART for L1 at index n_vars */
+                AST_t *l1_vart = expr_new(AST_VART); l1_vart->ival = n_vars;
                 /* build phrase(tail_nt, L1 [, rest_arg]) goal */
-                EXPR_t *rec = expr_new(E_FNC);
+                AST_t *rec = expr_new(AST_FNC);
                 rec->sval = strdup("phrase");
                 rec->nchildren = rest_arg ? 3 : 2;
-                rec->children = malloc(rec->nchildren * sizeof(EXPR_t *));
+                rec->children = malloc(rec->nchildren * sizeof(AST_t *));
                 rec->children[0] = tail_nt;
                 rec->children[1] = l1_vart;
                 if (rest_arg) rec->children[2] = rest_arg;
@@ -5331,16 +5331,16 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
 
             /* General NT (atom or compound, non-list): phrase(NT, List[, Rest]) -> NT/+2 call */
             {
-                EXPR_t *nil_node = NULL;
+                AST_t *nil_node = NULL;
                 if (!rest_arg) {
-                    nil_node = expr_new(E_QLIT);
+                    nil_node = expr_new(AST_QLIT);
                     nil_node->sval = strdup("[]");
                 }
-                EXPR_t *call = expr_new(E_FNC);
-                int base = (nt_expr->kind == E_FNC) ? nt_expr->nchildren : 0;
+                AST_t *call = expr_new(AST_FNC);
+                int base = (nt_expr->kind == AST_FNC) ? nt_expr->nchildren : 0;
                 call->sval = strdup(nt_expr->sval ? nt_expr->sval : "unknown");
                 call->nchildren = base + 2;
-                call->children  = malloc(call->nchildren * sizeof(EXPR_t *));
+                call->children  = malloc(call->nchildren * sizeof(AST_t *));
                 for (int i = 0; i < base; i++) call->children[i] = nt_expr->children[i];
                 call->children[base]   = list_arg;
                 call->children[base+1] = rest_arg ? rest_arg : nil_node;
@@ -5372,9 +5372,9 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
         }
     }
 
-    /* E_VART: variable used as goal — dispatch via pj_call_goal at runtime.
+    /* AST_VART: variable used as goal — dispatch via pj_call_goal at runtime.
      * This handles catch(Goal,...) and call(Var) where Goal/Var is a variable. */
-    if (goal->kind == E_VART) {
+    if (goal->kind == AST_VART) {
         int slot = goal->ival;
         if (slot >= 0 && slot < n_vars) {
             J("    aload %d\n", var_locals[slot]);
@@ -5404,7 +5404,7 @@ static void pj_emit_goal(EXPR_t *goal, const char *lbl_γ, const char *lbl_ω,
  * Deterministic goals: linear recursive chain.
  * next_local: pointer to next available JVM local slot (bumped on alloc).
  * ------------------------------------------------------------------------- */
-static void pj_emit_body(EXPR_t **goals, int ngoals, const char *lbl_γ,
+static void pj_emit_body(AST_t **goals, int ngoals, const char *lbl_γ,
                          const char *lbl_ω, const char *lbl_outer_ω,
                          int trail_local,
                          int *var_locals, int n_vars, int *next_local,
@@ -5414,9 +5414,9 @@ static void pj_emit_body(EXPR_t **goals, int ngoals, const char *lbl_γ,
                          const char *lbl_cutγ) {
     if (ngoals == 0) { JI("goto", lbl_γ); return; }
 
-    EXPR_t *g = goals[0];
+    AST_t *g = goals[0];
 
-    if (!g || g->kind == E_TRAIL_MARK || g->kind == E_TRAIL_UNWIND) {
+    if (!g || g->kind == AST_TRAIL_MARK || g->kind == AST_TRAIL_UNWIND) {
         pj_emit_body(goals + 1, ngoals - 1, lbl_γ, lbl_ω, lbl_outer_ω,
                      trail_local, var_locals, n_vars, next_local,
                      init_cs_local, sub_cs_out_local,
@@ -5424,7 +5424,7 @@ static void pj_emit_body(EXPR_t **goals, int ngoals, const char *lbl_γ,
         return;
     }
 
-    if (g->kind == E_CUT) {
+    if (g->kind == AST_CUT) {
         /* seal β: store base[nclauses] into cs_local so next dispatch → ω */
         if (cut_cs_seal >= 0 && cs_local_for_cut >= 0) {
             J("    ldc %d\n", cut_cs_seal);
@@ -5450,12 +5450,12 @@ static void pj_emit_body(EXPR_t **goals, int ngoals, const char *lbl_γ,
          * NT(List, Rest) so the retry loop below operates on the real NT. */
         if (g->sval && strcmp(g->sval, "phrase") == 0 &&
             (g->nchildren == 2 || g->nchildren == 3)) {
-            EXPR_t *nt_expr  = g->children[0];
-            EXPR_t *list_arg = g->children[1];
-            EXPR_t *rest_arg = (g->nchildren == 3) ? g->children[2] : NULL;
+            AST_t *nt_expr  = g->children[0];
+            AST_t *list_arg = g->children[1];
+            AST_t *rest_arg = (g->nchildren == 3) ? g->children[2] : NULL;
 
             /* Variable NT: dispatch at runtime via pj_call_goal */
-            if (nt_expr->kind == E_VART) {
+            if (nt_expr->kind == AST_VART) {
                 int np = g->nchildren;
                 J("    ldc %d\n", np + 2);
                 J("    anewarray java/lang/Object\n");
@@ -5487,11 +5487,11 @@ static void pj_emit_body(EXPR_t **goals, int ngoals, const char *lbl_γ,
             int nt_is_nil = (nt_expr->sval && strcmp(nt_expr->sval, "[]") == 0 &&
                              nt_expr->nchildren == 0);
             if (nt_is_nil) {
-                EXPR_t *rhs;
+                AST_t *rhs;
                 if (rest_arg) {
                     rhs = rest_arg;
                 } else {
-                    rhs = expr_new(E_QLIT);
+                    rhs = expr_new(AST_QLIT);
                     rhs->sval = strdup("[]");
                 }
                 pj_emit_term(list_arg, var_locals, n_vars);
@@ -5505,9 +5505,9 @@ static void pj_emit_body(EXPR_t **goals, int ngoals, const char *lbl_γ,
                 return;
             }
 
-            EXPR_t *nil_node = NULL;
+            AST_t *nil_node = NULL;
             if (!rest_arg) {
-                nil_node = expr_new(E_QLIT);
+                nil_node = expr_new(AST_QLIT);
                 nil_node->sval = strdup("[]");
             }
 
@@ -5516,8 +5516,8 @@ static void pj_emit_body(EXPR_t **goals, int ngoals, const char *lbl_γ,
             int nt_is_cons2 = (nt_expr->sval && strcmp(nt_expr->sval, ".") == 0 &&
                                nt_expr->nchildren == 2);
             if (nt_is_cons2) {
-                EXPR_t *hd2 = nt_expr->children[0];
-                EXPR_t *tl2 = nt_expr->children[1];
+                AST_t *hd2 = nt_expr->children[0];
+                AST_t *tl2 = nt_expr->children[1];
                 int l1_loc = *next_local; *next_local += 1;
                 J("    invokestatic %s/pj_term_var()[Ljava/lang/Object;\n", pj_classname);
                 J("    astore %d\n", l1_loc);
@@ -5533,16 +5533,16 @@ static void pj_emit_body(EXPR_t **goals, int ngoals, const char *lbl_γ,
                 int *vl2b = malloc((n_vars + 1) * sizeof(int));
                 for (int i = 0; i < n_vars; i++) vl2b[i] = var_locals ? var_locals[i] : 0;
                 vl2b[n_vars] = l1_loc;
-                EXPR_t *l1v2 = expr_new(E_VART); l1v2->ival = n_vars;
-                EXPR_t *rec2 = expr_new(E_FNC);
+                AST_t *l1v2 = expr_new(AST_VART); l1v2->ival = n_vars;
+                AST_t *rec2 = expr_new(AST_FNC);
                 rec2->sval = strdup("phrase");
                 rec2->nchildren = rest_arg ? 3 : 2;
-                rec2->children = malloc(rec2->nchildren * sizeof(EXPR_t *));
+                rec2->children = malloc(rec2->nchildren * sizeof(AST_t *));
                 rec2->children[0] = tl2; rec2->children[1] = l1v2;
                 if (rest_arg) rec2->children[2] = rest_arg;
                 /* Prepend rec2 to remaining goals */
                 int ngoals2 = ngoals; /* total remaining including current phrase */
-                EXPR_t **goals2 = malloc((ngoals2) * sizeof(EXPR_t *));
+                AST_t **goals2 = malloc((ngoals2) * sizeof(AST_t *));
                 goals2[0] = rec2;
                 for (int gi = 1; gi < ngoals2; gi++) goals2[gi] = goals[gi]; /* goals[0]=current phrase, rest follow */
                 pj_emit_body(goals2, ngoals2, lbl_γ, lbl_ω, lbl_outer_ω,
@@ -5553,11 +5553,11 @@ static void pj_emit_body(EXPR_t **goals, int ngoals, const char *lbl_γ,
                 return;
             }
 
-            EXPR_t *call = expr_new(E_FNC);
-            int base = (nt_expr->kind == E_FNC) ? nt_expr->nchildren : 0;
+            AST_t *call = expr_new(AST_FNC);
+            int base = (nt_expr->kind == AST_FNC) ? nt_expr->nchildren : 0;
             call->sval      = strdup(nt_expr->sval ? nt_expr->sval : "unknown");
             call->nchildren = base + 2;
-            call->children  = malloc(call->nchildren * sizeof(EXPR_t *));
+            call->children  = malloc(call->nchildren * sizeof(AST_t *));
             for (int i = 0; i < base; i++) call->children[i] = nt_expr->children[i];
             call->children[base]   = list_arg;
             call->children[base+1] = rest_arg ? rest_arg : nil_node;
@@ -5685,9 +5685,9 @@ static void pj_emit_body(EXPR_t **goals, int ngoals, const char *lbl_γ,
      * body; if body later fails, unwind trail and try arm[local_cs+1].
      * This handles (A ; B), (A ; B ; C), etc. without ITE.
      * ITE (Cond -> Then ; Else) is handled above in pj_emit_goal. */
-    if (g->kind == E_FNC && g->sval && strcmp(g->sval, ";") == 0 &&
+    if (g->kind == AST_FNC && g->sval && strcmp(g->sval, ";") == 0 &&
         g->nchildren >= 2 &&
-        !(g->children[0] && g->children[0]->kind == E_FNC &&
+        !(g->children[0] && g->children[0]->kind == AST_FNC &&
           g->children[0]->sval && strcmp(g->children[0]->sval, "->") == 0)) {
         int narms = g->nchildren;
         int uid = pj_fresh_label();
@@ -5732,14 +5732,14 @@ static void pj_emit_body(EXPR_t **goals, int ngoals, const char *lbl_γ,
         /* emit each arm: success falls to arm_done, failure to dj_β */
         for (int ai = 0; ai < narms; ai++) {
             J("%s:\n", arm_ok[ai]);
-            EXPR_t *arm = g->children[ai];
+            AST_t *arm = g->children[ai];
             int next_local_arm = *next_local;
             int ics_arm = next_local_arm++;
             int sco_arm = next_local_arm++;
             *next_local = next_local_arm;
             J("    iconst_0\n"); J("    istore %d\n", ics_arm);
             J("    iconst_0\n"); J("    istore %d\n", sco_arm);
-            if (arm && arm->kind == E_FNC && arm->sval && strcmp(arm->sval, ",") == 0) {
+            if (arm && arm->kind == AST_FNC && arm->sval && strcmp(arm->sval, ",") == 0) {
                 pj_emit_body(arm->children, arm->nchildren,
                              arm_done, arm_fail[ai], arm_fail[ai],
                              trail_local, var_locals, n_vars, next_local,
@@ -6971,7 +6971,7 @@ static int pj_predicate_base_nclauses(const char *fn, int arity) {
     char key[256];
     snprintf(key, sizeof key, "%s/%d", fn, arity);
     for (STMT_t *s = pj_prog->head; s; s = s->next) {
-        if (!s->subject || s->subject->kind != E_CHOICE) continue;
+        if (!s->subject || s->subject->kind != AST_CHOICE) continue;
         if (!s->subject->sval || strcmp(s->subject->sval, key) != 0) continue;
         int nc = s->subject->nchildren;
         if (nc <= 0 || nc > 64) return -1;
@@ -6990,15 +6990,15 @@ static int pj_callee_has_cut_no_last_ucall(const char *fn, int arity) {
     char key[256];
     snprintf(key, sizeof key, "%s/%d", fn, arity);
     for (STMT_t *s = pj_prog->head; s; s = s->next) {
-        if (!s->subject || s->subject->kind != E_CHOICE) continue;
+        if (!s->subject || s->subject->kind != AST_CHOICE) continue;
         if (!s->subject->sval || strcmp(s->subject->sval, key) != 0) continue;
-        EXPR_t *choice = s->subject;
+        AST_t *choice = s->subject;
         int nc = choice->nchildren;
         if (nc <= 0 || nc > 64) return 0;
         /* scan all clauses for cut */
         int any_cut = 0;
         for (int ci = 0; ci < nc && !any_cut; ci++) {
-            EXPR_t *cl = choice->children[ci];
+            AST_t *cl = choice->children[ci];
             if (!cl) continue;
             int nv = (int)cl->dval;
             int nb = (int)cl->nchildren - nv;
@@ -7008,13 +7008,13 @@ static int pj_callee_has_cut_no_last_ucall(const char *fn, int arity) {
         }
         if (!any_cut) return 0;
         /* check last clause has no user call */
-        EXPR_t *last = choice->children[nc - 1];
+        AST_t *last = choice->children[nc - 1];
         if (!last) return 1;
         int nv_last = (int)last->dval;
         int nb_last = (int)last->nchildren - nv_last;
         if (nb_last < 0) nb_last = 0;
         for (int bi = 0; bi < nb_last; bi++) {
-            EXPR_t *g = last->children[nv_last + bi];
+            AST_t *g = last->children[nv_last + bi];
             if (g && pj_is_user_call(g)) return 0;  /* last has ucall — sentinel unreliable */
         }
         return 1;
@@ -7022,8 +7022,8 @@ static int pj_callee_has_cut_no_last_ucall(const char *fn, int arity) {
     return 0;
 }
 
-static void pj_emit_choice(EXPR_t *choice) {
-    if (!choice || choice->kind != E_CHOICE) return;
+static void pj_emit_choice(AST_t *choice) {
+    if (!choice || choice->kind != AST_CHOICE) return;
     const char *functor = choice->sval ? choice->sval : "unknown";
     int nclauses = choice->nchildren;
     /* parse arity from sval "name/arity" */
@@ -7055,9 +7055,9 @@ static void pj_emit_choice(EXPR_t *choice) {
      * arity+1: trail mark (per clause) */
     int max_vars = 0;
     for (int ci = 0; ci < nclauses; ci++) {
-        EXPR_t *cl = choice->children[ci];
-        if (cl && cl->kind == E_CLAUSE) {
-            int nv = (int)cl->ival;  /* n_vars stored directly on E_CLAUSE */
+        AST_t *cl = choice->children[ci];
+        if (cl && cl->kind == AST_CLAUSE) {
+            int nv = (int)cl->ival;  /* n_vars stored directly on AST_CLAUSE */
             if (nv > max_vars) max_vars = nv;
         }
     }
@@ -7075,13 +7075,13 @@ static void pj_emit_choice(EXPR_t *choice) {
     base[0] = 0;
     /* helper: does clause ci have any body user-calls? */
     for (int ci = 0; ci < nclauses - 1; ci++) {
-        EXPR_t *ec = choice->children[ci];
+        AST_t *ec = choice->children[ci];
         int nv_args = ec ? (int)ec->dval : 0;
         int nb = ec ? (int)ec->nchildren - nv_args : 0;
         if (nb < 0) nb = 0;
         int has_ucall = 0;
         for (int bi = 0; bi < nb && !has_ucall; bi++) {
-            EXPR_t *g = ec->children[nv_args + bi];
+            AST_t *g = ec->children[nv_args + bi];
             if (g && pj_is_user_call(g)) has_ucall = 1;
         }
         base[ci + 1] = base[ci] + 1;
@@ -7096,17 +7096,17 @@ static void pj_emit_choice(EXPR_t *choice) {
     int last_has_ucall = 0;
     int any_has_cut = 0;
     {
-        EXPR_t *last = choice->children[nclauses - 1];
+        AST_t *last = choice->children[nclauses - 1];
         int nv_args_last = last ? (int)last->dval : 0;
         int nb_last = last ? (int)last->nchildren - nv_args_last : 0;
         if (nb_last < 0) nb_last = 0;
         for (int bi = 0; bi < nb_last && !last_has_ucall; bi++) {
-            EXPR_t *g = last->children[nv_args_last + bi];
+            AST_t *g = last->children[nv_args_last + bi];
             if (g && pj_is_user_call(g)) last_has_ucall = 1;
         }
         /* scan all clauses for cut presence — recursive so nested "," and ";" are checked */
         for (int ci2 = 0; ci2 < nclauses && !any_has_cut; ci2++) {
-            EXPR_t *cl = choice->children[ci2];
+            AST_t *cl = choice->children[ci2];
             if (!cl) continue;
             int nv2 = (int)cl->dval;
             int nb2 = (int)cl->nchildren - nv2;
@@ -7137,8 +7137,8 @@ static void pj_emit_choice(EXPR_t *choice) {
     int max_disj = 0;
     int max_stack = 16;
     for (int ci2 = 0; ci2 < nclauses; ci2++) {
-        EXPR_t *cl2 = choice->children[ci2];
-        if (!cl2 || cl2->kind != E_CLAUSE) continue;
+        AST_t *cl2 = choice->children[ci2];
+        if (!cl2 || cl2->kind != AST_CLAUSE) continue;
         int n_args_ci2 = (int)cl2->dval;
         int nb2 = cl2->nchildren - n_args_ci2;
         if (nb2 < 0) nb2 = 0;
@@ -7234,8 +7234,8 @@ static void pj_emit_choice(EXPR_t *choice) {
 
         /* Emit per-clause dispatch stubs in the main method */
         for (int ci = 0; ci < nclauses; ci++) {
-            EXPR_t *clause = choice->children[ci];
-            if (!clause || clause->kind != E_CLAUSE) continue;
+            AST_t *clause = choice->children[ci];
+            if (!clause || clause->kind != AST_CLAUSE) continue;
 
             /* label */
             J("p_%s_%d_clause%d:\n", safe_fn, arity, ci);
@@ -7289,8 +7289,8 @@ static void pj_emit_choice(EXPR_t *choice) {
 
     /* emit each clause block */
     for (int ci = 0; ci < nclauses; ci++) {
-        EXPR_t *clause = choice->children[ci];
-        if (!clause || clause->kind != E_CLAUSE) continue;
+        AST_t *clause = choice->children[ci];
+        if (!clause || clause->kind != AST_CLAUSE) continue;
 
         int n_vars = (int)clause->ival;
         int n_args = (int)clause->dval;
@@ -7341,15 +7341,15 @@ static void pj_emit_choice(EXPR_t *choice) {
         /* allocate variable cells.
          * Build jvm_arg_for_slot[]: for each var slot, which JVM arg local
          * provides its initial binding (-1 = none, allocate fresh var cell).
-         * A var slot is a "direct arg" when head position ai is E_VART with
+         * A var slot is a "direct arg" when head position ai is AST_VART with
          * ival==slot.  slot and ai can differ (e.g. append([H|T],L,[H|R]):
          * H=slot0, T=slot1, L=slot2, R=slot3; L is at head arg position 1
          * with slot 2 — old code failed because it tested slot==ai). */
         int *jvm_arg_for_slot = calloc(n_vars + 1, sizeof(int));
         for (int vi = 0; vi < n_vars; vi++) jvm_arg_for_slot[vi] = -1;
         for (int ai = 0; ai < n_args && ai < clause->nchildren; ai++) {
-            EXPR_t *ht = clause->children[ai];
-            if (ht && ht->kind == E_VART && ht->ival >= 0 && ht->ival < n_vars)
+            AST_t *ht = clause->children[ai];
+            if (ht && ht->kind == AST_VART && ht->ival >= 0 && ht->ival < n_vars)
                 if (jvm_arg_for_slot[ht->ival] < 0)   /* first occurrence wins */
                     jvm_arg_for_slot[ht->ival] = ai;
         }
@@ -7366,11 +7366,11 @@ static void pj_emit_choice(EXPR_t *choice) {
 
         /* head unification.
          * For compound/atom/int head terms: unify arg[ai] with the emitted term.
-         * For E_VART head terms: the var was initialized from the FIRST occurrence's
+         * For AST_VART head terms: the var was initialized from the FIRST occurrence's
          * JVM arg (via jvm_arg_for_slot above).  Subsequent occurrences of the same
          * slot need an explicit unify to enforce non-linear equality.
          * E.g. append([],L,L): L=slot0, first at ai=1 → slot loaded from arg1.
-         * At ai=2: also E_VART slot0, but var_locals[0] already holds arg1 value.
+         * At ai=2: also AST_VART slot0, but var_locals[0] already holds arg1 value.
          * We must unify arg2 with var_locals[0] to enforce arg1==arg2. */
         {
             /* seen_at_arg[slot] = first arg index that claimed this slot, or -1 */
@@ -7378,15 +7378,15 @@ static void pj_emit_choice(EXPR_t *choice) {
             for (int vi = 0; vi < n_vars; vi++) seen_at[vi] = -1;
             /* first pass: record first-claim arg for each var slot */
             for (int ai = 0; ai < n_args && ai < clause->nchildren; ai++) {
-                EXPR_t *ht = clause->children[ai];
-                if (ht && ht->kind == E_VART && ht->ival >= 0 && ht->ival < n_vars) {
+                AST_t *ht = clause->children[ai];
+                if (ht && ht->kind == AST_VART && ht->ival >= 0 && ht->ival < n_vars) {
                     if (seen_at[ht->ival] < 0) seen_at[ht->ival] = ai;
                 }
             }
             for (int ai = 0; ai < n_args && ai < clause->nchildren; ai++) {
-                EXPR_t *head_term = clause->children[ai];
+                AST_t *head_term = clause->children[ai];
                 if (!head_term) continue;
-                if (head_term->kind == E_VART) {
+                if (head_term->kind == AST_VART) {
                     int slot = head_term->ival;
                     if (slot < 0 || slot >= n_vars) continue;
                     if (seen_at[slot] == ai) continue;  /* first occurrence: no-op */
@@ -7422,8 +7422,8 @@ static void pj_emit_choice(EXPR_t *choice) {
             int *jaf = calloc(n_vars + 1, sizeof(int));
             for (int vi = 0; vi < n_vars; vi++) jaf[vi] = -1;
             for (int ai = 0; ai < n_args && ai < clause->nchildren; ai++) {
-                EXPR_t *ht = clause->children[ai];
-                if (ht && ht->kind == E_VART && ht->ival >= 0 && ht->ival < n_vars)
+                AST_t *ht = clause->children[ai];
+                if (ht && ht->kind == AST_VART && ht->ival >= 0 && ht->ival < n_vars)
                     jaf[ht->ival] = ai;
             }
             for (int vi = 0; vi < n_vars; vi++) {
@@ -7439,9 +7439,9 @@ static void pj_emit_choice(EXPR_t *choice) {
         }
         /* re-run head unification */
         for (int ai = 0; ai < n_args && ai < clause->nchildren; ai++) {
-            EXPR_t *head_term = clause->children[ai];
+            AST_t *head_term = clause->children[ai];
             if (!head_term) continue;
-            if (head_term->kind == E_VART) continue;
+            if (head_term->kind == AST_VART) continue;
             J("    aload %d\n", ai);
             pj_emit_term(head_term, var_locals, n_vars);
             J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
@@ -7453,7 +7453,7 @@ static void pj_emit_choice(EXPR_t *choice) {
         J("p_%s_%d_beta_%d:\n", safe_fn, arity, ci);
         {
             int nbody = clause->nchildren - n_args;
-            EXPR_t **body_goals = clause->children + n_args;
+            AST_t **body_goals = clause->children + n_args;
             char γ_lbl[128], α_retry_lbl[128];
             snprintf(γ_lbl, sizeof γ_lbl, "p_%s_%d_gamma_%d", safe_fn, arity, ci);
             snprintf(α_retry_lbl, sizeof α_retry_lbl, "p_%s_%d_alpha_%d", safe_fn, arity, ci);
@@ -7667,8 +7667,8 @@ static void pj_emit_choice(EXPR_t *choice) {
     /* PJ-81: emit per-clause sub-methods for split predicates */
     if (do_split) {
         for (int ci = 0; ci < nclauses; ci++) {
-            EXPR_t *clause = choice->children[ci];
-            if (!clause || clause->kind != E_CLAUSE) continue;
+            AST_t *clause = choice->children[ci];
+            if (!clause || clause->kind != AST_CLAUSE) continue;
 
             int n_vars = (int)clause->ival;
             int n_args = (int)clause->dval;
@@ -7733,8 +7733,8 @@ static void pj_emit_choice(EXPR_t *choice) {
                 int *jaf = calloc(n_vars + 1, sizeof(int));
                 for (int vi = 0; vi < n_vars; vi++) jaf[vi] = -1;
                 for (int ai2 = 0; ai2 < n_args && ai2 < clause->nchildren; ai2++) {
-                    EXPR_t *ht = clause->children[ai2];
-                    if (ht && ht->kind == E_VART && ht->ival >= 0 && ht->ival < n_vars)
+                    AST_t *ht = clause->children[ai2];
+                    if (ht && ht->kind == AST_VART && ht->ival >= 0 && ht->ival < n_vars)
                         if (jaf[ht->ival] < 0) jaf[ht->ival] = ai2;
                 }
                 for (int vi = 0; vi < n_vars; vi++) {
@@ -7756,14 +7756,14 @@ static void pj_emit_choice(EXPR_t *choice) {
                 int *seen_at = calloc(n_vars + 1, sizeof(int));
                 for (int vi = 0; vi < n_vars; vi++) seen_at[vi] = -1;
                 for (int ai2 = 0; ai2 < n_args && ai2 < clause->nchildren; ai2++) {
-                    EXPR_t *ht = clause->children[ai2];
-                    if (ht && ht->kind == E_VART && ht->ival >= 0 && ht->ival < n_vars)
+                    AST_t *ht = clause->children[ai2];
+                    if (ht && ht->kind == AST_VART && ht->ival >= 0 && ht->ival < n_vars)
                         if (seen_at[ht->ival] < 0) seen_at[ht->ival] = ai2;
                 }
                 for (int ai2 = 0; ai2 < n_args && ai2 < clause->nchildren; ai2++) {
-                    EXPR_t *ht = clause->children[ai2];
+                    AST_t *ht = clause->children[ai2];
                     if (!ht) continue;
-                    if (ht->kind == E_VART) {
+                    if (ht->kind == AST_VART) {
                         int slot = ht->ival;
                         if (slot < 0 || slot >= n_vars) continue;
                         if (seen_at[slot] == ai2) continue;
@@ -7796,8 +7796,8 @@ static void pj_emit_choice(EXPR_t *choice) {
                 int *jaf = calloc(n_vars + 1, sizeof(int));
                 for (int vi = 0; vi < n_vars; vi++) jaf[vi] = -1;
                 for (int ai2 = 0; ai2 < n_args && ai2 < clause->nchildren; ai2++) {
-                    EXPR_t *ht = clause->children[ai2];
-                    if (ht && ht->kind == E_VART && ht->ival >= 0 && ht->ival < n_vars)
+                    AST_t *ht = clause->children[ai2];
+                    if (ht && ht->kind == AST_VART && ht->ival >= 0 && ht->ival < n_vars)
                         jaf[ht->ival] = ai2;
                 }
                 for (int vi = 0; vi < n_vars; vi++) {
@@ -7807,8 +7807,8 @@ static void pj_emit_choice(EXPR_t *choice) {
                 free(jaf);
             }
             for (int ai2 = 0; ai2 < n_args && ai2 < clause->nchildren; ai2++) {
-                EXPR_t *ht = clause->children[ai2];
-                if (!ht || ht->kind == E_VART) continue;
+                AST_t *ht = clause->children[ai2];
+                if (!ht || ht->kind == AST_VART) continue;
                 J("    aload %d\n", ai2);
                 pj_emit_term(ht, var_locals, n_vars);
                 J("    invokestatic %s/pj_unify(Ljava/lang/Object;Ljava/lang/Object;)Z\n", pj_classname);
@@ -7819,7 +7819,7 @@ static void pj_emit_choice(EXPR_t *choice) {
             J("p_%s_%d__c%d_beta:\n", safe_fn, arity, ci);
             {
                 int nbody = clause->nchildren - n_args;
-                EXPR_t **body_goals = clause->children + n_args;
+                AST_t **body_goals = clause->children + n_args;
                 char γ_lbl[128], cutγ_lbl[128], bodyfail_lbl[128];
                 snprintf(γ_lbl,        sizeof γ_lbl,        "p_%s_%d__c%d_gamma",    safe_fn, arity, ci);
                 snprintf(cutγ_lbl,     sizeof cutγ_lbl,     "p_%s_%d__c%d_cutgamma", safe_fn, arity, ci);
@@ -8025,15 +8025,15 @@ static const char pj_plunit_shim_src[] =
 static int pj_linker_has_plunit(Program *prog) {
     for (STMT_t *s = prog->head; s; s = s->next) {
         if (!s->subject) continue;
-        EXPR_t *g = s->subject;
-        if (g->kind == E_CHOICE) continue;
-        if (g->kind != E_FNC || !g->sval) continue;
+        AST_t *g = s->subject;
+        if (g->kind == AST_CHOICE) continue;
+        if (g->kind != AST_FNC || !g->sval) continue;
         if (strcmp(g->sval, "use_module") != 0 || g->nchildren != 1) continue;
         /* use_module(library(plunit)) — child is library(plunit) */
-        EXPR_t *arg = g->children[0];
-        if (!arg || arg->kind != E_FNC || !arg->sval) continue;
+        AST_t *arg = g->children[0];
+        if (!arg || arg->kind != AST_FNC || !arg->sval) continue;
         if (strcmp(arg->sval, "library") != 0 || arg->nchildren != 1) continue;
-        EXPR_t *lib = arg->children[0];
+        AST_t *lib = arg->children[0];
         if (!lib || !lib->sval) continue;
         if (strcmp(lib->sval, "plunit") == 0) return 1;
     }
@@ -8050,16 +8050,16 @@ static void pj_linker_emit_plunit_shim(void) {
     if (!pl) { fprintf(stderr, "plunit linker: parse failed\n"); return; }
     Program *shim = prolog_lower(pl);
     if (!shim) { fprintf(stderr, "plunit linker: lower failed\n"); return; }
-    /* Emit each E_CHOICE from the shim, but skip predicates already defined
+    /* Emit each AST_CHOICE from the shim, but skip predicates already defined
      * in the user program to avoid duplicate method errors. */
     for (STMT_t *ss = shim->head; ss; ss = ss->next) {
-        if (!ss->subject || ss->subject->kind != E_CHOICE) continue;
+        if (!ss->subject || ss->subject->kind != AST_CHOICE) continue;
         const char *shim_key = ss->subject->sval; /* "name/arity" */
         if (!shim_key) continue;
         /* Check if user already defines this predicate */
         int user_defines = 0;
         for (STMT_t *us = pj_prog->head; us; us = us->next) {
-            if (!us->subject || us->subject->kind != E_CHOICE) continue;
+            if (!us->subject || us->subject->kind != AST_CHOICE) continue;
             if (us->subject->sval && strcmp(us->subject->sval, shim_key) == 0) {
                 user_defines = 1; break;
             }
@@ -8247,8 +8247,8 @@ void pj_linker_prescan(PlProgram *pl_prog) {
 #define PJ_LINKER_MAX_TESTS 512
 typedef struct {
     char suite[64]; char name[64]; char bridge[128];
-    int  arity; EXPR_t *opts_expr;
-    EXPR_t *clause_expr;  /* full E_CLAUSE node — needed for true(Expr) var-sharing fix */
+    int  arity; AST_t *opts_expr;
+    AST_t *clause_expr;  /* full AST_CLAUSE node — needed for true(Expr) var-sharing fix */
 } PjTestInfo;
 static PjTestInfo pj_linker_tests[PJ_LINKER_MAX_TESTS];
 static int        pj_linker_ntest = 0;
@@ -8267,8 +8267,8 @@ static void pj_linker_emit_bridge(const char *bridge_fn, const char *test_name, 
     /* arity and opts_expr are picked up from the PjTestInfo array by the caller;
      * we need them here — find the matching entry */
     int arity = 1;
-    EXPR_t *opts_expr   = NULL;
-    EXPR_t *clause_expr = NULL;
+    AST_t *opts_expr   = NULL;
+    AST_t *clause_expr = NULL;
     for (int i = 0; i < pj_linker_ntest; i++) {
         if (strcmp(pj_linker_tests[i].bridge, bridge_fn) == 0) {
             arity       = pj_linker_tests[i].arity;
@@ -8281,7 +8281,7 @@ static void pj_linker_emit_bridge(const char *bridge_fn, const char *test_name, 
     /* Detect true(Expr) opts — may be bare true(E), a bare expression, or inside a list.
      * Walk the list to find the first true(Expr) or bare-expression element. */
     int has_true_expr = 0;
-    EXPR_t *true_expr_arg = NULL;
+    AST_t *true_expr_arg = NULL;
     if (arity == 2 && opts_expr) {
         /* bare true(Expr) */
         if (opts_expr->sval && strcmp(opts_expr->sval, "true") == 0
@@ -8306,10 +8306,10 @@ static void pj_linker_emit_bridge(const char *bridge_fn, const char *test_name, 
             true_expr_arg = opts_expr;
         } else {
             /* walk list .(Head, Tail): look for true(E) or bare expr as head */
-            EXPR_t *node = opts_expr;
+            AST_t *node = opts_expr;
             while (node && node->sval && strcmp(node->sval, ".") == 0
                    && node->nchildren >= 2) {
-                EXPR_t *head = node->children[0];
+                AST_t *head = node->children[0];
                 if (head && head->sval && strcmp(head->sval, "true") == 0
                     && head->nchildren == 1) {
                     has_true_expr = 1;
@@ -8383,7 +8383,7 @@ static void pj_linker_emit_bridge(const char *bridge_fn, const char *test_name, 
         /* emit body goals (children[n_args..nchildren-1]) */
         int nbody = (int)clause_expr->nchildren - n_args;
         if (nbody > 0) {
-            EXPR_t **body_goals = clause_expr->children + n_args;
+            AST_t **body_goals = clause_expr->children + n_args;
             char lbl_body_ok[128], lbl_body_fail[128];
             snprintf(lbl_body_ok,   sizeof lbl_body_ok,   "p_%s_0_body_ok",   bridge_fn);
             snprintf(lbl_body_fail, sizeof lbl_body_fail, "p_%s_0_omega_fail", bridge_fn);
@@ -8481,13 +8481,13 @@ static void pj_linker_emit_bridge(const char *bridge_fn, const char *test_name, 
  * pj_linker_scan — walk program collecting suite/test info.
  * Must be called before pj_emit_main and before bridge emission.
  *
- * NOTE: prolog_lower() batches all E_CHOICE nodes separately from directives.
+ * NOTE: prolog_lower() batches all AST_CHOICE nodes separately from directives.
  * They are NOT interleaved in source order.  So we cannot track
- * begin_tests/end_tests windows while walking E_CHOICE nodes.
+ * begin_tests/end_tests windows while walking AST_CHOICE nodes.
  *
  * Strategy:
  *   Pass 1 — collect suite names from begin_tests directives.
- *   Pass 2 — collect test/1 and test/2 E_CHOICE nodes; assign all to
+ *   Pass 2 — collect test/1 and test/2 AST_CHOICE nodes; assign all to
  *             suite[0].  Correct for the universal case of one suite per file.
  * ------------------------------------------------------------------------- */
 static void pj_linker_scan(Program *prog) {
@@ -8497,11 +8497,11 @@ static void pj_linker_scan(Program *prog) {
     /* Pass 1: collect suite names from begin_tests directives */
     for (STMT_t *s = prog->head; s; s = s->next) {
         if (!s->subject) continue;
-        EXPR_t *g = s->subject;
-        if (g->kind == E_CHOICE) continue;
-        if (g->kind != E_FNC || !g->sval) continue;
+        AST_t *g = s->subject;
+        if (g->kind == AST_CHOICE) continue;
+        if (g->kind != AST_FNC || !g->sval) continue;
         if (strcmp(g->sval, "begin_tests") != 0 || g->nchildren < 1) continue;
-        EXPR_t *suite_arg = g->children[0];
+        AST_t *suite_arg = g->children[0];
         if (!suite_arg || !suite_arg->sval) continue;
         const char *sname = suite_arg->sval;
         int found = 0;
@@ -8519,8 +8519,8 @@ static void pj_linker_scan(Program *prog) {
      * Falls back to suite[0] if prescan map is empty (single-suite files). */
     int cnt1 = 0, cnt2 = 0;  /* per-key occurrence counters, match prescan order */
     for (STMT_t *s = prog->head; s; s = s->next) {
-        if (!s->subject || s->subject->kind != E_CHOICE) continue;
-        EXPR_t *g = s->subject;
+        if (!s->subject || s->subject->kind != AST_CHOICE) continue;
+        AST_t *g = s->subject;
         const char *key = g->sval;
         if (!key) continue;
         int is_test1 = (strcmp(key, "test/1") == 0);
@@ -8528,11 +8528,11 @@ static void pj_linker_scan(Program *prog) {
         if (!is_test1 && !is_test2) continue;
 
         for (int ci = 0; ci < g->nchildren && pj_linker_ntest < PJ_LINKER_MAX_TESTS; ci++) {
-            EXPR_t *cl = g->children[ci];
-            if (!cl || cl->kind != E_CLAUSE) continue;
+            AST_t *cl = g->children[ci];
+            if (!cl || cl->kind != AST_CLAUSE) continue;
             int n_args = (int)cl->dval;
             if (n_args < 1) continue;
-            EXPR_t *name_arg = cl->children[0];
+            AST_t *name_arg = cl->children[0];
             if (!name_arg || !name_arg->sval) continue;
 
             /* Determine suite: consult prescan map by key+occurrence index */
@@ -8648,7 +8648,7 @@ static void pj_linker_emit_main_assertz(void) {
             J("    dup\n");
             J("    bipush 4\n");
             if (ti->opts_expr) {
-                EXPR_t *oe = ti->opts_expr;
+                AST_t *oe = ti->opts_expr;
                 /* Check for true(Expr) — bare or inside list */
                 int is_true_expr = 0;
                 if (oe->sval && strcmp(oe->sval,"true")==0 && oe->nchildren==1) {
@@ -8663,9 +8663,9 @@ static void pj_linker_emit_main_assertz(void) {
                            oe->nchildren > 0) {
                     is_true_expr = 1; /* bare expression like X==y */
                 } else if (oe->sval && strcmp(oe->sval,".")==0 && oe->nchildren>=2) {
-                    EXPR_t *nd = oe;
+                    AST_t *nd = oe;
                     while (nd && nd->sval && strcmp(nd->sval,".")==0 && nd->nchildren>=2) {
-                        EXPR_t *hd = nd->children[0];
+                        AST_t *hd = nd->children[0];
                         if (hd && hd->sval && strcmp(hd->sval,"true")==0 && hd->nchildren==1)
                             { is_true_expr=1; break; }
                         /* bare expression inside list */
@@ -8728,12 +8728,12 @@ static void pj_emit_main(Program *prog) {
     pj_linker_emit_main_assertz();
 
     /* Bug 2 fix: execute :- assertz/asserta directives before calling main/0.
-     * Directives are STMT_t nodes whose subject is NOT E_CHOICE. */
+     * Directives are STMT_t nodes whose subject is NOT AST_CHOICE. */
     for (STMT_t *s = prog->head; s; s = s->next) {
         if (!s->subject) continue;
-        if (s->subject->kind == E_CHOICE) continue;
-        EXPR_t *g = s->subject;
-        if (g->kind != E_FNC || !g->sval) continue;
+        if (s->subject->kind == AST_CHOICE) continue;
+        AST_t *g = s->subject;
+        if (g->kind != AST_FNC || !g->sval) continue;
         /* Skip meta-directives that have no runtime effect */
         if (strcmp(g->sval, "dynamic") == 0 ||
             strcmp(g->sval, "discontiguous") == 0 ||
@@ -8780,7 +8780,7 @@ static void pj_emit_main(Program *prog) {
      * Plunit files use :- run_tests / :- halt directives and have no main/0. */
     int has_main0 = 0;
     for (STMT_t *s2 = prog->head; s2; s2 = s2->next) {
-        if (!s2->subject || s2->subject->kind != E_CHOICE) continue;
+        if (!s2->subject || s2->subject->kind != AST_CHOICE) continue;
         if (s2->subject->sval && strcmp(s2->subject->sval, "main/0") == 0) {
             has_main0 = 1; break;
         }
@@ -8798,9 +8798,9 @@ static void pj_emit_main(Program *prog) {
         /* Check whether :- run_tests was already emitted as a directive */
         int has_run_tests_dir = 0;
         for (STMT_t *s2 = prog->head; s2; s2 = s2->next) {
-            if (!s2->subject || s2->subject->kind == E_CHOICE) continue;
-            EXPR_t *g = s2->subject;
-            if (g->kind == E_FNC && g->sval &&
+            if (!s2->subject || s2->subject->kind == AST_CHOICE) continue;
+            AST_t *g = s2->subject;
+            if (g->kind == AST_FNC && g->sval &&
                 (strcmp(g->sval, "run_tests") == 0)) {
                 has_run_tests_dir = 1; break;
             }
@@ -8841,7 +8841,7 @@ void prolog_emit_jvm(Program *prog, FILE *out, const char *filename) {
         int defines_forall = 0;
         for (STMT_t *s = prog->head; s; s = s->next) {
             if (!s->subject) continue;
-            if (s->subject->kind == E_CHOICE && s->subject->sval &&
+            if (s->subject->kind == AST_CHOICE && s->subject->sval &&
                 strcmp(s->subject->sval, "forall") == 0)
                 defines_forall = 1;
         }
@@ -8854,7 +8854,7 @@ void prolog_emit_jvm(Program *prog, FILE *out, const char *filename) {
         int defines_between = 0;
         for (STMT_t *s = prog->head; s; s = s->next) {
             if (!s->subject) continue;
-            if (s->subject->kind == E_CHOICE && s->subject->sval &&
+            if (s->subject->kind == AST_CHOICE && s->subject->sval &&
                 strcmp(s->subject->sval, "between") == 0) {
                 defines_between = 1;
             }
@@ -8868,7 +8868,7 @@ void prolog_emit_jvm(Program *prog, FILE *out, const char *filename) {
         int defines_findall = 0;
         for (STMT_t *s = prog->head; s; s = s->next) {
             if (!s->subject) continue;
-            if (s->subject->kind == E_CHOICE && s->subject->sval &&
+            if (s->subject->kind == AST_CHOICE && s->subject->sval &&
                 strcmp(s->subject->sval, "findall") == 0)
                 defines_findall = 1;
         }
@@ -8881,7 +8881,7 @@ void prolog_emit_jvm(Program *prog, FILE *out, const char *filename) {
         int defines_agg = 0;
         for (STMT_t *s = prog->head; s; s = s->next) {
             if (!s->subject) continue;
-            if (s->subject->kind == E_CHOICE && s->subject->sval &&
+            if (s->subject->kind == AST_CHOICE && s->subject->sval &&
                 strcmp(s->subject->sval, "aggregate_all") == 0)
                 defines_agg = 1;
         }
@@ -8894,7 +8894,7 @@ void prolog_emit_jvm(Program *prog, FILE *out, const char *filename) {
         int defines_reverse = 0;
         for (STMT_t *s = prog->head; s; s = s->next) {
             if (!s->subject) continue;
-            if (s->subject->kind == E_CHOICE && s->subject->sval &&
+            if (s->subject->kind == AST_CHOICE && s->subject->sval &&
                 strcmp(s->subject->sval, "reverse") == 0)
                 defines_reverse = 1;
         }
@@ -8919,7 +8919,7 @@ void prolog_emit_jvm(Program *prog, FILE *out, const char *filename) {
     /* emit each predicate */
     for (STMT_t *s = prog->head; s; s = s->next) {
         if (!s->subject) continue;
-        if (s->subject->kind == E_CHOICE)
+        if (s->subject->kind == AST_CHOICE)
             pj_emit_choice(s->subject);
     }
 
@@ -8931,27 +8931,27 @@ void prolog_emit_jvm(Program *prog, FILE *out, const char *filename) {
 
     /* Bug 1 fix: emit stub methods for pure-dynamic predicates.
      * A predicate is "pure-dynamic" if it appears as assertz/asserta arg
-     * in a directive but has no E_CHOICE in the program. */
+     * in a directive but has no AST_CHOICE in the program. */
     {
         /* Collect all statically-defined functor/arity keys */
         /* Simple approach: for each directive assertz(foo(...)), check if
-         * foo/arity has an E_CHOICE; if not, emit a stub. */
+         * foo/arity has an AST_CHOICE; if not, emit a stub. */
         for (STMT_t *s = prog->head; s; s = s->next) {
-            if (!s->subject || s->subject->kind == E_CHOICE) continue;
-            EXPR_t *g = s->subject;
-            if (!g || g->kind != E_FNC || !g->sval) continue;
+            if (!s->subject || s->subject->kind == AST_CHOICE) continue;
+            AST_t *g = s->subject;
+            if (!g || g->kind != AST_FNC || !g->sval) continue;
             if ((strcmp(g->sval, "assertz") != 0 && strcmp(g->sval, "asserta") != 0)
                 || g->nchildren != 1) continue;
-            EXPR_t *term = g->children[0];
-            if (!term || term->kind != E_FNC || !term->sval) continue;
+            AST_t *term = g->children[0];
+            if (!term || term->kind != AST_FNC || !term->sval) continue;
             /* get functor and arity */
             const char *raw = term->sval;
             int dyn_arity = term->nchildren;
             /* check if static choice exists */
             int has_static = 0;
             for (STMT_t *s2 = prog->head; s2; s2 = s2->next) {
-                if (!s2->subject || s2->subject->kind != E_CHOICE) continue;
-                EXPR_t *ch = s2->subject;
+                if (!s2->subject || s2->subject->kind != AST_CHOICE) continue;
+                AST_t *ch = s2->subject;
                 if (!ch->sval) continue;
                 /* ch->sval is "name/arity" */
                 const char *sl2 = strrchr(ch->sval, '/');
@@ -8968,13 +8968,13 @@ void prolog_emit_jvm(Program *prog, FILE *out, const char *filename) {
              * of earlier directives */
             int already = 0;
             for (STMT_t *s3 = prog->head; s3 != s; s3 = s3->next) {
-                if (!s3->subject || s3->subject->kind == E_CHOICE) continue;
-                EXPR_t *g3 = s3->subject;
-                if (!g3 || g3->kind != E_FNC || !g3->sval) continue;
+                if (!s3->subject || s3->subject->kind == AST_CHOICE) continue;
+                AST_t *g3 = s3->subject;
+                if (!g3 || g3->kind != AST_FNC || !g3->sval) continue;
                 if ((strcmp(g3->sval,"assertz")!=0 && strcmp(g3->sval,"asserta")!=0)
                     || g3->nchildren!=1) continue;
-                EXPR_t *t3 = g3->children[0];
-                if (t3 && t3->kind == E_FNC && t3->sval &&
+                AST_t *t3 = g3->children[0];
+                if (t3 && t3->kind == AST_FNC && t3->sval &&
                     strcmp(t3->sval, raw) == 0 && t3->nchildren == dyn_arity) {
                     already = 1; break;
                 }

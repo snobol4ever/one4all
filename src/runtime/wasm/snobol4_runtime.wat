@@ -6,7 +6,7 @@
 ;;   [0  .. 32767]  output buffer  — written by sno_output_*; main() returns fill length
 ;;   [32768 .. 65535]  string heap — sno_str_alloc() bumps $str_ptr upward
 ;;   [65536 .. 131071]  program data segment — static string literals (STR_DATA_BASE=65536)
-;;   [131072 .. 196607]  Icon gen state — E_TO/E_TO_BY generator slots (ICN_GEN_STATE_BASE=0x20000)
+;;   [131072 .. 196607]  Icon gen state — AST_TO/AST_TO_BY generator slots (ICN_GEN_STATE_BASE=0x20000)
 ;;   [196608 .. 262143]  Icon activation frame stack (ICON_FRAME_STACK_BASE=0x30004)
 ;;   [262144 .. 327679]  Array/Table/DATA heap (ARR_HEAP_BASE=0x40000, 64KB)
 ;;

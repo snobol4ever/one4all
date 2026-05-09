@@ -167,7 +167,7 @@
     ldstr      "1"
     call       string [snobol4lib]Snobol4Lib::sno_add(string, string)
     stsfld     string _10_convert::kw_stno
-    // unhandled E_FNC stub
+    // unhandled AST_FNC stub
     ldstr      ""
     ldstr      "12"
     call       int32 [snobol4lib]Snobol4Lib::sno_differ(string, string)
@@ -198,7 +198,7 @@
     ldstr      "1"
     call       string [snobol4lib]Snobol4Lib::sno_add(string, string)
     stsfld     string _10_convert::kw_stno
-    // unhandled E_FNC stub
+    // unhandled AST_FNC stub
     ldstr      ""
     ldstr      "2"
     call       int32 [snobol4lib]Snobol4Lib::sno_differ(string, string)
@@ -229,7 +229,7 @@
     ldstr      "1"
     call       string [snobol4lib]Snobol4Lib::sno_add(string, string)
     stsfld     string _10_convert::kw_stno
-    // unhandled E_FNC stub
+    // unhandled AST_FNC stub
     ldstr      ""
     ldstr      "2."
     call       int32 [snobol4lib]Snobol4Lib::sno_differ(string, string)
@@ -260,7 +260,7 @@
     ldstr      "1"
     call       string [snobol4lib]Snobol4Lib::sno_add(string, string)
     stsfld     string _10_convert::kw_stno
-    // unhandled E_FNC stub
+    // unhandled AST_FNC stub
     ldstr      ""
     ldstr      "0.2"
     call       int32 [snobol4lib]Snobol4Lib::sno_differ(string, string)

@@ -4,8 +4,8 @@
  * See coro_stmt.h for the contract.
  *
  * RS-21 (2026-05-03): native dispatch for Icon statement-level kinds.
- *   E_WHILE, E_UNTIL, E_REPEAT, E_IF, E_SEQ, E_SEQ_EXPR, E_LOOP_NEXT,
- *   E_LOOP_BREAK, E_RETURN, E_PROC_FAIL, E_SUSPEND.
+ *   AST_WHILE, AST_UNTIL, AST_REPEAT, AST_IF, AST_SEQ, AST_SEQ_EXPR, AST_LOOP_NEXT,
+ *   AST_LOOP_BREAK, AST_RETURN, AST_PROC_FAIL, AST_SUSPEND.
  *
  * These kinds previously fell through to `interp_eval` (the IR-mode tree
  * walker).  RS-21 lifts each one into an explicit case here, with internal
@@ -13,9 +13,9 @@
  * statement-context body recursions going back through `bb_exec_stmt`.
  *
  * After RS-21, the only kinds reaching the trailing fallthrough should be
- * E_FNC (Icon proc/builtin call as statement), E_ASSIGN (slot store), and
+ * AST_FNC (Icon proc/builtin call as statement), AST_ASSIGN (slot store), and
  * a handful of expression-kind escapees that mode-1 was happy to swallow
- * with its DESCR_t-discarding contract.  RS-22 absorbs E_FNC + E_ASSIGN.
+ * with its DESCR_t-discarding contract.  RS-22 absorbs AST_FNC + AST_ASSIGN.
  *
  * The 13 statement-context call sites in coro_runtime.c (proc bodies,
  * loop bodies, do-clauses, every-bodies, do-clause re-entry after suspend)
@@ -50,7 +50,7 @@
  *  (b) statement-context body children recurse via `bb_exec_stmt`, again
  *      avoiding interp_eval.
  *----------------------------------------------------------------------------------------------------------------------------*/
-void bb_exec_stmt(EXPR_t *e)
+void bb_exec_stmt(AST_t *e)
 {
     if (!e) return;
 
@@ -59,23 +59,23 @@ void bb_exec_stmt(EXPR_t *e)
     /*========================================================================
      * Trivial control-flow markers — set FRAME state, no children.
      *======================================================================*/
-    case E_LOOP_NEXT: {
+    case AST_LOOP_NEXT: {
         /* `next` — abort body, ask enclosing loop to advance. */
         FRAME.loop_next = 1;
         return;
     }
-    case E_LOOP_BREAK: {
+    case AST_LOOP_BREAK: {
         /* `break` — exit enclosing loop. */
         FRAME.loop_break = 1;
         return;
     }
-    case E_PROC_FAIL: {
+    case AST_PROC_FAIL: {
         /* `fail` — procedure-level fail return. */
         FRAME.returning  = 1;
         FRAME.return_val = FAILDESCR;
         return;
     }
-    case E_RETURN: {
+    case AST_RETURN: {
         DESCR_t rv = (e->nchildren > 0) ? bb_eval_value(e->children[0]) : NULVCL;
         FRAME.returning  = 1;
         FRAME.return_val = rv;
@@ -83,9 +83,9 @@ void bb_exec_stmt(EXPR_t *e)
     }
 
     /*========================================================================
-     * E_SUSPEND — yield a value to coro_drive_fnc loop.
+     * AST_SUSPEND — yield a value to coro_drive_fnc loop.
      *======================================================================*/
-    case E_SUSPEND: {
+    case AST_SUSPEND: {
         DESCR_t val = (e->nchildren > 0) ? bb_eval_value(e->children[0]) : NULVCL;
         if (!IS_FAIL_fn(val)) {
             FRAME.suspending  = 1;
@@ -96,14 +96,14 @@ void bb_exec_stmt(EXPR_t *e)
     }
 
     /*========================================================================
-     * Conditional — E_IF.
+     * Conditional — AST_IF.
      * Goal-directed test (IC-8): if the condition is suspendable, pump it
      * via coro_eval; first non-fail value fires then-branch, exhaustion fires
      * else-branch.  Otherwise classic single-shot evaluation.
      *======================================================================*/
-    case E_IF: {
+    case AST_IF: {
         if (e->nchildren < 1) return;
-        EXPR_t *test = e->children[0];
+        AST_t *test = e->children[0];
         if (is_suspendable(test)) {
             bb_node_t box = coro_eval(test);
             DESCR_t v = box.fn(box.ζ, α);
@@ -124,12 +124,12 @@ void bb_exec_stmt(EXPR_t *e)
     }
 
     /*========================================================================
-     * Loops — E_WHILE, E_UNTIL, E_REPEAT.
+     * Loops — AST_WHILE, AST_UNTIL, AST_REPEAT.
      * Each saves/restores loop_break and loop_next around the loop, exits
      * on returning / loop_break / suspending, and re-runs the body via
      * bb_exec_stmt.
      *======================================================================*/
-    case E_WHILE: {
+    case AST_WHILE: {
         int saved_brk = FRAME.loop_break; FRAME.loop_break = 0;
         int saved_nxt = FRAME.loop_next;  FRAME.loop_next  = 0;
         while (!FRAME.returning && !FRAME.loop_break && !FRAME.suspending) {
@@ -143,7 +143,7 @@ void bb_exec_stmt(EXPR_t *e)
         FRAME.loop_next  = saved_nxt;
         return;
     }
-    case E_UNTIL: {
+    case AST_UNTIL: {
         int saved_brk = FRAME.loop_break; FRAME.loop_break = 0;
         int saved_nxt = FRAME.loop_next;  FRAME.loop_next  = 0;
         while (!FRAME.returning && !FRAME.loop_break && !FRAME.suspending) {
@@ -157,7 +157,7 @@ void bb_exec_stmt(EXPR_t *e)
         FRAME.loop_next  = saved_nxt;
         return;
     }
-    case E_REPEAT: {
+    case AST_REPEAT: {
         int saved_brk = FRAME.loop_break; FRAME.loop_break = 0;
         int saved_nxt = FRAME.loop_next;  FRAME.loop_next  = 0;
         while (!FRAME.returning && !FRAME.loop_break && !FRAME.suspending) {
@@ -173,15 +173,15 @@ void bb_exec_stmt(EXPR_t *e)
     }
 
     /*========================================================================
-     * Sequences — E_SEQ, E_SEQ_EXPR.
+     * Sequences — AST_SEQ, AST_SEQ_EXPR.
      * Statement-context: discard each child's value.  Honour returning /
      * loop_break / loop_next as exit conditions.
-     * E_SEQ honours the IC-9 "& conjunction" semantics (fail on any
+     * AST_SEQ honours the IC-9 "& conjunction" semantics (fail on any
      * sub-failure), but in statement context the caller doesn't observe the
      * fail — the child stmt's side effects already happened.
      *======================================================================*/
-    case E_SEQ:
-    case E_SEQ_EXPR: {
+    case AST_SEQ:
+    case AST_SEQ_EXPR: {
         for (int i = 0; i < e->nchildren; i++) {
             bb_exec_stmt(e->children[i]);
             if (FRAME.returning || FRAME.loop_break || FRAME.loop_next ||
@@ -193,12 +193,12 @@ void bb_exec_stmt(EXPR_t *e)
     /*========================================================================
      * RS-23a-route: high-volume expression kinds in statement context.
      * Contract: evaluate for side effects, discard the result.
-     * bb_eval_value already handles E_FNC (including raku_try_call_builtin
-     * at the top, via RS-23a-raku), E_ASSIGN, and E_AUGOP natively.
+     * bb_eval_value already handles AST_FNC (including raku_try_call_builtin
+     * at the top, via RS-23a-raku), AST_ASSIGN, and AST_AUGOP natively.
      *======================================================================*/
-    case E_FNC:
-    case E_ASSIGN:
-    case E_AUGOP: {
+    case AST_FNC:
+    case AST_ASSIGN:
+    case AST_AUGOP: {
         (void)bb_eval_value(e);
         return;
     }
@@ -208,52 +208,52 @@ void bb_exec_stmt(EXPR_t *e)
      * Icon/Prolog procedure bodies (caller=coro_call) and recursive
      * statement-context evaluation (caller=bb_exec_stmt).
      *
-     *   E_ILIT, E_NUL — pure literals, zero side effects → no-op.
-     *   E_NOT         — evaluates child for side effects, discards boolean.
-     *   E_ALTERNATE   — generator combinator; first-success branch runs its
+     *   AST_ILIT, AST_NUL — pure literals, zero side effects → no-op.
+     *   AST_NOT         — evaluates child for side effects, discards boolean.
+     *   AST_ALTERNATE   — generator combinator; first-success branch runs its
      *                   side effects via bb_eval_value, result discarded.
-     *   E_SCAN        — `subj ? body`; bb_eval_value handles scan-stack
+     *   AST_SCAN        — `subj ? body`; bb_eval_value handles scan-stack
      *                   push/pop and body evaluation.
-     *   E_CASE        — bb_eval_value evaluates topic, dispatches, runs
+     *   AST_CASE        — bb_eval_value evaluates topic, dispatches, runs
      *                   matching body for side effects.
      *
-     * bb_eval_value already handles all five non-trivial kinds (E_NOT,
-     * E_ALTERNATE, E_SCAN, E_CASE, plus E_ILIT/E_NUL via eval_node).
+     * bb_eval_value already handles all five non-trivial kinds (AST_NOT,
+     * AST_ALTERNATE, AST_SCAN, AST_CASE, plus AST_ILIT/AST_NUL via eval_node).
      *======================================================================*/
-    case E_ILIT:
-    case E_NUL:
+    case AST_ILIT:
+    case AST_NUL:
         return;
 
-    case E_NOT:
-    case E_ALTERNATE:
-    case E_SCAN:
-    case E_CASE: {
+    case AST_NOT:
+    case AST_ALTERNATE:
+    case AST_SCAN:
+    case AST_CASE: {
         (void)bb_eval_value(e);
         return;
     }
 
     /*========================================================================
-     * RS-23c: E_EVERY, E_INITIAL, E_SWAP — missing from both adapters.
+     * RS-23c: AST_EVERY, AST_INITIAL, AST_SWAP — missing from both adapters.
      * Statement context: evaluate for side effects, discard result.
      * bb_eval_value carries the full native implementation for all three
      * kinds (added in this rung to coro_value.c).
      *======================================================================*/
-    case E_EVERY:
-    case E_INITIAL:
-    case E_SWAP: {
+    case AST_EVERY:
+    case AST_INITIAL:
+    case AST_SWAP: {
         (void)bb_eval_value(e);
         return;
     }
 
     /*========================================================================
-     * RS-23-extra (session 2026-05-05): E_REVASSIGN stmt-context.
+     * RS-23-extra (session 2026-05-05): AST_REVASSIGN stmt-context.
      * Statement context: perform the reversible assign and discard the
      * returned value.  bb_eval_value carries the full native implementation
      * (added in this rung to coro_value.c).  The revert semantics for
      * every/alt-driven contexts are unaffected — those reach coro_bb_revassign
      * via coro_eval, not via this path.
      *======================================================================*/
-    case E_REVASSIGN: {
+    case AST_REVASSIGN: {
         (void)bb_eval_value(e);
         return;
     }

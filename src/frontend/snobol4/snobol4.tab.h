@@ -129,7 +129,7 @@ extern int snobol4_debug;
 union SNOBOL4_STYPE
 {
 #line 32 "snobol4.y"
- EXPR_t *expr; Token tok; 
+ AST_t *expr; Token tok; 
 
 #line 135 "snobol4.tab.h"
 

@@ -58,7 +58,7 @@ extern int raku_yydebug;
 /*
  * raku.y — Tiny-Raku Bison grammar
  *
- * FI-3: builds EXPR_t/STMT_t directly — no intermediate RakuNode AST.
+ * FI-3: builds AST_t/STMT_t directly — no intermediate RakuNode AST.
  *
  * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6
  */
@@ -66,7 +66,7 @@ extern int raku_yydebug;
 #include "../snobol4/scrip_cc.h"
 
 typedef struct ExprList {
-    EXPR_t **items;
+    AST_t **items;
     int      count;
     int      cap;
 } ExprList;
@@ -155,7 +155,7 @@ union RAKU_YYSTYPE
     long      ival;
     double    dval;
     char     *sval;
-    EXPR_t   *node;
+    AST_t   *node;
     ExprList *list;
 
 #line 162 "raku.tab.h"

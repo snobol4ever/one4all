@@ -3,10 +3,10 @@
 #
 # Builds and runs test_snocone_parse_c, which verifies that the new
 # Bison-based Snocone parser handles the LS-4.c additions:
-#   * synthetic concat T_CONCAT       → E_SEQ (n-ary fold)
-#   * pattern alternation `|`         → E_ALT (n-ary fold)
-#   * pattern match `?`               → E_SCAN
-#   * compound-assigns (+= -= *= /= ^=) lower to E_ASSIGN over the
+#   * synthetic concat T_CONCAT       → AST_SEQ (n-ary fold)
+#   * pattern alternation `|`         → AST_ALT (n-ary fold)
+#   * pattern match `?`               → AST_SCAN
+#   * compound-assigns (+= -= *= /= ^=) lower to AST_ASSIGN over the
 #     corresponding binop, with a clone of the LHS in the RHS subtree
 #   * the precedence chain:  =  <  ?  <  |  <  concat  <  ==  <  +/-  <  */  <  ^
 #     (each operator binds tighter than the one to its left)

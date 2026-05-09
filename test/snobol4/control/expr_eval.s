@@ -1220,7 +1220,7 @@ P_constant_β:               jmp         dol8_child_β ; DOL β
 dol8_child_α:               ALT_α       r12+24, cursor, alt_l9_α ; ALT α — save cursor, enter left
 dol8_child_β:               SEQ_β       alt_r9_β ; ALT β — resume right
 
-; E_VART real → CALL_PAT (runtime DT_P/DT_S dispatch)
+; AST_VART real → CALL_PAT (runtime DT_P/DT_S dispatch)
 alt_l9_α:                   lea         rdi, [rel S_real]
                             call        stmt_get
                             mov         [r12+32], rax

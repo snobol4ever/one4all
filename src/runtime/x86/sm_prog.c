@@ -110,7 +110,7 @@ int sm_label(SM_Program *p)
     /* CHUNKS-step03: store PC in a[1].i (matches sm_label_named layout) and
      * leave a[0].s == NULL.  Was: a[0].i = target — but that aliases a[0].s
      * to a small-integer pointer which sm_label_pc_lookup then strcmp'd,
-     * segfaulting on chunk-body unnamed labels emitted by E_DEFER lowering. */
+     * segfaulting on chunk-body unnamed labels emitted by AST_DEFER lowering. */
     p->instrs[idx].a[1].i  = (int64_t)target;
     return target;
 }

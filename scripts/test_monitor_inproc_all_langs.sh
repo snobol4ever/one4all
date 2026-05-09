@@ -68,7 +68,7 @@ run_expect_agree "snocone: fence" \
     "${CORPUS:-/home/claude/corpus}/programs/snocone/demo/beauty/test/fence.sc"
 
 # --- Prolog ---
-# SM does not yet support Prolog IR opcodes (E_CHOICE, E_UNIFY, etc.).
+# SM does not yet support Prolog IR opcodes (AST_CHOICE, AST_UNIFY, etc.).
 # --monitor crashes at the SM step. Skip until SM gains Prolog support.
 skip_lang "prolog: hello.pl" \
     "pre-existing SM/Prolog execution gap (sm_interp crashes on Prolog IR)"

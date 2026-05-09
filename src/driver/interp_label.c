@@ -40,21 +40,21 @@ STMT_t *label_lookup(const char *name)
     return NULL;
 }
 
-/* ── Extract DEFINE spec string from E_FNC("DEFINE",...) subject node ── */
-const char *define_spec_from_expr(EXPR_t *subj)
+/* ── Extract DEFINE spec string from AST_FNC("DEFINE",...) subject node ── */
+const char *define_spec_from_expr(AST_t *subj)
 {
-    if (!subj || subj->kind != E_FNC) return NULL;
+    if (!subj || subj->kind != AST_FNC) return NULL;
     if (!subj->sval || strcmp(subj->sval, "DEFINE") != 0) return NULL;  /* SN-19 */
     if (subj->nchildren < 1 || !subj->children[0]) return NULL;
-    EXPR_t *arg = subj->children[0];
-    if (arg->kind == E_QLIT) return arg->sval;
-    if (arg->kind == E_CAT || arg->kind == E_SEQ) {
+    AST_t *arg = subj->children[0];
+    if (arg->kind == AST_QLIT) return arg->sval;
+    if (arg->kind == AST_CAT || arg->kind == AST_SEQ) {
         static char flatbuf[1024];
         size_t pos = 0;
         flatbuf[0] = '\0';
         for (int i = 0; i < arg->nchildren && pos < sizeof(flatbuf)-1; i++) {
-            EXPR_t *c = arg->children[i];
-            if (c && c->kind == E_QLIT && c->sval) {
+            AST_t *c = arg->children[i];
+            if (c && c->kind == AST_QLIT && c->sval) {
                 size_t clen = strlen(c->sval);
                 if (pos + clen >= sizeof(flatbuf)-1) break;
                 memcpy(flatbuf + pos, c->sval, clen);
@@ -68,23 +68,23 @@ const char *define_spec_from_expr(EXPR_t *subj)
 }
 
 /* ── Extract optional entry-label string from second arg of DEFINE ── */
-const char *define_entry_from_expr(EXPR_t *subj)
+const char *define_entry_from_expr(AST_t *subj)
 {
-    if (!subj || subj->kind != E_FNC) return NULL;
+    if (!subj || subj->kind != AST_FNC) return NULL;
     if (!subj->sval || strcmp(subj->sval, "DEFINE") != 0) return NULL;  /* SN-19 */
     if (subj->nchildren < 2 || !subj->children[1]) return NULL;
-    EXPR_t *arg2 = subj->children[1];
-    /* .label_name → E_NAME(E_VAR sval="label_name") or E_CAPT_COND_ASGN */
-    if (arg2->kind == E_NAME && arg2->nchildren == 1) {
-        EXPR_t *inner = arg2->children[0];
-        if (inner->kind == E_VAR && inner->sval) return inner->sval;
+    AST_t *arg2 = subj->children[1];
+    /* .label_name → AST_NAME(AST_VAR sval="label_name") or AST_CAPT_COND_ASGN */
+    if (arg2->kind == AST_NAME && arg2->nchildren == 1) {
+        AST_t *inner = arg2->children[0];
+        if (inner->kind == AST_VAR && inner->sval) return inner->sval;
     }
-    if (arg2->kind == E_CAPT_COND_ASGN && arg2->nchildren == 1) {
-        EXPR_t *inner = arg2->children[0];
-        if (inner->kind == E_VAR && inner->sval) return inner->sval;
+    if (arg2->kind == AST_CAPT_COND_ASGN && arg2->nchildren == 1) {
+        AST_t *inner = arg2->children[0];
+        if (inner->kind == AST_VAR && inner->sval) return inner->sval;
     }
-    if (arg2->kind == E_VAR && arg2->sval) return arg2->sval;
-    if (arg2->kind == E_QLIT && arg2->sval) return arg2->sval;
+    if (arg2->kind == AST_VAR && arg2->sval) return arg2->sval;
+    if (arg2->kind == AST_QLIT && arg2->sval) return arg2->sval;
     return NULL;
 }
 

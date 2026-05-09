@@ -69,7 +69,7 @@ CIL `br` instructions, or WebAssembly `return_call` tail calls.
 
 ## Five Frontends
 
-Five frontends share the same IR (`EXPR_t` / `STMT_t`):
+Five frontends share the same IR (`AST_t` / `STMT_t`):
 
 | Frontend | Source language | Status |
 |----------|----------------|--------|
@@ -411,33 +411,33 @@ Source authority: `snobol4-2.3.3/v311.sil` (CSNOBOL4) and `spitbol-docs/v37.min`
 
 | Syntax | SIL / CSNOBOL4 | MINIMAL / SPITBOL | Functional name | IR node |
 |--------|---------------|-------------------|-----------------|---------|
-| `+X` | `PLS` | `o$aff` — affirmation | numeric coerce / affirmation | `E_PLS` → **`E_PLS`** (unary plus; see note) |
-| `-X` | `MNS` | `o$com` — complementation | arithmetic negation | `E_MNS` |
-| `\X` | `NEG` | `o$nta/b/c` — negation | logical negation (not) | `E_NOT` |
-| `?X` | `QUES` | `o$int` — interrogation | interrogation | `E_INTERROGATE` |
-| `@X` | `ATOP` | `o$cas` — cursor assignment | cursor position capture | `E_CAPT_CURSOR` |
-| `$X` | *(c$ind, inline)* | `o$inv` — indirection | indirection | `E_INDIRECT` |
-| `&X` | *(c$key, inline)* | `o$kwv` — keyword reference | keyword reference | `E_KEYWORD` |
-| `*X` | *(c$def, inline)* | *(c$def, no o$ entry)* | deferred expression | `E_DEFER` |
-| `.X` | *(unary, via NAM)* | `o$nam` — name reference | name reference (unary) | `E_NAME` |
+| `+X` | `PLS` | `o$aff` — affirmation | numeric coerce / affirmation | `AST_PLS` → **`AST_PLS`** (unary plus; see note) |
+| `-X` | `MNS` | `o$com` — complementation | arithmetic negation | `AST_MNS` |
+| `\X` | `NEG` | `o$nta/b/c` — negation | logical negation (not) | `AST_NOT` |
+| `?X` | `QUES` | `o$int` — interrogation | interrogation | `AST_INTERROGATE` |
+| `@X` | `ATOP` | `o$cas` — cursor assignment | cursor position capture | `AST_CAPT_CURSOR` |
+| `$X` | *(c$ind, inline)* | `o$inv` — indirection | indirection | `AST_INDIRECT` |
+| `&X` | *(c$key, inline)* | `o$kwv` — keyword reference | keyword reference | `AST_KEYWORD` |
+| `*X` | *(c$def, inline)* | *(c$def, no o$ entry)* | deferred expression | `AST_DEFER` |
+| `.X` | *(unary, via NAM)* | `o$nam` — name reference | name reference (unary) | `AST_NAME` |
 
-**Note on `E_PLS` vs `E_PLS`:** SIL `PLS` and MINIMAL `o$aff` are the same operation.
-The IR currently has both `E_PLS` and `E_PLS` with identical semantics — one must be removed.
-Decision: `E_PLS` is the canonical name (matches SIL); `E_PLS` is deprecated.
+**Note on `AST_PLS` vs `AST_PLS`:** SIL `PLS` and MINIMAL `o$aff` are the same operation.
+The IR currently has both `AST_PLS` and `AST_PLS` with identical semantics — one must be removed.
+Decision: `AST_PLS` is the canonical name (matches SIL); `AST_PLS` is deprecated.
 
 ### Binary operators
 
 | Syntax | SIL / CSNOBOL4 | MINIMAL / SPITBOL | Functional name | IR node |
 |--------|---------------|-------------------|-----------------|---------|
-| `X + Y` | `ADD` | `o$add` — addition | addition | `E_ADD` |
-| `X - Y` | `SUB` | `o$sub` — subtraction | subtraction | `E_SUB` |
-| `X * Y` | `MPY` | `o$mlt` — multiplication | multiplication | `E_MUL` |
-| `X / Y` | `DIV` | `o$dvd` — division | division | `E_DIV` |
-| `X ! Y` | `EXPOP` | `o$exp` — exponentiation | exponentiation | `E_POW` |
-| `X Y` (blank, value ctx) | `CONCAT` | `o$cnc` — concatenation | string concatenation | `E_CAT` |
-| `X Y` (blank, pattern ctx) | *(BINCON path, CONCL)* | *(c$cnc type, Byrd wiring)* | goal-directed pattern sequence | `E_SEQ` |
-| `X \| Y` | `OR` / `ORPP` | `o$alt` — alternation | pattern alternation | `E_ALT` |
-| `X ? Y` | `SCAN` | `o$pmv/pmn/pms` — pattern match | pattern match / scan | `E_SCAN` |
-| `X = Y` | `ASGN` | `o$ass` — assignment | assignment | `E_ASSIGN` |
-| `X . Y` | `NAM` | `o$pas` — pattern assignment | conditional capture (on match) | `E_CAPT_COND_ASGN` |
-| `X $ Y` | `DOL` | `o$ima` — immediate assignment | immediate capture | `E_CAPT_IMMED_ASGN` |
+| `X + Y` | `ADD` | `o$add` — addition | addition | `AST_ADD` |
+| `X - Y` | `SUB` | `o$sub` — subtraction | subtraction | `AST_SUB` |
+| `X * Y` | `MPY` | `o$mlt` — multiplication | multiplication | `AST_MUL` |
+| `X / Y` | `DIV` | `o$dvd` — division | division | `AST_DIV` |
+| `X ! Y` | `EXPOP` | `o$exp` — exponentiation | exponentiation | `AST_POW` |
+| `X Y` (blank, value ctx) | `CONCAT` | `o$cnc` — concatenation | string concatenation | `AST_CAT` |
+| `X Y` (blank, pattern ctx) | *(BINCON path, CONCL)* | *(c$cnc type, Byrd wiring)* | goal-directed pattern sequence | `AST_SEQ` |
+| `X \| Y` | `OR` / `ORPP` | `o$alt` — alternation | pattern alternation | `AST_ALT` |
+| `X ? Y` | `SCAN` | `o$pmv/pmn/pms` — pattern match | pattern match / scan | `AST_SCAN` |
+| `X = Y` | `ASGN` | `o$ass` — assignment | assignment | `AST_ASSIGN` |
+| `X . Y` | `NAM` | `o$pas` — pattern assignment | conditional capture (on match) | `AST_CAPT_COND_ASGN` |
+| `X $ Y` | `DOL` | `o$ima` — immediate assignment | immediate capture | `AST_CAPT_IMMED_ASGN` |

@@ -319,7 +319,7 @@ static void test_generator_suspend_resume(void)
  * Build a chunk that initializes locals[0]=100, yields, then on each resume
  * loads locals[0], increments, stores back, yields.  Three yields expected:
  * 100, 101, 102.  Proves the locals[] array in SmGenState survives across
- * SUSPEND/RESUME boundaries — the foundation for E_TO/E_TO_BY in CHUNKS-step15a. */
+ * SUSPEND/RESUME boundaries — the foundation for AST_TO/AST_TO_BY in CHUNKS-step15a. */
 static void test_gen_locals_survive_suspend(void)
 {
     printf("--- test_gen_locals_survive_suspend ---\n");

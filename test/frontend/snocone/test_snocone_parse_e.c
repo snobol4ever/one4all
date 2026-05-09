@@ -5,22 +5,22 @@
  * the correct EKind nodes.  Operators added this rung (beyond LS-4.a's
  * T_1PLUS / T_1MINUS):
  *
- *   *expr   → E_DEFER        (deferred evaluation / indirect pattern ref)
- *   .expr   → E_NAME         (name reference — returns name descriptor)
- *   $expr   → E_INDIRECT     (variable indirection)
- *   @expr   → E_CAPT_CURSOR  (cursor position capture)
- *   ~expr   → E_NOT          (negate success/failure)
- *   ?expr   → E_INTERROGATE  (null if succeeds, fail if fails)
- *   &expr   → E_OPSYN sval="&"  (bare ampersand — OPSYN slot pri 2)
- *   %expr   → E_OPSYN sval="%"  (OPSYN slot pri 10)
- *   /expr   → E_OPSYN sval="/"  (OPSYN slot)
- *   #expr   → E_OPSYN sval="#"  (OPSYN slot)
- *   |expr   → E_OPSYN sval="|"  (OPSYN slot)
- *   =expr   → E_OPSYN sval="="  (OPSYN slot)
+ *   *expr   → AST_DEFER        (deferred evaluation / indirect pattern ref)
+ *   .expr   → AST_NAME         (name reference — returns name descriptor)
+ *   $expr   → AST_INDIRECT     (variable indirection)
+ *   @expr   → AST_CAPT_CURSOR  (cursor position capture)
+ *   ~expr   → AST_NOT          (negate success/failure)
+ *   ?expr   → AST_INTERROGATE  (null if succeeds, fail if fails)
+ *   &expr   → AST_OPSYN sval="&"  (bare ampersand — OPSYN slot pri 2)
+ *   %expr   → AST_OPSYN sval="%"  (OPSYN slot pri 10)
+ *   /expr   → AST_OPSYN sval="/"  (OPSYN slot)
+ *   #expr   → AST_OPSYN sval="#"  (OPSYN slot)
+ *   |expr   → AST_OPSYN sval="|"  (OPSYN slot)
+ *   =expr   → AST_OPSYN sval="="  (OPSYN slot)
  *
  * All unaries apply to expr17 (atoms) — highest priority, binding tighter
  * than any binary operator.  Chains like `~.x` (tilde then dot) nest right-
- * to-left: E_NOT(E_NAME(x)).
+ * to-left: AST_NOT(AST_NAME(x)).
  *
  * Build:
  *   cc -Wall -o test_snocone_parse_e test_snocone_parse_e.c \
@@ -49,7 +49,7 @@ Program *snocone_parse_program(const char *src, const char *filename);
 /* ---- test harness ---- */
 static int g_pass = 0, g_fail = 0;
 
-static EXPR_t *parse_first_stmt(const char *src) {
+static AST_t *parse_first_stmt(const char *src) {
     /* bare expressions go into head->subject (see snocone_parse.y:886) */
     Program *prog = snocone_parse_program(src, "<test>");
     if (!prog || !prog->head) return NULL;
@@ -64,166 +64,166 @@ static EXPR_t *parse_first_stmt(const char *src) {
 /* ---- individual tests ---- */
 
 static void test_defer_star(void) {
-    /* *x  → E_DEFER(E_VAR("x")) */
-    EXPR_t *e = parse_first_stmt("*x ;");
+    /* *x  → AST_DEFER(AST_VAR("x")) */
+    AST_t *e = parse_first_stmt("*x ;");
     ASSERT(e, "parsed *x");
-    ASSERT(e->kind == E_DEFER, "kind E_DEFER, got %s", ekind_name[e->kind]);
+    ASSERT(e->kind == AST_DEFER, "kind AST_DEFER, got %s", ast_e_name[e->kind]);
     ASSERT(e->nchildren == 1, "one child");
-    ASSERT(e->children[0]->kind == E_VAR, "child is E_VAR");
+    ASSERT(e->children[0]->kind == AST_VAR, "child is AST_VAR");
     ASSERT(strcmp(e->children[0]->sval, "x") == 0, "child sval=x");
 }
 
 static void test_name_dot(void) {
-    /* .v  → E_NAME(E_VAR("v")) */
-    EXPR_t *e = parse_first_stmt(".v ;");
+    /* .v  → AST_NAME(AST_VAR("v")) */
+    AST_t *e = parse_first_stmt(".v ;");
     ASSERT(e, "parsed .v");
-    ASSERT(e->kind == E_NAME, "kind E_NAME, got %s", ekind_name[e->kind]);
+    ASSERT(e->kind == AST_NAME, "kind AST_NAME, got %s", ast_e_name[e->kind]);
     ASSERT(e->nchildren == 1, "one child");
-    ASSERT(e->children[0]->kind == E_VAR, "child is E_VAR");
+    ASSERT(e->children[0]->kind == AST_VAR, "child is AST_VAR");
 }
 
 static void test_indirect_dollar(void) {
-    /* $x  → E_INDIRECT(E_VAR("x")) */
-    EXPR_t *e = parse_first_stmt("$x ;");
+    /* $x  → AST_INDIRECT(AST_VAR("x")) */
+    AST_t *e = parse_first_stmt("$x ;");
     ASSERT(e, "parsed $x");
-    ASSERT(e->kind == E_INDIRECT, "kind E_INDIRECT, got %s", ekind_name[e->kind]);
+    ASSERT(e->kind == AST_INDIRECT, "kind AST_INDIRECT, got %s", ast_e_name[e->kind]);
     ASSERT(e->nchildren == 1, "one child");
 }
 
 static void test_cursor_at(void) {
-    /* @pos  → E_CAPT_CURSOR(E_VAR("pos")) */
-    EXPR_t *e = parse_first_stmt("@pos ;");
+    /* @pos  → AST_CAPT_CURSOR(AST_VAR("pos")) */
+    AST_t *e = parse_first_stmt("@pos ;");
     ASSERT(e, "parsed @pos");
-    ASSERT(e->kind == E_CAPT_CURSOR, "kind E_CAPT_CURSOR, got %s", ekind_name[e->kind]);
+    ASSERT(e->kind == AST_CAPT_CURSOR, "kind AST_CAPT_CURSOR, got %s", ast_e_name[e->kind]);
     ASSERT(e->nchildren == 1, "one child");
-    ASSERT(e->children[0]->kind == E_VAR, "child is E_VAR");
+    ASSERT(e->children[0]->kind == AST_VAR, "child is AST_VAR");
 }
 
 static void test_not_tilde(void) {
-    /* ~cond  → E_NOT(E_VAR("cond")) */
-    EXPR_t *e = parse_first_stmt("~cond ;");
+    /* ~cond  → AST_NOT(AST_VAR("cond")) */
+    AST_t *e = parse_first_stmt("~cond ;");
     ASSERT(e, "parsed ~cond");
-    ASSERT(e->kind == E_NOT, "kind E_NOT, got %s", ekind_name[e->kind]);
+    ASSERT(e->kind == AST_NOT, "kind AST_NOT, got %s", ast_e_name[e->kind]);
     ASSERT(e->nchildren == 1, "one child");
 }
 
 static void test_interrogate_quest(void) {
-    /* ?x  → E_INTERROGATE(E_VAR("x")) */
-    EXPR_t *e = parse_first_stmt("?x ;");
+    /* ?x  → AST_INTERROGATE(AST_VAR("x")) */
+    AST_t *e = parse_first_stmt("?x ;");
     ASSERT(e, "parsed ?x");
-    ASSERT(e->kind == E_INTERROGATE, "kind E_INTERROGATE, got %s", ekind_name[e->kind]);
+    ASSERT(e->kind == AST_INTERROGATE, "kind AST_INTERROGATE, got %s", ast_e_name[e->kind]);
     ASSERT(e->nchildren == 1, "one child");
 }
 
 static void test_opsyn_amp(void) {
-    /* &x  → E_OPSYN("&", E_VAR("x")) */
-    EXPR_t *e = parse_first_stmt("& x ;");   /* note space — no-space is T_KEYWORD */
+    /* &x  → AST_OPSYN("&", AST_VAR("x")) */
+    AST_t *e = parse_first_stmt("& x ;");   /* note space — no-space is T_KEYWORD */
     ASSERT(e, "parsed & x");
-    ASSERT(e->kind == E_OPSYN, "kind E_OPSYN, got %s", ekind_name[e->kind]);
+    ASSERT(e->kind == AST_OPSYN, "kind AST_OPSYN, got %s", ast_e_name[e->kind]);
     ASSERT(e->sval && strcmp(e->sval, "&") == 0, "sval=&");
     ASSERT(e->nchildren == 1, "one child");
 }
 
 static void test_opsyn_percent(void) {
-    /* %x  → E_OPSYN("%", E_VAR("x")) */
-    EXPR_t *e = parse_first_stmt("%x ;");
+    /* %x  → AST_OPSYN("%", AST_VAR("x")) */
+    AST_t *e = parse_first_stmt("%x ;");
     ASSERT(e, "parsed %%x");
-    ASSERT(e->kind == E_OPSYN, "kind E_OPSYN, got %s", ekind_name[e->kind]);
+    ASSERT(e->kind == AST_OPSYN, "kind AST_OPSYN, got %s", ast_e_name[e->kind]);
     ASSERT(e->sval && strcmp(e->sval, "%") == 0, "sval=%%");
 }
 
 static void test_opsyn_slash(void) {
-    /* /x  → E_OPSYN("/", ...) */
-    EXPR_t *e = parse_first_stmt("/x ;");
+    /* /x  → AST_OPSYN("/", ...) */
+    AST_t *e = parse_first_stmt("/x ;");
     ASSERT(e, "parsed /x");
-    ASSERT(e->kind == E_OPSYN, "kind E_OPSYN");
+    ASSERT(e->kind == AST_OPSYN, "kind AST_OPSYN");
     ASSERT(e->sval && strcmp(e->sval, "/") == 0, "sval=/");
 }
 
 static void test_opsyn_pound(void) {
-    EXPR_t *e = parse_first_stmt("#x ;");
+    AST_t *e = parse_first_stmt("#x ;");
     ASSERT(e, "parsed #x");
-    ASSERT(e->kind == E_OPSYN, "kind E_OPSYN");
+    ASSERT(e->kind == AST_OPSYN, "kind AST_OPSYN");
     ASSERT(e->sval && strcmp(e->sval, "#") == 0, "sval=#");
 }
 
 static void test_opsyn_pipe(void) {
-    EXPR_t *e = parse_first_stmt("|x ;");
+    AST_t *e = parse_first_stmt("|x ;");
     ASSERT(e, "parsed |x");
-    ASSERT(e->kind == E_OPSYN, "kind E_OPSYN");
+    ASSERT(e->kind == AST_OPSYN, "kind AST_OPSYN");
     ASSERT(e->sval && strcmp(e->sval, "|") == 0, "sval=|");
 }
 
 static void test_opsyn_equal(void) {
-    EXPR_t *e = parse_first_stmt("=x ;");
+    AST_t *e = parse_first_stmt("=x ;");
     ASSERT(e, "parsed =x");
-    ASSERT(e->kind == E_OPSYN, "kind E_OPSYN");
+    ASSERT(e->kind == AST_OPSYN, "kind AST_OPSYN");
     ASSERT(e->sval && strcmp(e->sval, "=") == 0, "sval==");
 }
 
 static void test_chain_not_dot(void) {
-    /* ~.x  → E_NOT(E_NAME(E_VAR("x"))) — right-to-left nesting */
-    EXPR_t *e = parse_first_stmt("~.x ;");
+    /* ~.x  → AST_NOT(AST_NAME(AST_VAR("x"))) — right-to-left nesting */
+    AST_t *e = parse_first_stmt("~.x ;");
     ASSERT(e, "parsed ~.x");
-    ASSERT(e->kind == E_NOT, "outer E_NOT");
+    ASSERT(e->kind == AST_NOT, "outer AST_NOT");
     ASSERT(e->nchildren == 1, "one child");
-    ASSERT(e->children[0]->kind == E_NAME, "inner E_NAME");
-    ASSERT(e->children[0]->nchildren == 1, "E_NAME has child");
-    ASSERT(e->children[0]->children[0]->kind == E_VAR, "innermost E_VAR");
+    ASSERT(e->children[0]->kind == AST_NAME, "inner AST_NAME");
+    ASSERT(e->children[0]->nchildren == 1, "AST_NAME has child");
+    ASSERT(e->children[0]->children[0]->kind == AST_VAR, "innermost AST_VAR");
 }
 
 static void test_chain_defer_indirect(void) {
-    /* *$x  → E_DEFER(E_INDIRECT(E_VAR("x"))) */
-    EXPR_t *e = parse_first_stmt("*$x ;");
+    /* *$x  → AST_DEFER(AST_INDIRECT(AST_VAR("x"))) */
+    AST_t *e = parse_first_stmt("*$x ;");
     ASSERT(e, "parsed *$x");
-    ASSERT(e->kind == E_DEFER, "outer E_DEFER");
-    ASSERT(e->children[0]->kind == E_INDIRECT, "inner E_INDIRECT");
+    ASSERT(e->kind == AST_DEFER, "outer AST_DEFER");
+    ASSERT(e->children[0]->kind == AST_INDIRECT, "inner AST_INDIRECT");
 }
 
 static void test_unary_on_literal(void) {
-    /* .'hello'  → E_NAME(E_QLIT("hello")) */
-    EXPR_t *e = parse_first_stmt(".'hello' ;");
+    /* .'hello'  → AST_NAME(AST_QLIT("hello")) */
+    AST_t *e = parse_first_stmt(".'hello' ;");
     ASSERT(e, "parsed .'hello'");
-    ASSERT(e->kind == E_NAME, "kind E_NAME");
-    ASSERT(e->children[0]->kind == E_QLIT, "child E_QLIT");
+    ASSERT(e->kind == AST_NAME, "kind AST_NAME");
+    ASSERT(e->children[0]->kind == AST_QLIT, "child AST_QLIT");
     ASSERT(strcmp(e->children[0]->sval, "hello") == 0, "sval=hello");
 }
 
 static void test_unary_on_call(void) {
-    /* *f(x)  — E_DEFER applied to an E_FNC node                    */
+    /* *f(x)  — AST_DEFER applied to an AST_FNC node                    */
     /* Lexer sees: T_1STAR T_CALL LPAREN T_IDENT RPAREN SEMI    */
-    EXPR_t *e = parse_first_stmt("*f(x) ;");
+    AST_t *e = parse_first_stmt("*f(x) ;");
     ASSERT(e, "parsed *f(x)");
-    ASSERT(e->kind == E_DEFER, "outer E_DEFER");
-    ASSERT(e->children[0]->kind == E_FNC, "child is E_FNC");
+    ASSERT(e->kind == AST_DEFER, "outer AST_DEFER");
+    ASSERT(e->children[0]->kind == AST_FNC, "child is AST_FNC");
 }
 
 static void test_unary_in_binary_context(void) {
     /* a + *b  — unary * binds tighter than binary +               */
-    EXPR_t *e = parse_first_stmt("a + *b ;");
-    /* Should parse as a + (*b), i.e. E_ADD(a, E_DEFER(b)) */
+    AST_t *e = parse_first_stmt("a + *b ;");
+    /* Should parse as a + (*b), i.e. AST_ADD(a, AST_DEFER(b)) */
     ASSERT(e, "parsed a + *b");
-    ASSERT(e->kind == E_ADD, "top E_ADD");
+    ASSERT(e->kind == AST_ADD, "top AST_ADD");
     ASSERT(e->nchildren == 2, "two children");
-    ASSERT(e->children[0]->kind == E_VAR, "left E_VAR(a)");
-    ASSERT(e->children[1]->kind == E_DEFER, "right E_DEFER");
+    ASSERT(e->children[0]->kind == AST_VAR, "left AST_VAR(a)");
+    ASSERT(e->children[1]->kind == AST_DEFER, "right AST_DEFER");
 }
 
 static void test_not_in_if_cond(void) {
     /* ~HOST(2) is a valid unary — tests unary on a function call    */
-    EXPR_t *e = parse_first_stmt("~HOST(2) ;");
+    AST_t *e = parse_first_stmt("~HOST(2) ;");
     ASSERT(e, "parsed ~HOST(2)");
-    ASSERT(e->kind == E_NOT, "kind E_NOT");
-    ASSERT(e->children[0]->kind == E_FNC, "child E_FNC");
+    ASSERT(e->kind == AST_NOT, "kind AST_NOT");
+    ASSERT(e->children[0]->kind == AST_FNC, "child AST_FNC");
     ASSERT(strcmp(e->children[0]->sval, "HOST") == 0, "sval=HOST");
 }
 
 static void test_interrogate_on_call(void) {
-    /* ?EQ(x, y) → E_INTERROGATE(E_FNC("EQ", x, y))               */
-    EXPR_t *e = parse_first_stmt("?EQ(x, y) ;");
+    /* ?EQ(x, y) → AST_INTERROGATE(AST_FNC("EQ", x, y))               */
+    AST_t *e = parse_first_stmt("?EQ(x, y) ;");
     ASSERT(e, "parsed ?EQ(x, y)");
-    ASSERT(e->kind == E_INTERROGATE, "kind E_INTERROGATE");
-    ASSERT(e->children[0]->kind == E_FNC, "child E_FNC");
+    ASSERT(e->kind == AST_INTERROGATE, "kind AST_INTERROGATE");
+    ASSERT(e->children[0]->kind == AST_FNC, "child AST_FNC");
     ASSERT(strcmp(e->children[0]->sval, "EQ") == 0, "sval=EQ");
     ASSERT(e->children[0]->nchildren == 2, "EQ has 2 children");
 }

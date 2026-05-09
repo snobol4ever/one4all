@@ -3,16 +3,16 @@
 #
 # Builds and runs test_snocone_parse_e, which verifies that the new
 # Bison-based Snocone parser handles the LS-4.e addition:
-#   * *expr  → E_DEFER        (deferred evaluation)
-#   * .expr  → E_NAME         (name reference)
-#   * $expr  → E_INDIRECT     (variable indirection)
-#   * @expr  → E_CAPT_CURSOR  (cursor position capture)
-#   * ~expr  → E_NOT          (negate success/failure)
-#   * ?expr  → E_INTERROGATE  (interrogation)
-#   * &expr  → E_OPSYN("&")   (bare amp — OPSYN slot)
-#   * %expr /expr #expr |expr =expr  → E_OPSYN(op)  (OPSYN slots)
-#   * Chains: ~.x → E_NOT(E_NAME(x))
-#   * Unary binds tighter than binary: a + *b → E_ADD(a, E_DEFER(b))
+#   * *expr  → AST_DEFER        (deferred evaluation)
+#   * .expr  → AST_NAME         (name reference)
+#   * $expr  → AST_INDIRECT     (variable indirection)
+#   * @expr  → AST_CAPT_CURSOR  (cursor position capture)
+#   * ~expr  → AST_NOT          (negate success/failure)
+#   * ?expr  → AST_INTERROGATE  (interrogation)
+#   * &expr  → AST_OPSYN("&")   (bare amp — OPSYN slot)
+#   * %expr /expr #expr |expr =expr  → AST_OPSYN(op)  (OPSYN slots)
+#   * Chains: ~.x → AST_NOT(AST_NAME(x))
+#   * Unary binds tighter than binary: a + *b → AST_ADD(a, AST_DEFER(b))
 #
 # Side-channel test — the LS-4.e parser is not yet wired into scrip's
 # production driver path (that happens at LS-4.j).

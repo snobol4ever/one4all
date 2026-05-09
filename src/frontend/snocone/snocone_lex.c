@@ -276,7 +276,7 @@ S_DISPATCH:
      * has no T_CONCAT injected and the parser sees two adjacent value
      * tokens with no operator between, causing a syntax error. */
     if (had_ws && last_value && PEEK(0) == '&' && is_alpha(PEEK(1))) { EMIT(T_CONCAT);               }
-    if (PEEK(0) == '\0' )                                                                                                  goto E_EOF;
+    if (PEEK(0) == '\0' )                                                                                                  goto AST_EOF;
     if (PEEK(0) == '\'' )                                          {  ctx->strpos = 0; ADV(1);                             goto S_STR1;      }
     if (PEEK(0) == '"'  )                                          {  ctx->strpos = 0; ADV(1);                             goto S_STR2;      }
     if (is_alpha(PEEK(0)))                                         {  tok_start = p; ADV(1);                               goto S_IDENT;     }
@@ -284,14 +284,14 @@ S_DISPATCH:
     if (PEEK(0) == '.'  && is_digit(PEEK(1)))                      {  tok_start = p; ADV(1);                                goto S_FRAC;      }
     if (PEEK(0) == '.'  )                                                                                                  goto S_OP_DOT;
     if (PEEK(0) == '&'  && is_alpha(PEEK(1)))                      {  ADV(1); tok_start = p;                               goto S_KEYWORD;   }
-    if (PEEK(0) == '('  )                                          {  ADV(1);                                              goto E_LPAREN;    }
-    if (PEEK(0) == ')'  )                                          {  ADV(1);                                              goto E_RPAREN;    }
-    if (PEEK(0) == '['  )                                          {  ADV(1);                                              goto E_LBRACK;    }
-    if (PEEK(0) == ']'  )                                          {  ADV(1);                                              goto E_RBRACK;    }
-    if (PEEK(0) == '{'  )                                          {  ADV(1);                                              goto E_LBRACE;    }
-    if (PEEK(0) == '}'  )                                          {  ADV(1);                                              goto E_RBRACE;    }
-    if (PEEK(0) == ','  )                                          {  ADV(1);                                              goto E_COMMA;     }
-    if (PEEK(0) == ';'  )                                          {  ADV(1);                                              goto E_SEMICOLON; }
+    if (PEEK(0) == '('  )                                          {  ADV(1);                                              goto AST_LPAREN;    }
+    if (PEEK(0) == ')'  )                                          {  ADV(1);                                              goto AST_RPAREN;    }
+    if (PEEK(0) == '['  )                                          {  ADV(1);                                              goto AST_LBRACK;    }
+    if (PEEK(0) == ']'  )                                          {  ADV(1);                                              goto AST_RBRACK;    }
+    if (PEEK(0) == '{'  )                                          {  ADV(1);                                              goto AST_LBRACE;    }
+    if (PEEK(0) == '}'  )                                          {  ADV(1);                                              goto AST_RBRACE;    }
+    if (PEEK(0) == ','  )                                          {  ADV(1);                                              goto AST_COMMA;     }
+    if (PEEK(0) == ';'  )                                          {  ADV(1);                                              goto AST_SEMICOLON; }
     if (PEEK(0) == ':'  )                                                                                                  goto S_OP_COLON;
     if (PEEK(0) == '='  )                                                                                                  goto S_OP_EQ;
     if (PEEK(0) == '!'  )                                                                                                  goto S_OP_BANG;
@@ -310,30 +310,30 @@ S_DISPATCH:
     if (PEEK(0) == '#'  )                                                                                                  goto S_OP_POUND;
     if (PEEK(0) == '%'  )                                                                                                  goto S_OP_PERCENT;
     if (PEEK(0) == '~'  )                                                                                                  goto S_OP_TILDE;
-                                                                   {  tok_start = p; ADV(1);                               goto E_UNKNOWN;   }
+                                                                   {  tok_start = p; ADV(1);                               goto AST_UNKNOWN;   }
 /*--------------------------------------------------------------------------------------------------------------------*/
 S_IDENT:
     if (is_idcont(PEEK(0)))                                        {  ADV(1);                                              goto S_IDENT;     }
-    if (PEEK(0) == '('  )                                                                                                  goto E_CALL;
-                                                                   {                                                       goto E_IDENT;     }
+    if (PEEK(0) == '('  )                                                                                                  goto AST_CALL;
+                                                                   {                                                       goto AST_IDENT;     }
 /*--------------------------------------------------------------------------------------------------------------------*/
 S_KEYWORD:
     if (is_idcont(PEEK(0)))                                        {  ADV(1);                                              goto S_KEYWORD;   }
-                                                                                                                           goto E_KEYWORD;
+                                                                                                                           goto AST_KEYWORD;
 /*--------------------------------------------------------------------------------------------------------------------*/
 S_INT:
     if (is_digit(PEEK(0)))                                         {  ADV(1);                                              goto S_INT;       }
     if (PEEK(0) == '.' && is_digit(PEEK(1)))                       {  ADV(1);                                              goto S_FRAC;      }
-    if (PEEK(0) == '.' )                                           {  ADV(1);                                              goto E_REAL;      }
+    if (PEEK(0) == '.' )                                           {  ADV(1);                                              goto AST_REAL;      }
     if (PEEK(0) == 'e' || PEEK(0) == 'E')                          {  ADV(1);                                              goto S_EXP_SIGN;  }
     if (PEEK(0) == 'd' || PEEK(0) == 'D')                          {  ADV(1);                                              goto S_EXP_SIGN;  }
-                                                                                                                           goto E_INT;
+                                                                                                                           goto AST_INT;
 /*--------------------------------------------------------------------------------------------------------------------*/
 S_FRAC:
     if (is_digit(PEEK(0)))                                         {  ADV(1);                                              goto S_FRAC;      }
     if (PEEK(0) == 'e' || PEEK(0) == 'E')                          {  ADV(1);                                              goto S_EXP_SIGN;  }
     if (PEEK(0) == 'd' || PEEK(0) == 'D')                          {  ADV(1);                                              goto S_EXP_SIGN;  }
-                                                                                                                           goto E_REAL;
+                                                                                                                           goto AST_REAL;
 /*--------------------------------------------------------------------------------------------------------------------*/
 S_EXP_SIGN:
     if (PEEK(0) == '+' || PEEK(0) == '-')                          {  ADV(1);                                              goto S_EXP_DIG;   }
@@ -341,19 +341,19 @@ S_EXP_SIGN:
 /*--------------------------------------------------------------------------------------------------------------------*/
 S_EXP_DIG:
     if (is_digit(PEEK(0)))                                         {  ADV(1);                                              goto S_EXP_DIG;   }
-                                                                                                                           goto E_REAL;
+                                                                                                                           goto AST_REAL;
 /*--------------------------------------------------------------------------------------------------------------------*/
 S_STR1:
-    if (PEEK(0) == '\0' )                                                                                                  goto E_STR;
+    if (PEEK(0) == '\0' )                                                                                                  goto AST_STR;
     if (PEEK(0) == '\'' && PEEK(1) == '\'' )                       {  ctx->strbuf[ctx->strpos++] = '\''; ADV(2);           goto S_STR1;      }
-    if (PEEK(0) == '\'' )                                          {  ADV(1);                                              goto E_STR;       }
+    if (PEEK(0) == '\'' )                                          {  ADV(1);                                              goto AST_STR;       }
     if (PEEK(0) == '\n' )                                          {  ctx->line++; ctx->strbuf[ctx->strpos++] = '\n'; ADV(1); goto S_STR1;   }
                                                                    {  ctx->strbuf[ctx->strpos++] = *p; ADV(1);              goto S_STR1;     }
 /*--------------------------------------------------------------------------------------------------------------------*/
 S_STR2:
-    if (PEEK(0) == '\0' )                                                                                                  goto E_STR;
+    if (PEEK(0) == '\0' )                                                                                                  goto AST_STR;
     if (PEEK(0) == '"'  && PEEK(1) == '"'  )                       {  ctx->strbuf[ctx->strpos++] = '"';  ADV(2);           goto S_STR2;      }
-    if (PEEK(0) == '"'  )                                          {  ADV(1);                                              goto E_STR;       }
+    if (PEEK(0) == '"'  )                                          {  ADV(1);                                              goto AST_STR;       }
     if (PEEK(0) == '\n' )                                          {  ctx->line++; ctx->strbuf[ctx->strpos++] = '\n'; ADV(1); goto S_STR2;   }
                                                                    {  ctx->strbuf[ctx->strpos++] = *p; ADV(1);              goto S_STR2;     }
     /* Each S_OP_* label disambiguates multi-char forms (++, +=,    */
@@ -367,234 +367,234 @@ S_STR2:
     /* ============================================================ */
 /*--------------------------------------------------------------------------------------------------------------------*/
 S_OP_COLON:
-    if (PEEK(1) == ':' )                                           {  ADV(2);                                              goto E_IDENT_OP;  }
-    if (PEEK(1) == '!' && PEEK(2) == ':' )                         {  ADV(3);                                              goto E_DIFFER;    }
-    if (PEEK(1) == '<' && PEEK(2) == '=' && PEEK(3) == ':' )       {  ADV(4);                                              goto E_LLE;       }
-    if (PEEK(1) == '>' && PEEK(2) == '=' && PEEK(3) == ':' )       {  ADV(4);                                              goto E_LGE;       }
-    if (PEEK(1) == '=' && PEEK(2) == '=' && PEEK(3) == ':' )       {  ADV(4);                                              goto E_LEQ;       }
-    if (PEEK(1) == '!' && PEEK(2) == '=' && PEEK(3) == ':' )       {  ADV(4);                                              goto E_LNE;       }
-    if (PEEK(1) == '<' && PEEK(2) == ':' )                         {  ADV(3);                                              goto E_LLT;       }
-    if (PEEK(1) == '>' && PEEK(2) == ':' )                         {  ADV(3);                                              goto E_LGT;       }
-                                                                   {  ADV(1);                                              goto E_COLON;     }
+    if (PEEK(1) == ':' )                                           {  ADV(2);                                              goto AST_IDENT_OP;  }
+    if (PEEK(1) == '!' && PEEK(2) == ':' )                         {  ADV(3);                                              goto AST_DIFFER;    }
+    if (PEEK(1) == '<' && PEEK(2) == '=' && PEEK(3) == ':' )       {  ADV(4);                                              goto AST_LLE;       }
+    if (PEEK(1) == '>' && PEEK(2) == '=' && PEEK(3) == ':' )       {  ADV(4);                                              goto AST_LGE;       }
+    if (PEEK(1) == '=' && PEEK(2) == '=' && PEEK(3) == ':' )       {  ADV(4);                                              goto AST_LEQ;       }
+    if (PEEK(1) == '!' && PEEK(2) == '=' && PEEK(3) == ':' )       {  ADV(4);                                              goto AST_LNE;       }
+    if (PEEK(1) == '<' && PEEK(2) == ':' )                         {  ADV(3);                                              goto AST_LLT;       }
+    if (PEEK(1) == '>' && PEEK(2) == ':' )                         {  ADV(3);                                              goto AST_LGT;       }
+                                                                   {  ADV(1);                                              goto AST_COLON;     }
 /*--------------------------------------------------------------------------------------------------------------------*/
 S_OP_EQ:
-    if (PEEK(1) == '=' )                                           {  ADV(2);                                              goto E_EQ;        }
-    if (last_value)                                                {  ADV(1);                                              goto E_ASSIGN;    }
-                                                                   {  ADV(1);                                              goto E_UN_EQUAL;  }
+    if (PEEK(1) == '=' )                                           {  ADV(2);                                              goto AST_EQ;        }
+    if (last_value)                                                {  ADV(1);                                              goto AST_ASSIGN;    }
+                                                                   {  ADV(1);                                              goto AST_UN_EQUAL;  }
 /*--------------------------------------------------------------------------------------------------------------------*/
 S_OP_BANG:
-    if (PEEK(1) == '=' )                                           {  ADV(2);                                              goto E_NE;        }
-    if (had_ws && last_value && is_rws_at(p, 1))                   {  ADV(1);                                              goto E_EXP;       }
+    if (PEEK(1) == '=' )                                           {  ADV(2);                                              goto AST_NE;        }
+    if (had_ws && last_value && is_rws_at(p, 1))                   {  ADV(1);                                              goto AST_EXP;       }
     if (had_ws && last_value)                                      {  EMIT(T_CONCAT);                 }
-                                                                   {  ADV(1);                                              goto E_UN_BANG;   }
+                                                                   {  ADV(1);                                              goto AST_UN_BANG;   }
 /*--------------------------------------------------------------------------------------------------------------------*/
 S_OP_LT:
-    if (PEEK(1) == '=' )                                           {  ADV(2);                                              goto E_LE;        }
-                                                                   {  ADV(1);                                              goto E_LT;        }
+    if (PEEK(1) == '=' )                                           {  ADV(2);                                              goto AST_LE;        }
+                                                                   {  ADV(1);                                              goto AST_LT;        }
 /*--------------------------------------------------------------------------------------------------------------------*/
 S_OP_GT:
-    if (PEEK(1) == '=' )                                           {  ADV(2);                                              goto E_GE;        }
-                                                                   {  ADV(1);                                              goto E_GT;        }
+    if (PEEK(1) == '=' )                                           {  ADV(2);                                              goto AST_GE;        }
+                                                                   {  ADV(1);                                              goto AST_GT;        }
 /*--------------------------------------------------------------------------------------------------------------------*/
 S_OP_PLUS:
-    if (PEEK(1) == '=' )                                           {  ADV(2);                                              goto E_PLUS_ASSIGN;  }
-    if (had_ws && last_value && is_rws_at(p, 1))                   {  ADV(1);                                              goto E_ADD;       }
+    if (PEEK(1) == '=' )                                           {  ADV(2);                                              goto AST_PLUS_ASSIGN;  }
+    if (had_ws && last_value && is_rws_at(p, 1))                   {  ADV(1);                                              goto AST_ADD;       }
     if (had_ws && last_value)                                      {  EMIT(T_CONCAT);                 }
-                                                                   {  ADV(1);                                              goto E_UN_PLUS;   }
+                                                                   {  ADV(1);                                              goto AST_UN_PLUS;   }
 /*--------------------------------------------------------------------------------------------------------------------*/
 S_OP_MINUS:
-    if (PEEK(1) == '=' )                                           {  ADV(2);                                              goto E_MINUS_ASSIGN; }
-    if (had_ws && last_value && is_rws_at(p, 1))                   {  ADV(1);                                              goto E_SUB;       }
+    if (PEEK(1) == '=' )                                           {  ADV(2);                                              goto AST_MINUS_ASSIGN; }
+    if (had_ws && last_value && is_rws_at(p, 1))                   {  ADV(1);                                              goto AST_SUB;       }
     if (had_ws && last_value)                                      {  EMIT(T_CONCAT);                 }
-                                                                   {  ADV(1);                                              goto E_UN_MINUS;  }
+                                                                   {  ADV(1);                                              goto AST_UN_MINUS;  }
 /*--------------------------------------------------------------------------------------------------------------------*/
 S_OP_STAR:
-    if (PEEK(1) == '*' && is_rws_at(p, 2))                         {  ADV(2);                                              goto E_EXP;       }
-    if (PEEK(1) == '=' )                                           {  ADV(2);                                              goto E_STAR_ASSIGN;  }
-    if (had_ws && last_value && is_rws_at(p, 1))                   {  ADV(1);                                              goto E_MUL;       }
+    if (PEEK(1) == '*' && is_rws_at(p, 2))                         {  ADV(2);                                              goto AST_EXP;       }
+    if (PEEK(1) == '=' )                                           {  ADV(2);                                              goto AST_STAR_ASSIGN;  }
+    if (had_ws && last_value && is_rws_at(p, 1))                   {  ADV(1);                                              goto AST_MUL;       }
     if (had_ws && last_value)                                      {  EMIT(T_CONCAT);                 }
-                                                                   {  ADV(1);                                              goto E_UN_STAR;   }
+                                                                   {  ADV(1);                                              goto AST_UN_STAR;   }
 /*--------------------------------------------------------------------------------------------------------------------*/
 S_OP_SLASH:
-    if (PEEK(1) == '=' )                                           {  ADV(2);                                              goto E_SLASH_ASSIGN; }
-    if (had_ws && last_value && is_rws_at(p, 1))                   {  ADV(1);                                              goto E_DIV;       }
+    if (PEEK(1) == '=' )                                           {  ADV(2);                                              goto AST_SLASH_ASSIGN; }
+    if (had_ws && last_value && is_rws_at(p, 1))                   {  ADV(1);                                              goto AST_DIV;       }
     if (had_ws && last_value)                                      {  EMIT(T_CONCAT);                 }
-                                                                   {  ADV(1);                                              goto E_UN_SLASH;  }
+                                                                   {  ADV(1);                                              goto AST_UN_SLASH;  }
 /*--------------------------------------------------------------------------------------------------------------------*/
 S_OP_CARET:
-    if (PEEK(1) == '=' )                                           {  ADV(2);                                              goto E_CARET_ASSIGN; }
-    if (had_ws && last_value && is_rws_at(p, 1))                   {  ADV(1);                                              goto E_EXP;       }
+    if (PEEK(1) == '=' )                                           {  ADV(2);                                              goto AST_CARET_ASSIGN; }
+    if (had_ws && last_value && is_rws_at(p, 1))                   {  ADV(1);                                              goto AST_EXP;       }
     if (had_ws && last_value)                                      {  EMIT(T_CONCAT);                 }
-                                                                   {  tok_start = p; ADV(1);                               goto E_UNKNOWN;   }
+                                                                   {  tok_start = p; ADV(1);                               goto AST_UNKNOWN;   }
 /*--------------------------------------------------------------------------------------------------------------------*/
 S_OP_PIPE:
-    if (had_ws && last_value && is_rws_at(p, 1))                   {  ADV(1);                                              goto E_ALT;       }
+    if (had_ws && last_value && is_rws_at(p, 1))                   {  ADV(1);                                              goto AST_ALT;       }
     if (had_ws && last_value)                                      {  EMIT(T_CONCAT);                 }
-                                                                   {  ADV(1);                                              goto E_UN_PIPE;   }
+                                                                   {  ADV(1);                                              goto AST_UN_PIPE;   }
 /*--------------------------------------------------------------------------------------------------------------------*/
 S_OP_QUEST:
-    if (had_ws && last_value && is_rws_at(p, 1))                   {  ADV(1);                                              goto E_MATCH;     }
+    if (had_ws && last_value && is_rws_at(p, 1))                   {  ADV(1);                                              goto AST_MATCH;     }
     if (had_ws && last_value)                                      {  EMIT(T_CONCAT);                 }
-                                                                   {  ADV(1);                                              goto E_UN_QUEST;  }
+                                                                   {  ADV(1);                                              goto AST_UN_QUEST;  }
 /*--------------------------------------------------------------------------------------------------------------------*/
 S_OP_DOLLAR:
-    if (had_ws && last_value && is_rws_at(p, 1))                   {  ADV(1);                                              goto E_IMM_ASSIGN;}
+    if (had_ws && last_value && is_rws_at(p, 1))                   {  ADV(1);                                              goto AST_IMM_ASSIGN;}
     if (had_ws && last_value)                                      {  EMIT(T_CONCAT);                 }
-                                                                   {  ADV(1);                                              goto E_UN_DOLLAR; }
+                                                                   {  ADV(1);                                              goto AST_UN_DOLLAR; }
 /*--------------------------------------------------------------------------------------------------------------------*/
 S_OP_DOT:
-    if (had_ws && last_value && is_rws_at(p, 1))                   {  ADV(1);                                              goto E_COND_ASSIGN;  }
+    if (had_ws && last_value && is_rws_at(p, 1))                   {  ADV(1);                                              goto AST_COND_ASSIGN;  }
     if (had_ws && last_value)                                      {  EMIT(T_CONCAT);                 }
-                                                                   {  ADV(1);                                              goto E_UN_DOT;    }
+                                                                   {  ADV(1);                                              goto AST_UN_DOT;    }
 /*--------------------------------------------------------------------------------------------------------------------*/
 S_OP_AMP:
-    if (had_ws && last_value && is_rws_at(p, 1))                   {  ADV(1);                                              goto E_AMP;       }
+    if (had_ws && last_value && is_rws_at(p, 1))                   {  ADV(1);                                              goto AST_AMP;       }
     if (had_ws && last_value)                                      {  EMIT(T_CONCAT);                 }
-                                                                   {  ADV(1);                                              goto E_UN_AMP;    }
+                                                                   {  ADV(1);                                              goto AST_UN_AMP;    }
 /*--------------------------------------------------------------------------------------------------------------------*/
 S_OP_AT:
-    if (had_ws && last_value && is_rws_at(p, 1))                   {  ADV(1);                                              goto E_AT;        }
+    if (had_ws && last_value && is_rws_at(p, 1))                   {  ADV(1);                                              goto AST_AT;        }
     if (had_ws && last_value)                                      {  EMIT(T_CONCAT);                 }
-                                                                   {  ADV(1);                                              goto E_UN_AT;     }
+                                                                   {  ADV(1);                                              goto AST_UN_AT;     }
 /*--------------------------------------------------------------------------------------------------------------------*/
 S_OP_POUND:
-    if (had_ws && last_value && is_rws_at(p, 1))                   {  ADV(1);                                              goto E_POUND;     }
+    if (had_ws && last_value && is_rws_at(p, 1))                   {  ADV(1);                                              goto AST_POUND;     }
     if (had_ws && last_value)                                      {  EMIT(T_CONCAT);                 }
-                                                                   {  ADV(1);                                              goto E_UN_POUND;  }
+                                                                   {  ADV(1);                                              goto AST_UN_POUND;  }
 /*--------------------------------------------------------------------------------------------------------------------*/
 S_OP_PERCENT:
-    if (had_ws && last_value && is_rws_at(p, 1))                   {  ADV(1);                                              goto E_PERCENT;   }
+    if (had_ws && last_value && is_rws_at(p, 1))                   {  ADV(1);                                              goto AST_PERCENT;   }
     if (had_ws && last_value)                                      {  EMIT(T_CONCAT);                 }
-                                                                   {  ADV(1);                                              goto E_UN_PERCENT;}
+                                                                   {  ADV(1);                                              goto AST_UN_PERCENT;}
 /*--------------------------------------------------------------------------------------------------------------------*/
 S_OP_TILDE:
-    if (had_ws && last_value && is_rws_at(p, 1))                   {  ADV(1);                                              goto E_TILDE;     }
+    if (had_ws && last_value && is_rws_at(p, 1))                   {  ADV(1);                                              goto AST_TILDE;     }
     if (had_ws && last_value)                                      {  EMIT(T_CONCAT);                 }
-                                                                   {  ADV(1);                                              goto E_UN_TILDE;  }
+                                                                   {  ADV(1);                                              goto AST_UN_TILDE;  }
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_EOF:           return 0;        /* Bison end-of-input sentinel */
+AST_EOF:           return 0;        /* Bison end-of-input sentinel */
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_LPAREN:        EMIT(T_LPAREN);
+AST_LPAREN:        EMIT(T_LPAREN);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_RPAREN:        EMIT(T_RPAREN);
+AST_RPAREN:        EMIT(T_RPAREN);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_LBRACK:        EMIT(T_LBRACK);
+AST_LBRACK:        EMIT(T_LBRACK);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_RBRACK:        EMIT(T_RBRACK);
+AST_RBRACK:        EMIT(T_RBRACK);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_LBRACE:        EMIT(T_LBRACE);
+AST_LBRACE:        EMIT(T_LBRACE);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_RBRACE:        EMIT(T_RBRACE);
+AST_RBRACE:        EMIT(T_RBRACE);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_COMMA:         EMIT(T_COMMA);
+AST_COMMA:         EMIT(T_COMMA);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_SEMICOLON:     EMIT(T_SEMICOLON);
+AST_SEMICOLON:     EMIT(T_SEMICOLON);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_COLON:         EMIT(T_COLON);
+AST_COLON:         EMIT(T_COLON);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_ASSIGN:        EMIT(T_2EQUAL);
+AST_ASSIGN:        EMIT(T_2EQUAL);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_MATCH:         EMIT(T_2QUEST);
+AST_MATCH:         EMIT(T_2QUEST);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_ALT:           EMIT(T_2PIPE);
+AST_ALT:           EMIT(T_2PIPE);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_LEQ:           EMIT(T_LEQ);
+AST_LEQ:           EMIT(T_LEQ);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_LNE:           EMIT(T_LNE);
+AST_LNE:           EMIT(T_LNE);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_LLE:           EMIT(T_LLE);
+AST_LLE:           EMIT(T_LLE);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_LGE:           EMIT(T_LGE);
+AST_LGE:           EMIT(T_LGE);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_LLT:           EMIT(T_LLT);
+AST_LLT:           EMIT(T_LLT);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_LGT:           EMIT(T_LGT);
+AST_LGT:           EMIT(T_LGT);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_DIFFER:        EMIT(T_DIFFER);
+AST_DIFFER:        EMIT(T_DIFFER);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_IDENT_OP:      EMIT(T_IDENT_OP);
+AST_IDENT_OP:      EMIT(T_IDENT_OP);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_EQ:            EMIT(T_EQ);
+AST_EQ:            EMIT(T_EQ);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_NE:            EMIT(T_NE);
+AST_NE:            EMIT(T_NE);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_LE:            EMIT(T_LE);
+AST_LE:            EMIT(T_LE);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_GE:            EMIT(T_GE);
+AST_GE:            EMIT(T_GE);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_LT:            EMIT(T_LT);
+AST_LT:            EMIT(T_LT);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_GT:            EMIT(T_GT);
+AST_GT:            EMIT(T_GT);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_ADD:           EMIT(T_2PLUS);
+AST_ADD:           EMIT(T_2PLUS);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_SUB:           EMIT(T_2MINUS);
+AST_SUB:           EMIT(T_2MINUS);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_MUL:           EMIT(T_2STAR);
+AST_MUL:           EMIT(T_2STAR);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_DIV:           EMIT(T_2SLASH);
+AST_DIV:           EMIT(T_2SLASH);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_EXP:           EMIT(T_2CARET);
+AST_EXP:           EMIT(T_2CARET);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_IMM_ASSIGN:    EMIT(T_2DOLLAR);
+AST_IMM_ASSIGN:    EMIT(T_2DOLLAR);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_COND_ASSIGN:   EMIT(T_2DOT);
+AST_COND_ASSIGN:   EMIT(T_2DOT);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_AMP:           EMIT(T_2AMP);
+AST_AMP:           EMIT(T_2AMP);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_AT:            EMIT(T_2AT);
+AST_AT:            EMIT(T_2AT);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_POUND:         EMIT(T_2POUND);
+AST_POUND:         EMIT(T_2POUND);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_PERCENT:       EMIT(T_2PERCENT);
+AST_PERCENT:       EMIT(T_2PERCENT);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_TILDE:         EMIT(T_2TILDE);
+AST_TILDE:         EMIT(T_2TILDE);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_PLUS_ASSIGN:   EMIT(T_PLUS_ASSIGN);
+AST_PLUS_ASSIGN:   EMIT(T_PLUS_ASSIGN);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_MINUS_ASSIGN:  EMIT(T_MINUS_ASSIGN);
+AST_MINUS_ASSIGN:  EMIT(T_MINUS_ASSIGN);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_STAR_ASSIGN:   EMIT(T_STAR_ASSIGN);
+AST_STAR_ASSIGN:   EMIT(T_STAR_ASSIGN);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_SLASH_ASSIGN:  EMIT(T_SLASH_ASSIGN);
+AST_SLASH_ASSIGN:  EMIT(T_SLASH_ASSIGN);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_CARET_ASSIGN:  EMIT(T_CARET_ASSIGN);
+AST_CARET_ASSIGN:  EMIT(T_CARET_ASSIGN);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_UN_PLUS:       EMIT(T_1PLUS);
+AST_UN_PLUS:       EMIT(T_1PLUS);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_UN_MINUS:      EMIT(T_1MINUS);
+AST_UN_MINUS:      EMIT(T_1MINUS);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_UN_STAR:       EMIT(T_1STAR);
+AST_UN_STAR:       EMIT(T_1STAR);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_UN_SLASH:      EMIT(T_1SLASH);
+AST_UN_SLASH:      EMIT(T_1SLASH);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_UN_PERCENT:    EMIT(T_1PERCENT);
+AST_UN_PERCENT:    EMIT(T_1PERCENT);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_UN_AT:         EMIT(T_1AT);
+AST_UN_AT:         EMIT(T_1AT);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_UN_TILDE:      EMIT(T_1TILDE);
+AST_UN_TILDE:      EMIT(T_1TILDE);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_UN_DOLLAR:     EMIT(T_1DOLLAR);
+AST_UN_DOLLAR:     EMIT(T_1DOLLAR);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_UN_DOT:        EMIT(T_1DOT);
+AST_UN_DOT:        EMIT(T_1DOT);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_UN_POUND:      EMIT(T_1POUND);
+AST_UN_POUND:      EMIT(T_1POUND);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_UN_PIPE:       EMIT(T_1PIPE);
+AST_UN_PIPE:       EMIT(T_1PIPE);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_UN_EQUAL:      EMIT(T_1EQUAL);
+AST_UN_EQUAL:      EMIT(T_1EQUAL);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_UN_QUEST:      EMIT(T_1QUEST);
+AST_UN_QUEST:      EMIT(T_1QUEST);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_UN_AMP:        EMIT(T_1AMP);
+AST_UN_AMP:        EMIT(T_1AMP);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_UN_BANG:       EMIT(T_1BANG);
+AST_UN_BANG:       EMIT(T_1BANG);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_INT:           EMIT_V(T_INT);
+AST_INT:           EMIT_V(T_INT);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_REAL:          EMIT_V(T_REAL);
+AST_REAL:          EMIT_V(T_REAL);
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_CALL:
+AST_CALL:
     /* T_CALL is the call-form token: IDENT immediately followed by `(`,
      * emitted as a single atomic token (the `(` is consumed here).  The
      * grammar form is `T_CALL exprlist T_RPAREN` — no separate T_LPAREN.
@@ -605,10 +605,10 @@ E_CALL:
      *   (b) the prev token is T_DEFINE (e.g. `function name(args)`) —
      *       this is a definition, not a call; the name is plain T_IDENT
      *       and the `(` stays in stream as T_LPAREN.
-     * In both cases redirect to E_IDENT, which emits the proper token
+     * In both cases redirect to AST_IDENT, which emits the proper token
      * without consuming `(`. */
-    if (classify_keyword_range(tok_start, p) != T_IDENT) goto E_IDENT;
-    if (ctx->last_kind == T_DEFINE)                      goto E_IDENT;
+    if (classify_keyword_range(tok_start, p) != T_IDENT) goto AST_IDENT;
+    if (ctx->last_kind == T_DEFINE)                      goto AST_IDENT;
     {
         /* Capture identifier name (range [tok_start, p)) into ctx->text,
          * then advance p past the `(` so it is consumed atomically. */
@@ -623,7 +623,7 @@ E_CALL:
         return T_CALL;
     }
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_IDENT:
+AST_IDENT:
     {
         int kind = classify_keyword_range(tok_start, p);
         int n    = (int)(p - tok_start);
@@ -634,7 +634,7 @@ E_IDENT:
         ctx->p = p; ctx->last_kind = kind; return kind;
     }
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_KEYWORD:
+AST_KEYWORD:
     {
         int n = (int)(p - tok_start);
         if (n >= (int)sizeof(ctx->text)) n = (int)sizeof(ctx->text) - 1;
@@ -644,7 +644,7 @@ E_KEYWORD:
         ctx->p = p; ctx->last_kind = T_KEYWORD; return T_KEYWORD;
     }
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_STR:
+AST_STR:
     {
         ctx->strbuf[ctx->strpos] = '\0';
         int n = ctx->strpos;
@@ -655,7 +655,7 @@ E_STR:
         ctx->p = p; ctx->last_kind = T_STR; return T_STR;
     }
 /*--------------------------------------------------------------------------------------------------------------------*/
-E_UNKNOWN:       EMIT_V(T_UNKNOWN);
+AST_UNKNOWN:       EMIT_V(T_UNKNOWN);
 }
 /*--------------------------------------------------------------------------------------------------------------------*/
 static const char *sc_name_table[512];

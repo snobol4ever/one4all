@@ -14,22 +14,22 @@
 
 /* _eval_str_impl_fn — EVAL(string) hook for pattern-context strings.
  * Uses bison parse_expr_pat_from_str (snobol4.tab.c) which produces
- * EXPR_t with correct EXPR_e values directly — no CMPILE/CMPND_t bridge.
+ * AST_t with correct AST_e values directly — no CMPILE/CMPND_t bridge.
  *
  * In SM mode, this path remains via interp_eval_pat. interp_eval_pat is
  * SM-safe by construction: all user-function dispatch flows through APPLY_fn
  * (label_table_clear_stmts() in scrip.c nulls the IR label table after
- * sm_lower, so interp_eval's E_FNC label_lookup always returns NULL and
+ * sm_lower, so interp_eval's AST_FNC label_lookup always returns NULL and
  * falls through to APPLY_fn → _usercall_hook → RS-11 SM dispatch).
  *
  * eval_node was considered as an SM-mode shortcut but lacks coverage of the
- * pattern-primitive node kinds (E_LEN, E_TAB, E_BREAK, E_SPAN, E_ANY,
- * E_NOTANY, E_ARB, E_ARBNO, E_REM, E_FAIL, E_SUCCEED, E_FENCE, E_POS, ...)
+ * pattern-primitive node kinds (AST_LEN, AST_TAB, AST_BREAK, AST_SPAN, AST_ANY,
+ * AST_NOTANY, AST_ARB, AST_ARBNO, AST_REM, AST_FAIL, AST_SUCCEED, AST_FENCE, AST_POS, ...)
  * that EVAL('LEN(2)') etc. produce. interp_eval_pat handles these via
  * pat_len()/pat_tab()/etc. helpers; eval_node would silently coerce them
  * to STRING. RS-12 explored the route and reverted. */
 DESCR_t _eval_str_impl_fn(const char *s) {
-    EXPR_t *tree = parse_expr_pat_from_str(s);
+    AST_t *tree = parse_expr_pat_from_str(s);
     if (!tree) return FAILDESCR;
     return interp_eval_pat(tree);
 }
@@ -148,16 +148,16 @@ DESCR_t _usercall_hook(const char *name, DESCR_t *args, int nargs) {
         if (g_pl_active) {
             char pl_key[256];
             snprintf(pl_key, sizeof pl_key, "%s/%d", name, nargs);
-            EXPR_t *choice = pl_pred_table_lookup(&g_pl_pred_table, pl_key);
+            AST_t *choice = pl_pred_table_lookup(&g_pl_pred_table, pl_key);
             if (choice) {
                 /* Set up Prolog arg Term** from DESCR_t args, drive BB_ONCE */
                 Term **pl_args = (nargs > 0) ? pl_env_new(nargs) : NULL;
                 for (int _i = 0; _i < nargs; _i++)
                     pl_args[_i] = pl_unified_term_from_expr(
-                        /* wrap DESCR_t as a literal EXPR_t leaf */
+                        /* wrap DESCR_t as a literal AST_t leaf */
                         (args[_i].v == DT_S)
-                            ? &(EXPR_t){ .kind = E_QLIT, .sval = (char*)args[_i].s }
-                            : &(EXPR_t){ .kind = E_ILIT, .ival = (long)args[_i].s },
+                            ? &(AST_t){ .kind = AST_QLIT, .sval = (char*)args[_i].s }
+                            : &(AST_t){ .kind = AST_ILIT, .ival = (long)args[_i].s },
                         NULL);
                 Term **saved_env = g_pl_env;
                 g_pl_env = pl_args;

@@ -5,9 +5,9 @@
 # Bison-based Snocone parser handles the LS-4.b additions:
 #   * the 14 comparison/identity operators (== != < > <= >= and the
 #     :==:/:!=:/:<:/:>:/:<=:/:>=: lexical family and ::/:!: identity
-#     operators), each lowering to an E_FNC named call;
+#     operators), each lowering to an AST_FNC named call;
 #   * the T_FUNCTION call-form `EQ(2+2, 4)` lowering to
-#     E_FNC("EQ", E_ADD(...), E_ILIT(4));
+#     AST_FNC("EQ", AST_ADD(...), AST_ILIT(4));
 #   * the precedence relation: comparisons sit BELOW arithmetic add/sub
 #     so `a + b == c + d` parses as `EQ(a+b, c+d)`.
 #

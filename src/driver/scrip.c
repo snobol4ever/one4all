@@ -54,11 +54,11 @@ extern CODE_t *sno_parse(FILE *f, const char *filename);
 #include "../frontend/raku/raku_driver.h"
 #include "../frontend/rebus/rebus_lower.h"
 #include "../frontend/icon/icon_gen.h"    /* coro_bb_to/by/iterate/suspend, state types — U-17 */
-#include "../frontend/icon/icon_lex.h"    /* IcnTkKind — TK_AUG* for E_AUGOP in unified interp */
+#include "../frontend/icon/icon_lex.h"    /* IcnTkKind — TK_AUG* for AST_AUGOP in unified interp */
 
 /* ir_print_node — from src/ir/ir_print.c (linked via Makefile) */
-extern void ir_print_node   (const EXPR_t *e, FILE *f);
-extern void ir_print_node_nl(const EXPR_t *e, FILE *f);
+extern void ir_print_node   (const AST_t *e, FILE *f);
+extern void ir_print_node_nl(const AST_t *e, FILE *f);
 
 /* ── runtime ──────────────────────────────────────────────────────────── */
 #include "../runtime/x86/snobol4.h"
@@ -463,7 +463,7 @@ int main(int argc, char **argv)
     }
 
     /* Wire DT_S eval hook: EVAL(string) containing complex operators
-     * (E_DEFER, cursor-assign) routes through interp_eval_pat. */
+     * (AST_DEFER, cursor-assign) routes through interp_eval_pat. */
     {
         extern DESCR_t (*g_eval_str_hook)(const char *s);
         g_eval_str_hook = _eval_str_impl_fn;
@@ -529,7 +529,7 @@ int main(int argc, char **argv)
          * live IR for the BB engine. */
         SM_Program *sm = sm_preamble(prog);
         if (!sm) return 1;
-        prog = NULL;   /* SM owns its EXPR_t clones; for non-SNO IR stays alive via globals */
+        prog = NULL;   /* SM owns its AST_t clones; for non-SNO IR stays alive via globals */
         if (dump_sm) {
             sm_prog_print(sm, stdout);
             sm_prog_free(sm);

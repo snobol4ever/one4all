@@ -170,7 +170,7 @@ P_6_β:                      jmp         seq_r3_β
 seq_l3_α:                   AT_α        S_NV, cursor, seq_r3_α, P_6_ω ; @VAR α
 seq_l3_β:                   AT_β        P_6_ω ; @VAR β
 
-; E_VART CROSS → CALL_PAT (runtime DT_P/DT_S dispatch)
+; AST_VART CROSS → CALL_PAT (runtime DT_P/DT_S dispatch)
 seq_r3_α:                   lea         rdi, [rel S_CROSS]
                             call        stmt_get
                             mov         [rpat4_t], rax

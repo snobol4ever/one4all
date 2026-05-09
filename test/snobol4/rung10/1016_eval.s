@@ -188,7 +188,7 @@ section .text
 
 ; P_expr_α (α entry) [r12=DATA block]
 
-; E_INDR no varname → ω
+; AST_INDR no varname → ω
 P_expr_α:
 P_expr_β:                   jmp         patdef_expr_ω
 ;  γ/ω ---------------------------------------------------------------------------------------------------------------
@@ -201,7 +201,7 @@ patdef_expr_ω:              NAMED_PAT_ω P_expr_ret_ω ; named pat ω
 ;  sexp ================================================================================================================
 P_sexp_α:                   mov         qword [r12+16], 0
 
-; E_INDR *q → inline LIT 'qqq'
+; AST_INDR *q → inline LIT 'qqq'
 pat_sexp_body:              LIT_α       lit_str_1, 3, r12+24, cursor, subject_data, subject_len_val, patdef_sexp_γ, patdef_sexp_ω ; LIT α
 P_sexp_β:                   LIT_β       r12+24, cursor, patdef_sexp_ω ; LIT β
 ;  γ/ω ---------------------------------------------------------------------------------------------------------------
@@ -210,14 +210,14 @@ patdef_sexp_ω:              NAMED_PAT_ω P_sexp_ret_ω ; named pat ω
 
 ; P_fexp_α (α entry) [r12=DATA block]
 
-; E_STAR/E_INDR *ident → runtime DT_P dispatch
+; AST_STAR/AST_INDR *ident → runtime DT_P dispatch
 ;  fexp ================================================================================================================
 P_fexp_α:                   lea         rdi, [rel S_ident]
                             call        stmt_get
                             mov         [rpat0_t], rax
                             mov         [rpat0_p], rdx
                             CALL_PAT_α  rpat0_t, rpat0_p, rpat0_s, cursor, patdef_fexp_γ, patdef_fexp_ω
-P_fexp_β:                   CALL_PAT_β  rpat0_s, cursor, patdef_fexp_ω ; E_STAR β
+P_fexp_β:                   CALL_PAT_β  rpat0_s, cursor, patdef_fexp_ω ; AST_STAR β
 ;  γ/ω ---------------------------------------------------------------------------------------------------------------
 patdef_fexp_γ:              NAMED_PAT_γ P_fexp_ret_γ ; named pat γ
 patdef_fexp_ω:              NAMED_PAT_ω P_fexp_ret_ω ; named pat ω

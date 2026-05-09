@@ -41,8 +41,8 @@ extern CODE_t *sno_parse(FILE *f, const char *filename);
 #include "frontend/icon/icon_gen.h"
 #include "frontend/icon/icon_lex.h"
 
-extern void ir_print_node   (const EXPR_t *e, FILE *f);
-extern void ir_print_node_nl(const EXPR_t *e, FILE *f);
+extern void ir_print_node   (const AST_t *e, FILE *f);
+extern void ir_print_node_nl(const AST_t *e, FILE *f);
 
 /* ── runtime ──────────────────────────────────────────────────────────── */
 #include "runtime/x86/snobol4.h"
@@ -90,8 +90,8 @@ FILE *raku_fh_get(int idx);
 void  raku_fh_free(int idx);
 
 /* ── label table (defined in interp_label.c) ─────────────────────────── */
-const char *define_spec_from_expr(EXPR_t *subj);
-const char *define_entry_from_expr(EXPR_t *subj);
+const char *define_spec_from_expr(AST_t *subj);
+const char *define_entry_from_expr(AST_t *subj);
 #define LABEL_MAX 4096
 typedef struct { const char *name; STMT_t *stmt; } LabelEntry;
 extern LabelEntry label_table[LABEL_MAX];
@@ -131,7 +131,7 @@ void icn_init_update_snapshot(char **snames, DESCR_t *svals, int nsaved);
 
 /* ── pattern helpers (defined in interp_eval.c) ──────────────────────── */
 int _is_pat_fnc_name(const char *s);
-int _expr_is_pat(EXPR_t *e);
+int _expr_is_pat(AST_t *e);
 
 /* ── set_and_trace (defined in interp_eval.c, used widely) ──────────── */
 void set_and_trace(const char *name, DESCR_t val);
@@ -153,13 +153,13 @@ static inline int NAME_SET(DESCR_t nd, DESCR_t val) {
 }
 
 /* ── lvalue helpers (defined in interp_lvalue.c) ───────────────────── */
-DESCR_t *interp_eval_ref(EXPR_t *e);
+DESCR_t *interp_eval_ref(AST_t *e);
 
 /* ── DATA field interior ptr (defined in interp_eval.c) ─────────────── */
 DESCR_t *data_field_ptr(const char *fname, DESCR_t inst);
 
 /* ── Icon string-section assign (defined in interp_eval.c) ──────────── */
-int icn_string_section_assign(EXPR_t *lhs, DESCR_t val);
+int icn_string_section_assign(AST_t *lhs, DESCR_t val);
 
 /* ── DATA registry (defined in interp_data.c) ───────────────────────── */
 typedef struct { char name[64]; int nfields; char fields[64][64]; } ScDatType;
@@ -173,8 +173,8 @@ DESCR_t    sc_dat_field_get(const char *fname, DESCR_t obj);
 DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs);
 
 /* ── icn helpers needed across eval/call (defined in interp_eval.c) ──── */
-DESCR_t icn_call_builtin(EXPR_t *call, DESCR_t *args, int nargs);
-/* CH-17g-runtime-bridge-1: name-based dispatch for EXPR_t-free Icon builtins.
+DESCR_t icn_call_builtin(AST_t *call, DESCR_t *args, int nargs);
+/* CH-17g-runtime-bridge-1: name-based dispatch for AST_t-free Icon builtins.
  * Returns 1 if handled (and writes result to *out), 0 otherwise.
  * Lets SM_CALL_FN (sm_interp.c) reach Icon `write`/`writes` from chunk
  * bodies without needing an IR call node. */
@@ -182,10 +182,10 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
 const char *real_str(double r, char *buf, int bufsz);
 
 /* ── RS-23a-raku: Raku-builtin dispatch (defined in runtime/interp/raku_builtins.c) ── */
-int raku_try_call_builtin(EXPR_t *call, DESCR_t *out);
+int raku_try_call_builtin(AST_t *call, DESCR_t *out);
 
 /* ── RS-23-extra-prep: SCAN-context builtin dispatch (defined in runtime/interp/scan_builtins.c) ── */
-int scan_try_call_builtin(EXPR_t *call, DESCR_t *args, int nargs, DESCR_t *out);
+int scan_try_call_builtin(AST_t *call, DESCR_t *args, int nargs, DESCR_t *out);
 
 /* ── Prolog pred table size (used by execute_program) ───────────────── */
 #define PL_PRED_TABLE_SIZE PL_PRED_TABLE_SIZE_FWD

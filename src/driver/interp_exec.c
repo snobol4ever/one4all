@@ -134,9 +134,9 @@ void execute_program(CODE_t *prog)
         /* LANG_SNO (0): fall through to existing SNOBOL4 path below.
          * Also skip any stray Prolog/Icon IR nodes that have lang==LANG_SNO
          * (shouldn't happen after U-12/U-13, but keep guard for safety). */
-        if (s->subject && (s->subject->kind == E_CHOICE ||
-                           s->subject->kind == E_UNIFY  ||
-                           s->subject->kind == E_CLAUSE)) {
+        if (s->subject && (s->subject->kind == AST_CHOICE ||
+                           s->subject->kind == AST_UNIFY  ||
+                           s->subject->kind == AST_CLAUSE)) {
             s = s->next; continue;
         }
 
@@ -145,7 +145,7 @@ void execute_program(CODE_t *prog)
         subj_name = NULL;
 
         if (s->subject) {
-            if (s->subject->kind == E_VAR && s->subject->sval) {
+            if (s->subject->kind == AST_VAR && s->subject->sval) {
                 subj_name = s->subject->sval;
                 /* Only read the value when we need to match against it.
                  * Pure assignment (has_eq, no pattern) only needs the name —
@@ -153,12 +153,12 @@ void execute_program(CODE_t *prog)
                  * zero-arg call (APPLY_fn → g_user_call_hook), causing Error 5. */
                 if (s->pattern)
                     subj_val = NV_GET_fn(subj_name);
-            } else if (s->subject->kind == E_INDIRECT && s->subject->nchildren > 0) {
+            } else if (s->subject->kind == AST_INDIRECT && s->subject->nchildren > 0) {
                 /* $'$B' or $X as subject — resolve to variable name for write-back */
-                EXPR_t *ic = s->subject->children[0];
-                if (ic->kind == E_QLIT && ic->sval) {
+                AST_t *ic = s->subject->children[0];
+                if (ic->kind == AST_QLIT && ic->sval) {
                     subj_name = ic->sval;  /* $'name' — literal name, use directly */
-                } else if (ic->kind == E_VAR && ic->sval) {
+                } else if (ic->kind == AST_VAR && ic->sval) {
                     DESCR_t xv = NV_GET_fn(ic->sval);
                     subj_name = VARVAL_fn(xv);
                 } else {
@@ -174,7 +174,7 @@ void execute_program(CODE_t *prog)
                     subj_val = NV_GET_fn(subj_name);
                 } else if (!subj_name)
                     subj_val = interp_eval(s->subject);
-            } else if (s->subject->kind == E_FNC && s->has_eq && !s->pattern) {
+            } else if (s->subject->kind == AST_FNC && s->has_eq && !s->pattern) {
                 /* SN-6 fix: fn() = val / fn(args) = val — LHS-as-fn assignment.
                  * The dedicated branches below (ITEM/FIELD setter at ~L4251,
                  * NRETURN lvalue-assign at ~L4281) call the function exactly
@@ -236,8 +236,8 @@ void execute_program(CODE_t *prog)
 
         /* ── subscript assignment: A<i> = expr ─────────────────────── */
         } else if (s->has_eq && s->subject &&
-                   s->subject->kind == E_IDX) {
-            EXPR_t *idx_e = s->subject;
+                   s->subject->kind == AST_IDX) {
+            AST_t *idx_e = s->subject;
             if (idx_e->nchildren >= 2) {
                 DESCR_t base = interp_eval(idx_e->children[0]);
                 DESCR_t idx  = interp_eval(idx_e->children[1]);
@@ -252,9 +252,9 @@ void execute_program(CODE_t *prog)
                         subscript_set(base, idx, repl_val);
                     }
                     /* SN-26-bridge-coverage-g: fire VALUE record for subscript store.
-                     * Use the base variable name (children[0]->sval when E_VAR). */
+                     * Use the base variable name (children[0]->sval when AST_VAR). */
                     { const char *base_nm = (idx_e->children[0] &&
-                                             idx_e->children[0]->kind == E_VAR)
+                                             idx_e->children[0]->kind == AST_VAR)
                                            ? idx_e->children[0]->sval : NULL;
                       if (base_nm) comm_var(base_nm, repl_val); }
                     succeeded = 1;
@@ -263,7 +263,7 @@ void execute_program(CODE_t *prog)
 
         /* ── keyword assignment: &KW = expr ───────────────────────── */
         } else if (s->has_eq && s->subject &&
-                   s->subject->kind == E_KEYWORD && s->subject->sval) {
+                   s->subject->kind == AST_KEYWORD && s->subject->sval) {
             DESCR_t repl_val = s->replacement ? interp_eval(s->replacement) : NULVCL;
             if (IS_FAIL_fn(repl_val)) {
                 succeeded = 0;
@@ -276,8 +276,8 @@ void execute_program(CODE_t *prog)
 
         /* ── indirect assignment: $expr = rhs ─────────────────────── */
         } else if (s->has_eq && s->subject &&
-                   s->subject->kind == E_INDIRECT) {
-            EXPR_t *ichild = s->subject->nchildren > 0 ? s->subject->children[0] : NULL;
+                   s->subject->kind == AST_INDIRECT) {
+            AST_t *ichild = s->subject->nchildren > 0 ? s->subject->children[0] : NULL;
             DESCR_t repl_val = s->replacement ? interp_eval(s->replacement) : NULVCL;
             if (IS_FAIL_fn(repl_val)) {
                 succeeded = 0;
@@ -298,7 +298,7 @@ void execute_program(CODE_t *prog)
 
         /* ── ITEM setter or DATA field setter: fname(obj[,i]) = expr ── */
         } else if (s->has_eq && s->subject &&
-                   s->subject->kind == E_FNC && s->subject->sval &&
+                   s->subject->kind == AST_FNC && s->subject->sval &&
                    s->subject->nchildren >= 1) {
             DESCR_t repl_val = s->replacement ? interp_eval(s->replacement) : NULVCL;
             if (IS_FAIL_fn(repl_val)) {
@@ -329,7 +329,7 @@ void execute_program(CODE_t *prog)
 
         /* ── NRETURN lvalue assign: fn() = expr  (zero-arg fn call as lvalue) ── */
         } else if (s->has_eq && s->subject &&
-                   s->subject->kind == E_FNC && s->subject->sval &&
+                   s->subject->kind == AST_FNC && s->subject->sval &&
                    s->subject->nchildren == 0) {
             DESCR_t rv = s->replacement ? interp_eval(s->replacement) : NULVCL;
             if (!IS_FAIL_fn(rv)) {
@@ -414,7 +414,7 @@ void execute_program(CODE_t *prog)
                             { proc_table_call(_pi,NULL,0); break; }   /* CH-17g-call-sites */
                 g_lang = 0;
             } else if (_m->lang == LANG_PL) {
-                EXPR_t *pl_main = pl_pred_table_lookup(&g_pl_pred_table, "main/0");
+                AST_t *pl_main = pl_pred_table_lookup(&g_pl_pred_table, "main/0");
                 if (pl_main) {
                     int sv_pl = g_pl_active; g_pl_active = 1;
                     interp_eval(pl_main);
@@ -435,7 +435,7 @@ void execute_program(CODE_t *prog)
         }
     }
     {
-        EXPR_t *pl_main = pl_pred_table_lookup(&g_pl_pred_table, "main/0");
+        AST_t *pl_main = pl_pred_table_lookup(&g_pl_pred_table, "main/0");
         if (pl_main) {
             int sv_pl = g_pl_active;
             g_pl_active = 1;

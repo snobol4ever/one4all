@@ -1,6 +1,6 @@
 // Ast.cs — Typed AST nodes for scrip-interp.cs
 //
-// Mirrors STMT_t / EXPR_t from src/frontend/snobol4/scrip_cc.h
+// Mirrors STMT_t / AST_t from src/frontend/snobol4/scrip_cc.h
 // Produced by Snobol4Parser, consumed by Executor.
 //
 // AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6

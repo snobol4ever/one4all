@@ -227,9 +227,9 @@
     ldstr      "1"
     call       string [snobol4lib]Snobol4Lib::sno_add(string, string)
     stsfld     string Wordcount::kw_stno
-    // unhandled E_FNC stub
+    // unhandled AST_FNC stub
     ldstr      ""
-    // unhandled E_FNC stub
+    // unhandled AST_FNC stub
     ldstr      ""
     call       string [mscorlib]System.String::Concat(string, string)
     dup

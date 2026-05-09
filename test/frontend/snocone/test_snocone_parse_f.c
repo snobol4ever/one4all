@@ -84,8 +84,8 @@ static int is_cond_fail(const STMT_t *s) {
 static void test_if_no_else_simple(void) {
     /* if (cond) y = 1;
      * Expect:
-     *   stmt[0]: subj=E_VAR(cond), go.onfailure="_Lend_0001"
-     *   stmt[1]: subj=E_VAR(y), repl=E_ILIT(1), has_eq=1
+     *   stmt[0]: subj=AST_VAR(cond), go.onfailure="_Lend_0001"
+     *   stmt[1]: subj=AST_VAR(y), repl=AST_ILIT(1), has_eq=1
      *   stmt[2]: label="_Lend_0001"
      */
     Program *p = snocone_parse_program("if (cond) y = 1;", "<test>");
@@ -94,11 +94,11 @@ static void test_if_no_else_simple(void) {
     ASSERT(n == 3, "3 stmts, got %d", n);
     if (n >= 3) {
         ASSERT(is_cond_fail(st[0]), "stmt[0] is cond+fail");
-        ASSERT(st[0]->subject && st[0]->subject->kind == E_VAR, "cond is E_VAR");
+        ASSERT(st[0]->subject && st[0]->subject->kind == AST_VAR, "cond is AST_VAR");
         ASSERT(strcmp(st[0]->subject->sval, "cond") == 0, "cond.sval==cond");
         ASSERT(st[0]->go->onfailure != NULL, "onfailure set");
         ASSERT(st[1]->has_eq == 1, "stmt[1] is assign (has_eq)");
-        ASSERT(st[1]->subject && st[1]->subject->kind == E_VAR && strcmp(st[1]->subject->sval, "y") == 0, "stmt[1] LHS is y");
+        ASSERT(st[1]->subject && st[1]->subject->kind == AST_VAR && strcmp(st[1]->subject->sval, "y") == 0, "stmt[1] LHS is y");
         ASSERT(is_label_only(st[2]), "stmt[2] is label-only");
         ASSERT(strcmp(st[2]->label, st[0]->go->onfailure) == 0, "fail target matches end label");
     }
@@ -333,7 +333,7 @@ static void test_while_block(void) {
     if (n >= 5) {
         ASSERT(is_label_only(st[0]), "[0] Ltop");
         ASSERT(is_cond_fail(st[1]), "[1] cond fail");
-        ASSERT(st[1]->subject->kind == E_FNC, "while cond is E_FNC (LT)");
+        ASSERT(st[1]->subject->kind == AST_FNC, "while cond is AST_FNC (LT)");
         ASSERT(strcmp(st[1]->subject->sval, "LT") == 0, "fname=LT");
     }
     free(st);

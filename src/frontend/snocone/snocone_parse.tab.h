@@ -108,7 +108,7 @@ typedef struct LoopFrame {
 /* Parser state — passed to sc_parse() via %parse-param.  Carries the
  * FSM lexer context (the single producer of tokens), the code under
  * construction, and a small error counter.  Uses CODE_t (typedef alias
- * of CODE_t) for symmetry with EXPR_t — Snocone's parser produces
+ * of CODE_t) for symmetry with AST_t — Snocone's parser produces
  * code, not just an expression. */
 typedef struct ScParseState {
     struct LexCtx *ctx;
@@ -245,7 +245,7 @@ union SC_STYPE
 {
 #line 384 "snocone_parse.y"
 
-    EXPR_t *expr;
+    AST_t *expr;
     char   *str;
     long    ival;
     double  dval;

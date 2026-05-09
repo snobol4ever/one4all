@@ -1472,7 +1472,7 @@ YY_RULE_SETUP
 	YY_BREAK
 /* ── Double-quoted string: flat literal or interpolated ──────── */
 /* If the buffer contains '$', emit LIT_INTERP_STR (RK-12).     */
-/* The lowerer splits on $var boundaries into an E_CAT chain.    */
+/* The lowerer splits on $var boundaries into an AST_CAT chain.    */
 case 62:
 YY_RULE_SETUP
 #line 120 "frontend/raku/raku.l"

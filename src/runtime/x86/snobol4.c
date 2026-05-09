@@ -2906,7 +2906,7 @@ DESCR_t NV_SET_fn(const char *name, DESCR_t val) {  /* RT-5: returns val for emb
 
     /* SIL: writing to an unknown & name → ERRTYP,7 (Unknown keyword).
      * We detect keyword context by checking if the name matches any known keyword.
-     * NV_SET_fn is called with the bare name (no '&') from E_KEYWORD nodes.
+     * NV_SET_fn is called with the bare name (no '&') from AST_KEYWORD nodes.
      * Non-keyword variables are set via NV_SET_fn too, so we must only fire
      * Error 7 when the caller is in keyword context — signalled by g_kw_ctx. */
     if (g_kw_ctx) {

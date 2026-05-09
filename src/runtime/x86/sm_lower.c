@@ -1,7 +1,7 @@
 /*
  * sm_lower.c — IR → SM_Program compiler pass (M-SCRIP-U3)
  *
- * Walks a CODE_t* (linked list of STMT_t, each holding EXPR_t trees)
+ * Walks a CODE_t* (linked list of STMT_t, each holding AST_t trees)
  * and emits a flat SM_Program instruction sequence.
  *
  * SNOBOL4 statement model:
@@ -35,10 +35,10 @@
 #include <gc/gc.h>
 #include "snobol4.h"   /* FNCEX_fn, FUNC_NPARAMS_fn */
 
-/* RS-9b: emit SM_PUSH_EXPR with a GC-cloned EXPR_t* so the SM_Program
- * owns its EXPR_t* values independently of the calloc-based IR tree.
+/* RS-9b: emit SM_PUSH_EXPR with a GC-cloned AST_t* so the SM_Program
+ * owns its AST_t* values independently of the calloc-based IR tree.
  * All SM_PUSH_EXPR emissions go through this helper. */
-static void emit_push_expr(SM_Program *p, const EXPR_t *e)
+static void emit_push_expr(SM_Program *p, const AST_t *e)
 {
     sm_emit_ptr(p, SM_PUSH_EXPR, (void *)expr_gc_clone(e));
 }
@@ -53,42 +53,42 @@ static void emit_push_expr(SM_Program *p, const EXPR_t *e)
  * to dispatch via entry_pc, at which point the unhandled kinds in proc bodies
  * become reachable and will need real lowering — that is later-rung territory
  * (CH-17h reactivates CH-15b for the Icon generator kinds; the cset and
- * E_ALTERNATE / E_ITERATE / E_REVASSIGN / E_REVSWAP gaps will be filled by
+ * AST_ALTERNATE / AST_ITERATE / AST_REVASSIGN / AST_REVSWAP gaps will be filled by
  * the same wave). */
 static int g_chunk_body_lowering = 0;
 
 /* CHUNKS-step17b'' (CH-17b''): per-proc IcnScope active during chunk-body
  * lowering.  Mirrors what coro_call's icn_scope_patch builds at runtime — but
- * built at lower-time and consulted (read-only) by the E_VAR / E_ASSIGN cases
+ * built at lower-time and consulted (read-only) by the AST_VAR / AST_ASSIGN cases
  * in lower_expr so chunks emit SM_LOAD_FRAME slot / SM_STORE_FRAME slot for
  * params + locals, leaving SM_PUSH_VAR / SM_STORE_VAR for true globals,
  * builtins, and other-proc references.
  *
  * Built and torn down in the per-proc emission loop below; NULL outside that
- * loop.  E_VAR / E_ASSIGN consult it gated on g_chunk_body_lowering so the
+ * loop.  AST_VAR / AST_ASSIGN consult it gated on g_chunk_body_lowering so the
  * stmt-level lowering (which still walks IR via coro_call) is unaffected. */
 static IcnScope *g_chunk_scope = NULL;
 
 /* Read-only mirror of coro_runtime.c's icn_scope_patch — walks the proc body's
- * EXPR_t tree and grows `sc` with non-global E_VAR + E_GLOBAL-decl names.  Does
- * NOT mutate EXPR_t.ival in place (the IR walker's slot indices were already
+ * AST_t tree and grows `sc` with non-global AST_VAR + AST_GLOBAL-decl names.  Does
+ * NOT mutate AST_t.ival in place (the IR walker's slot indices were already
  * written by coro_call earlier when the proc was first invoked, OR will be
  * written next time it runs the IR path; both are safe because slot numbers
  * are deterministic — same scope-add order yields same slots).  This walker
  * gives us the same scope without committing to mutate IR at this time. */
-static void chunk_scope_walk(IcnScope *sc, EXPR_t *e) {
+static void chunk_scope_walk(IcnScope *sc, AST_t *e) {
     if (!e) return;
-    if (e->kind == E_GLOBAL) {
+    if (e->kind == AST_GLOBAL) {
         for (int i = 0; i < e->nchildren; i++)
             if (e->children[i] && e->children[i]->sval)
                 scope_add(sc, e->children[i]->sval);
         return;
     }
-    if (e->kind == E_VAR && e->sval) {
+    if (e->kind == AST_VAR && e->sval) {
         /* Mirror icn_scope_patch: globals (registered via global_register at
          * polyglot_init time) bridge to the SNO NV store — they DON'T get a
          * frame slot.  Non-global, non-keyword vars become slots in entry
-         * order (params first, then E_GLOBAL-decl names, then any encountered
+         * order (params first, then AST_GLOBAL-decl names, then any encountered
          * here).  Names starting with '&' are keywords — leave them alone
          * (lowered as SM_PUSH_VAR with verbatim sval). */
         if (e->sval[0] != '&' && !is_global(e->sval))
@@ -249,7 +249,7 @@ static int emit_goto(SM_Program *p, LabelTable *lt,
 /* ── Expression lowering ────────────────────────────────────────────────── */
 
 /* Forward declaration */
-static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e);
+static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e);
 
 /* F-2 RS-7: boilerplate macros for the two most common lowering patterns.
  * LOWER2(op)     — lower both children then emit binary op (arith, etc.)
@@ -260,11 +260,11 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e);
 #define LOWER1_VAL(op) do { lower_expr(p,lt,CH0(e)); sm_emit(p,(op)); return; } while(0)
 #define LOWER1_PAT(op) do { lower_pat_expr(p,lt,CH0(e)); sm_emit(p,(op)); return; } while(0)
 
-/* TL-2: extract arg *names* from a *fn(var,var,...) E_FNC subtree so
+/* TL-2: extract arg *names* from a *fn(var,var,...) AST_FNC subtree so
  * SM_PAT_CAPTURE_FN can carry them in a[2].s for flush-time resolution.
  *
  * Returns:
- *   NULL  — if the E_FNC has no children, any child is not E_VAR with a
+ *   NULL  — if the AST_FNC has no children, any child is not AST_VAR with a
  *           non-NULL sval, or allocation failed.  Callers treat NULL as
  *           "fall back to legacy eager-eval path" (pat_assign_callcap with
  *           NULL args).
@@ -272,13 +272,13 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e);
  *
  * '\t' is safe because SNOBOL4 identifiers match [A-Za-z_$.][...], never
  * containing whitespace.  Callers split on '\t' to recover individual names. */
-static const char *sm_pat_capture_fn_arg_names(const EXPR_t *fnc)
+static const char *sm_pat_capture_fn_arg_names(const AST_t *fnc)
 {
     if (!fnc || fnc->nchildren <= 0) return NULL;
     size_t total_len = 0;
     for (int i = 0; i < fnc->nchildren; i++) {
-        const EXPR_t *c = fnc->children[i];
-        if (!c || c->kind != E_VAR || !c->sval) return NULL;
+        const AST_t *c = fnc->children[i];
+        if (!c || c->kind != AST_VAR || !c->sval) return NULL;
         total_len += strlen(c->sval) + 1;  /* name + separator/terminator */
     }
     char *buf = (char *)GC_MALLOC(total_len);
@@ -294,29 +294,29 @@ static const char *sm_pat_capture_fn_arg_names(const EXPR_t *fnc)
     return buf;
 }
 
-static void lower_pat_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
+static void lower_pat_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
 {
     if (!e) return;
 
     switch (e->kind) {
 
     /* Literals in pattern context → SM_PAT_LIT */
-    case E_QLIT:
+    case AST_QLIT:
         sm_emit_s(p, SM_PAT_LIT, e->sval ? e->sval : "");
         return;
 
     /* Variable → dereference, then pattern */
-    case E_VAR:
+    case AST_VAR:
         sm_emit_s(p, SM_PUSH_VAR, e->sval);
         sm_emit(p, SM_PAT_DEREF);
         return;
 
     /* Primitives */
-    case E_ARB:      sm_emit(p, SM_PAT_ARB);     return;
-    case E_REM:      sm_emit(p, SM_PAT_REM);      return;
-    case E_FAIL:     sm_emit(p, SM_PAT_FAIL);     return;
-    case E_SUCCEED:  sm_emit(p, SM_PAT_SUCCEED);  return;
-    case E_FENCE:
+    case AST_ARB:      sm_emit(p, SM_PAT_ARB);     return;
+    case AST_REM:      sm_emit(p, SM_PAT_REM);      return;
+    case AST_FAIL:     sm_emit(p, SM_PAT_FAIL);     return;
+    case AST_SUCCEED:  sm_emit(p, SM_PAT_SUCCEED);  return;
+    case AST_FENCE:
         if (e->nchildren > 0) {
             lower_pat_expr(p, lt, e->children[0]);
             sm_emit(p, SM_PAT_FENCE1);
@@ -324,25 +324,25 @@ static void lower_pat_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
             sm_emit(p, SM_PAT_FENCE);
         }
         return;
-    case E_ABORT:    sm_emit(p, SM_PAT_ABORT);    return;
-    case E_BAL:      sm_emit(p, SM_PAT_BAL);      return;
+    case AST_ABORT:    sm_emit(p, SM_PAT_ABORT);    return;
+    case AST_BAL:      sm_emit(p, SM_PAT_BAL);      return;
 
     /* Parameterised primitives — child[0] is the argument expr */
-    case E_ANY:    lower_expr(p, lt, CH0(e)); sm_emit(p, SM_PAT_ANY);    return;
-    case E_NOTANY: lower_expr(p, lt, CH0(e)); sm_emit(p, SM_PAT_NOTANY); return;
-    case E_SPAN:   lower_expr(p, lt, CH0(e)); sm_emit(p, SM_PAT_SPAN);   return;
-    case E_BREAK:  lower_expr(p, lt, CH0(e)); sm_emit(p, SM_PAT_BREAK);  return;
-    case E_BREAKX: lower_expr(p, lt, CH0(e)); sm_emit(p, SM_PAT_BREAK);  return; /* BREAKX → BREAK */
-    case E_LEN:    lower_expr(p, lt, CH0(e)); sm_emit(p, SM_PAT_LEN);    return;
-    case E_POS:    lower_expr(p, lt, CH0(e)); sm_emit(p, SM_PAT_POS);    return;
-    case E_RPOS:   lower_expr(p, lt, CH0(e)); sm_emit(p, SM_PAT_RPOS);   return;
-    case E_TAB:    lower_expr(p, lt, CH0(e)); sm_emit(p, SM_PAT_TAB);    return;
-    case E_RTAB:   lower_expr(p, lt, CH0(e)); sm_emit(p, SM_PAT_RTAB);   return;
-    case E_ARBNO:  LOWER1_PAT(SM_PAT_ARBNO);
+    case AST_ANY:    lower_expr(p, lt, CH0(e)); sm_emit(p, SM_PAT_ANY);    return;
+    case AST_NOTANY: lower_expr(p, lt, CH0(e)); sm_emit(p, SM_PAT_NOTANY); return;
+    case AST_SPAN:   lower_expr(p, lt, CH0(e)); sm_emit(p, SM_PAT_SPAN);   return;
+    case AST_BREAK:  lower_expr(p, lt, CH0(e)); sm_emit(p, SM_PAT_BREAK);  return;
+    case AST_BREAKX: lower_expr(p, lt, CH0(e)); sm_emit(p, SM_PAT_BREAK);  return; /* BREAKX → BREAK */
+    case AST_LEN:    lower_expr(p, lt, CH0(e)); sm_emit(p, SM_PAT_LEN);    return;
+    case AST_POS:    lower_expr(p, lt, CH0(e)); sm_emit(p, SM_PAT_POS);    return;
+    case AST_RPOS:   lower_expr(p, lt, CH0(e)); sm_emit(p, SM_PAT_RPOS);   return;
+    case AST_TAB:    lower_expr(p, lt, CH0(e)); sm_emit(p, SM_PAT_TAB);    return;
+    case AST_RTAB:   lower_expr(p, lt, CH0(e)); sm_emit(p, SM_PAT_RTAB);   return;
+    case AST_ARBNO:  LOWER1_PAT(SM_PAT_ARBNO);
 
     /* Concatenation (sequence in pattern) → left then right, then SM_PAT_CAT */
-    case E_SEQ:
-    case E_CAT:
+    case AST_SEQ:
+    case AST_CAT:
         for (int i = 0; i < e->nchildren; i++)
             lower_pat_expr(p, lt, e->children[i]);
         /* n-ary: emit n-1 SM_PAT_CAT */
@@ -351,7 +351,7 @@ static void lower_pat_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         return;
 
     /* Alternation */
-    case E_ALT:
+    case AST_ALT:
         for (int i = 0; i < e->nchildren; i++)
             lower_pat_expr(p, lt, e->children[i]);
         for (int i = 1; i < e->nchildren; i++)
@@ -359,49 +359,49 @@ static void lower_pat_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         return;
 
     /* Captures */
-    case E_CAPT_COND_ASGN:
+    case AST_CAPT_COND_ASGN:
         /* child[0] = sub-pattern, child[1] = variable; a[1].i=0 → cond (.V) */
         lower_pat_expr(p, lt, e->nchildren > 0 ? e->children[0] : NULL);
         if (e->nchildren > 1 && e->children[1]) {
-            EXPR_t *var_expr = e->children[1];
-            /* Detect . *func() — E_DEFER(E_FNC) — emit SM_PAT_CAPTURE_FN */
-            if (var_expr->kind == E_DEFER
+            AST_t *var_expr = e->children[1];
+            /* Detect . *func() — AST_DEFER(AST_FNC) — emit SM_PAT_CAPTURE_FN */
+            if (var_expr->kind == AST_DEFER
                     && var_expr->nchildren > 0
                     && var_expr->children[0]
-                    && var_expr->children[0]->kind == E_FNC
+                    && var_expr->children[0]->kind == AST_FNC
                     && var_expr->children[0]->sval) {
-                const EXPR_t *fnc = var_expr->children[0];
+                const AST_t *fnc = var_expr->children[0];
                 const char *namelist = sm_pat_capture_fn_arg_names(fnc);
                 if (namelist || fnc->nchildren == 0) {
-                    /* TL-2 name-stash path (all args are plain E_VAR, or no args). */
+                    /* TL-2 name-stash path (all args are plain AST_VAR, or no args). */
                     int idx = sm_emit_s(p, SM_PAT_CAPTURE_FN, fnc->sval);
                     p->instrs[idx].a[1].i = 0;  /* conditional */
                     p->instrs[idx].a[2].s = namelist;
                 } else {
                     /* SN-8a: args-on-stack path — eager-eval each arg, then
                      * SM_PAT_CAPTURE_FN_ARGS pops them and calls pat_assign_callcap.
-                     * SN-26c-parseerr-c: defer E_FNC sub-args as compiled SM chunks.
-                     * SN-26c-parseerr-d: also defer E_VAR — when args are mixed
+                     * SN-26c-parseerr-c: defer AST_FNC sub-args as compiled SM chunks.
+                     * SN-26c-parseerr-d: also defer AST_VAR — when args are mixed
                      * (e.g. literal+var) the all_vars name-stash fast path
-                     * doesn't fire, and an E_VAR set by an earlier capture in
+                     * doesn't fire, and an AST_VAR set by an earlier capture in
                      * the same pattern would be eagerly read at build time
                      * instead of at match time.
                      * SN-32b (SM/JIT parity with IR-side -t fix): defer all
-                     * non-E_QLIT args.  Compound expressions like `nTop()+1`
-                     * (E_ADD wrapping E_FNC) eagerly invoked via lower_expr
+                     * non-AST_QLIT args.  Compound expressions like `nTop()+1`
+                     * (AST_ADD wrapping AST_FNC) eagerly invoked via lower_expr
                      * cause the inner function to fire at pattern-build time,
                      * not at match time — same shape as SN-26-bridge-coverage-t
                      * but on the SM lowering side.  Thaw at match time via
-                     * EVAL_fn → EXPVAL_fn (name_t.c:97) handles all EXPR_t
+                     * EVAL_fn → EXPVAL_fn (name_t.c:97) handles all AST_t
                      * shapes including compound.
-                     * CHUNKS-step04: non-E_QLIT args are now lowered as compiled
+                     * CHUNKS-step04: non-AST_QLIT args are now lowered as compiled
                      * SM chunks (SM_JUMP skip + body + SM_RETURN + SM_PUSH_CHUNK)
-                     * so DT_E carries entry_pc, not EXPR_t*.  At match time
+                     * so DT_E carries entry_pc, not AST_t*.  At match time
                      * EVAL_fn → EXPVAL_fn dispatches the chunk via sm_call_chunk
                      * (slen==1 path).  Same emission shape as Steps 2/3. */
                     for (int i = 0; i < fnc->nchildren; i++) {
-                        EXPR_t *arg = fnc->children[i];
-                        if (arg && arg->kind == E_QLIT)
+                        AST_t *arg = fnc->children[i];
+                        if (arg && arg->kind == AST_QLIT)
                             lower_expr(p, lt, arg);   /* string lit — eager OK */
                         else if (arg) {
                             int skip_jump = sm_emit_i(p, SM_JUMP, 0);
@@ -424,18 +424,18 @@ static void lower_pat_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
             }
         }
         return;
-    case E_CAPT_IMMED_ASGN:
+    case AST_CAPT_IMMED_ASGN:
         /* a[1].i=1 → immediate ($V) */
         lower_pat_expr(p, lt, e->nchildren > 0 ? e->children[0] : NULL);
         if (e->nchildren > 1 && e->children[1]) {
-            EXPR_t *var_expr = e->children[1];
-            /* Detect $ *func() — E_DEFER(E_FNC) — emit SM_PAT_CAPTURE_FN */
-            if (var_expr->kind == E_DEFER
+            AST_t *var_expr = e->children[1];
+            /* Detect $ *func() — AST_DEFER(AST_FNC) — emit SM_PAT_CAPTURE_FN */
+            if (var_expr->kind == AST_DEFER
                     && var_expr->nchildren > 0
                     && var_expr->children[0]
-                    && var_expr->children[0]->kind == E_FNC
+                    && var_expr->children[0]->kind == AST_FNC
                     && var_expr->children[0]->sval) {
-                const EXPR_t *fnc = var_expr->children[0];
+                const AST_t *fnc = var_expr->children[0];
                 const char *namelist = sm_pat_capture_fn_arg_names(fnc);
                 if (namelist || fnc->nchildren == 0) {
                     int idx = sm_emit_s(p, SM_PAT_CAPTURE_FN, fnc->sval);
@@ -443,14 +443,14 @@ static void lower_pat_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
                     p->instrs[idx].a[2].s = namelist;
                 } else {
                     /* SN-8a: args-on-stack path for $ *fn(args).
-                     * SN-26c-parseerr-c: defer E_FNC sub-args as compiled SM chunks.
-                     * SN-26c-parseerr-d: also defer E_VAR (see twin site).
-                     * SN-32b: defer all non-E_QLIT args (mirrors -t fix on IR side).
+                     * SN-26c-parseerr-c: defer AST_FNC sub-args as compiled SM chunks.
+                     * SN-26c-parseerr-d: also defer AST_VAR (see twin site).
+                     * SN-32b: defer all non-AST_QLIT args (mirrors -t fix on IR side).
                      * CHUNKS-step04: same chunk emission pattern as the . *fn site above
-                     * and Steps 2/3.  DT_E now carries entry_pc, not EXPR_t*. */
+                     * and Steps 2/3.  DT_E now carries entry_pc, not AST_t*. */
                     for (int i = 0; i < fnc->nchildren; i++) {
-                        EXPR_t *arg = fnc->children[i];
-                        if (arg && arg->kind == E_QLIT)
+                        AST_t *arg = fnc->children[i];
+                        if (arg && arg->kind == AST_QLIT)
                             lower_expr(p, lt, arg);
                         else if (arg) {
                             int skip_jump = sm_emit_i(p, SM_JUMP, 0);
@@ -473,7 +473,7 @@ static void lower_pat_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
             }
         }
         return;
-    case E_CAPT_CURSOR:
+    case AST_CAPT_CURSOR:
         /* Two forms from the parser:
          *   unary @var  → nchildren=1, children[0] = var-name node (ATFN)
          *   binary X@V  → nchildren=2, children[0] = sub-pat, children[1] = var-name
@@ -496,14 +496,14 @@ static void lower_pat_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         return;
 
     /* Deferred pattern reference: *VAR   or   bare *FN() in pattern context */
-    case E_DEFER: {
-        EXPR_t *ch = e->nchildren > 0 ? e->children[0] : NULL;
+    case AST_DEFER: {
+        AST_t *ch = e->nchildren > 0 ? e->children[0] : NULL;
         /* SN-17a: bare *fn() in a pattern — emit SM_PAT_USERCALL so the engine
          * invokes fn at match time and the call's FAIL propagates as pattern FAIL.
-         * Without this, E_FNC falls through to lower_expr → SM_CALL_FN → SM_PAT_DEREF
+         * Without this, AST_FNC falls through to lower_expr → SM_CALL_FN → SM_PAT_DEREF
          * which evaluates fn ONCE at build time and treats the return as a pattern,
          * skipping the per-position sweep SPITBOL performs. */
-        if (ch && ch->kind == E_FNC && ch->sval) {
+        if (ch && ch->kind == AST_FNC && ch->sval) {
             if (ch->nchildren == 0) {
                 /* Bare *fn() — no args.  Use the namelist-less SM_PAT_USERCALL
                  * since pat_user_call(fname, NULL, 0) is the correct call. */
@@ -525,30 +525,30 @@ static void lower_pat_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
                  * inside upr's own body where SPITBOL emitted `VALUE upr=`.
                  *
                  * Fix: ALWAYS take the args-on-stack path when nchildren>0.
-                 * Defer non-E_QLIT args via SM_PUSH_EXPR so match-time
+                 * Defer non-AST_QLIT args via SM_PUSH_EXPR so match-time
                  * EVAL_fn thaw resolves variables in their captured state.
                  * This mirrors the IR-side path at interp.c:4188-4208
                  * exactly (SN-26c-parseerr-c/-d, SN-32b parity).
                  *
                  * SN-26c-parseerr-c (Bug B): when an arg is itself a function
-                 * call (E_FNC), DEFER via SM_PUSH_EXPR so the inner call
+                 * call (AST_FNC), DEFER via SM_PUSH_EXPR so the inner call
                  * evaluates at match time, not at pattern-build time.
-                 * SN-26c-parseerr-d: also defer E_VAR.
-                 * SN-32b: defer all non-E_QLIT args (mirrors IR -t fix).
+                 * SN-26c-parseerr-d: also defer AST_VAR.
+                 * SN-32b: defer all non-AST_QLIT args (mirrors IR -t fix).
                  *
                  * The match-time path (bb_usercall in stmt_exec.c) thaws each
                  * DT_E via EVAL_fn before invoking the user function. */
                 for (int i = 0; i < ch->nchildren; i++) {
-                    EXPR_t *arg = ch->children[i];
-                    if (arg && arg->kind == E_QLIT)
+                    AST_t *arg = ch->children[i];
+                    if (arg && arg->kind == AST_QLIT)
                         lower_expr(p, lt, arg);
                     else if (arg) {
-                        /* CHUNKS-step03: defer non-E_QLIT pattern arg as a
+                        /* CHUNKS-step03: defer non-AST_QLIT pattern arg as a
                          * compiled SM chunk so DT_E carries an entry_pc, not
-                         * an EXPR_t*.  At match time bb_usercall thaws each
+                         * an AST_t*.  At match time bb_usercall thaws each
                          * DT_E via EVAL_fn → EXPVAL_fn, which dispatches the
                          * chunk via sm_call_chunk (slen==1 path).  Same
-                         * emission shape as the E_DEFER chunk lowering. */
+                         * emission shape as the AST_DEFER chunk lowering. */
                         int skip_jump = sm_emit_i(p, SM_JUMP, 0);
                         int entry_pc  = sm_label(p);
                         lower_expr(p, lt, arg);
@@ -569,8 +569,8 @@ static void lower_pat_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
          *   primary = integer | '(' *primary ')'
          * need the XDSAR ref built from NAME, not from PRIMARY's in-progress
          * value at pattern-build time.  Mirrors --ir-run's pat_ref(child->sval)
-         * branch in interp_eval_pat E_DEFER. */
-        if (ch && ch->kind == E_VAR && ch->sval) {
+         * branch in interp_eval_pat AST_DEFER. */
+        if (ch && ch->kind == AST_VAR && ch->sval) {
             sm_emit_s(p, SM_PAT_REFNAME, ch->sval);
             return;
         }
@@ -580,7 +580,7 @@ static void lower_pat_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
     }
 
     /* Function call in pattern context → eval as value, then deref as pat */
-    case E_FNC:
+    case AST_FNC:
         lower_expr(p, lt, e);
         sm_emit(p, SM_PAT_DEREF);
         return;
@@ -593,7 +593,7 @@ static void lower_pat_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
     }
 }
 
-static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
+static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
 {
     if (!e) {
         sm_emit(p, SM_PUSH_NULL);
@@ -603,22 +603,22 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
     switch (e->kind) {
 
     /* ── Literals ── */
-    case E_QLIT:
+    case AST_QLIT:
         sm_emit_s(p, SM_PUSH_LIT_S, e->sval ? e->sval : "");
         return;
-    case E_ILIT:
+    case AST_ILIT:
         sm_emit_i(p, SM_PUSH_LIT_I, (int64_t)e->ival);
         return;
-    case E_FLIT:
+    case AST_FLIT:
         sm_emit_f(p, SM_PUSH_LIT_F, e->dval);
         return;
-    case E_NULL:
-    case E_NUL:
+    case AST_NULL:
+    case AST_NUL:
         sm_emit(p, SM_PUSH_NULL);
         return;
 
     /* ── References ── */
-    case E_VAR: {
+    case AST_VAR: {
         const char *vn = e->sval ? e->sval : "";
         /* CHUNKS-step17b'' (CH-17b''): inside chunk-body lowering, consult the
          * per-proc scope: if `vn` resolved to a frame slot, emit SM_LOAD_FRAME.
@@ -634,7 +634,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         sm_emit_s(p, SM_PUSH_VAR, vn);
         return;
     }
-    case E_KEYWORD: {
+    case AST_KEYWORD: {
         /* Keywords are registered uppercase (LCASE, UCASE, etc.) but the lexer
          * preserves the source case after stripping '&'. Uppercase before lookup. */
         const char *kraw = e->sval ? e->sval : "";
@@ -644,17 +644,17 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         sm_emit_s(p, SM_PUSH_VAR, kup);
         return;
     }
-    case E_INDIRECT: {
+    case AST_INDIRECT: {
         /* $expr — eval name-string, look up variable → push value on value stack.
-         * Special case: $.var<idx> parses as E_INDIRECT(E_IDX(E_NAME(E_VAR("v")),idx...))
+         * Special case: $.var<idx> parses as AST_INDIRECT(AST_IDX(AST_NAME(AST_VAR("v")),idx...))
          * Lower as: push var value directly + IDX, bypassing INDIR_GET. */
-        EXPR_t *ch = e->nchildren > 0 ? e->children[0] : NULL;
-        /* $.var<idx> => E_INDIRECT(E_NAME(E_IDX(E_VAR("v"), idx...)))
+        AST_t *ch = e->nchildren > 0 ? e->children[0] : NULL;
+        /* $.var<idx> => AST_INDIRECT(AST_NAME(AST_IDX(AST_VAR("v"), idx...)))
          * Push var value directly, then indices, then call IDX. */
-        if (ch && ch->kind == E_NAME && ch->nchildren == 1) {
-            EXPR_t *inner = ch->children[0];
-            if (inner && inner->kind == E_IDX && inner->nchildren >= 2
-                    && inner->children[0] && inner->children[0]->kind == E_VAR
+        if (ch && ch->kind == AST_NAME && ch->nchildren == 1) {
+            AST_t *inner = ch->children[0];
+            if (inner && inner->kind == AST_IDX && inner->nchildren >= 2
+                    && inner->children[0] && inner->children[0]->kind == AST_VAR
                     && inner->children[0]->sval) {
                 const char *vn = inner->children[0]->sval;
                 sm_emit_s(p, SM_PUSH_VAR, vn);
@@ -668,9 +668,9 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         sm_emit_si(p, SM_CALL_FN, "INDIR_GET", 1);
         return;
     }
-    case E_DEFER: {
+    case AST_DEFER: {
         /* CHUNKS-step02: *expr in value context — lower child as a compiled
-         * SM chunk so DT_E carries an entry_pc, not an EXPR_t*.
+         * SM chunk so DT_E carries an entry_pc, not an AST_t*.
          *
          * Emission shape:
          *   SM_JUMP  skip_chunk          ; jump around the chunk body
@@ -680,7 +680,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
          *   skip_chunk: (label)
          *   SM_PUSH_CHUNK entry_pc, 0   ; push DT_E{slen=1, i=entry_pc}
          */
-        const EXPR_t *child = e->nchildren > 0 ? e->children[0] : NULL;
+        const AST_t *child = e->nchildren > 0 ? e->children[0] : NULL;
         int skip_jump = sm_emit_i(p, SM_JUMP, 0);   /* forward jump, patched below */
         int entry_pc  = sm_label(p);                 /* chunk entry point */
         if (child)
@@ -695,14 +695,14 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
     }
 
     /* ── Arithmetic ── */
-    case E_ADD: LOWER2(SM_ADD);
-    case E_SUB: LOWER2(SM_SUB);
-    case E_MUL: LOWER2(SM_MUL);
-    case E_DIV: LOWER2(SM_DIV);
-    case E_POW: LOWER2(SM_EXP);
-    case E_MOD: LOWER2(SM_MOD);
-    case E_MNS: LOWER1_VAL(SM_NEG);
-    case E_PLS: LOWER1_VAL(SM_COERCE_NUM);
+    case AST_ADD: LOWER2(SM_ADD);
+    case AST_SUB: LOWER2(SM_SUB);
+    case AST_MUL: LOWER2(SM_MUL);
+    case AST_DIV: LOWER2(SM_DIV);
+    case AST_POW: LOWER2(SM_EXP);
+    case AST_MOD: LOWER2(SM_MOD);
+    case AST_MNS: LOWER1_VAL(SM_NEG);
+    case AST_PLS: LOWER1_VAL(SM_COERCE_NUM);
 
     /* ── Goal-directed value-context disjunction ─────────────────────── */
     /* SPITBOL `(a, b, c)` paren-list and Snocone `||`.  Eager left-to-right
@@ -710,7 +710,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
      * arms fail.  Lower as: eval each arm, JUMP_S to done on success,
      * POP failure value before next arm.  Last arm's value (success or
      * fail) is left on stack if no earlier arm succeeded. */
-    case E_VLIST: {
+    case AST_VLIST: {
         if (e->nchildren == 0) {
             sm_emit(p, SM_PUSH_NULL);
             return;
@@ -736,18 +736,18 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
     }
 
     /* ── String concatenation (or pattern concatenation if any child is *X) ── */
-    case E_CAT:
-    case E_SEQ: {
-        /* SN-26c-parseerr-g: parallel to interp.c E_SEQ fix.  In value
-         * context, E_DEFER lowers to SM_PUSH_EXPR (DT_E frozen expr).
+    case AST_CAT:
+    case AST_SEQ: {
+        /* SN-26c-parseerr-g: parallel to interp.c AST_SEQ fix.  In value
+         * context, AST_DEFER lowers to SM_PUSH_EXPR (DT_E frozen expr).
          * SM_CONCAT(DT_E, string) produces garbage that won't match.
-         * If any child is E_DEFER, this SEQ is building a pattern —
+         * If any child is AST_DEFER, this SEQ is building a pattern —
          * lower as pattern and use SM_PAT_CAT.  Mirror in JIT (sm_codegen.c)
          * is automatic since codegen reads the same SM ops. */
         int has_defer = 0;
         for (int j = 0; j < e->nchildren; j++) {
-            const EXPR_t *cj = e->children[j];
-            if (cj && cj->kind == E_DEFER) { has_defer = 1; break; }
+            const AST_t *cj = e->children[j];
+            if (cj && cj->kind == AST_DEFER) { has_defer = 1; break; }
         }
         if (has_defer) {
             for (int i = 0; i < e->nchildren; i++)
@@ -765,12 +765,12 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
     }
 
     /* ── Assignment ── */
-    case E_ASSIGN:
+    case AST_ASSIGN:
         /* child[1] = rhs value; child[0] = lhs variable */
         lower_expr(p, lt, e->nchildren > 1 ? e->children[1] : NULL);
         if (e->nchildren > 0 && e->children[0]) {
-            const EXPR_t *lhs = e->children[0];
-            if (lhs->kind == E_VAR) {
+            const AST_t *lhs = e->children[0];
+            if (lhs->kind == AST_VAR) {
                 const char *vn = lhs->sval ? lhs->sval : "";
                 /* CHUNKS-step17b'' (CH-17b''): inside chunk-body lowering,
                  * consult per-proc scope.  Frame slot → SM_STORE_FRAME slot.
@@ -784,7 +784,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
                 }
                 sm_emit_s(p, SM_STORE_VAR, vn);
             }
-            else if (lhs->kind == E_KEYWORD) {
+            else if (lhs->kind == AST_KEYWORD) {
                 /* uppercase keyword name for NV store, matching read path */
                 const char *kraw = lhs->sval ? lhs->sval : "";
                 char kup[64]; int ki = 0;
@@ -792,7 +792,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
                 kup[ki] = '\0';
                 sm_emit_s(p, SM_STORE_VAR, kup);
             }
-            else if (lhs->kind == E_FNC && lhs->sval) {
+            else if (lhs->kind == AST_FNC && lhs->sval) {
                 /* Field mutator: fname(obj) = val  →  push obj, SM_CALL_FN fname_SET 2
                  * Stack on entry to setter: [val, obj] (val pushed first above) */
                 lower_expr(p, lt, lhs->nchildren > 0 ? lhs->children[0] : NULL);
@@ -808,16 +808,16 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         return;
 
     /* ── Function / builtin call ── */
-    case E_FNC: {
+    case AST_FNC: {
         int nargs = e->nchildren;
         /* CHUNKS-step02: EVAL(*expr) special case — when EVAL is called with a
-         * single E_DEFER argument, emit the chunk inline + SM_CALL_CHUNK instead
+         * single AST_DEFER argument, emit the chunk inline + SM_CALL_CHUNK instead
          * of SM_PUSH_CHUNK + SM_CALL_FN "EVAL".  This avoids routing through
          * EXPVAL_fn from C mid-dispatch, keeping everything on the same SM stack. */
         if (nargs == 1 && e->sval && strcmp(e->sval, "EVAL") == 0
-                && e->children[0] && e->children[0]->kind == E_DEFER) {
-            const EXPR_t *defer = e->children[0];
-            const EXPR_t *child = defer->nchildren > 0 ? defer->children[0] : NULL;
+                && e->children[0] && e->children[0]->kind == AST_DEFER) {
+            const AST_t *defer = e->children[0];
+            const AST_t *child = defer->nchildren > 0 ? defer->children[0] : NULL;
             int skip_jump = sm_emit_i(p, SM_JUMP, 0);
             int entry_pc  = sm_label(p);
             if (child)
@@ -830,8 +830,8 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
             sm_emit_ii(p, SM_CALL_CHUNK, (int64_t)entry_pc, 0);
             return;
         }
-        /* CH-17c: Icon-style E_FNC — name in sval is NULL; children[0] is the
-         * callee name node (E_VAR with sval = function name), children[1..] are args.
+        /* CH-17c: Icon-style AST_FNC — name in sval is NULL; children[0] is the
+         * callee name node (AST_VAR with sval = function name), children[1..] are args.
          * Emit only the arg children; use children[0]->sval as the SM_CALL_FN name.
          * This fixes the stack-leak / empty-name bug in proc-body chunks that
          * contain user proc calls (noted in CH-17b'' handoff). */
@@ -850,14 +850,14 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
     }
 
     /* ── Array / table subscript ── */
-    case E_IDX:
+    case AST_IDX:
         for (int i = 0; i < e->nchildren; i++)
             lower_expr(p, lt, e->children[i]);
         sm_emit_si(p, SM_CALL_FN, "IDX", (int64_t)e->nchildren);
         return;
 
     /* ── Relational comparisons (numeric) → SM_ACOMP(op) ──
-     * a[0].i carries the operator EKind (E_EQ/E_NE/E_LT/E_LE/E_GT/E_GE).
+     * a[0].i carries the operator EKind (AST_EQ/AST_NE/AST_LT/AST_LE/AST_GT/AST_GE).
      * Runtime semantics (Icon-style): on success pushes the RIGHT operand
      * and sets last_ok=1; on failure pushes FAILDESCR and clears last_ok.
      * SM_JUMP_F dispatches on last_ok.  CH-17g-runtime-bridge-acomp,
@@ -865,12 +865,12 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
      * operator info — collapsed all six EKinds to a single opcode and
      * left the comparator unrecoverable at runtime.  See
      * docs/CHUNKS-step17g-runtime-bridge-acomp-validation.md. */
-    case E_EQ:
-    case E_NE:
-    case E_LT:
-    case E_LE:
-    case E_GT:
-    case E_GE: {
+    case AST_EQ:
+    case AST_NE:
+    case AST_LT:
+    case AST_LE:
+    case AST_GT:
+    case AST_GE: {
         lower_expr(p, lt, e->nchildren > 0 ? e->children[0] : NULL);
         lower_expr(p, lt, e->nchildren > 1 ? e->children[1] : NULL);
         sm_emit_i(p, SM_ACOMP, (int64_t)e->kind);
@@ -878,32 +878,32 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
     }
 
     /* ── Relational comparisons (string/lexicographic) → SM_LCOMP(op) ──
-     * a[0].i carries the operator EKind (E_LLT/E_LLE/E_LGT/E_LGE/E_LEQ/E_LNE).
+     * a[0].i carries the operator EKind (AST_LLT/AST_LLE/AST_LGT/AST_LGE/AST_LEQ/AST_LNE).
      * Runtime semantics (Icon-style, mirrors STRREL macro in interp_eval.c):
      * on success pushes the RIGHT operand and sets last_ok=1; on failure
      * pushes FAILDESCR and clears last_ok.  CH-17g-runtime-bridge-lcomp,
      * sess 2026-05-09: sibling fix to bridge-acomp — same shape bug, prior
      * emission was `sm_emit(p, SM_LCOMP)` with no operator info, collapsing
      * all six string relop EKinds onto one opcode. */
-    case E_LLT:
-    case E_LLE:
-    case E_LGT:
-    case E_LGE:
-    case E_LEQ:
-    case E_LNE:
+    case AST_LLT:
+    case AST_LLE:
+    case AST_LGT:
+    case AST_LGE:
+    case AST_LEQ:
+    case AST_LNE:
         lower_expr(p, lt, e->nchildren > 0 ? e->children[0] : NULL);
         lower_expr(p, lt, e->nchildren > 1 ? e->children[1] : NULL);
         sm_emit_i(p, SM_LCOMP, (int64_t)e->kind);
         return;
 
     /* ── Interrogation ?X → succeed if X succeeds ── */
-    case E_INTERROGATE:
+    case AST_INTERROGATE:
         lower_expr(p, lt, e->nchildren > 0 ? e->children[0] : NULL);
         /* result already on stack; success/failure propagates */
         return;
 
     /* ── Name reference .X — push DT_N name descriptor onto value stack ── */
-    case E_NAME: {
+    case AST_NAME: {
         /* Push the variable name as a string, then NAME_PUSH converts to DT_N */
         const char *vname = (e->nchildren > 0 && e->children[0] && e->children[0]->sval)
                             ? e->children[0]->sval : "";
@@ -913,7 +913,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
     }
 
     /* ── Scan E ? E ── */
-    case E_SCAN:
+    case AST_SCAN:
         lower_pat_expr(p, lt, e->nchildren > 1 ? e->children[1] : NULL);
         lower_expr(p, lt, e->nchildren > 0 ? e->children[0] : NULL);
         sm_emit_i(p, SM_PUSH_LIT_I, 0);   /* no replacement */
@@ -922,7 +922,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         return;
 
     /* ── OPSYN operator & / @ / | — dispatch via APPLY_fn(sval, args, n) ── */
-    case E_OPSYN: {
+    case AST_OPSYN: {
         /* sval is either:
          *   mangled: "BIATFN(@)", "ORFN(|)", "BIAMFN(&)" — op char between '(' and ')'
          *   bare:    "BARFN", "AROWFN" — unary ops from uop_names[] table
@@ -944,20 +944,20 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
     }
 
     /* ── Swap :=: ── */
-    case E_SWAP:
+    case AST_SWAP:
         lower_expr(p, lt, e->nchildren > 0 ? e->children[0] : NULL);
         lower_expr(p, lt, e->nchildren > 1 ? e->children[1] : NULL);
         sm_emit_si(p, SM_CALL_FN, "SWAP", 2);
         return;
 
     /* ── Pattern primitives used as values (not already handled above) ── */
-    case E_ALT:
-    case E_ARB:  case E_REM:  case E_FAIL: case E_SUCCEED:
-    case E_FENCE: case E_ABORT: case E_BAL:
-    case E_ANY:  case E_NOTANY: case E_SPAN: case E_BREAK: case E_BREAKX:
-    case E_LEN:  case E_POS:  case E_RPOS: case E_TAB: case E_RTAB:
-    case E_ARBNO:
-    case E_CAPT_COND_ASGN: case E_CAPT_IMMED_ASGN: case E_CAPT_CURSOR:
+    case AST_ALT:
+    case AST_ARB:  case AST_REM:  case AST_FAIL: case AST_SUCCEED:
+    case AST_FENCE: case AST_ABORT: case AST_BAL:
+    case AST_ANY:  case AST_NOTANY: case AST_SPAN: case AST_BREAK: case AST_BREAKX:
+    case AST_LEN:  case AST_POS:  case AST_RPOS: case AST_TAB: case AST_RTAB:
+    case AST_ARBNO:
+    case AST_CAPT_COND_ASGN: case AST_CAPT_IMMED_ASGN: case AST_CAPT_CURSOR:
         lower_pat_expr(p, lt, e);
         sm_emit(p, SM_PAT_BOXVAL);  /* bridge: pop pat-stack → push DT_P on value-stack */
         return;
@@ -971,7 +971,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
      * ══════════════════════════════════════════════════════════════════════ */
 
     /* ── Sequential expression list: eval all, leave last on stack ─────── */
-    case E_SEQ_EXPR:
+    case AST_SEQ_EXPR:
         if (e->nchildren == 0) { sm_emit(p, SM_PUSH_NULL); return; }
         for (int i = 0; i < e->nchildren; i++) {
             lower_expr(p, lt, e->children[i]);
@@ -980,7 +980,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         return;
 
     /* ── Icon/Raku if-then[-else] ───────────────────────────────────────── */
-    case E_IF: {
+    case AST_IF: {
         if (e->nchildren < 1) { sm_emit(p, SM_PUSH_NULL); return; }
         lower_expr(p, lt, e->children[0]);              /* condition */
         int jf = sm_emit_i(p, SM_JUMP_F, 0);           /* jump-if-fail to else */
@@ -997,7 +997,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
     }
 
     /* ── while (cond) body — functional form ───────────────────────────── */
-    case E_WHILE: {
+    case AST_WHILE: {
         int top_lbl = sm_label(p);
         if (e->nchildren < 1) { sm_emit(p, SM_PUSH_NULL); return; }
         lower_expr(p, lt, e->children[0]);              /* condition */
@@ -1012,7 +1012,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
     }
 
     /* ── until (!cond) body ─────────────────────────────────────────────── */
-    case E_UNTIL: {
+    case AST_UNTIL: {
         int top_lbl = sm_label(p);
         if (e->nchildren < 1) { sm_emit(p, SM_PUSH_NULL); return; }
         lower_expr(p, lt, e->children[0]);
@@ -1027,7 +1027,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
     }
 
     /* ── repeat body — loops until break ───────────────────────────────── */
-    case E_REPEAT: {
+    case AST_REPEAT: {
         int top_lbl = sm_label(p);
         if (e->nchildren > 0) { lower_expr(p, lt, e->children[0]); sm_emit(p, SM_VOID_POP); }
         sm_emit_i(p, SM_JUMP, top_lbl);
@@ -1036,7 +1036,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
     }
 
     /* ── loop control ───────────────────────────────────────────────────── */
-    case E_LOOP_BREAK:
+    case AST_LOOP_BREAK:
         /* In SM context: push result (if any) and halt the enclosing loop.
          * SM doesn't track loop nesting — emit JUMP to a sentinel; sm_interp
          * treats a SM_JUMP with target == current pc+1 as break. */
@@ -1046,24 +1046,24 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         sm_emit_i(p, SM_JUMP, p->count + 1);
         return;
 
-    case E_LOOP_NEXT:
+    case AST_LOOP_NEXT:
         sm_emit(p, SM_PUSH_NULL);
         return;
 
     /* ── return / freturn from user function ────────────────────────────── */
-    case E_RETURN:
+    case AST_RETURN:
         if (e->nchildren > 0) lower_expr(p, lt, e->children[0]);
         else sm_emit(p, SM_PUSH_NULL);
         sm_emit(p, SM_RETURN);
         return;
 
-    case E_PROC_FAIL:
+    case AST_PROC_FAIL:
         sm_emit(p, SM_PUSH_NULL);
         sm_emit(p, SM_FRETURN);
         return;
 
     /* ── logical not: succeed if child fails, fail if child succeeds ────── */
-    case E_NOT: {
+    case AST_NOT: {
         lower_expr(p, lt, e->nchildren > 0 ? e->children[0] : NULL);
         int js = sm_emit_i(p, SM_JUMP_S, 0);   /* child succeeded → fail */
         /* child failed → ~ succeeds: discard child value, push null, last_ok=1 */
@@ -1081,7 +1081,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
     }
 
     /* ── augmented assignment (+=, -=, ||=, etc.) ──────────────────────── */
-    case E_AUGOP:
+    case AST_AUGOP:
         lower_expr(p, lt, e->nchildren > 0 ? e->children[0] : NULL);
         lower_expr(p, lt, e->nchildren > 1 ? e->children[1] : NULL);
         sm_emit_i(p, SM_PUSH_LIT_I, (int64_t)(e->ival));  /* operator token */
@@ -1089,33 +1089,33 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         return;
 
     /* ── string/list size *e ────────────────────────────────────────────── */
-    case E_SIZE:
+    case AST_SIZE:
         lower_expr(p, lt, e->nchildren > 0 ? e->children[0] : NULL);
         sm_emit_si(p, SM_CALL_FN, "SIZE", 1);
         return;
 
     /* ── non-null test \e — succeed with e if e != null, else fail ──────── */
-    case E_NONNULL:
+    case AST_NONNULL:
         lower_expr(p, lt, e->nchildren > 0 ? e->children[0] : NULL);
         sm_emit_si(p, SM_CALL_FN, "NONNULL", 1);
         return;
 
     /* ── string identity ===  / non-identity ~=== ───────────────────────── */
-    case E_IDENTICAL:
+    case AST_IDENTICAL:
         lower_expr(p, lt, e->nchildren > 0 ? e->children[0] : NULL);
         lower_expr(p, lt, e->nchildren > 1 ? e->children[1] : NULL);
         sm_emit_si(p, SM_CALL_FN, "IDENTICAL", 2);
         return;
 
     /* ── list/array literal [a, b, c] ──────────────────────────────────── */
-    case E_MAKELIST:
+    case AST_MAKELIST:
         for (int i = 0; i < e->nchildren; i++)
             lower_expr(p, lt, e->children[i]);
         sm_emit_si(p, SM_CALL_FN, "MAKELIST", (int64_t)e->nchildren);
         return;
 
     /* ── record construction ────────────────────────────────────────────── */
-    case E_RECORD:
+    case AST_RECORD:
         sm_emit_s(p, SM_PUSH_LIT_S, e->sval ? e->sval : "");
         for (int i = 0; i < e->nchildren; i++)
             lower_expr(p, lt, e->children[i]);
@@ -1123,38 +1123,38 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         return;
 
     /* ── field access r.field ───────────────────────────────────────────── */
-    case E_FIELD:
+    case AST_FIELD:
         lower_expr(p, lt, e->nchildren > 0 ? e->children[0] : NULL);
         sm_emit_s(p, SM_PUSH_LIT_S, e->sval ? e->sval : "");
         sm_emit_si(p, SM_CALL_FN, "FIELD_GET", 2);
         return;
 
     /* ── declarative / init nodes — no runtime action at expression level ─ */
-    case E_GLOBAL:
-    case E_INITIAL:
+    case AST_GLOBAL:
+    case AST_INITIAL:
         sm_emit(p, SM_PUSH_NULL);
         return;
 
     /* ══════════════════════════════════════════════════════════════════════
      * Generator/backtracking nodes → BB broker
-     * SM_PUSH_EXPR bakes the EXPR_t* in; SM_BB_PUMP drives via bb_broker.
+     * SM_PUSH_EXPR bakes the AST_t* in; SM_BB_PUMP drives via bb_broker.
      * Prolog-specific nodes use SM_BB_ONCE (find one solution).
      * ══════════════════════════════════════════════════════════════════════ */
 
     /* ══════════════════════════════════════════════════════════════════════
      * Generator/backtracking nodes → BB broker
-     * SM_PUSH_EXPR bakes the EXPR_t* in; SM_BB_PUMP drives via bb_broker.
+     * SM_PUSH_EXPR bakes the AST_t* in; SM_BB_PUMP drives via bb_broker.
      * Prolog-specific nodes use SM_BB_ONCE (find one solution).
      * ══════════════════════════════════════════════════════════════════════ */
 
-    /* CHUNKS-step15a: E_TO / E_TO_BY migrated to SM chunks + SM_BB_PUMP_SM.
-     * gen-local slot layout (shared across E_TO and E_TO_BY):
+    /* CHUNKS-step15a: AST_TO / AST_TO_BY migrated to SM chunks + SM_BB_PUMP_SM.
+     * gen-local slot layout (shared across AST_TO and AST_TO_BY):
      *   glocal[0] = lo   (integer lower bound)
      *   glocal[1] = hi   (integer upper bound)
      *   glocal[2] = cur  (current value, updated each resume)
-     *   glocal[3] = step (E_TO_BY only; E_TO implicitly 1)
+     *   glocal[3] = step (AST_TO_BY only; AST_TO implicitly 1)
      *
-     * Chunk shape (E_TO):
+     * Chunk shape (AST_TO):
      *   SM_JUMP  skip_pc          ; jump over body to SM_BB_PUMP_SM
      * entry_pc:
      *   SM_RESUME                 ; documentation hook for future JIT
@@ -1175,7 +1175,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
      *   SM_LOAD_GLOCAL 2          ; push cur as yielded value
      *   SM_SUSPEND                ; yield; resume after this point
      *   SM_LOAD_GLOCAL 2          ; push cur
-     *   SM_INCR step              ; cur += step (1 for E_TO)
+     *   SM_INCR step              ; cur += step (1 for AST_TO)
      *   SM_STORE_GLOCAL 2         ; glocal[2] = new cur
      *   SM_VOID_POP
      *   SM_JUMP loop_pc           ; next iteration
@@ -1185,9 +1185,9 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
      * skip_pc:
      *   SM_BB_PUMP_SM entry_pc    ; drive the chunk as a generator
      */
-    case E_TO: {
-        const EXPR_t *lo_expr = (e->nchildren > 0) ? e->children[0] : NULL;
-        const EXPR_t *hi_expr = (e->nchildren > 1) ? e->children[1] : NULL;
+    case AST_TO: {
+        const AST_t *lo_expr = (e->nchildren > 0) ? e->children[0] : NULL;
+        const AST_t *hi_expr = (e->nchildren > 1) ? e->children[1] : NULL;
         int skip_jump = sm_emit_i(p, SM_JUMP, 0);       /* forward jump — patched to skip_pc */
         int entry_pc  = sm_label(p);                     /* chunk entry point */
         sm_emit(p, SM_RESUME);                           /* JIT hook */
@@ -1227,17 +1227,17 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         return;
     }
 
-    case E_TO_BY: {
-        /* E_TO_BY(lo, hi, step) — same shape as E_TO but step is glocal[3].
+    case AST_TO_BY: {
+        /* AST_TO_BY(lo, hi, step) — same shape as AST_TO but step is glocal[3].
          * Children: [0]=lo, [1]=hi, [2]=step.
          * Mirrors coro_bb_to_by semantics:
          *   step > 0: exit when cur > hi
          *   step < 0: exit when cur < hi
          *   step == 0: treated as +1 (degenerate) — same as positive case.
          * Loop dispatches on step sign each iteration via SM_ICMP_LT against 0. */
-        const EXPR_t *lo_expr   = (e->nchildren > 0) ? e->children[0] : NULL;
-        const EXPR_t *hi_expr   = (e->nchildren > 1) ? e->children[1] : NULL;
-        const EXPR_t *step_expr = (e->nchildren > 2) ? e->children[2] : NULL;
+        const AST_t *lo_expr   = (e->nchildren > 0) ? e->children[0] : NULL;
+        const AST_t *hi_expr   = (e->nchildren > 1) ? e->children[1] : NULL;
+        const AST_t *step_expr = (e->nchildren > 2) ? e->children[2] : NULL;
         int skip_jump = sm_emit_i(p, SM_JUMP, 0);
         int entry_pc  = sm_label(p);
         sm_emit(p, SM_RESUME);
@@ -1300,23 +1300,23 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
     }
 
     /* Icon generators — remaining kinds still use legacy emit_push_expr + SM_BB_PUMP */
-    case E_EVERY:
-    case E_SUSPEND:
-    case E_BANG_BINARY:
-    case E_LCONCAT:
-    case E_LIMIT:
-    case E_RANDOM:
-    case E_SECTION:
-    case E_SECTION_MINUS:
-    case E_SECTION_PLUS:
+    case AST_EVERY:
+    case AST_SUSPEND:
+    case AST_BANG_BINARY:
+    case AST_LCONCAT:
+    case AST_LIMIT:
+    case AST_RANDOM:
+    case AST_SECTION:
+    case AST_SECTION_MINUS:
+    case AST_SECTION_PLUS:
         emit_push_expr(p, e);
         sm_emit(p, SM_BB_PUMP);
         return;
 
     /* Prolog backtracking nodes */
-    case E_CHOICE:
-        /* CH-17f: E_CHOICE in value context — emit SM_BB_ONCE_PROC by key.
-         * Mirrors the lower_stmt fix; no raw EXPR_t* pushed to SM stack. */
+    case AST_CHOICE:
+        /* CH-17f: AST_CHOICE in value context — emit SM_BB_ONCE_PROC by key.
+         * Mirrors the lower_stmt fix; no raw AST_t* pushed to SM stack. */
         if (e->sval) {
             const char *key = e->sval;
             int arity = 0;
@@ -1328,12 +1328,12 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
             sm_emit(p, SM_BB_ONCE);
         }
         return;
-    case E_CLAUSE:
-    case E_CUT:
-    case E_UNIFY:
-    case E_TRAIL_MARK:
-    case E_TRAIL_UNWIND:
-        /* These are children of E_CHOICE walked by the broker, never
+    case AST_CLAUSE:
+    case AST_CUT:
+    case AST_UNIFY:
+    case AST_TRAIL_MARK:
+    case AST_TRAIL_UNWIND:
+        /* These are children of AST_CHOICE walked by the broker, never
          * lowered standalone from sm_lower.  Keep legacy path as safety
          * fallback; should be unreachable in practice. */
         emit_push_expr(p, e);
@@ -1341,7 +1341,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         return;
 
     /* ── Raku: typed variable declaration — no runtime action ───────────── */
-    case E_CASE: {
+    case AST_CASE: {
         /* CHUNKS-step13: Raku CASE dispatch — replaces the legacy
          * emit_push_expr + SM_BB_PUMP wrapper.  Lower each piece (topic,
          * per-arm value and body, optional default body) as its own
@@ -1355,11 +1355,11 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
          *   default_body_chunk        (only if has_default)
          *
          * IR layout produced by raku.y (RK-18d):
-         *   E_CASE[ topic, cmpnode_0, val_0, body_0, ..., (E_NUL, E_NUL, default_body)? ]
-         * cmpnode_i is an E_ILIT carrying the EXPR_e cmp kind in .ival,
-         * or E_NUL marking the trailing default triple.
+         *   AST_CASE[ topic, cmpnode_0, val_0, body_0, ..., (AST_NUL, AST_NUL, default_body)? ]
+         * cmpnode_i is an AST_ILIT carrying the AST_e cmp kind in .ival,
+         * or AST_NUL marking the trailing default triple.
          *
-         * Wrapper-level synthesis is now EXPR_t-free.  Per-arm body
+         * Wrapper-level synthesis is now AST_t-free.  Per-arm body
          * content is recursively lowered by the existing lower_expr
          * machinery — any deferred IR walking inside arm bodies for
          * not-yet-migrated kinds is M4-cleanup territory, mirroring
@@ -1372,22 +1372,22 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         }
 
         /* Detect Raku triple layout: child count after topic is a
-         * multiple of 3, AND child[1] is E_ILIT or E_NUL.  Mirrors the
+         * multiple of 3, AND child[1] is AST_ILIT or AST_NUL.  Mirrors the
          * detection in coro_value.c:947. */
         int is_raku_layout = (e->nchildren >= 4 && (e->nchildren - 1) % 3 == 0 &&
-            e->children[1] && (e->children[1]->kind == E_ILIT || e->children[1]->kind == E_NUL));
+            e->children[1] && (e->children[1]->kind == AST_ILIT || e->children[1]->kind == AST_NUL));
         if (!is_raku_layout) {
             /* Icon-style pair layout: not exercised by the Raku frontend
-             * today (Icon uses E_IF chains for case-of), but the legacy
+             * today (Icon uses AST_IF chains for case-of), but the legacy
              * fall-through preserves behaviour for any future producer.
              * Keep going with a deferred-body wrap as one chunk. */
             int skip_jump = sm_emit_i(p, SM_JUMP, 0);
             int entry_pc  = sm_label(p);
             /* Lower whole CASE body as a single thunk that delegates to
-             * coro_eval via the SM stack — but coro_eval(EXPR_t*) is the
+             * coro_eval via the SM stack — but coro_eval(AST_t*) is the
              * very thing we're eliminating, so for now emit a NULVCL
              * placeholder + diagnostic.  No Raku/Icon program reaches this
-             * branch under current frontends.  When Icon E_CASE is added,
+             * branch under current frontends.  When Icon AST_CASE is added,
              * a separate rung will lower the pair layout. */
             sm_emit(p, SM_PUSH_NULL);
             sm_emit(p, SM_RETURN);
@@ -1416,8 +1416,8 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         int default_idx   = -1;  /* triple index of the default, if any */
         if (total_triples > 0) {
             int last_i = 1 + (total_triples - 1) * 3;
-            EXPR_t *last_cmp = e->children[last_i];
-            if (last_cmp && last_cmp->kind == E_NUL) {
+            AST_t *last_cmp = e->children[last_i];
+            if (last_cmp && last_cmp->kind == AST_NUL) {
                 has_default = 1;
                 default_idx = total_triples - 1;
             }
@@ -1431,10 +1431,10 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         for (int t = 0; t < total_triples; t++) {
             if (t == default_idx) continue;  /* default handled last */
             int base = 1 + t * 3;
-            EXPR_t *cmpnode = e->children[base];
-            EXPR_t *val     = e->children[base + 1];
-            EXPR_t *body    = e->children[base + 2];
-            int cmp_kind = (cmpnode && cmpnode->kind == E_ILIT) ? (int)cmpnode->ival : (int)E_EQ;
+            AST_t *cmpnode = e->children[base];
+            AST_t *val     = e->children[base + 1];
+            AST_t *body    = e->children[base + 2];
+            int cmp_kind = (cmpnode && cmpnode->kind == AST_ILIT) ? (int)cmpnode->ival : (int)AST_EQ;
             sm_emit_i(p, SM_PUSH_LIT_I, (int64_t)cmp_kind);
             EMIT_CHUNK_OF(val);
             EMIT_CHUNK_OF(body);
@@ -1443,7 +1443,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         /* 3. Push default body chunk if present. */
         if (has_default) {
             int base = 1 + default_idx * 3;
-            EXPR_t *body = e->children[base + 2];
+            AST_t *body = e->children[base + 2];
             EMIT_CHUNK_OF(body);
         }
 
@@ -1514,24 +1514,24 @@ static void lower_stmt(SM_Program *p, LabelTable *lt, const STMT_t *s)
         /* RS-26b: Icon proc/global/record defs are registered in proc_table by
          * polyglot_init() inside sm_preamble() before sm_lower() runs.  There is
          * nothing to emit per-def: the BB engine reaches procs via coro_call, not
-         * by SM_BB_PUMPing the raw proc E_FNC node.  sm_lower() synthesises a
+         * by SM_BB_PUMPing the raw proc AST_FNC node.  sm_lower() synthesises a
          * single SM_PUSH_EXPR + SM_BB_PUMP for the main() call after the stmt loop.
          * This branch should now be unreachable; kept as a safety fallback. */
         return;
     }
     if (s->lang == LANG_PL) {
         /* CH-17f: Prolog statement — emit SM_BB_ONCE_PROC "name/arity", arity
-         * instead of the legacy lower_expr(E_CHOICE) + SM_BB_ONCE path that
-         * pushed a raw EXPR_t* and called coro_eval(E_CHOICE) at runtime.
-         * s->subject is always an E_CHOICE node whose sval = "name/arity". */
-        if (s->subject && s->subject->kind == E_CHOICE && s->subject->sval) {
+         * instead of the legacy lower_expr(AST_CHOICE) + SM_BB_ONCE path that
+         * pushed a raw AST_t* and called coro_eval(AST_CHOICE) at runtime.
+         * s->subject is always an AST_CHOICE node whose sval = "name/arity". */
+        if (s->subject && s->subject->kind == AST_CHOICE && s->subject->sval) {
             const char *key = s->subject->sval;
             int arity = 0;
             const char *sl = strrchr(key, '/');
             if (sl) arity = atoi(sl + 1);
             sm_emit_si(p, SM_BB_ONCE_PROC, key, (int64_t)arity);
         } else {
-            /* Fallback for non-E_CHOICE subjects (directives etc.) */
+            /* Fallback for non-AST_CHOICE subjects (directives etc.) */
             if (s->subject)
                 lower_expr(p, lt, s->subject);
             else
@@ -1579,7 +1579,7 @@ static void lower_stmt(SM_Program *p, LabelTable *lt, const STMT_t *s)
          * leave a dangling pointer if we stored s->subject->sval directly. */
         {
             const char *sname = NULL;
-            if (s->subject && (s->subject->kind == E_VAR || s->subject->kind == E_KEYWORD))
+            if (s->subject && (s->subject->kind == AST_VAR || s->subject->kind == AST_KEYWORD))
                 sname = s->subject->sval;
             sm_emit_si(p, SM_EXEC_STMT, sname, (int64_t)s->has_eq);
         }
@@ -1599,18 +1599,18 @@ static void lower_stmt(SM_Program *p, LabelTable *lt, const STMT_t *s)
             else
                 sm_emit(p, SM_PUSH_NULL);   /* X =   → assign null */
             /* lhs */
-            if (s->subject->kind == E_VAR || s->subject->kind == E_KEYWORD) {
+            if (s->subject->kind == AST_VAR || s->subject->kind == AST_KEYWORD) {
                 sm_emit_s(p, SM_STORE_VAR, s->subject->sval ? s->subject->sval : "");
-            } else if (s->subject->kind == E_INDIRECT) {
+            } else if (s->subject->kind == AST_INDIRECT) {
                 lower_expr(p, lt, s->subject->nchildren > 0 ? s->subject->children[0] : NULL);
                 sm_emit_si(p, SM_CALL_FN, "ASGN_INDIR", 2);
-            } else if (s->subject->kind == E_IDX) {
+            } else if (s->subject->kind == AST_IDX) {
                 /* a<i> = rhs  or  a<i,j> = rhs — stack: rhs already pushed above.
                  * Push base, then indices; sm_interp IDX_SET pops all and calls subscript_set. */
                 int nc = s->subject->nchildren;  /* child[0]=base, child[1]=i, [2]=j */
                 for (int ci = 0; ci < nc; ci++) lower_expr(p, lt, s->subject->children[ci]);
                 sm_emit_si(p, SM_CALL_FN, "IDX_SET", (int64_t)(nc + 1)); /* +1 for rhs */
-            } else if (s->subject->kind == E_FNC && s->subject->sval) {
+            } else if (s->subject->kind == AST_FNC && s->subject->sval) {
                 /* NRETURN lvalue or field mutator: fname(...) = rhs
                  * If fname is a zero-param user function (NRETURN path), emit
                  * NRETURN_ASGN pseudo-call: stack = [rhs], fname in a[0].s.
@@ -1687,7 +1687,7 @@ SM_Program *sm_lower(const CODE_t *prog)
      *   SM_JUMP <skip_proc_NN>     ; forward-jump around the chunk
      *   SM_LABEL "<proc_name>"     ; named entry — sm_label_pc_lookup target
      *   <lowered body>             ; CH-17b': lower_expr each body child + SM_VOID_POP
-     *   SM_RETURN                  ; trailing return (or unreachable after E_RETURN)
+     *   SM_RETURN                  ; trailing return (or unreachable after AST_RETURN)
      *   <skip_proc_NN>:            ; anonymous skip target
      *
      * After sm_lower returns, sm_resolve_proc_entry_pcs (CH-17a) walks
@@ -1697,14 +1697,14 @@ SM_Program *sm_lower(const CODE_t *prog)
      *
      * CH-17b' body-lowering details:
      *
-     *   - Body children of E_FNC live at proc->children[1+nparams..nchildren-1].
+     *   - Body children of AST_FNC live at proc->children[1+nparams..nchildren-1].
      *     proc->ival is nparams.  Param-name children at [1..1+nparams-1] are
      *     not body — they declare parameters (slot-bound at runtime by
      *     icn_scope_patch in coro_call); skipped here because lowering them
      *     would emit SM_PUSH_VAR <param-name> for no benefit, the parameter
      *     values having already been bound by the caller's frame.
      *
-     *   - E_GLOBAL declarations (and E_GLOBAL with ival==1 for `static`) are
+     *   - AST_GLOBAL declarations (and AST_GLOBAL with ival==1 for `static`) are
      *     not skipped here: lower_expr handles them as no-ops emitting
      *     SM_PUSH_NULL, which the trailing SM_VOID_POP discards.  Static-variable
      *     persistence semantics still live inside coro_call (lines 408-420 of
@@ -1714,19 +1714,19 @@ SM_Program *sm_lower(const CODE_t *prog)
      *     emit SM_VOID_POP after each to discard the result, mirroring how
      *     statement-context evaluation discards the value of an expression
      *     statement.  The kinds that appear at proc-body top level
-     *     (E_IF, E_WHILE, E_UNTIL, E_REPEAT, E_RETURN, E_PROC_FAIL,
-     *     E_LOOP_BREAK, E_LOOP_NEXT, E_ASSIGN, E_FNC, E_SEQ_EXPR, E_GLOBAL,
-     *     E_INITIAL, ...) all have lower_expr cases with single-value-push
-     *     stack discipline.  Generator kinds (E_EVERY, E_SUSPEND,
-     *     E_BANG_BINARY, E_TO, E_TO_BY, ...) currently emit
+     *     (AST_IF, AST_WHILE, AST_UNTIL, AST_REPEAT, AST_RETURN, AST_PROC_FAIL,
+     *     AST_LOOP_BREAK, AST_LOOP_NEXT, AST_ASSIGN, AST_FNC, AST_SEQ_EXPR, AST_GLOBAL,
+     *     AST_INITIAL, ...) all have lower_expr cases with single-value-push
+     *     stack discipline.  Generator kinds (AST_EVERY, AST_SUSPEND,
+     *     AST_BANG_BINARY, AST_TO, AST_TO_BY, ...) currently emit
      *     SM_PUSH_EXPR + SM_BB_PUMP — that's the gating note in
      *     GOAL-CHUNKS-STEP17.md CH-17b': those legacy emissions are
      *     acceptable because the chunks are unreachable until CH-17c flips
-     *     coro_call to dispatch via entry_pc.  Unhandled kinds (E_ALTERNATE,
-     *     E_ITERATE, E_CSET_*, E_REVASSIGN, E_REVSWAP) hit lower_expr's
+     *     coro_call to dispatch via entry_pc.  Unhandled kinds (AST_ALTERNATE,
+     *     AST_ITERATE, AST_CSET_*, AST_REVASSIGN, AST_REVSWAP) hit lower_expr's
      *     default case which would normally fprintf to stderr — silenced
      *     here via g_chunk_body_lowering since these chunks are dead code.
-     *     E_RETURN's lower_expr case already emits SM_RETURN, after which
+     *     AST_RETURN's lower_expr case already emits SM_RETURN, after which
      *     our trailing SM_VOID_POP + SM_RETURN is dead code — harmless.
      *
      *   - The shared LabelTable `lt` is reused.  Icon proc bodies do not use
@@ -1736,9 +1736,9 @@ SM_Program *sm_lower(const CODE_t *prog)
      *
      *   - CH-17b'': frame-slot resolution IS pre-built at lower-time.  Per
      *     proc, an IcnScope is constructed mirroring coro_runtime.c's
-     *     icn_scope_patch (params first, then E_GLOBAL-decl names, then any
-     *     non-global E_VAR encountered in the body).  The scope is installed
-     *     via g_chunk_scope so lower_expr's E_VAR / E_ASSIGN cases emit
+     *     icn_scope_patch (params first, then AST_GLOBAL-decl names, then any
+     *     non-global AST_VAR encountered in the body).  The scope is installed
+     *     via g_chunk_scope so lower_expr's AST_VAR / AST_ASSIGN cases emit
      *     SM_LOAD_FRAME / SM_STORE_FRAME for in-scope names, falling back to
      *     SM_PUSH_VAR / SM_STORE_VAR for globals / keywords / unscoped names.
      *     This mirrors what bb_eval_value does at runtime when frame_depth>0,
@@ -1754,7 +1754,7 @@ SM_Program *sm_lower(const CODE_t *prog)
     for (int pi = 0; pi < proc_count; pi++) {
         const char *nm = proc_table[pi].name;
         if (!nm || !*nm) continue;
-        EXPR_t *proc = proc_table[pi].proc;       /* registered by polyglot_init */
+        AST_t *proc = proc_table[pi].proc;       /* registered by polyglot_init */
 
         int skip_jump = sm_emit_i(p, SM_JUMP, 0); /* patched to skip_lbl below */
         /* sm_label_named records the name in a[0].s and the pc in a[1].i
@@ -1770,8 +1770,8 @@ SM_Program *sm_lower(const CODE_t *prog)
          *   emission below on chunk-body context.
          *
          *   g_chunk_scope (CH-17b'') — per-proc IcnScope built fresh: params
-         *   become slots 0..nparams-1; E_GLOBAL-decl locals follow; any
-         *   non-global E_VAR encountered in the body extends the scope.
+         *   become slots 0..nparams-1; AST_GLOBAL-decl locals follow; any
+         *   non-global AST_VAR encountered in the body extends the scope.
          *   The walker mirrors icn_scope_patch but without IR mutation. */
         if (proc) {
             int nparams    = (int)proc->ival;
@@ -1781,11 +1781,11 @@ SM_Program *sm_lower(const CODE_t *prog)
              * down when this `if` block exits.  scope_add returns the same
              * slot for the same name, so re-adding params via the body walk
              * is safe.  Order matches icn_scope_patch (params, then E_GLOBALs
-             * via the E_GLOBAL branch of chunk_scope_walk, then encountered
+             * via the AST_GLOBAL branch of chunk_scope_walk, then encountered
              * E_VARs in tree-walk order). */
             IcnScope chunk_sc; chunk_sc.n = 0;
             for (int i = 0; i < nparams && i < FRAME_SLOT_MAX; i++) {
-                EXPR_t *pn = proc->children[1+i];
+                AST_t *pn = proc->children[1+i];
                 if (pn && pn->sval) scope_add(&chunk_sc, pn->sval);
             }
             for (int bi = body_start; bi < proc->nchildren; bi++)
@@ -1794,7 +1794,7 @@ SM_Program *sm_lower(const CODE_t *prog)
             g_chunk_scope          = &chunk_sc;
             g_chunk_body_lowering  = 1;
             for (int bi = body_start; bi < proc->nchildren; bi++) {
-                EXPR_t *body_expr = proc->children[bi];
+                AST_t *body_expr = proc->children[bi];
                 if (!body_expr) continue;
                 lower_expr(p, &lt, body_expr);
                 sm_emit(p, SM_VOID_POP);
@@ -1826,7 +1826,7 @@ SM_Program *sm_lower(const CODE_t *prog)
      * stayed -1.  The chunks are forward-jumped over so nothing reaches
      * them at runtime; gates are byte-identical to baseline.
      *
-     * Body lowering (full E_CHOICE/E_CLAUSE IR walk) is CH-17f territory.
+     * Body lowering (full AST_CHOICE/AST_CLAUSE IR walk) is CH-17f territory.
      * This rung only validates that the resolver finds non-(-1) entry_pcs. */
     for (int b = 0; b < PL_PRED_TABLE_SIZE_FWD; b++) {
         for (Pl_PredEntry *e = g_pl_pred_table.buckets[b]; e; e = e->next) {
@@ -1856,12 +1856,12 @@ SM_Program *sm_lower(const CODE_t *prog)
     }
 
     /* CHUNKS-step12: synthesise top-level main() pump for Icon programs.
-     * Was: build a synthetic E_FNC("main") node, emit_push_expr it, follow
-     *      with SM_BB_PUMP — which read DT_E.ptr as EXPR_t* at runtime and
+     * Was: build a synthetic AST_FNC("main") node, emit_push_expr it, follow
+     *      with SM_BB_PUMP — which read DT_E.ptr as AST_t* at runtime and
      *      handed it to coro_eval, an IR walker.
      * Now: emit SM_BB_PUMP_PROC "main", 0 directly. The handler does the
      *      proc_table lookup and stages the coroutine without constructing
-     *      or walking any EXPR_t at this layer. The IR walk that remains
+     *      or walking any AST_t at this layer. The IR walk that remains
      *      lives entirely inside coro_call(proc_table[main].proc, ...) and
      *      is Step 17's territory (proc_table → entry_pcs).
      *

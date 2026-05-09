@@ -4,71 +4,71 @@
  * See coro_value.h for the contract and migration plan.
  *
  * Today this delegates to `eval_node` for kinds that are SNOBOL4/Icon-identical
- * (literals, keywords) and adds an Icon-frame-aware E_VAR shim that reads the
+ * (literals, keywords) and adds an Icon-frame-aware AST_VAR shim that reads the
  * slot-indexed local from FRAME.env when frame_depth > 0.  All other kinds
  * fall through to `interp_eval` — that fallthrough is intentional scaffolding
  * for the incremental migration of coro_runtime.c call sites (RS-17a-cont).
  *
- * RS-22a (2026-05-03): E_ASSIGN and E_FNC ported out of interp_eval's Icon-frame
+ * RS-22a (2026-05-03): AST_ASSIGN and AST_FNC ported out of interp_eval's Icon-frame
  * switch.  All interp_eval(child) recurses replaced with bb_eval_value(child).
- * E_FNC builtins route through icn_call_builtin (already IR-free).
+ * AST_FNC builtins route through icn_call_builtin (already IR-free).
  *
  * RS-22b (2026-05-03): Arithmetic + numeric-comparison binops lifted in.
- * E_ADD/E_SUB/E_MUL/E_DIV/E_MOD/E_POW dispatch through `shared_arith` in
+ * AST_ADD/AST_SUB/AST_MUL/AST_DIV/AST_MOD/AST_POW dispatch through `shared_arith` in
  * runtime/common/coerce.c (mirrors sm_interp's SM_ADD..SM_EXP path —
  * FAIL propagation, DT_S → INT, DT_SNUL → INT 0, then shared_arith).
- * E_LT/E_LE/E_GT/E_GE/E_EQ/E_NE return the right operand on success,
- * FAILDESCR on fail (Icon goal-directed convention).  E_IDENTICAL routes
+ * AST_LT/AST_LE/AST_GT/AST_GE/AST_EQ/AST_NE return the right operand on success,
+ * FAILDESCR on fail (Icon goal-directed convention).  AST_IDENTICAL routes
  * through `icn_descr_identical` (declared in coro_runtime.h).  Note: there
- * is no E_NOT_IDENTICAL kind — `~===` lowers as E_NOT(E_IDENTICAL(...)).
+ * is no AST_NOT_IDENTICAL kind — `~===` lowers as AST_NOT(AST_IDENTICAL(...)).
  *
  * RS-22c (2026-05-03): String concat + subscript read + section read +
- * field read lifted in.  E_CAT and E_LCONCAT share `bb_str_concat`
+ * field read lifted in.  AST_CAT and AST_LCONCAT share `bb_str_concat`
  * (numeric operands → string via `descr_to_str_icn`, then GC_malloc'd
- * concat).  E_IDX dispatches via `subscript_get`/`subscript_get2` (already
- * exposed in snobol4.h).  E_FIELD via `data_field_ptr`.  E_SECTION/
- * E_SECTION_PLUS/E_SECTION_MINUS share `bb_section` with Icon position
+ * concat).  AST_IDX dispatches via `subscript_get`/`subscript_get2` (already
+ * exposed in snobol4.h).  AST_FIELD via `data_field_ptr`.  AST_SECTION/
+ * AST_SECTION_PLUS/AST_SECTION_MINUS share `bb_section` with Icon position
  * normalization (0 → slen+1, negative → slen+1+p) — three minor variants
  * of bound computation kept inline.
  *
  * RS-22d (2026-05-03): Unary + augmented-assign kinds lifted in.
- * E_MNS (unary `-` — Icon parser uses E_MNS, not the rung-text "E_NEG"),
- * E_PLS (unary `+`), E_NOT (`not`), E_NULL (`/`), E_NONNULL (`\`),
- * E_SIZE (`*`), E_RANDOM (`?`) all dispatched directly.  E_AUGOP (the
- * actual IR kind name; rung-text "E_AUGASSIGN" was a label rather than
+ * AST_MNS (unary `-` — Icon parser uses AST_MNS, not the rung-text "AST_NEG"),
+ * AST_PLS (unary `+`), AST_NOT (`not`), AST_NULL (`/`), AST_NONNULL (`\`),
+ * AST_SIZE (`*`), AST_RANDOM (`?`) all dispatched directly.  AST_AUGOP (the
+ * actual IR kind name; rung-text "AST_AUGASSIGN" was a label rather than
  * the literal kind) handles all three IR-mode paths: bang-iterate lvalue
  * (`!container OP:= rhs`), generator-RHS drive (`every sum +:= (1 to n)`
  * via coro_eval + bb_node_t.fn ticks), and plain `lv OP rv` then
  * writeback.  Two helpers — `bb_augop_compute` (pure compute given lv,
- * rv, op token) and `bb_augop_writeback` (write to E_VAR slot / E_IDX /
- * E_FIELD lhs) — replace IR-mode's AUGOP_APPLY / AUGOP_CELL macros.
+ * rv, op token) and `bb_augop_writeback` (write to AST_VAR slot / AST_IDX /
+ * AST_FIELD lhs) — replace IR-mode's AUGOP_APPLY / AUGOP_CELL macros.
  * Unsupported tokens (TK_AUGPOW, TK_AUGCSET_*, TK_AUGSCAN) fall through
  * to the integer-add default — same coverage as IR-mode.
  *
  * RS-22e (2026-05-03): Fallthrough survey.  smoke_icon hits zero
  * unhandled kinds — the rung's stated gate is met.  Full Icon corpus
  * (271 programs) hits 16 distinct kinds totaling 62 fallthroughs, in
- * five categories: generators (E_TO/E_ALTERNATE/E_ITERATE/E_LIMIT/
- * E_SEQ), string relops (E_LEQ/E_LNE/E_LGE/E_LLT plus untriggered
- * E_LGT/E_LLE peers), cset arithmetic (E_CSET/E_CSET_COMPL/_DIFF/
- * _INTER), and three mid-size kinds (E_MAKELIST, E_SCAN, E_CASE).
+ * five categories: generators (AST_TO/AST_ALTERNATE/AST_ITERATE/AST_LIMIT/
+ * AST_SEQ), string relops (AST_LEQ/AST_LNE/AST_LGE/AST_LLT plus untriggered
+ * AST_LGT/AST_LLE peers), cset arithmetic (AST_CSET/AST_CSET_COMPL/_DIFF/
+ * _INTER), and three mid-size kinds (AST_MAKELIST, AST_SCAN, AST_CASE).
  * Hardening the fallthrough to FAILDESCR causes 4 unified_broker FAILs
- * (notably palindrome.icn via E_LNE), so per the rung the abort is
+ * (notably palindrome.icn via AST_LNE), so per the rung the abort is
  * reverted; full inventory in docs/RS-22e-fallthrough-survey.md.
  * RS-22f-or-RS-23 closes the remaining 16 kinds; only after that can
  * the `interp_eval` extern be dropped (RS-23) and coro_value.c
  * promoted into the isolation gate.
  *
  * RS-22f-strrel (2026-05-03): Six string lexicographic relops lifted
- * in.  E_LLT/E_LLE/E_LGT/E_LGE/E_LEQ/E_LNE share `bb_strrel` — direct
+ * in.  AST_LLT/AST_LLE/AST_LGT/AST_LGE/AST_LEQ/AST_LNE share `bb_strrel` — direct
  * mirror of `bb_numrel` using strcmp(VARVAL_fn(l), VARVAL_fn(r)).
  * Right-operand-on-success (Icon goal-directed convention).  Closes
- * 17 fallthroughs (E_LEQ ×9, E_LNE ×6, E_LGE ×1, E_LLT ×1) and the
+ * 17 fallthroughs (AST_LEQ ×9, AST_LNE ×6, AST_LGE ×1, AST_LLT ×1) and the
  * two untriggered peers in the survey.  Removes palindrome.icn
  * unified_broker failure path and three peers — first sub-rung of
  * RS-22f.
  *
- * RS-22f-makelist (2026-05-03): E_MAKELIST lifted in.  Mirrors
+ * RS-22f-makelist (2026-05-03): AST_MAKELIST lifted in.  Mirrors
  * interp_eval.c:4051-4062 verbatim — first-sighting DEFDAT_fn
  * registration of `icnlist`, GC_malloc'd elem array, bb_eval_value
  * over each child (was interp_eval in IR mode), DATCON_fn returns
@@ -80,17 +80,17 @@
  *==========================================================================================================================*/
 
 #include "coro_value.h"
-#include "coro_stmt.h"         /* RS-23c: bb_exec_stmt used in E_EVERY body dispatch */
+#include "coro_stmt.h"         /* RS-23c: bb_exec_stmt used in AST_EVERY body dispatch */
 #include "coro_runtime.h"   /* FRAME, frame_depth, scan_pos, scan_subj, icn_descr_identical, g_lang, is_suspendable, coro_eval */
 #include "../../driver/interp_private.h"  /* RS-22a: icn_call_builtin, icn_string_section_assign, set_and_trace, data_field_ptr, kw_assign; RS-22d: IcnTkKind via icon_lex.h */
 #include "../common/coerce.h"             /* RS-22b: shared_arith */
-#include "../x86/bb_broker.h"             /* RS-22d: α, β, bb_node_t for E_AUGOP generator-RHS path */
+#include "../x86/bb_broker.h"             /* RS-22d: α, β, bb_node_t for AST_AUGOP generator-RHS path */
 #include "snobol4.h"
 #include <string.h>
 #include <gc/gc.h>
 
 /* eval_node lives in src/runtime/x86/eval_code.c — IR-free expression evaluator. */
-extern DESCR_t eval_node(EXPR_t *e);
+extern DESCR_t eval_node(AST_t *e);
 
 /* RS-23e (closes RS-23 arc): the `interp_eval` extern is gone.  Diag
  * (`scrip-rs23-diag` with `-Wl,--wrap=interp_eval`) verified zero IR
@@ -107,7 +107,7 @@ extern DESCR_t eval_node(EXPR_t *e);
  * then delegate to `shared_arith` in runtime/common/coerce.c.  One helper
  * instead of six near-identical cases — and the same code path SM mode uses.
  *----------------------------------------------------------------------------------------------------------------------------*/
-static DESCR_t bb_arith(EXPR_t *e, sm_opcode_t op)
+static DESCR_t bb_arith(AST_t *e, sm_opcode_t op)
 {
     if (e->nchildren < 2) return FAILDESCR;
     DESCR_t l = bb_eval_value(e->children[0]);
@@ -130,7 +130,7 @@ static DESCR_t bb_arith(EXPR_t *e, sm_opcode_t op)
  *----------------------------------------------------------------------------------------------------------------------------*/
 typedef enum { BBR_LT, BBR_LE, BBR_GT, BBR_GE, BBR_EQ, BBR_NE } bb_relop_t;
 
-static DESCR_t bb_numrel(EXPR_t *e, bb_relop_t op)
+static DESCR_t bb_numrel(AST_t *e, bb_relop_t op)
 {
     if (e->nchildren < 2) return FAILDESCR;
     DESCR_t l = bb_eval_value(e->children[0]);
@@ -161,7 +161,7 @@ static DESCR_t bb_numrel(EXPR_t *e, bb_relop_t op)
  *----------------------------------------------------------------------------------------------------------------------------*/
 typedef enum { BBS_LLT, BBS_LLE, BBS_LGT, BBS_LGE, BBS_LEQ, BBS_LNE } bb_strrelop_t;
 
-static DESCR_t bb_strrel(EXPR_t *e, bb_strrelop_t op)
+static DESCR_t bb_strrel(AST_t *e, bb_strrelop_t op)
 {
     if (e->nchildren < 2) return FAILDESCR;
     DESCR_t l = bb_eval_value(e->children[0]);
@@ -184,10 +184,10 @@ static DESCR_t bb_strrel(EXPR_t *e, bb_strrelop_t op)
 }
 
 /*------------------------------------------------------------------------------------------------------------------------------
- * bb_str_concat — RS-22c string-concat helper (E_CAT + E_LCONCAT).
+ * bb_str_concat — RS-22c string-concat helper (AST_CAT + AST_LCONCAT).
  *
- * Icon `||` (E_CAT) and `|||` (E_LCONCAT) both reach here via the BB
- * adapter.  Mirrors the IR-mode E_LCONCAT case at interp_eval.c:4037 —
+ * Icon `||` (AST_CAT) and `|||` (AST_LCONCAT) both reach here via the BB
+ * adapter.  Mirrors the IR-mode AST_LCONCAT case at interp_eval.c:4037 —
  * coerce numeric operands via descr_to_str_icn (round-trip-correct real
  * formatting), VARVAL_fn for everything else, GC_malloc'd concat.
  *
@@ -196,7 +196,7 @@ static DESCR_t bb_strrel(EXPR_t *e, bb_strrelop_t op)
  * bb_eval_value).  If one ever did, descr_to_str_icn would fail-through
  * to FAILDESCR rather than producing garbage.
  *----------------------------------------------------------------------------------------------------------------------------*/
-static DESCR_t bb_str_concat(EXPR_t *e)
+static DESCR_t bb_str_concat(AST_t *e)
 {
     if (e->nchildren < 2) return NULVCL;
     DESCR_t a = bb_eval_value(e->children[0]);
@@ -219,8 +219,8 @@ static DESCR_t bb_str_concat(EXPR_t *e)
 /*------------------------------------------------------------------------------------------------------------------------------
  * bb_section — RS-22c string section helper.
  *
- * Mirrors interp_eval.c:4070-4125 for E_SECTION (s[i:j]), E_SECTION_PLUS
- * (s[i+:n]), E_SECTION_MINUS (s[i-:n]).  Icon position rules:
+ * Mirrors interp_eval.c:4070-4125 for AST_SECTION (s[i:j]), AST_SECTION_PLUS
+ * (s[i+:n]), AST_SECTION_MINUS (s[i-:n]).  Icon position rules:
  *   p ≥ 1     → 1-based position (1 is before first char)
  *   p == 0    → position past last char (= slen+1)
  *   p < 0     → slen+1+p   (-1 → slen, -2 → slen-1, ...)
@@ -228,7 +228,7 @@ static DESCR_t bb_str_concat(EXPR_t *e)
  *----------------------------------------------------------------------------------------------------------------------------*/
 typedef enum { BBS_RANGE, BBS_PLUS, BBS_MINUS } bb_section_t;
 
-static DESCR_t bb_section(EXPR_t *e, bb_section_t kind)
+static DESCR_t bb_section(AST_t *e, bb_section_t kind)
 {
     if (e->nchildren < 3) return NULVCL;
     DESCR_t sd = bb_eval_value(e->children[0]);
@@ -267,7 +267,7 @@ static DESCR_t bb_section(EXPR_t *e, bb_section_t kind)
 }
 
 /*------------------------------------------------------------------------------------------------------------------------------
- * bb_augop_compute — RS-22d pure compute step for E_AUGOP.
+ * bb_augop_compute — RS-22d pure compute step for AST_AUGOP.
  *
  * Given (lv, rv, op_token), produce the augop result (FAILDESCR if
  * the op fails — e.g. division by zero, or a comparison-augop whose
@@ -333,26 +333,26 @@ static DESCR_t bb_augop_compute(DESCR_t lv, DESCR_t rv, IcnTkKind op)
 /*------------------------------------------------------------------------------------------------------------------------------
  * bb_augop_writeback — RS-22d write augop result back to lhs.
  *
- * lhs may be E_VAR (slot/global), E_IDX (subscript), or E_FIELD (record
- * field).  E_VAR&-keyword left untouched for parity with IR-mode (the
+ * lhs may be AST_VAR (slot/global), AST_IDX (subscript), or AST_FIELD (record
+ * field).  AST_VAR&-keyword left untouched for parity with IR-mode (the
  * AUGOP_APPLY macro never wrote back to keyword lvalues).  Callers
  * already checked !IS_FAIL_fn(res).
  *----------------------------------------------------------------------------------------------------------------------------*/
-static void bb_augop_writeback(EXPR_t *lhs, DESCR_t res)
+static void bb_augop_writeback(AST_t *lhs, DESCR_t res)
 {
     if (!lhs) return;
-    if (lhs->kind == E_VAR) {
+    if (lhs->kind == AST_VAR) {
         int slot = (int)lhs->ival;
         if (frame_depth > 0 && slot >= 0 && slot < FRAME.env_n)
             FRAME.env[slot] = res;
         else if (slot < 0 && lhs->sval && lhs->sval[0] != '&')
             set_and_trace(lhs->sval, res);
-    } else if (lhs->kind == E_IDX && lhs->nchildren >= 2) {
+    } else if (lhs->kind == AST_IDX && lhs->nchildren >= 2) {
         DESCR_t base = bb_eval_value(lhs->children[0]);
         DESCR_t idx  = bb_eval_value(lhs->children[1]);
         if (!IS_FAIL_fn(base) && !IS_FAIL_fn(idx))
             subscript_set(base, idx, res);
-    } else if (lhs->kind == E_FIELD && lhs->sval && lhs->nchildren >= 1) {
+    } else if (lhs->kind == AST_FIELD && lhs->sval && lhs->nchildren >= 1) {
         DESCR_t obj = bb_eval_value(lhs->children[0]);
         if (!IS_FAIL_fn(obj)) {
             DESCR_t *cell = data_field_ptr(lhs->sval, obj);
@@ -365,21 +365,21 @@ static void bb_augop_writeback(EXPR_t *lhs, DESCR_t res)
  * bb_eval_value — evaluate e in value context.
  *
  * Value context means: produce a single DESCR_t result.  Generator-context
- * sub-expressions (E_TO/E_TO_BY/E_ALTERNATE/E_FNC user-proc/etc.) fall through
+ * sub-expressions (AST_TO/AST_TO_BY/AST_ALTERNATE/AST_FNC user-proc/etc.) fall through
  * to interp_eval today; routing them through coro_eval + a single bb_broker
  * BB_ONCE pump is RS-17a-cont work.
  *
- * Icon-frame E_VAR shim mirrors interp_eval.c lines 353-372: when frame_depth>0
+ * Icon-frame AST_VAR shim mirrors interp_eval.c lines 353-372: when frame_depth>0
  * we read scan/letter keywords directly and use slot-indexed locals from
- * FRAME.env[ival].  Outside an Icon frame, E_VAR delegates to eval_node which
+ * FRAME.env[ival].  Outside an Icon frame, AST_VAR delegates to eval_node which
  * does the SNOBOL4 NV_GET_fn lookup.
  *----------------------------------------------------------------------------------------------------------------------------*/
-DESCR_t bb_eval_value(EXPR_t *e)
+DESCR_t bb_eval_value(AST_t *e)
 {
     if (!e) return NULVCL;
 
-    /* Icon-frame-aware E_VAR: slot read when inside an Icon procedure call. */
-    if (e->kind == E_VAR && frame_depth > 0) {
+    /* Icon-frame-aware AST_VAR: slot read when inside an Icon procedure call. */
+    if (e->kind == AST_VAR && frame_depth > 0) {
         if (e->sval && e->sval[0] == '&') {
             const char *kw = e->sval + 1;
             if (!strcmp(kw, "subject")) return scan_subj ? STRVAL(scan_subj) : NULVCL;
@@ -399,38 +399,38 @@ DESCR_t bb_eval_value(EXPR_t *e)
     }
 
     /* Kinds that eval_node already handles identically for SNOBOL4 and Icon
-     * outside-of-frame: literals, &keywords, NULVCL.  E_VAR outside an Icon
+     * outside-of-frame: literals, &keywords, NULVCL.  AST_VAR outside an Icon
      * frame goes through eval_node's NV_GET_fn path. */
     switch (e->kind) {
-    case E_ILIT:
-    case E_FLIT:
-    case E_QLIT:
-    case E_NUL:
-    case E_KEYWORD:
+    case AST_ILIT:
+    case AST_FLIT:
+    case AST_QLIT:
+    case AST_NUL:
+    case AST_KEYWORD:
         return eval_node(e);
-    case E_VAR:
+    case AST_VAR:
         /* frame_depth == 0: SNOBOL4-style lookup via eval_node */
         return eval_node(e);
 
-    /* RS-22a: E_ASSIGN — slot store, IDX, FIELD, ITERATE, RANDOM lvalue paths.
+    /* RS-22a: AST_ASSIGN — slot store, IDX, FIELD, ITERATE, RANDOM lvalue paths.
      * Mirrors interp_eval.c lines 373-474; all interp_eval(child) replaced
      * with bb_eval_value(child). */
-    case E_ASSIGN: {
+    case AST_ASSIGN: {
         if (e->nchildren < 2) return NULVCL;
         DESCR_t val = bb_eval_value(e->children[1]);
         if (IS_FAIL_fn(val)) return FAILDESCR;
-        EXPR_t *lhs = e->children[0];
-        if (lhs && (lhs->kind == E_SECTION || lhs->kind == E_SECTION_PLUS ||
-                    lhs->kind == E_SECTION_MINUS)) {
+        AST_t *lhs = e->children[0];
+        if (lhs && (lhs->kind == AST_SECTION || lhs->kind == AST_SECTION_PLUS ||
+                    lhs->kind == AST_SECTION_MINUS)) {
             if (icn_string_section_assign(lhs, val)) return val;
             return FAILDESCR;
         }
-        if (lhs && lhs->kind == E_IDX && lhs->nchildren >= 2) {
+        if (lhs && lhs->kind == AST_IDX && lhs->nchildren >= 2) {
             if (icn_string_section_assign(lhs, val)) return val;
             { DESCR_t _b = bb_eval_value(lhs->children[0]);
               if (_b.v == DT_S || _b.v == DT_SNUL) return FAILDESCR; }
         }
-        if (lhs && lhs->kind == E_VAR) {
+        if (lhs && lhs->kind == AST_VAR) {
             if (lhs->sval && lhs->sval[0] == '&') {
                 if (!kw_assign(lhs->sval + 1, val)) return FAILDESCR;
                 return val;
@@ -438,19 +438,19 @@ DESCR_t bb_eval_value(EXPR_t *e)
             int slot = (int)lhs->ival;
             if (slot >= 0 && slot < FRAME.env_n) { FRAME.env[slot] = val; return val; }
             if (slot < 0 && lhs->sval && lhs->sval[0] != '&') set_and_trace(lhs->sval, val);
-        } else if (lhs && lhs->kind == E_IDX && lhs->nchildren >= 2) {
+        } else if (lhs && lhs->kind == AST_IDX && lhs->nchildren >= 2) {
             DESCR_t base = bb_eval_value(lhs->children[0]);
             if (!IS_FAIL_fn(base)) {
                 DESCR_t idx = bb_eval_value(lhs->children[1]);
                 if (!IS_FAIL_fn(idx)) subscript_set(base, idx, val);
             }
-        } else if (lhs && lhs->kind == E_FIELD && lhs->sval && lhs->nchildren >= 1) {
+        } else if (lhs && lhs->kind == AST_FIELD && lhs->sval && lhs->nchildren >= 1) {
             DESCR_t obj = bb_eval_value(lhs->children[0]);
             if (!IS_FAIL_fn(obj)) {
                 DESCR_t *cell = data_field_ptr(lhs->sval, obj);
                 if (cell) *cell = val;
             }
-        } else if (lhs && lhs->kind == E_ITERATE && lhs->nchildren >= 1) {
+        } else if (lhs && lhs->kind == AST_ITERATE && lhs->nchildren >= 1) {
             DESCR_t cv = bb_eval_value(lhs->children[0]);
             if (!IS_FAIL_fn(cv)) {
                 if (cv.v == DT_T && cv.tbl) {
@@ -473,16 +473,16 @@ DESCR_t bb_eval_value(EXPR_t *e)
         return val;
     }
 
-    /* RS-22a: E_FNC — user-proc path dispatches through proc_table → coro_call.
+    /* RS-22a: AST_FNC — user-proc path dispatches through proc_table → coro_call.
      * Builtin path evaluates args through bb_eval_value then calls icn_call_builtin
-     * (already IR-free).  Mirror of interp_eval.c E_FNC case but recursion-safe. */
-    case E_FNC: {
+     * (already IR-free).  Mirror of interp_eval.c AST_FNC case but recursion-safe. */
+    case AST_FNC: {
         if (e->nchildren < 1) return NULVCL;
         const char *fn = e->children[0] ? e->children[0]->sval : NULL;
         if (!fn) return NULVCL;
         int nargs = e->nchildren - 1;
         /* RS-23a-raku: Raku block-receiving builtins (raku_try / raku_map /
-         * raku_grep / raku_sort) need raw EXPR_t access and must NOT be subject
+         * raku_grep / raku_sort) need raw AST_t access and must NOT be subject
          * to FAIL-prop on the body argument — dispatch them here, before the
          * generic user-proc / builtin pre-eval loops below.  raku_try_call_builtin
          * returns 1 if `fn` matched a Raku builtin (and *out is set); 0 means
@@ -511,32 +511,32 @@ DESCR_t bb_eval_value(EXPR_t *e)
 
     /* RS-22b: arithmetic binops — bb_arith handles FAIL prop, string→int,
      * SNUL→0, then dispatches via shared_arith (the same path SM mode uses).
-     * E_POW: shared_arith maps SM_EXP → integer for non-negative int^int,
+     * AST_POW: shared_arith maps SM_EXP → integer for non-negative int^int,
      * else REALVAL(pow(...)).  This matches Icon `^` (always real if any
      * operand is real) and SNOBOL4 `**` (int when both ints, exp >= 0). */
-    case E_ADD: return bb_arith(e, SM_ADD);
-    case E_SUB: return bb_arith(e, SM_SUB);
-    case E_MUL: return bb_arith(e, SM_MUL);
-    case E_DIV: return bb_arith(e, SM_DIV);
-    case E_MOD: return bb_arith(e, SM_MOD);
-    case E_POW: return bb_arith(e, SM_EXP);
+    case AST_ADD: return bb_arith(e, SM_ADD);
+    case AST_SUB: return bb_arith(e, SM_SUB);
+    case AST_MUL: return bb_arith(e, SM_MUL);
+    case AST_DIV: return bb_arith(e, SM_DIV);
+    case AST_MOD: return bb_arith(e, SM_MOD);
+    case AST_POW: return bb_arith(e, SM_EXP);
 
     /* RS-22b: numeric relational binops — succeed → return right operand,
      * fail → FAILDESCR.  Right-operand-on-success is Icon goal-directed
      * convention (lets `2 < (1 to 4)` filter a generator chain). */
-    case E_LT: return bb_numrel(e, BBR_LT);
-    case E_LE: return bb_numrel(e, BBR_LE);
-    case E_GT: return bb_numrel(e, BBR_GT);
-    case E_GE: return bb_numrel(e, BBR_GE);
-    case E_EQ: return bb_numrel(e, BBR_EQ);
-    case E_NE: return bb_numrel(e, BBR_NE);
+    case AST_LT: return bb_numrel(e, BBR_LT);
+    case AST_LE: return bb_numrel(e, BBR_LE);
+    case AST_GT: return bb_numrel(e, BBR_GT);
+    case AST_GE: return bb_numrel(e, BBR_GE);
+    case AST_EQ: return bb_numrel(e, BBR_EQ);
+    case AST_NE: return bb_numrel(e, BBR_NE);
 
     /* RS-22b: deep identity (Icon `===`).  Right-operand-on-success again.
      * Note: `~===` does NOT lower to a distinct EXPR kind — Icon's parser
-     * emits E_NOT(E_IDENTICAL(a, b)).  When E_NOT is lifted (RS-22d), the
-     * full `~===` path becomes IR-free; until then E_NOT still falls through
-     * to interp_eval and walks back here for its E_IDENTICAL child. */
-    case E_IDENTICAL: {
+     * emits AST_NOT(AST_IDENTICAL(a, b)).  When AST_NOT is lifted (RS-22d), the
+     * full `~===` path becomes IR-free; until then AST_NOT still falls through
+     * to interp_eval and walks back here for its AST_IDENTICAL child. */
+    case AST_IDENTICAL: {
         if (e->nchildren < 2) return FAILDESCR;
         DESCR_t l = bb_eval_value(e->children[0]);
         DESCR_t r = bb_eval_value(e->children[1]);
@@ -547,27 +547,27 @@ DESCR_t bb_eval_value(EXPR_t *e)
     /* RS-22f-strrel: lexicographic (string) relational binops — succeed →
      * return right operand, fail → FAILDESCR.  Mirror of bb_numrel for
      * Icon string comparison operators (==, ~==, <<, <<=, >>, >>=). */
-    case E_LLT: return bb_strrel(e, BBS_LLT);
-    case E_LLE: return bb_strrel(e, BBS_LLE);
-    case E_LGT: return bb_strrel(e, BBS_LGT);
-    case E_LGE: return bb_strrel(e, BBS_LGE);
-    case E_LEQ: return bb_strrel(e, BBS_LEQ);
-    case E_LNE: return bb_strrel(e, BBS_LNE);
+    case AST_LLT: return bb_strrel(e, BBS_LLT);
+    case AST_LLE: return bb_strrel(e, BBS_LLE);
+    case AST_LGT: return bb_strrel(e, BBS_LGT);
+    case AST_LGE: return bb_strrel(e, BBS_LGE);
+    case AST_LEQ: return bb_strrel(e, BBS_LEQ);
+    case AST_LNE: return bb_strrel(e, BBS_LNE);
 
-    /* RS-22c: string concat — Icon `||` (E_CAT) and `|||` (E_LCONCAT)
+    /* RS-22c: string concat — Icon `||` (AST_CAT) and `|||` (AST_LCONCAT)
      * share bb_str_concat.  In Icon BB context neither produces patterns,
      * so the simple coerce-and-concat path is correct (mirrors IR-mode
-     * E_LCONCAT at interp_eval.c:4037).  SNOBOL4 E_CAT in pattern context
+     * AST_LCONCAT at interp_eval.c:4037).  SNOBOL4 AST_CAT in pattern context
      * does not arrive here — that path is interp_eval_pat-only. */
-    case E_CAT:
-    case E_LCONCAT:
+    case AST_CAT:
+    case AST_LCONCAT:
         return bb_str_concat(e);
 
     /* RS-22c: subscript read — table/list/record/string index.
      * Two-arg form → subscript_get; three-arg form (s[i:j] lowered as
-     * E_IDX with two index children) → subscript_get2.  Mirrors
+     * AST_IDX with two index children) → subscript_get2.  Mirrors
      * interp_eval.c:3084. */
-    case E_IDX: {
+    case AST_IDX: {
         if (e->nchildren < 2) return FAILDESCR;
         DESCR_t base = bb_eval_value(e->children[0]);
         if (IS_FAIL_fn(base)) return FAILDESCR;
@@ -583,7 +583,7 @@ DESCR_t bb_eval_value(EXPR_t *e)
     }
 
     /* RS-22c: record field read.  e->sval = field name, child[0] = object. */
-    case E_FIELD: {
+    case AST_FIELD: {
         if (!e->sval || e->nchildren < 1) return NULVCL;
         DESCR_t obj = bb_eval_value(e->children[0]);
         if (IS_FAIL_fn(obj)) return FAILDESCR;
@@ -594,9 +594,9 @@ DESCR_t bb_eval_value(EXPR_t *e)
 
     /* RS-22c: string section (Icon s[i:j], s[i+:n], s[i-:n]) — bb_section.
      * Three minor variants of bound computation share one helper. */
-    case E_SECTION:        return bb_section(e, BBS_RANGE);
-    case E_SECTION_PLUS:   return bb_section(e, BBS_PLUS);
-    case E_SECTION_MINUS:  return bb_section(e, BBS_MINUS);
+    case AST_SECTION:        return bb_section(e, BBS_RANGE);
+    case AST_SECTION_PLUS:   return bb_section(e, BBS_PLUS);
+    case AST_SECTION_MINUS:  return bb_section(e, BBS_MINUS);
 
     /* RS-22f-makelist: Icon `[e1, e2, ...]` list constructor.  Mirrors
      * interp_eval.c:4051-4062 — register `icnlist` DATA type once on
@@ -604,7 +604,7 @@ DESCR_t bb_eval_value(EXPR_t *e)
      * bb_eval_value (was interp_eval in IR mode), then DATCON_fn to
      * build the DT_DATA descriptor.  The static-flag idiom matches IR
      * mode exactly: DEFDAT_fn is called at most once per process. */
-    case E_MAKELIST: {
+    case AST_MAKELIST: {
         int n = e->nchildren;
         static int icnlist_registered = 0;
         if (!icnlist_registered) { DEFDAT_fn("icnlist(frame_elems,frame_size,icn_type)"); icnlist_registered = 1; }
@@ -615,13 +615,13 @@ DESCR_t bb_eval_value(EXPR_t *e)
     }
 
     /* RS-22d: unary minus / plus.  Mirrors interp_eval.c:2501-2540.
-     * E_PLS is more elaborate than `pos()` — try integer parse first,
+     * AST_PLS is more elaborate than `pos()` — try integer parse first,
      * then real, fall back to INTVAL(0).  Match exactly. */
-    case E_MNS: {
+    case AST_MNS: {
         if (e->nchildren < 1) return FAILDESCR;
         return neg(bb_eval_value(e->children[0]));
     }
-    case E_PLS: {
+    case AST_PLS: {
         if (e->nchildren < 1) return FAILDESCR;
         DESCR_t v = bb_eval_value(e->children[0]);
         if (IS_FAIL_fn(v)) return FAILDESCR;
@@ -638,7 +638,7 @@ DESCR_t bb_eval_value(EXPR_t *e)
 
     /* RS-22d: boolean not.  `not E` succeeds with &null iff E fails;
      * fails iff E succeeds.  Mirrors interp_eval.c:3124. */
-    case E_NOT: {
+    case AST_NOT: {
         if (e->nchildren < 1) return FAILDESCR;
         DESCR_t v = bb_eval_value(e->children[0]);
         if (IS_FAIL_fn(v)) return NULVCL;
@@ -646,7 +646,7 @@ DESCR_t bb_eval_value(EXPR_t *e)
     }
 
     /* RS-22d: `/E` succeed-if-null. Mirrors interp_eval.c:3629. */
-    case E_NULL: {
+    case AST_NULL: {
         if (e->nchildren < 1) return NULVCL;
         DESCR_t v = bb_eval_value(e->children[0]);
         if (IS_FAIL_fn(v)) return FAILDESCR;
@@ -656,7 +656,7 @@ DESCR_t bb_eval_value(EXPR_t *e)
     }
 
     /* RS-22d: `\E` succeed-if-non-null. Mirrors interp_eval.c:3646. */
-    case E_NONNULL: {
+    case AST_NONNULL: {
         if (e->nchildren < 1) return FAILDESCR;
         DESCR_t v = bb_eval_value(e->children[0]);
         if (IS_FAIL_fn(v)) return FAILDESCR;
@@ -666,7 +666,7 @@ DESCR_t bb_eval_value(EXPR_t *e)
     }
 
     /* RS-22d: `*E` size — string/list/table.  Mirrors interp_eval.c:3133. */
-    case E_SIZE: {
+    case AST_SIZE: {
         if (e->nchildren < 1) return INTVAL(0);
         DESCR_t v = bb_eval_value(e->children[0]);
         if (IS_FAIL_fn(v)) return FAILDESCR;
@@ -695,7 +695,7 @@ DESCR_t bb_eval_value(EXPR_t *e)
      * partly through bb_eval_value and partly through interp_eval,
      * the two RNGs interleave separately.  In pure BB (post-RS-22e)
      * this becomes the single source. */
-    case E_RANDOM: {
+    case AST_RANDOM: {
         if (e->nchildren < 1) return FAILDESCR;
         DESCR_t v = bb_eval_value(e->children[0]);
         if (IS_FAIL_fn(v)) return FAILDESCR;
@@ -748,23 +748,23 @@ DESCR_t bb_eval_value(EXPR_t *e)
 
     /* RS-22d: augmented assignment.  Three execution paths mirroring
      * interp_eval.c:3729-3870:
-     *   (1) `!container OP:= rhs`  (lhs is E_ITERATE) — bang-iterate,
+     *   (1) `!container OP:= rhs`  (lhs is AST_ITERATE) — bang-iterate,
      *       apply OP to every cell of T/list/record in place.
      *   (2) RHS suspendable          — drive via coro_eval+bb_node_t,
      *       apply OP per tick, re-reading lhs each tick.  Implements
      *       `every sum +:= (1 to n)`.
      *   (3) Plain                     — single lv OP rv, then writeback.
      * `bb_augop_compute` is the shared compute step; `bb_augop_writeback`
-     * is the shared writeback (E_VAR slot / E_IDX / E_FIELD). */
-    case E_AUGOP: {
+     * is the shared writeback (AST_VAR slot / AST_IDX / AST_FIELD). */
+    case AST_AUGOP: {
         if (e->nchildren < 2) return NULVCL;
-        EXPR_t *lhs = e->children[0];
-        EXPR_t *rhs = e->children[1];
+        AST_t *lhs = e->children[0];
+        AST_t *rhs = e->children[1];
         IcnTkKind op = (IcnTkKind)e->ival;
         DESCR_t result = NULVCL;
 
         /* (1) `!container OP:= rhs` — bang-iterate lvalue. */
-        if (lhs && lhs->kind == E_ITERATE && lhs->nchildren >= 1) {
+        if (lhs && lhs->kind == AST_ITERATE && lhs->nchildren >= 1) {
             DESCR_t cv = bb_eval_value(lhs->children[0]);
             DESCR_t rv = bb_eval_value(rhs);
             if (IS_FAIL_fn(cv) || IS_FAIL_fn(rv)) return FAILDESCR;
@@ -822,15 +822,15 @@ DESCR_t bb_eval_value(EXPR_t *e)
 
     /* RS-22f-generators (2026-05-03): Generator kinds in value context.
      *
-     * E_TO / E_TO_BY / E_ITERATE / E_LIMIT / E_ALTERNATE / E_SEQ_EXPR are
+     * AST_TO / AST_TO_BY / AST_ITERATE / AST_LIMIT / AST_ALTERNATE / AST_SEQ_EXPR are
      * generators.  The contract has THREE cases that must be distinguished:
      *
      * (1) The node is currently being driven by an outer pump.  An every-loop
-     *     above us pushed the E_TO onto FRAME's gen stack; the body re-reads
+     *     above us pushed the AST_TO onto FRAME's gen stack; the body re-reads
      *     the node to fetch the current tick value.  E.g.:
      *         every write("ICN: " || (1 to 3))
-     *     drives E_FNC(write) which drives E_CAT which evaluates E_TO.  The
-     *     E_TO is on FRAME's gen stack with cur = 1, 2, 3 successively.
+     *     drives AST_FNC(write) which drives AST_CAT which evaluates AST_TO.  The
+     *     AST_TO is on FRAME's gen stack with cur = 1, 2, 3 successively.
      *     Mirrors interp_eval.c:3470 — return INTVAL(cur) from the frame.
      *
      * (2) coro_drive_node injection: an outer driver staged a value for this
@@ -842,14 +842,14 @@ DESCR_t bb_eval_value(EXPR_t *e)
      *     generator is empty, FAILDESCR; otherwise the first value it yields.
      *     Used for stand-alone first-value contexts like `if (1 to n) > k`
      *     where the test is generative but no outer every is pumping.
-     *     Mirrors RS-22d's E_AUGOP generator-RHS path (lines 784-794) and
-     *     interp_eval.c's E_IF goal-directed test (line 2386-2392).
+     *     Mirrors RS-22d's AST_AUGOP generator-RHS path (lines 784-794) and
+     *     interp_eval.c's AST_IF goal-directed test (line 2386-2392).
      *
-     * E_SEQ is `&` conjunction in value context: evaluate children
+     * AST_SEQ is `&` conjunction in value context: evaluate children
      * left-to-right; FAILDESCR on first failure; return last child on full
      * success.  Mirrors interp_eval.c:2348 icn-frame switch case. */
-    case E_TO:
-    case E_TO_BY: {
+    case AST_TO:
+    case AST_TO_BY: {
         /* (2) injection check — outer driver staged a value */
         if (coro_drive_node && e == coro_drive_node) return coro_drive_val;
         /* (1) frame check — outer pump is iterating this node */
@@ -860,12 +860,12 @@ DESCR_t bb_eval_value(EXPR_t *e)
         return box.fn(box.ζ, α);
     }
 
-    case E_ITERATE: {
+    case AST_ITERATE: {
         /* (2) injection check */
         if (coro_drive_node && e == coro_drive_node) return coro_drive_val;
-        /* (1) frame check — !L pump pushes E_ITERATE onto frame as the
+        /* (1) frame check — !L pump pushes AST_ITERATE onto frame as the
          * generator node; current cur is the index, sval is the string for
-         * char-iter or the list bucket.  Mirrors interp_eval.c E_ITERATE in
+         * char-iter or the list bucket.  Mirrors interp_eval.c AST_ITERATE in
          * the icn-frame switch. */
         long cur; const char *sv;
         if (icn_frame_lookup_sv(e, &cur, &sv)) {
@@ -884,13 +884,13 @@ DESCR_t bb_eval_value(EXPR_t *e)
         return box.fn(box.ζ, α);
     }
 
-    case E_LIMIT:
-    case E_ALTERNATE:
-    case E_SEQ_EXPR: {
+    case AST_LIMIT:
+    case AST_ALTERNATE:
+    case AST_SEQ_EXPR: {
         /* (2) injection check */
         if (coro_drive_node && e == coro_drive_node) return coro_drive_val;
         /* These three don't carry per-tick scalar state on FRAME.gen the way
-         * E_TO/E_ITERATE do; they are pure generator combinators whose
+         * AST_TO/AST_ITERATE do; they are pure generator combinators whose
          * internal state lives in the bb_node_t.  Outer-pump retries reach
          * them through the bb_node_t's β path, not through re-entry of
          * bb_eval_value.  So fresh α-once is correct here.
@@ -899,7 +899,7 @@ DESCR_t bb_eval_value(EXPR_t *e)
         return box.fn(box.ζ, α);
     }
 
-    case E_SEQ: {
+    case AST_SEQ: {
         if (e->nchildren == 0) return NULVCL;
         DESCR_t last = NULVCL;
         for (int i = 0; i < e->nchildren; i++) {
@@ -910,9 +910,9 @@ DESCR_t bb_eval_value(EXPR_t *e)
         return last;
     }
 
-    /* RS-22f-stmt (2026-05-03): E_SCAN and E_CASE in value context.
+    /* RS-22f-stmt (2026-05-03): AST_SCAN and AST_CASE in value context.
      *
-     * E_SCAN: `subj ? body` in Icon/Prolog mode.  bb_eval_value is only
+     * AST_SCAN: `subj ? body` in Icon/Prolog mode.  bb_eval_value is only
      * reached from BB-engine call sites (Icon every-bodies, Prolog
      * clause-bodies), so the SNOBOL4-mode exec_stmt branch in
      * interp_eval.c:3887 is unreachable here — the Icon/Prolog branch
@@ -920,12 +920,12 @@ DESCR_t bb_eval_value(EXPR_t *e)
      * subject as string, install as new scan target with pos=1, evaluate
      * body, restore prior scan state.
      *
-     * E_CASE: case-expression in value context.  Evaluate topic; walk
+     * AST_CASE: case-expression in value context.  Evaluate topic; walk
      * pairs (Icon) or triples (Raku) comparing topic to each value;
      * return the matching body's value, or the default body's value, or
      * NULVCL.  Mirrors interp_eval.c:3569 verbatim — only `interp_eval`
      * recursive calls are replaced with `bb_eval_value`. */
-    case E_SCAN: {
+    case AST_SCAN: {
         if (e->nchildren < 1) return FAILDESCR;
         DESCR_t subj_d = bb_eval_value(e->children[0]);
         if (IS_FAIL_fn(subj_d)) return FAILDESCR;
@@ -945,25 +945,25 @@ DESCR_t bb_eval_value(EXPR_t *e)
         return r;
     }
 
-    case E_CASE: {
+    case AST_CASE: {
         if (e->nchildren < 1) return NULVCL;
         DESCR_t topic = bb_eval_value(e->children[0]);
         /* Detect Raku triple layout: (nchildren-1)%3==0 AND child[1] is
-         * E_ILIT or E_NUL (the comparison-kind marker). */
+         * AST_ILIT or AST_NUL (the comparison-kind marker). */
         int is_raku_layout = (e->nchildren >= 4 && (e->nchildren - 1) % 3 == 0 &&
-            e->children[1] && (e->children[1]->kind == E_ILIT || e->children[1]->kind == E_NUL));
+            e->children[1] && (e->children[1]->kind == AST_ILIT || e->children[1]->kind == AST_NUL));
         if (is_raku_layout) {
             int i = 1;
             while (i + 2 < e->nchildren) {
-                EXPR_t *cmpnode = e->children[i];
-                EXPR_t *val     = e->children[i+1];
-                EXPR_t *body    = e->children[i+2];
+                AST_t *cmpnode = e->children[i];
+                AST_t *val     = e->children[i+1];
+                AST_t *body    = e->children[i+2];
                 i += 3;
-                if (cmpnode->kind == E_NUL) return bb_eval_value(body);
-                EXPR_e cmp = (EXPR_e)(cmpnode->ival);
+                if (cmpnode->kind == AST_NUL) return bb_eval_value(body);
+                AST_e cmp = (AST_e)(cmpnode->ival);
                 DESCR_t wval = bb_eval_value(val);
                 int match = 0;
-                if (cmp == E_LEQ) {
+                if (cmp == AST_LEQ) {
                     const char *ts = IS_STR_fn(topic)?topic.s:VARVAL_fn(topic);
                     const char *ws = IS_STR_fn(wval) ?wval.s :VARVAL_fn(wval);
                     match = (ts && ws && strcmp(ts, ws) == 0);
@@ -973,7 +973,7 @@ DESCR_t bb_eval_value(EXPR_t *e)
                 }
                 if (match) return bb_eval_value(body);
             }
-            if (i+1 < e->nchildren && e->children[i]->kind == E_NUL)
+            if (i+1 < e->nchildren && e->children[i]->kind == AST_NUL)
                 return bb_eval_value(e->children[i+1]);
             return NULVCL;
         }
@@ -982,7 +982,7 @@ DESCR_t bb_eval_value(EXPR_t *e)
         int i = 1;
         while (i + 1 < nc) {
             DESCR_t wval = bb_eval_value(e->children[i]);
-            EXPR_t *body = e->children[i+1];
+            AST_t *body = e->children[i+1];
             i += 2;
             int match;
             if (IS_INT_fn(topic) && IS_INT_fn(wval)) match = (topic.i == wval.i);
@@ -1000,18 +1000,18 @@ DESCR_t bb_eval_value(EXPR_t *e)
     /* RS-22f-cset (2026-05-03): Cset literal + four set-arithmetic ops.
      * Icon csets are represented as NUL-terminated strings of member chars.
      * The four binary ops delegate to the icn_cset_* helpers in icon_runtime.c
-     * (now declared in coro_runtime.h).  E_CSET literal mirrors interp_eval.c:3466. */
-    case E_CSET:
+     * (now declared in coro_runtime.h).  AST_CSET literal mirrors interp_eval.c:3466. */
+    case AST_CSET:
         return e->sval ? STRVAL(e->sval) : NULVCL;
 
-    case E_CSET_COMPL: {
+    case AST_CSET_COMPL: {
         DESCR_t operand = bb_eval_value(e->children[0]);
         if (IS_FAIL_fn(operand)) return FAILDESCR;
         const char *cs = IS_NULL_fn(operand) ? "" : VARVAL_fn(operand);
         return STRVAL(icn_cset_complement(cs));
     }
 
-    case E_CSET_UNION: {
+    case AST_CSET_UNION: {
         DESCR_t lv = bb_eval_value(e->children[0]);
         if (IS_FAIL_fn(lv)) return FAILDESCR;
         DESCR_t rv = bb_eval_value(e->children[1]);
@@ -1021,7 +1021,7 @@ DESCR_t bb_eval_value(EXPR_t *e)
         return STRVAL(icn_cset_union(a, b));
     }
 
-    case E_CSET_DIFF: {
+    case AST_CSET_DIFF: {
         DESCR_t lv = bb_eval_value(e->children[0]);
         if (IS_FAIL_fn(lv)) return FAILDESCR;
         DESCR_t rv = bb_eval_value(e->children[1]);
@@ -1031,7 +1031,7 @@ DESCR_t bb_eval_value(EXPR_t *e)
         return STRVAL(icn_cset_diff(a, b));
     }
 
-    case E_CSET_INTER: {
+    case AST_CSET_INTER: {
         DESCR_t lv = bb_eval_value(e->children[0]);
         if (IS_FAIL_fn(lv)) return FAILDESCR;
         DESCR_t rv = bb_eval_value(e->children[1]);
@@ -1041,10 +1041,10 @@ DESCR_t bb_eval_value(EXPR_t *e)
         return STRVAL(icn_cset_inter(a, b));
     }
 
-    /* RS-23d: E_WHILE — Icon while loop in value context.
+    /* RS-23d: AST_WHILE — Icon while loop in value context.
      * Returns NULVCL after normal exit; mirrors interp_eval.c:1719-1730 with
      * interp_eval(child) replaced by bb_eval_value (cond) and bb_exec_stmt (body). */
-    case E_WHILE: {
+    case AST_WHILE: {
         int saved_brk = FRAME.loop_break; FRAME.loop_break = 0;
         int saved_nxt = FRAME.loop_next;  FRAME.loop_next  = 0;
         while (!FRAME.returning && !FRAME.loop_break && !FRAME.suspending) {
@@ -1060,23 +1060,23 @@ DESCR_t bb_eval_value(EXPR_t *e)
     }
 
     /*========================================================================
-     * RS-23c: E_EVERY, E_INITIAL, E_SWAP — missing from both adapters.
+     * RS-23c: AST_EVERY, AST_INITIAL, AST_SWAP — missing from both adapters.
      * Value-context implementations mirror interp_eval.c's icon-frame switch,
      * with interp_eval(child) replaced by bb_eval_value(child) / bb_exec_stmt.
      *======================================================================*/
 
-    /* E_EVERY — drive a generator, run optional body per tick.  Returns NULVCL.
+    /* AST_EVERY — drive a generator, run optional body per tick.  Returns NULVCL.
      * Three sub-cases mirror interp_eval.c:1639-1750:
-     *   1. E_ASSIGN with generative RHS — re-evaluate assignment per tick.
-     *   2. E_SEQ conjunction — drive filter, execute seq body per tick.
+     *   1. AST_ASSIGN with generative RHS — re-evaluate assignment per tick.
+     *   2. AST_SEQ conjunction — drive filter, execute seq body per tick.
      *   3. Generic — drive gen via coro_eval box, run body per tick. */
-    case E_EVERY: {
+    case AST_EVERY: {
         if (e->nchildren < 1) return NULVCL;
-        EXPR_t *gen  = e->children[0];
-        EXPR_t *body = (e->nchildren > 1) ? e->children[1] : NULL;
-        if (gen->kind == E_ASSIGN &&
+        AST_t *gen  = e->children[0];
+        AST_t *body = (e->nchildren > 1) ? e->children[1] : NULL;
+        if (gen->kind == AST_ASSIGN &&
             gen->nchildren >= 2 && is_suspendable(gen->children[1])) {
-            EXPR_t *leaf = find_leaf_suspendable(gen->children[1]);
+            AST_t *leaf = find_leaf_suspendable(gen->children[1]);
             if (!leaf) leaf = gen->children[1];
             bb_node_t rbox = coro_eval(leaf);
             DESCR_t tick = rbox.fn(rbox.ζ, α);
@@ -1094,8 +1094,8 @@ DESCR_t bb_eval_value(EXPR_t *e)
             FRAME.loop_next  = 0;
             return NULVCL;
         }
-        if (gen->kind == E_SEQ && gen->nchildren >= 2 && is_suspendable(gen->children[0])) {
-            EXPR_t *filter = gen->children[0];
+        if (gen->kind == AST_SEQ && gen->nchildren >= 2 && is_suspendable(gen->children[0])) {
+            AST_t *filter = gen->children[0];
             bb_node_t fbox = coro_eval(filter);
             DESCR_t tick = fbox.fn(fbox.ζ, α);
             while (!IS_FAIL_fn(tick) && !FRAME.returning && !FRAME.loop_break) {
@@ -1136,9 +1136,9 @@ DESCR_t bb_eval_value(EXPR_t *e)
         return NULVCL;
     }
 
-    /* E_INITIAL — once-only block; side-effects only, returns NULVCL.
+    /* AST_INITIAL — once-only block; side-effects only, returns NULVCL.
      * Mirrors interp_eval.c:3558-3601; interp_eval(child) → bb_eval_value(child). */
-    case E_INITIAL: {
+    case AST_INITIAL: {
         IcnInitEnt *ent = NULL;
         for (int _i = 0; _i < icn_init_n; _i++)
             if (init_tab[_i].id == e->id) { ent = &init_tab[_i]; break; }
@@ -1148,10 +1148,10 @@ DESCR_t bb_eval_value(EXPR_t *e)
                 ent = &init_tab[icn_init_n++];
                 ent->id = e->id; ent->ns = 0;
                 for (int i = 0; i < e->nchildren && ent->ns < ICN_INIT_SLOTS; i++) {
-                    EXPR_t *ch = e->children[i];
-                    if (!ch || ch->kind != E_ASSIGN || ch->nchildren < 1) continue;
-                    EXPR_t *lhs = ch->children[0];
-                    if (!lhs || lhs->kind != E_VAR || !lhs->sval) continue;
+                    AST_t *ch = e->children[i];
+                    if (!ch || ch->kind != AST_ASSIGN || ch->nchildren < 1) continue;
+                    AST_t *lhs = ch->children[0];
+                    if (!lhs || lhs->kind != AST_VAR || !lhs->sval) continue;
                     IcnInitSlot *sl = &ent->s[ent->ns++];
                     strncpy(sl->nm, lhs->sval, 63); sl->nm[63] = '\0';
                     if (frame_depth > 0 && lhs->ival >= 0 && lhs->ival < FRAME.env_n)
@@ -1166,10 +1166,10 @@ DESCR_t bb_eval_value(EXPR_t *e)
                 int restored = 0;
                 if (frame_depth > 0) {
                     for (int i = 0; i < e->nchildren && !restored; i++) {
-                        EXPR_t *ch = e->children[i];
-                        if (!ch || ch->kind != E_ASSIGN || ch->nchildren < 1) continue;
-                        EXPR_t *lhs = ch->children[0];
-                        if (!lhs || lhs->kind != E_VAR || !lhs->sval) continue;
+                        AST_t *ch = e->children[i];
+                        if (!ch || ch->kind != AST_ASSIGN || ch->nchildren < 1) continue;
+                        AST_t *lhs = ch->children[0];
+                        if (!lhs || lhs->kind != AST_VAR || !lhs->sval) continue;
                         if (strcasecmp(lhs->sval, ent->s[si].nm) == 0
                             && lhs->ival >= 0 && lhs->ival < FRAME.env_n) {
                             FRAME.env[lhs->ival] = ent->s[si].val;
@@ -1183,15 +1183,15 @@ DESCR_t bb_eval_value(EXPR_t *e)
         return NULVCL;
     }
 
-    /* E_SWAP — Icon :=: swap operator.  Evaluates both sides, writes cross.
+    /* AST_SWAP — Icon :=: swap operator.  Evaluates both sides, writes cross.
      * Returns rv (the new value of lhs), or FAILDESCR if either side fails.
      * Mirrors interp_eval.c:3408-3437; interp_eval(child) → bb_eval_value(child). */
-    case E_SWAP: {
+    case AST_SWAP: {
         if (e->nchildren < 2 || frame_depth <= 0) return NULVCL;
-        EXPR_t *lhs = e->children[0], *rhs = e->children[1];
+        AST_t *lhs = e->children[0], *rhs = e->children[1];
         DESCR_t lv = bb_eval_value(lhs), rv = bb_eval_value(rhs);
         if (IS_FAIL_fn(lv) || IS_FAIL_fn(rv)) return FAILDESCR;
-        if (lhs && lhs->kind == E_VAR) {
+        if (lhs && lhs->kind == AST_VAR) {
             if (lhs->sval && lhs->sval[0] == '&') {
                 if (!kw_assign(lhs->sval + 1, rv)) return FAILDESCR;
             } else {
@@ -1200,7 +1200,7 @@ DESCR_t bb_eval_value(EXPR_t *e)
                 else if (sl<0&&lhs->sval) NV_SET_fn(lhs->sval,rv);
             }
         }
-        if (rhs && rhs->kind == E_VAR) {
+        if (rhs && rhs->kind == AST_VAR) {
             if (rhs->sval && rhs->sval[0] == '&') {
                 if (!kw_assign(rhs->sval + 1, lv)) return FAILDESCR;
             } else {
@@ -1214,27 +1214,27 @@ DESCR_t bb_eval_value(EXPR_t *e)
 
     /*========================================================================
      * RS-23-extra (session 2026-05-05): value-context handlers for the
-     * remaining 5-of-6 unique tuples (`E_RETURN via coro_eval` excluded —
+     * remaining 5-of-6 unique tuples (`AST_RETURN via coro_eval` excluded —
      * separate oneshot path).  Diag prior to this rung showed:
-     *   E_BANG_BINARY  caller=bb_eval_value     via=bb_eval_value
-     *   E_IF           caller=bb_eval_value     via=bb_eval_value
-     *   E_IF           caller=coro_bb_seq_expr  via=bb_eval_value
-     *   E_PROC_FAIL    caller=(direct)          via=bb_eval_value
-     *   E_REVASSIGN    caller=bb_exec_stmt      via=bb_exec_stmt   (in coro_stmt.c)
+     *   AST_BANG_BINARY  caller=bb_eval_value     via=bb_eval_value
+     *   AST_IF           caller=bb_eval_value     via=bb_eval_value
+     *   AST_IF           caller=coro_bb_seq_expr  via=bb_eval_value
+     *   AST_PROC_FAIL    caller=(direct)          via=bb_eval_value
+     *   AST_REVASSIGN    caller=bb_exec_stmt      via=bb_exec_stmt   (in coro_stmt.c)
      * Precondition: RS-23-extra-prep2 (smart fallback in icn_call_builtin)
      * unblocks the route by killing the meander double-eval regression.
      *======================================================================*/
 
-    /* E_IF in value context — mirrors interp_eval.c:3108-3114.
+    /* AST_IF in value context — mirrors interp_eval.c:3108-3114.
      * Eval cond; if it doesn't fail, evaluate then-branch (or return cond
      * value if there is no then); if cond fails, evaluate else-branch
      * (or return FAILDESCR if there is no else).  is_suspendable check
      * mirrors the stmt-context handler at coro_stmt.c:106 — for a
      * suspendable cond, drive its first value via coro_eval+α so generator
      * semantics are preserved. */
-    case E_IF: {
+    case AST_IF: {
         if (e->nchildren < 1) return NULVCL;
-        EXPR_t *test = e->children[0];
+        AST_t *test = e->children[0];
         DESCR_t cv;
         if (is_suspendable(test)) {
             bb_node_t box = coro_eval(test);
@@ -1247,15 +1247,15 @@ DESCR_t bb_eval_value(EXPR_t *e)
         return (e->nchildren > 2) ? bb_eval_value(e->children[2]) : FAILDESCR;
     }
 
-    /* E_PROC_FAIL in value context — mirrors interp_eval.c:2064-2070.
+    /* AST_PROC_FAIL in value context — mirrors interp_eval.c:2064-2070.
      * Procedure-level fail: set the frame's returning sentinel and return
      * FAILDESCR.  Note: this is the *eager* form, reached when something
-     * directly calls bb_eval_value(E_PROC_FAIL).  The lazy form for
+     * directly calls bb_eval_value(AST_PROC_FAIL).  The lazy form for
      * `expr | fail` alternation lives in coro_eval (RS-23b's icn_lazy_box
      * wrapping at coro_runtime.c:1576) and is unaffected — the lazy box
      * triggers this same case only when the alternation arm is actually
      * pumped, preserving the semantics RS-23b established. */
-    case E_PROC_FAIL: {
+    case AST_PROC_FAIL: {
         if (frame_depth > 0) {
             FRAME.return_val = FAILDESCR;
             FRAME.returning  = 1;
@@ -1263,29 +1263,29 @@ DESCR_t bb_eval_value(EXPR_t *e)
         return FAILDESCR;
     }
 
-    /* E_REVASSIGN in value context — `x <- v`, reversible assign.
+    /* AST_REVASSIGN in value context — `x <- v`, reversible assign.
      * Mirrors interp_eval.c:606-637 (the standalone path).  Outside `every`
      * no driver backtracks the operation, so we just perform the assign and
      * succeed.  The revert semantics live in coro_bb_revassign and are
      * reached only when coro_eval is asked for a box (every / alt-driven
-     * contexts) — that path is unaffected.  Three lvalue shapes: E_VAR
-     * (slot or NV name), E_IDX (subscript_set), E_FIELD (data_field_ptr). */
-    case E_REVASSIGN: {
+     * contexts) — that path is unaffected.  Three lvalue shapes: AST_VAR
+     * (slot or NV name), AST_IDX (subscript_set), AST_FIELD (data_field_ptr). */
+    case AST_REVASSIGN: {
         if (e->nchildren < 2) return NULVCL;
         DESCR_t val = bb_eval_value(e->children[1]);
         if (IS_FAIL_fn(val)) return FAILDESCR;
-        EXPR_t *lhs = e->children[0];
-        if (lhs && lhs->kind == E_VAR) {
+        AST_t *lhs = e->children[0];
+        if (lhs && lhs->kind == AST_VAR) {
             int slot = (int)lhs->ival;
             if (slot >= 0 && slot < FRAME.env_n) FRAME.env[slot] = val;
             else if (slot < 0 && lhs->sval && lhs->sval[0] != '&') set_and_trace(lhs->sval, val);
-        } else if (lhs && lhs->kind == E_IDX && lhs->nchildren >= 2) {
+        } else if (lhs && lhs->kind == AST_IDX && lhs->nchildren >= 2) {
             DESCR_t base = bb_eval_value(lhs->children[0]);
             if (!IS_FAIL_fn(base)) {
                 DESCR_t idx = bb_eval_value(lhs->children[1]);
                 if (!IS_FAIL_fn(idx)) subscript_set(base, idx, val);
             }
-        } else if (lhs && lhs->kind == E_FIELD && lhs->sval && lhs->nchildren >= 1) {
+        } else if (lhs && lhs->kind == AST_FIELD && lhs->sval && lhs->nchildren >= 1) {
             DESCR_t obj = bb_eval_value(lhs->children[0]);
             if (!IS_FAIL_fn(obj)) {
                 DESCR_t *cell = data_field_ptr(lhs->sval, obj);
@@ -1295,13 +1295,13 @@ DESCR_t bb_eval_value(EXPR_t *e)
         return val;
     }
 
-    /* E_BANG_BINARY in value context — `E1 ! E2`, Icon's apply-as-generator.
+    /* AST_BANG_BINARY in value context — `E1 ! E2`, Icon's apply-as-generator.
      * This is a generator combinator with no per-tick scalar state on
      * FRAME.gen — its state lives entirely in the bb_node_t built by
      * coro_eval.  Outer-pump retries reach it through the box's β path,
      * not through re-entry of bb_eval_value.  Mirrors the existing
-     * E_LIMIT/E_ALTERNATE/E_SEQ_EXPR pattern at coro_value.c:888-901. */
-    case E_BANG_BINARY: {
+     * AST_LIMIT/AST_ALTERNATE/AST_SEQ_EXPR pattern at coro_value.c:888-901. */
+    case AST_BANG_BINARY: {
         /* (2) injection check — outer pump might have already produced
          * a tick we should return verbatim. */
         if (coro_drive_node && e == coro_drive_node) return coro_drive_val;
@@ -1310,26 +1310,26 @@ DESCR_t bb_eval_value(EXPR_t *e)
         return box.fn(box.ζ, α);
     }
 
-    /* E_LOOP_BREAK in value context — surfaced by the diag after RS-23-extra
-     * absorbed E_IF/E_PROC_FAIL/E_BANG_BINARY/E_REVASSIGN.  Pattern: `break`
+    /* AST_LOOP_BREAK in value context — surfaced by the diag after RS-23-extra
+     * absorbed AST_IF/AST_PROC_FAIL/AST_BANG_BINARY/AST_REVASSIGN.  Pattern: `break`
      * appears as a body whose value is harvested by an enclosing expression
      * (e.g. `expr & break` in a value-context).  Mirrors interp_eval.c:3419-
      * 3422: set the frame's loop_break sentinel and return the optional
      * value child if present, else NULVCL.  The stmt-context handler in
      * coro_stmt.c:69 is the more common path. */
-    case E_LOOP_BREAK: {
+    case AST_LOOP_BREAK: {
         FRAME.loop_break = 1;
         return (e->nchildren > 0) ? bb_eval_value(e->children[0]) : NULVCL;
     }
 
-    /* E_RETURN in value context — surfaced by the same diag rerun.  Pattern:
+    /* AST_RETURN in value context — surfaced by the same diag rerun.  Pattern:
      * `return expr` appears as a body whose value is harvested.  Mirrors
      * interp_eval.c:2053-2061: evaluate the optional value child, set
      * FRAME.return_val and FRAME.returning, and return the value.  At
      * frame_depth 0 we just evaluate the child (no procedure to return
      * from).  The stmt-context handler in coro_stmt.c:80 is the common
      * path; this addition handles the rare value-context arrival. */
-    case E_RETURN: {
+    case AST_RETURN: {
         if (frame_depth > 0) {
             FRAME.return_val = (e->nchildren > 0)
                 ? bb_eval_value(e->children[0]) : NULVCL;

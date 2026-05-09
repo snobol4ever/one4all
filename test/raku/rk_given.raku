@@ -1,6 +1,6 @@
 # rk_given.raku — RK-13: given/when scalar smart-match
-# given $x { when val { } ... default { } } lowers to nested E_IF chain.
-# Numeric when: E_EQ comparison. String when: E_LEQ comparison.
+# given $x { when val { } ... default { } } lowers to nested AST_IF chain.
+# Numeric when: AST_EQ comparison. String when: AST_LEQ comparison.
 
 sub day_type($d) {
     given $d {
