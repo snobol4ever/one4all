@@ -500,7 +500,7 @@ static void lower_pat_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         EXPR_t *ch = e->nchildren > 0 ? e->children[0] : NULL;
         /* SN-17a: bare *fn() in a pattern — emit SM_PAT_USERCALL so the engine
          * invokes fn at match time and the call's FAIL propagates as pattern FAIL.
-         * Without this, E_FNC falls through to lower_expr → SM_CALL → SM_PAT_DEREF
+         * Without this, E_FNC falls through to lower_expr → SM_CALL_FN → SM_PAT_DEREF
          * which evaluates fn ONCE at build time and treats the return as a pattern,
          * skipping the per-position sweep SPITBOL performs. */
         if (ch && ch->kind == E_FNC && ch->sval) {
@@ -660,12 +660,12 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
                 sm_emit_s(p, SM_PUSH_VAR, vn);
                 for (int i = 1; i < inner->nchildren; i++)
                     lower_expr(p, lt, inner->children[i]);
-                sm_emit_si(p, SM_CALL, "IDX", (int64_t)inner->nchildren);
+                sm_emit_si(p, SM_CALL_FN, "IDX", (int64_t)inner->nchildren);
                 return;
             }
         }
         lower_expr(p, lt, ch);
-        sm_emit_si(p, SM_CALL, "INDIR_GET", 1);
+        sm_emit_si(p, SM_CALL_FN, "INDIR_GET", 1);
         return;
     }
     case E_DEFER: {
@@ -725,7 +725,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
             lower_expr(p, lt, e->children[i]);
             if (i < e->nchildren - 1) {
                 jumps[i] = sm_emit_i(p, SM_JUMP_S, 0);  /* if success, jump to done */
-                sm_emit(p, SM_POP);                       /* discard failure value */
+                sm_emit(p, SM_VOID_POP);                       /* discard failure value */
             }
         }
         int done = sm_label(p);
@@ -793,16 +793,16 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
                 sm_emit_s(p, SM_STORE_VAR, kup);
             }
             else if (lhs->kind == E_FNC && lhs->sval) {
-                /* Field mutator: fname(obj) = val  →  push obj, SM_CALL fname_SET 2
+                /* Field mutator: fname(obj) = val  →  push obj, SM_CALL_FN fname_SET 2
                  * Stack on entry to setter: [val, obj] (val pushed first above) */
                 lower_expr(p, lt, lhs->nchildren > 0 ? lhs->children[0] : NULL);
                 char setname[256];
                 snprintf(setname, sizeof(setname), "%s_SET", lhs->sval);
-                sm_emit_si(p, SM_CALL, setname, 2);
+                sm_emit_si(p, SM_CALL_FN, setname, 2);
             } else {
                 /* Computed lhs — push lhs expr, then generic store */
                 lower_expr(p, lt, lhs);
-                sm_emit_si(p, SM_CALL, "ASGN", 2);
+                sm_emit_si(p, SM_CALL_FN, "ASGN", 2);
             }
         }
         return;
@@ -812,7 +812,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         int nargs = e->nchildren;
         /* CHUNKS-step02: EVAL(*expr) special case — when EVAL is called with a
          * single E_DEFER argument, emit the chunk inline + SM_CALL_CHUNK instead
-         * of SM_PUSH_CHUNK + SM_CALL "EVAL".  This avoids routing through
+         * of SM_PUSH_CHUNK + SM_CALL_FN "EVAL".  This avoids routing through
          * EXPVAL_fn from C mid-dispatch, keeping everything on the same SM stack. */
         if (nargs == 1 && e->sval && strcmp(e->sval, "EVAL") == 0
                 && e->children[0] && e->children[0]->kind == E_DEFER) {
@@ -832,7 +832,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         }
         /* CH-17c: Icon-style E_FNC — name in sval is NULL; children[0] is the
          * callee name node (E_VAR with sval = function name), children[1..] are args.
-         * Emit only the arg children; use children[0]->sval as the SM_CALL name.
+         * Emit only the arg children; use children[0]->sval as the SM_CALL_FN name.
          * This fixes the stack-leak / empty-name bug in proc-body chunks that
          * contain user proc calls (noted in CH-17b'' handoff). */
         if (!e->sval && nargs >= 1 && e->children[0] && e->children[0]->sval) {
@@ -840,12 +840,12 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
             int real_nargs = nargs - 1;   /* children[1..nargs-1] are args */
             for (int i = 1; i <= real_nargs; i++)
                 lower_expr(p, lt, e->children[i]);
-            sm_emit_si(p, SM_CALL, fn, (int64_t)real_nargs);
+            sm_emit_si(p, SM_CALL_FN, fn, (int64_t)real_nargs);
             return;
         }
         for (int i = 0; i < nargs; i++)
             lower_expr(p, lt, e->children[i]);
-        sm_emit_si(p, SM_CALL, e->sval ? e->sval : "", (int64_t)nargs);
+        sm_emit_si(p, SM_CALL_FN, e->sval ? e->sval : "", (int64_t)nargs);
         return;
     }
 
@@ -853,10 +853,10 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
     case E_IDX:
         for (int i = 0; i < e->nchildren; i++)
             lower_expr(p, lt, e->children[i]);
-        sm_emit_si(p, SM_CALL, "IDX", (int64_t)e->nchildren);
+        sm_emit_si(p, SM_CALL_FN, "IDX", (int64_t)e->nchildren);
         return;
 
-    /* ── Relational comparisons (numeric) → SM_ACOMP or SM_CALL ── */
+    /* ── Relational comparisons (numeric) → SM_ACOMP or SM_CALL_FN ── */
     case E_EQ:
     case E_NE:
     case E_LT:
@@ -893,7 +893,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         const char *vname = (e->nchildren > 0 && e->children[0] && e->children[0]->sval)
                             ? e->children[0]->sval : "";
         sm_emit_s(p, SM_PUSH_LIT_S, vname);
-        sm_emit_si(p, SM_CALL, "NAME_PUSH", 1);
+        sm_emit_si(p, SM_CALL_FN, "NAME_PUSH", 1);
         return;
     }
 
@@ -924,7 +924,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         else if (strcmp(raw, "AROWFN") == 0) { op = "^"; }
         for (int i = 0; i < e->nchildren; i++)
             lower_expr(p, lt, e->children[i]);
-        sm_emit_si(p, SM_CALL, op, (int64_t)e->nchildren);
+        sm_emit_si(p, SM_CALL_FN, op, (int64_t)e->nchildren);
         return;
     }
 
@@ -932,7 +932,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
     case E_SWAP:
         lower_expr(p, lt, e->nchildren > 0 ? e->children[0] : NULL);
         lower_expr(p, lt, e->nchildren > 1 ? e->children[1] : NULL);
-        sm_emit_si(p, SM_CALL, "SWAP", 2);
+        sm_emit_si(p, SM_CALL_FN, "SWAP", 2);
         return;
 
     /* ── Pattern primitives used as values (not already handled above) ── */
@@ -960,7 +960,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         if (e->nchildren == 0) { sm_emit(p, SM_PUSH_NULL); return; }
         for (int i = 0; i < e->nchildren; i++) {
             lower_expr(p, lt, e->children[i]);
-            if (i < e->nchildren - 1) sm_emit(p, SM_POP);
+            if (i < e->nchildren - 1) sm_emit(p, SM_VOID_POP);
         }
         return;
 
@@ -987,8 +987,8 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         if (e->nchildren < 1) { sm_emit(p, SM_PUSH_NULL); return; }
         lower_expr(p, lt, e->children[0]);              /* condition */
         int jf = sm_emit_i(p, SM_JUMP_F, 0);           /* exit on fail */
-        sm_emit(p, SM_POP);
-        if (e->nchildren > 1) { lower_expr(p, lt, e->children[1]); sm_emit(p, SM_POP); }
+        sm_emit(p, SM_VOID_POP);
+        if (e->nchildren > 1) { lower_expr(p, lt, e->children[1]); sm_emit(p, SM_VOID_POP); }
         sm_emit_i(p, SM_JUMP, top_lbl);
         int end_lbl = sm_label(p);
         sm_patch_jump(p, jf, end_lbl);
@@ -1002,8 +1002,8 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         if (e->nchildren < 1) { sm_emit(p, SM_PUSH_NULL); return; }
         lower_expr(p, lt, e->children[0]);
         int js = sm_emit_i(p, SM_JUMP_S, 0);           /* exit when cond succeeds */
-        sm_emit(p, SM_POP);
-        if (e->nchildren > 1) { lower_expr(p, lt, e->children[1]); sm_emit(p, SM_POP); }
+        sm_emit(p, SM_VOID_POP);
+        if (e->nchildren > 1) { lower_expr(p, lt, e->children[1]); sm_emit(p, SM_VOID_POP); }
         sm_emit_i(p, SM_JUMP, top_lbl);
         int end_lbl = sm_label(p);
         sm_patch_jump(p, js, end_lbl);
@@ -1014,7 +1014,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
     /* ── repeat body — loops until break ───────────────────────────────── */
     case E_REPEAT: {
         int top_lbl = sm_label(p);
-        if (e->nchildren > 0) { lower_expr(p, lt, e->children[0]); sm_emit(p, SM_POP); }
+        if (e->nchildren > 0) { lower_expr(p, lt, e->children[0]); sm_emit(p, SM_VOID_POP); }
         sm_emit_i(p, SM_JUMP, top_lbl);
         sm_emit(p, SM_PUSH_NULL);
         return;
@@ -1052,14 +1052,14 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         lower_expr(p, lt, e->nchildren > 0 ? e->children[0] : NULL);
         int js = sm_emit_i(p, SM_JUMP_S, 0);   /* child succeeded → fail */
         /* child failed → ~ succeeds: discard child value, push null, last_ok=1 */
-        sm_emit(p, SM_POP);
+        sm_emit(p, SM_VOID_POP);
         sm_emit(p, SM_PUSH_NULL);
         int jend = sm_emit_i(p, SM_JUMP, 0);
         int fail_lbl = sm_label(p);
         sm_patch_jump(p, js, fail_lbl);
         /* child succeeded → ~ fails: discard child value, push fail, last_ok=0 */
-        sm_emit(p, SM_POP);
-        sm_emit_si(p, SM_CALL, "FAIL", 0);     /* push fail descriptor */
+        sm_emit(p, SM_VOID_POP);
+        sm_emit_si(p, SM_CALL_FN, "FAIL", 0);     /* push fail descriptor */
         int end_lbl = sm_label(p);
         sm_patch_jump(p, jend, end_lbl);
         return;
@@ -1070,33 +1070,33 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         lower_expr(p, lt, e->nchildren > 0 ? e->children[0] : NULL);
         lower_expr(p, lt, e->nchildren > 1 ? e->children[1] : NULL);
         sm_emit_i(p, SM_PUSH_LIT_I, (int64_t)(e->ival));  /* operator token */
-        sm_emit_si(p, SM_CALL, "AUGOP", 3);
+        sm_emit_si(p, SM_CALL_FN, "AUGOP", 3);
         return;
 
     /* ── string/list size *e ────────────────────────────────────────────── */
     case E_SIZE:
         lower_expr(p, lt, e->nchildren > 0 ? e->children[0] : NULL);
-        sm_emit_si(p, SM_CALL, "SIZE", 1);
+        sm_emit_si(p, SM_CALL_FN, "SIZE", 1);
         return;
 
     /* ── non-null test \e — succeed with e if e != null, else fail ──────── */
     case E_NONNULL:
         lower_expr(p, lt, e->nchildren > 0 ? e->children[0] : NULL);
-        sm_emit_si(p, SM_CALL, "NONNULL", 1);
+        sm_emit_si(p, SM_CALL_FN, "NONNULL", 1);
         return;
 
     /* ── string identity ===  / non-identity ~=== ───────────────────────── */
     case E_IDENTICAL:
         lower_expr(p, lt, e->nchildren > 0 ? e->children[0] : NULL);
         lower_expr(p, lt, e->nchildren > 1 ? e->children[1] : NULL);
-        sm_emit_si(p, SM_CALL, "IDENTICAL", 2);
+        sm_emit_si(p, SM_CALL_FN, "IDENTICAL", 2);
         return;
 
     /* ── list/array literal [a, b, c] ──────────────────────────────────── */
     case E_MAKELIST:
         for (int i = 0; i < e->nchildren; i++)
             lower_expr(p, lt, e->children[i]);
-        sm_emit_si(p, SM_CALL, "MAKELIST", (int64_t)e->nchildren);
+        sm_emit_si(p, SM_CALL_FN, "MAKELIST", (int64_t)e->nchildren);
         return;
 
     /* ── record construction ────────────────────────────────────────────── */
@@ -1104,14 +1104,14 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         sm_emit_s(p, SM_PUSH_LIT_S, e->sval ? e->sval : "");
         for (int i = 0; i < e->nchildren; i++)
             lower_expr(p, lt, e->children[i]);
-        sm_emit_si(p, SM_CALL, "RECORD_MAKE", (int64_t)e->nchildren + 1);
+        sm_emit_si(p, SM_CALL_FN, "RECORD_MAKE", (int64_t)e->nchildren + 1);
         return;
 
     /* ── field access r.field ───────────────────────────────────────────── */
     case E_FIELD:
         lower_expr(p, lt, e->nchildren > 0 ? e->children[0] : NULL);
         sm_emit_s(p, SM_PUSH_LIT_S, e->sval ? e->sval : "");
-        sm_emit_si(p, SM_CALL, "FIELD_GET", 2);
+        sm_emit_si(p, SM_CALL_FN, "FIELD_GET", 2);
         return;
 
     /* ── declarative / init nodes — no runtime action at expression level ─ */
@@ -1145,13 +1145,13 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
      *   SM_RESUME                 ; documentation hook for future JIT
      *   lower_expr(lo)            ; evaluate lo bound
      *   SM_STORE_GLOCAL 0         ; glocal[0] = lo (value stays on stack)
-     *   SM_POP                    ; discard
+     *   SM_VOID_POP                    ; discard
      *   lower_expr(hi)            ; evaluate hi bound
      *   SM_STORE_GLOCAL 1         ; glocal[1] = hi
-     *   SM_POP
+     *   SM_VOID_POP
      *   SM_LOAD_GLOCAL 0          ; cur = lo
      *   SM_STORE_GLOCAL 2         ; glocal[2] = cur
-     *   SM_POP
+     *   SM_VOID_POP
      * loop_pc:
      *   SM_LOAD_GLOCAL 2          ; push cur
      *   SM_LOAD_GLOCAL 1          ; push hi
@@ -1162,7 +1162,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
      *   SM_LOAD_GLOCAL 2          ; push cur
      *   SM_INCR step              ; cur += step (1 for E_TO)
      *   SM_STORE_GLOCAL 2         ; glocal[2] = new cur
-     *   SM_POP
+     *   SM_VOID_POP
      *   SM_JUMP loop_pc           ; next iteration
      * exit_pc:
      *   SM_PUSH_NULL              ; ω: generator exhausted
@@ -1180,14 +1180,14 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         if (lo_expr) lower_expr(p, lt, lo_expr);
         else         sm_emit_i(p, SM_PUSH_LIT_I, 0);
         sm_emit_i(p, SM_STORE_GLOCAL, 0);               /* glocal[0] = lo */
-        sm_emit(p, SM_POP);
+        sm_emit(p, SM_VOID_POP);
         if (hi_expr) lower_expr(p, lt, hi_expr);
         else         sm_emit_i(p, SM_PUSH_LIT_I, 0);
         sm_emit_i(p, SM_STORE_GLOCAL, 1);               /* glocal[1] = hi */
-        sm_emit(p, SM_POP);
+        sm_emit(p, SM_VOID_POP);
         sm_emit_i(p, SM_LOAD_GLOCAL, 0);                /* cur = lo */
         sm_emit_i(p, SM_STORE_GLOCAL, 2);               /* glocal[2] = cur */
-        sm_emit(p, SM_POP);
+        sm_emit(p, SM_VOID_POP);
         /* loop: test cur > hi; yield cur; cur++ */
         int loop_pc = sm_label(p);
         sm_emit_i(p, SM_LOAD_GLOCAL, 2);                /* push cur */
@@ -1199,7 +1199,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         sm_emit_i(p, SM_LOAD_GLOCAL, 2);                /* push cur for increment */
         sm_emit_i(p, SM_INCR, 1);                        /* cur + 1 */
         sm_emit_i(p, SM_STORE_GLOCAL, 2);               /* glocal[2] = cur+1 */
-        sm_emit(p, SM_POP);
+        sm_emit(p, SM_VOID_POP);
         sm_emit_i(p, SM_JUMP, loop_pc);                  /* back to loop */
         int exit_pc_here = sm_label(p);
         sm_patch_jump(p, exit_jump, exit_pc_here);
@@ -1230,18 +1230,18 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         if (lo_expr) lower_expr(p, lt, lo_expr);
         else         sm_emit_i(p, SM_PUSH_LIT_I, 0);
         sm_emit_i(p, SM_STORE_GLOCAL, 0);
-        sm_emit(p, SM_POP);
+        sm_emit(p, SM_VOID_POP);
         if (hi_expr) lower_expr(p, lt, hi_expr);
         else         sm_emit_i(p, SM_PUSH_LIT_I, 0);
         sm_emit_i(p, SM_STORE_GLOCAL, 1);
-        sm_emit(p, SM_POP);
+        sm_emit(p, SM_VOID_POP);
         if (step_expr) lower_expr(p, lt, step_expr);
         else           sm_emit_i(p, SM_PUSH_LIT_I, 1);
         sm_emit_i(p, SM_STORE_GLOCAL, 3);               /* glocal[3] = step */
-        sm_emit(p, SM_POP);
+        sm_emit(p, SM_VOID_POP);
         sm_emit_i(p, SM_LOAD_GLOCAL, 0);                /* cur = lo */
         sm_emit_i(p, SM_STORE_GLOCAL, 2);
-        sm_emit(p, SM_POP);
+        sm_emit(p, SM_VOID_POP);
         /* loop: dispatch on step sign for exit test */
         int loop_pc = sm_label(p);
         sm_emit_i(p, SM_LOAD_GLOCAL, 3);                /* push step */
@@ -1270,7 +1270,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         sm_emit_i(p, SM_LOAD_GLOCAL, 3);                /* step */
         sm_emit(p, SM_ADD);                              /* cur + step */
         sm_emit_i(p, SM_STORE_GLOCAL, 2);
-        sm_emit(p, SM_POP);
+        sm_emit(p, SM_VOID_POP);
         sm_emit_i(p, SM_JUMP, loop_pc);
         int exit_pc_here = sm_label(p);
         sm_patch_jump(p, exit_jump_pos, exit_pc_here);
@@ -1588,13 +1588,13 @@ static void lower_stmt(SM_Program *p, LabelTable *lt, const STMT_t *s)
                 sm_emit_s(p, SM_STORE_VAR, s->subject->sval ? s->subject->sval : "");
             } else if (s->subject->kind == E_INDIRECT) {
                 lower_expr(p, lt, s->subject->nchildren > 0 ? s->subject->children[0] : NULL);
-                sm_emit_si(p, SM_CALL, "ASGN_INDIR", 2);
+                sm_emit_si(p, SM_CALL_FN, "ASGN_INDIR", 2);
             } else if (s->subject->kind == E_IDX) {
                 /* a<i> = rhs  or  a<i,j> = rhs — stack: rhs already pushed above.
                  * Push base, then indices; sm_interp IDX_SET pops all and calls subscript_set. */
                 int nc = s->subject->nchildren;  /* child[0]=base, child[1]=i, [2]=j */
                 for (int ci = 0; ci < nc; ci++) lower_expr(p, lt, s->subject->children[ci]);
-                sm_emit_si(p, SM_CALL, "IDX_SET", (int64_t)(nc + 1)); /* +1 for rhs */
+                sm_emit_si(p, SM_CALL_FN, "IDX_SET", (int64_t)(nc + 1)); /* +1 for rhs */
             } else if (s->subject->kind == E_FNC && s->subject->sval) {
                 /* NRETURN lvalue or field mutator: fname(...) = rhs
                  * If fname is a zero-param user function (NRETURN path), emit
@@ -1604,7 +1604,7 @@ static void lower_stmt(SM_Program *p, LabelTable *lt, const STMT_t *s)
                     /* Zero-arg call on LHS: NRETURN path (forward-declared fns allowed).
                      * NRETURN_ASGN calls fn at runtime; if it returns DT_N writes through
                      * the name, else falls back to fname_SET field-mutator convention. */
-                    sm_emit_si(p, SM_CALL, "NRETURN_ASGN", 1);
+                    sm_emit_si(p, SM_CALL_FN, "NRETURN_ASGN", 1);
                     p->instrs[p->count - 1].a[1].s = GC_strdup(s->subject->sval);
                 } else {
                     /* Multi-arg LHS: field mutator fname(obj,...) = rhs.
@@ -1613,21 +1613,21 @@ static void lower_stmt(SM_Program *p, LabelTable *lt, const STMT_t *s)
                         int nc = s->subject->nchildren;
                         for (int ci = 0; ci < nc; ci++)
                             lower_expr(p, lt, s->subject->children[ci]);
-                        sm_emit_si(p, SM_CALL, "ITEM_SET", (int64_t)(nc + 1)); /* +1 for rhs */
+                        sm_emit_si(p, SM_CALL_FN, "ITEM_SET", (int64_t)(nc + 1)); /* +1 for rhs */
                     } else {
                         lower_expr(p, lt, s->subject->nchildren > 0 ? s->subject->children[0] : NULL);
                         char _setname[256];
                         snprintf(_setname, sizeof(_setname), "%s_SET", s->subject->sval);
-                        sm_emit_si(p, SM_CALL, _setname, 2);
+                        sm_emit_si(p, SM_CALL_FN, _setname, 2);
                     }
                 }
             } else {
                 lower_expr(p, lt, s->subject);
-                sm_emit_si(p, SM_CALL, "ASGN", 2);
+                sm_emit_si(p, SM_CALL_FN, "ASGN", 2);
             }
         } else {
             lower_expr(p, lt, s->subject);
-            sm_emit(p, SM_POP);  /* expression statement, result unused */
+            sm_emit(p, SM_VOID_POP);  /* expression statement, result unused */
         }
     }
 
@@ -1671,7 +1671,7 @@ SM_Program *sm_lower(const CODE_t *prog)
      *
      *   SM_JUMP <skip_proc_NN>     ; forward-jump around the chunk
      *   SM_LABEL "<proc_name>"     ; named entry — sm_label_pc_lookup target
-     *   <lowered body>             ; CH-17b': lower_expr each body child + SM_POP
+     *   <lowered body>             ; CH-17b': lower_expr each body child + SM_VOID_POP
      *   SM_RETURN                  ; trailing return (or unreachable after E_RETURN)
      *   <skip_proc_NN>:            ; anonymous skip target
      *
@@ -1691,12 +1691,12 @@ SM_Program *sm_lower(const CODE_t *prog)
      *
      *   - E_GLOBAL declarations (and E_GLOBAL with ival==1 for `static`) are
      *     not skipped here: lower_expr handles them as no-ops emitting
-     *     SM_PUSH_NULL, which the trailing SM_POP discards.  Static-variable
+     *     SM_PUSH_NULL, which the trailing SM_VOID_POP discards.  Static-variable
      *     persistence semantics still live inside coro_call (lines 408-420 of
      *     coro_runtime.c) and remain unchanged — that's CH-17g cleanup.
      *
      *   - Each body-child expr is value-context-lowered via lower_expr; we
-     *     emit SM_POP after each to discard the result, mirroring how
+     *     emit SM_VOID_POP after each to discard the result, mirroring how
      *     statement-context evaluation discards the value of an expression
      *     statement.  The kinds that appear at proc-body top level
      *     (E_IF, E_WHILE, E_UNTIL, E_REPEAT, E_RETURN, E_PROC_FAIL,
@@ -1712,7 +1712,7 @@ SM_Program *sm_lower(const CODE_t *prog)
      *     default case which would normally fprintf to stderr — silenced
      *     here via g_chunk_body_lowering since these chunks are dead code.
      *     E_RETURN's lower_expr case already emits SM_RETURN, after which
-     *     our trailing SM_POP + SM_RETURN is dead code — harmless.
+     *     our trailing SM_VOID_POP + SM_RETURN is dead code — harmless.
      *
      *   - The shared LabelTable `lt` is reused.  Icon proc bodies do not use
      *     SNOBOL4-style stmt labels, so collisions are not a concern in
@@ -1782,7 +1782,7 @@ SM_Program *sm_lower(const CODE_t *prog)
                 EXPR_t *body_expr = proc->children[bi];
                 if (!body_expr) continue;
                 lower_expr(p, &lt, body_expr);
-                sm_emit(p, SM_POP);
+                sm_emit(p, SM_VOID_POP);
             }
             g_chunk_body_lowering  = 0;
             g_chunk_scope          = NULL;

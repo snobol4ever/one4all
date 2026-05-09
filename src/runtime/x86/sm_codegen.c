@@ -459,7 +459,7 @@ static void h_store_var(void)
     if (val.v == DT_FAIL) {
         /* SN-32c-store-fail: push FAILDESCR so enclosing calls (e.g.
          * DIFFER(sno = Pop()) where Pop() FRETURNs) see a balanced
-         * stack.  Without the push, the enclosing SM_CALL pops a
+         * stack.  Without the push, the enclosing SM_CALL_FN pops a
          * stale value, corrupting the arg and mis-setting last_ok.
          * Mirrors SN-32b-store-fail fix in sm_interp.c. */
         PUSH(FAILDESCR);
@@ -917,7 +917,7 @@ static void h_call(void)
         if (body_pc >= 0 && STATE->call_depth < SM_CALL_STACK_MAX) {
             /* Push JIT call frame — same layout as sm_interp RS-9a */
             SmCallFrame *fr = &STATE->call_stack[STATE->call_depth++];
-            fr->ret_pc = STATE->pc;   /* resume after this SM_CALL */
+            fr->ret_pc = STATE->pc;   /* resume after this SM_CALL_FN */
             fr->ret_ok = 1;
             /* RS-9c: save caller's value stack so SM_STNO resets inside callee don't wipe it */
             fr->caller_sp = STATE->sp;
@@ -1097,7 +1097,7 @@ static void init_handler_table(void)
     g_handlers[SM_PUSH_CHUNK] = h_push_chunk;  /* CHUNKS-step01 stub */
     g_handlers[SM_CALL_CHUNK] = h_call_chunk;  /* CHUNKS-step01 stub */
     g_handlers[SM_STORE_VAR]  = h_store_var;
-    g_handlers[SM_POP]        = h_pop;
+    g_handlers[SM_VOID_POP]        = h_pop;
 
     g_handlers[SM_ADD]        = h_arith;
     g_handlers[SM_SUB]        = h_arith;
@@ -1141,7 +1141,7 @@ static void init_handler_table(void)
     g_handlers[SM_PAT_BOXVAL]  = h_pat_boxval;
 
     g_handlers[SM_EXEC_STMT]   = h_exec_stmt;
-    g_handlers[SM_CALL]        = h_call;
+    g_handlers[SM_CALL_FN]        = h_call;
     g_handlers[SM_RETURN]      = h_return;
     g_handlers[SM_FRETURN]     = h_freturn;
     g_handlers[SM_NRETURN]     = h_nreturn;

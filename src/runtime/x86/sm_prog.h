@@ -38,7 +38,7 @@ typedef enum {
     SM_PUSH_CHUNK,   /* push DT_E chunk descriptor; a[0].i=entry_pc, a[1].i=arity */
     SM_CALL_CHUNK,   /* pop chunk descriptor, push return frame, jump to entry_pc */
     SM_STORE_VAR,
-    SM_POP,
+    SM_VOID_POP,
 
     /* Arithmetic / String */
     SM_ADD,
@@ -158,7 +158,7 @@ typedef enum {
     SM_BB_PUMP_SM,
 
     /* Functions */
-    SM_CALL,
+    SM_CALL_FN,
     SM_RETURN,
     SM_FRETURN,
     SM_NRETURN,
@@ -322,7 +322,7 @@ int sm_label_named(SM_Program *p, const char *name);
 extern SM_Program *g_current_sm_prog;
 
 /* Look up the PC (SM_LABEL instr index) for a named label. Returns -1 if not found.
- * RS-9a: used by SM_CALL to jump to user-defined function bodies. */
+ * RS-9a: used by SM_CALL_FN to jump to user-defined function bodies. */
 int sm_label_pc_lookup(const SM_Program *p, const char *name);
 
 /* Patch a jump target: set a[0].i of instr at `jump_idx` to `target_label` */

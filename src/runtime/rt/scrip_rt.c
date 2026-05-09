@@ -872,8 +872,8 @@ void scrip_rt_coerce_num(void)
     g_last_ok = 1;
 }
 
-/* SM_CALL helpers — pseudo-calls inlined here to avoid a full INVOKE_fn round trip.
- * The full pseudo-call vocabulary mirrors sm_interp.c's SM_CALL handler. */
+/* SM_CALL_FN helpers — pseudo-calls inlined here to avoid a full INVOKE_fn round trip.
+ * The full pseudo-call vocabulary mirrors sm_interp.c's SM_CALL_FN handler. */
 extern DESCR_t subscript_get(DESCR_t arr, DESCR_t idx);
 extern DESCR_t subscript_get2(DESCR_t arr, DESCR_t i, DESCR_t j);
 extern int     subscript_set(DESCR_t arr, DESCR_t idx, DESCR_t val);

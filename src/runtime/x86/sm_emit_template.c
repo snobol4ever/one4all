@@ -87,7 +87,7 @@ static const sm_op_template_t g_sm_templates[] = {
     { SM_PUSH_LIT_S,   "PUSH_STR",     "scrip_rt_push_str",     SM_TPL_LBL_INT32,  0, 0 },
     { SM_PUSH_VAR,     "PUSH_VAR",     "scrip_rt_nv_get",       SM_TPL_LBL,        0, 0 },
     { SM_STORE_VAR,    "STORE_VAR",    "scrip_rt_nv_set",       SM_TPL_LBL,        0, 0 },
-    { SM_POP,          "VOID_POP",          "scrip_rt_pop_void",     SM_TPL_NULLARY,    0, 0 },
+    { SM_VOID_POP,          "VOID_POP",          "scrip_rt_pop_void",     SM_TPL_NULLARY,    0, 0 },
     { SM_PUSH_NULL,    "PUSH_NULL",    "scrip_rt_push_null",    SM_TPL_NULLARY,    0, 0 },
     { SM_CONCAT,       "CONCAT",       "scrip_rt_concat",       SM_TPL_NULLARY,    0, 0 },
     { SM_COERCE_NUM,   "COERCE_NUM",   "scrip_rt_coerce_num",   SM_TPL_NULLARY,    0, 0 },
@@ -115,7 +115,7 @@ static const sm_op_template_t g_sm_templates[] = {
     { SM_RETURN,       "RETURN",       NULL,                    SM_TPL_RET,        0, 0 },
 
     /* General call */
-    { SM_CALL,         "CALL_FN",         "scrip_rt_call",         SM_TPL_LBL_INT32,  0, 0 },
+    { SM_CALL_FN,         "CALL_FN",         "scrip_rt_call",         SM_TPL_LBL_INT32,  0, 0 },
 
     /* Pattern construction (no-arg shape) */
     { SM_PAT_SPAN,     "PAT_SPAN",     "scrip_rt_pat_span",     SM_TPL_NULLARY,    0, 0 },
@@ -218,146 +218,191 @@ static int emit_optional_lbl(FILE *out, const char *macro_arg,
         register_load_dst + 1, register_load_dst + 1);
 }
 
+/* Helper: emit one three-column line for sm_macros.s content.
+ * Col 1 (label, 24-wide): label or empty.
+ * Col 2 (opcode, 16-wide): directive/mnemonic.
+ * Col 3 (free): operands + optional annotation.
+ *
+ * If opcode starts with '.' it is a directive (.macro, .endm, .ifnb, etc.).
+ * Banner lines (starting with '#') are printed full-width -- NOT three-column.
+ */
+static int macro_line(FILE *out, const char *label, const char *opcode, const char *col3)
+{
+    const char *lbl = (label  && *label)  ? label  : "";
+    const char *op  = (opcode && *opcode) ? opcode : "";
+    const char *c3  = (col3   && *col3)   ? col3   : "";
+    return fprintf(out, "%-24s%-16s %s\n", lbl, op, c3) < 0 ? -1 : 0;
+}
+
 static int render_macro_body(FILE *out, const sm_op_template_t *t)
 {
-    /* Each arm emits one .macro NAME args / body / .endm block. */
+    /* Each arm emits one .macro NAME args / body / .endm block.
+     * All lines use the corrected three-column format:
+     *   Col 1 (24-wide): label or empty
+     *   Col 2 (16-wide): opcode/directive/mnemonic
+     *   Col 3 (free):    args/operands */
+    char macro_def[64];
     switch (t->kind) {
     case SM_TPL_NULLARY:
-        fprintf(out, ".macro %s\n", t->macro_name);
-        fprintf(out, "    call    %s@PLT\n", t->runtime);
-        fprintf(out, ".endm\n");
-        return 0;
-
-    case SM_TPL_INT64:
-        fprintf(out, ".macro %s val\n", t->macro_name);
-        fprintf(out, "    movabs  rdi, \\val\n");
-        fprintf(out, "    call    %s@PLT\n", t->runtime);
-        fprintf(out, ".endm\n");
-        return 0;
-
-    case SM_TPL_LBL:
-        fprintf(out, ".macro %s lbl\n", t->macro_name);
-        fprintf(out, "    lea     rdi, [rip + \\lbl]\n");
-        fprintf(out, "    call    %s@PLT\n", t->runtime);
-        fprintf(out, ".endm\n");
-        return 0;
-
-    case SM_TPL_LBLOPT:
-        fprintf(out, ".macro %s lbl\n", t->macro_name);
-        emit_optional_lbl(out, "lbl", "rdi");
-        fprintf(out, "    call    %s@PLT\n", t->runtime);
-        fprintf(out, ".endm\n");
-        return 0;
-
-    case SM_TPL_LBL_INT32:
-        fprintf(out, ".macro %s lbl, n\n", t->macro_name);
-        fprintf(out, "    lea     rdi, [rip + \\lbl]\n");
-        fprintf(out, "    mov     esi, \\n\n");
-        fprintf(out, "    call    %s@PLT\n", t->runtime);
-        fprintf(out, ".endm\n");
-        return 0;
-
-    case SM_TPL_LBLOPT_INT32:
-        fprintf(out, ".macro %s n, lbl\n", t->macro_name);
-        emit_optional_lbl(out, "lbl", "rdi");
-        fprintf(out, "    mov     esi, \\n\n");
-        fprintf(out, "    call    %s@PLT\n", t->runtime);
-        fprintf(out, ".endm\n");
-        return 0;
-
-    case SM_TPL_LBLOPT3:
-        /* args: is_imm, fname_lbl, namelist_lbl  (matches the C-side
-         * wrapper sm_emit_capture_fn) */
-        fprintf(out, ".macro %s is_imm, fname_lbl, namelist_lbl\n",
-                t->macro_name);
-        emit_optional_lbl(out, "fname_lbl", "rdi");
-        fprintf(out, "    mov     esi, \\is_imm\n");
-        emit_optional_lbl(out, "namelist_lbl", "rdx");
-        fprintf(out, "    call    %s@PLT\n", t->runtime);
-        fprintf(out, ".endm\n");
-        return 0;
-
-    case SM_TPL_LBLOPT_I_I:
-        /* args: is_imm, nargs, fname_lbl */
-        fprintf(out, ".macro %s is_imm, nargs, fname_lbl\n", t->macro_name);
-        emit_optional_lbl(out, "fname_lbl", "rdi");
-        fprintf(out, "    mov     esi, \\is_imm\n");
-        fprintf(out, "    mov     edx, \\nargs\n");
-        fprintf(out, "    call    %s@PLT\n", t->runtime);
-        fprintf(out, ".endm\n");
-        return 0;
-
-    case SM_TPL_EXEC_VAR:
-        fprintf(out, ".macro %s has_repl, subj_lbl\n", t->macro_name);
-        emit_optional_lbl(out, "subj_lbl", "rdi");
-        fprintf(out, "    mov     esi, \\has_repl\n");
-        fprintf(out, "    call    %s@PLT\n", t->runtime);
-        fprintf(out, ".endm\n");
-        return 0;
-
-    case SM_TPL_ARITH:
-        /* SM_ARITH appears multiple times in the table (once per opcode
-         * value), but the macro only needs to be defined ONCE.
-         * sm_emit_macro_library() de-duplicates by macro_name. */
-        fprintf(out, ".macro %s op\n", t->macro_name);
-        fprintf(out, "    mov     edi, \\op\n");
-        fprintf(out, "    call    %s@PLT\n", t->runtime);
-        fprintf(out, ".endm\n");
-        return 0;
-
-    case SM_TPL_PCREF_JMP:
-        fprintf(out, ".macro %s tgt\n", t->macro_name);
-        fprintf(out, "    jmp     \\tgt\n");
-        fprintf(out, ".endm\n");
-        return 0;
-
-    case SM_TPL_PCREF_COND:
-        /* taken_when_ok is baked in: SM_JUMP_S uses jnz; SM_JUMP_F uses jz.
-         * Each SM_JUMP_S/_F template has its own macro entry. */
-        fprintf(out, ".macro %s tgt\n", t->macro_name);
-        fprintf(out, "    call    %s@PLT\n", t->runtime);
-        fprintf(out, "    test    eax, eax\n");
-        fprintf(out, "    %s     \\tgt\n", t->const_a ? "jnz" : "jz");
-        fprintf(out, ".endm\n");
-        return 0;
-
-    case SM_TPL_PUSH_CHUNK:
-        fprintf(out, ".macro %s entry, arity\n", t->macro_name);
-        fprintf(out, "    movabs  rdi, \\entry\n");
-        fprintf(out, "    mov     esi, \\arity\n");
-        fprintf(out, "    call    %s@PLT\n", t->runtime);
-        fprintf(out, ".endm\n");
-        return 0;
-
-    case SM_TPL_CALL_CHUNK:
-        fprintf(out, ".macro %s tgt\n", t->macro_name);
-        fprintf(out, "    call    \\tgt\n");
-        fprintf(out, ".endm\n");
+        snprintf(macro_def, sizeof(macro_def), "%s", t->macro_name);
+        macro_line(out, "", ".macro", macro_def);
+        { char ct[64]; snprintf(ct, sizeof(ct), "%s@PLT", t->runtime);
+          macro_line(out, "", "call", ct); }
+        macro_line(out, "", ".endm", "");
         return 0;
 
     case SM_TPL_RET:
-        fprintf(out, ".macro %s\n", t->macro_name);
-        fprintf(out, "    ret\n");
-        fprintf(out, ".endm\n");
+        snprintf(macro_def, sizeof(macro_def), "%s", t->macro_name);
+        macro_line(out, "", ".macro", macro_def);
+        macro_line(out, "", "ret", "");
+        macro_line(out, "", ".endm", "");
+        return 0;
+
+    case SM_TPL_INT64:
+        snprintf(macro_def, sizeof(macro_def), "%s val", t->macro_name);
+        macro_line(out, "", ".macro", macro_def);
+        macro_line(out, "", "movabs", "rdi, \\val");
+        { char ct[64]; snprintf(ct, sizeof(ct), "%s@PLT", t->runtime);
+          macro_line(out, "", "call", ct); }
+        macro_line(out, "", ".endm", "");
+        return 0;
+
+    case SM_TPL_LBL:
+        snprintf(macro_def, sizeof(macro_def), "%s lbl", t->macro_name);
+        macro_line(out, "", ".macro", macro_def);
+        macro_line(out, "", "lea", "rdi, [rip + \\lbl]");
+        { char ct[64]; snprintf(ct, sizeof(ct), "%s@PLT", t->runtime);
+          macro_line(out, "", "call", ct); }
+        macro_line(out, "", ".endm", "");
+        return 0;
+
+    case SM_TPL_LBLOPT:
+        snprintf(macro_def, sizeof(macro_def), "%s lbl", t->macro_name);
+        macro_line(out, "", ".macro", macro_def);
+        emit_optional_lbl(out, "lbl", "rdi");
+        { char ct[64]; snprintf(ct, sizeof(ct), "%s@PLT", t->runtime);
+          macro_line(out, "", "call", ct); }
+        macro_line(out, "", ".endm", "");
+        return 0;
+
+    case SM_TPL_LBL_INT32:
+        snprintf(macro_def, sizeof(macro_def), "%s lbl, n", t->macro_name);
+        macro_line(out, "", ".macro", macro_def);
+        macro_line(out, "", "lea", "rdi, [rip + \\lbl]");
+        macro_line(out, "", "mov", "esi, \\n");
+        { char ct[64]; snprintf(ct, sizeof(ct), "%s@PLT", t->runtime);
+          macro_line(out, "", "call", ct); }
+        macro_line(out, "", ".endm", "");
+        return 0;
+
+    case SM_TPL_LBLOPT_INT32:
+        snprintf(macro_def, sizeof(macro_def), "%s n, lbl", t->macro_name);
+        macro_line(out, "", ".macro", macro_def);
+        emit_optional_lbl(out, "lbl", "rdi");
+        macro_line(out, "", "mov", "esi, \\n");
+        { char ct[64]; snprintf(ct, sizeof(ct), "%s@PLT", t->runtime);
+          macro_line(out, "", "call", ct); }
+        macro_line(out, "", ".endm", "");
+        return 0;
+
+    case SM_TPL_LBLOPT3:
+        snprintf(macro_def, sizeof(macro_def), "%s is_imm, fname_lbl, namelist_lbl",
+                 t->macro_name);
+        macro_line(out, "", ".macro", macro_def);
+        emit_optional_lbl(out, "fname_lbl", "rdi");
+        macro_line(out, "", "mov", "esi, \\is_imm");
+        emit_optional_lbl(out, "namelist_lbl", "rdx");
+        { char ct[64]; snprintf(ct, sizeof(ct), "%s@PLT", t->runtime);
+          macro_line(out, "", "call", ct); }
+        macro_line(out, "", ".endm", "");
+        return 0;
+
+    case SM_TPL_LBLOPT_I_I:
+        snprintf(macro_def, sizeof(macro_def), "%s is_imm, nargs, fname_lbl",
+                 t->macro_name);
+        macro_line(out, "", ".macro", macro_def);
+        emit_optional_lbl(out, "fname_lbl", "rdi");
+        macro_line(out, "", "mov", "esi, \\is_imm");
+        macro_line(out, "", "mov", "edx, \\nargs");
+        { char ct[64]; snprintf(ct, sizeof(ct), "%s@PLT", t->runtime);
+          macro_line(out, "", "call", ct); }
+        macro_line(out, "", ".endm", "");
+        return 0;
+
+    case SM_TPL_EXEC_VAR:
+        snprintf(macro_def, sizeof(macro_def), "%s has_repl, subj_lbl", t->macro_name);
+        macro_line(out, "", ".macro", macro_def);
+        emit_optional_lbl(out, "subj_lbl", "rdi");
+        macro_line(out, "", "mov", "esi, \\has_repl");
+        { char ct[64]; snprintf(ct, sizeof(ct), "%s@PLT", t->runtime);
+          macro_line(out, "", "call", ct); }
+        macro_line(out, "", ".endm", "");
+        return 0;
+
+    case SM_TPL_ARITH:
+        snprintf(macro_def, sizeof(macro_def), "%s op", t->macro_name);
+        macro_line(out, "", ".macro", macro_def);
+        macro_line(out, "", "mov", "edi, \\op");
+        { char ct[64]; snprintf(ct, sizeof(ct), "%s@PLT", t->runtime);
+          macro_line(out, "", "call", ct); }
+        macro_line(out, "", ".endm", "");
+        return 0;
+
+    case SM_TPL_PCREF_JMP:
+        snprintf(macro_def, sizeof(macro_def), "%s tgt", t->macro_name);
+        macro_line(out, "", ".macro", macro_def);
+        macro_line(out, "", "jmp", "\\tgt");
+        macro_line(out, "", ".endm", "");
+        return 0;
+
+    case SM_TPL_PCREF_COND:
+        snprintf(macro_def, sizeof(macro_def), "%s tgt", t->macro_name);
+        macro_line(out, "", ".macro", macro_def);
+        { char ct[64]; snprintf(ct, sizeof(ct), "%s@PLT", t->runtime);
+          macro_line(out, "", "call", ct); }
+        macro_line(out, "", "test", "eax, eax");
+        macro_line(out, "", t->const_a ? "jnz" : "jz", "\\tgt");
+        macro_line(out, "", ".endm", "");
+        return 0;
+
+    case SM_TPL_PUSH_CHUNK:
+        snprintf(macro_def, sizeof(macro_def), "%s entry, arity", t->macro_name);
+        macro_line(out, "", ".macro", macro_def);
+        macro_line(out, "", "movabs", "rdi, \\entry");
+        macro_line(out, "", "mov", "esi, \\arity");
+        { char ct[64]; snprintf(ct, sizeof(ct), "%s@PLT", t->runtime);
+          macro_line(out, "", "call", ct); }
+        macro_line(out, "", ".endm", "");
+        return 0;
+
+    case SM_TPL_CALL_CHUNK:
+        snprintf(macro_def, sizeof(macro_def), "%s tgt", t->macro_name);
+        macro_line(out, "", ".macro", macro_def);
+        macro_line(out, "", "call", "\\tgt");
+        macro_line(out, "", ".endm", "");
         return 0;
 
     case SM_TPL_RET_VAR:
-        fprintf(out, ".macro %s kind, cond, pc\n", t->macro_name);
-        fprintf(out, "    mov     edi, \\kind\n");
-        fprintf(out, "    mov     esi, \\cond\n");
-        fprintf(out, "    call    %s@PLT\n", t->runtime);
-        fprintf(out, "    test    eax, eax\n");
-        fprintf(out, "    jz      .Lretskip_\\pc\n");
-        fprintf(out, "    ret\n");
-        fprintf(out, ".Lretskip_\\pc\\():\n");
-        fprintf(out, ".endm\n");
+        snprintf(macro_def, sizeof(macro_def), "%s kind, cond, pc", t->macro_name);
+        macro_line(out, "", ".macro", macro_def);
+        macro_line(out, "", "mov", "edi, \\kind");
+        macro_line(out, "", "mov", "esi, \\cond");
+        { char ct[64]; snprintf(ct, sizeof(ct), "%s@PLT", t->runtime);
+          macro_line(out, "", "call", ct); }
+        macro_line(out, "", "test", "eax, eax");
+        macro_line(out, "", "jz", ".Lretskip_\\pc");
+        macro_line(out, "", "ret", "");
+        fprintf(out, ".Lretskip_\\pc\\():\n");  /* GAS local label hack: must stay as-is */
+        macro_line(out, "", ".endm", "");
         return 0;
 
     case SM_TPL_UNHANDLED:
-        fprintf(out, ".macro %s op\n", t->macro_name);
-        fprintf(out, "    mov     edi, \\op\n");
-        fprintf(out, "    call    %s@PLT\n", t->runtime);
-        fprintf(out, ".endm\n");
+        snprintf(macro_def, sizeof(macro_def), "%s op", t->macro_name);
+        macro_line(out, "", ".macro", macro_def);
+        macro_line(out, "", "mov", "edi, \\op");
+        { char ct[64]; snprintf(ct, sizeof(ct), "%s@PLT", t->runtime);
+          macro_line(out, "", "call", ct); }
+        macro_line(out, "", ".endm", "");
         return 0;
 
     case SM_TPL__COUNT:
@@ -400,18 +445,24 @@ static int write_anno(FILE *out, const char *anno)
     return fprintf(out, "  # %s\n", a) < 0 ? -1 : 0;
 }
 
-/* Build the opcode+args string for column 2 into buf[cap].
- * Returns 0 on success, -1 if buf is too small (truncation). */
-static int build_op_col(char *buf, int cap, const sm_op_template_t *t,
-                        const sm_emit_args_t *args)
+/* Build the args-only string for column 3 into buf[cap].
+ * This is everything after the macro name in the call line.
+ * Returns 0 on success, -1 if buf is too small (truncation).
+ *
+ * Convention: if there are no args, buf[0] = '\0' (empty string).
+ * The macro name itself goes into column 2 (t->macro_name directly).
+ * These two together replace the old fused build_op_col. */
+static int build_args_col(char *buf, int cap, const sm_op_template_t *t,
+                          const sm_emit_args_t *args)
 {
     int n = 0;
     switch (t->kind) {
     case SM_TPL_NULLARY:
-        n = snprintf(buf, cap, "%s", t->macro_name);
+    case SM_TPL_RET:
+        n = snprintf(buf, cap, "");  /* no args */
         break;
     case SM_TPL_INT64:
-        n = snprintf(buf, cap, "%s %" PRId64, t->macro_name, args->i64);
+        n = snprintf(buf, cap, "%" PRId64, args->i64);
         break;
     case SM_TPL_LBL:
         if (!args->lbl) {
@@ -419,13 +470,13 @@ static int build_op_col(char *buf, int cap, const sm_op_template_t *t,
                     t->macro_name);
             return -1;
         }
-        n = snprintf(buf, cap, "%s %s", t->macro_name, args->lbl);
+        n = snprintf(buf, cap, "%s", args->lbl);
         break;
     case SM_TPL_LBLOPT:
         if (args->lbl)
-            n = snprintf(buf, cap, "%s %s", t->macro_name, args->lbl);
+            n = snprintf(buf, cap, "%s", args->lbl);
         else
-            n = snprintf(buf, cap, "%s", t->macro_name);
+            n = snprintf(buf, cap, "");
         break;
     case SM_TPL_LBL_INT32:
         if (!args->lbl) {
@@ -433,68 +484,60 @@ static int build_op_col(char *buf, int cap, const sm_op_template_t *t,
                     t->macro_name);
             return -1;
         }
-        n = snprintf(buf, cap, "%s %s, %d", t->macro_name, args->lbl, args->i32_a);
+        n = snprintf(buf, cap, "%s, %d", args->lbl, args->i32_a);
         break;
     case SM_TPL_LBLOPT_INT32:
         if (args->lbl)
-            n = snprintf(buf, cap, "%s %d, %s", t->macro_name, args->i32_a, args->lbl);
+            n = snprintf(buf, cap, "%d, %s", args->i32_a, args->lbl);
         else
-            n = snprintf(buf, cap, "%s %d", t->macro_name, args->i32_a);
+            n = snprintf(buf, cap, "%d", args->i32_a);
         break;
     case SM_TPL_LBLOPT3:
         if (args->lbl && args->lbl_b)
-            n = snprintf(buf, cap, "%s %d, %s, %s",
-                         t->macro_name, args->i32_a, args->lbl, args->lbl_b);
+            n = snprintf(buf, cap, "%d, %s, %s",
+                         args->i32_a, args->lbl, args->lbl_b);
         else if (args->lbl)
-            n = snprintf(buf, cap, "%s %d, %s",
-                         t->macro_name, args->i32_a, args->lbl);
+            n = snprintf(buf, cap, "%d, %s", args->i32_a, args->lbl);
         else if (args->lbl_b)
-            n = snprintf(buf, cap, "%s %d, , %s",
-                         t->macro_name, args->i32_a, args->lbl_b);
+            n = snprintf(buf, cap, "%d, , %s", args->i32_a, args->lbl_b);
         else
-            n = snprintf(buf, cap, "%s %d", t->macro_name, args->i32_a);
+            n = snprintf(buf, cap, "%d", args->i32_a);
         break;
     case SM_TPL_LBLOPT_I_I:
         if (args->lbl)
-            n = snprintf(buf, cap, "%s %d, %d, %s",
-                         t->macro_name, args->i32_a, args->i32_b, args->lbl);
+            n = snprintf(buf, cap, "%d, %d, %s",
+                         args->i32_a, args->i32_b, args->lbl);
         else
-            n = snprintf(buf, cap, "%s %d, %d",
-                         t->macro_name, args->i32_a, args->i32_b);
+            n = snprintf(buf, cap, "%d, %d", args->i32_a, args->i32_b);
         break;
     case SM_TPL_EXEC_VAR:
         if (args->lbl)
-            n = snprintf(buf, cap, "%s %d, %s",
-                         t->macro_name, args->i32_a, args->lbl);
+            n = snprintf(buf, cap, "%d, %s", args->i32_a, args->lbl);
         else
-            n = snprintf(buf, cap, "%s %d", t->macro_name, args->i32_a);
+            n = snprintf(buf, cap, "%d", args->i32_a);
         break;
     case SM_TPL_ARITH:
-        n = snprintf(buf, cap, "%s %d", t->macro_name, t->const_a);
+        n = snprintf(buf, cap, "%d", t->const_a);
         break;
     case SM_TPL_PCREF_JMP:
     case SM_TPL_PCREF_COND:
     case SM_TPL_CALL_CHUNK:
-        n = snprintf(buf, cap, "%s .Lpc%d", t->macro_name, args->i32_a);
+        n = snprintf(buf, cap, ".Lpc%d", args->i32_a);
         break;
     case SM_TPL_PUSH_CHUNK:
-        n = snprintf(buf, cap, "%s %" PRId64 ", %d",
-                     t->macro_name, args->i64, args->i32_a);
-        break;
-    case SM_TPL_RET:
-        n = snprintf(buf, cap, "%s", t->macro_name);
+        n = snprintf(buf, cap, "%" PRId64 ", %d", args->i64, args->i32_a);
         break;
     case SM_TPL_RET_VAR:
-        n = snprintf(buf, cap, "%s %d, %d, %d",
-                     t->macro_name, args->i32_a, args->i32_b, args->pc);
+        n = snprintf(buf, cap, "%d, %d, %d",
+                     args->i32_a, args->i32_b, args->pc);
         break;
     case SM_TPL_UNHANDLED:
-        n = snprintf(buf, cap, "%s %d", t->macro_name, args->i32_a);
+        n = snprintf(buf, cap, "%d", args->i32_a);
         break;
     case SM_TPL__COUNT:
         break;
     default:
-        fprintf(stderr, "sm_emit_template: build_op_col: unknown kind %d\n",
+        fprintf(stderr, "sm_emit_template: build_args_col: unknown kind %d\n",
                 (int)t->kind);
         return -1;
     }
@@ -504,17 +547,17 @@ static int build_op_col(char *buf, int cap, const sm_op_template_t *t,
 static int render_call_line(FILE *out, const sm_op_template_t *t,
                             const sm_emit_args_t *args)
 {
-    /* Three-column layout:  LABEL:       OPCODE args     # annotation
-     * Col 1 (label):  24 chars, left-aligned  -- from args->label or g_pending_pc_label
-     * Col 2 (opcode): 36 chars, left-aligned  -- macro name + args
-     * Col 3 (anno):   free width              -- # comment
+    /* Corrected three-column layout:
+     *   Col 1 (label):  24 chars, left-aligned  -- from args->label or g_pending_pc_label
+     *   Col 2 (opcode): 16 chars, left-aligned  -- macro name ONLY (no args)
+     *   Col 3 (args + anno): free width         -- args then # comment
      *
      * g_pending_pc_label is consumed (cleared) on the first call per
      * instruction so that continuation lines (multi-line blob handlers)
      * don't inherit the label.
      */
-    char op[128];
-    if (build_op_col(op, sizeof(op), t, args) != 0) return -1;
+    char argsb[128];
+    if (build_args_col(argsb, sizeof(argsb), t, args) != 0) return -1;
 
     /* Determine label: explicit args->label wins; else consume the pending one.
      * Snapshot to a local buffer before clearing g_pending_pc_label, since
@@ -535,14 +578,35 @@ static int render_call_line(FILE *out, const sm_op_template_t *t,
     /* Consume pending label so next call on this instruction gets no label. */
     g_pending_pc_label[0] = '\0';
 
-    if (lbl_col && *lbl_col) {
-        /* Three-column: label / opcode+args / annotation */
-        if (fprintf(out, "%-24s%-36s", lbl_col, op) < 0) return -1;
+    /* Build args+anno for column 3: args (if any) then annotation.
+     * One-space gap between args and `#` -- no fourth-column padding. */
+    char col3[256];
+    const char *anno = args ? args->anno : NULL;
+    if (argsb[0] && anno && *anno) {
+        if (anno[0] == '#')
+            snprintf(col3, sizeof(col3), "%s %s", argsb, anno);
+        else
+            snprintf(col3, sizeof(col3), "%s # %s", argsb, anno);
+    } else if (argsb[0]) {
+        snprintf(col3, sizeof(col3), "%s", argsb);
+    } else if (anno && *anno) {
+        if (anno[0] == '#')
+            snprintf(col3, sizeof(col3), "%s", anno);
+        else
+            snprintf(col3, sizeof(col3), "# %s", anno);
     } else {
-        /* No label (macro library emission, test path, continuation lines) */
-        if (fprintf(out, "\t%-35s", op) < 0) return -1;
+        col3[0] = '\0';
     }
-    return write_anno(out, args ? args->anno : NULL);
+
+    if (lbl_col && *lbl_col) {
+        /* Three-column: label(24) / opcode(16) / args+anno.
+         * Single space ensures gap even when opcode overflows 16 chars. */
+        if (fprintf(out, "%-24s%-16s %s\n", lbl_col, t->macro_name, col3) < 0) return -1;
+    } else {
+        /* No label: tab + opcode(16) + space + args+anno */
+        if (fprintf(out, "\t%-15s %s\n", t->macro_name, col3) < 0) return -1;
+    }
+    return 0;
 }
 
 /* ---------------------------------------------------------------------

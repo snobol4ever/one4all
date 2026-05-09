@@ -400,7 +400,7 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
             if (val.v == DT_FAIL) {
                 /* SN-32b-store-fail: push FAILDESCR so enclosing calls (e.g.
                  * DIFFER(sno = Pop()) where Pop() FRETURNs) see a balanced
-                 * stack.  Without the push, the enclosing SM_CALL pops a
+                 * stack.  Without the push, the enclosing SM_CALL_FN pops a
                  * stale value, corrupting the arg and mis-setting last_ok.
                  * SNOBOL4 semantics: the assignment does not occur, and FAIL
                  * propagates up to the enclosing expression. */
@@ -425,7 +425,7 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
             break;
         }
 
-        case SM_POP:
+        case SM_VOID_POP:
             sm_pop(st);
             break;
 
@@ -823,7 +823,7 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
          * even though E_CASE is currently used in stmt-context (raku
          * given_stmt), keeping the value-context discipline consistent
          * with the underlying coro_value.c E_CASE evaluator means
-         * future value-context use is symmetric. The trailing SM_POP
+         * future value-context use is symmetric. The trailing SM_VOID_POP
          * the lower_stmt expression-stmt path emits for E_CASE balances
          * the stack. Mirrors the comparison logic in
          * coro_value.c:947 — string compare on E_LEQ, integer-or-string
@@ -928,7 +928,7 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
 
         /* ── Functions (stubs — wired in U3) ───────────────────────── */
 
-        case SM_CALL: {
+        case SM_CALL_FN: {
             const char *name  = ins->a[0].s;
             int         nargs = (int)ins->a[1].i;
 
@@ -1140,7 +1140,7 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
                 if (body_pc >= 0 && st->call_depth < SM_CALL_STACK_MAX) {
                     /* ── Push SM call frame ── */
                     SmCallFrame *fr = &st->call_stack[st->call_depth++];
-                    fr->ret_pc = st->pc;  /* resume after the SM_CALL instr */
+                    fr->ret_pc = st->pc;  /* resume after the SM_CALL_FN instr */
                     fr->ret_ok = 1;
                     /* RS-9c: save caller's value stack so SM_STNO resets inside
                      * the callee don't wipe expression operands from the caller. */

@@ -117,7 +117,7 @@ DESCR_t sc_dat_field_get(const char *fname, DESCR_t obj) {
 }
 
 /* sc_dat_field_call — public entry for SM-run DATA dispatch.
- * Called from sm_interp SM_CALL handler when args[0] is DT_DATA, to give
+ * Called from sm_interp SM_CALL_FN handler when args[0] is DT_DATA, to give
  * DATA field accessors/mutators/constructors priority over same-named builtins
  * (e.g. DATA field named 'real' must win over REAL() builtin when arg is DT_DATA).
  * Returns FAILDESCR if name is not a DATA constructor/field — caller falls through

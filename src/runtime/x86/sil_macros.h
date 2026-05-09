@@ -224,7 +224,7 @@ int LCOMP_fn(const char *s1, size_t l1, const char *s2, size_t l2);
 /* ═══════════════════════════════════════════════════════════════════════
  * GROUP 5 — Control flow
  *
- * BRANCH/RCALL/RRTURN map to SM_JUMP/SM_CALL/SM_RETURN (DONE in SCRIP-SM.md).
+ * BRANCH/RCALL/RRTURN map to SM_JUMP/SM_CALL_FN/SM_RETURN (DONE in SCRIP-SM.md).
  * The new ones below are the three additions from the SIL scan.
  * ═══════════════════════════════════════════════════════════════════════ */
 

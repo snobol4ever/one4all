@@ -30,7 +30,7 @@
  * Opcode coverage:
  *   EM-1: literal-zero scaffold (init+finalize only).
  *   EM-2: SM_HALT, SM_PUSH_LIT_I. SM_NOP not in opcode enum.
- *   EM-3: SM_PUSH_LIT_S, SM_PUSH_VAR, SM_STORE_VAR, SM_POP,
+ *   EM-3: SM_PUSH_LIT_S, SM_PUSH_VAR, SM_STORE_VAR, SM_VOID_POP,
  *         SM_ADD/SUB/MUL/DIV/MOD via sm_macros.s.
  *         SM_DUP/SM_SWAP not in enum (honest deviation).
  *         emit_bb_box() scaffold added (no SM_PAT_* coverage yet).
@@ -50,7 +50,7 @@
  *         bb_emit BINARY mode (variant nodes built into bb_pool RX
  *         memory at runtime), with Phase-3 as a direct call to the
  *         root chunk's α — no broker, no pat-stack, no descriptor tree.
- *   EM-7-pre keepers (kept after revert): SM_CALL, SM_CONCAT,
+ *   EM-7-pre keepers (kept after revert): SM_CALL_FN, SM_CONCAT,
  *         SM_PUSH_NULL, SM_COERCE_NUM, all 8 conditional return
  *         variants.  These are Phase 1/4/5 concerns, orthogonal to BB.
  */
@@ -288,7 +288,7 @@ static void strtab_collect(const SM_Program *prog)
         case SM_PAT_CAPTURE_FN_ARGS:  /* EM-7: a[0].s = fname */
         case SM_PAT_USERCALL_ARGS:    /* EM-7: a[0].s = fname */
         case SM_EXEC_STMT:
-        case SM_CALL:
+        case SM_CALL_FN:
         case SM_LABEL:       /* EM-7d: named labels (SNOBOL4 func entries) */
             if (ins->a[0].s) strtab_intern(ins->a[0].s);
             break;
@@ -307,17 +307,64 @@ static void strtab_collect(const SM_Program *prog)
     }
 }
 
+/* -----------------------------------------------------------------------
+ * emit_three_column_line -- central renderer for all non-BB, non-banner lines.
+ *
+ * Corrected three-column shape (per EM-7c-three-column-non-bb):
+ *   Col 1 (label,  24-wide): label with trailing ':' if present, else empty.
+ *   Col 2 (opcode, 16-wide): directive/mnemonic name ONLY (no args).
+ *   Col 3 (free):            args + optional "# comment".
+ *
+ * When label is NULL/"", 24 spaces precede column 2.
+ * When opcode is NULL/"", column 2 is empty (useful for bare-label lines).
+ * When col3 is NULL/"" and no anno, nothing follows the opcode (padded).
+ * Banner lines (# ====..., # stmt N) are NOT routed here -- they print
+ * full-width and don't obey column rules.
+ * ----------------------------------------------------------------------- */
+static int emit_three_column_line(FILE *out,
+                                  const char *label,   /* e.g. ".Lstr_0:" or NULL */
+                                  const char *opcode,  /* e.g. ".string" or NULL */
+                                  const char *col3,    /* args+comment or NULL */
+                                  const char *anno)    /* optional annotation or NULL */
+{
+    /* Build column 3: col3 content (if any) + annotation (if any).
+     * One-space gap between args and `#` -- no fourth-column padding. */
+    char c3[512];
+    if (col3 && *col3 && anno && *anno) {
+        if (anno[0] == '#')
+            snprintf(c3, sizeof(c3), "%s %s", col3, anno);
+        else
+            snprintf(c3, sizeof(c3), "%s # %s", col3, anno);
+    } else if (col3 && *col3) {
+        snprintf(c3, sizeof(c3), "%s", col3);
+    } else if (anno && *anno) {
+        if (anno[0] == '#')
+            snprintf(c3, sizeof(c3), "%s", anno);
+        else
+            snprintf(c3, sizeof(c3), "# %s", anno);
+    } else {
+        c3[0] = '\0';
+    }
+
+    const char *lbl = (label  && *label)  ? label  : "";
+    const char *op  = (opcode && *opcode) ? opcode : "";
+    return fprintf(out, "%-24s%-16s %s\n", lbl, op, c3) < 0 ? -1 : 0;
+}
+
 /* Emit .section .rodata with all interned strings as .Lstr_N: .string "..." */
 static int strtab_emit_rodata(FILE *out)
 {
     if (g_strtab_n == 0) return 0;
-    if (fputs("\t.section .rodata\n", out) == EOF) return -1;
+    if (emit_three_column_line(out, "", ".section", ".rodata", NULL) != 0) return -1;
     char esc[1024];
+    char lbl[32];
     for (int i = 0; i < g_strtab_n; i++) {
         strtab_escape(esc, sizeof(esc), g_strtab[i].s);
-        if (fprintf(out, ".Lstr_%d:\n\t.string %s\n", i, esc) < 0) return -1;
+        snprintf(lbl, sizeof(lbl), ".Lstr_%d:", i);
+        if (emit_three_column_line(out, lbl, "", "", NULL) != 0) return -1;
+        if (emit_three_column_line(out, "", ".string", esc, NULL) != 0) return -1;
     }
-    if (fputs("\t.text\n", out) == EOF) return -1;
+    if (emit_three_column_line(out, "", ".text", "", NULL) != 0) return -1;
     return 0;
 }
 
@@ -344,9 +391,9 @@ static int emit_chunk_registry(FILE *out, const SM_Program *prog)
     }
     if (n == 0) return 0;
 
-    if (fputs("\t.section .data\n"
-              "\t.align  8\n"
-              ".Lchunk_registry:\n", out) == EOF) return -1;
+    if (emit_three_column_line(out, "", ".section", ".data", NULL) != 0) return -1;
+    if (emit_three_column_line(out, "", ".align",   "8",     NULL) != 0) return -1;
+    if (emit_three_column_line(out, ".Lchunk_registry:", "", "", NULL) != 0) return -1;
 
     for (int i = 0; i < prog->count; i++) {
         const SM_Instr *ins = &prog->instrs[i];
@@ -362,19 +409,18 @@ static int emit_chunk_registry(FILE *out, const SM_Program *prog)
          * the first op is at M+1.  We emit .Lpc{i+1} as the fn entry. */
         int entry_pc = i + 1;
 
-        if (fprintf(out,
-                    "\t# chunk: %s -> .Lpc%d\n"
-                    "\t.quad   .Lstr_%d\n"    /* name ptr */
-                    "\t.quad   .Lpc%d\n",     /* fn ptr   */
-                    ins->a[0].s, entry_pc,
-                    str_idx,
-                    entry_pc) < 0) return -1;
+        char anno[64], qarg[32], earg[32];
+        snprintf(anno, sizeof(anno), "chunk: %s -> .Lpc%d", ins->a[0].s, entry_pc);
+        snprintf(qarg, sizeof(qarg), ".Lstr_%d", str_idx);
+        snprintf(earg, sizeof(earg), ".Lpc%d", entry_pc);
+        if (emit_three_column_line(out, "", ".quad", qarg, anno) != 0) return -1;
+        if (emit_three_column_line(out, "", ".quad", earg, NULL)  != 0) return -1;
     }
 
     /* Sentinel: {NULL, NULL} */
-    if (fputs("\t.quad   0\n"
-              "\t.quad   0\n"
-              "\t.text\n", out) == EOF) return -1;
+    if (emit_three_column_line(out, "", ".quad", "0", "sentinel") != 0) return -1;
+    if (emit_three_column_line(out, "", ".quad", "0", NULL)       != 0) return -1;
+    if (emit_three_column_line(out, "", ".text", "",  NULL)        != 0) return -1;
 
     return n;
 }
@@ -412,100 +458,90 @@ static int emit_file_header(FILE *out, int count, int has_chunk_registry)
      * prologue.  If has_chunk_registry is non-zero, main calls
      * scrip_rt_register_chunks before scrip_rt_init so that user-defined
      * SNOBOL4 functions are dispatchable from the start. */
-    int rc = fprintf(out,
+    if (fprintf(out,
         "# -----------------------------------------------------------------------\n"
         "# scrip --jit-emit --x64  (M-JITEM-X64 / EM-1..EM-7d)\n"
         "# %d SM instructions. Links against libscrip_rt.so.\n"
         "# Architecture: two emitters -- SM straight-line via sm_macros.s\n"
         "#   macros (inline x86); BB boxes via emit_bb_box() one-proc-per-box.\n"
         "# See archive/EMITTER-MODE4-ARCH.md for the full design.\n"
-        "# -----------------------------------------------------------------------\n"
-        "\t.intel_syntax noprefix\n"
-        "\t.globl  main\n"
-        "\t.type   main, @function\n"
-        "main:\n"
-        "\tpush    rbp\n"
-        "\tmov     rbp, rsp\n",
-        count);
-    if (rc < 0) return -1;
+        "# -----------------------------------------------------------------------\n",
+        count) < 0) return -1;
+    if (emit_three_column_line(out, "", ".intel_syntax", "noprefix", NULL) != 0) return -1;
+    if (emit_three_column_line(out, "", ".globl",  "main",          NULL) != 0) return -1;
+    if (emit_three_column_line(out, "", ".type",   "main, @function", NULL) != 0) return -1;
+    if (emit_three_column_line(out, "main:",       "push",   "rbp", NULL) != 0) return -1;
+    if (emit_three_column_line(out, "",            "mov",    "rbp, rsp", NULL) != 0) return -1;
 
     if (has_chunk_registry) {
-        /* EM-7d-usercall-reentrant: register user-defined SNOBOL4 function
-         * chunks before scrip_rt_init so _rt_usercall can dispatch them. */
-        if (fputs("\t# EM-7d: register user-defined function chunks\n"
-                  "\tlea     rdi, [rip + .Lchunk_registry]\n"
-                  "\tcall    scrip_rt_register_chunks@PLT\n",
-                  out) == EOF) return -1;
+        if (emit_three_column_line(out, "", "lea",  "rdi, [rip + .Lchunk_registry]",
+                                   "EM-7d: register user-defined function chunks") != 0) return -1;
+        if (emit_three_column_line(out, "", "call", "scrip_rt_register_chunks@PLT", NULL) != 0) return -1;
     } else {
-        if (fputs("\t# no user-defined functions -- scrip_rt_register_chunks skipped\n"
-                  "\txor     edi, edi\n"
-                  "\tcall    scrip_rt_register_chunks@PLT\n",
-                  out) == EOF) return -1;
+        if (emit_three_column_line(out, "", "xor",  "edi, edi",
+                                   "no user-defined functions") != 0) return -1;
+        if (emit_three_column_line(out, "", "call", "scrip_rt_register_chunks@PLT", NULL) != 0) return -1;
     }
 
-    /* EM-7c-capture: patch cap_t fn pointers to baked child blobs.
-     * If cap_ptr == (void*)1, it is a symbolic fixup: derive cap_data_lbl from
-     * child_label by replacing "_child_α" with "_data" and prepending ".L". */
+    /* EM-7c-capture: patch cap_t fn pointers to baked child blobs. */
     for (int i = 0; i < g_cap_fixups_n; i++) {
-        const char *α = g_cap_fixups[i].child_label;  /* "_capN_child_α" */
+        const char *α = g_cap_fixups[i].child_label;
+        char anno[128];
         if ((uintptr_t)g_cap_fixups[i].cap_ptr == 1) {
-            /* Symbolic cap fixup: reconstruct ".LcapN_data" from "_capN_child_α" */
             char cap_lbl[128];
             const char *p = α;
             if (*p == '_') p++;
             const char *underscore = strchr(p, '_');
             int id_len = underscore ? (int)(underscore - p) : (int)strlen(p);
             snprintf(cap_lbl, sizeof(cap_lbl), ".L%.*s_data", id_len, p);
-            if (fprintf(out,
-                    "\t# cap fixup %d (cap static): %s -> %s\n"
-                    "\tlea     rdi, [rip + %s]\n"
-                    "\tlea     rsi, [rip + %s]\n"
-                    "\tcall    scrip_rt_patch_cap_fn@PLT\n",
-                    i, cap_lbl, α, cap_lbl, α) < 0) return -1;
+            snprintf(anno, sizeof(anno), "cap fixup %d (static): %s -> %s", i, cap_lbl, α);
+            char rdi_arg[128], rsi_arg[128];
+            snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", cap_lbl);
+            snprintf(rsi_arg, sizeof(rsi_arg), "rsi, [rip + %s]", α);
+            if (emit_three_column_line(out, "", "lea",  rdi_arg, anno) != 0) return -1;
+            if (emit_three_column_line(out, "", "lea",  rsi_arg, NULL) != 0) return -1;
+            if (emit_three_column_line(out, "", "call", "scrip_rt_patch_cap_fn@PLT", NULL) != 0) return -1;
         } else if ((uintptr_t)g_cap_fixups[i].cap_ptr == 2) {
-            /* Arbno fixup: reconstruct ".LarbnoN_slot" from "_arbnoN_child_α" */
             char slot_lbl[128];
             const char *p = α;
             if (*p == '_') p++;
             const char *underscore = strchr(p, '_');
             int id_len = underscore ? (int)(underscore - p) : (int)strlen(p);
             snprintf(slot_lbl, sizeof(slot_lbl), ".L%.*s_slot", id_len, p);
-            if (fprintf(out,
-                    "\t# arbno fixup %d: init %s -> %s\n"
-                    "\tlea     rdi, [rip + %s]\n"
-                    "\tlea     rsi, [rip + %s]\n"
-                    "\tcall    scrip_rt_init_arbno@PLT\n",
-                    i, slot_lbl, α, slot_lbl, α) < 0) return -1;
+            snprintf(anno, sizeof(anno), "arbno fixup %d: %s -> %s", i, slot_lbl, α);
+            char rdi_arg[128], rsi_arg[128];
+            snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", slot_lbl);
+            snprintf(rsi_arg, sizeof(rsi_arg), "rsi, [rip + %s]", α);
+            if (emit_three_column_line(out, "", "lea",  rdi_arg, anno) != 0) return -1;
+            if (emit_three_column_line(out, "", "lea",  rsi_arg, NULL) != 0) return -1;
+            if (emit_three_column_line(out, "", "call", "scrip_rt_init_arbno@PLT", NULL) != 0) return -1;
         } else {
-            if (fprintf(out,
-                    "\t# cap fixup %d: cap_t@%p -> %s\n"
-                    "\tmovabs  rdi, %llu\n"
-                    "\tlea     rsi, [rip + %s]\n"
-                    "\tcall    scrip_rt_patch_cap_fn@PLT\n",
-                    i,
-                    g_cap_fixups[i].cap_ptr,
-                    α,
-                    (unsigned long long)(uintptr_t)g_cap_fixups[i].cap_ptr,
-                    α) < 0) return -1;
+            char rdi_arg[64], rsi_arg[128];
+            snprintf(anno, sizeof(anno), "cap fixup %d: cap_t@%p -> %s",
+                     i, g_cap_fixups[i].cap_ptr, α);
+            snprintf(rdi_arg, sizeof(rdi_arg), "rdi, %llu",
+                     (unsigned long long)(uintptr_t)g_cap_fixups[i].cap_ptr);
+            snprintf(rsi_arg, sizeof(rsi_arg), "rsi, [rip + %s]", α);
+            if (emit_three_column_line(out, "", "movabs", rdi_arg, anno) != 0) return -1;
+            if (emit_three_column_line(out, "", "lea",    rsi_arg, NULL) != 0) return -1;
+            if (emit_three_column_line(out, "", "call",   "scrip_rt_patch_cap_fn@PLT", NULL) != 0) return -1;
         }
     }
 
-    if (fputs("\t# scrip_rt_init(argc, argv) -- argc in edi, argv in rsi\n"
-              "\tcall    scrip_rt_init@PLT\n",
-              out) == EOF) return -1;
+    if (emit_three_column_line(out, "", "call", "scrip_rt_init@PLT",
+                               "scrip_rt_init(argc, argv)") != 0) return -1;
     return 0;
 }
 
 static int emit_file_footer(FILE *out)
 {
-    return fputs(
-        "\t# -- epilogue -------------------------------------------\n"
-        "\tcall    scrip_rt_finalize@PLT\n"
-        "\tpop     rbp\n"
-        "\tret\n"
-        "\t.size   main, .-main\n"
-        "\t.section .note.GNU-stack,\"\",@progbits\n",
-        out) == EOF ? -1 : 0;
+    if (fprintf(out, "# -- epilogue -------------------------------------------\n") < 0) return -1;
+    if (emit_three_column_line(out, "", "call", "scrip_rt_finalize@PLT", NULL) != 0) return -1;
+    if (emit_three_column_line(out, "", "pop",  "rbp", NULL) != 0) return -1;
+    if (emit_three_column_line(out, "", "ret",  "",    NULL) != 0) return -1;
+    if (emit_three_column_line(out, "", ".size", "main, .-main", NULL) != 0) return -1;
+    if (emit_three_column_line(out, "", ".section", ".note.GNU-stack,\"\",@progbits", NULL) != 0) return -1;
+    return 0;
 }
 
 /* -----------------------------------------------------------------------
@@ -567,9 +603,9 @@ static int sm_line(FILE *out, const char *label, const char *action,
     }
     const char *act = (action && *action) ? action : "";
     if (lbl && *lbl)
-        return fprintf(out, "%-24s%-36s%s\n", lbl, act, gc) < 0 ? -1 : 0;
+        return fprintf(out, "%-24s%-16s %s\n", lbl, act, gc) < 0 ? -1 : 0;
     else
-        return fprintf(out, "\t%-35s%s\n", act, gc) < 0 ? -1 : 0;
+        return fprintf(out, "\t%-15s %s\n", act, gc) < 0 ? -1 : 0;
 }
 
 /* -----------------------------------------------------------------------
@@ -662,7 +698,7 @@ static int emit_sm_halt(FILE *out, int pc)
     /* SM_HALT: call scrip_rt_halt_tos() which safe-pops TOS as rc
      * if it's DT_I, else uses 0.  Driven by the SM_HALT template
      * (one source of truth with sm_macros.s). */
-    return sm_emit_nullary(out, sm_template_lookup(SM_HALT), "# SM_HALT");
+    return sm_emit_nullary(out, sm_template_lookup(SM_HALT), NULL);
 }
 
 static int emit_sm_push_lit_i(FILE *out, const SM_Instr *ins, int pc)
@@ -713,8 +749,7 @@ static int emit_sm_store_var(FILE *out, const SM_Instr *ins, int pc)
 static int emit_sm_pop(FILE *out, int pc)
 {
     (void)pc;
-    return sm_emit_nullary(out, sm_template_lookup(SM_POP),
-                           "# SM_POP: discard TOS");
+    return sm_emit_nullary(out, sm_template_lookup(SM_VOID_POP), NULL);
 }
 
 static int emit_sm_arith(FILE *out, const SM_Instr *ins, int pc)
@@ -744,10 +779,8 @@ static int emit_sm_jump(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
     int target = (int)ins->a[0].i;
-    char anno[64];
-    snprintf(anno, sizeof(anno), "# SM_JUMP -> pc=%d", target);
     return sm_emit_pcref_jmp(out, sm_template_lookup(SM_JUMP),
-                             target, anno);
+                             target, NULL);
 }
 
 static int emit_sm_jump_cond(FILE *out, const SM_Instr *ins, int pc,
@@ -759,11 +792,8 @@ static int emit_sm_jump_cond(FILE *out, const SM_Instr *ins, int pc,
     (void)pc;
     int  target = (int)ins->a[0].i;
     int  op_id  = take_when_ok ? SM_JUMP_S : SM_JUMP_F;
-    char anno[80];
-    snprintf(anno, sizeof(anno), "# %s -> pc=%d",
-             take_when_ok ? "SM_JUMP_S" : "SM_JUMP_F", target);
     return sm_emit_pcref_cond(out, sm_template_lookup(op_id),
-                              target, take_when_ok, anno);
+                              target, take_when_ok, NULL);
 }
 
 static int emit_sm_jump_s(FILE *out, const SM_Instr *ins, int pc)
@@ -783,7 +813,7 @@ static int emit_sm_jump_f(FILE *out, const SM_Instr *ins, int pc)
  *   a[0].i = entry_pc   a[1].i = arity
  * Codegen: scrip_rt_push_chunk_descr(entry_pc, arity).  The runtime
  * stores it as a DESCR_t { v=DT_E, slen=arity, i=entry_pc }
- * so a downstream SM_CALL "EVAL" / sm_call_chunk path can find it.
+ * so a downstream SM_CALL_FN "EVAL" / sm_call_chunk path can find it.
  *
  * SM_CALL_CHUNK is a baked direct call.  a[0].i = entry_pc resolves at
  * emit-time to the .Lpc<entry_pc> label that emit_pc_label has already
@@ -835,7 +865,7 @@ static int emit_sm_return(FILE *out, int pc)
     (void)pc;
     /* SM_RETURN: native return.  The chunk's last push left the result
      * on the SM value stack inside libscrip_rt.so. */
-    return sm_emit_ret(out, sm_template_lookup(SM_RETURN), "# SM_RETURN");
+    return sm_emit_ret(out, sm_template_lookup(SM_RETURN), NULL);
 }
 
 /* -----------------------------------------------------------------------
@@ -921,7 +951,7 @@ static int emit_sm_stno(FILE *out, const SM_Instr *ins, int pc,
  * ----------------------------------------------------------------------- */
 
 /* -----------------------------------------------------------------------
- * EM-7-pre keepers: SM_CALL, SM_CONCAT, SM_PUSH_NULL, SM_COERCE_NUM,
+ * EM-7-pre keepers: SM_CALL_FN, SM_CONCAT, SM_PUSH_NULL, SM_COERCE_NUM,
  *                   SM_RETURN_S/F, SM_FRETURN[_S/_F], SM_NRETURN[_S/_F].
  * These are Phase 1/4/5 concerns, orthogonal to BB / pattern-matching.
  * ----------------------------------------------------------------------- */
@@ -930,26 +960,24 @@ static int emit_sm_stno(FILE *out, const SM_Instr *ins, int pc,
 static int emit_sm_concat(FILE *out, int pc)
 {
     (void)pc;
-    return sm_emit_nullary(out, sm_template_lookup(SM_CONCAT), "# SM_CONCAT");
+    return sm_emit_nullary(out, sm_template_lookup(SM_CONCAT), NULL);
 }
 
 /* SM_PUSH_NULL: push null (empty-string) descriptor; sets last_ok=1. */
 static int emit_sm_push_null(FILE *out, int pc)
 {
     (void)pc;
-    return sm_emit_nullary(out, sm_template_lookup(SM_PUSH_NULL),
-                           "# SM_PUSH_NULL");
+    return sm_emit_nullary(out, sm_template_lookup(SM_PUSH_NULL), NULL);
 }
 
 /* SM_COERCE_NUM: unary +; coerce string→int/real if needed. */
 static int emit_sm_coerce_num(FILE *out, int pc)
 {
     (void)pc;
-    return sm_emit_nullary(out, sm_template_lookup(SM_COERCE_NUM),
-                           "# SM_COERCE_NUM");
+    return sm_emit_nullary(out, sm_template_lookup(SM_COERCE_NUM), NULL);
 }
 
-/* SM_CALL: general function call.  All dispatch (pseudo-calls, builtins,
+/* SM_CALL_FN: general function call.  All dispatch (pseudo-calls, builtins,
  * user-defined) lives in scrip_rt_call(name, nargs).
  *   a[0].s = function name (interned in strtab)
  *   a[1].i = nargs                                                       */
@@ -960,8 +988,10 @@ static int emit_sm_call(FILE *out, const SM_Instr *ins, int pc)
     int         nargs = (int)ins->a[1].i;
     char lbl[32], anno[80];
     strtab_label(lbl, sizeof(lbl), name);
-    snprintf(anno, sizeof(anno), "# SM_CALL fname=\"%s\" nargs=%d", name, nargs);
-    return sm_emit_lbl_int32(out, sm_template_lookup(SM_CALL),
+    /* Annotation: show the unmangled fname (the args column shows the .Lstr_N
+     * label which is opaque); CALL_FN macro name is in col 2. */
+    snprintf(anno, sizeof(anno), "fname=\"%s\"", name);
+    return sm_emit_lbl_int32(out, sm_template_lookup(SM_CALL_FN),
                              lbl, nargs, anno);
 }
 
@@ -1539,10 +1569,10 @@ static int emit_pattern_blobs(FILE *out)
         "# EM-7c: invariant pattern blobs (baked from sm_phase2_to_patnd → bb_build_flat_text)\n"
         "# Each block exposes _pat_inv_<id>_α / _β / _γ / _ω.\n"
         "# scrip_rt_match_blob(blob_α, ...) drives Phase-3 against these blobs.\n"
-        "# ============================================================================\n"
-        "\t.intel_syntax noprefix\n"
-        "\t.text\n",
+        "# ============================================================================\n",
         out) == EOF) return -1;
+    if (emit_three_column_line(out, "", ".intel_syntax", "noprefix", NULL) != 0) return -1;
+    if (emit_three_column_line(out, "", ".text", "", NULL) != 0) return -1;
 
     for (int i = 0; i < g_pat_windows_n; i++) {
         pattern_window_t *w = &g_pat_windows[i];
@@ -1667,12 +1697,11 @@ static int emit_sm_pat_lit(FILE *out, const SM_Instr *ins, int pc)
     char lbl[64], anno[128];
     const char *l = pat_arg_label(lbl, sizeof(lbl), ins->a[0].s);
     if (l) {
-        snprintf(anno, sizeof(anno), "# SM_PAT_LIT arg=\"%.40s\"%s",
+        snprintf(anno, sizeof(anno), "arg=\"%.40s\"%s",
                  ins->a[0].s, (strlen(ins->a[0].s) > 40) ? "..." : "");
-    } else {
-        snprintf(anno, sizeof(anno), "# SM_PAT_LIT arg=NULL");
+        return sm_emit_lblopt(out, sm_template_lookup(SM_PAT_LIT), l, anno);
     }
-    return sm_emit_lblopt(out, sm_template_lookup(SM_PAT_LIT), l, anno);
+    return sm_emit_lblopt(out, sm_template_lookup(SM_PAT_LIT), l, NULL);
 }
 
 /* SM_PAT_REFNAME: a[0].s = var name. */
@@ -1682,12 +1711,11 @@ static int emit_sm_pat_refname(FILE *out, const SM_Instr *ins, int pc)
     char lbl[64], anno[128];
     const char *l = pat_arg_label(lbl, sizeof(lbl), ins->a[0].s);
     if (l) {
-        snprintf(anno, sizeof(anno), "# SM_PAT_REFNAME arg=\"%.40s\"%s",
+        snprintf(anno, sizeof(anno), "var=\"%.40s\"%s",
                  ins->a[0].s, (strlen(ins->a[0].s) > 40) ? "..." : "");
-    } else {
-        snprintf(anno, sizeof(anno), "# SM_PAT_REFNAME arg=NULL");
+        return sm_emit_lblopt(out, sm_template_lookup(SM_PAT_REFNAME), l, anno);
     }
-    return sm_emit_lblopt(out, sm_template_lookup(SM_PAT_REFNAME), l, anno);
+    return sm_emit_lblopt(out, sm_template_lookup(SM_PAT_REFNAME), l, NULL);
 }
 
 /* SM_PAT_CAPTURE: a[0].s = varname, a[1].i = kind (0/1/2). */
@@ -1698,10 +1726,9 @@ static int emit_sm_pat_capture(FILE *out, const SM_Instr *ins, int pc)
     const char *l = pat_arg_label(lbl, sizeof(lbl), ins->a[0].s);
     int kind = (int)ins->a[1].i;
     if (l) {
-        snprintf(anno, sizeof(anno), "# SM_PAT_CAPTURE var=%s kind=%d",
-                 ins->a[0].s, kind);
+        snprintf(anno, sizeof(anno), "var=%s kind=%d", ins->a[0].s, kind);
     } else {
-        snprintf(anno, sizeof(anno), "# SM_PAT_CAPTURE var=NULL kind=%d", kind);
+        snprintf(anno, sizeof(anno), "kind=%d", kind);
     }
     return sm_emit_lblopt_int32(out, sm_template_lookup(SM_PAT_CAPTURE),
                                 l, kind, anno);
@@ -1717,8 +1744,8 @@ static int emit_sm_pat_capture_fn(FILE *out, const SM_Instr *ins, int pc)
     const char *nl = pat_arg_label(nl_lbl,    sizeof(nl_lbl),    ins->a[2].s);
     int is_imm = (int)ins->a[1].i;
     snprintf(anno, sizeof(anno),
-             "# SM_PAT_CAPTURE_FN fname=%s is_imm=%d namelist=%s",
-             fl ? ins->a[0].s : "(NULL)", is_imm,
+             "fname=%s namelist=%s",
+             fl ? ins->a[0].s : "(NULL)",
              nl ? ins->a[2].s : "(NULL)");
     return sm_emit_capture_fn(out, sm_template_lookup(SM_PAT_CAPTURE_FN),
                               fl, is_imm, nl, anno);
@@ -1732,9 +1759,8 @@ static int emit_sm_pat_capture_fn_args(FILE *out, const SM_Instr *ins, int pc)
     const char *fl = pat_arg_label(fname_lbl, sizeof(fname_lbl), ins->a[0].s);
     int is_imm = (int)ins->a[1].i;
     int nargs  = (int)ins->a[2].i;
-    snprintf(anno, sizeof(anno),
-             "# SM_PAT_CAPTURE_FN_ARGS fname=%s is_imm=%d nargs=%d",
-             fl ? ins->a[0].s : "(NULL)", is_imm, nargs);
+    snprintf(anno, sizeof(anno), "fname=%s",
+             fl ? ins->a[0].s : "(NULL)");
     return sm_emit_capture_fn_args(out,
                                    sm_template_lookup(SM_PAT_CAPTURE_FN_ARGS),
                                    fl, is_imm, nargs, anno);
@@ -1747,12 +1773,11 @@ static int emit_sm_pat_usercall(FILE *out, const SM_Instr *ins, int pc)
     char lbl[64], anno[128];
     const char *l = pat_arg_label(lbl, sizeof(lbl), ins->a[0].s);
     if (l) {
-        snprintf(anno, sizeof(anno), "# SM_PAT_USERCALL fname=\"%.40s\"%s",
+        snprintf(anno, sizeof(anno), "fname=\"%.40s\"%s",
                  ins->a[0].s, (strlen(ins->a[0].s) > 40) ? "..." : "");
-    } else {
-        snprintf(anno, sizeof(anno), "# SM_PAT_USERCALL fname=NULL");
+        return sm_emit_lblopt(out, sm_template_lookup(SM_PAT_USERCALL), l, anno);
     }
-    return sm_emit_lblopt(out, sm_template_lookup(SM_PAT_USERCALL), l, anno);
+    return sm_emit_lblopt(out, sm_template_lookup(SM_PAT_USERCALL), l, NULL);
 }
 
 /* SM_PAT_USERCALL_ARGS: a[0].s=fname, a[1].i=nargs. */
@@ -1763,30 +1788,26 @@ static int emit_sm_pat_usercall_args(FILE *out, const SM_Instr *ins, int pc)
     const char *l = pat_arg_label(lbl, sizeof(lbl), ins->a[0].s);
     int nargs = (int)ins->a[1].i;
     if (l) {
-        snprintf(anno, sizeof(anno),
-                 "# SM_PAT_USERCALL_ARGS fname=\"%.40s\" nargs=%d",
-                 ins->a[0].s, nargs);
-    } else {
-        snprintf(anno, sizeof(anno),
-                 "# SM_PAT_USERCALL_ARGS fname=NULL nargs=%d", nargs);
+        snprintf(anno, sizeof(anno), "fname=\"%.40s\"", ins->a[0].s);
+        return sm_emit_lblopt_int32(out, sm_template_lookup(SM_PAT_USERCALL_ARGS),
+                                    l, nargs, anno);
     }
     return sm_emit_lblopt_int32(out, sm_template_lookup(SM_PAT_USERCALL_ARGS),
-                                l, nargs, anno);
+                                l, nargs, NULL);
 }
 
 /* SM_PAT_<no-arg>: dispatch via template lookup.  Each NULLARY-shape
  * pattern opcode (SPAN/BREAK/ANY/NOTANY/LEN/POS/RPOS/TAB/RTAB/ARB/
  * ARBNO/REM/FENCE/FENCE1/FAIL/ABORT/SUCCEED/BAL/EPS/CAT/ALT/DEREF/
  * BOXVAL) has its own template entry; sm_template_lookup picks the
- * right one and sm_emit_nullary writes the macro call. */
+ * right one and sm_emit_nullary writes the macro call.  No annotation
+ * needed — the macro name in col 2 is self-describing. */
 static int emit_sm_pat_noarg(FILE *out, sm_opcode_t op, int pc)
 {
     (void)pc;
     const sm_op_template_t *t = sm_template_lookup(op);
     if (!t) return -1;
-    char anno[64];
-    snprintf(anno, sizeof(anno), "# %s", sm_opcode_name(op));
-    return sm_emit_nullary(out, t, anno);
+    return sm_emit_nullary(out, t, NULL);
 }
 
 /* SM_EXEC_STMT for a variant pattern: emit a scrip_rt_match_variant call.
@@ -1804,11 +1825,9 @@ static int emit_sm_exec_stmt_variant(FILE *out, const SM_Instr *ins, int pc)
      * shape (LBLOPT for subj + int for has_repl). */
     char anno[128];
     if (l) {
-        snprintf(anno, sizeof(anno),
-                 "# SM_EXEC_STMT_VARIANT subj=%s has_repl=%d", sname, has_repl);
+        snprintf(anno, sizeof(anno), "subj=%s", sname);
     } else {
-        snprintf(anno, sizeof(anno),
-                 "# SM_EXEC_STMT_VARIANT subj=NULL has_repl=%d", has_repl);
+        anno[0] = '\0';
     }
     /* Order: lbl then has_repl in template; sm_emit_exec_var packs
      * them into args->lbl and args->i32_a.  But we need the
@@ -1816,7 +1835,7 @@ static int emit_sm_exec_stmt_variant(FILE *out, const SM_Instr *ins, int pc)
     sm_emit_args_t a = { 0 };
     a.lbl   = l;
     a.i32_a = has_repl;
-    a.anno  = anno;
+    a.anno  = anno[0] ? anno : NULL;
     return sm_emit_template(out, sm_template_lookup(SM_EXEC_STMT), &a);
 }
 
@@ -1828,12 +1847,10 @@ static int emit_sm_exec_stmt_variant(FILE *out, const SM_Instr *ins, int pc)
 static int emit_sm_unhandled(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    /* SM_UNHANDLED template: trap with the opcode int as edi.  The
-     * macro's body matches what the legacy two-line emit produced
-     * (mov edi, op / call scrip_rt_unhandled_op@PLT), so bytes are
-     * identical -- single source of truth in g_tpl_unhandled. */
+    /* SM_UNHANDLED template: trap with the opcode int as edi.  Annotation
+     * names the actual opcode -- the integer in args is opaque otherwise. */
     char anno[64];
-    snprintf(anno, sizeof(anno), "# %s", sm_opcode_name(ins->op));
+    snprintf(anno, sizeof(anno), "%s", sm_opcode_name(ins->op));
     sm_emit_args_t a = { 0 };
     a.i32_a = (int)ins->op;
     a.anno  = anno;
@@ -1871,7 +1888,7 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
                 "(working directory writable?)\n");
         return -1;
     }
-    if (fputs("\t.include \"sm_macros.s\"\n", out) == EOF) return -1;
+    if (emit_three_column_line(out, "", ".include", "\"sm_macros.s\"", NULL) != 0) return -1;
 
     /* EM-6: collect all string literals and variable names into the string
      * table, then emit them in .section .rodata before .text.  This makes
@@ -1982,7 +1999,7 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
             case SM_PUSH_LIT_S:   rc = emit_sm_push_lit_s(out, ins, pc); break;
             case SM_PUSH_VAR:     rc = emit_sm_push_var(out, ins, pc);   break;
             case SM_STORE_VAR:    rc = emit_sm_store_var(out, ins, pc);  break;
-            case SM_POP:          rc = emit_sm_pop(out, pc);             break;
+            case SM_VOID_POP:          rc = emit_sm_pop(out, pc);             break;
             case SM_ADD:
             case SM_SUB:
             case SM_MUL:
@@ -2002,9 +2019,9 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
             case SM_CALL_CHUNK:   rc = emit_sm_call_chunk(out, ins, pc); break;
             case SM_RETURN:       rc = emit_sm_return(out, pc);          break;
 
-            /* EM-7-pre keepers: SM_CALL (general) + SM_CONCAT + SM_PUSH_NULL +
+            /* EM-7-pre keepers: SM_CALL_FN (general) + SM_CONCAT + SM_PUSH_NULL +
              * SM_COERCE_NUM + conditional return variants. */
-            case SM_CALL:         rc = emit_sm_call(out, ins, pc);       break;
+            case SM_CALL_FN:         rc = emit_sm_call(out, ins, pc);       break;
             case SM_CONCAT:       rc = emit_sm_concat(out, pc);          break;
             case SM_PUSH_NULL:    rc = emit_sm_push_null(out, pc);       break;
             case SM_COERCE_NUM:   rc = emit_sm_coerce_num(out, pc);      break;

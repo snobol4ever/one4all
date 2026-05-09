@@ -32,7 +32,7 @@
  *   scrip_rt_arith     — binary arithmetic (ADD/SUB/MUL/DIV/MOD)
  *   scrip_rt_nv_get    — load named variable onto stack (real in EM-6)
  *   scrip_rt_nv_set    — store TOS into named variable  (real in EM-6)
- *   scrip_rt_pop_void  — pop and discard TOS (SM_POP)
+ *   scrip_rt_pop_void  — pop and discard TOS (SM_VOID_POP)
  *
  * EM-4 surface:
  *   scrip_rt_last_ok     — read success flag (SM_JUMP_S / SM_JUMP_F)
@@ -112,7 +112,7 @@ void scrip_rt_pop_descr(DESCR_t *out);       /* pop TOS into *out (SM_STORE_VAR)
 void scrip_rt_arith(int op);                 /* SM_ADD=17 SUB=18 MUL=19 DIV=20 MOD=22 */
 void scrip_rt_nv_get(const char *name);      /* push value of named variable */
 void scrip_rt_nv_set(const char *name);      /* pop TOS -> named variable */
-void scrip_rt_pop_void(void);                /* pop and discard TOS (SM_POP) */
+void scrip_rt_pop_void(void);                /* pop and discard TOS (SM_VOID_POP) */
 
 /* ── EM-4 surface ────────────────────────────────────────────────────── */
 
@@ -215,7 +215,7 @@ void scrip_rt_push_null(void);
 /* SM_COERCE_NUM: pop TOS, coerce string→int/real if needed, push result. */
 void scrip_rt_coerce_num(void);
 
-/* SM_CALL: general function call.
+/* SM_CALL_FN: general function call.
  * name:  function name (INDIR_GET / NAME_PUSH / IDX / ... or user/builtin).
  * nargs: number of arguments already popped from SM vstack into the runtime's
  *        internal arg buffer by the emitter's call-setup sequence.

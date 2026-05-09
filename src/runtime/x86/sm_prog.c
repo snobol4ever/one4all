@@ -164,7 +164,7 @@ static const char *opnames[SM_OPCODE_COUNT] = {
     "SM_LABEL","SM_JUMP","SM_JUMP_S","SM_JUMP_F","SM_HALT",
     "SM_STNO",
     "SM_PUSH_LIT_S","SM_PUSH_LIT_I","SM_PUSH_LIT_F","SM_PUSH_NULL","SM_PUSH_NULL_NOFLIP",
-    "SM_PUSH_VAR","SM_PUSH_EXPR","SM_PUSH_CHUNK","SM_CALL_CHUNK","SM_STORE_VAR","SM_POP",
+    "SM_PUSH_VAR","SM_PUSH_EXPR","SM_PUSH_CHUNK","SM_CALL_CHUNK","SM_STORE_VAR","SM_VOID_POP",
     "SM_ADD","SM_SUB","SM_MUL","SM_DIV","SM_EXP","SM_MOD","SM_CONCAT","SM_COERCE_NUM","SM_NEG",
     "SM_PAT_LIT","SM_PAT_ANY","SM_PAT_NOTANY","SM_PAT_SPAN","SM_PAT_BREAK",
     "SM_PAT_LEN","SM_PAT_POS","SM_PAT_RPOS","SM_PAT_TAB","SM_PAT_RTAB",
@@ -177,7 +177,7 @@ static const char *opnames[SM_OPCODE_COUNT] = {
     "SM_PAT_USERCALL_ARGS",
     "SM_EXEC_STMT",
     "SM_BB_PUMP","SM_BB_ONCE","SM_BB_ONCE_PROC","SM_BB_PUMP_PROC","SM_BB_PUMP_CASE","SM_BB_PUMP_SM",
-    "SM_CALL","SM_RETURN","SM_FRETURN","SM_NRETURN",
+    "SM_CALL_FN","SM_RETURN","SM_FRETURN","SM_NRETURN",
     "SM_RETURN_S","SM_RETURN_F","SM_FRETURN_S","SM_FRETURN_F","SM_NRETURN_S","SM_NRETURN_F",
     "SM_DEFINE",
     "SM_JUMP_INDIR","SM_SELBRA",
@@ -265,7 +265,7 @@ void sm_prog_print(const SM_Program *p, FILE *out)
                 if (in->a[0].s) fprintf(out, " s=\"%s\"", in->a[0].s);
                 fprintf(out, " nargs=%lld", (long long)in->a[1].i);
                 break;
-            case SM_CALL:
+            case SM_CALL_FN:
                 fprintf(out, " s=\"%s\" nargs=%lld",
                     in->a[0].s ? in->a[0].s : "?",
                     (long long)in->a[1].i);

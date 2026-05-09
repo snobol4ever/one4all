@@ -48,7 +48,7 @@
  *   Outer chunk_A calls inner chunk_B (returns 7), adds 6, returns 13.
  *   main calls chunk_A and HALTs with the returned value as rc.
  *   Exercises SM_CALL_CHUNK (baked direct call), SM_RETURN (native ret),
- *   and SM_POP/SM_ADD already covered.
+ *   and SM_VOID_POP/SM_ADD already covered.
  *   Expected exit code: 13.
  *
  * EM-5b program (argv[6]):  SM_PUSH_CHUNK descriptor-push round trip
@@ -247,7 +247,7 @@ int main(int argc, char **argv)
         if (!p) { fprintf(stderr, "sm_prog_new failed\n"); return 1; }
 
         sm_emit_i(p, SM_PUSH_LIT_I, 0);          /* pc=0  seed */
-        sm_emit(p,   SM_POP);                    /* pc=1  clean stack */
+        sm_emit(p,   SM_VOID_POP);                    /* pc=1  clean stack */
         int j_main = sm_emit_i(p, SM_JUMP, 0);   /* pc=2  patch later */
         int L_b    = sm_label(p);                /* pc=3  chunk_B entry */
         sm_emit_i(p, SM_PUSH_LIT_I, 7);          /* pc=4 */
@@ -276,7 +276,7 @@ int main(int argc, char **argv)
     /* EM-5b program: SM_PUSH_CHUNK descriptor-push round trip.
      *
      * Pushes a chunk descriptor (entry_pc=99, arity=2) then pops it
-     * via SM_POP.  Then pushes 21 + HALT, exits rc=21.  The point is
+     * via SM_VOID_POP.  Then pushes 21 + HALT, exits rc=21.  The point is
      * to exercise the scrip_rt_push_chunk_descr@PLT call path so the
      * gate's grep-shape check has something to look at.
      *
@@ -290,7 +290,7 @@ int main(int argc, char **argv)
         if (!p) { fprintf(stderr, "sm_prog_new failed\n"); return 1; }
 
         sm_emit_ii(p, SM_PUSH_CHUNK, 99, 2);    /* pc=0 */
-        sm_emit(p,   SM_POP);                    /* pc=1 */
+        sm_emit(p,   SM_VOID_POP);                    /* pc=1 */
         sm_emit_i(p, SM_PUSH_LIT_I, 21);         /* pc=2 */
         sm_emit(p,   SM_HALT);                   /* pc=3 rc=21 */
 
