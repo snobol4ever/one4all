@@ -30,8 +30,8 @@
  * Milestone: M-G1-IR-HEADER-DEF
  */
 
-#ifndef IR_H
-#define IR_H
+#ifndef AST_H
+#define AST_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -392,4 +392,4 @@ static const char * const ast_e_name[AST_KIND_COUNT] = {
 }
 #endif
 
-#endif /* IR_H */
+#endif /* AST_H */

@@ -240,11 +240,11 @@ int ir_verify_program(const CODE_t *prog, FILE *err) {
 }
 
 /* -------------------------------------------------------------------------
- * Unit test — compiled when IR_VERIFY_TEST is defined.
+ * Unit test — compiled when AST_VERIFY_TEST is defined.
  * Build: gcc -I src -I src/frontend/snobol4 -DIR_VERIFY_TEST \
  *             src/ast/ast_verify.c -o /tmp/ir_verify_test
  * ---------------------------------------------------------------------- */
-#ifdef IR_VERIFY_TEST
+#ifdef AST_VERIFY_TEST
 
 #include <stdlib.h>
 #include <assert.h>
@@ -333,4 +333,4 @@ int main(void) {
             failures == 0 ? "ALL PASS" : "FAILURES PRESENT", failures);
     return failures ? 1 : 0;
 }
-#endif /* IR_VERIFY_TEST */
+#endif /* AST_VERIFY_TEST */

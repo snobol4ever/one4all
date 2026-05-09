@@ -75,8 +75,8 @@
  * Additions are backward-compatible; signatures must not change.
  */
 
-#ifndef SCRIP_RT_H
-#define SCRIP_RT_H
+#ifndef RT_H
+#define RT_H
 
 #include <stdint.h>
 
@@ -277,4 +277,4 @@ void rt_init_arbno(void **slot_ptr, void *child_fn);
 }
 #endif
 
-#endif /* SCRIP_RT_H */
+#endif /* RT_H */

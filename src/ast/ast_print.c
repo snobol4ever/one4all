@@ -31,7 +31,7 @@
  * ---------------------------------------------------------------------- */
 
 /* Maximum recursion depth before we truncate with "..." */
-#define IR_PRINT_MAX_DEPTH 64
+#define AST_PRINT_MAX_DEPTH 64
 
 /* -------------------------------------------------------------------------
  * Internal helpers
@@ -65,7 +65,7 @@ static void print_indent(int depth, FILE *f) {
 /* Core recursive printer */
 static void print_node(const AST_t *e, FILE *f, int depth) {
     if (!e) { fputs("(null)", f); return; }
-    if (depth > IR_PRINT_MAX_DEPTH) { fputs("(...)", f); return; }
+    if (depth > AST_PRINT_MAX_DEPTH) { fputs("(...)", f); return; }
 
     /* Node kind name */
     const char *kname = (e->kind >= 0 && e->kind < AST_KIND_COUNT)
@@ -163,11 +163,11 @@ void ir_print_node_nl(const AST_t *e, FILE *f) {
 }
 
 /* -------------------------------------------------------------------------
- * Unit test — compiled when IR_PRINT_TEST is defined.
+ * Unit test — compiled when AST_PRINT_TEST is defined.
  * Build: gcc -I src -I src/frontend/snobol4 -DIR_PRINT_TEST \
  *             src/ast/ast_print.c -o /tmp/ir_print_test
  * ---------------------------------------------------------------------- */
-#ifdef IR_PRINT_TEST
+#ifdef AST_PRINT_TEST
 
 /* Minimal AST_t for test — mirrors scrip-cc.h fields we use */
 #include <stdlib.h>
@@ -239,4 +239,4 @@ int main(void) {
     fputs("\n=== PASS ===\n", stdout);
     return 0;
 }
-#endif /* IR_PRINT_TEST */
+#endif /* AST_PRINT_TEST */
