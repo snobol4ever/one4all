@@ -221,4 +221,23 @@ void bb_text_label(bb_label_t *lbl);
 /* Emit a comment line (text mode only) */
 void bb_text_comment(const char *fmt, ...);
 
+/* ── BB three-column line emission (EM-7c-bb-three-column) ──────────────────
+ *
+ *   LABEL: ; ACTION ; GOTO
+ *
+ * Widths: label=24, action=16, goto=free.  Separators: " ; " between
+ * columns.  GAS interprets `;` as a statement separator on x86, so
+ * empty fields parse as empty statements (legal).  Used for BB-box
+ * body lines emitted via emitter_text.c, bb_emit.c text helpers, and
+ * bb_flat.c EV_TEXT blocks.
+ *
+ * NULL or "" arguments render as the right amount of whitespace.
+ * `bb3c_text` (text mode only) writes one line; no-op in binary mode.
+ *
+ * `bb3c_format` is a re-usable formatter for callers that already
+ * have a FILE*; it does NOT route through bb_emit_mode.
+ */
+void bb3c_text(const char *label, const char *action, const char *goto_);
+void bb3c_format(FILE *out, const char *label, const char *action, const char *goto_);
+
 #endif /* BB_EMIT_H */

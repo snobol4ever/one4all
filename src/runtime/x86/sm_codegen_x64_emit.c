@@ -621,9 +621,10 @@ static int emit_major_break(FILE *out, int stno, int lineno,
                             const char *src_text)
 {
     /* Bracket bar at column 0, full width 78 (matches GNU-as
-     * convention; '#' is the line-comment introducer). */
+     * convention; '#' is the line-comment introducer).  No leading
+     * '\n' — blank lines are not emitted. */
     if (fputs(
-        "\n# ============================================================================\n",
+        "# ============================================================================\n",
         out) == EOF) return -1;
     if (src_text && *src_text) {
         if (fprintf(out, "# stmt %d  (line %d):  %s\n",
@@ -755,12 +756,12 @@ static int emit_sm_pop(FILE *out, int pc)
 static int emit_sm_arith(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    /* SM_ARITH op  --  the op enum is baked into the template's
-     * const_a; renderer reads it.  Annotation is the opcode mnemonic. */
+    /* EM-7c-bb-three-column follow-up: the per-op macros (ADD, SUB,
+     * MUL, DIV, MOD, EXP) carry the op name directly in col 2.  No
+     * # SM_ADD annotation needed — that would duplicate col 2. */
     const sm_op_template_t *t = sm_template_lookup(ins->op);
     if (!t) return -1;
     sm_emit_args_t a = { 0 };
-    a.anno = sm_opcode_name(ins->op);
     return sm_emit_template(out, t, &a);
 }
 
@@ -1564,7 +1565,6 @@ static int emit_pattern_blobs(FILE *out)
     bb_build_flat_text_reset();
 
     if (fputs(
-        "\n"
         "# ============================================================================\n"
         "# EM-7c: invariant pattern blobs (baked from sm_phase2_to_patnd → bb_build_flat_text)\n"
         "# Each block exposes _pat_inv_<id>_α / _β / _γ / _ω.\n"
@@ -1582,7 +1582,7 @@ static int emit_pattern_blobs(FILE *out)
         snprintf(prefix, sizeof(prefix), "_pat_inv_%d", w->pat_id);
 
         if (fprintf(out,
-            "\n# ---- pattern blob %d (Phase-2 window pc=%d..%d, SM_EXEC_STMT pc=%d) ----\n",
+            "# ---- pattern blob %d (Phase-2 window pc=%d..%d, SM_EXEC_STMT pc=%d) ----\n",
             w->pat_id, w->phase2_start, w->phase2_end - 1,
             w->exec_stmt_pc) < 0) return -1;
 

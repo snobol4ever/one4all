@@ -92,17 +92,21 @@ static const sm_op_template_t g_sm_templates[] = {
     { SM_CONCAT,       "CONCAT",       "scrip_rt_concat",       SM_TPL_NULLARY,    0, 0 },
     { SM_COERCE_NUM,   "COERCE_NUM",   "scrip_rt_coerce_num",   SM_TPL_NULLARY,    0, 0 },
 
-    /* Arithmetic.  All five share the same shape; they differ only in
-     * the op-enum baked into the call.  The macro takes a single arg
-     * (the op enum) so per-instruction sites can use the same macro.
-     * For human readability we ALSO emit per-op convenience macros
-     * (SM_ADD, SM_SUB, ...) that wrap SM_ARITH; see render_macro_body.
-     * The per-call site uses SM_ARITH directly with the op as arg. */
-    { SM_ADD,          "ARITH",        "scrip_rt_arith",        SM_TPL_ARITH,     SM_ADD, 0 },
-    { SM_SUB,          "ARITH",        "scrip_rt_arith",        SM_TPL_ARITH,     SM_SUB, 0 },
-    { SM_MUL,          "ARITH",        "scrip_rt_arith",        SM_TPL_ARITH,     SM_MUL, 0 },
-    { SM_DIV,          "ARITH",        "scrip_rt_arith",        SM_TPL_ARITH,     SM_DIV, 0 },
-    { SM_MOD,          "ARITH",        "scrip_rt_arith",        SM_TPL_ARITH,     SM_MOD, 0 },
+    /* Arithmetic.  EM-7c follow-up: each op gets its own named no-arg
+     * macro.  Op-enum is baked into the macro body via t->const_a, not
+     * passed at the call site, so col 2 carries the human-readable name
+     * directly — no opaque integer + # annotation.  All six map to one
+     * runtime helper (scrip_rt_arith).
+     *
+     * Suffix `_NUM` disambiguates from x86 mnemonics `add`, `sub`, `mul`,
+     * `div` (GAS macro-name match is case-insensitive against mnemonics).
+     * Same disambiguator pattern as VOID_POP (SM POP vs x86 pop) and
+     * CALL_FN (SM CALL vs x86 call) from the prior rung. */
+    { SM_ADD,          "ADD_NUM",      "scrip_rt_arith",        SM_TPL_ARITH,     SM_ADD, 0 },
+    { SM_SUB,          "SUB_NUM",      "scrip_rt_arith",        SM_TPL_ARITH,     SM_SUB, 0 },
+    { SM_MUL,          "MUL_NUM",      "scrip_rt_arith",        SM_TPL_ARITH,     SM_MUL, 0 },
+    { SM_DIV,          "DIV_NUM",      "scrip_rt_arith",        SM_TPL_ARITH,     SM_DIV, 0 },
+    { SM_MOD,          "MOD_NUM",      "scrip_rt_arith",        SM_TPL_ARITH,     SM_MOD, 0 },
 
     /* Control flow */
     { SM_JUMP,         "JUMP",         NULL,                    SM_TPL_PCREF_JMP,  0, 0 },
@@ -340,9 +344,16 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
         return 0;
 
     case SM_TPL_ARITH:
-        snprintf(macro_def, sizeof(macro_def), "%s op", t->macro_name);
+        /* EM-7c-bb-three-column follow-up: each arithmetic SM op gets its
+         * own named no-arg macro (ADD_NUM, SUB_NUM, MUL_NUM, DIV_NUM,
+         * MOD_NUM).  Op enum is baked into the macro body via t->const_a;
+         * caller writes just "ADD_NUM" in col 2 — no opaque "ARITH 17"
+         * with redundant "# SM_ADD" annotation.  Suffix avoids collision
+         * with x86 mnemonics `add`/`sub`/`mul`/`div`. */
+        snprintf(macro_def, sizeof(macro_def), "%s", t->macro_name);
         macro_line(out, "", ".macro", macro_def);
-        macro_line(out, "", "mov", "edi, \\op");
+        { char op_arg[32]; snprintf(op_arg, sizeof(op_arg), "edi, %d", t->const_a);
+          macro_line(out, "", "mov", op_arg); }
         { char ct[64]; snprintf(ct, sizeof(ct), "%s@PLT", t->runtime);
           macro_line(out, "", "call", ct); }
         macro_line(out, "", ".endm", "");
@@ -517,7 +528,8 @@ static int build_args_col(char *buf, int cap, const sm_op_template_t *t,
             n = snprintf(buf, cap, "%d", args->i32_a);
         break;
     case SM_TPL_ARITH:
-        n = snprintf(buf, cap, "%d", t->const_a);
+        /* No args; op-enum is baked into the macro body. */
+        n = snprintf(buf, cap, "");
         break;
     case SM_TPL_PCREF_JMP:
     case SM_TPL_PCREF_COND:

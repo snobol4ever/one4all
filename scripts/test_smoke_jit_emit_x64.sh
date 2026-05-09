@@ -166,9 +166,14 @@ set -e
 if [ "$RC" -ne 20 ]; then
     echo "FAIL em3 expected rc=20 got rc=$RC"; exit 1
 fi
-# Asm-content sanity: ARITH is the shared macro for SM_ADD/SUB/MUL/DIV/MOD;
-# the call site emits `ARITH <op>` where <op> is the operator opcode constant.
-grep -qE '^\.Lpc[0-9]+:[[:space:]]+ARITH[[:space:]]+'   "$TMP/em3.s" || { echo "FAIL no ARITH macro call in em3 asm"; exit 1; }
+# Asm-content sanity: each arithmetic op is its own named no-arg macro now
+# (EM-7c-bb-three-column follow-up: ADD_NUM, SUB_NUM, MUL_NUM, DIV_NUM,
+# MOD_NUM — opcode name lives in col 2 directly, no opaque "ARITH 17 #
+# SM_ADD" form).  Suffix `_NUM` avoids collision with x86 add/sub/mul/div
+# mnemonics (GAS macro-name match is case-insensitive).
+# The em3 program is (2+3)*4 — must contain at least ADD_NUM and MUL_NUM.
+grep -qE '^\.Lpc[0-9]+:[[:space:]]+ADD_NUM\b' "$TMP/em3.s" || { echo "FAIL no ADD_NUM macro call in em3 asm"; exit 1; }
+grep -qE '^\.Lpc[0-9]+:[[:space:]]+MUL_NUM\b' "$TMP/em3.s" || { echo "FAIL no MUL_NUM macro call in em3 asm"; exit 1; }
 grep -q "scrip_rt_arith@PLT" "$ROOT/sm_macros.s" || { echo "FAIL no arith PLT call in sm_macros.s"; exit 1; }
 echo "  PASS EM-3 arithmetic  ((2+3)*4=20; emit->link->run verified)"
 

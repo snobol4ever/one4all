@@ -1,15 +1,26 @@
 /*
  * emitter_text.c — GAS/text-mode implementation of emitter_v
  *
- * emit_insn renders each bb_insn_desc_t as a single readable GAS line
- * using Intel syntax (matching .intel_syntax noprefix in the .s preamble).
- * No .byte walls — every instruction is a real mnemonic.
+ * EM-7c-bb-three-column (2026-05-09):
+ *   Every BB-box body line emits in three-column shape
  *
- * Authors: Lon Jones Cherryholmes · Claude Sonnet 4.6
- * Sprint:  EM-7b'' / GOAL-MODE4-EMIT
+ *     LABEL:                   ; ACTION           ; GOTO
+ *     col 1 (24 wide)          ; col 2 (16 wide)  ; col 3 (free)
+ *
+ *   Separators are literal ` ; ` (GAS: ; is statement separator on x86).
+ *   text_label_define   → label-only line (cols 2+3 empty)
+ *   text_emit_insn      → action-only line (cols 1+3 empty)
+ *   text_emit_jmp       → goto-only line  (cols 1+2 empty)
+ *
+ *   No .byte walls — every instruction is a real mnemonic.  Greek-only
+ *   port names; `bb`/`BB` prefix banned (no Latin alpha/beta...).
+ *
+ * Authors: Lon Jones Cherryholmes · Claude Sonnet
+ * Sprint:  EM-7b'' / EM-7c-bb-three-column / GOAL-MODE4-EMIT
  */
 
 #include "emitter_v.h"
+#include "bb_emit.h"     /* bb3c_format */
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
@@ -18,79 +29,105 @@ typedef struct { FILE *out; int pos; } text_ctx_t;
 #define CTX(e) ((text_ctx_t *)((e)->ctx))
 static FILE *outf(emitter_v *e) { FILE *f = CTX(e)->out; return f ? f : stdout; }
 
-/* ── emit_insn: one GAS line per instruction ─────────────────────────────── */
+/* ── three-column shorthands ──────────────────────────────────────────────── */
+
+static void emit3c_action(emitter_v *e, const char *fmt, ...)
+{
+    char buf[256];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
+    bb3c_format(outf(e), "", buf, "");
+}
+
+static void emit3c_goto(emitter_v *e, const char *fmt, ...)
+{
+    char buf[256];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
+    bb3c_format(outf(e), "", "", buf);
+}
+
+/* ── emit_insn: one three-column line per instruction (action column) ─────── */
 
 static void text_emit_insn(emitter_v *e, const bb_insn_desc_t *d)
 {
-    FILE *f = outf(e);
     uint64_t a0 = d->a0;
     uint32_t a1 = d->a1;
     uint8_t  a2 = d->a2;
 
     switch (d->kind) {
     /* 64-bit reg ← imm64 */
-    case BB_INSN_MOV_R10_IMM64: fprintf(f,"    mov     r10, 0x%llx\n",(unsigned long long)a0); CTX(e)->pos+=10; break;
-    case BB_INSN_MOV_RAX_IMM64: fprintf(f,"    mov     rax, 0x%llx\n",(unsigned long long)a0); CTX(e)->pos+=10; break;
-    case BB_INSN_MOV_RDI_IMM64: fprintf(f,"    mov     rdi, 0x%llx\n",(unsigned long long)a0); CTX(e)->pos+=10; break;
-    case BB_INSN_MOV_RSI_IMM64: fprintf(f,"    mov     rsi, 0x%llx\n",(unsigned long long)a0); CTX(e)->pos+=10; break;
-    case BB_INSN_MOV_RDX_IMM64: fprintf(f,"    mov     rdx, 0x%llx\n",(unsigned long long)a0); CTX(e)->pos+=10; break;
-    case BB_INSN_MOV_RCX_IMM64: fprintf(f,"    mov     rcx, 0x%llx\n",(unsigned long long)a0); CTX(e)->pos+=10; break;
+    case BB_INSN_MOV_R10_IMM64: emit3c_action(e,"mov     r10, 0x%llx",(unsigned long long)a0); CTX(e)->pos+=10; break;
+    case BB_INSN_MOV_RAX_IMM64: emit3c_action(e,"mov     rax, 0x%llx",(unsigned long long)a0); CTX(e)->pos+=10; break;
+    case BB_INSN_MOV_RDI_IMM64: emit3c_action(e,"mov     rdi, 0x%llx",(unsigned long long)a0); CTX(e)->pos+=10; break;
+    case BB_INSN_MOV_RSI_IMM64: emit3c_action(e,"mov     rsi, 0x%llx",(unsigned long long)a0); CTX(e)->pos+=10; break;
+    case BB_INSN_MOV_RDX_IMM64: emit3c_action(e,"mov     rdx, 0x%llx",(unsigned long long)a0); CTX(e)->pos+=10; break;
+    case BB_INSN_MOV_RCX_IMM64: emit3c_action(e,"mov     rcx, 0x%llx",(unsigned long long)a0); CTX(e)->pos+=10; break;
     /* 32-bit reg ← imm32 */
-    case BB_INSN_MOV_ESI_IMM32: fprintf(f,"    mov     esi, %u\n",  a1); CTX(e)->pos+=5; break;
-    case BB_INSN_MOV_EAX_IMM32: fprintf(f,"    mov     eax, %u\n",  a1); CTX(e)->pos+=5; break;
-    case BB_INSN_ADD_EAX_IMM32: fprintf(f,"    add     eax, %u\n",  a1); CTX(e)->pos+=5; break;
-    case BB_INSN_SUB_EAX_IMM32: fprintf(f,"    sub     eax, %u\n",  a1); CTX(e)->pos+=5; break;
-    case BB_INSN_CMP_EAX_IMM32: fprintf(f,"    cmp     eax, %u\n",  a1); CTX(e)->pos+=5; break;
-    case BB_INSN_CMP_ESI_IMM8:  fprintf(f,"    cmp     esi, %u\n", (unsigned)a2); CTX(e)->pos+=3; break;
+    case BB_INSN_MOV_ESI_IMM32: emit3c_action(e,"mov     esi, %u",  a1); CTX(e)->pos+=5; break;
+    case BB_INSN_MOV_EAX_IMM32: emit3c_action(e,"mov     eax, %u",  a1); CTX(e)->pos+=5; break;
+    case BB_INSN_ADD_EAX_IMM32: emit3c_action(e,"add     eax, %u",  a1); CTX(e)->pos+=5; break;
+    case BB_INSN_SUB_EAX_IMM32: emit3c_action(e,"sub     eax, %u",  a1); CTX(e)->pos+=5; break;
+    case BB_INSN_CMP_EAX_IMM32: emit3c_action(e,"cmp     eax, %u",  a1); CTX(e)->pos+=5; break;
+    case BB_INSN_CMP_ESI_IMM8:  emit3c_action(e,"cmp     esi, %u", (unsigned)a2); CTX(e)->pos+=3; break;
     /* memory loads */
-    case BB_INSN_MOV_EAX_RCXMEM:   fprintf(f,"    mov     eax, [rcx]\n"); CTX(e)->pos+=2; break;
-    case BB_INSN_MOV_RAX_RCXMEM:   fprintf(f,"    mov     rax, [rcx]\n"); CTX(e)->pos+=3; break;
-    case BB_INSN_CMP_EAX_RCXMEM:   fprintf(f,"    cmp     eax, [rcx]\n"); CTX(e)->pos+=2; break;
-    case BB_INSN_MOV_EAX_R10MEM:   fprintf(f,"    mov     eax, [r10]\n"); CTX(e)->pos+=3; break;
-    case BB_INSN_MOV_R10MEM_EAX:   fprintf(f,"    mov     [r10], eax\n"); CTX(e)->pos+=3; break;
+    case BB_INSN_MOV_EAX_RCXMEM:   emit3c_action(e,"mov     eax, [rcx]"); CTX(e)->pos+=2; break;
+    case BB_INSN_MOV_RAX_RCXMEM:   emit3c_action(e,"mov     rax, [rcx]"); CTX(e)->pos+=3; break;
+    case BB_INSN_CMP_EAX_RCXMEM:   emit3c_action(e,"cmp     eax, [rcx]"); CTX(e)->pos+=2; break;
+    case BB_INSN_MOV_EAX_R10MEM:   emit3c_action(e,"mov     eax, [r10]"); CTX(e)->pos+=3; break;
+    case BB_INSN_MOV_R10MEM_EAX:   emit3c_action(e,"mov     [r10], eax"); CTX(e)->pos+=3; break;
     /* reg-reg */
-    case BB_INSN_MOV_ECX_EAX:      fprintf(f,"    mov     ecx, eax\n"); CTX(e)->pos+=2; break;
-    case BB_INSN_MOV_RDI_RAX:      fprintf(f,"    mov     rdi, rax\n"); CTX(e)->pos+=3; break;
-    case BB_INSN_MOV_RDX_RAX:      fprintf(f,"    mov     rdx, rax\n"); CTX(e)->pos+=3; break;
-    case BB_INSN_CMP_EAX_ECX:      fprintf(f,"    cmp     eax, ecx\n"); CTX(e)->pos+=2; break;
-    case BB_INSN_TEST_EAX_EAX:     fprintf(f,"    test    eax, eax\n"); CTX(e)->pos+=2; break;
-    case BB_INSN_TEST_RAX_RAX:     fprintf(f,"    test    rax, rax\n"); CTX(e)->pos+=3; break;
-    case BB_INSN_XOR_EDX_EDX:      fprintf(f,"    xor     edx, edx\n"); CTX(e)->pos+=2; break;
-    case BB_INSN_MOVSXD_RCX_R10MEM:fprintf(f,"    movsxd  rcx, dword ptr [r10]\n"); CTX(e)->pos+=3; break;
-    case BB_INSN_LEA_RAX_RAXRCX:   fprintf(f,"    lea     rax, [rax+rcx]\n"); CTX(e)->pos+=4; break;
+    case BB_INSN_MOV_ECX_EAX:      emit3c_action(e,"mov     ecx, eax"); CTX(e)->pos+=2; break;
+    case BB_INSN_MOV_RDI_RAX:      emit3c_action(e,"mov     rdi, rax"); CTX(e)->pos+=3; break;
+    case BB_INSN_MOV_RDX_RAX:      emit3c_action(e,"mov     rdx, rax"); CTX(e)->pos+=3; break;
+    case BB_INSN_CMP_EAX_ECX:      emit3c_action(e,"cmp     eax, ecx"); CTX(e)->pos+=2; break;
+    case BB_INSN_TEST_EAX_EAX:     emit3c_action(e,"test    eax, eax"); CTX(e)->pos+=2; break;
+    case BB_INSN_TEST_RAX_RAX:     emit3c_action(e,"test    rax, rax"); CTX(e)->pos+=3; break;
+    case BB_INSN_XOR_EDX_EDX:      emit3c_action(e,"xor     edx, edx"); CTX(e)->pos+=2; break;
+    case BB_INSN_MOVSXD_RCX_R10MEM:emit3c_action(e,"movsxd  rcx, dword ptr [r10]"); CTX(e)->pos+=3; break;
+    case BB_INSN_LEA_RAX_RAXRCX:   emit3c_action(e,"lea     rax, [rax+rcx]"); CTX(e)->pos+=4; break;
     /* control */
-    case BB_INSN_RET:      fprintf(f,"    ret\n"); CTX(e)->pos+=1; break;
-    case BB_INSN_CALL_RAX: fprintf(f,"    call    rax\n"); CTX(e)->pos+=2; break;
+    case BB_INSN_RET:      emit3c_action(e,"ret"); CTX(e)->pos+=1; break;
+    case BB_INSN_CALL_RAX: emit3c_action(e,"call    rax"); CTX(e)->pos+=2; break;
     /* EM-7c-symbolic: RIP-relative symbol load and PLT call */
     case BB_INSN_LEA_RCX_SYM:
-        fprintf(f,"    lea     rcx, [rip + %s]\n", d->sym ? d->sym : "??sym??");
+        emit3c_action(e,"lea     rcx, [rip + %s]", d->sym ? d->sym : "??sym??");
         CTX(e)->pos += 7; break;
     case BB_INSN_CALL_SYM_PLT:
-        fprintf(f,"    call    %s@PLT\n", d->sym ? d->sym : "??sym??");
+        emit3c_action(e,"call    %s@PLT", d->sym ? d->sym : "??sym??");
         CTX(e)->pos += 5; break;
     /* BB_INSN_LEA_R10_SYM: lea r10, [rip + sym]  (7 bytes) */
     case BB_INSN_LEA_R10_SYM:
-        fprintf(f,"    lea     r10, [rip + %s]\n", d->sym ? d->sym : "??sym??");
+        emit3c_action(e,"lea     r10, [rip + %s]", d->sym ? d->sym : "??sym??");
         CTX(e)->pos += 7; break;
     }
 }
 
-/* ── label_define ──────────────────────────────────────────────────────────── */
+/* ── label_define: pure-label line (cols 2+3 empty) ──────────────────────── */
 static void text_label_define(emitter_v *e, bb_label_t *lbl)
-{ fprintf(outf(e), "%s:\n", lbl->name); }
+{
+    char lbuf[256]; snprintf(lbuf, sizeof(lbuf), "%s:", lbl->name);
+    bb3c_format(outf(e), lbuf, "", "");
+}
 
-/* ── emit_jmp ──────────────────────────────────────────────────────────────── */
+/* ── emit_jmp: pure-goto line (cols 1+2 empty) ───────────────────────────── */
 static void text_emit_jmp(emitter_v *e, bb_label_t *target, jmp_kind_t kind)
 {
-    FILE *f = outf(e);
     const char *mn[] = {"jmp","je","jne","jl","jge","jg"};
-    fprintf(f, "    %-8s%s\n", mn[(int)kind < 6 ? (int)kind : 0], target->name);
+    emit3c_goto(e, "%-7s %s", mn[(int)kind < 6 ? (int)kind : 0], target->name);
     CTX(e)->pos += 6;
 }
 
-/* ── global_sym ────────────────────────────────────────────────────────────── */
+/* ── global_sym: directive line (action column) ──────────────────────────── */
 static void text_global_sym(emitter_v *e, const char *name)
-{ fprintf(outf(e), ".global %s\n", name); }
+{
+    char buf[256]; snprintf(buf, sizeof(buf), ".global %s", name);
+    bb3c_format(outf(e), "", buf, "");
+}
 
 /* ── fprintf_raw ───────────────────────────────────────────────────────────── */
 static void text_fprintf_raw(emitter_v *e, const char *fmt, ...)

@@ -28,6 +28,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include "bb_emit.h"   /* bb_label_t, bb_patch_kind_t, bb_buf_t */
 
 /* ── jump kind ────────────────────────────────────────────────────────────── */
@@ -168,6 +169,51 @@ int        emitter_end       (emitter_v *e);
 #define EV_JMP(e, lbl, kind)  (e)->emit_jmp((e), (lbl), (kind))
 #define EV_GLOBAL(e, name)    (e)->global_sym((e), (name))
 #define EV_TEXT(e, ...)       (e)->fprintf_raw((e), __VA_ARGS__)
+
+/* ── EM-7c-bb-three-column: shared formatters ───────────────────────────────
+ *
+ *   LABEL:                   ; ACTION           ; GOTO
+ *   col 1 (24 wide)          ; col 2 (16 wide)  ; col 3 (free)
+ *
+ * For TEXT-mode emitters; no-op (well, still routes through fprintf_raw)
+ * when called from BB-mode contexts.  The GAS `;` is a statement
+ * separator on x86 — empty fields parse as empty statements (legal).
+ */
+
+static inline void ev3c(emitter_v *e, const char *lbl, const char *act, const char *got)
+{
+    e->fprintf_raw(e, "%-24s ; %-16s ; %s\n",
+                   lbl ? lbl : "", act ? act : "", got ? got : "");
+}
+
+/* Action-only line (cols 1+3 empty). */
+static inline void ev3c_action_v(emitter_v *e, const char *fmt, ...)
+{
+    char buf[256];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
+    ev3c(e, "", buf, "");
+}
+
+/* Label-only line (cols 2+3 empty); appends `:` to the name. */
+static inline void ev3c_label(emitter_v *e, const char *name)
+{
+    char buf[256]; snprintf(buf, sizeof(buf), "%s:", name);
+    ev3c(e, buf, "", "");
+}
+
+/* Goto-only line (cols 1+2 empty). */
+static inline void ev3c_goto_v(emitter_v *e, const char *fmt, ...)
+{
+    char buf[256];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
+    ev3c(e, "", "", buf);
+}
 
 /* ── inline named helpers — the only API bb_flat.c uses ──────────────────── */
 /*
