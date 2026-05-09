@@ -145,18 +145,49 @@ void global_register(const char *name) {
 /* IC-9 (2026-05-01): per-(proc, var) static-variable storage.  Statics are
  * declared `static x;` inside a procedure; their values persist across calls
  * to that procedure but are scoped to the procedure (statics with the same
- * name in different procs do not share storage).  Keyed on the proc EXPR_t*
- * (unique per source procedure since icon_parse builds one node per proc). */
-typedef struct { EXPR_t *proc; const char *name; DESCR_t val; } static_ent_t;
+ * name in different procs do not share storage).
+ * CH-17g-statics: re-keyed off EXPR_t* onto (entry_pc, proc_name).
+ * Primary key: entry_pc >= 0  → (entry_pc, var_name)  — stable SM pc.
+ * Fallback key: entry_pc < 0  → (proc_name, var_name) — name string identity.
+ * The fallback covers procs not yet lowered through sm_lower (EXPR_t path still
+ * live in coro_call); it provides the same scoping guarantee that EXPR_t*
+ * pointer identity provided before, since proc names are interned and unique. */
+typedef struct {
+    int         entry_pc;   /* >= 0: primary key; < 0: use proc_name fallback */
+    const char *proc_name;  /* interned proc name; fallback key when entry_pc < 0 */
+    const char *name;       /* interned static variable name */
+    DESCR_t     val;
+} static_ent_t;
 #define STATIC_MAX 256
 static static_ent_t static_tab[STATIC_MAX];
 static int              static_n = 0;
 
+/* Look up entry_pc for a proc by name.  Returns -1 if not found or not yet
+ * resolved (entry_pc == -1 means sm_lower hasn't emitted its chunk yet). */
+static int static_proc_entry_pc(const char *proc_name) {
+    if (!proc_name) return -1;
+    for (int i = 0; i < proc_count; i++)
+        if (proc_table[i].name && strcmp(proc_table[i].name, proc_name) == 0)
+            return proc_table[i].entry_pc; /* -1 if not yet resolved */
+    return -1;
+}
+
+/* Match predicate: true when entry matches the (entry_pc, proc_name, var_name)
+ * triple under the primary-or-fallback keying rules. */
+static int static_entry_matches(const static_ent_t *e, int epc,
+                                const char *pname, const char *vname) {
+    if (!e->name || !vname || strcmp(e->name, vname) != 0) return 0;
+    if (epc >= 0 && e->entry_pc >= 0) return e->entry_pc == epc;
+    /* fallback: both have entry_pc < 0 — match by proc_name */
+    return e->proc_name && pname && strcmp(e->proc_name, pname) == 0;
+}
+
 int static_get(EXPR_t *proc, const char *name, DESCR_t *out) {
     if (!proc || !name || !out) return 0;
+    const char *pname = proc->sval;
+    int epc = static_proc_entry_pc(pname);
     for (int i = 0; i < static_n; i++) {
-        if (static_tab[i].proc == proc && static_tab[i].name &&
-            strcmp(static_tab[i].name, name) == 0) {
+        if (static_entry_matches(&static_tab[i], epc, pname, name)) {
             *out = static_tab[i].val;
             return 1;
         }
@@ -166,17 +197,22 @@ int static_get(EXPR_t *proc, const char *name, DESCR_t *out) {
 
 void static_set(EXPR_t *proc, const char *name, DESCR_t val) {
     if (!proc || !name) return;
+    const char *pname = proc->sval;
+    int epc = static_proc_entry_pc(pname);
     for (int i = 0; i < static_n; i++) {
-        if (static_tab[i].proc == proc && static_tab[i].name &&
-            strcmp(static_tab[i].name, name) == 0) {
+        if (static_entry_matches(&static_tab[i], epc, pname, name)) {
+            /* Update entry_pc if it was just resolved (previously -1) */
+            if (epc >= 0 && static_tab[i].entry_pc < 0)
+                static_tab[i].entry_pc = epc;
             static_tab[i].val = val;
             return;
         }
     }
     if (static_n >= STATIC_MAX) return;
-    static_tab[static_n].proc = proc;
-    static_tab[static_n].name = name;
-    static_tab[static_n].val  = val;
+    static_tab[static_n].entry_pc  = epc;
+    static_tab[static_n].proc_name = pname;
+    static_tab[static_n].name      = name;
+    static_tab[static_n].val       = val;
     static_n++;
 }
 
