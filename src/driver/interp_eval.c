@@ -340,6 +340,159 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
         *out = nargs > 0 ? args[nargs-1] : NULVCL;
         return 1;
     }
+    /* CH-17g-runtime-bridge-3 (2026-05-09): single-arg pure value-transforms.
+     * Each branch is a verbatim copy of the equivalent in-eval branch, with
+     * `interp_eval(e->children[i])` replaced by `args[i-1]` (already
+     * pre-evaluated by the SM_CALL_FN handler).  No EXPR_t access.
+     *
+     * Builtins covered: integer, real, string, numeric, char, ord, type,
+     * image (0 or 1 arg), copy, *e (size-of). */
+
+    /* integer(x) — Icon spec: int → int; real → trunc to int; string → parse
+     * (with optional radix `BASErDIGITS`).  IC-9 (2026-05-01). */
+    if (!strcmp(fn,"integer") && nargs == 1) {
+        DESCR_t av = args[0];
+        if (IS_INT_fn(av))  { *out = av; return 1; }
+        if (IS_REAL_fn(av)) { *out = INTVAL((long long)av.r); return 1; }
+        const char *s = VARVAL_fn(av); if (!s) { *out = FAILDESCR; return 1; }
+        {
+            const char *p = s;
+            while (*p == ' ' || *p == '\t') p++;
+            int neg = 0; if (*p == '+') p++; else if (*p == '-') { neg = 1; p++; }
+            int base = 0; const char *bstart = p;
+            while (*p >= '0' && *p <= '9') { base = base * 10 + (*p - '0'); p++; }
+            if (p > bstart && (*p == 'r' || *p == 'R') && base >= 2 && base <= 36) {
+                p++; const char *dstart = p; long long v = 0;
+                while (*p) {
+                    int d = -1;
+                    if (*p >= '0' && *p <= '9') d = *p - '0';
+                    else if (*p >= 'a' && *p <= 'z') d = *p - 'a' + 10;
+                    else if (*p >= 'A' && *p <= 'Z') d = *p - 'A' + 10;
+                    if (d < 0 || d >= base) break;
+                    v = v * base + d;
+                    p++;
+                }
+                while (*p == ' ' || *p == '\t') p++;
+                if (p > dstart && *p == '\0') { *out = INTVAL(neg ? -v : v); return 1; }
+            }
+        }
+        char *end; long long iv = strtoll(s, &end, 10);
+        if (end != s && (*end=='\0'||*end==' ')) { *out = INTVAL(iv); return 1; }
+        double rv = strtod(s, &end);
+        if (end != s && (*end=='\0'||*end==' ')) { *out = INTVAL((long long)rv); return 1; }
+        *out = FAILDESCR; return 1;
+    }
+    if (!strcmp(fn,"real") && nargs == 1) {
+        DESCR_t av = args[0];
+        if (IS_REAL_fn(av)) { *out = av; return 1; }
+        if (IS_INT_fn(av))  { *out = REALVAL((double)av.i); return 1; }
+        const char *s = VARVAL_fn(av); if (!s) { *out = FAILDESCR; return 1; }
+        char *end; double rv = strtod(s, &end);
+        if (end != s && (*end=='\0'||*end==' ')) { *out = REALVAL(rv); return 1; }
+        *out = FAILDESCR; return 1;
+    }
+    if (!strcmp(fn,"string") && nargs == 1) {
+        DESCR_t av = args[0];
+        if (IS_STR_fn(av)) { *out = av; return 1; }
+        char *buf = GC_malloc(64);
+        if (IS_INT_fn(av))       snprintf(buf,64,"%lld",(long long)av.i);
+        else if (IS_REAL_fn(av)) { real_str(av.r,buf,64); }
+        else { *out = NULVCL; return 1; }
+        *out = STRVAL(buf); return 1;
+    }
+    if (!strcmp(fn,"numeric") && nargs == 1) {
+        DESCR_t av = args[0];
+        if (IS_INT_fn(av)||IS_REAL_fn(av)) { *out = av; return 1; }
+        const char *s = VARVAL_fn(av); if (!s||!*s) { *out = FAILDESCR; return 1; }
+        {
+            const char *p = s;
+            while (*p == ' ' || *p == '\t') p++;
+            int neg = 0; if (*p == '+') p++; else if (*p == '-') { neg = 1; p++; }
+            int base = 0; const char *bstart = p;
+            while (*p >= '0' && *p <= '9') { base = base * 10 + (*p - '0'); p++; }
+            if (p > bstart && (*p == 'r' || *p == 'R') && base >= 2 && base <= 36) {
+                p++; const char *dstart = p; long long v = 0;
+                while (*p) {
+                    int d = -1;
+                    if (*p >= '0' && *p <= '9') d = *p - '0';
+                    else if (*p >= 'a' && *p <= 'z') d = *p - 'a' + 10;
+                    else if (*p >= 'A' && *p <= 'Z') d = *p - 'A' + 10;
+                    if (d < 0 || d >= base) break;
+                    v = v * base + d;
+                    p++;
+                }
+                while (*p == ' ' || *p == '\t') p++;
+                if (p > dstart && *p == '\0') { *out = INTVAL(neg ? -v : v); return 1; }
+            }
+        }
+        char *end; long long iv = strtoll(s, &end, 10);
+        if (end != s && (*end=='\0'||*end==' ')) { *out = INTVAL(iv); return 1; }
+        double rv = strtod(s, &end);
+        if (end != s && (*end=='\0'||*end==' ')) { *out = REALVAL(rv); return 1; }
+        *out = FAILDESCR; return 1;
+    }
+    if (!strcmp(fn,"char") && nargs == 1) {
+        DESCR_t av = args[0];
+        int n = (int)(IS_INT_fn(av) ? av.i : (long long)strtol(VARVAL_fn(av)?VARVAL_fn(av):"0",NULL,10));
+        char *buf = GC_malloc(2); buf[0]=(char)(n&0xFF); buf[1]='\0';
+        *out = STRVAL(buf); return 1;
+    }
+    if (!strcmp(fn,"ord") && nargs == 1) {
+        DESCR_t av = args[0];
+        const char *s = VARVAL_fn(av); if (!s||!*s) { *out = FAILDESCR; return 1; }
+        *out = INTVAL((unsigned char)s[0]); return 1;
+    }
+    if (!strcmp(fn,"type") && nargs == 1) {
+        DESCR_t av = args[0];
+        const char *t;
+        if (IS_INT_fn(av))       t="integer";
+        else if (IS_REAL_fn(av)) t="real";
+        else if (av.v==DT_T)     t="table";
+        else if (av.v==DT_A)     t="list";
+        else if (av.v==DT_DATA)  {
+            DESCR_t tag = FIELD_GET_fn(av,"icn_type");
+            t = (tag.v==DT_S && tag.s) ? tag.s : "record";
+        }
+        else t="string";
+        *out = STRVAL(t); return 1;
+    }
+    if (!strcmp(fn,"image") && nargs == 0) {
+        *out = STRVAL("&null"); return 1;
+    }
+    if (!strcmp(fn,"image") && nargs == 1) {
+        DESCR_t av = args[0];
+        if (IS_FAIL_fn(av)) { *out = FAILDESCR; return 1; }
+        char *buf = GC_malloc(128);
+        if (av.v == DT_SNUL)     { *out = STRVAL("&null"); return 1; }
+        if (IS_INT_fn(av))       { snprintf(buf,128,"%lld",(long long)av.i); *out = STRVAL(buf); return 1; }
+        if (IS_REAL_fn(av))      { real_str(av.r,buf,128); *out = STRVAL(buf); return 1; }
+        if (av.v==DT_T)          { snprintf(buf,128,"table(%d)",av.tbl?av.tbl->size:0); *out = STRVAL(buf); return 1; }
+        if (av.v==DT_DATA)       { snprintf(buf,128,"record"); *out = STRVAL(buf); return 1; }
+        const char *s=VARVAL_fn(av); if (!s) s = "";
+        int sl = (int)strlen(s);
+        char *outs = GC_malloc(sl*4 + 3);
+        int o = 0;
+        outs[o++] = '"';
+        for (int i = 0; i < sl; i++) {
+            unsigned char c = (unsigned char)s[i];
+            switch (c) {
+                case '"':  outs[o++]='\\'; outs[o++]='"';  break;
+                case '\\': outs[o++]='\\'; outs[o++]='\\'; break;
+                case '\n': outs[o++]='\\'; outs[o++]='n';  break;
+                case '\t': outs[o++]='\\'; outs[o++]='t';  break;
+                case '\r': outs[o++]='\\'; outs[o++]='r';  break;
+                default:
+                    if (c < 0x20 || c == 0x7f) {
+                        o += snprintf(outs+o, 5, "\\x%02x", c);
+                    } else {
+                        outs[o++] = (char)c;
+                    }
+            }
+        }
+        outs[o++] = '"';
+        outs[o] = '\0';
+        *out = STRVAL(outs); return 1;
+    }
     return 0;
 }
 
