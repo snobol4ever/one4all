@@ -1361,6 +1361,47 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
             break;
         }
 
+        /* CH-17g-runtime-bridge-lcomp, sess 2026-05-09:
+         * SM_LCOMP — string/lexicographic comparison emitted by sm_lower
+         * for E_LLT/E_LLE/E_LGT/E_LGE/E_LEQ/E_LNE.  ins->a[0].i carries
+         * the operator EKind.  Sibling of SM_ACOMP — Icon-style relops:
+         * on success push the RIGHT operand and set last_ok=1; on failure
+         * push FAILDESCR and clear last_ok.  Mirrors STRREL macro in
+         * interp_eval.c. */
+        case SM_LCOMP: {
+            DESCR_t r = sm_pop(st);
+            DESCR_t l = sm_pop(st);
+            if (l.v == DT_FAIL || r.v == DT_FAIL) {
+                sm_push(st, FAILDESCR);
+                st->last_ok = 0;
+                break;
+            }
+            const char *ls = VARVAL_fn(l); if (!ls) ls = "";
+            const char *rs = VARVAL_fn(r); if (!rs) rs = "";
+            int cmp = strcmp(ls, rs);
+            int op = (int)ins->a[0].i;
+            int ok;
+            switch (op) {
+                case E_LLT: ok = (cmp <  0); break;
+                case E_LLE: ok = (cmp <= 0); break;
+                case E_LGT: ok = (cmp >  0); break;
+                case E_LGE: ok = (cmp >= 0); break;
+                case E_LEQ: ok = (cmp == 0); break;
+                case E_LNE: ok = (cmp != 0); break;
+                /* Legacy emit safety net (pre-bridge-lcomp programs).
+                 * Should not occur on freshly lowered code. */
+                default:    ok = (cmp == 0); break;
+            }
+            if (ok) {
+                sm_push(st, r);
+                st->last_ok = 1;
+            } else {
+                sm_push(st, FAILDESCR);
+                st->last_ok = 0;
+            }
+            break;
+        }
+
         /* CHUNKS-step14: SM_SUSPEND — yield a value from a generator chunk.
          * Pops TOS as the yielded value.  If g_current_gen_state is live
          * (we are inside bb_broker_drive_sm), saves pc+stack into the

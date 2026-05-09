@@ -1175,10 +1175,6 @@ static void init_handler_table(void)
     g_handlers[SM_LOAD_FRAME]   = h_load_frame;    /* CHUNKS-step17b'': named FATAL — JIT gen is M5 */
     g_handlers[SM_STORE_FRAME]  = h_store_frame;   /* CHUNKS-step17b'': named FATAL — JIT gen is M5 */
     /* Opcodes still stubbed as h_unimpl — by design, not by omission:
-     *   SM_LCOMP          — emitted by sm_lower for E_LLT, E_LLE,
-     *     E_LGT, E_LGE, E_LEQ, E_LNE (SNOBOL4 string comparison
-     *     EKinds).  No sm_interp handler today either; same shape gap
-     *     as SM_ACOMP had pre-bridge-acomp.  Tracked as a follow-on rung.
      *   SM_JUMP_INDIR     — computed gotos `:($expr)`.  sm_lower emits
      *     this from E_COMPUTED_GOTO, but the SNOBOL4 parser currently
      *     treats computed gotos as undefined labels (Error 24) in all
@@ -1187,8 +1183,9 @@ static void init_handler_table(void)
      *   SM_TRIM, SM_SPCINT, SM_SPREAL, SM_SELBRA, SM_STATE_PUSH,
      *   SM_STATE_POP, SM_RCOMP — never emitted by current sm_lower.
      *
-     * SM_ACOMP — handler landed sess 2026-05-09 (CH-17g-runtime-bridge-acomp);
-     * sm_interp.c has it; JIT codegen is M5 territory (named FATAL pattern).
+     * SM_ACOMP / SM_LCOMP — handlers landed sess 2026-05-09
+     * (CH-17g-runtime-bridge-acomp / -lcomp); sm_interp.c has them; JIT
+     * codegen is M5 territory (named FATAL pattern).
      */
 }
 

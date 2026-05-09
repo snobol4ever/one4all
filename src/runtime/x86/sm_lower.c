@@ -877,7 +877,14 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         return;
     }
 
-    /* ── Relational comparisons (string) → SM_LCOMP ── */
+    /* ── Relational comparisons (string/lexicographic) → SM_LCOMP(op) ──
+     * a[0].i carries the operator EKind (E_LLT/E_LLE/E_LGT/E_LGE/E_LEQ/E_LNE).
+     * Runtime semantics (Icon-style, mirrors STRREL macro in interp_eval.c):
+     * on success pushes the RIGHT operand and sets last_ok=1; on failure
+     * pushes FAILDESCR and clears last_ok.  CH-17g-runtime-bridge-lcomp,
+     * sess 2026-05-09: sibling fix to bridge-acomp — same shape bug, prior
+     * emission was `sm_emit(p, SM_LCOMP)` with no operator info, collapsing
+     * all six string relop EKinds onto one opcode. */
     case E_LLT:
     case E_LLE:
     case E_LGT:
@@ -886,7 +893,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
     case E_LNE:
         lower_expr(p, lt, e->nchildren > 0 ? e->children[0] : NULL);
         lower_expr(p, lt, e->nchildren > 1 ? e->children[1] : NULL);
-        sm_emit(p, SM_LCOMP);
+        sm_emit_i(p, SM_LCOMP, (int64_t)e->kind);
         return;
 
     /* ── Interrogation ?X → succeed if X succeeds ── */
