@@ -1982,6 +1982,12 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
         return -1;
     }
     if (emit_three_column_line(out, "", ".include", "\"sm_macros.s\"", NULL) != 0) return -1;
+    /* EM-7c-bb-macros: write BB macro library alongside sm_macros.s. */
+    if (bb_macros_write_to_path("bb_macros.s") != 0) {
+        fprintf(stderr, "sm_codegen_x64_emit: failed to write bb_macros.s\n");
+        return -1;
+    }
+    if (emit_three_column_line(out, "", ".include", "\"bb_macros.s\"", NULL) != 0) return -1;
 
     /* EM-6: collect all string literals and variable names into the string
      * table, then emit them in .section .rodata before .text.  This makes

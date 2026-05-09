@@ -88,6 +88,11 @@ void bb_flat_set_intern_str(const char *(*fn)(emitter_v *, const char *));
  */
 void bb_build_flat_text_reset(void);
 
+/* EM-7c-bb-macros: write the BB macro library to the given path.
+ * Call once per emit run (writes "bb_macros.s" in CWD).
+ * Returns 0 on success, -1 on I/O error. */
+int bb_macros_write_to_path(const char *path);
+
 /* EM-7c-capture: install a callback that is invoked each time flat_emit_node
  * emits an XNME/XFNME child sub-blob.  sm_codegen_x64_emit installs this
  * to collect cap fixups for the startup preamble. */
