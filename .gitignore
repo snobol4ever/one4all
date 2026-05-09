@@ -71,6 +71,10 @@ core
 # M-JITEM-X64 / EM-2: synthetic-program test harness
 out/sm_codegen_x64_emit_test
 
+# EM-7a/EM-7b: unit-test harnesses (rebuilt from source; do not track binaries)
+out/bb_flat_text_test
+out/sm_phase2_sim_test
+
 # EM-7c-sm-three-column: sm_macros.s is regenerated alongside each .s emit
 # (in CWD when --jit-emit --x64 runs).  Tracked copies live under corpus/.
 /sm_macros.s
