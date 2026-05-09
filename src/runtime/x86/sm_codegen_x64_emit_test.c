@@ -7,7 +7,7 @@
  * Builds tiny SM_Programs in memory and runs them through
  * sm_codegen_x64_emit(). The emitted asm is written to file paths
  * provided by argv. The companion shell script assembles, links against
- * librt.so, runs, and checks the rc.
+ * libscrip_rt.so, runs, and checks the rc.
  *
  * EM-2 program (argv[1]):
  *   pc=0  SM_PUSH_LIT_I  42

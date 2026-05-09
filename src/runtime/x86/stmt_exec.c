@@ -85,7 +85,7 @@ extern DESCR_t (*g_user_call_hook)(const char *name, DESCR_t *args, int nargs);
 
 /* SN-6b: DT_E thaw in bb_deferred_var needs AST_t + AST_FNC/AST_VAR kinds and
  * eval_node() for argument evaluation. Mirrors snobol4_pattern.c's pat_to_patnd. */
-#include "../../ir/ir.h"
+#include "../ir/ast.h"
 extern DESCR_t eval_node(AST_t *e);
 
 /* In the full-runtime build, include bb_box.h after snobol4.h.

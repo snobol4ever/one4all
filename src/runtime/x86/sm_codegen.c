@@ -36,7 +36,7 @@
 #include "sm_interp.h"   /* SM_State, sm_push, sm_pop, sm_state_init */
 #include "snobol4.h"
 #include "sil_macros.h"
-#include "../../ir/ir.h"
+#include "../ir/ast.h"
 #include "../../frontend/snobol4/scrip_cc.h"  /* AST_t, AST_FNC for SM_PAT_CAPTURE_FN */
 #include "bb_broker.h"   /* SN-9b: SM_BB_PUMP / SM_BB_ONCE handlers */
 

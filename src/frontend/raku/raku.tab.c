@@ -77,7 +77,7 @@
 /* First part of user prologue.  */
 #line 21 "raku.y"
 
-#include "../../ir/ir.h"
+#include "../../ir/ast.h"
 #include "../snobol4/scrip_cc.h"
 #include "raku.tab.h"   /* pulls in ExprList from %code requires */
 #include <stdio.h>

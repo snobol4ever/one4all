@@ -56,7 +56,7 @@ extern CODE_t *sno_parse(FILE *f, const char *filename);
 #include "../frontend/icon/icon_gen.h"    /* coro_bb_to/by/iterate/suspend, state types — U-17 */
 #include "../frontend/icon/icon_lex.h"    /* IcnTkKind — TK_AUG* for AST_AUGOP in unified interp */
 
-/* ir_print_node — from src/ir/ir_print.c (linked via Makefile) */
+/* ir_print_node — from src/ir/ast_print.c (linked via Makefile) */
 extern void ir_print_node   (const AST_t *e, FILE *f);
 extern void ir_print_node_nl(const AST_t *e, FILE *f);
 
@@ -101,7 +101,7 @@ extern int         Δ;
 #include "../runtime/interp/coro_runtime.h"
 #include "../runtime/interp/pl_runtime.h"
 #include "interp.h"   /* FI-6: interp loop extracted to interp.c */
-#include "../runtime/common/ir_clone.h"  /* RS-9b: code_free */
+#include "../runtime/common/ast_clone.h"  /* RS-9b: code_free */
 
 #include "driver/polyglot.h"   /* FI-7: polyglot layer extracted to polyglot.c */
 
@@ -231,7 +231,7 @@ int main(int argc, char **argv)
             "  --ir-run         interpret via IR tree-walk (correctness reference)\n"
             "  --sm-run         interpret SM_Program via dispatch loop  [DEFAULT]\n"
             "  --jit-run        SM_Program -> x86 bytes -> mmap slab -> jump in\n"
-            "  --jit-emit --x64 emit standalone x86-64 asm to stdout (links librt.so)\n"
+            "  --jit-emit --x64 emit standalone x86-64 asm to stdout (links libscrip_rt.so)\n"
             "  --monitor        in-process sync comparator (IR vs SM vs JIT)\n"
             "\n"
             "Byrd Box pattern mode (default: --bb-driver):\n"

@@ -28,7 +28,7 @@
 
 #include "descr.h"     /* DESCR_t */
 #include "scrip_cc.h"   /* AST_t, AST_e, ast_e_name[] via IR_DEFINE_NAMES */
-#include "ir/ir.h"
+#include "ir/ast.h"
 
 DESCR_t __real_interp_eval(AST_t *e);
 

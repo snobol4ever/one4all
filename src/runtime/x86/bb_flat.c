@@ -52,7 +52,7 @@ void bb_flat_set_cap_fixup_cb(void (*cb)(void *cap_ptr, const char *child_α_lab
 }
 
 /* ── address constants — EM-7c-symbolic ──────────────────────────────────── */
-/* Symbol names for globals exported by librt.so.                      */
+/* Symbol names for globals exported by libscrip_rt.so.                      */
 /* TEXT mode: ev_lea_rcx_sym emits  lea rcx, [rip + sym]                     */
 /* BINARY mode: ev_lea_rcx_sym emits mov rcx, imm64  (process-address)       */
 #define SYM_SIGMA   "\xCE\xA3"          /* UTF-8: Σ */

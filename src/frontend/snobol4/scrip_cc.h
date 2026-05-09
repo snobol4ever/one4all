@@ -20,7 +20,7 @@
 
 /* ---- expression node kinds — from shared IR ---- */
 /*
- * M-G1-IR-HEADER-WIRE: AST_e is now defined in ir/ir.h (the single source
+ * M-G1-IR-HEADER-WIRE: AST_e is now defined in ir/ast.h (the single source
  * of truth for all canonical node kinds).
  *
  * M-G3-ALIAS-CLEANUP: IR_COMPAT_ALIASES section removed — dead code,
@@ -32,7 +32,7 @@
  * scrip_cc.h defines a compatible subset when included standalone.
  * Both are guarded by EXPR_T_DEFINED to prevent double-definition.
  */
-#include "ir/ir.h"
+#include "ir/ast.h"
 
 /*
  * AST_t — unified n-ary expression node.
@@ -56,7 +56,7 @@
  *   expr_arg(e, i)  — children[i]
  *   expr_nargs(e)   — nchildren
  */
-/* AST_t is defined in ir/ir.h (included above) — ir.h is the sole owner.
+/* AST_t is defined in ir/ast.h (included above) — ir.h is the sole owner.
  * FI-0A: scrip_cc.h no longer carries a duplicate struct body. */
 
 /* NULL-safe named accessors */

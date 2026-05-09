@@ -49,7 +49,7 @@ typedef struct {
 /* -------------------------------------------------------------------------
  * API (post G-9 migration — IcnEmitter struct removed)
  * -------------------------------------------------------------------------*/
-#include "ir/ir.h"
+#include "ir/ast.h"
 void icn_emit_file(AST_t **nodes, int count, FILE *out);
 void icn_emit_expr(AST_t *n, const char *γ, const char *ω, char *oa, char *ob);
 void icn_label_α  (int id, char *buf, size_t sz);

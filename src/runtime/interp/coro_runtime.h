@@ -9,7 +9,7 @@
 #ifndef CORO_RUNTIME_H
 #define CORO_RUNTIME_H
 
-#include "../../ir/ir.h"
+#include "../ir/ast.h"
 #include "../../frontend/snobol4/scrip_cc.h"
 #include "../../runtime/x86/bb_broker.h"
 #include "../../frontend/icon/icon_gen.h"

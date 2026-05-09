@@ -1,10 +1,10 @@
 /*
- * rt.h — public ABI for librt.so (M-JITEM-X64 / EM-1..EM-6)
+ * rt.h — public ABI for libscrip_rt.so (M-JITEM-X64 / EM-1..EM-6)
  *
  * Authors: Lon Jones Cherryholmes · Claude Sonnet
  * Date: 2026-05-06
  *
- * librt.so is the runtime support library that mode-4-emitted
+ * libscrip_rt.so is the runtime support library that mode-4-emitted
  * binaries link against.  It carries language-level semantics — pattern
  * matcher, NV table, builtins, GC, generator BB pump (post-EM-10),
  * Prolog backtracking machinery (post-EM-14) — so that emitted
@@ -135,7 +135,7 @@ void rt_push_expression_descr(int64_t entry_pc, int64_t arity);
  *   subj_name   — subject NV name for write-back, or NULL
  *   has_repl    — 1 if a real replacement is on the stack, 0 if dummy
  *
- * Result lands on librt's last-ok flag (SM_JUMP_S/F observe it).
+ * Result lands on libscrip_rt's last-ok flag (SM_JUMP_S/F observe it).
  */
 void rt_match_blob(void *blob_α,
                          const char *subj_name,
@@ -147,7 +147,7 @@ void rt_match_blob(void *blob_α,
  * patterns (those with at least one runtime-dependent leaf — *VAR,
  * BREAK(VAR), LEN(VAR), etc.).  Each call mirrors the corresponding
  * sm_interp.c case: builds a PATND_t fragment, pushes it on the
- * librt pat-stack.  SM_PAT_BOXVAL bridges pat-stack → vstack.
+ * libscrip_rt pat-stack.  SM_PAT_BOXVAL bridges pat-stack → vstack.
  * SM_EXEC_STMT for variant patterns calls rt_match_variant,
  * which dispatches to exec_stmt (which in BB_MODE_LIVE — set by
  * rt_init — routes Phase-3 through bb_build_flat/binary +

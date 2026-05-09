@@ -1,19 +1,19 @@
 /*
- * ir_clone.c — IR tree cloning into GC memory, and CODE_t freeing (RS-9b)
+ * ast_clone.c — IR tree cloning into GC memory, and CODE_t freeing (RS-9b)
  * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6 (RS-9b, 2026-05-02)
  */
 
-#include "ir_clone.h"
+#include "ast_clone.h"
 #include <stdlib.h>
 #include <string.h>
 #include <gc/gc.h>
 
-/* ── expr_gc_clone ──────────────────────────────────────────────────────────
+/* ── ast_gc_clone ──────────────────────────────────────────────────────────
  * Deep-copy AST_t subtree rooted at e into GC-managed memory.
  * Every field is copied; sval is GC_strdup'd; children[] is GC_malloc'd.
  * The clone is structurally identical but lives in GC heap — safe to keep
  * after the original calloc-based IR is freed. */
-AST_t *expr_gc_clone(const AST_t *e)
+AST_t *ast_gc_clone(const AST_t *e)
 {
     if (!e) return NULL;
     AST_t *c = GC_malloc(sizeof(AST_t));
@@ -27,7 +27,7 @@ AST_t *expr_gc_clone(const AST_t *e)
     if (e->nchildren > 0) {
         c->children = GC_malloc((size_t)e->nchildren * sizeof(AST_t *));
         for (int i = 0; i < e->nchildren; i++)
-            c->children[i] = expr_gc_clone(e->children[i]);
+            c->children[i] = ast_gc_clone(e->children[i]);
     } else {
         c->children = NULL;
     }
@@ -68,7 +68,7 @@ static void stmt_free(STMT_t *s)
  * Free a CODE_t and all its STMT_t / AST_t nodes.
  * Walks the linked list; frees exports/imports lists.
  * Call only after sm_lower() has consumed the program and any AST_t*
- * pointers stored in SM_PUSH_EXPR have been cloned via expr_gc_clone(). */
+ * pointers stored in SM_PUSH_EXPR have been cloned via ast_gc_clone(). */
 void code_free(CODE_t *prog)
 {
     if (!prog) return;

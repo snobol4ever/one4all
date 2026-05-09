@@ -23,7 +23,7 @@
 #include "sil_macros.h" /* IS_NAMEPTR, NAME_DEREF_PTR, IS_NAMEVAL, etc. */
 
 /* AST_t / AST_e for SM_PAT_CAPTURE_FN synthetic AST_FNC node */
-#include "../../ir/ir.h"
+#include "../ir/ast.h"
 #include "../../frontend/snobol4/scrip_cc.h"
 
 /* Pattern constructors from snobol4_pattern.c */

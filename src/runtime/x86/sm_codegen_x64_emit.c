@@ -14,7 +14,7 @@
  *                       per opcode group. Three-column SNOBOL4 layout:
  *                         .LpcN:   SM_ADD         ; pop r,l -> push l+r
  *                       Arithmetic and push/pop bake inline via macros.
- *                       librt.so boundary: NV table, matcher, GC.
+ *                       libscrip_rt.so boundary: NV table, matcher, GC.
  *
  *   emit_bb_box()    -- BB graph boxes (called per SM_PAT_* instruction)
  *                       One proc per box. Four local labels per proc:
@@ -434,7 +434,7 @@ static int emit_chunk_registry(FILE *out, const SM_Program *prog)
 
 /* EM-7c-capture: cap fixup table.  Each entry pairs a heap cap_t pointer
  * (baked as imm64 — valid in emitter process AND in the emitted binary
- * since the binary calls into librt which allocates the same heap
+ * since the binary calls into libscrip_rt which allocates the same heap
  * objects) with the child's α label name.  Emitted as a sequence of
  * rt_patch_cap_fn(cap_ptr, child_fn) calls in main's preamble. */
 #define MAX_CAP_FIXUPS 1024
@@ -468,7 +468,7 @@ static int emit_file_header(FILE *out, int count, int has_chunk_registry)
     if (fprintf(out,
         "# -----------------------------------------------------------------------\n"
         "# scrip --jit-emit --x64  (M-JITEM-X64 / EM-1..EM-7d)\n"
-        "# %d SM instructions. Links against librt.so.\n"
+        "# %d SM instructions. Links against libscrip_rt.so.\n"
         "# Architecture: two emitters -- SM straight-line via sm_macros.s\n"
         "#   macros (inline x86); BB boxes via emit_bb_box() one-proc-per-box.\n"
         "# See archive/EMITTER-MODE4-ARCH.md for the full design.\n"
@@ -838,7 +838,7 @@ static int emit_sm_jump_f(FILE *out, const SM_Instr *ins, int pc)
  * emit-time to the .Lpc<entry_pc> label that emit_pc_label has already
  * planted at every PC.  The native CALL pushes the return address on
  * the host stack; SM_RETURN's RET pops it.  The SM value stack lives
- * inside librt.so and is shared across the call -- the expression
+ * inside libscrip_rt.so and is shared across the call -- the expression
  * pushes its result onto the same stack the caller will read from.
  *
  * Honest deviation from the interpreter:  sm_interp.c's SM_CALL_EXPRESSION
@@ -883,7 +883,7 @@ static int emit_sm_return(FILE *out, int pc)
 {
     (void)pc;
     /* SM_RETURN: native return.  The expression's last push left the result
-     * on the SM value stack inside librt.so. */
+     * on the SM value stack inside libscrip_rt.so. */
     return sm_emit_ret(out, sm_template_lookup(SM_RETURN), NULL);
 }
 
@@ -978,7 +978,7 @@ static int emit_sm_stno(FILE *out, const SM_Instr *ins, int pc,
  * These are Phase 1/4/5 concerns, orthogonal to BB / pattern-matching.
  * ----------------------------------------------------------------------- */
 
-/* SM_CONCAT: pop right then left; push CONCAT result.  All in librt. */
+/* SM_CONCAT: pop right then left; push CONCAT result.  All in libscrip_rt. */
 static int emit_sm_concat(FILE *out, int pc)
 {
     (void)pc;
@@ -2139,7 +2139,7 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
              * window built a tree with at least one variant node) or pattern-
              * as-rvalue (e.g., `WPAT = BREAK(WORD) SPAN(WORD)` builds a
              * pattern but does not exec one) — are emitted as PLT calls to
-             * the librt pat-construction ABI.
+             * the libscrip_rt pat-construction ABI.
              *
              * NB: the brokered Phase-3 path that EM-7-revert tore out is
              * NOT what this rung restores.  The architectural distinction

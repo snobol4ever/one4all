@@ -30,11 +30,11 @@
 #include "bb_pool.h"
 #include "bb_emit.h"
 
-/* Forward decls for symbols inside librt.so ---------------------- */
+/* Forward decls for symbols inside libscrip_rt.so ---------------------- */
 extern void   SNO_INIT_fn(void);
 extern void   bb_pool_init(void);
 
-/* pat_* constructors live in librt.so via snobol4_pattern.c ----- */
+/* pat_* constructors live in libscrip_rt.so via snobol4_pattern.c ----- */
 extern DESCR_t pat_lit(const char *s);
 
 /* PATND_t lives behind DESCR_t.p in pattern descriptors --------------- */

@@ -30,7 +30,7 @@
 #ifndef CORO_STMT_H
 #define CORO_STMT_H
 
-#include "../../ir/ir.h"
+#include "../ir/ast.h"
 #include "snobol4.h"      /* DESCR_t */
 
 /* Execute e as an Icon statement.  Side effects propagate through IcnFrame

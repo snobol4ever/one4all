@@ -18,7 +18,7 @@
 
 #include "snobol4.h"
 #include "sil_macros.h"
-#include "../../ir/ir.h"
+#include "../ir/ast.h"
 
 /* eval_node is in eval_code.c (sibling). pat_* helpers, NV_GET_fn, APPLY_fn,
  * PATVAL_fn, NULVCL, FAILDESCR, IS_FAIL_fn — all in snobol4.h. */

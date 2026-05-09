@@ -62,7 +62,7 @@ extern int raku_yydebug;
  *
  * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6
  */
-#include "../../ir/ir.h"
+#include "../../ir/ast.h"
 #include "../snobol4/scrip_cc.h"
 
 typedef struct ExprList {

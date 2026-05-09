@@ -558,7 +558,7 @@ CODE_t *prolog_lower(PlProgram *pl_prog) {
 /* =========================================================================
  * prolog_lower_pretty — IR dump for diagnostics
  * ======================================================================= */
-static void expr_dump(AST_t *e, int indent, FILE *out) {
+static void ast_dump(AST_t *e, int indent, FILE *out) {
     if (!e) { fprintf(out, "%*s<null>\n", indent, ""); return; }
     const char *kname = "?";
     switch (e->kind) {
@@ -586,13 +586,13 @@ static void expr_dump(AST_t *e, int indent, FILE *out) {
         fprintf(out, "  n_vars=%ld  n_args=%.0f", e->ival, e->dval);
     fprintf(out, "\n");
     for (int i = 0; i < e->nchildren; i++)
-        expr_dump(e->children[i], indent + 2, out);
+        ast_dump(e->children[i], indent + 2, out);
 }
 
 void prolog_lower_pretty(CODE_t *prog, FILE *out) {
     for (STMT_t *s = prog->head; s; s = s->next) {
         fprintf(out, "--- stmt (line %d) ---\n", s->lineno);
-        expr_dump(s->subject, 2, out);
+        ast_dump(s->subject, 2, out);
     }
 }
 

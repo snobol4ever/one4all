@@ -9,7 +9,7 @@
 #ifndef DRIVER_PL_RUNTIME_H
 #define DRIVER_PL_RUNTIME_H
 
-#include "../../ir/ir.h"
+#include "../ir/ast.h"
 #include "../../frontend/snobol4/scrip_cc.h"
 #include "../../frontend/prolog/prolog_driver.h"
 #include "../../frontend/prolog/term.h"

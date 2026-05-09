@@ -1,5 +1,5 @@
 /*
- * ir_verify.c — IR structural invariant checker
+ * ast_verify.c — IR structural invariant checker
  *
  * Validates every node in an AST_t tree:
  *   1. kind is in range [0, AST_KIND_COUNT)
@@ -21,7 +21,7 @@
  */
 
 #define IR_DEFINE_NAMES
-#include "scrip_cc.h"   /* → ir/ir.h (AST_e, AST_t, compat aliases, ast_e_name) */
+#include "scrip_cc.h"   /* → ir/ast.h (AST_e, AST_t, compat aliases, ast_e_name) */
 
 #include <stdio.h>
 #include <string.h>
@@ -142,7 +142,7 @@ typedef struct {
 
 static void violation(VerifyState *vs, const char *path, const char *msg) {
     if (vs->f)
-        fprintf(vs->f, "ir_verify: %s: %s\n", path, msg);
+        fprintf(vs->f, "ast_verify: %s: %s\n", path, msg);
     vs->count++;
 }
 
@@ -217,7 +217,7 @@ int ir_verify_node(const AST_t *e, const char *path, FILE *err) {
 
 int ir_verify_program(const CODE_t *prog, FILE *err) {
     if (!prog) {
-        if (err) fprintf(err, "ir_verify: NULL CODE_t pointer\n");
+        if (err) fprintf(err, "ast_verify: NULL CODE_t pointer\n");
         return 1;
     }
     VerifyState vs = { 0, err ? err : stderr };
@@ -242,7 +242,7 @@ int ir_verify_program(const CODE_t *prog, FILE *err) {
 /* -------------------------------------------------------------------------
  * Unit test — compiled when IR_VERIFY_TEST is defined.
  * Build: gcc -I src -I src/frontend/snobol4 -DIR_VERIFY_TEST \
- *             src/ir/ir_verify.c -o /tmp/ir_verify_test
+ *             src/ir/ast_verify.c -o /tmp/ir_verify_test
  * ---------------------------------------------------------------------- */
 #ifdef IR_VERIFY_TEST
 

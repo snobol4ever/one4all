@@ -1,5 +1,5 @@
 /*
- * rt.c — librt.so implementation (M-JITEM-X64 / EM-1..EM-7-pre)
+ * rt.c — libscrip_rt.so implementation (M-JITEM-X64 / EM-1..EM-7-pre)
  *
  * Authors: Lon Jones Cherryholmes · Claude Sonnet
  * Date: 2026-05-06; EM-7-revert 2026-05-07
@@ -140,7 +140,7 @@ static int     g_last_ok  = 1;  /* default success at process start */
 static void vstack_push(DESCR_t d)
 {
     if (g_vtop >= VSTACK_CAP) {
-        fprintf(stderr, "librt: SM value stack overflow (cap=%d).\n", VSTACK_CAP);
+        fprintf(stderr, "libscrip_rt: SM value stack overflow (cap=%d).\n", VSTACK_CAP);
         abort();
     }
     g_vstack[g_vtop++] = d;
@@ -149,7 +149,7 @@ static void vstack_push(DESCR_t d)
 static DESCR_t vstack_pop(void)
 {
     if (g_vtop <= 0) {
-        fprintf(stderr, "librt: SM value stack underflow.\n");
+        fprintf(stderr, "libscrip_rt: SM value stack underflow.\n");
         abort();
     }
     return g_vstack[--g_vtop];
@@ -162,7 +162,7 @@ static DESCR_t vstack_pop(void)
 static void pat_push(DESCR_t d)
 {
     if (g_pat_sp >= PATSTACK_CAP) {
-        fprintf(stderr, "librt: pat-stack overflow (cap=%d).\n", PATSTACK_CAP);
+        fprintf(stderr, "libscrip_rt: pat-stack overflow (cap=%d).\n", PATSTACK_CAP);
         abort();
     }
     g_pat_stack[g_pat_sp++] = d;
@@ -171,7 +171,7 @@ static void pat_push(DESCR_t d)
 static DESCR_t pat_pop_internal(void)
 {
     if (g_pat_sp <= 0) {
-        fprintf(stderr, "librt: pat-stack underflow.\n");
+        fprintf(stderr, "libscrip_rt: pat-stack underflow.\n");
         abort();
     }
     return g_pat_stack[--g_pat_sp];
@@ -256,7 +256,7 @@ void rt_patch_cap_fn(void *cap_ptr, void *child_fn)
 
 /* EM-7c-arbno: allocate a fresh arbno_t for a baked ARBNO blob.
  * bb_arbno_new is declared in bb_box.h via the opaque extern in bb_flat.c.
- * Here we call it directly since librt.so links bb_boxes.c. */
+ * Here we call it directly since libscrip_rt.so links bb_boxes.c. */
 extern void *bb_arbno_new(void *fn, void *state);  /* arbno_t* opaque */
 void rt_init_arbno(void **slot_ptr, void *child_fn)
 {
@@ -412,7 +412,7 @@ int64_t rt_pop_int(void)
     DESCR_t d = vstack_pop();
     if (d.v != DT_I) {
         fprintf(stderr,
-            "librt: rt_pop_int: TOS is not DT_I (tag=%d).\n", d.v);
+            "libscrip_rt: rt_pop_int: TOS is not DT_I (tag=%d).\n", d.v);
         abort();
     }
     return d.i;
@@ -442,7 +442,7 @@ void rt_halt_tos(void)
 void rt_unhandled_op(int op)
 {
     fprintf(stderr,
-        "librt: unhandled SM opcode %d reached in emitted code.\n"
+        "libscrip_rt: unhandled SM opcode %d reached in emitted code.\n"
         "  (scrip --dump-sm to identify; subsequent EM-N rungs shrink the set)\n",
         op);
     abort();
@@ -463,7 +463,7 @@ void rt_push_str(const char *s, uint32_t slen)
 
 void rt_pop_descr(DESCR_t *out)
 {
-    if (!out) { fprintf(stderr, "librt: pop_descr: NULL out ptr.\n"); abort(); }
+    if (!out) { fprintf(stderr, "libscrip_rt: pop_descr: NULL out ptr.\n"); abort(); }
     *out = vstack_pop();
 }
 
@@ -482,13 +482,13 @@ void rt_arith(int op)
         case 18: result = lv - rv; break;
         case 19: result = lv * rv; break;
         case 20:
-            if (!rv) { fprintf(stderr, "librt: SM_DIV by zero.\n"); abort(); }
+            if (!rv) { fprintf(stderr, "libscrip_rt: SM_DIV by zero.\n"); abort(); }
             result = lv / rv; break;
         case 22:
-            if (!rv) { fprintf(stderr, "librt: SM_MOD by zero.\n"); abort(); }
+            if (!rv) { fprintf(stderr, "libscrip_rt: SM_MOD by zero.\n"); abort(); }
             result = lv % rv; break;
         default:
-            fprintf(stderr, "librt: rt_arith: bad op=%d.\n", op);
+            fprintf(stderr, "libscrip_rt: rt_arith: bad op=%d.\n", op);
             abort();
     }
     vstack_push(INTVAL(result));
@@ -562,7 +562,7 @@ void rt_push_expression_descr(int64_t entry_pc, int64_t arity)
  *
  * Calls exec_stmt_blob() (declared in bb_box.h, defined in stmt_exec.c)
  * with the popped subject + replacement.  Stores the :S/:F result on
- * the librt last-ok flag (so SM_JUMP_S / SM_JUMP_F see it).
+ * the libscrip_rt last-ok flag (so SM_JUMP_S / SM_JUMP_F see it).
  *============================================================================*/
 
 extern void rt_set_last_ok(int v);   /* defined below */
@@ -1073,7 +1073,7 @@ int rt_do_return(int kind, int cond)
 DESCR_t sm_call_expression(int entry_pc)
 {
     fprintf(stderr,
-        "librt: sm_call_expression(%d) called — DT_E EVAL dispatch "
+        "libscrip_rt: sm_call_expression(%d) called — DT_E EVAL dispatch "
         "not yet wired in EM-6.  Add to EM-10 scope.\n", entry_pc);
     abort();
 }

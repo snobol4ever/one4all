@@ -262,7 +262,7 @@ struct AST_t {
 };
 
 /* =========================================================================
- * AST_e name table — for ir_print.c and debugging
+ * AST_e name table — for ast_print.c and debugging
  * ========================================================================= */
 
 #ifdef IR_DEFINE_NAMES

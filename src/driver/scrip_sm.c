@@ -14,7 +14,7 @@
 #include "scrip_sm.h"
 #include "../runtime/x86/sm_lower.h"
 #include "../runtime/x86/sm_prog.h"           /* CH-17a: sm_label_pc_lookup */
-#include "../runtime/common/ir_clone.h"
+#include "../runtime/common/ast_clone.h"
 #include "../runtime/interp/coro_runtime.h"   /* CH-17a: proc_table */
 #include "../runtime/interp/pl_runtime.h"     /* CH-17a: g_pl_pred_table */
 #include "interp_private.h"   /* label_table_build, prescan_defines, label_table_clear_stmts */

@@ -22,8 +22,8 @@
 #include "sm_prog.h"
 
 #include "../../frontend/snobol4/scrip_cc.h"
-#include "../../ir/ir.h"
-#include "../../runtime/common/ir_clone.h"   /* RS-9b: expr_gc_clone */
+#include "../ir/ast.h"
+#include "../../runtime/common/ast_clone.h"   /* RS-9b: ast_gc_clone */
 #include "../../runtime/interp/coro_runtime.h"  /* CH-17b: proc_table for expression skeletons */
 #include "../../runtime/interp/pl_runtime.h"    /* CH-17d: g_pl_pred_table for pred-expression skeletons */
 
@@ -40,7 +40,7 @@
  * All SM_PUSH_EXPR emissions go through this helper. */
 static void emit_push_expr(SM_Program *p, const AST_t *e)
 {
-    sm_emit_ptr(p, SM_PUSH_EXPR, (void *)expr_gc_clone(e));
+    sm_emit_ptr(p, SM_PUSH_EXPR, (void *)ast_gc_clone(e));
 }
 
 /* CH-17b': suppress lower_expr's "unhandled expr kind" stderr warning while

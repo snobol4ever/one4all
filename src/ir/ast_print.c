@@ -1,5 +1,5 @@
 /*
- * ir_print.c — Unified IR pretty-printer
+ * ast_print.c — Unified IR pretty-printer
  *
  * Prints any AST_t node (and its subtree) in a readable S-expression form.
  * Used for debugging all frontends uniformly — one printer, all 59 node kinds.
@@ -19,14 +19,14 @@
  */
 
 /*
- * Include scrip-cc.h — it defines EXPR_T_DEFINED then includes ir/ir.h,
+ * Include scrip-cc.h — it defines EXPR_T_DEFINED then includes ir/ast.h,
  * giving us AST_e and AST_t.  IR_DEFINE_NAMES pulls in ast_e_name[].
  */
 #define IR_DEFINE_NAMES
-#include "scrip_cc.h"   /* → ir/ir.h (AST_e, AST_t, ast_e_name) */
+#include "scrip_cc.h"   /* → ir/ast.h (AST_e, AST_t, ast_e_name) */
 
 /* -------------------------------------------------------------------------
- * ir_print.h forward declarations (inlined here — no separate .h needed
+ * ast_print.h forward declarations (inlined here — no separate .h needed
  * for a debug utility).
  * ---------------------------------------------------------------------- */
 
@@ -165,7 +165,7 @@ void ir_print_node_nl(const AST_t *e, FILE *f) {
 /* -------------------------------------------------------------------------
  * Unit test — compiled when IR_PRINT_TEST is defined.
  * Build: gcc -I src -I src/frontend/snobol4 -DIR_PRINT_TEST \
- *             src/ir/ir_print.c -o /tmp/ir_print_test
+ *             src/ir/ast_print.c -o /tmp/ir_print_test
  * ---------------------------------------------------------------------- */
 #ifdef IR_PRINT_TEST
 
@@ -216,7 +216,7 @@ int main(void) {
     add_child(alt, foo);
     add_child(alt, span);
 
-    fputs("=== ir_print unit test ===\n\n", stdout);
+    fputs("=== ast_print unit test ===\n\n", stdout);
 
     fputs("1. AST_SEQ:\n", stdout);
     ir_print_node_nl(root, stdout);
