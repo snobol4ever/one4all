@@ -82,15 +82,15 @@ const char *sm_emit_consume_pc_label(void)
 
 static const sm_op_template_t g_sm_templates[] = {
     /* Value push/pop/store */
-    { SM_HALT,         "SM_HALT",         "scrip_rt_halt_tos",     SM_TPL_NULLARY,    0, 0 },
-    { SM_PUSH_LIT_I,   "SM_PUSH_INT",     "scrip_rt_push_int",     SM_TPL_INT64,      0, 0 },
-    { SM_PUSH_LIT_S,   "SM_PUSH_STR",     "scrip_rt_push_str",     SM_TPL_LBL_INT32,  0, 0 },
-    { SM_PUSH_VAR,     "SM_PUSH_VAR",     "scrip_rt_nv_get",       SM_TPL_LBL,        0, 0 },
-    { SM_STORE_VAR,    "SM_STORE_VAR",    "scrip_rt_nv_set",       SM_TPL_LBL,        0, 0 },
-    { SM_POP,          "SM_POP",          "scrip_rt_pop_void",     SM_TPL_NULLARY,    0, 0 },
-    { SM_PUSH_NULL,    "SM_PUSH_NULL",    "scrip_rt_push_null",    SM_TPL_NULLARY,    0, 0 },
-    { SM_CONCAT,       "SM_CONCAT",       "scrip_rt_concat",       SM_TPL_NULLARY,    0, 0 },
-    { SM_COERCE_NUM,   "SM_COERCE_NUM",   "scrip_rt_coerce_num",   SM_TPL_NULLARY,    0, 0 },
+    { SM_HALT,         "HALT",         "scrip_rt_halt_tos",     SM_TPL_NULLARY,    0, 0 },
+    { SM_PUSH_LIT_I,   "PUSH_INT",     "scrip_rt_push_int",     SM_TPL_INT64,      0, 0 },
+    { SM_PUSH_LIT_S,   "PUSH_STR",     "scrip_rt_push_str",     SM_TPL_LBL_INT32,  0, 0 },
+    { SM_PUSH_VAR,     "PUSH_VAR",     "scrip_rt_nv_get",       SM_TPL_LBL,        0, 0 },
+    { SM_STORE_VAR,    "STORE_VAR",    "scrip_rt_nv_set",       SM_TPL_LBL,        0, 0 },
+    { SM_POP,          "VOID_POP",          "scrip_rt_pop_void",     SM_TPL_NULLARY,    0, 0 },
+    { SM_PUSH_NULL,    "PUSH_NULL",    "scrip_rt_push_null",    SM_TPL_NULLARY,    0, 0 },
+    { SM_CONCAT,       "CONCAT",       "scrip_rt_concat",       SM_TPL_NULLARY,    0, 0 },
+    { SM_COERCE_NUM,   "COERCE_NUM",   "scrip_rt_coerce_num",   SM_TPL_NULLARY,    0, 0 },
 
     /* Arithmetic.  All five share the same shape; they differ only in
      * the op-enum baked into the call.  The macro takes a single arg
@@ -98,67 +98,67 @@ static const sm_op_template_t g_sm_templates[] = {
      * For human readability we ALSO emit per-op convenience macros
      * (SM_ADD, SM_SUB, ...) that wrap SM_ARITH; see render_macro_body.
      * The per-call site uses SM_ARITH directly with the op as arg. */
-    { SM_ADD,          "SM_ARITH",        "scrip_rt_arith",        SM_TPL_ARITH,     SM_ADD, 0 },
-    { SM_SUB,          "SM_ARITH",        "scrip_rt_arith",        SM_TPL_ARITH,     SM_SUB, 0 },
-    { SM_MUL,          "SM_ARITH",        "scrip_rt_arith",        SM_TPL_ARITH,     SM_MUL, 0 },
-    { SM_DIV,          "SM_ARITH",        "scrip_rt_arith",        SM_TPL_ARITH,     SM_DIV, 0 },
-    { SM_MOD,          "SM_ARITH",        "scrip_rt_arith",        SM_TPL_ARITH,     SM_MOD, 0 },
+    { SM_ADD,          "ARITH",        "scrip_rt_arith",        SM_TPL_ARITH,     SM_ADD, 0 },
+    { SM_SUB,          "ARITH",        "scrip_rt_arith",        SM_TPL_ARITH,     SM_SUB, 0 },
+    { SM_MUL,          "ARITH",        "scrip_rt_arith",        SM_TPL_ARITH,     SM_MUL, 0 },
+    { SM_DIV,          "ARITH",        "scrip_rt_arith",        SM_TPL_ARITH,     SM_DIV, 0 },
+    { SM_MOD,          "ARITH",        "scrip_rt_arith",        SM_TPL_ARITH,     SM_MOD, 0 },
 
     /* Control flow */
-    { SM_JUMP,         "SM_JUMP",         NULL,                    SM_TPL_PCREF_JMP,  0, 0 },
-    { SM_JUMP_S,       "SM_JUMP_S",       "scrip_rt_last_ok",      SM_TPL_PCREF_COND, 1, 0 },
-    { SM_JUMP_F,       "SM_JUMP_F",       "scrip_rt_last_ok",      SM_TPL_PCREF_COND, 0, 0 },
+    { SM_JUMP,         "JUMP",         NULL,                    SM_TPL_PCREF_JMP,  0, 0 },
+    { SM_JUMP_S,       "JUMP_S",       "scrip_rt_last_ok",      SM_TPL_PCREF_COND, 1, 0 },
+    { SM_JUMP_F,       "JUMP_F",       "scrip_rt_last_ok",      SM_TPL_PCREF_COND, 0, 0 },
 
     /* Chunk discipline */
-    { SM_PUSH_CHUNK,   "SM_PUSH_CHUNK",   "scrip_rt_push_chunk_descr", SM_TPL_PUSH_CHUNK, 0, 0 },
-    { SM_CALL_CHUNK,   "SM_CALL_CHUNK",   NULL,                    SM_TPL_CALL_CHUNK, 0, 0 },
-    { SM_RETURN,       "SM_RETURN",       NULL,                    SM_TPL_RET,        0, 0 },
+    { SM_PUSH_CHUNK,   "PUSH_CHUNK",   "scrip_rt_push_chunk_descr", SM_TPL_PUSH_CHUNK, 0, 0 },
+    { SM_CALL_CHUNK,   "CALL_CHUNK",   NULL,                    SM_TPL_CALL_CHUNK, 0, 0 },
+    { SM_RETURN,       "RETURN",       NULL,                    SM_TPL_RET,        0, 0 },
 
     /* General call */
-    { SM_CALL,         "SM_CALL",         "scrip_rt_call",         SM_TPL_LBL_INT32,  0, 0 },
+    { SM_CALL,         "CALL_FN",         "scrip_rt_call",         SM_TPL_LBL_INT32,  0, 0 },
 
     /* Pattern construction (no-arg shape) */
-    { SM_PAT_SPAN,     "SM_PAT_SPAN",     "scrip_rt_pat_span",     SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_BREAK,    "SM_PAT_BREAK",    "scrip_rt_pat_break",    SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_ANY,      "SM_PAT_ANY",      "scrip_rt_pat_any",      SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_NOTANY,   "SM_PAT_NOTANY",   "scrip_rt_pat_notany",   SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_LEN,      "SM_PAT_LEN",      "scrip_rt_pat_len",      SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_POS,      "SM_PAT_POS",      "scrip_rt_pat_pos",      SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_RPOS,     "SM_PAT_RPOS",     "scrip_rt_pat_rpos",     SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_TAB,      "SM_PAT_TAB",      "scrip_rt_pat_tab",      SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_RTAB,     "SM_PAT_RTAB",     "scrip_rt_pat_rtab",     SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_ARB,      "SM_PAT_ARB",      "scrip_rt_pat_arb",      SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_ARBNO,    "SM_PAT_ARBNO",    "scrip_rt_pat_arbno",    SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_REM,      "SM_PAT_REM",      "scrip_rt_pat_rem",      SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_FENCE,    "SM_PAT_FENCE",    "scrip_rt_pat_fence",    SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_FENCE1,   "SM_PAT_FENCE1",   "scrip_rt_pat_fence1",   SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_FAIL,     "SM_PAT_FAIL",     "scrip_rt_pat_fail",     SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_ABORT,    "SM_PAT_ABORT",    "scrip_rt_pat_abort",    SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_SUCCEED,  "SM_PAT_SUCCEED",  "scrip_rt_pat_succeed",  SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_BAL,      "SM_PAT_BAL",      "scrip_rt_pat_bal",      SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_EPS,      "SM_PAT_EPS",      "scrip_rt_pat_eps",      SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_CAT,      "SM_PAT_CAT",      "scrip_rt_pat_cat",      SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_ALT,      "SM_PAT_ALT",      "scrip_rt_pat_alt",      SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_DEREF,    "SM_PAT_DEREF",    "scrip_rt_pat_deref",    SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_BOXVAL,   "SM_PAT_BOXVAL",   "scrip_rt_pat_boxval",   SM_TPL_NULLARY,    0, 0 },
+    { SM_PAT_SPAN,     "PAT_SPAN",     "scrip_rt_pat_span",     SM_TPL_NULLARY,    0, 0 },
+    { SM_PAT_BREAK,    "PAT_BREAK",    "scrip_rt_pat_break",    SM_TPL_NULLARY,    0, 0 },
+    { SM_PAT_ANY,      "PAT_ANY",      "scrip_rt_pat_any",      SM_TPL_NULLARY,    0, 0 },
+    { SM_PAT_NOTANY,   "PAT_NOTANY",   "scrip_rt_pat_notany",   SM_TPL_NULLARY,    0, 0 },
+    { SM_PAT_LEN,      "PAT_LEN",      "scrip_rt_pat_len",      SM_TPL_NULLARY,    0, 0 },
+    { SM_PAT_POS,      "PAT_POS",      "scrip_rt_pat_pos",      SM_TPL_NULLARY,    0, 0 },
+    { SM_PAT_RPOS,     "PAT_RPOS",     "scrip_rt_pat_rpos",     SM_TPL_NULLARY,    0, 0 },
+    { SM_PAT_TAB,      "PAT_TAB",      "scrip_rt_pat_tab",      SM_TPL_NULLARY,    0, 0 },
+    { SM_PAT_RTAB,     "PAT_RTAB",     "scrip_rt_pat_rtab",     SM_TPL_NULLARY,    0, 0 },
+    { SM_PAT_ARB,      "PAT_ARB",      "scrip_rt_pat_arb",      SM_TPL_NULLARY,    0, 0 },
+    { SM_PAT_ARBNO,    "PAT_ARBNO",    "scrip_rt_pat_arbno",    SM_TPL_NULLARY,    0, 0 },
+    { SM_PAT_REM,      "PAT_REM",      "scrip_rt_pat_rem",      SM_TPL_NULLARY,    0, 0 },
+    { SM_PAT_FENCE,    "PAT_FENCE",    "scrip_rt_pat_fence",    SM_TPL_NULLARY,    0, 0 },
+    { SM_PAT_FENCE1,   "PAT_FENCE1",   "scrip_rt_pat_fence1",   SM_TPL_NULLARY,    0, 0 },
+    { SM_PAT_FAIL,     "PAT_FAIL",     "scrip_rt_pat_fail",     SM_TPL_NULLARY,    0, 0 },
+    { SM_PAT_ABORT,    "PAT_ABORT",    "scrip_rt_pat_abort",    SM_TPL_NULLARY,    0, 0 },
+    { SM_PAT_SUCCEED,  "PAT_SUCCEED",  "scrip_rt_pat_succeed",  SM_TPL_NULLARY,    0, 0 },
+    { SM_PAT_BAL,      "PAT_BAL",      "scrip_rt_pat_bal",      SM_TPL_NULLARY,    0, 0 },
+    { SM_PAT_EPS,      "PAT_EPS",      "scrip_rt_pat_eps",      SM_TPL_NULLARY,    0, 0 },
+    { SM_PAT_CAT,      "PAT_CAT",      "scrip_rt_pat_cat",      SM_TPL_NULLARY,    0, 0 },
+    { SM_PAT_ALT,      "PAT_ALT",      "scrip_rt_pat_alt",      SM_TPL_NULLARY,    0, 0 },
+    { SM_PAT_DEREF,    "PAT_DEREF",    "scrip_rt_pat_deref",    SM_TPL_NULLARY,    0, 0 },
+    { SM_PAT_BOXVAL,   "PAT_BOXVAL",   "scrip_rt_pat_boxval",   SM_TPL_NULLARY,    0, 0 },
 
     /* Pattern construction (one-string-or-NULL shape) */
-    { SM_PAT_LIT,      "SM_PAT_LIT",      "scrip_rt_pat_lit",      SM_TPL_LBLOPT,     0, 0 },
-    { SM_PAT_REFNAME,  "SM_PAT_REFNAME",  "scrip_rt_pat_refname",  SM_TPL_LBLOPT,     0, 0 },
-    { SM_PAT_USERCALL, "SM_PAT_USERCALL", "scrip_rt_pat_usercall", SM_TPL_LBLOPT,     0, 0 },
+    { SM_PAT_LIT,      "PAT_LIT",      "scrip_rt_pat_lit",      SM_TPL_LBLOPT,     0, 0 },
+    { SM_PAT_REFNAME,  "PAT_REFNAME",  "scrip_rt_pat_refname",  SM_TPL_LBLOPT,     0, 0 },
+    { SM_PAT_USERCALL, "PAT_USERCALL", "scrip_rt_pat_usercall", SM_TPL_LBLOPT,     0, 0 },
 
     /* Pattern construction (string-or-NULL + int) */
-    { SM_PAT_CAPTURE,       "SM_PAT_CAPTURE",       "scrip_rt_pat_capture",       SM_TPL_LBLOPT_INT32, 0, 0 },
-    { SM_PAT_USERCALL_ARGS, "SM_PAT_USERCALL_ARGS", "scrip_rt_pat_usercall_args", SM_TPL_LBLOPT_INT32, 0, 0 },
+    { SM_PAT_CAPTURE,       "PAT_CAPTURE",       "scrip_rt_pat_capture",       SM_TPL_LBLOPT_INT32, 0, 0 },
+    { SM_PAT_USERCALL_ARGS, "PAT_USERCALL_ARGS", "scrip_rt_pat_usercall_args", SM_TPL_LBLOPT_INT32, 0, 0 },
 
     /* Pattern construction with three args */
-    { SM_PAT_CAPTURE_FN,      "SM_PAT_CAPTURE_FN",      "scrip_rt_pat_capture_fn",
+    { SM_PAT_CAPTURE_FN,      "PAT_CAPTURE_FN",      "scrip_rt_pat_capture_fn",
       SM_TPL_LBLOPT3,         0, 0 },
-    { SM_PAT_CAPTURE_FN_ARGS, "SM_PAT_CAPTURE_FN_ARGS", "scrip_rt_pat_capture_fn_args",
+    { SM_PAT_CAPTURE_FN_ARGS, "PAT_CAPTURE_FN_ARGS", "scrip_rt_pat_capture_fn_args",
       SM_TPL_LBLOPT_I_I,      0, 0 },
 
     /* Statement execution (variant pattern) */
-    { SM_EXEC_STMT,    "SM_EXEC_STMT_VARIANT",  "scrip_rt_match_variant",
+    { SM_EXEC_STMT,    "EXEC_STMT_VARIANT",  "scrip_rt_match_variant",
       SM_TPL_EXEC_VAR, 0, 0 },
 };
 
@@ -166,11 +166,11 @@ static const sm_op_template_t g_sm_templates[] = {
 
 /* Standalone non-table templates (for shapes that aren't keyed by opcode). */
 static const sm_op_template_t g_tpl_unhandled = {
-    -1, "SM_UNHANDLED", "scrip_rt_unhandled_op", SM_TPL_UNHANDLED, 0, 0
+    -1, "UNHANDLED", "scrip_rt_unhandled_op", SM_TPL_UNHANDLED, 0, 0
 };
 
 static const sm_op_template_t g_tpl_ret_var = {
-    -2, "SM_RETURN_VARIANT", "scrip_rt_do_return", SM_TPL_RET_VAR, 0, 0
+    -2, "RETURN_VARIANT", "scrip_rt_do_return", SM_TPL_RET_VAR, 0, 0
 };
 
 const sm_op_template_t *sm_template_lookup(int op)
@@ -554,7 +554,7 @@ static int render_call_line(FILE *out, const sm_op_template_t *t,
  * Walks g_sm_templates[] (plus the standalone unhandled and ret_var
  * templates) and emits one .macro definition per UNIQUE macro_name.
  * Multiple templates can share a macro_name (e.g. SM_ADD/SUB/MUL/DIV/MOD
- * all share "SM_ARITH"); each is emitted only once.
+ * all share "ARITH"); each is emitted only once.
  *
  * Output starts with a banner; ends with a blank line.  The macro
  * library is syntax-agnostic (only `.macro`/`.endm`/`.if` constructs
