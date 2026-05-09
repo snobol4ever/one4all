@@ -92,7 +92,7 @@ int  frame_active(AST_t *n) {
  * Semantics mirror coro_value.c:382–399 for AST_VAR with frame_depth > 0:
  *   slot in [0, FRAME.env_n) → use FRAME.env[slot]; else FAILDESCR.
  * Outside an Icon frame (frame_depth == 0), icn_frame_env_active() returns 0
- * and the caller pushes FAILDESCR — the chunk-shaped consumer dispatch
+ * and the caller pushes FAILDESCR — the expression-shaped consumer dispatch
  * (CH-17c+) is the only path that reaches these calls in real programs. */
 int icn_frame_env_active(void) {
     return frame_depth > 0;
@@ -163,7 +163,7 @@ static static_ent_t static_tab[STATIC_MAX];
 static int              static_n = 0;
 
 /* Look up entry_pc for a proc by name.  Returns -1 if not found or not yet
- * resolved (entry_pc == -1 means sm_lower hasn't emitted its chunk yet). */
+ * resolved (entry_pc == -1 means sm_lower hasn't emitted its expression yet). */
 static int static_proc_entry_pc(const char *proc_name) {
     if (!proc_name) return -1;
     for (int i = 0; i < proc_count; i++)
@@ -546,21 +546,21 @@ DESCR_t coro_call(AST_t *proc, DESCR_t *args, int nargs) {
 /*============================================================================================================================
  * CH-17c: sm_call_proc — run an Icon/Raku proc body via SM dispatch.
  *
- * Called when proc_table[i].entry_pc != -1 (chunk lowered by CH-17b/b'/b'').
+ * Called when proc_table[i].entry_pc != -1 (expression lowered by CH-17b/b'/b'').
  * Frame setup mirrors coro_call: push IcnFrame, bind args into param slots.
- * Chunk body uses SM_LOAD_FRAME / SM_STORE_FRAME (baked by CH-17b'') for
+ * Expression body uses SM_LOAD_FRAME / SM_STORE_FRAME (baked by CH-17b'') for
  * param and local access — no icn_scope_patch needed.
  *
- * Execution: delegates to sm_call_chunk(entry_pc), which runs the chunk in a
+ * Execution: delegates to sm_call_expression(entry_pc), which runs the expression in a
  * nested SM_State.  The IcnFrame pushed here is visible to SM_LOAD_FRAME /
- * SM_STORE_FRAME (via icn_frame_env_load/store) throughout the chunk body.
+ * SM_STORE_FRAME (via icn_frame_env_load/store) throughout the expression body.
  *
  * Static-variable persistence deferred to CH-17g (statics keyed on AST_t*;
  * procs with statics continue via legacy coro_call until that key changes).
  */
 DESCR_t sm_call_proc(int entry_pc, int nparams, DESCR_t *args, int nargs)
 {
-    extern DESCR_t sm_call_chunk(int epc);
+    extern DESCR_t sm_call_expression(int epc);
 
     if (entry_pc < 0) return FAILDESCR;
     if (frame_depth >= FRAME_STACK_MAX) return FAILDESCR;
@@ -576,8 +576,8 @@ DESCR_t sm_call_proc(int entry_pc, int nparams, DESCR_t *args, int nargs)
     for (int i = 0; i < nparams && i < nargs && i < FRAME_SLOT_MAX; i++)
         f->env[i] = args[i];
 
-    /* Run chunk body — frame is live for SM_LOAD_FRAME / SM_STORE_FRAME */
-    DESCR_t result = sm_call_chunk(entry_pc);
+    /* Run expression body — frame is live for SM_LOAD_FRAME / SM_STORE_FRAME */
+    DESCR_t result = sm_call_expression(entry_pc);
 
     /* Pop frame */
     icn_init_save_frame();
@@ -588,8 +588,8 @@ DESCR_t sm_call_proc(int entry_pc, int nparams, DESCR_t *args, int nargs)
 /* CH-17g-call-sites: single dispatch helper for proc_table[pi].  Mirrors the
  * trampoline-side flip CH-17c made for proc_trampoline / gather_trampoline:
  * when entry_pc is resolved (CH-17b' / CH-17b'' have lowered the proc body
- * into a chunk and CH-17a's resolver populated entry_pc), dispatch via SM
- * chunk; otherwise fall through to the legacy IR-walker coro_call.  Lets
+ * into an expression and CH-17a's resolver populated entry_pc), dispatch via SM
+ * expression; otherwise fall through to the legacy IR-walker coro_call.  Lets
  * every Icon/Raku user-proc call site flip in one line, identically. */
 DESCR_t proc_table_call(int pi, DESCR_t *args, int nargs)
 {
@@ -767,7 +767,7 @@ static void proc_trampoline(void) {
     Icn_coro_stage_t st = coro_stage;        /* copy before first yield */
     active_coro = st.ss;
     DESCR_t result;
-    /* CH-17c: dispatch via SM chunk when entry_pc is resolved */
+    /* CH-17c: dispatch via SM expression when entry_pc is resolved */
     if (st.entry_pc >= 0)
         result = sm_call_proc(st.entry_pc, st.nparams, st.args, st.nargs);
     else
@@ -798,7 +798,7 @@ void gather_trampoline(void) {
     coro_t *ss = gather_trampoline_ss;
     active_coro = ss;
     DESCR_t result;
-    /* CH-17c: use SM chunk when entry_pc is resolved */
+    /* CH-17c: use SM expression when entry_pc is resolved */
     if (ss->gather_entry_pc >= 0)
         result = sm_call_proc(ss->gather_entry_pc, ss->gather_nparams, NULL, 0);
     else

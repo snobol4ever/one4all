@@ -37,7 +37,7 @@ typedef struct {
     DESCR_t    *caller_stack;         /* GC'd copy of caller's stack[0..caller_sp-1] */
 } SmCallFrame;
 
-/* CHUNKS-step14: SmGenState — persistent state for a suspended generator chunk.
+/* CHUNKS-step14: SmGenState — persistent state for a suspended generator expression.
  * bb_broker_drive_sm allocates one of these per generator invocation.
  * sm_interp_run fills it in when SM_SUSPEND fires; bb_broker_drive_sm
  * restores it on each resume call.
@@ -59,7 +59,7 @@ struct SmGenState {
      * SM_LOAD_GLOCAL / SM_STORE_GLOCAL.  Survive SUSPEND/RESUME the same
      * way `stack` does (they are part of the SmGenState, which is the
      * persistent envelope).  Each Icon generator kind allocates a fixed
-     * static count of these at chunk start; the count itself is encoded
+     * static count of these at expression start; the count itself is encoded
      * in the lowering, never stored. */
     DESCR_t  locals[SM_GEN_LOCAL_MAX];
 };
@@ -102,15 +102,15 @@ DESCR_t sm_pop(SM_State *st);
 DESCR_t sm_peek(SM_State *st);
 
 /* CHUNKS-step02: run a compiled chunk thunk, return its result */
-DESCR_t sm_call_chunk(int entry_pc);
+DESCR_t sm_call_expression(int entry_pc);
 
 /* CHUNKS-step14: generator infrastructure.
  *
  * sm_gen_state_new — allocate and initialise a SmGenState for entry_pc.
  *   Must be called before the first bb_broker_drive_sm tick.
  *
- * bb_broker_drive_sm — drive an SM generator chunk across all its ticks.
- *   Analogous to bb_broker(root, BB_PUMP, body_fn, arg) but for SM chunks
+ * bb_broker_drive_sm — drive an SM generator expression across all its ticks.
+ *   Analogous to bb_broker(root, BB_PUMP, body_fn, arg) but for SM expressions
  *   rather than AST_t-based bb_node_t generators.
  *
  *   On each tick the interpreter runs until SM_SUSPEND (yield a value) or

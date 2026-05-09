@@ -166,9 +166,9 @@ int sm_emit_pcref_jmp  (FILE *out, const sm_op_template_t *t,
 int sm_emit_pcref_cond (FILE *out, const sm_op_template_t *t,
                         int target_pc, int taken_when_ok,
                         const char *anno);
-int sm_emit_push_chunk (FILE *out, const sm_op_template_t *t,
+int sm_emit_push_expression (FILE *out, const sm_op_template_t *t,
                         int64_t entry_pc, int arity);
-int sm_emit_call_chunk (FILE *out, const sm_op_template_t *t,
+int sm_emit_call_expression (FILE *out, const sm_op_template_t *t,
                         int target_pc);
 int sm_emit_ret        (FILE *out, const sm_op_template_t *t,
                         const char *anno);

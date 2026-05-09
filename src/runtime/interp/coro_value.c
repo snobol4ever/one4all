@@ -492,7 +492,7 @@ DESCR_t bb_eval_value(AST_t *e)
             if (raku_try_call_builtin(e, &__rk_d)) return __rk_d;
         }
         /* User-proc path: look up in proc_table and call via proc_table_call
-         * (CH-17g-call-sites: dispatches via SM chunk when entry_pc resolved). */
+         * (CH-17g-call-sites: dispatches via SM expression when entry_pc resolved). */
         for (int i = 0; i < proc_count; i++) {
             if (strcmp(proc_table[i].name, fn) != 0) continue;
             DESCR_t *args = nargs > 0 ? GC_malloc((size_t)nargs * sizeof(DESCR_t)) : NULL;

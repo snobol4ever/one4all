@@ -220,7 +220,7 @@ extern DESCR_t eval_node(AST_t *e);
 static PATND_t *pat_to_patnd(DESCR_t v) {
     if (v.v == DT_E) {
         /* CHUNKS-step02: chunk DT_E (slen==1) — dispatch via EXPVAL_fn which
-         * routes to sm_call_chunk.  Legacy AST_t* path (slen==0) follows below. */
+         * routes to sm_call_expression.  Legacy AST_t* path (slen==0) follows below. */
         if (v.slen == 1) {
             v = EXPVAL_fn(v);
             /* Fall through to coerce result as pattern value */

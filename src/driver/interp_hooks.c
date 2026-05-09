@@ -140,7 +140,7 @@ DESCR_t _usercall_hook(const char *name, DESCR_t *args, int nargs) {
             if (strcmp(proc_table[_i].name, name) == 0) {
                 /* Call as one-shot: drive the Icon proc and return its value.
                  * proc_table_call returns FAILDESCR if the procedure fails.
-                 * CH-17g-call-sites: dispatches via SM chunk when entry_pc resolved. */
+                 * CH-17g-call-sites: dispatches via SM expression when entry_pc resolved. */
                 return proc_table_call(_i, args, nargs);
             }
         }
@@ -161,7 +161,7 @@ DESCR_t _usercall_hook(const char *name, DESCR_t *args, int nargs) {
                         NULL);
                 Term **saved_env = g_pl_env;
                 g_pl_env = pl_args;
-                /* CH-17e: prefer SM-chunk path when entry_pc resolved */
+                /* CH-17e: prefer SM-expression path when entry_pc resolved */
                 Pl_PredEntry *_hpe = pl_pred_entry_lookup(pl_key);
                 bb_node_t root = (_hpe && _hpe->entry_pc >= 0)
                     ? pl_box_choice_pc(_hpe->entry_pc, g_pl_env, nargs)

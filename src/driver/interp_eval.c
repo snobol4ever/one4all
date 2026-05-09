@@ -283,7 +283,7 @@ const char *real_str(double r, char *buf, int bufsz) {
  * name and pre-evaluated args.
  *
  * This helper is the bridge that lets SM_CALL_FN in sm_interp.c dispatch
- * Icon builtins from inside chunk bodies.  Today the chunk emits e.g.
+ * Icon builtins from inside expression bodies.  Today the expression emits e.g.
  *
  *     SM_PUSH_LIT_S "hello"
  *     SM_CALL_FN s="write" nargs=1
@@ -291,7 +291,7 @@ const char *real_str(double r, char *buf, int bufsz) {
  * and SM_CALL_FN's handler walks INVOKE_fn / APPLY_fn (the SNOBOL4 builtin
  * registry).  Icon's `write` lives in icn_call_builtin (below) on the
  * legacy IR-walker path and is never registered through register_fn, so
- * APPLY_fn returns FAIL and the chunk surfaces "Error 5: Undefined
+ * APPLY_fn returns FAIL and the expression surfaces "Error 5: Undefined
  * function or operation."  Wiring this helper into SM_CALL_FN after the
  * INVOKE_fn fallback closes that gap (CH-17g-runtime-bridge-2).
  *
@@ -307,7 +307,7 @@ const char *real_str(double r, char *buf, int bufsz) {
  * Builtins that need AST_t (Raku/SCAN dispatch helpers, mutators that
  * write back through children[1]'s lvalue identity, generator builtins
  * that inspect children[i] structurally) are NOT covered here and remain
- * with icn_call_builtin / interp_eval.  Those become per-kind chunk
+ * with icn_call_builtin / interp_eval.  Those become per-kind expression
  * producer/consumer migrations under CH-17h. */
 int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR_t *out)
 {
@@ -823,7 +823,7 @@ DESCR_t icn_call_builtin(AST_t *call, DESCR_t *args, int nargs) {
     }
     DESCR_t a0 = nargs > 0 ? args[0] : NULVCL;
     DESCR_t a1 = nargs > 1 ? args[1] : NULVCL;
-    /* User proc — call directly with resolved args (CH-17g-call-sites: via SM chunk when entry_pc resolved) */
+    /* User proc — call directly with resolved args (CH-17g-call-sites: via SM expression when entry_pc resolved) */
     for (int i = 0; i < proc_count; i++) {
         if (!strcmp(proc_table[i].name, fn))
             return proc_table_call(i, args, nargs);
@@ -2776,7 +2776,7 @@ DESCR_t interp_eval(AST_t *e)
          * SNO body lookup above found nothing.  Try Icon proc table, then
          * Prolog pred table, before falling through to builtins/APPLY_fn. */
         {
-            /* Try Icon proc table (case-sensitive) — CH-17g-call-sites: via SM chunk when entry_pc resolved */
+            /* Try Icon proc table (case-sensitive) — CH-17g-call-sites: via SM expression when entry_pc resolved */
             for (int _ci = 0; _ci < proc_count; _ci++) {
                 if (strcmp(proc_table[_ci].name, e->sval) == 0)
                     return proc_table_call(_ci, args, nargs);
@@ -2790,7 +2790,7 @@ DESCR_t interp_eval(AST_t *e)
                     Term **_pl_args = (nargs > 0) ? pl_env_new(nargs) : NULL;
                     Term **_saved   = g_pl_env;
                     g_pl_env = _pl_args;
-                    /* CH-17e: use SM-chunk path when entry_pc is resolved */
+                    /* CH-17e: use SM-expression path when entry_pc is resolved */
                     Pl_PredEntry *_pe = pl_pred_entry_lookup(_pk);
                     bb_node_t _root = (_pe && _pe->entry_pc >= 0)
                         ? pl_box_choice_pc(_pe->entry_pc, g_pl_env, nargs)
@@ -3236,7 +3236,7 @@ DESCR_t interp_eval(AST_t *e)
         return NULVCL;
     case AST_CHOICE: {
         /* Drive clause selection via the Byrd box broker.
-         * CH-17e: when entry_pc >= 0 (SM chunk lowered by CH-17d/f), use
+         * CH-17e: when entry_pc >= 0 (SM expression lowered by CH-17d/f), use
          * pl_box_choice_pc; otherwise fall back to IR-walk pl_box_choice. */
         if (!g_pl_active) return NULVCL;
         int arity = 0;

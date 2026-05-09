@@ -64,9 +64,9 @@ bb_node_t pl_box_clause(AST_t *ec, Term **caller_args, int arity);
 /* pl_box_choice — OR-box over all AST_CLAUSE children of an AST_CHOICE node. */
 bb_node_t pl_box_choice(AST_t *choice_node, Term **caller_args, int arity);
 
-/* CH-17e: pl_box_choice_pc — SM-chunk variant of pl_box_choice.
- * Calls sm_call_chunk(entry_pc) directly; no IR walk.
- * Used when Pl_PredEntry.entry_pc >= 0 (chunk lowered by CH-17d/f). */
+/* CH-17e: pl_box_choice_pc — SM-expression variant of pl_box_choice.
+ * Calls sm_call_expression(entry_pc) directly; no IR walk.
+ * Used when Pl_PredEntry.entry_pc >= 0 (expression lowered by CH-17d/f). */
 bb_node_t pl_box_choice_pc(int entry_pc, Term **caller_args, int arity);
 
 /* pl_box_choice_call — build an OR-box for an AST_FNC user-predicate call goal. */

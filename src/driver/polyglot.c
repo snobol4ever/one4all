@@ -291,12 +291,12 @@ void polyglot_execute(CODE_t *prog) {
             g_pl_env = _saved;
             if (_dir_env) free(_dir_env);
         }
-        /* CH-17e: run main/0 via SM chunk when entry_pc resolved */
+        /* CH-17e: run main/0 via SM expression when entry_pc resolved */
         Pl_PredEntry *_main_pe = pl_pred_entry_lookup("main/0");
         AST_t *main_choice = pl_pred_table_lookup(&g_pl_pred_table, "main/0");
         if (_main_pe && _main_pe->entry_pc >= 0) {
-            extern DESCR_t sm_call_chunk(int);
-            sm_call_chunk(_main_pe->entry_pc);
+            extern DESCR_t sm_call_expression(int);
+            sm_call_expression(_main_pe->entry_pc);
         } else if (main_choice) interp_eval(main_choice);
         else fprintf(stderr, "prolog: no main/0 predicate\n");
         g_pl_active = 0;

@@ -201,7 +201,7 @@ bb_node_t bb_build(struct _PATND_t *p);
 
 /* EM-7c (GOAL-MODE4-EMIT): mode-4 entry for pre-built BB blobs.
  * The mode-4 emitter bakes invariant pattern sub-trees as flat .text
- * chunks via bb_build_flat_text; at Phase-3 the entry is a function
+ * expressions via bb_build_flat_text; at Phase-3 the entry is a function
  * pointer (the address of `_pat_inv_<id>_α`) but no PATND_t.
  * exec_stmt_blob() takes that bb_box_fn directly and skips Phase-2.
  * Defined in stmt_exec.c. */

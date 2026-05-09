@@ -27,9 +27,9 @@ extern jmp_buf g_sno_err_jmp;
  *
  * After sm_lower runs, every Icon/Raku proc and Prolog predicate in proc_table /
  * g_pl_pred_table looks itself up by name in the SM_Program's label table.  When
- * sm_lower has emitted a named SM_LABEL chunk for that proc (CH-17b for Icon/Raku,
+ * sm_lower has emitted a named SM_LABEL expression for that proc (CH-17b for Icon/Raku,
  * CH-17d for Prolog), the lookup returns a valid pc; otherwise -1.  CH-17a is
- * pure scaffolding — sm_lower does not yet emit named proc-body chunks for any
+ * pure scaffolding — sm_lower does not yet emit named proc-body expressions for any
  * frontend, so every entry_pc remains -1 here.  Subsequent rungs flip producers,
  * then consumers, then delete the legacy AST_t* paths.
  *
@@ -93,7 +93,7 @@ SM_Program *sm_preamble(void *prog_void)
 
     /* CH-17a: resolve entry_pcs for every proc / Prolog predicate.  Pure
      * scaffolding: today every entry resolves to -1 because sm_lower does not
-     * yet emit named proc-body chunks (CH-17b/d will).  Consumers still use
+     * yet emit named proc-body expressions (CH-17b/d will).  Consumers still use
      * the legacy proc/AST_t* paths until CH-17c/e flip them. */
     sm_resolve_proc_entry_pcs(sm);
 

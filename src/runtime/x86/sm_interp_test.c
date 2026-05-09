@@ -74,7 +74,7 @@ DESCR_t INVOKE_fn(const char *name, DESCR_t *args, int nargs) {
 /* CHUNKS-step17b'' (CH-17b''): stubs for the Icon frame-env forwarders.
  * The unit-test world has no Icon frame stack; report "no frame active"
  * so SM_LOAD_FRAME / SM_STORE_FRAME push FAILDESCR and clear last_ok.
- * The frame-slot opcodes are only emitted by sm_lower for chunks
+ * The frame-slot opcodes are only emitted by sm_lower for expressions
  * (which the unit tests do not exercise), so this path is never hit
  * by existing tests; the stubs exist purely to satisfy the linker. */
 int icn_frame_env_active(void) { return 0; }
@@ -316,7 +316,7 @@ static void test_generator_suspend_resume(void)
 }
 
 /* CHUNKS-step14b: gen-local slot survival across SUSPEND.
- * Build a chunk that initializes locals[0]=100, yields, then on each resume
+ * Build an expression that initializes locals[0]=100, yields, then on each resume
  * loads locals[0], increments, stores back, yields.  Three yields expected:
  * 100, 101, 102.  Proves the locals[] array in SmGenState survives across
  * SUSPEND/RESUME boundaries — the foundation for AST_TO/AST_TO_BY in CHUNKS-step15a. */
@@ -364,7 +364,7 @@ static void test_gen_locals_survive_suspend(void)
 /* CHUNKS-step14b: gen-locals are private to each SmGenState invocation.
  * Two independent generators using locals[0] must not interfere — even
  * when they share the same entry_pc.  Drive gen_a fully, then drive
- * gen_b fully on the same chunk; each must see its own private 100/101/102.
+ * gen_b fully on the same expression; each must see its own private 100/101/102.
  * (Sequential, not concurrent — but both allocate their own SmGenState.) */
 static void test_gen_locals_isolated_per_invocation(void)
 {
@@ -392,7 +392,7 @@ static void test_gen_locals_isolated_per_invocation(void)
     int64_t a_first  = gen_collected[0];
     int64_t a_second = gen_collected[1];
 
-    /* Second invocation — fresh SmGenState, same chunk */
+    /* Second invocation — fresh SmGenState, same expression */
     gen_count = 0;
     SmGenState *gs_b = sm_gen_state_new(0);
     int ticks_b = bb_broker_drive_sm(gs_b, collect_gen_val, NULL);

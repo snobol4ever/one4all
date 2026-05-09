@@ -110,7 +110,7 @@ int sm_label(SM_Program *p)
     /* CHUNKS-step03: store PC in a[1].i (matches sm_label_named layout) and
      * leave a[0].s == NULL.  Was: a[0].i = target — but that aliases a[0].s
      * to a small-integer pointer which sm_label_pc_lookup then strcmp'd,
-     * segfaulting on chunk-body unnamed labels emitted by AST_DEFER lowering. */
+     * segfaulting on expression-body unnamed labels emitted by AST_DEFER lowering. */
     p->instrs[idx].a[1].i  = (int64_t)target;
     return target;
 }
@@ -164,7 +164,7 @@ static const char *opnames[SM_OPCODE_COUNT] = {
     "SM_LABEL","SM_JUMP","SM_JUMP_S","SM_JUMP_F","SM_HALT",
     "SM_STNO",
     "SM_PUSH_LIT_S","SM_PUSH_LIT_I","SM_PUSH_LIT_F","SM_PUSH_NULL","SM_PUSH_NULL_NOFLIP",
-    "SM_PUSH_VAR","SM_PUSH_EXPR","SM_PUSH_CHUNK","SM_CALL_CHUNK","SM_STORE_VAR","SM_VOID_POP",
+    "SM_PUSH_VAR","SM_PUSH_EXPR","SM_PUSH_EXPRESSION","SM_CALL_EXPRESSION","SM_STORE_VAR","SM_VOID_POP",
     "SM_ADD","SM_SUB","SM_MUL","SM_DIV","SM_EXP","SM_MOD","SM_CONCAT","SM_COERCE_NUM","SM_NEG",
     "SM_PAT_LIT","SM_PAT_ANY","SM_PAT_NOTANY","SM_PAT_SPAN","SM_PAT_BREAK",
     "SM_PAT_LEN","SM_PAT_POS","SM_PAT_RPOS","SM_PAT_TAB","SM_PAT_RTAB",

@@ -8,7 +8,7 @@
  * EM-2: push_int / pop_int / halt / unhandled_op.
  * EM-3: push_str / pop_descr / arith / nv_get(stub) / nv_set(stub) / pop_void.
  * EM-4: last_ok flag.
- * EM-5: push_chunk_descr.
+ * EM-5: push_expression_descr.
  * EM-6: [REVERTED in EM-7-revert, session #72] The full pattern-builder
  *   ABI (scrip_rt_pat_*, scrip_rt_exec_stmt) and the runtime pat-stack
  *   (g_pat_stack[], g_pat_sp) are removed.  Lon's correction: this
@@ -16,7 +16,7 @@
  *   for emitted code.  See GOAL-MODE4-EMIT.md "Design Discoveries"
  *   section.  EM-7a/b/c will reintroduce pattern emit using the proven
  *   dual-mode bb_emit infrastructure (bb_flat in EMIT_TEXT mode for
- *   invariant sub-trees baked as flat .text chunks; bb_emit BINARY mode
+ *   invariant sub-trees baked as flat .text expressions; bb_emit BINARY mode
  *   for variant nodes built into bb_pool RX memory at runtime).
  *   The full SNOBOL4 runtime stays linked in (bb_pool, snobol4_pattern,
  *   stmt_exec, etc.) — those objects will be called by EM-7c via the
@@ -218,28 +218,28 @@ static DESCR_t _rt_DIFFER(DESCR_t *a, int n)
 }
 
 /*==============================================================================
- * EM-7d-usercall-reentrant: native chunk function pointer registry
+ * EM-7d-usercall-reentrant: native expression function pointer registry
  *
  * The emitter walks SM_Program for SM_LABEL instructions with a[0].s set
  * (SNOBOL4 named function entries) and emits a .data table in the .s file.
- * scrip_rt_register_chunks() is called from the emitted main() before
- * scrip_rt_init; it populates g_chunk_reg[] so _rt_usercall can dispatch
+ * scrip_rt_register_expressions() is called from the emitted main() before
+ * scrip_rt_init; it populates g_expression_reg[] so _rt_usercall can dispatch
  * user-defined SNOBOL4 functions by direct fn(args,nargs) without touching
  * the interpreter call stack.
  *============================================================================*/
 
 #define CHUNK_REG_MAX 256
 
-typedef struct { const char *name; void *fn; } ChunkRegEntry;
-static ChunkRegEntry g_chunk_reg[CHUNK_REG_MAX];
+typedef struct { const char *name; void *fn; } ExpressionRegEntry;
+static ExpressionRegEntry g_expression_reg[CHUNK_REG_MAX];
 static int           g_chunk_reg_count = 0;
 
-void scrip_rt_register_chunks(const rt_chunk_entry *tbl)
+void scrip_rt_register_expressions(const rt_expression_entry *tbl)
 {
     if (!tbl) return;
     for (; tbl->name && g_chunk_reg_count < CHUNK_REG_MAX; tbl++) {
-        g_chunk_reg[g_chunk_reg_count].name = tbl->name;
-        g_chunk_reg[g_chunk_reg_count].fn   = tbl->fn;
+        g_expression_reg[g_chunk_reg_count].name = tbl->name;
+        g_expression_reg[g_chunk_reg_count].fn   = tbl->fn;
         g_chunk_reg_count++;
     }
 }
@@ -264,27 +264,27 @@ void scrip_rt_init_arbno(void **slot_ptr, void *child_fn)
     *slot_ptr = bb_arbno_new(child_fn, NULL);
 }
 
-/* Look up a user function by name in the chunk registry.
+/* Look up a user function by name in the expression registry.
  * Returns fn pointer or NULL if not found. */
 static void *chunk_reg_lookup(const char *name)
 {
     if (!name || !*name) return NULL;
     for (int i = 0; i < g_chunk_reg_count; i++) {
-        if (strcmp(g_chunk_reg[i].name, name) == 0)
-            return g_chunk_reg[i].fn;
+        if (strcmp(g_expression_reg[i].name, name) == 0)
+            return g_expression_reg[i].fn;
     }
     return NULL;
 }
 
-/* Call a native chunk (a SNOBOL4 user-defined function body emitted as a
+/* Call a native expression (a SNOBOL4 user-defined function body emitted as a
  * sequence of SM ops ending in `ret`) with the given arguments.
  *
  * SNOBOL4 calling convention: formal parameters are bound into the NV table
  * by name before the body executes (body does `SM_PUSH_VAR "N"`, not vstack
  * pop).  We use FUNC_PARAM_fn(name, i) to get the i-th param name, save
- * the old NV value, bind the arg, call the chunk, then restore.
+ * the old NV value, bind the arg, call the expression, then restore.
  *
- * The chunk pushes its return value onto the vstack before `ret`; we pop it.
+ * The expression pushes its return value onto the vstack before `ret`; we pop it.
  *
  * NOTE: no call-stack depth tracking, no local-variable isolation — this is
  * a direct-call model.  Recursive SNOBOL4 functions will reuse the same NV
@@ -309,14 +309,14 @@ static DESCR_t call_native_chunk(const char *fname, void *fn,
     /* Snapshot the value-stack depth so we can restore it: the SNOBOL4
      * user-function calling convention is "value of the function = NV[fname]"
      * (the body executes `fname = expr`, which is SM_STORE_VAR popping TOS
-     * into NV[fname]).  The chunk does NOT push its retval onto vstack
+     * into NV[fname]).  The expression does NOT push its retval onto vstack
      * before `ret` — that's the SM-interp's job (sm_interp.c:1208-1210
-     * does `NV_GET_fn(retval_name)` after the chunk returns).  We mirror
+     * does `NV_GET_fn(retval_name)` after the expression returns).  We mirror
      * that here: read NV[fname] for the retval; ignore vstack residue. */
     int saved_vtop = g_vtop;
 
-    /* Call the native chunk.  It runs its SM body and executes `ret`.
-     * Calling convention: void(void) at the ABI level — the chunk
+    /* Call the native expression.  It runs its SM body and executes `ret`.
+     * Calling convention: void(void) at the ABI level — the expression
      * reads/writes the global vstack and NV table directly. */
     typedef void (*chunk_fn_t)(void);
     chunk_fn_t cfn = (chunk_fn_t)fn;
@@ -343,13 +343,13 @@ static DESCR_t call_native_chunk(const char *fname, void *fn,
 static DESCR_t _rt_usercall(const char *name, DESCR_t *args, int nargs)
 {
     /* Dispatch *func() in pattern position (Phase-3 BB match context).
-     * EM-7d-usercall-reentrant: look up in the native chunk registry first.
+     * EM-7d-usercall-reentrant: look up in the native expression registry first.
      * If found, call via direct fn pointer — no interpreter call stack needed.
      * Falls back to C-builtin dispatch (register_fn entries) then FAILDESCR. */
     if (!name || !*name) return FAILDESCR;
 
-    /* 1. Native chunk registry (user-defined SNOBOL4 functions emitted as
-     *    .LpcN chunks in the .s file). */
+    /* 1. Native expression registry (user-defined SNOBOL4 functions emitted as
+     *    .LpcN expressions in the .s file). */
     void *fn = chunk_reg_lookup(name);
     if (fn) return call_native_chunk(name, fn, args, nargs);
 
@@ -531,10 +531,10 @@ void scrip_rt_set_last_ok(int ok) { g_last_ok = ok ? 1 : 0; }
  * EM-5 entries
  *============================================================================*/
 
-void scrip_rt_push_chunk_descr(int64_t entry_pc, int64_t arity)
+void scrip_rt_push_expression_descr(int64_t entry_pc, int64_t arity)
 {
-    /* DT_E chunk descriptor: .i = entry_pc, .slen = arity.
-     * Mirrors sm_interp.c's DT_E handling for SM_PUSH_CHUNK. */
+    /* DT_E expression descriptor: .i = entry_pc, .slen = arity.
+     * Mirrors sm_interp.c's DT_E handling for SM_PUSH_EXPRESSION. */
     DESCR_t d;
     d.v    = DT_E;
     d.slen = (uint32_t)arity;
@@ -546,7 +546,7 @@ void scrip_rt_push_chunk_descr(int64_t entry_pc, int64_t arity)
  * EM-7c — pattern match for pre-built BB blobs (mode-4 emit path)
  *
  * The mode-4 emitter bakes invariant pattern sub-trees as flat .text
- * chunks via bb_build_flat_text(), with externally-visible entry
+ * expressions via bb_build_flat_text(), with externally-visible entry
  * symbols `_pat_inv_<id>_α` etc.  At runtime, the emitted binary
  * pushes the subject and replacement on the SM value stack and calls
  * scrip_rt_match_blob(blob_α, sname, has_repl).
@@ -984,8 +984,8 @@ void scrip_rt_call(const char *name, int nargs)
         }
     }
 
-    /* Default dispatch: try native chunk registry first (user-defined SNOBOL4
-     * functions emitted as .LpcN chunks in the .s file), then INVOKE_fn for
+    /* Default dispatch: try native expression registry first (user-defined SNOBOL4
+     * functions emitted as .LpcN expressions in the .s file), then INVOKE_fn for
      * builtins.  In mode-4, INVOKE_fn → g_user_call_hook → _rt_usercall
      * would also hit the registry, but short-circuiting here avoids the
      * extra indirection and the risk of interpreter call-stack corruption. */
@@ -1003,15 +1003,15 @@ void scrip_rt_call(const char *name, int nargs)
 
 /* SM_RETURN / SM_FRETURN / SM_NRETURN and conditional variants.
  *
- * In mode-4 with native call/ret, the chunk simply executes `ret` for plain
- * RETURN — the return value sits on the value stack already (value chunk's
+ * In mode-4 with native call/ret, the expression simply executes `ret` for plain
+ * RETURN — the return value sits on the value stack already (value expression's
  * body pushed it).  But FRETURN must replace TOS with FAILDESCR; NRETURN
  * must pop the value and push the function's name as a NAMEVAL descriptor.
  * Conditional variants check g_last_ok before doing anything.
  *
  * Returns 1 if the return should fire (caller emits `ret`), 0 if not (caller
  * falls through).  Note: when condition not met, this function does NOT
- * touch the value stack — the chunk continues normally.
+ * touch the value stack — the expression continues normally.
  *
  * In the unconditional+plain RETURN case, the emitter does NOT call this
  * function — it emits `ret` directly.  This function exists for FRETURN /
@@ -1065,15 +1065,15 @@ int scrip_rt_do_return(int kind, int cond)
  * replaced by real implementations in later rungs (EM-10+).
  *============================================================================*/
 
-#include "../../runtime/x86/sm_interp.h"  /* DESCR_t sm_call_chunk(int) */
+#include "../../runtime/x86/sm_interp.h"  /* DESCR_t sm_call_expression(int) */
 #include "../../runtime/x86/sm_prog.h"    /* sm_opcode_name */
 
-/* sm_call_chunk: used by eval_code.c when a DT_E chunk is EVAL'd.
- * Not exercised in EM-6 SNOBOL4 pattern gate (no chunk-via-EVAL paths). */
-DESCR_t sm_call_chunk(int entry_pc)
+/* sm_call_expression: used by eval_code.c when a DT_E expression is EVAL'd.
+ * Not exercised in EM-6 SNOBOL4 pattern gate (no expression-via-EVAL paths). */
+DESCR_t sm_call_expression(int entry_pc)
 {
     fprintf(stderr,
-        "libscrip_rt: sm_call_chunk(%d) called — DT_E EVAL dispatch "
+        "libscrip_rt: sm_call_expression(%d) called — DT_E EVAL dispatch "
         "not yet wired in EM-6.  Add to EM-10 scope.\n", entry_pc);
     abort();
 }

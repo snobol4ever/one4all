@@ -24,8 +24,8 @@
 #include "../../frontend/snobol4/scrip_cc.h"
 #include "../../ir/ir.h"
 #include "../../runtime/common/ir_clone.h"   /* RS-9b: expr_gc_clone */
-#include "../../runtime/interp/coro_runtime.h"  /* CH-17b: proc_table for chunk skeletons */
-#include "../../runtime/interp/pl_runtime.h"    /* CH-17d: g_pl_pred_table for pred-chunk skeletons */
+#include "../../runtime/interp/coro_runtime.h"  /* CH-17b: proc_table for expression skeletons */
+#include "../../runtime/interp/pl_runtime.h"    /* CH-17d: g_pl_pred_table for pred-expression skeletons */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -44,7 +44,7 @@ static void emit_push_expr(SM_Program *p, const AST_t *e)
 }
 
 /* CH-17b': suppress lower_expr's "unhandled expr kind" stderr warning while
- * lowering proc-body chunks.  These chunks are dead code today (forward-jumped
+ * lowering proc-body expressions.  These expressions are dead code today (forward-jumped
  * over; coro_call still walks IR for real execution), so any unhandled-kind
  * fall-through landing here is harmless — the warning would only mislead.  The
  * flag is set/cleared around the per-proc emission loop in sm_lower; outside
@@ -55,17 +55,17 @@ static void emit_push_expr(SM_Program *p, const AST_t *e)
  * (CH-17h reactivates CH-15b for the Icon generator kinds; the cset and
  * AST_ALTERNATE / AST_ITERATE / AST_REVASSIGN / AST_REVSWAP gaps will be filled by
  * the same wave). */
-static int g_chunk_body_lowering = 0;
+static int g_expression_body_lowering = 0;
 
 /* CHUNKS-step17b'' (CH-17b''): per-proc IcnScope active during chunk-body
  * lowering.  Mirrors what coro_call's icn_scope_patch builds at runtime — but
  * built at lower-time and consulted (read-only) by the AST_VAR / AST_ASSIGN cases
- * in lower_expr so chunks emit SM_LOAD_FRAME slot / SM_STORE_FRAME slot for
+ * in lower_expr so expressions emit SM_LOAD_FRAME slot / SM_STORE_FRAME slot for
  * params + locals, leaving SM_PUSH_VAR / SM_STORE_VAR for true globals,
  * builtins, and other-proc references.
  *
  * Built and torn down in the per-proc emission loop below; NULL outside that
- * loop.  AST_VAR / AST_ASSIGN consult it gated on g_chunk_body_lowering so the
+ * loop.  AST_VAR / AST_ASSIGN consult it gated on g_expression_body_lowering so the
  * stmt-level lowering (which still walks IR via coro_call) is unaffected. */
 static IcnScope *g_chunk_scope = NULL;
 
@@ -380,7 +380,7 @@ static void lower_pat_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
                 } else {
                     /* SN-8a: args-on-stack path — eager-eval each arg, then
                      * SM_PAT_CAPTURE_FN_ARGS pops them and calls pat_assign_callcap.
-                     * SN-26c-parseerr-c: defer AST_FNC sub-args as compiled SM chunks.
+                     * SN-26c-parseerr-c: defer AST_FNC sub-args as compiled SM expressions.
                      * SN-26c-parseerr-d: also defer AST_VAR — when args are mixed
                      * (e.g. literal+var) the all_vars name-stash fast path
                      * doesn't fire, and an AST_VAR set by an earlier capture in
@@ -395,9 +395,9 @@ static void lower_pat_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
                      * EVAL_fn → EXPVAL_fn (name_t.c:97) handles all AST_t
                      * shapes including compound.
                      * CHUNKS-step04: non-AST_QLIT args are now lowered as compiled
-                     * SM chunks (SM_JUMP skip + body + SM_RETURN + SM_PUSH_CHUNK)
+                     * SM expressions (SM_JUMP skip + body + SM_RETURN + SM_PUSH_EXPRESSION)
                      * so DT_E carries entry_pc, not AST_t*.  At match time
-                     * EVAL_fn → EXPVAL_fn dispatches the chunk via sm_call_chunk
+                     * EVAL_fn → EXPVAL_fn dispatches the expression via sm_call_expression
                      * (slen==1 path).  Same emission shape as Steps 2/3. */
                     for (int i = 0; i < fnc->nchildren; i++) {
                         AST_t *arg = fnc->children[i];
@@ -410,7 +410,7 @@ static void lower_pat_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
                             sm_emit(p, SM_RETURN);
                             int skip_lbl  = sm_label(p);
                             sm_patch_jump(p, skip_jump, skip_lbl);
-                            sm_emit_ii(p, SM_PUSH_CHUNK, (int64_t)entry_pc, 0);
+                            sm_emit_ii(p, SM_PUSH_EXPRESSION, (int64_t)entry_pc, 0);
                         } else
                             lower_expr(p, lt, arg);
                     }
@@ -443,7 +443,7 @@ static void lower_pat_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
                     p->instrs[idx].a[2].s = namelist;
                 } else {
                     /* SN-8a: args-on-stack path for $ *fn(args).
-                     * SN-26c-parseerr-c: defer AST_FNC sub-args as compiled SM chunks.
+                     * SN-26c-parseerr-c: defer AST_FNC sub-args as compiled SM expressions.
                      * SN-26c-parseerr-d: also defer AST_VAR (see twin site).
                      * SN-32b: defer all non-AST_QLIT args (mirrors -t fix on IR side).
                      * CHUNKS-step04: same chunk emission pattern as the . *fn site above
@@ -459,7 +459,7 @@ static void lower_pat_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
                             sm_emit(p, SM_RETURN);
                             int skip_lbl  = sm_label(p);
                             sm_patch_jump(p, skip_jump, skip_lbl);
-                            sm_emit_ii(p, SM_PUSH_CHUNK, (int64_t)entry_pc, 0);
+                            sm_emit_ii(p, SM_PUSH_EXPRESSION, (int64_t)entry_pc, 0);
                         } else
                             lower_expr(p, lt, arg);
                     }
@@ -544,18 +544,18 @@ static void lower_pat_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
                         lower_expr(p, lt, arg);
                     else if (arg) {
                         /* CHUNKS-step03: defer non-AST_QLIT pattern arg as a
-                         * compiled SM chunk so DT_E carries an entry_pc, not
+                         * compiled SM expression so DT_E carries an entry_pc, not
                          * an AST_t*.  At match time bb_usercall thaws each
                          * DT_E via EVAL_fn → EXPVAL_fn, which dispatches the
-                         * chunk via sm_call_chunk (slen==1 path).  Same
-                         * emission shape as the AST_DEFER chunk lowering. */
+                         * expression via sm_call_expression (slen==1 path).  Same
+                         * emission shape as the AST_DEFER expression lowering. */
                         int skip_jump = sm_emit_i(p, SM_JUMP, 0);
                         int entry_pc  = sm_label(p);
                         lower_expr(p, lt, arg);
                         sm_emit(p, SM_RETURN);
                         int skip_lbl  = sm_label(p);
                         sm_patch_jump(p, skip_jump, skip_lbl);
-                        sm_emit_ii(p, SM_PUSH_CHUNK, (int64_t)entry_pc, 0);
+                        sm_emit_ii(p, SM_PUSH_EXPRESSION, (int64_t)entry_pc, 0);
                     } else
                         lower_expr(p, lt, arg);
                 }
@@ -623,8 +623,8 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
         /* CHUNKS-step17b'' (CH-17b''): inside chunk-body lowering, consult the
          * per-proc scope: if `vn` resolved to a frame slot, emit SM_LOAD_FRAME.
          * Globals, keywords ('&'-prefixed), and unscoped names fall through
-         * to SM_PUSH_VAR — same shape as the legacy emission outside chunks. */
-        if (g_chunk_body_lowering && g_chunk_scope && vn[0] && vn[0] != '&') {
+         * to SM_PUSH_VAR — same shape as the legacy emission outside expressions. */
+        if (g_expression_body_lowering && g_chunk_scope && vn[0] && vn[0] != '&') {
             int slot = scope_get(g_chunk_scope, vn);
             if (slot >= 0) {
                 sm_emit_i(p, SM_LOAD_FRAME, slot);
@@ -670,19 +670,19 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
     }
     case AST_DEFER: {
         /* CHUNKS-step02: *expr in value context — lower child as a compiled
-         * SM chunk so DT_E carries an entry_pc, not an AST_t*.
+         * SM expression so DT_E carries an entry_pc, not an AST_t*.
          *
          * Emission shape:
-         *   SM_JUMP  skip_chunk          ; jump around the chunk body
+         *   SM_JUMP  skip_expression          ; jump around the expression body
          *   chunk_start: (entry_pc)
          *   <lower_expr(child)>          ; body: leaves result on stack
          *   SM_RETURN                    ; return to caller
-         *   skip_chunk: (label)
-         *   SM_PUSH_CHUNK entry_pc, 0   ; push DT_E{slen=1, i=entry_pc}
+         *   skip_expression: (label)
+         *   SM_PUSH_EXPRESSION entry_pc, 0   ; push DT_E{slen=1, i=entry_pc}
          */
         const AST_t *child = e->nchildren > 0 ? e->children[0] : NULL;
         int skip_jump = sm_emit_i(p, SM_JUMP, 0);   /* forward jump, patched below */
-        int entry_pc  = sm_label(p);                 /* chunk entry point */
+        int entry_pc  = sm_label(p);                 /* expression entry point */
         if (child)
             lower_expr(p, lt, child);
         else
@@ -690,7 +690,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
         sm_emit(p, SM_RETURN);
         int skip_lbl = sm_label(p);
         sm_patch_jump(p, skip_jump, skip_lbl);
-        sm_emit_ii(p, SM_PUSH_CHUNK, (int64_t)entry_pc, 0);
+        sm_emit_ii(p, SM_PUSH_EXPRESSION, (int64_t)entry_pc, 0);
         return;
     }
 
@@ -775,7 +775,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
                 /* CHUNKS-step17b'' (CH-17b''): inside chunk-body lowering,
                  * consult per-proc scope.  Frame slot → SM_STORE_FRAME slot.
                  * Globals / keywords / unscoped names → SM_STORE_VAR (NV store). */
-                if (g_chunk_body_lowering && g_chunk_scope && vn[0] && vn[0] != '&') {
+                if (g_expression_body_lowering && g_chunk_scope && vn[0] && vn[0] != '&') {
                     int slot = scope_get(g_chunk_scope, vn);
                     if (slot >= 0) {
                         sm_emit_i(p, SM_STORE_FRAME, slot);
@@ -811,8 +811,8 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
     case AST_FNC: {
         int nargs = e->nchildren;
         /* CHUNKS-step02: EVAL(*expr) special case — when EVAL is called with a
-         * single AST_DEFER argument, emit the chunk inline + SM_CALL_CHUNK instead
-         * of SM_PUSH_CHUNK + SM_CALL_FN "EVAL".  This avoids routing through
+         * single AST_DEFER argument, emit the expression inline + SM_CALL_EXPRESSION instead
+         * of SM_PUSH_EXPRESSION + SM_CALL_FN "EVAL".  This avoids routing through
          * EXPVAL_fn from C mid-dispatch, keeping everything on the same SM stack. */
         if (nargs == 1 && e->sval && strcmp(e->sval, "EVAL") == 0
                 && e->children[0] && e->children[0]->kind == AST_DEFER) {
@@ -827,13 +827,13 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
             sm_emit(p, SM_RETURN);
             int skip_lbl = sm_label(p);
             sm_patch_jump(p, skip_jump, skip_lbl);
-            sm_emit_ii(p, SM_CALL_CHUNK, (int64_t)entry_pc, 0);
+            sm_emit_ii(p, SM_CALL_EXPRESSION, (int64_t)entry_pc, 0);
             return;
         }
         /* CH-17c: Icon-style AST_FNC — name in sval is NULL; children[0] is the
          * callee name node (AST_VAR with sval = function name), children[1..] are args.
          * Emit only the arg children; use children[0]->sval as the SM_CALL_FN name.
-         * This fixes the stack-leak / empty-name bug in proc-body chunks that
+         * This fixes the stack-leak / empty-name bug in proc-body expressions that
          * contain user proc calls (noted in CH-17b'' handoff). */
         if (!e->sval && nargs >= 1 && e->children[0] && e->children[0]->sval) {
             const char *fn = e->children[0]->sval;
@@ -1154,7 +1154,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
      *   glocal[2] = cur  (current value, updated each resume)
      *   glocal[3] = step (AST_TO_BY only; AST_TO implicitly 1)
      *
-     * Chunk shape (AST_TO):
+     * Expression shape (AST_TO):
      *   SM_JUMP  skip_pc          ; jump over body to SM_BB_PUMP_SM
      * entry_pc:
      *   SM_RESUME                 ; documentation hook for future JIT
@@ -1183,13 +1183,13 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
      *   SM_PUSH_NULL              ; ω: generator exhausted
      *   SM_RETURN
      * skip_pc:
-     *   SM_BB_PUMP_SM entry_pc    ; drive the chunk as a generator
+     *   SM_BB_PUMP_SM entry_pc    ; drive the expression as a generator
      */
     case AST_TO: {
         const AST_t *lo_expr = (e->nchildren > 0) ? e->children[0] : NULL;
         const AST_t *hi_expr = (e->nchildren > 1) ? e->children[1] : NULL;
         int skip_jump = sm_emit_i(p, SM_JUMP, 0);       /* forward jump — patched to skip_pc */
-        int entry_pc  = sm_label(p);                     /* chunk entry point */
+        int entry_pc  = sm_label(p);                     /* expression entry point */
         sm_emit(p, SM_RESUME);                           /* JIT hook */
         /* initialise glocals: lo, hi, cur */
         if (lo_expr) lower_expr(p, lt, lo_expr);
@@ -1222,7 +1222,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
         sm_emit(p, SM_RETURN);
         int skip_pc = sm_label(p);
         sm_patch_jump(p, skip_jump, skip_pc);
-        sm_emit_ii(p, SM_PUSH_CHUNK, (int64_t)entry_pc, 0); /* push chunk descriptor */
+        sm_emit_ii(p, SM_PUSH_EXPRESSION, (int64_t)entry_pc, 0); /* push expression descriptor */
         sm_emit(p, SM_BB_PUMP_SM);                           /* pop + drive as generator */
         return;
     }
@@ -1294,7 +1294,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
         sm_emit(p, SM_RETURN);
         int skip_pc = sm_label(p);
         sm_patch_jump(p, skip_jump, skip_pc);
-        sm_emit_ii(p, SM_PUSH_CHUNK, (int64_t)entry_pc, 0);
+        sm_emit_ii(p, SM_PUSH_EXPRESSION, (int64_t)entry_pc, 0);
         sm_emit(p, SM_BB_PUMP_SM);
         return;
     }
@@ -1345,7 +1345,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
         /* CHUNKS-step13: Raku CASE dispatch — replaces the legacy
          * emit_push_expr + SM_BB_PUMP wrapper.  Lower each piece (topic,
          * per-arm value and body, optional default body) as its own
-         * chunk and emit the canonical CASE wrapper.  Stack layout
+         * expression and emit the canonical CASE wrapper.  Stack layout
          * pushed for SM_BB_PUMP_CASE:
          *
          *   topic_chunk
@@ -1380,7 +1380,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
             /* Icon-style pair layout: not exercised by the Raku frontend
              * today (Icon uses AST_IF chains for case-of), but the legacy
              * fall-through preserves behaviour for any future producer.
-             * Keep going with a deferred-body wrap as one chunk. */
+             * Keep going with a deferred-body wrap as one expression. */
             int skip_jump = sm_emit_i(p, SM_JUMP, 0);
             int entry_pc  = sm_label(p);
             /* Lower whole CASE body as a single thunk that delegates to
@@ -1393,13 +1393,13 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
             sm_emit(p, SM_RETURN);
             int skip_lbl  = sm_label(p);
             sm_patch_jump(p, skip_jump, skip_lbl);
-            sm_emit_ii(p, SM_PUSH_CHUNK, (int64_t)entry_pc, 0);
+            sm_emit_ii(p, SM_PUSH_EXPRESSION, (int64_t)entry_pc, 0);
             sm_emit_ii(p, SM_BB_PUMP_CASE, 0, 0);  /* zero arms, no default */
             return;
         }
 
         /* Helper macro: emit (jump-around + entry + lower(child) + RETURN) →
-         * SM_PUSH_CHUNK entry_pc, 0.  Same shape used in Steps 2/3/4. */
+         * SM_PUSH_EXPRESSION entry_pc, 0.  Same shape used in Steps 2/3/4. */
         #define EMIT_CHUNK_OF(child_expr) do {                                  \
             int _skip = sm_emit_i(p, SM_JUMP, 0);                                \
             int _entry = sm_label(p);                                            \
@@ -1407,7 +1407,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
             sm_emit(p, SM_RETURN);                                               \
             int _after = sm_label(p);                                            \
             sm_patch_jump(p, _skip, _after);                                     \
-            sm_emit_ii(p, SM_PUSH_CHUNK, (int64_t)_entry, 0);                    \
+            sm_emit_ii(p, SM_PUSH_EXPRESSION, (int64_t)_entry, 0);                    \
         } while (0)
 
         /* Walk triples, count arms, detect trailing default. */
@@ -1424,10 +1424,10 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
         }
         int ncases = total_triples - (has_default ? 1 : 0);
 
-        /* 1. Push topic as chunk. */
+        /* 1. Push topic as expression. */
         EMIT_CHUNK_OF(e->children[0]);
 
-        /* 2. Push each arm: cmp_kind (literal int), val chunk, body chunk. */
+        /* 2. Push each arm: cmp_kind (literal int), val expression, body expression. */
         for (int t = 0; t < total_triples; t++) {
             if (t == default_idx) continue;  /* default handled last */
             int base = 1 + t * 3;
@@ -1440,7 +1440,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
             EMIT_CHUNK_OF(body);
         }
 
-        /* 3. Push default body chunk if present. */
+        /* 3. Push default body expression if present. */
         if (has_default) {
             int base = 1 + default_idx * 3;
             AST_t *body = e->children[base + 2];
@@ -1455,7 +1455,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
     }
 
     default:
-        if (!g_chunk_body_lowering)
+        if (!g_expression_body_lowering)
             fprintf(stderr, "sm_lower: unhandled expr kind %d\n", (int)e->kind);
         sm_emit(p, SM_PUSH_NULL);
         return;
@@ -1679,12 +1679,12 @@ SM_Program *sm_lower(const CODE_t *prog)
     LabelTable  lt;
     lt_init(&lt);
 
-    /* CH-17b: emit named-chunk skeletons for every Icon/Raku proc.
-     * CH-17b': fill the chunks with lowered body SM ops.
+    /* CH-17b: emit named-expression skeletons for every Icon/Raku proc.
+     * CH-17b': fill the expressions with lowered body SM ops.
      *
-     * Chunk shape (one per proc in proc_table):
+     * Expression shape (one per proc in proc_table):
      *
-     *   SM_JUMP <skip_proc_NN>     ; forward-jump around the chunk
+     *   SM_JUMP <skip_proc_NN>     ; forward-jump around the expression
      *   SM_LABEL "<proc_name>"     ; named entry — sm_label_pc_lookup target
      *   <lowered body>             ; CH-17b': lower_expr each body child + SM_VOID_POP
      *   SM_RETURN                  ; trailing return (or unreachable after AST_RETURN)
@@ -1692,7 +1692,7 @@ SM_Program *sm_lower(const CODE_t *prog)
      *
      * After sm_lower returns, sm_resolve_proc_entry_pcs (CH-17a) walks
      * proc_table and sets entry_pc to the SM_LABEL's pc via
-     * sm_label_pc_lookup.  The chunks are unreachable today
+     * sm_label_pc_lookup.  The expressions are unreachable today
      * (coro_call still walks IR) but the entry_pcs validate end-to-end.
      *
      * CH-17b' body-lowering details:
@@ -1721,18 +1721,18 @@ SM_Program *sm_lower(const CODE_t *prog)
      *     AST_BANG_BINARY, AST_TO, AST_TO_BY, ...) currently emit
      *     SM_PUSH_EXPR + SM_BB_PUMP — that's the gating note in
      *     GOAL-CHUNKS-STEP17.md CH-17b': those legacy emissions are
-     *     acceptable because the chunks are unreachable until CH-17c flips
+     *     acceptable because the expressions are unreachable until CH-17c flips
      *     coro_call to dispatch via entry_pc.  Unhandled kinds (AST_ALTERNATE,
      *     AST_ITERATE, AST_CSET_*, AST_REVASSIGN, AST_REVSWAP) hit lower_expr's
      *     default case which would normally fprintf to stderr — silenced
-     *     here via g_chunk_body_lowering since these chunks are dead code.
+     *     here via g_expression_body_lowering since these expressions are dead code.
      *     AST_RETURN's lower_expr case already emits SM_RETURN, after which
      *     our trailing SM_VOID_POP + SM_RETURN is dead code — harmless.
      *
      *   - The shared LabelTable `lt` is reused.  Icon proc bodies do not use
      *     SNOBOL4-style stmt labels, so collisions are not a concern in
      *     practice; if any did appear they'd be statement-scoped within the
-     *     chunk and resolve via the same forward-patch machinery.
+     *     expression and resolve via the same forward-patch machinery.
      *
      *   - CH-17b'': frame-slot resolution IS pre-built at lower-time.  Per
      *     proc, an IcnScope is constructed mirroring coro_runtime.c's
@@ -1746,9 +1746,9 @@ SM_Program *sm_lower(const CODE_t *prog)
      *     scope_add only writes into the side table.  Slot order matches
      *     icn_scope_patch's order, so when CH-17c flips coro_call to dispatch
      *     via sm_call_proc, args[i] populates FRAME.env[i] at the same slot
-     *     that the chunk's SM_LOAD_FRAME reads from.
+     *     that the expression's SM_LOAD_FRAME reads from.
      *
-     *   - Empty-body skeleton (and the chunks themselves) remain safe:
+     *   - Empty-body skeleton (and the expressions themselves) remain safe:
      *     forward-jumped over by the SM_JUMP; even if a future caller
      *     invoked one before CH-17c, it would just SM_RETURN. */
     for (int pi = 0; pi < proc_count; pi++) {
@@ -1764,10 +1764,10 @@ SM_Program *sm_lower(const CODE_t *prog)
         /* CH-17b' + CH-17b'': lower each body child as a value expression and
          * pop the result.  body_start = 1 + nparams.  Defensive on missing IR.
          *
-         *   g_chunk_body_lowering — silences lower_expr's "unhandled expr kind"
-         *   stderr warning for the duration; chunks are dead code today so the
+         *   g_expression_body_lowering — silences lower_expr's "unhandled expr kind"
+         *   stderr warning for the duration; expressions are dead code today so the
          *   warning would only mislead.  Also gates the new frame-slot
-         *   emission below on chunk-body context.
+         *   emission below on expression-body context.
          *
          *   g_chunk_scope (CH-17b'') — per-proc IcnScope built fresh: params
          *   become slots 0..nparams-1; AST_GLOBAL-decl locals follow; any
@@ -1792,14 +1792,14 @@ SM_Program *sm_lower(const CODE_t *prog)
                 chunk_scope_walk(&chunk_sc, proc->children[bi]);
 
             g_chunk_scope          = &chunk_sc;
-            g_chunk_body_lowering  = 1;
+            g_expression_body_lowering  = 1;
             for (int bi = body_start; bi < proc->nchildren; bi++) {
                 AST_t *body_expr = proc->children[bi];
                 if (!body_expr) continue;
                 lower_expr(p, &lt, body_expr);
                 sm_emit(p, SM_VOID_POP);
             }
-            g_chunk_body_lowering  = 0;
+            g_expression_body_lowering  = 0;
             g_chunk_scope          = NULL;
         }
 
@@ -1808,14 +1808,14 @@ SM_Program *sm_lower(const CODE_t *prog)
         sm_patch_jump(p, skip_jump, skip_lbl);
     }
 
-    /* CH-17d: emit named-chunk skeletons for every Prolog predicate.
+    /* CH-17d: emit named-expression skeletons for every Prolog predicate.
      *
-     * Symmetrical to the Icon/Raku proc-chunk loop above, but driven by
+     * Symmetrical to the Icon/Raku proc-expression loop above, but driven by
      * g_pl_pred_table instead of proc_table.
      *
-     * Chunk shape (one per predicate, keyed by "name/arity"):
+     * Expression shape (one per predicate, keyed by "name/arity"):
      *
-     *   SM_JUMP <skip_pred_NN>     ; forward-jump around the chunk
+     *   SM_JUMP <skip_pred_NN>     ; forward-jump around the expression
      *   SM_LABEL "name/arity"      ; named entry — sm_label_pc_lookup target
      *   SM_RETURN                  ; skeleton body — CH-17f will fill this in
      *   <skip_pred_NN>:            ; anonymous skip target
@@ -1823,7 +1823,7 @@ SM_Program *sm_lower(const CODE_t *prog)
      * Producer fires; consumer is dormant.  sm_resolve_proc_entry_pcs
      * (CH-17a) walks g_pl_pred_table after sm_lower returns and populates
      * entry_pc via sm_label_pc_lookup — previously all Prolog entry_pcs
-     * stayed -1.  The chunks are forward-jumped over so nothing reaches
+     * stayed -1.  The expressions are forward-jumped over so nothing reaches
      * them at runtime; gates are byte-identical to baseline.
      *
      * Body lowering (full AST_CHOICE/AST_CLAUSE IR walk) is CH-17f territory.

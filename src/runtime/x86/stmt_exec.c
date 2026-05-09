@@ -1480,7 +1480,7 @@ Success:
  * exec_stmt_blob — EM-7c (GOAL-MODE4-EMIT) entry for pre-built BB blobs
  *
  * The mode-4 emitter (sm_codegen_x64_emit.c) bakes invariant pattern
- * sub-trees as flat .text chunks via bb_build_flat_text.  At Phase-3
+ * sub-trees as flat .text expressions via bb_build_flat_text.  At Phase-3
  * time it has a function pointer (the address of `_pat_inv_<id>_α`)
  * but no PATND_t — the tree is gone, only the code remains.
  *

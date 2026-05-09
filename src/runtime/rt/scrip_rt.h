@@ -8,7 +8,7 @@
  * binaries link against.  It carries language-level semantics — pattern
  * matcher, NV table, builtins, GC, generator BB pump (post-EM-10),
  * Prolog backtracking machinery (post-EM-14) — so that emitted
- * executables contain only compiled SM chunks plus calls into this ABI.
+ * executables contain only compiled SM expressions plus calls into this ABI.
  *
  * Value type: DESCR_t (from descr.h / snobol4.h).  The separate
  * ScripRtVal/ScripRtTag types that existed through EM-5 are gone.
@@ -39,8 +39,8 @@
  *   scrip_rt_set_last_ok — write success flag
  *
  * EM-5 surface:
- *   scrip_rt_push_chunk_descr — push DT_E chunk descriptor (SM_PUSH_CHUNK)
- *   SM_CALL_CHUNK / SM_RETURN are baked direct (call .LpcN / ret).
+ *   scrip_rt_push_expression_descr — push DT_E expression descriptor (SM_PUSH_EXPRESSION)
+ *   SM_CALL_EXPRESSION / SM_RETURN are baked direct (call .LpcN / ret).
  *
  * EM-6 surface:
  *   scrip_rt_pat_lit        — SM_PAT_LIT    (a[0].s = literal)
@@ -121,14 +121,14 @@ void scrip_rt_set_last_ok(int ok);
 
 /* ── EM-5 surface ────────────────────────────────────────────────────── */
 
-/* Push DT_E chunk descriptor {entry_pc, arity} (SM_PUSH_CHUNK).
- * SM_CALL_CHUNK with known entry_pc bakes direct `call .LpcN`. */
-void scrip_rt_push_chunk_descr(int64_t entry_pc, int64_t arity);
+/* Push DT_E expression descriptor {entry_pc, arity} (SM_PUSH_EXPRESSION).
+ * SM_CALL_EXPRESSION with known entry_pc bakes direct `call .LpcN`. */
+void scrip_rt_push_expression_descr(int64_t entry_pc, int64_t arity);
 
 /* ── EM-7c surface — pre-built BB blob match (mode-4 emit path) ──────── */
 
 /* The mode-4 emitter bakes invariant pattern sub-trees as flat .text
- * chunks (via bb_build_flat_text); at SM_EXEC_STMT, the emitted code
+ * expressions (via bb_build_flat_text); at SM_EXEC_STMT, the emitted code
  * pushes [subj][repl_or_zero] on the value stack and calls this entry.
  *
  *   blob_α  — address of `_pat_inv_<id>_α` (the baked entry)
@@ -235,12 +235,12 @@ void scrip_rt_call(const char *name, int nargs);
  * through to next instruction). */
 int scrip_rt_do_return(int kind, int cond);
 
-/* EM-7d-usercall-reentrant: native chunk function pointer registry.
+/* EM-7d-usercall-reentrant: native expression function pointer registry.
  *
  * The emitter walks the SM_Program for SM_LABEL instructions with a[0].s
  * set (SNOBOL4 function entry labels) and emits a .data table of
- * rt_chunk_entry records in the .s file, terminated by {NULL, NULL}.
- * scrip_rt_register_chunks() is called from main() (before scrip_rt_init)
+ * rt_expression_entry records in the .s file, terminated by {NULL, NULL}.
+ * scrip_rt_register_expressions() is called from main() (before scrip_rt_init)
  * with a pointer to that table; it populates g_chunk_registry so that
  * _rt_usercall can dispatch user-defined SNOBOL4 functions by direct
  * call/ret without touching the interpreter call stack.
@@ -252,12 +252,12 @@ int scrip_rt_do_return(int kind, int cond);
 typedef struct {
     const char *name;   /* SNOBOL4 function name (upper-cased) */
     void       *fn;     /* native entry point: .LpcN label in .text */
-} rt_chunk_entry;
+} rt_expression_entry;
 
-/* Register a NULL-terminated array of rt_chunk_entry records.
+/* Register a NULL-terminated array of rt_expression_entry records.
  * Called from the emitted main() before scrip_rt_init.
  * Safe to call with NULL (no-op) for programs with no user functions. */
-void scrip_rt_register_chunks(const rt_chunk_entry *tbl);
+void scrip_rt_register_expressions(const rt_expression_entry *tbl);
 
 /* EM-7c-capture: patch a heap cap_t's fn pointer to point to a baked child blob.
  * Called from the emitted binary's preamble (before scrip_rt_init) once per

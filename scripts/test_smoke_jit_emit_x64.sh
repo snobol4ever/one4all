@@ -239,10 +239,10 @@ fi
 grep -qE '^\.Lpc[0-9]+:[[:space:]]+JUMP_F[[:space:]]+\.Lpc1\b' "$TMP/em4b.s" || { echo "FAIL no backward JUMP_F .Lpc1 in em4b"; exit 1; }
 echo "  PASS EM-4b backward loop (JUMP_F backward x2, fallthrough; rc=0)"
 
-# -- Test 7a: EM-5 chunk call/return -- two chunks calling each other -------
-# Outer chunk_A calls inner chunk_B (returns 7), adds 6, returns 13.
-# main calls chunk_A and HALTs with the returned value.  Proves the
-# baked-direct call/ret discipline composes across nested chunks.
+# -- Test 7a: EM-5 expression call/return -- two expressions calling each other -------
+# Outer expression_A calls inner expression_B (returns 7), adds 6, returns 13.
+# main calls expression_A and HALTs with the returned value.  Proves the
+# baked-direct call/ret discipline composes across nested expressions.
 gcc -no-pie "$TMP/em5.s" \
     -L"$ROOT/out" -lscrip_rt -Wl,-rpath,"$ROOT/out" \
     -o "$TMP/em5_prog" 2> "$TMP/em5_link.err" || {
@@ -254,22 +254,22 @@ set -e
 if [ "$RC" -ne 13 ]; then
     echo "FAIL em5 expected rc=13 got rc=$RC"; exit 1
 fi
-# Asm-shape sanity: RETURN bakes direct ret; CALL_CHUNK bakes
+# Asm-shape sanity: RETURN bakes direct ret; CALL_EXPRESSION bakes
 # direct call to a .LpcN target -- no PLT call for either opcode.
-# Post EM-7c-sm-three-column: RETURN's `ret` and CALL_CHUNK's `call \tgt`
+# Post EM-7c-sm-three-column: RETURN's `ret` and CALL_EXPRESSION's `call \tgt`
 # live in the .macro bodies in sm_macros.s; the dispatcher emits
-# `.LpcN: RETURN` (no args) and `.LpcN: CALL_CHUNK .LpcM` at the call sites.
+# `.LpcN: RETURN` (no args) and `.LpcN: CALL_EXPRESSION .LpcM` at the call sites.
 grep -qE '^\.Lpc[0-9]+:[[:space:]]+RETURN\b'                "$TMP/em5.s" || { echo "FAIL no RETURN call in em5"; exit 1; }
-grep -qE '^\.Lpc[0-9]+:[[:space:]]+CALL_CHUNK[[:space:]]+\.Lpc' "$TMP/em5.s" || { echo "FAIL no CALL_CHUNK .LpcN call in em5"; exit 1; }
+grep -qE '^\.Lpc[0-9]+:[[:space:]]+CALL_EXPRESSION[[:space:]]+\.Lpc' "$TMP/em5.s" || { echo "FAIL no CALL_EXPRESSION .LpcN call in em5"; exit 1; }
 # Macro-body instructions: confirm the templates emitted the right bytes.
-# `call \tgt` lives in the .macro CALL_CHUNK body; `ret` lives in RETURN.
-grep -qE 'call[[:space:]]+\\tgt' "$ROOT/sm_macros.s" || { echo "FAIL no 'call \\\\tgt' in CALL_CHUNK macro body"; exit 1; }
+# `call \tgt` lives in the .macro CALL_EXPRESSION body; `ret` lives in RETURN.
+grep -qE 'call[[:space:]]+\\tgt' "$ROOT/sm_macros.s" || { echo "FAIL no 'call \\\\tgt' in CALL_EXPRESSION macro body"; exit 1; }
 grep -qE '^[[:space:]]+ret\b' "$ROOT/sm_macros.s" || { echo "FAIL no native ret in sm_macros.s"; exit 1; }
 echo "  PASS EM-5a chunk call/return  (chunk_A -> chunk_B; nested rc=13)"
 
-# -- Test 7b: EM-5 SM_PUSH_CHUNK descriptor round-trip ----------------------
-# PUSH_CHUNK (entry_pc=99, arity=2) then POP it; then PUSH_LIT_I 21 + HALT.
-# Proves scrip_rt_push_chunk_descr@PLT round-trips without corrupting
+# -- Test 7b: EM-5 SM_PUSH_EXPRESSION descriptor round-trip ----------------------
+# PUSH_EXPRESSION (entry_pc=99, arity=2) then POP it; then PUSH_LIT_I 21 + HALT.
+# Proves scrip_rt_push_expression_descr@PLT round-trips without corrupting
 # the SM stack.
 gcc -no-pie "$TMP/em5b.s" \
     -L"$ROOT/out" -lscrip_rt -Wl,-rpath,"$ROOT/out" \
@@ -282,9 +282,9 @@ set -e
 if [ "$RC" -ne 21 ]; then
     echo "FAIL em5b expected rc=21 got rc=$RC"; exit 1
 fi
-grep -q "PUSH_CHUNK"                "$TMP/em5b.s" || { echo "FAIL no PUSH_CHUNK marker"; exit 1; }
-grep -q "scrip_rt_push_chunk_descr@PLT" "$ROOT/sm_macros.s" || { echo "FAIL no descriptor-push PLT call in sm_macros.s"; exit 1; }
-echo "  PASS EM-5b push-chunk descr   (PUSH_CHUNK + POP round-trip; rc=21)"
+grep -q "PUSH_EXPRESSION"                "$TMP/em5b.s" || { echo "FAIL no PUSH_EXPRESSION marker"; exit 1; }
+grep -q "scrip_rt_push_expression_descr@PLT" "$ROOT/sm_macros.s" || { echo "FAIL no descriptor-push PLT call in sm_macros.s"; exit 1; }
+echo "  PASS EM-5b push-expression descr   (PUSH_EXPRESSION + POP round-trip; rc=21)"
 
 # ── Test 10: RETIRED in EM-7-revert (session #72) ─────────────────────────────
 # (reserved slot — see above for rationale)
@@ -403,4 +403,4 @@ else
 fi
 
 echo
-echo "PASS=13 FAIL=0  (EM-1 wiring + EM-2 HALT/PUSH_LIT_I + EM-3 stack ops + arithmetic + EM-4 control flow + EM-5 chunks; EM-6 retired; EM-7a Phase-2 sim; EM-7b bb_flat TEXT mode; EM-7c invariant blob emit + runtime correctness; EM-7c-sm-three-column-verify audit)"
+echo "PASS=13 FAIL=0  (EM-1 wiring + EM-2 HALT/PUSH_LIT_I + EM-3 stack ops + arithmetic + EM-4 control flow + EM-5 expressions; EM-6 retired; EM-7a Phase-2 sim; EM-7b bb_flat TEXT mode; EM-7c invariant blob emit + runtime correctness; EM-7c-sm-three-column-verify audit)"

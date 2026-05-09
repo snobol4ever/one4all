@@ -44,16 +44,16 @@
  *   correctly.  See scripts/test_smoke_jit_emit_x64.sh test 6b.
  *   Expected exit code: 0.
  *
- * EM-5 program (argv[5]):  two chunks calling each other
+ * EM-5 program (argv[5]):  two expressions calling each other
  *   Outer chunk_A calls inner chunk_B (returns 7), adds 6, returns 13.
  *   main calls chunk_A and HALTs with the returned value as rc.
- *   Exercises SM_CALL_CHUNK (baked direct call), SM_RETURN (native ret),
+ *   Exercises SM_CALL_EXPRESSION (baked direct call), SM_RETURN (native ret),
  *   and SM_VOID_POP/SM_ADD already covered.
  *   Expected exit code: 13.
  *
- * EM-5b program (argv[6]):  SM_PUSH_CHUNK descriptor-push round trip
+ * EM-5b program (argv[6]):  SM_PUSH_EXPRESSION descriptor-push round trip
  *   PUSH_CHUNK 99,2 then POP it; then PUSH_LIT_I 21 + HALT.
- *   Proves the scrip_rt_push_chunk_descr@PLT call path round-trips
+ *   Proves the scrip_rt_push_expression_descr@PLT call path round-trips
  *   without corrupting the SM stack.
  *   Expected exit code: 21.
  *
@@ -470,16 +470,16 @@ int main(int argc, char **argv)
 
     if (argc < 6) return 0;
 
-    /* EM-5 program: two chunks calling each other.
+    /* EM-5 program: two expressions calling each other.
      *
-     * Proves SM_PUSH_CHUNK is not needed here -- SM_CALL_CHUNK with a
+     * Proves SM_PUSH_EXPRESSION is not needed here -- SM_CALL_EXPRESSION with a
      * compile-time-known entry_pc is a baked direct `call .LpcN` and
-     * SM_RETURN is a native ret.  Two nested chunks demonstrate that
+     * SM_RETURN is a native ret.  Two nested expressions demonstrate that
      * the call/return discipline composes.
      *
      *   pc=0   PUSH_LIT_I  0          ; seed (popped immediately)
      *   pc=1   POP                    ; clean stack
-     *   pc=2   JUMP        L_main     ; skip both chunk bodies
+     *   pc=2   JUMP        L_main     ; skip both expression bodies
      *   pc=3   LABEL                  ; chunk_B entry_pc=3
      *   pc=4   PUSH_LIT_I  7
      *   pc=5   RETURN                 ; -> 7 on TOS, ret to caller
@@ -492,7 +492,7 @@ int main(int argc, char **argv)
      *   pc=12  CALL_CHUNK  6          ; call A, leaves 13 on TOS
      *   pc=13  HALT                   ; rc = 13
      *
-     * Also exercises SM_PUSH_CHUNK in a separate inline sub-test below
+     * Also exercises SM_PUSH_EXPRESSION in a separate inline sub-test below
      * (push the descriptor, then pop it -- proves the descriptor-push
      * path works even though the EM-5 gate's hot path bakes direct).
      */
@@ -507,12 +507,12 @@ int main(int argc, char **argv)
         sm_emit_i(p, SM_PUSH_LIT_I, 7);          /* pc=4 */
         sm_emit(p,   SM_RETURN);                 /* pc=5 */
         int L_a    = sm_label(p);                /* pc=6  chunk_A entry */
-        sm_emit_ii(p, SM_CALL_CHUNK, (int64_t)L_b, 0);  /* pc=7 */
+        sm_emit_ii(p, SM_CALL_EXPRESSION, (int64_t)L_b, 0);  /* pc=7 */
         sm_emit_i(p, SM_PUSH_LIT_I, 6);          /* pc=8 */
         sm_emit(p,   SM_ADD);                    /* pc=9  -> 13 */
         sm_emit(p,   SM_RETURN);                 /* pc=10 */
         int L_main = sm_label(p);                /* pc=11 */
-        sm_emit_ii(p, SM_CALL_CHUNK, (int64_t)L_a, 0);  /* pc=12 */
+        sm_emit_ii(p, SM_CALL_EXPRESSION, (int64_t)L_a, 0);  /* pc=12 */
         sm_emit(p,   SM_HALT);                   /* pc=13 rc=13 */
 
         sm_patch_jump(p, j_main, L_main);
@@ -527,11 +527,11 @@ int main(int argc, char **argv)
 
     if (argc < 7) return 0;
 
-    /* EM-5b program: SM_PUSH_CHUNK descriptor-push round trip.
+    /* EM-5b program: SM_PUSH_EXPRESSION descriptor-push round trip.
      *
-     * Pushes a chunk descriptor (entry_pc=99, arity=2) then pops it
+     * Pushes a expression descriptor (entry_pc=99, arity=2) then pops it
      * via SM_VOID_POP.  Then pushes 21 + HALT, exits rc=21.  The point is
-     * to exercise the scrip_rt_push_chunk_descr@PLT call path so the
+     * to exercise the scrip_rt_push_expression_descr@PLT call path so the
      * gate's grep-shape check has something to look at.
      *
      *   pc=0   PUSH_CHUNK  99, 2
@@ -543,7 +543,7 @@ int main(int argc, char **argv)
         SM_Program *p = sm_prog_new();
         if (!p) { fprintf(stderr, "sm_prog_new failed\n"); return 1; }
 
-        sm_emit_ii(p, SM_PUSH_CHUNK, 99, 2);    /* pc=0 */
+        sm_emit_ii(p, SM_PUSH_EXPRESSION, 99, 2);    /* pc=0 */
         sm_emit(p,   SM_VOID_POP);                    /* pc=1 */
         sm_emit_i(p, SM_PUSH_LIT_I, 21);         /* pc=2 */
         sm_emit(p,   SM_HALT);                   /* pc=3 rc=21 */

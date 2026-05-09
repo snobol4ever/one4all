@@ -35,8 +35,8 @@ typedef enum {
     SM_PUSH_NULL_NOFLIP, /* push null but do NOT clobber last_ok — for AST_SCAN value-balance */
     SM_PUSH_VAR,
     SM_PUSH_EXPR,    /* push DT_E frozen expression; a[0].ptr = AST_t* */
-    SM_PUSH_CHUNK,   /* push DT_E chunk descriptor; a[0].i=entry_pc, a[1].i=arity */
-    SM_CALL_CHUNK,   /* pop chunk descriptor, push return frame, jump to entry_pc */
+    SM_PUSH_EXPRESSION,   /* push DT_E expression descriptor; a[0].i=entry_pc, a[1].i=arity */
+    SM_CALL_EXPRESSION,   /* pop expression descriptor, push return frame, jump to entry_pc */
     SM_STORE_VAR,
     SM_VOID_POP,
 
@@ -135,26 +135,26 @@ typedef enum {
      * emit_push_expr + SM_BB_PUMP wrapper that sm_lower used to emit for
      * AST_CASE.  a[0].i = ncases (number of when-arms), a[1].i = has_default
      * (0 or 1).  Stack layout at entry (deepest first):
-     *   topic_chunk           (DT_E, evaluates the case topic)
+     *   topic_expression           (DT_E, evaluates the case topic)
      *   cmp_kind_0   (DT_I, AST_e value: AST_LEQ for string ==, else AST_EQ)
-     *   val_chunk_0           (DT_E, evaluates arm 0's "when" value)
-     *   body_chunk_0          (DT_E, evaluates arm 0's body)
+     *   val_expression_0           (DT_E, evaluates arm 0's "when" value)
+     *   body_expression_0          (DT_E, evaluates arm 0's body)
      *   ... ncases triples ...
-     *   default_body_chunk    (DT_E, only if has_default)
+     *   default_body_expression    (DT_E, only if has_default)
      * Handler pops in reverse, evaluates topic, walks arms doing string
-     * or integer compare per cmp_kind, runs the matching body's chunk,
+     * or integer compare per cmp_kind, runs the matching body's expression,
      * or the default if present, or pushes NULVCL.  No AST_t is
      * constructed at lowering time and none is walked by this opcode. */
     SM_BB_PUMP_CASE,
-    /* CHUNKS-step15: BB pump for a generator chunk — replaces the legacy
+    /* CHUNKS-step15: BB pump for a generator expression — replaces the legacy
      * emit_push_expr + SM_BB_PUMP pair for migrated Icon generator kinds
      * (AST_TO, AST_TO_BY in CH-15a; later kinds in subsequent rungs).  Pops
-     * a chunk descriptor (DT_E, slen=1, i=entry_pc) from TOS, allocates
-     * an SmGenState rooted at entry_pc, and drives the chunk with
+     * an expression descriptor (DT_E, slen=1, i=entry_pc) from TOS, allocates
+     * an SmGenState rooted at entry_pc, and drives the expression with
      * bb_broker_drive_sm(gs, pump_print, NULL) — same statement-context
      * print semantics as SM_BB_PUMP for un-migrated kinds.  No AST_t
      * is constructed at lowering time and none is walked by this opcode;
-     * the chunk body lowers to pure SM with explicit SM_SUSPEND points. */
+     * the expression body lowers to pure SM with explicit SM_SUSPEND points. */
     SM_BB_PUMP_SM,
 
     /* Functions */
@@ -194,8 +194,8 @@ typedef enum {
      * SM_SUSPEND: pop TOS as the yielded value; save pc+stack to the current
      *   SmGenState; return SM_INTERP_SUSPENDED (1) from sm_interp_run so that
      *   bb_broker_drive_sm can deliver the value to body_fn and later resume.
-     *   Only meaningful when the chunk is driven via bb_broker_drive_sm; a
-     *   bare sm_call_chunk call that reaches SM_SUSPEND yields FAILDESCR.
+     *   Only meaningful when the expression is driven via bb_broker_drive_sm; a
+     *   bare sm_call_expression call that reaches SM_SUSPEND yields FAILDESCR.
      * SM_RESUME: no-op in the main dispatch loop — the resume happens implicitly
      *   when bb_broker_drive_sm restores the SmGenState and re-enters sm_interp_run
      *   at the saved pc (which is the instruction AFTER the SM_SUSPEND that was
@@ -206,7 +206,7 @@ typedef enum {
 
     /* CHUNKS-step14b: gen-local slot access — read/write SmGenState->locals[N].
      * a[0].i = slot index (0..SM_GEN_LOCAL_MAX-1).  Only meaningful inside a
-     * generator chunk being driven by bb_broker_drive_sm; outside that
+     * generator expression being driven by bb_broker_drive_sm; outside that
      * context (g_current_gen_state == NULL) SM_LOAD_GLOCAL pushes FAILDESCR
      * and SM_STORE_GLOCAL is a no-op (with last_ok cleared).  These slots
      * survive SUSPEND/RESUME because the SmGenState is the persistent
@@ -218,10 +218,10 @@ typedef enum {
     /* CHUNKS-step15a: SM_ICMP_GT — integer compare greater-than.
      * Pops two DT_I values (right = TOS, left = TOS-1).
      * Sets last_ok = (left.i > right.i).  Pushes nothing.
-     * Used by AST_TO / AST_TO_BY generator chunks for the loop-exit test. */
+     * Used by AST_TO / AST_TO_BY generator expressions for the loop-exit test. */
     SM_ICMP_GT,
     /* CHUNKS-step15a: SM_ICMP_LT — integer compare less-than (mirror of GT).
-     * Used by AST_TO_BY chunks for the negative-step loop-exit test. */
+     * Used by AST_TO_BY expressions for the negative-step loop-exit test. */
     SM_ICMP_LT,
 
     /* CHUNKS-step17b'' (CH-17b''): frame-slot read/write — read/write
@@ -234,13 +234,13 @@ typedef enum {
      *
      * Outside an Icon frame (frame_depth == 0): push FAILDESCR / clear last_ok
      * (mirrors SM_LOAD_GLOCAL's behaviour outside a generator drive).  This is
-     * safe because chunks emitted with frame-slot ops are only reachable via
-     * the chunk-shaped consumer dispatch (CH-17c+); until then they are dead
+     * safe because expressions emitted with frame-slot ops are only reachable via
+     * the expression-shaped consumer dispatch (CH-17c+); until then they are dead
      * code, forward-jumped over by their enclosing SM_JUMP.
      *
      * The slot index is baked at lower-time by sm_lower's per-proc scope
      * construction (mirrors coro_runtime.c's icn_scope_patch but without
-     * mutating AST_t.ival in place).  See sm_lower.c chunk-body emission. */
+     * mutating AST_t.ival in place).  See sm_lower.c expression-body emission. */
     SM_LOAD_FRAME,
     SM_STORE_FRAME,
 
@@ -257,15 +257,15 @@ typedef union {
     void       *ptr;        /* frozen pointer (AST_t* for SM_PUSH_EXPR, etc.) */
 } sm_operand_t;
 
-/* ── Compiled chunk descriptor ──────────────────────────────────────── */
+/* ── Compiled expression descriptor ──────────────────────────────────────── */
 /* Replaces raw AST_t* in DT_E descriptors once a site is migrated away
  * from SM_PUSH_EXPR.  entry_pc indexes SM_Program::instrs[]; arity is the
  * number of args expected on the SM value stack at entry (0 for a thunk).
- * SM_PUSH_CHUNK encodes these as a[0].i and a[1].i respectively. */
+ * SM_PUSH_EXPRESSION encodes these as a[0].i and a[1].i respectively. */
 typedef struct {
-    int entry_pc;   /* index into SM_Program::instrs[] where chunk starts */
+    int entry_pc;   /* index into SM_Program::instrs[] where expression starts */
     int arity;      /* args on SM value stack at entry; 0 = thunk */
-} SmChunk_t;
+} SmExpression_t;
 
 /* CHUNKS-step14: return code from sm_interp_run when SM_SUSPEND fires.
  * Normal halt = 0; error = -1; suspended = SM_INTERP_SUSPENDED. */

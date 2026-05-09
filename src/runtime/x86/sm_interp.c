@@ -66,7 +66,7 @@ extern DESCR_t  NV_GET_fn(const char *name);
 /* CHUNKS-step17b'' (CH-17b''): forwarders to the active Icon frame's env slots.
  * Defined in coro_runtime.c for production builds, stubbed in sm_interp_test.c
  * for the unit-test world.  Returns FAILDESCR / no-op when frame_depth == 0
- * — chunks emitted with frame-slot opcodes are dead code today (CH-17c flips
+ * — expressions emitted with frame-slot opcodes are dead code today (CH-17c flips
  * the consumer that reaches them).  Pure-DESCR_t signatures: no AST_t leakage
  * across the SM-runtime/IR-runtime boundary. */
 extern DESCR_t  icn_frame_env_load(int slot);
@@ -99,7 +99,7 @@ int      g_chunks_audit_chunk_oor  = 0;
 static void chunks_audit_summary(void) {
     if (getenv("SCRIP_CHUNKS_AUDIT")) {
         fprintf(stderr,
-                "[CHUNKS-AUDIT] summary: SM_PUSH_CHUNK=%d  SM_PUSH_EXPR=%d  out_of_range=%d\n",
+                "[CHUNKS-AUDIT] summary: SM_PUSH_EXPRESSION=%d  SM_PUSH_EXPR=%d  out_of_range=%d\n",
                 g_chunks_audit_push_chunk,
                 g_chunks_audit_push_expr,
                 g_chunks_audit_chunk_oor);
@@ -321,7 +321,7 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
             /* Push a frozen DT_E expression descriptor (for *expr / EVAL()) */
             /* CHUNKS-step05 instrumentation: tally legacy AST_t* DT_E pushes.
              * When SCRIP_CHUNKS_AUDIT=1 and the program is pure SNOBOL4/Snocone,
-             * any SM_PUSH_EXPR fire is a violation of M1's "chunk-only" invariant.
+             * any SM_PUSH_EXPR fire is a violation of M1's "expression-only" invariant.
              * Icon/Raku/Prolog generators legitimately still hit this until M4. */
             if (getenv("SCRIP_CHUNKS_AUDIT")) {
                 g_chunks_audit_push_expr++;
@@ -337,9 +337,9 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
             break;
         }
 
-        case SM_PUSH_CHUNK: {
-            /* CHUNKS-step02: push DT_E chunk descriptor.
-             * slen=1 distinguishes chunk from legacy AST_t* (slen=0).
+        case SM_PUSH_EXPRESSION: {
+            /* CHUNKS-step02: push DT_E expression descriptor.
+             * slen=1 distinguishes expression from legacy AST_t* (slen=0).
              * entry_pc stored in the .i union field. */
             /* CHUNKS-step05 instrumentation: validate entry_pc within prog bounds.
              * Guarded by SCRIP_CHUNKS_AUDIT to keep production builds free of overhead. */
@@ -348,20 +348,20 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
                 int entry_pc = (int)ins->a[0].i;
                 if (entry_pc < 0 || entry_pc >= prog->count) {
                     g_chunks_audit_chunk_oor++;
-                    fprintf(stderr, "[CHUNKS-AUDIT] SM_PUSH_CHUNK at pc=%d: entry_pc=%d out of range [0,%d)\n",
+                    fprintf(stderr, "[CHUNKS-AUDIT] SM_PUSH_EXPRESSION at pc=%d: entry_pc=%d out of range [0,%d)\n",
                             st->pc, entry_pc, prog->count);
                 }
             }
             DESCR_t d;
             d.v    = DT_E;
-            d.slen = 1;                  /* chunk flag */
+            d.slen = 1; /* expression flag */
             d.i    = ins->a[0].i;        /* entry_pc */
             sm_push(st, d);
             st->last_ok = 1;
             break;
         }
 
-        case SM_CALL_CHUNK: {
+        case SM_CALL_EXPRESSION: {
             /* CHUNKS-step02: call a compiled chunk thunk on the same SM stack.
              * entry_pc = a[0].i.  No params, no locals, no retval NV slot.
              * Push a minimal SmCallFrame (caller stack saved, ret_pc set),
@@ -386,7 +386,7 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
             } else {
                 fr->caller_stack = NULL;
             }
-            st->sp = 0;  /* chunk body runs on empty stack */
+            st->sp = 0;  /* expression body runs on empty stack */
             st->pc = entry_pc;
             goto sm_call_done;
         }
@@ -765,14 +765,14 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
         /* CH-17f: Prolog goal dispatch by predicate key — replaces legacy
          * lower_expr(AST_CHOICE) + SM_BB_ONCE.  a[0].s = "name/arity" key,
          * a[1].i = arity.  Looks up Pl_PredEntry; if entry_pc >= 0 AND the
-         * chunk body is filled (CH-17f body fill rung), uses pl_box_choice_pc;
+         * expression body is filled (CH-17f body fill rung), uses pl_box_choice_pc;
          * otherwise falls back to pl_box_choice (IR path — correct semantics).
          * No AST_t* pushed or walked at the SM statement-dispatch layer. */
         case SM_BB_ONCE_PROC: {
             const char *key   = ins->a[0].s;
             int         arity = (int)ins->a[1].i;
             /* IR fallback: look up the AST_CHOICE node and drive it.
-             * This is the correct path until chunk bodies are filled in
+             * This is the correct path until expression bodies are filled in
              * a later CH-17f body-fill rung. */
             AST_t *choice = key ? pl_pred_table_lookup_global(key) : NULL;
             bb_node_t node = choice ? pl_box_choice(choice, g_pl_env, arity)
@@ -827,7 +827,7 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
          * the lower_stmt expression-stmt path emits for AST_CASE balances
          * the stack. Mirrors the comparison logic in
          * coro_value.c:947 — string compare on AST_LEQ, integer-or-string
-         * compare on AST_EQ — but operates entirely on chunk-call results,
+         * compare on AST_EQ — but operates entirely on expression-call results,
          * never on AST_t. */
         case SM_BB_PUMP_CASE: {
             int ncases      = (int)ins->a[0].i;
@@ -856,17 +856,17 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
                 cmp_kinds[k] = (c.v == DT_I) ? (int)c.i : (int)AST_EQ;
             }
 
-            /* Pop topic chunk and evaluate it */
+            /* Pop topic expression and evaluate it */
             DESCR_t topic_d = sm_pop(st);
             int topic_pc = (topic_d.v == DT_E && topic_d.slen == 1) ? (int)topic_d.i : -1;
-            DESCR_t topic = (topic_pc >= 0) ? sm_call_chunk(topic_pc) : NULVCL;
+            DESCR_t topic = (topic_pc >= 0) ? sm_call_expression(topic_pc) : NULVCL;
 
             /* Walk arms: for each, eval val_chunk, compare, run body on match */
             DESCR_t result = NULVCL;
             int matched   = 0;
             for (int k = 0; k < ncases; k++) {
                 if (val_pcs[k] < 0 || body_pcs[k] < 0) continue;
-                DESCR_t wval = sm_call_chunk(val_pcs[k]);
+                DESCR_t wval = sm_call_expression(val_pcs[k]);
                 int match = 0;
                 if ((AST_e)cmp_kinds[k] == AST_LEQ) {
                     /* String equality (Raku ==): coerce to string both sides */
@@ -883,13 +883,13 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
                     }
                 }
                 if (match) {
-                    result = sm_call_chunk(body_pcs[k]);
+                    result = sm_call_expression(body_pcs[k]);
                     matched = 1;
                     break;
                 }
             }
             if (!matched && default_pc >= 0) {
-                result = sm_call_chunk(default_pc);
+                result = sm_call_expression(default_pc);
                 matched = 1;
             }
 
@@ -898,20 +898,20 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
             break;
         }
 
-        /* CHUNKS-step15: BB pump for an SM generator chunk — replaces the
+        /* CHUNKS-step15: BB pump for an SM generator expression — replaces the
          * legacy emit_push_expr + SM_BB_PUMP pair for migrated Icon
-         * generator kinds (CH-15a: AST_TO, AST_TO_BY).  Pops chunk descriptor
+         * generator kinds (CH-15a: AST_TO, AST_TO_BY).  Pops expression descriptor
          * (DT_E, slen=1, .i = entry_pc) from TOS, allocates an SmGenState
-         * rooted at that entry_pc, and drives the chunk via
+         * rooted at that entry_pc, and drives the expression via
          * bb_broker_drive_sm with the same pump_print body that
          * SM_BB_PUMP uses — preserving Icon's statement-context
          * "every yielded value is printed" semantics.  No AST_t walk
-         * anywhere on this path: the chunk body is pure SM with explicit
+         * anywhere on this path: the expression body is pure SM with explicit
          * SM_SUSPEND yield points. */
         case SM_BB_PUMP_SM: {
             DESCR_t d = sm_pop(st);
             if (d.v != DT_E || d.slen != 1) {
-                /* Not a chunk descriptor — treat as failed pump */
+                /* Not a expression descriptor — treat as failed pump */
                 st->last_ok = 0;
                 break;
             }
@@ -1257,7 +1257,7 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
                 SmCallFrame *fr = &st->call_stack[--st->call_depth];
                 int is_fret  = (ins->op == SM_FRETURN  || ins->op == SM_FRETURN_S || ins->op == SM_FRETURN_F);
                 int is_nret  = (ins->op == SM_NRETURN  || ins->op == SM_NRETURN_S || ins->op == SM_NRETURN_F);
-                /* Read return value: for chunk thunks (retval_name==NULL) use stack top;
+                /* Read return value: for expression thunks (retval_name==NULL) use stack top;
                  * for user functions use the NV retval slot the body wrote. */
                 DESCR_t retval = (fr->retval_name)
                     ? NV_GET_fn(fr->retval_name)
@@ -1402,12 +1402,12 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
             break;
         }
 
-        /* CHUNKS-step14: SM_SUSPEND — yield a value from a generator chunk.
+        /* CHUNKS-step14: SM_SUSPEND — yield a value from a generator expression.
          * Pops TOS as the yielded value.  If g_current_gen_state is live
          * (we are inside bb_broker_drive_sm), saves pc+stack into the
          * SmGenState and returns SM_INTERP_SUSPENDED so the broker can
          * deliver the value and later resume.  If not in a generator context
-         * (bare sm_call_chunk or top-level), yields FAILDESCR / no-op. */
+         * (bare sm_call_expression or top-level), yields FAILDESCR / no-op. */
         case SM_SUSPEND: {
             DESCR_t yielded = (st->sp > 0) ? sm_pop(st) : FAILDESCR;
             if (g_current_gen_state) {
@@ -1440,7 +1440,7 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
             break;
 
         /* CHUNKS-step14b: SM_LOAD_GLOCAL — push gen-local slot N onto value stack.
-         * Only meaningful inside a generator chunk driven by bb_broker_drive_sm.
+         * Only meaningful inside a generator expression driven by bb_broker_drive_sm.
          * Outside that context, push FAILDESCR and clear last_ok so callers
          * see the slot as unavailable (mirrors SM_PUSH_VAR's FAIL handling). */
         case SM_LOAD_GLOCAL: {
@@ -1474,7 +1474,7 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
 
         /* CHUNKS-step15a: SM_ICMP_GT — integer compare greater-than.
          * Pops right (TOS) then left (TOS-1).  Sets last_ok = (left.i > right.i).
-         * Pushes nothing.  Used by AST_TO / AST_TO_BY generator chunk loop-exit test. */
+         * Pushes nothing.  Used by AST_TO / AST_TO_BY generator expression loop-exit test. */
         case SM_ICMP_GT: {
             DESCR_t r = sm_pop(st);
             DESCR_t l = sm_pop(st);
@@ -1492,7 +1492,7 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
 
         /* CHUNKS-step17b'' (CH-17b''): SM_LOAD_FRAME — push IcnFrame.env[slot]
          * of the active Icon frame onto the value stack.  Outside an Icon frame
-         * (frame_depth == 0), push FAILDESCR / clear last_ok — chunks emitted
+         * (frame_depth == 0), push FAILDESCR / clear last_ok — expressions emitted
          * with frame-slot ops are dead code until CH-17c flips the consumer
          * that reaches them, so the FAIL fallback never fires on real programs.
          * Mirrors the slot-resolution logic that bb_eval_value does for AST_VAR
@@ -1548,12 +1548,12 @@ int sm_interp_run_steps(SM_Program *prog, SM_State *st, int n) {
     return rc;
 }
 
-/* CHUNKS-step02: sm_call_chunk — run a compiled chunk as a thunk.
+/* CHUNKS-step02: sm_call_expression — run a compiled chunk as a thunk.
  * Used by EXPVAL_fn when called from C-land (via EVAL_fn or bb_usercall thaw).
- * Runs chunk body in a fresh nested SM_State (own stack, shared NV table) with
- * a local g_sno_err_jmp save/restore so a runtime error inside the chunk does
+ * Runs expression body in a fresh nested SM_State (own stack, shared NV table) with
+ * a local g_sno_err_jmp save/restore so a runtime error inside the expression does
  * not longjmp into the outer dispatch's jmp_buf.  Returns the top-of-stack
- * value left by the chunk body, or FAILDESCR if the chunk errored. */
+ * value left by the expression body, or FAILDESCR if the expression errored. */
 
 /* Subject globals (defined in stmt_exec.c) */
 extern const char *Σ;
@@ -1561,11 +1561,11 @@ extern int         Ω;
 extern int         Δ;
 extern jmp_buf     g_sno_err_jmp;
 
-DESCR_t sm_call_chunk(int entry_pc)
+DESCR_t sm_call_expression(int entry_pc)
 {
     SM_Program *prog = g_current_sm_prog;
     if (!prog || entry_pc < 0 || entry_pc >= prog->count) {
-        fprintf(stderr, "sm_call_chunk: invalid entry_pc %d\n", entry_pc);
+        fprintf(stderr, "sm_call_expression: invalid entry_pc %d\n", entry_pc);
         return FAILDESCR;
     }
 
@@ -1576,7 +1576,7 @@ DESCR_t sm_call_chunk(int entry_pc)
     int         save_Ω = Ω;
     int         save_Δ = Δ;
 
-    /* Save outer err_jmp; install a local one so chunk errors don't escape */
+    /* Save outer err_jmp; install a local one so expression errors don't escape */
     jmp_buf saved_err_jmp;
     memcpy(&saved_err_jmp, &g_sno_err_jmp, sizeof(jmp_buf));
 
@@ -1587,7 +1587,7 @@ DESCR_t sm_call_chunk(int entry_pc)
         nested->pc = entry_pc;
         sm_interp_run(prog, nested);
         if (nested->sp > 0) result = nested->stack[nested->sp - 1];
-    } /* else: chunk errored — result stays FAILDESCR */
+    } /* else: expression errored — result stays FAILDESCR */
 
     /* Restore outer err_jmp */
     memcpy(&g_sno_err_jmp, &saved_err_jmp, sizeof(jmp_buf));
@@ -1601,9 +1601,9 @@ DESCR_t sm_call_chunk(int entry_pc)
 /*============================================================================================================================
  * CHUNKS-step14: sm_gen_state_new / bb_broker_drive_sm — SM generator infrastructure
  *
- * A generator chunk is a compiled SM sub-program that uses SM_SUSPEND to yield successive
- * values.  bb_broker_drive_sm drives such a chunk in BB_PUMP style: call body_fn for each
- * yielded value, stop when the chunk reaches SM_RETURN or SM_HALT.
+ * A generator expression is a compiled SM sub-program that uses SM_SUSPEND to yield successive
+ * values.  bb_broker_drive_sm drives such an expression in BB_PUMP style: call body_fn for each
+ * yielded value, stop when the expression reaches SM_RETURN or SM_HALT.
  *
  * Design:
  *   - SmGenState holds the full SM_State snapshot at the last suspension point.
@@ -1629,7 +1629,7 @@ SmGenState *sm_gen_state_new(int entry_pc)
     return gs;
 }
 
-/* Drive an SM generator chunk through all its ticks.
+/* Drive an SM generator expression through all its ticks.
  * body_fn is called once per yielded value.  Returns tick count. */
 int bb_broker_drive_sm(SmGenState *gs, void (*body_fn)(DESCR_t val, void *arg), void *arg)
 {

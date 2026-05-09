@@ -176,7 +176,7 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs);
 DESCR_t icn_call_builtin(AST_t *call, DESCR_t *args, int nargs);
 /* CH-17g-runtime-bridge-1: name-based dispatch for AST_t-free Icon builtins.
  * Returns 1 if handled (and writes result to *out), 0 otherwise.
- * Lets SM_CALL_FN (sm_interp.c) reach Icon `write`/`writes` from chunk
+ * Lets SM_CALL_FN (sm_interp.c) reach Icon `write`/`writes` from expression
  * bodies without needing an IR call node. */
 int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR_t *out);
 const char *real_str(double r, char *buf, int bufsz);

@@ -254,7 +254,7 @@ static void h_push_expr(void)
     STATE->last_ok = 1;
 }
 
-/* CHUNKS-step02: SM_PUSH_CHUNK — push DT_E chunk descriptor (slen=1, i=entry_pc). */
+/* CHUNKS-step02: SM_PUSH_EXPRESSION — push DT_E expression descriptor (slen=1, i=entry_pc). */
 static void h_push_chunk(void)
 {
     DESCR_t d;
@@ -264,8 +264,8 @@ static void h_push_chunk(void)
     PUSH(d);
     STATE->last_ok = 1;
 }
-/* CHUNKS-step02: SM_CALL_CHUNK — push minimal SmCallFrame, jump to entry_pc.
- * Mirrors SM_CALL_CHUNK handler in sm_interp.c. */
+/* CHUNKS-step02: SM_CALL_EXPRESSION — push minimal SmCallFrame, jump to entry_pc.
+ * Mirrors SM_CALL_EXPRESSION handler in sm_interp.c. */
 static void h_call_chunk(void)
 {
     int entry_pc = (int)CUR_INS->a[0].i;
@@ -326,7 +326,7 @@ static void h_bb_once(void)
 
 /* CH-17f: Prolog name-driven BB_ONCE — mirror of SM_BB_ONCE_PROC handler
  * in sm_interp.c.  No AST_t* pushed or walked at the SM layer.
- * IR fallback path until chunk bodies are filled in a later rung. */
+ * IR fallback path until expression bodies are filled in a later rung. */
 #include "../../frontend/prolog/pl_broker.h"
 #include "../../runtime/interp/pl_runtime.h"
 static void h_bb_once_proc(void)
@@ -393,13 +393,13 @@ static void h_bb_pump_case(void)
 
     DESCR_t topic_d = POP();
     int topic_pc = (topic_d.v == DT_E && topic_d.slen == 1) ? (int)topic_d.i : -1;
-    DESCR_t topic = (topic_pc >= 0) ? sm_call_chunk(topic_pc) : NULVCL;
+    DESCR_t topic = (topic_pc >= 0) ? sm_call_expression(topic_pc) : NULVCL;
 
     DESCR_t result = NULVCL;
     int matched = 0;
     for (int k = 0; k < ncases; k++) {
         if (val_pcs[k] < 0 || body_pcs[k] < 0) continue;
-        DESCR_t wval = sm_call_chunk(val_pcs[k]);
+        DESCR_t wval = sm_call_expression(val_pcs[k]);
         int match = 0;
         if ((AST_e)cmp_kinds[k] == AST_LEQ) {
             const char *ts = IS_STR_fn(topic) ? topic.s : VARVAL_fn(topic);
@@ -415,13 +415,13 @@ static void h_bb_pump_case(void)
             }
         }
         if (match) {
-            result = sm_call_chunk(body_pcs[k]);
+            result = sm_call_expression(body_pcs[k]);
             matched = 1;
             break;
         }
     }
     if (!matched && default_pc >= 0) {
-        result = sm_call_chunk(default_pc);
+        result = sm_call_expression(default_pc);
         matched = 1;
     }
 
@@ -429,11 +429,11 @@ static void h_bb_pump_case(void)
     STATE->last_ok = matched;
 }
 
-/* CHUNKS-step15: BB pump for an SM generator chunk — JIT mirror of
- * SM_BB_PUMP_SM handler in sm_interp.c.  The chunk body itself runs
+/* CHUNKS-step15: BB pump for an SM generator expression — JIT mirror of
+ * SM_BB_PUMP_SM handler in sm_interp.c.  The expression body itself runs
  * interpreted via bb_broker_drive_sm → sm_interp_run, identical to how
- * h_bb_pump_case routes per-arm chunks through sm_call_chunk → the
- * interpreter.  No JIT-of-the-chunk-body needed in this rung; that is
+ * h_bb_pump_case routes per-arm expressions through sm_call_expression → the
+ * interpreter.  No JIT-of-the-expression-body needed in this rung; that is
  * M5/EM-10 territory.  The two handlers must stay in lockstep. */
 static void h_bb_pump_sm(void)
 {
@@ -985,7 +985,7 @@ static void h_decr(void) { DESCR_t v = POP(); PUSH(INTVAL(v.i - CUR_INS->a[0].i)
 /* CHUNKS-step14: SM_SUSPEND / SM_RESUME codegen stubs.
  * Full JIT support for generators is M5 territory (Step 19 / EM-10+).
  * For now, abort with a named FATAL so that any attempt to JIT-compile a
- * generator chunk is caught loudly rather than silently miscompiling. */
+ * generator expression is caught loudly rather than silently miscompiling. */
 static void h_suspend(void) {
     fprintf(stderr, "sm_codegen FATAL: SM_SUSPEND reached in jit-run — "
             "generator JIT not yet implemented (CHUNKS M5/EM-10)\n");
@@ -1045,7 +1045,7 @@ static void h_icmp_lt(void)
 /* CHUNKS-step17b'' (CH-17b''): SM_LOAD_FRAME — named FATAL stub.
  * JIT codegen for frame-slot ops is M5 territory; until then, the JIT path
  * emits this stub which prints a clear FATAL.  Today it is unreachable
- * because chunks (the only emit site for SM_LOAD_FRAME) are dead code:
+ * because expressions (the only emit site for SM_LOAD_FRAME) are dead code:
  * forward-jumped over by SM_JUMP, never executed.  CH-17c will flip the
  * consumer to dispatch via entry_pc — at which point this opcode becomes
  * live in --sm-run / --jit-run via the SM dispatch loop only; JIT-emit
@@ -1094,8 +1094,8 @@ static void init_handler_table(void)
     g_handlers[SM_PUSH_NULL]  = h_push_null;
     g_handlers[SM_PUSH_VAR]   = h_push_var;
     g_handlers[SM_PUSH_EXPR]  = h_push_expr;
-    g_handlers[SM_PUSH_CHUNK] = h_push_chunk;  /* CHUNKS-step01 stub */
-    g_handlers[SM_CALL_CHUNK] = h_call_chunk;  /* CHUNKS-step01 stub */
+    g_handlers[SM_PUSH_EXPRESSION] = h_push_chunk;  /* CHUNKS-step01 stub */
+    g_handlers[SM_CALL_EXPRESSION] = h_call_chunk;  /* CHUNKS-step01 stub */
     g_handlers[SM_STORE_VAR]  = h_store_var;
     g_handlers[SM_VOID_POP]        = h_pop;
 

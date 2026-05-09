@@ -104,7 +104,7 @@ typedef struct {
     void       *trampoline_arg;
     /* RK-21: gather coroutine — proc stored here so trampoline doesn't need coro_stage */
     struct AST_t *gather_proc;
-    /* CH-17c: SM chunk entry point for gather coroutine (-1 = legacy coro_call path) */
+    /* CH-17c: SM expression entry point for gather coroutine (-1 = legacy coro_call path) */
     int  gather_entry_pc;
     int  gather_nparams;
 } coro_t;

@@ -27,12 +27,12 @@
 /*------------------------------------------------------------------------
  * Types
  *------------------------------------------------------------------------*/
-/* CH-17a: entry_pc is the SM_Program pc of the proc body's named chunk.
+/* CH-17a: entry_pc is the SM_Program pc of the proc body's named expression.
  * Populated by sm_resolve_proc_entry_pcs(SM_Program*) after sm_lower runs.
- * -1 means no chunk emitted yet (CH-17b will start emitting Icon/Raku proc
- * chunks; until then every entry remains -1 and consumers fall back to the
+ * -1 means no expression emitted yet (CH-17b will start emitting Icon/Raku proc
+ * expressions; until then every entry remains -1 and consumers fall back to the
  * legacy proc-pointer path).  Once CH-17g lands, the proc field is deleted. */
-/* CH-17a: entry_pc is the SM_Program pc of the proc body's named chunk.
+/* CH-17a: entry_pc is the SM_Program pc of the proc body's named expression.
  * CH-17c: nparams cached from proc->ival so sm_call_proc can bind args
  *         without reading the AST_t. */
 typedef struct { const char *name; AST_t *proc; int entry_pc; int nparams; } IcnProcEntry;
@@ -110,7 +110,7 @@ int     scope_get(IcnScope *sc, const char *name);
 void    icn_scope_patch(IcnScope *sc, AST_t *e);
 
 DESCR_t coro_call(AST_t *proc, DESCR_t *args, int nargs);
-/* CH-17c: SM-dispatch entry for proc bodies lowered into named chunks. */
+/* CH-17c: SM-dispatch entry for proc bodies lowered into named expressions. */
 DESCR_t sm_call_proc(int entry_pc, int nparams, DESCR_t *args, int nargs);
 /* CH-17g-call-sites: dispatch helper for proc_table[pi].  Routes through
  * sm_call_proc when entry_pc is resolved, else falls back to coro_call.

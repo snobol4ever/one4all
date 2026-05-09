@@ -77,7 +77,7 @@ int main(int argc, char **argv) {
     if (!out) return 1;
 
     /* Wrapper scaffolding so the .s assembles standalone:
-     * .intel_syntax noprefix + .text section header + the chunk body.
+     * .intel_syntax noprefix + .text section header + the expression body.
      * The bb_emit.c text-mode helpers emit Intel syntax (mov rax, ...,
      * call rax, etc.); GAS default is AT&T which interprets bare "rax"
      * as an external symbol — wrong.  This .intel_syntax directive is

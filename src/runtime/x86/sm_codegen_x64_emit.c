@@ -36,7 +36,7 @@
  *         emit_bb_box() scaffold added (no SM_PAT_* coverage yet).
  *   EM-4: SM_LABEL (no-op; .LpcN label suffices), SM_JUMP (direct jmp),
  *         SM_JUMP_S/F (call last_ok + test + conditional jmp).
- *   EM-5: SM_PUSH_CHUNK (push DT_E descriptor), SM_CALL_CHUNK (baked
+ *   EM-5: SM_PUSH_EXPRESSION (push DT_E descriptor), SM_CALL_EXPRESSION (baked
  *         direct call to .Lpc<entry_pc>), SM_RETURN (native ret).
  *         Conditional return variants (SM_RETURN_S/F, SM_FRETURN[_S/_F],
  *         SM_NRETURN[_S/_F]) still trap via emit_sm_unhandled.
@@ -49,7 +49,7 @@
  *         EMIT_TEXT mode (invariant sub-trees baked into .text) plus
  *         bb_emit BINARY mode (variant nodes built into bb_pool RX
  *         memory at runtime), with Phase-3 as a direct call to the
- *         root chunk's α — no broker, no pat-stack, no descriptor tree.
+ *         root expression's α — no broker, no pat-stack, no descriptor tree.
  *   EM-7-pre keepers (kept after revert): SM_CALL_FN, SM_CONCAT,
  *         SM_PUSH_NULL, SM_COERCE_NUM, all 8 conditional return
  *         variants.  These are Phase 1/4/5 concerns, orthogonal to BB.
@@ -377,7 +377,7 @@ static int strtab_emit_rodata(FILE *out)
 
 
 
-/* EM-7d-usercall-reentrant: emit .data chunk registry table.
+/* EM-7d-usercall-reentrant: emit .datan expression registry table.
  *
  * Walk prog for SM_LABEL instructions with a[0].s set (SNOBOL4 named function
  * entries).  Emit a .section .data table of {name_ptr, fn_ptr} pairs (using
@@ -417,7 +417,7 @@ static int emit_chunk_registry(FILE *out, const SM_Program *prog)
         int entry_pc = i + 1;
 
         char anno[64], qarg[32], earg[32];
-        snprintf(anno, sizeof(anno), "chunk: %s -> .Lpc%d", ins->a[0].s, entry_pc);
+        snprintf(anno, sizeof(anno), "expression: %s -> .Lpc%d", ins->a[0].s, entry_pc);
         snprintf(qarg, sizeof(qarg), ".Lstr_%d", str_idx);
         snprintf(earg, sizeof(earg), ".Lpc%d", entry_pc);
         if (emit_three_column_line(out, "", ".quad", qarg, anno) != 0) return -1;
@@ -460,10 +460,10 @@ static void cap_fixup_add(void *cap_ptr, const char *child_label)
 
 static int emit_file_header(FILE *out, int count, int has_chunk_registry)
 {
-    /* The .rodata section (string literals) and .data chunk registry (if any)
+    /* The .rodata section (string literals) and .datan expression registry (if any)
      * were already emitted before this call.  We resume with .text + main
      * prologue.  If has_chunk_registry is non-zero, main calls
-     * scrip_rt_register_chunks before scrip_rt_init so that user-defined
+     * scrip_rt_register_expressions before scrip_rt_init so that user-defined
      * SNOBOL4 functions are dispatchable from the start. */
     if (fprintf(out,
         "# -----------------------------------------------------------------------\n"
@@ -482,12 +482,12 @@ static int emit_file_header(FILE *out, int count, int has_chunk_registry)
 
     if (has_chunk_registry) {
         if (emit_three_column_line(out, "", "lea",  "rdi, [rip + .Lchunk_registry]",
-                                   "EM-7d: register user-defined function chunks") != 0) return -1;
-        if (emit_three_column_line(out, "", "call", "scrip_rt_register_chunks@PLT", NULL) != 0) return -1;
+                                   "EM-7d: register user-defined function expressions") != 0) return -1;
+        if (emit_three_column_line(out, "", "call", "scrip_rt_register_expressions@PLT", NULL) != 0) return -1;
     } else {
         if (emit_three_column_line(out, "", "xor",  "edi, edi",
                                    "no user-defined functions") != 0) return -1;
-        if (emit_three_column_line(out, "", "call", "scrip_rt_register_chunks@PLT", NULL) != 0) return -1;
+        if (emit_three_column_line(out, "", "call", "scrip_rt_register_expressions@PLT", NULL) != 0) return -1;
     }
 
     /* EM-7c-capture: patch cap_t fn pointers to baked child blobs. */
@@ -826,28 +826,28 @@ static int emit_sm_jump_f(FILE *out, const SM_Instr *ins, int pc)
 }
 
 /* -----------------------------------------------------------------------
- * EM-5: SM_PUSH_CHUNK / SM_CALL_CHUNK / SM_RETURN
+ * EM-5: SM_PUSH_EXPRESSION / SM_CALL_EXPRESSION / SM_RETURN
  *
- * SM_PUSH_CHUNK pushes a DT_E chunk descriptor onto the SM value stack.
+ * SM_PUSH_EXPRESSION pushes a DT_E expression descriptor onto the SM value stack.
  *   a[0].i = entry_pc   a[1].i = arity
- * Codegen: scrip_rt_push_chunk_descr(entry_pc, arity).  The runtime
+ * Codegen: scrip_rt_push_expression_descr(entry_pc, arity).  The runtime
  * stores it as a DESCR_t { v=DT_E, slen=arity, i=entry_pc }
- * so a downstream SM_CALL_FN "EVAL" / sm_call_chunk path can find it.
+ * so a downstream SM_CALL_FN "EVAL" / sm_call_expression path can find it.
  *
- * SM_CALL_CHUNK is a baked direct call.  a[0].i = entry_pc resolves at
+ * SM_CALL_EXPRESSION is a baked direct call.  a[0].i = entry_pc resolves at
  * emit-time to the .Lpc<entry_pc> label that emit_pc_label has already
  * planted at every PC.  The native CALL pushes the return address on
  * the host stack; SM_RETURN's RET pops it.  The SM value stack lives
- * inside libscrip_rt.so and is shared across the call -- the chunk
+ * inside libscrip_rt.so and is shared across the call -- the expression
  * pushes its result onto the same stack the caller will read from.
  *
- * Honest deviation from the interpreter:  sm_interp.c's SM_CALL_CHUNK
- * snapshots the caller's value stack to a heap buffer, runs the chunk
+ * Honest deviation from the interpreter:  sm_interp.c's SM_CALL_EXPRESSION
+ * snapshots the caller's value stack to a heap buffer, runs the expression
  * on an empty stack, then restores + appends the result.  The mode-4
  * emitter does NOT do this.  Rationale:
- *   (1) For EM-5's gate program (single chunk pushing a single int and
+ *   (1) For EM-5's gate program (single expression pushing a single int and
  *       returning), shared-stack call/ret is byte-correct.
- *   (2) Stack-discipline violations in chunk bodies are bugs in the
+ *   (2) Stack-discipline violations in expression bodies are bugs in the
  *       lowerer, not the emitter; if the lowerer gets it right we
  *       don't need to defensively snapshot.
  *   (3) When SM_SUSPEND/SM_RESUME land in EM-10 we'll need a full
@@ -865,24 +865,24 @@ static int emit_sm_jump_f(FILE *out, const SM_Instr *ins, int pc)
  * shapes.  EM-5's gate doesn't exercise them.
  * ----------------------------------------------------------------------- */
 
-static int emit_sm_push_chunk(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_push_expression(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    return sm_emit_push_chunk(out, sm_template_lookup(SM_PUSH_CHUNK),
+    return sm_emit_push_expression(out, sm_template_lookup(SM_PUSH_EXPRESSION),
                               ins->a[0].i, (int)ins->a[1].i);
 }
 
-static int emit_sm_call_chunk(FILE *out, const SM_Instr *ins, int pc)
+static int emit_sm_call_expression(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    return sm_emit_call_chunk(out, sm_template_lookup(SM_CALL_CHUNK),
+    return sm_emit_call_expression(out, sm_template_lookup(SM_CALL_EXPRESSION),
                               (int)ins->a[0].i);
 }
 
 static int emit_sm_return(FILE *out, int pc)
 {
     (void)pc;
-    /* SM_RETURN: native return.  The chunk's last push left the result
+    /* SM_RETURN: native return.  The expression's last push left the result
      * on the SM value stack inside libscrip_rt.so. */
     return sm_emit_ret(out, sm_template_lookup(SM_RETURN), NULL);
 }
@@ -967,7 +967,7 @@ static int emit_sm_stno(FILE *out, const SM_Instr *ins, int pc,
  * bb_emit infrastructure (bb_flat in EMIT_TEXT mode for invariant
  * sub-trees baked into .text; bb_emit BINARY mode for variant nodes
  * emitted into bb_pool RX memory at runtime; direct-call Phase-3 to
- * the root chunk's α — no broker, no pat-stack, no descriptor tree).
+ * the root expression's α — no broker, no pat-stack, no descriptor tree).
  * Until those rungs land, all SM_PAT_* opcodes fall through to
  * emit_sm_unhandled in the dispatch switch.
  * ----------------------------------------------------------------------- */
@@ -1452,7 +1452,7 @@ DESCR_t sm_phase2_to_patnd(const SM_Program *prog,
  *
  * 2. Emit pre-text section: for each invariant pattern, call
  *    bb_build_flat_text(root, out, "_pat_inv_<id>") to bake a flat
- *    .text chunk with externally-visible α/β/γ/ω entry symbols.
+ *    .text expression with externally-visible α/β/γ/ω entry symbols.
  *
  * 3. Main dispatch:
  *      - SM_PAT_* and value-stack pushes inside an invariant Phase-2
@@ -1569,7 +1569,7 @@ static void pattern_windows_collect(const SM_Program *prog)
 
 /* Emit the .text-resident invariant pattern blobs.  Called after the
  * .rodata section and before the main `.text` instruction stream.
- * Each invariant pattern gets one labeled chunk with externally-visible
+ * Each invariant pattern gets one labeled expression with externally-visible
  * α/β/γ/ω labels (`_pat_inv_<id>_α` etc.). */
 static int emit_pattern_blobs(FILE *out)
 {
@@ -1990,7 +1990,7 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
     strtab_collect(prog);
     if (strtab_emit_rodata(out) != 0) return -1;
 
-    /* EM-7d-usercall-reentrant: emit .data chunk registry table for
+    /* EM-7d-usercall-reentrant: emit .datan expression registry table for
      * user-defined SNOBOL4 functions (SM_LABEL instructions with a[0].s set).
      * This must come after strtab_emit_rodata (so .Lstr_N labels are defined)
      * and before .text (so .LpcN forward references resolve in the same TU). */
@@ -1999,7 +1999,7 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
 
     /* EM-7c: collect Phase-2 windows (one per SM_EXEC_STMT) and run the
      * Phase-2 simulator to reconstruct each pattern's PATND_t tree.
-     * Fully-invariant patterns are emitted as flat .text chunks below;
+     * Fully-invariant patterns are emitted as flat .text expressions below;
      * variant patterns will be handled by a follow-up rung (their
      * SM_EXEC_STMT falls through to emit_sm_unhandled). */
     pattern_windows_collect(prog);
@@ -2107,9 +2107,9 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
             case SM_JUMP_S:       rc = emit_sm_jump_s(out, ins, pc);     break;
             case SM_JUMP_F:       rc = emit_sm_jump_f(out, ins, pc);     break;
 
-            /* EM-5: chunk descriptor push, baked-direct chunk call, return. */
-            case SM_PUSH_CHUNK:   rc = emit_sm_push_chunk(out, ins, pc); break;
-            case SM_CALL_CHUNK:   rc = emit_sm_call_chunk(out, ins, pc); break;
+            /* EM-5: expression descriptor push expression call, return. */
+            case SM_PUSH_EXPRESSION:   rc = emit_sm_push_expression(out, ins, pc); break;
+            case SM_CALL_EXPRESSION:   rc = emit_sm_call_expression(out, ins, pc); break;
             case SM_RETURN:       rc = emit_sm_return(out, pc);          break;
 
             /* EM-7-pre keepers: SM_CALL_FN (general) + SM_CONCAT + SM_PUSH_NULL +

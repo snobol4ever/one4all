@@ -53,7 +53,7 @@
 /* ── runtime ─────────────────────────────────────────────────────────── */
 #include "snobol4.h"
 #include "sil_macros.h"   /* SIL macro translations — RT + SM axes */
-#include "sm_interp.h"    /* CHUNKS-step02: sm_call_chunk for DT_E chunk dispatch */
+#include "sm_interp.h"    /* CHUNKS-step02: sm_call_expression for DT_E expression dispatch */
 
 /* ── frontend: bison/flex parse entry points (CMPILE removed) */
 #include "../../frontend/snobol4/scrip_cc.h"
@@ -548,12 +548,12 @@ const char *exec_code(DESCR_t code_block)
 DESCR_t EXPVAL_fn(DESCR_t expr_d)
 {
     if (expr_d.v == DT_E) {
-        /* CHUNKS-step03: chunk DT_E (slen==1) — dispatch via sm_call_chunk
+        /* CHUNKS-step03: chunk DT_E (slen==1) — dispatch via sm_call_expression
          * which runs a fresh nested SM_State with local err_jmp save/restore.
-         * Used for the stored-chunk thaw path (bb_usercall, pat_to_patnd). */
+         * Used for the stored-expression thaw path (bb_usercall, pat_to_patnd). */
         if (expr_d.slen == 1) {
             int entry_pc = (int)expr_d.i;
-            return sm_call_chunk(entry_pc);
+            return sm_call_expression(entry_pc);
         }
 
         /* Legacy: Frozen AST_t* — thaw and evaluate with NAM frame isolation */

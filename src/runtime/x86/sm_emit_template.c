@@ -113,9 +113,9 @@ static const sm_op_template_t g_sm_templates[] = {
     { SM_JUMP_S,       "JUMP_S",       "scrip_rt_last_ok",      SM_TPL_PCREF_COND, 1, 0 },
     { SM_JUMP_F,       "JUMP_F",       "scrip_rt_last_ok",      SM_TPL_PCREF_COND, 0, 0 },
 
-    /* Chunk discipline */
-    { SM_PUSH_CHUNK,   "PUSH_CHUNK",   "scrip_rt_push_chunk_descr", SM_TPL_PUSH_CHUNK, 0, 0 },
-    { SM_CALL_CHUNK,   "CALL_CHUNK",   NULL,                    SM_TPL_CALL_CHUNK, 0, 0 },
+    /* Expression discipline */
+    { SM_PUSH_EXPRESSION,   "PUSH_CHUNK",   "scrip_rt_push_expression_descr", SM_TPL_PUSH_CHUNK, 0, 0 },
+    { SM_CALL_EXPRESSION,   "CALL_CHUNK",   NULL,                    SM_TPL_CALL_CHUNK, 0, 0 },
     { SM_RETURN,       "RETURN",       NULL,                    SM_TPL_RET,        0, 0 },
 
     /* General call */
@@ -862,7 +862,7 @@ int sm_emit_pcref_cond(FILE *out, const sm_op_template_t *t,
     return sm_emit_template(out, t, &a);
 }
 
-int sm_emit_push_chunk(FILE *out, const sm_op_template_t *t,
+int sm_emit_push_expression(FILE *out, const sm_op_template_t *t,
                        int64_t entry_pc, int arity)
 {
     sm_emit_args_t a = { 0 };
@@ -871,7 +871,7 @@ int sm_emit_push_chunk(FILE *out, const sm_op_template_t *t,
     return sm_emit_template(out, t, &a);
 }
 
-int sm_emit_call_chunk(FILE *out, const sm_op_template_t *t, int target_pc)
+int sm_emit_call_expression(FILE *out, const sm_op_template_t *t, int target_pc)
 {
     sm_emit_args_t a = { 0 };
     a.i32_a = target_pc;
