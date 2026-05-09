@@ -215,20 +215,35 @@ const sm_op_template_t *sm_template_ret_var(void)    { return &g_tpl_ret_var; }
 
 /* ---- macro body renderer -------------------------------------------- */
 
-/* Helper: format the .ifnb/.else/.endif block for an optional label arg. */
+/* forward decl — emit_optional_lbl below uses macro_line, defined further down */
+static int macro_line(FILE *out, const char *label, const char *opcode, const char *col3);
+
+/* Helper: format the .ifnb/.else/.endif block for an optional label arg.
+ *
+ * EM-7c-sm-three-column-verify (2026-05-09): rewritten to route through
+ * macro_line so every emitted line obeys the col-1/col-2/col-3 grid.
+ * Was: `\t.ifnb \\lbl\\n\t\tlea rdi, [rip + \\lbl]\\n\t.else\\n...` —
+ * 4-space-indented directives + 8-space-indented body, off the grid.
+ * Now: each line is a macro_line call: directive token in col 2, args in
+ * col 3.  Result assembles identically (GAS conditional assembly is
+ * indentation-insensitive); audit test passes. */
 static int emit_optional_lbl(FILE *out, const char *macro_arg,
                              const char *register_load_dst)
 {
-    return fprintf(out,
-        "    .ifnb \\%s\n"
-        "        lea     %s, [rip + \\%s]\n"
-        "    .else\n"
-        "        xor     e%s, e%s\n"     /* clears the 64-bit reg too */
-        "    .endif\n",
-        macro_arg, register_load_dst, macro_arg,
-        /* xor edi,edi clears rdi; xor edx,edx clears rdx; etc.
-         * register_load_dst is "rdi"/"rsi"/"rdx"; we strip the 'r'. */
-        register_load_dst + 1, register_load_dst + 1);
+    char ifnb_arg[32], lea_arg[64], xor_arg[16];
+    snprintf(ifnb_arg, sizeof(ifnb_arg), "\\%s", macro_arg);
+    snprintf(lea_arg,  sizeof(lea_arg),  "%s, [rip + \\%s]",
+             register_load_dst, macro_arg);
+    /* xor edi,edi clears rdi; xor edx,edx clears rdx; etc.
+     * register_load_dst is "rdi"/"rsi"/"rdx"; we strip the 'r'. */
+    snprintf(xor_arg,  sizeof(xor_arg),  "e%s, e%s",
+             register_load_dst + 1, register_load_dst + 1);
+    if (macro_line(out, "", ".ifnb", ifnb_arg) < 0) return -1;
+    if (macro_line(out, "", "lea",   lea_arg)  < 0) return -1;
+    if (macro_line(out, "", ".else", "")       < 0) return -1;
+    if (macro_line(out, "", "xor",   xor_arg)  < 0) return -1;
+    if (macro_line(out, "", ".endif", "")      < 0) return -1;
+    return 0;
 }
 
 /* Helper: emit one three-column line for sm_macros.s content.
@@ -713,7 +728,10 @@ int sm_emit_macro_library(FILE *out)
 
     #undef EMIT_IF_NEW
 
-    if (fputs("# === END sm macro library ===\n\n", out) == EOF) return -1;
+    /* EM-7c-sm-three-column-verify (2026-05-09): trailing '\\n\\n'
+     * produced one blank line at end-of-file — flagged by the audit.
+     * Drop the second '\\n'. */
+    if (fputs("# === END sm macro library ===\n", out) == EOF) return -1;
     return 0;
 }
 

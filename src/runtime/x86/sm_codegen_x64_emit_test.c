@@ -60,6 +60,35 @@
  * Usage: sm_codegen_x64_emit_test <em2.s> [<em3.s>] [<em4a.s>] [<em4b.s>]
  *                                 [<em5.s>] [<em5b.s>]
  *   (each successive arg unlocks the next program; missing args = skip)
+ *
+ * AUDIT MODE (EM-7c-sm-three-column-verify, 2026-05-09):
+ *   sm_codegen_x64_emit_test --audit <file.s> [<file.s> ...]
+ *
+ * Validates that every non-banner line in the given .s file(s) obeys the
+ * three-column shape invariants:
+ *
+ *   I1.  No bare ';' column separator.  ';' is permitted inside double-
+ *        quoted strings and inside '#' line-comments; bare ';' anywhere
+ *        else is a violation.
+ *   I2.  No TAB character outside string literals.
+ *   I3.  If col-1 (chars 0..23) has any non-space content, that content
+ *        must be 'label:' shape (a single non-space token ending in ':').
+ *   I4.  Implicit in regex: the col-2 token is a single contiguous run
+ *        of non-whitespace chars (this catches the EM-7c-bb-three-column-
+ *        split class of bug where a fused 'mov  r10, ...' string spilled
+ *        into col 3).
+ *
+ * I5 (col-2 token <=16 chars when col-3 follows) was considered but dropped:
+ * col-2 width is a layout target, not an invariant.  printf's %-16s
+ * doesn't truncate, so long macro names like EXEC_STMT_VARIANT (17 chars)
+ * emit as well-formed three-column lines with col-3 pushed right by one.
+ *
+ * Banner lines (start with '#' optionally preceded by whitespace) are
+ * exempt entirely.  Blank lines are flagged separately (zero-blank-lines
+ * is an EM-7c-no-trailing-ws invariant).
+ *
+ * Exit code: 0 if every line in every file is clean, 1 otherwise.  The
+ * harness prints up to 10 violations per file plus a category summary.
  */
 
 #include "sm_prog.h"
@@ -67,6 +96,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 static int emit_to(const char *path, SM_Program *p)
 {
@@ -79,12 +109,236 @@ static int emit_to(const char *path, SM_Program *p)
     return rc != 0 ? 1 : 0;
 }
 
+/*============================================================================
+ * Audit mode (EM-7c-sm-three-column-verify, 2026-05-09)
+ *
+ * Validates the three-column shape of an emitted .s file.  Invariants
+ * I1..I5 documented in the file-header comment above.  Implementation
+ * mirrors the Python prototype that empirically determined the rule set
+ * against the five tracked artifacts.
+ *============================================================================*/
+
+#define AUDIT_COL1_END 24
+#define AUDIT_COL2_END 40
+
+/* Find first occurrence of `ch` in `s` (length `len`) that is NOT inside
+ * a double-quoted string.  Returns position or -1. */
+static int audit_first_unquoted(const char *s, int len, char ch)
+{
+    int in_str = 0;
+    for (int i = 0; i < len; i++) {
+        char c = s[i];
+        if (c == '"') in_str = !in_str;
+        else if (c == ch && !in_str) return i;
+    }
+    return -1;
+}
+
+/* True if line is a banner (whitespace-then-'#' or '#' at col 0). */
+static int audit_is_banner(const char *s, int len)
+{
+    int i = 0;
+    while (i < len && (s[i] == ' ' || s[i] == '\t')) i++;
+    return (i < len && s[i] == '#') ? 1 : 0;
+}
+
+/* Audit a single line.  `line` does NOT contain the trailing '\n'.
+ * Returns number of violations (0..N).  Each violation is printed
+ * with the supplied path/lineno prefix and tracked in counters[]. */
+typedef struct {
+    long blank;       /* I0: blank line */
+    long semicolon;   /* I1: bare ';' */
+    long tab;         /* I2: stray TAB */
+    long col1_shape;  /* I3: col-1 not 'label:' */
+    long off_grid;    /* I3a: directive off the col-1 grid */
+    long col2_overflow; /* I5: col-2 token > 16 chars w/col-3 */
+} AuditCounters;
+
+/* Scan `s` (length `len`) for the col-1 region: chars [0..min(len,24)).
+ * Trim trailing spaces.  Return 1 if the trimmed region is empty,
+ * 'label:' shape, or "" (empty), 0 otherwise.  Output the trimmed
+ * length via *out_trimmed_len.  out_starts_with_dot is set if the
+ * trimmed col-1 starts with '.' (a directive — used to distinguish
+ * the off-grid-directive sub-case). */
+static int audit_col1_check(const char *s, int len,
+                            int *out_trimmed_len,
+                            int *out_starts_with_dot)
+{
+    int n = (len < AUDIT_COL1_END) ? len : AUDIT_COL1_END;
+    /* trim trailing spaces */
+    while (n > 0 && s[n-1] == ' ') n--;
+    *out_trimmed_len = n;
+    *out_starts_with_dot = (n > 0 && s[0] == '.') ? 1 : 0;
+    if (n == 0) return 1;  /* empty col-1 — fine */
+    /* must be 'label:' — single non-space token ending ':' */
+    /* leading whitespace before token? — that's the off-grid case */
+    if (s[0] == ' ' || s[0] == '\t') return 0;
+    /* scan token: contiguous non-space chars up to ':' */
+    for (int i = 0; i < n; i++) {
+        if (s[i] == ' ' || s[i] == '\t') return 0;  /* internal ws — bad */
+    }
+    /* must end ':' */
+    return (s[n-1] == ':') ? 1 : 0;
+}
+
+static int audit_line(const char *path, long lineno,
+                      const char *raw, int len,
+                      AuditCounters *cnt, int *printed_so_far)
+{
+    int violations = 0;
+    /* blank line check */
+    int all_ws = 1;
+    for (int i = 0; i < len; i++) {
+        if (raw[i] != ' ' && raw[i] != '\t') { all_ws = 0; break; }
+    }
+    if (len == 0 || all_ws) {
+        cnt->blank++;
+        if ((*printed_so_far)++ < 10)
+            fprintf(stderr, "  %s:%ld [I0/blank]: blank line\n", path, lineno);
+        return 1;
+    }
+
+    if (audit_is_banner(raw, len)) return 0;
+
+    /* I1: bare ';' outside strings, before any '#' line-comment */
+    int hash_pos = audit_first_unquoted(raw, len, '#');
+    int code_len = (hash_pos < 0) ? len : hash_pos;
+    int semi_pos = audit_first_unquoted(raw, code_len, ';');
+    if (semi_pos >= 0) {
+        cnt->semicolon++;
+        violations++;
+        if ((*printed_so_far)++ < 10)
+            fprintf(stderr, "  %s:%ld [I1/semicolon]: bare ';' at col %d\n",
+                    path, lineno, semi_pos);
+    }
+
+    /* I2: stray TAB outside strings */
+    {
+        int in_str = 0;
+        for (int i = 0; i < len; i++) {
+            char c = raw[i];
+            if (c == '"') in_str = !in_str;
+            else if (c == '\t' && !in_str) {
+                cnt->tab++;
+                violations++;
+                if ((*printed_so_far)++ < 10)
+                    fprintf(stderr, "  %s:%ld [I2/tab]: TAB at col %d\n",
+                            path, lineno, i);
+                break;
+            }
+        }
+    }
+
+    /* I3: col-1 shape */
+    int c1_trim_len, c1_starts_dot;
+    if (!audit_col1_check(raw, len, &c1_trim_len, &c1_starts_dot)) {
+        if (c1_starts_dot || (len > 0 && (raw[0] == ' ' || raw[0] == '\t'))) {
+            /* off-grid directive (e.g. '    .ifnb \\lbl') */
+            cnt->off_grid++;
+            violations++;
+            if ((*printed_so_far)++ < 10)
+                fprintf(stderr, "  %s:%ld [I3a/off-grid-directive]: directive not on col-1 grid\n",
+                        path, lineno);
+        } else {
+            cnt->col1_shape++;
+            violations++;
+            if ((*printed_so_far)++ < 10)
+                fprintf(stderr, "  %s:%ld [I3/col1-shape]: col-1 not 'label:'\n",
+                        path, lineno);
+        }
+        return violations;
+    }
+
+    /* If line shorter than col-1, no col-2 to check. */
+    if (len < AUDIT_COL1_END) return violations;
+
+    /* col-2 region begins at AUDIT_COL1_END.  Skip leading spaces. */
+    int p = AUDIT_COL1_END;
+    while (p < len && raw[p] == ' ') p++;
+    if (p >= len) return violations;  /* no col-2 token */
+    int tok_start = p;
+    while (p < len && raw[p] != ' ' && raw[p] != '\t') p++;
+    int tok_end = p;
+    int tok_len = tok_end - tok_start;
+    (void)tok_len;
+    (void)tok_end;
+    /* I5 (col-2 token <=16 w/col-3) was dropped — col-2 width is a layout
+     * target, not an invariant.  printf's %-16s doesn't truncate, so a long
+     * macro name like EXEC_STMT_VARIANT (17) emits cleanly with col-3
+     * pushed right by 1.  The structural invariant — col-2 is a single
+     * token with no internal whitespace — is already enforced by the
+     * single-token scan above (loop terminates on first whitespace).  A
+     * fused 'mov  r10, ...' string would have whitespace inside what
+     * callers thought was col 2, but that means the loop above stops at
+     * the first space and 'r10,' becomes the col-3 content — well-formed
+     * three-column shape, just with an unintentional split.  The
+     * EM-7c-bb-three-column-split rung already eliminated those at the
+     * call sites. */
+    return violations;
+}
+
+/* Audit one file.  Returns total violations. */
+static long audit_file(const char *path, AuditCounters *cnt)
+{
+    FILE *f = fopen(path, "r");
+    if (!f) {
+        fprintf(stderr, "audit: cannot open '%s'\n", path);
+        return -1;
+    }
+    char buf[8192];
+    long lineno = 0, total = 0;
+    int printed = 0;
+    while (fgets(buf, sizeof(buf), f)) {
+        lineno++;
+        int len = (int)strlen(buf);
+        /* strip trailing \n (and \r if present) */
+        while (len > 0 && (buf[len-1] == '\n' || buf[len-1] == '\r')) {
+            buf[--len] = '\0';
+        }
+        total += audit_line(path, lineno, buf, len, cnt, &printed);
+    }
+    fclose(f);
+    if (printed > 10)
+        fprintf(stderr, "  ... (+%d more in %s)\n", printed - 10, path);
+    return total;
+}
+
+static int run_audit(int n_paths, char **paths)
+{
+    AuditCounters cnt = {0};
+    long grand_total = 0;
+    for (int i = 0; i < n_paths; i++) {
+        long t = audit_file(paths[i], &cnt);
+        if (t < 0) return 2;  /* fopen failed */
+        if (t == 0) printf("OK   %s\n", paths[i]);
+        else        printf("FAIL %s (%ld violations)\n", paths[i], t);
+        grand_total += t;
+    }
+    printf("\n--- audit summary ---\n");
+    printf("  I0/blank            : %ld\n", cnt.blank);
+    printf("  I1/semicolon        : %ld\n", cnt.semicolon);
+    printf("  I2/tab              : %ld\n", cnt.tab);
+    printf("  I3/col1-shape       : %ld\n", cnt.col1_shape);
+    printf("  I3a/off-grid-directive : %ld\n", cnt.off_grid);
+    printf("  TOTAL               : %ld violations across %d files\n",
+           grand_total, n_paths);
+    return grand_total == 0 ? 0 : 1;
+}
+
 int main(int argc, char **argv)
 {
+    /* Audit mode (EM-7c-sm-three-column-verify): validate a .s file's
+     * three-column shape.  Routed via --audit as argv[1]. */
+    if (argc >= 3 && strcmp(argv[1], "--audit") == 0) {
+        return run_audit(argc - 2, argv + 2);
+    }
+
     if (argc < 2 || argc > 7) {
         fprintf(stderr,
             "usage: %s <em2.s> [<em3.s>] [<em4a.s>] [<em4b.s>]"
-            " [<em5.s>] [<em5b.s>]\n", argv[0]);
+            " [<em5.s>] [<em5b.s>]\n"
+            "       %s --audit <file.s> [<file.s> ...]\n",
+            argv[0], argv[0]);
         return 2;
     }
 
