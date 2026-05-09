@@ -635,11 +635,9 @@ static int sm_line(FILE *out, const char *label, const char *action,
 static int emit_major_break(FILE *out, int stno, int lineno,
                             const char *src_text)
 {
-    /* Bracket bar at column 0, full width 78 (matches GNU-as
-     * convention; '#' is the line-comment introducer).  No leading
-     * '\n' — blank lines are not emitted. */
+    /* EM-FORMAT-SM: 120-char `#=` banner per spec.  No blank lines. */
     if (fputs(
-        "# ============================================================================\n",
+        "# ======================================================================================================================\n",
         out) == EOF) return -1;
     if (src_text && *src_text) {
         if (fprintf(out, "# stmt %d  (line %d):  %s\n",
@@ -650,18 +648,19 @@ static int emit_major_break(FILE *out, int stno, int lineno,
         if (fprintf(out, "# stmt %d\n", stno) < 0) return -1;
     }
     if (fputs(
-        "# ============================================================================\n",
+        "# ======================================================================================================================\n",
         out) == EOF) return -1;
     return 0;
 }
 
 static int emit_minor_break(FILE *out, const char *caption)
 {
-    if (fputs("# ----------------------------------------------------------------------------\n",
+    /* EM-FORMAT-SM: 120-char `#-` banner. */
+    if (fputs("# ----------------------------------------------------------------------------------------------------------------------\n",
               out) == EOF) return -1;
     if (caption && *caption) {
         if (fprintf(out, "# %s\n", caption) < 0) return -1;
-        if (fputs("# ----------------------------------------------------------------------------\n",
+        if (fputs("# ----------------------------------------------------------------------------------------------------------------------\n",
                   out) == EOF) return -1;
     }
     return 0;
@@ -736,7 +735,7 @@ static int emit_sm_push_lit_s(FILE *out, const SM_Instr *ins, int pc)
     char lbl[32], anno[STR_PREVIEW_MAX + 16], preview[STR_PREVIEW_MAX + 8];
     strtab_label(lbl, sizeof(lbl), s);
     render_str_preview(preview, sizeof(preview), s, (int)slen);
-    snprintf(anno, sizeof(anno), "# str=%s", preview);
+    snprintf(anno, sizeof(anno), "# %s", preview);
     return sm_emit_lbl_int32(out, sm_template_lookup(SM_PUSH_LIT_S),
                              lbl, (int)slen, anno);
 }
@@ -747,7 +746,7 @@ static int emit_sm_push_var(FILE *out, const SM_Instr *ins, int pc)
     const char *name = ins->a[0].s ? ins->a[0].s : "";
     char lbl[32], anno[80];
     strtab_label(lbl, sizeof(lbl), name);
-    snprintf(anno, sizeof(anno), "# var=%s", name);
+    snprintf(anno, sizeof(anno), "# %s", name);
     return sm_emit_lbl(out, sm_template_lookup(SM_PUSH_VAR), lbl, anno);
 }
 
@@ -757,7 +756,7 @@ static int emit_sm_store_var(FILE *out, const SM_Instr *ins, int pc)
     const char *name = ins->a[0].s ? ins->a[0].s : "";
     char lbl[32], anno[80];
     strtab_label(lbl, sizeof(lbl), name);
-    snprintf(anno, sizeof(anno), "# store -> %s", name);
+    snprintf(anno, sizeof(anno), "# %s", name);
     return sm_emit_lbl(out, sm_template_lookup(SM_STORE_VAR), lbl, anno);
 }
 
@@ -1012,7 +1011,7 @@ static int emit_sm_call(FILE *out, const SM_Instr *ins, int pc)
     strtab_label(lbl, sizeof(lbl), name);
     /* Annotation: show the unmangled fname (the args column shows the .Lstr_N
      * label which is opaque); CALL_FN macro name is in col 2. */
-    snprintf(anno, sizeof(anno), "fname=\"%s\"", name);
+    snprintf(anno, sizeof(anno), "%s", name);
     return sm_emit_lbl_int32(out, sm_template_lookup(SM_CALL_FN),
                              lbl, nargs, anno);
 }
@@ -1586,11 +1585,11 @@ static int emit_pattern_blobs(FILE *out)
     bb_build_flat_text_reset();
 
     if (fputs(
-        "# ============================================================================\n"
+        "# ======================================================================================================================\n"
         "# EM-7c: invariant pattern blobs (baked from sm_phase2_to_patnd → bb_build_flat_text)\n"
         "# Each block exposes _pat_inv_<id>_α / _β / _γ / _ω.\n"
         "# rt_match_blob(blob_α, ...) drives Phase-3 against these blobs.\n"
-        "# ============================================================================\n",
+        "# ======================================================================================================================\n",
         out) == EOF) return -1;
     if (emit_three_column_line(out, "", ".intel_syntax", "noprefix", NULL) != 0) return -1;
     if (emit_three_column_line(out, "", ".text", "", NULL) != 0) return -1;
@@ -1804,7 +1803,7 @@ static int emit_sm_pat_refname(FILE *out, const SM_Instr *ins, int pc)
     char lbl[64], anno[128];
     const char *l = pat_arg_label(lbl, sizeof(lbl), ins->a[0].s);
     if (l) {
-        snprintf(anno, sizeof(anno), "var=\"%.40s\"%s",
+        snprintf(anno, sizeof(anno), "%.40s%s",
                  ins->a[0].s, (strlen(ins->a[0].s) > 40) ? "..." : "");
         return sm_emit_lblopt(out, sm_template_lookup(SM_PAT_REFNAME), l, anno);
     }
@@ -1819,7 +1818,7 @@ static int emit_sm_pat_capture(FILE *out, const SM_Instr *ins, int pc)
     const char *l = pat_arg_label(lbl, sizeof(lbl), ins->a[0].s);
     int kind = (int)ins->a[1].i;
     if (l) {
-        snprintf(anno, sizeof(anno), "var=%s kind=%d", ins->a[0].s, kind);
+        snprintf(anno, sizeof(anno), "%s kind=%d", ins->a[0].s, kind);
     } else {
         snprintf(anno, sizeof(anno), "kind=%d", kind);
     }
@@ -1837,7 +1836,7 @@ static int emit_sm_pat_capture_fn(FILE *out, const SM_Instr *ins, int pc)
     const char *nl = pat_arg_label(nl_lbl,    sizeof(nl_lbl),    ins->a[2].s);
     int is_imm = (int)ins->a[1].i;
     snprintf(anno, sizeof(anno),
-             "fname=%s namelist=%s",
+             "%s, %s",
              fl ? ins->a[0].s : "(NULL)",
              nl ? ins->a[2].s : "(NULL)");
     return sm_emit_capture_fn(out, sm_template_lookup(SM_PAT_CAPTURE_FN),
@@ -1852,7 +1851,7 @@ static int emit_sm_pat_capture_fn_args(FILE *out, const SM_Instr *ins, int pc)
     const char *fl = pat_arg_label(fname_lbl, sizeof(fname_lbl), ins->a[0].s);
     int is_imm = (int)ins->a[1].i;
     int nargs  = (int)ins->a[2].i;
-    snprintf(anno, sizeof(anno), "fname=%s",
+    snprintf(anno, sizeof(anno), "%s",
              fl ? ins->a[0].s : "(NULL)");
     return sm_emit_capture_fn_args(out,
                                    sm_template_lookup(SM_PAT_CAPTURE_FN_ARGS),
@@ -1866,7 +1865,7 @@ static int emit_sm_pat_usercall(FILE *out, const SM_Instr *ins, int pc)
     char lbl[64], anno[128];
     const char *l = pat_arg_label(lbl, sizeof(lbl), ins->a[0].s);
     if (l) {
-        snprintf(anno, sizeof(anno), "fname=\"%.40s\"%s",
+        snprintf(anno, sizeof(anno), "%.40s%s",
                  ins->a[0].s, (strlen(ins->a[0].s) > 40) ? "..." : "");
         return sm_emit_lblopt(out, sm_template_lookup(SM_PAT_USERCALL), l, anno);
     }
@@ -1881,7 +1880,7 @@ static int emit_sm_pat_usercall_args(FILE *out, const SM_Instr *ins, int pc)
     const char *l = pat_arg_label(lbl, sizeof(lbl), ins->a[0].s);
     int nargs = (int)ins->a[1].i;
     if (l) {
-        snprintf(anno, sizeof(anno), "fname=\"%.40s\"", ins->a[0].s);
+        snprintf(anno, sizeof(anno), "%.40s", ins->a[0].s);
         return sm_emit_lblopt_int32(out, sm_template_lookup(SM_PAT_USERCALL_ARGS),
                                     l, nargs, anno);
     }
