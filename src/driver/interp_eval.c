@@ -330,10 +330,10 @@ DESCR_t icn_call_builtin(EXPR_t *call, DESCR_t *args, int nargs) {
         }
         return nargs > 0 ? args[nargs-1] : NULVCL;
     }
-    /* User proc — call directly with resolved args */
+    /* User proc — call directly with resolved args (CH-17g-call-sites: via SM chunk when entry_pc resolved) */
     for (int i = 0; i < proc_count; i++) {
         if (!strcmp(proc_table[i].name, fn))
-            return coro_call(proc_table[i].proc, args, nargs);
+            return proc_table_call(i, args, nargs);
     }
     /* RS-23-extra-prep2 (Option B′): smart fallback for the residual
      * builtins still living in interp_eval's E_FNC switch (~40 names:
@@ -790,7 +790,7 @@ DESCR_t interp_eval(EXPR_t *e)
                     DESCR_t args[FRAME_SLOT_MAX];
                     for (int j=0; j<nargs&&j<FRAME_SLOT_MAX; j++)
                         args[j]=interp_eval(e->children[1+j]);
-                    return coro_call(proc_table[i].proc,args,nargs);
+                    return proc_table_call(i,args,nargs);   /* CH-17g-call-sites */
                 }
             }
             /* RK-14: array builtins — arrays stored as \x01-separated strings */
@@ -2283,10 +2283,10 @@ DESCR_t interp_eval(EXPR_t *e)
          * SNO body lookup above found nothing.  Try Icon proc table, then
          * Prolog pred table, before falling through to builtins/APPLY_fn. */
         {
-            /* Try Icon proc table (case-sensitive) */
+            /* Try Icon proc table (case-sensitive) — CH-17g-call-sites: via SM chunk when entry_pc resolved */
             for (int _ci = 0; _ci < proc_count; _ci++) {
                 if (strcmp(proc_table[_ci].name, e->sval) == 0)
-                    return coro_call(proc_table[_ci].proc, args, nargs);
+                    return proc_table_call(_ci, args, nargs);
             }
             /* Try Prolog pred table: "name/arity" key */
             if (g_pl_active) {

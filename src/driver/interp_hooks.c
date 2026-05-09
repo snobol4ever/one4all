@@ -139,8 +139,9 @@ DESCR_t _usercall_hook(const char *name, DESCR_t *args, int nargs) {
         for (int _i = 0; _i < proc_count; _i++) {
             if (strcmp(proc_table[_i].name, name) == 0) {
                 /* Call as one-shot: drive the Icon proc and return its value.
-                 * coro_call returns FAILDESCR if the procedure fails. */
-                return coro_call(proc_table[_i].proc, args, nargs);
+                 * proc_table_call returns FAILDESCR if the procedure fails.
+                 * CH-17g-call-sites: dispatches via SM chunk when entry_pc resolved. */
+                return proc_table_call(_i, args, nargs);
             }
         }
         /* Try Prolog pred table: name/arity key, e.g. "color/1" */

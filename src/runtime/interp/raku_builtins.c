@@ -667,7 +667,7 @@ int raku_try_call_builtin(EXPR_t *call, DESCR_t *__rk_out) {
                 DESCR_t *callargs = GC_malloc((size_t)total * sizeof(DESCR_t));
                 callargs[0] = obj;
                 for (int i=0;i<nextra;i++) callargs[i+1] = bb_eval_value(call->children[3+i]);
-                { *__rk_out = coro_call(proc_table[pi].proc, callargs, total); return 1; }
+                { *__rk_out = proc_table_call(pi, callargs, total); return 1; }   /* CH-17g-call-sites */
             }
 
     /* Not a Raku builtin — let caller handle it. */

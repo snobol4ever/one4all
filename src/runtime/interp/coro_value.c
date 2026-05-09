@@ -491,12 +491,13 @@ DESCR_t bb_eval_value(EXPR_t *e)
             DESCR_t __rk_d;
             if (raku_try_call_builtin(e, &__rk_d)) return __rk_d;
         }
-        /* User-proc path: look up in proc_table and call via coro_call. */
+        /* User-proc path: look up in proc_table and call via proc_table_call
+         * (CH-17g-call-sites: dispatches via SM chunk when entry_pc resolved). */
         for (int i = 0; i < proc_count; i++) {
             if (strcmp(proc_table[i].name, fn) != 0) continue;
             DESCR_t *args = nargs > 0 ? GC_malloc((size_t)nargs * sizeof(DESCR_t)) : NULL;
             for (int j = 0; j < nargs; j++) args[j] = bb_eval_value(e->children[1+j]);
-            DESCR_t result = coro_call(proc_table[i].proc, args, nargs);
+            DESCR_t result = proc_table_call(i, args, nargs);
             return result;
         }
         /* Builtin path: evaluate args through bb_eval_value, then icn_call_builtin. */

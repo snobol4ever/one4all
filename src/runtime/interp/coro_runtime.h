@@ -112,6 +112,12 @@ void    icn_scope_patch(IcnScope *sc, EXPR_t *e);
 DESCR_t coro_call(EXPR_t *proc, DESCR_t *args, int nargs);
 /* CH-17c: SM-dispatch entry for proc bodies lowered into named chunks. */
 DESCR_t sm_call_proc(int entry_pc, int nparams, DESCR_t *args, int nargs);
+/* CH-17g-call-sites: dispatch helper for proc_table[pi].  Routes through
+ * sm_call_proc when entry_pc is resolved, else falls back to coro_call.
+ * Replaces ~8 hand-coded `coro_call(proc_table[pi].proc, ...)` call sites
+ * across coro_value.c, raku_builtins.c, interp_eval.c, interp_hooks.c,
+ * interp_exec.c, polyglot.c — symmetrical to CH-17c's trampoline flip. */
+DESCR_t proc_table_call(int pi, DESCR_t *args, int nargs);
 bb_node_t coro_eval(EXPR_t *e);
 /* CHUNKS-step12: build a bb_node_t for a user proc identified by name + args,
  * skipping the synthesised E_FNC + coro_eval routing. The proc's IR body is

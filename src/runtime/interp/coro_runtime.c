@@ -549,6 +549,20 @@ DESCR_t sm_call_proc(int entry_pc, int nparams, DESCR_t *args, int nargs)
     return result;
 }
 
+/* CH-17g-call-sites: single dispatch helper for proc_table[pi].  Mirrors the
+ * trampoline-side flip CH-17c made for proc_trampoline / gather_trampoline:
+ * when entry_pc is resolved (CH-17b' / CH-17b'' have lowered the proc body
+ * into a chunk and CH-17a's resolver populated entry_pc), dispatch via SM
+ * chunk; otherwise fall through to the legacy IR-walker coro_call.  Lets
+ * every Icon/Raku user-proc call site flip in one line, identically. */
+DESCR_t proc_table_call(int pi, DESCR_t *args, int nargs)
+{
+    if (pi < 0 || pi >= proc_count) return FAILDESCR;
+    if (proc_table[pi].entry_pc >= 0)
+        return sm_call_proc(proc_table[pi].entry_pc, proc_table[pi].nparams, args, nargs);
+    return coro_call(proc_table[pi].proc, args, nargs);
+}
+
 /*============================================================================================================================
  * coro_eval — U-17 (B-8): walk Icon IR node, return a drivable bb_node_t.
  *

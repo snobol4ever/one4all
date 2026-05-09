@@ -260,7 +260,7 @@ void polyglot_execute(CODE_t *prog) {
         g_lang = 1;
         for (int i = 0; i < proc_count; i++) {
             if (strcmp(proc_table[i].name, "main") == 0) {
-                coro_call(proc_table[i].proc, NULL, 0);
+                proc_table_call(i, NULL, 0);   /* CH-17g-call-sites */
                 return;
             }
         }

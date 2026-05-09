@@ -406,12 +406,12 @@ void execute_program(CODE_t *prog)
                 g_lang = 1;   /* OE-7: Icon top-level mode required for coro_call */
                 for (int _pi = _m->icn_proc_start; _pi < _pend && _pi < proc_count; _pi++) {
                     if (strcmp(proc_table[_pi].name, "main") == 0)
-                        { coro_call(proc_table[_pi].proc, NULL, 0); _found=1; break; }
+                        { proc_table_call(_pi, NULL, 0); _found=1; break; }   /* CH-17g-call-sites */
                 }
                 if (!_found)
                     for (int _pi=0; _pi<proc_count; _pi++)
                         if (strcmp(proc_table[_pi].name,"main")==0)
-                            { coro_call(proc_table[_pi].proc,NULL,0); break; }
+                            { proc_table_call(_pi,NULL,0); break; }   /* CH-17g-call-sites */
                 g_lang = 0;
             } else if (_m->lang == LANG_PL) {
                 EXPR_t *pl_main = pl_pred_table_lookup(&g_pl_pred_table, "main/0");
@@ -429,7 +429,7 @@ void execute_program(CODE_t *prog)
     if (proc_count > 0) {
         for (int _i = 0; _i < proc_count; _i++) {
             if (strcmp(proc_table[_i].name, "main") == 0) {
-                coro_call(proc_table[_i].proc, NULL, 0);
+                proc_table_call(_i, NULL, 0);   /* CH-17g-call-sites */
                 break;
             }
         }
