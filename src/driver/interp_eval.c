@@ -493,6 +493,298 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
         outs[o] = '\0';
         *out = STRVAL(outs); return 1;
     }
+    /* CH-17g-runtime-bridge-3 BATCH 2 (2026-05-09): multi-arg pure transforms.
+     * Same constraints as batch 1 — verbatim port of in-eval branches with
+     * `interp_eval(e->children[i])` → `args[i-1]`.  All EXPR_t-free, no
+     * write-back, no &pos/&subject mutation.  g_lang reads (in `trim`) are
+     * safe because polyglot_execute sets g_lang=1 before any Icon proc runs,
+     * regardless of --ir-run vs --sm-run path. */
+
+    /* repl(s,n) — n-fold concat */
+    if (!strcmp(fn,"repl") && nargs == 2) {
+        const char *s=VARVAL_fn(args[0]); if(!s)s="";
+        int n=(int)to_int(args[1]); if(n<0)n=0;
+        int sl=(int)strlen(s); char *buf=GC_malloc(sl*n+1); buf[0]='\0';
+        for(int i=0;i<n;i++) memcpy(buf+i*sl,s,sl); buf[sl*n]='\0';
+        *out = STRVAL(buf); return 1;
+    }
+    /* reverse(s) — string reverse */
+    if (!strcmp(fn,"reverse") && nargs == 1) {
+        const char *s=VARVAL_fn(args[0]); if(!s)s="";
+        int sl=(int)strlen(s); char *buf=GC_malloc(sl+1);
+        for(int i=0;i<sl;i++) buf[i]=s[sl-1-i]; buf[sl]='\0';
+        *out = STRVAL(buf); return 1;
+    }
+    /* map(s, c1, c2) — char-class mapping; defaults: c1=ucase, c2=lcase */
+    if (!strcmp(fn,"map") && nargs >= 1 && nargs <= 3) {
+        static const char *UCASE = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        static const char *LCASE = "abcdefghijklmnopqrstuvwxyz";
+        const char *s=VARVAL_fn(args[0]); if(!s)s="";
+        const char *from = UCASE, *to = LCASE;
+        if (nargs >= 2) {
+            DESCR_t fv=args[1];
+            if (fv.v != DT_SNUL) {
+                const char *fs = VARVAL_fn(fv);
+                if (fs) from = fs;
+            }
+        }
+        if (nargs >= 3) {
+            DESCR_t tv=args[2];
+            if (tv.v != DT_SNUL) {
+                const char *ts = VARVAL_fn(tv);
+                if (ts) to = ts;
+            }
+        }
+        int sl=(int)strlen(s); char *buf=GC_malloc(sl+1);
+        int fl=(int)strlen(from), tl=(int)strlen(to);
+        for (int i=0;i<sl;i++) {
+            char c=s[i]; int hit=0;
+            for (int j=fl-1;j>=0;j--) {
+                if (from[j]==c) { buf[i] = (j<tl) ? to[j] : c; hit=1; break; }
+            }
+            if (!hit) buf[i]=c;
+        }
+        buf[sl]='\0'; *out = STRVAL(buf); return 1;
+    }
+    /* trim(s, [c]) — Icon: trailing chars in cset; Raku: both ends, whitespace */
+    if (!strcmp(fn,"trim") && (nargs == 1 || nargs == 2)) {
+        const char *s=VARVAL_fn(args[0]); if(!s)s="";
+        const char *cset = " ";
+        if (nargs == 2) {
+            DESCR_t cv = args[1];
+            if (cv.v != DT_SNUL) {
+                const char *cs = VARVAL_fn(cv);
+                if (cs) cset = cs;
+            }
+        }
+        if (g_lang == 1 || nargs == 2) {
+            int sl=(int)strlen(s);
+            while (sl > 0 && strchr(cset, s[sl-1])) sl--;
+            char *buf=GC_malloc(sl+1); memcpy(buf,s,sl); buf[sl]='\0';
+            *out = STRVAL(buf); return 1;
+        } else {
+            while(*s==' '||*s=='\t'||*s=='\n'||*s=='\r') s++;
+            size_t len=strlen(s);
+            while(len>0&&(s[len-1]==' '||s[len-1]=='\t'||s[len-1]=='\n'||s[len-1]=='\r')) len--;
+            char *buf=GC_malloc(len+1); memcpy(buf,s,len); buf[len]='\0';
+            *out = STRVAL(buf); return 1;
+        }
+    }
+    /* left(s, [n], [p]) — pad/truncate string left-aligned */
+    if (!strcmp(fn,"left") && nargs >= 1) {
+        const char *s=VARVAL_fn(args[0]); if(!s)s="";
+        int sl=(int)strlen(s);
+        int n = 1;
+        if (nargs >= 2) {
+            DESCR_t nv = args[1];
+            if (!IS_FAIL_fn(nv) && nv.v != DT_SNUL) n = (int)to_int(nv);
+        }
+        if (n < 0) n = 0;
+        const char *fill=" "; int fl=1;
+        if (nargs >= 3) {
+            DESCR_t fd = args[2];
+            if (!IS_FAIL_fn(fd) && fd.v != DT_SNUL) {
+                const char *fs = VARVAL_fn(fd);
+                if (fs && *fs) { fill = fs; fl = (int)strlen(fs); }
+            }
+        }
+        char *buf=GC_malloc(n+1);
+        int copy = sl < n ? sl : n;
+        for (int i = 0; i < copy; i++) buf[i] = s[i];
+        int rpad = n - copy;
+        for (int k = 0; k < rpad; k++) {
+            int idx = ((k + fl - rpad) % fl + fl) % fl;
+            buf[copy + k] = fill[idx];
+        }
+        buf[n]='\0';
+        *out = STRVAL(buf); return 1;
+    }
+    /* right(s, [n], [p]) — pad/truncate string right-aligned */
+    if (!strcmp(fn,"right") && nargs >= 1) {
+        const char *s=VARVAL_fn(args[0]); if(!s)s="";
+        int sl=(int)strlen(s);
+        int n = 1;
+        if (nargs >= 2) {
+            DESCR_t nv = args[1];
+            if (!IS_FAIL_fn(nv) && nv.v != DT_SNUL) n = (int)to_int(nv);
+        }
+        if (n < 0) n = 0;
+        const char *fill=" "; int fl=1;
+        if (nargs >= 3) {
+            DESCR_t fd = args[2];
+            if (!IS_FAIL_fn(fd) && fd.v != DT_SNUL) {
+                const char *fs = VARVAL_fn(fd);
+                if (fs && *fs) { fill = fs; fl = (int)strlen(fs); }
+            }
+        }
+        char *buf=GC_malloc(n+1);
+        int pad = n - sl; if (pad < 0) pad = 0;
+        for (int i = 0; i < pad; i++) buf[i] = fill[i % fl];
+        int srcoff = (sl > n) ? (sl - n) : 0;
+        int copy = sl - srcoff; if (pad + copy > n) copy = n - pad;
+        for (int i = 0; i < copy; i++) buf[pad + i] = s[srcoff + i];
+        buf[n]='\0';
+        *out = STRVAL(buf); return 1;
+    }
+    /* center(s, [n], [p]) — pad/truncate centered */
+    if (!strcmp(fn,"center") && nargs >= 1) {
+        const char *s=VARVAL_fn(args[0]); if(!s)s="";
+        int sl=(int)strlen(s);
+        int n = 1;
+        if (nargs >= 2) {
+            DESCR_t nv = args[1];
+            if (!IS_FAIL_fn(nv) && nv.v != DT_SNUL) n = (int)to_int(nv);
+        }
+        if (n < 0) n = 0;
+        const char *fill=" "; int fl=1;
+        if (nargs >= 3) {
+            DESCR_t fd = args[2];
+            if (!IS_FAIL_fn(fd) && fd.v != DT_SNUL) {
+                const char *fs = VARVAL_fn(fd);
+                if (fs && *fs) { fill = fs; fl = (int)strlen(fs); }
+            }
+        }
+        char *buf=GC_malloc(n+1);
+        int lpad = (n - sl) / 2; if (lpad < 0) lpad = 0;
+        int srcoff = (sl > n) ? (sl - n + 1) / 2 : 0;
+        int copy = sl - srcoff; if (lpad + copy > n) copy = n - lpad;
+        int rpad = n - lpad - copy;
+        for (int i = 0; i < lpad; i++) buf[i] = fill[i % fl];
+        for (int i = 0; i < copy; i++) buf[lpad + i] = s[srcoff + i];
+        for (int k = 0; k < rpad; k++) {
+            int idx = ((k + fl - rpad) % fl + fl) % fl;
+            buf[lpad + copy + k] = fill[idx];
+        }
+        buf[n]='\0';
+        *out = STRVAL(buf); return 1;
+    }
+    /* abs(x), max(a,b,...), min(a,b,...), sqrt(x) — math */
+    if (!strcmp(fn,"abs") && nargs == 1) {
+        DESCR_t av = args[0];
+        if (IS_REAL_fn(av)) { *out = REALVAL(fabs(av.r)); return 1; }
+        *out = INTVAL(av.i < 0 ? -av.i : av.i); return 1;
+    }
+    if (!strcmp(fn,"max") && nargs >= 2) {
+        DESCR_t best = args[0];
+        for (int _j = 1; _j < nargs; _j++) {
+            DESCR_t cv = args[_j];
+            int gt = (IS_REAL_fn(best)||IS_REAL_fn(cv))
+                ? ((IS_REAL_fn(best)?best.r:(double)best.i) < (IS_REAL_fn(cv)?cv.r:(double)cv.i))
+                : (best.i < cv.i);
+            if (gt) best = cv;
+        }
+        *out = best; return 1;
+    }
+    if (!strcmp(fn,"min") && nargs >= 2) {
+        DESCR_t best = args[0];
+        for (int _j = 1; _j < nargs; _j++) {
+            DESCR_t cv = args[_j];
+            int lt = (IS_REAL_fn(best)||IS_REAL_fn(cv))
+                ? ((IS_REAL_fn(best)?best.r:(double)best.i) > (IS_REAL_fn(cv)?cv.r:(double)cv.i))
+                : (best.i > cv.i);
+            if (lt) best = cv;
+        }
+        *out = best; return 1;
+    }
+    if (!strcmp(fn,"sqrt") && nargs == 1) {
+        DESCR_t av = args[0];
+        double v = IS_REAL_fn(av) ? av.r : (double)av.i;
+        *out = REALVAL(sqrt(v)); return 1;
+    }
+    /* copy(X) — shallow container copy.  For tables, lists: fresh container,
+     * same element descriptors.  For strings/ints/reals/sets: value semantics
+     * already give a fresh descriptor; return as-is. */
+    if (!strcmp(fn,"copy") && nargs == 1) {
+        DESCR_t src = args[0];
+        if (src.v == DT_T && src.tbl) {
+            TBBLK_t *nt = table_new();
+            nt->dflt = src.tbl->dflt;
+            nt->init = src.tbl->init;
+            nt->inc  = src.tbl->inc;
+            for (int b = 0; b < TABLE_BUCKETS; b++)
+                for (TBPAIR_t *p = src.tbl->buckets[b]; p; p = p->next)
+                    table_set_descr(nt, p->key, p->key_descr, p->val);
+            DESCR_t d; d.v = DT_T; d.slen = 0; d.tbl = nt;
+            *out = d; return 1;
+        }
+        if (src.v == DT_DATA) {
+            DESCR_t tag = FIELD_GET_fn(src, "icn_type");
+            if (tag.v == DT_S && tag.s && strcmp(tag.s, "list") == 0) {
+                DESCR_t ea = FIELD_GET_fn(src, "frame_elems");
+                int n = (int)FIELD_GET_fn(src, "frame_size").i;
+                DESCR_t *src_elems = (ea.v == DT_DATA) ? (DESCR_t *)ea.ptr : NULL;
+                DESCR_t *new_elems = (DESCR_t *)GC_malloc((size_t)(n > 0 ? n : 1) * sizeof(DESCR_t));
+                if (src_elems && n > 0) memcpy(new_elems, src_elems, (size_t)n * sizeof(DESCR_t));
+                DESCR_t eptr; eptr.v = DT_DATA; eptr.slen = 0; eptr.ptr = (void *)new_elems;
+                *out = DATCON_fn("icnlist", eptr, INTVAL(n), STRVAL("list"));
+                return 1;
+            }
+        }
+        *out = src; return 1;
+    }
+    /* list([n], [init]) — Icon list constructor.  n elements, all init. */
+    if (!strcmp(fn,"list") && nargs >= 0 && nargs <= 2) {
+        int n = 0;
+        DESCR_t init = NULVCL;
+        if (nargs >= 1) {
+            DESCR_t nv = args[0];
+            if (!IS_FAIL_fn(nv) && nv.v != DT_SNUL) {
+                if (IS_INT_fn(nv)) n = (int)nv.i;
+                else if (IS_REAL_fn(nv)) n = (int)nv.r;
+                else { *out = FAILDESCR; return 1; }
+                if (n < 0) { *out = FAILDESCR; return 1; }
+            }
+        }
+        if (nargs >= 2) {
+            DESCR_t iv = args[1];
+            if (!IS_FAIL_fn(iv)) init = iv;
+        }
+        static int icnlist_reg2 = 0;
+        if (!icnlist_reg2) { DEFDAT_fn("icnlist(frame_elems,frame_size,icn_type)"); icnlist_reg2 = 1; }
+        DESCR_t *elems = GC_malloc((n>0?n:1)*sizeof(DESCR_t));
+        for (int i = 0; i < n; i++) elems[i] = init;
+        DESCR_t eptr; eptr.v=DT_DATA; eptr.slen=0; eptr.ptr=(void*)elems;
+        *out = DATCON_fn("icnlist", eptr, INTVAL(n), STRVAL("list"));
+        return 1;
+    }
+    /* table([dflt]) — Icon table constructor.  Optional default value. */
+    if (!strcmp(fn,"table") && nargs <= 2) {
+        TBBLK_t *tbl = table_new();
+        if (nargs == 1) {
+            tbl->dflt = args[0];
+        } else {
+            tbl->dflt = NULVCL;
+        }
+        DESCR_t d; d.v = DT_T; d.slen = 0; d.tbl = tbl;
+        *out = d; return 1;
+    }
+    /* read() — read one line from stdin (no newline), fail on EOF. */
+    if (!strcmp(fn,"read") && nargs == 0) {
+        char buf[4096];
+        if (!fgets(buf, sizeof buf, stdin)) { *out = FAILDESCR; return 1; }
+        size_t len = strlen(buf);
+        if (len > 0 && buf[len-1] == '\n') buf[--len] = '\0';
+        if (len > 0 && buf[len-1] == '\r') buf[--len] = '\0';
+        char *r = GC_malloc(len + 1); memcpy(r, buf, len + 1);
+        *out = STRVAL(r); return 1;
+    }
+    /* reads(n) — read n bytes from stdin, fail on EOF. */
+    if (!strcmp(fn,"reads") && nargs == 1) {
+        DESCR_t nd = args[0];
+        int n = (int)to_int(nd);
+        if (n <= 0) { *out = FAILDESCR; return 1; }
+        char *buf = GC_malloc(n + 1);
+        int got = (int)fread(buf, 1, (size_t)n, stdin);
+        if (got <= 0) { *out = FAILDESCR; return 1; }
+        buf[got] = '\0';
+        DESCR_t r; r.v = DT_S; r.slen = (uint32_t)got; r.s = buf;
+        *out = r; return 1;
+    }
+    /* stop() — terminate process with exit(0).  Matches the legacy in-eval
+     * behavior verbatim (note: not Icon-spec-conformant which would write
+     * args to stderr; that fidelity gap is pre-existing and tracked
+     * separately). */
+    if (!strcmp(fn,"stop")) { exit(0); }
     return 0;
 }
 
