@@ -856,7 +856,15 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
         sm_emit_si(p, SM_CALL_FN, "IDX", (int64_t)e->nchildren);
         return;
 
-    /* ── Relational comparisons (numeric) → SM_ACOMP or SM_CALL_FN ── */
+    /* ── Relational comparisons (numeric) → SM_ACOMP(op) ──
+     * a[0].i carries the operator EKind (E_EQ/E_NE/E_LT/E_LE/E_GT/E_GE).
+     * Runtime semantics (Icon-style): on success pushes the RIGHT operand
+     * and sets last_ok=1; on failure pushes FAILDESCR and clears last_ok.
+     * SM_JUMP_F dispatches on last_ok.  CH-17g-runtime-bridge-acomp,
+     * sess 2026-05-09: prior emission was `sm_emit(p, SM_ACOMP)` with no
+     * operator info — collapsed all six EKinds to a single opcode and
+     * left the comparator unrecoverable at runtime.  See
+     * docs/CHUNKS-step17g-runtime-bridge-acomp-validation.md. */
     case E_EQ:
     case E_NE:
     case E_LT:
@@ -865,7 +873,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const EXPR_t *e)
     case E_GE: {
         lower_expr(p, lt, e->nchildren > 0 ? e->children[0] : NULL);
         lower_expr(p, lt, e->nchildren > 1 ? e->children[1] : NULL);
-        sm_emit(p, SM_ACOMP);   /* leaves -1/0/1 on stack; stmt goto uses it */
+        sm_emit_i(p, SM_ACOMP, (int64_t)e->kind);
         return;
     }
 

@@ -1318,6 +1318,49 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
             break;
         }
 
+        /* CH-17g-runtime-bridge-acomp, sess 2026-05-09:
+         * SM_ACOMP — numeric comparison emitted by sm_lower for
+         * E_EQ/E_NE/E_LT/E_LE/E_GT/E_GE.  ins->a[0].i carries the
+         * operator EKind.  Icon-style relops: on success push the RIGHT
+         * operand and set last_ok=1; on failure push FAILDESCR and clear
+         * last_ok.  Mirrors NUMREL macro in interp_eval.c.  SNUL (unset)
+         * coerces to 0 — same convention as SM_ADD/SM_SUB. */
+        case SM_ACOMP: {
+            DESCR_t r = sm_pop(st);
+            DESCR_t l = sm_pop(st);
+            if (l.v == DT_FAIL || r.v == DT_FAIL) {
+                sm_push(st, FAILDESCR);
+                st->last_ok = 0;
+                break;
+            }
+            if (l.v == DT_SNUL) l = INTVAL(0);
+            if (r.v == DT_SNUL) r = INTVAL(0);
+            double lv = (l.v == DT_R) ? l.r : (double)((l.v == DT_I) ? l.i : 0);
+            double rv = (r.v == DT_R) ? r.r : (double)((r.v == DT_I) ? r.i : 0);
+            int op = (int)ins->a[0].i;
+            int ok;
+            switch (op) {
+                case E_EQ: ok = (lv == rv); break;
+                case E_NE: ok = (lv != rv); break;
+                case E_LT: ok = (lv <  rv); break;
+                case E_LE: ok = (lv <= rv); break;
+                case E_GT: ok = (lv >  rv); break;
+                case E_GE: ok = (lv >= rv); break;
+                /* No operator code (legacy emit).  Fall back to equality
+                 * — matches the historical SM_ACOMP-as-tristate intent
+                 * least surprisingly.  Should not occur post-bridge-acomp. */
+                default:   ok = (lv == rv); break;
+            }
+            if (ok) {
+                sm_push(st, r);
+                st->last_ok = 1;
+            } else {
+                sm_push(st, FAILDESCR);
+                st->last_ok = 0;
+            }
+            break;
+        }
+
         /* CHUNKS-step14: SM_SUSPEND — yield a value from a generator chunk.
          * Pops TOS as the yielded value.  If g_current_gen_state is live
          * (we are inside bb_broker_drive_sm), saves pc+stack into the

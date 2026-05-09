@@ -221,6 +221,7 @@ void sm_prog_print(const SM_Program *p, FILE *out)
             case SM_PAT_TAB: case SM_PAT_RTAB:
             case SM_INCR: case SM_DECR:
             case SM_LCOMP: case SM_RCOMP: case SM_TRIM:
+            case SM_ACOMP:  /* CH-17g-runtime-bridge-acomp: a[0].i = operator EKind */
                 fprintf(out, " i=%lld", (long long)in->a[0].i);
                 break;
             /* float operand */
