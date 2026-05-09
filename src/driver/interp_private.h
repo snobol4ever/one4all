@@ -174,6 +174,11 @@ DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs);
 
 /* ── icn helpers needed across eval/call (defined in interp_eval.c) ──── */
 DESCR_t icn_call_builtin(EXPR_t *call, DESCR_t *args, int nargs);
+/* CH-17g-runtime-bridge-1: name-based dispatch for EXPR_t-free Icon builtins.
+ * Returns 1 if handled (and writes result to *out), 0 otherwise.
+ * Lets SM_CALL_FN (sm_interp.c) reach Icon `write`/`writes` from chunk
+ * bodies without needing an IR call node. */
+int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR_t *out);
 const char *real_str(double r, char *buf, int bufsz);
 
 /* ── RS-23a-raku: Raku-builtin dispatch (defined in runtime/interp/raku_builtins.c) ── */

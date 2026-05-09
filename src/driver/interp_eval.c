@@ -277,6 +277,72 @@ const char *real_str(double r, char *buf, int bufsz) {
     return buf;
 }
 
+/* CH-17g-runtime-bridge-1 (2026-05-09): name-based EXPR_t-free Icon builtin
+ * dispatch.  Returns 1 if the call was handled (and writes the result to
+ * *out), 0 otherwise.  The caller has no EXPR_t handle: only the function
+ * name and pre-evaluated args.
+ *
+ * This helper is the bridge that lets SM_CALL_FN in sm_interp.c dispatch
+ * Icon builtins from inside chunk bodies.  Today the chunk emits e.g.
+ *
+ *     SM_PUSH_LIT_S "hello"
+ *     SM_CALL_FN s="write" nargs=1
+ *
+ * and SM_CALL_FN's handler walks INVOKE_fn / APPLY_fn (the SNOBOL4 builtin
+ * registry).  Icon's `write` lives in icn_call_builtin (below) on the
+ * legacy IR-walker path and is never registered through register_fn, so
+ * APPLY_fn returns FAIL and the chunk surfaces "Error 5: Undefined
+ * function or operation."  Wiring this helper into SM_CALL_FN after the
+ * INVOKE_fn fallback closes that gap (CH-17g-runtime-bridge-2).
+ *
+ * Scope today: write, writes.  Each branch is a copy of the same logic
+ * in icn_call_builtin's body — kept in lockstep by having icn_call_builtin
+ * delegate here.  Future rungs may extend coverage to other EXPR_t-free
+ * Icon builtins (integer, string, real, char, type, copy, list, table,
+ * read, repl, upto, find, any, many, tab, move, match, …) — each kind
+ * migrates by adding a branch here AND removing its branch from
+ * icn_call_builtin's tail (or its current home in interp_eval's E_FNC
+ * switch) in the same commit.
+ *
+ * Builtins that need EXPR_t (Raku/SCAN dispatch helpers, mutators that
+ * write back through children[1]'s lvalue identity, generator builtins
+ * that inspect children[i] structurally) are NOT covered here and remain
+ * with icn_call_builtin / interp_eval.  Those become per-kind chunk
+ * producer/consumer migrations under CH-17h. */
+int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR_t *out)
+{
+    if (!fn || !out) return 0;
+    /* write(x1,...,xN) — concatenate all args, append newline.
+     * Icon semantics: any FAIL arg propagates; &null arg writes empty. */
+    if (!strcmp(fn, "write")) {
+        for (int _wi = 0; _wi < nargs; _wi++) {
+            DESCR_t av = args[_wi];
+            if (IS_FAIL_fn(av)) { *out = FAILDESCR; return 1; }
+            if (av.v == DT_SNUL) continue;   /* &null → empty */
+            if (IS_INT_fn(av))       printf("%lld", (long long)av.i);
+            else if (IS_REAL_fn(av)) { char _rb[64]; printf("%s", real_str(av.r,_rb,sizeof _rb)); }
+            else { const char *s = VARVAL_fn(av); if (s) fputs(s, stdout); }
+        }
+        putchar('\n');
+        *out = nargs > 0 ? args[nargs-1] : NULVCL;
+        return 1;
+    }
+    /* writes(x1,...,xN) — same but no newline */
+    if (!strcmp(fn, "writes")) {
+        for (int _wi = 0; _wi < nargs; _wi++) {
+            DESCR_t av = args[_wi];
+            if (IS_FAIL_fn(av)) { *out = FAILDESCR; return 1; }
+            if (av.v == DT_SNUL) continue;
+            if (IS_INT_fn(av))       printf("%lld", (long long)av.i);
+            else if (IS_REAL_fn(av)) { char _rb[64]; printf("%s", real_str(av.r,_rb,sizeof _rb)); }
+            else { const char *s = VARVAL_fn(av); if (s) fputs(s, stdout); }
+        }
+        *out = nargs > 0 ? args[nargs-1] : NULVCL;
+        return 1;
+    }
+    return 0;
+}
+
 /* icn_call_builtin — call a builtin E_FNC with pre-resolved args array.
  * Used by coro_bb_fnc to avoid re-evaluating generator children.
  * Dispatches write/writes/upto/find/any/many/upto/tab/move/match by name.
@@ -302,34 +368,16 @@ DESCR_t icn_call_builtin(EXPR_t *call, DESCR_t *args, int nargs) {
         DESCR_t __sc_d;
         if (scan_try_call_builtin(call, args, nargs, &__sc_d)) return __sc_d;
     }
+    /* CH-17g-runtime-bridge-1 (2026-05-09): delegate write/writes (and any
+     * future EXPR_t-free Icon builtins) to icn_try_call_builtin_by_name.
+     * Pure refactor; behaviour identical to the inlined branches that lived
+     * here previously. */
+    {
+        DESCR_t __nb_d;
+        if (icn_try_call_builtin_by_name(fn, args, nargs, &__nb_d)) return __nb_d;
+    }
     DESCR_t a0 = nargs > 0 ? args[0] : NULVCL;
     DESCR_t a1 = nargs > 1 ? args[1] : NULVCL;
-    /* write(x1,...,xN) — concatenate all args, append newline.
-     * Icon semantics: any FAIL arg propagates; &null arg writes empty. */
-    if (!strcmp(fn, "write")) {
-        for (int _wi = 0; _wi < nargs; _wi++) {
-            DESCR_t av = args[_wi];
-            if (IS_FAIL_fn(av)) return FAILDESCR;
-            if (av.v == DT_SNUL) continue;   /* &null → empty */
-            if (IS_INT_fn(av))       printf("%lld", (long long)av.i);
-            else if (IS_REAL_fn(av)) { char _rb[64]; printf("%s", real_str(av.r,_rb,sizeof _rb)); }
-            else { const char *s = VARVAL_fn(av); if (s) fputs(s, stdout); }
-        }
-        putchar('\n');
-        return nargs > 0 ? args[nargs-1] : NULVCL;
-    }
-    /* writes(x1,...,xN) — same but no newline */
-    if (!strcmp(fn, "writes")) {
-        for (int _wi = 0; _wi < nargs; _wi++) {
-            DESCR_t av = args[_wi];
-            if (IS_FAIL_fn(av)) return FAILDESCR;
-            if (av.v == DT_SNUL) continue;
-            if (IS_INT_fn(av))       printf("%lld", (long long)av.i);
-            else if (IS_REAL_fn(av)) { char _rb[64]; printf("%s", real_str(av.r,_rb,sizeof _rb)); }
-            else { const char *s = VARVAL_fn(av); if (s) fputs(s, stdout); }
-        }
-        return nargs > 0 ? args[nargs-1] : NULVCL;
-    }
     /* User proc — call directly with resolved args (CH-17g-call-sites: via SM chunk when entry_pc resolved) */
     for (int i = 0; i < proc_count; i++) {
         if (!strcmp(proc_table[i].name, fn))
