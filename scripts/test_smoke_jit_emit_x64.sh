@@ -4,16 +4,16 @@
 # Single growing gate.  Each EM-N rung extends the test set; previous
 # rungs' invariants still hold.
 #
-# EM-1 contract (wiring + libscrip_rt.so skeleton):
+# EM-1 contract (wiring + librt.so skeleton):
 #   - --jit-emit + --x64 flag pair selects asm emission to stdout.
 #   - All three flag-validation paths error correctly.
 #   - Bare emit (any program) produces asm with a main: label and
-#     PLT calls into scrip_rt_init / scrip_rt_finalize.
+#     PLT calls into rt_init / rt_finalize.
 #
 # EM-2 contract (SM_HALT + SM_PUSH_LIT_I codegen):
 #   - Synthetic SM_PUSH_LIT_I 42 + SM_HALT program emits, links,
 #     runs, exits with rc=42 — proves PUSH_LIT_I + HALT codegen,
-#     SM stack push/pop in libscrip_rt.so, halt-rc surfacing
+#     SM stack push/pop in librt.so, halt-rc surfacing
 #     through finalize.
 #   - Synthetic program containing an opcode the emitter does not yet
 #     bake (SM_CONCAT) emits, links, runs, and aborts loudly with the
@@ -33,7 +33,7 @@
 #     (last_ok=1 default).  Expected rc=42; asm shape verified
 #     (jmp/jz/jnz forms all present).
 #   - 6b: synthetic 6-op countdown body uses SM_JUMP_F backward.  A
-#     thin C driver overrides scrip_rt_last_ok to return 0 twice then
+#     thin C driver overrides rt_last_ok to return 0 twice then
 #     1, proving the backward branch lands on its .Lpc<top> label.
 #     Expected rc=0.
 #
@@ -45,19 +45,19 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIP="$ROOT/scrip"
-RT_SO="$ROOT/out/libscrip_rt.so"
+RT_SO="$ROOT/out/librt.so"
 HARNESS="$ROOT/out/sm_codegen_x64_emit_test"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
 [ -x "$SCRIP" ]   || { echo "FAIL scrip not built — run scripts/build_scrip.sh"; exit 1; }
-[ -f "$RT_SO" ]   || { echo "FAIL libscrip_rt.so not built — run: make libscrip_rt"; exit 1; }
+[ -f "$RT_SO" ]   || { echo "FAIL librt.so not built — run: make librt"; exit 1; }
 [ -x "$HARNESS" ] || { echo "FAIL test harness not built — run: make out/sm_codegen_x64_emit_test"; exit 1; }
 
 # ── Test 1: SM_PUSH_LIT_I 42 + SM_HALT → rc=42 ─────────────────────────
 "$HARNESS" "$TMP/em2_a.s" >/dev/null
 gcc -no-pie "$TMP/em2_a.s" \
-    -L"$ROOT/out" -lscrip_rt -Wl,-rpath,"$ROOT/out" \
+    -L"$ROOT/out" -lrt -Wl,-rpath,"$ROOT/out" \
     -o "$TMP/em2_a" 2> "$TMP/em2_a.err" || {
     echo "FAIL em2_a link"; cat "$TMP/em2_a.err"; exit 1; }
 set +e
@@ -74,8 +74,8 @@ fi
 # Both are verified below — body proves the encoding; call-site proves the
 # dispatcher routed through the template.
 grep -qE '^\.Lpc[0-9]+:[[:space:]]+PUSH_INT[[:space:]]+42\b' "$TMP/em2_a.s" || { echo "FAIL no PUSH_INT 42 macro call"; exit 1; }
-grep -q "scrip_rt_push_int@PLT"       "$ROOT/sm_macros.s" || { echo "FAIL no push_int call in sm_macros.s"; exit 1; }
-grep -q "scrip_rt_halt_tos@PLT"       "$ROOT/sm_macros.s" || { echo "FAIL no halt_tos call in sm_macros.s"; exit 1; }
+grep -q "rt_push_int@PLT"       "$ROOT/sm_macros.s" || { echo "FAIL no push_int call in sm_macros.s"; exit 1; }
+grep -q "rt_halt_tos@PLT"       "$ROOT/sm_macros.s" || { echo "FAIL no halt_tos call in sm_macros.s"; exit 1; }
 echo "  PASS PUSH_LIT_I+HALT  (rc=42; emit shape correct)"
 
 # ── Test 2: unhandled-op trap fires on SM_INCR ─────────────────────────
@@ -104,12 +104,12 @@ gcc -O0 -g -w -I"$ROOT/src" -I"$ROOT/src/runtime/x86" -I"$ROOT/src/runtime" \
     "$ROOT/src/runtime/x86/sm_codegen_x64_emit.c" \
     "$ROOT/src/runtime/x86/sm_emit_template.c" \
     "$ROOT/src/runtime/x86/sm_prog.c" \
-    -L"$ROOT/out" -lscrip_rt -lgc -lm -Wl,-rpath,"$ROOT/out" \
+    -L"$ROOT/out" -lrt -lgc -lm -Wl,-rpath,"$ROOT/out" \
     -o "$TMP/unh_emitter" 2> "$TMP/unh_build.err" || {
     echo "FAIL unhandled-op harness build"; cat "$TMP/unh_build.err"; exit 1; }
 "$TMP/unh_emitter" "$TMP/unh.s" >/dev/null
 gcc -no-pie "$TMP/unh.s" \
-    -L"$ROOT/out" -lscrip_rt -Wl,-rpath,"$ROOT/out" \
+    -L"$ROOT/out" -lrt -Wl,-rpath,"$ROOT/out" \
     -o "$TMP/unh_prog" 2> "$TMP/unh_link.err" || {
     echo "FAIL unhandled-op link"; cat "$TMP/unh_link.err"; exit 1; }
 set +e
@@ -156,7 +156,7 @@ echo "  PASS EM-1 errors    (flag validation regression-clean)"
 #   argv[4]=EM-4b (backward-loop body, driven by override below).
 "$HARNESS" "$TMP/em2_a.s" "$TMP/em3.s" "$TMP/em4a.s" "$TMP/em4b.s" "$TMP/em5.s" "$TMP/em5b.s" >/dev/null
 gcc -no-pie "$TMP/em3.s" \
-    -L"$ROOT/out" -lscrip_rt -Wl,-rpath,"$ROOT/out" \
+    -L"$ROOT/out" -lrt -Wl,-rpath,"$ROOT/out" \
     -o "$TMP/em3_prog" 2> "$TMP/em3_link.err" || {
     echo "FAIL em3 link"; cat "$TMP/em3_link.err"; exit 1; }
 set +e
@@ -174,7 +174,7 @@ fi
 # The em3 program is (2+3)*4 — must contain at least ADD_NUM and MUL_NUM.
 grep -qE '^\.Lpc[0-9]+:[[:space:]]+ADD_NUM\b' "$TMP/em3.s" || { echo "FAIL no ADD_NUM macro call in em3 asm"; exit 1; }
 grep -qE '^\.Lpc[0-9]+:[[:space:]]+MUL_NUM\b' "$TMP/em3.s" || { echo "FAIL no MUL_NUM macro call in em3 asm"; exit 1; }
-grep -q "scrip_rt_arith@PLT" "$ROOT/sm_macros.s" || { echo "FAIL no arith PLT call in sm_macros.s"; exit 1; }
+grep -q "rt_arith@PLT" "$ROOT/sm_macros.s" || { echo "FAIL no arith PLT call in sm_macros.s"; exit 1; }
 echo "  PASS EM-3 arithmetic  ((2+3)*4=20; emit->link->run verified)"
 
 # -- Test 6a: EM-4 forward jump + conditional shapes -----------------------
@@ -182,7 +182,7 @@ echo "  PASS EM-3 arithmetic  ((2+3)*4=20; emit->link->run verified)"
 # SM_JUMP_F (not taken since last_ok=1) and SM_JUMP_S (taken since last_ok=1)
 # steer execution to the final HALT.  Expected rc=42.
 gcc -no-pie "$TMP/em4a.s" \
-    -L"$ROOT/out" -lscrip_rt -Wl,-rpath,"$ROOT/out" \
+    -L"$ROOT/out" -lrt -Wl,-rpath,"$ROOT/out" \
     -o "$TMP/em4a_prog" 2> "$TMP/em4a_link.err" || {
     echo "FAIL em4a link"; cat "$TMP/em4a_link.err"; exit 1; }
 set +e
@@ -200,7 +200,7 @@ fi
 grep -qE '^\.Lpc[0-9]+:[[:space:]]+JUMP[[:space:]]+\.Lpc' "$TMP/em4a.s" || { echo "FAIL no JUMP .LpcN call in em4a asm"; exit 1; }
 grep -qE '^\.Lpc[0-9]+:[[:space:]]+JUMP_F[[:space:]]+\.Lpc' "$TMP/em4a.s" || { echo "FAIL no JUMP_F .LpcN call in em4a asm"; exit 1; }
 grep -qE '^\.Lpc[0-9]+:[[:space:]]+JUMP_S[[:space:]]+\.Lpc' "$TMP/em4a.s" || { echo "FAIL no JUMP_S .LpcN call in em4a asm"; exit 1; }
-grep -q "scrip_rt_last_ok@PLT" "$ROOT/sm_macros.s" || { echo "FAIL no last_ok call in sm_macros.s"; exit 1; }
+grep -q "rt_last_ok@PLT" "$ROOT/sm_macros.s" || { echo "FAIL no last_ok call in sm_macros.s"; exit 1; }
 # Macro-body instructions: confirm the .macro definitions actually emitted
 # the conditional branches with \tgt as the target operand.
 grep -qE 'jz[[:space:]]+\\tgt'  "$ROOT/sm_macros.s" || { echo "FAIL no 'jz \\\\tgt' in JUMP_F macro body"; exit 1; }
@@ -209,20 +209,20 @@ echo "  PASS EM-4a control flow (forward JUMP + JUMP_F not-taken + JUMP_S taken;
 
 # -- Test 6b: EM-4 conditional backward loop ------------------------------
 # 6-op SM body: counter=3, decrement, JUMP_F backward.  The driver below
-# overrides scrip_rt_last_ok to return 0 twice (loop iterates 2x: 3->2, 2->1)
+# overrides rt_last_ok to return 0 twice (loop iterates 2x: 3->2, 2->1)
 # then 1 (exit; counter -=1 -> 0; HALT rc=0).  Proves the JUMP_F backward
 # branch lands on the .Lpc<top> label correctly.
 cat > "$TMP/em4b_driver.c" <<'CEOF'
-/* EM-4b loop driver: scrip_rt_last_ok override drives the backward loop.
- * Defined here so the linker resolves it before falling back to libscrip_rt.so. */
+/* EM-4b loop driver: rt_last_ok override drives the backward loop.
+ * Defined here so the linker resolves it before falling back to librt.so. */
 static int call_count = 0;
-int scrip_rt_last_ok(void) {
+int rt_last_ok(void) {
     call_count++;
     return (call_count >= 3) ? 1 : 0;
 }
 CEOF
 gcc -no-pie "$TMP/em4b.s" "$TMP/em4b_driver.c" \
-    -L"$ROOT/out" -lscrip_rt -Wl,-rpath,"$ROOT/out" \
+    -L"$ROOT/out" -lrt -Wl,-rpath,"$ROOT/out" \
     -o "$TMP/em4b_prog" 2> "$TMP/em4b_link.err" || {
     echo "FAIL em4b link"; cat "$TMP/em4b_link.err"; exit 1; }
 set +e
@@ -244,7 +244,7 @@ echo "  PASS EM-4b backward loop (JUMP_F backward x2, fallthrough; rc=0)"
 # main calls expression_A and HALTs with the returned value.  Proves the
 # baked-direct call/ret discipline composes across nested expressions.
 gcc -no-pie "$TMP/em5.s" \
-    -L"$ROOT/out" -lscrip_rt -Wl,-rpath,"$ROOT/out" \
+    -L"$ROOT/out" -lrt -Wl,-rpath,"$ROOT/out" \
     -o "$TMP/em5_prog" 2> "$TMP/em5_link.err" || {
     echo "FAIL em5 link"; cat "$TMP/em5_link.err"; exit 1; }
 set +e
@@ -269,10 +269,10 @@ echo "  PASS EM-5a chunk call/return  (chunk_A -> chunk_B; nested rc=13)"
 
 # -- Test 7b: EM-5 SM_PUSH_EXPRESSION descriptor round-trip ----------------------
 # PUSH_EXPRESSION (entry_pc=99, arity=2) then POP it; then PUSH_LIT_I 21 + HALT.
-# Proves scrip_rt_push_expression_descr@PLT round-trips without corrupting
+# Proves rt_push_expression_descr@PLT round-trips without corrupting
 # the SM stack.
 gcc -no-pie "$TMP/em5b.s" \
-    -L"$ROOT/out" -lscrip_rt -Wl,-rpath,"$ROOT/out" \
+    -L"$ROOT/out" -lrt -Wl,-rpath,"$ROOT/out" \
     -o "$TMP/em5b_prog" 2> "$TMP/em5b_link.err" || {
     echo "FAIL em5b link"; cat "$TMP/em5b_link.err"; exit 1; }
 set +e
@@ -283,7 +283,7 @@ if [ "$RC" -ne 21 ]; then
     echo "FAIL em5b expected rc=21 got rc=$RC"; exit 1
 fi
 grep -q "PUSH_EXPRESSION"                "$TMP/em5b.s" || { echo "FAIL no PUSH_EXPRESSION marker"; exit 1; }
-grep -q "scrip_rt_push_expression_descr@PLT" "$ROOT/sm_macros.s" || { echo "FAIL no descriptor-push PLT call in sm_macros.s"; exit 1; }
+grep -q "rt_push_expression_descr@PLT" "$ROOT/sm_macros.s" || { echo "FAIL no descriptor-push PLT call in sm_macros.s"; exit 1; }
 echo "  PASS EM-5b push-expression descr   (PUSH_EXPRESSION + POP round-trip; rc=21)"
 
 # ── Test 10: RETIRED in EM-7-revert (session #72) ─────────────────────────────
@@ -326,8 +326,8 @@ echo "  PASS EM-7b bb_flat TEXT mode (PASS=18 unit + .s assembles + 4/4 external
 # ── Test 13: EM-7c invariant-pattern blob emit shape ───────────────────────────
 # Verifies that an invariant pattern statement produces:
 #   1. a `_pat_inv_<id>_α/_β/_γ/_ω` block in the emitted `.s`,
-#   2. a `scrip_rt_match_blob@PLT` call at the SM_EXEC_STMT site,
-#   3. an `.s` that assembles AND links cleanly against libscrip_rt.so.
+#   2. a `rt_match_blob@PLT` call at the SM_EXEC_STMT site,
+#   3. an `.s` that assembles AND links cleanly against librt.so.
 # Runtime correctness of the linked binary is NOT checked here — bb_flat.c
 # bakes process-address imm64s into its leaf instructions (Σ/Δ/Σlen/lit/memcmp),
 # valid only inside the in-process JIT (mode 3); a follow-up rung
@@ -345,11 +345,11 @@ grep -q "^_pat_inv_0_α:"     "$TMP/em7c.s" || {
     echo "FAIL EM-7c no _pat_inv_0_α label"; exit 1; }
 grep -q "^_pat_inv_0_β:"      "$TMP/em7c.s" || {
     echo "FAIL EM-7c no _pat_inv_0_β label"; exit 1; }
-grep -q "scrip_rt_match_blob@PLT" "$TMP/em7c.s" || {
-    echo "FAIL EM-7c no scrip_rt_match_blob@PLT call"; exit 1; }
+grep -q "rt_match_blob@PLT" "$TMP/em7c.s" || {
+    echo "FAIL EM-7c no rt_match_blob@PLT call"; exit 1; }
 gcc -c "$TMP/em7c.s" -o "$TMP/em7c.o" 2> "$TMP/em7c.as_err" || {
     echo "FAIL EM-7c .s does not assemble"; cat "$TMP/em7c.as_err"; exit 1; }
-gcc -no-pie "$TMP/em7c.o" -L"$ROOT/out" -lscrip_rt -lgc -lm \
+gcc -no-pie "$TMP/em7c.o" -L"$ROOT/out" -lrt -lgc -lm \
     -Wl,-rpath,"$ROOT/out" -o "$TMP/em7c_bin" 2> "$TMP/em7c.ld_err" || {
     echo "FAIL EM-7c link"; cat "$TMP/em7c.ld_err"; exit 1; }
 # EM-7c-symbolic-runtime-correctness: run the linked binary and verify

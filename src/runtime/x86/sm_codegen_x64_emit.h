@@ -8,7 +8,7 @@
  * This is the mode-4 emitter entry point. Distinct from sm_codegen.c's
  * --jit-run path, which builds an in-process RX slab and jumps in.
  * mode-4 emits standalone assembler text that, when assembled and linked
- * against libscrip_rt.so, runs the program as an independent ELF binary.
+ * against librt.so, runs the program as an independent ELF binary.
  *
  * EM-1 scope (this commit): wiring + literal-zero stub. The function
  * writes a minimal asm program whose `main` returns 0 (and ignores the

@@ -52,7 +52,7 @@ void bb_flat_set_cap_fixup_cb(void (*cb)(void *cap_ptr, const char *child_α_lab
 }
 
 /* ── address constants — EM-7c-symbolic ──────────────────────────────────── */
-/* Symbol names for globals exported by libscrip_rt.so.                      */
+/* Symbol names for globals exported by librt.so.                      */
 /* TEXT mode: ev_lea_rcx_sym emits  lea rcx, [rip + sym]                     */
 /* BINARY mode: ev_lea_rcx_sym emits mov rcx, imm64  (process-address)       */
 #define SYM_SIGMA   "\xCE\xA3"          /* UTF-8: Σ */
@@ -734,7 +734,7 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
     }
     case XARBN: { /* ARBNO: zero-or-more greedy repetition of child.
                    * Emit child as callable sub-proc; arbno_t allocated at startup
-                   * via scrip_rt_init_arbno(.Larbno_slot, child_α). */
+                   * via rt_init_arbno(.Larbno_slot, child_α). */
         if (e->is_text && g_cap_fixup_cb) {
             int child_id = g_flat_node_id++;
             char slot_lbl[128], α_lbl[128];
@@ -768,7 +768,7 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
             ev_sigma_plus_delta(e, ADDR_SIGMA); ev_mov_rdx_rax(e); ev_mov_eax_imm32(e, 1); ev_ret(e);
             EV_LABEL(e, &cf);
             ev_mov_eax_imm32(e, 99); ev_xor_edx_edx(e); ev_ret(e);
-            /* Register arbno startup fixup: flag=(void*)2 → scrip_rt_init_arbno */
+            /* Register arbno startup fixup: flag=(void*)2 → rt_init_arbno */
             g_cap_fixup_cb((void*)(uintptr_t)2, α_lbl);
             /* Emit arbno box call via slot pointer (qword ptr deref, not lea+rip) */
             flat_box_call_slot(e, slot_lbl, "bb_arbno", 0);

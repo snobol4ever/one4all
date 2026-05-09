@@ -14,7 +14,7 @@
  *                       per opcode group. Three-column SNOBOL4 layout:
  *                         .LpcN:   SM_ADD         ; pop r,l -> push l+r
  *                       Arithmetic and push/pop bake inline via macros.
- *                       libscrip_rt.so boundary: NV table, matcher, GC.
+ *                       librt.so boundary: NV table, matcher, GC.
  *
  *   emit_bb_box()    -- BB graph boxes (called per SM_PAT_* instruction)
  *                       One proc per box. Four local labels per proc:
@@ -41,7 +41,7 @@
  *         Conditional return variants (SM_RETURN_S/F, SM_FRETURN[_S/_F],
  *         SM_NRETURN[_S/_F]) still trap via emit_sm_unhandled.
  *   EM-6: [REVERTED in EM-7-revert] SM_PAT_*, SM_EXEC_STMT, and the
- *         scrip_rt_pat_*@PLT helpers were removed from the emitted-code
+ *         rt_pat_*@PLT helpers were removed from the emitted-code
  *         path.  Lon's correction: the brokered descriptor-tree model
  *         was the wrong architecture.  See GOAL-MODE4-EMIT.md "Design
  *         Discoveries" section for the corrected five-phase model.
@@ -434,9 +434,9 @@ static int emit_chunk_registry(FILE *out, const SM_Program *prog)
 
 /* EM-7c-capture: cap fixup table.  Each entry pairs a heap cap_t pointer
  * (baked as imm64 — valid in emitter process AND in the emitted binary
- * since the binary calls into libscrip_rt which allocates the same heap
+ * since the binary calls into librt which allocates the same heap
  * objects) with the child's α label name.  Emitted as a sequence of
- * scrip_rt_patch_cap_fn(cap_ptr, child_fn) calls in main's preamble. */
+ * rt_patch_cap_fn(cap_ptr, child_fn) calls in main's preamble. */
 #define MAX_CAP_FIXUPS 1024
 typedef struct {
     void       *cap_ptr;      /* heap cap_t * from bb_cap_new — baked as imm64 */
@@ -463,12 +463,12 @@ static int emit_file_header(FILE *out, int count, int has_chunk_registry)
     /* The .rodata section (string literals) and .datan expression registry (if any)
      * were already emitted before this call.  We resume with .text + main
      * prologue.  If has_chunk_registry is non-zero, main calls
-     * scrip_rt_register_expressions before scrip_rt_init so that user-defined
+     * rt_register_expressions before rt_init so that user-defined
      * SNOBOL4 functions are dispatchable from the start. */
     if (fprintf(out,
         "# -----------------------------------------------------------------------\n"
         "# scrip --jit-emit --x64  (M-JITEM-X64 / EM-1..EM-7d)\n"
-        "# %d SM instructions. Links against libscrip_rt.so.\n"
+        "# %d SM instructions. Links against librt.so.\n"
         "# Architecture: two emitters -- SM straight-line via sm_macros.s\n"
         "#   macros (inline x86); BB boxes via emit_bb_box() one-proc-per-box.\n"
         "# See archive/EMITTER-MODE4-ARCH.md for the full design.\n"
@@ -483,11 +483,11 @@ static int emit_file_header(FILE *out, int count, int has_chunk_registry)
     if (has_chunk_registry) {
         if (emit_three_column_line(out, "", "lea",  "rdi, [rip + .Lchunk_registry]",
                                    "EM-7d: register user-defined function expressions") != 0) return -1;
-        if (emit_three_column_line(out, "", "call", "scrip_rt_register_expressions@PLT", NULL) != 0) return -1;
+        if (emit_three_column_line(out, "", "call", "rt_register_expressions@PLT", NULL) != 0) return -1;
     } else {
         if (emit_three_column_line(out, "", "xor",  "edi, edi",
                                    "no user-defined functions") != 0) return -1;
-        if (emit_three_column_line(out, "", "call", "scrip_rt_register_expressions@PLT", NULL) != 0) return -1;
+        if (emit_three_column_line(out, "", "call", "rt_register_expressions@PLT", NULL) != 0) return -1;
     }
 
     /* EM-7c-capture: patch cap_t fn pointers to baked child blobs. */
@@ -507,7 +507,7 @@ static int emit_file_header(FILE *out, int count, int has_chunk_registry)
             snprintf(rsi_arg, sizeof(rsi_arg), "rsi, [rip + %s]", α);
             if (emit_three_column_line(out, "", "lea",  rdi_arg, anno) != 0) return -1;
             if (emit_three_column_line(out, "", "lea",  rsi_arg, NULL) != 0) return -1;
-            if (emit_three_column_line(out, "", "call", "scrip_rt_patch_cap_fn@PLT", NULL) != 0) return -1;
+            if (emit_three_column_line(out, "", "call", "rt_patch_cap_fn@PLT", NULL) != 0) return -1;
         } else if ((uintptr_t)g_cap_fixups[i].cap_ptr == 2) {
             char slot_lbl[128];
             const char *p = α;
@@ -521,7 +521,7 @@ static int emit_file_header(FILE *out, int count, int has_chunk_registry)
             snprintf(rsi_arg, sizeof(rsi_arg), "rsi, [rip + %s]", α);
             if (emit_three_column_line(out, "", "lea",  rdi_arg, anno) != 0) return -1;
             if (emit_three_column_line(out, "", "lea",  rsi_arg, NULL) != 0) return -1;
-            if (emit_three_column_line(out, "", "call", "scrip_rt_init_arbno@PLT", NULL) != 0) return -1;
+            if (emit_three_column_line(out, "", "call", "rt_init_arbno@PLT", NULL) != 0) return -1;
         } else {
             char rdi_arg[64], rsi_arg[128];
             snprintf(anno, sizeof(anno), "cap fixup %d: cap_t@%p -> %s",
@@ -531,19 +531,19 @@ static int emit_file_header(FILE *out, int count, int has_chunk_registry)
             snprintf(rsi_arg, sizeof(rsi_arg), "rsi, [rip + %s]", α);
             if (emit_three_column_line(out, "", "movabs", rdi_arg, anno) != 0) return -1;
             if (emit_three_column_line(out, "", "lea",    rsi_arg, NULL) != 0) return -1;
-            if (emit_three_column_line(out, "", "call",   "scrip_rt_patch_cap_fn@PLT", NULL) != 0) return -1;
+            if (emit_three_column_line(out, "", "call",   "rt_patch_cap_fn@PLT", NULL) != 0) return -1;
         }
     }
 
-    if (emit_three_column_line(out, "", "call", "scrip_rt_init@PLT",
-                               "scrip_rt_init(argc, argv)") != 0) return -1;
+    if (emit_three_column_line(out, "", "call", "rt_init@PLT",
+                               "rt_init(argc, argv)") != 0) return -1;
     return 0;
 }
 
 static int emit_file_footer(FILE *out)
 {
     if (fprintf(out, "# -- epilogue -------------------------------------------\n") < 0) return -1;
-    if (emit_three_column_line(out, "", "call", "scrip_rt_finalize@PLT", NULL) != 0) return -1;
+    if (emit_three_column_line(out, "", "call", "rt_finalize@PLT", NULL) != 0) return -1;
     if (emit_three_column_line(out, "", "pop",  "rbp", NULL) != 0) return -1;
     if (emit_three_column_line(out, "", "ret",  "",    NULL) != 0) return -1;
     if (emit_three_column_line(out, "", ".size", "main, .-main", NULL) != 0) return -1;
@@ -710,7 +710,7 @@ static int emit_pc_label(FILE *out, int pc)
 static int emit_sm_halt(FILE *out, int pc)
 {
     (void)pc;
-    /* SM_HALT: call scrip_rt_halt_tos() which safe-pops TOS as rc
+    /* SM_HALT: call rt_halt_tos() which safe-pops TOS as rc
      * if it's DT_I, else uses 0.  Driven by the SM_HALT template
      * (one source of truth with sm_macros.s). */
     return sm_emit_nullary(out, sm_template_lookup(SM_HALT), NULL);
@@ -719,7 +719,7 @@ static int emit_sm_halt(FILE *out, int pc)
 static int emit_sm_push_lit_i(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    /* SM_PUSH_INT macro: movabs rdi,val / call scrip_rt_push_int.
+    /* SM_PUSH_INT macro: movabs rdi,val / call rt_push_int.
      * Template-driven; macro body in sm_emit_template.c shares ONE
      * renderer with this per-call site (drift impossible). */
     return sm_emit_int64(out, sm_template_lookup(SM_PUSH_LIT_I),
@@ -830,7 +830,7 @@ static int emit_sm_jump_f(FILE *out, const SM_Instr *ins, int pc)
  *
  * SM_PUSH_EXPRESSION pushes a DT_E expression descriptor onto the SM value stack.
  *   a[0].i = entry_pc   a[1].i = arity
- * Codegen: scrip_rt_push_expression_descr(entry_pc, arity).  The runtime
+ * Codegen: rt_push_expression_descr(entry_pc, arity).  The runtime
  * stores it as a DESCR_t { v=DT_E, slen=arity, i=entry_pc }
  * so a downstream SM_CALL_FN "EVAL" / sm_call_expression path can find it.
  *
@@ -838,7 +838,7 @@ static int emit_sm_jump_f(FILE *out, const SM_Instr *ins, int pc)
  * emit-time to the .Lpc<entry_pc> label that emit_pc_label has already
  * planted at every PC.  The native CALL pushes the return address on
  * the host stack; SM_RETURN's RET pops it.  The SM value stack lives
- * inside libscrip_rt.so and is shared across the call -- the expression
+ * inside librt.so and is shared across the call -- the expression
  * pushes its result onto the same stack the caller will read from.
  *
  * Honest deviation from the interpreter:  sm_interp.c's SM_CALL_EXPRESSION
@@ -883,7 +883,7 @@ static int emit_sm_return(FILE *out, int pc)
 {
     (void)pc;
     /* SM_RETURN: native return.  The expression's last push left the result
-     * on the SM value stack inside libscrip_rt.so. */
+     * on the SM value stack inside librt.so. */
     return sm_emit_ret(out, sm_template_lookup(SM_RETURN), NULL);
 }
 
@@ -959,8 +959,8 @@ static int emit_sm_stno(FILE *out, const SM_Instr *ins, int pc,
  * EM-7-revert (session #72, 2026-05-07): the EM-6 emit_pat_call_*
  * helpers and emit_bb_box (the brokered Phase-3 dispatcher) are
  * REMOVED.  Lon's correction: the brokered runtime descriptor-tree
- * model — scrip_rt_pat_*@PLT building a runtime pat-stack, then
- * scrip_rt_exec_stmt → exec_stmt → bb_broker — was the wrong
+ * model — rt_pat_*@PLT building a runtime pat-stack, then
+ * rt_exec_stmt → exec_stmt → bb_broker — was the wrong
  * architecture for emitted code.  See GOAL-MODE4-EMIT.md "Design
  * Discoveries" section for the corrected five-phase model.  EM-7a/b/c
  * will reintroduce pattern-side emit using the proven dual-mode
@@ -978,7 +978,7 @@ static int emit_sm_stno(FILE *out, const SM_Instr *ins, int pc,
  * These are Phase 1/4/5 concerns, orthogonal to BB / pattern-matching.
  * ----------------------------------------------------------------------- */
 
-/* SM_CONCAT: pop right then left; push CONCAT result.  All in libscrip_rt. */
+/* SM_CONCAT: pop right then left; push CONCAT result.  All in librt. */
 static int emit_sm_concat(FILE *out, int pc)
 {
     (void)pc;
@@ -1000,7 +1000,7 @@ static int emit_sm_coerce_num(FILE *out, int pc)
 }
 
 /* SM_CALL_FN: general function call.  All dispatch (pseudo-calls, builtins,
- * user-defined) lives in scrip_rt_call(name, nargs).
+ * user-defined) lives in rt_call(name, nargs).
  *   a[0].s = function name (interned in strtab)
  *   a[1].i = nargs                                                       */
 static int emit_sm_call(FILE *out, const SM_Instr *ins, int pc)
@@ -1458,14 +1458,14 @@ DESCR_t sm_phase2_to_patnd(const SM_Program *prog,
  *      - SM_PAT_* and value-stack pushes inside an invariant Phase-2
  *        window: emit a NOP comment (the pattern is already baked).
  *      - SM_EXEC_STMT for an invariant statement: emit a call to
- *        scrip_rt_match_blob(_pat_inv_<id>_α, sname, has_repl).
+ *        rt_match_blob(_pat_inv_<id>_α, sname, has_repl).
  *      - Variant patterns / non-pattern statements: unchanged
  *        (variant patterns fall through to emit_sm_unhandled until
  *        the variant-runtime-emitter rung lands).
  *
  * Phase-1 (subject push) and Phase-4 (replacement push) are emitted
  * normally — they leave the value stack at [subj][repl_or_zero] just
- * before SM_EXEC_STMT, which is exactly the contract scrip_rt_match_blob
+ * before SM_EXEC_STMT, which is exactly the contract rt_match_blob
  * expects.
  * ======================================================================= */
 
@@ -1589,7 +1589,7 @@ static int emit_pattern_blobs(FILE *out)
         "# ============================================================================\n"
         "# EM-7c: invariant pattern blobs (baked from sm_phase2_to_patnd → bb_build_flat_text)\n"
         "# Each block exposes _pat_inv_<id>_α / _β / _γ / _ω.\n"
-        "# scrip_rt_match_blob(blob_α, ...) drives Phase-3 against these blobs.\n"
+        "# rt_match_blob(blob_α, ...) drives Phase-3 against these blobs.\n"
         "# ============================================================================\n",
         out) == EOF) return -1;
     if (emit_three_column_line(out, "", ".intel_syntax", "noprefix", NULL) != 0) return -1;
@@ -1677,7 +1677,7 @@ static int emit_sm_exec_stmt_blob(FILE *out, const SM_Instr *ins, int pc, int wi
     snprintf(ann3, sizeof(ann3), "# has_repl=%d", has_repl);
     if (emit_three_column_line(out, "", "mov", act3, ann3) != 0) return -1;
 
-    if (emit_three_column_line(out, "", "call", "scrip_rt_match_blob@PLT",
+    if (emit_three_column_line(out, "", "call", "rt_match_blob@PLT",
                                "# EM-7c: Phase-3+5 against baked invariant blob") != 0) return -1;
 
     (void)pc;
@@ -1756,15 +1756,15 @@ static int emit_sm_pat_baked(FILE *out, const SM_Instr *ins, int pc, int win_idx
  * Each SM_PAT_* opcode that's not absorbed into an invariant blob (i.e.,
  * the pattern is variant, or there's no SM_EXEC_STMT in this region —
  * pattern-as-rvalue case like `WPAT = BREAK(WORD) SPAN(WORD)`) is emitted
- * as a thin call to the matching scrip_rt_pat_*() function.  The runtime
+ * as a thin call to the matching rt_pat_*() function.  The runtime
  * builds a PATND_t fragment on its pat-stack; SM_PAT_BOXVAL bridges to
  * the value stack as DT_P; SM_EXEC_STMT for variant patterns calls
- * scrip_rt_match_variant which delegates to exec_stmt.
+ * rt_match_variant which delegates to exec_stmt.
  *
  * This is path β from the EM-7c-variant rung's design space (see
  * GOAL-MODE4-EMIT.md): runtime PATND_t reconstruction + bb_build_*-driven
  * Phase-3, distinct from EM-7-pre's reverted bb_broker route by virtue
- * of scrip_rt_init setting g_bb_mode = BB_MODE_LIVE.  The architectural
+ * of rt_init setting g_bb_mode = BB_MODE_LIVE.  The architectural
  * ideal (path α — per-variant-node bb_pool emit with linker-resolved
  * invariant child labels) is filed as a follow-up rung
  * EM-7c-variant-bb-pool-emit.
@@ -1903,7 +1903,7 @@ static int emit_sm_pat_noarg(FILE *out, sm_opcode_t op, int pc)
     return sm_emit_nullary(out, t, NULL);
 }
 
-/* SM_EXEC_STMT for a variant pattern: emit a scrip_rt_match_variant call.
+/* SM_EXEC_STMT for a variant pattern: emit a rt_match_variant call.
  * Mirrors emit_sm_exec_stmt_blob's parameter shape (subj_name in rdi,
  * has_repl in esi). */
 static int emit_sm_exec_stmt_variant(FILE *out, const SM_Instr *ins, int pc)
@@ -2055,7 +2055,7 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
          *      .text.
          *
          *   2. pc IS an SM_EXEC_STMT for an invariant statement →
-         *      emit a call to scrip_rt_match_blob with the blob entry,
+         *      emit a call to rt_match_blob with the blob entry,
          *      subj name, and has_repl flag.  Phase-1 (subject) and
          *      Phase-4 (replacement) pushes immediately preceding this
          *      pc emit normally and leave the value stack at
@@ -2139,11 +2139,11 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
              * window built a tree with at least one variant node) or pattern-
              * as-rvalue (e.g., `WPAT = BREAK(WORD) SPAN(WORD)` builds a
              * pattern but does not exec one) — are emitted as PLT calls to
-             * the libscrip_rt pat-construction ABI.
+             * the librt pat-construction ABI.
              *
              * NB: the brokered Phase-3 path that EM-7-revert tore out is
              * NOT what this rung restores.  The architectural distinction
-             * is in scrip_rt_init's setting g_bb_mode = BB_MODE_LIVE so that
+             * is in rt_init's setting g_bb_mode = BB_MODE_LIVE so that
              * exec_stmt's Phase-3 routes through bb_build_flat / bb_build_binary
              * → direct bb_box_fn call, not through bb_broker.  See
              * GOAL-MODE4-EMIT.md "Design Discoveries" section; the bb_pool-

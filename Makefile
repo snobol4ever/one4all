@@ -47,7 +47,7 @@ SCRIP_CC_BIN := $(ROOT)/scrip
 .PHONY: all scrip scrip-interp scrip setup \
         test test-ir test-all \
         monitor-ipc \
-        libscrip_rt \
+        librt \
         run run-ir run-jvm run-net \
         clean distclean
 
@@ -55,15 +55,15 @@ SCRIP_CC_BIN := $(ROOT)/scrip
 
 all: scrip
 
-# ── libscrip_rt.so — runtime support library for --jit-emit --x64 ────────────
+# ── librt.so — runtime support library for --jit-emit --x64 ────────────
 # EM-6: full SNOBOL4 runtime compiled -fPIC and linked into the .so.
 # Emitted x86-64 binaries link against this .so for all language-level
 # semantics (pattern matcher, NV table, exec_stmt, builtins, GC).
-libscrip_rt: out/libscrip_rt.so
+librt: out/librt.so
 
 # EM-6 runtime objects (all compiled -fPIC so they can go into the .so)
 RT_PIC_SRCS := \
-    $(RT)/rt/scrip_rt.c \
+    $(RT)/rt/rt.c \
     $(RT)/x86/snobol4.c \
     $(RT)/x86/snobol4_pattern.c \
     $(RT)/x86/snobol4_invoke.c \
@@ -84,15 +84,15 @@ RT_PIC_SRCS := \
     $(SRC)/frontend/snobol4/snobol4.tab.c \
     $(SRC)/frontend/snobol4/snobol4.lex.c
 
-out/libscrip_rt.so: $(RT_PIC_SRCS) $(RT)/rt/scrip_rt.h
+out/librt.so: $(RT_PIC_SRCS) $(RT)/rt/rt.h
 	@mkdir -p out
 	$(CC) -O0 -g $(WARN) -fPIC -shared \
 	    -I$(SRC) -I$(RT)/x86 -I$(RT) -I$(RT)/rt \
 	    -DDYN_ENGINE_LINKED \
 	    $(RT_PIC_SRCS) \
 	    -lgc -lm \
-	    -o out/libscrip_rt.so
-	@echo "Built: out/libscrip_rt.so"
+	    -o out/librt.so
+	@echo "Built: out/librt.so"
 
 # ── EM-2 synthetic-program harness ───────────────────────────────────────────
 # Standalone helper: builds a 3-op SM_Program in memory and emits asm
@@ -104,7 +104,7 @@ out/sm_codegen_x64_emit_test: $(RT)/x86/sm_codegen_x64_emit_test.c \
                                $(RT)/x86/sm_emit_template.h \
                                $(RT)/x86/sm_prog.c \
                                $(RT)/x86/sm_prog.h \
-                               out/libscrip_rt.so
+                               out/librt.so
 	@mkdir -p out
 	$(CC) -O0 -g $(WARN) \
 	    -I$(SRC) -I$(RT)/x86 -I$(RT) -I$(RT)/rt \
@@ -113,14 +113,14 @@ out/sm_codegen_x64_emit_test: $(RT)/x86/sm_codegen_x64_emit_test.c \
 	    $(RT)/x86/sm_codegen_x64_emit.c \
 	    $(RT)/x86/sm_emit_template.c \
 	    $(RT)/x86/sm_prog.c \
-	    -Lout -lscrip_rt -lgc -lm \
+	    -Lout -lrt -lgc -lm \
 	    -Wl,-rpath,$(shell pwd)/out \
 	    -o out/sm_codegen_x64_emit_test
 	@echo "Built: out/sm_codegen_x64_emit_test"
 
 
 # ── EM-7a Phase-2 simulator unit test ────────────────────────────────────────
-# Links against libscrip_rt.so for pat_* constructors + GC.
+# Links against librt.so for pat_* constructors + GC.
 out/sm_phase2_sim_test: $(RT)/x86/sm_phase2_sim_test.c \
                         $(RT)/x86/sm_codegen_x64_emit.c \
                         $(RT)/x86/sm_codegen_x64_emit.h \
@@ -128,7 +128,7 @@ out/sm_phase2_sim_test: $(RT)/x86/sm_phase2_sim_test.c \
                         $(RT)/x86/sm_emit_template.h \
                         $(RT)/x86/sm_prog.c \
                         $(RT)/x86/sm_prog.h \
-                        out/libscrip_rt.so
+                        out/librt.so
 	@mkdir -p out
 	$(CC) -O0 -g $(WARN) \
 	    -I$(SRC) -I$(RT)/x86 -I$(RT) -I$(RT)/rt \
@@ -137,14 +137,14 @@ out/sm_phase2_sim_test: $(RT)/x86/sm_phase2_sim_test.c \
 	    $(RT)/x86/sm_codegen_x64_emit.c \
 	    $(RT)/x86/sm_emit_template.c \
 	    $(RT)/x86/sm_prog.c \
-	    -Lout -lscrip_rt -lgc -lm \
+	    -Lout -lrt -lgc -lm \
 	    -Wl,-rpath,$(shell pwd)/out \
 	    -o out/sm_phase2_sim_test
 
 # ── EM-7b bb_build_flat_text unit test ───────────────────────────────────────
 # Verifies dual-mode bb_flat.c: TEXT-mode emission produces a .s with
 # the four externally-visible α/β/γ/ω labels and assembles cleanly.
-# Links against libscrip_rt.so (which already includes bb_flat.c +
+# Links against librt.so (which already includes bb_flat.c +
 # bb_emit.c + pat_* constructors).
 out/bb_flat_text_test: $(RT)/x86/bb_flat_text_test.c \
                        $(RT)/x86/sm_codegen_x64_emit.c \
@@ -153,7 +153,7 @@ out/bb_flat_text_test: $(RT)/x86/bb_flat_text_test.c \
                        $(RT)/x86/sm_emit_template.h \
                        $(RT)/x86/sm_prog.c \
                        $(RT)/x86/sm_prog.h \
-                       out/libscrip_rt.so \
+                       out/librt.so \
                        $(RT)/x86/bb_flat.h \
                        $(RT)/x86/bb_emit.h \
                        $(RT)/x86/bb_pool.h
@@ -165,7 +165,7 @@ out/bb_flat_text_test: $(RT)/x86/bb_flat_text_test.c \
 	    $(RT)/x86/sm_codegen_x64_emit.c \
 	    $(RT)/x86/sm_emit_template.c \
 	    $(RT)/x86/sm_prog.c \
-	    -Lout -lscrip_rt -lgc -lm \
+	    -Lout -lrt -lgc -lm \
 	    -Wl,-rpath,$(shell pwd)/out \
 	    -o out/bb_flat_text_test
 	@echo "Built: out/bb_flat_text_test"

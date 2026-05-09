@@ -7,7 +7,7 @@
  * Builds tiny SM_Programs in memory and runs them through
  * sm_codegen_x64_emit(). The emitted asm is written to file paths
  * provided by argv. The companion shell script assembles, links against
- * libscrip_rt.so, runs, and checks the rc.
+ * librt.so, runs, and checks the rc.
  *
  * EM-2 program (argv[1]):
  *   pc=0  SM_PUSH_LIT_I  42
@@ -53,7 +53,7 @@
  *
  * EM-5b program (argv[6]):  SM_PUSH_EXPRESSION descriptor-push round trip
  *   PUSH_CHUNK 99,2 then POP it; then PUSH_LIT_I 21 + HALT.
- *   Proves the scrip_rt_push_expression_descr@PLT call path round-trips
+ *   Proves the rt_push_expression_descr@PLT call path round-trips
  *   without corrupting the SM stack.
  *   Expected exit code: 21.
  *
@@ -443,7 +443,7 @@ int main(int argc, char **argv)
      * pc=4   JUMP_F  1                 ; if !last_ok, backward to loop top
      * pc=5   HALT                      ; rc = final counter
      *
-     * The driver in test_smoke_jit_emit_x64.sh calls scrip_rt_set_last_ok(0)
+     * The driver in test_smoke_jit_emit_x64.sh calls rt_set_last_ok(0)
      * before entering this body to drive the loop, then sets it to 1 to exit.
      * This proves SM_JUMP_F backward-jump shape executes correctly.
      */
@@ -531,7 +531,7 @@ int main(int argc, char **argv)
      *
      * Pushes a expression descriptor (entry_pc=99, arity=2) then pops it
      * via SM_VOID_POP.  Then pushes 21 + HALT, exits rc=21.  The point is
-     * to exercise the scrip_rt_push_expression_descr@PLT call path so the
+     * to exercise the rt_push_expression_descr@PLT call path so the
      * gate's grep-shape check has something to look at.
      *
      *   pc=0   PUSH_CHUNK  99, 2

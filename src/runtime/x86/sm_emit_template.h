@@ -3,7 +3,7 @@
  * EM-7c-sm-macros (sess #87, 2026-05-09).
  *
  * Each SM opcode binds to ONE template.  A template names an arg-shape
- * (NULLARY, INT64, LBL_INT32, …) plus a `runtime` symbol (the libscrip_rt.so
+ * (NULLARY, INT64, LBL_INT32, …) plus a `runtime` symbol (the librt.so
  * entry that the macro calls into) plus a unique `macro` name.  ONE
  * renderer per shape produces:
  *   (a) the GAS macro body that goes into the macro library at the top
@@ -79,7 +79,7 @@ typedef enum {
 
 /* One template per opcode group.  A single g_sm_templates[] entry
  * binds an opcode integer to a {macro_name, runtime_symbol, kind}
- * triple; the runtime_symbol is the libscrip_rt.so PLT entry the
+ * triple; the runtime_symbol is the librt.so PLT entry the
  * macro calls.  For shapes that don't take a runtime arg (RET,
  * PCREF_JMP, PCREF_COND, CALL_CHUNK, RET_VAR), runtime is NULL.
  */
@@ -87,7 +87,7 @@ typedef struct {
     int             op;            /* sm_opcode_t value (or -1 for the
                                      trap template, indexed separately) */
     const char     *macro_name;    /* "SM_PUSH_INT" etc. */
-    const char     *runtime;       /* "scrip_rt_push_int" or NULL */
+    const char     *runtime;       /* "rt_push_int" or NULL */
     sm_tpl_kind_t   kind;
     /* Optional per-opcode integer constant baked into the call (e.g.
      * SM_ARITH op-enum, SM_RETURN_VARIANT kind/cond, UNHANDLED op). */

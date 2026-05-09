@@ -1,5 +1,5 @@
 /*
- * scrip_rt.c — libscrip_rt.so implementation (M-JITEM-X64 / EM-1..EM-7-pre)
+ * rt.c — librt.so implementation (M-JITEM-X64 / EM-1..EM-7-pre)
  *
  * Authors: Lon Jones Cherryholmes · Claude Sonnet
  * Date: 2026-05-06; EM-7-revert 2026-05-07
@@ -10,7 +10,7 @@
  * EM-4: last_ok flag.
  * EM-5: push_expression_descr.
  * EM-6: [REVERTED in EM-7-revert, session #72] The full pattern-builder
- *   ABI (scrip_rt_pat_*, scrip_rt_exec_stmt) and the runtime pat-stack
+ *   ABI (rt_pat_*, rt_exec_stmt) and the runtime pat-stack
  *   (g_pat_stack[], g_pat_sp) are removed.  Lon's correction: this
  *   brokered descriptor-tree-then-broker model was the wrong architecture
  *   for emitted code.  See GOAL-MODE4-EMIT.md "Design Discoveries"
@@ -21,8 +21,8 @@
  *   The full SNOBOL4 runtime stays linked in (bb_pool, snobol4_pattern,
  *   stmt_exec, etc.) — those objects will be called by EM-7c via the
  *   bb_build_flat / bb_build_binary entries already proven in mode-3.
- * EM-7-pre keepers: scrip_rt_concat / scrip_rt_push_null /
- *   scrip_rt_coerce_num / scrip_rt_call / scrip_rt_do_return.  These are
+ * EM-7-pre keepers: rt_concat / rt_push_null /
+ *   rt_coerce_num / rt_call / rt_do_return.  These are
  *   Phase 1/4/5 concerns, orthogonal to BB / pattern matching.
  *
  * Value type throughout: DESCR_t (snobol4.h / descr.h).
@@ -30,12 +30,12 @@
  * State:
  *   g_vstack[]   — DESCR_t value stack (cap = VSTACK_CAP).
  *   g_vtop       — next free slot (0 = empty).
- *   g_halt_rc    — rc from most recent scrip_rt_halt().
+ *   g_halt_rc    — rc from most recent rt_halt().
  *   g_halt_set   — nonzero once halt has been called.
  *   g_last_ok    — success flag for SM_JUMP_S / SM_JUMP_F.
  */
 
-#include "scrip_rt.h"
+#include "rt.h"
 
 /* Full SNOBOL4 runtime headers — .so links all runtime objects -fPIC. */
 #include "../../runtime/x86/snobol4.h"
@@ -115,7 +115,7 @@ static int     g_vtop    = 0;
  * is the destination architecture but a much larger rung).  The distinction
  * is the *Phase-3 routing*: EM-7-pre routed through bb_broker (descriptor
  * walker) by relying on the default g_bb_mode == BB_MODE_DRIVER; EM-7c-variant
- * sets g_bb_mode = BB_MODE_LIVE in scrip_rt_init so exec_stmt routes through
+ * sets g_bb_mode = BB_MODE_LIVE in rt_init so exec_stmt routes through
  * bb_build_flat / bb_build_binary and a direct call to the resulting bb_box_fn,
  * matching the proven mode-3 pipeline that the goal file calls "mode-4's
  * existence proof".
@@ -140,7 +140,7 @@ static int     g_last_ok  = 1;  /* default success at process start */
 static void vstack_push(DESCR_t d)
 {
     if (g_vtop >= VSTACK_CAP) {
-        fprintf(stderr, "libscrip_rt: SM value stack overflow (cap=%d).\n", VSTACK_CAP);
+        fprintf(stderr, "librt: SM value stack overflow (cap=%d).\n", VSTACK_CAP);
         abort();
     }
     g_vstack[g_vtop++] = d;
@@ -149,20 +149,20 @@ static void vstack_push(DESCR_t d)
 static DESCR_t vstack_pop(void)
 {
     if (g_vtop <= 0) {
-        fprintf(stderr, "libscrip_rt: SM value stack underflow.\n");
+        fprintf(stderr, "librt: SM value stack underflow.\n");
         abort();
     }
     return g_vstack[--g_vtop];
 }
 
-/* EM-7c-variant: pat-stack helpers — used by scrip_rt_pat_*() to assemble
+/* EM-7c-variant: pat-stack helpers — used by rt_pat_*() to assemble
  * patterns at runtime from the SM_PAT_* opcode sequence emitted into the
  * mode-4 binary.  See block comment on g_pat_stack[] for the architectural
  * note. */
 static void pat_push(DESCR_t d)
 {
     if (g_pat_sp >= PATSTACK_CAP) {
-        fprintf(stderr, "libscrip_rt: pat-stack overflow (cap=%d).\n", PATSTACK_CAP);
+        fprintf(stderr, "librt: pat-stack overflow (cap=%d).\n", PATSTACK_CAP);
         abort();
     }
     g_pat_stack[g_pat_sp++] = d;
@@ -171,7 +171,7 @@ static void pat_push(DESCR_t d)
 static DESCR_t pat_pop_internal(void)
 {
     if (g_pat_sp <= 0) {
-        fprintf(stderr, "libscrip_rt: pat-stack underflow.\n");
+        fprintf(stderr, "librt: pat-stack underflow.\n");
         abort();
     }
     return g_pat_stack[--g_pat_sp];
@@ -222,8 +222,8 @@ static DESCR_t _rt_DIFFER(DESCR_t *a, int n)
  *
  * The emitter walks SM_Program for SM_LABEL instructions with a[0].s set
  * (SNOBOL4 named function entries) and emits a .data table in the .s file.
- * scrip_rt_register_expressions() is called from the emitted main() before
- * scrip_rt_init; it populates g_expression_reg[] so _rt_usercall can dispatch
+ * rt_register_expressions() is called from the emitted main() before
+ * rt_init; it populates g_expression_reg[] so _rt_usercall can dispatch
  * user-defined SNOBOL4 functions by direct fn(args,nargs) without touching
  * the interpreter call stack.
  *============================================================================*/
@@ -234,7 +234,7 @@ typedef struct { const char *name; void *fn; } ExpressionRegEntry;
 static ExpressionRegEntry g_expression_reg[CHUNK_REG_MAX];
 static int           g_chunk_reg_count = 0;
 
-void scrip_rt_register_expressions(const rt_expression_entry *tbl)
+void rt_register_expressions(const rt_expression_entry *tbl)
 {
     if (!tbl) return;
     for (; tbl->name && g_chunk_reg_count < CHUNK_REG_MAX; tbl++) {
@@ -246,7 +246,7 @@ void scrip_rt_register_expressions(const rt_expression_entry *tbl)
 
 /* EM-7c-capture: patch a heap cap_t's fn pointer to the baked child blob.
  * cap_ptr points to the cap_t; fn field is first (offset 0). */
-void scrip_rt_patch_cap_fn(void *cap_ptr, void *child_fn)
+void rt_patch_cap_fn(void *cap_ptr, void *child_fn)
 {
     if (!cap_ptr || !child_fn) return;
     /* fn is the first field in cap_t — cast and set */
@@ -256,9 +256,9 @@ void scrip_rt_patch_cap_fn(void *cap_ptr, void *child_fn)
 
 /* EM-7c-arbno: allocate a fresh arbno_t for a baked ARBNO blob.
  * bb_arbno_new is declared in bb_box.h via the opaque extern in bb_flat.c.
- * Here we call it directly since libscrip_rt.so links bb_boxes.c. */
+ * Here we call it directly since librt.so links bb_boxes.c. */
 extern void *bb_arbno_new(void *fn, void *state);  /* arbno_t* opaque */
-void scrip_rt_init_arbno(void **slot_ptr, void *child_fn)
+void rt_init_arbno(void **slot_ptr, void *child_fn)
 {
     if (!slot_ptr || !child_fn) return;
     *slot_ptr = bb_arbno_new(child_fn, NULL);
@@ -369,7 +369,7 @@ static DESCR_t _rt_usercall(const char *name, DESCR_t *args, int nargs)
  * EM-1 entries
  *============================================================================*/
 
-void scrip_rt_init(int argc, char **argv)
+void rt_init(int argc, char **argv)
 {
     (void)argc; (void)argv;
 
@@ -393,7 +393,7 @@ void scrip_rt_init(int argc, char **argv)
     g_user_call_hook = _rt_usercall;
 }
 
-int scrip_rt_finalize(void)
+int rt_finalize(void)
 {
     return g_halt_set ? g_halt_rc : 0;
 }
@@ -402,29 +402,29 @@ int scrip_rt_finalize(void)
  * EM-2 entries
  *============================================================================*/
 
-void scrip_rt_push_int(int64_t v)
+void rt_push_int(int64_t v)
 {
     vstack_push(INTVAL(v));
 }
 
-int64_t scrip_rt_pop_int(void)
+int64_t rt_pop_int(void)
 {
     DESCR_t d = vstack_pop();
     if (d.v != DT_I) {
         fprintf(stderr,
-            "libscrip_rt: scrip_rt_pop_int: TOS is not DT_I (tag=%d).\n", d.v);
+            "librt: rt_pop_int: TOS is not DT_I (tag=%d).\n", d.v);
         abort();
     }
     return d.i;
 }
 
-void scrip_rt_halt(int rc)
+void rt_halt(int rc)
 {
     g_halt_rc  = rc;
     g_halt_set = 1;
 }
 
-void scrip_rt_halt_tos(void)
+void rt_halt_tos(void)
 {
     /* Safe-pop TOS as DT_I exit code; use 0 if TOS is missing or not DT_I.
      * This lets SM_HALT work for both synthetic tests (PUSH_LIT_I N + HALT)
@@ -439,10 +439,10 @@ void scrip_rt_halt_tos(void)
     g_halt_set = 1;
 }
 
-void scrip_rt_unhandled_op(int op)
+void rt_unhandled_op(int op)
 {
     fprintf(stderr,
-        "libscrip_rt: unhandled SM opcode %d reached in emitted code.\n"
+        "librt: unhandled SM opcode %d reached in emitted code.\n"
         "  (scrip --dump-sm to identify; subsequent EM-N rungs shrink the set)\n",
         op);
     abort();
@@ -452,7 +452,7 @@ void scrip_rt_unhandled_op(int op)
  * EM-3 entries
  *============================================================================*/
 
-void scrip_rt_push_str(const char *s, uint32_t slen)
+void rt_push_str(const char *s, uint32_t slen)
 {
     DESCR_t d;
     d.v    = DT_S;
@@ -461,13 +461,13 @@ void scrip_rt_push_str(const char *s, uint32_t slen)
     vstack_push(d);
 }
 
-void scrip_rt_pop_descr(DESCR_t *out)
+void rt_pop_descr(DESCR_t *out)
 {
-    if (!out) { fprintf(stderr, "libscrip_rt: pop_descr: NULL out ptr.\n"); abort(); }
+    if (!out) { fprintf(stderr, "librt: pop_descr: NULL out ptr.\n"); abort(); }
     *out = vstack_pop();
 }
 
-void scrip_rt_arith(int op)
+void rt_arith(int op)
 {
     /* op: SM_ADD=17 SM_SUB=18 SM_MUL=19 SM_DIV=20 SM_MOD=22 */
     DESCR_t r = vstack_pop();
@@ -482,30 +482,30 @@ void scrip_rt_arith(int op)
         case 18: result = lv - rv; break;
         case 19: result = lv * rv; break;
         case 20:
-            if (!rv) { fprintf(stderr, "libscrip_rt: SM_DIV by zero.\n"); abort(); }
+            if (!rv) { fprintf(stderr, "librt: SM_DIV by zero.\n"); abort(); }
             result = lv / rv; break;
         case 22:
-            if (!rv) { fprintf(stderr, "libscrip_rt: SM_MOD by zero.\n"); abort(); }
+            if (!rv) { fprintf(stderr, "librt: SM_MOD by zero.\n"); abort(); }
             result = lv % rv; break;
         default:
-            fprintf(stderr, "libscrip_rt: scrip_rt_arith: bad op=%d.\n", op);
+            fprintf(stderr, "librt: rt_arith: bad op=%d.\n", op);
             abort();
     }
     vstack_push(INTVAL(result));
 }
 
-void scrip_rt_nv_get(const char *name)
+void rt_nv_get(const char *name)
 {
     vstack_push(NV_GET_fn(name ? name : ""));
 }
 
-void scrip_rt_nv_set(const char *name)
+void rt_nv_set(const char *name)
 {
     DESCR_t val = vstack_pop();
     /* Mirror sm_interp.c SM_STORE_VAR: if RHS is DT_FAIL, the statement fails;
      * no assignment occurs and last_ok=0.  This is how LINE = INPUT :F(DONE)
-     * detects EOF in mode-4 — scrip_rt_nv_get("INPUT") pushes DT_FAIL, then
-     * scrip_rt_nv_set("LINE") propagates the failure to last_ok. */
+     * detects EOF in mode-4 — rt_nv_get("INPUT") pushes DT_FAIL, then
+     * rt_nv_set("LINE") propagates the failure to last_ok. */
     if (val.v == DT_FAIL) {
         vstack_push(val);   /* balanced push so subsequent pops don't underflow */
         g_last_ok = 0;
@@ -515,7 +515,7 @@ void scrip_rt_nv_set(const char *name)
     g_last_ok = 1;
 }
 
-void scrip_rt_pop_void(void)
+void rt_pop_void(void)
 {
     (void)vstack_pop();
 }
@@ -524,14 +524,14 @@ void scrip_rt_pop_void(void)
  * EM-4 entries
  *============================================================================*/
 
-int scrip_rt_last_ok(void)  { return g_last_ok; }
-void scrip_rt_set_last_ok(int ok) { g_last_ok = ok ? 1 : 0; }
+int rt_last_ok(void)  { return g_last_ok; }
+void rt_set_last_ok(int ok) { g_last_ok = ok ? 1 : 0; }
 
 /*==============================================================================
  * EM-5 entries
  *============================================================================*/
 
-void scrip_rt_push_expression_descr(int64_t entry_pc, int64_t arity)
+void rt_push_expression_descr(int64_t entry_pc, int64_t arity)
 {
     /* DT_E expression descriptor: .i = entry_pc, .slen = arity.
      * Mirrors sm_interp.c's DT_E handling for SM_PUSH_EXPRESSION. */
@@ -549,7 +549,7 @@ void scrip_rt_push_expression_descr(int64_t entry_pc, int64_t arity)
  * expressions via bb_build_flat_text(), with externally-visible entry
  * symbols `_pat_inv_<id>_α` etc.  At runtime, the emitted binary
  * pushes the subject and replacement on the SM value stack and calls
- * scrip_rt_match_blob(blob_α, sname, has_repl).
+ * rt_match_blob(blob_α, sname, has_repl).
  *
  * Stack contract (top-of-stack first, top last popped):
  *   [repl_or_zero]    ← top
@@ -562,12 +562,12 @@ void scrip_rt_push_expression_descr(int64_t entry_pc, int64_t arity)
  *
  * Calls exec_stmt_blob() (declared in bb_box.h, defined in stmt_exec.c)
  * with the popped subject + replacement.  Stores the :S/:F result on
- * the libscrip_rt last-ok flag (so SM_JUMP_S / SM_JUMP_F see it).
+ * the librt last-ok flag (so SM_JUMP_S / SM_JUMP_F see it).
  *============================================================================*/
 
-extern void scrip_rt_set_last_ok(int v);   /* defined below */
+extern void rt_set_last_ok(int v);   /* defined below */
 
-void scrip_rt_match_blob(void *blob_α,
+void rt_match_blob(void *blob_α,
                          const char *subj_name,
                          int has_repl)
 {
@@ -582,7 +582,7 @@ void scrip_rt_match_blob(void *blob_α,
                             root_fn,
                             has_repl ? &repl : NULL,
                             has_repl);
-    scrip_rt_set_last_ok(ok);
+    rt_set_last_ok(ok);
 }
 
 /*==============================================================================
@@ -594,12 +594,12 @@ void scrip_rt_match_blob(void *blob_α,
  * pattern build at runtime — but the Phase-3 routing.  EM-7-pre relied
  * on the default g_bb_mode = BB_MODE_DRIVER, routing exec_stmt through
  * bb_broker (the descriptor walker).  This rung sets g_bb_mode =
- * BB_MODE_LIVE in scrip_rt_init so exec_stmt routes through
+ * BB_MODE_LIVE in rt_init so exec_stmt routes through
  * bb_build_flat / bb_build_binary -> direct bb_box_fn call, which is
  * the proven mode-3 pipeline ("mode-4's existence proof" per
  * GOAL-MODE4-EMIT.md).
  *
- * Each scrip_rt_pat_*() mirrors the corresponding case in sm_interp.c's
+ * Each rt_pat_*() mirrors the corresponding case in sm_interp.c's
  * SM_PAT_* dispatcher byte-for-byte.  Args come from the SM value stack
  * (charsets, ints, vars) for kinds whose argument is computed; from the
  * pat-stack (children of CAT/ALT/ARBNO/FENCE1/CAPTURE) for kinds whose
@@ -608,91 +608,91 @@ void scrip_rt_match_blob(void *blob_α,
  * constant.  The result of each is pushed on the pat-stack.
  *
  * SM_PAT_BOXVAL bridges pat-stack -> value-stack; emitted as a single
- * call to scrip_rt_pat_boxval.  Used wherever a pattern is the value
+ * call to rt_pat_boxval.  Used wherever a pattern is the value
  * of a value-stack expression (e.g., assignment to WPAT in wordcount).
  *
- * SM_EXEC_STMT for variant patterns calls scrip_rt_match_variant, which
+ * SM_EXEC_STMT for variant patterns calls rt_match_variant, which
  * pops [subj][repl_or_zero] from value-stack, pops the pattern from
  * pat-stack, and calls exec_stmt with all five.  exec_stmt in
  * BB_MODE_LIVE then handles Phases 3-5 with bb_build_flat/binary.
  *============================================================================*/
 
-void scrip_rt_pat_lit(const char *s)
+void rt_pat_lit(const char *s)
 {
     pat_push(pat_lit(s ? s : ""));
 }
 
-void scrip_rt_pat_refname(const char *name)
+void rt_pat_refname(const char *name)
 {
     pat_push(pat_ref(name ? name : ""));
 }
 
-void scrip_rt_pat_span(void)
+void rt_pat_span(void)
 {
     const char *cs = vstack_pop_str();
     pat_push(pat_span(cs));
 }
 
-void scrip_rt_pat_break(void)
+void rt_pat_break(void)
 {
     const char *cs = vstack_pop_str();
     pat_push(pat_break_(cs));
 }
 
-void scrip_rt_pat_any(void)
+void rt_pat_any(void)
 {
     const char *cs = vstack_pop_str();
     pat_push(pat_any_cs(cs));
 }
 
-void scrip_rt_pat_notany(void)
+void rt_pat_notany(void)
 {
     const char *cs = vstack_pop_str();
     pat_push(pat_notany(cs));
 }
 
-void scrip_rt_pat_len(void)   { pat_push(pat_len (vstack_pop_int64())); }
-void scrip_rt_pat_pos(void)   { pat_push(pat_pos (vstack_pop_int64())); }
-void scrip_rt_pat_rpos(void)  { pat_push(pat_rpos(vstack_pop_int64())); }
-void scrip_rt_pat_tab(void)   { pat_push(pat_tab (vstack_pop_int64())); }
-void scrip_rt_pat_rtab(void)  { pat_push(pat_rtab(vstack_pop_int64())); }
+void rt_pat_len(void)   { pat_push(pat_len (vstack_pop_int64())); }
+void rt_pat_pos(void)   { pat_push(pat_pos (vstack_pop_int64())); }
+void rt_pat_rpos(void)  { pat_push(pat_rpos(vstack_pop_int64())); }
+void rt_pat_tab(void)   { pat_push(pat_tab (vstack_pop_int64())); }
+void rt_pat_rtab(void)  { pat_push(pat_rtab(vstack_pop_int64())); }
 
-void scrip_rt_pat_arb(void)     { pat_push(pat_arb());     }
-void scrip_rt_pat_rem(void)     { pat_push(pat_rem());     }
-void scrip_rt_pat_fence(void)   { pat_push(pat_fence());   }
-void scrip_rt_pat_fail(void)    { pat_push(pat_fail());    }
-void scrip_rt_pat_abort(void)   { pat_push(pat_abort());   }
-void scrip_rt_pat_succeed(void) { pat_push(pat_succeed()); }
-void scrip_rt_pat_bal(void)     { pat_push(pat_bal());     }
-void scrip_rt_pat_eps(void)     { pat_push(pat_epsilon()); }
+void rt_pat_arb(void)     { pat_push(pat_arb());     }
+void rt_pat_rem(void)     { pat_push(pat_rem());     }
+void rt_pat_fence(void)   { pat_push(pat_fence());   }
+void rt_pat_fail(void)    { pat_push(pat_fail());    }
+void rt_pat_abort(void)   { pat_push(pat_abort());   }
+void rt_pat_succeed(void) { pat_push(pat_succeed()); }
+void rt_pat_bal(void)     { pat_push(pat_bal());     }
+void rt_pat_eps(void)     { pat_push(pat_epsilon()); }
 
-void scrip_rt_pat_arbno(void)
+void rt_pat_arbno(void)
 {
     DESCR_t inner = pat_pop_internal();
     pat_push(pat_arbno(inner));
 }
 
-void scrip_rt_pat_fence1(void)
+void rt_pat_fence1(void)
 {
     DESCR_t child = pat_pop_internal();
     pat_push(pat_fence_p(child));
 }
 
-void scrip_rt_pat_cat(void)
+void rt_pat_cat(void)
 {
     DESCR_t right = pat_pop_internal();
     DESCR_t left  = pat_pop_internal();
     pat_push(pat_cat(left, right));
 }
 
-void scrip_rt_pat_alt(void)
+void rt_pat_alt(void)
 {
     DESCR_t right = pat_pop_internal();
     DESCR_t left  = pat_pop_internal();
     pat_push(pat_alt(left, right));
 }
 
-void scrip_rt_pat_deref(void)
+void rt_pat_deref(void)
 {
     /* Mirror sm_interp.c's SM_PAT_DEREF case: pop value-stack TOS,
      * dispatch by tag.  DT_P → already a pattern; DT_S → wrap in literal;
@@ -708,7 +708,7 @@ void scrip_rt_pat_deref(void)
     }
 }
 
-void scrip_rt_pat_capture(const char *varname, int kind)
+void rt_pat_capture(const char *varname, int kind)
 {
     /* a[0].s = varname, a[1].i = kind (0=cond, 1=imm, 2=cursor) */
     DESCR_t child = pat_pop_internal();
@@ -721,7 +721,7 @@ void scrip_rt_pat_capture(const char *varname, int kind)
         pat_push(pat_assign_cond(child, var));
 }
 
-void scrip_rt_pat_boxval(void)
+void rt_pat_boxval(void)
 {
     /* Move pat-stack TOS to value-stack as DT_P. */
     vstack_push(pat_pop_internal());
@@ -730,7 +730,7 @@ void scrip_rt_pat_boxval(void)
 /* SM_PAT_CAPTURE_FN: . *func() / $ *func() — no-args form.
  * a[0].s=fname, a[1].i=is_imm(0=cond/1=imm), a[2].s=namelist (tab-sep, or NULL).
  * Pops child from pat-stack; pushes XCALLCAP node. */
-void scrip_rt_pat_capture_fn(const char *fname, int is_imm, const char *namelist)
+void rt_pat_capture_fn(const char *fname, int is_imm, const char *namelist)
 {
     DESCR_t child = pat_pop_internal();
     if (!fname) fname = "";
@@ -763,7 +763,7 @@ void scrip_rt_pat_capture_fn(const char *fname, int is_imm, const char *namelist
 /* SM_PAT_CAPTURE_FN_ARGS: . *func(args) / $ *func(args) — args-on-stack form.
  * a[0].s=fname, a[1].i=is_imm, a[2].i=nargs.
  * Pops nargs from vstack (last-pushed=last arg), pops child from pat-stack. */
-void scrip_rt_pat_capture_fn_args(const char *fname, int is_imm, int nargs)
+void rt_pat_capture_fn_args(const char *fname, int is_imm, int nargs)
 {
     if (!fname) fname = "";
     DESCR_t *argv = nargs > 0
@@ -778,7 +778,7 @@ void scrip_rt_pat_capture_fn_args(const char *fname, int is_imm, int nargs)
 
 /* SM_PAT_USERCALL: bare *func() — no-args, no child.
  * a[0].s=fname. Builds XATP deferred-usercall node. */
-void scrip_rt_pat_usercall(const char *fname)
+void rt_pat_usercall(const char *fname)
 {
     if (!fname) fname = "";
     pat_push(pat_user_call(fname, NULL, 0));
@@ -786,7 +786,7 @@ void scrip_rt_pat_usercall(const char *fname)
 
 /* SM_PAT_USERCALL_ARGS: bare *func(args) — args-on-stack form.
  * a[0].s=fname, a[1].i=nargs. Pops nargs from vstack. */
-void scrip_rt_pat_usercall_args(const char *fname, int nargs)
+void rt_pat_usercall_args(const char *fname, int nargs)
 {
     if (!fname) fname = "";
     DESCR_t *argv = nargs > 0
@@ -797,7 +797,7 @@ void scrip_rt_pat_usercall_args(const char *fname, int nargs)
 }
 
 /*==============================================================================
- * scrip_rt_match_variant — SM_EXEC_STMT for variant patterns
+ * rt_match_variant — SM_EXEC_STMT for variant patterns
  *
  * Stack contract (top-of-stack last popped):
  *   pat-stack:  [pattern_descr]  ← pat-stack TOS
@@ -814,14 +814,14 @@ void scrip_rt_pat_usercall_args(const char *fname, int nargs)
  *
  * Side effects:
  *   - Calls exec_stmt(subj_name, &subj, pat, has_repl?&repl:NULL, has_repl).
- *     In BB_MODE_LIVE (set by scrip_rt_init), Phases 3-5 route through
+ *     In BB_MODE_LIVE (set by rt_init), Phases 3-5 route through
  *     bb_build_flat/binary -> direct bb_box_fn call.
  *   - Sets g_last_ok from exec_stmt's return (so SM_JUMP_S/F observe it).
  *   - Resets g_pat_sp = 0 after each statement (defensive — patterns
  *     do not leak across statements).
  *============================================================================*/
 
-void scrip_rt_match_variant(const char *subj_name, int has_repl)
+void rt_match_variant(const char *subj_name, int has_repl)
 {
     DESCR_t repl   = vstack_pop();   /* always pop: real repl or INTVAL(0) */
     DESCR_t subj_d = vstack_pop();
@@ -837,7 +837,7 @@ void scrip_rt_match_variant(const char *subj_name, int has_repl)
  * EM-7 entries
  *============================================================================*/
 
-void scrip_rt_concat(void)
+void rt_concat(void)
 {
     /* SM_CONCAT: pop right then left; push CONCAT_fn(left, right). */
     DESCR_t r = vstack_pop();
@@ -847,14 +847,14 @@ void scrip_rt_concat(void)
     g_last_ok = (result.v != DT_FAIL);
 }
 
-void scrip_rt_push_null(void)
+void rt_push_null(void)
 {
     /* SM_PUSH_NULL: push null (empty-string) descriptor; null is non-fail. */
     vstack_push(NULVCL);
     g_last_ok = 1;
 }
 
-void scrip_rt_coerce_num(void)
+void rt_coerce_num(void)
 {
     /* SM_COERCE_NUM: unary +; coerce string to int (or real if not integer). */
     DESCR_t v = vstack_pop();
@@ -897,7 +897,7 @@ static void _rt_nv_fold_set(const char *raw, DESCR_t val)
     NV_SET_fn(n, val);
 }
 
-void scrip_rt_call(const char *name, int nargs)
+void rt_call(const char *name, int nargs)
 {
     /* Pop nargs from value stack into args[] in original order. */
     DESCR_t args[32];
@@ -1016,7 +1016,7 @@ void scrip_rt_call(const char *name, int nargs)
  * In the unconditional+plain RETURN case, the emitter does NOT call this
  * function — it emits `ret` directly.  This function exists for FRETURN /
  * NRETURN and conditional variants. */
-int scrip_rt_do_return(int kind, int cond)
+int rt_do_return(int kind, int cond)
 {
     /* cond: 0=unconditional, 1=only if last_ok, 2=only if !last_ok */
     if (cond == 1 && !g_last_ok) return 0;
@@ -1073,7 +1073,7 @@ int scrip_rt_do_return(int kind, int cond)
 DESCR_t sm_call_expression(int entry_pc)
 {
     fprintf(stderr,
-        "libscrip_rt: sm_call_expression(%d) called — DT_E EVAL dispatch "
+        "librt: sm_call_expression(%d) called — DT_E EVAL dispatch "
         "not yet wired in EM-6.  Add to EM-10 scope.\n", entry_pc);
     abort();
 }

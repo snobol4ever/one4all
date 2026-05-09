@@ -231,7 +231,7 @@ int main(int argc, char **argv)
             "  --ir-run         interpret via IR tree-walk (correctness reference)\n"
             "  --sm-run         interpret SM_Program via dispatch loop  [DEFAULT]\n"
             "  --jit-run        SM_Program -> x86 bytes -> mmap slab -> jump in\n"
-            "  --jit-emit --x64 emit standalone x86-64 asm to stdout (links libscrip_rt.so)\n"
+            "  --jit-emit --x64 emit standalone x86-64 asm to stdout (links librt.so)\n"
             "  --monitor        in-process sync comparator (IR vs SM vs JIT)\n"
             "\n"
             "Byrd Box pattern mode (default: --bb-driver):\n"
