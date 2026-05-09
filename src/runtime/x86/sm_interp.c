@@ -1198,7 +1198,37 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
                 }
                 /* No SM body found — fall through to INVOKE_fn (builtins + hook) */
                 if (result.v == DT_FAIL || (!_data_first && !_data_set)) {
+                    /* CH-17g-runtime-bridge-2 (2026-05-09): try Icon-builtin
+                     * dispatch first.  APPLY_fn / INVOKE_fn knows only the
+                     * SNOBOL4 builtin registry plus user functions registered
+                     * through register_fn; Icon builtins live in
+                     * interp_eval.c's icn_call_builtin and are never
+                     * registered there.  When the name isn't a SNOBOL4
+                     * builtin or user fn, APPLY_fn calls sno_err which
+                     * longjmps out via g_sno_err_jmp — so we cannot wait
+                     * for INVOKE_fn to return FAIL on Icon names.  Instead:
+                     * try the Icon helper first.  If it handles the call,
+                     * use its result; if it returns 0 (unknown name), fall
+                     * through to INVOKE_fn unchanged (the Icon helper only
+                     * recognises a fixed set of Icon builtin names; any
+                     * other input passes through harmlessly).
+                     *
+                     * Without this fallback, --sm-run of any Icon program
+                     * that calls write() FATALs with "Undefined function
+                     * or operation."  The fallback was originally placed
+                     * after INVOKE_fn, but APPLY_fn's longjmp-on-not-found
+                     * meant control never returned to consult the helper. */
+                    if (name) {
+                        extern int icn_try_call_builtin_by_name(
+                            const char *fn, DESCR_t *args, int nargs, DESCR_t *out);
+                        DESCR_t icn_out;
+                        if (icn_try_call_builtin_by_name(name, args, nargs, &icn_out)) {
+                            result = icn_out;
+                            goto sm_call_invoke_done;
+                        }
+                    }
                     result = INVOKE_fn(name, args, nargs);
+                    sm_call_invoke_done: ;
                 }
             }
             /* NRETURN: user fn returned DT_N — dereference like tree-walk E_FNC */
