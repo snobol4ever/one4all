@@ -171,10 +171,11 @@ static void flat_globl(emitter_v *e, const char *name)
     flat3c(e, "", ".globl", name);
 }
 
-/* Emit the four-line box-call sequence: `lea rdi,[rip+ζ]` / `mov esi,mode` /
- * `call fn@PLT` / `test rax,rax`.  No `;` separators; uniform three-column
- * shape.  `ζ_lbl` may be either a `[rip + label]` form (text-mode static
- * data) or a raw `qword ptr [rip + label]` for arbno's slot pointer. */
+/* Emit the three-line box-call sequence: `lea rdi,[rip+ζ]` / `mov esi,mode` /
+ * `call fn@PLT`.  The trailing `test rax, rax` was previously here but is
+ * now folded into `flat_box_dispatch_jne_jmp` below so the test concats
+ * onto one line with the cond+uncond jmps that follow (per EM-FORMAT-BB-LAW
+ * "no jmp instruction with only another jmp instruction on that line"). */
 static void flat_box_call(emitter_v *e, const char *rdi_load,
                           const char *fn, int mode)
 {
@@ -184,11 +185,10 @@ static void flat_box_call(emitter_v *e, const char *rdi_load,
     flat3c_action(e, "mov", esi_arg);
     char call_arg[64]; snprintf(call_arg, sizeof(call_arg), "%s@PLT", fn);
     flat3c_action(e, "call", call_arg);
-    flat3c_action(e, "test", "rax, rax");
 }
 
 /* Variant: arbno's box call uses a slot pointer dereference rather than
- * lea+rip.  Same four-line shape, different first instruction. */
+ * lea+rip.  Same three-line shape, different first instruction. */
 static void flat_box_call_slot(emitter_v *e, const char *slot_lbl,
                                const char *fn, int mode)
 {
@@ -200,7 +200,54 @@ static void flat_box_call_slot(emitter_v *e, const char *slot_lbl,
     flat3c_action(e, "mov", esi_arg);
     char call_arg[64]; snprintf(call_arg, sizeof(call_arg), "%s@PLT", fn);
     flat3c_action(e, "call", call_arg);
-    flat3c_action(e, "test", "rax, rax");
+}
+
+/* EM-FORMAT-BB-LAW (TRIPLE-FUSION): emit
+ *   test  rax, rax;<pad>jne <succ>; jmp <fail>
+ * as ONE line.  Layout:
+ *   col-2 = "test"
+ *   col-3 = "rax, rax;" + spaces to width 27
+ *   col-4 = "jne <succ>; jmp <fail>"
+ * Replaces the prior 3-line emission
+ *   ev_test_rax_rax(e);
+ *   EV_JMP(e, lbl_succ, JMP_JNE);
+ *   EV_JMP(e, lbl_fail, JMP_JMP);
+ * which violated the LAW.  TEXT mode only. */
+static void flat_box_dispatch_jne_jmp(emitter_v *e,
+                                      bb_label_t *lbl_succ,
+                                      bb_label_t *lbl_fail)
+{
+    if (!e->is_text) return;
+    char buf[512];
+    int o = 0;
+    o += snprintf(buf + o, sizeof(buf) - o, "rax, rax;");
+    while (o < 27 && o < (int)sizeof(buf) - 1) buf[o++] = ' ';
+    buf[o] = '\0';
+    snprintf(buf + o, sizeof(buf) - o, "jne %s; jmp %s",
+             lbl_succ ? lbl_succ->name : "?",
+             lbl_fail ? lbl_fail->name : "?");
+    flat3c_action(e, "test", buf);
+}
+
+/* EM-FORMAT-BB-LAW (TRIPLE-FUSION): emit the entry dispatch
+ *   cmp  esi, 0;<pad>je <α_body>; jmp <β>
+ * as ONE line.  Used at the top of every BB child sub-proc (capture
+ * children, arbno children) where mode 0 = α-entry, mode 1 = β-retry.
+ * TEXT mode only. */
+static void flat_box_entry_dispatch(emitter_v *e,
+                                    bb_label_t *lbl_alpha_body,
+                                    bb_label_t *lbl_beta)
+{
+    if (!e->is_text) return;
+    char buf[512];
+    int o = 0;
+    o += snprintf(buf + o, sizeof(buf) - o, "esi, 0;");
+    while (o < 27 && o < (int)sizeof(buf) - 1) buf[o++] = ' ';
+    buf[o] = '\0';
+    snprintf(buf + o, sizeof(buf) - o, "je %s; jmp %s",
+             lbl_alpha_body ? lbl_alpha_body->name : "?",
+             lbl_beta       ? lbl_beta->name       : "?");
+    flat3c_action(e, "cmp", buf);
 }
 
 /* ── EM-FORMAT-BB-BOX-BANNERS helpers (2026-05-09) ─────────────────────────
@@ -739,16 +786,12 @@ static void flat_emit_charset_call(emitter_v *e, bb_box_fn c_fn,
         flat3c_action(e, "lea", rdi_arg);
         flat3c_action(e, "mov", "esi, 0");
         ev_call_sym_plt(e, c_fn_name, (uint64_t)(uintptr_t)c_fn);
-        ev_test_rax_rax(e);
-        EV_JMP(e, lbl_succ, JMP_JNE);
-        EV_JMP(e, lbl_fail, JMP_JMP);
+        flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
         EV_LABEL(e, lbl_β);
         flat3c_action(e, "lea", rdi_arg);
         flat3c_action(e, "mov", "esi, 1");
         ev_call_sym_plt(e, c_fn_name, (uint64_t)(uintptr_t)c_fn);
-        ev_test_rax_rax(e);
-        EV_JMP(e, lbl_succ, JMP_JNE);
-        EV_JMP(e, lbl_fail, JMP_JMP);
+        flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
     } else {
         /* Binary path: heap cs_t */
         typedef struct { const char *chars; int delta; } cs_t;
@@ -798,16 +841,24 @@ static void flat_emit_box_call(emitter_v *e, bb_box_fn fn, const char *fn_name,
     ev_mov_rdi_imm64(e, (uint64_t)(uintptr_t)z);
     ev_mov_esi_imm32(e, 0);
     ev_call_sym_plt(e, fn_name, (uint64_t)(uintptr_t)fn);
-    ev_test_rax_rax(e);
-    EV_JMP(e, lbl_succ, JMP_JNE);
-    EV_JMP(e, lbl_fail, JMP_JMP);
+    if (e->is_text) {
+        flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
+    } else {
+        ev_test_rax_rax(e);
+        EV_JMP(e, lbl_succ, JMP_JNE);
+        EV_JMP(e, lbl_fail, JMP_JMP);
+    }
     EV_LABEL(e, lbl_β);
     ev_mov_rdi_imm64(e, (uint64_t)(uintptr_t)z);
     ev_mov_esi_imm32(e, 1);
     ev_call_sym_plt(e, fn_name, (uint64_t)(uintptr_t)fn);
-    ev_test_rax_rax(e);
-    EV_JMP(e, lbl_succ, JMP_JNE);
-    EV_JMP(e, lbl_fail, JMP_JMP);
+    if (e->is_text) {
+        flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
+    } else {
+        ev_test_rax_rax(e);
+        EV_JMP(e, lbl_succ, JMP_JNE);
+        EV_JMP(e, lbl_fail, JMP_JMP);
+    }
 }
 
 static void flat_emit_node(emitter_v *e, PATND_t *p,
@@ -851,12 +902,10 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
             flat_intel_syntax(e);
             char rdi_arg[96]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", lbl);
             flat_box_call(e, rdi_arg, "bb_len", 0);
-            EV_JMP(e, lbl_succ, JMP_JNE);
-            EV_JMP(e, lbl_fail, JMP_JMP);
+            flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
             EV_LABEL(e, lbl_β);
             flat_box_call(e, rdi_arg, "bb_len", 1);
-            EV_JMP(e, lbl_succ, JMP_JNE);
-            EV_JMP(e, lbl_fail, JMP_JMP);
+            flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
         } else {
             len_t *z = bb_len_new((int)p->num);
             flat_emit_box_call(e, bb_len, "bb_len", z, lbl_succ, lbl_fail, lbl_β);
@@ -877,12 +926,10 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
             flat_intel_syntax(e);
             char rdi_arg[96]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", lbl);
             flat_box_call(e, rdi_arg, "bb_tab", 0);
-            EV_JMP(e, lbl_succ, JMP_JNE);
-            EV_JMP(e, lbl_fail, JMP_JMP);
+            flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
             EV_LABEL(e, lbl_β);
             flat_box_call(e, rdi_arg, "bb_tab", 1);
-            EV_JMP(e, lbl_succ, JMP_JNE);
-            EV_JMP(e, lbl_fail, JMP_JMP);
+            flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
         } else {
             tab_t *z = bb_tab_new((int)p->num);
             flat_emit_box_call(e, bb_tab, "bb_tab", z, lbl_succ, lbl_fail, lbl_β);
@@ -903,12 +950,10 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
             flat_intel_syntax(e);
             char rdi_arg[96]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", lbl);
             flat_box_call(e, rdi_arg, "bb_rtab", 0);
-            EV_JMP(e, lbl_succ, JMP_JNE);
-            EV_JMP(e, lbl_fail, JMP_JMP);
+            flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
             EV_LABEL(e, lbl_β);
             flat_box_call(e, rdi_arg, "bb_rtab", 1);
-            EV_JMP(e, lbl_succ, JMP_JNE);
-            EV_JMP(e, lbl_fail, JMP_JMP);
+            flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
         } else {
             rtab_t *z = bb_rtab_new((int)p->num);
             flat_emit_box_call(e, bb_rtab, "bb_rtab", z, lbl_succ, lbl_fail, lbl_β);
@@ -927,12 +972,10 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
             flat_intel_syntax(e);
             char rdi_arg[96]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", lbl);
             flat_box_call(e, rdi_arg, "bb_fence", 0);
-            EV_JMP(e, lbl_succ, JMP_JNE);
-            EV_JMP(e, lbl_fail, JMP_JMP);
+            flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
             EV_LABEL(e, lbl_β);
             flat_box_call(e, rdi_arg, "bb_fence", 1);
-            EV_JMP(e, lbl_succ, JMP_JNE);
-            EV_JMP(e, lbl_fail, JMP_JMP);
+            flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
         } else {
             fence_t *z = bb_fence_new();
             flat_emit_box_call(e, bb_fence, "bb_fence", z, lbl_succ, lbl_fail, lbl_β);
@@ -952,12 +995,10 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
             flat_intel_syntax(e);
             char rdi_arg[96]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", lbl);
             flat_box_call(e, rdi_arg, "bb_arb", 0);
-            EV_JMP(e, lbl_succ, JMP_JNE);
-            EV_JMP(e, lbl_fail, JMP_JMP);
+            flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
             EV_LABEL(e, lbl_β);
             flat_box_call(e, rdi_arg, "bb_arb", 1);
-            EV_JMP(e, lbl_succ, JMP_JNE);
-            EV_JMP(e, lbl_fail, JMP_JMP);
+            flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
         } else {
             arb_t *z = bb_arb_new();
             flat_emit_box_call(e, bb_arb, "bb_arb", z, lbl_succ, lbl_fail, lbl_β);
@@ -976,12 +1017,10 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
             flat_intel_syntax(e);
             char rdi_arg[96]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", lbl);
             flat_box_call(e, rdi_arg, "bb_rem", 0);
-            EV_JMP(e, lbl_succ, JMP_JNE);
-            EV_JMP(e, lbl_fail, JMP_JMP);
+            flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
             EV_LABEL(e, lbl_β);
             flat_box_call(e, rdi_arg, "bb_rem", 1);
-            EV_JMP(e, lbl_succ, JMP_JNE);
-            EV_JMP(e, lbl_fail, JMP_JMP);
+            flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
         } else {
             rem_t *z = bb_rem_new();
             flat_emit_box_call(e, bb_rem, "bb_rem", z, lbl_succ, lbl_fail, lbl_β);
@@ -1011,12 +1050,10 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
             flat_intel_syntax(e);
             char rdi_arg[96]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", lbl);
             flat_box_call(e, rdi_arg, "bb_breakx", 0);
-            EV_JMP(e, lbl_succ, JMP_JNE);
-            EV_JMP(e, lbl_fail, JMP_JMP);
+            flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
             EV_LABEL(e, lbl_β);
             flat_box_call(e, rdi_arg, "bb_breakx", 1);
-            EV_JMP(e, lbl_succ, JMP_JNE);
-            EV_JMP(e, lbl_fail, JMP_JMP);
+            flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
         } else {
             brkx_t *z = bb_breakx_new(p->STRVAL_fn?p->STRVAL_fn:"");
             flat_emit_box_call(e, bb_breakx, "bb_breakx", z, lbl_succ, lbl_fail, lbl_β);
@@ -1043,12 +1080,10 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
             flat_intel_syntax(e);
             char rdi_arg[96]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", lbl);
             flat_box_call(e, rdi_arg, "bb_atp", 0);
-            EV_JMP(e, lbl_succ, JMP_JNE);
-            EV_JMP(e, lbl_fail, JMP_JMP);
+            flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
             EV_LABEL(e, lbl_β);
             flat_box_call(e, rdi_arg, "bb_atp", 1);
-            EV_JMP(e, lbl_succ, JMP_JNE);
-            EV_JMP(e, lbl_fail, JMP_JMP);
+            flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
         } else {
             atp_t *z = bb_atp_new(p->STRVAL_fn?p->STRVAL_fn:"");
             flat_emit_box_call(e, bb_atp, "bb_atp", z, lbl_succ, lbl_fail, lbl_β);
@@ -1079,12 +1114,10 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
             flat_intel_syntax(e);
             char rdi_arg[96]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", zlbl);
             flat_box_call(e, rdi_arg, "bb_deferred_var_exported", 0);
-            EV_JMP(e, lbl_succ, JMP_JNE);
-            EV_JMP(e, lbl_fail, JMP_JMP);
+            flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
             EV_LABEL(e, lbl_β);
             flat_box_call(e, rdi_arg, "bb_deferred_var_exported", 1);
-            EV_JMP(e, lbl_succ, JMP_JNE);
-            EV_JMP(e, lbl_fail, JMP_JMP);
+            flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
         } else {
             void *z = bb_dvar_bin_new(p->STRVAL_fn?p->STRVAL_fn:"");
             flat_emit_box_call(e, bb_deferred_var_exported, "bb_deferred_var_exported",
@@ -1117,11 +1150,9 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
             {   bb_insn_desc_t d = {BB_INSN_LEA_R10_SYM, ADDR_DELTA, 0, 0, SYM_DELTA};
                 e->emit_insn(e, &d);
             }
-            ev_cmp_esi_imm8(e, 0);
             char ab_lbl[128]; snprintf(ab_lbl, sizeof(ab_lbl), "arbno%d_\xCE\xB1_body", child_id);  /* _arbno%d_α_body */
             bb_label_t alpha_body; bb_label_initf(&alpha_body, "%s", ab_lbl);
-            EV_JMP(e, &alpha_body, JMP_JE);
-            EV_JMP(e, &cb, JMP_JMP);
+            flat_box_entry_dispatch(e, &alpha_body, &cb);
             EV_LABEL(e, &alpha_body);
             PATND_t *ch = p->nchildren > 0 ? p->children[0] : NULL;
             flat_emit_node(e, ch, &cs, &cf, &cb);
@@ -1133,12 +1164,10 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
             g_cap_fixup_cb((void*)(uintptr_t)2, α_lbl);
             /* Emit arbno box call via slot pointer (qword ptr deref, not lea+rip) */
             flat_box_call_slot(e, slot_lbl, "bb_arbno", 0);
-            EV_JMP(e, lbl_succ, JMP_JNE);
-            EV_JMP(e, lbl_fail, JMP_JMP);
+            flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
             EV_LABEL(e, lbl_β);
             flat_box_call_slot(e, slot_lbl, "bb_arbno", 1);
-            EV_JMP(e, lbl_succ, JMP_JNE);
-            EV_JMP(e, lbl_fail, JMP_JMP);
+            flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
         } else {
             /* Binary path: build child via bb_build_binary_node, wire into arbno */
             /* For now fall through to default — binary path uses bb_build */
@@ -1204,11 +1233,9 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
             {   bb_insn_desc_t d = {BB_INSN_LEA_R10_SYM, ADDR_DELTA, 0, 0, SYM_DELTA};
                 e->emit_insn(e, &d);
             }
-            ev_cmp_esi_imm8(e, 0);
             char ab_lbl[128]; snprintf(ab_lbl, sizeof(ab_lbl), "cap%d_\xCE\xB1_body", child_id);  /* _cap%d_α_body */
             bb_label_t alpha_body; bb_label_initf(&alpha_body, "%s", ab_lbl);
-            EV_JMP(e, &alpha_body, JMP_JE);
-            EV_JMP(e, &cb,         JMP_JMP);
+            flat_box_entry_dispatch(e, &alpha_body, &cb);
             EV_LABEL(e, &alpha_body);
             PATND_t *ch = p->nchildren > 0 ? p->children[0] : NULL;
             flat_emit_node(e, ch, &cs, &cf, &cb);
@@ -1245,12 +1272,10 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
             /* Emit cap box call using RIP-relative address for static cap_t */
             char rdi_arg[160]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", cap_lbl);
             flat_box_call(e, rdi_arg, "bb_cap", 0);
-            EV_JMP(e, lbl_succ, JMP_JNE);
-            EV_JMP(e, lbl_fail, JMP_JMP);
+            flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
             EV_LABEL(e, lbl_β);
             flat_box_call(e, rdi_arg, "bb_cap", 1);
-            EV_JMP(e, lbl_succ, JMP_JNE);
-            EV_JMP(e, lbl_fail, JMP_JMP);
+            flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
         } else {
             /* Binary path: heap cap_t */
             cap_t *z = bb_cap_new(NULL, NULL, vn, NULL, immediate);
@@ -1320,9 +1345,7 @@ static int flat_emit_body_v(emitter_v *e, PATND_t *p,
     {   bb_insn_desc_t d = {BB_INSN_LEA_R10_SYM, ADDR_DELTA, 0, 0, SYM_DELTA};
         e->emit_insn(e, &d);
     }
-    ev_cmp_esi_imm8(e, 0);
-    EV_JMP(e, &lbl_α_body, JMP_JE);
-    EV_JMP(e, &lbl_β,       JMP_JMP);
+    flat_box_entry_dispatch(e, &lbl_α_body, &lbl_β);
 
     /* Internal α_body label (dispatch target within function).
      * In BINARY mode, lbl_α is also defined here (same offset = function
