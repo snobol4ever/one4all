@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdarg.h>
 
 /* Constructor externs (implemented in bb_boxes.c / stmt_exec.c) */
 extern len_t   *bb_len_new(int n);
@@ -202,6 +203,268 @@ static void flat_box_call_slot(emitter_v *e, const char *slot_lbl,
     flat3c_action(e, "test", "rax, rax");
 }
 
+/* ── EM-FORMAT-BB-BOX-BANNERS helpers (2026-05-09) ─────────────────────────
+ *
+ * Per the EM-FORMAT-BB rung spec:
+ *   - Pattern-blob banner: 120-char `#=` rule + `# pattern <prefix>: <src>`
+ *     + 120-char `#=` rule, where <src> is a SNOBOL4-source-style render of
+ *     the PATND_t tree.  Emitted once per pat_inv_<id> blob.
+ *   - Per-box banner: 120-char `#-` rule + `# BOX <kind>(<args>)  [<prefix>]`,
+ *     emitted before each box's α-arm code.
+ *
+ * Banner lines start with `#` so the audit harness's audit_is_banner short-
+ * circuit applies (no I1/I2/I3 violations).  Lines are non-blank, so I0 is
+ * also clean.
+ *
+ * Banners flush any pending bb3c label before writing so a fused label that
+ * was buffered from a prior box doesn't appear after this banner.  (The
+ * pattern banner runs at function-prologue time before any boxes have
+ * written; the per-box banner can follow another box's tail label.)
+ *
+ * 120-char rule:  '# ' + 118 separator chars = 120 total.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/* xkind_name lives in snobol4_pattern.c as static; we need our own local
+ * copy for banner reconstruction.  Names match the diagnostic spelling
+ * used by patnd_print's --dump-bb output. */
+static const char *flat_xkind_name(XKIND_t k) {
+    switch (k) {
+        case XCHR:     return "CHR";
+        case XSPNC:    return "SPAN";
+        case XBRKC:    return "BREAK";
+        case XANYC:    return "ANY";
+        case XNNYC:    return "NOTANY";
+        case XLNTH:    return "LEN";
+        case XPOSI:    return "POS";
+        case XRPSI:    return "RPOS";
+        case XTB:      return "TAB";
+        case XRTB:     return "RTAB";
+        case XFARB:    return "ARB";
+        case XARBN:    return "ARBNO";
+        case XSTAR:    return "REM";
+        case XFNCE:    return "FENCE";
+        case XFAIL:    return "FAIL";
+        case XABRT:    return "ABORT";
+        case XSUCF:    return "SUCCEED";
+        case XBAL:     return "BAL";
+        case XEPS:     return "EPS";
+        case XCAT:     return "CAT";
+        case XOR:      return "ALT";
+        case XDSAR:    return "DEREF";
+        case XFNME:    return "CAP_IMM";
+        case XNME:     return "CAP_COND";
+        case XCALLCAP: return "CALLCAP";
+        case XVAR:     return "VAR";
+        case XATP:     return "USERPAT";
+        case XBRKX:    return "BREAKX";
+        default:       return "?";
+    }
+}
+
+/* Append at most `cap-1` chars from `s` (escaping " and non-printables as `.`)
+ * into buf at offset *o, leaving room for the NUL.  Returns 1 on overflow. */
+static int patnd_buf_append(char *buf, size_t cap, size_t *o, const char *s)
+{
+    if (!s) return 0;
+    while (*s && *o + 1 < cap) {
+        unsigned char c = (unsigned char)*s++;
+        if (c < 0x20 || c == 0x7f) { buf[(*o)++] = '.'; }
+        else { buf[(*o)++] = (char)c; }
+    }
+    buf[*o] = '\0';
+    return (*o + 1 >= cap) ? 1 : 0;
+}
+
+static int patnd_buf_appendf(char *buf, size_t cap, size_t *o, const char *fmt, ...)
+{
+    if (*o + 1 >= cap) return 1;
+    va_list ap; va_start(ap, fmt);
+    int n = vsnprintf(buf + *o, cap - *o, fmt, ap);
+    va_end(ap);
+    if (n < 0) return 1;
+    if ((size_t)n >= cap - *o) { *o = cap - 1; return 1; }
+    *o += (size_t)n;
+    return 0;
+}
+
+/* Render PATND_t tree in SNOBOL4-source style, single-line, into buf.
+ * Conventions:
+ *   XCHR("foo")             → 'foo'
+ *   XSPNC("xyz")            → SPAN('xyz')
+ *   XBRKC("xyz")            → BREAK('xyz')
+ *   XANYC("xyz")            → ANY('xyz')
+ *   XNNYC("xyz")            → NOTANY('xyz')
+ *   XBRKX("xyz")            → BREAKX('xyz')
+ *   XLNTH(n) / XTB(n) /...  → LEN(n) / TAB(n) / RTAB(n) / POS(n) / RPOS(n)
+ *   XFARB / XEPS / XFAIL    → ARB / EPSILON / FAIL
+ *   XSTAR / XBAL / XSUCF    → REM / BAL / SUCCEED
+ *   XCAT(a,b,c)             → a b c
+ *   XOR(a,b,c)              → a | b | c
+ *   XARBN(p)                → ARBNO(p)
+ *   XFNCE(p)                → FENCE(p)        (or just FENCE if no children)
+ *   XFNME(p)/XNME(p)        → p $ var / p . var
+ *   XDSAR("name")           → *name
+ *   XATP("fn", args...)     → fn(args...)
+ *   XVAR                    → <var>           (concrete name not in node)
+ *
+ * Caps recursion depth at 16 to keep the banner sane on deep trees;
+ * deeper nesting renders as "...".
+ */
+static void patnd_to_sno_r(const PATND_t *p, char *buf, size_t cap,
+                           size_t *o, int depth)
+{
+    if (*o + 4 >= cap) return;
+    if (!p) { patnd_buf_append(buf, cap, o, "()"); return; }
+    if (depth >= 16) { patnd_buf_append(buf, cap, o, "..."); return; }
+
+    switch (p->kind) {
+    case XCHR: {
+        const char *s = p->STRVAL_fn ? p->STRVAL_fn : "";
+        patnd_buf_appendf(buf, cap, o, "'%s'", s);
+        break;
+    }
+    case XSPNC: case XBRKC: case XANYC: case XNNYC: case XBRKX: {
+        patnd_buf_appendf(buf, cap, o, "%s('%s')",
+                          flat_xkind_name(p->kind),
+                          p->STRVAL_fn ? p->STRVAL_fn : "");
+        break;
+    }
+    case XLNTH: case XTB: case XRTB: case XPOSI: case XRPSI:
+        patnd_buf_appendf(buf, cap, o, "%s(%lld)",
+                          flat_xkind_name(p->kind), (long long)p->num);
+        break;
+    case XFARB:    patnd_buf_append(buf, cap, o, "ARB");      break;
+    case XSTAR:    patnd_buf_append(buf, cap, o, "REM");      break;
+    case XBAL:     patnd_buf_append(buf, cap, o, "BAL");      break;
+    case XSUCF:    patnd_buf_append(buf, cap, o, "SUCCEED");  break;
+    case XABRT:    patnd_buf_append(buf, cap, o, "ABORT");    break;
+    case XEPS:     patnd_buf_append(buf, cap, o, "EPSILON");  break;
+    case XFAIL:    patnd_buf_append(buf, cap, o, "FAIL");     break;
+    case XVAR:     patnd_buf_append(buf, cap, o, "<var>");    break;
+    case XCAT:
+        for (int i = 0; i < p->nchildren; i++) {
+            if (i > 0 && *o + 1 < cap) buf[(*o)++] = ' ';
+            patnd_to_sno_r(p->children[i], buf, cap, o, depth + 1);
+        }
+        buf[*o] = '\0';
+        break;
+    case XOR:
+        for (int i = 0; i < p->nchildren; i++) {
+            if (i > 0) patnd_buf_append(buf, cap, o, " | ");
+            patnd_to_sno_r(p->children[i], buf, cap, o, depth + 1);
+        }
+        break;
+    case XARBN:
+        patnd_buf_append(buf, cap, o, "ARBNO(");
+        if (p->nchildren > 0) patnd_to_sno_r(p->children[0], buf, cap, o, depth + 1);
+        patnd_buf_append(buf, cap, o, ")");
+        break;
+    case XFNCE:
+        if (p->nchildren > 0) {
+            patnd_buf_append(buf, cap, o, "FENCE(");
+            patnd_to_sno_r(p->children[0], buf, cap, o, depth + 1);
+            patnd_buf_append(buf, cap, o, ")");
+        } else {
+            patnd_buf_append(buf, cap, o, "FENCE");
+        }
+        break;
+    case XFNME:
+        if (p->nchildren > 0) patnd_to_sno_r(p->children[0], buf, cap, o, depth + 1);
+        patnd_buf_append(buf, cap, o, " $ <var>");
+        break;
+    case XNME:
+        if (p->nchildren > 0) patnd_to_sno_r(p->children[0], buf, cap, o, depth + 1);
+        patnd_buf_append(buf, cap, o, " . <var>");
+        break;
+    case XCALLCAP:
+        if (p->nchildren > 0) patnd_to_sno_r(p->children[0], buf, cap, o, depth + 1);
+        patnd_buf_append(buf, cap, o, " . *<fn>()");
+        break;
+    case XDSAR:
+        patnd_buf_appendf(buf, cap, o, "*%s",
+                          p->STRVAL_fn ? p->STRVAL_fn : "<var>");
+        break;
+    case XATP: {
+        patnd_buf_appendf(buf, cap, o, "%s(",
+                          p->STRVAL_fn ? p->STRVAL_fn : "<fn>");
+        for (int i = 0; i < p->nargs; i++) {
+            if (i > 0) patnd_buf_append(buf, cap, o, ", ");
+            patnd_buf_append(buf, cap, o, "<arg>");
+        }
+        patnd_buf_append(buf, cap, o, ")");
+        break;
+    }
+    default:
+        patnd_buf_appendf(buf, cap, o, "<%s>", flat_xkind_name(p->kind));
+        break;
+    }
+}
+
+static void patnd_to_sno_string(const PATND_t *p, char *buf, size_t cap)
+{
+    if (!buf || cap == 0) return;
+    buf[0] = '\0';
+    size_t o = 0;
+    patnd_to_sno_r(p, buf, cap, &o, 0);
+}
+
+/* 120-char banner rule.  Rule chars: `#` then space, then 118 separator
+ * chars — total 120 visible columns. */
+#define BB_BANNER_RULE_LEN 118
+
+static void flat_emit_banner_rule(emitter_v *e, char ch)
+{
+    if (!e->is_text) return;
+    char buf[BB_BANNER_RULE_LEN + 4];
+    buf[0] = '#';
+    buf[1] = ' ';
+    for (int i = 0; i < BB_BANNER_RULE_LEN; i++) buf[2 + i] = ch;
+    buf[2 + BB_BANNER_RULE_LEN] = '\0';
+    /* Flush any pending label so it doesn't appear AFTER this banner. */
+    bb3c_flush_pending();
+    EV_TEXT(e, "%s\n", buf);
+}
+
+/* Pattern-blob banner: emit at the top of each pat_inv_<id> blob.
+ *
+ *   # ====================================================================
+ *   # pattern <prefix>: <reconstructed source>
+ *   # ====================================================================
+ */
+static void flat_emit_pat_banner(emitter_v *e, const char *prefix, PATND_t *p)
+{
+    if (!e->is_text) return;
+    char src[1024];
+    patnd_to_sno_string(p, src, sizeof(src));
+    flat_emit_banner_rule(e, '=');
+    EV_TEXT(e, "# pattern %s: %s\n", prefix ? prefix : "?", src);
+    flat_emit_banner_rule(e, '=');
+}
+
+/* Per-box banner: emit before the α-arm of a box.
+ *
+ *   # --------------------------------------------------------------------
+ *   # BOX <kind>(<args>)  [<label-prefix>]
+ *
+ * The trailing `#-` rule of the prior banner serves as the visual
+ * separator from any preceding code; we emit a `#-` rule above every
+ * box banner for symmetry, no rule below (the box's α label-line
+ * follows immediately).
+ */
+static void flat_emit_box_banner(emitter_v *e, const char *kind,
+                                 const char *args, const char *label_prefix)
+{
+    if (!e->is_text) return;
+    flat_emit_banner_rule(e, '-');
+    if (args && *args) {
+        EV_TEXT(e, "# BOX %s(%s)  [%s]\n", kind, args,
+                label_prefix ? label_prefix : "");
+    } else {
+        EV_TEXT(e, "# BOX %s  [%s]\n", kind,
+                label_prefix ? label_prefix : "");
+    }
+}
+
 /* ── forward declarations ────────────────────────────────────────────────── */
 static void flat_emit_node(emitter_v *e, PATND_t *p,
                            bb_label_t *lbl_succ, bb_label_t *lbl_fail,
@@ -339,6 +602,7 @@ static void flat_emit_eps(emitter_v *e, bb_label_t *lbl_succ,
                           bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     if (e->is_text) {
+        flat_emit_box_banner(e, "EPS", NULL, lbl_succ->name);
         /* EM-7c-bb-macros: single macro call per port.
          * EM-FORMAT-BB-COL3-COMMENTS: α-line names the box kind. */
         char args[256];
@@ -358,6 +622,7 @@ static void flat_emit_fail(emitter_v *e, bb_label_t *lbl_succ,
 {
     (void)lbl_succ;
     if (e->is_text) {
+        flat_emit_box_banner(e, "FAIL", NULL, lbl_fail->name);
         /* EM-FORMAT-BB-COL3-COMMENTS: α-line names the box kind. */
         char args[256];
         snprintf(args, sizeof(args), "%s # FAIL", lbl_fail->name);
@@ -375,6 +640,8 @@ static void flat_emit_pos(emitter_v *e, int n, bb_label_t *lbl_succ,
                           bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     if (e->is_text) {
+        char banner_args[32]; snprintf(banner_args, sizeof(banner_args), "%d", n);
+        flat_emit_box_banner(e, "POS", banner_args, lbl_succ->name);
         /* EM-7c-bb-macros: POS_α n, lbl_succ, lbl_fail
          * EM-FORMAT-BB-COL3-COMMENTS: α-line names the box kind + arg. */
         char args[256];
@@ -397,6 +664,8 @@ static void flat_emit_rpos(emitter_v *e, int n, bb_label_t *lbl_succ,
                            bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     if (e->is_text) {
+        char banner_args[32]; snprintf(banner_args, sizeof(banner_args), "%d", n);
+        flat_emit_box_banner(e, "RPOS", banner_args, lbl_succ->name);
         /* EM-7c-bb-macros: RPOS_α n, lbl_succ, lbl_fail
          * EM-FORMAT-BB-COL3-COMMENTS: α-line names the box kind + arg. */
         char args[256];
@@ -425,6 +694,24 @@ static void flat_emit_charset_call(emitter_v *e, bb_box_fn c_fn,
                                    bb_label_t *lbl_β)
 {
     if (e->is_text) {
+        /* Map runtime fn name to source-level kind for the banner.
+         * bb_span/any/brk/notany → SPAN/ANY/BREAK/NOTANY. */
+        const char *kind = "CHARSET";
+        if      (c_fn_name && !strcmp(c_fn_name, "bb_span"))   kind = "SPAN";
+        else if (c_fn_name && !strcmp(c_fn_name, "bb_any"))    kind = "ANY";
+        else if (c_fn_name && !strcmp(c_fn_name, "bb_brk"))    kind = "BREAK";
+        else if (c_fn_name && !strcmp(c_fn_name, "bb_notany")) kind = "NOTANY";
+        /* Truncate chars-arg preview at 24 chars; some patterns use long
+         * charsets that would otherwise blow past the 120-char banner. */
+        char preview[40];
+        if (chars && *chars) {
+            int n = (int)strlen(chars);
+            if (n > 24) snprintf(preview, sizeof(preview), "'%.24s...'", chars);
+            else        snprintf(preview, sizeof(preview), "'%s'", chars);
+        } else {
+            preview[0] = '\0';
+        }
+        flat_emit_box_banner(e, kind, preview, lbl_succ->name);
         /* Static .data: chars string + cs_t {chars*, delta=0} */
         int id = g_flat_node_id++;
         char zlbl[64], slbl[64];
@@ -522,6 +809,13 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
     switch (p->kind) {
     case XCHR: {
         const char *lit = p->STRVAL_fn ? p->STRVAL_fn : "";
+        if (e->is_text) {
+            int n = (int)strlen(lit);
+            char preview[40];
+            if (n > 24) snprintf(preview, sizeof(preview), "'%.24s...'", lit);
+            else        snprintf(preview, sizeof(preview), "'%s'", lit);
+            flat_emit_box_banner(e, "LIT", preview, lbl_succ->name);
+        }
         flat_emit_lit(e, lit, (int)strlen(lit), lbl_succ, lbl_fail, lbl_β);
         break;
     }
@@ -537,6 +831,8 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
     case XNNYC: flat_emit_charset_call(e, bb_notany, "bb_notany",  p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
     case XLNTH: {
         if (e->is_text) {
+            char banner_args[32]; snprintf(banner_args, sizeof(banner_args), "%lld", (long long)p->num);
+            flat_emit_box_banner(e, "LEN", banner_args, lbl_succ->name);
             int id = g_flat_node_id++;
             char lbl[64]; snprintf(lbl, sizeof(lbl), ".Llen%d_z", id);
             flat_data_section(e);
@@ -560,6 +856,8 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
     }
     case XTB: {
         if (e->is_text) {
+            char banner_args[32]; snprintf(banner_args, sizeof(banner_args), "%lld", (long long)p->num);
+            flat_emit_box_banner(e, "TAB", banner_args, lbl_succ->name);
             int id = g_flat_node_id++;
             char lbl[64]; snprintf(lbl, sizeof(lbl), ".Ltab%d_z", id);
             flat_data_section(e);
@@ -584,6 +882,8 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
     }
     case XRTB: {
         if (e->is_text) {
+            char banner_args[32]; snprintf(banner_args, sizeof(banner_args), "%lld", (long long)p->num);
+            flat_emit_box_banner(e, "RTAB", banner_args, lbl_succ->name);
             int id = g_flat_node_id++;
             char lbl[64]; snprintf(lbl, sizeof(lbl), ".Lrtab%d_z", id);
             flat_data_section(e);
@@ -608,6 +908,7 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
     }
     case XFNCE: {
         if (e->is_text) {
+            flat_emit_box_banner(e, "FENCE", NULL, lbl_succ->name);
             int id = g_flat_node_id++;
             char lbl[64]; snprintf(lbl, sizeof(lbl), ".Lfence%d_z", id);
             flat_data_section(e);
@@ -631,6 +932,7 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
     }
     case XFARB: {
         if (e->is_text) {
+            flat_emit_box_banner(e, "ARB", NULL, lbl_succ->name);
             int id = g_flat_node_id++;
             char lbl[64]; snprintf(lbl, sizeof(lbl), ".Larb%d_z", id);
             flat_data_section(e);
@@ -655,6 +957,7 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
     }
     case XSTAR: {
         if (e->is_text) {
+            flat_emit_box_banner(e, "REM", NULL, lbl_succ->name);
             int id = g_flat_node_id++;
             char lbl[64]; snprintf(lbl, sizeof(lbl), ".Lrem%d_z", id);
             flat_data_section(e);
@@ -678,6 +981,12 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
     }
     case XBRKX: {
         if (e->is_text) {
+            const char *cs0 = p->STRVAL_fn ? p->STRVAL_fn : "";
+            char preview[40];
+            int n = (int)strlen(cs0);
+            if (n > 24) snprintf(preview, sizeof(preview), "'%.24s...'", cs0);
+            else        snprintf(preview, sizeof(preview), "'%s'", cs0);
+            flat_emit_box_banner(e, "BREAKX", preview, lbl_succ->name);
             int id = g_flat_node_id++;
             char lbl[64], slbl[64];
             snprintf(lbl,  sizeof(lbl),  ".Lbrkx%d_z",     id);
@@ -707,6 +1016,8 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
     }
     case XATP: {
         if (e->is_text) {
+            const char *vn0 = p->STRVAL_fn ? p->STRVAL_fn : "";
+            flat_emit_box_banner(e, "USERPAT", vn0, lbl_succ->name);
             int id = g_flat_node_id++;
             char lbl[64], vlbl[64];
             snprintf(lbl,  sizeof(lbl),  ".Latp%d_z",     id);
@@ -737,6 +1048,9 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
     }
     case XDSAR: { /* XDSAR: *varname — re-resolves NV[varname] on every α */
         if (e->is_text) {
+            const char *vn0 = p->STRVAL_fn ? p->STRVAL_fn : "";
+            char banner_args[80]; snprintf(banner_args, sizeof(banner_args), "*%s", vn0);
+            flat_emit_box_banner(e, "DEREF", banner_args, lbl_succ->name);
             int id = g_flat_node_id++;
             char zlbl[64], slbl[64];
             snprintf(zlbl, sizeof(zlbl), ".Ldvar%d_z",    id);
@@ -773,6 +1087,7 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
                    * Emit child as callable sub-proc; arbno_t allocated at startup
                    * via rt_init_arbno(.Larbno_slot, child_α). */
         if (e->is_text && g_cap_fixup_cb) {
+            flat_emit_box_banner(e, "ARBNO", NULL, lbl_succ->name);
             int child_id = g_flat_node_id++;
             char slot_lbl[128], α_lbl[128];
             snprintf(slot_lbl,  sizeof(slot_lbl),  ".Larbno%d_slot", child_id);
@@ -830,6 +1145,9 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
         const char *vn = (p->var.v==DT_S && p->var.s) ? p->var.s :
                          (p->var.v==DT_N && p->var.slen==0 && p->var.s) ? p->var.s : "";
         if (e->is_text && g_cap_fixup_cb) {
+            const char *kind_name = (p->kind == XFNME) ? "CAP_IMM" : "CAP_COND";
+            char banner_args[80]; snprintf(banner_args, sizeof(banner_args), "%s", vn ? vn : "");
+            flat_emit_box_banner(e, kind_name, banner_args, lbl_succ->name);
             /* TEXT mode: emit cap_t as static .data (120 bytes) so the emitted
              * binary has a linker-assigned address for it — no heap ptr baked.
              *
@@ -976,6 +1294,9 @@ static int flat_emit_body_v(emitter_v *e, PATND_t *p,
      * BINARY mode: the function starts at offset 0 which IS the preamble;
      * no external symbols emitted, so the label placement doesn't matter. */
     if (text_externalise) {
+        /* EM-FORMAT-BB-BOX-BANNERS: pattern-level banner above the
+         * blob's exported symbols.  Reconstructed PATND_t source. */
+        flat_emit_pat_banner(e, prefix, p);
         EV_GLOBAL(e, lbl_α.name);
         EV_GLOBAL(e, lbl_β.name);
         EV_GLOBAL(e, lbl_succ.name);
