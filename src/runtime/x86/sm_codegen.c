@@ -1587,6 +1587,165 @@ static void emit_standard_blob(handler_fn_t fn, size_t trampoline_abs_off)
 }
 
 /*
+ * emit_standard_blob_no_stack — emit a "call C handler" blob for handlers
+ * that DO NOT read or write the SM value stack (and therefore don't need
+ * the r12↔sp sync protocol).  Used for:
+ *   - h_label          — no-op
+ *   - h_stno           — reads pc operand, calls comm_stno, sets st->sp = 0
+ *                        and IM-5 step-limit check; touches stack-pointer
+ *                        but not stack contents — and the SP RESET is
+ *                        exactly the convention we want anyway, so we
+ *                        re-derive r12 from st->stack after.
+ *   - h_jump_s/h_jump_f - obsolete: replaced by emit_cond_jump_blob below.
+ *
+ * Shape: PC bump + aligned call + jmp trampoline.  No sync blocks.
+ *
+ * IMPORTANT: when the handler resets st->sp to 0 (h_stno's job), r12 is
+ * stale — it still points where it pointed before the call.  The post-
+ * call reload `r12 = st->stack + st->sp * 16` re-derives the correct
+ * TOS pointer (= st->stack at sp=0).  This is the SM_STNO mode-2
+ * contract from REGISTER-LAYOUT.md.  For h_label which doesn't touch
+ * st->sp, the reload is a no-op (r12 ends up where it started).
+ *
+ * Variable-size: 39 bytes (vs 57 for emit_standard_blob).  Saves 18B
+ * per stack-neutral opcode on every dispatch.  In a tight loop hitting
+ * SM_STNO + SM_JUMP_S every iteration, that's 36B less code + the
+ * elided sync ops faster per iteration.
+ *
+ * The reload-only-no-pre-sync trick: handlers in this category don't
+ * READ st->sp meaningfully (h_label ignores it; h_stno overrides it to
+ * 0).  So we skip the pre-sync (no need to write the current sp from
+ * r12), keep the post-sync (the reload) so r12 is current after.
+ */
+static void emit_standard_blob_no_stack(handler_fn_t fn, size_t trampoline_abs_off)
+{
+    /* inc dword [r13+20]  (41 ff 45 14)  4 bytes — pc++ */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xff);
+    seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x14);
+
+    /* mov rax, handler_imm64  (48 b8 <imm64>)  10 bytes */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xb8);
+    seg_u64(SEG_CODE, (uint64_t)(uintptr_t)fn);
+
+    /* sub rsp, 8  (48 83 ec 08)  4 bytes — 16-byte alignment for `call` */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0x83);
+    seg_byte(SEG_CODE, 0xec); seg_byte(SEG_CODE, 0x08);
+
+    /* call rax  (ff d0)  2 bytes */
+    seg_byte(SEG_CODE, 0xff); seg_byte(SEG_CODE, 0xd0);
+
+    /* add rsp, 8  (48 83 c4 08)  4 bytes — undo alignment padding */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0x83);
+    seg_byte(SEG_CODE, 0xc4); seg_byte(SEG_CODE, 0x08);
+
+    /* Post-call: r12 = st->stack + st->sp * 16.  For h_label this is a
+     * no-op (sp unchanged from caller); for h_stno this resets r12 to
+     * st->stack (sp reset to 0).  Either way r12 is consistent after. */
+    /*   mov eax, [r13+8]        (41 8b 45 08)    4 bytes */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x08);
+    /*   shl rax, 4              (48 c1 e0 04)    4 bytes */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xc1);
+    seg_byte(SEG_CODE, 0xe0); seg_byte(SEG_CODE, 0x04);
+    /*   add rax, [r13]          (49 03 45 00)    4 bytes */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x03);
+    seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x00);
+    /*   mov r12, rax            (49 89 c4)       3 bytes */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x89); seg_byte(SEG_CODE, 0xc4);
+
+    /* jmp rel32 trampoline */
+    size_t rel32_end_off_ns = seg_offset(SEG_CODE) + 5;
+    int32_t rel_ns = (int32_t)((int64_t)trampoline_abs_off - (int64_t)rel32_end_off_ns);
+    seg_byte(SEG_CODE, 0xe9);
+    seg_u32(SEG_CODE, (uint32_t)rel_ns);
+}
+
+/*
+ * emit_cond_jump_blob_skeleton — inline-native lowering of SM_JUMP_S /
+ * SM_JUMP_F.  Reads st->last_ok via [r13+16] (no PLT call needed —
+ * r13 is &SM_State and last_ok is at offset 16).  On take: sets pc to
+ * target_pc and direct-rel32-jumps to blob[target_pc].  On fall-
+ * through: sets pc to fallthru_pc (= this_pc + 1) and direct-rel32-
+ * jumps to blob[fallthru_pc].
+ *
+ *   take_on_nonzero = 1 for SM_JUMP_S (jump when last_ok != 0)
+ *   take_on_nonzero = 0 for SM_JUMP_F (jump when last_ok == 0)
+ *
+ * Bypasses the trampoline entirely — direct rel32 to both target and
+ * fall-through.  Each blob has TWO rel32 patch sites; pass 2 fills
+ * them in.  Returns the offset of the FIRST rel32 (target_pc); the
+ * SECOND rel32 (fallthru_pc) is at first_off + 13 (deterministic
+ * layout).
+ *
+ * Shape:
+ *   cmp dword [r13+16], 0           5 bytes  (41 83 7d 10 00)
+ *   jcc rel8 +12 (skip taken-side)  2 bytes  (74 0c or 75 0c)
+ *   ; --- taken branch ---
+ *   mov dword [r13+20], target_pc   8 bytes  (41 c7 45 14 <imm32>)
+ *   jmp rel32 blob[target_pc]       5 bytes  (e9 <rel32>) [patch #1]
+ *   ; --- fall-through branch ---
+ *   mov dword [r13+20], fallthru    8 bytes  (41 c7 45 14 <imm32>)
+ *   jmp rel32 blob[fallthru_pc]     5 bytes  (e9 <rel32>) [patch #2]
+ *
+ * Total: 33 bytes.  vs 57 for standard_blob → big win on jump-heavy
+ * code.  Also: direct rel32 to target skips the trampoline's indirect-
+ * jump pipeline stall on every branch.
+ *
+ * jcc encoding:
+ *   take_on_nonzero=1 (SM_JUMP_S): jump-when-last_ok-nonzero.  We want
+ *     to FALL THROUGH on zero, so skip-taken-on-zero.  jcc = je rel8.
+ *     opcode 74.
+ *   take_on_nonzero=0 (SM_JUMP_F): jump-when-last_ok-zero.  Skip-taken
+ *     on nonzero.  jcc = jne rel8.  opcode 75.
+ *
+ * "skip taken side" means jcc over (8+5)=13 bytes if we want to land
+ * on the fall-through side.  But we placed the JCC after a 5-byte cmp,
+ * before the 13-byte taken side.  rel8 = 13 → 0x0d.  Hmm wait, jcc
+ * rel8's reference is "byte after the jcc", so taking 13 means landing
+ * 13 bytes past the jcc-end (which is byte 7 from blob start).  Fall-
+ * through-side mov starts at byte 20.  byte 7 + 13 = 20.  ✓
+ */
+static size_t emit_cond_jump_blob_skeleton(int take_on_nonzero,
+                                           int32_t target_pc,
+                                           int32_t fallthru_pc)
+{
+    /* cmp dword [r13+16], 0  (41 83 7d 10 00)  5 bytes */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0x83);
+    seg_byte(SEG_CODE, 0x7d); seg_byte(SEG_CODE, 0x10); seg_byte(SEG_CODE, 0x00);
+
+    /* jcc rel8 +13 (skip the taken-side 8+5=13 bytes) */
+    if (take_on_nonzero) {
+        /* SM_JUMP_S: skip taken when last_ok == 0.  je rel8. */
+        seg_byte(SEG_CODE, 0x74); seg_byte(SEG_CODE, 0x0d);
+    } else {
+        /* SM_JUMP_F: skip taken when last_ok != 0.  jne rel8. */
+        seg_byte(SEG_CODE, 0x75); seg_byte(SEG_CODE, 0x0d);
+    }
+
+    /* --- taken branch --- */
+    /* mov dword [r13+20], target_pc  (41 c7 45 14 <imm32>)  8 bytes */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xc7);
+    seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x14);
+    seg_u32(SEG_CODE, (uint32_t)target_pc);
+    /* jmp rel32 <placeholder>  (e9 <rel32>)  5 bytes — PATCH #1 */
+    seg_byte(SEG_CODE, 0xe9);
+    size_t target_rel32_off = seg_offset(SEG_CODE);
+    seg_u32(SEG_CODE, 0);
+
+    /* --- fall-through branch --- */
+    /* mov dword [r13+20], fallthru_pc  (41 c7 45 14 <imm32>)  8 bytes */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xc7);
+    seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x14);
+    seg_u32(SEG_CODE, (uint32_t)fallthru_pc);
+    /* jmp rel32 <placeholder>  (e9 <rel32>)  5 bytes — PATCH #2 */
+    seg_byte(SEG_CODE, 0xe9);
+    /* size_t fallthru_rel32_off = seg_offset(SEG_CODE);  -- unused; deterministic */
+    seg_u32(SEG_CODE, 0);
+
+    return target_rel32_off;
+}
+
+/*
  * emit_halt_blob — emit the SM_HALT blob: advance pc past HALT,
  * then ret (returns out of sm_jit_run via sm_jit_run's `call entry()`).
  * ME-4-post-r12-tos: PC at [r13+20].  No value-stack interaction.
@@ -1924,12 +2083,16 @@ int sm_codegen(SM_Program *prog)
 
     /* Pass 1 — emit one variable-size blob per instruction; record its
      * absolute address in g_blob_addrs[i].  Remember each SM_JUMP's
-     * rel32 patch offset and target_pc. */
+     * rel32 patch offset and target_pc.  Buffer sized 2x prog->count
+     * because ME-5 cond-jumps (SM_JUMP_S/SM_JUMP_F) push 2 entries each
+     * (one for the target arm, one for the fall-through arm); SM_JUMP
+     * pushes 1.  Worst case: every instruction is a cond-jump → 2x
+     * entries. */
     int *jump_indices = NULL;
     size_t *jump_rel32_offs = NULL;
     int    jump_count = 0;
-    jump_indices    = (int    *)calloc((size_t)prog->count, sizeof(int));
-    jump_rel32_offs = (size_t *)calloc((size_t)prog->count, sizeof(size_t));
+    jump_indices    = (int    *)calloc((size_t)prog->count * 2, sizeof(int));
+    jump_rel32_offs = (size_t *)calloc((size_t)prog->count * 2, sizeof(size_t));
     if (!jump_indices || !jump_rel32_offs) {
         fprintf(stderr, "sm_codegen: jump-patch buffers allocation failed\n");
         free(jump_indices); free(jump_rel32_offs);
@@ -1950,6 +2113,54 @@ int sm_codegen(SM_Program *prog)
             jump_indices[jump_count]    = i;
             jump_rel32_offs[jump_count] = rel32_off;
             jump_count++;
+        } else if (op == SM_JUMP_S || op == SM_JUMP_F) {
+            /* ME-5: inline-native conditional jump.  Reads st->last_ok via
+             * [r13+16] (no PLT call needed since r13 = &SM_State).  Direct
+             * rel32 to both target and fall-through — bypasses the
+             * trampoline indirect-jump dispatch for both arms.
+             *
+             * Two rel32 patches per blob:
+             *   - target: first rel32 (offset returned by skeleton)
+             *   - fallthru: second rel32 (deterministic at first_off + 13)
+             *
+             * Pass 2 patches both.  We record each as a separate jump
+             * entry; the patcher distinguishes by stuffing a tag in the
+             * upper bits of jump_indices[] — no, cleaner: record both as
+             * positive entries with i = (PC of source blob) and an
+             * auxiliary array `jump_is_fallthru[j]` that says which arm.
+             * Simpler still: emit two records into the existing arrays,
+             * each with its own (rel32_off, target_pc).  We extend
+             * jump_indices to carry the literal target_pc to use, not the
+             * source-PC index. */
+            int take_on_nonzero = (op == SM_JUMP_S) ? 1 : 0;
+            int32_t target_pc   = (int32_t)prog->instrs[i].a[0].i;
+            int32_t fallthru_pc = i + 1;
+            size_t target_rel32_off  = emit_cond_jump_blob_skeleton(
+                                          take_on_nonzero, target_pc, fallthru_pc);
+            size_t fallthru_rel32_off = target_rel32_off + 13;
+
+            /* Record both patch sites.  jump_indices[j] is repurposed to
+             * carry the destination_pc directly (not the source-PC index)
+             * for ME-5 cond-jump entries.  We tag this by storing
+             * (-(target_pc + 1)) in jump_indices to distinguish from the
+             * SM_JUMP entries (which store the source-PC index i >= 0).
+             * Pass 2 detects the tag and reads the target from the
+             * record directly. */
+            jump_indices[jump_count]    = -(target_pc + 1);   /* tagged: target = -ji - 1 */
+            jump_rel32_offs[jump_count] = target_rel32_off;
+            jump_count++;
+            jump_indices[jump_count]    = -(fallthru_pc + 1);
+            jump_rel32_offs[jump_count] = fallthru_rel32_off;
+            jump_count++;
+        } else if (op == SM_LABEL || op == SM_STNO) {
+            /* ME-5: stack-neutral handlers — use the no-stack variant of
+             * the standard blob (skips the r12↔sp sync protocol; ~18B
+             * smaller per blob).  h_label is a no-op; h_stno reads pc
+             * operand, fires monitor hook, sets st->sp=0 (mode-2
+             * statement-boundary contract).  Neither reads nor writes
+             * st->stack contents.  The post-call reload of r12 from
+             * st->stack + st->sp*16 handles h_stno's sp reset correctly. */
+            emit_standard_blob_no_stack(g_handlers[op], g_trampoline_offset);
         } else if (op == SM_ADD || op == SM_SUB || op == SM_MUL ||
                    op == SM_DIV || op == SM_MOD) {
             /* ME-4: inline-native arithmetic.  Args loaded from r12-stack,
@@ -1974,20 +2185,35 @@ int sm_codegen(SM_Program *prog)
     }
     g_blob_count = prog->count;
 
-    /* Pass 2 — patch SM_JUMP rel32 displacements.  target_blob_addr is
-     * g_blob_addrs[target_pc] (absolute address).  The rel32 is relative
-     * to the byte AFTER the rel32 in SEG_CODE = base + rel32_off + 4. */
+    /* Pass 2 — patch SM_JUMP and ME-5 cond-jump rel32 displacements.
+     *
+     *   jump_indices[j] >= 0  → SM_JUMP entry; source pc = jump_indices[j];
+     *                            target_pc read from prog->instrs[i].a[0].i.
+     *   jump_indices[j] < 0   → ME-5 cond-jump entry (tagged);
+     *                            target_pc = -jump_indices[j] - 1.
+     *
+     * target_blob_addr is g_blob_addrs[target_pc] (absolute address).  The
+     * rel32 is relative to the byte AFTER the rel32 in SEG_CODE = base +
+     * rel32_off + 4. */
     uint8_t *seg_base = scrip_segs[SEG_CODE].base;
     for (int j = 0; j < jump_count; j++) {
-        int    i        = jump_indices[j];
+        int    ji        = jump_indices[j];
         size_t rel32_off = jump_rel32_offs[j];
-        int32_t target_pc = (int32_t)prog->instrs[i].a[0].i;
+        int32_t target_pc;
+        int     source_pc;
+        if (ji >= 0) {
+            source_pc = ji;
+            target_pc = (int32_t)prog->instrs[ji].a[0].i;
+        } else {
+            source_pc = -1;  /* tagged cond-jump record — no source-pc context */
+            target_pc = -ji - 1;
+        }
         if (target_pc < 0 || target_pc >= prog->count) {
             /* Out-of-range target — pass 2 silently leaves rel32=0; this
              * was already broken before ME-3 (the handler would set pc
              * to a bogus value).  Diagnostic message preserves the trail. */
-            fprintf(stderr, "sm_codegen: SM_JUMP at pc=%d targets out-of-range pc=%d (count=%d)\n",
-                    i, target_pc, prog->count);
+            fprintf(stderr, "sm_codegen: jump at pc=%d targets out-of-range pc=%d (count=%d)\n",
+                    source_pc, target_pc, prog->count);
             continue;
         }
         int64_t target_abs   = (int64_t)(uintptr_t)g_blob_addrs[target_pc];
