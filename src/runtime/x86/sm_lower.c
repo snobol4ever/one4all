@@ -1419,13 +1419,47 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
         sm_emit_i(p, SM_BB_PUMP_AST, (int64_t)ast_pump_table_register((AST_t *)e));
         return;
 
+    /* GOAL-ICON-BB-COMPLETE Phase A (A2): AST_SECTION / AST_SECTION_MINUS /
+     * AST_SECTION_PLUS migrated off legacy fallthrough.
+     * These are scalar (one-shot) operations.  Lower children via lower_expr
+     * so SM_LOAD_FRAME / SM_PUSH_VAR correctly resolve local and global vars,
+     * then call a typed SM runtime helper that mirrors bb_section().
+     * Three children: children[0]=string, children[1]=lo, children[2]=hi. */
+    case AST_SECTION:
+        if (e->nchildren >= 3) {
+            lower_expr(p, lt, e->children[0]);
+            lower_expr(p, lt, e->children[1]);
+            lower_expr(p, lt, e->children[2]);
+            sm_emit_si(p, SM_CALL_FN, "ICN_SECTION_RANGE", 3);
+        } else {
+            sm_emit(p, SM_PUSH_NULL);
+        }
+        return;
+    case AST_SECTION_PLUS:
+        if (e->nchildren >= 3) {
+            lower_expr(p, lt, e->children[0]);
+            lower_expr(p, lt, e->children[1]);
+            lower_expr(p, lt, e->children[2]);
+            sm_emit_si(p, SM_CALL_FN, "ICN_SECTION_PLUS", 3);
+        } else {
+            sm_emit(p, SM_PUSH_NULL);
+        }
+        return;
+    case AST_SECTION_MINUS:
+        if (e->nchildren >= 3) {
+            lower_expr(p, lt, e->children[0]);
+            lower_expr(p, lt, e->children[1]);
+            lower_expr(p, lt, e->children[2]);
+            sm_emit_si(p, SM_CALL_FN, "ICN_SECTION_MINUS", 3);
+        } else {
+            sm_emit(p, SM_PUSH_NULL);
+        }
+        return;
+
     /* Icon generators — remaining kinds still use legacy emit_push_expr + SM_BB_PUMP.
      * Same pattern as AST_SUSPEND was: each will get its own lowering rung. */
     case AST_LIMIT:
     case AST_RANDOM:
-    case AST_SECTION:
-    case AST_SECTION_MINUS:
-    case AST_SECTION_PLUS:
         emit_push_expr(p, e);
         sm_emit(p, SM_BB_PUMP);
         return;

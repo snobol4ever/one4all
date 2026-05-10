@@ -1293,6 +1293,53 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                 break;
             }
 
+            /* GOAL-ICON-BB-COMPLETE A2: ICN_SECTION_RANGE/PLUS/MINUS
+             * Stack (pushed by sm_lower in order): string, lo, hi → TOS=hi
+             * Mirrors bb_section() in coro_value.c exactly.
+             * Uses the same Icon position rules: p>0 → 1-based; p==0 → slen+1; p<0 → slen+1+p. */
+            if (name && (strcmp(name, "ICN_SECTION_RANGE") == 0 ||
+                         strcmp(name, "ICN_SECTION_PLUS")  == 0 ||
+                         strcmp(name, "ICN_SECTION_MINUS") == 0)) {
+                DESCR_t hi_d = sm_pop(st);
+                DESCR_t lo_d = sm_pop(st);
+                DESCR_t sd   = sm_pop(st);
+                if (IS_FAIL_fn(sd) || IS_FAIL_fn(lo_d) || IS_FAIL_fn(hi_d)) {
+                    sm_push(st, FAILDESCR); st->last_ok = 0; break;
+                }
+                const char *s = (sd.v == DT_S || sd.v == DT_SNUL) ? VARVAL_fn(sd) : NULL;
+                if (!s) s = "";
+                int slen = (int)strlen(s);
+                int i = (int)to_int(lo_d);
+                int x = (int)to_int(hi_d);
+                if (i == 0) i = slen + 1; else if (i < 0) i = slen + 1 + i;
+                int lo, hi;
+                if (strcmp(name, "ICN_SECTION_RANGE") == 0) {
+                    if (x == 0) x = slen + 1; else if (x < 0) x = slen + 1 + x;
+                    if (i < 1 || i > slen+1 || x < 1 || x > slen+1) {
+                        sm_push(st, FAILDESCR); st->last_ok = 0; break;
+                    }
+                    lo = i < x ? i : x;
+                    hi = i < x ? x : i;
+                } else if (strcmp(name, "ICN_SECTION_PLUS") == 0) {
+                    if (i < 1 || i > slen+1) { sm_push(st, FAILDESCR); st->last_ok = 0; break; }
+                    if (x >= 0) { lo = i;     hi = i + x; }
+                    else        { lo = i + x; hi = i;     }
+                    if (lo < 1 || hi > slen+1) { sm_push(st, FAILDESCR); st->last_ok = 0; break; }
+                } else { /* ICN_SECTION_MINUS */
+                    if (i < 1 || i > slen+1) { sm_push(st, FAILDESCR); st->last_ok = 0; break; }
+                    if (x >= 0) { lo = i - x; hi = i;     }
+                    else        { lo = i;     hi = i - x; }
+                    if (lo < 1 || hi > slen+1) { sm_push(st, FAILDESCR); st->last_ok = 0; break; }
+                }
+                int len = hi - lo;
+                char *buf = GC_malloc(len + 1);
+                memcpy(buf, s + lo - 1, len);
+                buf[len] = '\0';
+                DESCR_t r = STRVAL(buf);
+                sm_push(st, r); st->last_ok = 1;
+                break;
+            }
+
             DESCR_t args[32];
             for (int k = nargs - 1; k >= 0; k--)
                 args[k] = sm_pop(st);
