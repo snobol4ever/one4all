@@ -279,25 +279,9 @@ static void data_buf_remember_label(const char *name)
     g_flat_data_block_nlbls++;
 }
 
-/* Emit the `# data: name1, name2, ...` comment for the just-closed block to
- * the main text stream (via flat3c so lone-label fusion still works). */
 static void data_buf_emit_block_comment(emitter_v *e)
 {
-    if (!e->is_text) return;
-    if (g_flat_data_block_nlbls == 0) return;
-    char comment[512];
-    size_t o = snprintf(comment, sizeof(comment), "# data:");
-    for (int i = 0; i < g_flat_data_block_nlbls && o + 4 < sizeof(comment); i++) {
-        const char *lbl = g_flat_data_block_lbls[i];
-        if (!lbl[0]) continue;
-        o += snprintf(comment + o, sizeof(comment) - o,
-                      "%s %s", (i ? "," : ""), lbl);
-    }
-    /* Emit as a banner-style line via the emitter's raw fprintf so it sits in
-     * col 0 (matches per-box banner style).  Routes through fprintf_raw which
-     * (per EM-FORMAT-BB-LONE-LABELS) flushes pending cjmp only — pending label
-     * still fuses with the NEXT real line below the comment. */
-    EV_TEXT(e, "%s\n", comment);
+    (void)e;
     g_flat_data_block_nlbls = 0;
 }
 
@@ -722,10 +706,7 @@ static void flat_emit_banner_rule(emitter_v *e, char ch)
 static void flat_emit_pat_banner(emitter_v *e, const char *prefix, PATND_t *p)
 {
     if (!e->is_text) return;
-    char src[1024];
-    patnd_to_sno_string(p, src, sizeof(src));
-    flat_emit_banner_rule(e, '=');
-    EV_TEXT(e, "# pattern %s: %s\n", prefix ? prefix : "?", src);
+    (void)prefix; (void)p;
     flat_emit_banner_rule(e, '=');
 }
 

@@ -587,7 +587,6 @@ static int emit_file_footer(FILE *out)
 {
     /* EM-FORMAT-BB lone-label fusion: flush any pending label before footer. */
     bb3c_flush_pending();
-    if (fprintf(out, "#-- epilogue -------------------------------------------\n") < 0) return -1;
     if (emit_three_column_line(out, "", "call", "rt_finalize@PLT", NULL) != 0) return -1;
     if (emit_three_column_line(out, "", "pop",  "rbp", NULL) != 0) return -1;
     if (emit_three_column_line(out, "", "ret",  "",    NULL) != 0) return -1;
@@ -716,11 +715,8 @@ static int emit_minor_break(FILE *out, const char *caption)
  * BB code, BB data, SM code). */
 static int emit_section_break(FILE *out, const char *caption)
 {
-    if (fputs("#=======================================================================================================================\n",
-              out) == EOF) return -1;
-    if (caption && *caption)
-        if (fprintf(out, "# %s\n", caption) < 0) return -1;
-    return 0;
+    (void)caption;
+    return fputs("#=======================================================================================================================\n", out) == EOF ? -1 : 0;
 }
 
 /* Render a printable, single-line preview of a string literal for use in
