@@ -21,6 +21,24 @@ on identical reasoning), Phases 2 / 3 / 4 are deferred until a corpus
 program forces the issue.  This doc IS the deferral artifact — future
 sessions should consult it before re-running the same audit.
 
+**Important — deferred ≠ optional.**  The kinds named in this doc
+(AST_BANG_BINARY, AST_LCONCAT-generative, AST_LIMIT, AST_RANDOM,
+AST_SECTION*) are **required for Mode 4** (`--jit-emit --x64`) on
+Icon and Prolog.  An emitted standalone binary cannot fall back to
+`coro_eval` IR-walking — every kind a program uses must be present
+as compiled SM in the artifact.  The reason the audit currently
+shows zero fires is precisely the architectural workaround that
+Mode 4 cannot use: proc bodies execute via `coro_pump_proc_by_name`
+→ `coro_eval(body)`, an in-host-process tree walk.  When
+**CH-17g-irrun-execution** lands and routes proc bodies through SM
+dispatch, every Icon program with a generator inside `main()` will
+fire SM_PUSH_EXPR for the un-migrated kinds — and those phases
+become unblocked with concrete anchors.
+
+The deferral is **sequencing**, not omission: each phase has a
+required slot in the M4.5 ladder before Mode 4 for Icon/Prolog ships.
+See §"Architectural sequencing" below.
+
 ---
 
 ## What the open phases would migrate
@@ -175,6 +193,108 @@ for proc bodies) gates these phases just as Step 17 gated CH-15b.
 Until proc bodies execute via SM dispatch, the kinds enumerated above
 are **structurally unreachable** from any SM lowering site, regardless
 of how that lowering is shaped.
+
+---
+
+## Architectural sequencing — why this matters for Mode 4
+
+The reachability finding above ("zero SM_PUSH_EXPR fires across 706
+programs") is true today but it is **not a statement about whether
+the kinds are needed** — it is a statement about whether the *current*
+runtime exercises them.  Today's runtime executes Icon/Prolog proc
+bodies via:
+
+```
+SM_BB_PUMP_PROC "main"
+  → coro_pump_proc_by_name("main", ...)
+    → coro_eval(main_body)            ← AST_t* tree walk in host process
+      → bb_eval_value(child)          ← recursive AST_t* walk
+        → coro_bb_bang_binary(...)    ← per-kind generator drivers
+        → coro_bb_to_by(...)
+        → ...
+```
+
+This walker lives in `libscrip_rt.so` / the in-process interpreter.
+It is reachable from `--ir-run` and `--sm-run` and `--jit-run`
+(Mode 1, Mode 2, Mode 3) because all three execute scrip in-process
+and link the runtime in.
+
+**Mode 4 cannot link this walker in.**  An emitted asm/x86 binary
+(`./prog`) is a standalone executable that calls into
+`libscrip_rt.so` for **language-level builtins** (string concat,
+table lookup, NV resolution, pattern matcher, etc.) — but it does
+not embed an AST_t walker.  GOAL-CHUNKS.md is explicit:
+
+> Mode 4 emission becomes possible because the emitted asm
+> executable contains no EXPR_t walker — it contains compiled
+> chunks plus calls into a runtime support library
+> (`libscrip_rt.so` or the JVM/.NET/JS host equivalent) that
+> implements language-level builtins (pattern matcher, NV table,
+> iterator advance, cset membership, etc.).
+
+Therefore, every Icon/Prolog program that mode 4 must run end-to-end
+— the 177-PASS `--ir-run` Icon set + the 4-PASS Prolog smoke set —
+must compile fully to SM.  Every kind those programs use, in every
+context (scalar value, generative, statement-level), must lower to
+SM ops the emitted backend can codegen.
+
+The legacy fallthrough block at `sm_lower.c:1410-1418` cannot
+contain any kinds by the time **CH-17i-mode4-icon-prolog** ships.
+
+### The sequence
+
+The goal file already names the order; this audit doc surfaces it
+explicitly so future sessions don't read the deferral as
+"indefinite":
+
+```
+1. CH-17g-irrun-execution           (proc bodies → SM dispatch)
+       ↓ kinds in legacy fallthrough start firing
+       ↓ audit becomes positive evidence
+2. CH-17i-bang-concat Phases 2,3,4  (this doc's deferred phases)
+   CH-17i-section
+   CH-17i-limit-random
+   CH-17i-prolog-initialization
+       ↓ legacy fallthrough block empty for Icon+Prolog
+3. CH-17i-mode3-completeness        (Icon/Prolog --sm-run == --ir-run PASS)
+       ↓
+4. CH-17i-mode4-icon-prolog         (--jit-emit --x64 covers Icon+Prolog)
+       ↓
+5. CH-17i-final-isolation           (locks the property in CI)
+```
+
+Each step is a prerequisite for the next.  The "deferred" status of
+Phases 2 / 3 / 4 means "blocked on step 1", not "optional".  Once
+CH-17g-irrun-execution lands, the deferred phases become the
+critical path for Mode 4 on Icon/Prolog.
+
+### Why not just do them now?
+
+Two reasons, both empirical:
+
+1. **No test would exercise the new code.**  The unified
+   `SM_BB_PUMP_AST` opcode + `g_ast_pump_table` infrastructure
+   would land with zero coverage.  CH-15-SURVEY explicitly named
+   this as the wrong move ("infrastructure-prep, not a behaviour
+   change … the standard 'real program + diff against oracle'
+   validation pattern does not apply").  The fix history of
+   `coro_bb_*` generator drivers shows they were tuned against
+   real failing programs; building their SM analogues blind is
+   how subtle semantic divergences slip through.
+
+2. **The right shape may differ post-CH-17g.**  CH-17g-irrun-execution's
+   choices about how proc bodies thread through SM dispatch
+   (e.g., how `FRAME` state is preserved, how nested generator
+   contexts surface in the value stack) will inform what the
+   per-kind lowering looks like.  Building the per-kind lowering
+   first risks designing against the wrong contract and rewriting
+   later.
+
+The deferral pays for itself when CH-17g lands: the per-kind
+lowering can be written against real failing programs (each "first
+non-zero `FIRES:` count" becomes a concrete anchor), with
+oracle-diff validation, in the shape CH-17g's runtime contract
+actually demands.
 
 ---
 
