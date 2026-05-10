@@ -412,6 +412,17 @@ static void patnd_to_sno_string(const PATND_t *p, char *buf, size_t cap)
  * chars — total 120 visible columns. */
 #define BB_BANNER_RULE_LEN 118
 
+/* EM-FORMAT-BB-PORT-COMPLETION-LONE-LABEL-FIX (sess 2026-05-09):
+ * Banner emission must NOT flush the bb3c pending-label buffer.  A pending
+ * label belongs to the address that the NEXT content line will define;
+ * the banner is comments that physically precede that label.  Flushing
+ * here writes the label as a standalone lone-label line BEFORE the banner,
+ * regressing the EM-FORMAT-BB-LONE-LABELS rung.  Pending label simply
+ * sits in the buffer through banner emission (which goes directly to the
+ * FILE* via fprintf_raw); the next flat3c_action call consumes it via
+ * bb3c_format's empty-col-1 fusion path.  Result: banner first, then
+ * `<label>:    <first content line>` on a single fused line.
+ */
 static void flat_emit_banner_rule(emitter_v *e, char ch)
 {
     if (!e->is_text) return;
@@ -420,8 +431,6 @@ static void flat_emit_banner_rule(emitter_v *e, char ch)
     buf[1] = ' ';
     for (int i = 0; i < BB_BANNER_RULE_LEN; i++) buf[2 + i] = ch;
     buf[2 + BB_BANNER_RULE_LEN] = '\0';
-    /* Flush any pending label so it doesn't appear AFTER this banner. */
-    bb3c_flush_pending();
     EV_TEXT(e, "%s\n", buf);
 }
 
