@@ -348,25 +348,29 @@ static char  g_bb3c_pending_cjmp_target[256] = "";
 static FILE *g_bb3c_pending_cjmp_out         = NULL;
 
 /* EM-FORMAT-BB-LAW (sess 2026-05-09):
- * Per archive/BB-GEN-X86-TEXT.md: every BB jxx (jmp / je / jne / jl / jge / jg
- * / jle / jbe) lives in column 3.  Column 2 (the action mnemonic field) is
- * reserved for non-jump instructions.
+ * Per archive/BB-GEN-X86-TEXT.md "The Three-Column NASM Layout — The Law":
+ *   "Column 3 (goto): col 60+. Semicolon comment OR live `jmp`."
  *
- *   LABEL:                  ACTION                          GOTO
- *   col 0..23              col 24..39                      col 41+
+ * The layout is conceptually 3 columns (LABEL / ACTION / GOTO) but the
+ * ACTION column carries macro-name + params together.  In our emitter,
+ * mnemonic and args live in separate sub-columns (16-wide MNEMONIC,
+ * variable-wide ARGS) so the layout is effectively four sub-columns:
  *
- * Two BB-jxx cases:
- *   (1) Fused cond+uncond: col-2 = cond mnemonic (`je`/`jne`/...), col-3 =
- *       "<succ_target>; jmp <fail_target>".  ONE space after `;`, no
- *       column padding.  The cond mnemonic in col-2 is technically the
- *       only jxx slot in col-2, but it pairs with its uncond partner in
- *       col-3 and is read together as a single decision.
- *   (2) Standalone uncond / bare label+jmp: col-2 empty, col-3 =
- *       "jmp <target>".  No leading padding — the jmp lives at the start
- *       of col-3 (file col 41).
+ *   col-1 LABEL (24)  col-2 MNEMONIC (16)  col-3 ARGS (27)  col-4 GOTO
+ *   file col 0..23    file col 24..39      file col 41..67  file col 68+
+ *
+ * BB-jxx cases:
+ *   (1) Fused cond+uncond: col-2 = cond mnemonic, col-3 = "<succ_target>;",
+ *       col-4 = "jmp <fail_target>".  The `;` lands in col-3 after the
+ *       cond's arg.  col-4 starts at vcol 68.
+ *   (2) Bare label+jmp / standalone uncond: col-2 empty, col-3 empty,
+ *       col-4 = "jmp <target>".  jmp lands at vcol 68.
+ *   (3) Standalone cond-jmp (defensive, doesn't fire on tracked corpora):
+ *       col-2 = cond mnemonic, col-3 = target, col-4 empty.
  *
  * Triple fusion (action+cond+uncond on one line) is NOT done here — it
  * is a future sub-rung (EM-FORMAT-BB-LAW-TRIPLE-FUSION). */
+#define BB_COL3_WIDTH 27
 
 /* Count visual columns (display width) of a UTF-8 string.
  * For our purposes: bytes 0x00..0x7F are 1 column each; UTF-8 lead bytes
@@ -439,12 +443,11 @@ static void bb3c_write_line(FILE *out, const char *L, const char *A, const char 
 static void bb3c_flush_pending_cond_jmp(void)
 {
     if (g_bb3c_pending_cjmp_mn[0] && g_bb3c_pending_cjmp_out) {
-        /* EM-FORMAT-BB-LAW: every BB jxx lives in col-3.  Standalone cond-jmp
-         * (no uncond partner to fuse with): empty col-2, col-3 = "<mn> <target>". */
-        char goto_col3[288];
-        snprintf(goto_col3, sizeof(goto_col3), "%s %s",
-                 g_bb3c_pending_cjmp_mn, g_bb3c_pending_cjmp_target);
-        bb3c_write_line(g_bb3c_pending_cjmp_out, "", "", goto_col3);
+        /* EM-FORMAT-BB-LAW: standalone cond-jmp (no uncond partner).
+         * col-2 = cond mnemonic, col-3 = target, col-4 empty. */
+        bb3c_write_line(g_bb3c_pending_cjmp_out, "",
+                        g_bb3c_pending_cjmp_mn,
+                        g_bb3c_pending_cjmp_target);
         g_bb3c_pending_cjmp_mn[0]     = '\0';
         g_bb3c_pending_cjmp_target[0] = '\0';
         g_bb3c_pending_cjmp_out       = NULL;
@@ -527,23 +530,43 @@ void bb3c_emit_jmp(FILE *out, const char *mn, const char *target)
 
     /* Unconditional jmp (or any non-cond mnemonic that arrived through here). */
     if (g_bb3c_pending_cjmp_mn[0] && g_bb3c_pending_cjmp_out == out) {
-        /* EM-FORMAT-BB-LAW: every BB jxx lives in col-3.  Fused cond+uncond:
-         * col-2 empty, col-3 = "<cond_mn> <succ_target>; jmp <fail_target>".
-         * ONE space between `;` and `jmp`, ONE space between mnemonic and target. */
-        char fused_col3[512];
-        snprintf(fused_col3, sizeof(fused_col3), "%s %s; %s %s",
-                 g_bb3c_pending_cjmp_mn, g_bb3c_pending_cjmp_target, m, t);
+        /* EM-FORMAT-BB-LAW (4-column layout):
+         *   col-1 LABEL (24)  col-2 ACTION (16)  col-3 ARGS (27)  col-4 GOTO
+         * Fused cond+uncond:
+         *   col-2 = cond mnemonic (`je`/`jne`/...)
+         *   col-3 = "<succ_target>;" (left-anchored, padded to 27 visual cols)
+         *   col-4 = "jmp <fail_target>"
+         * The `;` lands in col-3 right after the cond's arg; col-4 starts at
+         * file vcol 68 so the uncond `jmp` aligns vertically with the GOTO
+         * column of bare label+jmp lines below.  ONE space between mnemonic
+         * and arg in col-2/col-3 (managed by bb3c_format's separator).
+         * ONE space between `jmp` and arg in col-4. */
+        char rest[512];
+        char col3[288];
+        int n = snprintf(col3, sizeof(col3), "%s;",
+                         g_bb3c_pending_cjmp_target);
+        if (n < 0) n = 0;
+        /* Pad col3 to BB_COL3_WIDTH visual cols.  bb3c_pad_to_width handles
+         * UTF-8 multi-byte codepoints (Greek labels) correctly. */
+        int o = bb3c_pad_to_width(rest, sizeof(rest), col3, BB_COL3_WIDTH);
+        snprintf(rest + o, sizeof(rest) - o, "jmp %s", t);
+        char saved_mn[16];
+        snprintf(saved_mn, sizeof(saved_mn), "%s", g_bb3c_pending_cjmp_mn);
         g_bb3c_pending_cjmp_mn[0]     = '\0';
         g_bb3c_pending_cjmp_target[0] = '\0';
         g_bb3c_pending_cjmp_out       = NULL;
-        bb3c_format(out, "", "", fused_col3);
+        bb3c_format(out, "", saved_mn, rest);
         return;
     }
-    /* No pending: standalone unconditional jmp.  EM-FORMAT-BB-LAW: empty col-2,
-     * `jmp <target>` in col-3.  Per the LAW: every BB jxx is in col-3. */
-    char goto_col3[512];
-    snprintf(goto_col3, sizeof(goto_col3), "%s %s", m, t);
-    bb3c_format(out, "", "", goto_col3);
+    /* No pending: standalone unconditional jmp.  EM-FORMAT-BB-LAW (4-column):
+     * Bare label+jmp / trampoline:
+     *   col-2 empty, col-3 empty (padded to 27 visual cols), col-4 = "jmp <target>".
+     * The `jmp` lands at file vcol 68 (= col-2 16 + 1 sep + col-3 27 + 0 because
+     * col-3 has no content — but we pad it out so col-4 starts at the anchor). */
+    char rest[512];
+    int o = bb3c_pad_to_width(rest, sizeof(rest), "", BB_COL3_WIDTH);
+    snprintf(rest + o, sizeof(rest) - o, "%s %s", m, t);
+    bb3c_format(out, "", "", rest);
 }
 
 void bb3c_format(FILE *out, const char *label, const char *action, const char *goto_)
