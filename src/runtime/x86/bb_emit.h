@@ -240,4 +240,11 @@ void bb_text_comment(const char *fmt, ...);
 void bb3c_text(const char *label, const char *action, const char *goto_);
 void bb3c_format(FILE *out, const char *label, const char *action, const char *goto_);
 
+/* EM-FORMAT-BB lone-label fusion (2026-05-09):
+ * Flush any pending label held by `bb3c_format`'s fusion buffer.  Call
+ * once at end-of-file before closing the output stream so a trailing
+ * label-only emission doesn't get silently dropped.  No-op if buffer
+ * is empty. */
+void bb3c_flush_pending(void);
+
 #endif /* BB_EMIT_H */

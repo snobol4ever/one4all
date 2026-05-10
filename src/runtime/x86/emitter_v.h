@@ -163,6 +163,12 @@ emitter_v *emitter_binary_new(bb_buf_t buf, int size);
 void       emitter_free      (emitter_v *e);
 int        emitter_end       (emitter_v *e);
 
+/* EM-FORMAT-BB lone-label fusion (2026-05-09):
+ * Returns the FILE* that a TEXT-mode emitter writes to (for callers
+ * in bb_flat.c that need to route through bb3c_format directly).
+ * Returns NULL for non-text (binary) emitters. */
+FILE *emitter_text_file(emitter_v *e);
+
 /* ── convenience macros ───────────────────────────────────────────────────── */
 
 #define EV_LABEL(e, lbl)      (e)->label_define((e), (lbl))

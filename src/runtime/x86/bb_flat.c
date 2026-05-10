@@ -92,15 +92,13 @@ void bb_flat_set_intern_str(const char *(*fn)(emitter_v *, const char *))
 static void flat3c(emitter_v *e, const char *lbl, const char *act, const char *got)
 {
     if (!e->is_text) return;
-    /* EM-7c-no-trailing-ws (2026-05-09): build + right-trim before write. */
-    char line[768];
-    int n = snprintf(line, sizeof(line), "%-24s%-16s %s",
-                     lbl ? lbl : "", act ? act : "", got ? got : "");
-    if (n < 0) return;
-    if (n >= (int)sizeof(line)) n = (int)sizeof(line) - 1;
-    while (n > 0 && (line[n-1] == ' ' || line[n-1] == '\t')) n--;
-    line[n] = '\0';
-    e->fprintf_raw(e, "%s\n", line);
+    /* EM-FORMAT-BB lone-label fusion (2026-05-09): route through
+     * bb3c_format so the pending-label buffer covers data-section labels
+     * (e.g. .Lcap1_data:, .Llen2_z:) and child-entry labels (cap1_child_α:)
+     * that previously emitted standalone label-only lines. */
+    FILE *f = emitter_text_file(e);
+    if (!f) return;
+    bb3c_format(f, lbl ? lbl : "", act ? act : "", got ? got : "");
 }
 
 static void flat3c_action(emitter_v *e, const char *act, const char *args)
@@ -1040,6 +1038,10 @@ int bb_build_flat_text(PATND_t *p, FILE *out, const char *prefix)
     int rc = flat_emit_body_v(e, p, prefix, 1);
     emitter_end(e);
     emitter_free(e);
+    /* EM-FORMAT-BB lone-label fusion: flush any pending label before returning,
+     * so callers (notably bb_flat_text_test) that don't go through the
+     * sm_codegen_x64_emit path still get every label written to disk. */
+    bb3c_flush_pending();
     return rc;
 }
 

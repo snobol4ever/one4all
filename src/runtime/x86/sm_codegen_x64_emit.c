@@ -411,16 +411,12 @@ static int emit_three_column_line(FILE *out,
         c3[0] = '\0';
     }
 
-    const char *lbl = (label  && *label)  ? label  : "";
-    const char *op  = (opcode && *opcode) ? opcode : "";
-    /* EM-7c-no-trailing-ws (2026-05-09): build + right-trim. */
-    char line[768];
-    int n = snprintf(line, sizeof(line), "%-24s%-16s %s", lbl, op, c3);
-    if (n < 0) return -1;
-    if (n >= (int)sizeof(line)) n = (int)sizeof(line) - 1;
-    while (n > 0 && (line[n-1] == ' ' || line[n-1] == '\t')) n--;
-    line[n] = '\0';
-    return (fputs(line, out) < 0 || fputc('\n', out) == EOF) ? -1 : 0;
+    /* EM-FORMAT-BB lone-label fusion (2026-05-09): route through
+     * bb3c_format so the pending-label buffer covers SM-side data
+     * directives (e.g. .Lchunk_registry:) that previously emitted
+     * standalone label-only lines. */
+    bb3c_format(out, label ? label : "", opcode ? opcode : "", c3);
+    return 0;
 }
 
 /* Emit .section .rodata with all interned strings as .Lstr_N: .string "..." */
@@ -589,6 +585,8 @@ static int emit_file_header(FILE *out, int count, int has_chunk_registry)
 
 static int emit_file_footer(FILE *out)
 {
+    /* EM-FORMAT-BB lone-label fusion: flush any pending label before footer. */
+    bb3c_flush_pending();
     if (fprintf(out, "# -- epilogue -------------------------------------------\n") < 0) return -1;
     if (emit_three_column_line(out, "", "call", "rt_finalize@PLT", NULL) != 0) return -1;
     if (emit_three_column_line(out, "", "pop",  "rbp", NULL) != 0) return -1;
@@ -656,19 +654,12 @@ static int sm_line(FILE *out, const char *label, const char *action,
         lbl = sm_emit_consume_pc_label();   /* "" if no pending label */
     }
     const char *act = (action && *action) ? action : "";
-    /* EM-7c-no-trailing-ws (2026-05-09): build + right-trim.
-     * EM-FORMAT-SM (sess 2026-05-09): unified shape -- empty col-1 emits
-     * 24 spaces of padding, NOT a tab + 15-char col-2.  This way labelled
-     * and unlabelled lines align at the same col-2 column position. */
-    char line[768];
-    int n;
-    n = snprintf(line, sizeof(line), "%-24s%-16s %s",
-                 (lbl && *lbl) ? lbl : "", act, gc);
-    if (n < 0) return -1;
-    if (n >= (int)sizeof(line)) n = (int)sizeof(line) - 1;
-    while (n > 0 && (line[n-1] == ' ' || line[n-1] == '\t')) n--;
-    line[n] = '\0';
-    return (fputs(line, out) < 0 || fputc('\n', out) == EOF) ? -1 : 0;
+    /* EM-FORMAT-BB lone-label fusion (2026-05-09): route through bb3c_format
+     * so SM-side dispatch lines participate in the same pending-label buffer
+     * as BB-side and data-section emissions.  bb3c_format applies the same
+     * %-24s%-16s %s shape + right-trim. */
+    bb3c_format(out, (lbl && *lbl) ? lbl : "", act, gc);
+    return 0;
 }
 
 /* -----------------------------------------------------------------------
@@ -683,6 +674,9 @@ static int sm_line(FILE *out, const char *label, const char *action,
 static int emit_major_break(FILE *out, int stno, int lineno,
                             const char *src_text)
 {
+    /* EM-FORMAT-BB lone-label fusion (2026-05-09): flush any pending label
+     * before banner so it doesn't appear after the banner it should precede. */
+    bb3c_flush_pending();
     /* EM-FORMAT-SM: 120-char `#=` banner per spec.  No blank lines. */
     if (fputs(
         "# ======================================================================================================================\n",
@@ -703,6 +697,9 @@ static int emit_major_break(FILE *out, int stno, int lineno,
 
 static int emit_minor_break(FILE *out, const char *caption)
 {
+    /* EM-FORMAT-BB lone-label fusion (2026-05-09): flush any pending label
+     * before banner so it doesn't appear after the banner it should precede. */
+    bb3c_flush_pending();
     /* EM-FORMAT-SM: 120-char `#-` banner. */
     if (fputs("# ----------------------------------------------------------------------------------------------------------------------\n",
               out) == EOF) return -1;
@@ -1669,6 +1666,10 @@ static int emit_pattern_blobs(FILE *out)
             w->is_invariant = 0;
         }
     }
+    /* EM-FORMAT-BB lone-label fusion (2026-05-09): flush any pending label
+     * before the SM-side dispatch begins, so an unfused trailing blob
+     * label doesn't cross the section boundary into `main:` content. */
+    bb3c_flush_pending();
     return 0;
 }
 
@@ -2070,17 +2071,6 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
         return -1;
     }
 
-    /* If we have source, print a header banner naming the file and stmt
-     * count -- a one-line "table of contents" for the human reader. */
-    if (sl_loaded) {
-        fprintf(out,
-            "# source-file: %s  (%d lines)\n"
-            "# Each statement appears below as a major banner ('====') above\n"
-            "# the asm it produced.  Inline annotations on the right column\n"
-            "# show the source-level object referenced by each macro call.\n",
-            sl.path, sl.count);
-    }
-
     for (int pc = 0; pc < prog->count; pc++) {
         const SM_Instr *ins = &prog->instrs[pc];
 
@@ -2095,10 +2085,11 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
         {
             const char *leftover = sm_emit_consume_pc_label();
             if (leftover && *leftover) {
-                if (fprintf(out, "%s\n", leftover) < 0) {
-                    if (sl_loaded) srclines_free(&sl);
-                    return -1;
-                }
+                /* EM-FORMAT-BB lone-label fusion (2026-05-09): route through
+                 * bb3c_format so the pending-label buffer participates.  The
+                 * leftover string is "LABEL:" form already; treat as a label-
+                 * only emission. */
+                bb3c_format(out, leftover, "", "");
             }
             if (pc_is_used_as_target(pc)) {
                 char lbl[32];
@@ -2259,15 +2250,15 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
     {
         const char *leftover = sm_emit_consume_pc_label();
         if (leftover && *leftover) {
-            if (fprintf(out, "%s\n", leftover) < 0) {
-                if (sl_loaded) srclines_free(&sl);
-                release_pc_used_as_target();
-                return -1;
-            }
+            /* EM-FORMAT-BB lone-label fusion: route through bb3c_format. */
+            bb3c_format(out, leftover, "", "");
         }
     }
 
     int frc = emit_file_footer(out);
+    /* EM-FORMAT-BB lone-label fusion (2026-05-09): flush any pending label
+     * held by bb3c_format's fusion buffer before closing.  No-op if empty. */
+    bb3c_flush_pending();
     if (sl_loaded) srclines_free(&sl);
     release_pc_used_as_target();
     return frc;

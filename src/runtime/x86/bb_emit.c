@@ -300,23 +300,162 @@ void bb_text_comment(const char *fmt, ...)
  *   bb3c_format(f, "",        "",                "jmp _β");     // pure goto
  *   bb3c_format(f, "_body:",  "cmp esi, 0",      "je _α_body"); // merged
  */
+/* EM-FORMAT-BB lone-label fusion (2026-05-09):
+ *
+ * Pending-label buffer.  When a caller emits a label-only line (col-1
+ * has content; col-2 and col-3 empty), we hold it instead of writing.
+ * The next call with non-empty col-2 or col-3 fuses the pending label
+ * into its col-1 (if the caller passed an empty col-1) or flushes the
+ * pending label as a standalone line first (if the caller passed a
+ * non-empty col-1, e.g. for a multi-label chain at the same address).
+ *
+ * Multiple consecutive label-only calls form a chain at the same
+ * address: each new label-only call flushes the prior pending label
+ * as a standalone line and replaces it.  The last label in the chain
+ * is the one that fuses with the first content line that follows.
+ *
+ * `bb3c_flush_pending()` MUST be called at end-of-file before closing
+ * `out` to flush any trailing pending label.  Currently called from
+ * sm_codegen_x64_emit's emit-finalize path (added EM-FORMAT-BB).
+ *
+ * The buffer is keyed off a single static FILE*; if a different output
+ * stream comes in mid-emission, the prior pending label is flushed to
+ * its original stream first.  Multi-stream emission isn't expected in
+ * mode-4 today; this is defensive.
+ */
+
+static char  g_bb3c_pending_label[256] = "";
+static FILE *g_bb3c_pending_out          = NULL;
+
+/* Count visual columns (display width) of a UTF-8 string.
+ * For our purposes: bytes 0x00..0x7F are 1 column each; UTF-8 lead bytes
+ * 0xC0..0xFF start a multi-byte sequence whose continuation bytes
+ * (0x80..0xBF) DO NOT add to width.  So width = number of bytes that
+ * are NOT continuation bytes.  This treats every UTF-8 codepoint as 1
+ * column wide — fine for the Greek letters (α/β/γ/ω/Σ/Δ) we use, all
+ * of which are visually 1 column in monospace. */
+static int bb3c_visual_width(const char *s)
+{
+    int w = 0;
+    if (!s) return 0;
+    for (const unsigned char *p = (const unsigned char *)s; *p; p++) {
+        if ((*p & 0xC0) != 0x80) w++;
+    }
+    return w;
+}
+
+/* Write s to buf, then pad with spaces so the visual width reaches `target`.
+ * Returns number of bytes written to buf. */
+static int bb3c_pad_to_width(char *buf, size_t bufsz, const char *s, int target)
+{
+    int sw = bb3c_visual_width(s);
+    int slen = (int)strlen(s ? s : "");
+    if (slen >= (int)bufsz) slen = (int)bufsz - 1;
+    int o = 0;
+    if (s && slen > 0) {
+        memcpy(buf + o, s, (size_t)slen);
+        o += slen;
+    }
+    int pad = target - sw;
+    while (pad-- > 0 && o < (int)bufsz - 1) {
+        buf[o++] = ' ';
+    }
+    if (o >= (int)bufsz) o = (int)bufsz - 1;
+    buf[o] = '\0';
+    return o;
+}
+
+static void bb3c_write_line(FILE *out, const char *L, const char *A, const char *G)
+{
+    /* EM-7c-no-trailing-ws: build + right-trim.
+     * EM-FORMAT-BB UTF-8 visual width: pad on visual columns, not bytes,
+     * so labels and macros containing α/β/γ/ω align correctly with ASCII.
+     * Cols: 24 for label, 16 for action.  Single space then col-3. */
+    char buf[768];
+    int o = 0;
+    o += bb3c_pad_to_width(buf + o, sizeof(buf) - o, L ? L : "", 24);
+    o += bb3c_pad_to_width(buf + o, sizeof(buf) - o, A ? A : "", 16);
+    /* Single space between col-2 and col-3 (matches prior format) */
+    if (o < (int)sizeof(buf) - 1) buf[o++] = ' ';
+    if (G && *G) {
+        int gl = (int)strlen(G);
+        if (gl > (int)sizeof(buf) - 1 - o) gl = (int)sizeof(buf) - 1 - o;
+        memcpy(buf + o, G, (size_t)gl);
+        o += gl;
+    }
+    /* Right-trim trailing whitespace before the newline. */
+    while (o > 0 && (buf[o-1] == ' ' || buf[o-1] == '\t')) o--;
+    buf[o] = '\0';
+    fputs(buf, out);
+    fputc('\n', out);
+}
+
+static void bb3c_flush_pending_to(FILE *target)
+{
+    if (g_bb3c_pending_label[0] && g_bb3c_pending_out) {
+        bb3c_write_line(g_bb3c_pending_out, g_bb3c_pending_label, "", "");
+        g_bb3c_pending_label[0] = '\0';
+        g_bb3c_pending_out = NULL;
+    }
+    (void)target; /* reserved for future multi-stream variants */
+}
+
+void bb3c_flush_pending(void)
+{
+    bb3c_flush_pending_to(NULL);
+}
+
 void bb3c_format(FILE *out, const char *label, const char *action, const char *goto_)
 {
     const char *L = label  ? label  : "";
     const char *A = action ? action : "";
     const char *G = goto_  ? goto_  : "";
-    /* EM-7c-no-trailing-ws (2026-05-09): build into a buffer, right-trim
-     * trailing whitespace, write + '\n'.  The %-24s%-16s padding produces
-     * trailing spaces on label-only or empty-col3 lines; strip them so no
-     * generated line has trailing whitespace before its newline. */
-    char buf[768];
-    int n = snprintf(buf, sizeof(buf), "%-24s%-16s %s", L, A, G);
-    if (n < 0) return;
-    if (n >= (int)sizeof(buf)) n = (int)sizeof(buf) - 1;
-    while (n > 0 && (buf[n-1] == ' ' || buf[n-1] == '\t')) n--;
-    buf[n] = '\0';
-    fputs(buf, out);
-    fputc('\n', out);
+
+    int label_only = (*L) && !(*A) && !(*G);
+    int has_content = (*A) || (*G);
+
+    /* If switching streams mid-buffer, flush to the old stream first. */
+    if (g_bb3c_pending_label[0] && g_bb3c_pending_out && g_bb3c_pending_out != out) {
+        bb3c_write_line(g_bb3c_pending_out, g_bb3c_pending_label, "", "");
+        g_bb3c_pending_label[0] = '\0';
+        g_bb3c_pending_out = NULL;
+    }
+
+    if (label_only) {
+        /* Label-only emission: flush any prior pending label as standalone
+         * (multi-label chain), then buffer this one. */
+        if (g_bb3c_pending_label[0]) {
+            bb3c_write_line(out, g_bb3c_pending_label, "", "");
+        }
+        snprintf(g_bb3c_pending_label, sizeof(g_bb3c_pending_label), "%s", L);
+        g_bb3c_pending_out = out;
+        return;
+    }
+
+    if (has_content) {
+        /* Snapshot pending label to a local buffer BEFORE clearing the
+         * static, otherwise eff_L would be a dangling reference once the
+         * static is zeroed. */
+        char fused_lbl[256];
+        const char *eff_L = L;
+        if (g_bb3c_pending_label[0]) {
+            if (!*eff_L) {
+                /* Caller didn't supply col-1; fuse pending label into this line. */
+                snprintf(fused_lbl, sizeof(fused_lbl), "%s", g_bb3c_pending_label);
+                eff_L = fused_lbl;
+            } else {
+                /* Caller supplied own col-1 AND we have pending — flush pending
+                 * standalone, keep caller's col-1. */
+                bb3c_write_line(out, g_bb3c_pending_label, "", "");
+            }
+            g_bb3c_pending_label[0] = '\0';
+            g_bb3c_pending_out = NULL;
+        }
+        bb3c_write_line(out, eff_L, A, G);
+        return;
+    }
+
+    /* All-empty call: no-op (shouldn't happen, but defensively safe). */
 }
 
 void bb3c_text(const char *label, const char *action, const char *goto_)

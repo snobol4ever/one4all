@@ -165,6 +165,16 @@ emitter_v *emitter_text_new(FILE *out)
 
 void emitter_free(emitter_v *e) { if (!e) return; free(e->ctx); free(e); }
 
+/* EM-FORMAT-BB lone-label fusion (2026-05-09):
+ * Public accessor so callers in bb_flat.c can route their emissions
+ * through bb_emit.c's `bb3c_format`, sharing the pending-label fusion
+ * buffer.  Returns NULL for non-text emitters (binary mode). */
+FILE *emitter_text_file(emitter_v *e)
+{
+    if (!e || e->emit_insn != text_emit_insn) return NULL;
+    return outf(e);
+}
+
 int emitter_end(emitter_v *e)
 {
     if (!e) return 0;

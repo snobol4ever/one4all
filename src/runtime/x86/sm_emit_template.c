@@ -24,6 +24,7 @@
  */
 #include "sm_emit_template.h"
 #include "sm_prog.h"
+#include "bb_emit.h"     /* EM-FORMAT-BB: bb3c_format for unified label fusion */
 
 #include <assert.h>
 #include <inttypes.h>
@@ -652,20 +653,11 @@ static int render_call_line(FILE *out, const sm_op_template_t *t,
         col3[0] = '\0';
     }
 
-    /* EM-7c-no-trailing-ws (2026-05-09): build + right-trim.
-     * EM-FORMAT-SM (sess 2026-05-09): unified shape -- empty col-1 emits
-     * 24 spaces of padding, NOT a tab + 15-char col-2.  This way labelled
-     * and unlabelled lines align at the same col-2 column position. */
-    char line[768];
-    int n;
-    n = snprintf(line, sizeof(line), "%-24s%-16s %s",
-                 (lbl_col && *lbl_col) ? lbl_col : "",
-                 t->macro_name, col3);
-    if (n < 0) return -1;
-    if (n >= (int)sizeof(line)) n = (int)sizeof(line) - 1;
-    while (n > 0 && (line[n-1] == ' ' || line[n-1] == '\t')) n--;
-    line[n] = '\0';
-    if (fputs(line, out) < 0 || fputc('\n', out) == EOF) return -1;
+    /* EM-FORMAT-BB lone-label fusion (2026-05-09): route through bb3c_format
+     * so SM-side macro-driven dispatch lines participate in the same
+     * pending-label buffer as BB-side and data-section emissions. */
+    bb3c_format(out, (lbl_col && *lbl_col) ? lbl_col : "",
+                t->macro_name, col3);
     return 0;
 }
 
