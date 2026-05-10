@@ -710,15 +710,6 @@ static int emit_minor_break(FILE *out, const char *caption)
     return 0;
 }
 
-/* Section-level separator: one #== rule + caption line.  Used between the
- * five major sections of the emitted .s file (strings, expression registry,
- * BB code, BB data, SM code). */
-static int emit_section_break(FILE *out, const char *caption)
-{
-    (void)caption;
-    return fputs("#=======================================================================================================================\n", out) == EOF ? -1 : 0;
-}
-
 /* Render a printable, single-line preview of a string literal for use in
  * inline annotations (e.g. movabs rdi,<ptr>  # str="hi").  Truncates at
  * MAX_PREVIEW chars and replaces non-printable bytes with '.'. */
@@ -2049,14 +2040,12 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
      * every string pointer in the emitted binary a RIP-relative reference
      * to a .Lstr_N label rather than an in-process pointer from the emitter. */
     strtab_collect(prog);
-    if (emit_section_break(out, "strings") != 0) return -1;
     if (strtab_emit_rodata(out) != 0) return -1;
 
     /* EM-7d-usercall-reentrant: emit .data expression registry table for
      * user-defined SNOBOL4 functions (SM_LABEL instructions with a[0].s set).
      * This must come after strtab_emit_rodata (so .S* labels are defined)
      * and before .text (so .L* forward references resolve in the same TU). */
-    if (emit_section_break(out, "expression registry") != 0) return -1;
     int expression_reg_count = emit_expression_registry(out, prog);
     if (expression_reg_count < 0) return -1;
 
@@ -2070,14 +2059,12 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
      * pc_used_as_target bitset as a side effect -- one pass over
      * prog->instrs, two outputs. */
     pattern_windows_collect(prog);
-    if (emit_section_break(out, "BB code") != 0) return -1;
     if (emit_pattern_blobs(out) != 0) return -1;
 
     /* EM-4-readability: load the source file once if a path was given. */
     SrcLines sl;
     int sl_loaded = (srclines_load(&sl, src_path) == 0);
 
-    if (emit_section_break(out, "SM code") != 0) return -1;
     if (emit_file_header(out, prog->count, expression_reg_count > 0) != 0) {
         if (sl_loaded) srclines_free(&sl);
         return -1;
