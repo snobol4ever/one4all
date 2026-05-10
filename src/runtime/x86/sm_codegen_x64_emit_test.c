@@ -200,11 +200,13 @@ static int audit_line(const char *path, long lineno,
 
     if (audit_is_banner(raw, len)) return 0;
 
-    /* I1: bare ';' outside strings, before any '#' line-comment */
+    /* I1: bare ';' outside strings, before any '#' line-comment.
+     * Exception: ';' at col >= 40 (col-3 operand field) is a legitimate
+     * GAS statement separator (e.g. ".quad .Lstr_N ; .quad .LpcM"). */
     int hash_pos = audit_first_unquoted(raw, len, '#');
     int code_len = (hash_pos < 0) ? len : hash_pos;
     int semi_pos = audit_first_unquoted(raw, code_len, ';');
-    if (semi_pos >= 0) {
+    if (semi_pos >= 0 && semi_pos < 40) {
         cnt->semicolon++;
         violations++;
         if ((*printed_so_far)++ < 10)

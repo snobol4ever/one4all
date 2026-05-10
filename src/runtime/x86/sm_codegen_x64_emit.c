@@ -480,16 +480,16 @@ static int emit_chunk_registry(FILE *out, const SM_Program *prog)
          * the first op is at M+1.  We emit .Lpc{i+1} as the fn entry. */
         int entry_pc = i + 1;
 
-        char qarg[32], earg[32];
+        char qarg[32];
         snprintf(qarg, sizeof(qarg), ".Lstr_%d", str_idx);
-        snprintf(earg, sizeof(earg), ".Lpc%d", entry_pc);
-        if (emit_three_column_line(out, "", ".quad", qarg, NULL) != 0) return -1;
-        if (emit_three_column_line(out, "", ".quad", earg, NULL)  != 0) return -1;
+        /* Both quads on one line: ".quad .Lstr_N ; .quad .LpcM" */
+        char combined[128];
+        snprintf(combined, sizeof(combined), "%-16s ; .quad            .Lpc%d", qarg, entry_pc);
+        if (emit_three_column_line(out, "", ".quad", combined, NULL) != 0) return -1;
     }
 
     /* Sentinel: {NULL, NULL} */
-    if (emit_three_column_line(out, "", ".quad", "0", "sentinel") != 0) return -1;
-    if (emit_three_column_line(out, "", ".quad", "0", NULL)       != 0) return -1;
+    if (emit_three_column_line(out, "", ".quad", "0                ; .quad            0", NULL) != 0) return -1;
     if (emit_three_column_line(out, "", ".text", "",  NULL)        != 0) return -1;
 
     return n;
@@ -535,19 +535,16 @@ static int emit_file_header(FILE *out, int count, int has_chunk_registry)
     if (emit_three_column_line(out, "",            "mov",    "rbp, rsp", NULL) != 0) return -1;
 
     if (has_chunk_registry) {
-        if (emit_three_column_line(out, "", "lea",  "rdi, [rip + .Lchunk_registry]",
-                                   "EM-7d: register user-defined function expressions") != 0) return -1;
+        if (emit_three_column_line(out, "", "lea",  "rdi, [rip + .Lchunk_registry]", NULL) != 0) return -1;
         if (emit_three_column_line(out, "", "call", "rt_register_expressions@PLT", NULL) != 0) return -1;
     } else {
-        if (emit_three_column_line(out, "", "xor",  "edi, edi",
-                                   "no user-defined functions") != 0) return -1;
+        if (emit_three_column_line(out, "", "xor",  "edi, edi", NULL) != 0) return -1;
         if (emit_three_column_line(out, "", "call", "rt_register_expressions@PLT", NULL) != 0) return -1;
     }
 
     /* EM-7c-capture: patch cap_t fn pointers to baked child blobs. */
     for (int i = 0; i < g_cap_fixups_n; i++) {
         const char *α = g_cap_fixups[i].child_label;
-        char anno[128];
         if ((uintptr_t)g_cap_fixups[i].cap_ptr == 1) {
             char cap_lbl[128];
             const char *p = α;
@@ -555,11 +552,10 @@ static int emit_file_header(FILE *out, int count, int has_chunk_registry)
             const char *underscore = strchr(p, '_');
             int id_len = underscore ? (int)(underscore - p) : (int)strlen(p);
             snprintf(cap_lbl, sizeof(cap_lbl), ".L%.*s_data", id_len, p);
-            snprintf(anno, sizeof(anno), "cap fixup %d (static): %s -> %s", i, cap_lbl, α);
             char rdi_arg[128], rsi_arg[128];
             snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", cap_lbl);
             snprintf(rsi_arg, sizeof(rsi_arg), "rsi, [rip + %s]", α);
-            if (emit_three_column_line(out, "", "lea",  rdi_arg, anno) != 0) return -1;
+            if (emit_three_column_line(out, "", "lea",  rdi_arg, NULL) != 0) return -1;
             if (emit_three_column_line(out, "", "lea",  rsi_arg, NULL) != 0) return -1;
             if (emit_three_column_line(out, "", "call", "rt_patch_cap_fn@PLT", NULL) != 0) return -1;
         } else if ((uintptr_t)g_cap_fixups[i].cap_ptr == 2) {
@@ -569,21 +565,18 @@ static int emit_file_header(FILE *out, int count, int has_chunk_registry)
             const char *underscore = strchr(p, '_');
             int id_len = underscore ? (int)(underscore - p) : (int)strlen(p);
             snprintf(slot_lbl, sizeof(slot_lbl), ".L%.*s_slot", id_len, p);
-            snprintf(anno, sizeof(anno), "arbno fixup %d: %s -> %s", i, slot_lbl, α);
             char rdi_arg[128], rsi_arg[128];
             snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", slot_lbl);
             snprintf(rsi_arg, sizeof(rsi_arg), "rsi, [rip + %s]", α);
-            if (emit_three_column_line(out, "", "lea",  rdi_arg, anno) != 0) return -1;
+            if (emit_three_column_line(out, "", "lea",  rdi_arg, NULL) != 0) return -1;
             if (emit_three_column_line(out, "", "lea",  rsi_arg, NULL) != 0) return -1;
             if (emit_three_column_line(out, "", "call", "rt_init_arbno@PLT", NULL) != 0) return -1;
         } else {
             char rdi_arg[64], rsi_arg[128];
-            snprintf(anno, sizeof(anno), "cap fixup %d: cap_t@%p -> %s",
-                     i, g_cap_fixups[i].cap_ptr, α);
             snprintf(rdi_arg, sizeof(rdi_arg), "rdi, %llu",
                      (unsigned long long)(uintptr_t)g_cap_fixups[i].cap_ptr);
             snprintf(rsi_arg, sizeof(rsi_arg), "rsi, [rip + %s]", α);
-            if (emit_three_column_line(out, "", "movabs", rdi_arg, anno) != 0) return -1;
+            if (emit_three_column_line(out, "", "movabs", rdi_arg, NULL) != 0) return -1;
             if (emit_three_column_line(out, "", "lea",    rsi_arg, NULL) != 0) return -1;
             if (emit_three_column_line(out, "", "call",   "rt_patch_cap_fn@PLT", NULL) != 0) return -1;
         }
