@@ -247,4 +247,24 @@ void bb3c_format(FILE *out, const char *label, const char *action, const char *g
  * is empty. */
 void bb3c_flush_pending(void);
 
+/* EM-FORMAT-BB-FUSED-GOTOS (2026-05-09):
+ * Flush only the deferred conditional-jmp buffer (NOT the pending label).
+ * Used by raw-write paths (banners, EV_TEXT) that physically write to
+ * the FILE* without going through bb3c_format — they must land AFTER
+ * any cond-jmp emission, but the pending label is a separate concern
+ * (handled by bb3c_format's own logic when the next bb3c content
+ * arrives).  Symmetric with bb3c_flush_pending which flushes the label. */
+void bb3c_flush_pending_cjmp_only(void);
+
+/* EM-FORMAT-BB-FUSED-GOTOS (2026-05-09):
+ * Single entry point for emitting jmp-shape lines (col 1 empty,
+ * col 2 = jmp/je/jne/jl/jge/jg, col 3 = target).  Handles cond-jmp+
+ * uncond-jmp adjacency by deferring conditional jumps; if the next
+ * call is an unconditional `jmp`, the two fuse onto a single line:
+ *   <cond_mn>             <succ_target> ; jmp <fail_target>
+ * Otherwise the deferred cond-jmp flushes standalone.  Both
+ * `text_emit_jmp` (emitter_text.c) and `bb_insn_jmp/je/jne/jl/jge/
+ * jg_*` (bb_emit.c, TEXT mode) route through this. */
+void bb3c_emit_jmp(FILE *out, const char *mn, const char *target);
+
 #endif /* BB_EMIT_H */

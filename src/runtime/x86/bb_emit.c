@@ -327,6 +327,26 @@ void bb_text_comment(const char *fmt, ...)
 static char  g_bb3c_pending_label[256] = "";
 static FILE *g_bb3c_pending_out          = NULL;
 
+/* EM-FORMAT-BB-FUSED-GOTOS (sess 2026-05-09):
+ * Deferred-emit buffer for conditional jumps so that an immediately-
+ * following unconditional jmp can fuse with the prior conditional
+ * into a single line: `<cond_mn>  <succ_target> ; jmp <fail_target>`.
+ *
+ * The pattern arises 33 times in bb_flat.c as adjacent
+ *   EV_JMP(succ, JMP_J*); EV_JMP(fail, JMP_JMP);
+ * where the first is conditional (JE/JNE/JL/JGE/JG) and the second is
+ * the unconditional fallthrough.  Reads as one "if cond goto succ
+ * else goto fail" decision.
+ *
+ * Flush rules: the pending cond-jmp must be flushed standalone before
+ * any non-jmp content (label, action, directive, banner, file end).
+ * `bb3c_format` calls `bb3c_flush_pending_cond_jmp` at its top.  The
+ * flush writes the cond-jmp via the low-level `bb3c_write_line` to
+ * avoid recursing back into bb3c_format. */
+static char  g_bb3c_pending_cjmp_mn[16]      = "";
+static char  g_bb3c_pending_cjmp_target[256] = "";
+static FILE *g_bb3c_pending_cjmp_out         = NULL;
+
 /* Count visual columns (display width) of a UTF-8 string.
  * For our purposes: bytes 0x00..0x7F are 1 column each; UTF-8 lead bytes
  * 0xC0..0xFF start a multi-byte sequence whose continuation bytes
@@ -390,8 +410,29 @@ static void bb3c_write_line(FILE *out, const char *L, const char *A, const char 
     fputc('\n', out);
 }
 
+/* EM-FORMAT-BB-FUSED-GOTOS: flush deferred conditional jmp as standalone
+ * (col 1 empty, col 2 = jne/je/jl/jge/jg, col 3 = target).  Writes via
+ * the low-level `bb3c_write_line` to avoid recursing through
+ * `bb3c_format`'s pending-label path.  Called from bb3c_format at its
+ * top so the cond-jmp lands BEFORE any subsequent label/action/banner. */
+static void bb3c_flush_pending_cond_jmp(void)
+{
+    if (g_bb3c_pending_cjmp_mn[0] && g_bb3c_pending_cjmp_out) {
+        bb3c_write_line(g_bb3c_pending_cjmp_out, "",
+                        g_bb3c_pending_cjmp_mn,
+                        g_bb3c_pending_cjmp_target);
+        g_bb3c_pending_cjmp_mn[0]     = '\0';
+        g_bb3c_pending_cjmp_target[0] = '\0';
+        g_bb3c_pending_cjmp_out       = NULL;
+    }
+}
+
 static void bb3c_flush_pending_to(FILE *target)
 {
+    /* Flush cond-jmp first: it logically precedes any pending label
+     * (the cond-jmp came from an earlier emit; the label is buffered
+     * waiting for the next content line). */
+    bb3c_flush_pending_cond_jmp();
     if (g_bb3c_pending_label[0] && g_bb3c_pending_out) {
         bb3c_write_line(g_bb3c_pending_out, g_bb3c_pending_label, "", "");
         g_bb3c_pending_label[0] = '\0';
@@ -400,13 +441,99 @@ static void bb3c_flush_pending_to(FILE *target)
     (void)target; /* reserved for future multi-stream variants */
 }
 
+/* EM-FORMAT-BB-FUSED-GOTOS: flush only the deferred cond-jmp (NOT the
+ * pending label).  Used by raw-write paths (banners, EV_TEXT) that
+ * physically write to the FILE* without going through bb3c_format —
+ * they MUST land AFTER any cond-jmp emission, but the pending label is
+ * a different concern (handled by bb3c_format's own logic when the
+ * next bb3c content arrives).  Symmetric with bb3c_flush_pending which
+ * flushes the label only. */
+void bb3c_flush_pending_cjmp_only(void)
+{
+    bb3c_flush_pending_cond_jmp();
+}
+
 void bb3c_flush_pending(void)
 {
     bb3c_flush_pending_to(NULL);
 }
 
+/* EM-FORMAT-BB-FUSED-GOTOS: emit a jmp/cond-jmp line with optional fusion.
+ *
+ *   bb3c_emit_jmp(out, "jne", "lbl_succ");  -> defer to pending cjmp slot
+ *   bb3c_emit_jmp(out, "jmp", "lbl_fail");  -> if cjmp pending, fuse:
+ *                                              "<jne>  lbl_succ ; jmp lbl_fail"
+ *                                             else emit standalone
+ *
+ * Single entry point for both `text_emit_jmp` (in emitter_text.c) and
+ * `bb_insn_jmp/je/jne/jl/jge/jg_*` (in this file's TEXT-mode arms). */
+static int bb3c_is_cond_jmp(const char *mn)
+{
+    if (!mn) return 0;
+    return (strcmp(mn, "je")  == 0) ||
+           (strcmp(mn, "jne") == 0) ||
+           (strcmp(mn, "jl")  == 0) ||
+           (strcmp(mn, "jge") == 0) ||
+           (strcmp(mn, "jg")  == 0) ||
+           (strcmp(mn, "jle") == 0) ||
+           (strcmp(mn, "jbe") == 0);
+}
+
+void bb3c_emit_jmp(FILE *out, const char *mn, const char *target)
+{
+    const char *m = mn ? mn : "";
+    const char *t = target ? target : "";
+
+    if (bb3c_is_cond_jmp(m)) {
+        /* Stream change: flush any pending cjmp on prior stream first. */
+        if (g_bb3c_pending_cjmp_mn[0] && g_bb3c_pending_cjmp_out != out) {
+            bb3c_flush_pending_cond_jmp();
+        }
+        /* Two cond-jmps in a row (no intervening uncond): the prior one
+         * must flush standalone — it will not get fused. */
+        if (g_bb3c_pending_cjmp_mn[0]) {
+            bb3c_flush_pending_cond_jmp();
+        }
+        /* Defer this one. */
+        snprintf(g_bb3c_pending_cjmp_mn,     sizeof(g_bb3c_pending_cjmp_mn),     "%s", m);
+        snprintf(g_bb3c_pending_cjmp_target, sizeof(g_bb3c_pending_cjmp_target), "%s", t);
+        g_bb3c_pending_cjmp_out = out;
+        return;
+    }
+
+    /* Unconditional jmp (or any non-cond mnemonic that arrived through here). */
+    if (g_bb3c_pending_cjmp_mn[0] && g_bb3c_pending_cjmp_out == out) {
+        /* Fuse: emit "<cond_mn>  <succ_target> ; jmp <fail_target>".
+         * Build col-3 = "<succ_target> ; jmp <fail_target>".  Pass to
+         * bb3c_format so any pending label still fuses with col 1. */
+        char fused_col3[512];
+        snprintf(fused_col3, sizeof(fused_col3), "%s ; %s %s",
+                 g_bb3c_pending_cjmp_target, m, t);
+        char saved_mn[16];
+        snprintf(saved_mn, sizeof(saved_mn), "%s", g_bb3c_pending_cjmp_mn);
+        g_bb3c_pending_cjmp_mn[0]     = '\0';
+        g_bb3c_pending_cjmp_target[0] = '\0';
+        g_bb3c_pending_cjmp_out       = NULL;
+        bb3c_format(out, "", saved_mn, fused_col3);
+        return;
+    }
+    /* No pending: emit standalone via bb3c_format (handles pending label). */
+    bb3c_format(out, "", m, t);
+}
+
 void bb3c_format(FILE *out, const char *label, const char *action, const char *goto_)
 {
+    /* EM-FORMAT-BB-FUSED-GOTOS: any non-jmp content arriving here means
+     * a deferred cond-jmp (if any) cannot fuse and must flush standalone. */
+    if (g_bb3c_pending_cjmp_mn[0]) {
+        if (g_bb3c_pending_cjmp_out == out || g_bb3c_pending_cjmp_out == NULL) {
+            bb3c_flush_pending_cond_jmp();
+        } else {
+            /* Different stream: flush to original stream first. */
+            bb3c_flush_pending_cond_jmp();
+        }
+    }
+
     const char *L = label  ? label  : "";
     const char *A = action ? action : "";
     const char *G = goto_  ? goto_  : "";
@@ -487,12 +614,14 @@ static void bb3c_op(const char *mn, const char *fmt, ...)
     bb3c_format(f, "", mn ? mn : "", argbuf);
 }
 
-/* Goto-only line: col 1 empty, col 2 = jmp/je/jne/..., col 3 = target. */
+/* Goto-only line: col 1 empty, col 2 = jmp/je/jne/..., col 3 = target.
+ * EM-FORMAT-BB-FUSED-GOTOS: routes through bb3c_emit_jmp so a conditional
+ * jmp followed immediately by an unconditional jmp fuses onto one line. */
 static void bb3c_jmp(const char *mn, const char *target)
 {
     if (bb_emit_mode != EMIT_TEXT) return;
     FILE *f = bb_emit_out ? bb_emit_out : stdout;
-    bb3c_format(f, "", mn ? mn : "", target ? target : "");
+    bb3c_emit_jmp(f, mn ? mn : "", target ? target : "");
 }
 
 void bb_insn_mov_eax_imm32(uint32_t imm)

@@ -48,10 +48,12 @@ static void emit3c_op(emitter_v *e, const char *mn, const char *fmt, ...)
     bb3c_format(outf(e), "", mn ? mn : "", buf);
 }
 
-/* Goto-only: col 1 empty, col 2 = jmp/je/jne/..., col 3 = target. */
+/* Goto-only: col 1 empty, col 2 = jmp/je/jne/..., col 3 = target.
+ * EM-FORMAT-BB-FUSED-GOTOS: routes through bb3c_emit_jmp for cond+uncond
+ * fusion (defined in bb_emit.c). */
 static void emit3c_jmp(emitter_v *e, const char *mn, const char *target)
 {
-    bb3c_format(outf(e), "", mn ? mn : "", target ? target : "");
+    bb3c_emit_jmp(outf(e), mn ? mn : "", target ? target : "");
 }
 
 /* ── emit_insn: one three-column line per instruction (action column) ─────── */
@@ -133,7 +135,18 @@ static void text_global_sym(emitter_v *e, const char *name)
 
 /* ── fprintf_raw ───────────────────────────────────────────────────────────── */
 static void text_fprintf_raw(emitter_v *e, const char *fmt, ...)
-{ va_list ap; va_start(ap,fmt); vfprintf(outf(e),fmt,ap); va_end(ap); }
+{
+    /* EM-FORMAT-BB-FUSED-GOTOS: any raw text emission (banners, EV_TEXT
+     * blocks) MUST flush any deferred cond-jmp first, otherwise the
+     * cond-jmp would land AFTER the raw text in the file when it
+     * eventually flushes.  But we MUST NOT flush a pending label here —
+     * that would regress EM-FORMAT-BB-LONE-LABELS by emitting the label
+     * standalone before the banner.  Pending label stays in buffer; the
+     * next bb3c_format call after the banner consumes it via the
+     * empty-col-1 fusion path. */
+    bb3c_flush_pending_cjmp_only();
+    va_list ap; va_start(ap,fmt); vfprintf(outf(e),fmt,ap); va_end(ap);
+}
 
 /* ── pos ───────────────────────────────────────────────────────────────────── */
 static int text_pos(emitter_v *e) { return CTX(e)->pos; }
