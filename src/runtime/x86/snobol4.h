@@ -305,6 +305,10 @@ int         FUNC_NLOCALS_fn(const char *fname);
 const char *FUNC_PARAM_fn(const char *fname, int i);
 const char *FUNC_LOCAL_fn(const char *fname, int i);
 const char *FUNC_ENTRY_fn(const char *fname);
+/* ME-7: returns 1 if `label` is the entry label of some registered user function.
+ * Used by sm_lower to mark SM_LABEL instructions that are DEFINE'd-function entries
+ * (so mode-3 emit can issue real `push rbp; mov rbp, rsp` prologues for them). */
+int     FUNC_IS_ENTRY_LABEL(const char *label);
 
 /* ============================================================
  * GOTO / label runtime

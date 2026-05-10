@@ -1653,6 +1653,15 @@ static void lower_stmt(SM_Program *p, LabelTable *lt, const STMT_t *s)
     if (s->label && s->label[0]) {
         int lbl_idx = sm_label_named(p, s->label);
         lt_define(lt, s->label, lbl_idx);
+        /* ME-7: tag SM_LABEL with `a[2].i = 1` when this label is the entry
+         * point of a DEFINE'd user function.  prescan_defines() (called from
+         * sm_preamble before sm_lower) has already populated the function
+         * table, so FUNC_IS_ENTRY_LABEL is authoritative here.  Mode-3 codegen
+         * (ME-6) reads this flag to emit `push rbp; mov rbp, rsp` prologue for
+         * DEFINE'd-function entries and not for ordinary :S(label) targets. */
+        if (FUNC_IS_ENTRY_LABEL(s->label)) {
+            p->instrs[p->count - 1].a[2].i = 1;
+        }
     }
 
     /* 1. Statement counter tick — increments &STCOUNT / &STNO.
@@ -1805,6 +1814,35 @@ static void lower_stmt(SM_Program *p, LabelTable *lt, const STMT_t *s)
                 sm_emit_si(p, SM_CALL_FN, "ASGN", 2);
             }
         } else {
+            /* Bare expression statement, result unused.
+             *
+             * SNOBOL4 special-case: a statement whose entire body is the bare
+             * keyword RETURN / FRETURN / NRETURN (no `=`, no pattern, no goto)
+             * is equivalent to `:(RETURN)` — it should fire the corresponding
+             * return opcode, not push-then-pop a variable named "RETURN".
+             *
+             * This mirrors emit_goto's treatment of those names as goto
+             * targets (lines ~222-238 in this file) and unblocks the
+             * `define` smoke test under --sm-run / --jit-run: the smoke
+             * source ends its DOUBLE body with bare `RETURN` on its own
+             * line, which previously lowered as
+             *   SM_PUSH_VAR s="RETURN"; SM_VOID_POP
+             * leaving the function with no way to return to caller.
+             */
+            if (s->subject->kind == AST_VAR && s->subject->sval) {
+                if (strcasecmp(s->subject->sval, "RETURN") == 0) {
+                    sm_emit(p, SM_RETURN);
+                    goto emit_gotos;
+                }
+                if (strcasecmp(s->subject->sval, "FRETURN") == 0) {
+                    sm_emit(p, SM_FRETURN);
+                    goto emit_gotos;
+                }
+                if (strcasecmp(s->subject->sval, "NRETURN") == 0) {
+                    sm_emit(p, SM_NRETURN);
+                    goto emit_gotos;
+                }
+            }
             lower_expr(p, lt, s->subject);
             sm_emit(p, SM_VOID_POP);  /* expression statement, result unused */
         }

@@ -3623,6 +3623,27 @@ const char *FUNC_ENTRY_fn(const char *fname) {
     return NULL;
 }
 
+/* ME-7: scan every bucket for any registered user function whose entry label
+ * equals `label`.  Returns 1 if found.  Used by sm_lower at lowering time to
+ * mark SM_LABEL instructions that begin a DEFINE'd function body.
+ *
+ * O(N) over all registered user functions, but only called once per SM_LABEL
+ * emitted by lower_stmt — i.e. once per labeled SNOBOL4 statement.  Programs
+ * typically have tens to hundreds of statements and a handful of DEFINE'd
+ * functions, so the cost is negligible.  Hashing by entry_label would require
+ * a second hash table; not worth it for this access pattern. */
+int FUNC_IS_ENTRY_LABEL(const char *label) {
+    _func_init();
+    if (!label || !*label) return 0;
+    for (int b = 0; b < FUNC_BUCKETS; b++) {
+        for (FNCBLK_t *e = _func_buckets[b]; e; e = e->next) {
+            const char *el = e->entry_label ? e->entry_label : e->name;
+            if (el && strcmp(el, label) == 0) return 1;
+        }
+    }
+    return 0;
+}
+
 /* ============================================================
  * Builtin string functions
  * ============================================================ */
