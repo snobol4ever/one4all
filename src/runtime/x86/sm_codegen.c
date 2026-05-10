@@ -174,7 +174,15 @@ static void h_return_impl(int is_fret, int is_nret)
             PUSH(FAILDESCR); STATE->last_ok = 0;
             strncpy(kw_rtntype, "FRETURN", sizeof(kw_rtntype)-1); /* RS-11 */
         } else if (is_nret) {
-            PUSH(fr->retval_name ? NAMEVAL(GC_strdup(fr->retval_name)) : retval);
+            /* SN-33b-nreturn: see sm_interp.c h_return SM_NRETURN — same fix.
+             * NRETURN's retval (NV_GET_fn(retval_name)) is a NAME descriptor;
+             * push the NAME-DEREFed value to match IR-run convention
+             * (interp_eval.c:2771).  The previous push of NAMEVAL(retval_name)
+             * substituted the function's own name for the actual return value. */
+            DESCR_t deref = retval;
+            if (IS_NAMEPTR(deref))      deref = NAME_DEREF_PTR(deref);
+            else if (IS_NAMEVAL(deref)) deref = NV_GET_fn(deref.s);
+            PUSH(deref);
             STATE->last_ok = 1;
             strncpy(kw_rtntype, "NRETURN", sizeof(kw_rtntype)-1); /* RS-11 */
         } else {

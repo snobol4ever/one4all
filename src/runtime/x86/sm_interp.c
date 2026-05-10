@@ -1421,7 +1421,31 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
                     st->last_ok = 0;
                     strncpy(kw_rtntype, "FRETURN", sizeof(kw_rtntype)-1); /* RS-11 */
                 } else if (is_nret) {
-                    sm_push(st, fr->retval_name ? NAMEVAL(GC_strdup(fr->retval_name)) : retval);
+                    /* SN-33b-nreturn: NRETURN's `retval` (read at ~line 1338 from
+                     * NV_GET_fn(retname)) is a NAME descriptor (DT_N) referring
+                     * to the lvalue the body assigned to the function-name slot
+                     * (e.g. `foo = .dummy` → retval is NAMEVAL("dummy")).
+                     *
+                     * For value context (`r = foo()`) the IR pipeline applies
+                     * NAME_DEREF before storing — see interp_eval.c:2771
+                     * `if (IS_NAME(r)) return NAME_DEREF(r);` after
+                     * call_user_function returns.  The SM path was both
+                     * (a) substituting NAMEVAL(retval_name) instead of retval,
+                     *     pushing the function's own name as a string, AND
+                     * (b) skipping the NAME_DEREF, causing `r` to receive a
+                     *     raw NAME ref where IR receives the dereferenced value.
+                     *
+                     * Fix: deref the NAME on the way out, matching IR.  The
+                     * downstream NRETURN-aware lvalue-assign path (asg10-style
+                     * `fname() = rhs`) reads `kw_rtntype == "NRETURN"` to
+                     * re-fetch the raw DT_N when needed (cf. interp_call.c
+                     * BP-1 lines 344-349); SM follows the same convention via
+                     * SM_STORE_NRETURN_ASGN, which reads NV_GET_fn(retval_name)
+                     * itself and does not depend on what we push here. */
+                    DESCR_t deref = retval;
+                    if (IS_NAMEPTR(deref))      deref = NAME_DEREF_PTR(deref);
+                    else if (IS_NAMEVAL(deref)) deref = NV_GET_fn(deref.s);
+                    sm_push(st, deref);
                     st->last_ok = 1;
                     strncpy(kw_rtntype, "NRETURN", sizeof(kw_rtntype)-1); /* RS-11 */
                 } else {

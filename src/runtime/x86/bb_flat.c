@@ -1518,6 +1518,12 @@ static int flat_is_eligible(PATND_t *p)
     if (!p) return 1;
     if (p->kind == XVAR) return 0;  /* runtime DESCR_t as pattern — graph unknown */
     if (p->kind == XCAT && p->nchildren > 2) return 0;
+    /* SN-33b: XNME/XFNME/XARBN binary path in flat_emit_node passes child_fn=NULL
+     * to bb_cap_new (or emits a fail-stub for ARBNO).  bb_cap then dereferences
+     * NULL at bb_boxes.c:541.  Until recursive child-blob emission lands in the
+     * binary path, fall back to bb_build_binary (which builds the child correctly
+     * via bb_build_binary_node — see bb_build.c:bb_nme_emit_binary). */
+    if (p->kind == XNME || p->kind == XFNME || p->kind == XARBN) return 0;
     for (int i = 0; i < p->nchildren; i++)
         if (!flat_is_eligible(p->children[i])) return 0;
     return 1;
