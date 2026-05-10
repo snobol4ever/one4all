@@ -755,7 +755,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
                 lower_pat_expr(p, lt, e->children[i]);
             for (int i = 1; i < e->nchildren; i++)
                 sm_emit(p, SM_PAT_CAT);
-            sm_emit(p, SM_PAT_BOXVAL);  /* bridge: pat-stack → value-stack DT_P */
+            /* SM_PAT_BOXVAL removed by ME-1: SM_PAT_CAT leaves result on value stack */
         } else {
             for (int i = 0; i < e->nchildren; i++)
                 lower_expr(p, lt, e->children[i]);
@@ -960,7 +960,7 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
     case AST_ARBNO:
     case AST_CAPT_COND_ASGN: case AST_CAPT_IMMED_ASGN: case AST_CAPT_CURSOR:
         lower_pat_expr(p, lt, e);
-        sm_emit(p, SM_PAT_BOXVAL);  /* bridge: pop pat-stack → push DT_P on value-stack */
+        /* SM_PAT_BOXVAL removed by ME-1: lower_pat_expr leaves result on value stack */
         return;
 
     /* ══════════════════════════════════════════════════════════════════════

@@ -60,29 +60,7 @@ int      g_jit_step_limit = 0;   /* 0 = unlimited; N = stop after N stmts */
 int      g_jit_steps_done = 0;
 jmp_buf  g_jit_step_jmp;
 
-/* Pat-stack (mirrors sm_interp.c's private g_pat_stack) */
-#define JIT_PAT_STACK_INIT 16
-static DESCR_t *g_jit_pat_stack = NULL;
-static int      g_jit_pat_sp    = 0;
-static int      g_jit_pat_cap   = 0;
-
-static void jit_pat_push(DESCR_t d)
-{
-    if (g_jit_pat_sp >= g_jit_pat_cap) {
-        g_jit_pat_cap = g_jit_pat_cap ? g_jit_pat_cap * 2 : JIT_PAT_STACK_INIT;
-        g_jit_pat_stack = realloc(g_jit_pat_stack, g_jit_pat_cap * sizeof(DESCR_t));
-        if (!g_jit_pat_stack) { fprintf(stderr, "sm_codegen: pat-stack OOM\n"); abort(); }
-    }
-    g_jit_pat_stack[g_jit_pat_sp++] = d;
-}
-
-static DESCR_t jit_pat_pop(void)
-{
-    if (g_jit_pat_sp <= 0) {
-        fprintf(stderr, "sm_codegen: pat-stack underflow\n"); abort();
-    }
-    return g_jit_pat_stack[--g_jit_pat_sp];
-}
+/* ME-1: jit_pat_stack removed — SM_PAT_* ops use value stack (PUSH/POP) */
 
 /* ── Externs from snobol4 runtime ────────────────────────────────────── */
 
@@ -583,86 +561,86 @@ static void h_coerce_num(void)
 
 static void h_pat_lit(void)
 {
-    jit_pat_push(pat_lit(CUR_INS->a[0].s ? CUR_INS->a[0].s : ""));
+    PUSH(pat_lit(CUR_INS->a[0].s ? CUR_INS->a[0].s : ""));
 }
 static void h_pat_any(void)
 {
     DESCR_t arg = POP(); const char *cs = VARVAL_fn(arg);
-    jit_pat_push(pat_any_cs(cs ? cs : ""));
+    PUSH(pat_any_cs(cs ? cs : ""));
 }
 static void h_pat_notany(void)
 {
     DESCR_t arg = POP(); const char *cs = VARVAL_fn(arg);
-    jit_pat_push(pat_notany(cs ? cs : ""));
+    PUSH(pat_notany(cs ? cs : ""));
 }
 static void h_pat_span(void)
 {
     DESCR_t arg = POP(); const char *cs = VARVAL_fn(arg);
-    jit_pat_push(pat_span(cs ? cs : ""));
+    PUSH(pat_span(cs ? cs : ""));
 }
 static void h_pat_break(void)
 {
     DESCR_t arg = POP(); const char *cs = VARVAL_fn(arg);
-    jit_pat_push(pat_break_(cs ? cs : ""));
+    PUSH(pat_break_(cs ? cs : ""));
 }
 static void h_pat_len(void)
 {
     DESCR_t arg = POP();
-    jit_pat_push(pat_len(arg.v == DT_I ? arg.i : 0));
+    PUSH(pat_len(arg.v == DT_I ? arg.i : 0));
 }
 static void h_pat_pos(void)
 {
     DESCR_t arg = POP();
-    jit_pat_push(pat_pos(arg.v == DT_I ? arg.i : 0));
+    PUSH(pat_pos(arg.v == DT_I ? arg.i : 0));
 }
 static void h_pat_rpos(void)
 {
     DESCR_t arg = POP();
-    jit_pat_push(pat_rpos(arg.v == DT_I ? arg.i : 0));
+    PUSH(pat_rpos(arg.v == DT_I ? arg.i : 0));
 }
 static void h_pat_tab(void)
 {
     DESCR_t arg = POP();
-    jit_pat_push(pat_tab(arg.v == DT_I ? arg.i : 0));
+    PUSH(pat_tab(arg.v == DT_I ? arg.i : 0));
 }
 static void h_pat_rtab(void)
 {
     DESCR_t arg = POP();
-    jit_pat_push(pat_rtab(arg.v == DT_I ? arg.i : 0));
+    PUSH(pat_rtab(arg.v == DT_I ? arg.i : 0));
 }
-static void h_pat_arb(void)     { jit_pat_push(pat_arb()); }
-static void h_pat_arbno(void)   { DESCR_t _inner = jit_pat_pop(); jit_pat_push(pat_arbno(_inner)); }
-static void h_pat_rem(void)     { jit_pat_push(pat_rem()); }
-static void h_pat_fail(void)    { jit_pat_push(pat_fail()); }
-static void h_pat_succeed(void) { jit_pat_push(pat_succeed()); }
-static void h_pat_eps(void)     { jit_pat_push(pat_epsilon()); }
-static void h_pat_fence(void)   { jit_pat_push(pat_fence()); }
-static void h_pat_fence1(void)  { DESCR_t _ch = jit_pat_pop(); jit_pat_push(pat_fence_p(_ch)); }
-static void h_pat_abort(void)   { jit_pat_push(pat_abort()); }
-static void h_pat_bal(void)     { jit_pat_push(pat_bal()); }
+static void h_pat_arb(void)     { PUSH(pat_arb()); }
+static void h_pat_arbno(void)   { DESCR_t _inner = POP(); PUSH(pat_arbno(_inner)); }
+static void h_pat_rem(void)     { PUSH(pat_rem()); }
+static void h_pat_fail(void)    { PUSH(pat_fail()); }
+static void h_pat_succeed(void) { PUSH(pat_succeed()); }
+static void h_pat_eps(void)     { PUSH(pat_epsilon()); }
+static void h_pat_fence(void)   { PUSH(pat_fence()); }
+static void h_pat_fence1(void)  { DESCR_t _ch = POP(); PUSH(pat_fence_p(_ch)); }
+static void h_pat_abort(void)   { PUSH(pat_abort()); }
+static void h_pat_bal(void)     { PUSH(pat_bal()); }
 
 static void h_pat_cat(void)
 {
-    DESCR_t right = jit_pat_pop(), left = jit_pat_pop();
-    jit_pat_push(pat_cat(left, right));
+    DESCR_t right = POP(), left = POP();
+    PUSH(pat_cat(left, right));
 }
 static void h_pat_alt(void)
 {
-    DESCR_t right = jit_pat_pop(), left = jit_pat_pop();
-    jit_pat_push(pat_alt(left, right));
+    DESCR_t right = POP(), left = POP();
+    PUSH(pat_alt(left, right));
 }
-static void h_pat_boxval(void) { PUSH(jit_pat_pop()); }
+/* h_pat_boxval deleted by ME-1 — SM_PAT_BOXVAL opcode removed */
 
 static void h_pat_deref(void)
 {
     DESCR_t v = POP();
     if (v.v == DT_P) {
-        jit_pat_push(v);
+        PUSH(v);
     } else if (v.v == DT_S && v.s) {
-        jit_pat_push(pat_lit(v.s));
+        PUSH(pat_lit(v.s));
     } else {
         const char *name = VARVAL_fn(v);
-        jit_pat_push(pat_ref(name ? name : ""));
+        PUSH(pat_ref(name ? name : ""));
     }
 }
 
@@ -672,21 +650,21 @@ static void h_pat_refname(void)
      * never fetching variable's current value at build time.
      * Mirrors sm_interp.c case SM_PAT_REFNAME. */
     const char *name = CUR_INS->a[0].s ? CUR_INS->a[0].s : "";
-    jit_pat_push(pat_ref(name));
+    PUSH(pat_ref(name));
 }
 
 static void h_pat_capture(void)
 {
-    DESCR_t child  = jit_pat_pop();
+    DESCR_t child  = POP();
     const char *vn = CUR_INS->a[0].s ? CUR_INS->a[0].s : "";
     DESCR_t var    = NAME_fn(vn);
     int kind       = (int)CUR_INS->a[1].i;
     if (kind == 1)
-        jit_pat_push(pat_assign_imm(child, var));
+        PUSH(pat_assign_imm(child, var));
     else if (kind == 2)
-        jit_pat_push(pat_cat(child, pat_at_cursor(vn)));
+        PUSH(pat_cat(child, pat_at_cursor(vn)));
     else
-        jit_pat_push(pat_assign_cond(child, var));
+        PUSH(pat_assign_cond(child, var));
 }
 
 static void h_pat_capture_fn(void)
@@ -698,7 +676,7 @@ static void h_pat_capture_fn(void)
      * NameKind_t (SN-21d).  The old DT_E/pat_assign_cond approach only
      * worked via materialise() which is not used in the byrd-box
      * (--sm-run / --jit-emit) path. */
-    DESCR_t child  = jit_pat_pop();
+    DESCR_t child  = POP();
     const char *fname = CUR_INS->a[0].s ? CUR_INS->a[0].s : "";
     const char *namelist = CUR_INS->a[2].s;
     if (namelist && namelist[0]) {
@@ -719,12 +697,12 @@ static void h_pat_capture_fn(void)
             }
         }
         int is_imm = (int)CUR_INS->a[1].i;  /* SN-26c-parseerr-f */
-        jit_pat_push(is_imm
+        PUSH(is_imm
             ? pat_assign_callcap_named_imm(child, fname, NULL, 0, names, nnames)
             : pat_assign_callcap_named(child, fname, NULL, 0, names, nnames));
     } else {
         int is_imm = (int)CUR_INS->a[1].i;  /* SN-26c-parseerr-f */
-        jit_pat_push(is_imm
+        PUSH(is_imm
             ? pat_assign_callcap_named_imm(child, fname, NULL, 0, NULL, 0)
             : pat_assign_callcap(child, fname, NULL, 0));
     }
@@ -742,10 +720,10 @@ static void h_pat_capture_fn_args(void)
         ? (DESCR_t *)GC_MALLOC((size_t)nargs * sizeof(DESCR_t))
         : NULL;
     for (int i = nargs - 1; i >= 0; i--) argv[i] = POP();
-    DESCR_t child = jit_pat_pop();
+    DESCR_t child = POP();
     const char *fname = CUR_INS->a[0].s ? CUR_INS->a[0].s : "";
     int is_imm = (int)CUR_INS->a[1].i;  /* SN-26c-parseerr-f: 0=cond(.) 1=imm($) */
-    jit_pat_push(is_imm
+    PUSH(is_imm
         ? pat_assign_callcap_named_imm(child, fname, argv, nargs, NULL, 0)
         : pat_assign_callcap(child, fname, argv, nargs));
 }
@@ -758,7 +736,7 @@ static void h_pat_usercall(void)
      * Build XATP deferred-usercall node so the match engine invokes func()
      * per position; func's FAIL propagates as pattern FAIL (landing in SN-17d). */
     const char *fname = CUR_INS->a[0].s ? CUR_INS->a[0].s : "";
-    jit_pat_push(pat_user_call(fname, NULL, 0));
+    PUSH(pat_user_call(fname, NULL, 0));
 }
 
 static void h_pat_usercall_args(void)
@@ -773,19 +751,19 @@ static void h_pat_usercall_args(void)
         : NULL;
     for (int i = nargs - 1; i >= 0; i--) argv[i] = POP();
     const char *fname = CUR_INS->a[0].s ? CUR_INS->a[0].s : "";
-    jit_pat_push(pat_user_call(fname, argv, nargs));
+    PUSH(pat_user_call(fname, argv, nargs));
 }
 
 static void h_exec_stmt(void)
 {
+    /* ME-1: pattern is now on the value stack; sm_lower push order: pat, subj, repl; pop: repl, subj, pat */
     int has_repl   = (int)CUR_INS->a[1].i;
-    DESCR_t repl   = POP();
-    DESCR_t subj_d = POP();
-    DESCR_t pat_d  = (g_jit_pat_sp > 0) ? jit_pat_pop() : pat_epsilon();
+    DESCR_t repl   = POP();    /* replacement or INTVAL(0) — top of stack */
+    DESCR_t subj_d = POP();    /* subject descriptor */
+    DESCR_t pat_d  = POP();    /* pattern (DT_P) — pushed first by sm_lower */
     const char *sn = CUR_INS->a[0].s;
     int ok = exec_stmt(sn, &subj_d, pat_d, has_repl ? &repl : NULL, has_repl);
     STATE->last_ok = ok;
-    g_jit_pat_sp   = 0;
 }
 
 static void h_call(void)
@@ -1185,7 +1163,7 @@ static void init_handler_table(void)
     g_handlers[SM_PAT_CAPTURE_FN_ARGS] = h_pat_capture_fn_args;
     g_handlers[SM_PAT_USERCALL]   = h_pat_usercall;
     g_handlers[SM_PAT_USERCALL_ARGS] = h_pat_usercall_args;
-    g_handlers[SM_PAT_BOXVAL]  = h_pat_boxval;
+    /* SM_PAT_BOXVAL handler removed by ME-1 */
 
     g_handlers[SM_EXEC_STMT]   = h_exec_stmt;
     g_handlers[SM_CALL_FN]        = h_call;
@@ -1325,7 +1303,6 @@ int sm_jit_run(SM_Program *prog, SM_State *st)
     g_jit_prog   = prog;
     g_jit_state  = st;
     g_jit_halted = 0;
-    g_jit_pat_sp = 0;
 
     uint8_t **code_ptrs = (uint8_t **)scrip_segs[SEG_CODE].base;
 
@@ -1345,7 +1322,6 @@ int sm_jit_run_plain(SM_Program *prog, SM_State *st)
     g_jit_prog   = prog;
     g_jit_state  = st;
     g_jit_halted = 0;
-    g_jit_pat_sp = 0;
     while (st->pc < prog->count && !g_jit_halted) {
         st->pc++;
         g_handlers[prog->instrs[st->pc - 1].op]();

@@ -1261,12 +1261,7 @@ DESCR_t sm_phase2_to_patnd(const SM_Program *prog,
             simstack_push_variant_val(&ss);
             has_variant = 1;
             break;
-        case SM_PAT_BOXVAL:
-            /* Moves top of pat-stack to value-stack side (used when
-             * a pattern is stored in a variable for later DEREF).
-             * The SimVal keeps its is_variant flag and is_pat flips. */
-            if (ss.top > 0) ss.slots[ss.top - 1].is_pat = 0;
-            break;
+        /* SM_PAT_BOXVAL removed by ME-1 */
 
         /* ── leaf pat constructors that need no value-stack arg ──── */
         case SM_PAT_EPS:
@@ -2231,7 +2226,7 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
             case SM_PAT_CAT:
             case SM_PAT_ALT:
             case SM_PAT_DEREF:
-            case SM_PAT_BOXVAL:   rc = emit_sm_pat_noarg(out, ins->op, pc); break;
+            /* SM_PAT_BOXVAL removed by ME-1 */
 
             /* SM_EXEC_STMT for a variant pattern (invariant patterns are
              * already handled above by the pattern-window hook → blob call). */

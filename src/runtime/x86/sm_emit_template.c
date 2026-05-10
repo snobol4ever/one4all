@@ -145,7 +145,7 @@ static const sm_op_template_t g_sm_templates[] = {
     { SM_PAT_CAT,      "PAT_CAT",      "rt_pat_cat",      SM_TPL_NULLARY,    0, 0 },
     { SM_PAT_ALT,      "PAT_ALT",      "rt_pat_alt",      SM_TPL_NULLARY,    0, 0 },
     { SM_PAT_DEREF,    "PAT_DEREF",    "rt_pat_deref",    SM_TPL_NULLARY,    0, 0 },
-    { SM_PAT_BOXVAL,   "PAT_BOXVAL",   "rt_pat_boxval",   SM_TPL_NULLARY,    0, 0 },
+    /* SM_PAT_BOXVAL removed by ME-1 */
 
     /* Pattern construction (one-string-or-NULL shape) */
     { SM_PAT_LIT,      "PAT_LIT",      "rt_pat_lit",      SM_TPL_LBLOPT,     0, 0 },

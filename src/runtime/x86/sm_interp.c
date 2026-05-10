@@ -179,28 +179,7 @@ static void pump_print(DESCR_t val, void *arg) {
     char *s = VARVAL_fn(val);
     if (s) printf("%s\n", s);
 }
-#define SM_PAT_STACK_INIT 16
-static DESCR_t *g_pat_stack = NULL;
-static int      g_pat_sp    = 0;
-static int      g_pat_cap   = 0;
-
-static void pat_push(DESCR_t d)
-{
-    if (g_pat_sp >= g_pat_cap) {
-        g_pat_cap = g_pat_cap ? g_pat_cap * 2 : SM_PAT_STACK_INIT;
-        g_pat_stack = realloc(g_pat_stack, g_pat_cap * sizeof(DESCR_t));
-        if (!g_pat_stack) { fprintf(stderr, "sm_interp: pat-stack OOM\n"); abort(); }
-    }
-    g_pat_stack[g_pat_sp++] = d;
-}
-
-static DESCR_t pat_pop(void)
-{
-    if (g_pat_sp <= 0) {
-        fprintf(stderr, "sm_interp: pat-stack underflow\n"); abort();
-    }
-    return g_pat_stack[--g_pat_sp];
-}
+/* ME-1: pat-stack unified into SM_State.stack — no separate g_pat_stack */
 
 /* ── Stack helpers ──────────────────────────────────────────────────── */
 
@@ -547,102 +526,99 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
 
         case SM_PAT_LIT: {
             /* a[0].s = literal string */
-            pat_push(pat_lit(ins->a[0].s ? ins->a[0].s : ""));
+            sm_push(st, pat_lit(ins->a[0].s ? ins->a[0].s : ""));
             break;
         }
         case SM_PAT_ANY: {
             /* arg on value stack: charset string */
             DESCR_t arg = sm_pop(st);
             const char *cs = VARVAL_fn(arg);
-            pat_push(pat_any_cs(cs ? cs : ""));
+            sm_push(st, pat_any_cs(cs ? cs : ""));
             break;
         }
         case SM_PAT_NOTANY: {
             DESCR_t arg = sm_pop(st);
             const char *cs = VARVAL_fn(arg);
-            pat_push(pat_notany(cs ? cs : ""));
+            sm_push(st, pat_notany(cs ? cs : ""));
             break;
         }
         case SM_PAT_SPAN: {
             DESCR_t arg = sm_pop(st);
             const char *cs = VARVAL_fn(arg);
-            pat_push(pat_span(cs ? cs : ""));
+            sm_push(st, pat_span(cs ? cs : ""));
             break;
         }
         case SM_PAT_BREAK: {
             DESCR_t arg = sm_pop(st);
             const char *cs = VARVAL_fn(arg);
-            pat_push(pat_break_(cs ? cs : ""));
+            sm_push(st, pat_break_(cs ? cs : ""));
             break;
         }
         case SM_PAT_LEN: {
             DESCR_t arg = sm_pop(st);
             int64_t n = (arg.v == DT_I) ? arg.i : 0;
-            pat_push(pat_len(n));
+            sm_push(st, pat_len(n));
             break;
         }
         case SM_PAT_POS: {
             DESCR_t arg = sm_pop(st);
             int64_t n = (arg.v == DT_I) ? arg.i : 0;
-            pat_push(pat_pos(n));
+            sm_push(st, pat_pos(n));
             break;
         }
         case SM_PAT_RPOS: {
             DESCR_t arg = sm_pop(st);
             int64_t n = (arg.v == DT_I) ? arg.i : 0;
-            pat_push(pat_rpos(n));
+            sm_push(st, pat_rpos(n));
             break;
         }
         case SM_PAT_TAB: {
             DESCR_t arg = sm_pop(st);
             int64_t n = (arg.v == DT_I) ? arg.i : 0;
-            pat_push(pat_tab(n));
+            sm_push(st, pat_tab(n));
             break;
         }
         case SM_PAT_RTAB: {
             DESCR_t arg = sm_pop(st);
             int64_t n = (arg.v == DT_I) ? arg.i : 0;
-            pat_push(pat_rtab(n));
+            sm_push(st, pat_rtab(n));
             break;
         }
-        case SM_PAT_ARB:     pat_push(pat_arb());     break;
-        case SM_PAT_ARBNO:   { DESCR_t _inner = pat_pop(); pat_push(pat_arbno(_inner)); } break;
-        case SM_PAT_REM:     pat_push(pat_rem());     break;
-        case SM_PAT_FAIL:    pat_push(pat_fail());    break;
-        case SM_PAT_SUCCEED: pat_push(pat_succeed()); break;
-        case SM_PAT_EPS:     pat_push(pat_epsilon()); break;
-        case SM_PAT_FENCE:   pat_push(pat_fence());   break;
-        case SM_PAT_FENCE1:  { DESCR_t _ch = pat_pop(); pat_push(pat_fence_p(_ch)); } break;
-        case SM_PAT_ABORT:   pat_push(pat_abort());   break;
-        case SM_PAT_BAL:     pat_push(pat_bal());     break;
+        case SM_PAT_ARB:     sm_push(st, pat_arb());     break;
+        case SM_PAT_ARBNO:   { DESCR_t _inner = sm_pop(st); sm_push(st, pat_arbno(_inner)); } break;
+        case SM_PAT_REM:     sm_push(st, pat_rem());     break;
+        case SM_PAT_FAIL:    sm_push(st, pat_fail());    break;
+        case SM_PAT_SUCCEED: sm_push(st, pat_succeed()); break;
+        case SM_PAT_EPS:     sm_push(st, pat_epsilon()); break;
+        case SM_PAT_FENCE:   sm_push(st, pat_fence());   break;
+        case SM_PAT_FENCE1:  { DESCR_t _ch = sm_pop(st); sm_push(st, pat_fence_p(_ch)); } break;
+        case SM_PAT_ABORT:   sm_push(st, pat_abort());   break;
+        case SM_PAT_BAL:     sm_push(st, pat_bal());     break;
 
         case SM_PAT_CAT: {
             /* pop right then left (left was pushed first) */
-            DESCR_t right = pat_pop();
-            DESCR_t left  = pat_pop();
-            pat_push(pat_cat(left, right));
+            DESCR_t right = sm_pop(st);
+            DESCR_t left  = sm_pop(st);
+            sm_push(st, pat_cat(left, right));
             break;
         }
         case SM_PAT_ALT: {
-            DESCR_t right = pat_pop();
-            DESCR_t left  = pat_pop();
-            pat_push(pat_alt(left, right));
+            DESCR_t right = sm_pop(st);
+            DESCR_t left  = sm_pop(st);
+            sm_push(st, pat_alt(left, right));
             break;
         }
-        case SM_PAT_BOXVAL:
-            /* pop pat-stack top, push as DT_P onto value-stack */
-            sm_push(st, pat_pop());
-            break;
+        /* SM_PAT_BOXVAL deleted by ME-1 — pat-stack and value-stack are now one */
         case SM_PAT_DEREF: {
             DESCR_t v = sm_pop(st);
             if (v.v == DT_P) {
-                pat_push(v);                        /* already a pattern */
+                sm_push(st, v);                        /* already a pattern */
             } else if (v.v == DT_S && v.s) {
-                pat_push(pat_lit(v.s));             /* string → literal */
+                sm_push(st, pat_lit(v.s));             /* string → literal */
             } else {
                 /* variable name or other — deferred ref */
                 const char *name = VARVAL_fn(v);
-                pat_push(pat_ref(name ? name : ""));
+                sm_push(st, pat_ref(name ? name : ""));
             }
             break;
         }
@@ -651,22 +627,22 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
              * never fetching the variable's current value at build time.
              * Required for self-recursive patterns. */
             const char *name = ins->a[0].s ? ins->a[0].s : "";
-            pat_push(pat_ref(name));
+            sm_push(st, pat_ref(name));
             break;
         }
         case SM_PAT_CAPTURE: {
             /* a[0].s = variable name; a[1].i = 0=cond 1=imm 2=cursor
              * pat_assign_cond/imm expects a NAME descriptor (DT_N). */
-            DESCR_t child = pat_pop();
+            DESCR_t child = sm_pop(st);
             const char *vname = ins->a[0].s ? ins->a[0].s : "";
             DESCR_t var = NAME_fn(vname);
             int kind = (int)ins->a[1].i;
             if (kind == 1)
-                pat_push(pat_assign_imm(child, var));
+                sm_push(st, pat_assign_imm(child, var));
             else if (kind == 2)
-                pat_push(pat_cat(child, pat_at_cursor(vname)));  /* cursor: seq child then @var */
+                sm_push(st, pat_cat(child, pat_at_cursor(vname)));  /* cursor: seq child then @var */
             else
-                pat_push(pat_assign_cond(child, var));
+                sm_push(st, pat_assign_cond(child, var));
             break;
         }
 
@@ -681,7 +657,7 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
              * deferred for '.', immediate for '$'.
              * The old DT_E/pat_assign_cond approach only worked via the snobol4_pattern.c
              * materialise() path, which --sm-run does not use. */
-            DESCR_t child = pat_pop();
+            DESCR_t child = sm_pop(st);
             const char *fname    = ins->a[0].s ? ins->a[0].s : "";
             const char *namelist = ins->a[2].s;
             if (namelist && namelist[0]) {
@@ -703,12 +679,12 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
                     }
                 }
                 int is_imm = (int)ins->a[1].i;
-                pat_push(is_imm
+                sm_push(st, is_imm
                     ? pat_assign_callcap_named_imm(child, fname, NULL, 0, names, nnames)
                     : pat_assign_callcap_named(child, fname, NULL, 0, names, nnames));
             } else {
                 int is_imm = (int)ins->a[1].i;
-                pat_push(is_imm
+                sm_push(st, is_imm
                     ? pat_assign_callcap_named_imm(child, fname, NULL, 0, NULL, 0)
                     : pat_assign_callcap(child, fname, NULL, 0));
             }
@@ -727,10 +703,10 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
                 ? (DESCR_t *)GC_MALLOC((size_t)nargs * sizeof(DESCR_t))
                 : NULL;
             for (int i = nargs - 1; i >= 0; i--) argv[i] = sm_pop(st);
-            DESCR_t child = pat_pop();
+            DESCR_t child = sm_pop(st);
             const char *fname = ins->a[0].s ? ins->a[0].s : "";
             int is_imm = (int)ins->a[1].i;  /* SN-26c-parseerr-f: 0=cond(.) 1=imm($) */
-            pat_push(is_imm
+            sm_push(st, is_imm
                 ? pat_assign_callcap_named_imm(child, fname, argv, nargs, NULL, 0)
                 : pat_assign_callcap(child, fname, argv, nargs));
             break;
@@ -748,7 +724,7 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
              * to resolve names at match time.  SN-8a fixes the non-AST_VAR case
              * via SM_PAT_USERCALL_ARGS (args-on-stack). */
             const char *fname = ins->a[0].s ? ins->a[0].s : "";
-            pat_push(pat_user_call(fname, NULL, 0));
+            sm_push(st, pat_user_call(fname, NULL, 0));
             break;
         }
 
@@ -763,32 +739,30 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
                 : NULL;
             for (int i = nargs - 1; i >= 0; i--) argv[i] = sm_pop(st);
             const char *fname = ins->a[0].s ? ins->a[0].s : "";
-            pat_push(pat_user_call(fname, argv, nargs));
+            sm_push(st, pat_user_call(fname, argv, nargs));
             break;
         }
 
         case SM_EXEC_STMT: {
             /*
              * Stack at entry (top-of-stack = last pushed):
-             *   [subj_descr] [pat_on_pat_stack] [repl_or_zero]
+             *   [subj_descr] [pat_descr(DT_P)] [repl_or_zero]
              *   a[0].s  = subject variable name (or NULL)
              *   a[1].i  = has_repl flag
              *
-             * The subject was pushed onto the value stack by sm_lower.
-             * The pattern was built on g_pat_stack by SM_PAT_* ops.
-             * The replacement (or INTVAL(0)) is on top of the value stack.
+             * ME-1: pattern is now on the value stack alongside subj and repl.
+             * sm_lower push order: pat_tree, subject, repl — so pop order is repl, subj, pat.
              */
             int has_repl = (int)ins->a[1].i;
-            DESCR_t repl   = sm_pop(st);    /* replacement or INTVAL(0) */
+            DESCR_t repl   = sm_pop(st);    /* replacement or INTVAL(0) — top of stack */
             DESCR_t subj_d = sm_pop(st);    /* subject descriptor */
-            DESCR_t pat_d  = (g_pat_sp > 0) ? pat_pop() : pat_epsilon();
+            DESCR_t pat_d  = sm_pop(st);    /* pattern (DT_P) — pushed first by sm_lower */
 
             const char *sname = ins->a[0].s;   /* subject var name for write-back */
 
             int ok = exec_stmt(sname, &subj_d, pat_d,
                                has_repl ? &repl : NULL, has_repl);
             st->last_ok = ok;
-            g_pat_sp = 0;   /* reset pat-stack after each statement */
             break;
         }
 
