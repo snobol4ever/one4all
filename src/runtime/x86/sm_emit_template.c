@@ -114,8 +114,8 @@ static const sm_op_template_t g_sm_templates[] = {
     { SM_JUMP_F,       "JUMP_F",       "rt_last_ok",      SM_TPL_PCREF_COND, 0, 0 },
 
     /* Expression discipline */
-    { SM_PUSH_EXPRESSION,   "PUSH_CHUNK",   "rt_push_expression_descr", SM_TPL_PUSH_CHUNK, 0, 0 },
-    { SM_CALL_EXPRESSION,   "CALL_CHUNK",   NULL,                    SM_TPL_CALL_CHUNK, 0, 0 },
+    { SM_PUSH_EXPRESSION,   "PUSH_EXPRESSION",   "rt_push_expression_descr", SM_TPL_PUSH_EXPRESSION, 0, 0 },
+    { SM_CALL_EXPRESSION,   "CALL_EXPRESSION",   NULL,                    SM_TPL_CALL_EXPRESSION, 0, 0 },
     { SM_RETURN,       "RETURN",       NULL,                    SM_TPL_RET,        0, 0 },
 
     /* General call */
@@ -407,7 +407,7 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
         macro_line(out, "", ".endm", "");
         return 0;
 
-    case SM_TPL_PUSH_CHUNK:
+    case SM_TPL_PUSH_EXPRESSION:
         snprintf(macro_def, sizeof(macro_def), "%s entry, arity", t->macro_name);
         macro_line(out, "", ".macro", macro_def);
         macro_line(out, "", "movabs", "rdi, \\entry");
@@ -417,7 +417,7 @@ static int render_macro_body(FILE *out, const sm_op_template_t *t)
         macro_line(out, "", ".endm", "");
         return 0;
 
-    case SM_TPL_CALL_CHUNK:
+    case SM_TPL_CALL_EXPRESSION:
         snprintf(macro_def, sizeof(macro_def), "%s tgt", t->macro_name);
         macro_line(out, "", ".macro", macro_def);
         macro_line(out, "", "call", "\\tgt");
@@ -575,10 +575,10 @@ static int build_args_col(char *buf, int cap, const sm_op_template_t *t,
         break;
     case SM_TPL_PCREF_JMP:
     case SM_TPL_PCREF_COND:
-    case SM_TPL_CALL_CHUNK:
+    case SM_TPL_CALL_EXPRESSION:
         n = snprintf(buf, cap, ".Lpc%d", args->i32_a);
         break;
-    case SM_TPL_PUSH_CHUNK:
+    case SM_TPL_PUSH_EXPRESSION:
         n = snprintf(buf, cap, "%" PRId64 ", %d", args->i64, args->i32_a);
         break;
     case SM_TPL_RET_VAR:
@@ -652,17 +652,15 @@ static int render_call_line(FILE *out, const sm_op_template_t *t,
         col3[0] = '\0';
     }
 
-    /* EM-7c-no-trailing-ws (2026-05-09): build + right-trim. */
+    /* EM-7c-no-trailing-ws (2026-05-09): build + right-trim.
+     * EM-FORMAT-SM (sess 2026-05-09): unified shape -- empty col-1 emits
+     * 24 spaces of padding, NOT a tab + 15-char col-2.  This way labelled
+     * and unlabelled lines align at the same col-2 column position. */
     char line[768];
     int n;
-    if (lbl_col && *lbl_col) {
-        /* Three-column: label(24) / opcode(16) / args+anno.
-         * Single space ensures gap even when opcode overflows 16 chars. */
-        n = snprintf(line, sizeof(line), "%-24s%-16s %s", lbl_col, t->macro_name, col3);
-    } else {
-        /* No label: tab + opcode(16) + space + args+anno */
-        n = snprintf(line, sizeof(line), "\t%-15s %s", t->macro_name, col3);
-    }
+    n = snprintf(line, sizeof(line), "%-24s%-16s %s",
+                 (lbl_col && *lbl_col) ? lbl_col : "",
+                 t->macro_name, col3);
     if (n < 0) return -1;
     if (n >= (int)sizeof(line)) n = (int)sizeof(line) - 1;
     while (n > 0 && (line[n-1] == ' ' || line[n-1] == '\t')) n--;

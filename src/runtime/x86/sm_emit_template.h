@@ -45,8 +45,8 @@
  * ARITH      -- i32 op_enum;   SM_ADD..SM_MOD
  * PCREF_JMP  -- int target_pc; SM_JUMP
  * PCREF_COND -- int target_pc, int taken_when_ok; SM_JUMP_S / SM_JUMP_F
- * PUSH_CHUNK -- i64 entry, i32 arity
- * CALL_CHUNK -- int target_pc
+ * PUSH_EXPRESSION -- i64 entry, i32 arity
+ * CALL_EXPRESSION -- int target_pc
  * RET        -- no args; emits `ret`
  * RET_VAR    -- i32 kind, i32 cond, int pc; conditional return shape
  * UNHANDLED  -- i32 op_enum; trap shape
@@ -64,8 +64,8 @@ typedef enum {
     SM_TPL_ARITH,
     SM_TPL_PCREF_JMP,
     SM_TPL_PCREF_COND,
-    SM_TPL_PUSH_CHUNK,
-    SM_TPL_CALL_CHUNK,
+    SM_TPL_PUSH_EXPRESSION,
+    SM_TPL_CALL_EXPRESSION,
     SM_TPL_RET,
     SM_TPL_RET_VAR,
     SM_TPL_UNHANDLED,
@@ -81,7 +81,7 @@ typedef enum {
  * binds an opcode integer to a {macro_name, runtime_symbol, kind}
  * triple; the runtime_symbol is the libscrip_rt.so PLT entry the
  * macro calls.  For shapes that don't take a runtime arg (RET,
- * PCREF_JMP, PCREF_COND, CALL_CHUNK, RET_VAR), runtime is NULL.
+ * PCREF_JMP, PCREF_COND, CALL_EXPRESSION, RET_VAR), runtime is NULL.
  */
 typedef struct {
     int             op;            /* sm_opcode_t value (or -1 for the
@@ -133,7 +133,7 @@ int sm_emit_macro_library_to_path(const char *path);
  * The `args` carry the per-instruction values.  Returns 0 on
  * success, -1 on I/O error. */
 typedef struct {
-    int64_t     i64;          /* INT64 / PUSH_CHUNK entry */
+    int64_t     i64;          /* INT64 / PUSH_EXPRESSION entry */
     int         i32_a;        /* arity / slen / nargs / target_pc / taken / kind */
     int         i32_b;        /* nargs / cond / 2nd int arg */
     int         pc;           /* RET_VAR uses for unique skip-label */

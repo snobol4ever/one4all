@@ -308,6 +308,71 @@ static void strtab_collect(const SM_Program *prog)
 }
 
 /* -----------------------------------------------------------------------
+ * EM-FORMAT-SM "labels-only-when-referenced" (sess 2026-05-09)
+ *
+ * Pre-pass over SM_Program building a bitset of PCs that are actually
+ * referenced as control-flow / data targets.  An unreferenced PC has no
+ * .LpcN: label emitted in the .s file, eliminating the long stretches
+ * of one-shot labels that previously hung off every instruction.
+ *
+ * Sources of "PC is a target":
+ *   1. SM_JUMP / SM_JUMP_S / SM_JUMP_F : a[0].i is the destination pc.
+ *   2. SM_PUSH_EXPRESSION / SM_CALL_EXPRESSION : a[0].i is an entry_pc.
+ *   3. SM_LABEL with named a[0].s : the chunk registry emits
+ *      `.quad .Lpc{i+1}` (see emit_chunk_registry); mark pc+1.
+ *   4. PC 0 : conventional program entry; safe to keep marked.
+ *
+ * Pattern blobs (`pat_inv_<id>_α/β/γ/ω`) reference the pat_id, not
+ * .LpcN -- their back-references are human-readable comments only,
+ * not asm symbols.  No marking needed for blob entry pcs.
+ *
+ * The bitset is populated as a side effect of pattern_windows_collect()
+ * so prog->instrs is walked exactly ONCE before the main dispatch loop
+ * (the pattern-window walk + target-collection share the same pass).
+ * ----------------------------------------------------------------------- */
+
+static uint8_t *g_pc_used_as_target = NULL;   /* len = prog->count; 1 = referenced */
+static int      g_pc_used_count     = 0;
+
+static int pc_used_alloc(const SM_Program *prog)
+{
+    if (g_pc_used_as_target) {
+        free(g_pc_used_as_target);
+        g_pc_used_as_target = NULL;
+        g_pc_used_count = 0;
+    }
+    if (!prog || prog->count <= 0) return 0;
+    g_pc_used_as_target = (uint8_t *)calloc((size_t)prog->count, 1);
+    if (!g_pc_used_as_target) return -1;
+    g_pc_used_count = prog->count;
+    /* Source 4: program entry pc=0 always referenced. */
+    g_pc_used_as_target[0] = 1;
+    return 0;
+}
+
+static inline void pc_used_mark(int pc)
+{
+    if (g_pc_used_as_target && pc >= 0 && pc < g_pc_used_count)
+        g_pc_used_as_target[pc] = 1;
+}
+
+static int pc_is_used_as_target(int pc)
+{
+    if (!g_pc_used_as_target) return 1;   /* fallback: keep all labels */
+    if (pc < 0 || pc >= g_pc_used_count) return 1;
+    return g_pc_used_as_target[pc] ? 1 : 0;
+}
+
+static void release_pc_used_as_target(void)
+{
+    if (g_pc_used_as_target) {
+        free(g_pc_used_as_target);
+        g_pc_used_as_target = NULL;
+        g_pc_used_count = 0;
+    }
+}
+
+/* -----------------------------------------------------------------------
  * emit_three_column_line -- central renderer for all non-BB, non-banner lines.
  *
  * Corrected three-column shape (per EM-7c-three-column-non-bb):
@@ -609,13 +674,14 @@ static int sm_line(FILE *out, const char *label, const char *action,
         lbl = sm_emit_consume_pc_label();   /* "" if no pending label */
     }
     const char *act = (action && *action) ? action : "";
-    /* EM-7c-no-trailing-ws (2026-05-09): build + right-trim. */
+    /* EM-7c-no-trailing-ws (2026-05-09): build + right-trim.
+     * EM-FORMAT-SM (sess 2026-05-09): unified shape -- empty col-1 emits
+     * 24 spaces of padding, NOT a tab + 15-char col-2.  This way labelled
+     * and unlabelled lines align at the same col-2 column position. */
     char line[768];
     int n;
-    if (lbl && *lbl)
-        n = snprintf(line, sizeof(line), "%-24s%-16s %s", lbl, act, gc);
-    else
-        n = snprintf(line, sizeof(line), "\t%-15s %s", act, gc);
+    n = snprintf(line, sizeof(line), "%-24s%-16s %s",
+                 (lbl && *lbl) ? lbl : "", act, gc);
     if (n < 0) return -1;
     if (n >= (int)sizeof(line)) n = (int)sizeof(line) - 1;
     while (n > 0 && (line[n-1] == ' ' || line[n-1] == '\t')) n--;
@@ -1450,14 +1516,14 @@ DESCR_t sm_phase2_to_patnd(const SM_Program *prog,
  *    record [phase2_start, phase2_end, exec_pc, pat_id].
  *
  * 2. Emit pre-text section: for each invariant pattern, call
- *    bb_build_flat_text(root, out, "_pat_inv_<id>") to bake a flat
+ *    bb_build_flat_text(root, out, "pat_inv_<id>") to bake a flat
  *    .text expression with externally-visible α/β/γ/ω entry symbols.
  *
  * 3. Main dispatch:
  *      - SM_PAT_* and value-stack pushes inside an invariant Phase-2
  *        window: emit a NOP comment (the pattern is already baked).
  *      - SM_EXEC_STMT for an invariant statement: emit a call to
- *        rt_match_blob(_pat_inv_<id>_α, sname, has_repl).
+ *        rt_match_blob(pat_inv_<id>_α, sname, has_repl).
  *      - Variant patterns / non-pattern statements: unchanged
  *        (variant patterns fall through to emit_sm_unhandled until
  *        the variant-runtime-emitter rung lands).
@@ -1474,7 +1540,7 @@ typedef struct {
     int  phase2_start;       /* first SM pc inside Phase-2 (inclusive) */
     int  phase2_end;          /* one past last Phase-2 pc (exclusive) */
     int  exec_stmt_pc;        /* pc of the SM_EXEC_STMT instruction */
-    int  pat_id;              /* unique id for the _pat_inv_<id>_* labels */
+    int  pat_id;              /* unique id for the pat_inv_<id>_* labels */
     int  is_invariant;        /* 1 = baked in .text via bb_build_flat_text */
     DESCR_t root;             /* PATND_t root from sm_phase2_to_patnd (DT_P) */
 } pattern_window_t;
@@ -1523,10 +1589,34 @@ static void pattern_windows_collect(const SM_Program *prog)
 {
     pattern_windows_reset();
 
+    /* EM-FORMAT-SM (sess 2026-05-09): allocate the target bitset for the
+     * "labels-only-when-referenced" rule.  We populate it as a side effect
+     * of this same walk over prog->instrs -- one pass, two outputs. */
+    pc_used_alloc(prog);
+
     int stmt_start = 0;   /* PC of the first instruction in the current statement */
 
     for (int pc = 0; pc < prog->count; pc++) {
         const SM_Instr *ins = &prog->instrs[pc];
+
+        /* EM-FORMAT-SM: target-collection side pass.  Mark PCs that are
+         * jump / call / chunk-registry / data-quad targets so the dispatch
+         * loop later can skip emitting unreferenced .LpcN: labels. */
+        switch (ins->op) {
+        case SM_JUMP:
+        case SM_JUMP_S:
+        case SM_JUMP_F:
+        case SM_PUSH_EXPRESSION:
+        case SM_CALL_EXPRESSION:
+            pc_used_mark((int)ins->a[0].i);
+            break;
+        case SM_LABEL:
+            if (ins->a[0].s && *ins->a[0].s)
+                pc_used_mark(pc + 1);   /* chunk registry references pc+1 */
+            break;
+        default:
+            break;
+        }
 
         if (ins->op == SM_STNO) {
             stmt_start = pc + 1;
@@ -1569,7 +1659,7 @@ static void pattern_windows_collect(const SM_Program *prog)
 /* Emit the .text-resident invariant pattern blobs.  Called after the
  * .rodata section and before the main `.text` instruction stream.
  * Each invariant pattern gets one labeled expression with externally-visible
- * α/β/γ/ω labels (`_pat_inv_<id>_α` etc.). */
+ * α/β/γ/ω labels (`pat_inv_<id>_α` etc.). */
 static int emit_pattern_blobs(FILE *out)
 {
     int n_invariant = 0;
@@ -1587,7 +1677,7 @@ static int emit_pattern_blobs(FILE *out)
     if (fputs(
         "# ======================================================================================================================\n"
         "# EM-7c: invariant pattern blobs (baked from sm_phase2_to_patnd → bb_build_flat_text)\n"
-        "# Each block exposes _pat_inv_<id>_α / _β / _γ / _ω.\n"
+        "# Each block exposes pat_inv_<id>_α / _β / _γ / _ω.\n"
         "# rt_match_blob(blob_α, ...) drives Phase-3 against these blobs.\n"
         "# ======================================================================================================================\n",
         out) == EOF) return -1;
@@ -1599,7 +1689,7 @@ static int emit_pattern_blobs(FILE *out)
         if (!w->is_invariant) continue;
 
         char prefix[64];
-        snprintf(prefix, sizeof(prefix), "_pat_inv_%d", w->pat_id);
+        snprintf(prefix, sizeof(prefix), "pat_inv_%d", w->pat_id);
 
         if (fprintf(out,
             "# ---- pattern blob %d (Phase-2 window pc=%d..%d, SM_EXEC_STMT pc=%d) ----\n",
@@ -1631,12 +1721,12 @@ static int emit_sm_exec_stmt_blob(FILE *out, const SM_Instr *ins, int pc, int wi
     const char *sname = ins->a[0].s;     /* subject NV name (or NULL) */
     int has_repl      = (int)ins->a[1].i;
 
-    /* Arg 0 (rdi) = blob_α = address of `_pat_inv_<id>_α`.
+    /* Arg 0 (rdi) = blob_α = address of `pat_inv_<id>_α`.
      * GAS Intel syntax: `lea rdi, [rip + symbol]`.  This first line
      * consumes the pending .LpcN: pc-label (sm_line routes through it). */
     char act[160];
     snprintf(act, sizeof(act),
-             "rdi, [rip + _pat_inv_%d_α]", w->pat_id);
+             "rdi, [rip + pat_inv_%d_α]", w->pat_id);
     char anno[80];
     snprintf(anno, sizeof(anno),
              "# blob entry α  (Phase-2 pc=%d..%d)",
@@ -1685,7 +1775,7 @@ static int emit_sm_exec_stmt_blob(FILE *out, const SM_Instr *ins, int pc, int wi
 
 /* Emit a real three-column line for an SM op that was absorbed into an
  * invariant pattern blob.  EM-7c-stmt-banner-fidelity: replaces the
- * earlier disembodied `# (baked into _pat_inv_<id> at .text — SM_*)`
+ * earlier disembodied `# (baked into pat_inv_<id> at .text — SM_*)`
  * comment.  Shape:
  *   .LpcN:                  PAT_RPOS         baked  # _pat_inv_0 pc=7..12
  * Col 1 = pending .LpcN: label (consumed); col 2 = SM op name; col 3 =
@@ -1702,7 +1792,7 @@ static int emit_sm_exec_stmt_blob(FILE *out, const SM_Instr *ins, int pc, int wi
  * scan.  This preserves both correctness and readability.
  *
  * Final chosen shape (col 1 still meaningful as a jump target):
- *   .LpcN:                  # PAT_RPOS       baked  _pat_inv_0 pc=7..12
+ *   .LpcN:                  # PAT_RPOS       baked  pat_inv_0 pc=7..12
  * Col 2 starts with `#` so GAS treats the rest of the line as a
  * comment; the .LpcN: still defines the label so jumps targeting
  * this PC continue to work. */
@@ -1741,7 +1831,7 @@ static int emit_sm_pat_baked(FILE *out, const SM_Instr *ins, int pc, int win_idx
 
     char col3[160];
     snprintf(col3, sizeof(col3),
-             "baked  _pat_inv_%d pc=%d..%d",
+             "baked  pat_inv_%d pc=%d..%d",
              w->pat_id, w->phase2_start, w->phase2_end - 1);
 
     if (emit_three_column_line(out, lbl, op_col, col3, NULL) != 0) return -1;
@@ -2006,7 +2096,11 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
      * Phase-2 simulator to reconstruct each pattern's PATND_t tree.
      * Fully-invariant patterns are emitted as flat .text expressions below;
      * variant patterns will be handled by a follow-up rung (their
-     * SM_EXEC_STMT falls through to emit_sm_unhandled). */
+     * SM_EXEC_STMT falls through to emit_sm_unhandled).
+     *
+     * EM-FORMAT-SM (sess 2026-05-09): this call ALSO populates the
+     * pc_used_as_target bitset as a side effect -- one pass over
+     * prog->instrs, two outputs. */
     pattern_windows_collect(prog);
     if (emit_pattern_blobs(out) != 0) return -1;
 
@@ -2036,7 +2130,11 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
         /* If the previous instruction did not consume its pending label
          * (e.g. an SM_LABEL or SM_STNO that emits no opcode line), flush
          * it now as a standalone label line so it remains a valid jump
-         * target.  Then set the label for this instruction. */
+         * target.  Then set the label for this instruction -- but ONLY
+         * if this PC is actually referenced (EM-FORMAT-SM
+         * labels-only-when-referenced).  Unreferenced PCs emit no label;
+         * the dispatch line renders with col-1 empty (still uniform
+         * three-column shape via render_call_line / emit_three_column_line). */
         {
             const char *leftover = sm_emit_consume_pc_label();
             if (leftover && *leftover) {
@@ -2045,9 +2143,13 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
                     return -1;
                 }
             }
-            char lbl[32];
-            snprintf(lbl, sizeof(lbl), ".Lpc%d:", pc);
-            sm_emit_set_pc_label(lbl);
+            if (pc_is_used_as_target(pc)) {
+                char lbl[32];
+                snprintf(lbl, sizeof(lbl), ".Lpc%d:", pc);
+                sm_emit_set_pc_label(lbl);
+            } else {
+                sm_emit_set_pc_label("");
+            }
         }
 
         /* EM-7c: pattern-window dispatch hook.  Two cases handled here
@@ -2138,7 +2240,7 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
 
             /* EM-7c-variant (session #80, 2026-05-07): pattern-construction
              * opcodes.  Patterns inside an invariant Phase-2 window are
-             * absorbed into the .text-baked _pat_inv_<id>_* blob (handled
+             * absorbed into the .text-baked pat_inv_<id>_* blob (handled
              * by the pattern_window_at_pc hook above this switch).  Patterns
              * outside any window — either variant (the runtime Phase-2
              * window built a tree with at least one variant node) or pattern-
@@ -2202,6 +2304,7 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
         if (leftover && *leftover) {
             if (fprintf(out, "%s\n", leftover) < 0) {
                 if (sl_loaded) srclines_free(&sl);
+                release_pc_used_as_target();
                 return -1;
             }
         }
@@ -2209,5 +2312,6 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
 
     int frc = emit_file_footer(out);
     if (sl_loaded) srclines_free(&sl);
+    release_pc_used_as_target();
     return frc;
 }

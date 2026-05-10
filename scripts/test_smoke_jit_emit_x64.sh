@@ -73,7 +73,7 @@ fi
 # every .s by sm_emit_macro_library); the call site reads `SM_PUSH_INT 42`.
 # Both are verified below — body proves the encoding; call-site proves the
 # dispatcher routed through the template.
-grep -qE '^\.Lpc[0-9]+:[[:space:]]+PUSH_INT[[:space:]]+42\b' "$TMP/em2_a.s" || { echo "FAIL no PUSH_INT 42 macro call"; exit 1; }
+grep -qE '^(\.Lpc[0-9]+:)?[[:space:]]+PUSH_INT[[:space:]]+42\b' "$TMP/em2_a.s" || { echo "FAIL no PUSH_INT 42 macro call"; exit 1; }
 grep -q "rt_push_int@PLT"       "$ROOT/sm_macros.s" || { echo "FAIL no push_int call in sm_macros.s"; exit 1; }
 grep -q "rt_halt_tos@PLT"       "$ROOT/sm_macros.s" || { echo "FAIL no halt_tos call in sm_macros.s"; exit 1; }
 echo "  PASS PUSH_LIT_I+HALT  (rc=42; emit shape correct)"
@@ -172,8 +172,8 @@ fi
 # SM_ADD" form).  Suffix `_NUM` avoids collision with x86 add/sub/mul/div
 # mnemonics (GAS macro-name match is case-insensitive).
 # The em3 program is (2+3)*4 — must contain at least ADD_NUM and MUL_NUM.
-grep -qE '^\.Lpc[0-9]+:[[:space:]]+ADD_NUM\b' "$TMP/em3.s" || { echo "FAIL no ADD_NUM macro call in em3 asm"; exit 1; }
-grep -qE '^\.Lpc[0-9]+:[[:space:]]+MUL_NUM\b' "$TMP/em3.s" || { echo "FAIL no MUL_NUM macro call in em3 asm"; exit 1; }
+grep -qE '^(\.Lpc[0-9]+:)?[[:space:]]+ADD_NUM\b' "$TMP/em3.s" || { echo "FAIL no ADD_NUM macro call in em3 asm"; exit 1; }
+grep -qE '^(\.Lpc[0-9]+:)?[[:space:]]+MUL_NUM\b' "$TMP/em3.s" || { echo "FAIL no MUL_NUM macro call in em3 asm"; exit 1; }
 grep -q "rt_arith@PLT" "$ROOT/sm_macros.s" || { echo "FAIL no arith PLT call in sm_macros.s"; exit 1; }
 echo "  PASS EM-3 arithmetic  ((2+3)*4=20; emit->link->run verified)"
 
@@ -197,9 +197,9 @@ fi
 # in the .macro JUMP / JUMP_F / JUMP_S bodies in the externalised sm_macros.s
 # (one copy per emit run); the dispatcher emits `JUMP .LpcN`, `JUMP_F .LpcN`,
 # `JUMP_S .LpcN` at the call sites in three-column form.  Both forms verified.
-grep -qE '^\.Lpc[0-9]+:[[:space:]]+JUMP[[:space:]]+\.Lpc' "$TMP/em4a.s" || { echo "FAIL no JUMP .LpcN call in em4a asm"; exit 1; }
-grep -qE '^\.Lpc[0-9]+:[[:space:]]+JUMP_F[[:space:]]+\.Lpc' "$TMP/em4a.s" || { echo "FAIL no JUMP_F .LpcN call in em4a asm"; exit 1; }
-grep -qE '^\.Lpc[0-9]+:[[:space:]]+JUMP_S[[:space:]]+\.Lpc' "$TMP/em4a.s" || { echo "FAIL no JUMP_S .LpcN call in em4a asm"; exit 1; }
+grep -qE '^(\.Lpc[0-9]+:)?[[:space:]]+JUMP[[:space:]]+\.Lpc' "$TMP/em4a.s" || { echo "FAIL no JUMP .LpcN call in em4a asm"; exit 1; }
+grep -qE '^(\.Lpc[0-9]+:)?[[:space:]]+JUMP_F[[:space:]]+\.Lpc' "$TMP/em4a.s" || { echo "FAIL no JUMP_F .LpcN call in em4a asm"; exit 1; }
+grep -qE '^(\.Lpc[0-9]+:)?[[:space:]]+JUMP_S[[:space:]]+\.Lpc' "$TMP/em4a.s" || { echo "FAIL no JUMP_S .LpcN call in em4a asm"; exit 1; }
 grep -q "rt_last_ok@PLT" "$ROOT/sm_macros.s" || { echo "FAIL no last_ok call in sm_macros.s"; exit 1; }
 # Macro-body instructions: confirm the .macro definitions actually emitted
 # the conditional branches with \tgt as the target operand.
@@ -236,7 +236,7 @@ fi
 # Post EM-7c-sm-three-column: the call site emits `.LpcN: JUMP_F .Lpc1` (the
 # dispatcher's encoding of "jump-to-pc-1-on-failure"); the literal `jz \tgt`
 # lives in the .macro JUMP_F body in sm_macros.s and resolves at assembly time.
-grep -qE '^\.Lpc[0-9]+:[[:space:]]+JUMP_F[[:space:]]+\.Lpc1\b' "$TMP/em4b.s" || { echo "FAIL no backward JUMP_F .Lpc1 in em4b"; exit 1; }
+grep -qE '^(\.Lpc[0-9]+:)?[[:space:]]+JUMP_F[[:space:]]+\.Lpc1\b' "$TMP/em4b.s" || { echo "FAIL no backward JUMP_F .Lpc1 in em4b"; exit 1; }
 echo "  PASS EM-4b backward loop (JUMP_F backward x2, fallthrough; rc=0)"
 
 # -- Test 7a: EM-5 expression call/return -- two expressions calling each other -------
@@ -259,8 +259,8 @@ fi
 # Post EM-7c-sm-three-column: RETURN's `ret` and CALL_EXPRESSION's `call \tgt`
 # live in the .macro bodies in sm_macros.s; the dispatcher emits
 # `.LpcN: RETURN` (no args) and `.LpcN: CALL_EXPRESSION .LpcM` at the call sites.
-grep -qE '^\.Lpc[0-9]+:[[:space:]]+RETURN\b'                "$TMP/em5.s" || { echo "FAIL no RETURN call in em5"; exit 1; }
-grep -qE '^\.Lpc[0-9]+:[[:space:]]+CALL_EXPRESSION[[:space:]]+\.Lpc' "$TMP/em5.s" || { echo "FAIL no CALL_EXPRESSION .LpcN call in em5"; exit 1; }
+grep -qE '^(\.Lpc[0-9]+:)?[[:space:]]+RETURN\b'                "$TMP/em5.s" || { echo "FAIL no RETURN call in em5"; exit 1; }
+grep -qE '^(\.Lpc[0-9]+:)?[[:space:]]+CALL_EXPRESSION[[:space:]]+\.Lpc' "$TMP/em5.s" || { echo "FAIL no CALL_EXPRESSION .LpcN call in em5"; exit 1; }
 # Macro-body instructions: confirm the templates emitted the right bytes.
 # `call \tgt` lives in the .macro CALL_EXPRESSION body; `ret` lives in RETURN.
 grep -qE 'call[[:space:]]+\\tgt' "$ROOT/sm_macros.s" || { echo "FAIL no 'call \\\\tgt' in CALL_EXPRESSION macro body"; exit 1; }
@@ -312,20 +312,20 @@ grep -q "^PASS=18 FAIL=0" "$TMP/em7b.err" || {
 # externally-visible α/β/γ/ω globals.
 gcc -c "$TMP/em7b.s" -o "$TMP/em7b.o" 2> "$TMP/em7b.as_err" || {
     echo "FAIL EM-7b .s does not assemble"; cat "$TMP/em7b.as_err"; exit 1; }
-SYMS=$(objdump -t "$TMP/em7b.o" 2>/dev/null | awk '/_pat_inv_42_0_/{print $NF}' | grep -v '_α_body$' | sort)
-EXPECT=$(printf "_pat_inv_42_0_α\n_pat_inv_42_0_β\n_pat_inv_42_0_γ\n_pat_inv_42_0_ω")
+SYMS=$(objdump -t "$TMP/em7b.o" 2>/dev/null | awk '/pat_inv_42_0_/{print $NF}' | grep -v '_α_body$' | sort)
+EXPECT=$(printf "pat_inv_42_0_α\npat_inv_42_0_β\npat_inv_42_0_γ\npat_inv_42_0_ω")
 [ "$SYMS" = "$EXPECT" ] || {
     echo "FAIL EM-7b external labels missing or extra"; echo "got: $SYMS"; echo "expect: $EXPECT"; exit 1; }
 # Verify all four entry labels are GLOBAL (not local) — `g` flag in objdump column 2.
 # (`_α_body` is internal, may be local; we filter it before counting.)
-GLOBAL_COUNT=$(objdump -t "$TMP/em7b.o" 2>/dev/null | awk '/_pat_inv_42_0_/ && !/_α_body/ && $2 ~ /g/ {n++} END{print n+0}')
+GLOBAL_COUNT=$(objdump -t "$TMP/em7b.o" 2>/dev/null | awk '/pat_inv_42_0_/ && !/_α_body/ && $2 ~ /g/ {n++} END{print n+0}')
 [ "$GLOBAL_COUNT" = "4" ] || {
     echo "FAIL EM-7b only $GLOBAL_COUNT/4 entry labels are global"; exit 1; }
 echo "  PASS EM-7b bb_flat TEXT mode (PASS=18 unit + .s assembles + 4/4 external α/β/γ/ω)"
 
 # ── Test 13: EM-7c invariant-pattern blob emit shape ───────────────────────────
 # Verifies that an invariant pattern statement produces:
-#   1. a `_pat_inv_<id>_α/_β/_γ/_ω` block in the emitted `.s`,
+#   1. a `pat_inv_<id>_α/_β/_γ/_ω` block in the emitted `.s`,
 #   2. a `rt_match_blob@PLT` call at the SM_EXEC_STMT site,
 #   3. an `.s` that assembles AND links cleanly against libscrip_rt.so.
 # Runtime correctness of the linked binary is NOT checked here — bb_flat.c
@@ -341,10 +341,10 @@ END
 EOF
 "$SCRIP" --jit-emit --x64 "$TMP/em7c_inv.sno" > "$TMP/em7c.s" 2> "$TMP/em7c.err" || {
     echo "FAIL EM-7c emit"; cat "$TMP/em7c.err"; exit 1; }
-grep -q "^_pat_inv_0_α:"     "$TMP/em7c.s" || {
-    echo "FAIL EM-7c no _pat_inv_0_α label"; exit 1; }
-grep -q "^_pat_inv_0_β:"      "$TMP/em7c.s" || {
-    echo "FAIL EM-7c no _pat_inv_0_β label"; exit 1; }
+grep -q "^pat_inv_0_α:"     "$TMP/em7c.s" || {
+    echo "FAIL EM-7c no pat_inv_0_α label"; exit 1; }
+grep -q "^pat_inv_0_β:"      "$TMP/em7c.s" || {
+    echo "FAIL EM-7c no pat_inv_0_β label"; exit 1; }
 grep -q "rt_match_blob@PLT" "$TMP/em7c.s" || {
     echo "FAIL EM-7c no rt_match_blob@PLT call"; exit 1; }
 gcc -c "$TMP/em7c.s" -o "$TMP/em7c.o" 2> "$TMP/em7c.as_err" || {

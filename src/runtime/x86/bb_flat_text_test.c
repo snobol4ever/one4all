@@ -86,7 +86,7 @@ int main(int argc, char **argv) {
     fprintf(out, "    .intel_syntax noprefix\n");
     fprintf(out, "    .text\n");
 
-    int rc = bb_build_flat_text(p, out, "_pat_inv_42_0");
+    int rc = bb_build_flat_text(p, out, "pat_inv_42_0");
     CHECK(rc == 0, "bb_build_flat_text returned 0 for invariant pattern");
 
     fclose(out);
@@ -105,24 +105,24 @@ int main(int argc, char **argv) {
      * column 3 — separated by column-padding whitespace, not a single space.
      * Check for the directive and the symbol name independently; the order
      * is preserved on the same line by construction (one fputs per line). */
-    CHECK(strstr(buf, ".global") != NULL && strstr(buf, "_pat_inv_42_0_α") != NULL,
+    CHECK(strstr(buf, ".global") != NULL && strstr(buf, "pat_inv_42_0_α") != NULL,
           ".global _pat_inv_42_0_α missing");
-    CHECK(strstr(buf, "_pat_inv_42_0_β") != NULL,
+    CHECK(strstr(buf, "pat_inv_42_0_β") != NULL,
           ".global _pat_inv_42_0_β missing");
-    CHECK(strstr(buf, "_pat_inv_42_0_γ") != NULL,
+    CHECK(strstr(buf, "pat_inv_42_0_γ") != NULL,
           ".global _pat_inv_42_0_γ missing");
-    CHECK(strstr(buf, "_pat_inv_42_0_ω") != NULL,
+    CHECK(strstr(buf, "pat_inv_42_0_ω") != NULL,
           ".global _pat_inv_42_0_ω missing");
 
     /* ── 4. Verify each label is also DEFINED (not just declared) ── */
-    CHECK(strstr(buf, "_pat_inv_42_0_α:") != NULL,
-          "_pat_inv_42_0_α definition missing");
-    CHECK(strstr(buf, "_pat_inv_42_0_β:")  != NULL,
-          "_pat_inv_42_0_β definition missing");
-    CHECK(strstr(buf, "_pat_inv_42_0_γ:") != NULL,
-          "_pat_inv_42_0_γ definition missing");
-    CHECK(strstr(buf, "_pat_inv_42_0_ω:") != NULL,
-          "_pat_inv_42_0_ω definition missing");
+    CHECK(strstr(buf, "pat_inv_42_0_α:") != NULL,
+          "pat_inv_42_0_α definition missing");
+    CHECK(strstr(buf, "pat_inv_42_0_β:")  != NULL,
+          "pat_inv_42_0_β definition missing");
+    CHECK(strstr(buf, "pat_inv_42_0_γ:") != NULL,
+          "pat_inv_42_0_γ definition missing");
+    CHECK(strstr(buf, "pat_inv_42_0_ω:") != NULL,
+          "pat_inv_42_0_ω definition missing");
 
     /* ── 5. Verify readable-mnemonic emission (EM-7b'': no .byte walls) ── */
     /* EM-7c-symbolic: r10 now loaded via 'lea r10, [rip + Δ]' (symbolic).

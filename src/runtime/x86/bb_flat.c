@@ -768,7 +768,7 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
             int child_id = g_flat_node_id++;
             char slot_lbl[128], α_lbl[128];
             snprintf(slot_lbl,  sizeof(slot_lbl),  ".Larbno%d_slot", child_id);
-            snprintf(α_lbl, sizeof(α_lbl), "_arbno%d_child_α", child_id);
+            snprintf(α_lbl, sizeof(α_lbl), "arbno%d_child_α", child_id);
             /* Emit arbno_t* slot in .data (holds heap ptr after startup) */
             flat_data_section(e);
             flat3c_label(e, slot_lbl);
@@ -777,16 +777,16 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
             flat_intel_syntax(e);
             /* Emit child sub-proc */
             bb_label_t cs, cf, cb;
-            bb_label_initf(&cs, "_arbno%d_\xCE\xB3",        child_id);  /* _arbno%d_γ */
-            bb_label_initf(&cf, "_arbno%d_\xCF\x89",        child_id);  /* _arbno%d_ω */
-            bb_label_initf(&cb, "_arbno%d_\xCE\xB2",        child_id);  /* _arbno%d_β */
+            bb_label_initf(&cs, "arbno%d_\xCE\xB3",        child_id);  /* _arbno%d_γ */
+            bb_label_initf(&cf, "arbno%d_\xCF\x89",        child_id);  /* _arbno%d_ω */
+            bb_label_initf(&cb, "arbno%d_\xCE\xB2",        child_id);  /* _arbno%d_β */
             flat_globl(e, α_lbl);
             flat3c_label(e, α_lbl);
             {   bb_insn_desc_t d = {BB_INSN_LEA_R10_SYM, ADDR_DELTA, 0, 0, SYM_DELTA};
                 e->emit_insn(e, &d);
             }
             ev_cmp_esi_imm8(e, 0);
-            char ab_lbl[128]; snprintf(ab_lbl, sizeof(ab_lbl), "_arbno%d_\xCE\xB1_body", child_id);  /* _arbno%d_α_body */
+            char ab_lbl[128]; snprintf(ab_lbl, sizeof(ab_lbl), "arbno%d_\xCE\xB1_body", child_id);  /* _arbno%d_α_body */
             bb_label_t alpha_body; bb_label_initf(&alpha_body, "%s", ab_lbl);
             EV_JMP(e, &alpha_body, JMP_JE);
             EV_JMP(e, &cb, JMP_JMP);
@@ -840,7 +840,7 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
             char cap_lbl[128], vname_lbl[128], α_lbl[128];
             snprintf(cap_lbl,   sizeof(cap_lbl),   ".Lcap%d_data", child_id);
             snprintf(vname_lbl, sizeof(vname_lbl), ".Lcap%d_vname", child_id);
-            snprintf(α_lbl, sizeof(α_lbl), "_cap%d_child_α", child_id);
+            snprintf(α_lbl, sizeof(α_lbl), "cap%d_child_α", child_id);
 
             /* Emit varname string + static cap_t in .data */
             flat_data_section(e);
@@ -861,16 +861,16 @@ static void flat_emit_node(emitter_v *e, PATND_t *p,
 
             /* Emit child as callable sub-proc in .text */
             bb_label_t cs, cf, cb;
-            bb_label_initf(&cs, "_cap%d_\xCE\xB3",   child_id);   /* _cap%d_γ */
-            bb_label_initf(&cf, "_cap%d_\xCF\x89",   child_id);   /* _cap%d_ω */
-            bb_label_initf(&cb, "_cap%d_\xCE\xB2",   child_id);   /* _cap%d_β */
+            bb_label_initf(&cs, "cap%d_\xCE\xB3",   child_id);   /* _cap%d_γ */
+            bb_label_initf(&cf, "cap%d_\xCF\x89",   child_id);   /* _cap%d_ω */
+            bb_label_initf(&cb, "cap%d_\xCE\xB2",   child_id);   /* _cap%d_β */
             flat_globl(e, α_lbl);
             flat3c_label(e, α_lbl);
             {   bb_insn_desc_t d = {BB_INSN_LEA_R10_SYM, ADDR_DELTA, 0, 0, SYM_DELTA};
                 e->emit_insn(e, &d);
             }
             ev_cmp_esi_imm8(e, 0);
-            char ab_lbl[128]; snprintf(ab_lbl, sizeof(ab_lbl), "_cap%d_\xCE\xB1_body", child_id);  /* _cap%d_α_body */
+            char ab_lbl[128]; snprintf(ab_lbl, sizeof(ab_lbl), "cap%d_\xCE\xB1_body", child_id);  /* _cap%d_α_body */
             bb_label_t alpha_body; bb_label_initf(&alpha_body, "%s", ab_lbl);
             EV_JMP(e, &alpha_body, JMP_JE);
             EV_JMP(e, &cb,         JMP_JMP);
