@@ -577,7 +577,7 @@ static int build_args_col(char *buf, int cap, const sm_op_template_t *t,
     case SM_TPL_PCREF_JMP:
     case SM_TPL_PCREF_COND:
     case SM_TPL_CALL_EXPRESSION:
-        n = snprintf(buf, cap, ".Lpc%d", args->i32_a);
+        n = snprintf(buf, cap, ".L%d", args->i32_a);
         break;
     case SM_TPL_PUSH_EXPRESSION:
         n = snprintf(buf, cap, "%" PRId64 ", %d", args->i64, args->i32_a);

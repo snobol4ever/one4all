@@ -224,11 +224,11 @@ static void strtab_label(char *buf, size_t bufsz, const char *s)
     if (!s) s = "";
     for (int i = 0; i < g_strtab_n; i++)
         if (g_strtab[i].s == s || strcmp(g_strtab[i].s, s) == 0) {
-            snprintf(buf, bufsz, ".Lstr_%d", g_strtab[i].idx);
+            snprintf(buf, bufsz, ".S%d", g_strtab[i].idx);
             return;
         }
     /* Should not happen if caller always interns first. */
-    snprintf(buf, bufsz, ".Lstr_ERR");
+    snprintf(buf, bufsz, ".S_ERR");
 }
 
 /* EM-7c-symbolic: intern_str callback installed on text emitters so that
@@ -428,7 +428,7 @@ static int strtab_emit_rodata(FILE *out)
     char lbl[32];
     for (int i = 0; i < g_strtab_n; i++) {
         strtab_escape(esc, sizeof(esc), g_strtab[i].s);
-        snprintf(lbl, sizeof(lbl), ".Lstr_%d:", i);
+        snprintf(lbl, sizeof(lbl), ".S%d:", i);
         if (emit_three_column_line(out, lbl, ".string", esc, NULL) != 0) return -1;
     }
     if (emit_three_column_line(out, "", ".text", "", NULL) != 0) return -1;
@@ -477,10 +477,10 @@ static int emit_chunk_registry(FILE *out, const SM_Program *prog)
         int entry_pc = i + 1;
 
         char qarg[32];
-        snprintf(qarg, sizeof(qarg), ".Lstr_%d", str_idx);
-        /* Both quads on one line: ".quad .Lstr_N ; .quad .LpcM" */
+        snprintf(qarg, sizeof(qarg), ".S%d", str_idx);
+        /* Both quads on one line: ".quad .SN ; .quad .LM" */
         char combined[128];
-        snprintf(combined, sizeof(combined), "%-16s ; .quad            .Lpc%d", qarg, entry_pc);
+        snprintf(combined, sizeof(combined), "%-16s ; .quad            .L%d", qarg, entry_pc);
         if (emit_three_column_line(out, "", ".quad", combined, NULL) != 0) return -1;
     }
 
@@ -711,6 +711,18 @@ static int emit_minor_break(FILE *out, const char *caption)
     return 0;
 }
 
+/* Section-level separator: one #== rule + caption line.  Used between the
+ * five major sections of the emitted .s file (strings, expression registry,
+ * BB code, BB data, SM code). */
+static int emit_section_break(FILE *out, const char *caption)
+{
+    if (fputs("#=======================================================================================================================\n",
+              out) == EOF) return -1;
+    if (caption && *caption)
+        if (fprintf(out, "# %s\n", caption) < 0) return -1;
+    return 0;
+}
+
 /* Render a printable, single-line preview of a string literal for use in
  * inline annotations (e.g. movabs rdi,<ptr>  # str="hi").  Truncates at
  * MAX_PREVIEW chars and replaces non-printable bytes with '.'. */
@@ -748,7 +760,7 @@ static void render_str_preview(char *dst, size_t cap,
 static int emit_pc_label(FILE *out, int pc)
 {
     /* EM-7c-no-trailing-ws: bare label, no padding (no trailing spaces). */
-    return fprintf(out, ".Lpc%d:\n", pc) < 0 ? -1 : 0;
+    return fprintf(out, ".L%d:\n", pc) < 0 ? -1 : 0;
 }
 
 static int emit_sm_halt(FILE *out, int pc)
@@ -2041,12 +2053,14 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
      * every string pointer in the emitted binary a RIP-relative reference
      * to a .Lstr_N label rather than an in-process pointer from the emitter. */
     strtab_collect(prog);
+    if (emit_section_break(out, "strings") != 0) return -1;
     if (strtab_emit_rodata(out) != 0) return -1;
 
-    /* EM-7d-usercall-reentrant: emit .datan expression registry table for
+    /* EM-7d-usercall-reentrant: emit .data expression registry table for
      * user-defined SNOBOL4 functions (SM_LABEL instructions with a[0].s set).
-     * This must come after strtab_emit_rodata (so .Lstr_N labels are defined)
-     * and before .text (so .LpcN forward references resolve in the same TU). */
+     * This must come after strtab_emit_rodata (so .S* labels are defined)
+     * and before .text (so .L* forward references resolve in the same TU). */
+    if (emit_section_break(out, "expression registry") != 0) return -1;
     int chunk_reg_count = emit_chunk_registry(out, prog);
     if (chunk_reg_count < 0) return -1;
 
@@ -2060,12 +2074,14 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
      * pc_used_as_target bitset as a side effect -- one pass over
      * prog->instrs, two outputs. */
     pattern_windows_collect(prog);
+    if (emit_section_break(out, "BB code") != 0) return -1;
     if (emit_pattern_blobs(out) != 0) return -1;
 
     /* EM-4-readability: load the source file once if a path was given. */
     SrcLines sl;
     int sl_loaded = (srclines_load(&sl, src_path) == 0);
 
+    if (emit_section_break(out, "SM code") != 0) return -1;
     if (emit_file_header(out, prog->count, chunk_reg_count > 0) != 0) {
         if (sl_loaded) srclines_free(&sl);
         return -1;
@@ -2093,7 +2109,7 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
             }
             if (pc_is_used_as_target(pc)) {
                 char lbl[32];
-                snprintf(lbl, sizeof(lbl), ".Lpc%d:", pc);
+                snprintf(lbl, sizeof(lbl), ".L%d:", pc);
                 sm_emit_set_pc_label(lbl);
             } else {
                 sm_emit_set_pc_label("");
