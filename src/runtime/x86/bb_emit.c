@@ -347,6 +347,27 @@ static char  g_bb3c_pending_cjmp_mn[16]      = "";
 static char  g_bb3c_pending_cjmp_target[256] = "";
 static FILE *g_bb3c_pending_cjmp_out         = NULL;
 
+/* EM-FORMAT-BB-LAW (sess 2026-05-09):
+ * Per archive/BB-GEN-X86-TEXT.md: every BB jxx (jmp / je / jne / jl / jge / jg
+ * / jle / jbe) lives in column 3.  Column 2 (the action mnemonic field) is
+ * reserved for non-jump instructions.
+ *
+ *   LABEL:                  ACTION                          GOTO
+ *   col 0..23              col 24..39                      col 41+
+ *
+ * Two BB-jxx cases:
+ *   (1) Fused cond+uncond: col-2 = cond mnemonic (`je`/`jne`/...), col-3 =
+ *       "<succ_target>; jmp <fail_target>".  ONE space after `;`, no
+ *       column padding.  The cond mnemonic in col-2 is technically the
+ *       only jxx slot in col-2, but it pairs with its uncond partner in
+ *       col-3 and is read together as a single decision.
+ *   (2) Standalone uncond / bare label+jmp: col-2 empty, col-3 =
+ *       "jmp <target>".  No leading padding — the jmp lives at the start
+ *       of col-3 (file col 41).
+ *
+ * Triple fusion (action+cond+uncond on one line) is NOT done here — it
+ * is a future sub-rung (EM-FORMAT-BB-LAW-TRIPLE-FUSION). */
+
 /* Count visual columns (display width) of a UTF-8 string.
  * For our purposes: bytes 0x00..0x7F are 1 column each; UTF-8 lead bytes
  * 0xC0..0xFF start a multi-byte sequence whose continuation bytes
@@ -418,9 +439,12 @@ static void bb3c_write_line(FILE *out, const char *L, const char *A, const char 
 static void bb3c_flush_pending_cond_jmp(void)
 {
     if (g_bb3c_pending_cjmp_mn[0] && g_bb3c_pending_cjmp_out) {
-        bb3c_write_line(g_bb3c_pending_cjmp_out, "",
-                        g_bb3c_pending_cjmp_mn,
-                        g_bb3c_pending_cjmp_target);
+        /* EM-FORMAT-BB-LAW: every BB jxx lives in col-3.  Standalone cond-jmp
+         * (no uncond partner to fuse with): empty col-2, col-3 = "<mn> <target>". */
+        char goto_col3[288];
+        snprintf(goto_col3, sizeof(goto_col3), "%s %s",
+                 g_bb3c_pending_cjmp_mn, g_bb3c_pending_cjmp_target);
+        bb3c_write_line(g_bb3c_pending_cjmp_out, "", "", goto_col3);
         g_bb3c_pending_cjmp_mn[0]     = '\0';
         g_bb3c_pending_cjmp_target[0] = '\0';
         g_bb3c_pending_cjmp_out       = NULL;
@@ -503,22 +527,23 @@ void bb3c_emit_jmp(FILE *out, const char *mn, const char *target)
 
     /* Unconditional jmp (or any non-cond mnemonic that arrived through here). */
     if (g_bb3c_pending_cjmp_mn[0] && g_bb3c_pending_cjmp_out == out) {
-        /* Fuse: emit "<cond_mn>  <succ_target> ; jmp <fail_target>".
-         * Build col-3 = "<succ_target> ; jmp <fail_target>".  Pass to
-         * bb3c_format so any pending label still fuses with col 1. */
+        /* EM-FORMAT-BB-LAW: every BB jxx lives in col-3.  Fused cond+uncond:
+         * col-2 empty, col-3 = "<cond_mn> <succ_target>; jmp <fail_target>".
+         * ONE space between `;` and `jmp`, ONE space between mnemonic and target. */
         char fused_col3[512];
-        snprintf(fused_col3, sizeof(fused_col3), "%s ; %s %s",
-                 g_bb3c_pending_cjmp_target, m, t);
-        char saved_mn[16];
-        snprintf(saved_mn, sizeof(saved_mn), "%s", g_bb3c_pending_cjmp_mn);
+        snprintf(fused_col3, sizeof(fused_col3), "%s %s; %s %s",
+                 g_bb3c_pending_cjmp_mn, g_bb3c_pending_cjmp_target, m, t);
         g_bb3c_pending_cjmp_mn[0]     = '\0';
         g_bb3c_pending_cjmp_target[0] = '\0';
         g_bb3c_pending_cjmp_out       = NULL;
-        bb3c_format(out, "", saved_mn, fused_col3);
+        bb3c_format(out, "", "", fused_col3);
         return;
     }
-    /* No pending: emit standalone via bb3c_format (handles pending label). */
-    bb3c_format(out, "", m, t);
+    /* No pending: standalone unconditional jmp.  EM-FORMAT-BB-LAW: empty col-2,
+     * `jmp <target>` in col-3.  Per the LAW: every BB jxx is in col-3. */
+    char goto_col3[512];
+    snprintf(goto_col3, sizeof(goto_col3), "%s %s", m, t);
+    bb3c_format(out, "", "", goto_col3);
 }
 
 void bb3c_format(FILE *out, const char *label, const char *action, const char *goto_)
