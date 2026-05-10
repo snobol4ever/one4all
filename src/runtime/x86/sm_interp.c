@@ -175,6 +175,40 @@ void every_table_reset(void)
     g_every_table_cap = 0;
 }
 
+/* GOAL-ICON-BB-COMPLETE Phase A: unified ast_pump_table for SM_BB_PUMP_AST.
+ * Mirrors every_table exactly — same lifetime, same borrow model. */
+#define AST_PUMP_TABLE_INIT 16
+static AST_t **g_ast_pump_table     = NULL;
+static int     g_ast_pump_table_n   = 0;
+static int     g_ast_pump_table_cap = 0;
+
+int ast_pump_table_register(AST_t *ast)
+{
+    if (g_ast_pump_table_n >= g_ast_pump_table_cap) {
+        int new_cap = g_ast_pump_table_cap ? g_ast_pump_table_cap * 2 : AST_PUMP_TABLE_INIT;
+        AST_t **nt = (AST_t **)realloc(g_ast_pump_table, new_cap * sizeof(AST_t *));
+        if (!nt) { fprintf(stderr, "ast_pump_table: OOM\n"); abort(); }
+        g_ast_pump_table     = nt;
+        g_ast_pump_table_cap = new_cap;
+    }
+    int id = g_ast_pump_table_n++;
+    g_ast_pump_table[id] = ast;
+    return id;
+}
+
+AST_t *ast_pump_table_lookup(int id)
+{
+    if (id < 0 || id >= g_ast_pump_table_n) return NULL;
+    return g_ast_pump_table[id];
+}
+
+void ast_pump_table_reset(void)
+{
+    if (g_ast_pump_table) { free(g_ast_pump_table); g_ast_pump_table = NULL; }
+    g_ast_pump_table_n   = 0;
+    g_ast_pump_table_cap = 0;
+}
+
 /* OE-10: body_fn for BB_PUMP — print each generated Icon value to stdout */
 static void pump_print(DESCR_t val, void *arg) {
     (void)arg;
@@ -845,7 +879,9 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                 st->last_ok = 0;
                 break;
             }
+            g_ast_pump_active++;
             int ticks = bb_broker(node, BB_PUMP, pump_print, NULL);
+            g_ast_pump_active--;
             st->last_ok = (ticks > 0);
             break;
         }
@@ -998,10 +1034,55 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                 sm_push(st, NULVCL);
                 break;
             }
+            g_ast_pump_active++;
             bb_node_t node = coro_eval(every_ast);
             int ticks = bb_broker(node, BB_PUMP, NULL, NULL);
+            g_ast_pump_active--;
             st->last_ok = (ticks > 0);
             sm_push(st, NULVCL);   /* every is void — leave a placeholder for VOID_POP */
+            break;
+        }
+
+        /* GOAL-ICON-BB-COMPLETE Phase A: unified handler for legacy-fallthrough kinds.
+         * Mirrors SM_BB_PUMP_EVERY but drives the generator to collect ONE value
+         * (not to exhaustion) — the caller (every / for-each loop in the proc body)
+         * is responsible for re-issuing SM_BB_PUMP_AST on resume.
+         *
+         * Stack discipline: pushes the generator's result descriptor on success,
+         * NULVCL on fail.  last_ok = 1 on success, 0 on fail.
+         *
+         * This reuses coro_eval → bb_broker(BB_PUMP) exactly like EVERY; the
+         * difference is that EVERY drives to exhaustion while this opcode yields
+         * one value.  For Phase A kinds (BANG_BINARY, LCONCAT-gen, LIMIT, RANDOM,
+         * SECTION, SECTION_MINUS, SECTION_PLUS) coro_eval builds the correct
+         * coro_bb_* Byrd-box node and bb_broker(BB_PUMP) drives it one step. */
+        case SM_BB_PUMP_AST: {
+            int ast_id = (int)ins->a[0].i;
+            AST_t *ast = ast_pump_table_lookup(ast_id);
+            if (!ast) {
+                st->last_ok = 0;
+                sm_push(st, NULVCL);
+                break;
+            }
+            /* Increment g_ast_pump_active: marks that coro_eval calls from
+             * within this handler (and anything it transitively invokes,
+             * including nested sm_interp_run calls for SM proc bodies) are
+             * intentional Phase A bridges, not leaks.  The guard macro in
+             * coro_runtime.h exempts coro_eval when this counter > 0. */
+            int saved = g_sm_dispatch_active;
+            g_sm_dispatch_active = 0;
+            g_ast_pump_active++;
+            bb_node_t node = coro_eval(ast);
+            DESCR_t result = node.fn(node.ζ, α);
+            g_ast_pump_active--;
+            g_sm_dispatch_active = saved;
+            if (IS_FAIL_fn(result)) {
+                st->last_ok = 0;
+                sm_push(st, NULVCL);
+            } else {
+                st->last_ok = 1;
+                sm_push(st, result);
+            }
             break;
         }
 

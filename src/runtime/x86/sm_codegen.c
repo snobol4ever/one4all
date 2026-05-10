@@ -53,6 +53,12 @@
 #include "../../frontend/snobol4/scrip_cc.h"  /* AST_t, AST_FNC for SM_PAT_CAPTURE_FN */
 #include "bb_broker.h"   /* SN-9b: SM_BB_PUMP / SM_BB_ONCE handlers */
 
+/* GOAL-ICON-BB-COMPLETE Phase A: file-scope externs for tripwire + bridge counter.
+ * g_sm_dispatch_active: A0 tripwire — set while SM dispatch is running.
+ * g_ast_pump_active: re-entrant suppression for intentional coro_eval bridges. */
+extern int g_sm_dispatch_active;
+extern int g_ast_pump_active;
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -358,7 +364,9 @@ static void h_bb_pump_proc(void)
         STATE->last_ok = 0;
         return;
     }
+    g_ast_pump_active++;
     int ticks = bb_broker(node, BB_PUMP, jit_pump_print, NULL);
+    g_ast_pump_active--;
     STATE->last_ok = (ticks > 0);
 }
 
@@ -468,10 +476,41 @@ static void h_bb_pump_every(void)
         PUSH(NULVCL);
         return;
     }
+    g_ast_pump_active++;
     bb_node_t node = coro_eval(every_ast);
     int ticks = bb_broker(node, BB_PUMP, NULL, NULL);
+    g_ast_pump_active--;
     STATE->last_ok = (ticks > 0);
     PUSH(NULVCL);
+}
+
+/* GOAL-ICON-BB-COMPLETE Phase A: JIT mirror of SM_BB_PUMP_AST in sm_interp.c.
+ * Drives one alpha step of a legacy-fallthrough kind (BANG_BINARY, LCONCAT-gen,
+ * ITERATE, LIMIT, RANDOM, SECTION*) via coro_eval -> bb_node alpha.
+ * Pushes the result on success, NULVCL on fail. */
+static void h_bb_pump_ast(void)
+{
+    int ast_id = (int)CUR_INS->a[0].i;
+    AST_t *ast = ast_pump_table_lookup(ast_id);
+    if (!ast) {
+        STATE->last_ok = 0;
+        PUSH(NULVCL);
+        return;
+    }
+    int saved = g_sm_dispatch_active;
+    g_sm_dispatch_active = 0;
+    g_ast_pump_active++;
+    bb_node_t node = coro_eval(ast);
+    DESCR_t result = node.fn(node.ζ, α);
+    g_ast_pump_active--;
+    g_sm_dispatch_active = saved;
+    if (IS_FAIL_fn(result)) {
+        STATE->last_ok = 0;
+        PUSH(NULVCL);
+    } else {
+        STATE->last_ok = 1;
+        PUSH(result);
+    }
 }
 
 /* CHUNKS-step17i-suspend: JIT mirror of SM_SUSPEND_VALUE in sm_interp.c.
@@ -1205,6 +1244,7 @@ static void init_handler_table(void)
     g_handlers[SM_BB_PUMP_CASE] = h_bb_pump_case;
     g_handlers[SM_BB_PUMP_SM]   = h_bb_pump_sm;
     g_handlers[SM_BB_PUMP_EVERY] = h_bb_pump_every;
+    g_handlers[SM_BB_PUMP_AST]   = h_bb_pump_ast;   /* GOAL-ICON-BB-COMPLETE Phase A */
     g_handlers[SM_SUSPEND_VALUE] = h_suspend_value;   /* CHUNKS-step17i-suspend */
     g_handlers[SM_SUSPEND]      = h_suspend;   /* CHUNKS-step14: named FATAL — JIT gen is M5 */
     g_handlers[SM_RESUME]       = h_resume;    /* CHUNKS-step14: named FATAL — JIT gen is M5 */

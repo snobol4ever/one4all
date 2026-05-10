@@ -173,6 +173,29 @@ typedef enum {
      * DT_NUL at end so the trailing VOID_POP is balanced. */
     SM_BB_PUMP_EVERY,
 
+    /* GOAL-ICON-BB-COMPLETE Phase A: unified BB pump for legacy-fallthrough kinds.
+     *
+     * Replaces the per-kind emit_push_expr + SM_BB_PUMP for AST kinds that still
+     * hit the legacy fallthrough block (sm_lower.c:1410-1418):
+     *   AST_BANG_BINARY, AST_LIMIT, AST_RANDOM, AST_SECTION, AST_SECTION_MINUS,
+     *   AST_SECTION_PLUS, and generative AST_LCONCAT.
+     *
+     * Encoding:  a[0].i = ast_pump_id  (index into g_ast_pump_table)
+     * No AST_t* in SM bytecode — the table holds borrowed pointers registered
+     * at lower-time by ast_pump_table_register().
+     *
+     * Runtime handler: lookup AST → coro_eval → bb_broker(BB_PUMP).
+     * Net stack delta: +1 (pushes the generator's result or NULVCL on fail).
+     *
+     * Stack discipline mirrors SM_BB_PUMP_EVERY: pushes one descriptor so the
+     * trailing SM_VOID_POP from the proc-body balances.  For value-context
+     * callers (e.g. `every write(l ! gen)`) the pushed value IS the result;
+     * for stmt-context callers it is discarded by VOID_POP.
+     *
+     * Shared by all Phase A kinds — the coro_eval dispatch inside the handler
+     * routes to the correct coro_bb_* function via the AST kind in the node. */
+    SM_BB_PUMP_AST,
+
     /* CHUNKS-step17i-suspend: AST_SUSPEND `suspend E [do body]` — yield-to-caller.
      *
      * Stack discipline: pops one value (the yield value).  Pushes nothing.

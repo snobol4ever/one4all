@@ -1399,15 +1399,28 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
                 sm_emit(p, SM_CONCAT);
             return;
         }
-        /* fall through to legacy gen path (Phase 2 will replace this) */
-        emit_push_expr(p, e);
-        sm_emit(p, SM_BB_PUMP);
+        /* GOAL-ICON-BB-COMPLETE Phase A (A1): generative AST_LCONCAT via SM_BB_PUMP_AST.
+         * Registers the AST node in g_ast_pump_table; SM_BB_PUMP_AST drives
+         * coro_eval -> bb_node alpha at runtime.  No raw AST_t* in SM bytecode. */
+        sm_emit_i(p, SM_BB_PUMP_AST, (int64_t)ast_pump_table_register((AST_t *)e));
         return;
     }
 
+    /* GOAL-ICON-BB-COMPLETE Phase A (A1): AST_BANG_BINARY migrated off legacy fallthrough.
+     * Remaining kinds stay on legacy until their own Phase A rung lands. */
+    case AST_BANG_BINARY:
+        sm_emit_i(p, SM_BB_PUMP_AST, (int64_t)ast_pump_table_register((AST_t *)e));
+        return;
+
+    /* GOAL-ICON-BB-COMPLETE Phase A (A4 pulled forward): AST_ITERATE (!E).
+     * coro_bb_iterate already implements the full Byrd-box for string/list iterate.
+     * Route through SM_BB_PUMP_AST — no raw AST_t* on SM stack. */
+    case AST_ITERATE:
+        sm_emit_i(p, SM_BB_PUMP_AST, (int64_t)ast_pump_table_register((AST_t *)e));
+        return;
+
     /* Icon generators — remaining kinds still use legacy emit_push_expr + SM_BB_PUMP.
      * Same pattern as AST_SUSPEND was: each will get its own lowering rung. */
-    case AST_BANG_BINARY:
     case AST_LIMIT:
     case AST_RANDOM:
     case AST_SECTION:

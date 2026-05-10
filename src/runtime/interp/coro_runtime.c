@@ -28,9 +28,11 @@
 
 /* A0 — SCRIP_NO_AST_WALK tripwire guard.  Paste at top of every AST-walker
  * entry point.  Aborts only when SCRIP_NO_AST_WALK is set AND SM dispatch
- * is active — proving SM dispatch never reaches the AST walker. */
+ * is active — proving SM dispatch never reaches the AST walker.
+ * Exception: g_ast_pump_active > 0 means SM_BB_PUMP_AST is on the call stack
+ * (Phase A intentional bridge) — permit coro_eval in that case. */
 #define NO_AST_WALK_GUARD(fn_name) \
-    do { if (g_sm_dispatch_active && getenv("SCRIP_NO_AST_WALK")) { \
+    do { if (g_sm_dispatch_active && !g_ast_pump_active && getenv("SCRIP_NO_AST_WALK")) { \
         fprintf(stderr, "FATAL: " fn_name " reached from SM dispatch\n"); \
         abort(); \
     } } while (0)
@@ -68,6 +70,15 @@ AST_t      *g_icn_root     = NULL;  /* current Icon drive root */
  * reaches the AST walker under honest mode-3.  Global (not thread-local)
  * because scrip is single-threaded; revisit if threading is ever added. */
 int g_sm_dispatch_active = 0;
+
+/* GOAL-ICON-BB-COMPLETE Phase A: re-entrant suppression counter for SM_BB_PUMP_AST.
+ * When > 0, coro_eval is explicitly permitted even if g_sm_dispatch_active=1.
+ * Incremented at entry of SM_BB_PUMP_AST handler, decremented at exit.
+ * Needed because SM_BB_PUMP_AST calls coro_eval deliberately (Phase A bridge),
+ * and the Byrd-box functions called by coro_eval may re-enter sm_interp_run
+ * (for SM proc bodies), which would reset g_sm_dispatch_active=1 before
+ * any nested coro_eval calls inside the Byrd-box machinery. */
+int g_ast_pump_active = 0;
 
 /* OE-1: IcnFrame — per-call context for Icon procedure invocations.
  * Replaces the flat globals frame_env/FRAME.env_n/FRAME.returning/FRAME.return_val/

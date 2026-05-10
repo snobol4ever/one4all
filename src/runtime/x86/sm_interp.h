@@ -146,4 +146,11 @@ int   every_table_register(struct AST_t *ast);
 struct AST_t *every_table_lookup(int id);
 void  every_table_reset(void);
 
+/* GOAL-ICON-BB-COMPLETE Phase A: unified AST-pump table for SM_BB_PUMP_AST.
+ * Same lifetime model as every_table: borrowed AST pointers, populated by
+ * sm_lower at lower-time, reset on sm_program_free. */
+int   ast_pump_table_register(struct AST_t *ast);
+struct AST_t *ast_pump_table_lookup(int id);
+void  ast_pump_table_reset(void);
+
 #endif /* SM_INTERP_H */
