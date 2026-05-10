@@ -726,10 +726,10 @@ static void flat_emit_box_banner(emitter_v *e, const char *kind,
     if (!e->is_text) return;
     flat_emit_banner_rule(e, '-');
     if (args && *args) {
-        EV_TEXT(e, "# BOX %s(%s)  [%s]\n", kind, args,
+        EV_TEXT(e, "#                       BOX %s(%s)  [%s]\n", kind, args,
                 label_prefix ? label_prefix : "");
     } else {
-        EV_TEXT(e, "# BOX %s  [%s]\n", kind,
+        EV_TEXT(e, "#                       BOX %s  [%s]\n", kind,
                 label_prefix ? label_prefix : "");
     }
 }
