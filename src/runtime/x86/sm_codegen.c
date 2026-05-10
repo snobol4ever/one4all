@@ -1,47 +1,46 @@
 /*
  * sm_codegen.c — SM_Program → x86-64 in-memory code (M-JIT-RUN)
  *
- * Architecture: threaded-call JIT (first pass)
- * ─────────────────────────────────────────────
- * SEG_DISPATCH holds one C-ABI handler stub per SM opcode.
- * SEG_CODE is a sequence of CALL rel32 instructions, one per SM instruction,
- * followed by operand data read by the handler via a global pointer.
+ * Architecture: per-instruction native blob emitter (ME-3, 2026-05-10)
+ * ────────────────────────────────────────────────────────────────────
+ * SEG_CODE holds, in order: one shared trampoline, then one fixed-size
+ * 30-byte native blob per SM instruction.  Each blob does its work and
+ * ends with `jmp trampoline`; SM_HALT's blob ends with `ret` (exiting
+ * sm_jit_run); SM_JUMP's blob sets pc and direct-jumps to the target
+ * blob (rel32, patched in pass 2 of sm_codegen).
+ *
+ * The trampoline reads st->pc (via [r12+20]) and indirect-jumps to
+ * blob[pc] = blobs_base + pc * ME3_BLOB_SIZE.  No C dispatch loop.  No
+ * per-opcode tail-call thunk in SEG_DISPATCH (that mechanism removed
+ * in ME-3).
  *
  * Execution model:
  *   - g_jit_prog   points to the SM_Program (read by handlers for operands)
- *   - g_jit_pc     is the logical SM program counter
+ *   - g_jit_pc     is the logical SM program counter (kept in st->pc; r12
+ *                  points at SM_State so blobs read it via [r12+20])
  *   - g_jit_state  is a shared SM_State (stack, last_ok)
- *   - Each handler increments g_jit_pc and performs the same logic as
- *     the corresponding sm_interp case.
- *   - SEG_CODE entry is called as:  typedef void (*jit_fn_t)(void);
- *
- * This produces real x86-64 machine code in a sealed RX slab; the handlers
- * themselves are existing C functions — no hand-rolled x86 per opcode yet.
- * That native-emission layer (M-JITEM-X64) comes later.
- *
- * Calling convention for dispatch stubs:
- *   Each stub is a small x86-64 function:
- *     push rbp; mov rbp,rsp
- *     mov rdi, <handler_fn_ptr>   (imm64 via mov rdi,imm64 + call *rdi)
- *     pop rbp; ret
- *   The real work is in the C handler functions below.
+ *   - The 5 ME-3-named opcodes (SM_HALT, SM_PUSH_LIT_S, SM_PUSH_LIT_I,
+ *     SM_VOID_POP, SM_JUMP) have dedicated blobs.  SM_HALT and SM_JUMP
+ *     are pure native; SM_PUSH_LIT_S, SM_PUSH_LIT_I, SM_VOID_POP use the
+ *     Standard blob (which calls the C handler).  ME-4+ replaces those
+ *     Standards with inline native sequences.
+ *   - All other opcodes use the Standard blob: inc pc, mov rax handler,
+ *     call rax, jmp trampoline.  Same threaded-call shape as before
+ *     ME-3 but laid out per-instruction in SEG_CODE rather than via a
+ *     uint8_t** pointer array.
  *
  * ME-2 register convention (GOAL-MODE3-EMIT, 2026-05-10):
  *   r12 = SM_State*   — anchor for value stack, last_ok, pc.  Loaded by
- *                        sm_jit_run before transferring control to SEG_CODE,
- *                        survives across calls because r12 is callee-saved
- *                        in the System V x86-64 C-ABI.  Today's threaded-
- *                        call JIT does not consume r12 (handlers reach
- *                        SM_State via g_jit_state); ME-3+ rewrites SEG_CODE
- *                        as per-instruction native blobs that address the
- *                        value stack as [r12 + offset] and never reload r12.
+ *                        sm_jit_run before transferring control to the
+ *                        trampoline, survives across calls because r12
+ *                        is callee-saved in the System V x86-64 C-ABI.
  *   r10 = per-glob data-region ptr (bb_flat.c convention; unchanged here)
  *   rbp = chunk frame for DEFINE'd chunks (ME-6, future)
  *   rbx, r13, r14, r15 — callee-saved working regs per bb_boxes.s convention
  *   rax rdi rsi rdx rcx r8 r9 r11 — caller-saved scratch
  *
  * Authors: Lon Jones Cherryholmes · Claude Sonnet 4.6
- * Date: 2026-04-07 (M-JIT-RUN), 2026-05-10 (ME-2 r12 reservation)
+ * Date: 2026-04-07 (M-JIT-RUN), 2026-05-10 (ME-2 r12 reservation, ME-3 native blobs)
  */
 
 #include "sm_codegen.h"
@@ -1230,42 +1229,226 @@ static void init_handler_table(void)
      */
 }
 
-/* ── x86-64 dispatch stub emitter ────────────────────────────────────── */
+/* ── ME-3: per-instruction native blob emitter ───────────────────────── */
 /*
- * Emit into SEG_DISPATCH a 12-byte tail-call stub for handler fn:
+ * GOAL-MODE3-EMIT ME-3 (2026-05-10): SEG_CODE now holds per-instruction
+ * native x86 blobs, not a uint8_t** pointer array.  Each blob is a fixed
+ * 22-byte sequence; the program runs by transferring control from one
+ * blob to the next via a small native trampoline.
  *
- *   mov  rax, <imm64>      ; handler address (10 bytes)
- *   jmp  rax               ; tail-call, no frame (2 bytes)
+ * Blob layout (30 bytes uniformly, NOP-padded as needed):
  *
- * No stack frame: the stub is called via CALL from sm_jit_run's dispatch
- * loop, which already has a 16-byte-aligned stack at that point.  Adding
- * push/sub here broke alignment for any handler that itself issues a CALL
- * (e.g. NV_SET_fn → printf).  Tail-call avoids the problem entirely.
+ *   Standard (covers most opcodes, including SM_PUSH_LIT_S/I and SM_VOID_POP):
+ *     41 ff 44 24 14        inc  dword [r12+20]       ; st->pc++
+ *     48 b8 <imm64>         mov  rax, handler_addr
+ *     48 83 ec 08           sub  rsp, 8               ; 16-byte align for call
+ *     ff d0                 call rax
+ *     48 83 c4 08           add  rsp, 8               ; restore rsp
+ *     e9 <rel32>            jmp  trampoline
+ *
+ *   SM_HALT (returns out of sm_jit_run via ret):
+ *     41 ff 44 24 14        inc  dword [r12+20]       ; advance past HALT
+ *     c3                    ret                       ; return to sm_jit_run
+ *     24 × 0x90             nop padding
+ *
+ *   SM_JUMP (sets pc to target, jumps directly to target blob):
+ *     41 c7 44 24 14 <i32>  mov  dword [r12+20], target_pc
+ *     e9 <rel32>            jmp  blob_for_target_pc   ; patched in pass 2
+ *     16 × 0x90             nop padding
+ *
+ *   The trampoline is emitted ONCE at the head of SEG_CODE, before any
+ *   instruction blob.  It reads pc from [r12+20] and indirect-jumps to
+ *   blob[pc] via arithmetic on the fixed blob size:
+ *
+ *     trampoline:
+ *       8b 44 24 14         mov   eax, dword [r12+20]    ; eax = pc
+ *       3d <imm32>          cmp   eax, prog->count       ; bound check
+ *       73 01               jae   .exit
+ *       48 6b c0 16         imul  rax, rax, 22           ; rax = pc*22
+ *       48 b9 <imm64>       mov   rcx, blobs_base
+ *       48 01 c8            add   rax, rcx
+ *       ff e0               jmp   rax
+ *     .exit:
+ *       c3                  ret
+ *
+ *   sm_jit_run's job becomes: set r12, jump to trampoline, run until any
+ *   blob's `ret` returns.  The threaded-call C dispatch loop is gone.
+ *
+ * Per-PC side-table (g_blob_offsets[i] = byte offset of blob[i] from
+ * SEG_CODE base; g_blob_count = total) is built as bytes are laid down.
+ * Today used for SM_JUMP rel32 patching in pass 2.  ME-mode-4 will reuse
+ * it to map each SM PC back to a SEG_CODE address range for disassembly
+ * emission.
+ *
+ * Opcodes outside the ME-3 "covered" set (SM_HALT, SM_PUSH_LIT_S/I,
+ * SM_VOID_POP, SM_JUMP) get the Standard blob — same per-instruction
+ * native-blob shape, but the work is performed by calling the existing
+ * C handler.  ME-4+ will replace those Standard blobs with inline native
+ * sequences for the opcode set each rung names.
  */
-static uint8_t *emit_dispatch_stub(handler_fn_t fn)
+
+/* Fixed blob size — must match the encodings above */
+#define ME3_BLOB_SIZE  30
+
+/* Per-PC side-table built during sm_codegen */
+static size_t *g_blob_offsets = NULL;   /* g_blob_offsets[i] = byte offset in SEG_CODE */
+static int     g_blob_count   = 0;
+static size_t  g_trampoline_offset = 0;  /* byte offset of trampoline in SEG_CODE */
+
+/*
+ * emit_trampoline — emit the shared dispatch trampoline at the current
+ * SEG_CODE write head.  Returns its byte offset from SEG_CODE base.
+ * Caller must have determined `blobs_base` (the absolute address where
+ * blob 0 begins).
+ *
+ * Note on blob stride: the trampoline computes blob[pc] by `pc * stride`.
+ * `imul rax, rax, imm8` accepts an 8-bit signed immediate, sufficient for
+ * any stride up to 127.  Current stride = ME3_BLOB_SIZE = 30.
+ */
+static size_t emit_trampoline(SM_Program *prog, uint8_t *blobs_base)
 {
-    uint8_t *entry = scrip_segs[SEG_DISPATCH].top;
+    size_t off = seg_offset(SEG_CODE);
 
-    /* mov rax, imm64 */
-    seg_byte(SEG_DISPATCH, 0x48); seg_byte(SEG_DISPATCH, 0xb8);
-    seg_u64(SEG_DISPATCH, (uint64_t)(uintptr_t)fn);
-    /* jmp rax */
-    seg_byte(SEG_DISPATCH, 0xff); seg_byte(SEG_DISPATCH, 0xe0);
+    /* mov eax, dword [r12+20]    (41 8b 44 24 14)  — load st->pc */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x44); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0x14);
 
-    return entry;
+    /* cmp eax, prog->count       (3d <imm32>) */
+    seg_byte(SEG_CODE, 0x3d);
+    seg_u32(SEG_CODE, (uint32_t)prog->count);
+
+    /* jae .exit (rel8 = +19, skipping imul/mov/add/jmp):
+     * imul rax, rax, ME3_BLOB_SIZE : 48 6b c0 <imm8>      = 4 bytes
+     * mov  rcx, blobs_base         : 48 b9 <imm64>        = 10 bytes
+     * add  rax, rcx                : 48 01 c8             = 3 bytes
+     * jmp  rax                     : ff e0                = 2 bytes
+     * Total skip = 19 bytes.  jae rel8 = 0x73 0x13
+     */
+    seg_byte(SEG_CODE, 0x73); seg_byte(SEG_CODE, 0x13);
+
+    /* imul rax, rax, ME3_BLOB_SIZE  (48 6b c0 <imm8>) — sign-extended 8-bit */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0x6b);
+    seg_byte(SEG_CODE, 0xc0); seg_byte(SEG_CODE, (uint8_t)ME3_BLOB_SIZE);
+
+    /* mov rcx, blobs_base  (48 b9 <imm64>) */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xb9);
+    seg_u64(SEG_CODE, (uint64_t)(uintptr_t)blobs_base);
+
+    /* add rax, rcx  (48 01 c8) */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0x01); seg_byte(SEG_CODE, 0xc8);
+
+    /* jmp rax  (ff e0) */
+    seg_byte(SEG_CODE, 0xff); seg_byte(SEG_CODE, 0xe0);
+
+    /* .exit: ret  (c3).  Reached only if pc >= count, which should not
+     * happen on a well-formed program (SM_HALT terminates via its own
+     * blob ret).  If reached, returns to whichever C frame entered the
+     * trampoline last via `call` — typically sm_jit_run's `entry()`. */
+    seg_byte(SEG_CODE, 0xc3);
+
+    return off;
+}
+
+/*
+ * emit_standard_blob — emit the 30-byte standard blob that calls a C
+ * handler then jumps to the trampoline.
+ *
+ * 16-byte stack alignment discipline.  The System V x86-64 ABI requires
+ * rsp ≡ 0 (mod 16) at the point of `call`, so the callee sees rsp ≡ 8
+ * on function entry.  Control reaches each blob via `jmp` from the
+ * trampoline (no rsp change) or from another blob's `jmp` — but the
+ * very first transfer into SEG_CODE is sm_jit_run's `call entry()` which
+ * leaves rsp ≡ 8 (mod 16).  Inside the blob, a naive `call rax` would
+ * misalign rsp further (≡ 0 on callee entry from the blob's perspective,
+ * which means ≡ 8 inside the callee — wrong).  Fix: `sub rsp, 8` before
+ * `call rax`, restoring `rsp ≡ 0` so the callee enters with the canonical
+ * `rsp ≡ 8`.  `add rsp, 8` restores after.  Without this padding, any
+ * handler that itself issues a C-ABI call into a vararg or vsnprintf-
+ * descended path (h_store_var → NV_SET → printf, h_arith → shared_arith)
+ * faults on the first 16-byte aligned movaps in the standard library.
+ */
+static void emit_standard_blob(handler_fn_t fn, size_t trampoline_abs_off)
+{
+    size_t blob_off = seg_offset(SEG_CODE);
+
+    /* inc dword [r12+20]  (41 ff 44 24 14)  5 bytes */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xff);
+    seg_byte(SEG_CODE, 0x44); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0x14);
+
+    /* mov rax, handler_imm64  (48 b8 <imm64>)  10 bytes */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xb8);
+    seg_u64(SEG_CODE, (uint64_t)(uintptr_t)fn);
+
+    /* sub rsp, 8  (48 83 ec 08)  4 bytes — 16-byte alignment for `call` */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0x83);
+    seg_byte(SEG_CODE, 0xec); seg_byte(SEG_CODE, 0x08);
+
+    /* call rax  (ff d0)  2 bytes */
+    seg_byte(SEG_CODE, 0xff); seg_byte(SEG_CODE, 0xd0);
+
+    /* add rsp, 8  (48 83 c4 08)  4 bytes — undo alignment padding */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0x83);
+    seg_byte(SEG_CODE, 0xc4); seg_byte(SEG_CODE, 0x08);
+
+    /* jmp rel32 trampoline.  rel32 is relative to the byte AFTER the
+     * rel32 (i.e. blob_off + 30).  5 bytes. */
+    seg_byte(SEG_CODE, 0xe9);
+    int32_t rel = (int32_t)((int64_t)trampoline_abs_off - (int64_t)(blob_off + 30));
+    seg_u32(SEG_CODE, (uint32_t)rel);
+}
+
+/*
+ * emit_halt_blob — emit the 30-byte SM_HALT blob: advance pc past HALT,
+ * then ret (returns out of sm_jit_run via sm_jit_run's `call entry()`).
+ * Padded with NOPs.
+ */
+static void emit_halt_blob(void)
+{
+    /* inc dword [r12+20]  (41 ff 44 24 14)  5 bytes */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xff);
+    seg_byte(SEG_CODE, 0x44); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0x14);
+
+    /* ret  (c3)  1 byte — returns to sm_jit_run's `entry();` call site */
+    seg_byte(SEG_CODE, 0xc3);
+
+    /* nop * 24 to pad to 30 bytes */
+    for (int i = 0; i < 24; i++) seg_byte(SEG_CODE, 0x90);
+}
+
+/*
+ * emit_jump_blob_skeleton — emit the 30-byte SM_JUMP blob with the
+ * jmp rel32 displacement left as 0; pass 2 patches it with the real
+ * displacement to blob[target_pc].  Returns the byte offset within
+ * SEG_CODE of the rel32 field (used by the patcher).
+ */
+static size_t emit_jump_blob_skeleton(int32_t target_pc)
+{
+    /* mov dword [r12+20], target_pc  (41 c7 44 24 14 <imm32>)  9 bytes */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xc7);
+    seg_byte(SEG_CODE, 0x44); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0x14);
+    seg_u32(SEG_CODE, (uint32_t)target_pc);
+
+    /* jmp rel32 <placeholder> (e9 <rel32>) 5 bytes — patched in pass 2 */
+    seg_byte(SEG_CODE, 0xe9);
+    size_t rel32_off = seg_offset(SEG_CODE);
+    seg_u32(SEG_CODE, 0);
+
+    /* 16 nop padding to reach 30 bytes */
+    for (int i = 0; i < 16; i++) seg_byte(SEG_CODE, 0x90);
+
+    return rel32_off;
 }
 
 /* ── Main codegen entry point ─────────────────────────────────────────── */
 
 /*
- * sm_codegen — compile SM_Program into SEG_DISPATCH + SEG_CODE.
+ * sm_codegen — compile SM_Program into SEG_CODE per ME-3 layout.
  *
- * SEG_DISPATCH: one stub per unique opcode (lazy — only opcodes that appear).
- * SEG_CODE: for each instruction, emit:
- *     ; increment g_jit_state->pc  (done in the main loop, not in code)
- *   We use a pure-C dispatch loop that calls into SEG_CODE stubs.
- *   SEG_CODE layout: array of 8-byte absolute pointers to dispatch stubs,
- *   one per instruction. The runner walks this array and indirect-calls each.
+ * Pass 1: emit trampoline, then one fixed-size native blob per SM instr.
+ *         Record SEG_CODE byte offsets in g_blob_offsets[i].  Note rel32
+ *         patch sites for SM_JUMP instructions.
+ * Pass 2: patch each SM_JUMP's `jmp rel32` displacement to point at
+ *         blob[target_pc].
  *
  * Returns 0 on success, -1 on error.
  */
@@ -1273,32 +1456,109 @@ int sm_codegen(SM_Program *prog)
 {
     init_handler_table();
 
-    /* Build one dispatch stub per opcode (cache by opcode index) */
-    uint8_t *opcode_stub[SM_OPCODE_COUNT];
-    memset(opcode_stub, 0, sizeof(opcode_stub));
+    /* Free any previous side-table (e.g. from earlier sm_codegen call) */
+    if (g_blob_offsets) { free(g_blob_offsets); g_blob_offsets = NULL; }
+    g_blob_count = 0;
+    g_trampoline_offset = 0;
 
-    for (int i = 0; i < prog->count; i++) {
-        sm_opcode_t op = prog->instrs[i].op;
-        if (!opcode_stub[op]) {
-            opcode_stub[op] = emit_dispatch_stub(g_handlers[op]);
-        }
+    if (prog->count == 0) {
+        /* Empty program: nothing to emit; sm_jit_run handles count==0 as
+         * an immediate exit. */
+        return 0;
     }
 
-    /* SEG_CODE: array of (uint8_t *) stub pointers, one per instruction.
-     * The runner at execution time does:
-     *   for pc = 0..count: g_jit_state->pc = pc+1; call opcode_stub[instrs[pc].op]
-     * We store the stub pointer directly so the runner can indirect-call it
-     * without re-indexing through opcode_stub. */
-    size_t ptr_array_bytes = (size_t)prog->count * sizeof(uint8_t *);
-    uint8_t **code_ptrs = (uint8_t **)seg_alloc(SEG_CODE, ptr_array_bytes);
-    if (!code_ptrs) {
-        fprintf(stderr, "sm_codegen: SEG_CODE allocation failed\n");
+    g_blob_offsets = (size_t *)calloc((size_t)prog->count, sizeof(size_t));
+    if (!g_blob_offsets) {
+        fprintf(stderr, "sm_codegen: g_blob_offsets allocation failed\n");
         return -1;
     }
-    for (int i = 0; i < prog->count; i++)
-        code_ptrs[i] = opcode_stub[prog->instrs[i].op];
 
-    seg_seal(SEG_DISPATCH);
+    /* Compute where blob 0 will land: trampoline first, blobs after.
+     * Trampoline size = 5+5+2+4+10+3+2+1 = 32 bytes.  Computed as
+     * (current_seg_top + 32).  blobs_base must be a stable absolute addr;
+     * SEG_CODE is mmap-fixed so this is safe. */
+    const size_t TRAMPOLINE_SIZE = 32;
+    size_t before_tramp = seg_offset(SEG_CODE);
+    uint8_t *blobs_base = scrip_segs[SEG_CODE].base + before_tramp + TRAMPOLINE_SIZE;
+
+    /* Emit trampoline */
+    g_trampoline_offset = emit_trampoline(prog, blobs_base);
+
+    /* Sanity check: did the trampoline really come out 32 bytes? */
+    size_t actual_tramp_size = seg_offset(SEG_CODE) - g_trampoline_offset;
+    if (actual_tramp_size != TRAMPOLINE_SIZE) {
+        fprintf(stderr, "sm_codegen: trampoline size mismatch — expected %zu, got %zu\n",
+                TRAMPOLINE_SIZE, actual_tramp_size);
+        free(g_blob_offsets); g_blob_offsets = NULL;
+        return -1;
+    }
+
+    /* Pass 1 — emit one fixed-size blob per instruction; remember each
+     * SM_JUMP's rel32 patch offset and target_pc. */
+    int *jump_indices = NULL;
+    size_t *jump_rel32_offs = NULL;
+    int    jump_count = 0;
+    jump_indices    = (int    *)calloc((size_t)prog->count, sizeof(int));
+    jump_rel32_offs = (size_t *)calloc((size_t)prog->count, sizeof(size_t));
+    if (!jump_indices || !jump_rel32_offs) {
+        fprintf(stderr, "sm_codegen: jump-patch buffers allocation failed\n");
+        free(jump_indices); free(jump_rel32_offs);
+        free(g_blob_offsets); g_blob_offsets = NULL;
+        return -1;
+    }
+
+    for (int i = 0; i < prog->count; i++) {
+        size_t off_before = seg_offset(SEG_CODE);
+        g_blob_offsets[i] = off_before;
+        sm_opcode_t op = prog->instrs[i].op;
+
+        if (op == SM_HALT) {
+            emit_halt_blob();
+        } else if (op == SM_JUMP) {
+            int32_t target_pc = (int32_t)prog->instrs[i].a[0].i;
+            size_t rel32_off = emit_jump_blob_skeleton(target_pc);
+            jump_indices[jump_count]    = i;
+            jump_rel32_offs[jump_count] = rel32_off;
+            jump_count++;
+        } else {
+            emit_standard_blob(g_handlers[op], g_trampoline_offset);
+        }
+
+        size_t off_after = seg_offset(SEG_CODE);
+        if (off_after - off_before != ME3_BLOB_SIZE) {
+            fprintf(stderr, "sm_codegen: blob size mismatch at pc=%d op=%d (%zu bytes, want %d)\n",
+                    i, (int)op, off_after - off_before, ME3_BLOB_SIZE);
+            free(jump_indices); free(jump_rel32_offs);
+            free(g_blob_offsets); g_blob_offsets = NULL;
+            return -1;
+        }
+    }
+    g_blob_count = prog->count;
+
+    /* Pass 2 — patch SM_JUMP rel32 displacements.  target_blob_addr is
+     * SEG_CODE.base + g_blob_offsets[target_pc].  The rel32 is relative
+     * to the byte AFTER the rel32 (i.e. rel32_off + 4). */
+    for (int j = 0; j < jump_count; j++) {
+        int    i        = jump_indices[j];
+        size_t rel32_off = jump_rel32_offs[j];
+        int32_t target_pc = (int32_t)prog->instrs[i].a[0].i;
+        if (target_pc < 0 || target_pc >= prog->count) {
+            /* Out-of-range target — pass 2 silently leaves rel32=0; this
+             * was already broken before ME-3 (the handler would set pc
+             * to a bogus value).  Diagnostic message preserves the trail. */
+            fprintf(stderr, "sm_codegen: SM_JUMP at pc=%d targets out-of-range pc=%d (count=%d)\n",
+                    i, target_pc, prog->count);
+            continue;
+        }
+        size_t target_off = g_blob_offsets[target_pc];
+        int32_t rel = (int32_t)((int64_t)target_off - (int64_t)(rel32_off + 4));
+        seg_patch_u32(SEG_CODE, rel32_off, (uint32_t)rel);
+    }
+
+    free(jump_indices); free(jump_rel32_offs);
+
+    /* SEG_DISPATCH no longer used by ME-3.  Sealing an unused empty segment
+     * is harmless but skipped to avoid mprotect on a zero-sized region. */
     seg_seal(SEG_CODE);
     return 0;
 }
@@ -1306,11 +1566,12 @@ int sm_codegen(SM_Program *prog)
 /* ── JIT execution runner ─────────────────────────────────────────────── */
 
 /*
- * sm_jit_run — execute a codegen'd SM_Program.
+ * sm_jit_run — execute a codegen'd SM_Program per ME-3.
  *
  * Requires sm_codegen() to have been called first on the same prog.
- * Uses the pointer array at SEG_CODE base.
- * Mirrors sm_interp_run's error-recovery contract.
+ * Sets r12 = SM_State* (ME-2), then jumps into the trampoline; control
+ * runs through the per-instruction blob chain until SM_HALT's `ret`
+ * returns here.  No C dispatch loop, no per-opcode thunk.
  */
 int sm_jit_run(SM_Program *prog, SM_State *st)
 {
@@ -1318,24 +1579,26 @@ int sm_jit_run(SM_Program *prog, SM_State *st)
     g_jit_state  = st;
     g_jit_halted = 0;
 
-    uint8_t **code_ptrs = (uint8_t **)scrip_segs[SEG_CODE].base;
+    if (prog->count == 0) return 0;
 
-    while (st->pc < prog->count && !g_jit_halted) {
-        st->pc++;  /* advance before handler reads CUR_INS (mirrors interp) */
-        typedef void (*stub_fn_t)(void);
-        stub_fn_t stub = (stub_fn_t)code_ptrs[st->pc - 1];
-        /* ME-2 (GOAL-MODE3-EMIT, 2026-05-10): reserve r12 = SM_State* before
-         * transferring control to SEG_CODE.  Today's threaded-call stubs are
-         * C functions that ignore r12 (they reach SM_State via g_jit_state);
-         * this load establishes the convention for ME-3+ when SEG_CODE
-         * becomes per-instruction native blobs that read [r12 + offset].
-         * r12 is callee-saved in the System V x86-64 C-ABI, so any C frame
-         * (including this one) saves/restores it transparently.  asm volatile
-         * with a "r12" clobber forces GCC to spill its own r12 use here. */
-        asm volatile ("mov %0, %%r12" : : "r"(st) : "r12");
-        stub();
-    }
-    return g_jit_halted ? 0 : 0;  /* 0 = normal exit */
+    /* Compute trampoline entry point */
+    uint8_t *tramp = scrip_segs[SEG_CODE].base + g_trampoline_offset;
+    typedef void (*entry_fn_t)(void);
+    entry_fn_t entry = (entry_fn_t)tramp;
+
+    /* ME-2 + ME-3: load r12 = SM_State* before transferring control to
+     * SEG_CODE.  r12 is callee-saved per System V ABI, so the surrounding
+     * C frame (this function) saves/restores it for us.  Any C handler
+     * called from inside a blob also preserves r12 across its return.
+     * The trampoline reads st->pc as [r12+20] (offsetof SM_State.pc),
+     * looks up blob[pc] by arithmetic on the fixed 22-byte stride, and
+     * jmps in.  Each blob increments pc (or sets it for SM_JUMP), runs,
+     * jmps back to the trampoline.  SM_HALT's blob `ret`s out — that's
+     * how this function returns. */
+    asm volatile ("mov %0, %%r12" : : "r"(st) : "r12");
+    entry();
+
+    return 0;
 }
 
 /* sm_jit_run_plain — debug: pure C dispatch, no SEG_CODE, proves handler correctness */
