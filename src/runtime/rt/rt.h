@@ -273,6 +273,52 @@ void rt_init_arbno(void **slot_ptr, void *child_fn);
  * REMOVED in EM-7-revert (session #72) along with the rest of the
  * brokered Phase-3 path. */
 
+/* ── GOAL-MODE3-EMIT ME-4: pluggable vstack / last_ok backend ────────────
+ *
+ * Mode 3 and mode 4 own different value-stack instances (SM_State.stack
+ * vs libscrip_rt's static g_vstack[]) and different last_ok flags.  This
+ * ABI lets mode-3's sm_jit_run install an SM_State*-aware backend so the
+ * rt_arith / rt_concat / rt_nv_* / rt_push_null / rt_coerce_num / rt_pop_void
+ * calls emitted by ME-4's blobs reach the same stack the trampoline reads
+ * via r12 = SM_State*.
+ *
+ * The backend struct itself is libscrip_rt-internal; callers pass an
+ * opaque `const void *`.  The library defines `rt_vstack_ops_t` privately.
+ * Mode-3 builds its ops table in sm_codegen.c and passes a pointer here.
+ * Mode-4 standalone binaries never call rt_set_vstack_backend; they keep
+ * the default (static g_vstack[]) backend.
+ *
+ * rt_get_default_vstack_backend() returns the default ops pointer so
+ * mode-3 can restore it on sm_jit_run exit. */
+void        rt_set_vstack_backend(const void *ops);
+const void *rt_get_default_vstack_backend(void);
+
+/* The backend struct layout — declared publicly so mode 3 can build one.
+ * Callers must zero-initialise then fill every slot.  All fields required.
+ *
+ * Note on the C-ABI: DESCR_t is 16 bytes (two-word struct).  Passing it by
+ * value across a translation-unit boundary works fine when both sides have
+ * the complete struct definition, but rt.h only forward-declares it (so
+ * standalone-emitted mode-4 binaries don't need descr.h to link).  We pass
+ * by pointer in this ABI so the public header stays DESCR_t-opaque.
+ *
+ *   push(d_ptr)     — caller's DESCR_t* is copied onto the stack
+ *   pop (out_ptr)   — backend writes popped value into *out_ptr
+ *   peek(out_ptr)   — backend writes TOS into *out_ptr; does not pop
+ *   depth()         — returns count of values currently on the stack
+ *   set_depth(n)    — truncates the stack to depth n
+ *   get_last_ok()   — returns last-op-OK flag (1/0)
+ *   set_last_ok(x)  — writes last-op-OK flag (0 or non-zero) */
+typedef struct {
+    void (*push)       (const DESCR_t *d);
+    void (*pop)        (DESCR_t *out);
+    void (*peek)       (DESCR_t *out);
+    int  (*depth)      (void);
+    void (*set_depth)  (int n);
+    int  (*get_last_ok)(void);
+    void (*set_last_ok)(int x);
+} rt_vstack_ops_t;
+
 #ifdef __cplusplus
 }
 #endif

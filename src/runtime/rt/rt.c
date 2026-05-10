@@ -107,6 +107,78 @@ extern DESCR_t (*g_user_call_hook)(const char *, DESCR_t *, int);
 static DESCR_t g_vstack[VSTACK_CAP];
 static int     g_vtop    = 0;
 
+/* ── GOAL-MODE3-EMIT ME-4: pluggable vstack / last_ok backend ─────────────
+ *
+ * Mode 3 (--jit-run) and mode 4 (--sm-emit --target=x64) both reach into
+ * libscrip_rt for SM-level operations (rt_arith, rt_concat, rt_nv_get/set,
+ * rt_push_null, rt_coerce_num, rt_pop_void).  But the two modes own different
+ * value-stack instances:
+ *
+ *   Mode 3 → SM_State.stack (heap-realloc'd, anchored at r12 inside emitted
+ *            blob land per ARCH-x86 / GOAL-MODE3-EMIT register convention).
+ *   Mode 4 → libscrip_rt's static g_vstack[] (this file).
+ *
+ * Same goes for the "last operation succeeded" flag: SM_State.last_ok in
+ * mode 3, g_last_ok in mode 4.
+ *
+ * Without unification, ME-4's blob shape (`call rt_<op>@PLT`) cannot work
+ * in mode 3 — rt_arith would pop/push the wrong stack.  Two options exist:
+ *   (a) bypass rt_* in mode 3 and inline everything against r12;
+ *   (b) make rt_* dispatch through a pluggable backend, installable per
+ *       execution mode.
+ * Option (b) is the architecture this rung adopts, per Lon's direction.
+ *
+ * Default backend = the static g_vstack[]/g_last_ok pair (mode 4 unchanged).
+ * Mode 3 installs an SM_State*-aware backend at sm_jit_run entry, restores
+ * the default at exit.  Backend swap is process-global; mode 3 holds it for
+ * the duration of one sm_jit_run() invocation; nested sm_jit_run calls
+ * (e.g. sm_call_expression) are not currently expected but would re-install
+ * the same backend harmlessly.
+ *
+ * Scope: only the value-stack and last_ok flag are pluggable in this rung.
+ * The pat-stack (g_pat_stack[]) is left alone — it is a libscrip_rt-internal
+ * scratch area for variant-pattern construction, never observed by mode 3
+ * (which constructs patterns directly on the value stack since ME-1).
+ * A future rung may unify it too (libscrip_rt completion of ME-1).
+ */
+
+/* rt_vstack_ops_t is defined in rt.h (publicly) so mode 3 can build a
+ * backend struct.  This file owns the default backend instance. */
+
+static int     g_last_ok  = 1;  /* default success at process start */
+
+/* Default (mode-4) backend implementations — talk to g_vstack[] / g_vtop /
+ * g_last_ok directly.  Pointer-form ABI per rt.h. */
+static void    _default_push     (const DESCR_t *d);
+static void    _default_pop      (DESCR_t *out);
+static void    _default_peek     (DESCR_t *out);
+static int     _default_depth    (void)       { return g_vtop; }
+static void    _default_set_depth(int n)      { g_vtop = n; }
+static int     _default_get_last_ok(void)     { return g_last_ok; }
+static void    _default_set_last_ok(int ok)   { g_last_ok = ok ? 1 : 0; }
+
+static const rt_vstack_ops_t g_default_ops = {
+    .push        = _default_push,
+    .pop         = _default_pop,
+    .peek        = _default_peek,
+    .depth       = _default_depth,
+    .set_depth   = _default_set_depth,
+    .get_last_ok = _default_get_last_ok,
+    .set_last_ok = _default_set_last_ok,
+};
+
+static const rt_vstack_ops_t *g_ops = &g_default_ops;
+
+void rt_set_vstack_backend(const void *ops)
+{
+    g_ops = ops ? (const rt_vstack_ops_t *)ops : &g_default_ops;
+}
+
+const void *rt_get_default_vstack_backend(void)
+{
+    return &g_default_ops;
+}
+
 /* EM-7c-variant (session #80, 2026-05-07): g_pat_stack[] reintroduced for
  * the variant-pattern path.  The architecture distinction from EM-7-pre
  * (session #71) is *not* the existence of a runtime pat-stack — that was
@@ -131,29 +203,56 @@ static int     g_pat_sp = 0;
 
 static int     g_halt_rc  = 0;
 static int     g_halt_set = 0;
-static int     g_last_ok  = 1;  /* default success at process start */
+/* g_last_ok moved above into backend section; default backend reads/writes
+ * it via _default_get_last_ok / _default_set_last_ok. */
 
 /*==============================================================================
- * Internal stack helpers
+ * Default-backend implementations (used by g_default_ops above)
  *============================================================================*/
 
-static void vstack_push(DESCR_t d)
+static void _default_push(const DESCR_t *d)
 {
     if (g_vtop >= VSTACK_CAP) {
         fprintf(stderr, "libscrip_rt: SM value stack overflow (cap=%d).\n", VSTACK_CAP);
         abort();
     }
-    g_vstack[g_vtop++] = d;
+    g_vstack[g_vtop++] = *d;
 }
 
-static DESCR_t vstack_pop(void)
+static void _default_pop(DESCR_t *out)
 {
     if (g_vtop <= 0) {
         fprintf(stderr, "libscrip_rt: SM value stack underflow.\n");
         abort();
     }
-    return g_vstack[--g_vtop];
+    *out = g_vstack[--g_vtop];
 }
+
+static void _default_peek(DESCR_t *out)
+{
+    if (g_vtop <= 0) {
+        fprintf(stderr, "libscrip_rt: SM value stack peek on empty.\n");
+        abort();
+    }
+    *out = g_vstack[g_vtop - 1];
+}
+
+/*==============================================================================
+ * Backend-routed stack helpers (used by every rt_* SM-level entry)
+ *
+ * These look identical to the pre-ME-4 vstack_push/vstack_pop but dispatch
+ * through g_ops so mode 3 can swap in an SM_State*-aware backend.
+ *============================================================================*/
+
+static void vstack_push(DESCR_t d) { g_ops->push(&d); }
+static DESCR_t vstack_pop(void)    { DESCR_t out; g_ops->pop(&out); return out; }
+static DESCR_t vstack_peek(void)   { DESCR_t out; g_ops->peek(&out); return out; }
+
+/* last_ok read/write — route through backend so mode 3 hits SM_State.last_ok
+ * while mode 4 hits g_last_ok.  Used throughout this file in place of bare
+ * `g_last_ok` references (ME-4). */
+#define LAST_OK_GET()   (g_ops->get_last_ok())
+#define LAST_OK_SET(x)  (g_ops->set_last_ok(x))
 
 /* EM-7c-variant: pat-stack helpers — used by rt_pat_*() to assemble
  * patterns at runtime from the SM_PAT_* opcode sequence emitted into the
@@ -313,7 +412,7 @@ static DESCR_t call_native_chunk(const char *fname, void *fn,
      * before `ret` — that's the SM-interp's job (sm_interp.c:1208-1210
      * does `NV_GET_fn(retval_name)` after the expression returns).  We mirror
      * that here: read NV[fname] for the retval; ignore vstack residue. */
-    int saved_vtop = g_vtop;
+    int saved_vtop = g_ops->depth();
 
     /* Call the native expression.  It runs its SM body and executes `ret`.
      * Calling convention: void(void) at the ABI level — the expression
@@ -331,7 +430,7 @@ static DESCR_t call_native_chunk(const char *fname, void *fn,
     /* Restore vstack depth — drop any residue the body pushed and didn't
      * pop.  Mirrors sm_interp.c:1215-1222 which restores caller_sp.  Since
      * we share one global vstack, "restore" = truncate to pre-call depth. */
-    g_vtop = saved_vtop;
+    g_ops->set_depth(saved_vtop);
 
     /* Restore saved parameter values. */
     for (int k = nbound - 1; k >= 0; k--)
@@ -430,9 +529,10 @@ void rt_halt_tos(void)
      * This lets SM_HALT work for both synthetic tests (PUSH_LIT_I N + HALT)
      * and real programs (HALT with non-integer TOS → normal exit rc=0). */
     int rc = 0;
-    if (g_vtop > 0) {
-        DESCR_t d = g_vstack[g_vtop - 1];
-        if (d.v == DT_I) { rc = (int)d.i; g_vtop--; }
+    int depth = g_ops->depth();
+    if (depth > 0) {
+        DESCR_t d = vstack_peek();
+        if (d.v == DT_I) { rc = (int)d.i; g_ops->set_depth(depth - 1); }
         /* Non-DT_I TOS: leave stack intact, rc stays 0 */
     }
     g_halt_rc  = rc;
@@ -508,11 +608,11 @@ void rt_nv_set(const char *name)
      * rt_nv_set("LINE") propagates the failure to last_ok. */
     if (val.v == DT_FAIL) {
         vstack_push(val);   /* balanced push so subsequent pops don't underflow */
-        g_last_ok = 0;
+        LAST_OK_SET(0);
         return;
     }
     NV_SET_fn(name ? name : "", val);
-    g_last_ok = 1;
+    LAST_OK_SET(1);
 }
 
 void rt_pop_void(void)
@@ -524,8 +624,8 @@ void rt_pop_void(void)
  * EM-4 entries
  *============================================================================*/
 
-int rt_last_ok(void)  { return g_last_ok; }
-void rt_set_last_ok(int ok) { g_last_ok = ok ? 1 : 0; }
+int rt_last_ok(void)  { return LAST_OK_GET(); }
+void rt_set_last_ok(int ok) { LAST_OK_SET(ok ? 1 : 0); }
 
 /*==============================================================================
  * EM-5 entries
@@ -829,7 +929,7 @@ void rt_match_variant(const char *subj_name, int has_repl)
 
     int ok = exec_stmt(subj_name, &subj_d, pat_d,
                        has_repl ? &repl : NULL, has_repl);
-    g_last_ok = ok ? 1 : 0;
+    LAST_OK_SET(ok ? 1 : 0);
     g_pat_sp  = 0;
 }
 
@@ -844,14 +944,14 @@ void rt_concat(void)
     DESCR_t l = vstack_pop();
     DESCR_t result = CONCAT_fn(l, r);
     vstack_push(result);
-    g_last_ok = (result.v != DT_FAIL);
+    LAST_OK_SET((result.v != DT_FAIL));
 }
 
 void rt_push_null(void)
 {
     /* SM_PUSH_NULL: push null (empty-string) descriptor; null is non-fail. */
     vstack_push(NULVCL);
-    g_last_ok = 1;
+    LAST_OK_SET(1);
 }
 
 void rt_coerce_num(void)
@@ -869,7 +969,7 @@ void rt_coerce_num(void)
     } else {
         vstack_push(v);
     }
-    g_last_ok = 1;
+    LAST_OK_SET(1);
 }
 
 /* SM_CALL_FN helpers — pseudo-calls inlined here to avoid a full INVOKE_fn round trip.
@@ -913,7 +1013,7 @@ void rt_call(const char *name, int nargs)
         else if (IS_NAMEVAL(name_d)) val = _rt_nv_fold_get(name_d.s);
         else                         val = _rt_nv_fold_get(VARVAL_fn(name_d));
         vstack_push(val);
-        g_last_ok = 1;
+        LAST_OK_SET(1);
         return;
     }
     if (name && strcmp(name, "NAME_PUSH") == 0) {
@@ -922,7 +1022,7 @@ void rt_call(const char *name, int nargs)
         const char *vname0 = VARVAL_fn(name_d);
         char *vname = GC_strdup(vname0 ? vname0 : ""); sno_fold_name(vname);
         vstack_push(NAMEVAL(vname));
-        g_last_ok = 1;
+        LAST_OK_SET(1);
         return;
     }
     if (name && strcmp(name, "ASGN_INDIR") == 0) {
@@ -936,39 +1036,39 @@ void rt_call(const char *name, int nargs)
             if (vname0 && *vname0) { _rt_nv_fold_set(vname0, val); ok = 1; }
         }
         vstack_push(val);
-        g_last_ok = ok;
+        LAST_OK_SET(ok);
         return;
     }
     if (name && strcmp(name, "IDX") == 0) {
         if (nargs == 2) {
             DESCR_t r = subscript_get(args[0], args[1]);
             vstack_push(r);
-            g_last_ok = (r.v != DT_FAIL);
+            LAST_OK_SET((r.v != DT_FAIL));
         } else if (nargs == 3) {
             DESCR_t r = subscript_get2(args[0], args[1], args[2]);
             vstack_push(r);
-            g_last_ok = (r.v != DT_FAIL);
+            LAST_OK_SET((r.v != DT_FAIL));
         } else {
             /* N-dim via ITEM builtin */
             DESCR_t r = INVOKE_fn("ITEM", args, nargs);
             vstack_push(r);
-            g_last_ok = (r.v != DT_FAIL);
+            LAST_OK_SET((r.v != DT_FAIL));
         }
         return;
     }
     if (name && strcmp(name, "IDX_SET") == 0) {
         if (nargs == 3) {        /* val, base, idx */
             DESCR_t val = args[0]; DESCR_t base = args[1]; DESCR_t idx = args[2];
-            g_last_ok = subscript_set(base, idx, val);
+            LAST_OK_SET(subscript_set(base, idx, val));
             vstack_push(val);
         } else if (nargs == 4) {
             DESCR_t val = args[0]; DESCR_t base = args[1];
             DESCR_t i = args[2]; DESCR_t j = args[3];
-            g_last_ok = subscript_set2(base, i, j, val);
+            LAST_OK_SET(subscript_set2(base, i, j, val));
             vstack_push(val);
         } else {
             DESCR_t r = INVOKE_fn("ITEM_SET", args, nargs);
-            g_last_ok = (r.v != DT_FAIL);
+            LAST_OK_SET((r.v != DT_FAIL));
             vstack_push(args[0]);  /* val */
         }
         return;
@@ -979,7 +1079,7 @@ void rt_call(const char *name, int nargs)
     for (int k = 0; k < nargs; k++) {
         if (args[k].v == DT_FAIL) {
             vstack_push(FAILDESCR);
-            g_last_ok = 0;
+            LAST_OK_SET(0);
             return;
         }
     }
@@ -993,12 +1093,12 @@ void rt_call(const char *name, int nargs)
     if (cfn) {
         DESCR_t result = call_native_chunk(name, cfn, args, nargs);
         vstack_push(result);
-        g_last_ok = (result.v != DT_FAIL);
+        LAST_OK_SET((result.v != DT_FAIL));
         return;
     }
     DESCR_t result = INVOKE_fn(name ? name : "", args, nargs);
     vstack_push(result);
-    g_last_ok = (result.v != DT_FAIL);
+    LAST_OK_SET((result.v != DT_FAIL));
 }
 
 /* SM_RETURN / SM_FRETURN / SM_NRETURN and conditional variants.
@@ -1019,23 +1119,23 @@ void rt_call(const char *name, int nargs)
 int rt_do_return(int kind, int cond)
 {
     /* cond: 0=unconditional, 1=only if last_ok, 2=only if !last_ok */
-    if (cond == 1 && !g_last_ok) return 0;
-    if (cond == 2 &&  g_last_ok) return 0;
+    if (cond == 1 && !LAST_OK_GET()) return 0;
+    if (cond == 2 &&  LAST_OK_GET()) return 0;
 
     /* kind: 0=RETURN, 1=FRETURN, 2=NRETURN */
     if (kind == 1) {
         /* FRETURN: discard whatever the body produced, push FAILDESCR.
          * Body already pushed its retval (if any) — pop it; push FAIL. */
-        if (g_vtop > 0) (void)vstack_pop();
+        if (g_ops->depth() > 0) (void)vstack_pop();
         vstack_push(FAILDESCR);
-        g_last_ok = 0;
+        LAST_OK_SET(0);
     } else if (kind == 2) {
         /* NRETURN: pop body's retval; push a NAMEVAL.  Mode-4 deviation:
          * we don't track the function's retval-slot name at this layer, so
          * we use the raw value as a NAME if it's a string, else FAILDESCR.
          * This is enough for the dot-star NRETURN idiom (push_list = .dummy)
          * because the body explicitly assigned a NAMEVAL via NAME_PUSH. */
-        DESCR_t v = (g_vtop > 0) ? vstack_pop() : FAILDESCR;
+        DESCR_t v = (g_ops->depth() > 0) ? vstack_pop() : FAILDESCR;
         if (v.v == DT_N) {
             vstack_push(v);          /* already a NAME */
         } else if (v.v == DT_S && v.s) {
@@ -1044,10 +1144,12 @@ int rt_do_return(int kind, int cond)
         } else {
             vstack_push(FAILDESCR);
         }
-        g_last_ok = 1;
+        LAST_OK_SET(1);
     } else {
         /* RETURN: leave TOS alone; just `ret`. */
-        g_last_ok = (g_vtop > 0 && g_vstack[g_vtop - 1].v != DT_FAIL);
+        int ok = 0;
+        if (g_ops->depth() > 0) ok = (vstack_peek().v != DT_FAIL);
+        LAST_OK_SET(ok);
     }
     return 1;
 }

@@ -611,6 +611,89 @@ static void h_coerce_num(void)
     STATE->last_ok = 1;
 }
 
+/* ── ME-4 value-in/value-out helpers ─────────────────────────────────────
+ *
+ * The me4_* family is called directly by ME-4 inline-native blobs.  Each
+ * function takes its operands by value (via DESCR_t struct-pass in
+ * rdi:rsi / rdx:rcx etc.) and returns the result by value (rax:rdx for
+ * 16-byte DESCR_t).  No stack access — the blob does pop/push around
+ * the call.  Side effect: `g_jit_state->last_ok` is updated to reflect
+ * the operation's success.  Mirrors h_arith / h_concat / h_coerce_num
+ * semantics so byte-identical output is guaranteed across `--sm-run` and
+ * `--jit-run`.
+ *
+ * Why a parallel function family (instead of refactoring h_*):
+ *   - The h_* family is called via the indirect `mov rax, imm64 ; call rax`
+ *     blob shape and reads/writes STATE->stack implicitly.  Switching its
+ *     ABI would also touch sm_jit_run_plain and any future debug path that
+ *     calls handlers via the g_handlers[] table.
+ *   - me4_* is a clean island: blob ↔ me4_* with one ABI, no ambiguity.
+ *   - The two paths share underlying primitives (shared_arith, CONCAT_fn,
+ *     coercion table) so logic isn't duplicated. */
+
+DESCR_t me4_arith(DESCR_t l, DESCR_t r, sm_opcode_t op)
+{
+    if (l.v == DT_FAIL || r.v == DT_FAIL) {
+        g_jit_state->last_ok = 0;
+        return FAILDESCR;
+    }
+    if (l.v == DT_S)    l = INTVAL(to_int(l));
+    if (r.v == DT_S)    r = INTVAL(to_int(r));
+    if (l.v == DT_SNUL) l = INTVAL(0);
+    if (r.v == DT_SNUL) r = INTVAL(0);
+    DESCR_t result = shared_arith(l, r, op);
+    g_jit_state->last_ok = (result.v != DT_FAIL);
+    return result;
+}
+
+DESCR_t me4_concat(DESCR_t l, DESCR_t r)
+{
+    DESCR_t result = CONCAT_fn(l, r);
+    g_jit_state->last_ok = (result.v != DT_FAIL);
+    return result;
+}
+
+DESCR_t me4_coerce_num(DESCR_t v)
+{
+    g_jit_state->last_ok = 1;
+    if (v.v == DT_S) {
+        int64_t iv = to_int(v);
+        if (iv != 0 || (v.s && v.s[0] == '0')) return INTVAL(iv);
+        return REALVAL(to_real(v));
+    }
+    return v;
+}
+
+DESCR_t me4_push_var(const char *name)
+{
+    DESCR_t val = NV_GET_fn(name);
+    g_jit_state->last_ok = (val.v != DT_FAIL);
+    return val;
+}
+
+/* SM_STORE_VAR — pops val off the stack, stores it into NV[name], pushes
+ * val back onto the stack as the assignment's value.  This helper does
+ * the NV write and last_ok update; the blob does pop-arg / push-result. */
+DESCR_t me4_store_var(const char *name, DESCR_t val)
+{
+    if (val.v == DT_FAIL) {
+        g_jit_state->last_ok = 0;
+        return FAILDESCR;
+    }
+    NV_SET_fn(name, val);
+    g_jit_state->last_ok = 1;
+    return val;
+}
+
+/* Pure-data push helpers used by SM_PUSH_NULL.  Returns the constant
+ * NULVCL; setting last_ok=1.  Inline blob calls this once (no args) and
+ * pushes the result. */
+DESCR_t me4_push_null(void)
+{
+    g_jit_state->last_ok = 1;
+    return NULVCL;
+}
+
 static void h_pat_lit(void)
 {
     PUSH(pat_lit(CUR_INS->a[0].s ? CUR_INS->a[0].s : ""));
@@ -1327,71 +1410,84 @@ static void init_handler_table(void)
  * sequences for the opcode set each rung names.
  */
 
-/* Fixed blob size — must match the encodings above */
-#define ME3_BLOB_SIZE  30
+/* GOAL-MODE3-EMIT ME-4: variable-size blobs ────────────────────────────
+ *
+ * ME-3 used a fixed 30-byte blob stride so the trampoline could compute
+ * blob[pc] via `imul rax, rax, 30`.  ME-4's inline-native opcodes require
+ * larger blobs for arithmetic / string ops; rather than bump the uniform
+ * stride and waste bytes on NOP padding, we switch to a per-PC dispatch
+ * table.  Each `SM_Instr` blob is exactly as big as it needs to be.
+ *
+ * Table: g_blob_addrs[] — uint8_t*[prog->count], filled in pass 1 as
+ * blobs are laid down.  Each entry is the absolute address of the first
+ * byte of the blob for that pc.  Stable for the lifetime of the program
+ * (SEG_CODE is mmap-fixed; the C array is heap-stable until next codegen).
+ *
+ * Trampoline: read pc, bound-check, indirect-jmp through
+ * g_blob_addrs[pc].  One memory load instead of an imul + add; same
+ * dispatch latency in practice.
+ *
+ * Mode-4 future: g_blob_addrs[] becomes the per-pc label list in the
+ * serialized .s — `mov rax, [.Lblob_addrs + pc*8] ; jmp rax`, with
+ * `.Lblob_addrs` a `.quad` table of the assembler-emitted blob labels.
+ */
 
-/* Per-PC side-table built during sm_codegen */
-static size_t *g_blob_offsets = NULL;   /* g_blob_offsets[i] = byte offset in SEG_CODE */
-static int     g_blob_count   = 0;
-static size_t  g_trampoline_offset = 0;  /* byte offset of trampoline in SEG_CODE */
+/* Per-PC dispatch table built during sm_codegen.
+ * g_blob_addrs[i] = absolute address of blob[i] in SEG_CODE. */
+static uint8_t **g_blob_addrs = NULL;
+static int       g_blob_count = 0;
+static size_t    g_trampoline_offset = 0;  /* byte offset of trampoline in SEG_CODE */
 
 /*
  * emit_trampoline — emit the shared dispatch trampoline at the current
  * SEG_CODE write head.  Returns its byte offset from SEG_CODE base.
- * Caller must have determined `blobs_base` (the absolute address where
- * blob 0 begins).
  *
- * Note on blob stride: the trampoline computes blob[pc] by `pc * stride`.
- * `imul rax, rax, imm8` accepts an 8-bit signed immediate, sufficient for
- * any stride up to 127.  Current stride = ME3_BLOB_SIZE = 30.
+ * Variable-size dispatch (ME-4): looks up g_blob_addrs[pc] (absolute
+ * address) and indirect-jumps.  The C array's base is baked as imm64;
+ * it's stable until the next sm_codegen call.
  */
-static size_t emit_trampoline(SM_Program *prog, uint8_t *blobs_base)
+static size_t emit_trampoline(SM_Program *prog)
 {
     size_t off = seg_offset(SEG_CODE);
 
-    /* mov eax, dword [r12+20]    (41 8b 44 24 14)  — load st->pc */
+    /* mov eax, dword [r12+20]    (41 8b 44 24 14)  5 bytes — load st->pc */
     seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0x8b);
     seg_byte(SEG_CODE, 0x44); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0x14);
 
-    /* cmp eax, prog->count       (3d <imm32>) */
+    /* cmp eax, prog->count       (3d <imm32>)      5 bytes */
     seg_byte(SEG_CODE, 0x3d);
     seg_u32(SEG_CODE, (uint32_t)prog->count);
 
-    /* jae .exit (rel8 = +19, skipping imul/mov/add/jmp):
-     * imul rax, rax, ME3_BLOB_SIZE : 48 6b c0 <imm8>      = 4 bytes
-     * mov  rcx, blobs_base         : 48 b9 <imm64>        = 10 bytes
-     * add  rax, rcx                : 48 01 c8             = 3 bytes
-     * jmp  rax                     : ff e0                = 2 bytes
-     * Total skip = 19 bytes.  jae rel8 = 0x73 0x13
+    /* jae .exit (rel8 = +16, skipping mov/mov/jmp):
+     *   mov rcx, &g_blob_addrs[0]   48 b9 <imm64>   10 bytes
+     *   mov rax, [rcx + rax*8]      48 8b 04 c1      4 bytes
+     *   jmp rax                     ff e0            2 bytes
+     * Total skip = 16 bytes; rel8 = 0x10.
      */
-    seg_byte(SEG_CODE, 0x73); seg_byte(SEG_CODE, 0x13);
+    seg_byte(SEG_CODE, 0x73); seg_byte(SEG_CODE, 0x10);
 
-    /* imul rax, rax, ME3_BLOB_SIZE  (48 6b c0 <imm8>) — sign-extended 8-bit */
-    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0x6b);
-    seg_byte(SEG_CODE, 0xc0); seg_byte(SEG_CODE, (uint8_t)ME3_BLOB_SIZE);
-
-    /* mov rcx, blobs_base  (48 b9 <imm64>) */
+    /* mov rcx, &g_blob_addrs[0]  (48 b9 <imm64>) — baked C array base */
     seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xb9);
-    seg_u64(SEG_CODE, (uint64_t)(uintptr_t)blobs_base);
+    seg_u64(SEG_CODE, (uint64_t)(uintptr_t)g_blob_addrs);
 
-    /* add rax, rcx  (48 01 c8) */
-    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0x01); seg_byte(SEG_CODE, 0xc8);
+    /* mov rax, qword [rcx + rax*8]  (48 8b 04 c1) — rax = g_blob_addrs[pc] */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x04); seg_byte(SEG_CODE, 0xc1);
 
-    /* jmp rax  (ff e0) */
+    /* jmp rax  (ff e0)  2 bytes */
     seg_byte(SEG_CODE, 0xff); seg_byte(SEG_CODE, 0xe0);
 
-    /* .exit: ret  (c3).  Reached only if pc >= count, which should not
-     * happen on a well-formed program (SM_HALT terminates via its own
-     * blob ret).  If reached, returns to whichever C frame entered the
-     * trampoline last via `call` — typically sm_jit_run's `entry()`. */
+    /* .exit: ret  (c3) — reached only if pc out-of-bounds, shouldn't happen
+     * on well-formed programs (SM_HALT terminates via its own blob ret). */
     seg_byte(SEG_CODE, 0xc3);
 
     return off;
 }
 
 /*
- * emit_standard_blob — emit the 30-byte standard blob that calls a C
- * handler then jumps to the trampoline.
+ * emit_standard_blob — emit the standard "call C handler" blob.
+ *
+ * Variable-size (ME-4): exactly 28 bytes — no NOP padding.
  *
  * 16-byte stack alignment discipline.  The System V x86-64 ABI requires
  * rsp ≡ 0 (mod 16) at the point of `call`, so the callee sees rsp ≡ 8
@@ -1409,9 +1505,7 @@ static size_t emit_trampoline(SM_Program *prog, uint8_t *blobs_base)
  */
 static void emit_standard_blob(handler_fn_t fn, size_t trampoline_abs_off)
 {
-    size_t blob_off = seg_offset(SEG_CODE);
-
-    /* inc dword [r12+20]  (41 ff 44 24 14)  5 bytes */
+    /* inc dword [r12+20]  (41 ff 44 24 14)  5 bytes — pc++ */
     seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xff);
     seg_byte(SEG_CODE, 0x44); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0x14);
 
@@ -1431,16 +1525,17 @@ static void emit_standard_blob(handler_fn_t fn, size_t trampoline_abs_off)
     seg_byte(SEG_CODE, 0xc4); seg_byte(SEG_CODE, 0x08);
 
     /* jmp rel32 trampoline.  rel32 is relative to the byte AFTER the
-     * rel32 (i.e. blob_off + 30).  5 bytes. */
+     * rel32 (i.e. the current seg head + 5).  3 bytes opcode + 5 = total 28. */
+    size_t rel32_end_off = seg_offset(SEG_CODE) + 5;
+    int32_t rel = (int32_t)((int64_t)trampoline_abs_off - (int64_t)rel32_end_off);
     seg_byte(SEG_CODE, 0xe9);
-    int32_t rel = (int32_t)((int64_t)trampoline_abs_off - (int64_t)(blob_off + 30));
     seg_u32(SEG_CODE, (uint32_t)rel);
 }
 
 /*
- * emit_halt_blob — emit the 30-byte SM_HALT blob: advance pc past HALT,
+ * emit_halt_blob — emit the SM_HALT blob: advance pc past HALT,
  * then ret (returns out of sm_jit_run via sm_jit_run's `call entry()`).
- * Padded with NOPs.
+ * Variable-size: exactly 6 bytes.
  */
 static void emit_halt_blob(void)
 {
@@ -1450,16 +1545,13 @@ static void emit_halt_blob(void)
 
     /* ret  (c3)  1 byte — returns to sm_jit_run's `entry();` call site */
     seg_byte(SEG_CODE, 0xc3);
-
-    /* nop * 24 to pad to 30 bytes */
-    for (int i = 0; i < 24; i++) seg_byte(SEG_CODE, 0x90);
 }
 
 /*
- * emit_jump_blob_skeleton — emit the 30-byte SM_JUMP blob with the
- * jmp rel32 displacement left as 0; pass 2 patches it with the real
- * displacement to blob[target_pc].  Returns the byte offset within
- * SEG_CODE of the rel32 field (used by the patcher).
+ * emit_jump_blob_skeleton — emit the SM_JUMP blob with the jmp rel32
+ * displacement left as 0; pass 2 patches it with the real displacement
+ * to blob[target_pc].  Returns the byte offset within SEG_CODE of the
+ * rel32 field (used by the patcher).  Variable-size: exactly 14 bytes.
  */
 static size_t emit_jump_blob_skeleton(int32_t target_pc)
 {
@@ -1473,22 +1565,363 @@ static size_t emit_jump_blob_skeleton(int32_t target_pc)
     size_t rel32_off = seg_offset(SEG_CODE);
     seg_u32(SEG_CODE, 0);
 
-    /* 16 nop padding to reach 30 bytes */
-    for (int i = 0; i < 16; i++) seg_byte(SEG_CODE, 0x90);
-
     return rel32_off;
+}
+
+/* ── ME-4 inline-native blob emitters ────────────────────────────────────
+ *
+ * Each emit_me4_* helper lowers one SM opcode to a self-contained native
+ * x86 sequence that:
+ *   - increments pc via [r12+20]
+ *   - pops its operands from the value stack ([r12]-anchored)
+ *   - calls the matching me4_* helper via imm64 (SEG_CODE↔scrip-text
+ *     distance exceeds rel32 reach in mmap-allocated SEG_CODE; see
+ *     ME-3 design notes)
+ *   - pushes the result back onto the value stack
+ *   - tail-jumps to the trampoline via rel32 to dispatch the next opcode
+ *
+ * Stack base reload after the C call is defensive — me4_arith /
+ * me4_coerce_num / me4_push_null don't push and so cannot reallocate the
+ * stack; me4_concat and me4_push_var may allocate strings but do not push;
+ * me4_store_var calls NV_SET_fn which may grow the NV table but does not
+ * touch SM_State.stack.  Even so, reloading [r12] after the call is
+ * cheap (one mov) and removes a fragility class.
+ */
+
+/* Helper: 16-byte rsp alignment + call rax via imm64.  16 bytes. */
+static void emit_aligned_call_imm64(void *fn)
+{
+    /* sub rsp, 8  (48 83 ec 08)  4 bytes */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0x83);
+    seg_byte(SEG_CODE, 0xec); seg_byte(SEG_CODE, 0x08);
+    /* mov rax, imm64  (48 b8 <imm64>)  10 bytes */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xb8);
+    seg_u64(SEG_CODE, (uint64_t)(uintptr_t)fn);
+    /* call rax  (ff d0)  2 bytes */
+    seg_byte(SEG_CODE, 0xff); seg_byte(SEG_CODE, 0xd0);
+    /* add rsp, 8  (48 83 c4 08)  4 bytes */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0x83);
+    seg_byte(SEG_CODE, 0xc4); seg_byte(SEG_CODE, 0x08);
+}
+/* Note: the above is 4+10+2+4 = 20 bytes (not 16 — comment was wrong). */
+
+/* Helper: jmp rel32 to trampoline.  5 bytes. */
+static void emit_jmp_trampoline(size_t trampoline_abs_off)
+{
+    size_t rel32_end_off = seg_offset(SEG_CODE) + 5;
+    int32_t rel = (int32_t)((int64_t)trampoline_abs_off - (int64_t)rel32_end_off);
+    seg_byte(SEG_CODE, 0xe9);
+    seg_u32(SEG_CODE, (uint32_t)rel);
+}
+
+/* emit_me4_arith_blob — inline-native lowering of SM_ADD/SUB/MUL/DIV/MOD.
+ *
+ * Sequence:  pops two DESCR_t (l, r) off the value stack, calls
+ *   me4_arith(l, r, op) via imm64, pushes returned DESCR_t back.
+ *
+ * Reg use within the blob:
+ *   r12        — SM_State*, never modified
+ *   r8         — stack base (loaded twice: pre-call, post-call)
+ *   rax, rcx   — scratch + sp arithmetic
+ *   rdi, rsi   — l (DESCR_t arg 1, low / high)
+ *   rdx, rcx   — r (DESCR_t arg 2, low / high)
+ *   r8d        — op (3rd integer arg; reuses r8 because base is reloaded
+ *                after the call)
+ *
+ * Blob size: 84 bytes (pre-call setup 23 + arg loads 19 + op imm 6 +
+ * aligned_call 20 + post-call store 11 + jmp_trampoline 5).
+ */
+static void emit_me4_arith_blob(sm_opcode_t op, size_t trampoline_abs_off)
+{
+    extern DESCR_t me4_arith(DESCR_t, DESCR_t, sm_opcode_t);
+
+    /* ── pre-call: load operands, set up regs ────────────────────────── */
+    /* inc dword [r12+20]                  (41 ff 44 24 14)  5 */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xff);
+    seg_byte(SEG_CODE, 0x44); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0x14);
+    /* mov r8, [r12]                       (4d 8b 04 24)     4 */
+    seg_byte(SEG_CODE, 0x4d); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x04); seg_byte(SEG_CODE, 0x24);
+    /* mov eax, [r12+8]                    (41 8b 44 24 08)  5 */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x44); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0x08);
+    /* lea ecx, [rax - 1]                  (8d 48 ff)        3 — new sp = old sp - 1 */
+    seg_byte(SEG_CODE, 0x8d); seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xff);
+    /* mov [r12+8], ecx                    (41 89 4c 24 08)  5 — write new sp */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x4c); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0x08);
+    /* sub eax, 2                          (83 e8 02)        3 — index of l = old sp - 2 */
+    seg_byte(SEG_CODE, 0x83); seg_byte(SEG_CODE, 0xe8); seg_byte(SEG_CODE, 0x02);
+    /* shl rax, 4                          (48 c1 e0 04)     4 — byte offset */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xc1);
+    seg_byte(SEG_CODE, 0xe0); seg_byte(SEG_CODE, 0x04);
+    /* mov rdi, [r8 + rax]                 (49 8b 3c 00)     4 — l low */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x3c); seg_byte(SEG_CODE, 0x00);
+    /* mov rsi, [r8 + rax + 8]             (49 8b 74 00 08)  5 — l high */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x74); seg_byte(SEG_CODE, 0x00); seg_byte(SEG_CODE, 0x08);
+    /* mov rdx, [r8 + rax + 16]            (49 8b 54 00 10)  5 — r low */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x54); seg_byte(SEG_CODE, 0x00); seg_byte(SEG_CODE, 0x10);
+    /* mov rcx, [r8 + rax + 24]            (49 8b 4c 00 18)  5 — r high */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x4c); seg_byte(SEG_CODE, 0x00); seg_byte(SEG_CODE, 0x18);
+    /* mov r8d, <op_imm32>                 (41 b8 <imm32>)   6 — 3rd arg = op */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xb8);
+    seg_u32(SEG_CODE, (uint32_t)op);
+
+    /* ── call me4_arith ──────────────────────────────────────────────── */
+    emit_aligned_call_imm64((void *)&me4_arith);   /* 20 bytes */
+
+    /* ── post-call: store result into stack[new_sp - 1] (= l's old slot) */
+    /* Save rax in r9 (we need to compute slot addr; rax is also needed) */
+    /* mov r9, rax                         (49 89 c1)        3 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x89); seg_byte(SEG_CODE, 0xc1);
+    /* mov r8, [r12]                       (4d 8b 04 24)     4 — reload base (defensive) */
+    seg_byte(SEG_CODE, 0x4d); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x04); seg_byte(SEG_CODE, 0x24);
+    /* mov ecx, [r12+8]                    (41 8b 4c 24 08)  5 — ecx = new sp */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x4c); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0x08);
+    /* sub ecx, 1                          (83 e9 01)        3 — slot index = new sp - 1 */
+    seg_byte(SEG_CODE, 0x83); seg_byte(SEG_CODE, 0xe9); seg_byte(SEG_CODE, 0x01);
+    /* shl rcx, 4                          (48 c1 e1 04)     4 */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xc1);
+    seg_byte(SEG_CODE, 0xe1); seg_byte(SEG_CODE, 0x04);
+    /* mov [r8 + rcx], r9                  (4d 89 0c 08)     4 — result low */
+    seg_byte(SEG_CODE, 0x4d); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x0c); seg_byte(SEG_CODE, 0x08);
+    /* mov [r8 + rcx + 8], rdx             (49 89 54 08 08)  5 — result high */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x54); seg_byte(SEG_CODE, 0x08); seg_byte(SEG_CODE, 0x08);
+
+    /* ── tail to trampoline ──────────────────────────────────────────── */
+    emit_jmp_trampoline(trampoline_abs_off);   /* 5 bytes */
+}
+
+/* emit_me4_concat_blob — inline-native lowering of SM_CONCAT.
+ * Same shape as arith but no `op` argument; calls me4_concat(l, r). */
+static void emit_me4_concat_blob(size_t trampoline_abs_off)
+{
+    extern DESCR_t me4_concat(DESCR_t, DESCR_t);
+
+    /* Pre-call (same as arith, minus the op imm32 — see emit_me4_arith_blob): */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xff);
+    seg_byte(SEG_CODE, 0x44); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0x14);   /* inc [r12+20] */
+    seg_byte(SEG_CODE, 0x4d); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x04); seg_byte(SEG_CODE, 0x24);                              /* mov r8, [r12] */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x44); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0x08);   /* mov eax, [r12+8] */
+    seg_byte(SEG_CODE, 0x8d); seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xff);   /* lea ecx, [rax-1] */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x4c); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0x08);   /* mov [r12+8], ecx */
+    seg_byte(SEG_CODE, 0x83); seg_byte(SEG_CODE, 0xe8); seg_byte(SEG_CODE, 0x02);   /* sub eax, 2 */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xc1);
+    seg_byte(SEG_CODE, 0xe0); seg_byte(SEG_CODE, 0x04);                              /* shl rax, 4 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x3c); seg_byte(SEG_CODE, 0x00);                              /* mov rdi, [r8+rax] */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x74); seg_byte(SEG_CODE, 0x00); seg_byte(SEG_CODE, 0x08);   /* mov rsi, [r8+rax+8] */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x54); seg_byte(SEG_CODE, 0x00); seg_byte(SEG_CODE, 0x10);   /* mov rdx, [r8+rax+16] */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x4c); seg_byte(SEG_CODE, 0x00); seg_byte(SEG_CODE, 0x18);   /* mov rcx, [r8+rax+24] */
+
+    emit_aligned_call_imm64((void *)&me4_concat);
+
+    /* Post-call store: same as arith */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x89); seg_byte(SEG_CODE, 0xc1);   /* mov r9, rax */
+    seg_byte(SEG_CODE, 0x4d); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x04); seg_byte(SEG_CODE, 0x24);                              /* mov r8, [r12] */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x4c); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0x08);   /* mov ecx, [r12+8] */
+    seg_byte(SEG_CODE, 0x83); seg_byte(SEG_CODE, 0xe9); seg_byte(SEG_CODE, 0x01);   /* sub ecx, 1 */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xc1);
+    seg_byte(SEG_CODE, 0xe1); seg_byte(SEG_CODE, 0x04);                              /* shl rcx, 4 */
+    seg_byte(SEG_CODE, 0x4d); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x0c); seg_byte(SEG_CODE, 0x08);                              /* mov [r8+rcx], r9 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x54); seg_byte(SEG_CODE, 0x08); seg_byte(SEG_CODE, 0x08);   /* mov [r8+rcx+8], rdx */
+
+    emit_jmp_trampoline(trampoline_abs_off);
+}
+
+/* emit_me4_coerce_num_blob — inline-native lowering of SM_COERCE_NUM.
+ * Pops 1, calls me4_coerce_num(v), pushes 1.  Net stack delta: 0. */
+static void emit_me4_coerce_num_blob(size_t trampoline_abs_off)
+{
+    extern DESCR_t me4_coerce_num(DESCR_t);
+
+    /* pc++ */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xff);
+    seg_byte(SEG_CODE, 0x44); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0x14);
+    /* Load TOS into rdi:rsi.  Stack index = sp - 1. */
+    seg_byte(SEG_CODE, 0x4d); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x04); seg_byte(SEG_CODE, 0x24);                              /* mov r8, [r12] */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x44); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0x08);   /* mov eax, [r12+8] */
+    seg_byte(SEG_CODE, 0x83); seg_byte(SEG_CODE, 0xe8); seg_byte(SEG_CODE, 0x01);   /* sub eax, 1 */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xc1);
+    seg_byte(SEG_CODE, 0xe0); seg_byte(SEG_CODE, 0x04);                              /* shl rax, 4 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x3c); seg_byte(SEG_CODE, 0x00);                              /* mov rdi, [r8+rax] */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x74); seg_byte(SEG_CODE, 0x00); seg_byte(SEG_CODE, 0x08);   /* mov rsi, [r8+rax+8] */
+
+    emit_aligned_call_imm64((void *)&me4_coerce_num);
+
+    /* Post-call: write result back to the SAME slot (TOS unchanged depth).
+     * Defensive base reload. */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x89); seg_byte(SEG_CODE, 0xc1);   /* mov r9, rax */
+    seg_byte(SEG_CODE, 0x4d); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x04); seg_byte(SEG_CODE, 0x24);                              /* mov r8, [r12] */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x4c); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0x08);   /* mov ecx, [r12+8] */
+    seg_byte(SEG_CODE, 0x83); seg_byte(SEG_CODE, 0xe9); seg_byte(SEG_CODE, 0x01);   /* sub ecx, 1 */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xc1);
+    seg_byte(SEG_CODE, 0xe1); seg_byte(SEG_CODE, 0x04);                              /* shl rcx, 4 */
+    seg_byte(SEG_CODE, 0x4d); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x0c); seg_byte(SEG_CODE, 0x08);                              /* mov [r8+rcx], r9 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x54); seg_byte(SEG_CODE, 0x08); seg_byte(SEG_CODE, 0x08);   /* mov [r8+rcx+8], rdx */
+
+    emit_jmp_trampoline(trampoline_abs_off);
+}
+
+/* emit_me4_push_null_blob — inline-native lowering of SM_PUSH_NULL.
+ * Calls me4_push_null() (no args), pushes returned NULVCL. */
+static void emit_me4_push_null_blob(size_t trampoline_abs_off)
+{
+    extern DESCR_t me4_push_null(void);
+
+    /* pc++ */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xff);
+    seg_byte(SEG_CODE, 0x44); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0x14);
+
+    emit_aligned_call_imm64((void *)&me4_push_null);
+
+    /* Push result onto stack[sp], sp++. */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x89); seg_byte(SEG_CODE, 0xc1);   /* mov r9, rax */
+    seg_byte(SEG_CODE, 0x4d); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x04); seg_byte(SEG_CODE, 0x24);                              /* mov r8, [r12] */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x4c); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0x08);   /* mov ecx, [r12+8] */
+    /* For push: slot is at offset (sp)*16; then sp++. */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xc1);
+    seg_byte(SEG_CODE, 0xe1); seg_byte(SEG_CODE, 0x04);                              /* shl rcx, 4 */
+    seg_byte(SEG_CODE, 0x4d); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x0c); seg_byte(SEG_CODE, 0x08);                              /* mov [r8+rcx], r9 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x54); seg_byte(SEG_CODE, 0x08); seg_byte(SEG_CODE, 0x08);   /* mov [r8+rcx+8], rdx */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xff);
+    seg_byte(SEG_CODE, 0x44); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0x08);   /* inc dword [r12+8] */
+
+    emit_jmp_trampoline(trampoline_abs_off);
+}
+
+/* emit_me4_push_var_blob — inline-native lowering of SM_PUSH_VAR.
+ * Calls me4_push_var(name) where name is baked from CUR_INS->a[0].s.
+ * Pushes the loaded DESCR_t. */
+static void emit_me4_push_var_blob(const char *name, size_t trampoline_abs_off)
+{
+    extern DESCR_t me4_push_var(const char *);
+
+    /* pc++ */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xff);
+    seg_byte(SEG_CODE, 0x44); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0x14);
+
+    /* mov rdi, imm64(name)  (48 bf <imm64>)  10 bytes */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xbf);
+    seg_u64(SEG_CODE, (uint64_t)(uintptr_t)name);
+
+    emit_aligned_call_imm64((void *)&me4_push_var);
+
+    /* Push result onto stack[sp], sp++. */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x89); seg_byte(SEG_CODE, 0xc1);   /* mov r9, rax */
+    seg_byte(SEG_CODE, 0x4d); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x04); seg_byte(SEG_CODE, 0x24);                              /* mov r8, [r12] */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x4c); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0x08);   /* mov ecx, [r12+8] */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xc1);
+    seg_byte(SEG_CODE, 0xe1); seg_byte(SEG_CODE, 0x04);                              /* shl rcx, 4 */
+    seg_byte(SEG_CODE, 0x4d); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x0c); seg_byte(SEG_CODE, 0x08);                              /* mov [r8+rcx], r9 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x54); seg_byte(SEG_CODE, 0x08); seg_byte(SEG_CODE, 0x08);   /* mov [r8+rcx+8], rdx */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xff);
+    seg_byte(SEG_CODE, 0x44); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0x08);   /* inc dword [r12+8] */
+
+    emit_jmp_trampoline(trampoline_abs_off);
+}
+
+/* emit_me4_store_var_blob — inline-native lowering of SM_STORE_VAR.
+ * Pops val (TOS), calls me4_store_var(name, val), pushes the (un-modified)
+ * val back onto the stack (mirrors h_store_var: assignment expression's
+ * value is val, not NV_SET_fn's return). */
+static void emit_me4_store_var_blob(const char *name, size_t trampoline_abs_off)
+{
+    extern DESCR_t me4_store_var(const char *, DESCR_t);
+
+    /* pc++ */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xff);
+    seg_byte(SEG_CODE, 0x44); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0x14);
+
+    /* Pop val into rsi:rdx (2nd DESCR_t arg).  Stack index = sp - 1.
+     * We update sp BEFORE the call (decrement by 1) since this is a pop. */
+    seg_byte(SEG_CODE, 0x4d); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x04); seg_byte(SEG_CODE, 0x24);                              /* mov r8, [r12] */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x44); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0x08);   /* mov eax, [r12+8] */
+    seg_byte(SEG_CODE, 0x83); seg_byte(SEG_CODE, 0xe8); seg_byte(SEG_CODE, 0x01);   /* sub eax, 1 (new sp) */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x44); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0x08);   /* mov [r12+8], eax */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xc1);
+    seg_byte(SEG_CODE, 0xe0); seg_byte(SEG_CODE, 0x04);                              /* shl rax, 4 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x34); seg_byte(SEG_CODE, 0x00);                              /* mov rsi, [r8+rax] — val low */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x54); seg_byte(SEG_CODE, 0x00); seg_byte(SEG_CODE, 0x08);   /* mov rdx, [r8+rax+8] — val high */
+
+    /* mov rdi, imm64(name) */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xbf);
+    seg_u64(SEG_CODE, (uint64_t)(uintptr_t)name);
+
+    emit_aligned_call_imm64((void *)&me4_store_var);
+
+    /* Push returned val (= rax:rdx) back: stack[new_sp] = result, sp++. */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x89); seg_byte(SEG_CODE, 0xc1);   /* mov r9, rax */
+    seg_byte(SEG_CODE, 0x4d); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x04); seg_byte(SEG_CODE, 0x24);                              /* mov r8, [r12] */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x4c); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0x08);   /* mov ecx, [r12+8] */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xc1);
+    seg_byte(SEG_CODE, 0xe1); seg_byte(SEG_CODE, 0x04);                              /* shl rcx, 4 */
+    seg_byte(SEG_CODE, 0x4d); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x0c); seg_byte(SEG_CODE, 0x08);                              /* mov [r8+rcx], r9 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x54); seg_byte(SEG_CODE, 0x08); seg_byte(SEG_CODE, 0x08);   /* mov [r8+rcx+8], rdx */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xff);
+    seg_byte(SEG_CODE, 0x44); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0x08);   /* inc dword [r12+8] */
+
+    emit_jmp_trampoline(trampoline_abs_off);
 }
 
 /* ── Main codegen entry point ─────────────────────────────────────────── */
 
 /*
- * sm_codegen — compile SM_Program into SEG_CODE per ME-3 layout.
+ * sm_codegen — compile SM_Program into SEG_CODE per ME-3/ME-4 layout.
  *
- * Pass 1: emit trampoline, then one fixed-size native blob per SM instr.
- *         Record SEG_CODE byte offsets in g_blob_offsets[i].  Note rel32
+ * Pass 1: emit trampoline, then a variable-size native blob per SM instr.
+ *         Record blob absolute addresses in g_blob_addrs[i].  Note rel32
  *         patch sites for SM_JUMP instructions.
  * Pass 2: patch each SM_JUMP's `jmp rel32` displacement to point at
  *         blob[target_pc].
+ *
+ * Trampoline emit ordering: g_blob_addrs is calloc'd BEFORE the trampoline
+ * is emitted, so the trampoline can bake `&g_blob_addrs[0]` as imm64.
+ * The contents of g_blob_addrs[] are filled in by pass 1 as blobs are
+ * laid down.
  *
  * Returns 0 on success, -1 on error.
  */
@@ -1497,7 +1930,7 @@ int sm_codegen(SM_Program *prog)
     init_handler_table();
 
     /* Free any previous side-table (e.g. from earlier sm_codegen call) */
-    if (g_blob_offsets) { free(g_blob_offsets); g_blob_offsets = NULL; }
+    if (g_blob_addrs) { free(g_blob_addrs); g_blob_addrs = NULL; }
     g_blob_count = 0;
     g_trampoline_offset = 0;
 
@@ -1507,34 +1940,18 @@ int sm_codegen(SM_Program *prog)
         return 0;
     }
 
-    g_blob_offsets = (size_t *)calloc((size_t)prog->count, sizeof(size_t));
-    if (!g_blob_offsets) {
-        fprintf(stderr, "sm_codegen: g_blob_offsets allocation failed\n");
+    g_blob_addrs = (uint8_t **)calloc((size_t)prog->count, sizeof(uint8_t *));
+    if (!g_blob_addrs) {
+        fprintf(stderr, "sm_codegen: g_blob_addrs allocation failed\n");
         return -1;
     }
 
-    /* Compute where blob 0 will land: trampoline first, blobs after.
-     * Trampoline size = 5+5+2+4+10+3+2+1 = 32 bytes.  Computed as
-     * (current_seg_top + 32).  blobs_base must be a stable absolute addr;
-     * SEG_CODE is mmap-fixed so this is safe. */
-    const size_t TRAMPOLINE_SIZE = 32;
-    size_t before_tramp = seg_offset(SEG_CODE);
-    uint8_t *blobs_base = scrip_segs[SEG_CODE].base + before_tramp + TRAMPOLINE_SIZE;
+    /* Emit trampoline — bakes &g_blob_addrs[0] as imm64 internally. */
+    g_trampoline_offset = emit_trampoline(prog);
 
-    /* Emit trampoline */
-    g_trampoline_offset = emit_trampoline(prog, blobs_base);
-
-    /* Sanity check: did the trampoline really come out 32 bytes? */
-    size_t actual_tramp_size = seg_offset(SEG_CODE) - g_trampoline_offset;
-    if (actual_tramp_size != TRAMPOLINE_SIZE) {
-        fprintf(stderr, "sm_codegen: trampoline size mismatch — expected %zu, got %zu\n",
-                TRAMPOLINE_SIZE, actual_tramp_size);
-        free(g_blob_offsets); g_blob_offsets = NULL;
-        return -1;
-    }
-
-    /* Pass 1 — emit one fixed-size blob per instruction; remember each
-     * SM_JUMP's rel32 patch offset and target_pc. */
+    /* Pass 1 — emit one variable-size blob per instruction; record its
+     * absolute address in g_blob_addrs[i].  Remember each SM_JUMP's
+     * rel32 patch offset and target_pc. */
     int *jump_indices = NULL;
     size_t *jump_rel32_offs = NULL;
     int    jump_count = 0;
@@ -1543,13 +1960,13 @@ int sm_codegen(SM_Program *prog)
     if (!jump_indices || !jump_rel32_offs) {
         fprintf(stderr, "sm_codegen: jump-patch buffers allocation failed\n");
         free(jump_indices); free(jump_rel32_offs);
-        free(g_blob_offsets); g_blob_offsets = NULL;
+        free(g_blob_addrs); g_blob_addrs = NULL;
         return -1;
     }
 
     for (int i = 0; i < prog->count; i++) {
         size_t off_before = seg_offset(SEG_CODE);
-        g_blob_offsets[i] = off_before;
+        g_blob_addrs[i] = scrip_segs[SEG_CODE].base + off_before;
         sm_opcode_t op = prog->instrs[i].op;
 
         if (op == SM_HALT) {
@@ -1560,24 +1977,34 @@ int sm_codegen(SM_Program *prog)
             jump_indices[jump_count]    = i;
             jump_rel32_offs[jump_count] = rel32_off;
             jump_count++;
+        } else if (op == SM_ADD || op == SM_SUB || op == SM_MUL ||
+                   op == SM_DIV || op == SM_MOD) {
+            /* ME-4: inline-native arithmetic.  Args loaded from r12-stack,
+             * me4_arith called with values in registers, result stored back.
+             * No g_handlers[] indirection; no h_arith implicit-stack call. */
+            emit_me4_arith_blob(op, g_trampoline_offset);
+        } else if (op == SM_CONCAT) {
+            emit_me4_concat_blob(g_trampoline_offset);
+        } else if (op == SM_COERCE_NUM) {
+            emit_me4_coerce_num_blob(g_trampoline_offset);
+        } else if (op == SM_PUSH_NULL) {
+            emit_me4_push_null_blob(g_trampoline_offset);
+        } else if (op == SM_PUSH_VAR) {
+            emit_me4_push_var_blob(prog->instrs[i].a[0].s, g_trampoline_offset);
+        } else if (op == SM_STORE_VAR) {
+            emit_me4_store_var_blob(prog->instrs[i].a[0].s, g_trampoline_offset);
         } else {
             emit_standard_blob(g_handlers[op], g_trampoline_offset);
         }
-
-        size_t off_after = seg_offset(SEG_CODE);
-        if (off_after - off_before != ME3_BLOB_SIZE) {
-            fprintf(stderr, "sm_codegen: blob size mismatch at pc=%d op=%d (%zu bytes, want %d)\n",
-                    i, (int)op, off_after - off_before, ME3_BLOB_SIZE);
-            free(jump_indices); free(jump_rel32_offs);
-            free(g_blob_offsets); g_blob_offsets = NULL;
-            return -1;
-        }
+        /* Variable size — no equality check, just continue.  Each emit_*
+         * helper writes its own self-consistent byte count. */
     }
     g_blob_count = prog->count;
 
     /* Pass 2 — patch SM_JUMP rel32 displacements.  target_blob_addr is
-     * SEG_CODE.base + g_blob_offsets[target_pc].  The rel32 is relative
-     * to the byte AFTER the rel32 (i.e. rel32_off + 4). */
+     * g_blob_addrs[target_pc] (absolute address).  The rel32 is relative
+     * to the byte AFTER the rel32 in SEG_CODE = base + rel32_off + 4. */
+    uint8_t *seg_base = scrip_segs[SEG_CODE].base;
     for (int j = 0; j < jump_count; j++) {
         int    i        = jump_indices[j];
         size_t rel32_off = jump_rel32_offs[j];
@@ -1590,8 +2017,9 @@ int sm_codegen(SM_Program *prog)
                     i, target_pc, prog->count);
             continue;
         }
-        size_t target_off = g_blob_offsets[target_pc];
-        int32_t rel = (int32_t)((int64_t)target_off - (int64_t)(rel32_off + 4));
+        int64_t target_abs   = (int64_t)(uintptr_t)g_blob_addrs[target_pc];
+        int64_t rel32_end_abs = (int64_t)(uintptr_t)(seg_base + rel32_off + 4);
+        int32_t rel = (int32_t)(target_abs - rel32_end_abs);
         seg_patch_u32(SEG_CODE, rel32_off, (uint32_t)rel);
     }
 
