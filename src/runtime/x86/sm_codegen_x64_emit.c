@@ -318,8 +318,8 @@ static void strtab_collect(const SM_Program *prog)
  * Sources of "PC is a target":
  *   1. SM_JUMP / SM_JUMP_S / SM_JUMP_F : a[0].i is the destination pc.
  *   2. SM_PUSH_EXPRESSION / SM_CALL_EXPRESSION : a[0].i is an entry_pc.
- *   3. SM_LABEL with named a[0].s : the chunk registry emits
- *      `.quad .Lpc{i+1}` (see emit_chunk_registry); mark pc+1.
+ *   3. SM_LABEL with named a[0].s : the expression registry emits
+ *      `.quad .L{i+1}` (see emit_expression_registry); mark pc+1.
  *   4. PC 0 : conventional program entry; safe to keep marked.
  *
  * Pattern blobs (`pat_inv_<id>_α/β/γ/ω`) reference the pat_id, not
@@ -413,7 +413,7 @@ static int emit_three_column_line(FILE *out,
 
     /* EM-FORMAT-BB lone-label fusion (2026-05-09): route through
      * bb3c_format so the pending-label buffer covers SM-side data
-     * directives (e.g. .Lchunk_registry:) that previously emitted
+     * directives (e.g. .Lexpression_registry:) that previously emitted
      * standalone label-only lines. */
     bb3c_format(out, label ? label : "", opcode ? opcode : "", c3);
     return 0;
@@ -447,7 +447,7 @@ static int strtab_emit_rodata(FILE *out)
  *
  * Returns the number of entries emitted, or -1 on I/O error.
  * If no named labels exist, emits nothing (returns 0). */
-static int emit_chunk_registry(FILE *out, const SM_Program *prog)
+static int emit_expression_registry(FILE *out, const SM_Program *prog)
 {
     /* Count named labels first so we can skip the section if none. */
     int n = 0;
@@ -460,7 +460,7 @@ static int emit_chunk_registry(FILE *out, const SM_Program *prog)
 
     if (emit_three_column_line(out, "", ".section", ".data", NULL) != 0) return -1;
     if (emit_three_column_line(out, "", ".align",   "8",     NULL) != 0) return -1;
-    if (emit_three_column_line(out, ".Lchunk_registry:", "", "", NULL) != 0) return -1;
+    if (emit_three_column_line(out, ".Lexpression_registry:", "", "", NULL) != 0) return -1;
 
     for (int i = 0; i < prog->count; i++) {
         const SM_Instr *ins = &prog->instrs[i];
@@ -517,11 +517,11 @@ static void cap_fixup_add(void *cap_ptr, const char *child_label)
 }
 
 
-static int emit_file_header(FILE *out, int count, int has_chunk_registry)
+static int emit_file_header(FILE *out, int count, int has_expression_registry)
 {
-    /* The .rodata section (string literals) and .datan expression registry (if any)
+    /* The .rodata section (string literals) and expression registry (if any)
      * were already emitted before this call.  We resume with .text + main
-     * prologue.  If has_chunk_registry is non-zero, main calls
+     * prologue.  If has_expression_registry is non-zero, main calls
      * rt_register_expressions before rt_init so that user-defined
      * SNOBOL4 functions are dispatchable from the start. */
     if (emit_three_column_line(out, "", ".intel_syntax", "noprefix", NULL) != 0) return -1;
@@ -530,8 +530,8 @@ static int emit_file_header(FILE *out, int count, int has_chunk_registry)
     if (emit_three_column_line(out, "main:",       "push",   "rbp", NULL) != 0) return -1;
     if (emit_three_column_line(out, "",            "mov",    "rbp, rsp", NULL) != 0) return -1;
 
-    if (has_chunk_registry) {
-        if (emit_three_column_line(out, "", "lea",  "rdi, [rip + .Lchunk_registry]", NULL) != 0) return -1;
+    if (has_expression_registry) {
+        if (emit_three_column_line(out, "", "lea",  "rdi, [rip + .Lexpression_registry]", NULL) != 0) return -1;
         if (emit_three_column_line(out, "", "call", "rt_register_expressions@PLT", NULL) != 0) return -1;
     } else {
         if (emit_three_column_line(out, "", "xor",  "edi, edi", NULL) != 0) return -1;
@@ -2061,8 +2061,8 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
      * This must come after strtab_emit_rodata (so .S* labels are defined)
      * and before .text (so .L* forward references resolve in the same TU). */
     if (emit_section_break(out, "expression registry") != 0) return -1;
-    int chunk_reg_count = emit_chunk_registry(out, prog);
-    if (chunk_reg_count < 0) return -1;
+    int expression_reg_count = emit_expression_registry(out, prog);
+    if (expression_reg_count < 0) return -1;
 
     /* EM-7c: collect Phase-2 windows (one per SM_EXEC_STMT) and run the
      * Phase-2 simulator to reconstruct each pattern's PATND_t tree.
@@ -2082,7 +2082,7 @@ int sm_codegen_x64_emit(SM_Program *prog, FILE *out, const char *src_path)
     int sl_loaded = (srclines_load(&sl, src_path) == 0);
 
     if (emit_section_break(out, "SM code") != 0) return -1;
-    if (emit_file_header(out, prog->count, chunk_reg_count > 0) != 0) {
+    if (emit_file_header(out, prog->count, expression_reg_count > 0) != 0) {
         if (sl_loaded) srclines_free(&sl);
         return -1;
     }
