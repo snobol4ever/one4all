@@ -972,21 +972,20 @@ static int emit_sm_stno(FILE *out, const SM_Instr *ins, int pc,
     int stno   = (int)ins->a[0].i;
     int lineno = (int)ins->a[1].i;
 
-    /* Lineno fallback: the parser only records lineno for *labeled*
-     * statements (s->lineno = lbl.lineno).  For unlabeled statements
-     * lineno comes through as 0.  In typical SNOBOL4 source one
-     * statement occupies one line, so stno is an accurate estimator.
-     * Any lookup that produces a non-blank source line is then a win;
-     * mismatches produce blank-source banners (graceful degradation).
-     * Future rung: have the parser record lineno on every statement
-     * (one-line .y change) and remove this fallback. */
+    /* Lineno fallback: EM-BANNER-FIDELITY landed the parser fix so every
+     * statement now carries the correct source lineno.  The stno-as-lineno
+     * fallback that existed here was the root cause of banner drift (stno=2
+     * fetched srclines[2] which is a comment line, not the stmt body).
+     * Fallback now: if lineno is 0 or out of range, present stno in the
+     * banner but suppress the source-text fetch so we never show wrong text.
+     * This is graceful degradation for any pre-fix bytecode. */
     int try_lineno = lineno;
     if (try_lineno <= 0 || (sl && try_lineno > sl->count))
-        try_lineno = stno;
+        try_lineno = 0;   /* unknown — suppress source-text, not wrong text */
 
     char line_copy[1024];
     const char *src = NULL;
-    if (sl) {
+    if (sl && try_lineno > 0) {
         const char *raw = srclines_get(sl, try_lineno);
         if (raw && *raw) {
             /* Copy and strip trailing CR if present (CRLF-friendly). */
@@ -998,15 +997,12 @@ static int emit_sm_stno(FILE *out, const SM_Instr *ins, int pc,
     }
 
     /* If lineno was authoritatively recorded but out of range, suppress
-     * the misleading "(line N)" suffix in the banner.  If we used the
-     * stno-based fallback successfully, present try_lineno as the line. */
+     * the misleading "(line N)" suffix in the banner. */
     int banner_lineno;
     if (lineno > 0 && (!sl || lineno <= sl->count)) {
         banner_lineno = lineno;
-    } else if (src) {
-        banner_lineno = try_lineno;   /* fallback hit something printable */
     } else {
-        banner_lineno = 0;            /* truly unknown */
+        banner_lineno = 0;            /* truly unknown — omit (line N) */
     }
 
     if (emit_major_break(out, stno, banner_lineno, src) != 0) return -1;

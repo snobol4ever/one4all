@@ -29,6 +29,9 @@ Token lex_peek    (Lex *lx);
 int   lex_at_end  (Lex *lx);
 void  lex_destroy (Lex *lx);
 
+/* EM-BANNER-FIDELITY: source line of the most recently started statement */
+int   snobol4_get_stmt_lineno(void);
+
 void  flex_lex_open   (Lex *lx, FILE *f, const char *fname);
 Token flex_lex_next   (Lex *lx);
 void  flex_lex_destroy(Lex *lx);

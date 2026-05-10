@@ -40,8 +40,11 @@ int   n_inc = 0;
 int   sno_nerrors = 0;
 
 static int   lineno = 1;
+static int   g_stmt_lineno = 1;   /* EM-BANNER-FIDELITY: source line of current stmt start */
 static char  strbuf[65536];
 static int   strpos;
+
+int snobol4_get_stmt_lineno(void) { return g_stmt_lineno; }
 
 /* ── SN-19: case folding at lex time ────────────────────────────────────────
  * Default SNOBOL4 dialect is case-INsensitive. The lexer folds every
@@ -112,7 +115,7 @@ G       ({WS}|{CONT})*
 
 <INITIAL>\n             { lineno++; /* blank line — emit empty stmt to advance &STNO (matches SPITBOL/CSNOBOL4 / Green Book) */ return T_STMT_END; }
 <INITIAL>[*!|;]         { BEGIN(SKIP); }
-<INITIAL>[ \t]          { BEGIN(BODY_START); }
+<INITIAL>[ \t]          { g_stmt_lineno = lineno; BEGIN(BODY_START); }
 
 <INITIAL>"-"[Ii][Nn][Cc][Ll][Uu][Dd][Ee][ \t]+'[^'\n]+'[^\n]*\n  {
     /* -include 'filename' — single-quoted, whole line consumed */

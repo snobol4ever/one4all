@@ -240,7 +240,12 @@ static void sno4_stmt_commit_go(void *param,Token lbl,AST_t *subj,AST_t *pat,int
         else{e->lang=strdup("");e->name=strdup(n);e->method=strdup(n);}
         e->next=pp->prog->imports;pp->prog->imports=e;return;
     }
-    STMT_t *s=stmt_new();s->lineno=lbl.lineno;
+    STMT_t *s=stmt_new();
+    /* EM-BANNER-FIDELITY: lbl.lineno is set only for labeled statements
+     * (unlabeled stmts pass a zero-init Token).  Fall back to
+     * snobol4_get_stmt_lineno(), which the lexer sets when entering
+     * BODY_START — the correct source line of the unlabeled stmt. */
+    s->lineno = lbl.lineno ? lbl.lineno : snobol4_get_stmt_lineno();
     /* SN-26-bridge-coverage-j: assign source stno at parse time so backward
      * gotos report the correct stno (not a linear execution counter). 1-based.
      * Increment nstmts FIRST, then read it — counts blank statements too

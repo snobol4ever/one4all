@@ -705,8 +705,11 @@ int   n_inc = 0;
 int   sno_nerrors = 0;
 
 static int   lineno = 1;
+static int   g_stmt_lineno = 1;   /* EM-BANNER-FIDELITY: source line of current stmt start */
 static char  strbuf[65536];
 static int   strpos;
+
+int snobol4_get_stmt_lineno(void) { return g_stmt_lineno; }
 
 /* ── SN-19: case folding at lex time ────────────────────────────────────────
  * Default SNOBOL4 dialect is case-INsensitive. The lexer folds every
@@ -1089,7 +1092,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-{ BEGIN(BODY_START); }
+{ g_stmt_lineno = lineno; BEGIN(BODY_START); }
 	YY_BREAK
 case 4:
 /* rule 4 can match eol */
