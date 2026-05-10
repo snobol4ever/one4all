@@ -339,8 +339,11 @@ static void flat_emit_eps(emitter_v *e, bb_label_t *lbl_succ,
                           bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     if (e->is_text) {
-        /* EM-7c-bb-macros: single macro call per port. */
-        flat3c_action(e, "EPS_\xCE\xB1", lbl_succ->name);  /* EPS_α lbl_succ */
+        /* EM-7c-bb-macros: single macro call per port.
+         * EM-FORMAT-BB-COL3-COMMENTS: α-line names the box kind. */
+        char args[256];
+        snprintf(args, sizeof(args), "%s # EPS", lbl_succ->name);
+        flat3c_action(e, "EPS_\xCE\xB1", args);             /* EPS_α lbl_succ # EPS */
         EV_LABEL(e, lbl_β);
         flat3c_action(e, "EPS_\xCE\xB2", lbl_fail->name);  /* EPS_β lbl_fail */
     } else {
@@ -355,7 +358,10 @@ static void flat_emit_fail(emitter_v *e, bb_label_t *lbl_succ,
 {
     (void)lbl_succ;
     if (e->is_text) {
-        flat3c_action(e, "FAIL_\xCE\xB1", lbl_fail->name);  /* FAIL_α lbl_fail */
+        /* EM-FORMAT-BB-COL3-COMMENTS: α-line names the box kind. */
+        char args[256];
+        snprintf(args, sizeof(args), "%s # FAIL", lbl_fail->name);
+        flat3c_action(e, "FAIL_\xCE\xB1", args);            /* FAIL_α lbl_fail # FAIL */
         EV_LABEL(e, lbl_β);
         flat3c_action(e, "FAIL_\xCE\xB2", lbl_fail->name);  /* FAIL_β lbl_fail */
     } else {
@@ -369,9 +375,11 @@ static void flat_emit_pos(emitter_v *e, int n, bb_label_t *lbl_succ,
                           bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     if (e->is_text) {
-        /* EM-7c-bb-macros: POS_α n, lbl_succ, lbl_fail */
+        /* EM-7c-bb-macros: POS_α n, lbl_succ, lbl_fail
+         * EM-FORMAT-BB-COL3-COMMENTS: α-line names the box kind + arg. */
         char args[256];
-        snprintf(args, sizeof(args), "%d, %s, %s", n, lbl_succ->name, lbl_fail->name);
+        snprintf(args, sizeof(args), "%d, %s, %s # POS(%d)",
+                 n, lbl_succ->name, lbl_fail->name, n);
         flat3c_action(e, "POS_\xCE\xB1", args);  /* POS_α */
         EV_LABEL(e, lbl_β);
         flat3c_action(e, "POS_\xCE\xB2", lbl_fail->name);  /* POS_β */
@@ -389,9 +397,11 @@ static void flat_emit_rpos(emitter_v *e, int n, bb_label_t *lbl_succ,
                            bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
     if (e->is_text) {
-        /* EM-7c-bb-macros: RPOS_α n, lbl_succ, lbl_fail */
+        /* EM-7c-bb-macros: RPOS_α n, lbl_succ, lbl_fail
+         * EM-FORMAT-BB-COL3-COMMENTS: α-line names the box kind + arg. */
         char args[256];
-        snprintf(args, sizeof(args), "%d, %s, %s", n, lbl_succ->name, lbl_fail->name);
+        snprintf(args, sizeof(args), "%d, %s, %s # RPOS(%d)",
+                 n, lbl_succ->name, lbl_fail->name, n);
         flat3c_action(e, "RPOS_\xCE\xB1", args);  /* RPOS_α */
         EV_LABEL(e, lbl_β);
         flat3c_action(e, "RPOS_\xCE\xB2", lbl_fail->name);  /* RPOS_β */
