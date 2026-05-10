@@ -1457,11 +1457,24 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
         return;
 
     /* Icon generators — remaining kinds still use legacy emit_push_expr + SM_BB_PUMP.
-     * Same pattern as AST_SUSPEND was: each will get its own lowering rung. */
+     * LIMIT is handled honestly when wrapped in EVERY (coro_bb_every drives it);
+     * direct LIMIT usage is rare in corpus. Keep on legacy until a failing test requires it. */
     case AST_LIMIT:
-    case AST_RANDOM:
         emit_push_expr(p, e);
         sm_emit(p, SM_BB_PUMP);
+        return;
+
+    /* GOAL-ICON-BB-COMPLETE A3: AST_RANDOM (?E) — scalar SM lowering.
+     * AST_RANDOM is one-shot (not a generator). Lower child via lower_expr
+     * so SM_LOAD_FRAME / SM_PUSH_VAR correctly resolve locals/globals,
+     * then call ICN_RANDOM which mirrors bb_eval_value's AST_RANDOM arm. */
+    case AST_RANDOM:
+        if (e->nchildren >= 1) {
+            lower_expr(p, lt, e->children[0]);
+            sm_emit_si(p, SM_CALL_FN, "ICN_RANDOM", 1);
+        } else {
+            sm_emit(p, SM_PUSH_NULL);
+        }
         return;
 
     /* Prolog backtracking nodes */

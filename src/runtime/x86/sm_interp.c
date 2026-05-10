@@ -1293,6 +1293,61 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                 break;
             }
 
+            /* GOAL-ICON-BB-COMPLETE A3: ICN_RANDOM — ?E one-shot random selection.
+             * Mirrors bb_eval_value's AST_RANDOM arm in coro_value.c:698-746.
+             * Uses a static LCG seed (same algorithm as coro_value.c).
+             * NOTE: inner early-exits use goto (not break) to avoid breaking
+             * nested for-loops instead of the outer switch case. */
+            if (name && strcmp(name, "ICN_RANDOM") == 0) {
+                DESCR_t v = sm_pop(st);
+                if (IS_FAIL_fn(v)) { sm_push(st, FAILDESCR); st->last_ok = 0; break; }
+                static unsigned long sm_rnd_seed = 12345UL;
+                sm_rnd_seed = sm_rnd_seed * 6364136223846793005UL + 1442695040888963407UL;
+                unsigned long rnd = sm_rnd_seed >> 33;
+                DESCR_t result = FAILDESCR;
+                if (IS_INT_fn(v)) {
+                    long long n = v.i;
+                    if (n <= 0) goto icn_random_fail;
+                    result = INTVAL((long long)(rnd % (unsigned long)n) + 1);
+                } else if (v.v == DT_S || v.v == DT_SNUL) {
+                    const char *s = VARVAL_fn(v);
+                    if (!s || !*s) goto icn_random_fail;
+                    long slen = (long)strlen(s);
+                    char *out = GC_malloc(2); out[0] = s[rnd % (unsigned long)slen]; out[1] = '\0';
+                    result = STRVAL(out);
+                } else if (v.v == DT_DATA) {
+                    DESCR_t tag = FIELD_GET_fn(v, "icn_type");
+                    if (tag.v == DT_S && tag.s && strcmp(tag.s, "list") == 0) {
+                        int n = (int)FIELD_GET_fn(v, "frame_size").i;
+                        if (n <= 0) goto icn_random_fail;
+                        DESCR_t ea = FIELD_GET_fn(v, "frame_elems");
+                        if (ea.v == DT_DATA && ea.ptr) {
+                            DESCR_t *elems = (DESCR_t *)ea.ptr;
+                            result = elems[rnd % (unsigned long)n];
+                        }
+                    } else if (v.u && v.u->type && v.u->type->nfields > 0 && v.u->fields) {
+                        int n = v.u->type->nfields;
+                        result = v.u->fields[rnd % (unsigned long)n];
+                    }
+                } else if (v.v == DT_T) {
+                    if (!v.tbl || v.tbl->size <= 0) goto icn_random_fail;
+                    int target = (int)(rnd % (unsigned long)v.tbl->size);
+                    int seen = 0;
+                    for (int b = 0; b < TABLE_BUCKETS; b++) {
+                        for (TBPAIR_t *bp = v.tbl->buckets[b]; bp; bp = bp->next) {
+                            if (seen == target) { result = bp->val; goto icn_random_done; }
+                            seen++;
+                        }
+                    }
+                }
+                goto icn_random_done;
+                icn_random_fail: result = FAILDESCR;
+                icn_random_done:
+                sm_push(st, result);
+                st->last_ok = (result.v != DT_FAIL);
+                break;
+            }
+
             /* GOAL-ICON-BB-COMPLETE A2: ICN_SECTION_RANGE/PLUS/MINUS
              * Stack (pushed by sm_lower in order): string, lo, hi → TOS=hi
              * Mirrors bb_section() in coro_value.c exactly.
