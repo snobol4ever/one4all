@@ -20,6 +20,7 @@
 
 #include "sm_lower.h"
 #include "sm_prog.h"
+#include "sm_interp.h"   /* CH-17i-every-suspend: every_table_register */
 
 #include "../../frontend/snobol4/scrip_cc.h"
 #include "../ast/ast.h"
@@ -1299,8 +1300,30 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
         return;
     }
 
-    /* Icon generators — remaining kinds still use legacy emit_push_expr + SM_BB_PUMP */
-    case AST_EVERY:
+    /* CHUNKS-step17i-every-suspend: AST_EVERY migrated off legacy
+     * emit_push_expr + SM_BB_PUMP onto a CH-17f-style pattern.
+     * Register the AST in g_every_table at lower-time; emit
+     * SM_BB_PUMP_EVERY <every_id> — no AST_t* in SM bytecode or value stack.
+     * The runtime handler looks up by id, builds the box via coro_eval
+     * (existing IR-side icn_every_state_t), drives via bb_broker(BB_PUMP,
+     * pump_print), and pushes NULVCL to balance the trailing SM_VOID_POP
+     * from proc-body lowering's `lower_expr(body); SM_VOID_POP` loop.
+     *
+     * Pre-rung (legacy emit_push_expr + SM_BB_PUMP): net stack delta 0;
+     * trailing SM_VOID_POP underflowed when reached via sm_call_proc
+     * (CH-17g) in proc-body-lowered chunks — root cause of all 111
+     * --sm-run divergences in the CH-17i survey (sess 2026-05-09).
+     * Post-rung: net delta +1 (NULVCL), SM_VOID_POP balanced. */
+    case AST_EVERY: {
+        int every_id = every_table_register((AST_t *)e);
+        sm_emit_i(p, SM_BB_PUMP_EVERY, (int64_t)every_id);
+        return;
+    }
+
+    /* Icon generators — remaining kinds still use legacy emit_push_expr + SM_BB_PUMP.
+     * AST_SUSPEND is listed for the next sub-rung (CH-17i-suspend) — it
+     * yields to a coroutine caller, not to a pump, and has different
+     * stack-discipline requirements that warrant their own pattern. */
     case AST_SUSPEND:
     case AST_BANG_BINARY:
     case AST_LCONCAT:

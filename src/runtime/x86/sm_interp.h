@@ -125,4 +125,24 @@ int bb_broker_drive_sm(SmGenState *gs, void (*body_fn)(DESCR_t val, void *arg), 
  * SM_STORE_GLOCAL handlers in both sm_interp.c and sm_codegen.c. */
 extern SmGenState *g_current_gen_state;
 
+/* CHUNKS-step17i-every-suspend: every-table — id → AST_t* side table populated
+ * at lower-time when AST_EVERY is encountered in expression-body lowering.
+ * Mirrors CH-17f's g_pl_pred_table pattern (Prolog) for Icon `every`.
+ * The SM bytecode contains only the integer id; no AST_t* in any
+ * SM_Program::instrs[] payload.  The runtime handler (SM_BB_PUMP_EVERY)
+ * looks up by id and constructs the box via coro_eval — same boundary
+ * CH-17f draws for SM_BB_ONCE_PROC (broker constructs the box from IR;
+ * the SM dispatch layer never sees a raw IR pointer).
+ *
+ * every_table_register(ast) — append AST to table, return id.
+ *                              ast is borrowed (lifetime: the IR's lifetime,
+ *                              same as g_pl_pred_table's IR refs); table
+ *                              is reset by every_table_reset on each compile.
+ * every_table_lookup(id)    — return AST_t* for id, or NULL if out of range.
+ * every_table_reset()       — clear table; called by sm_program_free path. */
+struct AST_t;
+int   every_table_register(struct AST_t *ast);
+struct AST_t *every_table_lookup(int id);
+void  every_table_reset(void);
+
 #endif /* SM_INTERP_H */

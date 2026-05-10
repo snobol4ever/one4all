@@ -157,6 +157,22 @@ typedef enum {
      * the expression body lowers to pure SM with explicit SM_SUSPEND points. */
     SM_BB_PUMP_SM,
 
+    /* CHUNKS-step17i-every-suspend: BB pump for AST_EVERY by id —
+     * mirrors CH-17f's SM_BB_ONCE_PROC pattern (Prolog) for Icon `every`.
+     * a[0].i = every_id  (index into g_every_table; populated by sm_lower
+     *                     when AST_EVERY is encountered in expression-body
+     *                     lowering; NEVER an AST_t* in SM bytecode).
+     * Runtime handler does: g_every_table[id] → coro_eval → bb_broker(BB_PUMP).
+     * Net stack delta: pushes one DT_NUL (every is void in stmt context;
+     * the trailing SM_VOID_POP from the proc-body loop discards it).
+     *
+     * The legacy `emit_push_expr + SM_BB_PUMP` shape (which pushed a raw
+     * AST_t* on the SM stack and called coro_eval at runtime) underflowed
+     * the stack when reached via sm_call_proc (CH-17g) — net push 0,
+     * trailing SM_VOID_POP fires, underflow.  This opcode pushes a single
+     * DT_NUL at end so the trailing VOID_POP is balanced. */
+    SM_BB_PUMP_EVERY,
+
     /* Functions */
     SM_CALL_FN,
     SM_RETURN,

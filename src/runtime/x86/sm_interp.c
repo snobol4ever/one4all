@@ -117,6 +117,44 @@ static void exprs_audit_register(void) {
  * codegen handlers for SM_LOAD_GLOCAL / SM_STORE_GLOCAL can reach it. */
 SmGenState *g_current_gen_state = NULL;
 
+/* CHUNKS-step17i-every-suspend: every-table.
+ * Indexed by SM_BB_PUMP_EVERY's a[0].i.  Populated by sm_lower at AST_EVERY
+ * lowering time (sm_lower.c).  Bounded grow; never shrinks within a compile.
+ * Reset by every_table_reset (called from sm_program_free path).
+ * AST pointers borrowed — caller (lower) owns them; same lifetime as
+ * g_pl_pred_table's borrowed AST_CHOICE pointers. */
+#define EVERY_TABLE_INIT 16
+static AST_t **g_every_table     = NULL;
+static int     g_every_table_n   = 0;
+static int     g_every_table_cap = 0;
+
+int every_table_register(AST_t *ast)
+{
+    if (g_every_table_n >= g_every_table_cap) {
+        int new_cap = g_every_table_cap ? g_every_table_cap * 2 : EVERY_TABLE_INIT;
+        AST_t **nt = (AST_t **)realloc(g_every_table, new_cap * sizeof(AST_t *));
+        if (!nt) { fprintf(stderr, "every_table: OOM\n"); abort(); }
+        g_every_table     = nt;
+        g_every_table_cap = new_cap;
+    }
+    int id = g_every_table_n++;
+    g_every_table[id] = ast;
+    return id;
+}
+
+AST_t *every_table_lookup(int id)
+{
+    if (id < 0 || id >= g_every_table_n) return NULL;
+    return g_every_table[id];
+}
+
+void every_table_reset(void)
+{
+    if (g_every_table) { free(g_every_table); g_every_table = NULL; }
+    g_every_table_n = 0;
+    g_every_table_cap = 0;
+}
+
 /* OE-10: body_fn for BB_PUMP — print each generated Icon value to stdout */
 static void pump_print(DESCR_t val, void *arg) {
     (void)arg;
@@ -923,6 +961,44 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
             SmGenState *gs = sm_gen_state_new(entry_pc);
             int ticks = bb_broker_drive_sm(gs, pump_print, NULL);
             st->last_ok = (ticks > 0);
+            break;
+        }
+
+        /* CHUNKS-step17i-every-suspend: AST_EVERY dispatch by id.
+         * Mirrors SM_BB_ONCE_PROC for Prolog.  a[0].i = every_id;
+         * every_table_lookup(id) returns the borrowed AST_t* registered
+         * by sm_lower at expression-body lowering time.  Runtime delegates
+         * to the existing IR broker (coro_eval(AST_EVERY) builds an
+         * icn_every_state_t whose body field is e->children[1]; coro_bb_every
+         * pumps gen and calls bb_exec_stmt(body) per tick — this is the
+         * "boxes stay; graph-construction moves to lower-time" boundary
+         * the orientation note draws).  The SM bytecode and value stack
+         * carry only the integer id; no AST_t* in either layer.
+         *
+         * Stack discipline: this opcode is reached from proc-body lowering's
+         * `lower_expr(body); SM_VOID_POP` loop.  The legacy
+         * `emit_push_expr + SM_BB_PUMP` shape was net-stack-zero (push 1,
+         * pop 1) — the trailing SM_VOID_POP underflowed.  Fix: push DT_NUL
+         * after the pump so the trailing SM_VOID_POP balances.  In value
+         * context (every used as expression result, rare) DT_NUL is the
+         * correct semantic per Icon's `every` having no value.
+         *
+         * Body-function: NULL.  AST_EVERY-as-statement runs its own body
+         * (the do-clause, e.g. `write(v)`) via bb_exec_stmt inside
+         * coro_bb_every — passing pump_print would double-print yielded
+         * values, since the user's body already produces output. */
+        case SM_BB_PUMP_EVERY: {
+            int every_id = (int)ins->a[0].i;
+            AST_t *every_ast = every_table_lookup(every_id);
+            if (!every_ast) {
+                st->last_ok = 0;
+                sm_push(st, NULVCL);
+                break;
+            }
+            bb_node_t node = coro_eval(every_ast);
+            int ticks = bb_broker(node, BB_PUMP, NULL, NULL);
+            st->last_ok = (ticks > 0);
+            sm_push(st, NULVCL);   /* every is void — leave a placeholder for VOID_POP */
             break;
         }
 

@@ -453,6 +453,28 @@ static void h_bb_pump_sm(void)
     STATE->last_ok = (ticks > 0);
 }
 
+/* CHUNKS-step17i-every-suspend: JIT mirror of SM_BB_PUMP_EVERY in sm_interp.c.
+ * Looks up AST by id from g_every_table, builds a drivable bb_node_t via
+ * coro_eval (existing IR-side every box), drives via bb_broker(BB_PUMP).
+ * Body-fn is NULL — the AST_EVERY do-clause (the user's body, e.g.
+ * `write(v)`) already runs via bb_exec_stmt inside coro_bb_every; passing
+ * jit_pump_print would double-print yielded values.
+ * Pushes DT_NUL to balance the trailing SM_VOID_POP from proc-body lowering. */
+static void h_bb_pump_every(void)
+{
+    int every_id = (int)CUR_INS->a[0].i;
+    AST_t *every_ast = every_table_lookup(every_id);
+    if (!every_ast) {
+        STATE->last_ok = 0;
+        PUSH(NULVCL);
+        return;
+    }
+    bb_node_t node = coro_eval(every_ast);
+    int ticks = bb_broker(node, BB_PUMP, NULL, NULL);
+    STATE->last_ok = (ticks > 0);
+    PUSH(NULVCL);
+}
+
 static void h_store_var(void)
 {
     DESCR_t val = POP();
@@ -1166,6 +1188,7 @@ static void init_handler_table(void)
     g_handlers[SM_BB_PUMP_PROC] = h_bb_pump_proc;
     g_handlers[SM_BB_PUMP_CASE] = h_bb_pump_case;
     g_handlers[SM_BB_PUMP_SM]   = h_bb_pump_sm;
+    g_handlers[SM_BB_PUMP_EVERY] = h_bb_pump_every;
     g_handlers[SM_SUSPEND]      = h_suspend;   /* CHUNKS-step14: named FATAL — JIT gen is M5 */
     g_handlers[SM_RESUME]       = h_resume;    /* CHUNKS-step14: named FATAL — JIT gen is M5 */
     g_handlers[SM_LOAD_GLOCAL]  = h_load_glocal;   /* CHUNKS-step14b */
