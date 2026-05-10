@@ -1006,6 +1006,7 @@ int icn_kw_can_assign(const char *kw, DESCR_t val) {
 
 DESCR_t interp_eval(AST_t *e)
 {
+    NO_AST_WALK_GUARD("interp_eval");
     if (!e) return NULVCL;
     /* coro_drive_node injection: if this exact node is being driven as a generator
      * (set by AST_EVERY leaf-gen injection or coro_drive_fnc), return the staged value

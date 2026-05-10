@@ -153,4 +153,14 @@ int icn_kw_can_assign(const char *kw, DESCR_t val);
 /* RS-23c: exported so coro_value.c / coro_stmt.c can use it in AST_EVERY handling. */
 AST_t *find_leaf_suspendable(AST_t *e);
 
+/* A0 — SCRIP_NO_AST_WALK tripwire.  Set to 1 while SM dispatch is active;
+ * guards in coro_eval / interp_eval / etc. abort if the env var is set. */
+extern int g_sm_dispatch_active;
+
+#define NO_AST_WALK_GUARD(fn_name) \
+    do { if (g_sm_dispatch_active && getenv("SCRIP_NO_AST_WALK")) { \
+        fprintf(stderr, "FATAL: " fn_name " reached from SM dispatch\n"); \
+        abort(); \
+    } } while (0)
+
 #endif /* CORO_RUNTIME_H */

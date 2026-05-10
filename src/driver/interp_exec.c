@@ -19,6 +19,7 @@
 
 void execute_program(CODE_t *prog)
 {
+    NO_AST_WALK_GUARD("execute_program");
     polyglot_init(prog, polyglot_lang_mask(prog));   /* U-14 / FI-8: language-selective init */
     g_lang = 0;  /* SNOBOL4 mode */
 

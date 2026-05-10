@@ -19,6 +19,7 @@
 #include "snobol4.h"
 #include "sil_macros.h"
 #include "../ast/ast.h"
+#include "../interp/coro_runtime.h"   /* A0: NO_AST_WALK_GUARD, g_sm_dispatch_active */
 
 /* eval_node is in eval_code.c (sibling). pat_* helpers, NV_GET_fn, APPLY_fn,
  * PATVAL_fn, NULVCL, FAILDESCR, IS_FAIL_fn — all in snobol4.h. */
@@ -37,6 +38,7 @@ static inline DESCR_t NAME_DEREF(DESCR_t d) {
 
 DESCR_t interp_eval_pat(AST_t *e)
 {
+    NO_AST_WALK_GUARD("interp_eval_pat");
     if (!e) return NULVCL;
     switch (e->kind) {
     case AST_SEQ:

@@ -26,6 +26,15 @@
 #include <stdio.h>
 #include <gc/gc.h>
 
+/* A0 — SCRIP_NO_AST_WALK tripwire guard.  Paste at top of every AST-walker
+ * entry point.  Aborts only when SCRIP_NO_AST_WALK is set AND SM dispatch
+ * is active — proving SM dispatch never reaches the AST walker. */
+#define NO_AST_WALK_GUARD(fn_name) \
+    do { if (g_sm_dispatch_active && getenv("SCRIP_NO_AST_WALK")) { \
+        fprintf(stderr, "FATAL: " fn_name " reached from SM dispatch\n"); \
+        abort(); \
+    } } while (0)
+
 /* RS-17b: with bb_exec_stmt now handling every statement-context site in this
  * file (was 13 direct interp_eval calls before RS-17b), and bb_eval_value
  * handling every value-context site (RS-17a), no `extern DESCR_t
@@ -51,6 +60,14 @@ IcnProcEntry proc_table[PROC_TABLE_MAX];
 int          proc_count = 0;
 int          g_lang         = 0;     /* 0=SNOBOL4 1=Icon */
 AST_t      *g_icn_root     = NULL;  /* current Icon drive root */
+
+/* A0 — SCRIP_NO_AST_WALK tripwire.  Set to 1 at entry of sm_interp_run /
+ * sm_call_proc; cleared at exit.  When set, coro_eval / interp_eval /
+ * interp_eval_pat / interp_eval_ref / call_user_function / execute_program
+ * abort if SCRIP_NO_AST_WALK env var is set — proving SM dispatch never
+ * reaches the AST walker under honest mode-3.  Global (not thread-local)
+ * because scrip is single-threaded; revisit if threading is ever added. */
+int g_sm_dispatch_active = 0;
 
 /* OE-1: IcnFrame — per-call context for Icon procedure invocations.
  * Replaces the flat globals frame_env/FRAME.env_n/FRAME.returning/FRAME.return_val/
@@ -1218,6 +1235,7 @@ bb_node_t coro_pump_proc_by_name(const char *name, DESCR_t *args, int nargs) {
 }
 
 bb_node_t coro_eval(AST_t *e) {
+    NO_AST_WALK_GUARD("coro_eval");
     if (!e) {
         icn_oneshot_state_t *z = calloc(1, sizeof(*z));
         z->val = FAILDESCR; z->fired = 1;   /* immediately ω */

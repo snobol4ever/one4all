@@ -14,6 +14,7 @@
 
 DESCR_t *interp_eval_ref(AST_t *e)
 {
+    NO_AST_WALK_GUARD("interp_eval_ref");
     if (!e) return NULL;
     switch (e->kind) {
 

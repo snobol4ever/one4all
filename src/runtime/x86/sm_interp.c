@@ -18,6 +18,8 @@
 #include <math.h>
 #include <gc/gc.h>
 
+#include "../interp/coro_runtime.h"   /* A0: g_sm_dispatch_active */
+
 /* ── Pattern runtime (M-SCRIP-U4) ──────────────────────────────────────── */
 #include "snobol4.h"   /* DESCR_t, PATND_t, DT_* */
 #include "sil_macros.h" /* IS_NAMEPTR, NAME_DEREF_PTR, IS_NAMEVAL, etc. */
@@ -250,6 +252,15 @@ static void nv_fold_set(const char *raw, DESCR_t val) {
 /* ── Main dispatch loop ─────────────────────────────────────────────── */
 
 int sm_interp_run(SM_Program *prog, SM_State *st)
+{
+    int was_active = g_sm_dispatch_active;
+    g_sm_dispatch_active = 1;
+    int _rc = sm_interp_run_inner(prog, st);
+    g_sm_dispatch_active = was_active;
+    return _rc;
+}
+
+int sm_interp_run_inner(SM_Program *prog, SM_State *st)
 {
     while (st->pc < prog->count) {
         SM_Instr *ins = &prog->instrs[st->pc];

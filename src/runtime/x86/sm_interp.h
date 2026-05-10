@@ -86,6 +86,7 @@ typedef struct {
  * call only after SNO_INIT_fn() has run.
  */
 int sm_interp_run(SM_Program *prog, SM_State *st);
+int sm_interp_run_inner(SM_Program *prog, SM_State *st); /* A0: inner body; sm_interp_run wraps with dispatch flag */
 int sm_interp_run_steps(SM_Program *prog, SM_State *st, int n);  /* IM-4 */
 
 /* IM-4: SM step-limit globals */

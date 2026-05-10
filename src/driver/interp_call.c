@@ -98,6 +98,7 @@ int shadow_has(const char *name) {
 /* The program being interpreted (set in main before execute_program) */
 DESCR_t call_user_function(const char *fname, DESCR_t *args, int nargs)
 {
+    NO_AST_WALK_GUARD("call_user_function");
     if (call_depth >= CALL_STACK_MAX) return FAILDESCR;
 
     /* ── Gather param and local names via source-case accessors ── */
