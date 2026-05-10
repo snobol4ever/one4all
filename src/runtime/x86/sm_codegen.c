@@ -26,8 +26,22 @@
  *     pop rbp; ret
  *   The real work is in the C handler functions below.
  *
+ * ME-2 register convention (GOAL-MODE3-EMIT, 2026-05-10):
+ *   r12 = SM_State*   — anchor for value stack, last_ok, pc.  Loaded by
+ *                        sm_jit_run before transferring control to SEG_CODE,
+ *                        survives across calls because r12 is callee-saved
+ *                        in the System V x86-64 C-ABI.  Today's threaded-
+ *                        call JIT does not consume r12 (handlers reach
+ *                        SM_State via g_jit_state); ME-3+ rewrites SEG_CODE
+ *                        as per-instruction native blobs that address the
+ *                        value stack as [r12 + offset] and never reload r12.
+ *   r10 = per-glob data-region ptr (bb_flat.c convention; unchanged here)
+ *   rbp = chunk frame for DEFINE'd chunks (ME-6, future)
+ *   rbx, r13, r14, r15 — callee-saved working regs per bb_boxes.s convention
+ *   rax rdi rsi rdx rcx r8 r9 r11 — caller-saved scratch
+ *
  * Authors: Lon Jones Cherryholmes · Claude Sonnet 4.6
- * Date: 2026-04-07 (M-JIT-RUN)
+ * Date: 2026-04-07 (M-JIT-RUN), 2026-05-10 (ME-2 r12 reservation)
  */
 
 #include "sm_codegen.h"
@@ -1310,6 +1324,15 @@ int sm_jit_run(SM_Program *prog, SM_State *st)
         st->pc++;  /* advance before handler reads CUR_INS (mirrors interp) */
         typedef void (*stub_fn_t)(void);
         stub_fn_t stub = (stub_fn_t)code_ptrs[st->pc - 1];
+        /* ME-2 (GOAL-MODE3-EMIT, 2026-05-10): reserve r12 = SM_State* before
+         * transferring control to SEG_CODE.  Today's threaded-call stubs are
+         * C functions that ignore r12 (they reach SM_State via g_jit_state);
+         * this load establishes the convention for ME-3+ when SEG_CODE
+         * becomes per-instruction native blobs that read [r12 + offset].
+         * r12 is callee-saved in the System V x86-64 C-ABI, so any C frame
+         * (including this one) saves/restores it transparently.  asm volatile
+         * with a "r12" clobber forces GCC to spill its own r12 use here. */
+        asm volatile ("mov %0, %%r12" : : "r"(st) : "r12");
         stub();
     }
     return g_jit_halted ? 0 : 0;  /* 0 = normal exit */
