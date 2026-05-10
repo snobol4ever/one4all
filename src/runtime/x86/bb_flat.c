@@ -688,9 +688,9 @@ static void patnd_to_sno_string(const PATND_t *p, char *buf, size_t cap)
     patnd_to_sno_r(p, buf, cap, &o, 0);
 }
 
-/* 120-char banner rule.  Rule chars: `#` then space, then 118 separator
- * chars — total 120 visible columns. */
-#define BB_BANNER_RULE_LEN 118
+/* 120-char banner rule.  Rule chars: `#` then 119 separator
+ * chars — total 120 visible columns.  No space between `#` and rule. */
+#define BB_BANNER_RULE_LEN 119
 
 /* EM-FORMAT-BB-PORT-COMPLETION-LONE-LABEL-FIX (sess 2026-05-09):
  * Banner emission must NOT flush the bb3c pending-label buffer.  A pending
@@ -708,17 +708,16 @@ static void flat_emit_banner_rule(emitter_v *e, char ch)
     if (!e->is_text) return;
     char buf[BB_BANNER_RULE_LEN + 4];
     buf[0] = '#';
-    buf[1] = ' ';
-    for (int i = 0; i < BB_BANNER_RULE_LEN; i++) buf[2 + i] = ch;
-    buf[2 + BB_BANNER_RULE_LEN] = '\0';
+    for (int i = 0; i < BB_BANNER_RULE_LEN; i++) buf[1 + i] = ch;
+    buf[1 + BB_BANNER_RULE_LEN] = '\0';
     EV_TEXT(e, "%s\n", buf);
 }
 
 /* Pattern-blob banner: emit at the top of each pat_inv_<id> blob.
  *
- *   # ====================================================================
+ *   #=====================================================================
  *   # pattern <prefix>: <reconstructed source>
- *   # ====================================================================
+ *   #=====================================================================
  */
 static void flat_emit_pat_banner(emitter_v *e, const char *prefix, PATND_t *p)
 {
@@ -732,7 +731,7 @@ static void flat_emit_pat_banner(emitter_v *e, const char *prefix, PATND_t *p)
 
 /* Per-box banner: emit before the α-arm of a box.
  *
- *   # --------------------------------------------------------------------
+ *   #---------------------------------------------------------------------
  *   # BOX <kind>(<args>)  [<label-prefix>]
  *
  * The trailing `#-` rule of the prior banner serves as the visual

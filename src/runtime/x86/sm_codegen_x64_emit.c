@@ -383,7 +383,7 @@ static void release_pc_used_as_target(void)
  * When label is NULL/"", 24 spaces precede column 2.
  * When opcode is NULL/"", column 2 is empty (useful for bare-label lines).
  * When col3 is NULL/"" and no anno, nothing follows the opcode (padded).
- * Banner lines (# ====..., # stmt N) are NOT routed here -- they print
+ * Banner lines (#====..., # stmt N) are NOT routed here -- they print
  * full-width and don't obey column rules.
  * ----------------------------------------------------------------------- */
 static int emit_three_column_line(FILE *out,
@@ -587,7 +587,7 @@ static int emit_file_footer(FILE *out)
 {
     /* EM-FORMAT-BB lone-label fusion: flush any pending label before footer. */
     bb3c_flush_pending();
-    if (fprintf(out, "# -- epilogue -------------------------------------------\n") < 0) return -1;
+    if (fprintf(out, "#-- epilogue -------------------------------------------\n") < 0) return -1;
     if (emit_three_column_line(out, "", "call", "rt_finalize@PLT", NULL) != 0) return -1;
     if (emit_three_column_line(out, "", "pop",  "rbp", NULL) != 0) return -1;
     if (emit_three_column_line(out, "", "ret",  "",    NULL) != 0) return -1;
@@ -679,7 +679,7 @@ static int emit_major_break(FILE *out, int stno, int lineno,
     bb3c_flush_pending();
     /* EM-FORMAT-SM: 120-char `#=` banner per spec.  No blank lines. */
     if (fputs(
-        "# ======================================================================================================================\n",
+        "#=======================================================================================================================\n",
         out) == EOF) return -1;
     if (src_text && *src_text) {
         if (fprintf(out, "# stmt %d  (line %d):  %s\n",
@@ -690,7 +690,7 @@ static int emit_major_break(FILE *out, int stno, int lineno,
         if (fprintf(out, "# stmt %d\n", stno) < 0) return -1;
     }
     if (fputs(
-        "# ======================================================================================================================\n",
+        "#=======================================================================================================================\n",
         out) == EOF) return -1;
     return 0;
 }
@@ -701,11 +701,11 @@ static int emit_minor_break(FILE *out, const char *caption)
      * before banner so it doesn't appear after the banner it should precede. */
     bb3c_flush_pending();
     /* EM-FORMAT-SM: 120-char `#-` banner. */
-    if (fputs("# ----------------------------------------------------------------------------------------------------------------------\n",
+    if (fputs("#-----------------------------------------------------------------------------------------------------------------------\n",
               out) == EOF) return -1;
     if (caption && *caption) {
         if (fprintf(out, "# %s\n", caption) < 0) return -1;
-        if (fputs("# ----------------------------------------------------------------------------------------------------------------------\n",
+        if (fputs("#-----------------------------------------------------------------------------------------------------------------------\n",
                   out) == EOF) return -1;
     }
     return 0;
