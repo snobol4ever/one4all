@@ -475,6 +475,23 @@ static void h_bb_pump_every(void)
     PUSH(NULVCL);
 }
 
+/* CHUNKS-step17i-suspend: JIT mirror of SM_SUSPEND_VALUE in sm_interp.c.
+ * Same yield-to-caller protocol — sm_yield_to_caller (in coro_runtime.c) does
+ * the swapcontext to active_coro's caller_ctx.  See SM_SUSPEND_VALUE doc in
+ * sm_prog.h for the lowering shape and rationale. */
+extern int sm_yield_to_caller(DESCR_t v);   /* coro_runtime.c */
+static void h_suspend_value(void)
+{
+    DESCR_t v = POP();
+    if (sm_yield_to_caller(v)) {
+        STATE->last_ok = 1;
+    } else {
+        /* No coroutine — push value back; outer SM_VOID_POP discards it. */
+        PUSH(v);
+        STATE->last_ok = !IS_FAIL_fn(v);
+    }
+}
+
 static void h_store_var(void)
 {
     DESCR_t val = POP();
@@ -1189,6 +1206,7 @@ static void init_handler_table(void)
     g_handlers[SM_BB_PUMP_CASE] = h_bb_pump_case;
     g_handlers[SM_BB_PUMP_SM]   = h_bb_pump_sm;
     g_handlers[SM_BB_PUMP_EVERY] = h_bb_pump_every;
+    g_handlers[SM_SUSPEND_VALUE] = h_suspend_value;   /* CHUNKS-step17i-suspend */
     g_handlers[SM_SUSPEND]      = h_suspend;   /* CHUNKS-step14: named FATAL — JIT gen is M5 */
     g_handlers[SM_RESUME]       = h_resume;    /* CHUNKS-step14: named FATAL — JIT gen is M5 */
     g_handlers[SM_LOAD_GLOCAL]  = h_load_glocal;   /* CHUNKS-step14b */

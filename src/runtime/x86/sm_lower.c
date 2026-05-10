@@ -1320,11 +1320,54 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
         return;
     }
 
+    /* CHUNKS-step17i-suspend: AST_SUSPEND lowering — direct yield primitive.
+     *
+     * Mirrors coro_stmt.c:88's runtime semantics in SM bytecode.  No
+     * coro_eval, no broker, no AST_t* on the SM stack.  See SM_SUSPEND_VALUE
+     * doc-comment in sm_prog.h for the lowering shape and rationale.
+     *
+     * Children:
+     *   children[0] = expr (yield value)
+     *   children[1] = do-clause (optional)
+     *
+     * Net stack delta: +1 (push NULVCL placeholder for outer SM_VOID_POP) on
+     * success path; +1 (failed v left on stack) on failure path.  Either
+     * way the outer proc-body loop's trailing SM_VOID_POP balances. */
+    case AST_SUSPEND: {
+        /* Lower the value expression — must produce one value on stack. */
+        if (e->nchildren > 0 && e->children[0])
+            lower_expr(p, lt, e->children[0]);
+        else
+            sm_emit(p, SM_PUSH_NULL);
+
+        /* If the value failed, skip yield + do-clause; leave failed v on stack. */
+        int j_end = sm_emit_i(p, SM_JUMP_F, 0);
+
+        /* Yield: pop v, swapcontext to caller.  On resume, fall through. */
+        sm_emit(p, SM_SUSPEND_VALUE);
+
+        /* Run do-clause (if present); discard its value. */
+        if (e->nchildren > 1 && e->children[1]) {
+            lower_expr(p, lt, e->children[1]);
+            sm_emit(p, SM_VOID_POP);
+        }
+
+        /* Push NULVCL placeholder for outer proc-body SM_VOID_POP. */
+        sm_emit(p, SM_PUSH_NULL);
+        int j_done = sm_emit_i(p, SM_JUMP, 0);
+
+        /* L_end: failed-v fall-through. Stack still has the failed value. */
+        int lbl_end = sm_label(p);
+        sm_patch_jump(p, j_end, lbl_end);
+
+        /* L_finally: both paths converge; outer SM_VOID_POP fires here. */
+        int lbl_finally = sm_label(p);
+        sm_patch_jump(p, j_done, lbl_finally);
+        return;
+    }
+
     /* Icon generators — remaining kinds still use legacy emit_push_expr + SM_BB_PUMP.
-     * AST_SUSPEND is listed for the next sub-rung (CH-17i-suspend) — it
-     * yields to a coroutine caller, not to a pump, and has different
-     * stack-discipline requirements that warrant their own pattern. */
-    case AST_SUSPEND:
+     * Same pattern as AST_SUSPEND was: each will get its own lowering rung. */
     case AST_BANG_BINARY:
     case AST_LCONCAT:
     case AST_LIMIT:

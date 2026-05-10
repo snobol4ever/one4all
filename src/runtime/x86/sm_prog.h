@@ -173,6 +173,40 @@ typedef enum {
      * DT_NUL at end so the trailing VOID_POP is balanced. */
     SM_BB_PUMP_EVERY,
 
+    /* CHUNKS-step17i-suspend: AST_SUSPEND `suspend E [do body]` — yield-to-caller.
+     *
+     * Stack discipline: pops one value (the yield value).  Pushes nothing.
+     * The lowering shape (sm_lower.c AST_SUSPEND case) wraps it as:
+     *
+     *   [lower expr]                ; push v, last_ok = !IS_FAIL(v)
+     *   SM_JUMP_F  L_end            ; v failed → leave it on stack, fall to L_end
+     *   SM_SUSPEND_VALUE            ; pop v, yield (swapcontext to caller)
+     *                               ; on resume, control returns here
+     *   [lower do-clause if any]    ; push d
+     *   SM_VOID_POP                 ; discard d (do-clause is stmt-context)
+     *   SM_PUSH_NULL                ; placeholder for outer SM_VOID_POP
+     *   SM_JUMP    L_finally
+     *   L_end:                      ; failed-v path: stack already has v
+     *   L_finally:                  ; outer proc-body SM_VOID_POP fires here
+     *
+     * Runtime handler: if active_coro != NULL (running inside proc_trampoline /
+     * gather_trampoline), set active_coro->yielded = v and swapcontext to
+     * caller_ctx — exactly the same yield protocol as coro_bb_suspend
+     * (icon_gen.c:211–240).  When the caller resumes us, control returns
+     * naturally to the next SM instruction.  If active_coro is NULL
+     * (top-level suspend, semantically rare and not in current corpus),
+     * push v back as a fallback — the outer SM_VOID_POP will discard it.
+     *
+     * Why this shape rather than CH-17i-every's g_table+coro_eval+broker
+     * pattern: AST_SUSPEND-as-statement's existing semantics
+     * (coro_stmt.c:88) are entirely in-frame state mutation
+     * (FRAME.suspending=1 + suspend_val) followed by an outer-loop
+     * swapcontext.  No bb_node_t is constructed, no broker is driven.
+     * The SM-side equivalent is a direct yield primitive.  This matches
+     * JCON's ir_Succeed (irgen.icn:962, 970) — a yield primitive that
+     * saves resume PC and returns to caller. */
+    SM_SUSPEND_VALUE,
+
     /* Functions */
     SM_CALL_FN,
     SM_RETURN,

@@ -814,6 +814,37 @@ void gather_trampoline(void) {
 }
 
 /*============================================================================================================================
+ * CHUNKS-step17i-suspend: sm_yield_to_caller — yield primitive for SM_SUSPEND_VALUE.
+ *
+ * Mirrors the yield half of coro_bb_suspend (icon_gen.c:211–240): when an
+ * SM-dispatched proc body (running inside proc_trampoline / gather_trampoline)
+ * hits AST_SUSPEND, we:
+ *   1. Stash the value in active_coro->yielded (where the caller's box will read it).
+ *   2. swapcontext from gen_ctx (us) to caller_ctx (the every-loop / surrounding
+ *      driver in caller frame).
+ *   3. When the caller's broker swaps back to gen_ctx (next β tick), we resume
+ *      from where swapcontext returned — which falls through this function and
+ *      back to the SM dispatch loop, where the do-clause SM runs next.
+ *
+ * Precondition: active_coro != NULL.  If called outside a coroutine context
+ * (top-level suspend, semantically rare and not exercised by the rung03 corpus),
+ * this is a no-op returning 0 — the SM_SUSPEND_VALUE handler then pushes the
+ * value back so the outer SM_VOID_POP balances.
+ *
+ * Returns 1 if a yield happened, 0 if there was no active coroutine.
+ *==========================================================================================================================*/
+int sm_yield_to_caller(DESCR_t v) {
+    if (!active_coro) return 0;
+    coro_t *ss = active_coro;
+    ss->yielded = v;
+    swapcontext(&ss->gen_ctx, &ss->caller_ctx);
+    /* Resumed by caller's broker on next β.  active_coro and frame are
+     * restored automatically because the entire stack/context was preserved
+     * by swapcontext.  Fall through; caller (SM dispatch loop) continues. */
+    return 1;
+}
+
+/*============================================================================================================================
  * RK-18a: coro_bb_raku_array — Raku @array Byrd box  (for @arr -> $x)
  *
  * Handles SOH-delimited array strings with loop variable binding.

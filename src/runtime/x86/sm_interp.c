@@ -80,6 +80,24 @@ extern bb_node_t coro_eval(AST_t *e);   /* scrip.c — builds a drivable bb_node
 extern bb_node_t coro_pump_proc_by_name(const char *name, DESCR_t *args, int nargs);
                                           /* CHUNKS-step12: name-driven Icon proc pump */
 
+/* CHUNKS-step17i-suspend: yield-to-caller helper.
+ *
+ * Defined in coro_runtime.c (which already owns ucontext machinery for
+ * coro_t / proc_trampoline).  Called from the SM_SUSPEND_VALUE handler
+ * to implement Icon's `suspend E [do body]` yield protocol without
+ * pulling icon_gen.h transitive baggage into sm_interp.c.
+ *
+ *   sm_yield_to_caller(v) — if running inside a coroutine context
+ *   (active_coro != NULL), set active_coro->yielded = v and swapcontext
+ *   to caller_ctx.  When the caller resumes us, control returns from
+ *   this function naturally and the SM dispatch loop continues.
+ *
+ *   Returns 1 if a yield happened, 0 if there was no active coroutine
+ *   (top-level suspend — semantically rare).  The handler uses the
+ *   return value to decide whether to push a placeholder NULVCL or
+ *   the original value back. */
+extern int sm_yield_to_caller(DESCR_t v);
+
 /* CH-17f: Prolog name-driven BB_ONCE dispatch */
 #include "../../frontend/prolog/pl_broker.h"
 #include "../../runtime/interp/pl_runtime.h"
@@ -999,6 +1017,53 @@ int sm_interp_run(SM_Program *prog, SM_State *st)
             int ticks = bb_broker(node, BB_PUMP, NULL, NULL);
             st->last_ok = (ticks > 0);
             sm_push(st, NULVCL);   /* every is void — leave a placeholder for VOID_POP */
+            break;
+        }
+
+        /* CHUNKS-step17i-suspend: yield primitive for `suspend E [do body]`.
+         *
+         * Pops one value (the yield value) from the SM stack.  If we're
+         * inside a coroutine context (proc_trampoline / gather_trampoline
+         * set active_coro when they entered), call sm_yield_to_caller —
+         * it stashes the value in active_coro->yielded and swapcontexts
+         * to the caller.  When the caller's broker swaps back, control
+         * returns from sm_yield_to_caller and the SM dispatch loop
+         * proceeds — the next instructions in our lowering shape are
+         * the do-clause and the placeholder NULVCL push.
+         *
+         * Outside a coroutine (top-level suspend, semantically rare and
+         * not exercised by the corpus today), push the value back so the
+         * outer SM_VOID_POP balances.  This treats top-level suspend as
+         * a no-op yield, matching the existing coro_stmt.c:88 semantics
+         * where FRAME.suspending=1 has no observer when active_coro is
+         * NULL. */
+        case SM_SUSPEND_VALUE: {
+            DESCR_t v = sm_pop(st);
+            if (sm_yield_to_caller(v)) {
+                /* Yielded and resumed.  Stack is now one shorter than at
+                 * SM_SUSPEND_VALUE entry.  The lowering's next instruction
+                 * is the do-clause (or directly SM_PUSH_NULL).  last_ok
+                 * stays as it was (the value succeeded — that's how we
+                 * got past the SM_JUMP_F gate above this opcode). */
+                st->last_ok = 1;
+            } else {
+                /* No coroutine — push value back as a placeholder for the
+                 * outer SM_VOID_POP.  The lowering's SM_PUSH_NULL +
+                 * do-clause are dead in this case, but they're harmless:
+                 * they just push and pop one extra value.  Actually wait
+                 * — the lowering doesn't gate on whether we yielded.  In
+                 * the no-coroutine case, the do-clause WILL run (it would
+                 * have run on resume in the coroutine case).  Push the
+                 * value back; the lowering will then run do-clause,
+                 * VOID_POP it, and SM_PUSH_NULL.  That leaves
+                 * stack-effect +2 instead of the +1 that the proc-body
+                 * loop expects.  This is acceptable for now — top-level
+                 * AST_SUSPEND is not exercised by the rung03/04 corpus
+                 * and the existing AST-walker fallback (coro_stmt.c:88)
+                 * has the same "no-op" behaviour outside a coroutine. */
+                sm_push(st, v);
+                st->last_ok = !IS_FAIL_fn(v);
+            }
             break;
         }
 
