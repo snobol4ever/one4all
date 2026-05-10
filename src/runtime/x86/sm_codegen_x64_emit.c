@@ -433,8 +433,7 @@ static int strtab_emit_rodata(FILE *out)
     for (int i = 0; i < g_strtab_n; i++) {
         strtab_escape(esc, sizeof(esc), g_strtab[i].s);
         snprintf(lbl, sizeof(lbl), ".Lstr_%d:", i);
-        if (emit_three_column_line(out, lbl, "", "", NULL) != 0) return -1;
-        if (emit_three_column_line(out, "", ".string", esc, NULL) != 0) return -1;
+        if (emit_three_column_line(out, lbl, ".string", esc, NULL) != 0) return -1;
     }
     if (emit_three_column_line(out, "", ".text", "", NULL) != 0) return -1;
     return 0;
@@ -481,11 +480,10 @@ static int emit_chunk_registry(FILE *out, const SM_Program *prog)
          * the first op is at M+1.  We emit .Lpc{i+1} as the fn entry. */
         int entry_pc = i + 1;
 
-        char anno[64], qarg[32], earg[32];
-        snprintf(anno, sizeof(anno), "expression: %s -> .Lpc%d", ins->a[0].s, entry_pc);
+        char qarg[32], earg[32];
         snprintf(qarg, sizeof(qarg), ".Lstr_%d", str_idx);
         snprintf(earg, sizeof(earg), ".Lpc%d", entry_pc);
-        if (emit_three_column_line(out, "", ".quad", qarg, anno) != 0) return -1;
+        if (emit_three_column_line(out, "", ".quad", qarg, NULL) != 0) return -1;
         if (emit_three_column_line(out, "", ".quad", earg, NULL)  != 0) return -1;
     }
 
@@ -530,15 +528,6 @@ static int emit_file_header(FILE *out, int count, int has_chunk_registry)
      * prologue.  If has_chunk_registry is non-zero, main calls
      * rt_register_expressions before rt_init so that user-defined
      * SNOBOL4 functions are dispatchable from the start. */
-    if (fprintf(out,
-        "# -----------------------------------------------------------------------\n"
-        "# scrip --jit-emit --x64  (M-JITEM-X64 / EM-1..EM-7d)\n"
-        "# %d SM instructions. Links against libscrip_rt.so.\n"
-        "# Architecture: two emitters -- SM straight-line via sm_macros.s\n"
-        "#   macros (inline x86); BB boxes via emit_bb_box() one-proc-per-box.\n"
-        "# See archive/EMITTER-MODE4-ARCH.md for the full design.\n"
-        "# -----------------------------------------------------------------------\n",
-        count) < 0) return -1;
     if (emit_three_column_line(out, "", ".intel_syntax", "noprefix", NULL) != 0) return -1;
     if (emit_three_column_line(out, "", ".globl",  "main",          NULL) != 0) return -1;
     if (emit_three_column_line(out, "", ".type",   "main, @function", NULL) != 0) return -1;
@@ -1670,13 +1659,6 @@ static int emit_pattern_blobs(FILE *out)
     bb_flat_set_cap_fixup_cb(cap_fixup_add);     /* EM-7c-capture: collect XNME/XFNME fixups */
     bb_build_flat_text_reset();
 
-    if (fputs(
-        "# ======================================================================================================================\n"
-        "# EM-7c: invariant pattern blobs (baked from sm_phase2_to_patnd → bb_build_flat_text)\n"
-        "# Each block exposes pat_inv_<id>_α / _β / _γ / _ω.\n"
-        "# rt_match_blob(blob_α, ...) drives Phase-3 against these blobs.\n"
-        "# ======================================================================================================================\n",
-        out) == EOF) return -1;
     if (emit_three_column_line(out, "", ".intel_syntax", "noprefix", NULL) != 0) return -1;
     if (emit_three_column_line(out, "", ".text", "", NULL) != 0) return -1;
 
@@ -1687,14 +1669,8 @@ static int emit_pattern_blobs(FILE *out)
         char prefix[64];
         snprintf(prefix, sizeof(prefix), "pat_inv_%d", w->pat_id);
 
-        if (fprintf(out,
-            "# ---- pattern blob %d (Phase-2 window pc=%d..%d, SM_EXEC_STMT pc=%d) ----\n",
-            w->pat_id, w->phase2_start, w->phase2_end - 1,
-            w->exec_stmt_pc) < 0) return -1;
-
         PATND_t *p = (PATND_t *)w->root.p;
         if (bb_build_flat_text(p, out, prefix) != 0) {
-            fprintf(out, "# (bb_build_flat_text returned non-zero — pattern not baked)\n");
             /* If the bake fails despite the pre-pass marking it invariant,
              * downgrade — at SM_EXEC_STMT we'll fall back to UNHANDLED. */
             w->is_invariant = 0;
@@ -1723,10 +1699,7 @@ static int emit_sm_exec_stmt_blob(FILE *out, const SM_Instr *ins, int pc, int wi
     char act[160];
     snprintf(act, sizeof(act),
              "rdi, [rip + pat_inv_%d_α]", w->pat_id);
-    char anno[80];
-    snprintf(anno, sizeof(anno),
-             "# blob entry α  (Phase-2 pc=%d..%d)",
-             w->phase2_start, w->phase2_end - 1);
+    const char *anno = NULL;
     /* Use emit_three_column_line to keep col 1 = pending .LpcN, col 2 = lea,
      * col 3 = args + comment.  The pending label is consumed via the
      * sm_emit_consume_pc_label path below. */
@@ -1748,22 +1721,17 @@ static int emit_sm_exec_stmt_blob(FILE *out, const SM_Instr *ins, int pc, int wi
         strtab_label(lbl_str, sizeof(lbl_str), sname);
         char act2[160];
         snprintf(act2, sizeof(act2), "rsi, [rip + %s]", lbl_str);
-        char ann2[80];
-        snprintf(ann2, sizeof(ann2), "# subj_name=%s", sname);
-        if (emit_three_column_line(out, "", "lea", act2, ann2) != 0) return -1;
+        if (emit_three_column_line(out, "", "lea", act2, NULL) != 0) return -1;
     } else {
-        if (emit_three_column_line(out, "", "xor", "esi, esi", "# subj_name=NULL") != 0) return -1;
+        if (emit_three_column_line(out, "", "xor", "esi, esi", NULL) != 0) return -1;
     }
 
     /* Arg 2 (edx) = has_repl flag */
     char act3[80];
     snprintf(act3, sizeof(act3), "edx, %d", has_repl);
-    char ann3[80];
-    snprintf(ann3, sizeof(ann3), "# has_repl=%d", has_repl);
-    if (emit_three_column_line(out, "", "mov", act3, ann3) != 0) return -1;
+    if (emit_three_column_line(out, "", "mov", act3, NULL) != 0) return -1;
 
-    if (emit_three_column_line(out, "", "call", "rt_match_blob@PLT",
-                               "# EM-7c: Phase-3+5 against baked invariant blob") != 0) return -1;
+    if (emit_three_column_line(out, "", "call", "rt_match_blob@PLT", NULL) != 0) return -1;
 
     (void)pc;
     return 0;
