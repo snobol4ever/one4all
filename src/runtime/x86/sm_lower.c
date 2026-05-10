@@ -1366,10 +1366,48 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
         return;
     }
 
+    /* CHUNKS-step17i-bang-concat Phase 1 — AST_LCONCAT scalar value-path lowering.
+     *
+     * Icon `|||` (AST_LCONCAT) is a string-concat alias when both operands are
+     * non-generative scalars — see interp_eval.c:3827, which simply does
+     * VARVAL_fn(c0) ++ VARVAL_fn(c1).  AST_CAT's else-branch (line 740) shows
+     * the canonical SM shape for this: lower each child, emit SM_CONCAT
+     * between adjacent pairs.  Mirror it.
+     *
+     * Pre-rung: AST_LCONCAT fell through to legacy emit_push_expr + SM_BB_PUMP,
+     * which is net-stack-zero — broke value-context use (e.g.,
+     * `s := "hello" ||| " world"` in rung15_real_swap_lconcat: stack underflow
+     * on AST_ASSIGN's RHS pop).
+     *
+     * If any child is is_suspendable (gen ||| gen, gen ||| str, etc.), the
+     * scalar SM_CONCAT shape is wrong — coro_eval would route through
+     * coro_bb_binop with a cross-product yielding multiple values.  That case
+     * is Phase 2 of CH-17i-bang-concat (unified SM_BB_PUMP_AST opcode); until
+     * Phase 2 lands, fall through to the legacy path so behaviour is
+     * unchanged for the gen case.
+     */
+    case AST_LCONCAT: {
+        int has_gen = 0;
+        for (int j = 0; j < e->nchildren; j++) {
+            if (is_suspendable(e->children[j])) { has_gen = 1; break; }
+        }
+        if (!has_gen) {
+            if (e->nchildren < 1) { sm_emit(p, SM_PUSH_NULL); return; }
+            for (int i = 0; i < e->nchildren; i++)
+                lower_expr(p, lt, e->children[i]);
+            for (int i = 1; i < e->nchildren; i++)
+                sm_emit(p, SM_CONCAT);
+            return;
+        }
+        /* fall through to legacy gen path (Phase 2 will replace this) */
+        emit_push_expr(p, e);
+        sm_emit(p, SM_BB_PUMP);
+        return;
+    }
+
     /* Icon generators — remaining kinds still use legacy emit_push_expr + SM_BB_PUMP.
      * Same pattern as AST_SUSPEND was: each will get its own lowering rung. */
     case AST_BANG_BINARY:
-    case AST_LCONCAT:
     case AST_LIMIT:
     case AST_RANDOM:
     case AST_SECTION:
