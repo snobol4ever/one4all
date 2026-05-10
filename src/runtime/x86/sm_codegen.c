@@ -212,6 +212,19 @@ static void h_stno(void) {
         extern void mon_emit_label_bin(int64_t stno);
         mon_emit_label_bin((int64_t)sm_stno);
     }
+    /* ME-4-post: reset value-stack pointer at every statement boundary.
+     * Mirrors the mode-2 contract at sm_interp.c:329 ("st->sp = 0 reset
+     * value stack at each statement boundary").  Mode-3's inline ME-4
+     * blobs write to state->stack[sp] without bounds checks; without
+     * this reset, sp creeps monotonically across statements and
+     * eventually overflows state->stack_cap, corrupting the heap.  Live
+     * bug repro before this fix: multi-statement-arithmetic programs
+     * aborted with `realloc(): invalid next size` during a subsequent
+     * heap allocation that landed on the corruption (see ME-4 emergency
+     * handoff note in GOAL-MODE3-EMIT.md).  Pre-grow of state->stack
+     * (see sm_jit_run) plus per-statement sp-reset together provide the
+     * mode-2-equivalent stack discipline. */
+    STATE->sp = 0;
     /* IM-5: step-limit — longjmp out when limit reached */
     if (g_jit_step_limit > 0 && g_jit_steps_done++ >= g_jit_step_limit)
         longjmp(g_jit_step_jmp, 1);
@@ -1450,7 +1463,10 @@ static size_t emit_trampoline(SM_Program *prog)
 {
     size_t off = seg_offset(SEG_CODE);
 
-    /* mov eax, dword [r12+20]    (41 8b 44 24 14)  5 bytes — load st->pc */
+    /* mov eax, dword [r12+20]    (41 8b 44 24 14)  5 bytes — load st->pc
+     * (r12 = &SM_State per ME-2; offset 20 = offsetof(SM_State, pc)).
+     * ME-4-post r12=TOS-pointer transition deferred to follow-on rung;
+     * see sm_jit_run comment for status. */
     seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0x8b);
     seg_byte(SEG_CODE, 0x44); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0x14);
 
@@ -2049,6 +2065,28 @@ int sm_jit_run(SM_Program *prog, SM_State *st)
 
     if (prog->count == 0) return 0;
 
+    /* ME-4-post: pre-grow value stack to a safe high-water capacity.
+     * Mode-3 inline blobs write to state->stack[sp] without bounds
+     * checks (mode-2's sm_push() realloc-grows on demand; mode-3
+     * doesn't).  Mode-2's contract at sm_interp.c:295 resets
+     * st->sp = 0 at every SM_STNO; mode-3 must replicate that (see
+     * h_stno below).  Combining sp-reset-per-statement with a
+     * generous initial cap means intra-statement depth is bounded by
+     * the deepest single-statement expression, which 4096 entries
+     * comfortably accommodates for every known corpus program.  If a
+     * future program exceeds it, the right fix is per-blob bounds
+     * check + slow-path, not a larger initial cap.  Cheap
+     * defence-in-depth either way. */
+    {
+        const int ME4_STACK_PREGROW = 4096;
+        if (st->stack_cap < ME4_STACK_PREGROW) {
+            st->stack     = (DESCR_t *)realloc(st->stack, ME4_STACK_PREGROW * sizeof(DESCR_t));
+            if (!st->stack) { fprintf(stderr, "sm_jit_run: stack pregrow OOM\n"); abort(); }
+            st->stack_cap = ME4_STACK_PREGROW;
+        }
+        st->sp = 0;
+    }
+
     /* Compute trampoline entry point */
     uint8_t *tramp = scrip_segs[SEG_CODE].base + g_trampoline_offset;
     typedef void (*entry_fn_t)(void);
@@ -2059,10 +2097,17 @@ int sm_jit_run(SM_Program *prog, SM_State *st)
      * C frame (this function) saves/restores it for us.  Any C handler
      * called from inside a blob also preserves r12 across its return.
      * The trampoline reads st->pc as [r12+20] (offsetof SM_State.pc),
-     * looks up blob[pc] by arithmetic on the fixed 22-byte stride, and
+     * looks up blob[pc] by indirect jump through g_blob_addrs[], and
      * jmps in.  Each blob increments pc (or sets it for SM_JUMP), runs,
      * jmps back to the trampoline.  SM_HALT's blob `ret`s out — that's
-     * how this function returns. */
+     * how this function returns.
+     *
+     * ME-4-post status: r12 = &SM_State preserved from ME-2/ME-3 — the
+     * full r12 = TOS-pointer transition (per the Lon-signed
+     * REGISTER-LAYOUT.md, sess 2026-05-10) requires rewriting every
+     * blob's stack-access sequence and is deferred to a follow-on rung
+     * (ME-4-post-r12-tos) so the realloc-bug fix can land cleanly
+     * first.  See ME-4-post addendum in GOAL-MODE3-EMIT.md. */
     asm volatile ("mov %0, %%r12" : : "r"(st) : "r12");
     entry();
 
