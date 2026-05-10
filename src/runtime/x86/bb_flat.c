@@ -43,6 +43,147 @@ extern void    *bb_dvar_bin_new(const char *name);
 static int g_flat_node_id   = 0;
 static int g_flat_slot_count = 0;
 
+/* ── EM-FORMAT-BB-DATA-CONSOLIDATE state (2026-05-10) ─────────────────────────
+ *
+ * Per-blob deferred-data buffer.  In TEXT mode, every `.section .data` block
+ * inside a `pat_inv_<id>` blob would normally interleave with `.text` 4-5
+ * times (charset slots, capture state, len/tab/rtab/fence/arb/star/breakx
+ * slots).  Instead we buffer all data emissions into `g_flat_data_buf` and
+ * dump them as ONE consolidated `.section .data` block at the END of the
+ * blob's body via `flat_data_consolidate_flush`.
+ *
+ * Original sites get a `# data: <labels>` comment so the reader can still
+ * tie each box to its locals.
+ *
+ * Flow:
+ *   flat_data_section()  -> g_flat_data_active = 1; reset per-block label list
+ *   flat_data_*() helpers route through `data_buf_appendf` instead of `flat3c`
+ *   flat3c_label()       -> if active, also routes; collects label name in
+ *                           per-block list for the inline comment
+ *   flat_text_section()  -> if active, emit `# data: name1, name2` to main
+ *                           stream and toggle active off (we never actually
+ *                           switched the main stream out of `.text`)
+ *   flat_intel_syntax()  -> if was deferred just now, no-op (stayed in text)
+ *
+ * At end of `flat_emit_body_v`: `flat_data_consolidate_flush(e)` emits ONE
+ * `.section .data` directive, dumps the buffer, restores `.section .text`
+ * and `.intel_syntax noprefix`, then resets state.
+ *
+ * BINARY mode: state is unused; helpers gate on `e->is_text` first.         */
+
+#define FLAT_DATA_BUF_MAX     (32 * 1024)   /* per-blob; plenty for 5 corpora */
+#define FLAT_DATA_LBL_MAX     32            /* per-block; capture has ~3      */
+
+static char   g_flat_data_buf[FLAT_DATA_BUF_MAX];
+static size_t g_flat_data_len    = 0;
+static int    g_flat_data_active = 0;       /* 1 = currently inside a .data block */
+static int    g_flat_data_any    = 0;       /* 1 = at least one block this blob   */
+static int    g_flat_data_just_closed = 0;  /* 1 = next flat_intel_syntax is the
+                                             * trailing one from the box's
+                                             * `.section .text; .intel_syntax`
+                                             * pair — suppress (we never left
+                                             * intel-syntax on the main stream). */
+/* In-buffer pending-label fusion (mirrors bb3c_format's logic but local to
+ * the data buffer): a label-only line waits for the next content line and
+ * fuses into col-1.  Flushed standalone if the buffer ends or another label
+ * arrives first. */
+static char   g_flat_data_pending_lbl[160] = "";
+/* Per-block (one .data...flat_text_section() block) label list, used to build
+ * the `# data: ...` comment emitted to the main text stream when the block
+ * closes. */
+static char   g_flat_data_block_lbls[FLAT_DATA_LBL_MAX][96];
+static int    g_flat_data_block_nlbls = 0;
+
+static void data_buf_reset(void)
+{
+    g_flat_data_len = 0;
+    g_flat_data_active = 0;
+    g_flat_data_any = 0;
+    g_flat_data_just_closed = 0;
+    g_flat_data_block_nlbls = 0;
+    g_flat_data_pending_lbl[0] = '\0';
+}
+
+static void data_buf_appendf(const char *fmt, ...)
+{
+    if (g_flat_data_len >= FLAT_DATA_BUF_MAX) return;
+    va_list ap;
+    va_start(ap, fmt);
+    int n = vsnprintf(g_flat_data_buf + g_flat_data_len,
+                      FLAT_DATA_BUF_MAX - g_flat_data_len, fmt, ap);
+    va_end(ap);
+    if (n > 0) {
+        size_t left = FLAT_DATA_BUF_MAX - g_flat_data_len;
+        g_flat_data_len += ((size_t)n < left) ? (size_t)n : left;
+    }
+}
+
+/* Append a fully-formatted three-column data line to the buffer.  Mirrors
+ * `bb3c_format`'s `%-24s%-16s %s` shape but writes to memory; right-trims
+ * trailing whitespace to keep the audit invariant clean.  Consumes any
+ * in-buffer pending label as the fused col-1 (label-fusion mirrors
+ * bb_emit.c's bb3c_format behaviour). */
+static void data_buf_three_col(const char *lbl, const char *act, const char *got)
+{
+    /* Fusion: if caller passed an empty label and a label is pending, use it. */
+    char fused_lbl[160];
+    const char *eff_lbl = lbl ? lbl : "";
+    if ((eff_lbl[0] == '\0') && g_flat_data_pending_lbl[0]) {
+        snprintf(fused_lbl, sizeof(fused_lbl), "%s", g_flat_data_pending_lbl);
+        g_flat_data_pending_lbl[0] = '\0';
+        eff_lbl = fused_lbl;
+    } else if (eff_lbl[0] != '\0' && g_flat_data_pending_lbl[0]) {
+        /* Caller has its own label and a label is pending: emit pending
+         * standalone, then fall through to use caller's label. */
+        char line[256];
+        int n = snprintf(line, sizeof(line), "%-24s", g_flat_data_pending_lbl);
+        if (n > 0) {
+            while (n > 0 && (line[n-1] == ' ' || line[n-1] == '\t')) line[--n] = '\0';
+            data_buf_appendf("%s\n", line);
+        }
+        g_flat_data_pending_lbl[0] = '\0';
+    }
+    char line[512];
+    int n = snprintf(line, sizeof(line), "%-24s%-16s %s",
+                     eff_lbl, act ? act : "", got ? got : "");
+    if (n < 0) return;
+    if (n >= (int)sizeof(line)) n = (int)sizeof(line) - 1;
+    /* Right-trim trailing spaces/tabs (matches bb3c_format behaviour). */
+    while (n > 0 && (line[n-1] == ' ' || line[n-1] == '\t')) line[--n] = '\0';
+    data_buf_appendf("%s\n", line);
+}
+
+/* Defer a label to fuse with the next data line.  Used by flat3c_label's
+ * data-active path (replaces the prior immediate three-column emission). */
+static void data_buf_pend_label(const char *name)
+{
+    /* If a label is already pending, flush it standalone before this one. */
+    if (g_flat_data_pending_lbl[0]) {
+        char line[256];
+        int n = snprintf(line, sizeof(line), "%-24s", g_flat_data_pending_lbl);
+        if (n > 0) {
+            while (n > 0 && (line[n-1] == ' ' || line[n-1] == '\t')) line[--n] = '\0';
+            data_buf_appendf("%s\n", line);
+        }
+    }
+    snprintf(g_flat_data_pending_lbl, sizeof(g_flat_data_pending_lbl),
+             "%s:", name ? name : "");
+}
+
+/* Flush any unfused pending label to the buffer as a standalone line.  Called
+ * from data_buf_emit_consolidated_block before dumping. */
+static void data_buf_flush_pending_label(void)
+{
+    if (!g_flat_data_pending_lbl[0]) return;
+    char line[256];
+    int n = snprintf(line, sizeof(line), "%-24s", g_flat_data_pending_lbl);
+    if (n > 0) {
+        while (n > 0 && (line[n-1] == ' ' || line[n-1] == '\t')) line[--n] = '\0';
+        data_buf_appendf("%s\n", line);
+    }
+    g_flat_data_pending_lbl[0] = '\0';
+}
+
 /* EM-7c-capture: callback installed by sm_codegen_x64_emit to collect cap fixups.
  * Called from flat_emit_node when XNME/XFNME emits a child sub-blob. */
 static void (*g_cap_fixup_cb)(void *cap_ptr, const char *child_α_label) = NULL;
@@ -107,16 +248,103 @@ static void flat3c_action(emitter_v *e, const char *act, const char *args)
     flat3c(e, "", act, args ? args : "");
 }
 
+/* Forward decls for data-buffer helpers used by flat3c_label below; full
+ * definitions sit just after the label helper. */
+static void data_buf_remember_label(const char *name);
+
 static void flat3c_label(emitter_v *e, const char *name)
 {
     if (!e->is_text) return;
+    /* EM-FORMAT-BB-DATA-CONSOLIDATE: while a deferred-data block is active,
+     * label definitions belong with the data, not the main text stream.
+     * Defer the label so it fuses with the next data directive (`.string`,
+     * `.quad`, `.long`, `.zero`).  Also remember the bare name so we can
+     * emit `# data: <labels>` at the original site when the block closes. */
+    if (g_flat_data_active) {
+        data_buf_pend_label(name);
+        data_buf_remember_label(name);
+        return;
+    }
     char buf[160]; snprintf(buf, sizeof(buf), "%s:", name);
     flat3c(e, buf, "", "");
 }
 
-static void flat_data_section(emitter_v *e)   { flat3c(e, "", ".section", ".data"); }
-static void flat_text_section(emitter_v *e)   { flat3c(e, "", ".section", ".text"); }
-static void flat_intel_syntax(emitter_v *e)   { flat3c(e, "", ".intel_syntax", "noprefix"); }
+/* EM-FORMAT-BB-DATA-CONSOLIDATE: helper to record a label-name into the
+ * current data block's label list (for the inline `# data: ...` comment). */
+static void data_buf_remember_label(const char *name)
+{
+    if (g_flat_data_block_nlbls >= FLAT_DATA_LBL_MAX) return;
+    snprintf(g_flat_data_block_lbls[g_flat_data_block_nlbls],
+             sizeof(g_flat_data_block_lbls[0]), "%s", name ? name : "");
+    g_flat_data_block_nlbls++;
+}
+
+/* Emit the `# data: name1, name2, ...` comment for the just-closed block to
+ * the main text stream (via flat3c so lone-label fusion still works). */
+static void data_buf_emit_block_comment(emitter_v *e)
+{
+    if (!e->is_text) return;
+    if (g_flat_data_block_nlbls == 0) return;
+    char comment[512];
+    size_t o = snprintf(comment, sizeof(comment), "# data:");
+    for (int i = 0; i < g_flat_data_block_nlbls && o + 4 < sizeof(comment); i++) {
+        const char *lbl = g_flat_data_block_lbls[i];
+        if (!lbl[0]) continue;
+        o += snprintf(comment + o, sizeof(comment) - o,
+                      "%s %s", (i ? "," : ""), lbl);
+    }
+    /* Emit as a banner-style line via the emitter's raw fprintf so it sits in
+     * col 0 (matches per-box banner style).  Routes through fprintf_raw which
+     * (per EM-FORMAT-BB-LONE-LABELS) flushes pending cjmp only — pending label
+     * still fuses with the NEXT real line below the comment. */
+    EV_TEXT(e, "%s\n", comment);
+    g_flat_data_block_nlbls = 0;
+}
+
+static void flat_data_section(emitter_v *e)
+{
+    if (!e->is_text) return;
+    /* Begin a new deferred-data block.  The main text stream stays in `.text`;
+     * everything until the next flat_text_section() is buffered. */
+    g_flat_data_active = 1;
+    g_flat_data_any    = 1;
+    g_flat_data_block_nlbls = 0;
+}
+
+static void flat_text_section(emitter_v *e)
+{
+    if (!e->is_text) return;
+    if (g_flat_data_active) {
+        /* End of a buffered data block: emit the `# data: ...` comment to the
+         * main stream and toggle active off.  We never actually left `.text`
+         * on the main stream, so no real `.section .text` needed here.
+         * Set just-closed so the box-emitted trailing `.intel_syntax noprefix`
+         * (which always pairs with `.section .text`) also gets suppressed. */
+        data_buf_emit_block_comment(e);
+        g_flat_data_active = 0;
+        g_flat_data_just_closed = 1;
+        return;
+    }
+    /* Not buffering: legacy behaviour (rare; only for callers outside the
+     * pat_inv blob pipeline that may toggle sections directly). */
+    flat3c(e, "", ".section", ".text");
+}
+
+static void flat_intel_syntax(emitter_v *e)
+{
+    if (!e->is_text) return;
+    /* While buffering data, the main stream stayed in `.intel_syntax noprefix`
+     * (every blob's preamble already set it).  Suppress the redundant
+     * directive that would normally close a data block — both the in-block
+     * call (active==1) and the trailing one right after flat_text_section
+     * closed the block (just_closed==1). */
+    if (g_flat_data_active) return;
+    if (g_flat_data_just_closed) {
+        g_flat_data_just_closed = 0;
+        return;
+    }
+    flat3c(e, "", ".intel_syntax", "noprefix");
+}
 
 static void flat_data_string(emitter_v *e, const char *s)
 {
@@ -135,34 +363,39 @@ static void flat_data_string(emitter_v *e, const char *s)
     }
     if (o + 1 < sizeof(esc)) esc[o++] = '"';
     esc[o] = '\0';
-    flat3c(e, "", ".string", esc);
+    if (g_flat_data_active) data_buf_three_col("", ".string", esc);
+    else                    flat3c(e, "", ".string", esc);
 }
 
 static void flat_data_quad(emitter_v *e, const char *arg)
 {
     if (!e->is_text) return;
-    flat3c(e, "", ".quad", arg ? arg : "0");
+    if (g_flat_data_active) data_buf_three_col("", ".quad", arg ? arg : "0");
+    else                    flat3c(e, "", ".quad", arg ? arg : "0");
 }
 
 static void flat_data_quad_int(emitter_v *e, long long v)
 {
     if (!e->is_text) return;
     char buf[32]; snprintf(buf, sizeof(buf), "%lld", v);
-    flat3c(e, "", ".quad", buf);
+    if (g_flat_data_active) data_buf_three_col("", ".quad", buf);
+    else                    flat3c(e, "", ".quad", buf);
 }
 
 static void flat_data_long(emitter_v *e, long long v)
 {
     if (!e->is_text) return;
     char buf[32]; snprintf(buf, sizeof(buf), "%lld", v);
-    flat3c(e, "", ".long", buf);
+    if (g_flat_data_active) data_buf_three_col("", ".long", buf);
+    else                    flat3c(e, "", ".long", buf);
 }
 
 static void flat_data_zero(emitter_v *e, int n)
 {
     if (!e->is_text) return;
     char buf[16]; snprintf(buf, sizeof(buf), "%d", n);
-    flat3c(e, "", ".zero", buf);
+    if (g_flat_data_active) data_buf_three_col("", ".zero", buf);
+    else                    flat3c(e, "", ".zero", buf);
 }
 
 static void flat_globl(emitter_v *e, const char *name)
@@ -1321,6 +1554,10 @@ static int flat_emit_body_v(emitter_v *e, PATND_t *p,
     bb_label_initf(&lbl_fail,       "%s_ω",      prefix);
     bb_label_initf(&lbl_β,       "%s_β",       prefix);
 
+    /* EM-FORMAT-BB-DATA-CONSOLIDATE: reset per-blob deferred-data state.  In
+     * BINARY mode, helpers gate on `e->is_text` so the reset is harmless. */
+    if (text_externalise) data_buf_reset();
+
     /* TEXT mode: external _α label must be at the TRUE function entry
      * (before the r10-setup preamble), so that bb_broker can call fn(ζ,0)
      * or fn(ζ,1) and have r10 = &Δ ready.  The dispatch then jumps to
@@ -1366,6 +1603,25 @@ static int flat_emit_body_v(emitter_v *e, PATND_t *p,
     ev_mov_eax_imm32(e, 99);
     ev_xor_edx_edx(e);
     ev_ret(e);
+
+    /* EM-FORMAT-BB-DATA-CONSOLIDATE: flush all deferred data as ONE
+     * `.section .data` block at end of blob, then restore `.section .text`.
+     * `.intel_syntax noprefix` persists across `.section` switches in GAS,
+     * so we don't re-emit it. */
+    if (text_externalise && e->is_text && g_flat_data_any) {
+        /* Flush any unfused pending data-label (rare — end of buffer with a
+         * trailing label and no content line), so it lands inside the .data
+         * block, not after the section switches. */
+        data_buf_flush_pending_label();
+        /* Make sure any pending bb3c labels flush before we emit the section
+         * directive (defends against EM-FORMAT-BB-LONE-LABELS regression). */
+        bb3c_flush_pending();
+        flat3c(e, "", ".section", ".data");
+        /* Dump the buffered content directly (already three-column shaped). */
+        EV_TEXT(e, "%.*s", (int)g_flat_data_len, g_flat_data_buf);
+        flat3c(e, "", ".section", ".text");
+        data_buf_reset();
+    }
 
     return 0;
 }
