@@ -83,11 +83,11 @@ on the macro layer.
 
 The three backends cover three productions of the same template:
 
-| Backend          | Output       | Consumer                       |
-|------------------|--------------|--------------------------------|
-| `emit_v_binary`  | x86-64 bytes | mode-3 in-process JIT          |
-| `emit_v_text`    | `MNEMONIC <args>` | mode-4's per-call-site `.s` line — but for now this emits **macro invocations** matching the macro names defined by `macro_def` (e.g., `PUSH_INT 42`); the underlying instruction sequence is hidden in the macro body |
-| `emit_v_macro_def` | `.macro NAME params / <body> / .endm` | `sm_macros.s` regeneration |
+| Backend          | Output       | Consumer                       | Applies to |
+|------------------|--------------|--------------------------------|------------|
+| `emit_v_binary`  | x86-64 bytes | mode-3 in-process JIT          | SM and BB templates |
+| `emit_v_text`    | `MNEMONIC <args>` | mode-4's per-call-site `.s` line — but for now this emits **macro invocations** matching the macro names defined by `macro_def` (e.g., `PUSH_INT 42`); the underlying instruction sequence is hidden in the macro body | SM and BB templates |
+| `emit_v_macro_def` | `.macro NAME params / <body> / .endm` | `sm_macros.s` regeneration | **SM templates only** — BB has no macro layer |
 
 In practice mode-4's per-call-site emission may walk the same template
 with **text backend in "invocation mode"** (emit one line like
@@ -130,6 +130,12 @@ in three productions.  No "see also sm_macros.s" footnote; no
 "sm_codegen_x64_emit.c also emits this differently" footnote.
 
 ### The vtable surface
+
+**Naming.**  The `_v` suffix on `emit_v` reads as *vtable* (table of
+function pointers).  Convention inherited from the existing BB-side
+`emitter_v.h` already in the tree (whose `emitter_text.c` and
+`emitter_binary.c` are this rung's prior art).  After the retrofit
+completes, `emitter_v.h` deletes and `emit_v.h` is the survivor.
 
 `emit_v.h` defines one C struct of function pointers plus per-backend
 opaque state.
@@ -389,6 +395,54 @@ one box at a time into their per-box template file.
 
 ---
 
+## macro_def is SM-only — the one asymmetry
+
+⛔ **Co-equal does not mean symmetric on every backend.**  Among the
+three backends, `macro_def` is **SM-only**.  BB box templates never
+call `macro_begin` / `macro_end` / `macro_param_ref`, and the
+`emit_v_macro_def` driver never instantiates a BB template.
+
+Why: `sm_macros.s` is a library of parameterized GAS `.macro`
+definitions (`HALT`, `PUSH_INT val`, `PUSH_LIT_S lbl, len`, …) that
+mode-4's per-call-site emission invokes by name to keep `.s`
+readable.  Each SM opcode maps to one macro; the macro body is the
+instruction sequence that opcode lowers to.  BB boxes have no such
+macro layer: each BB box (whether emitted as a flat-glob inlined
+into a pattern's `.text` blob or as a dispatched proc) appears in
+the `.s` file as straight-line asm with α/β/γ/ω labels — no `.macro`
+wrapper, no parameter substitution.  A BB box's parameters (the
+literal bytes it matches, the cset it spans, the length to advance)
+are baked into the box's DATA section at emit time, not passed as
+macro arguments.
+
+Concretely:
+
+- `templates/sm_halt.c` calls `macro_begin / macro_param_ref /
+  macro_end` — three backends produce three different things from it.
+- `templates/bb_xchr.c` calls `bb_port_label`, instruction primitives,
+  and comments — **two backends** (binary, text) produce two things.
+  The macro_def driver never invokes a `bb_*.c` template.
+
+| Backend            | Invoked on SM templates | Invoked on BB templates |
+|--------------------|:-----------------------:|:-----------------------:|
+| `emit_v_binary`    | yes — mode-3            | yes — mode-3            |
+| `emit_v_text`      | yes — mode-4            | yes — mode-4            |
+| `emit_v_macro_def` | yes — sm_macros.s regen | **no — never**          |
+
+The `emit_v_macro_def` driver's main loop iterates over the SM
+opcode-template list only.  There is no `bb_macros.s` regeneration
+counterpart; if `bb_macros.s` exists in the tree as a hand-edited
+file, it stays hand-edited (or, more likely, the BB-side
+macro file goes away entirely after the retrofit since flat-glob
+emission writes everything inline).
+
+The `macro_begin / macro_end / macro_param_ref` slots on the
+`emit_v` struct exist for SM templates' use.  BB templates simply
+don't call them.  Static analysis can confirm: `grep macro_ templates/bb_*.c`
+should return zero hits at any point in the project's life.
+
+---
+
 ## The "sprinkle" model — generous surface, per-backend ignore rights
 
 A template C function can issue *any* call on the `emit_v` surface,
@@ -397,7 +451,7 @@ column breaks, section markers, structural assertions — all of these
 are first-class operations on the surface.  Each backend chooses
 which calls to implement and which to no-op:
 
-| Call category               | binary backend | text backend | macro_def backend |
+| Call category               | binary backend | text backend | macro_def backend (SM templates only) |
 |-----------------------------|:--------------:|:------------:|:-----------------:|
 | Instruction (`mov_reg_imm64`, `call_plt`, `ret`, etc.) | emits bytes | emits mnemonic line | emits inside `.macro` body |
 | Symbolic label              | records offset | writes label line | writes label line |
@@ -410,6 +464,8 @@ which calls to implement and which to no-op:
 | `pad_to_blob_size`          | emits NOPs     | NO-OP         | NO-OP |
 | `macro_begin/end`           | NO-OP          | NO-OP in invocation mode; emits `.macro/.endm` in definition mode (same as macro_def) | emits `.macro/.endm` |
 | `macro_param_ref(name)`     | substitutes the bound value | writes the bound value (invocation) or `\<name>` (definition) | writes `\<name>` |
+| `bb_port_label` / `bb_port_jmp` | records offset / emits jmp | writes port-named label / `jmp <port>` | **never reached** — BB templates never call macro_def |
+| `bb_box_banner`             | NO-OP          | writes 120-char #---- + "BOX <kind>(<args>) [<prefix>]" | **never reached** — same reason |
 
 The template author writes the *full intent* of an opcode or box —
 its instructions, its commentary, its visual layout, its
