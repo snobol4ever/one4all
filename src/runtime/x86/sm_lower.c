@@ -1419,6 +1419,19 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
         sm_emit_i(p, SM_BB_PUMP_AST, (int64_t)ast_pump_table_register((AST_t *)e));
         return;
 
+    /* GOAL-ICON-BB-COMPLETE Phase A (A4): AST_ALTERNATE (E1 | E2 | E3 | …).
+     * coro_bb_alternate already implements the full Byrd-box for n-ary
+     * left-recursive alternation in coro_runtime.c:1418-1437 (it builds a
+     * chain alt(alt(gen[0], gen[1]), gen[2]) … so exhausting each branch
+     * falls through to the next).  Route through SM_BB_PUMP_AST — same
+     * shape as A1's BANG_BINARY and the A4-pulled-forward ITERATE above.
+     * No raw AST_t* in SM bytecode; the AST is registered in
+     * g_ast_pump_table and SM_BB_PUMP_AST drives coro_eval → bb_node α
+     * at runtime to pull the first value of the alternation. */
+    case AST_ALTERNATE:
+        sm_emit_i(p, SM_BB_PUMP_AST, (int64_t)ast_pump_table_register((AST_t *)e));
+        return;
+
     /* GOAL-ICON-BB-COMPLETE Phase A (A2): AST_SECTION / AST_SECTION_MINUS /
      * AST_SECTION_PLUS migrated off legacy fallthrough.
      * These are scalar (one-shot) operations.  Lower children via lower_expr

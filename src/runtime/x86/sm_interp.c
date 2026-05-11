@@ -19,6 +19,7 @@
 #include <gc/gc.h>
 
 #include "../interp/coro_runtime.h"   /* A0: g_sm_dispatch_active */
+#include "../interp/coro_value.h"     /* A3-seed-fix: bb_icn_rnd_seed shared RNG */
 
 /* ── Pattern runtime (M-SCRIP-U4) ──────────────────────────────────────── */
 #include "snobol4.h"   /* DESCR_t, PATND_t, DT_* */
@@ -1295,15 +1296,15 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
 
             /* GOAL-ICON-BB-COMPLETE A3: ICN_RANDOM — ?E one-shot random selection.
              * Mirrors bb_eval_value's AST_RANDOM arm in coro_value.c:698-746.
-             * Uses a static LCG seed (same algorithm as coro_value.c).
+             * A3-seed-fix: uses canonical bb_icn_rnd_seed (defined in coro_value.c)
+             * so --ir-run and --sm-run produce identical sequences for random programs.
              * NOTE: inner early-exits use goto (not break) to avoid breaking
              * nested for-loops instead of the outer switch case. */
             if (name && strcmp(name, "ICN_RANDOM") == 0) {
                 DESCR_t v = sm_pop(st);
                 if (IS_FAIL_fn(v)) { sm_push(st, FAILDESCR); st->last_ok = 0; break; }
-                static unsigned long sm_rnd_seed = 12345UL;
-                sm_rnd_seed = sm_rnd_seed * 6364136223846793005UL + 1442695040888963407UL;
-                unsigned long rnd = sm_rnd_seed >> 33;
+                bb_icn_rnd_seed = bb_icn_rnd_seed * 6364136223846793005UL + 1442695040888963407UL;
+                unsigned long rnd = bb_icn_rnd_seed >> 33;
                 DESCR_t result = FAILDESCR;
                 if (IS_INT_fn(v)) {
                     long long n = v.i;

@@ -92,6 +92,14 @@
 /* eval_node lives in src/runtime/x86/eval_code.c — IR-free expression evaluator. */
 extern DESCR_t eval_node(AST_t *e);
 
+/* GOAL-ICON-BB-COMPLETE A3-seed-fix: canonical Icon ?E LCG seed.
+ * Shared with src/runtime/x86/sm_interp.c (SM ICN_RANDOM dispatch) and
+ * src/driver/interp_eval.c (AST_RANDOM fallback path) so the three modes
+ * advance one common sequence.  Initial value 12345UL preserves any test
+ * baseline that was computed by the previous static-seed sites; constants
+ * (Knuth MMIX) unchanged. */
+unsigned long bb_icn_rnd_seed = 12345UL;
+
 /* RS-23e (closes RS-23 arc): the `interp_eval` extern is gone.  Diag
  * (`scrip-rs23-diag` with `-Wl,--wrap=interp_eval`) verified zero IR
  * fallthrough from any BB-adapter ancestor across smoke +
@@ -699,9 +707,12 @@ DESCR_t bb_eval_value(AST_t *e)
         if (e->nchildren < 1) return FAILDESCR;
         DESCR_t v = bb_eval_value(e->children[0]);
         if (IS_FAIL_fn(v)) return FAILDESCR;
-        static unsigned long _rnd_seed = 12345UL;
-        _rnd_seed = _rnd_seed * 6364136223846793005UL + 1442695040888963407UL;
-        unsigned long _rnd = _rnd_seed >> 33;
+        /* GOAL-ICON-BB-COMPLETE A3-seed-fix: single canonical RNG seed shared
+         * with sm_interp.c::ICN_RANDOM and interp_eval.c::AST_RANDOM so the
+         * three modes (ir-run, sm-run, interp_eval fallback) produce
+         * identical sequences for random programs. */
+        bb_icn_rnd_seed = bb_icn_rnd_seed * 6364136223846793005UL + 1442695040888963407UL;
+        unsigned long _rnd = bb_icn_rnd_seed >> 33;
         if (v.v == DT_T) {
             if (!v.tbl || v.tbl->size <= 0) return FAILDESCR;
             int target = (int)(_rnd % (unsigned long)v.tbl->size);

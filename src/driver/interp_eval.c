@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <unistd.h>     /* getpid */
 #include "../ast/ast.h"   /* AST_KIND_COUNT */
+#include "../runtime/interp/coro_value.h"  /* A3-seed-fix: bb_icn_rnd_seed shared RNG */
 
 /* RS-24 diag: per-kind hit counter for the Icon-frame switch in
  * interp_eval().  See the env-gated init block inside that function for
@@ -3458,14 +3459,14 @@ DESCR_t interp_eval(AST_t *e)
          * &null rather than failing — surfaced in rung36_jcon_table line
          * `should fail &null` and rung36_jcon_evalx `?table() ----> &null`.
          *
-         * RNG: local static LCG (Knuth MMIX constants), self-contained.
-         * No cross-file linkage; matches frontend's icn_random shape. */
+         * RNG: shared canonical bb_icn_rnd_seed (defined in coro_value.c)
+         * — GOAL-ICON-BB-COMPLETE A3-seed-fix unifies ir-run / sm-run /
+         * interp_eval fallback RNG state so all three advance one sequence. */
         if (e->nchildren < 1) return FAILDESCR;
         DESCR_t v = interp_eval(e->children[0]);
         if (IS_FAIL_fn(v)) return FAILDESCR;
-        static unsigned long _rnd_seed = 12345UL;
-        _rnd_seed = _rnd_seed * 6364136223846793005UL + 1442695040888963407UL;
-        unsigned long _rnd = _rnd_seed >> 33;
+        bb_icn_rnd_seed = bb_icn_rnd_seed * 6364136223846793005UL + 1442695040888963407UL;
+        unsigned long _rnd = bb_icn_rnd_seed >> 33;
 
         /* DT_T table — pick random entry value, fail if empty */
         if (v.v == DT_T) {

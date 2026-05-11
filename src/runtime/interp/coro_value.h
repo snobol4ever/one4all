@@ -27,4 +27,10 @@
 
 DESCR_t bb_eval_value(AST_t *e);
 
+/* GOAL-ICON-BB-COMPLETE A3-seed-fix: canonical Icon ?E LCG seed.
+ * Defined in coro_value.c, referenced by sm_interp.c (SM ICN_RANDOM)
+ * and interp_eval.c (AST_RANDOM fallback) so all three modes advance
+ * one shared sequence. */
+extern unsigned long bb_icn_rnd_seed;
+
 #endif /* CORO_VALUE_H */
