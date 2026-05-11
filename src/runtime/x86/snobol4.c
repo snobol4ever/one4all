@@ -2857,11 +2857,11 @@ DESCR_t NV_GET_fn(const char *name) {
     /* CH-17g-scan-keywords: Icon &subject / &pos backed by scan_subj / scan_pos globals.
      * SM_PUSH_VAR "&subject" / "&pos" — Icon frontend emits lowercase &-prefixed names
      * (AST_VAR path, not AST_KEYWORD); use strcasecmp to match both cases. */
-    if (strcasecmp(name, "&subject") == 0) {
+    if (strcmp   (name, "&subject") == 0) {
         extern const char *scan_subj;
         return scan_subj ? STRVAL(scan_subj) : NULVCL;
     }
-    if (strcasecmp(name, "&pos") == 0) {
+    if (strcmp   (name, "&pos") == 0) {
         extern int scan_pos;
         return INTVAL(scan_pos);
     }
@@ -2913,12 +2913,12 @@ DESCR_t NV_SET_fn(const char *name, DESCR_t val) {  /* RT-5: returns val for emb
     if (strcmp(name, "ERRLIMIT") == 0) { kw_errlimit = (val.v==DT_I)?val.i:(int64_t)to_real(val); return val; }  /* RT-5 */
     if (strcmp(name, "CODE")     == 0) { kw_code     = (val.v==DT_I)?val.i:(int64_t)to_real(val); return val; }  /* RT-5 */
     /* CH-17g-scan-keywords: &subject / &pos write-back from SM mode. */
-    if (strcasecmp(name, "&subject") == 0) {
+    if (strcmp   (name, "&subject") == 0) {
         extern const char *scan_subj;
         const char *s = (val.v == DT_S) ? val.s : VARVAL_fn(val);
         scan_subj = s ? GC_strdup(s) : ""; return val;
     }
-    if (strcasecmp(name, "&pos") == 0) {
+    if (strcmp   (name, "&pos") == 0) {
         extern int scan_pos;
         scan_pos = (int)((val.v==DT_I) ? val.i : (int64_t)to_real(val)); return val;
     }
