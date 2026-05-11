@@ -2005,7 +2005,17 @@ DESCR_t coro_bb_every(void *zeta, int entry) {
         DESCR_t saved_drive_val = coro_drive_val;
         coro_drive_node = z->gen_ast;
         coro_drive_val  = v;
+        /* GOAL-ICON-BB-COMPLETE: clear loop_next before body so that a `next`
+         * fired in a prior iteration (which set FRAME.loop_next=1 and caused
+         * bb_exec_stmt to return early) does not bleed into this iteration's
+         * body execution.  After bb_exec_stmt returns, also clear loop_next:
+         * `next` means "advance to next generator tick", which bb_broker
+         * accomplishes by calling us again with β — the flag must not persist
+         * into the next call or the following body will also short-circuit. */
+        int saved_loop_next = FRAME.loop_next;
+        FRAME.loop_next = 0;
         bb_exec_stmt(z->body);
+        FRAME.loop_next = saved_loop_next;  /* restore outer loop's next state */
         coro_drive_node = saved_drive_node;
         coro_drive_val  = saved_drive_val;
     }
