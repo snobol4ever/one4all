@@ -787,6 +787,19 @@ DESCR_t me9_pat_rpos(DESCR_t d) { return pat_rpos(d.v == DT_I ? d.i : 0); }
 DESCR_t me9_pat_tab(DESCR_t d)  { return pat_tab (d.v == DT_I ? d.i : 0); }
 DESCR_t me9_pat_rtab(DESCR_t d) { return pat_rtab(d.v == DT_I ? d.i : 0); }
 
+/* ME-9g helper — SM_PAT_DEREF.  Mirrors h_pat_deref exactly:
+ *   DT_P → pass-through (already a pattern);
+ *   DT_S + non-null .s → pat_lit(.s);
+ *   else → pat_ref(VARVAL_fn(v)) with null guard.
+ * Keeping this discrimination in a C helper rather than x86 bytes is
+ * the explicit ME-9g design choice (see GOAL-MODE3-EMIT.md Group G). */
+DESCR_t me9_pat_deref(DESCR_t v) {
+    if (v.v == DT_P) return v;
+    if (v.v == DT_S && v.s) return pat_lit(v.s);
+    const char *name = VARVAL_fn(v);
+    return pat_ref(name ? name : "");
+}
+
 static void h_pat_lit(void)
 {
     PUSH(pat_lit(CUR_INS->a[0].s ? CUR_INS->a[0].s : ""));
@@ -2421,6 +2434,43 @@ static void emit_me9_pat_lit_blob(const char *lit, size_t trampoline_abs_off)
 }
 
 /*------------------------------------------------------------------------*/
+/* ME-9g — SM_PAT_REFNAME.                                                */
+/*                                                                        */
+/* Calls pat_ref(name) where name is the literal string baked as an      */
+/* imm64 operand (from prog->instrs[i].a[0].s).  No stack args; net      */
+/* delta +1.  pat_ref() null-guards internally so a[0].s passes through. */
+/*                                                                        */
+/* Layout (52 bytes) — same shape as emit_me9_pat_lit_blob, only the     */
+/* imm64 call target differs.                                             */
+/*------------------------------------------------------------------------*/
+static void emit_me9_pat_refname_blob(const char *name, size_t trampoline_abs_off)
+{
+    /* pc++                            (41 ff 45 14)                4 */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xff);
+    seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x14);
+
+    /* mov rdi, imm64(name)            (48 bf <imm64>)              10 */
+    seg_byte(SEG_CODE, 0x48); seg_byte(SEG_CODE, 0xbf);
+    seg_u64(SEG_CODE, (uint64_t)(uintptr_t)name);
+
+    /* aligned call pat_ref — DESCR_t in rax:rdx                  20 */
+    emit_aligned_call_imm64((void *)&pat_ref);
+
+    /* push result on r12 stack                                         */
+    /* mov [r12], rax                  (49 89 04 24)                4 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x04); seg_byte(SEG_CODE, 0x24);
+    /* mov [r12+8], rdx                (49 89 54 24 08)              5 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x54); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0x08);
+    /* add r12, 16                     (49 83 c4 10)                 4 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x83);
+    seg_byte(SEG_CODE, 0xc4); seg_byte(SEG_CODE, 0x10);
+
+    emit_jmp_trampoline(trampoline_abs_off);                       /* 5 */
+}
+
+/*------------------------------------------------------------------------*/
 /* ME-9c — SM_PAT_ANY / SM_PAT_NOTANY / SM_PAT_SPAN / SM_PAT_BREAK.      */
 /*                                                                        */
 /* Each pops one DESCR_t from r12, passes it to a me9_pat_X(DESCR_t)     */
@@ -2754,6 +2804,20 @@ int sm_codegen(SM_Program *prog)
             default: break;
             }
             emit_me9_pat_binary_blob(fn, g_trampoline_offset);
+        } else if (op == SM_PAT_DEREF) {
+            /* ME-9g: variable-as-pattern.  Pop one DESCR_t, helper
+             * (me9_pat_deref) does the 3-way DT_P/DT_S/else dispatch
+             * (DT_P pass-through, DT_S → pat_lit, else pat_ref(VARVAL_fn)).
+             * Keeping the type-discrimination in C rather than x86 is
+             * the explicit Group G design choice. Net delta 0 — reuses
+             * emit_me9_pat_charset_blob (single-DESCR_t-arg). */
+            emit_me9_pat_charset_blob((void *)&me9_pat_deref, g_trampoline_offset);
+        } else if (op == SM_PAT_REFNAME) {
+            /* ME-9g: *var in pattern context — build XDSAR from the
+             * literal name baked in a[0].s.  pat_ref null-guards
+             * internally.  No stack args; net delta +1.  Same shape as
+             * emit_me9_pat_lit_blob (different imm64 call target). */
+            emit_me9_pat_refname_blob(prog->instrs[i].a[0].s, g_trampoline_offset);
         } else if (op == SM_PAT_ARB     || op == SM_PAT_REM    ||
                    op == SM_PAT_FAIL    || op == SM_PAT_SUCCEED ||
                    op == SM_PAT_EPS     || op == SM_PAT_FENCE  ||
