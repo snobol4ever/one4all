@@ -1402,6 +1402,32 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             DESCR_t args[32];
             for (int k = nargs - 1; k >= 0; k--)
                 args[k] = sm_pop(st);
+            /* ICN_SCAN_PUSH / ICN_SCAN_POP — Icon scan-context helpers.
+             * Must be handled BEFORE the SN-6 FAIL-arg check because
+             * ICN_SCAN_POP must pass a failed body result through, and
+             * ICN_SCAN_PUSH must not be treated as a normal function call. */
+            if (name && strcmp(name, "ICN_SCAN_PUSH") == 0 && nargs == 1) {
+                const char *s = VARVAL_fn(args[0]); if (!s) s = "";
+                if (scan_depth < SCAN_STACK_MAX) {
+                    scan_stack[scan_depth].subj = scan_subj;
+                    scan_stack[scan_depth].pos  = scan_pos;
+                    scan_depth++;
+                }
+                scan_subj = GC_strdup(s); scan_pos = 1;
+                sm_push(st, args[0]);
+                st->last_ok = 1;
+                break;
+            }
+            if (name && strcmp(name, "ICN_SCAN_POP") == 0 && nargs == 1) {
+                if (scan_depth > 0) {
+                    scan_depth--;
+                    scan_subj = scan_stack[scan_depth].subj;
+                    scan_pos  = scan_stack[scan_depth].pos;
+                }
+                sm_push(st, args[0]);
+                st->last_ok = (args[0].v != DT_FAIL);
+                break;
+            }
             /* SN-6: SNOBOL4 semantics — if any argument is FAIL, the call fails
              * without invoking the function. This is what allows
              * CHARS + SIZE(INPUT) :F(DONE) to branch when INPUT hits EOF:

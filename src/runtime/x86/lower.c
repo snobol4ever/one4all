@@ -223,6 +223,27 @@ static void lower_vlist(const AST_t *t)
 static void lower_cat_seq(const AST_t *t)
 {
     SM_Program *p = g_p;
+    /* Icon & conjunction uses AST_SEQ but is goal-directed, not string concat.
+     * When lowering an Icon statement, emit JUMP_F between children so that
+     * a failing operand short-circuits the whole conjunction.
+     * SNOBOL4/Snocone AST_SEQ (pattern concatenation) is unaffected. */
+    extern int g_lang;
+    if (t->kind == AST_SEQ && g_lang == LANG_ICN) {
+        if (t->nchildren == 0) { sm_emit(p, SM_PUSH_NULL); return; }
+        if (t->nchildren == 1) { lower_expr(t->children[0]); return; }
+        int njumps = t->nchildren - 1;
+        int *fail_jumps = (int *)GC_MALLOC((size_t)njumps * sizeof(int));
+        for (int i = 0; i < t->nchildren; i++) {
+            lower_expr(t->children[i]);
+            if (i < t->nchildren - 1) {
+                fail_jumps[i] = sm_emit_i(p, SM_JUMP_F, 0); /* -> done with FAILDESCR */
+                sm_emit(p, SM_VOID_POP);
+            }
+        }
+        int done_lbl = sm_label(p);
+        for (int i = 0; i < njumps; i++) sm_patch_jump(p, fail_jumps[i], done_lbl);
+        return;
+    }
     int has_defer = 0;
     for (int i = 0; i < t->nchildren && !has_defer; i++)
         if (t->children[i] && t->children[i]->kind == AST_DEFER) has_defer = 1;
@@ -938,6 +959,7 @@ void lower_stmt(const AST_t *s)
     /* AST_STMT — read tagged attributes */
     const char *label   = attr_str_of(s, ":lbl");
     int         lang    = attr_int_of(s, ":lang");   /* 0 = LANG_SNO if absent */
+    { extern int g_lang; g_lang = lang; }             /* propagate to lower_cat_seq etc. */
     int         stno    = attr_int_of(s, ":stno");
     int         lineno  = attr_int_of(s, ":line");
     AST_t      *subject = attr_expr_of(s, ":subj");
@@ -1191,10 +1213,12 @@ static void lower_proc_skeletons(void)
             IcnScope sc; build_proc_scope(&sc, proc, body_start);
             proc_table[pi].lower_sc = sc;
             g_proc_scope = &sc; g_in_proc_body = 1;
+            { extern int g_lang; g_lang = LANG_ICN; }  /* Icon proc body — enable conjunction lowering */
             for (int i = body_start; i < proc->nchildren; i++) {
                 if (!proc->children[i]) continue;
                 lower_expr( proc->children[i]); sm_emit(p, SM_VOID_POP);
             }
+            { extern int g_lang; g_lang = 0; }          /* restore to LANG_SNO */
             g_in_proc_body = 0; g_proc_scope = NULL;
         }
         sm_emit(p, SM_RETURN);
