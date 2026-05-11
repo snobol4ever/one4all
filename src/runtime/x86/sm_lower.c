@@ -1008,6 +1008,8 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
         sm_emit_i(p, SM_JUMP, top_lbl);
         int end_lbl = sm_label(p);
         sm_patch_jump(p, jf, end_lbl);
+        /* Condition result (FAILDESCR) left on stack by JUMP_F — discard it. */
+        sm_emit(p, SM_VOID_POP);
         sm_emit(p, SM_PUSH_NULL);
         return;
     }
@@ -1023,6 +1025,8 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
         sm_emit_i(p, SM_JUMP, top_lbl);
         int end_lbl = sm_label(p);
         sm_patch_jump(p, js, end_lbl);
+        /* Condition result left on stack by JUMP_S — discard it, push &null result. */
+        sm_emit(p, SM_VOID_POP);
         sm_emit(p, SM_PUSH_NULL);
         return;
     }
