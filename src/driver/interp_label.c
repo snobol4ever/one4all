@@ -9,7 +9,7 @@
 #include "interp_private.h"
 
 /* ══════════════════════════════════════════════════════════════════════════
- * label_table — map SNOBOL4 source labels → STMT_t*
+ * label_table — map SNOBOL4 source labels → const AST_t*
  * ══════════════════════════════════════════════════════════════════════════ */
 
 

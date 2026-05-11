@@ -20,7 +20,7 @@
 #include "runtime/x86/sm_codegen.h"
 #include "runtime/x86/sm_image.h"
 #include "interp.h"
-#include "frontend/snobol4/scrip_cc.h"  /* CODE_t, STMT_t */
+#include "frontend/snobol4/scrip_cc.h"  /* AST_t, stmt_attr_* */
 #include "frontend/prolog/term.h"        /* IM-11: Term, TT_REF, term_deref */
 #include "frontend/prolog/prolog_atom.h" /* IM-11: prolog_atom_name */
 /* IM-15b: CSNOBOL4 in-process executor.
@@ -345,7 +345,7 @@ int sync_monitor_run(const AST_t *prog, int verbose, const char *sno_path) {
         jit_snap.last_ok = jit_st.last_ok;
 
         /* IM-9: append label for stmt n to each executor's path accumulator.
-         * All three share the same source labels (same CODE_t / SM_Program). */
+         * All three share the same source labels (same AST_PROGRAM / SM_Program). */
         const char *lbl_n = (n <= sm_prog->stno_count) ? sm_prog->stno_labels[n] : NULL;
         label_path_append(&ir_path,  ir_labels[n]);
         label_path_append(&sm_path,  lbl_n);

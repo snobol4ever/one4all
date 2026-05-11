@@ -256,7 +256,7 @@ int main(int argc, char **argv)
     }
     /* ── Multi-file load (U-MULTIFILE) ─────────────────────────────────────
      * All remaining argv entries are input files.  Each is compiled with the
-     * appropriate frontend (by extension) and merged into one CODE_t* in
+     * appropriate frontend (by extension) and merged into one AST_PROGRAM in
      * source order.  This enables:
      *   scrip --ir-run lib.pl main.pl
      *   scrip --ir-run shim.pl test_arith.pl
@@ -280,7 +280,7 @@ int main(int argc, char **argv)
             has_non_sno = 1;
     }
 
-    CODE_t *prog = NULL;  /* SI-6: kept only for sno_parse_ast out-param; not used for execution */
+    CODE_t *sub = NULL;  /* --dump-ir-bison only: receives old CODE_t for legacy IR dump */
     AST_t  *ast_prog = NULL;
 
     /* Helper: append one AST_PROGRAM's children into ast_prog, stripping trailing AST_END. */
@@ -345,7 +345,7 @@ int main(int argc, char **argv)
         int lang_rebus    = dot && strcmp(dot, ".reb")  == 0;
         int lang_polyglot = dot && (strcmp(dot, ".scrip") == 0 || strcmp(dot, ".md") == 0);
 
-        CODE_t *sub = NULL;  /* kept only for sno_parse_ast out-param; not used for execution */
+        sub = NULL;  /* reset for each file (used by --dump-ir-bison only) */
 
         if (lang_polyglot) {
             g_polyglot = 1;
@@ -489,7 +489,6 @@ int main(int argc, char **argv)
          * outside scrip (see scripts/test_smoke_jit_emit_x64.sh). */
         SM_Program *sm = sm_preamble(ast_prog);
         if (!sm) return 1;
-        prog = NULL;
         if (sm_codegen_x64_emit(sm, stdout, input_path) != 0) {
             fprintf(stderr, "scrip: sm_codegen_x64_emit failed\n");
             sm_prog_free(sm);
@@ -501,7 +500,7 @@ int main(int argc, char **argv)
 
     if (mode_monitor) {
         /* IM-7: --monitor — in-process sync comparator.
-         * Runs IR, SM, and JIT step-by-step over the same CODE_t,
+         * Runs IR, SM, and JIT step-by-step over the same AST_PROGRAM,
          * snapshot/restoring state between each run.
          * Returns 0 if all three agree; exits non-zero on first divergence. */
         label_table_build(ast_prog);
@@ -526,7 +525,6 @@ int main(int argc, char **argv)
          * live IR for the BB engine. */
         SM_Program *sm = sm_preamble(ast_prog);
         if (!sm) return 1;
-        prog = NULL;   /* SM owns its AST_t clones; for non-SNO IR stays alive via globals */
         if (dump_sm) {
             sm_prog_print(sm, stdout);
             sm_prog_free(sm);
@@ -539,7 +537,6 @@ int main(int argc, char **argv)
          * RS-14: shares sm_preamble + sm_run_with_recovery with --sm-run. */
         SM_Program *sm = sm_preamble(ast_prog);
         if (!sm) return 1;
-        prog = NULL;
         if (dump_sm) { sm_prog_print(sm, stdout); sm_prog_free(sm); return 0; }
         if (sm_image_init() != 0) {
             fprintf(stderr, "scrip: sm_image_init failed\n");

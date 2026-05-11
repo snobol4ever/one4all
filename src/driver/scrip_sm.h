@@ -28,11 +28,8 @@
 #include "../runtime/x86/sm_interp.h"
 #include "../ast/ast.h"  /* AST_t */
 
-/* `prog` is a CODE_t* — declared opaque here to avoid coupling driver
- * orchestration to frontend/snobol4/scrip_cc.h. The implementation casts. */
-
 /* Build label table, prescan DEFINEs, lower IR to SM_Program.
- * SI-6: takes AST_PROGRAM directly — CODE_t is gone.
+ * SI-6: takes AST_PROGRAM directly.
  * After this call:
  *   - g_current_sm_prog is set to the returned SM_Program*
  *   - g_sno_err_active is armed for sno_runtime_error longjmp safety

@@ -3158,7 +3158,7 @@ DESCR_t interp_eval(AST_t *e)
          * Builtins never have a body label; user functions always do (prescan_defines). */
         {
             /* Resolve body: try as-is, uppercase, then entry_label (OPSYN aliases) */
-            STMT_t *body = label_lookup(e->sval);
+            const AST_t *body = label_lookup(e->sval);
             if (!body) {
                 char ufn[128];
                 size_t fl = strlen(e->sval);

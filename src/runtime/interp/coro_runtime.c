@@ -55,8 +55,8 @@ extern DESCR_t NV_SET_fn(const char *name, DESCR_t val);
  * to the current frame's slot array. AST_VAR case checks frame_env first.
  * FRAME.env_n is the slot count. Both are NULL/0 when in SNOBOL4 context.
  *
- * Icon procedure table: built from CODE_t* at execute_program time.
- * Each entry maps procname → the AST_FNC node (from STMT_t subject).
+ * Icon procedure table: built from AST_PROGRAM at execute_program time.
+ * Each entry maps procname → the AST_FNC node (from AST_STMT :subj).
  * ────────────────────────────────────────────────────────────────────────── */
 IcnProcEntry proc_table[PROC_TABLE_MAX];
 int          proc_count = 0;

@@ -71,9 +71,7 @@ void exec_snapshot_free(ExecSnapshot *s);
 /* IM-6: in-process comparator — runs all three executors step by step.
  * Returns 0 if IR/SM/JIT agree on all statements, else first diverging stmt#.
  * verbose: 0=silent on agreement, 1=per-stmt progress, 2=full diff. */
-struct Program_s;   /* forward decl — scrip_cc.h typedef'd as CODE_t */
-typedef struct Program_s Program_im6_fwd;
-/* Use void* to avoid pulling in scrip_cc.h here; sync_monitor.c casts. */
+/* sync_monitor_run takes AST_PROGRAM directly (SI-6). */
 int sync_monitor_run(const AST_t *prog, int verbose, const char *sno_path);
 
 /* IM-15b: CSNOBOL4 4th executor interface lives in csnobol4_shim.c (WITH_CSNOBOL4 build).

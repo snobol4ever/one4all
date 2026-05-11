@@ -681,46 +681,36 @@ CODE_t *rebus_lower(RProgram *rp) {
 }
 
 /* -------------------------------------------------------------------------
- * rebus_compile — full pipeline: src string -> CODE_t*
+ * rebus_compile — full pipeline: src string -> AST_PROGRAM via *out_ast
  *
- * FI-1A: mirrors icon_compile() exactly.
- * Parses src via rebus_parse(), lowers via rebus_lower(), then tags every
- * STMT_t with LANG_REB so the polyglot dispatch routes correctly.
+ * FI-1A: mirrors icon_compile().
+ * Internally builds CODE_t/STMT_t; code_to_ast() wraps into AST_PROGRAM.
+ * Direct AST emission deferred to GOAL-SNOCONE-SM-LOWER.
  * ---------------------------------------------------------------------- */
-CODE_t *rebus_compile(const char *src, const char *filename, AST_t **out_ast) {
+void rebus_compile(const char *src, const char *filename, AST_t **out_ast) {
     if (!filename) filename = "<stdin>";
     if (out_ast) *out_ast = NULL;
 
-    /* Case policy is a frontend concern (cf. commit 8aa5803b for DATATYPE).
-     * Rebus preserves identifier spelling; tell the shared runtime to stop
-     * folding at name-ingest sites. No user --case-sensitive flag required. */
     sno_set_case_sensitive(1);
 
-    /* Parse: rebus_parse() takes FILE* — use fmemopen for string input */
     FILE *f = fmemopen((void *)src, strlen(src), "r");
     if (!f) {
         fprintf(stderr, "rebus_compile: fmemopen failed\n");
-        return NULL;
+        return;
     }
     RProgram *rp = rebus_parse(f, filename);
     fclose(f);
     if (!rp) {
         fprintf(stderr, "rebus_compile: parse error in %s\n", filename);
-        return NULL;
+        return;
     }
 
-    /* Lower RProgram* -> CODE_t* */
     CODE_t *prog = rebus_lower(rp);
-    if (!prog) return NULL;
+    if (!prog) return;
 
-    /* Tag every statement with LANG_REB */
     for (STMT_t *st = prog->head; st; st = st->next)
         st->lang = LANG_REB;
 
-    /* Append synthetic MAIN() call — TR 84-9 §2.3: "every program must have
-     * a function named main"; rebus_lower emits DEFINE+body but no call site.
-     * execute_program() runs the STMT_t chain top-to-bottom, so the call must
-     * be appended after all DEFINEs. */
     STMT_t *call_st = calloc(1, sizeof(STMT_t));
     call_st->subject = make_fnc("MAIN", 0);
     call_st->lang    = LANG_REB;
@@ -728,7 +718,5 @@ CODE_t *rebus_compile(const char *src, const char *filename, AST_t **out_ast) {
     else           { prog->tail->next = call_st; prog->tail = call_st; }
     prog->nstmts++;
 
-    /* SI-5: build AST_PROGRAM from CODE_t so sm_preamble uses native tree. */
-    if (out_ast && prog) *out_ast = code_to_ast(prog);
-    return prog;
+    if (out_ast) *out_ast = code_to_ast(prog);
 }

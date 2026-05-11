@@ -318,32 +318,40 @@ typedef enum {
  *   fval — AST_FLIT
  * ========================================================================= */
 
-/* AST_t — the unified IR node struct.
+/* AST_t — the unified IR node.  Four logical fields matching Snocone `tree`:
  *
- * FI-0A: ir.h is the sole owner of this definition. scrip_cc.h no longer
- * carries a duplicate body. The EXPR_T_DEFINED guard has been removed —
- * this struct is defined exactly once, here.
+ *   t  — kind       (AST_e)
+ *   v  — value      (anonymous union: sval / ival / dval — active by kind)
+ *   n  — nchildren  (int)
+ *   c  — children[] (AST_t **)
+ *
+ * v field usage by kind:
+ *   sval — AST_QLIT (text), AST_VAR/AST_KEYWORD/AST_FNC/AST_IDX (name),
+ *           AST_CSET (chars), AST_ATTR (tag string)
+ *   ival — AST_ILIT (literal); AST_VAR (frame-slot index after Icon scope,
+ *           sval still holds name); AST_AUGOP (AugOp_e); AST_GLOBAL (flag)
+ *   dval — AST_FLIT (float literal)
+ *
+ * Implementation details (not part of the logical tree — underscore-prefixed):
+ *   _nalloc — allocated capacity of c[] (realloc bookkeeping)
+ *   _id     — node identity for INITIAL block dedup (emit-time annotation)
+ *
+ * FI-0A: ast.h is the sole owner of this definition.
  */
 typedef struct AST_t AST_t;
 
-typedef struct AST_t AST_t;
-
 struct AST_t {
-    AST_e    kind;          /* t — node type/kind                           */
-    /* v — node value; active field(s) depend on kind:
-     *   sval: string (QLIT text, VAR/FNC/KEYWORD name, ATTR tag)
-     *   ival: integer (ILIT literal; also frame-slot index on VAR after scope)
-     *   dval: float   (FLIT literal)
-     * sval and ival may both be set on VAR nodes after Icon scope analysis.
-     * They are logically one value field (the Snocone `v`) but kept separate
-     * in C because some nodes carry both a name string and a derived integer. */
-    char    *sval;
-    long long ival;
-    double   dval;
-    AST_t  **children;     /* c — child nodes (realloc-grown array)        */
-    int      nchildren;     /* n — number of valid children                 */
-    int      nalloc;        /* C impl detail: allocated capacity            */
-    int      id;            /* C impl detail: node id for INITIAL dedup     */
+    AST_e    t;             /* kind                                          */
+    union {
+        char    *sval;      /* string value (QLIT/VAR/FNC/KEYWORD/ATTR/CSET) */
+        long long ival;     /* integer value (ILIT) or slot/flag (VAR etc.) */
+        double   dval;      /* float value (FLIT)                           */
+    } v;
+    int      n;             /* nchildren — number of valid children          */
+    AST_t  **c;             /* children[] — realloc-grown array              */
+    /* ── C implementation details (not logical tree fields) ── */
+    int      _nalloc;       /* allocated capacity of c[]                     */
+    int      _id;           /* node id for INITIAL dedup (emit-time only)    */
 };
 
 /* =========================================================================
@@ -479,6 +487,22 @@ static const char * const ast_e_name[AST_KIND_COUNT] = {
 #endif /* IR_DEFINE_NAMES */
 
 
+
+/* =========================================================================
+ * Compatibility accessor macros — keep existing callsites unchanged.
+ *
+ * The logical fields are t / v.sval|ival|dval / n / c.
+ * Code written before the struct rename uses kind/sval/ival/dval/
+ * nchildren/children/nalloc/id.  These macros make both spellings work.
+ * ========================================================================= */
+#define kind       t
+#define sval       v.sval
+#define ival       v.ival
+#define dval       v.dval
+#define nchildren  n
+#define children   c
+#define nalloc     _nalloc
+#define id         _id
 
 #ifdef __cplusplus
 }

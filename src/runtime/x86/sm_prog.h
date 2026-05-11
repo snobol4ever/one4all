@@ -361,7 +361,7 @@ typedef struct {
     sm_operand_t  a[SM_MAX_OPERANDS];   /* a[0], a[1], a[2] */
 } SM_Instr;
 
-/* ── CODE_t (flat array of instructions) ───────────────────────────── */
+/* ── SM_Program (flat array of SM instructions produced by lower()) ── */
 
 typedef struct {
     SM_Instr    *instrs;

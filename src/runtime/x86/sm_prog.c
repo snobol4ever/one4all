@@ -145,7 +145,7 @@ void sm_patch_jump(SM_Program *p, int jump_idx, int target_label)
 
 /* IM-9: record source label for statement stno (1-based).
  * label may be NULL (unlabelled statement). String is not copied — caller
- * owns the lifetime (interned in STMT_t which lives for the program). */
+ * owns the lifetime (interned in AST_STMT :lbl which lives for the program). */
 void sm_stno_label_record(SM_Program *p, int stno, const char *label)
 {
     if (stno <= 0) return;
