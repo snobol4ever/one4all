@@ -56,6 +56,9 @@ static void init_handlers(void)
     lower_icn_relop_register(g_handlers);
     lower_icn_cset_register(g_handlers);
     lower_icn_unary_register(g_handlers);
+    lower_icn_ctrl_register(g_handlers);
+    lower_icn_data_register(g_handlers);
+    lower_icn_sect_register(g_handlers);
     g_handlers_initialized = 1;
 }
 
@@ -109,182 +112,14 @@ void lower_expr(LowerCtx *c, const AST_t *e)
     /* AST_ALT, AST_ARB..AST_ARBNO → cohort_pat_prim */
     /* AST_CAPT_COND_ASGN, AST_CAPT_IMMED_ASGN, AST_CAPT_CURSOR → cohort_capture (SR-8) */
 
-    case AST_SEQ_EXPR:
-        if (e->nchildren == 0) { sm_emit(p, SM_PUSH_NULL); return; }
-        for (int i = 0; i < e->nchildren; i++) {
-            lower_expr(c, e->children[i]);
-            if (i < e->nchildren - 1) sm_emit(p, SM_VOID_POP);
-        }
-        return;
+    /* AST_SEQ_EXPR → lower_icn_ctrl (SR-10) */
 
-    case AST_IF: {
-        if (e->nchildren < 1) { sm_emit(p, SM_PUSH_NULL); return; }
-        lower_expr(c, e->children[0]);              /* condition */
-        int jf = sm_emit_i(p, SM_JUMP_F, 0);       /* jump-if-fail to else */
-        /* Condition result left on stack (SM_JUMP_F reads last_ok, not TOS).
-           Drain it before entering then-body. */
-        sm_emit(p, SM_VOID_POP);
-        if (e->nchildren > 1) lower_expr(c, e->children[1]);
-        else                  sm_emit(p, SM_PUSH_NULL);
-        int jend = sm_emit_i(p, SM_JUMP, 0);
-        int else_lbl = sm_label(p);
-        sm_patch_jump(p, jf, else_lbl);
-        /* Drain condition FAILDESCR on the else path too. */
-        sm_emit(p, SM_VOID_POP);
-        if (e->nchildren > 2) lower_expr(c, e->children[2]);
-        else                  sm_emit(p, SM_PUSH_NULL);
-        int end_lbl = sm_label(p);
-        sm_patch_jump(p, jend, end_lbl);
-        return;
-    }
-
-    case AST_WHILE: {
-        int top_lbl = sm_label(p);
-        if (e->nchildren < 1) { sm_emit(p, SM_PUSH_NULL); return; }
-        lower_expr(c, e->children[0]);
-        int jf = sm_emit_i(p, SM_JUMP_F, 0);
-        sm_emit(p, SM_VOID_POP);
-        if (e->nchildren > 1) { lower_expr(c, e->children[1]); sm_emit(p, SM_VOID_POP); }
-        sm_emit_i(p, SM_JUMP, top_lbl);
-        int end_lbl = sm_label(p);
-        sm_patch_jump(p, jf, end_lbl);
-        sm_emit(p, SM_VOID_POP);   /* FAILDESCR left on stack by JUMP_F */
-        sm_emit(p, SM_PUSH_NULL);
-        return;
-    }
-
-    case AST_UNTIL: {
-        int top_lbl = sm_label(p);
-        if (e->nchildren < 1) { sm_emit(p, SM_PUSH_NULL); return; }
-        lower_expr(c, e->children[0]);
-        int js = sm_emit_i(p, SM_JUMP_S, 0);
-        sm_emit(p, SM_VOID_POP);
-        if (e->nchildren > 1) { lower_expr(c, e->children[1]); sm_emit(p, SM_VOID_POP); }
-        sm_emit_i(p, SM_JUMP, top_lbl);
-        int end_lbl = sm_label(p);
-        sm_patch_jump(p, js, end_lbl);
-        sm_emit(p, SM_VOID_POP);
-        sm_emit(p, SM_PUSH_NULL);
-        return;
-    }
-
-    case AST_REPEAT: {
-        int top_lbl = sm_label(p);
-        if (e->nchildren > 0) { lower_expr(c, e->children[0]); sm_emit(p, SM_VOID_POP); }
-        sm_emit_i(p, SM_JUMP, top_lbl);
-        sm_emit(p, SM_PUSH_NULL);
-        return;
-    }
-
-    case AST_LOOP_BREAK:
-        if (e->nchildren > 0) lower_expr(c, e->children[0]);
-        else sm_emit(p, SM_PUSH_NULL);
-        /* SM_JUMP to self+1 signals break to the sm_interp loop handler. */
-        sm_emit_i(p, SM_JUMP, p->count + 1);
-        return;
-
-    case AST_LOOP_NEXT:
-        sm_emit(p, SM_PUSH_NULL);
-        return;
-
-    case AST_RETURN:
-        if (e->nchildren > 0) lower_expr(c, e->children[0]);
-        else sm_emit(p, SM_PUSH_NULL);
-        sm_emit(p, SM_RETURN);
-        return;
-
-    case AST_PROC_FAIL:
-        sm_emit(p, SM_PUSH_NULL);
-        sm_emit(p, SM_FRETURN);
-        return;
+    /* AST_IF, AST_WHILE, AST_UNTIL, AST_REPEAT, AST_LOOP_BREAK, AST_LOOP_NEXT,
+     * AST_RETURN, AST_PROC_FAIL → lower_icn_ctrl (SR-10) */
 
     /* AST_NOT, AST_AUGOP, AST_SIZE, AST_NONNULL, AST_IDENTICAL → cohort_icn_unary (SR-9) */
 
-    case AST_MAKELIST:
-        for (int i = 0; i < e->nchildren; i++) lower_expr(c, e->children[i]);
-        sm_emit_si(p, SM_CALL_FN, "MAKELIST", (int64_t)e->nchildren);
-        return;
-
-    case AST_RECORD:
-        sm_emit_s(p, SM_PUSH_LIT_S, e->sval ? e->sval : "");
-        for (int i = 0; i < e->nchildren; i++) lower_expr(c, e->children[i]);
-        sm_emit_si(p, SM_CALL_FN, "RECORD_MAKE", (int64_t)e->nchildren + 1);
-        return;
-
-    case AST_FIELD:
-        lower_expr(c, e->nchildren > 0 ? e->children[0] : NULL);
-        sm_emit_s(p, SM_PUSH_LIT_S, e->sval ? e->sval : "");
-        sm_emit_si(p, SM_CALL_FN, "FIELD_GET", 2);
-        return;
-
-    case AST_GLOBAL:
-        sm_emit(p, SM_PUSH_NULL);
-        return;
-
-    /* GOAL-ICON-BB-COMPLETE: AST_INITIAL once-flag fix.
-     *
-     * Icon `initial { ... }` runs its body the FIRST time the enclosing
-     * procedure is called, then skips on every subsequent call.  In SM
-     * mode the once-flag must persist across calls, so we use a per-AST
-     * NV sentinel variable (named `__initial_<hex_ptr>__`).
-     *
-     * Emitted shape:
-     *
-     *   SM_PUSH_VAR  __initial_<ptr>__   ; sentinel — null on first call
-     *   SM_CALL_FN   NONNULL 1           ; FAIL if null, succeed if set
-     *   SM_JUMP_S    L_skip              ; sentinel set → skip body
-     *   SM_VOID_POP                      ; drop FAILDESCR from NONNULL
-     *   [ lower each child of initial ]  ; the assignments
-     *   SM_PUSH_LIT_I 1                  ; mark sentinel
-     *   SM_STORE_VAR __initial_<ptr>__   ; sentinel := 1
-     *   SM_VOID_POP                      ; drop stored value
-     *   SM_JUMP      L_done
-     * L_skip:
-     *   SM_VOID_POP                      ; drop NONNULL's value (sentinel)
-     * L_done:
-     *   SM_PUSH_NULL                     ; initial is a statement; result is null
-     *
-     * The vars assigned inside `initial` were already routed to NV by
-     * expression_scope_walk's AST_INITIAL skip (in lower_ctx.c), so the
-     * child assignments emit SM_STORE_VAR (persistent) not SM_STORE_FRAME
-     * (per-call). */
-    case AST_INITIAL: {
-        char sentinel[64];
-        snprintf(sentinel, sizeof(sentinel), "__initial_%lx__",
-                 (unsigned long)(uintptr_t)e);
-
-        sm_emit_s(p, SM_PUSH_VAR, sentinel);
-        sm_emit_si(p, SM_CALL_FN, "NONNULL", 1);
-        int skip_jump = sm_emit_i(p, SM_JUMP_S, 0);
-
-        /* sentinel was null (or FAILDESCR is on stack) — drop the FAILDESCR. */
-        sm_emit(p, SM_VOID_POP);
-
-        /* Run the initial body. */
-        for (int i = 0; i < e->nchildren; i++) {
-            if (!e->children[i]) continue;
-            lower_expr(c, e->children[i]);
-            sm_emit(p, SM_VOID_POP);
-        }
-
-        /* Mark sentinel set. */
-        sm_emit_i(p, SM_PUSH_LIT_I, 1);
-        sm_emit_s(p, SM_STORE_VAR, sentinel);
-        sm_emit(p, SM_VOID_POP);
-
-        int done_jump = sm_emit_i(p, SM_JUMP, 0);
-
-        /* skip-body landing: drop the sentinel value left by NONNULL. */
-        int skip_pc = sm_label(p);
-        sm_patch_jump(p, skip_jump, skip_pc);
-        sm_emit(p, SM_VOID_POP);
-
-        int done_pc = sm_label(p);
-        sm_patch_jump(p, done_jump, done_pc);
-
-        sm_emit(p, SM_PUSH_NULL);
-        return;
-    }
+    /* AST_MAKELIST, AST_RECORD, AST_FIELD, AST_GLOBAL, AST_INITIAL → lower_icn_data (SR-10) */
 
     /* ── Generator: integer range lo to hi (step 1) ── */
     case AST_TO: {
@@ -397,52 +232,10 @@ void lower_expr(LowerCtx *c, const AST_t *e)
         return;
     }
 
-    /* AST_LCONCAT → cohort_icn_cset (SR-9) */
-
-    case AST_BANG_BINARY:
-        sm_emit_i(p, SM_BB_PUMP_AST, (int64_t)ast_pump_table_register((AST_t *)e));
-        return;
-
-    case AST_ITERATE:
-        sm_emit_i(p, SM_BB_PUMP_AST, (int64_t)ast_pump_table_register((AST_t *)e));
-        return;
-
-    case AST_ALTERNATE:
-        sm_emit_i(p, SM_BB_PUMP_AST, (int64_t)ast_pump_table_register((AST_t *)e));
-        return;
-
-    case AST_SECTION:
-        if (e->nchildren >= 3) {
-            lower_expr(c, e->children[0]); lower_expr(c, e->children[1]); lower_expr(c, e->children[2]);
-            sm_emit_si(p, SM_CALL_FN, "ICN_SECTION_RANGE", 3);
-        } else { sm_emit(p, SM_PUSH_NULL); }
-        return;
-    case AST_SECTION_PLUS:
-        if (e->nchildren >= 3) {
-            lower_expr(c, e->children[0]); lower_expr(c, e->children[1]); lower_expr(c, e->children[2]);
-            sm_emit_si(p, SM_CALL_FN, "ICN_SECTION_PLUS", 3);
-        } else { sm_emit(p, SM_PUSH_NULL); }
-        return;
-    case AST_SECTION_MINUS:
-        if (e->nchildren >= 3) {
-            lower_expr(c, e->children[0]); lower_expr(c, e->children[1]); lower_expr(c, e->children[2]);
-            sm_emit_si(p, SM_CALL_FN, "ICN_SECTION_MINUS", 3);
-        } else { sm_emit(p, SM_PUSH_NULL); }
-        return;
-
-    case AST_LIMIT:
-        emit_push_expr(c, e);
-        sm_emit(p, SM_BB_PUMP);
-        return;
-
-    case AST_RANDOM:
-        if (e->nchildren >= 1) {
-            lower_expr(c, e->children[0]);
-            sm_emit_si(p, SM_CALL_FN, "ICN_RANDOM", 1);
-        } else { sm_emit(p, SM_PUSH_NULL); }
-        return;
-
-    /* ── Prolog backtracking nodes ── */
+    /* AST_LCONCAT → lower_icn_cset (SR-9) */
+    /* AST_BANG_BINARY, AST_SECTION/PLUS/MINUS → lower_icn_sect (SR-10) */
+    /* AST_ITERATE, AST_ALTERNATE, AST_LIMIT → lower_icn_gen (SR-11) */
+/* ── Prolog backtracking nodes ── */
     case AST_CHOICE:
         if (e->sval) {
             const char *key = e->sval;
@@ -465,82 +258,7 @@ void lower_expr(LowerCtx *c, const AST_t *e)
         sm_emit(p, SM_BB_ONCE);
         return;
 
-    /* ── Raku CASE dispatch ── */
-    case AST_CASE: {
-        if (e->nchildren < 1) { sm_emit(p, SM_PUSH_NULL); return; }
-
-        /* Raku triple layout: (nchildren-1) % 3 == 0 and child[1] is AST_ILIT or AST_NUL. */
-        int is_raku_layout = (e->nchildren >= 4 && (e->nchildren - 1) % 3 == 0 &&
-            e->children[1] && (e->children[1]->kind == AST_ILIT || e->children[1]->kind == AST_NUL));
-
-        if (!is_raku_layout) {
-            /* Icon pair layout: [topic, val0, body0, val1, body1, ..., [default]].
-             * Topic stored in NV temp; each arm compares, on match evals body and jumps end. */
-            int nc = e->nchildren - 1;
-            int has_default = (nc % 2 != 0);
-            int npairs = nc / 2;
-            lower_expr(c, e->children[0]);
-            sm_emit_s(p, SM_STORE_VAR, "__case_topic__");
-            sm_emit(p, SM_VOID_POP);
-            int end_jumps[64]; int nend = 0;
-            for (int pair = 0; pair < npairs && pair < 32; pair++) {
-                AST_t *val  = e->children[1 + pair*2];
-                AST_t *body = e->children[2 + pair*2];
-                sm_emit_s(p, SM_PUSH_VAR, "__case_topic__");
-                lower_expr(c, val);
-                sm_emit_si(p, SM_CALL_FN, "ICN_CASE_EQ", 2);
-                int jf = sm_emit_i(p, SM_JUMP_F, 0);
-                sm_emit(p, SM_VOID_POP);
-                lower_expr(c, body);
-                if (nend < 64) end_jumps[nend++] = sm_emit_i(p, SM_JUMP, 0);
-                int next_lbl = sm_label(p);
-                sm_patch_jump(p, jf, next_lbl);
-                sm_emit(p, SM_VOID_POP);
-            }
-            if (has_default) lower_expr(c, e->children[e->nchildren - 1]);
-            else             sm_emit(p, SM_PUSH_NULL);
-            int end_lbl = sm_label(p);
-            for (int j = 0; j < nend; j++) sm_patch_jump(p, end_jumps[j], end_lbl);
-            return;
-        }
-
-        /* Raku triple layout: emit topic + per-arm (cmp_kind, val, body) chunks
-         * then optional default body chunk, then SM_BB_PUMP_CASE. */
-        #define EMIT_CHUNK_OF(child_expr) do {                              \
-            int _skip = sm_emit_i(p, SM_JUMP, 0);                           \
-            int _entry = sm_label(p);                                       \
-            lower_expr(c, (child_expr));                                    \
-            sm_emit(p, SM_RETURN);                                          \
-            int _after = sm_label(p);                                       \
-            sm_patch_jump(p, _skip, _after);                                \
-            sm_emit_ii(p, SM_PUSH_EXPRESSION, (int64_t)_entry, 0);         \
-        } while (0)
-
-        int total_triples = (e->nchildren - 1) / 3;
-        int has_default   = 0;
-        int default_idx   = -1;
-        if (total_triples > 0) {
-            int last_i = 1 + (total_triples - 1) * 3;
-            AST_t *last_cmp = e->children[last_i];
-            if (last_cmp && last_cmp->kind == AST_NUL) { has_default = 1; default_idx = total_triples - 1; }
-        }
-        int ncases = total_triples - (has_default ? 1 : 0);
-
-        EMIT_CHUNK_OF(e->children[0]);
-        for (int t = 0; t < total_triples; t++) {
-            if (t == default_idx) continue;
-            int base = 1 + t * 3;
-            AST_t *cmpnode = e->children[base];
-            int cmp_kind = (cmpnode && cmpnode->kind == AST_ILIT) ? (int)cmpnode->ival : (int)AST_EQ;
-            sm_emit_i(p, SM_PUSH_LIT_I, (int64_t)cmp_kind);
-            EMIT_CHUNK_OF(e->children[base + 1]);
-            EMIT_CHUNK_OF(e->children[base + 2]);
-        }
-        if (has_default) { int base = 1 + default_idx * 3; EMIT_CHUNK_OF(e->children[base + 2]); }
-        sm_emit_ii(p, SM_BB_PUMP_CASE, (int64_t)ncases, (int64_t)has_default);
-        #undef EMIT_CHUNK_OF
-        return;
-    }
+    /* AST_CASE → lower_icn_ctrl (SR-10) */
 
     default:
         if (!c->expression_body_lowering)

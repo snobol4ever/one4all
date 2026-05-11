@@ -246,6 +246,9 @@ scrip:
 	$(CC) $(CRT)   -c $(RT)/x86/lower_icn_relop.c -o $(OBJ)/lower_icn_relop.o
 	$(CC) $(CRT)   -c $(RT)/x86/lower_icn_cset.c  -o $(OBJ)/lower_icn_cset.o
 	$(CC) $(CRT)   -c $(RT)/x86/lower_icn_unary.c -o $(OBJ)/lower_icn_unary.o
+	$(CC) $(CRT)   -c $(RT)/x86/lower_icn_ctrl.c  -o $(OBJ)/lower_icn_ctrl.o
+	$(CC) $(CRT)   -c $(RT)/x86/lower_icn_data.c  -o $(OBJ)/lower_icn_data.o
+	$(CC) $(CRT)   -c $(RT)/x86/lower_icn_sect.c  -o $(OBJ)/lower_icn_sect.o
 	$(CC) $(CRT)   -c $(RT)/x86/lower_pat.c       -o $(OBJ)/lower_pat.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_image.c   -o $(OBJ)/sm_image.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_codegen.c -o $(OBJ)/sm_codegen.o
