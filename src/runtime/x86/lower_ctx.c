@@ -155,6 +155,14 @@ void expression_scope_walk(IcnScope *sc, AST_t *e)
                 scope_add(sc, e->children[i]->sval);
         return;
     }
+    /* GOAL-ICON-BB-COMPLETE: AST_INITIAL once-flag fix.
+     * Variables assigned inside an `initial { ... }` block must persist
+     * across procedure calls (initial is once-on-first-call).  Frame
+     * slots reset each call, so initial-block vars MUST route to NV
+     * (persistent named variables) instead.  Skip the AST_INITIAL
+     * subtree here so its vars don't get a frame slot — they then fall
+     * through to SM_PUSH_VAR / SM_STORE_VAR in sm_lower.c. */
+    if (e->kind == AST_INITIAL) return;
     if (e->kind == AST_VAR && e->sval) {
         if (e->sval[0] != '&' && !is_global(e->sval))
             scope_add(sc, e->sval);

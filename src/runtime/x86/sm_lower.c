@@ -436,9 +436,73 @@ void lower_expr(LowerCtx *c, const AST_t *e)
         return;
 
     case AST_GLOBAL:
-    case AST_INITIAL:
         sm_emit(p, SM_PUSH_NULL);
         return;
+
+    /* GOAL-ICON-BB-COMPLETE: AST_INITIAL once-flag fix.
+     *
+     * Icon `initial { ... }` runs its body the FIRST time the enclosing
+     * procedure is called, then skips on every subsequent call.  In SM
+     * mode the once-flag must persist across calls, so we use a per-AST
+     * NV sentinel variable (named `__initial_<hex_ptr>__`).
+     *
+     * Emitted shape:
+     *
+     *   SM_PUSH_VAR  __initial_<ptr>__   ; sentinel — null on first call
+     *   SM_CALL_FN   NONNULL 1           ; FAIL if null, succeed if set
+     *   SM_JUMP_S    L_skip              ; sentinel set → skip body
+     *   SM_VOID_POP                      ; drop FAILDESCR from NONNULL
+     *   [ lower each child of initial ]  ; the assignments
+     *   SM_PUSH_LIT_I 1                  ; mark sentinel
+     *   SM_STORE_VAR __initial_<ptr>__   ; sentinel := 1
+     *   SM_VOID_POP                      ; drop stored value
+     *   SM_JUMP      L_done
+     * L_skip:
+     *   SM_VOID_POP                      ; drop NONNULL's value (sentinel)
+     * L_done:
+     *   SM_PUSH_NULL                     ; initial is a statement; result is null
+     *
+     * The vars assigned inside `initial` were already routed to NV by
+     * expression_scope_walk's AST_INITIAL skip (in lower_ctx.c), so the
+     * child assignments emit SM_STORE_VAR (persistent) not SM_STORE_FRAME
+     * (per-call). */
+    case AST_INITIAL: {
+        char sentinel[64];
+        snprintf(sentinel, sizeof(sentinel), "__initial_%lx__",
+                 (unsigned long)(uintptr_t)e);
+
+        sm_emit_s(p, SM_PUSH_VAR, sentinel);
+        sm_emit_si(p, SM_CALL_FN, "NONNULL", 1);
+        int skip_jump = sm_emit_i(p, SM_JUMP_S, 0);
+
+        /* sentinel was null (or FAILDESCR is on stack) — drop the FAILDESCR. */
+        sm_emit(p, SM_VOID_POP);
+
+        /* Run the initial body. */
+        for (int i = 0; i < e->nchildren; i++) {
+            if (!e->children[i]) continue;
+            lower_expr(c, e->children[i]);
+            sm_emit(p, SM_VOID_POP);
+        }
+
+        /* Mark sentinel set. */
+        sm_emit_i(p, SM_PUSH_LIT_I, 1);
+        sm_emit_s(p, SM_STORE_VAR, sentinel);
+        sm_emit(p, SM_VOID_POP);
+
+        int done_jump = sm_emit_i(p, SM_JUMP, 0);
+
+        /* skip-body landing: drop the sentinel value left by NONNULL. */
+        int skip_pc = sm_label(p);
+        sm_patch_jump(p, skip_jump, skip_pc);
+        sm_emit(p, SM_VOID_POP);
+
+        int done_pc = sm_label(p);
+        sm_patch_jump(p, done_jump, done_pc);
+
+        sm_emit(p, SM_PUSH_NULL);
+        return;
+    }
 
     /* ── Generator: integer range lo to hi (step 1) ── */
     case AST_TO: {
@@ -906,6 +970,46 @@ SM_Program *sm_lower(const CODE_t *prog)
             }
             for (int bi = body_start; bi < proc->nchildren; bi++)
                 expression_scope_walk(&expression_sc, proc->children[bi]);
+
+            /* GOAL-ICON-BB-COMPLETE: AST_INITIAL once-flag fix (part 2).
+             *
+             * Variables assigned inside `initial { ... }` MUST be stored
+             * in NV (persistent), not frame slots (reset each call).
+             * The expression_scope_walk skip in lower_ctx.c prevented the
+             * init subtree from contributing slots, but a var like `x`
+             * also appears outside the initial block (e.g. `x := x + 1`)
+             * — that outer use added a frame slot.  Remove those names
+             * from expression_sc so all uses route to NV.
+             *
+             * Walk every AST_INITIAL child's AST_ASSIGN LHS; if LHS is an
+             * AST_VAR, remove its name from expression_sc by compacting
+             * the array. */
+            for (int bi = body_start; bi < proc->nchildren; bi++) {
+                AST_t *child = proc->children[bi];
+                if (!child || child->kind != AST_INITIAL) continue;
+                for (int ai = 0; ai < child->nchildren; ai++) {
+                    AST_t *as = child->children[ai];
+                    if (!as || as->kind != AST_ASSIGN || as->nchildren < 1) continue;
+                    AST_t *lhs = as->children[0];
+                    if (!lhs || lhs->kind != AST_VAR || !lhs->sval) continue;
+                    const char *nm = lhs->sval;
+                    int w = 0;
+                    for (int r = 0; r < expression_sc.n; r++) {
+                        if (expression_sc.e[r].name &&
+                            strcmp(expression_sc.e[r].name, nm) == 0)
+                            continue;  /* drop this entry */
+                        if (w != r) expression_sc.e[w] = expression_sc.e[r];
+                        w++;
+                    }
+                    /* Reassign slot numbers densely so SM_LOAD_FRAME indices
+                     * remain valid (slot field must match position).  Frame
+                     * env_n is set at call time from scope.n, so densifying
+                     * is required. */
+                    expression_sc.n = w;
+                    for (int s = 0; s < expression_sc.n; s++)
+                        expression_sc.e[s].slot = s;
+                }
+            }
 
             c->expression_scope         = &expression_sc;
             c->expression_body_lowering = 1;
