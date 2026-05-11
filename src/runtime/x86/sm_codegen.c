@@ -778,6 +778,15 @@ DESCR_t me9_pat_notany(DESCR_t d) { const char *cs = VARVAL_fn(d); return pat_no
 DESCR_t me9_pat_span(DESCR_t d)   { const char *cs = VARVAL_fn(d); return pat_span(cs ? cs : ""); }
 DESCR_t me9_pat_break(DESCR_t d)  { const char *cs = VARVAL_fn(d); return pat_break_(cs ? cs : ""); }
 
+/* ME-9d helpers — integer-arg pattern constructors
+ * (SM_PAT_LEN/POS/RPOS/TAB/RTAB).  Each takes one DESCR_t arg, extracts
+ * the integer if v==DT_I (else 0), then calls the pattern constructor. */
+DESCR_t me9_pat_len(DESCR_t d)  { return pat_len (d.v == DT_I ? d.i : 0); }
+DESCR_t me9_pat_pos(DESCR_t d)  { return pat_pos (d.v == DT_I ? d.i : 0); }
+DESCR_t me9_pat_rpos(DESCR_t d) { return pat_rpos(d.v == DT_I ? d.i : 0); }
+DESCR_t me9_pat_tab(DESCR_t d)  { return pat_tab (d.v == DT_I ? d.i : 0); }
+DESCR_t me9_pat_rtab(DESCR_t d) { return pat_rtab(d.v == DT_I ? d.i : 0); }
+
 static void h_pat_lit(void)
 {
     PUSH(pat_lit(CUR_INS->a[0].s ? CUR_INS->a[0].s : ""));
@@ -2630,6 +2639,22 @@ int sm_codegen(SM_Program *prog)
             case SM_PAT_NOTANY: helper = (void *)&me9_pat_notany; break;
             case SM_PAT_SPAN:   helper = (void *)&me9_pat_span;   break;
             case SM_PAT_BREAK:  helper = (void *)&me9_pat_break;  break;
+            default: break;
+            }
+            emit_me9_pat_charset_blob(helper, g_trampoline_offset);
+        } else if (op == SM_PAT_LEN  || op == SM_PAT_POS  || op == SM_PAT_RPOS ||
+                   op == SM_PAT_TAB  || op == SM_PAT_RTAB) {
+            /* ME-9d: inline-native integer-arg constructors.  Pop one
+             * DESCR_t, helper checks v==DT_I (else 0), calls pat
+             * constructor.  Same blob shape as ME-9c (single-DESCR_t-arg,
+             * net delta 0) — reuses emit_me9_pat_charset_blob. */
+            void *helper = NULL;
+            switch (op) {
+            case SM_PAT_LEN:  helper = (void *)&me9_pat_len;  break;
+            case SM_PAT_POS:  helper = (void *)&me9_pat_pos;  break;
+            case SM_PAT_RPOS: helper = (void *)&me9_pat_rpos; break;
+            case SM_PAT_TAB:  helper = (void *)&me9_pat_tab;  break;
+            case SM_PAT_RTAB: helper = (void *)&me9_pat_rtab; break;
             default: break;
             }
             emit_me9_pat_charset_blob(helper, g_trampoline_offset);
