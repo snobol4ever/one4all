@@ -1,16 +1,27 @@
 #ifndef SCRIP_CC_H
 #define SCRIP_CC_H
 /*
- * scrip_cc.h — IR for the scrip-cc SNOBOL4→C compiler
+ * scrip_cc.h — shared IR and frontend glue for the SCRIP compiler
  *
- * ONE expression type.  The emitter decides whether to call
- * pat_* or * based on emission context (subject vs pattern field).
+ * All six frontends (SNOBOL4, Snocone, Icon, Prolog, Raku, Rebus) produce
+ * the shared AST_t tree defined in ir/ast.h.  The pipeline waist is:
  *
- * Statement structure:
- *   [label]  subject  [pattern]  [= replacement]  [: goto]
+ *   frontend → AST_PROGRAM (AST_STMT children) → lower() → SM_Program → runtime
  *
- * subject, pattern, replacement are all AST_t*.
- * The emitter receives context when walking each field.
+ * SNOBOL4 (SI-4): emits AST_PROGRAM directly via sno_parse_ast().
+ * Snocone/Icon/Prolog/Raku/Rebus (SI-5): compile fn builds CODE_t internally,
+ *   calls code_to_ast() to wrap into AST_PROGRAM, passes via out_ast param.
+ *   Full migration to direct AST_STMT emission deferred to GOAL-SNOCONE-SM-LOWER.
+ *
+ * Statement structure (AST_STMT tagged-attribute children — SI-3):
+ *   :lbl :lang :line :stno :subj :pat :eq :repl :goS/:goF/:go
+ *
+ * Expression layout (AST_t children[]):
+ *   leaves  (AST_QLIT/AST_ILIT/AST_FLIT/AST_NUL/AST_VAR/AST_KEYWORD)  nchildren=0
+ *   unary   (AST_MNS/AST_CAPT_CURSOR/AST_INDIRECT/...)                 nchildren=1
+ *   binary  (AST_ADD/.../AST_ASSIGN/AST_CAPT_COND_ASGN/AST_IDX)       nchildren=2
+ *   n-ary   (AST_SEQ/AST_CAT/AST_ALT)                                  nchildren>=0
+ *   call    (AST_FNC)                                                   nchildren=nargs
  */
 
 #include <stdio.h>
@@ -74,8 +85,11 @@
 #define LANG_REB   5   /* Rebus   */
 
 /* ---- statement ---- */
-/* SI-6 NOTE: STMT_t/CODE_t still used by snocone/prolog/raku/rebus frontends
- * internally; full deletion deferred to SI-7 when those frontends emit AST directly. */
+/* SI-8 NOTE: STMT_t/CODE_t remain in use by snocone/prolog/raku/rebus frontends
+ * internally.  They build CODE_t and call code_to_ast() to hand AST_PROGRAM
+ * to the driver; sm_preamble/execute_program no longer receive CODE_t (SI-6).
+ * Full deletion of STMT_t/CODE_t and direct AST_STMT emission from all four
+ * frontends is deferred to GOAL-SNOCONE-SM-LOWER (SL-1+). */
 typedef struct STMT_t STMT_t;
 struct STMT_t {
     char    *label;
@@ -101,8 +115,9 @@ typedef struct ImportEntry {
     struct ImportEntry *next;
 } ImportEntry;
 
-/* SI-6: CODE_t_opaque body defined here; still used by snocone/prolog/raku/rebus
- * frontends internally. sm_preamble/execute_program no longer receive CODE_t. */
+/* SI-8: CODE_t_opaque body defined here; used by snocone/prolog/raku/rebus
+ * frontends internally. sm_preamble/execute_program no longer receive CODE_t
+ * (since SI-6); full deletion deferred to GOAL-SNOCONE-SM-LOWER. */
 struct CODE_t_opaque {
     STMT_t      *head;
     STMT_t      *tail;
@@ -170,10 +185,9 @@ void     sno_fold_name(char *name);
 /* emit_byrd.c interface now internal to emit_byrd_c.c */
 
 /* ---- SI-2/SI-3 shim: kept for snocone/prolog/raku/rebus frontends ---- */
-/* These frontends still build CODE_t internally and call code_to_ast()
- * to produce their out_ast.  SI-7 will migrate them to direct emission.
- * stmt_to_ast / code_to_ast remain in stmt_ast.c; sm_preamble no longer
- * uses them (SI-6). */
+/* These frontends build CODE_t internally and call code_to_ast() to produce
+ * their out_ast.  sm_preamble no longer uses them (SI-6).  Full migration to
+ * direct AST_STMT emission is deferred to GOAL-SNOCONE-SM-LOWER (SL-1+). */
 AST_t       *stmt_to_ast(const STMT_t *s);
 AST_t       *code_to_ast(const CODE_t *prog);
 AST_t       *stmt_attr_find(const AST_t *stmt, const char *tag);
