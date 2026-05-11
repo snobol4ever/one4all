@@ -14,7 +14,7 @@
 #include "runtime/x86/snobol4.h"
 #include "runtime/interp/coro_runtime.h"
 #include "runtime/interp/pl_runtime.h"
-#include "runtime/x86/sm_lower.h"
+#include "runtime/x86/lower.h"
 #include "runtime/x86/sm_prog.h"
 #include "runtime/x86/sm_interp.h"
 #include "runtime/x86/sm_codegen.h"
@@ -287,7 +287,7 @@ static int snap_diff(const ExecSnapshot *a, const char *a_name,
 int sync_monitor_run(void *prog_arg, int verbose, const char *sno_path) {
     CODE_t *prog = (CODE_t *)prog_arg;
     /* ── Build SM_Program once ── */
-    SM_Program *sm_prog = sm_lower(prog);
+    SM_Program *sm_prog = lower(prog);
     if (!sm_prog) { fprintf(stderr, "sync_monitor: sm_lower failed\n"); return -1; }
 
     /* ── Initialise JIT image once ── */

@@ -1,5 +1,5 @@
 /*
- * cohort_icn_relop.c — Numeric and string relational comparison handlers (SR-9)
+ * lower_icn_relop.c — Numeric and string relational comparison handlers (SR-9)
  *
  * AST kinds handled:
  *   Numeric (6): AST_EQ  AST_NE  AST_LT  AST_LE  AST_GT  AST_GE
@@ -31,7 +31,7 @@ static void lower_lcomp(LowerCtx *c, const AST_t *e)
     sm_emit_i(p, SM_LCOMP, (int64_t)e->kind);
 }
 
-void cohort_icn_relop_register(LowerHandler tbl[AST_KIND_COUNT])
+void lower_icn_relop_register(LowerHandler tbl[AST_KIND_COUNT])
 {
     /* Numeric */
     tbl[AST_EQ] = lower_acomp;

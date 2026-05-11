@@ -1,5 +1,5 @@
 /*
- * cohort_seq.c — Sequence, alternation, and operator-synonym handlers (SR-7)
+ * lower_seq.c — Sequence, alternation, and operator-synonym handlers (SR-7)
  *
  * AST kinds handled (value context):
  *   AST_VLIST  (v1 | v2 | ...)  SNOBOL4 paren-list / Snocone || disjunction
@@ -74,7 +74,7 @@ static void lower_opsyn(LowerCtx *c, const AST_t *e)
     sm_emit_si(p, SM_CALL_FN, op, (int64_t)e->nchildren);
 }
 
-void cohort_seq_register(LowerHandler tbl[AST_KIND_COUNT])
+void lower_seq_register(LowerHandler tbl[AST_KIND_COUNT])
 {
     tbl[AST_VLIST] = lower_vlist;
     tbl[AST_CAT]   = lower_cat_seq;

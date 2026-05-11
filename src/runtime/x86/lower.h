@@ -5,8 +5,8 @@
  * Date: 2026-04-06
  */
 
-#ifndef SM_LOWER_H
-#define SM_LOWER_H
+#ifndef LOWER_H
+#define LOWER_H
 
 #include "sm_prog.h"
 #include "../../frontend/snobol4/scrip_cc.h"
@@ -21,6 +21,6 @@
  *
  * Returns NULL on allocation failure.
  */
-SM_Program *sm_lower(const CODE_t *prog);
+SM_Program *lower(const CODE_t *prog);
 
-#endif /* SM_LOWER_H */
+#endif /* LOWER_H */

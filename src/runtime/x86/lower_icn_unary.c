@@ -1,5 +1,5 @@
 /*
- * cohort_icn_unary.c — Icon unary / miscellaneous expression handlers (SR-9)
+ * lower_icn_unary.c — Icon unary / miscellaneous expression handlers (SR-9)
  *
  * AST kinds handled:
  *   AST_NONNULL    \E    succeed iff E is non-null
@@ -11,7 +11,7 @@
  *   AST_AUGOP      E op:= E  augmented assignment
  *
  * AST_AUGOP: e->ival carries the raw IcnTkKind (TK_AUGPLUS etc.) as stored
- * by icon_parse.c.  The legacy sm_lower.c case contained an inline
+ * by icon_parse.c.  The legacy lower.c case contained an inline
  *   #include "../../frontend/icon/icon_lex.h"
  * mid-function inside the switch body — a layering violation.  SR-9 moves
  * that include to the top of this file (correct placement), eliminating the
@@ -26,7 +26,7 @@
 
 #include "lower_ctx.h"
 /* icon_lex.h is included here (top of file) rather than mid-function
- * as in the original sm_lower.c AST_AUGOP case. */
+ * as in the original lower.c AST_AUGOP case. */
 #include "../../frontend/icon/icon_lex.h"
 
 /* ── AST_NONNULL ─────────────────────────────────────────────── */
@@ -155,7 +155,7 @@ static void lower_augop(LowerCtx *c, const AST_t *e)
 
 /* ── Registration ─────────────────────────────────────────────── */
 
-void cohort_icn_unary_register(LowerHandler tbl[AST_KIND_COUNT])
+void lower_icn_unary_register(LowerHandler tbl[AST_KIND_COUNT])
 {
     tbl[AST_NONNULL]   = lower_nonnull;
     tbl[AST_NULL]      = lower_null;

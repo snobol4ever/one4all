@@ -15,7 +15,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 
 SM_FILES=(
-    "$ROOT/src/runtime/x86/sm_lower.c"
+    "$ROOT/src/runtime/x86/lower.c"
     "$ROOT/src/runtime/x86/sm_interp.c"
     "$ROOT/src/runtime/x86/sm_codegen.c"
     "$ROOT/src/runtime/x86/sm_prog.c"

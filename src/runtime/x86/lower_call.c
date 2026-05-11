@@ -1,5 +1,5 @@
 /*
- * cohort_call.c — Call, index, assignment, scan, and swap handlers (SR-8)
+ * lower_call.c — Call, index, assignment, scan, and swap handlers (SR-8)
  *
  * AST kinds handled:
  *   AST_FNC     function / builtin call (n-ary); includes EVAL(*expr) and
@@ -168,7 +168,7 @@ static void lower_swap(LowerCtx *c, const AST_t *e)
 
 /* ── Registration ─────────────────────────────────────────────────────── */
 
-void cohort_call_register(LowerHandler tbl[AST_KIND_COUNT])
+void lower_call_register(LowerHandler tbl[AST_KIND_COUNT])
 {
     tbl[AST_FNC]    = lower_fnc;
     tbl[AST_IDX]    = lower_idx;

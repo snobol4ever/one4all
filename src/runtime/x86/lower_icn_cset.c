@@ -1,5 +1,5 @@
 /*
- * cohort_icn_cset.c — Cset operation and list-concat handlers (SR-9)
+ * lower_icn_cset.c — Cset operation and list-concat handlers (SR-9)
  *
  * AST kinds handled:
  *   AST_CSET_COMPL   ~E        cset complement
@@ -52,7 +52,7 @@ static void lower_lconcat(LowerCtx *c, const AST_t *e)
 
 /* ── Registration ─────────────────────────────────────────────── */
 
-void cohort_icn_cset_register(LowerHandler tbl[AST_KIND_COUNT])
+void lower_icn_cset_register(LowerHandler tbl[AST_KIND_COUNT])
 {
     tbl[AST_CSET_COMPL] = lower_cset_op;
     tbl[AST_CSET_UNION]  = lower_cset_op;

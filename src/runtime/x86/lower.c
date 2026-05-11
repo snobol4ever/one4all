@@ -1,5 +1,5 @@
 /*
- * sm_lower.c — IR → SM_Program compiler pass
+ * lower.c — IR → SM_Program compiler pass
  *
  * Walks a CODE_t* (linked list of STMT_t, each holding AST_t trees)
  * and emits a flat SM_Program instruction sequence.
@@ -17,7 +17,7 @@
  * Authors: Lon Jones Cherryholmes · Claude Sonnet 4.6
  */
 
-#include "sm_lower.h"
+#include "lower.h"
 #include "lower_ctx.h"
 #include "sm_prog.h"
 #include "sm_interp.h"
@@ -46,16 +46,16 @@ static int          g_handlers_initialized = 0;
 
 static void init_handlers(void)
 {
-    cohort_literal_register(g_handlers);
-    cohort_ref_register(g_handlers);
-    cohort_arith_register(g_handlers);
-    cohort_seq_register(g_handlers);
-    cohort_pat_prim_register(g_handlers);
-    cohort_capture_register(g_handlers);
-    cohort_call_register(g_handlers);
-    cohort_icn_relop_register(g_handlers);
-    cohort_icn_cset_register(g_handlers);
-    cohort_icn_unary_register(g_handlers);
+    lower_literal_register(g_handlers);
+    lower_ref_register(g_handlers);
+    lower_arith_register(g_handlers);
+    lower_seq_register(g_handlers);
+    lower_pat_prim_register(g_handlers);
+    lower_capture_register(g_handlers);
+    lower_call_register(g_handlers);
+    lower_icn_relop_register(g_handlers);
+    lower_icn_cset_register(g_handlers);
+    lower_icn_unary_register(g_handlers);
     g_handlers_initialized = 1;
 }
 
@@ -694,7 +694,7 @@ emit_gotos: {
 
 /* ── Public entry point ─────────────────────────────────────────────────── */
 
-SM_Program *sm_lower(const CODE_t *prog)
+SM_Program *lower(const CODE_t *prog)
 {
     if (!prog) return NULL;
 

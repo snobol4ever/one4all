@@ -1,5 +1,5 @@
 /*
- * cohort_capture.c — Pattern capture handlers (SR-8)
+ * lower_capture.c — Pattern capture handlers (SR-8)
  *
  * AST kinds handled (value context — pat-context lives in lower_pat.c):
  *   AST_CAPT_COND_ASGN   .var  conditional capture (on success)
@@ -33,7 +33,7 @@ static void lower_capt_cursor(LowerCtx *c, const AST_t *e)
     lower_pat_expr(c, e);
 }
 
-void cohort_capture_register(LowerHandler tbl[AST_KIND_COUNT])
+void lower_capture_register(LowerHandler tbl[AST_KIND_COUNT])
 {
     tbl[AST_CAPT_COND_ASGN]  = lower_capt_cond_asgn;
     tbl[AST_CAPT_IMMED_ASGN] = lower_capt_immed_asgn;

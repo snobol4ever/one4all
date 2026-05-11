@@ -228,7 +228,7 @@ typedef enum AST_e {
  * AugOp_e — augmented-assignment operator codes (SR-9)
  *
  * Written into AST_AUGOP.ival by the Icon frontend (icon_parse.c).
- * sm_lower.c / cohort_icn_unary.c reads these values without including
+ * lower.c / lower_icn_unary.c reads these values without including
  * the frontend's icon_lex.h — eliminating the mid-function #include.
  *
  * The numeric values are stable; never reorder them.

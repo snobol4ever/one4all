@@ -5,12 +5,12 @@
  * emitting SM_PAT_* opcodes instead of value-context SM opcodes.
  *
  * Also provides sm_pat_capture_fn_arg_names(): shared helper for
- * cohort_capture.c (SR-8) and the CAPT_* handlers here.
+ * lower_capture.c (SR-8) and the CAPT_* handlers here.
  *
  * Called from:
- *   sm_lower.c  — lower_stmt (SNOBOL4 statement pattern field)
- *   cohort_seq.c — AST_CAT/SEQ value-context defer detection
- *   cohort_pat_prim.c — value-context pat-prim handlers
+ *   lower.c  — lower_stmt (SNOBOL4 statement pattern field)
+ *   lower_seq.c — AST_CAT/SEQ value-context defer detection
+ *   lower_pat_prim.c — value-context pat-prim handlers
  *
  * Authors: Lon Jones Cherryholmes · Claude Sonnet 4.6
  */

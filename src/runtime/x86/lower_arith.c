@@ -1,5 +1,5 @@
 /*
- * cohort_arith.c — Arithmetic and unary operators (SR-6)
+ * lower_arith.c — Arithmetic and unary operators (SR-6)
  *
  * AST kinds handled:
  *   AST_INTERROGATE  ?X        → lower child (succeed/fail probe, value discarded)
@@ -43,7 +43,7 @@ static void lower_div(LowerCtx *c, const AST_t *e) { SM_Program *p = c->p; LOWER
 static void lower_mod(LowerCtx *c, const AST_t *e) { SM_Program *p = c->p; LOWER2(SM_MOD); }
 static void lower_pow(LowerCtx *c, const AST_t *e) { SM_Program *p = c->p; LOWER2(SM_EXP); }
 
-void cohort_arith_register(LowerHandler tbl[AST_KIND_COUNT])
+void lower_arith_register(LowerHandler tbl[AST_KIND_COUNT])
 {
     tbl[AST_INTERROGATE] = lower_interrogate;
     tbl[AST_NAME]        = lower_name;

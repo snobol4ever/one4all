@@ -67,7 +67,7 @@ static void stmt_free(STMT_t *s)
 /* ── code_free ──────────────────────────────────────────────────────────────
  * Free a CODE_t and all its STMT_t / AST_t nodes.
  * Walks the linked list; frees exports/imports lists.
- * Call only after sm_lower() has consumed the program and any AST_t*
+ * Call only after lower() has consumed the program and any AST_t*
  * pointers stored in SM_PUSH_EXPR have been cloned via ast_gc_clone(). */
 void code_free(CODE_t *prog)
 {

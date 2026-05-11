@@ -9,7 +9,7 @@
  * Each repeats:
  *   - label_table_build / prescan_defines
  *   - g_sno_err_active = 1
- *   - sm_lower(prog) → SM_Program*
+ *   - lower(prog) → SM_Program*
  *   - g_current_sm_prog = sm
  *   - code_free(prog) ; label_table_clear_stmts()
  *   - per-statement setjmp/error-recovery loop driving sm_interp_run / sm_jit_run

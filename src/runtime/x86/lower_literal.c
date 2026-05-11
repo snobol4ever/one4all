@@ -1,5 +1,5 @@
 /*
- * cohort_literal.c — Literal value handlers (SR-4)
+ * lower_literal.c — Literal value handlers (SR-4)
  *
  * AST kinds handled:
  *   AST_QLIT   "string"   → SM_PUSH_LIT_S
@@ -42,7 +42,7 @@ static void lower_nul(LowerCtx *c, const AST_t *e)
     sm_emit(c->p, SM_PUSH_NULL);
 }
 
-void cohort_literal_register(LowerHandler tbl[AST_KIND_COUNT])
+void lower_literal_register(LowerHandler tbl[AST_KIND_COUNT])
 {
     tbl[AST_QLIT] = lower_qlit;
     tbl[AST_CSET] = lower_cset;

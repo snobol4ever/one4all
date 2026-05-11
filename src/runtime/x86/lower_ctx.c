@@ -4,8 +4,8 @@
  * SR-2: LabelTable — name→instruction-index registry with forward-reference
  *       patch list.  GC_MALLOC throughout; labtab_free() is a no-op shim.
  * SR-3: emit_goto, kw_canonicalize, expression_scope_walk moved here from
- *       sm_lower.c so cohort files (SR-4+) can use them without a dependency
- *       on the monolithic sm_lower.c.
+ *       lower.c so cohort files (SR-4+) can use them without a dependency
+ *       on the monolithic lower.c.
  *
  * Authors: Lon Jones Cherryholmes · Claude Sonnet 4.6
  * Date: 2026-05-11
@@ -161,7 +161,7 @@ void expression_scope_walk(IcnScope *sc, AST_t *e)
      * slots reset each call, so initial-block vars MUST route to NV
      * (persistent named variables) instead.  Skip the AST_INITIAL
      * subtree here so its vars don't get a frame slot — they then fall
-     * through to SM_PUSH_VAR / SM_STORE_VAR in sm_lower.c. */
+     * through to SM_PUSH_VAR / SM_STORE_VAR in lower.c. */
     if (e->kind == AST_INITIAL) return;
     if (e->kind == AST_VAR && e->sval) {
         if (e->sval[0] != '&' && !is_global(e->sval))

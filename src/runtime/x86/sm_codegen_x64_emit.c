@@ -937,7 +937,7 @@ static int emit_sm_return(FILE *out, int pc)
  * boundary.  We use it to emit a major page-break banner showing the
  * verbatim source line, plus the runtime tick into &STNO/&STCOUNT.
  *
- * Operand layout (from sm_lower.c, EM-4):
+ * Operand layout (from lower.c, EM-4):
  *   a[0].i  = source statement number (1-based)
  *   a[1].i  = source line number (added EM-4-readability; safe for
  *             interp because sm_interp.c reads only a[0].i)

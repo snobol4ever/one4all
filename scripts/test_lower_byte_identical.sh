@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
-# test_sm_lower_byte_identical.sh — SM bytecode byte-identical gate (SR-1)
+# test_lower_byte_identical.sh — SM bytecode byte-identical gate (SR-1)
 #
 # Compiles a corpus of small programs across all six frontends,
 # captures --dump-sm output, and compares md5 hashes against a baked
 # baseline.  Any drift from baseline = FAIL.
 #
 # Usage:
-#   bash scripts/test_sm_lower_byte_identical.sh            # compare
-#   bash scripts/test_sm_lower_byte_identical.sh --bake     # bake baseline
+#   bash scripts/test_lower_byte_identical.sh            # compare
+#   bash scripts/test_lower_byte_identical.sh --bake     # bake baseline
 #
 # AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6  DATE: 2026-05-11
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIP="${HERE}/../scrip"
 CORPUS="/home/claude/corpus"
-BASELINE="${HERE}/sm_lower_baseline.txt"
+BASELINE="${HERE}/lower_baseline.txt"
 
 PASS=0; FAIL=0; SKIP=0
 BAKE=0

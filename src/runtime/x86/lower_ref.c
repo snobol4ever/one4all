@@ -1,5 +1,5 @@
 /*
- * cohort_ref.c — Reference handlers (SR-5)
+ * lower_ref.c — Reference handlers (SR-5)
  *
  * AST kinds handled:
  *   AST_VAR      name      → SM_LOAD_FRAME (in-scope) or SM_PUSH_VAR (NV store)
@@ -9,7 +9,7 @@
  *
  * Cross-cutting: AST_VAR consults ctx->expression_body_lowering and
  *   ctx->expression_scope (set/cleared by the per-proc lowering loop in
- *   sm_lower.c). All other handlers are pure functions of (ctx, e).
+ *   lower.c). All other handlers are pure functions of (ctx, e).
  *
  * Authors: Lon Jones Cherryholmes · Claude Sonnet 4.6
  */
@@ -80,7 +80,7 @@ static void lower_defer(LowerCtx *c, const AST_t *e)
     sm_emit_ii(p, SM_PUSH_EXPRESSION, (int64_t)entry_pc, 0);
 }
 
-void cohort_ref_register(LowerHandler tbl[AST_KIND_COUNT])
+void lower_ref_register(LowerHandler tbl[AST_KIND_COUNT])
 {
     tbl[AST_VAR]      = lower_var;
     tbl[AST_KEYWORD]  = lower_keyword;

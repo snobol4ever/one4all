@@ -176,7 +176,7 @@ typedef enum {
     /* GOAL-ICON-BB-COMPLETE Phase A: unified BB pump for legacy-fallthrough kinds.
      *
      * Replaces the per-kind emit_push_expr + SM_BB_PUMP for AST kinds that still
-     * hit the legacy fallthrough block (sm_lower.c:1410-1418):
+     * hit the legacy fallthrough block (lower.c:1410-1418):
      *   AST_BANG_BINARY, AST_LIMIT, AST_RANDOM, AST_SECTION, AST_SECTION_MINUS,
      *   AST_SECTION_PLUS, and generative AST_LCONCAT.
      *
@@ -199,7 +199,7 @@ typedef enum {
     /* CHUNKS-step17i-suspend: AST_SUSPEND `suspend E [do body]` — yield-to-caller.
      *
      * Stack discipline: pops one value (the yield value).  Pushes nothing.
-     * The lowering shape (sm_lower.c AST_SUSPEND case) wraps it as:
+     * The lowering shape (lower.c AST_SUSPEND case) wraps it as:
      *
      *   [lower expr]                ; push v, last_ok = !IS_FAIL(v)
      *   SM_JUMP_F  L_end            ; v failed → leave it on stack, fall to L_end
@@ -319,7 +319,7 @@ typedef enum {
      *
      * The slot index is baked at lower-time by sm_lower's per-proc scope
      * construction (mirrors coro_runtime.c's icn_scope_patch but without
-     * mutating AST_t.ival in place).  See sm_lower.c expression-body emission. */
+     * mutating AST_t.ival in place).  See lower.c expression-body emission. */
     SM_LOAD_FRAME,
     SM_STORE_FRAME,
 
@@ -369,7 +369,7 @@ typedef struct {
     int          cap;
     /* IM-9: per-statement source label (1-based; stno_labels[0] unused).
      * stno_labels[n] = source label of statement n, or NULL if unlabelled.
-     * Populated by sm_lower(); strings are interned (not owned). */
+     * Populated by lower(); strings are interned (not owned). */
     const char **stno_labels;
     int          stno_labels_cap;   /* allocated slots (indices 0..cap-1) */
     int          stno_count;        /* number of statements lowered */
@@ -396,7 +396,7 @@ int sm_label(SM_Program *p);
  * Returns the label index (same as sm_label). RS-9a: needed for SM call frames. */
 int sm_label_named(SM_Program *p, const char *name);
 
-/* RS-9b: global pointer to the active SM_Program, set by scrip.c after sm_lower().
+/* RS-9b: global pointer to the active SM_Program, set by scrip.c after lower().
  * Allows _usercall_hook to detect SM-bodied functions without the IR tree. */
 extern SM_Program *g_current_sm_prog;
 

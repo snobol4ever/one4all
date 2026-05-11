@@ -66,7 +66,7 @@ extern void ir_print_node_nl(const AST_t *e, FILE *f);
 #include "../runtime/x86/snobol4_runtime_shim.h"
 
 /* ── SM stack machine (M-SCRIP-U3) ───────────────────────────────────── */
-#include "../runtime/x86/sm_lower.h"
+#include "../runtime/x86/lower.h"
 #include "../runtime/x86/sm_interp.h"
 #include "../runtime/x86/sm_prog.h"
 #include "../runtime/x86/bb_build.h"    /* M-BB-LIVE-WIRE: bb_mode_t, g_bb_mode */
@@ -477,7 +477,7 @@ int main(int argc, char **argv)
     if (dump_sm && !mode_sm_run) {
         label_table_build(prog);
         prescan_defines(prog);
-        SM_Program *sm0 = sm_lower(prog);
+        SM_Program *sm0 = lower(prog);
         if (!sm0) { fprintf(stderr, "scrip: sm_lower failed\n"); return 1; }
         sm_prog_print(sm0, stdout);
         sm_prog_free(sm0);

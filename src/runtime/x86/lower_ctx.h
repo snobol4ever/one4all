@@ -1,5 +1,5 @@
 /*
- * lower_ctx.h — Lowering context for sm_lower.c (SR-1)
+ * lower_ctx.h — Lowering context for lower.c (SR-1)
  *
  * Threads the state previously carried by two file-scope globals
  * (g_expression_body_lowering, g_expression_scope) plus the explicit
@@ -24,7 +24,7 @@
 
 /* ── Label resolution table ─────────────────────────────────────────────
  *
- * SR-1: types kept verbatim from sm_lower.c.  SR-2 moves labtab_*
+ * SR-1: types kept verbatim from lower.c.  SR-2 moves labtab_*
  * implementations to lower_ctx.c and migrates to GC allocation.
  */
 
@@ -51,7 +51,7 @@ typedef struct {
 
 /* ── Lowering context ────────────────────────────────────────────────────
  *
- * One LowerCtx is created per sm_lower() invocation.  All lowering
+ * One LowerCtx is created per lower() invocation.  All lowering
  * functions (lower_expr, lower_stmt, lower_pat_expr, emit helpers)
  * receive `LowerCtx *c` and reach the SM_Program via `c->p` and the
  * label table via `c->labtab`.
@@ -63,7 +63,7 @@ typedef struct {
  *   that proc; AST_VAR / AST_ASSIGN consult it to emit
  *   SM_LOAD_FRAME / SM_STORE_FRAME for in-scope names.
  *
- *   Outside the per-proc loop in sm_lower(), expression_body_lowering
+ *   Outside the per-proc loop in lower(), expression_body_lowering
  *   is 0 and expression_scope is NULL — the statement-context lowering
  *   path is unaffected.
  */
@@ -83,19 +83,19 @@ typedef struct {
  * `lower_expr` itself.  Phase-2 cohort files will mirror that prelude.
  *
  * `lower_expr` and `lower_pat_expr` themselves are declared in
- * `sm_lower.c` (still `static` until Phase-2 splits cohort files out).
- * They are visible to the macros via the include order in `sm_lower.c`;
+ * `lower.c` (still `static` until Phase-2 splits cohort files out).
+ * They are visible to the macros via the include order in `lower.c`;
  * a cohort TU (Phase-2+) will see them via cohort header glue.
  *
  * `emit_push_expr` is the SM_PUSH_EXPR helper from RS-9b: every emission
  * GC-clones the AST_t so the SM_Program owns its descendants
  * independently of the calloc-based IR tree.  Inlined here so cohorts
- * can use it without a translation-unit dependency on sm_lower.c.
+ * can use it without a translation-unit dependency on lower.c.
  */
 
 /* ── LabelTable API (implementation in lower_ctx.c) ─────────────────────
  *
- * SR-2: these functions moved from sm_lower.c to lower_ctx.c and migrated
+ * SR-2: these functions moved from lower.c to lower_ctx.c and migrated
  * to GC allocation.  labtab_free() is a no-op shim; the GC reclaims
  * storage automatically.
  */
@@ -106,7 +106,7 @@ int  labtab_find       (const LabelTable *labtab, const char *name);
 void labtab_patch_later(LabelTable *labtab, int jump_instr_idx, const char *name);
 int  labtab_resolve    (LabelTable *labtab, SM_Program *p);
 
-/* ── SR-3: helpers moved from sm_lower.c ───────────────────────────────── */
+/* ── SR-3: helpers moved from lower.c ───────────────────────────────── */
 
 /* Return a GC-allocated uppercase copy of `raw`.  No length cap. */
 char *kw_canonicalize(const char *raw);
@@ -136,16 +136,16 @@ const char *sm_pat_capture_fn_arg_names(const AST_t *fnc);
 
 /* Each cohort file exports one registration function that fills its
  * slice of the handler table. */
-void cohort_literal_register (LowerHandler tbl[AST_KIND_COUNT]);
-void cohort_ref_register     (LowerHandler tbl[AST_KIND_COUNT]);
-void cohort_arith_register   (LowerHandler tbl[AST_KIND_COUNT]);
-void cohort_seq_register     (LowerHandler tbl[AST_KIND_COUNT]);
-void cohort_pat_prim_register(LowerHandler tbl[AST_KIND_COUNT]);
-void cohort_capture_register (LowerHandler tbl[AST_KIND_COUNT]);
-void cohort_call_register    (LowerHandler tbl[AST_KIND_COUNT]);
-void cohort_icn_relop_register(LowerHandler tbl[AST_KIND_COUNT]);
-void cohort_icn_cset_register (LowerHandler tbl[AST_KIND_COUNT]);
-void cohort_icn_unary_register(LowerHandler tbl[AST_KIND_COUNT]);
+void lower_literal_register (LowerHandler tbl[AST_KIND_COUNT]);
+void lower_ref_register     (LowerHandler tbl[AST_KIND_COUNT]);
+void lower_arith_register   (LowerHandler tbl[AST_KIND_COUNT]);
+void lower_seq_register     (LowerHandler tbl[AST_KIND_COUNT]);
+void lower_pat_prim_register(LowerHandler tbl[AST_KIND_COUNT]);
+void lower_capture_register (LowerHandler tbl[AST_KIND_COUNT]);
+void lower_call_register    (LowerHandler tbl[AST_KIND_COUNT]);
+void lower_icn_relop_register(LowerHandler tbl[AST_KIND_COUNT]);
+void lower_icn_cset_register (LowerHandler tbl[AST_KIND_COUNT]);
+void lower_icn_unary_register(LowerHandler tbl[AST_KIND_COUNT]);
 
 #include "../common/ast_clone.h"   /* ast_gc_clone — used by emit_push_expr */
 

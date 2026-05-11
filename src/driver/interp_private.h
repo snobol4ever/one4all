@@ -48,7 +48,7 @@ extern void ir_print_node_nl(const AST_t *e, FILE *f);
 #include "runtime/x86/snobol4.h"
 #include "runtime/x86/sil_macros.h"
 #include "runtime/x86/snobol4_runtime_shim.h"
-#include "runtime/x86/sm_lower.h"
+#include "runtime/x86/lower.h"
 #include "runtime/x86/sm_interp.h"
 #include "runtime/x86/sm_prog.h"
 #include "runtime/x86/bb_build.h"

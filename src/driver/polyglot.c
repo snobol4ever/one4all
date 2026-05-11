@@ -30,7 +30,7 @@ extern int64_t kw_case;   /* &CASE: 0=fold, 1=sensitive; default 1 matches SPITB
 #include "runtime/interp/pl_runtime.h"
 #include "driver/interp.h"
 #include "driver/polyglot.h"
-#include "runtime/x86/sm_lower.h"   /* CH-17g-irrun-lowers: sm_lower */
+#include "runtime/x86/lower.h"   /* CH-17g-irrun-lowers: sm_lower */
 #include "runtime/x86/sm_prog.h"    /* CH-17g-irrun-lowers: sm_prog_free */
 #include "driver/scrip_sm.h"        /* CH-17g-irrun-lowers: sm_resolve_irrun_entry_pcs */
 

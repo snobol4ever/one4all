@@ -1,5 +1,5 @@
 /*
- * cohort_pat_prim.c — Pattern primitives in value context (SR-7)
+ * lower_pat_prim.c — Pattern primitives in value context (SR-7)
  *
  * AST kinds handled (all 18 nullary/unary SNOBOL4 pattern primitives):
  *   AST_ARB      arbitrary match
@@ -38,7 +38,7 @@ static void lower_pat_prim_val(LowerCtx *c, const AST_t *e)
     lower_pat_expr(c, e);
 }
 
-void cohort_pat_prim_register(LowerHandler tbl[AST_KIND_COUNT])
+void lower_pat_prim_register(LowerHandler tbl[AST_KIND_COUNT])
 {
     tbl[AST_ARB]     = lower_pat_prim_val;
     tbl[AST_REM]     = lower_pat_prim_val;

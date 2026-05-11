@@ -140,7 +140,7 @@ SmGenState *g_current_gen_state = NULL;
 
 /* CHUNKS-step17i-every-suspend: every-table.
  * Indexed by SM_BB_PUMP_EVERY's a[0].i.  Populated by sm_lower at AST_EVERY
- * lowering time (sm_lower.c).  Bounded grow; never shrinks within a compile.
+ * lowering time (lower.c).  Bounded grow; never shrinks within a compile.
  * Reset by every_table_reset (called from sm_program_free path).
  * AST pointers borrowed — caller (lower) owns them; same lifetime as
  * g_pl_pred_table's borrowed AST_CHOICE pointers. */
