@@ -391,7 +391,7 @@ void bb_label_define(bb_label_t *lbl)
 
         int target = lbl->offset;
 
-        if (p->t == PATCH_REL8) {
+        if (p->kind == PATCH_REL8) {
             /* rel8: displacement = target - (site + 1) */
             int disp = target - (p->site + 1);
             if (disp < -128 || disp > 127) {
@@ -476,7 +476,7 @@ void bb_emit_patch_rel8(bb_label_t *lbl)
     }
     bb_patch_list[bb_patch_count].site  = bb_emit_pos;
     bb_patch_list[bb_patch_count].label = lbl;
-    bb_patch_list[bb_patch_count].t  = PATCH_REL8;
+    bb_patch_list[bb_patch_count].kind  = PATCH_REL8;
     bb_patch_count++;
     bb_emit_byte(0x00);   /* placeholder */
 }
@@ -505,7 +505,7 @@ void bb_emit_patch_rel32(bb_label_t *lbl)
     }
     bb_patch_list[bb_patch_count].site  = bb_emit_pos;
     bb_patch_list[bb_patch_count].label = lbl;
-    bb_patch_list[bb_patch_count].t  = PATCH_REL32;
+    bb_patch_list[bb_patch_count].kind  = PATCH_REL32;
     bb_patch_count++;
     bb_emit_u32(0x00000000);   /* placeholder */
 }

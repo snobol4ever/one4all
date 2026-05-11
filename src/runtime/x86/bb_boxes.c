@@ -81,17 +81,17 @@ DESCR_t bb_alt(void *zeta, int entry)
     if (entry==α)                                                               goto ALT_α;
     if (entry==β)                                                               goto ALT_β;
     ALT_α:          ζ->position=Δ; ζ->current=1;                                
-                    cr=spec_from_descr(ζ->c[0].fn(ζ->c[0].state,α));               
+                    cr=spec_from_descr(ζ->children[0].fn(ζ->children[0].state,α));               
                     if (spec_is_empty(cr))                                      goto child_α_ω;
                                                                                 goto child_α_γ;
-    ALT_β:          cr=spec_from_descr(ζ->c[ζ->current-1].fn(ζ->c[ζ->current-1].state,β));
+    ALT_β:          cr=spec_from_descr(ζ->children[ζ->current-1].fn(ζ->children[ζ->current-1].state,β));
                     if (spec_is_empty(cr))                                      goto ALT_ω;
                                                                                 goto child_β_γ;
     child_α_γ:      ζ->result=cr;                                               goto ALT_γ;
     child_α_ω:      ζ->current++;                                               
                     if (ζ->current > ζ->n)                                      goto ALT_ω;
                     Δ=ζ->position;                                              
-                    cr=spec_from_descr(ζ->c[ζ->current-1].fn(ζ->c[ζ->current-1].state,α));
+                    cr=spec_from_descr(ζ->children[ζ->current-1].fn(ζ->children[ζ->current-1].state,α));
                     if (spec_is_empty(cr))                                      goto child_α_ω;
                                                                                 goto child_α_γ;
     child_β_γ:      ζ->result=cr;                                               goto ALT_γ;
@@ -103,9 +103,9 @@ alt_t *bb_alt_new(int n, bb_box_fn *fns)
 {
     alt_t *ζ = calloc(1, sizeof(alt_t));
     ζ->cap      = n > BB_ALT_INIT ? n : BB_ALT_INIT;
-    ζ->c = malloc(ζ->cap * sizeof(bb_altchild_t));
+    ζ->children = malloc(ζ->cap * sizeof(bb_altchild_t));
     ζ->n = n;
-    for (int i = 0; i < n; i++) ζ->c[i].fn = fns[i];
+    for (int i = 0; i < n; i++) ζ->children[i].fn = fns[i];
     return ζ;
 }
 

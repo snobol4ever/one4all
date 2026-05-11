@@ -199,7 +199,7 @@ static Term *parse_primary(Parser *p);
 static Term *parse_list(Parser *p) {
     /* '[' already consumed; peek tells us if empty */
     Token tk = lexer_peek(&p->lx);
-    if (tk.t == TK_RBRACKET) {
+    if (tk.kind == TK_RBRACKET) {
         lexer_next(&p->lx); /* consume ] */
         return term_new_atom(ATOM_NIL);
     }
@@ -216,18 +216,18 @@ static Term *parse_list(Parser *p) {
     tk = lexer_peek(&p->lx);
     Term *tail = NULL;
 
-    if (tk.t == TK_COMMA) {
+    if (tk.kind == TK_COMMA) {
         lexer_next(&p->lx);
         tail = parse_list(p); /* recurse for rest */
-    } else if (tk.t == TK_PIPE) {
+    } else if (tk.kind == TK_PIPE) {
         lexer_next(&p->lx);
         p->in_args++;
         tail = parse_term(p, 1200);
         p->in_args--;
         tk = lexer_peek(&p->lx);
-        if (tk.t == TK_RBRACKET) lexer_next(&p->lx);
+        if (tk.kind == TK_RBRACKET) lexer_next(&p->lx);
         else perror_at(p, tk.line, "expected ] after list tail");
-    } else if (tk.t == TK_RBRACKET) {
+    } else if (tk.kind == TK_RBRACKET) {
         lexer_next(&p->lx);
         tail = term_new_atom(ATOM_NIL);
     } else {
@@ -248,7 +248,7 @@ static int parse_args(Parser *p, Term ***args_out) {
 
     /* f() — zero-arity compound: peek for immediate ')' */
     Token pk0 = lexer_peek(&p->lx);
-    if (pk0.t == TK_RPAREN) {
+    if (pk0.kind == TK_RPAREN) {
         *args_out = args;
         return 0;
     }
@@ -265,7 +265,7 @@ static int parse_args(Parser *p, Term ***args_out) {
         if (!t) break;
         args[n++] = t;
         Token tk = lexer_peek(&p->lx);
-        if (tk.t != TK_COMMA) break;
+        if (tk.kind != TK_COMMA) break;
         lexer_next(&p->lx); /* consume comma */
     }
     p->in_args--;
@@ -280,7 +280,7 @@ static int parse_args(Parser *p, Term ***args_out) {
 static Term *parse_primary(Parser *p) {
     Token tk = lexer_next(&p->lx);
 
-    switch (tk.t) {
+    switch (tk.kind) {
         case TK_VAR:
             return scope_get(&p->sc, tk.text);
 
@@ -288,7 +288,7 @@ static Term *parse_primary(Parser *p) {
             return term_new_var(-1); /* fresh anonymous each time */
 
         case TK_INT: {
-            Term *t = term_new_int(tk.v.ival);
+            Term *t = term_new_int(tk.ival);
             return t;
         }
         case TK_FLOAT: {
@@ -305,12 +305,12 @@ static Term *parse_primary(Parser *p) {
         case TK_ATOM: {
             /* Check if followed by '(' -> compound */
             Token pk = lexer_peek(&p->lx);
-            if (pk.t == TK_LPAREN) {
+            if (pk.kind == TK_LPAREN) {
                 lexer_next(&p->lx); /* consume ( */
                 Term **args = NULL;
                 int nargs = parse_args(p, &args);
                 Token rp = lexer_peek(&p->lx);
-                if (rp.t == TK_RPAREN) lexer_next(&p->lx);
+                if (rp.kind == TK_RPAREN) lexer_next(&p->lx);
                 else perror_at(p, rp.line, "expected ) after args");
                 int fid = prolog_atom_intern(tk.text);
                 Term *t = term_new_compound(fid, nargs, args);
@@ -330,9 +330,9 @@ static Term *parse_primary(Parser *p) {
                     strcmp(tk.text, "ensure_loaded") == 0 ||
                     strcmp(tk.text, "mode") == 0) {
                 /* Only treat as prefix if next token can start a term */
-                if (pk.t == TK_ATOM || pk.t == TK_VAR || pk.t == TK_INT ||
-                    pk.t == TK_FLOAT || pk.t == TK_LPAREN || pk.t == TK_LBRACKET ||
-                    pk.t == TK_OP) {
+                if (pk.kind == TK_ATOM || pk.kind == TK_VAR || pk.kind == TK_INT ||
+                    pk.kind == TK_FLOAT || pk.kind == TK_LPAREN || pk.kind == TK_LBRACKET ||
+                    pk.kind == TK_OP) {
                     int fid = prolog_atom_intern(tk.text);
                     Term *arg = parse_term(p, 1150);
                     Term *args1[1] = { arg };
@@ -356,7 +356,7 @@ static Term *parse_primary(Parser *p) {
             Term *t = parse_term(p, 1200);
             p->in_args = saved_in_args;
             Token rp = lexer_peek(&p->lx);
-            if (rp.t == TK_RPAREN) lexer_next(&p->lx);
+            if (rp.kind == TK_RPAREN) lexer_next(&p->lx);
             else perror_at(p, rp.line, "expected )");
             return t;
         }
@@ -370,14 +370,14 @@ static Term *parse_primary(Parser *p) {
          * parse error (operator climbing handles them as binary ops). */
         case TK_COMMA:
         case TK_SEMI: {
-            const char *opname = (tk.t == TK_COMMA) ? "," : ";";
+            const char *opname = (tk.kind == TK_COMMA) ? "," : ";";
             Token pk = lexer_peek(&p->lx);
-            if (pk.t == TK_LPAREN) {
+            if (pk.kind == TK_LPAREN) {
                 lexer_next(&p->lx); /* consume ( */
                 Term **args = NULL;
                 int nargs = parse_args(p, &args);
                 Token rp = lexer_peek(&p->lx);
-                if (rp.t == TK_RPAREN) lexer_next(&p->lx);
+                if (rp.kind == TK_RPAREN) lexer_next(&p->lx);
                 else perror_at(p, rp.line, "expected ) after args");
                 int fid = prolog_atom_intern(opname);
                 Term *t = term_new_compound(fid, nargs, args);
@@ -403,13 +403,13 @@ static Term *parse_primary(Parser *p) {
             }
             if (strcmp(tk.text, "-") == 0) {
                 Token pk = lexer_peek(&p->lx);
-                if (pk.t == TK_INT || pk.t == TK_FLOAT) {
+                if (pk.kind == TK_INT || pk.kind == TK_FLOAT) {
                     Token num = lexer_next(&p->lx);
-                    if (num.t == TK_INT)   return term_new_int(-num.v.ival);
-                    if (num.t == TK_FLOAT) return term_new_float(-num.fval);
+                    if (num.kind == TK_INT)   return term_new_int(-num.ival);
+                    if (num.kind == TK_FLOAT) return term_new_float(-num.fval);
                 }
                 /* -atom, -compound, -Variable: treat as -(Arg) prefix compound (prec 200) */
-                if (pk.t == TK_ATOM || pk.t == TK_OP || pk.t == TK_VAR || pk.t == TK_LPAREN) {
+                if (pk.kind == TK_ATOM || pk.kind == TK_OP || pk.kind == TK_VAR || pk.kind == TK_LPAREN) {
                     Term *arg = parse_term(p, 200);
                     int fid = prolog_atom_intern("-");
                     Term *args[1] = { arg };
@@ -419,8 +419,8 @@ static Term *parse_primary(Parser *p) {
             if (strcmp(tk.text, "+") == 0) {
                 Token pk = lexer_peek(&p->lx);
                 /* +atom, +compound, +Variable: treat as +(Arg) prefix compound (prec 200) */
-                if (pk.t == TK_ATOM || pk.t == TK_OP || pk.t == TK_VAR ||
-                    pk.t == TK_LPAREN || pk.t == TK_INT || pk.t == TK_FLOAT) {
+                if (pk.kind == TK_ATOM || pk.kind == TK_OP || pk.kind == TK_VAR ||
+                    pk.kind == TK_LPAREN || pk.kind == TK_INT || pk.kind == TK_FLOAT) {
                     Term *arg = parse_term(p, 200);
                     int fid = prolog_atom_intern("+");
                     Term *args[1] = { arg };
@@ -431,12 +431,12 @@ static Term *parse_primary(Parser *p) {
             {
                 int id = prolog_atom_intern(tk.text);
                 Token pk2 = lexer_peek(&p->lx);
-                if (pk2.t == TK_LPAREN) {
+                if (pk2.kind == TK_LPAREN) {
                     lexer_next(&p->lx); /* consume ( */
                     Term **args = NULL;
                     int nargs = parse_args(p, &args);
                     Token rp = lexer_peek(&p->lx);
-                    if (rp.t == TK_RPAREN) lexer_next(&p->lx);
+                    if (rp.kind == TK_RPAREN) lexer_next(&p->lx);
                     else perror_at(p, rp.line, "expected ) after args");
                     Term *t = term_new_compound(id, nargs, args);
                     free(args);
@@ -456,14 +456,14 @@ static Term *parse_primary(Parser *p) {
         case TK_LBRACE: {
             /* { Term } — parsed as '{}'(Term) compound, used in DCG bodies */
             Token pk2 = lexer_peek(&p->lx);
-            if (pk2.t == TK_RBRACE) {
+            if (pk2.kind == TK_RBRACE) {
                 /* {} — empty braces → atom '{}' */
                 lexer_next(&p->lx);
                 return term_new_atom(prolog_atom_intern("{}"));
             }
             Term *inner = parse_term(p, 1200);
             Token rb = lexer_next(&p->lx);
-            if (rb.t != TK_RBRACE)
+            if (rb.kind != TK_RBRACE)
                 perror_at(p, rb.line, "expected } after term");
             int curl_id = prolog_atom_intern("{}");
             Term *args[1] = { inner };
@@ -487,12 +487,12 @@ static Term *parse_term(Parser *p, int max_prec) {
         Token pk = lexer_peek(&p->lx);
         const char *optext = NULL;
 
-        if (pk.t == TK_OP)   optext = pk.text;
-        else if (pk.t == TK_ATOM) optext = pk.text; /* mod, is, etc */
-        else if (pk.t == TK_COMMA && p->in_args > 0) break; /* comma is arg separator */
-        else if (pk.t == TK_COMMA && max_prec >= 1000) optext = ",";
-        else if (pk.t == TK_SEMI  && max_prec >= 1100) optext = ";";
-        else if (pk.t == TK_NECK  && max_prec >= 1200) optext = ":-";
+        if (pk.kind == TK_OP)   optext = pk.text;
+        else if (pk.kind == TK_ATOM) optext = pk.text; /* mod, is, etc */
+        else if (pk.kind == TK_COMMA && p->in_args > 0) break; /* comma is arg separator */
+        else if (pk.kind == TK_COMMA && max_prec >= 1000) optext = ",";
+        else if (pk.kind == TK_SEMI  && max_prec >= 1100) optext = ";";
+        else if (pk.kind == TK_NECK  && max_prec >= 1200) optext = ":-";
         else break;
 
         const OpEntry *op = optext ? find_binop(optext) : NULL;
@@ -519,7 +519,7 @@ static int count_conj(Term *t) {
     t = term_deref(t);
     if (!t) return 0;
     int comma_id = prolog_atom_intern(",");
-    if (t->tag == TT_COMPOUND && t->compound.functor == comma_id && t->compound.arity == 2)
+    if (t->tag == TERM_COMPOUND && t->compound.functor == comma_id && t->compound.arity == 2)
         return count_conj(t->compound.args[0]) + count_conj(t->compound.args[1]);
     return 1;
 }
@@ -528,7 +528,7 @@ static int flatten_conj(Term *t, Term **buf, int idx) {
     t = term_deref(t);
     if (!t) return idx;
     int comma_id = prolog_atom_intern(",");
-    if (t->tag == TT_COMPOUND && t->compound.functor == comma_id && t->compound.arity == 2) {
+    if (t->tag == TERM_COMPOUND && t->compound.functor == comma_id && t->compound.arity == 2) {
         idx = flatten_conj(t->compound.args[0], buf, idx);
         idx = flatten_conj(t->compound.args[1], buf, idx);
         return idx;
@@ -567,14 +567,14 @@ static Term *dcg_fresh_var(VarScope *sc) {
 
 /* Build list term [t1,t2,...|tail] from an existing list term spine,
  * appending tail at the end. The list term is already fully parsed
- * (possibly TT_ATOM NIL at end). We walk to the tail and replace NIL with tail. */
+ * (possibly TERM_ATOM NIL at end). We walk to the tail and replace NIL with tail. */
 static Term *dcg_append_tail(Term *list, Term *tail) {
     /* list is either ATOM_NIL (empty) or compound('.', [H, rest]) */
     list = term_deref(list);
     if (!list) return tail;
-    if (list->tag == TT_ATOM && list->atom_id == ATOM_NIL)
+    if (list->tag == TERM_ATOM && list->atom_id == ATOM_NIL)
         return tail;
-    if (list->tag == TT_COMPOUND && list->compound.arity == 2) {
+    if (list->tag == TERM_COMPOUND && list->compound.arity == 2) {
         /* Recurse into tail position */
         Term *new_tail = dcg_append_tail(list->compound.args[1], tail);
         Term **args = malloc(2 * sizeof(Term *));
@@ -596,11 +596,11 @@ static Term *dcg_make_unify(Term *a, Term *b) {
 /* Add a non-terminal call: append s_in, s_out to its arg list */
 static Term *dcg_call_nt(Term *nt, Term *s_in, Term *s_out) {
     nt = term_deref(nt);
-    if (nt->tag == TT_ATOM) {
+    if (nt->tag == TERM_ATOM) {
         Term **args = malloc(2 * sizeof(Term *));
         args[0] = s_in; args[1] = s_out;
         return term_new_compound(nt->atom_id, 2, args);
-    } else if (nt->tag == TT_COMPOUND) {
+    } else if (nt->tag == TERM_COMPOUND) {
         int new_arity = nt->compound.arity + 2;
         Term **args = malloc(new_arity * sizeof(Term *));
         for (int i = 0; i < nt->compound.arity; i++)
@@ -630,7 +630,7 @@ static int dcg_expand_body(Term *body, Term *s_in, Term *s_out,
     int curl_id  = prolog_atom_intern("{}");
 
     /* {} — inline Prolog goal, no list threading */
-    if (body->tag == TT_COMPOUND && body->compound.functor == curl_id
+    if (body->tag == TERM_COMPOUND && body->compound.functor == curl_id
             && body->compound.arity == 1) {
         /* flatten the inner goal into buf */
         int n = count_conj(body->compound.args[0]);
@@ -646,20 +646,20 @@ static int dcg_expand_body(Term *body, Term *s_in, Term *s_out,
     }
 
     /* [] — empty terminal list: s_in = s_out */
-    if (body->tag == TT_ATOM && body->atom_id == ATOM_NIL) {
+    if (body->tag == TERM_ATOM && body->atom_id == ATOM_NIL) {
         buf[idx++] = dcg_make_unify(s_in, s_out);
         return idx;
     }
 
     /* [t1,...] — terminal list: s_in = [t1,...|s_out] */
-    if (body->tag == TT_COMPOUND && body->compound.functor == ATOM_DOT) {
+    if (body->tag == TERM_COMPOUND && body->compound.functor == ATOM_DOT) {
         Term *list_with_tail = dcg_append_tail(body, s_out);
         buf[idx++] = dcg_make_unify(s_in, list_with_tail);
         return idx;
     }
 
     /* (A , B) — conjunction: thread s_in -> s_mid -> s_out */
-    if (body->tag == TT_COMPOUND && body->compound.functor == comma_id
+    if (body->tag == TERM_COMPOUND && body->compound.functor == comma_id
             && body->compound.arity == 2) {
         Term *s_mid = dcg_fresh_var(sc);
         idx = dcg_expand_body(body->compound.args[0], s_in,  s_mid, sc, buf, idx);
@@ -668,7 +668,7 @@ static int dcg_expand_body(Term *body, Term *s_in, Term *s_out,
     }
 
     /* (A ; B) — disjunction: build (expanded_A ; expanded_B) as single goal */
-    if (body->tag == TT_COMPOUND && body->compound.functor == semi_id
+    if (body->tag == TERM_COMPOUND && body->compound.functor == semi_id
             && body->compound.arity == 2) {
         /* Expand each branch into a conjunction term */
         Term *buf_a[256]; int na = 0;
@@ -695,14 +695,14 @@ static int dcg_expand_body(Term *body, Term *s_in, Term *s_out,
     }
 
     /* ! — cut passes through, s_in = s_out */
-    if (body->tag == TT_ATOM && body->atom_id == prolog_atom_intern("!")) {
+    if (body->tag == TERM_ATOM && body->atom_id == prolog_atom_intern("!")) {
         buf[idx++] = body;
         buf[idx++] = dcg_make_unify(s_in, s_out);
         return idx;
     }
 
     /* true — no-op */
-    if (body->tag == TT_ATOM && body->atom_id == prolog_atom_intern("true")) {
+    if (body->tag == TERM_ATOM && body->atom_id == prolog_atom_intern("true")) {
         buf[idx++] = dcg_make_unify(s_in, s_out);
         return idx;
     }
@@ -724,11 +724,11 @@ static void dcg_expand_clause(PlClause *cl, Term *dcg_body, Term *pushback, VarS
     Term *s  = dcg_fresh_var(sc);
 
     Term *head = term_deref(cl->head);
-    if (head->tag == TT_ATOM) {
+    if (head->tag == TERM_ATOM) {
         Term **args = malloc(2 * sizeof(Term *));
         args[0] = s0; args[1] = s;
         cl->head = term_new_compound(head->atom_id, 2, args);
-    } else if (head->tag == TT_COMPOUND) {
+    } else if (head->tag == TERM_COMPOUND) {
         int new_arity = head->compound.arity + 2;
         Term **args = malloc(new_arity * sizeof(Term *));
         for (int i = 0; i < head->compound.arity; i++)
@@ -783,13 +783,13 @@ static int eval_if_condition(Term *cond) {
     cond = term_deref(cond);
     if (!cond) return -1;
 
-    if (cond->tag == TT_ATOM) {
+    if (cond->tag == TERM_ATOM) {
         const char *a = prolog_atom_name(cond->atom_id);
         if (strcmp(a, "true") == 0) return 1;
         if (strcmp(a, "fail") == 0 || strcmp(a, "false") == 0) return 0;
         return -1;
     }
-    if (cond->tag != TT_COMPOUND) return -1;
+    if (cond->tag != TERM_COMPOUND) return -1;
 
     const char *fn = prolog_atom_name(cond->compound.functor);
     int arity = cond->compound.arity;
@@ -803,7 +803,7 @@ static int eval_if_condition(Term *cond) {
     if (strcmp(fn, "current_prolog_flag") == 0 && arity == 2) {
         Term *flag_t = term_deref(cond->compound.args[0]);
         Term *val_t  = term_deref(cond->compound.args[1]);
-        if (!flag_t || !val_t || flag_t->tag != TT_ATOM || val_t->tag != TT_ATOM)
+        if (!flag_t || !val_t || flag_t->tag != TERM_ATOM || val_t->tag != TERM_ATOM)
             return -1;
         const char *flag = prolog_atom_name(flag_t->atom_id);
         const char *val  = prolog_atom_name(val_t->atom_id);
@@ -835,10 +835,10 @@ static int try_handle_if_directive(Parser *p, Term *goal, int lineno) {
     const char *fn = NULL;
     int arity = 0;
     Term *arg0 = NULL;
-    if (goal->tag == TT_ATOM) {
+    if (goal->tag == TERM_ATOM) {
         fn = prolog_atom_name(goal->atom_id);
         arity = 0;
-    } else if (goal->tag == TT_COMPOUND) {
+    } else if (goal->tag == TERM_COMPOUND) {
         fn = prolog_atom_name(goal->compound.functor);
         arity = goal->compound.arity;
         if (arity > 0) arg0 = goal->compound.args[0];
@@ -911,17 +911,17 @@ static PlClause *parse_clause(Parser *p) {
     scope_reset(&p->sc);
 
     Token pk = lexer_peek(&p->lx);
-    if (pk.t == TK_EOF) return NULL;
+    if (pk.kind == TK_EOF) return NULL;
 
     PlClause *cl = calloc(1, sizeof(PlClause));
     cl->lineno = pk.line;
 
     /* Directive:  :- goal . */
-    if (pk.t == TK_NECK) {
+    if (pk.kind == TK_NECK) {
         lexer_next(&p->lx); /* consume :- */
         Term *goal = parse_term(p, 1200);
         Token dot = lexer_next(&p->lx);
-        if (dot.t != TK_DOT)
+        if (dot.kind != TK_DOT)
             perror_at(p, dot.line, "expected . after directive");
 
         /* Conditional-compilation meta-directives — handled here, returned as a
@@ -949,7 +949,7 @@ static PlClause *parse_clause(Parser *p) {
     cl->head = head;
 
     pk = lexer_peek(&p->lx);
-    if (pk.t == TK_NECK) {
+    if (pk.kind == TK_NECK) {
         /* Normal :- rule — head was parsed at 1200 but comma at top level is fine
          * because the head of a :- clause is never a bare conjunction. */
         lexer_next(&p->lx); /* consume :- */
@@ -957,14 +957,14 @@ static PlClause *parse_clause(Parser *p) {
         int n = count_conj(body_term);
         cl->body  = malloc((n ? n : 1) * sizeof(Term *));
         cl->nbody = flatten_conj(body_term, cl->body, 0);
-    } else if (pk.t == TK_OP && strcmp(pk.text, "-->") == 0) {
+    } else if (pk.kind == TK_OP && strcmp(pk.text, "-->") == 0) {
         lexer_next(&p->lx); /* consume --> */
         Term *dcg_body = parse_term(p, 1200);
         /* Pushback notation: if head is ','(RealHead, Pushback), split it */
         Term *pushback = NULL;
         Term *hd = term_deref(cl->head);
         int comma_id = prolog_atom_intern(",");
-        if (hd->tag == TT_COMPOUND && hd->compound.functor == comma_id && hd->compound.arity == 2) {
+        if (hd->tag == TERM_COMPOUND && hd->compound.functor == comma_id && hd->compound.arity == 2) {
             cl->head = hd->compound.args[0];
             pushback = hd->compound.args[1];
         }
@@ -975,7 +975,7 @@ static PlClause *parse_clause(Parser *p) {
     }
 
     Token dot = lexer_next(&p->lx);
-    if (dot.t != TK_DOT)
+    if (dot.kind != TK_DOT)
         perror_at(p, dot.line, "expected . at end of clause");
 
     return cl;
@@ -999,8 +999,8 @@ PlProgram *prolog_parse(const char *src, const char *filename) {
 
     for (;;) {
         Token pk = lexer_peek(&p.lx);
-        if (pk.t == TK_EOF) break;
-        if (pk.t == TK_ERROR) {
+        if (pk.kind == TK_EOF) break;
+        if (pk.kind == TK_ERROR) {
             fprintf(stderr, "%s:%d: lex error: %s\n",
                     p.filename, pk.line, pk.text);
             p.nerrors++;
@@ -1051,7 +1051,7 @@ void term_pretty(Term *t, FILE *out) {
     if (!t) { fprintf(out, "<null>"); return; }
 
     switch (t->tag) {
-        case TT_ATOM: {
+        case TERM_ATOM: {
             const char *n = prolog_atom_name(t->atom_id);
             if (!n) n = "?";
             /* Quote if needed */
@@ -1065,16 +1065,16 @@ void term_pretty(Term *t, FILE *out) {
                 fprintf(out, "%s", n);
             break;
         }
-        case TT_VAR:
+        case TERM_VAR:
             fprintf(out, "_V%d", t->var_slot < 0 ? 0 : t->var_slot);
             break;
-        case TT_INT:
-            fprintf(out, "%ld", t->v.ival);
+        case TERM_INT:
+            fprintf(out, "%ld", t->ival);
             break;
-        case TT_FLOAT:
+        case TERM_FLOAT:
             fprintf(out, "%g", t->fval);
             break;
-        case TT_COMPOUND: {
+        case TERM_COMPOUND: {
             const char *fn = prolog_atom_name(t->compound.functor);
             if (!fn) fn = "?";
             /* List notation */
@@ -1082,13 +1082,13 @@ void term_pretty(Term *t, FILE *out) {
                 fprintf(out, "[");
                 term_pretty(t->compound.args[0], out);
                 Term *tail = term_deref(t->compound.args[1]);
-                while (tail && tail->tag == TT_COMPOUND &&
+                while (tail && tail->tag == TERM_COMPOUND &&
                        tail->compound.functor == ATOM_DOT && tail->compound.arity == 2) {
                     fprintf(out, ",");
                     term_pretty(tail->compound.args[0], out);
                     tail = term_deref(tail->compound.args[1]);
                 }
-                if (tail && !(tail->tag == TT_ATOM && tail->atom_id == ATOM_NIL)) {
+                if (tail && !(tail->tag == TERM_ATOM && tail->atom_id == ATOM_NIL)) {
                     fprintf(out, "|");
                     term_pretty(tail, out);
                 }
@@ -1113,7 +1113,7 @@ void term_pretty(Term *t, FILE *out) {
             fprintf(out, ")");
             break;
         }
-        case TT_REF:
+        case TERM_REF:
             term_pretty(t->ref, out);
             break;
     }

@@ -12,11 +12,11 @@
  * value-context evaluator introduced by RS-17.  No direct interp_eval
  * call site or extern declaration remains here.  bb_eval_value falls
  * through to interp_eval for the IR shapes a Prolog clause body
- * contains today (AST_BLOCK / AST_FNC / AST_CHOICE / AST_UNIFY / AST_CUT / etc.) —
+ * contains today (AST_BLOCK / TT_FNC / TT_CHOICE / TT_UNIFY / TT_CUT / etc.) —
  * each gets handled inside the existing interp_eval Prolog dispatch,
  * which reads g_pl_env directly for variable resolution (clause-body
- * AST_VAR is never reached because Prolog uses pl_unified_term_from_expr
- * for variable resolution at goal evaluation, not AST_VAR-eval).
+ * TERM_VAR is never reached because Prolog uses pl_unified_term_from_expr
+ * for variable resolution at goal evaluation, not TERM_VAR-eval).
  *
  * AUTHORS: Lon Jones Cherryholmes · Claude Sonnet 4.6 (FI-5, 2026-04-14)
  */
@@ -33,7 +33,7 @@
 
 /* pl_assert_term declared in prolog_lower.h but included here via forward decl
  * to avoid scrip_cc.h path issues from runtime/interp context. */
-extern AST_t *pl_assert_term(Term *t, int *functor_out, int *arity_out);
+extern tree_t *pl_assert_term(Term *t, int *functor_out, int *arity_out);
 #include "../../frontend/prolog/pl_broker.h"
 #include "../../runtime/x86/bb_broker.h"
 #include "coro_value.h"   /* RS-18: bb_eval_value — shared Icon/Prolog value-context evaluator */
@@ -146,19 +146,19 @@ unsigned pl_pred_hash(const char *s) {
     while (*s) h = h * 33 ^ (unsigned char)*s++;
     return h % PL_PRED_TABLE_SIZE;
 }
-void pl_pred_table_insert(Pl_PredTable *pt, const char *key, AST_t *choice) {
+void pl_pred_table_insert(Pl_PredTable *pt, const char *key, tree_t *choice) {
     unsigned h = pl_pred_hash(key);
     Pl_PredEntry *e = malloc(sizeof(Pl_PredEntry));
     e->key = key; e->choice = choice; e->entry_pc = -1; e->next = pt->buckets[h]; pt->buckets[h] = e;
 }
-AST_t *pl_pred_table_lookup(Pl_PredTable *pt, const char *key) {
+tree_t *pl_pred_table_lookup(Pl_PredTable *pt, const char *key) {
     for (Pl_PredEntry *e = pt->buckets[pl_pred_hash(key)]; e; e = e->next)
         if (strcmp(e->key, key) == 0) return e->choice;
     return NULL;
 }
 
 /* pl_pred_table_lookup_global — non-static wrapper for pl_broker.c (pl_interp.h) */
-AST_t *pl_pred_table_lookup_global(const char *key) {
+tree_t *pl_pred_table_lookup_global(const char *key) {
     return pl_pred_table_lookup(&g_pl_pred_table, key);
 }
 /* CH-17e: return full Pl_PredEntry* for entry_pc access */
@@ -169,13 +169,13 @@ Pl_PredEntry *pl_pred_entry_lookup(const char *key) {
 }
 
 /*----------------------------------------------------------------------------------------------------------------------------
- * pl_pred_table_get_or_create_choice — find or create the AST_CHOICE node for key in the global pred table.
+ * pl_pred_table_get_or_create_choice — find or create the TT_CHOICE node for key in the global pred table.
  * key is "functor/arity" string (caller owns; we strdup internally if creating).
  *----------------------------------------------------------------------------------------------------------------------------*/
-static AST_t *pl_pred_table_get_or_create_choice(const char *key) {
-    AST_t *ch = pl_pred_table_lookup(&g_pl_pred_table, key);
+static tree_t *pl_pred_table_get_or_create_choice(const char *key) {
+    tree_t *ch = pl_pred_table_lookup(&g_pl_pred_table, key);
     if (ch) return ch;
-    ch = expr_new(AST_CHOICE);
+    ch = ast_node_new(TT_CHOICE);
     ch->v.sval = strdup(key);
     pl_pred_table_insert(&g_pl_pred_table, ch->v.sval, ch);
     return ch;
@@ -187,14 +187,14 @@ static AST_t *pl_pred_table_get_or_create_choice(const char *key) {
  *----------------------------------------------------------------------------------------------------------------------------*/
 static int pl_assert_clause(Term *t, int end) {
     int functor_id = -1, arity = 0;
-    AST_t *ec = pl_assert_term(t, &functor_id, &arity);
+    tree_t *ec = pl_assert_term(t, &functor_id, &arity);
     if (!ec) return 0;
     /* Build key string "functor/arity" */
     const char *fname = prolog_atom_name(functor_id);
     if (!fname) return 0;
     char key[256];
     snprintf(key, sizeof key, "%s/%d", fname, arity);
-    AST_t *ch = pl_pred_table_get_or_create_choice(key);
+    tree_t *ch = pl_pred_table_get_or_create_choice(key);
     if (end) {
         /* assertz — append at end */
         expr_add_child(ch, ec);
@@ -202,7 +202,7 @@ static int pl_assert_clause(Term *t, int end) {
         /* asserta — prepend: shift existing children up, insert at [0] */
         expr_add_child(ch, ec);  /* grow array first */
         if (ch->n > 1) {
-            memmove(&ch->c[1], &ch->c[0], (ch->n - 1) * sizeof(AST_t *));
+            memmove(&ch->c[1], &ch->c[0], (ch->n - 1) * sizeof(tree_t *));
             ch->c[0] = ec;
         }
     }
@@ -219,25 +219,25 @@ static int pl_retract_clause(Term *t) {
     t = term_deref(t);
     /* Extract head from :-(Head,Body) or plain head */
     Term *head = t;
-    if (t->tag == TT_COMPOUND && t->compound.arity == 2) {
+    if (t->tag == TERM_COMPOUND && t->compound.arity == 2) {
         const char *fn = prolog_atom_name(t->compound.functor);
         if (fn && strcmp(fn, ":-") == 0) head = term_deref(t->compound.args[0]);
     }
     /* Get functor/arity key */
     const char *fname = NULL;
     int arity = 0;
-    if (head->tag == TT_ATOM) {
+    if (head->tag == TERM_ATOM) {
         fname = prolog_atom_name(head->atom_id); arity = 0;
-    } else if (head->tag == TT_COMPOUND) {
+    } else if (head->tag == TERM_COMPOUND) {
         fname = prolog_atom_name(head->compound.functor); arity = head->compound.arity;
     }
     if (!fname) return 0;
     char key[256]; snprintf(key, sizeof key, "%s/%d", fname, arity);
-    AST_t *ch = pl_pred_table_lookup(&g_pl_pred_table, key);
+    tree_t *ch = pl_pred_table_lookup(&g_pl_pred_table, key);
     if (!ch || ch->n == 0) return 0;
     /* Remove first clause */
     free(ch->c[0]);
-    memmove(&ch->c[0], &ch->c[1], (ch->n - 1) * sizeof(AST_t *));
+    memmove(&ch->c[0], &ch->c[1], (ch->n - 1) * sizeof(tree_t *));
     ch->n--;
     return 1;
 }
@@ -250,20 +250,20 @@ static int pl_abolish_pred(Term *t) {
     t = term_deref(t);
     const char *fname = NULL; int arity = 0;
     /* Accept functor/arity compound or plain atom */
-    if (t->tag == TT_COMPOUND && t->compound.arity == 2) {
+    if (t->tag == TERM_COMPOUND && t->compound.arity == 2) {
         const char *fn = prolog_atom_name(t->compound.functor);
         if (fn && strcmp(fn, "/") == 0) {
             Term *na = term_deref(t->compound.args[0]);
             Term *ar = term_deref(t->compound.args[1]);
-            if (na && na->tag == TT_ATOM) fname = prolog_atom_name(na->atom_id);
-            if (ar && ar->tag == TT_INT)  arity = (int)ar->v.ival;
+            if (na && na->tag == TERM_ATOM) fname = prolog_atom_name(na->atom_id);
+            if (ar && ar->tag == TERM_INT)  arity = (int)ar->ival;
         }
-    } else if (t->tag == TT_ATOM) {
+    } else if (t->tag == TERM_ATOM) {
         fname = prolog_atom_name(t->atom_id); arity = 0;
     }
     if (!fname) return 0;
     char key[256]; snprintf(key, sizeof key, "%s/%d", fname, arity);
-    AST_t *ch = pl_pred_table_lookup(&g_pl_pred_table, key);
+    tree_t *ch = pl_pred_table_lookup(&g_pl_pred_table, key);
     if (!ch) return 1;  /* already gone — succeed */
     ch->n = 0;  /* remove all clauses */
     return 1;
@@ -293,28 +293,28 @@ Term **pl_env_new(int n) {
 
 /*---- Continuation type ----*/
 /*---- Forward declarations ----*/
-Term *pl_unified_term_from_expr(AST_t *e, Term **env);
+Term *pl_unified_term_from_expr(tree_t *e, Term **env);
 static Term *pl_unified_deep_copy(Term *t);
-int          interp_exec_pl_builtin(AST_t *goal, Term **env);
+int          interp_exec_pl_builtin(tree_t *goal, Term **env);
 
 
 
 /*---- pl_unified_term_from_expr ----*/
-Term *pl_unified_term_from_expr(AST_t *e, Term **env) {
+Term *pl_unified_term_from_expr(tree_t *e, Term **env) {
     if (!e) return term_new_atom(prolog_atom_intern("[]"));
     switch (e->t) {
-        case AST_QLIT: return term_new_atom(prolog_atom_intern(e->v.sval ? e->v.sval : ""));
-        case AST_ILIT: return term_new_int((long)e->v.ival);
-        case AST_FLIT: return term_new_float(e->v.dval);
-        case AST_VAR:  return (env && e->v.ival >= 0) ? env[e->v.ival] : term_new_var(e->v.ival);
-        case AST_ADD: case AST_SUB: case AST_MUL: case AST_DIV: case AST_MOD: {
+        case TT_QLIT: return term_new_atom(prolog_atom_intern(e->v.sval ? e->v.sval : ""));
+        case TT_ILIT: return term_new_int((long)e->v.ival);
+        case TT_FLIT: return term_new_float(e->v.dval);
+        case TT_VAR:  return (env && e->v.ival >= 0) ? env[e->v.ival] : term_new_var(e->v.ival);
+        case TT_ADD: case TT_SUB: case TT_MUL: case TT_DIV: case TT_MOD: {
             /* arithmetic ops used as terms (e.g. K-V): wrap as compound */
-            const char *op = e->t==AST_ADD?"+":e->t==AST_SUB?"-":e->t==AST_MUL?"*":e->t==AST_DIV?"/":"%";
+            const char *op = e->t==TT_ADD?"+":e->t==TT_SUB?"-":e->t==TT_MUL?"*":e->t==TT_DIV?"/":"%";
             int atom = prolog_atom_intern(op);
             Term *args2[2]; args2[0]=pl_unified_term_from_expr(e->c[0],env); args2[1]=pl_unified_term_from_expr(e->c[1],env);
             return term_new_compound(atom, 2, args2);
         }
-        case AST_UNIFY: {
+        case TT_UNIFY: {
             /* =/2 used as a term (e.g. G = (X = 5), assertz(p(X = 5))): wrap as
              * compound. Without this, the default arm below silently produced
              * atom("?") and any later call(G) / catch(G,_,_) saw a literal
@@ -325,9 +325,9 @@ Term *pl_unified_term_from_expr(AST_t *e, Term **env) {
             args2[1] = e->n > 1 ? pl_unified_term_from_expr(e->c[1], env) : term_new_atom(atom);
             return term_new_compound(atom, 2, args2);
         }
-        case AST_CUT:  return term_new_atom(prolog_atom_intern("!"));
-        case AST_NUL:  return term_new_atom(prolog_atom_intern("[]"));
-        case AST_FNC: {
+        case TT_CUT:  return term_new_atom(prolog_atom_intern("!"));
+        case TT_NUL:  return term_new_atom(prolog_atom_intern("[]"));
+        case TT_FNC: {
             int arity = e->n;
             int atom  = prolog_atom_intern(e->v.sval ? e->v.sval : "f");
             if (arity == 0) return term_new_atom(atom);
@@ -344,11 +344,11 @@ Term *pl_unified_term_from_expr(AST_t *e, Term **env) {
 /*---- pl_unified_deep_copy ----*/
 static Term *pl_unified_deep_copy(Term *t) {
     t = term_deref(t);
-    if (!t || t->tag == TT_VAR) return term_new_atom(prolog_atom_intern("_"));
-    if (t->tag == TT_ATOM)  return term_new_atom(t->atom_id);
-    if (t->tag == TT_INT)   return term_new_int(t->v.ival);
-    if (t->tag == TT_FLOAT) return term_new_float(t->fval);
-    if (t->tag == TT_COMPOUND) {
+    if (!t || t->tag == TERM_VAR) return term_new_atom(prolog_atom_intern("_"));
+    if (t->tag == TERM_ATOM)  return term_new_atom(t->atom_id);
+    if (t->tag == TERM_INT)   return term_new_int(t->ival);
+    if (t->tag == TERM_FLOAT) return term_new_float(t->fval);
+    if (t->tag == TERM_COMPOUND) {
         Term **args = malloc(t->compound.arity * sizeof(Term *));
         for (int i = 0; i < t->compound.arity; i++) args[i] = pl_unified_deep_copy(t->compound.args[i]);
         Term *r = term_new_compound(t->compound.functor, t->compound.arity, args);
@@ -359,7 +359,7 @@ static Term *pl_unified_deep_copy(Term *t) {
 }
 
 /* F-3 RS-7: ISO mod — sign of divisor (floor division remainder).
- * Appears in AST_MOD case and AST_FNC "mod" case — unified here. */
+ * Appears in TT_MOD case and TT_FNC "mod" case — unified here. */
 static inline long pl_iso_mod(long n, long d) {
     if (!d) return 0;
     if (n == LONG_MIN && d == -1) return 0;
@@ -369,27 +369,27 @@ static inline long pl_iso_mod(long n, long d) {
 }
 
 /*---- pl_unified_eval_arith_term — float-aware, returns Term* ----*/
-static Term *pl_unified_eval_arith_term(AST_t *e, Term **env) {
+static Term *pl_unified_eval_arith_term(tree_t *e, Term **env) {
     if (!e) return term_new_int(0);
     /* helper macros */
-#define _EI(x) ({ Term *_t = pl_unified_eval_arith_term(x,env); (_t&&_t->tag==TT_INT)?_t->v.ival:(_t&&_t->tag==TT_FLOAT)?(long)_t->fval:0L; })
-#define _ED(x) ({ Term *_t = pl_unified_eval_arith_term(x,env); (_t&&_t->tag==TT_FLOAT)?_t->fval:(_t&&_t->tag==TT_INT)?(double)_t->v.ival:0.0; })
-#define _EIS(x) (pl_unified_eval_arith_term(x,env)->tag==TT_FLOAT)
+#define _EI(x) ({ Term *_t = pl_unified_eval_arith_term(x,env); (_t&&_t->tag==TERM_INT)?_t->ival:(_t&&_t->tag==TERM_FLOAT)?(long)_t->fval:0L; })
+#define _ED(x) ({ Term *_t = pl_unified_eval_arith_term(x,env); (_t&&_t->tag==TERM_FLOAT)?_t->fval:(_t&&_t->tag==TERM_INT)?(double)_t->ival:0.0; })
+#define _EIS(x) (pl_unified_eval_arith_term(x,env)->tag==TERM_FLOAT)
 #define _EF(op,a,b) ({ Term *_la=pl_unified_eval_arith_term(a,env),*_lb=pl_unified_eval_arith_term(b,env); \
-                       int _fl=(_la&&_la->tag==TT_FLOAT)||(_lb&&_lb->tag==TT_FLOAT); \
+                       int _fl=(_la&&_la->tag==TERM_FLOAT)||(_lb&&_lb->tag==TERM_FLOAT); \
                        _fl?term_new_float(_ED(a) op _ED(b)):term_new_int(_EI(a) op _EI(b)); })
     switch (e->t) {
-        case AST_ILIT: return term_new_int((long)e->v.ival);
-        case AST_FLIT: return term_new_float(e->v.dval);
-        case AST_VAR: {
+        case TT_ILIT: return term_new_int((long)e->v.ival);
+        case TT_FLIT: return term_new_float(e->v.dval);
+        case TT_VAR: {
             Term *t = term_deref(env && e->v.ival >= 0 ? env[e->v.ival] : NULL);
-            if (!t || t->tag == TT_VAR) { pl_throw_instantiation_error(); return NULL; }
+            if (!t || t->tag == TERM_VAR) { pl_throw_instantiation_error(); return NULL; }
             return t;
         }
-        case AST_ADD: {
+        case TT_ADD: {
             Term *la=pl_unified_eval_arith_term(e->c[0],env);
             Term *lb=pl_unified_eval_arith_term(e->c[1],env);
-            int fl=(la&&la->tag==TT_FLOAT)||(lb&&lb->tag==TT_FLOAT);
+            int fl=(la&&la->tag==TERM_FLOAT)||(lb&&lb->tag==TERM_FLOAT);
             if (fl) return term_new_float(_ED(e->c[0]) + _ED(e->c[1]));
             /* signed-overflow detection — promote to float on wrap (matches SWI
              * bounded=true semantics: minint_promotion expects a float result). */
@@ -398,30 +398,30 @@ static Term *pl_unified_eval_arith_term(AST_t *e, Term **env) {
                 return term_new_float((double)a + (double)b);
             return term_new_int(r);
         }
-        case AST_SUB: {
+        case TT_SUB: {
             Term *la=pl_unified_eval_arith_term(e->c[0],env);
             Term *lb=pl_unified_eval_arith_term(e->c[1],env);
-            int fl=(la&&la->tag==TT_FLOAT)||(lb&&lb->tag==TT_FLOAT);
+            int fl=(la&&la->tag==TERM_FLOAT)||(lb&&lb->tag==TERM_FLOAT);
             if (fl) return term_new_float(_ED(e->c[0]) - _ED(e->c[1]));
             long a=_EI(e->c[0]), b=_EI(e->c[1]), r;
             if (__builtin_sub_overflow(a, b, &r))
                 return term_new_float((double)a - (double)b);
             return term_new_int(r);
         }
-        case AST_MUL: {
+        case TT_MUL: {
             Term *la=pl_unified_eval_arith_term(e->c[0],env);
             Term *lb=pl_unified_eval_arith_term(e->c[1],env);
-            int fl=(la&&la->tag==TT_FLOAT)||(lb&&lb->tag==TT_FLOAT);
+            int fl=(la&&la->tag==TERM_FLOAT)||(lb&&lb->tag==TERM_FLOAT);
             if (fl) return term_new_float(_ED(e->c[0]) * _ED(e->c[1]));
             long a=_EI(e->c[0]), b=_EI(e->c[1]), r;
             if (__builtin_mul_overflow(a, b, &r))
                 return term_new_float((double)a * (double)b);
             return term_new_int(r);
         }
-        case AST_DIV: {
+        case TT_DIV: {
             Term *la=pl_unified_eval_arith_term(e->c[0],env);
             Term *lb=pl_unified_eval_arith_term(e->c[1],env);
-            int fl=(la&&la->tag==TT_FLOAT)||(lb&&lb->tag==TT_FLOAT);
+            int fl=(la&&la->tag==TERM_FLOAT)||(lb&&lb->tag==TERM_FLOAT);
             if (fl) { double d=_ED(e->c[1]); return term_new_float(d?_ED(e->c[0])/d:0.0); }
             else    {
                 long  n=_EI(e->c[0]);
@@ -435,8 +435,8 @@ static Term *pl_unified_eval_arith_term(AST_t *e, Term **env) {
                 return term_new_int(n/d);
             }
         }
-        case AST_MOD: return term_new_int(pl_iso_mod(_EI(e->c[0]), _EI(e->c[1])));
-        case AST_FNC: {
+        case TT_MOD: return term_new_int(pl_iso_mod(_EI(e->c[0]), _EI(e->c[1])));
+        case TT_FNC: {
             const char *fn = e->v.sval ? e->v.sval : "";
             /* two-arg integer bitwise / misc */
             if (strcmp(fn,"/\\")==0&&e->n==2) return term_new_int(_EI(e->c[0])&_EI(e->c[1]));
@@ -458,15 +458,15 @@ static Term *pl_unified_eval_arith_term(AST_t *e, Term **env) {
                 /* ^ returns integer for non-negative integer exponents, else float */
                 Term *la=pl_unified_eval_arith_term(e->c[0],env);
                 Term *lb=pl_unified_eval_arith_term(e->c[1],env);
-                if (la&&lb&&la->tag==TT_INT&&lb->tag==TT_INT&&lb->v.ival>=0) {
-                    long base=la->v.ival, exp=lb->v.ival, acc=1;
+                if (la&&lb&&la->tag==TERM_INT&&lb->tag==TERM_INT&&lb->ival>=0) {
+                    long base=la->ival, exp=lb->ival, acc=1;
                     while (exp-- > 0) acc *= base;
                     return term_new_int(acc);
                 }
                 return term_new_float(pow(_ED(e->c[0]),_ED(e->c[1])));
             }
-            if (strcmp(fn,"max")==0&&e->n==2) { Term *la=pl_unified_eval_arith_term(e->c[0],env),*lb=pl_unified_eval_arith_term(e->c[1],env); int fl=(la&&la->tag==TT_FLOAT)||(lb&&lb->tag==TT_FLOAT); return fl?(_ED(e->c[0])>=_ED(e->c[1])?la:lb):(_EI(e->c[0])>=_EI(e->c[1])?la:lb); }
-            if (strcmp(fn,"min")==0&&e->n==2) { Term *la=pl_unified_eval_arith_term(e->c[0],env),*lb=pl_unified_eval_arith_term(e->c[1],env); int fl=(la&&la->tag==TT_FLOAT)||(lb&&lb->tag==TT_FLOAT); return fl?(_ED(e->c[0])<=_ED(e->c[1])?la:lb):(_EI(e->c[0])<=_EI(e->c[1])?la:lb); }
+            if (strcmp(fn,"max")==0&&e->n==2) { Term *la=pl_unified_eval_arith_term(e->c[0],env),*lb=pl_unified_eval_arith_term(e->c[1],env); int fl=(la&&la->tag==TERM_FLOAT)||(lb&&lb->tag==TERM_FLOAT); return fl?(_ED(e->c[0])>=_ED(e->c[1])?la:lb):(_EI(e->c[0])>=_EI(e->c[1])?la:lb); }
+            if (strcmp(fn,"min")==0&&e->n==2) { Term *la=pl_unified_eval_arith_term(e->c[0],env),*lb=pl_unified_eval_arith_term(e->c[1],env); int fl=(la&&la->tag==TERM_FLOAT)||(lb&&lb->tag==TERM_FLOAT); return fl?(_ED(e->c[0])<=_ED(e->c[1])?la:lb):(_EI(e->c[0])<=_EI(e->c[1])?la:lb); }
             if (strcmp(fn,"gcd")==0&&e->n==2) { long a=labs(_EI(e->c[0])),b=labs(_EI(e->c[1])); while(b){long r=a%b;a=b;b=r;} return term_new_int(a); }
             /* one-arg float ops */
             if (e->n==1) {
@@ -493,10 +493,10 @@ static Term *pl_unified_eval_arith_term(AST_t *e, Term **env) {
             /* atom constants */
             if (strcmp(fn,"pi")==0&&e->n==0) return term_new_float(M_PI);
             if (strcmp(fn,"e")==0&&e->n==0)  return term_new_float(M_E);
-            /* unknown evaluable: resolve via env (e.g. TT_INT/TT_FLOAT atom from copy_term) */
+            /* unknown evaluable: resolve via env (e.g. TERM_INT/TERM_FLOAT atom from copy_term) */
             Term *t=term_deref(pl_unified_term_from_expr(e,env));
-            if (!t || t->tag == TT_VAR) { pl_throw_instantiation_error(); return NULL; }
-            if (t->tag == TT_INT || t->tag == TT_FLOAT) return t;
+            if (!t || t->tag == TERM_VAR) { pl_throw_instantiation_error(); return NULL; }
+            if (t->tag == TERM_INT || t->tag == TERM_FLOAT) return t;
             /* truly non-evaluable: throw type_error(evaluable, Name/Arity) */
             pl_throw_type_error_evaluable(fn ? fn : "", e->n);
             return NULL;
@@ -510,17 +510,17 @@ static Term *pl_unified_eval_arith_term(AST_t *e, Term **env) {
 }
 
 /*---- pl_unified_eval_arith — integer wrapper (kept for comparison callers) ----*/
-static long pl_unified_eval_arith(AST_t *e, Term **env) {
+static long pl_unified_eval_arith(tree_t *e, Term **env) {
     Term *t = pl_unified_eval_arith_term(e, env);
     if (!t) return 0;
-    if (t->tag == TT_FLOAT) return (long)t->fval;
-    if (t->tag == TT_INT)   return t->v.ival;
+    if (t->tag == TERM_FLOAT) return (long)t->fval;
+    if (t->tag == TERM_INT)   return t->ival;
     return 0;
 }
 
 /*---- is_pl_user_call ----*/
-int is_pl_user_call(AST_t *goal) {
-    if (!goal || goal->t != AST_FNC || !goal->v.sval) return 0;
+int is_pl_user_call(tree_t *goal) {
+    if (!goal || goal->t != TT_FNC || !goal->v.sval) return 0;
     static const char *builtins[] = {
         "true","fail","halt","nl","write","writeln","print","writeq","write_canonical","tab","is",
         "<",">","=<",">=","=:=","=\\=","=","\\=","==","\\==",
@@ -557,19 +557,19 @@ static int term_order_cmp(Term *a, Term *b) {
     if (!a) return -1;
     if (!b) return  1;
     /* Type rank: var=0, number=1, atom=2, compound=3 */
-    int ra = (a->tag==TT_VAR)?0:(a->tag==TT_INT||a->tag==TT_FLOAT)?1:(a->tag==TT_ATOM)?2:3;
-    int rb = (b->tag==TT_VAR)?0:(b->tag==TT_INT||b->tag==TT_FLOAT)?1:(b->tag==TT_ATOM)?2:3;
+    int ra = (a->tag==TERM_VAR)?0:(a->tag==TERM_INT||a->tag==TERM_FLOAT)?1:(a->tag==TERM_ATOM)?2:3;
+    int rb = (b->tag==TERM_VAR)?0:(b->tag==TERM_INT||b->tag==TERM_FLOAT)?1:(b->tag==TERM_ATOM)?2:3;
     if (ra != rb) return ra - rb;
     switch (a->tag) {
         case TT_VAR:   return (int)(a - b);  /* address order for unbound vars */
-        case TT_INT:   return (a->v.ival < b->v.ival) ? -1 : (a->v.ival > b->v.ival) ? 1 : 0;
-        case TT_FLOAT: return (a->fval < b->fval) ? -1 : (a->fval > b->fval) ? 1 : 0;
-        case TT_ATOM: {
+        case TERM_INT:   return (a->ival < b->ival) ? -1 : (a->ival > b->ival) ? 1 : 0;
+        case TERM_FLOAT: return (a->fval < b->fval) ? -1 : (a->fval > b->fval) ? 1 : 0;
+        case TERM_ATOM: {
             const char *sa = prolog_atom_name(a->atom_id);
             const char *sb = prolog_atom_name(b->atom_id);
             return strcmp(sa ? sa : "", sb ? sb : "");
         }
-        case TT_COMPOUND: {
+        case TERM_COMPOUND: {
             /* arity first, then functor name, then args left-to-right */
             if (a->compound.arity != b->compound.arity) return a->compound.arity - b->compound.arity;
             const char *fa = prolog_atom_name(a->compound.functor);
@@ -616,10 +616,10 @@ static Term *copy_term_rec(Term *t, CopyVarMap *map, int *nmap) {
             }
             return fresh;
         }
-        case TT_ATOM:  return term_new_atom(t->atom_id);
-        case TT_INT:   return term_new_int(t->v.ival);
-        case TT_FLOAT: return term_new_float(t->fval);
-        case TT_COMPOUND: {
+        case TERM_ATOM:  return term_new_atom(t->atom_id);
+        case TERM_INT:   return term_new_int(t->ival);
+        case TERM_FLOAT: return term_new_float(t->fval);
+        case TERM_COMPOUND: {
             int ar = t->compound.arity;
             Term **args = malloc(ar * sizeof(Term *));
             for (int i = 0; i < ar; i++)
@@ -645,8 +645,8 @@ static Term *pl_copy_term(Term *t) {
  * Defect background (PL-12 fix #2 v3):
  * When `catch(G,_,_)`'s G is a runtime variable (e.g. plunit asserts test
  * goals into a clause and dispatches them via catch), the EXPR at the catch
- * call site has goal_e->t == AST_VAR. The previous fall-through dispatched
- * `interp_exec_pl_builtin(AST_VAR, env)` which had no AST_VAR case and returned
+ * call site has goal_e->t == TERM_VAR. The previous fall-through dispatched
+ * `interp_exec_pl_builtin(TERM_VAR, env)` which had no TERM_VAR case and returned
  * 1 (silent success) via the `default:` arm. The Var-bound goal never ran.
  * Same defect afflicts \+/1, once/1, not/1 (lines 681/689).
  *
@@ -657,28 +657,28 @@ static Term *pl_copy_term(Term *t) {
  * bb_broker's choice-point machinery interacted badly with the tenv slot
  * Term*s.
  *
- * v3 simplification: the synth EXPR's AST_VAR slots store **the original Term**
+ * v3 simplification: the synth EXPR's TERM_VAR slots store **the original Term**
  * (deref'd) directly. Dispatch goes through `interp_exec_pl_builtin(synth, tenv)`
  * — same routine the surrounding catch code already uses for non-Var goals.
- * No new bb_broker entry. When the synth AST_VAR is resolved by
- * `pl_unified_term_from_expr(child=AST_VAR, env=tenv)`, it returns `tenv[k]`
+ * No new bb_broker entry. When the synth TERM_VAR is resolved by
+ * `pl_unified_term_from_expr(child=TERM_VAR, env=tenv)`, it returns `tenv[k]`
  * which IS the original Term* from the goal. Bindings made on that Term
- * (TT_REF chained back to the caller's env vars) propagate naturally; on
- * caller's unify-stage uargs[k] is bound TT_REF -> tenv[k] which itself is
- * TT_REF -> caller_env[m], so the chain flows correctly.
+ * (TERM_REF chained back to the caller's env vars) propagate naturally; on
+ * caller's unify-stage uargs[k] is bound TERM_REF -> tenv[k] which itself is
+ * TERM_REF -> caller_env[m], so the chain flows correctly.
  *
  * Only the kinds plunit-style goal Terms actually carry are handled:
- *   TT_VAR    -> AST_VAR slot (deduped by pointer identity, X+X = one slot)
- *   TT_INT    -> AST_ILIT
- *   TT_FLOAT  -> AST_FLIT
- *   TT_ATOM   -> AST_FNC nchildren=0 sval=name (true/fail/etc. handled there)
- *   TT_COMPOUND with functor f arity n:
- *     `=` arity 2  -> AST_UNIFY
- *     `+`/`-`/`*`/`/`/`mod` arity 2 -> AST_ADD/AST_SUB/AST_MUL/AST_DIV/AST_MOD
+ *   TERM_VAR    -> TERM_VAR slot (deduped by pointer identity, X+X = one slot)
+ *   TERM_INT    -> TT_ILIT
+ *   TERM_FLOAT  -> TT_FLIT
+ *   TERM_ATOM   -> TT_FNC nchildren=0 sval=name (true/fail/etc. handled there)
+ *   TERM_COMPOUND with functor f arity n:
+ *     `=` arity 2  -> TT_UNIFY
+ *     `+`/`-`/`*`/`/`/`mod` arity 2 -> TT_ADD/TT_SUB/TT_MUL/TT_DIV/TT_MOD
  *       (only when used inside is/2 RHS or similar arith-eval context;
  *       at goal level these aren't valid Prolog goals — but interp_exec_pl_builtin
  *       still recurses on children, so the kinds match what lower_term emits)
- *     anything else -> AST_FNC sval=fn nchildren=n
+ *     anything else -> TT_FNC sval=fn nchildren=n
  *
  * Memory: synth EXPR allocated on heap, freed on exit. Var dedup via
  * pointer-identity scan of tenv (linear; fine for typical goal sizes <16).
@@ -686,17 +686,17 @@ static Term *pl_copy_term(Term *t) {
 
 #define PL_SYNTH_TENV_MAX 64
 
-static AST_t *pl_synth_new(AST_e k) {
-    AST_t *e = (AST_t *)calloc(1, sizeof(AST_t));
+static tree_t *pl_synth_new(tree_e k) {
+    tree_t *e = (tree_t *)calloc(1, sizeof(tree_t));
     e->t = k;
     return e;
 }
 
-static void pl_synth_add_child(AST_t *e, AST_t *child) {
+static void pl_synth_add_child(tree_t *e, tree_t *child) {
     ast_push(e, child);
 }
 
-static void pl_synth_free(AST_t *e) {
+static void pl_synth_free(tree_t *e) {
     if (!e) return;
     for (int i = 0; i < e->n; i++) pl_synth_free(e->c[i]);
     free(e->c);
@@ -712,67 +712,67 @@ static int pl_tenv_add_dedup(Term **tenv, int *pn, Term *v) {
     return (*pn)++;
 }
 
-static AST_t *pl_term_to_synth_expr(Term *t, Term **tenv, int *pn) {
+static tree_t *pl_term_to_synth_expr(Term *t, Term **tenv, int *pn) {
     t = term_deref(t);
     if (!t) {
-        AST_t *e = pl_synth_new(AST_FNC);
+        tree_t *e = pl_synth_new(TT_FNC);
         e->v.sval = strdup("[]");
         return e;
     }
     switch (t->tag) {
         case TT_VAR: {
             int slot = pl_tenv_add_dedup(tenv, pn, t);
-            AST_t *e = pl_synth_new(AST_VAR);
+            tree_t *e = pl_synth_new(TERM_VAR);
             e->v.ival = slot >= 0 ? slot : 0;
             return e;
         }
-        case TT_INT: {
-            AST_t *e = pl_synth_new(AST_ILIT);
-            e->v.ival = t->v.ival;
+        case TERM_INT: {
+            tree_t *e = pl_synth_new(TT_ILIT);
+            e->v.ival = t->ival;
             return e;
         }
-        case TT_FLOAT: {
-            AST_t *e = pl_synth_new(AST_FLIT);
+        case TERM_FLOAT: {
+            tree_t *e = pl_synth_new(TT_FLIT);
             e->v.dval = t->fval;
             return e;
         }
-        case TT_ATOM: {
+        case TERM_ATOM: {
             const char *nm = prolog_atom_name(t->atom_id);
-            AST_t *e = pl_synth_new(AST_FNC);
+            tree_t *e = pl_synth_new(TT_FNC);
             e->v.sval = strdup(nm ? nm : "");
             return e;
         }
-        case TT_COMPOUND: {
+        case TERM_COMPOUND: {
             const char *fn = prolog_atom_name(t->compound.functor);
             if (!fn) fn = "?";
             int arity = t->compound.arity;
-            /* =/2 -> AST_UNIFY */
+            /* =/2 -> TT_UNIFY */
             if (arity == 2 && strcmp(fn, "=") == 0) {
-                AST_t *e = pl_synth_new(AST_UNIFY);
+                tree_t *e = pl_synth_new(TT_UNIFY);
                 pl_synth_add_child(e, pl_term_to_synth_expr(t->compound.args[0], tenv, pn));
                 pl_synth_add_child(e, pl_term_to_synth_expr(t->compound.args[1], tenv, pn));
                 return e;
             }
-            /* arith ops -> AST_ADD etc. only meaningful inside is/2 RHS, but
+            /* arith ops -> TT_ADD etc. only meaningful inside is/2 RHS, but
              * interp_exec_pl_builtin only recurses on children of recognised
              * top-level goals — this is fine because is/2 calls
              * pl_unified_eval_arith_term which knows these kinds. */
             if (arity == 2) {
-                AST_e ak = AST_KIND_COUNT;
-                if      (!strcmp(fn,"+"))   ak = AST_ADD;
-                else if (!strcmp(fn,"-"))   ak = AST_SUB;
-                else if (!strcmp(fn,"*"))   ak = AST_MUL;
-                else if (!strcmp(fn,"/"))   ak = AST_DIV;
-                else if (!strcmp(fn,"mod")) ak = AST_MOD;
-                if (ak != AST_KIND_COUNT) {
-                    AST_t *e = pl_synth_new(ak);
+                tree_e ak = TT_KIND_COUNT;
+                if      (!strcmp(fn,"+"))   ak = TT_ADD;
+                else if (!strcmp(fn,"-"))   ak = TT_SUB;
+                else if (!strcmp(fn,"*"))   ak = TT_MUL;
+                else if (!strcmp(fn,"/"))   ak = TT_DIV;
+                else if (!strcmp(fn,"mod")) ak = TT_MOD;
+                if (ak != TT_KIND_COUNT) {
+                    tree_t *e = pl_synth_new(ak);
                     pl_synth_add_child(e, pl_term_to_synth_expr(t->compound.args[0], tenv, pn));
                     pl_synth_add_child(e, pl_term_to_synth_expr(t->compound.args[1], tenv, pn));
                     return e;
                 }
             }
-            /* General compound -> AST_FNC sval=fn */
-            AST_t *e = pl_synth_new(AST_FNC);
+            /* General compound -> TT_FNC sval=fn */
+            tree_t *e = pl_synth_new(TT_FNC);
             e->v.sval = strdup(fn);
             for (int i = 0; i < arity; i++)
                 pl_synth_add_child(e, pl_term_to_synth_expr(t->compound.args[i], tenv, pn));
@@ -780,7 +780,7 @@ static AST_t *pl_term_to_synth_expr(Term *t, Term **tenv, int *pn) {
         }
     }
     /* unreachable */
-    return pl_synth_new(AST_FNC);
+    return pl_synth_new(TT_FNC);
 }
 
 /* pl_invoke_var_goal — entry point.
@@ -790,7 +790,7 @@ static AST_t *pl_term_to_synth_expr(Term *t, Term **tenv, int *pn) {
  *
  * NOTE: caller_env is unused by this function — the bridge owns its tenv —
  * but is kept in the signature for future use (e.g. if we ever need to alias
- * synth AST_VAR slots to specific caller_env[k] indices instead of via tenv
+ * synth TERM_VAR slots to specific caller_env[k] indices instead of via tenv
  * Term*s). Today it's unused; tenv-by-Term*-identity already preserves the
  * caller's variable bindings via the deref chains. */
 static int pl_invoke_var_goal(Term *gt, Term **caller_env) {
@@ -798,15 +798,15 @@ static int pl_invoke_var_goal(Term *gt, Term **caller_env) {
     gt = term_deref(gt);
     if (!gt) return 0;
     /* Unbound var as goal: instantiation_error in standard Prolog; we just fail. */
-    if (gt->tag == TT_VAR)   return 0;
+    if (gt->tag == TERM_VAR)   return 0;
     /* Numbers aren't callable */
-    if (gt->tag == TT_INT)   return 0;
-    if (gt->tag == TT_FLOAT) return 0;
+    if (gt->tag == TERM_INT)   return 0;
+    if (gt->tag == TERM_FLOAT) return 0;
 
     Term *tenv[PL_SYNTH_TENV_MAX];
     for (int i = 0; i < PL_SYNTH_TENV_MAX; i++) tenv[i] = NULL;
     int    tn = 0;
-    AST_t *synth = pl_term_to_synth_expr(gt, tenv, &tn);
+    tree_t *synth = pl_term_to_synth_expr(gt, tenv, &tn);
     int ok = interp_exec_pl_builtin(synth, tenv);
     pl_synth_free(synth);
     return ok;
@@ -815,27 +815,27 @@ static int pl_invoke_var_goal(Term *gt, Term **caller_env) {
 /*---- interp_exec_pl_builtin — execute one Prolog builtin goal ----*/
 /* Uses file-scope globals g_pl_trail, g_pl_cut_flag, g_pl_pred_table, g_pl_env.
  * Returns 1=success, 0=fail. Called by pl_box_builtin in pl_broker.c. */
-int interp_exec_pl_builtin(AST_t *goal, Term **env) {
+int interp_exec_pl_builtin(tree_t *goal, Term **env) {
     if (!goal) return 1;
     Trail *trail = &g_pl_trail;
     int *cut_flag = &g_pl_cut_flag;
     switch (goal->t) {
-        case AST_UNIFY: {
+        case TT_UNIFY: {
             Term *t1=pl_unified_term_from_expr(goal->c[0],env);
             Term *t2=pl_unified_term_from_expr(goal->c[1],env);
             int mark=trail_mark(trail);
             if (!unify(t1,t2,trail)){trail_unwind(trail,mark);return 0;}
             return 1;
         }
-        case AST_CUT: if (cut_flag) *cut_flag=1; return 1;
-        case AST_TRAIL_MARK: case AST_TRAIL_UNWIND: return 1;
-        case AST_FNC: {
+        case TT_CUT: if (cut_flag) *cut_flag=1; return 1;
+        case TT_TRAIL_MARK: case TT_TRAIL_UNWIND: return 1;
+        case TT_FNC: {
             const char *fn = goal->v.sval ? goal->v.sval : "true";
             int arity = goal->n;
             /* ---- user-defined predicate dispatch (must come before builtin checks) ---- */
             if (is_pl_user_call(goal)) {
                 char ukey[256]; snprintf(ukey,sizeof ukey,"%s/%d",fn,arity);
-                AST_t *uch = pl_pred_table_lookup(&g_pl_pred_table, ukey);
+                tree_t *uch = pl_pred_table_lookup(&g_pl_pred_table, ukey);
                 if (uch) {
                     int ua = arity;
                     Term **uenv = ua ? pl_env_new(ua) : NULL;
@@ -852,7 +852,7 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
             if (strcmp(fn,"true")==0&&arity==0) return 1;
             if (strcmp(fn,"fail")==0&&arity==0) return 0;
             if (strcmp(fn,"halt")==0&&arity==0) exit(0);
-            if (strcmp(fn,"halt")==0&&arity==1){Term *t=term_deref(pl_unified_term_from_expr(goal->c[0],env));exit(t&&t->tag==TT_INT?(int)t->v.ival:0);}
+            if (strcmp(fn,"halt")==0&&arity==1){Term *t=term_deref(pl_unified_term_from_expr(goal->c[0],env));exit(t&&t->tag==TERM_INT?(int)t->ival:0);}
             /* ---- directive no-ops: dynamic, discontiguous, module, use_module, include, etc. ---- */
             if ((strcmp(fn,"dynamic")==0||strcmp(fn,"discontiguous")==0||
                  strcmp(fn,"module")==0||strcmp(fn,"use_module")==0||
@@ -874,7 +874,7 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
             if (strcmp(fn,"write_canonical")==0&&arity==1){pl_write_canonical(pl_unified_term_from_expr(goal->c[0],env));return 1;}
             if (strcmp(fn,"tab")==0&&arity==1){
                 Term *t=term_deref(pl_unified_term_from_expr(goal->c[0],env));
-                long n=(t&&t->tag==TT_INT)?t->v.ival:0;
+                long n=(t&&t->tag==TERM_INT)?t->ival:0;
                 for(long i=0;i<n;i++) putchar(' ');
                 return 1;
             }
@@ -907,9 +907,9 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                 Term *t2=term_deref(pl_unified_term_from_expr(goal->c[1],env));
                 if(!t1||!t2)return t1==t2;
                 if(t1->tag!=t2->tag)return 0;
-                if(t1->tag==TT_ATOM)return t1->atom_id==t2->atom_id;
-                if(t1->tag==TT_INT) return t1->v.ival==t2->v.ival;
-                if(t1->tag==TT_VAR) return t1==t2;
+                if(t1->tag==TERM_ATOM)return t1->atom_id==t2->atom_id;
+                if(t1->tag==TERM_INT) return t1->ival==t2->ival;
+                if(t1->tag==TERM_VAR) return t1==t2;
                 return 0;
             }
             if (strcmp(fn,"\\==")==0&&arity==2){
@@ -917,35 +917,35 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                 Term *t2=term_deref(pl_unified_term_from_expr(goal->c[1],env));
                 if(!t1||!t2)return t1!=t2;
                 if(t1->tag!=t2->tag)return 1;
-                if(t1->tag==TT_ATOM)return t1->atom_id!=t2->atom_id;
-                if(t1->tag==TT_INT) return t1->v.ival!=t2->v.ival;
-                if(t1->tag==TT_VAR) return t1!=t2;
+                if(t1->tag==TERM_ATOM)return t1->atom_id!=t2->atom_id;
+                if(t1->tag==TERM_INT) return t1->ival!=t2->ival;
+                if(t1->tag==TERM_VAR) return t1!=t2;
                 return 1;
             }
             /* type tests */
             if (arity==1){
                 Term *t=term_deref(pl_unified_term_from_expr(goal->c[0],env));
-                if(strcmp(fn,"var"     )==0)return !t||t->tag==TT_VAR;
-                if(strcmp(fn,"nonvar"  )==0)return  t&&t->tag!=TT_VAR;
-                if(strcmp(fn,"atom"    )==0)return  t&&t->tag==TT_ATOM;
-                if(strcmp(fn,"integer" )==0)return  t&&t->tag==TT_INT;
-                if(strcmp(fn,"float"   )==0)return  t&&t->tag==TT_FLOAT;
-                if(strcmp(fn,"compound")==0)return  t&&t->tag==TT_COMPOUND;
-                if(strcmp(fn,"atomic"  )==0)return  t&&(t->tag==TT_ATOM||t->tag==TT_INT||t->tag==TT_FLOAT);
-                if(strcmp(fn,"callable")==0)return  t&&(t->tag==TT_ATOM||t->tag==TT_COMPOUND);
+                if(strcmp(fn,"var"     )==0)return !t||t->tag==TERM_VAR;
+                if(strcmp(fn,"nonvar"  )==0)return  t&&t->tag!=TERM_VAR;
+                if(strcmp(fn,"atom"    )==0)return  t&&t->tag==TERM_ATOM;
+                if(strcmp(fn,"integer" )==0)return  t&&t->tag==TERM_INT;
+                if(strcmp(fn,"float"   )==0)return  t&&t->tag==TERM_FLOAT;
+                if(strcmp(fn,"compound")==0)return  t&&t->tag==TERM_COMPOUND;
+                if(strcmp(fn,"atomic"  )==0)return  t&&(t->tag==TERM_ATOM||t->tag==TERM_INT||t->tag==TERM_FLOAT);
+                if(strcmp(fn,"callable")==0)return  t&&(t->tag==TERM_ATOM||t->tag==TERM_COMPOUND);
                 if(strcmp(fn,"is_list" )==0){
                     int nil=prolog_atom_intern("[]"),dot=prolog_atom_intern(".");
-                    for(Term *c=t;;){c=term_deref(c);if(!c)return 0;if(c->tag==TT_ATOM&&c->atom_id==nil)return 1;if(c->tag!=TT_COMPOUND||c->compound.arity!=2||c->compound.functor!=dot)return 0;c=c->compound.args[1];}
+                    for(Term *c=t;;){c=term_deref(c);if(!c)return 0;if(c->tag==TERM_ATOM&&c->atom_id==nil)return 1;if(c->tag!=TERM_COMPOUND||c->compound.arity!=2||c->compound.functor!=dot)return 0;c=c->compound.args[1];}
                 }
             }
             /* ,/N conjunction — run each child goal in sequence */
             if (strcmp(fn,",")==0){
                 for(int i=0;i<goal->n;i++){
-                    AST_t *g=goal->c[i];
+                    tree_t *g=goal->c[i];
                     if(!g) continue;
                     int ok = is_pl_user_call(g) ? ({
                         char key[256]; snprintf(key,sizeof key,"%s/%d",g->v.sval?g->v.sval:"",g->n);
-                        AST_t *ch=pl_pred_table_lookup(&g_pl_pred_table,key);
+                        tree_t *ch=pl_pred_table_lookup(&g_pl_pred_table,key);
                         int r=0;
                         if(ch){ int ca=g->n; Term **cargs=ca?malloc(ca*sizeof(Term*)):NULL;
                                  for(int a=0;a<ca;a++) cargs[a]=pl_unified_term_from_expr(g->c[a],env);
@@ -959,9 +959,9 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
             }
             /* ;/N disjunction */
             if (strcmp(fn,";")==0&&arity>=2){
-                AST_t *left=goal->c[0],*right=goal->c[1];
+                tree_t *left=goal->c[0],*right=goal->c[1];
                 /* if-then-else: (Cond -> Then ; Else) */
-                if(left&&left->t==AST_FNC&&left->v.sval&&strcmp(left->v.sval,"->")==0&&left->n>=2){
+                if(left&&left->t==TT_FNC&&left->v.sval&&strcmp(left->v.sval,"->")==0&&left->n>=2){
                     int mark=trail_mark(trail); int cut2=0;
                     if(interp_exec_pl_builtin(left->c[0],env)){
                         for(int i=1;i<left->n;i++) if(!interp_exec_pl_builtin(left->c[i],env)) return 0;
@@ -983,7 +983,7 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                 return 1;
             }
             /* \+/not — PR-19b: var-goal arg dispatches via Term→EXPR bridge.
-             * Without this, child[0]->t == AST_VAR fell through to the
+             * Without this, child[0]->t == TERM_VAR fell through to the
              * `default: return 1;` arm of interp_exec_pl_builtin (silent
              * success), so `\+ Var` always returned 0 (negation of fake
              * success) and the inner goal never ran. Same defect as the
@@ -991,7 +991,7 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
             if ((strcmp(fn,"\\+")==0||strcmp(fn,"not")==0)&&arity==1){
                 int mark=trail_mark(trail);
                 int ok;
-                if (goal->c[0] && goal->c[0]->t == AST_VAR) {
+                if (goal->c[0] && goal->c[0]->t == TERM_VAR) {
                     Term *gt = pl_unified_term_from_expr(goal->c[0], env);
                     ok = pl_invoke_var_goal(gt, env);
                 } else {
@@ -1007,7 +1007,7 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
             if (strcmp(fn,"once")==0&&arity==1){
                 int mark=trail_mark(trail);
                 int ok;
-                if (goal->c[0] && goal->c[0]->t == AST_VAR) {
+                if (goal->c[0] && goal->c[0]->t == TERM_VAR) {
                     Term *gt = pl_unified_term_from_expr(goal->c[0], env);
                     ok = pl_invoke_var_goal(gt, env);
                 } else {
@@ -1022,18 +1022,18 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
              * call(G, A1, ...) — G is an atom or compound; build G(G_args..., A1...)
              *                    and dispatch the reconstructed compound.
              *
-             * When call's first child is AST_VAR (goal_e->t == AST_VAR after
+             * When call's first child is TERM_VAR (goal_e->t == TERM_VAR after
              * resolving child[0]), the deref'd Term becomes the goal or its
              * base.  Extra args (call/2, call/3, ...) are resolved and appended.
              *
              * For call/1 with no extra args: straightforward bridge dispatch.
-             * For call/N (N>1): reconstruct a fresh TT_COMPOUND Term whose
+             * For call/N (N>1): reconstruct a fresh TERM_COMPOUND Term whose
              * functor = G's functor and whose args = G's existing args ++ extras.
              * Then dispatch via pl_invoke_var_goal on the reconstructed Term.
              */
             if (strcmp(fn,"call")==0 && arity>=1) {
-                AST_t *g_expr = goal->c[0];
-                /* Resolve the goal arg to a Term (handles AST_VAR and direct AST_FNC) */
+                tree_t *g_expr = goal->c[0];
+                /* Resolve the goal arg to a Term (handles TERM_VAR and direct TT_FNC) */
                 Term *g_term = pl_unified_term_from_expr(g_expr, env);
                 g_term = term_deref(g_term);
                 if (!g_term) return 0;
@@ -1050,10 +1050,10 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                 const char *cfn = NULL;
                 int carity_base = 0;
                 Term **cargs_base = NULL;
-                if (g_term->tag == TT_ATOM) {
+                if (g_term->tag == TERM_ATOM) {
                     cfn = prolog_atom_name(g_term->atom_id);
                     carity_base = 0; cargs_base = NULL;
-                } else if (g_term->tag == TT_COMPOUND) {
+                } else if (g_term->tag == TERM_COMPOUND) {
                     cfn = prolog_atom_name(g_term->compound.functor);
                     carity_base = g_term->compound.arity;
                     cargs_base = g_term->compound.args;
@@ -1071,7 +1071,7 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                     all_args[carity_base + i] =
                         pl_unified_term_from_expr(goal->c[1 + i], env);
 
-                /* Build a fresh TT_COMPOUND for the reconstructed call */
+                /* Build a fresh TERM_COMPOUND for the reconstructed call */
                 int fn_id = prolog_atom_intern(cfn);
                 Term **rargs2 = (Term **)malloc(total_arity * sizeof(Term *));
                 for (int i = 0; i < total_arity; i++) rargs2[i] = all_args[i];
@@ -1079,8 +1079,8 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                 Term *reconstructed = term_new_compound(fn_id, total_arity, rargs2);
                 free(rargs2);
 
-                /* Dispatch via bridge (reconstructed is a concrete Term, not AST_VAR,
-                 * so pl_invoke_var_goal handles it correctly via the TT_COMPOUND path) */
+                /* Dispatch via bridge (reconstructed is a concrete Term, not TERM_VAR,
+                 * so pl_invoke_var_goal handles it correctly via the TERM_COMPOUND path) */
                 return pl_invoke_var_goal(reconstructed, env);
             }
             /* functor/3 */
@@ -1124,8 +1124,8 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                 Term *a=term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *l=pl_unified_term_from_expr(goal->c[1],env);
                 const char *s=NULL;
-                if (a&&a->tag==TT_ATOM) s=prolog_atom_name(a->atom_id);
-                else if (a&&a->tag==TT_INT) { char buf[32]; snprintf(buf,sizeof buf,"%ld",a->v.ival); s=buf; }
+                if (a&&a->tag==TERM_ATOM) s=prolog_atom_name(a->atom_id);
+                else if (a&&a->tag==TERM_INT) { char buf[32]; snprintf(buf,sizeof buf,"%ld",a->ival); s=buf; }
                 if (!s) return 0;
                 Term *len=term_new_int((long)strlen(s));
                 int mark=trail_mark(trail);
@@ -1138,7 +1138,7 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                 Term *a2=term_deref(pl_unified_term_from_expr(goal->c[1],env));
                 Term *a3=pl_unified_term_from_expr(goal->c[2],env);
                 /* mode: +,+,? */
-                if (a1&&a1->tag==TT_ATOM&&a2&&a2->tag==TT_ATOM) {
+                if (a1&&a1->tag==TERM_ATOM&&a2&&a2->tag==TERM_ATOM) {
                     const char *s1=prolog_atom_name(a1->atom_id);
                     const char *s2=prolog_atom_name(a2->atom_id);
                     size_t l1=strlen(s1),l2=strlen(s2);
@@ -1151,7 +1151,7 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                 }
                 /* mode: ?,?,+ — split */
                 Term *a3d=term_deref(a3);
-                if (a3d&&a3d->tag==TT_ATOM) {
+                if (a3d&&a3d->tag==TERM_ATOM) {
                     const char *s3=prolog_atom_name(a3d->atom_id);
                     size_t n=strlen(s3);
                     for (size_t i=0;i<=n;i++) {
@@ -1173,7 +1173,7 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                 Term *a=term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *cl=pl_unified_term_from_expr(goal->c[1],env);
                 int nil_id=prolog_atom_intern("[]"), dot_id=prolog_atom_intern(".");
-                if (a&&a->tag==TT_ATOM) {
+                if (a&&a->tag==TERM_ATOM) {
                     /* +Atom → build char list */
                     const char *s=prolog_atom_name(a->atom_id);
                     int n=(int)strlen(s);
@@ -1189,9 +1189,9 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                 } else {
                     /* +Chars → build atom */
                     Term *cur=term_deref(cl); char buf[1024]; int pos=0;
-                    while(cur&&cur->tag==TT_COMPOUND&&cur->compound.arity==2){
+                    while(cur&&cur->tag==TERM_COMPOUND&&cur->compound.arity==2){
                         Term *hd=term_deref(cur->compound.args[0]);
-                        if(!hd||hd->tag!=TT_ATOM) return 0;
+                        if(!hd||hd->tag!=TERM_ATOM) return 0;
                         const char *cs=prolog_atom_name(hd->atom_id);
                         if(pos<1023) buf[pos++]=cs[0];
                         cur=term_deref(cur->compound.args[1]);
@@ -1208,7 +1208,7 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                 Term *a=term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *cl=pl_unified_term_from_expr(goal->c[1],env);
                 int nil_id=prolog_atom_intern("[]"), dot_id=prolog_atom_intern(".");
-                if (a&&a->tag==TT_ATOM) {
+                if (a&&a->tag==TERM_ATOM) {
                     const char *s=prolog_atom_name(a->atom_id);
                     int n=(int)strlen(s);
                     Term *lst=term_new_atom(nil_id);
@@ -1221,10 +1221,10 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                     return 1;
                 } else {
                     Term *cur=term_deref(cl); char buf[1024]; int pos=0;
-                    while(cur&&cur->tag==TT_COMPOUND&&cur->compound.arity==2){
+                    while(cur&&cur->tag==TERM_COMPOUND&&cur->compound.arity==2){
                         Term *hd=term_deref(cur->compound.args[0]);
-                        if(!hd||hd->tag!=TT_INT) return 0;
-                        if(pos<1023) buf[pos++]=(char)hd->v.ival;
+                        if(!hd||hd->tag!=TERM_INT) return 0;
+                        if(pos<1023) buf[pos++]=(char)hd->ival;
                         cur=term_deref(cur->compound.args[1]);
                     }
                     buf[pos]='\0';
@@ -1264,7 +1264,7 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                 Term *elems[4096]; int n=0;
                 Term *cur=lst;
                 int nil_id=prolog_atom_intern("[]"),dot_id=prolog_atom_intern(".");
-                while(cur&&cur->tag==TT_COMPOUND&&cur->compound.arity==2) {
+                while(cur&&cur->tag==TERM_COMPOUND&&cur->compound.arity==2) {
                     if(n<4096) elems[n++]=term_deref(cur->compound.args[0]);
                     cur=term_deref(cur->compound.args[1]);
                 }
@@ -1294,14 +1294,14 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                 Term *a=term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *b=term_deref(pl_unified_term_from_expr(goal->c[1],env));
                 int mark=trail_mark(trail);
-                if (a&&a->tag==TT_INT) {
-                    if (a->v.ival < 0) return 0;
-                    Term *r=term_new_int(a->v.ival+1);
+                if (a&&a->tag==TERM_INT) {
+                    if (a->ival < 0) return 0;
+                    Term *r=term_new_int(a->ival+1);
                     if(!unify(b,r,trail)){trail_unwind(trail,mark);return 0;}
                     return 1;
-                } else if (b&&b->tag==TT_INT) {
-                    if (b->v.ival <= 0) return 0;
-                    Term *r=term_new_int(b->v.ival-1);
+                } else if (b&&b->tag==TERM_INT) {
+                    if (b->ival <= 0) return 0;
+                    Term *r=term_new_int(b->ival-1);
                     if(!unify(a,r,trail)){trail_unwind(trail,mark);return 0;}
                     return 1;
                 }
@@ -1313,12 +1313,12 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                 Term *b=term_deref(pl_unified_term_from_expr(goal->c[1],env));
                 Term *c=term_deref(pl_unified_term_from_expr(goal->c[2],env));
                 int mark=trail_mark(trail);
-                int ai=(a&&a->tag==TT_INT),bi=(b&&b->tag==TT_INT),ci=(c&&c->tag==TT_INT);
+                int ai=(a&&a->tag==TERM_INT),bi=(b&&b->tag==TERM_INT),ci=(c&&c->tag==TERM_INT);
                 Term *r=NULL;
                 Term *tgt=NULL;
-                if (ai&&bi)        { r=term_new_int(a->v.ival+b->v.ival); tgt=c; }
-                else if (ai&&ci)   { r=term_new_int(c->v.ival-a->v.ival); tgt=b; }
-                else if (bi&&ci)   { r=term_new_int(c->v.ival-b->v.ival); tgt=a; }
+                if (ai&&bi)        { r=term_new_int(a->ival+b->ival); tgt=c; }
+                else if (ai&&ci)   { r=term_new_int(c->ival-a->ival); tgt=b; }
+                else if (bi&&ci)   { r=term_new_int(c->ival-b->ival); tgt=a; }
                 else return 0;
                 if(!unify(tgt,r,trail)){trail_unwind(trail,mark);return 0;}
                 return 1;
@@ -1327,7 +1327,7 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
             if (strcmp(fn,"format")==0&&(arity==1||arity==2)) {
                 Term *fmt_t=term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 const char *fmt=NULL;
-                if (fmt_t&&fmt_t->tag==TT_ATOM) fmt=prolog_atom_name(fmt_t->atom_id);
+                if (fmt_t&&fmt_t->tag==TERM_ATOM) fmt=prolog_atom_name(fmt_t->atom_id);
                 if (!fmt) return 0;
                 /* Build args list */
                 Term *args_list=(arity==2)?term_deref(pl_unified_term_from_expr(goal->c[1],env)):NULL;
@@ -1338,19 +1338,19 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                         p++;
                         if (*p=='w'||*p=='a'||*p=='p') {
                             /* ~w/~a/~p: write next arg */
-                            if (args_list&&args_list->tag==TT_COMPOUND&&args_list->compound.arity==2) {
+                            if (args_list&&args_list->tag==TERM_COMPOUND&&args_list->compound.arity==2) {
                                 pl_write(term_deref(args_list->compound.args[0]));
                                 args_list=term_deref(args_list->compound.args[1]);
                             }
                         } else if (*p=='d') {
-                            if (args_list&&args_list->tag==TT_COMPOUND&&args_list->compound.arity==2) {
+                            if (args_list&&args_list->tag==TERM_COMPOUND&&args_list->compound.arity==2) {
                                 Term *h=term_deref(args_list->compound.args[0]);
-                                if (h&&h->tag==TT_INT) printf("%ld",h->v.ival);
+                                if (h&&h->tag==TERM_INT) printf("%ld",h->ival);
                                 args_list=term_deref(args_list->compound.args[1]);
                             }
                         } else if (*p=='i') {
                             /* ~i: ignore next arg */
-                            if (args_list&&args_list->tag==TT_COMPOUND&&args_list->compound.arity==2)
+                            if (args_list&&args_list->tag==TERM_COMPOUND&&args_list->compound.arity==2)
                                 args_list=term_deref(args_list->compound.args[1]);
                         } else if (*p=='n') { putchar('\n');
                         } else if (*p=='N') { /* newline if not at start of line — approx */ putchar('\n');
@@ -1369,8 +1369,8 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                 Term *t   = pl_unified_term_from_expr(goal->c[0],env);
                 Term *s   = term_deref(pl_unified_term_from_expr(goal->c[1],env));
                 Term *end = pl_unified_term_from_expr(goal->c[2],env);
-                if (!s||s->tag!=TT_INT) return 0;
-                long n = s->v.ival;
+                if (!s||s->tag!=TERM_INT) return 0;
+                long n = s->ival;
                 int var_id = prolog_atom_intern("$VAR");
                 /* Iterative DFS to number all unbound vars */
                 Term *stk[4096]; int top=0;
@@ -1378,11 +1378,11 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                 while (top>0) {
                     Term *cur=term_deref(stk[--top]);
                     if (!cur) continue;
-                    if (cur->tag==TT_VAR) {
+                    if (cur->tag==TERM_VAR) {
                         Term *narg=term_new_int(n++);
                         Term *binding=term_new_compound(var_id,1,&narg);
-                        cur->ref=binding; cur->tag=TT_REF;
-                    } else if (cur->tag==TT_COMPOUND) {
+                        cur->ref=binding; cur->tag=TERM_REF;
+                    } else if (cur->tag==TERM_COMPOUND) {
                         for (int i=cur->compound.arity-1;i>=0;i--)
                             if (top<4095) stk[top++]=term_deref(cur->compound.args[i]);
                     }
@@ -1394,7 +1394,7 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
             }
             /* term_singletons(+Term, -Singletons) — list of variables that
              * occur exactly once in Term. We walk the term, gather all
-             * unbound TT_VAR pointers, count occurrences, and unify Singletons
+             * unbound TERM_VAR pointers, count occurrences, and unify Singletons
              * with the list of those that appear once.  Order: leftmost-first
              * (matches SWI). */
             if (strcmp(fn,"term_singletons")==0&&arity==2) {
@@ -1407,12 +1407,12 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                 while (top>0) {
                     Term *cur=term_deref(stk[--top]);
                     if (!cur) continue;
-                    if (cur->tag==TT_VAR) {
+                    if (cur->tag==TERM_VAR) {
                         int found=-1;
                         for (int i=0;i<nv;i++) if (vars[i]==cur) { found=i; break; }
                         if (found>=0) counts[found]++;
                         else if (nv<1024) { vars[nv]=cur; counts[nv]=1; nv++; }
-                    } else if (cur->tag==TT_COMPOUND) {
+                    } else if (cur->tag==TERM_COMPOUND) {
                         for (int i=cur->compound.arity-1;i>=0;i--)
                             if (top<4095) stk[top++]=term_deref(cur->compound.args[i]);
                     }
@@ -1434,15 +1434,15 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
             if (strcmp(fn,"char_type")==0&&arity==2) {
                 Term *ch=term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *ty=term_deref(pl_unified_term_from_expr(goal->c[1],env));
-                if (!ch||ch->tag!=TT_ATOM) return 0;
+                if (!ch||ch->tag!=TERM_ATOM) return 0;
                 const char *cs=prolog_atom_name(ch->atom_id);
                 if (!cs||!cs[0]) return 0;
                 unsigned char c=(unsigned char)cs[0];
-                if (!ty||ty->tag==TT_VAR) return 0; /* need bound type for now */
+                if (!ty||ty->tag==TERM_VAR) return 0; /* need bound type for now */
                 const char *tname=NULL;
                 int tarity=0;
-                if (ty->tag==TT_ATOM) { tname=prolog_atom_name(ty->atom_id); tarity=0; }
-                else if (ty->tag==TT_COMPOUND) { tname=prolog_atom_name(ty->compound.functor); tarity=ty->compound.arity; }
+                if (ty->tag==TERM_ATOM) { tname=prolog_atom_name(ty->atom_id); tarity=0; }
+                else if (ty->tag==TERM_COMPOUND) { tname=prolog_atom_name(ty->compound.functor); tarity=ty->compound.arity; }
                 if (!tname) return 0;
                 if (strcmp(tname,"alpha")==0)   return isalpha(c)?1:0;
                 if (strcmp(tname,"alnum")==0)   return isalnum(c)?1:0;
@@ -1495,7 +1495,7 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
             /* U-23: nv_get(+Name, -Val) / nv_set(+Name, +Val) -- SNO NV store bridge */
             if (strcmp(fn,"nv_get")==0&&arity==2) {
                 Term *nm=term_deref(pl_unified_term_from_expr(goal->c[0],env));
-                if (!nm || nm->tag != TT_ATOM) return 0;
+                if (!nm || nm->tag != TERM_ATOM) return 0;
                 const char *nm_str = prolog_atom_name(nm->atom_id);
                 DESCR_t dv = NV_GET_fn(nm_str);
                 Term *val_t = IS_FAIL_fn(dv) ? term_new_atom(ATOM_NIL) :
@@ -1509,10 +1509,10 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
             if (strcmp(fn,"nv_set")==0&&arity==2) {
                 Term *nm=term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *vl=term_deref(pl_unified_term_from_expr(goal->c[1],env));
-                if (!nm || nm->tag != TT_ATOM) return 0;
+                if (!nm || nm->tag != TERM_ATOM) return 0;
                 const char *nm_str = prolog_atom_name(nm->atom_id);
-                const char *vl_str = (vl && vl->tag==TT_ATOM) ? prolog_atom_name(vl->atom_id) : NULL;
-                DESCR_t dv = (vl && vl->tag==TT_INT) ? INTVAL(vl->v.ival) :
+                const char *vl_str = (vl && vl->tag==TERM_ATOM) ? prolog_atom_name(vl->atom_id) : NULL;
+                DESCR_t dv = (vl && vl->tag==TERM_INT) ? INTVAL(vl->ival) :
                              vl_str                   ? STRVAL(vl_str) : NULVCL;
                 NV_SET_fn(nm_str, dv);
                 return 1;
@@ -1522,7 +1522,7 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
             if (strcmp(fn,"term_string")==0&&arity==2) {
                 Term *ta=term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *ts=term_deref(pl_unified_term_from_expr(goal->c[1],env));
-                if (ta && ta->tag!=TT_VAR) {
+                if (ta && ta->tag!=TERM_VAR) {
                     /* mode: +Term, -String — render term as atom */
                     char *buf = pl_term_to_string(ta);
                     Term *str = term_new_atom(prolog_atom_intern(buf));
@@ -1530,7 +1530,7 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                     int mark=trail_mark(trail);
                     if(!unify(ts,str,trail)){trail_unwind(trail,mark);return 0;}
                     return 1;
-                } else if (ts && ts->tag==TT_ATOM) {
+                } else if (ts && ts->tag==TERM_ATOM) {
                     /* mode: -Term, +String — parse atom as term (simple: just intern as atom) */
                     const char *s = prolog_atom_name(ts->atom_id);
                     if (!s) return 0;
@@ -1550,9 +1550,9 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                 Term *tn=term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *tc=pl_unified_term_from_expr(goal->c[1],env);
                 int nil_id=prolog_atom_intern("[]"), dot_id=prolog_atom_intern(".");
-                if (tn && (tn->tag==TT_INT||tn->tag==TT_FLOAT)) {
+                if (tn && (tn->tag==TERM_INT||tn->tag==TERM_FLOAT)) {
                     char buf[64];
-                    if (tn->tag==TT_INT) snprintf(buf,sizeof buf,"%ld",tn->v.ival);
+                    if (tn->tag==TERM_INT) snprintf(buf,sizeof buf,"%ld",tn->ival);
                     else snprintf(buf,sizeof buf,"%g",tn->fval);
                     int n=(int)strlen(buf);
                     Term *lst=term_new_atom(nil_id);
@@ -1563,10 +1563,10 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                 } else {
                     /* +Codes → Number */
                     Term *cur=term_deref(tc); char buf[64]; int pos=0;
-                    while(cur&&cur->tag==TT_COMPOUND&&cur->compound.arity==2){
+                    while(cur&&cur->tag==TERM_COMPOUND&&cur->compound.arity==2){
                         Term *hd=term_deref(cur->compound.args[0]);
-                        if(!hd||hd->tag!=TT_INT) return 0;
-                        if(pos<63) buf[pos++]=(char)hd->v.ival;
+                        if(!hd||hd->tag!=TERM_INT) return 0;
+                        if(pos<63) buf[pos++]=(char)hd->ival;
                         cur=term_deref(cur->compound.args[1]);
                     }
                     buf[pos]='\0';
@@ -1582,9 +1582,9 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                 Term *tn=term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *tc=pl_unified_term_from_expr(goal->c[1],env);
                 int nil_id=prolog_atom_intern("[]"), dot_id=prolog_atom_intern(".");
-                if (tn && (tn->tag==TT_INT||tn->tag==TT_FLOAT)) {
+                if (tn && (tn->tag==TERM_INT||tn->tag==TERM_FLOAT)) {
                     char buf[64];
-                    if (tn->tag==TT_INT) snprintf(buf,sizeof buf,"%ld",tn->v.ival);
+                    if (tn->tag==TERM_INT) snprintf(buf,sizeof buf,"%ld",tn->ival);
                     else snprintf(buf,sizeof buf,"%g",tn->fval);
                     int n=(int)strlen(buf);
                     Term *lst=term_new_atom(nil_id);
@@ -1594,9 +1594,9 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                     return 1;
                 } else {
                     Term *cur=term_deref(tc); char buf[64]; int pos=0;
-                    while(cur&&cur->tag==TT_COMPOUND&&cur->compound.arity==2){
+                    while(cur&&cur->tag==TERM_COMPOUND&&cur->compound.arity==2){
                         Term *hd=term_deref(cur->compound.args[0]);
-                        if(!hd||hd->tag!=TT_ATOM) return 0;
+                        if(!hd||hd->tag!=TERM_ATOM) return 0;
                         const char *cs=prolog_atom_name(hd->atom_id);
                         if(pos<63) buf[pos++]=cs?cs[0]:0;
                         cur=term_deref(cur->compound.args[1]);
@@ -1613,14 +1613,14 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
             if (strcmp(fn,"char_code")==0&&arity==2) {
                 Term *tch=term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *tco=term_deref(pl_unified_term_from_expr(goal->c[1],env));
-                if (tch && tch->tag==TT_ATOM) {
+                if (tch && tch->tag==TERM_ATOM) {
                     const char *s=prolog_atom_name(tch->atom_id);
                     Term *code=term_new_int(s?(unsigned char)s[0]:0);
                     int mark=trail_mark(trail);
                     if(!unify(tco,code,trail)){trail_unwind(trail,mark);return 0;}
                     return 1;
-                } else if (tco && tco->tag==TT_INT) {
-                    char ch[2]={(char)tco->v.ival,'\0'};
+                } else if (tco && tco->tag==TERM_INT) {
+                    char ch[2]={(char)tco->ival,'\0'};
                     Term *cat=term_new_atom(prolog_atom_intern(ch));
                     int mark=trail_mark(trail);
                     if(!unify(tch,cat,trail)){trail_unwind(trail,mark);return 0;}
@@ -1632,7 +1632,7 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
             if (strcmp(fn,"upcase_atom")==0&&arity==2) {
                 Term *ta=term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *tr=pl_unified_term_from_expr(goal->c[1],env);
-                if (!ta||ta->tag!=TT_ATOM) return 0;
+                if (!ta||ta->tag!=TERM_ATOM) return 0;
                 const char *s=prolog_atom_name(ta->atom_id); if(!s) return 0;
                 char *buf=malloc(strlen(s)+1);
                 for(int i=0;s[i];i++) buf[i]=(char)toupper((unsigned char)s[i]); buf[strlen(s)]='\0';
@@ -1645,7 +1645,7 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
             if (strcmp(fn,"downcase_atom")==0&&arity==2) {
                 Term *ta=term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *tr=pl_unified_term_from_expr(goal->c[1],env);
-                if (!ta||ta->tag!=TT_ATOM) return 0;
+                if (!ta||ta->tag!=TERM_ATOM) return 0;
                 const char *s=prolog_atom_name(ta->atom_id); if(!s) return 0;
                 char *buf=malloc(strlen(s)+1);
                 for(int i=0;s[i];i++) buf[i]=(char)tolower((unsigned char)s[i]); buf[strlen(s)]='\0';
@@ -1664,13 +1664,13 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                 Term *tl  = pl_unified_term_from_expr(goal->c[2],env); /* Length */
                 Term *taf = pl_unified_term_from_expr(goal->c[3],env); /* After  */
                 Term *ts  = pl_unified_term_from_expr(goal->c[4],env); /* SubAtom */
-                if (!ta || ta->tag != TT_ATOM) return 0;
+                if (!ta || ta->tag != TERM_ATOM) return 0;
                 const char *s = prolog_atom_name(ta->atom_id); if (!s) return 0;
                 int slen = (int)strlen(s);
                 /* Determine Before and Length if bound */
                 int bef = -1, len = -1;
-                Term *tbv = term_deref(tb); if (tbv && tbv->tag == TT_INT) bef = (int)tbv->v.ival;
-                Term *tlv = term_deref(tl); if (tlv && tlv->tag == TT_INT) len = (int)tlv->v.ival;
+                Term *tbv = term_deref(tb); if (tbv && tbv->tag == TERM_INT) bef = (int)tbv->ival;
+                Term *tlv = term_deref(tl); if (tlv && tlv->tag == TERM_INT) len = (int)tlv->ival;
                 /* If both bound, single deterministic solution */
                 if (bef >= 0 && len >= 0) {
                     if (bef + len > slen) return 0;
@@ -1722,7 +1722,7 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                 Term *ta = term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *tn = pl_unified_term_from_expr(goal->c[1],env);
                 Term *tnv = term_deref(tn);
-                if (ta && ta->tag == TT_ATOM) {
+                if (ta && ta->tag == TERM_ATOM) {
                     const char *s = prolog_atom_name(ta->atom_id); if (!s) return 0;
                     char *end = NULL;
                     long iv = strtol(s, &end, 10);
@@ -1733,9 +1733,9 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                     int mark = trail_mark(trail);
                     if (!unify(tn, num, trail)) { trail_unwind(trail,mark); return 0; }
                     return 1;
-                } else if (tnv && (tnv->tag == TT_INT || tnv->tag == TT_FLOAT)) {
+                } else if (tnv && (tnv->tag == TERM_INT || tnv->tag == TERM_FLOAT)) {
                     char buf[64];
-                    if (tnv->tag == TT_INT) snprintf(buf, sizeof buf, "%ld", tnv->v.ival);
+                    if (tnv->tag == TERM_INT) snprintf(buf, sizeof buf, "%ld", tnv->ival);
                     else snprintf(buf, sizeof buf, "%g", tnv->fval);
                     Term *rat = term_new_atom(prolog_atom_intern(buf));
                     int mark = trail_mark(trail);
@@ -1751,7 +1751,7 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                 Term *ta   = term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *tt   = pl_unified_term_from_expr(goal->c[1],env);
                 Term *tbnd = pl_unified_term_from_expr(goal->c[2],env);
-                if (ta && ta->tag == TT_ATOM) {
+                if (ta && ta->tag == TERM_ATOM) {
                     /* Parse mode: atom -> term + bindings */
                     const char *src = prolog_atom_name(ta->atom_id);
                     if (!src) return 0;
@@ -1862,10 +1862,10 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                 const char *rfn = NULL;
                 int rarity = 0;
                 Term **rargs = NULL;
-                if (rule->tag == TT_ATOM) {
+                if (rule->tag == TERM_ATOM) {
                     rfn = prolog_atom_name(rule->atom_id);
                     rarity = 0; rargs = NULL;
-                } else if (rule->tag == TT_COMPOUND) {
+                } else if (rule->tag == TERM_COMPOUND) {
                     rfn = prolog_atom_name(rule->compound.functor);
                     rarity = rule->compound.arity;
                     rargs = rule->compound.args;
@@ -1874,7 +1874,7 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                 /* Build call: rfn(rargs..., s0, s1) — arity = rarity+2 */
                 int call_arity = rarity + 2;
                 char ukey[256]; snprintf(ukey, sizeof ukey, "%s/%d", rfn, call_arity);
-                AST_t *uch = pl_pred_table_lookup(&g_pl_pred_table, ukey);
+                tree_t *uch = pl_pred_table_lookup(&g_pl_pred_table, ukey);
                 if (!uch) return 0;
                 Term **uargs = pl_env_new(call_arity);
                 for (int ui = 0; ui < rarity; ui++) uargs[ui] = term_deref(rargs[ui]);
@@ -1898,22 +1898,22 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
             }
             /* findall/3 — collect ALL solutions via bb_broker retry loop */
             if (strcmp(fn,"findall")==0&&arity==3){
-                AST_t *tmpl_expr=goal->c[0];
-                AST_t *goal_expr=goal->c[1];
-                AST_t *list_expr=goal->c[2];
+                tree_t *tmpl_expr=goal->c[0];
+                tree_t *goal_expr=goal->c[1];
+                tree_t *list_expr=goal->c[2];
                 Term **solutions=NULL; int nsol=0,sol_cap=0;
                 /* Isolate in sub-trail so bindings don't leak to parent */
                 Trail fa_trail; trail_init(&fa_trail);
                 Trail saved_global_trail=g_pl_trail;  /* save by value — NOT pointer (self-alias bug) */
                 g_pl_trail=fa_trail;
                 /* Build a box for the goal and drive α/β to exhaustion.
-                 * PR-19d bridge: if goal_expr is AST_VAR, deref to a Term and
+                 * PR-19d bridge: if goal_expr is TERM_VAR, deref to a Term and
                  * build a synth EXPR so the goal can be retried across solutions.
                  * outer_env is kept for tmpl_expr/list_expr which belong to the
                  * static IR and must still resolve against the caller's env. */
-                AST_t *fa_synth = NULL; Term **fa_tenv = NULL;
+                tree_t *fa_synth = NULL; Term **fa_tenv = NULL;
                 Term **outer_env = env;
-                if (goal_expr && goal_expr->t == AST_VAR) {
+                if (goal_expr && goal_expr->t == TERM_VAR) {
                     Term *gt = term_deref(pl_unified_term_from_expr(goal_expr, env));
                     fa_tenv = (Term **)calloc(PL_SYNTH_TENV_MAX, sizeof(Term *));
                     int fa_tn = 0;
@@ -1926,7 +1926,7 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                 while(!IS_FAIL_fn(fa_r)){
                     /* PL-12 session #7: use pl_copy_term (preserves var
                      * sharing within snapshot via CopyVarMap) instead of
-                     * pl_unified_deep_copy (collapsed every TT_VAR to atom `_`,
+                     * pl_unified_deep_copy (collapsed every TERM_VAR to atom `_`,
                      * which destroyed test goal vars carried through findall).
                      * plunit's pj_run_suite stores test bodies as findall
                      * snapshots; without this fix the goals would lose their
@@ -1950,7 +1950,7 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
             /* Look up user-defined predicate in global pred table (assertz/asserta support) */
             {
                 char ukey[256]; snprintf(ukey, sizeof ukey, "%s/%d", fn, arity);
-                AST_t *uch = pl_pred_table_lookup(&g_pl_pred_table, ukey);
+                tree_t *uch = pl_pred_table_lookup(&g_pl_pred_table, ukey);
                 if (uch) {
                     Term **uargs = (arity > 0) ? pl_env_new(arity) : NULL;
                     /* Unify call arguments into fresh env */
@@ -1995,21 +1995,21 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                 char sepbuf[64]; sepbuf[0]='\0';
                 if (arity==3) {
                     Term *sv = term_deref(pl_unified_term_from_expr(goal->c[1],env));
-                    if (sv && sv->tag==TT_ATOM) sep=prolog_atom_name(sv->atom_id);
-                    else if (sv && sv->tag==TT_INT) { snprintf(sepbuf,sizeof sepbuf,"%ld",sv->v.ival); sep=sepbuf; }
+                    if (sv && sv->tag==TERM_ATOM) sep=prolog_atom_name(sv->atom_id);
+                    else if (sv && sv->tag==TERM_INT) { snprintf(sepbuf,sizeof sepbuf,"%ld",sv->ival); sep=sepbuf; }
                 }
                 /* build result string from list */
                 char buf[4096]; int pos=0; int first=1;
                 for (Term *cur=lst; cur; cur=term_deref(cur->compound.args[1])) {
                     cur = term_deref(cur);
                     if (!cur) break;
-                    if (cur->tag==TT_ATOM && cur->atom_id==nil_id) break;
-                    if (cur->tag!=TT_COMPOUND || cur->compound.arity!=2) break;
+                    if (cur->tag==TERM_ATOM && cur->atom_id==nil_id) break;
+                    if (cur->tag!=TERM_COMPOUND || cur->compound.arity!=2) break;
                     Term *hd = term_deref(cur->compound.args[0]);
                     const char *s = NULL; char tmp[64];
-                    if (hd && hd->tag==TT_ATOM) s=prolog_atom_name(hd->atom_id);
-                    else if (hd && hd->tag==TT_INT) { snprintf(tmp,sizeof tmp,"%ld",hd->v.ival); s=tmp; }
-                    else if (hd && hd->tag==TT_FLOAT) { snprintf(tmp,sizeof tmp,"%g",hd->fval); s=tmp; }
+                    if (hd && hd->tag==TERM_ATOM) s=prolog_atom_name(hd->atom_id);
+                    else if (hd && hd->tag==TERM_INT) { snprintf(tmp,sizeof tmp,"%ld",hd->ival); s=tmp; }
+                    else if (hd && hd->tag==TERM_FLOAT) { snprintf(tmp,sizeof tmp,"%g",hd->fval); s=tmp; }
                     if (!s) s="";
                     if (!first && sep[0]) { int sl=(int)strlen(sep); if(pos+sl<(int)sizeof buf-1){memcpy(buf+pos,sep,sl);pos+=sl;} }
                     first=0;
@@ -2027,10 +2027,10 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                 Term *a0 = term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *a1 = pl_unified_term_from_expr(goal->c[1],env);
                 /* mode +,? : convert string/atom arg0 to atom arg1 */
-                if (a0 && (a0->tag==TT_ATOM||a0->tag==TT_INT||a0->tag==TT_FLOAT)) {
+                if (a0 && (a0->tag==TERM_ATOM||a0->tag==TERM_INT||a0->tag==TERM_FLOAT)) {
                     const char *s=NULL; char tmp[64];
-                    if(a0->tag==TT_ATOM) s=prolog_atom_name(a0->atom_id);
-                    else if(a0->tag==TT_INT){snprintf(tmp,sizeof tmp,"%ld",a0->v.ival);s=tmp;}
+                    if(a0->tag==TERM_ATOM) s=prolog_atom_name(a0->atom_id);
+                    else if(a0->tag==TERM_INT){snprintf(tmp,sizeof tmp,"%ld",a0->ival);s=tmp;}
                     else{snprintf(tmp,sizeof tmp,"%g",a0->fval);s=tmp;}
                     Term *res=term_new_atom(prolog_atom_intern(s));
                     int mark=trail_mark(trail);
@@ -2039,7 +2039,7 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                 }
                 /* mode ?,+ : arg1 is the atom, unify with arg0 */
                 Term *a1d = term_deref(a1);
-                if (a1d && a1d->tag==TT_ATOM) {
+                if (a1d && a1d->tag==TERM_ATOM) {
                     int mark=trail_mark(trail);
                     if(!unify(a0,a1d,trail)){trail_unwind(trail,mark);return 0;}
                     return 1;
@@ -2050,14 +2050,14 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
             if (strcmp(fn,"nb_setval")==0&&arity==2) {
                 Term *key = term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *val = pl_unified_term_from_expr(goal->c[1],env);
-                if (!key || key->tag!=TT_ATOM) return 0;
+                if (!key || key->tag!=TERM_ATOM) return 0;
                 pl_nb_setval(prolog_atom_name(key->atom_id), val);
                 return 1;
             }
             if (strcmp(fn,"nb_getval")==0&&arity==2) {
                 Term *key = term_deref(pl_unified_term_from_expr(goal->c[0],env));
                 Term *out = pl_unified_term_from_expr(goal->c[1],env);
-                if (!key || key->tag!=TT_ATOM) return 0;
+                if (!key || key->tag!=TERM_ATOM) return 0;
                 Term *val = pl_nb_getval(prolog_atom_name(key->atom_id));
                 if (!val) return 0;
                 int mark=trail_mark(trail);
@@ -2070,15 +2070,15 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
              * Uses same α/β broker loop as findall. */
             if (strcmp(fn,"aggregate_all")==0&&arity==3) {
                 Term   *tmpl_t    = term_deref(pl_unified_term_from_expr(goal->c[0],env));
-                AST_t *goal_expr = goal->c[1];
+                tree_t *goal_expr = goal->c[1];
                 Term   *result_out= pl_unified_term_from_expr(goal->c[2],env);
                 /* classify template */
                 int is_count=0, is_sum=0, is_max=0, is_min=0;
-                AST_t *val_expr = NULL;
-                if (tmpl_t && tmpl_t->tag==TT_ATOM) {
+                tree_t *val_expr = NULL;
+                if (tmpl_t && tmpl_t->tag==TERM_ATOM) {
                     const char *tn=prolog_atom_name(tmpl_t->atom_id);
                     if (strcmp(tn,"count")==0) is_count=1;
-                } else if (tmpl_t && tmpl_t->tag==TT_COMPOUND && tmpl_t->compound.arity==1) {
+                } else if (tmpl_t && tmpl_t->tag==TERM_COMPOUND && tmpl_t->compound.arity==1) {
                     const char *fn2=prolog_atom_name(tmpl_t->compound.functor);
                     /* val_expr is the IR child of sum(Expr)/max(Expr)/min(Expr) */
                     if (goal->c[0] && goal->c[0]->n>0)
@@ -2095,7 +2095,7 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                 long ag_count=0, ag_sum=0, ag_best=0; int ag_best_set=0;
                 /* Use goal children[0] (the template IR expr) as snapshot template.
                  * For count, snapshot a dummy atom; for sum/max/min, snapshot val_expr. */
-                AST_t *snap_expr = (is_count || !val_expr) ? NULL : val_expr;
+                tree_t *snap_expr = (is_count || !val_expr) ? NULL : val_expr;
                 bb_node_t goal_box = pl_box_goal_from_ir(goal_expr, env);
                 DESCR_t ag_r = goal_box.fn(goal_box.ζ, α);
                 while (!IS_FAIL_fn(ag_r)) {
@@ -2103,8 +2103,8 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                     if ((is_sum||is_max||is_min) && snap_expr) {
                         Term *vt = term_deref(pl_unified_term_from_expr(snap_expr, env));
                         long v=0;
-                        if (vt && vt->tag==TT_INT)   v=vt->v.ival;
-                        else if (vt && vt->tag==TT_FLOAT) v=(long)vt->fval;
+                        if (vt && vt->tag==TERM_INT)   v=vt->ival;
+                        else if (vt && vt->tag==TERM_FLOAT) v=(long)vt->fval;
                         if (is_sum) ag_sum += v;
                         if (!ag_best_set || (is_max && v>ag_best) || (is_min && v<ag_best)) {
                             ag_best=v; ag_best_set=1;
@@ -2149,9 +2149,9 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
             }
             /* ---- catch/3 (PL-10) ---- */
             if (strcmp(fn,"catch")==0&&arity==3) {
-                AST_t *goal_e   = goal->c[0];
+                tree_t *goal_e   = goal->c[0];
                 Term   *catcher  = pl_unified_term_from_expr(goal->c[1],env);
-                AST_t *recovery = goal->c[2];
+                tree_t *recovery = goal->c[2];
                 if (g_pl_catch_top >= PL_CATCH_STACK_MAX) return 0;
                 Pl_CatchFrame *cf = &g_pl_catch_stack[g_pl_catch_top];
                 cf->catcher    = catcher;
@@ -2162,24 +2162,24 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
                 if (!threw) {
                     /* run the goal */
                     int ok;
-                    /* PL-12 fix #2 v3: AST_VAR-shaped goal (catch's first arg is a
+                    /* PL-12 fix #2 v3: TERM_VAR-shaped goal (catch's first arg is a
                      * runtime variable bound to a callable Term, e.g. plunit
                      * pj_do_succeed(...) calling catch(Goal,_,...)). Without
                      * this branch the else-arm dispatched
-                     * interp_exec_pl_builtin(AST_VAR, env) which fell through to
+                     * interp_exec_pl_builtin(TERM_VAR, env) which fell through to
                      * `default: return 1;` — the silent-success defect that
                      * gates ~3-4 plunit suites. Bridge derefs the env-resolved
                      * Term and dispatches via Term->synth EXPR with tenv slots
                      * holding the original Term*s (preserving binding chains
                      * back to caller env). */
-                    if (goal_e && goal_e->t == AST_VAR) {
+                    if (goal_e && goal_e->t == TERM_VAR) {
                         Term *gt = pl_unified_term_from_expr(goal_e, env);
                         ok = pl_invoke_var_goal(gt, env);
                     } else if (is_pl_user_call(goal_e)) {
                         char ukey[256];
                         snprintf(ukey,sizeof ukey,"%s/%d",
                                  goal_e->v.sval?goal_e->v.sval:"",goal_e->n);
-                        AST_t *uch=pl_pred_table_lookup(&g_pl_pred_table,ukey);
+                        tree_t *uch=pl_pred_table_lookup(&g_pl_pred_table,ukey);
                         if (uch && uch->n > 0) {
                             int ua=goal_e->n;
                             Term **uenv=ua?pl_env_new(ua):NULL;
@@ -2221,26 +2221,26 @@ int interp_exec_pl_builtin(AST_t *goal, Term **env) {
             /* setup_call_cleanup(+Setup, :Goal, +Cleanup)
              * Setup runs once. Goal runs (BB_ONCE here). Cleanup runs once
              * after Goal finishes (success or failure) or throws.
-             * AST_VAR bridge applied to all three positions. */
+             * TERM_VAR bridge applied to all three positions. */
             if (strcmp(fn,"setup_call_cleanup")==0&&arity==3) {
-                AST_t *setup_e    = goal->c[0];
-                AST_t *scc_goal_e = goal->c[1];
-                AST_t *cleanup_e  = goal->c[2];
-                /* Resolve AST_VAR arms to synth EXPRs */
-                AST_t *s_synth=NULL; Term **s_tenv=NULL;
-                AST_t *g_synth=NULL; Term **g_tenv=NULL;
-                AST_t *c_synth=NULL; Term **c_tenv=NULL;
-                if (setup_e && setup_e->t==AST_VAR) {
+                tree_t *setup_e    = goal->c[0];
+                tree_t *scc_goal_e = goal->c[1];
+                tree_t *cleanup_e  = goal->c[2];
+                /* Resolve TERM_VAR arms to synth EXPRs */
+                tree_t *s_synth=NULL; Term **s_tenv=NULL;
+                tree_t *g_synth=NULL; Term **g_tenv=NULL;
+                tree_t *c_synth=NULL; Term **c_tenv=NULL;
+                if (setup_e && setup_e->t==TERM_VAR) {
                     Term *gt=term_deref(pl_unified_term_from_expr(setup_e,env));
                     s_tenv=calloc(PL_SYNTH_TENV_MAX,sizeof(Term*)); int n=0;
                     s_synth=pl_term_to_synth_expr(gt,s_tenv,&n); setup_e=s_synth;
                 }
-                if (scc_goal_e && scc_goal_e->t==AST_VAR) {
+                if (scc_goal_e && scc_goal_e->t==TERM_VAR) {
                     Term *gt=term_deref(pl_unified_term_from_expr(scc_goal_e,env));
                     g_tenv=calloc(PL_SYNTH_TENV_MAX,sizeof(Term*)); int n=0;
                     g_synth=pl_term_to_synth_expr(gt,g_tenv,&n); scc_goal_e=g_synth;
                 }
-                if (cleanup_e && cleanup_e->t==AST_VAR) {
+                if (cleanup_e && cleanup_e->t==TERM_VAR) {
                     Term *gt=term_deref(pl_unified_term_from_expr(cleanup_e,env));
                     c_tenv=calloc(PL_SYNTH_TENV_MAX,sizeof(Term*)); int n=0;
                     c_synth=pl_term_to_synth_expr(gt,c_tenv,&n); cleanup_e=c_synth;

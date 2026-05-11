@@ -1,7 +1,7 @@
 /*
  * eval_pat.c — pattern-context expression evaluator (RS-16).
  *
- * Evaluates an AST_t in PATTERN context, producing a DT_P descriptor.
+ * Evaluates an tree_t in PATTERN context, producing a DT_P descriptor.
  * Pattern evaluation drives SNOBOL4 match: alternation, concatenation,
  * captures, primitive patterns (LEN, TAB, ANY, BREAK, ARBNO, ...).
  *
@@ -23,7 +23,7 @@
 
 /* eval_node is in eval_code.c (sibling). pat_* helpers, NV_GET_fn, APPLY_fn,
  * PATVAL_fn, NULVCL, FAILDESCR, IS_FAIL_fn — all in snobol4.h. */
-extern DESCR_t eval_node(AST_t *e);
+extern DESCR_t eval_node(tree_t *e);
 
 /* RS-16: local copy of NAME_DEREF (originally inline in interp_private.h —
  * mode-1 only). This helper is needed for value-context arg eval inside
@@ -36,13 +36,13 @@ static inline DESCR_t NAME_DEREF(DESCR_t d) {
     return d;
 }
 
-DESCR_t interp_eval_pat(AST_t *e)
+DESCR_t interp_eval_pat(tree_t *e)
 {
     NO_AST_WALK_GUARD("interp_eval_pat");
     if (!e) return NULVCL;
     switch (e->t) {
-    case AST_SEQ:
-    case AST_CAT: {
+    case TT_SEQ:
+    case TT_CAT: {
         if (e->n == 0) return NULVCL;
         DESCR_t acc = interp_eval_pat(e->c[0]);
         if (IS_FAIL_fn(acc)) return FAILDESCR;
@@ -53,9 +53,9 @@ DESCR_t interp_eval_pat(AST_t *e)
         }
         return acc;
     }
-    case AST_ALT: {
+    case TT_ALT: {
         /* pattern alternation: p1 | p2 | ... — each child evaluated in
-         * pattern context so that AST_DEFER(AST_VAR) children become XDSAR
+         * pattern context so that TT_DEFER(TT_VAR) children become XDSAR
          * nodes rather than frozen DT_E values. */
         if (e->n == 0) return pat_epsilon();
         DESCR_t acc = interp_eval_pat(e->c[0]);
@@ -67,7 +67,7 @@ DESCR_t interp_eval_pat(AST_t *e)
         }
         return acc;
     }
-    case AST_VLIST: {
+    case TT_VLIST: {
         /* Goal-directed value-context disjunction in pattern context.
          * Paren-list `(a, b, c)` is a value-level construct even when it
          * appears inside a pattern; the result is then coerced to pattern
@@ -81,7 +81,7 @@ DESCR_t interp_eval_pat(AST_t *e)
         }
         return FAILDESCR;
     }
-    case AST_VAR:
+    case TT_VAR:
         if (e->v.sval && *e->v.sval) {
             if (_is_pat_fnc_name(e->v.sval)) {
                 DESCR_t _fr = APPLY_fn(e->v.sval, NULL, 0);
@@ -99,24 +99,24 @@ DESCR_t interp_eval_pat(AST_t *e)
             return _v;
         }
         return NULVCL;
-    case AST_DEFER:
+    case TT_DEFER:
         /* *expr in pattern context — two sub-cases:
          *
-         * 1. *func(args)  — AST_DEFER(AST_FNC): build a deferred T_FUNC pattern node
+         * 1. *func(args)  — TT_DEFER(TT_FNC): build a deferred T_FUNC pattern node
          *    (XATP via pat_user_call) so the function fires at MATCH time as a
          *    zero-width side-effect.  Mirrors SIL *X where X is a user function.
          *
-         * 2. *var         — AST_DEFER(AST_VAR): look up the variable NOW and return
+         * 2. *var         — TT_DEFER(TT_VAR): look up the variable NOW and return
          *    its stored pattern value (the pattern was built at assignment time).
-         *    (Contrast: AST_DEFER in value context produces DT_E via interp_eval.) */
+         *    (Contrast: TT_DEFER in value context produces DT_E via interp_eval.) */
         if (e->n < 1) return pat_epsilon();
         {
-            AST_t *child = e->c[0];
-            if (child->t == AST_FNC && child->v.sval) {
+            tree_t *child = e->c[0];
+            if (child->t == TT_FNC && child->v.sval) {
                 /* *func(args) — build deferred XATP pattern node.
                  *
                  * SN-26c-parseerr-c (Bug B): args that are themselves function
-                 * calls (AST_FNC) or other non-trivial expressions must be
+                 * calls (TT_FNC) or other non-trivial expressions must be
                  * DEFERRED to match time, not eagerly evaluated here.  Beauty's
                  * snoParse production has  ("'snoParse'" & 'nTop()')  which
                  * builds  EVAL("epsilon . *Reduce('snoParse', nTop())").
@@ -124,22 +124,22 @@ DESCR_t interp_eval_pat(AST_t *e)
                  * (after ARBNO has bumped the counter), not at pattern-build
                  * time (when counter is just-pushed = 0).
                  *
-                 * Mechanism: wrap the arg child as DT_E (frozen AST_t*); the
+                 * Mechanism: wrap the arg child as DT_E (frozen tree_t*); the
                  * match-time path (bb_usercall in stmt_exec.c) thaws each DT_E
                  * via EVAL_fn before invoking the user function.
                  *
                  * Plain AST_LIT args don't need this — AST_LIT already has
                  * its constant value baked in.
                  *
-                 * SN-26c-parseerr-d: extend deferral to AST_VAR.  The earlier
-                 * "Plain AST_VAR args don't need this" reasoning was wrong:
+                 * SN-26c-parseerr-d: extend deferral to TT_VAR.  The earlier
+                 * "Plain TT_VAR args don't need this" reasoning was wrong:
                  * in  p . thx . *Shift_t('idtag', thx)  the cursor capture
                  * `. thx` writes the matched substring into thx ONLY at
                  * match time.  If we eagerly eval_node(thx) here at
                  * pattern-build time, we capture the stale value (typically
                  * empty), and the match-time call to Shift_t receives that
                  * stale value instead of the captured cursor substring.
-                 * Wrapping AST_VAR as DT_E with the AST_t* itself defers the
+                 * Wrapping TT_VAR as DT_E with the tree_t* itself defers the
                  * lookup to bb_usercall's thaw loop, which calls EVAL_fn ->
                  * eval_node -> NV_GET_fn AT MATCH TIME. */
                 int na = child->n;
@@ -147,8 +147,8 @@ DESCR_t interp_eval_pat(AST_t *e)
                 if (na > 0) {
                     av = GC_malloc(na * sizeof(DESCR_t));
                     for (int i = 0; i < na; i++) {
-                        AST_t *arg = child->c[i];
-                        if (arg && (arg->t == AST_FNC || arg->t == AST_VAR)) {
+                        tree_t *arg = child->c[i];
+                        if (arg && (arg->t == TT_FNC || arg->t == TT_VAR)) {
                             /* Defer: wrap as DT_E for match-time EVAL_fn thaw. */
                             av[i].v = DT_E;
                             av[i].ptr = arg;
@@ -172,12 +172,12 @@ DESCR_t interp_eval_pat(AST_t *e)
              * being assigned.  pat_ref() creates an XDSAR node; the
              * materialise() path in snobol4_pattern.c resolves it with
              * cycle detection at match time. */
-            if (child->t == AST_VAR && child->v.sval)
+            if (child->t == TT_VAR && child->v.sval)
                 return pat_ref(child->v.sval);
             /* Non-VAR, non-FNC child: if it contains no pattern-only nodes,
              * it is a pure value expression — freeze as DT_E for EVAL() to
              * thaw later.  E.g. *('abc' 'def') or *'str' → DT_E, not STRING.
-             * If it IS a pattern tree (AST_ALT etc.) evaluate in pat context. */
+             * If it IS a pattern tree (TT_ALT etc.) evaluate in pat context. */
             if (!_expr_is_pat(child)) {
                 DESCR_t d; d.v = DT_E; d.ptr = child; d.slen = 0;
                 return d;
@@ -191,91 +191,91 @@ DESCR_t interp_eval_pat(AST_t *e)
      * Typed E_* nodes produced by the SNOBOL4 parser via pat_prim_kind().
      * Belong here in interp_eval_pat, not in interp_eval
      * (moved from DYN-55 location in interp_eval.c -- RS-5). */
-    case AST_ARB:     return pat_arb();
-    case AST_REM:     return pat_rem();
-    case AST_FAIL:    return pat_fail();
-    case AST_SUCCEED: return pat_succeed();
-    case AST_FENCE:
+    case TT_ARB:     return pat_arb();
+    case TT_REM:     return pat_rem();
+    case TT_FAIL:    return pat_fail();
+    case TT_SUCCEED: return pat_succeed();
+    case TT_FENCE:
         if (e->n > 0) {
             DESCR_t _inner = interp_eval_pat(e->c[0]);
             if (IS_FAIL_fn(_inner)) return FAILDESCR;
             return pat_fence_p(_inner);
         }
         return pat_fence();
-    case AST_ABORT:   return pat_abort();
-    case AST_BAL:     return pat_bal();
+    case TT_ABORT:   return pat_abort();
+    case TT_BAL:     return pat_bal();
 
     /* One-argument pattern primitives.
      * POS(n), RPOS(n), TAB(n), RTAB(n), LEN(n) take integer args.
      * ANY(s), NOTANY(s), SPAN(s), BREAK(s), BREAKX(s) take string args. */
-    case AST_POS: {
+    case TT_POS: {
         if (e->n < 1) return pat_pos(0);
         DESCR_t a = eval_node(e->c[0]);
         return pat_pos((int64_t)(a.v==DT_I ? a.i : (int64_t)(a.v==DT_R ? (int64_t)a.r : 0)));
     }
-    case AST_RPOS: {
+    case TT_RPOS: {
         if (e->n < 1) return pat_rpos(0);
         DESCR_t a = eval_node(e->c[0]);
         return pat_rpos((int64_t)(a.v==DT_I ? a.i : (int64_t)(a.v==DT_R ? (int64_t)a.r : 0)));
     }
-    case AST_TAB: {
+    case TT_TAB: {
         if (e->n < 1) return pat_tab(0);
         DESCR_t a = eval_node(e->c[0]);
         return pat_tab((int64_t)(a.v==DT_I ? a.i : (int64_t)(a.v==DT_R ? (int64_t)a.r : 0)));
     }
-    case AST_RTAB: {
+    case TT_RTAB: {
         if (e->n < 1) return pat_rtab(0);
         DESCR_t a = eval_node(e->c[0]);
         return pat_rtab((int64_t)(a.v==DT_I ? a.i : (int64_t)(a.v==DT_R ? (int64_t)a.r : 0)));
     }
-    case AST_LEN: {
+    case TT_LEN: {
         if (e->n < 1) return pat_len(0);
         DESCR_t a = eval_node(e->c[0]);
         return pat_len((int64_t)(a.v==DT_I ? a.i : (int64_t)(a.v==DT_R ? (int64_t)a.r : 0)));
     }
-    case AST_ANY: {
+    case TT_ANY: {
         if (e->n < 1) return pat_any_cs("");
         DESCR_t a = NAME_DEREF(eval_node(e->c[0]));
         const char *s = (a.v==DT_S||a.v==DT_SNUL) && a.s ? a.s : "";
         return pat_any_cs(s);
     }
-    case AST_NOTANY: {
+    case TT_NOTANY: {
         if (e->n < 1) return pat_notany("");
         DESCR_t a = NAME_DEREF(eval_node(e->c[0]));
         const char *s = (a.v==DT_S||a.v==DT_SNUL) && a.s ? a.s : "";
         return pat_notany(s);
     }
-    case AST_SPAN: {
+    case TT_SPAN: {
         if (e->n < 1) return pat_span("");
         DESCR_t a = NAME_DEREF(eval_node(e->c[0]));
         const char *s = (a.v==DT_S||a.v==DT_SNUL) && a.s ? a.s : "";
         return pat_span(s);
     }
-    case AST_BREAK: {
+    case TT_BREAK: {
         if (e->n < 1) return pat_break_("");
         DESCR_t a = NAME_DEREF(eval_node(e->c[0]));
         const char *s = (a.v==DT_S||a.v==DT_SNUL) && a.s ? a.s : "";
         return pat_break_(s);
     }
-    case AST_BREAKX: {
+    case TT_BREAKX: {
         extern DESCR_t pat_breakx(const char *);
         if (e->n < 1) return pat_breakx("");
         DESCR_t a = NAME_DEREF(eval_node(e->c[0]));
         const char *s = (a.v==DT_S||a.v==DT_SNUL) && a.s ? a.s : "";
         return pat_breakx(s);
     }
-    case AST_ARBNO: {
+    case TT_ARBNO: {
         if (e->n < 1) return pat_arb(); /* degenerate */
         DESCR_t inner = interp_eval_pat(e->c[0]);
         return pat_arbno(inner);
     }
 
-    case AST_FNC:
+    case TT_FNC:
         /* Generic function call in pattern context -- evaluate as value,
          * let the caller coerce via PATVAL.  The SB-5c.1 guards for
-         * AST_FNC("ARBNO")/AST_FNC("FENCE") are removed: no frontend produces
-         * those; the SNOBOL4 parser uses pat_prim_kind() to emit AST_ARBNO /
-         * AST_FENCE directly (RS-5). */
+         * TT_FNC("ARBNO")/TT_FNC("FENCE") are removed: no frontend produces
+         * those; the SNOBOL4 parser uses pat_prim_kind() to emit TT_ARBNO /
+         * TT_FENCE directly (RS-5). */
         return eval_node(e);
 
     default:

@@ -79,23 +79,23 @@ int main(void) {
     /* --- verify X is bound to b ---------------------------------------- */
     Term *Xval = term_deref(X);
     CHECK("X = b",
-          Xval && Xval->tag == TT_ATOM && Xval->atom_id == atom_b);
+          Xval && Xval->tag == TERM_ATOM && Xval->atom_id == atom_b);
 
     /* --- verify Y is bound to a ---------------------------------------- */
     Term *Yval = term_deref(Y);
     CHECK("Y = a",
-          Yval && Yval->tag == TT_ATOM && Yval->atom_id == atom_a);
+          Yval && Yval->tag == TERM_ATOM && Yval->atom_id == atom_a);
 
     /* --- undo bindings via trail_unwind --------------------------------- */
     trail_unwind(&trail, mark);
 
     /* --- verify X is unbound again ------------------------------------- */
     CHECK("trail_unwind restores X to unbound",
-          X->tag == TT_VAR && X->var_slot == 0);
+          X->tag == TERM_VAR && X->var_slot == 0);
 
     /* --- verify Y is unbound again ------------------------------------- */
     CHECK("trail_unwind restores Y to unbound",
-          Y->tag == TT_VAR && Y->var_slot == 1);
+          Y->tag == TERM_VAR && Y->var_slot == 1);
 
     /* --- summary -------------------------------------------------------- */
     printf("%d/%d tests passed\n", tests_passed, tests_run);

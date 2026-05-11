@@ -2,24 +2,24 @@
  * prolog_lower.c — Prolog ClauseAST -> scrip-cc IR lowering
  *
  * Takes a PlProgram (list of PlClause) and produces a CODE_t* whose
- * STMT_t nodes carry the Prolog IR node kinds added to AST_e in scrip-cc.h.
+ * STMT_t nodes carry the Prolog IR node kinds added to tree_e in scrip-cc.h.
  *
  * Pipeline:
- *   1. Group clauses by functor/arity key -> one AST_CHOICE per predicate
- *   2. For each PlClause -> one AST_CLAUSE child of the AST_CHOICE
- *   3. Lower each Term* in head args and body goals -> AST_t*
+ *   1. Group clauses by functor/arity key -> one TT_CHOICE per predicate
+ *   2. For each PlClause -> one TT_CLAUSE child of the TT_CHOICE
+ *   3. Lower each Term* in head args and body goals -> tree_t*
  *   4. Assign variable slots per clause (VarScope reused from parser)
- *   5. Emit AST_TRAIL_MARK / AST_TRAIL_UNWIND sentinels around each clause
+ *   5. Emit TT_TRAIL_MARK / TT_TRAIL_UNWIND sentinels around each clause
  *
- * Term -> AST_t lowering:
- *   TT_ATOM     -> AST_QLIT  (sval = atom name)
- *   TT_INT      -> AST_ILIT  (ival = value)
- *   TT_FLOAT    -> AST_FLIT  (dval = value)
- *   TT_VAR      -> AST_VAR  (sval = "_V<slot>", ival = slot)
- *   TT_COMPOUND -> AST_FNC   (sval = functor name, children = lowered args)
- *                  special: =/2  -> AST_UNIFY
- *                           is/2 -> AST_FNC("is") with arithmetic rhs
- *                           !/0  -> AST_CUT
+ * Term -> tree_t lowering:
+ *   TERM_ATOM     -> TT_QLIT  (sval = atom name)
+ *   TERM_INT      -> TT_ILIT  (ival = value)
+ *   TERM_FLOAT    -> TT_FLIT  (dval = value)
+ *   TERM_VAR      -> TERM_VAR  (sval = "_V<slot>", ival = slot)
+ *   TERM_COMPOUND -> TT_FNC   (sval = functor name, children = lowered args)
+ *                  special: =/2  -> TT_UNIFY
+ *                           is/2 -> TT_FNC("is") with arithmetic rhs
+ *                           !/0  -> TT_CUT
  *                           ,/2  -> flattened into body (done in parser)
  */
 
@@ -50,10 +50,10 @@ static PredKey key_of_head(Term *head) {
     if (!head) return k;
     head = term_deref(head);
     if (!head) return k;
-    if (head->tag == TT_ATOM) {
+    if (head->tag == TERM_ATOM) {
         k.functor = head->atom_id;
         k.arity   = 0;
-    } else if (head->tag == TT_COMPOUND) {
+    } else if (head->tag == TERM_COMPOUND) {
         k.functor = head->compound.functor;
         k.arity   = head->compound.arity;
     }
@@ -61,11 +61,11 @@ static PredKey key_of_head(Term *head) {
 }
 
 /* =========================================================================
- * Term -> AST_t lowering
+ * Term -> tree_t lowering
  * ======================================================================= */
 
-static AST_t *lower_term(Term *t);
-static AST_t *lower_clause(PlClause *cl, PredKey key);
+static tree_t *lower_term(Term *t);
+static tree_t *lower_clause(PlClause *cl, PredKey key);
 
 /* Walk the Term graph rooted at the head + each body goal of a clause.
  * Pass 1: find max named-var slot.  Pass 2: assign fresh distinct slots to
@@ -74,7 +74,7 @@ static AST_t *lower_clause(PlClause *cl, PredKey key);
  * Used both by lower_clause and by the plunit prescan, which builds an
  * assertz term whose Goal arg points back at the clause body Terms; the
  * prescan must run this BEFORE lowering the assertz term so anon vars in
- * the test body emit distinct AST_VAR slots, not all aliased to slot 0. */
+ * the test body emit distinct TERM_VAR slots, not all aliased to slot 0. */
 static void assign_clause_anon_slots(PlClause *cl) {
     if (!cl) return;
     Term *stk[512]; int top = 0;
@@ -84,9 +84,9 @@ static void assign_clause_anon_slots(PlClause *cl) {
     /* Pass 1: max named slot */
     #define PA_WALK_MAX(root_) do { top = 0; PA_PUSH(root_); \
         while (top > 0) { Term *_c = stk[--top]; if (!_c) continue; \
-            if (_c->tag == TT_VAR && _c->saved_slot > max_slot) \
+            if (_c->tag == TERM_VAR && _c->saved_slot > max_slot) \
                 max_slot = _c->saved_slot; \
-            if (_c->tag == TT_COMPOUND) \
+            if (_c->tag == TERM_COMPOUND) \
                 for (int _i = 0; _i < _c->compound.arity; _i++) \
                     PA_PUSH(_c->compound.args[_i]); } } while(0)
     if (cl->head) PA_WALK_MAX(cl->head);
@@ -95,9 +95,9 @@ static void assign_clause_anon_slots(PlClause *cl) {
     int next_anon = max_slot + 1;
     #define PA_WALK_ASSIGN(root_) do { top = 0; PA_PUSH(root_); \
         while (top > 0) { Term *_c = stk[--top]; if (!_c) continue; \
-            if (_c->tag == TT_VAR && _c->saved_slot < 0) \
+            if (_c->tag == TERM_VAR && _c->saved_slot < 0) \
                 _c->saved_slot = next_anon++; \
-            if (_c->tag == TT_COMPOUND) \
+            if (_c->tag == TERM_COMPOUND) \
                 for (int _i = 0; _i < _c->compound.arity; _i++) \
                     PA_PUSH(_c->compound.args[_i]); } } while(0)
     if (cl->head) PA_WALK_ASSIGN(cl->head);
@@ -107,7 +107,7 @@ static void assign_clause_anon_slots(PlClause *cl) {
     #undef PA_WALK_ASSIGN
 }
 
-/* Build functor/arity string like "foo/2" for AST_CHOICE sval */
+/* Build functor/arity string like "foo/2" for TT_CHOICE sval */
 static char *pred_str(int functor, int arity) {
     const char *fn = prolog_atom_name(functor);
     if (!fn) fn = "?";
@@ -116,36 +116,36 @@ static char *pred_str(int functor, int arity) {
     return strdup(buf);
 }
 
-static AST_t *lower_term(Term *t) {
+static tree_t *lower_term(Term *t) {
     t = term_deref(t);
     if (!t) {
-        AST_t *e = expr_new(AST_QLIT);
+        tree_t *e = ast_node_new(TT_QLIT);
         e->v.sval = strdup("[]");
         return e;
     }
 
     switch (t->tag) {
-        case TT_ATOM: {
-            /* ! -> AST_CUT */
-            if (t->atom_id == ATOM_CUT) return expr_new(AST_CUT);
-            /* Atom in a goal position -> AST_FNC/0 (nl, true, fail, halt, etc.) */
-            AST_t *e = expr_new(AST_FNC);
+        case TERM_ATOM: {
+            /* ! -> TT_CUT */
+            if (t->atom_id == ATOM_CUT) return ast_node_new(TT_CUT);
+            /* Atom in a goal position -> TT_FNC/0 (nl, true, fail, halt, etc.) */
+            tree_t *e = ast_node_new(TT_FNC);
             const char *nm = prolog_atom_name(t->atom_id);
             e->v.sval = strdup(nm ? nm : "");
             return e;
         }
-        case TT_INT: {
-            AST_t *e = expr_new(AST_ILIT);
-            e->v.ival = t->v.ival;
+        case TERM_INT: {
+            tree_t *e = ast_node_new(TT_ILIT);
+            e->v.ival = t->ival;
             return e;
         }
-        case TT_FLOAT: {
-            AST_t *e = expr_new(AST_FLIT);
+        case TERM_FLOAT: {
+            tree_t *e = ast_node_new(TT_FLIT);
             e->v.dval = t->fval;
             return e;
         }
-        case TT_VAR: {
-            AST_t *e = expr_new(AST_VAR);
+        case TERM_VAR: {
+            tree_t *e = ast_node_new(TERM_VAR);
             int slot = t->saved_slot;  /* -1 = anonymous wildcard */
             char buf[32];
             if (slot < 0) {
@@ -157,29 +157,29 @@ static AST_t *lower_term(Term *t) {
             e->v.ival = slot;  /* -1 for wildcard, >=0 for real var */
             return e;
         }
-        case TT_COMPOUND: {
+        case TERM_COMPOUND: {
             const char *fn = prolog_atom_name(t->compound.functor);
             if (!fn) fn = "?";
             int arity = t->compound.arity;
 
-            /* =/2 -> AST_UNIFY */
+            /* =/2 -> TT_UNIFY */
             int eq_id = prolog_atom_intern("=");
             if (t->compound.functor == eq_id && arity == 2) {
-                AST_t *e = expr_new(AST_UNIFY);
+                tree_t *e = ast_node_new(TT_UNIFY);
                 expr_add_child(e, lower_term(t->compound.args[0]));
                 expr_add_child(e, lower_term(t->compound.args[1]));
                 return e;
             }
 
             /* Arithmetic operators within is/2 rhs */
-            struct { const char *name; AST_e kind; } arith[] = {
-                { "+", AST_ADD }, { "-", AST_SUB }, { "*", AST_MUL },
-                { "/", AST_DIV }, { "//", AST_DIV }, { NULL, 0 }
+            struct { const char *name; tree_e kind; } arith[] = {
+                { "+", TT_ADD }, { "-", TT_SUB }, { "*", TT_MUL },
+                { "/", TT_DIV }, { "//", TT_DIV }, { NULL, 0 }
             };
             if (arity == 2) {
                 for (int i = 0; arith[i].name; i++) {
                     if (strcmp(fn, arith[i].name) == 0) {
-                        AST_t *e = expr_new(arith[i].t);
+                        tree_t *e = ast_node_new(arith[i].kind);
                         expr_add_child(e, lower_term(t->compound.args[0]));
                         expr_add_child(e, lower_term(t->compound.args[1]));
                         return e;
@@ -187,15 +187,15 @@ static AST_t *lower_term(Term *t) {
                 }
             }
 
-            /* ,/2 — conjunction: flatten right-spine into n-ary AST_FNC(",")
-             * e.g. (A,(B,(C,D))) -> AST_FNC(",") [A, B, C, D]  */
+            /* ,/2 — conjunction: flatten right-spine into n-ary TT_FNC(",")
+             * e.g. (A,(B,(C,D))) -> TT_FNC(",") [A, B, C, D]  */
             int comma_id = prolog_atom_intern(",");
             if (t->compound.functor == comma_id && arity == 2) {
-                AST_t *e = expr_new(AST_FNC);
+                tree_t *e = ast_node_new(TT_FNC);
                 e->v.sval = strdup(",");
                 /* walk the right spine collecting all conjuncts */
                 Term *cur = t;
-                while (cur && cur->tag == TT_COMPOUND &&
+                while (cur && cur->tag == TERM_COMPOUND &&
                        cur->compound.functor == comma_id &&
                        cur->compound.arity == 2) {
                     expr_add_child(e, lower_term(cur->compound.args[0]));
@@ -205,14 +205,14 @@ static AST_t *lower_term(Term *t) {
                 return e;
             }
 
-            /* ;/2 — disjunction: flatten right-spine into n-ary AST_FNC(";")
-             * e.g. (A;(B;C)) -> AST_FNC(";") [A, B, C]  */
+            /* ;/2 — disjunction: flatten right-spine into n-ary TT_FNC(";")
+             * e.g. (A;(B;C)) -> TT_FNC(";") [A, B, C]  */
             int semi_id = prolog_atom_intern(";");
             if (t->compound.functor == semi_id && arity == 2) {
-                AST_t *e = expr_new(AST_FNC);
+                tree_t *e = ast_node_new(TT_FNC);
                 e->v.sval = strdup(";");
                 Term *cur = t;
-                while (cur && cur->tag == TT_COMPOUND &&
+                while (cur && cur->tag == TERM_COMPOUND &&
                        cur->compound.functor == semi_id &&
                        cur->compound.arity == 2) {
                     expr_add_child(e, lower_term(cur->compound.args[0]));
@@ -223,18 +223,18 @@ static AST_t *lower_term(Term *t) {
             }
 
             /* ->/2 — if-then: flatten Then-part into n-ary children.
-             * AST_FNC("->") layout: children[0] = Cond, children[1..] = Then goals.
-             * (Then conjunction flattened, same as AST_CLAUSE body goals.)
+             * TT_FNC("->") layout: children[0] = Cond, children[1..] = Then goals.
+             * (Then conjunction flattened, same as TT_CLAUSE body goals.)
              * Every then-step is visible at top level for the emitter. */
             int arrow_id = prolog_atom_intern("->");
             if (t->compound.functor == arrow_id && arity == 2) {
-                AST_t *e = expr_new(AST_FNC);
+                tree_t *e = ast_node_new(TT_FNC);
                 e->v.sval = strdup("->");
                 /* children[0] = Cond */
                 expr_add_child(e, lower_term(t->compound.args[0]));
                 /* children[1..] = Then goals (flatten right-spine conjunction) */
                 Term *then_part = term_deref(t->compound.args[1]);
-                while (then_part && then_part->tag == TT_COMPOUND &&
+                while (then_part && then_part->tag == TERM_COMPOUND &&
                        then_part->compound.functor == comma_id &&
                        then_part->compound.arity == 2) {
                     expr_add_child(e, lower_term(then_part->compound.args[0]));
@@ -244,17 +244,17 @@ static AST_t *lower_term(Term *t) {
                 return e;
             }
 
-            /* General compound / goal -> AST_FNC */
-            AST_t *e = expr_new(AST_FNC);
+            /* General compound / goal -> TT_FNC */
+            tree_t *e = ast_node_new(TT_FNC);
             e->v.sval = strdup(fn);
             for (int i = 0; i < arity; i++)
                 expr_add_child(e, lower_term(t->compound.args[i]));
             return e;
         }
-        case TT_REF:
+        case TERM_REF:
             return lower_term(t->ref);
         default: {
-            AST_t *e = expr_new(AST_QLIT);
+            tree_t *e = ast_node_new(TT_QLIT);
             e->v.sval = strdup("?");
             return e;
         }
@@ -262,20 +262,20 @@ static AST_t *lower_term(Term *t) {
 }
 
 /* =========================================================================
- * Lower one PlClause -> AST_CLAUSE AST_t
+ * Lower one PlClause -> TT_CLAUSE tree_t
  *
- * AST_CLAUSE layout:
+ * TT_CLAUSE layout:
  *   sval   = "functor/arity"
  *   ival   = n_vars (EnvLayout.n_vars)
  *   dval   = (double)n_args
  *   children[0..n_args-1]  = lowered head argument terms
  *   children[n_args..]     = lowered body goals
- *   (AST_TRAIL_MARK and AST_TRAIL_UNWIND are added as sentinel children
+ *   (TT_TRAIL_MARK and TT_TRAIL_UNWIND are added as sentinel children
  *    around the head-unify region by the emitter; lower just records
  *    ival = trail_mark_slot = n_vars)
  * ======================================================================= */
-static AST_t *lower_clause(PlClause *cl, PredKey key) {
-    AST_t *ec = expr_new(AST_CLAUSE);
+static tree_t *lower_clause(PlClause *cl, PredKey key) {
+    tree_t *ec = ast_node_new(TT_CLAUSE);
     ec->v.sval = pred_str(key.functor, key.arity);
 
     /* Count distinct variable slots via full recursive Term walk */
@@ -297,9 +297,9 @@ static AST_t *lower_clause(PlClause *cl, PredKey key) {
         while (stk_top > 0) { \
             Term *_cur = stk[--stk_top]; \
             if (!_cur) continue; \
-            if (_cur->tag == TT_VAR && _cur->saved_slot > max_slot) \
+            if (_cur->tag == TERM_VAR && _cur->saved_slot > max_slot) \
                 max_slot = _cur->saved_slot; \
-            if (_cur->tag == TT_COMPOUND) \
+            if (_cur->tag == TERM_COMPOUND) \
                 for (int _wi = 0; _wi < _cur->compound.arity; _wi++) \
                     PUSH_TERM(_cur->compound.args[_wi]); \
         } \
@@ -315,7 +315,7 @@ static AST_t *lower_clause(PlClause *cl, PredKey key) {
     /* Pass 2: assign fresh slots to anonymous TT_VARs (saved_slot == -1).
      * Each distinct anon Term* gets its own slot starting at max_slot+1.
      * Without this, lower_term sees saved_slot==-1 for every "_" and emits
-     * a single shared AST_VAR slot — which incorrectly aliases distinct anon
+     * a single shared TERM_VAR slot — which incorrectly aliases distinct anon
      * vars in the same clause (e.g. assertz-synthesized plunit test bodies
      * containing multiple "_" placeholders). Idempotent: re-running on a
      * Term graph whose anon vars already got slots leaves them unchanged.
@@ -333,9 +333,9 @@ static AST_t *lower_clause(PlClause *cl, PredKey key) {
         while (stk_top > 0) { \
             Term *_cur = stk[--stk_top]; \
             if (!_cur) continue; \
-            if (_cur->tag == TT_VAR && _cur->saved_slot < 0) \
+            if (_cur->tag == TERM_VAR && _cur->saved_slot < 0) \
                 _cur->saved_slot = next_anon++; \
-            if (_cur->tag == TT_COMPOUND) \
+            if (_cur->tag == TERM_COMPOUND) \
                 for (int _ai = 0; _ai < _cur->compound.arity; _ai++) \
                     PUSH_TERM(_cur->compound.args[_ai]); \
         } \
@@ -352,7 +352,7 @@ static AST_t *lower_clause(PlClause *cl, PredKey key) {
     /* Add head argument nodes */
     if (cl->head) {
         Term *h = term_deref(cl->head);
-        if (h && h->tag == TT_COMPOUND) {
+        if (h && h->tag == TERM_COMPOUND) {
             for (int i = 0; i < h->compound.arity; i++)
                 expr_add_child(ec, lower_term(h->compound.args[i]));
         }
@@ -385,13 +385,13 @@ CODE_t *prolog_lower(PlProgram *pl_prog) {
             if (!cl->head && cl->nbody > 0) {
                 /* directive — check for begin_tests/end_tests */
                 Term *d = term_deref(cl->body[0]);
-                if (d && d->tag == TT_COMPOUND && d->compound.arity >= 1) {
+                if (d && d->tag == TERM_COMPOUND && d->compound.arity >= 1) {
                     const char *fn = prolog_atom_name(d->compound.functor);
                     if (fn && strcmp(fn, "begin_tests") == 0) {
                         Term *a = term_deref(d->compound.args[0]);
                         const char *sn = NULL;
-                        if (a && a->tag == TT_ATOM)     sn = prolog_atom_name(a->atom_id);
-                        if (a && a->tag == TT_COMPOUND) sn = prolog_atom_name(a->compound.functor);
+                        if (a && a->tag == TERM_ATOM)     sn = prolog_atom_name(a->atom_id);
+                        if (a && a->tag == TERM_COMPOUND) sn = prolog_atom_name(a->compound.functor);
                         if (sn) strncpy(cur_suite, sn, 63);
                     } else if (fn && strcmp(fn, "end_tests") == 0) {
                         cur_suite[0] = '\0';
@@ -407,7 +407,7 @@ CODE_t *prolog_lower(PlProgram *pl_prog) {
     /* ---- Pass 1: collect all predicate keys in order of first appearance */
     #define MAX_PREDS 512
     PredKey  keys[MAX_PREDS];
-    AST_t  *choices[MAX_PREDS];   /* one AST_CHOICE per predicate */
+    tree_t  *choices[MAX_PREDS];   /* one TT_CHOICE per predicate */
     int      nkeys = 0;
     int      clause_idx = 0;  /* tracks position for plunit_suite[] lookup */
 
@@ -433,7 +433,7 @@ CODE_t *prolog_lower(PlProgram *pl_prog) {
                 assign_clause_anon_slots(cl);
                 /* Extract Name and Opts from head */
                 Term *hd = term_deref(cl->head);
-                Term *name_term = (hd->tag == TT_COMPOUND) ? term_deref(hd->compound.args[0]) : hd;
+                Term *name_term = (hd->tag == TERM_COMPOUND) ? term_deref(hd->compound.args[0]) : hd;
                 Term *opts_term = (k.arity == 2) ? term_deref(hd->compound.args[1]) : NULL;
                 /* Build Goal term = conjunction of body goals */
                 Term *goal_term = NULL;
@@ -481,26 +481,26 @@ CODE_t *prolog_lower(PlProgram *pl_prog) {
                 continue;
             }
             keys[nkeys] = k;
-            choices[nkeys] = expr_new(AST_CHOICE);
+            choices[nkeys] = ast_node_new(TT_CHOICE);
             choices[nkeys]->v.sval = pred_str(k.functor, k.arity);
             found = nkeys++;
         }
 
         /* Lower this clause and append to the choice */
-        AST_t *ec = lower_clause(cl, k);
+        tree_t *ec = lower_clause(cl, k);
         expr_add_child(choices[found], ec);
     }
 
     /* ---- Pass 2: handle directives.
      * :- export(name/arity) or :- export(name) → prog->exports
-     * All other directives → plain AST_FNC STMT_t nodes. */
+     * All other directives → plain TT_FNC STMT_t nodes. */
     for (PlClause *cl = pl_prog->head; cl; cl = cl->next) {
         if (!cl->head && cl->nbody > 0) {
             Term *goal = cl->body[0];
             Term *dg   = term_deref(goal);
             /* Check for :- export(Name/Arity) or :- export(Name) */
             int is_export = 0;
-            if (dg && dg->tag == TT_COMPOUND
+            if (dg && dg->tag == TERM_COMPOUND
                 && dg->compound.arity == 1) {
                 int fn = dg->compound.functor;
                 const char *fname = prolog_atom_name(fn);
@@ -509,13 +509,13 @@ CODE_t *prolog_lower(PlProgram *pl_prog) {
                     Term *arg = term_deref(dg->compound.args[0]);
                     /* arg is Name/Arity compound or bare atom */
                     const char *ename = NULL;
-                    if (arg && arg->tag == TT_COMPOUND
+                    if (arg && arg->tag == TERM_COMPOUND
                         && arg->compound.arity == 2) {
                         /* Name/Arity — extract Name */
                         Term *n = term_deref(arg->compound.args[0]);
-                        if (n && n->tag == TT_ATOM)
+                        if (n && n->tag == TERM_ATOM)
                             ename = prolog_atom_name(n->atom_id);
-                    } else if (arg && arg->tag == TT_ATOM) {
+                    } else if (arg && arg->tag == TERM_ATOM) {
                         ename = prolog_atom_name(arg->atom_id);
                     }
                     if (ename) {
@@ -540,7 +540,7 @@ CODE_t *prolog_lower(PlProgram *pl_prog) {
         }
     }
 
-    /* ---- Pass 3: emit one STMT_t per AST_CHOICE */
+    /* ---- Pass 3: emit one STMT_t per TT_CHOICE */
     for (int i = 0; i < nkeys; i++) {
         STMT_t *s = stmt_new();
         s->subject = choices[i];
@@ -558,31 +558,31 @@ CODE_t *prolog_lower(PlProgram *pl_prog) {
 /* =========================================================================
  * prolog_lower_pretty — IR dump for diagnostics
  * ======================================================================= */
-static void ast_dump(AST_t *e, int indent, FILE *out) {
+static void ast_dump(tree_t *e, int indent, FILE *out) {
     if (!e) { fprintf(out, "%*s<null>\n", indent, ""); return; }
     const char *kname = "?";
     switch (e->t) {
-        case AST_CHOICE:      kname = "AST_CHOICE";      break;
-        case AST_CLAUSE:      kname = "AST_CLAUSE";      break;
-        case AST_UNIFY:       kname = "AST_UNIFY";       break;
-        case AST_CUT:         kname = "AST_CUT";         break;
-        case AST_TRAIL_MARK:  kname = "AST_TRAIL_MARK";  break;
-        case AST_TRAIL_UNWIND:kname = "AST_TRAIL_UNWIND";break;
-        case AST_FNC:         kname = "AST_FNC";         break;
-        case AST_QLIT:        kname = "AST_QLIT";        break;
-        case AST_ILIT:        kname = "AST_ILIT";        break;
-        case AST_FLIT:        kname = "AST_FLIT";        break;
-        case AST_VAR:        kname = "AST_VAR";        break;
-        case AST_ADD:         kname = "AST_ADD";         break;
-        case AST_SUB:         kname = "AST_SUB";         break;
-        case AST_MUL:         kname = "AST_MUL";         break;
-        case AST_DIV:         kname = "AST_DIV";         break;
+        case TT_CHOICE:      kname = "TT_CHOICE";      break;
+        case TT_CLAUSE:      kname = "TT_CLAUSE";      break;
+        case TT_UNIFY:       kname = "TT_UNIFY";       break;
+        case TT_CUT:         kname = "TT_CUT";         break;
+        case TT_TRAIL_MARK:  kname = "TT_TRAIL_MARK";  break;
+        case TT_TRAIL_UNWIND:kname = "TT_TRAIL_UNWIND";break;
+        case TT_FNC:         kname = "TT_FNC";         break;
+        case TT_QLIT:        kname = "TT_QLIT";        break;
+        case TT_ILIT:        kname = "TT_ILIT";        break;
+        case TT_FLIT:        kname = "TT_FLIT";        break;
+        case TT_VAR:         kname = "TT_VAR";        break;
+        case TT_ADD:         kname = "TT_ADD";         break;
+        case TT_SUB:         kname = "TT_SUB";         break;
+        case TT_MUL:         kname = "TT_MUL";         break;
+        case TT_DIV:         kname = "TT_DIV";         break;
         default: break;
     }
     fprintf(out, "%*s%s", indent, "", kname);
     if (e->v.sval) fprintf(out, "  sval=%s", e->v.sval);
     if (e->v.ival) fprintf(out, "  ival=%ld", e->v.ival);
-    if (e->t == AST_CLAUSE)
+    if (e->t == TT_CLAUSE)
         fprintf(out, "  n_vars=%ld  n_args=%.0f", e->v.ival, e->v.dval);
     fprintf(out, "\n");
     for (int i = 0; i < e->n; i++)
@@ -597,17 +597,17 @@ void prolog_lower_pretty(CODE_t *prog, FILE *out) {
 }
 
 /*============================================================================================================================
- * pl_assert_term — build an AST_CLAUSE from a runtime Term* (for assertz/asserta).
+ * pl_assert_term — build an TT_CLAUSE from a runtime Term* (for assertz/asserta).
  *
  * Accepts:
  *   atom or compound f(a1..an)          → fact clause, no body
  *   ':-'(head, body)                    → rule clause
  *
- * Returns a heap-allocated AST_CLAUSE ready to append to an AST_CHOICE node.
+ * Returns a heap-allocated TT_CLAUSE ready to append to an TT_CHOICE node.
  * Also sets *key_out to the predicate key (functor atom_id, arity).
  * Returns NULL on error.
  *============================================================================================================================*/
-AST_t *pl_assert_term(Term *t, int *functor_out, int *arity_out) {
+tree_t *pl_assert_term(Term *t, int *functor_out, int *arity_out) {
     if (!t) return NULL;
     t = term_deref(t);
     if (!t) return NULL;
@@ -616,7 +616,7 @@ AST_t *pl_assert_term(Term *t, int *functor_out, int *arity_out) {
     Term *body = NULL;  /* NULL means fact (body = true) */
 
     /* Detect :-(Head, Body) rule form */
-    if (t->tag == TT_COMPOUND && t->compound.arity == 2) {
+    if (t->tag == TERM_COMPOUND && t->compound.arity == 2) {
         const char *fn = prolog_atom_name(t->compound.functor);
         if (fn && strcmp(fn, ":-") == 0) {
             head = term_deref(t->compound.args[0]);
@@ -644,7 +644,7 @@ AST_t *pl_assert_term(Term *t, int *functor_out, int *arity_out) {
     if (body) {
         /* Flatten comma-conjunction */
         Term *cur = body;
-        while (cur && cur->tag == TT_COMPOUND && cur->compound.arity == 2) {
+        while (cur && cur->tag == TERM_COMPOUND && cur->compound.arity == 2) {
             const char *cfn = prolog_atom_name(cur->compound.functor);
             if (!cfn || strcmp(cfn, ",") != 0) break;
             if (nbody < 256) body_goals[nbody++] = term_deref(cur->compound.args[0]);

@@ -145,7 +145,7 @@ void prolog_atom_init(void) {
 Term *term_new_atom(int atom_id) {
     Term *t = GC_malloc(sizeof(Term));
     memset(t, 0, sizeof(Term));
-    t->tag     = TT_ATOM;
+    t->tag     = TERM_ATOM;
     t->atom_id = atom_id;
     return t;
 }
@@ -153,7 +153,7 @@ Term *term_new_atom(int atom_id) {
 Term *term_new_var(int var_slot) {
     Term *t = GC_malloc(sizeof(Term));
     memset(t, 0, sizeof(Term));
-    t->tag        = TT_VAR;
+    t->tag        = TERM_VAR;
     t->var_slot   = var_slot;
     t->saved_slot = var_slot;   /* preserved across bind() / trail_unwind() */
     return t;
@@ -162,7 +162,7 @@ Term *term_new_var(int var_slot) {
 Term *term_new_compound(int functor, int arity, Term **args) {
     Term *t = GC_malloc(sizeof(Term));
     memset(t, 0, sizeof(Term));
-    t->tag              = TT_COMPOUND;
+    t->tag              = TERM_COMPOUND;
     t->compound.functor = functor;
     t->compound.arity   = arity;
     if (arity > 0 && args) {
@@ -177,15 +177,15 @@ Term *term_new_compound(int functor, int arity, Term **args) {
 Term *term_new_int(long ival) {
     Term *t = GC_malloc(sizeof(Term));
     memset(t, 0, sizeof(Term));
-    t->tag  = TT_INT;
-    t->v.ival = ival;
+    t->tag  = TERM_INT;
+    t->ival = ival;
     return t;
 }
 
 Term *term_new_float(double fval) {
     Term *t = GC_malloc(sizeof(Term));
     memset(t, 0, sizeof(Term));
-    t->tag  = TT_FLOAT;
+    t->tag  = TERM_FLOAT;
     t->fval = fval;
     return t;
 }

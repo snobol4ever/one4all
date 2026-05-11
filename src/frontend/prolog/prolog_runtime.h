@@ -17,7 +17,7 @@
  * ======================================================================= */
 
 typedef struct {
-    Term  **stack;    /* array of Term* — each entry is a bound TT_VAR node */
+    Term  **stack;    /* array of Term* — each entry is a bound TERM_VAR node */
     int     top;      /* next free index                                     */
     int     capacity; /* allocated size of stack[]                           */
 } Trail;
@@ -25,12 +25,12 @@ typedef struct {
 /* Initialise a trail (call once; trail lives on the heap).               */
 void trail_init(Trail *t);
 
-/* Record that term was just bound (tag changed to TT_REF).
+/* Record that term was just bound (tag changed to TERM_REF).
  * Called inside unify() only.                                            */
 void trail_push(Trail *t, Term *term);
 
-/* Undo all bindings recorded since mark.  Sets their TT_REF back to
- * TT_VAR and pops the stack down to mark.                                */
+/* Undo all bindings recorded since mark.  Sets their TERM_REF back to
+ * TERM_VAR and pops the stack down to mark.                                */
 void trail_unwind(Trail *t, int mark);
 
 /* Save current trail top (use as argument to trail_unwind later).        */

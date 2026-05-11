@@ -110,7 +110,7 @@ int sm_label(SM_Program *p)
     /* CHUNKS-step03: store PC in a[1].i (matches sm_label_named layout) and
      * leave a[0].s == NULL.  Was: a[0].i = target — but that aliases a[0].s
      * to a small-integer pointer which sm_label_pc_lookup then strcmp'd,
-     * segfaulting on expression-body unnamed labels emitted by AST_DEFER lowering. */
+     * segfaulting on expression-body unnamed labels emitted by TT_DEFER lowering. */
     p->instrs[idx].a[1].i  = (int64_t)target;
     return target;
 }
@@ -145,7 +145,7 @@ void sm_patch_jump(SM_Program *p, int jump_idx, int target_label)
 
 /* IM-9: record source label for statement stno (1-based).
  * label may be NULL (unlabelled statement). String is not copied — caller
- * owns the lifetime (interned in AST_STMT :lbl which lives for the program). */
+ * owns the lifetime (interned in TT_STMT :lbl which lives for the program). */
 void sm_stno_label_record(SM_Program *p, int stno, const char *label)
 {
     if (stno <= 0) return;

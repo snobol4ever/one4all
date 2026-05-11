@@ -1,9 +1,9 @@
 /*============================================================================================================================
- * scan_builtins.c — RS-23-extra-prep: lift SCAN-context builtins out of interp_eval's icn-frame AST_FNC switch.
+ * scan_builtins.c — RS-23-extra-prep: lift SCAN-context builtins out of interp_eval's icn-frame TT_FNC switch.
  *
  * Why this file exists.  Before this rung, the SCAN-context builtins
  * (any, many, upto, move, tab, pos, rpos, match, bal, find — the scalar
- * paths) lived inside interp_eval.c's icn-frame AST_FNC case, around lines
+ * paths) lived inside interp_eval.c's icn-frame TT_FNC case, around lines
  * 580-720 pre-lift.  That made them reachable only via direct
  * `interp_eval` recursion.  When the BB adapters (`bb_eval_value` /
  * `bb_exec_stmt`) dispatched an Icon function call through
@@ -11,10 +11,10 @@
  * fell back to `interp_eval`, walking the IR tree.  That violates the
  * IR/SM isolation invariant the four-mode pipeline depends on (RS-20).
  *
- * Concretely, the RS-23-extra attempt to add AST_IF in value context
+ * Concretely, the RS-23-extra attempt to add TT_IF in value context
  * regressed `rung36_jcon_meander.icn` because the IF test in that
  * program (`tab(upto(':')) & move(1) & n := integer(tab(0))`)
- * routes through bb_eval_value's AST_FNC handler — which knows nothing
+ * routes through bb_eval_value's TT_FNC handler — which knows nothing
  * about tab/move/upto.  Same architectural shape as the RS-23a-raku
  * precondition; same fix.
  *
@@ -22,8 +22,8 @@
  * *out)` that owns the dispatch.  It returns 1 if `call` named a SCAN
  * builtin (with *out set to the result) and 0 otherwise.  Invoked from
  * three places, mirroring the raku_try_call_builtin pattern:
- *   1. interp_eval's icn-frame AST_FNC case — preserves mode-1 behaviour.
- *   2. bb_eval_value's AST_FNC case — before the generic builtin arg-eval
+ *   1. interp_eval's icn-frame TT_FNC case — preserves mode-1 behaviour.
+ *   2. bb_eval_value's TT_FNC case — before the generic builtin arg-eval
  *      loop is fine because args are already pre-evaluated (the dispatch
  *      uses args[] directly, not call->c).
  *   3. icn_call_builtin top — defensive coverage for the coro_bb_fnc path
@@ -54,7 +54,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-int scan_try_call_builtin(AST_t *call, DESCR_t *args, int nargs, DESCR_t *out)
+int scan_try_call_builtin(tree_t *call, DESCR_t *args, int nargs, DESCR_t *out)
 {
     if (!call || call->n < 1 || !call->c[0]) return 0;
     const char *fn = call->c[0]->v.sval;

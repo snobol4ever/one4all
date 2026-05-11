@@ -13,7 +13,7 @@
 #include <setjmp.h>
 #include "scrip_sm.h"
 #include "../runtime/x86/lower.h"
-#include "../frontend/snobol4/scrip_cc.h"  /* AST_t types */
+#include "../frontend/snobol4/scrip_cc.h"  /* tree_t types */
 #include "../runtime/x86/sm_prog.h"           /* CH-17a: sm_label_pc_lookup */
 #include "../runtime/x86/sm_codegen.h"        /* sm_jit_unwind_call_stack */
 #include "../runtime/interp/coro_runtime.h"   /* CH-17a: proc_table */
@@ -32,7 +32,7 @@ extern jmp_buf g_sno_err_jmp;
  * CH-17d for Prolog), the lookup returns a valid pc; otherwise -1.  CH-17a is
  * pure scaffolding — sm_lower does not yet emit named proc-body expressions for any
  * frontend, so every entry_pc remains -1 here.  Subsequent rungs flip producers,
- * then consumers, then delete the legacy AST_t* paths.
+ * then consumers, then delete the legacy tree_t* paths.
  *
  * Env var SCRIP_PROC_ENTRY_PCS=1 prints a summary line per resolved entry. */
 static void sm_resolve_proc_entry_pcs(SM_Program *p)
@@ -71,7 +71,7 @@ static void sm_resolve_proc_entry_pcs(SM_Program *p)
 
 /* CH-17g-irrun-lowers: lower prog to SM, resolve entry_pcs, discard SM.
  * Called by polyglot_execute when g_irrun_lowers is set. */
-void sm_resolve_irrun_entry_pcs(const AST_t *ast_prog)
+void sm_resolve_irrun_entry_pcs(const tree_t *ast_prog)
 {
     SM_Program *sm = lower(ast_prog);
     if (!sm) {
@@ -82,7 +82,7 @@ void sm_resolve_irrun_entry_pcs(const AST_t *ast_prog)
     sm_prog_free(sm);
 }
 
-SM_Program *sm_preamble(const AST_t *ast_prog){
+SM_Program *sm_preamble(const tree_t *ast_prog){
     label_table_build(ast_prog);
     prescan_defines(ast_prog);
     g_sno_err_active = 1;   /* arm so sno_runtime_error longjmps safely */
@@ -92,7 +92,7 @@ SM_Program *sm_preamble(const AST_t *ast_prog){
     uint32_t lang_mask = polyglot_lang_mask(ast_prog);
     polyglot_init(ast_prog, lang_mask);
 
-    /* SI-6: lower takes AST_PROGRAM directly — no code_to_ast fallback. */
+    /* SI-6: lower takes TT_PROGRAM directly — no code_to_ast fallback. */
     SM_Program *sm = lower(ast_prog);
     if (!sm) {
         fprintf(stderr, "scrip: sm_lower failed\n");
@@ -111,14 +111,14 @@ SM_Program *sm_preamble(const AST_t *ast_prog){
     /* CH-17a: resolve entry_pcs for every proc / Prolog predicate.  Pure
      * scaffolding: today every entry resolves to -1 because sm_lower does not
      * yet emit named proc-body expressions (CH-17b/d will).  Consumers still use
-     * the legacy proc/AST_t* paths until CH-17c/e flip them. */
+     * the legacy proc/tree_t* paths until CH-17c/e flip them. */
     sm_resolve_proc_entry_pcs(sm);
 
     /* RS-9b: SM_Program is self-contained for SNOBOL4 — emit_push_expr
-     * GC-clones the AST_t subtrees so SM owns them.  Free the IR.
+     * GC-clones the tree_t subtrees so SM owns them.  Free the IR.
      *
      * RS-26: but for non-SNO frontends, BB drives the live IR — the proc/
-     * pred tables populated above hold AST_t* into prog that survive only
+     * pred tables populated above hold tree_t* into prog that survive only
      * if the IR survives.  Gate code_free on lang_mask: pure-SNO programs
      * still get the RS-9b behaviour; mixed or non-SNO programs keep the IR
      * alive for the duration of execution.
@@ -126,7 +126,7 @@ SM_Program *sm_preamble(const AST_t *ast_prog){
      * RS-9c: g_current_sm_prog must be set so _usercall_hook detects SM
      * bodies, regardless of whether IR is freed. */
     g_current_sm_prog = sm;
-    /* SI-6: CODE_t is gone; AST_t nodes are GC-managed — no code_free needed. */
+    /* SI-6: CODE_t is gone; tree_t nodes are GC-managed — no code_free needed. */
     return sm;
 }
 

@@ -20,8 +20,8 @@
 #include "runtime/x86/sm_codegen.h"
 #include "runtime/x86/sm_image.h"
 #include "interp.h"
-#include "frontend/snobol4/scrip_cc.h"  /* AST_t, stmt_attr_* */
-#include "frontend/prolog/term.h"        /* IM-11: Term, TT_REF, term_deref */
+#include "frontend/snobol4/scrip_cc.h"  /* tree_t, stmt_attr_* */
+#include "frontend/prolog/term.h"        /* IM-11: Term, TERM_REF, term_deref */
 #include "frontend/prolog/prolog_atom.h" /* IM-11: prolog_atom_name */
 /* IM-15b: CSNOBOL4 in-process executor.
  * When WITH_CSNOBOL4 is defined (scrip-monitor build), csnobol4_shim.c
@@ -81,14 +81,14 @@ void exec_snapshot_take(ExecSnapshot *s) {
                 char vbuf[256];
                 if (!val || val->tag == TT_VAR) {
                     snprintf(vbuf, sizeof vbuf, "_");
-                } else if (val->tag == TT_ATOM) {
+                } else if (val->tag == TERM_ATOM) {
                     const char *aname = prolog_atom_name(val->atom_id);
                     snprintf(vbuf, sizeof vbuf, "%s", aname ? aname : "?");
-                } else if (val->tag == TT_INT) {
-                    snprintf(vbuf, sizeof vbuf, "%ld", val->v.ival);
-                } else if (val->tag == TT_FLOAT) {
+                } else if (val->tag == TERM_INT) {
+                    snprintf(vbuf, sizeof vbuf, "%ld", val->ival);
+                } else if (val->tag == TERM_FLOAT) {
                     snprintf(vbuf, sizeof vbuf, "%g", val->fval);
-                } else if (val->tag == TT_COMPOUND) {
+                } else if (val->tag == TERM_COMPOUND) {
                     const char *fn = prolog_atom_name(val->compound.functor);
                     snprintf(vbuf, sizeof vbuf, "%s/%d", fn ? fn : "?", val->compound.arity);
                 } else {
@@ -284,7 +284,7 @@ static int snap_diff(const ExecSnapshot *a, const char *a_name,
  *
  * verbose: 0=silent on agreement, 1=print per-stmt progress, 2=full diff.
  *----------------------------------------------------------------------*/
-int sync_monitor_run(const AST_t *prog, int verbose, const char *sno_path) {
+int sync_monitor_run(const tree_t *prog, int verbose, const char *sno_path) {
     /* ── Build SM_Program once ── */
     SM_Program *sm_prog = lower(prog);
     if (!sm_prog) { fprintf(stderr, "sync_monitor: sm_lower failed\n"); return -1; }
@@ -303,11 +303,11 @@ int sync_monitor_run(const AST_t *prog, int verbose, const char *sno_path) {
     ExecSnapshot baseline = {0};
     exec_snapshot_take(&baseline);
 
-    /* SI-6: build IR label index — walk AST_PROGRAM children */
+    /* SI-6: build IR label index — walk TT_PROGRAM children */
     int nstmts = prog ? prog->n : 0;
     const char **ir_labels = calloc((size_t)(nstmts + 1), sizeof(const char *));
     { for (int i = 0; i < nstmts; i++) {
-        const AST_t *s = prog->c[i];
+        const tree_t *s = prog->c[i];
         const char *lbl = s ? stmt_attr_str(stmt_attr_find(s, ":lbl")) : NULL;
         ir_labels[i+1] = (lbl && lbl[0]) ? lbl : NULL; } }
 
@@ -345,7 +345,7 @@ int sync_monitor_run(const AST_t *prog, int verbose, const char *sno_path) {
         jit_snap.last_ok = jit_st.last_ok;
 
         /* IM-9: append label for stmt n to each executor's path accumulator.
-         * All three share the same source labels (same AST_PROGRAM / SM_Program). */
+         * All three share the same source labels (same TT_PROGRAM / SM_Program). */
         const char *lbl_n = (n <= sm_prog->stno_count) ? sm_prog->stno_labels[n] : NULL;
         label_path_append(&ir_path,  ir_labels[n]);
         label_path_append(&sm_path,  lbl_n);
@@ -387,7 +387,7 @@ int sync_monitor_run(const AST_t *prog, int verbose, const char *sno_path) {
             const char *hdr_lbl = ir_labels[n] ? ir_labels[n] : "-";
             int lineno = 0;
             { if (n-1 < prog->n) {
-                const AST_t *ws = prog->c[n-1];
+                const tree_t *ws = prog->c[n-1];
                 const char *lv = ws ? stmt_attr_str(stmt_attr_find(ws, ":line")) : NULL;
                 if (lv) lineno = atoi(lv); } }
             fprintf(stderr, "DIVERGE at stmt %d [label: %s, line %d]\n", n, hdr_lbl, lineno);

@@ -586,7 +586,7 @@ static void patnd_to_sno_r(const PATND_t *p, char *buf, size_t cap,
     if (!p) { patnd_buf_append(buf, cap, o, "()"); return; }
     if (depth >= 16) { patnd_buf_append(buf, cap, o, "..."); return; }
 
-    switch (p->t) {
+    switch (p->kind) {
     case XCHR: {
         const char *s = p->STRVAL_fn ? p->STRVAL_fn : "";
         patnd_buf_appendf(buf, cap, o, "'%s'", s);
@@ -594,13 +594,13 @@ static void patnd_to_sno_r(const PATND_t *p, char *buf, size_t cap,
     }
     case XSPNC: case XBRKC: case XANYC: case XNNYC: case XBRKX: {
         patnd_buf_appendf(buf, cap, o, "%s('%s')",
-                          flat_xkind_name(p->t),
+                          flat_xkind_name(p->kind),
                           p->STRVAL_fn ? p->STRVAL_fn : "");
         break;
     }
     case XLNTH: case XTB: case XRTB: case XPOSI: case XRPSI:
         patnd_buf_appendf(buf, cap, o, "%s(%lld)",
-                          flat_xkind_name(p->t), (long long)p->num);
+                          flat_xkind_name(p->kind), (long long)p->num);
         break;
     case XFARB:    patnd_buf_append(buf, cap, o, "ARB");      break;
     case XSTAR:    patnd_buf_append(buf, cap, o, "REM");      break;
@@ -611,42 +611,42 @@ static void patnd_to_sno_r(const PATND_t *p, char *buf, size_t cap,
     case XFAIL:    patnd_buf_append(buf, cap, o, "FAIL");     break;
     case XVAR:     patnd_buf_append(buf, cap, o, "<var>");    break;
     case XCAT:
-        for (int i = 0; i < p->n; i++) {
+        for (int i = 0; i < p->nchildren; i++) {
             if (i > 0 && *o + 1 < cap) buf[(*o)++] = ' ';
-            patnd_to_sno_r(p->c[i], buf, cap, o, depth + 1);
+            patnd_to_sno_r(p->children[i], buf, cap, o, depth + 1);
         }
         buf[*o] = '\0';
         break;
     case XOR:
-        for (int i = 0; i < p->n; i++) {
+        for (int i = 0; i < p->nchildren; i++) {
             if (i > 0) patnd_buf_append(buf, cap, o, " | ");
-            patnd_to_sno_r(p->c[i], buf, cap, o, depth + 1);
+            patnd_to_sno_r(p->children[i], buf, cap, o, depth + 1);
         }
         break;
     case XARBN:
         patnd_buf_append(buf, cap, o, "ARBNO(");
-        if (p->n > 0) patnd_to_sno_r(p->c[0], buf, cap, o, depth + 1);
+        if (p->nchildren > 0) patnd_to_sno_r(p->children[0], buf, cap, o, depth + 1);
         patnd_buf_append(buf, cap, o, ")");
         break;
     case XFNCE:
-        if (p->n > 0) {
+        if (p->nchildren > 0) {
             patnd_buf_append(buf, cap, o, "FENCE(");
-            patnd_to_sno_r(p->c[0], buf, cap, o, depth + 1);
+            patnd_to_sno_r(p->children[0], buf, cap, o, depth + 1);
             patnd_buf_append(buf, cap, o, ")");
         } else {
             patnd_buf_append(buf, cap, o, "FENCE");
         }
         break;
     case XFNME:
-        if (p->n > 0) patnd_to_sno_r(p->c[0], buf, cap, o, depth + 1);
+        if (p->nchildren > 0) patnd_to_sno_r(p->children[0], buf, cap, o, depth + 1);
         patnd_buf_append(buf, cap, o, " $ <var>");
         break;
     case XNME:
-        if (p->n > 0) patnd_to_sno_r(p->c[0], buf, cap, o, depth + 1);
+        if (p->nchildren > 0) patnd_to_sno_r(p->children[0], buf, cap, o, depth + 1);
         patnd_buf_append(buf, cap, o, " . <var>");
         break;
     case XCALLCAP:
-        if (p->n > 0) patnd_to_sno_r(p->c[0], buf, cap, o, depth + 1);
+        if (p->nchildren > 0) patnd_to_sno_r(p->children[0], buf, cap, o, depth + 1);
         patnd_buf_append(buf, cap, o, " . *<fn>()");
         break;
     case XDSAR:
@@ -664,7 +664,7 @@ static void patnd_to_sno_r(const PATND_t *p, char *buf, size_t cap,
         break;
     }
     default:
-        patnd_buf_appendf(buf, cap, o, "<%s>", flat_xkind_name(p->t));
+        patnd_buf_appendf(buf, cap, o, "<%s>", flat_xkind_name(p->kind));
         break;
     }
 }
@@ -761,7 +761,7 @@ static void flat_emit_xcat(emitter_t *e, PATND_t *p,
     bb_label_initf(&right_β, "xcat%d_right_\xCE\xB2",   id);  /* xcat%d_right_β */
     bb_label_initf(&xcat_ω,  "xcat%d_\xCF\x89",         id);  /* xcat%d_ω */
 
-    if (p->n == 0) {
+    if (p->nchildren == 0) {
         EV_JMP(e, lbl_succ, JMP_JMP);
         EV_LABEL(e, lbl_β); EV_JMP(e, lbl_fail, JMP_JMP);
         EV_LABEL(e, &xcat_ω); EV_JMP(e, lbl_fail, JMP_JMP);
@@ -769,21 +769,21 @@ static void flat_emit_xcat(emitter_t *e, PATND_t *p,
         EV_LABEL(e, &right_β); EV_LABEL(e, &left_β);
         return;
     }
-    if (p->n == 1) {
-        flat_emit_node(e, p->c[0], lbl_succ, lbl_fail, &left_β);
+    if (p->nchildren == 1) {
+        flat_emit_node(e, p->children[0], lbl_succ, lbl_fail, &left_β);
         EV_LABEL(e, lbl_β); EV_JMP(e, &left_β, JMP_JMP);
         EV_LABEL(e, &xcat_ω); EV_JMP(e, lbl_fail, JMP_JMP);
         EV_LABEL(e, &mid_γ); EV_LABEL(e, &right_ω); EV_LABEL(e, &right_β);
         return;
     }
 
-    flat_emit_node(e, p->c[0], &mid_γ, &xcat_ω, &left_β);
+    flat_emit_node(e, p->children[0], &mid_γ, &xcat_ω, &left_β);
     EV_LABEL(e, &mid_γ);
 
-    if (p->n == 2) {
-        flat_emit_node(e, p->c[1], lbl_succ, &right_ω, &right_β);
+    if (p->nchildren == 2) {
+        flat_emit_node(e, p->children[1], lbl_succ, &right_ω, &right_β);
     } else {
-        int nc = p->n;
+        int nc = p->nchildren;
         bb_label_t *mids  = alloca(sizeof(bb_label_t) * (nc - 1));
         bb_label_t *betas = alloca(sizeof(bb_label_t) * (nc - 1));
         for (int i = 0; i < nc - 1; i++) {
@@ -792,7 +792,7 @@ static void flat_emit_xcat(emitter_t *e, PATND_t *p,
         }
         for (int i = 1; i < nc; i++) {
             bb_label_t *s = (i < nc-1) ? &mids[i-1] : lbl_succ;
-            flat_emit_node(e, p->c[i], s, &right_ω, &betas[i-1]);
+            flat_emit_node(e, p->children[i], s, &right_ω, &betas[i-1]);
             if (i < nc-1) EV_LABEL(e, &mids[i-1]);
         }
     }
@@ -807,9 +807,9 @@ static void flat_emit_alt(emitter_t *e, PATND_t *p,
                           bb_label_t *lbl_β)
 {
     int id = g_flat_node_id++;
-    int nc = p->n;
+    int nc = p->nchildren;
     if (nc == 0) { EV_LABEL(e, lbl_β); EV_JMP(e, lbl_fail, JMP_JMP); return; }
-    if (nc == 1) { flat_emit_node(e, p->c[0], lbl_succ, lbl_fail, lbl_β); return; }
+    if (nc == 1) { flat_emit_node(e, p->children[0], lbl_succ, lbl_fail, lbl_β); return; }
 
     bb_label_t *ci_βs = alloca((size_t)nc * sizeof(bb_label_t));
     bb_label_t *ci_ωs = alloca((size_t)nc * sizeof(bb_label_t));
@@ -819,7 +819,7 @@ static void flat_emit_alt(emitter_t *e, PATND_t *p,
     }
     for (int i = 0; i < nc; i++) {
         bb_label_t *f = (i < nc-1) ? &ci_ωs[i] : &ci_ωs[nc-1];
-        flat_emit_node(e, p->c[i], lbl_succ, f, &ci_βs[i]);
+        flat_emit_node(e, p->children[i], lbl_succ, f, &ci_βs[i]);
         if (i < nc-1) EV_LABEL(e, &ci_ωs[i]);
         else          EV_LABEL(e, &ci_ωs[nc-1]);
     }
@@ -1277,7 +1277,7 @@ static void flat_emit_node(emitter_t *e, PATND_t *p,
                            bb_label_t *lbl_β)
 {
     if (!p) { flat_emit_eps(e, lbl_succ, lbl_fail, lbl_β); return; }
-    switch (p->t) {
+    switch (p->kind) {
     case XCHR: {
         /* EM-MODE4-IS-MODE3-DUMP-d (sess 2026-05-11): routed through
          * the per-box template (templates/bb_xchr.c).  Body lifted
@@ -1447,7 +1447,7 @@ static void flat_emit_node(emitter_t *e, PATND_t *p,
             bb_label_t alpha_body; bb_label_initf(&alpha_body, "%s", ab_lbl);
             flat_box_entry_dispatch(e, &alpha_body, &cb);
             EV_LABEL(e, &alpha_body);
-            PATND_t *ch = p->n > 0 ? p->c[0] : NULL;
+            PATND_t *ch = p->nchildren > 0 ? p->children[0] : NULL;
             flat_emit_node(e, ch, &cs, &cf, &cb);
             EV_LABEL(e, &cs);
             emit_sigma_plus_delta(e, ADDR_SIGMA); emit_mov_rdx_rax(e); emit_mov_eax_imm32(e, 1); emit_ret(e);
@@ -1472,11 +1472,11 @@ static void flat_emit_node(emitter_t *e, PATND_t *p,
     }
     case XNME:   /* pat . var — conditional capture */
     case XFNME: { /* pat $ var — immediate capture */
-        int immediate = (p->t == XFNME) ? 1 : 0;
+        int immediate = (p->kind == XFNME) ? 1 : 0;
         const char *vn = (p->var.v==DT_S && p->var.s) ? p->var.s :
                          (p->var.v==DT_N && p->var.slen==0 && p->var.s) ? p->var.s : "";
         if (e->is_text && g_cap_fixup_cb) {
-            const char *kind_name = (p->t == XFNME) ? "CAP_IMM" : "CAP_COND";
+            const char *kind_name = (p->kind == XFNME) ? "CAP_IMM" : "CAP_COND";
             char banner_args[80]; snprintf(banner_args, sizeof(banner_args), "%s", vn ? vn : "");
             flat_emit_box_banner(e, kind_name, banner_args, lbl_succ->name);
             /* TEXT mode: emit cap_t as static .data (120 bytes) so the emitted
@@ -1530,7 +1530,7 @@ static void flat_emit_node(emitter_t *e, PATND_t *p,
             bb_label_t alpha_body; bb_label_initf(&alpha_body, "%s", ab_lbl);
             flat_box_entry_dispatch(e, &alpha_body, &cb);
             EV_LABEL(e, &alpha_body);
-            PATND_t *ch = p->n > 0 ? p->c[0] : NULL;
+            PATND_t *ch = p->nchildren > 0 ? p->children[0] : NULL;
             flat_emit_node(e, ch, &cs, &cf, &cb);
             /* Success epilogue: return DT_S with Σ+Δ */
             EV_LABEL(e, &cs);
@@ -1596,16 +1596,16 @@ static void flat_emit_node(emitter_t *e, PATND_t *p,
 static int flat_is_eligible(PATND_t *p)
 {
     if (!p) return 1;
-    if (p->t == XVAR) return 0;  /* runtime DESCR_t as pattern — graph unknown */
-    if (p->t == XCAT && p->n > 2) return 0;
+    if (p->kind == XVAR) return 0;  /* runtime DESCR_t as pattern — graph unknown */
+    if (p->kind == XCAT && p->nchildren > 2) return 0;
     /* SN-33b: XNME/XFNME/XARBN binary path in flat_emit_node passes child_fn=NULL
      * to bb_cap_new (or emits a fail-stub for ARBNO).  bb_cap then dereferences
      * NULL at bb_boxes.c:541.  Until recursive child-blob emission lands in the
      * binary path, fall back to bb_build_binary (which builds the child correctly
      * via bb_build_binary_node — see bb_build.c:bb_nme_emit_binary). */
-    if (p->t == XNME || p->t == XFNME || p->t == XARBN) return 0;
-    for (int i = 0; i < p->n; i++)
-        if (!flat_is_eligible(p->c[i])) return 0;
+    if (p->kind == XNME || p->kind == XFNME || p->kind == XARBN) return 0;
+    for (int i = 0; i < p->nchildren; i++)
+        if (!flat_is_eligible(p->children[i])) return 0;
     return 1;
 }
 

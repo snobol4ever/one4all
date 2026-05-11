@@ -90,18 +90,18 @@ char *kw_canonicalize(const char *raw)
     return buf;
 }
 
-void expression_scope_walk(IcnScope *sc, AST_t *e)
+void expression_scope_walk(IcnScope *sc, tree_t *e)
 {
     if (!e) return;
-    if (e->t == AST_GLOBAL) {
+    if (e->t == TT_GLOBAL) {
         for (int i = 0; i < e->n; i++)
             if (e->c[i] && e->c[i]->v.sval)
                 scope_add(sc, e->c[i]->v.sval);
         return;
     }
     /* Skip initial{} subtrees — vars there must use NV, not frame slots. */
-    if (e->t == AST_INITIAL) return;
-    if (e->t == AST_VAR && e->v.sval && e->v.sval[0] != '&' && !is_global(e->v.sval))
+    if (e->t == TT_INITIAL) return;
+    if (e->t == TT_VAR && e->v.sval && e->v.sval[0] != '&' && !is_global(e->v.sval))
         scope_add(sc, e->v.sval);
     for (int i = 0; i < e->n; i++)
         expression_scope_walk(sc, e->c[i]);

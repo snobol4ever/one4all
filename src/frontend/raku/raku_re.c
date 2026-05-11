@@ -61,13 +61,13 @@ static int nfa_alloc(Raku_nfa *nfa) {
     nfa->states[id].out1    = NFA_NULL;
     nfa->states[id].out2    = NFA_NULL;
     nfa->states[id].cap_idx = -1;
-    nfa->states[id].t    = NK_EPS;
+    nfa->states[id].kind    = NK_EPS;
     return id;
 }
 
 static int nfa_state(Raku_nfa *nfa, Nfa_kind kind, int out1, int out2) {
     int id = nfa_alloc(nfa);
-    nfa->states[id].t = kind;
+    nfa->states[id].kind = kind;
     nfa->states[id].out1 = out1;
     nfa->states[id].out2 = out2;
     return id;
@@ -105,7 +105,7 @@ static int parse_atom(Re_parser *p, int *out_start, int *out_accept);
 static int parse_charclass(Re_parser *p) {
     int id = nfa_alloc(p->nfa);
     Nfa_state *s = &p->nfa->states[id];
-    s->t = NK_CLASS;
+    s->kind = NK_CLASS;
     s->out1 = NFA_NULL; s->out2 = NFA_NULL;
     int negate = 0, first = 1;
     if (peek(p) == '^') { negate = 1; consume(p); }
@@ -155,7 +155,7 @@ static int parse_atom(Re_parser *p, int *out_start, int *out_accept) {
         int gidx = p->group_counter++;
         if (gidx >= MAX_GROUPS) { re_err(p,"too many capture groups"); return 0; }
         int cap_open = nfa_alloc(p->nfa);
-        p->nfa->states[cap_open].t    = NK_CAP_OPEN;
+        p->nfa->states[cap_open].kind    = NK_CAP_OPEN;
         p->nfa->states[cap_open].cap_idx = gidx;
         p->nfa->states[cap_open].out1    = NFA_NULL;
         p->nfa->states[cap_open].out2    = NFA_NULL;
@@ -167,7 +167,7 @@ static int parse_atom(Re_parser *p, int *out_start, int *out_accept) {
 
         /* emit CAP_CLOSE */
         int cap_close = nfa_alloc(p->nfa);
-        p->nfa->states[cap_close].t    = NK_CAP_CLOSE;
+        p->nfa->states[cap_close].kind    = NK_CAP_CLOSE;
         p->nfa->states[cap_close].cap_idx = gidx;
         p->nfa->states[cap_close].out1    = NFA_NULL;
         p->nfa->states[cap_close].out2    = NFA_NULL;
@@ -198,7 +198,7 @@ static int parse_atom(Re_parser *p, int *out_start, int *out_accept) {
         if (gidx>=MAX_GROUPS) { re_err(p,"too many groups"); return 0; }
         snprintf(p->nfa->group_name[gidx],64,"%s",capname);
         int cap_open=nfa_alloc(p->nfa);
-        p->nfa->states[cap_open].t=NK_CAP_OPEN;
+        p->nfa->states[cap_open].kind=NK_CAP_OPEN;
         p->nfa->states[cap_open].cap_idx=gidx;
         p->nfa->states[cap_open].out1=NFA_NULL;
         p->nfa->states[cap_open].out2=NFA_NULL;
@@ -207,7 +207,7 @@ static int parse_atom(Re_parser *p, int *out_start, int *out_accept) {
         if (peek(p)!=')') { re_err(p,"missing ) in <n>(...)"); return 0; }
         consume(p);
         int cap_close=nfa_alloc(p->nfa);
-        p->nfa->states[cap_close].t=NK_CAP_CLOSE;
+        p->nfa->states[cap_close].kind=NK_CAP_CLOSE;
         p->nfa->states[cap_close].cap_idx=gidx;
         p->nfa->states[cap_close].out1=NFA_NULL;
         p->nfa->states[cap_close].out2=NFA_NULL;
@@ -226,7 +226,7 @@ static int parse_atom(Re_parser *p, int *out_start, int *out_accept) {
         int clen=ce-cs;
         char *code=malloc(clen+1); memcpy(code,p->pat+cs,clen); code[clen]='\0';
         int id=nfa_alloc(p->nfa);
-        p->nfa->states[id].t=NK_CODE_ASSERT;
+        p->nfa->states[id].kind=NK_CODE_ASSERT;
         p->nfa->states[id].code_str=code;
         p->nfa->states[id].out1=NFA_NULL;
         p->nfa->states[id].out2=NFA_NULL;
@@ -249,13 +249,13 @@ static int parse_atom(Re_parser *p, int *out_start, int *out_accept) {
         Nfa_state *s = &p->nfa->states[id];
         s->out1=NFA_NULL; s->out2=NFA_NULL;
         switch (esc) {
-            case 'd': s->t=NK_CLASS; cc_fill_digit(&s->cc);  break;
-            case 'D': s->t=NK_CLASS; cc_fill_digit(&s->cc); cc_invert(&s->cc); break;
-            case 'w': s->t=NK_CLASS; cc_fill_word(&s->cc);   break;
-            case 'W': s->t=NK_CLASS; cc_fill_word(&s->cc);  cc_invert(&s->cc); break;
-            case 's': s->t=NK_CLASS; cc_fill_space(&s->cc);  break;
-            case 'S': s->t=NK_CLASS; cc_fill_space(&s->cc); cc_invert(&s->cc); break;
-            default:  s->t=NK_CHAR; s->ch=(unsigned char)esc; break;
+            case 'd': s->kind=NK_CLASS; cc_fill_digit(&s->cc);  break;
+            case 'D': s->kind=NK_CLASS; cc_fill_digit(&s->cc); cc_invert(&s->cc); break;
+            case 'w': s->kind=NK_CLASS; cc_fill_word(&s->cc);   break;
+            case 'W': s->kind=NK_CLASS; cc_fill_word(&s->cc);  cc_invert(&s->cc); break;
+            case 's': s->kind=NK_CLASS; cc_fill_space(&s->cc);  break;
+            case 'S': s->kind=NK_CLASS; cc_fill_space(&s->cc); cc_invert(&s->cc); break;
+            default:  s->kind=NK_CHAR; s->ch=(unsigned char)esc; break;
         }
         *out_start=*out_accept=id; return 1;
     }
@@ -280,21 +280,21 @@ static int parse_quantified(Re_parser *p, int *out_start, int *out_accept) {
         Raku_nfa *nfa=p->nfa;
         if (q=='*') {
             int split=nfa_alloc(nfa), acc=nfa_alloc(nfa);
-            nfa->states[split].t=NK_SPLIT; nfa->states[split].out1=a_start; nfa->states[split].out2=acc;
+            nfa->states[split].kind=NK_SPLIT; nfa->states[split].out1=a_start; nfa->states[split].out2=acc;
             nfa->states[a_acc].out1=split;
-            nfa->states[acc].t=NK_EPS; nfa->states[acc].out1=NFA_NULL; nfa->states[acc].out2=NFA_NULL;
+            nfa->states[acc].kind=NK_EPS; nfa->states[acc].out1=NFA_NULL; nfa->states[acc].out2=NFA_NULL;
             *out_start=split; *out_accept=acc;
         } else if (q=='+') {
             int split=nfa_alloc(nfa), acc=nfa_alloc(nfa);
-            nfa->states[split].t=NK_SPLIT; nfa->states[split].out1=a_start; nfa->states[split].out2=acc;
+            nfa->states[split].kind=NK_SPLIT; nfa->states[split].out1=a_start; nfa->states[split].out2=acc;
             nfa->states[a_acc].out1=split;
-            nfa->states[acc].t=NK_EPS; nfa->states[acc].out1=NFA_NULL; nfa->states[acc].out2=NFA_NULL;
+            nfa->states[acc].kind=NK_EPS; nfa->states[acc].out1=NFA_NULL; nfa->states[acc].out2=NFA_NULL;
             *out_start=a_start; *out_accept=acc;
         } else {
             int split=nfa_alloc(nfa), acc=nfa_alloc(nfa);
-            nfa->states[split].t=NK_SPLIT; nfa->states[split].out1=a_start; nfa->states[split].out2=acc;
+            nfa->states[split].kind=NK_SPLIT; nfa->states[split].out1=a_start; nfa->states[split].out2=acc;
             nfa->states[a_acc].out1=acc;
-            nfa->states[acc].t=NK_EPS; nfa->states[acc].out1=NFA_NULL; nfa->states[acc].out2=NFA_NULL;
+            nfa->states[acc].kind=NK_EPS; nfa->states[acc].out1=NFA_NULL; nfa->states[acc].out2=NFA_NULL;
             *out_start=split; *out_accept=acc;
         }
     } else { *out_start=a_start; *out_accept=a_acc; }
@@ -325,9 +325,9 @@ static int parse_alt(Re_parser *p, int *out_start, int *out_accept) {
         if (!parse_concat(p,&r_start,&r_acc)) return 0;
         Raku_nfa *nfa=p->nfa;
         int split=nfa_alloc(nfa), join=nfa_alloc(nfa);
-        nfa->states[split].t=NK_SPLIT; nfa->states[split].out1=l_start; nfa->states[split].out2=r_start;
+        nfa->states[split].kind=NK_SPLIT; nfa->states[split].out1=l_start; nfa->states[split].out2=r_start;
         nfa->states[l_acc].out1=join; nfa->states[r_acc].out1=join;
-        nfa->states[join].t=NK_EPS; nfa->states[join].out1=NFA_NULL; nfa->states[join].out2=NFA_NULL;
+        nfa->states[join].kind=NK_EPS; nfa->states[join].out1=NFA_NULL; nfa->states[join].out2=NFA_NULL;
         l_start=split; l_acc=join;
     }
     *out_start=l_start; *out_accept=l_acc; return 1;
@@ -396,7 +396,7 @@ static void ss_add(State_set *ss, Cap_snap *snaps, const Raku_nfa *nfa, int id,
     if (id==NFA_NULL||visited[id]) return;
     visited[id]=1;
     Nfa_state *s=&nfa->states[id];
-    switch (s->t) {
+    switch (s->kind) {
         case NK_EPS:
             ss_add(ss,snaps,nfa,s->out1,visited,pos,slen,cur_snap); break;
         case NK_SPLIT:
@@ -446,7 +446,7 @@ void raku_nfa_exec(const Raku_nfa *nfa, const char *subject, Raku_match *result)
     if (nfa->n>MAX_STATES) { fprintf(stderr,"raku_re: NFA too large\n"); return; }
 
     int slen=(int)strlen(subject);
-    int anchored_bol=(nfa->states[nfa->start].t==NK_ANCHOR_BOL);
+    int anchored_bol=(nfa->states[nfa->start].kind==NK_ANCHOR_BOL);
 
     Cap_snap blank; for(int i=0;i<MAX_GROUPS;i++){blank.gs[i]=-1;blank.ge[i]=-1;}
     static Cap_snap cur_snaps[MAX_STATES], nxt_snaps[MAX_STATES];
@@ -461,7 +461,7 @@ void raku_nfa_exec(const Raku_nfa *nfa, const char *subject, Raku_match *result)
         while (1) {
             /* record accept but keep driving for longer match */
             for (int i=0;i<cur.n;i++) {
-                if (nfa->states[cur.ids[i]].t==NK_ACCEPT && pos>=best_end) {
+                if (nfa->states[cur.ids[i]].kind==NK_ACCEPT && pos>=best_end) {
                     best_end  = pos;
                     best_snap = cur_snaps[i];
                 }
@@ -474,7 +474,7 @@ void raku_nfa_exec(const Raku_nfa *nfa, const char *subject, Raku_match *result)
             for (int i=0;i<cur.n;i++) {
                 Nfa_state *s=&nfa->states[cur.ids[i]];
                 int advance=0;
-                switch (s->t) {
+                switch (s->kind) {
                     case NK_CHAR:  advance=(s->ch==ch); break;
                     case NK_ANY:   advance=(ch!='\n');  break;
                     case NK_CLASS: advance=raku_cc_test(&s->cc,ch); break;

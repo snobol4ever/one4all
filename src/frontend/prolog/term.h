@@ -8,12 +8,12 @@
  *
  * Memory model:
  *   - All Terms are heap-allocated via term_new_*().
- *   - TT_REF forms a dereference chain; walk with term_deref().
- *   - The trail records which TT_VAR slots were bound so that
+ *   - TERM_REF forms a dereference chain; walk with term_deref().
+ *   - The trail records which TERM_VAR slots were bound so that
  *     trail_unwind() can restore them on backtrack.
  *
  * Compile-time variable slots:
- *   TT_VAR carries a var_slot index into the per-clause ENV DATA block.
+ *   TERM_VAR carries a var_slot index into the per-clause ENV DATA block.
  *   At runtime r12 points at the live env frame; slot k lives at [r12+k*8].
  *   A var_slot of -1 means "unbound wildcard" (_).
  *
@@ -33,12 +33,12 @@ typedef struct Term Term;
  * TermTag — discriminates the union
  * ---------------------------------------------------------------------- */
 typedef enum {
-    TT_ATOM,      /* 'foo' or foo  — interned atom index               */
-    TT_VAR,       /* X             — var_slot in env frame; -1=wildcard */
-    TT_COMPOUND,  /* f(a,b)        — functor + arity + args[]           */
-    TT_INT,       /* 42            — machine long                        */
-    TT_FLOAT,     /* 3.14          — double                              */
-    TT_REF        /* bound var     — pointer to target (dereference chain) */
+    TERM_ATOM,      /* 'foo' or foo  — interned atom index               */
+    TERM_VAR,       /* X             — var_slot in env frame; -1=wildcard */
+    TERM_COMPOUND,  /* f(a,b)        — functor + arity + args[]           */
+    TERM_INT,       /* 42            — machine long                        */
+    TERM_FLOAT,     /* 3.14          — double                              */
+    TERM_REF        /* bound var     — pointer to target (dereference chain) */
 } TermTag;
 
 /* -------------------------------------------------------------------------
@@ -46,39 +46,39 @@ typedef enum {
  * ---------------------------------------------------------------------- */
 struct Term {
     TermTag tag;
-    int     saved_slot;  /* TT_VAR slot preserved across bind() for trail_unwind */
+    int     saved_slot;  /* TERM_VAR slot preserved across bind() for trail_unwind */
     union {
-        /* TT_ATOM */
+        /* TERM_ATOM */
         int atom_id;
 
-        /* TT_VAR: compile-time slot in env DATA block.
+        /* TERM_VAR: compile-time slot in env DATA block.
          * -1 = anonymous wildcard (_), never trailed.              */
         int var_slot;
 
-        /* TT_COMPOUND */
+        /* TERM_COMPOUND */
         struct {
             int    functor;   /* atom_id of functor name              */
             int    arity;
             Term **args;      /* heap array of arity Term* pointers   */
         } compound;
 
-        /* TT_INT */
+        /* TERM_INT */
         long ival;
 
-        /* TT_FLOAT */
+        /* TERM_FLOAT */
         double fval;
 
-        /* TT_REF: dereference chain.
-         * A TT_VAR becomes TT_REF after unification binds it.       */
+        /* TERM_REF: dereference chain.
+         * A TERM_VAR becomes TERM_REF after unification binds it.       */
         Term *ref;
     };
 };
 
 /* -------------------------------------------------------------------------
- * term_deref — walk TT_REF chain to the ultimate non-REF term
+ * term_deref — walk TERM_REF chain to the ultimate non-REF term
  * ---------------------------------------------------------------------- */
 static inline Term *term_deref(Term *t) {
-    while (t && t->tag == TT_REF) t = t->ref;
+    while (t && t->tag == TERM_REF) t = t->ref;
     return t;
 }
 

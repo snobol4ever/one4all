@@ -2,8 +2,8 @@
  * ir.h — Unified Intermediate Representation
  *
  * THE single source of truth for all IR node kinds across all frontends
- * and all backends in scrip-cc. Every frontend lowers to AST_t nodes
- * using this AST_e enum. Every backend consumes it.
+ * and all backends in scrip-cc. Every frontend lowers to tree_t nodes
+ * using this tree_e enum. Every backend consumes it.
  *
  * 59 canonical node kinds:
  *   5  Literals
@@ -30,62 +30,62 @@
  * Milestone: M-G1-IR-HEADER-DEF
  */
 
-#ifndef AST_H
-#define AST_H
+#ifndef TREE_H
+#define TREE_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /* =========================================================================
- * AST_e — unified expression node kind enum
+ * tree_e — unified expression node kind enum
  * ========================================================================= */
 
-typedef enum AST_e {
+typedef enum tree_e {
 
     /* --- Literals -------------------------------------------------------- */
 
-    AST_QLIT,         /* Quoted string / pattern literal  (QLITYP=1 in SIL)   */
-    AST_ILIT,         /* Integer literal                  (ILITYP=2 in SIL)   */
-    AST_FLIT,         /* Float / real literal             (FLITYP=6 in SIL)   */
-    AST_CSET,         /* Cset literal (Icon / Rebus)                          */
-    AST_NUL,          /* Null / empty value               (was AST_NULV)         */
+    TT_QLIT,         /* Quoted string / pattern literal  (QLITYP=1 in SIL)   */
+    TT_ILIT,         /* Integer literal                  (ILITYP=2 in SIL)   */
+    TT_FLIT,         /* Float / real literal             (FLITYP=6 in SIL)   */
+    TT_CSET,         /* Cset literal (Icon / Rebus)                          */
+    TT_NUL,          /* Null / empty value               (was AST_NULV)         */
 
     /* --- References ------------------------------------------------------ */
 
-    AST_VAR,          /* Variable reference               (VARTYP=3; was AST_VART) */
-    AST_KEYWORD,           /* &IDENT keyword reference         (K=10 data type)     */
-    AST_INDIRECT,         /* $expr  indirect / imm-assign target                  */
-    AST_DEFER,        /* *expr  deferred / indirect pattern ref (XSTAR=32; was AST_STAR) */
+    TT_VAR,          /* Variable reference               (VARTYP=3; was AST_VART) */
+    TT_KEYWORD,           /* &IDENT keyword reference         (K=10 data type)     */
+    TT_INDIRECT,         /* $expr  indirect / imm-assign target                  */
+    TT_DEFER,        /* *expr  deferred / indirect pattern ref (XSTAR=32; was AST_STAR) */
 
     /* --- Arithmetic ------------------------------------------------------ */
 
-    AST_INTERROGATE,  /* ?X  interrogation: null if X succeeds, fail if X fails  (o$int)  */
-    AST_NAME,         /* .X  name reference: return name descriptor of X         (o$nam)  */
-    AST_MNS,          /* Unary minus          (MNS proc in SIL; o$com in MINIMAL) */
-    AST_PLS,          /* Unary plus / numeric coerce  (PLS proc in SIL; o$aff in MINIMAL) */
-    AST_ADD,          /* Addition                                              */
-    AST_SUB,          /* Subtraction                                           */
-    AST_MUL,          /* Multiplication                                        */
-    AST_DIV,          /* Division                                              */
-    AST_MOD,          /* Modulo / remainder                                    */
-    AST_POW,          /* Exponentiation       (EXR in SIL; was AST_EXPOP)        */
+    TT_INTERROGATE,  /* ?X  interrogation: null if X succeeds, fail if X fails  (o$int)  */
+    TT_NAME,         /* .X  name reference: return name descriptor of X         (o$nam)  */
+    TT_MNS,          /* Unary minus          (MNS proc in SIL; o$com in MINIMAL) */
+    TT_PLS,          /* Unary plus / numeric coerce  (PLS proc in SIL; o$aff in MINIMAL) */
+    TT_ADD,          /* Addition                                              */
+    TT_SUB,          /* Subtraction                                           */
+    TT_MUL,          /* Multiplication                                        */
+    TT_DIV,          /* Division                                              */
+    TT_MOD,          /* Modulo / remainder                                    */
+    TT_POW,          /* Exponentiation       (EXR in SIL; was AST_EXPOP)        */
 
     /* --- Sequence and Alternation ---------------------------------------- */
 
-    AST_SEQ,          /* Goal-directed sequence, n-ary — Byrd-box wiring       */
+    TT_SEQ,          /* Goal-directed sequence, n-ary — Byrd-box wiring       */
                     /* α→lα, lγ→rα, rω→lβ, rγ→γ. SNOBOL4 pattern CAT;      */
                     /* Icon ||/;/&/loop bodies. (CONCAT/CONCL in SIL)          */
-    AST_CAT,       /* Pure value-context string concat, n-ary, cannot fail  */
+    TT_CAT,       /* Pure value-context string concat, n-ary, cannot fail  */
                     /* SNOBOL4 value ctx; JVM StringBuilder; .NET Concat.     */
                     /* M-G4-SPLIT-SEQ-CONCAT (2026-03-28).                   */
-    AST_ALT,          /* Pattern alternation, n-ary (ORPP in SIL; was AST_OR)   */
-    AST_VLIST,        /* Goal-directed value-context disjunction.  N-ary.     */
+    TT_ALT,          /* Pattern alternation, n-ary (ORPP in SIL; was AST_OR)   */
+    TT_VLIST,        /* Goal-directed value-context disjunction.  N-ary.     */
                     /* Try children left-to-right; return first non-failing  */
                     /* value; fail if all fail.  SPITBOL `(a, b, c)`         */
-                    /* paren-list and Snocone `||`.  Distinct from AST_ALT     */
+                    /* paren-list and Snocone `||`.  Distinct from TT_ALT     */
                     /* (pattern alternation, lazy at match time).            */
-    AST_OPSYN,        /* & operator: reduce(left, right)                      */
+    TT_OPSYN,        /* & operator: reduce(left, right)                      */
 
     /* --- Pattern Primitives ---------------------------------------------- */
     /*
@@ -94,128 +94,128 @@ typedef enum AST_e {
      * All 14 are required; none can be merged without emitter evidence.
      */
 
-    AST_ARB,          /* Arbitrary match           (XFARB=17; p$arb)          */
-    AST_ARBNO,        /* Zero-or-more              (XARBN=3;  p$arb)          */
-    AST_POS,          /* Cursor assert POS(n)      (XPOSI=24)                 */
-    AST_RPOS,         /* Right cursor RPOS(n)      (XRPSI=25)                 */
-    AST_ANY,          /* ANY(S) — match one from S (XANYC=1;  p$any)          */
-    AST_NOTANY,       /* NOTANY(S) — match one not in S  (XNNYC=21)           */
-    AST_SPAN,         /* SPAN(S) — longest run from S    (XSPNC=31; p$spn)    */
-    AST_BREAK,        /* BREAK(S) — up to char in S      (XBRKC=8;  p$brk)    */
-    AST_BREAKX,       /* BREAKX(S) — BREAK + backtrack   (XBRKX=9;  p$bkx)    */
-    AST_LEN,          /* LEN(N) — exactly N chars        (XLNTH=19; p$len)    */
-    AST_TAB,          /* TAB(N) — to cursor pos N        (XTB=33;   p$tab)    */
-    AST_RTAB,         /* RTAB(N) — to N from right       (XRTB=26;  p$rtb)    */
-    AST_REM,          /* REM — remainder of subject      (p$rem)              */
-    AST_FAIL,         /* FAIL — always fail              (XFAIL=27; p$fal)    */
-    AST_SUCCEED,      /* SUCCEED — always succeed        (XSUCF=36; p$suc)    */
-    AST_FENCE,        /* FENCE — succeed, seal β         (XFNCE=35)           */
-    AST_ABORT,        /* ABORT — abort entire match                           */
-    AST_BAL,          /* BAL — balanced parentheses      (XBAL=6;   p$bal)    */
+    TT_ARB,          /* Arbitrary match           (XFARB=17; p$arb)          */
+    TT_ARBNO,        /* Zero-or-more              (XARBN=3;  p$arb)          */
+    TT_POS,          /* Cursor assert POS(n)      (XPOSI=24)                 */
+    TT_RPOS,         /* Right cursor RPOS(n)      (XRPSI=25)                 */
+    TT_ANY,          /* ANY(S) — match one from S (XANYC=1;  p$any)          */
+    TT_NOTANY,       /* NOTANY(S) — match one not in S  (XNNYC=21)           */
+    TT_SPAN,         /* SPAN(S) — longest run from S    (XSPNC=31; p$spn)    */
+    TT_BREAK,        /* BREAK(S) — up to char in S      (XBRKC=8;  p$brk)    */
+    TT_BREAKX,       /* BREAKX(S) — BREAK + backtrack   (XBRKX=9;  p$bkx)    */
+    TT_LEN,          /* LEN(N) — exactly N chars        (XLNTH=19; p$len)    */
+    TT_TAB,          /* TAB(N) — to cursor pos N        (XTB=33;   p$tab)    */
+    TT_RTAB,         /* RTAB(N) — to N from right       (XRTB=26;  p$rtb)    */
+    TT_REM,          /* REM — remainder of subject      (p$rem)              */
+    TT_FAIL,         /* FAIL — always fail              (XFAIL=27; p$fal)    */
+    TT_SUCCEED,      /* SUCCEED — always succeed        (XSUCF=36; p$suc)    */
+    TT_FENCE,        /* FENCE — succeed, seal β         (XFNCE=35)           */
+    TT_ABORT,        /* ABORT — abort entire match                           */
+    TT_BAL,          /* BAL — balanced parentheses      (XBAL=6;   p$bal)    */
 
     /* --- Captures -------------------------------------------------------- */
 
-    AST_CAPT_COND_ASGN,    /* .var  conditional capture (on success) (was AST_NAM)   */
-    AST_CAPT_IMMED_ASGN,     /* $var  immediate capture               (was AST_DOL)    */
-    AST_CAPT_CURSOR,     /* @var  cursor position capture (XATP=4; was AST_ATP)    */
+    TT_CAPT_COND_ASGN,    /* .var  conditional capture (on success) (was AST_NAM)   */
+    TT_CAPT_IMMED_ASGN,     /* $var  immediate capture               (was AST_DOL)    */
+    TT_CAPT_CURSOR,     /* @var  cursor position capture (XATP=4; was AST_ATP)    */
 
     /* --- Call, Access, Assignment, Scan, Swap ---------------------------- */
 
-    AST_FNC,          /* Function call / goal / builtin, n-ary (FNCTYP=5)     */
-    AST_IDX,          /* Array / table / record subscript (ARYTYP=7; absorbs AST_ARY) */
-    AST_ASSIGN,       /* Assignment  (ASGN proc in SIL; was AST_ASGN)           */
-    AST_SCAN,        /* E ? E  scanning  (XSCON=30/SCONCL; was AST_SCAN)       */
-    AST_SWAP,         /* :=:  swap bindings  (SWAP proc in SIL)               */
+    TT_FNC,          /* Function call / goal / builtin, n-ary (FNCTYP=5)     */
+    TT_IDX,          /* Array / table / record subscript (ARYTYP=7; absorbs AST_ARY) */
+    TT_ASSIGN,       /* Assignment  (ASGN proc in SIL; was AST_ASGN)           */
+    TT_SCAN,        /* E ? E  scanning  (XSCON=30/SCONCL; was TT_SCAN)       */
+    TT_SWAP,         /* :=:  swap bindings  (SWAP proc in SIL)               */
 
     /* --- Icon Generators and Constructors -------------------------------- */
 
-    AST_SUSPEND,      /* Generator suspend / yield                            */
-    AST_TO,           /* i to j  generator                                    */
-    AST_TO_BY,        /* i to j by k  generator                               */
-    AST_LIMIT,        /* E \ N  limitation                                    */
-    AST_ALTERNATE,       /* Icon / Rebus alt generator, left-then-right (was AST_ALT_GEN) */
-    AST_ITERATE,         /* !E  iterate list or string elements (was AST_BANG)     */
-    AST_MAKELIST,     /* [e1,e2,...]  list constructor                        */
+    TT_SUSPEND,      /* Generator suspend / yield                            */
+    TT_TO,           /* i to j  generator                                    */
+    TT_TO_BY,        /* i to j by k  generator                               */
+    TT_LIMIT,        /* E \ N  limitation                                    */
+    TT_ALTERNATE,       /* Icon / Rebus alt generator, left-then-right (was AST_ALT_GEN) */
+    TT_ITERATE,         /* !E  iterate list or string elements (was AST_BANG)     */
+    TT_MAKELIST,     /* [e1,e2,...]  list constructor                        */
 
     /* --- Prolog ---------------------------------------------------------- */
 
-    AST_UNIFY,        /* =/2  unification with trail                          */
-    AST_CLAUSE,       /* Horn clause: head + body + EnvLayout                 */
-    AST_CHOICE,       /* Predicate choice point: α/β chain over clauses       */
-    AST_CUT,          /* !  cut / FENCE — seals β of enclosing choice         */
-    AST_TRAIL_MARK,   /* Save trail.top into env slot                         */
-    AST_TRAIL_UNWIND, /* Restore trail to saved mark                          */
+    TT_UNIFY,        /* =/2  unification with trail                          */
+    TT_CLAUSE,       /* Horn clause: head + body + EnvLayout                 */
+    TT_CHOICE,       /* Predicate choice point: α/β chain over clauses       */
+    TT_CUT,          /* !  cut / FENCE — seals β of enclosing choice         */
+    TT_TRAIL_MARK,   /* Save trail.top into env slot                         */
+    TT_TRAIL_UNWIND, /* Restore trail to saved mark                          */
 
     /* --- Icon: Numeric Relational ----------------------------------------
      * Goal-directed: succeed and yield rhs if condition holds, else fail.
      * Six distinct Byrd-box wiring patterns (each distinct comparison jump).
-     * No SNOBOL4/Prolog equivalent — those use AST_FNC("lt",...) dispatch.
+     * No SNOBOL4/Prolog equivalent — those use TT_FNC("lt",...) dispatch.
      * M-G9-ICON-IR-WIRE (2026-03-30). */
 
-    AST_LT,           /* E1 < E2   (numeric less-than)                        */
-    AST_LE,           /* E1 <= E2  (numeric less-or-equal)                    */
-    AST_GT,           /* E1 > E2   (numeric greater-than)                     */
-    AST_GE,           /* E1 >= E2  (numeric greater-or-equal)                 */
-    AST_EQ,           /* E1 = E2   (numeric equality)                         */
-    AST_NE,           /* E1 ~= E2  (numeric not-equal)                        */
+    TT_LT,           /* E1 < E2   (numeric less-than)                        */
+    TT_LE,           /* E1 <= E2  (numeric less-or-equal)                    */
+    TT_GT,           /* E1 > E2   (numeric greater-than)                     */
+    TT_GE,           /* E1 >= E2  (numeric greater-or-equal)                 */
+    TT_EQ,           /* E1 = E2   (numeric equality)                         */
+    TT_NE,           /* E1 ~= E2  (numeric not-equal)                        */
 
     /* --- Icon: Lexicographic (String) Relational -------------------------
      * L prefix = Lexicographic. Goal-directed semantics on string values.
-     * AST_L{LT,LE,GT,GE,EQ,NE} — parallel to E_{LT,LE,GT,GE} numeric relops. */
+     * TT_L{LT,LE,GT,GE,EQ,NE} — parallel to E_{LT,LE,GT,GE} numeric relops. */
 
-    AST_LLT,          /* E1 << E2  (string less-than)                         */
-    AST_LLE,          /* E1 <<= E2 (string less-or-equal)                     */
-    AST_LGT,          /* E1 >> E2  (string greater-than)                      */
-    AST_LGE,          /* E1 >>= E2 (string greater-or-equal)                  */
-    AST_LEQ,         /* E1 == E2  (string equality;  ICN_SEQ)                */
-    AST_LNE,          /* E1 ~== E2 (string not-equal)                         */
+    TT_LLT,          /* E1 << E2  (string less-than)                         */
+    TT_LLE,          /* E1 <<= E2 (string less-or-equal)                     */
+    TT_LGT,          /* E1 >> E2  (string greater-than)                      */
+    TT_LGE,          /* E1 >>= E2 (string greater-or-equal)                  */
+    TT_LEQ,         /* E1 == E2  (string equality;  ICN_SEQ)                */
+    TT_LNE,          /* E1 ~== E2 (string not-equal)                         */
 
     /* --- Icon: Cset Operators -------------------------------------------- */
 
-    AST_CSET_COMPL,   /* ~E       cset complement                             */
-    AST_CSET_UNION,   /* E1 ++ E2 cset union                                  */
-    AST_CSET_DIFF,    /* E1 -- E2 cset difference                             */
-    AST_CSET_INTER,   /* E1 ** E2 cset intersection                           */
-    AST_LCONCAT,      /* E1 ||| E2  list concatenation (distinct from || str) */
+    TT_CSET_COMPL,   /* ~E       cset complement                             */
+    TT_CSET_UNION,   /* E1 ++ E2 cset union                                  */
+    TT_CSET_DIFF,    /* E1 -- E2 cset difference                             */
+    TT_CSET_INTER,   /* E1 ** E2 cset intersection                           */
+    TT_LCONCAT,      /* E1 ||| E2  list concatenation (distinct from || str) */
 
     /* --- Icon: Unary Operators ------------------------------------------- */
 
-    AST_NONNULL,      /* \E   succeed if E non-null, yield E's value          */
-    AST_NULL,         /* /E   succeed if E is null, yield &null               */
-    AST_NOT,          /* not E  succeed iff E fails                           */
-    AST_SIZE,         /* *E   size of string/list/table                       */
-    AST_RANDOM,       /* ?E   random element or integer in [1,E]              */
-    AST_IDENTICAL,    /* E1 === E2  object identity (same pointer)            */
-    AST_AUGOP,        /* E1 op:= E2  augmented assignment; op subtype in ival */
+    TT_NONNULL,      /* \E   succeed if E non-null, yield E's value          */
+    TT_NULL,         /* /E   succeed if E is null, yield &null               */
+    TT_NOT,          /* not E  succeed iff E fails                           */
+    TT_SIZE,         /* *E   size of string/list/table                       */
+    TT_RANDOM,       /* ?E   random element or integer in [1,E]              */
+    TT_IDENTICAL,    /* E1 === E2  object identity (same pointer)            */
+    TT_AUGOP,        /* E1 op:= E2  augmented assignment; op subtype in ival */
 
     /* --- Icon: Expression Sequence / Control Flow ------------------------ */
 
-    AST_SEQ_EXPR,     /* (E1; E2; ...; En) — evaluate all, result = last     */
-    AST_EVERY,        /* every E [do body]  — drive generator to exhaustion  */
-    AST_WHILE,        /* while E [do body]                                    */
-    AST_UNTIL,        /* until E [do body]                                    */
-    AST_REPEAT,       /* repeat body        — unconditional loop              */
-    AST_IF,           /* if E then E2 [else E3]                               */
-    AST_CASE,         /* case E of { clauses }                                */
-    AST_RETURN,       /* return [E]         — return from procedure           */
-    AST_PROC_FAIL,    /* fail               — fail-return from procedure (Icon/Raku)
-                     * NOTE: distinct from AST_FAIL = SNOBOL4 FAIL pattern primitive */
-    AST_LOOP_BREAK,   /* break [E]          — exit innermost loop
-                     * NOTE: distinct from AST_BREAK = SNOBOL4 BREAK(S)      */
-    AST_LOOP_NEXT,    /* next               — restart innermost loop          */
-    AST_BANG_BINARY,  /* E1 ! E2            — invoke E1 with list E2         */
+    TT_SEQ_EXPR,     /* (E1; E2; ...; En) — evaluate all, result = last     */
+    TT_EVERY,        /* every E [do body]  — drive generator to exhaustion  */
+    TT_WHILE,        /* while E [do body]                                    */
+    TT_UNTIL,        /* until E [do body]                                    */
+    TT_REPEAT,       /* repeat body        — unconditional loop              */
+    TT_IF,           /* if E then E2 [else E3]                               */
+    TT_CASE,         /* case E of { clauses }                                */
+    TT_RETURN,       /* return [E]         — return from procedure           */
+    TT_PROC_FAIL,    /* fail               — fail-return from procedure (Icon/Raku)
+                     * NOTE: distinct from TT_FAIL = SNOBOL4 FAIL pattern primitive */
+    TT_LOOP_BREAK,   /* break [E]          — exit innermost loop
+                     * NOTE: distinct from TT_BREAK = SNOBOL4 BREAK(S)      */
+    TT_LOOP_NEXT,    /* next               — restart innermost loop          */
+    TT_BANG_BINARY,  /* E1 ! E2            — invoke E1 with list E2         */
 
     /* --- Icon: Structure / Declarations ---------------------------------- */
 
-    AST_SECTION,      /* E[i:j]   string section                              */
-    AST_SECTION_PLUS, /* E[i+:n]  section by length (forward)                */
-    AST_SECTION_MINUS,/* E[i-:n]  section by length (backward)               */
-    AST_RECORD,       /* record declaration                                   */
-    AST_FIELD,        /* E.name   field access                                */
-    AST_GLOBAL,       /* global varname  declaration                          */
-    AST_INITIAL,      /* initial { body }  once-on-first-call block          */
-    AST_REVASSIGN,    /* E1 <- E2  reversible assignment (Icon)               */
-    AST_REVSWAP,      /* E1 <-> E2 reversible value swap (Icon)               */
+    TT_SECTION,      /* E[i:j]   string section                              */
+    TT_SECTION_PLUS, /* E[i+:n]  section by length (forward)                */
+    TT_SECTION_MINUS,/* E[i-:n]  section by length (backward)               */
+    TT_RECORD,       /* record declaration                                   */
+    TT_FIELD,        /* E.name   field access                                */
+    TT_GLOBAL,       /* global varname  declaration                          */
+    TT_INITIAL,      /* initial { body }  once-on-first-call block          */
+    TT_REVASSIGN,    /* E1 <- E2  reversible assignment (Icon)               */
+    TT_REVSWAP,      /* E1 <-> E2 reversible value swap (Icon)               */
 
     /* --- Program structure (SI-1, Phase 5) --------------------------------
      * These replace CODE_t / STMT_t once all frontends emit them directly.
@@ -225,9 +225,9 @@ typedef enum AST_e {
      * Pure tree shape — four logical fields per node: t(kind) v(sval/ival/dval)
      * n(nchildren) c(children[]).  Matches Snocone `tree` datatype exactly.
      *
-     * AST_PROGRAM  kind=AST_PROGRAM  v=""  children = AST_STMT/AST_END nodes
+     * TT_PROGRAM  kind=TT_PROGRAM  v=""  children = TT_STMT/TT_END nodes
      *
-     * AST_STMT     kind=AST_STMT  v=""  children = tagged attribute nodes:
+     * TT_STMT     kind=TT_STMT  v=""  children = tagged attribute nodes:
      *   tree(':lbl',  label_str)          — label (omitted if none)
      *   tree(':lang', lang_int_as_str)    — lang code (omitted if LANG_SNO=0)
      *   tree(':line', lineno_str)         — source line number
@@ -240,35 +240,35 @@ typedef enum AST_e {
      *   tree(':goF',  label_or_expr)      — failure goto (omitted if absent)
      *   tree(':go',   label_or_expr)      — unconditional goto (omitted if absent)
      *
-     * AST_END      kind=AST_END  v=""  children: [:lbl] [:line] [:stno]
+     * TT_END      kind=TT_END  v=""  children: [:lbl] [:line] [:stno]
      *
      * Attribute tag kinds (sval = the tag string, v = payload or child):
      *   ':lbl' ':lang' ':line' ':stno' ':subj' ':pat' ':eq' ':repl'
      *   ':goS' ':goF' ':go'
-     * Each tag node: kind=AST_ATTR, sval=tag_name, nchildren=0 (leaf with
+     * Each tag node: kind=TT_ATTR, sval=tag_name, nchildren=0 (leaf with
      * sval payload) or nchildren=1 (tree payload in children[0]).
      *
      * Matches parser_snobol4.sc STMT shape byte-for-byte.
      * ----------------------------------------------------------------------- */
-    AST_PROGRAM,
-    AST_STMT,
-    AST_END,      /* END statement — structurally distinct from AST_STMT    */
-    AST_ATTR,     /* attribute tag node: sval=":lbl"/":subj"/etc.           */
-    AST_GOTO_S,   /* kept for lower_stmt goto arm compat during SI-3..SI-5 */
-    AST_GOTO_F,
-    AST_GOTO_U,
+    TT_PROGRAM,
+    TT_STMT,
+    TT_END,      /* END statement — structurally distinct from TT_STMT    */
+    TT_ATTR,     /* attribute tag node: sval=":lbl"/":subj"/etc.           */
+    TT_GOTO_S,   /* kept for lower_stmt goto arm compat during SI-3..SI-5 */
+    TT_GOTO_F,
+    TT_GOTO_U,
 
     /* --- Sentinel -------------------------------------------------------- */
 
-    AST_KIND_COUNT    /* Total number of kinds — used for array sizing / asserts.
+    TT_KIND_COUNT    /* Total number of kinds — used for array sizing / asserts.
                      * NOT a valid node kind. Must remain last. */
 
-} AST_e;
+} tree_e;
 
 /* =========================================================================
  * AugOp_e — augmented-assignment operator codes (SR-9)
  *
- * Written into AST_AUGOP.v.ival by the Icon frontend (icon_parse.c).
+ * Written into TT_AUGOP.v.ival by the Icon frontend (icon_parse.c).
  * lower.c / lower_icn_unary.c reads these values without including
  * the frontend's icon_lex.h — eliminating the mid-function #include.
  *
@@ -301,22 +301,22 @@ typedef enum {
 } AugOp_e;
 
 /* =========================================================================
- * AST_t — the canonical IR node type.
+ * tree_t — the canonical IR node type.
  *
  * Matches the Snocone `tree` datatype exactly: four logical fields t/v/n/c.
  *
- *   t  — kind       (AST_e)
+ *   t  — kind       (tree_e)
  *   v  — value      (union: v.sval / v.ival / v.dval — active by kind)
  *   n  — nchildren  (int, number of valid children)
- *   c  — children[] (AST_t **, realloc array that grows and shrinks)
+ *   c  — children[] (tree_t **, realloc array that grows and shrinks)
  *
  * v field by kind:
- *   v.sval — AST_QLIT (text), AST_VAR/AST_KEYWORD/AST_FNC/AST_IDX (name),
- *             AST_CSET (chars), AST_ATTR (tag string)
- *   v.ival — AST_ILIT (literal); AST_VAR (frame-slot index after Icon scope
- *             analysis; v.sval still holds name); AST_AUGOP (AugOp_e);
- *             AST_GLOBAL (declared-global flag)
- *   v.dval — AST_FLIT (float literal)
+ *   v.sval — TT_QLIT (text), TT_VAR/TT_KEYWORD/TT_FNC/TT_IDX (name),
+ *             TT_CSET (chars), TT_ATTR (tag string)
+ *   v.ival — TT_ILIT (literal); TT_VAR (frame-slot index after Icon scope
+ *             analysis; v.sval still holds name); TT_AUGOP (AugOp_e);
+ *             TT_GLOBAL (declared-global flag)
+ *   v.dval — TT_FLIT (float literal)
  *
  * C implementation details (not logical tree fields, underscore-prefixed):
  *   _nalloc — allocated capacity of c[] for realloc bookkeeping
@@ -324,187 +324,187 @@ typedef enum {
  *
  * ast.h is the sole owner of this definition (FI-0A).
  * ========================================================================= */
-typedef struct AST_t AST_t;
+typedef struct tree_t tree_t;
 
-struct AST_t {
-    AST_e    t;         /* kind                                              */
+struct tree_t {
+    tree_e    t;         /* kind                                              */
     union {
         char     *sval; /* string value (QLIT/VAR/FNC/KEYWORD/ATTR/CSET)    */
         long long ival; /* integer value (ILIT) or slot/flag (VAR etc.)     */
         double   dval;  /* float value (FLIT)                               */
     } v;
     int       n;        /* nchildren — number of valid children              */
-    AST_t  **c;        /* children[] — realloc-grown/shrunk array           */
+    tree_t  **c;        /* children[] — realloc-grown/shrunk array           */
     /* C implementation details: */
     int      _nalloc;   /* allocated capacity of c[]                         */
     int      _id;       /* node id for INITIAL dedup (emit-time only)        */
 };
 
 /* =========================================================================
- * ast_push / ast_pop / expr_new
+ * ast_push / ast_pop / ast_node_new
  *
  * ast_push: append child; c[] doubles when full.
  * ast_pop:  remove last child; c[] halves when n < _nalloc/4; frees when empty.
- * expr_new:  allocate a zeroed node with kind t.
+ * ast_node_new:  allocate a zeroed node with kind t.
  *
  * These match the Snocone push_child / pop_child / tree contract exactly.
  * ========================================================================= */
 #include <stdlib.h>
 
-static inline void ast_push(AST_t *p, AST_t *child) {
+static inline void ast_push(tree_t *p, tree_t *child) {
     if (p->n >= p->_nalloc) {
         p->_nalloc = p->_nalloc ? p->_nalloc * 2 : 4;
-        p->c = (AST_t **)realloc(p->c, (size_t)p->_nalloc * sizeof(AST_t *));
+        p->c = (tree_t **)realloc(p->c, (size_t)p->_nalloc * sizeof(tree_t *));
     }
     p->c[p->n++] = child;
 }
 
-static inline AST_t *ast_pop(AST_t *p) {
+static inline tree_t *ast_pop(tree_t *p) {
     if (p->n == 0) return NULL;
-    AST_t *child = p->c[--p->n];
+    tree_t *child = p->c[--p->n];
     if (p->n == 0) {
         free(p->c); p->c = NULL; p->_nalloc = 0;
     } else if (p->n < p->_nalloc / 4) {
         p->_nalloc /= 2;
-        p->c = (AST_t **)realloc(p->c, (size_t)p->_nalloc * sizeof(AST_t *));
+        p->c = (tree_t **)realloc(p->c, (size_t)p->_nalloc * sizeof(tree_t *));
     }
     return child;
 }
 
-static inline AST_t *expr_new(AST_e kind) {
-    AST_t *e = (AST_t *)calloc(1, sizeof(AST_t));
+static inline tree_t *ast_node_new(tree_e kind) {
+    tree_t *e = (tree_t *)calloc(1, sizeof(tree_t));
     e->t = kind;
     return e;
 }
 
 /* =========================================================================
- * AST_e name table — for ast_print.c and debugging
+ * tree_e name table — for ast_print.c and debugging
  * ========================================================================= */
 
 #ifdef IR_DEFINE_NAMES
 
-static const char * const ast_e_name[AST_KIND_COUNT] = {
-    [AST_QLIT]         = "AST_QLIT",
-    [AST_ILIT]         = "AST_ILIT",
-    [AST_FLIT]         = "AST_FLIT",
-    [AST_CSET]         = "AST_CSET",
-    [AST_NUL]          = "AST_NUL",
-    [AST_VAR]          = "AST_VAR",
-    [AST_KEYWORD]           = "AST_KEYWORD",
-    [AST_INDIRECT]         = "AST_INDIRECT",
-    [AST_DEFER]        = "AST_DEFER",
-    [AST_INTERROGATE]  = "AST_INTERROGATE",
-    [AST_NAME]         = "AST_NAME",
-    [AST_MNS]          = "AST_MNS",
-    [AST_PLS]          = "AST_PLS",
-    [AST_ADD]          = "AST_ADD",
-    [AST_SUB]          = "AST_SUB",
-    [AST_MUL]          = "AST_MUL",
-    [AST_DIV]          = "AST_DIV",
-    [AST_MOD]          = "AST_MOD",
-    [AST_POW]          = "AST_POW",
-    [AST_SEQ]          = "AST_SEQ",
-    [AST_CAT]       = "AST_CAT",
-    [AST_ALT]          = "AST_ALT",
-    [AST_VLIST]        = "AST_VLIST",
-    [AST_OPSYN]        = "AST_OPSYN",
-    [AST_ARB]          = "AST_ARB",
-    [AST_ARBNO]        = "AST_ARBNO",
-    [AST_POS]          = "AST_POS",
-    [AST_RPOS]         = "AST_RPOS",
-    [AST_ANY]          = "AST_ANY",
-    [AST_NOTANY]       = "AST_NOTANY",
-    [AST_SPAN]         = "AST_SPAN",
-    [AST_BREAK]        = "AST_BREAK",
-    [AST_BREAKX]       = "AST_BREAKX",
-    [AST_LEN]          = "AST_LEN",
-    [AST_TAB]          = "AST_TAB",
-    [AST_RTAB]         = "AST_RTAB",
-    [AST_REM]          = "AST_REM",
-    [AST_FAIL]         = "AST_FAIL",
-    [AST_SUCCEED]      = "AST_SUCCEED",
-    [AST_FENCE]        = "AST_FENCE",
-    [AST_ABORT]        = "AST_ABORT",
-    [AST_BAL]          = "AST_BAL",
-    [AST_CAPT_COND_ASGN]    = "AST_CAPT_COND_ASGN",
-    [AST_CAPT_IMMED_ASGN]     = "AST_CAPT_IMMED_ASGN",
-    [AST_CAPT_CURSOR]     = "AST_CAPT_CURSOR",
-    [AST_FNC]          = "AST_FNC",
-    [AST_IDX]          = "AST_IDX",
-    [AST_ASSIGN]       = "AST_ASSIGN",
-    [AST_SCAN]        = "AST_SCAN",
-    [AST_SWAP]         = "AST_SWAP",
-    [AST_SUSPEND]      = "AST_SUSPEND",
-    [AST_TO]           = "AST_TO",
-    [AST_TO_BY]        = "AST_TO_BY",
-    [AST_LIMIT]        = "AST_LIMIT",
-    [AST_ALTERNATE]       = "AST_ALTERNATE",
-    [AST_ITERATE]         = "AST_ITERATE",
-    [AST_MAKELIST]     = "AST_MAKELIST",
-    [AST_UNIFY]        = "AST_UNIFY",
-    [AST_CLAUSE]       = "AST_CLAUSE",
-    [AST_CHOICE]       = "AST_CHOICE",
-    [AST_CUT]          = "AST_CUT",
-    [AST_TRAIL_MARK]   = "AST_TRAIL_MARK",
-    [AST_TRAIL_UNWIND] = "AST_TRAIL_UNWIND",
+static const char * const tt_e_name[TT_KIND_COUNT] = {
+    [TT_QLIT]         = "TT_QLIT",
+    [TT_ILIT]         = "TT_ILIT",
+    [TT_FLIT]         = "TT_FLIT",
+    [TT_CSET]         = "TT_CSET",
+    [TT_NUL]          = "TT_NUL",
+    [TT_VAR]          = "TT_VAR",
+    [TT_KEYWORD]           = "TT_KEYWORD",
+    [TT_INDIRECT]         = "TT_INDIRECT",
+    [TT_DEFER]        = "TT_DEFER",
+    [TT_INTERROGATE]  = "TT_INTERROGATE",
+    [TT_NAME]         = "TT_NAME",
+    [TT_MNS]          = "TT_MNS",
+    [TT_PLS]          = "TT_PLS",
+    [TT_ADD]          = "TT_ADD",
+    [TT_SUB]          = "TT_SUB",
+    [TT_MUL]          = "TT_MUL",
+    [TT_DIV]          = "TT_DIV",
+    [TT_MOD]          = "TT_MOD",
+    [TT_POW]          = "TT_POW",
+    [TT_SEQ]          = "TT_SEQ",
+    [TT_CAT]       = "TT_CAT",
+    [TT_ALT]          = "TT_ALT",
+    [TT_VLIST]        = "TT_VLIST",
+    [TT_OPSYN]        = "TT_OPSYN",
+    [TT_ARB]          = "TT_ARB",
+    [TT_ARBNO]        = "TT_ARBNO",
+    [TT_POS]          = "TT_POS",
+    [TT_RPOS]         = "TT_RPOS",
+    [TT_ANY]          = "TT_ANY",
+    [TT_NOTANY]       = "TT_NOTANY",
+    [TT_SPAN]         = "TT_SPAN",
+    [TT_BREAK]        = "TT_BREAK",
+    [TT_BREAKX]       = "TT_BREAKX",
+    [TT_LEN]          = "TT_LEN",
+    [TT_TAB]          = "TT_TAB",
+    [TT_RTAB]         = "TT_RTAB",
+    [TT_REM]          = "TT_REM",
+    [TT_FAIL]         = "TT_FAIL",
+    [TT_SUCCEED]      = "TT_SUCCEED",
+    [TT_FENCE]        = "TT_FENCE",
+    [TT_ABORT]        = "TT_ABORT",
+    [TT_BAL]          = "TT_BAL",
+    [TT_CAPT_COND_ASGN]    = "TT_CAPT_COND_ASGN",
+    [TT_CAPT_IMMED_ASGN]     = "TT_CAPT_IMMED_ASGN",
+    [TT_CAPT_CURSOR]     = "TT_CAPT_CURSOR",
+    [TT_FNC]          = "TT_FNC",
+    [TT_IDX]          = "TT_IDX",
+    [TT_ASSIGN]       = "TT_ASSIGN",
+    [TT_SCAN]        = "TT_SCAN",
+    [TT_SWAP]         = "TT_SWAP",
+    [TT_SUSPEND]      = "TT_SUSPEND",
+    [TT_TO]           = "TT_TO",
+    [TT_TO_BY]        = "TT_TO_BY",
+    [TT_LIMIT]        = "TT_LIMIT",
+    [TT_ALTERNATE]       = "TT_ALTERNATE",
+    [TT_ITERATE]         = "TT_ITERATE",
+    [TT_MAKELIST]     = "TT_MAKELIST",
+    [TT_UNIFY]        = "TT_UNIFY",
+    [TT_CLAUSE]       = "TT_CLAUSE",
+    [TT_CHOICE]       = "TT_CHOICE",
+    [TT_CUT]          = "TT_CUT",
+    [TT_TRAIL_MARK]   = "TT_TRAIL_MARK",
+    [TT_TRAIL_UNWIND] = "TT_TRAIL_UNWIND",
     /* Icon numeric relational */
-    [AST_LT]           = "AST_LT",
-    [AST_LE]           = "AST_LE",
-    [AST_GT]           = "AST_GT",
-    [AST_GE]           = "AST_GE",
-    [AST_EQ]           = "AST_EQ",
-    [AST_NE]           = "AST_NE",
+    [TT_LT]           = "TT_LT",
+    [TT_LE]           = "TT_LE",
+    [TT_GT]           = "TT_GT",
+    [TT_GE]           = "TT_GE",
+    [TT_EQ]           = "TT_EQ",
+    [TT_NE]           = "TT_NE",
     /* Icon string relational */
-    [AST_LLT]          = "AST_LLT",
-    [AST_LLE]          = "AST_LLE",
-    [AST_LGT]          = "AST_LGT",
-    [AST_LGE]          = "AST_LGE",
-    [AST_LEQ]         = "AST_LEQ",
-    [AST_LNE]          = "AST_LNE",
+    [TT_LLT]          = "TT_LLT",
+    [TT_LLE]          = "TT_LLE",
+    [TT_LGT]          = "TT_LGT",
+    [TT_LGE]          = "TT_LGE",
+    [TT_LEQ]         = "TT_LEQ",
+    [TT_LNE]          = "TT_LNE",
     /* Icon cset ops */
-    [AST_CSET_COMPL]   = "AST_CSET_COMPL",
-    [AST_CSET_UNION]   = "AST_CSET_UNION",
-    [AST_CSET_DIFF]    = "AST_CSET_DIFF",
-    [AST_CSET_INTER]   = "AST_CSET_INTER",
-    [AST_LCONCAT]      = "AST_LCONCAT",
+    [TT_CSET_COMPL]   = "TT_CSET_COMPL",
+    [TT_CSET_UNION]   = "TT_CSET_UNION",
+    [TT_CSET_DIFF]    = "TT_CSET_DIFF",
+    [TT_CSET_INTER]   = "TT_CSET_INTER",
+    [TT_LCONCAT]      = "TT_LCONCAT",
     /* Icon unary */
-    [AST_NONNULL]      = "AST_NONNULL",
-    [AST_NULL]         = "AST_NULL",
-    [AST_NOT]          = "AST_NOT",
-    [AST_SIZE]         = "AST_SIZE",
-    [AST_RANDOM]       = "AST_RANDOM",
-    [AST_IDENTICAL]    = "AST_IDENTICAL",
-    [AST_AUGOP]        = "AST_AUGOP",
+    [TT_NONNULL]      = "TT_NONNULL",
+    [TT_NULL]         = "TT_NULL",
+    [TT_NOT]          = "TT_NOT",
+    [TT_SIZE]         = "TT_SIZE",
+    [TT_RANDOM]       = "TT_RANDOM",
+    [TT_IDENTICAL]    = "TT_IDENTICAL",
+    [TT_AUGOP]        = "TT_AUGOP",
     /* Icon control flow */
-    [AST_SEQ_EXPR]     = "AST_SEQ_EXPR",
-    [AST_EVERY]        = "AST_EVERY",
-    [AST_WHILE]        = "AST_WHILE",
-    [AST_UNTIL]        = "AST_UNTIL",
-    [AST_REPEAT]       = "AST_REPEAT",
-    [AST_IF]           = "AST_IF",
-    [AST_CASE]         = "AST_CASE",
-    [AST_RETURN]       = "AST_RETURN",
-    [AST_PROC_FAIL]    = "AST_PROC_FAIL",
-    [AST_LOOP_BREAK]   = "AST_LOOP_BREAK",
-    [AST_LOOP_NEXT]    = "AST_LOOP_NEXT",
-    [AST_BANG_BINARY]  = "AST_BANG_BINARY",
+    [TT_SEQ_EXPR]     = "TT_SEQ_EXPR",
+    [TT_EVERY]        = "TT_EVERY",
+    [TT_WHILE]        = "TT_WHILE",
+    [TT_UNTIL]        = "TT_UNTIL",
+    [TT_REPEAT]       = "TT_REPEAT",
+    [TT_IF]           = "TT_IF",
+    [TT_CASE]         = "TT_CASE",
+    [TT_RETURN]       = "TT_RETURN",
+    [TT_PROC_FAIL]    = "TT_PROC_FAIL",
+    [TT_LOOP_BREAK]   = "TT_LOOP_BREAK",
+    [TT_LOOP_NEXT]    = "TT_LOOP_NEXT",
+    [TT_BANG_BINARY]  = "TT_BANG_BINARY",
     /* Icon structure */
-    [AST_SECTION]      = "AST_SECTION",
-    [AST_SECTION_PLUS] = "AST_SECTION_PLUS",
-    [AST_SECTION_MINUS]= "AST_SECTION_MINUS",
-    [AST_RECORD]       = "AST_RECORD",
-    [AST_FIELD]        = "AST_FIELD",
-    [AST_GLOBAL]       = "AST_GLOBAL",
-    [AST_INITIAL]      = "AST_INITIAL",
-    [AST_REVASSIGN]    = "AST_REVASSIGN",
-    [AST_REVSWAP]      = "AST_REVSWAP",
-    [AST_PROGRAM]      = "AST_PROGRAM",
-    [AST_STMT]         = "AST_STMT",
-    [AST_END]          = "AST_END",
-    [AST_ATTR]         = "AST_ATTR",
-    [AST_GOTO_S]       = "AST_GOTO_S",
-    [AST_GOTO_F]       = "AST_GOTO_F",
-    [AST_GOTO_U]       = "AST_GOTO_U",
+    [TT_SECTION]      = "TT_SECTION",
+    [TT_SECTION_PLUS] = "TT_SECTION_PLUS",
+    [TT_SECTION_MINUS]= "TT_SECTION_MINUS",
+    [TT_RECORD]       = "TT_RECORD",
+    [TT_FIELD]        = "TT_FIELD",
+    [TT_GLOBAL]       = "TT_GLOBAL",
+    [TT_INITIAL]      = "TT_INITIAL",
+    [TT_REVASSIGN]    = "TT_REVASSIGN",
+    [TT_REVSWAP]      = "TT_REVSWAP",
+    [TT_PROGRAM]      = "TT_PROGRAM",
+    [TT_STMT]         = "TT_STMT",
+    [TT_END]          = "TT_END",
+    [TT_ATTR]         = "TT_ATTR",
+    [TT_GOTO_S]       = "TT_GOTO_S",
+    [TT_GOTO_F]       = "TT_GOTO_F",
+    [TT_GOTO_U]       = "TT_GOTO_U",
 };
 
 #endif /* IR_DEFINE_NAMES */

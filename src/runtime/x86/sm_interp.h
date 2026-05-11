@@ -44,7 +44,7 @@ typedef struct {
  * (Forward-declared as typedef struct SmGenState in sm_prog.h.) */
 #define SM_GEN_LOCAL_MAX 8   /* CHUNKS-step14b: gen-local slots per chunk invocation;
                                 covers every Icon generator kind in CHUNKS-step15
-                                (AST_TO 3 slots, AST_TO_BY 4, AST_LIMIT 2, etc.) */
+                                (TT_TO 3 slots, TT_TO_BY 4, TT_LIMIT 2, etc.) */
 struct SmGenState {
     int      entry_pc;   /* initial entry pc (for first call) */
     int      resume_pc;  /* pc to resume from (instruction after last SM_SUSPEND) */
@@ -128,7 +128,7 @@ DESCR_t sm_call_expression(int entry_pc);
  *
  * bb_broker_drive_sm — drive an SM generator expression across all its ticks.
  *   Analogous to bb_broker(root, BB_PUMP, body_fn, arg) but for SM expressions
- *   rather than AST_t-based bb_node_t generators.
+ *   rather than tree_t-based bb_node_t generators.
  *
  *   On each tick the interpreter runs until SM_SUSPEND (yield a value) or
  *   SM_RETURN / SM_HALT (generator exhausted).  body_fn is called once per
@@ -142,10 +142,10 @@ int bb_broker_drive_sm(SmGenState *gs, void (*body_fn)(DESCR_t val, void *arg), 
  * SM_STORE_GLOCAL handlers in both sm_interp.c and sm_codegen.c. */
 extern SmGenState *g_current_gen_state;
 
-/* CHUNKS-step17i-every-suspend: every-table — id → AST_t* side table populated
- * at lower-time when AST_EVERY is encountered in expression-body lowering.
+/* CHUNKS-step17i-every-suspend: every-table — id → tree_t* side table populated
+ * at lower-time when TT_EVERY is encountered in expression-body lowering.
  * Mirrors CH-17f's g_pl_pred_table pattern (Prolog) for Icon `every`.
- * The SM bytecode contains only the integer id; no AST_t* in any
+ * The SM bytecode contains only the integer id; no tree_t* in any
  * SM_Program::instrs[] payload.  The runtime handler (SM_BB_PUMP_EVERY)
  * looks up by id and constructs the box via coro_eval — same boundary
  * CH-17f draws for SM_BB_ONCE_PROC (broker constructs the box from IR;
@@ -155,18 +155,18 @@ extern SmGenState *g_current_gen_state;
  *                              ast is borrowed (lifetime: the IR's lifetime,
  *                              same as g_pl_pred_table's IR refs); table
  *                              is reset by every_table_reset on each compile.
- * every_table_lookup(id)    — return AST_t* for id, or NULL if out of range.
+ * every_table_lookup(id)    — return tree_t* for id, or NULL if out of range.
  * every_table_reset()       — clear table; called by sm_program_free path. */
-struct AST_t;
-int   every_table_register(struct AST_t *ast);
-struct AST_t *every_table_lookup(int id);
+struct tree_t;
+int   every_table_register(struct tree_t *ast);
+struct tree_t *every_table_lookup(int id);
 void  every_table_reset(void);
 
 /* GOAL-ICON-BB-COMPLETE Phase A: unified AST-pump table for SM_BB_PUMP_AST.
  * Same lifetime model as every_table: borrowed AST pointers, populated by
  * sm_lower at lower-time, reset on sm_program_free. */
-int   ast_pump_table_register(struct AST_t *ast);
-struct AST_t *ast_pump_table_lookup(int id);
+int   ast_pump_table_register(struct tree_t *ast);
+struct tree_t *ast_pump_table_lookup(int id);
 void  ast_pump_table_reset(void);
 
 #endif /* SM_INTERP_H */

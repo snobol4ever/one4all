@@ -28,7 +28,7 @@
 /* ---- Null DESCR_t ---- */
 /* We cannot redefine DT_SNUL (it's a DTYPE_t enum member).
  * scrip-cc emits DT_SNUL as a DESCR_t — we handle this by emit.c
- * emitting NULVCL instead. See emit.c emit_expr AST_NUL case. */
+ * emitting NULVCL instead. See emit.c emit_expr TT_NUL case. */
 
 /* ---- Scalar constructors ---- */
 static inline DESCR_t _vint_impl(int64_t i)    { return INTVAL(i); }

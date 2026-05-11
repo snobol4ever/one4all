@@ -1179,28 +1179,28 @@ YY_RULE_SETUP
 case 4:
 /* rule 4 can match eol */
 YY_RULE_SETUP
-{ yylval.v.sval=rebus_intern_n(yytext+1,yyleng-2); last_tok=T_STR; return T_STR; }
+{ yylval.sval=rebus_intern_n(yytext+1,yyleng-2); last_tok=T_STR; return T_STR; }
 	YY_BREAK
 case 5:
 /* rule 5 can match eol */
 YY_RULE_SETUP
-{ yylval.v.sval=rebus_intern_n(yytext+1,yyleng-2); last_tok=T_STR; return T_STR; }
+{ yylval.sval=rebus_intern_n(yytext+1,yyleng-2); last_tok=T_STR; return T_STR; }
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-{ yylval.v.dval=atof(yytext); last_tok=T_REAL; return T_REAL; }
+{ yylval.dval=atof(yytext); last_tok=T_REAL; return T_REAL; }
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-{ yylval.v.dval=atof(yytext); last_tok=T_REAL; return T_REAL; }
+{ yylval.dval=atof(yytext); last_tok=T_REAL; return T_REAL; }
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-{ yylval.v.ival=atol(yytext); last_tok=T_INT; return T_INT; }
+{ yylval.ival=atol(yytext); last_tok=T_INT; return T_INT; }
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-{ yylval.v.sval=upcase(yytext+1); last_tok=T_KEYWORD; return T_KEYWORD; }
+{ yylval.sval=upcase(yytext+1); last_tok=T_KEYWORD; return T_KEYWORD; }
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
@@ -1210,7 +1210,7 @@ case 11:
 YY_RULE_SETUP
 { char *up=upcase(yytext); int kw=lookup_kw(up);
                   if(kw){free(up);last_tok=kw;return kw;}
-                  yylval.v.sval=up; last_tok=T_IDENT; return T_IDENT; }
+                  yylval.sval=up; last_tok=T_IDENT; return T_IDENT; }
 	YY_BREAK
 case 12:
 YY_RULE_SETUP

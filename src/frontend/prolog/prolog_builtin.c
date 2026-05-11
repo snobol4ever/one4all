@@ -51,7 +51,7 @@ void pl_write(Term *t) {
     t = term_deref(t);
     if (!t) { printf("[]"); return; }
     switch (t->tag) {
-        case TT_ATOM: {
+        case TERM_ATOM: {
             const char *name = prolog_atom_name(t->atom_id);
             if (!name) name = "?";
             /* Quote atoms that need it (contain spaces or start with upper) */
@@ -68,14 +68,14 @@ void pl_write(Term *t) {
             printf("%s", name);
             break;
         }
-        case TT_VAR:
+        case TERM_VAR:
             /* Unbound variable — print as _GN */
             printf("_G%d", t->var_slot);
             break;
-        case TT_INT:
-            printf("%ld", t->v.ival);
+        case TERM_INT:
+            printf("%ld", t->ival);
             break;
-        case TT_FLOAT: {
+        case TERM_FLOAT: {
             double fv = t->fval;
             if (fv == (long)fv && fv >= -1e15 && fv <= 1e15)
                 printf("%.1f", fv);
@@ -83,14 +83,14 @@ void pl_write(Term *t) {
                 printf("%g", fv);
             break;
         }
-        case TT_COMPOUND: {
+        case TERM_COMPOUND: {
             const char *fn = prolog_atom_name(t->compound.functor);
             if (!fn) fn = "?";
             /* '$VAR'(N) — print as variable name A,B,...,Z,A1,... */
             if (strcmp(fn, "$VAR") == 0 && t->compound.arity == 1) {
                 Term *n = term_deref(t->compound.args[0]);
-                if (n && n->tag == TT_INT) {
-                    long num = n->v.ival;
+                if (n && n->tag == TERM_INT) {
+                    long num = n->ival;
                     int letter = (int)(num % 26);
                     long suffix = num / 26;
                     if (suffix == 0) printf("%c", 'A' + letter);
@@ -103,14 +103,14 @@ void pl_write(Term *t) {
                 printf("[");
                 pl_write(t->compound.args[0]);
                 Term *tail = term_deref(t->compound.args[1]);
-                while (tail && tail->tag == TT_COMPOUND &&
+                while (tail && tail->tag == TERM_COMPOUND &&
                        tail->compound.functor == ATOM_DOT &&
                        tail->compound.arity == 2) {
                     printf(",");
                     pl_write(tail->compound.args[0]);
                     tail = term_deref(tail->compound.args[1]);
                 }
-                if (tail && tail->tag == TT_ATOM && tail->atom_id == ATOM_NIL) {
+                if (tail && tail->tag == TERM_ATOM && tail->atom_id == ATOM_NIL) {
                     /* clean list end */
                 } else {
                     printf("|");
@@ -148,11 +148,11 @@ void pl_write(Term *t) {
                         Term *larg = term_deref(t->compound.args[0]);
                         Term *rarg = term_deref(t->compound.args[1]);
                         int lp = -1, rp = -1;
-                        if (larg && larg->tag == TT_COMPOUND) {
+                        if (larg && larg->tag == TERM_COMPOUND) {
                             const char *lfn = prolog_atom_name(larg->compound.functor);
                             if (lfn) lp = pl_op_prec(lfn, larg->compound.arity);
                         }
-                        if (rarg && rarg->tag == TT_COMPOUND) {
+                        if (rarg && rarg->tag == TERM_COMPOUND) {
                             const char *rfn = prolog_atom_name(rarg->compound.functor);
                             if (rfn) rp = pl_op_prec(rfn, rarg->compound.arity);
                         }
@@ -172,7 +172,7 @@ void pl_write(Term *t) {
                         /* Unary prefix */
                         Term *arg = term_deref(t->compound.args[0]);
                         int ap = -1;
-                        if (arg && arg->tag == TT_COMPOUND) {
+                        if (arg && arg->tag == TERM_COMPOUND) {
                             const char *afn = prolog_atom_name(arg->compound.functor);
                             if (afn) ap = pl_op_prec(afn, arg->compound.arity);
                         }
@@ -196,7 +196,7 @@ void pl_write(Term *t) {
             }
             break;
         }
-        case TT_REF:
+        case TERM_REF:
             pl_write(t->ref);  /* should not happen after term_deref */
             break;
     }
@@ -237,7 +237,7 @@ static void pl_writeq_term(Term *t) {
     t = term_deref(t);
     if (!t) { printf("'[]'"); return; }
     switch (t->tag) {
-        case TT_ATOM: {
+        case TERM_ATOM: {
             const char *name = prolog_atom_name(t->atom_id);
             if (!name) name = "?";
             if (atom_needs_quoting(name)) {
@@ -252,26 +252,26 @@ static void pl_writeq_term(Term *t) {
             }
             break;
         }
-        case TT_VAR:
+        case TERM_VAR:
             printf("_G%d", t->var_slot);
             break;
-        case TT_INT:
-            printf("%ld", t->v.ival);
+        case TERM_INT:
+            printf("%ld", t->ival);
             break;
-        case TT_FLOAT: {
+        case TERM_FLOAT: {
             double fv = t->fval;
             if (fv == (long)fv && fv >= -1e15 && fv <= 1e15) printf("%.1f", fv);
             else printf("%g", fv);
             break;
         }
-        case TT_COMPOUND: {
+        case TERM_COMPOUND: {
             const char *fn = prolog_atom_name(t->compound.functor);
             if (!fn) fn = "?";
             /* '$VAR'(N) suppressed in writeq — print as var name */
             if (strcmp(fn,"$VAR")==0 && t->compound.arity==1) {
                 Term *n = term_deref(t->compound.args[0]);
-                if (n && n->tag == TT_INT) {
-                    long num = n->v.ival; int letter=(int)(num%26); long suf=num/26;
+                if (n && n->tag == TERM_INT) {
+                    long num = n->ival; int letter=(int)(num%26); long suf=num/26;
                     if (suf==0) printf("%c",'A'+letter); else printf("%c%ld",'A'+letter,suf);
                     break;
                 }
@@ -280,11 +280,11 @@ static void pl_writeq_term(Term *t) {
             if (t->compound.functor == ATOM_DOT && t->compound.arity == 2) {
                 printf("["); pl_writeq_term(t->compound.args[0]);
                 Term *tail = term_deref(t->compound.args[1]);
-                while (tail && tail->tag==TT_COMPOUND && tail->compound.functor==ATOM_DOT && tail->compound.arity==2) {
+                while (tail && tail->tag==TERM_COMPOUND && tail->compound.functor==ATOM_DOT && tail->compound.arity==2) {
                     printf(","); pl_writeq_term(tail->compound.args[0]);
                     tail = term_deref(tail->compound.args[1]);
                 }
-                if (!(tail && tail->tag==TT_ATOM && tail->atom_id==ATOM_NIL)) { printf("|"); pl_writeq_term(tail); }
+                if (!(tail && tail->tag==TERM_ATOM && tail->atom_id==ATOM_NIL)) { printf("|"); pl_writeq_term(tail); }
                 printf("]"); break;
             }
             /* Operator notation (same table as pl_write) */
@@ -309,8 +309,8 @@ static void pl_writeq_term(Term *t) {
                     if (ops[i].arity==2) {
                         Term *la=term_deref(t->compound.args[0]),*ra=term_deref(t->compound.args[1]);
                         int lp=-1,rp=-1;
-                        if(la&&la->tag==TT_COMPOUND){const char*lf=prolog_atom_name(la->compound.functor);if(lf)lp=pl_op_prec(lf,la->compound.arity);}
-                        if(ra&&ra->tag==TT_COMPOUND){const char*rf=prolog_atom_name(ra->compound.functor);if(rf)rp=pl_op_prec(rf,ra->compound.arity);}
+                        if(la&&la->tag==TERM_COMPOUND){const char*lf=prolog_atom_name(la->compound.functor);if(lf)lp=pl_op_prec(lf,la->compound.arity);}
+                        if(ra&&ra->tag==TERM_COMPOUND){const char*rf=prolog_atom_name(ra->compound.functor);if(rf)rp=pl_op_prec(rf,ra->compound.arity);}
                         int my=ops[i].prec;
                         if((lp>my)||(lp==my&&ops[i].right_assoc)) { printf("("); pl_writeq_term(t->compound.args[0]); printf(")"); }
                         else pl_writeq_term(t->compound.args[0]);
@@ -319,7 +319,7 @@ static void pl_writeq_term(Term *t) {
                         else pl_writeq_term(t->compound.args[1]);
                     } else {
                         Term *arg=term_deref(t->compound.args[0]); int ap=-1;
-                        if(arg&&arg->tag==TT_COMPOUND){const char*af=prolog_atom_name(arg->compound.functor);if(af)ap=pl_op_prec(af,arg->compound.arity);}
+                        if(arg&&arg->tag==TERM_COMPOUND){const char*af=prolog_atom_name(arg->compound.functor);if(af)ap=pl_op_prec(af,arg->compound.arity);}
                         if(isalpha((unsigned char)fn[0])) printf("%s ",fn); else printf("%s",fn);
                         if(ap>=ops[i].prec){printf("(");pl_writeq_term(t->compound.args[0]);printf(")");}
                         else pl_writeq_term(t->compound.args[0]);
@@ -351,7 +351,7 @@ static void pl_write_canonical_term(Term *t) {
     t = term_deref(t);
     if (!t) { printf("'[]'"); return; }
     switch (t->tag) {
-        case TT_ATOM: {
+        case TERM_ATOM: {
             const char *name = prolog_atom_name(t->atom_id);
             if (!name) name = "?";
             if (atom_needs_quoting(name)) {
@@ -361,15 +361,15 @@ static void pl_write_canonical_term(Term *t) {
             } else printf("%s",name);
             break;
         }
-        case TT_VAR:  printf("_G%d",t->var_slot); break;
-        case TT_INT:  printf("%ld",t->v.ival); break;
-        case TT_FLOAT: {
+        case TERM_VAR:  printf("_G%d",t->var_slot); break;
+        case TERM_INT:  printf("%ld",t->ival); break;
+        case TERM_FLOAT: {
             double fv=t->fval;
             if(fv==(long)fv&&fv>=-1e15&&fv<=1e15) printf("%.1f",fv);
             else printf("%g",fv);
             break;
         }
-        case TT_COMPOUND: {
+        case TERM_COMPOUND: {
             const char *fn = prolog_atom_name(t->compound.functor);
             if (!fn) fn = "?";
             /* No operator sugar, no list sugar — pure functor(args) */
@@ -402,31 +402,31 @@ static void pl_write_to_file(Term *t, FILE *out) {
     t = term_deref(t);
     if (!t) { fprintf(out, "[]"); return; }
     switch (t->tag) {
-        case TT_ATOM: {
+        case TERM_ATOM: {
             const char *name = prolog_atom_name(t->atom_id);
             fprintf(out, "%s", name ? name : "?");
             break;
         }
-        case TT_VAR:   fprintf(out, "_G%d", t->var_slot); break;
-        case TT_INT:   fprintf(out, "%ld", t->v.ival); break;
-        case TT_FLOAT: {
+        case TERM_VAR:   fprintf(out, "_G%d", t->var_slot); break;
+        case TERM_INT:   fprintf(out, "%ld", t->ival); break;
+        case TERM_FLOAT: {
             double fv = t->fval;
             if (fv == (long)fv && fv >= -1e15 && fv <= 1e15) fprintf(out, "%.1f", fv);
             else fprintf(out, "%g", fv);
             break;
         }
-        case TT_COMPOUND: {
+        case TERM_COMPOUND: {
             const char *fn = prolog_atom_name(t->compound.functor);
             if (!fn) fn = "?";
             if (t->compound.functor == ATOM_DOT && t->compound.arity == 2) {
                 fprintf(out, "["); pl_write_to_file(t->compound.args[0], out);
                 Term *tail = term_deref(t->compound.args[1]);
-                while (tail && tail->tag == TT_COMPOUND &&
+                while (tail && tail->tag == TERM_COMPOUND &&
                        tail->compound.functor == ATOM_DOT && tail->compound.arity == 2) {
                     fprintf(out, ","); pl_write_to_file(tail->compound.args[0], out);
                     tail = term_deref(tail->compound.args[1]);
                 }
-                if (!(tail && tail->tag == TT_ATOM && tail->atom_id == ATOM_NIL))
+                if (!(tail && tail->tag == TERM_ATOM && tail->atom_id == ATOM_NIL))
                     { fprintf(out, "|"); pl_write_to_file(tail, out); }
                 fprintf(out, "]"); break;
             }
@@ -464,24 +464,24 @@ int pl_functor(Term *t, Term *name, Term *arity, Trail *tr) {
     name  = term_deref(name);
     arity = term_deref(arity);
 
-    if (t && t->tag != TT_VAR) {
+    if (t && t->tag != TERM_VAR) {
         /* Decompose mode */
         Term *name_term  = NULL;
         Term *arity_term = NULL;
         switch (t->tag) {
-            case TT_ATOM:
+            case TERM_ATOM:
                 name_term  = term_new_atom(t->atom_id);
                 arity_term = term_new_int(0);
                 break;
-            case TT_INT:
-                name_term  = term_new_int(t->v.ival);
+            case TERM_INT:
+                name_term  = term_new_int(t->ival);
                 arity_term = term_new_int(0);
                 break;
-            case TT_FLOAT:
+            case TERM_FLOAT:
                 name_term  = term_new_float(t->fval);
                 arity_term = term_new_int(0);
                 break;
-            case TT_COMPOUND:
+            case TERM_COMPOUND:
                 name_term  = term_new_atom(t->compound.functor);
                 arity_term = term_new_int(t->compound.arity);
                 break;
@@ -496,16 +496,16 @@ int pl_functor(Term *t, Term *name, Term *arity, Trail *tr) {
         return 1;
     } else {
         /* Construct mode: Name and Arity must be bound */
-        if (!name || name->tag == TT_VAR) return 0;
-        if (!arity || arity->tag != TT_INT) return 0;
-        long ar = arity->v.ival;
+        if (!name || name->tag == TERM_VAR) return 0;
+        if (!arity || arity->tag != TERM_INT) return 0;
+        long ar = arity->ival;
         Term *new_t;
         if (ar == 0) {
-            if (name->tag == TT_ATOM) new_t = term_new_atom(name->atom_id);
-            else if (name->tag == TT_INT) new_t = term_new_int(name->v.ival);
+            if (name->tag == TERM_ATOM) new_t = term_new_atom(name->atom_id);
+            else if (name->tag == TERM_INT) new_t = term_new_int(name->ival);
             else return 0;
         } else {
-            if (name->tag != TT_ATOM) return 0;
+            if (name->tag != TERM_ATOM) return 0;
             /* Build compound with unbound var args */
             Term **args = malloc(ar * sizeof(Term *));
             for (int i = 0; i < ar; i++) args[i] = term_new_var(i);
@@ -528,9 +528,9 @@ int pl_arg(Term *n, Term *compound, Term *arg, Trail *tr) {
     n        = term_deref(n);
     compound = term_deref(compound);
 
-    if (!n || n->tag != TT_INT) return 0;
-    if (!compound || compound->tag != TT_COMPOUND) return 0;
-    long idx = n->v.ival;  /* 1-based */
+    if (!n || n->tag != TERM_INT) return 0;
+    if (!compound || compound->tag != TERM_COMPOUND) return 0;
+    long idx = n->ival;  /* 1-based */
     if (idx < 1 || idx > compound->compound.arity) return 0;
 
     int mark = trail_mark(tr);
@@ -564,8 +564,8 @@ static int list_len(Term *t) {
     while (1) {
         t = term_deref(t);
         if (!t) return -1;
-        if (t->tag == TT_ATOM && t->atom_id == ATOM_NIL) return n;
-        if (t->tag != TT_COMPOUND || t->compound.functor != ATOM_DOT ||
+        if (t->tag == TERM_ATOM && t->atom_id == ATOM_NIL) return n;
+        if (t->tag != TERM_COMPOUND || t->compound.functor != ATOM_DOT ||
             t->compound.arity != 2) return -1;
         n++;
         t = t->compound.args[1];
@@ -576,16 +576,16 @@ int pl_univ(Term *t, Term *list, Trail *tr) {
     t    = term_deref(t);
     list = term_deref(list);
 
-    if (t && t->tag != TT_VAR) {
+    if (t && t->tag != TERM_VAR) {
         /* Decompose: T =.. L */
         Term *result;
-        if (t->tag == TT_ATOM) {
+        if (t->tag == TERM_ATOM) {
             Term *items[1] = { term_new_atom(t->atom_id) };
             result = make_list(1, items);
-        } else if (t->tag == TT_INT) {
-            Term *items[1] = { term_new_int(t->v.ival) };
+        } else if (t->tag == TERM_INT) {
+            Term *items[1] = { term_new_int(t->ival) };
             result = make_list(1, items);
-        } else if (t->tag == TT_COMPOUND) {
+        } else if (t->tag == TERM_COMPOUND) {
             int arity = t->compound.arity;
             Term **items = malloc((arity + 1) * sizeof(Term *));
             items[0] = term_new_atom(t->compound.functor);
@@ -598,13 +598,13 @@ int pl_univ(Term *t, Term *list, Trail *tr) {
         return 1;
     } else {
         /* Construct: T =.. L, L must be bound */
-        if (!list || list->tag != TT_COMPOUND || list->compound.functor != ATOM_DOT)
+        if (!list || list->tag != TERM_COMPOUND || list->compound.functor != ATOM_DOT)
             return 0;
         int len = list_len(list);
         if (len < 1) return 0;
         /* Extract functor and args */
         Term *head_item = term_deref(list->compound.args[0]);
-        if (!head_item || head_item->tag != TT_ATOM) return 0;
+        if (!head_item || head_item->tag != TERM_ATOM) return 0;
         int functor_id = head_item->atom_id;
         int arity = len - 1;
         Term *new_t;
@@ -648,7 +648,7 @@ static void arith_atoms_init(void) {
     _aid_mod   = prolog_atom_intern("mod");
 }
 
-/* Type-preserving arithmetic evaluator — returns Term* (TT_INT or TT_FLOAT) */
+/* Type-preserving arithmetic evaluator — returns Term* (TERM_INT or TERM_FLOAT) */
 static Term *pl_eval_arith_term(Term *t) {
     static int _aid_pow = -1, _aid_idiv = -1, _aid_sqrt = -1, _aid_log = -1,
                _aid_exp = -1, _aid_sin = -1, _aid_cos = -1, _aid_abs = -1,
@@ -693,23 +693,23 @@ static Term *pl_eval_arith_term(Term *t) {
     t = term_deref(t);
     if (!t) return term_new_int(0);
     switch (t->tag) {
-        case TT_INT:   return t;
-        case TT_FLOAT: return t;
-        case TT_ATOM:
+        case TERM_INT:   return t;
+        case TERM_FLOAT: return t;
+        case TERM_ATOM:
             if (t->atom_id == _aid_pi) return term_new_float(M_PI);
             if (t->atom_id == _aid_e)  return term_new_float(M_E);
             return term_new_int(0);
-        case TT_COMPOUND: {
+        case TERM_COMPOUND: {
             int f = t->compound.functor;
             int a = t->compound.arity;
             if (a == 2) {
                 Term *lv = pl_eval_arith_term(t->compound.args[0]);
                 Term *rv = pl_eval_arith_term(t->compound.args[1]);
-                int is_float = (lv->tag == TT_FLOAT || rv->tag == TT_FLOAT);
-                double ld = (lv->tag == TT_FLOAT) ? lv->fval : (double)lv->v.ival;
-                double rd = (rv->tag == TT_FLOAT) ? rv->fval : (double)rv->v.ival;
-                long   li = (lv->tag == TT_INT)   ? lv->v.ival : (long)lv->fval;
-                long   ri = (rv->tag == TT_INT)   ? rv->v.ival : (long)rv->fval;
+                int is_float = (lv->tag == TERM_FLOAT || rv->tag == TERM_FLOAT);
+                double ld = (lv->tag == TERM_FLOAT) ? lv->fval : (double)lv->ival;
+                double rd = (rv->tag == TERM_FLOAT) ? rv->fval : (double)rv->ival;
+                long   li = (lv->tag == TERM_INT)   ? lv->ival : (long)lv->fval;
+                long   ri = (rv->tag == TERM_INT)   ? rv->ival : (long)rv->fval;
                 if (f == _aid_plus)   return is_float ? term_new_float(ld+rd) : term_new_int(li+ri);
                 if (f == _aid_minus)  return is_float ? term_new_float(ld-rd) : term_new_int(li-ri);
                 if (f == _aid_times)  return is_float ? term_new_float(ld*rd) : term_new_int(li*ri);
@@ -728,10 +728,10 @@ static Term *pl_eval_arith_term(Term *t) {
             }
             if (a == 1) {
                 Term *v = pl_eval_arith_term(t->compound.args[0]);
-                double d = (v->tag == TT_FLOAT) ? v->fval : (double)v->v.ival;
-                long   i = (v->tag == TT_INT)   ? v->v.ival : (long)v->fval;
-                if (f == _aid_minus)    return (v->tag==TT_FLOAT) ? term_new_float(-d) : term_new_int(-i);
-                if (f == _aid_abs)      return (v->tag==TT_FLOAT) ? term_new_float(fabs(d)) : term_new_int(i<0?-i:i);
+                double d = (v->tag == TERM_FLOAT) ? v->fval : (double)v->ival;
+                long   i = (v->tag == TERM_INT)   ? v->ival : (long)v->fval;
+                if (f == _aid_minus)    return (v->tag==TERM_FLOAT) ? term_new_float(-d) : term_new_int(-i);
+                if (f == _aid_abs)      return (v->tag==TERM_FLOAT) ? term_new_float(fabs(d)) : term_new_int(i<0?-i:i);
                 if (f == _aid_sqrt)     return term_new_float(sqrt(d));
                 if (f == _aid_log)      return term_new_float(log(d));
                 if (f == _aid_exp)      return term_new_float(exp(d));
@@ -746,7 +746,7 @@ static Term *pl_eval_arith_term(Term *t) {
                 if (f == _aid_float_frac) return term_new_float(d - trunc(d));
                 if (f == _aid_bnot)     return term_new_int(~i);
                 if (f == _aid_msb)      return term_new_int(i>0 ? 63 - __builtin_clzl(i) : -1);
-                if (f == _aid_sign)     return (v->tag==TT_FLOAT) ? term_new_float(d>0?1.0:d<0?-1.0:0.0) : term_new_int(i>0?1:i<0?-1:0);
+                if (f == _aid_sign)     return (v->tag==TERM_FLOAT) ? term_new_float(d>0?1.0:d<0?-1.0:0.0) : term_new_int(i>0?1:i<0?-1:0);
             }
             return term_new_int(0);
         }
@@ -758,14 +758,14 @@ static Term *pl_eval_arith_term(Term *t) {
 long pl_eval_arith(Term *t) {
     Term *r = pl_eval_arith_term(t);
     if (!r) return 0;
-    return (r->tag == TT_FLOAT) ? (long)r->fval : r->v.ival;
+    return (r->tag == TERM_FLOAT) ? (long)r->fval : r->ival;
 }
 
 /* Floating-point version for mixed-type comparisons */
 static double pl_eval_dbl(Term *t) {
     Term *r = pl_eval_arith_term(t);
     if (!r) return 0.0;
-    return (r->tag == TT_FLOAT) ? r->fval : (double)r->v.ival;
+    return (r->tag == TERM_FLOAT) ? r->fval : (double)r->ival;
 }
 
 /* is/2: Result is Expr — unify Result with correctly-typed evaluated term */
@@ -783,10 +783,10 @@ int pl_num_eq(Term *a, Term *b)  { return pl_eval_dbl(a) == pl_eval_dbl(b); }
 int pl_num_ne(Term *a, Term *b)  { return pl_eval_dbl(a) != pl_eval_dbl(b); }
 
 /* Type-test builtins — return 1 (true) or 0 (false), no Trail needed */
-int pl_atom(Term *t)     { t = term_deref(t); return t && t->tag == TT_ATOM; }
-int pl_integer(Term *t)  { t = term_deref(t); return t && t->tag == TT_INT; }
-int pl_is_float(Term *t) { t = term_deref(t); return t && t->tag == TT_FLOAT; }
-int pl_var(Term *t)      { t = term_deref(t); return !t || t->tag == TT_VAR; }
-int pl_nonvar(Term *t)   { t = term_deref(t); return t && t->tag != TT_VAR; }
-int pl_compound(Term *t) { t = term_deref(t); return t && t->tag == TT_COMPOUND; }
-int pl_callable(Term *t) { t = term_deref(t); return t && (t->tag == TT_ATOM || t->tag == TT_COMPOUND); }
+int pl_atom(Term *t)     { t = term_deref(t); return t && t->tag == TERM_ATOM; }
+int pl_integer(Term *t)  { t = term_deref(t); return t && t->tag == TERM_INT; }
+int pl_is_float(Term *t) { t = term_deref(t); return t && t->tag == TERM_FLOAT; }
+int pl_var(Term *t)      { t = term_deref(t); return !t || t->tag == TERM_VAR; }
+int pl_nonvar(Term *t)   { t = term_deref(t); return t && t->tag != TERM_VAR; }
+int pl_compound(Term *t) { t = term_deref(t); return t && t->tag == TERM_COMPOUND; }
+int pl_callable(Term *t) { t = term_deref(t); return t && (t->tag == TERM_ATOM || t->tag == TERM_COMPOUND); }

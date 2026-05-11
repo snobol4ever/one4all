@@ -9,14 +9,14 @@
 #include <gc/gc.h>
 
 /* ── ast_gc_clone ──────────────────────────────────────────────────────────
- * Deep-copy AST_t subtree rooted at e into GC-managed memory.
+ * Deep-copy tree_t subtree rooted at e into GC-managed memory.
  * Every field is copied; sval is GC_strdup'd; children[] is GC_malloc'd.
  * The clone is structurally identical but lives in GC heap — safe to keep
  * after the original calloc-based IR is freed. */
-AST_t *ast_gc_clone(const AST_t *e)
+tree_t *ast_gc_clone(const tree_t *e)
 {
     if (!e) return NULL;
-    AST_t *c = GC_malloc(sizeof(AST_t));
+    tree_t *c = GC_malloc(sizeof(tree_t));
     c->t      = e->t;
     c->v.ival      = e->v.ival;
     c->v.dval      = e->v.dval;
@@ -25,7 +25,7 @@ AST_t *ast_gc_clone(const AST_t *e)
     c->_nalloc    = e->n;
     c->v.sval      = e->v.sval ? GC_strdup(e->v.sval) : NULL;
     if (e->n > 0) {
-        c->c = GC_malloc((size_t)e->n * sizeof(AST_t *));
+        c->c = GC_malloc((size_t)e->n * sizeof(tree_t *));
         for (int i = 0; i < e->n; i++)
             c->c[i] = ast_gc_clone(e->c[i]);
     } else {
@@ -35,8 +35,8 @@ AST_t *ast_gc_clone(const AST_t *e)
 }
 
 /* ── expr_free (internal) ───────────────────────────────────────────────────
- * Free a calloc-based AST_t tree recursively. */
-static void expr_free(AST_t *e)
+ * Free a calloc-based tree_t tree recursively. */
+static void expr_free(tree_t *e)
 {
     if (!e) return;
     free(e->v.sval);
@@ -47,7 +47,7 @@ static void expr_free(AST_t *e)
 }
 
 /* ── stmt_free (internal) ───────────────────────────────────────────────────
- * Free one STMT_t and all its AST_t fields. */
+ * Free one STMT_t and all its tree_t fields. */
 static void stmt_free(STMT_t *s)
 {
     if (!s) return;
@@ -65,9 +65,9 @@ static void stmt_free(STMT_t *s)
 }
 
 /* ── code_free ──────────────────────────────────────────────────────────────
- * Free a CODE_t and all its STMT_t / AST_t nodes.
+ * Free a CODE_t and all its STMT_t / tree_t nodes.
  * Walks the linked list; frees exports/imports lists.
- * Call only after lower() has consumed the program and any AST_t*
+ * Call only after lower() has consumed the program and any tree_t*
  * pointers stored in SM_PUSH_EXPR have been cloned via ast_gc_clone(). */
 void code_free(CODE_t *prog)
 {

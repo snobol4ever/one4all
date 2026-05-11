@@ -17,7 +17,7 @@ DESCR_t _builtin_print(DESCR_t *args, int nargs) {
 /* ── SC-1: DATA registry — constructor/accessor dispatch for --ir-run ─────────
  * DEFDAT_fn registers in the SPITBOL binary runtime table; APPLY_fn does not
  * expose DATA-defined names via FNCEX_fn.  We maintain our own registry so
- * interp_eval AST_FNC can dispatch constructors and field accessors directly. */
+ * interp_eval TT_FNC can dispatch constructors and field accessors directly. */
 
 #define SC_DAT_MAX_FIELDS 64
 #define SC_DAT_MAX_TYPES  128

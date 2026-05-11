@@ -103,7 +103,7 @@ typedef struct {
     void      (*trampoline)(void);
     void       *trampoline_arg;
     /* RK-21: gather coroutine — proc stored here so trampoline doesn't need coro_stage */
-    struct AST_t *gather_proc;
+    struct tree_t *gather_proc;
     /* CH-17c: SM expression entry point for gather coroutine (-1 = legacy coro_call path) */
     int  gather_entry_pc;
     int  gather_nparams;
@@ -147,7 +147,7 @@ typedef struct {
 } icn_binop_gen_state_t;
 
 /*----------------------------------------------------------------------------------------------------------------------------
- * coro_bb_alternate — AST_ALTERNATE Byrd box (IC-2a)
+ * coro_bb_alternate — TT_ALTERNATE Byrd box (IC-2a)
  *
  * JCON irgen.icn ir_a_Alt: try left until ω, then switch to right.
  * Binary variant: which=0 → pumping left; which=1 → pumping right.
@@ -158,16 +158,16 @@ typedef struct {
 } icn_alternate_state_t;
 
 /*----------------------------------------------------------------------------------------------------------------------------
- * Forward declaration of AST_t needed by IC-2b state structs below.
+ * Forward declaration of tree_t needed by IC-2b state structs below.
  * When ir.h is already included this is a harmless redundant typedef.
  *--------------------------------------------------------------------------------------------------------------------------*/
 #ifndef EXPR_T_DEFINED
 #define EXPR_T_DEFINED
-typedef struct AST_t AST_t;
+typedef struct tree_t tree_t;
 #endif
 
 /*----------------------------------------------------------------------------------------------------------------------------
- * coro_bb_limit — AST_LIMIT Byrd box  (gen \ N)   IC-2b
+ * coro_bb_limit — TT_LIMIT Byrd box  (gen \ N)   IC-2b
  *
  * Drives inner generator, yields each value, stops after N ticks.
  * State: gen (inner box), max (limit count), count (ticks so far).
@@ -180,51 +180,51 @@ typedef struct {
 DESCR_t coro_bb_limit(void *zeta, int entry);
 
 /*----------------------------------------------------------------------------------------------------------------------------
- * coro_bb_every — AST_EVERY Byrd box  (every gen [do body])   IC-2b
+ * coro_bb_every — TT_EVERY Byrd box  (every gen [do body])   IC-2b
  *
- * Drives inner generator to exhaustion; evaluates body AST_t* per tick.
+ * Drives inner generator to exhaustion; evaluates body tree_t* per tick.
  * body may be NULL (bare "every gen" — just drives gen to exhaustion for side effects).
  * Yields body result (or gen value if no body) per tick.
- * State: gen (inner box), body (AST_t*), started flag.
+ * State: gen (inner box), body (tree_t*), started flag.
  *--------------------------------------------------------------------------------------------------------------------------*/
 typedef struct {
     bb_node_t  gen;
-    AST_t    *gen_ast; /* AST node of generator child — for coro_drive_node injection */
-    AST_t    *body;   /* may be NULL */
+    tree_t    *gen_ast; /* AST node of generator child — for coro_drive_node injection */
+    tree_t    *body;   /* may be NULL */
     int        started;
 } icn_every_state_t;
 DESCR_t coro_bb_every(void *zeta, int entry);
 
 /*----------------------------------------------------------------------------------------------------------------------------
- * coro_bb_bang_binary — AST_BANG_BINARY Byrd box  (E1 ! E2)   IC-2b
+ * coro_bb_bang_binary — TT_BANG_BINARY Byrd box  (E1 ! E2)   IC-2b
  *
- * Invoke E1 (a procedure AST_t*) with successive values from E2 (a generator).
+ * Invoke E1 (a procedure tree_t*) with successive values from E2 (a generator).
  * E1 is re-evaluated for each value produced by E2.
- * State: proc_expr (AST_FNC AST_t*), arg_box (generator for E2), current arg DESCR_t.
+ * State: proc_expr (TT_FNC tree_t*), arg_box (generator for E2), current arg DESCR_t.
  *--------------------------------------------------------------------------------------------------------------------------*/
 typedef struct {
-    AST_t   *proc_expr;   /* E1 — the callable */
+    tree_t   *proc_expr;   /* E1 — the callable */
     bb_node_t arg_box;     /* E2 — the argument generator */
     DESCR_t   cur_arg;     /* current argument value */
 } icn_bang_binary_state_t;
 DESCR_t coro_bb_bang_binary(void *zeta, int entry);
 
 /*----------------------------------------------------------------------------------------------------------------------------
- * coro_bb_seq_expr — AST_SEQ_EXPR Byrd box  (E1; E2; …; En)   IC-2b
+ * coro_bb_seq_expr — TT_SEQ_EXPR Byrd box  (E1; E2; …; En)   IC-2b
  *
  * Evaluates each child in order; result = last child.
  * If last child is a generator, its values are forwarded.
  * State: children array, count, last-child box.
  *--------------------------------------------------------------------------------------------------------------------------*/
 typedef struct {
-    AST_t   **children;   /* pointer into the AST_SEQ_EXPR AST_t children array */
+    tree_t   **children;   /* pointer into the TT_SEQ_EXPR tree_t children array */
     int        n;
     bb_node_t  last_box;   /* generator box for last child (may be oneshot) */
     int        started;
 } icn_seq_state_t;
 DESCR_t coro_bb_seq_expr(void *zeta, int entry);
 
-bb_node_t coro_eval(AST_t *e);
+bb_node_t coro_eval(tree_t *e);
 
 /* RK-21: gather coroutine trampoline — defined in icn_runtime.c, referenced in icon_gen.c */
 extern void gather_trampoline(void);

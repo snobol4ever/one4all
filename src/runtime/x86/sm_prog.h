@@ -32,9 +32,9 @@ typedef enum {
     SM_PUSH_LIT_I,
     SM_PUSH_LIT_F,
     SM_PUSH_NULL,
-    SM_PUSH_NULL_NOFLIP, /* push null but do NOT clobber last_ok — for AST_SCAN value-balance */
+    SM_PUSH_NULL_NOFLIP, /* push null but do NOT clobber last_ok — for TT_SCAN value-balance */
     SM_PUSH_VAR,
-    SM_PUSH_EXPR,    /* push DT_E frozen expression; a[0].ptr = AST_t* */
+    SM_PUSH_EXPR,    /* push DT_E frozen expression; a[0].ptr = tree_t* */
     SM_PUSH_EXPRESSION,   /* push DT_E expression descriptor; a[0].i=entry_pc, a[1].i=arity */
     SM_CALL_EXPRESSION,   /* pop expression descriptor, push return frame, jump to entry_pc */
     SM_STORE_VAR,
@@ -81,7 +81,7 @@ typedef enum {
                          * self-recursive patterns like primary = ... | '(' *primary ')'),
                          * this opcode preserves the name and defers lookup to match time
                          * via XDSAR / bb_deferred_var.  Mirrors the --ir-run pat_ref(name)
-                         * path in interp_eval_pat's AST_DEFER(AST_VAR) case.  SN-6 fix. */
+                         * path in interp_eval_pat's TT_DEFER(TT_VAR) case.  SN-6 fix. */
     SM_PAT_CAPTURE,
     SM_PAT_CAPTURE_FN,  /* . *func() — a[0].s=funcname; calls func(matched_text) at match time */
     SM_PAT_CAPTURE_FN_ARGS, /* . *func(args) / $ *func(args) — args-are-values form.
@@ -89,8 +89,8 @@ typedef enum {
                          * The nargs values were pushed onto the value stack by preceding
                          * lower_expr calls; handler pops them (last-pushed = last arg) and
                          * calls pat_assign_callcap(child, fname, values, nargs).  SN-8a.
-                         * Emitted when any arg is not a plain AST_VAR (AST_QLIT literal, nested
-                         * expression, etc.) — the TL-2 name-stash path handles the all-AST_VAR
+                         * Emitted when any arg is not a plain TT_VAR (TT_QLIT literal, nested
+                         * expression, etc.) — the TL-2 name-stash path handles the all-TT_VAR
                          * case in SM_PAT_CAPTURE_FN. */
     SM_PAT_USERCALL,    /* bare *func() — a[0].s=funcname; a[2].s = '\t'-separated arg names (or NULL)
                          * Builds XATP deferred-usercall pattern via pat_user_call; at match time
@@ -100,7 +100,7 @@ typedef enum {
                          * a[0].s = funcname, a[1].i = nargs.  The nargs values were pushed
                          * onto the value stack; handler pops them and calls
                          * pat_user_call(fname, values, nargs).  SN-8a.
-                         * Emitted when any arg is not a plain AST_VAR. */
+                         * Emitted when any arg is not a plain TT_VAR. */
 
     /* Statement execution */
     SM_EXEC_STMT,
@@ -114,60 +114,60 @@ typedef enum {
     SM_BB_PUMP,
     SM_BB_ONCE,
     /* CH-17f: Prolog goal dispatch identified by predicate key + arity.
-     * Replaces the legacy lower_expr(AST_CHOICE) + SM_BB_ONCE wrapper that
-     * pushed a raw AST_t* and called coro_eval(AST_CHOICE) at runtime.
+     * Replaces the legacy lower_expr(TT_CHOICE) + SM_BB_ONCE wrapper that
+     * pushed a raw tree_t* and called coro_eval(TT_CHOICE) at runtime.
      * a[0].s = predicate key ("name/arity"), a[1].i = arity.
      * Handler: pl_pred_entry_lookup(key) → if entry_pc >= 0 use
      * pl_box_choice_pc; else fall back to pl_box_choice(IR).
      * Drive via bb_broker(BB_ONCE); sets st->last_ok.
-     * No AST_t* is pushed or walked by this opcode at the SM layer. */
+     * No tree_t* is pushed or walked by this opcode at the SM layer. */
     SM_BB_ONCE_PROC,
     /* CHUNKS-step12: BB pump for an Icon user-proc identified by name + nargs.
-     * Replaces the synthesised AST_FNC + emit_push_expr + SM_BB_PUMP wrapper
+     * Replaces the synthesised TT_FNC + emit_push_expr + SM_BB_PUMP wrapper
      * that sm_lower used to emit for the top-level call_main(). a[0].s = proc
      * name, a[1].i = nargs. Args (when nargs>0) are popped from the value
      * stack in caller order and passed straight to the coroutine staging
-     * machinery — no AST_t* is constructed at lowering time and none is
+     * machinery — no tree_t* is constructed at lowering time and none is
      * walked by this opcode. The IR walk that remains lives entirely inside
      * coro_call(proc_table[i].proc, ...) and is Step 17's territory. */
     SM_BB_PUMP_PROC,
     /* CHUNKS-step13: Raku CASE dispatch — replaces the synthesised
      * emit_push_expr + SM_BB_PUMP wrapper that sm_lower used to emit for
-     * AST_CASE.  a[0].i = ncases (number of when-arms), a[1].i = has_default
+     * TT_CASE.  a[0].i = ncases (number of when-arms), a[1].i = has_default
      * (0 or 1).  Stack layout at entry (deepest first):
      *   topic_expression           (DT_E, evaluates the case topic)
-     *   cmp_kind_0   (DT_I, AST_e value: AST_LEQ for string ==, else AST_EQ)
+     *   cmp_kind_0   (DT_I, tree_e value: TT_LEQ for string ==, else TT_EQ)
      *   val_expression_0           (DT_E, evaluates arm 0's "when" value)
      *   body_expression_0          (DT_E, evaluates arm 0's body)
      *   ... ncases triples ...
      *   default_body_expression    (DT_E, only if has_default)
      * Handler pops in reverse, evaluates topic, walks arms doing string
      * or integer compare per cmp_kind, runs the matching body's expression,
-     * or the default if present, or pushes NULVCL.  No AST_t is
+     * or the default if present, or pushes NULVCL.  No tree_t is
      * constructed at lowering time and none is walked by this opcode. */
     SM_BB_PUMP_CASE,
     /* CHUNKS-step15: BB pump for a generator expression — replaces the legacy
      * emit_push_expr + SM_BB_PUMP pair for migrated Icon generator kinds
-     * (AST_TO, AST_TO_BY in CH-15a; later kinds in subsequent rungs).  Pops
+     * (TT_TO, TT_TO_BY in CH-15a; later kinds in subsequent rungs).  Pops
      * an expression descriptor (DT_E, slen=1, i=entry_pc) from TOS, allocates
      * an SmGenState rooted at entry_pc, and drives the expression with
      * bb_broker_drive_sm(gs, pump_print, NULL) — same statement-context
-     * print semantics as SM_BB_PUMP for un-migrated kinds.  No AST_t
+     * print semantics as SM_BB_PUMP for un-migrated kinds.  No tree_t
      * is constructed at lowering time and none is walked by this opcode;
      * the expression body lowers to pure SM with explicit SM_SUSPEND points. */
     SM_BB_PUMP_SM,
 
-    /* CHUNKS-step17i-every-suspend: BB pump for AST_EVERY by id —
+    /* CHUNKS-step17i-every-suspend: BB pump for TT_EVERY by id —
      * mirrors CH-17f's SM_BB_ONCE_PROC pattern (Prolog) for Icon `every`.
      * a[0].i = every_id  (index into g_every_table; populated by sm_lower
-     *                     when AST_EVERY is encountered in expression-body
-     *                     lowering; NEVER an AST_t* in SM bytecode).
+     *                     when TT_EVERY is encountered in expression-body
+     *                     lowering; NEVER an tree_t* in SM bytecode).
      * Runtime handler does: g_every_table[id] → coro_eval → bb_broker(BB_PUMP).
      * Net stack delta: pushes one DT_NUL (every is void in stmt context;
      * the trailing SM_VOID_POP from the proc-body loop discards it).
      *
      * The legacy `emit_push_expr + SM_BB_PUMP` shape (which pushed a raw
-     * AST_t* on the SM stack and called coro_eval at runtime) underflowed
+     * tree_t* on the SM stack and called coro_eval at runtime) underflowed
      * the stack when reached via sm_call_proc (CH-17g) — net push 0,
      * trailing SM_VOID_POP fires, underflow.  This opcode pushes a single
      * DT_NUL at end so the trailing VOID_POP is balanced. */
@@ -177,11 +177,11 @@ typedef enum {
      *
      * Replaces the per-kind emit_push_expr + SM_BB_PUMP for AST kinds that still
      * hit the legacy fallthrough block (lower.c:1410-1418):
-     *   AST_BANG_BINARY, AST_LIMIT, AST_RANDOM, AST_SECTION, AST_SECTION_MINUS,
-     *   AST_SECTION_PLUS, and generative AST_LCONCAT.
+     *   TT_BANG_BINARY, TT_LIMIT, TT_RANDOM, TT_SECTION, TT_SECTION_MINUS,
+     *   TT_SECTION_PLUS, and generative TT_LCONCAT.
      *
      * Encoding:  a[0].i = ast_pump_id  (index into g_ast_pump_table)
-     * No AST_t* in SM bytecode — the table holds borrowed pointers registered
+     * No tree_t* in SM bytecode — the table holds borrowed pointers registered
      * at lower-time by ast_pump_table_register().
      *
      * Runtime handler: lookup AST → coro_eval → bb_broker(BB_PUMP).
@@ -196,10 +196,10 @@ typedef enum {
      * routes to the correct coro_bb_* function via the AST kind in the node. */
     SM_BB_PUMP_AST,
 
-    /* CHUNKS-step17i-suspend: AST_SUSPEND `suspend E [do body]` — yield-to-caller.
+    /* CHUNKS-step17i-suspend: TT_SUSPEND `suspend E [do body]` — yield-to-caller.
      *
      * Stack discipline: pops one value (the yield value).  Pushes nothing.
-     * The lowering shape (lower.c AST_SUSPEND case) wraps it as:
+     * The lowering shape (lower.c TT_SUSPEND case) wraps it as:
      *
      *   [lower expr]                ; push v, last_ok = !IS_FAIL(v)
      *   SM_JUMP_F  L_end            ; v failed → leave it on stack, fall to L_end
@@ -221,7 +221,7 @@ typedef enum {
      * push v back as a fallback — the outer SM_VOID_POP will discard it.
      *
      * Why this shape rather than CH-17i-every's g_table+coro_eval+broker
-     * pattern: AST_SUSPEND-as-statement's existing semantics
+     * pattern: TT_SUSPEND-as-statement's existing semantics
      * (coro_stmt.c:88) are entirely in-frame state mutation
      * (FRAME.suspending=1 + suspend_val) followed by an outer-loop
      * swapcontext.  No bb_node_t is constructed, no broker is driven.
@@ -297,10 +297,10 @@ typedef enum {
     /* CHUNKS-step15a: SM_ICMP_GT — integer compare greater-than.
      * Pops two DT_I values (right = TOS, left = TOS-1).
      * Sets last_ok = (left.i > right.i).  Pushes nothing.
-     * Used by AST_TO / AST_TO_BY generator expressions for the loop-exit test. */
+     * Used by TT_TO / TT_TO_BY generator expressions for the loop-exit test. */
     SM_ICMP_GT,
     /* CHUNKS-step15a: SM_ICMP_LT — integer compare less-than (mirror of GT).
-     * Used by AST_TO_BY expressions for the negative-step loop-exit test. */
+     * Used by TT_TO_BY expressions for the negative-step loop-exit test. */
     SM_ICMP_LT,
 
     /* CHUNKS-step17b'' (CH-17b''): frame-slot read/write — read/write
@@ -319,7 +319,7 @@ typedef enum {
      *
      * The slot index is baked at lower-time by sm_lower's per-proc scope
      * construction (mirrors coro_runtime.c's icn_scope_patch but without
-     * mutating AST_t.v.ival in place).  See lower.c expression-body emission. */
+     * mutating tree_t.v.ival in place).  See lower.c expression-body emission. */
     SM_LOAD_FRAME,
     SM_STORE_FRAME,
 
@@ -333,11 +333,11 @@ typedef union {
     double      f;          /* float literal */
     const char *s;          /* string literal / variable name / label name */
     int         b;          /* boolean (has_repl etc.) */
-    void       *ptr;        /* frozen pointer (AST_t* for SM_PUSH_EXPR, etc.) */
+    void       *ptr;        /* frozen pointer (tree_t* for SM_PUSH_EXPR, etc.) */
 } sm_operand_t;
 
 /* ── Compiled expression descriptor ──────────────────────────────────────── */
-/* Replaces raw AST_t* in DT_E descriptors once a site is migrated away
+/* Replaces raw tree_t* in DT_E descriptors once a site is migrated away
  * from SM_PUSH_EXPR.  entry_pc indexes SM_Program::instrs[]; arity is the
  * number of args expected on the SM value stack at entry (0 for a thunk).
  * SM_PUSH_EXPRESSION encodes these as a[0].i and a[1].i respectively. */

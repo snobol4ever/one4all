@@ -25,7 +25,7 @@
 #include "snobol4.h"   /* DESCR_t, PATND_t, DT_* */
 #include "sil_macros.h" /* IS_NAMEPTR, NAME_DEREF_PTR, IS_NAMEVAL, etc. */
 
-/* AST_t / AST_e for SM_PAT_CAPTURE_FN synthetic AST_FNC node */
+/* tree_t / tree_e for SM_PAT_CAPTURE_FN synthetic TT_FNC node */
 #include "../ast/ast.h"
 #include "../../frontend/snobol4/scrip_cc.h"
 
@@ -70,7 +70,7 @@ extern DESCR_t  NV_GET_fn(const char *name);
  * Defined in coro_runtime.c for production builds, stubbed in sm_interp_test.c
  * for the unit-test world.  Returns FAILDESCR / no-op when frame_depth == 0
  * — expressions emitted with frame-slot opcodes are dead code today (CH-17c flips
- * the consumer that reaches them).  Pure-DESCR_t signatures: no AST_t leakage
+ * the consumer that reaches them).  Pure-DESCR_t signatures: no tree_t leakage
  * across the SM-runtime/IR-runtime boundary. */
 extern DESCR_t  icn_frame_env_load(int slot);
 extern void     icn_frame_env_store(int slot, DESCR_t val);
@@ -79,7 +79,7 @@ extern int      icn_frame_env_active(void);   /* 1 if frame_depth > 0 */
 /* OE-10: Icon/Prolog BB opcode support */
 #include "bb_broker.h"
 #include <setjmp.h>
-extern bb_node_t coro_eval(AST_t *e);   /* scrip.c — builds a drivable bb_node_t */
+extern bb_node_t coro_eval(tree_t *e);   /* scrip.c — builds a drivable bb_node_t */
 extern bb_node_t coro_pump_proc_by_name(const char *name, DESCR_t *args, int nargs);
                                           /* CHUNKS-step12: name-driven Icon proc pump */
 
@@ -139,21 +139,21 @@ static void exprs_audit_register(void) {
 SmGenState *g_current_gen_state = NULL;
 
 /* CHUNKS-step17i-every-suspend: every-table.
- * Indexed by SM_BB_PUMP_EVERY's a[0].i.  Populated by sm_lower at AST_EVERY
+ * Indexed by SM_BB_PUMP_EVERY's a[0].i.  Populated by sm_lower at TT_EVERY
  * lowering time (lower.c).  Bounded grow; never shrinks within a compile.
  * Reset by every_table_reset (called from sm_program_free path).
  * AST pointers borrowed — caller (lower) owns them; same lifetime as
- * g_pl_pred_table's borrowed AST_CHOICE pointers. */
+ * g_pl_pred_table's borrowed TT_CHOICE pointers. */
 #define EVERY_TABLE_INIT 16
-static AST_t **g_every_table     = NULL;
+static tree_t **g_every_table     = NULL;
 static int     g_every_table_n   = 0;
 static int     g_every_table_cap = 0;
 
-int every_table_register(AST_t *ast)
+int every_table_register(tree_t *ast)
 {
     if (g_every_table_n >= g_every_table_cap) {
         int new_cap = g_every_table_cap ? g_every_table_cap * 2 : EVERY_TABLE_INIT;
-        AST_t **nt = (AST_t **)realloc(g_every_table, new_cap * sizeof(AST_t *));
+        tree_t **nt = (tree_t **)realloc(g_every_table, new_cap * sizeof(tree_t *));
         if (!nt) { fprintf(stderr, "every_table: OOM\n"); abort(); }
         g_every_table     = nt;
         g_every_table_cap = new_cap;
@@ -163,7 +163,7 @@ int every_table_register(AST_t *ast)
     return id;
 }
 
-AST_t *every_table_lookup(int id)
+tree_t *every_table_lookup(int id)
 {
     if (id < 0 || id >= g_every_table_n) return NULL;
     return g_every_table[id];
@@ -179,15 +179,15 @@ void every_table_reset(void)
 /* GOAL-ICON-BB-COMPLETE Phase A: unified ast_pump_table for SM_BB_PUMP_AST.
  * Mirrors every_table exactly — same lifetime, same borrow model. */
 #define AST_PUMP_TABLE_INIT 16
-static AST_t **g_ast_pump_table     = NULL;
+static tree_t **g_ast_pump_table     = NULL;
 static int     g_ast_pump_table_n   = 0;
 static int     g_ast_pump_table_cap = 0;
 
-int ast_pump_table_register(AST_t *ast)
+int ast_pump_table_register(tree_t *ast)
 {
     if (g_ast_pump_table_n >= g_ast_pump_table_cap) {
         int new_cap = g_ast_pump_table_cap ? g_ast_pump_table_cap * 2 : AST_PUMP_TABLE_INIT;
-        AST_t **nt = (AST_t **)realloc(g_ast_pump_table, new_cap * sizeof(AST_t *));
+        tree_t **nt = (tree_t **)realloc(g_ast_pump_table, new_cap * sizeof(tree_t *));
         if (!nt) { fprintf(stderr, "ast_pump_table: OOM\n"); abort(); }
         g_ast_pump_table     = nt;
         g_ast_pump_table_cap = new_cap;
@@ -197,7 +197,7 @@ int ast_pump_table_register(AST_t *ast)
     return id;
 }
 
-AST_t *ast_pump_table_lookup(int id)
+tree_t *ast_pump_table_lookup(int id)
 {
     if (id < 0 || id >= g_ast_pump_table_n) return NULL;
     return g_ast_pump_table[id];
@@ -403,13 +403,13 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
 
         case SM_PUSH_EXPR: {
             /* Push a frozen DT_E expression descriptor (for *expr / EVAL()) */
-            /* CHUNKS-step05 instrumentation: tally legacy AST_t* DT_E pushes.
+            /* CHUNKS-step05 instrumentation: tally legacy tree_t* DT_E pushes.
              * When SCRIP_EXPRS_AUDIT=1 and the program is pure SNOBOL4/Snocone,
              * any SM_PUSH_EXPR fire is a violation of M1's "expression-only" invariant.
              * Icon/Raku/Prolog generators legitimately still hit this until M4. */
             if (getenv("SCRIP_EXPRS_AUDIT")) {
                 g_exprs_audit_push_expr++;
-                fprintf(stderr, "[CHUNKS-AUDIT] SM_PUSH_EXPR fired at pc=%d (legacy AST_t* path)\n",
+                fprintf(stderr, "[CHUNKS-AUDIT] SM_PUSH_EXPR fired at pc=%d (legacy tree_t* path)\n",
                         st->pc);
             }
             DESCR_t d;
@@ -423,7 +423,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
 
         case SM_PUSH_EXPRESSION: {
             /* CHUNKS-step02: push DT_E expression descriptor.
-             * slen=1 distinguishes expression from legacy AST_t* (slen=0).
+             * slen=1 distinguishes expression from legacy tree_t* (slen=0).
              * entry_pc stored in the .i union field. */
             /* CHUNKS-step05 instrumentation: validate entry_pc within prog bounds.
              * Guarded by SCRIP_EXPRS_AUDIT to keep production builds free of overhead. */
@@ -493,7 +493,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                 break;
             }
             /* RT-5 / SN-32b-store-val: push `val` (the RHS value), NOT the return
-             * value of NV_SET_fn.  The IR path (interp.c AST_ASSIGN, line 2844) always
+             * value of NV_SET_fn.  The IR path (interp.c TT_ASSIGN, line 2844) always
              * returns `val` regardless of what NV_SET_fn stores — NV_SET_fn's return
              * value is unreliable for DT_DATA objects (returns SNUL on the second
              * call for the same variable).  Pushing `val` ensures DIFFER(sno=Pop())
@@ -698,7 +698,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
         case SM_PAT_CAPTURE_FN: {
             /* . *func() or $ *func() — a[0].s = function name, a[1].i = 0(cond)/1(imm).
              * a[2].s (TL-2): optional '\t'-separated arg *names* for flush-time
-             * resolution — set when every arg of *func() is a plain AST_VAR.
+             * resolution — set when every arg of *func() is a plain TT_VAR.
              * When NULL, legacy path (no args, pat_assign_callcap).
              * Use pat_assign_callcap → XCALLCAP node, lowered to bb_cap with
              * NM_CALL NameKind_t (SN-21d).  At match time, name_commit_value's
@@ -768,9 +768,9 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
              * Build XATP deferred-usercall node via pat_user_call so the engine
              * invokes func() per position at match time; func's FAIL propagates
              * as pattern FAIL.  The named-args (a[2].s) path is not yet consumed
-             * — when every arg is a plain AST_VAR it is currently routed through
-             * the all-AST_VAR stash but the downstream XATP node is not yet wired
-             * to resolve names at match time.  SN-8a fixes the non-AST_VAR case
+             * — when every arg is a plain TT_VAR it is currently routed through
+             * the all-TT_VAR stash but the downstream XATP node is not yet wired
+             * to resolve names at match time.  SN-8a fixes the non-TT_VAR case
              * via SM_PAT_USERCALL_ARGS (args-on-stack). */
             const char *fname = ins->a[0].s ? ins->a[0].s : "";
             sm_push(st, pat_user_call(fname, NULL, 0));
@@ -817,10 +817,10 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
 
         /* ── OE-10/11: Byrd box broker opcodes — Icon/Prolog SM-run support ── */
         case SM_BB_PUMP: {
-            /* Pop DT_E descriptor whose .ptr is the AST_t* of the Icon statement subject.
+            /* Pop DT_E descriptor whose .ptr is the tree_t* of the Icon statement subject.
              * Build a drivable bb_node_t via coro_eval, pump all values via bb_broker. */
             DESCR_t expr_d = sm_pop(st);
-            AST_t *expr   = (AST_t *)expr_d.ptr;
+            tree_t *expr   = (tree_t *)expr_d.ptr;
             if (!expr) { st->last_ok = 0; break; }
             bb_node_t node = coro_eval(expr);
             int ticks = bb_broker(node, BB_PUMP, pump_print, NULL);
@@ -829,11 +829,11 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
         }
 
         case SM_BB_ONCE: {
-            /* Pop DT_E descriptor whose .ptr is the AST_t* of the Prolog statement subject.
-             * Build a bb_node_t via coro_eval (shared builder handles AST_CHOICE/AST_CLAUSE),
+            /* Pop DT_E descriptor whose .ptr is the tree_t* of the Prolog statement subject.
+             * Build a bb_node_t via coro_eval (shared builder handles TT_CHOICE/TT_CLAUSE),
              * drive once via bb_broker(BB_ONCE). */
             DESCR_t expr_d = sm_pop(st);
-            AST_t *expr   = (AST_t *)expr_d.ptr;
+            tree_t *expr   = (tree_t *)expr_d.ptr;
             if (!expr) { st->last_ok = 0; break; }
             bb_node_t node = coro_eval(expr);
             int ticks = bb_broker(node, BB_ONCE, NULL, NULL);
@@ -842,18 +842,18 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
         }
 
         /* CH-17f: Prolog goal dispatch by predicate key — replaces legacy
-         * lower_expr(AST_CHOICE) + SM_BB_ONCE.  a[0].s = "name/arity" key,
+         * lower_expr(TT_CHOICE) + SM_BB_ONCE.  a[0].s = "name/arity" key,
          * a[1].i = arity.  Looks up Pl_PredEntry; if entry_pc >= 0 AND the
          * expression body is filled (CH-17f body fill rung), uses pl_box_choice_pc;
          * otherwise falls back to pl_box_choice (IR path — correct semantics).
-         * No AST_t* pushed or walked at the SM statement-dispatch layer. */
+         * No tree_t* pushed or walked at the SM statement-dispatch layer. */
         case SM_BB_ONCE_PROC: {
             const char *key   = ins->a[0].s;
             int         arity = (int)ins->a[1].i;
-            /* IR fallback: look up the AST_CHOICE node and drive it.
+            /* IR fallback: look up the TT_CHOICE node and drive it.
              * This is the correct path until expression bodies are filled in
              * a later CH-17f body-fill rung. */
-            AST_t *choice = key ? pl_pred_table_lookup_global(key) : NULL;
+            tree_t *choice = key ? pl_pred_table_lookup_global(key) : NULL;
             bb_node_t node = choice ? pl_box_choice(choice, g_pl_env, arity)
                                     : pl_box_fail();
             int ticks = bb_broker(node, BB_ONCE, NULL, NULL);
@@ -862,10 +862,10 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
         }
 
         /* CHUNKS-step12: name-driven Icon proc BB pump — replaces the
-         * synthesised AST_FNC + emit_push_expr + SM_BB_PUMP wrapper that
+         * synthesised TT_FNC + emit_push_expr + SM_BB_PUMP wrapper that
          * sm_lower used to emit for the top-level call_main(). a[0].s = proc
          * name, a[1].i = nargs. nargs values, if any, are popped from the
-         * value stack in caller-pushed order (reverse-pop). No AST_t is
+         * value stack in caller-pushed order (reverse-pop). No tree_t is
          * constructed or walked at this layer. The IR walk inside
          * coro_call(proc_table[i].proc, ...) is unchanged — Step 17 territory. */
         case SM_BB_PUMP_PROC: {
@@ -893,25 +893,25 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
         }
 
         /* CHUNKS-step13: Raku CASE dispatch — replaces emit_push_expr +
-         * SM_BB_PUMP for AST_CASE. a[0].i = ncases, a[1].i = has_default.
+         * SM_BB_PUMP for TT_CASE. a[0].i = ncases, a[1].i = has_default.
          * Stack layout (bottom→top, i.e. earliest pushed first):
          *   topic_chunk          (DT_E)
-         *   cmp_kind_0           (DT_I, AST_e: AST_LEQ for ==, AST_EQ otherwise)
+         *   cmp_kind_0           (DT_I, tree_e: TT_LEQ for ==, TT_EQ otherwise)
          *   val_chunk_0          (DT_E)
          *   body_chunk_0         (DT_E)
          *   ... ncases triples ...
          *   default_body_chunk   (DT_E, only if has_default)
          * Reverse-pop, evaluate topic, walk arms, run matching body.
          * The matched body's value (or NULVCL) is left on the stack —
-         * even though AST_CASE is currently used in stmt-context (raku
+         * even though TT_CASE is currently used in stmt-context (raku
          * given_stmt), keeping the value-context discipline consistent
-         * with the underlying coro_value.c AST_CASE evaluator means
+         * with the underlying coro_value.c TT_CASE evaluator means
          * future value-context use is symmetric. The trailing SM_VOID_POP
-         * the lower_stmt expression-stmt path emits for AST_CASE balances
+         * the lower_stmt expression-stmt path emits for TT_CASE balances
          * the stack. Mirrors the comparison logic in
-         * coro_value.c:947 — string compare on AST_LEQ, integer-or-string
-         * compare on AST_EQ — but operates entirely on expression-call results,
-         * never on AST_t. */
+         * coro_value.c:947 — string compare on TT_LEQ, integer-or-string
+         * compare on TT_EQ — but operates entirely on expression-call results,
+         * never on tree_t. */
         case SM_BB_PUMP_CASE: {
             int ncases      = (int)ins->a[0].i;
             int has_default = (int)ins->a[1].i;
@@ -936,7 +936,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                 DESCR_t c = sm_pop(st);
                 body_pcs[k]  = (b.v == DT_E && b.slen == 1) ? (int)b.i : -1;
                 val_pcs[k]   = (v.v == DT_E && v.slen == 1) ? (int)v.i : -1;
-                cmp_kinds[k] = (c.v == DT_I) ? (int)c.i : (int)AST_EQ;
+                cmp_kinds[k] = (c.v == DT_I) ? (int)c.i : (int)TT_EQ;
             }
 
             /* Pop topic expression and evaluate it */
@@ -951,7 +951,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                 if (val_pcs[k] < 0 || body_pcs[k] < 0) continue;
                 DESCR_t wval = sm_call_expression(val_pcs[k]);
                 int match = 0;
-                if ((AST_e)cmp_kinds[k] == AST_LEQ) {
+                if ((tree_e)cmp_kinds[k] == TT_LEQ) {
                     /* String equality (Raku ==): coerce to string both sides */
                     const char *ts = IS_STR_fn(topic) ? topic.s : VARVAL_fn(topic);
                     const char *ws = IS_STR_fn(wval)  ? wval.s  : VARVAL_fn(wval);
@@ -983,12 +983,12 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
 
         /* CHUNKS-step15: BB pump for an SM generator expression — replaces the
          * legacy emit_push_expr + SM_BB_PUMP pair for migrated Icon
-         * generator kinds (CH-15a: AST_TO, AST_TO_BY).  Pops expression descriptor
+         * generator kinds (CH-15a: TT_TO, TT_TO_BY).  Pops expression descriptor
          * (DT_E, slen=1, .i = entry_pc) from TOS, allocates an SmGenState
          * rooted at that entry_pc, and drives the expression via
          * bb_broker_drive_sm with the same pump_print body that
          * SM_BB_PUMP uses — preserving Icon's statement-context
-         * "every yielded value is printed" semantics.  No AST_t walk
+         * "every yielded value is printed" semantics.  No tree_t walk
          * anywhere on this path: the expression body is pure SM with explicit
          * SM_SUSPEND yield points. */
         case SM_BB_PUMP_SM: {
@@ -1009,16 +1009,16 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             break;
         }
 
-        /* CHUNKS-step17i-every-suspend: AST_EVERY dispatch by id.
+        /* CHUNKS-step17i-every-suspend: TT_EVERY dispatch by id.
          * Mirrors SM_BB_ONCE_PROC for Prolog.  a[0].i = every_id;
-         * every_table_lookup(id) returns the borrowed AST_t* registered
+         * every_table_lookup(id) returns the borrowed tree_t* registered
          * by sm_lower at expression-body lowering time.  Runtime delegates
-         * to the existing IR broker (coro_eval(AST_EVERY) builds an
+         * to the existing IR broker (coro_eval(TT_EVERY) builds an
          * icn_every_state_t whose body field is e->c[1]; coro_bb_every
          * pumps gen and calls bb_exec_stmt(body) per tick — this is the
          * "boxes stay; graph-construction moves to lower-time" boundary
          * the orientation note draws).  The SM bytecode and value stack
-         * carry only the integer id; no AST_t* in either layer.
+         * carry only the integer id; no tree_t* in either layer.
          *
          * Stack discipline: this opcode is reached from proc-body lowering's
          * `lower_expr(body); SM_VOID_POP` loop.  The legacy
@@ -1028,13 +1028,13 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
          * context (every used as expression result, rare) DT_NUL is the
          * correct semantic per Icon's `every` having no value.
          *
-         * Body-function: NULL.  AST_EVERY-as-statement runs its own body
+         * Body-function: NULL.  TT_EVERY-as-statement runs its own body
          * (the do-clause, e.g. `write(v)`) via bb_exec_stmt inside
          * coro_bb_every — passing pump_print would double-print yielded
          * values, since the user's body already produces output. */
         case SM_BB_PUMP_EVERY: {
             int every_id = (int)ins->a[0].i;
-            AST_t *every_ast = every_table_lookup(every_id);
+            tree_t *every_ast = every_table_lookup(every_id);
             if (!every_ast) {
                 st->last_ok = 0;
                 sm_push(st, NULVCL);
@@ -1064,7 +1064,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
          * coro_bb_* Byrd-box node and bb_broker(BB_PUMP) drives it one step. */
         case SM_BB_PUMP_AST: {
             int ast_id = (int)ins->a[0].i;
-            AST_t *ast = ast_pump_table_lookup(ast_id);
+            tree_t *ast = ast_pump_table_lookup(ast_id);
             if (!ast) {
                 st->last_ok = 0;
                 sm_push(st, NULVCL);
@@ -1130,7 +1130,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                  * VOID_POP it, and SM_PUSH_NULL.  That leaves
                  * stack-effect +2 instead of the +1 that the proc-body
                  * loop expects.  This is acceptable for now — top-level
-                 * AST_SUSPEND is not exercised by the rung03/04 corpus
+                 * TT_SUSPEND is not exercised by the rung03/04 corpus
                  * and the existing AST-walker fallback (coro_stmt.c:88)
                  * has the same "no-op" behaviour outside a coroutine. */
                 sm_push(st, v);
@@ -1300,7 +1300,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             }
 
             /* GOAL-ICON-BB-COMPLETE A3: ICN_RANDOM — ?E one-shot random selection.
-             * Mirrors bb_eval_value's AST_RANDOM arm in coro_value.c:698-746.
+             * Mirrors bb_eval_value's TT_RANDOM arm in coro_value.c:698-746.
              * A3-seed-fix: uses canonical bb_icn_rnd_seed (defined in coro_value.c)
              * so --ir-run and --sm-run produce identical sequences for random programs.
              * NOTE: inner early-exits use goto (not break) to avoid breaking
@@ -1596,7 +1596,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
                     sm_call_invoke_done: ;
                 }
             }
-            /* NRETURN: user fn returned DT_N — dereference like tree-walk AST_FNC */
+            /* NRETURN: user fn returned DT_N — dereference like tree-walk TT_FNC */
             if (IS_NAMEPTR(result))      result = NAME_DEREF_PTR(result);
             else if (IS_NAMEVAL(result)) result = NV_GET_fn(result.s);
             sm_push(st, result);
@@ -1709,7 +1709,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
 
         /* CH-17g-runtime-bridge-acomp, sess 2026-05-09:
          * SM_ACOMP — numeric comparison emitted by sm_lower for
-         * AST_EQ/AST_NE/AST_LT/AST_LE/AST_GT/AST_GE.  ins->a[0].i carries the
+         * TT_EQ/TT_NE/TT_LT/TT_LE/TT_GT/TT_GE.  ins->a[0].i carries the
          * operator EKind.  Icon-style relops: on success push the RIGHT
          * operand and set last_ok=1; on failure push FAILDESCR and clear
          * last_ok.  Mirrors NUMREL macro in interp_eval.c.  SNUL (unset)
@@ -1729,12 +1729,12 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             int op = (int)ins->a[0].i;
             int ok;
             switch (op) {
-                case AST_EQ: ok = (lv == rv); break;
-                case AST_NE: ok = (lv != rv); break;
-                case AST_LT: ok = (lv <  rv); break;
-                case AST_LE: ok = (lv <= rv); break;
-                case AST_GT: ok = (lv >  rv); break;
-                case AST_GE: ok = (lv >= rv); break;
+                case TT_EQ: ok = (lv == rv); break;
+                case TT_NE: ok = (lv != rv); break;
+                case TT_LT: ok = (lv <  rv); break;
+                case TT_LE: ok = (lv <= rv); break;
+                case TT_GT: ok = (lv >  rv); break;
+                case TT_GE: ok = (lv >= rv); break;
                 /* No operator code (legacy emit).  Fall back to equality
                  * — matches the historical SM_ACOMP-as-tristate intent
                  * least surprisingly.  Should not occur post-bridge-acomp. */
@@ -1752,7 +1752,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
 
         /* CH-17g-runtime-bridge-lcomp, sess 2026-05-09:
          * SM_LCOMP — string/lexicographic comparison emitted by sm_lower
-         * for AST_LLT/AST_LLE/AST_LGT/AST_LGE/AST_LEQ/AST_LNE.  ins->a[0].i carries
+         * for TT_LLT/TT_LLE/TT_LGT/TT_LGE/TT_LEQ/TT_LNE.  ins->a[0].i carries
          * the operator EKind.  Sibling of SM_ACOMP — Icon-style relops:
          * on success push the RIGHT operand and set last_ok=1; on failure
          * push FAILDESCR and clear last_ok.  Mirrors STRREL macro in
@@ -1771,12 +1771,12 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             int op = (int)ins->a[0].i;
             int ok;
             switch (op) {
-                case AST_LLT: ok = (cmp <  0); break;
-                case AST_LLE: ok = (cmp <= 0); break;
-                case AST_LGT: ok = (cmp >  0); break;
-                case AST_LGE: ok = (cmp >= 0); break;
-                case AST_LEQ: ok = (cmp == 0); break;
-                case AST_LNE: ok = (cmp != 0); break;
+                case TT_LLT: ok = (cmp <  0); break;
+                case TT_LLE: ok = (cmp <= 0); break;
+                case TT_LGT: ok = (cmp >  0); break;
+                case TT_LGE: ok = (cmp >= 0); break;
+                case TT_LEQ: ok = (cmp == 0); break;
+                case TT_LNE: ok = (cmp != 0); break;
                 /* Legacy emit safety net (pre-bridge-lcomp programs).
                  * Should not occur on freshly lowered code. */
                 default:    ok = (cmp == 0); break;
@@ -1863,7 +1863,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
 
         /* CHUNKS-step15a: SM_ICMP_GT — integer compare greater-than.
          * Pops right (TOS) then left (TOS-1).  Sets last_ok = (left.i > right.i).
-         * Pushes nothing.  Used by AST_TO / AST_TO_BY generator expression loop-exit test. */
+         * Pushes nothing.  Used by TT_TO / TT_TO_BY generator expression loop-exit test. */
         case SM_ICMP_GT: {
             DESCR_t r = sm_pop(st);
             DESCR_t l = sm_pop(st);
@@ -1871,7 +1871,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
             break;
         }
 
-        /* CHUNKS-step15a: SM_ICMP_LT — mirror of SM_ICMP_GT for negative-step AST_TO_BY. */
+        /* CHUNKS-step15a: SM_ICMP_LT — mirror of SM_ICMP_GT for negative-step TT_TO_BY. */
         case SM_ICMP_LT: {
             DESCR_t r = sm_pop(st);
             DESCR_t l = sm_pop(st);
@@ -1884,7 +1884,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
          * (frame_depth == 0), push FAILDESCR / clear last_ok — expressions emitted
          * with frame-slot ops are dead code until CH-17c flips the consumer
          * that reaches them, so the FAIL fallback never fires on real programs.
-         * Mirrors the slot-resolution logic that bb_eval_value does for AST_VAR
+         * Mirrors the slot-resolution logic that bb_eval_value does for TT_VAR
          * when frame_depth > 0 (coro_value.c:382–399). */
         case SM_LOAD_FRAME: {
             int slot = (int)ins->a[0].i;
@@ -1900,7 +1900,7 @@ int sm_interp_run_inner(SM_Program *prog, SM_State *st)
 
         /* CHUNKS-step17b'' (CH-17b''): SM_STORE_FRAME — pop TOS into IcnFrame.env[slot].
          * Like SM_STORE_VAR / SM_STORE_GLOCAL, the value is left on the stack
-         * after the store (mirrors interp_eval AST_ASSIGN's "return val" semantics
+         * after the store (mirrors interp_eval TT_ASSIGN's "return val" semantics
          * so chained assigns / value-context assignments compose). */
         case SM_STORE_FRAME: {
             int slot = (int)ins->a[0].i;

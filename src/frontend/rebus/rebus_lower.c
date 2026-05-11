@@ -5,11 +5,11 @@
  * Authored: 2026-03-30, G-9 s19, Claude Sonnet 4.6
  *
  * Walks RProgram* (from rebus_parse()) and produces CODE_t*
- * (STMT_t list with AST_t nodes using AST_e values).
+ * (STMT_t list with tree_t nodes using tree_e values).
  *
  * Architecture per archive/doc/IR_LOWER_REBUS.md:
- *   - P-component (pattern) → SNOBOL4 AST_e pool
- *   - L-component (control) → Icon AST_e pool / label+goto STMT_t chains
+ *   - P-component (pattern) → SNOBOL4 tree_e pool
+ *   - L-component (control) → Icon tree_e pool / label+goto STMT_t chains
  *
  * Control-flow lowering uses the same label/goto STMT_t pattern as
  * snocone_control.c.  Each structured construct becomes labeled SNOBOL4-style
@@ -75,58 +75,58 @@ static void emit_goto(RebLow *L, const char *target) {
 }
 
 /* -------------------------------------------------------------------------
- * Expression lowering: RExpr* → AST_t*
+ * Expression lowering: RExpr* → tree_t*
  * ---------------------------------------------------------------------- */
 
-static AST_t *lower_expr(RebLow *L, RExpr *e);
+static tree_t *lower_expr(RebLow *L, RExpr *e);
 
-/* Build AST_FNC node with given name and N children. */
-static AST_t *make_fnc(const char *name, int n, ...) {
-    AST_t *f = expr_new(AST_FNC);
+/* Build TT_FNC node with given name and N children. */
+static tree_t *make_fnc(const char *name, int n, ...) {
+    tree_t *f = ast_node_new(TT_FNC);
     f->v.sval = strdup(name);
     va_list ap; va_start(ap, n);
     for (int i = 0; i < n; i++)
-        expr_add_child(f, va_arg(ap, AST_t *));
+        expr_add_child(f, va_arg(ap, tree_t *));
     va_end(ap);
     return f;
 }
 
-static AST_t *lower_expr(RebLow *L, RExpr *e) {
-    if (!e) { AST_t *n = expr_new(AST_NUL); return n; }
+static tree_t *lower_expr(RebLow *L, RExpr *e) {
+    if (!e) { tree_t *n = ast_node_new(TT_NUL); return n; }
 
-    switch (e->t) {
+    switch (e->kind) {
 
     /* --- Literals --- */
-    case RE_STR:  { AST_t *x = expr_new(AST_QLIT); x->v.sval = strdup(e->v.sval); return x; }
-    case RE_INT:  { AST_t *x = expr_new(AST_ILIT); x->v.ival = e->v.ival;          return x; }
-    case RE_REAL: { AST_t *x = expr_new(AST_FLIT); x->v.dval = e->v.dval;          return x; }
-    case RE_NULL: { return expr_new(AST_NUL); }
+    case RE_STR:  { tree_t *x = ast_node_new(TT_QLIT); x->v.sval = strdup(e->sval); return x; }
+    case RE_INT:  { tree_t *x = ast_node_new(TT_ILIT); x->v.ival = e->ival;          return x; }
+    case RE_REAL: { tree_t *x = ast_node_new(TT_FLIT); x->v.dval = e->dval;          return x; }
+    case RE_NULL: { return ast_node_new(TT_NUL); }
 
     /* --- References --- */
-    case RE_VAR:     { AST_t *x = expr_new(AST_VAR); x->v.sval = strdup(e->v.sval); return x; }
-    case RE_KEYWORD: { AST_t *x = expr_new(AST_KEYWORD);  x->v.sval = strdup(e->v.sval); return x; }
+    case RE_VAR:     { tree_t *x = ast_node_new(TT_VAR); x->v.sval = strdup(e->sval); return x; }
+    case RE_KEYWORD: { tree_t *x = ast_node_new(TT_KEYWORD);  x->v.sval = strdup(e->sval); return x; }
 
     /* --- Unary arithmetic --- */
-    case RE_NEG:   return expr_unary(AST_MNS, lower_expr(L, e->left));
+    case RE_NEG:   return expr_unary(TT_MNS, lower_expr(L, e->left));
     case RE_POS:   return lower_expr(L, e->left); /* identity — drop */
     case RE_NOT:   return make_fnc("DIFFER", 1, lower_expr(L, e->left));
     case RE_VALUE: return make_fnc("IDENT",  1, lower_expr(L, e->left));
 
     /* --- Icon generator bang --- */
-    case RE_BANG:   return expr_unary(AST_ITERATE,  lower_expr(L, e->left));
+    case RE_BANG:   return expr_unary(TT_ITERATE,  lower_expr(L, e->left));
 
     /* --- Binary arithmetic --- */
-    case RE_ADD: return expr_binary(AST_ADD,    lower_expr(L,e->left), lower_expr(L,e->right));
-    case RE_SUB: return expr_binary(AST_SUB,    lower_expr(L,e->left), lower_expr(L,e->right));
-    case RE_MUL: return expr_binary(AST_MUL,    lower_expr(L,e->left), lower_expr(L,e->right));
-    case RE_DIV: return expr_binary(AST_DIV,    lower_expr(L,e->left), lower_expr(L,e->right));
-    case RE_POW: return expr_binary(AST_POW,    lower_expr(L,e->left), lower_expr(L,e->right));
+    case RE_ADD: return expr_binary(TT_ADD,    lower_expr(L,e->left), lower_expr(L,e->right));
+    case RE_SUB: return expr_binary(TT_SUB,    lower_expr(L,e->left), lower_expr(L,e->right));
+    case RE_MUL: return expr_binary(TT_MUL,    lower_expr(L,e->left), lower_expr(L,e->right));
+    case RE_DIV: return expr_binary(TT_DIV,    lower_expr(L,e->left), lower_expr(L,e->right));
+    case RE_POW: return expr_binary(TT_POW,    lower_expr(L,e->left), lower_expr(L,e->right));
     case RE_MOD: return make_fnc("REMDR", 2,  lower_expr(L,e->left), lower_expr(L,e->right));
 
     /* --- String/pattern --- */
-    case RE_STRCAT: return expr_binary(AST_CAT, lower_expr(L,e->left), lower_expr(L,e->right));
-    case RE_PATCAT: return expr_binary(AST_CAT, lower_expr(L,e->left), lower_expr(L,e->right));
-    case RE_ALT:    return expr_binary(AST_ALT,    lower_expr(L,e->left), lower_expr(L,e->right));
+    case RE_STRCAT: return expr_binary(TT_CAT, lower_expr(L,e->left), lower_expr(L,e->right));
+    case RE_PATCAT: return expr_binary(TT_CAT, lower_expr(L,e->left), lower_expr(L,e->right));
+    case RE_ALT:    return expr_binary(TT_ALT,    lower_expr(L,e->left), lower_expr(L,e->right));
 
     /* --- Comparison (SNOBOL4 pool) --- */
     case RE_EQ:  return make_fnc("EQ",     2, lower_expr(L,e->left), lower_expr(L,e->right));
@@ -144,57 +144,57 @@ static AST_t *lower_expr(RebLow *L, RExpr *e) {
 
     /* --- Assignment --- */
     case RE_ASSIGN:
-        return expr_binary(AST_ASSIGN, lower_expr(L,e->left), lower_expr(L,e->right));
+        return expr_binary(TT_ASSIGN, lower_expr(L,e->left), lower_expr(L,e->right));
     case RE_EXCHANGE:
         return make_fnc("EXCHG", 2, lower_expr(L,e->left), lower_expr(L,e->right));
     case RE_ADDASSIGN:
-        return expr_binary(AST_ASSIGN, lower_expr(L,e->left),
-               expr_binary(AST_ADD, lower_expr(L,e->left), lower_expr(L,e->right)));
+        return expr_binary(TT_ASSIGN, lower_expr(L,e->left),
+               expr_binary(TT_ADD, lower_expr(L,e->left), lower_expr(L,e->right)));
     case RE_SUBASSIGN:
-        return expr_binary(AST_ASSIGN, lower_expr(L,e->left),
-               expr_binary(AST_SUB, lower_expr(L,e->left), lower_expr(L,e->right)));
+        return expr_binary(TT_ASSIGN, lower_expr(L,e->left),
+               expr_binary(TT_SUB, lower_expr(L,e->left), lower_expr(L,e->right)));
     case RE_CATASSIGN:
-        return expr_binary(AST_ASSIGN, lower_expr(L,e->left),
-               expr_binary(AST_CAT, lower_expr(L,e->left), lower_expr(L,e->right)));
+        return expr_binary(TT_ASSIGN, lower_expr(L,e->left),
+               expr_binary(TT_CAT, lower_expr(L,e->left), lower_expr(L,e->right)));
 
     /* --- Call / subscript --- */
     case RE_CALL: {
-        AST_t *f = expr_new(AST_FNC);
-        f->v.sval = strdup(e->v.sval);
+        tree_t *f = ast_node_new(TT_FNC);
+        f->v.sval = strdup(e->sval);
         for (int i = 0; i < e->nargs; i++)
             expr_add_child(f, lower_expr(L, e->args[i]));
         return f;
     }
     case RE_SUB_IDX: {
-        AST_t *f = expr_new(AST_IDX);
+        tree_t *f = ast_node_new(TT_IDX);
         expr_add_child(f, lower_expr(L, e->left));
         for (int i = 0; i < e->nargs; i++)
             expr_add_child(f, lower_expr(L, e->args[i]));
         return f;
     }
     case RE_RANGE:
-        return expr_binary(AST_IDX, lower_expr(L,e->left), lower_expr(L,e->right));
+        return expr_binary(TT_IDX, lower_expr(L,e->left), lower_expr(L,e->right));
 
     /* --- Pattern captures (SNOBOL4 pool) --- */
-    case RE_COND:   return expr_binary(AST_CAPT_COND_ASGN, lower_expr(L,e->left), lower_expr(L,e->right));
-    case RE_IMM:    return expr_binary(AST_CAPT_IMMED_ASGN,  lower_expr(L,e->left), lower_expr(L,e->right));
-    case RE_CURSOR: { AST_t *x = expr_new(AST_CAPT_CURSOR); x->v.sval = strdup(e->v.sval); return x; }
-    case RE_DEREF:  return expr_unary(AST_INDIRECT, lower_expr(L, e->left));
-    case RE_PATOPT: return expr_unary(AST_ARBNO, lower_expr(L, e->left)); /* ~pat → AST_ARBNO */
+    case RE_COND:   return expr_binary(TT_CAPT_COND_ASGN, lower_expr(L,e->left), lower_expr(L,e->right));
+    case RE_IMM:    return expr_binary(TT_CAPT_IMMED_ASGN,  lower_expr(L,e->left), lower_expr(L,e->right));
+    case RE_CURSOR: { tree_t *x = ast_node_new(TT_CAPT_CURSOR); x->v.sval = strdup(e->sval); return x; }
+    case RE_DEREF:  return expr_unary(TT_INDIRECT, lower_expr(L, e->left));
+    case RE_PATOPT: return expr_unary(TT_ARBNO, lower_expr(L, e->left)); /* ~pat → TT_ARBNO */
 
     /* --- Augmented (generic) --- */
     case RE_AUG:
         /* Synthesize: lhs := lhs augop rhs */
         {
-            AST_e op;
+            tree_e op;
             switch (e->augop) {
-            case RE_ADD: op = AST_ADD; break;
-            case RE_SUB: op = AST_SUB; break;
-            case RE_MUL: op = AST_MUL; break;
-            case RE_DIV: op = AST_DIV; break;
-            default:     op = AST_CAT; break;
+            case RE_ADD: op = TT_ADD; break;
+            case RE_SUB: op = TT_SUB; break;
+            case RE_MUL: op = TT_MUL; break;
+            case RE_DIV: op = TT_DIV; break;
+            default:     op = TT_CAT; break;
             }
-            return expr_binary(AST_ASSIGN, lower_expr(L,e->left),
+            return expr_binary(TT_ASSIGN, lower_expr(L,e->left),
                    expr_binary(op, lower_expr(L,e->left), lower_expr(L,e->right)));
         }
 
@@ -203,11 +203,11 @@ static AST_t *lower_expr(RebLow *L, RExpr *e) {
 
     default:
         fprintf(stderr, "rebus_lower: unhandled REKind %d at line %d\n",
-                e->t, e->lineno);
+                e->kind, e->lineno);
         L->nerrors++;
-        return expr_new(AST_NUL);
+        return ast_node_new(TT_NUL);
     }
-    return expr_new(AST_NUL);
+    return ast_node_new(TT_NUL);
 }
 
 /* -------------------------------------------------------------------------
@@ -219,7 +219,7 @@ static void lower_stmt(RebLow *L, RStmt *s);
 static void lower_stmt(RebLow *L, RStmt *s) {
     if (!s) return;
 
-    switch (s->t) {
+    switch (s->kind) {
 
     case RS_EXPR:
     case RS_ASSIGN: {
@@ -227,26 +227,26 @@ static void lower_stmt(RebLow *L, RStmt *s) {
          * emit as a STMT_t with subject=lhs, has_eq=1, replacement=rhs.
          * This routes through the statement-level assignment path which
          * correctly handles OUTPUT, INPUT, and other SNOBOL4 keywords.
-         * Nested assignments (e.g. x := y := z) still go through AST_ASSIGN. */
+         * Nested assignments (e.g. x := y := z) still go through TT_ASSIGN. */
         RExpr *ex = s->expr;
-        if (ex && (ex->t == RE_ASSIGN    ||
-                   ex->t == RE_ADDASSIGN ||
-                   ex->t == RE_SUBASSIGN ||
-                   ex->t == RE_CATASSIGN) && ex->left) {
+        if (ex && (ex->kind == RE_ASSIGN    ||
+                   ex->kind == RE_ADDASSIGN ||
+                   ex->kind == RE_SUBASSIGN ||
+                   ex->kind == RE_CATASSIGN) && ex->left) {
             STMT_t *st = blank_stmt();
             st->lineno = s->lineno;
-            if (ex->t == RE_ASSIGN) {
+            if (ex->kind == RE_ASSIGN) {
                 st->subject     = lower_expr(L, ex->left);
                 st->replacement = lower_expr(L, ex->right);
                 st->has_eq      = 1;
             } else {
                 /* x +:= e  →  subject=x, has_eq=1, replacement=x+e */
-                AST_t *lhs = lower_expr(L, ex->left);
-                AST_t *rhs = lower_expr(L, ex->right);
-                AST_e   op  = (ex->t == RE_ADDASSIGN) ? AST_ADD :
-                              (ex->t == RE_SUBASSIGN) ? AST_SUB : AST_CAT;
+                tree_t *lhs = lower_expr(L, ex->left);
+                tree_t *rhs = lower_expr(L, ex->right);
+                tree_e   op  = (ex->kind == RE_ADDASSIGN) ? TT_ADD :
+                              (ex->kind == RE_SUBASSIGN) ? TT_SUB : TT_CAT;
                 /* Need a fresh copy of lhs for the rhs operand */
-                AST_t *lhs2 = lower_expr(L, ex->left);
+                tree_t *lhs2 = lower_expr(L, ex->left);
                 st->subject     = lhs;
                 st->replacement = expr_binary(op, lhs2, rhs);
                 st->has_eq      = 1;
@@ -285,7 +285,7 @@ static void lower_stmt(RebLow *L, RStmt *s) {
         st->lineno      = s->lineno;
         st->subject     = lower_expr(L, s->expr);
         st->pattern     = lower_expr(L, s->pat);
-        st->replacement = expr_new(AST_NUL);
+        st->replacement = ast_node_new(TT_NUL);
         emit(L, st);
         break;
     }
@@ -424,14 +424,14 @@ static void lower_stmt(RebLow *L, RStmt *s) {
         L->loop_end[L->loop_depth++] = l_end;
 
         /* id := e1 */
-        AST_t *var = expr_new(AST_VAR); var->v.sval = strdup(s->for_var);
+        tree_t *var = ast_node_new(TT_VAR); var->v.sval = strdup(s->for_var);
         STMT_t *init = blank_stmt();
-        init->subject = expr_binary(AST_ASSIGN, var, lower_expr(L, s->for_from));
+        init->subject = expr_binary(TT_ASSIGN, var, lower_expr(L, s->for_from));
         emit(L, init);
 
         /* L_top: GT(id, e2) :S(L_end) */
         emit_label(L, l_top);
-        AST_t *var2 = expr_new(AST_VAR); var2->v.sval = strdup(s->for_var);
+        tree_t *var2 = ast_node_new(TT_VAR); var2->v.sval = strdup(s->for_var);
         STMT_t *test = blank_stmt();
         test->subject = make_fnc("GT", 2, var2, lower_expr(L, s->for_to));
         test->goto_s = strdup(l_end);
@@ -440,13 +440,13 @@ static void lower_stmt(RebLow *L, RStmt *s) {
         lower_stmt(L, s->body);
 
         /* id := id + step */
-        AST_t *var3 = expr_new(AST_VAR); var3->v.sval = strdup(s->for_var);
-        AST_t *var4 = expr_new(AST_VAR); var4->v.sval = strdup(s->for_var);
-        AST_t *step = s->for_by ? lower_expr(L, s->for_by)
-                                 : ({ AST_t *one = expr_new(AST_ILIT); one->v.ival = 1; one; });
+        tree_t *var3 = ast_node_new(TT_VAR); var3->v.sval = strdup(s->for_var);
+        tree_t *var4 = ast_node_new(TT_VAR); var4->v.sval = strdup(s->for_var);
+        tree_t *step = s->for_by ? lower_expr(L, s->for_by)
+                                 : ({ tree_t *one = ast_node_new(TT_ILIT); one->v.ival = 1; one; });
         STMT_t *inc  = blank_stmt();
-        inc->subject = expr_binary(AST_ASSIGN, var3,
-                       expr_binary(AST_ADD, var4, step));
+        inc->subject = expr_binary(TT_ASSIGN, var3,
+                       expr_binary(TT_ADD, var4, step));
         emit(L, inc);
         emit_goto(L, l_top);
         emit_label(L, l_end);
@@ -470,9 +470,9 @@ static void lower_stmt(RebLow *L, RStmt *s) {
         /* Materialize case expr into a temp variable for repeated comparison */
         char tmpbuf[32];
         snprintf(tmpbuf, sizeof tmpbuf, "rb_case_%d", L->label_ctr);
-        AST_t *tmpvar = expr_new(AST_VAR); tmpvar->v.sval = strdup(tmpbuf);
+        tree_t *tmpvar = ast_node_new(TT_VAR); tmpvar->v.sval = strdup(tmpbuf);
         STMT_t *assign = blank_stmt();
-        assign->subject = expr_binary(AST_ASSIGN, tmpvar, lower_expr(L, s->case_expr));
+        assign->subject = expr_binary(TT_ASSIGN, tmpvar, lower_expr(L, s->case_expr));
         emit(L, assign);
 
         char *l_next = NULL;
@@ -484,7 +484,7 @@ static void lower_stmt(RebLow *L, RStmt *s) {
             } else {
                 char *l_match = newlab(L);
                 l_next = newlab(L);
-                AST_t *tv = expr_new(AST_VAR); tv->v.sval = strdup(tmpbuf);
+                tree_t *tv = ast_node_new(TT_VAR); tv->v.sval = strdup(tmpbuf);
                 STMT_t *cst = blank_stmt();
                 cst->subject = make_fnc("IDENT", 2, tv, lower_expr(L, c->guard));
                 cst->goto_s = strdup(l_match);
@@ -505,7 +505,7 @@ static void lower_stmt(RebLow *L, RStmt *s) {
     case RS_RETURN: {
         if (s->retval && L->fname) {
             /* fname = retval */
-            AST_t *fn = expr_new(AST_VAR); fn->v.sval = strdup(L->fname);
+            tree_t *fn = ast_node_new(TT_VAR); fn->v.sval = strdup(L->fname);
             STMT_t *assign = blank_stmt();
             assign->subject     = fn;
             assign->replacement = lower_expr(L, s->retval);
@@ -559,7 +559,7 @@ static void lower_stmt(RebLow *L, RStmt *s) {
 
     default:
         fprintf(stderr, "rebus_lower: unhandled RSKind %d at line %d\n",
-                s->t, s->lineno);
+                s->kind, s->lineno);
         L->nerrors++;
         break;
     }
@@ -574,7 +574,7 @@ static void lower_stmt(RebLow *L, RStmt *s) {
 
 static void lower_decl(RebLow *L, RDecl *d) {
     if (!d) return;
-    switch (d->t) {
+    switch (d->kind) {
 
     case RD_RECORD: {
         /* DEFINE('Name(f1,f2,...)')  DATA call */
@@ -586,7 +586,7 @@ static void lower_decl(RebLow *L, RDecl *d) {
         }
         snprintf(buf + pos, sizeof buf - pos, ")");
         STMT_t *st = blank_stmt();
-        AST_t *arg = expr_new(AST_QLIT); arg->v.sval = strdup(buf);
+        tree_t *arg = ast_node_new(TT_QLIT); arg->v.sval = strdup(buf);
         st->subject = make_fnc("DATA", 1, arg);
         emit(L, st);
         break;
@@ -611,7 +611,7 @@ static void lower_decl(RebLow *L, RDecl *d) {
 
         /* DEFINE call */
         STMT_t *def_st = blank_stmt();
-        AST_t *arg = expr_new(AST_QLIT); arg->v.sval = strdup(buf);
+        tree_t *arg = ast_node_new(TT_QLIT); arg->v.sval = strdup(buf);
         def_st->subject = make_fnc("DEFINE", 1, arg);
         emit(L, def_st);
 
@@ -626,7 +626,7 @@ static void lower_decl(RebLow *L, RDecl *d) {
         if (d->initial) {
             char flagbuf[64];
             snprintf(flagbuf, sizeof flagbuf, "rb_init_%s", d->name);
-            AST_t *flag = expr_new(AST_VAR); flag->v.sval = strdup(flagbuf);
+            tree_t *flag = ast_node_new(TT_VAR); flag->v.sval = strdup(flagbuf);
             char *l_done = newlab(L);
             STMT_t *chk = blank_stmt();
             chk->subject = flag;
@@ -634,10 +634,10 @@ static void lower_decl(RebLow *L, RDecl *d) {
             emit(L, chk);
             lower_stmt(L, d->initial);
             /* set flag */
-            AST_t *fv = expr_new(AST_VAR); fv->v.sval = strdup(flagbuf);
-            AST_t *one = expr_new(AST_ILIT); one->v.ival = 1;
+            tree_t *fv = ast_node_new(TT_VAR); fv->v.sval = strdup(flagbuf);
+            tree_t *one = ast_node_new(TT_ILIT); one->v.ival = 1;
             STMT_t *fst = blank_stmt();
-            fst->subject = expr_binary(AST_ASSIGN, fv, one);
+            fst->subject = expr_binary(TT_ASSIGN, fv, one);
             emit(L, fst);
             emit_label(L, l_done); free(l_done);
         }
@@ -649,7 +649,7 @@ static void lower_decl(RebLow *L, RDecl *d) {
         free(L->fname);
         L->fname = saved_fname;
 
-        /* implicit :(RETURN) at end of function — goto pseudo-label, not AST_FNC */
+        /* implicit :(RETURN) at end of function — goto pseudo-label, not TT_FNC */
         emit_goto(L, "RETURN");
 
         emit_label(L, l_end); free(l_end);
@@ -681,13 +681,13 @@ CODE_t *rebus_lower(RProgram *rp) {
 }
 
 /* -------------------------------------------------------------------------
- * rebus_compile — full pipeline: src string -> AST_PROGRAM via *out_ast
+ * rebus_compile — full pipeline: src string -> TT_PROGRAM via *out_ast
  *
  * FI-1A: mirrors icon_compile().
- * Internally builds CODE_t/STMT_t; code_to_ast() wraps into AST_PROGRAM.
+ * Internally builds CODE_t/STMT_t; code_to_ast() wraps into TT_PROGRAM.
  * Direct AST emission deferred to GOAL-SNOCONE-SM-LOWER.
  * ---------------------------------------------------------------------- */
-void rebus_compile(const char *src, const char *filename, AST_t **out_ast) {
+void rebus_compile(const char *src, const char *filename, tree_t **out_ast) {
     if (!filename) filename = "<stdin>";
     if (out_ast) *out_ast = NULL;
 

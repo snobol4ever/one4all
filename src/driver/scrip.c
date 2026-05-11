@@ -53,11 +53,11 @@
 #include "../frontend/raku/raku_driver.h"
 #include "../frontend/rebus/rebus_lower.h"
 #include "../frontend/icon/icon_gen.h"    /* coro_bb_to/by/iterate/suspend, state types — U-17 */
-#include "../frontend/icon/icon_lex.h"    /* IcnTkKind — TK_AUG* for AST_AUGOP in unified interp */
+#include "../frontend/icon/icon_lex.h"    /* IcnTkKind — TK_AUG* for TT_AUGOP in unified interp */
 
 /* ir_print_node — from src/ast/ast_print.c (linked via Makefile) */
-extern void ir_print_node   (const AST_t *e, FILE *f);
-extern void ir_print_node_nl(const AST_t *e, FILE *f);
+extern void ir_print_node   (const tree_t *e, FILE *f);
+extern void ir_print_node_nl(const tree_t *e, FILE *f);
 
 /* ── runtime ──────────────────────────────────────────────────────────── */
 #include "../runtime/x86/snobol4.h"
@@ -256,7 +256,7 @@ int main(int argc, char **argv)
     }
     /* ── Multi-file load (U-MULTIFILE) ─────────────────────────────────────
      * All remaining argv entries are input files.  Each is compiled with the
-     * appropriate frontend (by extension) and merged into one AST_PROGRAM in
+     * appropriate frontend (by extension) and merged into one TT_PROGRAM in
      * source order.  This enables:
      *   scrip --ir-run lib.pl main.pl
      *   scrip --ir-run shim.pl test_arith.pl
@@ -281,16 +281,16 @@ int main(int argc, char **argv)
     }
 
     CODE_t *sub = NULL;  /* --dump-ir-bison only: receives old CODE_t for legacy IR dump */
-    AST_t  *ast_prog = NULL;
+    tree_t  *ast_prog = NULL;
 
-    /* Helper: append one AST_PROGRAM's children into ast_prog, stripping trailing AST_END. */
+    /* Helper: append one TT_PROGRAM's children into ast_prog, stripping trailing TT_END. */
     #define MERGE_AST(sub_ast) do { \
         if (sub_ast) { \
             if (!ast_prog) { ast_prog = sub_ast; } \
             else { \
                 if (ast_prog->n > 0) { \
-                    AST_t *_last = ast_prog->c[ast_prog->n-1]; \
-                    if (_last && _last->t == AST_END) ast_prog->n--; \
+                    tree_t *_last = ast_prog->c[ast_prog->n-1]; \
+                    if (_last && _last->t == TT_END) ast_prog->n--; \
                 } \
                 for (int _i = 0; _i < (sub_ast)->n; _i++) { \
                     ast_push(ast_prog, (sub_ast)->c[_i]); \
@@ -350,7 +350,7 @@ int main(int argc, char **argv)
             char *src = malloc(flen + 1);
             if (!src) { fprintf(stderr, "scrip: out of memory\n"); return 1; }
             fread(src, 1, flen, f); src[flen] = '\0'; fclose(f);
-            AST_t *sub_ast = parse_scrip_polyglot(src, input_path);
+            tree_t *sub_ast = parse_scrip_polyglot(src, input_path);
             free(src);
             MERGE_AST(sub_ast);
         } else if (lang_snocone || lang_prolog || lang_icon || lang_raku || lang_rebus) {
@@ -360,7 +360,7 @@ int main(int argc, char **argv)
             char *src = malloc(flen + 1);
             if (!src) { fprintf(stderr, "scrip: out of memory\n"); return 1; }
             fread(src, 1, flen, f); src[flen] = '\0'; fclose(f);
-            AST_t *sub_ast = NULL;
+            tree_t *sub_ast = NULL;
             if (lang_icon)         icon_compile(src, input_path, &sub_ast);
             else if (lang_raku)    raku_compile(src, input_path, &sub_ast);
             else if (lang_prolog)  prolog_compile(src, input_path, &sub_ast);
@@ -372,11 +372,11 @@ int main(int argc, char **argv)
             }
             MERGE_AST(sub_ast);
         } else if (dump_ir) {
-            /* --dump-ir: parse SNO via sno_parse_ast, dump AST_PROGRAM */
+            /* --dump-ir: parse SNO via sno_parse_ast, dump TT_PROGRAM */
             FILE *f = fopen(input_path, "r");
             if (!f) { fprintf(stderr, "scrip: cannot open '%s'\n", input_path); return 1; }
             if (opt_bench) clock_gettime(CLOCK_MONOTONIC, &_t1);
-            AST_t *sub_ast = sno_parse_ast(f, input_path, NULL);
+            tree_t *sub_ast = sno_parse_ast(f, input_path, NULL);
             fclose(f);
             ir_dump_program(sub_ast, stdout);
             return 0;
@@ -385,14 +385,14 @@ int main(int argc, char **argv)
             FILE *f = fopen(input_path, "r");
             if (!f) { fprintf(stderr, "scrip: cannot open '%s'\n", input_path); return 1; }
             if (opt_bench) clock_gettime(CLOCK_MONOTONIC, &_t1);
-            AST_t *sub_ast = sno_parse_ast(f, input_path, NULL);
+            tree_t *sub_ast = sno_parse_ast(f, input_path, NULL);
             fclose(f);
             MERGE_AST(sub_ast);
         } else {
             FILE *f = fopen(input_path, "r");
             if (!f) { fprintf(stderr, "scrip: cannot open '%s'\n", input_path); return 1; }
-            /* SI-4/SI-6: sno_parse_ast builds AST_PROGRAM directly. */
-            AST_t *sub_ast = sno_parse_ast(f, input_path, dump_ir_bison ? &sub : NULL);
+            /* SI-4/SI-6: sno_parse_ast builds TT_PROGRAM directly. */
+            tree_t *sub_ast = sno_parse_ast(f, input_path, dump_ir_bison ? &sub : NULL);
             fclose(f);
             if (dump_ir_bison) { ir_dump_program(sub, stdout); return 0; }
             MERGE_AST(sub_ast);
@@ -454,7 +454,7 @@ int main(int argc, char **argv)
     }
 
     /* Wire DT_S eval hook: EVAL(string) containing complex operators
-     * (AST_DEFER, cursor-assign) routes through interp_eval_pat. */
+     * (TT_DEFER, cursor-assign) routes through interp_eval_pat. */
     {
         extern DESCR_t (*g_eval_str_hook)(const char *s);
         g_eval_str_hook = _eval_str_impl_fn;
@@ -468,7 +468,7 @@ int main(int argc, char **argv)
     if (dump_sm && !mode_sm_run) {
         label_table_build(ast_prog);
         prescan_defines(ast_prog);
-        /* SI-6: lower takes AST_PROGRAM directly. */
+        /* SI-6: lower takes TT_PROGRAM directly. */
         SM_Program *sm0 = lower(ast_prog);
         if (!sm0) { fprintf(stderr, "scrip: sm_lower failed\n"); return 1; }
         sm_prog_print(sm0, stdout);
@@ -495,7 +495,7 @@ int main(int argc, char **argv)
 
     if (mode_monitor) {
         /* IM-7: --monitor — in-process sync comparator.
-         * Runs IR, SM, and JIT step-by-step over the same AST_PROGRAM,
+         * Runs IR, SM, and JIT step-by-step over the same TT_PROGRAM,
          * snapshot/restoring state between each run.
          * Returns 0 if all three agree; exits non-zero on first divergence. */
         label_table_build(ast_prog);

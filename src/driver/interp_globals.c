@@ -55,7 +55,7 @@ extern int         Ω;
 extern int         Δ;
 extern int         Σlen;
 
-/* SI-6: g_prog (CODE_t*) removed — AST_PROGRAM is now the sole program rep. */
+/* SI-6: g_prog (CODE_t*) removed — TT_PROGRAM is now the sole program rep. */
 int g_polyglot = 0; /* U-23: 1 when running a fenced polyglot .scrip file */
 int g_opt_trace   = 0;  /* --trace:   print STMT N on each statement */
 int g_opt_dump_bb = 0;  /* --dump-bb: print PATND tree before each match */

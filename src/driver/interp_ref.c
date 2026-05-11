@@ -1,7 +1,7 @@
 /*
  * interp_ref.c — lvalue evaluator (interp_eval_ref)
  *
- * Evaluates an AST_t in NAME context, returning a DESCR_t* interior pointer.
+ * Evaluates an tree_t in NAME context, returning a DESCR_t* interior pointer.
  * Mirrors SIL: ARYA10 (array), ASSCR (table), FIELD (DATA), GNVARS (variable).
  * Called by assignment sites that need a writable cell rather than a value.
  *
@@ -12,18 +12,18 @@
 
 #include "interp_private.h"
 
-DESCR_t *interp_eval_ref(AST_t *e)
+DESCR_t *interp_eval_ref(tree_t *e)
 {
     NO_AST_WALK_GUARD("interp_eval_ref");
     if (!e) return NULL;
     switch (e->t) {
 
-    case AST_VAR: {
+    case TT_VAR: {
         /* Simple variable — find-or-create NV cell */
         return NV_PTR_fn(e->v.sval);
     }
 
-    case AST_IDX: {
+    case TT_IDX: {
         /* arr[idx] or arr[i][j] — return interior cell pointer */
         if (e->n < 2) return NULL;
         DESCR_t base = interp_eval(e->c[0]);
@@ -39,7 +39,7 @@ DESCR_t *interp_eval_ref(AST_t *e)
         return NULL;
     }
 
-    case AST_NAME: {
+    case TT_NAME: {
         /* .expr — dot operator: evaluate child as lvalue */
         if (e->n == 1)
             return interp_eval_ref(e->c[0]);
@@ -49,7 +49,7 @@ DESCR_t *interp_eval_ref(AST_t *e)
         return NULL;
     }
 
-    case AST_FIELD: {
+    case TT_FIELD: {
         /* obj.fieldname as lvalue — return interior ptr to field cell */
         if (!e->v.sval || e->n < 1) return NULL;
         DESCR_t obj = interp_eval(e->c[0]);
@@ -57,16 +57,16 @@ DESCR_t *interp_eval_ref(AST_t *e)
         return data_field_ptr(e->v.sval, obj);
     }
 
-    case AST_CAPT_COND_ASGN: {
-        /* .var (parsed as AST_CAPT_COND_ASGN child AST_VAR) */
-        if (e->n >= 1 && e->c[0]->t == AST_VAR)
+    case TT_CAPT_COND_ASGN: {
+        /* .var (parsed as TT_CAPT_COND_ASGN child TT_VAR) */
+        if (e->n >= 1 && e->c[0]->t == TT_VAR)
             return NV_PTR_fn(e->c[0]->v.sval);
         if (e->n >= 1)
             return interp_eval_ref(e->c[0]);
         return NULL;
     }
 
-    case AST_INDIRECT: {
+    case TT_INDIRECT: {
         /* $expr — evaluate expr to get name string, then return that var's cell */
         DESCR_t name_d = interp_eval(e->n >= 1 ? e->c[0] : NULL);
         const char *nm0 = IS_NAMEPTR(name_d)

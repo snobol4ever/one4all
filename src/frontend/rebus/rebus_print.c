@@ -61,13 +61,13 @@ static const char *op_str(REKind k) {
 
 static void print_expr(RExpr *e, FILE *out) {
     if (!e) { fprintf(out, "<null>"); return; }
-    switch (e->t) {
+    switch (e->kind) {
         case RE_NULL:    fprintf(out, "\"\""); break;
-        case RE_STR:     fprintf(out, "\"%s\"", e->v.sval ? e->v.sval : ""); break;
-        case RE_INT:     fprintf(out, "%ld", e->v.ival); break;
-        case RE_REAL:    fprintf(out, "%g", e->v.dval); break;
-        case RE_VAR:     fprintf(out, "%s", e->v.sval ? e->v.sval : "?"); break;
-        case RE_KEYWORD: fprintf(out, "&%s", e->v.sval ? e->v.sval : ""); break;
+        case RE_STR:     fprintf(out, "\"%s\"", e->sval ? e->sval : ""); break;
+        case RE_INT:     fprintf(out, "%ld", e->ival); break;
+        case RE_REAL:    fprintf(out, "%g", e->dval); break;
+        case RE_VAR:     fprintf(out, "%s", e->sval ? e->sval : "?"); break;
+        case RE_KEYWORD: fprintf(out, "&%s", e->sval ? e->sval : ""); break;
 
         case RE_NEG:
             fprintf(out, "-("); print_expr(e->right, out); fprintf(out, ")");
@@ -88,7 +88,7 @@ static void print_expr(RExpr *e, FILE *out) {
             fprintf(out, "$("); print_expr(e->right, out); fprintf(out, ")");
             break;
         case RE_CURSOR:
-            fprintf(out, "@%s", e->v.sval ? e->v.sval : "?");
+            fprintf(out, "@%s", e->sval ? e->sval : "?");
             break;
         case RE_PATOPT:
             fprintf(out, "~("); print_expr(e->right, out); fprintf(out, ")");
@@ -103,7 +103,7 @@ static void print_expr(RExpr *e, FILE *out) {
         case RE_SUBASSIGN: case RE_CATASSIGN:
             fprintf(out, "(");
             print_expr(e->left, out);
-            fprintf(out, " %s ", op_str(e->t));
+            fprintf(out, " %s ", op_str(e->kind));
             print_expr(e->right, out);
             fprintf(out, ")");
             break;
@@ -127,7 +127,7 @@ static void print_expr(RExpr *e, FILE *out) {
             break;
 
         case RE_CALL:
-            if (e->v.sval) fprintf(out, "%s", e->v.sval);
+            if (e->sval) fprintf(out, "%s", e->sval);
             else if (e->left) { fprintf(out, "("); print_expr(e->left, out); fprintf(out, ")"); }
             fprintf(out, "(");
             for (int i = 0; i < e->nargs; i++) {
@@ -148,7 +148,7 @@ static void print_expr(RExpr *e, FILE *out) {
             break;
 
         default:
-            fprintf(out, "<expr:%d>", e->t);
+            fprintf(out, "<expr:%d>", e->kind);
             break;
     }
 }
@@ -166,7 +166,7 @@ static void print_stmt_list(RStmt *head, FILE *out, int depth) {
 static void print_stmt(RStmt *s, FILE *out, int depth) {
     if (!s) return;
     indent(out, depth);
-    switch (s->t) {
+    switch (s->kind) {
 
         case RS_EXPR:
             print_expr(s->expr, out);
@@ -290,7 +290,7 @@ static void print_stmt(RStmt *s, FILE *out, int depth) {
             break;
 
         default:
-            fprintf(out, "<stmt:%d>\n", s->t);
+            fprintf(out, "<stmt:%d>\n", s->kind);
             break;
     }
 }
@@ -300,7 +300,7 @@ static void print_stmt(RStmt *s, FILE *out, int depth) {
  * ================================================================ */
 static void print_decl(RDecl *d, FILE *out) {
     if (!d) return;
-    switch (d->t) {
+    switch (d->kind) {
 
         case RD_RECORD:
             fprintf(out, "record %s(", d->name ? d->name : "?");

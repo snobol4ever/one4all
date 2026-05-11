@@ -4,24 +4,24 @@
  * scrip_cc.h — shared IR and frontend glue for the SCRIP compiler
  *
  * All six frontends (SNOBOL4, Snocone, Icon, Prolog, Raku, Rebus) produce
- * the shared AST_t tree defined in ir/ast.h.  The pipeline waist is:
+ * the shared tree_t tree defined in ir/ast.h.  The pipeline waist is:
  *
- *   frontend → AST_PROGRAM (AST_STMT children) → lower() → SM_Program → runtime
+ *   frontend → TT_PROGRAM (TT_STMT children) → lower() → SM_Program → runtime
  *
- * SNOBOL4 (SI-4): emits AST_PROGRAM directly via sno_parse_ast().
+ * SNOBOL4 (SI-4): emits TT_PROGRAM directly via sno_parse_ast().
  * Snocone/Icon/Prolog/Raku/Rebus (SI-5): compile fn builds CODE_t internally,
- *   calls code_to_ast() to wrap into AST_PROGRAM, passes via out_ast param.
- *   Full migration to direct AST_STMT emission deferred to GOAL-SNOCONE-SM-LOWER.
+ *   calls code_to_ast() to wrap into TT_PROGRAM, passes via out_ast param.
+ *   Full migration to direct TT_STMT emission deferred to GOAL-SNOCONE-SM-LOWER.
  *
- * Statement structure (AST_STMT tagged-attribute children — SI-3):
+ * Statement structure (TT_STMT tagged-attribute children — SI-3):
  *   :lbl :lang :line :stno :subj :pat :eq :repl :goS/:goF/:go
  *
- * Expression layout (AST_t children[]):
- *   leaves  (AST_QLIT/AST_ILIT/AST_FLIT/AST_NUL/AST_VAR/AST_KEYWORD)  nchildren=0
- *   unary   (AST_MNS/AST_CAPT_CURSOR/AST_INDIRECT/...)                 nchildren=1
- *   binary  (AST_ADD/.../AST_ASSIGN/AST_CAPT_COND_ASGN/AST_IDX)       nchildren=2
- *   n-ary   (AST_SEQ/AST_CAT/AST_ALT)                                  nchildren>=0
- *   call    (AST_FNC)                                                   nchildren=nargs
+ * Expression layout (tree_t children[]):
+ *   leaves  (TT_QLIT/TT_ILIT/TT_FLIT/TT_NUL/TT_VAR/TT_KEYWORD)  nchildren=0
+ *   unary   (TT_MNS/TT_CAPT_CURSOR/TT_INDIRECT/...)                 nchildren=1
+ *   binary  (TT_ADD/.../TT_ASSIGN/TT_CAPT_COND_ASGN/TT_IDX)       nchildren=2
+ *   n-ary   (TT_SEQ/TT_CAT/TT_ALT)                                  nchildren>=0
+ *   call    (TT_FNC)                                                   nchildren=nargs
  */
 
 #include <stdio.h>
@@ -31,35 +31,35 @@
 
 /* ---- expression node kinds — from shared IR ---- */
 /*
- * M-G1-IR-HEADER-WIRE: AST_e is now defined in ir/ast.h (the single source
+ * M-G1-IR-HEADER-WIRE: tree_e is now defined in ir/ast.h (the single source
  * of truth for all canonical node kinds).
  *
  * M-G3-ALIAS-CLEANUP: IR_COMPAT_ALIASES section removed — dead code,
- * never enabled. All code uses canonical AST_e names directly:
- * AST_VAR, AST_ALT, AST_MNS, AST_POW, AST_CAPT_COND_ASGN, AST_CAPT_IMMED_ASGN,
- * AST_CAPT_CURSOR, AST_NUL, AST_ASSIGN, AST_SCAN, AST_ITERATE, AST_ALTERNATE, AST_IDX.
+ * never enabled. All code uses canonical tree_e names directly:
+ * TT_VAR, TT_ALT, TT_MNS, TT_POW, TT_CAPT_COND_ASGN, TT_CAPT_IMMED_ASGN,
+ * TT_CAPT_CURSOR, TT_NUL, TT_ASSIGN, TT_SCAN, TT_ITERATE, TT_ALTERNATE, TT_IDX.
  *
- * ir.h defines AST_t (with fval, nalloc, id) when included first.
+ * ir.h defines tree_t (with fval, nalloc, id) when included first.
  * scrip_cc.h defines a compatible subset when included standalone.
  * Both are guarded by EXPR_T_DEFINED to prevent double-definition.
  */
 #include "ast/ast.h"
 
 /*
- * AST_t — unified n-ary expression node.
+ * tree_t — unified n-ary expression node.
  *
  * All structural children live in the `children` array (realloc-grown via
  * expr_add_child).  Use the named accessor macros — never index children[]
  * directly in backends; the macros give NULL-safe bounds-checked access.
  *
  * Layout by kind:
- *   leaves  (AST_QLIT/AST_ILIT/AST_FLIT/AST_NUL/AST_VAR/AST_KEYWORD)     nchildren=0
- *   unary   (AST_MNS/AST_CAPT_CURSOR/AST_INDIRECT/...)                nchildren=1
- *   binary  (AST_ADD/AST_SUB/AST_MUL/AST_DIV/AST_POW/AST_OPSYN/
- *            AST_ASSIGN/AST_CAPT_COND_ASGN/AST_CAPT_IMMED_ASGN/AST_IDX)      nchildren=2
- *   n-ary   (AST_SEQ / AST_CAT / AST_ALT)                   nchildren>=0
- *   call    (AST_FNC)                                       nchildren=nargs
- *   subscript (AST_IDX)                                     children[0]=base, children[1..]=indices
+ *   leaves  (TT_QLIT/TT_ILIT/TT_FLIT/TT_NUL/TT_VAR/TT_KEYWORD)     nchildren=0
+ *   unary   (TT_MNS/TT_CAPT_CURSOR/TT_INDIRECT/...)                nchildren=1
+ *   binary  (TT_ADD/TT_SUB/TT_MUL/TT_DIV/TT_POW/TT_OPSYN/
+ *            TT_ASSIGN/TT_CAPT_COND_ASGN/TT_CAPT_IMMED_ASGN/TT_IDX)      nchildren=2
+ *   n-ary   (TT_SEQ / TT_CAT / TT_ALT)                   nchildren>=0
+ *   call    (TT_FNC)                                       nchildren=nargs
+ *   subscript (TT_IDX)                                     children[0]=base, children[1..]=indices
  *
  * Named accessors (NULL-safe):
  *   expr_left(e)    — children[0]
@@ -67,7 +67,7 @@
  *   expr_arg(e, i)  — children[i]
  *   expr_nargs(e)   — nchildren
  */
-/* AST_t is defined in ir/ast.h (included above) — ir.h is the sole owner.
+/* tree_t is defined in ir/ast.h (included above) — ir.h is the sole owner.
  * FI-0A: scrip_cc.h no longer carries a duplicate struct body. */
 
 /* NULL-safe named accessors */
@@ -86,18 +86,18 @@
 
 /* ---- statement ---- */
 /* SI-8 NOTE: STMT_t/CODE_t remain in use by snocone/prolog/raku/rebus frontends
- * internally.  They build CODE_t and call code_to_ast() to hand AST_PROGRAM
+ * internally.  They build CODE_t and call code_to_ast() to hand TT_PROGRAM
  * to the driver; sm_preamble/execute_program no longer receive CODE_t (SI-6).
- * Full deletion of STMT_t/CODE_t and direct AST_STMT emission from all four
+ * Full deletion of STMT_t/CODE_t and direct TT_STMT emission from all four
  * frontends is deferred to GOAL-SNOCONE-SM-LOWER (SL-1+). */
 typedef struct STMT_t STMT_t;
 struct STMT_t {
     char    *label;
-    AST_t  *subject;
-    AST_t  *pattern;
-    AST_t  *replacement;
+    tree_t  *subject;
+    tree_t  *pattern;
+    tree_t  *replacement;
     char    *goto_s, *goto_f, *goto_u;
-    AST_t  *goto_s_expr, *goto_f_expr, *goto_u_expr;
+    tree_t  *goto_s_expr, *goto_f_expr, *goto_u_expr;
     int      lineno, stno, is_end, has_eq, lang;
     STMT_t  *next;
 };
@@ -127,24 +127,23 @@ struct CODE_t_opaque {
 };
 typedef struct CODE_t_opaque CODE_t;
 
-/* ---- allocators (wrappers around expr_new/ast_push from ast.h) ---- */
-/* expr_new(k) is defined in ast.h — use it directly where possible.   */
-static inline AST_t *expr_new(AST_e k) { return expr_new(k); }
+/* ---- allocators (wrappers around ast_push from ast.h) ---- */
+/* ast_node_new(k) is defined in ast.h — use it directly where possible.   */
 static inline STMT_t *stmt_new(void) { return calloc(1, sizeof(STMT_t)); }
 
 /* expr_add_child: alias for ast_push */
-static inline void expr_add_child(AST_t *e, AST_t *child) {
+static inline void expr_add_child(tree_t *e, tree_t *child) {
     ast_push(e, child);
 }
 
 /* Convenience: build a unary node (one child). */
-static inline AST_t *expr_unary(AST_e k, AST_t *operand) {
-    AST_t *e = expr_new(k); ast_push(e, operand); return e;
+static inline tree_t *expr_unary(tree_e k, tree_t *operand) {
+    tree_t *e = ast_node_new(k); ast_push(e, operand); return e;
 }
 
 /* Convenience: build a binary node (two children). */
-static inline AST_t *expr_binary(AST_e k, AST_t *left, AST_t *right) {
-    AST_t *e = expr_new(k); ast_push(e, left); ast_push(e, right); return e;
+static inline tree_t *expr_binary(tree_e k, tree_t *left, tree_t *right) {
+    tree_t *e = ast_node_new(k); ast_push(e, left); ast_push(e, right); return e;
 }
 
 /* ---- string helpers ---- */
@@ -157,10 +156,10 @@ static inline char *intern_n(const char *s, int n) {
 void     sno_add_include_dir(const char *d);
 void     sno_reset(void);          /* reset per-file state between multi-file compilations */
 CODE_t *sno_parse(FILE *f, const char *filename);
-AST_t  *parse_expr_from_str(const char *src);
-AST_t  *parse_expr_pat_from_str(const char *src); /* bison: bare expr -> AST_t, pattern slot */
+tree_t  *parse_expr_from_str(const char *src);
+tree_t  *parse_expr_pat_from_str(const char *src); /* bison: bare expr -> tree_t, pattern slot */
 CODE_t *sno_parse_string(const char *src);         /* bison: multi-stmt string -> CODE_t* */
-AST_t  *sno_parse_string_ast(const char *src, CODE_t **code_out); /* SI-6: multi-stmt string -> AST_PROGRAM */
+tree_t  *sno_parse_string_ast(const char *src, CODE_t **code_out); /* SI-6: multi-stmt string -> TT_PROGRAM */
 void     c_emit(CODE_t *prog, FILE *out);
 
 /* SN-19: case-sensitivity control. Default = case-INsensitive (fold to upper).
@@ -179,24 +178,24 @@ void     sno_fold_name(char *name);
 /* ---- SI-2/SI-3 shim: kept for snocone/prolog/raku/rebus frontends ---- */
 /* These frontends build CODE_t internally and call code_to_ast() to produce
  * their out_ast.  sm_preamble no longer uses them (SI-6).  Full migration to
- * direct AST_STMT emission is deferred to GOAL-SNOCONE-SM-LOWER (SL-1+). */
-AST_t       *stmt_to_ast(const STMT_t *s);
-AST_t       *code_to_ast(const CODE_t *prog);
-AST_t       *stmt_attr_find(const AST_t *stmt, const char *tag);
-AST_t       *stmt_attr_expr(const AST_t *attr);
-const char  *stmt_attr_str(const AST_t *attr);
+ * direct TT_STMT emission is deferred to GOAL-SNOCONE-SM-LOWER (SL-1+). */
+tree_t       *stmt_to_ast(const STMT_t *s);
+tree_t       *code_to_ast(const CODE_t *prog);
+tree_t       *stmt_attr_find(const tree_t *stmt, const char *tag);
+tree_t       *stmt_attr_expr(const tree_t *attr);
+const char  *stmt_attr_str(const tree_t *attr);
 
-/* ---- SI-4: direct AST_STMT/AST_END builders (stmt_ast.c) -------------- */
+/* ---- SI-4: direct TT_STMT/TT_END builders (stmt_ast.c) -------------- */
 /* Used by snobol4.y to emit AST tree directly without the STMT_t intermediary. */
-AST_t       *ast_stmt_new(AST_e kind);
-AST_t       *ast_attr_leaf(const char *tag, const char *val);
-AST_t       *ast_attr_int(const char *tag, int ival);
-AST_t       *ast_attr_expr(const char *tag, AST_t *expr);
+tree_t       *ast_stmt_new(tree_e kind);
+tree_t       *ast_attr_leaf(const char *tag, const char *val);
+tree_t       *ast_attr_int(const char *tag, int ival);
+tree_t       *ast_attr_expr(const char *tag, tree_t *expr);
 
-/* sno_parse_ast — parse a SNOBOL4 file and return an AST_PROGRAM directly.
+/* sno_parse_ast — parse a SNOBOL4 file and return an TT_PROGRAM directly.
  * If code_out is non-NULL, a minimal CODE_t stub is also returned for
  * --dump-ir-bison (parse_expr_pat_from_str internal use only). */
-AST_t       *sno_parse_ast(FILE *f, const char *filename, CODE_t **code_out);
+tree_t       *sno_parse_ast(FILE *f, const char *filename, CODE_t **code_out);
 
 /* ---- error ---- */
 void sno_error(int lineno, const char *fmt, ...);

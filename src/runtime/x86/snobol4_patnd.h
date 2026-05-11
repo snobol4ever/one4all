@@ -60,7 +60,7 @@ struct _PATND_t {
     /* TL-2: for XCALLCAP *fn(var) captures, arg *names* captured at pattern-build
      * time, to be resolved at flush time (NAME_commit / CC_γ_core immediate branch)
      * after in-order prior . captures have written the variable.  Only populated
-     * when every arg of the *fn() call is a plain AST_VAR.  If arg_names==NULL the
+     * when every arg of the *fn() call is a plain TT_VAR.  If arg_names==NULL the
      * args/nargs fields above carry pre-evaluated DESCR_t snapshots (legacy path).
      */
     char       **arg_names;      /* XCALLCAP: GC-allocated array of arg var names */

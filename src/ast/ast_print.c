@@ -1,7 +1,7 @@
 /*
  * ast_print.c — Unified IR pretty-printer
  *
- * Prints any AST_t node (and its subtree) in a readable S-expression form.
+ * Prints any tree_t node (and its subtree) in a readable S-expression form.
  * Used for debugging all frontends uniformly — one printer, all 59 node kinds.
  *
  * Public API:
@@ -9,9 +9,9 @@
  *   ir_print_node_nl(e, f)       — same + trailing newline
  *
  * Output format (S-expression, compact):
- *   Leaf:    (AST_QLIT "hello")   (AST_ILIT 42)   (AST_VAR x)   (AST_NUL)
- *   Unary:   (AST_MNS (AST_ILIT 1))
- *   N-ary:   (AST_SEQ (AST_QLIT "a") (AST_VAR x) (AST_QLIT "b"))
+ *   Leaf:    (TT_QLIT "hello")   (TT_ILIT 42)   (TT_VAR x)   (TT_NUL)
+ *   Unary:   (TT_MNS (TT_ILIT 1))
+ *   N-ary:   (TT_SEQ (TT_QLIT "a") (TT_VAR x) (TT_QLIT "b"))
  *   Wide:    multi-line with 2-space indent per depth level when nchildren > 1
  *
  * Produced by: Claude Sonnet 4.6 (G-7 session, 2026-03-28)
@@ -20,10 +20,10 @@
 
 /*
  * Include scrip-cc.h — it defines EXPR_T_DEFINED then includes ir/ast.h,
- * giving us AST_e and AST_t.  IR_DEFINE_NAMES pulls in ast_e_name[].
+ * giving us tree_e and tree_t.  IR_DEFINE_NAMES pulls in tt_e_name[].
  */
 #define IR_DEFINE_NAMES
-#include "scrip_cc.h"   /* → ir/ast.h (AST_e, AST_t, ast_e_name) */
+#include "scrip_cc.h"   /* → ir/ast.h (tree_e, tree_t, tt_e_name) */
 
 /* -------------------------------------------------------------------------
  * ast_print.h forward declarations (inlined here — no separate .h needed
@@ -63,41 +63,41 @@ static void print_indent(int depth, FILE *f) {
 }
 
 /* Core recursive printer */
-static void print_node(const AST_t *e, FILE *f, int depth) {
+static void print_node(const tree_t *e, FILE *f, int depth) {
     if (!e) { fputs("(null)", f); return; }
     if (depth > AST_PRINT_MAX_DEPTH) { fputs("(...)", f); return; }
 
     /* Node kind name */
-    const char *kname = (e->t >= 0 && e->t < AST_KIND_COUNT)
-                        ? ast_e_name[e->t]
+    const char *kname = (e->t >= 0 && e->t < TT_KIND_COUNT)
+                        ? tt_e_name[e->t]
                         : "E_???";
 
     /* Leaf nodes — no children, just payload */
     switch (e->t) {
-    case AST_QLIT:
+    case TT_QLIT:
         fputc('(', f); fputs(kname, f); fputc(' ', f);
         print_escaped(e->v.sval, f); fputc(')', f);
         return;
-    case AST_ILIT:
+    case TT_ILIT:
         fprintf(f, "(%s %lld)", kname, (long long)e->v.ival);
         return;
-    case AST_FLIT:
+    case TT_FLIT:
         fprintf(f, "(%s %g)", kname, e->v.dval);
         return;
-    case AST_CSET:
+    case TT_CSET:
         fputc('(', f); fputs(kname, f); fputc(' ', f);
         print_escaped(e->v.sval, f); fputc(')', f);
         return;
-    case AST_NUL:
+    case TT_NUL:
         fprintf(f, "(%s)", kname);
         return;
-    case AST_VAR:
-    case AST_KEYWORD:
-    case AST_FNC:
-    case AST_IDX:
-    case AST_CAPT_COND_ASGN:
-    case AST_CAPT_IMMED_ASGN:
-    case AST_CAPT_CURSOR:
+    case TT_VAR:
+    case TT_KEYWORD:
+    case TT_FNC:
+    case TT_IDX:
+    case TT_CAPT_COND_ASGN:
+    case TT_CAPT_IMMED_ASGN:
+    case TT_CAPT_CURSOR:
         /* sval carries the name; children (if any) are args */
         if (e->n == 0) {
             fputc('(', f); fputs(kname, f);
@@ -106,8 +106,8 @@ static void print_node(const AST_t *e, FILE *f, int depth) {
             return;
         }
         break;
-    case AST_ARB: case AST_REM: case AST_FAIL: case AST_SUCCEED:
-    case AST_FENCE: case AST_ABORT: case AST_BAL:
+    case TT_ARB: case TT_REM: case TT_FAIL: case TT_SUCCEED:
+    case TT_FENCE: case TT_ABORT: case TT_BAL:
         if (e->n == 0) {
             fprintf(f, "(%s)", kname);
             return;
@@ -122,7 +122,7 @@ static void print_node(const AST_t *e, FILE *f, int depth) {
     fputs(kname, f);
 
     /* Attach sval label when present and meaningful */
-    if (e->v.sval && e->t != AST_QLIT && e->t != AST_CSET) {
+    if (e->v.sval && e->t != TT_QLIT && e->t != TT_CSET) {
         fputc(' ', f); fputs(e->v.sval, f);
     }
 
@@ -153,11 +153,11 @@ static void print_node(const AST_t *e, FILE *f, int depth) {
  * Public API
  * ---------------------------------------------------------------------- */
 
-void ir_print_node(const AST_t *e, FILE *f) {
+void ir_print_node(const tree_t *e, FILE *f) {
     print_node(e, f, 0);
 }
 
-void ir_print_node_nl(const AST_t *e, FILE *f) {
+void ir_print_node_nl(const tree_t *e, FILE *f) {
     print_node(e, f, 0);
     fputc('\n', f);
 }
@@ -169,72 +169,72 @@ void ir_print_node_nl(const AST_t *e, FILE *f) {
  * ---------------------------------------------------------------------- */
 #ifdef AST_PRINT_TEST
 
-/* Minimal AST_t for test — mirrors scrip-cc.h fields we use */
+/* Minimal tree_t for test — mirrors scrip-cc.h fields we use */
 #include <stdlib.h>
 
-static AST_t *mk(AST_e k) {
-    AST_t *e = calloc(1, sizeof *e);
+static tree_t *mk(tree_e k) {
+    tree_t *e = calloc(1, sizeof *e);
     e->t = k;
     return e;
 }
-static void add_child(AST_t *parent, AST_t *child) {
+static void add_child(tree_t *parent, tree_t *child) {
     parent->c = realloc(parent->c,
-                               (size_t)(parent->n + 1) * sizeof(AST_t *));
+                               (size_t)(parent->n + 1) * sizeof(tree_t *));
     parent->c[parent->n++] = child;
 }
 
 int main(void) {
-    /* (AST_SEQ (AST_QLIT "hello") (AST_VAR x) (AST_ILIT 42)) */
-    AST_t *root = mk(AST_SEQ);
-    AST_t *lit  = mk(AST_QLIT); lit->v.sval  = "hello";
-    AST_t *var  = mk(AST_VAR);  var->v.sval  = "x";
-    AST_t *num  = mk(AST_ILIT); num->v.ival  = 42;
+    /* (TT_SEQ (TT_QLIT "hello") (TT_VAR x) (TT_ILIT 42)) */
+    tree_t *root = mk(TT_SEQ);
+    tree_t *lit  = mk(TT_QLIT); lit->v.sval  = "hello";
+    tree_t *var  = mk(TT_VAR);  var->v.sval  = "x";
+    tree_t *num  = mk(TT_ILIT); num->v.ival  = 42;
     add_child(root, lit);
     add_child(root, var);
     add_child(root, num);
 
-    /* (AST_ASSIGN (AST_VAR result) (AST_ADD (AST_ILIT 1) (AST_ILIT 2))) */
-    AST_t *assign = mk(AST_ASSIGN);
-    AST_t *lhs    = mk(AST_VAR);  lhs->v.sval = "result";
-    AST_t *add    = mk(AST_ADD);
-    AST_t *one    = mk(AST_ILIT); one->v.ival = 1;
-    AST_t *two    = mk(AST_ILIT); two->v.ival = 2;
+    /* (TT_ASSIGN (TT_VAR result) (TT_ADD (TT_ILIT 1) (TT_ILIT 2))) */
+    tree_t *assign = mk(TT_ASSIGN);
+    tree_t *lhs    = mk(TT_VAR);  lhs->v.sval = "result";
+    tree_t *add    = mk(TT_ADD);
+    tree_t *one    = mk(TT_ILIT); one->v.ival = 1;
+    tree_t *two    = mk(TT_ILIT); two->v.ival = 2;
     add_child(add, one);
     add_child(add, two);
     add_child(assign, lhs);
     add_child(assign, add);
 
-    /* (AST_FNC LENGTH (AST_VAR s)) */
-    AST_t *fnc = mk(AST_FNC); fnc->v.sval = "LENGTH";
-    AST_t *arg = mk(AST_VAR); arg->v.sval = "s";
+    /* (TT_FNC LENGTH (TT_VAR s)) */
+    tree_t *fnc = mk(TT_FNC); fnc->v.sval = "LENGTH";
+    tree_t *arg = mk(TT_VAR); arg->v.sval = "s";
     add_child(fnc, arg);
 
-    /* Pattern: (AST_ALT (AST_QLIT "foo") (AST_SPAN "abc")) */
-    AST_t *alt  = mk(AST_ALT);
-    AST_t *foo  = mk(AST_QLIT); foo->v.sval  = "foo";
-    AST_t *span = mk(AST_SPAN); span->v.sval = "abc";
+    /* Pattern: (TT_ALT (TT_QLIT "foo") (TT_SPAN "abc")) */
+    tree_t *alt  = mk(TT_ALT);
+    tree_t *foo  = mk(TT_QLIT); foo->v.sval  = "foo";
+    tree_t *span = mk(TT_SPAN); span->v.sval = "abc";
     add_child(alt, foo);
     add_child(alt, span);
 
     fputs("=== ast_print unit test ===\n\n", stdout);
 
-    fputs("1. AST_SEQ:\n", stdout);
+    fputs("1. TT_SEQ:\n", stdout);
     ir_print_node_nl(root, stdout);
 
-    fputs("\n2. AST_ASSIGN:\n", stdout);
+    fputs("\n2. TT_ASSIGN:\n", stdout);
     ir_print_node_nl(assign, stdout);
 
-    fputs("\n3. AST_FNC:\n", stdout);
+    fputs("\n3. TT_FNC:\n", stdout);
     ir_print_node_nl(fnc, stdout);
 
-    fputs("\n4. AST_ALT (pattern):\n", stdout);
+    fputs("\n4. TT_ALT (pattern):\n", stdout);
     ir_print_node_nl(alt, stdout);
 
-    fputs("\n5. AST_NUL leaf:\n", stdout);
-    ir_print_node_nl(mk(AST_NUL), stdout);
+    fputs("\n5. TT_NUL leaf:\n", stdout);
+    ir_print_node_nl(mk(TT_NUL), stdout);
 
-    fputs("\n6. AST_FAIL leaf:\n", stdout);
-    ir_print_node_nl(mk(AST_FAIL), stdout);
+    fputs("\n6. TT_FAIL leaf:\n", stdout);
+    ir_print_node_nl(mk(TT_FAIL), stdout);
 
     fputs("\n=== PASS ===\n", stdout);
     return 0;

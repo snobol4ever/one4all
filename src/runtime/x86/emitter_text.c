@@ -64,7 +64,7 @@ static void text_emit_insn(emitter_t *e, const bb_insn_desc_t *d)
     uint32_t a1 = d->a1;
     uint8_t  a2 = d->a2;
 
-    switch (d->t) {
+    switch (d->kind) {
     /* 64-bit reg ← imm64 */
     case BB_INSN_MOV_R10_IMM64: emit3c_op(e,"mov","r10, 0x%llx",(unsigned long long)a0); CTX(e)->pos+=10; break;
     case BB_INSN_MOV_RAX_IMM64: emit3c_op(e,"mov","rax, 0x%llx",(unsigned long long)a0); CTX(e)->pos+=10; break;

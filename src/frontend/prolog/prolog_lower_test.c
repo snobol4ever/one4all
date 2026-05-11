@@ -27,25 +27,25 @@ static int tests_run = 0, tests_passed = 0;
     else        printf("FAIL: %s\n", label); \
 } while(0)
 
-/* Count STMT_t nodes whose subject has a given AST_e */
-static int count_kind(CODE_t *prog, AST_e k) {
+/* Count STMT_t nodes whose subject has a given tree_e */
+static int count_kind(CODE_t *prog, tree_e k) {
     int n = 0;
     for (STMT_t *s = prog->head; s; s = s->next)
         if (s->subject && s->subject->t == k) n++;
     return n;
 }
 
-/* Find AST_CHOICE by functor/arity string "foo/2" */
-static AST_t *find_choice(CODE_t *prog, const char *pred) {
+/* Find TT_CHOICE by functor/arity string "foo/2" */
+static tree_t *find_choice(CODE_t *prog, const char *pred) {
     for (STMT_t *s = prog->head; s; s = s->next)
-        if (s->subject && s->subject->t == AST_CHOICE &&
+        if (s->subject && s->subject->t == TT_CHOICE &&
             s->subject->v.sval && strcmp(s->subject->v.sval, pred) == 0)
             return s->subject;
     return NULL;
 }
 
 /* -------------------------------------------------------------------------
- * Test 1: facts -> AST_CHOICE with AST_CLAUSE children, zero body goals
+ * Test 1: facts -> TT_CHOICE with TT_CLAUSE children, zero body goals
  * ---------------------------------------------------------------------- */
 static void test_facts(void) {
     const char *src =
@@ -55,19 +55,19 @@ static void test_facts(void) {
     PlProgram *pl = prolog_parse(src, "t_facts");
     CODE_t   *ir = prolog_lower(pl);
 
-    CHECK("facts: 1 AST_CHOICE", count_kind(ir, AST_CHOICE) == 1);
-    AST_t *ch = find_choice(ir, "person/1");
+    CHECK("facts: 1 TT_CHOICE", count_kind(ir, TT_CHOICE) == 1);
+    tree_t *ch = find_choice(ir, "person/1");
     CHECK("facts: choice is person/1", ch != NULL);
     CHECK("facts: 3 clauses",  ch && ch->n == 3);
     /* Each clause: 1 head arg, 0 body goals */
     CHECK("facts: clause[0] nchildren==1", ch && ch->n >= 1 &&
-          ch->c[0]->t == AST_CLAUSE &&
+          ch->c[0]->t == TT_CLAUSE &&
           ch->c[0]->n == 1);
     prolog_program_free(pl); free(ir);
 }
 
 /* -------------------------------------------------------------------------
- * Test 2: rule with body -> AST_CLAUSE children include body goals
+ * Test 2: rule with body -> TT_CLAUSE children include body goals
  * ---------------------------------------------------------------------- */
 static void test_rule(void) {
     const char *src =
@@ -75,12 +75,12 @@ static void test_rule(void) {
     PlProgram *pl = prolog_parse(src, "t_rule");
     CODE_t   *ir = prolog_lower(pl);
 
-    AST_t *ch = find_choice(ir, "double/2");
+    tree_t *ch = find_choice(ir, "double/2");
     CHECK("rule: choice double/2 exists", ch != NULL);
     CHECK("rule: 1 clause", ch && ch->n == 1);
     if (ch && ch->n == 1) {
-        AST_t *cl = ch->c[0];
-        CHECK("rule: AST_CLAUSE kind", cl->t == AST_CLAUSE);
+        tree_t *cl = ch->c[0];
+        CHECK("rule: TT_CLAUSE kind", cl->t == TT_CLAUSE);
         /* head args: X(_V0), Y(_V1) = 2 children; body: is(Y, X*2) = 1 child */
         CHECK("rule: 3 children (2 head args + 1 body goal)", cl->n == 3);
         CHECK("rule: n_vars >= 2", cl->v.ival >= 2);
@@ -89,7 +89,7 @@ static void test_rule(void) {
 }
 
 /* -------------------------------------------------------------------------
- * Test 3: unification -> AST_UNIFY node
+ * Test 3: unification -> TT_UNIFY node
  * ---------------------------------------------------------------------- */
 static void test_unify_node(void) {
     const char *src =
@@ -97,21 +97,21 @@ static void test_unify_node(void) {
     PlProgram *pl = prolog_parse(src, "t_unify");
     CODE_t   *ir = prolog_lower(pl);
 
-    AST_t *ch = find_choice(ir, "test/0");
+    tree_t *ch = find_choice(ir, "test/0");
     CHECK("unify: choice test/0 exists", ch != NULL);
     if (ch && ch->n == 1) {
-        AST_t *cl = ch->c[0];
-        /* body has 1 goal: X = foo -> AST_UNIFY */
+        tree_t *cl = ch->c[0];
+        /* body has 1 goal: X = foo -> TT_UNIFY */
         /* nchildren = 0 head args + 1 body = 1 */
-        CHECK("unify: AST_UNIFY in body",
+        CHECK("unify: TT_UNIFY in body",
               cl->n >= 1 &&
-              cl->c[0]->t == AST_UNIFY);
+              cl->c[0]->t == TT_UNIFY);
     }
     prolog_program_free(pl); free(ir);
 }
 
 /* -------------------------------------------------------------------------
- * Test 4: cut -> AST_CUT node
+ * Test 4: cut -> TT_CUT node
  * ---------------------------------------------------------------------- */
 static void test_cut_node(void) {
     const char *src =
@@ -120,23 +120,23 @@ static void test_cut_node(void) {
     PlProgram *pl = prolog_parse(src, "t_cut");
     CODE_t   *ir = prolog_lower(pl);
 
-    AST_t *ch = find_choice(ir, "differ/2");
+    tree_t *ch = find_choice(ir, "differ/2");
     CHECK("cut: choice differ/2 exists", ch != NULL);
     CHECK("cut: 2 clauses", ch && ch->n == 2);
     if (ch && ch->n >= 1) {
-        AST_t *cl1 = ch->c[0];
+        tree_t *cl1 = ch->c[0];
         /* differ(X,X) :- !,fail  -> head_args=2, body=[!,fail]=2 -> 4 children */
-        /* body[0] = AST_CUT */
+        /* body[0] = TT_CUT */
         int found_cut = 0;
         for (int i = 0; i < cl1->n; i++)
-            if (cl1->c[i]->t == AST_CUT) found_cut = 1;
-        CHECK("cut: AST_CUT in clause 1 body", found_cut);
+            if (cl1->c[i]->t == TT_CUT) found_cut = 1;
+        CHECK("cut: TT_CUT in clause 1 body", found_cut);
     }
     prolog_program_free(pl); free(ir);
 }
 
 /* -------------------------------------------------------------------------
- * Test 5: multiple predicates -> multiple AST_CHOICE nodes
+ * Test 5: multiple predicates -> multiple TT_CHOICE nodes
  * ---------------------------------------------------------------------- */
 static void test_multi_pred(void) {
     const char *src =
@@ -147,10 +147,10 @@ static void test_multi_pred(void) {
     PlProgram *pl = prolog_parse(src, "t_multi");
     CODE_t   *ir = prolog_lower(pl);
 
-    CHECK("multi: 2 AST_CHOICE nodes", count_kind(ir, AST_CHOICE) == 2);
+    CHECK("multi: 2 TT_CHOICE nodes", count_kind(ir, TT_CHOICE) == 2);
     CHECK("multi: member/2 exists", find_choice(ir, "member/2") != NULL);
     CHECK("multi: append/3 exists", find_choice(ir, "append/3") != NULL);
-    AST_t *mem = find_choice(ir, "member/2");
+    tree_t *mem = find_choice(ir, "member/2");
     CHECK("multi: member/2 has 2 clauses", mem && mem->n == 2);
     prolog_program_free(pl); free(ir);
 }
@@ -166,10 +166,10 @@ static void test_directive(void) {
     CODE_t   *ir = prolog_lower(pl);
 
     CHECK("directive: nstmts >= 2", ir->nstmts >= 2);
-    /* First stmt is directive (AST_FNC) */
-    CHECK("directive: first stmt is AST_FNC",
+    /* First stmt is directive (TT_FNC) */
+    CHECK("directive: first stmt is TT_FNC",
           ir->head && ir->head->subject &&
-          ir->head->subject->t == AST_FNC);
+          ir->head->subject->t == TT_FNC);
     prolog_program_free(pl); free(ir);
 }
 
@@ -203,7 +203,7 @@ static void test_puzzle01(void) {
     PlProgram *pl = prolog_parse(PUZZLE01, "puzzle01");
     CHECK("puzzle01: parse 0 errors", pl->nerrors == 0);
     CODE_t *ir = prolog_lower(pl);
-    CHECK("puzzle01: AST_CHOICE nodes >= 5", count_kind(ir, AST_CHOICE) >= 5);
+    CHECK("puzzle01: TT_CHOICE nodes >= 5", count_kind(ir, TT_CHOICE) >= 5);
     CHECK("puzzle01: person/1 has 3 clauses",
           find_choice(ir, "person/1") &&
           find_choice(ir, "person/1")->n == 3);
