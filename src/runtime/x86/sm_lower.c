@@ -51,6 +51,8 @@ static void init_handlers(void)
     cohort_arith_register(g_handlers);
     cohort_seq_register(g_handlers);
     cohort_pat_prim_register(g_handlers);
+    cohort_capture_register(g_handlers);
+    cohort_call_register(g_handlers);
     g_handlers_initialized = 1;
 }
 
@@ -97,84 +99,8 @@ void lower_expr(LowerCtx *c, const AST_t *e)
     /* AST_VLIST, AST_CAT, AST_SEQ, AST_ALT, AST_OPSYN → cohort_seq */
     /* AST_ARB..AST_ARBNO (pattern primitives) → cohort_pat_prim */
 
-    /* ── Assignment ── */
-    case AST_ASSIGN:
-        /* child[1] = rhs; child[0] = lhs */
-        lower_expr(c, e->nchildren > 1 ? e->children[1] : NULL);
-        if (e->nchildren > 0 && e->children[0]) {
-            const AST_t *lhs = e->children[0];
-            if (lhs->kind == AST_VAR) {
-                const char *vn = lhs->sval ? lhs->sval : "";
-                if (c->expression_body_lowering && c->expression_scope && vn[0] && vn[0] != '&') {
-                    int slot = scope_get(c->expression_scope, vn);
-                    if (slot >= 0) { sm_emit_i(p, SM_STORE_FRAME, slot); return; }
-                }
-                sm_emit_s(p, SM_STORE_VAR, vn);
-            }
-            else if (lhs->kind == AST_KEYWORD) {
-                sm_emit_s(p, SM_STORE_VAR, kw_canonicalize(lhs->sval));
-            }
-            else if (lhs->kind == AST_FNC && lhs->sval) {
-                /* Field mutator: fname(obj) = val → push obj, call fname_SET 2 */
-                lower_expr(c, lhs->nchildren > 0 ? lhs->children[0] : NULL);
-                char setname[256];
-                snprintf(setname, sizeof(setname), "%s_SET", lhs->sval);
-                sm_emit_si(p, SM_CALL_FN, setname, 2);
-            }
-            else if (lhs->kind == AST_IDX) {
-                /* t[k] := v — rhs already on stack; push base + indices, call IDX_SET. */
-                int nc = lhs->nchildren;
-                for (int i = 0; i < nc; i++) lower_expr(c, lhs->children[i]);
-                sm_emit_si(p, SM_CALL_FN, "IDX_SET", (int64_t)(nc + 1));
-            }
-            else if (lhs->kind == AST_FIELD) {
-                /* r.f := v → push obj, push field name, call FIELD_SET 3 */
-                lower_expr(c, lhs->nchildren > 0 ? lhs->children[0] : NULL);
-                sm_emit_s(p, SM_PUSH_LIT_S, lhs->sval ? lhs->sval : "");
-                sm_emit_si(p, SM_CALL_FN, "FIELD_SET", 3);
-            }
-            else {
-                lower_expr(c, lhs);
-                sm_emit_si(p, SM_CALL_FN, "ASGN", 2);
-            }
-        }
-        return;
-
-    /* ── Function / builtin call ── */
-    case AST_FNC: {
-        int nargs = e->nchildren;
-        /* EVAL(*expr): emit expression inline + SM_CALL_EXPRESSION. */
-        if (nargs == 1 && e->sval && strcmp(e->sval, "EVAL") == 0
-                && e->children[0] && e->children[0]->kind == AST_DEFER) {
-            const AST_t *defer = e->children[0];
-            const AST_t *child = defer->nchildren > 0 ? defer->children[0] : NULL;
-            int skip_jump = sm_emit_i(p, SM_JUMP, 0);
-            int entry_pc  = sm_label(p);
-            if (child) lower_expr(c, child);
-            else       sm_emit(p, SM_PUSH_NULL);
-            sm_emit(p, SM_RETURN);
-            int skip_lbl = sm_label(p);
-            sm_patch_jump(p, skip_jump, skip_lbl);
-            sm_emit_ii(p, SM_CALL_EXPRESSION, (int64_t)entry_pc, 0);
-            return;
-        }
-        /* Icon-style call: sval is NULL; children[0] is the callee name node. */
-        if (!e->sval && nargs >= 1 && e->children[0] && e->children[0]->sval) {
-            const char *fn = e->children[0]->sval;
-            int real_nargs = nargs - 1;
-            for (int i = 1; i <= real_nargs; i++) lower_expr(c, e->children[i]);
-            sm_emit_si(p, SM_CALL_FN, fn, (int64_t)real_nargs);
-            return;
-        }
-        for (int i = 0; i < nargs; i++) lower_expr(c, e->children[i]);
-        sm_emit_si(p, SM_CALL_FN, e->sval ? e->sval : "", (int64_t)nargs);
-        return;
-    }
-
-    case AST_IDX:
-        for (int i = 0; i < e->nchildren; i++) lower_expr(c, e->children[i]);
-        sm_emit_si(p, SM_CALL_FN, "IDX", (int64_t)e->nchildren);
-        return;
+    /* AST_ASSIGN, AST_FNC, AST_IDX, AST_SCAN, AST_SWAP → cohort_call */
+    /* AST_CAPT_COND_ASGN, AST_CAPT_IMMED_ASGN, AST_CAPT_CURSOR → cohort_capture */
 
     /* ── Numeric relational comparisons — a[0].i carries the operator EKind ── */
     case AST_EQ: case AST_NE: case AST_LT:
@@ -195,55 +121,10 @@ void lower_expr(LowerCtx *c, const AST_t *e)
 
     /* AST_INTERROGATE, AST_NAME → cohort_arith */
 
-    /* ── Scan E ? E ── */
-    case AST_SCAN:
-        if (e->nchildren < 1) { sm_emit(p, SM_PUSH_NULL); return; }
-        lower_expr(c, e->children[0]);
-        sm_emit_si(p, SM_CALL_FN, "ICN_SCAN_PUSH", 1);
-        sm_emit(p, SM_VOID_POP);
-        if (e->nchildren > 1) lower_expr(c, e->children[1]);
-        else                  sm_emit(p, SM_PUSH_NULL);
-        sm_emit_si(p, SM_CALL_FN, "ICN_SCAN_POP", 1);
-        return;
+    /* AST_SCAN, AST_SWAP → cohort_call (SR-8) */
+
 
     /* AST_OPSYN → cohort_seq */
-    /* AST_ALT, AST_ARB..AST_ARBNO, AST_CAPT_* → cohort_seq / cohort_pat_prim / cohort_capture */
-
-
-    case AST_SWAP: {
-        /* Inline SM sequence for simple variable lvalues.
-         * Saves lhs to NV temp, writes rhs→lhs, writes saved→rhs.
-         * Leaves new lhs value on stack as expression result. */
-        if (e->nchildren >= 2 && e->children[0] && e->children[1] &&
-            e->children[0]->kind == AST_VAR && e->children[1]->kind == AST_VAR) {
-            const AST_t *lhs = e->children[0], *rhs = e->children[1];
-            const char *lname = lhs->sval ? lhs->sval : "";
-            const char *rname = rhs->sval ? rhs->sval : "";
-            int lslot = -1, rslot = -1;
-            if (c->expression_body_lowering && c->expression_scope) {
-                if (lname[0] && lname[0] != '&') lslot = scope_get(c->expression_scope, lname);
-                if (rname[0] && rname[0] != '&') rslot = scope_get(c->expression_scope, rname);
-            }
-            if (lslot >= 0) sm_emit_i(p, SM_LOAD_FRAME, lslot);
-            else             sm_emit_s(p, SM_PUSH_VAR, lname);
-            sm_emit_s(p, SM_STORE_VAR, "__icn_swap_tmp__");
-            sm_emit(p, SM_VOID_POP);
-            if (rslot >= 0) sm_emit_i(p, SM_LOAD_FRAME, rslot);
-            else             sm_emit_s(p, SM_PUSH_VAR, rname);
-            if (lslot >= 0) sm_emit_i(p, SM_STORE_FRAME, lslot);
-            else             sm_emit_s(p, SM_STORE_VAR, lname);
-            sm_emit_s(p, SM_PUSH_VAR, "__icn_swap_tmp__");
-            if (rslot >= 0) sm_emit_i(p, SM_STORE_FRAME, rslot);
-            else             sm_emit_s(p, SM_STORE_VAR, rname);
-            sm_emit(p, SM_VOID_POP);
-            return;
-        }
-        lower_expr(c, e->nchildren > 0 ? e->children[0] : NULL);
-        lower_expr(c, e->nchildren > 1 ? e->children[1] : NULL);
-        sm_emit_si(p, SM_CALL_FN, "SWAP", 2);
-        return;
-    }
-
     /* AST_ALT, AST_ARB..AST_ARBNO → cohort_pat_prim */
     /* AST_CAPT_COND_ASGN, AST_CAPT_IMMED_ASGN, AST_CAPT_CURSOR → cohort_capture (SR-8) */
 

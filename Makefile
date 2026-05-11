@@ -241,6 +241,8 @@ scrip:
 	$(CC) $(CRT)   -c $(RT)/x86/cohort_arith.c    -o $(OBJ)/cohort_arith.o
 	$(CC) $(CRT)   -c $(RT)/x86/cohort_seq.c      -o $(OBJ)/cohort_seq.o
 	$(CC) $(CRT)   -c $(RT)/x86/cohort_pat_prim.c -o $(OBJ)/cohort_pat_prim.o
+	$(CC) $(CRT)   -c $(RT)/x86/cohort_capture.c  -o $(OBJ)/cohort_capture.o
+	$(CC) $(CRT)   -c $(RT)/x86/cohort_call.c     -o $(OBJ)/cohort_call.o
 	$(CC) $(CRT)   -c $(RT)/x86/lower_pat.c       -o $(OBJ)/lower_pat.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_image.c   -o $(OBJ)/sm_image.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_codegen.c -o $(OBJ)/sm_codegen.o
