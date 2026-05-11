@@ -52,6 +52,9 @@
 #include "../ast/ast.h"
 #include "../../frontend/snobol4/scrip_cc.h"  /* AST_t, AST_FNC for SM_PAT_CAPTURE_FN */
 #include "bb_broker.h"   /* SN-9b: SM_BB_PUMP / SM_BB_ONCE handlers */
+#include "templates/templates.h"  /* EM-MODE4-IS-MODE3-DUMP-c: per-opcode templates */
+#include "bb_emit.h"              /* EM-MODE4-IS-MODE3-DUMP-c: capture-and-flush adapter */
+#include "emitter.h"              /* EM-MODE4-IS-MODE3-DUMP-c: emitter_t */
 
 /* GOAL-ICON-BB-COMPLETE Phase A: file-scope externs for tripwire + bridge counter.
  * g_sm_dispatch_active: A0 tripwire — set while SM dispatch is running.
@@ -1945,7 +1948,19 @@ static size_t emit_cond_jump_blob_skeleton(int take_on_nonzero,
  * then ret (returns out of sm_jit_run via sm_jit_run's `call entry()`).
  * ME-4-post-r12-tos: PC at [r13+20].  No value-stack interaction.
  * Variable-size: exactly 5 bytes.
+ *
+ * EM-MODE4-IS-MODE3-DUMP-c (sess 2026-05-11): kept as the rollback
+ * reference but no longer called from the SM_HALT site.  Replaced by
+ * `emit_halt_blob_via_template` below, which drives the per-opcode
+ * template `emit_sm_halt` (templates/sm_halt.c) through a binary
+ * emitter, capture-and-flush style into SEG_CODE.  The output is
+ * byte-identical (41 ff 45 14 c3); the gate
+ * `test_gate_em_template_byte_identity.sh` enforces this.
+ *
+ * If a future bug surfaces, single-line revert: change the call at
+ * the SM_HALT case in the pass-1 dispatcher back to `emit_halt_blob()`.
  */
+static void emit_halt_blob(void) __attribute__((unused));
 static void emit_halt_blob(void)
 {
     /* inc dword [r13+20]  (41 ff 45 14)  4 bytes */
@@ -1954,6 +1969,70 @@ static void emit_halt_blob(void)
 
     /* ret  (c3)  1 byte — returns to sm_jit_run's `entry();` call site */
     seg_byte(SEG_CODE, 0xc3);
+}
+
+/*
+ * emit_halt_blob_via_template — EM-MODE4-IS-MODE3-DUMP-c adapter.
+ *
+ * Drives the SM_HALT per-opcode template (templates/sm_halt.c) through
+ * a binary emitter and flushes the resulting bytes into SEG_CODE.
+ *
+ * Adapter rather than direct binary-emitter-into-SEG_CODE because the
+ * binary emitter today writes into `bb_emit_buf` (the bb_pool current
+ * buffer), not SEG_CODE.  The capture-and-flush pattern reuses the
+ * proven binary backend unchanged: allocate a temporary buffer, run
+ * the template into it, then `seg_byte` each captured byte into
+ * SEG_CODE.  At 5 bytes per HALT, overhead is trivial.
+ *
+ * Byte-identity invariant: this function MUST produce exactly the
+ * same byte sequence at the same SEG_CODE offset as `emit_halt_blob`
+ * for every well-formed SM program.  The gate
+ * `test_gate_em_template_byte_identity.sh` verifies this.
+ */
+static void emit_halt_blob_via_template(void)
+{
+    /* Temporary capture buffer — 16 bytes is generous for SM_HALT's
+     * 5-byte sequence; future templates that emit more (SM_JUMP,
+     * SM_CALL_FN, ...) will use the same pattern with a sized buffer. */
+    uint8_t buf[16];
+    bb_buf_t capture = buf;   /* bb_buf_t is `uint8_t *` (bb_pool.h:32) */
+
+    /* Construct a binary emitter that targets the capture buffer.
+     * emitter_binary_new() also sets bb_emit_mode = EMIT_BINARY and
+     * calls bb_emit_begin(buf, size) which resets bb_emit_pos = 0. */
+    emitter_t *e = emitter_binary_new(capture, (int)sizeof(buf));
+    if (!e) {
+        fprintf(stderr,
+                "emit_halt_blob_via_template: emitter_binary_new failed; "
+                "falling back to legacy emit_halt_blob\n");
+        emit_halt_blob();
+        return;
+    }
+
+    /* Run the template.  This populates buf[0..bb_emit_pos) with the
+     * x86 byte sequence the binary backend renders for SM_HALT.
+     * Formatting/comment calls on the emitter no-op for binary. */
+    emit_sm_halt(e);
+
+    /* Capture the byte count before freeing the emitter (which leaves
+     * bb_emit_pos at its last-write value but is in any case a global
+     * we must not depend on across the free). */
+    int n = emitter_end(e);
+    emitter_free(e);
+
+    /* Sanity check: SM_HALT must produce exactly 5 bytes
+     * (41 ff 45 14 c3).  Any deviation is a template bug; trip a
+     * clean abort with a clear message rather than corrupting
+     * SEG_CODE. */
+    if (n != 5) {
+        fprintf(stderr,
+                "emit_halt_blob_via_template: template produced %d bytes; "
+                "expected 5 (41 ff 45 14 c3) — template bug\n", n);
+        abort();
+    }
+
+    /* Flush captured bytes into SEG_CODE at the current cursor. */
+    for (int i = 0; i < n; i++) seg_byte(SEG_CODE, buf[i]);
 }
 
 /*
@@ -3144,7 +3223,12 @@ int sm_codegen(SM_Program *prog)
         sm_opcode_t op = prog->instrs[i].op;
 
         if (op == SM_HALT) {
-            emit_halt_blob();
+            /* EM-MODE4-IS-MODE3-DUMP-c (sess 2026-05-11): SM_HALT
+             * routed through the per-opcode template
+             * (templates/sm_halt.c) via the binary-emitter capture-
+             * and-flush adapter.  Single-line revert if needed:
+             * replace with `emit_halt_blob();`. */
+            emit_halt_blob_via_template();
         } else if (op == SM_JUMP) {
             int32_t target_pc = (int32_t)prog->instrs[i].a[0].i;
             size_t rel32_off = emit_jump_blob_skeleton(target_pc);

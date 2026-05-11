@@ -71,6 +71,9 @@ static void binary_emit_insn(emitter_t *e, const bb_insn_desc_t *d)
     /* control */
     case BB_INSN_RET:      b1(0xC3); break;
     case BB_INSN_CALL_RAX: b2(0xFF,0xD0); break;
+    /* EM-MODE4-IS-MODE3-DUMP-c: SM-State field manipulation */
+    /* inc dword [r13 + disp8]:  41 ff 45 <disp8>  — 4 bytes */
+    case BB_INSN_INC_MEM_R13_DISP8: b3(0x41,0xFF,0x45); b1(a2); break;
     /* EM-7c-symbolic: in BINARY mode, fall back to imm64 (in-process JIT) */
     /* LEA_RCX_SYM → mov rcx, imm64 */
     case BB_INSN_LEA_RCX_SYM:  b2(0x48,0xB9); imm64(a0); break;

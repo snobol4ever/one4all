@@ -98,6 +98,10 @@ static void text_emit_insn(emitter_t *e, const bb_insn_desc_t *d)
     /* control */
     case BB_INSN_RET:      emit3c_op(e,"ret", NULL); CTX(e)->pos+=1; break;
     case BB_INSN_CALL_RAX: emit3c_op(e,"call","rax", NULL); CTX(e)->pos+=2; break;
+    /* EM-MODE4-IS-MODE3-DUMP-c: SM-State field manipulation */
+    case BB_INSN_INC_MEM_R13_DISP8:
+        emit3c_op(e,"inc","dword ptr [r13 + %u]", (unsigned)a2);
+        CTX(e)->pos += 4; break;
     /* EM-7c-symbolic: RIP-relative symbol load and PLT call */
     case BB_INSN_LEA_RCX_SYM:
         emit3c_op(e,"lea","rcx, [rip + %s]", d->sym ? d->sym : "??sym??");

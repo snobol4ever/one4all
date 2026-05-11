@@ -101,6 +101,11 @@ typedef enum {
     BB_INSN_XOR_EDX_EDX,      /* xor edx, edx          31 D2 */
     BB_INSN_RET,               /* ret                   C3 */
     BB_INSN_CALL_RAX,          /* call rax              FF D0 */
+    /* ── EM-MODE4-IS-MODE3-DUMP-c: SM-State-field manipulation ──────────── */
+    /* inc dword [r13 + disp8]  — pc++ / sp++ / last_ok++ etc.
+     * a2 carries the disp8.  Used by SM_HALT (pc bump via [r13+20]) and
+     * future SM opcodes that touch SM_State fields directly. */
+    BB_INSN_INC_MEM_R13_DISP8,
     /* ── symbolic kinds (EM-7c-symbolic) ──────────────────────────────────── */
     /* TEXT:   lea rcx, [rip + sym]   (RIP-relative GOT/data reference)      */
     /* BINARY: mov rcx, a0            (imm64 process-address fallback)        */
@@ -549,6 +554,13 @@ static inline void emit_test_rax_rax(emitter_t *e) { emit_insn0(e, BB_INSN_TEST_
 static inline void emit_xor_edx_edx(emitter_t *e)  { emit_insn0(e, BB_INSN_XOR_EDX_EDX); }
 static inline void emit_ret(emitter_t *e)           { emit_insn0(e, BB_INSN_RET); }
 static inline void emit_call_rax(emitter_t *e)      { emit_insn0(e, BB_INSN_CALL_RAX); }
+
+/* EM-MODE4-IS-MODE3-DUMP-c: increment an SM_State field by 1.
+ *   inc dword [r13 + disp8]   — 4 bytes: 41 ff 45 <disp8>
+ * Used by SM_HALT (pc bump via [r13+20]) and future SM opcodes that
+ * touch SM_State integer fields. */
+static inline void emit_inc_mem_r13_disp8(emitter_t *e, uint8_t disp)
+{ emit_insn_a2(e, BB_INSN_INC_MEM_R13_DISP8, disp); }
 
 
 #endif /* EMITTER_H */
