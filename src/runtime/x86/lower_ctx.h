@@ -1,0 +1,110 @@
+/*
+ * lower_ctx.h — Lowering context for sm_lower.c (SR-1)
+ *
+ * Threads the state previously carried by two file-scope globals
+ * (g_expression_body_lowering, g_expression_scope) plus the explicit
+ * (SM_Program *p, LabelTable *lt) parameter pair through a single
+ * pointer argument.  Every dataflow becomes visible at the call site.
+ *
+ * SR-1 is structural only: the LabelTable types still live here in
+ * their original shape and are still allocated/freed with malloc/free.
+ * SR-2 will move the lt_* family to lower_ctx.c and migrate to GC.
+ *
+ * Authors: Lon Jones Cherryholmes · Claude Sonnet 4.6
+ * Date: 2026-05-11
+ */
+
+#ifndef LOWER_CTX_H
+#define LOWER_CTX_H
+
+#include "sm_prog.h"
+#include "../../frontend/snobol4/scrip_cc.h"      /* CODE_t */
+#include "../ast/ast.h"                            /* AST_t */
+#include "../../runtime/interp/coro_runtime.h"    /* IcnScope */
+
+/* ── Label resolution table ─────────────────────────────────────────────
+ *
+ * SR-1: types kept verbatim from sm_lower.c.  SR-2 moves lt_*
+ * implementations to lower_ctx.c and migrates to GC allocation.
+ */
+
+typedef struct {
+    char *name;         /* SNOBOL4 label string (interned) */
+    int   instr_idx;    /* SM_Program instruction index of the SM_LABEL instr */
+} LabelEntry;
+
+typedef struct {
+    /* Forward-reference patches: a goto whose target isn't defined yet */
+    int   jump_instr_idx;   /* index of the SM_JUMP / SM_JUMP_S / SM_JUMP_F */
+    char *target_name;      /* label name to resolve */
+} PatchEntry;
+
+typedef struct {
+    LabelEntry *labels;
+    int         nlabels;
+    int         labels_cap;
+
+    PatchEntry *patches;
+    int         npatches;
+    int         patches_cap;
+} LabelTable;
+
+/* ── Lowering context ────────────────────────────────────────────────────
+ *
+ * One LowerCtx is created per sm_lower() invocation.  All lowering
+ * functions (lower_expr, lower_stmt, lower_pat_expr, emit helpers)
+ * receive `LowerCtx *c` and reach the SM_Program via `c->p` and the
+ * label table via `c->lt`.
+ *
+ * Expression-body lowering state:
+ *   When true, lower_expr is walking an Icon/Raku proc body emitted
+ *   into the SM_Program as a forward-jumped expression (CH-17b/b').
+ *   The `expression_scope` is the per-proc IcnScope built fresh for
+ *   that proc; AST_VAR / AST_ASSIGN consult it to emit
+ *   SM_LOAD_FRAME / SM_STORE_FRAME for in-scope names.
+ *
+ *   Outside the per-proc loop in sm_lower(), expression_body_lowering
+ *   is 0 and expression_scope is NULL — the statement-context lowering
+ *   path is unaffected.
+ */
+typedef struct {
+    SM_Program  *p;                          /* output program (owned) */
+    LabelTable   lt;                         /* label resolution + patches */
+    int          expression_body_lowering;   /* CH-17b': set during proc-body emit */
+    IcnScope    *expression_scope;           /* CH-17b'': active per-proc scope */
+} LowerCtx;
+
+/* ── Lowering primitives available to cohort files ──────────────────────
+ *
+ * The LOWER* macros are the workhorse of the per-kind handlers.  They
+ * lower one or two children and emit a single SM opcode.  Each macro
+ * assumes the caller has `LowerCtx *c`, `SM_Program *p` (typically
+ * `c->p`), and `const AST_t *e` in scope — the same shape as
+ * `lower_expr` itself.  Phase-2 cohort files will mirror that prelude.
+ *
+ * `lower_expr` and `lower_pat_expr` themselves are declared in
+ * `sm_lower.c` (still `static` until Phase-2 splits cohort files out).
+ * They are visible to the macros via the include order in `sm_lower.c`;
+ * a cohort TU (Phase-2+) will see them via cohort header glue.
+ *
+ * `emit_push_expr` is the SM_PUSH_EXPR helper from RS-9b: every emission
+ * GC-clones the AST_t so the SM_Program owns its descendants
+ * independently of the calloc-based IR tree.  Inlined here so cohorts
+ * can use it without a translation-unit dependency on sm_lower.c.
+ */
+
+#include "../common/ast_clone.h"   /* ast_gc_clone — used by emit_push_expr */
+
+static inline void emit_push_expr(LowerCtx *c, const AST_t *e)
+{
+    sm_emit_ptr(c->p, SM_PUSH_EXPR, (void *)ast_gc_clone(e));
+}
+
+#define CH0(e) ((e)->nchildren > 0 ? (e)->children[0] : NULL)
+#define CH1(e) ((e)->nchildren > 1 ? (e)->children[1] : NULL)
+
+#define LOWER2(op)     do { lower_expr(c,CH0(e));     lower_expr(c,CH1(e));     sm_emit(p,(op)); return; } while(0)
+#define LOWER1_VAL(op) do { lower_expr(c,CH0(e));                               sm_emit(p,(op)); return; } while(0)
+#define LOWER1_PAT(op) do { lower_pat_expr(c,CH0(e));                           sm_emit(p,(op)); return; } while(0)
+
+#endif /* LOWER_CTX_H */
