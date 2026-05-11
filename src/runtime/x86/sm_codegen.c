@@ -2473,6 +2473,73 @@ static void emit_me9_pat_charset_blob(void *me9_helper, size_t trampoline_abs_of
     emit_jmp_trampoline(trampoline_abs_off);                       /* 5 */
 }
 
+/*------------------------------------------------------------------------*/
+/* ME-9f — SM_PAT_CAT / SM_PAT_ALT.                                       */
+/*                                                                        */
+/* Pops two DESCR_t values (left=TOS-1, right=TOS), calls                 */
+/* fn(left, right), writes result back at TOS-1 slot, decrements r12      */
+/* by 16.  Net delta: −1 (pop 2, push 1).                                 */
+/*                                                                        */
+/* Identical shape to emit_me4_concat_blob — same signature               */
+/* DESCR_t(*)(DESCR_t,DESCR_t).  pat_cat and pat_alt are both direct      */
+/* runtime entry points, so no me9_* helper indirection.                  */
+/*                                                                        */
+/* Layout (58 bytes):                                                     */
+/*    inc  dword [r13+20]      ; pc++                          4          */
+/*    mov  rdi, [r12-32]       ; left.lo                       5          */
+/*    mov  rsi, [r12-24]       ; left.hi                       5          */
+/*    mov  rdx, [r12-16]       ; right.lo                      5          */
+/*    mov  rcx, [r12-8]        ; right.hi                      5          */
+/*    sub  rsp, 8              ; align          \              */
+/*    mov  rax, imm64(fn)      ;                 \  20         */
+/*    call rax                 ;                 /             */
+/*    add  rsp, 8              ; re-align       /              */
+/*    mov  [r12-32], rax       ; result.lo at TOS-1 slot       5          */
+/*    mov  [r12-24], rdx       ; result.hi                     5          */
+/*    sub  r12, 16             ; net pop 1                     4          */
+/*    jmp  rel32 trampoline                                    5          */
+/*                                                          = 63          */
+/*------------------------------------------------------------------------*/
+static void emit_me9_pat_binary_blob(void *fn, size_t trampoline_abs_off)
+{
+    /* pc++                            (41 ff 45 14)                4 */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xff);
+    seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x14);
+
+    /* Load left (TOS-1) into rdi:rsi */
+    /* mov rdi, [r12-32]               (49 8b 7c 24 e0)              5 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x7c); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0xe0);
+    /* mov rsi, [r12-24]               (49 8b 74 24 e8)              5 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x74); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0xe8);
+
+    /* Load right (TOS) into rdx:rcx */
+    /* mov rdx, [r12-16]               (49 8b 54 24 f0)              5 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x54); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0xf0);
+    /* mov rcx, [r12-8]                (49 8b 4c 24 f8)              5 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x4c); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0xf8);
+
+    /* aligned call fn — DESCR_t returned in rax:rdx              20 */
+    emit_aligned_call_imm64(fn);
+
+    /* Store result at TOS-1 slot */
+    /* mov [r12-32], rax               (49 89 44 24 e0)              5 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x44); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0xe0);
+    /* mov [r12-24], rdx               (49 89 54 24 e8)              5 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x54); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0xe8);
+
+    /* sub r12, 16                     (49 83 ec 10)                 4 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x83);
+    seg_byte(SEG_CODE, 0xec); seg_byte(SEG_CODE, 0x10);
+
+    emit_jmp_trampoline(trampoline_abs_off);                       /* 5 */
+}
+
 /* ── Main codegen entry point ─────────────────────────────────────────── */
 
 /*
@@ -2674,6 +2741,19 @@ int sm_codegen(SM_Program *prog)
             default: break;
             }
             emit_me9_pat_charset_blob(fn, g_trampoline_offset);
+        } else if (op == SM_PAT_CAT || op == SM_PAT_ALT) {
+            /* ME-9f: inline-native binary-pattern combinators.  Pop
+             * right (TOS) and left (TOS-1), call pat_cat(left,right) or
+             * pat_alt(left,right) directly — both have signature
+             * DESCR_t(DESCR_t,DESCR_t) so no me9_* helper needed.
+             * Net delta −1 (pop 2, push 1). */
+            void *fn = NULL;
+            switch (op) {
+            case SM_PAT_CAT: fn = (void *)&pat_cat; break;
+            case SM_PAT_ALT: fn = (void *)&pat_alt; break;
+            default: break;
+            }
+            emit_me9_pat_binary_blob(fn, g_trampoline_offset);
         } else if (op == SM_PAT_ARB     || op == SM_PAT_REM    ||
                    op == SM_PAT_FAIL    || op == SM_PAT_SUCCEED ||
                    op == SM_PAT_EPS     || op == SM_PAT_FENCE  ||
