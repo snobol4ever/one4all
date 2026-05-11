@@ -107,4 +107,8 @@ void emit_bb_xrpsi(emitter_t *e, int n,
                    bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β,
                    bb_pos_text_fn text_body_fn, void *text_body_arg);
 
+/* SM arithmetic family (ADD/SUB/MUL/DIV/MOD) — sub-rung -l (2026-05-11).
+ * op_enum: SM opcode integer; macro_name: GAS macro name (ADD_NUM etc.). */
+void emit_sm_arith_op(emitter_t *e, int op_enum, const char *macro_name);
+
 #endif /* RUNTIME_X86_TEMPLATES_TEMPLATES_H */

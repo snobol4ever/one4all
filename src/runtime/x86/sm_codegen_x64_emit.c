@@ -847,13 +847,15 @@ static int emit_sm_pop_legacy(FILE *out, int pc)
 static int emit_sm_arith(FILE *out, const SM_Instr *ins, int pc)
 {
     (void)pc;
-    /* EM-7c-bb-three-column follow-up: the per-op macros (ADD, SUB,
-     * MUL, DIV, MOD, EXP) carry the op name directly in col 2.  No
-     * # SM_ADD annotation needed — that would duplicate col 2. */
+    /* EM-MODE4-IS-MODE3-DUMP-l: routed through per-opcode template.
+     * macro_name from sm_template_lookup carries ADD_NUM/SUB_NUM/etc. */
     const sm_op_template_t *t = sm_template_lookup(ins->op);
     if (!t) return -1;
-    sm_emit_args_t a = { 0 };
-    return sm_emit_template(out, t, &a);
+    emitter_t *e = emitter_text_new(out);
+    if (!e) return -1;
+    emit_sm_arith_op(e, (int)ins->op, t->macro_name);
+    emitter_free(e);
+    return 0;
 }
 
 /* EM-4 opcodes: SM_LABEL + SM_JUMP / SM_JUMP_S / SM_JUMP_F */
