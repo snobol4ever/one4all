@@ -983,11 +983,49 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
     }
 
     /* ── Swap :=: ── */
-    case AST_SWAP:
+    case AST_SWAP: {
+        /* x :=: y — swap two simple variable lvalues.
+         * Inline SM sequence:
+         *   load lhs → tmp (store to __swap_tmp__ NV)
+         *   load rhs → stack
+         *   store rhs_val → lhs
+         *   load __swap_tmp__ → stack
+         *   store lhs_val → rhs
+         *   push rhs_val (= new lhs value = result of swap expr)
+         * For frame-slot vars uses SM_LOAD_FRAME/SM_STORE_FRAME; else SM_PUSH_VAR/SM_STORE_VAR. */
+        if (e->nchildren >= 2 && e->children[0] && e->children[1] &&
+            e->children[0]->kind == AST_VAR && e->children[1]->kind == AST_VAR) {
+            const AST_t *lhs = e->children[0], *rhs = e->children[1];
+            const char *lname = lhs->sval ? lhs->sval : "";
+            const char *rname = rhs->sval ? rhs->sval : "";
+            int lslot = -1, rslot = -1;
+            if (g_expression_body_lowering && g_expression_scope) {
+                if (lname[0] && lname[0] != '&') lslot = scope_get(g_expression_scope, lname);
+                if (rname[0] && rname[0] != '&') rslot = scope_get(g_expression_scope, rname);
+            }
+            /* Save lhs_val to NV temp */
+            if (lslot >= 0) sm_emit_i(p, SM_LOAD_FRAME, lslot);
+            else             sm_emit_s(p, SM_PUSH_VAR, lname);
+            sm_emit_s(p, SM_STORE_VAR, "__icn_swap_tmp__");
+            sm_emit(p, SM_VOID_POP);   /* discard store result */
+            /* Load rhs_val, store → lhs */
+            if (rslot >= 0) sm_emit_i(p, SM_LOAD_FRAME, rslot);
+            else             sm_emit_s(p, SM_PUSH_VAR, rname);
+            if (lslot >= 0) sm_emit_i(p, SM_STORE_FRAME, lslot);
+            else             sm_emit_s(p, SM_STORE_VAR, lname);
+            /* Stack: TOS=rhs_val (result stays).
+             * Load lhs_val from temp, store → rhs */
+            sm_emit_s(p, SM_PUSH_VAR, "__icn_swap_tmp__");
+            if (rslot >= 0) sm_emit_i(p, SM_STORE_FRAME, rslot);
+            else             sm_emit_s(p, SM_STORE_VAR, rname);
+            sm_emit(p, SM_VOID_POP);   /* discard lhs_val (rhs_val already on stack as result) */
+            return;
+        }
         lower_expr(p, lt, e->nchildren > 0 ? e->children[0] : NULL);
         lower_expr(p, lt, e->nchildren > 1 ? e->children[1] : NULL);
         sm_emit_si(p, SM_CALL_FN, "SWAP", 2);
         return;
+    }
 
     /* ── Pattern primitives used as values (not already handled above) ── */
     case AST_ALT:
@@ -1657,23 +1695,55 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
         if (!is_raku_layout) {
             /* Icon-style pair layout: not exercised by the Raku frontend
              * today (Icon uses AST_IF chains for case-of), but the legacy
-             * fall-through preserves behaviour for any future producer.
-             * Keep going with a deferred-body wrap as one expression. */
-            int skip_jump = sm_emit_i(p, SM_JUMP, 0);
-            int entry_pc  = sm_label(p);
-            /* Lower whole CASE body as a single thunk that delegates to
-             * coro_eval via the SM stack — but coro_eval(AST_t*) is the
-             * very thing we're eliminating, so for now emit a NULVCL
-             * placeholder + diagnostic.  No Raku/Icon program reaches this
-             * branch under current frontends.  When Icon AST_CASE is added,
-             * a separate rung will lower the pair layout. */
-            sm_emit(p, SM_PUSH_NULL);
-            sm_emit(p, SM_RETURN);
-            int skip_lbl  = sm_label(p);
-            sm_patch_jump(p, skip_jump, skip_lbl);
-            sm_emit_ii(p, SM_PUSH_EXPRESSION, (int64_t)entry_pc, 0);
-            sm_emit_ii(p, SM_BB_PUMP_CASE, 0, 0);  /* zero arms, no default */
-            return;
+             * fall-through preserves behaviour for any future producer. */
+            /* Icon pair layout: children = [topic, val0, body0, val1, body1, ..., [default]]
+             * Odd child count after topic means the last child is a lone default.
+             * Lower as a chain of if-then (topic==valI → bodyI) → default.
+             *
+             * The topic is evaluated once and stored in NV __case_topic__ for comparison.
+             * Each arm: load topic, eval val, SM_ACOMP(EQ); on match eval body and jump end. */
+            {
+                int nc = e->nchildren - 1;  /* children after topic */
+                int has_default = (nc % 2 != 0);
+                int npairs = nc / 2;
+
+                /* Evaluate topic once, store to NV temp */
+                lower_expr(p, lt, e->children[0]);
+                sm_emit_s(p, SM_STORE_VAR, "__case_topic__");
+                sm_emit(p, SM_VOID_POP);   /* discard store result */
+
+                int end_jumps[64]; int nend = 0;
+
+                for (int pair = 0; pair < npairs && pair < 32; pair++) {
+                    AST_t *val  = e->children[1 + pair*2];
+                    AST_t *body = e->children[2 + pair*2];
+                    /* Compare topic == val using type-aware equality */
+                    sm_emit_s(p, SM_PUSH_VAR, "__case_topic__");
+                    lower_expr(p, lt, val);
+                    sm_emit_si(p, SM_CALL_FN, "ICN_CASE_EQ", 2);
+                    int jf = sm_emit_i(p, SM_JUMP_F, 0);
+                    /* Match: ACOMP pushed val_i on success; discard it, eval body */
+                    sm_emit(p, SM_VOID_POP);
+                    lower_expr(p, lt, body);
+                    if (nend < 64) end_jumps[nend++] = sm_emit_i(p, SM_JUMP, 0);
+                    int next_lbl = sm_label(p);
+                    sm_patch_jump(p, jf, next_lbl);
+                    /* No match: ACOMP pushed FAILDESCR; discard before next arm */
+                    sm_emit(p, SM_VOID_POP);
+                }
+
+                /* Default or null */
+                if (has_default) {
+                    lower_expr(p, lt, e->children[e->nchildren - 1]);
+                } else {
+                    sm_emit(p, SM_PUSH_NULL);
+                }
+
+                int end_lbl = sm_label(p);
+                for (int j = 0; j < nend; j++)
+                    sm_patch_jump(p, end_jumps[j], end_lbl);
+                return;
+            }
         }
 
         /* Helper macro: emit (jump-around + entry + lower(child) + RETURN) →

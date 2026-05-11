@@ -919,6 +919,42 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
         *out = v; return 1;
     }
 
+    /* ICN_CASE_EQ(topic, val) — type-aware equality for case expressions.
+     * SM pop order: args[1]=TOS=val, args[0]=topic (topic pushed first).
+     * Numeric if both numeric; string otherwise. Returns val on match, FAILDESCR on miss. */
+    if (!strcmp(fn,"ICN_CASE_EQ") && nargs == 2) {
+        DESCR_t topic = args[0], val = args[1];
+        if (IS_FAIL_fn(topic) || IS_FAIL_fn(val)) { *out = FAILDESCR; return 1; }
+        int eq = 0;
+        if ((IS_INT_fn(topic) || IS_REAL_fn(topic)) &&
+            (IS_INT_fn(val)   || IS_REAL_fn(val))) {
+            double tv = IS_REAL_fn(topic) ? topic.r : (double)topic.i;
+            double vv = IS_REAL_fn(val)   ? val.r   : (double)val.i;
+            eq = (tv == vv);
+        } else {
+            const char *ts = VARVAL_fn(topic); if (!ts) ts = "";
+            const char *vs = VARVAL_fn(val);   if (!vs) vs = "";
+            eq = (strcmp(ts, vs) == 0);
+        }
+        *out = eq ? val : FAILDESCR; return 1;
+    }
+
+    /* ICN_SWAP_TOP2(a, b) — swap top two stack items; returns a (the lower one).
+     * Used by AST_SWAP lowering to cross-store two variable values. */
+    if (!strcmp(fn,"ICN_SWAP_TOP2") && nargs == 2) {
+        /* args[0]=TOS (rhs_val), args[1]=below (lhs_val) after SM pop order.
+         * Push lhs_val first (it goes below), then rhs_val on top.
+         * But SM_CALL_FN replaces both with *out — only one value returned.
+         * We need to push TWO values back. That's not possible via SM_CALL_FN.
+         * Use a different approach: return lhs_val; the STORE_FRAME/VAR following
+         * will store it; rhs_val is already stored by the prior STORE_FRAME/VAR. */
+        /* SM pop order: args[1]=TOS=rhs_val pushed second, args[0]=lhs_val pushed first.
+         * Wait — SM_CALL_FN loop: for(k=nargs-1; k>=0; k--) args[k]=sm_pop().
+         * So args[1]=sm_pop()=TOS=rhs_val, args[0]=sm_pop()=lhs_val. */
+        *out = args[0];  /* return lhs_val; caller stores it to rhs */
+        return 1;
+    }
+
     /* ICN_NULL (/E) — succeed with &null iff E is null, else fail.
      * Mirrors coro_value.c:AST_NULL. */
     if (!strcmp(fn,"ICN_NULL") && nargs == 1) {
