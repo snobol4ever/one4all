@@ -770,6 +770,14 @@ DESCR_t me4_push_null(void)
     return NULVCL;
 }
 
+/* ME-9c helpers — charset pattern constructors (SM_PAT_ANY/NOTANY/SPAN/BREAK).
+ * Each takes one DESCR_t arg, coerces to const char* via VARVAL_fn,
+ * null-guards, then calls the pattern constructor. */
+DESCR_t me9_pat_any(DESCR_t d)    { const char *cs = VARVAL_fn(d); return pat_any_cs(cs ? cs : ""); }
+DESCR_t me9_pat_notany(DESCR_t d) { const char *cs = VARVAL_fn(d); return pat_notany(cs ? cs : ""); }
+DESCR_t me9_pat_span(DESCR_t d)   { const char *cs = VARVAL_fn(d); return pat_span(cs ? cs : ""); }
+DESCR_t me9_pat_break(DESCR_t d)  { const char *cs = VARVAL_fn(d); return pat_break_(cs ? cs : ""); }
+
 static void h_pat_lit(void)
 {
     PUSH(pat_lit(CUR_INS->a[0].s ? CUR_INS->a[0].s : ""));
@@ -2403,6 +2411,59 @@ static void emit_me9_pat_lit_blob(const char *lit, size_t trampoline_abs_off)
     emit_jmp_trampoline(trampoline_abs_off);                       /* 5 */
 }
 
+/*------------------------------------------------------------------------*/
+/* ME-9c — SM_PAT_ANY / SM_PAT_NOTANY / SM_PAT_SPAN / SM_PAT_BREAK.      */
+/*                                                                        */
+/* Each pops one DESCR_t from r12, passes it to a me9_pat_X(DESCR_t)     */
+/* helper (which calls VARVAL_fn + null-guards + pat constructor), then   */
+/* writes the DT_P result back in place.  Net delta: 0 (pop 1, push 1).  */
+/*                                                                        */
+/* Identical shape to emit_me4_coerce_num_blob: TOS loaded into rdi:rsi  */
+/* (DESCR_t ABI), call via imm64, result written back to [r12-16],[r12-8]*/
+/*                                                                        */
+/* Layout (57 bytes):                                                     */
+/*    inc  dword [r13+20]      ; pc++                          4          */
+/*    mov  rdi, [r12-16]       ; arg.lo                        5          */
+/*    mov  rsi, [r12-8]        ; arg.hi                        5          */
+/*    sub  rsp, 8              ; align          \              */
+/*    mov  rax, imm64(me9_*)   ;                 \  20         */
+/*    call rax                 ;                 /             */
+/*    add  rsp, 8              ; re-align       /              */
+/*    mov  [r12-16], rax       ; result.lo                     5          */
+/*    mov  [r12-8],  rdx       ; result.hi                     5          */
+/*    jmp  rel32 trampoline                                    5          */
+/*                                                          = 54          */
+/*------------------------------------------------------------------------*/
+static void emit_me9_pat_charset_blob(void *me9_helper, size_t trampoline_abs_off)
+{
+    extern DESCR_t me9_pat_any(DESCR_t);
+
+    /* pc++                            (41 ff 45 14)                4 */
+    seg_byte(SEG_CODE, 0x41); seg_byte(SEG_CODE, 0xff);
+    seg_byte(SEG_CODE, 0x45); seg_byte(SEG_CODE, 0x14);
+
+    /* Load TOS into rdi:rsi (DESCR_t arg) */
+    /* mov rdi, [r12-16]               (49 8b 7c 24 f0)             5 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x7c); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0xf0);
+    /* mov rsi, [r12-8]                (49 8b 74 24 f8)              5 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x8b);
+    seg_byte(SEG_CODE, 0x74); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0xf8);
+
+    /* aligned call me9_helper — DESCR_t returned in rax:rdx        20 */
+    emit_aligned_call_imm64(me9_helper);
+
+    /* Write result back to TOS slot (no r12 adjustment — net delta 0) */
+    /* mov [r12-16], rax               (49 89 44 24 f0)              5 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x44); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0xf0);
+    /* mov [r12-8], rdx                (49 89 54 24 f8)              5 */
+    seg_byte(SEG_CODE, 0x49); seg_byte(SEG_CODE, 0x89);
+    seg_byte(SEG_CODE, 0x54); seg_byte(SEG_CODE, 0x24); seg_byte(SEG_CODE, 0xf8);
+
+    emit_jmp_trampoline(trampoline_abs_off);                       /* 5 */
+}
+
 /* ── Main codegen entry point ─────────────────────────────────────────── */
 
 /*
@@ -2558,6 +2619,20 @@ int sm_codegen(SM_Program *prog)
             /* ME-9b: inline-native pat_lit.  String baked as imm64 from
              * a[0].s; pat_lit null-guards internally so no extra check. */
             emit_me9_pat_lit_blob(prog->instrs[i].a[0].s, g_trampoline_offset);
+        } else if (op == SM_PAT_ANY || op == SM_PAT_NOTANY ||
+                   op == SM_PAT_SPAN || op == SM_PAT_BREAK) {
+            /* ME-9c: inline-native charset constructors.  Pop one DESCR_t,
+             * coerce via VARVAL_fn (in me9_* helper), call pat constructor,
+             * write result back.  Net delta 0. */
+            void *helper = NULL;
+            switch (op) {
+            case SM_PAT_ANY:    helper = (void *)&me9_pat_any;    break;
+            case SM_PAT_NOTANY: helper = (void *)&me9_pat_notany; break;
+            case SM_PAT_SPAN:   helper = (void *)&me9_pat_span;   break;
+            case SM_PAT_BREAK:  helper = (void *)&me9_pat_break;  break;
+            default: break;
+            }
+            emit_me9_pat_charset_blob(helper, g_trampoline_offset);
         } else if (op == SM_PAT_ARB     || op == SM_PAT_REM    ||
                    op == SM_PAT_FAIL    || op == SM_PAT_SUCCEED ||
                    op == SM_PAT_EPS     || op == SM_PAT_FENCE  ||
