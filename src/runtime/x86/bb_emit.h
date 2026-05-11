@@ -90,6 +90,10 @@ void t_bb_box_banner(const char *kind, const char *args);
 void t_inc_mem_r13_disp8(uint8_t disp);
 void t_ret(void);
 void t_pad_to_blob_size(void);
+void t_mov_rdi_imm64(uint64_t val);
+void t_call_sym_plt(const char *sym, uint64_t fn_fallback);
+void t_macro_begin(const char *name, const char *const *params, int nparams);
+void t_macro_end(void);
 
 /* ── label ──────────────────────────────────────────────────────────────── */
 

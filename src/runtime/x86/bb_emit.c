@@ -149,6 +149,119 @@ void t_pad_to_blob_size(void)
     }
 }
 
+void t_mov_rdi_imm64(uint64_t val)
+{
+    /* mov rdi, imm64   — 10 bytes: 48 BF <8>
+     * Used to load a value or a baked pointer into the first arg reg. */
+    switch (bb_emit_mode) {
+    case EMIT_BINARY: {
+        bb_emit_byte(0x48); bb_emit_byte(0xBF);
+        bb_emit_byte((uint8_t)(val      ));
+        bb_emit_byte((uint8_t)(val >>  8));
+        bb_emit_byte((uint8_t)(val >> 16));
+        bb_emit_byte((uint8_t)(val >> 24));
+        bb_emit_byte((uint8_t)(val >> 32));
+        bb_emit_byte((uint8_t)(val >> 40));
+        bb_emit_byte((uint8_t)(val >> 48));
+        bb_emit_byte((uint8_t)(val >> 56));
+        return;
+    }
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF: {
+        char args[64];
+        snprintf(args, sizeof(args), "rdi, 0x%llx", (unsigned long long)val);
+        bb3c_format(emit_outf(), "", "mov", args);
+        return;
+    }
+    }
+}
+
+void t_call_sym_plt(const char *sym, uint64_t fn_fallback)
+{
+    /* call sym@PLT
+     *   BINARY: in-process JIT can't reach a real PLT; instead bake the
+     *           resolved fn address and call indirect through rax.
+     *           Sequence is 12 bytes: 48 B8 <8-byte fn> FF D0
+     *           (= mov rax, fn; call rax).  This matches the existing
+     *           BB_INSN_CALL_SYM_PLT binary encoding in emitter_binary.c.
+     *   TEXT:   emit `call <sym>@PLT` — GAS resolves via PLT at link time.
+     *   MACRO_DEF: same form as TEXT (sym is a fixed name in the macro). */
+    switch (bb_emit_mode) {
+    case EMIT_BINARY: {
+        bb_emit_byte(0x48); bb_emit_byte(0xB8);
+        bb_emit_byte((uint8_t)(fn_fallback      ));
+        bb_emit_byte((uint8_t)(fn_fallback >>  8));
+        bb_emit_byte((uint8_t)(fn_fallback >> 16));
+        bb_emit_byte((uint8_t)(fn_fallback >> 24));
+        bb_emit_byte((uint8_t)(fn_fallback >> 32));
+        bb_emit_byte((uint8_t)(fn_fallback >> 40));
+        bb_emit_byte((uint8_t)(fn_fallback >> 48));
+        bb_emit_byte((uint8_t)(fn_fallback >> 56));
+        bb_emit_byte(0xFF); bb_emit_byte(0xD0);
+        return;
+    }
+    case EMIT_TEXT:
+    case EMIT_MACRO_DEF: {
+        char args[80];
+        snprintf(args, sizeof(args), "%s@PLT", sym ? sym : "??sym??");
+        bb3c_format(emit_outf(), "", "call", args);
+        return;
+    }
+    }
+}
+
+void t_macro_begin(const char *name, const char *const *params, int nparams)
+{
+    /* macro_begin — open a `.macro NAME params` block (MACRO_DEF) or
+     * emit the invocation line (TEXT).
+     *
+     *   BINARY:    no-op.
+     *   TEXT:      `    NAME p1, p2, ...` invocation line.
+     *   MACRO_DEF: `.macro NAME p1 p2 ...` definition opener. */
+    switch (bb_emit_mode) {
+    case EMIT_BINARY:
+        return;
+    case EMIT_TEXT: {
+        bb3c_flush_pending_cjmp_only();
+        FILE *f = emit_outf();
+        fprintf(f, "    %s", name ? name : "?");
+        for (int i = 0; i < nparams; i++) {
+            fprintf(f, "%s%s", (i == 0 ? " " : ", "),
+                    params && params[i] ? params[i] : "?");
+        }
+        fputc('\n', f);
+        return;
+    }
+    case EMIT_MACRO_DEF: {
+        bb3c_flush_pending_cjmp_only();
+        FILE *f = emit_outf();
+        fprintf(f, ".macro %s", name ? name : "?");
+        for (int i = 0; i < nparams; i++) {
+            fprintf(f, " %s", params && params[i] ? params[i] : "?");
+        }
+        fputc('\n', f);
+        return;
+    }
+    }
+}
+
+void t_macro_end(void)
+{
+    /* macro_end — close a `.macro` block (MACRO_DEF only).
+     *   BINARY: no-op.
+     *   TEXT:   no-op (invocation has no closer).
+     *   MACRO_DEF: emit `.endm`. */
+    switch (bb_emit_mode) {
+    case EMIT_BINARY:
+    case EMIT_TEXT:
+        return;
+    case EMIT_MACRO_DEF:
+        bb3c_flush_pending_cjmp_only();
+        fputs(".endm\n", emit_outf());
+        return;
+    }
+}
+
 /* ── label ──────────────────────────────────────────────────────────────── */
 
 void bb_label_init(bb_label_t *lbl, const char *name)
