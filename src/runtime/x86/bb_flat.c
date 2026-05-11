@@ -887,116 +887,38 @@ static void flat_emit_lit(emitter_t *e, const char *lit, int len,
 /* ── leaf: epsilon ──────────────────────────────────────────────────────── */
 /* ── XEPS/XFAIL/XFARB text-body callbacks (EM-MODE4-IS-MODE3-DUMP-m) ──────── */
 
-static void eps_text_body(emitter_t *e,
-                          bb_label_t *lbl_succ, bb_label_t *lbl_fail,
-                          bb_label_t *lbl_β, void *arg_)
-{
-    (void)arg_;
-    flat_emit_box_banner(e, "EPS", NULL, lbl_succ->name);
-    char args[256];
-    snprintf(args, sizeof(args), "%s # EPS", lbl_succ->name);
-    flat3c_action(e, "EPS_\xCE\xB1", args);
-    EV_LABEL(e, lbl_β);
-    flat3c_action(e, "EPS_\xCE\xB2", lbl_fail->name);
-}
-
-static void fail_text_body(emitter_t *e,
-                           bb_label_t *lbl_succ, bb_label_t *lbl_fail,
-                           bb_label_t *lbl_β, void *arg_)
-{
-    (void)lbl_succ; (void)arg_;
-    flat_emit_box_banner(e, "FAIL", NULL, lbl_fail->name);
-    char args[256];
-    snprintf(args, sizeof(args), "%s # FAIL", lbl_fail->name);
-    flat3c_action(e, "FAIL_\xCE\xB1", args);
-    EV_LABEL(e, lbl_β);
-    flat3c_action(e, "FAIL_\xCE\xB2", lbl_fail->name);
-}
-
-static void arb_text_body(emitter_t *e,
-                          bb_label_t *lbl_succ, bb_label_t *lbl_fail,
-                          bb_label_t *lbl_β, void *arg_)
-{
-    (void)arg_;
-    flat_emit_box_banner(e, "ARB", NULL, lbl_succ->name);
-    int id = g_flat_node_id++;
-    char lbl[64]; snprintf(lbl, sizeof(lbl), ".Larb%d_z", id);
-    flat_data_section(e);
-    flat3c_label(e, lbl);
-    flat_data_long(e, 0);
-    flat_data_long(e, 0);
-    flat_text_section(e);
-    flat_intel_syntax(e);
-    char rdi_arg[96]; snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", lbl);
-    flat_box_call(e, rdi_arg, "bb_arb", 0);
-    flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
-    EV_LABEL(e, lbl_β);
-    flat_box_call(e, rdi_arg, "bb_arb", 1);
-    flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
-}
-
 static void flat_emit_eps(emitter_t *e, bb_label_t *lbl_succ,
                           bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
-    emit_bb_xeps(e, lbl_succ, lbl_fail, lbl_β, eps_text_body, NULL);
+    emit_bb_xeps(e, lbl_succ, lbl_fail, lbl_β);
 }
 
 static void flat_emit_fail(emitter_t *e, bb_label_t *lbl_succ,
                            bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
-    emit_bb_xfail(e, lbl_succ, lbl_fail, lbl_β, fail_text_body, NULL);
+    emit_bb_xfail(e, lbl_succ, lbl_fail, lbl_β);
 }
 
 static void flat_emit_xfarb(emitter_t *e, bb_label_t *lbl_succ,
                              bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
-    emit_bb_xfarb(e, lbl_succ, lbl_fail, lbl_β, arb_text_body, NULL);
+    emit_bb_xfarb(e, lbl_succ, lbl_fail, lbl_β);
 }
 
 
 /* ── leaf: POS(n) ───────────────────────────────────────────────────────── */
 /* ── XPOSI/XRPSI text-body callbacks (EM-MODE4-IS-MODE3-DUMP-k) ─────────── */
 
-static void pos_text_body(emitter_t *e, int n,
-                          bb_label_t *lbl_succ, bb_label_t *lbl_fail,
-                          bb_label_t *lbl_β, void *arg_)
-{
-    (void)arg_;
-    char banner_args[32]; snprintf(banner_args, sizeof(banner_args), "%d", n);
-    flat_emit_box_banner(e, "POS", banner_args, lbl_succ->name);
-    char args[256];
-    snprintf(args, sizeof(args), "%d, %s, %s # POS(%d)",
-             n, lbl_succ->name, lbl_fail->name, n);
-    flat3c_action(e, "POS_\xCE\xB1", args);   /* POS_α */
-    EV_LABEL(e, lbl_β);
-    flat3c_action(e, "POS_\xCE\xB2", lbl_fail->name);  /* POS_β */
-}
-
-static void rpos_text_body(emitter_t *e, int n,
-                           bb_label_t *lbl_succ, bb_label_t *lbl_fail,
-                           bb_label_t *lbl_β, void *arg_)
-{
-    (void)arg_;
-    char banner_args[32]; snprintf(banner_args, sizeof(banner_args), "%d", n);
-    flat_emit_box_banner(e, "RPOS", banner_args, lbl_succ->name);
-    char args[256];
-    snprintf(args, sizeof(args), "%d, %s, %s # RPOS(%d)",
-             n, lbl_succ->name, lbl_fail->name, n);
-    flat3c_action(e, "RPOS_\xCE\xB1", args);   /* RPOS_α */
-    EV_LABEL(e, lbl_β);
-    flat3c_action(e, "RPOS_\xCE\xB2", lbl_fail->name);  /* RPOS_β */
-}
-
 static void flat_emit_pos(emitter_t *e, int n, bb_label_t *lbl_succ,
                           bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
-    emit_bb_xposi(e, n, lbl_succ, lbl_fail, lbl_β, pos_text_body, NULL);
+    emit_bb_xposi(e, n, lbl_succ, lbl_fail, lbl_β);
 }
 
 static void flat_emit_rpos(emitter_t *e, int n, bb_label_t *lbl_succ,
                            bb_label_t *lbl_fail, bb_label_t *lbl_β)
 {
-    emit_bb_xrpsi(e, n, lbl_succ, lbl_fail, lbl_β, rpos_text_body, NULL);
+    emit_bb_xrpsi(e, n, lbl_succ, lbl_fail, lbl_β);
 }
 
 
