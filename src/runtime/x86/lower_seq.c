@@ -38,6 +38,27 @@ static void lower_vlist(LowerCtx *c, const AST_t *e)
 static void lower_cat_seq(LowerCtx *c, const AST_t *e)
 {
     SM_Program *p = c->p;
+    /* Icon & conjunction uses AST_SEQ but is goal-directed, not string concat.
+     * When lowering an Icon statement, emit JUMP_F between children so that
+     * a failing operand short-circuits the whole conjunction. */
+    extern int g_lang;
+    if (e->kind == AST_SEQ && g_lang == LANG_ICN) {
+        /* Goal-directed conjunction: each non-final child must succeed. */
+        if (e->nchildren == 0) { sm_emit(p, SM_PUSH_NULL); return; }
+        if (e->nchildren == 1) { lower_expr(c, e->children[0]); return; }
+        int njumps = e->nchildren - 1;
+        int *fail_jumps = (int *)GC_MALLOC((size_t)njumps * sizeof(int));
+        for (int i = 0; i < e->nchildren; i++) {
+            lower_expr(c, e->children[i]);
+            if (i < e->nchildren - 1) {
+                fail_jumps[i] = sm_emit_i(p, SM_JUMP_F, 0); /* -> done with FAILDESCR */
+                sm_emit(p, SM_VOID_POP);
+            }
+        }
+        int done_lbl = sm_label(p);
+        for (int i = 0; i < njumps; i++) sm_patch_jump(p, fail_jumps[i], done_lbl);
+        return;
+    }
     /* If any child is AST_DEFER, lower as pattern-context concatenation. */
     int has_defer = 0;
     for (int j = 0; j < e->nchildren; j++) {
