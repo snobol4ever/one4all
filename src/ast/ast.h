@@ -217,6 +217,25 @@ typedef enum AST_e {
     AST_REVASSIGN,    /* E1 <- E2  reversible assignment (Icon)               */
     AST_REVSWAP,      /* E1 <-> E2 reversible value swap (Icon)               */
 
+    /* --- Program structure (SI-1, Phase 5) --------------------------------
+     * These replace CODE_t / STMT_t once all frontends emit them directly.
+     * Until SI-6, the shim helpers stmt_to_ast / code_to_ast produce these
+     * from the old structs; lower() and lower_stmt() consume them.
+     *
+     * AST_PROGRAM  — was CODE_t: children[] = list of AST_STMT nodes
+     * AST_STMT     — was STMT_t: children[0]=subject, [1]=pattern,
+     *                [2]=replacement, [3]=AST_GOTO_S, [4]=AST_GOTO_F,
+     *                [5]=AST_GOTO_U, [6..8]=computed goto exprs
+     *                sval=label  ival=lang  a[0].i=lineno  a[1].i=stno
+     *                a[2].i=flags
+     * AST_GOTO_S/F/U — goto arm: sval=target label (NULL = fall-through)
+     * ----------------------------------------------------------------------- */
+    AST_PROGRAM,
+    AST_STMT,
+    AST_GOTO_S,   /* success goto arm   */
+    AST_GOTO_F,   /* failure goto arm   */
+    AST_GOTO_U,   /* unconditional goto */
+
     /* --- Sentinel -------------------------------------------------------- */
 
     AST_KIND_COUNT    /* Total number of kinds — used for array sizing / asserts.
@@ -417,6 +436,11 @@ static const char * const ast_e_name[AST_KIND_COUNT] = {
     [AST_INITIAL]      = "AST_INITIAL",
     [AST_REVASSIGN]    = "AST_REVASSIGN",
     [AST_REVSWAP]      = "AST_REVSWAP",
+    [AST_PROGRAM]      = "AST_PROGRAM",
+    [AST_STMT]         = "AST_STMT",
+    [AST_GOTO_S]       = "AST_GOTO_S",
+    [AST_GOTO_F]       = "AST_GOTO_F",
+    [AST_GOTO_U]       = "AST_GOTO_U",
 };
 
 #endif /* IR_DEFINE_NAMES */
