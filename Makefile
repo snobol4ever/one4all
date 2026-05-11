@@ -81,6 +81,7 @@ RT_PIC_SRCS := \
     $(RT)/x86/bb_build.c \
     $(RT)/x86/bb_flat.c \
     $(RT)/x86/templates/bb_xchr.c \
+    $(RT)/x86/templates/bb_xspnc.c \
     $(RT)/x86/bb_boxes.c \
     $(RT)/x86/bb_broker.c \
     $(SRC)/frontend/snobol4/snobol4.tab.c \
@@ -243,6 +244,7 @@ scrip:
 	$(CC) $(CRT)   -c $(RT)/x86/sm_codegen.c -o $(OBJ)/sm_codegen.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/sm_halt.c -o $(OBJ)/template_sm_halt.o
 	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xchr.c -o $(OBJ)/template_bb_xchr.o
+	$(CC) $(CRT)   -c $(RT)/x86/templates/bb_xspnc.c -o $(OBJ)/template_bb_xspnc.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_emit_template.c -o $(OBJ)/sm_emit_template.o
 	$(CC) $(CRT)   -c $(RT)/x86/sm_codegen_x64_emit.c -o $(OBJ)/sm_codegen_x64_emit.o
 	$(CC) $(CRT)   -c $(SRC)/driver/interp_globals.c -o $(OBJ)/interp_globals.o

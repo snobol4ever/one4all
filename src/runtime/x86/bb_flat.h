@@ -111,4 +111,19 @@ void flat_emit_banner_rule(emitter_t *e, char ch);
 void flat_emit_box_banner (emitter_t *e, const char *kind,
                            const char *args, const char *label_prefix);
 
+/* Per-node ID counter used by templates to generate unique static-data
+ * labels (.Lcs<id>_z, .Lcs<id>_chars, etc.).  Declared extern here so
+ * per-box template files can call g_flat_node_id++ without including
+ * the full bb_flat.c static context.  Defined in bb_flat.c. */
+extern int g_flat_node_id;
+
+/* Callback type for the charset-family template (bb_xspnc.c).
+ * bb_flat.c supplies a text-path implementation; the template supplies
+ * the binary path.  This avoids externalizing bb_flat.c's static helpers. */
+typedef void (*bb_charset_text_fn)(emitter_t *e,
+                                   bb_label_t *lbl_succ,
+                                   bb_label_t *lbl_fail,
+                                   bb_label_t *lbl_β,
+                                   void *arg);
+
 #endif /* BB_FLAT_H */

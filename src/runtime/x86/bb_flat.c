@@ -41,7 +41,11 @@ extern void    *bb_dvar_bin_new(const char *name);
 
 #define FLAT_BUF_MAX  (16 * 1024)
 
-static int g_flat_node_id   = 0;
+/* EM-MODE4-IS-MODE3-DUMP-e: promoted from static to extern so
+ * template files (templates/bb_xspnc.c etc.) can generate unique
+ * per-node static-data labels without including bb_flat.c's internals.
+ * Declaration lives in bb_flat.h. */
+int g_flat_node_id   = 0;
 static int g_flat_slot_count = 0;
 
 /* ── EM-FORMAT-BB-DATA-CONSOLIDATE state (2026-05-10) ─────────────────────────
@@ -970,6 +974,10 @@ static void flat_emit_rpos(emitter_t *e, int n, bb_label_t *lbl_succ,
 }
 
 /* ── leaf: charset (ANY/NOTANY/SPAN/BRK) ───────────────────────────────── */
+/* EM-MODE4-IS-MODE3-DUMP-e: charset family now routed through
+ * emit_bb_charset() in templates/bb_xspnc.c.  Kept as a rollback
+ * reference and byte-identity oracle.  Do not call from flat_emit_node. */
+__attribute__((unused))
 static void flat_emit_charset_call(emitter_t *e, bb_box_fn c_fn,
                                    const char *c_fn_name,
                                    const char *chars,
@@ -1040,12 +1048,110 @@ static void flat_emit_charset_call(emitter_t *e, bb_box_fn c_fn,
     }
 }
 
-/* ── flat_emit_node dispatch ─────────────────────────────────────────────── */
+/* ── charset text-body callback (EM-MODE4-IS-MODE3-DUMP-e) ──────────────── */
 
 extern DESCR_t bb_span  (void *zeta, int entry);
-extern DESCR_t bb_any   (void *zeta, int entry);
 extern DESCR_t bb_brk   (void *zeta, int entry);
+extern DESCR_t bb_any   (void *zeta, int entry);
 extern DESCR_t bb_notany(void *zeta, int entry);
+
+/* Arg struct passed to the text-body callback from the per-kind wrappers. */
+typedef struct {
+    bb_box_fn   c_fn;
+    const char *c_fn_name;
+    const char *kind_name;
+    const char *chars;
+} charset_text_arg_t;
+
+/* Text-path body for emit_bb_charset.  Has access to all of bb_flat.c's
+ * static helpers (flat_data_section, flat3c_action, etc.).  Called only
+ * when e->is_text; binary path lives in templates/bb_xspnc.c. */
+static void charset_text_body(emitter_t *e,
+                              bb_label_t *lbl_succ,
+                              bb_label_t *lbl_fail,
+                              bb_label_t *lbl_β,
+                              void *arg_)
+{
+    const charset_text_arg_t *a = (const charset_text_arg_t *)arg_;
+    const char *chars     = a->chars     ? a->chars     : "";
+    const char *c_fn_name = a->c_fn_name ? a->c_fn_name : "";
+    const char *kind      = a->kind_name ? a->kind_name : "CHARSET";
+
+    /* Banner preview: truncate at 24 chars. */
+    char preview[40];
+    if (chars && *chars) {
+        int n = (int)strlen(chars);
+        if (n > 24) snprintf(preview, sizeof(preview), "'%.24s...'", chars);
+        else        snprintf(preview, sizeof(preview), "'%s'", chars);
+    } else {
+        preview[0] = '\0';
+    }
+    flat_emit_box_banner(e, kind, preview, lbl_succ->name);
+
+    /* Static .data: charset string + cs_t {chars*, delta=0}. */
+    int id = g_flat_node_id++;
+    char zlbl[64], slbl[64];
+    snprintf(zlbl, sizeof(zlbl), ".Lcs%d_z",     id);
+    snprintf(slbl, sizeof(slbl), ".Lcs%d_chars", id);
+    flat_data_section(e);
+    flat3c_label(e, slbl);
+    flat_data_string(e, chars);
+    flat3c_label(e, zlbl);
+    flat_data_quad(e, slbl);   /* &chars  */
+    flat_data_long(e, 0);      /* delta   */
+    flat_data_long(e, 0);      /* padding */
+
+    /* .text: alpha port — lea rdi,[rip+z]; mov esi,0; call fn@PLT */
+    flat_text_section(e);
+    flat_intel_syntax(e);
+    char rdi_arg[96];
+    snprintf(rdi_arg, sizeof(rdi_arg), "rdi, [rip + %s]", zlbl);
+    flat3c_action(e, "lea", rdi_arg);
+    flat3c_action(e, "mov", "esi, 0");
+    emit_call_sym_plt(e, c_fn_name, (uint64_t)(uintptr_t)a->c_fn);
+    flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
+
+    /* beta port */
+    EV_LABEL(e, lbl_β);
+    flat3c_action(e, "lea", rdi_arg);
+    flat3c_action(e, "mov", "esi, 1");
+    emit_call_sym_plt(e, c_fn_name, (uint64_t)(uintptr_t)a->c_fn);
+    flat_box_dispatch_jne_jmp(e, lbl_succ, lbl_fail);
+}
+
+/* Per-kind wrappers called from flat_emit_node.  Each builds a
+ * charset_text_arg_t and delegates to emit_bb_charset (template), which
+ * owns the binary path and dispatches the text path back here. */
+static void flat_emit_xspnc(emitter_t *e, const char *chars,
+                             bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
+{
+    charset_text_arg_t a = { bb_span,   "bb_span",   "SPAN",   chars };
+    emit_bb_charset(e, bb_span, "bb_span", "SPAN", chars, lbl_succ, lbl_fail, lbl_β,
+                    charset_text_body, &a);
+}
+static void flat_emit_xbrkc(emitter_t *e, const char *chars,
+                             bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
+{
+    charset_text_arg_t a = { bb_brk,    "bb_brk",    "BREAK",  chars };
+    emit_bb_charset(e, bb_brk, "bb_brk", "BREAK", chars, lbl_succ, lbl_fail, lbl_β,
+                    charset_text_body, &a);
+}
+static void flat_emit_xanyc(emitter_t *e, const char *chars,
+                             bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
+{
+    charset_text_arg_t a = { bb_any,    "bb_any",    "ANY",    chars };
+    emit_bb_charset(e, bb_any, "bb_any", "ANY", chars, lbl_succ, lbl_fail, lbl_β,
+                    charset_text_body, &a);
+}
+static void flat_emit_xnnyc(emitter_t *e, const char *chars,
+                             bb_label_t *lbl_succ, bb_label_t *lbl_fail, bb_label_t *lbl_β)
+{
+    charset_text_arg_t a = { bb_notany, "bb_notany", "NOTANY", chars };
+    emit_bb_charset(e, bb_notany, "bb_notany", "NOTANY", chars, lbl_succ, lbl_fail, lbl_β,
+                    charset_text_body, &a);
+}
+
+/* ── flat_emit_node dispatch ─────────────────────────────────────────────── */
 extern DESCR_t bb_len   (void *zeta, int entry);
 extern DESCR_t bb_tab   (void *zeta, int entry);
 extern DESCR_t bb_rtab  (void *zeta, int entry);
@@ -1110,10 +1216,11 @@ static void flat_emit_node(emitter_t *e, PATND_t *p,
     case XRPSI: flat_emit_rpos(e, (int)p->num, lbl_succ, lbl_fail, lbl_β); break;
     case XCAT:  flat_emit_xcat(e, p, lbl_succ, lbl_fail, lbl_β); break;
     case XOR:   flat_emit_alt (e, p, lbl_succ, lbl_fail, lbl_β); break;
-    case XSPNC: flat_emit_charset_call(e, bb_span,   "bb_span",    p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
-    case XANYC: flat_emit_charset_call(e, bb_any,    "bb_any",     p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
-    case XBRKC: flat_emit_charset_call(e, bb_brk,    "bb_brk",     p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
-    case XNNYC: flat_emit_charset_call(e, bb_notany, "bb_notany",  p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
+    /* EM-MODE4-IS-MODE3-DUMP-e: charset family routed through templates. */
+    case XSPNC: flat_emit_xspnc(e, p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
+    case XANYC: flat_emit_xanyc(e, p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
+    case XBRKC: flat_emit_xbrkc(e, p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
+    case XNNYC: flat_emit_xnnyc(e, p->STRVAL_fn?p->STRVAL_fn:"", lbl_succ, lbl_fail, lbl_β); break;
     case XLNTH: {
         if (e->is_text) {
             char banner_args[32]; snprintf(banner_args, sizeof(banner_args), "%lld", (long long)p->num);

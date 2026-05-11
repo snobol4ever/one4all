@@ -41,4 +41,23 @@ void emit_bb_xchr(emitter_t *e, PATND_t *p,
                   bb_label_t *lbl_succ, bb_label_t *lbl_fail,
                   bb_label_t *lbl_β);
 
+/* Charset-family (SPAN/BREAK/ANY/NOTANY) — sub-rung -e (2026-05-11).
+ * Generic core: emit_bb_charset; per-kind wrappers (in bb_flat.c) call it.
+ *
+ * The text path is provided by a callback to avoid externalizing
+ * bb_flat.c's static helpers (flat_data_section, flat3c_action, etc.).
+ * bb_flat.c supplies text_body_fn; the template owns the binary path. */
+#include "../bb_flat.h"   /* bb_box_fn, bb_charset_text_fn */
+
+void emit_bb_charset(emitter_t *e,
+                     bb_box_fn c_fn,
+                     const char *c_fn_name,
+                     const char *kind_name,
+                     const char *chars,
+                     bb_label_t *lbl_succ,
+                     bb_label_t *lbl_fail,
+                     bb_label_t *lbl_β,
+                     bb_charset_text_fn text_body_fn,
+                     void *text_body_arg);
+
 #endif /* RUNTIME_X86_TEMPLATES_TEMPLATES_H */

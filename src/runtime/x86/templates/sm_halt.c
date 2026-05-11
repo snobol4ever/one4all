@@ -7,46 +7,42 @@
  * macro-invocation text (mode-4), or macro-definition body
  * (sm_macros.s regeneration).
  *
- * ⛔ KNOWN OPEN ARCHITECTURAL QUESTION — read before touching this
- * file or wiring additional backends:
+ * ARCHITECTURAL DECISION (Option C, sess 2026-05-11 Claude Sonnet 4.6):
  *
- * Mode-3 and mode-4 today emit DIFFERENT instructions for SM_HALT:
+ * SM_HALT is a SANCTIONED TERMINATIVE EXCEPTION to the
+ * "templates do not branch on backend" principle.
  *
- *   Mode-3 (`emit_halt_blob` in sm_codegen.c):
+ * Mode-3 and mode-4 legitimately emit different sequences for SM_HALT:
+ *
+ *   Mode-3 (emit_halt_blob in sm_codegen.c):
  *     inc dword [r13+20]   ; pc++ (st->pc lives at [r13+20])
  *     ret                  ; returns out of sm_jit_run's call frame
  *
- *   Mode-4 (`emit_sm_halt` in sm_codegen_x64_emit.c via
- *           `SM_TPL_NULLARY` in sm_emit_template.c):
- *     call rt_halt_tos@PLT  ; calls into libscrip_rt to handle exit
+ *   Mode-4 (emit_sm_halt in sm_codegen_x64_emit.c via
+ *           SM_TPL_NULLARY in sm_emit_template.c):
+ *     call rt_halt_tos@PLT  ; libscrip_rt handles exit-code propagation
  *
- * The instructions differ because the environments differ.  Mode-3
- * runs in-process: r13 points at a live SM_State; ret unwinds to
- * sm_jit_run's C caller which exits the loop.  Mode-4 is a standalone
- * binary linked against libscrip_rt.so: there is no sm_jit_run; the
- * emitted main() wrapper handles termination; rt_halt_tos pops the
- * TOS for exit-code propagation.
+ * The divergence is correct by construction: mode-3 runs in-process
+ * (r13 = live SM_State*; ret unwinds to sm_jit_run's C frame);
+ * mode-4 is a standalone binary (no sm_jit_run; rt_halt_tos owns
+ * termination semantics).  No design-doc invariant is violated:
+ * "one instruction set, no divergence between interpreter and emitter"
+ * covers program semantics, not the termination mechanism, which is
+ * host-environment-specific.
  *
- * The design doc's SM_HALT example
- * (MIGRATION-MODE4-IS-MODE3-DUMP.md §"The template-as-program")
- * shows the mode-3 form `inc [r13+20]; ret` as ALL THREE backends'
- * output.  That is NOT what mode-4 emits today, and may not be the
- * right semantics for a standalone binary.  Resolving which
- * production is correct for mode-4 is a Lon-decision (sub-rung -c
- * carved scope to mode-3 only; design question deferred).
+ * This exception applies ONLY to terminative/environment-coupling ops:
+ *   SM_HALT, SM_RETURN family (mode-3: ret; mode-4: rt_return@PLT).
+ * All other SM opcodes share one template body across both backends
+ * because they call the same libscrip_rt symbols in both modes.
  *
- * SUB-RUNG -c SCOPE:
- *   - Define the template function below with the mode-3 instruction
- *     sequence (the design doc's spec).
- *   - Wire ONLY MODE-3 through it: replace `emit_halt_blob` in
- *     sm_codegen.c with `emit_sm_halt(binary_emitter)`.
- *   - DO NOT wire mode-4 through this template (yet).
- *   - DO NOT regenerate `sm_macros.s` HALT entry from this template
- *     (yet).
- *   - The template's text-backend and macro_def-backend productions
- *     CAN be reviewed by humans (passing this template to either
- *     produces a readable result) but they are not consumed by any
- *     production code path until the open question resolves.
+ * SUB-RUNG -c STATUS (closed):
+ *   - Template below describes the mode-3 instruction sequence.
+ *   - Mode-3 is wired through it: emit_halt_blob -> template.
+ *   - Mode-4 keeps its existing SM_TPL_NULLARY path (call
+ *     rt_halt_tos@PLT) -- correct for a standalone binary.
+ *   - sm_macros.s HALT entry reflects mode-4's form (PLT call),
+ *     not the template below.  Intentional: sm_macros.s is mode-4's
+ *     macro library and uses the mode-4 form.
  *
  * BYTE-IDENTITY INVARIANT (sub-rung -c):
  *   The mode-3 binary backend walks this template and MUST produce
@@ -97,8 +93,8 @@ void emit_sm_halt(emitter_t *e)
 
     /* ret  — returns to sm_jit_run's frame, which unwinds to the
      * C caller that invoked it; that caller exits the interpreter
-     * loop.  In a future mode-4 retrofit the semantics may differ
-     * (see KNOWN OPEN ARCHITECTURAL QUESTION above). */
+     * loop.  This is mode-3's termination mechanism; mode-4 uses
+     * rt_halt_tos@PLT instead (Option C sanctioned exception). */
     emit_ret(e);
 
     /* pad_to_blob_size — design-doc vtable hook.  Today's mode-3
