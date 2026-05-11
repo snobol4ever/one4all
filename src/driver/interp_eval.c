@@ -786,6 +786,102 @@ int icn_try_call_builtin_by_name(const char *fn, DESCR_t *args, int nargs, DESCR
      * args to stderr; that fidelity gap is pre-existing and tracked
      * separately). */
     if (!strcmp(fn,"stop")) { exit(0); }
+
+    /* CH-17g-scan: Icon string-scanning context helpers.
+     * ICN_SCAN_PUSH(subj): save &subject/&pos, set scan_subj=subj, scan_pos=1.
+     * ICN_SCAN_POP(body_result): restore scan_subj/scan_pos, pass body_result through. */
+    extern const char *scan_subj;
+    extern int         scan_pos;
+    extern int         scan_depth;
+    extern ScanEntry   scan_stack[];
+    if (!strcmp(fn,"ICN_SCAN_PUSH") && nargs == 1) {
+        const char *s = VARVAL_fn(args[0]); if (!s) s = "";
+        if (scan_depth < SCAN_STACK_MAX) {
+            scan_stack[scan_depth].subj = scan_subj;
+            scan_stack[scan_depth].pos  = scan_pos;
+            scan_depth++;
+        }
+        scan_subj = GC_strdup(s); scan_pos = 1;
+        *out = args[0]; return 1;
+    }
+    if (!strcmp(fn,"ICN_SCAN_POP") && nargs == 1) {
+        if (scan_depth > 0) {
+            scan_depth--;
+            scan_subj = scan_stack[scan_depth].subj;
+            scan_pos  = scan_stack[scan_depth].pos;
+        }
+        *out = args[0]; return 1;
+    }
+
+    /* Icon string-scanning builtins — operate on scan_subj / scan_pos globals.
+     * All require scan_pos > 0 (i.e. active scanning context). */
+    if (!strcmp(fn,"any") && nargs >= 1 && scan_pos > 0) {
+        const char *cv = VARVAL_fn(args[0]); if (!cv) { *out = FAILDESCR; return 1; }
+        if (!scan_subj) { *out = FAILDESCR; return 1; }
+        int slen = (int)strlen(scan_subj), p0 = scan_pos - 1;
+        if (p0 < 0 || p0 >= slen || !strchr(cv, scan_subj[p0])) { *out = FAILDESCR; return 1; }
+        scan_pos++; *out = INTVAL(scan_pos); return 1;
+    }
+    if (!strcmp(fn,"many") && nargs >= 1 && scan_pos > 0) {
+        const char *cv = VARVAL_fn(args[0]); if (!cv) { *out = FAILDESCR; return 1; }
+        if (!scan_subj) { *out = FAILDESCR; return 1; }
+        int slen = (int)strlen(scan_subj), p0 = scan_pos - 1;
+        if (p0 < 0 || p0 >= slen || !strchr(cv, scan_subj[p0])) { *out = FAILDESCR; return 1; }
+        while (p0 < slen && strchr(cv, scan_subj[p0])) p0++;
+        scan_pos = p0 + 1; *out = INTVAL(scan_pos); return 1;
+    }
+    if (!strcmp(fn,"upto") && nargs >= 1 && scan_pos > 0) {
+        const char *cv = VARVAL_fn(args[0]); if (!cv) { *out = FAILDESCR; return 1; }
+        if (!scan_subj) { *out = FAILDESCR; return 1; }
+        int slen = (int)strlen(scan_subj), p0 = scan_pos - 1;
+        while (p0 < slen && !strchr(cv, scan_subj[p0])) p0++;
+        if (p0 >= slen) { *out = FAILDESCR; return 1; }
+        scan_pos = p0 + 1; *out = INTVAL(scan_pos); return 1;
+    }
+    if (!strcmp(fn,"tab") && nargs == 1 && scan_pos > 0) {
+        if (!scan_subj) { *out = FAILDESCR; return 1; }
+        int slen = (int)strlen(scan_subj);
+        int target = (int)to_int(args[0]);
+        if (target <= 0) target = slen + 1 + target;   /* negative: from right */
+        if (target < 1 || target > slen + 1) { *out = FAILDESCR; return 1; }
+        int old = scan_pos; scan_pos = target;
+        int lo = old < target ? old : target, hi = old < target ? target : old;
+        int len = hi - lo;
+        char *buf = GC_malloc(len + 1);
+        memcpy(buf, scan_subj + lo - 1, len); buf[len] = '\0';
+        *out = STRVAL(buf); return 1;
+    }
+    if (!strcmp(fn,"move") && nargs == 1 && scan_pos > 0) {
+        if (!scan_subj) { *out = FAILDESCR; return 1; }
+        int slen = (int)strlen(scan_subj);
+        int n = (int)to_int(args[0]);
+        int target = scan_pos + n;
+        if (target < 1 || target > slen + 1) { *out = FAILDESCR; return 1; }
+        int old = scan_pos; scan_pos = target;
+        int lo = old < target ? old : target, hi = old < target ? target : old;
+        int len = hi - lo;
+        char *buf = GC_malloc(len + 1);
+        memcpy(buf, scan_subj + lo - 1, len); buf[len] = '\0';
+        *out = STRVAL(buf); return 1;
+    }
+    if (!strcmp(fn,"match") && nargs >= 1 && scan_pos > 0) {
+        const char *pat = VARVAL_fn(args[0]); if (!pat) { *out = FAILDESCR; return 1; }
+        if (!scan_subj) { *out = FAILDESCR; return 1; }
+        int plen = (int)strlen(pat), p0 = scan_pos - 1;
+        int slen = (int)strlen(scan_subj);
+        if (p0 + plen > slen || strncmp(scan_subj + p0, pat, plen) != 0) { *out = FAILDESCR; return 1; }
+        scan_pos += plen; *out = INTVAL(scan_pos); return 1;
+    }
+    if (!strcmp(fn,"find") && nargs >= 2 && scan_pos > 0) {
+        const char *needle = VARVAL_fn(args[0]); if (!needle) { *out = FAILDESCR; return 1; }
+        const char *hay    = VARVAL_fn(args[1]); if (!hay) hay = scan_subj ? scan_subj : "";
+        int nlen = (int)strlen(needle), hlen = (int)strlen(hay);
+        int start = scan_pos - 1;
+        for (int i = start; i + nlen <= hlen; i++) {
+            if (strncmp(hay + i, needle, nlen) == 0) { *out = INTVAL(i + 1); return 1; }
+        }
+        *out = FAILDESCR; return 1;
+    }
     return 0;
 }
 

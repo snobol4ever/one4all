@@ -607,6 +607,11 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
     case AST_QLIT:
         sm_emit_s(p, SM_PUSH_LIT_S, e->sval ? e->sval : "");
         return;
+    case AST_CSET:
+        /* Icon cset literal: push the cset chars as a string descriptor.
+         * any(), many(), upto() etc. accept either DT_S or DT_P — string is sufficient. */
+        sm_emit_s(p, SM_PUSH_LIT_S, e->sval ? e->sval : "");
+        return;
     case AST_ILIT:
         sm_emit_i(p, SM_PUSH_LIT_I, (int64_t)e->ival);
         return;
@@ -915,11 +920,21 @@ static void lower_expr(SM_Program *p, LabelTable *lt, const AST_t *e)
 
     /* ── Scan E ? E ── */
     case AST_SCAN:
-        lower_pat_expr(p, lt, e->nchildren > 1 ? e->children[1] : NULL);
-        lower_expr(p, lt, e->nchildren > 0 ? e->children[0] : NULL);
-        sm_emit_i(p, SM_PUSH_LIT_I, 0);   /* no replacement */
-        sm_emit(p, SM_EXEC_STMT);
-        sm_emit(p, SM_PUSH_NULL_NOFLIP);   /* balance value stack; preserve last_ok from scan */
+        /* Icon `subject ? body` — set &subject/&pos, eval body as expression, restore.
+         * SM lowering:
+         *   [lower subject]
+         *   SM_CALL_FN "ICN_SCAN_PUSH" 1   ; save scan context, set scan_subj/pos from TOS
+         *   [lower body as expression]
+         *   SM_CALL_FN "ICN_SCAN_POP"  1   ; restore scan context, leave body result on stack
+         * ICN_SCAN_PUSH/POP are handled in icn_try_call_builtin_by_name.
+         * Falls back to SNOBOL4 PAT path for non-Icon (frame_depth==0) context. */
+        if (e->nchildren < 1) { sm_emit(p, SM_PUSH_NULL); return; }
+        lower_expr(p, lt, e->children[0]);                  /* subject string */
+        sm_emit_si(p, SM_CALL_FN, "ICN_SCAN_PUSH", 1);     /* sets scan context */
+        sm_emit(p, SM_VOID_POP);                             /* discard PUSH return value */
+        if (e->nchildren > 1) lower_expr(p, lt, e->children[1]);
+        else                  sm_emit(p, SM_PUSH_NULL);
+        sm_emit_si(p, SM_CALL_FN, "ICN_SCAN_POP", 1);      /* restores context */
         return;
 
     /* ── OPSYN operator & / @ / | — dispatch via APPLY_fn(sval, args, n) ── */
