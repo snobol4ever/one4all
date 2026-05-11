@@ -176,6 +176,33 @@ static void binary_pad_to_blob_size(emitter_t *e)
     (void)e;
 }
 
+static void binary_data_long(emitter_t *e, int32_t val)
+{
+    (void)e;
+    /* Write 4 bytes little-endian into the current bb_pool buffer. */
+    uint32_t u = (uint32_t)val;
+    bb_emit_byte((uint8_t)(u));
+    bb_emit_byte((uint8_t)(u >> 8));
+    bb_emit_byte((uint8_t)(u >> 16));
+    bb_emit_byte((uint8_t)(u >> 24));
+}
+
+static void binary_bb_zeta_rdi(emitter_t *e, uint64_t ptr, const char *sym)
+{
+    /* BINARY: bake in-process pointer directly — mov rdi, imm64(ptr). */
+    (void)sym;
+    emit_mov_rdi_imm64(e, ptr);
+}
+
+static void binary_bb_dispatch_jne_jmp(emitter_t *e,
+                                       bb_label_t *lbl_succ, bb_label_t *lbl_fail)
+{
+    /* BINARY: test rax,rax; jne succ; jmp fail — 3 separate instructions. */
+    emit_test_rax_rax(e);
+    EV_JMP(e, lbl_succ, JMP_JNE);
+    EV_JMP(e, lbl_fail, JMP_JMP);
+}
+
 static void binary_bb_port_label(emitter_t *e, const char *bp, char p) { (void)e;(void)bp;(void)p; }
 static void binary_bb_port_jmp  (emitter_t *e, const char *bp, char p) { (void)e;(void)bp;(void)p; }
 static void binary_bb_box_banner(emitter_t *e, const char *k, const char *a) { (void)e;(void)k;(void)a; }
@@ -207,8 +234,11 @@ static const emitter_t binary_tmpl = {
     .directive        = binary_directive,
     .data_quad        = binary_data_quad,
     .data_quad_sym    = binary_data_quad_sym,
-    .data_string      = binary_data_string,
-    .pad_to_blob_size = binary_pad_to_blob_size,
+    .data_string          = binary_data_string,
+    .data_long            = binary_data_long,
+    .bb_zeta_rdi          = binary_bb_zeta_rdi,
+    .bb_dispatch_jne_jmp  = binary_bb_dispatch_jne_jmp,
+    .pad_to_blob_size     = binary_pad_to_blob_size,
     .bb_port_label    = binary_bb_port_label,
     .bb_port_jmp      = binary_bb_port_jmp,
     .bb_box_banner    = binary_bb_box_banner,

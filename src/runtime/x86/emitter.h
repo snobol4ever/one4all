@@ -236,6 +236,25 @@ struct emitter_t {
      *   BINARY: writes the raw bytes at current position. */
     void (*data_string)    (emitter_t *e, const char *bytes, size_t len);
 
+    /* data_long — emit a 32-bit integer word in the current section.
+     *   TEXT:   emits ".long <val>\n".
+     *   BINARY: writes 4 bytes (little-endian) at current position. */
+    void (*data_long)      (emitter_t *e, int32_t val);
+
+    /* bb_zeta_rdi — load the address of a per-box zeta struct into rdi.
+     *   BINARY: emit_mov_rdi_imm64(e, ptr) — bake the in-process ptr.
+     *   TEXT:   emit lea rdi, [rip + sym] — RIP-relative static ref.
+     * Use instead of emit_mov_rdi_imm64 in templates that manage a zeta
+     * in both binary (heap alloc) and text (.data section) modes. */
+    void (*bb_zeta_rdi)    (emitter_t *e, uint64_t ptr, const char *sym);
+
+    /* bb_dispatch_jne_jmp — after a box runtime call whose return value
+     * is in rax (non-zero = success), emit the success/fail dispatch.
+     *   BINARY: emit_test_rax_rax + JNE lbl_succ + JMP lbl_fail (3 insns).
+     *   TEXT:   emit fused three-column "test rax,rax; jne x; jmp y" line. */
+    void (*bb_dispatch_jne_jmp)(emitter_t *e,
+                                bb_label_t *lbl_succ, bb_label_t *lbl_fail);
+
     /* pad_to_blob_size — pad current emission to the canonical blob size.
      *   TEXT:   no-op (text size has no fixed-blob constraint).
      *   BINARY: writes 0x90 (NOP) bytes until alignment is reached. */

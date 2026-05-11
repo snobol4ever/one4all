@@ -236,6 +236,36 @@ static void text_data_string(emitter_t *e, const char *bytes, size_t len)
     fputs("\"\n", f);
 }
 
+static void text_data_long(emitter_t *e, int32_t val)
+{
+    char buf[24]; snprintf(buf, sizeof(buf), "%d", (int)val);
+    bb3c_format(outf(e), "", ".long", buf);
+}
+
+static void text_bb_zeta_rdi(emitter_t *e, uint64_t ptr, const char *sym)
+{
+    /* TEXT: lea rdi, [rip + sym] — RIP-relative reference to static .data zeta. */
+    (void)ptr;
+    char arg[128];
+    snprintf(arg, sizeof(arg), "rdi, [rip + %s]", sym ? sym : "0");
+    bb3c_format(outf(e), "", "lea", arg);
+}
+
+static void text_bb_dispatch_jne_jmp(emitter_t *e,
+                                     bb_label_t *lbl_succ, bb_label_t *lbl_fail)
+{
+    /* TEXT: fused three-column "test rax,rax; jne x; jmp y". */
+    char buf[256];
+    int o = 0;
+    o += snprintf(buf + o, sizeof(buf) - o, "rax, rax;");
+    while (o < 27 && o < (int)sizeof(buf) - 1) buf[o++] = ' ';
+    buf[o] = '\0';
+    snprintf(buf + o, sizeof(buf) - o, "jne %s; jmp %s",
+             lbl_succ ? lbl_succ->name : "?",
+             lbl_fail ? lbl_fail->name : "?");
+    bb3c_format(outf(e), "", "test", buf);
+}
+
 static void text_pad_to_blob_size(emitter_t *e)
 {
     /* TEXT: no-op (text size is not byte-counted by GAS in any way that
@@ -396,8 +426,11 @@ static const emitter_t text_tmpl = {
     .directive        = text_directive,
     .data_quad        = text_data_quad,
     .data_quad_sym    = text_data_quad_sym,
-    .data_string      = text_data_string,
-    .pad_to_blob_size = text_pad_to_blob_size,
+    .data_string          = text_data_string,
+    .data_long            = text_data_long,
+    .bb_zeta_rdi          = text_bb_zeta_rdi,
+    .bb_dispatch_jne_jmp  = text_bb_dispatch_jne_jmp,
+    .pad_to_blob_size     = text_pad_to_blob_size,
     .bb_port_label    = text_bb_port_label,
     .bb_port_jmp      = text_bb_port_jmp,
     .bb_box_banner    = text_bb_box_banner,
