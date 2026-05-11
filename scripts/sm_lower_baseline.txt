@@ -21,7 +21,7 @@ efb8038ef8f959743c6e5c7a8ab86bf3  rk_arith_prec
 c2c481d2ba64d9d495834e3c31fc78d2  rk_arr_get
 a249f52a3d8622fdaa07e68ff1ddaf9e  rk_for_range
 26d5ebe53d96e6806725d4f337e29973  rk_str_chars
-7174f4e126ac4a5a6d50e1b9d542086b  rk_logic_or
+c5952c3e4d49cb98ec63b1f89ab31f14  rk_logic_or
 d8e0bd152e7bdbcf8eed0ed811828200  sc_literals
 71d894fd9870c4994512e0e1d7d6b928  sc_assign
 98b2e63e49b9bc7e9d495e1855e61733  sc_control

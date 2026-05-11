@@ -117,6 +117,19 @@ void expression_scope_walk(IcnScope *sc, AST_t *e);
 /* Emit a SM_JUMP/SM_JUMP_S/SM_JUMP_F for a named SNOBOL4 goto target. */
 int emit_goto(LowerCtx *c, sm_opcode_t op, const char *target);
 
+/* ── SR-4: handler table (cohort dispatch) ──────────────────────────────
+ *
+ * LowerHandler is the uniform signature for every per-kind handler.
+ * g_handlers[] is indexed by AST_e; NULL entries fall through to the
+ * legacy switch in lower_expr (hybrid dispatcher, SR-4 through SR-11).
+ * Once all cohorts are registered (SR-11) the legacy switch is deleted.
+ */
+typedef void (*LowerHandler)(LowerCtx *c, const AST_t *e);
+
+/* Each cohort file exports one registration function that fills its
+ * slice of the handler table. */
+void cohort_literal_register(LowerHandler tbl[AST_KIND_COUNT]);
+
 #include "../common/ast_clone.h"   /* ast_gc_clone — used by emit_push_expr */
 
 static inline void emit_push_expr(LowerCtx *c, const AST_t *e)

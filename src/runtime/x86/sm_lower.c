@@ -38,6 +38,18 @@
 
 /* SR-3: expression_scope_walk, emit_goto, kw_canonicalize moved to lower_ctx.c */
 
+/* ── SR-4: handler table (hybrid dispatcher) ────────────────────────────
+ * Indexed by AST_e.  NULL → fall through to legacy switch in lower_expr.
+ * Populated once at first call to lower_expr via init_handlers(). */
+static LowerHandler g_handlers[AST_KIND_COUNT];
+static int          g_handlers_initialized = 0;
+
+static void init_handlers(void)
+{
+    cohort_literal_register(g_handlers);
+    g_handlers_initialized = 1;
+}
+
 /* ── Expression lowering ────────────────────────────────────────────────── */
 
 static void lower_expr(LowerCtx *c, const AST_t *e);
@@ -290,29 +302,23 @@ static void lower_expr(LowerCtx *c, const AST_t *e)
         return;
     }
 
+    /* SR-4: handler table first; NULL → legacy switch below. */
+    if (!g_handlers_initialized) init_handlers();
+    if (e->kind >= 0 && e->kind < AST_KIND_COUNT && g_handlers[e->kind]) {
+        g_handlers[e->kind](c, e);
+        return;
+    }
+
     switch (e->kind) {
 
     /* ── Literals ── */
-    case AST_QLIT:
-        sm_emit_s(p, SM_PUSH_LIT_S, e->sval ? e->sval : "");
-        return;
-    case AST_CSET:
-        sm_emit_s(p, SM_PUSH_LIT_S, e->sval ? e->sval : "");
-        return;
-    case AST_ILIT:
-        sm_emit_i(p, SM_PUSH_LIT_I, (int64_t)e->ival);
-        return;
-    case AST_FLIT:
-        sm_emit_f(p, SM_PUSH_LIT_F, e->dval);
-        return;
+    /* AST_QLIT, AST_CSET, AST_ILIT, AST_FLIT, AST_NUL → cohort_literal */
     case AST_NULL:
         /* /E — Icon null test: succeed (yielding &null) iff E is null, else fail. */
         lower_expr(c, e->nchildren > 0 ? e->children[0] : NULL);
         sm_emit_si(p, SM_CALL_FN, "ICN_NULL", 1);
         return;
-    case AST_NUL:
-        sm_emit(p, SM_PUSH_NULL);
-        return;
+    /* AST_NUL → cohort_literal */
 
     /* ── References ── */
     case AST_VAR: {
