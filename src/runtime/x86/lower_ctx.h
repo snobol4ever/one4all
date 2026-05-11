@@ -93,6 +93,19 @@ typedef struct {
  * can use it without a translation-unit dependency on sm_lower.c.
  */
 
+/* ── LabelTable API (implementation in lower_ctx.c) ─────────────────────
+ *
+ * SR-2: these functions moved from sm_lower.c to lower_ctx.c and migrated
+ * to GC allocation.  labtab_free() is a no-op shim; the GC reclaims
+ * storage automatically.
+ */
+void labtab_init       (LabelTable *labtab);
+void labtab_free       (LabelTable *labtab);   /* no-op; GC handles it */
+void labtab_define     (LabelTable *labtab, const char *name, int instr_idx);
+int  labtab_find       (const LabelTable *labtab, const char *name);
+void labtab_patch_later(LabelTable *labtab, int jump_instr_idx, const char *name);
+int  labtab_resolve    (LabelTable *labtab, SM_Program *p);
+
 #include "../common/ast_clone.h"   /* ast_gc_clone — used by emit_push_expr */
 
 static inline void emit_push_expr(LowerCtx *c, const AST_t *e)
